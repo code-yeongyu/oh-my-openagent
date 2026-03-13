@@ -13,6 +13,8 @@ import { applyAgentConfig } from "./agent-config-handler"
 import type { PluginComponents } from "./plugin-components-loader"
 
 const BUILTIN_SISYPHUS_DISPLAY_NAME = getAgentDisplayName("sisyphus")
+const BUILTIN_SISYPHUS_JUNIOR_DISPLAY_NAME = getAgentDisplayName("sisyphus-junior")
+const BUILTIN_MULTIMODAL_LOOKER_DISPLAY_NAME = getAgentDisplayName("multimodal-looker")
 
 function createPluginComponents(): PluginComponents {
   return {
@@ -66,6 +68,12 @@ describe("applyAgentConfig builtin override protection", () => {
     mode: "subagent",
   }
 
+  const builtinMultimodalLookerConfig: AgentConfig = {
+    name: "multimodal-looker",
+    prompt: "multimodal prompt",
+    mode: "subagent",
+  }
+
   const sisyphusJuniorConfig: AgentConfig = {
     name: "Sisyphus-Junior",
     prompt: "junior prompt",
@@ -76,6 +84,7 @@ describe("applyAgentConfig builtin override protection", () => {
     createBuiltinAgentsSpy = spyOn(agents, "createBuiltinAgents").mockResolvedValue({
       sisyphus: builtinSisyphusConfig,
       oracle: builtinOracleConfig,
+      "multimodal-looker": builtinMultimodalLookerConfig,
     })
 
     createSisyphusJuniorAgentSpy = spyOn(
@@ -193,5 +202,57 @@ describe("applyAgentConfig builtin override protection", () => {
 
     // then
     expect(result[BUILTIN_SISYPHUS_DISPLAY_NAME]).toEqual(builtinSisyphusConfig)
+  })
+
+  describe("#given protected builtin agents use hyphenated names", () => {
+    describe("#when a user agent uses the underscored multimodal looker alias", () => {
+      test("filters the override", async () => {
+        // given
+        loadUserAgentsSpy.mockReturnValue({
+          multimodal_looker: {
+            name: "multimodal_looker",
+            prompt: "user multimodal alias prompt",
+            mode: "subagent",
+          },
+        })
+
+        // when
+        const result = await applyAgentConfig({
+          config: createBaseConfig(),
+          pluginConfig: createPluginConfig(),
+          ctx: { directory: "/tmp" },
+          pluginComponents: createPluginComponents(),
+        })
+
+        // then
+        expect(result[BUILTIN_MULTIMODAL_LOOKER_DISPLAY_NAME]).toEqual(builtinMultimodalLookerConfig)
+        expect(result.multimodal_looker).toBeUndefined()
+      })
+    })
+
+    describe("#when a user agent uses the underscored sisyphus junior alias", () => {
+      test("filters the override", async () => {
+        // given
+        loadUserAgentsSpy.mockReturnValue({
+          sisyphus_junior: {
+            name: "sisyphus_junior",
+            prompt: "user junior alias prompt",
+            mode: "subagent",
+          },
+        })
+
+        // when
+        const result = await applyAgentConfig({
+          config: createBaseConfig(),
+          pluginConfig: createPluginConfig(),
+          ctx: { directory: "/tmp" },
+          pluginComponents: createPluginComponents(),
+        })
+
+        // then
+        expect(result[BUILTIN_SISYPHUS_JUNIOR_DISPLAY_NAME]).toEqual(sisyphusJuniorConfig)
+        expect(result.sisyphus_junior).toBeUndefined()
+      })
+    })
   })
 })

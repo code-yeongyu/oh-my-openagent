@@ -67,6 +67,7 @@ function extractPermissionPhrase(text: string): string | null {
 
 function resetAutoContinuationState(state: SessionState): void {
   state.consecutiveAutoContinueCount = 0
+  state.awaitingAutoContinuationResponse = false
   state.lastAutoContinuePermissionPhrase = undefined
 }
 
@@ -117,8 +118,17 @@ export function createGptPermissionContinuationHandler(args: {
 
       const lastAssistantIndex = messages.lastIndexOf(lastAssistantMessage)
       const previousUserMessage = getLastUserMessageBefore(messages, lastAssistantIndex)
-      if (previousUserMessage && !isAutoContinuationUserMessage(previousUserMessage)) {
+      const previousUserMessageWasAutoContinuation =
+        previousUserMessage !== null
+        && state.awaitingAutoContinuationResponse
+        && isAutoContinuationUserMessage(previousUserMessage)
+
+      if (previousUserMessageWasAutoContinuation) {
+        state.awaitingAutoContinuationResponse = false
+      } else if (previousUserMessage) {
         resetAutoContinuationState(state)
+      } else {
+        state.awaitingAutoContinuationResponse = false
       }
 
       const messageID = lastAssistantMessage.info?.id
@@ -174,6 +184,7 @@ export function createGptPermissionContinuationHandler(args: {
       await promptContinuation(ctx, sessionID)
       state.lastHandledMessageID = messageID
       state.consecutiveAutoContinueCount += 1
+      state.awaitingAutoContinuationResponse = true
       state.lastAutoContinuePermissionPhrase = permissionPhrase
       state.lastInjectedAt = Date.now()
       log(`[${HOOK_NAME}] Injected continuation prompt`, { sessionID, messageID })

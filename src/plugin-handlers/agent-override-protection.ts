@@ -1,7 +1,12 @@
 const PARENTHETICAL_SUFFIX_PATTERN = /\s*(\([^)]*\)\s*)+$/u
 
 export function normalizeProtectedAgentName(agentName: string): string {
-  return agentName.trim().toLowerCase().replace(PARENTHETICAL_SUFFIX_PATTERN, "").trim()
+  return agentName
+    .trim()
+    .toLowerCase()
+    .replace(PARENTHETICAL_SUFFIX_PATTERN, "")
+    .replace(/[-_]/g, "")
+    .trim()
 }
 
 export function createProtectedAgentNameSet(agentNames: Iterable<string>): Set<string> {

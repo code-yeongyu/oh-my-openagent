@@ -1,6 +1,7 @@
 type SessionState = {
   inFlight: boolean
   consecutiveAutoContinueCount: number
+  awaitingAutoContinuationResponse: boolean
   lastHandledMessageID?: string
   lastAutoContinuePermissionPhrase?: string
   lastInjectedAt?: number
@@ -18,6 +19,7 @@ export function createSessionStateStore() {
     const created: SessionState = {
       inFlight: false,
       consecutiveAutoContinueCount: 0,
+      awaitingAutoContinuationResponse: false,
     }
     states.set(sessionID, created)
     return created

@@ -1,5 +1,6 @@
 /// <reference path="../../../bun-test.d.ts" />
 
+import { createOpencodeClient } from "@opencode-ai/sdk"
 import { describe, expect, it as test } from "bun:test"
 
 import { createGptPermissionContinuationHook } from "."
@@ -17,25 +18,79 @@ type SessionMessage = {
   parts?: Array<{ type: string; text?: string }>
 }
 
-function createMockPluginInput(messages: SessionMessage[]) {
-  const promptCalls: string[] = []
+type GptPermissionContext = Parameters<typeof createGptPermissionContinuationHook>[0]
 
-  const ctx = {
-    directory: "/tmp/test",
-    client: {
-      session: {
-        messages: async () => ({ data: messages }),
-        prompt: async (input: { body: { parts: Array<{ text: string }> } }) => {
-          promptCalls.push(input.body.parts[0]?.text ?? "")
-          return {}
-        },
-        promptAsync: async (input: { body: { parts: Array<{ text: string }> } }) => {
-          promptCalls.push(input.body.parts[0]?.text ?? "")
-          return {}
-        },
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null
+}
+
+function extractPromptText(input: unknown): string {
+  if (!isRecord(input)) return ""
+
+  const body = input.body
+  if (!isRecord(body)) return ""
+
+  const parts = body.parts
+  if (!Array.isArray(parts)) return ""
+
+  const firstPart = parts[0]
+  if (!isRecord(firstPart)) return ""
+
+  return typeof firstPart.text === "string" ? firstPart.text : ""
+}
+
+function createMockPluginInput(messages: SessionMessage[]): {
+  ctx: GptPermissionContext
+  promptCalls: string[]
+} {
+  const promptCalls: string[] = []
+  const client = createOpencodeClient({ directory: "/tmp/test" })
+  const shell = Object.assign(
+    () => {
+      throw new Error("$ is not used in this test")
+    },
+    {
+      braces: () => [],
+      escape: (input: string) => input,
+      env() {
+        return shell
+      },
+      cwd() {
+        return shell
+      },
+      nothrow() {
+        return shell
+      },
+      throws() {
+        return shell
       },
     },
-  } as any
+  )
+  const request = new Request("http://localhost")
+  const response = new Response()
+
+  Reflect.set(client.session, "messages", async () => ({ data: messages, error: undefined, request, response }))
+  Reflect.set(client.session, "prompt", async (input: unknown) => {
+    promptCalls.push(extractPromptText(input))
+    return { data: undefined, error: undefined, request, response }
+  })
+  Reflect.set(client.session, "promptAsync", async (input: unknown) => {
+    promptCalls.push(extractPromptText(input))
+    return { data: undefined, error: undefined, request, response }
+  })
+
+  const ctx: GptPermissionContext = {
+    client,
+    project: {
+      id: "test-project",
+      worktree: "/tmp/test",
+      time: { created: Date.now() },
+    },
+    directory: "/tmp/test",
+    worktree: "/tmp/test",
+    serverUrl: new URL("http://localhost"),
+    $: shell,
+  }
 
   return { ctx, promptCalls }
 }
@@ -243,6 +298,36 @@ describe("gpt-permission-continuation", () => {
 
         // then
         expect(promptCalls).toEqual(["continue"])
+      })
+    })
+
+    describe("#when a user manually types continue after the cap is reached", () => {
+      test("resets the cap and allows another auto-continue", async () => {
+        // given
+        const messages: SessionMessage[] = [
+          createUserMessage("msg-0", "Please continue the fix."),
+          createAssistantMessage("msg-1", "If you want, I can apply the patch next."),
+        ]
+        const { ctx, promptCalls } = createMockPluginInput(messages)
+        const hook = createGptPermissionContinuationHook(ctx)
+
+        // when
+        await hook.handler({ event: { type: "session.idle", properties: { sessionID: "ses-1" } } })
+        messages.push(createUserMessage("msg-2", "continue"))
+        messages.push(createAssistantMessage("msg-3", "Would you like me to continue with the tests?"))
+        await hook.handler({ event: { type: "session.idle", properties: { sessionID: "ses-1" } } })
+        messages.push(createUserMessage("msg-4", "continue"))
+        messages.push(createAssistantMessage("msg-5", "Do you want me to wire the remaining cleanup?"))
+        await hook.handler({ event: { type: "session.idle", properties: { sessionID: "ses-1" } } })
+        messages.push(createUserMessage("msg-6", "continue"))
+        messages.push(createAssistantMessage("msg-7", "Shall I finish the remaining updates?"))
+        await hook.handler({ event: { type: "session.idle", properties: { sessionID: "ses-1" } } })
+        messages.push(createUserMessage("msg-8", "continue"))
+        messages.push(createAssistantMessage("msg-9", "If you want, I can apply the final polish."))
+        await hook.handler({ event: { type: "session.idle", properties: { sessionID: "ses-1" } } })
+
+        // then
+        expect(promptCalls).toEqual(["continue", "continue", "continue", "continue"])
       })
     })
   })
