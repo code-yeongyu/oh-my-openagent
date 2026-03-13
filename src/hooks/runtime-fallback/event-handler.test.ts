@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test"
+import { describe, expect, it, beforeEach } from "bun:test"
 import type { HookDeps, RuntimeFallbackPluginInput } from "./types"
 import type { AutoRetryHelpers } from "./auto-retry"
 import { createFallbackState } from "./fallback-state"
