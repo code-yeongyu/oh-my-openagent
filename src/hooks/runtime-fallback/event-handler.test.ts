@@ -58,7 +58,65 @@ function createHelpers(deps: HookDeps, abortCalls: string[], clearCalls: string[
   }
 }
 
+import { clearBlacklist, isProviderBlacklisted } from "../../shared/global-blacklist"
+
 describe("createEventHandler", () => {
+  beforeEach(() => {
+    clearBlacklist()
+  })
+
+  it("#given a rate limit error (429) #when session.error fires #then provider is blacklisted", async () => {
+    // given
+    const sessionID = "session-rate-limit"
+    const deps = createDeps()
+    const abortCalls: string[] = []
+    const clearCalls: string[] = []
+    const state = createFallbackState("anthropic/claude-opus-4-6")
+    deps.sessionStates.set(sessionID, state)
+    deps.sessionLastAccess.set(sessionID, Date.now())
+    const handler = createEventHandler(deps, createHelpers(deps, abortCalls, clearCalls))
+
+    // when - simulate a 429 rate limit error
+    await handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          error: { name: "APIError", data: { statusCode: 429, message: "Rate limit exceeded" } },
+        },
+      },
+    })
+
+    // then - provider should be blacklisted
+    expect(isProviderBlacklisted("anthropic")).toBe(true)
+  })
+
+  it("#given a model not found error #when session.error fires #then provider is NOT blacklisted", async () => {
+    // given
+    const sessionID = "session-model-not-found"
+    const deps = createDeps()
+    const abortCalls: string[] = []
+    const clearCalls: string[] = []
+    const state = createFallbackState("bailian-coding-plan/kimi-k2.5")
+    deps.sessionStates.set(sessionID, state)
+    deps.sessionLastAccess.set(sessionID, Date.now())
+    const handler = createEventHandler(deps, createHelpers(deps, abortCalls, clearCalls))
+
+    // when - simulate a model not found error (not 429)
+    await handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          error: { name: "UnknownError", data: { message: "Model not found: bailian-coding-plan/kimi-k2.5" } },
+        },
+      },
+    })
+
+    // then - provider should NOT be blacklisted (only rate limits trigger blacklist)
+    expect(isProviderBlacklisted("bailian-coding-plan")).toBe(false)
+  })
+
   it("#given a session retry dedupe key #when session.stop fires #then the retry dedupe key is cleared", async () => {
     // given
     const sessionID = "session-stop"
