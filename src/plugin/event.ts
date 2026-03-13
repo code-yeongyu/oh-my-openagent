@@ -6,6 +6,7 @@ import {
   getMainSessionID,
   getSessionAgent,
   setMainSession,
+  setSessionAgent,
   subagentSessions,
   syncSubagentSessions,
   updateSessionAgent,
@@ -166,7 +167,7 @@ export function createEventHandler(args: {
   // Avoid triggering multiple abort+continue cycles for the same failing assistant message.
   const lastHandledModelErrorMessageID = new Map<string, string>();
   const lastHandledRetryStatusKey = new Map<string, string>();
-  const lastKnownModelBySession = new Map<string, { providerID: string; modelID: string }>();
+  const lastKnownModelBySession = new Map<string, { providerID: string; modelID: string; agentName?: string }>();
 
   const resolveFallbackProviderID = (sessionID: string, providerHint?: string): string => {
     const sessionModel = getSessionModel(sessionID);
@@ -308,16 +309,18 @@ export function createEventHandler(args: {
           subagentSessions.add(sessionInfo.id);
           log("[event] Tracked subagent session", { sessionID: sessionInfo.id, parentID: sessionInfo.parentID });
           
-          // Set up fallback chain for subagent based on title (which contains agent name)
+          // Extract agent name from title for ANY subagent
           const title = sessionInfo.title || "";
           const agentMatch = title.match(/@([^\s]+)\s+subagent/i);
           const agentName = agentMatch ? agentMatch[1].toLowerCase() : "sisyphus-junior";
           
-          // Apply fallback chain for common subagent types
-          if (agentName.includes("junior") || agentName.includes("explore") || agentName.includes("librarian")) {
-            applyUserConfiguredFallbackChain(sessionInfo.id, agentName, "anthropic", args.pluginConfig);
-            log("[event] Set up fallback chain for subagent", { sessionID: sessionInfo.id, agentName });
-          }
+          // Store agent name for this subagent session
+          setSessionAgent(sessionInfo.id, agentName);
+          log("[event] Set agent for subagent session", { sessionID: sessionInfo.id, agentName });
+          
+          // Apply fallback chain for ALL subagents
+          applyUserConfiguredFallbackChain(sessionInfo.id, agentName, "anthropic", args.pluginConfig);
+          log("[event] Set up fallback chain for subagent", { sessionID: sessionInfo.id, agentName });
         }
       }
 
@@ -374,8 +377,9 @@ export function createEventHandler(args: {
         }
         const providerID = info?.providerID as string | undefined;
         const modelID = info?.modelID as string | undefined;
+        const agentName = agent || getSessionAgent(sessionID);
         if (providerID && modelID && !isCompactionMessage) {
-          lastKnownModelBySession.set(sessionID, { providerID, modelID });
+          lastKnownModelBySession.set(sessionID, { providerID, modelID, agentName });
           setSessionModel(sessionID, { providerID, modelID });
         }
       }
@@ -556,18 +560,17 @@ export function createEventHandler(args: {
         else if (sessionID && shouldRetryError(errorInfo) && !isRuntimeFallbackEnabled && isModelFallbackEnabled) {
           let agentName = getSessionAgent(sessionID);
 
-          // For subagents without tracked agent name, try to extract from error or use default
+          // For subagents without tracked agent name, use session title or default
           if (!agentName && subagentSessions.has(sessionID)) {
-            // Try to extract agent name from error message
-            if (errorMessage.includes("claude-opus") || errorMessage.includes("opus")) {
-              agentName = "sisyphus-junior";
-            } else if (errorMessage.includes("gpt-5")) {
-              agentName = "hephaestus-junior";
+            // Try to get agent name from session title via last known model
+            const lastKnown = lastKnownModelBySession.get(sessionID);
+            if (lastKnown && lastKnown.agentName) {
+              agentName = lastKnown.agentName;
             } else {
-              // Default subagent fallback
+              // Default to sisyphus-junior if we can't determine
               agentName = "sisyphus-junior";
             }
-            log("[event] Using default subagent name for fallback", { sessionID, agentName });
+            log("[event] Using subagent name for fallback", { sessionID, agentName });
           }
 
           if (!agentName && sessionID === getMainSessionID()) {
