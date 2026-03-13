@@ -3,6 +3,7 @@ import { appendSessionId, getPlanProgress, readBoulderState } from "../../featur
 import type { BoulderState, PlanProgress } from "../../features/boulder-state"
 import { subagentSessions } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
+import { isSessionInBoulderLineage } from "./boulder-session-lineage"
 import { injectBoulderContinuation } from "./boulder-continuation-injector"
 import { HOOK_NAME } from "./hook-name"
 import type { AtlasHookOptions, SessionState } from "./types"
@@ -18,14 +19,15 @@ function hasRunningBackgroundTasks(sessionID: string, options?: AtlasHookOptions
     : false
 }
 
-function resolveActiveBoulderSession(input: {
+async function resolveActiveBoulderSession(input: {
+  client: PluginInput["client"]
   directory: string
   sessionID: string
-}): {
+}): Promise<{
   boulderState: BoulderState
   progress: PlanProgress
   appendedSession: boolean
-} | null {
+} | null> {
   const boulderState = readBoulderState(input.directory)
   if (!boulderState) {
     return null
@@ -41,6 +43,15 @@ function resolveActiveBoulderSession(input: {
   }
 
   if (!subagentSessions.has(input.sessionID)) {
+    return null
+  }
+
+  const belongsToActiveBoulder = await isSessionInBoulderLineage({
+    client: input.client,
+    sessionID: input.sessionID,
+    boulderSessionIDs: boulderState.session_ids,
+  })
+  if (!belongsToActiveBoulder) {
     return null
   }
 
@@ -136,7 +147,8 @@ export async function handleAtlasSessionIdle(input: {
 
   log(`[${HOOK_NAME}] session.idle`, { sessionID })
 
-  const activeBoulderSession = resolveActiveBoulderSession({
+  const activeBoulderSession = await resolveActiveBoulderSession({
+    client: ctx.client,
     directory: ctx.directory,
     sessionID,
   })
