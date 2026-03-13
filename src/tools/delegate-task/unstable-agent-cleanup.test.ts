@@ -115,7 +115,7 @@ describe("executeUnstableAgentTask cleanup", () => {
         manager: mockManager,
         client: {
           session: {
-            status: async () => ({ data: { ses_timeout_cleanup: { type: "running" } } }),
+            status: async () => ({ data: { ses_timeout_cleanup: { type: "busy" } } }),
             messages: async () => ({ data: [] }),
           },
         },

@@ -223,6 +223,9 @@ ${textContent || "(No text output)"}
 session_id: ${sessionID}
 </task_metadata>`
   } catch (error) {
+    if (!cleanupReason) {
+      cleanupReason = "exception"
+    }
     return formatDetailedError(error, {
       operation: "Launch monitored background task",
       args,
