@@ -46,6 +46,13 @@ function isTokenLimitOrOverloadedError(error: SessionErrorEvent | string | undef
     return true
   }
 
+  const hasTokenLimitSignal = errorMessage.includes("prompt is too long")
+    || errorMessage.includes("context length")
+    || errorMessage.includes("context_length")
+  if (hasTokenLimitSignal) {
+    return true
+  }
+
   const hasOverloadedSignal = errorMessage.includes("overloaded")
   return hasOverloadedSignal && isRetryableModelError({ name: error.name, message: errorMessage })
 }
