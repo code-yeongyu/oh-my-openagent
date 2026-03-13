@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 
 import { afterEach, describe, expect, it } from "bun:test"
-import { cpSync, existsSync, mkdtempSync, rmSync } from "node:fs"
+import { cpSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { pathToFileURL } from "node:url"
@@ -21,10 +21,7 @@ function getNestedRecord(record: Record<string, unknown>, key: string): Record<s
 
 async function loadSeparateHostZodModule(): Promise<typeof import("zod")> {
   const pluginPackageDirectory = dirname(Bun.resolveSync("@opencode-ai/plugin/package.json", import.meta.dir))
-  const nestedZodDirectory = join(pluginPackageDirectory, "node_modules", "zod")
-  const sourceZodDirectory = existsSync(nestedZodDirectory)
-    ? nestedZodDirectory
-    : dirname(Bun.resolveSync("zod", pluginPackageDirectory))
+  const sourceZodDirectory = join(pluginPackageDirectory, "node_modules", "zod")
   const tempDirectory = mkdtempSync(join(tmpdir(), "omo-host-zod-"))
   const copiedZodDirectory = join(tempDirectory, "zod")
 
