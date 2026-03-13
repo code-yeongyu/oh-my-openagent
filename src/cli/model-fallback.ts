@@ -85,10 +85,10 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
         agents[role] = { model: "opencode/claude-haiku-4-5" }
       } else if (avail.copilot) {
         agents[role] = { model: "github-copilot/gpt-5-mini" }
-      } else if (avail.minimaxCnCodingPlan) {
-        agents[role] = { model: getMiniMaxModel("minimax-cn-coding-plan", config) }
       } else if (avail.minimaxCodingPlan) {
         agents[role] = { model: getMiniMaxModel("minimax-coding-plan", config) }
+      } else if (avail.minimaxCnCodingPlan) {
+        agents[role] = { model: getMiniMaxModel("minimax-cn-coding-plan", config) }
       } else {
         agents[role] = { model: "opencode/gpt-5-nano" }
       }

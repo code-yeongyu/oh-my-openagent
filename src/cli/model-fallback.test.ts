@@ -487,6 +487,18 @@ describe("generateModelConfig", () => {
       expect(result.agents?.atlas?.model).toBe("minimax-coding-plan/MiniMax-M2.5-highspeed")
       expect(result.categories?.writing?.model).toBe("minimax-coding-plan/MiniMax-M2.5-highspeed")
     })
+
+    test("MiniMax prefers minimax.io by default when both plans are enabled", () => {
+      // #given both minimax providers are enabled with default preference
+      const config = createConfig({ hasMinimaxCnCodingPlan: true, hasMinimaxCodingPlan: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then minimax.io should win by default
+      expect(result.agents?.sisyphus?.model).toBe("minimax-coding-plan/MiniMax-M2.5")
+      expect(result.agents?.explore?.model).toBe("minimax-coding-plan/MiniMax-M2.5")
+    })
   })
 
   describe("Sisyphus agent special cases", () => {
