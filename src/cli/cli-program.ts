@@ -33,6 +33,7 @@ program
   .option("--kimi-for-coding <value>", "Kimi For Coding subscription: no, yes (default: no)")
   .option("--minimax-cn-coding-plan <value>", "MiniMax Coding Plan (minimaxi.com) subscription: no, yes (default: no)")
   .option("--minimax-coding-plan <value>", "MiniMax Coding Plan (minimax.io) subscription: no, yes (default: no)")
+  .option("--minimax-model-variant <value>", "MiniMax model preference: standard, highspeed (default: standard)")
   .option("--skip-auth", "Skip authentication setup hints")
   .addHelpText("after", `
 Examples:
@@ -48,8 +49,11 @@ Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi > MiniM
   OpenCode Zen  opencode/ models (opencode/claude-opus-4-6, etc.)
    Z.ai          zai-coding-plan/glm-5 (visual-engineering fallback)
    Kimi          kimi-for-coding/k2p5 (Sisyphus/Prometheus fallback)
-   MiniMax CN    minimax-cn-coding-plan/MiniMax-M2.5-highspeed (opencode default today)
-   MiniMax       minimax-coding-plan/MiniMax-M2.5-highspeed (opencode default today)
+   MiniMax CN    minimax-cn-coding-plan/MiniMax-M2.5 (default)
+   MiniMax       minimax-coding-plan/MiniMax-M2.5 (default)
+
+MiniMax Note:
+  Use --minimax-model-variant=highspeed only if your MiniMax plan explicitly includes MiniMax-M2.5-highspeed.
 `)
   .action(async (options) => {
     const args: InstallArgs = {
@@ -63,6 +67,7 @@ Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi > MiniM
       kimiForCoding: options.kimiForCoding,
       minimaxCnCodingPlan: options.minimaxCnCodingPlan,
       minimaxCodingPlan: options.minimaxCodingPlan,
+      minimaxModelVariant: options.minimaxModelVariant,
       skipAuth: options.skipAuth ?? false,
     }
     const exitCode = await install(args)

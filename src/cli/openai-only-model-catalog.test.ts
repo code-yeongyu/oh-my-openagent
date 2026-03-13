@@ -15,6 +15,7 @@ function createConfig(overrides: Partial<InstallConfig> = {}): InstallConfig {
     hasKimiForCoding: false,
     hasMinimaxCnCodingPlan: false,
     hasMinimaxCodingPlan: false,
+    minimaxModelVariant: "standard",
     ...overrides,
   }
 }

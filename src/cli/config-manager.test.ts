@@ -183,6 +183,7 @@ describe("generateOmoConfig - model fallback system", () => {
       hasKimiForCoding: false,
       hasMinimaxCnCodingPlan: false,
       hasMinimaxCodingPlan: false,
+      minimaxModelVariant: "standard",
     }
 
     // #when generating config
@@ -205,6 +206,7 @@ describe("generateOmoConfig - model fallback system", () => {
       hasKimiForCoding: false,
       hasMinimaxCnCodingPlan: false,
       hasMinimaxCodingPlan: false,
+      minimaxModelVariant: "standard",
     }
 
     // #when generating config
@@ -228,6 +230,7 @@ describe("generateOmoConfig - model fallback system", () => {
       hasKimiForCoding: false,
       hasMinimaxCnCodingPlan: false,
       hasMinimaxCodingPlan: false,
+      minimaxModelVariant: "standard",
     }
 
     // #when generating config
@@ -252,6 +255,7 @@ describe("generateOmoConfig - model fallback system", () => {
       hasKimiForCoding: false,
       hasMinimaxCnCodingPlan: false,
       hasMinimaxCodingPlan: false,
+      minimaxModelVariant: "standard",
     }
 
     // #when generating config
@@ -279,6 +283,7 @@ describe("generateOmoConfig - model fallback system", () => {
       hasKimiForCoding: false,
       hasMinimaxCnCodingPlan: false,
       hasMinimaxCodingPlan: false,
+      minimaxModelVariant: "standard",
     }
 
     // #when generating config
@@ -301,6 +306,7 @@ describe("generateOmoConfig - model fallback system", () => {
       hasKimiForCoding: false,
       hasMinimaxCnCodingPlan: false,
       hasMinimaxCodingPlan: false,
+      minimaxModelVariant: "standard",
     }
 
     // #when generating config

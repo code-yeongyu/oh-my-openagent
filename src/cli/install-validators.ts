@@ -5,6 +5,7 @@ import type {
   DetectedConfig,
   InstallArgs,
   InstallConfig,
+  MiniMaxModelVariant,
 } from "./types"
 
 export const SYMBOLS = {
@@ -38,8 +39,9 @@ export function formatConfigSummary(config: InstallConfig): string {
   lines.push(formatProvider("OpenCode Zen", config.hasOpencodeZen, "opencode/ models"))
   lines.push(formatProvider("Z.ai Coding Plan", config.hasZaiCodingPlan, "Librarian/Multimodal"))
   lines.push(formatProvider("Kimi For Coding", config.hasKimiForCoding, "Sisyphus/Prometheus fallback"))
-  lines.push(formatProvider("MiniMax Coding Plan (minimaxi.com)", config.hasMinimaxCnCodingPlan, "MiniMax highspeed fallback"))
-  lines.push(formatProvider("MiniMax Coding Plan (minimax.io)", config.hasMinimaxCodingPlan, "MiniMax highspeed fallback"))
+  const minimaxDetail = `MiniMax ${config.minimaxModelVariant === "highspeed" ? "M2.5-highspeed" : "M2.5"} fallback`
+  lines.push(formatProvider("MiniMax Coding Plan (minimaxi.com)", config.hasMinimaxCnCodingPlan, minimaxDetail))
+  lines.push(formatProvider("MiniMax Coding Plan (minimax.io)", config.hasMinimaxCodingPlan, minimaxDetail))
 
   lines.push("")
   lines.push(color.dim("─".repeat(40)))
@@ -48,7 +50,7 @@ export function formatConfigSummary(config: InstallConfig): string {
   lines.push(color.bold(color.white("Model Assignment")))
   lines.push("")
   lines.push(`  ${SYMBOLS.info} Models auto-configured based on provider priority`)
-  lines.push(`  ${SYMBOLS.bullet} Priority: Native > Copilot > OpenCode Zen > Z.ai`)
+  lines.push(`  ${SYMBOLS.bullet} Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi > MiniMax`)
 
   return lines.join("\n")
 }
@@ -157,6 +159,10 @@ export function validateNonTuiArgs(args: InstallArgs): { valid: boolean; errors:
     errors.push(`Invalid --minimax-coding-plan value: ${args.minimaxCodingPlan} (expected: no, yes)`)
   }
 
+  if (args.minimaxModelVariant !== undefined && !["standard", "highspeed"].includes(args.minimaxModelVariant)) {
+    errors.push(`Invalid --minimax-model-variant value: ${args.minimaxModelVariant} (expected: standard, highspeed)`)
+  }
+
   return { valid: errors.length === 0, errors }
 }
 
@@ -172,6 +178,7 @@ export function argsToConfig(args: InstallArgs): InstallConfig {
     hasKimiForCoding: args.kimiForCoding === "yes",
     hasMinimaxCnCodingPlan: args.minimaxCnCodingPlan === "yes",
     hasMinimaxCodingPlan: args.minimaxCodingPlan === "yes",
+    minimaxModelVariant: args.minimaxModelVariant ?? "standard",
   }
 }
 
@@ -185,6 +192,7 @@ export function detectedToInitialValues(detected: DetectedConfig): {
   kimiForCoding: BooleanArg
   minimaxCnCodingPlan: BooleanArg
   minimaxCodingPlan: BooleanArg
+  minimaxModelVariant: MiniMaxModelVariant
 } {
   let claude: ClaudeSubscription = "no"
   if (detected.hasClaude) {
@@ -201,5 +209,6 @@ export function detectedToInitialValues(detected: DetectedConfig): {
     kimiForCoding: detected.hasKimiForCoding ? "yes" : "no",
     minimaxCnCodingPlan: detected.hasMinimaxCnCodingPlan ? "yes" : "no",
     minimaxCodingPlan: detected.hasMinimaxCodingPlan ? "yes" : "no",
+    minimaxModelVariant: detected.minimaxModelVariant,
   }
 }

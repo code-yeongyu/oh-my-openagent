@@ -17,12 +17,30 @@ import {
 
 export type { GeneratedOmoConfig } from "./model-fallback-types"
 
-const ZAI_MODEL                    = "zai-coding-plan/glm-4.7"
-const MINIMAX_CN_CODING_PLAN_MODEL        = "minimax-cn-coding-plan/MiniMax-M2.5-highspeed"
-const MINIMAX_CODING_PLAN_MODEL    = "minimax-coding-plan/MiniMax-M2.5-highspeed"
+const ZAI_MODEL = "zai-coding-plan/glm-4.7"
+const MINIMAX_STANDARD_MODEL_ID = "MiniMax-M2.5"
+const MINIMAX_HIGHSPEED_MODEL_ID = "MiniMax-M2.5-highspeed"
 
 const ULTIMATE_FALLBACK = "opencode/glm-4.7-free"
 const SCHEMA_URL = "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json"
+
+function getMiniMaxModelId(config: InstallConfig): string {
+  return config.minimaxModelVariant === "highspeed"
+    ? MINIMAX_HIGHSPEED_MODEL_ID
+    : MINIMAX_STANDARD_MODEL_ID
+}
+
+function getMiniMaxModel(providerID: "minimax-cn-coding-plan" | "minimax-coding-plan", config: InstallConfig): string {
+  return `${providerID}/${getMiniMaxModelId(config)}`
+}
+
+function applyMiniMaxVariant(model: string, config: InstallConfig): string {
+  if (!model.includes("minimax-cn-coding-plan/") && !model.includes("minimax-coding-plan/")) {
+    return model
+  }
+
+  return model.replace(/MiniMax-M2\.5(-highspeed)?$/, getMiniMaxModelId(config))
+}
 
 export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
   const avail = toProviderAvailability(config)
@@ -68,9 +86,9 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
       } else if (avail.copilot) {
         agents[role] = { model: "github-copilot/gpt-5-mini" }
       } else if (avail.minimaxCnCodingPlan) {
-        agents[role] = { model: MINIMAX_CN_CODING_PLAN_MODEL }
+        agents[role] = { model: getMiniMaxModel("minimax-cn-coding-plan", config) }
       } else if (avail.minimaxCodingPlan) {
-        agents[role] = { model: MINIMAX_CODING_PLAN_MODEL }
+        agents[role] = { model: getMiniMaxModel("minimax-coding-plan", config) }
       } else {
         agents[role] = { model: "opencode/gpt-5-nano" }
       }
@@ -85,7 +103,8 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
       const resolved = resolveModelFromChain(fallbackChain, avail)
       if (resolved) {
         const variant = resolved.variant ?? req.variant
-        agents[role] = variant ? { model: resolved.model, variant } : { model: resolved.model }
+        const model = applyMiniMaxVariant(resolved.model, config)
+        agents[role] = variant ? { model, variant } : { model }
       }
       continue
     }
@@ -100,7 +119,8 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
     const resolved = resolveModelFromChain(req.fallbackChain, avail)
     if (resolved) {
       const variant = resolved.variant ?? req.variant
-      agents[role] = variant ? { model: resolved.model, variant } : { model: resolved.model }
+      const model = applyMiniMaxVariant(resolved.model, config)
+      agents[role] = variant ? { model, variant } : { model }
     } else {
       agents[role] = { model: ULTIMATE_FALLBACK }
     }
@@ -123,7 +143,8 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
     const resolved = resolveModelFromChain(fallbackChain, avail)
     if (resolved) {
       const variant = resolved.variant ?? req.variant
-      categories[cat] = variant ? { model: resolved.model, variant } : { model: resolved.model }
+      const model = applyMiniMaxVariant(resolved.model, config)
+      categories[cat] = variant ? { model, variant } : { model }
     } else {
       categories[cat] = { model: ULTIMATE_FALLBACK }
     }

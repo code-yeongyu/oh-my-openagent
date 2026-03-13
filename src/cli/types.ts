@@ -1,5 +1,6 @@
 export type ClaudeSubscription = "no" | "yes" | "max20"
 export type BooleanArg = "no" | "yes"
+export type MiniMaxModelVariant = "standard" | "highspeed"
 
 export interface InstallArgs {
   tui: boolean
@@ -12,6 +13,7 @@ export interface InstallArgs {
   kimiForCoding?: BooleanArg
   minimaxCnCodingPlan?: BooleanArg
   minimaxCodingPlan?: BooleanArg
+  minimaxModelVariant?: MiniMaxModelVariant
   skipAuth?: boolean
 }
 
@@ -26,6 +28,7 @@ export interface InstallConfig {
   hasKimiForCoding: boolean
   hasMinimaxCnCodingPlan: boolean
   hasMinimaxCodingPlan: boolean
+  minimaxModelVariant: MiniMaxModelVariant
 }
 
 export interface ConfigMergeResult {
@@ -46,4 +49,5 @@ export interface DetectedConfig {
   hasKimiForCoding: boolean
   hasMinimaxCnCodingPlan: boolean
   hasMinimaxCodingPlan: boolean
+  minimaxModelVariant: MiniMaxModelVariant
 }
