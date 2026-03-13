@@ -125,6 +125,7 @@ export class BackgroundManager {
   private idleDeferralTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
   private notificationQueueByParent: Map<string, Promise<void>> = new Map()
   private rootDescendantCounts: Map<string, number>
+  private preStartDescendantReservations: Set<string>
   private enableParentSessionNotifications: boolean
   readonly taskHistory = new TaskHistory()
 
@@ -150,6 +151,7 @@ export class BackgroundManager {
     this.onSubagentSessionCreated = options?.onSubagentSessionCreated
     this.onShutdown = options?.onShutdown
     this.rootDescendantCounts = new Map()
+    this.preStartDescendantReservations = new Set()
     this.enableParentSessionNotifications = options?.enableParentSessionNotifications ?? true
     this.registerProcessCleanup()
   }
@@ -218,6 +220,26 @@ export class BackgroundManager {
     }
 
     this.rootDescendantCounts.set(rootSessionID, currentCount - 1)
+  }
+
+  private markPreStartDescendantReservation(task: BackgroundTask): void {
+    this.preStartDescendantReservations.add(task.id)
+  }
+
+  private settlePreStartDescendantReservation(task: BackgroundTask): void {
+    this.preStartDescendantReservations.delete(task.id)
+  }
+
+  private rollbackPreStartDescendantReservation(task: BackgroundTask): void {
+    if (!this.preStartDescendantReservations.delete(task.id)) {
+      return
+    }
+
+    if (!task.rootSessionID) {
+      return
+    }
+
+    this.unregisterRootDescendant(task.rootSessionID)
   }
 
   async launch(input: LaunchInput): Promise<BackgroundTask> {
@@ -296,6 +318,7 @@ export class BackgroundManager {
       }
 
       spawnReservation.commit()
+      this.markPreStartDescendantReservation(task)
 
       // Trigger processing (fire-and-forget)
       this.processKey(key)
@@ -322,6 +345,7 @@ export class BackgroundManager {
         await this.concurrencyManager.acquire(key)
 
         if (item.task.status === "cancelled" || item.task.status === "error" || item.task.status === "interrupt") {
+          this.rollbackPreStartDescendantReservation(item.task)
           this.concurrencyManager.release(key)
           queue.shift()
           continue
@@ -331,6 +355,7 @@ export class BackgroundManager {
           await this.startTask(item)
         } catch (error) {
           log("[background-agent] Error starting task:", error)
+          this.rollbackPreStartDescendantReservation(item.task)
           if (item.task.concurrencyKey) {
             this.concurrencyManager.release(item.task.concurrencyKey)
             item.task.concurrencyKey = undefined
@@ -386,6 +411,7 @@ export class BackgroundManager {
     }
 
     const sessionID = createResult.data.id
+    this.settlePreStartDescendantReservation(task)
     subagentSessions.add(sessionID)
 
     log("[background-agent] tmux callback check", {
@@ -1204,6 +1230,7 @@ export class BackgroundManager {
           }
         }
       }
+      this.rollbackPreStartDescendantReservation(task)
       log("[background-agent] Cancelled pending task:", { taskId, key })
     }
 

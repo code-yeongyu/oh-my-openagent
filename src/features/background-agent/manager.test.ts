@@ -2111,6 +2111,90 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       // then
       await expect(result).rejects.toThrow("background_task.maxDescendants cannot be enforced safely")
     })
+
+    test("should release descendant quota when queued task is cancelled before session starts", async () => {
+      // given
+      manager.shutdown()
+      manager = new BackgroundManager(
+        {
+          client: createMockClientWithSessionChain({
+            "session-root": { directory: "/test/dir" },
+          }),
+          directory: tmpdir(),
+        } as unknown as PluginInput,
+        { defaultConcurrency: 1, maxDescendants: 2 },
+      )
+
+      const input = {
+        description: "Test task",
+        prompt: "Do something",
+        agent: "test-agent",
+        parentSessionID: "session-root",
+        parentMessageID: "parent-message",
+      }
+
+      await manager.launch(input)
+      const queuedTask = await manager.launch(input)
+      await new Promise(resolve => setTimeout(resolve, 50))
+      expect(manager.getTask(queuedTask.id)?.status).toBe("pending")
+
+      // when
+      const cancelled = manager.cancelPendingTask(queuedTask.id)
+      const replacementTask = await manager.launch(input)
+
+      // then
+      expect(cancelled).toBe(true)
+      expect(replacementTask.status).toBe("pending")
+    })
+
+    test("should release descendant quota when session creation fails before session starts", async () => {
+      // given
+      let createAttempts = 0
+      manager.shutdown()
+      manager = new BackgroundManager(
+        {
+          client: {
+            session: {
+              create: async () => {
+                createAttempts += 1
+                if (createAttempts === 1) {
+                  return { error: "session create failed", data: undefined }
+                }
+
+                return { data: { id: `ses_${crypto.randomUUID()}` } }
+              },
+              get: async () => ({ data: { directory: "/test/dir" } }),
+              prompt: async () => ({}),
+              promptAsync: async () => ({}),
+              messages: async () => ({ data: [] }),
+              todo: async () => ({ data: [] }),
+              status: async () => ({ data: {} }),
+              abort: async () => ({}),
+            },
+          },
+          directory: tmpdir(),
+        } as unknown as PluginInput,
+        { maxDescendants: 1 },
+      )
+
+      const input = {
+        description: "Test task",
+        prompt: "Do something",
+        agent: "test-agent",
+        parentSessionID: "session-root",
+        parentMessageID: "parent-message",
+      }
+
+      await manager.launch(input)
+      await new Promise(resolve => setTimeout(resolve, 50))
+      expect(createAttempts).toBe(1)
+
+      // when
+      const retryTask = await manager.launch(input)
+
+      // then
+      expect(retryTask.status).toBe("pending")
+    })
   })
 
   describe("pending task can be cancelled", () => {
