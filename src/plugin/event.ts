@@ -33,6 +33,7 @@ import type { Managers } from "../create-managers";
 import { pruneRecentSyntheticIdles } from "./recent-synthetic-idles";
 import { normalizeSessionStatusToIdle } from "./session-status-normalizer";
 import { clearSubagentBlacklistGuard } from "../hooks/subagent-blacklist-guard";
+import { clearBlacklistGuard } from "../hooks/blacklist-guard";
 
 type FirstMessageVariantGate = {
   markSessionCreated: (sessionInfo: { id?: string; title?: string; parentID?: string } | undefined) => void;
@@ -340,6 +341,7 @@ export function createEventHandler(args: {
         syncSubagentSessions.delete(sessionInfo.id);
         subagentSessions.delete(sessionInfo.id);
         clearSubagentBlacklistGuard(sessionInfo.id);
+        clearBlacklistGuard(sessionInfo.id);
         deleteSessionTools(sessionInfo.id);
         await managers.skillMcpManager.disconnectSession(sessionInfo.id);
         await lspManager.cleanupTempDirectoryClients();

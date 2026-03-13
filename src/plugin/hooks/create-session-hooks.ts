@@ -27,6 +27,7 @@ import {
   createRuntimeFallbackHook,
 } from "../../hooks"
 import { createSubagentBlacklistGuard } from "../../hooks/subagent-blacklist-guard"
+import { createBlacklistGuard } from "../../hooks/blacklist-guard"
 import { createAnthropicEffortHook } from "../../hooks/anthropic-effort"
 import {
   detectExternalNotificationPlugin,
@@ -62,6 +63,7 @@ export type SessionHooks = {
   anthropicEffort: ReturnType<typeof createAnthropicEffortHook> | null
   runtimeFallback: ReturnType<typeof createRuntimeFallbackHook> | null
   subagentBlacklistGuard: ReturnType<typeof createSubagentBlacklistGuard> | null
+  blacklistGuard: ReturnType<typeof createBlacklistGuard> | null
 }
 
 export function createSessionHooks(args: {
@@ -269,6 +271,11 @@ export function createSessionHooks(args: {
         createSubagentBlacklistGuard({ pluginConfig }))
     : null
 
+  const blacklistGuard = isHookEnabled("blacklist-guard")
+    ? safeHook("blacklist-guard", () =>
+        createBlacklistGuard({ pluginConfig }))
+    : null
+
   return {
     contextWindowMonitor,
     preemptiveCompaction,
@@ -294,5 +301,6 @@ export function createSessionHooks(args: {
     anthropicEffort,
     runtimeFallback,
     subagentBlacklistGuard,
+    blacklistGuard,
   }
 }

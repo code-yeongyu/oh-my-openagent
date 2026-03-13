@@ -59,13 +59,13 @@ export function createSubagentBlacklistGuard(args: {
       if (subagentFallbackSetup.has(sessionID)) return
       subagentFallbackSetup.add(sessionID)
 
-      const message = output.message as { providerID?: string; modelID?: string; agent?: string }
-      const providerID = message.providerID
-      const modelID = message.modelID
-      const agentName = message.agent
+      // Get model info from input.model (where OpenCode puts it)
+      const providerID = input.model?.providerID
+      const modelID = input.model?.modelID
+      const agentName = input.agent || (output.message as { agent?: string }).agent
 
       if (!providerID || !modelID) {
-        log("[subagent-blacklist-guard] Missing providerID or modelID", { sessionID })
+        log("[subagent-blacklist-guard] Missing providerID or modelID in input.model", { sessionID, inputModel: input.model })
         return
       }
 
