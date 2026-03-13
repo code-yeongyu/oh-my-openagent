@@ -58,6 +58,21 @@ describe("loadBuiltinCommands", () => {
     //#then
     expect(commands.handoff.description).toContain("context summary")
   })
+
+  test("should include debug command", () => {
+    const commands = loadBuiltinCommands()
+
+    expect(commands["debug"]).toBeDefined()
+    expect(commands["debug"].name).toBe("debug")
+    expect(commands["debug"].description).toContain("Debug runtime issues")
+    expect(commands["debug"].template).toContain("DEBUG MODE")
+  })
+
+  test("should respect disabled commands", () => {
+    const commands = loadBuiltinCommands(["debug"])
+
+    expect(commands["debug"]).toBeUndefined()
+  })
 })
 
 describe("HANDOFF_TEMPLATE", () => {
