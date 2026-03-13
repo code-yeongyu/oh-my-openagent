@@ -274,29 +274,31 @@ export class BackgroundManager {
       throw new Error("Agent parameter is required")
     }
 
-    const maxSessions = this.config?.maxSessions
-    if (maxSessions !== undefined) {
-      const activeCount = this.getActiveTaskCount()
-      if (activeCount >= maxSessions) {
-        throw new Error(
-          `Background task spawn blocked: ${activeCount} active sessions meets background_task.maxSessions=${maxSessions}. Wait for existing tasks to complete before spawning new ones.`
-        )
-      }
-    }
-
-    const maxTasksPerParent = this.config?.maxTasksPerParent
-    if (maxTasksPerParent !== undefined) {
-      const parentCount = this.getActiveTaskCountForParent(input.parentSessionID)
-      if (parentCount >= maxTasksPerParent) {
-        throw new Error(
-          `Background task spawn blocked: parent session ${input.parentSessionID} already has ${parentCount} active tasks, which meets background_task.maxTasksPerParent=${maxTasksPerParent}. Wait for existing tasks to complete or reuse a session.`
-        )
-      }
-    }
-
     const spawnReservation = await this.reserveSubagentSpawn(input.parentSessionID)
 
     try {
+      const maxSessions = this.config?.maxSessions
+      if (maxSessions !== undefined) {
+        const activeCount = this.getActiveTaskCount()
+        if (activeCount >= maxSessions) {
+          spawnReservation.rollback()
+          throw new Error(
+            `Background task spawn blocked: ${activeCount} active sessions meets background_task.maxSessions=${maxSessions}. Wait for existing tasks to complete before spawning new ones.`
+          )
+        }
+      }
+
+      const maxTasksPerParent = this.config?.maxTasksPerParent
+      if (maxTasksPerParent !== undefined) {
+        const parentCount = this.getActiveTaskCountForParent(input.parentSessionID)
+        if (parentCount >= maxTasksPerParent) {
+          spawnReservation.rollback()
+          throw new Error(
+            `Background task spawn blocked: parent session ${input.parentSessionID} already has ${parentCount} active tasks, which meets background_task.maxTasksPerParent=${maxTasksPerParent}. Wait for existing tasks to complete or reuse a session.`
+          )
+        }
+      }
+
       log("[background-agent] spawn guard passed", {
         parentSessionID: input.parentSessionID,
         rootSessionID: spawnReservation.spawnContext.rootSessionID,
