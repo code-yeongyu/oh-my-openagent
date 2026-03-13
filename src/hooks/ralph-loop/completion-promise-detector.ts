@@ -2,11 +2,24 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { existsSync, readFileSync } from "node:fs"
 import { log } from "../../shared/logger"
 import { HOOK_NAME } from "./constants"
+import { detectSemanticCompletion } from "./semantic-completion-detector"
 import { withTimeout } from "./with-timeout"
 
 interface OpenCodeSessionMessage {
 	info?: { role?: string }
 	parts?: Array<{ type: string; text?: string }>
+}
+
+function getAssistantMessageText(message: OpenCodeSessionMessage): string {
+	if (!message.parts) return ""
+
+	let responseText = ""
+	for (const part of message.parts) {
+		if (part.type !== "text") continue
+		responseText += `${responseText ? "\n" : ""}${part.text ?? ""}`
+	}
+
+	return responseText
 }
 
 function escapeRegex(str: string): string {
@@ -29,18 +42,30 @@ export function detectCompletionInTranscript(
 
 		const content = readFileSync(transcriptPath, "utf-8")
 		const pattern = buildPromisePattern(promise)
-		const lines = content.split("\n").filter((line) => line.trim())
+		const lines = content.split("\n").filter((line: string) => line.trim())
+		let lastAssistantLine: string | undefined
 
 		for (const line of lines) {
 			try {
 				const entry = JSON.parse(line) as { type?: string; timestamp?: string }
 				if (entry.type === "user") continue
 				if (startedAt && entry.timestamp && entry.timestamp < startedAt) continue
+				lastAssistantLine = line
 				if (pattern.test(line)) return true
 			} catch {
 				continue
 			}
 		}
+
+		const semanticSignal = detectSemanticCompletion(lastAssistantLine ?? "")
+		if (semanticSignal) {
+			log(`[${HOOK_NAME}] Semantic completion detected in transcript`, {
+				signal: semanticSignal,
+				transcriptPath,
+			})
+			return true
+		}
+
 		return false
 	} catch {
 		return false
@@ -89,17 +114,21 @@ export async function detectCompletionInSessionMessages(
 		const pattern = buildPromisePattern(options.promise)
 		for (let index = assistantMessages.length - 1; index >= 0; index -= 1) {
 			const assistant = assistantMessages[index]
-			if (!assistant.parts) continue
-
-			let responseText = ""
-			for (const part of assistant.parts) {
-				if (part.type !== "text") continue
-				responseText += `${responseText ? "\n" : ""}${part.text ?? ""}`
-			}
+			const responseText = getAssistantMessageText(assistant)
 
 			if (pattern.test(responseText)) {
 				return true
 			}
+		}
+
+		const latestAssistantMessage = assistantMessages[assistantMessages.length - 1]
+		const semanticSignal = detectSemanticCompletion(getAssistantMessageText(latestAssistantMessage))
+		if (semanticSignal) {
+			log(`[${HOOK_NAME}] Semantic completion detected in session messages`, {
+				sessionID: options.sessionID,
+				signal: semanticSignal,
+			})
+			return true
 		}
 
 		return false
