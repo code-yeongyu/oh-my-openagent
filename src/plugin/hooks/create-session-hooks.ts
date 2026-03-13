@@ -16,6 +16,7 @@ import {
   createRalphLoopHook,
   createEditErrorRecoveryHook,
   createDelegateTaskRetryHook,
+  createDelegateTaskEnglishDirectiveHook,
   createTaskResumeInfoHook,
   createStartWorkHook,
   createPrometheusMdOnlyHook,
@@ -26,8 +27,6 @@ import {
   createPreemptiveCompactionHook,
   createRuntimeFallbackHook,
 } from "../../hooks"
-import { createSubagentBlacklistGuard } from "../../hooks/subagent-blacklist-guard"
-import { createBlacklistGuard } from "../../hooks/blacklist-guard"
 import { createAnthropicEffortHook } from "../../hooks/anthropic-effort"
 import {
   detectExternalNotificationPlugin,
@@ -62,8 +61,7 @@ export type SessionHooks = {
   taskResumeInfo: ReturnType<typeof createTaskResumeInfoHook> | null
   anthropicEffort: ReturnType<typeof createAnthropicEffortHook> | null
   runtimeFallback: ReturnType<typeof createRuntimeFallbackHook> | null
-  subagentBlacklistGuard: ReturnType<typeof createSubagentBlacklistGuard> | null
-  blacklistGuard: ReturnType<typeof createBlacklistGuard> | null
+  delegateTaskEnglishDirective: ReturnType<typeof createDelegateTaskEnglishDirectiveHook> | null
 }
 
 export function createSessionHooks(args: {
@@ -219,6 +217,10 @@ export function createSessionHooks(args: {
     ? safeHook("delegate-task-retry", () => createDelegateTaskRetryHook(ctx))
     : null
 
+  const delegateTaskEnglishDirective = isHookEnabled("delegate-task-english-directive")
+    ? safeHook("delegate-task-english-directive", () => createDelegateTaskEnglishDirectiveHook())
+    : null
+
   const startWork = isHookEnabled("start-work")
     ? safeHook("start-work", () => createStartWorkHook(ctx))
     : null
@@ -265,17 +267,6 @@ export function createSessionHooks(args: {
           pluginConfig,
         }))
     : null
-
-  const subagentBlacklistGuard = isHookEnabled("subagent-blacklist-guard")
-    ? safeHook("subagent-blacklist-guard", () =>
-        createSubagentBlacklistGuard({ pluginConfig }))
-    : null
-
-  const blacklistGuard = isHookEnabled("blacklist-guard")
-    ? safeHook("blacklist-guard", () =>
-        createBlacklistGuard({ pluginConfig }))
-    : null
-
   return {
     contextWindowMonitor,
     preemptiveCompaction,
@@ -291,6 +282,7 @@ export function createSessionHooks(args: {
     ralphLoop,
     editErrorRecovery,
     delegateTaskRetry,
+    delegateTaskEnglishDirective,
     startWork,
     prometheusMdOnly,
     sisyphusJuniorNotepad,
@@ -300,7 +292,5 @@ export function createSessionHooks(args: {
     taskResumeInfo,
     anthropicEffort,
     runtimeFallback,
-    subagentBlacklistGuard,
-    blacklistGuard,
   }
 }
