@@ -2111,6 +2111,254 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       // then
       await expect(result).rejects.toThrow("background_task.maxDescendants cannot be enforced safely")
     })
+
+    test("should release descendant quota when queued task is cancelled before session starts", async () => {
+      // given
+      manager.shutdown()
+      manager = new BackgroundManager(
+        {
+          client: createMockClientWithSessionChain({
+            "session-root": { directory: "/test/dir" },
+          }),
+          directory: tmpdir(),
+        } as unknown as PluginInput,
+        { defaultConcurrency: 1, maxDescendants: 2 },
+      )
+
+      const input = {
+        description: "Test task",
+        prompt: "Do something",
+        agent: "test-agent",
+        parentSessionID: "session-root",
+        parentMessageID: "parent-message",
+      }
+
+      await manager.launch(input)
+      const queuedTask = await manager.launch(input)
+      await new Promise(resolve => setTimeout(resolve, 50))
+      expect(manager.getTask(queuedTask.id)?.status).toBe("pending")
+
+      // when
+      const cancelled = manager.cancelPendingTask(queuedTask.id)
+      const replacementTask = await manager.launch(input)
+
+      // then
+      expect(cancelled).toBe(true)
+      expect(replacementTask.status).toBe("pending")
+    })
+
+    test("should release descendant quota when session creation fails before session starts", async () => {
+      // given
+      let createAttempts = 0
+      manager.shutdown()
+      manager = new BackgroundManager(
+        {
+          client: {
+            session: {
+              create: async () => {
+                createAttempts += 1
+                if (createAttempts === 1) {
+                  return { error: "session create failed", data: undefined }
+                }
+
+                return { data: { id: `ses_${crypto.randomUUID()}` } }
+              },
+              get: async () => ({ data: { directory: "/test/dir" } }),
+              prompt: async () => ({}),
+              promptAsync: async () => ({}),
+              messages: async () => ({ data: [] }),
+              todo: async () => ({ data: [] }),
+              status: async () => ({ data: {} }),
+              abort: async () => ({}),
+            },
+          },
+          directory: tmpdir(),
+        } as unknown as PluginInput,
+        { maxDescendants: 1 },
+      )
+
+      const input = {
+        description: "Test task",
+        prompt: "Do something",
+        agent: "test-agent",
+        parentSessionID: "session-root",
+        parentMessageID: "parent-message",
+      }
+
+      await manager.launch(input)
+      await new Promise(resolve => setTimeout(resolve, 50))
+      expect(createAttempts).toBe(1)
+
+      // when
+      const retryTask = await manager.launch(input)
+
+      // then
+      expect(retryTask.status).toBe("pending")
+    })
+
+    test("should keep the next queued task when the first task is cancelled during session creation", async () => {
+      // given
+      const firstSessionID = "ses-first-cancelled-during-create"
+      const secondSessionID = "ses-second-survives-queue"
+      let createCallCount = 0
+      let resolveFirstCreate: ((value: { data: { id: string } }) => void) | undefined
+      let resolveFirstCreateStarted: (() => void) | undefined
+      let resolveSecondPromptAsync: (() => void) | undefined
+      const firstCreateStarted = new Promise<void>((resolve) => {
+        resolveFirstCreateStarted = resolve
+      })
+      const secondPromptAsyncStarted = new Promise<void>((resolve) => {
+        resolveSecondPromptAsync = resolve
+      })
+
+      manager.shutdown()
+      manager = new BackgroundManager(
+        {
+          client: {
+            session: {
+              create: async () => {
+                createCallCount += 1
+                if (createCallCount === 1) {
+                  resolveFirstCreateStarted?.()
+                  return await new Promise<{ data: { id: string } }>((resolve) => {
+                    resolveFirstCreate = resolve
+                  })
+                }
+
+                return { data: { id: secondSessionID } }
+              },
+              get: async () => ({ data: { directory: "/test/dir" } }),
+              prompt: async () => ({}),
+              promptAsync: async ({ path }: { path: { id: string } }) => {
+                if (path.id === secondSessionID) {
+                  resolveSecondPromptAsync?.()
+                }
+
+                return {}
+              },
+              messages: async () => ({ data: [] }),
+              todo: async () => ({ data: [] }),
+              status: async () => ({ data: {} }),
+              abort: async () => ({}),
+            },
+          },
+          directory: tmpdir(),
+        } as unknown as PluginInput,
+        { defaultConcurrency: 1 }
+      )
+
+      const input = {
+        description: "Test task",
+        prompt: "Do something",
+        agent: "test-agent",
+        parentSessionID: "parent-session",
+        parentMessageID: "parent-message",
+      }
+
+      const firstTask = await manager.launch(input)
+      const secondTask = await manager.launch(input)
+      await firstCreateStarted
+
+      // when
+      const cancelled = await manager.cancelTask(firstTask.id, {
+        source: "test",
+        abortSession: false,
+      })
+      resolveFirstCreate?.({ data: { id: firstSessionID } })
+
+      await Promise.race([
+        secondPromptAsyncStarted,
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), 100)),
+      ])
+
+      // then
+      expect(cancelled).toBe(true)
+      expect(createCallCount).toBe(2)
+      expect(manager.getTask(firstTask.id)?.status).toBe("cancelled")
+      expect(manager.getTask(secondTask.id)?.status).toBe("running")
+      expect(manager.getTask(secondTask.id)?.sessionID).toBe(secondSessionID)
+    })
+
+    test("should keep task cancelled and abort the session when cancellation wins during session creation", async () => {
+      // given
+      const createdSessionID = "ses-cancelled-during-create"
+      let resolveCreate: ((value: { data: { id: string } }) => void) | undefined
+      let resolveCreateStarted: (() => void) | undefined
+      let resolveAbortCalled: (() => void) | undefined
+      const createStarted = new Promise<void>((resolve) => {
+        resolveCreateStarted = resolve
+      })
+      const abortCalled = new Promise<void>((resolve) => {
+        resolveAbortCalled = resolve
+      })
+      const abortCalls: string[] = []
+      const promptAsyncSessionIDs: string[] = []
+
+      manager.shutdown()
+      manager = new BackgroundManager(
+        {
+          client: {
+            session: {
+              create: async () => {
+                resolveCreateStarted?.()
+                return await new Promise<{ data: { id: string } }>((resolve) => {
+                  resolveCreate = resolve
+                })
+              },
+              get: async () => ({ data: { directory: "/test/dir" } }),
+              prompt: async () => ({}),
+              promptAsync: async ({ path }: { path: { id: string } }) => {
+                promptAsyncSessionIDs.push(path.id)
+                return {}
+              },
+              messages: async () => ({ data: [] }),
+              todo: async () => ({ data: [] }),
+              status: async () => ({ data: {} }),
+              abort: async ({ path }: { path: { id: string } }) => {
+                abortCalls.push(path.id)
+                resolveAbortCalled?.()
+                return {}
+              },
+            },
+          },
+          directory: tmpdir(),
+        } as unknown as PluginInput,
+        { defaultConcurrency: 1 }
+      )
+
+      const input = {
+        description: "Test task",
+        prompt: "Do something",
+        agent: "test-agent",
+        parentSessionID: "parent-session",
+        parentMessageID: "parent-message",
+      }
+
+      const task = await manager.launch(input)
+      await createStarted
+
+      // when
+      const cancelled = await manager.cancelTask(task.id, {
+        source: "test",
+        abortSession: false,
+      })
+      resolveCreate?.({ data: { id: createdSessionID } })
+
+      await Promise.race([
+        abortCalled,
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), 100)),
+      ])
+      await Promise.resolve()
+
+      // then
+      const updatedTask = manager.getTask(task.id)
+      expect(cancelled).toBe(true)
+      expect(updatedTask?.status).toBe("cancelled")
+      expect(updatedTask?.sessionID).toBeUndefined()
+      expect(promptAsyncSessionIDs).not.toContain(createdSessionID)
+      expect(abortCalls).toEqual([createdSessionID])
+      expect(getConcurrencyManager(manager).getCount("test-agent")).toBe(0)
+    })
   })
 
   describe("pending task can be cancelled", () => {

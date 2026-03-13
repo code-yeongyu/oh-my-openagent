@@ -31,4 +31,5 @@ export interface SessionState {
   promptFailureCount: number
   lastFailureAt?: number
   pendingRetryTimer?: ReturnType<typeof setTimeout>
+  waitingForFinalWaveApproval?: boolean
 }

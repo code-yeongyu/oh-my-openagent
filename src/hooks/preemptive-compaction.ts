@@ -1,22 +1,12 @@
 import { log } from "../shared/logger"
 import type { OhMyOpenCodeConfig } from "../config"
+import {
+  resolveActualContextLimit,
+  type ContextLimitModelCacheState,
+} from "../shared/context-limit-resolver"
 
 import { resolveCompactionModel } from "./shared/compaction-model-resolver"
-const DEFAULT_ACTUAL_LIMIT = 200_000
 const PREEMPTIVE_COMPACTION_TIMEOUT_MS = 120_000
-
-type ModelCacheStateLike = {
-  anthropicContext1MEnabled: boolean
-  modelContextLimitsCache?: Map<string, number>
-}
-
-function getAnthropicActualLimit(modelCacheState?: ModelCacheStateLike): number {
-  return (modelCacheState?.anthropicContext1MEnabled ?? false) ||
-    process.env.ANTHROPIC_1M_CONTEXT === "true" ||
-    process.env.VERTEX_ANTHROPIC_1M_CONTEXT === "true"
-    ? 1_000_000
-    : DEFAULT_ACTUAL_LIMIT
-}
 
 const PREEMPTIVE_COMPACTION_THRESHOLD = 0.78
 
@@ -33,7 +23,7 @@ interface CachedCompactionState {
   tokens: TokenInfo
 }
 
-function withTimeout<TValue>(
+async function withTimeout<TValue>(
   promise: Promise<TValue>,
   timeoutMs: number,
   errorMessage: string,
@@ -46,15 +36,11 @@ function withTimeout<TValue>(
     }, timeoutMs)
   })
 
-  return Promise.race([promise, timeoutPromise]).finally(() => {
+  return await Promise.race([promise, timeoutPromise]).finally(() => {
     if (timeoutID !== undefined) {
       clearTimeout(timeoutID)
     }
   })
-}
-
-function isAnthropicProvider(providerID: string): boolean {
-  return providerID === "anthropic" || providerID === "google-vertex-anthropic"
 }
 
 type PluginInput = {
@@ -76,7 +62,7 @@ type PluginInput = {
 export function createPreemptiveCompactionHook(
   ctx: PluginInput,
   pluginConfig: OhMyOpenCodeConfig,
-  modelCacheState?: ModelCacheStateLike,
+  modelCacheState?: ContextLimitModelCacheState,
 ) {
   const compactionInProgress = new Set<string>()
   const compactedSessions = new Set<string>()
@@ -92,24 +78,18 @@ export function createPreemptiveCompactionHook(
     const cached = tokenCache.get(sessionID)
     if (!cached) return
 
-    const isAnthropic = isAnthropicProvider(cached.providerID)
-    const modelSpecificLimit = !isAnthropic
-      ? modelCacheState?.modelContextLimitsCache?.get(`${cached.providerID}/${cached.modelID}`)
-      : undefined
+    const actualLimit = resolveActualContextLimit(
+      cached.providerID,
+      cached.modelID,
+      modelCacheState,
+    )
 
-    let actualLimit: number
-    if (isAnthropic) {
-      actualLimit = getAnthropicActualLimit(modelCacheState)
-    } else {
-      if (modelSpecificLimit === undefined) {
-        log("[preemptive-compaction] Skipping preemptive compaction: unknown context limit for model", {
-          providerID: cached.providerID,
-          modelID: cached.modelID,
-        })
-        return
-      }
-
-      actualLimit = modelSpecificLimit
+    if (actualLimit === null) {
+      log("[preemptive-compaction] Skipping preemptive compaction: unknown context limit for model", {
+        providerID: cached.providerID,
+        modelID: cached.modelID,
+      })
+      return
     }
 
     const lastTokens = cached.tokens

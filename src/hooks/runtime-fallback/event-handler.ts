@@ -54,6 +54,7 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
 
     sessionRetryInFlight.delete(sessionID)
     sessionAwaitingFallbackResult.delete(sessionID)
+    sessionStatusRetryKeys.delete(sessionID)
 
     const state = sessionStates.get(sessionID)
     if (state?.pendingFallbackModel) {
@@ -75,6 +76,7 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
     const hadTimeout = sessionFallbackTimeouts.has(sessionID)
     helpers.clearSessionFallbackTimeout(sessionID)
     sessionRetryInFlight.delete(sessionID)
+    sessionStatusRetryKeys.delete(sessionID)
 
     const state = sessionStates.get(sessionID)
     if (state?.pendingFallbackModel) {

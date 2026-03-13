@@ -38,11 +38,15 @@ export function createAtlasEventHandler(input: {
     if (event.type === "message.updated") {
       const info = props?.info as Record<string, unknown> | undefined
       const sessionID = info?.sessionID as string | undefined
+      const role = info?.role as string | undefined
       if (!sessionID) return
 
       const state = sessions.get(sessionID)
       if (state) {
         state.lastEventWasAbortError = false
+        if (role === "user") {
+          state.waitingForFinalWaveApproval = false
+        }
       }
       return
     }

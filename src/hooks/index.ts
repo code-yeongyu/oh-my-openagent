@@ -54,3 +54,4 @@ export { createHashlineReadEnhancerHook } from "./hashline-read-enhancer";
 export { createJsonErrorRecoveryHook, JSON_ERROR_TOOL_EXCLUDE_LIST, JSON_ERROR_PATTERNS, JSON_ERROR_REMINDER } from "./json-error-recovery";
 export { createReadImageResizerHook } from "./read-image-resizer"
 export { createCoeusCommandHook } from "./coeus-command"
+export { createDelegateTaskEnglishDirectiveHook } from "./delegate-task-english-directive"

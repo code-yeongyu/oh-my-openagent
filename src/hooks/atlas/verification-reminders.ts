@@ -108,6 +108,45 @@ ${commitStep}
 **${remaining} tasks remain. Keep bouldering.**`
 }
 
+export function buildFinalWaveApprovalReminder(
+  planName: string,
+  progress: { total: number; completed: number },
+  sessionId: string
+): string {
+  const remaining = progress.total - progress.completed
+
+  return `
+---
+
+**BOULDER STATE:** Plan: \
+\`${planName}\` | ${progress.completed}/${progress.total} done | ${remaining} remaining
+
+---
+
+${buildVerificationReminder(sessionId)}
+
+**FINAL WAVE APPROVAL GATE**
+
+The last Final Verification Wave result just passed.
+This is the ONLY point where approval-style user interaction is required.
+
+1. Read \
+\`.sisyphus/plans/${planName}.md\` again and confirm the remaining unchecked item is the last final-wave task.
+2. Consolidate the F1-F4 verdicts into a short summary for the user.
+3. Tell the user all final reviewers approved.
+4. Ask for explicit user approval before editing the last final-wave checkbox or marking the plan complete.
+5. Wait for the user's explicit approval. Do NOT auto-continue. Do NOT call \
+\`task()\` again unless the user rejects and requests fixes.
+
+If the user rejects or requests changes:
+- delegate the required fix
+- re-run the affected final-wave reviewer
+- present the updated results again
+- wait again for explicit user approval
+
+**DO NOT mark the final-wave checkbox complete until the user explicitly says okay.**`
+}
+
 export function buildStandaloneVerificationReminder(sessionId: string): string {
   return `
 ---
