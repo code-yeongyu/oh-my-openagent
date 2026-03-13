@@ -24,9 +24,17 @@ interface SessionErrorEvent {
   }
 }
 
-function isTokenLimitOrOverloadedError(error: SessionErrorEvent | undefined): boolean {
+function isTokenLimitOrOverloadedError(error: SessionErrorEvent | string | undefined): boolean {
   if (!error) {
     return false
+  }
+
+  if (typeof error === "string") {
+    const lower = error.toLowerCase()
+    return lower.includes("prompt is too long")
+      || lower.includes("context length")
+      || lower.includes("context_length")
+      || lower.includes("overloaded")
   }
 
   const errorMessage = [error.message, error.data?.message]

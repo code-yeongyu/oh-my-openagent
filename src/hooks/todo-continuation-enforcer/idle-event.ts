@@ -205,10 +205,21 @@ export async function handleSessionIdle(args: {
     return
   }
 
-  if (state.awaitingPostInjectionProgressCheck && state.lastTodoSnapshot !== undefined) {
+  if (state.lastTodoSnapshot !== undefined) {
     const previousTodoCount = state.lastTodoSnapshot
-    if (incompleteCount === previousTodoCount) {
+    if (incompleteCount < previousTodoCount) {
+      state.stagnationCount = 0
+      if (state.awaitingPostInjectionProgressCheck) {
+        state.awaitingPostInjectionProgressCheck = false
+      }
+      log(`[${HOOK_NAME}] Todo progress detected: reset stagnation`, {
+        sessionID,
+        previousTodoCount,
+        currentTodoCount: incompleteCount,
+      })
+    } else if (state.awaitingPostInjectionProgressCheck) {
       state.stagnationCount += 1
+      state.awaitingPostInjectionProgressCheck = false
       log(`[${HOOK_NAME}] Todo stagnation detected`, {
         sessionID,
         previousTodoCount,
@@ -216,15 +227,7 @@ export async function handleSessionIdle(args: {
         stagnationCount: state.stagnationCount,
         maxStagnationCount: MAX_STAGNATION_COUNT,
       })
-    } else {
-      state.stagnationCount = 0
-      log(`[${HOOK_NAME}] Todo progress detected: reset stagnation`, {
-        sessionID,
-        previousTodoCount,
-        currentTodoCount: incompleteCount,
-      })
     }
-    state.awaitingPostInjectionProgressCheck = false
   }
 
   if (state.stagnationCount >= MAX_STAGNATION_COUNT) {
