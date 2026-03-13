@@ -21,6 +21,7 @@ const installConfig: InstallConfig = {
   hasMinimaxCnCodingPlan: false,
   hasMinimaxCodingPlan: false,
   minimaxModelVariant: "standard",
+  hasOpencodeGo: false,
 }
 
 function getRecord(value: unknown): Record<string, unknown> {

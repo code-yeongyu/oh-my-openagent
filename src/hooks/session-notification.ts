@@ -3,6 +3,7 @@ import { subagentSessions, getMainSessionID } from "../features/claude-code-sess
 import {
   startBackgroundCheck,
 } from "./session-notification-utils"
+import { buildReadyNotificationContent } from "./session-notification-content"
 import {
   type Platform,
 } from "./session-notification-sender"
@@ -55,7 +56,28 @@ export function createSessionNotification(
     platform: currentPlatform,
     config: mergedConfig,
     hasIncompleteTodos,
-    send: sessionNotificationSender.sendSessionNotification,
+    send: async (hookCtx, platform, sessionID) => {
+      if (
+        typeof hookCtx.client.session.get !== "function"
+        && typeof hookCtx.client.session.messages !== "function"
+      ) {
+        await sessionNotificationSender.sendSessionNotification(
+          hookCtx,
+          platform,
+          mergedConfig.title,
+          mergedConfig.message,
+        )
+        return
+      }
+
+      const content = await buildReadyNotificationContent(hookCtx, {
+        sessionID,
+        baseTitle: mergedConfig.title,
+        baseMessage: mergedConfig.message,
+      })
+
+      await sessionNotificationSender.sendSessionNotification(hookCtx, platform, content.title, content.message)
+    },
     playSound: sessionNotificationSender.playSessionNotificationSound,
   })
 

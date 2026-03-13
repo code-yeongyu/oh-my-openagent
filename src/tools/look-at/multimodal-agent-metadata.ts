@@ -1,6 +1,11 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { MULTIMODAL_LOOKER_AGENT } from "./constants"
-import { log } from "../../shared"
+import { fetchAvailableModels } from "../../shared/model-availability"
+import { log } from "../../shared/logger"
+import { readConnectedProvidersCache } from "../../shared/connected-providers-cache"
+import { resolveModelPipeline } from "../../shared/model-resolution-pipeline"
+import { readVisionCapableModelsCache } from "../../shared/vision-capable-models-cache"
+import { buildMultimodalLookerFallbackChain } from "./multimodal-fallback-chain"
 
 type AgentModel = { providerID: string; modelID: string }
 
@@ -19,6 +24,33 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
 }
 
+function getFullModelKey(model: AgentModel): string {
+  return `${model.providerID}/${model.modelID}`
+}
+
+function isVisionCapableAgentModel(
+  agentModel: AgentModel | undefined,
+  visionCapableModels: Array<AgentModel>,
+): agentModel is AgentModel {
+  if (!agentModel) {
+    return false
+  }
+
+  return visionCapableModels.some((visionCapableModel) =>
+    getFullModelKey(visionCapableModel) === getFullModelKey(agentModel),
+  )
+}
+
+function parseAgentModel(model: string): AgentModel | undefined {
+  const [providerID, ...modelIDParts] = model.split("/")
+  const modelID = modelIDParts.join("/")
+  if (!providerID || modelID.length === 0) {
+    return undefined
+  }
+
+  return { providerID, modelID }
+}
+
 function toAgentInfo(value: unknown): AgentInfo | null {
   if (!isObject(value)) return null
   const name = typeof value["name"] === "string" ? value["name"] : undefined
@@ -33,22 +65,97 @@ function toAgentInfo(value: unknown): AgentInfo | null {
   return { name, model, variant }
 }
 
+async function resolveRegisteredAgentMetadata(
+  ctx: PluginInput,
+): Promise<ResolvedAgentMetadata> {
+  const agentsResult = await ctx.client.app?.agents?.()
+  const agentsRaw = isObject(agentsResult) ? agentsResult["data"] : undefined
+  const agents = Array.isArray(agentsRaw) ? agentsRaw.map(toAgentInfo).filter(Boolean) : []
+
+  const matched = agents.find(
+    (agent) => agent?.name?.toLowerCase() === MULTIMODAL_LOOKER_AGENT.toLowerCase()
+  )
+
+  return {
+    agentModel: matched?.model,
+    agentVariant: matched?.variant,
+  }
+}
+
+async function resolveDynamicAgentMetadata(
+  ctx: PluginInput,
+  visionCapableModels = readVisionCapableModelsCache(),
+): Promise<ResolvedAgentMetadata> {
+  const fallbackChain = buildMultimodalLookerFallbackChain(visionCapableModels)
+  const connectedProviders = readConnectedProvidersCache()
+  const availableModels = await fetchAvailableModels(ctx.client, {
+    connectedProviders,
+  })
+
+  const resolution = resolveModelPipeline({
+    constraints: {
+      availableModels,
+      connectedProviders,
+    },
+    policy: {
+      fallbackChain,
+    },
+  })
+
+  const agentModel = resolution ? parseAgentModel(resolution.model) : undefined
+  if (!isVisionCapableAgentModel(agentModel, visionCapableModels)) {
+    return {}
+  }
+
+  return {
+    agentModel,
+    agentVariant: resolution?.variant,
+  }
+}
+
+function isConfiguredVisionModel(
+  configuredModel: AgentModel | undefined,
+  dynamicModel: AgentModel | undefined,
+): boolean {
+  if (!configuredModel || !dynamicModel) {
+    return false
+  }
+
+  return getFullModelKey(configuredModel) === getFullModelKey(dynamicModel)
+}
+
 export async function resolveMultimodalLookerAgentMetadata(
   ctx: PluginInput
 ): Promise<ResolvedAgentMetadata> {
   try {
-    const agentsResult = await ctx.client.app?.agents?.()
-    const agentsRaw = isObject(agentsResult) ? agentsResult["data"] : undefined
-    const agents = Array.isArray(agentsRaw) ? agentsRaw.map(toAgentInfo).filter(Boolean) : []
-
-    const matched = agents.find(
-      (agent) => agent?.name?.toLowerCase() === MULTIMODAL_LOOKER_AGENT.toLowerCase()
+    const registeredMetadata = await resolveRegisteredAgentMetadata(ctx)
+    const visionCapableModels = readVisionCapableModelsCache()
+    const registeredModelIsVisionCapable = isVisionCapableAgentModel(
+      registeredMetadata.agentModel,
+      visionCapableModels,
     )
 
-    return {
-      agentModel: matched?.model,
-      agentVariant: matched?.variant,
+    const dynamicMetadata = await resolveDynamicAgentMetadata(ctx, visionCapableModels)
+
+    if (
+      registeredModelIsVisionCapable &&
+      isConfiguredVisionModel(registeredMetadata.agentModel, dynamicMetadata.agentModel)
+    ) {
+      return {
+        agentModel: registeredMetadata.agentModel,
+        agentVariant: registeredMetadata.agentVariant ?? dynamicMetadata.agentVariant,
+      }
     }
+
+    if (dynamicMetadata.agentModel) {
+      return dynamicMetadata
+    }
+
+    if (registeredModelIsVisionCapable) {
+      return registeredMetadata
+    }
+
+    return {}
   } catch (error) {
     log("[look_at] Failed to resolve multimodal-looker model info", error)
     return {}

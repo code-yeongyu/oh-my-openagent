@@ -30,6 +30,7 @@ export { createCategorySkillReminderHook } from "./category-skill-reminder";
 export { createRalphLoopHook, type RalphLoopHook } from "./ralph-loop";
 export { createNoSisyphusGptHook } from "./no-sisyphus-gpt";
 export { createNoHephaestusNonGptHook } from "./no-hephaestus-non-gpt";
+export { createGptPermissionContinuationHook, type GptPermissionContinuationHook } from "./gpt-permission-continuation"
 export { createAutoSlashCommandHook } from "./auto-slash-command";
 export { createEditErrorRecoveryHook } from "./edit-error-recovery";
 
@@ -51,3 +52,4 @@ export { createWriteExistingFileGuardHook } from "./write-existing-file-guard";
 export { createHashlineReadEnhancerHook } from "./hashline-read-enhancer";
 export { createJsonErrorRecoveryHook, JSON_ERROR_TOOL_EXCLUDE_LIST, JSON_ERROR_PATTERNS, JSON_ERROR_REMINDER } from "./json-error-recovery";
 export { createReadImageResizerHook } from "./read-image-resizer"
+export { createDelegateTaskEnglishDirectiveHook } from "./delegate-task-english-directive"

@@ -19,11 +19,12 @@ import {
 import { getFallbackModelsForSession } from "../hooks/runtime-fallback/fallback-models";
 import { resetMessageCursor } from "../shared";
 import { getAgentConfigKey } from "../shared/agent-display-names";
+import { readConnectedProvidersCache } from "../shared/connected-providers-cache";
 import { log } from "../shared/logger";
 import { shouldRetryError } from "../shared/model-error-classifier";
 import { buildFallbackChainFromModels } from "../shared/fallback-chain-from-models";
 import { extractRetryAttempt, normalizeRetryStatusMessage } from "../shared/retry-status-utils";
-import { clearSessionModel, setSessionModel } from "../shared/session-model-state";
+import { clearSessionModel, getSessionModel, setSessionModel } from "../shared/session-model-state";
 import { deleteSessionTools } from "../shared/session-tools-store";
 import { lspManager } from "../tools";
 
@@ -165,14 +166,40 @@ export function createEventHandler(args: {
   const lastHandledRetryStatusKey = new Map<string, string>();
   const lastKnownModelBySession = new Map<string, { providerID: string; modelID: string }>();
 
+  const resolveFallbackProviderID = (sessionID: string, providerHint?: string): string => {
+    const sessionModel = getSessionModel(sessionID);
+    if (sessionModel?.providerID) {
+      return sessionModel.providerID;
+    }
+
+    const lastKnownModel = lastKnownModelBySession.get(sessionID);
+    if (lastKnownModel?.providerID) {
+      return lastKnownModel.providerID;
+    }
+
+    const normalizedProviderHint = providerHint?.trim();
+    if (normalizedProviderHint) {
+      return normalizedProviderHint;
+    }
+
+    const connectedProvider = readConnectedProvidersCache()?.[0];
+    if (connectedProvider) {
+      return connectedProvider;
+    }
+
+    return "opencode";
+  };
+
   const dispatchToHooks = async (input: EventInput): Promise<void> => {
     await Promise.resolve(hooks.autoUpdateChecker?.event?.(input));
     await Promise.resolve(hooks.claudeCodeHooks?.event?.(input));
     await Promise.resolve(hooks.backgroundNotificationHook?.event?.(input));
     await Promise.resolve(hooks.sessionNotification?.(input));
+    await Promise.resolve(hooks.gptPermissionContinuation?.handler?.(input));
     await Promise.resolve(hooks.todoContinuationEnforcer?.handler?.(input));
     await Promise.resolve(hooks.unstableAgentBabysitter?.event?.(input));
     await Promise.resolve(hooks.contextWindowMonitor?.event?.(input));
+    await Promise.resolve(hooks.preemptiveCompaction?.event?.(input));
     await Promise.resolve(hooks.directoryAgentsInjector?.event?.(input));
     await Promise.resolve(hooks.directoryReadmeInjector?.event?.(input));
     await Promise.resolve(hooks.rulesInjector?.event?.(input));
@@ -184,9 +211,11 @@ export function createEventHandler(args: {
     await Promise.resolve(hooks.interactiveBashSession?.event?.(input as EventInput));
     await Promise.resolve(hooks.ralphLoop?.event?.(input));
     await Promise.resolve(hooks.stopContinuationGuard?.event?.(input));
+    await Promise.resolve(hooks.compactionContextInjector?.event?.(input));
     await Promise.resolve(hooks.compactionTodoPreserver?.event?.(input));
     await Promise.resolve(hooks.writeExistingFileGuard?.event?.(input));
     await Promise.resolve(hooks.atlasHook?.handler?.(input));
+    await Promise.resolve(hooks.autoSlashCommand?.event?.(input));
   };
 
   const recentSyntheticIdles = new Map<string, number>();
@@ -290,6 +319,7 @@ export function createEventHandler(args: {
       }
 
       if (sessionInfo?.id) {
+        const wasSyncSubagentSession = syncSubagentSessions.has(sessionInfo.id);
         clearSessionAgent(sessionInfo.id);
         lastHandledModelErrorMessageID.delete(sessionInfo.id);
         lastHandledRetryStatusKey.delete(sessionInfo.id);
@@ -300,6 +330,9 @@ export function createEventHandler(args: {
         firstMessageVariantGate.clear(sessionInfo.id);
         clearSessionModel(sessionInfo.id);
         syncSubagentSessions.delete(sessionInfo.id);
+        if (wasSyncSubagentSession) {
+          subagentSessions.delete(sessionInfo.id);
+        }
         deleteSessionTools(sessionInfo.id);
         await managers.skillMcpManager.disconnectSession(sessionInfo.id);
         await lspManager.cleanupTempDirectoryClients();
@@ -315,12 +348,13 @@ export function createEventHandler(args: {
       const agent = info?.agent as string | undefined;
       const role = info?.role as string | undefined;
       if (sessionID && role === "user") {
-        if (agent && !isCompactionAgent(agent)) {
+        const isCompactionMessage = agent ? isCompactionAgent(agent) : false;
+        if (agent && !isCompactionMessage) {
           updateSessionAgent(sessionID, agent);
         }
         const providerID = info?.providerID as string | undefined;
         const modelID = info?.modelID as string | undefined;
-        if (providerID && modelID) {
+        if (providerID && modelID && !isCompactionMessage) {
           lastKnownModelBySession.set(sessionID, { providerID, modelID });
           setSessionModel(sessionID, { providerID, modelID });
         }
@@ -356,7 +390,10 @@ export function createEventHandler(args: {
               }
 
               if (agentName) {
-                const currentProvider = (info?.providerID as string | undefined) ?? "opencode";
+                const currentProvider = resolveFallbackProviderID(
+                  sessionID,
+                  info?.providerID as string | undefined,
+                );
                 const rawModel = (info?.modelID as string | undefined) ?? "claude-opus-4-6";
                 const currentModel = normalizeFallbackModelID(rawModel);
                 applyUserConfiguredFallbackChain(sessionID, agentName, currentProvider, args.pluginConfig);
@@ -413,7 +450,7 @@ export function createEventHandler(args: {
             if (agentName) {
               const parsed = extractProviderModelFromErrorMessage(retryMessage);
               const lastKnown = lastKnownModelBySession.get(sessionID);
-              const currentProvider = parsed.providerID ?? lastKnown?.providerID ?? "opencode";
+              const currentProvider = resolveFallbackProviderID(sessionID, parsed.providerID);
               let currentModel = parsed.modelID ?? lastKnown?.modelID ?? "claude-opus-4-6";
               currentModel = normalizeFallbackModelID(currentModel);
               applyUserConfiguredFallbackChain(sessionID, agentName, currentProvider, args.pluginConfig);
@@ -485,7 +522,10 @@ export function createEventHandler(args: {
 
           if (agentName) {
             const parsed = extractProviderModelFromErrorMessage(errorMessage);
-            const currentProvider = (props?.providerID as string) || parsed.providerID || "opencode";
+            const currentProvider = resolveFallbackProviderID(
+              sessionID,
+              (props?.providerID as string | undefined) || parsed.providerID,
+            );
             let currentModel = (props?.modelID as string) || parsed.modelID || "claude-opus-4-6";
             currentModel = normalizeFallbackModelID(currentModel);
             applyUserConfiguredFallbackChain(sessionID, agentName, currentProvider, args.pluginConfig);

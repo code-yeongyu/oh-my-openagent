@@ -1,5 +1,24 @@
-import pc from "picocolors"
 import { spawnWithWindowsHide } from "../../shared/spawn-with-windows-hide"
+import { log } from "../../shared"
+
+async function readOutput(
+  stream: ReadableStream<Uint8Array> | undefined,
+  streamName: "stdout" | "stderr"
+): Promise<string> {
+  if (!stream) {
+    return ""
+  }
+
+  try {
+    return await new Response(stream).text()
+  } catch (error) {
+    log("Failed to read on-complete hook output", {
+      stream: streamName,
+      error: error instanceof Error ? error.message : String(error),
+    })
+    return ""
+  }
+}
 
 export async function executeOnCompleteHook(options: {
   command: string
@@ -15,7 +34,7 @@ export async function executeOnCompleteHook(options: {
     return
   }
 
-  console.error(pc.dim(`Running on-complete hook: ${trimmedCommand}`))
+  log("Running on-complete hook", { command: trimmedCommand })
 
   try {
     const proc = spawnWithWindowsHide(["sh", "-c", trimmedCommand], {
@@ -26,18 +45,34 @@ export async function executeOnCompleteHook(options: {
         DURATION_MS: String(durationMs),
         MESSAGE_COUNT: String(messageCount),
       },
-      stdout: "inherit",
-      stderr: "inherit",
+      stdout: "pipe",
+      stderr: "pipe",
     })
 
-    const hookExitCode = await proc.exited
+    const [hookExitCode, stdout, stderr] = await Promise.all([
+      proc.exited,
+      readOutput(proc.stdout, "stdout"),
+      readOutput(proc.stderr, "stderr"),
+    ])
+
+    if (stdout.trim()) {
+      log("On-complete hook stdout", { command: trimmedCommand, stdout: stdout.trim() })
+    }
+
+    if (stderr.trim()) {
+      log("On-complete hook stderr", { command: trimmedCommand, stderr: stderr.trim() })
+    }
 
     if (hookExitCode !== 0) {
-      console.error(
-        pc.yellow(`Warning: on-complete hook exited with code ${hookExitCode}`)
-      )
+      log("On-complete hook exited with non-zero code", {
+        command: trimmedCommand,
+        exitCode: hookExitCode,
+      })
     }
   } catch (error) {
-    console.error(pc.yellow(`Warning: Failed to execute on-complete hook: ${error instanceof Error ? error.message : String(error)}`))
+    log("Failed to execute on-complete hook", {
+      command: trimmedCommand,
+      error: error instanceof Error ? error.message : String(error),
+    })
   }
 }

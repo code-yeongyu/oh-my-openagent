@@ -1,9 +1,12 @@
-const { describe, expect, test, beforeEach, afterEach, spyOn } = require("bun:test")
-
+import { afterEach, beforeEach, describe, expect, jest, spyOn, test } from "bun:test"
 import { createSessionNotification } from "./session-notification"
 import { setMainSession, subagentSessions, _resetForTesting } from "../features/claude-code-session-state"
 import * as utils from "./session-notification-utils"
 import * as sender from "./session-notification-sender"
+
+const originalSetTimeout = globalThis.setTimeout
+const originalClearTimeout = globalThis.clearTimeout
+const originalDateNow = Date.now
 
 describe("session-notification", () => {
   let notificationCalls: string[]
@@ -31,6 +34,10 @@ describe("session-notification", () => {
   }
 
   beforeEach(() => {
+    jest.useRealTimers()
+    globalThis.setTimeout = originalSetTimeout
+    globalThis.clearTimeout = originalClearTimeout
+    Date.now = originalDateNow
     _resetForTesting()
     notificationCalls = []
     
@@ -42,13 +49,24 @@ describe("session-notification", () => {
     spyOn(utils, "getAplayPath").mockResolvedValue("/usr/bin/aplay")
     spyOn(utils, "startBackgroundCheck").mockImplementation(() => {})
     spyOn(sender, "detectPlatform").mockReturnValue("darwin")
-    spyOn(sender, "sendSessionNotification").mockImplementation(async (_ctx, _platform, _title, message) => {
-      notificationCalls.push(message)
-    })
+    spyOn(sender, "sendSessionNotification").mockImplementation(
+      async (
+        _ctx: Parameters<typeof sender.sendSessionNotification>[0],
+        _platform: Parameters<typeof sender.sendSessionNotification>[1],
+        _title: Parameters<typeof sender.sendSessionNotification>[2],
+        message: Parameters<typeof sender.sendSessionNotification>[3]
+      ) => {
+        notificationCalls.push(message)
+      }
+    )
   })
 
   afterEach(() => {
     // given - cleanup after each test
+    jest.useRealTimers()
+    globalThis.setTimeout = originalSetTimeout
+    globalThis.clearTimeout = originalClearTimeout
+    Date.now = originalDateNow
     subagentSessions.clear()
     _resetForTesting()
   })
@@ -372,12 +390,16 @@ describe("session-notification", () => {
   function createSenderMockCtx() {
     const notifyCalls: string[] = []
     const mockCtx = {
-      $: async (cmd: TemplateStringsArray | string, ...values: any[]) => {
+      $: (cmd: TemplateStringsArray | string, ...values: any[]) => {
         const cmdStr = typeof cmd === "string"
           ? cmd
           : cmd.reduce((acc, part, i) => acc + part + (values[i] ?? ""), "")
         notifyCalls.push(cmdStr)
-        return { stdout: "", stderr: "", exitCode: 0 }
+        const result = { stdout: "", stderr: "", exitCode: 0 }
+        const promise = Promise.resolve(result) as any
+        promise.quiet = () => promise
+        promise.nothrow = () => { const p = Promise.resolve(result) as any; p.quiet = () => p; p.nothrow = () => p; return p }
+        return promise
       },
     } as any
     return { mockCtx, notifyCalls }
@@ -433,17 +455,25 @@ describe("session-notification", () => {
     spyOn(sender, "sendSessionNotification").mockRestore()
     const notifyCalls: string[] = []
     const mockCtx = {
-      $: async (cmd: TemplateStringsArray | string, ...values: unknown[]) => {
+      $: (cmd: TemplateStringsArray | string, ...values: unknown[]) => {
         const cmdStr = typeof cmd === "string"
           ? cmd
           : cmd.reduce((acc, part, index) => `${acc}${part}${String(values[index] ?? "")}`, "")
         notifyCalls.push(cmdStr)
 
         if (cmdStr.includes("terminal-notifier")) {
-          throw new Error("terminal-notifier failed")
+          const err = Object.assign(new Error("terminal-notifier failed"), { stdout: "", stderr: "", exitCode: 1 })
+          const rejected = Promise.reject(err) as any
+          rejected.quiet = () => rejected
+          rejected.nothrow = () => { const p = Promise.resolve({ stdout: "", stderr: "", exitCode: 1 }) as any; p.quiet = () => p; p.nothrow = () => p; return p }
+          return rejected
         }
 
-        return { stdout: "", stderr: "", exitCode: 0 }
+        const result = { stdout: "", stderr: "", exitCode: 0 }
+        const promise = Promise.resolve(result) as any
+        promise.quiet = () => promise
+        promise.nothrow = () => { const p = Promise.resolve(result) as any; p.quiet = () => p; p.nothrow = () => p; return p }
+        return promise
       },
     } as any
     spyOn(utils, "getTerminalNotifierPath").mockResolvedValue("/usr/local/bin/terminal-notifier")
@@ -464,16 +494,24 @@ describe("session-notification", () => {
     spyOn(sender, "sendSessionNotification").mockRestore()
     const notifyCalls: string[] = []
     const mockCtx = {
-      $: async (cmd: TemplateStringsArray | string, ...values: unknown[]) => {
+      $: (cmd: TemplateStringsArray | string, ...values: unknown[]) => {
         if (values.some(Array.isArray)) {
-          throw new Error("array interpolation unsupported")
+          const err = Object.assign(new Error("array interpolation unsupported"), { stdout: "", stderr: "", exitCode: 1 })
+          const rejected = Promise.reject(err) as any
+          rejected.quiet = () => rejected
+          rejected.nothrow = () => { const p = Promise.resolve({ stdout: "", stderr: "", exitCode: 1 }) as any; p.quiet = () => p; p.nothrow = () => p; return p }
+          return rejected
         }
 
         const commandString = typeof cmd === "string"
           ? cmd
           : cmd.reduce((acc, part, index) => `${acc}${part}${String(values[index] ?? "")}`, "")
         notifyCalls.push(commandString)
-        return { stdout: "", stderr: "", exitCode: 0 }
+        const result = { stdout: "", stderr: "", exitCode: 0 }
+        const promise = Promise.resolve(result) as any
+        promise.quiet = () => promise
+        promise.nothrow = () => { const p = Promise.resolve(result) as any; p.quiet = () => p; p.nothrow = () => p; return p }
+        return promise
       },
     } as any
     spyOn(utils, "getTerminalNotifierPath").mockResolvedValue("/usr/local/bin/terminal-notifier")
@@ -514,55 +552,68 @@ describe("session-notification", () => {
   })
 
   test("should ignore activity events within grace period", async () => {
-    // given - main session is set
-    const mainSessionID = "main-grace"
-    setMainSession(mainSessionID)
+    jest.useFakeTimers()
+    jest.setSystemTime(new Date("2026-01-01T00:00:00.000Z"))
 
-    const hook = createSessionNotification(createMockPluginInput(), {
-      idleConfirmationDelay: 50,
-      skipIfIncompleteTodos: false,
-      activityGracePeriodMs: 100,
-    })
+    try {
+      // given - a regular session notification is scheduled
+      const sessionID = "main-grace"
 
-    // when - session goes idle
-    await hook({
-      event: {
-        type: "session.idle",
-        properties: { sessionID: mainSessionID },
-      },
-    })
+      const hook = createSessionNotification(createMockPluginInput(), {
+        idleConfirmationDelay: 50,
+        skipIfIncompleteTodos: false,
+        activityGracePeriodMs: 100,
+        enforceMainSessionFilter: false,
+      })
 
-    // when - activity happens immediately (within grace period)
-    await hook({
-      event: {
-        type: "tool.execute.before",
-        properties: { sessionID: mainSessionID },
-      },
-    })
+      // when - session goes idle
+      await hook({
+        event: {
+          type: "session.idle",
+          properties: { sessionID },
+        },
+      })
 
-    // Wait for idle delay to pass
-    await new Promise((resolve) => setTimeout(resolve, 100))
+      // when - activity happens immediately (within grace period)
+      await hook({
+        event: {
+          type: "tool.execute.before",
+          properties: { sessionID },
+        },
+      })
 
-    // then - notification SHOULD be sent (activity was within grace period, ignored)
-    expect(notificationCalls.length).toBeGreaterThanOrEqual(1)
+      // when - idle confirmation delay passes deterministically
+      jest.advanceTimersByTime(50)
+      jest.runOnlyPendingTimers()
+      await Promise.resolve()
+
+      // then - notification SHOULD be sent (activity was within grace period, ignored)
+      expect(notificationCalls.length).toBeGreaterThanOrEqual(1)
+    } finally {
+      jest.clearAllTimers()
+      jest.useRealTimers()
+      globalThis.setTimeout = originalSetTimeout
+      globalThis.clearTimeout = originalClearTimeout
+      Date.now = originalDateNow
+    }
   })
 
   test("should cancel notification for activity after grace period", async () => {
-    // given - main session is set
-    const mainSessionID = "main-grace-cancel"
-    setMainSession(mainSessionID)
+    // given - a regular session notification is scheduled
+    const sessionID = "main-grace-cancel"
 
     const hook = createSessionNotification(createMockPluginInput(), {
       idleConfirmationDelay: 200,
       skipIfIncompleteTodos: false,
       activityGracePeriodMs: 50,
+      enforceMainSessionFilter: false,
     })
 
     // when - session goes idle
     await hook({
       event: {
         type: "session.idle",
-        properties: { sessionID: mainSessionID },
+        properties: { sessionID },
       },
     })
 
@@ -573,7 +624,7 @@ describe("session-notification", () => {
     await hook({
       event: {
         type: "tool.execute.before",
-        properties: { sessionID: mainSessionID },
+        properties: { sessionID },
       },
     })
 

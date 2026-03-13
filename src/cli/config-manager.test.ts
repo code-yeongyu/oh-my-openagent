@@ -184,6 +184,7 @@ describe("generateOmoConfig - model fallback system", () => {
       hasMinimaxCnCodingPlan: false,
       hasMinimaxCodingPlan: false,
       minimaxModelVariant: "standard",
+      hasOpencodeGo: false,
     }
 
     // #when generating config
@@ -207,6 +208,7 @@ describe("generateOmoConfig - model fallback system", () => {
       hasMinimaxCnCodingPlan: false,
       hasMinimaxCodingPlan: false,
       minimaxModelVariant: "standard",
+      hasOpencodeGo: false,
     }
 
     // #when generating config
@@ -231,6 +233,7 @@ describe("generateOmoConfig - model fallback system", () => {
       hasMinimaxCnCodingPlan: false,
       hasMinimaxCodingPlan: false,
       minimaxModelVariant: "standard",
+      hasOpencodeGo: false,
     }
 
     // #when generating config
@@ -256,6 +259,7 @@ describe("generateOmoConfig - model fallback system", () => {
       hasMinimaxCnCodingPlan: false,
       hasMinimaxCodingPlan: false,
       minimaxModelVariant: "standard",
+      hasOpencodeGo: false,
     }
 
     // #when generating config
@@ -284,6 +288,7 @@ describe("generateOmoConfig - model fallback system", () => {
       hasMinimaxCnCodingPlan: false,
       hasMinimaxCodingPlan: false,
       minimaxModelVariant: "standard",
+      hasOpencodeGo: false,
     }
 
     // #when generating config
@@ -307,6 +312,7 @@ describe("generateOmoConfig - model fallback system", () => {
       hasMinimaxCnCodingPlan: false,
       hasMinimaxCodingPlan: false,
       minimaxModelVariant: "standard",
+      hasOpencodeGo: false,
     }
 
     // #when generating config

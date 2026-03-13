@@ -5,6 +5,7 @@ export interface TodoContinuationEnforcerOptions {
   backgroundManager?: BackgroundManager
   skipAgents?: string[]
   isContinuationStopped?: (sessionID: string) => boolean
+  shouldSkipContinuation?: (sessionID: string) => boolean
 }
 
 export interface TodoContinuationEnforcer {
@@ -12,6 +13,7 @@ export interface TodoContinuationEnforcer {
   markRecovering: (sessionID: string) => void
   markRecoveryComplete: (sessionID: string) => void
   cancelAllCountdowns: () => void
+  dispose: () => void
 }
 
 export interface Todo {
@@ -27,8 +29,11 @@ export interface SessionState {
   isRecovering?: boolean
   countdownStartedAt?: number
   abortDetectedAt?: number
+  lastIncompleteCount?: number
   lastInjectedAt?: number
+  awaitingPostInjectionProgressCheck?: boolean
   inFlight?: boolean
+  stagnationCount: number
   consecutiveFailures: number
 }
 

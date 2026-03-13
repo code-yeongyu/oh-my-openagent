@@ -48,7 +48,7 @@ export async function spawnTmuxPane(
 
 	log("[spawnTmuxPane] all checks passed, spawning...")
 
-	const opencodeCmd = `opencode attach ${serverUrl} --session ${sessionId}`
+	const opencodeCmd = `zsh -c 'opencode attach ${serverUrl} --session ${sessionId}'`
 
 	const args = [
 		"split-window",

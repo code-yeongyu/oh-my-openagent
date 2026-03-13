@@ -58,6 +58,11 @@ export function extractErrorName(error: unknown): string | undefined {
     return directName
   }
 
+  const dataName = (errorObj.data as Record<string, unknown> | undefined)?.name
+  if (typeof dataName === "string" && dataName.length > 0) {
+    return dataName
+  }
+
   const nestedError = errorObj.error as Record<string, unknown> | undefined
   const nestedName = nestedError?.name
   if (typeof nestedName === "string" && nestedName.length > 0) {
@@ -78,6 +83,7 @@ export function classifyErrorType(error: unknown): string | undefined {
   const errorName = extractErrorName(error)?.toLowerCase()
 
   if (
+    errorName?.includes("ai_loadapikeyerror") ||
     errorName?.includes("loadapi") ||
     (/api.?key.?is.?missing/i.test(message) && /environment variable/i.test(message))
   ) {
@@ -88,7 +94,11 @@ export function classifyErrorType(error: unknown): string | undefined {
     return "invalid_api_key"
   }
 
-  if (errorName?.includes("unknownerror") && /model\s+not\s+found/i.test(message)) {
+  if (
+    errorName?.includes("providermodelnotfounderror") ||
+    errorName?.includes("modelnotfounderror") ||
+    (errorName?.includes("unknownerror") && /model\s+not\s+found/i.test(message))
+  ) {
     return "model_not_found"
   }
 

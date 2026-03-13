@@ -1025,7 +1025,6 @@ Original task: Build something`
       const transcriptPath = join(TEST_DIR, "transcript.jsonl")
       const toolResultEntry = JSON.stringify({
         type: "tool_result",
-        timestamp: new Date().toISOString(),
         tool_name: "write",
         tool_input: {},
         tool_output: { output: "Task complete! <promise>DONE</promise>" },

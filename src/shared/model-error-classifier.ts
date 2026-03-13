@@ -6,13 +6,14 @@ import { readConnectedProvidersCache } from "./connected-providers-cache"
  * These errors completely halt the action loop and should trigger fallback retry.
  */
 const RETRYABLE_ERROR_NAMES = new Set([
-  "ProviderModelNotFoundError",
-  "RateLimitError",
-  "QuotaExceededError",
-  "InsufficientCreditsError",
-  "ModelUnavailableError",
-  "ProviderConnectionError",
-  "AuthenticationError",
+  "providermodelnotfounderror",
+  "ratelimiterror",
+  "quotaexceedederror",
+  "insufficientcreditserror",
+  "modelunavailableerror",
+  "providerconnectionerror",
+  "authenticationerror",
+  "freeusagelimiterror",
 ])
 
 /**
@@ -20,13 +21,13 @@ const RETRYABLE_ERROR_NAMES = new Set([
  * These errors are typically user-induced or fixable without switching models.
  */
 const NON_RETRYABLE_ERROR_NAMES = new Set([
-  "MessageAbortedError",
-  "PermissionDeniedError",
-  "ContextLengthError",
-  "TimeoutError",
-  "ValidationError",
-  "SyntaxError",
-  "UserError",
+  "messageabortederror",
+  "permissiondeniederror",
+  "contextlengtherror",
+  "timeouterror",
+  "validationerror",
+  "syntaxerror",
+  "usererror",
 ])
 
 /**
@@ -55,9 +56,17 @@ const RETRYABLE_MESSAGE_PATTERNS = [
   "timeout",
   "service unavailable",
   "internal_server_error",
+  "free usage",
+  "usage exceeded",
+  "credit",
+  "balance",
+  "temporarily unavailable",
+  "try again",
   "503",
   "502",
   "504",
+  "429",
+  "529",
 ]
 
 const AUTO_RETRY_GATE_PATTERNS = [
@@ -89,12 +98,13 @@ export interface ErrorInfo {
 export function isRetryableModelError(error: ErrorInfo): boolean {
   // If we have an error name, check against known lists
   if (error.name) {
+    const errorNameLower = error.name.toLowerCase()
     // Explicit non-retryable takes precedence
-    if (NON_RETRYABLE_ERROR_NAMES.has(error.name)) {
+    if (NON_RETRYABLE_ERROR_NAMES.has(errorNameLower)) {
       return false
     }
     // Check if it's a known retryable error
-    if (RETRYABLE_ERROR_NAMES.has(error.name)) {
+    if (RETRYABLE_ERROR_NAMES.has(errorNameLower)) {
       return true
     }
   }

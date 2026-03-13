@@ -1,27 +1,46 @@
-import { describe, test, expect, beforeEach, afterEach, spyOn } from "bun:test"
-import { existsSync, mkdirSync, rmSync } from "fs"
-import { join } from "path"
-import * as dataPath from "./data-path"
-import { updateConnectedProvidersCache, readProviderModelsCache } from "./connected-providers-cache"
+/// <reference types="bun-types" />
 
-const TEST_CACHE_DIR = join(import.meta.dir, "__test-cache__")
+import { beforeAll, beforeEach, afterEach, describe, expect, mock, test } from "bun:test"
+
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import * as dataPath from "./data-path"
+
+let testCacheDir = ""
+let moduleImportCounter = 0
+
+const getOmoOpenCodeCacheDirMock = mock(() => testCacheDir)
+
+let updateConnectedProvidersCache: typeof import("./connected-providers-cache").updateConnectedProvidersCache
+let readProviderModelsCache: typeof import("./connected-providers-cache").readProviderModelsCache
+
+async function prepareConnectedProvidersCacheTestModule(): Promise<void> {
+	testCacheDir = mkdtempSync(join(tmpdir(), "connected-providers-cache-test-"))
+	getOmoOpenCodeCacheDirMock.mockClear()
+	mock.module("./data-path", () => ({
+		getOmoOpenCodeCacheDir: getOmoOpenCodeCacheDirMock,
+	}))
+	moduleImportCounter += 1
+	;({ updateConnectedProvidersCache, readProviderModelsCache } = await import(`./connected-providers-cache?test=${moduleImportCounter}`))
+}
 
 describe("updateConnectedProvidersCache", () => {
-	let cacheDirSpy: ReturnType<typeof spyOn>
+	beforeAll(() => {
+		mock.restore()
+	})
 
-	beforeEach(() => {
-		cacheDirSpy = spyOn(dataPath, "getOmoOpenCodeCacheDir").mockReturnValue(TEST_CACHE_DIR)
-		if (existsSync(TEST_CACHE_DIR)) {
-			rmSync(TEST_CACHE_DIR, { recursive: true })
-		}
-		mkdirSync(TEST_CACHE_DIR, { recursive: true })
+	beforeEach(async () => {
+		mock.restore()
+		await prepareConnectedProvidersCacheTestModule()
 	})
 
 	afterEach(() => {
-		cacheDirSpy.mockRestore()
-		if (existsSync(TEST_CACHE_DIR)) {
-			rmSync(TEST_CACHE_DIR, { recursive: true })
+		mock.restore()
+		if (existsSync(testCacheDir)) {
+			rmSync(testCacheDir, { recursive: true, force: true })
 		}
+		testCacheDir = ""
 	})
 
 	test("extracts models from provider.list().all response", async () => {
@@ -129,5 +148,26 @@ describe("updateConnectedProvidersCache", () => {
 		//#then
 		const cache = readProviderModelsCache()
 		expect(cache).toBeNull()
+	})
+
+	test("does not remove the user's real cache directory during test setup", async () => {
+		//#given
+		const realCacheDir = join(dataPath.getCacheDir(), "oh-my-opencode")
+		const sentinelPath = join(realCacheDir, "connected-providers-cache.test-sentinel.json")
+		mkdirSync(realCacheDir, { recursive: true })
+		writeFileSync(sentinelPath, JSON.stringify({ keep: true }))
+
+		try {
+			//#when
+			await prepareConnectedProvidersCacheTestModule()
+
+			//#then
+			expect(existsSync(sentinelPath)).toBe(true)
+			expect(readFileSync(sentinelPath, "utf-8")).toBe(JSON.stringify({ keep: true }))
+		} finally {
+			if (existsSync(sentinelPath)) {
+				rmSync(sentinelPath, { force: true })
+			}
+		}
 	})
 })

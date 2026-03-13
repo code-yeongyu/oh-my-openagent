@@ -14,6 +14,7 @@ export interface InstallArgs {
   minimaxCnCodingPlan?: BooleanArg
   minimaxCodingPlan?: BooleanArg
   minimaxModelVariant?: MiniMaxModelVariant
+  opencodeGo?: BooleanArg
   skipAuth?: boolean
 }
 
@@ -29,6 +30,7 @@ export interface InstallConfig {
   hasMinimaxCnCodingPlan: boolean
   hasMinimaxCodingPlan: boolean
   minimaxModelVariant: MiniMaxModelVariant
+  hasOpencodeGo: boolean
 }
 
 export interface ConfigMergeResult {
@@ -50,4 +52,5 @@ export interface DetectedConfig {
   hasMinimaxCnCodingPlan: boolean
   hasMinimaxCodingPlan: boolean
   minimaxModelVariant: MiniMaxModelVariant
+  hasOpencodeGo: boolean
 }

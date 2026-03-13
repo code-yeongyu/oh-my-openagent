@@ -1,7 +1,7 @@
-declare const require: (name: string) => any
-const { afterEach, describe, expect, test } = require("bun:test")
+import { afterEach, describe, expect, it } from "bun:test"
 
 import { _resetForTesting, getSessionAgent, updateSessionAgent } from "../features/claude-code-session-state"
+import { clearSessionModel, getSessionModel, setSessionModel } from "../shared/session-model-state"
 import { createEventHandler } from "./event"
 
 function createMinimalEventHandler() {
@@ -51,9 +51,11 @@ function createMinimalEventHandler() {
 describe("createEventHandler compaction agent filtering", () => {
   afterEach(() => {
     _resetForTesting()
+    clearSessionModel("ses_compaction_poisoning")
+    clearSessionModel("ses_compaction_model_poisoning")
   })
 
-  test("does not overwrite the stored session agent with compaction", async () => {
+  it("does not overwrite the stored session agent with compaction", async () => {
     // given
     const sessionID = "ses_compaction_poisoning"
     updateSessionAgent(sessionID, "atlas")
@@ -79,5 +81,37 @@ describe("createEventHandler compaction agent filtering", () => {
 
     // then
     expect(getSessionAgent(sessionID)).toBe("atlas")
+  })
+
+  it("does not overwrite the stored session model with compaction", async () => {
+    // given
+    const sessionID = "ses_compaction_model_poisoning"
+    setSessionModel(sessionID, { providerID: "openai", modelID: "gpt-5" })
+    const eventHandler = createMinimalEventHandler()
+    const input: Parameters<ReturnType<typeof createEventHandler>>[0] = {
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg-compaction-model",
+            sessionID,
+            role: "user",
+            agent: "compaction",
+            providerID: "anthropic",
+            modelID: "claude-opus-4-1",
+            time: { created: Date.now() },
+          },
+        },
+      },
+    }
+
+    // when
+    await eventHandler(input)
+
+    // then
+    expect(getSessionModel(sessionID)).toEqual({
+      providerID: "openai",
+      modelID: "gpt-5",
+    })
   })
 })

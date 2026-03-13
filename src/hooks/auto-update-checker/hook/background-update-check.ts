@@ -1,10 +1,10 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { runBunInstall } from "../../../cli/config-manager"
+import { runBunInstallWithDetails } from "../../../cli/config-manager"
 import { log } from "../../../shared/logger"
 import { invalidatePackage } from "../cache"
 import { PACKAGE_NAME } from "../constants"
 import { extractChannel } from "../version-channel"
-import { findPluginEntry, getCachedVersion, getLatestVersion, revertPinnedVersion } from "../checker"
+import { findPluginEntry, getCachedVersion, getLatestVersion, syncCachePackageJsonToIntent } from "../checker"
 import { showAutoUpdatedToast, showUpdateAvailableToast } from "./update-toasts"
 
 function getPinnedVersionToastMessage(latestVersion: string): string {
@@ -13,7 +13,11 @@ function getPinnedVersionToastMessage(latestVersion: string): string {
 
 async function runBunInstallSafe(): Promise<boolean> {
   try {
-    return await runBunInstall()
+    const result = await runBunInstallWithDetails({ outputMode: "pipe" })
+    if (!result.success && result.error) {
+      log("[auto-update-checker] bun install error:", result.error)
+    }
+    return result.success
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err)
     log("[auto-update-checker] bun install error:", errorMessage)
@@ -65,6 +69,17 @@ export async function runBackgroundUpdateCheck(
     return
   }
 
+  // Sync cache package.json to match opencode.json intent before updating
+  // This handles the case where user switched from pinned version to tag (e.g., 3.10.0 -> @latest)
+  const syncResult = syncCachePackageJsonToIntent(pluginInfo)
+
+  // Abort on ANY sync error to prevent corrupting a bad state further
+  if (syncResult.error) {
+    log(`[auto-update-checker] Sync failed with error: ${syncResult.error}`, syncResult.message)
+    await showUpdateAvailableToast(ctx, latestVersion, getToastMessage)
+    return
+  }
+
   invalidatePackage(PACKAGE_NAME)
 
   const installSuccess = await runBunInstallSafe()
@@ -73,11 +88,6 @@ export async function runBackgroundUpdateCheck(
     await showAutoUpdatedToast(ctx, currentVersion, latestVersion)
     log(`[auto-update-checker] Update installed: ${currentVersion} → ${latestVersion}`)
     return
-  }
-
-  if (pluginInfo.isPinned) {
-    revertPinnedVersion(pluginInfo.configPath, latestVersion, pluginInfo.entry)
-    log("[auto-update-checker] Config reverted due to install failure")
   }
 
   await showUpdateAvailableToast(ctx, latestVersion, getToastMessage)

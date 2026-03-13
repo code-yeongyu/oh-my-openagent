@@ -34,6 +34,7 @@ program
   .option("--minimax-cn-coding-plan <value>", "MiniMax Coding Plan (minimaxi.com) subscription: no, yes (default: no)")
   .option("--minimax-coding-plan <value>", "MiniMax Coding Plan (minimax.io) subscription: no, yes (default: no)")
   .option("--minimax-model-variant <value>", "MiniMax model preference: standard, highspeed (default: standard)")
+  .option("--opencode-go <value>", "OpenCode Go subscription: no, yes (default: no)")
   .option("--skip-auth", "Skip authentication setup hints")
   .addHelpText("after", `
 Examples:
@@ -41,16 +42,17 @@ Examples:
   $ bunx oh-my-opencode install --no-tui --claude=max20 --openai=yes --gemini=yes --copilot=no
   $ bunx oh-my-opencode install --no-tui --claude=no --gemini=no --copilot=yes --opencode-zen=yes
 
-Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi > MiniMax):
+Model Providers (agent/category fallback chains choose among these):
   Claude        Native anthropic/ models (Opus, Sonnet, Haiku)
   OpenAI        Native openai/ models (GPT-5.4 for Oracle)
   Gemini        Native google/ models (Gemini 3 Pro, Flash)
   Copilot       github-copilot/ models (fallback)
   OpenCode Zen  opencode/ models (opencode/claude-opus-4-6, etc.)
-   Z.ai          zai-coding-plan/glm-5 (visual-engineering fallback)
-   Kimi          kimi-for-coding/k2p5 (Sisyphus/Prometheus fallback)
-   MiniMax CN    minimax-cn-coding-plan/MiniMax-M2.5 (default)
-   MiniMax       minimax-coding-plan/MiniMax-M2.5 (default)
+  Z.ai          zai-coding-plan/glm-5 (visual-engineering fallback)
+  Kimi          kimi-for-coding/k2p5 (Sisyphus/Prometheus fallback)
+  MiniMax CN    minimax-cn-coding-plan/MiniMax-M2.5 (default)
+  MiniMax       minimax-coding-plan/MiniMax-M2.5 (default)
+  OpenCode Go   opencode-go/minimax-m2.5 or opencode-go/glm-5
 
 MiniMax Note:
   Use --minimax-model-variant=highspeed only if your MiniMax plan explicitly includes MiniMax-M2.5-highspeed.
@@ -68,6 +70,7 @@ MiniMax Note:
       minimaxCnCodingPlan: options.minimaxCnCodingPlan,
       minimaxCodingPlan: options.minimaxCodingPlan,
       minimaxModelVariant: options.minimaxModelVariant,
+      opencodeGo: options.opencodeGo,
       skipAuth: options.skipAuth ?? false,
     }
     const exitCode = await install(args)
@@ -80,6 +83,7 @@ program
   .passThroughOptions()
   .description("Run opencode with todo/background task completion enforcement")
   .option("-a, --agent <name>", "Agent to use (default: from CLI/env/config, fallback: Sisyphus)")
+  .option("-m, --model <provider/model>", "Model override (e.g., anthropic/claude-sonnet-4)")
   .option("-d, --directory <path>", "Working directory")
   .option("-p, --port <port>", "Server port (attaches if port already in use)", parseInt)
   .option("--attach <url>", "Attach to existing opencode server URL")
@@ -97,6 +101,8 @@ Examples:
   $ bunx oh-my-opencode run --json "Fix the bug" | jq .sessionId
   $ bunx oh-my-opencode run --on-complete "notify-send Done" "Fix the bug"
   $ bunx oh-my-opencode run --session-id ses_abc123 "Continue the work"
+  $ bunx oh-my-opencode run --model anthropic/claude-sonnet-4 "Fix the bug"
+  $ bunx oh-my-opencode run --agent Sisyphus --model openai/gpt-5.4 "Implement feature X"
 
 Agent resolution order:
   1) --agent flag
@@ -119,6 +125,7 @@ Unlike 'opencode run', this command waits until:
     const runOptions: RunOptions = {
       message,
       agent: options.agent,
+      model: options.model,
       directory: options.directory,
       port: options.port,
       attach: options.attach,

@@ -100,7 +100,7 @@ Here's a practical starting configuration:
     "unspecified-low": { "model": "anthropic/claude-sonnet-4-6" },
 
     // unspecified-high — complex work
-    "unspecified-high": { "model": "openai/gpt-5.4-high" },
+    "unspecified-high": { "model": "anthropic/claude-opus-4-6", "variant": "max" },
 
     // writing — docs/prose
     "writing": { "model": "google/gemini-3-flash" },
@@ -225,12 +225,12 @@ Domain-specific model delegation used by the `task()` tool. When Sisyphus delega
 | Category             | Default Model                   | Description                                    |
 | -------------------- | ------------------------------- | ---------------------------------------------- |
 | `visual-engineering` | `google/gemini-3.1-pro` (high)  | Frontend, UI/UX, design, animation             |
-| `ultrabrain`         | `openai/gpt-5.3-codex` (xhigh)  | Deep logical reasoning, complex architecture   |
+| `ultrabrain`         | `openai/gpt-5.4` (xhigh)        | Deep logical reasoning, complex architecture   |
 | `deep`               | `openai/gpt-5.3-codex` (medium) | Autonomous problem-solving, thorough research  |
 | `artistry`           | `google/gemini-3.1-pro` (high)  | Creative/unconventional approaches             |
 | `quick`              | `anthropic/claude-haiku-4-5`    | Trivial tasks, typo fixes, single-file changes |
 | `unspecified-low`    | `anthropic/claude-sonnet-4-6`   | General tasks, low effort                      |
-| `unspecified-high`   | `openai/gpt-5.4` (high)         | General tasks, high effort                     |
+| `unspecified-high`   | `anthropic/claude-opus-4-6` (max) | General tasks, high effort                   |
 | `writing`            | `google/gemini-3-flash`         | Documentation, prose, technical writing        |
 
 > **Note**: Built-in defaults only apply if the category is present in your config. Otherwise the system default model is used.
@@ -283,12 +283,12 @@ Disable categories: `{ "disabled_categories": ["ultrabrain"] }`
 | Category               | Default Model       | Provider Priority                                              |
 | ---------------------- | ------------------- | -------------------------------------------------------------- |
 | **visual-engineering** | `gemini-3.1-pro`    | `gemini-3.1-pro` → `glm-5` → `claude-opus-4-6`                 |
-| **ultrabrain**         | `gpt-5.3-codex`     | `gpt-5.3-codex` → `gemini-3.1-pro` → `claude-opus-4-6`         |
+| **ultrabrain**         | `gpt-5.4`           | `gpt-5.4` → `gemini-3.1-pro` → `claude-opus-4-6`               |
 | **deep**               | `gpt-5.3-codex`     | `gpt-5.3-codex` → `claude-opus-4-6` → `gemini-3.1-pro`         |
 | **artistry**           | `gemini-3.1-pro`    | `gemini-3.1-pro` → `claude-opus-4-6` → `gpt-5.4`               |
 | **quick**              | `claude-haiku-4-5`  | `claude-haiku-4-5` → `gemini-3-flash` → `gpt-5-nano`           |
 | **unspecified-low**    | `claude-sonnet-4-6` | `claude-sonnet-4-6` → `gpt-5.3-codex` → `gemini-3-flash`       |
-| **unspecified-high**   | `gpt-5.4`           | `gpt-5.4` → `claude-opus-4-6` → `glm-5` → `k2p5` → `kimi-k2.5` |
+| **unspecified-high**   | `claude-opus-4-6`   | `claude-opus-4-6` → `gpt-5.4 (high)` → `glm-5` → `k2p5` → `kimi-k2.5` |
 | **writing**            | `gemini-3-flash`    | `gemini-3-flash` → `claude-sonnet-4-6`                         |
 
 Run `bunx oh-my-opencode doctor --verbose` to see effective model resolution for your config.
@@ -418,14 +418,15 @@ Disable built-in skills: `{ "disabled_skills": ["playwright"] }`
 Disable built-in hooks via `disabled_hooks`:
 
 ```json
-{ "disabled_hooks": ["comment-checker", "agent-usage-reminder"] }
+{ "disabled_hooks": ["comment-checker", "gpt-permission-continuation"] }
 ```
 
-Available hooks: `todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `tool-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-context-window-limit-recovery`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `compaction-context-injector`, `thinking-block-validator`, `claude-code-hooks`, `ralph-loop`, `preemptive-compaction`, `auto-slash-command`, `sisyphus-junior-notepad`, `no-sisyphus-gpt`, `start-work`, `runtime-fallback`
+Available hooks: `gpt-permission-continuation`, `todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `tool-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-context-window-limit-recovery`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `compaction-context-injector`, `thinking-block-validator`, `claude-code-hooks`, `ralph-loop`, `preemptive-compaction`, `auto-slash-command`, `sisyphus-junior-notepad`, `no-sisyphus-gpt`, `start-work`, `runtime-fallback`
 
 **Notes:**
 
 - `directory-agents-injector` — auto-disabled on OpenCode 1.1.37+ (native AGENTS.md support)
+- `gpt-permission-continuation` — resumes GPT sessions only when the last assistant reply ends with a permission-seeking tail like `If you want, ...`. Disable it if you prefer GPT sessions to wait for explicit user follow-up.
 - `no-sisyphus-gpt` — **do not disable**. It blocks incompatible GPT models for Sisyphus while allowing the dedicated GPT-5.4 prompt path.
 - `startup-toast` is a sub-feature of `auto-update-checker`. Disable just the toast by adding `startup-toast` to `disabled_hooks`.
 

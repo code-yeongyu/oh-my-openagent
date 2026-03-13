@@ -10,20 +10,21 @@ function detectProvidersFromOmoConfig(): {
   hasOpencodeZen: boolean
   hasZaiCodingPlan: boolean
   hasKimiForCoding: boolean
+  hasOpencodeGo: boolean
   hasMinimaxCnCodingPlan: boolean
   hasMinimaxCodingPlan: boolean
   minimaxModelVariant: "standard" | "highspeed"
 } {
   const omoConfigPath = getOmoConfigPath()
   if (!existsSync(omoConfigPath)) {
-    return { hasOpenAI: true, hasOpencodeZen: true, hasZaiCodingPlan: false, hasKimiForCoding: false, hasMinimaxCnCodingPlan: false, hasMinimaxCodingPlan: false, minimaxModelVariant: "standard" }
+    return { hasOpenAI: true, hasOpencodeZen: true, hasZaiCodingPlan: false, hasKimiForCoding: false, hasOpencodeGo: false, hasMinimaxCnCodingPlan: false, hasMinimaxCodingPlan: false, minimaxModelVariant: "standard" }
   }
 
   try {
     const content = readFileSync(omoConfigPath, "utf-8")
     const omoConfig = parseJsonc<Record<string, unknown>>(content)
     if (!omoConfig || typeof omoConfig !== "object") {
-      return { hasOpenAI: true, hasOpencodeZen: true, hasZaiCodingPlan: false, hasKimiForCoding: false, hasMinimaxCnCodingPlan: false, hasMinimaxCodingPlan: false, minimaxModelVariant: "standard" }
+      return { hasOpenAI: true, hasOpencodeZen: true, hasZaiCodingPlan: false, hasKimiForCoding: false, hasOpencodeGo: false, hasMinimaxCnCodingPlan: false, hasMinimaxCodingPlan: false, minimaxModelVariant: "standard" }
     }
 
     const configStr = JSON.stringify(omoConfig)
@@ -31,13 +32,14 @@ function detectProvidersFromOmoConfig(): {
     const hasOpencodeZen = configStr.includes('"opencode/')
     const hasZaiCodingPlan = configStr.includes('"zai-coding-plan/')
     const hasKimiForCoding = configStr.includes('"kimi-for-coding/')
+    const hasOpencodeGo = configStr.includes('"opencode-go/')
     const hasMinimaxCnCodingPlan = configStr.includes('"minimax-cn-coding-plan/')
     const hasMinimaxCodingPlan = configStr.includes('"minimax-coding-plan/')
     const minimaxModelVariant = configStr.includes('MiniMax-M2.5-highspeed') ? "highspeed" : "standard"
 
-    return { hasOpenAI, hasOpencodeZen, hasZaiCodingPlan, hasKimiForCoding, hasMinimaxCnCodingPlan, hasMinimaxCodingPlan, minimaxModelVariant }
+    return { hasOpenAI, hasOpencodeZen, hasZaiCodingPlan, hasKimiForCoding, hasOpencodeGo, hasMinimaxCnCodingPlan, hasMinimaxCodingPlan, minimaxModelVariant }
   } catch {
-    return { hasOpenAI: true, hasOpencodeZen: true, hasZaiCodingPlan: false, hasKimiForCoding: false, hasMinimaxCnCodingPlan: false, hasMinimaxCodingPlan: false, minimaxModelVariant: "standard" }
+    return { hasOpenAI: true, hasOpencodeZen: true, hasZaiCodingPlan: false, hasKimiForCoding: false, hasOpencodeGo: false, hasMinimaxCnCodingPlan: false, hasMinimaxCodingPlan: false, minimaxModelVariant: "standard" }
   }
 }
 
@@ -55,6 +57,7 @@ export function detectCurrentConfig(): DetectedConfig {
     hasMinimaxCnCodingPlan: false,
     hasMinimaxCodingPlan: false,
     minimaxModelVariant: "standard",
+    hasOpencodeGo: false,
   }
 
   const { format, path } = detectConfigFormat()
@@ -78,11 +81,21 @@ export function detectCurrentConfig(): DetectedConfig {
   const providers = openCodeConfig.provider as Record<string, unknown> | undefined
   result.hasGemini = providers ? "google" in providers : false
 
-  const { hasOpenAI, hasOpencodeZen, hasZaiCodingPlan, hasKimiForCoding, hasMinimaxCnCodingPlan, hasMinimaxCodingPlan, minimaxModelVariant } = detectProvidersFromOmoConfig()
+  const {
+    hasOpenAI,
+    hasOpencodeZen,
+    hasZaiCodingPlan,
+    hasKimiForCoding,
+    hasOpencodeGo,
+    hasMinimaxCnCodingPlan,
+    hasMinimaxCodingPlan,
+    minimaxModelVariant,
+  } = detectProvidersFromOmoConfig()
   result.hasOpenAI = hasOpenAI
   result.hasOpencodeZen = hasOpencodeZen
   result.hasZaiCodingPlan = hasZaiCodingPlan
   result.hasKimiForCoding = hasKimiForCoding
+  result.hasOpencodeGo = hasOpencodeGo
   result.hasMinimaxCnCodingPlan = hasMinimaxCnCodingPlan
   result.hasMinimaxCodingPlan = hasMinimaxCodingPlan
   result.minimaxModelVariant = minimaxModelVariant

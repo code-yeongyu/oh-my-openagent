@@ -83,7 +83,7 @@ describe("sisyphus-task", () => {
 
       // when / #then
       expect(category).toBeDefined()
-      expect(category.model).toBe("openai/gpt-5.3-codex")
+      expect(category.model).toBe("openai/gpt-5.4")
       expect(category.variant).toBe("xhigh")
     })
 
@@ -97,14 +97,14 @@ describe("sisyphus-task", () => {
       expect(category.variant).toBe("medium")
     })
 
-    test("unspecified-high category uses explicit high model", () => {
+    test("unspecified-high category uses claude-opus-4-6 max as primary", () => {
       // given
       const category = DEFAULT_CATEGORIES["unspecified-high"]
 
       // when / #then
       expect(category).toBeDefined()
-      expect(category.model).toBe("openai/gpt-5.4-high")
-      expect(category.variant).toBeUndefined()
+      expect(category.model).toBe("anthropic/claude-opus-4-6")
+      expect(category.variant).toBe("max")
     })
   })
 
@@ -1036,7 +1036,7 @@ describe("sisyphus-task", () => {
         abort: new AbortController().signal,
       }
 
-      // when - unspecified-high uses the explicit high model in DEFAULT_CATEGORIES
+      // when - unspecified-high uses claude-opus-4-6 max in DEFAULT_CATEGORIES
       await tool.execute(
         {
           description: "Test unspecified-high default variant",
@@ -1048,10 +1048,11 @@ describe("sisyphus-task", () => {
         toolContext
       )
 
-      // then - the explicit high model should be passed without a separate variant
+      // then - claude-opus-4-6 should be passed with max variant
       expect(launchInput.model).toEqual({
-        providerID: "openai",
-        modelID: "gpt-5.4-high",
+        providerID: "anthropic",
+        modelID: "claude-opus-4-6",
+        variant: "max",
       })
     }, { timeout: 20000 })
 
@@ -1096,7 +1097,7 @@ describe("sisyphus-task", () => {
         abort: new AbortController().signal,
       }
 
-      // when - unspecified-high uses the explicit high model in DEFAULT_CATEGORIES
+      // when - unspecified-high uses claude-opus-4-6 max in DEFAULT_CATEGORIES
       await tool.execute(
         {
           description: "Test unspecified-high sync variant",
@@ -1108,12 +1109,12 @@ describe("sisyphus-task", () => {
         toolContext
       )
 
-      // then - the explicit high model should be passed without a separate variant
+      // then - claude-opus-4-6 should be passed with max variant
       expect(promptBody.model).toEqual({
-        providerID: "openai",
-        modelID: "gpt-5.4-high",
+        providerID: "anthropic",
+        modelID: "claude-opus-4-6",
       })
-      expect(promptBody.variant).toBeUndefined()
+      expect(promptBody.variant).toBe("max")
     }, { timeout: 20000 })
   })
 
@@ -2402,7 +2403,7 @@ describe("sisyphus-task", () => {
         abort: new AbortController().signal,
       }
 
-      // when - using ultrabrain category (default model is openai/gpt-5.3-codex)
+      // when - using ultrabrain category (default model is openai/gpt-5.4)
       await tool.execute(
         {
           description: "Override precedence test",
@@ -2454,7 +2455,7 @@ describe("sisyphus-task", () => {
          client: mockClient,
          sisyphusJuniorModel: "anthropic/claude-sonnet-4-6",
          userCategories: {
-           ultrabrain: { model: "openai/gpt-5.3-codex" },
+           ultrabrain: { model: "openai/gpt-5.4" },
          },
          connectedProvidersOverride: TEST_CONNECTED_PROVIDERS,
          availableModelsOverride: createTestAvailableModels(),
@@ -2481,7 +2482,7 @@ describe("sisyphus-task", () => {
 
       // then - explicit category model should win
       expect(launchInput.model.providerID).toBe("openai")
-      expect(launchInput.model.modelID).toBe("gpt-5.3-codex")
+      expect(launchInput.model.modelID).toBe("gpt-5.4")
     })
 
     test("sisyphus-junior model override works with quick category (#1295)", async () => {
@@ -2946,7 +2947,7 @@ describe("sisyphus-task", () => {
       
       // then - catalog model is used
       expect(resolved).not.toBeNull()
-      expect(resolved!.config.model).toBe("openai/gpt-5.3-codex")
+      expect(resolved!.config.model).toBe("openai/gpt-5.4")
       expect(resolved!.config.variant).toBe("xhigh")
     })
 
@@ -2970,10 +2971,10 @@ describe("sisyphus-task", () => {
       // when
       const resolved = resolveCategoryConfig(categoryName, { inheritedModel, systemDefaultModel: SYSTEM_DEFAULT_MODEL })
       
-      // then - category's built-in model wins (ultrabrain uses gpt-5.3-codex)
+      // then - category's built-in model wins (ultrabrain uses gpt-5.4)
       expect(resolved).not.toBeNull()
       const actualModel = resolved!.config.model
-      expect(actualModel).toBe("openai/gpt-5.3-codex")
+      expect(actualModel).toBe("openai/gpt-5.4")
     })
 
     test("when user defines model - modelInfo should report user-defined regardless of inheritedModel", () => {
@@ -3027,12 +3028,12 @@ describe("sisyphus-task", () => {
       const categoryName = "ultrabrain"
       const inheritedModel = "anthropic/claude-opus-4-6"
       
-      // when category has a built-in model (gpt-5.3-codex for ultrabrain)
+      // when category has a built-in model (gpt-5.4 for ultrabrain)
       const resolved = resolveCategoryConfig(categoryName, { inheritedModel, systemDefaultModel: SYSTEM_DEFAULT_MODEL })
       
       // then category's built-in model should be used, NOT inheritedModel
       expect(resolved).not.toBeNull()
-      expect(resolved!.model).toBe("openai/gpt-5.3-codex")
+      expect(resolved!.model).toBe("openai/gpt-5.4")
     })
 
     test("FIXED: systemDefaultModel is used when no userConfig.model and no inheritedModel", () => {
