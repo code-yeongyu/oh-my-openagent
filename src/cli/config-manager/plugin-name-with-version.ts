@@ -1,28 +1,33 @@
 import { fetchNpmDistTags } from "./npm-dist-tags"
 
-const PACKAGE_NAME = "oh-my-opencode"
+const DEFAULT_PACKAGE_NAME = "oh-my-opencode"
+const NEW_PACKAGE_NAME = "oh-my-openagent"
 const PRIORITIZED_TAGS = ["latest", "beta", "next"] as const
 
-function getFallbackEntry(version: string): string {
+function getFallbackEntry(version: string, packageName: string): string {
   const prereleaseMatch = version.match(/-([a-zA-Z][a-zA-Z0-9-]*)(?:\.|$)/)
   if (prereleaseMatch) {
-    return `${PACKAGE_NAME}@${prereleaseMatch[1]}`
+    return `${packageName}@${prereleaseMatch[1]}`
   }
 
-  return PACKAGE_NAME
+  return packageName
 }
 
-export async function getPluginNameWithVersion(currentVersion: string): Promise<string> {
-  const distTags = await fetchNpmDistTags(PACKAGE_NAME)
+export async function getPluginNameWithVersion(
+  currentVersion: string,
+  packageName: string = DEFAULT_PACKAGE_NAME
+): Promise<string> {
+  const distTags = await fetchNpmDistTags(NEW_PACKAGE_NAME)
+
 
   if (distTags) {
     const allTags = new Set([...PRIORITIZED_TAGS, ...Object.keys(distTags)])
     for (const tag of allTags) {
       if (distTags[tag] === currentVersion) {
-        return `${PACKAGE_NAME}@${tag}`
+        return `${packageName}@${tag}`
       }
     }
   }
 
-  return getFallbackEntry(currentVersion)
+  return getFallbackEntry(currentVersion, packageName)
 }

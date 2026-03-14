@@ -61,7 +61,9 @@ hasKimiForCoding: false,
 
   const openCodeConfig = parseResult.config
   const plugins = openCodeConfig.plugin ?? []
-  result.isInstalled = plugins.some((p) => p.startsWith("oh-my-opencode"))
+  const OLD_PACKAGE_NAME = "oh-my-opencode"
+const NEW_PACKAGE_NAME = "oh-my-openagent"
+result.isInstalled = plugins.some((p) => p.startsWith(OLD_PACKAGE_NAME) || p.startsWith(NEW_PACKAGE_NAME))
 
   if (!result.isInstalled) {
     return result
