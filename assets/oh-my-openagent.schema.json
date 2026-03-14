@@ -93,7 +93,9 @@
           "anthropic-effort",
           "hashline-read-enhancer",
           "read-image-resizer",
-          "delegate-task-english-directive"
+          "delegate-task-english-directive",
+          "subagent-blacklist-guard",
+          "blacklist-guard"
         ]
       }
     },
