@@ -13,6 +13,7 @@ import {
 } from "../features/claude-code-session-state";
 import { clearBlacklistGuard } from "../hooks/blacklist-guard";
 import { clearSubagentBlacklistGuard } from "../hooks/subagent-blacklist-guard";
+import { isProviderBlacklisted } from "../shared/global-blacklist";
 import {
   clearPendingModelFallback,
   clearSessionFallbackChain,
@@ -586,6 +587,33 @@ export function createEventHandler(args: {
       } catch (err) {
         const sessionID = props?.sessionID as string | undefined;
         log("[event] model-fallback error in session.error:", { sessionID, error: err });
+      }
+    }
+
+    // Handle agent cycle events (Shift+Tab / Alt+Tab agent switching)
+    // When user switches agents, we check if the current provider is blacklisted
+    // and show a warning toast if so. Note: We can't prevent the switch, but we
+    // can warn the user that their next message will use a fallback provider.
+    if (event.type === "tui.command.execute") {
+      const command = props?.command as string | undefined;
+      if (command === "agent.cycle" || command === "agent.cycle_reverse") {
+        const sessionID = getMainSessionID();
+        if (sessionID) {
+          const lastKnown = lastKnownModelBySession.get(sessionID);
+          const currentProvider = lastKnown?.providerID;
+          
+          if (currentProvider && isProviderBlacklisted(currentProvider)) {
+            // Show warning toast - the provider is blacklisted
+            // The next message will automatically use the fallback
+            log("[event] Agent cycled while provider blacklisted", {
+              sessionID,
+              provider: currentProvider,
+            });
+            
+            // Note: We can't easily show a toast here without access to client.tui
+            // But the next message will trigger the blacklist-guard and show the fallback
+          }
+        }
       }
     }
   };
