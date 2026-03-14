@@ -10,10 +10,12 @@ import { addPluginToOpenCodeConfig } from "./add-plugin-to-opencode-config"
 describe("detectCurrentConfig - dual name detection", () => {
   let testConfigDir = ""
   let testConfigPath = ""
+  let testOmoConfigPath = ""
 
   beforeEach(() => {
     testConfigDir = join(tmpdir(), `omo-detect-config-${Date.now()}-${Math.random().toString(36).slice(2)}`)
     testConfigPath = join(testConfigDir, "opencode.json")
+    testOmoConfigPath = join(testConfigDir, "oh-my-opencode.json")
 
     mkdirSync(testConfigDir, { recursive: true })
     process.env.OPENCODE_CONFIG_DIR = testConfigDir
@@ -84,6 +86,23 @@ describe("detectCurrentConfig - dual name detection", () => {
 
     // then
     expect(result.isInstalled).toBe(false)
+  })
+
+  it("detects OpenCode Go from the existing omo config", () => {
+    // given
+    writeFileSync(testConfigPath, JSON.stringify({ plugin: ["oh-my-openagent"] }, null, 2) + "\n", "utf-8")
+    writeFileSync(
+      testOmoConfigPath,
+      JSON.stringify({ agents: { atlas: { model: "opencode-go/kimi-k2.5" } } }, null, 2) + "\n",
+      "utf-8",
+    )
+
+    // when
+    const result = detectCurrentConfig()
+
+    // then
+    expect(result.isInstalled).toBe(true)
+    expect(result.hasOpencodeGo).toBe(true)
   })
 })
 
