@@ -108,6 +108,27 @@ export function createKeywordDetectorHook(ctx: PluginInput, _collector?: Context
           )
       }
 
+      const hasTokenManagement = detectedKeywords.some((k) => k.type === "token-management")
+      if (hasTokenManagement) {
+        log(`[keyword-detector] Token Management mode activated`, { sessionID: input.sessionID })
+
+        ctx.client.tui
+          .showToast({
+            body: {
+              title: "Token Management Mode",
+              message: "Monitoring token usage. Will fallback or wait on exhaustion.",
+              variant: "success" as const,
+              duration: 3000,
+            },
+          })
+          .catch((err) =>
+            log(`[keyword-detector] Failed to show toast`, {
+              error: err,
+              sessionID: input.sessionID,
+            })
+          )
+      }
+
       const textPartIndex = output.parts.findIndex((p) => p.type === "text" && p.text !== undefined)
       if (textPartIndex === -1) {
         log(`[keyword-detector] No text part found, skipping injection`, { sessionID: input.sessionID })
