@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test"
-import { computeLineHash } from "./hash-computation"
+import { computeLineHash, computeLegacyLineHash } from "./hash-computation"
 import { parseLineRef, validateLineRef, validateLineRefs } from "./validation"
 
 describe("parseLineRef", () => {
@@ -114,6 +114,15 @@ describe("validateLineRef", () => {
 
     //#when / #then
     expect(() => validateLineRef(lines, "1#ZZ")).toThrow(/>>>\s+1#[ZPMQVRWSNKTXJBYH]{2}\|/)
+  })
+
+  it("accepts legacy hashes for indented lines", () => {
+    //#given
+    const lines = ["  function hello() {", "    return 42", "  }"]
+    const legacyHash = computeLegacyLineHash(1, lines[0])
+
+    //#when / #then
+    expect(() => validateLineRef(lines, `1#${legacyHash}`)).not.toThrow()
   })
 
   it("shows >>> mismatch context in batched validation", () => {

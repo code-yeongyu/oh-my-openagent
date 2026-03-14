@@ -1,6 +1,7 @@
 import { describe, it, expect } from "bun:test"
 import {
   computeLineHash,
+  computeLegacyLineHash,
   formatHashLine,
   formatHashLines,
   streamHashLinesFromLines,
@@ -56,6 +57,19 @@ describe("computeLineHash", () => {
 
     //#then
     expect(hash1).not.toBe(hash2)
+  })
+
+  it("preserves legacy hashes for leading indentation variants", () => {
+    //#given
+    const content1 = "function hello() {"
+    const content2 = "  function hello() {"
+
+    //#when
+    const hash1 = computeLegacyLineHash(1, content1)
+    const hash2 = computeLegacyLineHash(1, content2)
+
+    //#then
+    expect(hash1).toBe(hash2)
   })
 
   it("ignores trailing whitespace differences", () => {
