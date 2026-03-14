@@ -108,6 +108,48 @@ export function createKeywordDetectorHook(ctx: PluginInput, _collector?: Context
           )
       }
 
+      const hasTmuxScript = detectedKeywords.some((k) => k.type === "tmux-script")
+      if (hasTmuxScript) {
+        log(`[keyword-detector] Tmux Script mode activated`, { sessionID: input.sessionID })
+
+        ctx.client.tui
+          .showToast({
+            body: {
+              title: "Tmux Script Mode",
+              message: "Generating tmux dev environment script with error monitoring.",
+              variant: "success" as const,
+              duration: 3000,
+            },
+          })
+          .catch((err) =>
+            log(`[keyword-detector] Failed to show toast`, {
+              error: err,
+              sessionID: input.sessionID,
+            })
+          )
+      }
+
+      const hasWatchGithubIssues = detectedKeywords.some((k) => k.type === "watch-github-issues")
+      if (hasWatchGithubIssues) {
+        log(`[keyword-detector] Watch GitHub Issues mode activated`, { sessionID: input.sessionID })
+
+        ctx.client.tui
+          .showToast({
+            body: {
+              title: "GitHub Issue Watcher",
+              message: "Starting persistent issue monitoring loop.",
+              variant: "success" as const,
+              duration: 3000,
+            },
+          })
+          .catch((err) =>
+            log(`[keyword-detector] Failed to show toast`, {
+              error: err,
+              sessionID: input.sessionID,
+            })
+          )
+      }
+
       const textPartIndex = output.parts.findIndex((p) => p.type === "text" && p.text !== undefined)
       if (textPartIndex === -1) {
         log(`[keyword-detector] No text part found, skipping injection`, { sessionID: input.sessionID })
