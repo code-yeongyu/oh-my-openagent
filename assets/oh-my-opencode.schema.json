@@ -92,8 +92,7 @@
           "write-existing-file-guard",
           "anthropic-effort",
           "hashline-read-enhancer",
-          "read-image-resizer",
-          "delegate-task-english-directive"
+          "read-image-resizer"
         ]
       }
     },

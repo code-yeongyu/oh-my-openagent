@@ -16,7 +16,6 @@ import {
   createRalphLoopHook,
   createEditErrorRecoveryHook,
   createDelegateTaskRetryHook,
-  createDelegateTaskEnglishDirectiveHook,
   createTaskResumeInfoHook,
   createStartWorkHook,
   createPrometheusMdOnlyHook,
@@ -61,7 +60,6 @@ export type SessionHooks = {
   taskResumeInfo: ReturnType<typeof createTaskResumeInfoHook> | null
   anthropicEffort: ReturnType<typeof createAnthropicEffortHook> | null
   runtimeFallback: ReturnType<typeof createRuntimeFallbackHook> | null
-  delegateTaskEnglishDirective: ReturnType<typeof createDelegateTaskEnglishDirectiveHook> | null
 }
 
 export function createSessionHooks(args: {
@@ -217,10 +215,6 @@ export function createSessionHooks(args: {
     ? safeHook("delegate-task-retry", () => createDelegateTaskRetryHook(ctx))
     : null
 
-  const delegateTaskEnglishDirective = isHookEnabled("delegate-task-english-directive")
-    ? safeHook("delegate-task-english-directive", () => createDelegateTaskEnglishDirectiveHook())
-    : null
-
   const startWork = isHookEnabled("start-work")
     ? safeHook("start-work", () => createStartWorkHook(ctx))
     : null
@@ -282,7 +276,6 @@ export function createSessionHooks(args: {
     ralphLoop,
     editErrorRecovery,
     delegateTaskRetry,
-    delegateTaskEnglishDirective,
     startWork,
     prometheusMdOnly,
     sisyphusJuniorNotepad,

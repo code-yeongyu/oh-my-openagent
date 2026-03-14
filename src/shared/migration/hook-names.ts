@@ -9,6 +9,7 @@ export const HOOK_NAME_MAP: Record<string, string | null> = {
 
   // Removed hooks (v3.0.0) - will be filtered out and user warned
   "empty-message-sanitizer": null,
+  "delegate-task-english-directive": null,
 }
 
 export function migrateHookNames(
