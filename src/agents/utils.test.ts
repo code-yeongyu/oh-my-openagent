@@ -966,6 +966,28 @@ describe("createBuiltinAgents with requiresAnyModel gating (sisyphus)", () => {
       cacheSpy.mockRestore()
     }
   })
+
+  test("atlas and metis resolve to OpenAI in an OpenAI-only environment without a system default", async () => {
+    // #given
+    const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(new Set(["openai/gpt-5.4"]))
+    const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
+
+    try {
+      // #when
+      const agents = await createBuiltinAgents([], {}, undefined, undefined, undefined, undefined, [], {})
+
+      // #then
+      expect(agents.atlas).toBeDefined()
+      expect(agents.atlas.model).toBe("openai/gpt-5.4")
+      expect(agents.atlas.variant).toBe("medium")
+      expect(agents.metis).toBeDefined()
+      expect(agents.metis.model).toBe("openai/gpt-5.4")
+      expect(agents.metis.variant).toBe("high")
+    } finally {
+      fetchSpy.mockRestore()
+      cacheSpy.mockRestore()
+    }
+  })
 })
 
 describe("buildAgent with category and skills", () => {

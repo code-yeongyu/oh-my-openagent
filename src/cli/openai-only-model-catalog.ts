@@ -17,6 +17,7 @@ export function isOpenAiOnlyAvailability(availability: ProviderAvailability): bo
     availability.native.openai &&
     !availability.native.claude &&
     !availability.native.gemini &&
+    !availability.opencodeGo &&
     !availability.opencodeZen &&
     !availability.copilot &&
     !availability.zai &&
