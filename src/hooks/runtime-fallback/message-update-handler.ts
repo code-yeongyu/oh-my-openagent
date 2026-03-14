@@ -160,6 +160,19 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
       // Extract provider BEFORE prepareFallback updates state
       const currentModelProvider = state.currentModel.split("/")[0]
 
+      // Blacklist provider on rate limit errors (same logic as event-handler.ts)
+      const statusCode = extractStatusCode(error, config.retry_on_errors)
+      const isRateLimit = statusCode === 429 || /rate.*limit|too.*many.*requests/i.test(String(error))
+      if (currentModelProvider && isRateLimit) {
+        blacklistProvider(currentModelProvider, config.cooldown_seconds, `Rate limit error in message update`)
+        log(`[${HOOK_NAME}] Blacklisted provider due to rate limit error`, {
+          sessionID,
+          provider: currentModelProvider,
+          model: state.currentModel,
+          source: "message.updated",
+        })
+      }
+
       await dispatchFallbackRetry(deps, helpers, {
         sessionID,
         state,

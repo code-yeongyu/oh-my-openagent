@@ -2,7 +2,7 @@ import type { HookDeps } from "./types"
 import type { AutoRetryHelpers } from "./auto-retry"
 import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
-import { extractStatusCode, extractErrorName, classifyErrorType, isRetryableError } from "./error-classifier"
+import { extractStatusCode, extractErrorName, classifyErrorType, isRetryableError, getErrorMessage } from "./error-classifier"
 import { createFallbackState } from "./fallback-state"
 import { getFallbackModelsForSession } from "./fallback-models"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
@@ -161,7 +161,7 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
     // Only blacklist for rate limit errors (429), not for other retryable errors like "model not found"
     // This MUST happen before the fallbackModels.length check to ensure provider is always blacklisted
     const statusCode = extractStatusCode(error, config.retry_on_errors)
-    const isRateLimit = statusCode === 429 || /rate.*limit|too.*many.*requests/i.test(String(error))
+    const isRateLimit = statusCode === 429 || /rate.*limit|too.*many.*requests/i.test(getErrorMessage(error))
     const currentModelProvider = state.currentModel.split("/")[0]
     if (currentModelProvider && isRateLimit) {
       blacklistProvider(currentModelProvider, config.cooldown_seconds, `Rate limit error`)

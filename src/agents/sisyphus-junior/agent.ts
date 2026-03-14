@@ -107,6 +107,10 @@ export function createSisyphusJuniorAgentWithOverrides(
               model = fallback
               break
             }
+          } else {
+            // Skip invalid fallback model format (must be "provider/model")
+            // Models without "/" prefix cannot be used for fallback
+            continue
           }
         }
       }
