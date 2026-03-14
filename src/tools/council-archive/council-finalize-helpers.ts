@@ -27,6 +27,33 @@ export function isPathEscaping(expectedRoot: string, targetPath: string): boolea
   return rel === ".." || rel.startsWith("../") || rel.startsWith("..\\") || isAbsolute(rel)
 }
 
+function resolvePromptTempFilePath(promptFilePath: string, base: string): string | undefined {
+  const absPromptPath = isAbsolute(promptFilePath) ? promptFilePath : resolve(base, promptFilePath)
+  const expectedPromptRoot = join(base, ".sisyphus", "tmp")
+
+  if (isPathEscaping(expectedPromptRoot, absPromptPath)) {
+    log("[council-finalize] Rejected prompt_file outside .sisyphus/tmp/", { promptFile: promptFilePath })
+    return undefined
+  }
+
+  return absPromptPath
+}
+
+export async function cleanupPromptFile(promptFilePath: string, base: string): Promise<void> {
+  const absPromptPath = resolvePromptTempFilePath(promptFilePath, base)
+  if (!absPromptPath) return
+
+  try {
+    await unlink(absPromptPath)
+    log("[council-finalize] Cleaned up prompt temp file", { promptFile: promptFilePath })
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code
+    if (code !== "ENOENT") {
+      log("[council-finalize] Failed to clean up prompt temp file", { promptFile: promptFilePath, error: String(err), code })
+    }
+  }
+}
+
 export async function movePromptFile(
   promptFilePath: string,
   base: string,
@@ -35,12 +62,8 @@ export async function movePromptFile(
 ): Promise<string | undefined> {
   try {
     const promptFilename = "council-prompt.md"
-    const absPromptSrc = isAbsolute(promptFilePath) ? promptFilePath : resolve(base, promptFilePath)
-    const expectedPromptRoot = join(base, ".sisyphus", "tmp")
-    if (isPathEscaping(expectedPromptRoot, absPromptSrc)) {
-      log("[council-finalize] Rejected prompt_file outside .sisyphus/tmp/", { promptFile: promptFilePath })
-      return undefined
-    }
+    const absPromptSrc = resolvePromptTempFilePath(promptFilePath, base)
+    if (!absPromptSrc) return undefined
     const absPromptDest = join(absArchiveDir, promptFilename)
     await rename(absPromptSrc, absPromptDest).catch(async (renameErr) => {
       log("[council-finalize] Rename failed, falling back to copy", { promptFile: promptFilePath, error: String(renameErr) })
