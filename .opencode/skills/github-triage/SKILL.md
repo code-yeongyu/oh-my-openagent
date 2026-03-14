@@ -11,14 +11,14 @@ Read-only GitHub triage orchestrator. Fetch open issues/PRs, classify, spawn 1 b
 
 ## Architecture
 
-**1 ISSUE/PR = 1 TASKCREATE = 1 `quick` SUBAGENT (background). NO EXCEPTIONS.**
+**1 ISSUE/PR = 1 `task_create` = 1 `quick` SUBAGENT (background). NO EXCEPTIONS.**
 
 | Rule | Value |
 |------|-------|
 | Category | `quick` |
 | Execution | `run_in_background=true` |
 | Parallelism | ALL items simultaneously |
-| Tracking | `TaskCreate` per item |
+| Tracking | `task_create` per item |
 | Output | `/tmp/{YYYYMMDD-HHmmss}/issue-{N}.md` or `pr-{N}.md` |
 
 ---
@@ -140,7 +140,7 @@ fi
 
 ```
 For each item:
-  1. TaskCreate(subject="Triage: #{number} {title}")
+  1. task_create(subject="Triage: #{number} {title}")
   2. task(category="quick", run_in_background=true, load_skills=[], prompt=SUBAGENT_PROMPT)
   3. Store mapping: item_number -> { task_id, background_task_id }
 ```
@@ -482,7 +482,7 @@ NEVER merge. NEVER comment. NEVER review. Write to file ONLY.
 
 Poll `background_output()` per task. As each completes:
 1. Parse report.
-2. `TaskUpdate(id=task_id, status="completed", description=REPORT_SUMMARY)`
+2. `task_update(id=task_id, status="completed", description=REPORT_SUMMARY)`
 3. Stream to user immediately.
 
 ---
