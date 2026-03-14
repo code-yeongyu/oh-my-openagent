@@ -12,9 +12,9 @@ export function toProviderAvailability(config: InstallConfig): ProviderAvailabil
     copilot: config.hasCopilot,
     zai: config.hasZaiCodingPlan,
     kimiForCoding: config.hasKimiForCoding,
+		opencodeGo: config.hasOpencodeGo,
     minimaxCnCodingPlan: config.hasMinimaxCnCodingPlan,
     minimaxCodingPlan: config.hasMinimaxCodingPlan,
-    opencodeGo: config.hasOpencodeGo,
     isMaxPlan: config.isMax20,
   }
 }
@@ -28,9 +28,9 @@ export function isProviderAvailable(provider: string, availability: ProviderAvai
     opencode: availability.opencodeZen,
     "zai-coding-plan": availability.zai,
     "kimi-for-coding": availability.kimiForCoding,
+		"opencode-go": availability.opencodeGo,
     "minimax-cn-coding-plan": availability.minimaxCnCodingPlan,
     "minimax-coding-plan": availability.minimaxCodingPlan,
-    "opencode-go": availability.opencodeGo,
   }
   return mapping[provider] ?? false
 }

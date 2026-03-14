@@ -52,9 +52,9 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
     avail.copilot ||
     avail.zai ||
     avail.kimiForCoding ||
+    avail.opencodeGo ||
     avail.minimaxCnCodingPlan ||
-    avail.minimaxCodingPlan ||
-    avail.opencodeGo
+    avail.minimaxCodingPlan
   if (!hasAnyProvider) {
     return {
       $schema: SCHEMA_URL,

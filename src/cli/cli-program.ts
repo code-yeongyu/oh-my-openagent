@@ -31,10 +31,10 @@ program
   .option("--opencode-zen <value>", "OpenCode Zen access: no, yes (default: no)")
   .option("--zai-coding-plan <value>", "Z.ai Coding Plan subscription: no, yes (default: no)")
   .option("--kimi-for-coding <value>", "Kimi For Coding subscription: no, yes (default: no)")
+  .option("--opencode-go <value>", "OpenCode Go subscription: no, yes (default: no)")
   .option("--minimax-cn-coding-plan <value>", "MiniMax Coding Plan (minimaxi.com) subscription: no, yes (default: no)")
   .option("--minimax-coding-plan <value>", "MiniMax Coding Plan (minimax.io) subscription: no, yes (default: no)")
   .option("--minimax-model-variant <value>", "MiniMax model preference: standard, highspeed (default: standard)")
-  .option("--opencode-go <value>", "OpenCode Go subscription: no, yes (default: no)")
   .option("--skip-auth", "Skip authentication setup hints")
   .addHelpText("after", `
 Examples:
@@ -42,7 +42,7 @@ Examples:
   $ bunx oh-my-opencode install --no-tui --claude=max20 --openai=yes --gemini=yes --copilot=no
   $ bunx oh-my-opencode install --no-tui --claude=no --gemini=no --copilot=yes --opencode-zen=yes
 
-Model Providers (agent/category fallback chains choose among these):
+Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi > MiniMax):
   Claude        Native anthropic/ models (Opus, Sonnet, Haiku)
   OpenAI        Native openai/ models (GPT-5.4 for Oracle)
   Gemini        Native google/ models (Gemini 3 Pro, Flash)
@@ -52,7 +52,6 @@ Model Providers (agent/category fallback chains choose among these):
   Kimi          kimi-for-coding/k2p5 (Sisyphus/Prometheus fallback)
   MiniMax CN    minimax-cn-coding-plan/MiniMax-M2.5 (default)
   MiniMax       minimax-coding-plan/MiniMax-M2.5 (default)
-  OpenCode Go   opencode-go/minimax-m2.5 or opencode-go/glm-5
 
 MiniMax Note:
   Use --minimax-model-variant=highspeed only if your MiniMax plan explicitly includes MiniMax-M2.5-highspeed.
@@ -67,10 +66,10 @@ MiniMax Note:
       opencodeZen: options.opencodeZen,
       zaiCodingPlan: options.zaiCodingPlan,
       kimiForCoding: options.kimiForCoding,
+      opencodeGo: options.opencodeGo,
       minimaxCnCodingPlan: options.minimaxCnCodingPlan,
       minimaxCodingPlan: options.minimaxCodingPlan,
       minimaxModelVariant: options.minimaxModelVariant,
-      opencodeGo: options.opencodeGo,
       skipAuth: options.skipAuth ?? false,
     }
     const exitCode = await install(args)

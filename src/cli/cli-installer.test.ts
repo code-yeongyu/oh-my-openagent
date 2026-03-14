@@ -37,7 +37,6 @@ describe("runCliInstaller", () => {
         hasMinimaxCnCodingPlan: false,
         hasMinimaxCodingPlan: false,
         minimaxModelVariant: "standard",
-        hasOpencodeGo: false,
       }),
       spyOn(configManager, "isOpenCodeInstalled").mockResolvedValue(true),
       spyOn(configManager, "getOpenCodeVersion").mockResolvedValue("1.0.200"),
@@ -63,7 +62,6 @@ describe("runCliInstaller", () => {
       minimaxCnCodingPlan: "no",
       minimaxCodingPlan: "no",
       minimaxModelVariant: "standard",
-      opencodeGo: "no",
     }
 
     //#when

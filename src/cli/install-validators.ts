@@ -42,7 +42,6 @@ export function formatConfigSummary(config: InstallConfig): string {
   const minimaxDetail = `MiniMax ${config.minimaxModelVariant === "highspeed" ? "M2.5-highspeed" : "M2.5"} fallback`
   lines.push(formatProvider("MiniMax Coding Plan (minimaxi.com)", config.hasMinimaxCnCodingPlan, minimaxDetail))
   lines.push(formatProvider("MiniMax Coding Plan (minimax.io)", config.hasMinimaxCodingPlan, minimaxDetail))
-  lines.push(formatProvider("OpenCode Go", config.hasOpencodeGo, "quick-task fallback"))
 
   lines.push("")
   lines.push(color.dim("─".repeat(40)))
@@ -51,7 +50,7 @@ export function formatConfigSummary(config: InstallConfig): string {
   lines.push(color.bold(color.white("Model Assignment")))
   lines.push("")
   lines.push(`  ${SYMBOLS.info} Models auto-configured from agent/category fallback chains`)
-  lines.push(`  ${SYMBOLS.bullet} Providers may differ per role: Native, Copilot, OpenCode Zen, Z.ai, Kimi, MiniMax, OpenCode Go`)
+  lines.push(`  ${SYMBOLS.bullet} Providers may differ per role: Native, Copilot, OpenCode Zen, Z.ai, Kimi, MiniMax`)
 
   return lines.join("\n")
 }
@@ -152,10 +151,6 @@ export function validateNonTuiArgs(args: InstallArgs): { valid: boolean; errors:
     errors.push(`Invalid --kimi-for-coding value: ${args.kimiForCoding} (expected: no, yes)`)
   }
 
-  if (args.opencodeGo !== undefined && !["no", "yes"].includes(args.opencodeGo)) {
-    errors.push(`Invalid --opencode-go value: ${args.opencodeGo} (expected: no, yes)`)
-  }
-
   if (args.minimaxCnCodingPlan !== undefined && !["no", "yes"].includes(args.minimaxCnCodingPlan)) {
     errors.push(`Invalid --minimax-cn-coding-plan value: ${args.minimaxCnCodingPlan} (expected: no, yes)`)
   }
@@ -181,10 +176,10 @@ export function argsToConfig(args: InstallArgs): InstallConfig {
     hasOpencodeZen: args.opencodeZen === "yes",
     hasZaiCodingPlan: args.zaiCodingPlan === "yes",
     hasKimiForCoding: args.kimiForCoding === "yes",
+    hasOpencodeGo: args.opencodeGo === "yes",
     hasMinimaxCnCodingPlan: args.minimaxCnCodingPlan === "yes",
     hasMinimaxCodingPlan: args.minimaxCodingPlan === "yes",
     minimaxModelVariant: args.minimaxModelVariant ?? "standard",
-    hasOpencodeGo: args.opencodeGo === "yes",
   }
 }
 
@@ -196,10 +191,10 @@ export function detectedToInitialValues(detected: DetectedConfig): {
   opencodeZen: BooleanArg
   zaiCodingPlan: BooleanArg
   kimiForCoding: BooleanArg
+  opencodeGo: BooleanArg
   minimaxCnCodingPlan: BooleanArg
   minimaxCodingPlan: BooleanArg
   minimaxModelVariant: MiniMaxModelVariant
-  opencodeGo: BooleanArg
 } {
   let claude: ClaudeSubscription = "no"
   if (detected.hasClaude) {
@@ -214,9 +209,9 @@ export function detectedToInitialValues(detected: DetectedConfig): {
     opencodeZen: detected.hasOpencodeZen ? "yes" : "no",
     zaiCodingPlan: detected.hasZaiCodingPlan ? "yes" : "no",
     kimiForCoding: detected.hasKimiForCoding ? "yes" : "no",
+    opencodeGo: detected.hasOpencodeGo ? "yes" : "no",
     minimaxCnCodingPlan: detected.hasMinimaxCnCodingPlan ? "yes" : "no",
     minimaxCodingPlan: detected.hasMinimaxCodingPlan ? "yes" : "no",
     minimaxModelVariant: detected.minimaxModelVariant,
-    opencodeGo: detected.hasOpencodeGo ? "yes" : "no",
   }
 }

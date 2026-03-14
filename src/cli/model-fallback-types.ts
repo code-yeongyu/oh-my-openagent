@@ -8,9 +8,9 @@ export interface ProviderAvailability {
   copilot: boolean
   zai: boolean
   kimiForCoding: boolean
+  opencodeGo: boolean
   minimaxCnCodingPlan: boolean
   minimaxCodingPlan: boolean
-  opencodeGo: boolean
   isMaxPlan: boolean
 }
 
