@@ -53,8 +53,8 @@ describe("runBunInstallWithDetails", () => {
   })
 
   describe("#given the cache workspace exists", () => {
-    describe("#when bun install uses inherited output", () => {
-      it("#then runs bun install in the cache directory", async () => {
+    describe("#when bun install uses default piped output", () => {
+      it("#then pipes stdout and stderr by default", async () => {
         // given
 
         // when
@@ -65,8 +65,8 @@ describe("runBunInstallWithDetails", () => {
         expect(getOpenCodeCacheDirSpy).toHaveBeenCalledTimes(1)
         expect(spawnWithWindowsHideSpy).toHaveBeenCalledWith(["bun", "install"], {
           cwd: "/tmp/opencode-cache",
-          stdout: "inherit",
-          stderr: "inherit",
+          stdout: "pipe",
+          stderr: "pipe",
         })
       })
     })
@@ -84,6 +84,23 @@ describe("runBunInstallWithDetails", () => {
           cwd: "/tmp/opencode-cache",
           stdout: "pipe",
           stderr: "pipe",
+        })
+      })
+    })
+
+    describe("#when bun install uses explicit inherited output", () => {
+      it("#then passes inherit mode to the spawned process", async () => {
+        // given
+
+        // when
+        const result = await runBunInstallWithDetails({ outputMode: "inherit" })
+
+        // then
+        expect(result).toEqual({ success: true })
+        expect(spawnWithWindowsHideSpy).toHaveBeenCalledWith(["bun", "install"], {
+          cwd: "/tmp/opencode-cache",
+          stdout: "inherit",
+          stderr: "inherit",
         })
       })
     })

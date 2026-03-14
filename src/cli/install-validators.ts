@@ -159,7 +159,8 @@ export function argsToConfig(args: InstallArgs): InstallConfig {
     hasCopilot: args.copilot === "yes",
     hasOpencodeZen: args.opencodeZen === "yes",
     hasZaiCodingPlan: args.zaiCodingPlan === "yes",
-    hasKimiForCoding: args.kimiForCoding === "yes",
+hasKimiForCoding: args.kimiForCoding === "yes",
+    hasOpencodeGo: args.opencodeGo === "yes",
   }
 }
 
@@ -170,7 +171,8 @@ export function detectedToInitialValues(detected: DetectedConfig): {
   copilot: BooleanArg
   opencodeZen: BooleanArg
   zaiCodingPlan: BooleanArg
-  kimiForCoding: BooleanArg
+kimiForCoding: BooleanArg
+  opencodeGo: BooleanArg
 } {
   let claude: ClaudeSubscription = "no"
   if (detected.hasClaude) {
@@ -184,6 +186,7 @@ export function detectedToInitialValues(detected: DetectedConfig): {
     copilot: detected.hasCopilot ? "yes" : "no",
     opencodeZen: detected.hasOpencodeZen ? "yes" : "no",
     zaiCodingPlan: detected.hasZaiCodingPlan ? "yes" : "no",
-    kimiForCoding: detected.hasKimiForCoding ? "yes" : "no",
+kimiForCoding: detected.hasKimiForCoding ? "yes" : "no",
+    opencodeGo: detected.hasOpencodeGo ? "yes" : "no",
   }
 }

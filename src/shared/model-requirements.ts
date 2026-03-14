@@ -20,6 +20,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         model: "claude-opus-4-6",
         variant: "max",
       },
+      { providers: ["opencode-go"], model: "kimi-k2.5" },
       { providers: ["kimi-for-coding"], model: "k2p5" },
       {
         providers: [
@@ -66,21 +67,21 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         model: "claude-opus-4-6",
         variant: "max",
       },
+      { providers: ["opencode-go"], model: "glm-5" },
     ],
   },
   librarian: {
     fallbackChain: [
-      {
-        providers: ["google", "github-copilot", "opencode"],
-        model: "gemini-3-flash",
-      },
+      { providers: ["opencode-go"], model: "minimax-m2.5" },
       { providers: ["opencode"], model: "minimax-m2.5-free" },
-      { providers: ["opencode"], model: "big-pickle" },
+      { providers: ["anthropic", "opencode"], model: "claude-haiku-4-5" },
+      { providers: ["opencode"], model: "gpt-5-nano" },
     ],
   },
   explore: {
     fallbackChain: [
       { providers: ["github-copilot"], model: "grok-code-fast-1" },
+      { providers: ["opencode-go"], model: "minimax-m2.5" },
       { providers: ["opencode"], model: "minimax-m2.5-free" },
       { providers: ["anthropic", "opencode"], model: "claude-haiku-4-5" },
       { providers: ["opencode"], model: "gpt-5-nano" },
@@ -88,21 +89,10 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   "multimodal-looker": {
     fallbackChain: [
-      {
-        providers: ["openai", "opencode"],
-        model: "gpt-5.4",
-        variant: "medium",
-      },
-      { providers: ["kimi-for-coding"], model: "k2p5" },
-      {
-        providers: ["google", "github-copilot", "opencode"],
-        model: "gemini-3-flash",
-      },
+      { providers: ["openai", "opencode"], model: "gpt-5.4", variant: "medium" },
+      { providers: ["opencode-go"], model: "kimi-k2.5" },
       { providers: ["zai-coding-plan"], model: "glm-4.6v" },
-      {
-        providers: ["openai", "github-copilot", "opencode"],
-        model: "gpt-5-nano",
-      },
+      { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5-nano" },
     ],
   },
   prometheus: {
@@ -117,6 +107,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         model: "gpt-5.4",
         variant: "high",
       },
+      { providers: ["opencode-go"], model: "glm-5" },
       {
         providers: ["google", "github-copilot", "opencode"],
         model: "gemini-3.1-pro",
@@ -130,16 +121,8 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         model: "claude-opus-4-6",
         variant: "max",
       },
-      {
-        providers: ["openai", "github-copilot", "opencode"],
-        model: "gpt-5.4",
-        variant: "high",
-      },
-      {
-        providers: ["google", "github-copilot", "opencode"],
-        model: "gemini-3.1-pro",
-        variant: "high",
-      },
+      { providers: ["opencode-go"], model: "glm-5" },
+      { providers: ["kimi-for-coding"], model: "k2p5" },
     ],
   },
   momus: {
@@ -159,15 +142,13 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         model: "gemini-3.1-pro",
         variant: "high",
       },
+      { providers: ["opencode-go"], model: "glm-5" },
     ],
   },
   atlas: {
     fallbackChain: [
-      {
-        providers: ["anthropic", "github-copilot", "opencode"],
-        model: "claude-sonnet-4-6",
-      },
-      { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.4", variant: "medium" },
+      { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-sonnet-4-6" },
+      { providers: ["opencode-go"], model: "kimi-k2.5" },
     ],
   },
   athena: {
@@ -219,15 +200,9 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   "sisyphus-junior": {
     fallbackChain: [
-      {
-        providers: ["anthropic", "github-copilot", "opencode"],
-        model: "claude-sonnet-4-6",
-      },
-      { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.4", variant: "medium" },
-      {
-        providers: ["google", "github-copilot", "opencode"],
-        model: "gemini-3-flash",
-      },
+      { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-sonnet-4-6" },
+      { providers: ["opencode-go"], model: "kimi-k2.5" },
+      { providers: ["opencode"], model: "big-pickle" },
     ],
   },
 };
@@ -246,6 +221,8 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         model: "claude-opus-4-6",
         variant: "max",
       },
+      { providers: ["opencode-go"], model: "glm-5" },
+      { providers: ["kimi-for-coding"], model: "k2p5" },
     ],
   },
   ultrabrain: {
@@ -265,6 +242,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         model: "claude-opus-4-6",
         variant: "max",
       },
+      { providers: ["opencode-go"], model: "glm-5" },
     ],
   },
   deep: {
@@ -313,6 +291,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         providers: ["google", "github-copilot", "opencode"],
         model: "gemini-3-flash",
       },
+      { providers: ["opencode-go"], model: "minimax-m2.5" },
       { providers: ["opencode"], model: "gpt-5-nano" },
     ],
   },
@@ -327,6 +306,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         model: "gpt-5.3-codex",
         variant: "medium",
       },
+      { providers: ["opencode-go"], model: "kimi-k2.5" },
       {
         providers: ["google", "github-copilot", "opencode"],
         model: "gemini-3-flash",
@@ -347,6 +327,8 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       },
       { providers: ["zai-coding-plan", "opencode"], model: "glm-5" },
       { providers: ["kimi-for-coding"], model: "k2p5" },
+      { providers: ["opencode-go"], model: "glm-5" },
+      { providers: ["opencode"], model: "kimi-k2.5" },
       {
         providers: [
           "opencode",
@@ -366,6 +348,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         providers: ["google", "github-copilot", "opencode"],
         model: "gemini-3-flash",
       },
+      { providers: ["opencode-go"], model: "kimi-k2.5" },
       {
         providers: ["anthropic", "github-copilot", "opencode"],
         model: "claude-sonnet-4-6",

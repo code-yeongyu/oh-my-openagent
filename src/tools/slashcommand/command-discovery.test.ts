@@ -157,4 +157,28 @@ describe("slashcommand command discovery plugin integration", () => {
     expect(names).not.toContain("daplug:run-prompt")
     expect(names).not.toContain("daplug:plugin-plan")
   })
+
+  it("discovers parent opencode commands when profile config dir is active", () => {
+    const opencodeRootDir = join(tempDir, "opencode-root")
+    const profileConfigDir = join(opencodeRootDir, "profiles", "codex")
+    const globalCommandDir = join(opencodeRootDir, "command")
+
+    mkdirSync(profileConfigDir, { recursive: true })
+    mkdirSync(globalCommandDir, { recursive: true })
+    writeFileSync(
+      join(globalCommandDir, "commit.md"),
+      `---
+description: Commit through parent opencode config
+---
+Use parent opencode commit command.
+`
+    )
+    process.env.OPENCODE_CONFIG_DIR = profileConfigDir
+
+    const commands = discoverCommandsSync(projectDir)
+    const commitCommand = commands.find(command => command.name === "commit")
+
+    expect(commitCommand?.scope).toBe("opencode")
+    expect(commitCommand?.content).toContain("Use parent opencode commit command.")
+  })
 })

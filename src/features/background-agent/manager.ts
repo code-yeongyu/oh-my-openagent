@@ -120,14 +120,16 @@ export class BackgroundManager {
   private config?: BackgroundTaskConfig
   private tmuxEnabled: boolean
   private onSubagentSessionCreated?: OnSubagentSessionCreated
-  private onShutdown?: () => void
+  private onShutdown?: () => void | Promise<void>
 
   private queuesByKey: Map<string, QueueItem[]> = new Map()
   private processingKeys: Set<string> = new Set()
   private completionTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
+  private completedTaskSummaries: Map<string, Array<{id: string, description: string}>> = new Map()
   private idleDeferralTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
   private notificationQueueByParent: Map<string, Promise<void>> = new Map()
   private rootDescendantCounts: Map<string, number>
+  private preStartDescendantReservations: Set<string>
   private enableParentSessionNotifications: boolean
   readonly taskHistory = new TaskHistory()
 
@@ -137,7 +139,7 @@ export class BackgroundManager {
     options?: {
       tmuxConfig?: TmuxConfig
       onSubagentSessionCreated?: OnSubagentSessionCreated
-      onShutdown?: () => void
+      onShutdown?: () => void | Promise<void>
       enableParentSessionNotifications?: boolean
     }
   ) {
@@ -153,6 +155,7 @@ export class BackgroundManager {
     this.onSubagentSessionCreated = options?.onSubagentSessionCreated
     this.onShutdown = options?.onShutdown
     this.rootDescendantCounts = new Map()
+    this.preStartDescendantReservations = new Set()
     this.enableParentSessionNotifications = options?.enableParentSessionNotifications ?? true
     this.registerProcessCleanup()
   }
@@ -221,6 +224,26 @@ export class BackgroundManager {
     }
 
     this.rootDescendantCounts.set(rootSessionID, currentCount - 1)
+  }
+
+  private markPreStartDescendantReservation(task: BackgroundTask): void {
+    this.preStartDescendantReservations.add(task.id)
+  }
+
+  private settlePreStartDescendantReservation(task: BackgroundTask): void {
+    this.preStartDescendantReservations.delete(task.id)
+  }
+
+  private rollbackPreStartDescendantReservation(task: BackgroundTask): void {
+    if (!this.preStartDescendantReservations.delete(task.id)) {
+      return
+    }
+
+    if (!task.rootSessionID) {
+      return
+    }
+
+    this.unregisterRootDescendant(task.rootSessionID)
   }
 
   async launch(input: LaunchInput): Promise<BackgroundTask> {
@@ -300,6 +323,7 @@ export class BackgroundManager {
       }
 
       spawnReservation.commit()
+      this.markPreStartDescendantReservation(task)
 
       // Trigger processing (fire-and-forget)
       this.processKey(key)
@@ -321,13 +345,16 @@ export class BackgroundManager {
     try {
       const queue = this.queuesByKey.get(key)
       while (queue && queue.length > 0) {
-        const item = queue[0]
+        const item = queue.shift()
+        if (!item) {
+          continue
+        }
 
         await this.concurrencyManager.acquire(key)
 
         if (item.task.status === "cancelled" || item.task.status === "error" || item.task.status === "interrupt") {
+          this.rollbackPreStartDescendantReservation(item.task)
           this.concurrencyManager.release(key)
-          queue.shift()
           continue
         }
 
@@ -335,6 +362,7 @@ export class BackgroundManager {
           await this.startTask(item)
         } catch (error) {
           log("[background-agent] Error starting task:", error)
+          this.rollbackPreStartDescendantReservation(item.task)
           if (item.task.concurrencyKey) {
             this.concurrencyManager.release(item.task.concurrencyKey)
             item.task.concurrencyKey = undefined
@@ -342,8 +370,6 @@ export class BackgroundManager {
             this.concurrencyManager.release(key)
           }
         }
-
-        queue.shift()
       }
     } finally {
       this.processingKeys.delete(key)
@@ -390,6 +416,18 @@ export class BackgroundManager {
     }
 
     const sessionID = createResult.data.id
+
+    if (task.status === "cancelled") {
+      await this.client.session.abort({
+        path: { id: sessionID },
+      }).catch((error) => {
+        log("[background-agent] Failed to abort cancelled pre-start session:", error)
+      })
+      this.concurrencyManager.release(concurrencyKey)
+      return
+    }
+
+    this.settlePreStartDescendantReservation(task)
     subagentSessions.add(sessionID)
 
     log("[background-agent] tmux callback check", {
@@ -942,6 +980,13 @@ export class BackgroundManager {
         this.idleDeferralTimers.delete(task.id)
       }
 
+      this.cleanupPendingByParent(task)
+      this.clearNotificationsForTask(task.id)
+      const toastManager = getTaskToastManager()
+      if (toastManager) {
+        toastManager.removeTask(task.id)
+      }
+      this.scheduleTaskRemoval(task.id)
       if (task.sessionID) {
         SessionCategoryRegistry.remove(task.sessionID)
       }
@@ -968,7 +1013,12 @@ export class BackgroundManager {
 
       this.pendingNotifications.delete(sessionID)
 
-      if (tasksToCancel.size === 0) return
+      if (tasksToCancel.size === 0) {
+        this.clearTaskHistoryWhenParentTasksGone(sessionID)
+        return
+      }
+
+      const parentSessionsToClear = new Set<string>()
 
       const deletedSessionIDs = new Set<string>([sessionID])
       for (const task of tasksToCancel.values()) {
@@ -978,6 +1028,8 @@ export class BackgroundManager {
       }
 
       for (const task of tasksToCancel.values()) {
+        parentSessionsToClear.add(task.parentSessionID)
+
         if (task.status === "running" || task.status === "pending") {
           void this.cancelTask(task.id, {
             source: "session.deleted",
@@ -993,6 +1045,10 @@ export class BackgroundManager {
             log("[background-agent] Failed to cancel task on session.deleted:", { taskId: task.id, error: err })
           })
         }
+      }
+
+      for (const parentSessionID of parentSessionsToClear) {
+        this.clearTaskHistoryWhenParentTasksGone(parentSessionID)
       }
 
       this.rootDescendantCounts.delete(sessionID)
@@ -1161,6 +1217,39 @@ export class BackgroundManager {
     }
   }
 
+  private clearTaskHistoryWhenParentTasksGone(parentSessionID: string | undefined): void {
+    if (!parentSessionID) return
+    if (this.getTasksByParentSession(parentSessionID).length > 0) return
+    this.taskHistory.clearSession(parentSessionID)
+    this.completedTaskSummaries.delete(parentSessionID)
+  }
+
+  private scheduleTaskRemoval(taskId: string): void {
+    const existingTimer = this.completionTimers.get(taskId)
+    if (existingTimer) {
+      clearTimeout(existingTimer)
+      this.completionTimers.delete(taskId)
+    }
+
+    const timer = setTimeout(() => {
+      this.completionTimers.delete(taskId)
+      const task = this.tasks.get(taskId)
+      if (task) {
+        this.clearNotificationsForTask(taskId)
+        this.tasks.delete(taskId)
+        this.clearTaskHistoryWhenParentTasksGone(task.parentSessionID)
+        if (task.sessionID) {
+          subagentSessions.delete(task.sessionID)
+          SessionCategoryRegistry.remove(task.sessionID)
+        }
+        log("[background-agent] Removed completed task from memory:", taskId)
+        this.clearTaskHistoryWhenParentTasksGone(task?.parentSessionID)
+      }
+    }, TASK_CLEANUP_DELAY_MS)
+
+    this.completionTimers.set(taskId, timer)
+  }
+
   async cancelTask(
     taskId: string,
     options?: { source?: string; reason?: string; abortSession?: boolean; skipNotification?: boolean }
@@ -1188,6 +1277,7 @@ export class BackgroundManager {
           }
         }
       }
+      this.rollbackPreStartDescendantReservation(task)
       log("[background-agent] Cancelled pending task:", { taskId, key })
     }
 
@@ -1227,6 +1317,8 @@ export class BackgroundManager {
     removeTaskToastTracking(task.id)
 
     if (options?.skipNotification) {
+      this.cleanupPendingByParent(task)
+      this.scheduleTaskRemoval(task.id)
       log(`[background-agent] Task cancelled via ${source} (notification skipped):`, task.id)
       return true
     }
@@ -1377,6 +1469,14 @@ export class BackgroundManager {
       })
     }
 
+    if (!this.completedTaskSummaries.has(task.parentSessionID)) {
+      this.completedTaskSummaries.set(task.parentSessionID, [])
+    }
+    this.completedTaskSummaries.get(task.parentSessionID)!.push({
+      id: task.id,
+      description: task.description,
+    })
+
     // Update pending tracking and check if all tasks complete
     const pendingSet = this.pendingByParent.get(task.parentSessionID)
     let allComplete = false
@@ -1396,9 +1496,12 @@ export class BackgroundManager {
     }
 
     const completedTasks = allComplete
-      ? Array.from(this.tasks.values())
-        .filter(t => t.parentSessionID === task.parentSessionID && t.status !== "running" && t.status !== "pending")
+      ? (this.completedTaskSummaries.get(task.parentSessionID) ?? [{ id: task.id, description: task.description }])
       : []
+
+    if (allComplete) {
+      this.completedTaskSummaries.delete(task.parentSessionID)
+    }
 
     const statusText = task.status === "completed"
       ? "COMPLETED"
@@ -1530,29 +1633,8 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
         })
       }
 
-    if (allComplete) {
-      for (const completedTask of completedTasks) {
-        const taskId = completedTask.id
-        const existingTimer = this.completionTimers.get(taskId)
-        if (existingTimer) {
-          clearTimeout(existingTimer)
-          this.completionTimers.delete(taskId)
-        }
-        const timer = setTimeout(() => {
-          this.completionTimers.delete(taskId)
-          const taskToRemove = this.tasks.get(taskId)
-          if (taskToRemove) {
-            this.clearNotificationsForTask(taskId)
-            if (taskToRemove.sessionID) {
-              subagentSessions.delete(taskToRemove.sessionID)
-              SessionCategoryRegistry.remove(taskToRemove.sessionID)
-            }
-            this.tasks.delete(taskId)
-            log("[background-agent] Removed completed task from memory:", taskId)
-          }
-        }, TASK_CLEANUP_DELAY_MS)
-        this.completionTimers.set(taskId, timer)
-      }
+    if (task.status !== "running" && task.status !== "pending") {
+      this.scheduleTaskRemoval(task.id)
     }
   }
 
@@ -1606,6 +1688,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
             }
           }
         }
+        this.cleanupPendingByParent(task)
         this.markForNotification(task)
         this.enqueueNotificationForParent(task.parentSessionID, () => this.notifyParentSession(task)).catch(err => {
           log("[background-agent] Error in notifyParentSession for stale-pruned task:", { taskId: task.id, error: err })
@@ -1747,14 +1830,19 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
    * Cancels all pending concurrency waiters and clears timers.
    * Should be called when the plugin is unloaded.
    */
-  shutdown(): void {
+  async shutdown(): Promise<void> {
     if (this.shutdownTriggered) return
     this.shutdownTriggered = true
     log("[background-agent] Shutting down BackgroundManager")
     this.stopPolling()
+    const trackedSessionIDs = new Set<string>()
 
     // Abort all running sessions to prevent zombie processes (#1240)
     for (const task of this.tasks.values()) {
+      if (task.sessionID) {
+        trackedSessionIDs.add(task.sessionID)
+      }
+
       if (task.status === "running" && task.sessionID) {
         this.client.session.abort({
           path: { id: task.sessionID },
@@ -1765,7 +1853,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
     // Notify shutdown listeners (e.g., tmux cleanup)
     if (this.onShutdown) {
       try {
-        this.onShutdown()
+        await this.onShutdown()
       } catch (error) {
         log("[background-agent] Error in onShutdown callback:", error)
       }
@@ -1789,6 +1877,11 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
     }
     this.idleDeferralTimers.clear()
 
+    for (const sessionID of trackedSessionIDs) {
+      subagentSessions.delete(sessionID)
+      SessionCategoryRegistry.remove(sessionID)
+    }
+
     this.concurrencyManager.clear()
     this.tasks.clear()
     this.notifications.clear()
@@ -1798,6 +1891,8 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
     this.rootDescendantCounts.clear()
     this.queuesByKey.clear()
     this.processingKeys.clear()
+    this.taskHistory.clearAll()
+    this.completedTaskSummaries.clear()
     this.unregisterProcessCleanup()
     log("[background-agent] Shutdown complete")
 

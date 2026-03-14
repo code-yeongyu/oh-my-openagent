@@ -384,7 +384,7 @@ describe("skill tool - ordering and priority", () => {
     }
   }
 
-  it("lists skills before commands in available_items", () => {
+  it("shows skills as command items with slash prefix in available_items", () => {
     //#given: mix of skills and commands
     const skills = [
       createMockSkillWithScope("builtin-skill", "builtin"),
@@ -398,16 +398,17 @@ describe("skill tool - ordering and priority", () => {
     //#when: creating tool with both
     const tool = createSkillTool({ skills, commands })
 
-    //#then: skills should appear before commands
+    //#then: skills should appear as <command> items with / prefix, listed before regular commands
     const desc = tool.description
-    const skillIndex = desc.indexOf("<skill>")
-    const commandIndex = desc.indexOf("<command>")
-    expect(skillIndex).toBeGreaterThan(0)
-    expect(commandIndex).toBeGreaterThan(0)
-    expect(skillIndex).toBeLessThan(commandIndex)
+    expect(desc).toContain("<name>/builtin-skill</name>")
+    expect(desc).toContain("<name>/project-skill</name>")
+    expect(desc).not.toContain("<skill>")
+    const skillCmdIndex = desc.indexOf("/project-skill")
+    const regularCmdIndex = desc.indexOf("/project-cmd")
+    expect(skillCmdIndex).toBeLessThan(regularCmdIndex)
   })
 
-  it("sorts skills by priority: project > user > opencode > builtin", () => {
+  it("sorts skill-commands by priority: project > user > opencode > builtin", () => {
     //#given: skills in random order
     const skills = [
       createMockSkillWithScope("builtin-skill", "builtin"),
@@ -421,10 +422,10 @@ describe("skill tool - ordering and priority", () => {
 
     //#then: should be sorted by priority
     const desc = tool.description
-    const projectIndex = desc.indexOf("project-skill")
-    const userIndex = desc.indexOf("user-skill")
-    const opencodeIndex = desc.indexOf("opencode-skill")
-    const builtinIndex = desc.indexOf("builtin-skill")
+    const projectIndex = desc.indexOf("/project-skill")
+    const userIndex = desc.indexOf("/user-skill")
+    const opencodeIndex = desc.indexOf("/opencode-skill")
+    const builtinIndex = desc.indexOf("/builtin-skill")
 
     expect(projectIndex).toBeLessThan(userIndex)
     expect(userIndex).toBeLessThan(opencodeIndex)
@@ -468,7 +469,7 @@ describe("skill tool - ordering and priority", () => {
     expect(tool.description).toContain("Skills listed before commands")
   })
 
-  it("uses <available_items> wrapper with unified format", () => {
+  it("uses <available_items> wrapper with unified command format", () => {
     //#given: mix of skills and commands
     const skills = [createMockSkillWithScope("test-skill", "project")]
     const commands = [createMockCommand("test-cmd", "project")]
@@ -476,10 +477,51 @@ describe("skill tool - ordering and priority", () => {
     //#when: creating tool
     const tool = createSkillTool({ skills, commands })
 
-    //#then: should use unified wrapper
+    //#then: should use unified wrapper with all items as commands
     expect(tool.description).toContain("<available_items>")
     expect(tool.description).toContain("</available_items>")
-    expect(tool.description).toContain("<skill>")
+    expect(tool.description).not.toContain("<skill>")
     expect(tool.description).toContain("<command>")
+    expect(tool.description).toContain("/test-skill")
+    expect(tool.description).toContain("/test-cmd")
+  })
+})
+
+describe("skill tool - dynamic discovery", () => {
+  it("discovers skills from disk on every invocation instead of caching", async () => {
+    // given: tool created with initial skills
+    const initialSkills = [createMockSkill("initial-skill")]
+    const tool = createSkillTool({ skills: initialSkills })
+
+    // when: executing with the initial skill name
+    const result = await tool.execute({ name: "initial-skill" }, mockContext)
+
+    // then: initial skill found (merged from options.skills since not on disk)
+    expect(result).toContain("Skill: initial-skill")
+  })
+
+  it("merges pre-provided skills with dynamically discovered ones", async () => {
+    // given: tool with a synthetic skill not on disk
+    const syntheticSkill = createMockSkill("synthetic-only")
+    const tool = createSkillTool({ skills: [syntheticSkill] })
+
+    // when: looking up the synthetic skill
+    const result = await tool.execute({ name: "synthetic-only" }, mockContext)
+
+    // then: synthetic skill is still accessible via merge
+    expect(result).toContain("Skill: synthetic-only")
+  })
+
+  it("prefers disk-discovered skills over pre-provided ones", async () => {
+    // given: tool with a pre-provided skill that also exists on disk (builtin)
+    const overrideSkill = createMockSkill("playwright")
+    overrideSkill.definition.description = "SHOULD_BE_OVERRIDDEN"
+    const tool = createSkillTool({ skills: [overrideSkill] })
+
+    // when: executing with the builtin skill name
+    const result = await tool.execute({ name: "playwright" }, mockContext)
+
+    // then: disk version wins (not the pre-provided override)
+    expect(result).not.toContain("SHOULD_BE_OVERRIDDEN")
   })
 })

@@ -1,10 +1,9 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { appendSessionId, getPlanProgress, readBoulderState } from "../../features/boulder-state"
-import type { BoulderState, PlanProgress } from "../../features/boulder-state"
-import { subagentSessions } from "../../features/claude-code-session-state"
+import { getPlanProgress, readBoulderState } from "../../features/boulder-state"
 import { log } from "../../shared/logger"
 import { injectBoulderContinuation } from "./boulder-continuation-injector"
 import { HOOK_NAME } from "./hook-name"
+import { resolveActiveBoulderSession } from "./resolve-active-boulder-session"
 import type { AtlasHookOptions, SessionState } from "./types"
 
 const CONTINUATION_COOLDOWN_MS = 5000
@@ -16,44 +15,6 @@ function hasRunningBackgroundTasks(sessionID: string, options?: AtlasHookOptions
   return backgroundManager
     ? backgroundManager.getTasksByParentSession(sessionID).some((task: { status: string }) => task.status === "running")
     : false
-}
-
-function resolveActiveBoulderSession(input: {
-  directory: string
-  sessionID: string
-}): {
-  boulderState: BoulderState
-  progress: PlanProgress
-  appendedSession: boolean
-} | null {
-  const boulderState = readBoulderState(input.directory)
-  if (!boulderState) {
-    return null
-  }
-
-  const progress = getPlanProgress(boulderState.active_plan)
-  if (progress.isComplete) {
-    return { boulderState, progress, appendedSession: false }
-  }
-
-  if (boulderState.session_ids.includes(input.sessionID)) {
-    return { boulderState, progress, appendedSession: false }
-  }
-
-  if (!subagentSessions.has(input.sessionID)) {
-    return null
-  }
-
-  const updatedBoulderState = appendSessionId(input.directory, input.sessionID)
-  if (!updatedBoulderState?.session_ids.includes(input.sessionID)) {
-    return null
-  }
-
-  return {
-    boulderState: updatedBoulderState,
-    progress,
-    appendedSession: true,
-  }
 }
 
 async function injectContinuation(input: {
@@ -102,6 +63,7 @@ function scheduleRetry(input: {
     sessionState.pendingRetryTimer = undefined
 
     if (sessionState.promptFailureCount >= 2) return
+    if (sessionState.waitingForFinalWaveApproval) return
 
     const currentBoulder = readBoulderState(ctx.directory)
     if (!currentBoulder) return
@@ -136,7 +98,8 @@ export async function handleAtlasSessionIdle(input: {
 
   log(`[${HOOK_NAME}] session.idle`, { sessionID })
 
-  const activeBoulderSession = resolveActiveBoulderSession({
+  const activeBoulderSession = await resolveActiveBoulderSession({
+    client: ctx.client,
     directory: ctx.directory,
     sessionID,
   })
@@ -160,6 +123,11 @@ export async function handleAtlasSessionIdle(input: {
 
   const sessionState = getState(sessionID)
   const now = Date.now()
+
+  if (sessionState.waitingForFinalWaveApproval) {
+    log(`[${HOOK_NAME}] Skipped: waiting for explicit final-wave approval`, { sessionID })
+    return
+  }
 
   if (sessionState.lastEventWasAbortError) {
     sessionState.lastEventWasAbortError = false

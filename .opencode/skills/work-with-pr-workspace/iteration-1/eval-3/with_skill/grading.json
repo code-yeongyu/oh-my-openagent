@@ -1,0 +1,10 @@
+{
+  "run_id": "eval-3-with_skill",
+  "expectations": [
+    {"text": "Plan uses git worktree in a sibling directory", "passed": true, "evidence": "../omo-wt/refactor-delegate-task-constants"},
+    {"text": "Uses 2+ commits for the multi-file refactor", "passed": true, "evidence": "Commit 1: category defaults+appends, Commit 2: plan agent prompt+names"},
+    {"text": "Maintains backward compatibility via barrel re-export", "passed": true, "evidence": "constants.ts converted to re-export from 4 new files, full import map verified"},
+    {"text": "Verification loop includes all 3 gates", "passed": true, "evidence": "Gate A (CI), Gate B (review-work), Gate C (Cubic)"},
+    {"text": "References actual src/tools/delegate-task/constants.ts", "passed": true, "evidence": "654 lines analyzed, 4 responsibilities identified, full external+internal import map"}
+  ]
+}

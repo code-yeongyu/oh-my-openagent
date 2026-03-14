@@ -72,6 +72,23 @@ describe("runtime-fallback", () => {
     }
   }
 
+  function createMockPluginConfigWithCategoryModel(
+    categoryName: string,
+    model: string,
+    fallbackModels: string[],
+    variant?: string,
+  ): OhMyOpenCodeConfig {
+    return {
+      categories: {
+        [categoryName]: {
+          model,
+          fallback_models: fallbackModels,
+          ...(variant ? { variant } : {}),
+        },
+      },
+    }
+  }
+
   describe("session.error handling", () => {
     test("should detect retryable error with status code 429", async () => {
       const hook = createRuntimeFallbackHook(createMockPluginInput(), { config: createMockConfig() })
@@ -308,6 +325,114 @@ describe("runtime-fallback", () => {
         (c) => c.msg.includes("Error not retryable") && (c.data as { sessionID?: string } | undefined)?.sessionID === sessionID
       )
       expect(nonRetryLog).toBeUndefined()
+    })
+
+    test("should continue fallback chain when ProviderModelNotFoundError occurs", async () => {
+      const hook = createRuntimeFallbackHook(createMockPluginInput(), {
+        config: createMockConfig({ notify_on_fallback: false }),
+        pluginConfig: createMockPluginConfigWithCategoryFallback([
+          "anthropic/claude-opus-4.6",
+          "openai/gpt-5.4",
+        ]),
+      })
+      const sessionID = "test-session-provider-model-not-found"
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "google/gemini-2.5-pro" } },
+        },
+      })
+
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: {
+            sessionID,
+            error: {
+              name: "AI_LoadAPIKeyError",
+              message:
+                "Google Generative AI API key is missing. Pass it using the 'apiKey' parameter or the GOOGLE_GENERATIVE_AI_API_KEY environment variable.",
+            },
+          },
+        },
+      })
+
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: {
+            sessionID,
+            error: {
+              name: "ProviderModelNotFoundError",
+              data: {
+                providerID: "anthropic",
+                modelID: "claude-opus-4.6",
+                message: "Model not found: anthropic/claude-opus-4.6.",
+              },
+            },
+          },
+        },
+      })
+
+      const fallbackLogs = logCalls.filter((c) => c.msg.includes("Preparing fallback"))
+      expect(fallbackLogs.length).toBeGreaterThanOrEqual(2)
+      expect(fallbackLogs[1]?.data).toMatchObject({ from: "anthropic/claude-opus-4.6", to: "openai/gpt-5.4" })
+    })
+
+    test("should bootstrap session.error fallback from session category model and preserve variant", async () => {
+      const promptCalls: Array<Record<string, unknown>> = []
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput({
+          session: {
+            messages: async () => ({
+              data: [{ info: { role: "user" }, parts: [{ type: "text", text: "continue" }] }],
+            }),
+            promptAsync: async (args) => {
+              promptCalls.push(args as Record<string, unknown>)
+              return {}
+            },
+          },
+        }),
+        {
+          config: createMockConfig({ notify_on_fallback: false }),
+          pluginConfig: createMockPluginConfigWithCategoryModel(
+            "quick",
+            "anthropic/claude-haiku-4-5",
+            ["openai/gpt-5.4(high)"],
+          ),
+        },
+      )
+      const sessionID = "test-session-category-bootstrap-session-error"
+      SessionCategoryRegistry.register(sessionID, "quick")
+
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: {
+            sessionID,
+            error: { statusCode: 429, message: "Rate limit exceeded" },
+          },
+        },
+      })
+
+      expect(promptCalls).toHaveLength(1)
+      const promptBody = promptCalls[0]?.body as {
+        model?: { providerID?: string; modelID?: string }
+        variant?: string
+      } | undefined
+      expect(promptBody?.model).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
+      expect(promptBody?.variant).toBe("high")
+
+      const bootstrapLog = logCalls.find((call) =>
+        call.msg.includes("Derived model from session category config for session.error"),
+      )
+      expect(bootstrapLog?.data).toMatchObject({
+        sessionID,
+        category: "quick",
+        model: "anthropic/claude-haiku-4-5",
+      })
     })
 
     test("should trigger fallback on Copilot auto-retry signal in message.updated", async () => {
@@ -903,6 +1028,63 @@ describe("runtime-fallback", () => {
       const fallbackLog = logCalls.find((c) => c.msg.includes("Preparing fallback"))
       expect(fallbackLog).toBeDefined()
       expect(fallbackLog?.data).toMatchObject({ from: "google/gemini-2.5-pro", to: "openai/gpt-5.4" })
+    })
+
+    test("should bootstrap message.updated fallback from session category model and preserve variant", async () => {
+      const promptCalls: Array<Record<string, unknown>> = []
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput({
+          session: {
+            messages: async () => ({
+              data: [{ info: { role: "user" }, parts: [{ type: "text", text: "continue" }] }],
+            }),
+            promptAsync: async (args) => {
+              promptCalls.push(args as Record<string, unknown>)
+              return {}
+            },
+          },
+        }),
+        {
+          config: createMockConfig({ notify_on_fallback: false }),
+          pluginConfig: createMockPluginConfigWithCategoryModel(
+            "quick",
+            "anthropic/claude-haiku-4-5",
+            ["openai/gpt-5.4(high)"],
+          ),
+        },
+      )
+      const sessionID = "test-session-category-bootstrap-message-updated"
+      SessionCategoryRegistry.register(sessionID, "quick")
+
+      await hook.event({
+        event: {
+          type: "message.updated",
+          properties: {
+            info: {
+              sessionID,
+              role: "assistant",
+              error: { statusCode: 429, message: "Rate limit exceeded" },
+            },
+          },
+        },
+      })
+
+      expect(promptCalls).toHaveLength(1)
+      const promptBody = promptCalls[0]?.body as {
+        model?: { providerID?: string; modelID?: string }
+        variant?: string
+      } | undefined
+      expect(promptBody?.model).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
+      expect(promptBody?.variant).toBe("high")
+
+      const bootstrapLog = logCalls.find((call) =>
+        call.msg.includes("Derived model from session category config for message.updated"),
+      )
+      expect(bootstrapLog?.data).toMatchObject({
+        sessionID,
+        category: "quick",
+        model: "anthropic/claude-haiku-4-5",
+      })
     })
 
     test("should not advance fallback state from message.updated while retry is already in flight", async () => {

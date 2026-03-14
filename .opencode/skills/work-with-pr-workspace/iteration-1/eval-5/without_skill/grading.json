@@ -1,0 +1,10 @@
+{
+  "run_id": "eval-5-without_skill",
+  "expectations": [
+    {"text": "Plan uses git worktree in a sibling directory", "passed": false, "evidence": "git checkout -b, no worktree"},
+    {"text": "References actual comment-checker hook files", "passed": true, "evidence": "Deep analysis of Go binary, tree-sitter, formatter.go, agent_memo.go with line numbers"},
+    {"text": "Adds test cases for Note: false positive scenarios", "passed": true, "evidence": "Detailed test cases distinguishing legit vs AI slop patterns"},
+    {"text": "Verification loop includes all 3 gates", "passed": false, "evidence": "Only bun test and typecheck. No review-work or Cubic."},
+    {"text": "Only modifies regex and adds tests — no unrelated changes", "passed": true, "evidence": "Adds allowed-prefix filter module — focused approach with config extension"}
+  ]
+}

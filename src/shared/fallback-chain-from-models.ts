@@ -39,13 +39,15 @@ function parseVariantFromModel(rawModel: string): { modelID: string; variant?: s
 
 export function parseFallbackModelEntry(
   model: string,
-  defaultProviderID: string,
+  contextProviderID: string | undefined,
+  defaultProviderID = "opencode",
 ): FallbackEntry | undefined {
   const trimmed = model.trim()
   if (!trimmed) return undefined
 
   const parts = trimmed.split("/")
-  const providerID = parts.length >= 2 ? parts[0].trim() : defaultProviderID
+  const providerID =
+    parts.length >= 2 ? parts[0].trim() : (contextProviderID?.trim() || defaultProviderID)
   const rawModelID = parts.length >= 2 ? parts.slice(1).join("/").trim() : trimmed
   if (!providerID || !rawModelID) return undefined
 
@@ -61,13 +63,14 @@ export function parseFallbackModelEntry(
 
 export function buildFallbackChainFromModels(
   fallbackModels: string | string[] | undefined,
-  defaultProviderID: string,
+  contextProviderID: string | undefined,
+  defaultProviderID = "opencode",
 ): FallbackEntry[] | undefined {
   const normalized = normalizeFallbackModels(fallbackModels)
   if (!normalized || normalized.length === 0) return undefined
 
   const parsed = normalized
-    .map((model) => parseFallbackModelEntry(model, defaultProviderID))
+    .map((model) => parseFallbackModelEntry(model, contextProviderID, defaultProviderID))
     .filter((entry): entry is FallbackEntry => entry !== undefined)
 
   if (parsed.length === 0) return undefined

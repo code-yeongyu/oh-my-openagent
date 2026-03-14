@@ -179,7 +179,7 @@ describe("resolveVariantForModel", () => {
         "custom-agent": { category: "ultrabrain" },
       },
     } as OhMyOpenCodeConfig
-    const model = { providerID: "openai", modelID: "gpt-5.3-codex" }
+    const model = { providerID: "openai", modelID: "gpt-5.4" }
 
     // when
     const variant = resolveVariantForModel(config, "custom-agent", model)
