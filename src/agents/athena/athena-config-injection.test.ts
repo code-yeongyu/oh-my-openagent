@@ -10,8 +10,8 @@ describe("Athena prompt config injection placeholders", () => {
 
   describe("#given the Athena agent prompt", () => {
     describe("#when checking for runtime injection placeholders", () => {
-      it("#then contains RETRY_ON_FAIL placeholder", () => {
-        expect(athenaConfig.prompt).toContain("{RETRY_ON_FAIL}")
+      it("#then contains RETRY_ON_FAIL placeholder in non-interactive prompt", () => {
+        expect(ATHENA_NON_INTERACTIVE_PROMPT).toContain("{RETRY_ON_FAIL}")
       })
 
       it("#then contains STUCK_THRESHOLD_SECONDS placeholder", () => {
@@ -22,20 +22,20 @@ describe("Athena prompt config injection placeholders", () => {
         expect(athenaConfig.prompt).toContain("{MEMBER_MAX_RUNNING_SECONDS}")
       })
 
-      it("#then contains quorum reference", () => {
-        expect(athenaConfig.prompt).toContain("quorum")
+      it("#then references failed members handling", () => {
+        expect(athenaConfig.prompt).toContain("Handle failed members")
       })
 
       it("#then contains timeout reference with 30000", () => {
         expect(athenaConfig.prompt).toContain("30000")
       })
 
-      it("#then contains RETRY_FAILED_IF_OTHERS_FINISHED placeholder", () => {
-        expect(athenaConfig.prompt).toContain("{RETRY_FAILED_IF_OTHERS_FINISHED}")
+      it("#then contains RETRY_FAILED_IF_OTHERS_FINISHED in non-interactive prompt", () => {
+        expect(ATHENA_NON_INTERACTIVE_PROMPT).toContain("{RETRY_FAILED_IF_OTHERS_FINISHED}")
       })
 
-      it("#then contains CANCEL_RETRYING_ON_QUORUM placeholder", () => {
-        expect(athenaConfig.prompt).toContain("{CANCEL_RETRYING_ON_QUORUM}")
+      it("#then contains CANCEL_RETRYING_ON_QUORUM in non-interactive prompt", () => {
+        expect(ATHENA_NON_INTERACTIVE_PROMPT).toContain("{CANCEL_RETRYING_ON_QUORUM}")
       })
 
       it("#then avoids session_id continuation retry instruction", () => {

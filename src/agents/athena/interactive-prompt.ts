@@ -212,31 +212,33 @@ For each member in the latest status map from Step 6, check:
 
 ### Step 9: Verify completed members have valid responses.
 For each member in the council_finalize result, check:
-- has_response: true AND response_complete: true → ✅ Use this result for synthesis.
-- has_response: true AND response_complete: false → Member output is incomplete after completion. Treat as failed and apply retry logic (Step 10).
-- has_response: false and background_wait status for the same task_id is "completed" → Member completed without valid tagged output. Treat as failed and apply retry logic (Step 10).
-- has_response: false AND error → Member failed to produce output. Apply retry logic (Step 10).
+- has_response: true AND response_complete: true -> successful. Use for synthesis.
+- has_response: true AND response_complete: false -> failed (incomplete output).
+- has_response: false and background_wait status for the same task_id is "completed" -> failed (no valid tagged output).
+- has_response: false AND error -> failed (member error).
 
-### Step 10: Retry failed members (if configured).
-Config values (injected at runtime):
-- retry_on_fail = {RETRY_ON_FAIL} (max retry attempts per failed member, 0 = no retries)
-- retry_failed_if_others_finished = {RETRY_FAILED_IF_OTHERS_FINISHED} (false = retry only while others running, true = retry even after all others done)
-- cancel_retrying_on_quorum = {CANCEL_RETRYING_ON_QUORUM} (true = cancel in-flight retries when 2+ successful)
+### Step 10: Handle failed members.
+If ALL members succeeded (every member has has_response=true AND response_complete=true), skip this step and proceed directly to synthesis (Step 12).
 
-If retry_on_fail > 0 and a member failed:
-- If retry_failed_if_others_finished == false: retry only while other members are still running. Once all non-failed members complete, stop retrying and proceed to quorum check.
-- If retry_failed_if_others_finished == true: retry even after other members are done. Wait for retry results before synthesizing.
-- Track retry count per member. Never exceed retry_on_fail attempts.
-- Maintain active_task_id_by_member. On retry, launch a fresh background task for that member with the same role and constraints, then replace the previous task_id for that member with the new retry task_id.
-- Use active_task_id_by_member as the source of truth for Step 6 waiting and Step 7 finalization.
-- Show retry status in progress bar with 🔄 marker.
+If ANY members failed, inform the user which members failed and why, then ask what to do using the Question tool:
+- Tell the user which specific members failed and the reason (timeout, error, incomplete, no output).
+- Present two choices:
+  1. "Retry failed members" — re-launch only the failed members with the same prompt and role.
+  2. "Skip and synthesize" — proceed with the successful responses as-is.
+- Your recommendation depends on the ratio of successful to total members:
+  - If 0-1 members succeeded out of 3+: recommend "Retry failed members" (too few results for meaningful synthesis).
+  - If most members succeeded (e.g., 3/4 or 4/5): recommend "Skip and synthesize" (enough results for a solid synthesis).
+  - Otherwise: present both options neutrally.
 
-If cancel_retrying_on_quorum == true and 2+ members have successful responses (has_response=true, response_complete=true): cancel any in-flight retries using background_cancel and proceed to synthesis.
+If the user chooses to retry:
+- Re-launch failed members via athena_council with the same prompt_file and members parameter set to the failed member names.
+- Return to Step 5 to wait for completion via background_wait.
+- Call council_finalize again to collect retried results.
+- If retried members also fail, ask the user again with the same options. Do not retry indefinitely without user consent.
 
-**Quorum enforcement (minimum 2 successful):**
-Before starting synthesis (Step 12+), verify at least 2 members have has_response=true AND response_complete=true.
-- If <2 successful after all retries: do NOT synthesize. Report the failures with reasons to the user. Suggest re-running the council with different members or settings.
-- Example failure message: "Council quorum not met: only N/M members produced valid responses. [Details of failures]. Consider re-running with different council members."
+If the user chooses to skip:
+- Proceed to synthesis with whatever successful responses are available.
+- Even a single successful response has value — synthesize it and note the limited participation.
 
 ### Step 11: Layer 2 — Follow-up and Cross-check (optional, use when needed):
 
@@ -275,7 +277,7 @@ Universal requirements (all intents):
 
 ### Step 12b: Persist the synthesis.
 
-After completing synthesis, ALWAYS write the full synthesis document to \`{archive_dir}/synthesis.md\` using the Write tool, where \`{archive_dir}\` is the archive directory returned by council_finalize in Step 7. This creates a permanent record of the council's findings alongside the individual member archives. Skip this step ONLY if quorum failed and synthesis was not performed.
+After completing synthesis, ALWAYS write the full synthesis document to \`{archive_dir}/synthesis.md\` using the Write tool, where \`{archive_dir}\` is the archive directory returned by council_finalize in Step 7. This creates a permanent record of the council's findings alongside the individual member archives.
 
 </synthesis_rules>
 

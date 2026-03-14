@@ -89,20 +89,20 @@ Track every task_id from the response for use in Step 5.
 ### Step 9: Retry failed members (if configured).
 - retry_on_fail = {RETRY_ON_FAIL} (max retries, 0 = none)
 - retry_failed_if_others_finished = {RETRY_FAILED_IF_OTHERS_FINISHED}
-- cancel_retrying_on_quorum = {CANCEL_RETRYING_ON_QUORUM}
-- Quorum enforcement: minimum 2 successful members required before synthesis.
 
 If retry_on_fail > 0 and failed members exist:
 1. Re-launch failed members via athena_council with the same prompt_file and members parameter set to the failed member names.
 2. Return to Step 5 to wait for their completion via background_wait.
 3. Call council_finalize again to collect retried results.
-4. Continue retrying until retry count exhausted or quorum met.
+4. Continue retrying until retry count exhausted.
 - If retry_failed_if_others_finished is false, retry opportunistically as soon as failures are detected while others are still running.
 - If retry_failed_if_others_finished is true, only retry after all non-failed members have completed.
-- If cancel_retrying_on_quorum is true, stop retrying once quorum (2+ successful) is met.
-- If retry_on_fail is 0, no failed members remain, or retry budget is exhausted, do NOT re-launch members.
+- If retry_on_fail is 0, no failed members remain, or retry budget is exhausted, proceed to synthesis.
 - If Step 6 (council_finalize) has already executed for the current task IDs, proceed to Step 10.
 - Otherwise, return to Step 5 and continue tracking until Step 6 can run for the current task IDs.
+
+Always proceed to synthesis with whatever successful responses are available. Even partial results have value.
+Set status to "partial" if some members failed, "failed" only if zero members produced valid responses.
 
 ### Step 10: Synthesize using council_finalize runtime guidance.
 - Preconditions: Step 6 (council_finalize) has executed for the current task IDs and archive data is available.
