@@ -4,6 +4,7 @@ import { log } from "../../shared/logger"
 import { normalizeAgentName, resolveAgentForSession } from "./agent-resolver"
 import { getSessionAgent } from "../../features/claude-code-session-state"
 import { setSessionModel } from "../../shared/session-model-state"
+import { getSessionSystemPrompt } from "../../shared/session-system-prompt-state"
 import { getFallbackModelsForSession } from "./fallback-models"
 import { prepareFallback } from "./fallback-state"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
@@ -141,12 +142,16 @@ export function createAutoRetryHelpers(deps: HookDeps) {
         // Add small delay to ensure abort signal from previous request doesn't affect new request
         await new Promise<void>(resolve => setTimeout(() => resolve(), 100))
         
+        // Retrieve the original system prompt to preserve agent behavior during fallback
+        const systemPrompt = getSessionSystemPrompt(sessionID)
+        
         await ctx.client.session.promptAsync({
           path: { id: sessionID },
           body: {
             ...(displayAgentName ? { agent: displayAgentName } : {}),
             ...retryModelPayload,
             parts: retryParts,
+            ...(systemPrompt ? { system: systemPrompt } : {}),
           },
           query: { directory: ctx.directory },
         })
