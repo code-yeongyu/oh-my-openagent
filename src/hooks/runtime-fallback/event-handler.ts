@@ -135,11 +135,8 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
     let state = sessionStates.get(sessionID)
     const fallbackModels = getFallbackModelsForSession(sessionID, resolvedAgent, pluginConfig)
 
-    if (fallbackModels.length === 0) {
-      log(`[${HOOK_NAME}] No fallback models configured`, { sessionID, agent })
-      return
-    }
-
+    // Get current model for blacklisting BEFORE any early returns
+    // We need to blacklist even if there are no fallback models configured
     if (!state) {
       const initialModel = resolveFallbackBootstrapModel({
         sessionID,
@@ -162,6 +159,7 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
 
     // Extract and blacklist the CURRENT model's provider BEFORE prepareFallback updates it
     // Only blacklist for rate limit errors (429), not for other retryable errors like "model not found"
+    // This MUST happen before the fallbackModels.length check to ensure provider is always blacklisted
     const statusCode = extractStatusCode(error, config.retry_on_errors)
     const isRateLimit = statusCode === 429 || /rate.*limit|too.*many.*requests/i.test(String(error))
     const currentModelProvider = state.currentModel.split("/")[0]
@@ -173,6 +171,12 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
         model: state.currentModel,
         source: "session.error",
       })
+    }
+
+    // Early return if no fallback models AFTER blacklisting
+    if (fallbackModels.length === 0) {
+      log(`[${HOOK_NAME}] No fallback models configured`, { sessionID, agent })
+      return
     }
 
     await dispatchFallbackRetry(deps, helpers, {

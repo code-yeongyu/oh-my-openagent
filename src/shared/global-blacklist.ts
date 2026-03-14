@@ -1,9 +1,9 @@
 import * as fs from "fs"
 import * as path from "path"
-import { homedir } from "os"
 import { log } from "./logger"
+import { getOpenCodeCacheDir } from "./data-path"
 
-const BLACKLIST_FILE = path.join(homedir(), ".cache", "opencode", "provider-blacklist.json")
+const BLACKLIST_FILE = path.join(getOpenCodeCacheDir(), "provider-blacklist.json")
 
 export interface BlacklistEntry {
   providerID: string

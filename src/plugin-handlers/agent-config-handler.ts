@@ -165,11 +165,19 @@ export async function applyAgentConfig(params: {
       ]
     }
     
+    // Normalize fallback_models to array (schema allows string | string[])
+    const fallbackModelsRaw = (sjConfigWithFallback as any).fallback_models
+    const fallbackModels = Array.isArray(fallbackModelsRaw)
+      ? fallbackModelsRaw
+      : fallbackModelsRaw
+        ? [fallbackModelsRaw]
+        : undefined
+
     agentConfig["sisyphus-junior"] = createSisyphusJuniorAgentWithOverrides(
       sjConfigWithFallback,
       undefined,
       useTaskSystem,
-      (sjConfigWithFallback as any).fallback_models,
+      fallbackModels,
     );
 
     if (builderEnabled) {

@@ -55,10 +55,6 @@ export function createSubagentBlacklistGuard(args: {
       // Only process subagent sessions
       if (!subagentSessions.has(sessionID)) return
 
-      // Only process once per session (first message)
-      if (subagentFallbackSetup.has(sessionID)) return
-      subagentFallbackSetup.add(sessionID)
-
       // Get model info from input.model (where OpenCode puts it)
       const providerID = input.model?.providerID
       const modelID = input.model?.modelID
@@ -68,6 +64,10 @@ export function createSubagentBlacklistGuard(args: {
         log("[subagent-blacklist-guard] Missing providerID or modelID in input.model", { sessionID, inputModel: input.model })
         return
       }
+
+      // Only process once per session (first message) - AFTER validation
+      if (subagentFallbackSetup.has(sessionID)) return
+      subagentFallbackSetup.add(sessionID)
 
       log("[subagent-blacklist-guard] Checking subagent first message", {
         sessionID,

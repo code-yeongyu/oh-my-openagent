@@ -106,10 +106,21 @@ export function createBlacklistGuard(args: {
         
         for (let i = 0; i < fallbackChain.length; i++) {
           const entry = fallbackChain[i]
-          // Simple selection: use first entry's first provider
-          // In production, you'd check connectivity here
+          const firstProvider = entry.providers[0]
+          
+          // Skip blacklisted providers
+          if (isProviderBlacklisted(firstProvider)) {
+            log("[blacklist-guard] Skipping blacklisted fallback provider", {
+              sessionID,
+              provider: firstProvider,
+              index: i,
+            })
+            continue
+          }
+          
+          // Found non-blacklisted provider
           selectedFallback = {
-            providerID: entry.providers[0],
+            providerID: firstProvider,
             modelID: entry.model,
             variant: entry.variant,
           }
