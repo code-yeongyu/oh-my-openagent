@@ -1,7 +1,7 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin"
 import { normalizeAgentForPrompt } from "../../shared/agent-display-names"
 import { log } from "../../shared/logger"
-import type { SwitchAgentArgs } from "./types"
+import { SWITCHABLE_AGENT_NAMES, type SwitchAgentArgs } from "./types"
 
 const DESCRIPTION =
   "Switch the active session agent. After calling this tool, the session will transition to the specified agent " +
@@ -10,7 +10,15 @@ const DESCRIPTION =
   "Permanent one-way handoff. Use ONLY when you're the wrong agent for the overall job, NEVER for subtasks (use task()). " +
   "Targets: atlas, prometheus, sisyphus, hephaestus."
 
-const ALLOWED_AGENTS = new Set(["atlas", "prometheus", "sisyphus", "hephaestus"])
+const ALLOWED_AGENTS = new Set<string>(SWITCHABLE_AGENT_NAMES)
+
+type TuiClient = {
+  post: (input: {
+    url: string
+    body: { sessionID: string }
+    headers?: Record<string, string>
+  }) => Promise<unknown>
+}
 
 type SessionClient = {
   session: {
@@ -44,9 +52,20 @@ function extractSessionId(response: unknown): string | undefined {
   return undefined
 }
 
+function hasTuiClient(client: SessionClient): client is SessionClient & { _client: TuiClient } {
+  const maybeClient = Reflect.get(client as object, "_client")
+  if (typeof maybeClient !== "object" || maybeClient === null) {
+    return false
+  }
+  return typeof Reflect.get(maybeClient, "post") === "function"
+}
+
 async function navigateTuiToSession(client: SessionClient, sessionID: string): Promise<boolean> {
+  if (!hasTuiClient(client)) {
+    return false
+  }
   try {
-    await (client as any)._client.post({
+    await client._client.post({
       url: "/tui/select-session",
       body: { sessionID },
       headers: { "Content-Type": "application/json" },
