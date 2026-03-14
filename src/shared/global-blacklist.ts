@@ -3,7 +3,9 @@ import * as path from "path"
 import { log } from "./logger"
 import { getOpenCodeCacheDir } from "./data-path"
 
-const BLACKLIST_FILE = path.join(getOpenCodeCacheDir(), "provider-blacklist.json")
+// Allow tests to override the blacklist file path via environment variable
+const BLACKLIST_FILE = process.env.OHMYOPENCODE_BLACKLIST_FILE 
+  || path.join(getOpenCodeCacheDir(), "provider-blacklist.json")
 
 export interface BlacklistEntry {
   providerID: string
