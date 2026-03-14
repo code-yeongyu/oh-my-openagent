@@ -131,10 +131,11 @@ The last Final Verification Wave result just passed.
 This is the ONLY point where approval-style user interaction is required.
 
 1. Read \
-\`.sisyphus/plans/${planName}.md\` again and confirm the remaining unchecked item is the last final-wave task.
+\`.sisyphus/plans/${planName}.md\` again and confirm every remaining unchecked **top-level** task belongs to F1-F4.
+   Ignore nested checkboxes under Acceptance Criteria, Evidence, or Final Checklist sections.
 2. Consolidate the F1-F4 verdicts into a short summary for the user.
 3. Tell the user all final reviewers approved.
-4. Ask for explicit user approval before editing the last final-wave checkbox or marking the plan complete.
+4. Ask for explicit user approval before editing any remaining final-wave checkboxes or marking the plan complete.
 5. Wait for the user's explicit approval. Do NOT auto-continue. Do NOT call \
 \`task()\` again unless the user rejects and requests fixes.
 
