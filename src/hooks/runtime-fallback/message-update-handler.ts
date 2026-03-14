@@ -2,7 +2,7 @@ import type { HookDeps } from "./types"
 import type { AutoRetryHelpers } from "./auto-retry"
 import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
-import { extractStatusCode, extractErrorName, classifyErrorType, isRetryableError, extractAutoRetrySignal, containsErrorContent } from "./error-classifier"
+import { extractStatusCode, extractErrorName, classifyErrorType, isRetryableError, extractAutoRetrySignal, containsErrorContent, getErrorMessage } from "./error-classifier"
 import { createFallbackState } from "./fallback-state"
 import { getFallbackModelsForSession } from "./fallback-models"
 import { blacklistProvider } from "../../shared/global-blacklist"
@@ -162,7 +162,7 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
 
       // Blacklist provider on rate limit errors (same logic as event-handler.ts)
       const statusCode = extractStatusCode(error, config.retry_on_errors)
-      const isRateLimit = statusCode === 429 || /rate.*limit|too.*many.*requests/i.test(String(error))
+      const isRateLimit = statusCode === 429 || /rate.*limit|too.*many.*requests/i.test(getErrorMessage(error))
       if (currentModelProvider && isRateLimit) {
         blacklistProvider(currentModelProvider, config.cooldown_seconds, `Rate limit error in message update`)
         log(`[${HOOK_NAME}] Blacklisted provider due to rate limit error`, {
