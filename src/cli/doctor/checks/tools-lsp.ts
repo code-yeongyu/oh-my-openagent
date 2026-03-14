@@ -6,6 +6,7 @@ const DEFAULT_LSP_SERVERS: Array<{ id: string; binary: string; extensions: strin
   { id: "pyright", binary: "pyright-langserver", extensions: [".py"] },
   { id: "rust-analyzer", binary: "rust-analyzer", extensions: [".rs"] },
   { id: "gopls", binary: "gopls", extensions: [".go"] },
+  { id: "php", binary: "intelephense", extensions: [".php"] },
 ]
 
 export function getLspServersInfo(): LspServerInfo[] {
