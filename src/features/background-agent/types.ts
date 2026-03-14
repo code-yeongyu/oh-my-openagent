@@ -60,6 +60,8 @@ export interface BackgroundTask {
   outputFilePath?: string
   /** Race condition guard: prevents concurrent re-entry during async completion */
   _isCompleting?: boolean
+  /** TTL in milliseconds for this task (defaults to TASK_TTL_MS if not set) */
+  ttl?: number
 
   /** Last message count for stability detection */
   lastMsgCount?: number
@@ -85,6 +87,8 @@ export interface LaunchInput {
   category?: string
   /** Flag to write raw output to file on completion */
   writeOutputToFile?: boolean
+  /** TTL in milliseconds for this task (defaults to TASK_TTL_MS if not set) */
+  ttl?: number
   sessionPermission?: SessionPermissionRule[]
 }
 

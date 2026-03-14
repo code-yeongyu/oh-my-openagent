@@ -290,6 +290,7 @@ export class BackgroundManager {
         attemptCount: 0,
         category: input.category,
         writeOutputToFile: input.writeOutputToFile,
+        ttl: input.ttl,
       }
 
       this.tasks.set(task.id, task)

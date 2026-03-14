@@ -3,6 +3,7 @@ import type { BackgroundTask } from "../../features/background-agent/types"
 import type { CouncilMemberConfig } from "../../config/schema/athena"
 import { parseModelString } from "../delegate-task/model-string-parser"
 import { COUNCIL_MEMBER_KEY_PREFIX } from "../../agents/builtin-agents/council-member-agents"
+import { COUNCIL_DEFAULTS } from "../../agents/athena"
 
 export interface CouncilLaunchContext {
   parentSessionID: string
@@ -46,6 +47,7 @@ export async function launchCouncilMember(
       modelID: parsed.modelID,
       ...(member.variant ? { variant: member.variant } : {}),
     },
+      ttl: COUNCIL_DEFAULTS.COUNCIL_MEMBER_TTL_MS,
   })
 
   return { member, task }
