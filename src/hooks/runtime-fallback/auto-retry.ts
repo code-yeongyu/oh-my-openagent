@@ -10,6 +10,7 @@ import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { buildRetryModelPayload } from "./retry-model-payload"
 import { getLastUserRetryParts } from "./last-user-retry-parts"
 import { extractSessionMessages } from "./session-messages"
+import { getAgentDisplayName } from "../../shared/agent-display-names"
 
 const SESSION_TTL_MS = 30 * 60 * 1000
 
@@ -127,16 +128,23 @@ export function createAutoRetryHelpers(deps: HookDeps) {
         })
 
         const retryAgent = resolvedAgent ?? getSessionAgent(sessionID)
+        // Convert config key to display name for OpenCode compatibility
+        // OpenCode registers agents with display names (e.g., "Atlas (Plan Executor)")
+        // not config keys (e.g., "atlas")
+        const displayAgentName = retryAgent ? getAgentDisplayName(retryAgent) : undefined
         sessionAwaitingFallbackResult.add(sessionID)
         scheduleSessionFallbackTimeout(sessionID, retryAgent)
 
         // Update session model state so OpenCode uses the fallback model
         setSessionModel(sessionID, retryModelPayload.model)
         
+        // Add small delay to ensure abort signal from previous request doesn't affect new request
+        await new Promise<void>(resolve => setTimeout(() => resolve(), 100))
+        
         await ctx.client.session.promptAsync({
           path: { id: sessionID },
           body: {
-            ...(retryAgent ? { agent: retryAgent } : {}),
+            ...(displayAgentName ? { agent: displayAgentName } : {}),
             ...retryModelPayload,
             parts: retryParts,
           },
