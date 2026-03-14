@@ -66,6 +66,10 @@ export function createToolRegistry(args: {
   )
   const lookAt = isMultimodalLookerEnabled ? createLookAt(ctx) : null
 
+  const isAthenaEnabled = !(pluginConfig.disabled_agents ?? []).some(
+    (agent) => agent.toLowerCase() === "athena",
+  )
+
   const delegateTask = createDelegateTask({
     manager: managers.backgroundManager,
     client: ctx.client,
@@ -152,13 +156,15 @@ export function createToolRegistry(args: {
     interactive_bash,
     ...taskToolsRecord,
     ...hashlineToolsRecord,
-    prepare_council_prompt: createPrepareCouncilPromptTool(ctx.directory),
-    council_finalize: createCouncilFinalize(ctx.directory),
-    athena_council: createAthenaCouncilTool({
-      backgroundManager: managers.backgroundManager,
-      councilConfig: pluginConfig.agents?.athena?.council,
-      directory: ctx.directory,
-    }),
+    ...(isAthenaEnabled ? {
+      prepare_council_prompt: createPrepareCouncilPromptTool(ctx.directory),
+      council_finalize: createCouncilFinalize(ctx.directory),
+      athena_council: createAthenaCouncilTool({
+        backgroundManager: managers.backgroundManager,
+        councilConfig: pluginConfig.agents?.athena?.council,
+        directory: ctx.directory,
+      }),
+    } : {}),
   }
 
   for (const toolDefinition of Object.values(allTools)) {
