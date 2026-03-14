@@ -12,6 +12,7 @@ import {
   TASK_TTL_MS,
 } from "./constants"
 import { removeTaskToastTracking } from "./remove-task-toast-tracking"
+import { isCouncilMemberAgent } from "./council-continuation-enforcer"
 
 const TERMINAL_TASK_TTL_MS = 30 * 60 * 1000
 
@@ -62,16 +63,18 @@ export function pruneStaleTasksAndNotifications(args: {
 
     const age = now - timestamp
 
-    // Athena-junior runs council sessions that can exceed the standard TTL.
-    // Council members are their own background tasks with their own TTLs.
+    // Athena-junior orchestrates council sessions; council members may run for hours.
+    // Both are exempt from the standard 30-minute TTL.
     if (TTL_EXEMPT_AGENTS.has(task.agent.toLowerCase())) continue
+    if (isCouncilMemberAgent(task.agent)) continue
 
     const taskTTL = task.ttl ?? TASK_TTL_MS
     if (age <= taskTTL) continue
 
+    const timeoutMinutes = Math.round(taskTTL / 60_000)
     const errorMessage = task.status === "pending"
-      ? "Task timed out while queued (30 minutes)"
-      : "Task timed out after 30 minutes"
+      ? `Task timed out while queued (${timeoutMinutes} minutes)`
+      : `Task timed out after ${timeoutMinutes} minutes`
 
     onTaskPruned(taskId, task, errorMessage)
   }

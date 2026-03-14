@@ -44,6 +44,7 @@ export function createCouncilFinalize(
 
       const base = basePath ?? process.cwd()
 
+      let promptFileMoved = false
       try {
         const hexId = randomBytes(COUNCIL_DEFAULTS.ARCHIVE_ID_BYTES).toString("hex")
         const safeName = slugify(args.name) || "unnamed"
@@ -144,7 +145,7 @@ export function createCouncilFinalize(
           })
         }
 
-        let promptFileMoved = false
+
         const relPromptFile = args.prompt_file
           ? await movePromptFile(args.prompt_file, base, absArchiveDir, relArchiveDir).then((result) => {
               promptFileMoved = true
