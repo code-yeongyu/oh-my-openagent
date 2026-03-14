@@ -56,6 +56,7 @@ function detectProvidersFromOmoConfig(): {
 }
 
 export function detectCurrentConfig(): DetectedConfig {
+  const PACKAGE_NAME = "oh-my-opencode"
   const result: DetectedConfig = {
     isInstalled: false,
     hasClaude: true,
@@ -65,7 +66,7 @@ export function detectCurrentConfig(): DetectedConfig {
     hasCopilot: false,
     hasOpencodeZen: true,
     hasZaiCodingPlan: false,
-hasKimiForCoding: false,
+    hasKimiForCoding: false,
     hasOpencodeGo: false,
   }
 
@@ -81,9 +82,7 @@ hasKimiForCoding: false,
 
   const openCodeConfig = parseResult.config
   const plugins = openCodeConfig.plugin ?? []
-  const OLD_PACKAGE_NAME = "oh-my-opencode"
-const NEW_PACKAGE_NAME = "oh-my-openagent"
-result.isInstalled = plugins.some((p) => p.startsWith(OLD_PACKAGE_NAME) || p.startsWith(NEW_PACKAGE_NAME))
+  result.isInstalled = plugins.some((plugin) => plugin.startsWith(PACKAGE_NAME))
 
   if (!result.isInstalled) {
     return result
