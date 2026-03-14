@@ -1,0 +1,32 @@
+{
+  "eval_id": 3,
+  "eval_name": "refactor-split-constants",
+  "prompt": "Refactor src/tools/delegate-task/constants.ts to split DEFAULT_CATEGORIES and CATEGORY_MODEL_REQUIREMENTS into separate files. Keep backward compatibility with the barrel export. Make a PR.",
+  "assertions": [
+    {
+      "id": "worktree-isolation",
+      "text": "Plan uses git worktree in a sibling directory",
+      "type": "manual"
+    },
+    {
+      "id": "multiple-atomic-commits",
+      "text": "Uses 2+ commits for the multi-file refactor",
+      "type": "manual"
+    },
+    {
+      "id": "barrel-export",
+      "text": "Maintains backward compatibility via barrel re-export in constants.ts or index.ts",
+      "type": "manual"
+    },
+    {
+      "id": "three-gates",
+      "text": "Verification loop includes all 3 gates",
+      "type": "manual"
+    },
+    {
+      "id": "real-constants-file",
+      "text": "References actual src/tools/delegate-task/constants.ts file and its exports",
+      "type": "manual"
+    }
+  ]
+}
