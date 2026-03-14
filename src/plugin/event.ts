@@ -28,6 +28,7 @@ import { shouldRetryError } from "../shared/model-error-classifier";
 import { buildFallbackChainFromModels } from "../shared/fallback-chain-from-models";
 import { extractRetryAttempt, normalizeRetryStatusMessage } from "../shared/retry-status-utils";
 import { clearSessionModel, getSessionModel, setSessionModel } from "../shared/session-model-state";
+import { getSessionSystemPrompt } from "../shared/session-system-prompt-state";
 import { deleteSessionTools } from "../shared/session-tools-store";
 import { lspManager } from "../tools";
 
@@ -239,9 +240,15 @@ export function createEventHandler(args: {
       log("[event] model-fallback abort failed", { sessionID, source, error });
     });
 
+    // Retrieve the original system prompt to preserve agent behavior during fallback
+    const systemPrompt = getSessionSystemPrompt(sessionID);
+
     const promptBody = {
       path: { id: sessionID },
-      body: { parts: [{ type: "text" as const, text: "continue" }] },
+      body: {
+        parts: [{ type: "text" as const, text: "continue" }],
+        ...(systemPrompt ? { system: systemPrompt } : {}),
+      },
       query: { directory: pluginContext.directory },
     };
 

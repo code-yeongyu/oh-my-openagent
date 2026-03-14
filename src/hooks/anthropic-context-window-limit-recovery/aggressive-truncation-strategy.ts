@@ -6,6 +6,7 @@ import { clearSessionState } from "./state"
 import { formatBytes } from "./message-builder"
 import { log } from "../../shared/logger"
 import { resolveInheritedPromptTools } from "../../shared"
+import { getSessionSystemPrompt } from "../../shared/session-system-prompt-state"
 
 export async function runAggressiveTruncationStrategy(params: {
   sessionID: string
@@ -63,11 +64,13 @@ export async function runAggressiveTruncationStrategy(params: {
     setTimeout(async () => {
       try {
         const inheritedTools = resolveInheritedPromptTools(params.sessionID)
+        const systemPrompt = getSessionSystemPrompt(params.sessionID)
         await params.client.session.promptAsync({
           path: { id: params.sessionID },
           body: {
             auto: true,
             ...(inheritedTools ? { tools: inheritedTools } : {}),
+            ...(systemPrompt ? { system: systemPrompt } : {}),
           } as never,
           query: { directory: params.directory },
         })

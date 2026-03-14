@@ -2,6 +2,7 @@ import type { BackgroundManager } from "../../features/background-agent"
 import { getMainSessionID, getSessionAgent } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
 import { createInternalAgentTextPart, resolveInheritedPromptTools } from "../../shared"
+import { getSessionSystemPrompt } from "../../shared/session-system-prompt-state"
 import {
   buildReminder,
   extractMessages,
@@ -152,6 +153,7 @@ export function createUnstableAgentBabysitterHook(ctx: BabysitterContext, option
       const { agent, model, tools } = await resolveMainSessionTarget(ctx, mainSessionID)
 
       try {
+        const systemPrompt = getSessionSystemPrompt(mainSessionID)
         await ctx.client.session.promptAsync({
           path: { id: mainSessionID },
           body: {
@@ -159,6 +161,7 @@ export function createUnstableAgentBabysitterHook(ctx: BabysitterContext, option
             ...(model ? { model } : {}),
             ...(tools ? { tools } : {}),
             parts: [createInternalAgentTextPart(reminder)],
+            ...(systemPrompt ? { system: systemPrompt } : {}),
           },
           query: { directory: ctx.directory },
         })
