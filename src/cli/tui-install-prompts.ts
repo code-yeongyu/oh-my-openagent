@@ -101,6 +101,16 @@ export async function promptInstallConfig(detected: DetectedConfig): Promise<Ins
   })
   if (!kimiForCoding) return null
 
+  const opencodeGo = await selectOrCancel({
+    message: "Do you have an OpenCode Go subscription?",
+    options: [
+      { value: "no", label: "No", hint: "Will use other configured providers" },
+      { value: "yes", label: "Yes", hint: "OpenCode Go for quick tasks" },
+    ],
+    initialValue: initial.opencodeGo,
+  })
+  if (!opencodeGo) return null
+
   const minimaxCnCodingPlan = await selectOrCancel({
     message: "Do you have a MiniMax Coding Plan (minimaxi.com) subscription?",
     options: [
@@ -111,16 +121,6 @@ export async function promptInstallConfig(detected: DetectedConfig): Promise<Ins
   })
   if (!minimaxCnCodingPlan) return null
 
-  const opencodeGo = await selectOrCancel({
-    message: "Do you have an OpenCode Go subscription?",
-    options: [
-      { value: "no", label: "No", hint: "Will use other configured providers" },
-      { value: "yes", label: "Yes", hint: "OpenCode Go for quick tasks" },
-    ],
-    initialValue: initial.opencodeGo,
-  })
-
-  if (!opencodeGo) return null
   const minimaxCodingPlan = await selectOrCancel({
     message: "Do you have a MiniMax Coding Plan (minimax.io) subscription?",
     options: [
