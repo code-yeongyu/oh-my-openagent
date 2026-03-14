@@ -19,6 +19,13 @@ export interface BlacklistData {
   updatedAt: number
 }
 
+/**
+ * Read blacklist from disk.
+ * NOTE: Uses synchronous reads intentionally - this is a bug fix for race conditions.
+ * Async reads caused race conditions where multiple concurrent checks would all see
+ * the provider as not blacklisted before any could write the blacklist update.
+ * Synchronous reads ensure consistency across the event loop tick.
+ */
 function readBlacklist(): BlacklistData {
   try {
     const content = fs.readFileSync(BLACKLIST_FILE, "utf-8")
