@@ -4,6 +4,7 @@ import { join } from "path"
 import { log } from "../../shared/logger"
 import type {
   InstalledPluginsDatabase,
+  InstalledPluginEntryV3,
   PluginInstallation,
   PluginManifest,
   LoadedPlugin,
@@ -96,9 +97,26 @@ function isPluginEnabled(
   return true
 }
 
+function v3EntryToInstallation(entry: InstalledPluginEntryV3): PluginInstallation {
+  return {
+    scope: entry.scope,
+    installPath: entry.installPath,
+    version: entry.version,
+    installedAt: entry.lastUpdated,
+    lastUpdated: entry.lastUpdated,
+    gitCommitSha: entry.gitCommitSha,
+  }
+}
+
 function extractPluginEntries(
   db: InstalledPluginsDatabase,
 ): Array<[string, PluginInstallation | undefined]> {
+  if (Array.isArray(db)) {
+    return db.map((entry) => [
+      `${entry.name}@${entry.marketplace}`,
+      v3EntryToInstallation(entry),
+    ])
+  }
   if (db.version === 1) {
     return Object.entries(db.plugins).map(([key, installation]) => [key, installation])
   }
@@ -111,7 +129,7 @@ export function discoverInstalledPlugins(options?: PluginLoaderOptions): PluginL
   const plugins: LoadedPlugin[] = []
   const errors: PluginLoadError[] = []
 
-  if (!db || !db.plugins) {
+  if (!db || (!Array.isArray(db) && !db.plugins)) {
     return { plugins, errors }
   }
 
