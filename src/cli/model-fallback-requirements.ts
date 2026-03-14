@@ -112,16 +112,6 @@ export const CLI_AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["kimi-for-coding"], model: "k2p5" },
       { providers: ["minimax-coding-plan"], model: "MiniMax-M2.5" },
       { providers: ["minimax-cn-coding-plan"], model: "MiniMax-M2.5" },
-      {
-        providers: ["openai", "github-copilot", "opencode"],
-        model: "gpt-5.4",
-        variant: "high",
-      },
-      {
-        providers: ["google", "github-copilot", "opencode"],
-        model: "gemini-3.1-pro",
-        variant: "high",
-      },
     ],
   },
   momus: {
@@ -154,11 +144,6 @@ export const CLI_AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["kimi-for-coding"], model: "k2p5" },
       { providers: ["minimax-coding-plan"], model: "MiniMax-M2.5" },
       { providers: ["minimax-cn-coding-plan"], model: "MiniMax-M2.5" },
-      { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.4", variant: "medium" },
-      {
-        providers: ["google", "github-copilot", "opencode"],
-        model: "gemini-3.1-pro",
-      },
     ],
   },
   "sisyphus-junior": {
