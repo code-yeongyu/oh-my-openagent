@@ -106,12 +106,18 @@ describe("athena-sisyphus-only hook", () => {
         expect(isAllowedPath(symlinkPath, tempWorkspaceRoot)).toBe(false)
       })
 
-      it("#then rejects symlink inside .sisyphus/ pointing to /etc/passwd", async () => {
-        const symlinkPath = join(tempWorkspaceRoot, ".sisyphus", "passwd-link")
+      it("#then rejects symlink inside .sisyphus/ pointing to file outside workspace", async () => {
+        const outsideTarget = join(tmpdir(), "athena-outside-target.txt")
+        const symlinkPath = join(tempWorkspaceRoot, ".sisyphus", "outside-link")
 
-        await symlink("/etc/passwd", symlinkPath)
+        await writeFile(outsideTarget, "outside-content", "utf-8")
+        try {
+          await symlink(outsideTarget, symlinkPath)
 
-        expect(isAllowedPath(symlinkPath, tempWorkspaceRoot)).toBe(false)
+          expect(isAllowedPath(symlinkPath, tempWorkspaceRoot)).toBe(false)
+        } finally {
+          await rm(outsideTarget, { force: true })
+        }
       })
 
       it("#then allows a regular file inside .sisyphus/tmp/", async () => {

@@ -12,12 +12,8 @@ const DESCRIPTION =
 
 const ALLOWED_AGENTS = new Set<string>(SWITCHABLE_AGENT_NAMES)
 
-type TuiClient = {
-  post: (input: {
-    url: string
-    body: { sessionID: string }
-    headers?: Record<string, string>
-  }) => Promise<unknown>
+type TuiService = {
+  selectSession: (input?: { sessionID?: string }) => Promise<unknown>
 }
 
 type SessionClient = {
@@ -52,24 +48,20 @@ function extractSessionId(response: unknown): string | undefined {
   return undefined
 }
 
-function hasTuiClient(client: SessionClient): client is SessionClient & { _client: TuiClient } {
-  const maybeClient = Reflect.get(client as object, "_client")
-  if (typeof maybeClient !== "object" || maybeClient === null) {
+function hasTuiService(client: SessionClient): client is SessionClient & { tui: TuiService } {
+  const maybeTui = Reflect.get(client as object, "tui")
+  if (typeof maybeTui !== "object" || maybeTui === null) {
     return false
   }
-  return typeof Reflect.get(maybeClient, "post") === "function"
+  return typeof Reflect.get(maybeTui, "selectSession") === "function"
 }
 
 async function navigateTuiToSession(client: SessionClient, sessionID: string): Promise<boolean> {
-  if (!hasTuiClient(client)) {
+  if (!hasTuiService(client)) {
     return false
   }
   try {
-    await client._client.post({
-      url: "/tui/select-session",
-      body: { sessionID },
-      headers: { "Content-Type": "application/json" },
-    })
+    await client.tui.selectSession({ sessionID })
     return true
   } catch {
     return false
