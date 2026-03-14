@@ -746,3 +746,208 @@ describe("keyword-detector agent-specific ultrawork messages", () => {
     expect(textPart!.text).not.toContain("YOU ARE A PLANNER, NOT AN IMPLEMENTER")
   })
 })
+
+describe("keyword-detector token-management mode", () => {
+  let logSpy: ReturnType<typeof spyOn>
+  let getMainSessionSpy: ReturnType<typeof spyOn>
+
+  beforeEach(() => {
+    _resetForTesting()
+    logSpy = spyOn(sharedModule, "log").mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    logSpy?.mockRestore()
+    getMainSessionSpy?.mockRestore()
+    _resetForTesting()
+  })
+
+  function createMockPluginInput(options: { toastCalls?: string[] } = {}) {
+    const toastCalls = options.toastCalls ?? []
+    return {
+      client: {
+        tui: {
+          showToast: async (opts: any) => {
+            toastCalls.push(opts.body.title)
+          },
+        },
+      },
+    } as any
+  }
+
+  test("should inject token-management message when 'manage tokens' is in prompt", async () => {
+    // given - main session with manage tokens keyword
+    const sessionID = "token-mgmt-session"
+    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
+    const toastCalls: string[] = []
+    const hook = createKeywordDetectorHook(createMockPluginInput({ toastCalls }))
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "manage tokens for this session" }],
+    }
+
+    // when - keyword detection runs
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then - token-management message should be injected with toast
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).toContain("[token-management-mode]")
+    expect(textPart!.text).toContain("for this session")
+    expect(textPart!.text).toContain("---")
+    expect(toastCalls).toContain("Token Management Mode")
+  })
+
+  test("should inject message when 'token limit' is in prompt", async () => {
+    // given - main session with token limit keyword
+    const sessionID = "token-limit-session"
+    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
+    const hook = createKeywordDetectorHook(createMockPluginInput())
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "watch the token limit carefully" }],
+    }
+
+    // when - keyword detection runs
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then - token-management message should be injected
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).toContain("[token-management-mode]")
+  })
+
+  test("should inject message when 'switch provider' is in prompt", async () => {
+    // given - main session with switch provider keyword
+    const sessionID = "switch-provider-session"
+    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
+    const hook = createKeywordDetectorHook(createMockPluginInput())
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "switch provider when tokens run out" }],
+    }
+
+    // when - keyword detection runs
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then - token-management message should be injected
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).toContain("[token-management-mode]")
+  })
+
+  test("should inject message when 'out of tokens' is in prompt", async () => {
+    // given - main session with out of tokens keyword
+    const sessionID = "out-of-tokens-session"
+    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
+    const hook = createKeywordDetectorHook(createMockPluginInput())
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "what happens when we are out of tokens" }],
+    }
+
+    // when - keyword detection runs
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then - token-management message should be injected
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).toContain("[token-management-mode]")
+  })
+
+  test("should inject message when 'tokens remaining' is in prompt", async () => {
+    // given - main session with tokens remaining keyword
+    const sessionID = "tokens-remaining-session"
+    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
+    const hook = createKeywordDetectorHook(createMockPluginInput())
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "how many tokens remaining in my subscription" }],
+    }
+
+    // when - keyword detection runs
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then - token-management message should be injected
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).toContain("[token-management-mode]")
+  })
+
+  test("should inject message when 'save tokens' is in prompt", async () => {
+    // given - main session with save tokens keyword
+    const sessionID = "save-tokens-session"
+    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
+    const hook = createKeywordDetectorHook(createMockPluginInput())
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "save tokens and be efficient" }],
+    }
+
+    // when - keyword detection runs
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then - token-management message should be injected
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).toContain("[token-management-mode]")
+  })
+
+  test("should inject message when 'fallback provider' is in prompt", async () => {
+    // given - main session with fallback provider keyword
+    const sessionID = "fallback-session"
+    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
+    const hook = createKeywordDetectorHook(createMockPluginInput())
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "use a fallback provider if needed" }],
+    }
+
+    // when - keyword detection runs
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then - token-management message should be injected
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).toContain("[token-management-mode]")
+  })
+
+  test("should NOT inject token-management in non-main session", async () => {
+    // given - non-main session with token keyword
+    const mainSessionID = "main-session"
+    const subSessionID = "sub-session"
+    setMainSession(mainSessionID)
+    const hook = createKeywordDetectorHook(createMockPluginInput())
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "manage tokens please" }],
+    }
+
+    // when - non-main session triggers keyword
+    await hook["chat.message"]({ sessionID: subSessionID }, output)
+
+    // then - token-management should be filtered (only ultrawork allowed in non-main)
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).not.toContain("[token-management-mode]")
+  })
+
+  test("should NOT trigger on 'token' alone without management context", async () => {
+    // given - text with just 'token' in unrelated context
+    const sessionID = "no-match-session"
+    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
+    const hook = createKeywordDetectorHook(createMockPluginInput())
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "generate a JWT token for auth" }],
+    }
+
+    // when - keyword detection runs
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then - should not trigger token-management mode
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).not.toContain("[token-management-mode]")
+  })
+})
