@@ -108,14 +108,26 @@ function v3EntryToInstallation(entry: InstalledPluginEntryV3): PluginInstallatio
   }
 }
 
+function isValidV3Entry(entry: unknown): entry is InstalledPluginEntryV3 {
+  return (
+    entry != null &&
+    typeof entry === "object" &&
+    typeof (entry as Record<string, unknown>).name === "string" &&
+    typeof (entry as Record<string, unknown>).marketplace === "string" &&
+    typeof (entry as Record<string, unknown>).installPath === "string"
+  )
+}
+
 function extractPluginEntries(
   db: InstalledPluginsDatabase,
 ): Array<[string, PluginInstallation | undefined]> {
   if (Array.isArray(db)) {
-    return db.map((entry) => [
-      `${entry.name}@${entry.marketplace}`,
-      v3EntryToInstallation(entry),
-    ])
+    return db
+      .filter(isValidV3Entry)
+      .map((entry) => [
+        `${entry.name}@${entry.marketplace}`,
+        v3EntryToInstallation(entry),
+      ])
   }
   if (db.version === 1) {
     return Object.entries(db.plugins).map(([key, installation]) => [key, installation])

@@ -19452,9 +19452,12 @@ function v3EntryToInstallation(entry) {
     gitCommitSha: entry.gitCommitSha
   };
 }
+function isValidV3Entry(entry) {
+  return entry != null && typeof entry === "object" && typeof entry.name === "string" && typeof entry.marketplace === "string" && typeof entry.installPath === "string";
+}
 function extractPluginEntries(db) {
   if (Array.isArray(db)) {
-    return db.map((entry) => [
+    return db.filter(isValidV3Entry).map((entry) => [
       `${entry.name}@${entry.marketplace}`,
       v3EntryToInstallation(entry)
     ]);
