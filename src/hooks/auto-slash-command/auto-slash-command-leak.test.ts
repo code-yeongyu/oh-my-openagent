@@ -58,19 +58,55 @@ describe("createAutoSlashCommandHook leak prevention", () => {
   })
 
   describe("#given hook with sessionProcessedCommandExecutions", () => {
-    describe("#when same command executed twice for same session", () => {
+    describe("#when same command executed twice within TTL for same session", () => {
       it("#then second execution is deduplicated", async () => {
-        const hook = createAutoSlashCommandHook()
-        const input = createCommandInput("session-dedup", "leak-test-command")
-        const firstOutput = createCommandOutput("first")
-        const secondOutput = createCommandOutput("second")
+        //#given
+        const nowSpy = spyOn(Date, "now")
+        try {
+          const hook = createAutoSlashCommandHook()
+          const input = createCommandInput("session-dedup", "leak-test-command")
+          const firstOutput = createCommandOutput("first")
+          const secondOutput = createCommandOutput("second")
 
-        await hook["command.execute.before"](input, firstOutput)
-        await hook["command.execute.before"](input, secondOutput)
+          //#when
+          nowSpy.mockReturnValue(0)
+          await hook["command.execute.before"](input, firstOutput)
+          nowSpy.mockReturnValue(29_999)
+          await hook["command.execute.before"](input, secondOutput)
 
-        expect(executeSlashCommandMock).toHaveBeenCalledTimes(1)
-        expect(firstOutput.parts[0].text).toContain(AUTO_SLASH_COMMAND_TAG_OPEN)
-        expect(secondOutput.parts[0].text).toBe("second")
+          //#then
+          expect(executeSlashCommandMock).toHaveBeenCalledTimes(1)
+          expect(firstOutput.parts[0].text).toContain(AUTO_SLASH_COMMAND_TAG_OPEN)
+          expect(secondOutput.parts[0].text).toBe("second")
+        } finally {
+          nowSpy.mockRestore()
+        }
+      })
+    })
+
+    describe("#when same command is repeated after TTL expires", () => {
+      it("#then command executes again", async () => {
+        //#given
+        const nowSpy = spyOn(Date, "now")
+        try {
+          const hook = createAutoSlashCommandHook()
+          const input = createCommandInput("session-dedup", "leak-test-command")
+          const firstOutput = createCommandOutput("first")
+          const secondOutput = createCommandOutput("second")
+
+          //#when
+          nowSpy.mockReturnValue(0)
+          await hook["command.execute.before"](input, firstOutput)
+          nowSpy.mockReturnValue(30_001)
+          await hook["command.execute.before"](input, secondOutput)
+
+          //#then
+          expect(executeSlashCommandMock).toHaveBeenCalledTimes(2)
+          expect(firstOutput.parts[0].text).toContain(AUTO_SLASH_COMMAND_TAG_OPEN)
+          expect(secondOutput.parts[0].text).toContain(AUTO_SLASH_COMMAND_TAG_OPEN)
+        } finally {
+          nowSpy.mockRestore()
+        }
       })
     })
   })
