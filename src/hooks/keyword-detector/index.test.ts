@@ -746,3 +746,299 @@ describe("keyword-detector agent-specific ultrawork messages", () => {
     expect(textPart!.text).not.toContain("YOU ARE A PLANNER, NOT AN IMPLEMENTER")
   })
 })
+
+describe("keyword-detector tmux-script mode", () => {
+  let logSpy: ReturnType<typeof spyOn>
+  let getMainSessionSpy: ReturnType<typeof spyOn>
+
+  beforeEach(() => {
+    _resetForTesting()
+    logSpy = spyOn(sharedModule, "log").mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    logSpy?.mockRestore()
+    getMainSessionSpy?.mockRestore()
+    _resetForTesting()
+  })
+
+  function createMockPluginInput(options: { toastCalls?: string[] } = {}) {
+    const toastCalls = options.toastCalls ?? []
+    return {
+      client: {
+        tui: {
+          showToast: async (opts: any) => {
+            toastCalls.push(opts.body.title)
+          },
+        },
+      },
+    } as any
+  }
+
+  test("should inject tmux-script message when 'tmux script' is in prompt", async () => {
+    // given - main session with tmux script keyword
+    const sessionID = "tmux-test-session"
+    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
+    const toastCalls: string[] = []
+    const hook = createKeywordDetectorHook(createMockPluginInput({ toastCalls }))
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "tmux script for this project" }],
+    }
+
+    // when - keyword detection runs
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then - tmux-script message should be injected
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).toContain("[tmux-script-mode]")
+    expect(textPart!.text).toContain("for this project")
+    expect(textPart!.text).toContain("---")
+    expect(toastCalls).toContain("Tmux Script Mode")
+  })
+
+  test("should inject tmux-script message when 'tmux setup' is in prompt", async () => {
+    // given - main session with tmux setup keyword
+    const sessionID = "tmux-setup-session"
+    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
+    const hook = createKeywordDetectorHook(createMockPluginInput())
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "tmux setup my dev environment" }],
+    }
+
+    // when - keyword detection runs
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then - tmux-script message should be injected
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).toContain("[tmux-script-mode]")
+  })
+
+  test("should inject tmux-script message when 'dev environment script' is in prompt", async () => {
+    // given - main session with dev environment script keyword
+    const sessionID = "dev-env-session"
+    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
+    const hook = createKeywordDetectorHook(createMockPluginInput())
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "create a dev environment script for this repo" }],
+    }
+
+    // when - keyword detection runs
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then - tmux-script message should be injected
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).toContain("[tmux-script-mode]")
+  })
+
+  test("should NOT inject tmux-script in non-main session", async () => {
+    // given - non-main session with tmux keyword
+    const mainSessionID = "main-session"
+    const subSessionID = "sub-session"
+    setMainSession(mainSessionID)
+    const hook = createKeywordDetectorHook(createMockPluginInput())
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "tmux script please" }],
+    }
+
+    // when - non-main session triggers keyword
+    await hook["chat.message"]({ sessionID: subSessionID }, output)
+
+    // then - tmux-script should be filtered (only ultrawork allowed in non-main)
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).not.toContain("[tmux-script-mode]")
+  })
+
+  test("should NOT trigger on partial matches like 'tmuxinator script'", async () => {
+    // given - text with tmux as substring of another word
+    const sessionID = "no-match-session"
+    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
+    const hook = createKeywordDetectorHook(createMockPluginInput())
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "use tmuxinator for session management" }],
+    }
+
+    // when - keyword detection runs
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then - should not trigger tmux-script mode
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).not.toContain("[tmux-script-mode]")
+  })
+})
+
+describe("keyword-detector watch-github-issues mode", () => {
+  let logSpy: ReturnType<typeof spyOn>
+  let getMainSessionSpy: ReturnType<typeof spyOn>
+
+  beforeEach(() => {
+    _resetForTesting()
+    logSpy = spyOn(sharedModule, "log").mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    logSpy?.mockRestore()
+    getMainSessionSpy?.mockRestore()
+    _resetForTesting()
+  })
+
+  function createMockPluginInput(options: { toastCalls?: string[] } = {}) {
+    const toastCalls = options.toastCalls ?? []
+    return {
+      client: {
+        tui: {
+          showToast: async (opts: any) => {
+            toastCalls.push(opts.body.title)
+          },
+        },
+      },
+    } as any
+  }
+
+  test("should inject watch-github-issues message when 'watch github issues' is in prompt", async () => {
+    // given - main session with watch github issues keyword
+    const sessionID = "watch-issues-session"
+    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
+    const toastCalls: string[] = []
+    const hook = createKeywordDetectorHook(createMockPluginInput({ toastCalls }))
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "watch github issues for this repo" }],
+    }
+
+    // when - keyword detection runs
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then - watch-github-issues message should be injected
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).toContain("[watch-github-issues-mode]")
+    expect(textPart!.text).toContain("for this repo")
+    expect(textPart!.text).toContain("---")
+    expect(toastCalls).toContain("GitHub Issue Watcher")
+  })
+
+  test("should inject message when 'monitor issues' is in prompt", async () => {
+    // given - main session with monitor issues keyword
+    const sessionID = "monitor-issues-session"
+    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
+    const hook = createKeywordDetectorHook(createMockPluginInput())
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "monitor issues and fix them" }],
+    }
+
+    // when - keyword detection runs
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then - watch-github-issues message should be injected
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).toContain("[watch-github-issues-mode]")
+  })
+
+  test("should inject message when 'track issues' is in prompt", async () => {
+    // given - main session with track issues keyword
+    const sessionID = "track-issues-session"
+    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
+    const hook = createKeywordDetectorHook(createMockPluginInput())
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "track issues on our github" }],
+    }
+
+    // when - keyword detection runs
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then - watch-github-issues message should be injected
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).toContain("[watch-github-issues-mode]")
+  })
+
+  test("should inject message when 'watch gh issues' is in prompt", async () => {
+    // given - main session with shorthand gh keyword
+    const sessionID = "gh-issues-session"
+    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
+    const hook = createKeywordDetectorHook(createMockPluginInput())
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "watch gh issues periodically" }],
+    }
+
+    // when - keyword detection runs
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then - watch-github-issues message should be injected
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).toContain("[watch-github-issues-mode]")
+  })
+
+  test("should inject message when 'issue watcher' is in prompt", async () => {
+    // given - main session with issue watcher keyword
+    const sessionID = "watcher-session"
+    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
+    const hook = createKeywordDetectorHook(createMockPluginInput())
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "start the github issue watcher" }],
+    }
+
+    // when - keyword detection runs
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then - watch-github-issues message should be injected
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).toContain("[watch-github-issues-mode]")
+  })
+
+  test("should NOT inject watch-github-issues in non-main session", async () => {
+    // given - non-main session with watch issues keyword
+    const mainSessionID = "main-session"
+    const subSessionID = "sub-session"
+    setMainSession(mainSessionID)
+    const hook = createKeywordDetectorHook(createMockPluginInput())
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "watch github issues please" }],
+    }
+
+    // when - non-main session triggers keyword
+    await hook["chat.message"]({ sessionID: subSessionID }, output)
+
+    // then - watch-github-issues should be filtered
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).not.toContain("[watch-github-issues-mode]")
+  })
+
+  test("should NOT trigger on 'issue' alone without watch/monitor/track prefix", async () => {
+    // given - text with just 'issue' without watch context
+    const sessionID = "no-match-session"
+    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
+    const hook = createKeywordDetectorHook(createMockPluginInput())
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "fix this issue in the code" }],
+    }
+
+    // when - keyword detection runs
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then - should not trigger watch-github-issues mode
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).not.toContain("[watch-github-issues-mode]")
+  })
+})
