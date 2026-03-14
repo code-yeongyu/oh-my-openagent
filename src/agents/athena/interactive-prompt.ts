@@ -270,6 +270,21 @@ After Step 7, you will receive a separate runtime guidance message injected by c
 Treat the injected runtime guidance as authoritative over generic defaults.
 
 Universal requirements (all intents):
+- ALWAYS start synthesis.md with this YAML front-matter header:
+
+  ---
+  council: {archive_dir basename, e.g. council-auth-review-a1b2c3d4}
+  question: {original user question, verbatim}
+  date: {ISO 8601 date of synthesis}
+  members: [{member1}, {member2}, ...]
+  session_ids: [{bg_xxx}, {bg_xxx}, ...]
+  mode: {Solo|Delegation}
+  intent: {AUDIT|PLAN|EVALUATE|DIAGNOSE|EXPLAIN|CREATE|PERSPECTIVES|FREEFORM}
+  responded: {N}/{total}
+  ---
+
+- The header values come from your council session: question and intent from council_finalize args, members and session_ids from Step 6 launch, mode from Step 2, responded count from council_finalize result.
+- After the front-matter, write the intent-specific synthesis content following the runtime guidance.
 - Track agreement/disagreement across members and use agreement level as a confidence signal.
 - Flag single-member points as lower confidence.
 - Be concrete and evidence-based.

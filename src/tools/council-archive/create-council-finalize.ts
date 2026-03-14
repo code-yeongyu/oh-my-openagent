@@ -144,8 +144,12 @@ export function createCouncilFinalize(
           })
         }
 
+        let promptFileMoved = false
         const relPromptFile = args.prompt_file
-          ? await movePromptFile(args.prompt_file, base, absArchiveDir, relArchiveDir)
+          ? await movePromptFile(args.prompt_file, base, absArchiveDir, relArchiveDir).then((result) => {
+              promptFileMoved = true
+              return result
+            })
           : undefined
 
         const relMetaFile = join(relArchiveDir, "meta.yaml")
@@ -164,7 +168,7 @@ export function createCouncilFinalize(
         const guidance = buildAthenaRuntimeGuidance(resolvedIntent, resolvedMode)
         return JSON.stringify(result, null, 2) + "\n\n" + guidance
       } finally {
-        if (args.prompt_file) {
+        if (args.prompt_file && !promptFileMoved) {
           await cleanupPromptFile(args.prompt_file, base)
         }
       }
