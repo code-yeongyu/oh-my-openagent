@@ -7,7 +7,8 @@ import { detectConfigFormat } from "./opencode-config-format"
 import { parseOpenCodeConfigFileWithError, type OpenCodeConfig } from "./parse-opencode-config-file"
 import { getPluginNameWithVersion } from "./plugin-name-with-version"
 
-const PACKAGE_NAME = "oh-my-opencode"
+const OLD_PACKAGE_NAME = "oh-my-opencode"
+const NEW_PACKAGE_NAME = "oh-my-openagent"
 
 export async function addPluginToOpenCodeConfig(currentVersion: string): Promise<ConfigMergeResult> {
   try {
@@ -21,7 +22,7 @@ export async function addPluginToOpenCodeConfig(currentVersion: string): Promise
   }
 
   const { format, path } = detectConfigFormat()
-  const pluginEntry = await getPluginNameWithVersion(currentVersion)
+  const pluginEntry = await getPluginNameWithVersion(currentVersion, NEW_PACKAGE_NAME)
 
   try {
     if (format === "none") {
@@ -41,7 +42,13 @@ export async function addPluginToOpenCodeConfig(currentVersion: string): Promise
 
     const config = parseResult.config
     const plugins = config.plugin ?? []
-    const existingIndex = plugins.findIndex((p) => p === PACKAGE_NAME || p.startsWith(`${PACKAGE_NAME}@`))
+    const existingIndex = plugins.findIndex(
+      (p) =>
+        p === OLD_PACKAGE_NAME ||
+        p.startsWith(`${OLD_PACKAGE_NAME}@`) ||
+        p === NEW_PACKAGE_NAME ||
+        p.startsWith(`${NEW_PACKAGE_NAME}@`)
+    )
 
     if (existingIndex !== -1) {
       if (plugins[existingIndex] === pluginEntry) {
