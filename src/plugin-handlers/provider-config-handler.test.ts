@@ -6,6 +6,46 @@ import { createModelCacheState } from "../plugin-state"
 import { clearVisionCapableModelsCache, readVisionCapableModelsCache } from "../shared/vision-capable-models-cache"
 
 describe("applyProviderConfig", () => {
+  test("clears stale model context limits when provider config changes", () => {
+    // given
+    const modelCacheState = createModelCacheState()
+    applyProviderConfig({
+      config: {
+        provider: {
+          opencode: {
+            models: {
+              "kimi-k2.5-free": {
+                limit: { context: 262144 },
+              },
+            },
+          },
+        },
+      },
+      modelCacheState,
+    })
+
+    // when
+    applyProviderConfig({
+      config: {
+        provider: {
+          google: {
+            models: {
+              "gemini-2.5-pro": {
+                limit: { context: 1048576 },
+              },
+            },
+          },
+        },
+      },
+      modelCacheState,
+    })
+
+    // then
+    expect(Array.from(modelCacheState.modelContextLimitsCache.entries())).toEqual([
+      ["google/gemini-2.5-pro", 1048576],
+    ])
+  })
+
   test("caches vision-capable models from modalities and capabilities", () => {
     // given
     const modelCacheState = createModelCacheState()
