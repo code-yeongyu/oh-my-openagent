@@ -47,12 +47,15 @@ export function loadPluginAgents(plugins: LoadedPlugin[]): Record<string, Claude
         const formattedDescription = `(plugin: ${plugin.name}) ${originalDescription}`
 
         const mappedModelOverride = mapClaudeModelToOpenCode(data.model)
+        const modelString = mappedModelOverride
+          ? `${mappedModelOverride.providerID}/${mappedModelOverride.modelID}`
+          : undefined
 
         const config: ClaudeCodeAgentConfig = {
           description: formattedDescription,
           mode: "subagent",
           prompt: body.trim(),
-          ...(mappedModelOverride ? { model: mappedModelOverride } : {}),
+          ...(modelString ? { model: modelString } : {}),
         }
 
         const toolsConfig = parseToolsConfig(data.tools)
