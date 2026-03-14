@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { mergeConfigs, parseConfigPartially } from "./plugin-config";
-import type { OhMyOpenCodeConfig } from "./config";
+import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig } from "./config";
 
 describe("mergeConfigs", () => {
   describe("categories merging", () => {
@@ -94,9 +94,9 @@ describe("mergeConfigs", () => {
 
       const result = mergeConfigs(base, override);
 
-      expect(result.agents?.oracle?.model).toBe("openai/gpt-5.4");
+      expect(result.agents?.oracle).toMatchObject({ model: "openai/gpt-5.4" });
       expect(result.agents?.oracle?.temperature).toBe(0.5);
-      expect(result.agents?.explore?.model).toBe("anthropic/claude-haiku-4-5");
+      expect(result.agents?.explore).toMatchObject({ model: "anthropic/claude-haiku-4-5" });
     });
 
     it("should merge disabled arrays without duplicates", () => {
@@ -136,6 +136,23 @@ describe("mergeConfigs", () => {
 });
 
 describe("parseConfigPartially", () => {
+  describe("disabled_hooks compatibility", () => {
+    //#given a config with a future hook name unknown to this version
+    //#when validating against the full config schema
+    //#then should accept the hook name so runtime and schema stay aligned
+
+    it("should accept unknown disabled_hooks values for forward compatibility", () => {
+      const result = OhMyOpenCodeConfigSchema.safeParse({
+        disabled_hooks: ["future-hook-name"],
+      });
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.disabled_hooks).toEqual(["future-hook-name"]);
+      }
+    });
+  });
+
   describe("fully valid config", () => {
     //#given a config where all sections are valid
     //#when parsing the config
@@ -153,8 +170,8 @@ describe("parseConfigPartially", () => {
       const result = parseConfigPartially(rawConfig);
 
       expect(result).not.toBeNull();
-      expect(result!.agents?.oracle?.model).toBe("openai/gpt-5.4");
-      expect(result!.agents?.momus?.model).toBe("openai/gpt-5.4");
+      expect(result!.agents?.oracle).toMatchObject({ model: "openai/gpt-5.4" });
+      expect(result!.agents?.momus).toMatchObject({ model: "openai/gpt-5.4" });
       expect(result!.disabled_hooks).toEqual(["comment-checker"]);
     });
   });
@@ -196,7 +213,7 @@ describe("parseConfigPartially", () => {
       const result = parseConfigPartially(rawConfig);
 
       expect(result).not.toBeNull();
-      expect(result!.agents?.oracle?.model).toBe("openai/gpt-5.4");
+      expect(result!.agents?.oracle).toMatchObject({ model: "openai/gpt-5.4" });
       expect(result!.disabled_hooks).toEqual(["not-a-real-hook"]);
     });
   });
@@ -249,7 +266,7 @@ describe("parseConfigPartially", () => {
       const result = parseConfigPartially(rawConfig);
 
       expect(result).not.toBeNull();
-      expect(result!.agents?.oracle?.model).toBe("openai/gpt-5.4");
+      expect(result!.agents?.oracle).toMatchObject({ model: "openai/gpt-5.4" });
       expect((result as Record<string, unknown>)["some_future_key"]).toBeUndefined();
     });
   });
