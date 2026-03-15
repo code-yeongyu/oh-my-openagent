@@ -183,6 +183,7 @@ describe("opencode-config-dir", () => {
         // given opencode CLI binary detected, platform is Windows
         Object.defineProperty(process, "platform", { value: "win32" })
         delete process.env.APPDATA
+        delete process.env.XDG_CONFIG_HOME
         delete process.env.OPENCODE_CONFIG_DIR
 
         // when getOpenCodeConfigDir is called with binary="opencode"
@@ -197,6 +198,7 @@ describe("opencode-config-dir", () => {
         // (regression test: previously would check AppData for existing config)
         Object.defineProperty(process, "platform", { value: "win32" })
         process.env.APPDATA = "C:\\Users\\TestUser\\AppData\\Roaming"
+        delete process.env.XDG_CONFIG_HOME
         delete process.env.OPENCODE_CONFIG_DIR
 
         // when getOpenCodeConfigDir is called with binary="opencode"
