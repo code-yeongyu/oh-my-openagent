@@ -231,9 +231,10 @@ If ANY members failed, inform the user which members failed and why, then ask wh
   - Otherwise: present both options neutrally.
 
 If the user chooses to retry:
-- Re-launch failed members via athena_council with the same prompt_file and members parameter set to the failed member names.
-- Return to Step 5 to wait for completion via background_wait.
-- Call council_finalize again to collect retried results.
+- Call prepare_council_prompt again with the same question and intent to create a fresh prompt file.
+- Re-launch only the failed members via athena_council with the new prompt_file and members parameter set to the failed member names.
+- Return to Step 6 to wait for completion via background_wait.
+- Call council_finalize again to collect retried results (this will create a separate archive for the retry round).
 - If retried members also fail, ask the user again with the same options. Do not retry indefinitely without user consent.
 
 If the user chooses to skip:
