@@ -48,10 +48,6 @@ function getCliConfigDir(): string {
     return resolve(envConfigDir)
   }
 
-  if (process.platform === "win32") {
-    return join(homedir(), ".config", "opencode")
-  }
-
   const xdgConfig = process.env.XDG_CONFIG_HOME || join(homedir(), ".config")
   return join(xdgConfig, "opencode")
 }
