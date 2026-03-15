@@ -146,6 +146,12 @@ export function mergeConfigs(
         ...(override.disabled_skills ?? []),
       ]),
     ],
+    disabled_tools: [
+      ...new Set([
+        ...(base.disabled_tools ?? []),
+        ...(override.disabled_tools ?? []),
+      ]),
+    ],
     claude_code: deepMerge(base.claude_code, override.claude_code),
   };
 }
