@@ -1,10 +1,50 @@
 import { consumeToolMetadata } from "../features/tool-metadata-store"
 import type { CreatedHooks } from "../create-hooks"
 import { log } from "../shared"
+import { sanitizeSurrogates } from "../shared/sanitize-surrogates"
 import type { PluginContext } from "./types"
 import { readState, writeState } from "../hooks/ralph-loop/storage"
 
 const VERIFICATION_ATTEMPT_PATTERN = /<ulw_verification_attempt_id>(.*?)<\/ulw_verification_attempt_id>/i
+
+function sanitizeMcpContentArray(content: unknown[]): void {
+  for (let index = 0; index < content.length; index += 1) {
+    const part = content[index]
+    if (!part || typeof part !== "object") {
+      continue
+    }
+
+    const textPart = part as { text?: unknown }
+    if (typeof textPart.text === "string") {
+      textPart.text = sanitizeSurrogates(textPart.text)
+    }
+  }
+}
+
+function sanitizeToolOutput(output: {
+  title?: unknown
+  output?: unknown
+  content?: unknown
+}): void {
+  if (typeof output.title === "string") {
+    output.title = sanitizeSurrogates(output.title)
+  }
+
+  if (typeof output.output === "string") {
+    output.output = sanitizeSurrogates(output.output)
+  }
+
+  if (Array.isArray(output.content)) {
+    sanitizeMcpContentArray(output.content)
+  }
+
+  if (output.output && typeof output.output === "object") {
+    const outputObject = output.output as { content?: unknown }
+    if (Array.isArray(outputObject.content)) {
+      sanitizeMcpContentArray(outputObject.content)
+    }
+  }
+}
 
 function getPluginDirectory(ctx: PluginContext): string | null {
   if (typeof ctx === "object" && ctx !== null && "directory" in ctx && typeof ctx.directory === "string") {
@@ -27,9 +67,18 @@ export function createToolExecuteAfterHandler(args: {
 
   return async (
     input: { tool: string; sessionID: string; callID: string },
-    output: { title: string; output: string; metadata: Record<string, unknown> } | undefined,
+    output:
+      | {
+          title: string
+          output: string
+          metadata: Record<string, unknown>
+          content?: unknown[]
+        }
+      | undefined,
   ): Promise<void> => {
     if (!output) return
+
+    sanitizeToolOutput(output)
 
     const stored = consumeToolMetadata(input.sessionID, input.callID)
     if (stored) {
