@@ -14,6 +14,7 @@ const RETRYABLE_ERROR_NAMES = new Set([
   "providerconnectionerror",
   "authenticationerror",
   "freeusagelimiterror",
+  "modelnotsupportederror",
 ])
 
 /**
@@ -63,6 +64,9 @@ const RETRYABLE_MESSAGE_PATTERNS = [
   "temporarily unavailable",
   "try again",
   "503",
+  "model_not_supported",
+  "model is not supported",
+  "model not supported",
   "502",
   "504",
   "429",
