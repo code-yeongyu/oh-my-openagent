@@ -7,6 +7,7 @@ function createMockClient(args?: {
   statusSequence?: Array<StatusMap>
   messageSequence?: Array<unknown[]>
   includeStatus?: boolean
+  statusError?: Error
 }) {
   let statusIndex = 0
   let messageIndex = 0
@@ -18,6 +19,9 @@ function createMockClient(args?: {
       status: args?.includeStatus === false
         ? undefined
         : mock(async () => {
+            if (args?.statusError) {
+              throw args.statusError
+            }
             const result = statusSequence[statusIndex] ?? statusSequence[statusSequence.length - 1]
             statusIndex += 1
             return { data: result }
@@ -36,7 +40,7 @@ describe("waitForLookAtSessionResult", () => {
   test("returns assistant text once child session completes", async () => {
     const client = createMockClient({
       statusSequence: [
-        { ses_test: { type: "running" } },
+        { ses_test: { type: "busy" } },
         { ses_test: { type: "idle" } },
       ],
       messageSequence: [
@@ -86,7 +90,7 @@ describe("waitForLookAtSessionResult", () => {
   test("returns empty outcome after stable idle once activity has stopped", async () => {
     const client = createMockClient({
       statusSequence: [
-        { ses_test: { type: "running" } },
+        { ses_test: { type: "busy" } },
         { ses_test: { type: "idle" } },
         { ses_test: { type: "idle" } },
         { ses_test: { type: "idle" } },
@@ -121,7 +125,7 @@ describe("waitForLookAtSessionResult", () => {
   test("aborts child session when upstream abort signal is triggered", async () => {
     const controller = new AbortController()
     const client = createMockClient({
-      statusSequence: [{ ses_test: { type: "running" } }],
+      statusSequence: [{ ses_test: { type: "busy" } }],
       messageSequence: [[]],
     })
 
@@ -134,6 +138,38 @@ describe("waitForLookAtSessionResult", () => {
     controller.abort(new Error("cancelled"))
 
     await expect(waitPromise).rejects.toThrow("aborted")
+    expect(client.session.abort).toHaveBeenCalledWith({ path: { id: "ses_test" } })
+  })
+
+  test("falls back to stable messages when status API throws", async () => {
+    const client = createMockClient({
+      statusError: new Error("status unavailable"),
+      messageSequence: [[], [], []],
+    })
+
+    const result = await waitForLookAtSessionResult(client as any, "ses_test", {
+      pollIntervalMs: 1,
+      timeoutMs: 100,
+    })
+
+    expect(result.outcome.text).toBeNull()
+    expect(client.session.messages).toHaveBeenCalledTimes(3)
+    expect(client.session.abort).not.toHaveBeenCalled()
+  })
+
+  test("aborts child session before throwing on timeout", async () => {
+    const client = createMockClient({
+      statusSequence: [{ ses_test: { type: "busy" } }],
+      messageSequence: [[]],
+    })
+
+    await expect(
+      waitForLookAtSessionResult(client as any, "ses_test", {
+        pollIntervalMs: 1,
+        timeoutMs: 5,
+      }),
+    ).rejects.toThrow("Timed out")
+
     expect(client.session.abort).toHaveBeenCalledWith({ path: { id: "ses_test" } })
   })
 })

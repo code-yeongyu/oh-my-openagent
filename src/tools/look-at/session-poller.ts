@@ -47,7 +47,7 @@ async function getSessionStatus(client: Client, sessionID: string): Promise<{
     return { supported: true, type: sessionStatus?.type ?? null }
   } catch (error) {
     log(`[look_at] session.status error (falling back to messages):`, error)
-    return { supported: true, type: null }
+    return { supported: false, type: null }
   }
 }
 
@@ -124,5 +124,6 @@ export async function waitForLookAtSessionResult(
     await new Promise((resolve) => setTimeout(resolve, pollInterval))
   }
 
+  await abortChildSession(client, sessionID)
   throw new Error(`[look_at] Timed out after ${timeoutMs}ms waiting for session ${sessionID} result`)
 }

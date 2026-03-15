@@ -516,7 +516,7 @@ describe("look-at tool", () => {
             if (statusCalls === 1) {
               abortController.abort(new Error("user cancelled"))
             }
-            return { data: { ses_wait_abort: { type: "running" } } }
+            return { data: { ses_wait_abort: { type: "busy" } } }
           },
           abort: abortChild,
           messages: async () => ({ data: [] }),
