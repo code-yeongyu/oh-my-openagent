@@ -1,9 +1,0 @@
-import type { ModelFallbackInfo } from "../../features/task-toast-manager/types";
-import type { DelegateTaskArgs, ToolContextWithMetadata } from "./types";
-import type { ExecutorContext, ParentContext } from "./executor-types";
-import { type SyncTaskDeps } from "./sync-task-deps";
-export declare function executeSyncTask(args: DelegateTaskArgs, ctx: ToolContextWithMetadata, executorCtx: ExecutorContext, parentContext: ParentContext, agentToUse: string, categoryModel: {
-    providerID: string;
-    modelID: string;
-    variant?: string;
-} | undefined, systemContent: string | undefined, modelInfo?: ModelFallbackInfo, fallbackChain?: import("../../shared/model-requirements").FallbackEntry[], deps?: SyncTaskDeps): Promise<string>;

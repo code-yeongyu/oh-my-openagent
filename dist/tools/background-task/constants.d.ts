@@ -1,3 +1,0 @@
-export declare const BACKGROUND_TASK_DESCRIPTION = "Run agent task in background. Returns task_id immediately; notifies on completion.\n\nUse `background_output` to get results. Prompts MUST be in English.";
-export declare const BACKGROUND_OUTPUT_DESCRIPTION = "Get output from background task. Use full_session=true to fetch session messages with filters. System notifies on completion, so block=true rarely needed. - Timeout values are in milliseconds (ms), NOT seconds.";
-export declare const BACKGROUND_CANCEL_DESCRIPTION = "Cancel running background task(s). Use all=true to cancel ALL before final answer.";
