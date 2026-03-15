@@ -108,7 +108,7 @@ describe("install CLI - binary check behavior", () => {
     // then opencode.json should have plugin entry
     const config = JSON.parse(readFileSync(configPath, "utf-8"))
     expect(config.plugin).toBeDefined()
-    expect(config.plugin.some((p: string) => p.includes("oh-my-opencode"))).toBe(true)
+    expect(config.plugin.some((p: string) => p.includes("oh-my-openagent"))).toBe(true)
 
     // then exit code should be 0 (success)
     expect(exitCode).toBe(0)
