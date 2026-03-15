@@ -1,33 +1,10 @@
 import { describe, test, expect } from "bun:test"
 import { loadBuiltinCommands } from "./commands"
 import { HANDOFF_TEMPLATE } from "./templates/handoff"
+import { START_TEAMMODE_TEMPLATE } from "./templates/start-teammode"
 import type { BuiltinCommandName } from "./types"
 
 describe("loadBuiltinCommands", () => {
-
-
-  test("should include start-teammode command in loaded commands", () => {
-    //#given
-    const disabledCommands: BuiltinCommandName[] = []
-
-    //#when
-    const commands = loadBuiltinCommands(disabledCommands)
-
-    //#then
-    expect(commands["start-teammode"]).toBeDefined()
-    expect(commands["start-teammode"].name).toBe("start-teammode")
-  })
-
-  test("should exclude start-teammode when disabled", () => {
-    //#given
-    const disabledCommands: BuiltinCommandName[] = ["start-teammode"]
-
-    //#when
-    const commands = loadBuiltinCommands(disabledCommands)
-
-    //#then
-    expect(commands["start-teammode"]).toBeUndefined()
-  })
   test("should include handoff command in loaded commands", () => {
     //#given
     const disabledCommands: BuiltinCommandName[] = []
@@ -71,6 +48,32 @@ describe("loadBuiltinCommands", () => {
     expect(commands.handoff.template).toContain("$SESSION_ID")
     expect(commands.handoff.template).toContain("$TIMESTAMP")
     expect(commands.handoff.template).toContain("$ARGUMENTS")
+  })
+
+
+
+  test("should include start-teammode command in loaded commands", () => {
+    //#given
+    const disabledCommands: BuiltinCommandName[] = []
+
+    //#when
+    const commands = loadBuiltinCommands(disabledCommands)
+
+    //#then
+    expect(commands["start-teammode"]).toBeDefined()
+    expect(commands["start-teammode"].name).toBe("start-teammode")
+    expect(commands["start-teammode"].agent).toBe("atlas")
+  })
+
+  test("should exclude start-teammode when disabled", () => {
+    //#given
+    const disabledCommands: BuiltinCommandName[] = ["start-teammode"]
+
+    //#when
+    const commands = loadBuiltinCommands(disabledCommands)
+
+    //#then
+    expect(commands["start-teammode"]).toBeUndefined()
   })
 
   test("should have correct description for handoff", () => {
@@ -158,5 +161,15 @@ describe("HANDOFF_TEMPLATE", () => {
     //#when / #then
     const emojiRegex = /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2702}-\u{27B0}\u{24C2}-\u{1F251}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/u
     expect(emojiRegex.test(HANDOFF_TEMPLATE)).toBe(false)
+  })
+})
+
+
+describe("START_TEAMMODE_TEMPLATE", () => {
+  test("should describe dedicated team-mode entrypoint distinct from start-work", () => {
+    //#given / #when / #then
+    expect(START_TEAMMODE_TEMPLATE).toContain("/start-teammode")
+    expect(START_TEAMMODE_TEMPLATE).toContain("dedicated tmux-first team-runtime entrypoint")
+    expect(START_TEAMMODE_TEMPLATE).toContain("Keep `/start-work` for the normal single-session Atlas execution path")
   })
 })

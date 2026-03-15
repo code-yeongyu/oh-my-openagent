@@ -31,7 +31,7 @@ ultrawork
 
 That's it. The agent figures everything out — explores your codebase, researches patterns, implements the feature, verifies with diagnostics. Keeps working until done.
 
-Want more control? Press **Tab** to enter [Prometheus mode](./orchestration.md) for interview-based planning, then run `/start-work` for full orchestration.
+Want more control? Press **Tab** to enter [Prometheus mode](./orchestration.md) for interview-based planning, then run `/start-work` for normal Atlas orchestration or `/start-teammode` for the dedicated tmux-first team runtime.
 
 ---
 
@@ -114,7 +114,7 @@ Press **Tab** to enter Prometheus mode, or type `@plan "your task"` from Sisyphu
 
 Atlas executes Prometheus plans. Distributes tasks to specialized subagents. Accumulates learnings across tasks. Verifies completion independently.
 
-Run `/start-work` to activate Atlas on your latest plan.
+Run `/start-work` to activate Atlas on your latest approved plan. Use `/start-teammode` when you want Atlas to enter the dedicated tmux-first team runtime with coordinated workers.
 
 ### Oracle: The Consultant
 
@@ -146,7 +146,7 @@ Press **Tab** to enter Prometheus mode.
 
 Prometheus interviews you like a real engineer. Asks clarifying questions. Identifies scope and ambiguities. Builds a detailed plan before a single line of code is touched.
 
-Then run `/start-work` and Atlas takes over. Tasks are distributed to specialized subagents. Each completion is verified independently. Learnings accumulate across tasks. Progress tracks across sessions.
+Then run `/start-work` and Atlas takes over for the normal execution path. When the work needs coordinated worker panes, run `/start-teammode` and Atlas enters the tmux-first team runtime with persisted state, worker orchestration, and verification gates.
 
 Use Prometheus for multi-day projects, critical production changes, complex refactoring, or when you want a documented decision trail.
 

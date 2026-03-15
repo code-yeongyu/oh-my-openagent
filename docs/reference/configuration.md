@@ -435,10 +435,10 @@ Available hooks: `gpt-permission-continuation`, `todo-continuation-enforcer`, `c
 Disable built-in commands via `disabled_commands`:
 
 ```json
-{ "disabled_commands": ["init-deep", "start-work"] }
+{ "disabled_commands": ["init-deep", "start-work", "start-teammode"] }
 ```
 
-Available commands: `init-deep`, `ralph-loop`, `ulw-loop`, `cancel-ralph`, `refactor`, `start-work`, `stop-continuation`, `handoff`
+Available commands: `init-deep`, `ralph-loop`, `ulw-loop`, `cancel-ralph`, `refactor`, `start-work`, `start-teammode`, `stop-continuation`, `handoff`
 
 ### Browser Automation
 

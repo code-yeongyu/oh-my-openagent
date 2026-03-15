@@ -10,7 +10,7 @@ Oh My OpenCode's orchestration system transforms a simple AI agent into a coordi
 | --------------------- | ------------------------- | ---------------------------------------------------------------------------------------- |
 | **Simple**            | Just prompt               | Simple tasks, quick fixes, single-file changes                                           |
 | **Complex + Lazy**    | Type `ulw` or `ultrawork` | Complex tasks where explaining context is tedious. Agent figures it out.                 |
-| **Complex + Precise** | `@plan` → `/start-work`   | Precise, multi-step work requiring true orchestration. Prometheus plans, Atlas executes. |
+| **Complex + Precise** | `@plan` → `/start-work` or `/start-teammode` | Precise, multi-step work requiring true orchestration. Prometheus plans, Atlas executes, and team runtime is available when you need coordinated workers. |
 
 **Decision Flow:**
 
@@ -20,7 +20,7 @@ Is it a quick fix or simple task?
   └─ NO  → Is explaining the full context tedious?
               └─ YES → Type "ulw" and let the agent figure it out
               └─ NO  → Do you need precise, verifiable execution?
-                         └─ YES → Use @plan for Prometheus planning, then /start-work
+                         └─ YES → Use @plan for Prometheus planning, then /start-work for normal execution or /start-teammode for the dedicated team runtime
                          └─ NO  → Just use "ulw"
 ```
 
@@ -58,7 +58,7 @@ flowchart TB
     Plan -->|"High accuracy?"| Momus
     Momus -->|"OKAY / REJECT"| Prometheus
 
-    User -->|"/start-work"| Orchestrator
+    User -->|"/start-work" or "/start-teammode"| Orchestrator
     Plan -->|"Read"| Orchestrator
 
     Orchestrator -->|"task(category)"| Junior
@@ -113,7 +113,7 @@ stateDiagram-v2
     MomusLoop --> WritePlan: REJECTED - fix issues
     MomusLoop --> Done: OKAY - plan approved
 
-    Done --> [*]: Guide to /start-work
+    Done --> [*]: Guide to /start-work or /start-teammode
 ```
 
 **Intent-Specific Strategies:**
@@ -360,9 +360,11 @@ task(
 
 Both methods trigger the same Prometheus planning flow. The @plan command is simply a convenience shortcut.
 
-### /start-work Behavior and Session Continuity
+### /start-work and /start-teammode Behavior
 
 **What Happens When You Run /start-work:**
+
+`/start-work` remains the normal Atlas execution entrypoint for one active plan in the current session. It reads or creates boulder state, resumes incomplete work, and keeps Atlas focused on plan execution without booting the tmux team runtime.
 
 ```
 User: /start-work
@@ -413,6 +415,10 @@ Monday 2:00 PM (NEW SESSION)
 ```
 
 Atlas is automatically activated when you run `/start-work`. You don't need to manually switch to Atlas.
+
+**When to use `/start-teammode` instead:**
+
+Use `/start-teammode` when the plan is approved and you want Atlas to enter the dedicated team runtime. In that mode Atlas initializes persisted team state, creates the tmux pane topology, bootstraps workers, monitors claims and progress, rebalances work when safe, and enforces the stronger multi-worker verification loop described in the OmO team-mode design.
 
 ### Hephaestus vs Sisyphus + ultrawork
 
@@ -501,7 +507,7 @@ You can control related features in `oh-my-opencode.json`:
 
 Prometheus enters interview mode by default. It will ask you questions about your requirements. Answer them, then say "make it a plan" when ready.
 
-### "/start-work says 'no active plan found'"
+### "/start-work or /start-teammode says 'no active plan found'"
 
 Either:
 
@@ -510,7 +516,7 @@ Either:
 
 ### "I'm in Atlas but I want to switch back to normal mode"
 
-Type `exit` or start a new session. Atlas is primarily entered via `/start-work` - you don't typically "switch to Atlas" manually.
+Type `exit` or start a new session. Atlas is primarily entered via `/start-work` for normal execution or `/start-teammode` for the team runtime. You usually do not switch to Atlas manually.
 
 ### "What's the difference between @plan and just switching to Prometheus?"
 

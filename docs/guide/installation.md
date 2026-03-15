@@ -456,7 +456,7 @@ Tell the user of following:
 
 2. **Feeling lazy?** Just include `ultrawork` (or `ulw`) in your prompt. That's it. The agent figures out the rest.
 
-3. **Need precision?** Press **Tab** to enter Prometheus (Planner) mode, create a work plan through an interview process, then run `/start-work` to execute it with full orchestration.
+3. **Need precision?** Press **Tab** to enter Prometheus (Planner) mode, create a work plan through an interview process, then run `/start-work` for normal Atlas execution or `/start-teammode` for the dedicated tmux-first team runtime.
 
 4. You wanna have your own agent- catalog setup? I can read the [docs](docs/guide/agent-model-matching.md) and set up for you after interviewing!
 

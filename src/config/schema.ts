@@ -24,3 +24,5 @@ export * from "./schema/tmux"
 export * from "./schema/websearch"
 
 export { AnyMcpNameSchema, type AnyMcpName, McpNameSchema, type McpName } from "../mcp/types"
+export * from "./schema/start-work"
+export * from "./schema/start-teammode"

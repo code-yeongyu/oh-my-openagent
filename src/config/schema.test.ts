@@ -394,6 +394,23 @@ describe("BuiltinCategoryNameSchema", () => {
   })
 })
 
+describe("start-teammode config", () => {
+  test("accepts start_teammode configuration and disabled command", () => {
+    const result = OhMyOpenCodeConfigSchema.safeParse({
+      disabled_commands: ["start-teammode"],
+      disabled_hooks: ["start-teammode"],
+      start_teammode: { auto_commit: false, default_worker_count: 5 },
+    })
+
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.start_teammode?.default_worker_count).toBe(5)
+      expect(result.data.disabled_commands).toContain("start-teammode")
+      expect(result.data.disabled_hooks).toContain("start-teammode")
+    }
+  })
+})
+
 describe("HookNameSchema", () => {
   test("rejects removed beast-mode-system hook name", () => {
     //#given
@@ -404,6 +421,24 @@ describe("HookNameSchema", () => {
 
     //#then
     expect(result.success).toBe(false)
+  })
+})
+
+describe("disabled_commands schema", () => {
+  test("accepts start-teammode as a builtin command name", () => {
+    // given
+    const config = {
+      disabled_commands: ["start-teammode"],
+    }
+
+    // when
+    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+
+    // then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.disabled_commands).toEqual(["start-teammode"])
+    }
   })
 })
 

@@ -93,7 +93,8 @@
           "write-existing-file-guard",
           "anthropic-effort",
           "hashline-read-enhancer",
-          "read-image-resizer"
+          "read-image-resizer",
+          "delegate-task-english-directive"
         ]
       }
     },
@@ -109,7 +110,8 @@
           "refactor",
           "start-work",
           "start-teammode",
-          "stop-continuation"
+          "stop-continuation",
+          "handoff"
         ]
       }
     },
@@ -3918,6 +3920,26 @@
       },
       "required": [
         "auto_commit"
+      ],
+      "additionalProperties": false
+    },
+    "start_teammode": {
+      "type": "object",
+      "properties": {
+        "auto_commit": {
+          "default": true,
+          "type": "boolean"
+        },
+        "default_worker_count": {
+          "default": 3,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16
+        }
+      },
+      "required": [
+        "auto_commit",
+        "default_worker_count"
       ],
       "additionalProperties": false
     },

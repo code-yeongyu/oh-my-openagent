@@ -117,7 +117,7 @@ The output should be consistent. Not random, not surprising, not "creative" in w
 ### Continuous
 
 Work should survive interruptions:
-- Session crashes? Resume with `/start-work`
+- Session crashes? Resume Atlas execution with `/start-work`, or resume the dedicated team runtime with `/start-teammode`
 - Need to step away? Progress is tracked
 - Multi-day project? Context is preserved
 

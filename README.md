@@ -243,7 +243,7 @@ Agents auto-read relevant context. Zero manual management.
 
 Complex task? Don't prompt and pray.
 
-`/start-work` calls Prometheus. **Interviews you like a real engineer**, identifies scope and ambiguities, builds a verified plan before touching code. Agent knows what it's building before it starts.
+Prometheus handles the interview-first planning flow. After the plan is approved, `/start-work` hands execution to Atlas for the normal single-session path, while `/start-teammode` starts the dedicated tmux-first team runtime when you need coordinated workers.
 
 ### Skills
 

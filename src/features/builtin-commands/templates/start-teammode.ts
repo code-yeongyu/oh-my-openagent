@@ -1,22 +1,26 @@
-export const START_TEAMMODE_TEMPLATE = `You are starting Atlas Team Mode.
+export const START_TEAMMODE_TEMPLATE = `You are starting an Atlas team-runtime session through the dedicated tmux-first team-runtime entrypoint distinct from /start-work.
 
 ## ARGUMENTS
 
-- \`/start-teammode [plan-name] [--worktree <path>]\`
-  - Reuse the same plan-discovery and worktree parsing flow as \`/start-work\`
-  - Start a durable team runtime instead of a single-session run
+- \`/start-teammode [plan-name] [--workers N] [--team-name slug] [--worktree <path>]\`
+  - \`plan-name\` (optional): name or partial match of the Prometheus plan to run in team mode
+  - \`--workers N\` (optional): desired worker count for the tmux-first runtime (default from config)
+  - \`--team-name slug\` (optional): stable persisted runtime identifier
+  - \`--worktree <path>\` (optional): absolute path to an existing git worktree
 
 ## WHAT TO DO
 
-1. Resolve or reuse the requested Prometheus plan.
-2. Create or resume durable team runtime state under \`.sisyphus/team/<team-id>/\`.
-3. Update \`.sisyphus/boulder.json\` with team-mode anchor metadata.
-4. Launch tmux-backed Atlas worker sessions for the team runtime.
-5. Keep leader coordination state durable so the run can resume safely.
+1. Read the injected team-runtime manifest and persisted state paths.
+2. Keep \`/start-work\` for the normal single-session Atlas execution path. This command is for tmux-first multi-worker execution only.
+3. Reuse existing Prometheus plan output as the execution source of truth.
+4. Launch or resume a tmux-first worker runtime with durable state, monitor snapshots, and guarded shutdown artifacts.
+5. Use the manifest's persisted contract for worker orchestration, monitor/rebalance, and verification handoff.
+6. Keep all worker execution inside the selected worktree when one is configured.
 
 ## CRITICAL
 
-- Preserve durable worker/task/mailbox/resume/shutdown semantics.
-- Do not mutate \`/start-work\` behavior.
-- Use the injected session id and timestamp values directly.
-- Read the full plan before launching workers.`
+- Do not collapse this into a normal single-session Atlas run
+- Persist monitor/rebalance state as work progresses
+- Guard shutdown via shutdown-request + shutdown-ack artifacts
+- Reuse existing tmux utilities and Atlas execution concepts where possible
+- Treat the execution manifest as the authoritative team-runtime contract`

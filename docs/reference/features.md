@@ -377,7 +377,8 @@ Commands are slash-triggered workflows that execute predefined templates.
 | `/ulw-loop`          | Start ultrawork loop - continues with ultrawork mode                                       |
 | `/cancel-ralph`      | Cancel active Ralph Loop                                                                   |
 | `/refactor`          | Intelligent refactoring with LSP, AST-grep, architecture analysis, and TDD verification    |
-| `/start-work`        | Start Sisyphus work session from Prometheus plan                                           |
+| `/start-work`        | Start Atlas execution from a Prometheus plan                                                |
+| `/start-teammode`    | Start Atlas tmux-first team runtime from prepared planning artifacts                        |
 | `/stop-continuation` | Stop all continuation mechanisms (ralph loop, todo continuation, boulder) for this session |
 | `/handoff`           | Create a detailed context summary for continuing work in a new session                     |
 
@@ -450,7 +451,7 @@ Everything runs at maximum intensity - parallel agents, background tasks, aggres
 
 ### /start-work
 
-**Purpose**: Start execution from a Prometheus-generated plan
+**Purpose**: Start the normal Atlas execution path from a Prometheus-generated plan
 
 **Usage**:
 
@@ -458,7 +459,25 @@ Everything runs at maximum intensity - parallel agents, background tasks, aggres
 /start-work [plan-name]
 ```
 
-Uses atlas agent to execute planned tasks systematically.
+Uses the Atlas agent to execute a prepared plan in the current session, with boulder state tracking and resume support.
+
+### /start-teammode
+
+**Purpose**: Start the dedicated Atlas tmux-first team runtime from a Prometheus-generated plan
+
+**Usage**:
+
+```
+/start-teammode [plan-name]
+```
+
+Uses Atlas to initialize the persisted team-runtime state, bootstrap coordinated workers, and run monitor and verification loops for multi-worker execution.
+
+**Notes**:
+
+- Keeps `/start-work` as the normal single-session execution path
+- Reuses Prometheus plan discovery and Atlas execution entry, but signals the team-runtime intent explicitly
+- Intended for multi-worker orchestration flows with persisted runtime state and guarded shutdown behavior
 
 ### /stop-continuation
 
@@ -678,7 +697,7 @@ Hooks intercept and modify behavior at key points in the agent lifecycle across 
 | **keyword-detector**        | Message + Transform | Detects keywords and activates modes: `ultrawork`/`ulw` (max performance), `search`/`find` (parallel exploration), `analyze`/`investigate` (deep analysis). |
 | **think-mode**              | Params              | Auto-detects extended thinking needs. Catches "think deeply", "ultrathink" and adjusts model settings.                                                      |
 | **ralph-loop**              | Event + Message     | Manages self-referential loop continuation.                                                                                                                 |
-| **start-work**              | Message             | Handles /start-work command execution.                                                                                                                      |
+| **start-work**              | Message             | Handles /start-work and /start-teammode command execution entry into Atlas.                                                                                 |
 | **auto-slash-command**      | Message             | Automatically executes slash commands from prompts.                                                                                                         |
 | **gpt-permission-continuation** | Event           | Auto-continues GPT sessions when the final assistant reply ends with a permission-seeking tail such as `If you want, ...`.                               |
 | **stop-continuation-guard** | Event + Message     | Guards the stop-continuation mechanism.                                                                                                                     |
