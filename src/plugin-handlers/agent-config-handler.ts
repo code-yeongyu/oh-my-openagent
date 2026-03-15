@@ -87,16 +87,28 @@ export async function applyAgentConfig(params: {
   const projectAgents = includeClaudeAgents ? loadProjectAgents(params.ctx.directory) : {};
   const rawPluginAgents = params.pluginComponents.agents;
 
+  const pluginAgents = Object.fromEntries(
+    Object.entries(rawPluginAgents).map(([key, value]) => [
+      key,
+      value ? migrateAgentConfig(value as Record<string, unknown>) : value,
+    ]),
+  );
+
+  const configAgent = params.config.agent as AgentConfigRecord | undefined;
+
   const customAgentSummaries = [
+    ...Object.entries(configAgent ?? {}),
     ...Object.entries(userAgents),
     ...Object.entries(projectAgents),
-    ...Object.entries(rawPluginAgents).filter(([, config]) => config !== undefined),
-  ].map(([name, config]) => ({
-    name,
-    description: typeof (config as Record<string, unknown>)?.description === "string"
-      ? (config as Record<string, unknown>).description as string
-      : "",
-  }));
+    ...Object.entries(pluginAgents).filter(([, config]) => config !== undefined),
+  ]
+    .filter(([, config]) => config != null)
+    .map(([name, config]) => ({
+      name,
+      description: typeof (config as Record<string, unknown>)?.description === "string"
+        ? ((config as Record<string, unknown>).description as string)
+        : "",
+    }));
 
   const builtinAgents = await createBuiltinAgents(
     migratedDisabledAgents,
@@ -112,13 +124,6 @@ export async function applyAgentConfig(params: {
     disabledSkills,
     useTaskSystem,
     disableOmoEnv,
-  );
-
-  const pluginAgents = Object.fromEntries(
-    Object.entries(rawPluginAgents).map(([key, value]) => [
-      key,
-      value ? migrateAgentConfig(value as Record<string, unknown>) : value,
-    ]),
   );
 
   const disabledAgentNames = new Set(
@@ -137,8 +142,6 @@ export async function applyAgentConfig(params: {
   const replacePlan = params.pluginConfig.sisyphus_agent?.replace_plan ?? true;
   const shouldDemotePlan = plannerEnabled && replacePlan;
   const configuredDefaultAgent = getConfiguredDefaultAgent(params.config);
-
-  const configAgent = params.config.agent as AgentConfigRecord | undefined;
 
   if (isSisyphusEnabled && builtinAgents.sisyphus) {
     if (configuredDefaultAgent) {
