@@ -178,9 +178,8 @@ Available categories: ${categoryNames.join(", ")}`,
     }
   }
 
-  const unstableModel = actualModel?.toLowerCase()
-  const categoryConfigModel = resolved.config.model?.toLowerCase()
-  const isUnstableAgent = resolved.config.is_unstable_agent === true || [unstableModel, categoryConfigModel].some(m => m ? m.includes("gemini") || m.includes("minimax") || m.includes("kimi") : false)
+  const resolvedModel = actualModel?.toLowerCase()
+  const isUnstableAgent = resolved.config.is_unstable_agent === true || (resolvedModel ? resolvedModel.includes("gemini") || resolvedModel.includes("minimax") || resolvedModel.includes("kimi") : false)
 
   const defaultProviderID = categoryModel?.providerID
     ?? parseModelString(actualModel ?? "")?.providerID
