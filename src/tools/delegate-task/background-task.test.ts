@@ -13,7 +13,7 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
     //#given - reduce waiting to keep tests fast
     __setTimingConfig({
       WAIT_FOR_SESSION_INTERVAL_MS: 1,
-      WAIT_FOR_SESSION_TIMEOUT_MS: 2,
+      WAIT_FOR_SESSION_TIMEOUT_MS: 50,
     })
   })
 
@@ -154,5 +154,51 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
     expectFn(result).toContain("background_task_id: bg_late")
     expectFn(metadataCalls).toHaveLength(1)
     expectFn(metadataCalls[0].metadata.sessionId).toBe("ses_late_123")
+  })
+
+  testFn("passes question-deny session permission when launching delegate task", async () => {
+    //#given - delegate task background launch should deny question at session creation time
+    const launchCalls: any[] = []
+    const manager = {
+      launch: async (input: any) => {
+        launchCalls.push(input)
+        return {
+          id: "bg_permission",
+          sessionID: "ses_permission_123",
+          description: "Permission session",
+          agent: "explore",
+          status: "running",
+        }
+      },
+      getTask: () => ({ sessionID: "ses_permission_123" }),
+    }
+
+    //#when
+    await executeBackgroundTask(
+      {
+        description: "Permission session",
+        prompt: "check",
+        run_in_background: true,
+        load_skills: [],
+      },
+      {
+        sessionID: "ses_parent",
+        callID: "call_4",
+        metadata: async () => {},
+        abort: new AbortController().signal,
+      },
+      { manager },
+      { sessionID: "ses_parent", messageID: "msg_4" },
+      "explore",
+      undefined,
+      undefined,
+      undefined,
+    )
+
+    //#then
+    expectFn(launchCalls).toHaveLength(1)
+    expectFn(launchCalls[0].sessionPermission).toEqual([
+      { permission: "question", action: "deny", pattern: "*" },
+    ])
   })
 })

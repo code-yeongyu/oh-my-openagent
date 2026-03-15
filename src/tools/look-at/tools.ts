@@ -4,6 +4,7 @@ import { tool, type PluginInput, type ToolDefinition } from "@opencode-ai/plugin
 import { LOOK_AT_DESCRIPTION, MULTIMODAL_LOOKER_AGENT } from "./constants"
 import type { LookAtArgs } from "./types"
 import { log, promptWithModelSuggestionRetry } from "../../shared"
+import { readVisionCapableModelsCache } from "../../shared/vision-capable-models-cache"
 import { extractLatestAssistantOutcome } from "./assistant-message-extractor"
 import type { LookAtArgsWithAlias } from "./look-at-arguments"
 import { normalizeArgs, validateArgs } from "./look-at-arguments"
@@ -37,6 +38,16 @@ function getTemporaryConversionPath(error: unknown): string | null {
   }
 
   return null
+}
+
+function isVisionCapableResolvedModel(model: {
+  providerID: string
+  modelID: string
+}): boolean {
+  return readVisionCapableModelsCache().some((visionCapableModel) =>
+    visionCapableModel.providerID === model.providerID &&
+    visionCapableModel.modelID === model.modelID,
+  )
 }
 
 export { normalizeArgs, validateArgs } from "./look-at-arguments"
@@ -153,6 +164,14 @@ Provide ONLY the extracted information that matches the goal.
 Be thorough on what was requested, concise on everything else.
 If the requested information is not found, clearly state what is missing.`
 
+      const { agentModel, agentVariant } = await resolveMultimodalLookerAgentMetadata(ctx)
+      if (agentModel && !isVisionCapableResolvedModel(agentModel)) {
+        log("[look_at] Resolved model is not vision-capable, blocking", {
+          resolvedModel: agentModel,
+        })
+        return "Error: Resolved multimodal-looker model is not vision-capable"
+      }
+
       log(`[look_at] Creating session with parent: ${toolContext.sessionID}`)
       const parentSession = await ctx.client.session.get({
         path: { id: toolContext.sessionID },
@@ -186,7 +205,6 @@ Original error: ${createResult.error}`
       const sessionID = createResult.data.id
       log(`[look_at] Created session: ${sessionID}`)
 
-      const { agentModel, agentVariant } = await resolveMultimodalLookerAgentMetadata(ctx)
       const promptBody = {
         agent: MULTIMODAL_LOOKER_AGENT,
         tools: {
@@ -202,7 +220,6 @@ Original error: ${createResult.error}`
         ...(agentModel ? { model: { providerID: agentModel.providerID, modelID: agentModel.modelID } } : {}),
         ...(agentVariant ? { variant: agentVariant } : {}),
       }
-
       log(`[look_at] Sending prompt with ${isBase64Input ? "base64 image" : "file"} to session ${sessionID}`)
       let promptError: unknown = null
       let watchedMessages: unknown[] | null = null

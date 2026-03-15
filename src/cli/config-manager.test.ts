@@ -207,7 +207,7 @@ describe("generateOmoConfig - model fallback system", () => {
     const result = generateOmoConfig(config)
 
     // #then Sisyphus is omitted (requires all fallback providers)
-    expect(result.$schema).toBe("https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/dev/assets/oh-my-opencode.schema.json")
+    expect(result.$schema).toBe("https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json")
     expect((result.agents as Record<string, { model: string }>).sisyphus).toBeUndefined()
   })
 
@@ -249,12 +249,13 @@ describe("generateOmoConfig - model fallback system", () => {
     // #when generating config
     const result = generateOmoConfig(config)
 
-    // #then Sisyphus is omitted (requires all fallback providers)
-    expect((result.agents as Record<string, { model: string }>).sisyphus).toBeUndefined()
+    // #then Sisyphus resolves to gpt-5.4 medium (openai is now in sisyphus chain)
+    expect((result.agents as Record<string, { model: string; variant?: string }>).sisyphus.model).toBe("openai/gpt-5.4")
+    expect((result.agents as Record<string, { model: string; variant?: string }>).sisyphus.variant).toBe("medium")
     // #then Oracle should use native OpenAI (first fallback entry)
     expect((result.agents as Record<string, { model: string }>).oracle.model).toBe("openai/gpt-5.4")
-    // #then multimodal-looker should use native OpenAI (first fallback entry is gpt-5.3-codex)
-    expect((result.agents as Record<string, { model: string }>)["multimodal-looker"].model).toBe("openai/gpt-5.3-codex")
+    // #then multimodal-looker should use native OpenAI (first fallback entry is gpt-5.4)
+    expect((result.agents as Record<string, { model: string }>)["multimodal-looker"].model).toBe("openai/gpt-5.4")
   })
 
   test("uses haiku for explore when Claude max20", () => {

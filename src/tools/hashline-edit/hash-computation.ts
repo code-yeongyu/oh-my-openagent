@@ -4,7 +4,7 @@ import { createHashlineChunkFormatter } from "./hashline-chunk-formatter"
 const RE_SIGNIFICANT = /[\p{L}\p{N}]/u
 
 export function computeLineHash(lineNumber: number, content: string): string {
-  const stripped = content.endsWith("\r") ? content.slice(0, -1).replace(/\s+/g, "") : content.replace(/\s+/g, "")
+  const stripped = content.replace(/\r/g, "").trimEnd()
   const seed = RE_SIGNIFICANT.test(stripped) ? 0 : lineNumber
   const hash = Bun.hash.xxHash32(stripped, seed)
   const index = hash % 256

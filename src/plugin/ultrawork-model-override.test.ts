@@ -262,24 +262,24 @@ describe("applyUltraworkModelOverrideOnMessage", () => {
     } as unknown as Parameters<typeof applyUltraworkModelOverrideOnMessage>[0]
   }
 
-  test("should schedule deferred DB override when message ID present", () => {
+  test("should schedule deferred DB override without variant when SDK unavailable", () => {
     //#given
     const config = createConfig("sisyphus", { model: "anthropic/claude-opus-4-6", variant: "max" })
     const output = createOutput("ultrawork do something", { messageId: "msg_123" })
     const tui = createMockTui()
 
-    //#when
+    //#when - no client passed, SDK validation unavailable
     applyUltraworkModelOverrideOnMessage(config, "sisyphus", output, tui)
 
-    //#then
+    //#then - variant should NOT be applied without SDK validation
     expect(dbOverrideSpy).toHaveBeenCalledWith(
       "msg_123",
       { providerID: "anthropic", modelID: "claude-opus-4-6" },
-      "max",
+      undefined,
     )
   })
 
-  test("should override keyword-detector variant with configured ultrawork variant on deferred path", () => {
+  test("should NOT override variant when SDK unavailable even if config specifies variant", () => {
     //#given
     const config = createConfig("sisyphus", {
       model: "anthropic/claude-opus-4-6",
@@ -290,17 +290,17 @@ describe("applyUltraworkModelOverrideOnMessage", () => {
     output.message["thinking"] = "max"
     const tui = createMockTui()
 
-    //#when
+    //#when - no client, SDK unavailable
     applyUltraworkModelOverrideOnMessage(config, "sisyphus", output, tui)
 
-    //#then
+    //#then - existing variant preserved, not overridden to "extended"
     expect(dbOverrideSpy).toHaveBeenCalledWith(
       "msg_123",
       { providerID: "anthropic", modelID: "claude-opus-4-6" },
-      "extended",
+      undefined,
     )
-    expect(output.message["variant"]).toBe("extended")
-    expect(output.message["thinking"]).toBe("extended")
+    expect(output.message["variant"]).toBe("max")
+    expect(output.message["thinking"]).toBe("max")
   })
 
   test("should NOT mutate output.message.model when message ID present", () => {
@@ -320,7 +320,7 @@ describe("applyUltraworkModelOverrideOnMessage", () => {
     expect(output.message.model).toEqual(sonnetModel)
   })
 
-  test("should fall back to direct mutation when no message ID", () => {
+  test("should fall back to direct model mutation without variant when no message ID and no SDK", () => {
     //#given
     const config = createConfig("sisyphus", { model: "anthropic/claude-opus-4-6", variant: "max" })
     const output = createOutput("ultrawork do something")
@@ -329,24 +329,24 @@ describe("applyUltraworkModelOverrideOnMessage", () => {
     //#when
     applyUltraworkModelOverrideOnMessage(config, "sisyphus", output, tui)
 
-    //#then
+    //#then - model is set but variant is NOT applied without SDK validation
     expect(output.message.model).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-6" })
-    expect(output.message["variant"]).toBe("max")
+    expect(output.message["variant"]).toBeUndefined()
     expect(dbOverrideSpy).not.toHaveBeenCalled()
   })
 
-  test("should apply variant-only override when no message ID", () => {
+  test("should not apply variant-only override when no SDK available", () => {
     //#given
     const config = createConfig("sisyphus", { variant: "high" })
     const output = createOutput("ultrawork do something")
     const tui = createMockTui()
 
-    //#when
+    //#when - variant-only override, no SDK = no-op
     applyUltraworkModelOverrideOnMessage(config, "sisyphus", output, tui)
 
-    //#then
+    //#then - nothing applied since no model and variant requires SDK
     expect(output.message.model).toBeUndefined()
-    expect(output.message["variant"]).toBe("high")
+    expect(output.message["variant"]).toBeUndefined()
     expect(dbOverrideSpy).not.toHaveBeenCalled()
   })
 
@@ -414,7 +414,7 @@ describe("applyUltraworkModelOverrideOnMessage", () => {
     expect(dbOverrideSpy).toHaveBeenCalledWith(
       "msg_123",
       { providerID: "anthropic", modelID: "claude-opus-4-6" },
-      "max",
+      undefined,
     )
   })
 
@@ -438,5 +438,49 @@ describe("applyUltraworkModelOverrideOnMessage", () => {
     //#then
     expect(dbOverrideSpy).not.toHaveBeenCalled()
     expect(toastCalled).toBe(false)
+  })
+
+  test("should apply validated variant when SDK confirms model supports it", async () => {
+    //#given
+    const config = createConfig("sisyphus", { model: "anthropic/claude-opus-4-6", variant: "max" })
+    const output = createOutput("ultrawork do something", { messageId: "msg_123" })
+    const tui = createMockTui()
+    const mockClient = {
+      provider: {
+        list: async () => ({
+          data: { all: [{ id: "anthropic", models: { "claude-opus-4-6": { variants: { max: {} } } } }] },
+        }),
+      },
+    }
+
+    //#when
+    await applyUltraworkModelOverrideOnMessage(config, "sisyphus", output, tui, undefined, mockClient)
+
+    //#then - SDK confirmed max exists, so variant is applied
+    expect(dbOverrideSpy).toHaveBeenCalledWith(
+      "msg_123",
+      { providerID: "anthropic", modelID: "claude-opus-4-6" },
+      "max",
+    )
+  })
+
+  test("should NOT apply variant when SDK confirms model does NOT have it", async () => {
+    //#given
+    const config = createConfig("sisyphus", { model: "anthropic/claude-haiku-4-5", variant: "max" })
+    const output = createOutput("ultrawork do something", { messageId: "msg_123" })
+    const tui = createMockTui()
+    const mockClient = {
+      provider: {
+        list: async () => ({
+          data: { all: [{ id: "anthropic", models: { "claude-haiku-4-5": { variants: { high: {} } } } }] },
+        }),
+      },
+    }
+
+    //#when
+    await applyUltraworkModelOverrideOnMessage(config, "sisyphus", output, tui, undefined, mockClient)
+
+    //#then - SDK says haiku has no max variant, so variant is NOT applied
+    expect(output.message["variant"]).toBeUndefined()
   })
 })

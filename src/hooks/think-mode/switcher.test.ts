@@ -4,6 +4,20 @@ import {
   isAlreadyHighVariant,
 } from "./switcher"
 
+/**
+ * DEPRECATION NOTICE:
+ *
+ * getHighVariant() is no longer used by the think-mode hook.
+ * The hook now only sets output.message.variant = "high" and lets
+ * OpenCode's native variant system handle the transformation.
+ *
+ * This function is kept for:
+ * - Potential future validation use
+ * - Backward compatibility for external consumers
+ *
+ * Tests verify the function still works correctly.
+ */
+
 describe("think-mode switcher", () => {
   describe("Model ID normalization", () => {
     describe("getHighVariant with dots vs hyphens", () => {

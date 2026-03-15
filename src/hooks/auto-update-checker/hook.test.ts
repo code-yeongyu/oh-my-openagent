@@ -54,6 +54,26 @@ function createPluginInput() {
   } as never
 }
 
+async function flushScheduledWork(): Promise<void> {
+  await new Promise<void>((resolve) => {
+    setTimeout(resolve, 0)
+  })
+  await Promise.resolve()
+  await Promise.resolve()
+}
+
+function runSessionCreatedEvent(
+  hook: ReturnType<HookFactory>,
+  properties?: { info?: { parentID?: string } }
+): void {
+  hook.event({
+    event: {
+      type: "session.created",
+      properties,
+    },
+  })
+}
+
 beforeEach(() => {
   mockShowConfigErrorsIfAny.mockClear()
   mockShowModelCacheWarningIfNeeded.mockClear()
@@ -85,13 +105,8 @@ describe("createAutoUpdateCheckerHook", () => {
     })
 
     //#when - session.created event arrives
-    hook.event({
-      event: {
-        type: "session.created",
-        properties: { info: { parentID: undefined } },
-      },
-    })
-    await new Promise((resolve) => setTimeout(resolve, 50))
+    runSessionCreatedEvent(hook, { info: { parentID: undefined } })
+    await flushScheduledWork()
 
     //#then - no update checker side effects run
     expect(mockShowConfigErrorsIfAny).not.toHaveBeenCalled()
@@ -108,12 +123,8 @@ describe("createAutoUpdateCheckerHook", () => {
     const hook = createAutoUpdateCheckerHook(createPluginInput())
 
     //#when - session.created event arrives on primary session
-    hook.event({
-      event: {
-        type: "session.created",
-      },
-    })
-    await new Promise((resolve) => setTimeout(resolve, 50))
+    runSessionCreatedEvent(hook)
+    await flushScheduledWork()
 
     //#then - startup checks, toast, and background check run
     expect(mockShowConfigErrorsIfAny).toHaveBeenCalledTimes(1)
@@ -129,13 +140,8 @@ describe("createAutoUpdateCheckerHook", () => {
     const hook = createAutoUpdateCheckerHook(createPluginInput())
 
     //#when - session.created event contains parentID
-    hook.event({
-      event: {
-        type: "session.created",
-        properties: { info: { parentID: "parent-123" } },
-      },
-    })
-    await new Promise((resolve) => setTimeout(resolve, 50))
+    runSessionCreatedEvent(hook, { info: { parentID: "parent-123" } })
+    await flushScheduledWork()
 
     //#then - no startup actions run
     expect(mockShowConfigErrorsIfAny).not.toHaveBeenCalled()
@@ -152,17 +158,9 @@ describe("createAutoUpdateCheckerHook", () => {
     const hook = createAutoUpdateCheckerHook(createPluginInput())
 
     //#when - session.created event is fired twice
-    hook.event({
-      event: {
-        type: "session.created",
-      },
-    })
-    hook.event({
-      event: {
-        type: "session.created",
-      },
-    })
-    await new Promise((resolve) => setTimeout(resolve, 50))
+    runSessionCreatedEvent(hook)
+    runSessionCreatedEvent(hook)
+    await flushScheduledWork()
 
     //#then - side effects execute only once
     expect(mockShowConfigErrorsIfAny).toHaveBeenCalledTimes(1)
@@ -179,12 +177,8 @@ describe("createAutoUpdateCheckerHook", () => {
     const hook = createAutoUpdateCheckerHook(createPluginInput())
 
     //#when - session.created event arrives
-    hook.event({
-      event: {
-        type: "session.created",
-      },
-    })
-    await new Promise((resolve) => setTimeout(resolve, 50))
+    runSessionCreatedEvent(hook)
+    await flushScheduledWork()
 
     //#then - local dev toast is shown and background check is skipped
     expect(mockShowConfigErrorsIfAny).toHaveBeenCalledTimes(1)
@@ -206,7 +200,7 @@ describe("createAutoUpdateCheckerHook", () => {
         type: "session.deleted",
       },
     })
-    await new Promise((resolve) => setTimeout(resolve, 50))
+    await flushScheduledWork()
 
     //#then - no startup actions run
     expect(mockShowConfigErrorsIfAny).not.toHaveBeenCalled()
@@ -225,12 +219,8 @@ describe("createAutoUpdateCheckerHook", () => {
     })
 
     //#when - session.created event arrives
-    hook.event({
-      event: {
-        type: "session.created",
-      },
-    })
-    await new Promise((resolve) => setTimeout(resolve, 50))
+    runSessionCreatedEvent(hook)
+    await flushScheduledWork()
 
     //#then - startup toast includes sisyphus wording
     expect(mockShowVersionToast).toHaveBeenCalledTimes(1)

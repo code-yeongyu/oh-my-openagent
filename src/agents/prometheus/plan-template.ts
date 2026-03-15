@@ -125,19 +125,14 @@ Wave 3 (After Wave 2 — integration + UI):
 ├── Task 19: Deployment config C (depends: 15) [quick]
 └── Task 20: UI request log + build (depends: 16) [visual-engineering]
 
-Wave 4 (After Wave 3 — verification):
-├── Task 21: Integration tests (depends: 15) [deep]
-├── Task 22: UI QA - Playwright (depends: 20) [unspecified-high]
-├── Task 23: E2E QA (depends: 21) [deep]
-└── Task 24: Git cleanup + tagging (depends: 21) [git]
+Wave FINAL (After ALL tasks \u2014 4 parallel reviews, then user okay):
+\u251c\u2500\u2500 Task F1: Plan compliance audit (oracle)
+\u251c\u2500\u2500 Task F2: Code quality review (unspecified-high)
+\u251c\u2500\u2500 Task F3: Real manual QA (unspecified-high)
+\u2514\u2500\u2500 Task F4: Scope fidelity check (deep)
+-> Present results -> Get explicit user okay
 
-Wave FINAL (After ALL tasks — independent review, 4 parallel):
-├── Task F1: Plan compliance audit (oracle)
-├── Task F2: Code quality review (unspecified-high)
-├── Task F3: Real manual QA (unspecified-high)
-└── Task F4: Scope fidelity check (deep)
-
-Critical Path: Task 1 → Task 5 → Task 8 → Task 11 → Task 15 → Task 21 → F1-F4
+Critical Path: Task 1 \u2192 Task 5 \u2192 Task 8 \u2192 Task 11 \u2192 Task 15 \u2192 Task 21 \u2192 F1-F4 \u2192 user okay
 Parallel Speedup: ~70% faster than sequential
 Max Concurrent: 7 (Waves 1 & 2)
 \`\`\`
@@ -282,24 +277,27 @@ Max Concurrent: 7 (Waves 1 & 2)
 
 ---
 
-## Final Verification Wave (MANDATORY — after ALL implementation tasks)
+## Final Verification Wave (MANDATORY \u2014 after ALL implementation tasks)
 
-> 4 review agents run in PARALLEL. ALL must APPROVE. Rejection → fix → re-run.
+> 4 review agents run in PARALLEL. ALL must APPROVE. Present consolidated results to user and get explicit "okay" before completing.
+>
+> **Do NOT auto-proceed after verification. Wait for user's explicit approval before marking work complete.**
+> **Never mark F1-F4 as checked before getting user's okay.** Rejection or user feedback -> fix -> re-run -> present again -> wait for okay.
 
-- [ ] F1. **Plan Compliance Audit** — \`oracle\`
-  Read the plan end-to-end. For each "Must Have": verify implementation exists (read file, curl endpoint, run command). For each "Must NOT Have": search codebase for forbidden patterns — reject with file:line if found. Check evidence files exist in .sisyphus/evidence/. Compare deliverables against plan.
+- [ ] F1. **Plan Compliance Audit** \u2014 \`oracle\`
+  Read the plan end-to-end. For each "Must Have": verify implementation exists (read file, curl endpoint, run command). For each "Must NOT Have": search codebase for forbidden patterns \u2014 reject with file:line if found. Check evidence files exist in .sisyphus/evidence/. Compare deliverables against plan.
   Output: \`Must Have [N/N] | Must NOT Have [N/N] | Tasks [N/N] | VERDICT: APPROVE/REJECT\`
 
-- [ ] F2. **Code Quality Review** — \`unspecified-high\`
+- [ ] F2. **Code Quality Review** \u2014 \`unspecified-high\`
   Run \`tsc --noEmit\` + linter + \`bun test\`. Review all changed files for: \`as any\`/\`@ts-ignore\`, empty catches, console.log in prod, commented-out code, unused imports. Check AI slop: excessive comments, over-abstraction, generic names (data/result/item/temp).
   Output: \`Build [PASS/FAIL] | Lint [PASS/FAIL] | Tests [N pass/N fail] | Files [N clean/N issues] | VERDICT\`
 
-- [ ] F3. **Real Manual QA** — \`unspecified-high\` (+ \`playwright\` skill if UI)
-  Start from clean state. Execute EVERY QA scenario from EVERY task — follow exact steps, capture evidence. Test cross-task integration (features working together, not isolation). Test edge cases: empty state, invalid input, rapid actions. Save to \`.sisyphus/evidence/final-qa/\`.
+- [ ] F3. **Real Manual QA** \u2014 \`unspecified-high\` (+ \`playwright\` skill if UI)
+  Start from clean state. Execute EVERY QA scenario from EVERY task \u2014 follow exact steps, capture evidence. Test cross-task integration (features working together, not isolation). Test edge cases: empty state, invalid input, rapid actions. Save to \`.sisyphus/evidence/final-qa/\`.
   Output: \`Scenarios [N/N pass] | Integration [N/N] | Edge Cases [N tested] | VERDICT\`
 
-- [ ] F4. **Scope Fidelity Check** — \`deep\`
-  For each task: read "What to do", read actual diff (git log/diff). Verify 1:1 — everything in spec was built (no missing), nothing beyond spec was built (no creep). Check "Must NOT do" compliance. Detect cross-task contamination: Task N touching Task M's files. Flag unaccounted changes.
+- [ ] F4. **Scope Fidelity Check** \u2014 \`deep\`
+  For each task: read "What to do", read actual diff (git log/diff). Verify 1:1 \u2014 everything in spec was built (no missing), nothing beyond spec was built (no creep). Check "Must NOT do" compliance. Detect cross-task contamination: Task N touching Task M's files. Flag unaccounted changes.
   Output: \`Tasks [N/N compliant] | Contamination [CLEAN/N issues] | Unaccounted [CLEAN/N files] | VERDICT\`
 
 ---

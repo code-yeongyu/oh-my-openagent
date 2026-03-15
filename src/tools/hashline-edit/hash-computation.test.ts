@@ -45,10 +45,36 @@ describe("computeLineHash", () => {
     expect(hash1).not.toBe(hash2)
   })
 
-  it("ignores whitespace differences", () => {
+  it("produces different hashes for different leading indentation", () => {
     //#given
     const content1 = "function hello() {"
-    const content2 = "  function hello() {  "
+    const content2 = "  function hello() {"
+
+    //#when
+    const hash1 = computeLineHash(1, content1)
+    const hash2 = computeLineHash(1, content2)
+
+    //#then
+    expect(hash1).not.toBe(hash2)
+  })
+
+  it("ignores trailing whitespace differences", () => {
+    //#given
+    const content1 = "function hello() {"
+    const content2 = "function hello() {  "
+
+    //#when
+    const hash1 = computeLineHash(1, content1)
+    const hash2 = computeLineHash(1, content2)
+
+    //#then
+    expect(hash1).toBe(hash2)
+  })
+
+  it("produces same hash for CRLF and LF line endings", () => {
+    //#given
+    const content1 = "function hello() {"
+    const content2 = "function hello() {\r"
 
     //#when
     const hash1 = computeLineHash(1, content1)

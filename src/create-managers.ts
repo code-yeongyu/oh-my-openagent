@@ -53,8 +53,8 @@ export function createManagers(args: {
 
         log("[index] onSubagentSessionCreated callback completed")
       },
-      onShutdown: () => {
-        tmuxSessionManager.cleanup().catch((error) => {
+      onShutdown: async () => {
+        await tmuxSessionManager.cleanup().catch((error) => {
           log("[index] tmux cleanup error during shutdown:", error)
         })
       },

@@ -3,6 +3,7 @@ import type { BackgroundManager } from "../../features/background-agent"
 import type { PluginContext } from "../types"
 
 import {
+  createGptPermissionContinuationHook,
   createTodoContinuationEnforcer,
   createBackgroundNotificationHook,
   createStopContinuationGuardHook,
@@ -14,6 +15,7 @@ import { safeCreateHook } from "../../shared/safe-create-hook"
 import { createUnstableAgentBabysitter } from "../unstable-agent-babysitter"
 
 export type ContinuationHooks = {
+  gptPermissionContinuation: ReturnType<typeof createGptPermissionContinuationHook> | null
   stopContinuationGuard: ReturnType<typeof createStopContinuationGuardHook> | null
   compactionContextInjector: ReturnType<typeof createCompactionContextInjector> | null
   compactionTodoPreserver: ReturnType<typeof createCompactionTodoPreserverHook> | null
@@ -55,8 +57,16 @@ export function createContinuationHooks(args: {
         }))
     : null
 
+  const gptPermissionContinuation = isHookEnabled("gpt-permission-continuation")
+    ? safeHook("gpt-permission-continuation", () =>
+        createGptPermissionContinuationHook(ctx, {
+          isContinuationStopped: stopContinuationGuard?.isStopped,
+        }))
+    : null
+
   const compactionContextInjector = isHookEnabled("compaction-context-injector")
-    ? safeHook("compaction-context-injector", () => createCompactionContextInjector(backgroundManager))
+    ? safeHook("compaction-context-injector", () =>
+        createCompactionContextInjector({ ctx, backgroundManager }))
     : null
 
   const compactionTodoPreserver = isHookEnabled("compaction-todo-preserver")
@@ -65,9 +75,11 @@ export function createContinuationHooks(args: {
 
   const todoContinuationEnforcer = isHookEnabled("todo-continuation-enforcer")
     ? safeHook("todo-continuation-enforcer", () =>
-        createTodoContinuationEnforcer(ctx, {
+      createTodoContinuationEnforcer(ctx, {
           backgroundManager,
           isContinuationStopped: stopContinuationGuard?.isStopped,
+          shouldSkipContinuation: (sessionID: string) =>
+            gptPermissionContinuation?.wasRecentlyInjected(sessionID) ?? false,
         }))
     : null
 
@@ -110,12 +122,15 @@ export function createContinuationHooks(args: {
           backgroundManager,
           isContinuationStopped: (sessionID: string) =>
             stopContinuationGuard?.isStopped(sessionID) ?? false,
+          shouldSkipContinuation: (sessionID: string) =>
+            gptPermissionContinuation?.wasRecentlyInjected(sessionID) ?? false,
           agentOverrides: pluginConfig.agents,
           autoCommit: pluginConfig.start_work?.auto_commit,
         }))
     : null
 
   return {
+    gptPermissionContinuation,
     stopContinuationGuard,
     compactionContextInjector,
     compactionTodoPreserver,

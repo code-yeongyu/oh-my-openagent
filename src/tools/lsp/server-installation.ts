@@ -1,7 +1,7 @@
 import { existsSync } from "fs"
-import { join } from "path"
+import { delimiter, join } from "path"
 
-import { getOpenCodeConfigDir, getDataDir } from "../../shared"
+import { getLspServerAdditionalPathBases } from "./server-path-bases"
 
 export function isServerInstalled(command: string[]): boolean {
   if (command.length === 0) return false
@@ -31,8 +31,7 @@ export function isServerInstalled(command: string[]): boolean {
     pathEnv = process.env.Path || ""
   }
 
-  const pathSeparator = isWindows ? ";" : ":"
-  const paths = pathEnv.split(pathSeparator)
+  const paths = pathEnv.split(delimiter)
 
   for (const p of paths) {
     for (const suffix of exts) {
@@ -42,17 +41,7 @@ export function isServerInstalled(command: string[]): boolean {
     }
   }
 
-  const cwd = process.cwd()
-  const configDir = getOpenCodeConfigDir({ binary: "opencode" })
-  const dataDir = join(getDataDir(), "opencode")
-  const additionalBases = [
-    join(cwd, "node_modules", ".bin"),
-    join(configDir, "bin"),
-    join(configDir, "node_modules", ".bin"),
-    join(dataDir, "bin"),
-  ]
-
-  for (const base of additionalBases) {
+  for (const base of getLspServerAdditionalPathBases(process.cwd())) {
     for (const suffix of exts) {
       if (existsSync(join(base, cmd + suffix))) {
         return true

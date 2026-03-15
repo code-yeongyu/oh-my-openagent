@@ -19,7 +19,7 @@ function registerProcessSignal(
 }
 
 interface CleanupTarget {
-  shutdown(): void
+  shutdown(): void | Promise<void>
 }
 
 const cleanupManagers = new Set<CleanupTarget>()
@@ -35,7 +35,9 @@ export function registerManagerForCleanup(manager: CleanupTarget): void {
   const cleanupAll = () => {
     for (const m of cleanupManagers) {
       try {
-        m.shutdown()
+        void Promise.resolve(m.shutdown()).catch((error) => {
+          log("[background-agent] Error during async shutdown cleanup:", error)
+        })
       } catch (error) {
         log("[background-agent] Error during shutdown cleanup:", error)
       }

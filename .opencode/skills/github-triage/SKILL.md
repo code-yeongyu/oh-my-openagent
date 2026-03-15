@@ -1,105 +1,181 @@
 ---
 name: github-triage
-description: "Unified GitHub triage for issues AND PRs. 1 item = 1 background task (category: free). Issues: answer questions from codebase, analyze bugs. PRs: review bugfixes, merge safe ones. All parallel, all background. Triggers: 'triage', 'triage issues', 'triage PRs', 'github triage'."
+description: "Read-only GitHub triage for issues AND PRs. 1 item = 1 background task (category: quick). Analyzes all open items and writes evidence-backed reports to /tmp/{datetime}/. Every claim requires a GitHub permalink as proof. NEVER takes any action on GitHub - no comments, no merges, no closes, no labels. Reports only. Triggers: 'triage', 'triage issues', 'triage PRs', 'github triage'."
 ---
 
-# GitHub Triage — Unified Issue & PR Processor
+# GitHub Triage - Read-Only Analyzer
 
 <role>
-You are a GitHub triage orchestrator. You fetch all open issues and PRs, classify each one, then spawn exactly 1 background subagent per item using `category="free"`. Each subagent analyzes its item, takes action (comment/close/merge/report), and records results via TaskCreate.
+Read-only GitHub triage orchestrator. Fetch open issues/PRs, classify, spawn 1 background `quick` subagent per item. Each subagent analyzes and writes a report file. ZERO GitHub mutations.
 </role>
 
----
+## Architecture
 
-## ARCHITECTURE
-
-```
-1 issue or PR = 1 TaskCreate = 1 task(category="free", run_in_background=true)
-```
+**1 ISSUE/PR = 1 TASKCREATE = 1 `quick` SUBAGENT (background). NO EXCEPTIONS.**
 
 | Rule | Value |
 |------|-------|
-| Category for ALL subagents | `free` |
-| Execution mode | `run_in_background=true` |
-| Parallelism | ALL items launched simultaneously |
-| Result tracking | Each subagent calls `TaskCreate` with its findings |
-| Result collection | `background_output()` polling loop |
+| Category | `quick` |
+| Execution | `run_in_background=true` |
+| Parallelism | ALL items simultaneously |
+| Tracking | `TaskCreate` per item |
+| Output | `/tmp/{YYYYMMDD-HHmmss}/issue-{N}.md` or `pr-{N}.md` |
 
 ---
 
-## PHASE 1: FETCH ALL OPEN ITEMS
+## Zero-Action Policy (ABSOLUTE)
 
-<fetch>
-Run these commands to collect data. Use the bundled script if available, otherwise fall back to gh CLI.
+<zero_action>
+Subagents MUST NEVER run ANY command that writes or mutates GitHub state.
+
+**FORBIDDEN** (non-exhaustive):
+`gh issue comment`, `gh issue close`, `gh issue edit`, `gh pr comment`, `gh pr merge`, `gh pr review`, `gh pr edit`, `gh api -X POST`, `gh api -X PUT`, `gh api -X PATCH`, `gh api -X DELETE`
+
+**ALLOWED**:
+- `gh issue view`, `gh pr view`, `gh api` (GET only) - read GitHub data
+- `Grep`, `Read`, `Glob` - read codebase
+- `Write` - write report files to `/tmp/` ONLY
+- `git log`, `git show`, `git blame` - read git history (for finding fix commits)
+
+**ANY GitHub mutation = CRITICAL violation.**
+</zero_action>
+
+---
+
+## Evidence Rule (MANDATORY)
+
+<evidence>
+**Every factual claim in a report MUST include a GitHub permalink as proof.**
+
+A permalink is a URL pointing to a specific line/range in a specific commit, e.g.:
+`https://github.com/{owner}/{repo}/blob/{commit_sha}/{path}#L{start}-L{end}`
+
+### How to generate permalinks
+
+1. Find the relevant file and line(s) via Grep/Read.
+2. Get the current commit SHA: `git rev-parse HEAD`
+3. Construct: `https://github.com/{REPO}/blob/{SHA}/{filepath}#L{line}` (or `#L{start}-L{end}` for ranges)
+
+### Rules
+
+- **No permalink = no claim.** If you cannot back a statement with a permalink, state "No evidence found" instead.
+- Claims without permalinks are explicitly marked `[UNVERIFIED]` and carry zero weight.
+- Permalinks to `main`/`master`/`dev` branches are NOT acceptable - use commit SHAs only.
+- For bug analysis: permalink to the problematic code. For fix verification: permalink to the fixing commit diff.
+</evidence>
+
+---
+
+## Phase 0: Setup
 
 ```bash
 REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
-
-# Issues: all open
-gh issue list --repo $REPO --state open --limit 500 \
-  --json number,title,state,createdAt,updatedAt,labels,author,body,comments
-
-# PRs: all open
-gh pr list --repo $REPO --state open --limit 500 \
-  --json number,title,state,createdAt,updatedAt,labels,author,body,headRefName,baseRefName,isDraft,mergeable,reviewDecision,statusCheckRollup
+REPORT_DIR="/tmp/$(date +%Y%m%d-%H%M%S)"
+mkdir -p "$REPORT_DIR"
+COMMIT_SHA=$(git rev-parse HEAD)
 ```
 
-If either returns exactly 500 results, paginate using `--search "created:<LAST_CREATED_AT"` until exhausted.
+Pass `REPO`, `REPORT_DIR`, and `COMMIT_SHA` to every subagent.
+
+---
+
+## Phase 1: Fetch All Open Items
+
+<fetch>
+Paginate if 500 results returned.
+
+```bash
+ISSUES=$(gh issue list --repo $REPO --state open --limit 500 \
+  --json number,title,state,createdAt,updatedAt,labels,author,body,comments)
+ISSUE_LEN=$(echo "$ISSUES" | jq length)
+if [ "$ISSUE_LEN" -eq 500 ]; then
+  LAST_DATE=$(echo "$ISSUES" | jq -r '.[-1].createdAt')
+  while true; do
+    PAGE=$(gh issue list --repo $REPO --state open --limit 500 \
+      --search "created:<$LAST_DATE" \
+      --json number,title,state,createdAt,updatedAt,labels,author,body,comments)
+    PAGE_LEN=$(echo "$PAGE" | jq length)
+    [ "$PAGE_LEN" -eq 0 ] && break
+    ISSUES=$(echo "[$ISSUES, $PAGE]" | jq -s 'add | unique_by(.number)')
+    [ "$PAGE_LEN" -lt 500 ] && break
+    LAST_DATE=$(echo "$PAGE" | jq -r '.[-1].createdAt')
+  done
+fi
+
+PRS=$(gh pr list --repo $REPO --state open --limit 500 \
+  --json number,title,state,createdAt,updatedAt,labels,author,body,headRefName,baseRefName,isDraft,mergeable,reviewDecision,statusCheckRollup)
+PR_LEN=$(echo "$PRS" | jq length)
+if [ "$PR_LEN" -eq 500 ]; then
+  LAST_DATE=$(echo "$PRS" | jq -r '.[-1].createdAt')
+  while true; do
+    PAGE=$(gh pr list --repo $REPO --state open --limit 500 \
+      --search "created:<$LAST_DATE" \
+      --json number,title,state,createdAt,updatedAt,labels,author,body,headRefName,baseRefName,isDraft,mergeable,reviewDecision,statusCheckRollup)
+    PAGE_LEN=$(echo "$PAGE" | jq length)
+    [ "$PAGE_LEN" -eq 0 ] && break
+    PRS=$(echo "[$PRS, $PAGE]" | jq -s 'add | unique_by(.number)')
+    [ "$PAGE_LEN" -lt 500 ] && break
+    LAST_DATE=$(echo "$PAGE" | jq -r '.[-1].createdAt')
+  done
+fi
+```
 </fetch>
 
 ---
 
-## PHASE 2: CLASSIFY EACH ITEM
+## Phase 2: Classify
 
-For each item, determine its type based on title, labels, and body content:
-
-<classification>
-
-### Issues
-
-| Type | Detection | Action Path |
-|------|-----------|-------------|
-| `ISSUE_QUESTION` | Title contains `[Question]`, `[Discussion]`, `?`, or body is asking "how to" / "why does" / "is it possible" | SUBAGENT_ISSUE_QUESTION |
-| `ISSUE_BUG` | Title contains `[Bug]`, `Bug:`, body describes unexpected behavior, error messages, stack traces | SUBAGENT_ISSUE_BUG |
-| `ISSUE_FEATURE` | Title contains `[Feature]`, `[RFE]`, `[Enhancement]`, `Feature Request`, `Proposal` | SUBAGENT_ISSUE_FEATURE |
-| `ISSUE_OTHER` | Anything else | SUBAGENT_ISSUE_OTHER |
-
-### PRs
-
-| Type | Detection | Action Path |
-|------|-----------|-------------|
-| `PR_BUGFIX` | Title starts with `fix`, `fix:`, `fix(`, branch contains `fix/`, `bugfix/`, or labels include `bug` | SUBAGENT_PR_BUGFIX |
-| `PR_OTHER` | Everything else (feat, refactor, docs, chore, etc.) | SUBAGENT_PR_OTHER |
-
-</classification>
+| Type | Detection |
+|------|-----------|
+| `ISSUE_QUESTION` | `[Question]`, `[Discussion]`, `?`, "how to" / "why does" / "is it possible" |
+| `ISSUE_BUG` | `[Bug]`, `Bug:`, error messages, stack traces, unexpected behavior |
+| `ISSUE_FEATURE` | `[Feature]`, `[RFE]`, `[Enhancement]`, `Feature Request`, `Proposal` |
+| `ISSUE_OTHER` | Anything else |
+| `PR_BUGFIX` | Title starts with `fix`, branch contains `fix/`/`bugfix/`, label `bug` |
+| `PR_OTHER` | Everything else |
 
 ---
 
-## PHASE 3: SPAWN 1 BACKGROUND TASK PER ITEM
-
-For EVERY item, create a TaskCreate entry first, then spawn a background task.
+## Phase 3: Spawn Subagents
 
 ```
 For each item:
   1. TaskCreate(subject="Triage: #{number} {title}")
-  2. task(category="free", run_in_background=true, load_skills=[], prompt=SUBAGENT_PROMPT)
+  2. task(category="quick", run_in_background=true, load_skills=[], prompt=SUBAGENT_PROMPT)
   3. Store mapping: item_number -> { task_id, background_task_id }
 ```
 
 ---
 
-## SUBAGENT PROMPT TEMPLATES
+## Subagent Prompts
 
-Each subagent gets an explicit, step-by-step prompt. Free models are limited — leave NOTHING implicit.
+### Common Preamble (include in ALL subagent prompts)
+
+```
+CONTEXT:
+- Repository: {REPO}
+- Report directory: {REPORT_DIR}
+- Current commit SHA: {COMMIT_SHA}
+
+PERMALINK FORMAT:
+Every factual claim MUST include a permalink: https://github.com/{REPO}/blob/{COMMIT_SHA}/{filepath}#L{start}-L{end}
+No permalink = no claim. Mark unverifiable claims as [UNVERIFIED].
+To get current SHA if needed: git rev-parse HEAD
+
+ABSOLUTE RULES (violating ANY = critical failure):
+- NEVER run gh issue comment, gh issue close, gh issue edit
+- NEVER run gh pr comment, gh pr merge, gh pr review, gh pr edit
+- NEVER run any gh command with -X POST, -X PUT, -X PATCH, -X DELETE
+- NEVER run git checkout, git fetch, git pull, git switch, git worktree
+- Your ONLY writable output: {REPORT_DIR}/{issue|pr}-{number}.md via the Write tool
+```
 
 ---
 
-### SUBAGENT_ISSUE_QUESTION
-
-<issue_question_prompt>
+### ISSUE_QUESTION
 
 ```
-You are a GitHub issue responder for the repository {REPO}.
+You are analyzing issue #{number} for {REPO}.
 
 ITEM:
 - Issue #{number}: {title}
@@ -107,52 +183,43 @@ ITEM:
 - Body: {body}
 - Comments: {comments_summary}
 
-YOUR JOB:
-1. Read the issue carefully. Understand what the user is asking.
-2. Search the codebase to find the answer. Use Grep and Read tools.
-   - Search for relevant file names, function names, config keys mentioned in the issue.
-   - Read the files you find to understand how the feature works.
-3. Decide: Can you answer this clearly and accurately from the codebase?
+TASK:
+1. Understand the question.
+2. Search the codebase (Grep, Read) for the answer.
+3. For every finding, construct a permalink: https://github.com/{REPO}/blob/{COMMIT_SHA}/{path}#L{N}
+4. Write report to {REPORT_DIR}/issue-{number}.md
 
-IF YES (you found a clear, accurate answer):
-  Step A: Write a helpful comment. The comment MUST:
-    - Start with exactly: [sisyphus-bot]
-    - Be warm, friendly, and thorough
-    - Include specific file paths and code references
-    - Include code snippets or config examples if helpful
-    - End with "Feel free to reopen if this doesn't resolve your question!"
-  Step B: Post the comment:
-    gh issue comment {number} --repo {REPO} --body "YOUR_COMMENT"
-  Step C: Close the issue:
-    gh issue close {number} --repo {REPO}
-  Step D: Report back with this EXACT format:
-    ACTION: ANSWERED_AND_CLOSED
-    COMMENT_POSTED: yes
-    SUMMARY: [1-2 sentence summary of your answer]
+REPORT FORMAT (write this as the file content):
 
-IF NO (not enough info in codebase, or answer is uncertain):
-  Report back with:
-    ACTION: NEEDS_MANUAL_ATTENTION
-    REASON: [why you couldn't answer — be specific]
-    PARTIAL_FINDINGS: [what you DID find, if anything]
+# Issue #{number}: {title}
+**Type:** Question | **Author:** {author} | **Created:** {createdAt}
 
-RULES:
-- NEVER guess. Only answer if the codebase clearly supports your answer.
-- NEVER make up file paths or function names.
-- The [sisyphus-bot] prefix is MANDATORY on every comment you post.
-- Be genuinely helpful — imagine you're a senior maintainer who cares about the community.
+## Question
+[1-2 sentence summary]
+
+## Findings
+[Each finding with permalink proof. Example:]
+- The config is parsed in [`src/config/loader.ts#L42-L58`](https://github.com/{REPO}/blob/{SHA}/src/config/loader.ts#L42-L58)
+
+## Suggested Answer
+[Draft answer with code references and permalinks]
+
+## Confidence: [HIGH | MEDIUM | LOW]
+[Reason. If LOW: what's missing]
+
+## Recommended Action
+[What maintainer should do]
+
+---
+REMEMBER: No permalink = no claim. Every code reference needs a permalink.
 ```
-
-</issue_question_prompt>
 
 ---
 
-### SUBAGENT_ISSUE_BUG
-
-<issue_bug_prompt>
+### ISSUE_BUG
 
 ```
-You are a GitHub bug analyzer for the repository {REPO}.
+You are analyzing bug report #{number} for {REPO}.
 
 ITEM:
 - Issue #{number}: {title}
@@ -160,74 +227,75 @@ ITEM:
 - Body: {body}
 - Comments: {comments_summary}
 
-YOUR JOB:
-1. Read the issue carefully. Understand the reported bug:
-   - What behavior does the user expect?
-   - What behavior do they actually see?
-   - What steps reproduce it?
-2. Search the codebase for the relevant code. Use Grep and Read tools.
-   - Find the files/functions mentioned or related to the bug.
-   - Read them carefully and trace the logic.
-3. Determine one of three outcomes:
+TASK:
+1. Understand: expected behavior, actual behavior, reproduction steps.
+2. Search the codebase for relevant code. Trace the logic.
+3. Determine verdict: CONFIRMED_BUG, NOT_A_BUG, ALREADY_FIXED, or UNCLEAR.
+4. For ALREADY_FIXED: find the fixing commit using git log/git blame. Include the commit SHA and what changed.
+5. For every finding, construct a permalink.
+6. Write report to {REPORT_DIR}/issue-{number}.md
 
-OUTCOME A — CONFIRMED BUG (you found the problematic code):
-  Step 1: Post a comment on the issue. The comment MUST:
-    - Start with exactly: [sisyphus-bot]
-    - Apologize sincerely for the inconvenience ("We're sorry you ran into this issue.")
-    - Briefly acknowledge what the bug is
-    - Say "We've identified the root cause and will work on a fix."
-    - Do NOT reveal internal implementation details unnecessarily
-  Step 2: Post the comment:
-    gh issue comment {number} --repo {REPO} --body "YOUR_COMMENT"
-  Step 3: Report back with:
-    ACTION: CONFIRMED_BUG
-    ROOT_CAUSE: [which file, which function, what goes wrong]
-    FIX_APPROACH: [how to fix it — be specific: "In {file}, line ~{N}, change X to Y because Z"]
-    SEVERITY: [LOW|MEDIUM|HIGH|CRITICAL]
-    AFFECTED_FILES: [list of files that need changes]
+FINDING "ALREADY_FIXED" COMMITS:
+- Use `git log --all --oneline -- {file}` to find recent changes to relevant files
+- Use `git log --all --grep="fix" --grep="{keyword}" --all-match --oneline` to search commit messages
+- Use `git blame {file}` to find who last changed the relevant lines
+- Use `git show {commit_sha}` to verify the fix
+- Construct commit permalink: https://github.com/{REPO}/commit/{fix_commit_sha}
 
-OUTCOME B — NOT A BUG (user misunderstanding, provably correct behavior):
-  ONLY choose this if you can RIGOROUSLY PROVE the behavior is correct.
-  Step 1: Post a comment. The comment MUST:
-    - Start with exactly: [sisyphus-bot]
-    - Be kind and empathetic — never condescending
-    - Explain clearly WHY the current behavior is correct
-    - Include specific code references or documentation links
-    - Offer a workaround or alternative if possible
-    - End with "Please let us know if you have further questions!"
-  Step 2: Post the comment:
-    gh issue comment {number} --repo {REPO} --body "YOUR_COMMENT"
-  Step 3: DO NOT close the issue. Let the user or maintainer decide.
-  Step 4: Report back with:
-    ACTION: NOT_A_BUG
-    EXPLANATION: [why this is correct behavior]
-    PROOF: [specific code reference proving it]
+REPORT FORMAT (write this as the file content):
 
-OUTCOME C — UNCLEAR (can't determine from codebase alone):
-  Report back with:
-    ACTION: NEEDS_INVESTIGATION
-    FINDINGS: [what you found so far]
-    BLOCKERS: [what's preventing you from determining the cause]
-    SUGGESTED_NEXT_STEPS: [what a human should look at]
+# Issue #{number}: {title}
+**Type:** Bug Report | **Author:** {author} | **Created:** {createdAt}
 
-RULES:
-- NEVER guess at root causes. Only report CONFIRMED_BUG if you found the exact problematic code.
-- NEVER close bug issues yourself. Only comment.
-- For OUTCOME B (not a bug): you MUST have rigorous proof. If there's ANY doubt, choose OUTCOME C instead.
-- The [sisyphus-bot] prefix is MANDATORY on every comment.
-- When apologizing, be genuine. The user took time to report this.
+## Bug Summary
+**Expected:** [what user expects]
+**Actual:** [what actually happens]
+**Reproduction:** [steps if provided]
+
+## Verdict: [CONFIRMED_BUG | NOT_A_BUG | ALREADY_FIXED | UNCLEAR]
+
+## Analysis
+
+### Evidence
+[Each piece of evidence with permalink. No permalink = mark [UNVERIFIED]]
+
+### Root Cause (if CONFIRMED_BUG)
+[Which file, which function, what goes wrong]
+- Problematic code: [`{path}#L{N}`](permalink)
+
+### Why Not A Bug (if NOT_A_BUG)
+[Rigorous proof with permalinks that current behavior is correct]
+
+### Fix Details (if ALREADY_FIXED)
+- **Fixed in commit:** [`{short_sha}`](https://github.com/{REPO}/commit/{full_sha})
+- **Fixed date:** {date}
+- **What changed:** [description with diff permalink]
+- **Fixed by:** {author}
+
+### Blockers (if UNCLEAR)
+[What prevents determination, what to investigate next]
+
+## Severity: [LOW | MEDIUM | HIGH | CRITICAL]
+
+## Affected Files
+[List with permalinks]
+
+## Suggested Fix (if CONFIRMED_BUG)
+[Specific approach: "In {file}#L{N}, change X to Y because Z"]
+
+## Recommended Action
+[What maintainer should do]
+
+---
+CRITICAL: Claims without permalinks are worthless. If you cannot find evidence, say so explicitly rather than making unverified claims.
 ```
-
-</issue_bug_prompt>
 
 ---
 
-### SUBAGENT_ISSUE_FEATURE
-
-<issue_feature_prompt>
+### ISSUE_FEATURE
 
 ```
-You are a GitHub feature request analyzer for the repository {REPO}.
+You are analyzing feature request #{number} for {REPO}.
 
 ITEM:
 - Issue #{number}: {title}
@@ -235,38 +303,41 @@ ITEM:
 - Body: {body}
 - Comments: {comments_summary}
 
-YOUR JOB:
-1. Read the feature request.
-2. Search the codebase to check if this feature already exists (partially or fully).
-3. Assess feasibility and alignment with the project.
+TASK:
+1. Understand the request.
+2. Search codebase for existing (partial/full) implementations.
+3. Assess feasibility.
+4. Write report to {REPORT_DIR}/issue-{number}.md
 
-Report back with:
-  ACTION: FEATURE_ASSESSED
-  ALREADY_EXISTS: [YES_FULLY | YES_PARTIALLY | NO]
-  IF_EXISTS: [where in the codebase, how to use it]
-  FEASIBILITY: [EASY | MODERATE | HARD | ARCHITECTURAL_CHANGE]
-  RELEVANT_FILES: [files that would need changes]
-  NOTES: [any observations about implementation approach]
+REPORT FORMAT (write this as the file content):
 
-If the feature already fully exists:
-  Post a comment (prefix: [sisyphus-bot]) explaining how to use the existing feature with examples.
-  gh issue comment {number} --repo {REPO} --body "YOUR_COMMENT"
+# Issue #{number}: {title}
+**Type:** Feature Request | **Author:** {author} | **Created:** {createdAt}
 
-RULES:
-- Do NOT close feature requests.
-- The [sisyphus-bot] prefix is MANDATORY on any comment.
+## Request Summary
+[What the user wants]
+
+## Existing Implementation: [YES_FULLY | YES_PARTIALLY | NO]
+[If exists: where, with permalinks to the implementation]
+
+## Feasibility: [EASY | MODERATE | HARD | ARCHITECTURAL_CHANGE]
+
+## Relevant Files
+[With permalinks]
+
+## Implementation Notes
+[Approach, pitfalls, dependencies]
+
+## Recommended Action
+[What maintainer should do]
 ```
-
-</issue_feature_prompt>
 
 ---
 
-### SUBAGENT_ISSUE_OTHER
-
-<issue_other_prompt>
+### ISSUE_OTHER
 
 ```
-You are a GitHub issue analyzer for the repository {REPO}.
+You are analyzing issue #{number} for {REPO}.
 
 ITEM:
 - Issue #{number}: {title}
@@ -274,209 +345,195 @@ ITEM:
 - Body: {body}
 - Comments: {comments_summary}
 
-YOUR JOB:
-Quickly assess this issue and report:
-  ACTION: ASSESSED
-  TYPE_GUESS: [QUESTION | BUG | FEATURE | DISCUSSION | META | STALE]
-  SUMMARY: [1-2 sentence summary]
-  NEEDS_ATTENTION: [YES | NO]
-  SUGGESTED_LABEL: [if any]
+TASK: Assess and write report to {REPORT_DIR}/issue-{number}.md
 
-Do NOT post comments. Do NOT close. Just analyze and report.
+REPORT FORMAT (write this as the file content):
+
+# Issue #{number}: {title}
+**Type:** [QUESTION | BUG | FEATURE | DISCUSSION | META | STALE]
+**Author:** {author} | **Created:** {createdAt}
+
+## Summary
+[1-2 sentences]
+
+## Needs Attention: [YES | NO]
+## Suggested Label: [if any]
+## Recommended Action: [what maintainer should do]
 ```
-
-</issue_other_prompt>
 
 ---
 
-### SUBAGENT_PR_BUGFIX
-
-<pr_bugfix_prompt>
+### PR_BUGFIX
 
 ```
-You are a GitHub PR reviewer for the repository {REPO}.
+You are reviewing PR #{number} for {REPO}.
 
 ITEM:
 - PR #{number}: {title}
 - Author: {author}
-- Base: {baseRefName}
-- Head: {headRefName}
-- Draft: {isDraft}
-- Mergeable: {mergeable}
-- Review Decision: {reviewDecision}
-- CI Status: {statusCheckRollup_summary}
+- Base: {baseRefName} <- Head: {headRefName}
+- Draft: {isDraft} | Mergeable: {mergeable}
+- Review: {reviewDecision} | CI: {statusCheckRollup_summary}
 - Body: {body}
 
-YOUR JOB:
-1. Fetch PR details (DO NOT checkout the branch — read-only analysis):
-   gh pr view {number} --repo {REPO} --json files,reviews,comments,statusCheckRollup,reviewDecision
-2. Read the changed files list. For each changed file, use `gh api repos/{REPO}/pulls/{number}/files` to see the diff.
-3. Search the codebase to understand what the PR is fixing and whether the fix is correct.
-4. Evaluate merge safety:
+TASK:
+1. Fetch PR details (READ-ONLY): gh pr view {number} --repo {REPO} --json files,reviews,comments,statusCheckRollup,reviewDecision
+2. Read diff: gh api repos/{REPO}/pulls/{number}/files
+3. Search codebase to verify fix correctness.
+4. Write report to {REPORT_DIR}/pr-{number}.md
 
-MERGE CONDITIONS (ALL must be true for auto-merge):
-  a. CI status checks: ALL passing (no failures, no pending)
-  b. Review decision: APPROVED
-  c. The fix is clearly correct — addresses an obvious, unambiguous bug
-  d. No risky side effects (no architectural changes, no breaking changes)
-  e. Not a draft PR
-  f. Mergeable state is clean (no conflicts)
+REPORT FORMAT (write this as the file content):
 
-IF ALL MERGE CONDITIONS MET:
-  Step 1: Merge the PR:
-    gh pr merge {number} --repo {REPO} --squash --auto
-  Step 2: Report back with:
-    ACTION: MERGED
-    FIX_SUMMARY: [what bug was fixed and how]
-    FILES_CHANGED: [list of files]
-    RISK: NONE
+# PR #{number}: {title}
+**Type:** Bugfix | **Author:** {author}
+**Base:** {baseRefName} <- {headRefName} | **Draft:** {isDraft}
 
-IF ANY CONDITION NOT MET:
-  Report back with:
-    ACTION: NEEDS_HUMAN_DECISION
-    FIX_SUMMARY: [what the PR does]
-    WHAT_IT_FIXES: [the bug or issue it addresses]
-    CI_STATUS: [PASS | FAIL | PENDING — list any failures]
-    REVIEW_STATUS: [APPROVED | CHANGES_REQUESTED | PENDING | NONE]
-    MISSING: [what's preventing auto-merge — be specific]
-    RISK_ASSESSMENT: [what could go wrong]
-    AMBIGUOUS_PARTS: [anything that needs human judgment]
-    RECOMMENDED_ACTION: [what the maintainer should do]
+## Fix Summary
+[What bug, how fixed - with permalinks to changed code]
 
-ABSOLUTE RULES:
-- NEVER run `git checkout`, `git fetch`, `git pull`, or `git switch`. READ-ONLY via gh CLI and API.
-- NEVER checkout the PR branch. NEVER. Use `gh api` and `gh pr view` only.
-- Only merge if you are 100% certain ALL conditions are met. When in doubt, report instead.
-- The [sisyphus-bot] prefix is MANDATORY on any comment you post.
+## Code Review
+
+### Correctness
+[Is fix correct? Root cause addressed? Evidence with permalinks]
+
+### Side Effects
+[Risky changes, breaking changes - with permalinks if any]
+
+### Code Quality
+[Style, patterns, test coverage]
+
+## Merge Readiness
+
+| Check | Status |
+|-------|--------|
+| CI | [PASS / FAIL / PENDING] |
+| Review | [APPROVED / CHANGES_REQUESTED / PENDING / NONE] |
+| Mergeable | [YES / NO / CONFLICTED] |
+| Draft | [YES / NO] |
+| Correctness | [VERIFIED / CONCERNS / UNCLEAR] |
+| Risk | [NONE / LOW / MEDIUM / HIGH] |
+
+## Files Changed
+[List with brief descriptions]
+
+## Recommended Action: [MERGE | REQUEST_CHANGES | NEEDS_REVIEW | WAIT]
+[Reasoning with evidence]
+
+---
+NEVER merge. NEVER comment. NEVER review. Write to file ONLY.
 ```
-
-</pr_bugfix_prompt>
 
 ---
 
-### SUBAGENT_PR_OTHER
-
-<pr_other_prompt>
+### PR_OTHER
 
 ```
-You are a GitHub PR reviewer for the repository {REPO}.
+You are reviewing PR #{number} for {REPO}.
 
 ITEM:
 - PR #{number}: {title}
 - Author: {author}
-- Base: {baseRefName}
-- Head: {headRefName}
-- Draft: {isDraft}
-- Mergeable: {mergeable}
-- Review Decision: {reviewDecision}
-- CI Status: {statusCheckRollup_summary}
+- Base: {baseRefName} <- Head: {headRefName}
+- Draft: {isDraft} | Mergeable: {mergeable}
+- Review: {reviewDecision} | CI: {statusCheckRollup_summary}
 - Body: {body}
 
-YOUR JOB:
-1. Fetch PR details (READ-ONLY — no checkout):
-   gh pr view {number} --repo {REPO} --json files,reviews,comments,statusCheckRollup,reviewDecision
-2. Read the changed files via `gh api repos/{REPO}/pulls/{number}/files`.
-3. Assess the PR and report:
+TASK:
+1. Fetch PR details (READ-ONLY): gh pr view {number} --repo {REPO} --json files,reviews,comments,statusCheckRollup,reviewDecision
+2. Read diff: gh api repos/{REPO}/pulls/{number}/files
+3. Write report to {REPORT_DIR}/pr-{number}.md
 
-  ACTION: PR_ASSESSED
-  TYPE: [FEATURE | REFACTOR | DOCS | CHORE | TEST | OTHER]
-  SUMMARY: [what this PR does in 2-3 sentences]
-  CI_STATUS: [PASS | FAIL | PENDING]
-  REVIEW_STATUS: [APPROVED | CHANGES_REQUESTED | PENDING | NONE]
-  FILES_CHANGED: [count and key files]
-  RISK_LEVEL: [LOW | MEDIUM | HIGH]
-  ALIGNMENT: [does this fit the project direction? YES | NO | UNCLEAR]
-  BLOCKERS: [anything preventing merge]
-  RECOMMENDED_ACTION: [MERGE | REQUEST_CHANGES | NEEDS_REVIEW | CLOSE | WAIT]
-  NOTES: [any observations for the maintainer]
+REPORT FORMAT (write this as the file content):
 
-ABSOLUTE RULES:
-- NEVER run `git checkout`, `git fetch`, `git pull`, or `git switch`. READ-ONLY.
-- NEVER checkout the PR branch. Use `gh api` and `gh pr view` only.
-- Do NOT merge non-bugfix PRs automatically. Report only.
+# PR #{number}: {title}
+**Type:** [FEATURE | REFACTOR | DOCS | CHORE | TEST | OTHER]
+**Author:** {author}
+**Base:** {baseRefName} <- {headRefName} | **Draft:** {isDraft}
+
+## Summary
+[2-3 sentences with permalinks to key changes]
+
+## Status
+
+| Check | Status |
+|-------|--------|
+| CI | [PASS / FAIL / PENDING] |
+| Review | [APPROVED / CHANGES_REQUESTED / PENDING / NONE] |
+| Mergeable | [YES / NO / CONFLICTED] |
+| Risk | [LOW / MEDIUM / HIGH] |
+| Alignment | [YES / NO / UNCLEAR] |
+
+## Files Changed
+[Count and key files]
+
+## Blockers
+[If any]
+
+## Recommended Action: [MERGE | REQUEST_CHANGES | NEEDS_REVIEW | CLOSE | WAIT]
+[Reasoning]
+
+---
+NEVER merge. NEVER comment. NEVER review. Write to file ONLY.
 ```
 
-</pr_other_prompt>
+---
+
+## Phase 4: Collect & Update
+
+Poll `background_output()` per task. As each completes:
+1. Parse report.
+2. `TaskUpdate(id=task_id, status="completed", description=REPORT_SUMMARY)`
+3. Stream to user immediately.
 
 ---
 
-## PHASE 4: COLLECT RESULTS & UPDATE TASKS
+## Phase 5: Final Summary
 
-<collection>
-Poll `background_output()` for each spawned task. As each completes:
-
-1. Parse the subagent's report.
-2. Update the corresponding TaskCreate entry:
-   - `TaskUpdate(id=task_id, status="completed", description=FULL_REPORT_TEXT)`
-3. Stream the result to the user immediately — do not wait for all to finish.
-
-Track counters:
-- issues_answered (commented + closed)
-- bugs_confirmed
-- bugs_not_a_bug
-- prs_merged
-- prs_needs_decision
-- features_assessed
-</collection>
-
----
-
-## PHASE 5: FINAL SUMMARY
-
-After all background tasks complete, produce a summary:
+Write to `{REPORT_DIR}/SUMMARY.md` AND display to user:
 
 ```markdown
-# GitHub Triage Report — {REPO}
+# GitHub Triage Report - {REPO}
 
-**Date:** {date}
+**Date:** {date} | **Commit:** {COMMIT_SHA}
 **Items Processed:** {total}
+**Report Directory:** {REPORT_DIR}
 
 ## Issues ({issue_count})
-| Action | Count |
-|--------|-------|
-| Answered & Closed | {issues_answered} |
-| Bug Confirmed | {bugs_confirmed} |
-| Not A Bug (explained) | {bugs_not_a_bug} |
-| Feature Assessed | {features_assessed} |
-| Needs Manual Attention | {needs_manual} |
+| Category | Count |
+|----------|-------|
+| Bug Confirmed | {n} |
+| Bug Already Fixed | {n} |
+| Not A Bug | {n} |
+| Needs Investigation | {n} |
+| Question Analyzed | {n} |
+| Feature Assessed | {n} |
+| Other | {n} |
 
 ## PRs ({pr_count})
-| Action | Count |
-|--------|-------|
-| Auto-Merged (safe bugfix) | {prs_merged} |
-| Needs Human Decision | {prs_needs_decision} |
-| Assessed (non-bugfix) | {prs_assessed} |
+| Category | Count |
+|----------|-------|
+| Bugfix Reviewed | {n} |
+| Other PR Reviewed | {n} |
 
-## Items Requiring Your Attention
-[List each item that needs human decision with its report summary]
+## Items Requiring Attention
+[Each item: number, title, verdict, 1-line summary, link to report file]
+
+## Report Files
+[All generated files with paths]
 ```
 
 ---
 
-## ANTI-PATTERNS
+## Anti-Patterns
 
 | Violation | Severity |
 |-----------|----------|
-| Using any category other than `free` | CRITICAL |
+| ANY GitHub mutation (comment/close/merge/review/label/edit) | **CRITICAL** |
+| Claim without permalink | **CRITICAL** |
+| Using category other than `quick` | CRITICAL |
 | Batching multiple items into one task | CRITICAL |
-| Using `run_in_background=false` | CRITICAL |
-| Subagent running `git checkout` on a PR branch | CRITICAL |
-| Posting comment without `[sisyphus-bot]` prefix | CRITICAL |
-| Merging a PR that doesn't meet ALL 6 conditions | CRITICAL |
-| Closing a bug issue (only comment, never close bugs) | HIGH |
-| Guessing at answers without codebase evidence | HIGH |
-| Not recording results via TaskCreate/TaskUpdate | HIGH |
-
----
-
-## QUICK START
-
-When invoked:
-
-1. `TaskCreate` for the overall triage job
-2. Fetch all open issues + PRs via gh CLI (paginate if needed)
-3. Classify each item (ISSUE_QUESTION, ISSUE_BUG, ISSUE_FEATURE, PR_BUGFIX, etc.)
-4. For EACH item: `TaskCreate` + `task(category="free", run_in_background=true, load_skills=[], prompt=...)`
-5. Poll `background_output()` — stream results as they arrive
-6. `TaskUpdate` each task with the subagent's findings
-7. Produce final summary report
+| `run_in_background=false` | CRITICAL |
+| `git checkout` on PR branch | CRITICAL |
+| Guessing without codebase evidence | HIGH |
+| Not writing report to `{REPORT_DIR}` | HIGH |
+| Using branch name instead of commit SHA in permalink | HIGH |

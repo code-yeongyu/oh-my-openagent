@@ -3,7 +3,7 @@ import { tool, type ToolDefinition } from "@opencode-ai/plugin"
 import { TOOL_DESCRIPTION_NO_SKILLS, TOOL_DESCRIPTION_PREFIX } from "./constants"
 import type { SkillArgs, SkillInfo, SkillLoadOptions } from "./types"
 import type { LoadedSkill } from "../../features/opencode-skill-loader"
-import { getAllSkills, extractSkillTemplate } from "../../features/opencode-skill-loader/skill-content"
+import { getAllSkills, extractSkillTemplate, clearSkillCache } from "../../features/opencode-skill-loader/skill-content"
 import { injectGitMasterConfig } from "../../features/opencode-skill-loader/skill-content"
 import type { SkillMcpManager, SkillMcpClientInfo, SkillMcpServerContext } from "../../features/skill-mcp-manager"
 import type { Tool, Resource, Prompt } from "@modelcontextprotocol/sdk/types.js"
@@ -45,23 +45,24 @@ function formatCombinedDescription(skills: SkillInfo[], commands: CommandInfo[])
 
   const allItems: string[] = []
 
-  // Sort and add skills first (skills before commands)
+  // Skills rendered as command items (skills are also slash-invocable)
   if (skills.length > 0) {
     const sortedSkills = [...skills].sort((a, b) => {
       const priorityA = scopePriority[a.scope] || 0
       const priorityB = scopePriority[b.scope] || 0
-      return priorityB - priorityA // Higher priority first
+      return priorityB - priorityA
     })
     sortedSkills.forEach(skill => {
       const parts = [
-        "  <skill>",
-        `    <name>${skill.name}</name>`,
+        "  <command>",
+        `    <name>/${skill.name}</name>`,
         `    <description>${skill.description}</description>`,
+        `    <scope>${skill.scope}</scope>`,
       ]
       if (skill.compatibility) {
         parts.push(`    <compatibility>${skill.compatibility}</compatibility>`)
       }
-      parts.push("  </skill>")
+      parts.push("  </command>")
       allItems.push(parts.join("\n"))
     })
   }
@@ -183,24 +184,22 @@ async function formatMcpCapabilities(
 }
 
 export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition {
-  let cachedSkills: LoadedSkill[] | null = null
-  let cachedCommands: CommandInfo[] | null = options.commands ?? null
   let cachedDescription: string | null = null
 
   const getSkills = async (): Promise<LoadedSkill[]> => {
-    if (options.skills) return options.skills
-    if (cachedSkills) return cachedSkills
-    cachedSkills = await getAllSkills({disabledSkills: options?.disabledSkills})
-    return cachedSkills
+    clearSkillCache()
+    const discovered = await getAllSkills({disabledSkills: options?.disabledSkills})
+    if (!options.skills) return discovered
+    const discoveredNames = new Set(discovered.map(s => s.name))
+    const extras = options.skills.filter(s => !discoveredNames.has(s.name))
+    return [...discovered, ...extras]
   }
 
   const getCommands = (): CommandInfo[] => {
-    if (cachedCommands) return cachedCommands
-    cachedCommands = discoverCommandsSync(undefined, {
+    return discoverCommandsSync(undefined, {
       pluginsEnabled: options.pluginsEnabled,
       enabledPluginsOverride: options.enabledPluginsOverride,
     })
-    return cachedCommands
   }
 
   const buildDescription = async (): Promise<string> => {
