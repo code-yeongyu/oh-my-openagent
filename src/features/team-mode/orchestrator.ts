@@ -92,7 +92,7 @@ export async function launchTeamWorkers(
         teamStatePath: input.teamStatePath,
         worktreePath: input.worktreePath,
       }),
-      agent: "atlas",
+      agent: "sisyphus",
       parentSessionID: input.sessionID,
       parentMessageID: input.parentMessageID ?? "teammode",
       parentAgent: "atlas",

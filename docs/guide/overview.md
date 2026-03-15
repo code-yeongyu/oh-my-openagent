@@ -146,7 +146,7 @@ Press **Tab** to enter Prometheus mode.
 
 Prometheus interviews you like a real engineer. Asks clarifying questions. Identifies scope and ambiguities. Builds a detailed plan before a single line of code is touched.
 
-Then run `/start-work` and Atlas takes over for the normal execution path. When the work needs coordinated worker panes, run `/start-teammode` and Atlas enters the tmux-first team runtime with persisted state, worker orchestration, and verification gates.
+Then run `/start-work` and Atlas takes over for the normal execution path. When the work needs coordinated worker panes, run `/start-teammode` and Atlas enters the tmux-first team runtime with persisted state, worker orchestration, and verification gates. In team mode Atlas stays the orchestrator, while each spawned tmux pane runs its own native OpenCode session using Sisyphus as the worker agent rather than an OMX worker bootstrap.
 
 Use Prometheus for multi-day projects, critical production changes, complex refactoring, or when you want a documented decision trail.
 

@@ -473,11 +473,15 @@ Uses the Atlas agent to execute a prepared plan in the current session, with bou
 
 Uses Atlas to initialize the persisted team-runtime state, bootstrap coordinated workers, and run monitor and verification loops for multi-worker execution.
 
+After Atlas enters team mode, each spawned tmux worker pane must host a native OpenCode session rather than an OMX team-worker bootstrap. Atlas remains the conductor for plan execution and runtime state, while the worker session itself should run the normal OpenCode agent flow with Sisyphus as the execution identity inside that pane.
+
 **Notes**:
 
 - Keeps `/start-work` as the normal single-session execution path
 - Reuses Prometheus plan discovery and Atlas execution entry, but signals the team-runtime intent explicitly
 - Intended for multi-worker orchestration flows with persisted runtime state and guarded shutdown behavior
+- Worker panes must be real OpenCode-backed sessions attached to tmux panes, not codex-style worker-runtime panes
+- The team-runtime contract should prove four things: Atlas is the `/start-teammode` entry agent, spawned panes are OpenCode sessions, the worker agent identity is Sisyphus, and no OMX-specific worker bootstrap runs inside those panes
 
 ### /stop-continuation
 

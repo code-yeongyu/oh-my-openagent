@@ -18,6 +18,7 @@ import * as tmux from "../../shared/tmux"
 describe("start-teammode hook", () => {
   let testDir: string
   let sisyphusDir: string
+  let insideTmuxSpy: ReturnType<typeof spyOn>
 
   const startTeammodePrompt = (body: string): string =>
     `You are starting Atlas Team Mode.\n<session-context>Session ID: $SESSION_ID\nTimestamp: $TIMESTAMP</session-context>\n<user-request>${body}</user-request>`
@@ -53,9 +54,11 @@ describe("start-teammode hook", () => {
     sisyphusDir = join(testDir, ".sisyphus")
     mkdirSync(sisyphusDir, { recursive: true })
     clearBoulderState(testDir)
+    insideTmuxSpy = spyOn(tmux, "isInsideTmux").mockReturnValue(true)
   })
 
   afterEach(() => {
+    insideTmuxSpy.mockRestore()
     clearBoulderState(testDir)
     if (existsSync(testDir)) {
       rmSync(testDir, { recursive: true, force: true })
@@ -90,8 +93,14 @@ describe("start-teammode hook", () => {
     expect(output.parts[0].text).not.toContain("$TIMESTAMP")
     expect(backgroundManager.launch).toHaveBeenCalledTimes(3)
     for (const call of backgroundManager.launch.mock.calls) {
+      expect(call[0]?.agent).toBe("sisyphus")
+      expect(call[0]?.parentAgent).toBe("atlas")
       expect(call[0]?.forceTmuxPane).toBe(true)
       expect(call[0]?.strictTmuxAttach).toBe(true)
+      expect(call[0]?.prompt).toContain("Team state path:")
+      expect(call[0]?.prompt).not.toContain("Atlas team-mode worker")
+      expect(call[0]?.prompt).not.toContain("Use explicit claim and transition primitives")
+      expect(call[0]?.prompt).not.toContain("Use mailbox state for leader-mediated coordination")
     }
     expect(boulderState?.execution_mode).toBe("teammode")
     expect(boulderState?.active_team_id).toBeTruthy()
@@ -118,7 +127,7 @@ describe("start-teammode hook", () => {
     mkdirSync(plansDir, { recursive: true })
     writeFileSync(join(plansDir, "plan-a.md"), "# Plan A\n- [ ] Task 1")
 
-    const insideTmuxSpy = spyOn(tmux, "isInsideTmux").mockReturnValue(false)
+    insideTmuxSpy.mockReturnValue(false)
     const backgroundManager = createBackgroundManager()
     const hook = createStartTeammodeHook(createMockPluginInput(), backgroundManager)
     const output = { parts: [{ type: "text", text: startTeammodePrompt("") }] }
@@ -128,7 +137,6 @@ describe("start-teammode hook", () => {
     expect(output.parts[0].text).toContain("Team Mode Requires tmux")
     expect(backgroundManager.launch).toHaveBeenCalledTimes(0)
     expect(readBoulderState(testDir)).toBeNull()
-    insideTmuxSpy.mockRestore()
   })
 
   test("should resume active team mode from a new session id", async () => {

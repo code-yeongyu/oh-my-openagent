@@ -420,6 +420,15 @@ Atlas is automatically activated when you run `/start-work`. You don't need to m
 
 Use `/start-teammode` when the plan is approved and you want Atlas to enter the dedicated team runtime. In that mode Atlas initializes persisted team state, creates the tmux pane topology, bootstraps workers, monitors claims and progress, rebalances work when safe, and enforces the stronger multi-worker verification loop described in the OmO team-mode design.
 
+The important boundary is:
+
+- **Atlas remains the team-mode orchestrator**
+- **Each worker pane is a native OpenCode session**
+- **The worker agent inside those panes is Sisyphus**
+- **The team runtime does not switch those panes into OMX worker-runtime or Codex-style worker bootstrap semantics**
+
+This keeps `/start-teammode` distinct from `/start-work` without changing `/start-work`'s normal single-session Atlas flow.
+
 ### Hephaestus vs Sisyphus + ultrawork
 
 **Quick Comparison:**
