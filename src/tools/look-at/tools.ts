@@ -3,10 +3,11 @@ import { pathToFileURL } from "node:url"
 import { tool, type PluginInput, type ToolDefinition } from "@opencode-ai/plugin"
 import { LOOK_AT_DESCRIPTION, MULTIMODAL_LOOKER_AGENT } from "./constants"
 import type { LookAtArgs } from "./types"
-import { log, promptSyncWithModelSuggestionRetry } from "../../shared"
-import { extractLatestAssistantText } from "./assistant-message-extractor"
+import { log, promptWithModelSuggestionRetry } from "../../shared"
+import { extractLatestAssistantOutcome } from "./assistant-message-extractor"
 import type { LookAtArgsWithAlias } from "./look-at-arguments"
 import { normalizeArgs, validateArgs } from "./look-at-arguments"
+import { waitForLookAtSessionResult } from "./session-poller"
 import {
   extractBase64Data,
   inferMimeTypeFromBase64,
@@ -39,6 +40,22 @@ function getTemporaryConversionPath(error: unknown): string | null {
 }
 
 export { normalizeArgs, validateArgs } from "./look-at-arguments"
+
+function formatLookAtFailure(args: {
+  promptError?: unknown
+  outcome?: ReturnType<typeof extractLatestAssistantOutcome>
+  sessionID: string
+}): string {
+  const errorMessage = args.promptError instanceof Error ? args.promptError.message : args.promptError ? String(args.promptError) : null
+  const outcomeError = args.outcome?.errorName
+    ? `${args.outcome.errorName}${args.outcome.errorMessage ? `: ${args.outcome.errorMessage}` : ""}`
+    : null
+
+  const details = [outcomeError, errorMessage].filter(Boolean).join(" | ")
+  return details.length > 0
+    ? `Error: multimodal-looker failed for session ${args.sessionID}: ${details}`
+    : `Error: No response from multimodal-looker agent (session ${args.sessionID})`
+}
 
 export function createLookAt(ctx: PluginInput): ToolDefinition {
   return tool({
@@ -170,53 +187,81 @@ Original error: ${createResult.error}`
       log(`[look_at] Created session: ${sessionID}`)
 
       const { agentModel, agentVariant } = await resolveMultimodalLookerAgentMetadata(ctx)
+      const promptBody = {
+        agent: MULTIMODAL_LOOKER_AGENT,
+        tools: {
+          task: false,
+          call_omo_agent: false,
+          look_at: false,
+          read: false,
+        },
+        parts: [
+          { type: "text", text: prompt },
+          filePart,
+        ],
+        ...(agentModel ? { model: { providerID: agentModel.providerID, modelID: agentModel.modelID } } : {}),
+        ...(agentVariant ? { variant: agentVariant } : {}),
+      }
 
       log(`[look_at] Sending prompt with ${isBase64Input ? "base64 image" : "file"} to session ${sessionID}`)
+      let promptError: unknown = null
+      let watchedMessages: unknown[] | null = null
+      let watchedOutcome: ReturnType<typeof extractLatestAssistantOutcome> | null = null
       try {
-        await promptSyncWithModelSuggestionRetry(ctx.client, {
+        await promptWithModelSuggestionRetry(ctx.client, {
           path: { id: sessionID },
-          body: {
-            agent: MULTIMODAL_LOOKER_AGENT,
-            tools: {
-              task: false,
-              call_omo_agent: false,
-              look_at: false,
-              read: false,
-            },
-            parts: [
-              { type: "text", text: prompt },
-              filePart,
-            ],
-            ...(agentModel ? { model: { providerID: agentModel.providerID, modelID: agentModel.modelID } } : {}),
-            ...(agentVariant ? { variant: agentVariant } : {}),
-          },
+          signal: toolContext.abort,
+          body: promptBody,
         })
-      } catch (promptError) {
-        log(`[look_at] Prompt error (ignored, will still fetch messages):`, promptError)
+      } catch (error) {
+        log(`[look_at] Prompt error (will inspect session outcome):`, error)
+        promptError = error
+      }
+
+      try {
+        const sessionResult = await waitForLookAtSessionResult(ctx.client as any, sessionID, {
+          timeoutMs: 120_000,
+          abortSignal: toolContext.abort,
+          allowStableIdleWithoutActivity: Boolean(promptError),
+        })
+        watchedMessages = sessionResult.messages
+        watchedOutcome = sessionResult.outcome
+      } catch (pollError) {
+        log(`[look_at] Session watcher error for session ${sessionID}:`, pollError)
+        if (!promptError) {
+          promptError = pollError
+        }
       }
 
       log(`[look_at] Fetching messages from session ${sessionID}...`)
 
-      const messagesResult = await ctx.client.session.messages({
-        path: { id: sessionID },
-      })
+      const messages = watchedMessages ?? await (async () => {
+        const messagesResult = await ctx.client.session.messages({
+          path: { id: sessionID },
+        })
 
-      if (messagesResult.error) {
-        log(`[look_at] Messages error:`, messagesResult.error)
-        return `Error: Failed to get messages: ${messagesResult.error}`
-      }
+        if (messagesResult.error) {
+          log(`[look_at] Messages error:`, messagesResult.error)
+          throw new Error(`Failed to get messages: ${messagesResult.error}`)
+        }
 
-      const messages = messagesResult.data
+        return Array.isArray(messagesResult.data) ? messagesResult.data : []
+      })()
+
       log(`[look_at] Got ${messages.length} messages`)
 
-      const responseText = extractLatestAssistantText(messages)
-      if (!responseText) {
-        log("[look_at] No assistant message found")
-        return "Error: No response from multimodal-looker agent"
+      const outcome = watchedOutcome ?? extractLatestAssistantOutcome(messages)
+      if (!outcome.text) {
+        log("[look_at] No assistant text found", {
+          hasAssistant: outcome.hasAssistant,
+          completed: outcome.completed,
+          errorName: outcome.errorName,
+        })
+        return formatLookAtFailure({ promptError, outcome, sessionID })
       }
 
-        log(`[look_at] Got response, length: ${responseText.length}`)
-        return responseText
+        log(`[look_at] Got response, length: ${outcome.text.length}`)
+        return outcome.text
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error)
         log(`[look_at] Unexpected error analyzing ${sourceDescription}:`, error)
