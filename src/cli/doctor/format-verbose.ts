@@ -36,8 +36,8 @@ export function formatVerbose(result: DoctorResult): string {
   if (tools.lspServers.length === 0) {
     lines.push(`  ${formatStatusSymbol("warn")} LSP         none detected`)
   } else {
-    const allExts = [...new Set(tools.lspServers.flatMap((s) => s.extensions))].sort()
-    lines.push(`  ${formatStatusSymbol("pass")} LSP         ${tools.lspServers.length} server${tools.lspServers.length === 1 ? "" : "s"} (${allExts.join(", ")})`)
+    const count = tools.lspServers.length
+    lines.push(`  ${formatStatusSymbol("pass")} LSP         ${count} server${count === 1 ? "" : "s"}`)
     for (const server of tools.lspServers) {
       lines.push(`${" ".repeat(20)}${server.id} (${server.extensions.join(", ")})`)
     }
