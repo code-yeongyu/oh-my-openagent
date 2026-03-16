@@ -1,7 +1,11 @@
 export type SplitDirection = "-h" | "-v"
 
+export function isInsideTmuxEnvironment(environment: Record<string, string | undefined>): boolean {
+  return Boolean(environment.TMUX)
+}
+
 export function isInsideTmux(): boolean {
-	return Boolean(process.env.TMUX)
+	return isInsideTmuxEnvironment(process.env)
 }
 
 export function getCurrentPaneId(): string | undefined {
