@@ -1,6 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { HOOK_NAME, NON_INTERACTIVE_ENV, SHELL_COMMAND_PATTERNS } from "./constants"
-import { log, buildEnvPrefix } from "../../shared"
+import { HOOK_NAME, SHELL_COMMAND_PATTERNS } from "./constants"
+import { log } from "../../shared"
 
 export * from "./constants"
 export * from "./detector"
@@ -45,28 +45,20 @@ export function createNonInteractiveEnvHook(_ctx: PluginInput) {
         return
       }
 
-      // NOTE: We intentionally removed the isNonInteractive() check here.
-      // Even when OpenCode runs in a TTY, the agent cannot interact with
-      // spawned bash processes. Git commands like `git rebase --continue`
-      // would open editors (vim/nvim) that hang forever.
-      // The env vars (GIT_EDITOR=:, EDITOR=:, etc.) must ALWAYS be injected
-      // for git commands to prevent interactive prompts.
+      // Minimal env prefix: only the vars that prevent git from hanging.
+      // Previous approach used ALL NON_INTERACTIVE_ENV vars via `export`,
+      // creating a long prefix that polluted tool output and confused models
+      // into echoing it back as text (#2599).
+      const GIT_ENV_PREFIX = "GIT_EDITOR=: GIT_PAGER=cat GIT_TERMINAL_PROMPT=0"
 
-      // The bash tool always runs in a Unix-like shell (bash/sh), even on Windows
-      // (via Git Bash, WSL, etc.), so always use unix export syntax.
-      const envPrefix = buildEnvPrefix(NON_INTERACTIVE_ENV, "unix")
-      
-      // Check if the command already starts with the prefix to avoid stacking.
-      // This maintains the non-interactive behavior and makes the operation idempotent.
-      if (command.trim().startsWith(envPrefix.trim())) {
+      if (command.includes("GIT_EDITOR=:")) {
         return
       }
 
-      output.args.command = `${envPrefix} ${command}`
+      output.args.command = `${GIT_ENV_PREFIX} ${command}`
 
-      log(`[${HOOK_NAME}] Prepended non-interactive env vars to git command`, {
+      log(`[${HOOK_NAME}] Prepended git env vars`, {
         sessionID: input.sessionID,
-        envPrefix,
       })
     },
   }
