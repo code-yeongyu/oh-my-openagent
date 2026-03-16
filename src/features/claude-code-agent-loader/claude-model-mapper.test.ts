@@ -75,6 +75,10 @@ describe("mapClaudeModelToOpenCode", () => {
       expect(mapClaudeModelToOpenCode("anthropic/claude-sonnet-4-6")).toEqual({ providerID: "anthropic", modelID: "claude-sonnet-4-6" })
     })
 
+    it("#when called with anthropic/claude-3.5-sonnet #then normalizes dots before splitting into object format", () => {
+      expect(mapClaudeModelToOpenCode("anthropic/claude-3.5-sonnet")).toEqual({ providerID: "anthropic", modelID: "claude-3-5-sonnet" })
+    })
+
     it("#when called with openai/gpt-5.2 #then splits into object format", () => {
       expect(mapClaudeModelToOpenCode("openai/gpt-5.2")).toEqual({ providerID: "openai", modelID: "gpt-5.2" })
     })
