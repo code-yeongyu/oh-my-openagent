@@ -82,10 +82,11 @@ describe("env-expander", () => {
     })
 
     it("supports ~/homedir expansion", () => {
-      const homeFile = join(homedir(), "test-file.txt")
+      const testFileName = `.env-expander-test-${Date.now()}.txt`
+      const homeFile = join(homedir(), testFileName)
       writeFileSync(homeFile, "home-secret")
       try {
-        const result = expandEnvVars("{file:~/test-file.txt}")
+        const result = expandEnvVars(`{file:~/${testFileName}}`)
         expect(result).toBe("home-secret")
       } finally {
         rmSync(homeFile, { force: true })
@@ -97,6 +98,12 @@ describe("env-expander", () => {
       const relativePath = `{file:${TEST_DIR.split('/').pop()}/secret-token.txt}`
       const result = expandEnvVars(relativePath, baseDir)
       expect(result).toBe("secret-api-key-123")
+    })
+
+    it("preserves $ patterns in file content (no replacement corruption)", () => {
+      writeFileSync(join(TEST_DIR, "dollar-patterns.txt"), "secret-$$-and-$&-and-$1")
+      const result = expandEnvVars(`{file:${TEST_DIR}/dollar-patterns.txt}`)
+      expect(result).toBe("secret-$$-and-$&-and-$1") // All $ patterns preserved
     })
   })
 

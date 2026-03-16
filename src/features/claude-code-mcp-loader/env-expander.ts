@@ -44,7 +44,7 @@ export function expandEnvVars(value: string, baseDir?: string): string {
   let result = envExpanded
   for (const { placeholder, filePath } of fileMatches) {
     const content = readFileTemplate(filePath, baseDir)
-    result = result.replace(placeholder, content)
+    result = result.replace(placeholder, () => content)
   }
 
   return result
