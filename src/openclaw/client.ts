@@ -6,7 +6,7 @@
  * Usage:
  *   wakeOpenClaw("session-start", { sessionId, projectPath: directory }, config);
  *
- * Activation requires OMO_OPENCLAW=1 env var and config in pluginConfig.openclaw.
+ * Activation requires OMX_OPENCLAW=1 env var and config in pluginConfig.openclaw.
  */
 
 import {
@@ -29,7 +29,7 @@ import { execSync } from "child_process";
 import { basename } from "path";
 
 /** Whether debug logging is enabled */
-const DEBUG = process.env.OMO_OPENCLAW_DEBUG === "1";
+const DEBUG = process.env.OMX_OPENCLAW_DEBUG === "1";
 
 // Helper for tmux session
 function getCurrentTmuxSession(): string | undefined {
@@ -138,8 +138,8 @@ export async function wakeOpenClaw(
   config?: OpenClawConfig
 ): Promise<OpenClawResult | null> {
   try {
-    // Activation gate: only active when OMO_OPENCLAW=1
-    if (process.env.OMO_OPENCLAW !== "1") {
+    // Activation gate: only active when OMX_OPENCLAW=1
+    if (process.env.OMX_OPENCLAW !== "1") {
       return null;
     }
 

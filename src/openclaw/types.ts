@@ -36,7 +36,7 @@ export interface OpenClawCommandGatewayConfig {
   command: string;
   /**
    * Per-command timeout in ms.
-   * Precedence: gateway timeout > OMO_OPENCLAW_COMMAND_TIMEOUT_MS > default (5000ms).
+   * Precedence: gateway timeout > OMX_OPENCLAW_COMMAND_TIMEOUT_MS > default (5000ms).
    * Runtime clamps to safe bounds.
    */
   timeout?: number;

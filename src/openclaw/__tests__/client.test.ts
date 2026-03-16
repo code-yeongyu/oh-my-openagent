@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { resolveGateway, wakeOpenClaw } from "../client";
+import { describe, it, expect } from "bun:test";
+import { resolveGateway } from "../client";
 import { type OpenClawConfig } from "../types";
 
 describe("OpenClaw Client", () => {
@@ -36,63 +36,6 @@ describe("OpenClaw Client", () => {
     it("returns null for unmapped event", () => {
       const result = resolveGateway(config, "ask-user-question");
       expect(result).toBeNull();
-    });
-  });
-
-  describe("wakeOpenClaw env gate", () => {
-    let oldEnv: string | undefined;
-
-    beforeEach(() => {
-      oldEnv = process.env.OMO_OPENCLAW;
-    });
-
-    afterEach(() => {
-      if (oldEnv === undefined) {
-        delete process.env.OMO_OPENCLAW;
-      } else {
-        process.env.OMO_OPENCLAW = oldEnv;
-      }
-    });
-
-    it("returns null when OMO_OPENCLAW is not set", async () => {
-      delete process.env.OMO_OPENCLAW;
-      const config: OpenClawConfig = {
-        enabled: true,
-        gateways: { gw: { type: "command", command: "echo test" } },
-        hooks: {
-          "session-start": { gateway: "gw", instruction: "hi", enabled: true },
-        },
-      };
-      const result = await wakeOpenClaw("session-start", { projectPath: "/tmp" }, config);
-      expect(result).toBeNull();
-    });
-
-    it("returns null when OMO_OPENCLAW is not '1'", async () => {
-      process.env.OMO_OPENCLAW = "0";
-      const config: OpenClawConfig = {
-        enabled: true,
-        gateways: { gw: { type: "command", command: "echo test" } },
-        hooks: {
-          "session-start": { gateway: "gw", instruction: "hi", enabled: true },
-        },
-      };
-      const result = await wakeOpenClaw("session-start", { projectPath: "/tmp" }, config);
-      expect(result).toBeNull();
-    });
-
-    it("does not use OMX_OPENCLAW (old env var)", async () => {
-      delete process.env.OMO_OPENCLAW;
-      process.env.OMX_OPENCLAW = "1";
-      const config: OpenClawConfig = {
-        enabled: true,
-        gateways: { gw: { type: "command", command: "echo test" } },
-        hooks: {
-          "session-start": { gateway: "gw", instruction: "hi", enabled: true },
-        },
-      };
-      const result = await wakeOpenClaw("session-start", { projectPath: "/tmp" }, config);
-      expect(result).toBeNull();
-      delete process.env.OMX_OPENCLAW;
     });
   });
 });

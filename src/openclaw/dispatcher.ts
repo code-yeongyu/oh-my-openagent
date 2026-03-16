@@ -5,7 +5,7 @@
  * All calls are non-blocking with timeouts. Failures are swallowed
  * to avoid blocking hooks.
  *
- * SECURITY: Command gateway requires OMO_OPENCLAW_COMMAND=1 opt-in.
+ * SECURITY: Command gateway requires OMX_OPENCLAW_COMMAND=1 opt-in.
  * Command timeout is configurable with safe bounds.
  * Prefers execFile for simple commands; falls back to sh -c only for shell metacharacters.
  */
@@ -105,11 +105,11 @@ export function shellEscapeArg(value: string): string {
 
 /**
  * Resolve command gateway timeout with precedence:
- * gateway timeout > OMO_OPENCLAW_COMMAND_TIMEOUT_MS > default.
+ * gateway timeout > OMX_OPENCLAW_COMMAND_TIMEOUT_MS > default.
  */
 export function resolveCommandTimeoutMs(
   gatewayTimeout?: number,
-  envTimeoutRaw = process.env.OMO_OPENCLAW_COMMAND_TIMEOUT_MS
+  envTimeoutRaw = process.env.OMX_OPENCLAW_COMMAND_TIMEOUT_MS
 ): number {
   const parseFinite = (value: unknown): number | undefined => {
     if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
@@ -189,8 +189,8 @@ export async function wakeGateway(
  * Wake a command-type OpenClaw gateway by executing a shell command.
  *
  * SECURITY REQUIREMENTS:
- * - Requires OMO_OPENCLAW_COMMAND=1 opt-in (separate gate from OMO_OPENCLAW)
- * - Timeout is configurable via gateway.timeout or OMO_OPENCLAW_COMMAND_TIMEOUT_MS
+ * - Requires OMX_OPENCLAW_COMMAND=1 opt-in (separate gate from OMX_OPENCLAW)
+ * - Timeout is configurable via gateway.timeout or OMX_OPENCLAW_COMMAND_TIMEOUT_MS
  *   with safe clamping bounds and backward-compatible default 5000ms
  * - Prefers execFile for simple commands (no metacharacters)
  * - Falls back to sh -c only when metacharacters detected
@@ -206,11 +206,11 @@ export async function wakeCommandGateway(
   variables: Record<string, string | undefined>
 ): Promise<OpenClawResult> {
   // Separate command gateway opt-in gate
-  if (process.env.OMO_OPENCLAW_COMMAND !== "1") {
+  if (process.env.OMX_OPENCLAW_COMMAND !== "1") {
     return {
       gateway: gatewayName,
       success: false,
-      error: "Command gateway disabled (set OMO_OPENCLAW_COMMAND=1 to enable)",
+      error: "Command gateway disabled (set OMX_OPENCLAW_COMMAND=1 to enable)",
     };
   }
 

@@ -63,8 +63,8 @@ describe("OpenClaw Dispatcher", () => {
 
   describe("wakeCommandGateway", () => {
     it("rejects if disabled via env", async () => {
-      const oldEnv = process.env.OMO_OPENCLAW_COMMAND;
-      process.env.OMO_OPENCLAW_COMMAND = "0";
+      const oldEnv = process.env.OMX_OPENCLAW_COMMAND;
+      process.env.OMX_OPENCLAW_COMMAND = "0";
       const config: OpenClawCommandGatewayConfig = {
         type: "command",
         command: "echo hi",
@@ -72,7 +72,7 @@ describe("OpenClaw Dispatcher", () => {
       const result = await wakeCommandGateway("test", config, {});
       expect(result.success).toBe(false);
       expect(result.error).toContain("disabled");
-      process.env.OMO_OPENCLAW_COMMAND = oldEnv;
+      process.env.OMX_OPENCLAW_COMMAND = oldEnv;
     });
   });
 });
