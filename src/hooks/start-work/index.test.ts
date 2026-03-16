@@ -574,5 +574,41 @@ describe("start-work hook", () => {
       expect(output.parts[0].text).toContain("subagent")
       expect(output.parts[0].text).not.toContain("Worktree Setup Required")
     })
+
+    test("should inject structured execution contract when plan metadata defines next tasks", async () => {
+      // given
+      const plansDir = join(testDir, ".sisyphus", "plans")
+      mkdirSync(plansDir, { recursive: true })
+      writeFileSync(join(plansDir, "structured-plan.md"), `# Plan
+
+## Parallel Execution Graph
+
+Wave 1:
+└── Task 1: API
+
+## TODOs
+
+- [ ] 1. API
+
+  **Recommended Agent Profile**:
+  - Category: \`unspecified-high\`
+
+  **Parallelization**: Can Parallel: YES | Wave 1
+`)
+
+      const hook = createStartWorkHook(createMockPluginInput())
+      const output = {
+        parts: [{ type: "text", text: "<session-context></session-context>" }],
+      }
+
+      // when
+      await hook["chat.message"]({ sessionID: "session-123" }, output)
+
+      // then
+      expect(output.parts[0].text).toContain("Structured Execution Contract")
+      expect(output.parts[0].text).toContain("Next Wave")
+      expect(output.parts[0].text).toContain("Wave 1")
+      expect(output.parts[0].text).toContain("category=`unspecified-high`")
+    })
   })
 })

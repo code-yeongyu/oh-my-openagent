@@ -2,6 +2,7 @@ import { statSync } from "node:fs"
 import type { PluginInput } from "@opencode-ai/plugin"
 import {
   readBoulderState,
+  readPlanExecutionSummary,
   writeBoulderState,
   appendSessionId,
   findPrometheusPlans,
@@ -66,6 +67,32 @@ function resolveWorktreeContext(
   }
 }
 
+function buildStructuredExecutionBlock(planPath: string): string {
+  const summary = readPlanExecutionSummary(planPath)
+  if (!summary || summary.nextTasks.length === 0) {
+    return ""
+  }
+
+  const waveLine = summary.nextWaveId ? `**Next Wave**: ${summary.nextWaveId}\n` : ""
+  const taskLines = summary.nextTasks
+    .map((task) => {
+      const tags: string[] = []
+      if (task.category) tags.push(`category=\`${task.category}\``)
+      if (task.section === "final-wave") tags.push("final-wave")
+      return `- \`${task.id}\` ${task.title}${tags.length > 0 ? ` (${tags.join(", ")})` : ""}`
+    })
+    .join("\n")
+
+  return `
+## Structured Execution Contract
+
+Use the parsed plan contract as the default execution guide until verification/blockers prove it stale.
+
+${waveLine}**Next Task Set**:
+${taskLines}
+`
+}
+
 export function createStartWorkHook(ctx: PluginInput) {
   return {
     "chat.message": async (input: StartWorkHookInput, output: StartWorkHookOutput): Promise<void> => {
@@ -123,6 +150,7 @@ All ${progress.total} tasks are done. Create a new plan with: /plan "your task"`
 **Session ID**: ${sessionId}
 **Started**: ${timestamp}
 ${worktreeBlock}
+${buildStructuredExecutionBlock(matchedPlan)}
 
 boulder.json has been created. Read the plan and begin execution.`
           }
@@ -184,6 +212,7 @@ No incomplete plans available. Create a new plan with: /plan "your task"`
 **Sessions**: ${existingState.session_ids.length + 1} (current session appended)
 **Started**: ${existingState.started_at}
 ${worktreeDisplay}
+${buildStructuredExecutionBlock(existingState.active_plan)}
 
 The current session (${sessionId}) has been added to session_ids.
 Read the plan file and continue from the first unchecked task.`
@@ -231,6 +260,7 @@ All ${plans.length} plan(s) are complete. Create a new plan with: /plan "your ta
 **Session ID**: ${sessionId}
 **Started**: ${timestamp}
 ${worktreeBlock}
+${buildStructuredExecutionBlock(planPath)}
 
 boulder.json has been created. Read the plan and begin execution.`
         } else {
