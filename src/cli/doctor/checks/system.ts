@@ -36,7 +36,7 @@ export async function gatherSystemInfo(): Promise<SystemInfo> {
   const loadedInfo = getLoadedPluginVersion()
 
   const opencodeVersion = binaryInfo ? await getOpenCodeVersion(binaryInfo.path) : null
-  const pluginVersion = pluginInfo.pinnedVersion ?? loadedInfo.expectedVersion
+  const pluginVersion = pluginInfo.pinnedVersion ?? loadedInfo.expectedVersion ?? loadedInfo.loadedVersion
 
   return {
     opencodeVersion,
