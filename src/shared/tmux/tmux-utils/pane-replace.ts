@@ -34,7 +34,8 @@ export async function replaceTmuxPane(
 	})
 	await ctrlCProc.exited
 
-	const opencodeCmd = `zsh -c 'opencode attach ${serverUrl} --session ${sessionId}'`
+	const shell = process.env.SHELL || "/bin/sh"
+	const opencodeCmd = `${shell} -c 'opencode attach ${serverUrl} --session ${sessionId}'`
 
 	const proc = spawn([tmux, "respawn-pane", "-k", "-t", paneId, opencodeCmd], {
 		stdout: "pipe",
