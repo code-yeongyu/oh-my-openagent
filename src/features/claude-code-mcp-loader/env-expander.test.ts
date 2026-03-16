@@ -1,18 +1,20 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test"
-import { mkdirSync, writeFileSync, rmSync } from "fs"
-import { join } from "path"
+import { mkdirSync, writeFileSync, rmSync, mkdtempSync } from "fs"
+import { join, dirname } from "path"
+import { tmpdir, homedir } from "os"
 import { expandEnvVars, expandEnvVarsInObject } from "./env-expander"
 
 describe("env-expander", () => {
-  const TEST_DIR = "/tmp/env-expander-test"
+  let TEST_DIR: string
   
   beforeEach(() => {
     // Create test directory and files
-    mkdirSync(TEST_DIR, { recursive: true })
+    TEST_DIR = mkdtempSync(join(tmpdir(), "env-expander-test-"))
     writeFileSync(join(TEST_DIR, "secret-token.txt"), "secret-api-key-123")
     writeFileSync(join(TEST_DIR, "config.json"), '{"host": "localhost", "port": 8080}')
     writeFileSync(join(TEST_DIR, "multi-line.txt"), "line1\nline2\nline3")
     writeFileSync(join(TEST_DIR, "whitespace.txt"), "  secret-with-whitespace  \n")
+    writeFileSync(join(TEST_DIR, "with-env-var.txt"), "secret-${HOME}-key")
   })
 
   afterEach(() => {
@@ -35,10 +37,8 @@ describe("env-expander", () => {
       expect(result).toBe(`API_KEY=secret-api-key-123 CONFIG={"host": "localhost", "port": 8080}`)
     })
 
-    it("returns original string if file does not exist", () => {
-      const original = "{file:/nonexistent/file.txt}"
-      const result = expandEnvVars(original)
-      expect(result).toBe(original)
+    it("throws error when file does not exist", () => {
+      expect(() => expandEnvVars("{file:/nonexistent/file.txt}")).toThrow()
     })
 
     it("resolves relative paths from process.cwd()", () => {
@@ -74,6 +74,29 @@ describe("env-expander", () => {
     it("handles ${VAR} with default values", () => {
       const result = expandEnvVars("\${NONEXISTENT:-default-value}")
       expect(result).toBe("default-value")
+    })
+
+    it("does not expand env vars within file content (security fix)", () => {
+      const result = expandEnvVars(`{file:${TEST_DIR}/with-env-var.txt}`)
+      expect(result).toBe("secret-${HOME}-key") // ${HOME} should NOT be expanded
+    })
+
+    it("supports ~/homedir expansion", () => {
+      const homeFile = join(homedir(), "test-file.txt")
+      writeFileSync(homeFile, "home-secret")
+      try {
+        const result = expandEnvVars("{file:~/test-file.txt}")
+        expect(result).toBe("home-secret")
+      } finally {
+        rmSync(homeFile, { force: true })
+      }
+    })
+
+    it("supports baseDir parameter for relative paths", () => {
+      const baseDir = dirname(TEST_DIR)
+      const relativePath = `{file:${TEST_DIR.split('/').pop()}/secret-token.txt}`
+      const result = expandEnvVars(relativePath, baseDir)
+      expect(result).toBe("secret-api-key-123")
     })
   })
 
@@ -133,6 +156,30 @@ describe("env-expander", () => {
         combined: "Token: secret-api-key-123 Env: env-value"
       })
       delete process.env.TEST_ENV
+    })
+
+    it("supports baseDir parameter in expandEnvVarsInObject", () => {
+      const baseDir = dirname(TEST_DIR)
+      const relativePath = `{file:${TEST_DIR.split('/').pop()}/secret-token.txt}`
+      const config = {
+        token: relativePath
+      }
+      
+      const result = expandEnvVarsInObject(config, baseDir)
+      expect(result).toEqual({
+        token: "secret-api-key-123"
+      })
+    })
+
+    it("file content with env vars is not re-expanded in objects", () => {
+      const config = {
+        secret: `{file:${TEST_DIR}/with-env-var.txt}`
+      }
+      
+      const result = expandEnvVarsInObject(config)
+      expect(result).toEqual({
+        secret: "secret-${HOME}-key" // ${HOME} should NOT be expanded
+      })
     })
   })
 })
