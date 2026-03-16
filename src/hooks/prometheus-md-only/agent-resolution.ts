@@ -12,21 +12,30 @@ import { isSqliteBackend } from "../../shared/opencode-storage-detection"
 
 type OpencodeClient = PluginInput["client"]
 
+function isCompactionAgent(agent: string): boolean {
+  return agent.toLowerCase() === "compaction"
+}
+
 async function getAgentFromMessageFiles(
   sessionID: string,
   client?: OpencodeClient
 ): Promise<string | undefined> {
   if (isSqliteBackend() && client) {
     const firstAgent = await findFirstMessageWithAgentFromSDK(client, sessionID)
-    if (firstAgent) return firstAgent
+    if (firstAgent && !isCompactionAgent(firstAgent)) return firstAgent
 
     const nearest = await findNearestMessageWithFieldsFromSDK(client, sessionID)
-    return nearest?.agent
+    if (nearest?.agent && !isCompactionAgent(nearest.agent)) return nearest.agent
+    return undefined
   }
 
   const messageDir = getMessageDir(sessionID)
   if (!messageDir) return undefined
-  return findFirstMessageWithAgent(messageDir) ?? findNearestMessageWithFields(messageDir)?.agent
+  const firstAgent = findFirstMessageWithAgent(messageDir)
+  if (firstAgent && !isCompactionAgent(firstAgent)) return firstAgent
+  const nearestAgent = findNearestMessageWithFields(messageDir)?.agent
+  if (nearestAgent && !isCompactionAgent(nearestAgent)) return nearestAgent
+  return undefined
 }
 
 /**
