@@ -878,6 +878,21 @@ export class BackgroundManager {
       if (partInfo?.type === "tool" || partInfo?.tool) {
         task.progress.toolCalls += 1
         task.progress.lastTool = partInfo.tool
+
+        const maxToolCalls = this.config?.maxToolCalls ?? 200
+        if (task.progress.toolCalls >= maxToolCalls) {
+          log("[background-agent] Circuit breaker: tool call limit reached", {
+            taskId: task.id,
+            toolCalls: task.progress.toolCalls,
+            maxToolCalls,
+            agent: task.agent,
+            sessionID,
+          })
+          void this.cancelTask(task.id, {
+            source: "circuit-breaker",
+            reason: `Subagent exceeded maximum tool call limit (${maxToolCalls}). This usually indicates an infinite loop. The task was automatically cancelled to prevent excessive token usage.`,
+          })
+        }
       }
     }
 
