@@ -33,7 +33,7 @@ export function extractStatusCode(error: unknown, retryOnErrors?: number[]): num
 
   const errorObj = error as Record<string, unknown>
 
-  const statusCode = errorObj.statusCode ?? errorObj.status ?? (errorObj.data as Record<string, unknown>)?.statusCode
+  const statusCode = errorObj.statusCode ?? errorObj.status ?? (errorObj.data as Record<string, unknown>)?.statusCode ?? (errorObj.error as Record<string, unknown>)?.statusCode ?? (errorObj.cause as Record<string, unknown>)?.statusCode
   if (typeof statusCode === "number") {
     return statusCode
   }
