@@ -54,3 +54,8 @@ export interface ResolvedMessageInfo {
   model?: { providerID: string; modelID: string }
   tools?: Record<string, ToolPermission>
 }
+
+export interface ResolveLatestMessageInfoResult {
+  resolvedInfo?: ResolvedMessageInfo
+  encounteredCompaction: boolean
+}
