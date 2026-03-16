@@ -72,6 +72,19 @@ describe("computeLineHash", () => {
     expect(hash1).toBe(hash2)
   })
 
+  it("preserves legacy hashes for internal whitespace variants", () => {
+    //#given
+    const content1 = "if (a && b) {"
+    const content2 = "if(a&&b){"
+
+    //#when
+    const hash1 = computeLegacyLineHash(1, content1)
+    const hash2 = computeLegacyLineHash(1, content2)
+
+    //#then
+    expect(hash1).toBe(hash2)
+  })
+
   it("ignores trailing whitespace differences", () => {
     //#given
     const content1 = "function hello() {"

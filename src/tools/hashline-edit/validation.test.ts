@@ -125,6 +125,15 @@ describe("validateLineRef", () => {
     expect(() => validateLineRef(lines, `1#${legacyHash}`)).not.toThrow()
   })
 
+  it("accepts legacy hashes for internal whitespace variants", () => {
+    //#given
+    const lines = ["if (a && b) {"]
+    const legacyHash = computeLegacyLineHash(1, "if(a&&b){")
+
+    //#when / #then
+    expect(() => validateLineRef(lines, `1#${legacyHash}`)).not.toThrow()
+  })
+
   it("shows >>> mismatch context in batched validation", () => {
     //#given
     const lines = ["one", "two", "three", "four"]
