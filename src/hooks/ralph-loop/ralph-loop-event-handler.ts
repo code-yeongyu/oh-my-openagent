@@ -7,6 +7,7 @@ import {
 	detectCompletionInSessionMessages,
 	detectCompletionInTranscript,
 } from "./completion-promise-detector"
+import { detectSemanticCompletion } from "./semantic-completion-detector"
 import { continueIteration } from "./iteration-continuation"
 import { handlePendingVerification } from "./pending-verification-handler"
 import { handleDeletedLoopSession, handleErroredLoopSession } from "./session-event-handler"
@@ -116,24 +117,35 @@ export function createRalphLoopEventHandler(
 						sinceMessageIndex: state.message_count_at_start,
 					})
 
-				if (completionViaTranscript || completionViaApi) {
-					log(`[${HOOK_NAME}] Completion detected!`, {
-						sessionID,
-						iteration: state.iteration,
-						promise: state.completion_promise,
-						detectedVia: completionViaTranscript
-							? "transcript_file"
-							: "session_messages_api",
-					})
-					await handleDetectedCompletion(ctx, {
-						sessionID,
-						state,
-						loopState: options.loopState,
-						directory: options.directory,
-						apiTimeoutMs: options.apiTimeoutMs,
-					})
-					return
-				}
+			const completionViaSemantic = (completionViaTranscript || completionViaApi || state.verification_pending)
+				? false
+				: await detectSemanticCompletion(ctx, {
+					sessionID,
+					apiTimeoutMs: options.apiTimeoutMs,
+					directory: options.directory,
+					sinceMessageIndex: state.message_count_at_start,
+				})
+
+			if (completionViaTranscript || completionViaApi || completionViaSemantic) {
+				log(`[${HOOK_NAME}] Completion detected!`, {
+					sessionID,
+					iteration: state.iteration,
+					promise: state.completion_promise,
+					detectedVia: completionViaTranscript
+						? "transcript_file"
+						: completionViaApi
+							? "session_messages_api"
+							: "semantic_fallback",
+				})
+				await handleDetectedCompletion(ctx, {
+					sessionID,
+					state,
+					loopState: options.loopState,
+					directory: options.directory,
+					apiTimeoutMs: options.apiTimeoutMs,
+				})
+				return
+			}
 
 				if (state.verification_pending) {
 					await handlePendingVerification(ctx, {
