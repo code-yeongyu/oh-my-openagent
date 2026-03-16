@@ -137,30 +137,30 @@ export function loadPluginConfig(
   directory: string,
   ctx: unknown
 ): OhMyOpenCodeConfig {
-  // User-level config path - prefer better-oh-my-opencode over oh-my-opencode, .jsonc over .json
+  // User-level config path - prefer talos over oh-my-opencode, .jsonc over .json
   const configDir = getOpenCodeConfigDir({ binary: "opencode" });
-  const betterUserBasePath = path.join(configDir, "better-oh-my-opencode");
-  const betterUserDetected = detectConfigFile(betterUserBasePath);
+  const talosUserBasePath = path.join(configDir, "talos");
+  const talosUserDetected = detectConfigFile(talosUserBasePath);
   const userBasePath = path.join(configDir, "oh-my-opencode");
   const userDetected = detectConfigFile(userBasePath);
   const userConfigPath =
-    betterUserDetected.format !== "none"
-      ? betterUserDetected.path
+    talosUserDetected.format !== "none"
+      ? talosUserDetected.path
       : userDetected.format !== "none"
         ? userDetected.path
-        : betterUserBasePath + ".jsonc";
+        : talosUserBasePath + ".jsonc";
 
-  // Project-level config path - prefer better-oh-my-opencode over oh-my-opencode, .jsonc over .json
-  const betterProjectBasePath = path.join(directory, ".opencode", "better-oh-my-opencode");
-  const betterProjectDetected = detectConfigFile(betterProjectBasePath);
+  // Project-level config path - prefer talos over oh-my-opencode, .jsonc over .json
+  const talosProjectBasePath = path.join(directory, ".opencode", "talos");
+  const talosProjectDetected = detectConfigFile(talosProjectBasePath);
   const projectBasePath = path.join(directory, ".opencode", "oh-my-opencode");
   const projectDetected = detectConfigFile(projectBasePath);
   const projectConfigPath =
-    betterProjectDetected.format !== "none"
-      ? betterProjectDetected.path
+    talosProjectDetected.format !== "none"
+      ? talosProjectDetected.path
       : projectDetected.format !== "none"
         ? projectDetected.path
-        : betterProjectBasePath + ".jsonc";
+        : talosProjectBasePath + ".jsonc";
 
   // Load user config first (base)
   let config: OhMyOpenCodeConfig =

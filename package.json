@@ -1,5 +1,5 @@
 {
-  "name": "better-oh-my-opencode",
+  "name": "talos",
   "version": "1.0.0",
   "description": "oh-my-opencode fork with Argus mandatory code review and Sisyphus pure orchestration enforcement",
   "main": "dist/index.js",
