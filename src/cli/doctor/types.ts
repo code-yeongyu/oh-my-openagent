@@ -47,8 +47,7 @@ export interface SystemInfo {
 }
 
 export interface ToolsSummary {
-  lspInstalled: number
-  lspTotal: number
+  lspServers: Array<{ id: string; extensions: string[] }>
   astGrepCli: boolean
   astGrepNapi: boolean
   commentChecker: boolean
