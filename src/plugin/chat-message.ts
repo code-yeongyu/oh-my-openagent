@@ -96,18 +96,27 @@ export function createChatMessageHandler(args: {
     } else if (input.model) {
       setSessionModel(input.sessionID, input.model)
     }
-    await hooks.stopContinuationGuard?.["chat.message"]?.(input)
-    await hooks.backgroundNotificationHook?.["chat.message"]?.(input, output)
-    await hooks.runtimeFallback?.["chat.message"]?.(input, output)
-    await hooks.keywordDetector?.["chat.message"]?.(input, output)
-    await hooks.thinkMode?.["chat.message"]?.(input, output)
-    await hooks.claudeCodeHooks?.["chat.message"]?.(input, output)
+
+    await Promise.all([
+      hooks.stopContinuationGuard?.["chat.message"]?.(input),
+      hooks.backgroundNotificationHook?.["chat.message"]?.(input, output),
+      hooks.runtimeFallback?.["chat.message"]?.(input, output),
+      hooks.keywordDetector?.["chat.message"]?.(input, output),
+      hooks.thinkMode?.["chat.message"]?.(input, output),
+      hooks.noSisyphusGpt?.["chat.message"]?.(input, output),
+      hooks.noHephaestusNonGpt?.["chat.message"]?.(input, output),
+    ])
+
     await hooks.autoSlashCommand?.["chat.message"]?.(input, output)
-    await hooks.noSisyphusGpt?.["chat.message"]?.(input, output)
-    await hooks.noHephaestusNonGpt?.["chat.message"]?.(input, output)
-    if (hooks.startWork && isStartWorkHookOutput(output)) {
-      await hooks.startWork["chat.message"]?.(input, output)
-    }
+
+    const nonBlockingHooks: Promise<void>[] = [
+      hooks.claudeCodeHooks?.["chat.message"]?.(input, output),
+      hooks.startWork && isStartWorkHookOutput(output)
+        ? hooks.startWork["chat.message"]?.(input, output)
+        : undefined,
+    ].filter((p): p is Promise<void> => p !== undefined)
+
+    void Promise.all(nonBlockingHooks).catch(() => {})
 
     if (!hasConnectedProvidersCache()) {
       pluginContext.client.tui
