@@ -58,7 +58,7 @@ const STATE_FILE_PATH = join(DEFAULT_STATE_DIR, "reply-listener-state.json")
 const CONFIG_FILE_PATH = join(DEFAULT_STATE_DIR, "reply-listener-config.json")
 const LOG_FILE_PATH = join(DEFAULT_STATE_DIR, "reply-listener.log")
 
-const DAEMON_IDENTITY_MARKER = "pollLoop"
+export const DAEMON_IDENTITY_MARKER = "--openclaw-reply-listener-daemon"
 
 function createMinimalDaemonEnv(): Record<string, string> {
   const env: Record<string, string> = {}
@@ -112,6 +112,10 @@ function log(message: string): void {
   } catch {
     // Ignore
   }
+}
+
+export function logReplyListenerMessage(message: string): void {
+  log(message)
 }
 
 interface DaemonState {
@@ -255,22 +259,23 @@ async function injectReply(
   platform: string,
   config: OpenClawConfig,
 ): Promise<boolean> {
+  const replyListener = config.replyListener
   const content = await captureTmuxPane(paneId, 15)
   const analysis = analyzePaneContent(content)
-  
+
   if (analysis.confidence < 0.3) { // Lower threshold for simple check
     log(
-      `WARN: Pane ${paneId} does not appear to be running Codex CLI (confidence: ${analysis.confidence}). Skipping injection, removing stale mapping.`,
+      `WARN: Pane ${paneId} does not appear to be running OpenCode CLI (confidence: ${analysis.confidence}). Skipping injection, removing stale mapping.`,
     )
     removeMessagesByPane(paneId)
     return false
   }
-  
-  const prefix = config.includePrefix ? `[reply:${platform}] ` : ""
+
+  const prefix = replyListener?.includePrefix === false ? "" : `[reply:${platform}] `
   const sanitized = sanitizeReplyInput(prefix + text)
-  const truncated = sanitized.slice(0, config.maxMessageLength)
+  const truncated = sanitized.slice(0, replyListener?.maxMessageLength ?? 500)
   const success = await sendToPane(paneId, truncated, true)
-  
+
   if (success) {
     log(
       `Injected reply from ${platform} into pane ${paneId}: "${truncated.slice(0, 50)}${truncated.length > 50 ? "..." : ""}"`,
@@ -288,30 +293,36 @@ async function pollDiscord(
   state: DaemonState,
   rateLimiter: RateLimiter,
 ): Promise<void> {
-  if (!config.discordBotToken || !config.discordChannelId) return
-  if (!config.authorizedDiscordUserIds || config.authorizedDiscordUserIds.length === 0) return
+  const replyListener = config.replyListener
+  if (!replyListener?.discordBotToken || !replyListener.discordChannelId) return
+  if (
+    !replyListener.authorizedDiscordUserIds
+    || replyListener.authorizedDiscordUserIds.length === 0
+  ) {
+    return
+  }
   if (Date.now() < discordBackoffUntil) return
 
   try {
     const after = state.discordLastMessageId
       ? `?after=${state.discordLastMessageId}&limit=10`
       : "?limit=10"
-    const url = `https://discord.com/api/v10/channels/${config.discordChannelId}/messages${after}`
-    
+    const url = `https://discord.com/api/v10/channels/${replyListener.discordChannelId}/messages${after}`
+
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 10000)
-    
+
     const response = await fetch(url, {
       method: "GET",
-      headers: { Authorization: `Bot ${config.discordBotToken}` },
+      headers: { Authorization: `Bot ${replyListener.discordBotToken}` },
       signal: controller.signal,
     })
-    
+
     clearTimeout(timeout)
-    
+
     const remaining = response.headers.get("x-ratelimit-remaining")
     const reset = response.headers.get("x-ratelimit-reset")
-    
+
     if (remaining !== null && parseInt(remaining, 10) < 2) {
       const parsed = reset ? parseFloat(reset) : Number.NaN
       const resetTime = Number.isFinite(parsed) ? parsed * 1000 : Date.now() + 10000
@@ -320,37 +331,37 @@ async function pollDiscord(
         `WARN: Discord rate limit low (remaining: ${remaining}), backing off until ${new Date(resetTime).toISOString()}`,
       )
     }
-    
+
     if (!response.ok) {
       log(`Discord API error: HTTP ${response.status}`)
       return
     }
-    
+
     const messages = await response.json()
     if (!Array.isArray(messages) || messages.length === 0) return
-    
+
     const sorted = [...messages].reverse()
-    
+
     for (const msg of sorted) {
       if (!msg.message_reference?.message_id) {
         state.discordLastMessageId = msg.id
         writeDaemonState(state)
         continue
       }
-      
-      if (!config.authorizedDiscordUserIds.includes(msg.author.id)) {
+
+      if (!replyListener.authorizedDiscordUserIds.includes(msg.author.id)) {
         state.discordLastMessageId = msg.id
         writeDaemonState(state)
         continue
       }
-      
+
       const mapping = lookupByMessageId("discord-bot", msg.message_reference.message_id)
       if (!mapping) {
         state.discordLastMessageId = msg.id
         writeDaemonState(state)
         continue
       }
-      
+
       if (!rateLimiter.canProceed()) {
         log(`WARN: Rate limit exceeded, dropping Discord message ${msg.id}`)
         state.discordLastMessageId = msg.id
@@ -358,21 +369,21 @@ async function pollDiscord(
         state.errors++
         continue
       }
-      
+
       state.discordLastMessageId = msg.id
       writeDaemonState(state)
-      
+
       const success = await injectReply(mapping.tmuxPaneId, msg.content, "discord", config)
-      
+
       if (success) {
         state.messagesInjected++
         // Add reaction
         try {
           await fetch(
-            `https://discord.com/api/v10/channels/${config.discordChannelId}/messages/${msg.id}/reactions/%E2%9C%85/@me`,
+            `https://discord.com/api/v10/channels/${replyListener.discordChannelId}/messages/${msg.id}/reactions/%E2%9C%85/@me`,
             {
               method: "PUT",
-              headers: { Authorization: `Bot ${config.discordBotToken}` },
+              headers: { Authorization: `Bot ${replyListener.discordBotToken}` },
             },
           )
         } catch {
@@ -394,30 +405,31 @@ async function pollTelegram(
   state: DaemonState,
   rateLimiter: RateLimiter,
 ): Promise<void> {
-  if (!config.telegramBotToken || !config.telegramChatId) return
+  const replyListener = config.replyListener
+  if (!replyListener?.telegramBotToken || !replyListener.telegramChatId) return
 
   try {
     const offset = state.telegramLastUpdateId ? state.telegramLastUpdateId + 1 : 0
-    const url = `https://api.telegram.org/bot${config.telegramBotToken}/getUpdates?offset=${offset}&timeout=0`
-    
+    const url = `https://api.telegram.org/bot${replyListener.telegramBotToken}/getUpdates?offset=${offset}&timeout=0`
+
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 10000)
-    
+
     const response = await fetch(url, {
       method: "GET",
       signal: controller.signal,
     })
-    
+
     clearTimeout(timeout)
-    
+
     if (!response.ok) {
       log(`Telegram API error: HTTP ${response.status}`)
       return
     }
-    
+
     const body = await response.json() as any
     const updates = body.result || []
-    
+
     for (const update of updates) {
       const msg = update.message
       if (!msg) {
@@ -431,27 +443,27 @@ async function pollTelegram(
         writeDaemonState(state)
         continue
       }
-      
-      if (String(msg.chat.id) !== config.telegramChatId) {
+
+      if (String(msg.chat.id) !== replyListener.telegramChatId) {
         state.telegramLastUpdateId = update.update_id
         writeDaemonState(state)
         continue
       }
-      
+
       const mapping = lookupByMessageId("telegram", String(msg.reply_to_message.message_id))
       if (!mapping) {
         state.telegramLastUpdateId = update.update_id
         writeDaemonState(state)
         continue
       }
-      
+
       const text = msg.text || ""
       if (!text) {
         state.telegramLastUpdateId = update.update_id
         writeDaemonState(state)
         continue
       }
-      
+
       if (!rateLimiter.canProceed()) {
         log(`WARN: Rate limit exceeded, dropping Telegram message ${msg.message_id}`)
         state.telegramLastUpdateId = update.update_id
@@ -459,22 +471,22 @@ async function pollTelegram(
         state.errors++
         continue
       }
-      
+
       state.telegramLastUpdateId = update.update_id
       writeDaemonState(state)
-      
+
       const success = await injectReply(mapping.tmuxPaneId, text, "telegram", config)
-      
+
       if (success) {
         state.messagesInjected++
         try {
           await fetch(
-            `https://api.telegram.org/bot${config.telegramBotToken}/sendMessage`,
+            `https://api.telegram.org/bot${replyListener.telegramBotToken}/sendMessage`,
             {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                chat_id: config.telegramChatId,
+                chat_id: replyListener.telegramChatId,
                 text: "Injected into Codex CLI session.",
                 reply_to_message_id: msg.message_id,
               }),
@@ -517,10 +529,10 @@ export async function pollLoop(): Promise<void> {
 
   state.isRunning = true
   state.pid = process.pid
-  
-  const rateLimiter = new RateLimiter(config.rateLimitPerMinute || 10)
+
+  const rateLimiter = new RateLimiter(config.replyListener?.rateLimitPerMinute || 10)
   let lastPruneAt = Date.now()
-  
+
   const shutdown = (): void => {
     log("Shutdown signal received")
     state.isRunning = false
@@ -528,10 +540,10 @@ export async function pollLoop(): Promise<void> {
     removePidFile()
     process.exit(0)
   }
-  
+
   process.on("SIGTERM", shutdown)
   process.on("SIGINT", shutdown)
-  
+
   try {
     pruneStale()
     log("Pruned stale registry entries")
@@ -554,15 +566,19 @@ export async function pollLoop(): Promise<void> {
           log(`WARN: Prune failed: ${e instanceof Error ? e.message : String(e)}`)
         }
       }
-      
+
       writeDaemonState(state)
-      await new Promise((resolve) => setTimeout(resolve, config.pollIntervalMs || 3000))
+      await new Promise((resolve) =>
+        setTimeout(resolve, config.replyListener?.pollIntervalMs || 3000),
+      )
     } catch (error) {
       state.errors++
       state.lastError = error instanceof Error ? error.message : String(error)
       log(`Poll error: ${state.lastError}`)
       writeDaemonState(state)
-      await new Promise((resolve) => setTimeout(resolve, (config.pollIntervalMs || 3000) * 2))
+      await new Promise((resolve) =>
+        setTimeout(resolve, (config.replyListener?.pollIntervalMs || 3000) * 2),
+      )
     }
   }
   log("Poll loop ended")
@@ -577,16 +593,17 @@ export async function startReplyListener(config: OpenClawConfig): Promise<{ succ
       state: state || undefined,
     }
   }
-  
+
   if (!(await isTmuxAvailable())) {
     return {
       success: false,
       message: "tmux not available - reply injection requires tmux",
     }
   }
-  
+
   const normalizedConfig = normalizeReplyListenerConfig(config)
-  if (!normalizedConfig.discordBotToken && !normalizedConfig.telegramBotToken) {
+  const replyListener = normalizedConfig.replyListener
+  if (!replyListener?.discordBotToken && !replyListener?.telegramBotToken) {
     // Only warn if no platforms enabled, but user might just want outbound
     // Actually, instructions say: "Fire-and-forget for outbound, daemon process for inbound"
     // So if no inbound config, we shouldn't start daemon.
@@ -595,18 +612,18 @@ export async function startReplyListener(config: OpenClawConfig): Promise<{ succ
       message: "No enabled reply listener platforms configured (missing bot tokens/channels)",
     }
   }
-  
+
   writeDaemonConfig(normalizedConfig)
   ensureStateDir()
-  
+
   const currentFile = import.meta.url
   const isTs = currentFile.endsWith(".ts")
-  const daemonScript = isTs 
+  const daemonScript = isTs
     ? join(dirname(new URL(currentFile).pathname), "daemon.ts")
     : join(dirname(new URL(currentFile).pathname), "daemon.js")
-    
+
   try {
-    const proc = spawn(["bun", "run", daemonScript], {
+    const proc = spawn(["bun", "run", daemonScript, DAEMON_IDENTITY_MARKER], {
       detached: true,
       stdio: ["ignore", "ignore", "ignore"],
       cwd: process.cwd(),

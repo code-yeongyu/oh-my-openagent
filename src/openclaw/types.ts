@@ -1,6 +1,16 @@
-import type { OpenClawConfig, OpenClawGateway, OpenClawHook } from "../config/schema/openclaw"
+import type {
+  OpenClawConfig,
+  OpenClawGateway,
+  OpenClawHook,
+  OpenClawReplyListenerConfig,
+} from "../config/schema/openclaw"
 
-export type { OpenClawConfig, OpenClawGateway, OpenClawHook }
+export type {
+  OpenClawConfig,
+  OpenClawGateway,
+  OpenClawHook,
+  OpenClawReplyListenerConfig,
+}
 
 export interface OpenClawContext {
   sessionId?: string

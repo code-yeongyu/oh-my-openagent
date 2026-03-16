@@ -3,7 +3,6 @@ import type { OhMyOpenCodeConfig } from "../config"
 import { wakeOpenClaw } from "../openclaw"
 import type { OpenClawContext } from "../openclaw/types"
 
-
 export function createOpenClawHook(
   ctx: PluginContext,
   pluginConfig: OhMyOpenCodeConfig,
@@ -35,21 +34,31 @@ export function createOpenClawHook(
         // This is heuristic. If the last message was from assistant and ended with a question?
         // Or if the system is idle.
         await handleWake("session-idle", context)
-      } else if (event.type === "session.stopped") { // Assuming this event exists or map from error?
+      } else if (event.type === "session.stop") {
         await handleWake("stop", context)
       }
     },
-    
-    toolExecuteBefore: async (input: any) => {
-        const { toolName, toolInput, sessionID } = input
-        if (toolName === "ask_user" || toolName === "ask_followup_question") {
-             const context: OpenClawContext = {
-                sessionId: sessionID,
-                projectPath: ctx.directory,
-                question: toolInput.question,
-             }
-             await handleWake("ask-user-question", context)
-        }
-    }
+
+    "tool.execute.before": async (
+      input: { tool: string; sessionID: string },
+      output: { args: Record<string, unknown> },
+    ) => {
+      const normalizedToolName = input.tool.toLowerCase()
+      if (
+        normalizedToolName !== "question"
+        && normalizedToolName !== "ask_user_question"
+        && normalizedToolName !== "askuserquestion"
+      ) {
+        return
+      }
+
+      const question = typeof output.args.question === "string" ? output.args.question : undefined
+      const context: OpenClawContext = {
+        sessionId: input.sessionID,
+        projectPath: ctx.directory,
+        question,
+      }
+      await handleWake("ask-user-question", context)
+    },
   }
 }

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { resolveGateway, validateGatewayUrl, normalizeReplyListenerConfig } from "../config"
 import type { OpenClawConfig } from "../types"
+import { OpenClawConfigSchema } from "../../config/schema/openclaw"
 
 describe("OpenClaw Config", () => {
   test("resolveGateway resolves HTTP gateway", () => {
@@ -49,7 +50,7 @@ describe("OpenClaw Config", () => {
   test("resolveGateway returns null for disabled hook", () => {
     const config: OpenClawConfig = {
       enabled: true,
-      gateways: { g: { url: "https://example.com" } },
+      gateways: { g: { type: "http", url: "https://example.com" } },
       hooks: {
         event: { enabled: false, gateway: "g", instruction: "i" },
       },
@@ -68,5 +69,47 @@ describe("OpenClaw Config", () => {
   test("validateGatewayUrl allows HTTP localhost", () => {
     expect(validateGatewayUrl("http://localhost:3000")).toBe(true)
     expect(validateGatewayUrl("http://127.0.0.1:3000")).toBe(true)
+  })
+
+  test("normalizeReplyListenerConfig normalizes nested reply listener fields", () => {
+    const config = normalizeReplyListenerConfig({
+      enabled: true,
+      gateways: {},
+      hooks: {},
+      replyListener: {
+        discordBotToken: "discord-token",
+        discordChannelId: "channel-id",
+        authorizedDiscordUserIds: ["user-1", "", "user-2"],
+        pollIntervalMs: 100,
+        rateLimitPerMinute: 0,
+        maxMessageLength: 9000,
+        includePrefix: false,
+      },
+    } as OpenClawConfig)
+
+    expect(config.replyListener).toEqual({
+      discordBotToken: "discord-token",
+      discordChannelId: "channel-id",
+      authorizedDiscordUserIds: ["user-1", "user-2"],
+      pollIntervalMs: 500,
+      rateLimitPerMinute: 1,
+      maxMessageLength: 4000,
+      includePrefix: false,
+    })
+  })
+
+  test("gateway timeout remains optional so env fallback can apply", () => {
+    const parsed = OpenClawConfigSchema.parse({
+      enabled: true,
+      gateways: {
+        command: {
+          type: "command",
+          command: "echo hi",
+        },
+      },
+      hooks: {},
+    })
+
+    expect(parsed.gateways.command.timeout).toBeUndefined()
   })
 })

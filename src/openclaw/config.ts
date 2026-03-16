@@ -1,4 +1,8 @@
-import type { OpenClawConfig, OpenClawGateway } from "./types"
+import type {
+  OpenClawConfig,
+  OpenClawGateway,
+  OpenClawReplyListenerConfig,
+} from "./types"
 
 const DEFAULT_REPLY_POLL_INTERVAL_MS = 3000
 const MIN_REPLY_POLL_INTERVAL_MS = 500
@@ -29,40 +33,43 @@ function normalizeInteger(
 }
 
 export function normalizeReplyListenerConfig(config: OpenClawConfig): OpenClawConfig {
-  const discordEnabled =
-    config.discordBotToken && config.discordChannelId ? true : false
-  const telegramEnabled =
-    config.telegramBotToken && config.telegramChatId ? true : false
+  const replyListener = config.replyListener
+  if (!replyListener) return config
 
-  return {
-    ...config,
-    discordBotToken: config.discordBotToken,
-    discordChannelId: config.discordChannelId,
-    telegramBotToken: config.telegramBotToken,
-    telegramChatId: config.telegramChatId,
+  const normalizedReplyListener: OpenClawReplyListenerConfig = {
+    ...replyListener,
+    discordBotToken: replyListener.discordBotToken,
+    discordChannelId: replyListener.discordChannelId,
+    telegramBotToken: replyListener.telegramBotToken,
+    telegramChatId: replyListener.telegramChatId,
     pollIntervalMs: normalizeInteger(
-      config.pollIntervalMs,
+      replyListener.pollIntervalMs,
       DEFAULT_REPLY_POLL_INTERVAL_MS,
       MIN_REPLY_POLL_INTERVAL_MS,
       MAX_REPLY_POLL_INTERVAL_MS,
     ),
     rateLimitPerMinute: normalizeInteger(
-      config.rateLimitPerMinute,
+      replyListener.rateLimitPerMinute,
       DEFAULT_REPLY_RATE_LIMIT_PER_MINUTE,
       MIN_REPLY_RATE_LIMIT_PER_MINUTE,
     ),
     maxMessageLength: normalizeInteger(
-      config.maxMessageLength,
+      replyListener.maxMessageLength,
       DEFAULT_REPLY_MAX_MESSAGE_LENGTH,
       MIN_REPLY_MAX_MESSAGE_LENGTH,
       MAX_REPLY_MAX_MESSAGE_LENGTH,
     ),
-    includePrefix: config.includePrefix !== false,
-    authorizedDiscordUserIds: Array.isArray(config.authorizedDiscordUserIds)
-      ? config.authorizedDiscordUserIds.filter(
+    includePrefix: replyListener.includePrefix !== false,
+    authorizedDiscordUserIds: Array.isArray(replyListener.authorizedDiscordUserIds)
+      ? replyListener.authorizedDiscordUserIds.filter(
           (id) => typeof id === "string" && id.trim() !== "",
         )
       : [],
+  }
+
+  return {
+    ...config,
+    replyListener: normalizedReplyListener,
   }
 }
 
@@ -71,17 +78,17 @@ export function resolveGateway(
   event: string,
 ): { gatewayName: string; gateway: OpenClawGateway; instruction: string } | null {
   if (!config.enabled) return null
-  
+
   const mapping = config.hooks[event]
   if (!mapping || !mapping.enabled) {
     return null
   }
-  
+
   const gateway = config.gateways[mapping.gateway]
   if (!gateway) {
     return null
   }
-  
+
   // Validate based on gateway type
   if (gateway.type === "command") {
     if (!gateway.command) return null
@@ -89,7 +96,7 @@ export function resolveGateway(
     // HTTP gateway
     if (!gateway.url) return null
   }
-  
+
   return { gatewayName: mapping.gateway, gateway, instruction: mapping.instruction }
 }
 

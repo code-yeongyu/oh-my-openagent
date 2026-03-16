@@ -1,6 +1,7 @@
 import { describe, expect, test, mock, spyOn } from "bun:test"
 import {
   interpolateInstruction,
+  resolveCommandTimeoutMs,
   shellEscapeArg,
   wakeGateway,
   wakeCommandGateway,
@@ -30,26 +31,39 @@ describe("OpenClaw Dispatcher", () => {
     const fetchSpy = spyOn(global, "fetch").mockResolvedValue(
       new Response(JSON.stringify({ ok: true }), { status: 200 }),
     )
+    try {
+      const result = await wakeGateway(
+        "test",
+        { url: "https://example.com", method: "POST", timeout: 1000, type: "http" },
+        { foo: "bar" },
+      )
 
-    const result = await wakeGateway(
-      "test",
-      { url: "https://example.com", method: "POST", timeout: 1000, type: "http" },
-      { foo: "bar" },
-    )
-
-    expect(result.success).toBe(true)
-    expect(fetchSpy).toHaveBeenCalled()
-    const call = fetchSpy.mock.calls[0]
-    expect(call[0]).toBe("https://example.com")
-    expect(call[1]?.method).toBe("POST")
-    expect(call[1]?.body).toBe('{"foo":"bar"}')
-
-    fetchSpy.mockRestore()
+      expect(result.success).toBe(true)
+      expect(fetchSpy).toHaveBeenCalled()
+      const call = fetchSpy.mock.calls[0]
+      expect(call[0]).toBe("https://example.com")
+      expect(call[1]?.method).toBe("POST")
+      expect(call[1]?.body).toBe('{"foo":"bar"}')
+    } finally {
+      fetchSpy.mockRestore()
+    }
   })
 
   test("wakeGateway fails on invalid URL", async () => {
     const result = await wakeGateway("test", { url: "http://example.com", method: "POST", timeout: 1000, type: "http" }, {})
     expect(result.success).toBe(false)
     expect(result.error).toContain("Invalid URL")
+  })
+
+  test("resolveCommandTimeoutMs reads OMO env fallback", () => {
+    const original = process.env.OMO_OPENCLAW_COMMAND_TIMEOUT_MS
+    process.env.OMO_OPENCLAW_COMMAND_TIMEOUT_MS = "4321"
+
+    try {
+      expect(resolveCommandTimeoutMs(undefined, process.env.OMO_OPENCLAW_COMMAND_TIMEOUT_MS)).toBe(4321)
+    } finally {
+      if (original === undefined) delete process.env.OMO_OPENCLAW_COMMAND_TIMEOUT_MS
+      else process.env.OMO_OPENCLAW_COMMAND_TIMEOUT_MS = original
+    }
   })
 })

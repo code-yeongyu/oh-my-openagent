@@ -14,7 +14,9 @@ export async function getTmuxSessionName(): Promise<string | null> {
       stdout: "pipe",
       stderr: "ignore",
     })
-    const output = await new Response(proc.stdout).text()
+    const outputPromise = new Response(proc.stdout).text()
+    await proc.exited
+    const output = await outputPromise
     if (proc.exitCode !== 0) return null
     return output.trim() || null
   } catch {
@@ -31,7 +33,9 @@ export async function captureTmuxPane(paneId: string, lines = 15): Promise<strin
         stderr: "ignore",
       },
     )
-    const output = await new Response(proc.stdout).text()
+    const outputPromise = new Response(proc.stdout).text()
+    await proc.exited
+    const output = await outputPromise
     if (proc.exitCode !== 0) return null
     return output.trim() || null
   } catch {
@@ -41,12 +45,21 @@ export async function captureTmuxPane(paneId: string, lines = 15): Promise<strin
 
 export async function sendToPane(paneId: string, text: string, confirm = true): Promise<boolean> {
   try {
-    const proc = spawn(["tmux", "send-keys", "-t", paneId, text, ...(confirm ? ["Enter"] : [])], {
+    const literalProc = spawn(["tmux", "send-keys", "-t", paneId, "-l", "--", text], {
       stdout: "ignore",
       stderr: "ignore",
     })
-    await proc.exited
-    return proc.exitCode === 0
+    await literalProc.exited
+    if (literalProc.exitCode !== 0) return false
+
+    if (!confirm) return true
+
+    const enterProc = spawn(["tmux", "send-keys", "-t", paneId, "Enter"], {
+      stdout: "ignore",
+      stderr: "ignore",
+    })
+    await enterProc.exited
+    return enterProc.exitCode === 0
   } catch {
     return false
   }
@@ -67,18 +80,11 @@ export async function isTmuxAvailable(): Promise<boolean> {
 
 export function analyzePaneContent(content: string | null): { confidence: number } {
   if (!content) return { confidence: 0 }
-  // Simple heuristic: check for common CLI prompts or output
-  // Reference implementation had more logic, but for now simple check is okay
-  // Ideally, I should port the reference logic.
-  // Reference logic:
-  // if (content.includes("opencode")) confidence += 0.5
-  // if (content.includes("How can I help you?")) confidence += 0.8
-  // etc.
-  
+
   let confidence = 0
   if (content.includes("opencode")) confidence += 0.3
-  if (content.includes("How can I help you?")) confidence += 0.5
-  if (content.includes("Type /help")) confidence += 0.2
-  
+  if (content.includes("Ask anything...")) confidence += 0.5
+  if (content.includes("Run /help")) confidence += 0.2
+
   return { confidence: Math.min(1, confidence) }
 }

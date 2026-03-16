@@ -11,11 +11,12 @@ import {
   constants,
 } from "fs"
 import { join, dirname } from "path"
-import { homedir } from "os"
 import { randomUUID } from "crypto"
+import { getOpenCodeStorageDir } from "../shared/data-path"
 
-const REGISTRY_PATH = join(homedir(), ".omx", "state", "reply-session-registry.jsonl")
-const REGISTRY_LOCK_PATH = join(homedir(), ".omx", "state", "reply-session-registry.lock")
+const OPENCLAW_STORAGE_DIR = join(getOpenCodeStorageDir(), "openclaw")
+const REGISTRY_PATH = join(OPENCLAW_STORAGE_DIR, "reply-session-registry.jsonl")
+const REGISTRY_LOCK_PATH = join(OPENCLAW_STORAGE_DIR, "reply-session-registry.lock")
 const SECURE_FILE_MODE = 0o600
 const MAX_AGE_MS = 24 * 60 * 60 * 1000
 const LOCK_TIMEOUT_MS = 2000
@@ -120,12 +121,26 @@ function acquireRegistryLock(): LockHandle | null {
         constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY,
         SECURE_FILE_MODE,
       )
-      const lockPayload = JSON.stringify({
-        pid: process.pid,
-        acquiredAt: Date.now(),
-        token,
-      })
-      writeSync(fd, lockPayload)
+      try {
+        const lockPayload = JSON.stringify({
+          pid: process.pid,
+          acquiredAt: Date.now(),
+          token,
+        })
+        writeSync(fd, lockPayload)
+      } catch (writeError) {
+        try {
+          closeSync(fd)
+        } catch {
+          // Ignore
+        }
+        try {
+          unlinkSync(REGISTRY_LOCK_PATH)
+        } catch {
+          // Ignore
+        }
+        throw writeError
+      }
       return { fd, token }
     } catch (error) {
       const err = error as NodeJS.ErrnoException

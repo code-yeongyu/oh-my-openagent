@@ -41,7 +41,9 @@ export function shellEscapeArg(value: string): string {
 
 export function resolveCommandTimeoutMs(
   gatewayTimeout?: number,
-  envTimeoutRaw = process.env.OMX_OPENCLAW_COMMAND_TIMEOUT_MS,
+  envTimeoutRaw =
+    process.env.OMO_OPENCLAW_COMMAND_TIMEOUT_MS
+    ?? process.env.OMX_OPENCLAW_COMMAND_TIMEOUT_MS,
 ): number {
   const parseFinite = (value: unknown): number | undefined => {
     if (typeof value !== "number" || !Number.isFinite(value)) return undefined
@@ -52,12 +54,12 @@ export function resolveCommandTimeoutMs(
     const parsed = Number(value)
     return Number.isFinite(parsed) ? parsed : undefined
   }
-  
+
   const rawTimeout =
     parseFinite(gatewayTimeout) ??
     parseEnv(envTimeoutRaw) ??
     DEFAULT_COMMAND_TIMEOUT_MS
-    
+
   return Math.min(
     MAX_COMMAND_TIMEOUT_MS,
     Math.max(MIN_COMMAND_TIMEOUT_MS, Math.trunc(rawTimeout)),
@@ -76,27 +78,27 @@ export async function wakeGateway(
       error: "Invalid URL (HTTPS required)",
     }
   }
-  
+
   try {
     const headers = {
       "Content-Type": "application/json",
       ...gatewayConfig.headers,
     }
-    
+
     const timeout = gatewayConfig.timeout ?? DEFAULT_HTTP_TIMEOUT_MS
-    
+
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), timeout)
-    
+
     const response = await fetch(gatewayConfig.url, {
       method: gatewayConfig.method || "POST",
       headers,
       body: JSON.stringify(payload),
       signal: controller.signal,
+    }).finally(() => {
+      clearTimeout(timeoutId)
     })
-    
-    clearTimeout(timeoutId)
-    
+
     if (!response.ok) {
       return {
         gateway: gatewayName,
@@ -128,38 +130,45 @@ export async function wakeCommandGateway(
       error: "No command configured",
     }
   }
-  
+
   try {
     const timeout = resolveCommandTimeoutMs(gatewayConfig.timeout)
-    
+
     // Interpolate variables with shell escaping
-    let interpolated = gatewayConfig.command.replace(/\{\{(\w+)\}\}/g, (_match, key) => {
+    const interpolated = gatewayConfig.command.replace(/\{\{(\w+)\}\}/g, (_match, key) => {
       const value = variables[key]
       if (value === undefined) return _match
       return shellEscapeArg(value)
     })
-    
+
     // Always use sh -c to handle the shell command string correctly
     const proc = spawn(["sh", "-c", interpolated], {
       env: { ...process.env },
       stdout: "ignore",
       stderr: "ignore",
     })
-    
+
     // Handle timeout manually
-    const timeoutPromise = new Promise<number>((_, reject) => {
-      setTimeout(() => {
+    let timeoutId: ReturnType<typeof setTimeout> | undefined
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => {
         proc.kill()
         reject(new Error("Command timed out"))
       }, timeout)
     })
-    
-    await Promise.race([proc.exited, timeoutPromise])
-    
+
+    try {
+      await Promise.race([proc.exited, timeoutPromise])
+    } finally {
+      if (timeoutId !== undefined) {
+        clearTimeout(timeoutId)
+      }
+    }
+
     if (proc.exitCode !== 0) {
       throw new Error(`Command exited with code ${proc.exitCode}`)
     }
-    
+
     return { gateway: gatewayName, success: true }
   } catch (error) {
     return {
@@ -169,4 +178,3 @@ export async function wakeCommandGateway(
     }
   }
 }
-
