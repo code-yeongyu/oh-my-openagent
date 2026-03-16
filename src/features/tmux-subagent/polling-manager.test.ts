@@ -10,6 +10,7 @@ describe("TmuxPollingManager overlap", () => {
       sessionId: "ses-1",
       paneId: "%1",
       description: "test",
+      attachActivated: false,
       createdAt: new Date(),
       lastSeenAt: new Date(),
       closePending: false,

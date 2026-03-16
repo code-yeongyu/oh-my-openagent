@@ -4,6 +4,7 @@ import { getTmuxPath } from "../../../tools/interactive-bash/tmux-path-resolver"
 import type { SpawnPaneResult } from "../types"
 import type { SplitDirection } from "./environment"
 import { isInsideTmux } from "./environment"
+import { buildDetachedPanePlaceholderCommand } from "./pane-command"
 import { isServerRunning } from "./server-health"
 
 export async function spawnTmuxPane(
@@ -48,7 +49,7 @@ export async function spawnTmuxPane(
 
 	log("[spawnTmuxPane] all checks passed, spawning...")
 
-	const opencodeCmd = `zsh -c 'opencode attach ${serverUrl} --session ${sessionId}'`
+	const placeholderCommand = buildDetachedPanePlaceholderCommand()
 
 	const args = [
 		"split-window",
@@ -58,7 +59,7 @@ export async function spawnTmuxPane(
 		"-F",
 		"#{pane_id}",
 		...(targetPaneId ? ["-t", targetPaneId] : []),
-		opencodeCmd,
+		placeholderCommand,
 	]
 
 	const proc = spawn([tmux, ...args], { stdout: "pipe", stderr: "pipe" })

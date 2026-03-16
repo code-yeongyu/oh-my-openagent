@@ -16,7 +16,8 @@ export class TmuxPollingManager {
   constructor(
     private client: OpencodeClient,
     private sessions: Map<string, TrackedSession>,
-    private closeSessionById: (sessionId: string) => Promise<void>
+    private closeSessionById: (sessionId: string) => Promise<void>,
+    private activateFocusedSessions?: () => Promise<void>,
   ) {}
 
   startPolling(): void {
@@ -41,6 +42,10 @@ export class TmuxPollingManager {
     if (this.pollingInFlight) return
     this.pollingInFlight = true
     try {
+      if (this.activateFocusedSessions) {
+        await this.activateFocusedSessions()
+      }
+
       if (this.sessions.size === 0) {
         this.stopPolling()
         return

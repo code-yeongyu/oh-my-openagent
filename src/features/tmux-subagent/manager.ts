@@ -3,6 +3,7 @@ import type { TmuxConfig } from "../../config/schema"
 import type { TrackedSession, CapacityConfig, WindowState } from "./types"
 import { log, normalizeSDKResponse } from "../../shared"
 import {
+  activateTmuxPane,
   isInsideTmux as defaultIsInsideTmux,
   getCurrentPaneId as defaultGetCurrentPaneId,
   POLL_INTERVAL_BACKGROUND_MS,
@@ -13,7 +14,12 @@ import { queryWindowState } from "./pane-state-querier"
 import { decideSpawnActions, decideCloseAction, type SessionMapping } from "./decision-engine"
 import { executeActions, executeAction } from "./action-executor"
 import { TmuxPollingManager } from "./polling-manager"
-import { createTrackedSession, markTrackedSessionClosePending } from "./tracked-session-state"
+import {
+  createTrackedSession,
+  markTrackedSessionActivated,
+  markTrackedSessionClosePending,
+} from "./tracked-session-state"
+import { getSessionsToActivate } from "./focus-activation"
 type OpencodeClient = PluginInput["client"]
 
 interface SessionCreatedEvent {
@@ -82,7 +88,8 @@ export class TmuxSessionManager {
     this.pollingManager = new TmuxPollingManager(
       this.client,
       this.sessions,
-      this.closeSessionById.bind(this)
+      this.closeSessionById.bind(this),
+      this.activateFocusedSessionPanes.bind(this),
     )
     log("[tmux-session-manager] initialized", {
       configEnabled: this.tmuxConfig.enabled,
@@ -425,6 +432,41 @@ export class TmuxSessionManager {
       timeoutMs: SESSION_READY_TIMEOUT_MS,
     })
     return false
+  }
+
+  private async activateFocusedSessionPanes(): Promise<void> {
+    if (!this.sourcePaneId || this.sessions.size === 0) return
+
+    const state = await queryWindowState(this.sourcePaneId)
+    if (!state) return
+
+    const sessionsToActivate = getSessionsToActivate(state, this.sessions)
+    for (const tracked of sessionsToActivate) {
+      const result = await activateTmuxPane(
+        tracked.paneId,
+        tracked.sessionId,
+        tracked.description,
+        this.tmuxConfig,
+        this.serverUrl,
+      )
+
+      if (!result.success) {
+        log("[tmux-session-manager] failed to activate focused session pane", {
+          sessionId: tracked.sessionId,
+          paneId: tracked.paneId,
+        })
+        continue
+      }
+
+      const latestTracked = this.sessions.get(tracked.sessionId)
+      if (!latestTracked) continue
+
+      this.sessions.set(tracked.sessionId, markTrackedSessionActivated(latestTracked))
+      log("[tmux-session-manager] activated focused session pane", {
+        sessionId: tracked.sessionId,
+        paneId: tracked.paneId,
+      })
+    }
   }
 
   async onSessionCreated(event: SessionCreatedEvent): Promise<void> {

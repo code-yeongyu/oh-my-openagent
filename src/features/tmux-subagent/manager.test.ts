@@ -1,4 +1,5 @@
 import { describe, test, expect, mock, beforeEach, spyOn } from 'bun:test'
+import type { PluginInput } from '@opencode-ai/plugin'
 import type { TmuxConfig } from '../../config/schema'
 import type { WindowState, PaneAction } from './types'
 import type { ActionResult, ExecuteContext } from './action-executor'
@@ -34,6 +35,7 @@ const mockExecuteAction = mock<(
 ) => Promise<ActionResult>>(async () => ({ success: true }))
 const mockIsInsideTmux = mock<() => boolean>(() => true)
 const mockGetCurrentPaneId = mock<() => string | undefined>(() => '%0')
+const mockActivateTmuxPane = mock(async () => ({ success: true, paneId: '%mock' }))
 
 const mockTmuxDeps: TmuxUtilDeps = {
   isInsideTmux: mockIsInsideTmux,
@@ -65,6 +67,7 @@ mock.module('../../shared/tmux', () => {
   return {
     isInsideTmux,
     getCurrentPaneId,
+    activateTmuxPane: mockActivateTmuxPane,
     POLL_INTERVAL_BACKGROUND_MS,
     SESSION_TIMEOUT_MS,
     SESSION_MISSING_GRACE_MS,
@@ -78,7 +81,7 @@ const trackedSessions = new Set<string>()
 function createMockContext(overrides?: {
   sessionStatusResult?: { data?: Record<string, { type: string }> }
   sessionMessagesResult?: { data?: unknown[] }
-}) {
+}): PluginInput {
   return {
     serverUrl: new URL('http://localhost:4096'),
     client: {
@@ -101,7 +104,7 @@ function createMockContext(overrides?: {
         }),
       },
     },
-  } as any
+  } as unknown as PluginInput
 }
 
 function createSessionCreatedEvent(
@@ -127,6 +130,33 @@ function createWindowState(overrides?: Partial<WindowState>): WindowState {
   }
 }
 
+function getDeferredQueue(target: object): string[] {
+	const deferredQueue = Reflect.get(target, 'deferredQueue')
+	if (!Array.isArray(deferredQueue)) {
+		throw new Error('Expected deferredQueue array')
+	}
+
+	return deferredQueue
+}
+
+function getActivateFocusedSessionPanes(target: object): () => Promise<void> {
+	const activateFocusedSessionPanes = Reflect.get(target, 'activateFocusedSessionPanes')
+	if (typeof activateFocusedSessionPanes !== 'function') {
+		throw new Error('Expected activateFocusedSessionPanes method')
+	}
+
+	return activateFocusedSessionPanes.bind(target)
+}
+
+function getTryAttachDeferredSession(target: object): () => Promise<void> {
+	const tryAttachDeferredSession = Reflect.get(target, 'tryAttachDeferredSession')
+	if (typeof tryAttachDeferredSession !== 'function') {
+		throw new Error('Expected tryAttachDeferredSession method')
+	}
+
+	return tryAttachDeferredSession.bind(target)
+}
+
 describe('TmuxSessionManager', () => {
   beforeEach(() => {
     mockQueryWindowState.mockClear()
@@ -135,6 +165,7 @@ describe('TmuxSessionManager', () => {
     mockExecuteAction.mockClear()
     mockIsInsideTmux.mockClear()
     mockGetCurrentPaneId.mockClear()
+    mockActivateTmuxPane.mockClear()
     trackedSessions.clear()
 
     mockQueryWindowState.mockImplementation(async () => createWindowState())
@@ -326,6 +357,117 @@ describe('TmuxSessionManager', () => {
       expect(actionsArg[0].type).toBe('spawn')
     })
 
+    test('activates attach only when pane is focused', async () => {
+      // given
+      mockIsInsideTmux.mockReturnValue(true)
+      mockQueryWindowState.mockImplementation(async () => createWindowState())
+
+      const { TmuxSessionManager } = await import('./manager')
+      const manager = new TmuxSessionManager(createMockContext(), {
+        enabled: true,
+        layout: 'main-vertical',
+        main_pane_size: 60,
+        main_pane_min_width: 80,
+        agent_pane_min_width: 40,
+      }, mockTmuxDeps)
+
+      await manager.onSessionCreated(
+        createSessionCreatedEvent('ses_focus', 'ses_parent', 'Focus Task')
+      )
+
+      mockQueryWindowState.mockImplementation(async () =>
+        createWindowState({
+          agentPanes: [
+            {
+              paneId: '%mock',
+              width: 40,
+              height: 44,
+              left: 100,
+              top: 0,
+              title: 'omo-subagent-Focus Task',
+              isActive: false,
+            },
+          ],
+        })
+      )
+
+	      await getActivateFocusedSessionPanes(manager)()
+
+      expect(mockActivateTmuxPane).toHaveBeenCalledTimes(0)
+
+      mockQueryWindowState.mockImplementation(async () =>
+        createWindowState({
+          agentPanes: [
+            {
+              paneId: '%mock',
+              width: 40,
+              height: 44,
+              left: 100,
+              top: 0,
+              title: 'omo-subagent-Focus Task',
+              isActive: true,
+            },
+          ],
+        })
+      )
+	      await getActivateFocusedSessionPanes(manager)()
+
+      // then
+      expect(mockActivateTmuxPane).toHaveBeenCalledTimes(1)
+      expect(mockActivateTmuxPane).toHaveBeenCalledWith(
+        '%mock',
+        'ses_focus',
+        'Focus Task',
+	        expect.objectContaining({
+	          enabled: true,
+	          layout: 'main-vertical',
+	        }),
+	        'http://localhost:4096/',
+      )
+    })
+
+    test('focus-based activation is idempotent across repeated checks', async () => {
+      // given
+      mockIsInsideTmux.mockReturnValue(true)
+      mockQueryWindowState.mockImplementation(async () => createWindowState())
+
+      const { TmuxSessionManager } = await import('./manager')
+      const manager = new TmuxSessionManager(createMockContext(), {
+        enabled: true,
+        layout: 'main-vertical',
+        main_pane_size: 60,
+        main_pane_min_width: 80,
+        agent_pane_min_width: 40,
+      }, mockTmuxDeps)
+
+      await manager.onSessionCreated(
+        createSessionCreatedEvent('ses_once_focus', 'ses_parent', 'Focus Once')
+      )
+
+      mockQueryWindowState.mockImplementation(async () =>
+        createWindowState({
+          agentPanes: [
+            {
+              paneId: '%mock',
+              width: 40,
+              height: 44,
+              left: 100,
+              top: 0,
+              title: 'omo-subagent-Focus Once',
+              isActive: true,
+            },
+          ],
+        })
+      )
+
+      // when
+	      await getActivateFocusedSessionPanes(manager)()
+	      await getActivateFocusedSessionPanes(manager)()
+
+      // then
+      expect(mockActivateTmuxPane).toHaveBeenCalledTimes(1)
+    })
+
     test('does NOT spawn pane when session has no parentID', async () => {
       // given
       mockIsInsideTmux.mockReturnValue(true)
@@ -440,7 +582,7 @@ describe('TmuxSessionManager', () => {
 
       // then - with small window, manager defers instead of replacing
       expect(mockExecuteActions).toHaveBeenCalledTimes(0)
-      expect((manager as any).deferredQueue).toEqual(['ses_new'])
+	      expect(getDeferredQueue(manager)).toEqual(['ses_new'])
     })
 
     test('keeps deferred queue idempotent for duplicate session.created events', async () => {
@@ -484,7 +626,7 @@ describe('TmuxSessionManager', () => {
       )
 
       // then
-      expect((manager as any).deferredQueue).toEqual(['ses_dup'])
+	      expect(getDeferredQueue(manager)).toEqual(['ses_dup'])
     })
 
     test('auto-attaches deferred sessions in FIFO order', async () => {
@@ -538,17 +680,17 @@ describe('TmuxSessionManager', () => {
       await manager.onSessionCreated(createSessionCreatedEvent('ses_1', 'ses_parent', 'Task 1'))
       await manager.onSessionCreated(createSessionCreatedEvent('ses_2', 'ses_parent', 'Task 2'))
       await manager.onSessionCreated(createSessionCreatedEvent('ses_3', 'ses_parent', 'Task 3'))
-      expect((manager as any).deferredQueue).toEqual(['ses_1', 'ses_2', 'ses_3'])
+	      expect(getDeferredQueue(manager)).toEqual(['ses_1', 'ses_2', 'ses_3'])
 
       // when
       mockQueryWindowState.mockImplementation(async () => createWindowState())
-      await (manager as any).tryAttachDeferredSession()
-      await (manager as any).tryAttachDeferredSession()
-      await (manager as any).tryAttachDeferredSession()
+	      await getTryAttachDeferredSession(manager)()
+	      await getTryAttachDeferredSession(manager)()
+	      await getTryAttachDeferredSession(manager)()
 
       // then
       expect(attachOrder).toEqual(['ses_1', 'ses_2', 'ses_3'])
-      expect((manager as any).deferredQueue).toEqual([])
+	      expect(getDeferredQueue(manager)).toEqual([])
     })
 
     test('does not attach deferred session more than once across repeated retries', async () => {
@@ -605,12 +747,12 @@ describe('TmuxSessionManager', () => {
 
       // when
       mockQueryWindowState.mockImplementation(async () => createWindowState())
-      await (manager as any).tryAttachDeferredSession()
-      await (manager as any).tryAttachDeferredSession()
+	      await getTryAttachDeferredSession(manager)()
+	      await getTryAttachDeferredSession(manager)()
 
       // then
       expect(attachCount).toBe(1)
-      expect((manager as any).deferredQueue).toEqual([])
+	      expect(getDeferredQueue(manager)).toEqual([])
     })
 
     test('removes deferred session when session is deleted before attach', async () => {
@@ -648,13 +790,13 @@ describe('TmuxSessionManager', () => {
       await manager.onSessionCreated(
         createSessionCreatedEvent('ses_pending', 'ses_parent', 'Pending Task')
       )
-      expect((manager as any).deferredQueue).toEqual(['ses_pending'])
+	      expect(getDeferredQueue(manager)).toEqual(['ses_pending'])
 
       // when
       await manager.onSessionDeleted({ sessionID: 'ses_pending' })
 
       // then
-      expect((manager as any).deferredQueue).toEqual([])
+	      expect(getDeferredQueue(manager)).toEqual([])
       expect(mockExecuteAction).toHaveBeenCalledTimes(0)
     })
 
@@ -687,7 +829,7 @@ describe('TmuxSessionManager', () => {
             String(message).includes('failed to query window state, deferring session')
           )
         ).toBe(true)
-        expect((manager as any).deferredQueue).toEqual(['ses_null_state'])
+	        expect(getDeferredQueue(manager)).toEqual(['ses_null_state'])
 
         logSpy.mockRestore()
       })
@@ -728,7 +870,7 @@ describe('TmuxSessionManager', () => {
             String(message).includes('re-queueing deferred session after spawn failure')
           )
         ).toBe(true)
-        expect((manager as any).deferredQueue).toEqual(['ses_fail_no_close'])
+	        expect(getDeferredQueue(manager)).toEqual(['ses_fail_no_close'])
 
         logSpy.mockRestore()
       })
@@ -781,7 +923,7 @@ describe('TmuxSessionManager', () => {
             String(message).includes('re-queueing deferred session after spawn failure')
           )
         ).toBe(true)
-        expect((manager as any).deferredQueue).toEqual(['ses_fail_with_close'])
+	        expect(getDeferredQueue(manager)).toEqual(['ses_fail_with_close'])
 
         logSpy.mockRestore()
       })

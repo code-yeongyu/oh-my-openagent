@@ -12,10 +12,20 @@ export function createTrackedSession(params: {
     sessionId: params.sessionId,
     paneId: params.paneId,
     description: params.description,
+    attachActivated: false,
     createdAt: now,
     lastSeenAt: now,
     closePending: false,
     closeRetryCount: 0,
+  }
+}
+
+export function markTrackedSessionActivated(tracked: TrackedSession): TrackedSession {
+  if (tracked.attachActivated) return tracked
+
+  return {
+    ...tracked,
+    attachActivated: true,
   }
 }
 

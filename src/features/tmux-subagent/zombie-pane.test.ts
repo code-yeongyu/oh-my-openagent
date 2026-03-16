@@ -27,6 +27,7 @@ const mockExecuteActions = mock<(
 
 const mockIsInsideTmux = mock<() => boolean>(() => true)
 const mockGetCurrentPaneId = mock<() => string | undefined>(() => "%0")
+const mockActivateTmuxPane = mock(async () => ({ success: true, paneId: "%1" }))
 
 mock.module("./pane-state-querier", () => ({
   queryWindowState: mockQueryWindowState,
@@ -40,6 +41,7 @@ mock.module("./action-executor", () => ({
 mock.module("../../shared/tmux", () => ({
   isInsideTmux: mockIsInsideTmux,
   getCurrentPaneId: mockGetCurrentPaneId,
+  activateTmuxPane: mockActivateTmuxPane,
   POLL_INTERVAL_BACKGROUND_MS: 10,
   SESSION_READY_POLL_INTERVAL_MS: 10,
   SESSION_READY_TIMEOUT_MS: 50,
@@ -108,6 +110,7 @@ function createTrackedSession(overrides?: Partial<TrackedSession>): TrackedSessi
     sessionId: "ses_pending",
     paneId: "%1",
     description: "Pending pane",
+    attachActivated: false,
     createdAt: new Date(),
     lastSeenAt: new Date(),
     closePending: false,

@@ -9,5 +9,6 @@ export type { PaneDimensions } from "./tmux-utils/pane-dimensions"
 export { spawnTmuxPane } from "./tmux-utils/pane-spawn"
 export { closeTmuxPane } from "./tmux-utils/pane-close"
 export { replaceTmuxPane } from "./tmux-utils/pane-replace"
+export { activateTmuxPane } from "./tmux-utils/pane-activate"
 
 export { applyLayout, enforceMainPaneWidth } from "./tmux-utils/layout"

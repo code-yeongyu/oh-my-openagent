@@ -3,9 +3,9 @@ import type { TmuxConfig } from "../../../config/schema"
 import { getTmuxPath } from "../../../tools/interactive-bash/tmux-path-resolver"
 import type { SpawnPaneResult } from "../types"
 import { isInsideTmux } from "./environment"
-import { buildDetachedPanePlaceholderCommand } from "./pane-command"
+import { buildOpencodeAttachCommand } from "./pane-command"
 
-export async function replaceTmuxPane(
+export async function activateTmuxPane(
 	paneId: string,
 	sessionId: string,
 	description: string,
@@ -14,12 +14,7 @@ export async function replaceTmuxPane(
 ): Promise<SpawnPaneResult> {
 	const { log } = await import("../../logger")
 
-	log("[replaceTmuxPane] called", { paneId, sessionId, description })
-
-	if (!config.enabled) {
-		return { success: false }
-	}
-	if (!isInsideTmux()) {
+	if (!config.enabled || !isInsideTmux()) {
 		return { success: false }
 	}
 
@@ -28,16 +23,8 @@ export async function replaceTmuxPane(
 		return { success: false }
 	}
 
-	log("[replaceTmuxPane] sending Ctrl+C for graceful shutdown", { paneId })
-	const ctrlCProc = spawn([tmux, "send-keys", "-t", paneId, "C-c"], {
-		stdout: "pipe",
-		stderr: "pipe",
-	})
-	await ctrlCProc.exited
-
-	const placeholderCommand = buildDetachedPanePlaceholderCommand()
-
-	const proc = spawn([tmux, "respawn-pane", "-k", "-t", paneId, placeholderCommand], {
+	const opencodeCmd = buildOpencodeAttachCommand(serverUrl, sessionId)
+	const proc = spawn([tmux, "respawn-pane", "-k", "-t", paneId, opencodeCmd], {
 		stdout: "pipe",
 		stderr: "pipe",
 	})
@@ -45,7 +32,7 @@ export async function replaceTmuxPane(
 
 	if (exitCode !== 0) {
 		const stderr = await new Response(proc.stderr).text()
-		log("[replaceTmuxPane] FAILED", { paneId, exitCode, stderr: stderr.trim() })
+		log("[activateTmuxPane] FAILED", { paneId, sessionId, exitCode, stderr: stderr.trim() })
 		return { success: false }
 	}
 
@@ -58,13 +45,14 @@ export async function replaceTmuxPane(
 	const titleExitCode = await titleProc.exited
 	if (titleExitCode !== 0) {
 		const titleStderr = await stderrPromise
-		log("[replaceTmuxPane] WARNING: failed to set pane title", {
+		log("[activateTmuxPane] WARNING: failed to set pane title", {
 			paneId,
+			title,
 			exitCode: titleExitCode,
 			stderr: titleStderr.trim(),
 		})
 	}
 
-	log("[replaceTmuxPane] SUCCESS", { paneId, sessionId })
+	log("[activateTmuxPane] SUCCESS", { paneId, sessionId })
 	return { success: true, paneId }
 }
