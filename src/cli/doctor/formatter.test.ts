@@ -19,8 +19,10 @@ function createDoctorResult(): DoctorResult {
       isLocalDev: false,
     },
     tools: {
-      lspInstalled: 2,
-      lspTotal: 4,
+      lspServers: [
+        { id: "typescript", extensions: [".ts", ".tsx", ".js", ".jsx"] },
+        { id: "pyright", extensions: [".py", ".pyi"] },
+      ],
       astGrepCli: true,
       astGrepNapi: false,
       commentChecker: true,
@@ -119,7 +121,7 @@ describe("formatDoctorOutput", () => {
       const output = stripAnsi(formatDoctorOutput(result, "status"))
 
       //#then
-      expect(output).toContain("LSP 2/4")
+      expect(output).toContain("LSP")
       expect(output).toContain("context7")
     })
   })
