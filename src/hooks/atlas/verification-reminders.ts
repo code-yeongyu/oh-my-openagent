@@ -46,10 +46,8 @@ export function buildOrchestratorReminder(
   planName: string,
   progress: { total: number; completed: number },
   sessionId: string,
-  autoCommit: boolean = true,
   includeCompletionGate: boolean = true
 ): string {
-  void autoCommit
   const remaining = progress.total - progress.completed
 
   return `

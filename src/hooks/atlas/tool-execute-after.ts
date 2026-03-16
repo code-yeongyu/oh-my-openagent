@@ -21,10 +21,9 @@ import type { ToolExecuteAfterInput, ToolExecuteAfterOutput } from "./types"
 export function createToolExecuteAfterHandler(input: {
   ctx: PluginInput
   pendingFilePaths: Map<string, string>
-  autoCommit: boolean
   getState: (sessionID: string) => SessionState
 }): (toolInput: ToolExecuteAfterInput, toolOutput: ToolExecuteAfterOutput) => Promise<void> {
-  const { ctx, pendingFilePaths, autoCommit, getState } = input
+  const { ctx, pendingFilePaths, getState } = input
   return async (toolInput, toolOutput): Promise<void> => {
     // Guard against undefined output (e.g., from /review command - see issue #1035)
     if (!toolOutput) {
@@ -106,7 +105,7 @@ export function createToolExecuteAfterHandler(input: {
           : buildCompletionGate(boulderState.plan_name, subagentSessionId)
         const followupReminder = shouldPauseForApproval
           ? null
-          : buildOrchestratorReminder(boulderState.plan_name, progress, subagentSessionId, autoCommit, false)
+          : buildOrchestratorReminder(boulderState.plan_name, progress, subagentSessionId, false)
 
         toolOutput.output = `
 <system-reminder>
