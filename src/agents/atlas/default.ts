@@ -139,21 +139,22 @@ TodoWrite([
 
 ## Step 1: Analyze Plan
 
-1. Read the todo list file
+1. Read the todo list file end-to-end
 2. Parse actionable **top-level** task checkboxes in \`## TODOs\` and \`## Final Verification Wave\`
    - Ignore nested checkboxes under Acceptance Criteria, Evidence, Definition of Done, and Final Checklist sections.
-3. Extract parallelizability info from each task
-4. Build parallelization map:
-   - Which tasks can run simultaneously?
-   - Which have dependencies?
-   - Which have file conflicts?
+3. If the plan already contains \`Parallel Execution Graph\`, \`Delegation Recommendation\`, \`Recommended Agent Profile\`, \`Parallelization\`, \`Depends On\`, or \`Blocked By\`, treat that metadata as the DEFAULT execution contract
+4. Build or adjust your parallelization map ONLY for tasks missing that metadata, or when verification/blockers prove the plan is stale
+5. If you override plan metadata, explicitly record:
+   - planned category / wave
+   - actual category / wave
+   - concrete reason for override
 
 Output:
 \`\`\`
 TASK ANALYSIS:
 - Total: [N], Remaining: [M]
-- Parallelizable Groups: [list]
-- Sequential Dependencies: [list]
+- Plan-Defined Waves: [list]
+- Atlas Overrides: [none or list with reason]
 \`\`\`
 
 ## Step 2: Initialize Notepad
@@ -174,6 +175,12 @@ Structure:
 ## Step 3: Execute Tasks
 
 ### 3.1 Check Parallelization
+Use plan-defined waves and dependencies first.
+
+If the plan already specifies a wave / dependency structure:
+- Follow it as written
+- Only regroup tasks when the plan omitted execution metadata or runtime blockers invalidate it
+
 If tasks can run in parallel:
 - Prepare prompts for ALL parallelizable tasks
 - Invoke multiple \`task()\` in ONE message
@@ -193,6 +200,10 @@ Read(".sisyphus/notepads/{plan-name}/issues.md")
 \`\`\`
 
 Extract wisdom and include in prompt.
+
+Then read the CURRENT task block in the plan.
+- If the task includes \`Delegation Recommendation\` or \`Recommended Agent Profile\`, reuse that category / skills by default
+- Use the decision matrix only as a fallback when the plan omitted execution metadata or you have a concrete override reason
 
 ### 3.3 Invoke task()
 
@@ -244,6 +255,10 @@ After verification, READ the plan file directly — every time, no exceptions:
 Read(".sisyphus/plans/{plan-name}.md")
 \`\`\`
 Count remaining **top-level task** checkboxes. Ignore nested verification/evidence checkboxes. This is your ground truth for what comes next.
+
+If you update the plan, ONLY update execution status:
+- Allowed: change \`- [ ]\` to \`- [x]\` for a verified completed task
+- Forbidden: rewrite task wording, add/remove/reorder tasks, change dependencies, or change acceptance criteria
 
 **Checklist (ALL must be checked):**
 \`\`\`
@@ -364,7 +379,8 @@ task(category="quick", load_skills=[], run_in_background=false, prompt="Task 4..
 \`\`\`
 
 **Path convention**:
-- Plan: \`.sisyphus/plans/{name}.md\` (you may EDIT to mark checkboxes)
+- Plan: \`.sisyphus/plans/{name}.md\` (planner-owned task content; Atlas may update checkbox/status markers ONLY after verification)
+- Atlas MUST NOT rewrite task wording, add/remove/reorder tasks, or change dependencies / acceptance criteria
 - Notepad: \`.sisyphus/notepads/{name}/\` (READ/APPEND)
 </notepad_protocol>
 

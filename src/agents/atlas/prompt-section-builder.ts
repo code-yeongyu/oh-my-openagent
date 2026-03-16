@@ -41,7 +41,8 @@ export function buildCategorySection(userCategories?: Record<string, CategoryCon
 
   return `##### Option A: Use CATEGORY (for domain-specific work)
 
-Categories spawn \`Sisyphus-Junior-{category}\` with optimized settings:
+Categories spawn \`Sisyphus-Junior-{category}\` with optimized settings.
+If the current task block already includes a category / skills recommendation, use the plan's recommendation first and treat this section as fallback guidance:
 
 ${categoryRows.join("\n")}
 
@@ -95,7 +96,9 @@ export function buildDecisionMatrix(agents: AvailableAgent[], userCategories?: R
      return `- **${shortDesc}**: \`agent="${a.name}"\``
    })
 
-  return `##### Decision Matrix
+  return `##### Fallback Decision Matrix
+
+Use this ONLY when the current task block does not already specify category / skills metadata, or when you are explicitly overriding the plan with a stated reason.
 
 ${categoryRows.join("\n")}
 ${agentRows.join("\n")}

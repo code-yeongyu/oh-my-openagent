@@ -373,7 +373,7 @@ describe("atlas hook", () => {
       cleanupMessageStorage(sessionID)
     })
 
-     test("should include session_id and checkbox instructions in reminder", async () => {
+     test("should include status-only plan instructions in reminder", async () => {
        // given - boulder state, Atlas caller
        const sessionID = "session-resume-test"
        setupMessageStorage(sessionID, "atlas")
@@ -406,6 +406,9 @@ describe("atlas hook", () => {
       expect(output.output).toContain("LYING")
       expect(output.output).toContain("PHASE 1")
       expect(output.output).toContain("PHASE 2")
+      expect(output.output).toContain("Allowed: change")
+      expect(output.output).toContain("Forbidden: rewrite task wording")
+      expect(output.output).not.toContain("COMMIT ATOMIC UNIT")
       
       cleanupMessageStorage(sessionID)
     })
