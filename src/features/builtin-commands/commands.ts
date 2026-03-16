@@ -6,6 +6,7 @@ import { STOP_CONTINUATION_TEMPLATE } from "./templates/stop-continuation"
 import { REFACTOR_TEMPLATE } from "./templates/refactor"
 import { START_WORK_TEMPLATE } from "./templates/start-work"
 import { HANDOFF_TEMPLATE } from "./templates/handoff"
+import { COEUS_COMMAND_TEMPLATE } from "./templates/coeus"
 
 const BUILTIN_COMMAND_DEFINITIONS: Record<BuiltinCommandName, Omit<CommandDefinition, "name">> = {
   "init-deep": {
@@ -78,9 +79,9 @@ $ARGUMENTS
 ${STOP_CONTINUATION_TEMPLATE}
 </command-instruction>`,
   },
-  handoff: {
-    description: "(builtin) Create a detailed context summary for continuing work in a new session",
-    template: `<command-instruction>
+   handoff: {
+     description: "(builtin) Create a detailed context summary for continuing work in a new session",
+     template: `<command-instruction>
 ${HANDOFF_TEMPLATE}
 </command-instruction>
 
@@ -92,8 +93,25 @@ Timestamp: $TIMESTAMP
 <user-request>
 $ARGUMENTS
 </user-request>`,
-    argumentHint: "[goal]",
-  },
+     argumentHint: "[goal]",
+   },
+   coeus: {
+     description: "(builtin) Deep research planning with knowledge verification",
+     agent: "coeus",
+     template: `<command-instruction>
+${COEUS_COMMAND_TEMPLATE}
+</command-instruction>
+
+<coeus-session>
+Session ID: $SESSION_ID
+Timestamp: $TIMESTAMP
+</coeus-session>
+
+<user-request>
+$ARGUMENTS
+</user-request>`,
+     argumentHint: '"describe the complex feature or system to plan"',
+   },
 }
 
 export function loadBuiltinCommands(

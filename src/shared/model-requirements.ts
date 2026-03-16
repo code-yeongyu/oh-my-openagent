@@ -151,9 +151,26 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["opencode-go"], model: "kimi-k2.5" },
     ],
   },
+  coeus: {
+    fallbackChain: [
+      { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-opus-4-6", variant: "max" },
+      { providers: ["kimi-for-coding"], model: "k2p5" },
+      { providers: ["opencode"], model: "kimi-k2.5-free" },
+      { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.2", variant: "high" },
+    ],
+  },
+  "sub-prometheus": {
+    fallbackChain: [
+      { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-sonnet-4-5" },
+      { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.2", variant: "high" },
+      { providers: ["google", "github-copilot", "opencode"], model: "gemini-3-pro" },
+    ],
+  },
   "sisyphus-junior": {
     fallbackChain: [
       { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-sonnet-4-6" },
+      { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.4", variant: "medium" },
+      { providers: ["google", "github-copilot", "opencode"], model: "gemini-3-flash" },
       { providers: ["opencode-go"], model: "kimi-k2.5" },
       { providers: ["opencode"], model: "big-pickle" },
     ],

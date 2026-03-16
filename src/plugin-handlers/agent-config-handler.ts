@@ -20,11 +20,13 @@ import {
   filterProtectedAgentOverrides,
 } from "./agent-override-protection";
 import { buildPrometheusAgentConfig } from "./prometheus-agent-config-builder";
+import { buildCoeusAgentConfig } from "./coeus-agent-config-builder";
 import { buildPlanDemoteConfig } from "./plan-model-inheritance";
 
 type AgentConfigRecord = Record<string, Record<string, unknown> | undefined> & {
   build?: Record<string, unknown>;
   plan?: Record<string, unknown>;
+  coeus?: Record<string, unknown>;
 };
 
 function getConfiguredDefaultAgent(config: Record<string, unknown>): string | undefined {
@@ -184,6 +186,20 @@ export async function applyAgentConfig(params: {
       agentConfig["prometheus"] = await buildPrometheusAgentConfig({
         configAgentPlan: configAgent?.plan,
         pluginPrometheusOverride: prometheusOverride,
+        userCategories: params.pluginConfig.categories,
+        currentModel,
+      });
+    }
+
+    const coeusEnabled = params.pluginConfig.coeus?.enabled !== false;
+    if (coeusEnabled) {
+      const coeusOverride = params.pluginConfig.agents?.["coeus"] as
+        | (Record<string, unknown> & { prompt_append?: string })
+        | undefined;
+
+      agentConfig["coeus"] = await buildCoeusAgentConfig({
+        configAgentCoeus: configAgent?.coeus as Record<string, unknown> | undefined,
+        pluginCoeusOverride: coeusOverride,
         userCategories: params.pluginConfig.categories,
         currentModel,
       });

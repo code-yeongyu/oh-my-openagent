@@ -1,6 +1,8 @@
+import type { Model } from "@opencode-ai/sdk"
+
 export function createSystemTransformHandler(): (
-  input: { sessionID?: string; model: { id: string; providerID: string; [key: string]: unknown } },
+  input: { sessionID?: string; model: Model },
   output: { system: string[] },
-) => Promise<void> {
+)=> Promise<void> {
   return async (): Promise<void> => {}
 }

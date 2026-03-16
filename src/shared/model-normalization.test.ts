@@ -1,3 +1,5 @@
+/// <reference types="bun-types" />
+
 import { describe, expect, test } from "bun:test"
 import { normalizeModel, normalizeModelID } from "./model-normalization"
 
@@ -77,6 +79,30 @@ describe("normalizeModel", () => {
 
 			// then
 			expect(result).toBeUndefined()
+		})
+	})
+
+	describe("#given deprecated Claude Haiku inputs", () => {
+		test("#when user configured anthropic/claude-3-5-haiku-20241022 #then remaps to claude-haiku-4-5", () => {
+			// given
+			const input = "anthropic/claude-3-5-haiku-20241022"
+
+			// when
+			const result = normalizeModel(input)
+
+			// then
+			expect(result).toBe("anthropic/claude-haiku-4-5")
+		})
+
+		test("#when user writes haiku alias #then maps to anthropic/claude-haiku-4-5", () => {
+			// given
+			const input = "haiku"
+
+			// when
+			const result = normalizeModel(input)
+
+			// then
+			expect(result).toBe("anthropic/claude-haiku-4-5")
 		})
 	})
 })

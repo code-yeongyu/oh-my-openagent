@@ -1,6 +1,7 @@
 import { describe, test, expect } from "bun:test"
 import { loadBuiltinCommands } from "./commands"
 import { HANDOFF_TEMPLATE } from "./templates/handoff"
+import { COEUS_COMMAND_TEMPLATE } from "./templates/coeus"
 import type { BuiltinCommandName } from "./types"
 
 describe("loadBuiltinCommands", () => {
@@ -134,5 +135,60 @@ describe("HANDOFF_TEMPLATE", () => {
     //#when / #then
     const emojiRegex = /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2702}-\u{27B0}\u{24C2}-\u{1F251}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/u
     expect(emojiRegex.test(HANDOFF_TEMPLATE)).toBe(false)
+  })
+})
+
+describe("loadBuiltinCommands - coeus", () => {
+  test("should include coeus command in loaded commands", () => {
+    //#given
+    const disabledCommands: BuiltinCommandName[] = []
+
+    //#when
+    const commands = loadBuiltinCommands(disabledCommands)
+
+    //#then
+    expect(commands.coeus).toBeDefined()
+    expect(commands.coeus.name).toBe("coeus")
+  })
+
+  test("should have coeus agent set to 'coeus'", () => {
+    //#given - no disabled commands
+
+    //#when
+    const commands = loadBuiltinCommands()
+
+    //#then
+    expect(commands.coeus.agent).toBe("coeus")
+  })
+
+  test("should include coeus-session tag in coeus template", () => {
+    //#given - no disabled commands
+
+    //#when
+    const commands = loadBuiltinCommands()
+
+    //#then
+    expect(commands.coeus.template).toContain("<coeus-session>")
+  })
+
+  test("should include COEUS_COMMAND_TEMPLATE in coeus command template", () => {
+    //#given - no disabled commands
+
+    //#when
+    const commands = loadBuiltinCommands()
+
+    //#then
+    expect(commands.coeus.template).toContain(COEUS_COMMAND_TEMPLATE)
+  })
+
+  test("should exclude coeus when disabled", () => {
+    //#given
+    const disabledCommands: BuiltinCommandName[] = ["coeus"]
+
+    //#when
+    const commands = loadBuiltinCommands(disabledCommands)
+
+    //#then
+    expect(commands.coeus).toBeUndefined()
   })
 })

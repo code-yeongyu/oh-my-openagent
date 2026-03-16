@@ -1,0 +1,28 @@
+Task 8: coeus-command hook
+Date: 2026-03-05
+Status: COMPLETE
+
+## Files Created
+- src/hooks/coeus-command/constants.ts — COEUS_SESSION_TAG, HOOK_NAME, dir constants
+- src/hooks/coeus-command/brief-detector.ts — findBriefBySlug, findLatestBrief, listBriefs
+- src/hooks/coeus-command/state-injector.ts — buildCoeusContext for 3 states (fresh/brief-exists/plan-exists)
+- src/hooks/coeus-command/hook.ts — createCoeusCommandHook factory (chat.message)
+- src/hooks/coeus-command/index.ts — barrel exports
+- src/hooks/coeus-command/hook.test.ts — 11 tests, BDD comments
+
+## Files Modified
+- src/config/schema/hooks.ts — added "coeus-command" to HookNameSchema
+- src/hooks/index.ts — added createCoeusCommandHook export
+- src/plugin/hooks/create-session-hooks.ts — registered coeusCommand in type, creation, return
+- src/plugin/chat-message.ts — added coeusCommand call after startWork
+
+## Test Results
+bun test src/hooks/coeus-command/: 11 pass, 0 fail, 14 expect() calls
+
+## Typecheck
+Pre-existing error in plugin-interface.ts (unrelated). No new errors introduced.
+Verified by: git stash → typecheck → same error → git stash pop
+
+## TDD
+RED: Tests written first, confirmed module-not-found failures
+GREEN: All 11 tests pass after implementation

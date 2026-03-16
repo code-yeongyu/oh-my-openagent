@@ -64,6 +64,7 @@
     "diff": "^8.0.3",
     "js-yaml": "^4.1.1",
     "jsonc-parser": "^3.3.1",
+    "oh-my-opencode": "^3.10.0",
     "picocolors": "^1.1.1",
     "picomatch": "^4.0.2",
     "vscode-jsonrpc": "^8.2.0",

@@ -35,6 +35,7 @@ export { createAutoSlashCommandHook } from "./auto-slash-command";
 export { createEditErrorRecoveryHook } from "./edit-error-recovery";
 
 export { createPrometheusMdOnlyHook } from "./prometheus-md-only";
+export { createCoeusMdOnlyHook } from "./coeus-md-only";
 export { createSisyphusJuniorNotepadHook } from "./sisyphus-junior-notepad";
 export { createTaskResumeInfoHook } from "./task-resume-info";
 export { createStartWorkHook } from "./start-work";
@@ -52,4 +53,5 @@ export { createWriteExistingFileGuardHook } from "./write-existing-file-guard";
 export { createHashlineReadEnhancerHook } from "./hashline-read-enhancer";
 export { createJsonErrorRecoveryHook, JSON_ERROR_TOOL_EXCLUDE_LIST, JSON_ERROR_PATTERNS, JSON_ERROR_REMINDER } from "./json-error-recovery";
 export { createReadImageResizerHook } from "./read-image-resizer"
+export { createCoeusCommandHook } from "./coeus-command"
 export { createDelegateTaskEnglishDirectiveHook } from "./delegate-task-english-directive"

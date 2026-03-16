@@ -17,7 +17,7 @@ oh-my-opencode/
 │   ├── hooks/                # 46 hooks across 45 directories + 11 standalone files
 │   ├── tools/                # 26 tools across 15 directories
 │   ├── features/             # 19 feature modules (background-agent, skill-loader, tmux, MCP-OAuth, etc.)
-│   ├── shared/               # 95+ utility files in 13 categories
+│   ├── shared/               # 95+ utility files in 13 categories (includes taxonomy-client.ts)
 │   ├── config/               # Zod v4 schema system (24 files)
 │   ├── cli/                  # CLI: install, run, doctor, mcp-oauth (Commander.js)
 │   ├── mcp/                  # 3 built-in remote MCPs (websearch, context7, grep_app)
@@ -31,11 +31,16 @@ oh-my-opencode/
 
 ```
 OhMyOpenCodePlugin(ctx)
-  ├─→ loadPluginConfig()         # JSONC parse → project/user merge → Zod validate → migrate
-  ├─→ createManagers()           # TmuxSessionManager, BackgroundManager, SkillMcpManager, ConfigHandler
-  ├─→ createTools()              # SkillContext + AvailableCategories + ToolRegistry (26 tools)
-  ├─→ createHooks()              # 3-tier: Core(37) + Continuation(7) + Skill(2) = 46 hooks
-  └─→ createPluginInterface()    # 8 OpenCode hook handlers → PluginInterface
+  1. injectServerAuthIntoClient(ctx.client)
+  2. startTmuxCheck()
+  3. loadPluginConfig(ctx.directory, ctx)      → OhMyOpenCodeConfig
+  4. createFirstMessageVariantGate()
+  5. createModelCacheState()
+  6. createManagers(ctx, config, tmux, cache)  → TmuxSessionManager, BackgroundManager, SkillMcpManager, ConfigHandler
+  7. createTools(ctx, config, managers)         → filteredTools, mergedSkills, availableSkills, availableCategories
+  8. createHooks(ctx, config, backgroundMgr)   → 41 hooks (core + continuation + skill)
+  9. createPluginInterface(...)                 → 7 OpenCode hook handlers
+ 10. Return plugin with experimental.session.compacting
 ```
 
 ## 8 OPENCODE HOOK HANDLERS
@@ -52,27 +57,32 @@ OhMyOpenCodePlugin(ctx)
 | `tool.execute.after` | Post-tool hooks (output truncation, metadata store) |
 | `experimental.chat.messages.transform` | Context injection, thinking block validation |
 
+
 ## WHERE TO LOOK
 
 | Task | Location | Notes |
 |------|----------|-------|
-| Add new agent | `src/agents/` + `src/agents/builtin-agents/` | Follow createXXXAgent factory pattern |
-| Add new hook | `src/hooks/{name}/` + register in `src/plugin/hooks/create-*-hooks.ts` | Match event type to tier |
-| Add new tool | `src/tools/{name}/` + register in `src/plugin/tool-registry.ts` | Follow createXXXTool factory |
-| Add new feature module | `src/features/{name}/` | Standalone module, wire in plugin/ |
-| Add new MCP | `src/mcp/` + register in `createBuiltinMcps()` | Remote HTTP only |
-| Add new skill | `src/features/builtin-skills/skills/` | Implement BuiltinSkill interface |
-| Add new command | `src/features/builtin-commands/` | Template in templates/ |
-| Add new CLI command | `src/cli/cli-program.ts` | Commander.js subcommand |
-| Add new doctor check | `src/cli/doctor/checks/` | Register in checks/index.ts |
-| Modify config schema | `src/config/schema/` + update root schema | Zod v4, add to OhMyOpenCodeConfigSchema |
-| Add new category | `src/tools/delegate-task/constants.ts` | DEFAULT_CATEGORIES + CATEGORY_MODEL_REQUIREMENTS |
+| Add agent | `src/agents/` | Create .ts with factory, add to `agentSources` in builtin-agents/ |
+| Add hook | `src/hooks/` | Create dir, register in `src/plugin/hooks/create-*-hooks.ts` |
+| Add tool | `src/tools/` | Dir with index/types/constants/tools.ts |
+| Add MCP | `src/mcp/` | Create config, add to `createBuiltinMcps()` |
+| Add skill | `src/features/builtin-skills/` | Create .ts in skills/ |
+| Add command | `src/features/builtin-commands/` | Add template + register in commands.ts |
+| Config schema | `src/config/schema/` | 21 schema component files, run `bun run build:schema` |
+| Plugin config | `src/plugin-handlers/config-handler.ts` | JSONC loading, merging, migration |
+| Background agents | `src/features/background-agent/` | manager.ts (1701 lines) |
+| Orchestrator | `src/hooks/atlas/` | Main orchestration hook (1976 lines) |
+| Delegation | `src/tools/delegate-task/` | Category routing (constants.ts 569 lines) |
+| Task system | `src/features/claude-tasks/` | Task schema, storage, todo sync |
+| Coeus planner | `src/agents/coeus/` | Recursive divide-and-conquer planner (14 files) |
+| Plugin interface | `src/plugin/` | 21 files composing hooks, handlers, registries |
 
-## MULTI-LEVEL CONFIG
+## TDD (Test-Driven Development)
 
-```
-Project (.opencode/oh-my-opencode.jsonc)  →  User (~/.config/opencode/oh-my-opencode.jsonc)  →  Defaults
-```
+**MANDATORY.** RED-GREEN-REFACTOR:
+1. **RED**: Write test → `bun test` → FAIL
+2. **GREEN**: Implement minimum → PASS
+3. **REFACTOR**: Clean up → stay GREEN
 
 - `agents`, `categories`, `claude_code`: deep merged recursively
 - `disabled_*` arrays: Set union (concatenated + deduplicated)
@@ -127,13 +137,15 @@ Fields: agents (14 overridable, 21 fields each), categories (8 built-in + custom
 bun test                    # Bun test suite
 bun run build              # Build plugin (ESM + declarations + schema)
 bun run build:all          # Build + platform binaries
+bun run rebuild            # Clean + Build
 bun run typecheck           # tsc --noEmit
+bun run build:schema       # Regenerate JSON schema
 bunx oh-my-opencode install # Interactive setup
 bunx oh-my-opencode doctor  # Health diagnostics
 bunx oh-my-opencode run     # Non-interactive session
 ```
 
-## CI/CD
+## DEPLOYMENT
 
 | Workflow | Trigger | Purpose |
 |----------|---------|---------|
@@ -143,6 +155,37 @@ bunx oh-my-opencode run     # Non-interactive session
 | sisyphus-agent.yml | @mention / dispatch | AI agent handles issues/PRs |
 | cla.yml | issue_comment/PR | CLA assistant for contributors |
 | lint-workflows.yml | push to .github/ | actionlint + shellcheck on workflow files |
+
+## COMPLEXITY HOTSPOTS
+
+| File | Lines | Description |
+|------|-------|-------------|
+| `src/features/background-agent/manager.ts` | 1701 | Task lifecycle, concurrency |
+| `src/hooks/anthropic-context-window-limit-recovery/` | 2232 | Multi-strategy context recovery |
+| `src/hooks/claude-code-hooks/` | 2110 | Claude Code settings.json compat |
+| `src/hooks/todo-continuation-enforcer/` | 2061 | Core boulder mechanism |
+| `src/hooks/atlas/` | 1976 | Session orchestration |
+| `src/hooks/ralph-loop/` | 1687 | Self-referential dev loop |
+| `src/hooks/keyword-detector/` | 1665 | Mode detection (ultrawork/search) |
+| `src/hooks/rules-injector/` | 1604 | Conditional rules injection |
+| `src/hooks/think-mode/` | 1365 | Model/variant switching |
+| `src/hooks/session-recovery/` | 1279 | Auto error recovery |
+| `src/features/builtin-skills/skills/git-master.ts` | 1112 | Git master skill |
+| `src/tools/delegate-task/constants.ts` | 569 | Category routing configs |
+
+## MCP ARCHITECTURE
+
+Three-tier system:
+1. **Built-in** (src/mcp/): websearch (Exa/Tavily), context7 (docs), grep_app (GitHub)
+2. **Claude Code compat** (features/claude-code-mcp-loader/): .mcp.json with `${VAR}` expansion
+3. **Skill-embedded** (features/opencode-skill-loader/): YAML frontmatter in SKILL.md
+
+## CONFIG SYSTEM
+
+- **Zod validation**: 21 schema component files in `src/config/schema/`
+- **JSONC support**: Comments, trailing commas
+- **Multi-level**: Project (`.opencode/`) → User (`~/.config/opencode/`) → Defaults
+- **Migration**: Legacy config auto-migration in `src/shared/migration/`
 
 ## NOTES
 
@@ -155,3 +198,5 @@ bunx oh-my-opencode run     # Non-interactive session
 - Test setup: `test-setup.ts` preloaded via bunfig.toml, mock-heavy tests run in isolation in CI
 - 98 barrel export files (index.ts) establish module boundaries
 - Architecture rules enforced via `.sisyphus/rules/modular-code-enforcement.md`
+- **No linter/formatter**: No ESLint, Prettier, or Biome configured
+- **License**: SUL-1.0 (Sisyphus Use License)
