@@ -144,8 +144,11 @@ export async function handleSessionIdle(args: {
   }
 
   let resolvedInfo: ResolvedMessageInfo | undefined
+  let encounteredCompaction = false
   try {
-    resolvedInfo = await resolveLatestMessageInfo(ctx, sessionID)
+    const messageInfoResult = await resolveLatestMessageInfo(ctx, sessionID)
+    resolvedInfo = messageInfoResult.resolvedInfo
+    encounteredCompaction = messageInfoResult.encounteredCompaction
   } catch (error) {
     log(`[${HOOK_NAME}] Failed to fetch messages for agent check`, { sessionID, error: String(error) })
   }
@@ -164,7 +167,7 @@ export async function handleSessionIdle(args: {
     log(`[${HOOK_NAME}] Skipped: agent in skipAgents list`, { sessionID, agent: resolvedAgentName })
     return
   }
-  if (compactionGuardActive && !resolvedInfo?.agent) {
+  if ((compactionGuardActive || encounteredCompaction) && !resolvedInfo?.agent) {
     log(`[${HOOK_NAME}] Skipped: compaction occurred but no agent info resolved`, { sessionID })
     return
   }
