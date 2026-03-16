@@ -143,8 +143,8 @@ describe("createAnthropicEffortHook", () => {
       expect(output.options.effort).toBeUndefined()
     })
 
-    it("should NOT inject effort for non-opus model", async () => {
-      //#given claude-sonnet-4-6 (not opus)
+    it("should clamp effort to high for non-opus claude model with variant max", async () => {
+      //#given claude-sonnet-4-6 (not opus) with variant max
       const hook = createAnthropicEffortHook()
       const { input, output } = createMockParams({
         modelID: "claude-sonnet-4-6",
@@ -153,8 +153,9 @@ describe("createAnthropicEffortHook", () => {
       //#when chat.params hook is called
       await hook["chat.params"](input, output)
 
-      //#then effort should NOT be injected
-      expect(output.options.effort).toBeUndefined()
+      //#then effort should be clamped to high (not max)
+      expect(output.options.effort).toBe("high")
+      expect(input.message.variant).toBe("high")
     })
 
     it("should NOT inject effort for non-anthropic provider with non-claude model", async () => {
