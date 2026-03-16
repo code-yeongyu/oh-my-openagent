@@ -11,6 +11,20 @@ export const ALLOWED_PATH_PREFIX = ".sisyphus"
 
 export const BLOCKED_TOOLS = ["Write", "Edit", "write", "edit"]
 
+export const BASH_TOOLS = ["Bash", "bash"]
+
+const WRITE_COMMAND_PATTERNS = [
+  /\b(cp|mv|rm|mkdir|rmdir|touch|chmod|chown)\b/,
+  /\b(sed\s+-i|perl\s+-[pi])/,
+  /\b(tee|install)\b/,
+  />[^>]/,
+  /\bgit\s+(add|commit|push|merge|rebase|reset|checkout\s+-b|branch\s+-[dD]|stash|cherry-pick|revert|tag)\b/,
+]
+
+export function isWriteCommand(command: string): boolean {
+  return WRITE_COMMAND_PATTERNS.some((pattern) => pattern.test(command))
+}
+
 export const PLANNING_CONSULT_WARNING = `
 
 ---

@@ -1,5 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { HOOK_NAME, BLOCKED_TOOLS, PLANNING_CONSULT_WARNING, PROMETHEUS_WORKFLOW_REMINDER } from "./constants"
+import { HOOK_NAME, BLOCKED_TOOLS, BASH_TOOLS, PLANNING_CONSULT_WARNING, PROMETHEUS_WORKFLOW_REMINDER, isWriteCommand } from "./constants"
 import { log } from "../../shared/logger"
 import { SYSTEM_DIRECTIVE_PREFIX } from "../../shared/system-directive"
 import { getAgentDisplayName } from "../../shared/agent-display-names"
@@ -33,6 +33,24 @@ export function createPrometheusMdOnlyHook(ctx: PluginInput) {
             tool: toolName,
             agent: agentName,
           })
+        }
+        return
+      }
+
+      if (BASH_TOOLS.includes(toolName)) {
+        const command = output.args.command as string | undefined
+        if (command && isWriteCommand(command)) {
+          log(`[${HOOK_NAME}] Blocked: Prometheus cannot run file-modifying shell commands`, {
+            sessionID: input.sessionID,
+            tool: toolName,
+            command: command.slice(0, 200),
+            agent: agentName,
+          })
+          throw new Error(
+            `[${HOOK_NAME}] ${getAgentDisplayName("prometheus")} is a READ-ONLY planner and cannot run file-modifying shell commands. ` +
+            `Blocked command: ${command.slice(0, 100)}. ` +
+            `Use /start-work to execute your plan. Only read-only commands (git log, ls, grep, cat) are allowed.`
+          )
         }
         return
       }
