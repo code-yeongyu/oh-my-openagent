@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { parsePlanContractFromContent } from "./plan-contract"
+import { parsePlanContractFromContent, summarizePlanExecution } from "./plan-contract"
 
 describe("plan-contract parser", () => {
   test("parses top-level tasks and ignores nested acceptance criteria checkboxes", () => {
@@ -117,6 +117,62 @@ Wave 2:
     expect(contract.waves).toEqual([
       { id: "Wave 1", taskIds: ["1", "5"] },
       { id: "Wave 2", taskIds: ["2", "3"] },
+    ])
+  })
+
+  test("summarizes next work from parsed waves and top-level tasks", () => {
+    const content = `# Plan
+
+## Parallel Execution Graph
+
+Wave 1:
+├── Task 1: foundation
+└── Task 2: api
+
+Wave 2:
+└── Task 3: review
+
+## TODOs
+
+- [x] 1. Foundation
+
+  **Recommended Agent Profile**:
+  - Category: \`deep\`
+
+  **Parallelization**: Can Parallel: YES | Wave 1
+
+- [ ] 2. API
+
+  **Recommended Agent Profile**:
+  - Category: \`unspecified-high\`
+
+  **Parallelization**: Can Parallel: YES | Wave 1
+
+## Final Verification Wave
+
+- [ ] F1. Review
+
+  **Recommended Agent Profile**:
+  - Category: \`oracle\`
+
+  **Parallelization**: Can Parallel: NO | Wave 2
+`
+
+    const contract = parsePlanContractFromContent("/tmp/summary-plan.md", content)
+    const summary = summarizePlanExecution(contract)
+
+    expect(summary.progress).toEqual({ total: 3, completed: 1, isComplete: false })
+    expect(summary.pendingImplementationTaskCount).toBe(1)
+    expect(summary.pendingFinalWaveTaskCount).toBe(1)
+    expect(summary.nextWaveId).toBe("Wave 1")
+    expect(summary.nextTasks).toEqual([
+      {
+        id: "2",
+        title: "API",
+        category: "unspecified-high",
+        wave: "Wave 1",
+        section: "todo",
+      },
     ])
   })
 })

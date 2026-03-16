@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs"
 import { basename } from "node:path"
+import type { PlanProgress } from "./types"
 
 export type ParsedPlanTaskSection = "todo" | "final-wave"
 export type ParsedPlanTaskSourceFormat =
@@ -33,6 +34,14 @@ export interface ParsedPlanContract {
   planName: string
   tasks: ParsedPlanTask[]
   waves: ParsedPlanWave[]
+}
+
+export interface PlanExecutionSummary {
+  progress: PlanProgress
+  pendingImplementationTaskCount: number
+  pendingFinalWaveTaskCount: number
+  nextWaveId?: string
+  nextTasks: Array<Pick<ParsedPlanTask, "id" | "title" | "category" | "wave" | "section">>
 }
 
 const TODO_SECTION_HEADER = /^##\s+TODOs\b/i
@@ -287,4 +296,54 @@ export function readPlanContract(planPath: string): ParsedPlanContract | null {
   } catch {
     return null
   }
+}
+
+export function summarizePlanExecution(contract: ParsedPlanContract): PlanExecutionSummary {
+  const pendingTasks = contract.tasks.filter((task) => !task.checked)
+  const completedTasks = contract.tasks.filter((task) => task.checked)
+  const pendingImplementationTasks = pendingTasks.filter((task) => task.section === "todo")
+  const pendingFinalWaveTasks = pendingTasks.filter((task) => task.section === "final-wave")
+
+  const waveOrder = contract.waves.map((wave) => wave.id)
+  const pendingWaveIds = pendingTasks
+    .map((task) => task.wave)
+    .filter((waveId): waveId is string => Boolean(waveId))
+  const nextWaveId = waveOrder.find((waveId) => pendingWaveIds.includes(waveId))
+
+  let nextTasks = pendingTasks
+  if (nextWaveId) {
+    const waveTasks = pendingTasks.filter((task) => task.wave === nextWaveId)
+    if (waveTasks.length > 0) {
+      nextTasks = waveTasks
+    }
+  } else if (pendingTasks.length > 0) {
+    nextTasks = [pendingTasks[0]]
+  }
+
+  return {
+    progress: {
+      total: contract.tasks.length,
+      completed: completedTasks.length,
+      isComplete: pendingTasks.length === 0,
+    },
+    pendingImplementationTaskCount: pendingImplementationTasks.length,
+    pendingFinalWaveTaskCount: pendingFinalWaveTasks.length,
+    ...(nextWaveId ? { nextWaveId } : {}),
+    nextTasks: nextTasks.map((task) => ({
+      id: task.id,
+      title: task.title,
+      ...(task.category ? { category: task.category } : {}),
+      ...(task.wave ? { wave: task.wave } : {}),
+      section: task.section,
+    })),
+  }
+}
+
+export function readPlanExecutionSummary(planPath: string): PlanExecutionSummary | null {
+  const contract = readPlanContract(planPath)
+  if (!contract) {
+    return null
+  }
+
+  return summarizePlanExecution(contract)
 }

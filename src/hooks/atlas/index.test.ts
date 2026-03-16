@@ -1150,6 +1150,61 @@ describe("atlas hook", () => {
       expect(callArgs.body.parts[0].text).toContain("2 remaining")
     })
 
+    test("should include structured next-work guidance when plan metadata defines waves", async () => {
+      // given - structured plan with wave/category metadata
+      const planPath = join(TEST_DIR, "structured-plan.md")
+      writeFileSync(planPath, `# Plan
+
+## Parallel Execution Graph
+
+Wave 1:
+├── Task 1: foundation
+└── Task 2: api
+
+## TODOs
+
+- [x] 1. Foundation
+
+  **Recommended Agent Profile**:
+  - Category: \`deep\`
+
+  **Parallelization**: Can Parallel: YES | Wave 1
+
+- [ ] 2. API
+
+  **Recommended Agent Profile**:
+  - Category: \`unspecified-high\`
+
+  **Parallelization**: Can Parallel: YES | Wave 1
+`)
+
+      const state: BoulderState = {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: [MAIN_SESSION_ID],
+        plan_name: "structured-plan",
+      }
+      writeBoulderState(TEST_DIR, state)
+
+      const mockInput = createMockPluginInput()
+      const hook = createAtlasHook(mockInput)
+
+      // when
+      await hook.handler({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: MAIN_SESSION_ID },
+        },
+      })
+
+      // then
+      const callArgs = mockInput._promptMock.mock.calls[0][0]
+      expect(callArgs.body.parts[0].text).toContain("STRUCTURED NEXT WORK")
+      expect(callArgs.body.parts[0].text).toContain("Current wave: Wave 1")
+      expect(callArgs.body.parts[0].text).toContain("2. API")
+      expect(callArgs.body.parts[0].text).toContain("category=unspecified-high")
+    })
+
     test("should inject when last agent is sisyphus and boulder targets atlas explicitly", async () => {
        // given - boulder explicitly set to atlas, but last agent is sisyphus (initial state after /start-work)
        const planPath = join(TEST_DIR, "test-plan.md")

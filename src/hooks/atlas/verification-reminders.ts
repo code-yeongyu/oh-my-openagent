@@ -1,5 +1,43 @@
 import { VERIFICATION_REMINDER } from "./system-reminder-templates"
 
+type NextWorkTask = {
+  id: string
+  title: string
+  category?: string
+  wave?: string
+  section: "todo" | "final-wave"
+}
+
+type NextWorkSummary = {
+  nextWaveId?: string
+  nextTasks: NextWorkTask[]
+}
+
+function buildNextWorkSection(nextWork?: NextWorkSummary): string {
+  if (!nextWork || nextWork.nextTasks.length === 0) {
+    return ""
+  }
+
+  const waveLine = nextWork.nextWaveId ? `**NEXT WAVE:** \`${nextWork.nextWaveId}\`\n\n` : ""
+  const taskLines = nextWork.nextTasks
+    .map((task) => {
+      const suffix: string[] = []
+      if (task.category) suffix.push(`category=\`${task.category}\``)
+      if (task.section === "final-wave") suffix.push("final-wave")
+      return `- \`${task.id}\` ${task.title}${suffix.length > 0 ? ` (${suffix.join(", ")})` : ""}`
+    })
+    .join("\n")
+
+  return `
+**STRUCTURED NEXT WORK**
+
+${waveLine}Use the parsed plan contract as the default execution order for the next delegation(s):
+${taskLines}
+
+Do not skip ahead unless verification or a runtime blocker proves the plan metadata is stale.
+`
+}
+
 export function buildCompletionGate(planName: string, sessionId: string): string {
   return `
 **COMPLETION GATE — DO NOT PROCEED UNTIL THIS IS DONE**
@@ -46,7 +84,8 @@ export function buildOrchestratorReminder(
   planName: string,
   progress: { total: number; completed: number },
   sessionId: string,
-  includeCompletionGate: boolean = true
+  includeCompletionGate: boolean = true,
+  nextWork?: NextWorkSummary
 ): string {
   const remaining = progress.total - progress.completed
 
@@ -86,10 +125,12 @@ Read(".sisyphus/plans/${planName}.md")
 Count exactly: how many \`- [ ]\` remain? How many \`- [x]\` completed?
 This is YOUR ground truth. Use it to decide what comes next.
 
-**STEP 7: PROCEED TO NEXT TASK**
+**STEP 8: PROCEED TO NEXT TASK**
 
 - Read the plan file AGAIN to identify the next \`- [ ]\` task
 - Start immediately - DO NOT STOP
+
+${buildNextWorkSection(nextWork)}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 

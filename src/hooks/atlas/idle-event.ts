@@ -23,6 +23,7 @@ async function injectContinuation(input: {
   sessionState: SessionState
   options?: AtlasHookOptions
   planName: string
+  planPath?: string
   progress: { total: number; completed: number }
   agent?: string
   worktreePath?: string
@@ -38,6 +39,7 @@ async function injectContinuation(input: {
       remaining,
       total: input.progress.total,
       agent: input.agent,
+      planPath: input.planPath,
       worktreePath: input.worktreePath,
       backgroundManager: input.options?.backgroundManager,
       sessionState: input.sessionState,
@@ -83,6 +85,7 @@ function scheduleRetry(input: {
       planName: currentBoulder.plan_name,
       progress: currentProgress,
       agent: currentBoulder.agent,
+      planPath: currentBoulder.active_plan,
       worktreePath: currentBoulder.worktree_path,
     })
   }, RETRY_DELAY_MS)
@@ -184,6 +187,7 @@ export async function handleAtlasSessionIdle(input: {
     planName: boulderState.plan_name,
     progress,
     agent: boulderState.agent,
+    planPath: boulderState.active_plan,
     worktreePath: boulderState.worktree_path,
   })
 }

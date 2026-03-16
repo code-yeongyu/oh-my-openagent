@@ -1,5 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { appendSessionId, getPlanProgress, readBoulderState } from "../../features/boulder-state"
+import { appendSessionId, getPlanProgress, readBoulderState, readPlanExecutionSummary } from "../../features/boulder-state"
 import { log } from "../../shared/logger"
 import { isCallerOrchestrator } from "../../shared/session-utils"
 import { collectGitDiffStats, formatFileChanges } from "../../shared/git-worktree"
@@ -71,6 +71,7 @@ export function createToolExecuteAfterHandler(input: {
       const boulderState = readBoulderState(ctx.directory)
       if (boulderState) {
         const progress = getPlanProgress(boulderState.active_plan)
+        const executionSummary = readPlanExecutionSummary(boulderState.active_plan)
         const sessionState = toolInput.sessionID ? getState(toolInput.sessionID) : undefined
 
         if (toolInput.sessionID && !boulderState.session_ids?.includes(toolInput.sessionID)) {
@@ -105,7 +106,18 @@ export function createToolExecuteAfterHandler(input: {
           : buildCompletionGate(boulderState.plan_name, subagentSessionId)
         const followupReminder = shouldPauseForApproval
           ? null
-          : buildOrchestratorReminder(boulderState.plan_name, progress, subagentSessionId, false)
+          : buildOrchestratorReminder(
+              boulderState.plan_name,
+              progress,
+              subagentSessionId,
+              false,
+              executionSummary
+                ? {
+                    nextWaveId: executionSummary.nextWaveId,
+                    nextTasks: executionSummary.nextTasks,
+                  }
+                : undefined,
+            )
 
         toolOutput.output = `
 <system-reminder>
