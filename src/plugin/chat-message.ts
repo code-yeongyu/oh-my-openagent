@@ -105,6 +105,7 @@ export function createChatMessageHandler(args: {
       hooks.thinkMode?.["chat.message"]?.(input, output),
       hooks.noSisyphusGpt?.["chat.message"]?.(input, output),
       hooks.noHephaestusNonGpt?.["chat.message"]?.(input, output),
+      hooks.claudeCodeHooks?.["chat.message"]?.(input, output),
     ])
 
     await hooks.autoSlashCommand?.["chat.message"]?.(input, output)
@@ -112,12 +113,6 @@ export function createChatMessageHandler(args: {
     if (hooks.startWork && isStartWorkHookOutput(output)) {
       await hooks.startWork["chat.message"]?.(input, output)
     }
-
-    const nonBlockingHooks: Promise<void>[] = [
-      hooks.claudeCodeHooks?.["chat.message"]?.(input, output),
-    ].filter((p): p is Promise<void> => p !== undefined)
-
-    void Promise.all(nonBlockingHooks).catch(() => {})
 
     if (!hasConnectedProvidersCache()) {
       pluginContext.client.tui
