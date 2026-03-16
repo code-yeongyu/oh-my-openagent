@@ -24,7 +24,7 @@ function removeSessionEntries(entries: Map<string, number>, sessionID: string): 
 
 export interface ProcessedCommandStore {
   has(commandKey: string): boolean
-  add(commandKey: string): void
+  add(commandKey: string, ttlMs?: number): void
   cleanupSession(sessionID: string): void
   clear(): void
 }
@@ -38,11 +38,11 @@ export function createProcessedCommandStore(): ProcessedCommandStore {
       entries = pruneExpiredEntries(entries, now)
       return entries.has(commandKey)
     },
-    add(commandKey: string): void {
+    add(commandKey: string, ttlMs = PROCESSED_COMMAND_TTL_MS): void {
       const now = Date.now()
       entries = pruneExpiredEntries(entries, now)
       entries.delete(commandKey)
-      entries.set(commandKey, now + PROCESSED_COMMAND_TTL_MS)
+      entries.set(commandKey, now + ttlMs)
       entries = trimProcessedEntries(entries)
     },
     cleanupSession(sessionID: string): void {

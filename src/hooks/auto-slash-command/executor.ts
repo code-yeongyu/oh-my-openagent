@@ -41,6 +41,7 @@ export interface ExecutorOptions {
   skills?: LoadedSkill[]
   pluginsEnabled?: boolean
   enabledPluginsOverride?: Record<string, boolean>
+  agent?: string
 }
 
 function filterDiscoveredCommandsByScope(
@@ -60,12 +61,12 @@ async function discoverAllCommands(options?: ExecutorOptions): Promise<CommandIn
   const skillCommands = skills.map(skillToCommandInfo)
 
   return [
-    ...filterDiscoveredCommandsByScope(discoveredCommands, "builtin"),
-    ...filterDiscoveredCommandsByScope(discoveredCommands, "opencode-project"),
-    ...filterDiscoveredCommandsByScope(discoveredCommands, "project"),
-    ...filterDiscoveredCommandsByScope(discoveredCommands, "opencode"),
-    ...filterDiscoveredCommandsByScope(discoveredCommands, "user"),
     ...skillCommands,
+    ...filterDiscoveredCommandsByScope(discoveredCommands, "project"),
+    ...filterDiscoveredCommandsByScope(discoveredCommands, "user"),
+    ...filterDiscoveredCommandsByScope(discoveredCommands, "opencode-project"),
+    ...filterDiscoveredCommandsByScope(discoveredCommands, "opencode"),
+    ...filterDiscoveredCommandsByScope(discoveredCommands, "builtin"),
     ...filterDiscoveredCommandsByScope(discoveredCommands, "plugin"),
   ]
 }
@@ -138,6 +139,15 @@ export async function executeSlashCommand(parsed: ParsedSlashCommand, options?: 
     return {
       success: false,
       error: `Command "/${parsed.command}" not found. Use the skill tool to list available skills and commands.`,
+    }
+  }
+
+  if (command.scope === "skill" && command.metadata.agent) {
+    if (!options?.agent || command.metadata.agent !== options.agent) {
+      return {
+        success: false,
+        error: `Skill "${command.name}" is restricted to agent "${command.metadata.agent}"`,
+      }
     }
   }
 
