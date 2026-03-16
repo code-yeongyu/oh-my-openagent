@@ -1,5 +1,23 @@
-export function expandEnvVars(value: string): string {
+import { readFileSync } from "fs"
+import { resolve } from "path"
+
+export function expandFileTemplates(value: string): string {
   return value.replace(
+    /\{file:([^}]+)\}/g,
+    (match, filePath: string) => {
+      try {
+        const resolvedPath = resolve(process.cwd(), filePath.trim())
+        return readFileSync(resolvedPath, "utf-8").trim()
+      } catch {
+        return match // Return original if file not found
+      }
+    }
+  )
+}
+
+export function expandEnvVars(value: string): string {
+  const fileExpanded = expandFileTemplates(value)
+  return fileExpanded.replace(
     /\$\{([^}:]+)(?::-([^}]*))?\}/g,
     (_, varName: string, defaultValue?: string) => {
       const envValue = process.env[varName]
