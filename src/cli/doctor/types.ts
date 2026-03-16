@@ -125,13 +125,6 @@ export interface DependencyInfo {
   installHint?: string
 }
 
-export interface LspServerInfo {
-  id: string
-  installed: boolean
-  extensions: string[]
-  source: "builtin" | "config" | "plugin"
-}
-
 export interface McpServerInfo {
   id: string
   type: "builtin" | "user"
