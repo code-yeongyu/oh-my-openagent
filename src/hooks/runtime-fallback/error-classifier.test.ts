@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { classifyErrorType, extractAutoRetrySignal, isRetryableError } from "./error-classifier"
+import { classifyErrorType, extractAutoRetrySignal, extractStatusCode, isRetryableError } from "./error-classifier"
 
 describe("runtime-fallback error classifier", () => {
   test("detects cooling-down auto-retry status signals", () => {
@@ -95,5 +95,74 @@ describe("runtime-fallback error classifier", () => {
 
     //#then
     expect(signal).toBeUndefined()
+  })
+})
+
+describe("extractStatusCode", () => {
+  test("extracts numeric statusCode from top-level", () => {
+    expect(extractStatusCode({ statusCode: 429 })).toBe(429)
+  })
+
+  test("extracts numeric status from top-level", () => {
+    expect(extractStatusCode({ status: 503 })).toBe(503)
+  })
+
+  test("extracts statusCode from nested data", () => {
+    expect(extractStatusCode({ data: { statusCode: 500 } })).toBe(500)
+  })
+
+  test("extracts statusCode from nested error", () => {
+    expect(extractStatusCode({ error: { statusCode: 502 } })).toBe(502)
+  })
+
+  test("extracts statusCode from nested cause", () => {
+    expect(extractStatusCode({ cause: { statusCode: 504 } })).toBe(504)
+  })
+
+  test("skips non-numeric status and finds deeper numeric statusCode", () => {
+    //#given — status is a string, but error.statusCode is numeric
+    const error = {
+      status: "error",
+      error: { statusCode: 429 },
+    }
+
+    //#when
+    const code = extractStatusCode(error)
+
+    //#then
+    expect(code).toBe(429)
+  })
+
+  test("skips non-numeric statusCode string and finds numeric in cause", () => {
+    const error = {
+      statusCode: "UNKNOWN",
+      status: "failed",
+      cause: { statusCode: 503 },
+    }
+
+    expect(extractStatusCode(error)).toBe(503)
+  })
+
+  test("returns undefined when no numeric status exists", () => {
+    expect(extractStatusCode({ status: "error", message: "something broke" })).toBeUndefined()
+  })
+
+  test("returns undefined for null/undefined error", () => {
+    expect(extractStatusCode(null)).toBeUndefined()
+    expect(extractStatusCode(undefined)).toBeUndefined()
+  })
+
+  test("falls back to regex match in error message", () => {
+    const error = { message: "Request failed with status code 429" }
+    expect(extractStatusCode(error, [429, 503])).toBe(429)
+  })
+
+  test("prefers top-level numeric over nested numeric", () => {
+    const error = {
+      statusCode: 400,
+      error: { statusCode: 429 },
+      cause: { statusCode: 503 },
+    }
+    expect(extractStatusCode(error)).toBe(400)
   })
 })
