@@ -53,6 +53,11 @@ function mergeDisabledHooks(
 }
 
 export async function loadPluginExtendedConfig(): Promise<PluginExtendedConfig> {
+  const now = Date.now()
+  if (cachedExtendedConfig !== undefined && now - extendedConfigLastLoaded < EXTENDED_CONFIG_CACHE_TTL_MS) {
+    return cachedExtendedConfig
+  }
+
   const userConfig = await loadConfigFromPath(USER_CONFIG_PATH)
   const projectConfig = await loadConfigFromPath(getProjectConfigPath())
 
@@ -71,8 +76,14 @@ export async function loadPluginExtendedConfig(): Promise<PluginExtendedConfig> 
     })
   }
 
+  cachedExtendedConfig = merged
+  extendedConfigLastLoaded = Date.now()
   return merged
 }
+
+let cachedExtendedConfig: PluginExtendedConfig | undefined = undefined
+let extendedConfigLastLoaded = 0
+const EXTENDED_CONFIG_CACHE_TTL_MS = 30000
 
 const regexCache = new Map<string, RegExp>()
 

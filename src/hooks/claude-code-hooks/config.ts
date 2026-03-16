@@ -3,6 +3,10 @@ import { existsSync } from "fs"
 import { getClaudeConfigDir } from "../../shared"
 import type { ClaudeHooksConfig, HookMatcher, HookAction } from "./types"
 
+let cachedConfig: ClaudeHooksConfig | null | undefined = undefined
+let configLastLoaded = 0
+const CONFIG_CACHE_TTL_MS = 30000
+
 interface RawHookMatcher {
   matcher?: string
   pattern?: string
@@ -83,6 +87,11 @@ function mergeHooksConfig(
 export async function loadClaudeHooksConfig(
   customSettingsPath?: string
 ): Promise<ClaudeHooksConfig | null> {
+  const now = Date.now()
+  if (cachedConfig !== undefined && now - configLastLoaded < CONFIG_CACHE_TTL_MS) {
+    return cachedConfig
+  }
+
   const paths = getClaudeSettingsPaths(customSettingsPath)
   let mergedConfig: ClaudeHooksConfig = {}
 
@@ -101,5 +110,7 @@ export async function loadClaudeHooksConfig(
     }
   }
 
-  return Object.keys(mergedConfig).length > 0 ? mergedConfig : null
+  cachedConfig = Object.keys(mergedConfig).length > 0 ? mergedConfig : null
+  configLastLoaded = Date.now()
+  return cachedConfig
 }
