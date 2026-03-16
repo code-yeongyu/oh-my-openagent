@@ -1,7 +1,7 @@
 import { z } from "zod"
 
 export const StartWorkConfigSchema = z.object({
-  /** Enable auto-commit after each atomic task completion (default: true) */
+  /** Legacy compatibility flag. Atlas reminder flow no longer emits direct commit instructions. */
   auto_commit: z.boolean().default(true),
 })
 
