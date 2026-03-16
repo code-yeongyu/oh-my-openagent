@@ -12,8 +12,12 @@ export function createOpenClawSenderHook(
       event: { type: string; properties?: Record<string, unknown> };
     }) => {
       const { type, properties } = input.event;
+      const info = properties?.info as Record<string, unknown> | undefined;
       const context: OpenClawContext = {
-        sessionId: (properties?.sessionID as string) || getMainSessionID(),
+        sessionId:
+          (properties?.sessionID as string) ||
+          (info?.id as string) ||
+          getMainSessionID(),
         projectPath: ctx.directory,
       };
 
