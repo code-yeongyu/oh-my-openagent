@@ -1,5 +1,4 @@
-declare const require: (name: string) => any
-const { describe, test, expect, beforeEach, afterEach, spyOn, mock } = require("bun:test")
+import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test"
 import { resolveModelForDelegateTask } from "./model-selection"
 import * as connectedProvidersCache from "../../shared/connected-providers-cache"
 
@@ -103,6 +102,26 @@ describe("resolveModelForDelegateTask", () => {
 
 				expect(result).toBeDefined()
 				expect(result!.model).toBe("anthropic/claude-sonnet-4-6")
+			})
+		})
+
+		describe("#when user fallback models include variant syntax", () => {
+			test("#then resolves a parenthesized variant against the base available model", () => {
+				const result = resolveModelForDelegateTask({
+					userFallbackModels: ["openai/gpt-5.2(high)"],
+					availableModels: new Set(["openai/gpt-5.2"]),
+				})
+
+				expect(result).toEqual({ model: "openai/gpt-5.2", variant: "high" })
+			})
+
+			test("#then resolves a space-separated variant against the base available model", () => {
+				const result = resolveModelForDelegateTask({
+					userFallbackModels: ["gpt-5.2 medium"],
+					availableModels: new Set(["openai/gpt-5.2"]),
+				})
+
+				expect(result).toEqual({ model: "openai/gpt-5.2", variant: "medium" })
 			})
 		})
 	})

@@ -3,6 +3,7 @@ import { normalizeModel } from "../../shared/model-normalization"
 import { fuzzyMatchModel } from "../../shared/model-availability"
 import { transformModelForProvider } from "../../shared/provider-model-id-transform"
 import { hasConnectedProvidersCache, hasProviderModelsCache } from "../../shared/connected-providers-cache"
+import { parseModelString, parseVariantFromModelID } from "./model-string-parser"
 
 function isExplicitHighModel(model: string): boolean {
   return /(?:^|\/)[^/]+-high$/.test(model)
@@ -10,6 +11,36 @@ function isExplicitHighModel(model: string): boolean {
 
 function getExplicitHighBaseModel(model: string): string | null {
   return isExplicitHighModel(model) ? model.replace(/-high$/, "") : null
+}
+
+function parseUserFallbackModel(fallbackModel: string): {
+  baseModel: string
+  providerHint?: string[]
+  variant?: string
+} | undefined {
+  const normalizedFallback = normalizeModel(fallbackModel)
+  if (!normalizedFallback) {
+    return undefined
+  }
+
+  const parsedFullModel = parseModelString(normalizedFallback)
+  if (parsedFullModel) {
+    return {
+      baseModel: `${parsedFullModel.providerID}/${parsedFullModel.modelID}`,
+      providerHint: [parsedFullModel.providerID],
+      variant: parsedFullModel.variant,
+    }
+  }
+
+  const parsedModel = parseVariantFromModelID(normalizedFallback)
+  if (!parsedModel.modelID) {
+    return undefined
+  }
+
+  return {
+    baseModel: parsedModel.modelID,
+    variant: parsedModel.variant,
+  }
 }
 
 
@@ -55,20 +86,18 @@ export function resolveModelForDelegateTask(input: {
   const userFallbackModels = input.userFallbackModels
   if (userFallbackModels && userFallbackModels.length > 0) {
     if (input.availableModels.size === 0) {
-      const first = normalizeModel(userFallbackModels[0])
+      const first = userFallbackModels[0] ? parseUserFallbackModel(userFallbackModels[0]) : undefined
       if (first) {
-        return { model: first }
+        return { model: first.baseModel, variant: first.variant }
       }
     } else {
       for (const fallbackModel of userFallbackModels) {
-        const normalizedFallback = normalizeModel(fallbackModel)
-        if (!normalizedFallback) continue
+        const parsedFallback = parseUserFallbackModel(fallbackModel)
+        if (!parsedFallback) continue
 
-        const parts = normalizedFallback.split("/")
-        const providerHint = parts.length >= 2 ? [parts[0]] : undefined
-        const match = fuzzyMatchModel(normalizedFallback, input.availableModels, providerHint)
+        const match = fuzzyMatchModel(parsedFallback.baseModel, input.availableModels, parsedFallback.providerHint)
         if (match) {
-          return { model: match }
+          return { model: match, variant: parsedFallback.variant }
         }
       }
     }
