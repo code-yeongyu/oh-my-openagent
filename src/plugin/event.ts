@@ -215,7 +215,6 @@ export function createEventHandler(args: {
     await Promise.resolve(hooks.compactionTodoPreserver?.event?.(input));
     await Promise.resolve(hooks.writeExistingFileGuard?.event?.(input));
     await Promise.resolve(hooks.atlasHook?.handler?.(input));
-    await Promise.resolve(hooks.openclawSender?.event?.(input));
     await Promise.resolve(hooks.autoSlashCommand?.event?.(input));
   };
 
