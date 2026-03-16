@@ -31,6 +31,7 @@ import {
   buildDelegationTable,
   buildCategorySkillsDelegationGuide,
   buildOracleSection,
+  buildArgusSection,
   buildHardBlocksSection,
   buildAntiPatternsSection,
   buildDeepParallelSection,
@@ -170,6 +171,7 @@ function buildDynamicSisyphusPrompt(
   );
   const delegationTable = buildDelegationTable(availableAgents);
   const oracleSection = buildOracleSection(availableAgents);
+  const argusSection = buildArgusSection(availableAgents);
   const hardBlocks = buildHardBlocksSection();
   const antiPatterns = buildAntiPatternsSection();
   const deepParallelSection = buildDeepParallelSection(model, availableCategories);
@@ -228,11 +230,11 @@ This verbalization anchors your routing decision and makes your reasoning transp
 
 ### Step 1: Classify Request Type
 
-- **Trivial** (single file, known location, direct answer) → Direct tools only (UNLESS Key Trigger applies)
-- **Explicit** (specific file/line, clear command) → Execute directly
-- **Exploratory** ("How does X work?", "Find Y") → Fire explore (1-3) + tools in parallel
-- **Open-ended** ("Improve", "Refactor", "Add feature") → Assess codebase first
-- **Ambiguous** (unclear scope, multiple interpretations) → Ask ONE clarifying question
+- **Trivial** (single file, known location) → delegate to \`quick\` category
+- **Explicit** (specific file/line, clear command) → delegate to \`quick\` category
+- **Exploratory** ("How does X work?", "Find Y") → fire explore + librarian in parallel
+- **Open-ended** ("Improve", "Refactor", "Add feature") → assess codebase first, then delegate
+- **Ambiguous** (unclear scope) → ask ONE clarifying question
 
 ### Step 2: Check for Ambiguity
 
@@ -248,13 +250,7 @@ This verbalization anchors your routing decision and makes your reasoning transp
 - Do I have any implicit assumptions that might affect the outcome?
 - Is the search scope clear?
 
-**Delegation Check (MANDATORY before acting directly):**
-1. Is there a specialized agent that perfectly matches this request?
-2. If not, is there a \`task\` category best describes this task? (visual-engineering, ultrabrain, quick etc.) What skills are available to equip the agent with?
-  - MUST FIND skills to use, for: \`task(load_skills=[{skill1}, ...])\` MUST PASS SKILL AS TASK PARAMETER.
-3. Can I do it myself for the best result, FOR SURE? REALLY, REALLY, THERE IS NO APPROPRIATE CATEGORIES TO WORK WITH?
-
-**Default Bias: DELEGATE. WORK YOURSELF ONLY WHEN IT IS SUPER SIMPLE.**
+**Delegation is not optional. You have no write or edit tools. Every implementation task MUST go to a subagent via task() or call_omo_agent(). Your only job is to plan, delegate, verify Argus approval, and report.**
 
 ### When to Challenge the User
 If you observe:
@@ -475,6 +471,7 @@ A task is complete when:
 - [ ] All planned todo items marked done
 - [ ] Diagnostics clean on changed files
 - [ ] Build passes (if applicable)
+- [ ] Argus review: APPROVED
 - [ ] User's original request fully addressed
 
 If verification fails:
@@ -488,6 +485,8 @@ If verification fails:
 </Behavior_Instructions>
 
 ${oracleSection}
+
+${argusSection}
 
 ${taskManagementSection}
 
@@ -593,7 +592,10 @@ export function createSisyphusAgent(
 
   const permission = {
     question: "allow",
-    call_omo_agent: "deny",
+    call_omo_agent: "allow",
+    edit: "deny",
+    write: "deny",
+    apply_patch: "deny",
   } as AgentConfig["permission"];
   const base = {
     description:

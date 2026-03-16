@@ -92,6 +92,7 @@ export type BuiltinAgentName =
   | "sisyphus"
   | "hephaestus"
   | "oracle"
+  | "argus"
   | "librarian"
   | "explore"
   | "multimodal-looker"

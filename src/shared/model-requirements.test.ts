@@ -179,12 +179,33 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(hephaestus.requiresModel).toBeUndefined()
   })
 
-  test("all 10 builtin agents have valid fallbackChain arrays", () => {
-    // #given - list of 10 agent names
+  test("argus has claude-sonnet-4-6 as primary", () => {
+    // #given - argus agent requirement
+    const argus = AGENT_MODEL_REQUIREMENTS["argus"]
+
+    // #when - accessing Argus requirement
+    // #then - claude-sonnet-4-6 is first, gpt-5.3-codex is second
+    expect(argus).toBeDefined()
+    expect(argus.fallbackChain).toBeArray()
+    expect(argus.fallbackChain).toHaveLength(2)
+
+    const primary = argus.fallbackChain[0]
+    expect(primary.model).toBe("claude-sonnet-4-6")
+    expect(primary.providers).toEqual(["anthropic", "github-copilot", "opencode"])
+
+    const secondary = argus.fallbackChain[1]
+    expect(secondary.model).toBe("gpt-5.3-codex")
+    expect(secondary.providers).toEqual(["openai", "opencode"])
+    expect(secondary.variant).toBe("medium")
+  })
+
+  test("all 11 builtin agents have valid fallbackChain arrays", () => {
+    // #given - list of 11 agent names
     const expectedAgents = [
       "sisyphus",
       "hephaestus",
       "oracle",
+      "argus",
       "librarian",
       "explore",
       "multimodal-looker",
@@ -198,7 +219,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     const definedAgents = Object.keys(AGENT_MODEL_REQUIREMENTS)
 
     // #then - all agents present with valid fallbackChain
-    expect(definedAgents).toHaveLength(10)
+    expect(definedAgents).toHaveLength(11)
     for (const agent of expectedAgents) {
       const requirement = AGENT_MODEL_REQUIREMENTS[agent]
       expect(requirement).toBeDefined()

@@ -36,6 +36,12 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-opus-4-6", variant: "max" },
     ],
   },
+  argus: {
+    fallbackChain: [
+      { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-sonnet-4-6" },
+      { providers: ["openai", "opencode"], model: "gpt-5.3-codex", variant: "medium" },
+    ],
+  },
    librarian: {
      fallbackChain: [
        { providers: ["google", "github-copilot", "opencode"], model: "gemini-3-flash" },

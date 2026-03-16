@@ -137,22 +137,30 @@ export function loadPluginConfig(
   directory: string,
   ctx: unknown
 ): OhMyOpenCodeConfig {
-  // User-level config path - prefer .jsonc over .json
+  // User-level config path - prefer talos over oh-my-opencode, .jsonc over .json
   const configDir = getOpenCodeConfigDir({ binary: "opencode" });
+  const talosUserBasePath = path.join(configDir, "talos");
+  const talosUserDetected = detectConfigFile(talosUserBasePath);
   const userBasePath = path.join(configDir, "oh-my-opencode");
   const userDetected = detectConfigFile(userBasePath);
   const userConfigPath =
-    userDetected.format !== "none"
-      ? userDetected.path
-      : userBasePath + ".json";
+    talosUserDetected.format !== "none"
+      ? talosUserDetected.path
+      : userDetected.format !== "none"
+        ? userDetected.path
+        : talosUserBasePath + ".jsonc";
 
-  // Project-level config path - prefer .jsonc over .json
+  // Project-level config path - prefer talos over oh-my-opencode, .jsonc over .json
+  const talosProjectBasePath = path.join(directory, ".opencode", "talos");
+  const talosProjectDetected = detectConfigFile(talosProjectBasePath);
   const projectBasePath = path.join(directory, ".opencode", "oh-my-opencode");
   const projectDetected = detectConfigFile(projectBasePath);
   const projectConfigPath =
-    projectDetected.format !== "none"
-      ? projectDetected.path
-      : projectBasePath + ".json";
+    talosProjectDetected.format !== "none"
+      ? talosProjectDetected.path
+      : projectDetected.format !== "none"
+        ? projectDetected.path
+        : talosProjectBasePath + ".jsonc";
 
   // Load user config first (base)
   let config: OhMyOpenCodeConfig =
