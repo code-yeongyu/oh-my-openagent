@@ -54,11 +54,11 @@ export function createPrometheusMdOnlyHook(ctx: PluginInput) {
            agent: agentName,
          })
          throw new Error(
-           `[${HOOK_NAME}] ${getAgentDisplayName("prometheus")} can only write/edit .md files inside .sisyphus/ directory. ` +
-           `Attempted to modify: ${filePath}. ` +
-           `${getAgentDisplayName("prometheus")} is a READ-ONLY planner. Use /start-work to execute the plan. ` +
-           `APOLOGIZE TO THE USER, REMIND OF YOUR PLAN WRITING PROCESSES, TELL USER WHAT YOU WILL GOING TO DO AS THE PROCESS, WRITE THE PLAN`
-         )
+            `[${HOOK_NAME}] ${getAgentDisplayName("prometheus")} attempted to modify: ${filePath}. ` +
+            `Only .md files inside .sisyphus/plans/ and .sisyphus/drafts/ are writable. ` +
+            `All other files are off-limits during planning. Use /start-work to execute the plan. ` +
+            `APOLOGIZE TO THE USER, REMIND OF YOUR PLAN WRITING PROCESSES, TELL USER WHAT YOU WILL GOING TO DO AS THE PROCESS, WRITE THE PLAN`
+          )
        }
 
       const normalizedPath = filePath.toLowerCase().replace(/\\/g, "/")
