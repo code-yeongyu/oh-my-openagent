@@ -6,10 +6,11 @@ import {
 } from "../../features/run-continuation-state"
 import { log } from "../../shared/logger"
 
-import { DEFAULT_SKIP_AGENTS, HOOK_NAME } from "./constants"
+import { DEFAULT_SKIP_AGENTS, HOOK_NAME, MAX_CONSECUTIVE_FAILURES } from "./constants"
 import type { SessionStateStore } from "./session-state"
 import { handleSessionIdle } from "./idle-event"
 import { handleNonIdleEvent } from "./non-idle-events"
+import { isContextLengthError } from "./context-length-detection"
 
 export function createTodoContinuationHandler(args: {
   ctx: PluginInput
@@ -35,11 +36,22 @@ export function createTodoContinuationHandler(args: {
       const sessionID = props?.sessionID as string | undefined
       if (!sessionID) return
 
-      const error = props?.error as { name?: string } | undefined
+      const error = props?.error as { name?: string; message?: string } | undefined
       if (error?.name === "MessageAbortedError" || error?.name === "AbortError") {
         const state = sessionStateStore.getState(sessionID)
         state.abortDetectedAt = Date.now()
         log(`[${HOOK_NAME}] Abort detected via session.error`, { sessionID, errorName: error.name })
+      }
+
+      if (isContextLengthError(error)) {
+        const state = sessionStateStore.getState(sessionID)
+        state.isRecovering = true
+        state.consecutiveFailures = MAX_CONSECUTIVE_FAILURES
+        state.inFlight = false
+        log(`[${HOOK_NAME}] Context length error detected, blocking continuation`, {
+          sessionID,
+          errorName: error?.name,
+        })
       }
 
       sessionStateStore.cancelCountdown(sessionID)
