@@ -109,11 +109,12 @@ export function createChatMessageHandler(args: {
 
     await hooks.autoSlashCommand?.["chat.message"]?.(input, output)
 
+    if (hooks.startWork && isStartWorkHookOutput(output)) {
+      await hooks.startWork["chat.message"]?.(input, output)
+    }
+
     const nonBlockingHooks: Promise<void>[] = [
       hooks.claudeCodeHooks?.["chat.message"]?.(input, output),
-      hooks.startWork && isStartWorkHookOutput(output)
-        ? hooks.startWork["chat.message"]?.(input, output)
-        : undefined,
     ].filter((p): p is Promise<void> => p !== undefined)
 
     void Promise.all(nonBlockingHooks).catch(() => {})
