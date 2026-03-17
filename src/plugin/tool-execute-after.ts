@@ -48,21 +48,49 @@ export function createToolExecuteAfterHandler(args: {
       const prompt = typeof output.metadata?.prompt === "string" ? output.metadata.prompt : undefined
       const verificationAttemptId = prompt?.match(VERIFICATION_ATTEMPT_PATTERN)?.[1]?.trim()
       const loopState = directory ? readState(directory) : null
-
-      if (
+      const isVerificationContext =
         agent === "oracle"
-        && sessionId
-        && verificationAttemptId
-        && directory
+        && !!sessionId
+        && !!directory
         && loopState?.active === true
         && loopState.ultrawork === true
         && loopState.verification_pending === true
         && loopState.session_id === input.sessionID
+
+      log("[tool-execute-after] ULW verification tracking check", {
+        tool: input.tool,
+        agent,
+        parentSessionID: input.sessionID,
+        oracleSessionID: sessionId,
+        hasPromptInMetadata: typeof prompt === "string",
+        extractedVerificationAttemptId: verificationAttemptId,
+      })
+
+      if (
+        isVerificationContext
+        && verificationAttemptId
         && loopState.verification_attempt_id === verificationAttemptId
       ) {
         writeState(directory, {
           ...loopState,
           verification_session_id: sessionId,
+        })
+        log("[tool-execute-after] Stored oracle verification session via attempt match", {
+          parentSessionID: input.sessionID,
+          oracleSessionID: sessionId,
+          verificationAttemptId,
+        })
+      } else if (isVerificationContext && !verificationAttemptId) {
+        writeState(directory, {
+          ...loopState,
+          verification_session_id: sessionId,
+        })
+        log("[tool-execute-after] Fallback: stored oracle verification session without attempt match", {
+          parentSessionID: input.sessionID,
+          oracleSessionID: sessionId,
+          hasPromptInMetadata: typeof prompt === "string",
+          expectedAttemptId: loopState.verification_attempt_id,
+          extractedAttemptId: verificationAttemptId,
         })
       }
     }
