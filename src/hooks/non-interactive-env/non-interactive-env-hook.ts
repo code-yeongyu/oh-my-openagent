@@ -45,11 +45,11 @@ export function createNonInteractiveEnvHook(_ctx: PluginInput) {
         return
       }
 
-      // Minimal env prefix: only the vars that prevent git from hanging.
-      // Previous approach used ALL NON_INTERACTIVE_ENV vars via `export`,
-      // creating a long prefix that polluted tool output and confused models
-      // into echoing it back as text (#2599).
-      const GIT_ENV_PREFIX = "GIT_EDITOR=: GIT_PAGER=cat GIT_TERMINAL_PROMPT=0"
+      // Minimal env prefix: only the 3 vars that prevent git from hanging.
+      // Uses `export` so vars apply across chained commands (&&, ;).
+      // Previous approach exported ALL 15 NON_INTERACTIVE_ENV vars, creating
+      // a ~300 char prefix that polluted output and confused models (#2599).
+      const GIT_ENV_PREFIX = "export GIT_EDITOR=: GIT_PAGER=cat GIT_TERMINAL_PROMPT=0;"
 
       if (command.includes("GIT_EDITOR=:")) {
         return
