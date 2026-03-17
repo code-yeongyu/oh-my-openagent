@@ -53,6 +53,11 @@ import { pruneStaleTasksAndNotifications } from "./task-poller"
 import { checkAndInterruptStaleTasks } from "./task-poller"
 import { removeTaskToastTracking } from "./remove-task-toast-tracking"
 import {
+  detectRepetitiveToolUse,
+  recordToolCall,
+  resolveCircuitBreakerSettings,
+} from "./loop-detector"
+import {
   createSubagentDepthLimitError,
   createSubagentDescendantLimitError,
   getMaxRootSessionSpawnBudget,
@@ -65,9 +70,11 @@ type OpencodeClient = PluginInput["client"]
 
 
 interface MessagePartInfo {
+  id?: string
   sessionID?: string
   type?: string
   tool?: string
+  state?: { status?: string }
 }
 
 interface EventProperties {
@@ -79,6 +86,19 @@ interface EventProperties {
 interface Event {
   type: string
   properties?: EventProperties
+}
+
+function resolveMessagePartInfo(properties: EventProperties | undefined): MessagePartInfo | undefined {
+  if (!properties || typeof properties !== "object") {
+    return undefined
+  }
+
+  const nestedPart = properties.part
+  if (nestedPart && typeof nestedPart === "object") {
+    return nestedPart as MessagePartInfo
+  }
+
+  return properties as MessagePartInfo
 }
 
 interface Todo {
@@ -723,6 +743,8 @@ export class BackgroundManager {
 
     existingTask.progress = {
       toolCalls: existingTask.progress?.toolCalls ?? 0,
+      toolCallWindow: existingTask.progress?.toolCallWindow,
+      countedToolPartIDs: existingTask.progress?.countedToolPartIDs,
       lastUpdate: new Date(),
     }
 
@@ -855,8 +877,7 @@ export class BackgroundManager {
     }
 
     if (event.type === "message.part.updated" || event.type === "message.part.delta") {
-      if (!props || typeof props !== "object" || !("sessionID" in props)) return
-      const partInfo = props as unknown as MessagePartInfo
+      const partInfo = resolveMessagePartInfo(props)
       const sessionID = partInfo?.sessionID
       if (!sessionID) return
 
@@ -879,10 +900,50 @@ export class BackgroundManager {
       task.progress.lastUpdate = new Date()
 
       if (partInfo?.type === "tool" || partInfo?.tool) {
+        const countedToolPartIDs = task.progress.countedToolPartIDs ?? []
+        const shouldCountToolCall =
+          !partInfo.id ||
+          partInfo.state?.status !== "running" ||
+          !countedToolPartIDs.includes(partInfo.id)
+
+        if (!shouldCountToolCall) {
+          return
+        }
+
+        if (partInfo.id && partInfo.state?.status === "running") {
+          task.progress.countedToolPartIDs = [...countedToolPartIDs, partInfo.id]
+        }
+
         task.progress.toolCalls += 1
         task.progress.lastTool = partInfo.tool
+        const circuitBreaker = resolveCircuitBreakerSettings(this.config)
+        if (partInfo.tool) {
+          task.progress.toolCallWindow = recordToolCall(
+            task.progress.toolCallWindow,
+            partInfo.tool,
+            circuitBreaker
+          )
 
-        const maxToolCalls = this.config?.maxToolCalls ?? 200
+          const loopDetection = detectRepetitiveToolUse(task.progress.toolCallWindow)
+          if (loopDetection.triggered) {
+            log("[background-agent] Circuit breaker: repetitive tool usage detected", {
+              taskId: task.id,
+              agent: task.agent,
+              sessionID,
+              toolName: loopDetection.toolName,
+              repeatedCount: loopDetection.repeatedCount,
+              sampleSize: loopDetection.sampleSize,
+              thresholdPercent: loopDetection.thresholdPercent,
+            })
+            void this.cancelTask(task.id, {
+              source: "circuit-breaker",
+              reason: `Subagent repeatedly called ${loopDetection.toolName} ${loopDetection.repeatedCount}/${loopDetection.sampleSize} times in the recent tool-call window (${loopDetection.thresholdPercent}% threshold). This usually indicates an infinite loop. The task was automatically cancelled to prevent excessive token usage.`,
+            })
+            return
+          }
+        }
+
+        const maxToolCalls = circuitBreaker.maxToolCalls
         if (task.progress.toolCalls >= maxToolCalls) {
           log("[background-agent] Circuit breaker: tool call limit reached", {
             taskId: task.id,

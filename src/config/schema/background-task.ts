@@ -1,5 +1,11 @@
 import { z } from "zod"
 
+const CircuitBreakerConfigSchema = z.object({
+  maxToolCalls: z.number().int().min(10).optional(),
+  windowSize: z.number().int().min(5).optional(),
+  repetitionThresholdPercent: z.number().gt(0).max(100).optional(),
+})
+
 export const BackgroundTaskConfigSchema = z.object({
   defaultConcurrency: z.number().min(1).optional(),
   providerConcurrency: z.record(z.string(), z.number().min(0)).optional(),
@@ -13,6 +19,7 @@ export const BackgroundTaskConfigSchema = z.object({
   syncPollTimeoutMs: z.number().min(60000).optional(),
   /** Maximum tool calls per subagent task before circuit breaker triggers (default: 200, minimum: 10). Prevents runaway loops from burning unlimited tokens. */
   maxToolCalls: z.number().int().min(10).optional(),
+  circuitBreaker: CircuitBreakerConfigSchema.optional(),
 })
 
 export type BackgroundTaskConfig = z.infer<typeof BackgroundTaskConfigSchema>
