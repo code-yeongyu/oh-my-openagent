@@ -9,9 +9,17 @@ export type BackgroundTaskStatus =
   | "cancelled"
   | "interrupt"
 
+export interface ToolCallWindow {
+  toolNames: string[]
+  windowSize: number
+  thresholdPercent: number
+}
+
 export interface TaskProgress {
   toolCalls: number
   lastTool?: string
+  toolCallWindow?: ToolCallWindow
+  countedToolPartIDs?: string[]
   lastUpdate: Date
   lastMessage?: string
   lastMessageAt?: Date
