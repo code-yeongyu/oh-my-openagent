@@ -235,6 +235,7 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
     },
     async execute(args: SkillArgs, ctx?: { agent?: string }) {
       const skills = await getSkills()
+      cachedDescription = null
       const commands = getCommands()
 
       const requestedName = args.name.replace(/^\//, "")
