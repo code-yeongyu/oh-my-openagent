@@ -85,6 +85,7 @@ Available categories: ${allCategoryNames}`,
   let actualModel: string | undefined
   let modelInfo: ModelFallbackInfo | undefined
   let categoryModel: { providerID: string; modelID: string; variant?: string } | undefined
+  let isModelResolutionSkipped = false
 
   const overrideModel = sisyphusJuniorModel
   const explicitCategoryModel = userCategories?.[args.category!]?.model
@@ -98,6 +99,11 @@ Available categories: ${allCategoryNames}`,
       modelInfo = explicitCategoryModel || overrideModel
         ? { model: actualModel, type: "user-defined", source: "override" }
         : { model: actualModel, type: "system-default", source: "system-default" }
+      const parsedModel = parseModelString(actualModel)
+      const variantToUse = userCategories?.[args.category!]?.variant ?? resolved.config.variant
+      categoryModel = parsedModel
+        ? (variantToUse ? { ...parsedModel, variant: variantToUse } : parsedModel)
+        : undefined
     }
   } else {
     const resolution = await resolveModelForDelegateTask({
@@ -109,7 +115,9 @@ Available categories: ${allCategoryNames}`,
       systemDefaultModel,
     })
 
-    if (resolution) {
+    if (resolution && "skipped" in resolution) {
+      isModelResolutionSkipped = true
+    } else if (resolution) {
       const { model: resolvedModel, variant: resolvedVariant } = resolution
       actualModel = resolvedModel
 
@@ -156,7 +164,7 @@ Available categories: ${allCategoryNames}`,
   }
   const categoryPromptAppend = resolved.promptAppend || undefined
 
-  if (!categoryModel && !actualModel) {
+  if (!categoryModel && !actualModel && !isModelResolutionSkipped) {
     const categoryNames = Object.keys(enabledCategories)
     return {
       agentToUse: "",
@@ -178,9 +186,8 @@ Available categories: ${categoryNames.join(", ")}`,
     }
   }
 
-  const unstableModel = actualModel?.toLowerCase()
-  const categoryConfigModel = resolved.config.model?.toLowerCase()
-  const isUnstableAgent = resolved.config.is_unstable_agent === true || [unstableModel, categoryConfigModel].some(m => m ? m.includes("gemini") || m.includes("minimax") || m.includes("kimi") : false)
+  const resolvedModel = actualModel?.toLowerCase()
+  const isUnstableAgent = resolved.config.is_unstable_agent === true || (resolvedModel ? resolvedModel.includes("gemini") || resolvedModel.includes("minimax") || resolvedModel.includes("kimi") : false)
 
   const defaultProviderID = categoryModel?.providerID
     ?? parseModelString(actualModel ?? "")?.providerID

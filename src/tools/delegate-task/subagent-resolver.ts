@@ -124,7 +124,7 @@ Create the work plan directly - that's your job as the planning agent.`,
         systemDefaultModel: undefined,
       })
 
-      if (resolution) {
+      if (resolution && !('skipped' in resolution)) {
         const normalized = normalizeModelFormat(resolution.model)
         if (normalized) {
           const variantToUse = agentOverride?.variant ?? resolution.variant

@@ -79,6 +79,12 @@ export function createToolExecuteBeforeHandler(args: {
 
       if (shouldInjectOracleVerification) {
         const verificationAttemptId = randomUUID()
+        log("[tool-execute-before] Injecting ULW oracle verification attempt", {
+          sessionID: input.sessionID,
+          callID: input.callID,
+          verificationAttemptId,
+          loopSessionID: loopState.session_id,
+        })
         writeState(ctx.directory, {
           ...loopState,
           verification_attempt_id: verificationAttemptId,

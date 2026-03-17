@@ -74,6 +74,13 @@ describe("applyAgentConfig builtin override protection", () => {
     mode: "subagent",
   }
 
+  const builtinAtlasConfig: AgentConfig = {
+    name: "atlas",
+    prompt: "atlas prompt",
+    mode: "all",
+    model: "openai/gpt-5.4",
+  }
+
   const sisyphusJuniorConfig: AgentConfig = {
     name: "Sisyphus-Junior",
     prompt: "junior prompt",
@@ -85,6 +92,7 @@ describe("applyAgentConfig builtin override protection", () => {
       sisyphus: builtinSisyphusConfig,
       oracle: builtinOracleConfig,
       "multimodal-looker": builtinMultimodalLookerConfig,
+      atlas: builtinAtlasConfig,
     })
 
     createSisyphusJuniorAgentSpy = spyOn(
@@ -254,5 +262,20 @@ describe("applyAgentConfig builtin override protection", () => {
         expect(result.sisyphus_junior).toBeUndefined()
       })
     })
+  })
+
+  test("passes the resolved Atlas model to Sisyphus-Junior as its fallback default", async () => {
+    // given
+
+    // when
+    await applyAgentConfig({
+      config: createBaseConfig(),
+      pluginConfig: createPluginConfig(),
+      ctx: { directory: "/tmp" },
+      pluginComponents: createPluginComponents(),
+    })
+
+    // then
+    expect(createSisyphusJuniorAgentSpy).toHaveBeenCalledWith(undefined, "openai/gpt-5.4", false)
   })
 })

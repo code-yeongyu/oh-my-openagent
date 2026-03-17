@@ -72,8 +72,16 @@ function prefixGitCommandsInBashCodeBlocks(template: string, prefix: string): st
 
 function prefixGitCommandsInCodeBlock(codeBlock: string, prefix: string): string {
 	return codeBlock
-		.replace(LEADING_GIT_COMMAND_PATTERN, `$1${prefix} git`)
-		.replace(INLINE_GIT_COMMAND_PATTERN, `$1${prefix} git`)
+		.split("\n")
+		.map((line) => {
+			if (line.includes(prefix)) {
+				return line
+			}
+			return line
+				.replace(LEADING_GIT_COMMAND_PATTERN, `$1${prefix} git`)
+				.replace(INLINE_GIT_COMMAND_PATTERN, `$1${prefix} git`)
+		})
+		.join("\n")
 }
 
 function buildCommitFooterInjection(

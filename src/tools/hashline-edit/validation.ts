@@ -1,4 +1,4 @@
-import { computeLineHash } from "./hash-computation"
+import { computeLegacyLineHash, computeLineHash } from "./hash-computation"
 import { HASHLINE_REF_PATTERN } from "./constants"
 
 export interface LineRef {
@@ -14,6 +14,10 @@ interface HashMismatch {
 const MISMATCH_CONTEXT = 2
 
 const LINE_REF_EXTRACT_PATTERN = /([0-9]+#[ZPMQVRWSNKTXJBYH]{2})/
+
+function isCompatibleLineHash(line: number, content: string, hash: string): boolean {
+  return computeLineHash(line, content) === hash || computeLegacyLineHash(line, content) === hash
+}
 
 export function normalizeLineRef(ref: string): string {
   const originalTrimmed = ref.trim()
@@ -71,9 +75,7 @@ export function validateLineRef(lines: string[], ref: string): void {
   }
 
   const content = lines[line - 1]
-  const currentHash = computeLineHash(line, content)
-
-  if (currentHash !== hash) {
+  if (!isCompatibleLineHash(line, content, hash)) {
     throw new HashlineMismatchError([{ line, expected: hash }], lines)
   }
 }
@@ -140,8 +142,8 @@ function suggestLineForHash(ref: string, lines: string[]): string | null {
   if (!hashMatch) return null
   const hash = hashMatch[1]
   for (let i = 0; i < lines.length; i++) {
-    if (computeLineHash(i + 1, lines[i]) === hash) {
-      return `Did you mean "${i + 1}#${hash}"?`
+    if (isCompatibleLineHash(i + 1, lines[i], hash)) {
+      return `Did you mean "${i + 1}#${computeLineHash(i + 1, lines[i])}"?`
     }
   }
   return null
@@ -169,8 +171,7 @@ export function validateLineRefs(lines: string[], refs: string[]): void {
     }
 
     const content = lines[line - 1]
-    const currentHash = computeLineHash(line, content)
-    if (currentHash !== hash) {
+    if (!isCompatibleLineHash(line, content, hash)) {
       mismatches.push({ line, expected: hash })
     }
   }

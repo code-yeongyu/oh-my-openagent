@@ -178,6 +178,13 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(primary.model).toBe("claude-opus-4-6")
     expect(primary.providers).toEqual(["anthropic", "github-copilot", "opencode"])
     expect(primary.variant).toBe("max")
+
+    const openAiFallback = metis.fallbackChain.find((entry) => entry.providers.includes("openai"))
+    expect(openAiFallback).toEqual({
+      providers: ["openai", "github-copilot", "opencode"],
+      model: "gpt-5.4",
+      variant: "high",
+    })
   })
 
   test("momus has valid fallbackChain with gpt-5.4 as primary", () => {
@@ -213,6 +220,32 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     const secondary = atlas.fallbackChain[1]
     expect(secondary.model).toBe("kimi-k2.5")
     expect(secondary.providers[0]).toBe("opencode-go")
+
+    const tertiary = atlas.fallbackChain[2]
+    expect(tertiary).toEqual({
+      providers: ["openai", "github-copilot", "opencode"],
+      model: "gpt-5.4",
+      variant: "medium",
+    })
+  })
+
+  test("sisyphus-junior has an OpenAI fallback before big-pickle", () => {
+    // given - sisyphus-junior agent requirement
+    const sisyphusJunior = AGENT_MODEL_REQUIREMENTS["sisyphus-junior"]
+
+    // when - locating the OpenAI fallback entry
+    const openAiFallback = sisyphusJunior.fallbackChain.find((entry) => entry.providers.includes("openai"))
+    const openAiFallbackIndex = sisyphusJunior.fallbackChain.findIndex((entry) => entry.providers.includes("openai"))
+    const bigPickleIndex = sisyphusJunior.fallbackChain.findIndex((entry) => entry.model === "big-pickle")
+
+    // then
+    expect(openAiFallback).toEqual({
+      providers: ["openai", "github-copilot", "opencode"],
+      model: "gpt-5.4",
+      variant: "medium",
+    })
+    expect(openAiFallbackIndex).toBeGreaterThan(-1)
+    expect(bigPickleIndex).toBeGreaterThan(openAiFallbackIndex)
   })
 
   test("hephaestus supports openai, github-copilot, venice, and opencode providers", () => {

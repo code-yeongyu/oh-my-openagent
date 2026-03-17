@@ -153,3 +153,25 @@ describe("#given git_env_prefix with commit footer", () => {
 		})
 	})
 })
+
+describe("#given idempotency of prefixGitCommandsInBashCodeBlocks", () => {
+	describe("#when git_env_prefix is provided and template already has prefixed commands in env prefix section", () => {
+		it("#then does NOT double-prefix the already-prefixed commands", () => {
+			const result = injectGitMasterConfig(SAMPLE_TEMPLATE, {
+				commit_footer: false,
+				include_co_authored_by: false,
+				git_env_prefix: "GIT_MASTER=1",
+			})
+
+			expect(result).not.toContain("GIT_MASTER=1 GIT_MASTER=1 git status")
+			expect(result).not.toContain("GIT_MASTER=1 GIT_MASTER=1 git add")
+			expect(result).not.toContain("GIT_MASTER=1 GIT_MASTER=1 git commit")
+			expect(result).not.toContain("GIT_MASTER=1 GIT_MASTER=1 git push")
+
+			expect(result).toContain("GIT_MASTER=1 git status")
+			expect(result).toContain("GIT_MASTER=1 git add")
+			expect(result).toContain("GIT_MASTER=1 git commit")
+			expect(result).toContain("GIT_MASTER=1 git push")
+		})
+	})
+})

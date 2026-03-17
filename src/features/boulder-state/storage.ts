@@ -59,10 +59,13 @@ export function appendSessionId(directory: string, sessionId: string): BoulderSt
     if (!Array.isArray(state.session_ids)) {
       state.session_ids = []
     }
+    const originalSessionIds = [...state.session_ids]
     state.session_ids.push(sessionId)
     if (writeBoulderState(directory, state)) {
       return state
     }
+    state.session_ids = originalSessionIds
+    return null
   }
 
   return state

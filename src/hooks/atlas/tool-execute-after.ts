@@ -72,6 +72,7 @@ export function createToolExecuteAfterHandler(input: {
       const boulderState = readBoulderState(ctx.directory)
       if (boulderState) {
         const progress = getPlanProgress(boulderState.active_plan)
+        const sessionState = toolInput.sessionID ? getState(toolInput.sessionID) : undefined
 
         if (toolInput.sessionID && !boulderState.session_ids?.includes(toolInput.sessionID)) {
           appendSessionId(ctx.directory, toolInput.sessionID)
@@ -83,13 +84,15 @@ export function createToolExecuteAfterHandler(input: {
 
         // Preserve original subagent response - critical for debugging failed tasks
         const originalResponse = toolOutput.output
-        const shouldPauseForApproval = shouldPauseForFinalWaveApproval({
-          planPath: boulderState.active_plan,
-          taskOutput: originalResponse,
-        })
+        const shouldPauseForApproval = sessionState
+          ? shouldPauseForFinalWaveApproval({
+              planPath: boulderState.active_plan,
+              taskOutput: originalResponse,
+              sessionState,
+            })
+          : false
 
-        if (toolInput.sessionID) {
-          const sessionState = getState(toolInput.sessionID)
+        if (sessionState) {
           sessionState.waitingForFinalWaveApproval = shouldPauseForApproval
 
           if (shouldPauseForApproval && sessionState.pendingRetryTimer) {

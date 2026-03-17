@@ -1,6 +1,6 @@
 declare const require: (name: string) => any
 const { describe, expect, test } = require("bun:test")
-import { __resetTimingConfig, __setTimingConfig, getDefaultSyncPollTimeoutMs } from "./timing"
+import { __resetTimingConfig, __setTimingConfig, getDefaultSyncPollTimeoutMs, getTimingConfig } from "./timing"
 
 describe("timing sync poll timeout defaults", () => {
   test("default sync timeout is 30 minutes", () => {
@@ -25,5 +25,18 @@ describe("timing sync poll timeout defaults", () => {
     expect(getDefaultSyncPollTimeoutMs()).toBe(123_456)
 
     __resetTimingConfig()
+  })
+})
+
+  describe("WAIT_FOR_SESSION_TIMEOUT_MS default", () => {
+  test("default wait for session timeout is 1 minute", () => {
+    // #given
+    __resetTimingConfig()
+
+    // #when
+    const config = getTimingConfig()
+
+    // #then
+    expect(config.WAIT_FOR_SESSION_TIMEOUT_MS).toBe(60_000)
   })
 })

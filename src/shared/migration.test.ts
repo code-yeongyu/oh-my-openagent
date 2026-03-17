@@ -1,3 +1,5 @@
+/// <reference types="bun-types" />
+
 import { describe, test, expect, afterEach } from "bun:test"
 import * as fs from "fs"
 import * as path from "path"
@@ -398,6 +400,17 @@ describe("migrateConfigFile", () => {
     expect(needsWrite).toBe(true)
     expect(rawConfig.disabled_hooks).toContain("anthropic-context-window-limit-recovery")
     expect(rawConfig.disabled_hooks).not.toContain("anthropic-auto-compact")
+  })
+
+  test("removes deleted hook names from disabled_hooks", () => {
+    const rawConfig: Record<string, unknown> = {
+      disabled_hooks: ["delegate-task-english-directive", "comment-checker"],
+    }
+
+    const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
+
+    expect(needsWrite).toBe(true)
+    expect(rawConfig.disabled_hooks).toEqual(["comment-checker"])
   })
 
   test("does not write if no migration needed", () => {

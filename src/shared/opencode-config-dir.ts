@@ -48,25 +48,6 @@ function getCliConfigDir(): string {
     return resolve(envConfigDir)
   }
 
-  if (process.platform === "win32") {
-    const crossPlatformDir = join(homedir(), ".config", "opencode")
-    const crossPlatformConfig = join(crossPlatformDir, "opencode.json")
-
-    if (existsSync(crossPlatformConfig)) {
-      return crossPlatformDir
-    }
-
-    const appData = process.env.APPDATA || join(homedir(), "AppData", "Roaming")
-    const appdataDir = join(appData, "opencode")
-    const appdataConfig = join(appdataDir, "opencode.json")
-
-    if (existsSync(appdataConfig)) {
-      return appdataDir
-    }
-
-    return crossPlatformDir
-  }
-
   const xdgConfig = process.env.XDG_CONFIG_HOME || join(homedir(), ".config")
   return join(xdgConfig, "opencode")
 }

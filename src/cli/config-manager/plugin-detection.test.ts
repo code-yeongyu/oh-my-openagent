@@ -7,13 +7,15 @@ import { resetConfigContext } from "./config-context"
 import { detectCurrentConfig } from "./detect-current-config"
 import { addPluginToOpenCodeConfig } from "./add-plugin-to-opencode-config"
 
-describe("detectCurrentConfig - dual name detection", () => {
+describe("detectCurrentConfig - single package detection", () => {
   let testConfigDir = ""
   let testConfigPath = ""
+  let testOmoConfigPath = ""
 
   beforeEach(() => {
     testConfigDir = join(tmpdir(), `omo-detect-config-${Date.now()}-${Math.random().toString(36).slice(2)}`)
     testConfigPath = join(testConfigDir, "opencode.json")
+    testOmoConfigPath = join(testConfigDir, "oh-my-opencode.json")
 
     mkdirSync(testConfigDir, { recursive: true })
     process.env.OPENCODE_CONFIG_DIR = testConfigDir
@@ -38,18 +40,6 @@ describe("detectCurrentConfig - dual name detection", () => {
     expect(result.isInstalled).toBe(true)
   })
 
-  it("detects oh-my-openagent in plugin array", () => {
-    // given
-    const config = { plugin: ["oh-my-openagent"] }
-    writeFileSync(testConfigPath, JSON.stringify(config, null, 2) + "\n", "utf-8")
-
-    // when
-    const result = detectCurrentConfig()
-
-    // then
-    expect(result.isInstalled).toBe(true)
-  })
-
   it("detects oh-my-opencode with version pin", () => {
     // given
     const config = { plugin: ["oh-my-opencode@3.11.0"] }
@@ -62,9 +52,21 @@ describe("detectCurrentConfig - dual name detection", () => {
     expect(result.isInstalled).toBe(true)
   })
 
-  it("detects oh-my-openagent with version pin", () => {
+  it("detects oh-my-openagent as installed (legacy name)", () => {
     // given
-    const config = { plugin: ["oh-my-openagent@3.12.0"] }
+    const config = { plugin: ["oh-my-openagent"] }
+    writeFileSync(testConfigPath, JSON.stringify(config, null, 2) + "\n", "utf-8")
+
+    // when
+    const result = detectCurrentConfig()
+
+    // then
+    expect(result.isInstalled).toBe(true)
+  })
+
+  it("detects oh-my-openagent with version pin as installed (legacy name)", () => {
+    // given
+    const config = { plugin: ["oh-my-openagent@3.11.0"] }
     writeFileSync(testConfigPath, JSON.stringify(config, null, 2) + "\n", "utf-8")
 
     // when
@@ -85,9 +87,38 @@ describe("detectCurrentConfig - dual name detection", () => {
     // then
     expect(result.isInstalled).toBe(false)
   })
+
+  it("returns false when plugin not present (even with similar name)", () => {
+    // given - not exactly oh-my-openagent
+    const config = { plugin: ["oh-my-openagent-extra"] }
+    writeFileSync(testConfigPath, JSON.stringify(config, null, 2) + "\n", "utf-8")
+
+    // when
+    const result = detectCurrentConfig()
+
+    // then
+    expect(result.isInstalled).toBe(false)
+  })
+
+  it("detects OpenCode Go from the existing omo config", () => {
+    // given
+    writeFileSync(testConfigPath, JSON.stringify({ plugin: ["oh-my-opencode"] }, null, 2) + "\n", "utf-8")
+    writeFileSync(
+      testOmoConfigPath,
+      JSON.stringify({ agents: { atlas: { model: "opencode-go/kimi-k2.5" } } }, null, 2) + "\n",
+      "utf-8",
+    )
+
+    // when
+    const result = detectCurrentConfig()
+
+    // then
+    expect(result.isInstalled).toBe(true)
+    expect(result.hasOpencodeGo).toBe(true)
+  })
 })
 
-describe("addPluginToOpenCodeConfig - dual name detection", () => {
+describe("addPluginToOpenCodeConfig - single package writes", () => {
   let testConfigDir = ""
   let testConfigPath = ""
 
@@ -106,7 +137,7 @@ describe("addPluginToOpenCodeConfig - dual name detection", () => {
     delete process.env.OPENCODE_CONFIG_DIR
   })
 
-  it("finds and replaces old oh-my-opencode with new name", async () => {
+  it("keeps oh-my-opencode when it already exists", async () => {
     // given
     const config = { plugin: ["oh-my-opencode"] }
     writeFileSync(testConfigPath, JSON.stringify(config, null, 2) + "\n", "utf-8")
@@ -117,26 +148,10 @@ describe("addPluginToOpenCodeConfig - dual name detection", () => {
     // then
     expect(result.success).toBe(true)
     const savedConfig = JSON.parse(readFileSync(testConfigPath, "utf-8"))
-    expect(savedConfig.plugin).toContain("oh-my-openagent")
-    expect(savedConfig.plugin).not.toContain("oh-my-opencode")
+    expect(savedConfig.plugin).toContain("oh-my-opencode")
   })
 
-  it("finds and replaces oh-my-openagent with new name", async () => {
-    // given
-    const config = { plugin: ["oh-my-openagent"] }
-    writeFileSync(testConfigPath, JSON.stringify(config, null, 2) + "\n", "utf-8")
-
-    // when
-    const result = await addPluginToOpenCodeConfig("3.11.0")
-
-    // then
-    expect(result.success).toBe(true)
-    const savedConfig = JSON.parse(readFileSync(testConfigPath, "utf-8"))
-    expect(savedConfig.plugin).toContain("oh-my-openagent")
-    expect(savedConfig.plugin).not.toContain("oh-my-opencode")
-  })
-
-  it("finds and replaces version-pinned oh-my-opencode@X.Y.Z", async () => {
+  it("replaces version-pinned oh-my-opencode@X.Y.Z", async () => {
     // given
     const config = { plugin: ["oh-my-opencode@3.10.0"] }
     writeFileSync(testConfigPath, JSON.stringify(config, null, 2) + "\n", "utf-8")
@@ -147,11 +162,27 @@ describe("addPluginToOpenCodeConfig - dual name detection", () => {
     // then
     expect(result.success).toBe(true)
     const savedConfig = JSON.parse(readFileSync(testConfigPath, "utf-8"))
-    expect(savedConfig.plugin).toContain("oh-my-openagent")
+    expect(savedConfig.plugin).toContain("oh-my-opencode")
     expect(savedConfig.plugin).not.toContain("oh-my-opencode@3.10.0")
   })
 
-  it("finds and replaces version-pinned oh-my-openagent@X.Y.Z", async () => {
+  it("recognizes oh-my-openagent as already installed (legacy name)", async () => {
+    // given
+    const config = { plugin: ["oh-my-openagent"] }
+    writeFileSync(testConfigPath, JSON.stringify(config, null, 2) + "\n", "utf-8")
+
+    // when
+    const result = await addPluginToOpenCodeConfig("3.11.0")
+
+    // then
+    expect(result.success).toBe(true)
+    const savedConfig = JSON.parse(readFileSync(testConfigPath, "utf-8"))
+    // Should upgrade to new name
+    expect(savedConfig.plugin).toContain("oh-my-opencode")
+    expect(savedConfig.plugin).not.toContain("oh-my-openagent")
+  })
+
+  it("replaces version-pinned oh-my-openagent@X.Y.Z with new name", async () => {
     // given
     const config = { plugin: ["oh-my-openagent@3.10.0"] }
     writeFileSync(testConfigPath, JSON.stringify(config, null, 2) + "\n", "utf-8")
@@ -162,12 +193,13 @@ describe("addPluginToOpenCodeConfig - dual name detection", () => {
     // then
     expect(result.success).toBe(true)
     const savedConfig = JSON.parse(readFileSync(testConfigPath, "utf-8"))
-    expect(savedConfig.plugin).toContain("oh-my-openagent")
-    expect(savedConfig.plugin).not.toContain("oh-my-openagent@3.10.0")
+    // Legacy should be replaced with new name
+    expect(savedConfig.plugin).toContain("oh-my-opencode")
+    expect(savedConfig.plugin).not.toContain("oh-my-openagent")
   })
 
   it("adds new plugin when none exists", async () => {
-    // given - no plugin array
+    // given
     const config = {}
     writeFileSync(testConfigPath, JSON.stringify(config, null, 2) + "\n", "utf-8")
 
@@ -177,11 +209,11 @@ describe("addPluginToOpenCodeConfig - dual name detection", () => {
     // then
     expect(result.success).toBe(true)
     const savedConfig = JSON.parse(readFileSync(testConfigPath, "utf-8"))
-    expect(savedConfig.plugin).toContain("oh-my-openagent")
+    expect(savedConfig.plugin).toContain("oh-my-opencode")
   })
 
   it("adds plugin when plugin array is empty", async () => {
-    // given - empty plugin array
+    // given
     const config = { plugin: [] }
     writeFileSync(testConfigPath, JSON.stringify(config, null, 2) + "\n", "utf-8")
 
@@ -191,6 +223,6 @@ describe("addPluginToOpenCodeConfig - dual name detection", () => {
     // then
     expect(result.success).toBe(true)
     const savedConfig = JSON.parse(readFileSync(testConfigPath, "utf-8"))
-    expect(savedConfig.plugin).toContain("oh-my-openagent")
+    expect(savedConfig.plugin).toContain("oh-my-opencode")
   })
 })

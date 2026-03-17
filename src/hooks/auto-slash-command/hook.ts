@@ -18,6 +18,8 @@ import type {
 } from "./types"
 import type { LoadedSkill } from "../../features/opencode-skill-loader"
 
+const COMMAND_EXECUTE_FALLBACK_DEDUP_TTL_MS = 100
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
 }
@@ -33,6 +35,33 @@ function getDeletedSessionID(properties: unknown): string | null {
   }
 
   return typeof info.id === "string" ? info.id : null
+}
+
+function getCommandExecutionEventID(input: CommandExecuteBeforeInput): string | null {
+  const candidateKeys = [
+    "messageID",
+    "messageId",
+    "eventID",
+    "eventId",
+    "invocationID",
+    "invocationId",
+    "commandID",
+    "commandId",
+  ]
+
+  const recordInput = input as unknown
+  if (!isRecord(recordInput)) {
+    return null
+  }
+
+  for (const key of candidateKeys) {
+    const candidateValue = recordInput[key]
+    if (typeof candidateValue === "string" && candidateValue.length > 0) {
+      return candidateValue
+    }
+  }
+
+  return null
 }
 
 export interface AutoSlashCommandHookOptions {
@@ -96,7 +125,12 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
         args: parsed.args,
       })
 
-      const result = await executeSlashCommand(parsed, executorOptions)
+      const executionOptions: ExecutorOptions = {
+        ...executorOptions,
+        agent: input.agent,
+      }
+
+      const result = await executeSlashCommand(parsed, executionOptions)
 
       const idx = findSlashCommandPartIndex(output.parts)
       if (idx < 0) {
@@ -125,7 +159,10 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
       input: CommandExecuteBeforeInput,
       output: CommandExecuteBeforeOutput
     ): Promise<void> => {
-      const commandKey = `${input.sessionID}:${input.command.toLowerCase()}:${input.arguments || ""}`
+      const eventID = getCommandExecutionEventID(input)
+      const commandKey = eventID
+        ? `${input.sessionID}:event:${eventID}`
+        : `${input.sessionID}:fallback:${input.command.toLowerCase()}:${input.arguments || ""}`
       if (sessionProcessedCommandExecutions.has(commandKey)) {
         return
       }
@@ -142,7 +179,12 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
         raw: `/${input.command}${input.arguments ? " " + input.arguments : ""}`,
       }
 
-      const result = await executeSlashCommand(parsed, executorOptions)
+      const executionOptions: ExecutorOptions = {
+        ...executorOptions,
+        agent: input.agent,
+      }
+
+      const result = await executeSlashCommand(parsed, executionOptions)
 
       if (!result.success || !result.replacementText) {
         log(`[auto-slash-command] command.execute.before - command not found in our executor`, {
@@ -153,7 +195,10 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
         return
       }
 
-      sessionProcessedCommandExecutions.add(commandKey)
+      sessionProcessedCommandExecutions.add(
+        commandKey,
+        eventID ? undefined : COMMAND_EXECUTE_FALLBACK_DEDUP_TTL_MS
+      )
 
       const taggedContent = `${AUTO_SLASH_COMMAND_TAG_OPEN}\n${result.replacementText}\n${AUTO_SLASH_COMMAND_TAG_CLOSE}`
 

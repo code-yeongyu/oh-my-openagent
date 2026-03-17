@@ -4,6 +4,7 @@ import { fuzzyMatchModel } from "../../shared/model-availability"
 import { transformModelForProvider } from "../../shared/provider-model-id-transform"
 import { hasConnectedProvidersCache, hasProviderModelsCache } from "../../shared/connected-providers-cache"
 import { isProviderBlacklisted } from "../../shared/global-blacklist"
+import { parseModelString, parseVariantFromModelID } from "./model-string-parser"
 
 function isExplicitHighModel(model: string): boolean {
   return /(?:^|\/)[^/]+-high$/.test(model)
@@ -11,6 +12,36 @@ function isExplicitHighModel(model: string): boolean {
 
 function getExplicitHighBaseModel(model: string): string | null {
   return isExplicitHighModel(model) ? model.replace(/-high$/, "") : null
+}
+
+function parseUserFallbackModel(fallbackModel: string): {
+  baseModel: string
+  providerHint?: string[]
+  variant?: string
+} | undefined {
+  const normalizedFallback = normalizeModel(fallbackModel)
+  if (!normalizedFallback) {
+    return undefined
+  }
+
+  const parsedFullModel = parseModelString(normalizedFallback)
+  if (parsedFullModel) {
+    return {
+      baseModel: `${parsedFullModel.providerID}/${parsedFullModel.modelID}`,
+      providerHint: [parsedFullModel.providerID],
+      variant: parsedFullModel.variant,
+    }
+  }
+
+  const parsedModel = parseVariantFromModelID(normalizedFallback)
+  if (!parsedModel.modelID) {
+    return undefined
+  }
+
+  return {
+    baseModel: parsedModel.modelID,
+    variant: parsedModel.variant,
+  }
 }
 
 
@@ -21,7 +52,7 @@ export async function resolveModelForDelegateTask(input: {
   fallbackChain?: FallbackEntry[]
   availableModels: Set<string>
   systemDefaultModel?: string
-}): Promise<{ model: string; variant?: string } | undefined> {
+}): Promise<{ model: string; variant?: string } | { skipped: true } | undefined> {
   const userModel = normalizeModel(input.userModel)
   if (userModel) {
     return { model: userModel }
@@ -30,7 +61,7 @@ export async function resolveModelForDelegateTask(input: {
   // Before provider cache is created (first run), skip model resolution entirely.
   // OpenCode will use its system default model when no model is specified in the prompt.
   if (input.availableModels.size === 0 && !hasProviderModelsCache() && !hasConnectedProvidersCache()) {
-    return undefined
+    return { skipped: true }
   }
 
   const categoryDefault = normalizeModel(input.categoryDefaultModel)
@@ -56,29 +87,27 @@ export async function resolveModelForDelegateTask(input: {
   const userFallbackModels = input.userFallbackModels
   if (userFallbackModels && userFallbackModels.length > 0) {
     if (input.availableModels.size === 0) {
-      const first = normalizeModel(userFallbackModels[0])
+      const first = userFallbackModels[0] ? parseUserFallbackModel(userFallbackModels[0]) : undefined
       if (first) {
-        return { model: first }
+        return { model: first.baseModel, variant: first.variant }
       }
     } else {
       for (const fallbackModel of userFallbackModels) {
-        const normalizedFallback = normalizeModel(fallbackModel)
-        if (!normalizedFallback) continue
+        const parsedFallback = parseUserFallbackModel(fallbackModel)
+        if (!parsedFallback) continue
 
         // Check if provider is blacklisted
-        const parts = normalizedFallback.split("/")
-        if (parts.length >= 2) {
-          const providerID = parts[0]
+        if (parsedFallback.providerHint && parsedFallback.providerHint.length > 0) {
+          const providerID = parsedFallback.providerHint[0]
           const blacklisted = isProviderBlacklisted(providerID)
           if (blacklisted) {
             continue  // Skip blacklisted provider
           }
         }
 
-        const providerHint = parts.length >= 2 ? [parts[0]] : undefined
-        const match = fuzzyMatchModel(normalizedFallback, input.availableModels, providerHint)
+        const match = fuzzyMatchModel(parsedFallback.baseModel, input.availableModels, parsedFallback.providerHint)
         if (match) {
-          return { model: match }
+          return { model: match, variant: parsedFallback.variant }
         }
       }
     }

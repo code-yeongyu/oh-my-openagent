@@ -136,6 +136,13 @@ export function createRalphLoopEventHandler(
 				}
 
 				if (state.verification_pending) {
+					if (!verificationSessionID && matchesParentSession) {
+						log(`[${HOOK_NAME}] Verification pending without tracked oracle session, running recovery check`, {
+							sessionID,
+							iteration: state.iteration,
+						})
+					}
+
 					await handlePendingVerification(ctx, {
 						sessionID,
 						state,

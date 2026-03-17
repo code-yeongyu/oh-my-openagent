@@ -1,3 +1,5 @@
+/// <reference types="bun-types" />
+
 import { describe, expect, test } from "bun:test"
 import {
   AgentOverrideConfigSchema,
@@ -398,6 +400,17 @@ describe("HookNameSchema", () => {
   test("rejects removed beast-mode-system hook name", () => {
     //#given
     const input = "beast-mode-system"
+
+    //#when
+    const result = HookNameSchema.safeParse(input)
+
+    //#then
+    expect(result.success).toBe(false)
+  })
+
+  test("rejects removed delegate-task-english-directive hook name", () => {
+    //#given
+    const input = "delegate-task-english-directive"
 
     //#when
     const result = HookNameSchema.safeParse(input)
