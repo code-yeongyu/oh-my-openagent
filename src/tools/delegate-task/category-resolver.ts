@@ -98,6 +98,11 @@ Available categories: ${allCategoryNames}`,
       modelInfo = explicitCategoryModel || overrideModel
         ? { model: actualModel, type: "user-defined", source: "override" }
         : { model: actualModel, type: "system-default", source: "system-default" }
+      const parsedModel = parseModelString(actualModel)
+      const variantToUse = userCategories?.[args.category!]?.variant ?? resolved.config.variant
+      categoryModel = parsedModel
+        ? (variantToUse ? { ...parsedModel, variant: variantToUse } : parsedModel)
+        : undefined
     }
   } else {
     const resolution = resolveModelForDelegateTask({
