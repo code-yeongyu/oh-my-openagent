@@ -187,7 +187,7 @@ export function injectServerAuthIntoClient(client: unknown): void {
  */
 export function injectServerBaseUrlIntoClient(client: unknown, serverUrl: string): void {
   try {
-    let injected = false
+    let mainInjected = false
 
     const internal = getInternalClient(client)
     if (internal) {
@@ -195,11 +195,12 @@ export function injectServerBaseUrlIntoClient(client: unknown, serverUrl: string
       if (typeof setConfig === "function") {
         setConfig({ baseUrl: serverUrl })
         log("[opencode-server-auth] Updated client baseUrl", { serverUrl })
-        injected = true
+        mainInjected = true
       }
     }
 
     // Also inject into session subclient if it exists (mirrors getServerBaseUrl fallback path)
+    // Tracked separately — session success should not suppress the main-client fallback below
     if (isRecord(client)) {
       const session = client["session"]
       if (isRecord(session)) {
@@ -209,23 +210,23 @@ export function injectServerBaseUrlIntoClient(client: unknown, serverUrl: string
           if (typeof setConfig === "function") {
             setConfig({ baseUrl: serverUrl })
             log("[opencode-server-auth] Updated session client baseUrl", { serverUrl })
-            injected = true
           }
         }
       }
     }
 
-    // Fallback: try to set baseUrl directly on client if it has setConfig
-    if (!injected && isRecord(client)) {
+    // Fallback: try to set baseUrl directly on client if it has setConfig.
+    // Only skip if the main internal client was already configured above.
+    if (!mainInjected && isRecord(client)) {
       const setConfig = client["setConfig"]
       if (typeof setConfig === "function") {
         setConfig({ baseUrl: serverUrl })
         log("[opencode-server-auth] Updated client baseUrl (top-level)", { serverUrl })
-        injected = true
+        mainInjected = true
       }
     }
 
-    if (!injected) {
+    if (!mainInjected) {
       log("[opencode-server-auth] Could not update client baseUrl - incompatible client structure")
     }
   } catch (error) {
