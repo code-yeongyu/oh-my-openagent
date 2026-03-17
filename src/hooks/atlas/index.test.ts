@@ -33,6 +33,8 @@ mock.module("../../shared/opencode-storage-detection", () => ({
 }))
 
 const { createAtlasHook } = await import("./index")
+const { createToolExecuteAfterHandler } = await import("./tool-execute-after")
+const { createToolExecuteBeforeHandler } = await import("./tool-execute-before")
 const { MESSAGE_STORAGE } = await import("../../features/hook-message-injector")
 
 describe("atlas hook", () => {
@@ -407,6 +409,62 @@ describe("atlas hook", () => {
      expect(output.output).toContain("PHASE 1")
      expect(output.output).toContain("PHASE 2")
       
+      cleanupMessageStorage(sessionID)
+    })
+
+    test("should clean pending task refs when a task returns background launch output", async () => {
+      // given - direct handlers with shared pending maps
+      const sessionID = "session-bg-launch-cleanup-test"
+      setupMessageStorage(sessionID, "atlas")
+
+      const planPath = join(TEST_DIR, "background-cleanup-plan.md")
+      writeFileSync(planPath, `# Plan
+
+## TODOs
+- [ ] 1. Implement auth flow
+`)
+      writeBoulderState(TEST_DIR, {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: ["session-1"],
+        plan_name: "background-cleanup-plan",
+      })
+
+      const pendingFilePaths = new Map<string, string>()
+      const pendingTaskRefs = new Map<string, { key: string; label: string; title: string } | null>()
+      const beforeHandler = createToolExecuteBeforeHandler({
+        ctx: createMockPluginInput(),
+        pendingFilePaths,
+        pendingTaskRefs,
+      })
+      const afterHandler = createToolExecuteAfterHandler({
+        ctx: createMockPluginInput(),
+        pendingFilePaths,
+        pendingTaskRefs,
+        autoCommit: true,
+        getState: () => ({ promptFailureCount: 0 }),
+      })
+
+      // when - the task is captured before execution
+      await beforeHandler(
+        { tool: "task", sessionID, callID: "call-bg-launch" },
+        { args: { prompt: "Implement auth flow" } }
+      )
+      expect(pendingTaskRefs.size).toBe(1)
+
+      // and the task returns a background launch result
+      await afterHandler(
+        { tool: "task", sessionID, callID: "call-bg-launch" },
+        {
+          title: "Sisyphus Task",
+          output: "Background task launched.\n\nSession ID: ses_bg_12345",
+          metadata: {},
+        }
+      )
+
+      // then - the pending task ref is still cleaned up
+      expect(pendingTaskRefs.size).toBe(0)
+
       cleanupMessageStorage(sessionID)
     })
 

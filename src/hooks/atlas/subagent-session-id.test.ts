@@ -50,4 +50,19 @@ session_id: ses_real_metadata_456
     // then
     expect(result).toBe("ses_real_metadata_456")
   })
+
+  test("does not let task_metadata parsing bleed into incidental body text after the closing tag", () => {
+    // given
+    const output = `<task_metadata>
+session_id: ses_real_metadata_456
+</task_metadata>
+
+debug log: session_id: ses_wrong_body_789`
+
+    // when
+    const result = extractSessionIdFromOutput(output)
+
+    // then
+    expect(result).toBe("ses_real_metadata_456")
+  })
 })

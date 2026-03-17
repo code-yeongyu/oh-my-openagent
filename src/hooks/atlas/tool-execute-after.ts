@@ -71,6 +71,10 @@ export function createToolExecuteAfterHandler(input: {
     }
 
     const outputStr = toolOutput.output && typeof toolOutput.output === "string" ? toolOutput.output : ""
+    const pendingTaskRef = toolInput.callID ? pendingTaskRefs.get(toolInput.callID) : undefined
+    if (toolInput.callID) {
+      pendingTaskRefs.delete(toolInput.callID)
+    }
     const isBackgroundLaunch = outputStr.includes("Background task launched") || outputStr.includes("Background task continued")
     if (isBackgroundLaunch) {
       return
@@ -80,10 +84,6 @@ export function createToolExecuteAfterHandler(input: {
       const gitStats = collectGitDiffStats(ctx.directory)
       const fileChanges = formatFileChanges(gitStats)
       const subagentSessionId = extractSessionIdFromOutput(toolOutput.output)
-      const pendingTaskRef = toolInput.callID ? pendingTaskRefs.get(toolInput.callID) : undefined
-      if (toolInput.callID) {
-        pendingTaskRefs.delete(toolInput.callID)
-      }
 
       const boulderState = readBoulderState(ctx.directory)
       if (boulderState) {
