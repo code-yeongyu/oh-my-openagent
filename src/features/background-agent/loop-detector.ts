@@ -39,28 +39,56 @@ export function resolveCircuitBreakerSettings(
 export function recordToolCall(
   window: ToolCallWindow | undefined,
   toolName: string,
-  settings: CircuitBreakerSettings
+  settings: CircuitBreakerSettings,
+  toolInput?: Record<string, unknown> | null
 ): ToolCallWindow {
-  const previous = window?.toolNames ?? []
-  const toolNames = [...previous, toolName].slice(-settings.windowSize)
+  const previous = window?.toolSignatures ?? []
+  const signature = createToolCallSignature(toolName, toolInput)
+  const toolSignatures = [...previous, signature].slice(-settings.windowSize)
 
   return {
-    toolNames,
+    toolSignatures,
     windowSize: settings.windowSize,
     thresholdPercent: settings.repetitionThresholdPercent,
   }
 }
 
+function sortObject(obj: unknown): unknown {
+  if (obj === null || obj === undefined) return obj
+  if (typeof obj !== "object") return obj
+  if (Array.isArray(obj)) return obj.map(sortObject)
+
+  const sorted: Record<string, unknown> = {}
+  const keys = Object.keys(obj as Record<string, unknown>).sort()
+  for (const key of keys) {
+    sorted[key] = sortObject((obj as Record<string, unknown>)[key])
+  }
+  return sorted
+}
+
+export function createToolCallSignature(
+  toolName: string,
+  toolInput?: Record<string, unknown> | null
+): string {
+  if (toolInput === undefined || toolInput === null) {
+    return toolName
+  }
+  if (Object.keys(toolInput).length === 0) {
+    return toolName
+  }
+  return `${toolName}::${JSON.stringify(sortObject(toolInput))}`
+}
+
 export function detectRepetitiveToolUse(
   window: ToolCallWindow | undefined
 ): ToolLoopDetectionResult {
-  if (!window || window.toolNames.length === 0) {
+  if (!window || window.toolSignatures.length === 0) {
     return { triggered: false }
   }
 
   const counts = new Map<string, number>()
-  for (const toolName of window.toolNames) {
-    counts.set(toolName, (counts.get(toolName) ?? 0) + 1)
+  for (const signature of window.toolSignatures) {
+    counts.set(signature, (counts.get(signature) ?? 0) + 1)
   }
 
   let repeatedTool: string | undefined
@@ -73,7 +101,7 @@ export function detectRepetitiveToolUse(
     }
   }
 
-  const sampleSize = window.toolNames.length
+  const sampleSize = window.toolSignatures.length
   const minimumSampleSize = Math.min(
     window.windowSize,
     Math.ceil((window.windowSize * window.thresholdPercent) / 100)
@@ -91,7 +119,7 @@ export function detectRepetitiveToolUse(
 
   return {
     triggered: true,
-    toolName: repeatedTool,
+    toolName: repeatedTool.split("::")[0],
     repeatedCount,
     sampleSize,
     thresholdPercent: window.thresholdPercent,

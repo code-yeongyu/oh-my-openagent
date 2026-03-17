@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import {
+  createToolCallSignature,
   detectRepetitiveToolUse,
   recordToolCall,
   resolveCircuitBreakerSettings,
@@ -13,6 +14,17 @@ function buildWindow(
 
   return toolNames.reduce(
     (window, toolName) => recordToolCall(window, toolName, settings),
+    undefined as ReturnType<typeof recordToolCall> | undefined
+  )
+}
+
+function buildWindowWithInputs(
+  calls: Array<{ tool: string; input?: Record<string, unknown> }>,
+  override?: Parameters<typeof resolveCircuitBreakerSettings>[0]
+) {
+  const settings = resolveCircuitBreakerSettings(override)
+  return calls.reduce(
+    (window, { tool, input }) => recordToolCall(window, tool, settings, input),
     undefined as ReturnType<typeof recordToolCall> | undefined
   )
 }
@@ -81,6 +93,39 @@ describe("loop-detector", () => {
 
         expect(result.enabled).toBe(true)
       })
+    })
+  })
+
+  describe("createToolCallSignature", () => {
+    test("#given tool with input #when signature created #then includes tool and sorted input", () => {
+      const result = createToolCallSignature("read", { filePath: "/a.ts" })
+
+      expect(result).toBe('read::{"filePath":"/a.ts"}')
+    })
+
+    test("#given tool with undefined input #when signature created #then returns bare tool name", () => {
+      const result = createToolCallSignature("read", undefined)
+
+      expect(result).toBe("read")
+    })
+
+    test("#given tool with null input #when signature created #then returns bare tool name", () => {
+      const result = createToolCallSignature("read", null)
+
+      expect(result).toBe("read")
+    })
+
+    test("#given tool with empty object input #when signature created #then returns bare tool name", () => {
+      const result = createToolCallSignature("read", {})
+
+      expect(result).toBe("read")
+    })
+
+    test("#given same input different key order #when signatures compared #then they are equal", () => {
+      const first = createToolCallSignature("read", { filePath: "/a.ts", offset: 0 })
+      const second = createToolCallSignature("read", { offset: 0, filePath: "/a.ts" })
+
+      expect(first).toBe(second)
     })
   })
 
@@ -156,6 +201,57 @@ describe("loop-detector", () => {
           sampleSize: 8,
           thresholdPercent: 80,
         })
+      })
+    })
+
+    describe("#given same tool with different file inputs", () => {
+      test("#when evaluated #then it does not trigger", () => {
+        const calls = Array.from({ length: 20 }, (_, i) => ({
+          tool: "read",
+          input: { filePath: `/src/file-${i}.ts` },
+        }))
+        const window = buildWindowWithInputs(calls, {
+          circuitBreaker: { windowSize: 20, repetitionThresholdPercent: 80 },
+        })
+        const result = detectRepetitiveToolUse(window)
+        expect(result.triggered).toBe(false)
+      })
+    })
+
+    describe("#given same tool with identical file inputs", () => {
+      test("#when evaluated #then it triggers with bare tool name", () => {
+        const calls = [
+          ...Array.from({ length: 16 }, () => ({ tool: "read", input: { filePath: "/src/same.ts" } })),
+          { tool: "grep", input: { pattern: "foo" } },
+          { tool: "edit", input: { filePath: "/src/other.ts" } },
+          { tool: "bash", input: { command: "ls" } },
+          { tool: "glob", input: { pattern: "**/*.ts" } },
+        ]
+        const window = buildWindowWithInputs(calls, {
+          circuitBreaker: { windowSize: 20, repetitionThresholdPercent: 80 },
+        })
+        const result = detectRepetitiveToolUse(window)
+        expect(result.triggered).toBe(true)
+        expect(result.toolName).toBe("read")
+        expect(result.repeatedCount).toBe(16)
+      })
+    })
+
+    describe("#given tool calls with no input", () => {
+      test("#when the same tool dominates #then falls back to name-only detection", () => {
+        const calls = [
+          ...Array.from({ length: 16 }, () => ({ tool: "read" })),
+          { tool: "grep" },
+          { tool: "edit" },
+          { tool: "bash" },
+          { tool: "glob" },
+        ]
+        const window = buildWindowWithInputs(calls, {
+          circuitBreaker: { windowSize: 20, repetitionThresholdPercent: 80 },
+        })
+        const result = detectRepetitiveToolUse(window)
+        expect(result.triggered).toBe(true)
+        expect(result.toolName).toBe("read")
       })
     })
   })
