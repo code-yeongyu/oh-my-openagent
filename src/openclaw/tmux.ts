@@ -17,6 +17,7 @@ export async function getTmuxSessionName(): Promise<string | null> {
     const outputPromise = new Response(proc.stdout).text()
     await proc.exited
     const output = await outputPromise
+    // Await proc.exited ensures exitCode is set; avoid race condition
     if (proc.exitCode !== 0) return null
     return output.trim() || null
   } catch {
