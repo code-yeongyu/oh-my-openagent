@@ -163,28 +163,31 @@ export function injectServerAuthIntoClient(client: unknown): void {
           keys: Object.keys(internal),
         })
       }
-
-      // Also inject into session subclient — it is a separately configured internal
-      // client and session_* requests will miss Authorization headers otherwise
-      if (isRecord(client)) {
-        const session = client["session"]
-        if (isRecord(session)) {
-          const sessionInternal = getInternalClient(session)
-          if (sessionInternal) {
-            tryInjectViaSetConfigHeaders(sessionInternal, auth)
-            tryInjectViaInterceptors(sessionInternal, auth)
-            tryInjectViaFetchWrapper(sessionInternal, auth)
-            tryInjectViaMutableInternalConfig(sessionInternal, auth)
-          }
-        }
-      }
-
-      return
     }
 
-    const injected = tryInjectViaTopLevelFetch(client, auth)
-    if (!injected) {
-      log("[opencode-server-auth] OPENCODE_SERVER_PASSWORD is set but no compatible SDK client found")
+    // Also inject into session subclient — it is a separately configured internal
+    // client and session_* requests will miss Authorization headers otherwise.
+    // Runs independently of main client injection result.
+    if (isRecord(client)) {
+      const session = client["session"]
+      if (isRecord(session)) {
+        const sessionInternal = getInternalClient(session)
+        if (sessionInternal) {
+          tryInjectViaSetConfigHeaders(sessionInternal, auth)
+          tryInjectViaInterceptors(sessionInternal, auth)
+          tryInjectViaFetchWrapper(sessionInternal, auth)
+          tryInjectViaMutableInternalConfig(sessionInternal, auth)
+        }
+      }
+    }
+
+    // If main internal client didn't exist, try top-level fetch fallback
+    if (!internal) {
+      const injected = tryInjectViaTopLevelFetch(client, auth)
+      if (!injected) {
+        log("[opencode-server-auth] OPENCODE_SERVER_PASSWORD is set but no compatible SDK client found")
+      }
+      return
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)

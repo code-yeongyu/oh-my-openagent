@@ -12,7 +12,7 @@ import { createPluginDispose, type PluginDispose } from "./plugin-dispose"
 import { loadPluginConfig } from "./plugin-config"
 import { createModelCacheState } from "./plugin-state"
 import { createFirstMessageVariantGate } from "./shared/first-message-variant"
-import { injectServerAuthIntoClient, injectServerBaseUrlIntoClient, log } from "./shared"
+import { injectServerAuthIntoClient, injectServerBaseUrlIntoClient, log, getServerBaseUrl } from "./shared"
 import { startTmuxCheck } from "./tools"
 
 let activePluginDispose: PluginDispose | null = null
@@ -25,16 +25,38 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   })
 
   // Inject correct server baseUrl to ensure SDK client uses dynamic port
-  // Priority: ctx.serverUrl > fallback to existing client baseUrl
-  // Guarded because ctx.serverUrl getter can throw in some opencode versions
+  // Priority: ctx.serverUrl > getServerBaseUrl > env var > hardcoded default
+  let serverUrl: string | null = null
+
+  // Priority 1: ctx.serverUrl (guarded — getter can throw)
   try {
-    const serverUrl = ctx.serverUrl
-    if (serverUrl) {
-      injectServerBaseUrlIntoClient(ctx.client, serverUrl.origin)
+    const ctxServerUrl = ctx.serverUrl
+    if (ctxServerUrl) {
+      serverUrl = ctxServerUrl.origin
     }
   } catch {
-    // getter threw — injectServerBaseUrlIntoClient will fall back to other priorities
+    // getter threw — fall through to lower-priority resolution
   }
+
+  // Priority 2: Extract from client's internal config
+  if (!serverUrl) {
+    serverUrl = getServerBaseUrl(ctx.client)
+  }
+
+  // Priority 3: Environment variable
+  if (!serverUrl) {
+    const envPort = process.env.OPENCODE_PORT
+    if (envPort) {
+      serverUrl = `http://localhost:${envPort}`
+    }
+  }
+
+  // Priority 4: Hardcoded default
+  if (!serverUrl) {
+    serverUrl = "http://localhost:4096"
+  }
+
+  injectServerBaseUrlIntoClient(ctx.client, serverUrl)
 
   injectServerAuthIntoClient(ctx.client)
   startTmuxCheck()
