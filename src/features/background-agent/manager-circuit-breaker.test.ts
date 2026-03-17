@@ -236,4 +236,181 @@ describe("BackgroundManager circuit breaker", () => {
       expect(task.progress?.countedToolPartIDs).toEqual(["tool-1"])
     })
   })
+
+  describe("#given same tool reading different files", () => {
+    test("#when tool events arrive with state.input #then task keeps running", async () => {
+      const manager = createManager({
+        circuitBreaker: {
+          windowSize: 20,
+          repetitionThresholdPercent: 80,
+        },
+      })
+      const task: BackgroundTask = {
+        id: "task-diff-files-1",
+        sessionID: "session-diff-files-1",
+        parentSessionID: "parent-1",
+        parentMessageID: "msg-1",
+        description: "Reading different files",
+        prompt: "work",
+        agent: "explore",
+        status: "running",
+        startedAt: new Date(Date.now() - 60_000),
+        progress: {
+          toolCalls: 0,
+          lastUpdate: new Date(Date.now() - 60_000),
+        },
+      }
+      getTaskMap(manager).set(task.id, task)
+
+      for (let i = 0; i < 20; i++) {
+        manager.handleEvent({
+          type: "message.part.updated",
+          properties: {
+            part: {
+              sessionID: task.sessionID,
+              type: "tool",
+              tool: "read",
+              state: { status: "running", input: { filePath: `/src/file-${i}.ts` } },
+            },
+          },
+        })
+      }
+
+      await flushAsyncWork()
+
+      expect(task.status).toBe("running")
+      expect(task.progress?.toolCalls).toBe(20)
+    })
+  })
+
+  describe("#given same tool reading same file repeatedly", () => {
+    test("#when tool events arrive with state.input #then task is cancelled with bare tool name in error", async () => {
+      const manager = createManager({
+        circuitBreaker: {
+          windowSize: 20,
+          repetitionThresholdPercent: 80,
+        },
+      })
+      const task: BackgroundTask = {
+        id: "task-same-file-1",
+        sessionID: "session-same-file-1",
+        parentSessionID: "parent-1",
+        parentMessageID: "msg-1",
+        description: "Reading same file repeatedly",
+        prompt: "work",
+        agent: "explore",
+        status: "running",
+        startedAt: new Date(Date.now() - 60_000),
+        progress: {
+          toolCalls: 0,
+          lastUpdate: new Date(Date.now() - 60_000),
+        },
+      }
+      getTaskMap(manager).set(task.id, task)
+
+      for (let i = 0; i < 20; i++) {
+        manager.handleEvent({
+          type: "message.part.updated",
+          properties: {
+            part: {
+              sessionID: task.sessionID,
+              type: "tool",
+              tool: "read",
+              state: { status: "running", input: { filePath: "/src/same.ts" } },
+            },
+          },
+        })
+      }
+
+      await flushAsyncWork()
+
+      expect(task.status).toBe("cancelled")
+      expect(task.error).toContain("repeatedly called read")
+      expect(task.error).not.toContain("::")
+    })
+  })
+
+  describe("#given circuit breaker enabled is false", () => {
+    test("#when repetitive tools arrive #then task keeps running", async () => {
+      const manager = createManager({
+        circuitBreaker: {
+          enabled: false,
+          windowSize: 20,
+          repetitionThresholdPercent: 80,
+        },
+      })
+      const task: BackgroundTask = {
+        id: "task-disabled-1",
+        sessionID: "session-disabled-1",
+        parentSessionID: "parent-1",
+        parentMessageID: "msg-1",
+        description: "Disabled circuit breaker task",
+        prompt: "work",
+        agent: "explore",
+        status: "running",
+        startedAt: new Date(Date.now() - 60_000),
+        progress: {
+          toolCalls: 0,
+          lastUpdate: new Date(Date.now() - 60_000),
+        },
+      }
+      getTaskMap(manager).set(task.id, task)
+
+      for (let i = 0; i < 20; i++) {
+        manager.handleEvent({
+          type: "message.part.updated",
+          properties: {
+            sessionID: task.sessionID,
+            type: "tool",
+            tool: "read",
+          },
+        })
+      }
+
+      await flushAsyncWork()
+
+      expect(task.status).toBe("running")
+    })
+  })
+
+  describe("#given circuit breaker enabled is false but absolute cap is low", () => {
+    test("#when max tool calls exceeded #then task is still cancelled by absolute cap", async () => {
+      const manager = createManager({
+        maxToolCalls: 3,
+        circuitBreaker: {
+          enabled: false,
+          windowSize: 10,
+          repetitionThresholdPercent: 95,
+        },
+      })
+      const task: BackgroundTask = {
+        id: "task-cap-disabled-1",
+        sessionID: "session-cap-disabled-1",
+        parentSessionID: "parent-1",
+        parentMessageID: "msg-1",
+        description: "Backstop task with disabled circuit breaker",
+        prompt: "work",
+        agent: "explore",
+        status: "running",
+        startedAt: new Date(Date.now() - 60_000),
+        progress: {
+          toolCalls: 0,
+          lastUpdate: new Date(Date.now() - 60_000),
+        },
+      }
+      getTaskMap(manager).set(task.id, task)
+
+      for (const toolName of ["read", "grep", "edit"]) {
+        manager.handleEvent({
+          type: "message.part.updated",
+          properties: { sessionID: task.sessionID, type: "tool", tool: toolName },
+        })
+      }
+
+      await flushAsyncWork()
+
+      expect(task.status).toBe("cancelled")
+      expect(task.error).toContain("maximum tool call limit (3)")
+    })
+  })
 })
