@@ -3,16 +3,17 @@ import { readFile, writeFile, mkdir } from "node:fs/promises"
 import { join, dirname } from "node:path"
 import { stepCountIs, streamText, type CoreMessage } from "ai"
 import { tool } from "ai"
-import { createFriendli } from "@friendliai/ai-provider"
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible"
 import { z } from "zod"
-import { formatHashLines } from "../src/tools/hashline-edit/hash-computation"
-import { normalizeHashlineEdits } from "../src/tools/hashline-edit/normalize-edits"
-import { applyHashlineEditsWithReport } from "../src/tools/hashline-edit/edit-operations"
-import { canonicalizeFileText, restoreFileText } from "../src/tools/hashline-edit/file-text-canonicalization"
+import { formatHashLines } from "../../src/tools/hashline-edit/hash-computation"
+import { normalizeHashlineEdits } from "../../src/tools/hashline-edit/normalize-edits"
+import { applyHashlineEditsWithReport } from "../../src/tools/hashline-edit/edit-operations"
+import { canonicalizeFileText, restoreFileText } from "../../src/tools/hashline-edit/file-text-canonicalization"
+import { HASHLINE_EDIT_DESCRIPTION } from "../../src/tools/hashline-edit/tool-description"
 
-const DEFAULT_MODEL = "MiniMaxAI/MiniMax-M2.5"
+const DEFAULT_MODEL = "minimax-m2.5-free"
 const MAX_STEPS = 50
-const sessionId = `bench-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+const sessionId = `hashline-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 
 const emit = (event: Record<string, unknown>) =>
   console.log(JSON.stringify({ sessionId, timestamp: new Date().toISOString(), ...event }))
@@ -33,7 +34,7 @@ function parseArgs(): { prompt: string; modelId: string } {
     // --no-translate, --think consumed silently
   }
   if (!prompt) {
-    console.error("Usage: bun run benchmarks/headless.ts -p <prompt> [-m <model>]")
+    console.error("Usage: bun run tests/hashline/headless.ts -p <prompt> [-m <model>]")
     process.exit(1)
   }
   return { prompt, modelId }
@@ -57,7 +58,7 @@ const readFileTool = tool({
 })
 
 const editFileTool = tool({
-  description: "Edit a file using hashline anchors (LINE#ID format)",
+  description: HASHLINE_EDIT_DESCRIPTION,
   inputSchema: z.object({
     path: z.string(),
     edits: z.array(
@@ -116,8 +117,12 @@ const editFileTool = tool({
 async function run() {
   const { prompt, modelId } = parseArgs()
 
-  const friendli = createFriendli({ apiKey: process.env.FRIENDLI_TOKEN! })
-  const model = friendli(modelId)
+  const provider = createOpenAICompatible({
+    name: "hashline-test",
+    baseURL: process.env.HASHLINE_TEST_BASE_URL ?? "https://quotio.mengmota.com/v1",
+    apiKey: process.env.HASHLINE_TEST_API_KEY ?? "quotio-local-60A613FE-DB74-40FF-923E-A14151951E5D",
+  })
+  const model = provider.chatModel(modelId)
   const tools = { read_file: readFileTool, edit_file: editFileTool }
 
   emit({ type: "user", content: prompt })
@@ -125,7 +130,8 @@ async function run() {
   const messages: CoreMessage[] = [{ role: "user", content: prompt }]
   const system =
     "You are a code editing assistant. Use read_file to read files and edit_file to edit them. " +
-    "Always read a file before editing it to get fresh LINE#ID anchors."
+    "Always read a file before editing it to get fresh LINE#ID anchors.\n\n" +
+    "edit_file tool description:\n" + HASHLINE_EDIT_DESCRIPTION
 
   for (let step = 0; step < MAX_STEPS; step++) {
     const stream = streamText({
@@ -161,6 +167,7 @@ async function run() {
             ...(isError ? { error: output } : {}),
           })
           break
+        }
       }
     }
 
@@ -191,3 +198,4 @@ run()
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(2)
     console.error(`[headless] Completed in ${elapsed}s`)
   })
+
