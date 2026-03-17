@@ -21,6 +21,14 @@ function extractErrorString(error: unknown): string {
   if (typeof obj.message === "string") parts.push(obj.message)
   if (typeof obj.error === "string") parts.push(obj.error)
 
+  // OpenCode SDK wraps errors in error.data or error.error
+  if (typeof obj.data === "object" && obj.data !== null) {
+    const data = obj.data as Record<string, unknown>
+    if (typeof data.message === "string") parts.push(data.message)
+    if (typeof data.error === "string") parts.push(data.error)
+    if (typeof data.type === "string") parts.push(data.type)
+  }
+
   if (typeof obj.error === "object" && obj.error !== null) {
     const nested = obj.error as Record<string, unknown>
     if (typeof nested.message === "string") parts.push(nested.message)

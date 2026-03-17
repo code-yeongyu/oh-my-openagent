@@ -48,6 +48,7 @@ export function createTodoContinuationHandler(args: {
         state.isRecovering = true
         state.consecutiveFailures = MAX_CONSECUTIVE_FAILURES
         state.inFlight = false
+        state.contextLengthErrorAt = Date.now()
         log(`[${HOOK_NAME}] Context length error detected, blocking continuation`, {
           sessionID,
           errorName: error?.name,

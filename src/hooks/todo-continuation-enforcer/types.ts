@@ -27,6 +27,7 @@ export interface SessionState {
   countdownTimer?: ReturnType<typeof setTimeout>
   countdownInterval?: ReturnType<typeof setInterval>
   isRecovering?: boolean
+  contextLengthErrorAt?: number
   countdownStartedAt?: number
   abortDetectedAt?: number
   lastIncompleteCount?: number

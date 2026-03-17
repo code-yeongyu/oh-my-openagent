@@ -46,8 +46,18 @@ export async function handleSessionIdle(args: {
 
   const state = sessionStateStore.getState(sessionID)
   if (state.isRecovering) {
-    log(`[${HOOK_NAME}] Skipped: in recovery`, { sessionID })
-    return
+    // Auto-clear recovery lock after 5 minutes to prevent permanent lockout
+    // when the recovery hook doesn't fire (non-Anthropic providers, recovery failure)
+    const RECOVERY_TIMEOUT_MS = 5 * 60 * 1000
+    if (state.contextLengthErrorAt && Date.now() - state.contextLengthErrorAt > RECOVERY_TIMEOUT_MS) {
+      state.isRecovering = false
+      state.consecutiveFailures = 0
+      state.contextLengthErrorAt = undefined
+      log(`[${HOOK_NAME}] Auto-cleared stale recovery lock after timeout`, { sessionID })
+    } else {
+      log(`[${HOOK_NAME}] Skipped: in recovery`, { sessionID })
+      return
+    }
   }
 
   if (state.abortDetectedAt) {
