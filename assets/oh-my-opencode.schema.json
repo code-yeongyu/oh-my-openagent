@@ -3708,6 +3708,9 @@
         "circuitBreaker": {
           "type": "object",
           "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
             "maxToolCalls": {
               "type": "integer",
               "minimum": 10,
