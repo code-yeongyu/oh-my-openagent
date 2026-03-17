@@ -34,8 +34,6 @@ export function createOpenClawHook(
         // This is heuristic. If the last message was from assistant and ended with a question?
         // Or if the system is idle.
         await handleWake("session-idle", context)
-      } else if (event.type === "session.stop") {
-        await handleWake("stop", context)
       }
     },
 

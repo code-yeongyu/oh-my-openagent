@@ -11,7 +11,7 @@ describe("createOpenClawHook", () => {
     wakeOpenClawMock.mockClear()
   })
 
-  test("maps session.stop events to stop", async () => {
+  test("maps session.created to session-start", async () => {
     const { createOpenClawHook } = await import("./openclaw")
     const hook = createOpenClawHook(
       { directory: "/tmp/project" } as any,
@@ -20,14 +20,14 @@ describe("createOpenClawHook", () => {
 
     await hook?.event?.({
       event: {
-        type: "session.stop",
+        type: "session.created",
         properties: { sessionID: "session-1" },
       },
     })
 
     expect(wakeOpenClawMock).toHaveBeenCalledWith(
       expect.anything(),
-      "stop",
+      "session-start",
       expect.objectContaining({
         projectPath: "/tmp/project",
         sessionId: "session-1",

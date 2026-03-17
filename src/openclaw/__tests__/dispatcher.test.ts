@@ -60,7 +60,8 @@ describe("OpenClaw Dispatcher", () => {
     process.env.OMO_OPENCLAW_COMMAND_TIMEOUT_MS = "4321"
 
     try {
-      expect(resolveCommandTimeoutMs(undefined, process.env.OMO_OPENCLAW_COMMAND_TIMEOUT_MS)).toBe(4321)
+      // Call without explicit envTimeoutRaw so the function reads from process.env itself
+      expect(resolveCommandTimeoutMs(undefined)).toBe(4321)
     } finally {
       if (original === undefined) delete process.env.OMO_OPENCLAW_COMMAND_TIMEOUT_MS
       else process.env.OMO_OPENCLAW_COMMAND_TIMEOUT_MS = original
