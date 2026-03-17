@@ -21,13 +21,6 @@ interface MessageWithParts {
   parts: Part[]
 }
 
-interface MessageInfoExtended {
-  id: string
-  role: string
-  sessionID?: string
-  modelID?: string
-}
-
 type MessagesTransformHook = {
   "experimental.chat.messages.transform"?: (
     input: Record<string, never>,
@@ -36,24 +29,18 @@ type MessagesTransformHook = {
 }
 
 /**
- * Check if a model has extended thinking enabled
- * Uses patterns from think-mode/switcher.ts for consistency
+ * Check if there are any real thinking/reasoning blocks in the message history.
+ * Model-name checks are unreliable (miss GPT+thinking, custom model IDs, etc.)
+ * so we inspect the messages themselves.
  */
-function isExtendedThinkingModel(modelID: string): boolean {
-  if (!modelID) return false
-  const lower = modelID.toLowerCase()
-
-  // Check for explicit thinking/high variants (always enabled)
-  if (lower.includes("thinking") || lower.endsWith("-high")) {
-    return true
-  }
-
-  // Check for thinking-capable models (claude-4 family, claude-3)
-  // Aligns with THINKING_CAPABLE_MODELS in think-mode/switcher.ts
-  return (
-    lower.includes("claude-sonnet-4") ||
-    lower.includes("claude-opus-4") ||
-    lower.includes("claude-3")
+function hasThinkingBlocksInHistory(messages: MessageWithParts[]): boolean {
+  return messages.some(
+    m =>
+      m.info.role === "assistant" &&
+      m.parts?.some((p: Part) => {
+        const type = p.type as string
+        return type === "thinking" || type === "reasoning"
+      }),
   )
 }
 
@@ -142,12 +129,10 @@ export function createThinkingBlockValidatorHook(): MessagesTransformHook {
         return
       }
 
-      // Get the model info from the last user message
-      const lastUserMessage = messages.findLast(m => m.info.role === "user")
-      const modelID = (lastUserMessage?.info as unknown as MessageInfoExtended)?.modelID || ""
-
-      // Only process if extended thinking might be enabled
-      if (!isExtendedThinkingModel(modelID)) {
+      // Skip if there are no thinking blocks in history at all.
+      // This is more reliable than checking model names — works for Claude,
+      // GPT with thinking variants, or any future model.
+      if (!hasThinkingBlocksInHistory(messages)) {
         return
       }
 
