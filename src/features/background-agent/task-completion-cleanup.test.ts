@@ -1,6 +1,5 @@
-declare const require: (name: string) => any
-const { describe, test, expect, afterEach } = require("bun:test")
 import { tmpdir } from "node:os"
+import { afterEach, describe, expect, test } from "bun:test"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { TASK_CLEANUP_DELAY_MS } from "./constants"
 import { BackgroundManager } from "./manager"
@@ -157,17 +156,19 @@ function getRequiredTimer(manager: BackgroundManager, taskID: string): ReturnTyp
 }
 
 describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
-  describe("#given 2 tasks for same parent and task A completed", () => {
-    test("#when task B is still running #then task A is cleaned up from this.tasks after delay even though task B is not done", async () => {
+  describe("#given 3 tasks for same parent and task A completed first", () => {
+    test("#when siblings are still running or pending #then task A remains until siblings also complete", async () => {
       // given
       const { manager } = createManager(false)
       managerUnderTest = manager
       fakeTimers = installFakeTimers()
-      const taskA = createTask({ id: "task-a", parentSessionID: "parent-1", description: "task A", status: "completed", completedAt: new Date("2026-03-11T00:01:00.000Z") })
+      const taskA = createTask({ id: "task-a", parentSessionID: "parent-1", description: "task A", status: "completed", completedAt: new Date() })
       const taskB = createTask({ id: "task-b", parentSessionID: "parent-1", description: "task B", status: "running" })
+      const taskC = createTask({ id: "task-c", parentSessionID: "parent-1", description: "task C", status: "pending" })
       getTasks(manager).set(taskA.id, taskA)
       getTasks(manager).set(taskB.id, taskB)
-      getPendingByParent(manager).set(taskA.parentSessionID, new Set([taskA.id, taskB.id]))
+      getTasks(manager).set(taskC.id, taskC)
+      getPendingByParent(manager).set(taskA.parentSessionID, new Set([taskA.id, taskB.id, taskC.id]))
 
       // when
       await notifyParentSessionForTest(manager, taskA)
@@ -177,8 +178,23 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
 
       // then
       expect(fakeTimers.getDelay(taskATimer)).toBeUndefined()
-      expect(getTasks(manager).has(taskA.id)).toBe(false)
+      expect(getTasks(manager).has(taskA.id)).toBe(true)
       expect(getTasks(manager).get(taskB.id)).toBe(taskB)
+      expect(getTasks(manager).get(taskC.id)).toBe(taskC)
+
+      // when
+      taskB.status = "completed"
+      taskB.completedAt = new Date()
+      taskC.status = "completed"
+      taskC.completedAt = new Date()
+      await notifyParentSessionForTest(manager, taskB)
+      await notifyParentSessionForTest(manager, taskC)
+      const rescheduledTaskATimer = getRequiredTimer(manager, taskA.id)
+      expect(fakeTimers.getDelay(rescheduledTaskATimer)).toBe(TASK_CLEANUP_DELAY_MS)
+      fakeTimers.run(rescheduledTaskATimer)
+
+      // then
+      expect(getTasks(manager).has(taskA.id)).toBe(false)
     })
   })
 
