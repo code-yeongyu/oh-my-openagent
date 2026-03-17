@@ -233,11 +233,10 @@ jobs:
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           
-          # Update package name to oh-my-openagent
-          jq '.name = "oh-my-openagent"' package.json > tmp.json && mv tmp.json package.json
-          
-          # Update optionalDependencies to use oh-my-openagent naming
+          # Update package name, version, and optionalDependencies for oh-my-openagent
           jq --arg v "$VERSION" '
+            .name = "oh-my-openagent" |
+            .version = $v |
             .optionalDependencies = (
               .optionalDependencies | to_entries |
               map(.key = (.key | sub("^oh-my-opencode-"; "oh-my-openagent-")) | .value = $v) |
