@@ -557,6 +557,71 @@ describe("keyword-detector agent-specific ultrawork messages", () => {
     } as any
   }
 
+  test("should skip analyze-mode injection when agent is prometheus", async () => {
+    // given - prometheus agent with analyze keyword in message
+    const collector = new ContextCollector()
+    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
+    const sessionID = "prometheus-analyze-session"
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "왜 로그인이 안되는지 파악해서 계획해줘" }],
+    }
+
+    // when - analyze keyword detected with prometheus agent
+    await hook["chat.message"]({ sessionID, agent: "prometheus" }, output)
+
+    // then - analyze-mode should be skipped for planner agents, text unchanged
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).toBe("왜 로그인이 안되는지 파악해서 계획해줘")
+    expect(textPart!.text).not.toContain("[analyze-mode]")
+  })
+
+  test("should skip search-mode injection when agent is prometheus", async () => {
+    // given - prometheus agent with search keyword in message
+    const collector = new ContextCollector()
+    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
+    const sessionID = "prometheus-search-session"
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "찾아봐서 계획 세워줘" }],
+    }
+
+    // when - search keyword detected with prometheus agent
+    await hook["chat.message"]({ sessionID, agent: "prometheus" }, output)
+
+    // then - search-mode should be skipped for planner agents, text unchanged
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).toBe("찾아봐서 계획 세워줘")
+    expect(textPart!.text).not.toContain("[search-mode]")
+  })
+
+  test("should skip all keyword injections for planner agents but allow for non-planner", async () => {
+    // given - same message tested with prometheus vs sisyphus
+    const collector = new ContextCollector()
+    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
+
+    // prometheus agent - should skip
+    const prometheusOutput = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "분석해서 계획해줘" }],
+    }
+    await hook["chat.message"]({ sessionID: "prom-sess", agent: "prometheus" }, prometheusOutput)
+
+    // sisyphus agent - should inject
+    setMainSession("sis-sess")
+    const sisyphusOutput = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "분석해서 계획해줘" }],
+    }
+    await hook["chat.message"]({ sessionID: "sis-sess", agent: "sisyphus" }, sisyphusOutput)
+
+    // then - prometheus: unchanged, sisyphus: analyze-mode injected
+    expect(prometheusOutput.parts[0].text).toBe("분석해서 계획해줘")
+    expect(sisyphusOutput.parts[0].text).toContain("[analyze-mode]")
+  })
+
   test("should skip ultrawork injection when agent is prometheus", async () => {
     // given - collector and prometheus agent
     const collector = new ContextCollector()

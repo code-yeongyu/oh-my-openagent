@@ -51,7 +51,9 @@ export function createKeywordDetectorHook(ctx: PluginInput, _collector?: Context
       let detectedKeywords = detectKeywordsWithType(cleanText, currentAgent, modelID)
 
       if (isPlannerAgent(currentAgent)) {
-        detectedKeywords = detectedKeywords.filter((k) => k.type !== "ultrawork")
+        detectedKeywords = detectedKeywords.filter(
+          (k) => k.type !== "ultrawork" && k.type !== "analyze" && k.type !== "search"
+        )
       }
 
       if (detectedKeywords.length === 0) {
