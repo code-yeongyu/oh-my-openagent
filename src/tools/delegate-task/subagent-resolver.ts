@@ -60,14 +60,6 @@ Create the work plan directly - that's your job as the planning agent.`,
       return getTaskAgentCatalog(client)
     })()
 
-    // Fail open if pre-fetched catalog was explicitly null (provided but empty)
-    if (preFetchedCatalog === null) {
-      return {
-        agentToUse: agentName,
-        categoryModel: undefined,
-      }
-    }
-
     // Error if catalog fetch failed (preFetchedCatalog was undefined and fetch returned null)
     if (!agentCatalog) {
       return {

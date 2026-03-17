@@ -64,7 +64,7 @@ describe("resolveSubagentExecution", () => {
     expect(result.error).toBe('Failed to fetch agent catalog for "oracle"')
   })
 
-  test("fails open when pre-fetched catalog is null", async () => {
+  test("fails closed when pre-fetched catalog is null - returns error", async () => {
     //#given
     const args = createBaseArgs({ subagent_type: "review" })
     const executorCtx = createExecutorContext(async () => {
@@ -76,9 +76,27 @@ describe("resolveSubagentExecution", () => {
     const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep", null)
 
     //#then
-    expect(result.agentToUse).toBe("review")
+    expect(result.agentToUse).toBe("")
     expect(result.categoryModel).toBeUndefined()
-    expect(result.error).toBeUndefined()
+    expect(result.error).toBe('Failed to fetch agent catalog for "review"')
+    expect(agentsSpy).not.toHaveBeenCalled()
+  })
+
+  test("should return error for primary agent when catalog is null", async () => {
+    //#given
+    const args = createBaseArgs({ subagent_type: "sisyphus" })
+    const executorCtx = createExecutorContext(async () => {
+      throw new Error("network timeout")
+    })
+    const agentsSpy = spyOn(executorCtx.client.app, "agents")
+
+    //#when
+    const result = await resolveSubagentExecution(args, executorCtx, "hephaestus", "deep", null)
+
+    //#then
+    expect(result.agentToUse).toBe("")
+    expect(result.categoryModel).toBeUndefined()
+    expect(result.error).toBe('Failed to fetch agent catalog for "sisyphus"')
     expect(agentsSpy).not.toHaveBeenCalled()
   })
 
