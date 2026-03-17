@@ -47,10 +47,11 @@ export async function run(options: RunOptions): Promise<number> {
 
   const pluginConfig = loadPluginConfig(directory, { command: "run" })
   const resolvedAgent = resolveRunAgent(options, pluginConfig)
-  const resolvedModel = resolveRunModel(options.model)
   const abortController = new AbortController()
 
   try {
+    const resolvedModel = resolveRunModel(options.model)
+
     const { client, cleanup: serverCleanup } = await createServerConnection({
       port: options.port,
       attach: options.attach,

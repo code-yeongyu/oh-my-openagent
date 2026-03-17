@@ -5,60 +5,60 @@ exports[`generateModelConfig no providers available returns ULTIMATE_FALLBACK fo
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json",
   "agents": {
     "atlas": {
-      "model": "opencode/glm-4.7-free",
+      "model": "opencode/gpt-5-nano",
     },
     "explore": {
-      "model": "opencode/glm-4.7-free",
+      "model": "opencode/gpt-5-nano",
     },
     "hephaestus": {
-      "model": "opencode/glm-4.7-free",
+      "model": "opencode/gpt-5-nano",
     },
     "librarian": {
-      "model": "opencode/glm-4.7-free",
+      "model": "opencode/gpt-5-nano",
     },
     "metis": {
-      "model": "opencode/glm-4.7-free",
+      "model": "opencode/gpt-5-nano",
     },
     "momus": {
-      "model": "opencode/glm-4.7-free",
+      "model": "opencode/gpt-5-nano",
     },
     "multimodal-looker": {
-      "model": "opencode/glm-4.7-free",
+      "model": "opencode/gpt-5-nano",
     },
     "oracle": {
-      "model": "opencode/glm-4.7-free",
+      "model": "opencode/gpt-5-nano",
     },
     "prometheus": {
-      "model": "opencode/glm-4.7-free",
+      "model": "opencode/gpt-5-nano",
     },
     "sisyphus-junior": {
-      "model": "opencode/glm-4.7-free",
+      "model": "opencode/gpt-5-nano",
     },
   },
   "categories": {
     "artistry": {
-      "model": "opencode/glm-4.7-free",
+      "model": "opencode/gpt-5-nano",
     },
     "deep": {
-      "model": "opencode/glm-4.7-free",
+      "model": "opencode/gpt-5-nano",
     },
     "quick": {
-      "model": "opencode/glm-4.7-free",
+      "model": "opencode/gpt-5-nano",
     },
     "ultrabrain": {
-      "model": "opencode/glm-4.7-free",
+      "model": "opencode/gpt-5-nano",
     },
     "unspecified-high": {
-      "model": "opencode/glm-4.7-free",
+      "model": "opencode/gpt-5-nano",
     },
     "unspecified-low": {
-      "model": "opencode/glm-4.7-free",
+      "model": "opencode/gpt-5-nano",
     },
     "visual-engineering": {
-      "model": "opencode/glm-4.7-free",
+      "model": "opencode/gpt-5-nano",
     },
     "writing": {
-      "model": "opencode/glm-4.7-free",
+      "model": "opencode/gpt-5-nano",
     },
   },
 }
@@ -83,7 +83,7 @@ exports[`generateModelConfig single native provider uses Claude models when only
       "variant": "max",
     },
     "multimodal-looker": {
-      "model": "opencode/glm-4.7-free",
+      "model": "opencode/gpt-5-nano",
     },
     "oracle": {
       "model": "anthropic/claude-opus-4-6",
@@ -145,7 +145,7 @@ exports[`generateModelConfig single native provider uses Claude models with isMa
       "variant": "max",
     },
     "multimodal-looker": {
-      "model": "opencode/glm-4.7-free",
+      "model": "opencode/gpt-5-nano",
     },
     "oracle": {
       "model": "anthropic/claude-opus-4-6",
@@ -366,20 +366,20 @@ exports[`generateModelConfig single native provider uses Gemini models when only
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json",
   "agents": {
     "atlas": {
-      "model": "opencode/glm-4.7-free",
+      "model": "opencode/gpt-5-nano",
     },
     "explore": {
       "model": "opencode/gpt-5-nano",
     },
     "metis": {
-      "model": "opencode/glm-4.7-free",
+      "model": "opencode/gpt-5-nano",
     },
     "momus": {
       "model": "google/gemini-3.1-pro-preview",
       "variant": "high",
     },
     "multimodal-looker": {
-      "model": "opencode/glm-4.7-free",
+      "model": "opencode/gpt-5-nano",
     },
     "oracle": {
       "model": "google/gemini-3.1-pro-preview",
@@ -389,7 +389,7 @@ exports[`generateModelConfig single native provider uses Gemini models when only
       "model": "google/gemini-3.1-pro-preview",
     },
     "sisyphus-junior": {
-      "model": "opencode/glm-4.7-free",
+      "model": "opencode/gpt-5-nano",
     },
   },
   "categories": {
@@ -426,20 +426,20 @@ exports[`generateModelConfig single native provider uses Gemini models with isMa
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json",
   "agents": {
     "atlas": {
-      "model": "opencode/glm-4.7-free",
+      "model": "opencode/gpt-5-nano",
     },
     "explore": {
       "model": "opencode/gpt-5-nano",
     },
     "metis": {
-      "model": "opencode/glm-4.7-free",
+      "model": "opencode/gpt-5-nano",
     },
     "momus": {
       "model": "google/gemini-3.1-pro-preview",
       "variant": "high",
     },
     "multimodal-looker": {
-      "model": "opencode/glm-4.7-free",
+      "model": "opencode/gpt-5-nano",
     },
     "oracle": {
       "model": "google/gemini-3.1-pro-preview",
@@ -449,7 +449,7 @@ exports[`generateModelConfig single native provider uses Gemini models with isMa
       "model": "google/gemini-3.1-pro-preview",
     },
     "sisyphus-junior": {
-      "model": "opencode/glm-4.7-free",
+      "model": "opencode/gpt-5-nano",
     },
   },
   "categories": {
@@ -465,7 +465,7 @@ exports[`generateModelConfig single native provider uses Gemini models with isMa
       "variant": "high",
     },
     "unspecified-high": {
-      "model": "opencode/glm-4.7-free",
+      "model": "opencode/gpt-5-nano",
     },
     "unspecified-low": {
       "model": "google/gemini-3-flash-preview",
@@ -929,7 +929,7 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian whe
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json",
   "agents": {
     "atlas": {
-      "model": "opencode/glm-4.7-free",
+      "model": "opencode/gpt-5-nano",
     },
     "explore": {
       "model": "opencode/gpt-5-nano",
@@ -938,45 +938,45 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian whe
       "model": "zai-coding-plan/glm-4.7",
     },
     "metis": {
-      "model": "opencode/glm-4.7-free",
+      "model": "opencode/gpt-5-nano",
     },
     "momus": {
-      "model": "opencode/glm-4.7-free",
+      "model": "opencode/gpt-5-nano",
     },
     "multimodal-looker": {
       "model": "zai-coding-plan/glm-4.6v",
     },
     "oracle": {
-      "model": "opencode/glm-4.7-free",
+      "model": "opencode/gpt-5-nano",
     },
     "prometheus": {
-      "model": "opencode/glm-4.7-free",
+      "model": "opencode/gpt-5-nano",
     },
     "sisyphus": {
       "model": "zai-coding-plan/glm-5",
     },
     "sisyphus-junior": {
-      "model": "opencode/glm-4.7-free",
+      "model": "opencode/gpt-5-nano",
     },
   },
   "categories": {
     "quick": {
-      "model": "opencode/glm-4.7-free",
+      "model": "opencode/gpt-5-nano",
     },
     "ultrabrain": {
-      "model": "opencode/glm-4.7-free",
+      "model": "opencode/gpt-5-nano",
     },
     "unspecified-high": {
-      "model": "opencode/glm-4.7-free",
+      "model": "opencode/gpt-5-nano",
     },
     "unspecified-low": {
-      "model": "opencode/glm-4.7-free",
+      "model": "opencode/gpt-5-nano",
     },
     "visual-engineering": {
       "model": "zai-coding-plan/glm-5",
     },
     "writing": {
-      "model": "opencode/glm-4.7-free",
+      "model": "opencode/gpt-5-nano",
     },
   },
 }
@@ -987,7 +987,7 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian wit
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json",
   "agents": {
     "atlas": {
-      "model": "opencode/glm-4.7-free",
+      "model": "opencode/gpt-5-nano",
     },
     "explore": {
       "model": "opencode/gpt-5-nano",
@@ -996,45 +996,45 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian wit
       "model": "zai-coding-plan/glm-4.7",
     },
     "metis": {
-      "model": "opencode/glm-4.7-free",
+      "model": "opencode/gpt-5-nano",
     },
     "momus": {
-      "model": "opencode/glm-4.7-free",
+      "model": "opencode/gpt-5-nano",
     },
     "multimodal-looker": {
       "model": "zai-coding-plan/glm-4.6v",
     },
     "oracle": {
-      "model": "opencode/glm-4.7-free",
+      "model": "opencode/gpt-5-nano",
     },
     "prometheus": {
-      "model": "opencode/glm-4.7-free",
+      "model": "opencode/gpt-5-nano",
     },
     "sisyphus": {
       "model": "zai-coding-plan/glm-5",
     },
     "sisyphus-junior": {
-      "model": "opencode/glm-4.7-free",
+      "model": "opencode/gpt-5-nano",
     },
   },
   "categories": {
     "quick": {
-      "model": "opencode/glm-4.7-free",
+      "model": "opencode/gpt-5-nano",
     },
     "ultrabrain": {
-      "model": "opencode/glm-4.7-free",
+      "model": "opencode/gpt-5-nano",
     },
     "unspecified-high": {
       "model": "zai-coding-plan/glm-5",
     },
     "unspecified-low": {
-      "model": "opencode/glm-4.7-free",
+      "model": "opencode/gpt-5-nano",
     },
     "visual-engineering": {
       "model": "zai-coding-plan/glm-5",
     },
     "writing": {
-      "model": "opencode/glm-4.7-free",
+      "model": "opencode/gpt-5-nano",
     },
   },
 }
@@ -1273,7 +1273,7 @@ exports[`generateModelConfig mixed provider scenarios uses Gemini + Claude combi
       "variant": "max",
     },
     "multimodal-looker": {
-      "model": "opencode/glm-4.7-free",
+      "model": "opencode/gpt-5-nano",
     },
     "oracle": {
       "model": "google/gemini-3.1-pro-preview",

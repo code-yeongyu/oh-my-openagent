@@ -27,6 +27,7 @@ import {
 import {
   POLLING_INTERVAL_MS,
   TASK_CLEANUP_DELAY_MS,
+  TASK_TTL_MS,
 } from "./constants"
 
 import { subagentSessions } from "../claude-code-session-state"
@@ -99,6 +100,8 @@ export interface SubagentSessionCreatedEvent {
 }
 
 export type OnSubagentSessionCreated = (event: SubagentSessionCreatedEvent) => Promise<void>
+
+const MAX_TASK_REMOVAL_RESCHEDULES = 6
 
 export class BackgroundManager {
 
@@ -1203,7 +1206,7 @@ export class BackgroundManager {
     this.completedTaskSummaries.delete(parentSessionID)
   }
 
-  private scheduleTaskRemoval(taskId: string): void {
+  private scheduleTaskRemoval(taskId: string, rescheduleCount = 0): void {
     const existingTimer = this.completionTimers.get(taskId)
     if (existingTimer) {
       clearTimeout(existingTimer)
@@ -1213,17 +1216,29 @@ export class BackgroundManager {
     const timer = setTimeout(() => {
       this.completionTimers.delete(taskId)
       const task = this.tasks.get(taskId)
-      if (task) {
-        this.clearNotificationsForTask(taskId)
-        this.tasks.delete(taskId)
-        this.clearTaskHistoryWhenParentTasksGone(task.parentSessionID)
-        if (task.sessionID) {
-          subagentSessions.delete(task.sessionID)
-          SessionCategoryRegistry.remove(task.sessionID)
+      if (!task) return
+
+      if (task.parentSessionID) {
+        const siblings = this.getTasksByParentSession(task.parentSessionID)
+        const runningOrPendingSiblings = siblings.filter(
+          sibling => sibling.id !== taskId && (sibling.status === "running" || sibling.status === "pending"),
+        )
+        const completedAtTimestamp = task.completedAt?.getTime()
+        const reachedTaskTtl = completedAtTimestamp !== undefined && (Date.now() - completedAtTimestamp) >= TASK_TTL_MS
+        if (runningOrPendingSiblings.length > 0 && rescheduleCount < MAX_TASK_REMOVAL_RESCHEDULES && !reachedTaskTtl) {
+          this.scheduleTaskRemoval(taskId, rescheduleCount + 1)
+          return
         }
-        log("[background-agent] Removed completed task from memory:", taskId)
-        this.clearTaskHistoryWhenParentTasksGone(task?.parentSessionID)
       }
+
+      this.clearNotificationsForTask(taskId)
+      this.tasks.delete(taskId)
+      this.clearTaskHistoryWhenParentTasksGone(task.parentSessionID)
+      if (task.sessionID) {
+        subagentSessions.delete(task.sessionID)
+        SessionCategoryRegistry.remove(task.sessionID)
+      }
+      log("[background-agent] Removed completed task from memory:", taskId)
     }, TASK_CLEANUP_DELAY_MS)
 
     this.completionTimers.set(taskId, timer)

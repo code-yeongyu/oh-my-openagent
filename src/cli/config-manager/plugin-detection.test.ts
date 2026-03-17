@@ -52,9 +52,45 @@ describe("detectCurrentConfig - single package detection", () => {
     expect(result.isInstalled).toBe(true)
   })
 
+  it("detects oh-my-openagent as installed (legacy name)", () => {
+    // given
+    const config = { plugin: ["oh-my-openagent"] }
+    writeFileSync(testConfigPath, JSON.stringify(config, null, 2) + "\n", "utf-8")
+
+    // when
+    const result = detectCurrentConfig()
+
+    // then
+    expect(result.isInstalled).toBe(true)
+  })
+
+  it("detects oh-my-openagent with version pin as installed (legacy name)", () => {
+    // given
+    const config = { plugin: ["oh-my-openagent@3.11.0"] }
+    writeFileSync(testConfigPath, JSON.stringify(config, null, 2) + "\n", "utf-8")
+
+    // when
+    const result = detectCurrentConfig()
+
+    // then
+    expect(result.isInstalled).toBe(true)
+  })
+
   it("returns false when plugin not present", () => {
     // given
     const config = { plugin: ["some-other-plugin"] }
+    writeFileSync(testConfigPath, JSON.stringify(config, null, 2) + "\n", "utf-8")
+
+    // when
+    const result = detectCurrentConfig()
+
+    // then
+    expect(result.isInstalled).toBe(false)
+  })
+
+  it("returns false when plugin not present (even with similar name)", () => {
+    // given - not exactly oh-my-openagent
+    const config = { plugin: ["oh-my-openagent-extra"] }
     writeFileSync(testConfigPath, JSON.stringify(config, null, 2) + "\n", "utf-8")
 
     // when
@@ -128,6 +164,38 @@ describe("addPluginToOpenCodeConfig - single package writes", () => {
     const savedConfig = JSON.parse(readFileSync(testConfigPath, "utf-8"))
     expect(savedConfig.plugin).toContain("oh-my-opencode")
     expect(savedConfig.plugin).not.toContain("oh-my-opencode@3.10.0")
+  })
+
+  it("recognizes oh-my-openagent as already installed (legacy name)", async () => {
+    // given
+    const config = { plugin: ["oh-my-openagent"] }
+    writeFileSync(testConfigPath, JSON.stringify(config, null, 2) + "\n", "utf-8")
+
+    // when
+    const result = await addPluginToOpenCodeConfig("3.11.0")
+
+    // then
+    expect(result.success).toBe(true)
+    const savedConfig = JSON.parse(readFileSync(testConfigPath, "utf-8"))
+    // Should upgrade to new name
+    expect(savedConfig.plugin).toContain("oh-my-opencode")
+    expect(savedConfig.plugin).not.toContain("oh-my-openagent")
+  })
+
+  it("replaces version-pinned oh-my-openagent@X.Y.Z with new name", async () => {
+    // given
+    const config = { plugin: ["oh-my-openagent@3.10.0"] }
+    writeFileSync(testConfigPath, JSON.stringify(config, null, 2) + "\n", "utf-8")
+
+    // when
+    const result = await addPluginToOpenCodeConfig("3.11.0")
+
+    // then
+    expect(result.success).toBe(true)
+    const savedConfig = JSON.parse(readFileSync(testConfigPath, "utf-8"))
+    // Legacy should be replaced with new name
+    expect(savedConfig.plugin).toContain("oh-my-opencode")
+    expect(savedConfig.plugin).not.toContain("oh-my-openagent")
   })
 
   it("adds new plugin when none exists", async () => {

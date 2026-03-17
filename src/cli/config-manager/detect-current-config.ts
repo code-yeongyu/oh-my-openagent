@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs"
-import { parseJsonc } from "../../shared"
+import { parseJsonc, LEGACY_PLUGIN_NAME, PLUGIN_NAME } from "../../shared"
 import type { DetectedConfig } from "../types"
 import { getOmoConfigPath } from "./config-context"
 import { detectConfigFormat } from "./opencode-config-format"
@@ -55,8 +55,12 @@ function detectProvidersFromOmoConfig(): {
   }
 }
 
+function isOurPlugin(plugin: string): boolean {
+  return plugin === PLUGIN_NAME || plugin.startsWith(`${PLUGIN_NAME}@`) ||
+         plugin === LEGACY_PLUGIN_NAME || plugin.startsWith(`${LEGACY_PLUGIN_NAME}@`)
+}
+
 export function detectCurrentConfig(): DetectedConfig {
-  const PACKAGE_NAME = "oh-my-opencode"
   const result: DetectedConfig = {
     isInstalled: false,
     hasClaude: true,
@@ -82,7 +86,7 @@ export function detectCurrentConfig(): DetectedConfig {
 
   const openCodeConfig = parseResult.config
   const plugins = openCodeConfig.plugin ?? []
-  result.isInstalled = plugins.some((plugin) => plugin.startsWith(PACKAGE_NAME))
+  result.isInstalled = plugins.some(isOurPlugin)
 
   if (!result.isInstalled) {
     return result

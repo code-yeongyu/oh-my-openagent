@@ -85,6 +85,7 @@ Available categories: ${allCategoryNames}`,
   let actualModel: string | undefined
   let modelInfo: ModelFallbackInfo | undefined
   let categoryModel: { providerID: string; modelID: string; variant?: string } | undefined
+  let isModelResolutionSkipped = false
 
   const overrideModel = sisyphusJuniorModel
   const explicitCategoryModel = userCategories?.[args.category!]?.model
@@ -114,7 +115,9 @@ Available categories: ${allCategoryNames}`,
       systemDefaultModel,
     })
 
-    if (resolution) {
+    if (resolution && "skipped" in resolution) {
+      isModelResolutionSkipped = true
+    } else if (resolution) {
       const { model: resolvedModel, variant: resolvedVariant } = resolution
       actualModel = resolvedModel
 
@@ -161,7 +164,7 @@ Available categories: ${allCategoryNames}`,
   }
   const categoryPromptAppend = resolved.promptAppend || undefined
 
-  if (!categoryModel && !actualModel) {
+  if (!categoryModel && !actualModel && !isModelResolutionSkipped) {
     const categoryNames = Object.keys(enabledCategories)
     return {
       agentToUse: "",

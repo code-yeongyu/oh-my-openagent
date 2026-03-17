@@ -18,7 +18,7 @@ describe("createSessionStateStore regressions", () => {
 
   describe("#given external activity happens after a successful continuation", () => {
     describe("#when todos stay unchanged", () => {
-      test("#then it treats the activity as progress instead of stagnation", () => {
+      test("#then it keeps counting stagnation", () => {
         const sessionID = "ses-activity-progress"
         const todos = [
           { id: "1", content: "Task 1", status: "pending", priority: "high" },
@@ -37,9 +37,9 @@ describe("createSessionStateStore regressions", () => {
         trackedState.abortDetectedAt = undefined
         const progressUpdate = sessionStateStore.trackContinuationProgress(sessionID, 2, todos)
 
-        expect(progressUpdate.hasProgressed).toBe(true)
-        expect(progressUpdate.progressSource).toBe("activity")
-        expect(progressUpdate.stagnationCount).toBe(0)
+        expect(progressUpdate.hasProgressed).toBe(false)
+        expect(progressUpdate.progressSource).toBe("none")
+        expect(progressUpdate.stagnationCount).toBe(1)
       })
     })
   })
@@ -72,7 +72,7 @@ describe("createSessionStateStore regressions", () => {
 
   describe("#given stagnation already halted a session", () => {
     describe("#when new activity appears before the next idle check", () => {
-      test("#then it resets the stop condition on the next progress check", () => {
+      test("#then it does not reset the stop condition", () => {
         const sessionID = "ses-stagnation-recovery"
         const todos = [
           { id: "1", content: "Task 1", status: "pending", priority: "high" },
@@ -96,9 +96,9 @@ describe("createSessionStateStore regressions", () => {
         const progressUpdate = sessionStateStore.trackContinuationProgress(sessionID, 2, todos)
 
         expect(progressUpdate.previousStagnationCount).toBe(MAX_STAGNATION_COUNT)
-        expect(progressUpdate.hasProgressed).toBe(true)
-        expect(progressUpdate.progressSource).toBe("activity")
-        expect(progressUpdate.stagnationCount).toBe(0)
+        expect(progressUpdate.hasProgressed).toBe(false)
+        expect(progressUpdate.progressSource).toBe("none")
+        expect(progressUpdate.stagnationCount).toBe(MAX_STAGNATION_COUNT)
       })
     })
   })

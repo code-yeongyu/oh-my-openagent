@@ -7,16 +7,22 @@ import * as connectedProvidersCache from "../../shared/connected-providers-cache
 describe("resolveCategoryExecution", () => {
 	let connectedProvidersSpy: ReturnType<typeof spyOn> | undefined
 	let providerModelsSpy: ReturnType<typeof spyOn> | undefined
+	let hasConnectedProvidersSpy: ReturnType<typeof spyOn> | undefined
+	let hasProviderModelsSpy: ReturnType<typeof spyOn> | undefined
 
 	beforeEach(() => {
 		mock.restore()
 		connectedProvidersSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(null)
 		providerModelsSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue(null)
+		hasConnectedProvidersSpy = spyOn(connectedProvidersCache, "hasConnectedProvidersCache").mockReturnValue(false)
+		hasProviderModelsSpy = spyOn(connectedProvidersCache, "hasProviderModelsCache").mockReturnValue(false)
 	})
 
 	afterEach(() => {
 		connectedProvidersSpy?.mockRestore()
 		providerModelsSpy?.mockRestore()
+		hasConnectedProvidersSpy?.mockRestore()
+		hasProviderModelsSpy?.mockRestore()
 	})
 
 	const createMockExecutorContext = (): ExecutorContext => ({
@@ -27,7 +33,7 @@ describe("resolveCategoryExecution", () => {
 		sisyphusJuniorModel: undefined,
 	})
 
-	test("returns clear error when category exists but required model is not available", async () => {
+	test("returns unpinned resolution when category cache is not ready on first run", async () => {
 		//#given
 		const args = {
 			category: "deep",
@@ -39,6 +45,9 @@ describe("resolveCategoryExecution", () => {
 			enableSkillTools: false,
 		}
 		const executorCtx = createMockExecutorContext()
+		executorCtx.userCategories = {
+			deep: {},
+		}
 		const inheritedModel = undefined
 		const systemDefaultModel = "anthropic/claude-sonnet-4-6"
 
@@ -46,10 +55,10 @@ describe("resolveCategoryExecution", () => {
 		const result = await resolveCategoryExecution(args, executorCtx, inheritedModel, systemDefaultModel)
 
 		//#then
-		expect(result.error).toBeDefined()
-		expect(result.error).toContain("deep")
-		expect(result.error).toMatch(/model.*not.*available|requires.*model/i)
-		expect(result.error).not.toContain("Unknown category")
+		expect(result.error).toBeUndefined()
+		expect(result.actualModel).toBeUndefined()
+		expect(result.categoryModel).toBeUndefined()
+		expect(result.agentToUse).toBeDefined()
 	})
 
 	test("returns 'unknown category' error for truly unknown categories", async () => {

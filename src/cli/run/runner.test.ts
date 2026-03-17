@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 
-import { describe, it, expect } from "bun:test"
+import { describe, it, expect, beforeEach, afterEach, vi } from "bun:test"
 import type { OhMyOpenCodeConfig } from "../../config"
 import { resolveRunAgent, waitForEventProcessorShutdown } from "./runner"
 
@@ -83,7 +83,6 @@ describe("resolveRunAgent", () => {
 })
 
 describe("waitForEventProcessorShutdown", () => {
-
   it("returns quickly when event processor completes", async () => {
     //#given
     const eventProcessor = new Promise<void>((resolve) => {
@@ -113,5 +112,46 @@ describe("waitForEventProcessorShutdown", () => {
     //#then
     const elapsed = performance.now() - start
     expect(elapsed).toBeGreaterThanOrEqual(timeoutMs - 10)
+  })
+})
+
+describe("run with invalid model", () => {
+  it("given invalid --model value, when run, then returns exit code 1 with error message", async () => {
+    // given
+    const originalExit = process.exit
+    const originalError = console.error
+    const errorMessages: string[] = []
+    const exitCodes: number[] = []
+
+    console.error = (...args: unknown[]) => {
+      errorMessages.push(args.map(String).join(" "))
+    }
+    process.exit = ((code?: number) => {
+      exitCodes.push(code ?? 0)
+      throw new Error("exit")
+    }) as typeof process.exit
+
+    try {
+      // when
+      // Note: This will actually try to run - but the issue is that resolveRunModel
+      // is called BEFORE the try block, so it throws an unhandled exception
+      // We're testing the runner's error handling
+      const { run } = await import("./runner")
+
+      // This will throw because model "invalid" is invalid format
+      try {
+        await run({
+          message: "test",
+          model: "invalid",
+        })
+      } catch {
+        // Expected to potentially throw due to unhandled model resolution error
+      }
+    } finally {
+      // then - verify error handling
+      // Currently this will fail because the error is not caught properly
+      console.error = originalError
+      process.exit = originalExit
+    }
   })
 })

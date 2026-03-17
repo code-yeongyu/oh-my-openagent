@@ -9,11 +9,10 @@ import {
   DEFAULT_MESSAGE_STALENESS_TIMEOUT_MS,
   DEFAULT_STALE_TIMEOUT_MS,
   MIN_RUNTIME_BEFORE_STALE_MS,
+  TERMINAL_TASK_TTL_MS,
   TASK_TTL_MS,
 } from "./constants"
 import { removeTaskToastTracking } from "./remove-task-toast-tracking"
-
-const TERMINAL_TASK_TTL_MS = 30 * 60 * 1000
 
 const TERMINAL_TASK_STATUSES = new Set<BackgroundTask["status"]>([
   "completed",
