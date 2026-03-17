@@ -6,6 +6,10 @@ export type ChatParamsInput = {
   message: { variant?: string }
 }
 
+type ChatParamsHookInput = ChatParamsInput & {
+  rawMessage?: Record<string, unknown>
+}
+
 export type ChatParamsOutput = {
   temperature?: number
   topP?: number
@@ -17,7 +21,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
 }
 
-function buildChatParamsInput(raw: unknown): ChatParamsInput | null {
+function buildChatParamsInput(raw: unknown): ChatParamsHookInput | null {
   if (!isRecord(raw)) return null
 
   const sessionID = raw.sessionID
@@ -56,7 +60,9 @@ function buildChatParamsInput(raw: unknown): ChatParamsInput | null {
     agent: { name: agentName },
     model: { providerID, modelID },
     provider: { id: providerId },
-    message: typeof variant === "string" ? { variant } : {},
+    message,
+    rawMessage: message,
+    ...(typeof variant === "string" ? {} : {}),
   }
 }
 
@@ -69,7 +75,7 @@ function isChatParamsOutput(raw: unknown): raw is ChatParamsOutput {
 }
 
 export function createChatParamsHandler(args: {
-  anthropicEffort: { "chat.params"?: (input: ChatParamsInput, output: ChatParamsOutput) => Promise<void> } | null
+  anthropicEffort: { "chat.params"?: (input: ChatParamsHookInput, output: ChatParamsOutput) => Promise<void> } | null
 }): (input: unknown, output: unknown) => Promise<void> {
   return async (input, output): Promise<void> => {
     const normalizedInput = buildChatParamsInput(input)

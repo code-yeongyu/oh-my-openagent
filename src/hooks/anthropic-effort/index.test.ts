@@ -116,6 +116,21 @@ describe("createAnthropicEffortHook", () => {
       //#then should normalize and inject effort
       expect(output.options.effort).toBe("max")
     })
+
+    it("should preserve max for other opus model IDs such as opus-4-5", async () => {
+      //#given another opus model id that is not 4.6
+      const hook = createAnthropicEffortHook()
+      const { input, output } = createMockParams({
+        modelID: "claude-opus-4-5",
+      })
+
+      //#when chat.params hook is called
+      await hook["chat.params"](input, output)
+
+      //#then max should still be treated as valid for opus family
+      expect(output.options.effort).toBe("max")
+      expect(input.message.variant).toBe("max")
+    })
   })
 
   describe("conditions NOT met - should skip", () => {
