@@ -26,8 +26,14 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
   // Inject correct server baseUrl to ensure SDK client uses dynamic port
   // Priority: ctx.serverUrl > fallback to existing client baseUrl
-  if (ctx.serverUrl) {
-    injectServerBaseUrlIntoClient(ctx.client, ctx.serverUrl.origin)
+  // Guarded because ctx.serverUrl getter can throw in some opencode versions
+  try {
+    const serverUrl = ctx.serverUrl
+    if (serverUrl) {
+      injectServerBaseUrlIntoClient(ctx.client, serverUrl.origin)
+    }
+  } catch {
+    // getter threw — injectServerBaseUrlIntoClient will fall back to other priorities
   }
 
   injectServerAuthIntoClient(ctx.client)
