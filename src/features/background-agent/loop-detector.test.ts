@@ -31,10 +31,55 @@ describe("loop-detector", () => {
         })
 
         expect(result).toEqual({
+          enabled: true,
           maxToolCalls: 120,
           windowSize: 10,
           repetitionThresholdPercent: 70,
         })
+      })
+    })
+
+    describe("#given no enabled config", () => {
+      test("#when resolved #then enabled defaults to true", () => {
+        const result = resolveCircuitBreakerSettings({
+          circuitBreaker: {
+            maxToolCalls: 100,
+            windowSize: 5,
+            repetitionThresholdPercent: 60,
+          },
+        })
+
+        expect(result.enabled).toBe(true)
+      })
+    })
+
+    describe("#given enabled is false in config", () => {
+      test("#when resolved #then enabled is false", () => {
+        const result = resolveCircuitBreakerSettings({
+          circuitBreaker: {
+            enabled: false,
+            maxToolCalls: 100,
+            windowSize: 5,
+            repetitionThresholdPercent: 60,
+          },
+        })
+
+        expect(result.enabled).toBe(false)
+      })
+    })
+
+    describe("#given enabled is true in config", () => {
+      test("#when resolved #then enabled is true", () => {
+        const result = resolveCircuitBreakerSettings({
+          circuitBreaker: {
+            enabled: true,
+            maxToolCalls: 100,
+            windowSize: 5,
+            repetitionThresholdPercent: 60,
+          },
+        })
+
+        expect(result.enabled).toBe(true)
       })
     })
   })

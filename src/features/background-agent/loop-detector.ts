@@ -1,5 +1,6 @@
 import type { BackgroundTaskConfig } from "../../config/schema"
 import {
+  DEFAULT_CIRCUIT_BREAKER_ENABLED,
   DEFAULT_CIRCUIT_BREAKER_REPETITION_THRESHOLD_PERCENT,
   DEFAULT_CIRCUIT_BREAKER_WINDOW_SIZE,
   DEFAULT_MAX_TOOL_CALLS,
@@ -7,6 +8,7 @@ import {
 import type { ToolCallWindow } from "./types"
 
 export interface CircuitBreakerSettings {
+  enabled: boolean
   maxToolCalls: number
   windowSize: number
   repetitionThresholdPercent: number
@@ -24,6 +26,7 @@ export function resolveCircuitBreakerSettings(
   config?: BackgroundTaskConfig
 ): CircuitBreakerSettings {
   return {
+    enabled: config?.circuitBreaker?.enabled ?? DEFAULT_CIRCUIT_BREAKER_ENABLED,
     maxToolCalls:
       config?.circuitBreaker?.maxToolCalls ?? config?.maxToolCalls ?? DEFAULT_MAX_TOOL_CALLS,
     windowSize: config?.circuitBreaker?.windowSize ?? DEFAULT_CIRCUIT_BREAKER_WINDOW_SIZE,
