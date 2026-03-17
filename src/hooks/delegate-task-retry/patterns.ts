@@ -5,11 +5,17 @@ export interface DelegateTaskErrorPattern {
 }
 
 export const DELEGATE_TASK_ERROR_PATTERNS: DelegateTaskErrorPattern[] = [
+  // NOTE: When adding new "Invalid arguments:" errors to tools.ts, add a matching pattern here.
   {
     pattern: "'run_in_background' parameter is REQUIRED",
     errorType: "missing_run_in_background",
     fixHint:
       "Add run_in_background=false (for delegation) or run_in_background=true (for parallel exploration)",
+  },
+  {
+    pattern: "load_skills=null is not allowed",
+    errorType: "invalid_load_skills_null",
+    fixHint: "Use load_skills=[] (empty array) when no skills are needed, not null.",
   },
   {
     pattern: "'load_skills' parameter is REQUIRED",
@@ -69,9 +75,9 @@ export function detectDelegateTaskError(output: string): DetectedError | null {
     }
   }
 
-  // Fallback: if no known pattern matched but output contains error indicators,
+  // Fallback: if no known pattern matched but output starts with [ERROR],
   // return unknown_delegate_task_error for retry eligibility
-  if (output.startsWith("[ERROR]") || output.includes("Invalid arguments:")) {
+  if (output.startsWith("[ERROR]")) {
     return {
       errorType: "unknown_delegate_task_error",
       originalOutput: output,
