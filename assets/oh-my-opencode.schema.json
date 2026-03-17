@@ -3699,6 +3699,32 @@
         "syncPollTimeoutMs": {
           "type": "number",
           "minimum": 60000
+        },
+        "maxToolCalls": {
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 9007199254740991
+        },
+        "circuitBreaker": {
+          "type": "object",
+          "properties": {
+            "maxToolCalls": {
+              "type": "integer",
+              "minimum": 10,
+              "maximum": 9007199254740991
+            },
+            "windowSize": {
+              "type": "integer",
+              "minimum": 5,
+              "maximum": 9007199254740991
+            },
+            "repetitionThresholdPercent": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 100
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false
