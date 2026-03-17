@@ -78,10 +78,12 @@ export class TmuxSessionManager {
 
     // Priority 1: ctx.serverUrl (provided by plugin framework)
     // Wrapped in try/catch because ctx.serverUrl is a getter that can throw
-    // in some opencode versions (see fix/serverurl-throw-getter)
+    // in some opencode versions (see fix/serverurl-throw-getter).
+    // Cached to avoid double-evaluation of a throwing getter.
     try {
-      if (ctx.serverUrl) {
-        serverUrl = ctx.serverUrl.origin
+      const ctxServerUrl = ctx.serverUrl
+      if (ctxServerUrl) {
+        serverUrl = ctxServerUrl.origin
       }
     } catch {
       // getter threw - fall through to lower-priority resolution

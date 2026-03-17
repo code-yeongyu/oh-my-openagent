@@ -163,6 +163,22 @@ export function injectServerAuthIntoClient(client: unknown): void {
           keys: Object.keys(internal),
         })
       }
+
+      // Also inject into session subclient — it is a separately configured internal
+      // client and session_* requests will miss Authorization headers otherwise
+      if (isRecord(client)) {
+        const session = client["session"]
+        if (isRecord(session)) {
+          const sessionInternal = getInternalClient(session)
+          if (sessionInternal) {
+            tryInjectViaSetConfigHeaders(sessionInternal, auth)
+            tryInjectViaInterceptors(sessionInternal, auth)
+            tryInjectViaFetchWrapper(sessionInternal, auth)
+            tryInjectViaMutableInternalConfig(sessionInternal, auth)
+          }
+        }
+      }
+
       return
     }
 
