@@ -14,11 +14,18 @@ export const BLOCKED_TOOLS = ["Write", "Edit", "write", "edit"]
 export const BASH_TOOLS = ["Bash", "bash"]
 
 const WRITE_COMMAND_PATTERNS = [
-  /\b(cp|mv|rm|mkdir|rmdir|touch|chmod|chown)\b/,
-  /\b(sed\s+-i|perl\s+-[pi])/,
-  /\b(tee|install)\b/,
-  />[^>]/,
-  /\bgit\s+(add|commit|push|merge|rebase|reset|checkout\s+-b|branch\s+-[dD]|stash|cherry-pick|revert|tag)\b/,
+  // File-modifying commands at start of command or after pipe/chain operators
+  /(?:^|[;&|]\s*)(cp|mv|rm|mkdir|rmdir|touch|chmod|chown)\b/,
+  /(?:^|[;&|]\s*)(sed\s+-i|perl\s+-[pi])/,
+  /(?:^|[;&|]\s*)(tee)\b/,
+  // Redirect operators (both > and >>)
+  />+\s*[^&]/,
+  // Git mutating subcommands (excludes read-only: merge-base, tag -l, branch -a)
+  /\bgit\s+(add|commit|push|rebase|reset|stash|cherry-pick|revert)\b/,
+  /\bgit\s+merge\b(?!\s*-)/,
+  /\bgit\s+tag\b(?!\s+-(l|list)\b)/,
+  /\bgit\s+checkout\s+-b\b/,
+  /\bgit\s+branch\s+-[dD]\b/,
 ]
 
 export function isWriteCommand(command: string): boolean {
