@@ -4,6 +4,7 @@ import { fuzzyMatchModel } from "./model-availability"
 import type { FallbackEntry } from "./model-requirements"
 import { transformModelForProvider } from "./provider-model-id-transform"
 import { normalizeModel } from "./model-normalization"
+import { warnAntigravityPluginMissing } from "./plugin-availability"
 
 export type ModelResolutionRequest = {
   intent?: {
@@ -38,6 +39,16 @@ export type ModelResolutionResult = {
 
 
 export function resolveModelPipeline(
+  request: ModelResolutionRequest,
+): ModelResolutionResult | undefined {
+  const result = resolveModelPipelineInternal(request)
+  if (result) {
+    warnAntigravityPluginMissing(result.model, "model-resolution")
+  }
+  return result
+}
+
+function resolveModelPipelineInternal(
   request: ModelResolutionRequest,
 ): ModelResolutionResult | undefined {
   const attempted: string[] = []
