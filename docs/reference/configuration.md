@@ -667,9 +667,29 @@ When enabled, two companion hooks are active: `hashline-read-enhancer` (annotate
 
 ### Provider-Specific
 
-#### Google Auth
+#### Google Auth via Antigravity (Optional)
 
-Install [`opencode-antigravity-auth`](https://github.com/NoeFabris/opencode-antigravity-auth) for Google Gemini. Provides multi-account load balancing, dual quota, and variant-based thinking.
+To use Google Gemini models with multi-account load balancing, dual quota management, and extended thinking:
+
+1. Install the external plugin:
+   ```bash
+   npm install opencode-antigravity-auth
+   ```
+
+2. Follow the plugin's [setup instructions](https://github.com/NoeFabris/opencode-antigravity-auth) to configure Google OAuth
+
+3. Configure model in `oh-my-opencode.json`:
+   ```json
+   {
+     "agents": {
+       "default": {
+         "model": "google/antigravity-gemini-3-1-pro-high"
+       }
+     }
+   }
+   ```
+
+**Note**: This plugin is optional. You can still use Google Gemini models through the native `google/` provider (without multi-account load balancing) without installing this plugin.
 
 #### Ollama
 
