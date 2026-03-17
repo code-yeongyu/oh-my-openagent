@@ -1,5 +1,12 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { appendSessionId, getPlanProgress, readBoulderState } from "../../features/boulder-state"
+import {
+  appendSessionId,
+  getPlanProgress,
+  getTaskSessionState,
+  readBoulderState,
+  readCurrentTopLevelTask,
+  upsertTaskSessionState,
+} from "../../features/boulder-state"
 import { log } from "../../shared/logger"
 import { isCallerOrchestrator } from "../../shared/session-utils"
 import { collectGitDiffStats, formatFileChanges } from "../../shared/git-worktree"
@@ -18,13 +25,18 @@ import { isWriteOrEditToolName } from "./write-edit-tool-policy"
 import type { SessionState } from "./types"
 import type { ToolExecuteAfterInput, ToolExecuteAfterOutput } from "./types"
 
+function resolvePreferredSessionId(currentSessionId?: string, trackedSessionId?: string): string {
+  return currentSessionId ?? trackedSessionId ?? "<session_id>"
+}
+
 export function createToolExecuteAfterHandler(input: {
   ctx: PluginInput
   pendingFilePaths: Map<string, string>
+  pendingTaskRefs: Map<string, { key: string; label: string; title: string } | null>
   autoCommit: boolean
   getState: (sessionID: string) => SessionState
 }): (toolInput: ToolExecuteAfterInput, toolOutput: ToolExecuteAfterOutput) => Promise<void> {
-  const { ctx, pendingFilePaths, autoCommit, getState } = input
+  const { ctx, pendingFilePaths, pendingTaskRefs, autoCommit, getState } = input
   return async (toolInput, toolOutput): Promise<void> => {
     // Guard against undefined output (e.g., from /review command - see issue #1035)
     if (!toolOutput) {
@@ -68,10 +80,21 @@ export function createToolExecuteAfterHandler(input: {
       const gitStats = collectGitDiffStats(ctx.directory)
       const fileChanges = formatFileChanges(gitStats)
       const subagentSessionId = extractSessionIdFromOutput(toolOutput.output)
+      const pendingTaskRef = toolInput.callID ? pendingTaskRefs.get(toolInput.callID) : undefined
+      if (toolInput.callID) {
+        pendingTaskRefs.delete(toolInput.callID)
+      }
 
       const boulderState = readBoulderState(ctx.directory)
       if (boulderState) {
         const progress = getPlanProgress(boulderState.active_plan)
+        const shouldSkipTaskSessionUpdate = pendingTaskRef === null
+        const currentTask = shouldSkipTaskSessionUpdate
+          ? null
+          : pendingTaskRef ?? readCurrentTopLevelTask(boulderState.active_plan)
+        const trackedTaskSession = currentTask
+          ? getTaskSessionState(ctx.directory, currentTask.key)
+          : null
         const sessionState = toolInput.sessionID ? getState(toolInput.sessionID) : undefined
 
         if (toolInput.sessionID && !boulderState.session_ids?.includes(toolInput.sessionID)) {
@@ -81,6 +104,22 @@ export function createToolExecuteAfterHandler(input: {
             plan: boulderState.plan_name,
           })
         }
+
+        if (currentTask && subagentSessionId) {
+          upsertTaskSessionState(ctx.directory, {
+            taskKey: currentTask.key,
+            taskLabel: currentTask.label,
+            taskTitle: currentTask.title,
+            sessionId: subagentSessionId,
+            agent: toolOutput.metadata?.agent as string | undefined,
+            category: toolOutput.metadata?.category as string | undefined,
+          })
+        }
+
+        const preferredSessionId = resolvePreferredSessionId(
+          subagentSessionId,
+          trackedTaskSession?.session_id,
+        )
 
         // Preserve original subagent response - critical for debugging failed tasks
         const originalResponse = toolOutput.output
@@ -102,11 +141,11 @@ export function createToolExecuteAfterHandler(input: {
         }
 
         const leadReminder = shouldPauseForApproval
-          ? buildFinalWaveApprovalReminder(boulderState.plan_name, progress, subagentSessionId)
-          : buildCompletionGate(boulderState.plan_name, subagentSessionId)
+          ? buildFinalWaveApprovalReminder(boulderState.plan_name, progress, preferredSessionId)
+          : buildCompletionGate(boulderState.plan_name, preferredSessionId)
         const followupReminder = shouldPauseForApproval
           ? null
-          : buildOrchestratorReminder(boulderState.plan_name, progress, subagentSessionId, autoCommit, false)
+          : buildOrchestratorReminder(boulderState.plan_name, progress, preferredSessionId, autoCommit, false)
 
         toolOutput.output = `
 <system-reminder>
@@ -132,10 +171,13 @@ ${
           plan: boulderState.plan_name,
           progress: `${progress.completed}/${progress.total}`,
           fileCount: gitStats.length,
+          preferredSessionId,
           waitingForFinalWaveApproval: shouldPauseForApproval,
         })
       } else {
-        toolOutput.output += `\n<system-reminder>\n${buildStandaloneVerificationReminder(subagentSessionId)}\n</system-reminder>`
+        toolOutput.output += `\n<system-reminder>\n${buildStandaloneVerificationReminder(
+          resolvePreferredSessionId(subagentSessionId),
+        )}\n</system-reminder>`
 
         log(`[${HOOK_NAME}] Verification reminder appended for orchestrator`, {
           sessionID: toolInput.sessionID,

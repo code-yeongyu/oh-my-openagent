@@ -404,9 +404,171 @@ describe("atlas hook", () => {
 
       // then - should include verification instructions
       expect(output.output).toContain("LYING")
-      expect(output.output).toContain("PHASE 1")
-      expect(output.output).toContain("PHASE 2")
+     expect(output.output).toContain("PHASE 1")
+     expect(output.output).toContain("PHASE 2")
       
+      cleanupMessageStorage(sessionID)
+    })
+
+     test("should persist preferred subagent session for the current top-level task", async () => {
+       // given - boulder state with a current top-level task, Atlas caller
+       const sessionID = "session-task-session-track-test"
+       setupMessageStorage(sessionID, "atlas")
+
+      const planPath = join(TEST_DIR, "task-session-plan.md")
+      writeFileSync(planPath, `# Plan
+
+## TODOs
+- [ ] 1. Implement auth flow
+  - [ ] nested acceptance checkbox
+`)
+
+      const state: BoulderState = {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: ["session-1"],
+        plan_name: "task-session-plan",
+      }
+      writeBoulderState(TEST_DIR, state)
+
+      const hook = createAtlasHook(createMockPluginInput())
+      const output = {
+        title: "Sisyphus Task",
+        output: `Task completed successfully
+
+<task_metadata>
+session_id: ses_auth_flow_123
+</task_metadata>`,
+        metadata: {
+          agent: "sisyphus-junior",
+          category: "deep",
+        },
+      }
+
+      // when
+      await hook["tool.execute.after"](
+        { tool: "task", sessionID },
+        output
+      )
+
+      // then
+     const updatedState = readBoulderState(TEST_DIR)
+      expect(updatedState?.task_sessions?.["todo:1"]?.session_id).toBe("ses_auth_flow_123")
+      expect(updatedState?.task_sessions?.["todo:1"]?.task_title).toBe("Implement auth flow")
+      expect(updatedState?.task_sessions?.["todo:1"]?.agent).toBe("sisyphus-junior")
+      expect(updatedState?.task_sessions?.["todo:1"]?.category).toBe("deep")
+
+      cleanupMessageStorage(sessionID)
+    })
+
+     test("should preserve the delegated task key even after the plan advances to the next task", async () => {
+       // given - Atlas caller starts task 1, then the plan advances before task output is processed
+       const sessionID = "session-stable-task-key-test"
+       setupMessageStorage(sessionID, "atlas")
+
+      const planPath = join(TEST_DIR, "stable-task-key-plan.md")
+      writeFileSync(planPath, `# Plan
+
+## TODOs
+- [ ] 1. Implement auth flow
+- [ ] 2. Add API validation
+`)
+
+      writeBoulderState(TEST_DIR, {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: ["session-1"],
+        plan_name: "stable-task-key-plan",
+      })
+
+      const hook = createAtlasHook(createMockPluginInput())
+
+      // when - Atlas delegates task 1
+      await hook["tool.execute.before"](
+        { tool: "task", sessionID, callID: "call-task-1" },
+        { args: { prompt: "Implement auth flow" } }
+      )
+
+      // and the plan is advanced before the task output is processed
+      writeFileSync(planPath, `# Plan
+
+## TODOs
+- [x] 1. Implement auth flow
+- [ ] 2. Add API validation
+`)
+
+      await hook["tool.execute.after"](
+        { tool: "task", sessionID, callID: "call-task-1" },
+        {
+          title: "Sisyphus Task",
+          output: `Task completed successfully
+
+<task_metadata>
+session_id: ses_auth_flow_123
+</task_metadata>`,
+          metadata: {
+            agent: "sisyphus-junior",
+            category: "deep",
+          },
+        }
+      )
+
+      // then - the completed task session is still recorded against task 1, not task 2
+     const updatedState = readBoulderState(TEST_DIR)
+      expect(updatedState?.task_sessions?.["todo:1"]?.session_id).toBe("ses_auth_flow_123")
+      expect(updatedState?.task_sessions?.["todo:2"]).toBeUndefined()
+
+      cleanupMessageStorage(sessionID)
+    })
+
+     test("should not overwrite the current task mapping when task() explicitly resumes an older session", async () => {
+       // given - current plan is on task 2, but Atlas explicitly resumes an older session for a previous task
+       const sessionID = "session-cross-task-resume-test"
+       setupMessageStorage(sessionID, "atlas")
+
+      const planPath = join(TEST_DIR, "cross-task-resume-plan.md")
+      writeFileSync(planPath, `# Plan
+
+## TODOs
+- [x] 1. Implement auth flow
+- [ ] 2. Add API validation
+`)
+
+      writeBoulderState(TEST_DIR, {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: ["session-1"],
+        plan_name: "cross-task-resume-plan",
+      })
+
+      const hook = createAtlasHook(createMockPluginInput())
+
+      // when - Atlas resumes an explicit prior session
+      await hook["tool.execute.before"](
+        { tool: "task", sessionID, callID: "call-resume-old-task" },
+        { args: { prompt: "Follow up on previous task", session_id: "ses_old_task_111" } }
+      )
+
+      await hook["tool.execute.after"](
+        { tool: "task", sessionID, callID: "call-resume-old-task" },
+        {
+          title: "Sisyphus Task",
+          output: `Task continued successfully
+
+<task_metadata>
+session_id: ses_old_task_111
+</task_metadata>`,
+          metadata: {
+            agent: "sisyphus-junior",
+            category: "deep",
+          },
+        }
+      )
+
+      // then - Atlas does not poison task 2's preferred session mapping
+      const updatedState = readBoulderState(TEST_DIR)
+      expect(updatedState?.task_sessions?.["todo:2"]).toBeUndefined()
+
       cleanupMessageStorage(sessionID)
     })
 
@@ -1145,6 +1307,48 @@ describe("atlas hook", () => {
       const callArgs = mockInput._promptMock.mock.calls[0][0]
       expect(callArgs.body.parts[0].text).toContain("2/4 completed")
       expect(callArgs.body.parts[0].text).toContain("2 remaining")
+    })
+
+    test("should include preferred reuse session in continuation prompt for current top-level task", async () => {
+      // given - boulder state with tracked preferred session
+      const planPath = join(TEST_DIR, "preferred-session-plan.md")
+      writeFileSync(planPath, `# Plan
+
+## TODOs
+- [ ] 1. Implement auth flow
+`)
+
+      writeBoulderState(TEST_DIR, {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: [MAIN_SESSION_ID],
+        plan_name: "preferred-session-plan",
+        task_sessions: {
+          "todo:1": {
+            task_key: "todo:1",
+            task_label: "1",
+            task_title: "Implement auth flow",
+            session_id: "ses_auth_flow_123",
+            updated_at: "2026-01-02T10:00:00Z",
+          },
+        },
+      })
+
+      const mockInput = createMockPluginInput()
+      const hook = createAtlasHook(mockInput)
+
+      // when
+      await hook.handler({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: MAIN_SESSION_ID },
+        },
+      })
+
+      // then
+      const callArgs = mockInput._promptMock.mock.calls[0][0]
+      expect(callArgs.body.parts[0].text).toContain("Preferred reuse session for current top-level plan task")
+      expect(callArgs.body.parts[0].text).toContain("ses_auth_flow_123")
     })
 
     test("should inject when last agent is sisyphus and boulder targets atlas explicitly", async () => {

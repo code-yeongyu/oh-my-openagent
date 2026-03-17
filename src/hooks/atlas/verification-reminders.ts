@@ -1,5 +1,14 @@
 import { VERIFICATION_REMINDER } from "./system-reminder-templates"
 
+function buildReuseHint(sessionId: string): string {
+  return `
+**PREFERRED REUSE SESSION FOR THE CURRENT TOP-LEVEL PLAN TASK**
+
+- Reuse \`${sessionId}\` first if verification fails or the result needs follow-up.
+- Start a fresh subagent session only when reuse is unavailable or would cross task boundaries.
+`
+}
+
 export function buildCompletionGate(planName: string, sessionId: string): string {
   return `
 **COMPLETION GATE — DO NOT PROCEED UNTIL THIS IS DONE**
@@ -25,7 +34,8 @@ task(session_id="${sessionId}", prompt="fix: checkbox not recorded correctly")
 
 **Your completion is NOT tracked until the checkbox is marked in the plan file.**
 
-**VERIFICATION_REMINDER**`
+**VERIFICATION_REMINDER**
+${buildReuseHint(sessionId)}`
 }
 
 function buildVerificationReminder(sessionId: string): string {
@@ -38,7 +48,9 @@ ${VERIFICATION_REMINDER}
 **If ANY verification fails, use this immediately:**
 \`\`\`
 task(session_id="${sessionId}", prompt="fix: [describe the specific failure]")
-\`\`\``
+\`\`\`
+
+${buildReuseHint(sessionId)}`
 }
 
 export function buildOrchestratorReminder(

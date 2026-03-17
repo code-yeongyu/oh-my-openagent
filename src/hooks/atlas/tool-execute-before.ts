@@ -2,6 +2,7 @@ import { log } from "../../shared/logger"
 import { SYSTEM_DIRECTIVE_PREFIX } from "../../shared/system-directive"
 import { isCallerOrchestrator } from "../../shared/session-utils"
 import type { PluginInput } from "@opencode-ai/plugin"
+import { readBoulderState, readCurrentTopLevelTask } from "../../features/boulder-state"
 import { HOOK_NAME } from "./hook-name"
 import { ORCHESTRATOR_DELEGATION_REQUIRED, SINGLE_TASK_DIRECTIVE } from "./system-reminder-templates"
 import { isSisyphusPath } from "./sisyphus-path"
@@ -10,11 +11,12 @@ import { isWriteOrEditToolName } from "./write-edit-tool-policy"
 export function createToolExecuteBeforeHandler(input: {
   ctx: PluginInput
   pendingFilePaths: Map<string, string>
+  pendingTaskRefs: Map<string, { key: string; label: string; title: string } | null>
 }): (
   toolInput: { tool: string; sessionID?: string; callID?: string },
   toolOutput: { args: Record<string, unknown>; message?: string }
 ) => Promise<void> {
-  const { ctx, pendingFilePaths } = input
+  const { ctx, pendingFilePaths, pendingTaskRefs } = input
 
   return async (toolInput, toolOutput): Promise<void> => {
     if (!(await isCallerOrchestrator(toolInput.sessionID, ctx.client))) {
@@ -43,6 +45,25 @@ export function createToolExecuteBeforeHandler(input: {
 
     // Check task - inject single-task directive
     if (toolInput.tool === "task") {
+      if (toolInput.callID) {
+        const requestedSessionId = toolOutput.args.session_id as string | undefined
+        if (requestedSessionId) {
+          pendingTaskRefs.set(toolInput.callID, null)
+        } else {
+          const boulderState = readBoulderState(ctx.directory)
+          const currentTask = boulderState
+            ? readCurrentTopLevelTask(boulderState.active_plan)
+            : null
+          if (currentTask) {
+            pendingTaskRefs.set(toolInput.callID, {
+              key: currentTask.key,
+              label: currentTask.label,
+              title: currentTask.title,
+            })
+          }
+        }
+      }
+
       const prompt = toolOutput.args.prompt as string | undefined
       if (prompt && !prompt.includes(SYSTEM_DIRECTIVE_PREFIX)) {
         toolOutput.args.prompt = `<system-reminder>${SINGLE_TASK_DIRECTIVE}</system-reminder>\n` + prompt
