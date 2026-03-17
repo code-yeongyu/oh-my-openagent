@@ -216,6 +216,49 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
 
+      - name: Check if oh-my-openagent already published
+        id: check-openagent
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/oh-my-openagent/${VERSION}")
+          if [ "$STATUS" = "200" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "✓ oh-my-openagent@${VERSION} already published"
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Publish oh-my-openagent
+        if: steps.check-openagent.outputs.skip != 'true'
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          
+          # Update package name to oh-my-openagent
+          jq '.name = "oh-my-openagent"' package.json > tmp.json && mv tmp.json package.json
+          
+          # Update optionalDependencies to use oh-my-openagent naming
+          jq --arg v "$VERSION" '
+            .optionalDependencies = (
+              .optionalDependencies | to_entries |
+              map(.key = (.key | sub("^oh-my-opencode-"; "oh-my-openagent-")) | .value = $v) |
+              from_entries
+            )
+          ' package.json > tmp.json && mv tmp.json package.json
+          
+          TAG_ARG=""
+          if [ -n "${{ steps.version.outputs.dist_tag }}" ]; then
+            TAG_ARG="--tag ${{ steps.version.outputs.dist_tag }}"
+          fi
+          npm publish --access public --provenance $TAG_ARG || echo "::warning::oh-my-openagent publish failed"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+          NPM_CONFIG_PROVENANCE: true
+
+      - name: Restore package.json
+        if: steps.check-openagent.outputs.skip != 'true'
+        run: |
+          git checkout -- package.json
+
   trigger-platform:
     runs-on: ubuntu-latest
     needs: publish-main
