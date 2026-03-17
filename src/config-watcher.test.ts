@@ -168,6 +168,43 @@ describe("createConfigWatcher", () => {
     fs.rmSync(emptyDir, { recursive: true, force: true })
   })
 
+  test("#given config section removed from file #when config reloads #then stale keys are deleted from pluginConfig", async () => {
+    // given — pluginConfig has agents AND categories
+    const pluginConfig: OhMyOpenCodeConfig = {
+      agents: {
+        build: { model: "anthropic/claude-sonnet-4-20250514" },
+      },
+      categories: {
+        quick: { model: "openai/gpt-4.1-mini" },
+      },
+    }
+
+    // New config has agents but NOT categories — simulates user deleting the section
+    mockLoadResult = {
+      agents: {
+        build: { model: "openai/gpt-5.4" },
+      },
+    }
+
+    const dispose = createConfigWatcher(testProjectDir, {}, pluginConfig)
+
+    // when — trigger file change
+    const configFilePath = path.join(testConfigDir, "oh-my-opencode.json")
+    fs.writeFileSync(configFilePath, JSON.stringify({ agents: { build: { model: "openai/gpt-5.4" } } }))
+
+    // wait for debounce + buffer
+    await new Promise((resolve) => setTimeout(resolve, 500))
+
+    // then — agents should be updated
+    expect(pluginConfig.agents?.build?.model).toBe("openai/gpt-5.4")
+
+    // then — categories should be GONE, not lingering
+    expect(pluginConfig.categories).toBeUndefined()
+    expect("categories" in pluginConfig).toBe(false)
+
+    dispose()
+  })
+
   test("#given dispose already called #when dispose called again #then no errors", () => {
     // given
     const pluginConfig: OhMyOpenCodeConfig = {}
