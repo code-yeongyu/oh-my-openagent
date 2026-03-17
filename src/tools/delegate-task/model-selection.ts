@@ -51,7 +51,7 @@ export function resolveModelForDelegateTask(input: {
   fallbackChain?: FallbackEntry[]
   availableModels: Set<string>
   systemDefaultModel?: string
-}): { model: string; variant?: string } | undefined {
+}): { model: string; variant?: string } | { skipped: true } | undefined {
   const userModel = normalizeModel(input.userModel)
   if (userModel) {
     return { model: userModel }
@@ -60,7 +60,7 @@ export function resolveModelForDelegateTask(input: {
   // Before provider cache is created (first run), skip model resolution entirely.
   // OpenCode will use its system default model when no model is specified in the prompt.
   if (input.availableModels.size === 0 && !hasProviderModelsCache() && !hasConnectedProvidersCache()) {
-    return undefined
+    return { skipped: true }
   }
 
   const categoryDefault = normalizeModel(input.categoryDefaultModel)

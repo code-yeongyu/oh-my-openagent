@@ -1,6 +1,9 @@
 import type { PluginInput } from "@opencode-ai/plugin"
+import { existsSync } from "node:fs"
+import { join } from "node:path"
 import { runBunInstallWithDetails } from "../../../cli/config-manager"
 import { log } from "../../../shared/logger"
+import { getOpenCodeCacheDir, getOpenCodeConfigPaths } from "../../../shared"
 import { invalidatePackage } from "../cache"
 import { PACKAGE_NAME } from "../constants"
 import { extractChannel } from "../version-channel"
@@ -11,9 +14,36 @@ function getPinnedVersionToastMessage(latestVersion: string): string {
   return `Update available: ${latestVersion} (version pinned, update manually)`
 }
 
-async function runBunInstallSafe(): Promise<boolean> {
+/**
+ * Resolves the active install workspace.
+ * Same logic as doctor check: prefer config-dir if installed, fall back to cache-dir.
+ */
+function resolveActiveInstallWorkspace(): string {
+  const configPaths = getOpenCodeConfigPaths({ binary: "opencode" })
+  const cacheDir = getOpenCodeCacheDir()
+
+  const configInstallPath = join(configPaths.configDir, "node_modules", PACKAGE_NAME, "package.json")
+  const cacheInstallPath = join(cacheDir, "node_modules", PACKAGE_NAME, "package.json")
+
+  // Prefer config-dir if installed there, otherwise fall back to cache-dir
+  if (existsSync(configInstallPath)) {
+    log(`[auto-update-checker] Active workspace: config-dir (${configPaths.configDir})`)
+    return configPaths.configDir
+  }
+
+  if (existsSync(cacheInstallPath)) {
+    log(`[auto-update-checker] Active workspace: cache-dir (${cacheDir})`)
+    return cacheDir
+  }
+
+  // Default to config-dir if neither exists (matches doctor behavior)
+  log(`[auto-update-checker] Active workspace: config-dir (default, no install detected)`)
+  return configPaths.configDir
+}
+
+async function runBunInstallSafe(workspaceDir: string): Promise<boolean> {
   try {
-    const result = await runBunInstallWithDetails({ outputMode: "pipe" })
+    const result = await runBunInstallWithDetails({ outputMode: "pipe", workspaceDir })
     if (!result.success && result.error) {
       log("[auto-update-checker] bun install error:", result.error)
     }
@@ -82,7 +112,8 @@ export async function runBackgroundUpdateCheck(
 
   invalidatePackage(PACKAGE_NAME)
 
-  const installSuccess = await runBunInstallSafe()
+  const activeWorkspace = resolveActiveInstallWorkspace()
+  const installSuccess = await runBunInstallSafe(activeWorkspace)
 
   if (installSuccess) {
     await showAutoUpdatedToast(ctx, currentVersion, latestVersion)

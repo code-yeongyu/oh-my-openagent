@@ -11,6 +11,8 @@ type BunInstallOutputMode = "inherit" | "pipe"
 
 interface RunBunInstallOptions {
   outputMode?: BunInstallOutputMode
+  /** Workspace directory to install to. Defaults to cache dir if not provided. */
+  workspaceDir?: string
 }
 
 interface BunInstallOutput {
