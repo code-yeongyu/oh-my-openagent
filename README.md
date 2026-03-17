@@ -1,9 +1,3 @@
-> [!WARNING]
-> **TEMP NOTICE (This Week): Reduced Maintainer Availability**
->
-> Core maintainer Q got injured, so issue/PR responses and releases may be delayed this week.
-> Thank you for your patience and support.
-
 > [!NOTE]
 >
 > [![Sisyphus Labs - Sisyphus is the agent that codes like your team.](./.github/assets/sisyphuslabs.png?v=2)](https://sisyphuslabs.ai)
