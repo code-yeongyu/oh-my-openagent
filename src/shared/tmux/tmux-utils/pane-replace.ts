@@ -3,6 +3,7 @@ import type { TmuxConfig } from "../../../config/schema"
 import { getTmuxPath } from "../../../tools/interactive-bash/tmux-path-resolver"
 import type { SpawnPaneResult } from "../types"
 import { isInsideTmux } from "./environment"
+import { shellEscapeForDoubleQuotedCommand } from "../../shell-env"
 
 export async function replaceTmuxPane(
 	paneId: string,
@@ -35,7 +36,8 @@ export async function replaceTmuxPane(
 	await ctrlCProc.exited
 
 	const shell = process.env.SHELL || "/bin/sh"
-	const opencodeCmd = `${shell} -c 'opencode attach ${serverUrl} --session ${sessionId}'`
+	const escapedUrl = shellEscapeForDoubleQuotedCommand(serverUrl)
+	const opencodeCmd = `${shell} -c "opencode attach ${escapedUrl} --session ${sessionId}"`
 
 	const proc = spawn([tmux, "respawn-pane", "-k", "-t", paneId, opencodeCmd], {
 		stdout: "pipe",
@@ -60,6 +62,7 @@ export async function replaceTmuxPane(
 		const titleStderr = await stderrPromise
 		log("[replaceTmuxPane] WARNING: failed to set pane title", {
 			paneId,
+			title,
 			exitCode: titleExitCode,
 			stderr: titleStderr.trim(),
 		})
