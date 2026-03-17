@@ -21,7 +21,12 @@ const COMPLETION_PATTERNS = [
   /[已都全]完成[了啦]?[。！!]?\s*$/,
   /规划[已都]完成/,
   /工作[已都]完成/,
-  /所有.*(?:完成|结束)/,
+  /所有(?:任务|工作)[已都全](?:完成|结束)/,
+]
+
+const NEGATION_PATTERNS = [
+  /\b(?:not|isn't|aren't|hasn't|haven't|won't|can't|cannot|still|yet|pending|remaining)\b/i,
+  /(?:尚未|还没|并非|未能|没有|不是|还未|仍未)/,
 ]
 
 function extractLastAssistantText(messages: OpenCodeSessionMessage[]): string | null {
@@ -30,7 +35,7 @@ function extractLastAssistantText(messages: OpenCodeSessionMessage[]): string | 
     if (msg.info?.role !== "assistant") continue
     if (!msg.parts) continue
 
-    const hasToolCalls = msg.parts.some((p) => p.type === "tool")
+    const hasToolCalls = msg.parts.some((p) => p.type === "tool" || p.type === "tool_use")
     if (hasToolCalls) return null
 
     let text = ""
@@ -46,6 +51,10 @@ function extractLastAssistantText(messages: OpenCodeSessionMessage[]): string | 
   return null
 }
 
+function isNegated(text: string): boolean {
+  return NEGATION_PATTERNS.some((pattern) => pattern.test(text))
+}
+
 function countRecentCompletionMessages(messages: OpenCodeSessionMessage[], limit: number): number {
   let count = 0
   let checked = 0
@@ -56,7 +65,7 @@ function countRecentCompletionMessages(messages: OpenCodeSessionMessage[], limit
     checked += 1
 
     if (!msg.parts) continue
-    const hasToolCalls = msg.parts.some((p) => p.type === "tool")
+    const hasToolCalls = msg.parts.some((p) => p.type === "tool" || p.type === "tool_use")
     if (hasToolCalls) break
 
     let text = ""
@@ -107,7 +116,7 @@ export async function detectSemanticCompletion(
         : []
 
     const scopedMessages =
-      typeof options.sinceMessageIndex === "number" && options.sinceMessageIndex >= 0 && options.sinceMessageIndex < messageArray.length
+      typeof options.sinceMessageIndex === "number" && options.sinceMessageIndex >= 0 && options.sinceMessageIndex <= messageArray.length
         ? messageArray.slice(options.sinceMessageIndex)
         : messageArray
 
@@ -117,6 +126,8 @@ export async function detectSemanticCompletion(
 
     const matchesCompletionPattern = COMPLETION_PATTERNS.some((pattern) => pattern.test(lastText))
     if (!matchesCompletionPattern) return false
+
+    if (isNegated(lastText)) return false
 
     const repeatedCompletionCount = countRecentCompletionMessages(messages, 3)
     if (repeatedCompletionCount >= 2) {
