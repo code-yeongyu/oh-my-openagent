@@ -21,11 +21,6 @@ interface MessageWithParts {
   parts: Part[]
 }
 
-interface ThinkingPart {
-  thinking?: string
-  text?: string
-}
-
 interface MessageInfoExtended {
   id: string
   role: string
@@ -87,53 +82,52 @@ function startsWithThinkingBlock(parts: Part[]): boolean {
 }
 
 /**
- * Find the most recent thinking content from previous assistant messages
+ * Find the most recent real thinking part from previous assistant messages.
+ *
+ * Returns the original Part object (including its `signature` field) so it can
+ * be reused verbatim in another message.  Synthetic parts — those that were
+ * injected by a previous run of this hook — are intentionally skipped because
+ * they lack a valid `signature` and would be rejected by the Anthropic API with
+ * "Invalid `signature` in `thinking` block".
  */
-function findPreviousThinkingContent(
+function findPreviousThinkingPart(
   messages: MessageWithParts[],
   currentIndex: number
-): string {
+): Part | null {
   // Search backwards from current message
   for (let i = currentIndex - 1; i >= 0; i--) {
     const msg = messages[i]
     if (msg.info.role !== "assistant") continue
-
-    // Look for thinking parts
     if (!msg.parts) continue
+
     for (const part of msg.parts) {
       const type = part.type as string
-      if (type === "thinking" || type === "reasoning") {
-        const thinking = (part as unknown as ThinkingPart).thinking || (part as unknown as ThinkingPart).text
-        if (thinking && typeof thinking === "string" && thinking.trim().length > 0) {
-          return thinking
-        }
-      }
+      if (type !== "thinking" && type !== "reasoning") continue
+
+      // Skip synthetic parts — they have no valid signature
+      if ((part as unknown as { synthetic?: boolean }).synthetic) continue
+
+      return part
     }
   }
 
-  return ""
+  return null
 }
 
 /**
- * Prepend a thinking block to a message's parts array
+ * Prepend an existing thinking block (with its original signature) to a
+ * message's parts array.
+ *
+ * We reuse the original Part verbatim instead of creating a new one, because
+ * the Anthropic API validates the `signature` field against the thinking
+ * content.  Any synthetic block we create ourselves would fail that check.
  */
-function prependThinkingBlock(message: MessageWithParts, thinkingContent: string): void {
+function prependThinkingBlock(message: MessageWithParts, thinkingPart: Part): void {
   if (!message.parts) {
     message.parts = []
   }
 
-  // Create synthetic thinking part
-  const thinkingPart = {
-    type: "thinking" as const,
-    id: `prt_0000000000_synthetic_thinking`,
-    sessionID: (message.info as unknown as MessageInfoExtended).sessionID || "",
-    messageID: message.info.id,
-    thinking: thinkingContent,
-    synthetic: true,
-  }
-
-  // Prepend to parts array
-  message.parts.unshift(thinkingPart as unknown as Part)
+  message.parts.unshift(thinkingPart)
 }
 
 /**
@@ -166,13 +160,18 @@ export function createThinkingBlockValidatorHook(): MessagesTransformHook {
 
         // Check if message has content parts but doesn't start with thinking
         if (hasContentParts(msg.parts) && !startsWithThinkingBlock(msg.parts)) {
-          // Find thinking content from previous turns
-          const previousThinking = findPreviousThinkingContent(messages, i)
+          // Find the most recent real thinking part (with valid signature) from
+          // previous turns.  If none exists we cannot safely inject a thinking
+          // block — a synthetic block without a signature would cause the API
+          // to reject the request with "Invalid `signature` in `thinking` block".
+          const previousThinkingPart = findPreviousThinkingPart(messages, i)
 
-          // Prepend thinking block with content from previous turn or placeholder
-          const thinkingContent = previousThinking || "[Continuing from previous reasoning]"
-
-          prependThinkingBlock(msg, thinkingContent)
+          if (previousThinkingPart) {
+            prependThinkingBlock(msg, previousThinkingPart)
+          }
+          // If no real thinking part is available, skip injection entirely.
+          // The downstream error (if any) is preferable to a guaranteed API
+          // rejection caused by a signature-less synthetic thinking block.
         }
       }
     },
