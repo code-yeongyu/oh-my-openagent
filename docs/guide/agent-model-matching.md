@@ -64,8 +64,8 @@ These agents have Claude-optimized prompts — long, detailed, mechanics-driven.
 
 | Agent        | Role              | Fallback Chain                         | Notes                                                                                             |
 | ------------ | ----------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| **Sisyphus** | Main orchestrator | Claude Opus → opencode-go/kimi-k2.5 → K2P5 → GPT-5.4 → GLM-5 → Big Pickle | Claude-family first. GPT-5.4 has dedicated prompt support. Kimi/GLM as intermediate fallbacks. |
-| **Metis**    | Plan gap analyzer | Claude Opus → opencode-go/glm-5 → K2P5 | Claude preferred. Uses opencode-go for reliable GLM-5 access.                                     |
+| **Sisyphus** | Main orchestrator | Claude Opus → opencode-go/kimi-k2.5 → K2P5 → Kimi K2.5 → GPT-5.4 → GLM-5 → Big Pickle | Claude-family first. GPT-5.4 has dedicated prompt support. Kimi available through multiple providers. |
+| **Metis**    | Plan gap analyzer | Claude Opus → GPT-5.4 → opencode-go/glm-5 → K2P5 | Claude preferred. GPT-5.4 as secondary before GLM-5 fallback.                                     |
 
 ### Dual-Prompt Agents → Claude preferred, GPT supported
 
@@ -74,7 +74,7 @@ These agents ship separate prompts for Claude and GPT families. They auto-detect
 | Agent          | Role              | Fallback Chain                         | Notes                                                                |
 | -------------- | ----------------- | -------------------------------------- | -------------------------------------------------------------------- |
 | **Prometheus** | Strategic planner | Claude Opus → GPT-5.4 → opencode-go/glm-5 → Gemini 3.1 Pro | Interview-mode planning. GPT prompt is compact and principle-driven. |
-| **Atlas**      | Todo orchestrator | Claude Sonnet → opencode-go/kimi-k2.5  | Claude first, opencode-go as the current fallback path.              |
+| **Atlas**      | Todo orchestrator | Claude Sonnet → opencode-go/kimi-k2.5 → GPT-5.4 | Claude first, opencode-go as intermediate, GPT-5.4 as last resort.   |
 
 ### Deep Specialists → GPT
 
@@ -82,9 +82,9 @@ These agents are built for GPT's principle-driven style. Their prompts assume au
 
 | Agent          | Role                    | Fallback Chain                         | Notes                                            |
 | -------------- | ----------------------- | -------------------------------------- | ------------------------------------------------ |
-| **Hephaestus** | Autonomous deep worker  | GPT-5.3 Codex only                     | No fallback. Requires GPT access. The craftsman. |
-| **Oracle**     | Architecture consultant | GPT-5.4 → Gemini 3.1 Pro → Claude Opus | Read-only high-IQ consultation.                  |
-| **Momus**      | Ruthless reviewer       | GPT-5.4 → Claude Opus → Gemini 3.1 Pro | Verification and plan review.                    |
+| **Hephaestus** | Autonomous deep worker  | GPT-5.3 Codex → GPT-5.4 (Copilot)     | Requires GPT access. GPT-5.4 via Copilot as fallback. The craftsman. |
+| **Oracle**     | Architecture consultant | GPT-5.4 → Gemini 3.1 Pro → Claude Opus → opencode-go/glm-5 | Read-only high-IQ consultation.                  |
+| **Momus**      | Ruthless reviewer       | GPT-5.4 → Claude Opus → Gemini 3.1 Pro → opencode-go/glm-5 | Verification and plan review. GPT-5.4 uses xhigh variant. |
 
 ### Utility Runners → Speed over Intelligence
 
@@ -95,6 +95,7 @@ These agents do grep, search, and retrieval. They intentionally use the fastest,
 | **Explore**           | Fast codebase grep | Grok Code Fast → opencode-go/minimax-m2.5 → MiniMax Free → Haiku → GPT-5-Nano | Speed is everything. Fire 10 in parallel.             |
 | **Librarian**         | Docs/code search   | opencode-go/minimax-m2.5 → MiniMax Free → Haiku → GPT-5-Nano                  | Doc retrieval doesn't need deep reasoning.            |
 | **Multimodal Looker** | Vision/screenshots | GPT-5.4 → opencode-go/kimi-k2.5 → GLM-4.6v → GPT-5-Nano                       | Uses the first available multimodal-capable fallback. |
+| **Sisyphus-Junior**   | Category executor  | Claude Sonnet → opencode-go/kimi-k2.5 → GPT-5.4 → Big Pickle                  | Handles delegated category tasks. Sonnet-tier default. |
 
 ---
 
@@ -119,8 +120,7 @@ Principle-driven, explicit reasoning, deep technical capability. Best for agents
 | Model             | Strengths                                                                                       |
 | ----------------- | ----------------------------------------------------------------------------------------------- |
 | **GPT-5.3 Codex** | Deep coding powerhouse. Autonomous exploration. Required for Hephaestus.                        |
-| **GPT-5.4**       | High intelligence, strategic reasoning. Default for Oracle.                                     |
-| **GPT-5.4**       | Strong principle-driven reasoning. Default for Momus and a key fallback for Prometheus / Atlas. |
+| **GPT-5.4**       | High intelligence, strategic reasoning. Default for Oracle, Momus, and a key fallback for Prometheus / Atlas. Uses xhigh variant for Momus. |
 | **GPT-5-Nano**    | Ultra-cheap, fast. Good for simple utility tasks.                                               |
 
 ### Other Models
@@ -166,14 +166,14 @@ When agents delegate work, they don't pick a model name — they pick a **catego
 
 | Category             | When Used                  | Fallback Chain                               |
 | -------------------- | -------------------------- | -------------------------------------------- |
-| `visual-engineering` | Frontend, UI, CSS, design  | Gemini 3.1 Pro → GLM 5 → Claude Opus         |
-| `ultrabrain`         | Maximum reasoning needed   | GPT-5.4 → Gemini 3.1 Pro → Claude Opus       |
+| `visual-engineering` | Frontend, UI, CSS, design  | Gemini 3.1 Pro → GLM 5 → Claude Opus → opencode-go/glm-5 → K2P5 |
+| `ultrabrain`         | Maximum reasoning needed   | GPT-5.4 → Gemini 3.1 Pro → Claude Opus → opencode-go/glm-5 |
 | `deep`               | Deep coding, complex logic | GPT-5.3 Codex → Claude Opus → Gemini 3.1 Pro |
 | `artistry`           | Creative, novel approaches | Gemini 3.1 Pro → Claude Opus → GPT-5.4       |
-| `quick`              | Simple, fast tasks         | Claude Haiku → Gemini Flash → GPT-5-Nano     |
-| `unspecified-high`   | General complex work       | Claude Opus → GPT-5.4 (high) → GLM 5 → K2P5  |
-| `unspecified-low`    | General standard work      | Claude Sonnet → GPT-5.3 Codex → Gemini Flash |
-| `writing`            | Text, docs, prose          | Gemini Flash → Claude Sonnet                 |
+| `quick`              | Simple, fast tasks         | Claude Haiku → Gemini Flash → opencode-go/minimax-m2.5 → GPT-5-Nano |
+| `unspecified-high`   | General complex work       | Claude Opus → GPT-5.4 → GLM 5 → K2P5 → opencode-go/glm-5 → Kimi K2.5 |
+| `unspecified-low`    | General standard work      | Claude Sonnet → GPT-5.3 Codex → opencode-go/kimi-k2.5 → Gemini Flash |
+| `writing`            | Text, docs, prose          | Gemini Flash → opencode-go/kimi-k2.5 → Claude Sonnet |
 
 See the [Orchestration System Guide](./orchestration.md) for how agents dispatch tasks to categories.
 
