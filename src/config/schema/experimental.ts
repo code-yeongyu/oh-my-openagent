@@ -21,6 +21,8 @@ export const ExperimentalConfigSchema = z.object({
   hashline_edit: z.boolean().optional(),
   /** Append fallback model info to session title when a runtime fallback occurs (default: false) */
   model_fallback_title: z.boolean().optional(),
+  /** Enable hot-reloading of config file changes mid-session without restart (opt-in, default: false) */
+  hot_reload: z.boolean().optional(),
 })
 
 export type ExperimentalConfig = z.infer<typeof ExperimentalConfigSchema>

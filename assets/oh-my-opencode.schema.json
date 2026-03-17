@@ -3463,6 +3463,9 @@
         },
         "model_fallback_title": {
           "type": "boolean"
+        },
+        "hot_reload": {
+          "type": "boolean"
         }
       },
       "additionalProperties": false

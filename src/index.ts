@@ -9,6 +9,7 @@ import { createTools } from "./create-tools"
 import { createPluginInterface } from "./plugin-interface"
 import { createPluginDispose, type PluginDispose } from "./plugin-dispose"
 
+import { createConfigWatcher, type ConfigWatcherDispose } from "./config-watcher"
 import { loadPluginConfig } from "./plugin-config"
 import { createModelCacheState } from "./plugin-state"
 import { createFirstMessageVariantGate } from "./shared/first-message-variant"
@@ -29,6 +30,13 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   await activePluginDispose?.()
 
   const pluginConfig = loadPluginConfig(ctx.directory, ctx)
+
+  let configWatcherDispose: ConfigWatcherDispose | undefined
+  if (pluginConfig.experimental?.hot_reload) {
+    configWatcherDispose = createConfigWatcher(ctx.directory, ctx, pluginConfig)
+    log("[OhMyOpenCodePlugin] Config hot-reload enabled")
+  }
+
   const disabledHooks = new Set(pluginConfig.disabled_hooks ?? [])
 
   const isHookEnabled = (hookName: HookName): boolean => !disabledHooks.has(hookName)
@@ -75,6 +83,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     backgroundManager: managers.backgroundManager,
     skillMcpManager: managers.skillMcpManager,
     disposeHooks: hooks.disposeHooks,
+    configWatcherDispose,
   })
 
   const pluginInterface = createPluginInterface({
