@@ -74,7 +74,7 @@ interface MessagePartInfo {
   sessionID?: string
   type?: string
   tool?: string
-  state?: { status?: string }
+  state?: { status?: string; input?: Record<string, unknown> }
 }
 
 interface EventProperties {
@@ -918,29 +918,32 @@ export class BackgroundManager {
         task.progress.lastTool = partInfo.tool
         const circuitBreaker = resolveCircuitBreakerSettings(this.config)
         if (partInfo.tool) {
-          task.progress.toolCallWindow = recordToolCall(
-            task.progress.toolCallWindow,
-            partInfo.tool,
-            circuitBreaker
-          )
+         task.progress.toolCallWindow = recordToolCall(
+             task.progress.toolCallWindow,
+             partInfo.tool,
+             circuitBreaker,
+             partInfo.state?.input
+           )
 
-          const loopDetection = detectRepetitiveToolUse(task.progress.toolCallWindow)
-          if (loopDetection.triggered) {
-            log("[background-agent] Circuit breaker: repetitive tool usage detected", {
-              taskId: task.id,
-              agent: task.agent,
-              sessionID,
-              toolName: loopDetection.toolName,
-              repeatedCount: loopDetection.repeatedCount,
-              sampleSize: loopDetection.sampleSize,
-              thresholdPercent: loopDetection.thresholdPercent,
-            })
-            void this.cancelTask(task.id, {
-              source: "circuit-breaker",
-              reason: `Subagent repeatedly called ${loopDetection.toolName} ${loopDetection.repeatedCount}/${loopDetection.sampleSize} times in the recent tool-call window (${loopDetection.thresholdPercent}% threshold). This usually indicates an infinite loop. The task was automatically cancelled to prevent excessive token usage.`,
-            })
-            return
-          }
+           if (circuitBreaker.enabled) {
+             const loopDetection = detectRepetitiveToolUse(task.progress.toolCallWindow)
+             if (loopDetection.triggered) {
+               log("[background-agent] Circuit breaker: repetitive tool usage detected", {
+                 taskId: task.id,
+                 agent: task.agent,
+                 sessionID,
+                 toolName: loopDetection.toolName,
+                 repeatedCount: loopDetection.repeatedCount,
+                 sampleSize: loopDetection.sampleSize,
+                 thresholdPercent: loopDetection.thresholdPercent,
+               })
+               void this.cancelTask(task.id, {
+                 source: "circuit-breaker",
+                 reason: `Subagent repeatedly called ${loopDetection.toolName} ${loopDetection.repeatedCount}/${loopDetection.sampleSize} times in the recent tool-call window (${loopDetection.thresholdPercent}% threshold). This usually indicates an infinite loop. The task was automatically cancelled to prevent excessive token usage.`,
+               })
+               return
+             }
+           }
         }
 
         const maxToolCalls = circuitBreaker.maxToolCalls
