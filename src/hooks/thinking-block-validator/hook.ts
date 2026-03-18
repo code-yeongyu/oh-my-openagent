@@ -28,19 +28,35 @@ type MessagesTransformHook = {
   ) => Promise<void>
 }
 
+interface ThinkingPart extends Part {
+  thinking: string
+  signature: string
+  synthetic?: boolean
+}
+
+function isAnthropicThinkingPart(part: Part): part is ThinkingPart {
+  return (
+    (part.type as string) === "thinking" &&
+    typeof (part as ThinkingPart).thinking === "string" &&
+    typeof (part as ThinkingPart).signature === "string"
+  )
+}
+
 /**
- * Check if there are any real thinking/reasoning blocks in the message history.
+ * Check if there are any Anthropic-signed thinking blocks in the message history.
+ *
+ * Only returns true for real `type: "thinking"` blocks with a valid `signature`.
+ * GPT reasoning blocks (`type: "reasoning"`) are intentionally excluded — they
+ * have no Anthropic signature and must never be forwarded to the Anthropic API.
+ *
  * Model-name checks are unreliable (miss GPT+thinking, custom model IDs, etc.)
  * so we inspect the messages themselves.
  */
-function hasThinkingBlocksInHistory(messages: MessageWithParts[]): boolean {
+function hasAnthropicThinkingBlocksInHistory(messages: MessageWithParts[]): boolean {
   return messages.some(
     m =>
       m.info.role === "assistant" &&
-      m.parts?.some((p: Part) => {
-        const type = p.type as string
-        return type === "thinking" || type === "reasoning"
-      }),
+      m.parts?.some((p: Part) => isAnthropicThinkingPart(p)),
   )
 }
 
@@ -69,18 +85,19 @@ function startsWithThinkingBlock(parts: Part[]): boolean {
 }
 
 /**
- * Find the most recent real thinking part from previous assistant messages.
+ * Find the most recent Anthropic-signed thinking part from previous assistant messages.
  *
  * Returns the original Part object (including its `signature` field) so it can
- * be reused verbatim in another message.  Synthetic parts — those that were
- * injected by a previous run of this hook — are intentionally skipped because
- * they lack a valid `signature` and would be rejected by the Anthropic API with
- * "Invalid `signature` in `thinking` block".
+ * be reused verbatim in another message.  Only `type: "thinking"` blocks with
+ * both a `signature` and `thinking` field are returned — GPT `type: "reasoning"`
+ * blocks are excluded because they lack an Anthropic signature and would be
+ * rejected by the API with "Invalid `signature` in `thinking` block".
+ * Synthetic parts injected by a previous run of this hook are also skipped.
  */
 function findPreviousThinkingPart(
   messages: MessageWithParts[],
   currentIndex: number
-): Part | null {
+): ThinkingPart | null {
   // Search backwards from current message
   for (let i = currentIndex - 1; i >= 0; i--) {
     const msg = messages[i]
@@ -88,11 +105,11 @@ function findPreviousThinkingPart(
     if (!msg.parts) continue
 
     for (const part of msg.parts) {
-      const type = part.type as string
-      if (type !== "thinking" && type !== "reasoning") continue
+      // Only Anthropic thinking blocks — type must be "thinking", not "reasoning"
+      if (!isAnthropicThinkingPart(part)) continue
 
       // Skip synthetic parts — they have no valid signature
-      if ((part as unknown as { synthetic?: boolean }).synthetic) continue
+      if (part.synthetic) continue
 
       return part
     }
@@ -109,7 +126,7 @@ function findPreviousThinkingPart(
  * the Anthropic API validates the `signature` field against the thinking
  * content.  Any synthetic block we create ourselves would fail that check.
  */
-function prependThinkingBlock(message: MessageWithParts, thinkingPart: Part): void {
+function prependThinkingBlock(message: MessageWithParts, thinkingPart: ThinkingPart): void {
   if (!message.parts) {
     message.parts = []
   }
@@ -129,10 +146,12 @@ export function createThinkingBlockValidatorHook(): MessagesTransformHook {
         return
       }
 
-      // Skip if there are no thinking blocks in history at all.
+      // Skip if there are no Anthropic-signed thinking blocks in history.
       // This is more reliable than checking model names — works for Claude,
-      // GPT with thinking variants, or any future model.
-      if (!hasThinkingBlocksInHistory(messages)) {
+      // GPT with thinking variants, or any future model.  Crucially, GPT
+      // reasoning blocks (type="reasoning", no signature) do NOT trigger this
+      // hook — only real Anthropic thinking blocks do.
+      if (!hasAnthropicThinkingBlocksInHistory(messages)) {
         return
       }
 
