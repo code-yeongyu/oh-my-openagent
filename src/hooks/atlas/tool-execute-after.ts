@@ -1,5 +1,12 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { appendSessionId, getPlanProgress, readBoulderState } from "../../features/boulder-state"
+import {
+  appendSessionId,
+  getPlanProgress,
+  getTaskSessionState,
+  readBoulderState,
+  readCurrentTopLevelTask,
+  upsertTaskSessionState,
+} from "../../features/boulder-state"
 import { log } from "../../shared/logger"
 import { isCallerOrchestrator } from "../../shared/session-utils"
 import { collectGitDiffStats, formatFileChanges } from "../../shared/git-worktree"
@@ -7,7 +14,7 @@ import { shouldPauseForFinalWaveApproval } from "./final-wave-approval-gate"
 import { HOOK_NAME } from "./hook-name"
 import { DIRECT_WORK_REMINDER } from "./system-reminder-templates"
 import { isSisyphusPath } from "./sisyphus-path"
-import { extractSessionIdFromOutput } from "./subagent-session-id"
+import { extractSessionIdFromOutput, validateSubagentSessionId } from "./subagent-session-id"
 import {
   buildCompletionGate,
   buildFinalWaveApprovalReminder,
@@ -15,16 +22,60 @@ import {
   buildStandaloneVerificationReminder,
 } from "./verification-reminders"
 import { isWriteOrEditToolName } from "./write-edit-tool-policy"
-import type { SessionState } from "./types"
-import type { ToolExecuteAfterInput, ToolExecuteAfterOutput } from "./types"
+import type { PendingTaskRef, SessionState } from "./types"
+import type { ToolExecuteAfterInput, ToolExecuteAfterOutput, TrackedTopLevelTaskRef } from "./types"
+
+function resolvePreferredSessionId(currentSessionId?: string, trackedSessionId?: string): string {
+  return currentSessionId ?? trackedSessionId ?? "<session_id>"
+}
+
+function resolveTaskContext(
+  pendingTaskRef: PendingTaskRef | undefined,
+  planPath: string,
+): {
+  currentTask: TrackedTopLevelTaskRef | null
+  shouldSkipTaskSessionUpdate: boolean
+  shouldIgnoreCurrentSessionId: boolean
+} {
+  if (!pendingTaskRef) {
+    return {
+      currentTask: readCurrentTopLevelTask(planPath),
+      shouldSkipTaskSessionUpdate: false,
+      shouldIgnoreCurrentSessionId: false,
+    }
+  }
+
+  if (pendingTaskRef.kind === "track") {
+    return {
+      currentTask: pendingTaskRef.task,
+      shouldSkipTaskSessionUpdate: false,
+      shouldIgnoreCurrentSessionId: false,
+    }
+  }
+
+  if (pendingTaskRef.reason === "explicit_resume") {
+    return {
+      currentTask: readCurrentTopLevelTask(planPath),
+      shouldSkipTaskSessionUpdate: true,
+      shouldIgnoreCurrentSessionId: true,
+    }
+  }
+
+  return {
+    currentTask: pendingTaskRef.task,
+    shouldSkipTaskSessionUpdate: true,
+    shouldIgnoreCurrentSessionId: true,
+  }
+}
 
 export function createToolExecuteAfterHandler(input: {
   ctx: PluginInput
   pendingFilePaths: Map<string, string>
+  pendingTaskRefs: Map<string, PendingTaskRef>
   autoCommit: boolean
   getState: (sessionID: string) => SessionState
 }): (toolInput: ToolExecuteAfterInput, toolOutput: ToolExecuteAfterOutput) => Promise<void> {
-  const { ctx, pendingFilePaths, autoCommit, getState } = input
+  const { ctx, pendingFilePaths, pendingTaskRefs, autoCommit, getState } = input
   return async (toolInput, toolOutput): Promise<void> => {
     // Guard against undefined output (e.g., from /review command - see issue #1035)
     if (!toolOutput) {
@@ -59,6 +110,10 @@ export function createToolExecuteAfterHandler(input: {
     }
 
     const outputStr = toolOutput.output && typeof toolOutput.output === "string" ? toolOutput.output : ""
+    const pendingTaskRef = toolInput.callID ? pendingTaskRefs.get(toolInput.callID) : undefined
+    if (toolInput.callID) {
+      pendingTaskRefs.delete(toolInput.callID)
+    }
     const isBackgroundLaunch = outputStr.includes("Background task launched") || outputStr.includes("Background task continued")
     if (isBackgroundLaunch) {
       return
@@ -67,11 +122,19 @@ export function createToolExecuteAfterHandler(input: {
     if (toolOutput.output && typeof toolOutput.output === "string") {
       const gitStats = collectGitDiffStats(ctx.directory)
       const fileChanges = formatFileChanges(gitStats)
-      const subagentSessionId = extractSessionIdFromOutput(toolOutput.output)
+      const extractedSessionId = extractSessionIdFromOutput(toolOutput.output)
 
       const boulderState = readBoulderState(ctx.directory)
       if (boulderState) {
         const progress = getPlanProgress(boulderState.active_plan)
+        const {
+          currentTask,
+          shouldSkipTaskSessionUpdate,
+          shouldIgnoreCurrentSessionId,
+        } = resolveTaskContext(pendingTaskRef, boulderState.active_plan)
+        const trackedTaskSession = currentTask
+          ? getTaskSessionState(ctx.directory, currentTask.key)
+          : null
         const sessionState = toolInput.sessionID ? getState(toolInput.sessionID) : undefined
 
         if (toolInput.sessionID && !boulderState.session_ids?.includes(toolInput.sessionID)) {
@@ -81,6 +144,31 @@ export function createToolExecuteAfterHandler(input: {
             plan: boulderState.plan_name,
           })
         }
+
+        const lineageSessionIDs = toolInput.sessionID && !boulderState.session_ids.includes(toolInput.sessionID)
+          ? [...boulderState.session_ids, toolInput.sessionID]
+          : boulderState.session_ids
+        const subagentSessionId = await validateSubagentSessionId({
+          client: ctx.client,
+          sessionID: extractedSessionId,
+          lineageSessionIDs,
+        })
+
+        if (currentTask && subagentSessionId && !shouldSkipTaskSessionUpdate) {
+          upsertTaskSessionState(ctx.directory, {
+            taskKey: currentTask.key,
+            taskLabel: currentTask.label,
+            taskTitle: currentTask.title,
+            sessionId: subagentSessionId,
+            agent: toolOutput.metadata?.agent as string | undefined,
+            category: toolOutput.metadata?.category as string | undefined,
+          })
+        }
+
+        const preferredSessionId = resolvePreferredSessionId(
+          shouldIgnoreCurrentSessionId ? undefined : subagentSessionId,
+          trackedTaskSession?.session_id,
+        )
 
         // Preserve original subagent response - critical for debugging failed tasks
         const originalResponse = toolOutput.output
@@ -102,11 +190,11 @@ export function createToolExecuteAfterHandler(input: {
         }
 
         const leadReminder = shouldPauseForApproval
-          ? buildFinalWaveApprovalReminder(boulderState.plan_name, progress, subagentSessionId)
-          : buildCompletionGate(boulderState.plan_name, subagentSessionId)
+          ? buildFinalWaveApprovalReminder(boulderState.plan_name, progress, preferredSessionId)
+          : buildCompletionGate(boulderState.plan_name, preferredSessionId)
         const followupReminder = shouldPauseForApproval
           ? null
-          : buildOrchestratorReminder(boulderState.plan_name, progress, subagentSessionId, autoCommit, false)
+          : buildOrchestratorReminder(boulderState.plan_name, progress, preferredSessionId, autoCommit, false)
 
         toolOutput.output = `
 <system-reminder>
@@ -132,10 +220,22 @@ ${
           plan: boulderState.plan_name,
           progress: `${progress.completed}/${progress.total}`,
           fileCount: gitStats.length,
+          preferredSessionId,
           waitingForFinalWaveApproval: shouldPauseForApproval,
         })
       } else {
-        toolOutput.output += `\n<system-reminder>\n${buildStandaloneVerificationReminder(subagentSessionId)}\n</system-reminder>`
+        const lineageSessionIDs = toolInput.sessionID ? [toolInput.sessionID] : []
+        const subagentSessionId = await validateSubagentSessionId({
+          client: ctx.client,
+          sessionID: extractedSessionId,
+          lineageSessionIDs,
+        })
+        const preferredSessionId = pendingTaskRef?.kind === "skip"
+          ? undefined
+          : subagentSessionId
+        toolOutput.output += `\n<system-reminder>\n${buildStandaloneVerificationReminder(
+          resolvePreferredSessionId(preferredSessionId),
+        )}\n</system-reminder>`
 
         log(`[${HOOK_NAME}] Verification reminder appended for orchestrator`, {
           sessionID: toolInput.sessionID,

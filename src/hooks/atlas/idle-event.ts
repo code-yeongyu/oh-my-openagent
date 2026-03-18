@@ -1,5 +1,10 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { getPlanProgress, readBoulderState } from "../../features/boulder-state"
+import {
+  getPlanProgress,
+  getTaskSessionState,
+  readBoulderState,
+  readCurrentTopLevelTask,
+} from "../../features/boulder-state"
 import { log } from "../../shared/logger"
 import { injectBoulderContinuation } from "./boulder-continuation-injector"
 import { HOOK_NAME } from "./hook-name"
@@ -31,6 +36,14 @@ async function injectContinuation(input: {
   input.sessionState.lastContinuationInjectedAt = Date.now()
 
   try {
+    const currentBoulder = readBoulderState(input.ctx.directory)
+    const currentTask = currentBoulder
+      ? readCurrentTopLevelTask(currentBoulder.active_plan)
+      : null
+    const preferredTaskSession = currentTask
+      ? getTaskSessionState(input.ctx.directory, currentTask.key)
+      : null
+
     await injectBoulderContinuation({
       ctx: input.ctx,
       sessionID: input.sessionID,
@@ -39,6 +52,8 @@ async function injectContinuation(input: {
       total: input.progress.total,
       agent: input.agent,
       worktreePath: input.worktreePath,
+      preferredTaskSessionId: preferredTaskSession?.session_id,
+      preferredTaskTitle: preferredTaskSession?.task_title,
       backgroundManager: input.options?.backgroundManager,
       sessionState: input.sessionState,
     })

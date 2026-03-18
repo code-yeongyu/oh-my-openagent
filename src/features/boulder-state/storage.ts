@@ -6,7 +6,7 @@
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from "node:fs"
 import { dirname, join, basename } from "node:path"
-import type { BoulderState, PlanProgress } from "./types"
+import type { BoulderState, PlanProgress, TaskSessionState } from "./types"
 import { BOULDER_DIR, BOULDER_FILE, PROMETHEUS_PLANS_DIR } from "./constants"
 
 export function getBoulderFilePath(directory: string): string {
@@ -28,6 +28,9 @@ export function readBoulderState(directory: string): BoulderState | null {
     }
     if (!Array.isArray(parsed.session_ids)) {
       parsed.session_ids = []
+    }
+    if (!parsed.task_sessions || typeof parsed.task_sessions !== "object" || Array.isArray(parsed.task_sessions)) {
+      parsed.task_sessions = {}
     }
     return parsed as BoulderState
   } catch {
@@ -83,6 +86,50 @@ export function clearBoulderState(directory: string): boolean {
   } catch {
     return false
   }
+}
+
+export function getTaskSessionState(directory: string, taskKey: string): TaskSessionState | null {
+  const state = readBoulderState(directory)
+  if (!state?.task_sessions) {
+    return null
+  }
+
+  return state.task_sessions[taskKey] ?? null
+}
+
+export function upsertTaskSessionState(
+  directory: string,
+  input: {
+    taskKey: string
+    taskLabel: string
+    taskTitle: string
+    sessionId: string
+    agent?: string
+    category?: string
+  },
+): BoulderState | null {
+  const state = readBoulderState(directory)
+  if (!state) {
+    return null
+  }
+
+  const taskSessions = state.task_sessions ?? {}
+  taskSessions[input.taskKey] = {
+    task_key: input.taskKey,
+    task_label: input.taskLabel,
+    task_title: input.taskTitle,
+    session_id: input.sessionId,
+    ...(input.agent !== undefined ? { agent: input.agent } : {}),
+    ...(input.category !== undefined ? { category: input.category } : {}),
+    updated_at: new Date().toISOString(),
+  }
+
+  state.task_sessions = taskSessions
+  if (writeBoulderState(directory, state)) {
+    return state
+  }
+
+  return null
 }
 
 /**
