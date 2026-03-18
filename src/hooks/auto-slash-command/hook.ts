@@ -206,7 +206,11 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
       if (idx >= 0) {
         output.parts[idx].text = taggedContent
       } else {
-        output.parts.unshift({ type: "text", text: taggedContent })
+        output.parts.unshift({ 
+          id: `prt_0000000000_autoslash_${input.sessionID}`,
+          type: "text", 
+          text: taggedContent 
+        })
       }
 
       log(`[auto-slash-command] command.execute.before - injected template`, {
