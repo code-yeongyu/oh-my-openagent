@@ -25,7 +25,7 @@ const COMPLETION_PATTERNS = [
 ]
 
 const NEGATION_PATTERNS = [
-  /\b(?:not|isn't|aren't|hasn't|haven't|won't|can't|cannot|still|yet|pending|remaining)\b/i,
+  /\b(?:not|isn't|aren't|hasn't|haven't|won't|can't|cannot|still|yet|pending)\b/i,
   /(?:尚未|还没|并非|未能|没有|不是|还未|仍未)/,
 ]
 
@@ -35,7 +35,7 @@ function extractLastAssistantText(messages: OpenCodeSessionMessage[]): string | 
     if (msg.info?.role !== "assistant") continue
     if (!msg.parts) continue
 
-    const hasToolCalls = msg.parts.some((p) => p.type === "tool" || p.type === "tool_use")
+    const hasToolCalls = msg.parts.some((p) => p.type === "tool" || p.type === "tool-invocation")
     if (hasToolCalls) return null
 
     let text = ""
@@ -65,7 +65,7 @@ function countRecentCompletionMessages(messages: OpenCodeSessionMessage[], limit
     checked += 1
 
     if (!msg.parts) continue
-    const hasToolCalls = msg.parts.some((p) => p.type === "tool" || p.type === "tool_use")
+    const hasToolCalls = msg.parts.some((p) => p.type === "tool" || p.type === "tool-invocation")
     if (hasToolCalls) break
 
     let text = ""
@@ -75,11 +75,13 @@ function countRecentCompletionMessages(messages: OpenCodeSessionMessage[], limit
       }
     }
 
-    if (COMPLETION_PATTERNS.some((pattern) => pattern.test(text))) {
-      count += 1
-    } else {
+    if (!COMPLETION_PATTERNS.some((pattern) => pattern.test(text))) {
       break
     }
+    if (isNegated(text)) {
+      break
+    }
+    count += 1
   }
 
   return count
