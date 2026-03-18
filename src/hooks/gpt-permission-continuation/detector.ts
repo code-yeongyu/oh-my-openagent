@@ -21,3 +21,12 @@ export function detectStallPattern(
 
   return patterns.some((pattern) => trailingSegment.startsWith(pattern.toLowerCase()))
 }
+
+export function extractPermissionPhrase(text: string): string | null {
+  const tail = text.slice(-800)
+  const lines = tail.split("\n").map((line) => line.trim()).filter(Boolean)
+  const hotZone = lines.slice(-3).join(" ")
+  const sentenceParts = hotZone.trim().replace(/\s+/g, " ").split(/(?<=[.!?])\s+/)
+  const trailingSegment = sentenceParts[sentenceParts.length - 1]?.trim().toLowerCase() ?? ""
+  return trailingSegment || null
+}

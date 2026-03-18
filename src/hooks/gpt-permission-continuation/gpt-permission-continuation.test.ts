@@ -1,8 +1,9 @@
 /// <reference path="../../../bun-test.d.ts" />
 
 import { createOpencodeClient } from "@opencode-ai/sdk"
-import { describe, expect, it as test } from "bun:test"
+import { afterEach, describe, expect, it as test } from "bun:test"
 
+import { subagentSessions, _resetForTesting } from "../../features/claude-code-session-state"
 import { createGptPermissionContinuationHook } from "."
 
 type SessionMessage = {
@@ -109,7 +110,18 @@ function createUserMessage(id: string, text: string): SessionMessage {
   }
 }
 
+function expectContinuationPrompts(promptCalls: string[], count: number): void {
+  expect(promptCalls).toHaveLength(count)
+  for (const call of promptCalls) {
+    expect(call.startsWith("continue")).toBe(true)
+  }
+}
+
 describe("gpt-permission-continuation", () => {
+  afterEach(() => {
+    _resetForTesting()
+  })
+
   test("injects continue when the last GPT assistant reply asks for permission", async () => {
     // given
     const { ctx, promptCalls } = createMockPluginInput([
@@ -124,7 +136,7 @@ describe("gpt-permission-continuation", () => {
     await hook.handler({ event: { type: "session.idle", properties: { sessionID: "ses-1" } } })
 
     // then
-    expect(promptCalls).toEqual(["continue"])
+    expectContinuationPrompts(promptCalls, 1)
   })
 
   test("does not inject when the last assistant model is not GPT", async () => {
@@ -216,7 +228,7 @@ describe("gpt-permission-continuation", () => {
     await hook.handler({ event: { type: "session.idle", properties: { sessionID: "ses-1" } } })
 
     // then
-    expect(promptCalls).toEqual(["continue"])
+    expectContinuationPrompts(promptCalls, 1)
   })
 
   describe("#given repeated GPT permission tails in the same session", () => {
@@ -243,7 +255,7 @@ describe("gpt-permission-continuation", () => {
         await hook.handler({ event: { type: "session.idle", properties: { sessionID: "ses-1" } } })
 
         // then
-        expect(promptCalls).toEqual(["continue", "continue", "continue"])
+        expectContinuationPrompts(promptCalls, 3)
       })
     })
 
@@ -276,7 +288,7 @@ describe("gpt-permission-continuation", () => {
         await hook.handler({ event: { type: "session.idle", properties: { sessionID: "ses-1" } } })
 
         // then
-        expect(promptCalls).toEqual(["continue", "continue", "continue", "continue", "continue"])
+        expectContinuationPrompts(promptCalls, 5)
       })
     })
 
@@ -297,7 +309,7 @@ describe("gpt-permission-continuation", () => {
         await hook.handler({ event: { type: "session.idle", properties: { sessionID: "ses-1" } } })
 
         // then
-        expect(promptCalls).toEqual(["continue"])
+        expectContinuationPrompts(promptCalls, 1)
       })
     })
 
@@ -327,8 +339,46 @@ describe("gpt-permission-continuation", () => {
         await hook.handler({ event: { type: "session.idle", properties: { sessionID: "ses-1" } } })
 
         // then
-        expect(promptCalls).toEqual(["continue", "continue", "continue", "continue"])
+        expectContinuationPrompts(promptCalls, 4)
       })
     })
+  })
+
+  test("does not inject when the session is a subagent session", async () => {
+    // given
+    const { ctx, promptCalls } = createMockPluginInput([
+      {
+        info: { id: "msg-1", role: "assistant", modelID: "gpt-5.4" },
+        parts: [{ type: "text", text: "If you want, I can continue with the fix." }],
+      },
+    ])
+    subagentSessions.add("ses-subagent")
+    const hook = createGptPermissionContinuationHook(ctx)
+
+    // when
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID: "ses-subagent" } } })
+
+    // then
+    expect(promptCalls).toEqual([])
+  })
+
+  test("includes assistant text context in the continuation prompt", async () => {
+    // given
+    const assistantText = "I finished the analysis. If you want, I can apply the changes next."
+    const { ctx, promptCalls } = createMockPluginInput([
+      {
+        info: { id: "msg-1", role: "assistant", modelID: "gpt-5.4" },
+        parts: [{ type: "text", text: assistantText }],
+      },
+    ])
+    const hook = createGptPermissionContinuationHook(ctx)
+
+    // when
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID: "ses-1" } } })
+
+    // then
+    expect(promptCalls).toHaveLength(1)
+    expect(promptCalls[0].startsWith("continue")).toBe(true)
+    expect(promptCalls[0]).toContain("If you want, I can apply the changes next.")
   })
 })

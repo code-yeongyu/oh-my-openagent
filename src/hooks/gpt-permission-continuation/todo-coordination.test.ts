@@ -56,7 +56,9 @@ describe("gpt-permission-continuation coordination", () => {
     })
 
     // then
-    expect(promptCalls).toEqual(["continue"])
+    expect(promptCalls).toHaveLength(1)
+    expect(promptCalls[0].startsWith("continue")).toBe(true)
+    expect(promptCalls[0]).toContain("If you want, I can implement the fix next.")
     expect(toastCalls).toEqual([])
   })
 })

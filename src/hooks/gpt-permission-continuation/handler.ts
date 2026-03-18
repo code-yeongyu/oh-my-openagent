@@ -1,5 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 
+import { subagentSessions } from "../../features/claude-code-session-state"
 import { normalizeSDKResponse } from "../../shared"
 import { log } from "../../shared/logger"
 
@@ -14,7 +15,8 @@ import {
   HOOK_NAME,
   MAX_CONSECUTIVE_AUTO_CONTINUES,
 } from "./constants"
-import { detectStallPattern } from "./detector"
+import { detectStallPattern, extractPermissionPhrase } from "./detector"
+import { buildContextualContinuationPrompt } from "./prompt-builder"
 import type { SessionStateStore } from "./session-state"
 
 type SessionState = ReturnType<SessionStateStore["getState"]>
@@ -22,11 +24,13 @@ type SessionState = ReturnType<SessionStateStore["getState"]>
 async function promptContinuation(
   ctx: PluginInput,
   sessionID: string,
+  assistantText: string,
 ): Promise<void> {
+  const prompt = buildContextualContinuationPrompt(assistantText)
   const payload = {
     path: { id: sessionID },
     body: {
-      parts: [{ type: "text" as const, text: CONTINUATION_PROMPT }],
+      parts: [{ type: "text" as const, text: prompt }],
     },
     query: { directory: ctx.directory },
   }
@@ -53,16 +57,8 @@ function getLastUserMessageBefore(
 }
 
 function isAutoContinuationUserMessage(message: SessionMessage): boolean {
-  return extractAssistantText(message).trim().toLowerCase() === CONTINUATION_PROMPT
-}
-
-function extractPermissionPhrase(text: string): string | null {
-  const tail = text.slice(-800)
-  const lines = tail.split("\n").map((line) => line.trim()).filter(Boolean)
-  const hotZone = lines.slice(-3).join(" ")
-  const sentenceParts = hotZone.trim().replace(/\s+/g, " ").split(/(?<=[.!?])\s+/)
-  const trailingSegment = sentenceParts[sentenceParts.length - 1]?.trim().toLowerCase() ?? ""
-  return trailingSegment || null
+  const text = extractAssistantText(message).trim().toLowerCase()
+  return text === CONTINUATION_PROMPT || text.startsWith(`${CONTINUATION_PROMPT}\n`)
 }
 
 function resetAutoContinuationState(state: SessionState): void {
@@ -94,6 +90,10 @@ export function createGptPermissionContinuationHandler(args: {
     const sessionID = properties?.sessionID as string | undefined
     if (!sessionID) return
 
+    if (subagentSessions.has(sessionID)) {
+      log(`[${HOOK_NAME}] Skipped: session is a subagent`, { sessionID })
+      return
+    }
     if (isContinuationStopped?.(sessionID)) {
       log(`[${HOOK_NAME}] Skipped: continuation stopped for session`, { sessionID })
       return
@@ -181,7 +181,7 @@ export function createGptPermissionContinuationHandler(args: {
       }
 
       state.inFlight = true
-      await promptContinuation(ctx, sessionID)
+      await promptContinuation(ctx, sessionID, assistantText)
       state.lastHandledMessageID = messageID
       state.consecutiveAutoContinueCount += 1
       state.awaitingAutoContinuationResponse = true
