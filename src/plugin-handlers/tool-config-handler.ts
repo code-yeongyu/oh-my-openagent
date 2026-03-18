@@ -1,19 +1,14 @@
 import type { OhMyOpenCodeConfig } from "../config";
-import { parse } from "jsonc-parser";
 import { getAgentDisplayName } from "../shared/agent-display-names";
 import { isTaskSystemEnabled } from "../shared";
 
 type AgentWithPermission = { permission?: Record<string, unknown> };
 
-function getConfigQuestionPermission(): string | null {
-  const configContent = process.env.OPENCODE_CONFIG_CONTENT;
-  if (!configContent) return null;
-  try {
-    const parsed = parse(configContent);
-    return parsed?.permission?.question ?? null;
-  } catch {
-    return null;
-  }
+function getConfigQuestionPermission(config: Record<string, unknown>): string | null {
+  const permission = config.permission;
+  if (!permission || typeof permission !== "object") return null;
+  const question = (permission as Record<string, unknown>).question;
+  return typeof question === "string" ? question : null;
 }
 
 function agentByKey(agentResult: Record<string, unknown>, key: string): AgentWithPermission | undefined {
@@ -52,8 +47,8 @@ export function applyToolConfig(params: {
   };
 
   const isCliRunMode = process.env.OPENCODE_CLI_RUN_MODE === "true";
-  const configQuestionPermission = getConfigQuestionPermission();
   const isQuestionDisabledByPlugin = params.pluginConfig.disabled_tools?.includes("question") ?? false;
+  const configQuestionPermission = getConfigQuestionPermission(params.config);
   const questionPermission =
     isQuestionDisabledByPlugin ? "deny" :
     configQuestionPermission === "deny" ? "deny" :

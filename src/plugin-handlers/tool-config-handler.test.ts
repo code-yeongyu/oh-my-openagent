@@ -7,6 +7,7 @@ function createParams(overrides: {
   taskSystem?: boolean
   agents?: string[]
   disabledTools?: string[]
+  questionPermission?: string
 }) {
   const agentResult: Record<string, { permission?: Record<string, unknown> }> = {}
   for (const agent of overrides.agents ?? []) {
@@ -14,7 +15,12 @@ function createParams(overrides: {
   }
 
   return {
-    config: { tools: {}, permission: {} } as Record<string, unknown>,
+    config: {
+      tools: {},
+      permission: overrides.questionPermission
+        ? { question: overrides.questionPermission }
+        : {},
+    } as Record<string, unknown>,
     pluginConfig: {
       experimental: overrides.taskSystem === undefined ? undefined : { task_system: overrides.taskSystem },
       disabled_tools: overrides.disabledTools,
@@ -89,21 +95,14 @@ describe("applyToolConfig", () => {
     })
   })
 
-  describe("#given OPENCODE_CONFIG_CONTENT has question set to deny", () => {
-    let originalConfigContent: string | undefined
+  describe("#given config.permission.question is available", () => {
     let originalCliRunMode: string | undefined
 
     beforeEach(() => {
-      originalConfigContent = process.env.OPENCODE_CONFIG_CONTENT
       originalCliRunMode = process.env.OPENCODE_CLI_RUN_MODE
     })
 
     afterEach(() => {
-      if (originalConfigContent === undefined) {
-        delete process.env.OPENCODE_CONFIG_CONTENT
-      } else {
-        process.env.OPENCODE_CONFIG_CONTENT = originalConfigContent
-      }
       if (originalCliRunMode === undefined) {
         delete process.env.OPENCODE_CLI_RUN_MODE
       } else {
@@ -115,11 +114,11 @@ describe("applyToolConfig", () => {
       it.each(["sisyphus", "hephaestus", "prometheus"])(
         "#then should deny question for %s even without CLI_RUN_MODE",
         (agentName) => {
-          process.env.OPENCODE_CONFIG_CONTENT = JSON.stringify({
-            permission: { question: "deny" },
+          delete process.env.OPENCODE_CLI_RUN_MODE
+          const params = createParams({
+            agents: [agentName],
+            questionPermission: "deny",
           })
-          delete process.env.OPENCODE_CLI_RUN_MODE
-          const params = createParams({ agents: [agentName] })
 
           applyToolConfig(params)
 
@@ -130,37 +129,17 @@ describe("applyToolConfig", () => {
         },
       )
 
-      it.each(["sisyphus", "hephaestus", "prometheus"])(
-        "#then should parse JSONC config content for %s",
-        (agentName) => {
-          process.env.OPENCODE_CONFIG_CONTENT = `{
-            // allow comments in config content
-            "permission": {
-              "question": "deny"
-            }
-          }`
-          delete process.env.OPENCODE_CLI_RUN_MODE
-          const params = createParams({ agents: [agentName] })
-
-          applyToolConfig(params)
-
-          const agent = params.agentResult[agentName] as {
-            permission: Record<string, unknown>
-          }
-          expect(agent.permission.question).toBe("deny")
-        },
-      )
     })
 
     describe("#when config does not deny question permission", () => {
       it.each(["sisyphus", "hephaestus", "prometheus"])(
         "#then should allow question for %s in interactive mode",
         (agentName) => {
-          process.env.OPENCODE_CONFIG_CONTENT = JSON.stringify({
-            permission: { question: "allow" },
+          const params = createParams({
+            agents: [agentName],
+            questionPermission: "allow",
           })
           delete process.env.OPENCODE_CLI_RUN_MODE
-          const params = createParams({ agents: [agentName] })
 
           applyToolConfig(params)
 
@@ -176,9 +155,6 @@ describe("applyToolConfig", () => {
       it.each(["sisyphus", "hephaestus", "prometheus"])(
         "#then should deny question for %s via CLI_RUN_MODE",
         (agentName) => {
-          process.env.OPENCODE_CONFIG_CONTENT = JSON.stringify({
-            permission: {},
-          })
           process.env.OPENCODE_CLI_RUN_MODE = "true"
           const params = createParams({ agents: [agentName] })
 
@@ -196,11 +172,11 @@ describe("applyToolConfig", () => {
       it.each(["sisyphus", "hephaestus", "prometheus"])(
         "#then should deny question for %s when config says deny regardless of CLI_RUN_MODE",
         (agentName) => {
-          process.env.OPENCODE_CONFIG_CONTENT = JSON.stringify({
-            permission: { question: "deny" },
-          })
           process.env.OPENCODE_CLI_RUN_MODE = "false"
-          const params = createParams({ agents: [agentName] })
+          const params = createParams({
+            agents: [agentName],
+            questionPermission: "deny",
+          })
 
           applyToolConfig(params)
 
