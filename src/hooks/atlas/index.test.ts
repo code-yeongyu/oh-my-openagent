@@ -10,6 +10,7 @@ import {
 } from "../../features/boulder-state"
 import type { BoulderState } from "../../features/boulder-state"
 import { _resetForTesting, subagentSessions, updateSessionAgent } from "../../features/claude-code-session-state"
+import type { PendingTaskRef } from "./types"
 
 const TEST_STORAGE_ROOT = join(tmpdir(), `atlas-message-storage-${randomUUID()}`)
 const TEST_MESSAGE_STORAGE = join(TEST_STORAGE_ROOT, "message")
@@ -41,19 +42,32 @@ describe("atlas hook", () => {
   let TEST_DIR: string
   let SISYPHUS_DIR: string
 
-  function createMockPluginInput(overrides?: { promptMock?: ReturnType<typeof mock> }) {
+  function createMockPluginInput(overrides?: {
+    promptMock?: ReturnType<typeof mock>
+    sessionGetMock?: ReturnType<typeof mock>
+  }) {
     const promptMock = overrides?.promptMock ?? mock(() => Promise.resolve())
+    const sessionGetMock = overrides?.sessionGetMock ?? mock(async ({ path }: { path: { id: string } }) => ({
+      data: {
+        id: path.id,
+        parentID: path.id.startsWith("ses_") ? "session-1" : "main-session-123",
+      },
+    }))
     return {
       directory: TEST_DIR,
       client: {
         session: {
-          get: async () => ({ data: { parentID: "main-session-123" } }),
+          get: sessionGetMock,
           prompt: promptMock,
           promptAsync: promptMock,
         },
       },
       _promptMock: promptMock,
-    } as unknown as Parameters<typeof createAtlasHook>[0] & { _promptMock: ReturnType<typeof mock> }
+      _sessionGetMock: sessionGetMock,
+    } as unknown as Parameters<typeof createAtlasHook>[0] & {
+      _promptMock: ReturnType<typeof mock>
+      _sessionGetMock: ReturnType<typeof mock>
+    }
   }
 
   function setupMessageStorage(sessionID: string, agent: string): void {
@@ -431,7 +445,7 @@ describe("atlas hook", () => {
       })
 
       const pendingFilePaths = new Map<string, string>()
-      const pendingTaskRefs = new Map<string, { key: string; label: string; title: string } | null>()
+      const pendingTaskRefs = new Map<string, PendingTaskRef>()
       const beforeHandler = createToolExecuteBeforeHandler({
         ctx: createMockPluginInput(),
         pendingFilePaths,
@@ -607,25 +621,212 @@ session_id: ses_auth_flow_123
         { args: { prompt: "Follow up on previous task", session_id: "ses_old_task_111" } }
       )
 
-      await hook["tool.execute.after"](
-        { tool: "task", sessionID, callID: "call-resume-old-task" },
-        {
-          title: "Sisyphus Task",
-          output: `Task continued successfully
+      const output = {
+        title: "Sisyphus Task",
+        output: `Task continued successfully
 
 <task_metadata>
 session_id: ses_old_task_111
 </task_metadata>`,
-          metadata: {
-            agent: "sisyphus-junior",
-            category: "deep",
-          },
-        }
+        metadata: {
+          agent: "sisyphus-junior",
+          category: "deep",
+        },
+      }
+      await hook["tool.execute.after"](
+        { tool: "task", sessionID, callID: "call-resume-old-task" },
+        output
       )
 
       // then - Atlas does not poison task 2's preferred session mapping
       const updatedState = readBoulderState(TEST_DIR)
       expect(updatedState?.task_sessions?.["todo:2"]).toBeUndefined()
+      expect(output.output).not.toContain('task(session_id="ses_old_task_111"')
+
+      cleanupMessageStorage(sessionID)
+    })
+
+    test("should not reuse an explicitly resumed session id in completion reminders", async () => {
+      // given - current plan is on task 2 with an existing tracked session
+      const sessionID = "session-explicit-resume-reminder-test"
+      setupMessageStorage(sessionID, "atlas")
+
+      const planPath = join(TEST_DIR, "explicit-resume-reminder-plan.md")
+      writeFileSync(planPath, `# Plan
+
+## TODOs
+- [x] 1. Implement auth flow
+- [ ] 2. Add API validation
+`)
+
+      writeBoulderState(TEST_DIR, {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: ["session-1"],
+        plan_name: "explicit-resume-reminder-plan",
+        task_sessions: {
+          "todo:2": {
+            task_key: "todo:2",
+            task_label: "2",
+            task_title: "Add API validation",
+            session_id: "ses_tracked_current_task",
+            updated_at: "2026-01-02T10:00:00Z",
+          },
+        },
+      })
+
+      const hook = createAtlasHook(createMockPluginInput())
+      const output = {
+        title: "Sisyphus Task",
+        output: `Task continued successfully
+
+<task_metadata>
+session_id: ses_old_task_111
+</task_metadata>`,
+        metadata: {},
+      }
+
+      // when
+      await hook["tool.execute.before"](
+        { tool: "task", sessionID, callID: "call-explicit-resume-reminder" },
+        { args: { prompt: "Follow up on previous task", session_id: "ses_old_task_111" } }
+      )
+      await hook["tool.execute.after"](
+        { tool: "task", sessionID, callID: "call-explicit-resume-reminder" },
+        output
+      )
+
+      // then
+      expect(output.output).not.toContain('task(session_id="ses_old_task_111"')
+      expect(output.output).toContain("ses_tracked_current_task")
+
+      cleanupMessageStorage(sessionID)
+    })
+
+    test("should skip persistence when multiple in-flight task calls claim the same top-level task", async () => {
+      // given
+      const sessionID = "session-parallel-task-collision-test"
+      setupMessageStorage(sessionID, "atlas")
+
+      const planPath = join(TEST_DIR, "parallel-task-collision-plan.md")
+      writeFileSync(planPath, `# Plan
+
+## TODOs
+- [ ] 1. Implement auth flow
+- [ ] 2. Add API validation
+`)
+
+      writeBoulderState(TEST_DIR, {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: ["session-1"],
+        plan_name: "parallel-task-collision-plan",
+      })
+
+      const pendingFilePaths = new Map<string, string>()
+      const pendingTaskRefs = new Map<string, PendingTaskRef>()
+      const beforeHandler = createToolExecuteBeforeHandler({
+        ctx: createMockPluginInput(),
+        pendingFilePaths,
+        pendingTaskRefs,
+      })
+      const afterHandler = createToolExecuteAfterHandler({
+        ctx: createMockPluginInput(),
+        pendingFilePaths,
+        pendingTaskRefs,
+        autoCommit: true,
+        getState: () => ({ promptFailureCount: 0 }),
+      })
+
+      // when - two task() calls start before either one completes
+      await beforeHandler(
+        { tool: "task", sessionID, callID: "call-task-first" },
+        { args: { prompt: "Implement auth flow part 1" } }
+      )
+      await beforeHandler(
+        { tool: "task", sessionID, callID: "call-task-second" },
+        { args: { prompt: "Implement auth flow part 2" } }
+      )
+
+      const secondPendingTaskRef = pendingTaskRefs.get("call-task-second")
+
+      await afterHandler(
+        { tool: "task", sessionID, callID: "call-task-second" },
+        {
+          title: "Sisyphus Task",
+          output: `Task completed successfully
+
+<task_metadata>
+session_id: ses_parallel_collision_222
+</task_metadata>`,
+          metadata: {},
+        }
+      )
+
+      // then
+      expect(secondPendingTaskRef).toEqual({
+        kind: "skip",
+        reason: "ambiguous_task_key",
+        task: {
+          key: "todo:1",
+          label: "1",
+          title: "Implement auth flow",
+        },
+      })
+      const updatedState = readBoulderState(TEST_DIR)
+      expect(updatedState?.task_sessions?.["todo:1"]).toBeUndefined()
+
+      cleanupMessageStorage(sessionID)
+    })
+
+    test("should ignore extracted session ids that are outside the active boulder lineage", async () => {
+      // given
+      const sessionID = "session-untrusted-session-id-test"
+      setupMessageStorage(sessionID, "atlas")
+
+      const planPath = join(TEST_DIR, "untrusted-session-id-plan.md")
+      writeFileSync(planPath, `# Plan
+
+## TODOs
+- [ ] 1. Implement auth flow
+`)
+
+      writeBoulderState(TEST_DIR, {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: ["session-1"],
+        plan_name: "untrusted-session-id-plan",
+      })
+
+      const hook = createAtlasHook(createMockPluginInput({
+        sessionGetMock: mock(async ({ path }: { path: { id: string } }) => ({
+          data: {
+            id: path.id,
+            parentID: path.id === "ses_untrusted_999" ? "session-outside-lineage" : "main-session-123",
+          },
+        })),
+      }))
+      const output = {
+        title: "Sisyphus Task",
+        output: `Task completed successfully
+
+<task_metadata>
+session_id: ses_untrusted_999
+</task_metadata>`,
+        metadata: {},
+      }
+
+      // when
+      await hook["tool.execute.after"](
+        { tool: "task", sessionID },
+        output
+      )
+
+      // then
+      const updatedState = readBoulderState(TEST_DIR)
+      expect(updatedState?.task_sessions?.["todo:1"]).toBeUndefined()
+      expect(output.output).not.toContain('task(session_id="ses_untrusted_999"')
+      expect(output.output).toContain('task(session_id="<session_id>"')
 
       cleanupMessageStorage(sessionID)
     })

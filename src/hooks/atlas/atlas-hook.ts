@@ -2,12 +2,12 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { createAtlasEventHandler } from "./event-handler"
 import { createToolExecuteAfterHandler } from "./tool-execute-after"
 import { createToolExecuteBeforeHandler } from "./tool-execute-before"
-import type { AtlasHookOptions, SessionState } from "./types"
+import type { AtlasHookOptions, PendingTaskRef, SessionState } from "./types"
 
 export function createAtlasHook(ctx: PluginInput, options?: AtlasHookOptions) {
   const sessions = new Map<string, SessionState>()
   const pendingFilePaths = new Map<string, string>()
-  const pendingTaskRefs = new Map<string, { key: string; label: string; title: string } | null>()
+  const pendingTaskRefs = new Map<string, PendingTaskRef>()
   const autoCommit = options?.autoCommit ?? true
 
   function getState(sessionID: string): SessionState {

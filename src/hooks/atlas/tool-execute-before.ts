@@ -6,17 +6,22 @@ import { readBoulderState, readCurrentTopLevelTask } from "../../features/boulde
 import { HOOK_NAME } from "./hook-name"
 import { ORCHESTRATOR_DELEGATION_REQUIRED, SINGLE_TASK_DIRECTIVE } from "./system-reminder-templates"
 import { isSisyphusPath } from "./sisyphus-path"
+import type { PendingTaskRef, TrackedTopLevelTaskRef } from "./types"
 import { isWriteOrEditToolName } from "./write-edit-tool-policy"
 
 export function createToolExecuteBeforeHandler(input: {
   ctx: PluginInput
   pendingFilePaths: Map<string, string>
-  pendingTaskRefs: Map<string, { key: string; label: string; title: string } | null>
+  pendingTaskRefs: Map<string, PendingTaskRef>
 }): (
   toolInput: { tool: string; sessionID?: string; callID?: string },
   toolOutput: { args: Record<string, unknown>; message?: string }
 ) => Promise<void> {
   const { ctx, pendingFilePaths, pendingTaskRefs } = input
+
+  function trackTask(callID: string, task: TrackedTopLevelTaskRef): void {
+    pendingTaskRefs.set(callID, { kind: "track", task })
+  }
 
   return async (toolInput, toolOutput): Promise<void> => {
     if (!(await isCallerOrchestrator(toolInput.sessionID, ctx.client))) {
@@ -48,18 +53,39 @@ export function createToolExecuteBeforeHandler(input: {
       if (toolInput.callID) {
         const requestedSessionId = toolOutput.args.session_id as string | undefined
         if (requestedSessionId) {
-          pendingTaskRefs.set(toolInput.callID, null)
+          pendingTaskRefs.set(toolInput.callID, {
+            kind: "skip",
+            reason: "explicit_resume",
+          })
         } else {
           const boulderState = readBoulderState(ctx.directory)
           const currentTask = boulderState
             ? readCurrentTopLevelTask(boulderState.active_plan)
             : null
           if (currentTask) {
-            pendingTaskRefs.set(toolInput.callID, {
+            const task = {
               key: currentTask.key,
               label: currentTask.label,
               title: currentTask.title,
-            })
+            }
+            const hasExistingClaim = [...pendingTaskRefs.values()].some((pendingTaskRef) => (
+              pendingTaskRef.kind === "track" && pendingTaskRef.task.key === task.key
+            ))
+
+            if (hasExistingClaim) {
+              pendingTaskRefs.set(toolInput.callID, {
+                kind: "skip",
+                reason: "ambiguous_task_key",
+                task,
+              })
+              log(`[${HOOK_NAME}] Skipping task session persistence for ambiguous task key`, {
+                sessionID: toolInput.sessionID,
+                callID: toolInput.callID,
+                taskKey: task.key,
+              })
+            } else {
+              trackTask(toolInput.callID, task)
+            }
           }
         }
       }

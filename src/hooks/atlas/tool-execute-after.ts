@@ -14,7 +14,7 @@ import { shouldPauseForFinalWaveApproval } from "./final-wave-approval-gate"
 import { HOOK_NAME } from "./hook-name"
 import { DIRECT_WORK_REMINDER } from "./system-reminder-templates"
 import { isSisyphusPath } from "./sisyphus-path"
-import { extractSessionIdFromOutput } from "./subagent-session-id"
+import { extractSessionIdFromOutput, validateSubagentSessionId } from "./subagent-session-id"
 import {
   buildCompletionGate,
   buildFinalWaveApprovalReminder,
@@ -22,17 +22,56 @@ import {
   buildStandaloneVerificationReminder,
 } from "./verification-reminders"
 import { isWriteOrEditToolName } from "./write-edit-tool-policy"
-import type { SessionState } from "./types"
-import type { ToolExecuteAfterInput, ToolExecuteAfterOutput } from "./types"
+import type { PendingTaskRef, SessionState } from "./types"
+import type { ToolExecuteAfterInput, ToolExecuteAfterOutput, TrackedTopLevelTaskRef } from "./types"
 
 function resolvePreferredSessionId(currentSessionId?: string, trackedSessionId?: string): string {
   return currentSessionId ?? trackedSessionId ?? "<session_id>"
 }
 
+function resolveTaskContext(
+  pendingTaskRef: PendingTaskRef | undefined,
+  planPath: string,
+): {
+  currentTask: TrackedTopLevelTaskRef | null
+  shouldSkipTaskSessionUpdate: boolean
+  shouldIgnoreCurrentSessionId: boolean
+} {
+  if (!pendingTaskRef) {
+    return {
+      currentTask: readCurrentTopLevelTask(planPath),
+      shouldSkipTaskSessionUpdate: false,
+      shouldIgnoreCurrentSessionId: false,
+    }
+  }
+
+  if (pendingTaskRef.kind === "track") {
+    return {
+      currentTask: pendingTaskRef.task,
+      shouldSkipTaskSessionUpdate: false,
+      shouldIgnoreCurrentSessionId: false,
+    }
+  }
+
+  if (pendingTaskRef.reason === "explicit_resume") {
+    return {
+      currentTask: readCurrentTopLevelTask(planPath),
+      shouldSkipTaskSessionUpdate: true,
+      shouldIgnoreCurrentSessionId: true,
+    }
+  }
+
+  return {
+    currentTask: pendingTaskRef.task,
+    shouldSkipTaskSessionUpdate: true,
+    shouldIgnoreCurrentSessionId: true,
+  }
+}
+
 export function createToolExecuteAfterHandler(input: {
   ctx: PluginInput
   pendingFilePaths: Map<string, string>
-  pendingTaskRefs: Map<string, { key: string; label: string; title: string } | null>
+  pendingTaskRefs: Map<string, PendingTaskRef>
   autoCommit: boolean
   getState: (sessionID: string) => SessionState
 }): (toolInput: ToolExecuteAfterInput, toolOutput: ToolExecuteAfterOutput) => Promise<void> {
@@ -83,15 +122,16 @@ export function createToolExecuteAfterHandler(input: {
     if (toolOutput.output && typeof toolOutput.output === "string") {
       const gitStats = collectGitDiffStats(ctx.directory)
       const fileChanges = formatFileChanges(gitStats)
-      const subagentSessionId = extractSessionIdFromOutput(toolOutput.output)
+      const extractedSessionId = extractSessionIdFromOutput(toolOutput.output)
 
       const boulderState = readBoulderState(ctx.directory)
       if (boulderState) {
         const progress = getPlanProgress(boulderState.active_plan)
-        const shouldSkipTaskSessionUpdate = pendingTaskRef === null
-        const currentTask = shouldSkipTaskSessionUpdate
-          ? null
-          : pendingTaskRef ?? readCurrentTopLevelTask(boulderState.active_plan)
+        const {
+          currentTask,
+          shouldSkipTaskSessionUpdate,
+          shouldIgnoreCurrentSessionId,
+        } = resolveTaskContext(pendingTaskRef, boulderState.active_plan)
         const trackedTaskSession = currentTask
           ? getTaskSessionState(ctx.directory, currentTask.key)
           : null
@@ -105,7 +145,16 @@ export function createToolExecuteAfterHandler(input: {
           })
         }
 
-        if (currentTask && subagentSessionId) {
+        const lineageSessionIDs = toolInput.sessionID && !boulderState.session_ids.includes(toolInput.sessionID)
+          ? [...boulderState.session_ids, toolInput.sessionID]
+          : boulderState.session_ids
+        const subagentSessionId = await validateSubagentSessionId({
+          client: ctx.client,
+          sessionID: extractedSessionId,
+          lineageSessionIDs,
+        })
+
+        if (currentTask && subagentSessionId && !shouldSkipTaskSessionUpdate) {
           upsertTaskSessionState(ctx.directory, {
             taskKey: currentTask.key,
             taskLabel: currentTask.label,
@@ -117,7 +166,7 @@ export function createToolExecuteAfterHandler(input: {
         }
 
         const preferredSessionId = resolvePreferredSessionId(
-          subagentSessionId,
+          shouldIgnoreCurrentSessionId ? undefined : subagentSessionId,
           trackedTaskSession?.session_id,
         )
 
@@ -175,8 +224,17 @@ ${
           waitingForFinalWaveApproval: shouldPauseForApproval,
         })
       } else {
+        const lineageSessionIDs = toolInput.sessionID ? [toolInput.sessionID] : []
+        const subagentSessionId = await validateSubagentSessionId({
+          client: ctx.client,
+          sessionID: extractedSessionId,
+          lineageSessionIDs,
+        })
+        const preferredSessionId = pendingTaskRef?.kind === "skip"
+          ? undefined
+          : subagentSessionId
         toolOutput.output += `\n<system-reminder>\n${buildStandaloneVerificationReminder(
-          resolvePreferredSessionId(subagentSessionId),
+          resolvePreferredSessionId(preferredSessionId),
         )}\n</system-reminder>`
 
         log(`[${HOOK_NAME}] Verification reminder appended for orchestrator`, {
