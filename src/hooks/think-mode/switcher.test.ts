@@ -53,22 +53,6 @@ describe("think-mode switcher", () => {
         expect(variant).toBe("gpt-5-4-high")
       })
 
-      it("should handle gpt-5.4-mini model", () => {
-        // given a GPT-5.4-mini model ID
-        const variant = getHighVariant("gpt-5.4-mini")
-
-        // then should return high variant
-        expect(variant).toBe("gpt-5-4-mini-high")
-      })
-
-      it("should handle gpt-5.4-nano model", () => {
-        // given a GPT-5.4-nano model ID
-        const variant = getHighVariant("gpt-5.4-nano")
-
-        // then should return high variant
-        expect(variant).toBe("gpt-5-4-nano-high")
-      })
-
       it("should handle dots in GPT-5.1 codex variants", () => {
         // given a GPT-5.1-codex model ID
         const variant = getHighVariant("gpt-5.1-codex")
