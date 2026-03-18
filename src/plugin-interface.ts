@@ -71,5 +71,9 @@ export function createPluginInterface(args: {
       ctx,
       hooks,
     }),
+
+    "tool.definition": async (input, output) => {
+      await hooks.todoDescriptionOverride?.["tool.definition"]?.(input, output)
+    },
   }
 }
