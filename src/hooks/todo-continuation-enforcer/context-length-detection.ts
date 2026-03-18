@@ -25,7 +25,14 @@ function extractErrorString(error: unknown): string {
   if (typeof obj.data === "object" && obj.data !== null) {
     const data = obj.data as Record<string, unknown>
     if (typeof data.message === "string") parts.push(data.message)
-    if (typeof data.error === "string") parts.push(data.error)
+    if (typeof data.error === "string") {
+      parts.push(data.error)
+    } else if (typeof data.error === "object" && data.error !== null) {
+      const nestedError = data.error as Record<string, unknown>
+      if (typeof nestedError.message === "string") parts.push(nestedError.message)
+      if (typeof nestedError.code === "string") parts.push(nestedError.code)
+      if (typeof nestedError.type === "string") parts.push(nestedError.type)
+    }
     if (typeof data.type === "string") parts.push(data.type)
   }
 
