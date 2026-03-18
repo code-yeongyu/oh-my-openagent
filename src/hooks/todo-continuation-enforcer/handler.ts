@@ -31,10 +31,6 @@ export function createTodoContinuationHandler(args: {
   return async ({ event }: { event: { type: string; properties?: unknown } }): Promise<void> => {
     const props = event.properties as Record<string, unknown> | undefined
 
-    if (event.type === "session.idle") {
-      console.error(`[TODO-DIAG] handler received session.idle event`, { sessionID: (props?.sessionID as string) })
-    }
-
     if (event.type === "session.error") {
       const sessionID = props?.sessionID as string | undefined
       if (!sessionID) return

@@ -43,12 +43,10 @@ export async function handleSessionIdle(args: {
   } = args
 
   log(`[${HOOK_NAME}] session.idle`, { sessionID })
-  console.error(`[TODO-DIAG] session.idle fired for ${sessionID}`)
 
   const state = sessionStateStore.getState(sessionID)
   if (state.isRecovering) {
     log(`[${HOOK_NAME}] Skipped: in recovery`, { sessionID })
-    console.error(`[TODO-DIAG] BLOCKED: isRecovering=true`)
     return
   }
 
@@ -56,7 +54,6 @@ export async function handleSessionIdle(args: {
     const timeSinceAbort = Date.now() - state.abortDetectedAt
     if (timeSinceAbort < ABORT_WINDOW_MS) {
       log(`[${HOOK_NAME}] Skipped: abort detected via event ${timeSinceAbort}ms ago`, { sessionID })
-      console.error(`[TODO-DIAG] BLOCKED: abort detected ${timeSinceAbort}ms ago`)
       state.abortDetectedAt = undefined
       return
     }
@@ -69,7 +66,6 @@ export async function handleSessionIdle(args: {
 
   if (hasRunningBgTasks) {
     log(`[${HOOK_NAME}] Skipped: background tasks running`, { sessionID })
-    console.error(`[TODO-DIAG] BLOCKED: background tasks running`, backgroundManager?.getTasksByParentSession(sessionID).filter((t: {status:string}) => t.status === 'running').map((t: {id:string, status:string}) => t.id))
     return
   }
 
@@ -81,12 +77,10 @@ export async function handleSessionIdle(args: {
     const messages = normalizeSDKResponse(messagesResp, [] as Array<{ info?: MessageInfo }>)
     if (isLastAssistantMessageAborted(messages)) {
       log(`[${HOOK_NAME}] Skipped: last assistant message was aborted (API fallback)`, { sessionID })
-      console.error(`[TODO-DIAG] BLOCKED: last assistant message aborted`)
       return
     }
     if (hasUnansweredQuestion(messages)) {
       log(`[${HOOK_NAME}] Skipped: pending question awaiting user response`, { sessionID })
-      console.error(`[TODO-DIAG] BLOCKED: hasUnansweredQuestion=true`)
       return
     }
   } catch (error) {
@@ -99,7 +93,6 @@ export async function handleSessionIdle(args: {
     todos = normalizeSDKResponse(response, [] as Todo[], { preferResponseOnMissingData: true })
   } catch (error) {
     log(`[${HOOK_NAME}] Todo fetch failed`, { sessionID, error: String(error) })
-    console.error(`[TODO-DIAG] BLOCKED: todo fetch failed`, String(error))
     return
   }
 
@@ -107,7 +100,6 @@ export async function handleSessionIdle(args: {
     sessionStateStore.resetContinuationProgress(sessionID)
     sessionStateStore.resetContinuationProgress(sessionID)
     log(`[${HOOK_NAME}] No todos`, { sessionID })
-    console.error(`[TODO-DIAG] BLOCKED: no todos`)
     return
   }
 
@@ -116,13 +108,11 @@ export async function handleSessionIdle(args: {
     sessionStateStore.resetContinuationProgress(sessionID)
     sessionStateStore.resetContinuationProgress(sessionID)
     log(`[${HOOK_NAME}] All todos complete`, { sessionID, total: todos.length })
-    console.error(`[TODO-DIAG] BLOCKED: all todos complete (${todos.length})`)
     return
   }
 
   if (state.inFlight) {
     log(`[${HOOK_NAME}] Skipped: injection in flight`, { sessionID })
-    console.error(`[TODO-DIAG] BLOCKED: inFlight=true`)
     return
   }
 
@@ -137,7 +127,6 @@ export async function handleSessionIdle(args: {
 
   if (state.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
     log(`[${HOOK_NAME}] Skipped: max consecutive failures reached`, { sessionID, consecutiveFailures: state.consecutiveFailures })
-    console.error(`[TODO-DIAG] BLOCKED: consecutiveFailures=${state.consecutiveFailures} >= ${MAX_CONSECUTIVE_FAILURES}`)
     return
   }
 
@@ -145,7 +134,6 @@ export async function handleSessionIdle(args: {
     CONTINUATION_COOLDOWN_MS * Math.pow(2, Math.min(state.consecutiveFailures, 5))
   if (state.lastInjectedAt && Date.now() - state.lastInjectedAt < effectiveCooldown) {
     log(`[${HOOK_NAME}] Skipped: cooldown active`, { sessionID, effectiveCooldown, consecutiveFailures: state.consecutiveFailures })
-    console.error(`[TODO-DIAG] BLOCKED: cooldown active (${effectiveCooldown}ms, failures=${state.consecutiveFailures})`)
     return
   }
 
@@ -171,12 +159,10 @@ export async function handleSessionIdle(args: {
   const resolvedAgentName = resolvedInfo?.agent
   if (resolvedAgentName && skipAgents.some(s => getAgentConfigKey(s) === getAgentConfigKey(resolvedAgentName))) {
     log(`[${HOOK_NAME}] Skipped: agent in skipAgents list`, { sessionID, agent: resolvedAgentName })
-    console.error(`[TODO-DIAG] BLOCKED: agent '${resolvedAgentName}' in skipAgents`)
     return
   }
   if ((compactionGuardActive || encounteredCompaction) && !resolvedInfo?.agent) {
     log(`[${HOOK_NAME}] Skipped: compaction occurred but no agent info resolved`, { sessionID })
-    console.error(`[TODO-DIAG] BLOCKED: compaction guard + no agent`)
     return
   }
   if (state.recentCompactionAt && resolvedInfo?.agent) {
@@ -185,22 +171,18 @@ export async function handleSessionIdle(args: {
 
   if (isContinuationStopped?.(sessionID)) {
     log(`[${HOOK_NAME}] Skipped: continuation stopped for session`, { sessionID })
-    console.error(`[TODO-DIAG] BLOCKED: isContinuationStopped=true`)
     return
   }
 
   if (shouldSkipContinuation?.(sessionID)) {
     log(`[${HOOK_NAME}] Skipped: another continuation hook already injected`, { sessionID })
-    console.error(`[TODO-DIAG] BLOCKED: shouldSkipContinuation=true (gptPermissionContinuation recently injected)`)
     return
   }
 
   const progressUpdate = sessionStateStore.trackContinuationProgress(sessionID, incompleteCount, todos)
   if (shouldStopForStagnation({ sessionID, incompleteCount, progressUpdate })) {
-    console.error(`[TODO-DIAG] BLOCKED: stagnation detected (count=${progressUpdate.stagnationCount})`)
     return
   }
-  console.error(`[TODO-DIAG] PASSED all gates! Starting countdown (${incompleteCount}/${todos.length} incomplete)`)
   startCountdown({
     ctx,
     sessionID,
