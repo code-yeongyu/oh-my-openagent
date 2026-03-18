@@ -1,8 +1,7 @@
 import type { BackgroundTaskConfig } from "../../config/schema"
 import {
   DEFAULT_CIRCUIT_BREAKER_ENABLED,
-  DEFAULT_CIRCUIT_BREAKER_REPETITION_THRESHOLD_PERCENT,
-  DEFAULT_CIRCUIT_BREAKER_WINDOW_SIZE,
+  DEFAULT_CIRCUIT_BREAKER_CONSECUTIVE_THRESHOLD,
   DEFAULT_MAX_TOOL_CALLS,
 } from "./constants"
 import type { ToolCallWindow } from "./types"
@@ -10,16 +9,13 @@ import type { ToolCallWindow } from "./types"
 export interface CircuitBreakerSettings {
   enabled: boolean
   maxToolCalls: number
-  windowSize: number
-  repetitionThresholdPercent: number
+  consecutiveThreshold: number
 }
 
 export interface ToolLoopDetectionResult {
   triggered: boolean
   toolName?: string
   repeatedCount?: number
-  sampleSize?: number
-  thresholdPercent?: number
 }
 
 export function resolveCircuitBreakerSettings(
@@ -29,10 +25,8 @@ export function resolveCircuitBreakerSettings(
     enabled: config?.circuitBreaker?.enabled ?? DEFAULT_CIRCUIT_BREAKER_ENABLED,
     maxToolCalls:
       config?.circuitBreaker?.maxToolCalls ?? config?.maxToolCalls ?? DEFAULT_MAX_TOOL_CALLS,
-    windowSize: config?.circuitBreaker?.windowSize ?? DEFAULT_CIRCUIT_BREAKER_WINDOW_SIZE,
-    repetitionThresholdPercent:
-      config?.circuitBreaker?.repetitionThresholdPercent ??
-      DEFAULT_CIRCUIT_BREAKER_REPETITION_THRESHOLD_PERCENT,
+    consecutiveThreshold:
+      config?.circuitBreaker?.consecutiveThreshold ?? DEFAULT_CIRCUIT_BREAKER_CONSECUTIVE_THRESHOLD,
   }
 }
 
@@ -42,16 +36,20 @@ export function recordToolCall(
   settings: CircuitBreakerSettings,
   toolInput?: Record<string, unknown> | null
 ): ToolCallWindow {
-  const previous = window?.toolSignatures ?? []
   const signature = createToolCallSignature(toolName, toolInput)
-  const toolSignatures = previous.length >= settings.windowSize
-    ? [...previous.slice(1), signature]
-    : [...previous, signature]
+
+  if (window && window.lastSignature === signature) {
+    return {
+      lastSignature: signature,
+      consecutiveCount: window.consecutiveCount + 1,
+      threshold: settings.consecutiveThreshold,
+    }
+  }
 
   return {
-    toolSignatures,
-    windowSize: settings.windowSize,
-    thresholdPercent: settings.repetitionThresholdPercent,
+    lastSignature: signature,
+    consecutiveCount: 1,
+    threshold: settings.consecutiveThreshold,
   }
 }
 
@@ -84,46 +82,13 @@ export function createToolCallSignature(
 export function detectRepetitiveToolUse(
   window: ToolCallWindow | undefined
 ): ToolLoopDetectionResult {
-  if (!window || window.toolSignatures.length === 0) {
-    return { triggered: false }
-  }
-
-  const counts = new Map<string, number>()
-  for (const signature of window.toolSignatures) {
-    counts.set(signature, (counts.get(signature) ?? 0) + 1)
-  }
-
-  let repeatedTool: string | undefined
-  let repeatedCount = 0
-
-  for (const [toolName, count] of counts.entries()) {
-    if (count > repeatedCount) {
-      repeatedTool = toolName
-      repeatedCount = count
-    }
-  }
-
-  const sampleSize = window.toolSignatures.length
-  const minimumSampleSize = Math.min(
-    window.windowSize,
-    Math.ceil((window.windowSize * window.thresholdPercent) / 100)
-  )
-
-  if (sampleSize < minimumSampleSize) {
-    return { triggered: false }
-  }
-
-  const thresholdCount = Math.ceil((sampleSize * window.thresholdPercent) / 100)
-
-  if (!repeatedTool || repeatedCount < thresholdCount) {
+  if (!window || window.consecutiveCount < window.threshold) {
     return { triggered: false }
   }
 
   return {
     triggered: true,
-    toolName: repeatedTool.split("::")[0],
-    repeatedCount,
-    sampleSize,
-    thresholdPercent: window.thresholdPercent,
+    toolName: window.lastSignature.split("::")[0],
+    repeatedCount: window.consecutiveCount,
   }
 }

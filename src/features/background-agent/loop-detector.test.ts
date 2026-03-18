@@ -37,16 +37,14 @@ describe("loop-detector", () => {
           maxToolCalls: 200,
           circuitBreaker: {
             maxToolCalls: 120,
-            windowSize: 10,
-            repetitionThresholdPercent: 70,
+            consecutiveThreshold: 7,
           },
         })
 
         expect(result).toEqual({
           enabled: true,
           maxToolCalls: 120,
-          windowSize: 10,
-          repetitionThresholdPercent: 70,
+          consecutiveThreshold: 7,
         })
       })
     })
@@ -56,8 +54,7 @@ describe("loop-detector", () => {
         const result = resolveCircuitBreakerSettings({
           circuitBreaker: {
             maxToolCalls: 100,
-            windowSize: 5,
-            repetitionThresholdPercent: 60,
+            consecutiveThreshold: 5,
           },
         })
 
@@ -71,8 +68,7 @@ describe("loop-detector", () => {
           circuitBreaker: {
             enabled: false,
             maxToolCalls: 100,
-            windowSize: 5,
-            repetitionThresholdPercent: 60,
+            consecutiveThreshold: 5,
           },
         })
 
@@ -86,8 +82,7 @@ describe("loop-detector", () => {
           circuitBreaker: {
             enabled: true,
             maxToolCalls: 100,
-            windowSize: 5,
-            repetitionThresholdPercent: 60,
+            consecutiveThreshold: 5,
           },
         })
 
@@ -151,55 +146,52 @@ describe("loop-detector", () => {
       })
     })
 
-    describe("#given the same tool dominates the recent window", () => {
+    describe("#given the same tool is called consecutively", () => {
       test("#when evaluated #then it triggers", () => {
-        const window = buildWindow([
-          "read",
-          "read",
-          "read",
-          "edit",
-          "read",
-          "read",
-          "read",
-          "read",
-          "grep",
-          "read",
-        ], {
-          circuitBreaker: {
-            windowSize: 10,
-            repetitionThresholdPercent: 80,
-          },
-        })
+        const window = buildWindow(Array.from({ length: 20 }, () => "read"))
 
         const result = detectRepetitiveToolUse(window)
 
         expect(result).toEqual({
           triggered: true,
           toolName: "read",
-          repeatedCount: 8,
-          sampleSize: 10,
-          thresholdPercent: 80,
+          repeatedCount: 20,
         })
       })
     })
 
-    describe("#given the window is not full yet", () => {
-      test("#when the current sample crosses the threshold #then it still triggers", () => {
-        const window = buildWindow(["read", "read", "edit", "read", "read", "read", "read", "read"], {
-          circuitBreaker: {
-            windowSize: 10,
-            repetitionThresholdPercent: 80,
-          },
-        })
+    describe("#given consecutive calls are interrupted by different tool", () => {
+      test("#when evaluated #then it does not trigger", () => {
+        const window = buildWindow([
+          ...Array.from({ length: 19 }, () => "read"),
+          "edit",
+          "read",
+        ])
 
         const result = detectRepetitiveToolUse(window)
+
+        expect(result).toEqual({ triggered: false })
+      })
+    })
+
+    describe("#given threshold boundary", () => {
+      test("#when below threshold #then it does not trigger", () => {
+        const belowThresholdWindow = buildWindow(Array.from({ length: 19 }, () => "read"))
+
+        const result = detectRepetitiveToolUse(belowThresholdWindow)
+
+        expect(result).toEqual({ triggered: false })
+      })
+
+      test("#when equal to threshold #then it triggers", () => {
+        const atThresholdWindow = buildWindow(Array.from({ length: 20 }, () => "read"))
+
+        const result = detectRepetitiveToolUse(atThresholdWindow)
 
         expect(result).toEqual({
           triggered: true,
           toolName: "read",
-          repeatedCount: 7,
-          sampleSize: 8,
-          thresholdPercent: 80,
+          repeatedCount: 20,
         })
       })
     })
@@ -210,9 +202,7 @@ describe("loop-detector", () => {
           tool: "read",
           input: { filePath: `/src/file-${i}.ts` },
         }))
-        const window = buildWindowWithInputs(calls, {
-          circuitBreaker: { windowSize: 20, repetitionThresholdPercent: 80 },
-        })
+        const window = buildWindowWithInputs(calls)
         const result = detectRepetitiveToolUse(window)
         expect(result.triggered).toBe(false)
       })
@@ -220,38 +210,30 @@ describe("loop-detector", () => {
 
     describe("#given same tool with identical file inputs", () => {
       test("#when evaluated #then it triggers with bare tool name", () => {
-        const calls = [
-          ...Array.from({ length: 16 }, () => ({ tool: "read", input: { filePath: "/src/same.ts" } })),
-          { tool: "grep", input: { pattern: "foo" } },
-          { tool: "edit", input: { filePath: "/src/other.ts" } },
-          { tool: "bash", input: { command: "ls" } },
-          { tool: "glob", input: { pattern: "**/*.ts" } },
-        ]
-        const window = buildWindowWithInputs(calls, {
-          circuitBreaker: { windowSize: 20, repetitionThresholdPercent: 80 },
-        })
+        const calls = Array.from({ length: 20 }, () => ({
+          tool: "read",
+          input: { filePath: "/src/same.ts" },
+        }))
+        const window = buildWindowWithInputs(calls)
         const result = detectRepetitiveToolUse(window)
-        expect(result.triggered).toBe(true)
-        expect(result.toolName).toBe("read")
-        expect(result.repeatedCount).toBe(16)
+        expect(result).toEqual({
+          triggered: true,
+          toolName: "read",
+          repeatedCount: 20,
+        })
       })
     })
 
     describe("#given tool calls with no input", () => {
-      test("#when the same tool dominates #then falls back to name-only detection", () => {
-        const calls = [
-          ...Array.from({ length: 16 }, () => ({ tool: "read" })),
-          { tool: "grep" },
-          { tool: "edit" },
-          { tool: "bash" },
-          { tool: "glob" },
-        ]
-        const window = buildWindowWithInputs(calls, {
-          circuitBreaker: { windowSize: 20, repetitionThresholdPercent: 80 },
-        })
+      test("#when evaluated #then it triggers", () => {
+        const calls = Array.from({ length: 20 }, () => ({ tool: "read" }))
+        const window = buildWindowWithInputs(calls)
         const result = detectRepetitiveToolUse(window)
-        expect(result.triggered).toBe(true)
-        expect(result.toolName).toBe("read")
+        expect(result).toEqual({
+          triggered: true,
+          toolName: "read",
+          repeatedCount: 20,
+        })
       })
     })
   })

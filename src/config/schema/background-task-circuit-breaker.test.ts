@@ -8,27 +8,24 @@ describe("BackgroundTaskConfigSchema.circuitBreaker", () => {
       const result = BackgroundTaskConfigSchema.parse({
         circuitBreaker: {
           maxToolCalls: 150,
-          windowSize: 10,
-          repetitionThresholdPercent: 70,
+          consecutiveThreshold: 10,
         },
       })
-
       expect(result.circuitBreaker).toEqual({
         maxToolCalls: 150,
-        windowSize: 10,
-        repetitionThresholdPercent: 70,
+        consecutiveThreshold: 10,
       })
     })
   })
 
-  describe("#given windowSize below minimum", () => {
+  describe("#given consecutiveThreshold below minimum", () => {
     test("#when parsed #then throws ZodError", () => {
       let thrownError: unknown
 
       try {
         BackgroundTaskConfigSchema.parse({
           circuitBreaker: {
-            windowSize: 4,
+            consecutiveThreshold: 4,
           },
         })
       } catch (error) {
@@ -39,14 +36,14 @@ describe("BackgroundTaskConfigSchema.circuitBreaker", () => {
     })
   })
 
-  describe("#given repetitionThresholdPercent is zero", () => {
+  describe("#given consecutiveThreshold is zero", () => {
     test("#when parsed #then throws ZodError", () => {
       let thrownError: unknown
 
       try {
         BackgroundTaskConfigSchema.parse({
           circuitBreaker: {
-            repetitionThresholdPercent: 0,
+            consecutiveThreshold: 0,
           },
         })
       } catch (error) {

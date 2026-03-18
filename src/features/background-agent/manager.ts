@@ -932,18 +932,16 @@ export class BackgroundManager {
            if (circuitBreaker.enabled) {
              const loopDetection = detectRepetitiveToolUse(task.progress.toolCallWindow)
              if (loopDetection.triggered) {
-               log("[background-agent] Circuit breaker: repetitive tool usage detected", {
+               log("[background-agent] Circuit breaker: consecutive tool usage detected", {
                  taskId: task.id,
                  agent: task.agent,
                  sessionID,
                  toolName: loopDetection.toolName,
                  repeatedCount: loopDetection.repeatedCount,
-                 sampleSize: loopDetection.sampleSize,
-                 thresholdPercent: loopDetection.thresholdPercent,
                })
                void this.cancelTask(task.id, {
                  source: "circuit-breaker",
-                 reason: `Subagent repeatedly called ${loopDetection.toolName} ${loopDetection.repeatedCount}/${loopDetection.sampleSize} times in the recent tool-call window (${loopDetection.thresholdPercent}% threshold). This usually indicates an infinite loop. The task was automatically cancelled to prevent excessive token usage.`,
+                 reason: `Subagent called ${loopDetection.toolName} ${loopDetection.repeatedCount} consecutive times (threshold: ${circuitBreaker.consecutiveThreshold}). This usually indicates an infinite loop. The task was automatically cancelled to prevent excessive token usage.`,
                })
                return
              }

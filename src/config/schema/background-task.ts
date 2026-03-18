@@ -3,8 +3,7 @@ import { z } from "zod"
 const CircuitBreakerConfigSchema = z.object({
   enabled: z.boolean().optional(),
   maxToolCalls: z.number().int().min(10).optional(),
-  windowSize: z.number().int().min(5).optional(),
-  repetitionThresholdPercent: z.number().gt(0).max(100).optional(),
+  consecutiveThreshold: z.number().int().min(5).optional(),
 })
 
 export const BackgroundTaskConfigSchema = z.object({

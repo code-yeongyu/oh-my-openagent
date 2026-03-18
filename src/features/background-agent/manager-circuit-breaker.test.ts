@@ -38,12 +38,11 @@ async function flushAsyncWork() {
 }
 
 describe("BackgroundManager circuit breaker", () => {
-  describe("#given the same tool dominates the recent window", () => {
-    test("#when tool events arrive #then the task is cancelled early", async () => {
+  describe("#given the same tool is called consecutively", () => {
+    test("#when consecutive tool events arrive #then the task is cancelled", async () => {
       const manager = createManager({
         circuitBreaker: {
-          windowSize: 20,
-          repetitionThresholdPercent: 80,
+          consecutiveThreshold: 20,
         },
       })
       const task: BackgroundTask = {
@@ -63,38 +62,17 @@ describe("BackgroundManager circuit breaker", () => {
       }
       getTaskMap(manager).set(task.id, task)
 
-      for (const toolName of [
-        "read",
-        "read",
-        "grep",
-        "read",
-        "edit",
-        "read",
-        "read",
-        "bash",
-        "read",
-        "read",
-        "read",
-        "glob",
-        "read",
-        "read",
-        "read",
-        "read",
-        "read",
-        "read",
-        "read",
-        "read",
-      ]) {
+      for (let i = 0; i < 20; i++) {
         manager.handleEvent({
           type: "message.part.updated",
-          properties: { sessionID: task.sessionID, type: "tool", tool: toolName },
+          properties: { sessionID: task.sessionID, type: "tool", tool: "read" },
         })
       }
 
       await flushAsyncWork()
 
       expect(task.status).toBe("cancelled")
-      expect(task.error).toContain("repeatedly called read 16/20 times")
+      expect(task.error).toContain("read 20 consecutive times")
     })
   })
 
@@ -102,8 +80,7 @@ describe("BackgroundManager circuit breaker", () => {
     test("#when the window fills #then the task keeps running", async () => {
       const manager = createManager({
         circuitBreaker: {
-          windowSize: 10,
-          repetitionThresholdPercent: 80,
+          consecutiveThreshold: 10,
         },
       })
       const task: BackgroundTask = {
@@ -153,8 +130,7 @@ describe("BackgroundManager circuit breaker", () => {
       const manager = createManager({
         maxToolCalls: 3,
         circuitBreaker: {
-          windowSize: 10,
-          repetitionThresholdPercent: 95,
+          consecutiveThreshold: 95,
         },
       })
       const task: BackgroundTask = {
@@ -193,8 +169,7 @@ describe("BackgroundManager circuit breaker", () => {
       const manager = createManager({
         maxToolCalls: 2,
         circuitBreaker: {
-          windowSize: 5,
-          repetitionThresholdPercent: 80,
+          consecutiveThreshold: 5,
         },
       })
       const task: BackgroundTask = {
@@ -241,8 +216,7 @@ describe("BackgroundManager circuit breaker", () => {
     test("#when tool events arrive with state.input #then task keeps running", async () => {
       const manager = createManager({
         circuitBreaker: {
-          windowSize: 20,
-          repetitionThresholdPercent: 80,
+          consecutiveThreshold: 20,
         },
       })
       const task: BackgroundTask = {
@@ -287,8 +261,7 @@ describe("BackgroundManager circuit breaker", () => {
     test("#when tool events arrive with state.input #then task is cancelled with bare tool name in error", async () => {
       const manager = createManager({
         circuitBreaker: {
-          windowSize: 20,
-          repetitionThresholdPercent: 80,
+          consecutiveThreshold: 20,
         },
       })
       const task: BackgroundTask = {
@@ -325,7 +298,7 @@ describe("BackgroundManager circuit breaker", () => {
       await flushAsyncWork()
 
       expect(task.status).toBe("cancelled")
-      expect(task.error).toContain("repeatedly called read")
+      expect(task.error).toContain("read 20 consecutive times")
       expect(task.error).not.toContain("::")
     })
   })
@@ -335,8 +308,7 @@ describe("BackgroundManager circuit breaker", () => {
       const manager = createManager({
         circuitBreaker: {
           enabled: false,
-          windowSize: 20,
-          repetitionThresholdPercent: 80,
+          consecutiveThreshold: 20,
         },
       })
       const task: BackgroundTask = {
@@ -379,8 +351,7 @@ describe("BackgroundManager circuit breaker", () => {
         maxToolCalls: 3,
         circuitBreaker: {
           enabled: false,
-          windowSize: 10,
-          repetitionThresholdPercent: 95,
+          consecutiveThreshold: 95,
         },
       })
       const task: BackgroundTask = {
