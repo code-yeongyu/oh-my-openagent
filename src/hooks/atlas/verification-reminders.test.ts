@@ -61,8 +61,8 @@ describe("buildOrchestratorReminder", () => {
     const sessionId = "session-abc"
     const progress = { total: 10, completed: 3 }
 
-    when("buildOrchestratorReminder is called with autoCommit true", () => {
-      const reminder = buildOrchestratorReminder(planName, progress, sessionId, true)
+    when("buildOrchestratorReminder is called", () => {
+      const reminder = buildOrchestratorReminder(planName, progress, sessionId)
 
       then("old STEP 7 MARK COMPLETION IN PLAN FILE text is absent", () => {
         expect(reminder).not.toContain("STEP 7: MARK COMPLETION IN PLAN FILE")
@@ -76,19 +76,5 @@ describe("buildOrchestratorReminder", () => {
       })
     })
 
-    when("buildOrchestratorReminder is called with autoCommit false", () => {
-      const reminder = buildOrchestratorReminder(planName, progress, sessionId, false)
-
-      then("old STEP 7 MARK COMPLETION IN PLAN FILE text is absent", () => {
-        expect(reminder).not.toContain("STEP 7: MARK COMPLETION IN PLAN FILE")
-      })
-
-      then("completion gate appears before verification reminder", () => {
-        const gateIndex = reminder.indexOf("COMPLETION GATE")
-        const verificationIndex = reminder.indexOf("VERIFICATION_REMINDER")
-        expect(gateIndex).toBeGreaterThanOrEqual(0)
-        expect(gateIndex).toBeLessThan(verificationIndex)
-      })
-    })
   })
 })

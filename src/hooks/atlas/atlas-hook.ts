@@ -7,7 +7,6 @@ import type { AtlasHookOptions, SessionState } from "./types"
 export function createAtlasHook(ctx: PluginInput, options?: AtlasHookOptions) {
   const sessions = new Map<string, SessionState>()
   const pendingFilePaths = new Map<string, string>()
-  const autoCommit = options?.autoCommit ?? true
 
   function getState(sessionID: string): SessionState {
     let state = sessions.get(sessionID)
@@ -21,6 +20,6 @@ export function createAtlasHook(ctx: PluginInput, options?: AtlasHookOptions) {
   return {
     handler: createAtlasEventHandler({ ctx, options, sessions, getState }),
     "tool.execute.before": createToolExecuteBeforeHandler({ ctx, pendingFilePaths }),
-    "tool.execute.after": createToolExecuteAfterHandler({ ctx, pendingFilePaths, autoCommit, getState }),
+    "tool.execute.after": createToolExecuteAfterHandler({ ctx, pendingFilePaths, getState }),
   }
 }

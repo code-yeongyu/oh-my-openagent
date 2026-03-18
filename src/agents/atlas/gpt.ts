@@ -166,17 +166,19 @@ TodoWrite([
 
 ## Step 1: Analyze Plan
 
-1. Read the todo list file
+1. Read the todo list file end-to-end
 2. Parse actionable **top-level** task checkboxes in \`## TODOs\` and \`## Final Verification Wave\`
    - Ignore nested checkboxes under Acceptance Criteria, Evidence, Definition of Done, and Final Checklist sections.
-3. Build parallelization map
+3. If the plan already contains \`Parallel Execution Graph\`, \`Delegation Recommendation\`, \`Recommended Agent Profile\`, \`Parallelization\`, \`Depends On\`, or \`Blocked By\`, treat that metadata as the DEFAULT execution contract
+4. Build or adjust your execution map ONLY for tasks missing that metadata, or when verification/blockers prove the plan is stale
+5. If you override plan metadata, explicitly record the planned category / wave, the actual category / wave, and the concrete reason for override
 
 Output format:
 \`\`\`
 TASK ANALYSIS:
 - Total: [N], Remaining: [M]
-- Parallel Groups: [list]
-- Sequential: [list]
+- Plan-Defined Waves: [list]
+- Atlas Overrides: [none or list with reason]
 \`\`\`
 
 ## Step 2: Initialize Notepad
@@ -190,6 +192,8 @@ Structure: learnings.md, decisions.md, issues.md, problems.md
 ## Step 3: Execute Tasks
 
 ### 3.1 Parallelization Check
+- Use plan-defined waves and dependencies first
+- Only regroup tasks when the plan omitted execution metadata or runtime blockers invalidate it
 - Parallel tasks → invoke multiple \`task()\` in ONE message
 - Sequential → process one at a time
 
@@ -199,6 +203,10 @@ Read(".sisyphus/notepads/{plan-name}/learnings.md")
 Read(".sisyphus/notepads/{plan-name}/issues.md")
 \`\`\`
 Extract wisdom → include in prompt.
+
+Then read the CURRENT task block in the plan.
+- If the task includes \`Delegation Recommendation\` or \`Recommended Agent Profile\`, reuse that category / skills by default
+- Use the decision matrix only as a fallback when the plan omitted execution metadata or you have a concrete override reason
 
 ### 3.3 Invoke task()
 
@@ -343,7 +351,8 @@ task(category="quick", load_skills=[], run_in_background=false, prompt="Task 3..
 - Instruct subagent to append findings (never overwrite)
 
 **Paths**:
-- Plan: \`.sisyphus/plans/{name}.md\` (you may EDIT to mark checkboxes)
+- Plan: \`.sisyphus/plans/{name}.md\` (planner-owned task content; Atlas may update checkbox/status markers ONLY after verification)
+- Atlas MUST NOT rewrite task wording, add/remove/reorder tasks, or change dependencies / acceptance criteria
 - Notepad: \`.sisyphus/notepads/{name}/\` (READ/APPEND)
 </notepad_protocol>
 

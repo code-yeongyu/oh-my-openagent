@@ -7,8 +7,9 @@ export function buildCompletionGate(planName: string, sessionId: string): string
 Your completion will NOT be recorded until you complete ALL of the following:
 
 1. **Edit** the plan file \`.sisyphus/plans/${planName}.md\`:
-   - Change \`- [ ]\` to \`- [x]\` for the completed task
-   - Use \`Edit\` tool to modify the checkbox
+   - Allowed: change \`- [ ]\` to \`- [x]\` for the completed task
+   - Forbidden: rewrite task wording, add/remove/reorder tasks, change dependencies, or change acceptance criteria
+   - Use \`Edit\` tool to modify the checkbox only
 
 2. **Read** the plan file AGAIN:
    \`\`\`
@@ -45,21 +46,9 @@ export function buildOrchestratorReminder(
   planName: string,
   progress: { total: number; completed: number },
   sessionId: string,
-  autoCommit: boolean = true,
   includeCompletionGate: boolean = true
 ): string {
   const remaining = progress.total - progress.completed
-
-  const commitStep = autoCommit
-    ? `
-**STEP 7: COMMIT ATOMIC UNIT**
-
-- Stage ONLY the verified changes
-- Commit with clear message describing what was done
-`
-    : ""
-
-  const nextStepNumber = autoCommit ? 8 : 7
 
   return `
 ---
@@ -97,8 +86,7 @@ Read(".sisyphus/plans/${planName}.md")
 Count exactly: how many \`- [ ]\` remain? How many \`- [x]\` completed?
 This is YOUR ground truth. Use it to decide what comes next.
 
-${commitStep}
-**STEP ${nextStepNumber}: PROCEED TO NEXT TASK**
+**STEP 7: PROCEED TO NEXT TASK**
 
 - Read the plan file AGAIN to identify the next \`- [ ]\` task
 - Start immediately - DO NOT STOP
