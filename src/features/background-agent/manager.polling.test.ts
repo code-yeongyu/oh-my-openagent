@@ -153,4 +153,42 @@ describe("BackgroundManager pollRunningTasks", () => {
       expect(task.status).toBe("running")
     })
   })
+
+  describe("#given a running task whose session has terminal non-idle status", () => {
+    test('#when session status is "interrupted" #then completes the task', async () => {
+      //#given
+      const manager = createManagerWithClient({
+        status: async () => ({ data: { "ses-interrupted": { type: "interrupted" } } }),
+      })
+      const task = createRunningTask("ses-interrupted")
+      injectTask(manager, task)
+
+      //#when
+      const poll = (manager as unknown as { pollRunningTasks: () => Promise<void> }).pollRunningTasks
+      await poll.call(manager)
+      manager.shutdown()
+
+      //#then
+      expect(task.status).toBe("completed")
+      expect(task.completedAt).toBeDefined()
+    })
+
+    test('#when session status is an unknown type #then completes the task', async () => {
+      //#given
+      const manager = createManagerWithClient({
+        status: async () => ({ data: { "ses-unknown": { type: "some-weird-status" } } }),
+      })
+      const task = createRunningTask("ses-unknown")
+      injectTask(manager, task)
+
+      //#when
+      const poll = (manager as unknown as { pollRunningTasks: () => Promise<void> }).pollRunningTasks
+      await poll.call(manager)
+      manager.shutdown()
+
+      //#then
+      expect(task.status).toBe("completed")
+      expect(task.completedAt).toBeDefined()
+    })
+  })
 })

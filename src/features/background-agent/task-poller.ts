@@ -14,6 +14,7 @@ import {
 } from "./constants"
 import { removeTaskToastTracking } from "./remove-task-toast-tracking"
 
+import { isActiveSessionStatus } from "./session-status-classifier"
 const TERMINAL_TASK_STATUSES = new Set<BackgroundTask["status"]>([
   "completed",
   "error",
@@ -120,7 +121,7 @@ export async function checkAndInterruptStaleTasks(args: {
     if (!startedAt || !sessionID) continue
 
     const sessionStatus = sessionStatuses?.[sessionID]?.type
-    const sessionIsRunning = sessionStatus !== undefined && sessionStatus !== "idle"
+    const sessionIsRunning = sessionStatus !== undefined && isActiveSessionStatus(sessionStatus)
     const runtime = now - startedAt.getTime()
 
     if (!task.progress?.lastUpdate) {
