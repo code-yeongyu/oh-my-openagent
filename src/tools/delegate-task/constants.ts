@@ -149,9 +149,9 @@ Approach:
 </Category_Context>
 
 <Caller_Warning>
-THIS CATEGORY USES A LESS CAPABLE MODEL (claude-haiku-4-5).
+THIS CATEGORY USES A SMALLER/FASTER MODEL (gpt-5.4-mini).
 
-The model executing this task has LIMITED reasoning capacity. Your prompt MUST be:
+The model executing this task is optimized for speed over depth. Your prompt MUST be:
 
 **EXHAUSTIVELY EXPLICIT** - Leave NOTHING to interpretation:
 1. MUST DO: List every required action as atomic, numbered steps
@@ -159,10 +159,9 @@ The model executing this task has LIMITED reasoning capacity. Your prompt MUST b
 3. EXPECTED OUTPUT: Describe exact success criteria with concrete examples
 
 **WHY THIS MATTERS:**
-- Less capable models WILL deviate without explicit guardrails
-- Vague instructions → unpredictable results
-- Implicit expectations → missed requirements
-
+- Smaller models benefit from explicit guardrails
+- Vague instructions may lead to unpredictable results
+- Implicit expectations may be missed
 **PROMPT STRUCTURE (MANDATORY):**
 \`\`\`
 TASK: [One-sentence goal]
@@ -287,7 +286,7 @@ export const DEFAULT_CATEGORIES: Record<string, CategoryConfig> = {
   ultrabrain: { model: "openai/gpt-5.4", variant: "xhigh" },
   deep: { model: "openai/gpt-5.3-codex", variant: "medium" },
   artistry: { model: "google/gemini-3.1-pro", variant: "high" },
-  quick: { model: "anthropic/claude-haiku-4-5" },
+  quick: { model: "openai/gpt-5.4-mini" },
   "unspecified-low": { model: "anthropic/claude-sonnet-4-6" },
   "unspecified-high": { model: "anthropic/claude-opus-4-6", variant: "max" },
   writing: { model: "kimi-for-coding/k2p5" },

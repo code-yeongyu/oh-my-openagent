@@ -228,7 +228,7 @@ Domain-specific model delegation used by the `task()` tool. When Sisyphus delega
 | `ultrabrain`         | `openai/gpt-5.4` (xhigh)        | Deep logical reasoning, complex architecture   |
 | `deep`               | `openai/gpt-5.3-codex` (medium) | Autonomous problem-solving, thorough research  |
 | `artistry`           | `google/gemini-3.1-pro` (high)  | Creative/unconventional approaches             |
-| `quick`              | `anthropic/claude-haiku-4-5`    | Trivial tasks, typo fixes, single-file changes |
+| `quick`              | `openai/gpt-5.4-mini`           | Trivial tasks, typo fixes, single-file changes |
 | `unspecified-low`    | `anthropic/claude-sonnet-4-6`   | General tasks, low effort                      |
 | `unspecified-high`   | `anthropic/claude-opus-4-6` (max) | General tasks, high effort                   |
 | `writing`            | `google/gemini-3-flash`         | Documentation, prose, technical writing        |
@@ -286,7 +286,7 @@ Disable categories: `{ "disabled_categories": ["ultrabrain"] }`
 | **ultrabrain**         | `gpt-5.4`           | `gpt-5.4` → `gemini-3.1-pro` → `claude-opus-4-6`               |
 | **deep**               | `gpt-5.3-codex`     | `gpt-5.3-codex` → `claude-opus-4-6` → `gemini-3.1-pro`         |
 | **artistry**           | `gemini-3.1-pro`    | `gemini-3.1-pro` → `claude-opus-4-6` → `gpt-5.4`               |
-| **quick**              | `claude-haiku-4-5`  | `claude-haiku-4-5` → `gemini-3-flash` → `gpt-5-nano`           |
+| **quick**              | `gpt-5.4-mini`    | `gpt-5.4-mini` → `claude-haiku-4-5` → `gemini-3-flash` → `minimax-m2.5` → `gpt-5-nano` |
 | **unspecified-low**    | `claude-sonnet-4-6` | `claude-sonnet-4-6` → `gpt-5.3-codex` → `gemini-3-flash`       |
 | **unspecified-high**   | `claude-opus-4-6`   | `claude-opus-4-6` → `gpt-5.4 (high)` → `glm-5` → `k2p5` → `kimi-k2.5` |
 | **writing**            | `gemini-3-flash`    | `gemini-3-flash` → `claude-sonnet-4-6`                         |
