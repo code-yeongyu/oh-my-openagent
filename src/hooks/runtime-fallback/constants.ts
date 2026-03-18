@@ -40,6 +40,8 @@ export const RETRYABLE_ERROR_PATTERNS = [
   /(?:^|\s)429(?:\s|$)/,
   /(?:^|\s)503(?:\s|$)/,
   /(?:^|\s)529(?:\s|$)/,
+  /internal.?network.?failure/i,
+  /api_error/i,
 ]
 
 /**
