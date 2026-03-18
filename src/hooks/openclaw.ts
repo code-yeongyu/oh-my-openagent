@@ -50,7 +50,11 @@ export function createOpenClawHook(
         return
       }
 
-      const question = typeof output.args.question === "string" ? output.args.question : undefined
+      // question tool uses args.questions array, not args.question
+      const questions = Array.isArray(output.args.questions) ? output.args.questions : []
+      const question = questions.length > 0 && typeof questions[0]?.question === "string"
+        ? questions[0].question
+        : typeof output.args.question === "string" ? output.args.question : undefined
       const context: OpenClawContext = {
         sessionId: input.sessionID,
         projectPath: ctx.directory,
