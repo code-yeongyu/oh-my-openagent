@@ -14,6 +14,7 @@ import { resolve } from "node:path";
 
 // ── Models ────────────────────────────────────────────────────
 const MODELS = [
+  { id: "minimax-m2.7-free", short: "M2.7-Free" },
   { id: "minimax-m2.5-free", short: "M2.5-Free" },
 ];
 

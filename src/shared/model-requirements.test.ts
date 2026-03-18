@@ -64,41 +64,50 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(last.model).toBe("big-pickle")
   })
 
-  test("librarian has valid fallbackChain with opencode-go/minimax-m2.5 as primary", () => {
+  test("librarian has valid fallbackChain with opencode-go/minimax-m2.7 as primary", () => {
     // given - librarian agent requirement
     const librarian = AGENT_MODEL_REQUIREMENTS["librarian"]
 
     // when - accessing librarian requirement
-    // then - fallbackChain exists with opencode-go/minimax-m2.5 as first entry
+    // then - fallbackChain exists with opencode-go/minimax-m2.7 as first entry
     expect(librarian).toBeDefined()
     expect(librarian.fallbackChain).toBeArray()
     expect(librarian.fallbackChain.length).toBeGreaterThan(0)
 
     const primary = librarian.fallbackChain[0]
     expect(primary.providers[0]).toBe("opencode-go")
-    expect(primary.model).toBe("minimax-m2.5")
+    expect(primary.model).toBe("minimax-m2.7")
 
     const second = librarian.fallbackChain[1]
     expect(second.providers[0]).toBe("opencode")
-    expect(second.model).toBe("minimax-m2.5-free")
+    expect(second.model).toBe("minimax-m2.7-free")
 
-    const tertiary = librarian.fallbackChain[2]
-    expect(tertiary.providers).toContain("anthropic")
-    expect(tertiary.model).toBe("claude-haiku-4-5")
+    // M2.5 retained as fallback
+    const third = librarian.fallbackChain[2]
+    expect(third.providers[0]).toBe("opencode-go")
+    expect(third.model).toBe("minimax-m2.5")
 
-    const quaternary = librarian.fallbackChain[3]
-    expect(quaternary.model).toBe("gpt-5-nano")
+    const fourth = librarian.fallbackChain[3]
+    expect(fourth.providers[0]).toBe("opencode")
+    expect(fourth.model).toBe("minimax-m2.5-free")
+
+    const fifth = librarian.fallbackChain[4]
+    expect(fifth.providers).toContain("anthropic")
+    expect(fifth.model).toBe("claude-haiku-4-5")
+
+    const sixth = librarian.fallbackChain[5]
+    expect(sixth.model).toBe("gpt-5-nano")
   })
 
-  test("explore has valid fallbackChain with grok-code-fast-1 as primary", () => {
+  test("explore has valid fallbackChain with grok-code-fast-1 as primary and minimax-m2.7 fallback", () => {
     // given - explore agent requirement
     const explore = AGENT_MODEL_REQUIREMENTS["explore"]
 
     // when - accessing explore requirement
-    // then - fallbackChain: grok → opencode-go/minimax → minimax-free → haiku → nano
+    // then - fallbackChain: grok → m2.7 → m2.7-free → m2.5 → m2.5-free → haiku → nano
     expect(explore).toBeDefined()
     expect(explore.fallbackChain).toBeArray()
-    expect(explore.fallbackChain).toHaveLength(5)
+    expect(explore.fallbackChain).toHaveLength(7)
 
     const primary = explore.fallbackChain[0]
     expect(primary.providers).toContain("github-copilot")
@@ -106,19 +115,28 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
 
     const secondary = explore.fallbackChain[1]
     expect(secondary.providers).toContain("opencode-go")
-    expect(secondary.model).toBe("minimax-m2.5")
+    expect(secondary.model).toBe("minimax-m2.7")
 
     const tertiary = explore.fallbackChain[2]
     expect(tertiary.providers).toContain("opencode")
-    expect(tertiary.model).toBe("minimax-m2.5-free")
+    expect(tertiary.model).toBe("minimax-m2.7-free")
 
-    const quaternary = explore.fallbackChain[3]
-    expect(quaternary.providers).toContain("anthropic")
-    expect(quaternary.model).toBe("claude-haiku-4-5")
+    // M2.5 retained as fallback
+    const fourth = explore.fallbackChain[3]
+    expect(fourth.providers).toContain("opencode-go")
+    expect(fourth.model).toBe("minimax-m2.5")
 
     const fifth = explore.fallbackChain[4]
     expect(fifth.providers).toContain("opencode")
-    expect(fifth.model).toBe("gpt-5-nano")
+    expect(fifth.model).toBe("minimax-m2.5-free")
+
+    const sixth = explore.fallbackChain[5]
+    expect(sixth.providers).toContain("anthropic")
+    expect(sixth.model).toBe("claude-haiku-4-5")
+
+    const seventh = explore.fallbackChain[6]
+    expect(seventh.providers).toContain("opencode")
+    expect(seventh.model).toBe("gpt-5-nano")
   })
 
   test("multimodal-looker has valid fallbackChain with gpt-5.4 as primary", () => {
