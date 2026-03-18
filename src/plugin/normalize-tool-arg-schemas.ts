@@ -25,7 +25,7 @@ function sanitizeJsonSchema(value: unknown, depth = 0): unknown {
   const sanitized: Record<string, unknown> = {}
 
   for (const [key, nestedValue] of Object.entries(value)) {
-    if (key === "contentEncoding") {
+    if (key === "contentEncoding" || key === "contentMediaType") {
       continue
     }
 
