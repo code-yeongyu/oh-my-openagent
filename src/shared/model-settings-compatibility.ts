@@ -31,54 +31,65 @@ export type ModelSettingsCompatibilityResult = {
   changes: ModelSettingsCompatibilityChange[]
 }
 
-type ModelFamily = "claude-opus" | "claude-non-opus" | "openai-reasoning" | "gpt-5" | "gpt-5-mini" | "gpt-legacy" | "unknown"
+// ---------------------------------------------------------------------------
+// Unified model family registry — detection rules + capabilities in ONE row.
+// New model family = one entry. Zero code changes anywhere else.
+// Order matters: more-specific patterns first (claude-opus before claude).
+// ---------------------------------------------------------------------------
+
+type FamilyDefinition = {
+  /** Substring(s) in normalised model ID that identify this family (OR) */
+  includes?: string[]
+  /** Regex when substring matching isn't enough */
+  pattern?: RegExp
+  /** Supported variant levels (ordered low -> max) */
+  variants: string[]
+  /** Supported reasoning-effort levels. Omit = not supported. */
+  reasoningEffort?: string[]
+}
+
+const MODEL_FAMILY_REGISTRY: ReadonlyArray<readonly [string, FamilyDefinition]> = [
+  ["claude-opus", { pattern: /claude(?:-\d+(?:-\d+)*)?-opus/, variants: ["low", "medium", "high", "max"] }],
+  ["claude-non-opus", { includes: ["claude"], variants: ["low", "medium", "high"] }],
+  ["openai-reasoning", { pattern: /^o\d(?:$|-)/, variants: ["low", "medium", "high"], reasoningEffort: ["none", "minimal", "low", "medium", "high"] }],
+  ["gpt-5", { includes: ["gpt-5"], variants: ["low", "medium", "high", "xhigh", "max"], reasoningEffort: ["none", "minimal", "low", "medium", "high", "xhigh"] }],
+  ["gpt-legacy", { includes: ["gpt"], variants: ["low", "medium", "high"] }],
+  ["gemini", { includes: ["gemini"], variants: ["low", "medium", "high"] }],
+  ["kimi", { includes: ["kimi", "k2"], variants: ["low", "medium", "high"] }],
+  ["glm", { includes: ["glm"], variants: ["low", "medium", "high"] }],
+  ["minimax", { includes: ["minimax"], variants: ["low", "medium", "high"] }],
+  ["deepseek", { includes: ["deepseek"], variants: ["low", "medium", "high"] }],
+  ["mistral", { includes: ["mistral", "codestral"], variants: ["low", "medium", "high"] }],
+  ["llama", { includes: ["llama"], variants: ["low", "medium", "high"] }],
+]
 
 const VARIANT_LADDER = ["low", "medium", "high", "xhigh", "max"]
-const REASONING_LADDER = ["none", "minimal", "low", "medium", "high", "xhigh", "max"]
+const REASONING_LADDER = ["none", "minimal", "low", "medium", "high", "xhigh"]
 
-function detectModelFamily(providerID: string, modelID: string): ModelFamily {
-  const provider = providerID.toLowerCase()
+// ---------------------------------------------------------------------------
+// Model family detection — single pass over the registry
+// ---------------------------------------------------------------------------
+
+function detectFamily(_providerID: string, modelID: string): FamilyDefinition | undefined {
   const model = normalizeModelID(modelID).toLowerCase()
-
-  const isClaudeProvider = [
-    "anthropic",
-    "google-vertex-anthropic",
-    "aws-bedrock-anthropic",
-  ].includes(provider)
-    || (["github-copilot", "opencode", "aws-bedrock", "bedrock"].includes(provider) && model.includes("claude"))
-
-  if (isClaudeProvider) {
-    return /claude(?:-\d+(?:-\d+)*)?-opus/.test(model) ? "claude-opus" : "claude-non-opus"
+  for (const [, def] of MODEL_FAMILY_REGISTRY) {
+    if (def.pattern?.test(model)) return def
+    if (def.includes?.some((s) => model.includes(s))) return def
   }
-
-  const isOpenAiReasoningFamily = provider === "openai" && (/^o\d(?:$|-)/.test(model) || model.includes("reasoning"))
-  if (isOpenAiReasoningFamily) {
-    return "openai-reasoning"
-  }
-
-  if (/gpt-5.*-mini/.test(model)) {
-    return "gpt-5-mini"
-  }
-
-  if (model.includes("gpt-5")) {
-    return "gpt-5"
-  }
-
-  if (model.includes("gpt") || (provider === "openai" && /^o\d(?:$|-)/.test(model))) {
-    return "gpt-legacy"
-  }
-
-  return "unknown"
+  return undefined
 }
+
+// ---------------------------------------------------------------------------
+// Generic resolution — one function for both fields
+// ---------------------------------------------------------------------------
 
 function downgradeWithinLadder(value: string, allowed: string[], ladder: string[]): string | undefined {
   const requestedIndex = ladder.indexOf(value)
   if (requestedIndex === -1) return undefined
 
   for (let index = requestedIndex; index >= 0; index -= 1) {
-    const candidate = ladder[index]
-    if (allowed.includes(candidate)) {
-      return candidate
+    if (allowed.includes(ladder[index])) {
+      return ladder[index]
     }
   }
 
@@ -89,172 +100,76 @@ function normalizeCapabilitiesVariants(capabilities: VariantCapabilities | undef
   if (!capabilities?.variants || capabilities.variants.length === 0) {
     return undefined
   }
-
-  return capabilities.variants.map((variant) => variant.toLowerCase())
+  return capabilities.variants.map((v) => v.toLowerCase())
 }
 
-function resolveVariant(
-  modelFamily: ModelFamily,
-  variant: string,
-  capabilities?: VariantCapabilities,
-): { value?: string; reason?: ModelSettingsCompatibilityChange["reason"] } {
-  const normalized = variant.toLowerCase()
-  const metadataVariants = normalizeCapabilitiesVariants(capabilities)
+type FieldResolution = { value?: string; reason?: ModelSettingsCompatibilityChange["reason"] }
 
-  if (metadataVariants) {
-    if (metadataVariants.includes(normalized)) {
-      return { value: normalized }
-    }
+function resolveField(
+  normalized: string,
+  familyCaps: string[] | undefined,
+  ladder: string[],
+  familyKnown: boolean,
+  metadataOverride?: string[],
+): FieldResolution {
+  // Priority 1: runtime metadata from provider
+  if (metadataOverride) {
+    if (metadataOverride.includes(normalized)) return { value: normalized }
     return {
-      value: downgradeWithinLadder(normalized, metadataVariants, VARIANT_LADDER),
+      value: downgradeWithinLadder(normalized, metadataOverride, ladder),
       reason: "unsupported-by-model-metadata",
     }
   }
 
-  if (modelFamily === "claude-opus") {
-    const allowed = ["low", "medium", "high", "max"]
-    if (allowed.includes(normalized)) {
-      return { value: normalized }
-    }
+  // Priority 2: family heuristic from registry
+  if (familyCaps) {
+    if (familyCaps.includes(normalized)) return { value: normalized }
     return {
-      value: downgradeWithinLadder(normalized, allowed, VARIANT_LADDER),
+      value: downgradeWithinLadder(normalized, familyCaps, ladder),
       reason: "unsupported-by-model-family",
     }
   }
 
-  if (modelFamily === "claude-non-opus") {
-    const allowed = ["low", "medium", "high"]
-    if (allowed.includes(normalized)) {
-      return { value: normalized }
-    }
-    return {
-      value: downgradeWithinLadder(normalized, allowed, VARIANT_LADDER),
-      reason: "unsupported-by-model-family",
-    }
-  }
-
-  if (modelFamily === "gpt-5" || modelFamily === "gpt-5-mini") {
-    const allowed = ["low", "medium", "high", "xhigh", "max"]
-    if (allowed.includes(normalized)) {
-      return { value: normalized }
-    }
-    return {
-      value: downgradeWithinLadder(normalized, allowed, VARIANT_LADDER),
-      reason: "unsupported-by-model-family",
-    }
-  }
-
-  if (modelFamily === "openai-reasoning") {
-    const allowed = ["low", "medium", "high"]
-    if (allowed.includes(normalized)) {
-      return { value: normalized }
-    }
-    return {
-      value: downgradeWithinLadder(normalized, allowed, VARIANT_LADDER),
-      reason: "unsupported-by-model-family",
-    }
-  }
-
-  if (modelFamily === "gpt-legacy") {
-    const allowed = ["low", "medium", "high"]
-    if (allowed.includes(normalized)) {
-      return { value: normalized }
-    }
-    return {
-      value: downgradeWithinLadder(normalized, allowed, VARIANT_LADDER),
-      reason: "unsupported-by-model-family",
-    }
-  }
-
-  return { value: undefined, reason: "unknown-model-family" }
-}
-
-function resolveReasoningEffort(modelFamily: ModelFamily, reasoningEffort: string): { value?: string; reason?: ModelSettingsCompatibilityChange["reason"] } {
-  const normalized = reasoningEffort.toLowerCase()
-
-  if (modelFamily === "gpt-5") {
-    const allowed = ["none", "minimal", "low", "medium", "high", "xhigh"]
-    if (allowed.includes(normalized)) {
-      return { value: normalized }
-    }
-    return {
-      value: downgradeWithinLadder(normalized, allowed, REASONING_LADDER),
-      reason: "unsupported-by-model-family",
-    }
-  }
-
-  if (modelFamily === "gpt-5-mini") {
+  // Known family but field not in registry (e.g. Claude + reasoningEffort)
+  if (familyKnown) {
     return { value: undefined, reason: "unsupported-by-model-family" }
   }
 
-  if (modelFamily === "openai-reasoning") {
-    const allowed = ["none", "minimal", "low", "medium", "high"]
-    if (allowed.includes(normalized)) {
-      return { value: normalized }
-    }
-    return {
-      value: downgradeWithinLadder(normalized, allowed, REASONING_LADDER),
-      reason: "unsupported-by-model-family",
-    }
-  }
-
-  if (modelFamily === "gpt-legacy") {
-    const allowed = ["none", "minimal", "low", "medium", "high"]
-    if (allowed.includes(normalized)) {
-      return { value: normalized }
-    }
-    return {
-      value: downgradeWithinLadder(normalized, allowed, REASONING_LADDER),
-      reason: "unsupported-by-model-family",
-    }
-  }
-
-  if (modelFamily === "claude-opus" || modelFamily === "claude-non-opus") {
-    return { value: undefined, reason: "unsupported-by-model-family" }
-  }
-
+  // Unknown family — drop the value
   return { value: undefined, reason: "unknown-model-family" }
 }
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
 
 export function resolveCompatibleModelSettings(
   input: ModelSettingsCompatibilityInput,
 ): ModelSettingsCompatibilityResult {
-  const modelFamily = detectModelFamily(input.providerID, input.modelID)
+  const family = detectFamily(input.providerID, input.modelID)
+  const familyKnown = family !== undefined
   const changes: ModelSettingsCompatibilityChange[] = []
+  const metadataVariants = normalizeCapabilitiesVariants(input.capabilities)
 
   let variant = input.desired.variant
   if (variant !== undefined) {
-    const normalizedVariant = variant.toLowerCase()
-    const resolved = resolveVariant(modelFamily, normalizedVariant, input.capabilities)
-    if (resolved.value !== normalizedVariant && resolved.reason) {
-      changes.push({
-        field: "variant",
-        from: variant,
-        to: resolved.value,
-        reason: resolved.reason,
-      })
+    const normalized = variant.toLowerCase()
+    const resolved = resolveField(normalized, family?.variants, VARIANT_LADDER, familyKnown, metadataVariants)
+    if (resolved.value !== normalized && resolved.reason) {
+      changes.push({ field: "variant", from: variant, to: resolved.value, reason: resolved.reason })
     }
     variant = resolved.value
   }
 
   let reasoningEffort = input.desired.reasoningEffort
   if (reasoningEffort !== undefined) {
-    const normalizedReasoningEffort = reasoningEffort.toLowerCase()
-    const resolved = resolveReasoningEffort(modelFamily, normalizedReasoningEffort)
-    if (resolved.value !== normalizedReasoningEffort && resolved.reason) {
-      changes.push({
-        field: "reasoningEffort",
-        from: reasoningEffort,
-        to: resolved.value,
-        reason: resolved.reason,
-      })
+    const normalized = reasoningEffort.toLowerCase()
+    const resolved = resolveField(normalized, family?.reasoningEffort, REASONING_LADDER, familyKnown)
+    if (resolved.value !== normalized && resolved.reason) {
+      changes.push({ field: "reasoningEffort", from: reasoningEffort, to: resolved.value, reason: resolved.reason })
     }
     reasoningEffort = resolved.value
   }
 
-  return {
-    variant,
-    reasoningEffort,
-    changes,
-  }
+  return { variant, reasoningEffort, changes }
 }

@@ -71,16 +71,8 @@ export interface DelegateTaskToolOptions {
   syncPollTimeoutMs?: number
 }
 
-export interface DelegatedModelConfig {
-  providerID: string
-  modelID: string
-  variant?: string
-  reasoningEffort?: string
-  temperature?: number
-  top_p?: number
-  maxTokens?: number
-  thinking?: { type: "enabled" | "disabled"; budgetTokens?: number }
-}
+import type { DelegatedModelConfig } from "../../shared/model-resolution-types"
+export type { DelegatedModelConfig }
 
 export interface BuildSystemContentInput {
   skillContent?: string

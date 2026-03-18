@@ -57,13 +57,11 @@ export function parseFallbackModelObjectEntry(
   contextProviderID: string | undefined,
   defaultProviderID = "opencode",
 ): FallbackEntry | undefined {
-  // Reuse the string-based parser for provider/model/variant extraction.
   const base = parseFallbackModelEntry(obj.model, contextProviderID, defaultProviderID)
   if (!base) return undefined
 
   return {
     ...base,
-    // Explicit object variant overrides any inline variant in the model string.
     variant: obj.variant ?? base.variant,
     reasoningEffort: obj.reasoningEffort,
     temperature: obj.temperature,
