@@ -3,6 +3,18 @@ import type { CommentCheckerConfig } from "../../config/schema"
 
 import z from "zod"
 
+const ApplyPatchMetadataSchema = z.object({
+  files: z.array(
+    z.object({
+      filePath: z.string(),
+      movePath: z.string().optional(),
+      before: z.string(),
+      after: z.string(),
+      type: z.string().optional(),
+    }),
+  ),
+})
+
 import {
   initializeCommentCheckerCli,
   getCommentCheckerCliPathPromise,
@@ -104,17 +116,6 @@ export function createCommentCheckerHooks(config?: CommentCheckerConfig) {
         return
       }
 
-      const ApplyPatchMetadataSchema = z.object({
-        files: z.array(
-          z.object({
-            filePath: z.string(),
-            movePath: z.string().optional(),
-            before: z.string(),
-            after: z.string(),
-            type: z.string().optional(),
-          }),
-        ),
-      })
 
       if (toolLower === "apply_patch") {
         const parsed = ApplyPatchMetadataSchema.safeParse(output.metadata)
