@@ -136,7 +136,36 @@ fi
 
 ---
 
-## Phase 3: Spawn Subagents
+## Phase 3: Spawn Subagents (Individual Tool Calls)
+
+**CRITICAL: Create tasks ONE BY ONE using individual `task_create` tool calls. NEVER batch or script.**
+
+For each item, execute these steps sequentially:
+
+### Step 3.1: Create Task Record
+```typescript
+task_create(
+  subject="Triage: #{number} {title}",
+  description="GitHub {issue|PR} triage analysis - {type}",
+  metadata={"type": "{ISSUE_QUESTION|ISSUE_BUG|ISSUE_FEATURE|ISSUE_OTHER|PR_BUGFIX|PR_OTHER}", "number": {number}}
+)
+```
+
+### Step 3.2: Spawn Analysis Subagent (Background)
+```typescript
+task(
+  category="quick",
+  run_in_background=true,
+  load_skills=[],
+  prompt=SUBAGENT_PROMPT
+)
+```
+
+**ABSOLUTE RULES for Subagents:**
+- **ONLY ANALYZE** - Never take action on GitHub (no comments, merges, closes)
+- **READ-ONLY** - Use tools only for reading code/GitHub data
+- **WRITE REPORT ONLY** - Output goes to `{REPORT_DIR}/{issue|pr}-{number}.md` via Write tool
+- **EVIDENCE REQUIRED** - Every claim must have GitHub permalink as proof
 
 ```
 For each item:
@@ -169,6 +198,7 @@ ABSOLUTE RULES (violating ANY = critical failure):
 - NEVER run git checkout, git fetch, git pull, git switch, git worktree
 - Your ONLY writable output: {REPORT_DIR}/{issue|pr}-{number}.md via the Write tool
 ```
+
 
 ---
 
