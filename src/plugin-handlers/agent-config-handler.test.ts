@@ -278,4 +278,48 @@ describe("applyAgentConfig builtin override protection", () => {
     // then
     expect(createSisyphusJuniorAgentSpy).toHaveBeenCalledWith(undefined, "openai/gpt-5.4", false)
   })
+
+  test("keeps runtime-selected model for managed builtin agent display names", async () => {
+    // given
+    const config = createBaseConfig()
+    config.agent = {
+      [BUILTIN_SISYPHUS_DISPLAY_NAME]: {
+        model: "openai/gpt-5.4",
+        variant: "high",
+      },
+    }
+
+    // when
+    const result = await applyAgentConfig({
+      config,
+      pluginConfig: createPluginConfig(),
+      ctx: { directory: "/tmp" },
+      pluginComponents: createPluginComponents(),
+    })
+
+    // then
+    expect((result[BUILTIN_SISYPHUS_DISPLAY_NAME] as AgentConfig | undefined)?.model).toBe("openai/gpt-5.4")
+    expect((result[BUILTIN_SISYPHUS_DISPLAY_NAME] as AgentConfig | undefined)?.variant).toBe("high")
+  })
+
+  test("keeps runtime-selected model for managed builtin config-key aliases", async () => {
+    // given
+    const config = createBaseConfig()
+    config.agent = {
+      sisyphus: {
+        model: "openai/gpt-5.4",
+      },
+    }
+
+    // when
+    const result = await applyAgentConfig({
+      config,
+      pluginConfig: createPluginConfig(),
+      ctx: { directory: "/tmp" },
+      pluginComponents: createPluginComponents(),
+    })
+
+    // then
+    expect((result[BUILTIN_SISYPHUS_DISPLAY_NAME] as AgentConfig | undefined)?.model).toBe("openai/gpt-5.4")
+  })
 })

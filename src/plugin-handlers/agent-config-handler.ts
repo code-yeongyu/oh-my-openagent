@@ -3,7 +3,7 @@ import { createSisyphusJuniorAgentWithOverrides } from "../agents/sisyphus-junio
 import type { OhMyOpenCodeConfig } from "../config";
 import { log, migrateAgentConfig } from "../shared";
 import { AGENT_NAME_MAP } from "../shared/migration";
-import { getAgentDisplayName } from "../shared/agent-display-names";
+import { getAgentConfigKey, getAgentDisplayName } from "../shared/agent-display-names";
 import {
   discoverConfigSourceSkills,
   discoverOpencodeGlobalSkills,
@@ -26,6 +26,51 @@ type AgentConfigRecord = Record<string, Record<string, unknown> | undefined> & {
   build?: Record<string, unknown>;
   plan?: Record<string, unknown>;
 };
+
+function applyRuntimeSelectedModels(params: {
+  generatedAgents: Record<string, unknown>;
+  configAgent: AgentConfigRecord | undefined;
+}): Record<string, unknown> {
+  const { generatedAgents, configAgent } = params;
+  if (!configAgent) return generatedAgents;
+
+  const generatedByConfigKey = new Map<string, string>();
+  for (const generatedKey of Object.keys(generatedAgents)) {
+    generatedByConfigKey.set(getAgentConfigKey(generatedKey), generatedKey);
+  }
+
+  const result = { ...generatedAgents };
+
+  for (const [incomingKey, incomingConfig] of Object.entries(configAgent)) {
+    if (!incomingConfig) continue;
+
+    const targetGeneratedKey = generatedByConfigKey.get(getAgentConfigKey(incomingKey));
+    if (!targetGeneratedKey) continue;
+
+    const runtimeModel = incomingConfig.model;
+    if (typeof runtimeModel !== "string" || runtimeModel.trim() === "") continue;
+
+    const generatedConfig = result[targetGeneratedKey];
+    if (typeof generatedConfig !== "object" || generatedConfig === null) continue;
+
+    const generatedRecord = generatedConfig as Record<string, unknown>;
+    const generatedModel =
+      typeof generatedRecord.model === "string" ? generatedRecord.model : undefined;
+
+    if (generatedModel === runtimeModel) continue;
+
+    result[targetGeneratedKey] = {
+      ...generatedRecord,
+      model: runtimeModel,
+      ...(typeof incomingConfig.variant === "string" ? { variant: incomingConfig.variant } : {}),
+      ...(typeof incomingConfig.thinking === "string"
+        ? { thinking: incomingConfig.thinking }
+        : {}),
+    };
+  }
+
+  return result;
+}
 
 function getConfiguredDefaultAgent(config: Record<string, unknown>): string | undefined {
   const defaultAgent = config.default_agent;
@@ -233,11 +278,18 @@ export async function applyAgentConfig(params: {
       protectedBuiltinAgentNames,
     );
 
+    const generatedAgentConfig = applyRuntimeSelectedModels({
+      generatedAgents: {
+        ...agentConfig,
+        ...Object.fromEntries(
+          Object.entries(builtinAgents).filter(([key]) => key !== "sisyphus"),
+        ),
+      },
+      configAgent,
+    });
+
     params.config.agent = {
-      ...agentConfig,
-      ...Object.fromEntries(
-        Object.entries(builtinAgents).filter(([key]) => key !== "sisyphus"),
-      ),
+      ...generatedAgentConfig,
       ...filterDisabledAgents(filteredUserAgents),
       ...filterDisabledAgents(filteredProjectAgents),
       ...filterDisabledAgents(filteredPluginAgents),
