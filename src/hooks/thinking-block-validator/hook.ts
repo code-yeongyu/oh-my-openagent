@@ -28,7 +28,7 @@ type MessagesTransformHook = {
   ) => Promise<void>
 }
 
-interface ThinkingPart extends Part {
+type ThinkingPart = Part & {
   thinking: string
   signature: string
   synthetic?: boolean
