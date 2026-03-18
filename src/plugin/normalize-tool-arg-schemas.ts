@@ -9,9 +9,34 @@ type SchemaWithJsonSchemaOverride = ToolArgSchema & {
   }
 }
 
-function stripRootJsonSchemaFields(jsonSchema: Record<string, unknown>): Record<string, unknown> {
-  const { $schema: _schema, ...rest } = jsonSchema
-  return rest
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+function sanitizeJsonSchema(value: unknown, depth = 0): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeJsonSchema(item, depth + 1))
+  }
+
+  if (!isRecord(value)) {
+    return value
+  }
+
+  const sanitized: Record<string, unknown> = {}
+
+  for (const [key, nestedValue] of Object.entries(value)) {
+    if (key === "contentEncoding") {
+      continue
+    }
+
+    if (depth === 0 && key === "$schema") {
+      continue
+    }
+
+    sanitized[key] = sanitizeJsonSchema(nestedValue, depth + 1)
+  }
+
+  return sanitized
 }
 
 function attachJsonSchemaOverride(schema: SchemaWithJsonSchemaOverride): void {
@@ -24,7 +49,9 @@ function attachJsonSchemaOverride(schema: SchemaWithJsonSchemaOverride): void {
     delete schema._zod.toJSONSchema
 
     try {
-      return stripRootJsonSchemaFields(tool.schema.toJSONSchema(schema))
+      const jsonSchema = tool.schema.toJSONSchema(schema)
+      const sanitizedJsonSchema = sanitizeJsonSchema(jsonSchema)
+      return isRecord(sanitizedJsonSchema) ? sanitizedJsonSchema : {}
     } finally {
       schema._zod.toJSONSchema = originalOverride
     }
