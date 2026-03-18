@@ -9,6 +9,8 @@ import { dirname, join, basename } from "node:path"
 import type { BoulderState, PlanProgress, TaskSessionState } from "./types"
 import { BOULDER_DIR, BOULDER_FILE, PROMETHEUS_PLANS_DIR } from "./constants"
 
+const RESERVED_KEYS = new Set(["__proto__", "prototype", "constructor"])
+
 export function getBoulderFilePath(directory: string): string {
   return join(directory, BOULDER_DIR, BOULDER_FILE)
 }
@@ -110,6 +112,10 @@ export function upsertTaskSessionState(
 ): BoulderState | null {
   const state = readBoulderState(directory)
   if (!state) {
+    return null
+  }
+
+  if (RESERVED_KEYS.has(input.taskKey)) {
     return null
   }
 

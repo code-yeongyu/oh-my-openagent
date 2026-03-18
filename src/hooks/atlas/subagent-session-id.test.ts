@@ -25,6 +25,17 @@ describe("extractSessionIdFromOutput", () => {
     expect(result).toBe("ses_sync_12345")
   })
 
+  test("extracts hyphenated session IDs from task metadata blocks", () => {
+    // given
+    const output = `Task completed.\n\n<task_metadata>\nsession_id: ses_auth-flow-123\n</task_metadata>`
+
+    // when
+    const result = extractSessionIdFromOutput(output)
+
+    // then
+    expect(result).toBe("ses_auth-flow-123")
+  })
+
   test("returns undefined when no session id is present", () => {
     // given
     const output = "Task completed without metadata"
