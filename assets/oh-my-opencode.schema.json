@@ -3716,15 +3716,10 @@
               "minimum": 10,
               "maximum": 9007199254740991
             },
-            "windowSize": {
+            "consecutiveThreshold": {
               "type": "integer",
               "minimum": 5,
               "maximum": 9007199254740991
-            },
-            "repetitionThresholdPercent": {
-              "type": "number",
-              "exclusiveMinimum": 0,
-              "maximum": 100
             }
           },
           "additionalProperties": false
