@@ -160,8 +160,8 @@ export function createToolExecuteAfterHandler(input: {
             taskLabel: currentTask.label,
             taskTitle: currentTask.title,
             sessionId: subagentSessionId,
-            agent: toolOutput.metadata?.agent as string | undefined,
-            category: toolOutput.metadata?.category as string | undefined,
+            agent: typeof toolOutput.metadata?.agent === "string" ? toolOutput.metadata.agent : undefined,
+            category: typeof toolOutput.metadata?.category === "string" ? toolOutput.metadata.category : undefined,
           })
         }
 
