@@ -1,5 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { appendSessionId, getPlanProgress, readBoulderState } from "../../features/boulder-state"
+import { appendSessionId, getPlanProgress, readBoulderState, readPlanExecutionSummary } from "../../features/boulder-state"
 import { log } from "../../shared/logger"
 import { isCallerOrchestrator } from "../../shared/session-utils"
 import { collectGitDiffStats, formatFileChanges } from "../../shared/git-worktree"
@@ -21,10 +21,9 @@ import type { ToolExecuteAfterInput, ToolExecuteAfterOutput } from "./types"
 export function createToolExecuteAfterHandler(input: {
   ctx: PluginInput
   pendingFilePaths: Map<string, string>
-  autoCommit: boolean
   getState: (sessionID: string) => SessionState
 }): (toolInput: ToolExecuteAfterInput, toolOutput: ToolExecuteAfterOutput) => Promise<void> {
-  const { ctx, pendingFilePaths, autoCommit, getState } = input
+  const { ctx, pendingFilePaths, getState } = input
   return async (toolInput, toolOutput): Promise<void> => {
     // Guard against undefined output (e.g., from /review command - see issue #1035)
     if (!toolOutput) {
@@ -72,6 +71,7 @@ export function createToolExecuteAfterHandler(input: {
       const boulderState = readBoulderState(ctx.directory)
       if (boulderState) {
         const progress = getPlanProgress(boulderState.active_plan)
+        const executionSummary = readPlanExecutionSummary(boulderState.active_plan)
         const sessionState = toolInput.sessionID ? getState(toolInput.sessionID) : undefined
 
         if (toolInput.sessionID && !boulderState.session_ids?.includes(toolInput.sessionID)) {
@@ -106,7 +106,18 @@ export function createToolExecuteAfterHandler(input: {
           : buildCompletionGate(boulderState.plan_name, subagentSessionId)
         const followupReminder = shouldPauseForApproval
           ? null
-          : buildOrchestratorReminder(boulderState.plan_name, progress, subagentSessionId, autoCommit, false)
+          : buildOrchestratorReminder(
+              boulderState.plan_name,
+              progress,
+              subagentSessionId,
+              false,
+              executionSummary
+                ? {
+                    nextWaveId: executionSummary.nextWaveId,
+                    nextTasks: executionSummary.nextTasks,
+                  }
+                : undefined,
+            )
 
         toolOutput.output = `
 <system-reminder>

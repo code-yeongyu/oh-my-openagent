@@ -35,9 +35,38 @@ You have an active work plan with incomplete tasks. Continue working.
 RULES:
 - **FIRST**: Read the plan file NOW. If the last completed task is still unchecked, mark it \`- [x]\` IMMEDIATELY before anything else
 - Proceed without asking for permission
+- Change \`- [ ]\` to \`- [x]\` in the plan file when done, but ONLY as a status update
+- Do NOT rewrite task wording, add/remove/reorder tasks, or change dependencies / acceptance criteria
 - Use the notepad at .sisyphus/notepads/{PLAN_NAME}/ to record learnings
 - Do not stop until all tasks are complete
 - If blocked, document the blocker and move to the next task`
+
+export function buildStructuredNextWorkPrompt(input: {
+  nextWaveId?: string
+  nextTasks: Array<{ id: string; title: string; category?: string; section: "todo" | "final-wave" }>
+}): string {
+  if (input.nextTasks.length === 0) {
+    return ""
+  }
+
+  const waveLine = input.nextWaveId ? `\n- Current wave: ${input.nextWaveId}` : ""
+  const taskLines = input.nextTasks
+    .map((task) => {
+      const tags: string[] = []
+      if (task.category) tags.push(`category=${task.category}`)
+      if (task.section === "final-wave") tags.push("final-wave")
+      return `  - ${task.id}. ${task.title}${tags.length > 0 ? ` [${tags.join(", ")}]` : ""}`
+    })
+    .join("\n")
+
+  return `
+
+STRUCTURED NEXT WORK:
+- Use the parsed plan contract as the default execution order${waveLine}
+- Next task set:
+${taskLines}
+- Only override this order when verification or runtime blockers prove the plan metadata is stale`
+}
 
 export const VERIFICATION_REMINDER = `**THE SUBAGENT JUST CLAIMED THIS TASK IS DONE. THEY ARE PROBABLY LYING.**
 

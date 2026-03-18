@@ -4,6 +4,7 @@ import { isCallerOrchestrator } from "../../shared/session-utils"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { HOOK_NAME } from "./hook-name"
 import { ORCHESTRATOR_DELEGATION_REQUIRED, SINGLE_TASK_DIRECTIVE } from "./system-reminder-templates"
+import { trackAtlasPlanOverride } from "./plan-override-tracker"
 import { isSisyphusPath } from "./sisyphus-path"
 import { isWriteOrEditToolName } from "./write-edit-tool-policy"
 
@@ -48,6 +49,24 @@ export function createToolExecuteBeforeHandler(input: {
         toolOutput.args.prompt = `<system-reminder>${SINGLE_TASK_DIRECTIVE}</system-reminder>\n` + prompt
         log(`[${HOOK_NAME}] Injected single-task directive to task`, {
           sessionID: toolInput.sessionID,
+        })
+      }
+
+      const category = typeof toolOutput.args.category === "string" ? toolOutput.args.category : undefined
+      const subagentType =
+        typeof toolOutput.args.subagent_type === "string" ? toolOutput.args.subagent_type : undefined
+      const tracked = trackAtlasPlanOverride({
+        directory: ctx.directory,
+        sessionID: toolInput.sessionID,
+        category,
+        subagentType,
+        prompt,
+      })
+      if (tracked) {
+        log(`[${HOOK_NAME}] Recorded Atlas plan override`, {
+          sessionID: toolInput.sessionID,
+          category,
+          subagentType,
         })
       }
     }

@@ -8,6 +8,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from 
 import { dirname, join, basename } from "node:path"
 import type { BoulderState, PlanProgress } from "./types"
 import { BOULDER_DIR, BOULDER_FILE, PROMETHEUS_PLANS_DIR } from "./constants"
+import { readPlanExecutionSummary } from "./plan-contract"
 
 export function getBoulderFilePath(directory: string): string {
   return join(directory, BOULDER_DIR, BOULDER_FILE)
@@ -116,6 +117,11 @@ export function findPrometheusPlans(directory: string): string[] {
  * Parse a plan file and count checkbox progress.
  */
 export function getPlanProgress(planPath: string): PlanProgress {
+  const summary = readPlanExecutionSummary(planPath)
+  if (summary && summary.progress.total > 0) {
+    return summary.progress
+  }
+
   if (!existsSync(planPath)) {
     return { total: 0, completed: 0, isComplete: true }
   }

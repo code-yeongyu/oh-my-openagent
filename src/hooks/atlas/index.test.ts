@@ -1,5 +1,5 @@
 import { describe, expect, test, beforeEach, afterEach, mock } from "bun:test"
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { randomUUID } from "node:crypto"
@@ -373,7 +373,7 @@ describe("atlas hook", () => {
       cleanupMessageStorage(sessionID)
     })
 
-     test("should include session_id and checkbox instructions in reminder", async () => {
+     test("should include status-only plan instructions in reminder", async () => {
        // given - boulder state, Atlas caller
        const sessionID = "session-resume-test"
        setupMessageStorage(sessionID, "atlas")
@@ -406,6 +406,9 @@ describe("atlas hook", () => {
       expect(output.output).toContain("LYING")
       expect(output.output).toContain("PHASE 1")
       expect(output.output).toContain("PHASE 2")
+      expect(output.output).toContain("Allowed: change")
+      expect(output.output).toContain("Forbidden: rewrite task wording")
+      expect(output.output).not.toContain("COMMIT ATOMIC UNIT")
       
       cleanupMessageStorage(sessionID)
     })
@@ -748,6 +751,65 @@ describe("atlas hook", () => {
           expect(output.output).toContain("ORCHESTRATOR, not an IMPLEMENTER")
         })
       })
+    })
+  })
+
+  describe("tool.execute.before handler", () => {
+    test("should record structured override when delegated category diverges from next planned task", async () => {
+      // given
+      const sessionID = "session-override-test"
+      setupMessageStorage(sessionID, "atlas")
+
+      const planPath = join(TEST_DIR, ".sisyphus", "plans", "structured-plan.md")
+      mkdirSync(join(TEST_DIR, ".sisyphus", "plans"), { recursive: true })
+      writeFileSync(planPath, `# Plan
+
+## Parallel Execution Graph
+
+Wave 1:
+└── Task 1: API
+
+## TODOs
+
+- [ ] 1. API
+
+  **Recommended Agent Profile**:
+  - Category: \`unspecified-high\`
+
+  **Parallelization**: Can Parallel: YES | Wave 1
+`)
+
+      writeBoulderState(TEST_DIR, {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: [sessionID],
+        plan_name: "structured-plan",
+      })
+
+      const hook = createAtlasHook(createMockPluginInput())
+      const output = {
+        args: {
+          category: "deep",
+          prompt: `## 1. TASK
+1. API
+
+override reason: backend cross-cutting changes require deeper reasoning`,
+        },
+      }
+
+      // when
+      await hook["tool.execute.before"]({ tool: "task", sessionID }, output)
+
+      // then
+      const decisionsPath = join(TEST_DIR, ".sisyphus", "notepads", "structured-plan", "decisions.md")
+      expect(existsSync(decisionsPath)).toBe(true)
+      const decisions = readFileSync(decisionsPath, "utf-8")
+      expect(decisions).toContain("Planned category: `unspecified-high`")
+      expect(decisions).toContain("Actual category: `deep`")
+      expect(decisions).toContain("Planned wave: `Wave 1`")
+      expect(decisions).toContain("Reason: backend cross-cutting changes require deeper reasoning")
+
+      cleanupMessageStorage(sessionID)
     })
   })
 
@@ -1145,6 +1207,61 @@ describe("atlas hook", () => {
       const callArgs = mockInput._promptMock.mock.calls[0][0]
       expect(callArgs.body.parts[0].text).toContain("2/4 completed")
       expect(callArgs.body.parts[0].text).toContain("2 remaining")
+    })
+
+    test("should include structured next-work guidance when plan metadata defines waves", async () => {
+      // given - structured plan with wave/category metadata
+      const planPath = join(TEST_DIR, "structured-plan.md")
+      writeFileSync(planPath, `# Plan
+
+## Parallel Execution Graph
+
+Wave 1:
+├── Task 1: foundation
+└── Task 2: api
+
+## TODOs
+
+- [x] 1. Foundation
+
+  **Recommended Agent Profile**:
+  - Category: \`deep\`
+
+  **Parallelization**: Can Parallel: YES | Wave 1
+
+- [ ] 2. API
+
+  **Recommended Agent Profile**:
+  - Category: \`unspecified-high\`
+
+  **Parallelization**: Can Parallel: YES | Wave 1
+`)
+
+      const state: BoulderState = {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: [MAIN_SESSION_ID],
+        plan_name: "structured-plan",
+      }
+      writeBoulderState(TEST_DIR, state)
+
+      const mockInput = createMockPluginInput()
+      const hook = createAtlasHook(mockInput)
+
+      // when
+      await hook.handler({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: MAIN_SESSION_ID },
+        },
+      })
+
+      // then
+      const callArgs = mockInput._promptMock.mock.calls[0][0]
+      expect(callArgs.body.parts[0].text).toContain("STRUCTURED NEXT WORK")
+      expect(callArgs.body.parts[0].text).toContain("Current wave: Wave 1")
+      expect(callArgs.body.parts[0].text).toContain("2. API")
+      expect(callArgs.body.parts[0].text).toContain("category=unspecified-high")
     })
 
     test("should inject when last agent is sisyphus and boulder targets atlas explicitly", async () => {

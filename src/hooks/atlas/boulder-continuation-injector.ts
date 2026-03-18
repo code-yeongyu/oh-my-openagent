@@ -1,9 +1,10 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { BackgroundManager } from "../../features/background-agent"
+import { readPlanExecutionSummary } from "../../features/boulder-state"
 import { log } from "../../shared/logger"
 import { createInternalAgentTextPart, resolveInheritedPromptTools } from "../../shared"
 import { HOOK_NAME } from "./hook-name"
-import { BOULDER_CONTINUATION_PROMPT } from "./system-reminder-templates"
+import { BOULDER_CONTINUATION_PROMPT, buildStructuredNextWorkPrompt } from "./system-reminder-templates"
 import { resolveRecentPromptContextForSession } from "./recent-model-resolver"
 import type { SessionState } from "./types"
 
@@ -14,6 +15,7 @@ export async function injectBoulderContinuation(input: {
   remaining: number
   total: number
   agent?: string
+  planPath?: string
   worktreePath?: string
   backgroundManager?: BackgroundManager
   sessionState: SessionState
@@ -25,6 +27,7 @@ export async function injectBoulderContinuation(input: {
     remaining,
     total,
     agent,
+    planPath,
     worktreePath,
     backgroundManager,
     sessionState,
@@ -40,9 +43,17 @@ export async function injectBoulderContinuation(input: {
   }
 
   const worktreeContext = worktreePath ? `\n\n[Worktree: ${worktreePath}]` : ""
+  const executionSummary = planPath ? readPlanExecutionSummary(planPath) : null
+  const nextWorkContext = executionSummary
+    ? buildStructuredNextWorkPrompt({
+        nextWaveId: executionSummary.nextWaveId,
+        nextTasks: executionSummary.nextTasks,
+      })
+    : ""
   const prompt =
     BOULDER_CONTINUATION_PROMPT.replace(/{PLAN_NAME}/g, planName) +
     `\n\n[Status: ${total - remaining}/${total} completed, ${remaining} remaining]` +
+    nextWorkContext +
     worktreeContext
 
   try {

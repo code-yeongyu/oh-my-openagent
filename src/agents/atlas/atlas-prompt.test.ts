@@ -2,6 +2,8 @@ import { describe, test, expect } from "bun:test"
 import { ATLAS_SYSTEM_PROMPT } from "./default"
 import { ATLAS_GPT_SYSTEM_PROMPT } from "./gpt"
 import { ATLAS_GEMINI_SYSTEM_PROMPT } from "./gemini"
+import { buildDecisionMatrix } from "./prompt-section-builder"
+import type { AvailableAgent } from "../dynamic-agent-prompt-builder"
 
 describe("Atlas prompts auto-continue policy", () => {
   test("default variant should forbid asking user for continuation confirmation", () => {
@@ -142,5 +144,39 @@ describe("Atlas prompts plan path consistency", () => {
       expect(lowerPrompt).toMatch(/ignore nested.*checkbox/)
       expect(lowerPrompt).toMatch(/final verification wave/)
     }
+  })
+})
+
+describe("Atlas prompts planner metadata preference", () => {
+  test("all variants should prefer plan metadata and limit plan edits", () => {
+    // given
+    const prompts = [ATLAS_SYSTEM_PROMPT, ATLAS_GPT_SYSTEM_PROMPT, ATLAS_GEMINI_SYSTEM_PROMPT]
+
+    // when / then
+    for (const prompt of prompts) {
+      expect(prompt).toContain("DEFAULT execution contract")
+      expect(prompt).toContain("Atlas may update checkbox/status markers ONLY after verification")
+      expect(prompt).toContain("Atlas MUST NOT rewrite task wording")
+    }
+  })
+
+  test("decision matrix should be marked as fallback guidance", () => {
+    // given
+    const agents: AvailableAgent[] = [{
+      name: "oracle",
+      description: "Architecture review expert",
+      metadata: {
+        category: "advisor",
+        cost: "EXPENSIVE",
+        triggers: [],
+      },
+    }]
+
+    // when
+    const matrix = buildDecisionMatrix(agents)
+
+    // then
+    expect(matrix).toContain("##### Fallback Decision Matrix")
+    expect(matrix).toContain("ONLY when the current task block does not already specify category / skills metadata")
   })
 })
