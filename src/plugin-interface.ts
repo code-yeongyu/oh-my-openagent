@@ -32,7 +32,13 @@ export function createPluginInterface(args: {
   return {
     tool: tools,
 
-    "chat.params": createChatParamsHandler({ anthropicEffort: hooks.anthropicEffort }),
+    "chat.params": async (input: unknown, output: unknown) => {
+      const handler = createChatParamsHandler({
+        anthropicEffort: hooks.anthropicEffort,
+        client: ctx.client,
+      })
+      await handler(input, output)
+    },
 
     "chat.headers": createChatHeadersHandler({ ctx }),
 
@@ -68,9 +74,5 @@ export function createPluginInterface(args: {
       ctx,
       hooks,
     }),
-
-    "tool.definition": async (input, output) => {
-      await hooks.todoDescriptionOverride?.["tool.definition"]?.(input, output)
-    },
   }
 }

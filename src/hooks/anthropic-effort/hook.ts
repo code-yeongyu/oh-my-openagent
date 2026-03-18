@@ -1,6 +1,6 @@
 import { log, normalizeModelID } from "../../shared"
 
-const OPUS_PATTERN = /claude-opus/i
+const OPUS_PATTERN = /claude-.*opus/i
 
 function isClaudeProvider(providerID: string, modelID: string): boolean {
   if (["anthropic", "google-vertex-anthropic", "opencode"].includes(providerID)) return true
