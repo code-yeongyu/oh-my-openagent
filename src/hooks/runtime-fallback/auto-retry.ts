@@ -101,7 +101,13 @@ export function createAutoRetryHelpers(deps: HookDeps) {
       return
     }
 
-    const retryModelPayload = buildRetryModelPayload(newModel)
+    const agentSettings = resolvedAgent
+      ? pluginConfig?.agents?.[resolvedAgent as keyof typeof pluginConfig.agents]
+      : undefined
+    const retryModelPayload = buildRetryModelPayload(newModel, agentSettings ? {
+      variant: agentSettings.variant,
+      reasoningEffort: agentSettings.reasoningEffort,
+    } : undefined)
     if (!retryModelPayload) {
       log(`[${HOOK_NAME}] Invalid model format (missing provider prefix): ${newModel}`)
       const state = sessionStates.get(sessionID)
