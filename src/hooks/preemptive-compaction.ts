@@ -11,6 +11,9 @@ import { createPostCompactionDegradationMonitor } from "./preemptive-compaction-
 const PREEMPTIVE_COMPACTION_TIMEOUT_MS = 120_000
 const PREEMPTIVE_COMPACTION_THRESHOLD = 0.78
 
+declare function setTimeout(handler: () => void, timeout?: number): unknown
+declare function clearTimeout(timeoutID: unknown): void
+
 interface TokenInfo {
   input: number
   output: number
@@ -29,7 +32,7 @@ async function withTimeout<TValue>(
   timeoutMs: number,
   errorMessage: string,
 ): Promise<TValue> {
-  let timeoutID: ReturnType<typeof setTimeout> | undefined
+  let timeoutID: unknown
 
   const timeoutPromise = new Promise<never>((_, reject) => {
     timeoutID = setTimeout(() => {
@@ -38,9 +41,7 @@ async function withTimeout<TValue>(
   })
 
   return await Promise.race([promise, timeoutPromise]).finally(() => {
-    if (timeoutID !== undefined) {
-      clearTimeout(timeoutID)
-    }
+    clearTimeout(timeoutID)
   })
 }
 
@@ -165,7 +166,6 @@ export function createPreemptiveCompactionHook(
         modelID?: string
         finish?: boolean
         tokens?: TokenInfo
-        parts?: unknown
       } | undefined
 
       if (!info || info.role !== "assistant" || !info.finish || !info.sessionID) return
@@ -182,7 +182,6 @@ export function createPreemptiveCompactionHook(
       await postCompactionMonitor.onAssistantMessageUpdated({
         sessionID: info.sessionID,
         id: info.id,
-        parts: info.parts,
       })
     }
   }
