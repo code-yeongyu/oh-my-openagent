@@ -79,8 +79,6 @@ export function createToolExecuteAfterHandler(ctx: PluginInput, config: PluginCo
 			return
 		}
 
-		const claudeConfig = await loadClaudeHooksConfig()
-		const extendedConfig = await loadPluginExtendedConfig()
 
 		const cachedInput = getToolInput(input.sessionID, input.tool, input.callID) || {}
 
@@ -95,6 +93,9 @@ export function createToolExecuteAfterHandler(ctx: PluginInput, config: PluginCo
 		if (isHookDisabled(config, "PostToolUse")) {
 			return
 		}
+
+		const claudeConfig = await loadClaudeHooksConfig()
+		const extendedConfig = await loadPluginExtendedConfig()
 
 		const postClient: PostToolUseClient = {
 			session: {
