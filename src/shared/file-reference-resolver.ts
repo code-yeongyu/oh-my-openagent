@@ -74,7 +74,7 @@ export async function resolveFileReferencesInText(
 
   let resolved = text
   for (const [pattern, replacement] of replacements.entries()) {
-    resolved = resolved.split(pattern).join(replacement)
+    resolved = resolved.replaceAll(pattern, replacement)
   }
 
   if (findFileReferences(resolved).length > 0 && depth + 1 < maxDepth) {

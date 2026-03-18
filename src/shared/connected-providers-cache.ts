@@ -32,6 +32,9 @@ export function createConnectedProvidersCacheStore(
 		return join(getCacheDir(), filename)
 	}
 
+	let memConnected: string[] | null | undefined
+	let memProviderModels: ProviderModelsCache | null | undefined
+
 	function ensureCacheDir(): void {
 		const cacheDir = getCacheDir()
 		if (!existsSync(cacheDir)) {
@@ -40,10 +43,12 @@ export function createConnectedProvidersCacheStore(
 	}
 
 	function readConnectedProvidersCache(): string[] | null {
+		if (memConnected !== undefined) return memConnected
 		const cacheFile = getCacheFilePath(CONNECTED_PROVIDERS_CACHE_FILE)
 
 		if (!existsSync(cacheFile)) {
 			log("[connected-providers-cache] Cache file not found", { cacheFile })
+			memConnected = null
 			return null
 		}
 
@@ -51,9 +56,11 @@ export function createConnectedProvidersCacheStore(
 			const content = readFileSync(cacheFile, "utf-8")
 			const data = JSON.parse(content) as ConnectedProvidersCache
 			log("[connected-providers-cache] Read cache", { count: data.connected.length, updatedAt: data.updatedAt })
+			memConnected = data.connected
 			return data.connected
 		} catch (err) {
 			log("[connected-providers-cache] Error reading cache", { error: String(err) })
+			memConnected = null
 			return null
 		}
 	}
@@ -74,6 +81,7 @@ export function createConnectedProvidersCacheStore(
 
 		try {
 			writeFileSync(cacheFile, JSON.stringify(data, null, 2))
+			memConnected = connected
 			log("[connected-providers-cache] Cache written", { count: connected.length })
 		} catch (err) {
 			log("[connected-providers-cache] Error writing cache", { error: String(err) })
@@ -81,10 +89,12 @@ export function createConnectedProvidersCacheStore(
 	}
 
 	function readProviderModelsCache(): ProviderModelsCache | null {
+		if (memProviderModels !== undefined) return memProviderModels
 		const cacheFile = getCacheFilePath(PROVIDER_MODELS_CACHE_FILE)
 
 		if (!existsSync(cacheFile)) {
 			log("[connected-providers-cache] Provider-models cache file not found", { cacheFile })
+			memProviderModels = null
 			return null
 		}
 
@@ -95,9 +105,11 @@ export function createConnectedProvidersCacheStore(
 				providerCount: Object.keys(data.models).length,
 				updatedAt: data.updatedAt,
 			})
+			memProviderModels = data
 			return data
 		} catch (err) {
 			log("[connected-providers-cache] Error reading provider-models cache", { error: String(err) })
+			memProviderModels = null
 			return null
 		}
 	}
@@ -118,6 +130,7 @@ export function createConnectedProvidersCacheStore(
 
 		try {
 			writeFileSync(cacheFile, JSON.stringify(cacheData, null, 2))
+			memProviderModels = cacheData
 			log("[connected-providers-cache] Provider-models cache written", {
 				providerCount: Object.keys(data.models).length,
 			})
