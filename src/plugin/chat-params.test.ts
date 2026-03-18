@@ -12,6 +12,7 @@ describe("createChatParamsHandler", () => {
           called = input.agent.name === "sisyphus"
         },
       },
+      anthropicServerCompaction: null,
     })
 
     const input = {

@@ -27,6 +27,7 @@ import {
   createRuntimeFallbackHook,
 } from "../../hooks"
 import { createAnthropicEffortHook } from "../../hooks/anthropic-effort"
+import { createAnthropicServerCompactionHook } from "../../hooks/anthropic-server-compaction"
 import {
   detectExternalNotificationPlugin,
   getNotificationConflictWarning,
@@ -59,6 +60,7 @@ export type SessionHooks = {
   questionLabelTruncator: ReturnType<typeof createQuestionLabelTruncatorHook> | null
   taskResumeInfo: ReturnType<typeof createTaskResumeInfoHook> | null
   anthropicEffort: ReturnType<typeof createAnthropicEffortHook> | null
+  anthropicServerCompaction: ReturnType<typeof createAnthropicServerCompactionHook> | null
   runtimeFallback: ReturnType<typeof createRuntimeFallbackHook> | null
 }
 
@@ -95,7 +97,8 @@ export function createSessionHooks(args: {
     const forceEnable = pluginConfig.notification?.force_enable ?? false
     const externalNotifier = detectExternalNotificationPlugin(ctx.directory)
     if (externalNotifier.detected && !forceEnable) {
-      log(getNotificationConflictWarning(externalNotifier.pluginName!))
+      const pluginName = externalNotifier.pluginName ?? "unknown"
+      log(getNotificationConflictWarning(pluginName))
     } else {
       sessionNotification = safeHook("session-notification", () => createSessionNotification(ctx))
     }
@@ -249,6 +252,19 @@ export function createSessionHooks(args: {
     ? safeHook("anthropic-effort", () => createAnthropicEffortHook())
     : null
 
+  const serverCompactionConfig = pluginConfig.experimental?.server_compaction
+  const serverCompactionEnabled = typeof serverCompactionConfig === "boolean"
+    ? serverCompactionConfig
+    : serverCompactionConfig?.enabled ?? false
+
+  const anthropicServerCompaction = serverCompactionEnabled && isHookEnabled("anthropic-server-compaction")
+    ? safeHook("anthropic-server-compaction", () => {
+      const triggerTokens = typeof serverCompactionConfig === "object" ? serverCompactionConfig.trigger_tokens : undefined
+      const instructions = typeof serverCompactionConfig === "object" ? serverCompactionConfig.instructions : undefined
+      return createAnthropicServerCompactionHook({ triggerTokens, instructions })
+    })
+    : null
+
   const runtimeFallbackConfig =
     typeof pluginConfig.runtime_fallback === "boolean"
       ? { enabled: pluginConfig.runtime_fallback }
@@ -284,6 +300,7 @@ export function createSessionHooks(args: {
     questionLabelTruncator,
     taskResumeInfo,
     anthropicEffort,
+    anthropicServerCompaction,
     runtimeFallback,
   }
 }

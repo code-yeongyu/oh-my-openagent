@@ -1,17 +1,16 @@
-import type { PluginContext, PluginInterface, ToolsRecord } from "./plugin/types"
 import type { OhMyOpenCodeConfig } from "./config"
-
-import { createChatParamsHandler } from "./plugin/chat-params"
-import { createChatHeadersHandler } from "./plugin/chat-headers"
-import { createChatMessageHandler } from "./plugin/chat-message"
-import { createMessagesTransformHandler } from "./plugin/messages-transform"
-import { createSystemTransformHandler } from "./plugin/system-transform"
-import { createEventHandler } from "./plugin/event"
-import { createToolExecuteAfterHandler } from "./plugin/tool-execute-after"
-import { createToolExecuteBeforeHandler } from "./plugin/tool-execute-before"
-
 import type { CreatedHooks } from "./create-hooks"
 import type { Managers } from "./create-managers"
+
+import { createChatHeadersHandler } from "./plugin/chat-headers"
+import { createChatMessageHandler } from "./plugin/chat-message"
+import { createChatParamsHandler } from "./plugin/chat-params"
+import { createEventHandler } from "./plugin/event"
+import { createMessagesTransformHandler } from "./plugin/messages-transform"
+import { createSystemTransformHandler } from "./plugin/system-transform"
+import { createToolExecuteAfterHandler } from "./plugin/tool-execute-after"
+import { createToolExecuteBeforeHandler } from "./plugin/tool-execute-before"
+import type { PluginContext, PluginInterface, ToolsRecord } from "./plugin/types"
 
 export function createPluginInterface(args: {
   ctx: PluginContext
@@ -33,7 +32,10 @@ export function createPluginInterface(args: {
     tool: tools,
 
     "chat.params": async (input: unknown, output: unknown) => {
-      const handler = createChatParamsHandler({ anthropicEffort: hooks.anthropicEffort })
+      const handler = createChatParamsHandler({
+        anthropicEffort: hooks.anthropicEffort,
+        anthropicServerCompaction: hooks.anthropicServerCompaction,
+      })
       await handler(input, output)
     },
 

@@ -3326,6 +3326,29 @@
         "preemptive_compaction": {
           "type": "boolean"
         },
+        "server_compaction": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "trigger_tokens": {
+                  "type": "number",
+                  "minimum": 10000
+                },
+                "instructions": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          ]
+        },
         "truncate_all_tool_outputs": {
           "type": "boolean"
         },

@@ -5,6 +5,17 @@ export const ExperimentalConfigSchema = z.object({
   aggressive_truncation: z.boolean().optional(),
   auto_resume: z.boolean().optional(),
   preemptive_compaction: z.boolean().optional(),
+  /** Enable Anthropic server-side compaction for Claude 4.6 models (default: false). Set to true for defaults, or use object for advanced config. */
+  server_compaction: z
+    .union([
+      z.boolean(),
+      z.object({
+        enabled: z.boolean().optional(),
+        trigger_tokens: z.number().min(10000).optional(),
+        instructions: z.string().optional(),
+      }),
+    ])
+    .optional(),
   /** Truncate all tool outputs, not just whitelisted tools (default: false). Tool output truncator is enabled by default - disable via disabled_hooks. */
   truncate_all_tool_outputs: z.boolean().optional(),
   /** Dynamic context pruning configuration */
