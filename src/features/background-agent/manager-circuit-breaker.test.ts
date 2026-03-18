@@ -233,7 +233,7 @@ describe("BackgroundManager circuit breaker", () => {
 
       expect(task.status).toBe("running")
       expect(task.progress?.toolCalls).toBe(1)
-      expect(task.progress?.countedToolPartIDs).toEqual(["tool-1"])
+      expect(task.progress?.countedToolPartIDs).toEqual(new Set(["tool-1"]))
     })
   })
 

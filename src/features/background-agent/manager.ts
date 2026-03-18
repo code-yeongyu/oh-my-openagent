@@ -57,6 +57,7 @@ import {
   detectRepetitiveToolUse,
   recordToolCall,
   resolveCircuitBreakerSettings,
+  type CircuitBreakerSettings,
 } from "./loop-detector"
 import {
   createSubagentDepthLimitError,
@@ -152,6 +153,7 @@ export class BackgroundManager {
   private preStartDescendantReservations: Set<string>
   private enableParentSessionNotifications: boolean
   readonly taskHistory = new TaskHistory()
+  private cachedCircuitBreakerSettings?: CircuitBreakerSettings
 
   constructor(
     ctx: PluginInput,
@@ -918,7 +920,7 @@ export class BackgroundManager {
 
         task.progress.toolCalls += 1
         task.progress.lastTool = partInfo.tool
-        const circuitBreaker = resolveCircuitBreakerSettings(this.config)
+        const circuitBreaker = this.cachedCircuitBreakerSettings ?? (this.cachedCircuitBreakerSettings = resolveCircuitBreakerSettings(this.config))
         if (partInfo.tool) {
          task.progress.toolCallWindow = recordToolCall(
              task.progress.toolCallWindow,

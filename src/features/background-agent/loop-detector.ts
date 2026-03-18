@@ -44,7 +44,9 @@ export function recordToolCall(
 ): ToolCallWindow {
   const previous = window?.toolSignatures ?? []
   const signature = createToolCallSignature(toolName, toolInput)
-  const toolSignatures = [...previous, signature].slice(-settings.windowSize)
+  const toolSignatures = previous.length >= settings.windowSize
+    ? [...previous.slice(1), signature]
+    : [...previous, signature]
 
   return {
     toolSignatures,
