@@ -23,8 +23,8 @@ interface ClientLike {
       query: { directory: string }
     }) => Promise<unknown>
     messages: (input: {
-      sessionID: string
-      directory: string
+      path: { id: string }
+      query?: { directory: string }
     }) => Promise<unknown>
   }
   tui: {

@@ -38,8 +38,8 @@ export async function resolveNoTextTailFromSession(args: {
   client: {
     session: {
       messages: (input: {
-        sessionID: string
-        directory: string
+        path: { id: string }
+        query?: { directory: string }
       }) => Promise<unknown>
     }
   }
@@ -51,8 +51,8 @@ export async function resolveNoTextTailFromSession(args: {
 
   try {
     const response = await client.session.messages({
-      sessionID,
-      directory,
+      path: { id: sessionID },
+      query: { directory },
     })
 
     const messages = normalizeSDKResponse(response, [] as SessionMessage[], {
