@@ -119,4 +119,41 @@ describe("runSummarizeRetryStrategy", () => {
     expect(timeoutCalls[0]!.delay).toBeGreaterThan(0)
     expect(timeoutCalls[0]!.delay).toBeLessThanOrEqual(500)
   })
+
+  test("clears session state after successful summarize", async () => {
+    //#given
+    autoCompactState.pendingCompact.add(sessionID)
+    autoCompactState.errorDataBySession.set(sessionID, {
+      currentTokens: 250000,
+      maxTokens: 200000,
+      errorType: "token_limit_exceeded",
+    })
+    autoCompactState.retryStateBySession.set(sessionID, {
+      attempt: 1,
+      lastAttemptTime: Date.now(),
+      firstAttemptTime: Date.now() - 1000,
+    })
+    autoCompactState.truncateStateBySession.set(sessionID, { truncateAttempt: 1 })
+    autoCompactState.emptyContentAttemptBySession.set(sessionID, 1)
+    autoCompactState.compactionInProgress.add(sessionID)
+
+    //#when
+    await runSummarizeRetryStrategy({
+      sessionID,
+      msg: { providerID: "anthropic", modelID: "claude-sonnet-4-6" },
+      autoCompactState,
+      client: client as never,
+      directory,
+      pluginConfig: {} as OhMyOpenCodeConfig,
+    })
+
+    //#then
+    expect(summarizeMock).toHaveBeenCalledTimes(1)
+    expect(autoCompactState.pendingCompact.has(sessionID)).toBe(false)
+    expect(autoCompactState.errorDataBySession.has(sessionID)).toBe(false)
+    expect(autoCompactState.retryStateBySession.has(sessionID)).toBe(false)
+    expect(autoCompactState.truncateStateBySession.has(sessionID)).toBe(false)
+    expect(autoCompactState.emptyContentAttemptBySession.has(sessionID)).toBe(false)
+    expect(autoCompactState.compactionInProgress.has(sessionID)).toBe(false)
+  })
 })
