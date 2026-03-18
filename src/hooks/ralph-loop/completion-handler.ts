@@ -23,6 +23,10 @@ export async function handleDetectedCompletion(
 	const { sessionID, state, loopState, directory, apiTimeoutMs } = input
 
 	if (state.ultrawork && !state.verification_pending) {
+		if (state.verification_session_id) {
+			ctx.client.session.abort({ path: { id: state.verification_session_id } }).catch(() => {})
+		}
+
 		const verificationState = loopState.markVerificationPending(sessionID)
 		if (!verificationState) {
 			log(`[${HOOK_NAME}] Failed to transition ultrawork loop to verification`, {

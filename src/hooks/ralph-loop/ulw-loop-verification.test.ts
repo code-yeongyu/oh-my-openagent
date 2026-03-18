@@ -10,6 +10,7 @@ describe("ulw-loop verification", () => {
 	const testDir = join(tmpdir(), `ulw-loop-verification-${Date.now()}`)
 	let promptCalls: Array<{ sessionID: string; text: string }>
 	let toastCalls: Array<{ title: string; message: string; variant: string }>
+	let abortCalls: Array<{ id: string }>
 	let parentTranscriptPath: string
 	let oracleTranscriptPath: string
 
@@ -25,6 +26,10 @@ describe("ulw-loop verification", () => {
 						return {}
 					},
 					messages: async () => ({ data: [] }),
+					abort: async (opts: { path: { id: string } }) => {
+						abortCalls.push({ id: opts.path.id })
+						return {}
+					},
 				},
 				tui: {
 					showToast: async (opts: { body: { title: string; message: string; variant: string } }) => {
@@ -40,6 +45,7 @@ describe("ulw-loop verification", () => {
 	beforeEach(() => {
 		promptCalls = []
 		toastCalls = []
+		abortCalls = []
 		parentTranscriptPath = join(testDir, "transcript-parent.jsonl")
 		oracleTranscriptPath = join(testDir, "transcript-oracle.jsonl")
 
@@ -384,5 +390,97 @@ describe("ulw-loop verification", () => {
 		expect(hook.getState()?.verification_pending).toBeUndefined()
 		expect(promptCalls).toHaveLength(2)
 		expect(promptCalls[1]?.text).toContain("Verification failed")
+	})
+
+	test("#given oracle verification fails #when loop restarts #then old oracle session is aborted", async () => {
+		const sessionMessages: Record<string, unknown[]> = {
+			"session-123": [{}, {}, {}],
+		}
+		const hook = createRalphLoopHook({
+			...createMockPluginInput(),
+			client: {
+				...createMockPluginInput().client,
+				session: {
+					...createMockPluginInput().client.session,
+					messages: async (opts: { path: { id: string } }) => ({
+						data: sessionMessages[opts.path.id] ?? [],
+					}),
+				},
+			},
+		} as Parameters<typeof createRalphLoopHook>[0], {
+			getTranscriptPath: (sessionID) => sessionID === "ses-oracle" ? oracleTranscriptPath : parentTranscriptPath,
+		})
+		hook.startLoop("session-123", "Build API", { ultrawork: true })
+		writeFileSync(
+			parentTranscriptPath,
+			`${JSON.stringify({ type: "tool_result", timestamp: new Date().toISOString(), tool_output: { output: "done <promise>DONE</promise>" } })}\n`,
+		)
+
+		await hook.event({ event: { type: "session.idle", properties: { sessionID: "session-123" } } })
+		writeState(testDir, {
+			...hook.getState()!,
+			verification_session_id: "ses-oracle",
+		})
+		writeFileSync(
+			oracleTranscriptPath,
+			`${JSON.stringify({ type: "tool_result", timestamp: new Date().toISOString(), tool_output: { output: "verification failed: missing tests" } })}\n`,
+		)
+
+		await hook.event({ event: { type: "session.idle", properties: { sessionID: "ses-oracle" } } })
+
+		expect(abortCalls).toHaveLength(1)
+		expect(abortCalls[0].id).toBe("ses-oracle")
+	})
+
+	test("#given ulw loop re-enters verification #when DONE detected again after failed verification #then previous verification session is aborted", async () => {
+		const sessionMessages: Record<string, unknown[]> = {
+			"session-123": [{}, {}, {}],
+		}
+		const hook = createRalphLoopHook({
+			...createMockPluginInput(),
+			client: {
+				...createMockPluginInput().client,
+				session: {
+					...createMockPluginInput().client.session,
+					messages: async (opts: { path: { id: string } }) => ({
+						data: sessionMessages[opts.path.id] ?? [],
+					}),
+				},
+			},
+		} as Parameters<typeof createRalphLoopHook>[0], {
+			getTranscriptPath: (sessionID) => sessionID === "ses-oracle" ? oracleTranscriptPath : parentTranscriptPath,
+		})
+		hook.startLoop("session-123", "Build API", { ultrawork: true })
+		writeFileSync(
+			parentTranscriptPath,
+			`${JSON.stringify({ type: "tool_result", timestamp: new Date().toISOString(), tool_output: { output: "done <promise>DONE</promise>" } })}\n`,
+		)
+
+		await hook.event({ event: { type: "session.idle", properties: { sessionID: "session-123" } } })
+		writeState(testDir, {
+			...hook.getState()!,
+			verification_session_id: "ses-oracle",
+		})
+		writeFileSync(
+			oracleTranscriptPath,
+			`${JSON.stringify({ type: "tool_result", timestamp: new Date().toISOString(), tool_output: { output: "failed" } })}\n`,
+		)
+
+		await hook.event({ event: { type: "session.idle", properties: { sessionID: "ses-oracle" } } })
+		abortCalls.length = 0
+
+		writeFileSync(
+			parentTranscriptPath,
+			`${JSON.stringify({ type: "tool_result", timestamp: new Date().toISOString(), tool_output: { output: "fixed it <promise>DONE</promise>" } })}\n`,
+		)
+		writeState(testDir, {
+			...hook.getState()!,
+			verification_session_id: "ses-oracle-old",
+		})
+
+		await hook.event({ event: { type: "session.idle", properties: { sessionID: "session-123" } } })
+
+		expect(abortCalls).toHaveLength(1)
+		expect(abortCalls[0].id).toBe("ses-oracle-old")
 	})
 })
