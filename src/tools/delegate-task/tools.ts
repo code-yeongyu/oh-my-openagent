@@ -178,7 +178,18 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
         : undefined
 
       let agentToUse: string
-      let categoryModel: { providerID: string; modelID: string; variant?: string } | undefined
+      let categoryModel:
+        | {
+            providerID: string
+            modelID: string
+            variant?: string
+            reasoningEffort?: string
+            temperature?: number
+            top_p?: number
+            maxTokens?: number
+            thinking?: { type: "enabled" | "disabled"; budgetTokens?: number }
+          }
+        | undefined
       let categoryPromptAppend: string | undefined
       let modelInfo: import("../../features/task-toast-manager/types").ModelFallbackInfo | undefined
       let actualModel: string | undefined

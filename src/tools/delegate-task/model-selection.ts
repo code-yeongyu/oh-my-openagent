@@ -53,7 +53,7 @@ export function resolveModelForDelegateTask(input: {
   fallbackChain?: FallbackEntry[]
   availableModels: Set<string>
   systemDefaultModel?: string
-}): { model: string; variant?: string } | { skipped: true } | undefined {
+}): { model: string; variant?: string; fallbackEntry?: FallbackEntry } | { skipped: true } | undefined {
   const userModel = normalizeModel(input.userModel)
   if (userModel) {
     return { model: userModel }
@@ -119,7 +119,7 @@ export function resolveModelForDelegateTask(input: {
       const provider = first?.providers?.[0]
       if (provider) {
         const transformedModelId = transformModelForProvider(provider, first.model)
-        return { model: `${provider}/${transformedModelId}`, variant: first.variant }
+        return { model: `${provider}/${transformedModelId}`, variant: first.variant, fallbackEntry: first }
       }
     } else {
       for (const entry of fallbackChain) {
@@ -128,20 +128,20 @@ export function resolveModelForDelegateTask(input: {
           const match = fuzzyMatchModel(fullModel, input.availableModels, [provider])
           if (match) {
             if (explicitHighModel && entry.variant === "high" && match === explicitHighBaseModel) {
-              return { model: explicitHighModel }
+              return { model: explicitHighModel, fallbackEntry: entry }
             }
 
-            return { model: match, variant: entry.variant }
+            return { model: match, variant: entry.variant, fallbackEntry: entry }
           }
         }
 
         const crossProviderMatch = fuzzyMatchModel(entry.model, input.availableModels)
         if (crossProviderMatch) {
           if (explicitHighModel && entry.variant === "high" && crossProviderMatch === explicitHighBaseModel) {
-            return { model: explicitHighModel }
+            return { model: explicitHighModel, fallbackEntry: entry }
           }
 
-          return { model: crossProviderMatch, variant: entry.variant }
+          return { model: crossProviderMatch, variant: entry.variant, fallbackEntry: entry }
         }
       }
     }

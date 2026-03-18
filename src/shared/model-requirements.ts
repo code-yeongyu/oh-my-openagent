@@ -2,6 +2,11 @@ export type FallbackEntry = {
   providers: string[];
   model: string;
   variant?: string; // Entry-specific variant (e.g., GPT→high, Opus→max)
+  reasoningEffort?: string;
+  temperature?: number;
+  top_p?: number;
+  maxTokens?: number;
+  thinking?: { type: "enabled" | "disabled"; budgetTokens?: number };
 };
 
 export type ModelRequirement = {

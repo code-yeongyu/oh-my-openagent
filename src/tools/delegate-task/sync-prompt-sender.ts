@@ -1,4 +1,4 @@
-import type { DelegateTaskArgs, OpencodeClient } from "./types"
+import type { DelegateTaskArgs, OpencodeClient, DelegatedModelConfig } from "./types"
 import { isPlanFamily } from "./constants"
 import { buildTaskPrompt } from "./prompt-builder"
 import {
@@ -8,6 +8,7 @@ import {
 import { formatDetailedError } from "./error-formatting"
 import { getAgentToolRestrictions } from "../../shared/agent-tool-restrictions"
 import { setSessionTools } from "../../shared/session-tools-store"
+import { setSessionPromptParams } from "../../shared/session-prompt-params-state"
 import { createInternalAgentTextPart } from "../../shared/internal-initiator-marker"
 
 type SendSyncPromptDeps = {
@@ -37,7 +38,7 @@ export async function sendSyncPrompt(
     agentToUse: string
     args: DelegateTaskArgs
     systemContent: string | undefined
-    categoryModel: { providerID: string; modelID: string; variant?: string } | undefined
+    categoryModel: DelegatedModelConfig | undefined
     toastManager: { removeTask: (id: string) => void } | null | undefined
     taskId: string | undefined
   },
@@ -53,6 +54,26 @@ export async function sendSyncPrompt(
   }
   setSessionTools(input.sessionID, tools)
 
+  if (input.categoryModel) {
+    const promptOptions: Record<string, unknown> = {
+      ...(input.categoryModel.reasoningEffort ? { reasoningEffort: input.categoryModel.reasoningEffort } : {}),
+      ...(input.categoryModel.thinking ? { thinking: input.categoryModel.thinking } : {}),
+      ...(input.categoryModel.maxTokens !== undefined ? { maxTokens: input.categoryModel.maxTokens } : {}),
+    }
+
+    if (
+      input.categoryModel.temperature !== undefined ||
+      input.categoryModel.top_p !== undefined ||
+      Object.keys(promptOptions).length > 0
+    ) {
+      setSessionPromptParams(input.sessionID, {
+        ...(input.categoryModel.temperature !== undefined ? { temperature: input.categoryModel.temperature } : {}),
+        ...(input.categoryModel.top_p !== undefined ? { topP: input.categoryModel.top_p } : {}),
+        ...(Object.keys(promptOptions).length > 0 ? { options: promptOptions } : {}),
+      })
+    }
+  }
+
   const promptArgs = {
     path: { id: input.sessionID },
     body: {
@@ -61,7 +82,12 @@ export async function sendSyncPrompt(
       tools,
       parts: [createInternalAgentTextPart(effectivePrompt)],
       ...(input.categoryModel
-        ? { model: { providerID: input.categoryModel.providerID, modelID: input.categoryModel.modelID } }
+        ? {
+            model: {
+              providerID: input.categoryModel.providerID,
+              modelID: input.categoryModel.modelID,
+            },
+          }
         : {}),
       ...(input.categoryModel?.variant ? { variant: input.categoryModel.variant } : {}),
     },

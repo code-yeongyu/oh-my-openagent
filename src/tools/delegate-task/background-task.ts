@@ -1,4 +1,4 @@
-import type { DelegateTaskArgs, ToolContextWithMetadata } from "./types"
+import type { DelegateTaskArgs, ToolContextWithMetadata, DelegatedModelConfig } from "./types"
 import type { ExecutorContext, ParentContext } from "./executor-types"
 import type { FallbackEntry } from "../../shared/model-requirements"
 import { getTimingConfig } from "./timing"
@@ -16,7 +16,7 @@ export async function executeBackgroundTask(
   executorCtx: ExecutorContext,
   parentContext: ParentContext,
   agentToUse: string,
-  categoryModel: { providerID: string; modelID: string; variant?: string } | undefined,
+  categoryModel: DelegatedModelConfig | undefined,
   systemContent: string | undefined,
   fallbackChain?: FallbackEntry[],
 ): Promise<string> {

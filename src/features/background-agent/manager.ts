@@ -16,6 +16,35 @@ import {
   createInternalAgentTextPart,
 } from "../../shared"
 import { setSessionTools } from "../../shared/session-tools-store"
+import { setSessionPromptParams } from "../../shared/session-prompt-params-state"
+
+type PromptParamsModel = {
+  reasoningEffort?: string
+  thinking?: { type: "enabled" | "disabled"; budgetTokens?: number }
+  maxTokens?: number
+  temperature?: number
+  top_p?: number
+}
+
+function applySessionPromptParams(sessionID: string, model: PromptParamsModel): void {
+  const promptOptions: Record<string, unknown> = {
+    ...(model.reasoningEffort ? { reasoningEffort: model.reasoningEffort } : {}),
+    ...(model.thinking ? { thinking: model.thinking } : {}),
+    ...(model.maxTokens !== undefined ? { maxTokens: model.maxTokens } : {}),
+  }
+
+  if (
+    model.temperature !== undefined ||
+    model.top_p !== undefined ||
+    Object.keys(promptOptions).length > 0
+  ) {
+    setSessionPromptParams(sessionID, {
+      ...(model.temperature !== undefined ? { temperature: model.temperature } : {}),
+      ...(model.top_p !== undefined ? { topP: model.top_p } : {}),
+      ...(Object.keys(promptOptions).length > 0 ? { options: promptOptions } : {}),
+    })
+  }
+}
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { ConcurrencyManager } from "./concurrency"
 import type { BackgroundTaskConfig, TmuxConfig } from "../../config/schema"
@@ -504,13 +533,19 @@ export class BackgroundManager {
     })
 
     // Fire-and-forget prompt via promptAsync (no response body needed)
-    // Include model if caller provided one (e.g., from Sisyphus category configs)
-    // IMPORTANT: variant must be a top-level field in the body, NOT nested inside model
-    // OpenCode's PromptInput schema expects: { model: { providerID, modelID }, variant: "max" }
+    // OpenCode prompt payload accepts model provider/model IDs and top-level variant only.
+    // Temperature/topP and provider-specific options are applied through chat.params.
     const launchModel = input.model
-      ? { providerID: input.model.providerID, modelID: input.model.modelID }
+      ? {
+          providerID: input.model.providerID,
+          modelID: input.model.modelID,
+        }
       : undefined
     const launchVariant = input.model?.variant
+
+    if (input.model) {
+      applySessionPromptParams(sessionID, input.model)
+    }
 
     promptWithModelSuggestionRetry(this.client, {
       path: { id: sessionID },
@@ -782,12 +817,18 @@ export class BackgroundManager {
     })
 
     // Fire-and-forget prompt via promptAsync (no response body needed)
-    // Include model if task has one (preserved from original launch with category config)
-    // variant must be top-level in body, not nested inside model (OpenCode PromptInput schema)
+    // Resume uses the same PromptInput contract as launch: model IDs plus top-level variant.
     const resumeModel = existingTask.model
-      ? { providerID: existingTask.model.providerID, modelID: existingTask.model.modelID }
+      ? {
+          providerID: existingTask.model.providerID,
+          modelID: existingTask.model.modelID,
+        }
       : undefined
     const resumeVariant = existingTask.model?.variant
+
+    if (existingTask.model) {
+      applySessionPromptParams(existingTask.sessionID!, existingTask.model)
+    }
 
     this.client.session.promptAsync({
       path: { id: existingTask.sessionID },

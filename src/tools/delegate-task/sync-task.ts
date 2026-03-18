@@ -1,5 +1,5 @@
 import type { ModelFallbackInfo } from "../../features/task-toast-manager/types"
-import type { DelegateTaskArgs, ToolContextWithMetadata } from "./types"
+import type { DelegateTaskArgs, ToolContextWithMetadata, DelegatedModelConfig } from "./types"
 import type { ExecutorContext, ParentContext } from "./executor-types"
 import { getTaskToastManager } from "../../features/task-toast-manager"
 import { storeToolMetadata } from "../../features/tool-metadata-store"
@@ -17,7 +17,7 @@ export async function executeSyncTask(
   executorCtx: ExecutorContext,
   parentContext: ParentContext,
   agentToUse: string,
-  categoryModel: { providerID: string; modelID: string; variant?: string } | undefined,
+  categoryModel: DelegatedModelConfig | undefined,
   systemContent: string | undefined,
   modelInfo?: ModelFallbackInfo,
   fallbackChain?: import("../../shared/model-requirements").FallbackEntry[],
