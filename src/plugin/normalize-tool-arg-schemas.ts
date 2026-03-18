@@ -13,9 +13,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
 }
 
-function sanitizeJsonSchema(value: unknown, depth = 0): unknown {
+const UNSUPPORTED_SCHEMA_KEYWORDS = new Set(["contentEncoding", "contentMediaType"])
+
+function sanitizeJsonSchema(value: unknown, depth = 0, parentKey?: string): unknown {
   if (Array.isArray(value)) {
-    return value.map((item) => sanitizeJsonSchema(item, depth + 1))
+    return value.map((item) => sanitizeJsonSchema(item, depth + 1, parentKey))
   }
 
   if (!isRecord(value)) {
@@ -23,9 +25,10 @@ function sanitizeJsonSchema(value: unknown, depth = 0): unknown {
   }
 
   const sanitized: Record<string, unknown> = {}
+  const isInsideProperties = parentKey === "properties"
 
   for (const [key, nestedValue] of Object.entries(value)) {
-    if (key === "contentEncoding" || key === "contentMediaType") {
+    if (!isInsideProperties && UNSUPPORTED_SCHEMA_KEYWORDS.has(key)) {
       continue
     }
 
@@ -33,7 +36,7 @@ function sanitizeJsonSchema(value: unknown, depth = 0): unknown {
       continue
     }
 
-    sanitized[key] = sanitizeJsonSchema(nestedValue, depth + 1)
+    sanitized[key] = sanitizeJsonSchema(nestedValue, depth + 1, key)
   }
 
   return sanitized
