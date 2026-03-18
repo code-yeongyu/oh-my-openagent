@@ -6,6 +6,17 @@ import { readState, writeState } from "../hooks/ralph-loop/storage"
 
 const VERIFICATION_ATTEMPT_PATTERN = /<ulw_verification_attempt_id>(.*?)<\/ulw_verification_attempt_id>/i
 
+function getMetadataString(metadata: Record<string, unknown> | undefined, keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = metadata?.[key]
+    if (typeof value === "string") {
+      return value
+    }
+  }
+
+  return undefined
+}
+
 function getPluginDirectory(ctx: PluginContext): string | null {
   if (typeof ctx === "object" && ctx !== null && "directory" in ctx && typeof ctx.directory === "string") {
     return ctx.directory
@@ -43,9 +54,9 @@ export function createToolExecuteAfterHandler(args: {
 
     if (input.tool === "task") {
       const directory = getPluginDirectory(ctx)
-      const sessionId = typeof output.metadata?.sessionId === "string" ? output.metadata.sessionId : undefined
-      const agent = typeof output.metadata?.agent === "string" ? output.metadata.agent : undefined
-      const prompt = typeof output.metadata?.prompt === "string" ? output.metadata.prompt : undefined
+      const sessionId = getMetadataString(output.metadata, ["sessionId", "sessionID", "session_id"])
+      const agent = getMetadataString(output.metadata, ["agent"])
+      const prompt = getMetadataString(output.metadata, ["prompt"])
       const verificationAttemptId = prompt?.match(VERIFICATION_ATTEMPT_PATTERN)?.[1]?.trim()
       const loopState = directory ? readState(directory) : null
       const isVerificationContext =

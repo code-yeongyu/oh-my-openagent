@@ -87,7 +87,7 @@ export function createRalphLoopEventHandler(
 					return
 				}
 
-				const completionSessionID = verificationSessionID ?? (state.verification_pending ? undefined : sessionID)
+				const completionSessionID = verificationSessionID ?? sessionID
 				const transcriptPath = completionSessionID ? options.getTranscriptPath(completionSessionID) : undefined
 				const completionViaTranscript = completionSessionID
 					? detectCompletionInTranscript(
@@ -107,7 +107,13 @@ export function createRalphLoopEventHandler(
 							sinceMessageIndex: undefined,
 						})
 					: state.verification_pending
-						? false
+						? await detectCompletionInSessionMessages(ctx, {
+							sessionID,
+							promise: state.completion_promise,
+							apiTimeoutMs: options.apiTimeoutMs,
+							directory: options.directory,
+							sinceMessageIndex: state.message_count_at_start,
+						})
 					: await detectCompletionInSessionMessages(ctx, {
 						sessionID,
 						promise: state.completion_promise,
