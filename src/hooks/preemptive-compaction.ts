@@ -6,8 +6,9 @@ import {
 } from "../shared/context-limit-resolver"
 
 import { resolveCompactionModel } from "./shared/compaction-model-resolver"
-const PREEMPTIVE_COMPACTION_TIMEOUT_MS = 120_000
+import { createPostCompactionDegradationMonitor } from "./preemptive-compaction-degradation-monitor"
 
+const PREEMPTIVE_COMPACTION_TIMEOUT_MS = 120_000
 const PREEMPTIVE_COMPACTION_THRESHOLD = 0.78
 
 interface TokenInfo {
@@ -68,6 +69,14 @@ export function createPreemptiveCompactionHook(
   const compactedSessions = new Set<string>()
   const tokenCache = new Map<string, CachedCompactionState>()
 
+  const postCompactionMonitor = createPostCompactionDegradationMonitor({
+    client: ctx.client,
+    directory: ctx.directory,
+    pluginConfig,
+    tokenCache,
+    compactionInProgress,
+  })
+
   const toolExecuteAfter = async (
     input: { tool: string; sessionID: string; callID: string },
     _output: { title: string; output: string; metadata: unknown }
@@ -92,14 +101,9 @@ export function createPreemptiveCompactionHook(
       return
     }
 
-    const lastTokens = cached.tokens
-    const totalInputTokens = (lastTokens?.input ?? 0) + (lastTokens?.cache?.read ?? 0)
+    const totalInputTokens = (cached.tokens.input ?? 0) + (cached.tokens.cache?.read ?? 0)
     const usageRatio = totalInputTokens / actualLimit
-
-    if (usageRatio < PREEMPTIVE_COMPACTION_THRESHOLD) return
-
-    const modelID = cached.modelID
-    if (!modelID) return
+    if (usageRatio < PREEMPTIVE_COMPACTION_THRESHOLD || !cached.modelID) return
 
     compactionInProgress.add(sessionID)
 
@@ -108,7 +112,7 @@ export function createPreemptiveCompactionHook(
         pluginConfig,
         sessionID,
         cached.providerID,
-        modelID
+        cached.modelID,
       )
 
       await withTimeout(
@@ -133,34 +137,53 @@ export function createPreemptiveCompactionHook(
     const props = event.properties as Record<string, unknown> | undefined
 
     if (event.type === "session.deleted") {
-      const sessionInfo = props?.info as { id?: string } | undefined
-      if (sessionInfo?.id) {
-        compactionInProgress.delete(sessionInfo.id)
-        compactedSessions.delete(sessionInfo.id)
-        tokenCache.delete(sessionInfo.id)
+      const sessionID = (props?.info as { id?: string } | undefined)?.id
+      if (sessionID) {
+        compactionInProgress.delete(sessionID)
+        compactedSessions.delete(sessionID)
+        tokenCache.delete(sessionID)
+        postCompactionMonitor.clear(sessionID)
+      }
+      return
+    }
+
+    if (event.type === "session.compacted") {
+      const sessionID = (props?.sessionID as string | undefined)
+        ?? (props?.info as { id?: string } | undefined)?.id
+      if (sessionID) {
+        postCompactionMonitor.onSessionCompacted(sessionID)
       }
       return
     }
 
     if (event.type === "message.updated") {
       const info = props?.info as {
+        id?: string
         role?: string
         sessionID?: string
         providerID?: string
         modelID?: string
         finish?: boolean
         tokens?: TokenInfo
+        parts?: unknown
       } | undefined
 
-      if (!info || info.role !== "assistant" || !info.finish) return
-      if (!info.sessionID || !info.providerID || !info.tokens) return
+      if (!info || info.role !== "assistant" || !info.finish || !info.sessionID) return
 
-      tokenCache.set(info.sessionID, {
-        providerID: info.providerID,
-        modelID: info.modelID ?? "",
-        tokens: info.tokens,
-      })
+      if (info.providerID && info.tokens) {
+        tokenCache.set(info.sessionID, {
+          providerID: info.providerID,
+          modelID: info.modelID ?? "",
+          tokens: info.tokens,
+        })
+      }
       compactedSessions.delete(info.sessionID)
+
+      await postCompactionMonitor.onAssistantMessageUpdated({
+        sessionID: info.sessionID,
+        id: info.id,
+        parts: info.parts,
+      })
     }
   }
 
