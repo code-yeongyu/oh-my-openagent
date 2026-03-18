@@ -86,15 +86,17 @@ export async function* streamHashLinesFromUtf8(
     pending += text
     const chunksToYield: string[] = []
 
+    let lastIdx = 0
     while (true) {
-      const idx = pending.indexOf("\n")
+      const idx = pending.indexOf("\n", lastIdx)
       if (idx === -1) break
-      const line = pending.slice(0, idx)
-      pending = pending.slice(idx + 1)
+      const line = pending.slice(lastIdx, idx)
+      lastIdx = idx + 1
       endedWithNewline = true
       chunksToYield.push(...pushLine(line))
     }
 
+    pending = pending.slice(lastIdx)
     if (pending.length > 0) endedWithNewline = false
     return chunksToYield
   }

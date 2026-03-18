@@ -28,6 +28,8 @@ export function getErrorMessage(error: unknown): string {
   }
 }
 
+const DEFAULT_RETRY_PATTERN = new RegExp(`\\b(${DEFAULT_CONFIG.retry_on_errors.join("|")})\\b`)
+
 export function extractStatusCode(error: unknown, retryOnErrors?: number[]): number | undefined {
   if (!error) return undefined
 
@@ -45,8 +47,9 @@ export function extractStatusCode(error: unknown, retryOnErrors?: number[]): num
     return statusCode
   }
 
-  const codes = retryOnErrors ?? DEFAULT_CONFIG.retry_on_errors
-  const pattern = new RegExp(`\\b(${codes.join("|")})\\b`)
+  const pattern = retryOnErrors 
+    ? new RegExp(`\\b(${retryOnErrors.join("|")})\\b`)
+    : DEFAULT_RETRY_PATTERN
   const message = getErrorMessage(error)
   const statusMatch = message.match(pattern)
   if (statusMatch) {
