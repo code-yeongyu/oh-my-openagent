@@ -14,15 +14,16 @@ export const BLOCKED_TOOLS = ["Write", "Edit", "write", "edit"]
 export const BASH_TOOLS = ["Bash", "bash"]
 
 const WRITE_COMMAND_PATTERNS = [
-  // File-modifying commands at start of command or after pipe/chain operators
-  /(?:^|[;&|]\s*)(cp|mv|rm|mkdir|rmdir|touch|chmod|chown)\b/,
-  /(?:^|[;&|]\s*)(sed\s+-i|perl\s+-[pi])/,
-  /(?:^|[;&|]\s*)(tee)\b/,
+  // File-modifying commands at start of command, after newlines, or after chain operators.
+  // (?:(?:^|\n)\s*|[;&|]\s*) handles: leading whitespace, newline-separated, and chained cmds
+  /(?:(?:^|\n)\s*|[;&|]\s*)(cp|mv|rm|mkdir|rmdir|touch|chmod|chown)\b/,
+  /(?:(?:^|\n)\s*|[;&|]\s*)(sed\s+-i|perl\s+-[pi])/,
+  /(?:(?:^|\n)\s*|[;&|]\s*)(tee)\b/,
   // Redirect operators (both > and >>)
   />+\s*[^&]/,
   // Git mutating subcommands (excludes read-only: merge-base, tag -l, branch -a)
-  /\bgit\s+(add|commit|push|rebase|reset|stash|cherry-pick|revert)\b/,
-  /\bgit\s+merge\b(?!\s*-)/,
+  /\bgit\s+(add|commit|push|rebase|reset|stash|cherry-pick|revert|rm|clean|restore|pull)\b/,
+  /\bgit\s+merge(?!-)/,
   /\bgit\s+tag\b(?!\s+-(l|list)\b)/,
   /\bgit\s+checkout\s+-b\b/,
   /\bgit\s+branch\s+-[dD]\b/,
