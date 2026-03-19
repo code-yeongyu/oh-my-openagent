@@ -255,6 +255,50 @@ describe("model fallback hook", () => {
     clearPendingModelFallback(sessionID)
   })
 
+  test("uses connected preferred provider when fallback entry providers are disconnected", async () => {
+    //#given
+    const sessionID = "ses_model_fallback_preferred_provider"
+    clearPendingModelFallback(sessionID)
+    readConnectedProvidersCacheMock.mockReturnValue(["provider-x"])
+
+    const hook = createModelFallbackHook() as unknown as {
+      "chat.message"?: (
+        input: { sessionID: string },
+        output: { message: Record<string, unknown>; parts: Array<{ type: string; text?: string }> },
+      ) => Promise<void>
+    }
+
+    setSessionFallbackChain(sessionID, [
+      { providers: ["provider-y"], model: "fallback-model" },
+    ])
+
+    expect(
+      setPendingModelFallback(
+        sessionID,
+        "Sisyphus (Ultraworker)",
+        "provider-x",
+        "current-model",
+      ),
+    ).toBe(true)
+
+    const output = {
+      message: {
+        model: { providerID: "provider-x", modelID: "current-model" },
+      },
+      parts: [{ type: "text", text: "continue" }],
+    }
+
+    //#when
+    await hook["chat.message"]?.({ sessionID }, output)
+
+    //#then
+    expect(output.message["model"]).toEqual({
+      providerID: "provider-x",
+      modelID: "fallback-model",
+    })
+    clearPendingModelFallback(sessionID)
+  })
+
   test("shows toast when fallback is applied", async () => {
     //#given
     const toastCalls: Array<{ title: string; message: string }> = []

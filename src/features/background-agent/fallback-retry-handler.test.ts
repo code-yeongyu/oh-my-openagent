@@ -19,6 +19,8 @@ mock.module("../../shared/provider-model-id-transform", () => ({
 
 import { tryFallbackRetry } from "./fallback-retry-handler"
 import { shouldRetryError } from "../../shared/model-error-classifier"
+import { selectFallbackProvider } from "../../shared/model-error-classifier"
+import { readProviderModelsCache } from "../../shared"
 import type { BackgroundTask } from "./types"
 import type { ConcurrencyManager } from "./concurrency"
 
@@ -82,6 +84,8 @@ function createDefaultArgs(taskOverrides: Partial<BackgroundTask> = {}) {
 describe("tryFallbackRetry", () => {
   beforeEach(() => {
     ;(shouldRetryError as any).mockImplementation(() => true)
+    ;(selectFallbackProvider as any).mockImplementation((providers: string[]) => providers[0])
+    ;(readProviderModelsCache as any).mockReturnValue(null)
   })
 
   describe("#given retryable error with fallback chain", () => {
@@ -265,6 +269,26 @@ describe("tryFallbackRetry", () => {
 
       expect(args.task.model?.modelID).toBe("fallback-model-2")
       expect(args.task.attemptCount).toBe(2)
+    })
+  })
+
+  describe("#given disconnected fallback providers with connected preferred provider", () => {
+    test("keeps fallback entry and selects connected preferred provider", () => {
+      ;(readProviderModelsCache as any).mockReturnValue({ connected: ["provider-a"] })
+      ;(selectFallbackProvider as any).mockImplementation(
+        (_providers: string[], preferredProviderID?: string) => preferredProviderID ?? "provider-b",
+      )
+
+      const args = createDefaultArgs({
+        fallbackChain: [{ model: "fallback-model-1", providers: ["provider-b"], variant: undefined }],
+        model: { providerID: "provider-a", modelID: "original-model" },
+      })
+
+      const result = tryFallbackRetry(args)
+
+      expect(result).toBe(true)
+      expect(args.task.model?.providerID).toBe("provider-a")
+      expect(args.task.model?.modelID).toBe("fallback-model-1")
     })
   })
 })
