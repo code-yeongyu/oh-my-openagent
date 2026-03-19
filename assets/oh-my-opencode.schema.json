@@ -36,7 +36,8 @@
           "agent-browser",
           "dev-browser",
           "frontend-ui-ux",
-          "git-master"
+          "git-master",
+          "runtime-debugging"
         ]
       }
     },
@@ -57,7 +58,9 @@
           "cancel-ralph",
           "refactor",
           "start-work",
-          "stop-continuation"
+          "stop-continuation",
+          "handoff",
+          "debug"
         ]
       }
     },

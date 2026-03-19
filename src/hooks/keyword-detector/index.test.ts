@@ -342,6 +342,7 @@ describe("keyword-detector word boundary", () => {
 describe("keyword-detector system-reminder filtering", () => {
   let logCalls: Array<{ msg: string; data?: unknown }>
   let logSpy: ReturnType<typeof spyOn>
+  let getMainSessionSpy: ReturnType<typeof spyOn>
 
   beforeEach(() => {
     _resetForTesting()
@@ -349,10 +350,12 @@ describe("keyword-detector system-reminder filtering", () => {
     logSpy = spyOn(sharedModule, "log").mockImplementation((msg: string, data?: unknown) => {
       logCalls.push({ msg, data })
     })
+    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(undefined)
   })
 
   afterEach(() => {
     logSpy?.mockRestore()
+    getMainSessionSpy?.mockRestore()
     _resetForTesting()
   })
 
@@ -744,5 +747,72 @@ describe("keyword-detector agent-specific ultrawork messages", () => {
     expect(textPart).toBeDefined()
     expect(textPart!.text).toBe("ultrawork plan this")
     expect(textPart!.text).not.toContain("YOU ARE A PLANNER, NOT AN IMPLEMENTER")
+  })
+})
+
+describe("keyword-detector debug keyword detection", () => {
+  let logCalls: Array<{ msg: string; data?: unknown }>
+  let logSpy: ReturnType<typeof spyOn>
+
+  let getMainSessionSpy: ReturnType<typeof spyOn>
+
+  beforeEach(() => {
+    _resetForTesting()
+    logCalls = []
+    logSpy = spyOn(sharedModule, "log").mockImplementation((msg: string, data?: unknown) => {
+      logCalls.push({ msg, data })
+    })
+    // Override any mocks from other tests
+    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(undefined)
+  })
+
+  afterEach(() => {
+    logSpy?.mockRestore()
+    getMainSessionSpy?.mockRestore()
+  })
+
+  function createMockPluginInput() {
+    return {
+      client: {
+        tui: {
+          showToast: async () => {},
+        },
+      },
+    } as any
+  }
+
+  test("should prepend debug message to text part", async () => {
+    const collector = new ContextCollector()
+    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
+    const sessionID = "test-session-debug"
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "debug this issue" }],
+    }
+
+    await hook["chat.message"]({ sessionID }, output)
+
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).toContain("[debug-mode]")
+    expect(textPart!.text).toContain("---")
+    expect(textPart!.text).toContain("this issue")
+  })
+
+  test("should NOT trigger analyze-mode for 'debug' keyword", async () => {
+    const collector = new ContextCollector()
+    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
+    const sessionID = "test-session-debug-only"
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "debug this code" }],
+    }
+
+    await hook["chat.message"]({ sessionID }, output)
+
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).toContain("[debug-mode]")
+    expect(textPart!.text).not.toContain("[analyze-mode]")
   })
 })

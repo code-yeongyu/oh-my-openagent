@@ -28,4 +28,17 @@ export const KEYWORD_DETECTORS: KeywordDetector[] = [
     pattern: ANALYZE_PATTERN,
     message: ANALYZE_MESSAGE,
   },
+  // DEBUG (index 3)
+  {
+    pattern: /\b(debug|debugging|debugger|breakpoint)\b|디버그|デバッグ|调试|gỡ lỗi/i,
+    message: `[debug-mode]
+DEBUG MODE. Use /debug command or follow runtime-debugging skill:
+1. Describe the bug
+2. Generate hypotheses
+3. Instrument code
+4. Reproduce issue
+5. Analyze logs
+6. Fix based on evidence
+7. Verify and cleanup`,
+  },
 ]

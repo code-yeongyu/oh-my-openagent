@@ -6,6 +6,7 @@ import { STOP_CONTINUATION_TEMPLATE } from "./templates/stop-continuation"
 import { REFACTOR_TEMPLATE } from "./templates/refactor"
 import { START_WORK_TEMPLATE } from "./templates/start-work"
 import { HANDOFF_TEMPLATE } from "./templates/handoff"
+import { DEBUG_TEMPLATE } from "./templates/debug"
 
 const BUILTIN_COMMAND_DEFINITIONS: Record<BuiltinCommandName, Omit<CommandDefinition, "name">> = {
   "init-deep": {
@@ -19,28 +20,28 @@ $ARGUMENTS
 </user-request>`,
     argumentHint: "[--create-new] [--max-depth=N]",
   },
-   "ralph-loop": {
-     description: "(builtin) Start self-referential development loop until completion",
-     template: `<command-instruction>
+  "ralph-loop": {
+    description: "(builtin) Start self-referential development loop until completion",
+    template: `<command-instruction>
 ${RALPH_LOOP_TEMPLATE}
 </command-instruction>
 
 <user-task>
 $ARGUMENTS
 </user-task>`,
-     argumentHint: '"task description" [--completion-promise=TEXT] [--max-iterations=N] [--strategy=reset|continue]',
-   },
-   "ulw-loop": {
-      description: "(builtin) Start ultrawork loop - continues until completion with ultrawork mode",
-      template: `<command-instruction>
+    argumentHint: '"task description" [--completion-promise=TEXT] [--max-iterations=N] [--strategy=reset|continue]',
+  },
+  "ulw-loop": {
+    description: "(builtin) Start ultrawork loop - continues until completion with ultrawork mode",
+    template: `<command-instruction>
 ${ULW_LOOP_TEMPLATE}
 </command-instruction>
 
 <user-task>
 $ARGUMENTS
 </user-task>`,
-      argumentHint: '"task description" [--completion-promise=TEXT] [--strategy=reset|continue]',
-    },
+    argumentHint: '"task description" [--completion-promise=TEXT] [--strategy=reset|continue]',
+  },
   "cancel-ralph": {
     description: "(builtin) Cancel active Ralph Loop",
     template: `<command-instruction>
@@ -93,6 +94,12 @@ Timestamp: $TIMESTAMP
 $ARGUMENTS
 </user-request>`,
     argumentHint: "[goal]",
+  },
+  debug: {
+    description: "(builtin) Debug runtime issues with hypothesis-driven instrumentation",
+    template: `<command-instruction>
+${DEBUG_TEMPLATE}
+</command-instruction>`,
   },
 }
 
