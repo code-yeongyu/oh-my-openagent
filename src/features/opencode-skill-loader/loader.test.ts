@@ -5,6 +5,8 @@ import { tmpdir } from "os"
 
 const TEST_DIR = join(tmpdir(), "skill-loader-test-" + Date.now())
 const SKILLS_DIR = join(TEST_DIR, ".opencode", "skills")
+const ORIGINAL_OPENCODE_CONFIG_DIR = process.env.OPENCODE_CONFIG_DIR
+const ORIGINAL_XDG_CACHE_HOME = process.env.XDG_CACHE_HOME
 
 function createTestSkill(name: string, content: string, mcpJson?: object): string {
   const skillDir = join(SKILLS_DIR, name)
@@ -24,6 +26,16 @@ describe("skill loader MCP parsing", () => {
 
   afterEach(() => {
     rmSync(TEST_DIR, { recursive: true, force: true })
+    if (ORIGINAL_OPENCODE_CONFIG_DIR !== undefined) {
+      process.env.OPENCODE_CONFIG_DIR = ORIGINAL_OPENCODE_CONFIG_DIR
+    } else {
+      delete process.env.OPENCODE_CONFIG_DIR
+    }
+    if (ORIGINAL_XDG_CACHE_HOME !== undefined) {
+      process.env.XDG_CACHE_HOME = ORIGINAL_XDG_CACHE_HOME
+    } else {
+      delete process.env.XDG_CACHE_HOME
+    }
   })
 
   describe("parseSkillMcpConfig", () => {
@@ -615,5 +627,83 @@ Skill body.
       expect(skill).toBeDefined()
       expect(skill?.scope).toBe("project")
     })
+  })
+})
+
+describe("plugin-bundled skill discovery", () => {
+  beforeEach(() => {
+    mkdirSync(TEST_DIR, { recursive: true })
+  })
+
+  afterEach(() => {
+    rmSync(TEST_DIR, { recursive: true, force: true })
+    if (ORIGINAL_OPENCODE_CONFIG_DIR !== undefined) {
+      process.env.OPENCODE_CONFIG_DIR = ORIGINAL_OPENCODE_CONFIG_DIR
+    } else {
+      delete process.env.OPENCODE_CONFIG_DIR
+    }
+    if (ORIGINAL_XDG_CACHE_HOME !== undefined) {
+      process.env.XDG_CACHE_HOME = ORIGINAL_XDG_CACHE_HOME
+    } else {
+      delete process.env.XDG_CACHE_HOME
+    }
+  })
+
+  it("discovers plugin-packaged OpenCode skills from the OpenCode cache node_modules", async () => {
+    const configDir = join(TEST_DIR, ".config", "opencode")
+    const cacheDir = join(TEST_DIR, ".cache")
+    const pluginRoot = join(cacheDir, "opencode", "node_modules", "superpowers")
+    const pluginEntryDir = join(pluginRoot, ".opencode", "plugins")
+    const pluginSkillsDir = join(pluginRoot, "skills", "systematic-debugging")
+
+    mkdirSync(pluginEntryDir, { recursive: true })
+    mkdirSync(pluginSkillsDir, { recursive: true })
+    writeFileSync(join(pluginEntryDir, "superpowers.js"), "export const plugin = {};\n")
+    writeFileSync(
+      join(pluginSkillsDir, "SKILL.md"),
+      `---
+name: systematic-debugging
+description: Root-cause debugging workflow
+---
+Debug things systematically.
+`
+    )
+
+    process.env.OPENCODE_CONFIG_DIR = configDir
+    process.env.XDG_CACHE_HOME = cacheDir
+
+    const { discoverSkills } = await import("./loader")
+    const skills = await discoverSkills({ includeClaudeCodePaths: false, directory: TEST_DIR })
+
+    expect(skills.some(s => s.name === "superpowers/systematic-debugging")).toBe(true)
+  })
+
+  it("preserves npm scope for plugin-packaged OpenCode skills", async () => {
+    const configDir = join(TEST_DIR, ".config", "opencode")
+    const cacheDir = join(TEST_DIR, ".cache")
+    const pluginRoot = join(cacheDir, "opencode", "node_modules", "@obra", "superpowers")
+    const pluginEntryDir = join(pluginRoot, ".opencode", "plugins")
+    const pluginSkillsDir = join(pluginRoot, "skills", "systematic-debugging")
+
+    mkdirSync(pluginEntryDir, { recursive: true })
+    mkdirSync(pluginSkillsDir, { recursive: true })
+    writeFileSync(join(pluginEntryDir, "superpowers.js"), "export const plugin = {};\n")
+    writeFileSync(
+      join(pluginSkillsDir, "SKILL.md"),
+      `---
+name: systematic-debugging
+description: Root-cause debugging workflow
+---
+Debug things systematically.
+`
+    )
+
+    process.env.OPENCODE_CONFIG_DIR = configDir
+    process.env.XDG_CACHE_HOME = cacheDir
+
+    const { discoverSkills } = await import("./loader")
+    const skills = await discoverSkills({ includeClaudeCodePaths: false, directory: TEST_DIR })
+
+    expect(skills.some(s => s.name === "@obra/superpowers/systematic-debugging")).toBe(true)
   })
 })
