@@ -1746,7 +1746,7 @@ session_id: ses_untrusted_999
       expect(mockInput._promptMock).toHaveBeenCalledTimes(1)
     })
 
-    test("should stop continuation after 2 consecutive prompt failures (issue #1355)", async () => {
+    test("should stop continuation after 10 consecutive prompt failures (issue #1355)", async () => {
       //#given - boulder state with incomplete plan and prompt always fails
       const planPath = join(TEST_DIR, "test-plan.md")
       writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
@@ -1759,7 +1759,7 @@ session_id: ses_untrusted_999
       }
       writeBoulderState(TEST_DIR, state)
 
-      const promptMock = mock(() => Promise.reject(new Error("Bad Request")))
+      const promptMock = mock((): Promise<void> => Promise.reject(new Error("Bad Request")))
       const mockInput = createMockPluginInput({ promptMock })
       const hook = createAtlasHook(mockInput)
 
@@ -1769,25 +1769,23 @@ session_id: ses_untrusted_999
 
       try {
         //#when - idle fires repeatedly, past cooldown each time
-        await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
-        await flushMicrotasks()
-        now += 6000
-
-        await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
-        await flushMicrotasks()
-        now += 6000
+        for (let i = 0; i < 10; i++) {
+          await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
+          await flushMicrotasks()
+          now += 6000
+        }
 
         await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
         await flushMicrotasks()
 
-        //#then - should attempt only twice, then disable continuation
-        expect(promptMock).toHaveBeenCalledTimes(2)
+        //#then - should attempt only 10 times, then disable continuation
+        expect(promptMock).toHaveBeenCalledTimes(10)
       } finally {
         Date.now = originalDateNow
       }
     })
 
-    test("should reset prompt failure counter on success and only stop after 2 consecutive failures", async () => {
+    test("should reset prompt failure counter on success and only stop after 10 consecutive failures", async () => {
       //#given - boulder state with incomplete plan
       const planPath = join(TEST_DIR, "test-plan.md")
       writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
@@ -1800,11 +1798,9 @@ session_id: ses_untrusted_999
       }
       writeBoulderState(TEST_DIR, state)
 
-      const promptMock = mock(() => Promise.resolve())
+      const promptMock = mock((): Promise<void> => Promise.reject(new Error("Bad Request")))
       promptMock.mockImplementationOnce(() => Promise.reject(new Error("Bad Request")))
       promptMock.mockImplementationOnce(() => Promise.resolve())
-      promptMock.mockImplementationOnce(() => Promise.reject(new Error("Bad Request")))
-      promptMock.mockImplementationOnce(() => Promise.reject(new Error("Bad Request")))
 
       const mockInput = createMockPluginInput({ promptMock })
       const hook = createAtlasHook(mockInput)
@@ -1814,21 +1810,21 @@ session_id: ses_untrusted_999
       Date.now = () => now
 
       try {
-        //#when - fail, succeed (reset), then fail twice (disable), then attempt again
-        for (let i = 0; i < 5; i++) {
+        //#when - fail, succeed (reset), then fail 10 times (disable), then attempt again
+        for (let i = 0; i < 13; i++) {
           await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
           await flushMicrotasks()
           now += 6000
         }
 
-        //#then - 4 prompt attempts; 5th idle is skipped after 2 consecutive failures
-        expect(promptMock).toHaveBeenCalledTimes(4)
+        //#then - 12 prompt attempts; 13th idle is skipped after 10 consecutive failures
+        expect(promptMock).toHaveBeenCalledTimes(12)
       } finally {
         Date.now = originalDateNow
       }
     })
 
-    test("should keep skipping continuation during 5-minute backoff after 2 consecutive failures", async () => {
+    test("should keep skipping continuation during 5-minute backoff after 10 consecutive failures", async () => {
       //#given - boulder state with incomplete plan and prompt always fails
       const planPath = join(TEST_DIR, "test-plan.md")
       writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
@@ -1850,26 +1846,26 @@ session_id: ses_untrusted_999
       Date.now = () => now
 
       try {
-        //#when - third idle occurs inside 5-minute backoff window
-        await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
-        await flushMicrotasks()
-        now += 6000
+        //#when - 11th idle occurs inside 5-minute backoff window
+        for (let i = 0; i < 10; i++) {
+          await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
+          await flushMicrotasks()
+          now += 6000
+        }
 
-        await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
-        await flushMicrotasks()
         now += 60000
 
         await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
         await flushMicrotasks()
 
-        //#then - third attempt should still be skipped
-        expect(promptMock).toHaveBeenCalledTimes(2)
+        //#then - 11th attempt should still be skipped
+        expect(promptMock).toHaveBeenCalledTimes(10)
       } finally {
         Date.now = originalDateNow
       }
     })
 
-    test("should retry continuation after 5-minute backoff expires following 2 consecutive failures", async () => {
+    test("should retry continuation after 5-minute backoff expires following 10 consecutive failures", async () => {
       //#given - boulder state with incomplete plan and prompt always fails
       const planPath = join(TEST_DIR, "test-plan.md")
       writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
@@ -1891,20 +1887,20 @@ session_id: ses_untrusted_999
       Date.now = () => now
 
       try {
-        //#when - third idle occurs after 5+ minutes
-        await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
-        await flushMicrotasks()
-        now += 6000
+        //#when - 11th idle occurs after 5+ minutes
+        for (let i = 0; i < 10; i++) {
+          await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
+          await flushMicrotasks()
+          now += 6000
+        }
 
-        await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
-        await flushMicrotasks()
         now += 300000
 
         await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
         await flushMicrotasks()
 
-        //#then - third attempt should run after backoff expiration
-        expect(promptMock).toHaveBeenCalledTimes(3)
+        //#then - 11th attempt should run after backoff expiration
+        expect(promptMock).toHaveBeenCalledTimes(11)
       } finally {
         Date.now = originalDateNow
       }
@@ -1924,8 +1920,9 @@ session_id: ses_untrusted_999
       writeBoulderState(TEST_DIR, state)
 
       const promptMock = mock((): Promise<void> => Promise.reject(new Error("Bad Request")))
-      promptMock.mockImplementationOnce(() => Promise.reject(new Error("Bad Request")))
-      promptMock.mockImplementationOnce(() => Promise.reject(new Error("Bad Request")))
+      for (let i = 0; i < 10; i++) {
+        promptMock.mockImplementationOnce(() => Promise.reject(new Error("Bad Request")))
+      }
       promptMock.mockImplementationOnce(() => Promise.resolve(undefined))
       const mockInput = createMockPluginInput({ promptMock })
       const hook = createAtlasHook(mockInput)
@@ -1935,32 +1932,30 @@ session_id: ses_untrusted_999
       Date.now = () => now
 
       try {
-        //#when - fail twice, recover after backoff with success, then fail twice again
-        await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
-        await flushMicrotasks()
-        now += 6000
+        //#when - fail 10 times, recover after backoff with success, then fail 10 times again
+        for (let i = 0; i < 10; i++) {
+          await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
+          await flushMicrotasks()
+          now += 6000
+        }
 
-        await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
-        await flushMicrotasks()
         now += 300000
 
         await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
         await flushMicrotasks()
         now += 6000
 
-        await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
-        await flushMicrotasks()
-        now += 6000
-
-        await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
-        await flushMicrotasks()
-        now += 6000
+        for (let i = 0; i < 10; i++) {
+          await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
+          await flushMicrotasks()
+          now += 6000
+        }
 
         await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
         await flushMicrotasks()
 
-        //#then - success retry resets counter, so two additional failures are allowed before skip
-        expect(promptMock).toHaveBeenCalledTimes(5)
+        //#then - success retry resets counter, so 10 additional failures are allowed before skip
+        expect(promptMock).toHaveBeenCalledTimes(21)
       } finally {
         Date.now = originalDateNow
       }
@@ -1988,14 +1983,12 @@ session_id: ses_untrusted_999
       Date.now = () => now
 
       try {
-        //#when - two failures disables continuation, then compaction resets it
-        await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
-        await flushMicrotasks()
-        now += 6000
-
-        await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
-        await flushMicrotasks()
-        now += 6000
+        //#when - 10 failures disable continuation, then compaction resets it
+        for (let i = 0; i < 10; i++) {
+          await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
+          await flushMicrotasks()
+          now += 6000
+        }
 
         await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
         await flushMicrotasks()
@@ -2006,8 +1999,8 @@ session_id: ses_untrusted_999
         await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
         await flushMicrotasks()
 
-        //#then - 2 attempts + 1 after compaction (3 total)
-        expect(promptMock).toHaveBeenCalledTimes(3)
+        //#then - 10 attempts + 1 after compaction (11 total)
+        expect(promptMock).toHaveBeenCalledTimes(11)
       } finally {
         Date.now = originalDateNow
       }

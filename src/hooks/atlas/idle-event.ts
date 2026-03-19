@@ -13,6 +13,7 @@ import type { AtlasHookOptions, SessionState } from "./types"
 
 const CONTINUATION_COOLDOWN_MS = 5000
 const FAILURE_BACKOFF_MS = 5 * 60 * 1000
+const MAX_CONSECUTIVE_PROMPT_FAILURES = 10
 const RETRY_DELAY_MS = CONTINUATION_COOLDOWN_MS + 1000
 
 function hasRunningBackgroundTasks(sessionID: string, options?: AtlasHookOptions): boolean {
@@ -77,7 +78,7 @@ function scheduleRetry(input: {
   sessionState.pendingRetryTimer = setTimeout(async () => {
     sessionState.pendingRetryTimer = undefined
 
-    if (sessionState.promptFailureCount >= 2) return
+    if (sessionState.promptFailureCount >= MAX_CONSECUTIVE_PROMPT_FAILURES) return
     if (sessionState.waitingForFinalWaveApproval) return
 
     const currentBoulder = readBoulderState(ctx.directory)
@@ -150,7 +151,7 @@ export async function handleAtlasSessionIdle(input: {
     return
   }
 
-  if (sessionState.promptFailureCount >= 2) {
+  if (sessionState.promptFailureCount >= MAX_CONSECUTIVE_PROMPT_FAILURES) {
     const timeSinceLastFailure =
       sessionState.lastFailureAt !== undefined ? now - sessionState.lastFailureAt : Number.POSITIVE_INFINITY
     if (timeSinceLastFailure < FAILURE_BACKOFF_MS) {
