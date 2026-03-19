@@ -27,7 +27,7 @@ Core glue layer. 20 source files assembling the 8 OpenCode hook handlers and com
 | `create-session-hooks.ts` | Session | 23 |
 | `create-tool-guard-hooks.ts` | Tool Guard | 12 |
 | `create-skill-hooks.ts` | Skill | 2 |
-| `create-core-hooks.ts` | Aggregator | Session + Guard + Transform = 37 |
+| `create-core-hooks.ts` | Aggregator | Session + Guard + Transform = 39 |
 
 ## SUPPORT FILES
 
