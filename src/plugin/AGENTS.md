@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-Core glue layer. 20 source files assembling the 8 OpenCode hook handlers and composing 45 hooks into the PluginInterface. Every handler file corresponds to one OpenCode hook type.
+Core glue layer. 20 source files assembling the 8 OpenCode hook handlers and composing 48 hooks into the PluginInterface. Every handler file corresponds to one OpenCode hook type.
 
 ## HANDLER FILES
 
@@ -25,7 +25,7 @@ Core glue layer. 20 source files assembling the 8 OpenCode hook handlers and com
 | File | Tier | Count |
 |------|------|-------|
 | `create-session-hooks.ts` | Session | 23 |
-| `create-tool-guard-hooks.ts` | Tool Guard | 10 |
+| `create-tool-guard-hooks.ts` | Tool Guard | 12 |
 | `create-skill-hooks.ts` | Skill | 2 |
 | `create-core-hooks.ts` | Aggregator | Session + Guard + Transform = 37 |
 

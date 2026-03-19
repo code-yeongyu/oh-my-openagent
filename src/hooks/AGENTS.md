@@ -1,10 +1,10 @@
-# src/hooks/ — 45 Lifecycle Hooks
+# src/hooks/ — 48 Lifecycle Hooks
 
 **Generated:** 2026-03-06
 
 ## OVERVIEW
 
-45 hooks across 44 directories + 11 standalone files. Three-tier composition: Core(37) + Continuation(6) + Skill(2). All hooks follow `createXXXHook(deps) → HookFunction` factory pattern.
+48 hooks across dedicated modules and standalone files. Three-tier composition: Core(39) + Continuation(7) + Skill(2). All hooks follow `createXXXHook(deps) → HookFunction` factory pattern.
 
 ## HOOK TIERS
 
@@ -85,7 +85,7 @@ hooks/
 | noHephaestusNonGpt | chat.message | Block Hephaestus from using non-GPT models |
 | runtimeFallback | event | Auto-switch models on API provider errors |
 
-### Tier 2: Tool Guard Hooks (10) — `create-tool-guard-hooks.ts`
+### Tier 2: Tool Guard Hooks (12) — `create-tool-guard-hooks.ts`
 
 | Hook | Event | Purpose |
 |------|-------|---------|
@@ -109,7 +109,7 @@ hooks/
 | contextInjectorMessagesTransform | messages.transform | Inject AGENTS.md/README.md into context |
 | thinkingBlockValidator | messages.transform | Validate thinking block structure |
 
-### Tier 4: Continuation Hooks (6) — `create-continuation-hooks.ts`
+### Tier 4: Continuation Hooks (7) — `create-continuation-hooks.ts`
 
 | Hook | Event | Purpose |
 |------|-------|---------|

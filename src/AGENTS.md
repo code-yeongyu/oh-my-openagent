@@ -14,7 +14,7 @@ Entry point `index.ts` orchestrates 5-step initialization: loadConfig → create
 | `plugin-config.ts` | JSONC parse, multi-level merge, Zod v4 validation |
 | `create-managers.ts` | TmuxSessionManager, BackgroundManager, SkillMcpManager, ConfigHandler |
 | `create-tools.ts` | SkillContext + AvailableCategories + ToolRegistry (26 tools) |
-| `create-hooks.ts` | 3-tier: Core(37) + Continuation(6) + Skill(2) = 45 hooks |
+| `create-hooks.ts` | 3-tier: Core(39) + Continuation(7) + Skill(2) = 48 hooks |
 | `plugin-interface.ts` | 8 OpenCode hook handlers: config, tool, chat.message, chat.params, chat.headers, event, tool.execute.before, tool.execute.after |
 
 ## CONFIG LOADING
@@ -36,6 +36,6 @@ createHooks()
   │   ├─ createSessionHooks()     # 23: contextWindowMonitor, thinkMode, ralphLoop, modelFallback, runtimeFallback, noSisyphusGpt, noHephaestusNonGpt, anthropicEffort, intentGate...
   │   ├─ createToolGuardHooks()   # 10: commentChecker, rulesInjector, writeExistingFileGuard, jsonErrorRecovery, hashlineReadEnhancer...
   │   └─ createTransformHooks()   # 4: claudeCodeHooks, keywordDetector, contextInjector, thinkingBlockValidator
-  ├─→ createContinuationHooks()   # 6: todoContinuationEnforcer, atlas, stopContinuationGuard, ralphLoopActivator...
+  ├─→ createContinuationHooks()   # 7: todoContinuationEnforcer, atlas, stopContinuationGuard, ralphLoopActivator...
   └─→ createSkillHooks()          # 2: categorySkillReminder, autoSlashCommand
 ```
