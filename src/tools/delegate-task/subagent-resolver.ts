@@ -12,6 +12,7 @@ import { log } from "../../shared/logger"
 import { getAvailableModelsForDelegateTask } from "./available-models"
 import type { FallbackEntry } from "../../shared/model-requirements"
 import { resolveModelForDelegateTask } from "./model-selection"
+import { loadUserAgents, loadProjectAgents } from "../../features/claude-code-agent-loader"
 
 export async function resolveSubagentExecution(
   args: DelegateTaskArgs,
@@ -19,7 +20,7 @@ export async function resolveSubagentExecution(
   parentAgent: string | undefined,
   categoryExamples: string
 ): Promise<{ agentToUse: string; categoryModel: { providerID: string; modelID: string; variant?: string } | undefined; fallbackChain?: FallbackEntry[]; error?: string }> {
-  const { client, agentOverrides, userCategories } = executorCtx
+  const { client, agentOverrides, userCategories, directory } = executorCtx
 
   if (!args.subagent_type?.trim()) {
     return { agentToUse: "", categoryModel: undefined, error: `Agent name cannot be empty.` }
@@ -62,7 +63,33 @@ Create the work plan directly - that's your job as the planning agent.`,
       preferResponseOnMissingData: true,
     })
 
-    const callableAgents = agents.filter((a) => a.mode !== "primary")
+    // Merge user and project agents into the server's agent list
+    // Server agents take precedence; user/project agents fill in gaps
+    const userAgents = loadUserAgents()
+    const projectAgents = loadProjectAgents(directory)
+
+    const mergedAgents: AgentInfo[] = [
+      ...agents,
+      ...Object.entries(userAgents).map(([name, config]) => ({
+        name,
+        mode: config.mode as "subagent" | "primary" | "all",
+        model: config.model,
+      })),
+      ...Object.entries(projectAgents).map(([name, config]) => ({
+        name,
+        mode: config.mode as "subagent" | "primary" | "all",
+        model: config.model,
+      })),
+    ]
+
+    // Dedupe by name, server agents first
+    const agentByName = new Map<string, AgentInfo>()
+    for (const agent of mergedAgents) {
+      if (!agentByName.has(agent.name.toLowerCase())) {
+        agentByName.set(agent.name.toLowerCase(), agent)
+      }
+    }
+    const callableAgents = Array.from(agentByName.values()).filter((a) => a.mode !== "primary")
 
     const resolvedDisplayName = getAgentDisplayName(agentToUse)
     const matchedAgent = callableAgents.find(
@@ -70,12 +97,12 @@ Create the work plan directly - that's your job as the planning agent.`,
         || agent.name.toLowerCase() === resolvedDisplayName.toLowerCase()
     )
     if (!matchedAgent) {
-      const isPrimaryAgent = agents
-        .filter((a) => a.mode === "primary")
+      // Check against all merged agents (not callableAgents) since callableAgents excludes primary
+      const isPrimaryAgent = Array.from(agentByName.values())
         .find((agent) => agent.name.toLowerCase() === agentToUse.toLowerCase()
           || agent.name.toLowerCase() === resolvedDisplayName.toLowerCase())
 
-      if (isPrimaryAgent) {
+      if (isPrimaryAgent && isPrimaryAgent.mode === "primary") {
         return {
           agentToUse: "",
           categoryModel: undefined,
