@@ -13,7 +13,7 @@ const DESCRIPTION =
 const ALLOWED_AGENTS = new Set<string>(SWITCHABLE_AGENT_NAMES)
 
 type TuiService = {
-  selectSession: (input?: { sessionID?: string }) => Promise<unknown>
+  selectSession: (input: { body: { sessionID: string } }) => Promise<unknown>
 }
 
 type SessionClient = {
@@ -58,12 +58,14 @@ function hasTuiService(client: SessionClient): client is SessionClient & { tui: 
 
 async function navigateTuiToSession(client: SessionClient, sessionID: string): Promise<boolean> {
   if (!hasTuiService(client)) {
+    log("[switch-agent] TUI service not available, cannot navigate to session:", sessionID)
     return false
   }
   try {
-    await client.tui.selectSession({ sessionID })
+    await client.tui.selectSession({ body: { sessionID } })
     return true
-  } catch {
+  } catch (error) {
+    log("[switch-agent] TUI navigation failed for session:", { sessionID, error })
     return false
   }
 }

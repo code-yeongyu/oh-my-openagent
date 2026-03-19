@@ -1839,37 +1839,6 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
           }
         }
 
-        if (sessionStatus?.type === "idle") {
-
-          // Refresh lastUpdate so the next poll's stale check doesn't kill
-          // the task while we're awaiting async validation
-          if (task.progress) {
-            task.progress.lastUpdate = new Date()
-          }
-
-          // Edge guard: Validate session has actual output before completing
-          const hasValidOutput = await this.validateSessionHasOutput(sessionID)
-          if (!hasValidOutput) {
-            log("[background-agent] Polling idle but no valid output yet, waiting:", task.id)
-            continue
-          }
-
-          // Re-check status after async operation
-          if (task.status !== "running") continue
-
-          const hasIncompleteTodos = await this.checkSessionTodos(sessionID)
-          if (hasIncompleteTodos) {
-            log("[background-agent] Task has incomplete todos via polling, waiting:", task.id)
-            continue
-          }
-
-          const councilNudged = await this.nudgeCouncilMemberIfNeeded(task, sessionID)
-          if (councilNudged) continue
-
-          await this.tryCompleteTask(task, "polling (idle status)")
-          continue
-        }
-
         // Only skip completion when session status is actively running.
         // Unknown or terminal statuses (like "interrupted") fall through to completion.
         if (sessionStatus && isActiveSessionStatus(sessionStatus.type)) {
