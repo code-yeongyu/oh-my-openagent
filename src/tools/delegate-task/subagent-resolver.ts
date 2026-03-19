@@ -53,7 +53,7 @@ Create the work plan directly - that's your job as the planning agent.`,
   let fallbackChain: FallbackEntry[] | undefined = undefined
 
   try {
-    const agentsResult = await client.app.agents()
+    const agentsResult = await client.app.agents({ query: { directory } })
     type AgentInfo = {
       name: string
       mode?: "subagent" | "primary" | "all"
