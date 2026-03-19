@@ -88,7 +88,6 @@ function scheduleRetry(input: {
     const currentProgress = getPlanProgress(currentBoulder.active_plan)
     if (currentProgress.isComplete) return
     if (options?.isContinuationStopped?.(sessionID)) return
-    if (options?.shouldSkipContinuation?.(sessionID)) return
     if (hasRunningBackgroundTasks(sessionID, options)) return
 
     await injectContinuation({
@@ -174,11 +173,6 @@ export async function handleAtlasSessionIdle(input: {
 
   if (options?.isContinuationStopped?.(sessionID)) {
     log(`[${HOOK_NAME}] Skipped: continuation stopped for session`, { sessionID })
-    return
-  }
-
-  if (options?.shouldSkipContinuation?.(sessionID)) {
-    log(`[${HOOK_NAME}] Skipped: another continuation hook already injected`, { sessionID })
     return
   }
 

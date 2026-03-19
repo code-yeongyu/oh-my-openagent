@@ -1,10 +1,10 @@
-# src/hooks/ — 46 Lifecycle Hooks
+# src/hooks/ — 45 Lifecycle Hooks
 
 **Generated:** 2026-03-06
 
 ## OVERVIEW
 
-46 hooks across 45 directories + 11 standalone files. Three-tier composition: Core(37) + Continuation(7) + Skill(2). All hooks follow `createXXXHook(deps) → HookFunction` factory pattern.
+45 hooks across 44 directories + 11 standalone files. Three-tier composition: Core(37) + Continuation(6) + Skill(2). All hooks follow `createXXXHook(deps) → HookFunction` factory pattern.
 
 ## HOOK TIERS
 
@@ -109,7 +109,7 @@ hooks/
 | contextInjectorMessagesTransform | messages.transform | Inject AGENTS.md/README.md into context |
 | thinkingBlockValidator | messages.transform | Validate thinking block structure |
 
-### Tier 4: Continuation Hooks (7) — `create-continuation-hooks.ts`
+### Tier 4: Continuation Hooks (6) — `create-continuation-hooks.ts`
 
 | Hook | Event | Purpose |
 |------|-------|---------|

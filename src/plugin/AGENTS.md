@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-Core glue layer. 20 source files assembling the 8 OpenCode hook handlers and composing 46 hooks into the PluginInterface. Every handler file corresponds to one OpenCode hook type.
+Core glue layer. 20 source files assembling the 8 OpenCode hook handlers and composing 45 hooks into the PluginInterface. Every handler file corresponds to one OpenCode hook type.
 
 ## HANDLER FILES
 

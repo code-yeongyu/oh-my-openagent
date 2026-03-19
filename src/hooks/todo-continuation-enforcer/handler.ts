@@ -17,7 +17,6 @@ export function createTodoContinuationHandler(args: {
   backgroundManager?: BackgroundManager
   skipAgents?: string[]
   isContinuationStopped?: (sessionID: string) => boolean
-  shouldSkipContinuation?: (sessionID: string) => boolean
 }): (input: { event: { type: string; properties?: unknown } }) => Promise<void> {
   const {
     ctx,
@@ -25,7 +24,6 @@ export function createTodoContinuationHandler(args: {
     backgroundManager,
     skipAgents = DEFAULT_SKIP_AGENTS,
     isContinuationStopped,
-    shouldSkipContinuation,
   } = args
 
   return async ({ event }: { event: { type: string; properties?: unknown } }): Promise<void> => {
@@ -58,7 +56,6 @@ export function createTodoContinuationHandler(args: {
         backgroundManager,
         skipAgents,
         isContinuationStopped,
-        shouldSkipContinuation,
       })
       return
     }
