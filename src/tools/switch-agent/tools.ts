@@ -12,8 +12,12 @@ const DESCRIPTION =
 
 const ALLOWED_AGENTS = new Set<string>(SWITCHABLE_AGENT_NAMES)
 
-type TuiService = {
-  selectSession: (input: { body: { sessionID: string } }) => Promise<unknown>
+type TuiHttpClient = {
+  post: (input: {
+    url: string
+    body: Record<string, unknown>
+    headers?: Record<string, string>
+  }) => Promise<unknown>
 }
 
 type SessionClient = {
@@ -48,21 +52,29 @@ function extractSessionId(response: unknown): string | undefined {
   return undefined
 }
 
-function hasTuiService(client: SessionClient): client is SessionClient & { tui: TuiService } {
-  const maybeTui = Reflect.get(client as object, "tui")
-  if (typeof maybeTui !== "object" || maybeTui === null) {
-    return false
+function getHttpClient(client: SessionClient): TuiHttpClient | null {
+  const maybeClient = Reflect.get(client as object, "_client")
+  if (typeof maybeClient !== "object" || maybeClient === null) {
+    return null
   }
-  return typeof Reflect.get(maybeTui, "selectSession") === "function"
+  if (typeof Reflect.get(maybeClient, "post") !== "function") {
+    return null
+  }
+  return maybeClient as TuiHttpClient
 }
 
 async function navigateTuiToSession(client: SessionClient, sessionID: string): Promise<boolean> {
-  if (!hasTuiService(client)) {
-    log("[switch-agent] TUI service not available, cannot navigate to session:", sessionID)
+  const httpClient = getHttpClient(client)
+  if (!httpClient) {
+    log("[switch-agent] HTTP client not available, cannot navigate TUI to session:", sessionID)
     return false
   }
   try {
-    await client.tui.selectSession({ body: { sessionID } })
+    await httpClient.post({
+      url: "/tui/select-session",
+      body: { sessionID },
+      headers: { "Content-Type": "application/json" },
+    })
     return true
   } catch (error) {
     log("[switch-agent] TUI navigation failed for session:", { sessionID, error })
