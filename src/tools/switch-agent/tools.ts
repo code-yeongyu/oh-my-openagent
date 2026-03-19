@@ -70,11 +70,15 @@ async function navigateTuiToSession(client: SessionClient, sessionID: string): P
     return false
   }
   try {
-    await httpClient.post({
+    const result = await httpClient.post({
       url: "/tui/select-session",
       body: { sessionID },
       headers: { "Content-Type": "application/json" },
     })
+    if (typeof result === "object" && result !== null && "error" in result) {
+      log("[switch-agent] TUI navigation returned error for session:", { sessionID, error: result.error })
+      return false
+    }
     return true
   } catch (error) {
     log("[switch-agent] TUI navigation failed for session:", { sessionID, error })
