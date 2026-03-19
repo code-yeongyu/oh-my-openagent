@@ -6,9 +6,10 @@ import {
   deepMerge,
   getOpenCodeConfigDir,
   addConfigLoadError,
-  parseJsonc,
   detectConfigFile,
+  parseConfigContent,
   migrateConfigFile,
+  type ConfigFileFormat,
 } from "./shared";
 
 const PARTIAL_STRING_ARRAY_KEYS = new Set([
@@ -66,14 +67,15 @@ export function parseConfigPartially(
 
 export function loadConfigFromPath(
   configPath: string,
+  format: ConfigFileFormat,
   _ctx: unknown
 ): OhMyOpenCodeConfig | null {
   try {
     if (fs.existsSync(configPath)) {
       const content = fs.readFileSync(configPath, "utf-8");
-      const rawConfig = parseJsonc<Record<string, unknown>>(content);
+      const rawConfig = parseConfigContent(content, format);
 
-      migrateConfigFile(configPath, rawConfig);
+      migrateConfigFile(configPath, rawConfig, format);
 
       const result = OhMyOpenCodeConfigSchema.safeParse(rawConfig);
 
@@ -160,7 +162,7 @@ export function loadPluginConfig(
   directory: string,
   ctx: unknown
 ): OhMyOpenCodeConfig {
-  // User-level config path - prefer .jsonc over .json
+  // User-level config path - prefer .jsonc > .json > .toml
   const configDir = getOpenCodeConfigDir({ binary: "opencode" });
   const userBasePath = path.join(configDir, "oh-my-opencode");
   const userDetected = detectConfigFile(userBasePath);
@@ -168,21 +170,23 @@ export function loadPluginConfig(
     userDetected.format !== "none"
       ? userDetected.path
       : userBasePath + ".json";
+  const userConfigFormat = userDetected.format !== "none" ? userDetected.format : "json";
 
-  // Project-level config path - prefer .jsonc over .json
+  // Project-level config path - prefer .jsonc > .json > .toml
   const projectBasePath = path.join(directory, ".opencode", "oh-my-opencode");
   const projectDetected = detectConfigFile(projectBasePath);
   const projectConfigPath =
     projectDetected.format !== "none"
       ? projectDetected.path
       : projectBasePath + ".json";
+  const projectConfigFormat = projectDetected.format !== "none" ? projectDetected.format : "json";
 
   // Load user config first (base)
   let config: OhMyOpenCodeConfig =
-    loadConfigFromPath(userConfigPath, ctx) ?? {};
+    loadConfigFromPath(userConfigPath, userConfigFormat, ctx) ?? {};
 
   // Override with project config
-  const projectConfig = loadConfigFromPath(projectConfigPath, ctx);
+  const projectConfig = loadConfigFromPath(projectConfigPath, projectConfigFormat, ctx);
   if (projectConfig) {
     config = mergeConfigs(config, projectConfig);
   }

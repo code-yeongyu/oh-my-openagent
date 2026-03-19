@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs"
+import { readFileSync } from "node:fs"
 import { parse, ParseError, printParseErrorCode } from "jsonc-parser"
 
 export interface JsoncParseResult<T> {
@@ -47,20 +47,4 @@ export function readJsoncFile<T = unknown>(filePath: string): T | null {
   } catch {
     return null
   }
-}
-
-export function detectConfigFile(basePath: string): {
-  format: "json" | "jsonc" | "none"
-  path: string
-} {
-  const jsoncPath = `${basePath}.jsonc`
-  const jsonPath = `${basePath}.json`
-
-  if (existsSync(jsoncPath)) {
-    return { format: "jsonc", path: jsoncPath }
-  }
-  if (existsSync(jsonPath)) {
-    return { format: "json", path: jsonPath }
-  }
-  return { format: "none", path: jsonPath }
 }

@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 
 import { OhMyOpenCodeConfigSchema } from "../../../config"
-import { detectConfigFile, getOpenCodeConfigDir, parseJsonc } from "../../../shared"
+import { detectConfigFile, getOpenCodeConfigDir, parseConfigContent, type ConfigFileFormat } from "../../../shared"
 import { CHECK_IDS, CHECK_NAMES, PACKAGE_NAME } from "../constants"
 import type { CheckResult, DoctorIssue } from "../types"
 import { loadAvailableModelsFromCache } from "./model-resolution-cache"
@@ -20,42 +20,42 @@ interface ConfigValidationResult {
   errors: string[]
 }
 
-function findConfigPath(): string | null {
+function findConfigPath(): { path: string; format: ConfigFileFormat } | null {
   const projectConfig = detectConfigFile(PROJECT_CONFIG_BASE)
-  if (projectConfig.format !== "none") return projectConfig.path
+  if (projectConfig.format !== "none") return { path: projectConfig.path, format: projectConfig.format }
 
   const userConfig = detectConfigFile(USER_CONFIG_BASE)
-  if (userConfig.format !== "none") return userConfig.path
+  if (userConfig.format !== "none") return { path: userConfig.path, format: userConfig.format }
 
   return null
 }
 
 function validateConfig(): ConfigValidationResult {
-  const configPath = findConfigPath()
-  if (!configPath) {
+  const detected = findConfigPath()
+  if (!detected) {
     return { exists: false, path: null, valid: true, config: null, errors: [] }
   }
 
   try {
-    const content = readFileSync(configPath, "utf-8")
-    const rawConfig = parseJsonc<OmoConfig>(content)
+    const content = readFileSync(detected.path, "utf-8")
+    const rawConfig = parseConfigContent<OmoConfig>(content, detected.format)
     const schemaResult = OhMyOpenCodeConfigSchema.safeParse(rawConfig)
 
     if (!schemaResult.success) {
       return {
         exists: true,
-        path: configPath,
+        path: detected.path,
         valid: false,
         config: rawConfig,
         errors: schemaResult.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`),
       }
     }
 
-    return { exists: true, path: configPath, valid: true, config: rawConfig, errors: [] }
+    return { exists: true, path: detected.path, valid: true, config: rawConfig, errors: [] }
   } catch (error) {
     return {
       exists: true,
-      path: configPath,
+      path: detected.path,
       valid: false,
       config: null,
       errors: [error instanceof Error ? error.message : "Failed to parse config"],

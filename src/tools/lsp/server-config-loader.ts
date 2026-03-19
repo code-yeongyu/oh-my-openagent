@@ -4,7 +4,8 @@ import { join } from "path"
 import { BUILTIN_SERVERS } from "./constants"
 import type { ResolvedServer } from "./types"
 import { getOpenCodeConfigDir } from "../../shared"
-import { parseJsonc, detectConfigFile } from "../../shared/jsonc-parser"
+import { parseJsonc } from "../../shared/jsonc-parser"
+import { detectConfigFile } from "../../shared/config-detector"
 
 interface LspEntry {
   disabled?: boolean

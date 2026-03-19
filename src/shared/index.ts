@@ -14,6 +14,8 @@ export * from "./data-path"
 export * from "./config-errors"
 export * from "./claude-config-dir"
 export * from "./jsonc-parser"
+export * from "./toml-parser"
+export * from "./config-detector"
 export * from "./migration"
 export * from "./opencode-config-dir"
 export type {

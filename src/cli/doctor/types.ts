@@ -101,7 +101,7 @@ export interface PluginInfo {
 export interface ConfigInfo {
   exists: boolean
   path: string | null
-  format: "json" | "jsonc" | null
+  format: "json" | "jsonc" | "toml" | null
   valid: boolean
   errors: string[]
 }
