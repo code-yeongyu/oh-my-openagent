@@ -17,6 +17,8 @@ export const SYMBOLS = {
   star: color.yellow("*"),
 }
 
+const ANSI_COLOR_PATTERN = new RegExp("\u001b\\[[0-9;]*m", "g")
+
 function formatProvider(name: string, enabled: boolean, detail?: string): string {
   const status = enabled ? SYMBOLS.check : color.dim("○")
   const label = enabled ? color.white(name) : color.dim(name)
@@ -83,7 +85,7 @@ export function printBox(content: string, title?: string): void {
   const lines = content.split("\n")
   const maxWidth =
     Math.max(
-      ...lines.map((line) => line.replace(/\x1b\[[0-9;]*m/g, "").length),
+      ...lines.map((line) => line.replace(ANSI_COLOR_PATTERN, "").length),
       title?.length ?? 0,
     ) + 4
   const border = color.dim("─".repeat(maxWidth))
@@ -101,7 +103,7 @@ export function printBox(content: string, title?: string): void {
   }
 
   for (const line of lines) {
-    const stripped = line.replace(/\x1b\[[0-9;]*m/g, "")
+    const stripped = line.replace(ANSI_COLOR_PATTERN, "")
     const padding = maxWidth - stripped.length
     console.log(color.dim("│") + ` ${line}${" ".repeat(padding - 1)}` + color.dim("│"))
   }
@@ -133,6 +135,10 @@ export function validateNonTuiArgs(args: InstallArgs): { valid: boolean; errors:
 
   if (args.openai !== undefined && !["no", "yes"].includes(args.openai)) {
     errors.push(`Invalid --openai value: ${args.openai} (expected: no, yes)`)
+  }
+
+  if (args.opencodeGo !== undefined && !["no", "yes"].includes(args.opencodeGo)) {
+    errors.push(`Invalid --opencode-go value: ${args.opencodeGo} (expected: no, yes)`)
   }
 
   if (args.opencodeZen !== undefined && !["no", "yes"].includes(args.opencodeZen)) {

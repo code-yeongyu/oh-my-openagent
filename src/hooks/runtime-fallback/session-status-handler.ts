@@ -26,6 +26,7 @@ export function createSessionStatusHandler(
     const status = props?.status as { type?: string; message?: string; attempt?: number } | undefined
     const agent = props?.agent as string | undefined
     const model = props?.model as string | undefined
+    const timeoutEnabled = deps.config.timeout_seconds > 0
 
     if (!sessionID || status?.type !== "retry") return
 
@@ -40,8 +41,17 @@ export function createSessionStatusHandler(
     sessionStatusRetryKeys.set(sessionID, retryKey)
 
     if (sessionRetryInFlight.has(sessionID)) {
-      log(`[${HOOK_NAME}] session.status retry skipped — retry already in flight`, { sessionID })
-      return
+      if (timeoutEnabled) {
+        log(`[${HOOK_NAME}] Overriding in-flight retry due to provider auto-retry signal`, {
+          sessionID,
+          model,
+        })
+        await helpers.abortSessionRequest(sessionID, "session.status.retry-signal")
+        sessionRetryInFlight.delete(sessionID)
+      } else {
+        log(`[${HOOK_NAME}] session.status retry skipped — retry already in flight`, { sessionID })
+        return
+      }
     }
 
     const resolvedAgent = await helpers.resolveAgentForSessionFromContext(sessionID, agent)
@@ -75,11 +85,19 @@ export function createSessionStatusHandler(
     sessionLastAccess.set(sessionID, Date.now())
 
     if (state.pendingFallbackModel) {
-      log(`[${HOOK_NAME}] session.status retry skipped (pending fallback in progress)`, {
-        sessionID,
-        pendingFallbackModel: state.pendingFallbackModel,
-      })
-      return
+      if (timeoutEnabled) {
+        log(`[${HOOK_NAME}] Clearing pending fallback due to provider auto-retry signal`, {
+          sessionID,
+          pendingFallbackModel: state.pendingFallbackModel,
+        })
+        state.pendingFallbackModel = undefined
+      } else {
+        log(`[${HOOK_NAME}] session.status retry skipped (pending fallback in progress)`, {
+          sessionID,
+          pendingFallbackModel: state.pendingFallbackModel,
+        })
+        return
+      }
     }
 
     log(`[${HOOK_NAME}] Detected provider auto-retry signal in session.status`, {

@@ -421,6 +421,12 @@ export function createEventHandler(args: {
       const sessionID = props?.sessionID as string | undefined;
       const status = props?.status as { type?: string; attempt?: number; message?: string; next?: number } | undefined;
 
+      // Retry dedupe lifecycle: set key when a retry status is handled, clear it after recovery
+      // (non-retry idle) so future failures with the same key can trigger fallback again.
+      if (sessionID && status?.type === "idle") {
+        lastHandledRetryStatusKey.delete(sessionID);
+      }
+
       if (sessionID && status?.type === "retry" && isModelFallbackEnabled && !isRuntimeFallbackEnabled) {
         try {
           const retryMessage = typeof status.message === "string" ? status.message : "";

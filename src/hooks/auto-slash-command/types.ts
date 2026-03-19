@@ -26,6 +26,15 @@ export interface CommandExecuteBeforeInput {
   command: string
   sessionID: string
   arguments: string
+  agent?: string
+  messageID?: string
+  messageId?: string
+  eventID?: string
+  eventId?: string
+  invocationID?: string
+  invocationId?: string
+  commandID?: string
+  commandId?: string
 }
 
 export interface CommandExecuteBeforeOutput {

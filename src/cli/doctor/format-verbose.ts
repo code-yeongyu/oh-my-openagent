@@ -33,7 +33,15 @@ export function formatVerbose(result: DoctorResult): string {
 
   lines.push(`${color.bold("Tools")}`)
   lines.push(`${color.dim("\u2500".repeat(40))}`)
-  lines.push(`  ${formatStatusSymbol("pass")} LSP         ${tools.lspInstalled}/${tools.lspTotal} installed`)
+  if (tools.lspServers.length === 0) {
+    lines.push(`  ${formatStatusSymbol("warn")} LSP         none detected`)
+  } else {
+    const count = tools.lspServers.length
+    lines.push(`  ${formatStatusSymbol("pass")} LSP         ${count} server${count === 1 ? "" : "s"}`)
+    for (const server of tools.lspServers) {
+      lines.push(`${" ".repeat(20)}${server.id} (${server.extensions.join(", ")})`)
+    }
+  }
   lines.push(`  ${formatStatusSymbol(tools.astGrepCli ? "pass" : "fail")} ast-grep CLI ${tools.astGrepCli ? "installed" : "not found"}`)
   lines.push(`  ${formatStatusSymbol(tools.astGrepNapi ? "pass" : "fail")} ast-grep napi ${tools.astGrepNapi ? "installed" : "not found"}`)
   lines.push(`  ${formatStatusSymbol(tools.commentChecker ? "pass" : "fail")} comment-checker ${tools.commentChecker ? "installed" : "not found"}`)
@@ -56,6 +64,19 @@ export function formatVerbose(result: DoctorResult): string {
     }
   }
   lines.push("")
+
+  for (const check of results) {
+    if (!check.details || check.details.length === 0) {
+      continue
+    }
+
+    lines.push(`${color.bold(check.name)}`)
+    lines.push(`${color.dim("\u2500".repeat(40))}`)
+    for (const detail of check.details) {
+      lines.push(detail)
+    }
+    lines.push("")
+  }
 
   const allIssues = results.flatMap((r) => r.issues)
   if (allIssues.length > 0) {

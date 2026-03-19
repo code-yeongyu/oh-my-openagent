@@ -157,7 +157,8 @@ TodoWrite([
 ## Step 1: Analyze Plan
 
 1. Read the todo list file
-2. Parse incomplete checkboxes \`- [ ]\`
+2. Parse actionable **top-level** task checkboxes in \`## TODOs\` and \`## Final Verification Wave\`
+   - Ignore nested checkboxes under Acceptance Criteria, Evidence, Definition of Done, and Final Checklist sections.
 3. Build parallelization map
 
 Output format:
@@ -263,7 +264,7 @@ ALL three must be YES. "Probably" = NO. "I think so" = NO.
 \`\`\`
 Read(".sisyphus/plans/{plan-name}.md")
 \`\`\`
-Count remaining \`- [ ]\` tasks.
+Count remaining **top-level task** checkboxes. Ignore nested verification/evidence checkboxes.
 
 ### 3.5 Handle Failures
 
@@ -284,6 +285,7 @@ Repeat Step 3 until all implementation tasks complete. Then proceed to Step 4.
 
 The plan's Final Wave tasks (F1-F4) are APPROVAL GATES — not regular tasks.
 Each reviewer produces a VERDICT: APPROVE or REJECT.
+Final-wave reviewers can finish in parallel before you update the plan file, so do NOT rely on raw unchecked-count alone.
 
 1. Execute all Final Wave tasks in parallel
 2. If ANY verdict is REJECT:

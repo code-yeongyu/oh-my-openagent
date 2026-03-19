@@ -9,6 +9,8 @@ function escapeRegexExceptAsterisk(str: string): string {
   return str.replace(/[.+?^${}()|[\]\\]/g, "\\$&")
 }
 
+const regexCache = new Map<string, RegExp>()
+
 export function matchesToolMatcher(toolName: string, matcher: string): boolean {
   if (!matcher) {
     return true
@@ -17,8 +19,12 @@ export function matchesToolMatcher(toolName: string, matcher: string): boolean {
   return patterns.some((p) => {
     if (p.includes("*")) {
       // First escape regex special chars (except *), then convert * to .*
-      const escaped = escapeRegexExceptAsterisk(p)
-      const regex = new RegExp(`^${escaped.replace(/\*/g, ".*")}$`, "i")
+      let regex = regexCache.get(p)
+      if (!regex) {
+        const escaped = escapeRegexExceptAsterisk(p)
+        regex = new RegExp(`^${escaped.replace(/\*/g, ".*")}$`, "i")
+        regexCache.set(p, regex)
+      }
       return regex.test(toolName)
     }
     return p.toLowerCase() === toolName.toLowerCase()

@@ -1,6 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 
 import type { BackgroundManager } from "../../features/background-agent"
+import { getSessionAgent } from "../../features/claude-code-session-state"
 import {
   createInternalAgentTextPart,
   normalizeSDKResponse,
@@ -20,6 +21,7 @@ import {
   DEFAULT_SKIP_AGENTS,
   HOOK_NAME,
 } from "./constants"
+import { isCompactionGuardActive } from "./compaction-guard"
 import { getMessageDir } from "./message-directory"
 import { getIncompleteCount } from "./todo"
 import type { ResolvedMessageInfo, Todo } from "./types"
@@ -88,7 +90,7 @@ export async function injectContinuation(args: {
     return
   }
 
-  let agentName = resolvedInfo?.agent
+  let agentName = resolvedInfo?.agent ?? getSessionAgent(sessionID)
   let model = resolvedInfo?.model
   let tools = resolvedInfo?.tools
 
@@ -118,6 +120,14 @@ export async function injectContinuation(args: {
   if (agentName && skipAgents.some(s => getAgentConfigKey(s) === getAgentConfigKey(agentName))) {
     log(`[${HOOK_NAME}] Skipped: agent in skipAgents list`, { sessionID, agent: agentName })
     return
+  }
+
+  if (!agentName) {
+    const compactionState = sessionStateStore.getExistingState(sessionID)
+    if (compactionState && isCompactionGuardActive(compactionState, Date.now())) {
+      log(`[${HOOK_NAME}] Skipped: agent unknown after compaction`, { sessionID })
+      return
+    }
   }
 
   if (!hasWritePermission(tools)) {

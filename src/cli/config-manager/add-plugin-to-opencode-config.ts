@@ -1,14 +1,12 @@
 import { readFileSync, writeFileSync } from "node:fs"
 import type { ConfigMergeResult } from "../types"
+import { PLUGIN_NAME, LEGACY_PLUGIN_NAME } from "../../shared"
 import { getConfigDir } from "./config-context"
 import { ensureConfigDirectoryExists } from "./ensure-config-directory-exists"
 import { formatErrorWithSuggestion } from "./format-error-with-suggestion"
 import { detectConfigFormat } from "./opencode-config-format"
 import { parseOpenCodeConfigFileWithError, type OpenCodeConfig } from "./parse-opencode-config-file"
 import { getPluginNameWithVersion } from "./plugin-name-with-version"
-
-const OLD_PACKAGE_NAME = "oh-my-opencode"
-const NEW_PACKAGE_NAME = "oh-my-openagent"
 
 export async function addPluginToOpenCodeConfig(currentVersion: string): Promise<ConfigMergeResult> {
   try {
@@ -22,7 +20,7 @@ export async function addPluginToOpenCodeConfig(currentVersion: string): Promise
   }
 
   const { format, path } = detectConfigFormat()
-  const pluginEntry = await getPluginNameWithVersion(currentVersion, NEW_PACKAGE_NAME)
+  const pluginEntry = await getPluginNameWithVersion(currentVersion, PLUGIN_NAME)
 
   try {
     if (format === "none") {
@@ -42,19 +40,24 @@ export async function addPluginToOpenCodeConfig(currentVersion: string): Promise
 
     const config = parseResult.config
     const plugins = config.plugin ?? []
-    const existingIndex = plugins.findIndex(
-      (p) =>
-        p === OLD_PACKAGE_NAME ||
-        p.startsWith(`${OLD_PACKAGE_NAME}@`) ||
-        p === NEW_PACKAGE_NAME ||
-        p.startsWith(`${NEW_PACKAGE_NAME}@`)
+
+    // Check for existing plugin (either current or legacy name)
+    const currentNameIndex = plugins.findIndex(
+      (plugin) => plugin === PLUGIN_NAME || plugin.startsWith(`${PLUGIN_NAME}@`)
+    )
+    const legacyNameIndex = plugins.findIndex(
+      (plugin) => plugin === LEGACY_PLUGIN_NAME || plugin.startsWith(`${LEGACY_PLUGIN_NAME}@`)
     )
 
-    if (existingIndex !== -1) {
-      if (plugins[existingIndex] === pluginEntry) {
+    // If either name exists, update to new name
+    if (currentNameIndex !== -1) {
+      if (plugins[currentNameIndex] === pluginEntry) {
         return { success: true, configPath: path }
       }
-      plugins[existingIndex] = pluginEntry
+      plugins[currentNameIndex] = pluginEntry
+    } else if (legacyNameIndex !== -1) {
+      // Upgrade legacy name to new name
+      plugins[legacyNameIndex] = pluginEntry
     } else {
       plugins.push(pluginEntry)
     }

@@ -1,5 +1,5 @@
 declare const require: (name: string) => any
-const { describe, test, expect, beforeEach, afterEach, spyOn, mock } = require("bun:test")
+const { afterEach, beforeEach, describe, expect, mock, spyOn, test } = require("bun:test")
 import { resolveModelForDelegateTask } from "./model-selection"
 import * as connectedProvidersCache from "../../shared/connected-providers-cache"
 
@@ -23,7 +23,7 @@ describe("resolveModelForDelegateTask", () => {
 		})
 
 		describe("#when availableModels is empty and no user model override", () => {
-			test("#then returns undefined to let OpenCode use system default", () => {
+			test("#then returns skipped sentinel to leave model unpinned", () => {
 				const result = resolveModelForDelegateTask({
 					categoryDefaultModel: "anthropic/claude-sonnet-4-6",
 					fallbackChain: [
@@ -33,7 +33,7 @@ describe("resolveModelForDelegateTask", () => {
 					systemDefaultModel: "anthropic/claude-sonnet-4-6",
 				})
 
-				expect(result).toBeUndefined()
+				expect(result).toEqual({ skipped: true })
 			})
 		})
 
@@ -54,7 +54,7 @@ describe("resolveModelForDelegateTask", () => {
 		})
 
 		describe("#when user set fallback_models but no cache exists", () => {
-			test("#then returns undefined (skip fallback resolution without cache)", () => {
+			test("#then returns skipped sentinel (skip fallback resolution without cache)", () => {
 				const result = resolveModelForDelegateTask({
 					userFallbackModels: ["openai/gpt-5.4", "google/gemini-3.1-pro"],
 					categoryDefaultModel: "anthropic/claude-sonnet-4-6",
@@ -64,7 +64,7 @@ describe("resolveModelForDelegateTask", () => {
 					availableModels: new Set(),
 				})
 
-				expect(result).toBeUndefined()
+				expect(result).toEqual({ skipped: true })
 			})
 		})
 	})
@@ -86,8 +86,7 @@ describe("resolveModelForDelegateTask", () => {
 					systemDefaultModel: "anthropic/claude-sonnet-4-6",
 				})
 
-				expect(result).toBeDefined()
-				expect(result!.model).toBe("anthropic/claude-sonnet-4-6")
+				expect(result).toEqual({ model: "anthropic/claude-sonnet-4-6" })
 			})
 		})
 
@@ -101,8 +100,27 @@ describe("resolveModelForDelegateTask", () => {
 					availableModels: new Set(["anthropic/claude-sonnet-4-6"]),
 				})
 
-				expect(result).toBeDefined()
-				expect(result!.model).toBe("anthropic/claude-sonnet-4-6")
+				expect(result).toEqual({ model: "anthropic/claude-sonnet-4-6" })
+			})
+		})
+
+		describe("#when user fallback models include variant syntax", () => {
+			test("#then resolves a parenthesized variant against the base available model", () => {
+				const result = resolveModelForDelegateTask({
+					userFallbackModels: ["openai/gpt-5.2(high)"],
+					availableModels: new Set(["openai/gpt-5.2"]),
+				})
+
+				expect(result).toEqual({ model: "openai/gpt-5.2", variant: "high" })
+			})
+
+			test("#then resolves a space-separated variant against the base available model", () => {
+				const result = resolveModelForDelegateTask({
+					userFallbackModels: ["gpt-5.2 medium"],
+					availableModels: new Set(["openai/gpt-5.2"]),
+				})
+
+				expect(result).toEqual({ model: "openai/gpt-5.2", variant: "medium" })
 			})
 		})
 	})

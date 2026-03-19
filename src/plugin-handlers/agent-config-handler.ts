@@ -93,16 +93,28 @@ export async function applyAgentConfig(params: {
   const projectAgents = includeClaudeAgents ? loadProjectAgents(params.ctx.directory) : {};
   const rawPluginAgents = params.pluginComponents.agents;
 
+  const pluginAgents = Object.fromEntries(
+    Object.entries(rawPluginAgents).map(([key, value]) => [
+      key,
+      value ? migrateAgentConfig(value as Record<string, unknown>) : value,
+    ]),
+  );
+
+  const configAgent = params.config.agent as AgentConfigRecord | undefined;
+
   const customAgentSummaries = [
+    ...Object.entries(configAgent ?? {}),
     ...Object.entries(userAgents),
     ...Object.entries(projectAgents),
-    ...Object.entries(rawPluginAgents).filter(([, config]) => config !== undefined),
-  ].map(([name, config]) => ({
-    name,
-    description: typeof (config as Record<string, unknown>)?.description === "string"
-      ? (config as Record<string, unknown>).description as string
-      : "",
-  }));
+    ...Object.entries(pluginAgents).filter(([, config]) => config !== undefined),
+  ]
+    .filter(([, config]) => config != null)
+    .map(([name, config]) => ({
+      name,
+      description: typeof (config as Record<string, unknown>)?.description === "string"
+        ? ((config as Record<string, unknown>).description as string)
+        : "",
+    }));
   const builtinAgents = await createBuiltinAgents(
     migratedDisabledAgents,
     params.pluginConfig.agents,
@@ -122,13 +134,6 @@ export async function applyAgentConfig(params: {
     athenaNonInteractiveConfig,
   );
 
-  const pluginAgents = Object.fromEntries(
-    Object.entries(rawPluginAgents).map(([key, value]) => [
-      key,
-      value ? migrateAgentConfig(value as Record<string, unknown>) : value,
-    ]),
-  );
-
   const disabledAgentNames = new Set(
     (migratedDisabledAgents ?? []).map(a => a.toLowerCase())
   );
@@ -146,8 +151,6 @@ export async function applyAgentConfig(params: {
   const shouldDemotePlan = plannerEnabled && replacePlan;
   const configuredDefaultAgent = getConfiguredDefaultAgent(params.config);
 
-  const configAgent = params.config.agent as AgentConfigRecord | undefined;
-
   if (isSisyphusEnabled && builtinAgents.sisyphus) {
     if (configuredDefaultAgent) {
       (params.config as { default_agent?: string }).default_agent =
@@ -163,7 +166,7 @@ export async function applyAgentConfig(params: {
 
     agentConfig["sisyphus-junior"] = createSisyphusJuniorAgentWithOverrides(
       params.pluginConfig.agents?.["sisyphus-junior"],
-      undefined,
+      (builtinAgents.atlas as { model?: string } | undefined)?.model,
       useTaskSystem,
     );
 

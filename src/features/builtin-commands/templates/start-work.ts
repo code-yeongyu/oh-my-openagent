@@ -7,7 +7,7 @@ export const START_WORK_TEMPLATE = `You are starting a Sisyphus work session.
   - \`--worktree <path>\` (optional): absolute path to an existing git worktree to work in
     - If specified and valid: hook pre-sets worktree_path in boulder.json
     - If specified but invalid: you must run \`git worktree add <path> <branch>\` first
-    - If omitted: you MUST choose or create a worktree (see Worktree Setup below)
+    - If omitted: work directly in the current project directory (no worktree)
 
 ## WHAT TO DO
 
@@ -24,7 +24,7 @@ export const START_WORK_TEMPLATE = `You are starting a Sisyphus work session.
      - If ONE plan: auto-select it
      - If MULTIPLE plans: show list with timestamps, ask user to select
 
-4. **Worktree Setup** (when \`worktree_path\` not already set in boulder.json):
+4. **Worktree Setup** (ONLY when \`--worktree\` was explicitly specified and \`worktree_path\` not already set in boulder.json):
    1. \`git worktree list --porcelain\` — see available worktrees
    2. Create: \`git worktree add <absolute-path> <branch-or-HEAD>\`
    3. Update boulder.json to add \`"worktree_path": "<absolute-path>"\`
@@ -86,6 +86,38 @@ Reading plan and beginning execution...
 
 - The session_id is injected by the hook - use it directly
 - Always update boulder.json BEFORE starting work
-- Always set worktree_path in boulder.json before executing any tasks
+- If worktree_path is set in boulder.json, all work happens inside that worktree directory
 - Read the FULL plan file before delegating any tasks
-- Follow atlas delegation protocols (7-section format)`
+- Follow atlas delegation protocols (7-section format)
+
+## TASK BREAKDOWN (MANDATORY)
+
+After reading the plan file, you MUST decompose every plan task into granular, implementation-level sub-steps and register ALL of them as task/todo items BEFORE starting any work.
+
+**How to break down**:
+- Each plan checkbox item (e.g., \`- [ ] Add user authentication\`) must be split into concrete, actionable sub-tasks
+- Sub-tasks should be specific enough that each one touches a clear set of files/functions
+- Include: file to modify, what to change, expected behavior, and how to verify
+- Do NOT leave any task vague — "implement feature X" is NOT acceptable; "add validateToken() to src/auth/middleware.ts that checks JWT expiry and returns 401" IS acceptable
+
+**Example breakdown**:
+Plan task: \`- [ ] Add rate limiting to API\`
+→ Todo items:
+  1. Create \`src/middleware/rate-limiter.ts\` with sliding window algorithm (max 100 req/min per IP)
+  2. Add RateLimiter middleware to \`src/app.ts\` router chain, before auth middleware
+  3. Add rate limit headers (X-RateLimit-Limit, X-RateLimit-Remaining) to response in \`rate-limiter.ts\`
+  4. Add test: verify 429 response after exceeding limit in \`src/middleware/rate-limiter.test.ts\`
+  5. Add test: verify headers are present on normal responses
+
+Register these as task/todo items so progress is tracked and visible throughout the session.
+
+## WORKTREE COMPLETION
+
+When working in a worktree (\`worktree_path\` is set in boulder.json) and ALL plan tasks are complete:
+1. Commit all remaining changes in the worktree
+2. Switch to the main working directory (the original repo, NOT the worktree)
+3. Merge the worktree branch into the current branch: \`git merge <worktree-branch>\`
+4. If merge succeeds, clean up: \`git worktree remove <worktree-path>\`
+5. Remove the boulder.json state
+
+This is the DEFAULT behavior when \`--worktree\` was used. Skip merge only if the user explicitly instructs otherwise (e.g., asks to create a PR instead).`

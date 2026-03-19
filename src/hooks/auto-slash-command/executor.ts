@@ -41,14 +41,9 @@ export interface ExecutorOptions {
   skills?: LoadedSkill[]
   pluginsEnabled?: boolean
   enabledPluginsOverride?: Record<string, boolean>
+  agent?: string
 }
 
-function filterDiscoveredCommandsByScope(
-  commands: DiscoveredCommandInfo[],
-  scope: DiscoveredCommandInfo["scope"],
-): DiscoveredCommandInfo[] {
-  return commands.filter(command => command.scope === scope)
-}
 
 async function discoverAllCommands(options?: ExecutorOptions): Promise<CommandInfo[]> {
   const discoveredCommands = discoverCommandsSync(process.cwd(), {
@@ -59,14 +54,18 @@ async function discoverAllCommands(options?: ExecutorOptions): Promise<CommandIn
   const skills = options?.skills ?? await discoverAllSkills()
   const skillCommands = skills.map(skillToCommandInfo)
 
+  const scopeOrder: DiscoveredCommandInfo["scope"][] = ["project", "user", "opencode-project", "opencode", "builtin", "plugin"]
+  const grouped = new Map<string, DiscoveredCommandInfo[]>()
+  for (const cmd of discoveredCommands) {
+    const list = grouped.get(cmd.scope) ?? []
+    list.push(cmd)
+    grouped.set(cmd.scope, list)
+  }
+  const orderedCommands = scopeOrder.flatMap((scope) => grouped.get(scope) ?? [])
+
   return [
-    ...filterDiscoveredCommandsByScope(discoveredCommands, "builtin"),
-    ...filterDiscoveredCommandsByScope(discoveredCommands, "opencode-project"),
-    ...filterDiscoveredCommandsByScope(discoveredCommands, "project"),
-    ...filterDiscoveredCommandsByScope(discoveredCommands, "opencode"),
-    ...filterDiscoveredCommandsByScope(discoveredCommands, "user"),
     ...skillCommands,
-    ...filterDiscoveredCommandsByScope(discoveredCommands, "plugin"),
+    ...orderedCommands,
   ]
 }
 
@@ -138,6 +137,15 @@ export async function executeSlashCommand(parsed: ParsedSlashCommand, options?: 
     return {
       success: false,
       error: `Command "/${parsed.command}" not found. Use the skill tool to list available skills and commands.`,
+    }
+  }
+
+  if (command.scope === "skill" && command.metadata.agent) {
+    if (!options?.agent || command.metadata.agent !== options.agent) {
+      return {
+        success: false,
+        error: `Skill "${command.name}" is restricted to agent "${command.metadata.agent}"`,
+      }
     }
   }
 

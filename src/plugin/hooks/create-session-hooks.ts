@@ -16,7 +16,6 @@ import {
   createRalphLoopHook,
   createEditErrorRecoveryHook,
   createDelegateTaskRetryHook,
-  createDelegateTaskEnglishDirectiveHook,
   createTaskResumeInfoHook,
   createStartWorkHook,
   createPrometheusMdOnlyHook,
@@ -63,7 +62,6 @@ export type SessionHooks = {
   taskResumeInfo: ReturnType<typeof createTaskResumeInfoHook> | null
   anthropicEffort: ReturnType<typeof createAnthropicEffortHook> | null
   runtimeFallback: ReturnType<typeof createRuntimeFallbackHook> | null
-  delegateTaskEnglishDirective: ReturnType<typeof createDelegateTaskEnglishDirectiveHook> | null
 }
 
 export function createSessionHooks(args: {
@@ -157,7 +155,7 @@ export function createSessionHooks(args: {
 
   // Model fallback hook (configurable via model_fallback config + disabled_hooks)
   // This handles automatic model switching when model errors occur
-  const isModelFallbackConfigEnabled = pluginConfig.model_fallback ?? true
+  const isModelFallbackConfigEnabled = pluginConfig.model_fallback ?? false
   const modelFallback = isModelFallbackConfigEnabled && isHookEnabled("model-fallback")
     ? safeHook("model-fallback", () =>
       createModelFallbackHook({
@@ -217,10 +215,6 @@ export function createSessionHooks(args: {
 
   const delegateTaskRetry = isHookEnabled("delegate-task-retry")
     ? safeHook("delegate-task-retry", () => createDelegateTaskRetryHook(ctx))
-    : null
-
-  const delegateTaskEnglishDirective = isHookEnabled("delegate-task-english-directive")
-    ? safeHook("delegate-task-english-directive", () => createDelegateTaskEnglishDirectiveHook())
     : null
 
   const startWork = isHookEnabled("start-work")
@@ -287,7 +281,6 @@ export function createSessionHooks(args: {
     ralphLoop,
     editErrorRecovery,
     delegateTaskRetry,
-    delegateTaskEnglishDirective,
     startWork,
     prometheusMdOnly,
     athenaSisyphusOnly,

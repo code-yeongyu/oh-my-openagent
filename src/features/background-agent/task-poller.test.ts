@@ -417,6 +417,56 @@ describe("checkAndInterruptStaleTasks", () => {
     expect(task.status).toBe("cancelled")
     expect(onTaskInterrupted).toHaveBeenCalledWith(task)
   })
+
+  it('should NOT protect task when session has terminal non-idle status like "interrupted"', async () => {
+    //#given — lastUpdate is 5min old, session is "interrupted" (terminal, not active)
+    const task = createRunningTask({
+      startedAt: new Date(Date.now() - 300_000),
+      progress: {
+        toolCalls: 2,
+        lastUpdate: new Date(Date.now() - 300_000),
+      },
+    })
+
+    //#when — session status is "interrupted" (terminal)
+    await checkAndInterruptStaleTasks({
+      tasks: [task],
+      client: mockClient as never,
+      config: { staleTimeoutMs: 180_000 },
+      concurrencyManager: mockConcurrencyManager as never,
+      notifyParentSession: mockNotify,
+      sessionStatuses: { "ses-1": { type: "interrupted" } },
+    })
+
+    //#then — terminal statuses should not protect from stale timeout
+    expect(task.status).toBe("cancelled")
+    expect(task.error).toContain("Stale timeout")
+  })
+
+  it('should NOT protect task when session has unknown status type', async () => {
+    //#given — lastUpdate is 5min old, session has an unknown status
+    const task = createRunningTask({
+      startedAt: new Date(Date.now() - 300_000),
+      progress: {
+        toolCalls: 2,
+        lastUpdate: new Date(Date.now() - 300_000),
+      },
+    })
+
+    //#when — session has unknown status type
+    await checkAndInterruptStaleTasks({
+      tasks: [task],
+      client: mockClient as never,
+      config: { staleTimeoutMs: 180_000 },
+      concurrencyManager: mockConcurrencyManager as never,
+      notifyParentSession: mockNotify,
+      sessionStatuses: { "ses-1": { type: "some-weird-status" } },
+    })
+
+    //#then — unknown statuses should not protect from stale timeout
+    expect(task.status).toBe("cancelled")
+    expect(task.error).toContain("Stale timeout")
+  })
 })
 
 describe("pruneStaleTasksAndNotifications", () => {

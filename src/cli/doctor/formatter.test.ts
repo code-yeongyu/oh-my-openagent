@@ -19,8 +19,10 @@ function createDoctorResult(): DoctorResult {
       isLocalDev: false,
     },
     tools: {
-      lspInstalled: 2,
-      lspTotal: 4,
+      lspServers: [
+        { id: "typescript", extensions: [".ts", ".tsx", ".js", ".jsx"] },
+        { id: "pyright", extensions: [".py", ".pyi"] },
+      ],
       astGrepCli: true,
       astGrepNapi: false,
       commentChecker: true,
@@ -48,6 +50,23 @@ function createDoctorResultWithIssues(): DoctorResult {
   ]
   base.summary.failed = 1
   base.summary.warnings = 1
+  return base
+}
+
+function createDoctorResultWithDetails(): DoctorResult {
+  const base = createDoctorResult()
+  base.results = [
+    ...base.results,
+    {
+      name: "Models",
+      status: "pass",
+      message: "2 agents, 1 category, 0 overrides",
+      details: ["Available models: openai/gpt-5.4", "Agent sisyphus -> openai/gpt-5.4"],
+      issues: [],
+    },
+  ]
+  base.summary.total = 3
+  base.summary.passed = 2
   return base
 }
 
@@ -102,7 +121,7 @@ describe("formatDoctorOutput", () => {
       const output = stripAnsi(formatDoctorOutput(result, "status"))
 
       //#then
-      expect(output).toContain("LSP 2/4")
+      expect(output).toContain("LSP")
       expect(output).toContain("context7")
     })
   })
@@ -136,6 +155,20 @@ describe("formatDoctorOutput", () => {
       expect(output).toContain("1 passed")
       expect(output).toContain("0 failed")
       expect(output).toContain("1 warnings")
+    })
+
+    it("renders check details sections such as Models", async () => {
+      //#given
+      const result = createDoctorResultWithDetails()
+      const { formatDoctorOutput } = await import(`./formatter?verbose-details-${Date.now()}`)
+
+      //#when
+      const output = stripAnsi(formatDoctorOutput(result, "verbose"))
+
+      //#then
+      expect(output).toContain("Models")
+      expect(output).toContain("Available models: openai/gpt-5.4")
+      expect(output).toContain("Agent sisyphus -> openai/gpt-5.4")
     })
   })
 

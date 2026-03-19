@@ -7,51 +7,48 @@ import {
   closeTmuxPane,
   applyLayout,
 } from "./tmux-utils"
+import { isInsideTmuxEnvironment } from "./tmux-utils/environment"
 
 describe("isInsideTmux", () => {
   test("returns true when TMUX env is set", () => {
     // given
-    const originalTmux = process.env.TMUX
-    process.env.TMUX = "/tmp/tmux-1000/default"
+    const environment = { TMUX: "/tmp/tmux-1000/default" }
 
     // when
-    const result = isInsideTmux()
+    const result = isInsideTmuxEnvironment(environment)
 
     // then
     expect(result).toBe(true)
-
-    // cleanup
-    process.env.TMUX = originalTmux
   })
 
   test("returns false when TMUX env is not set", () => {
     // given
-    const originalTmux = process.env.TMUX
-    delete process.env.TMUX
+    const environment = {}
 
     // when
-    const result = isInsideTmux()
+    const result = isInsideTmuxEnvironment(environment)
 
     // then
     expect(result).toBe(false)
-
-    // cleanup
-    process.env.TMUX = originalTmux
   })
 
   test("returns false when TMUX env is empty string", () => {
     // given
-    const originalTmux = process.env.TMUX
-    process.env.TMUX = ""
+    const environment = { TMUX: "" }
 
     // when
-    const result = isInsideTmux()
+    const result = isInsideTmuxEnvironment(environment)
 
     // then
     expect(result).toBe(false)
+  })
 
-    // cleanup
-    process.env.TMUX = originalTmux
+  test("returns the same result as the process environment helper", () => {
+    // given, #when
+    const result = isInsideTmux()
+
+    // then
+    expect(result).toBe(isInsideTmuxEnvironment(process.env))
   })
 })
 

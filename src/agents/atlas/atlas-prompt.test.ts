@@ -130,4 +130,17 @@ describe("Atlas prompts plan path consistency", () => {
       expect(prompt).toMatch(/read[\s\S]*?\.sisyphus\/plans\//)
     }
   })
+
+  test("all variants should distinguish top-level plan tasks from nested checkboxes", () => {
+    // given
+    const prompts = [ATLAS_SYSTEM_PROMPT, ATLAS_GPT_SYSTEM_PROMPT, ATLAS_GEMINI_SYSTEM_PROMPT]
+
+    // when / then
+    for (const prompt of prompts) {
+      const lowerPrompt = prompt.toLowerCase()
+      expect(lowerPrompt).toMatch(/top-level.*checkbox/)
+      expect(lowerPrompt).toMatch(/ignore nested.*checkbox/)
+      expect(lowerPrompt).toMatch(/final verification wave/)
+    }
+  })
 })

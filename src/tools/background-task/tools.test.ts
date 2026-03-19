@@ -232,7 +232,7 @@ describe("background_output full_session", () => {
     expect(output).toContain("Has more: true")
   })
 
-  test("defaults to compact status when task is running", async () => {
+  test("keeps legacy status output when full_session is not provided", async () => {
     // #given
     const task = createTask({ status: "running" })
     const manager = createMockManager(task)
@@ -243,7 +243,8 @@ describe("background_output full_session", () => {
     const output = await tool.execute({ task_id: "task-1" }, mockContext)
 
     // #then
-    expect(output).toContain("# Full Session Output")
+    expect(output).toContain("# Task Status")
+    expect(output).not.toContain("# Full Session Output")
   })
 
   test("returns full session when explicitly requested for running task", async () => {
@@ -341,10 +342,10 @@ describe("background_output full_session", () => {
 
 
 describe("background_output blocking", () => {
-  test("block=true waits for task completion even with default full_session=true", async () => {
+  test("block=true keeps legacy task result output when full_session is not provided", async () => {
     // #given a task that transitions running → completed after 2 polls
     let pollCount = 0
-    const task = createTask({ status: "running" })
+    const task = createTask({ status: "running", sessionID: "ses-blocking-default" })
     const manager: BackgroundOutputManager = {
       getTask: (id: string) => {
         if (id !== task.id) return undefined
@@ -356,7 +357,7 @@ describe("background_output blocking", () => {
       },
     }
     const client = createMockClient({
-      "ses-1": [
+      "ses-blocking-default": [
         {
           id: "m1",
           info: { role: "assistant", time: "2026-01-01T00:00:00Z" },
@@ -366,17 +367,17 @@ describe("background_output blocking", () => {
     })
     const tool = createBackgroundOutput(manager, client)
 
-    // #when block=true, full_session not specified (defaults to true)
+    // #when block=true, full_session not specified
     const output = await tool.execute({
       task_id: "task-1",
       block: true,
       timeout: 10000,
     }, mockContext)
 
-    // #then should have waited and returned full session output
+    // #then should have waited and returned task result output
     expect(task.status).toBe("completed")
     expect(pollCount).toBeGreaterThanOrEqual(3)
-    expect(output).toContain("# Full Session Output")
+    expect(output).toContain("Task Result")
     expect(output).toContain("completed result")
   })
 })

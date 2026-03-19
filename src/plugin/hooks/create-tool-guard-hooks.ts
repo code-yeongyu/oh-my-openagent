@@ -14,6 +14,7 @@ import {
   createHashlineReadEnhancerHook,
   createReadImageResizerHook,
   createJsonErrorRecoveryHook,
+  createTodoDescriptionOverrideHook,
 } from "../../hooks"
 import {
   getOpenCodeVersion,
@@ -35,6 +36,7 @@ export type ToolGuardHooks = {
   hashlineReadEnhancer: ReturnType<typeof createHashlineReadEnhancerHook> | null
   jsonErrorRecovery: ReturnType<typeof createJsonErrorRecoveryHook> | null
   readImageResizer: ReturnType<typeof createReadImageResizerHook> | null
+  todoDescriptionOverride: ReturnType<typeof createTodoDescriptionOverrideHook> | null
 }
 
 export function createToolGuardHooks(args: {
@@ -111,6 +113,10 @@ export function createToolGuardHooks(args: {
     ? safeHook("read-image-resizer", () => createReadImageResizerHook(ctx))
     : null
 
+  const todoDescriptionOverride = isHookEnabled("todo-description-override")
+    ? safeHook("todo-description-override", () => createTodoDescriptionOverrideHook())
+    : null
+
   return {
     commentChecker,
     toolOutputTruncator,
@@ -123,5 +129,6 @@ export function createToolGuardHooks(args: {
     hashlineReadEnhancer,
     jsonErrorRecovery,
     readImageResizer,
+    todoDescriptionOverride,
   }
 }

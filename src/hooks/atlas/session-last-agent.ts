@@ -18,9 +18,9 @@ function getLastAgentFromMessageDir(messageDir: string): string | null {
     const files = readdirSync(messageDir)
       .filter((fileName) => fileName.endsWith(".json"))
       .sort()
-      .reverse()
 
-    for (const fileName of files) {
+    for (let i = files.length - 1; i >= 0; i--) {
+      const fileName = files[i]
       try {
         const content = readFileSync(join(messageDir, fileName), "utf-8")
         const parsed = JSON.parse(content) as { agent?: unknown }

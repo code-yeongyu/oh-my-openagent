@@ -279,6 +279,116 @@ describe("TaskToastManager", () => {
     })
   })
 
+  describe("model name display in task line", () => {
+    test("should show model name before category when modelInfo exists", () => {
+      // given - a task with category and modelInfo
+      const task = {
+        id: "task_model_display",
+        description: "Build UI component",
+        agent: "sisyphus-junior",
+        isBackground: true,
+        category: "deep",
+        modelInfo: { model: "openai/gpt-5.3-codex", type: "category-default" as const },
+      }
+
+      // when - addTask is called
+      toastManager.addTask(task)
+
+      // then - toast should show model name before category like "gpt-5.3-codex: deep"
+      const call = mockClient.tui.showToast.mock.calls[0][0]
+      expect(call.body.message).toContain("gpt-5.3-codex: deep")
+      expect(call.body.message).not.toContain("sisyphus-junior/deep")
+    })
+
+    test("should strip provider prefix from model name", () => {
+      // given - a task with provider-prefixed model
+      const task = {
+        id: "task_strip_provider",
+        description: "Fix styles",
+        agent: "sisyphus-junior",
+        isBackground: false,
+        category: "visual-engineering",
+        modelInfo: { model: "google/gemini-3.1-pro", type: "category-default" as const },
+      }
+
+      // when - addTask is called
+      toastManager.addTask(task)
+
+      // then - should show model ID without provider prefix
+      const call = mockClient.tui.showToast.mock.calls[0][0]
+      expect(call.body.message).toContain("gemini-3.1-pro: visual-engineering")
+    })
+
+    test("should fall back to agent/category format when no modelInfo", () => {
+      // given - a task without modelInfo
+      const task = {
+        id: "task_no_model",
+        description: "Quick fix",
+        agent: "sisyphus-junior",
+        isBackground: true,
+        category: "quick",
+      }
+
+      // when - addTask is called
+      toastManager.addTask(task)
+
+      // then - should use old format with agent name
+      const call = mockClient.tui.showToast.mock.calls[0][0]
+      expect(call.body.message).toContain("sisyphus-junior/quick")
+    })
+
+    test("should show model name without category when category is absent", () => {
+      // given - a task with modelInfo but no category
+      const task = {
+        id: "task_model_no_cat",
+        description: "Explore codebase",
+        agent: "explore",
+        isBackground: true,
+        modelInfo: { model: "anthropic/claude-sonnet-4-6", type: "category-default" as const },
+      }
+
+      // when - addTask is called
+      toastManager.addTask(task)
+
+      // then - should show just the model name in parens
+      const call = mockClient.tui.showToast.mock.calls[0][0]
+      expect(call.body.message).toContain("(claude-sonnet-4-6)")
+    })
+
+    test("should show model name in queued tasks too", () => {
+      // given - a concurrency manager that limits to 1
+      const limitedConcurrency = {
+        getConcurrencyLimit: mock(() => 1),
+      } as unknown as ConcurrencyManager
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const limitedManager = new TaskToastManager(mockClient as any, limitedConcurrency)
+
+      limitedManager.addTask({
+        id: "task_running",
+        description: "Running task",
+        agent: "sisyphus-junior",
+        isBackground: true,
+        category: "deep",
+        modelInfo: { model: "openai/gpt-5.3-codex", type: "category-default" as const },
+      })
+      limitedManager.addTask({
+        id: "task_queued",
+        description: "Queued task",
+        agent: "sisyphus-junior",
+        isBackground: true,
+        category: "quick",
+        status: "queued",
+        modelInfo: { model: "anthropic/claude-haiku-4-5", type: "category-default" as const },
+      })
+
+      // when - the queued task toast fires
+      const lastCall = mockClient.tui.showToast.mock.calls[1][0]
+
+      // then - queued task should also show model name
+      expect(lastCall.body.message).toContain("claude-haiku-4-5: quick")
+    })
+  })
+
   describe("updateTaskModelBySession", () => {
     test("updates task model info and shows fallback toast", () => {
       // given - task without model info
