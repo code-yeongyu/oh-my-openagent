@@ -1,4 +1,4 @@
-import type { AgentOverrides } from "../../config"
+import type { AgentOverrides, SisyphusAgentConfig } from "../../config"
 import type { BackgroundManager } from "../../features/background-agent"
 import type { TopLevelTaskRef } from "../../features/boulder-state"
 
@@ -12,6 +12,7 @@ export interface AtlasHookOptions {
   agentOverrides?: AgentOverrides
   /** Enable auto-commit after each atomic task completion (default: true) */
   autoCommit?: boolean
+  sisyphusConfig?: SisyphusAgentConfig
 }
 
 export interface ToolExecuteAfterInput {

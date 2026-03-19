@@ -126,6 +126,7 @@ export function createContinuationHooks(args: {
             gptPermissionContinuation?.wasRecentlyInjected(sessionID) ?? false,
           agentOverrides: pluginConfig.agents,
           autoCommit: pluginConfig.start_work?.auto_commit,
+          sisyphusConfig: pluginConfig.sisyphus_agent,
         }))
     : null
 
