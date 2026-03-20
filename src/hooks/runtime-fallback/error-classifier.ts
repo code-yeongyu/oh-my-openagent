@@ -145,7 +145,7 @@ export function extractAutoRetrySignal(info: Record<string, unknown> | undefined
   const combined = candidates.join("\n")
   if (!combined) return undefined
 
-  const isAutoRetry = AUTO_RETRY_PATTERNS.every((test) => test(combined))
+  const isAutoRetry = AUTO_RETRY_PATTERNS.some((test) => test(combined))
   if (isAutoRetry) {
     return { signal: combined }
   }
