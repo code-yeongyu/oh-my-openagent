@@ -2468,18 +2468,18 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
         parentMessageID: "parent-message",
       };
 
+      stubNotifyParentSession(manager);
+
       // Launch first task and move it to running state
       const task = await manager.launch(input);
       const internalTask = getTaskMap(manager).get(task.id)!;
       internalTask.status = "running";
       internalTask.sessionID = "child-session-complete";
+      internalTask.rootSessionID = "session-root";
 
-      // Simulate task completing via session.status terminal event
-      manager.handleEvent({
-        type: "session.status",
-        properties: { sessionID: internalTask.sessionID, status: { type: "complete" } },
-      });
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      // Complete the task directly via the internal method (session.status events
+      // go through the poller, not handleEvent — use tryCompleteTaskForTest instead)
+      await tryCompleteTaskForTest(manager, internalTask);
 
       // when — launch second task (should succeed if quota was released on completion)
       const result = manager.launch(input);
