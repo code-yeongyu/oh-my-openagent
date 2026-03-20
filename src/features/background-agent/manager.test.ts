@@ -2359,6 +2359,133 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       expect(abortCalls).toEqual([createdSessionID])
       expect(getConcurrencyManager(manager).getCount("test-agent")).toBe(0)
     })
+
+    test("should release descendant quota when task completes", async () => {
+      manager.shutdown()
+      manager = new BackgroundManager(
+        {
+          client: createMockClientWithSessionChain({
+            "session-root": { directory: "/test/dir" },
+          }),
+          directory: tmpdir(),
+        } as unknown as PluginInput,
+        { maxDescendants: 1 },
+      )
+      stubNotifyParentSession(manager)
+
+      const input = {
+        description: "Test task",
+        prompt: "Do something",
+        agent: "test-agent",
+        parentSessionID: "session-root",
+        parentMessageID: "parent-message",
+      }
+
+      const task = await manager.launch(input)
+      const internalTask = getTaskMap(manager).get(task.id)!
+      internalTask.status = "running"
+      internalTask.sessionID = "child-session-complete"
+      internalTask.rootSessionID = "session-root"
+
+      // Complete via internal method (session.status events go through the poller, not handleEvent)
+      await tryCompleteTaskForTest(manager, internalTask)
+
+      await expect(manager.launch(input)).resolves.toBeDefined()
+    })
+
+    test("should release descendant quota when running task is cancelled", async () => {
+      manager.shutdown()
+      manager = new BackgroundManager(
+        {
+          client: createMockClientWithSessionChain({
+            "session-root": { directory: "/test/dir" },
+          }),
+          directory: tmpdir(),
+        } as unknown as PluginInput,
+        { maxDescendants: 1 },
+      )
+
+      const input = {
+        description: "Test task",
+        prompt: "Do something",
+        agent: "test-agent",
+        parentSessionID: "session-root",
+        parentMessageID: "parent-message",
+      }
+
+      const task = await manager.launch(input)
+      const internalTask = getTaskMap(manager).get(task.id)!
+      internalTask.status = "running"
+      internalTask.sessionID = "child-session-cancel"
+
+      await manager.cancelTask(task.id)
+
+      await expect(manager.launch(input)).resolves.toBeDefined()
+    })
+
+    test("should release descendant quota when task errors", async () => {
+      manager.shutdown()
+      manager = new BackgroundManager(
+        {
+          client: createMockClientWithSessionChain({
+            "session-root": { directory: "/test/dir" },
+          }),
+          directory: tmpdir(),
+        } as unknown as PluginInput,
+        { maxDescendants: 1 },
+      )
+
+      const input = {
+        description: "Test task",
+        prompt: "Do something",
+        agent: "test-agent",
+        parentSessionID: "session-root",
+        parentMessageID: "parent-message",
+      }
+
+      const task = await manager.launch(input)
+      const internalTask = getTaskMap(manager).get(task.id)!
+      internalTask.status = "running"
+      internalTask.sessionID = "child-session-error"
+
+      manager.handleEvent({
+        type: "session.error",
+        properties: { sessionID: internalTask.sessionID, info: { id: internalTask.sessionID } },
+      })
+      await new Promise((resolve) => setTimeout(resolve, 100))
+
+      await expect(manager.launch(input)).resolves.toBeDefined()
+    })
+
+    test("should not double-decrement quota when pending task is cancelled", async () => {
+      manager.shutdown()
+      manager = new BackgroundManager(
+        {
+          client: createMockClientWithSessionChain({
+            "session-root": { directory: "/test/dir" },
+          }),
+          directory: tmpdir(),
+        } as unknown as PluginInput,
+        { maxDescendants: 2 },
+      )
+
+      const input = {
+        description: "Test task",
+        prompt: "Do something",
+        agent: "test-agent",
+        parentSessionID: "session-root",
+        parentMessageID: "parent-message",
+      }
+
+      const task1 = await manager.launch(input)
+      const task2 = await manager.launch(input)
+
+      await manager.cancelTask(task1.id)
+      await manager.cancelTask(task2.id)
+
+      await expect(manager.launch(input)).resolves.toBeDefined()
+      await expect(manager.launch(input)).resolves.toBeDefined()
+    })
   })
 
   describe("pending task can be cancelled", () => {
