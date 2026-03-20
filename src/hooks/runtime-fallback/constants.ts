@@ -34,6 +34,8 @@ export const RETRYABLE_ERROR_PATTERNS = [
   /service.?unavailable/i,
   /overloaded/i,
   /temporarily.?unavailable/i,
+  /token\s+refresh\s+failed/i,
+  /failed\s+to\s+authorize/i,
   /try.?again/i,
   /credit.*balance.*too.*low/i,
   /insufficient.?(?:credits?|funds?|balance)/i,

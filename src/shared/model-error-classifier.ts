@@ -56,6 +56,8 @@ const RETRYABLE_MESSAGE_PATTERNS = [
   "timeout",
   "service unavailable",
   "internal_server_error",
+  "token refresh failed",
+  "failed to authorize",
   "free usage",
   "usage exceeded",
   "credit",

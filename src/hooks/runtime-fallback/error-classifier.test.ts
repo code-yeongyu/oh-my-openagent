@@ -1,4 +1,5 @@
-import { describe, expect, test } from "bun:test"
+declare const require: (name: string) => any
+const { describe, expect, test } = require("bun:test")
 
 import { classifyErrorType, extractAutoRetrySignal, isRetryableError } from "./error-classifier"
 
@@ -62,6 +63,19 @@ describe("runtime-fallback error classifier", () => {
     const error = {
       message:
         "All credentials for model claude-opus-4-6-thinking are cooling down [retrying in ~5 days attempt #1]",
+    }
+
+    //#when
+    const retryable = isRetryableError(error, [400, 403, 408, 429, 500, 502, 503, 504, 529])
+
+    //#then
+    expect(retryable).toBe(true)
+  })
+
+  test("treats failed to authorize message as retryable for session.error path", () => {
+    //#given
+    const error = {
+      message: "Failed to authorize",
     }
 
     //#when

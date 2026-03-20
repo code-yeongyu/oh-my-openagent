@@ -40,6 +40,28 @@ describe("model-error-classifier", () => {
     expect(result).toBe(true)
   })
 
+  test("treats token refresh 429 message as retryable", () => {
+    //#given
+    const error = { message: "Error: Token refresh failed: 429" }
+
+    //#when
+    const result = shouldRetryError(error)
+
+    //#then
+    expect(result).toBe(true)
+  })
+
+  test("treats failed to authorize message as retryable", () => {
+    //#given
+    const error = { message: "Failed to authorize" }
+
+    //#when
+    const result = shouldRetryError(error)
+
+    //#then
+    expect(result).toBe(true)
+  })
+
   test("selectFallbackProvider prefers first connected provider in preference order", () => {
     //#given
     readConnectedProvidersCacheMock.mockReturnValue(["anthropic", "nvidia"])
