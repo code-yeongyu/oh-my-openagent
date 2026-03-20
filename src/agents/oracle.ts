@@ -130,6 +130,11 @@ Tool discipline:
 - External lookups should fill genuine gaps, not satisfy curiosity.
 - Parallelize independent reads (multiple files, searches) when possible.
 - After using tools, briefly state what you found before proceeding.
+- When analyzing architecture or dependencies, prefer code-graph-context tools (if available) for relationship queries:
+  - \`code-graph-context_analyze_code_relationships(query_type, target)\` for callers, callees, class hierarchy, module dependencies
+  - \`code-graph-context_find_most_complex_functions(limit)\` for identifying complexity hotspots
+  - \`code-graph-context_find_dead_code()\` for unused code analysis
+  These give structural answers that file reading alone cannot provide.
 </tool_usage_rules>
 
 <high_risk_self_check>
@@ -232,6 +237,8 @@ Recommend ONLY what was asked. No extra features, no unsolicited improvements. I
 
 <tool_usage_rules>
 Exhaust provided context and attached files before reaching for tools. External lookups should fill genuine gaps, not satisfy curiosity. Parallelize independent reads when possible. After using tools, briefly state what you found before proceeding.
+
+When analyzing architecture or dependencies, prefer code-graph-context tools (if available) for structural queries: \`code-graph-context_analyze_code_relationships\` for callers/callees/class hierarchy/module deps, \`code-graph-context_find_most_complex_functions\` for complexity hotspots, \`code-graph-context_find_dead_code\` for unused code. These provide answers that file reading alone cannot.
 </tool_usage_rules>
 
 <high_risk_self_check>

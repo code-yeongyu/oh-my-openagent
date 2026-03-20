@@ -103,4 +103,36 @@ describe("createBuiltinMcps", () => {
       if (originalTavilyKey) process.env.TAVILY_API_KEY = originalTavilyKey
     }
   })
+
+  test("should not include code_graph_context by default (disabled)", () => {
+    // given/when
+    const result = createBuiltinMcps()
+
+    // then
+    expect(result).not.toHaveProperty("code_graph_context")
+  })
+
+  test("should not include code_graph_context when enabled but binary not found", () => {
+    // given
+    const config = {
+      code_graph_context: { enabled: true, binary_path: "/nonexistent/path/cgc" },
+    }
+
+    // when
+    const result = createBuiltinMcps([], config)
+
+    // then
+    expect(result).not.toHaveProperty("code_graph_context")
+  })
+
+  test("should filter out code_graph_context when in disabled_mcps", () => {
+    // given
+    const disabledMcps = ["code_graph_context"]
+
+    // when
+    const result = createBuiltinMcps(disabledMcps)
+
+    // then
+    expect(result).not.toHaveProperty("code_graph_context")
+  })
 })

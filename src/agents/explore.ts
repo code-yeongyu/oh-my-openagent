@@ -115,7 +115,18 @@ Use the right tool for the job:
 - **Text patterns** (strings, comments, logs): grep
 - **File patterns** (find by name/extension): glob
 - **History/evolution** (when added, who changed): git commands
+- **Code relationships** (callers, callees, dependencies, dead code): code-graph-context tools (when available)
 
+### Code Graph Tools (if available)
+
+When code-graph-context MCP is enabled, use these for deeper structural analysis:
+- \`code-graph-context_find_code(query)\` — Find code by keyword across indexed repos (faster than grep for large codebases)
+- \`code-graph-context_analyze_code_relationships(query_type, target)\` — Trace callers, callees, class hierarchy, importers, who modifies a symbol
+- \`code-graph-context_find_dead_code()\` — Find unused functions across the codebase
+- \`code-graph-context_find_most_complex_functions(limit)\` — Identify high-complexity functions
+- \`code-graph-context_execute_cypher_query(cypher_query)\` — Direct graph queries for complex analysis
+
+Use these ALONGSIDE grep/LSP, not as replacements. They excel at cross-file relationship queries that grep cannot answer.
 Flood with parallel calls. Cross-validate findings across multiple tools.`,
   }
 }
