@@ -31,6 +31,32 @@ describe("runtime-fallback error classifier", () => {
     expect(signal).toBeDefined()
   })
 
+  test("detects token refresh 429 as auto-retry signal", () => {
+    //#given
+    const info = {
+      status: "Error: Token refresh failed: 429",
+    }
+
+    //#when
+    const signal = extractAutoRetrySignal(info)
+
+    //#then
+    expect(signal).toBeDefined()
+  })
+
+  test("detects failed to authorize as auto-retry signal", () => {
+    //#given
+    const info = {
+      message: "Failed to authorize",
+    }
+
+    //#when
+    const signal = extractAutoRetrySignal(info)
+
+    //#then
+    expect(signal).toBeDefined()
+  })
+
   test("treats cooling-down retry messages as retryable", () => {
     //#given
     const error = {

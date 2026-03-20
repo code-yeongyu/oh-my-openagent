@@ -112,7 +112,7 @@ export interface AutoRetrySignal {
 export const AUTO_RETRY_PATTERNS: Array<(combined: string) => boolean> = [
   (combined) => /retrying\s+in/i.test(combined),
   (combined) =>
-    /(?:too\s+many\s+requests|quota\s*exceeded|quota\s+will\s+reset\s+after|usage\s+limit|rate\s+limit|limit\s+reached|all\s+credentials\s+for\s+model|cool(?:ing)?\s*down|exhausted\s+your\s+capacity)/i.test(combined),
+    /(?:too\s+many\s+requests|quota\s*exceeded|quota\s+will\s+reset\s+after|usage\s+limit|rate\s+limit|limit\s+reached|all\s+credentials\s+for\s+model|cool(?:ing)?\s*down|exhausted\s+your\s+capacity|token\s+refresh\s+failed|failed\s+to\s+authorize)/i.test(combined),
 ]
 
 export function extractAutoRetrySignal(info: Record<string, unknown> | undefined): AutoRetrySignal | undefined {
@@ -135,7 +135,7 @@ export function extractAutoRetrySignal(info: Record<string, unknown> | undefined
   const combined = candidates.join("\n")
   if (!combined) return undefined
 
-  const isAutoRetry = AUTO_RETRY_PATTERNS.every((test) => test(combined))
+  const isAutoRetry = AUTO_RETRY_PATTERNS.some((test) => test(combined))
   if (isAutoRetry) {
     return { signal: combined }
   }
