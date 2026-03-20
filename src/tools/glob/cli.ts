@@ -1,3 +1,4 @@
+import { resolve } from "node:path"
 import { spawn } from "bun"
 import {
   resolveGrepCli,
@@ -7,9 +8,11 @@ import {
   DEFAULT_MAX_DEPTH,
   DEFAULT_MAX_OUTPUT_BYTES,
   RG_FILES_FLAGS,
+  DEFAULT_RG_THREADS,
 } from "./constants"
 import type { GlobOptions, GlobResult, FileMatch } from "./types"
 import { stat } from "node:fs/promises"
+import { rgSemaphore } from "../shared/semaphore"
 
 export interface ResolvedCli {
   path: string
@@ -19,6 +22,7 @@ export interface ResolvedCli {
 function buildRgArgs(options: GlobOptions): string[] {
   const args: string[] = [
     ...RG_FILES_FLAGS,
+    `--threads=${Math.min(options.threads ?? DEFAULT_RG_THREADS, DEFAULT_RG_THREADS)}`,
     `--max-depth=${Math.min(options.maxDepth ?? DEFAULT_MAX_DEPTH, DEFAULT_MAX_DEPTH)}`,
   ]
 
@@ -92,6 +96,18 @@ export async function runRgFiles(
   options: GlobOptions,
   resolvedCli?: ResolvedCli
 ): Promise<GlobResult> {
+  await rgSemaphore.acquire()
+  try {
+    return await runRgFilesInternal(options, resolvedCli)
+  } finally {
+    rgSemaphore.release()
+  }
+}
+
+async function runRgFilesInternal(
+  options: GlobOptions,
+  resolvedCli?: ResolvedCli
+): Promise<GlobResult> {
   const cli = resolvedCli ?? resolveGrepCli()
   const timeout = Math.min(options.timeout ?? DEFAULT_TIMEOUT_MS, DEFAULT_TIMEOUT_MS)
   const limit = Math.min(options.limit ?? DEFAULT_LIMIT, DEFAULT_LIMIT)
@@ -104,10 +120,9 @@ export async function runRgFiles(
 
   if (isRg) {
     const args = buildRgArgs(options)
-    const paths = options.paths?.length ? options.paths : ["."]
-    args.push(...paths)
+    cwd = options.paths?.[0] || "."
+    args.push(".")
     command = [cli.path, ...args]
-    cwd = undefined
   } else if (isWindows) {
     command = buildPowerShellCommand(options)
     cwd = undefined
@@ -162,7 +177,7 @@ export async function runRgFiles(
 
       let filePath: string
       if (isRg) {
-        filePath = line
+        filePath = cwd ? resolve(cwd, line) : line
       } else if (isWindows) {
         filePath = line.trim()
       } else {

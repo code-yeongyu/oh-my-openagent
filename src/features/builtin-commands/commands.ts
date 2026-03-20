@@ -1,9 +1,11 @@
 import type { CommandDefinition } from "../claude-code-command-loader"
 import type { BuiltinCommandName, BuiltinCommands } from "./types"
 import { INIT_DEEP_TEMPLATE } from "./templates/init-deep"
-import { RALPH_LOOP_TEMPLATE, CANCEL_RALPH_TEMPLATE } from "./templates/ralph-loop"
+import { RALPH_LOOP_TEMPLATE, ULW_LOOP_TEMPLATE, CANCEL_RALPH_TEMPLATE } from "./templates/ralph-loop"
+import { STOP_CONTINUATION_TEMPLATE } from "./templates/stop-continuation"
 import { REFACTOR_TEMPLATE } from "./templates/refactor"
 import { START_WORK_TEMPLATE } from "./templates/start-work"
+import { HANDOFF_TEMPLATE } from "./templates/handoff"
 
 const BUILTIN_COMMAND_DEFINITIONS: Record<BuiltinCommandName, Omit<CommandDefinition, "name">> = {
   "init-deep": {
@@ -26,19 +28,19 @@ ${RALPH_LOOP_TEMPLATE}
 <user-task>
 $ARGUMENTS
 </user-task>`,
-     argumentHint: '"task description" [--completion-promise=TEXT] [--max-iterations=N]',
+     argumentHint: '"task description" [--completion-promise=TEXT] [--max-iterations=N] [--strategy=reset|continue]',
    },
    "ulw-loop": {
-     description: "(builtin) Start ultrawork loop - continues until completion with ultrawork mode",
-     template: `<command-instruction>
-${RALPH_LOOP_TEMPLATE}
+      description: "(builtin) Start ultrawork loop - continues until completion with ultrawork mode",
+      template: `<command-instruction>
+${ULW_LOOP_TEMPLATE}
 </command-instruction>
 
 <user-task>
 $ARGUMENTS
 </user-task>`,
-     argumentHint: '"task description" [--completion-promise=TEXT] [--max-iterations=N]',
-   },
+      argumentHint: '"task description" [--completion-promise=TEXT] [--strategy=reset|continue]',
+    },
   "cancel-ralph": {
     description: "(builtin) Cancel active Ralph Loop",
     template: `<command-instruction>
@@ -69,6 +71,28 @@ Timestamp: $TIMESTAMP
 $ARGUMENTS
 </user-request>`,
     argumentHint: "[plan-name]",
+  },
+  "stop-continuation": {
+    description: "(builtin) Stop all continuation mechanisms (ralph loop, todo continuation, boulder) for this session",
+    template: `<command-instruction>
+${STOP_CONTINUATION_TEMPLATE}
+</command-instruction>`,
+  },
+  handoff: {
+    description: "(builtin) Create a detailed context summary for continuing work in a new session",
+    template: `<command-instruction>
+${HANDOFF_TEMPLATE}
+</command-instruction>
+
+<session-context>
+Session ID: $SESSION_ID
+Timestamp: $TIMESTAMP
+</session-context>
+
+<user-request>
+$ARGUMENTS
+</user-request>`,
+    argumentHint: "[goal]",
   },
 }
 

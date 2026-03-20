@@ -13,7 +13,7 @@ export interface SkillMetadata {
   license?: string
   compatibility?: string
   metadata?: Record<string, string>
-  "allowed-tools"?: string
+  "allowed-tools"?: string | string[]
   mcp?: SkillMcpConfig
 }
 

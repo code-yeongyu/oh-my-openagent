@@ -1,73 +1,71 @@
-# CLI KNOWLEDGE BASE
+# src/cli/ — CLI: install, run, doctor, mcp-oauth
+
+**Generated:** 2026-03-06
 
 ## OVERVIEW
 
-CLI entry: `bunx oh-my-opencode`. Interactive installer, doctor diagnostics. Commander.js + @clack/prompts.
+Commander.js CLI with 5 commands. Entry: `index.ts` → `runCli()` in `cli-program.ts`.
+
+## COMMANDS
+
+| Command | Purpose | Key Logic |
+|---------|---------|-----------|
+| `install` | Interactive/non-interactive setup | Provider selection → config gen → plugin registration |
+| `run <message>` | Non-interactive session launcher | Agent resolution (flag → env → config → Sisyphus) |
+| `doctor` | 4-category health checks | System, Config, Tools, Models |
+| `get-local-version` | Version detection | Installed vs npm latest |
+| `mcp-oauth` | OAuth token management | login (PKCE), logout, status |
 
 ## STRUCTURE
 
 ```
 cli/
-├── index.ts              # Commander.js entry
-├── install.ts            # Interactive TUI (520 lines)
-├── config-manager.ts     # JSONC parsing (664 lines)
-├── types.ts              # InstallArgs, InstallConfig
-├── model-fallback.ts     # Model fallback configuration
+├── index.ts                     # Entry point → runCli()
+├── cli-program.ts               # Commander.js program (5 commands)
+├── install.ts                   # Routes to TUI or CLI installer
+├── cli-installer.ts             # Non-interactive (console output)
+├── tui-installer.ts             # Interactive (@clack/prompts)
+├── model-fallback.ts            # Model config gen by provider availability
+├── provider-availability.ts     # Provider detection
+├── fallback-chain-resolution.ts # Fallback chain logic
+├── config-manager/              # 20 config utilities
+│   ├── plugin registration, provider config
+│   ├── JSONC operations, auth plugins
+│   └── npm dist-tags, binary detection
 ├── doctor/
-│   ├── index.ts          # Doctor entry
-│   ├── runner.ts         # Check orchestration
-│   ├── formatter.ts      # Colored output
-│   ├── constants.ts      # Check IDs, symbols
-│   ├── types.ts          # CheckResult, CheckDefinition
-│   └── checks/           # 14 checks, 21 files
-│       ├── version.ts    # OpenCode + plugin version
-│       ├── config.ts     # JSONC validity, Zod
-│       ├── auth.ts       # Anthropic, OpenAI, Google
-│       ├── dependencies.ts # AST-Grep, Comment Checker
-│       ├── lsp.ts        # LSP connectivity
-│       ├── mcp.ts        # MCP validation
-│       ├── model-resolution.ts # Model resolution check
-│       └── gh.ts         # GitHub CLI
-├── run/
-│   └── index.ts          # Session launcher
-└── get-local-version/
-    └── index.ts          # Version detection
+│   ├── runner.ts                # Parallel check execution
+│   ├── formatter.ts             # Output formatting
+│   └── checks/                  # 15 check files in 4 categories
+│       ├── system.ts            # Binary, plugin, version
+│       ├── config.ts            # JSONC validity, Zod schema
+│       ├── tools.ts             # AST-Grep, LSP, GH CLI, MCP
+│       └── model-resolution.ts  # Cache, resolution, overrides (6 sub-files)
+├── run/                         # Session launcher
+│   ├── runner.ts                # Main orchestration
+│   ├── agent-resolver.ts        # Flag → env → config → Sisyphus
+│   ├── session-resolver.ts      # Create/resume sessions
+│   ├── event-handlers.ts        # Event processing
+│   └── poll-for-completion.ts   # Wait for todos/background tasks
+└── mcp-oauth/                   # OAuth token management
 ```
 
-## COMMANDS
+## MODEL FALLBACK SYSTEM
 
-| Command | Purpose |
-|---------|---------|
-| `install` | Interactive setup |
-| `doctor` | 14 health checks |
-| `run` | Launch session |
-| `get-local-version` | Version check |
+No single global priority. CLI install-time resolution uses per-agent fallback chains from `model-fallback-requirements.ts`.
 
-## DOCTOR CATEGORIES
+Common patterns: Claude/OpenAI/Gemini are preferred when an agent chain includes them, `librarian` prefers ZAI, `sisyphus` falls back through Kimi then GLM-5, and `hephaestus` requires OpenAI-compatible providers.
 
-| Category | Checks |
-|----------|--------|
-| installation | opencode, plugin |
-| configuration | config validity, Zod |
-| authentication | anthropic, openai, google |
-| dependencies | ast-grep, comment-checker |
-| tools | LSP, MCP |
-| updates | version comparison |
+## DOCTOR CHECKS
 
-## HOW TO ADD CHECK
+| Category | Validates |
+|----------|-----------|
+| **System** | Binary found, version >=1.0.150, plugin registered, version match |
+| **Config** | JSONC validity, Zod schema, model override syntax |
+| **Tools** | AST-Grep, comment-checker, LSP servers, GH CLI, MCP servers |
+| **Models** | Cache exists, model resolution, agent/category overrides, availability |
 
-1. Create `src/cli/doctor/checks/my-check.ts`
-2. Export from `checks/index.ts`
-3. Add to `getAllCheckDefinitions()`
+## HOW TO ADD A DOCTOR CHECK
 
-## TUI FRAMEWORK
-
-- **@clack/prompts**: `select()`, `spinner()`, `intro()`
-- **picocolors**: Terminal colors
-- **Symbols**: ✓ (pass), ✗ (fail), ⚠ (warn)
-
-## ANTI-PATTERNS
-
-- **Blocking in non-TTY**: Check `process.stdout.isTTY`
-- **Direct JSON.parse**: Use `parseJsonc()`
-- **Silent failures**: Return warn/fail in doctor
+1. Create `src/cli/doctor/checks/{name}.ts`
+2. Export check function matching `DoctorCheck` interface
+3. Register in `checks/index.ts`

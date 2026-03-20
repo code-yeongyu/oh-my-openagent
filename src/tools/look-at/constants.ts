@@ -1,3 +1,3 @@
 export const MULTIMODAL_LOOKER_AGENT = "multimodal-looker" as const
 
-export const LOOK_AT_DESCRIPTION = `Analyze media files (PDFs, images, diagrams) that require interpretation beyond raw text. Extracts specific information or summaries from documents, describes visual content. Use when you need analyzed/extracted data rather than literal file contents.`
+export const LOOK_AT_DESCRIPTION = `Extract basic information from media files (PDFs, images, diagrams) when a quick summary suffices over precise reading. Good for simple text-based content extraction without using the Read tool. NEVER use for visual precision, aesthetic evaluation, or exact accuracy — use Read tool instead for those cases.`

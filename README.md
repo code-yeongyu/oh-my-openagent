@@ -1,24 +1,9 @@
-> [!WARNING]
-> **Security warning: impersonation site**
->
-> **ohmyopencode.com is NOT affiliated with this project.** We do not operate or endorse that site.
->
-> OhMyOpenCode is **free and open-source**. Do **not** download installers or enter payment details on third-party sites that claim to be "official."
->
-> Because the impersonation site is behind a paywall, we **cannot verify what it distributes**. Treat any downloads from it as **potentially unsafe**.
->
-> ✅ Official downloads: https://github.com/code-yeongyu/oh-my-opencode/releases
-
 > [!NOTE]
 >
-> [![Sisyphus Labs — Sisyphus is the agent that codes like your team.](./.github/assets/sisyphuslabs.png?v=2)](https://sisyphuslabs.ai)
+> [![Sisyphus Labs - Sisyphus is the agent that codes like your team.](./.github/assets/sisyphuslabs.png?v=2)](https://sisyphuslabs.ai)
 > > **We're building a fully productized version of Sisyphus to define the future of frontier agents. <br />Join the waitlist [here](https://sisyphuslabs.ai).**
 
 > [!TIP]
->
-> [![Oh My OpenCode 3.0 is now stable!](./.github/assets/orchestrator-atlas.png?v=3)](https://github.com/code-yeongyu/oh-my-opencode/releases/tag/v3.0.0)
-> > **Oh My OpenCode 3.0 is now stable! Use `oh-my-opencode@latest` to install it.**
->
 > Be with us!
 >
 > | [<img alt="Discord link" src="https://img.shields.io/discord/1452487457085063218?color=5865F2&label=discord&labelColor=black&logo=discord&logoColor=white&style=flat-square" width="156px" />](https://discord.gg/PUwSMR9XNk) | Join our [Discord community](https://discord.gg/PUwSMR9XNk) to connect with contributors and fellow `oh-my-opencode` users. |
@@ -30,50 +15,29 @@
 
 <div align="center">
 
-[![Oh My OpenCode](./.github/assets/hero.jpg)](https://github.com/code-yeongyu/oh-my-opencode#oh-my-opencode)
+[![Oh My OpenCode](./.github/assets/hero.jpg)](https://github.com/code-yeongyu/oh-my-openagent#oh-my-opencode)
 
-[![Preview](./.github/assets/omo.png)](https://github.com/code-yeongyu/oh-my-opencode#oh-my-opencode)
+[![Preview](./.github/assets/omo.png)](https://github.com/code-yeongyu/oh-my-openagent#oh-my-opencode)
 
 
 </div>
 
-> This is coding on steroids—`oh-my-opencode` in action. Run background agents, call specialized agents like oracle, librarian, and frontend engineer. Use crafted LSP/AST tools, curated MCPs, and a full Claude Code compatibility layer.
-
-# Claude OAuth Access Notice
-
-## TL;DR
-
-> Q. Can I use oh-my-opencode?
-
-Yes.
-
-> Q. Can I use it with my Claude Code subscription?
-
-Yes, technically possible. But I cannot recommend using it.
-
-## FULL
-
-> As of January 2026, Anthropic has restricted third-party OAuth access citing ToS violations.
+> Anthropic [**blocked OpenCode because of us.**](https://x.com/thdxr/status/2010149530486911014) **Yes this is true.**
+> They want you locked in. Claude Code's a nice prison, but it's still a prison.
 >
-> [**Anthropic has cited this project, oh-my-opencode as justification for blocking opencode.**](https://x.com/thdxr/status/2010149530486911014)
->
-> Indeed, some plugins that spoof Claude Code's oauth request signatures exist in the community.
->
-> These tools may work regardless of technical detectability, but users should be aware of ToS implications, and I personally cannot recommend to use those.
->
-> This project is not responsible for any issues arising from the use of unofficial tools, and **we do not have any custom implementations of those oauth systems.**
-
+> We don't do lock-in here. We ride every model. Claude / Kimi / GLM for orchestration. GPT for reasoning. Minimax for speed. Gemini for creativity.
+> The future isn't picking one winner—it's orchestrating them all. Models get cheaper every month. Smarter every month. No single provider will dominate. We're building for that open market, not their walled gardens.
 
 <div align="center">
 
-[![GitHub Release](https://img.shields.io/github/v/release/code-yeongyu/oh-my-opencode?color=369eff&labelColor=black&logo=github&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/releases)
-[![npm downloads](https://img.shields.io/npm/dt/oh-my-opencode?color=ff6b35&labelColor=black&style=flat-square)](https://www.npmjs.com/package/oh-my-opencode)
-[![GitHub Contributors](https://img.shields.io/github/contributors/code-yeongyu/oh-my-opencode?color=c4f042&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/graphs/contributors)
-[![GitHub Forks](https://img.shields.io/github/forks/code-yeongyu/oh-my-opencode?color=8ae8ff&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/network/members)
-[![GitHub Stars](https://img.shields.io/github/stars/code-yeongyu/oh-my-opencode?color=ffcb47&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/stargazers)
-[![GitHub Issues](https://img.shields.io/github/issues/code-yeongyu/oh-my-opencode?color=ff80eb&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/issues)
-[![License](https://img.shields.io/badge/license-SUL--1.0-white?labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/blob/master/LICENSE.md)
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/code-yeongyu/oh-my-opencode)
+[![GitHub Release](https://img.shields.io/github/v/release/code-yeongyu/oh-my-openagent?color=369eff&labelColor=black&logo=github&style=flat-square)](https://github.com/code-yeongyu/oh-my-openagent/releases)
+[![npm downloads](https://img.shields.io/endpoint?url=https%3A%2F%2Fohmyopenagent.com%2Fapi%2Fnpm-downloads&style=flat-square)](https://www.npmjs.com/package/oh-my-opencode)
+[![GitHub Contributors](https://img.shields.io/github/contributors/code-yeongyu/oh-my-openagent?color=c4f042&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-openagent/graphs/contributors)
+[![GitHub Forks](https://img.shields.io/github/forks/code-yeongyu/oh-my-openagent?color=8ae8ff&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-openagent/network/members)
+[![GitHub Stars](https://img.shields.io/github/stars/code-yeongyu/oh-my-openagent?color=ffcb47&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-openagent/stargazers)
+[![GitHub Issues](https://img.shields.io/github/issues/code-yeongyu/oh-my-openagent?color=ff80eb&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-openagent/issues)
+[![License](https://img.shields.io/badge/license-SUL--1.0-white?labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-openagent/blob/dev/LICENSE.md)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/code-yeongyu/oh-my-openagent)
 
 [English](README.md) | [한국어](README.ko.md) | [日本語](README.ja.md) | [简体中文](README.zh-cn.md)
 
@@ -85,13 +49,13 @@ Yes, technically possible. But I cannot recommend using it.
 
 > "It made me cancel my Cursor subscription. Unbelievable things are happening in the open source community." - [Arthur Guiot](https://x.com/arthur_guiot/status/2008736347092382053?s=20)
 
-> "If Claude Code does in 7 days what a human does in 3 months, Sisyphus does it in 1 hour. It just works until the task is done. It is a discipline agent." — B, Quant Researcher
+> "If Claude Code does in 7 days what a human does in 3 months, Sisyphus does it in 1 hour. It just works until the task is done. It is a discipline agent." <br/>- B, Quant Researcher
 
-> "Knocked out 8000 eslint warnings with Oh My Opencode, just in a day" — [Jacob Ferrari](https://x.com/jacobferrari_/status/2003258761952289061)
+> "Knocked out 8000 eslint warnings with Oh My Opencode, just in a day" <br/>- [Jacob Ferrari](https://x.com/jacobferrari_/status/2003258761952289061)
 
 > "I converted a 45k line tauri app into a SaaS web app overnight using Ohmyopencode and ralph loop. Started with interview me prompt, asked it for ratings and recommendations on the questions. It was amazing to watch it work and to wake up this morning to a mostly working website!" - [James Hargis](https://x.com/hargabyte/status/2007299688261882202)
 
-> "use oh-my-opencode, you will never go back" — [d0t3ch](https://x.com/d0t3ch/status/2001685618200580503)
+> "use oh-my-opencode, you will never go back" <br/>- [d0t3ch](https://x.com/d0t3ch/status/2001685618200580503)
 
 > "I haven't really been able to articulate exactly what makes it so great yet, but the development experience has reached a completely different dimension." - [
 苔硯:こけすずり](https://x.com/kokesuzuri/status/2008532913961529372?s=20)
@@ -99,140 +63,22 @@ Yes, technically possible. But I cannot recommend using it.
 > "Experimenting with open code, oh my opencode and supermemory this weekend to build some minecraft/souls-like abomination."
 > "Asking it to add crouch animations while I go take my post-lunch walk. [Video]" - [MagiMetal](https://x.com/MagiMetal/status/2005374704178373023)
 
-> "You guys should pull this into core and recruit him. Seriously. It's really, really, really good." — Henning Kilset
+> "You guys should pull this into core and recruit him. Seriously. It's really, really, really good." <br/>- Henning Kilset
 
-> "Hire @yeon_gyu_kim if you can convince him, this dude has revolutionized opencode." — [mysticaltech](https://x.com/mysticaltech/status/2001858758608376079)
+> "Hire @yeon_gyu_kim if you can convince him, this dude has revolutionized opencode." <br/>- [mysticaltech](https://x.com/mysticaltech/status/2001858758608376079)
 
 > "Oh My OpenCode Is Actually Insane" - [YouTube - Darren Builds AI](https://www.youtube.com/watch?v=G_Snfh2M41M)
 
 ---
 
-## Contents
-
-- [Oh My OpenCode](#oh-my-opencode)
-  - [Just Skip Reading This Readme](#just-skip-reading-this-readme)
-    - [It's the Age of Agents](#its-the-age-of-agents)
-    - [🪄 The Magic Word: `ultrawork`](#-the-magic-word-ultrawork)
-    - [For Those Who Want to Read: Meet Sisyphus](#for-those-who-want-to-read-meet-sisyphus)
-      - [Just Install It.](#just-install-it)
-  - [Installation](#installation)
-    - [For Humans](#for-humans)
-    - [For LLM Agents](#for-llm-agents)
-  - [Uninstallation](#uninstallation)
-  - [Features](#features)
-   - [Configuration](#configuration)
-    - [JSONC Support](#jsonc-support)
-    - [Google Auth](#google-auth)
-    - [Agents](#agents)
-      - [Permission Options](#permission-options)
-    - [Built-in Skills](#built-in-skills)
-    - [Git Master](#git-master)
-    - [Sisyphus Agent](#sisyphus-agent)
-    - [Background Tasks](#background-tasks)
-    - [Categories](#categories)
-    - [Hooks](#hooks)
-    - [MCPs](#mcps)
-    - [LSP](#lsp)
-    - [Experimental](#experimental)
-    - [Environment Variables](#environment-variables)
-  - [Author's Note](#authors-note)
-  - [Warnings](#warnings)
-  - [Loved by professionals at](#loved-by-professionals-at)
-
 # Oh My OpenCode
 
-[Claude Code](https://www.claude.com/product/claude-code) is great.
-But if you're a hacker, you'll fall head over heels for [OpenCode](https://github.com/sst/opencode).
-**START WITH YOUR ChatGPT, Claude, Gemini SUBSCRIPTIONS. OPENCODE COVERS THEM ALL.**
+You're juggling Claude Code, Codex, random OSS models. Configuring workflows. Debugging agents.
 
-- Endlessly extensible. Endlessly customizable.
-- Zero screen flicker.
-- [LSP](https://opencode.ai/docs/lsp/), [linters, formatters](https://opencode.ai/docs/formatters/) activate automatically per file—and you can tweak everything.
-- Mix and match models. **Orchestrate them by purpose.**
-- Feature-rich. Beautiful. The terminal doesn't choke. High performance.
+We did the work. Tested everything. Kept what actually shipped.
 
-Remember the first time you switched from Windows to Linux? That rush of configuring everything exactly how you wanted?
-In an age where that magic seems lost, OpenCode brings it back.
-If you love coding and computers, OpenCode is that Linux-after-Windows moment.
+Install OmO. Type `ultrawork`. Done.
 
-**But here's the catch: there's a lot to learn, it's complex, and your time is expensive.**
-
-I've fixed that.
-Even if you're not a hacker, invest a few minutes. Multiply your skills and productivity.
-Hand this doc to an agent and let them set it up.
-
-## Just Skip Reading This Readme
-
-### It's the Age of Agents
-- **Just paste this link into Claude Code / AmpCode / Factory Droid / Cursor and ask it to explain.**
-  - Ask why it's good, why it's not just another boilerplate setup, what actually gets better.
-  - If you're an LLM agent, explain to the user what becomes possible right now with this project.
-
-As following:
-
-```
-Hey please read this readme and tell me why it is different from other agent harness? why is this actually good? https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/heads/dev/README.md
-```
-
-### 🪄 The Magic Word: `ultrawork`
-
-**Don't want to read all this? Just include `ultrawork` (or `ulw`) in your prompt.**
-
-That's it. All the features we provide will work like magic—parallel agents, background tasks, deep exploration, and relentless execution until completion. The agent figures out the rest automatically.
-
-### For Those Who Want to Read: Meet Sisyphus
-
-![Meet Sisyphus](.github/assets/sisyphus.png)
-
-In greek mythology, Sisyphus was condemned to roll a boulder up a hill for eternity as punishment for deceiving the gods. LLM Agents haven't really done anything wrong, yet they too roll their "stones"—their thoughts—every single day.
-My life is no different. Looking back, we are not so different from these agents.
-**Yes! LLM Agents are no different from us. They can write code as brilliant as ours and work just as excellently—if you give them great tools and solid teammates.**
-
-Meet our main agent: Sisyphus (Opus 4.5 High). Below are the tools Sisyphus uses to keep that boulder rolling.
-
-*Everything below is customizable. Take what you want. All features are enabled by default. You don't have to do anything. Battery Included, works out of the box.*
-
-- Sisyphus's Teammates (Curated Agents)
-  - Oracle: Design, debugging (GPT 5.2 Medium)
-  - Frontend UI/UX Engineer: Frontend development (Gemini 3 Pro)
-  - Librarian: Official docs, open source implementations, codebase exploration (Claude Sonnet 4.5)
-  - Explore: Blazing fast codebase exploration (Contextual Grep) (Grok Code)
-- Full LSP / AstGrep Support: Refactor decisively.
-- Todo Continuation Enforcer: Forces the agent to continue if it quits halfway. **This is what keeps Sisyphus rolling that boulder.**
-- Comment Checker: Prevents AI from adding excessive comments. Code generated by Sisyphus should be indistinguishable from human-written code.
-- Claude Code Compatibility: Command, Agent, Skill, MCP, Hook(PreToolUse, PostToolUse, UserPromptSubmit, Stop)
-- Curated MCPs:
-  - Exa (Web Search)
-  - Context7 (Official Documentation)
-  - Grep.app (GitHub Code Search)
-- Interactive Terminal Supported - Tmux Integration
-- Async Agents
-- ...
-
-#### Just Install This
-
-You can learn a lot from [overview page](docs/guide/overview.md), but following is like the example workflow.
-
-Just by installing this, you make your agents to work like:
-
-1. Sisyphus doesn't waste time hunting for files himself; he keeps the main agent's context lean. Instead, he fires off background tasks to faster, cheaper models in parallel to map the territory for him.
-1. Sisyphus leverages LSP for refactoring; it's more deterministic, safer, and surgical.
-1. When the heavy lifting requires a UI touch, Sisyphus delegates frontend tasks directly to Gemini 3 Pro.
-1. If Sisyphus gets stuck in a loop or hits a wall, he doesn't keep banging his head—he calls GPT 5.2 for high-IQ strategic backup.
-1. Working with a complex open-source framework? Sisyphus spawns subagents to digest the raw source code and documentation in real-time. He operates with total contextual awareness.
-1. When Sisyphus touches comments, he either justifies their existence or nukes them. He keeps your codebase clean.
-1. Sisyphus is bound by his TODO list. If he doesn't finish what he started, the system forces him back into "bouldering" mode. Your task gets done, period.
-1. Honestly, don't even bother reading the docs. Just write your prompt. Include the 'ultrawork' keyword. Sisyphus will analyze the structure, gather the context, dig through external source code, and just keep bouldering until the job is 100% complete.
-1. Actually, typing 'ultrawork' is too much effort. Just type 'ulw'. Just ulw. Sip your coffee. Your work is done.
-
-Need to look something up? It scours official docs, your entire codebase history, and public GitHub implementations—using not just grep but built-in LSP tools and AST-Grep.
-3. Stop worrying about context management when delegating to LLMs. I've got it covered.
-    - OhMyOpenCode aggressively leverages multiple agents to lighten the context load.
-    - **Your agent is now the dev team lead. You're the AI Manager.**
-4. It doesn't stop until the job is done.
-5. Don't want to dive deep into this project? No problem. Just type 'ultrathink'.
-
-If you don't want all this, as mentioned, you can just pick and choose specific features.
 
 ## Installation
 
@@ -242,18 +88,174 @@ Copy and paste this prompt to your LLM agent (Claude Code, AmpCode, Cursor, etc.
 
 ```
 Install and configure oh-my-opencode by following the instructions here:
-https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/heads/master/docs/guide/installation.md
+https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/heads/dev/docs/guide/installation.md
 ```
 
-Or read the [Installation Guide](docs/guide/installation.md) directly—but **we strongly recommend letting an agent handle it. Humans make mistakes.**
+Or read the [Installation Guide](docs/guide/installation.md), but seriously, let an agent do it. Humans fat-finger configs.
 
 ### For LLM Agents
 
 Fetch the installation guide and follow it:
 
 ```bash
-curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/heads/master/docs/guide/installation.md
+curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/heads/dev/docs/guide/installation.md
 ```
+
+---
+
+## Skip This README
+
+We're past the era of reading docs. Just paste this into your agent:
+
+```
+Read this and tell me why it's not just another boilerplate: https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/heads/dev/README.md
+```
+
+## Highlights
+
+### 🪄 `ultrawork`
+
+You're actually reading this? Wild.
+
+Install. Type `ultrawork` (or `ulw`). Done.
+
+Everything below, every feature, every optimization, you don't need to know it. It just works.
+
+Even only with following subscriptions, ultrawork will work well (this project is not affiliated, this is just personal recommendation):
+- [ChatGPT Subscription ($20)](https://chatgpt.com/)
+- [Kimi Code Subscription ($0.99) (*only this month)](https://www.kimi.com/kimiplus/sale)
+- [GLM Coding Plan ($10)](https://z.ai/subscribe)
+- If you are eligible for pay-per-token, using kimi and gemini models won't cost you that much.
+
+|       | Feature                                                  | What it does                                                                                                                                                                                                     |
+| :---: | :------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+|   🤖   | **Discipline Agents**                                    | Sisyphus orchestrates Hephaestus, Oracle, Librarian, Explore. A full AI dev team in parallel.                                                                                                                    |
+|   ⚡   | **`ultrawork` / `ulw`**                                  | One word. Every agent activates. Doesn't stop until done.                                                                                                                                                        |
+|   🚪   | **[IntentGate](https://factory.ai/news/terminal-bench)** | Analyzes true user intent before classifying or acting. No more literal misinterpretations.                                                                                                                      |
+|   🔗   | **Hash-Anchored Edit Tool**                              | `LINE#ID` content hash validates every change. Zero stale-line errors. Inspired by [oh-my-pi](https://github.com/can1357/oh-my-pi). [The Harness Problem →](https://blog.can.ac/2026/02/12/the-harness-problem/) |
+|   🛠️   | **LSP + AST-Grep**                                       | Workspace rename, pre-build diagnostics, AST-aware rewrites. IDE precision for agents.                                                                                                                           |
+|   🧠   | **Background Agents**                                    | Fire 5+ specialists in parallel. Context stays lean. Results when ready.                                                                                                                                         |
+|   📚   | **Built-in MCPs**                                        | Exa (web search), Context7 (official docs), Grep.app (GitHub search). Always on.                                                                                                                                 |
+|   🔁   | **Ralph Loop / `/ulw-loop`**                             | Self-referential loop. Doesn't stop until 100% done.                                                                                                                                                             |
+|   ✅   | **Todo Enforcer**                                        | Agent goes idle? System yanks it back. Your task gets done, period.                                                                                                                                              |
+|   💬   | **Comment Checker**                                      | No AI slop in comments. Code reads like a senior wrote it.                                                                                                                                                       |
+|   🖥️   | **Tmux Integration**                                     | Full interactive terminal. REPLs, debuggers, TUIs. All live.                                                                                                                                                     |
+|   🔌   | **Claude Code Compatible**                               | Your hooks, commands, skills, MCPs, and plugins? All work here.                                                                                                                                                  |
+|   🎯   | **Skill-Embedded MCPs**                                  | Skills carry their own MCP servers. No context bloat.                                                                                                                                                            |
+|   📋   | **Prometheus Planner**                                   | Interview-mode strategic planning before any execution.                                                                                                                                                          |
+|   🔍   | **`/init-deep`**                                         | Auto-generates hierarchical `AGENTS.md` files throughout your project. Great for both token efficiency and your agent's performance                                                                              |
+
+### Discipline Agents
+
+<table><tr>
+<td align="center"><img src=".github/assets/sisyphus.png" height="300" /></td>
+<td align="center"><img src=".github/assets/hephaestus.png" height="300" /></td>
+</tr></table>
+
+**Sisyphus** (`claude-opus-4-6` / **`kimi-k2.5`** / **`glm-5`** ) is your main orchestrator. He plans, delegates to specialists, and drives tasks to completion with aggressive parallel execution. He does not stop halfway.
+
+**Hephaestus** (`gpt-5.3-codex`) is your autonomous deep worker. Give him a goal, not a recipe. He explores the codebase, researches patterns, and executes end-to-end without hand-holding. *The Legitimate Craftsman.*
+
+**Prometheus** (`claude-opus-4-6` / **`kimi-k2.5`** / **`glm-5`** ) is your strategic planner. Interview mode: it questions, identifies scope, and builds a detailed plan before a single line of code is touched.
+
+Every agent is tuned to its model's specific strengths. No manual model-juggling. [Learn more →](docs/guide/overview.md)
+
+> Anthropic [blocked OpenCode because of us.](https://x.com/thdxr/status/2010149530486911014) That's why Hephaestus is called "The Legitimate Craftsman." The irony is intentional.
+>
+> We run best on Opus, but Kimi K2.5 + GPT-5.3 Codex already beats vanilla Claude Code. Zero config needed.
+
+### Agent Orchestration
+
+When Sisyphus delegates to a subagent, it doesn't pick a model. It picks a **category**. The category maps automatically to the right model:
+
+| Category             | What it's for                      |
+| :------------------- | :--------------------------------- |
+| `visual-engineering` | Frontend, UI/UX, design            |
+| `deep`               | Autonomous research + execution    |
+| `quick`              | Single-file changes, typos         |
+| `ultrabrain`         | Hard logic, architecture decisions |
+
+Agent says what kind of work. Harness picks the right model. `ultrabrain` now routes to GPT-5.4 xhigh by default. You touch nothing.
+
+### Claude Code Compatibility
+
+You dialed in your Claude Code setup. Good.
+
+Every hook, command, skill, MCP, plugin works here unchanged. Full compatibility, including plugins.
+
+### World-Class Tools for Your Agents
+
+LSP, AST-Grep, Tmux, MCP actually integrated, not duct-taped together.
+
+- **LSP**: `lsp_rename`, `lsp_goto_definition`, `lsp_find_references`, `lsp_diagnostics`. IDE precision for every agent
+- **AST-Grep**: Pattern-aware code search and rewriting across 25 languages
+- **Tmux**: Full interactive terminal. REPLs, debuggers, TUI apps. Your agent stays in session
+- **MCP**: Web search, official docs, GitHub code search. All baked in
+
+### Skill-Embedded MCPs
+
+MCP servers eat your context budget. We fixed that.
+
+Skills bring their own MCP servers. Spin up on-demand, scoped to task, gone when done. Context window stays clean.
+
+### Codes Better. Hash-Anchored Edits
+
+The harness problem is real. Most agent failures aren't the model. It's the edit tool.
+
+> *"None of these tools give the model a stable, verifiable identifier for the lines it wants to change... They all rely on the model reproducing content it already saw. When it can't - and it often can't - the user blames the model."*
+>
+> <br/>- [Can Bölük, The Harness Problem](https://blog.can.ac/2026/02/12/the-harness-problem/)
+
+Inspired by [oh-my-pi](https://github.com/can1357/oh-my-pi), we implemented **Hashline**. Every line the agent reads comes back tagged with a content hash:
+
+```
+11#VK| function hello() {
+22#XJ|   return "world";
+33#MB| }
+```
+
+The agent edits by referencing those tags. If the file changed since the last read, the hash won't match and the edit is rejected before corruption. No whitespace reproduction. No stale-line errors.
+
+Grok Code Fast 1: **6.7% → 68.3%** success rate. Just from changing the edit tool.
+
+### Deep Initialization. `/init-deep`
+
+Run `/init-deep`. It generates hierarchical `AGENTS.md` files:
+
+```
+project/
+├── AGENTS.md              ← project-wide context
+├── src/
+│   ├── AGENTS.md          ← src-specific context
+│   └── components/
+│       └── AGENTS.md      ← component-specific context
+```
+
+Agents auto-read relevant context. Zero manual management.
+
+### Planning. Prometheus
+
+Complex task? Don't prompt and pray.
+
+`/start-work` calls Prometheus. **Interviews you like a real engineer**, identifies scope and ambiguities, builds a verified plan before touching code. Agent knows what it's building before it starts.
+
+### Skills
+
+Skills aren't just prompts. Each brings:
+
+- Domain-tuned system instructions
+- Embedded MCP servers, on-demand
+- Scoped permissions. Agents stay in bounds
+
+Built-ins: `playwright` (browser automation), `git-master` (atomic commits, rebase surgery), `frontend-ui-ux` (design-first UI).
+
+Add your own: `.opencode/skills/*/SKILL.md` or `~/.config/opencode/skills/*/SKILL.md`.
+
+**Want the full feature breakdown?** See the **[Features Documentation](docs/reference/features.md)** for agents, hooks, tools, MCPs, and everything else in detail.
+
+---
+
+> **New to oh-my-opencode?** Read the **[Overview](docs/guide/overview.md)** to understand what you have, or check the **[Orchestration Guide](docs/guide/orchestration.md)** for how agents collaborate.
 
 ## Uninstallation
 
@@ -274,10 +276,10 @@ To remove oh-my-opencode:
 
    ```bash
    # Remove user config
-   rm -f ~/.config/opencode/oh-my-opencode.json
+   rm -f ~/.config/opencode/oh-my-opencode.json ~/.config/opencode/oh-my-opencode.jsonc
 
    # Remove project config (if exists)
-   rm -f .opencode/oh-my-opencode.json
+   rm -f .opencode/oh-my-opencode.json .opencode/oh-my-opencode.jsonc
    ```
 
 3. **Verify removal**
@@ -289,26 +291,30 @@ To remove oh-my-opencode:
 
 ## Features
 
-We have lots of features that you'll think should obviously exist, and once you experience them, you'll never be able to go back to how things were before.
-See the full [Features Documentation](docs/features.md) for detailed information.
+Features you'll think should've always existed. Once you use them, you can't go back.
+
+See full [Features Documentation](docs/reference/features.md).
 
 **Quick Overview:**
 - **Agents**: Sisyphus (the main agent), Prometheus (planner), Oracle (architecture/debugging), Librarian (docs/code search), Explore (fast codebase grep), Multimodal Looker
 - **Background Agents**: Run multiple agents in parallel like a real dev team
 - **LSP & AST Tools**: Refactoring, rename, diagnostics, AST-aware code search
+- **Hash-anchored Edit Tool**: `LINE#ID` references validate content before applying every change. Surgical edits, zero stale-line errors
 - **Context Injection**: Auto-inject AGENTS.md, README.md, conditional rules
 - **Claude Code Compatibility**: Full hook system, commands, skills, agents, MCPs
 - **Built-in MCPs**: websearch (Exa), context7 (docs), grep_app (GitHub search)
 - **Session Tools**: List, read, search, and analyze session history
 - **Productivity Features**: Ralph Loop, Todo Enforcer, Comment Checker, Think Mode, and more
+- **Model Setup**: Agent-model matching is built into the [Installation Guide](docs/guide/installation.md#step-5-understand-your-model-setup)
 
 ## Configuration
 
-Highly opinionated, but adjustable to taste.
-See the full [Configuration Documentation](docs/configurations.md) for detailed information.
+Opinionated defaults, adjustable if you insist.
+
+See [Configuration Documentation](docs/reference/configuration.md).
 
 **Quick Overview:**
-- **Config Locations**: `.opencode/oh-my-opencode.json` (project) or `~/.config/opencode/oh-my-opencode.json` (user)
+- **Config Locations**: `.opencode/oh-my-opencode.jsonc` or `.opencode/oh-my-opencode.json` (project), `~/.config/opencode/oh-my-opencode.jsonc` or `~/.config/opencode/oh-my-opencode.json` (user)
 - **JSONC Support**: Comments and trailing commas supported
 - **Agents**: Override models, temperatures, prompts, and permissions for any agent
 - **Built-in Skills**: `playwright` (browser automation), `git-master` (atomic commits)
@@ -323,48 +329,39 @@ See the full [Configuration Documentation](docs/configurations.md) for detailed 
 
 ## Author's Note
 
-**Curious about the philosophy behind this project?** Read the [Ultrawork Manifesto](docs/ultrawork-manifesto.md).
+**Want the philosophy?** Read the [Ultrawork Manifesto](docs/manifesto.md).
 
-Install Oh My OpenCode.
+---
 
-I've used LLMs worth $24,000 tokens purely for personal development.
-Tried every tool out there, configured them to death. OpenCode won.
+I burned through $24K in LLM tokens on personal projects. Tried every tool. Configured everything to death. OpenCode won.
 
-The answers to every problem I hit are baked into this plugin. Just install and go.
-If OpenCode is Debian/Arch, Oh My OpenCode is Ubuntu/[Omarchy](https://omarchy.org/).
+Every problem I hit, the fix is baked into this plugin. Install and go.
 
+If OpenCode is Debian/Arch, OmO is Ubuntu/[Omarchy](https://omarchy.org/).
 
-Heavily influenced by [AmpCode](https://ampcode.com) and [Claude Code](https://code.claude.com/docs/overview)—I've ported their features here, often improved. And I'm still building.
-It's **Open**Code, after all.
+Heavy influence from [AmpCode](https://ampcode.com) and [Claude Code](https://code.claude.com/docs/overview). Features ported, often improved. Still building. It's **Open**Code.
 
-Enjoy multi-model orchestration, stability, and rich features that other harnesses promise but can't deliver.
-I'll keep testing and updating. I'm this project's most obsessive user.
+Other harnesses promise multi-model orchestration. We ship it. Stability too. And features that actually work.
+
+I'm this project's most obsessive user:
 - Which model has the sharpest logic?
 - Who's the debugging god?
 - Who writes the best prose?
 - Who dominates frontend?
 - Who owns backend?
-- Which model is fastest for daily driving?
-- What new features are other harnesses shipping?
+- What's fastest for daily driving?
+- What are competitors shipping?
 
-This plugin is the distillation of that experience. Just take the best. Got a better idea? PRs are welcome.
+This plugin is the distillation. Take the best. Got improvements? PRs welcome.
 
-**Stop agonizing over agent harness choices.**
-**I'll do the research, borrow from the best, and ship updates here.**
+**Stop agonizing over harness choices.**
+**I'll research, steal the best, and ship it here.**
 
-If this sounds arrogant and you have a better answer, please contribute. You're welcome.
+Sounds arrogant? Have a better way? Contribute. You're welcome.
 
-I have no affiliation with any project or model mentioned here. This is purely personal experimentation and preference.
+No affiliation with any project/model mentioned. Just personal experimentation.
 
-99% of this project was built using OpenCode. I tested for functionality—I don't really know how to write proper TypeScript. **But I personally reviewed and largely rewrote this doc, so read with confidence.**
-
-## Warnings
-
-- Productivity might spike too hard. Don't let your coworker notice.
-  - Actually, I'll spread the word. Let's see who wins.
-- If you're on [1.0.132](https://github.com/sst/opencode/releases/tag/v1.0.132) or older, an OpenCode bug may break config.
-  - [The fix](https://github.com/sst/opencode/pull/5040) was merged after 1.0.132—use a newer version.
-    - Fun fact: That PR was discovered and fixed thanks to OhMyOpenCode's Librarian, Explore, and Oracle setup.
+99% of this project was built with OpenCode. I don't really know TypeScript. **But I personally reviewed and largely rewrote this doc.**
 
 ## Loved by professionals at
 
@@ -372,5 +369,7 @@ I have no affiliation with any project or model mentioned here. This is purely p
   - Making Spray - influencer marketing solution, vovushop - crossborder commerce platform, vreview - ai commerce review marketing solution
 - [Google](https://google.com)
 - [Microsoft](https://microsoft.com)
+- [ELESTYLE](https://elestyle.jp)
+  - Making elepay - multi-mobile payment gateway, OneQR - mobile application SaaS for cashless solutions
 
 *Special thanks to [@junhoyeo](https://github.com/junhoyeo) for this amazing hero image.*

@@ -1,159 +1,164 @@
-import { createOpencode } from "@opencode-ai/sdk"
 import pc from "picocolors"
 import type { RunOptions, RunContext } from "./types"
-import { checkCompletionConditions } from "./completion"
 import { createEventState, processEvents, serializeError } from "./events"
+import { loadPluginConfig } from "../../plugin-config"
+import { createServerConnection } from "./server-connection"
+import { resolveSession } from "./session-resolver"
+import { createJsonOutputManager } from "./json-output"
+import { executeOnCompleteHook } from "./on-complete-hook"
+import { resolveRunAgent } from "./agent-resolver"
+import { resolveRunModel } from "./model-resolver"
+import { pollForCompletion } from "./poll-for-completion"
+import { loadAgentProfileColors } from "./agent-profile-colors"
+import { suppressRunInput } from "./stdin-suppression"
+import { createTimestampedStdoutController } from "./timestamp-output"
 
-const POLL_INTERVAL_MS = 500
-const DEFAULT_TIMEOUT_MS = 0
-const SESSION_CREATE_MAX_RETRIES = 3
-const SESSION_CREATE_RETRY_DELAY_MS = 1000
+export { resolveRunAgent }
+
+const EVENT_PROCESSOR_SHUTDOWN_TIMEOUT_MS = 2_000
+
+export async function waitForEventProcessorShutdown(
+  eventProcessor: Promise<void>,
+  timeoutMs = EVENT_PROCESSOR_SHUTDOWN_TIMEOUT_MS,
+): Promise<void> {
+  const completed = await Promise.race([
+    eventProcessor.then(() => true),
+    new Promise<boolean>((resolve) => setTimeout(() => resolve(false), timeoutMs)),
+  ])
+
+  void completed
+}
 
 export async function run(options: RunOptions): Promise<number> {
+  process.env.OPENCODE_CLI_RUN_MODE = "true"
+  process.env.OPENCODE_CLIENT = "run"
+
+  const startTime = Date.now()
   const {
     message,
-    agent,
     directory = process.cwd(),
-    timeout = DEFAULT_TIMEOUT_MS,
   } = options
 
-  console.log(pc.cyan("Starting opencode server..."))
+  const jsonManager = options.json ? createJsonOutputManager() : null
+  if (jsonManager) jsonManager.redirectToStderr()
+  const timestampOutput = options.json || options.timestamp === false
+    ? null
+    : createTimestampedStdoutController()
+  timestampOutput?.enable()
 
+  const pluginConfig = loadPluginConfig(directory, { command: "run" })
+  const resolvedAgent = resolveRunAgent(options, pluginConfig)
   const abortController = new AbortController()
-  let timeoutId: ReturnType<typeof setTimeout> | null = null
-
-  // timeout=0 means no timeout (run until completion)
-  if (timeout > 0) {
-    timeoutId = setTimeout(() => {
-      console.log(pc.yellow("\nTimeout reached. Aborting..."))
-      abortController.abort()
-    }, timeout)
-  }
 
   try {
-    const { client, server } = await createOpencode({
+    const resolvedModel = resolveRunModel(options.model)
+
+    const { client, cleanup: serverCleanup } = await createServerConnection({
+      port: options.port,
+      attach: options.attach,
       signal: abortController.signal,
     })
 
     const cleanup = () => {
-      if (timeoutId) clearTimeout(timeoutId)
-      server.close()
+      serverCleanup()
     }
 
-    process.on("SIGINT", () => {
+    const restoreInput = suppressRunInput()
+    const handleSigint = () => {
       console.log(pc.yellow("\nInterrupted. Shutting down..."))
+      restoreInput()
       cleanup()
       process.exit(130)
-    })
+    }
+
+    process.on("SIGINT", handleSigint)
 
     try {
-      // Retry session creation with exponential backoff
-      // Server might not be fully ready even after "listening" message
-      let sessionID: string | undefined
-      let lastError: unknown
-
-      for (let attempt = 1; attempt <= SESSION_CREATE_MAX_RETRIES; attempt++) {
-        const sessionRes = await client.session.create({
-          body: { title: "oh-my-opencode run" },
-        })
-
-        if (sessionRes.error) {
-          lastError = sessionRes.error
-          console.error(pc.yellow(`Session create attempt ${attempt}/${SESSION_CREATE_MAX_RETRIES} failed:`))
-          console.error(pc.dim(`  Error: ${serializeError(sessionRes.error)}`))
-
-          if (attempt < SESSION_CREATE_MAX_RETRIES) {
-            const delay = SESSION_CREATE_RETRY_DELAY_MS * attempt
-            console.log(pc.dim(`  Retrying in ${delay}ms...`))
-            await new Promise((resolve) => setTimeout(resolve, delay))
-            continue
-          }
-        }
-
-        sessionID = sessionRes.data?.id
-        if (sessionID) {
-          break
-        }
-
-        // No error but also no session ID - unexpected response
-        lastError = new Error(`Unexpected response: ${JSON.stringify(sessionRes, null, 2)}`)
-        console.error(pc.yellow(`Session create attempt ${attempt}/${SESSION_CREATE_MAX_RETRIES}: No session ID returned`))
-
-        if (attempt < SESSION_CREATE_MAX_RETRIES) {
-          const delay = SESSION_CREATE_RETRY_DELAY_MS * attempt
-          console.log(pc.dim(`  Retrying in ${delay}ms...`))
-          await new Promise((resolve) => setTimeout(resolve, delay))
-        }
-      }
-
-      if (!sessionID) {
-        console.error(pc.red("Failed to create session after all retries"))
-        console.error(pc.dim(`Last error: ${serializeError(lastError)}`))
-        cleanup()
-        return 1
-      }
+      const sessionID = await resolveSession({
+        client,
+        sessionId: options.sessionId,
+        directory,
+      })
 
       console.log(pc.dim(`Session: ${sessionID}`))
+
+      if (resolvedModel) {
+        console.log(pc.dim(`Model: ${resolvedModel.providerID}/${resolvedModel.modelID}`))
+      }
 
       const ctx: RunContext = {
         client,
         sessionID,
         directory,
         abortController,
+        verbose: options.verbose ?? false,
       }
-
-      const events = await client.event.subscribe()
+      const events = await client.event.subscribe({ query: { directory } })
       const eventState = createEventState()
-      const eventProcessor = processEvents(ctx, events.stream, eventState)
+      eventState.agentColorsByName = await loadAgentProfileColors(client)
+      const eventProcessor = processEvents(ctx, events.stream, eventState).catch(
+        () => {},
+      )
 
-      console.log(pc.dim("\nSending prompt..."))
       await client.session.promptAsync({
         path: { id: sessionID },
         body: {
-          agent,
+          agent: resolvedAgent,
+          ...(resolvedModel ? { model: resolvedModel } : {}),
+          tools: {
+            question: false,
+          },
           parts: [{ type: "text", text: message }],
         },
         query: { directory },
       })
+      const exitCode = await pollForCompletion(ctx, eventState, abortController)
 
-      console.log(pc.dim("Waiting for completion...\n"))
+      // Abort the event stream to stop the processor
+      abortController.abort()
 
-      while (!abortController.signal.aborted) {
-        await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS))
+      await waitForEventProcessorShutdown(eventProcessor)
+      cleanup()
 
-        if (!eventState.mainSessionIdle) {
-          continue
-        }
+      const durationMs = Date.now() - startTime
 
-        // Check if session errored - exit with failure if so
-        if (eventState.mainSessionError) {
-          console.error(pc.red(`\n\nSession ended with error: ${eventState.lastError}`))
-          console.error(pc.yellow("Check if todos were completed before the error."))
-          cleanup()
-          process.exit(1)
-        }
-
-        const shouldExit = await checkCompletionConditions(ctx)
-        if (shouldExit) {
-          console.log(pc.green("\n\nAll tasks completed."))
-          cleanup()
-          process.exit(0)
-        }
+      if (options.onComplete) {
+        await executeOnCompleteHook({
+          command: options.onComplete,
+          sessionId: sessionID,
+          exitCode,
+          durationMs,
+          messageCount: eventState.messageCount,
+        })
       }
 
-      await eventProcessor.catch(() => {})
-      cleanup()
-      return 130
+      if (jsonManager) {
+        jsonManager.emitResult({
+          sessionId: sessionID,
+          success: exitCode === 0,
+          durationMs,
+          messageCount: eventState.messageCount,
+          summary: eventState.lastPartText.slice(0, 200) || "Run completed",
+        })
+      }
+
+      return exitCode
     } catch (err) {
       cleanup()
       throw err
+    } finally {
+      process.removeListener("SIGINT", handleSigint)
+      restoreInput()
     }
   } catch (err) {
-    if (timeoutId) clearTimeout(timeoutId)
+    if (jsonManager) jsonManager.restore()
+    timestampOutput?.restore()
     if (err instanceof Error && err.name === "AbortError") {
       return 130
     }
     console.error(pc.red(`Error: ${serializeError(err)}`))
     return 1
+  } finally {
+    timestampOutput?.restore()
   }
 }

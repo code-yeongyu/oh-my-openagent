@@ -1,15 +1,17 @@
 import type { PluginInput } from "@opencode-ai/plugin";
+import {
+	resolveActualContextLimit,
+	type ContextLimitModelCacheState,
+} from "./context-limit-resolver"
+import { normalizeSDKResponse } from "./normalize-sdk-response"
 
-const ANTHROPIC_ACTUAL_LIMIT =
-  process.env.ANTHROPIC_1M_CONTEXT === "true" ||
-  process.env.VERTEX_ANTHROPIC_1M_CONTEXT === "true"
-    ? 1_000_000
-    : 200_000;
 const CHARS_PER_TOKEN_ESTIMATE = 4;
 const DEFAULT_TARGET_MAX_TOKENS = 50_000;
 
 interface AssistantMessageInfo {
 	role: "assistant";
+	providerID?: string;
+	modelID?: string;
 	tokens: {
 		input: number;
 		output: number;
@@ -43,6 +45,10 @@ export function truncateToTokenLimit(
 	maxTokens: number,
 	preserveHeaderLines = 3,
 ): TruncationResult {
+	if (typeof output !== 'string') {
+		return { result: String(output ?? ''), truncated: false };
+	}
+
 	const currentTokens = estimateTokens(output);
 
 	if (currentTokens <= maxTokens) {
@@ -105,6 +111,7 @@ export function truncateToTokenLimit(
 export async function getContextWindowUsage(
 	ctx: PluginInput,
 	sessionID: string,
+	modelCacheState?: ContextLimitModelCacheState,
 ): Promise<{
 	usedTokens: number;
 	remainingTokens: number;
@@ -115,26 +122,39 @@ export async function getContextWindowUsage(
 			path: { id: sessionID },
 		});
 
-		const messages = (response.data ?? response) as MessageWrapper[];
+		const messages = normalizeSDKResponse(response, [] as MessageWrapper[], { preferResponseOnMissingData: true })
 
 		const assistantMessages = messages
 			.filter((m) => m.info.role === "assistant")
 			.map((m) => m.info as AssistantMessageInfo);
 
 		if (assistantMessages.length === 0) return null;
-
+		
 		const lastAssistant = assistantMessages[assistantMessages.length - 1];
-		const lastTokens = lastAssistant.tokens;
+		const lastTokens = lastAssistant?.tokens;
+		if (!lastAssistant || !lastTokens) return null;
+
+		const actualLimit =
+			lastAssistant.providerID !== undefined
+				? resolveActualContextLimit(
+					lastAssistant.providerID,
+					lastAssistant.modelID ?? "",
+					modelCacheState,
+				)
+				: null;
+
+		if (!actualLimit) return null;
+
 		const usedTokens =
 			(lastTokens?.input ?? 0) +
 			(lastTokens?.cache?.read ?? 0) +
 			(lastTokens?.output ?? 0);
-		const remainingTokens = ANTHROPIC_ACTUAL_LIMIT - usedTokens;
+		const remainingTokens = actualLimit - usedTokens;
 
 		return {
 			usedTokens,
 			remainingTokens,
-			usagePercentage: usedTokens / ANTHROPIC_ACTUAL_LIMIT,
+			usagePercentage: usedTokens / actualLimit,
 		};
 	} catch {
 		return null;
@@ -146,13 +166,18 @@ export async function dynamicTruncate(
 	sessionID: string,
 	output: string,
 	options: TruncationOptions = {},
+	modelCacheState?: ContextLimitModelCacheState,
 ): Promise<TruncationResult> {
+	if (typeof output !== 'string') {
+		return { result: String(output ?? ''), truncated: false };
+	}
+
 	const {
 		targetMaxTokens = DEFAULT_TARGET_MAX_TOKENS,
 		preserveHeaderLines = 3,
 	} = options;
 
-	const usage = await getContextWindowUsage(ctx, sessionID);
+	const usage = await getContextWindowUsage(ctx, sessionID, modelCacheState);
 
 	if (!usage) {
 		// Fallback: apply conservative truncation when context usage unavailable
@@ -174,15 +199,19 @@ export async function dynamicTruncate(
 	return truncateToTokenLimit(output, maxOutputTokens, preserveHeaderLines);
 }
 
-export function createDynamicTruncator(ctx: PluginInput) {
+export function createDynamicTruncator(
+	ctx: PluginInput,
+	modelCacheState?: ContextLimitModelCacheState,
+) {
 	return {
 		truncate: (
 			sessionID: string,
 			output: string,
 			options?: TruncationOptions,
-		) => dynamicTruncate(ctx, sessionID, output, options),
+		) => dynamicTruncate(ctx, sessionID, output, options, modelCacheState),
 
-		getUsage: (sessionID: string) => getContextWindowUsage(ctx, sessionID),
+		getUsage: (sessionID: string) =>
+			getContextWindowUsage(ctx, sessionID, modelCacheState),
 
 		truncateSync: (
 			output: string,

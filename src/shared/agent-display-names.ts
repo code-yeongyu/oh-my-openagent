@@ -5,11 +5,12 @@
  */
 export const AGENT_DISPLAY_NAMES: Record<string, string> = {
   sisyphus: "Sisyphus (Ultraworker)",
-  atlas: "Atlas (Plan Execution Orchestrator)",
+  hephaestus: "Hephaestus (Deep Agent)",
   prometheus: "Prometheus (Plan Builder)",
+  atlas: "Atlas (Plan Executor)",
   "sisyphus-junior": "Sisyphus-Junior",
   metis: "Metis (Plan Consultant)",
-  momus: "Momus (Plan Reviewer)",
+  momus: "Momus (Plan Critic)",
   oracle: "oracle",
   librarian: "librarian",
   explore: "explore",
@@ -34,4 +35,20 @@ export function getAgentDisplayName(configKey: string): string {
   
   // Unknown agent: return original key
   return configKey
+}
+
+const REVERSE_DISPLAY_NAMES: Record<string, string> = Object.fromEntries(
+  Object.entries(AGENT_DISPLAY_NAMES).map(([key, displayName]) => [displayName.toLowerCase(), key]),
+)
+
+/**
+ * Resolve an agent name (display name or config key) to its lowercase config key.
+ * "Atlas (Plan Executor)" → "atlas", "atlas" → "atlas", "unknown" → "unknown"
+ */
+export function getAgentConfigKey(agentName: string): string {
+  const lower = agentName.toLowerCase()
+  const reversed = REVERSE_DISPLAY_NAMES[lower]
+  if (reversed !== undefined) return reversed
+  if (AGENT_DISPLAY_NAMES[lower] !== undefined) return lower
+  return lower
 }

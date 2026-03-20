@@ -1,5 +1,6 @@
 # Dependencies
-.sisyphus/
+.sisyphus/*
+!.sisyphus/rules/
 node_modules/
 
 # Build output
@@ -8,6 +9,7 @@ dist/
 # Platform binaries (built, not committed)
 packages/*/bin/oh-my-opencode
 packages/*/bin/oh-my-opencode.exe
+packages/*/bin/*.map
 
 # IDE
 .idea/
@@ -33,3 +35,5 @@ yarn.lock
 test-injection/
 notepad.md
 oauth-success.html
+*.bun-build
+.omx/

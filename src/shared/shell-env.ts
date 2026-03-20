@@ -109,3 +109,44 @@ export function buildEnvPrefix(
       return ""
   }
 }
+
+/**
+ * Escape a value for use in a double-quoted shell -c command argument.
+ * 
+ * In shell -c "..." strings, these characters have special meaning and must be escaped:
+ * - $ - variable expansion, command substitution $(...)
+ * - ` - command substitution `...`
+ * - \\ - escape character
+ * - " - end quote
+ * - ; | & - command separators
+ * - # - comment
+ * - () - grouping operators
+ * 
+ * @param value - The value to escape
+ * @returns Escaped value safe for double-quoted shell -c argument
+ * 
+ * @example
+ * ```ts
+ * // For malicious input
+ * const url = "http://localhost:3000'; cat /etc/passwd; echo '"
+ * const escaped = shellEscapeForDoubleQuotedCommand(url)
+ * // => "http://localhost:3000'\''; cat /etc/passwd; echo '"
+ * 
+ * // Usage in command:
+ * const cmd = `/bin/sh -c "opencode attach ${escaped} --session ${sessionId}"`
+ * ```
+ */
+export function shellEscapeForDoubleQuotedCommand(value: string): string {
+  // Order matters: escape backslash FIRST, then other characters
+  return value
+    .replace(/\\/g, "\\\\") // escape backslash first
+    .replace(/\$/g, "\\$") // escape dollar sign
+    .replace(/`/g, "\\`") // escape backticks
+    .replace(/"/g, "\\\"") // escape double quotes
+    .replace(/;/g, "\\;") // escape semicolon (command separator)
+    .replace(/\|/g, "\\|") // escape pipe (command separator)
+    .replace(/&/g, "\\&") // escape ampersand (command separator)
+    .replace(/#/g, "\\#") // escape hash (comment)
+    .replace(/\(/g, "\\(") // escape parentheses
+    .replace(/\)/g, "\\)") // escape parentheses
+}

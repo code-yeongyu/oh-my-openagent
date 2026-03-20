@@ -30,20 +30,20 @@ const createMockContext = (overrides: {
 
 describe("checkCompletionConditions", () => {
   it("returns true when no todos and no children", async () => {
-    // #given
+    // given
     spyOn(console, "log").mockImplementation(() => {})
     const ctx = createMockContext()
     const { checkCompletionConditions } = await import("./completion")
 
-    // #when
+    // when
     const result = await checkCompletionConditions(ctx)
 
-    // #then
+    // then
     expect(result).toBe(true)
   })
 
   it("returns false when incomplete todos exist", async () => {
-    // #given
+    // given
     spyOn(console, "log").mockImplementation(() => {})
     const ctx = createMockContext({
       todo: [
@@ -53,15 +53,15 @@ describe("checkCompletionConditions", () => {
     })
     const { checkCompletionConditions } = await import("./completion")
 
-    // #when
+    // when
     const result = await checkCompletionConditions(ctx)
 
-    // #then
+    // then
     expect(result).toBe(false)
   })
 
   it("returns true when all todos completed or cancelled", async () => {
-    // #given
+    // given
     spyOn(console, "log").mockImplementation(() => {})
     const ctx = createMockContext({
       todo: [
@@ -71,15 +71,15 @@ describe("checkCompletionConditions", () => {
     })
     const { checkCompletionConditions } = await import("./completion")
 
-    // #when
+    // when
     const result = await checkCompletionConditions(ctx)
 
-    // #then
+    // then
     expect(result).toBe(true)
   })
 
   it("returns false when child session is busy", async () => {
-    // #given
+    // given
     spyOn(console, "log").mockImplementation(() => {})
     const ctx = createMockContext({
       childrenBySession: {
@@ -90,15 +90,15 @@ describe("checkCompletionConditions", () => {
     })
     const { checkCompletionConditions } = await import("./completion")
 
-    // #when
+    // when
     const result = await checkCompletionConditions(ctx)
 
-    // #then
+    // then
     expect(result).toBe(false)
   })
 
   it("returns true when all children idle", async () => {
-    // #given
+    // given
     spyOn(console, "log").mockImplementation(() => {})
     const ctx = createMockContext({
       childrenBySession: {
@@ -113,15 +113,15 @@ describe("checkCompletionConditions", () => {
     })
     const { checkCompletionConditions } = await import("./completion")
 
-    // #when
+    // when
     const result = await checkCompletionConditions(ctx)
 
-    // #then
+    // then
     expect(result).toBe(true)
   })
 
   it("returns false when grandchild is busy (recursive)", async () => {
-    // #given
+    // given
     spyOn(console, "log").mockImplementation(() => {})
     const ctx = createMockContext({
       childrenBySession: {
@@ -136,15 +136,56 @@ describe("checkCompletionConditions", () => {
     })
     const { checkCompletionConditions } = await import("./completion")
 
-    // #when
+    // when
     const result = await checkCompletionConditions(ctx)
 
-    // #then
+    // then
+    expect(result).toBe(false)
+  })
+
+  it("returns true when child status is missing but descendants are idle", async () => {
+    // given
+    spyOn(console, "log").mockImplementation(() => {})
+    const ctx = createMockContext({
+      childrenBySession: {
+        "test-session": [{ id: "child-1" }],
+        "child-1": [],
+      },
+      statuses: {},
+    })
+    const { checkCompletionConditions } = await import("./completion")
+
+    // when
+    const result = await checkCompletionConditions(ctx)
+
+    // then
+    expect(result).toBe(true)
+  })
+
+  it("returns false when descendant is busy even if parent status is missing", async () => {
+    // given
+    spyOn(console, "log").mockImplementation(() => {})
+    const ctx = createMockContext({
+      childrenBySession: {
+        "test-session": [{ id: "child-1" }],
+        "child-1": [{ id: "grandchild-1" }],
+        "grandchild-1": [],
+      },
+      statuses: {
+        "grandchild-1": { type: "busy" },
+      },
+    })
+    const { checkCompletionConditions } = await import("./completion")
+
+    // when
+    const result = await checkCompletionConditions(ctx)
+
+    // then
     expect(result).toBe(false)
   })
 
   it("returns true when all descendants idle (recursive)", async () => {
-    // #given
+    // given
     spyOn(console, "log").mockImplementation(() => {})
     const ctx = createMockContext({
       childrenBySession: {
@@ -161,10 +202,10 @@ describe("checkCompletionConditions", () => {
     })
     const { checkCompletionConditions } = await import("./completion")
 
-    // #when
+    // when
     const result = await checkCompletionConditions(ctx)
 
-    // #then
+    // then
     expect(result).toBe(true)
   })
 })

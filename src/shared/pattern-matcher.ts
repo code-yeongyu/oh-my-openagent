@@ -1,5 +1,16 @@
 import type { ClaudeHooksConfig, HookMatcher } from "../hooks/claude-code-hooks/types"
 
+/**
+ * Escape all regex special characters EXCEPT asterisk (*).
+ * Asterisk is preserved for glob-to-regex conversion.
+ */
+function escapeRegexExceptAsterisk(str: string): string {
+  // Escape all regex special chars except * (which we convert to .* for glob matching)
+  return str.replace(/[.+?^${}()|[\]\\]/g, "\\$&")
+}
+
+const regexCache = new Map<string, RegExp>()
+
 export function matchesToolMatcher(toolName: string, matcher: string): boolean {
   if (!matcher) {
     return true
@@ -7,7 +18,13 @@ export function matchesToolMatcher(toolName: string, matcher: string): boolean {
   const patterns = matcher.split("|").map((p) => p.trim())
   return patterns.some((p) => {
     if (p.includes("*")) {
-      const regex = new RegExp(`^${p.replace(/\*/g, ".*")}$`, "i")
+      // First escape regex special chars (except *), then convert * to .*
+      let regex = regexCache.get(p)
+      if (!regex) {
+        const escaped = escapeRegexExceptAsterisk(p)
+        regex = new RegExp(`^${escaped.replace(/\*/g, ".*")}$`, "i")
+        regexCache.set(p, regex)
+      }
       return regex.test(toolName)
     }
     return p.toLowerCase() === toolName.toLowerCase()

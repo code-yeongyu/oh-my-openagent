@@ -1,51 +1,41 @@
-# CLAUDE CODE HOOKS COMPATIBILITY
+# src/hooks/claude-code-hooks/ — Claude Code Compatibility
+
+**Generated:** 2026-03-06
 
 ## OVERVIEW
 
-Full Claude Code settings.json hook compatibility. 5 lifecycle events: PreToolUse, PostToolUse, UserPromptSubmit, Stop, PreCompact.
+~2110 LOC across 19 files. Provides Claude Code settings.json compatibility layer. Parses CC permission rules and maps CC hooks (PreToolUse, PostToolUse) to OpenCode hooks.
 
-## STRUCTURE
+## WHAT IT DOES
 
+1. Parses Claude Code `settings.json` permission format
+2. Maps CC hook types to OpenCode event types
+3. Enforces CC permission rules (allow/deny per tool)
+4. Supports CC `.claude/settings.json` and `.claude/settings.local.json`
+
+## CC → OPENCODE HOOK MAPPING
+
+| CC Hook | OpenCode Event |
+|---------|---------------|
+| PreToolUse | tool.execute.before |
+| PostToolUse | tool.execute.after |
+| Notification | event (session.idle) |
+| Stop | event (session.idle) |
+
+## PERMISSION SYSTEM
+
+CC permissions format:
+```json
+{
+  "permissions": {
+    "allow": ["Edit", "Write"],
+    "deny": ["Bash(rm:*)"]
+  }
+}
 ```
-claude-code-hooks/
-├── index.ts              # Main factory (401 lines)
-├── config.ts             # Loads ~/.claude/settings.json
-├── config-loader.ts      # Extended config
-├── pre-tool-use.ts       # PreToolUse executor
-├── post-tool-use.ts      # PostToolUse executor
-├── user-prompt-submit.ts # UserPromptSubmit executor
-├── stop.ts               # Stop hook executor
-├── pre-compact.ts        # PreCompact executor
-├── transcript.ts         # Tool use recording
-├── tool-input-cache.ts   # Pre→post caching
-├── types.ts              # Hook types
-└── todo.ts               # Todo JSON fix
-```
 
-## HOOK LIFECYCLE
+Translated to OpenCode tool restrictions via permission-compat in shared/.
 
-| Event | When | Can Block | Context |
-|-------|------|-----------|---------|
-| PreToolUse | Before tool | Yes | sessionId, toolName, toolInput |
-| PostToolUse | After tool | Warn | + toolOutput, transcriptPath |
-| UserPromptSubmit | On message | Yes | sessionId, prompt, parts |
-| Stop | Session idle | inject | sessionId, parentSessionId |
-| PreCompact | Before summarize | No | sessionId |
+## FILES
 
-## CONFIG SOURCES
-
-Priority (highest first):
-1. `.claude/settings.json` (project)
-2. `~/.claude/settings.json` (user)
-
-## HOOK EXECUTION
-
-1. Hooks loaded from settings.json
-2. Matchers filter by tool name
-3. Commands via subprocess with `$SESSION_ID`, `$TOOL_NAME`
-4. Exit codes: 0=pass, 1=warn, 2=block
-
-## ANTI-PATTERNS
-
-- **Heavy PreToolUse**: Runs before EVERY tool call
-- **Blocking non-critical**: Use PostToolUse warnings
+Key files: `settings-loader.ts` (parse CC settings), `hook-mapper.ts` (CC→OC mapping), `permission-handler.ts` (rule enforcement), `types.ts` (CC type definitions).

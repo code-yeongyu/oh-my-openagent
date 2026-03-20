@@ -58,8 +58,31 @@ export function detectSlashCommand(text: string): ParsedSlashCommand | null {
 export function extractPromptText(
   parts: Array<{ type: string; text?: string }>
 ): string {
-  return parts
-    .filter((p) => p.type === "text")
-    .map((p) => p.text || "")
-    .join(" ")
+  const textParts = parts.filter((p) => p.type === "text")
+  const slashPart = textParts.find((p) => (p.text ?? "").trim().startsWith("/"))
+  if (slashPart?.text) {
+    return slashPart.text
+  }
+
+  const nonSyntheticParts = textParts.filter(
+    (p) => !(p as { synthetic?: boolean }).synthetic
+  )
+  if (nonSyntheticParts.length > 0) {
+    return nonSyntheticParts.map((p) => p.text || "").join(" ")
+  }
+
+  return textParts.map((p) => p.text || "").join(" ")
+}
+
+export function findSlashCommandPartIndex(
+  parts: Array<{ type: string; text?: string }>
+): number {
+  for (let idx = 0; idx < parts.length; idx += 1) {
+    const part = parts[idx]
+    if (part.type !== "text") continue
+    if ((part.text ?? "").trim().startsWith("/")) {
+      return idx
+    }
+  }
+  return -1
 }

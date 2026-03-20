@@ -1,15 +1,16 @@
-import { log } from "./logger"
-import { fuzzyMatchModel } from "./model-availability"
 import type { FallbackEntry } from "./model-requirements"
+import { normalizeModel } from "./model-normalization"
+import { resolveModelPipeline } from "./model-resolution-pipeline"
 
 export type ModelResolutionInput = {
 	userModel?: string
 	inheritedModel?: string
-	systemDefault: string
+	systemDefault?: string
 }
 
 export type ModelSource =
 	| "override"
+	| "category-default"
 	| "provider-fallback"
 	| "system-default"
 
@@ -20,18 +21,17 @@ export type ModelResolutionResult = {
 }
 
 export type ExtendedModelResolutionInput = {
+	uiSelectedModel?: string
 	userModel?: string
+	userFallbackModels?: string[]
+	categoryDefaultModel?: string
 	fallbackChain?: FallbackEntry[]
 	availableModels: Set<string>
-	systemDefaultModel: string
+	systemDefaultModel?: string
 }
 
-function normalizeModel(model?: string): string | undefined {
-	const trimmed = model?.trim()
-	return trimmed || undefined
-}
 
-export function resolveModel(input: ModelResolutionInput): string {
+export function resolveModel(input: ModelResolutionInput): string | undefined {
 	return (
 		normalizeModel(input.userModel) ??
 		normalizeModel(input.inheritedModel) ??
@@ -41,42 +41,31 @@ export function resolveModel(input: ModelResolutionInput): string {
 
 export function resolveModelWithFallback(
 	input: ExtendedModelResolutionInput,
-): ModelResolutionResult {
-	const { userModel, fallbackChain, availableModels, systemDefaultModel } = input
+): ModelResolutionResult | undefined {
+	const { uiSelectedModel, userModel, userFallbackModels, categoryDefaultModel, fallbackChain, availableModels, systemDefaultModel } = input
+	const resolved = resolveModelPipeline({
+		intent: { uiSelectedModel, userModel, userFallbackModels, categoryDefaultModel },
+		constraints: { availableModels },
+		policy: { fallbackChain, systemDefaultModel },
+	})
 
-	// Step 1: Override
-	const normalizedUserModel = normalizeModel(userModel)
-	if (normalizedUserModel) {
-		log("Model resolved via override", { model: normalizedUserModel })
-		return { model: normalizedUserModel, source: "override" }
+	if (!resolved) {
+		return undefined
 	}
 
-	// Step 2: Provider fallback chain (with availability check)
-	if (fallbackChain && fallbackChain.length > 0) {
-		// If availableModels is empty (no cache), use first fallback entry directly without availability check
-		if (availableModels.size === 0) {
-			const firstEntry = fallbackChain[0]
-			const firstProvider = firstEntry.providers[0]
-			const model = `${firstProvider}/${firstEntry.model}`
-			log("Model resolved via fallback chain (no cache, using first entry)", { provider: firstProvider, model: firstEntry.model, variant: firstEntry.variant })
-			return { model, source: "provider-fallback", variant: firstEntry.variant }
-		}
-
-		for (const entry of fallbackChain) {
-			for (const provider of entry.providers) {
-				const fullModel = `${provider}/${entry.model}`
-				const match = fuzzyMatchModel(fullModel, availableModels, [provider])
-				if (match) {
-					log("Model resolved via fallback chain (availability confirmed)", { provider, model: entry.model, match, variant: entry.variant })
-					return { model: match, source: "provider-fallback", variant: entry.variant }
-				}
-			}
-		}
-		// No match found in fallback chain - fall through to system default
-		log("No available model found in fallback chain, falling through to system default")
+	return {
+		model: resolved.model,
+		source: resolved.provenance,
+		variant: resolved.variant,
 	}
+}
 
-	// Step 4: System default
-	log("Model resolved via system default", { model: systemDefaultModel })
-	return { model: systemDefaultModel, source: "system-default" }
+/**
+ * Normalizes fallback_models config (which can be string or string[]) to string[]
+ * Centralized helper to avoid duplicated normalization logic
+ */
+export function normalizeFallbackModels(models: string | string[] | undefined): string[] | undefined {
+	if (!models) return undefined
+	if (typeof models === "string") return [models]
+	return models
 }

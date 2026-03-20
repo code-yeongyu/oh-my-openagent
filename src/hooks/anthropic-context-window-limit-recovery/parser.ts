@@ -70,10 +70,18 @@ function isTokenLimitError(text: string): boolean {
     return false
   }
   const lower = text.toLowerCase()
-  return TOKEN_LIMIT_KEYWORDS.some((kw) => lower.includes(kw.toLowerCase()))
+  return TOKEN_LIMIT_KEYWORDS.some((kw) => lower.includes(kw))
 }
 
 export function parseAnthropicTokenLimitError(err: unknown): ParsedTokenLimitError | null {
+  try {
+    return parseAnthropicTokenLimitErrorUnsafe(err)
+  } catch {
+    return null
+  }
+}
+
+function parseAnthropicTokenLimitErrorUnsafe(err: unknown): ParsedTokenLimitError | null {
   if (typeof err === "string") {
     if (err.toLowerCase().includes("non-empty content")) {
       return {

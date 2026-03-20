@@ -4,6 +4,12 @@ import type { ConcurrencyManager } from "../background-agent/concurrency"
 
 type OpencodeClient = PluginInput["client"]
 
+type ClientWithTui = {
+  tui?: {
+    showToast: (opts: { body: { title: string; message: string; variant: string; duration: number } }) => Promise<unknown>
+  }
+}
+
 export class TaskToastManager {
   private tasks: Map<string, TrackedTask> = new Map()
   private client: OpencodeClient
@@ -20,6 +26,7 @@ export class TaskToastManager {
 
   addTask(task: {
     id: string
+    sessionID?: string
     description: string
     agent: string
     isBackground: boolean
@@ -30,6 +37,7 @@ export class TaskToastManager {
   }): void {
     const trackedTask: TrackedTask = {
       id: task.id,
+      sessionID: task.sessionID,
       description: task.description,
       agent: task.agent,
       status: task.status ?? "running",
@@ -52,6 +60,18 @@ export class TaskToastManager {
     if (task) {
       task.status = status
     }
+  }
+
+  /**
+   * Update model info for a task by session ID
+   */
+  updateTaskModelBySession(sessionID: string, modelInfo: ModelFallbackInfo): void {
+    if (!sessionID) return
+    const task = Array.from(this.tasks.values()).find((t) => t.sessionID === sessionID)
+    if (!task) return
+    if (task.modelInfo?.model === modelInfo.model && task.modelInfo?.type === modelInfo.type) return
+    task.modelInfo = modelInfo
+    this.showTaskListToast(task)
   }
 
   /**
@@ -107,17 +127,27 @@ export class TaskToastManager {
     const queued = this.getQueuedTasks()
     const concurrencyInfo = this.getConcurrencyInfo()
 
+    const formatTaskIdentifier = (task: TrackedTask): string => {
+      const modelName = task.modelInfo?.model?.split("/").pop()
+      if (modelName && task.category) return `${modelName}: ${task.category}`
+      if (modelName) return modelName
+      if (task.category) return `${task.agent}/${task.category}`
+      return task.agent
+    }
     const lines: string[] = []
 
     const isFallback = newTask.modelInfo && (
-      newTask.modelInfo.type === "inherited" || newTask.modelInfo.type === "system-default"
+      newTask.modelInfo.type === "inherited" ||
+      newTask.modelInfo.type === "system-default" ||
+      newTask.modelInfo.type === "runtime-fallback"
     )
     if (isFallback) {
-      const suffixMap: Record<"inherited" | "system-default", string> = {
+      const suffixMap: Record<"inherited" | "system-default" | "runtime-fallback", string> = {
         inherited: " (inherited from parent)",
         "system-default": " (system default fallback)",
+        "runtime-fallback": " (runtime fallback)",
       }
-      const suffix = suffixMap[newTask.modelInfo!.type as "inherited" | "system-default"]
+      const suffix = suffixMap[newTask.modelInfo!.type as "inherited" | "system-default" | "runtime-fallback"]
       lines.push(`[FALLBACK] Model: ${newTask.modelInfo!.model}${suffix}`)
       lines.push("")
     }
@@ -128,9 +158,9 @@ export class TaskToastManager {
         const duration = this.formatDuration(task.startedAt)
         const bgIcon = task.isBackground ? "[BG]" : "[RUN]"
         const isNew = task.id === newTask.id ? " ← NEW" : ""
-        const categoryInfo = task.category ? `/${task.category}` : ""
+        const taskId = formatTaskIdentifier(task)
         const skillsInfo = task.skills?.length ? ` [${task.skills.join(", ")}]` : ""
-        lines.push(`${bgIcon} ${task.description} (${task.agent}${categoryInfo})${skillsInfo} - ${duration}${isNew}`)
+        lines.push(`${bgIcon} ${task.description} (${taskId})${skillsInfo} - ${duration}${isNew}`)
       }
     }
 
@@ -139,10 +169,10 @@ export class TaskToastManager {
       lines.push(`Queued (${queued.length}):`)
       for (const task of queued) {
         const bgIcon = task.isBackground ? "[Q]" : "[W]"
-        const categoryInfo = task.category ? `/${task.category}` : ""
+        const taskId = formatTaskIdentifier(task)
         const skillsInfo = task.skills?.length ? ` [${task.skills.join(", ")}]` : ""
         const isNew = task.id === newTask.id ? " ← NEW" : ""
-        lines.push(`${bgIcon} ${task.description} (${task.agent}${categoryInfo})${skillsInfo} - Queued${isNew}`)
+        lines.push(`${bgIcon} ${task.description} (${taskId})${skillsInfo} - Queued${isNew}`)
       }
     }
 
@@ -153,8 +183,7 @@ export class TaskToastManager {
    * Show consolidated toast with all running/queued tasks
    */
   private showTaskListToast(newTask: TrackedTask): void {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const tuiClient = this.client as any
+    const tuiClient = this.client as ClientWithTui
     if (!tuiClient.tui?.showToast) return
 
     const message = this.buildTaskListMessage(newTask)
@@ -179,8 +208,7 @@ export class TaskToastManager {
    * Show task completion toast
    */
   showCompletionToast(task: { id: string; description: string; duration: string }): void {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const tuiClient = this.client as any
+    const tuiClient = this.client as ClientWithTui
     if (!tuiClient.tui?.showToast) return
 
     this.removeTask(task.id)
@@ -216,4 +244,8 @@ export function initTaskToastManager(
 ): TaskToastManager {
   instance = new TaskToastManager(client, concurrencyManager)
   return instance
+}
+
+export function _resetTaskToastManagerForTesting(): void {
+  instance = null
 }

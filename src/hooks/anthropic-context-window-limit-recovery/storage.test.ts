@@ -1,4 +1,4 @@
-import { describe, test, expect, mock, beforeEach } from "bun:test"
+import { describe, test, expect, mock, beforeEach, afterAll } from "bun:test"
 import { truncateUntilTargetTokens } from "./storage"
 import * as storage from "./storage"
 
@@ -11,6 +11,10 @@ mock.module("./storage", () => {
   }
 })
 
+afterAll(() => {
+  mock.module("./storage", () => storage)
+})
+
 describe("truncateUntilTargetTokens", () => {
   const sessionID = "test-session"
   
@@ -21,10 +25,10 @@ describe("truncateUntilTargetTokens", () => {
     truncateToolResult.mockReset()
   })
 
-  test("truncates only until target is reached", () => {
+  test("truncates only until target is reached", async () => {
     const { findToolResultsBySize, truncateToolResult } = require("./storage")
     
-    // #given: Two tool results, each 1000 chars. Target reduction is 500 chars.
+    // given: Two tool results, each 1000 chars. Target reduction is 500 chars.
     const results = [
       { partPath: "path1", partId: "id1", messageID: "m1", toolName: "tool1", outputSize: 1000 },
       { partPath: "path2", partId: "id2", messageID: "m2", toolName: "tool2", outputSize: 1000 },
@@ -37,11 +41,11 @@ describe("truncateUntilTargetTokens", () => {
       originalSize: 1000
     }))
 
-    // #when: currentTokens=1000, maxTokens=1000, targetRatio=0.5 (target=500, reduce=500)
+    // when: currentTokens=1000, maxTokens=1000, targetRatio=0.5 (target=500, reduce=500)
     // charsPerToken=1 for simplicity in test
-    const result = truncateUntilTargetTokens(sessionID, 1000, 1000, 0.5, 1)
+    const result = await truncateUntilTargetTokens(sessionID, 1000, 1000, 0.5, 1)
 
-    // #then: Should only truncate the first tool
+    // then: Should only truncate the first tool
     expect(result.truncatedCount).toBe(1)
     expect(truncateToolResult).toHaveBeenCalledTimes(1)
     expect(truncateToolResult).toHaveBeenCalledWith("path1")
@@ -49,10 +53,10 @@ describe("truncateUntilTargetTokens", () => {
     expect(result.sufficient).toBe(true)
   })
 
-  test("truncates all if target not reached", () => {
+  test("truncates all if target not reached", async () => {
     const { findToolResultsBySize, truncateToolResult } = require("./storage")
     
-    // #given: Two tool results, each 100 chars. Target reduction is 500 chars.
+    // given: Two tool results, each 100 chars. Target reduction is 500 chars.
     const results = [
       { partPath: "path1", partId: "id1", messageID: "m1", toolName: "tool1", outputSize: 100 },
       { partPath: "path2", partId: "id2", messageID: "m2", toolName: "tool2", outputSize: 100 },
@@ -65,10 +69,10 @@ describe("truncateUntilTargetTokens", () => {
       originalSize: 100
     }))
 
-    // #when: reduce 500 chars
-    const result = truncateUntilTargetTokens(sessionID, 1000, 1000, 0.5, 1)
+    // when: reduce 500 chars
+    const result = await truncateUntilTargetTokens(sessionID, 1000, 1000, 0.5, 1)
 
-    // #then: Should truncate both
+    // then: Should truncate both
     expect(result.truncatedCount).toBe(2)
     expect(truncateToolResult).toHaveBeenCalledTimes(2)
     expect(result.totalBytesRemoved).toBe(200)

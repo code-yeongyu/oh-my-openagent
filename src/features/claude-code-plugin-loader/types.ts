@@ -30,8 +30,8 @@ export interface InstalledPluginsDatabaseV1 {
 }
 
 /**
- * Installed plugins database v2 (current)
- * plugins stored as arrays
+ * Installed plugins database v2
+ * plugins stored as arrays keyed by plugin identifier
  */
 export interface InstalledPluginsDatabaseV2 {
   version: 2
@@ -39,10 +39,33 @@ export interface InstalledPluginsDatabaseV2 {
 }
 
 /**
+ * Installed plugins database v3 entry (current Claude Code format)
+ * A flat array of plugin entries, each containing name and marketplace fields
+ * used to construct the plugin key as "name@marketplace".
+ */
+export interface InstalledPluginEntryV3 {
+  name: string
+  marketplace: string
+  scope: PluginScope
+  version: string
+  installPath: string
+  lastUpdated: string
+  gitCommitSha?: string
+}
+
+/**
  * Installed plugins database structure
  * Located at ~/.claude/plugins/installed_plugins.json
+ *
+ * Supports three formats:
+ * - v1: { version: 1, plugins: Record<string, PluginInstallation> }
+ * - v2: { version: 2, plugins: Record<string, PluginInstallation[]> }
+ * - v3: InstalledPluginEntryV3[] (flat array, current Claude Code format)
  */
-export type InstalledPluginsDatabase = InstalledPluginsDatabaseV1 | InstalledPluginsDatabaseV2
+export type InstalledPluginsDatabase =
+  | InstalledPluginsDatabaseV1
+  | InstalledPluginsDatabaseV2
+  | InstalledPluginEntryV3[]
 
 /**
  * Plugin author information
@@ -80,12 +103,11 @@ export interface PluginManifest {
 /**
  * Hooks configuration
  */
-export interface HookEntry {
-  type: "command" | "prompt" | "agent"
-  command?: string
-  prompt?: string
-  agent?: string
-}
+export type HookEntry =
+  | { type: "command"; command?: string }
+  | { type: "prompt"; prompt?: string }
+  | { type: "agent"; agent?: string }
+  | { type: "http"; url: string; headers?: Record<string, string>; allowedEnvVars?: string[]; timeout?: number }
 
 export interface HookMatcher {
   matcher?: string

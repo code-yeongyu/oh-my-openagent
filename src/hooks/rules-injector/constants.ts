@@ -1,7 +1,5 @@
 import { join } from "node:path";
-import { getOpenCodeStorageDir } from "../../shared/data-path";
-
-export const OPENCODE_STORAGE = getOpenCodeStorageDir();
+import { OPENCODE_STORAGE } from "../../shared";
 export const RULES_INJECTOR_STORAGE = join(OPENCODE_STORAGE, "rules-injector");
 
 export const PROJECT_MARKERS = [
@@ -17,6 +15,7 @@ export const PROJECT_RULE_SUBDIRS: [string, string][] = [
   [".github", "instructions"],
   [".cursor", "rules"],
   [".claude", "rules"],
+  [".sisyphus", "rules"],
 ];
 
 export const PROJECT_RULE_FILES: string[] = [

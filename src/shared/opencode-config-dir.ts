@@ -2,21 +2,17 @@ import { existsSync } from "node:fs"
 import { homedir } from "node:os"
 import { join, resolve } from "node:path"
 
-export type OpenCodeBinaryType = "opencode" | "opencode-desktop"
+import type {
+  OpenCodeBinaryType,
+  OpenCodeConfigDirOptions,
+  OpenCodeConfigPaths,
+} from "./opencode-config-dir-types"
 
-export interface OpenCodeConfigDirOptions {
-  binary: OpenCodeBinaryType
-  version?: string | null
-  checkExisting?: boolean
-}
-
-export interface OpenCodeConfigPaths {
-  configDir: string
-  configJson: string
-  configJsonc: string
-  packageJson: string
-  omoConfig: string
-}
+export type {
+  OpenCodeBinaryType,
+  OpenCodeConfigDirOptions,
+  OpenCodeConfigPaths,
+} from "./opencode-config-dir-types"
 
 export const TAURI_APP_IDENTIFIER = "ai.opencode.desktop"
 export const TAURI_APP_IDENTIFIER_DEV = "ai.opencode.desktop.dev"
@@ -50,25 +46,6 @@ function getCliConfigDir(): string {
   const envConfigDir = process.env.OPENCODE_CONFIG_DIR?.trim()
   if (envConfigDir) {
     return resolve(envConfigDir)
-  }
-
-  if (process.platform === "win32") {
-    const crossPlatformDir = join(homedir(), ".config", "opencode")
-    const crossPlatformConfig = join(crossPlatformDir, "opencode.json")
-
-    if (existsSync(crossPlatformConfig)) {
-      return crossPlatformDir
-    }
-
-    const appData = process.env.APPDATA || join(homedir(), "AppData", "Roaming")
-    const appdataDir = join(appData, "opencode")
-    const appdataConfig = join(appdataDir, "opencode.json")
-
-    if (existsSync(appdataConfig)) {
-      return appdataDir
-    }
-
-    return crossPlatformDir
   }
 
   const xdgConfig = process.env.XDG_CONFIG_HOME || join(homedir(), ".config")

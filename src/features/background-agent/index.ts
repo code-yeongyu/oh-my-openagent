@@ -1,3 +1,2 @@
 export * from "./types"
-export { BackgroundManager } from "./manager"
-export { ConcurrencyManager } from "./concurrency"
+export { BackgroundManager, type SubagentSessionCreatedEvent, type OnSubagentSessionCreated } from "./manager"

@@ -1,6 +1,8 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
-import type { AgentPromptMetadata } from "./types"
+import type { AgentMode, AgentPromptMetadata } from "./types"
 import { createAgentToolRestrictions } from "../shared/permission-compat"
+
+const MODE: AgentMode = "subagent"
 
 export const EXPLORE_PROMPT_METADATA: AgentPromptMetadata = {
   category: "exploration",
@@ -26,15 +28,15 @@ export function createExploreAgent(model: string): AgentConfig {
   const restrictions = createAgentToolRestrictions([
     "write",
     "edit",
+    "apply_patch",
     "task",
-    "delegate_task",
     "call_omo_agent",
   ])
 
   return {
     description:
-      'Contextual grep for codebases. Answers "Where is X?", "Which file has Y?", "Find the code that does Z". Fire multiple in parallel for broad searches. Specify thoroughness: "quick" for basic, "medium" for moderate, "very thorough" for comprehensive analysis.',
-    mode: "subagent" as const,
+      'Contextual grep for codebases. Answers "Where is X?", "Which file has Y?", "Find the code that does Z". Fire multiple in parallel for broad searches. Specify thoroughness: "quick" for basic, "medium" for moderate, "very thorough" for comprehensive analysis. (Explore - OhMyOpenCode)',
+    mode: MODE,
     model,
     temperature: 0.1,
     ...restrictions,
@@ -85,12 +87,10 @@ Always end with this exact format:
 
 ## Success Criteria
 
-| Criterion | Requirement |
-|-----------|-------------|
-| **Paths** | ALL paths must be **absolute** (start with /) |
-| **Completeness** | Find ALL relevant matches, not just the first one |
-| **Actionability** | Caller can proceed **without asking follow-up questions** |
-| **Intent** | Address their **actual need**, not just literal request |
+- **Paths** — ALL paths must be **absolute** (start with /)
+- **Completeness** — Find ALL relevant matches, not just the first one
+- **Actionability** — Caller can proceed **without asking follow-up questions**
+- **Intent** — Address their **actual need**, not just literal request
 
 ## Failure Conditions
 
@@ -119,4 +119,4 @@ Use the right tool for the job:
 Flood with parallel calls. Cross-validate findings across multiple tools.`,
   }
 }
-
+createExploreAgent.mode = MODE

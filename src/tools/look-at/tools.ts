@@ -1,74 +1,62 @@
-import { extname, basename } from "node:path"
+import { basename } from "node:path"
 import { pathToFileURL } from "node:url"
 import { tool, type PluginInput, type ToolDefinition } from "@opencode-ai/plugin"
 import { LOOK_AT_DESCRIPTION, MULTIMODAL_LOOKER_AGENT } from "./constants"
 import type { LookAtArgs } from "./types"
-import { log } from "../../shared/logger"
+import { log, promptSyncWithModelSuggestionRetry } from "../../shared"
+import { readVisionCapableModelsCache } from "../../shared/vision-capable-models-cache"
+import { extractLatestAssistantText } from "./assistant-message-extractor"
+import type { LookAtArgsWithAlias } from "./look-at-arguments"
+import { normalizeArgs, validateArgs } from "./look-at-arguments"
+import {
+  extractBase64Data,
+  inferMimeTypeFromBase64,
+  inferMimeTypeFromFilePath,
+} from "./mime-type-inference"
+import { resolveMultimodalLookerAgentMetadata } from "./multimodal-agent-metadata"
+import {
+  needsConversion,
+  convertImageToJpeg,
+  convertBase64ImageToJpeg,
+  cleanupConvertedImage,
+} from "./image-converter"
 
-interface LookAtArgsWithAlias extends LookAtArgs {
-  path?: string
-}
+function getTemporaryConversionPath(error: unknown): string | null {
+  if (!(error instanceof Error)) {
+    return null
+  }
 
-export function normalizeArgs(args: LookAtArgsWithAlias): LookAtArgs {
-  return {
-    file_path: args.file_path ?? args.path ?? "",
-    goal: args.goal ?? "",
+  const temporaryOutputPath = Reflect.get(error, "temporaryOutputPath")
+  if (typeof temporaryOutputPath === "string" && temporaryOutputPath.length > 0) {
+    return temporaryOutputPath
   }
-}
 
-export function validateArgs(args: LookAtArgs): string | null {
-  if (!args.file_path) {
-    return `Error: Missing required parameter 'file_path'. Usage: look_at(file_path="/path/to/file", goal="what to extract")`
+  const temporaryDirectory = Reflect.get(error, "temporaryDirectory")
+  if (typeof temporaryDirectory === "string" && temporaryDirectory.length > 0) {
+    return temporaryDirectory
   }
-  if (!args.goal) {
-    return `Error: Missing required parameter 'goal'. Usage: look_at(file_path="/path/to/file", goal="what to extract")`
-  }
+
   return null
 }
 
-function inferMimeType(filePath: string): string {
-  const ext = extname(filePath).toLowerCase()
-  const mimeTypes: Record<string, string> = {
-    ".jpg": "image/jpeg",
-    ".jpeg": "image/jpeg",
-    ".png": "image/png",
-    ".webp": "image/webp",
-    ".heic": "image/heic",
-    ".heif": "image/heif",
-    ".mp4": "video/mp4",
-    ".mpeg": "video/mpeg",
-    ".mpg": "video/mpeg",
-    ".mov": "video/mov",
-    ".avi": "video/avi",
-    ".flv": "video/x-flv",
-    ".webm": "video/webm",
-    ".wmv": "video/wmv",
-    ".3gpp": "video/3gpp",
-    ".3gp": "video/3gpp",
-    ".wav": "audio/wav",
-    ".mp3": "audio/mp3",
-    ".aiff": "audio/aiff",
-    ".aac": "audio/aac",
-    ".ogg": "audio/ogg",
-    ".flac": "audio/flac",
-    ".pdf": "application/pdf",
-    ".txt": "text/plain",
-    ".csv": "text/csv",
-    ".md": "text/md",
-    ".html": "text/html",
-    ".json": "application/json",
-    ".xml": "application/xml",
-    ".js": "text/javascript",
-    ".py": "text/x-python",
-  }
-  return mimeTypes[ext] || "application/octet-stream"
+function isVisionCapableResolvedModel(model: {
+  providerID: string
+  modelID: string
+}): boolean {
+  return readVisionCapableModelsCache().some((visionCapableModel) =>
+    visionCapableModel.providerID === model.providerID &&
+    visionCapableModel.modelID === model.modelID,
+  )
 }
+
+export { normalizeArgs, validateArgs } from "./look-at-arguments"
 
 export function createLookAt(ctx: PluginInput): ToolDefinition {
   return tool({
     description: LOOK_AT_DESCRIPTION,
     args: {
-      file_path: tool.schema.string().describe("Absolute path to the file to analyze"),
+      file_path: tool.schema.string().optional().describe("Absolute path to the file to analyze"),
+      image_data: tool.schema.string().optional().describe("Base64 encoded image data (for clipboard/pasted images)"),
       goal: tool.schema.string().describe("What specific information to extract from the file"),
     },
     async execute(rawArgs: LookAtArgs, toolContext) {
@@ -79,18 +67,93 @@ export function createLookAt(ctx: PluginInput): ToolDefinition {
         return validationError
       }
 
-      log(`[look_at] Analyzing file: ${args.file_path}, goal: ${args.goal}`)
+      const isBase64Input = Boolean(args.image_data)
+      const sourceDescription = isBase64Input ? "clipboard/pasted image" : args.file_path
+      log(`[look_at] Analyzing ${sourceDescription}, goal: ${args.goal}`)
 
-      const mimeType = inferMimeType(args.file_path)
-      const filename = basename(args.file_path)
+      const imageData = args.image_data
+      const filePath = args.file_path
 
-      const prompt = `Analyze this file and extract the requested information.
+      let mimeType: string
+      let filePart: { type: "file"; mime: string; url: string; filename: string }
+      let tempFilePath: string | null = null
+      let tempConversionPath: string | null = null
+      let tempFilesToCleanup: string[] = []
+
+      try {
+        if (imageData) {
+          mimeType = inferMimeTypeFromBase64(imageData)
+          
+          let finalBase64Data = extractBase64Data(imageData)
+          let finalMimeType = mimeType
+          
+          if (needsConversion(mimeType)) {
+            log(`[look_at] Detected unsupported Base64 format: ${mimeType}, converting to JPEG...`)
+            try {
+              const { base64, tempFiles } = convertBase64ImageToJpeg(finalBase64Data, mimeType)
+              finalBase64Data = base64
+              finalMimeType = "image/jpeg"
+              tempFilesToCleanup = tempFiles
+              log(`[look_at] Base64 conversion successful`)
+            } catch (conversionError) {
+              log(`[look_at] Base64 conversion failed: ${conversionError}`)
+              return `Error: Failed to convert Base64 image format. ${conversionError}`
+            }
+          }
+          
+          filePart = {
+            type: "file",
+            mime: finalMimeType,
+            url: `data:${finalMimeType};base64,${finalBase64Data}`,
+            filename: `clipboard-image.${finalMimeType.split("/")[1] || "png"}`,
+          }
+        } else if (filePath) {
+        mimeType = inferMimeTypeFromFilePath(filePath)
+        
+        let actualFilePath = filePath
+        if (needsConversion(mimeType)) {
+          log(`[look_at] Detected unsupported format: ${mimeType}, converting to JPEG...`)
+          try {
+            tempFilePath = convertImageToJpeg(filePath, mimeType)
+            tempConversionPath = tempFilePath
+            actualFilePath = tempFilePath
+            mimeType = "image/jpeg"
+            log(`[look_at] Conversion successful: ${tempFilePath}`)
+          } catch (conversionError) {
+            const failedConversionPath = getTemporaryConversionPath(conversionError)
+            if (failedConversionPath) {
+              tempConversionPath = failedConversionPath
+            }
+            log(`[look_at] Conversion failed: ${conversionError}`)
+            return `Error: Failed to convert image format. ${conversionError}`
+          }
+        }
+
+        filePart = {
+          type: "file",
+          mime: mimeType,
+          url: pathToFileURL(actualFilePath).href,
+          filename: basename(actualFilePath),
+        }
+      } else {
+        return "Error: Must provide either 'file_path' or 'image_data'."
+      }
+
+      const prompt = `Analyze this ${isBase64Input ? "image" : "file"} and extract the requested information.
 
 Goal: ${args.goal}
 
 Provide ONLY the extracted information that matches the goal.
 Be thorough on what was requested, concise on everything else.
 If the requested information is not found, clearly state what is missing.`
+
+      const { agentModel, agentVariant } = await resolveMultimodalLookerAgentMetadata(ctx)
+      if (agentModel && !isVisionCapableResolvedModel(agentModel)) {
+        log("[look_at] Resolved model is not vision-capable, blocking", {
+          resolvedModel: agentModel,
+        })
+        return "Error: Resolved multimodal-looker model is not vision-capable"
+      }
 
       log(`[look_at] Creating session with parent: ${toolContext.sessionID}`)
       const parentSession = await ctx.client.session.get({
@@ -103,38 +166,53 @@ If the requested information is not found, clearly state what is missing.`
           parentID: toolContext.sessionID,
           title: `look_at: ${args.goal.substring(0, 50)}`,
         },
-        query: {
-          directory: parentDirectory,
-        },
+        query: { directory: parentDirectory },
       })
 
       if (createResult.error) {
         log(`[look_at] Session create error:`, createResult.error)
+        const errorStr = String(createResult.error)
+        if (errorStr.toLowerCase().includes("unauthorized")) {
+          return `Error: Failed to create session (Unauthorized). This may be due to:
+1. OAuth token restrictions (e.g., Claude Code credentials are restricted to Claude Code only)
+2. Provider authentication issues
+3. Session permission inheritance problems
+
+Try using a different provider or API key authentication.
+
+Original error: ${createResult.error}`
+        }
         return `Error: Failed to create session: ${createResult.error}`
       }
 
       const sessionID = createResult.data.id
       log(`[look_at] Created session: ${sessionID}`)
 
-      log(`[look_at] Sending prompt with file passthrough to session ${sessionID}`)
-      await ctx.client.session.prompt({
-        path: { id: sessionID },
-        body: {
-          agent: MULTIMODAL_LOOKER_AGENT,
-          tools: {
-            task: false,
-            call_omo_agent: false,
-            look_at: false,
-            read: false,
+      log(`[look_at] Sending prompt with ${isBase64Input ? "base64 image" : "file"} to session ${sessionID}`)
+      try {
+        await promptSyncWithModelSuggestionRetry(ctx.client, {
+          path: { id: sessionID },
+          body: {
+            agent: MULTIMODAL_LOOKER_AGENT,
+            tools: {
+              task: false,
+              call_omo_agent: false,
+              look_at: false,
+              read: false,
+            },
+            parts: [
+              { type: "text", text: prompt },
+              filePart,
+            ],
+            ...(agentModel ? { model: { providerID: agentModel.providerID, modelID: agentModel.modelID } } : {}),
+            ...(agentVariant ? { variant: agentVariant } : {}),
           },
-          parts: [
-            { type: "text", text: prompt },
-            { type: "file", mime: mimeType, url: pathToFileURL(args.file_path).href, filename },
-          ],
-        },
-      })
+        })
+      } catch (promptError) {
+        log(`[look_at] Prompt error (ignored, will still fetch messages):`, promptError)
+      }
 
-      log(`[look_at] Prompt sent, fetching messages...`)
+      log(`[look_at] Fetching messages from session ${sessionID}...`)
 
       const messagesResult = await ctx.client.session.messages({
         path: { id: sessionID },
@@ -148,26 +226,28 @@ If the requested information is not found, clearly state what is missing.`
       const messages = messagesResult.data
       log(`[look_at] Got ${messages.length} messages`)
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const lastAssistantMessage = messages
-        .filter((m: any) => m.info.role === "assistant")
-        .sort((a: any, b: any) => (b.info.time?.created || 0) - (a.info.time?.created || 0))[0]
-
-      if (!lastAssistantMessage) {
-        log(`[look_at] No assistant message found`)
-        return `Error: No response from multimodal-looker agent`
+      const responseText = extractLatestAssistantText(messages)
+      if (!responseText) {
+        log("[look_at] No assistant message found")
+        return "Error: No response from multimodal-looker agent"
       }
 
-      log(`[look_at] Found assistant message with ${lastAssistantMessage.parts.length} parts`)
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const textParts = lastAssistantMessage.parts.filter((p: any) => p.type === "text")
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const responseText = textParts.map((p: any) => p.text).join("\n")
-
-      log(`[look_at] Got response, length: ${responseText.length}`)
-
-      return responseText
+        log(`[look_at] Got response, length: ${responseText.length}`)
+        return responseText
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        log(`[look_at] Unexpected error analyzing ${sourceDescription}:`, error)
+        return `Error: Failed to analyze ${sourceDescription}: ${errorMessage}`
+      } finally {
+        if (tempConversionPath) {
+          cleanupConvertedImage(tempConversionPath)
+        } else if (tempFilePath) {
+          cleanupConvertedImage(tempFilePath)
+        }
+        tempFilesToCleanup.forEach(file => {
+          cleanupConvertedImage(file)
+        })
+      }
     },
   })
 }

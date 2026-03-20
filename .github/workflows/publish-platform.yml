@@ -28,29 +28,28 @@ permissions:
   id-token: write
 
 jobs:
-  publish-platform:
-    # Use windows-latest for Windows to avoid cross-compilation segfault (oven-sh/bun#18416)
-    # Fixes: #873, #844
-    runs-on: ${{ matrix.platform == 'windows-x64' && 'windows-latest' || 'ubuntu-latest' }}
+  # =============================================================================
+  # Job 1: Build binaries for all platforms
+  # - Windows builds on windows-latest (avoid bun cross-compile segfault)
+  # - All other platforms build on ubuntu-latest
+  # - Uploads compressed artifacts for the publish job
+  # =============================================================================
+  build:
+    runs-on: ${{ startsWith(matrix.platform, 'windows-') && 'windows-latest' || 'ubuntu-latest' }}
     defaults:
       run:
         shell: bash
     strategy:
       fail-fast: false
-      max-parallel: 2
+      max-parallel: 11
       matrix:
-        platform: [darwin-arm64, darwin-x64, linux-x64, linux-arm64, linux-x64-musl, linux-arm64-musl, windows-x64]
+        platform: [darwin-arm64, darwin-x64, darwin-x64-baseline, linux-x64, linux-x64-baseline, linux-arm64, linux-x64-musl, linux-x64-musl-baseline, linux-arm64-musl, windows-x64, windows-x64-baseline]
     steps:
       - uses: actions/checkout@v4
 
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-          registry-url: "https://registry.npmjs.org"
 
       - name: Install dependencies
         run: bun install
@@ -60,54 +59,267 @@ jobs:
       - name: Check if already published
         id: check
         run: |
-          PKG_NAME="oh-my-opencode-${{ matrix.platform }}"
           VERSION="${{ inputs.version }}"
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/${PKG_NAME}/${VERSION}")
-          if [ "$STATUS" = "200" ]; then
+          PLATFORM_KEY="${{ matrix.platform }}"
+          PLATFORM_KEY="${PLATFORM_KEY//-/_}"
+          
+          # Check oh-my-opencode
+          OC_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/oh-my-opencode-${{ matrix.platform }}/${VERSION}")
+          # Check oh-my-openagent
+          OA_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/oh-my-openagent-${{ matrix.platform }}/${VERSION}")
+          
+          echo "oh-my-opencode-${{ matrix.platform }}@${VERSION}: ${OC_STATUS}"
+          echo "oh-my-openagent-${{ matrix.platform }}@${VERSION}: ${OA_STATUS}"
+          
+          if [ "$OC_STATUS" = "200" ]; then
+            echo "skip_opencode=true" >> $GITHUB_OUTPUT
+            echo "✓ oh-my-opencode-${{ matrix.platform }}@${VERSION} already published"
+          else
+            echo "skip_opencode=false" >> $GITHUB_OUTPUT
+            echo "→ oh-my-opencode-${{ matrix.platform }}@${VERSION} needs publishing"
+          fi
+          
+          if [ "$OA_STATUS" = "200" ]; then
+            echo "skip_openagent=true" >> $GITHUB_OUTPUT
+            echo "✓ oh-my-openagent-${{ matrix.platform }}@${VERSION} already published"
+          else
+            echo "skip_openagent=false" >> $GITHUB_OUTPUT
+            echo "→ oh-my-openagent-${{ matrix.platform }}@${VERSION} needs publishing"
+          fi
+          
+          # Skip build only if BOTH are already published
+          if [ "$OC_STATUS" = "200" ] && [ "$OA_STATUS" = "200" ]; then
             echo "skip=true" >> $GITHUB_OUTPUT
-            echo "✓ ${PKG_NAME}@${VERSION} already published"
           else
             echo "skip=false" >> $GITHUB_OUTPUT
-            echo "→ ${PKG_NAME}@${VERSION} needs publishing"
           fi
 
-      - name: Update version
+      - name: Update version in package.json
         if: steps.check.outputs.skip != 'true'
         run: |
           VERSION="${{ inputs.version }}"
           cd packages/${{ matrix.platform }}
           jq --arg v "$VERSION" '.version = $v' package.json > tmp.json && mv tmp.json package.json
 
+      - name: Set root package version
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          jq --arg v "${{ inputs.version }}" '.version = $v' package.json > tmp.json && mv tmp.json package.json
+
+      - name: Pre-download baseline compile target
+        if: steps.check.outputs.skip != 'true' && endsWith(matrix.platform, '-baseline')
+        shell: bash
+        run: |
+          BUN_VERSION=$(bun --version)
+          PLATFORM="${{ matrix.platform }}"
+          PKG_NAME="bun-${PLATFORM}"
+          CACHE_DIR=$(bun pm cache)
+          CACHE_DEST="${CACHE_DIR}/${PKG_NAME}-v${BUN_VERSION}"
+          
+          if [[ -f "$CACHE_DEST" ]]; then
+            echo "✓ Compile target already cached at ${CACHE_DEST}"
+            exit 0
+          fi
+          
+          echo "Pre-downloading ${PKG_NAME} v${BUN_VERSION} to ${CACHE_DEST}"
+          TARBALL_URL="https://registry.npmjs.org/@oven/bun-${PLATFORM}/-/bun-${PLATFORM}-${BUN_VERSION}.tgz"
+          echo "URL: ${TARBALL_URL}"
+          
+          mkdir -p "$(dirname "$CACHE_DEST")"
+          TMP_DIR=$(mktemp -d)
+          
+          # Download and extract the bun binary from npm tarball
+          curl -fsSL --retry 5 --retry-delay 5 "${TARBALL_URL}" | tar -xzf - -C "${TMP_DIR}"
+          
+          if [[ "$PLATFORM" == windows-* ]]; then
+            BIN_NAME="bun.exe"
+          else
+            BIN_NAME="bun"
+          fi
+          
+          # npm tarball has package/bin/bun structure
+          if [[ -f "${TMP_DIR}/package/bin/${BIN_NAME}" ]]; then
+            cp "${TMP_DIR}/package/bin/${BIN_NAME}" "${CACHE_DEST}"
+          elif [[ -f "${TMP_DIR}/package/${BIN_NAME}" ]]; then
+            cp "${TMP_DIR}/package/${BIN_NAME}" "${CACHE_DEST}"
+          else
+            echo "Could not find ${BIN_NAME} in tarball, listing contents:"
+            find "${TMP_DIR}" -type f
+            exit 1
+          fi
+          
+          chmod +x "${CACHE_DEST}" 2>/dev/null || true
+          echo "✓ Pre-downloaded to ${CACHE_DEST}"
+          ls -lh "${CACHE_DEST}"
+
       - name: Build binary
+        if: steps.check.outputs.skip != 'true'
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 5
+          max_attempts: 5
+          retry_wait_seconds: 10
+          shell: bash
+          command: |
+            PLATFORM="${{ matrix.platform }}"
+            case "$PLATFORM" in
+              darwin-arm64) TARGET="bun-darwin-arm64" ;;
+              darwin-x64) TARGET="bun-darwin-x64" ;;
+              darwin-x64-baseline) TARGET="bun-darwin-x64-baseline" ;;
+              linux-x64) TARGET="bun-linux-x64" ;;
+              linux-x64-baseline) TARGET="bun-linux-x64-baseline" ;;
+              linux-arm64) TARGET="bun-linux-arm64" ;;
+              linux-x64-musl) TARGET="bun-linux-x64-musl" ;;
+              linux-x64-musl-baseline) TARGET="bun-linux-x64-musl-baseline" ;;
+              linux-arm64-musl) TARGET="bun-linux-arm64-musl" ;;
+              windows-x64) TARGET="bun-windows-x64" ;;
+              windows-x64-baseline) TARGET="bun-windows-x64-baseline" ;;
+            esac
+            
+            if [[ "$PLATFORM" == windows-* ]]; then
+              OUTPUT="packages/${PLATFORM}/bin/oh-my-opencode.exe"
+            else
+              OUTPUT="packages/${PLATFORM}/bin/oh-my-opencode"
+            fi
+            
+            bun build src/cli/index.ts --compile --minify --target=$TARGET --outfile=$OUTPUT
+            
+            echo "Built binary:"
+            ls -lh "$OUTPUT"
+
+      - name: Compress binary
         if: steps.check.outputs.skip != 'true'
         run: |
           PLATFORM="${{ matrix.platform }}"
-          case "$PLATFORM" in
-            darwin-arm64) TARGET="bun-darwin-arm64" ;;
-            darwin-x64) TARGET="bun-darwin-x64" ;;
-            linux-x64) TARGET="bun-linux-x64" ;;
-            linux-arm64) TARGET="bun-linux-arm64" ;;
-            linux-x64-musl) TARGET="bun-linux-x64-musl" ;;
-            linux-arm64-musl) TARGET="bun-linux-arm64-musl" ;;
-            windows-x64) TARGET="bun-windows-x64" ;;
-          esac
+          cd packages/${PLATFORM}
           
-          if [ "$PLATFORM" = "windows-x64" ]; then
-            OUTPUT="packages/${PLATFORM}/bin/oh-my-opencode.exe"
+          if [[ "$PLATFORM" == windows-* ]]; then
+            # Windows: use 7z (pre-installed on windows-latest)
+            7z a -tzip ../../binary-${PLATFORM}.zip bin/ package.json
           else
-            OUTPUT="packages/${PLATFORM}/bin/oh-my-opencode"
+            # Unix: use tar.gz
+            tar -czvf ../../binary-${PLATFORM}.tar.gz bin/ package.json
           fi
           
-          bun build src/cli/index.ts --compile --minify --target=$TARGET --outfile=$OUTPUT
+          cd ../..
+          echo "Compressed artifact:"
+          ls -lh binary-${PLATFORM}.*
 
-      - name: Publish ${{ matrix.platform }}
+      - name: Upload artifact
         if: steps.check.outputs.skip != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-${{ matrix.platform }}
+          path: |
+            binary-${{ matrix.platform }}.tar.gz
+            binary-${{ matrix.platform }}.zip
+          retention-days: 1
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    if: always() && !cancelled()
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        platform: [darwin-arm64, darwin-x64, darwin-x64-baseline, linux-x64, linux-x64-baseline, linux-arm64, linux-x64-musl, linux-x64-musl-baseline, linux-arm64-musl, windows-x64, windows-x64-baseline]
+    steps:
+      - name: Check if already published
+        id: check
+        run: |
+          VERSION="${{ inputs.version }}"
+          
+          OC_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/oh-my-opencode-${{ matrix.platform }}/${VERSION}")
+          OA_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/oh-my-openagent-${{ matrix.platform }}/${VERSION}")
+          
+          if [ "$OC_STATUS" = "200" ]; then
+            echo "skip_opencode=true" >> $GITHUB_OUTPUT
+            echo "✓ oh-my-opencode-${{ matrix.platform }}@${VERSION} already published"
+          else
+            echo "skip_opencode=false" >> $GITHUB_OUTPUT
+          fi
+          
+          if [ "$OA_STATUS" = "200" ]; then
+            echo "skip_openagent=true" >> $GITHUB_OUTPUT
+            echo "✓ oh-my-openagent-${{ matrix.platform }}@${VERSION} already published"
+          else
+            echo "skip_openagent=false" >> $GITHUB_OUTPUT
+          fi
+          
+          # Need artifact if either package needs publishing
+          if [ "$OC_STATUS" = "200" ] && [ "$OA_STATUS" = "200" ]; then
+            echo "skip_all=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip_all=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Download artifact
+        id: download
+        if: steps.check.outputs.skip_all != 'true'
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: binary-${{ matrix.platform }}
+          path: .
+
+      - name: Extract artifact
+        if: steps.check.outputs.skip_all != 'true' && steps.download.outcome == 'success'
+        run: |
+          PLATFORM="${{ matrix.platform }}"
+          mkdir -p packages/${PLATFORM}
+          
+          if [[ "$PLATFORM" == windows-* ]]; then
+            unzip binary-${PLATFORM}.zip -d packages/${PLATFORM}/
+          else
+            tar -xzvf binary-${PLATFORM}.tar.gz -C packages/${PLATFORM}/
+          fi
+          
+          echo "Extracted contents:"
+          ls -la packages/${PLATFORM}/
+          ls -la packages/${PLATFORM}/bin/
+
+      - uses: actions/setup-node@v4
+        if: steps.check.outputs.skip_all != 'true' && steps.download.outcome == 'success'
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Publish oh-my-opencode-${{ matrix.platform }}
+        if: steps.check.outputs.skip_opencode != 'true' && steps.download.outcome == 'success'
         run: |
           cd packages/${{ matrix.platform }}
+          
           TAG_ARG=""
           if [ -n "${{ inputs.dist_tag }}" ]; then
             TAG_ARG="--tag ${{ inputs.dist_tag }}"
           fi
-          npm publish --access public $TAG_ARG
+          
+          npm publish --access public --provenance $TAG_ARG
         env:
-          NPM_CONFIG_PROVENANCE: false
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+          NPM_CONFIG_PROVENANCE: true
+        timeout-minutes: 15
+
+      - name: Publish oh-my-openagent-${{ matrix.platform }}
+        if: steps.check.outputs.skip_openagent != 'true' && steps.download.outcome == 'success'
+        run: |
+          cd packages/${{ matrix.platform }}
+          
+          # Rename package for oh-my-openagent
+          jq --arg name "oh-my-openagent-${{ matrix.platform }}" \
+             --arg desc "Platform-specific binary for oh-my-openagent (${{ matrix.platform }})" \
+             '.name = $name | .description = $desc | .bin = {"oh-my-openagent": (.bin | to_entries | .[0].value)}' \
+             package.json > tmp.json && mv tmp.json package.json
+          
+          TAG_ARG=""
+          if [ -n "${{ inputs.dist_tag }}" ]; then
+            TAG_ARG="--tag ${{ inputs.dist_tag }}"
+          fi
+          
+          npm publish --access public --provenance $TAG_ARG
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+          NPM_CONFIG_PROVENANCE: true
+        timeout-minutes: 15

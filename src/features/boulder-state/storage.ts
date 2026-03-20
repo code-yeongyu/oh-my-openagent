@@ -6,8 +6,10 @@
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from "node:fs"
 import { dirname, join, basename } from "node:path"
-import type { BoulderState, PlanProgress } from "./types"
+import type { BoulderState, PlanProgress, TaskSessionState } from "./types"
 import { BOULDER_DIR, BOULDER_FILE, PROMETHEUS_PLANS_DIR } from "./constants"
+
+const RESERVED_KEYS = new Set(["__proto__", "prototype", "constructor"])
 
 export function getBoulderFilePath(directory: string): string {
   return join(directory, BOULDER_DIR, BOULDER_FILE)
@@ -22,7 +24,17 @@ export function readBoulderState(directory: string): BoulderState | null {
 
   try {
     const content = readFileSync(filePath, "utf-8")
-    return JSON.parse(content) as BoulderState
+    const parsed = JSON.parse(content)
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return null
+    }
+    if (!Array.isArray(parsed.session_ids)) {
+      parsed.session_ids = []
+    }
+    if (!parsed.task_sessions || typeof parsed.task_sessions !== "object" || Array.isArray(parsed.task_sessions)) {
+      parsed.task_sessions = {}
+    }
+    return parsed as BoulderState
   } catch {
     return null
   }
@@ -48,11 +60,17 @@ export function appendSessionId(directory: string, sessionId: string): BoulderSt
   const state = readBoulderState(directory)
   if (!state) return null
 
-  if (!state.session_ids.includes(sessionId)) {
+  if (!state.session_ids?.includes(sessionId)) {
+    if (!Array.isArray(state.session_ids)) {
+      state.session_ids = []
+    }
+    const originalSessionIds = [...state.session_ids]
     state.session_ids.push(sessionId)
     if (writeBoulderState(directory, state)) {
       return state
     }
+    state.session_ids = originalSessionIds
+    return null
   }
 
   return state
@@ -70,6 +88,54 @@ export function clearBoulderState(directory: string): boolean {
   } catch {
     return false
   }
+}
+
+export function getTaskSessionState(directory: string, taskKey: string): TaskSessionState | null {
+  const state = readBoulderState(directory)
+  if (!state?.task_sessions) {
+    return null
+  }
+
+  return state.task_sessions[taskKey] ?? null
+}
+
+export function upsertTaskSessionState(
+  directory: string,
+  input: {
+    taskKey: string
+    taskLabel: string
+    taskTitle: string
+    sessionId: string
+    agent?: string
+    category?: string
+  },
+): BoulderState | null {
+  const state = readBoulderState(directory)
+  if (!state) {
+    return null
+  }
+
+  if (RESERVED_KEYS.has(input.taskKey)) {
+    return null
+  }
+
+  const taskSessions = state.task_sessions ?? {}
+  taskSessions[input.taskKey] = {
+    task_key: input.taskKey,
+    task_label: input.taskLabel,
+    task_title: input.taskTitle,
+    session_id: input.sessionId,
+    ...(input.agent !== undefined ? { agent: input.agent } : {}),
+    ...(input.category !== undefined ? { category: input.category } : {}),
+    updated_at: new Date().toISOString(),
+  }
+
+  state.task_sessions = taskSessions
+  if (writeBoulderState(directory, state)) {
+    return state
+  }
+
+  return null
 }
 
 /**
@@ -111,8 +177,8 @@ export function getPlanProgress(planPath: string): PlanProgress {
     const content = readFileSync(planPath, "utf-8")
     
     // Match markdown checkboxes: - [ ] or - [x] or - [X]
-    const uncheckedMatches = content.match(/^[-*]\s*\[\s*\]/gm) || []
-    const checkedMatches = content.match(/^[-*]\s*\[[xX]\]/gm) || []
+    const uncheckedMatches = content.match(/^\s*[-*]\s*\[\s*\]/gm) || []
+    const checkedMatches = content.match(/^\s*[-*]\s*\[[xX]\]/gm) || []
 
     const total = uncheckedMatches.length + checkedMatches.length
     const completed = checkedMatches.length
@@ -139,12 +205,16 @@ export function getPlanName(planPath: string): string {
  */
 export function createBoulderState(
   planPath: string,
-  sessionId: string
+  sessionId: string,
+  agent?: string,
+  worktreePath?: string,
 ): BoulderState {
   return {
     active_plan: planPath,
     started_at: new Date().toISOString(),
     session_ids: [sessionId],
     plan_name: getPlanName(planPath),
+    ...(agent !== undefined ? { agent } : {}),
+    ...(worktreePath !== undefined ? { worktree_path: worktreePath } : {}),
   }
 }

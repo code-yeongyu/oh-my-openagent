@@ -12,6 +12,7 @@ export interface MessageMeta {
   model?: {
     providerID: string
     modelID: string
+    variant?: string
   }
   path?: {
     cwd: string
@@ -25,6 +26,7 @@ export interface OriginalMessageContext {
   model?: {
     providerID?: string
     modelID?: string
+    variant?: string
   }
   path?: {
     cwd?: string

@@ -1,17 +1,29 @@
+/// <reference types="bun-types" />
+
 import { describe, expect, test } from "bun:test"
-import { AgentOverrideConfigSchema, BuiltinCategoryNameSchema, CategoryConfigSchema, OhMyOpenCodeConfigSchema } from "./schema"
+import {
+  AgentOverrideConfigSchema,
+  BrowserAutomationConfigSchema,
+  BrowserAutomationProviderSchema,
+  BuiltinCategoryNameSchema,
+  CategoryConfigSchema,
+  ExperimentalConfigSchema,
+  GitMasterConfigSchema,
+  HookNameSchema,
+  OhMyOpenCodeConfigSchema,
+} from "./schema"
 
 describe("disabled_mcps schema", () => {
   test("should accept built-in MCP names", () => {
-    //#given
+    // given
     const config = {
       disabled_mcps: ["context7", "grep_app"],
     }
 
-    //#when
+    // when
     const result = OhMyOpenCodeConfigSchema.safeParse(config)
 
-    //#then
+    // then
     expect(result.success).toBe(true)
     if (result.success) {
       expect(result.data.disabled_mcps).toEqual(["context7", "grep_app"])
@@ -19,15 +31,15 @@ describe("disabled_mcps schema", () => {
   })
 
   test("should accept custom MCP names", () => {
-    //#given
+    // given
     const config = {
       disabled_mcps: ["playwright", "sqlite", "custom-mcp"],
     }
 
-    //#when
+    // when
     const result = OhMyOpenCodeConfigSchema.safeParse(config)
 
-    //#then
+    // then
     expect(result.success).toBe(true)
     if (result.success) {
       expect(result.data.disabled_mcps).toEqual(["playwright", "sqlite", "custom-mcp"])
@@ -35,15 +47,15 @@ describe("disabled_mcps schema", () => {
   })
 
   test("should accept mixed built-in and custom names", () => {
-    //#given
+    // given
     const config = {
       disabled_mcps: ["context7", "playwright", "custom-server"],
     }
 
-    //#when
+    // when
     const result = OhMyOpenCodeConfigSchema.safeParse(config)
 
-    //#then
+    // then
     expect(result.success).toBe(true)
     if (result.success) {
       expect(result.data.disabled_mcps).toEqual(["context7", "playwright", "custom-server"])
@@ -51,15 +63,15 @@ describe("disabled_mcps schema", () => {
   })
 
   test("should accept empty array", () => {
-    //#given
+    // given
     const config = {
       disabled_mcps: [],
     }
 
-    //#when
+    // when
     const result = OhMyOpenCodeConfigSchema.safeParse(config)
 
-    //#then
+    // then
     expect(result.success).toBe(true)
     if (result.success) {
       expect(result.data.disabled_mcps).toEqual([])
@@ -67,26 +79,26 @@ describe("disabled_mcps schema", () => {
   })
 
   test("should reject non-string values", () => {
-    //#given
+    // given
     const config = {
       disabled_mcps: [123, true, null],
     }
 
-    //#when
+    // when
     const result = OhMyOpenCodeConfigSchema.safeParse(config)
 
-    //#then
+    // then
     expect(result.success).toBe(false)
   })
 
   test("should accept undefined (optional field)", () => {
-    //#given
+    // given
     const config = {}
 
-    //#when
+    // when
     const result = OhMyOpenCodeConfigSchema.safeParse(config)
 
-    //#then
+    // then
     expect(result.success).toBe(true)
     if (result.success) {
       expect(result.data.disabled_mcps).toBeUndefined()
@@ -94,20 +106,20 @@ describe("disabled_mcps schema", () => {
   })
 
   test("should reject empty strings", () => {
-    //#given
+    // given
     const config = {
       disabled_mcps: [""],
     }
 
-    //#when
+    // when
     const result = OhMyOpenCodeConfigSchema.safeParse(config)
 
-    //#then
+    // then
     expect(result.success).toBe(false)
   })
 
   test("should accept MCP names with various naming patterns", () => {
-    //#given
+    // given
     const config = {
       disabled_mcps: [
         "my-custom-mcp",
@@ -118,10 +130,10 @@ describe("disabled_mcps schema", () => {
       ],
     }
 
-    //#when
+    // when
     const result = OhMyOpenCodeConfigSchema.safeParse(config)
 
-    //#then
+    // then
     expect(result.success).toBe(true)
     if (result.success) {
       expect(result.data.disabled_mcps).toEqual([
@@ -138,13 +150,13 @@ describe("disabled_mcps schema", () => {
 describe("AgentOverrideConfigSchema", () => {
   describe("category field", () => {
     test("accepts category as optional string", () => {
-      // #given
+      // given
       const config = { category: "visual-engineering" }
 
-      // #when
+      // when
       const result = AgentOverrideConfigSchema.safeParse(config)
 
-      // #then
+      // then
       expect(result.success).toBe(true)
       if (result.success) {
         expect(result.data.category).toBe("visual-engineering")
@@ -152,37 +164,37 @@ describe("AgentOverrideConfigSchema", () => {
     })
 
     test("accepts config without category", () => {
-      // #given
+      // given
       const config = { temperature: 0.5 }
 
-      // #when
+      // when
       const result = AgentOverrideConfigSchema.safeParse(config)
 
-      // #then
+      // then
       expect(result.success).toBe(true)
     })
 
     test("rejects non-string category", () => {
-      // #given
+      // given
       const config = { category: 123 }
 
-      // #when
+      // when
       const result = AgentOverrideConfigSchema.safeParse(config)
 
-      // #then
+      // then
       expect(result.success).toBe(false)
     })
   })
 
   describe("variant field", () => {
     test("accepts variant as optional string", () => {
-      // #given
+      // given
       const config = { variant: "high" }
 
-      // #when
+      // when
       const result = AgentOverrideConfigSchema.safeParse(config)
 
-      // #then
+      // then
       expect(result.success).toBe(true)
       if (result.success) {
         expect(result.data.variant).toBe("high")
@@ -190,26 +202,26 @@ describe("AgentOverrideConfigSchema", () => {
     })
 
     test("rejects non-string variant", () => {
-      // #given
+      // given
       const config = { variant: 123 }
 
-      // #when
+      // when
       const result = AgentOverrideConfigSchema.safeParse(config)
 
-      // #then
+      // then
       expect(result.success).toBe(false)
     })
   })
 
   describe("skills field", () => {
     test("accepts skills as optional string array", () => {
-      // #given
+      // given
       const config = { skills: ["frontend-ui-ux", "code-reviewer"] }
 
-      // #when
+      // when
       const result = AgentOverrideConfigSchema.safeParse(config)
 
-      // #then
+      // then
       expect(result.success).toBe(true)
       if (result.success) {
         expect(result.data.skills).toEqual(["frontend-ui-ux", "code-reviewer"])
@@ -217,13 +229,13 @@ describe("AgentOverrideConfigSchema", () => {
     })
 
     test("accepts empty skills array", () => {
-      // #given
+      // given
       const config = { skills: [] }
 
-      // #when
+      // when
       const result = AgentOverrideConfigSchema.safeParse(config)
 
-      // #then
+      // then
       expect(result.success).toBe(true)
       if (result.success) {
         expect(result.data.skills).toEqual([])
@@ -231,57 +243,57 @@ describe("AgentOverrideConfigSchema", () => {
     })
 
     test("accepts config without skills", () => {
-      // #given
+      // given
       const config = { temperature: 0.5 }
 
-      // #when
+      // when
       const result = AgentOverrideConfigSchema.safeParse(config)
 
-      // #then
+      // then
       expect(result.success).toBe(true)
     })
 
     test("rejects non-array skills", () => {
-      // #given
+      // given
       const config = { skills: "frontend-ui-ux" }
 
-      // #when
+      // when
       const result = AgentOverrideConfigSchema.safeParse(config)
 
-      // #then
+      // then
       expect(result.success).toBe(false)
     })
   })
 
   describe("backward compatibility", () => {
     test("still accepts model field (deprecated)", () => {
-      // #given
-      const config = { model: "openai/gpt-5.2" }
+      // given
+      const config = { model: "openai/gpt-5.4" }
 
-      // #when
+      // when
       const result = AgentOverrideConfigSchema.safeParse(config)
 
-      // #then
+      // then
       expect(result.success).toBe(true)
       if (result.success) {
-        expect(result.data.model).toBe("openai/gpt-5.2")
+        expect(result.data.model).toBe("openai/gpt-5.4")
       }
     })
 
     test("accepts both model and category (deprecated usage)", () => {
-      // #given - category should take precedence at runtime, but both should validate
+      // given - category should take precedence at runtime, but both should validate
       const config = { 
-        model: "openai/gpt-5.2",
+        model: "openai/gpt-5.4",
         category: "ultrabrain"
       }
 
-      // #when
+      // when
       const result = AgentOverrideConfigSchema.safeParse(config)
 
-      // #then
+      // then
       expect(result.success).toBe(true)
       if (result.success) {
-        expect(result.data.model).toBe("openai/gpt-5.2")
+        expect(result.data.model).toBe("openai/gpt-5.4")
         expect(result.data.category).toBe("ultrabrain")
       }
     })
@@ -289,16 +301,16 @@ describe("AgentOverrideConfigSchema", () => {
 
   describe("combined fields", () => {
     test("accepts category with skills", () => {
-      // #given
+      // given
       const config = { 
         category: "visual-engineering",
         skills: ["frontend-ui-ux"]
       }
 
-      // #when
+      // when
       const result = AgentOverrideConfigSchema.safeParse(config)
 
-      // #then
+      // then
       expect(result.success).toBe(true)
       if (result.success) {
         expect(result.data.category).toBe("visual-engineering")
@@ -307,7 +319,7 @@ describe("AgentOverrideConfigSchema", () => {
     })
 
     test("accepts category with skills and other fields", () => {
-      // #given
+      // given
       const config = { 
         category: "ultrabrain",
         skills: ["code-reviewer"],
@@ -315,10 +327,10 @@ describe("AgentOverrideConfigSchema", () => {
         prompt_append: "Extra instructions"
       }
 
-      // #when
+      // when
       const result = AgentOverrideConfigSchema.safeParse(config)
 
-      // #then
+      // then
       expect(result.success).toBe(true)
       if (result.success) {
         expect(result.data.category).toBe("ultrabrain")
@@ -332,13 +344,13 @@ describe("AgentOverrideConfigSchema", () => {
 
 describe("CategoryConfigSchema", () => {
   test("accepts variant as optional string", () => {
-    // #given
-    const config = { model: "openai/gpt-5.2", variant: "xhigh" }
+    // given
+    const config = { model: "openai/gpt-5.4", variant: "xhigh" }
 
-    // #when
+    // when
     const result = CategoryConfigSchema.safeParse(config)
 
-    // #then
+    // then
     expect(result.success).toBe(true)
     if (result.success) {
       expect(result.data.variant).toBe("xhigh")
@@ -346,13 +358,13 @@ describe("CategoryConfigSchema", () => {
   })
 
   test("accepts reasoningEffort as optional string with xhigh", () => {
-    // #given
+    // given
     const config = { reasoningEffort: "xhigh" }
 
-    // #when
+    // when
     const result = CategoryConfigSchema.safeParse(config)
 
-    // #then
+    // then
     expect(result.success).toBe(true)
     if (result.success) {
       expect(result.data.reasoningEffort).toBe("xhigh")
@@ -360,23 +372,23 @@ describe("CategoryConfigSchema", () => {
   })
 
   test("rejects non-string variant", () => {
-    // #given
-    const config = { model: "openai/gpt-5.2", variant: 123 }
+    // given
+    const config = { model: "openai/gpt-5.4", variant: 123 }
 
-    // #when
+    // when
     const result = CategoryConfigSchema.safeParse(config)
 
-    // #then
+    // then
     expect(result.success).toBe(false)
   })
 })
 
 describe("BuiltinCategoryNameSchema", () => {
   test("accepts all builtin category names", () => {
-    // #given
+    // given
     const categories = ["visual-engineering", "ultrabrain", "artistry", "quick", "unspecified-low", "unspecified-high", "writing"]
 
-    // #when / #then
+    // when / #then
     for (const cat of categories) {
       const result = BuiltinCategoryNameSchema.safeParse(cat)
       expect(result.success).toBe(true)
@@ -384,32 +396,56 @@ describe("BuiltinCategoryNameSchema", () => {
   })
 })
 
+describe("HookNameSchema", () => {
+  test("rejects removed beast-mode-system hook name", () => {
+    //#given
+    const input = "beast-mode-system"
+
+    //#when
+    const result = HookNameSchema.safeParse(input)
+
+    //#then
+    expect(result.success).toBe(false)
+  })
+
+  test("rejects removed delegate-task-english-directive hook name", () => {
+    //#given
+    const input = "delegate-task-english-directive"
+
+    //#when
+    const result = HookNameSchema.safeParse(input)
+
+    //#then
+    expect(result.success).toBe(false)
+  })
+})
+
 describe("Sisyphus-Junior agent override", () => {
   test("schema accepts agents['Sisyphus-Junior'] and retains the key after parsing", () => {
-    // #given
+    // given
     const config = {
       agents: {
         "sisyphus-junior": {
-          model: "openai/gpt-5.2",
+          model: "openai/gpt-5.4",
           temperature: 0.2,
         },
       },
     }
 
-    // #when
+    // when
     const result = OhMyOpenCodeConfigSchema.safeParse(config)
 
-    // #then
+    // then
     expect(result.success).toBe(true)
     if (result.success) {
       expect(result.data.agents?.["sisyphus-junior"]).toBeDefined()
-      expect(result.data.agents?.["sisyphus-junior"]?.model).toBe("openai/gpt-5.2")
+      expect(result.data.agents?.["sisyphus-junior"]?.model).toBe("openai/gpt-5.4")
       expect(result.data.agents?.["sisyphus-junior"]?.temperature).toBe(0.2)
     }
   })
 
   test("schema accepts sisyphus-junior with prompt_append", () => {
-    // #given
+    // given
     const config = {
       agents: {
         "sisyphus-junior": {
@@ -418,10 +454,10 @@ describe("Sisyphus-Junior agent override", () => {
       },
     }
 
-    // #when
+    // when
     const result = OhMyOpenCodeConfigSchema.safeParse(config)
 
-    // #then
+    // then
     expect(result.success).toBe(true)
     if (result.success) {
       expect(result.data.agents?.["sisyphus-junior"]?.prompt_append).toBe(
@@ -431,7 +467,7 @@ describe("Sisyphus-Junior agent override", () => {
   })
 
   test("schema accepts sisyphus-junior with tools override", () => {
-    // #given
+    // given
     const config = {
       agents: {
         "sisyphus-junior": {
@@ -443,10 +479,10 @@ describe("Sisyphus-Junior agent override", () => {
       },
     }
 
-    // #when
+    // when
     const result = OhMyOpenCodeConfigSchema.safeParse(config)
 
-    // #then
+    // then
     expect(result.success).toBe(true)
     if (result.success) {
       expect(result.data.agents?.["sisyphus-junior"]?.tools).toEqual({
@@ -457,7 +493,7 @@ describe("Sisyphus-Junior agent override", () => {
   })
 
   test("schema accepts lowercase agent names (sisyphus, atlas, prometheus)", () => {
-    // #given
+    // given
     const config = {
       agents: {
         sisyphus: {
@@ -472,10 +508,10 @@ describe("Sisyphus-Junior agent override", () => {
       },
     }
 
-    // #when
+    // when
     const result = OhMyOpenCodeConfigSchema.safeParse(config)
 
-    // #then
+    // then
     expect(result.success).toBe(true)
     if (result.success) {
       expect(result.data.agents?.sisyphus?.temperature).toBe(0.1)
@@ -485,7 +521,7 @@ describe("Sisyphus-Junior agent override", () => {
   })
 
   test("schema accepts lowercase metis and momus agent names", () => {
-    // #given
+    // given
     const config = {
       agents: {
         metis: {
@@ -497,14 +533,404 @@ describe("Sisyphus-Junior agent override", () => {
       },
     }
 
-    // #when
+    // when
     const result = OhMyOpenCodeConfigSchema.safeParse(config)
 
-    // #then
+    // then
     expect(result.success).toBe(true)
     if (result.success) {
       expect(result.data.agents?.metis?.category).toBe("ultrabrain")
       expect(result.data.agents?.momus?.category).toBe("quick")
     }
+  })
+})
+
+describe("BrowserAutomationProviderSchema", () => {
+  test("accepts 'playwright' as valid provider", () => {
+    // given
+    const input = "playwright"
+
+    // when
+    const result = BrowserAutomationProviderSchema.safeParse(input)
+
+    // then
+    expect(result.success).toBe(true)
+    expect(result.data).toBe("playwright")
+  })
+
+  test("accepts 'agent-browser' as valid provider", () => {
+    // given
+    const input = "agent-browser"
+
+    // when
+    const result = BrowserAutomationProviderSchema.safeParse(input)
+
+    // then
+    expect(result.success).toBe(true)
+    expect(result.data).toBe("agent-browser")
+  })
+
+  test("rejects invalid provider", () => {
+    // given
+    const input = "invalid-provider"
+
+    // when
+    const result = BrowserAutomationProviderSchema.safeParse(input)
+
+    // then
+    expect(result.success).toBe(false)
+  })
+
+  test("accepts 'playwright-cli' as valid provider", () => {
+    // given
+    const input = "playwright-cli"
+
+    // when
+    const result = BrowserAutomationProviderSchema.safeParse(input)
+
+    // then
+    expect(result.success).toBe(true)
+    expect(result.data).toBe("playwright-cli")
+  })
+})
+
+describe("BrowserAutomationConfigSchema", () => {
+  test("defaults provider to 'playwright' when not specified", () => {
+    // given
+    const input = {}
+
+    // when
+    const result = BrowserAutomationConfigSchema.parse(input)
+
+    // then
+    expect(result.provider).toBe("playwright")
+  })
+
+  test("accepts agent-browser provider", () => {
+    // given
+    const input = { provider: "agent-browser" }
+
+    // when
+    const result = BrowserAutomationConfigSchema.parse(input)
+
+    // then
+    expect(result.provider).toBe("agent-browser")
+  })
+
+  test("accepts playwright-cli provider in config", () => {
+    // given
+    const input = { provider: "playwright-cli" }
+
+    // when
+    const result = BrowserAutomationConfigSchema.parse(input)
+
+    // then
+    expect(result.provider).toBe("playwright-cli")
+  })
+})
+
+describe("OhMyOpenCodeConfigSchema - browser_automation_engine", () => {
+  test("accepts browser_automation_engine config", () => {
+    // given
+    const input = {
+      browser_automation_engine: {
+        provider: "agent-browser",
+      },
+    }
+
+    // when
+    const result = OhMyOpenCodeConfigSchema.safeParse(input)
+
+    // then
+    expect(result.success).toBe(true)
+    expect(result.data?.browser_automation_engine?.provider).toBe("agent-browser")
+  })
+
+  test("accepts config without browser_automation_engine", () => {
+    // given
+    const input = {}
+
+    // when
+    const result = OhMyOpenCodeConfigSchema.safeParse(input)
+
+    // then
+    expect(result.success).toBe(true)
+    expect(result.data?.browser_automation_engine).toBeUndefined()
+  })
+
+  test("accepts browser_automation_engine with playwright-cli", () => {
+    // given
+    const input = { browser_automation_engine: { provider: "playwright-cli" } }
+
+    // when
+    const result = OhMyOpenCodeConfigSchema.safeParse(input)
+
+    // then
+    expect(result.success).toBe(true)
+    expect(result.data?.browser_automation_engine?.provider).toBe("playwright-cli")
+  })
+})
+
+describe("OhMyOpenCodeConfigSchema - hashline_edit", () => {
+  test("accepts hashline_edit as true", () => {
+    //#given
+    const input = { hashline_edit: true }
+
+    //#when
+    const result = OhMyOpenCodeConfigSchema.safeParse(input)
+
+    //#then
+    expect(result.success).toBe(true)
+    expect(result.data?.hashline_edit).toBe(true)
+  })
+
+  test("accepts hashline_edit as false", () => {
+    //#given
+    const input = { hashline_edit: false }
+
+    //#when
+    const result = OhMyOpenCodeConfigSchema.safeParse(input)
+
+    //#then
+    expect(result.success).toBe(true)
+    expect(result.data?.hashline_edit).toBe(false)
+  })
+
+  test("hashline_edit is optional", () => {
+    //#given
+    const input = { auto_update: true }
+
+    //#when
+    const result = OhMyOpenCodeConfigSchema.safeParse(input)
+
+    //#then
+    expect(result.success).toBe(true)
+    expect(result.data?.hashline_edit).toBeUndefined()
+  })
+
+  test("rejects non-boolean hashline_edit", () => {
+    //#given
+    const input = { hashline_edit: "true" }
+
+    //#when
+    const result = OhMyOpenCodeConfigSchema.safeParse(input)
+
+    //#then
+    expect(result.success).toBe(false)
+  })
+})
+
+describe("ExperimentalConfigSchema feature flags", () => {
+  test("accepts plugin_load_timeout_ms as number", () => {
+    //#given
+    const config = { plugin_load_timeout_ms: 5000 }
+
+    //#when
+    const result = ExperimentalConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.plugin_load_timeout_ms).toBe(5000)
+    }
+  })
+
+  test("rejects plugin_load_timeout_ms below 1000", () => {
+    //#given
+    const config = { plugin_load_timeout_ms: 500 }
+
+    //#when
+    const result = ExperimentalConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(false)
+  })
+
+  test("accepts safe_hook_creation as boolean", () => {
+    //#given
+    const config = { safe_hook_creation: false }
+
+    //#when
+    const result = ExperimentalConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.safe_hook_creation).toBe(false)
+    }
+  })
+
+  test("both fields are optional", () => {
+    //#given
+    const config = {}
+
+    //#when
+    const result = ExperimentalConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.plugin_load_timeout_ms).toBeUndefined()
+      expect(result.data.safe_hook_creation).toBeUndefined()
+    }
+  })
+
+  test("accepts disable_omo_env as true", () => {
+    //#given
+    const config = { disable_omo_env: true }
+
+    //#when
+    const result = ExperimentalConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.disable_omo_env).toBe(true)
+    }
+  })
+
+  test("accepts disable_omo_env as false", () => {
+    //#given
+    const config = { disable_omo_env: false }
+
+    //#when
+    const result = ExperimentalConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.disable_omo_env).toBe(false)
+    }
+  })
+
+  test("disable_omo_env is optional", () => {
+    //#given
+    const config = { safe_hook_creation: true }
+
+    //#when
+    const result = ExperimentalConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.disable_omo_env).toBeUndefined()
+    }
+  })
+
+  test("rejects non-boolean disable_omo_env", () => {
+    //#given
+    const config = { disable_omo_env: "true" }
+
+    //#when
+    const result = ExperimentalConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(false)
+  })
+
+})
+
+describe("GitMasterConfigSchema", () => {
+  test("accepts boolean true for commit_footer", () => {
+    //#given
+    const config = { commit_footer: true }
+
+    //#when
+    const result = GitMasterConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.commit_footer).toBe(true)
+    }
+  })
+
+  test("accepts boolean false for commit_footer", () => {
+    //#given
+    const config = { commit_footer: false }
+
+    //#when
+    const result = GitMasterConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.commit_footer).toBe(false)
+    }
+  })
+
+  test("accepts string value for commit_footer", () => {
+    //#given
+    const config = { commit_footer: "Custom footer text" }
+
+    //#when
+    const result = GitMasterConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.commit_footer).toBe("Custom footer text")
+    }
+  })
+
+  test("defaults commit_footer to true when not provided", () => {
+    //#given
+    const config = {}
+
+    //#when
+    const result = GitMasterConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.commit_footer).toBe(true)
+    }
+  })
+
+  test("rejects number for commit_footer", () => {
+    //#given
+    const config = { commit_footer: 123 }
+
+    //#when
+    const result = GitMasterConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(false)
+  })
+
+  test("accepts shell-safe git_env_prefix", () => {
+    const config = { git_env_prefix: "MY_HOOK=active" }
+
+    const result = GitMasterConfigSchema.safeParse(config)
+
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.git_env_prefix).toBe("MY_HOOK=active")
+    }
+  })
+
+  test("rejects git_env_prefix with shell metacharacters", () => {
+    const config = { git_env_prefix: "A=1; rm -rf /" }
+
+    const result = GitMasterConfigSchema.safeParse(config)
+
+    expect(result.success).toBe(false)
+  })
+})
+
+describe("skills schema", () => {
+  test("accepts skills.sources configuration", () => {
+    //#given
+    const config = {
+      skills: {
+        sources: [{ path: "skill/", recursive: true }],
+      },
+    }
+
+    //#when
+    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
   })
 })

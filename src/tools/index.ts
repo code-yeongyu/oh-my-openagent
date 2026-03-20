@@ -10,31 +10,23 @@ import {
 
 export { lspManager }
 
-import {
-  ast_grep_search,
-  ast_grep_replace,
-} from "./ast-grep"
-
-import { grep } from "./grep"
-import { glob } from "./glob"
-export { createSlashcommandTool, discoverCommandsSync } from "./slashcommand"
-
-import {
-  session_list,
-  session_read,
-  session_search,
-  session_info,
-} from "./session-manager"
+export { createAstGrepTools } from "./ast-grep"
+export { createGrepTools } from "./grep"
+export { createGlobTools } from "./glob"
+export { createSkillTool } from "./skill"
+export { discoverCommandsSync } from "./slashcommand"
+export { createSessionManagerTools } from "./session-manager"
 
 export { sessionExists } from "./session-manager/storage"
 
 export { interactive_bash, startBackgroundCheck as startTmuxCheck } from "./interactive-bash"
-export { createSkillTool } from "./skill"
 export { createSkillMcpTool } from "./skill-mcp"
 
 import {
   createBackgroundOutput,
   createBackgroundCancel,
+  type BackgroundOutputManager,
+  type BackgroundCancelClient,
 } from "./background-task"
 
 import type { PluginInput, ToolDefinition } from "@opencode-ai/plugin"
@@ -45,11 +37,20 @@ type OpencodeClient = PluginInput["client"]
 export { createCallOmoAgent } from "./call-omo-agent"
 export { createLookAt } from "./look-at"
 export { createDelegateTask } from "./delegate-task"
+export {
+  createTaskCreateTool,
+  createTaskGetTool,
+  createTaskList,
+  createTaskUpdateTool,
+} from "./task"
+export { createHashlineEditTool } from "./hashline-edit"
 
 export function createBackgroundTools(manager: BackgroundManager, client: OpencodeClient): Record<string, ToolDefinition> {
+  const outputManager: BackgroundOutputManager = manager
+  const cancelClient: BackgroundCancelClient = client
   return {
-    background_output: createBackgroundOutput(manager, client),
-    background_cancel: createBackgroundCancel(manager, client),
+    background_output: createBackgroundOutput(outputManager, client),
+    background_cancel: createBackgroundCancel(manager, cancelClient),
   }
 }
 
@@ -60,12 +61,4 @@ export const builtinTools: Record<string, ToolDefinition> = {
   lsp_diagnostics,
   lsp_prepare_rename,
   lsp_rename,
-  ast_grep_search,
-  ast_grep_replace,
-  grep,
-  glob,
-  session_list,
-  session_read,
-  session_search,
-  session_info,
 }

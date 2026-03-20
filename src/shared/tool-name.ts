@@ -13,14 +13,15 @@ function toPascalCase(str: string): string {
 }
 
 export function transformToolName(toolName: string): string {
-  const lower = toolName.toLowerCase()
+  const trimmed = toolName.trim()
+  const lower = trimmed.toLowerCase()
   if (lower in SPECIAL_TOOL_MAPPINGS) {
     return SPECIAL_TOOL_MAPPINGS[lower]
   }
 
-  if (toolName.includes("-") || toolName.includes("_")) {
-    return toPascalCase(toolName)
+  if (trimmed.includes("-") || trimmed.includes("_")) {
+    return toPascalCase(trimmed)
   }
 
-  return toolName.charAt(0).toUpperCase() + toolName.slice(1)
+  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1)
 }

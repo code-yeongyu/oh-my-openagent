@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "fs"
 import { join } from "path"
+import { homedir } from "os"
 import { getClaudeConfigDir } from "../../shared"
 import type {
   ClaudeCodeMcpConfig,
@@ -20,6 +21,7 @@ function getMcpConfigPaths(): McpConfigPath[] {
   const cwd = process.cwd()
 
   return [
+    { path: join(homedir(), ".claude.json"), scope: "user" },
     { path: join(claudeConfigDir, ".mcp.json"), scope: "user" },
     { path: join(cwd, ".mcp.json"), scope: "project" },
     { path: join(cwd, ".claude", ".mcp.json"), scope: "local" },
@@ -66,16 +68,24 @@ export function getSystemMcpServerNames(): Set<string> {
   return names
 }
 
-export async function loadMcpConfigs(): Promise<McpLoadResult> {
+export async function loadMcpConfigs(
+  disabledMcps: string[] = []
+): Promise<McpLoadResult> {
   const servers: McpLoadResult["servers"] = {}
   const loadedServers: LoadedMcpServer[] = []
   const paths = getMcpConfigPaths()
+  const disabledSet = new Set(disabledMcps)
 
   for (const { path, scope } of paths) {
     const config = await loadMcpConfigFile(path)
     if (!config?.mcpServers) continue
 
     for (const [name, serverConfig] of Object.entries(config.mcpServers)) {
+      if (disabledSet.has(name)) {
+        log(`Skipping MCP "${name}" (in disabled_mcps)`, { path })
+        continue
+      }
+
       if (serverConfig.disabled) {
         log(`Disabling MCP server "${name}"`, { path })
         delete servers[name]

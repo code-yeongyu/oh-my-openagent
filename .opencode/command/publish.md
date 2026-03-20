@@ -14,7 +14,7 @@ You are the release manager for oh-my-opencode. Execute the FULL publish workflo
 - `major`: Breaking changes (1.1.7 → 2.0.0)
 
 **If the user did not provide a bump type argument, STOP IMMEDIATELY and ask:**
-> "배포를 진행하려면 버전 범프 타입을 지정해주세요: `patch`, `minor`, 또는 `major`"
+> "To proceed with deployment, please specify a version bump type: `patch`, `minor`, or `major`"
 
 **DO NOT PROCEED without explicit user confirmation of bump type.**
 
@@ -31,9 +31,9 @@ You are the release manager for oh-my-opencode. Execute the FULL publish workflo
   { "id": "sync-remote", "content": "Sync with remote (pull --rebase && push if unpushed commits)", "status": "pending", "priority": "high" },
   { "id": "run-workflow", "content": "Trigger GitHub Actions publish workflow", "status": "pending", "priority": "high" },
   { "id": "wait-workflow", "content": "Wait for workflow completion (poll every 30s)", "status": "pending", "priority": "high" },
-  { "id": "verify-release", "content": "Verify GitHub release was created", "status": "pending", "priority": "high" },
-  { "id": "draft-release-notes", "content": "Draft enhanced release notes content", "status": "pending", "priority": "high" },
-  { "id": "update-release-notes", "content": "Update GitHub release with enhanced notes", "status": "pending", "priority": "high" },
+  { "id": "verify-and-preview", "content": "Verify release created + preview auto-generated changelog & contributor thanks", "status": "pending", "priority": "high" },
+  { "id": "draft-summary", "content": "Draft enhanced release summary (mandatory for minor/major, optional for patch — ask user)", "status": "pending", "priority": "high" },
+  { "id": "apply-summary", "content": "Prepend enhanced summary to release (if user opted in)", "status": "pending", "priority": "high" },
   { "id": "verify-npm", "content": "Verify npm package published successfully", "status": "pending", "priority": "high" },
   { "id": "wait-platform-workflow", "content": "Wait for publish-platform workflow completion", "status": "pending", "priority": "high" },
   { "id": "verify-platform-binaries", "content": "Verify all 7 platform binary packages published", "status": "pending", "priority": "high" },
@@ -48,7 +48,7 @@ You are the release manager for oh-my-opencode. Execute the FULL publish workflo
 ## STEP 1: CONFIRM BUMP TYPE
 
 If bump type provided as argument, confirm with user:
-> "버전 범프 타입: `{bump}`. 진행할까요? (y/n)"
+> "Version bump type: `{bump}`. Proceed? (y/n)"
 
 Wait for user confirmation before proceeding.
 
@@ -111,102 +111,165 @@ gh run view {run_id} --log-failed
 
 ---
 
-## STEP 5: VERIFY GITHUB RELEASE
+## STEP 5: VERIFY RELEASE & PREVIEW AUTO-GENERATED CONTENT
 
-Get the new version and verify release exists:
+Two goals: confirm the release exists, then show the user what the workflow already generated.
+
 ```bash
-# Get new version from package.json (workflow updates it)
+# Pull latest (workflow committed version bump)
 git pull --rebase
 NEW_VERSION=$(node -p "require('./package.json').version")
-gh release view "v${NEW_VERSION}"
+
+# Verify release exists on GitHub
+gh release view "v${NEW_VERSION}" --json tagName,url --jq '{tag: .tagName, url: .url}'
 ```
 
----
-
-## STEP 6: DRAFT ENHANCED RELEASE NOTES
-
-Analyze commits since the previous version and draft release notes following project conventions:
-
-### For PATCH releases:
-Keep simple format - just list commits:
-```markdown
-- {hash} {conventional commit message}
-- ...
-```
-
-### For MINOR releases:
-Use feature-focused format:
-```markdown
-## New Features
-
-### Feature Name
-- Description of what it does
-- Why it matters
-
-## Bug Fixes
-- fix(scope): description
-
-## Improvements
-- refactor(scope): description
-```
-
-### For MAJOR releases:
-Full changelog format:
-```markdown
-# v{version}
-
-Brief description of the release.
-
-## What's New Since v{previous}
-
-### Breaking Changes
-- Description of breaking change
-
-### Features
-- **Feature Name**: Description
-
-### Bug Fixes
-- Description
-
-### Documentation
-- Description
-
-## Migration Guide (if applicable)
-...
-```
-
-**CRITICAL: The enhanced notes must ADD to existing workflow-generated notes, not replace them.**
-
----
-
-## STEP 7: UPDATE GITHUB RELEASE
-
-**ZERO CONTENT LOSS POLICY:**
-- First, fetch the existing release body with `gh release view`
-- Your enhanced notes must be PREPENDED to the existing content
-- **NOT A SINGLE CHARACTER of existing content may be removed or modified**
-- The final release body = `{your_enhanced_notes}\n\n---\n\n{existing_body_exactly_as_is}`
+**After verifying, generate a local preview of the auto-generated content:**
 
 ```bash
-# Get existing body
-EXISTING_BODY=$(gh release view "v${NEW_VERSION}" --json body --jq '.body')
+bun run script/generate-changelog.ts
+```
 
-# Write enhanced notes to temp file (prepend to existing)
-cat > /tmp/release-notes-v${NEW_VERSION}.md << 'EOF'
-{your_enhanced_notes}
+<agent-instruction>
+After running the preview, present the output to the user and say:
+
+> **The following content is ALREADY included in the release automatically:**
+> - Commit changelog (grouped by feat/fix/refactor)
+> - Contributor thank-you messages (for non-team contributors)
+>
+> You do NOT need to write any of this. It's handled.
+>
+> **For a patch release**, this is usually sufficient on its own. However, if there are notable bug fixes or changes worth highlighting, an enhanced summary can be added.
+> **For a minor/major release**, an enhanced summary is **required** — I'll draft one in the next step.
+
+Wait for the user to acknowledge before proceeding.
+</agent-instruction>
 
 ---
 
-EOF
+## STEP 6: DRAFT ENHANCED RELEASE SUMMARY
 
-# Append existing body EXACTLY as-is (zero modifications)
-echo "$EXISTING_BODY" >> /tmp/release-notes-v${NEW_VERSION}.md
+<decision-gate>
 
-# Update release
-gh release edit "v${NEW_VERSION}" --notes-file /tmp/release-notes-v${NEW_VERSION}.md
+| Release Type | Action |
+|-------------|--------|
+| **patch** | ASK the user: "Would you like me to draft an enhanced summary highlighting the key bug fixes / changes? Or is the auto-generated changelog sufficient?" If user declines → skip to Step 8. If user accepts → draft a concise bug-fix / change summary below. |
+| **minor** | MANDATORY. Draft a concise feature summary. Do NOT proceed without one. |
+| **major** | MANDATORY. Draft a full release narrative with migration notes if applicable. Do NOT proceed without one. |
+
+</decision-gate>
+
+### What You're Writing (and What You're NOT)
+
+You are writing the **headline layer** — a product announcement that sits ABOVE the auto-generated commit log. Think "release blog post", not "git log".
+
+<rules>
+- NEVER duplicate commit messages. The auto-generated section already lists every commit.
+- NEVER write generic filler like "Various bug fixes and improvements" or "Several enhancements".
+- ALWAYS focus on USER IMPACT: what can users DO now that they couldn't before?
+- ALWAYS group by THEME or CAPABILITY, not by commit type (feat/fix/refactor).
+- ALWAYS use concrete language: "You can now do X" not "Added X feature".
+</rules>
+
+<examples>
+<bad title="Commit regurgitation — DO NOT do this">
+## What's New
+- feat(auth): add JWT refresh token rotation
+- fix(auth): handle expired token edge case
+- refactor(auth): extract middleware
+</bad>
+
+<good title="User-impact narrative — DO this">
+## 🔐 Smarter Authentication
+
+Token refresh is now automatic and seamless. Sessions no longer expire mid-task — the system silently rotates credentials in the background. If you've been frustrated by random logouts, this release fixes that.
+</good>
+
+<bad title="Vague filler — DO NOT do this">
+## Improvements
+- Various performance improvements
+- Bug fixes and stability enhancements
+</bad>
+
+<good title="Specific and measurable — DO this">
+## ⚡ 3x Faster Rule Parsing
+
+Rules are now cached by file modification time. If your project has 50+ rule files, you'll notice startup is noticeably faster — we measured a 3x improvement in our test suite.
+</good>
+</examples>
+
+### Drafting Process
+
+1. **Analyze** the commit list from Step 5's preview. Identify 2-5 themes that matter to users.
+2. **Write** the summary to `/tmp/release-summary-v${NEW_VERSION}.md`.
+3. **Present** the draft to the user for review and approval before applying.
+
+```bash
+# Write your draft here
+cat > /tmp/release-summary-v${NEW_VERSION}.md << 'SUMMARY_EOF'
+{your_enhanced_summary}
+SUMMARY_EOF
+
+cat /tmp/release-summary-v${NEW_VERSION}.md
 ```
 
-**CRITICAL: This is ADDITIVE ONLY. You are adding your notes on top. The existing content remains 100% intact.**
+<agent-instruction>
+After drafting, ask the user:
+> "Here's the release summary I drafted. This will appear AT THE TOP of the release notes, above the auto-generated commit changelog and contributor thanks. Want me to adjust anything before applying?"
+
+Do NOT proceed to Step 7 without user confirmation.
+</agent-instruction>
+
+---
+
+## STEP 7: APPLY ENHANCED SUMMARY TO RELEASE
+
+**Skip this step ONLY if the user opted out of the enhanced summary in Step 6** — proceed directly to Step 8.
+
+<architecture>
+The final release note structure:
+
+```
+┌─────────────────────────────────────┐
+│  Enhanced Summary (from Step 6)     │  ← You wrote this
+│  - Theme-based, user-impact focused │
+├─────────────────────────────────────┤
+│  ---  (separator)                   │
+├─────────────────────────────────────┤
+│  Auto-generated Commit Changelog    │  ← Workflow wrote this
+│  - feat/fix/refactor grouped        │
+│  - Contributor thank-you messages   │
+└─────────────────────────────────────┘
+```
+</architecture>
+
+<zero-content-loss-policy>
+- Fetch the existing release body FIRST
+- PREPEND your summary above it
+- The existing auto-generated content must remain 100% INTACT
+- NOT A SINGLE CHARACTER of existing content may be removed or modified
+</zero-content-loss-policy>
+
+```bash
+# 1. Fetch existing auto-generated body
+EXISTING_BODY=$(gh release view "v${NEW_VERSION}" --json body --jq '.body')
+
+# 2. Combine: enhanced summary on top, auto-generated below
+{
+  cat /tmp/release-summary-v${NEW_VERSION}.md
+  echo ""
+  echo "---"
+  echo ""
+  echo "$EXISTING_BODY"
+} > /tmp/final-release-v${NEW_VERSION}.md
+
+# 3. Update the release (additive only)
+gh release edit "v${NEW_VERSION}" --notes-file /tmp/final-release-v${NEW_VERSION}.md
+
+# 4. Confirm
+echo "✅ Release v${NEW_VERSION} updated with enhanced summary."
+gh release view "v${NEW_VERSION}" --json url --jq '.url'
+```
 
 ---
 
@@ -293,7 +356,7 @@ Report success to user with:
 
 ## LANGUAGE
 
-Respond to user in Korean (한국어).
+Respond to user in English.
 
 </command-instruction>
 

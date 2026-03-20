@@ -21,3 +21,22 @@ export interface AutoSlashCommandResult {
   parsedCommand?: ParsedSlashCommand
   injectedMessage?: string
 }
+
+export interface CommandExecuteBeforeInput {
+  command: string
+  sessionID: string
+  arguments: string
+  agent?: string
+  messageID?: string
+  messageId?: string
+  eventID?: string
+  eventId?: string
+  invocationID?: string
+  invocationId?: string
+  commandID?: string
+  commandId?: string
+}
+
+export interface CommandExecuteBeforeOutput {
+  parts: Array<{ type: string; text?: string; [key: string]: unknown }>
+}

@@ -31,6 +31,7 @@ Be respectful, inclusive, and constructive. We're all here to make better tools 
 **English is the primary language for all communications in this repository.**
 
 This includes:
+
 - Issues and bug reports
 - Pull requests and code reviews
 - Documentation and comments
@@ -45,6 +46,7 @@ This includes:
 ### Need Help with English?
 
 If English isn't your first language, don't worry! We value your contributions regardless of perfect grammar. You can:
+
 - Use translation tools to help compose messages
 - Ask for help from other community members
 - Focus on clear, simple communication rather than perfect prose
@@ -61,8 +63,8 @@ If English isn't your first language, don't worry! We value your contributions r
 
 ```bash
 # Clone the repository
-git clone https://github.com/code-yeongyu/oh-my-opencode.git
-cd oh-my-opencode
+git clone https://github.com/code-yeongyu/oh-my-openagent.git
+cd oh-my-openagent
 
 # Install dependencies (bun only - never use npm/yarn)
 bun install
@@ -76,25 +78,24 @@ bun run build
 After making changes, you can test your local build in OpenCode:
 
 1. **Build the project**:
+
    ```bash
    bun run build
    ```
 
 2. **Update your OpenCode config** (`~/.config/opencode/opencode.json` or `opencode.jsonc`):
+
    ```json
    {
-     "plugin": [
-       "file:///absolute/path/to/oh-my-opencode/dist/index.js"
-     ]
+     "plugin": ["file:///absolute/path/to/oh-my-opencode/dist/index.js"]
    }
    ```
-   
+
    For example, if your project is at `/Users/yourname/projects/oh-my-opencode`:
+
    ```json
    {
-     "plugin": [
-       "file:///Users/yourname/projects/oh-my-opencode/dist/index.js"
-     ]
+     "plugin": ["file:///Users/yourname/projects/oh-my-opencode/dist/index.js"]
    }
    ```
 
@@ -109,18 +110,20 @@ After making changes, you can test your local build in OpenCode:
 ```
 oh-my-opencode/
 ├── src/
-│   ├── agents/        # AI agents (OmO, oracle, librarian, explore, etc.)
-│   ├── hooks/         # 21 lifecycle hooks
-│   ├── tools/         # LSP (11), AST-Grep, Grep, Glob, etc.
-│   ├── mcp/           # MCP server integrations (context7, grep_app)
-│   ├── features/      # Claude Code compatibility layers
-│   ├── config/        # Zod schemas and TypeScript types
-│   ├── auth/          # Google Antigravity OAuth
-│   ├── shared/        # Common utilities
-│   └── index.ts       # Main plugin entry (OhMyOpenCodePlugin)
-├── script/            # Build utilities (build-schema.ts, publish.ts)
-├── assets/            # JSON schema
-└── dist/              # Build output (ESM + .d.ts)
+│   ├── index.ts         # Plugin entry (OhMyOpenCodePlugin)
+│   ├── plugin-config.ts # JSONC multi-level config (Zod v4)
+│   ├── agents/          # 11 agents (Sisyphus, Hephaestus, Oracle, Librarian, Explore, Atlas, Prometheus, Metis, Momus, Multimodal-Looker, Sisyphus-Junior)
+│   ├── hooks/           # Lifecycle hooks for orchestration, recovery, UX, and context management
+│   ├── tools/           # 26 tools across 15 directories
+│   ├── mcp/             # 3 built-in remote MCPs (websearch, context7, grep_app)
+│   ├── features/        # 19 feature modules (background-agent, skill-loader, tmux, MCP-OAuth, etc.)
+│   ├── config/          # Zod v4 schema system
+│   ├── shared/          # Cross-cutting utilities
+│   ├── cli/             # CLI: install, run, doctor, mcp-oauth (Commander.js)
+│   ├── plugin/          # 8 OpenCode hook handlers + hook composition
+│   └── plugin-handlers/ # 6-phase config loading pipeline
+├── packages/            # Monorepo: comment-checker, opencode-sdk
+└── dist/                # Build output (ESM + .d.ts)
 ```
 
 ## Development Workflow
@@ -134,8 +137,11 @@ bun run typecheck
 # Full build (ESM + TypeScript declarations + JSON schema)
 bun run build
 
-# Clean build output and rebuild
-bun run rebuild
+# Clean build output
+bun run clean
+
+# Rebuild from scratch
+bun run clean && bun run build
 
 # Build schema only (after modifying src/config/schema.ts)
 bun run build:schema
@@ -143,17 +149,18 @@ bun run build:schema
 
 ### Code Style & Conventions
 
-| Convention | Rule |
-|------------|------|
-| Package Manager | **Bun only** (`bun run`, `bun build`, `bunx`) |
-| Types | Use `bun-types`, not `@types/node` |
-| Directory Naming | kebab-case (`ast-grep/`, `claude-code-hooks/`) |
-| File Operations | Never use bash commands (mkdir/touch/rm) for file creation in code |
-| Tool Structure | Each tool: `index.ts`, `types.ts`, `constants.ts`, `tools.ts`, `utils.ts` |
-| Hook Pattern | `createXXXHook(input: PluginInput)` function naming |
-| Exports | Barrel pattern (`export * from "./module"` in index.ts) |
+| Convention       | Rule                                                                      |
+| ---------------- | ------------------------------------------------------------------------- |
+| Package Manager  | **Bun only** (`bun run`, `bun build`, `bunx`)                             |
+| Types            | Use `bun-types`, not `@types/node`                                        |
+| Directory Naming | kebab-case (`ast-grep/`, `claude-code-hooks/`)                            |
+| File Operations  | Never use bash commands (mkdir/touch/rm) for file creation in code        |
+| Tool Structure   | Each tool: `index.ts`, `types.ts`, `constants.ts`, `tools.ts`, `utils.ts` |
+| Hook Pattern     | `createXXXHook(input: PluginInput)` function naming                       |
+| Exports          | Barrel pattern (`export * from "./module"` in index.ts)                   |
 
 **Anti-Patterns (Do Not Do)**:
+
 - Using npm/yarn instead of bun
 - Using `@types/node` instead of `bun-types`
 - Suppressing TypeScript errors with `as any`, `@ts-ignore`, `@ts-expect-error`
@@ -177,7 +184,7 @@ import type { AgentConfig } from "./types";
 
 export const myAgent: AgentConfig = {
   name: "my-agent",
-  model: "anthropic/claude-sonnet-4-5",
+  model: "anthropic/claude-opus-4-6",
   description: "Description of what this agent does",
   prompt: `Your agent's system prompt here`,
   temperature: 0.1,

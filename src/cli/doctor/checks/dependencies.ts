@@ -1,13 +1,15 @@
-import type { CheckResult, CheckDefinition, DependencyInfo } from "../types"
-import { CHECK_IDS, CHECK_NAMES } from "../constants"
+import { existsSync } from "node:fs"
+import { createRequire } from "node:module"
+import { dirname, join } from "node:path"
+
+import type { DependencyInfo } from "../types"
+import { spawnWithWindowsHide } from "../../../shared/spawn-with-windows-hide"
 
 async function checkBinaryExists(binary: string): Promise<{ exists: boolean; path: string | null }> {
   try {
-    const proc = Bun.spawn(["which", binary], { stdout: "pipe", stderr: "pipe" })
-    const output = await new Response(proc.stdout).text()
-    await proc.exited
-    if (proc.exitCode === 0) {
-      return { exists: true, path: output.trim() }
+    const path = Bun.which(binary)
+    if (path) {
+      return { exists: true, path }
     }
   } catch {
     // intentionally empty - binary not found
@@ -17,7 +19,7 @@ async function checkBinaryExists(binary: string): Promise<{ exists: boolean; pat
 
 async function getBinaryVersion(binary: string): Promise<string | null> {
   try {
-    const proc = Bun.spawn([binary, "--version"], { stdout: "pipe", stderr: "pipe" })
+    const proc = spawnWithWindowsHide([binary, "--version"], { stdout: "pipe", stderr: "pipe" })
     const output = await new Response(proc.stdout).text()
     await proc.exited
     if (proc.exitCode === 0) {
@@ -101,10 +103,24 @@ export async function checkAstGrepNapi(): Promise<DependencyInfo> {
   }
 }
 
+function findCommentCheckerPackageBinary(): string | null {
+  const binaryName = process.platform === "win32" ? "comment-checker.exe" : "comment-checker"
+  try {
+    const require = createRequire(import.meta.url)
+    const pkgPath = require.resolve("@code-yeongyu/comment-checker/package.json")
+    const binaryPath = join(dirname(pkgPath), "bin", binaryName)
+    if (existsSync(binaryPath)) return binaryPath
+  } catch {
+    // intentionally empty - package not installed
+  }
+  return null
+}
+
 export async function checkCommentChecker(): Promise<DependencyInfo> {
   const binaryCheck = await checkBinaryExists("comment-checker")
+  const resolvedPath = binaryCheck.exists ? binaryCheck.path : findCommentCheckerPackageBinary()
 
-  if (!binaryCheck.exists) {
+  if (!resolvedPath) {
     return {
       name: "Comment Checker",
       required: false,
@@ -115,72 +131,13 @@ export async function checkCommentChecker(): Promise<DependencyInfo> {
     }
   }
 
-  const version = await getBinaryVersion("comment-checker")
+  const version = await getBinaryVersion(resolvedPath)
 
   return {
     name: "Comment Checker",
     required: false,
     installed: true,
     version,
-    path: binaryCheck.path,
+    path: resolvedPath,
   }
-}
-
-function dependencyToCheckResult(dep: DependencyInfo, checkName: string): CheckResult {
-  if (dep.installed) {
-    return {
-      name: checkName,
-      status: "pass",
-      message: dep.version ?? "installed",
-      details: dep.path ? [`Path: ${dep.path}`] : undefined,
-    }
-  }
-
-  return {
-    name: checkName,
-    status: "warn",
-    message: "Not installed (optional)",
-    details: dep.installHint ? [dep.installHint] : undefined,
-  }
-}
-
-export async function checkDependencyAstGrepCli(): Promise<CheckResult> {
-  const info = await checkAstGrepCli()
-  return dependencyToCheckResult(info, CHECK_NAMES[CHECK_IDS.DEP_AST_GREP_CLI])
-}
-
-export async function checkDependencyAstGrepNapi(): Promise<CheckResult> {
-  const info = await checkAstGrepNapi()
-  return dependencyToCheckResult(info, CHECK_NAMES[CHECK_IDS.DEP_AST_GREP_NAPI])
-}
-
-export async function checkDependencyCommentChecker(): Promise<CheckResult> {
-  const info = await checkCommentChecker()
-  return dependencyToCheckResult(info, CHECK_NAMES[CHECK_IDS.DEP_COMMENT_CHECKER])
-}
-
-export function getDependencyCheckDefinitions(): CheckDefinition[] {
-  return [
-    {
-      id: CHECK_IDS.DEP_AST_GREP_CLI,
-      name: CHECK_NAMES[CHECK_IDS.DEP_AST_GREP_CLI],
-      category: "dependencies",
-      check: checkDependencyAstGrepCli,
-      critical: false,
-    },
-    {
-      id: CHECK_IDS.DEP_AST_GREP_NAPI,
-      name: CHECK_NAMES[CHECK_IDS.DEP_AST_GREP_NAPI],
-      category: "dependencies",
-      check: checkDependencyAstGrepNapi,
-      critical: false,
-    },
-    {
-      id: CHECK_IDS.DEP_COMMENT_CHECKER,
-      name: CHECK_NAMES[CHECK_IDS.DEP_COMMENT_CHECKER],
-      category: "dependencies",
-      check: checkDependencyCommentChecker,
-      critical: false,
-    },
-  ]
 }

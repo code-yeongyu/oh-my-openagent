@@ -5,123 +5,123 @@ type AnyObject = Record<string, unknown>
 
 describe("isPlainObject", () => {
   test("returns false for null", () => {
-    //#given
+    // given
     const value = null
 
-    //#when
+    // when
     const result = isPlainObject(value)
 
-    //#then
+    // then
     expect(result).toBe(false)
   })
 
   test("returns false for undefined", () => {
-    //#given
+    // given
     const value = undefined
 
-    //#when
+    // when
     const result = isPlainObject(value)
 
-    //#then
+    // then
     expect(result).toBe(false)
   })
 
   test("returns false for string", () => {
-    //#given
+    // given
     const value = "hello"
 
-    //#when
+    // when
     const result = isPlainObject(value)
 
-    //#then
+    // then
     expect(result).toBe(false)
   })
 
   test("returns false for number", () => {
-    //#given
+    // given
     const value = 42
 
-    //#when
+    // when
     const result = isPlainObject(value)
 
-    //#then
+    // then
     expect(result).toBe(false)
   })
 
   test("returns false for boolean", () => {
-    //#given
+    // given
     const value = true
 
-    //#when
+    // when
     const result = isPlainObject(value)
 
-    //#then
+    // then
     expect(result).toBe(false)
   })
 
   test("returns false for array", () => {
-    //#given
+    // given
     const value = [1, 2, 3]
 
-    //#when
+    // when
     const result = isPlainObject(value)
 
-    //#then
+    // then
     expect(result).toBe(false)
   })
 
   test("returns false for Date", () => {
-    //#given
+    // given
     const value = new Date()
 
-    //#when
+    // when
     const result = isPlainObject(value)
 
-    //#then
+    // then
     expect(result).toBe(false)
   })
 
   test("returns false for RegExp", () => {
-    //#given
+    // given
     const value = /test/
 
-    //#when
+    // when
     const result = isPlainObject(value)
 
-    //#then
+    // then
     expect(result).toBe(false)
   })
 
   test("returns true for plain object", () => {
-    //#given
+    // given
     const value = { a: 1 }
 
-    //#when
+    // when
     const result = isPlainObject(value)
 
-    //#then
+    // then
     expect(result).toBe(true)
   })
 
   test("returns true for empty object", () => {
-    //#given
+    // given
     const value = {}
 
-    //#when
+    // when
     const result = isPlainObject(value)
 
-    //#then
+    // then
     expect(result).toBe(true)
   })
 
   test("returns true for nested object", () => {
-    //#given
+    // given
     const value = { a: { b: 1 } }
 
-    //#when
+    // when
     const result = isPlainObject(value)
 
-    //#then
+    // then
     expect(result).toBe(true)
   })
 })
@@ -129,179 +129,179 @@ describe("isPlainObject", () => {
 describe("deepMerge", () => {
   describe("basic merging", () => {
     test("merges two simple objects", () => {
-      //#given
+      // given
       const base: AnyObject = { a: 1 }
       const override: AnyObject = { b: 2 }
 
-      //#when
+      // when
       const result = deepMerge(base, override)
 
-      //#then
+      // then
       expect(result).toEqual({ a: 1, b: 2 })
     })
 
     test("override value takes precedence", () => {
-      //#given
+      // given
       const base = { a: 1 }
       const override = { a: 2 }
 
-      //#when
+      // when
       const result = deepMerge(base, override)
 
-      //#then
+      // then
       expect(result).toEqual({ a: 2 })
     })
 
     test("deeply merges nested objects", () => {
-      //#given
+      // given
       const base: AnyObject = { a: { b: 1, c: 2 } }
       const override: AnyObject = { a: { b: 10 } }
 
-      //#when
+      // when
       const result = deepMerge(base, override)
 
-      //#then
+      // then
       expect(result).toEqual({ a: { b: 10, c: 2 } })
     })
 
     test("handles multiple levels of nesting", () => {
-      //#given
+      // given
       const base: AnyObject = { a: { b: { c: { d: 1 } } } }
       const override: AnyObject = { a: { b: { c: { e: 2 } } } }
 
-      //#when
+      // when
       const result = deepMerge(base, override)
 
-      //#then
+      // then
       expect(result).toEqual({ a: { b: { c: { d: 1, e: 2 } } } })
     })
   })
 
   describe("edge cases", () => {
     test("returns undefined when both are undefined", () => {
-      //#given
+      // given
       const base = undefined
       const override = undefined
 
-      //#when
+      // when
       const result = deepMerge<AnyObject>(base, override)
 
-      //#then
+      // then
       expect(result).toBeUndefined()
     })
 
     test("returns override when base is undefined", () => {
-      //#given
+      // given
       const base = undefined
       const override = { a: 1 }
 
-      //#when
+      // when
       const result = deepMerge<AnyObject>(base, override)
 
-      //#then
+      // then
       expect(result).toEqual({ a: 1 })
     })
 
     test("returns base when override is undefined", () => {
-      //#given
+      // given
       const base = { a: 1 }
       const override = undefined
 
-      //#when
+      // when
       const result = deepMerge<AnyObject>(base, override)
 
-      //#then
+      // then
       expect(result).toEqual({ a: 1 })
     })
 
     test("preserves base value when override value is undefined", () => {
-      //#given
+      // given
       const base = { a: 1, b: 2 }
       const override = { a: undefined, b: 3 }
 
-      //#when
+      // when
       const result = deepMerge(base, override)
 
-      //#then
+      // then
       expect(result).toEqual({ a: 1, b: 3 })
     })
 
     test("does not mutate base object", () => {
-      //#given
+      // given
       const base = { a: 1, b: { c: 2 } }
       const override = { b: { c: 10 } }
       const originalBase = JSON.parse(JSON.stringify(base))
 
-      //#when
+      // when
       deepMerge(base, override)
 
-      //#then
+      // then
       expect(base).toEqual(originalBase)
     })
   })
 
   describe("array handling", () => {
     test("replaces arrays instead of merging them", () => {
-      //#given
+      // given
       const base = { arr: [1, 2] }
       const override = { arr: [3, 4, 5] }
 
-      //#when
+      // when
       const result = deepMerge(base, override)
 
-      //#then
+      // then
       expect(result).toEqual({ arr: [3, 4, 5] })
     })
 
     test("replaces nested arrays", () => {
-      //#given
+      // given
       const base = { a: { arr: [1, 2, 3] } }
       const override = { a: { arr: [4] } }
 
-      //#when
+      // when
       const result = deepMerge(base, override)
 
-      //#then
+      // then
       expect(result).toEqual({ a: { arr: [4] } })
     })
   })
 
   describe("prototype pollution protection", () => {
     test("ignores __proto__ key", () => {
-      //#given
+      // given
       const base: AnyObject = { a: 1 }
       const override: AnyObject = JSON.parse('{"__proto__": {"polluted": true}, "b": 2}')
 
-      //#when
+      // when
       const result = deepMerge(base, override)
 
-      //#then
+      // then
       expect(result).toEqual({ a: 1, b: 2 })
       expect(({} as AnyObject).polluted).toBeUndefined()
     })
 
     test("ignores constructor key", () => {
-      //#given
+      // given
       const base: AnyObject = { a: 1 }
       const override: AnyObject = { constructor: { polluted: true }, b: 2 }
 
-      //#when
+      // when
       const result = deepMerge(base, override)
 
-      //#then
+      // then
       expect(result!.b).toBe(2)
       expect(result!["constructor"]).not.toEqual({ polluted: true })
     })
 
     test("ignores prototype key", () => {
-      //#given
+      // given
       const base: AnyObject = { a: 1 }
       const override: AnyObject = { prototype: { polluted: true }, b: 2 }
 
-      //#when
+      // when
       const result = deepMerge(base, override)
 
-      //#then
+      // then
       expect(result!.b).toBe(2)
       expect(result!.prototype).toBeUndefined()
     })
@@ -309,7 +309,7 @@ describe("deepMerge", () => {
 
   describe("depth limit", () => {
     test("returns override when depth exceeds MAX_DEPTH", () => {
-      //#given
+      // given
       const createDeepObject = (depth: number, leaf: AnyObject): AnyObject => {
         if (depth === 0) return leaf
         return { nested: createDeepObject(depth - 1, leaf) }
@@ -318,10 +318,10 @@ describe("deepMerge", () => {
       const base = createDeepObject(55, { baseKey: "base" })
       const override = createDeepObject(55, { overrideKey: "override" })
 
-      //#when
+      // when
       const result = deepMerge(base, override)
 
-      //#then
+      // then
       // Navigate to depth 55 (leaf level, beyond MAX_DEPTH of 50)
       let current: AnyObject = result as AnyObject
       for (let i = 0; i < 55; i++) {

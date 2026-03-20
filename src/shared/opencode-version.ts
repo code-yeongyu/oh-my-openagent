@@ -6,6 +6,21 @@ import { execSync } from "child_process"
  */
 export const MINIMUM_OPENCODE_VERSION = "1.1.1"
 
+/**
+ * OpenCode version that introduced native AGENTS.md injection.
+ * PR #10678 merged on Jan 26, 2026 - OpenCode now dynamically resolves
+ * AGENTS.md files from subdirectories as the agent explores them.
+ * When this version is detected, the directory-agents-injector hook
+ * is auto-disabled to prevent duplicate AGENTS.md loading.
+ */
+export const OPENCODE_NATIVE_AGENTS_INJECTION_VERSION = "1.1.37"
+
+/**
+ * OpenCode version that introduced SQLite backend for storage.
+ * When this version is detected AND opencode.db exists, SQLite backend is used.
+ */
+export const OPENCODE_SQLITE_VERSION = "1.1.53"
+
 const NOT_CACHED = Symbol("NOT_CACHED")
 let cachedVersion: string | null | typeof NOT_CACHED = NOT_CACHED
 
@@ -28,13 +43,6 @@ export function compareVersions(a: string, b: string): -1 | 0 | 1 {
   return 0
 }
 
-export function isVersionGte(a: string, b: string): boolean {
-  return compareVersions(a, b) >= 0
-}
-
-export function isVersionLt(a: string, b: string): boolean {
-  return compareVersions(a, b) < 0
-}
 
 export function getOpenCodeVersion(): string | null {
   if (cachedVersion !== NOT_CACHED) {
@@ -60,7 +68,7 @@ export function getOpenCodeVersion(): string | null {
 export function isOpenCodeVersionAtLeast(version: string): boolean {
   const current = getOpenCodeVersion()
   if (!current) return true
-  return isVersionGte(current, version)
+  return compareVersions(current, version) >= 0
 }
 
 export function resetVersionCache(): void {
