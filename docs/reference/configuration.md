@@ -270,8 +270,8 @@ Disable categories: `{ "disabled_categories": ["ultrabrain"] }`
 | **Sisyphus**          | `claude-opus-4-6`   | `claude-opus-4-6` → `glm-5` → `big-pickle`                                   |
 | **Hephaestus**        | `gpt-5.3-codex`     | `gpt-5.3-codex` → `gpt-5.4` (GitHub Copilot fallback)                        |
 | **oracle**            | `gpt-5.4`           | `gpt-5.4` → `gemini-3.1-pro` → `claude-opus-4-6`                             |
-| **librarian**         | `gemini-3-flash`    | `gemini-3-flash` → `minimax-m2.5-free` → `big-pickle`                        |
-| **explore**           | `grok-code-fast-1`  | `grok-code-fast-1` → `minimax-m2.5-free` → `claude-haiku-4-5` → `gpt-5-nano` |
+| **librarian**         | `minimax-m2.7`      | `minimax-m2.7` → `minimax-m2.7-highspeed` → `claude-haiku-4-5` → `gpt-5-nano` |
+| **explore**           | `grok-code-fast-1`  | `grok-code-fast-1` → `minimax-m2.7-highspeed` → `minimax-m2.7` → `claude-haiku-4-5` → `gpt-5-nano` |
 | **multimodal-looker** | `gpt-5.3-codex`     | `gpt-5.3-codex` → `k2p5` → `gemini-3-flash` → `glm-4.6v` → `gpt-5-nano`      |
 | **Prometheus**        | `claude-opus-4-6`   | `claude-opus-4-6` → `gpt-5.4` → `gemini-3.1-pro`                             |
 | **Metis**             | `claude-opus-4-6`   | `claude-opus-4-6` → `gpt-5.4` → `gemini-3.1-pro`                             |
@@ -286,10 +286,10 @@ Disable categories: `{ "disabled_categories": ["ultrabrain"] }`
 | **ultrabrain**         | `gpt-5.4`           | `gpt-5.4` → `gemini-3.1-pro` → `claude-opus-4-6`               |
 | **deep**               | `gpt-5.3-codex`     | `gpt-5.3-codex` → `claude-opus-4-6` → `gemini-3.1-pro`         |
 | **artistry**           | `gemini-3.1-pro`    | `gemini-3.1-pro` → `claude-opus-4-6` → `gpt-5.4`               |
-| **quick**              | `gpt-5.4-mini`    | `gpt-5.4-mini` → `claude-haiku-4-5` → `gemini-3-flash` → `minimax-m2.5` → `gpt-5-nano` |
-| **unspecified-low**    | `claude-sonnet-4-6` | `claude-sonnet-4-6` → `gpt-5.3-codex` → `gemini-3-flash`       |
+| **quick**              | `gpt-5.4-mini`    | `gpt-5.4-mini` → `claude-haiku-4-5` → `gemini-3-flash` → `minimax-m2.7` → `gpt-5-nano` |
+| **unspecified-low**    | `claude-sonnet-4-6` | `claude-sonnet-4-6` → `gpt-5.3-codex` → `gemini-3-flash` → `minimax-m2.7` |
 | **unspecified-high**   | `claude-opus-4-6`   | `claude-opus-4-6` → `gpt-5.4 (high)` → `glm-5` → `k2p5` → `kimi-k2.5` |
-| **writing**            | `gemini-3-flash`    | `gemini-3-flash` → `claude-sonnet-4-6`                         |
+| **writing**            | `gemini-3-flash`    | `gemini-3-flash` → `claude-sonnet-4-6` → `minimax-m2.7`        |
 
 Run `bunx oh-my-opencode doctor --verbose` to see effective model resolution for your config.
 

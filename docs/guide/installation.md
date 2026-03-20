@@ -69,7 +69,7 @@ Ask the user these questions to determine CLI options:
    - If **no** → `--zai-coding-plan=no` (default)
 
 7. **Do you have an OpenCode Go subscription?**
-   - OpenCode Go is a $10/month subscription providing access to GLM-5, Kimi K2.5, and MiniMax M2.5 models
+   - OpenCode Go is a $10/month subscription providing access to GLM-5, Kimi K2.5, and MiniMax M2.7 models
    - If **yes** → `--opencode-go=yes`
    - If **no** → `--opencode-go=no` (default)
 
@@ -227,7 +227,7 @@ If Z.ai is your main provider, the most important fallbacks are:
 
 #### OpenCode Zen
 
-OpenCode Zen provides access to `opencode/` prefixed models including `opencode/claude-opus-4-6`, `opencode/gpt-5.4`, `opencode/gpt-5.3-codex`, `opencode/gpt-5-nano`, `opencode/glm-5`, `opencode/big-pickle`, and `opencode/minimax-m2.5-free`.
+OpenCode Zen provides access to `opencode/` prefixed models including `opencode/claude-opus-4-6`, `opencode/gpt-5.4`, `opencode/gpt-5.3-codex`, `opencode/gpt-5-nano`, `opencode/glm-5`, `opencode/big-pickle`, and `opencode/minimax-m2.7-highspeed`.
 
 When OpenCode Zen is the best available provider (no native or Copilot), these models are used:
 
@@ -236,7 +236,7 @@ When OpenCode Zen is the best available provider (no native or Copilot), these m
 | **Sisyphus**  | `opencode/claude-opus-4-6`                           |
 | **Oracle**    | `opencode/gpt-5.4`                                   |
 | **Explore**   | `opencode/gpt-5-nano`                                |
-| **Librarian** | `opencode/minimax-m2.5-free` / `opencode/big-pickle` |
+| **Librarian** | `opencode/minimax-m2.7-highspeed` / `opencode/big-pickle` |
 
 ##### Setup
 
@@ -296,8 +296,8 @@ Not all models behave the same way. Understanding which models are "similar" hel
 | --------------------- | -------------------------------- | ----------------------------------------------------------- |
 | **Gemini 3 Pro**      | google, github-copilot, opencode | Excels at visual/frontend tasks. Different reasoning style. |
 | **Gemini 3 Flash**    | google, github-copilot, opencode | Fast, good for doc search and light tasks.                  |
-| **MiniMax M2.5**      | venice                           | Fast and smart. Good for utility tasks.                     |
-| **MiniMax M2.5 Free** | opencode                         | Free-tier MiniMax. Fast for search/retrieval.               |
+| **MiniMax M2.7**      | venice, opencode-go              | Fast and smart. Good for utility tasks. Upgraded from M2.5. |
+| **MiniMax M2.7 Highspeed** | opencode                    | Ultra-fast MiniMax variant. Optimized for latency.          |
 
 **Speed-Focused Models**:
 
@@ -305,7 +305,7 @@ Not all models behave the same way. Understanding which models are "similar" hel
 | ----------------------- | ---------------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Grok Code Fast 1**    | github-copilot, venice | Very fast      | Optimized for code grep/search. Default for Explore.                                                                                          |
 | **Claude Haiku 4.5**    | anthropic, opencode    | Fast           | Good balance of speed and intelligence.                                                                                                       |
-| **MiniMax M2.5 (Free)** | opencode, venice       | Fast           | Smart for its speed class.                                                                                                                    |
+| **MiniMax M2.7 Highspeed** | opencode            | Very fast      | Ultra-fast MiniMax variant. Smart for its speed class.                                                                                        |
 | **GPT-5.3-codex-spark** | openai                 | Extremely fast | Blazing fast but compacts so aggressively that oh-my-opencode's context management doesn't work well with it. Not recommended for omo agents. |
 
 #### What Each Agent Does and Which Model It Got
@@ -344,8 +344,8 @@ These agents do search, grep, and retrieval. They intentionally use fast, cheap 
 
 | Agent                 | Role               | Default Chain                                                          | Design Rationale                                               |
 | --------------------- | ------------------ | ---------------------------------------------------------------------- | -------------------------------------------------------------- |
-| **Explore**           | Fast codebase grep | MiniMax M2.5 Free → Grok Code Fast → MiniMax M2.5 → Haiku → GPT-5-Nano | Speed is everything. Grok is blazing fast for grep.            |
-| **Librarian**         | Docs/code search   | MiniMax M2.5 Free → Gemini Flash → Big Pickle                          | Entirely free-tier. Doc retrieval doesn't need deep reasoning. |
+| **Explore**           | Fast codebase grep | Grok Code Fast → MiniMax M2.7-highspeed → MiniMax M2.7 → Haiku → GPT-5-Nano | Speed is everything. Grok is blazing fast for grep.            |
+| **Librarian**         | Docs/code search   | MiniMax M2.7 → MiniMax M2.7-highspeed → Haiku → GPT-5-Nano                   | Doc retrieval doesn't need deep reasoning. MiniMax is fast.    |
 | **Multimodal Looker** | Vision/screenshots | Kimi K2.5 → Kimi Free → Gemini Flash → GPT-5.4 → GLM-4.6v              | Kimi excels at multimodal understanding.                       |
 
 #### Why Different Models Need Different Prompts

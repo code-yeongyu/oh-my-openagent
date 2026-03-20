@@ -92,10 +92,10 @@ These agents do grep, search, and retrieval. They intentionally use the fastest,
 
 | Agent                 | Role               | Fallback Chain                                 | Notes                                                 |
 | --------------------- | ------------------ | ---------------------------------------------- | ----------------------------------------------------- |
-| **Explore**           | Fast codebase grep | Grok Code Fast → opencode-go/minimax-m2.5 → MiniMax Free → Haiku → GPT-5-Nano | Speed is everything. Fire 10 in parallel.             |
-| **Librarian**         | Docs/code search   | opencode-go/minimax-m2.5 → MiniMax Free → Haiku → GPT-5-Nano                  | Doc retrieval doesn't need deep reasoning.            |
-| **Multimodal Looker** | Vision/screenshots | GPT-5.4 → opencode-go/kimi-k2.5 → GLM-4.6v → GPT-5-Nano                       | Uses the first available multimodal-capable fallback. |
-| **Sisyphus-Junior**   | Category executor  | Claude Sonnet → opencode-go/kimi-k2.5 → GPT-5.4 → Big Pickle                  | Handles delegated category tasks. Sonnet-tier default. |
+| **Explore**           | Fast codebase grep | Grok Code Fast → opencode-go/minimax-m2.7-highspeed → MiniMax M2.7 → Haiku → GPT-5-Nano | Speed is everything. Fire 10 in parallel.             |
+| **Librarian**         | Docs/code search   | opencode-go/minimax-m2.7 → MiniMax M2.7-highspeed → Haiku → GPT-5-Nano                  | Doc retrieval doesn't need deep reasoning.            |
+| **Multimodal Looker** | Vision/screenshots | GPT-5.4 → opencode-go/kimi-k2.5 → GLM-4.6v → GPT-5-Nano                                 | Uses the first available multimodal-capable fallback. |
+| **Sisyphus-Junior**   | Category executor  | Claude Sonnet → opencode-go/kimi-k2.5 → GPT-5.4 → MiniMax M2.7 → Big Pickle              | Handles delegated category tasks. Sonnet-tier default. |
 
 ---
 
@@ -131,7 +131,8 @@ Principle-driven, explicit reasoning, deep technical capability. Best for agents
 | **Gemini 3.1 Pro**   | Excels at visual/frontend tasks. Different reasoning style. Default for `visual-engineering` and `artistry`. |
 | **Gemini 3 Flash**   | Fast. Good for doc search and light tasks.                                                                   |
 | **Grok Code Fast 1** | Blazing fast code grep. Default for Explore agent.                                                           |
-| **MiniMax M2.5**     | Fast and smart. Good for utility tasks and search/retrieval.                                                 |
+| **MiniMax M2.7**     | Fast and smart. Good for utility tasks and search/retrieval. Upgraded from M2.5 with better reasoning.       |
+| **MiniMax M2.7 Highspeed** | Ultra-fast variant. Optimized for latency-sensitive tasks like codebase grep.                           |
 
 ### OpenCode Go
 
@@ -143,11 +144,11 @@ A premium subscription tier ($10/month) that provides reliable access to Chinese
 | ------------------------ | --------------------------------------------------------------------- |
 | **opencode-go/kimi-k2.5** | Vision-capable, Claude-like reasoning. Used by Sisyphus, Atlas, Sisyphus-Junior, Multimodal Looker. |
 | **opencode-go/glm-5**     | Text-only orchestration model. Used by Oracle, Prometheus, Metis, Momus.                           |
-| **opencode-go/minimax-m2.5** | Ultra-cheap, fast responses. Used by Librarian, Explore for utility work.                          |
+| **opencode-go/minimax-m2.7** | Ultra-cheap, fast responses. Used by Librarian, Explore, Atlas, Sisyphus-Junior for utility work.   |
 
 **When It Gets Used:**
 
-OpenCode Go models appear in fallback chains as intermediate options. They bridge the gap between premium Claude access and free-tier alternatives. The system tries OpenCode Go models before falling back to free tiers (MiniMax Free, Big Pickle) or GPT alternatives.
+OpenCode Go models appear in fallback chains as intermediate options. They bridge the gap between premium Claude access and free-tier alternatives. The system tries OpenCode Go models before falling back to free tiers (MiniMax M2.7-highspeed, Big Pickle) or GPT alternatives.
 
 **Go-Only Scenarios:**
 
@@ -155,7 +156,7 @@ Some model identifiers like `k2p5` (paid Kimi K2.5) and `glm-5` may only be avai
 
 ### About Free-Tier Fallbacks
 
-You may see model names like `kimi-k2.5-free`, `minimax-m2.5-free`, or `big-pickle` (GLM 4.6) in the source code or logs. These are free-tier versions of the same model families, served through the OpenCode Zen provider. They exist as lower-priority entries in fallback chains.
+You may see model names like `kimi-k2.5-free`, `minimax-m2.7-highspeed`, or `big-pickle` (GLM 4.6) in the source code or logs. These are free-tier or speed-optimized versions of the same model families. They exist as lower-priority entries in fallback chains.
 
 You don't need to configure them. The system includes them so it degrades gracefully when you don't have every paid subscription. If you have the paid version, the paid version is always preferred.
 
@@ -171,7 +172,7 @@ When agents delegate work, they don't pick a model name — they pick a **catego
 | `ultrabrain`         | Maximum reasoning needed   | GPT-5.4 → Gemini 3.1 Pro → Claude Opus → opencode-go/glm-5 |
 | `deep`               | Deep coding, complex logic | GPT-5.3 Codex → Claude Opus → Gemini 3.1 Pro |
 | `artistry`           | Creative, novel approaches | Gemini 3.1 Pro → Claude Opus → GPT-5.4       |
-| `quick`              | Simple, fast tasks         | GPT-5.4 Mini → Claude Haiku → Gemini Flash → opencode-go/minimax-m2.5 → GPT-5-Nano |
+| `quick`              | Simple, fast tasks         | GPT-5.4 Mini → Claude Haiku → Gemini Flash → opencode-go/minimax-m2.7 → GPT-5-Nano |
 | `unspecified-high`   | General complex work       | Claude Opus → GPT-5.4 → GLM 5 → K2P5 → opencode-go/glm-5 → Kimi K2.5 |
 | `unspecified-low`    | General standard work      | Claude Sonnet → GPT-5.3 Codex → opencode-go/kimi-k2.5 → Gemini Flash |
 | `writing`            | Text, docs, prose          | Gemini Flash → opencode-go/kimi-k2.5 → Claude Sonnet |

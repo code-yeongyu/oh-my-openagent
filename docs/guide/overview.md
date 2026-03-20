@@ -221,7 +221,7 @@ You can override specific agents or categories in your config:
 **Different-behavior models**:
 
 - Gemini 3 Pro — excels at visual/frontend tasks
-- MiniMax M2.5 — fast and smart for utility tasks
+- MiniMax M2.7 / M2.7-highspeed — fast and smart for utility tasks
 - Grok Code Fast 1 — optimized for code grep/search
 
 See the [Agent-Model Matching Guide](./agent-model-matching.md) for complete details on which models work best for each agent, safe vs dangerous overrides, and provider priority chains.
