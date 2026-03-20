@@ -89,8 +89,8 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   activePluginDispose = dispose
 
   return {
+    name: "oh-my-opencode",
     ...pluginInterface,
-
     "experimental.session.compacting": async (
       _input: { sessionID: string },
       output: { context: string[] },
@@ -105,7 +105,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         output.context.push(hooks.compactionContextInjector.inject(_input.sessionID))
       }
     },
-  }
+  } as any
 }
 
 export default OhMyOpenCodePlugin
