@@ -31,6 +31,7 @@ export async function waitForEventProcessorShutdown(
 
 export async function run(options: RunOptions): Promise<number> {
   process.env.OPENCODE_CLI_RUN_MODE = "true"
+  process.env.OPENCODE_CLIENT = "run"
 
   const startTime = Date.now()
   const {
