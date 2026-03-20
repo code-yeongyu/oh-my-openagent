@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs"
+import { existsSync, readFileSync, realpathSync } from "node:fs"
 import { homedir } from "node:os"
 import { join } from "node:path"
 
@@ -36,6 +36,16 @@ function resolveOpenCodeCacheDir(): string {
   return platformDefault
 }
 
+function resolveExistingDir(dirPath: string): string {
+  if (!existsSync(dirPath)) return dirPath
+
+  try {
+    return realpathSync(dirPath)
+  } catch {
+    return dirPath
+  }
+}
+
 function readPackageJson(filePath: string): PackageJsonShape | null {
   if (!existsSync(filePath)) return null
 
@@ -55,12 +65,13 @@ function normalizeVersion(value: string | undefined): string | null {
 
 export function getLoadedPluginVersion(): LoadedVersionInfo {
   const configPaths = getOpenCodeConfigPaths({ binary: "opencode" })
-  const cacheDir = resolveOpenCodeCacheDir()
+  const configDir = resolveExistingDir(configPaths.configDir)
+  const cacheDir = resolveExistingDir(resolveOpenCodeCacheDir())
   const candidates = [
     {
-      cacheDir: configPaths.configDir,
-      cachePackagePath: configPaths.packageJson,
-      installedPackagePath: join(configPaths.configDir, "node_modules", PACKAGE_NAME, "package.json"),
+      cacheDir: configDir,
+      cachePackagePath: join(configDir, "package.json"),
+      installedPackagePath: join(configDir, "node_modules", PACKAGE_NAME, "package.json"),
     },
     {
       cacheDir,

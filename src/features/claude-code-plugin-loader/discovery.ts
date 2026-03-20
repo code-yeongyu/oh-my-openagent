@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "fs"
 import { homedir } from "os"
-import { join } from "path"
+import { basename, join } from "path"
+import { fileURLToPath } from "url"
 import { log } from "../../shared/logger"
 import type {
   InstalledPluginsDatabase,
@@ -79,8 +80,23 @@ function loadPluginManifest(installPath: string): PluginManifest | null {
 }
 
 function derivePluginNameFromKey(pluginKey: string): string {
-  const atIndex = pluginKey.indexOf("@")
-  return atIndex > 0 ? pluginKey.substring(0, atIndex) : pluginKey
+  const keyWithoutSource = pluginKey.startsWith("npm:") ? pluginKey.slice(4) : pluginKey
+  const versionSeparator = keyWithoutSource.lastIndexOf("@")
+  const keyWithoutVersion = versionSeparator > 0 ? keyWithoutSource.slice(0, versionSeparator) : keyWithoutSource
+
+  if (keyWithoutVersion.startsWith("file://")) {
+    try {
+      return basename(fileURLToPath(keyWithoutVersion))
+    } catch {
+      return basename(keyWithoutVersion)
+    }
+  }
+
+  if (keyWithoutVersion.includes("/") || keyWithoutVersion.includes("\\")) {
+    return basename(keyWithoutVersion)
+  }
+
+  return keyWithoutVersion
 }
 
 function isPluginEnabled(
