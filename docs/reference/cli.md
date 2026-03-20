@@ -232,6 +232,24 @@ bunx oh-my-opencode doctor --verbose
 bunx oh-my-opencode doctor --category authentication
 ```
 
+### "Token refresh failed: 429" or "Failed to authorize"
+
+This usually means your shell resolves multiple `claude` binaries (for example `~/.local/bin/claude` and `/usr/local/bin/claude`) or you have stale local OAuth cache.
+
+```bash
+# Inspect resolved binaries
+which -a claude
+
+# Diagnose with doctor (Tools section will warn on multiple Claude binaries)
+bunx oh-my-opencode doctor --verbose
+```
+
+Recommended recovery:
+
+1. Keep a single `claude` installation in PATH precedence.
+2. Close concurrent Claude/OpenCode sessions.
+3. Re-open terminal and login again.
+
 ---
 
 ## Non-Interactive Mode

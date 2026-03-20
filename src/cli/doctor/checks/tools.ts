@@ -1,4 +1,5 @@
 import { checkAstGrepCli, checkAstGrepNapi, checkCommentChecker } from "./dependencies"
+import { executeLookupCommand, resolveClaudeBinaryDiagnostics } from "./tools-claude-binary"
 import { getGhCliInfo } from "./tools-gh"
 import { getLspServerStats, getLspServersInfo } from "./tools-lsp"
 import { getBuiltinMcpInfo, getUserMcpInfo } from "./tools-mcp"
@@ -34,7 +35,10 @@ export async function gatherToolsSummary(): Promise<ToolsSummary> {
   }
 }
 
-function buildToolIssues(summary: ToolsSummary): DoctorIssue[] {
+function buildToolIssues(
+  summary: ToolsSummary,
+  claudeDiagnostics: { hasConflict: boolean; discoveredPaths: string[] },
+): DoctorIssue[] {
   const issues: DoctorIssue[] = []
 
   if (!summary.astGrepCli && !summary.astGrepNapi) {
@@ -84,14 +88,27 @@ function buildToolIssues(summary: ToolsSummary): DoctorIssue[] {
     })
   }
 
+  if (claudeDiagnostics.hasConflict) {
+    issues.push({
+      title: "Multiple Claude CLI binaries detected",
+      description:
+        "More than one claude executable is available in PATH. On macOS/Linux this can cause token refresh/auth inconsistencies when different shells resolve different binaries.",
+      fix:
+        "Keep one claude install, ensure your shell resolves the intended binary first (which -a claude), then restart terminal sessions.",
+      severity: "warning",
+      affects: ["Claude login", "Token refresh"],
+    })
+  }
+
   return issues
 }
 
 export async function checkTools(): Promise<CheckResult> {
   const summary = await gatherToolsSummary()
+  const claudeDiagnostics = await resolveClaudeBinaryDiagnostics(executeLookupCommand)
   const userMcpServers = getUserMcpInfo()
   const invalidUserMcpServers = userMcpServers.filter((server) => !server.valid)
-  const issues = buildToolIssues(summary)
+  const issues = buildToolIssues(summary, claudeDiagnostics)
 
   if (invalidUserMcpServers.length > 0) {
     issues.push({
@@ -112,6 +129,7 @@ export async function checkTools(): Promise<CheckResult> {
       `LSP: ${summary.lspInstalled}/${summary.lspTotal}`,
       `GH CLI: ${summary.ghCli.installed ? "installed" : "missing"}${summary.ghCli.authenticated ? " (authenticated)" : ""}`,
       `MCP: builtin=${summary.mcpBuiltin.length}, user=${summary.mcpUser.length}`,
+      `Claude CLI paths: ${claudeDiagnostics.discoveredPaths.length > 0 ? claudeDiagnostics.discoveredPaths.length : 0}${claudeDiagnostics.activePath ? ` (active: ${claudeDiagnostics.activePath})` : ""}`,
     ],
     issues,
   }
