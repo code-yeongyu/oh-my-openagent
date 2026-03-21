@@ -14,7 +14,7 @@ import { resolve } from "node:path";
 
 // ── Models ────────────────────────────────────────────────────
 const MODELS = [
-  { id: "minimax-m2.5-free", short: "M2.5-Free" },
+  { id: "minimax-m2.7-free", short: "M2.7-Free" },
 ];
 
 // ── CLI args ──────────────────────────────────────────────────
@@ -29,6 +29,7 @@ for (let i = 0; i < rawArgs.length; i++) {
     }
     perModelTimeoutSec = parsed;
     i++;
+  }
 }
 
 // ── Colors ────────────────────────────────────────────────────
@@ -71,7 +72,7 @@ function parseOpsOutput(stdout: string): TestResult[] {
   for (const line of lines) {
     // Detect test name: starts with ANSI-colored bold cyan + "N. Name"
     // Strip ANSI codes for matching
-    const stripped = line.replace(/\x1b\[[0-9;]*m/g, "");
+    const stripped = line.replace(new RegExp("\\u001b\\[[0-9;]*m", "g"), "");
 
     // Test name pattern: "N. <name>"
     const testNameMatch = stripped.match(/^\s*(\d+\.\s+.+)$/);

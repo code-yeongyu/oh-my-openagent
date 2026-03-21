@@ -11,7 +11,7 @@ import { applyHashlineEditsWithReport } from "../../src/tools/hashline-edit/edit
 import { canonicalizeFileText, restoreFileText } from "../../src/tools/hashline-edit/file-text-canonicalization"
 import { HASHLINE_EDIT_DESCRIPTION } from "../../src/tools/hashline-edit/tool-description"
 
-const DEFAULT_MODEL = "minimax-m2.5-free"
+const DEFAULT_MODEL = "minimax-m2.7-free"
 const MAX_STEPS = 50
 const sessionId = `hashline-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 
@@ -198,4 +198,3 @@ run()
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(2)
     console.error(`[headless] Completed in ${elapsed}s`)
   })
-
