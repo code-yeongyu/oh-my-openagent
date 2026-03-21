@@ -4,6 +4,7 @@ import { run } from "./run"
 import { getLocalVersion } from "./get-local-version"
 import { doctor } from "./doctor"
 import { createMcpOAuthCommand } from "./mcp-oauth"
+import { config } from "./config"
 import type { InstallArgs } from "./types"
 import type { RunOptions } from "./run"
 import type { GetLocalVersionOptions } from "./get-local-version/types"
@@ -167,6 +168,21 @@ Examples:
       json: options.json ?? false,
     }
     const exitCode = await doctor(doctorOptions)
+    process.exit(exitCode)
+  })
+
+program
+  .command("config")
+  .description("Edit oh-my-opencode.json interactively via TUI")
+  .addHelpText("after", `
+Examples:
+  $ oh-my-opencode config
+  $ bunx oh-my-opencode config
+
+Edit agents, categories, and root defaults with validation warnings.
+`)
+  .action(async () => {
+    const exitCode = await config()
     process.exit(exitCode)
   })
 
