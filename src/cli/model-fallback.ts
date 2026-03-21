@@ -55,7 +55,7 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
   for (const [role, req] of Object.entries(CLI_AGENT_MODEL_REQUIREMENTS)) {
     if (role === "librarian") {
       if (avail.opencodeGo) {
-        agents[role] = { model: "opencode-go/minimax-m2.5" }
+        agents[role] = { model: "opencode-go/minimax-m2.7" }
       } else if (avail.zai) {
         agents[role] = { model: ZAI_MODEL }
       }
@@ -68,7 +68,7 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
       } else if (avail.opencodeZen) {
         agents[role] = { model: "opencode/claude-haiku-4-5" }
       } else if (avail.opencodeGo) {
-        agents[role] = { model: "opencode-go/minimax-m2.5" }
+        agents[role] = { model: "opencode-go/minimax-m2.7" }
       } else if (avail.copilot) {
         agents[role] = { model: "github-copilot/gpt-5-mini" }
       } else {
