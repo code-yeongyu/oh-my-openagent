@@ -42,8 +42,8 @@ export async function resolveTaskRouting(args: DelegateTaskArgs, input: {
     categoryPromptAppend: undefined,
     maxPromptTokens: undefined,
     modelInfo: undefined,
-    actualModel: undefined,
-    isUnstableAgent: false,
+    actualModel: resolution.actualModel,
+    isUnstableAgent: resolution.isUnstableAgent,
     fallbackChain: resolution.fallbackChain,
     error: resolution.error,
   }

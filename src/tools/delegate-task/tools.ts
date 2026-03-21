@@ -198,32 +198,31 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
         fallbackChain,
       } = resolution
 
-      if (args.category) {
-        const isRunInBackgroundExplicitlyFalse = args.run_in_background === false || args.run_in_background === "false" as unknown as boolean
+      const isRunInBackgroundExplicitlyFalse = args.run_in_background === false || args.run_in_background === "false" as unknown as boolean
 
-        log("[task] unstable agent detection", {
-          category: args.category,
-          actualModel,
-          isUnstableAgent,
-          run_in_background_value: args.run_in_background,
-          run_in_background_type: typeof args.run_in_background,
-          isRunInBackgroundExplicitlyFalse,
-          willForceBackground: isUnstableAgent && isRunInBackgroundExplicitlyFalse,
+      log("[task] unstable agent detection", {
+        category: args.category,
+        subagent_type: args.subagent_type,
+        actualModel,
+        isUnstableAgent,
+        run_in_background_value: args.run_in_background,
+        run_in_background_type: typeof args.run_in_background,
+        isRunInBackgroundExplicitlyFalse,
+        willForceBackground: isUnstableAgent && isRunInBackgroundExplicitlyFalse,
+      })
+
+      if (isUnstableAgent && isRunInBackgroundExplicitlyFalse) {
+        const systemContent = buildSystemContent({
+          skillContent,
+          skillContents,
+          categoryPromptAppend,
+          agentName: agentToUse,
+          maxPromptTokens,
+          model: categoryModel,
+          availableCategories,
+          availableSkills,
         })
-
-        if (isUnstableAgent && isRunInBackgroundExplicitlyFalse) {
-          const systemContent = buildSystemContent({
-            skillContent,
-            skillContents,
-            categoryPromptAppend,
-            agentName: agentToUse,
-            maxPromptTokens,
-            model: categoryModel,
-            availableCategories,
-            availableSkills,
-          })
-          return executeUnstableAgentTask(args, ctx, options, parentContext, agentToUse, categoryModel, systemContent, actualModel)
-        }
+        return executeUnstableAgentTask(args, ctx, options, parentContext, agentToUse, categoryModel, systemContent, actualModel)
       }
 
       const systemContent = buildSystemContent({

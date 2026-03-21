@@ -122,6 +122,43 @@ describe("delegate-task model inheritance", () => {
     expect(result.categoryModel).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-6" })
   })
 
+  test("marks inherited unstable subagent models for supervised execution", async () => {
+    const client = {
+      app: {
+        agents: async () => ({
+          data: [
+            {
+              name: "oracle",
+              mode: "subagent",
+              model: { providerID: "openai", modelID: "gpt-5.4" },
+            },
+          ],
+        }),
+      },
+    }
+
+    const result = await resolveSubagentExecution(
+      {
+        description: "Use oracle",
+        prompt: "Inspect architecture",
+        subagent_type: "oracle",
+        run_in_background: false,
+        load_skills: [],
+      },
+      {
+        manager: {} as never,
+        client: client as never,
+        directory: "/tmp",
+      },
+      "sisyphus",
+      "quick, deep",
+      "google/gemini-3-pro",
+    )
+
+    expect(result.actualModel).toBe("google/gemini-3-pro")
+    expect(result.isUnstableAgent).toBe(true)
+  })
+
   test("uses inherited model for category when user did not configure one", async () => {
     const result = await resolveCategoryExecution(
       {
