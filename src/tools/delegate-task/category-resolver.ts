@@ -91,13 +91,12 @@ Available categories: ${allCategoryNames}`,
   const explicitCategoryModel = userCategories?.[args.category!]?.model
 
   if (!requirement) {
-    // Precedence: explicit category model > sisyphus-junior default > category resolved model
-    // This keeps `sisyphus-junior.model` useful as a global default while allowing
-    // per-category overrides via `categories[category].model`.
-    actualModel = explicitCategoryModel ?? overrideModel ?? resolved.model
+    actualModel = explicitCategoryModel ?? overrideModel ?? inheritedModel ?? resolved.model
     if (actualModel) {
       modelInfo = explicitCategoryModel || overrideModel
         ? { model: actualModel, type: "user-defined", source: "override" }
+        : inheritedModel && actualModel === inheritedModel
+            ? { model: actualModel, type: "inherited", source: "category-default" }
         : { model: actualModel, type: "system-default", source: "system-default" }
       const parsedModel = parseModelString(actualModel)
       const variantToUse = userCategories?.[args.category!]?.variant ?? resolved.config.variant
@@ -109,6 +108,7 @@ Available categories: ${allCategoryNames}`,
     const resolution = resolveModelForDelegateTask({
       userModel: explicitCategoryModel ?? overrideModel,
       userFallbackModels: normalizedConfiguredFallbackModels,
+      inheritedModel,
       categoryDefaultModel: resolved.model,
       fallbackChain: requirement.fallbackChain,
       availableModels,
@@ -137,6 +137,8 @@ Available categories: ${allCategoryNames}`,
       const type: "user-defined" | "inherited" | "category-default" | "system-default" =
         (explicitCategoryModel || overrideModel)
           ? "user-defined"
+          : inheritedModel && actualModel === inheritedModel
+              ? "inherited"
           : (systemDefaultModel && actualModel === systemDefaultModel)
               ? "system-default"
               : "category-default"

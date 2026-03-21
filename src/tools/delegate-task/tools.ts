@@ -2,6 +2,7 @@ import { tool, type ToolDefinition } from "@opencode-ai/plugin"
 import type { DelegateTaskArgs, ToolContextWithMetadata, DelegateTaskToolOptions } from "./types"
 import { CATEGORY_DESCRIPTIONS } from "./constants"
 import { SISYPHUS_JUNIOR_AGENT } from "./sisyphus-junior-agent"
+import { resolveTaskRouting } from "./task-routing-resolver"
 import { mergeCategories } from "../../shared/merge-categories"
 import { log } from "../../shared/logger"
 import { buildSystemContent } from "./prompt-builder"
@@ -14,8 +15,6 @@ import {
   resolveParentContext,
   executeBackgroundContinuation,
   executeSyncContinuation,
-  resolveCategoryExecution,
-  resolveSubagentExecution,
   executeUnstableAgentTask,
   executeBackgroundTask,
   executeSyncTask,
@@ -177,29 +176,29 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
         ? `${parentContext.model.providerID}/${parentContext.model.modelID}`
         : undefined
 
-      let agentToUse: string
-      let categoryModel: { providerID: string; modelID: string; variant?: string } | undefined
-      let categoryPromptAppend: string | undefined
-      let modelInfo: import("../../features/task-toast-manager/types").ModelFallbackInfo | undefined
-      let actualModel: string | undefined
-      let isUnstableAgent = false
-      let fallbackChain: import("../../shared/model-requirements").FallbackEntry[] | undefined
-      let maxPromptTokens: number | undefined
+      const resolution = await resolveTaskRouting(args, {
+        options,
+        parentContext,
+        categoryExamples,
+        inheritedModel,
+        systemDefaultModel,
+      })
+      if (resolution.error) {
+        return resolution.error
+      }
+
+      const {
+        agentToUse,
+        categoryModel,
+        categoryPromptAppend,
+        maxPromptTokens,
+        modelInfo,
+        actualModel,
+        isUnstableAgent,
+        fallbackChain,
+      } = resolution
 
       if (args.category) {
-        const resolution = await resolveCategoryExecution(args, options, inheritedModel, systemDefaultModel)
-        if (resolution.error) {
-          return resolution.error
-        }
-        agentToUse = resolution.agentToUse
-        categoryModel = resolution.categoryModel
-        categoryPromptAppend = resolution.categoryPromptAppend
-        modelInfo = resolution.modelInfo
-        actualModel = resolution.actualModel
-        isUnstableAgent = resolution.isUnstableAgent
-        fallbackChain = resolution.fallbackChain
-        maxPromptTokens = resolution.maxPromptTokens
-
         const isRunInBackgroundExplicitlyFalse = args.run_in_background === false || args.run_in_background === "false" as unknown as boolean
 
         log("[task] unstable agent detection", {
@@ -225,14 +224,6 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
           })
           return executeUnstableAgentTask(args, ctx, options, parentContext, agentToUse, categoryModel, systemContent, actualModel)
         }
-      } else {
-        const resolution = await resolveSubagentExecution(args, options, parentContext.agent, categoryExamples)
-        if (resolution.error) {
-          return resolution.error
-        }
-        agentToUse = resolution.agentToUse
-        categoryModel = resolution.categoryModel
-        fallbackChain = resolution.fallbackChain
       }
 
       const systemContent = buildSystemContent({

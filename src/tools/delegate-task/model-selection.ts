@@ -47,6 +47,7 @@ function parseUserFallbackModel(fallbackModel: string): {
 export function resolveModelForDelegateTask(input: {
   userModel?: string
   userFallbackModels?: string[]
+  inheritedModel?: string
   categoryDefaultModel?: string
   fallbackChain?: FallbackEntry[]
   availableModels: Set<string>
@@ -61,6 +62,20 @@ export function resolveModelForDelegateTask(input: {
   // OpenCode will use its system default model when no model is specified in the prompt.
   if (input.availableModels.size === 0 && !hasProviderModelsCache() && !hasConnectedProvidersCache()) {
     return { skipped: true }
+  }
+
+  const inheritedModel = normalizeModel(input.inheritedModel)
+  if (inheritedModel) {
+    if (input.availableModels.size === 0) {
+      return { model: inheritedModel }
+    }
+
+    const parts = inheritedModel.split("/")
+    const providerHint = parts.length >= 2 ? [parts[0]] : undefined
+    const match = fuzzyMatchModel(inheritedModel, input.availableModels, providerHint)
+    if (match) {
+      return { model: match }
+    }
   }
 
   const categoryDefault = normalizeModel(input.categoryDefaultModel)

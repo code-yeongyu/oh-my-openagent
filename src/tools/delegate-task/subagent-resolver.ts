@@ -17,7 +17,8 @@ export async function resolveSubagentExecution(
   args: DelegateTaskArgs,
   executorCtx: ExecutorContext,
   parentAgent: string | undefined,
-  categoryExamples: string
+  categoryExamples: string,
+  inheritedModel: string | undefined,
 ): Promise<{ agentToUse: string; categoryModel: { providerID: string; modelID: string; variant?: string } | undefined; fallbackChain?: FallbackEntry[]; error?: string }> {
   const { client, agentOverrides, userCategories } = executorCtx
 
@@ -118,6 +119,7 @@ Create the work plan directly - that's your job as the planning agent.`,
       const resolution = resolveModelForDelegateTask({
         userModel: agentOverride?.model,
         userFallbackModels: normalizedAgentFallbackModels,
+        inheritedModel,
         categoryDefaultModel: matchedAgentModelStr,
         fallbackChain: agentRequirement?.fallbackChain,
         availableModels,
