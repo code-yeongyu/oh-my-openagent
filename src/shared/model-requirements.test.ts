@@ -64,23 +64,23 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(last.model).toBe("big-pickle")
   })
 
-  test("librarian has valid fallbackChain with opencode-go/minimax-m2.5 as primary", () => {
+  test("librarian has valid fallbackChain with opencode-go/minimax-m2.7 as primary", () => {
     // given - librarian agent requirement
     const librarian = AGENT_MODEL_REQUIREMENTS["librarian"]
 
     // when - accessing librarian requirement
-    // then - fallbackChain exists with opencode-go/minimax-m2.5 as first entry
+    // then - fallbackChain exists with opencode-go/minimax-m2.7 as first entry
     expect(librarian).toBeDefined()
     expect(librarian.fallbackChain).toBeArray()
     expect(librarian.fallbackChain.length).toBeGreaterThan(0)
 
     const primary = librarian.fallbackChain[0]
     expect(primary.providers[0]).toBe("opencode-go")
-    expect(primary.model).toBe("minimax-m2.5")
+    expect(primary.model).toBe("minimax-m2.7")
 
     const second = librarian.fallbackChain[1]
     expect(second.providers[0]).toBe("opencode")
-    expect(second.model).toBe("minimax-m2.5-free")
+    expect(second.model).toBe("minimax-m2.7-free")
 
     const tertiary = librarian.fallbackChain[2]
     expect(tertiary.providers).toContain("anthropic")
@@ -106,11 +106,11 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
 
     const secondary = explore.fallbackChain[1]
     expect(secondary.providers).toContain("opencode-go")
-    expect(secondary.model).toBe("minimax-m2.5")
+    expect(secondary.model).toBe("minimax-m2.7")
 
     const tertiary = explore.fallbackChain[2]
     expect(tertiary.providers).toContain("opencode")
-    expect(tertiary.model).toBe("minimax-m2.5-free")
+    expect(tertiary.model).toBe("minimax-m2.7-free")
 
     const quaternary = explore.fallbackChain[3]
     expect(quaternary.providers).toContain("anthropic")
