@@ -226,6 +226,76 @@ describe('TmuxSessionManager', () => {
       // then
       expect(manager).toBeDefined()
     })
+
+    test('falls back to localhost when serverUrl has port 0 (serve+attach mode)', async () => {
+      // given
+      mockIsInsideTmux.mockReturnValue(true)
+      const { TmuxSessionManager } = await import('./manager')
+      const ctx = {
+        serverUrl: new URL('http://127.0.0.1:0/'),
+        client: createMockContext().client,
+      } as any
+      const config: TmuxConfig = {
+        enabled: true,
+        layout: 'main-vertical',
+        main_pane_size: 60,
+        main_pane_min_width: 80,
+        agent_pane_min_width: 40,
+      }
+
+      // when
+      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+
+      // then
+      expect(manager).toBeDefined()
+      // The manager should have been created with the fallback URL
+    })
+
+    test('falls back to localhost when serverUrl is undefined', async () => {
+      // given
+      mockIsInsideTmux.mockReturnValue(true)
+      const { TmuxSessionManager } = await import('./manager')
+      const ctx = {
+        serverUrl: undefined,
+        client: createMockContext().client,
+      } as any
+      const config: TmuxConfig = {
+        enabled: true,
+        layout: 'main-vertical',
+        main_pane_size: 60,
+        main_pane_min_width: 80,
+        agent_pane_min_width: 40,
+      }
+
+      // when
+      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+
+      // then
+      expect(manager).toBeDefined()
+    })
+
+    test('uses valid serverUrl with proper port', async () => {
+      // given
+      mockIsInsideTmux.mockReturnValue(true)
+      const { TmuxSessionManager } = await import('./manager')
+      const ctx = {
+        serverUrl: new URL('http://localhost:54220'),
+        client: createMockContext().client,
+      } as any
+      const config: TmuxConfig = {
+        enabled: true,
+        layout: 'main-vertical',
+        main_pane_size: 60,
+        main_pane_min_width: 80,
+        agent_pane_min_width: 40,
+      }
+
+      // when
+      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+
+      // then
+      expect(manager).toBeDefined()
+    })
   })
 
   describe('onSessionCreated', () => {

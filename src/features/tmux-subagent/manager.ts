@@ -74,7 +74,8 @@ export class TmuxSessionManager {
     this.deps = deps
     const defaultPort = process.env.OPENCODE_PORT ?? "4096"
     try {
-      this.serverUrl = ctx.serverUrl?.toString() ?? `http://localhost:${defaultPort}`
+      const rawUrl = ctx.serverUrl?.toString()
+      this.serverUrl = this.validateServerUrl(rawUrl) ?? `http://localhost:${defaultPort}`
     } catch {
       this.serverUrl = `http://localhost:${defaultPort}`
     }
@@ -93,6 +94,36 @@ export class TmuxSessionManager {
   }
   private isEnabled(): boolean {
     return this.tmuxConfig.enabled && this.deps.isInsideTmux()
+  }
+
+  /**
+   * Validates a server URL and returns it if valid, or null if invalid.
+   * URLs with port 0 are considered invalid because they indicate
+   * the server URL was not properly resolved (e.g., in serve+attach mode).
+   */
+  private validateServerUrl(url: string | undefined): string | null {
+    if (!url) {
+      return null
+    }
+
+    try {
+      const parsed = new URL(url)
+      // Port 0 means the server URL was not properly resolved
+      // This commonly happens in serve+attach mode where ctx.serverUrl
+      // resolves to http://127.0.0.1:0/
+      if (parsed.port === "0" || parsed.port === "") {
+        log("[tmux-session-manager] detected invalid serverUrl with port 0 or empty, falling back to default", {
+          originalUrl: url
+        })
+        return null
+      }
+      return url
+    } catch {
+      log("[tmux-session-manager] failed to parse serverUrl, falling back to default", {
+        originalUrl: url
+      })
+      return null
+    }
   }
 
   private getCapacityConfig(): CapacityConfig {
