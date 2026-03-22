@@ -1,4 +1,5 @@
-import { describe, expect, it } from "bun:test"
+declare const require: (name: string) => any
+const { describe, expect, it } = require("bun:test")
 import {
   getHighVariant,
   isAlreadyHighVariant,
@@ -146,6 +147,11 @@ describe("think-mode switcher", () => {
         expect(getHighVariant("custom-llm/gemini-3.1-pro")).toBe("custom-llm/gemini-3-1-pro-high")
       })
 
+			it("should preserve multi-slash prefixes when getting high variant", () => {
+				expect(getHighVariant("nvidia/aws/claude-opus-4-6")).toBe("nvidia/aws/claude-opus-4-6-high")
+				expect(getHighVariant("nvidia/aws/gpt-5.4")).toBe("nvidia/aws/gpt-5-4-high")
+			})
+
       it("should return null for prefixed models without high variant mapping", () => {
         // given prefixed model IDs without high variant mapping
         expect(getHighVariant("vertex_ai/unknown-model")).toBeNull()
@@ -166,6 +172,11 @@ describe("think-mode switcher", () => {
         expect(isAlreadyHighVariant("openai/gpt-5-4-high")).toBe(true)
         expect(isAlreadyHighVariant("custom/gemini-3.1-pro-high")).toBe(true)
       })
+
+			it("should detect -high suffix in multi-slash prefixed models", () => {
+				expect(isAlreadyHighVariant("nvidia/aws/claude-opus-4-6-high")).toBe(true)
+				expect(isAlreadyHighVariant("nvidia/aws/gpt-5.4-high")).toBe(true)
+			})
 
       it("should return false for prefixed base models", () => {
         // given prefixed base model IDs without -high suffix

@@ -46,6 +46,7 @@ export async function executeSync(
   deps: ExecuteSyncDeps = defaultDeps,
   fallbackChain?: FallbackEntry[],
   spawnReservation?: SpawnReservation,
+  agentModel?: { providerID: string; modelID: string; variant?: string },
 ): Promise<string> {
   let sessionID: string | undefined
   let createdSessionForExecution = false
@@ -82,6 +83,8 @@ export async function executeSync(
         path: { id: sessionID },
         body: {
           agent: args.subagent_type,
+          ...(agentModel ? { model: { providerID: agentModel.providerID, modelID: agentModel.modelID } } : {}),
+          ...(agentModel?.variant ? { variant: agentModel.variant } : {}),
           tools: {
             ...getAgentToolRestrictions(args.subagent_type),
             task: false,

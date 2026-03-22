@@ -8,6 +8,7 @@ import { AGENT_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
 import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { normalizeFallbackModels } from "../../shared/model-resolver"
 import { buildFallbackChainFromModels } from "../../shared/fallback-chain-from-models"
+import { normalizeModelFormat } from "../../shared/model-format-normalizer"
 import { log } from "../../shared"
 import { executeBackground } from "./background-executor"
 import { executeSync } from "./sync-executor"
@@ -34,6 +35,27 @@ function resolveFallbackChainForCallOmoAgent(args: {
   const configuredFallbackChain = buildFallbackChainFromModels(normalizedFallbackModels, defaultProviderID)
 
   return configuredFallbackChain ?? agentRequirement?.fallbackChain
+}
+
+function resolveModelForCallOmoAgent(args: {
+  subagentType: string
+  agentOverrides?: AgentOverrides
+}): { providerID: string; modelID: string; variant?: string } | undefined {
+  const { subagentType, agentOverrides } = args
+  const agentConfigKey = getAgentConfigKey(subagentType)
+  const agentOverride = agentOverrides?.[agentConfigKey as keyof AgentOverrides]
+    ?? (agentOverrides
+      ? Object.entries(agentOverrides).find(([key]) => key.toLowerCase() === agentConfigKey)?.[1]
+      : undefined)
+
+  if (!agentOverride?.model) return undefined
+
+  const normalized = normalizeModelFormat(agentOverride.model)
+  if (!normalized) return undefined
+
+  return agentOverride.variant
+    ? { ...normalized, variant: agentOverride.variant }
+    : normalized
 }
 
 export function createCallOmoAgent(
@@ -88,25 +110,30 @@ export function createCallOmoAgent(
         userCategories,
       })
 
+      const agentModel = resolveModelForCallOmoAgent({
+        subagentType: args.subagent_type,
+        agentOverrides,
+      })
+
       if (args.run_in_background) {
         if (args.session_id) {
           return `Error: session_id is not supported in background mode. Use run_in_background=false to continue an existing session.`
         }
-        return await executeBackground(args, toolCtx, backgroundManager, ctx.client, fallbackChain)
+        return await executeBackground(args, toolCtx, backgroundManager, ctx.client, fallbackChain, agentModel)
       }
 
       if (!args.session_id) {
         let spawnReservation: Awaited<ReturnType<BackgroundManager["reserveSubagentSpawn"]>> | undefined
         try {
           spawnReservation = await backgroundManager.reserveSubagentSpawn(toolCtx.sessionID)
-          return await executeSync(args, toolCtx, ctx, undefined, fallbackChain, spawnReservation)
+          return await executeSync(args, toolCtx, ctx, undefined, fallbackChain, spawnReservation, agentModel)
         } catch (error) {
           spawnReservation?.rollback()
           return `Error: ${error instanceof Error ? error.message : String(error)}`
         }
       }
 
-      return await executeSync(args, toolCtx, ctx, undefined, fallbackChain)
+      return await executeSync(args, toolCtx, ctx, undefined, fallbackChain, undefined, agentModel)
     },
   })
 }

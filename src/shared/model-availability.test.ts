@@ -391,6 +391,18 @@ describe("fuzzyMatchModel", () => {
 		expect(result).toBe("openai/gpt-5.4")
 	})
 
+	it("should retry without provider filter when filtered candidates are empty for multi-slash model IDs", () => {
+		const available = new Set([
+			"nvidia/aws/anthropic/bedrock-claude-opus-4-6",
+		])
+		const result = fuzzyMatchModel(
+			"aws/anthropic/bedrock-claude-opus-4-6",
+			available,
+			["aws"],
+		)
+		expect(result).toBe("nvidia/aws/anthropic/bedrock-claude-opus-4-6")
+	})
+
 	// given empty available set
 	// when searching
 	// then return null

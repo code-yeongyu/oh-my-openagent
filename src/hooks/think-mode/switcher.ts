@@ -28,10 +28,10 @@ import { normalizeModelID } from "../../shared"
  * extractModelPrefix("openai/gpt-5.4") // { prefix: "openai/", base: "gpt-5.4" }
  */
 function extractModelPrefix(modelID: string): { prefix: string; base: string } {
-  const slashIndex = modelID.indexOf("/")
-  if (slashIndex === -1) {
-    return { prefix: "", base: modelID }
-  }
+	const slashIndex = modelID.lastIndexOf("/")
+	if (slashIndex === -1) {
+		return { prefix: "", base: modelID }
+	}
   return {
     prefix: modelID.slice(0, slashIndex + 1),
     base: modelID.slice(slashIndex + 1),

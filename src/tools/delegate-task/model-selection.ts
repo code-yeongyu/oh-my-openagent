@@ -2,7 +2,8 @@ import type { FallbackEntry } from "../../shared/model-requirements"
 import { normalizeModel } from "../../shared/model-normalization"
 import { fuzzyMatchModel } from "../../shared/model-availability"
 import { transformModelForProvider } from "../../shared/provider-model-id-transform"
-import { hasConnectedProvidersCache, hasProviderModelsCache } from "../../shared/connected-providers-cache"
+import { extractProviderHint } from "../../shared/extract-provider-hint"
+import { hasConnectedProvidersCache, hasProviderModelsCache, readConnectedProvidersCache } from "../../shared/connected-providers-cache"
 import { parseModelString, parseVariantFromModelID } from "./model-string-parser"
 
 function isExplicitHighModel(model: string): boolean {
@@ -23,11 +24,13 @@ function parseUserFallbackModel(fallbackModel: string): {
     return undefined
   }
 
-  const parsedFullModel = parseModelString(normalizedFallback)
+  const connectedProviders = readConnectedProvidersCache()
+  const providerHint = extractProviderHint(normalizedFallback, connectedProviders)
+  const parsedFullModel = providerHint ? parseModelString(normalizedFallback) : undefined
   if (parsedFullModel) {
     return {
       baseModel: `${parsedFullModel.providerID}/${parsedFullModel.modelID}`,
-      providerHint: [parsedFullModel.providerID],
+      providerHint,
       variant: parsedFullModel.variant,
     }
   }
@@ -52,6 +55,7 @@ export function resolveModelForDelegateTask(input: {
   availableModels: Set<string>
   systemDefaultModel?: string
 }): { model: string; variant?: string } | { skipped: true } | undefined {
+  const connectedProviders = readConnectedProvidersCache()
   const userModel = normalizeModel(input.userModel)
   if (userModel) {
     return { model: userModel }
@@ -71,8 +75,7 @@ export function resolveModelForDelegateTask(input: {
       return { model: categoryDefault }
     }
 
-    const parts = categoryDefault.split("/")
-    const providerHint = parts.length >= 2 ? [parts[0]] : undefined
+    const providerHint = extractProviderHint(categoryDefault, connectedProviders)
     const match = fuzzyMatchModel(categoryDefault, input.availableModels, providerHint)
     if (match) {
       if (isExplicitHighModel(categoryDefault) && match !== categoryDefault) {

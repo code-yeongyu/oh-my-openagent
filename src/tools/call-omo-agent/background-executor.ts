@@ -20,6 +20,7 @@ export async function executeBackground(
   manager: BackgroundManager,
   client: PluginInput["client"],
   fallbackChain?: FallbackEntry[],
+  agentModel?: { providerID: string; modelID: string; variant?: string },
 ): Promise<string> {
   try {
     const messageDir = getMessageDir(toolContext.sessionID)
@@ -50,6 +51,7 @@ export async function executeBackground(
       parentMessageID: toolContext.messageID,
       parentAgent,
       parentTools: getSessionTools(toolContext.sessionID),
+      model: agentModel,
       fallbackChain,
     })
 

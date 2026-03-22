@@ -73,6 +73,7 @@ describe("resolveModelForDelegateTask", () => {
 		beforeEach(() => {
 			hasConnectedProvidersSpy = spyOn(connectedProvidersCache, "hasConnectedProvidersCache").mockReturnValue(true)
 			hasProviderModelsSpy = spyOn(connectedProvidersCache, "hasProviderModelsCache").mockReturnValue(true)
+			spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["nvidia", "anthropic", "openai"])
 		})
 
 		describe("#when availableModels is empty (cache exists but empty)", () => {
@@ -121,6 +122,26 @@ describe("resolveModelForDelegateTask", () => {
 				})
 
 				expect(result).toEqual({ model: "openai/gpt-5.2", variant: "medium" })
+			})
+
+			test("#then resolves a provider-less multi-slash fallback model against the correct available provider", () => {
+				const result = resolveModelForDelegateTask({
+					userFallbackModels: ["aws/anthropic/bedrock-claude-opus-4-6"],
+					availableModels: new Set(["nvidia/aws/anthropic/bedrock-claude-opus-4-6"]),
+				})
+
+				expect(result).toEqual({ model: "nvidia/aws/anthropic/bedrock-claude-opus-4-6" })
+			})
+		})
+
+		describe("#when category default omits provider for multi-slash model ID", () => {
+			test("#then resolves against available models without forcing the first segment as provider", () => {
+				const result = resolveModelForDelegateTask({
+					categoryDefaultModel: "aws/anthropic/bedrock-claude-opus-4-6",
+					availableModels: new Set(["nvidia/aws/anthropic/bedrock-claude-opus-4-6"]),
+				})
+
+				expect(result).toEqual({ model: "nvidia/aws/anthropic/bedrock-claude-opus-4-6" })
 			})
 		})
 	})
