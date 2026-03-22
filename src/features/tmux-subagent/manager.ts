@@ -1,5 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { TmuxConfig } from "../../config/schema"
+import type { CmuxConfig } from "../../config/schema/cmux"
 import type { TrackedSession, CapacityConfig, WindowState } from "./types"
 import { log, normalizeSDKResponse } from "../../shared"
 import {
@@ -9,6 +10,7 @@ import {
   SESSION_READY_POLL_INTERVAL_MS,
   SESSION_READY_TIMEOUT_MS,
 } from "../../shared/tmux"
+import { isInsideCmux } from "../../shared/cmux"
 import { queryWindowState } from "./pane-state-querier"
 import { decideSpawnActions, decideCloseAction, type SessionMapping } from "./decision-engine"
 import { executeActions, executeAction } from "./action-executor"
@@ -56,6 +58,7 @@ const MAX_CLOSE_RETRY_COUNT = 3
 export class TmuxSessionManager {
   private client: OpencodeClient
   private tmuxConfig: TmuxConfig
+  private cmuxConfig: CmuxConfig
   private serverUrl: string
   private sourcePaneId: string | undefined
   private sessions = new Map<string, TrackedSession>()
@@ -68,9 +71,10 @@ export class TmuxSessionManager {
   private nullStateCount = 0
   private deps: TmuxUtilDeps
   private pollingManager: TmuxPollingManager
-  constructor(ctx: PluginInput, tmuxConfig: TmuxConfig, deps: TmuxUtilDeps = defaultTmuxDeps) {
+  constructor(ctx: PluginInput, tmuxConfig: TmuxConfig, cmuxConfig: CmuxConfig, deps: TmuxUtilDeps = defaultTmuxDeps) {
     this.client = ctx.client
     this.tmuxConfig = tmuxConfig
+    this.cmuxConfig = cmuxConfig
     this.deps = deps
     const defaultPort = process.env.OPENCODE_PORT ?? "4096"
     try {
@@ -92,10 +96,28 @@ export class TmuxSessionManager {
     })
   }
   private isEnabled(): boolean {
-    return this.tmuxConfig.enabled && this.deps.isInsideTmux()
+    const mux = this.detectMultiplexer()
+    if (mux === "cmux") return this.cmuxConfig.enabled && isInsideCmux()
+    if (mux === "tmux") return this.tmuxConfig.enabled && this.deps.isInsideTmux()
+    return false
+  }
+
+  private detectMultiplexer(): "tmux" | "cmux" | "none" {
+    if (isInsideCmux()) return "cmux"
+    if (this.deps.isInsideTmux()) return "tmux"
+    return "none"
   }
 
   private getCapacityConfig(): CapacityConfig {
+    const mux = this.detectMultiplexer()
+    if (mux === "cmux") {
+      return {
+        layout: this.cmuxConfig.layout,
+        mainPaneSize: this.cmuxConfig.main_pane_size,
+        mainPaneMinWidth: this.cmuxConfig.main_pane_min_width,
+        agentPaneWidth: this.cmuxConfig.agent_pane_min_width,
+      }
+    }
     return {
       layout: this.tmuxConfig.layout,
       mainPaneSize: this.tmuxConfig.main_pane_size,
@@ -153,7 +175,8 @@ export class TmuxSessionManager {
       const result = await executeAction(
         { type: "close", paneId: tracked.paneId, sessionId: tracked.sessionId },
         {
-          config: this.tmuxConfig,
+          tmuxConfig: this.tmuxConfig,
+          cmuxConfig: this.cmuxConfig,
           serverUrl: this.serverUrl,
           windowState: state,
           sourcePaneId: this.sourcePaneId,
@@ -354,7 +377,8 @@ export class TmuxSessionManager {
     }
 
     const result = await executeActions(decision.actions, {
-      config: this.tmuxConfig,
+      tmuxConfig: this.tmuxConfig,
+      cmuxConfig: this.cmuxConfig,
       serverUrl: this.serverUrl,
       windowState: state,
       sourcePaneId: this.sourcePaneId,
@@ -510,7 +534,8 @@ export class TmuxSessionManager {
         const result = await executeActions(
           decision.actions,
           {
-            config: this.tmuxConfig,
+            tmuxConfig: this.tmuxConfig,
+      cmuxConfig: this.cmuxConfig,
             serverUrl: this.serverUrl,
             windowState: state,
             sourcePaneId,
@@ -575,7 +600,7 @@ export class TmuxSessionManager {
           if (result.spawnedPaneId) {
             await executeAction(
               { type: "close", paneId: result.spawnedPaneId, sessionId },
-              { config: this.tmuxConfig, serverUrl: this.serverUrl, windowState: state }
+              { tmuxConfig: this.tmuxConfig, cmuxConfig: this.cmuxConfig, serverUrl: this.serverUrl, windowState: state }
             )
           }
 
@@ -624,7 +649,8 @@ export class TmuxSessionManager {
 
     try {
       const result = await executeAction(closeAction, {
-        config: this.tmuxConfig,
+        tmuxConfig: this.tmuxConfig,
+      cmuxConfig: this.cmuxConfig,
         serverUrl: this.serverUrl,
         windowState: state,
         sourcePaneId: this.sourcePaneId,

@@ -1,13 +1,13 @@
 import type { TmuxConfig } from "../../config/schema"
+import type { CmuxConfig } from "../../config/schema/cmux"
 import type { PaneAction, WindowState } from "./types"
 import {
-  applyLayout,
-  spawnTmuxPane,
-  closeTmuxPane,
-  enforceMainPaneWidth,
-  replaceTmuxPane,
-} from "../../shared/tmux"
-import { getTmuxPath } from "../../tools/interactive-bash/tmux-path-resolver"
+  spawnPane,
+  closePane,
+  applyLayout as applyMultiplexerLayout,
+  enforceMainPaneWidth as enforceMultiplexerMainPaneWidth,
+  detectMultiplexer,
+} from "../../shared/multiplexer"
 import { queryWindowState } from "./pane-state-querier"
 import { log } from "../../shared"
 import type {
@@ -24,7 +24,8 @@ export interface ExecuteActionsResult {
 }
 
 export interface ExecuteContext {
-  config: TmuxConfig
+  tmuxConfig: TmuxConfig
+  cmuxConfig: CmuxConfig
   serverUrl: string
   windowState: WindowState
   sourcePaneId?: string
@@ -32,35 +33,36 @@ export interface ExecuteContext {
 
 async function enforceMainPane(
   windowState: WindowState,
-  config: TmuxConfig,
+  ctx: ExecuteContext,
 ): Promise<void> {
   if (!windowState.mainPane) return
-  await enforceMainPaneWidth(windowState.mainPane.paneId, windowState.windowWidth, {
-    mainPaneSize: config.main_pane_size,
-    mainPaneMinWidth: config.main_pane_min_width,
-    agentPaneMinWidth: config.agent_pane_min_width,
-  })
+  await enforceMultiplexerMainPaneWidth(
+    windowState.mainPane.paneId,
+    windowState.windowWidth,
+    ctx.tmuxConfig,
+    ctx.cmuxConfig
+  )
 }
 
 async function enforceLayoutAndMainPane(ctx: ExecuteContext): Promise<void> {
   const sourcePaneId = ctx.sourcePaneId
   if (!sourcePaneId) {
-    await enforceMainPane(ctx.windowState, ctx.config)
+    await enforceMainPane(ctx.windowState, ctx)
     return
   }
 
   const latestState = await queryWindowState(sourcePaneId)
   if (!latestState?.mainPane) {
-    await enforceMainPane(ctx.windowState, ctx.config)
+    await enforceMainPane(ctx.windowState, ctx)
     return
   }
 
-  const tmux = await getTmuxPath()
-  if (tmux) {
-    await applyLayout(tmux, ctx.config.layout, ctx.config.main_pane_size)
-  }
-
-  await enforceMainPane(latestState, ctx.config)
+  const mux = detectMultiplexer()
+  const layout = mux === "cmux" ? ctx.cmuxConfig.layout : ctx.tmuxConfig.layout
+  const mainPaneSize = mux === "cmux" ? ctx.cmuxConfig.main_pane_size : ctx.tmuxConfig.main_pane_size
+  
+  await applyMultiplexerLayout(layout, mainPaneSize, ctx.tmuxConfig, ctx.cmuxConfig)
+  await enforceMainPane(latestState, ctx)
 }
 
 export async function executeAction(
@@ -68,7 +70,7 @@ export async function executeAction(
   ctx: ExecuteContext
 ): Promise<ActionResult> {
   if (action.type === "close") {
-    const success = await closeTmuxPane(action.paneId)
+    const success = await closePane(action.paneId, ctx.tmuxConfig, ctx.cmuxConfig)
     if (success) {
       await enforceLayoutAndMainPane(ctx)
     }
@@ -76,12 +78,14 @@ export async function executeAction(
   }
 
   if (action.type === "replace") {
-    const result = await replaceTmuxPane(
-      action.paneId,
+    const result = await spawnPane(
       action.newSessionId,
       action.description,
-      ctx.config,
-      ctx.serverUrl
+      ctx.tmuxConfig,
+      ctx.cmuxConfig,
+      ctx.serverUrl,
+      action.paneId,
+      "-h"
     )
     if (result.success) {
       await enforceLayoutAndMainPane(ctx)
@@ -92,10 +96,11 @@ export async function executeAction(
     }
   }
 
-  const result = await spawnTmuxPane(
+  const result = await spawnPane(
     action.sessionId,
     action.description,
-    ctx.config,
+    ctx.tmuxConfig,
+    ctx.cmuxConfig,
     ctx.serverUrl,
     action.targetPaneId,
     action.splitDirection
