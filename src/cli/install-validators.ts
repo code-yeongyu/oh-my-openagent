@@ -40,6 +40,7 @@ export function formatConfigSummary(config: InstallConfig): string {
   lines.push(formatProvider("OpenCode Zen", config.hasOpencodeZen, "opencode/ models"))
   lines.push(formatProvider("Z.ai Coding Plan", config.hasZaiCodingPlan, "Librarian/Multimodal"))
   lines.push(formatProvider("Kimi For Coding", config.hasKimiForCoding, "Sisyphus/Prometheus fallback"))
+  lines.push(formatProvider("MiniMax", config.hasMinimax, "MiniMax-M2.7 for all agents"))
 
   lines.push("")
   lines.push(color.dim("─".repeat(40)))
@@ -153,6 +154,10 @@ export function validateNonTuiArgs(args: InstallArgs): { valid: boolean; errors:
     errors.push(`Invalid --kimi-for-coding value: ${args.kimiForCoding} (expected: no, yes)`)
   }
 
+  if (args.minimax !== undefined && !["no", "yes"].includes(args.minimax)) {
+    errors.push(`Invalid --minimax value: ${args.minimax} (expected: no, yes)`)
+  }
+
   return { valid: errors.length === 0, errors }
 }
 
@@ -165,8 +170,9 @@ export function argsToConfig(args: InstallArgs): InstallConfig {
     hasCopilot: args.copilot === "yes",
     hasOpencodeZen: args.opencodeZen === "yes",
     hasZaiCodingPlan: args.zaiCodingPlan === "yes",
-hasKimiForCoding: args.kimiForCoding === "yes",
+    hasKimiForCoding: args.kimiForCoding === "yes",
     hasOpencodeGo: args.opencodeGo === "yes",
+    hasMinimax: args.minimax === "yes",
   }
 }
 
@@ -177,8 +183,9 @@ export function detectedToInitialValues(detected: DetectedConfig): {
   copilot: BooleanArg
   opencodeZen: BooleanArg
   zaiCodingPlan: BooleanArg
-kimiForCoding: BooleanArg
+  kimiForCoding: BooleanArg
   opencodeGo: BooleanArg
+  minimax: BooleanArg
 } {
   let claude: ClaudeSubscription = "no"
   if (detected.hasClaude) {
@@ -192,7 +199,8 @@ kimiForCoding: BooleanArg
     copilot: detected.hasCopilot ? "yes" : "no",
     opencodeZen: detected.hasOpencodeZen ? "yes" : "no",
     zaiCodingPlan: detected.hasZaiCodingPlan ? "yes" : "no",
-kimiForCoding: detected.hasKimiForCoding ? "yes" : "no",
+    kimiForCoding: detected.hasKimiForCoding ? "yes" : "no",
     opencodeGo: detected.hasOpencodeGo ? "yes" : "no",
+    minimax: detected.hasMinimax ? "yes" : "no",
   }
 }

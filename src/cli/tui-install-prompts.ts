@@ -110,6 +110,16 @@ export async function promptInstallConfig(detected: DetectedConfig): Promise<Ins
   })
   if (!opencodeGo) return null
 
+  const minimax = await selectOrCancel({
+    message: "Do you have a MiniMax subscription?",
+    options: [
+      { value: "no", label: "No", hint: "Will use other configured providers" },
+      { value: "yes", label: "Yes", hint: "MiniMax-M2.7 for all agents (recommended)" },
+    ],
+    initialValue: initial.minimax,
+  })
+  if (!minimax) return null
+
   return {
     hasClaude: claude !== "no",
     isMax20: claude === "max20",
@@ -120,5 +130,6 @@ export async function promptInstallConfig(detected: DetectedConfig): Promise<Ins
     hasZaiCodingPlan: zaiCodingPlan === "yes",
     hasKimiForCoding: kimiForCoding === "yes",
     hasOpencodeGo: opencodeGo === "yes",
+    hasMinimax: minimax === "yes",
   }
 }
