@@ -248,7 +248,7 @@ describe('TmuxSessionManager', () => {
 
       // then
       expect(manager).toBeDefined()
-      // The manager should have been created with the fallback URL
+      expect(manager.getServerUrl()).toMatch(/^http:\/\/localhost:\d+$/)
     })
 
     test('falls back to localhost when serverUrl is undefined', async () => {
@@ -272,6 +272,7 @@ describe('TmuxSessionManager', () => {
 
       // then
       expect(manager).toBeDefined()
+      expect(manager.getServerUrl()).toMatch(/^http:\/\/localhost:\d+$/)
     })
 
     test('uses valid serverUrl with proper port', async () => {
@@ -295,6 +296,31 @@ describe('TmuxSessionManager', () => {
 
       // then
       expect(manager).toBeDefined()
+      expect(manager.getServerUrl()).toBe('http://localhost:54220/')
+    })
+
+    test('uses valid serverUrl with empty port (protocol default)', async () => {
+      // given
+      mockIsInsideTmux.mockReturnValue(true)
+      const { TmuxSessionManager } = await import('./manager')
+      const ctx = {
+        serverUrl: new URL('http://localhost'),
+        client: createMockContext().client,
+      } as any
+      const config: TmuxConfig = {
+        enabled: true,
+        layout: 'main-vertical',
+        main_pane_size: 60,
+        main_pane_min_width: 80,
+        agent_pane_min_width: 40,
+      }
+
+      // when
+      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+
+      // then
+      expect(manager).toBeDefined()
+      expect(manager.getServerUrl()).toBe('http://localhost/')
     })
   })
 

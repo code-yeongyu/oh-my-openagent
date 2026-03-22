@@ -98,8 +98,8 @@ export class TmuxSessionManager {
 
   /**
    * Validates a server URL and returns it if valid, or null if invalid.
-   * URLs with port 0 are considered invalid because they indicate
-   * the server URL was not properly resolved (e.g., in serve+attach mode).
+   * Only port 0 is considered invalid (indicates unresolved URL in serve+attach mode).
+   * Empty port is allowed as it means using the protocol's default port.
    */
   private validateServerUrl(url: string | undefined): string | null {
     if (!url) {
@@ -111,8 +111,9 @@ export class TmuxSessionManager {
       // Port 0 means the server URL was not properly resolved
       // This commonly happens in serve+attach mode where ctx.serverUrl
       // resolves to http://127.0.0.1:0/
-      if (parsed.port === "0" || parsed.port === "") {
-        log("[tmux-session-manager] detected invalid serverUrl with port 0 or empty, falling back to default", {
+      // Empty port is allowed - it means use the protocol's default port (e.g., 80 for http)
+      if (parsed.port === "0") {
+        log("[tmux-session-manager] detected invalid serverUrl with port 0, falling back to default", {
           originalUrl: url
         })
         return null
@@ -124,6 +125,11 @@ export class TmuxSessionManager {
       })
       return null
     }
+  }
+
+  /** Exposed for testing purposes only */
+  getServerUrl(): string {
+    return this.serverUrl
   }
 
   private getCapacityConfig(): CapacityConfig {
