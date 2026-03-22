@@ -15,6 +15,7 @@ export type ModelRequirement = {
 export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   sisyphus: {
     fallbackChain: [
+      { providers: ["minimax"], model: "MiniMax-M2.7" },
       {
         providers: ["anthropic", "github-copilot", "opencode"],
         model: "claude-opus-4-6",
@@ -41,6 +42,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   hephaestus: {
     fallbackChain: [
+      { providers: ["minimax"], model: "MiniMax-M2.7" },
       {
         providers: ["openai", "venice", "opencode"],
         model: "gpt-5.3-codex",
@@ -52,6 +54,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   oracle: {
     fallbackChain: [
+      { providers: ["minimax"], model: "MiniMax-M2.7" },
       {
         providers: ["openai", "github-copilot", "opencode"],
         model: "gpt-5.4",
@@ -72,6 +75,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   librarian: {
     fallbackChain: [
+      { providers: ["minimax"], model: "MiniMax-M2.7" },
       { providers: ["opencode-go"], model: "minimax-m2.5" },
       { providers: ["opencode"], model: "minimax-m2.5-free" },
       { providers: ["anthropic", "opencode"], model: "claude-haiku-4-5" },
@@ -80,6 +84,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   explore: {
     fallbackChain: [
+      { providers: ["minimax"], model: "MiniMax-M2.7" },
       { providers: ["github-copilot"], model: "grok-code-fast-1" },
       { providers: ["opencode-go"], model: "minimax-m2.5" },
       { providers: ["opencode"], model: "minimax-m2.5-free" },
@@ -89,6 +94,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   "multimodal-looker": {
     fallbackChain: [
+      { providers: ["minimax"], model: "MiniMax-M2.7" },
       { providers: ["openai", "opencode"], model: "gpt-5.4", variant: "medium" },
       { providers: ["opencode-go"], model: "kimi-k2.5" },
       { providers: ["zai-coding-plan"], model: "glm-4.6v" },
@@ -97,6 +103,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   prometheus: {
     fallbackChain: [
+      { providers: ["minimax"], model: "MiniMax-M2.7" },
       {
         providers: ["anthropic", "github-copilot", "opencode"],
         model: "claude-opus-4-6",
@@ -116,6 +123,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   metis: {
     fallbackChain: [
+      { providers: ["minimax"], model: "MiniMax-M2.7" },
       {
         providers: ["anthropic", "github-copilot", "opencode"],
         model: "claude-opus-4-6",
@@ -132,6 +140,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   momus: {
     fallbackChain: [
+      { providers: ["minimax"], model: "MiniMax-M2.7" },
       {
         providers: ["openai", "github-copilot", "opencode"],
         model: "gpt-5.4",
@@ -152,6 +161,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   atlas: {
     fallbackChain: [
+      { providers: ["minimax"], model: "MiniMax-M2.7" },
       { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-sonnet-4-6" },
       { providers: ["opencode-go"], model: "kimi-k2.5" },
       {
@@ -163,6 +173,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   "sisyphus-junior": {
     fallbackChain: [
+      { providers: ["minimax"], model: "MiniMax-M2.7" },
       { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-sonnet-4-6" },
       { providers: ["opencode-go"], model: "kimi-k2.5" },
       {
@@ -178,6 +189,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
 export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   "visual-engineering": {
     fallbackChain: [
+      { providers: ["minimax"], model: "MiniMax-M2.7" },
       {
         providers: ["google", "github-copilot", "opencode"],
         model: "gemini-3.1-pro",
@@ -195,6 +207,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   ultrabrain: {
     fallbackChain: [
+      { providers: ["minimax"], model: "MiniMax-M2.7" },
       {
         providers: ["openai", "opencode"],
         model: "gpt-5.4",
@@ -215,6 +228,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   deep: {
     fallbackChain: [
+      { providers: ["minimax"], model: "MiniMax-M2.7" },
       {
         providers: ["openai", "opencode"],
         model: "gpt-5.3-codex",
@@ -235,6 +249,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   artistry: {
     fallbackChain: [
+      { providers: ["minimax"], model: "MiniMax-M2.7" },
       {
         providers: ["google", "github-copilot", "opencode"],
         model: "gemini-3.1-pro",
@@ -251,6 +266,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   quick: {
     fallbackChain: [
+      { providers: ["minimax"], model: "MiniMax-M2.7" },
       {
         providers: ["openai", "github-copilot", "opencode"],
         model: "gpt-5.4-mini",
@@ -269,6 +285,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   "unspecified-low": {
     fallbackChain: [
+      { providers: ["minimax"], model: "MiniMax-M2.7" },
       {
         providers: ["anthropic", "github-copilot", "opencode"],
         model: "claude-sonnet-4-6",
@@ -287,6 +304,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   "unspecified-high": {
     fallbackChain: [
+      { providers: ["minimax"], model: "MiniMax-M2.7" },
       {
         providers: ["anthropic", "github-copilot", "opencode"],
         model: "claude-opus-4-6",
@@ -316,6 +334,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   writing: {
     fallbackChain: [
+      { providers: ["minimax"], model: "MiniMax-M2.7" },
       {
         providers: ["google", "github-copilot", "opencode"],
         model: "gemini-3-flash",
