@@ -3736,6 +3736,147 @@
       },
       "additionalProperties": false
     },
+    "openclaw": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "default": false,
+          "type": "boolean"
+        },
+        "gateways": {
+          "default": {},
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "default": "http",
+                "type": "string",
+                "enum": [
+                  "http",
+                  "command"
+                ]
+              },
+              "url": {
+                "type": "string"
+              },
+              "method": {
+                "default": "POST",
+                "type": "string"
+              },
+              "headers": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "command": {
+                "type": "string"
+              },
+              "timeout": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "type",
+              "method"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "hooks": {
+          "default": {},
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "default": true,
+                "type": "boolean"
+              },
+              "gateway": {
+                "type": "string"
+              },
+              "instruction": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "enabled",
+              "gateway",
+              "instruction"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "replyListener": {
+          "type": "object",
+          "properties": {
+            "discordBotToken": {
+              "type": "string"
+            },
+            "discordChannelId": {
+              "type": "string"
+            },
+            "discordMention": {
+              "type": "string"
+            },
+            "authorizedDiscordUserIds": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "telegramBotToken": {
+              "type": "string"
+            },
+            "telegramChatId": {
+              "type": "string"
+            },
+            "pollIntervalMs": {
+              "default": 3000,
+              "type": "number"
+            },
+            "rateLimitPerMinute": {
+              "default": 10,
+              "type": "number"
+            },
+            "maxMessageLength": {
+              "default": 500,
+              "type": "number"
+            },
+            "includePrefix": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "authorizedDiscordUserIds",
+            "pollIntervalMs",
+            "rateLimitPerMinute",
+            "maxMessageLength",
+            "includePrefix"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "enabled",
+        "gateways",
+        "hooks"
+      ],
+      "additionalProperties": false
+    },
     "babysitting": {
       "type": "object",
       "properties": {
