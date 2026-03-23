@@ -40,22 +40,26 @@ function resolveFallbackChainForCallOmoAgent(args: {
 function resolveModelForCallOmoAgent(args: {
   subagentType: string
   agentOverrides?: AgentOverrides
+  userCategories?: CategoriesConfig
 }): { providerID: string; modelID: string; variant?: string } | undefined {
-  const { subagentType, agentOverrides } = args
+  const { subagentType, agentOverrides, userCategories } = args
   const agentConfigKey = getAgentConfigKey(subagentType)
   const agentOverride = agentOverrides?.[agentConfigKey as keyof AgentOverrides]
     ?? (agentOverrides
       ? Object.entries(agentOverrides).find(([key]) => key.toLowerCase() === agentConfigKey)?.[1]
       : undefined)
 
-  if (!agentOverride?.model) return undefined
+  const modelString = agentOverride?.model
+    ?? (agentOverride?.category ? userCategories?.[agentOverride.category]?.model : undefined)
+  if (!modelString) return undefined
 
-  const normalized = normalizeModelFormat(agentOverride.model)
+  const normalized = normalizeModelFormat(modelString)
   if (!normalized) return undefined
 
-  return agentOverride.variant
-    ? { ...normalized, variant: agentOverride.variant }
-    : normalized
+  const variant = agentOverride?.variant
+    ?? (agentOverride?.category ? userCategories?.[agentOverride.category]?.variant : undefined)
+
+  return variant ? { ...normalized, variant } : normalized
 }
 
 export function createCallOmoAgent(
@@ -113,6 +117,7 @@ export function createCallOmoAgent(
       const agentModel = resolveModelForCallOmoAgent({
         subagentType: args.subagent_type,
         agentOverrides,
+        userCategories,
       })
 
       if (args.run_in_background) {

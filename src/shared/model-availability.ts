@@ -58,17 +58,12 @@ export function fuzzyMatchModel(
 	}
 
 	if (candidates.length === 0) {
-		if (providers && providers.length > 0) {
-			log("[fuzzyMatchModel] no candidates after provider filter, retrying without provider filter", {
-				target,
-				providers,
-				availableCount: available.size,
-			})
-			candidates = allCandidates
-		} else {
-		log("[fuzzyMatchModel] no candidates after filter")
-		return null
-		}
+		log("[fuzzyMatchModel] no candidates after provider filter, retrying without provider filter", {
+			target,
+			providers,
+			availableCount: available.size,
+		})
+		candidates = allCandidates
 	}
 
 	// Find all matches (case-insensitive substring match with normalization)

@@ -137,7 +137,6 @@ export function resolveModelPipeline(
 
   if (fallbackChain && fallbackChain.length > 0) {
     if (availableModels.size === 0) {
-      const connectedProviders = constraints.connectedProviders ?? connectedProvidersCache.readConnectedProvidersCache()
       const connectedSet = connectedProviders ? new Set(connectedProviders) : null
 
       if (connectedSet === null) {
