@@ -44,7 +44,9 @@ export function applyToolConfig(params: {
 
   const isCliRunMode = process.env.OPENCODE_CLI_RUN_MODE === "true";
   const configQuestionPermission = getConfigQuestionPermission();
+  const isQuestionDisabledByPlugin = params.pluginConfig.disabled_tools?.includes("question") ?? false;
   const questionPermission =
+    isQuestionDisabledByPlugin ? "deny" :
     configQuestionPermission === "deny" ? "deny" :
     isCliRunMode ? "deny" :
     "allow";
