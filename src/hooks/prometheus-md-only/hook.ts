@@ -23,12 +23,12 @@ export function createPrometheusMdOnlyHook(ctx: PluginInput) {
 
       const toolName = input.tool
 
-      // Inject read-only warning for task tools called by Prometheus
+      // Inject planning-only warning for task tools called by Prometheus
        if (TASK_TOOLS.includes(toolName)) {
          const prompt = output.args.prompt as string | undefined
          if (prompt && !prompt.includes(SYSTEM_DIRECTIVE_PREFIX)) {
            output.args.prompt = PLANNING_CONSULT_WARNING + prompt
-          log(`[${HOOK_NAME}] Injected read-only planning warning to ${toolName}`, {
+          log(`[${HOOK_NAME}] Injected planning warning to ${toolName}`, {
             sessionID: input.sessionID,
             tool: toolName,
             agent: agentName,
@@ -54,9 +54,8 @@ export function createPrometheusMdOnlyHook(ctx: PluginInput) {
            agent: agentName,
          })
          throw new Error(
-           `[${HOOK_NAME}] ${getAgentDisplayName("prometheus")} can only write/edit .md files inside .sisyphus/ directory. ` +
+           `[${HOOK_NAME}] Prometheus is a planning agent. File operations restricted to .sisyphus/*.md plan files only. Use task() to delegate implementation. ` +
            `Attempted to modify: ${filePath}. ` +
-           `${getAgentDisplayName("prometheus")} is a READ-ONLY planner. Use /start-work to execute the plan. ` +
            `APOLOGIZE TO THE USER, REMIND OF YOUR PLAN WRITING PROCESSES, TELL USER WHAT YOU WILL GOING TO DO AS THE PROCESS, WRITE THE PLAN`
          )
        }
