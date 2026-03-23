@@ -226,6 +226,29 @@ describe('TmuxSessionManager', () => {
       // then
       expect(manager).toBeDefined()
     })
+
+    test('falls back to default port when serverUrl has port 0', async () => {
+      // given
+      mockIsInsideTmux.mockReturnValue(true)
+      const { TmuxSessionManager } = await import('./manager')
+      const ctx = {
+        ...createMockContext(),
+        serverUrl: new URL('http://127.0.0.1:0/'),
+      }
+      const config: TmuxConfig = {
+        enabled: true,
+        layout: 'main-vertical',
+        main_pane_size: 60,
+        main_pane_min_width: 80,
+        agent_pane_min_width: 40,
+      }
+
+      // when
+      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+
+      // then
+      expect((manager as any).serverUrl).toBe('http://localhost:4096')
+    })
   })
 
   describe('onSessionCreated', () => {
