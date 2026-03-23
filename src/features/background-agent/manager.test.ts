@@ -1,5 +1,5 @@
 declare const require: (name: string) => any
-const { describe, test, expect, beforeEach, afterEach } = require("bun:test")
+const { describe, test, expect, beforeEach, afterEach, spyOn } = require("bun:test")
 import { tmpdir } from "node:os"
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { BackgroundTask, ResumeInput } from "./types"
@@ -2781,6 +2781,18 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
 })
 
 describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
+  const originalDateNow = Date.now
+  let fixedTime: number
+
+  beforeEach(() => {
+    fixedTime = Date.now()
+    spyOn(globalThis.Date, "now").mockReturnValue(fixedTime)
+  })
+
+  afterEach(() => {
+    Date.now = originalDateNow
+  })
+
    test("should NOT interrupt task running less than 30 seconds (min runtime guard)", async () => {
      const client = {
        session: {
@@ -3027,10 +3039,10 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
       prompt: "Test",
       agent: "test-agent",
       status: "running",
-      startedAt: new Date(Date.now() - 25 * 60 * 1000),
+      startedAt: new Date(Date.now() - 50 * 60 * 1000),
       progress: {
         toolCalls: 1,
-        lastUpdate: new Date(Date.now() - 21 * 60 * 1000),
+        lastUpdate: new Date(Date.now() - 46 * 60 * 1000),
       },
     }
 

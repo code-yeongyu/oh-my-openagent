@@ -4,8 +4,8 @@ import type { BackgroundTask, LaunchInput } from "./types"
 export const TASK_TTL_MS = 30 * 60 * 1000
 export const TERMINAL_TASK_TTL_MS = 30 * 60 * 1000
 export const MIN_STABILITY_TIME_MS = 10 * 1000
-export const DEFAULT_STALE_TIMEOUT_MS = 1_200_000
-export const DEFAULT_MESSAGE_STALENESS_TIMEOUT_MS = 1_800_000
+export const DEFAULT_STALE_TIMEOUT_MS = 2_700_000
+export const DEFAULT_MESSAGE_STALENESS_TIMEOUT_MS = 3_600_000
 export const DEFAULT_MAX_TOOL_CALLS = 4000
 export const DEFAULT_CIRCUIT_BREAKER_CONSECUTIVE_THRESHOLD = 20
 export const DEFAULT_CIRCUIT_BREAKER_ENABLED = true
