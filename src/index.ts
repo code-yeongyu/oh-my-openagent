@@ -89,6 +89,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   activePluginDispose = dispose
 
   return {
+    name: "oh-my-openagent",
     ...pluginInterface,
 
     "experimental.session.compacting": async (
