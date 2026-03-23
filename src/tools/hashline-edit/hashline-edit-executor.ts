@@ -6,6 +6,8 @@ import { canonicalizeFileText, restoreFileText } from "./file-text-canonicalizat
 import { normalizeHashlineEdits, type RawHashlineEdit } from "./normalize-edits"
 import type { HashlineEdit } from "./types"
 import { HashlineMismatchError } from "./validation"
+import { runFormattersForFile } from "./formatter-trigger"
+import type { PluginContext } from "../../plugin/types"
 
 interface HashlineEditArgs {
   filePath: string
@@ -80,7 +82,7 @@ function buildSuccessMeta(
   }
 }
 
-export async function executeHashlineEditTool(args: HashlineEditArgs, context: ToolContext): Promise<string> {
+export async function executeHashlineEditTool(args: HashlineEditArgs, context: ToolContext, pluginCtx?: PluginContext): Promise<string> {
   try {
     const metadataContext = context as ToolContextWithMetadata
     const filePath = args.filePath
@@ -128,6 +130,34 @@ export async function executeHashlineEditTool(args: HashlineEditArgs, context: T
     const writeContent = restoreFileText(canonicalNewContent, oldEnvelope)
 
     await Bun.write(filePath, writeContent)
+
+    if (pluginCtx?.client) {
+      await runFormattersForFile(pluginCtx.client as any, context.directory, filePath)
+      const formattedContent = Buffer.from(await Bun.file(filePath).arrayBuffer()).toString("utf8")
+      if (formattedContent !== writeContent) {
+        const formattedEnvelope = canonicalizeFileText(formattedContent)
+        const formattedMeta = buildSuccessMeta(
+          filePath,
+          oldEnvelope.content,
+          formattedEnvelope.content,
+          applyResult.noopEdits,
+          applyResult.deduplicatedEdits
+        )
+        if (typeof metadataContext.metadata === "function") {
+          metadataContext.metadata(formattedMeta)
+        }
+        const callID = resolveToolCallID(metadataContext)
+        if (callID) {
+          storeToolMetadata(context.sessionID, callID, formattedMeta)
+        }
+        if (rename && rename !== filePath) {
+          await Bun.write(rename, formattedContent)
+          await Bun.file(filePath).delete()
+          return `Moved ${filePath} to ${rename}`
+        }
+        return `Updated ${filePath}`
+      }
+    }
 
     if (rename && rename !== filePath) {
       await Bun.write(rename, writeContent)
