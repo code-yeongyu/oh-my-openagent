@@ -6,7 +6,7 @@ import { canonicalizeFileText, restoreFileText } from "./file-text-canonicalizat
 import { normalizeHashlineEdits, type RawHashlineEdit } from "./normalize-edits"
 import type { HashlineEdit } from "./types"
 import { HashlineMismatchError } from "./validation"
-import { runFormattersForFile } from "./formatter-trigger"
+import { runFormattersForFile, type FormatterClient } from "./formatter-trigger"
 import type { PluginContext } from "../../plugin/types"
 
 interface HashlineEditArgs {
@@ -132,7 +132,7 @@ export async function executeHashlineEditTool(args: HashlineEditArgs, context: T
     await Bun.write(filePath, writeContent)
 
     if (pluginCtx?.client) {
-      await runFormattersForFile(pluginCtx.client as any, context.directory, filePath)
+      await runFormattersForFile(pluginCtx.client as FormatterClient, context.directory, filePath)
       const formattedContent = Buffer.from(await Bun.file(filePath).arrayBuffer()).toString("utf8")
       if (formattedContent !== writeContent) {
         const formattedEnvelope = canonicalizeFileText(formattedContent)

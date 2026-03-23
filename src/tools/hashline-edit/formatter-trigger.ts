@@ -19,7 +19,7 @@ interface OpencodeConfig {
   }
 }
 
-interface OpencodeClient {
+export interface FormatterClient {
   config: {
     get: (options?: { query?: { directory?: string } }) => Promise<{ data?: OpencodeConfig }>
   }
@@ -27,8 +27,8 @@ interface OpencodeClient {
 
 let cachedFormatters: Map<string, Array<{ command: string[]; environment: Record<string, string> }>> | null = null
 
-async function resolveFormatters(
-  client: OpencodeClient,
+export async function resolveFormatters(
+  client: FormatterClient,
   directory: string,
 ): Promise<Map<string, Array<{ command: string[]; environment: Record<string, string> }>>> {
   if (cachedFormatters) return cachedFormatters
@@ -76,12 +76,12 @@ async function resolveFormatters(
   return result
 }
 
-function buildFormatterCommand(command: string[], filePath: string): string[] {
+export function buildFormatterCommand(command: string[], filePath: string): string[] {
   return command.map((arg) => arg.replace(/\$FILE/g, filePath))
 }
 
 export async function runFormattersForFile(
-  client: OpencodeClient,
+  client: FormatterClient,
   directory: string,
   filePath: string,
 ): Promise<void> {
