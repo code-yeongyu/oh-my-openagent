@@ -1,4 +1,5 @@
 import type { ToolDefinition } from "@opencode-ai/plugin"
+import type { SkillLoadOptions } from "../tools/skill/types"
 
 import type {
   AvailableCategory,
@@ -112,6 +113,8 @@ export function createToolRegistry(args: {
     mcpManager: managers.skillMcpManager,
     getSessionID: getSessionIDForMcp,
     gitMasterConfig: pluginConfig.git_master,
+    // ctx.skills is available when OpenCode >= TBD; safe to access since nativeSkills is optional
+    nativeSkills: "skills" in ctx ? (ctx as { skills: SkillLoadOptions["nativeSkills"] }).skills : undefined,
   })
 
   const taskSystemEnabled = pluginConfig.experimental?.task_system ?? false
