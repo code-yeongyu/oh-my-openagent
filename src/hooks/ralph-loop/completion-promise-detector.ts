@@ -17,6 +17,18 @@ function buildPromisePattern(promise: string): RegExp {
 	return new RegExp(`<promise>\\s*${escapeRegex(promise)}\\s*</promise>`, "is")
 }
 
+const SEMANTIC_COMPLETION_PATTERNS = [
+	/\b(?:task|work|implementation|all\s+tasks?)\s+(?:is|are)\s+(?:complete|completed|done|finished)\b/i,
+	/\ball\s+(?:items?|todos?|steps?)\s+(?:are\s+)?(?:complete|completed|done|finished|marked)\b/i,
+	/\b(?:everything|all\s+work)\s+(?:is\s+)?(?:complete|completed|done|finished)\b/i,
+	/\bsuccessfully\s+completed?\s+all\b/i,
+	/\bnothing\s+(?:left|more|remaining)\s+to\s+(?:do|implement|fix)\b/i,
+]
+
+export function detectSemanticCompletion(text: string): boolean {
+	return SEMANTIC_COMPLETION_PATTERNS.some((pattern) => pattern.test(text))
+}
+
 export function detectCompletionInTranscript(
 	transcriptPath: string | undefined,
 	promise: string,
@@ -37,6 +49,11 @@ export function detectCompletionInTranscript(
 				if (entry.type === "user") continue
 				if (startedAt && entry.timestamp && entry.timestamp < startedAt) continue
 				if (pattern.test(line)) return true
+				// Fallback: check for semantic completion
+				if (detectSemanticCompletion(line)) {
+					log("[ralph-loop] WARNING: Semantic completion detected in transcript (agent used natural language instead of <promise>DONE</promise>)")
+					return true
+				}
 			} catch {
 				continue
 			}
@@ -98,6 +115,14 @@ export async function detectCompletionInSessionMessages(
 			}
 
 			if (pattern.test(responseText)) {
+				return true
+			}
+
+			// Fallback: check for semantic completion
+			if (detectSemanticCompletion(responseText)) {
+				log("[ralph-loop] WARNING: Semantic completion detected (agent used natural language instead of <promise>DONE</promise>)", {
+					sessionID: options.sessionID,
+				})
 				return true
 			}
 		}
