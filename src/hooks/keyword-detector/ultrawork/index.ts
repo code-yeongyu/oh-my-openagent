@@ -10,6 +10,7 @@
 
 export {
   isPlannerAgent,
+  isNonOmoAgent,
   isGptModel,
   isGeminiModel,
   getUltraworkSource,
