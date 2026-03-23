@@ -23,6 +23,16 @@ export function isPlannerAgent(agentName?: string): boolean {
   return /\bplan\b/.test(normalized)
 }
 
+/**
+ * Checks if agent is a non-OMO agent (e.g., OpenCode's built-in Builder/Plan).
+ * Non-OMO agents should not receive keyword injection (search-mode, analyze-mode, etc.).
+ */
+export function isNonOmoAgent(agentName?: string): boolean {
+  if (!agentName) return false
+  const lowerName = agentName.toLowerCase()
+  return lowerName.includes("builder") || lowerName === "plan"
+}
+
 export { isGptModel, isGeminiModel }
 
 /** Ultrawork message source type */
