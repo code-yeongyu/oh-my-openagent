@@ -238,4 +238,28 @@ describe("quota error detection (fixes #2747)", () => {
     //#then
     expect(retryable).toBe(true)
   })
+
+  test("classifies QuotaExceededError by errorName even without quota keywords in message", () => {
+    //#given
+    const error = { name: "QuotaExceededError", message: "Request failed." }
+
+    //#when
+    const errorType = classifyErrorType(error)
+
+    //#then
+    expect(errorType).toBe("quota_exceeded")
+  })
+
+  test("matches payment required pattern directly via RETRYABLE_ERROR_PATTERNS", () => {
+    //#given — message has no quota keyword, only "payment required"
+    const error = { message: "Error 402: payment required for this request" }
+
+    //#when — classifyErrorType will NOT match (no quota keyword), so isRetryableError must use RETRYABLE_ERROR_PATTERNS
+    const errorType = classifyErrorType(error)
+    const retryable = isRetryableError(error, [429, 503])
+
+    //#then
+    expect(errorType).toBe("quota_exceeded")
+    expect(retryable).toBe(true)
+  })
 })

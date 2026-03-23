@@ -120,6 +120,9 @@ export function classifyErrorType(error: unknown): string | undefined {
   }
 
   if (
+    errorName?.includes("quotaexceeded") ||
+    errorName?.includes("insufficientquota") ||
+    errorName?.includes("billingerror") ||
     /quota.?exceeded/i.test(message) ||
     /subscription.*quota/i.test(message) ||
     /insufficient.?quota/i.test(message) ||
