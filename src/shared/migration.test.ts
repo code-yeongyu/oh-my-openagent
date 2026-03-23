@@ -289,6 +289,19 @@ describe("migrateHookNames", () => {
     expect(removed).toHaveLength(1)
   })
 
+  test("removes gpt-permission-continuation from disabled hooks", () => {
+    // given: Config with removed GPT permission continuation hook
+    const hooks = ["gpt-permission-continuation", "comment-checker"]
+
+    // when: Migrate hook names
+    const { migrated, changed, removed } = migrateHookNames(hooks)
+
+    // then: Removed hook should be filtered out
+    expect(changed).toBe(true)
+    expect(migrated).toEqual(["comment-checker"])
+    expect(removed).toEqual(["gpt-permission-continuation"])
+  })
+
   test("handles mixed migration and removal", () => {
     // given: Config with both legacy rename and removed hooks
     const hooks = ["anthropic-auto-compact", "preemptive-compaction", "sisyphus-orchestrator"]
@@ -409,6 +422,20 @@ describe("migrateConfigFile", () => {
 
     const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
 
+    expect(needsWrite).toBe(true)
+    expect(rawConfig.disabled_hooks).toEqual(["comment-checker"])
+  })
+
+  test("removes gpt-permission-continuation from disabled_hooks", () => {
+    // given: Config with removed GPT permission continuation hook
+    const rawConfig: Record<string, unknown> = {
+      disabled_hooks: ["gpt-permission-continuation", "comment-checker"],
+    }
+
+    // when: Migrate config file
+    const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
+
+    // then: Removed hook should be filtered out
     expect(needsWrite).toBe(true)
     expect(rawConfig.disabled_hooks).toEqual(["comment-checker"])
   })

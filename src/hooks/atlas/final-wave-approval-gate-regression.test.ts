@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { createOpencodeClient } from "@opencode-ai/sdk"
-import type { AssistantMessage } from "@opencode-ai/sdk"
+import type { AssistantMessage, Session } from "@opencode-ai/sdk"
 import type { BoulderState } from "../../features/boulder-state"
 import { clearBoulderState, writeBoulderState } from "../../features/boulder-state"
 
@@ -51,6 +51,23 @@ describe("Atlas final-wave approval gate regressions", () => {
       request: new Request("http://localhost/session/prompt_async"),
       response: new Response(),
     }))
+
+    Reflect.set(client.session, "get", async ({ path }: { path: { id: string } }) => {
+      const parentID = path.id === "ses_nested_scope_review"
+        ? "atlas-nested-final-wave-session"
+        : path.id.startsWith("ses_parallel_review_")
+          ? "atlas-parallel-final-wave-session"
+          : "main-session-123"
+
+      return {
+        data: {
+          id: path.id,
+          parentID,
+        } as Session,
+        request: new Request(`http://localhost/session/${path.id}`),
+        response: new Response(),
+      }
+    })
 
     return {
       directory: testDirectory,

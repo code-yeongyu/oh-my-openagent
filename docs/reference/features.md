@@ -111,7 +111,7 @@ By combining these two concepts, you can generate optimal agents through `task`.
 | `ultrabrain`         | `openai/gpt-5.4` (xhigh)        | Deep logical reasoning, complex architecture decisions requiring extensive analysis                                         |
 | `deep`               | `openai/gpt-5.3-codex` (medium) | Goal-oriented autonomous problem-solving. Thorough research before action. For hairy problems requiring deep understanding. |
 | `artistry`           | `google/gemini-3.1-pro` (high)  | Highly creative/artistic tasks, novel ideas                                                                                 |
-| `quick`              | `anthropic/claude-haiku-4-5`    | Trivial tasks - single file changes, typo fixes, simple modifications                                                       |
+| `quick`              | `openai/gpt-5.4-mini`           | Trivial tasks - single file changes, typo fixes, simple modifications                                                       |
 | `unspecified-low`    | `anthropic/claude-sonnet-4-6`   | Tasks that don't fit other categories, low effort required                                                                  |
 | `unspecified-high`   | `anthropic/claude-opus-4-6` (max) | Tasks that don't fit other categories, high effort required                                                               |
 | `writing`            | `google/gemini-3-flash`         | Documentation, prose, technical writing                                                                                     |
@@ -680,7 +680,6 @@ Hooks intercept and modify behavior at key points in the agent lifecycle across 
 | **ralph-loop**              | Event + Message     | Manages self-referential loop continuation.                                                                                                                 |
 | **start-work**              | Message             | Handles /start-work command execution.                                                                                                                      |
 | **auto-slash-command**      | Message             | Automatically executes slash commands from prompts.                                                                                                         |
-| **gpt-permission-continuation** | Event           | Auto-continues GPT sessions when the final assistant reply ends with a permission-seeking tail such as `If you want, ...`.                               |
 | **stop-continuation-guard** | Event + Message     | Guards the stop-continuation mechanism.                                                                                                                     |
 | **category-skill-reminder** | Event + PostToolUse | Reminds agents about available category skills for delegation.                                                                                              |
 | **anthropic-effort**        | Params              | Adjusts Anthropic API effort level based on context.                                                                                                        |
@@ -735,7 +734,6 @@ Hooks intercept and modify behavior at key points in the agent lifecycle across 
 
 | Hook                           | Event | Description                                                |
 | ------------------------------ | ----- | ---------------------------------------------------------- |
-| **gpt-permission-continuation** | Event | Continues GPT replies that end in a permission-seeking tail. |
 | **todo-continuation-enforcer** | Event | Enforces todo completion — yanks idle agents back to work. |
 | **compaction-todo-preserver**  | Event | Preserves todo state during session compaction.            |
 | **unstable-agent-babysitter**  | Event | Handles unstable agent behavior with recovery strategies.  |
@@ -787,11 +785,9 @@ Disable specific hooks in config:
 
 ```json
 {
-  "disabled_hooks": ["comment-checker", "gpt-permission-continuation"]
+  "disabled_hooks": ["comment-checker"]
 }
 ```
-
-Use `gpt-permission-continuation` when you want GPT sessions to stop at permission-seeking endings instead of auto-resuming.
 
 ## MCPs
 

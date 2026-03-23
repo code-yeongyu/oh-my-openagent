@@ -11,8 +11,11 @@ import {
   getPlanName,
   createBoulderState,
   findPrometheusPlans,
+  getTaskSessionState,
+  upsertTaskSessionState,
 } from "./storage"
 import type { BoulderState } from "./types"
+import { readCurrentTopLevelTask } from "./top-level-task"
 
 describe("boulder-state", () => {
   const TEST_DIR = join(tmpdir(), "boulder-state-test-" + Date.now())
@@ -134,6 +137,24 @@ describe("boulder-state", () => {
       expect(result?.session_ids).toEqual(["session-1", "session-2"])
       expect(result?.plan_name).toBe("my-plan")
     })
+
+    test("should default task_sessions to empty object when missing from JSON", () => {
+      // given - boulder.json without task_sessions field
+      const boulderFile = join(SISYPHUS_DIR, "boulder.json")
+      writeFileSync(boulderFile, JSON.stringify({
+        active_plan: "/path/to/plan.md",
+        started_at: "2026-01-01T00:00:00Z",
+        session_ids: ["session-1"],
+        plan_name: "plan",
+      }))
+
+      // when
+      const result = readBoulderState(TEST_DIR)
+
+      // then
+      expect(result).not.toBeNull()
+      expect(result!.task_sessions).toEqual({})
+    })
   })
 
   describe("writeBoulderState", () => {
@@ -246,6 +267,115 @@ describe("boulder-state", () => {
       const success = clearBoulderState(TEST_DIR)
       // then
       expect(success).toBe(true)
+    })
+  })
+
+  describe("task session state", () => {
+    test("should persist and read preferred session for a top-level plan task", () => {
+      // given - existing boulder state
+      const state: BoulderState = {
+        active_plan: "/plan.md",
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: ["session-1"],
+        plan_name: "plan",
+      }
+      writeBoulderState(TEST_DIR, state)
+
+      // when
+      upsertTaskSessionState(TEST_DIR, {
+        taskKey: "todo:1",
+        taskLabel: "1",
+        taskTitle: "Implement auth flow",
+        sessionId: "ses_task_123",
+        agent: "sisyphus-junior",
+        category: "deep",
+      })
+      const result = getTaskSessionState(TEST_DIR, "todo:1")
+
+      // then
+      expect(result).not.toBeNull()
+      expect(result?.session_id).toBe("ses_task_123")
+      expect(result?.task_title).toBe("Implement auth flow")
+      expect(result?.agent).toBe("sisyphus-junior")
+      expect(result?.category).toBe("deep")
+    })
+
+    test("should overwrite preferred session for the same top-level plan task", () => {
+      // given - existing boulder state with prior preferred session
+      const state: BoulderState = {
+        active_plan: "/plan.md",
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: ["session-1"],
+        plan_name: "plan",
+        task_sessions: {
+          "todo:1": {
+            task_key: "todo:1",
+            task_label: "1",
+            task_title: "Implement auth flow",
+            session_id: "ses_old",
+            updated_at: "2026-01-02T10:00:00Z",
+          },
+        },
+      }
+      writeBoulderState(TEST_DIR, state)
+
+      // when
+      upsertTaskSessionState(TEST_DIR, {
+        taskKey: "todo:1",
+        taskLabel: "1",
+        taskTitle: "Implement auth flow",
+        sessionId: "ses_new",
+      })
+      const result = getTaskSessionState(TEST_DIR, "todo:1")
+
+      // then
+      expect(result?.session_id).toBe("ses_new")
+    })
+  })
+
+  describe("readCurrentTopLevelTask", () => {
+    test("should return the first unchecked top-level task in TODOs", () => {
+      // given - plan with nested and top-level unchecked tasks
+      const planPath = join(TEST_DIR, "current-task-plan.md")
+      writeFileSync(planPath, `# Plan
+
+## TODOs
+- [x] 1. Finished task
+  - [ ] nested acceptance checkbox
+- [ ] 2. Current task
+
+## Final Verification Wave
+- [ ] F1. Final review
+`)
+
+      // when
+      const result = readCurrentTopLevelTask(planPath)
+
+      // then
+      expect(result).not.toBeNull()
+      expect(result?.key).toBe("todo:2")
+      expect(result?.title).toBe("Current task")
+    })
+
+    test("should fall back to final-wave task when implementation tasks are complete", () => {
+      // given - plan with only final-wave work remaining
+      const planPath = join(TEST_DIR, "final-wave-current-task-plan.md")
+      writeFileSync(planPath, `# Plan
+
+## TODOs
+- [x] 1. Finished task
+
+## Final Verification Wave
+- [ ] F1. Final review
+`)
+
+      // when
+      const result = readCurrentTopLevelTask(planPath)
+
+      // then
+      expect(result).not.toBeNull()
+      expect(result?.key).toBe("final-wave:f1")
+      expect(result?.title).toBe("Final review")
     })
   })
 

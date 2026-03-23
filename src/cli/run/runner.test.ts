@@ -115,6 +115,42 @@ describe("waitForEventProcessorShutdown", () => {
   })
 })
 
+describe("run environment setup", () => {
+  let originalClient: string | undefined
+  let originalRunMode: string | undefined
+
+  beforeEach(() => {
+    originalClient = process.env.OPENCODE_CLIENT
+    originalRunMode = process.env.OPENCODE_CLI_RUN_MODE
+  })
+
+  afterEach(() => {
+    if (originalClient === undefined) {
+      delete process.env.OPENCODE_CLIENT
+    } else {
+      process.env.OPENCODE_CLIENT = originalClient
+    }
+    if (originalRunMode === undefined) {
+      delete process.env.OPENCODE_CLI_RUN_MODE
+    } else {
+      process.env.OPENCODE_CLI_RUN_MODE = originalRunMode
+    }
+  })
+
+  it("sets OPENCODE_CLIENT to 'run' to exclude question tool from registry", async () => {
+    //#given
+    delete process.env.OPENCODE_CLIENT
+
+    //#when - run() sets env vars synchronously before any async work
+    const { run } = await import(`./runner?env-setup-${Date.now()}`)
+    run({ message: "test" }).catch(() => {})
+
+    //#then
+    expect(String(process.env.OPENCODE_CLIENT)).toBe("run")
+    expect(String(process.env.OPENCODE_CLI_RUN_MODE)).toBe("true")
+  })
+})
+
 describe("run with invalid model", () => {
   it("given invalid --model value, when run, then returns exit code 1 with error message", async () => {
     // given

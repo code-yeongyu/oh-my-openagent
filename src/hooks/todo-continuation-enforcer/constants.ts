@@ -10,7 +10,8 @@ Incomplete tasks remain in your todo list. Continue working on the next pending 
 
 - Proceed without asking for permission
 - Mark each task complete when finished
-- Do not stop until all tasks are done`
+- Do not stop until all tasks are done
+- If you believe all work is already complete, the system is questioning your completion claim. Critically re-examine each todo item from a skeptical perspective, verify the work was actually done correctly, and update the todo list accordingly.`
 
 export const COUNTDOWN_SECONDS = 2
 export const TOAST_DURATION_MS = 900

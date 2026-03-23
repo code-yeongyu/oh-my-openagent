@@ -93,7 +93,7 @@ export async function detectCompletionInSessionMessages(
 
 			let responseText = ""
 			for (const part of assistant.parts) {
-				if (part.type !== "text") continue
+				if (part.type !== "text" && part.type !== "tool_result") continue
 				responseText += `${responseText ? "\n" : ""}${part.text ?? ""}`
 			}
 

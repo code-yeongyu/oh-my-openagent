@@ -1,7 +1,6 @@
 import { z } from "zod"
 
 export const HookNameSchema = z.enum([
-  "gpt-permission-continuation",
   "todo-continuation-enforcer",
   "context-window-monitor",
   "session-recovery",

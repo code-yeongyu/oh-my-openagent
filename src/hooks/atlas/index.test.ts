@@ -10,6 +10,7 @@ import {
 } from "../../features/boulder-state"
 import type { BoulderState } from "../../features/boulder-state"
 import { _resetForTesting, subagentSessions, updateSessionAgent } from "../../features/claude-code-session-state"
+import type { PendingTaskRef } from "./types"
 
 const TEST_STORAGE_ROOT = join(tmpdir(), `atlas-message-storage-${randomUUID()}`)
 const TEST_MESSAGE_STORAGE = join(TEST_STORAGE_ROOT, "message")
@@ -33,25 +34,40 @@ mock.module("../../shared/opencode-storage-detection", () => ({
 }))
 
 const { createAtlasHook } = await import("./index")
+const { createToolExecuteAfterHandler } = await import("./tool-execute-after")
+const { createToolExecuteBeforeHandler } = await import("./tool-execute-before")
 const { MESSAGE_STORAGE } = await import("../../features/hook-message-injector")
 
 describe("atlas hook", () => {
   let TEST_DIR: string
   let SISYPHUS_DIR: string
 
-  function createMockPluginInput(overrides?: { promptMock?: ReturnType<typeof mock> }) {
+  function createMockPluginInput(overrides?: {
+    promptMock?: ReturnType<typeof mock>
+    sessionGetMock?: ReturnType<typeof mock>
+  }) {
     const promptMock = overrides?.promptMock ?? mock(() => Promise.resolve())
+    const sessionGetMock = overrides?.sessionGetMock ?? mock(async ({ path }: { path: { id: string } }) => ({
+      data: {
+        id: path.id,
+        parentID: path.id.startsWith("ses_") ? "session-1" : "main-session-123",
+      },
+    }))
     return {
       directory: TEST_DIR,
       client: {
         session: {
-          get: async () => ({ data: { parentID: "main-session-123" } }),
+          get: sessionGetMock,
           prompt: promptMock,
           promptAsync: promptMock,
         },
       },
       _promptMock: promptMock,
-    } as unknown as Parameters<typeof createAtlasHook>[0] & { _promptMock: ReturnType<typeof mock> }
+      _sessionGetMock: sessionGetMock,
+    } as unknown as Parameters<typeof createAtlasHook>[0] & {
+      _promptMock: ReturnType<typeof mock>
+      _sessionGetMock: ReturnType<typeof mock>
+    }
   }
 
   function setupMessageStorage(sessionID: string, agent: string): void {
@@ -404,9 +420,414 @@ describe("atlas hook", () => {
 
       // then - should include verification instructions
       expect(output.output).toContain("LYING")
-      expect(output.output).toContain("PHASE 1")
-      expect(output.output).toContain("PHASE 2")
+     expect(output.output).toContain("PHASE 1")
+     expect(output.output).toContain("PHASE 2")
       
+      cleanupMessageStorage(sessionID)
+    })
+
+    test("should clean pending task refs when a task returns background launch output", async () => {
+      // given - direct handlers with shared pending maps
+      const sessionID = "session-bg-launch-cleanup-test"
+      setupMessageStorage(sessionID, "atlas")
+
+      const planPath = join(TEST_DIR, "background-cleanup-plan.md")
+      writeFileSync(planPath, `# Plan
+
+## TODOs
+- [ ] 1. Implement auth flow
+`)
+      writeBoulderState(TEST_DIR, {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: ["session-1"],
+        plan_name: "background-cleanup-plan",
+      })
+
+      const pendingFilePaths = new Map<string, string>()
+      const pendingTaskRefs = new Map<string, PendingTaskRef>()
+      const beforeHandler = createToolExecuteBeforeHandler({
+        ctx: createMockPluginInput(),
+        pendingFilePaths,
+        pendingTaskRefs,
+      })
+      const afterHandler = createToolExecuteAfterHandler({
+        ctx: createMockPluginInput(),
+        pendingFilePaths,
+        pendingTaskRefs,
+        autoCommit: true,
+        getState: () => ({ promptFailureCount: 0 }),
+      })
+
+      // when - the task is captured before execution
+      await beforeHandler(
+        { tool: "task", sessionID, callID: "call-bg-launch" },
+        { args: { prompt: "Implement auth flow" } }
+      )
+      expect(pendingTaskRefs.size).toBe(1)
+
+      // and the task returns a background launch result
+      await afterHandler(
+        { tool: "task", sessionID, callID: "call-bg-launch" },
+        {
+          title: "Sisyphus Task",
+          output: "Background task launched.\n\nSession ID: ses_bg_12345",
+          metadata: {},
+        }
+      )
+
+      // then - the pending task ref is still cleaned up
+      expect(pendingTaskRefs.size).toBe(0)
+
+      cleanupMessageStorage(sessionID)
+    })
+
+     test("should persist preferred subagent session for the current top-level task", async () => {
+       // given - boulder state with a current top-level task, Atlas caller
+       const sessionID = "session-task-session-track-test"
+       setupMessageStorage(sessionID, "atlas")
+
+      const planPath = join(TEST_DIR, "task-session-plan.md")
+      writeFileSync(planPath, `# Plan
+
+## TODOs
+- [ ] 1. Implement auth flow
+  - [ ] nested acceptance checkbox
+`)
+
+      const state: BoulderState = {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: ["session-1"],
+        plan_name: "task-session-plan",
+      }
+      writeBoulderState(TEST_DIR, state)
+
+      const hook = createAtlasHook(createMockPluginInput())
+      const output = {
+        title: "Sisyphus Task",
+        output: `Task completed successfully
+
+<task_metadata>
+session_id: ses_auth_flow_123
+</task_metadata>`,
+        metadata: {
+          agent: "sisyphus-junior",
+          category: "deep",
+        },
+      }
+
+      // when
+      await hook["tool.execute.after"](
+        { tool: "task", sessionID },
+        output
+      )
+
+      // then
+     const updatedState = readBoulderState(TEST_DIR)
+      expect(updatedState?.task_sessions?.["todo:1"]?.session_id).toBe("ses_auth_flow_123")
+      expect(updatedState?.task_sessions?.["todo:1"]?.task_title).toBe("Implement auth flow")
+      expect(updatedState?.task_sessions?.["todo:1"]?.agent).toBe("sisyphus-junior")
+      expect(updatedState?.task_sessions?.["todo:1"]?.category).toBe("deep")
+
+      cleanupMessageStorage(sessionID)
+    })
+
+     test("should preserve the delegated task key even after the plan advances to the next task", async () => {
+       // given - Atlas caller starts task 1, then the plan advances before task output is processed
+       const sessionID = "session-stable-task-key-test"
+       setupMessageStorage(sessionID, "atlas")
+
+      const planPath = join(TEST_DIR, "stable-task-key-plan.md")
+      writeFileSync(planPath, `# Plan
+
+## TODOs
+- [ ] 1. Implement auth flow
+- [ ] 2. Add API validation
+`)
+
+      writeBoulderState(TEST_DIR, {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: ["session-1"],
+        plan_name: "stable-task-key-plan",
+      })
+
+      const hook = createAtlasHook(createMockPluginInput())
+
+      // when - Atlas delegates task 1
+      await hook["tool.execute.before"](
+        { tool: "task", sessionID, callID: "call-task-1" },
+        { args: { prompt: "Implement auth flow" } }
+      )
+
+      // and the plan is advanced before the task output is processed
+      writeFileSync(planPath, `# Plan
+
+## TODOs
+- [x] 1. Implement auth flow
+- [ ] 2. Add API validation
+`)
+
+      await hook["tool.execute.after"](
+        { tool: "task", sessionID, callID: "call-task-1" },
+        {
+          title: "Sisyphus Task",
+          output: `Task completed successfully
+
+<task_metadata>
+session_id: ses_auth_flow_123
+</task_metadata>`,
+          metadata: {
+            agent: "sisyphus-junior",
+            category: "deep",
+          },
+        }
+      )
+
+      // then - the completed task session is still recorded against task 1, not task 2
+     const updatedState = readBoulderState(TEST_DIR)
+      expect(updatedState?.task_sessions?.["todo:1"]?.session_id).toBe("ses_auth_flow_123")
+      expect(updatedState?.task_sessions?.["todo:2"]).toBeUndefined()
+
+      cleanupMessageStorage(sessionID)
+    })
+
+     test("should not overwrite the current task mapping when task() explicitly resumes an older session", async () => {
+       // given - current plan is on task 2, but Atlas explicitly resumes an older session for a previous task
+       const sessionID = "session-cross-task-resume-test"
+       setupMessageStorage(sessionID, "atlas")
+
+      const planPath = join(TEST_DIR, "cross-task-resume-plan.md")
+      writeFileSync(planPath, `# Plan
+
+## TODOs
+- [x] 1. Implement auth flow
+- [ ] 2. Add API validation
+`)
+
+      writeBoulderState(TEST_DIR, {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: ["session-1"],
+        plan_name: "cross-task-resume-plan",
+      })
+
+      const hook = createAtlasHook(createMockPluginInput())
+
+      // when - Atlas resumes an explicit prior session
+      await hook["tool.execute.before"](
+        { tool: "task", sessionID, callID: "call-resume-old-task" },
+        { args: { prompt: "Follow up on previous task", session_id: "ses_old_task_111" } }
+      )
+
+      const output = {
+        title: "Sisyphus Task",
+        output: `Task continued successfully
+
+<task_metadata>
+session_id: ses_old_task_111
+</task_metadata>`,
+        metadata: {
+          agent: "sisyphus-junior",
+          category: "deep",
+        },
+      }
+      await hook["tool.execute.after"](
+        { tool: "task", sessionID, callID: "call-resume-old-task" },
+        output
+      )
+
+      // then - Atlas does not poison task 2's preferred session mapping
+      const updatedState = readBoulderState(TEST_DIR)
+      expect(updatedState?.task_sessions?.["todo:2"]).toBeUndefined()
+      expect(output.output).not.toContain('task(session_id="ses_old_task_111"')
+
+      cleanupMessageStorage(sessionID)
+    })
+
+    test("should not reuse an explicitly resumed session id in completion reminders", async () => {
+      // given - current plan is on task 2 with an existing tracked session
+      const sessionID = "session-explicit-resume-reminder-test"
+      setupMessageStorage(sessionID, "atlas")
+
+      const planPath = join(TEST_DIR, "explicit-resume-reminder-plan.md")
+      writeFileSync(planPath, `# Plan
+
+## TODOs
+- [x] 1. Implement auth flow
+- [ ] 2. Add API validation
+`)
+
+      writeBoulderState(TEST_DIR, {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: ["session-1"],
+        plan_name: "explicit-resume-reminder-plan",
+        task_sessions: {
+          "todo:2": {
+            task_key: "todo:2",
+            task_label: "2",
+            task_title: "Add API validation",
+            session_id: "ses_tracked_current_task",
+            updated_at: "2026-01-02T10:00:00Z",
+          },
+        },
+      })
+
+      const hook = createAtlasHook(createMockPluginInput())
+      const output = {
+        title: "Sisyphus Task",
+        output: `Task continued successfully
+
+<task_metadata>
+session_id: ses_old_task_111
+</task_metadata>`,
+        metadata: {},
+      }
+
+      // when
+      await hook["tool.execute.before"](
+        { tool: "task", sessionID, callID: "call-explicit-resume-reminder" },
+        { args: { prompt: "Follow up on previous task", session_id: "ses_old_task_111" } }
+      )
+      await hook["tool.execute.after"](
+        { tool: "task", sessionID, callID: "call-explicit-resume-reminder" },
+        output
+      )
+
+      // then
+      expect(output.output).not.toContain('task(session_id="ses_old_task_111"')
+      expect(output.output).toContain("ses_tracked_current_task")
+
+      cleanupMessageStorage(sessionID)
+    })
+
+    test("should skip persistence when multiple in-flight task calls claim the same top-level task", async () => {
+      // given
+      const sessionID = "session-parallel-task-collision-test"
+      setupMessageStorage(sessionID, "atlas")
+
+      const planPath = join(TEST_DIR, "parallel-task-collision-plan.md")
+      writeFileSync(planPath, `# Plan
+
+## TODOs
+- [ ] 1. Implement auth flow
+- [ ] 2. Add API validation
+`)
+
+      writeBoulderState(TEST_DIR, {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: ["session-1"],
+        plan_name: "parallel-task-collision-plan",
+      })
+
+      const pendingFilePaths = new Map<string, string>()
+      const pendingTaskRefs = new Map<string, PendingTaskRef>()
+      const beforeHandler = createToolExecuteBeforeHandler({
+        ctx: createMockPluginInput(),
+        pendingFilePaths,
+        pendingTaskRefs,
+      })
+      const afterHandler = createToolExecuteAfterHandler({
+        ctx: createMockPluginInput(),
+        pendingFilePaths,
+        pendingTaskRefs,
+        autoCommit: true,
+        getState: () => ({ promptFailureCount: 0 }),
+      })
+
+      // when - two task() calls start before either one completes
+      await beforeHandler(
+        { tool: "task", sessionID, callID: "call-task-first" },
+        { args: { prompt: "Implement auth flow part 1" } }
+      )
+      await beforeHandler(
+        { tool: "task", sessionID, callID: "call-task-second" },
+        { args: { prompt: "Implement auth flow part 2" } }
+      )
+
+      const secondPendingTaskRef = pendingTaskRefs.get("call-task-second")
+
+      await afterHandler(
+        { tool: "task", sessionID, callID: "call-task-second" },
+        {
+          title: "Sisyphus Task",
+          output: `Task completed successfully
+
+<task_metadata>
+session_id: ses_parallel_collision_222
+</task_metadata>`,
+          metadata: {},
+        }
+      )
+
+      // then
+      expect(secondPendingTaskRef).toEqual({
+        kind: "skip",
+        reason: "ambiguous_task_key",
+        task: {
+          key: "todo:1",
+          label: "1",
+          title: "Implement auth flow",
+        },
+      })
+      const updatedState = readBoulderState(TEST_DIR)
+      expect(updatedState?.task_sessions?.["todo:1"]).toBeUndefined()
+
+      cleanupMessageStorage(sessionID)
+    })
+
+    test("should ignore extracted session ids that are outside the active boulder lineage", async () => {
+      // given
+      const sessionID = "session-untrusted-session-id-test"
+      setupMessageStorage(sessionID, "atlas")
+
+      const planPath = join(TEST_DIR, "untrusted-session-id-plan.md")
+      writeFileSync(planPath, `# Plan
+
+## TODOs
+- [ ] 1. Implement auth flow
+`)
+
+      writeBoulderState(TEST_DIR, {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: ["session-1"],
+        plan_name: "untrusted-session-id-plan",
+      })
+
+      const hook = createAtlasHook(createMockPluginInput({
+        sessionGetMock: mock(async ({ path }: { path: { id: string } }) => ({
+          data: {
+            id: path.id,
+            parentID: path.id === "ses_untrusted_999" ? "session-outside-lineage" : "main-session-123",
+          },
+        })),
+      }))
+      const output = {
+        title: "Sisyphus Task",
+        output: `Task completed successfully
+
+<task_metadata>
+session_id: ses_untrusted_999
+</task_metadata>`,
+        metadata: {},
+      }
+
+      // when
+      await hook["tool.execute.after"](
+        { tool: "task", sessionID },
+        output
+      )
+
+      // then
+      const updatedState = readBoulderState(TEST_DIR)
+      expect(updatedState?.task_sessions?.["todo:1"]).toBeUndefined()
+      expect(output.output).not.toContain('task(session_id="ses_untrusted_999"')
+      expect(output.output).toContain('task(session_id="<session_id>"')
+
       cleanupMessageStorage(sessionID)
     })
 
@@ -1043,37 +1464,6 @@ describe("atlas hook", () => {
        expect(mockInput._promptMock).not.toHaveBeenCalled()
      })
 
-     test("should skip when another continuation hook already injected", async () => {
-       // given - boulder state with incomplete plan
-       const planPath = join(TEST_DIR, "test-plan.md")
-       writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
-
-       const state: BoulderState = {
-         active_plan: planPath,
-         started_at: "2026-01-02T10:00:00Z",
-         session_ids: [MAIN_SESSION_ID],
-         plan_name: "test-plan",
-       }
-       writeBoulderState(TEST_DIR, state)
-
-       const mockInput = createMockPluginInput()
-       const hook = createAtlasHook(mockInput, {
-         directory: TEST_DIR,
-         shouldSkipContinuation: (sessionID: string) => sessionID === MAIN_SESSION_ID,
-       })
-
-       // when
-       await hook.handler({
-         event: {
-           type: "session.idle",
-           properties: { sessionID: MAIN_SESSION_ID },
-         },
-       })
-
-       // then - should not call prompt because another continuation already handled it
-       expect(mockInput._promptMock).not.toHaveBeenCalled()
-     })
-
     test("should clear abort state on message.updated", async () => {
       // given - boulder with incomplete plan
       const planPath = join(TEST_DIR, "test-plan.md")
@@ -1145,6 +1535,48 @@ describe("atlas hook", () => {
       const callArgs = mockInput._promptMock.mock.calls[0][0]
       expect(callArgs.body.parts[0].text).toContain("2/4 completed")
       expect(callArgs.body.parts[0].text).toContain("2 remaining")
+    })
+
+    test("should include preferred reuse session in continuation prompt for current top-level task", async () => {
+      // given - boulder state with tracked preferred session
+      const planPath = join(TEST_DIR, "preferred-session-plan.md")
+      writeFileSync(planPath, `# Plan
+
+## TODOs
+- [ ] 1. Implement auth flow
+`)
+
+      writeBoulderState(TEST_DIR, {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: [MAIN_SESSION_ID],
+        plan_name: "preferred-session-plan",
+        task_sessions: {
+          "todo:1": {
+            task_key: "todo:1",
+            task_label: "1",
+            task_title: "Implement auth flow",
+            session_id: "ses_auth_flow_123",
+            updated_at: "2026-01-02T10:00:00Z",
+          },
+        },
+      })
+
+      const mockInput = createMockPluginInput()
+      const hook = createAtlasHook(mockInput)
+
+      // when
+      await hook.handler({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: MAIN_SESSION_ID },
+        },
+      })
+
+      // then
+      const callArgs = mockInput._promptMock.mock.calls[0][0]
+      expect(callArgs.body.parts[0].text).toContain("Preferred reuse session for current top-level plan task")
+      expect(callArgs.body.parts[0].text).toContain("ses_auth_flow_123")
     })
 
     test("should inject when last agent is sisyphus and boulder targets atlas explicitly", async () => {
@@ -1283,7 +1715,7 @@ describe("atlas hook", () => {
       expect(mockInput._promptMock).toHaveBeenCalledTimes(1)
     })
 
-    test("should stop continuation after 2 consecutive prompt failures (issue #1355)", async () => {
+    test("should stop continuation after 10 consecutive prompt failures (issue #1355)", async () => {
       //#given - boulder state with incomplete plan and prompt always fails
       const planPath = join(TEST_DIR, "test-plan.md")
       writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
@@ -1296,7 +1728,7 @@ describe("atlas hook", () => {
       }
       writeBoulderState(TEST_DIR, state)
 
-      const promptMock = mock(() => Promise.reject(new Error("Bad Request")))
+      const promptMock = mock((): Promise<void> => Promise.reject(new Error("Bad Request")))
       const mockInput = createMockPluginInput({ promptMock })
       const hook = createAtlasHook(mockInput)
 
@@ -1306,25 +1738,23 @@ describe("atlas hook", () => {
 
       try {
         //#when - idle fires repeatedly, past cooldown each time
-        await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
-        await flushMicrotasks()
-        now += 6000
-
-        await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
-        await flushMicrotasks()
-        now += 6000
+        for (let i = 0; i < 10; i++) {
+          await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
+          await flushMicrotasks()
+          now += 6000
+        }
 
         await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
         await flushMicrotasks()
 
-        //#then - should attempt only twice, then disable continuation
-        expect(promptMock).toHaveBeenCalledTimes(2)
+        //#then - should attempt only 10 times, then disable continuation
+        expect(promptMock).toHaveBeenCalledTimes(10)
       } finally {
         Date.now = originalDateNow
       }
     })
 
-    test("should reset prompt failure counter on success and only stop after 2 consecutive failures", async () => {
+    test("should reset prompt failure counter on success and only stop after 10 consecutive failures", async () => {
       //#given - boulder state with incomplete plan
       const planPath = join(TEST_DIR, "test-plan.md")
       writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
@@ -1337,11 +1767,9 @@ describe("atlas hook", () => {
       }
       writeBoulderState(TEST_DIR, state)
 
-      const promptMock = mock(() => Promise.resolve())
+      const promptMock = mock((): Promise<void> => Promise.reject(new Error("Bad Request")))
       promptMock.mockImplementationOnce(() => Promise.reject(new Error("Bad Request")))
       promptMock.mockImplementationOnce(() => Promise.resolve())
-      promptMock.mockImplementationOnce(() => Promise.reject(new Error("Bad Request")))
-      promptMock.mockImplementationOnce(() => Promise.reject(new Error("Bad Request")))
 
       const mockInput = createMockPluginInput({ promptMock })
       const hook = createAtlasHook(mockInput)
@@ -1351,21 +1779,21 @@ describe("atlas hook", () => {
       Date.now = () => now
 
       try {
-        //#when - fail, succeed (reset), then fail twice (disable), then attempt again
-        for (let i = 0; i < 5; i++) {
+        //#when - fail, succeed (reset), then fail 10 times (disable), then attempt again
+        for (let i = 0; i < 13; i++) {
           await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
           await flushMicrotasks()
           now += 6000
         }
 
-        //#then - 4 prompt attempts; 5th idle is skipped after 2 consecutive failures
-        expect(promptMock).toHaveBeenCalledTimes(4)
+        //#then - 12 prompt attempts; 13th idle is skipped after 10 consecutive failures
+        expect(promptMock).toHaveBeenCalledTimes(12)
       } finally {
         Date.now = originalDateNow
       }
     })
 
-    test("should keep skipping continuation during 5-minute backoff after 2 consecutive failures", async () => {
+    test("should keep skipping continuation during 5-minute backoff after 10 consecutive failures", async () => {
       //#given - boulder state with incomplete plan and prompt always fails
       const planPath = join(TEST_DIR, "test-plan.md")
       writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
@@ -1387,26 +1815,26 @@ describe("atlas hook", () => {
       Date.now = () => now
 
       try {
-        //#when - third idle occurs inside 5-minute backoff window
-        await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
-        await flushMicrotasks()
-        now += 6000
+        //#when - 11th idle occurs inside 5-minute backoff window
+        for (let i = 0; i < 10; i++) {
+          await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
+          await flushMicrotasks()
+          now += 6000
+        }
 
-        await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
-        await flushMicrotasks()
         now += 60000
 
         await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
         await flushMicrotasks()
 
-        //#then - third attempt should still be skipped
-        expect(promptMock).toHaveBeenCalledTimes(2)
+        //#then - 11th attempt should still be skipped
+        expect(promptMock).toHaveBeenCalledTimes(10)
       } finally {
         Date.now = originalDateNow
       }
     })
 
-    test("should retry continuation after 5-minute backoff expires following 2 consecutive failures", async () => {
+    test("should retry continuation after 5-minute backoff expires following 10 consecutive failures", async () => {
       //#given - boulder state with incomplete plan and prompt always fails
       const planPath = join(TEST_DIR, "test-plan.md")
       writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
@@ -1428,20 +1856,20 @@ describe("atlas hook", () => {
       Date.now = () => now
 
       try {
-        //#when - third idle occurs after 5+ minutes
-        await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
-        await flushMicrotasks()
-        now += 6000
+        //#when - 11th idle occurs after 5+ minutes
+        for (let i = 0; i < 10; i++) {
+          await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
+          await flushMicrotasks()
+          now += 6000
+        }
 
-        await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
-        await flushMicrotasks()
         now += 300000
 
         await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
         await flushMicrotasks()
 
-        //#then - third attempt should run after backoff expiration
-        expect(promptMock).toHaveBeenCalledTimes(3)
+        //#then - 11th attempt should run after backoff expiration
+        expect(promptMock).toHaveBeenCalledTimes(11)
       } finally {
         Date.now = originalDateNow
       }
@@ -1461,8 +1889,9 @@ describe("atlas hook", () => {
       writeBoulderState(TEST_DIR, state)
 
       const promptMock = mock((): Promise<void> => Promise.reject(new Error("Bad Request")))
-      promptMock.mockImplementationOnce(() => Promise.reject(new Error("Bad Request")))
-      promptMock.mockImplementationOnce(() => Promise.reject(new Error("Bad Request")))
+      for (let i = 0; i < 10; i++) {
+        promptMock.mockImplementationOnce(() => Promise.reject(new Error("Bad Request")))
+      }
       promptMock.mockImplementationOnce(() => Promise.resolve(undefined))
       const mockInput = createMockPluginInput({ promptMock })
       const hook = createAtlasHook(mockInput)
@@ -1472,32 +1901,30 @@ describe("atlas hook", () => {
       Date.now = () => now
 
       try {
-        //#when - fail twice, recover after backoff with success, then fail twice again
-        await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
-        await flushMicrotasks()
-        now += 6000
+        //#when - fail 10 times, recover after backoff with success, then fail 10 times again
+        for (let i = 0; i < 10; i++) {
+          await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
+          await flushMicrotasks()
+          now += 6000
+        }
 
-        await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
-        await flushMicrotasks()
         now += 300000
 
         await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
         await flushMicrotasks()
         now += 6000
 
-        await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
-        await flushMicrotasks()
-        now += 6000
-
-        await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
-        await flushMicrotasks()
-        now += 6000
+        for (let i = 0; i < 10; i++) {
+          await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
+          await flushMicrotasks()
+          now += 6000
+        }
 
         await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
         await flushMicrotasks()
 
-        //#then - success retry resets counter, so two additional failures are allowed before skip
-        expect(promptMock).toHaveBeenCalledTimes(5)
+        //#then - success retry resets counter, so 10 additional failures are allowed before skip
+        expect(promptMock).toHaveBeenCalledTimes(21)
       } finally {
         Date.now = originalDateNow
       }
@@ -1525,14 +1952,12 @@ describe("atlas hook", () => {
       Date.now = () => now
 
       try {
-        //#when - two failures disables continuation, then compaction resets it
-        await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
-        await flushMicrotasks()
-        now += 6000
-
-        await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
-        await flushMicrotasks()
-        now += 6000
+        //#when - 10 failures disable continuation, then compaction resets it
+        for (let i = 0; i < 10; i++) {
+          await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
+          await flushMicrotasks()
+          now += 6000
+        }
 
         await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
         await flushMicrotasks()
@@ -1543,8 +1968,8 @@ describe("atlas hook", () => {
         await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
         await flushMicrotasks()
 
-        //#then - 2 attempts + 1 after compaction (3 total)
-        expect(promptMock).toHaveBeenCalledTimes(3)
+        //#then - 10 attempts + 1 after compaction (11 total)
+        expect(promptMock).toHaveBeenCalledTimes(11)
       } finally {
         Date.now = originalDateNow
       }

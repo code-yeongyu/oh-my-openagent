@@ -287,6 +287,7 @@ Not all models behave the same way. Understanding which models are "similar" hel
 | ----------------- | -------------------------------- | ------------------------------------------------- |
 | **GPT-5.3-codex** | openai, github-copilot, opencode | Deep coding powerhouse. Required for Hephaestus.  |
 | **GPT-5.4**       | openai, github-copilot, opencode | High intelligence. Default for Oracle.            |
+| **GPT-5.4 Mini**  | openai, github-copilot, opencode | Fast + strong reasoning. Default for quick category.     |
 | **GPT-5-Nano**    | opencode                         | Ultra-cheap, fast. Good for simple utility tasks. |
 
 **Different-Behavior Models**:

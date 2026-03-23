@@ -298,7 +298,7 @@ task({ category: "quick", prompt: "..." }); // "Just get it done fast"
 | `visual-engineering` | Gemini 3.1 Pro         | Frontend, UI/UX, design, styling, animation                 |
 | `ultrabrain`         | GPT-5.4 (xhigh)        | Deep logical reasoning, complex architecture decisions      |
 | `artistry`           | Gemini 3.1 Pro (high)  | Highly creative or artistic tasks, novel ideas              |
-| `quick`              | Claude Haiku 4.5       | Trivial tasks - single file changes, typo fixes             |
+| `quick`              | GPT-5.4 Mini           | Trivial tasks - single file changes, typo fixes             |
 | `deep`               | GPT-5.3 Codex (medium) | Goal-oriented autonomous problem-solving, thorough research |
 | `unspecified-low`    | Claude Sonnet 4.6      | Tasks that don't fit other categories, low effort           |
 | `unspecified-high`   | Claude Opus 4.6 (max)  | Tasks that don't fit other categories, high effort          |

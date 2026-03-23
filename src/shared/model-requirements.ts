@@ -252,6 +252,10 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   quick: {
     fallbackChain: [
       {
+        providers: ["openai", "github-copilot", "opencode"],
+        model: "gpt-5.4-mini",
+      },
+      {
         providers: ["anthropic", "github-copilot", "opencode"],
         model: "claude-haiku-4-5",
       },

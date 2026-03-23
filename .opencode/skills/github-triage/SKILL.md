@@ -79,47 +79,65 @@ Pass `REPO`, `REPORT_DIR`, and `COMMIT_SHA` to every subagent.
 
 ---
 
-## Phase 1: Fetch All Open Items
+---
 
-<fetch>
-Paginate if 500 results returned.
+## Phase 1: Fetch All Open Items (CORRECTED)
+
+**IMPORTANT:** `body` and `comments` fields may contain control characters that break jq parsing. Fetch basic metadata first, then fetch full details per-item in subagents.
 
 ```bash
-ISSUES=$(gh issue list --repo $REPO --state open --limit 500 \
-  --json number,title,state,createdAt,updatedAt,labels,author,body,comments)
-ISSUE_LEN=$(echo "$ISSUES" | jq length)
-if [ "$ISSUE_LEN" -eq 500 ]; then
-  LAST_DATE=$(echo "$ISSUES" | jq -r '.[-1].createdAt')
+# Step 1: Fetch basic metadata (without body/comments to avoid JSON parsing issues)
+ISSUES_LIST=$(gh issue list --repo $REPO --state open --limit 500 \
+  --json number,title,labels,author,createdAt)
+ISSUE_COUNT=$(echo "$ISSUES_LIST" | jq length)
+
+# Paginate if needed
+if [ "$ISSUE_COUNT" -eq 500 ]; then
+  LAST_DATE=$(echo "$ISSUES_LIST" | jq -r '.[-1].createdAt')
   while true; do
     PAGE=$(gh issue list --repo $REPO --state open --limit 500 \
       --search "created:<$LAST_DATE" \
-      --json number,title,state,createdAt,updatedAt,labels,author,body,comments)
-    PAGE_LEN=$(echo "$PAGE" | jq length)
-    [ "$PAGE_LEN" -eq 0 ] && break
-    ISSUES=$(echo "[$ISSUES, $PAGE]" | jq -s 'add | unique_by(.number)')
-    [ "$PAGE_LEN" -lt 500 ] && break
+      --json number,title,labels,author,createdAt)
+    PAGE_COUNT=$(echo "$PAGE" | jq length)
+    [ "$PAGE_COUNT" -eq 0 ] && break
+    ISSUES_LIST=$(echo "$ISSUES_LIST" "$PAGE" | jq -s '.[0] + .[1] | unique_by(.number)')
+    ISSUE_COUNT=$(echo "$ISSUES_LIST" | jq length)
+    [ "$PAGE_COUNT" -lt 500 ] && break
     LAST_DATE=$(echo "$PAGE" | jq -r '.[-1].createdAt')
   done
 fi
 
-PRS=$(gh pr list --repo $REPO --state open --limit 500 \
-  --json number,title,state,createdAt,updatedAt,labels,author,body,headRefName,baseRefName,isDraft,mergeable,reviewDecision,statusCheckRollup)
-PR_LEN=$(echo "$PRS" | jq length)
-if [ "$PR_LEN" -eq 500 ]; then
-  LAST_DATE=$(echo "$PRS" | jq -r '.[-1].createdAt')
+# Same for PRs
+PRS_LIST=$(gh pr list --repo $REPO --state open --limit 500 \
+  --json number,title,labels,author,headRefName,baseRefName,isDraft,createdAt)
+PR_COUNT=$(echo "$PRS_LIST" | jq length)
+
+if [ "$PR_COUNT" -eq 500 ]; then
+  LAST_DATE=$(echo "$PRS_LIST" | jq -r '.[-1].createdAt')
   while true; do
     PAGE=$(gh pr list --repo $REPO --state open --limit 500 \
       --search "created:<$LAST_DATE" \
-      --json number,title,state,createdAt,updatedAt,labels,author,body,headRefName,baseRefName,isDraft,mergeable,reviewDecision,statusCheckRollup)
-    PAGE_LEN=$(echo "$PAGE" | jq length)
-    [ "$PAGE_LEN" -eq 0 ] && break
-    PRS=$(echo "[$PRS, $PAGE]" | jq -s 'add | unique_by(.number)')
-    [ "$PAGE_LEN" -lt 500 ] && break
+      --json number,title,labels,author,headRefName,baseRefName,isDraft,createdAt)
+    PAGE_COUNT=$(echo "$PAGE" | jq length)
+    [ "$PAGE_COUNT" -eq 0 ] && break
+    PRS_LIST=$(echo "$PRS_LIST" "$PAGE" | jq -s '.[0] + .[1] | unique_by(.number)')
+    PR_COUNT=$(echo "$PRS_LIST" | jq length)
+    [ "$PAGE_COUNT" -lt 500 ] && break
     LAST_DATE=$(echo "$PAGE" | jq -r '.[-1].createdAt')
   done
 fi
+
+echo "Total issues: $ISSUE_COUNT, Total PRs: $PR_COUNT"
 ```
-</fetch>
+
+**LARGE REPOSITORY HANDLING:**
+If total items exceeds 50, you MUST process ALL items. Use the pagination code above to fetch every single open issue and PR.
+**DO NOT** sample or limit to 50 items - process the entire backlog.
+
+Example: If there are 500 open issues, spawn 500 subagents. If there are 1000 open PRs, spawn 1000 subagents.
+
+**Note:** Background task system will queue excess tasks automatically.
+
 
 ---
 
