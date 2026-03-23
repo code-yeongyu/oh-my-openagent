@@ -27,7 +27,26 @@ export interface PluginComponentsResult {
   errors: PluginLoadError[]
 }
 
+function isClaudeCodePluginsDisabled(): boolean {
+  const disableFlag = process.env.OPENCODE_DISABLE_CLAUDE_CODE
+  const disablePluginsFlag = process.env.OPENCODE_DISABLE_CLAUDE_CODE_PLUGINS
+  return disableFlag === "true" || disableFlag === "1" || disablePluginsFlag === "true" || disablePluginsFlag === "1"
+}
+
 export async function loadAllPluginComponents(options?: PluginLoaderOptions): Promise<PluginComponentsResult> {
+  if (isClaudeCodePluginsDisabled()) {
+    log("Claude Code plugin loading disabled via OPENCODE_DISABLE_CLAUDE_CODE env var")
+    return {
+      commands: {},
+      skills: {},
+      agents: {},
+      mcpServers: {},
+      hooksConfigs: [],
+      plugins: [],
+      errors: [],
+    }
+  }
+
   const { plugins, errors } = discoverInstalledPlugins(options)
 
   const [commands, skills, agents, mcpServers, hooksConfigs] = await Promise.all([
