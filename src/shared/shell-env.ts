@@ -1,4 +1,4 @@
-export type ShellType = "unix" | "powershell" | "cmd"
+export type ShellType = "unix" | "powershell" | "cmd" | "csh"
 
 /**
  * Detect the current shell type based on environment variables.
@@ -14,6 +14,10 @@ export function detectShellType(): ShellType {
   }
 
   if (process.env.SHELL) {
+    const shell = process.env.SHELL
+    if (shell.includes("csh") || shell.includes("tcsh")) {
+      return "csh"
+    }
     return "unix"
   }
 
@@ -34,6 +38,7 @@ export function shellEscape(value: string, shellType: ShellType): string {
 
   switch (shellType) {
     case "unix":
+    case "csh":
       if (/[^a-zA-Z0-9_\-.:\/]/.test(value)) {
         return `'${value.replace(/'/g, "'\\''")}'`
       }
@@ -89,6 +94,13 @@ export function buildEnvPrefix(
         .map(([key, value]) => `${key}=${shellEscape(value, shellType)}`)
         .join(" ")
       return `export ${assignments};`
+    }
+
+    case "csh": {
+      const assignments = entries
+        .map(([key, value]) => `setenv ${key} ${shellEscape(value, shellType)}`)
+        .join("; ")
+      return `${assignments};`
     }
 
     case "powershell": {
