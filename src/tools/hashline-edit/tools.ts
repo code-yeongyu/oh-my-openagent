@@ -2,6 +2,7 @@ import { tool, type ToolContext, type ToolDefinition } from "@opencode-ai/plugin
 import { executeHashlineEditTool } from "./hashline-edit-executor"
 import { HASHLINE_EDIT_DESCRIPTION } from "./tool-description"
 import type { RawHashlineEdit } from "./normalize-edits"
+import type { PluginContext } from "../../plugin/types"
 
 interface HashlineEditArgs {
   filePath: string
@@ -10,7 +11,7 @@ interface HashlineEditArgs {
   rename?: string
 }
 
-export function createHashlineEditTool(): ToolDefinition {
+export function createHashlineEditTool(ctx?: PluginContext): ToolDefinition {
   return tool({
     description: HASHLINE_EDIT_DESCRIPTION,
     args: {
@@ -36,6 +37,6 @@ export function createHashlineEditTool(): ToolDefinition {
         )
         .describe("Array of edit operations to apply (empty when delete=true)"),
     },
-    execute: async (args: HashlineEditArgs, context: ToolContext) => executeHashlineEditTool(args, context),
+    execute: async (args: HashlineEditArgs, context: ToolContext) => executeHashlineEditTool(args, context, ctx),
   })
 }
