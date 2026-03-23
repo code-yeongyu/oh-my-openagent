@@ -165,6 +165,62 @@ describe("createCallOmoAgent", () => {
     ])
   })
 
+  test("inherits category model and variant when launching background subagent", async () => {
+    //#given
+    const launch = mock((_input: { model?: { providerID: string; modelID: string; variant?: string } }) => Promise.resolve({
+      id: "task-model",
+      sessionID: "sub-session",
+      description: "Test task",
+      agent: "explore",
+      status: "pending",
+    }))
+    const managerWithLaunch = {
+      launch,
+      getTask: mock(() => undefined),
+    }
+    const toolDef = createCallOmoAgent(
+      mockCtx,
+      managerWithLaunch,
+      [],
+      {
+        explore: {
+          category: "deep",
+        },
+      },
+      {
+        deep: {
+          model: "nvidia/aws/anthropic/bedrock-claude-opus-4-6",
+          variant: "max",
+        },
+      },
+    )
+    const executeFunc = toolDef.execute as Function
+
+    //#when
+    await executeFunc(
+      {
+        description: "Test category model",
+        prompt: "Test prompt",
+        subagent_type: "explore",
+        run_in_background: true,
+      },
+      { sessionID: "test", messageID: "msg", agent: "test", abort: new AbortController().signal },
+    )
+
+    //#then
+    const firstLaunchCall = launch.mock.calls[0]
+    if (firstLaunchCall === undefined) {
+      throw new Error("Expected launch to be called")
+    }
+
+    const [launchArgs] = firstLaunchCall
+    expect(launchArgs.model).toEqual({
+      providerID: "nvidia",
+      modelID: "aws/anthropic/bedrock-claude-opus-4-6",
+      variant: "max",
+    })
+  })
+
   test("should return a tool error when sync spawn depth validation fails", async () => {
     //#given
     reserveSubagentSpawnMock.mockRejectedValueOnce(new Error("Subagent spawn blocked: child depth 4 exceeds background_task.maxDepth=3."))

@@ -46,7 +46,8 @@ export function fuzzyMatchModel(
 	const targetNormalized = normalizeModelName(target)
 
 	// Filter by providers if specified
-	let candidates = Array.from(available)
+	const allCandidates = Array.from(available)
+	let candidates = allCandidates
 	if (providers && providers.length > 0) {
 		const providerSet = new Set(providers)
 		candidates = candidates.filter((model) => {
@@ -57,8 +58,12 @@ export function fuzzyMatchModel(
 	}
 
 	if (candidates.length === 0) {
-		log("[fuzzyMatchModel] no candidates after filter")
-		return null
+		log("[fuzzyMatchModel] no candidates after provider filter, retrying without provider filter", {
+			target,
+			providers,
+			availableCount: available.size,
+		})
+		candidates = allCandidates
 	}
 
 	// Find all matches (case-insensitive substring match with normalization)

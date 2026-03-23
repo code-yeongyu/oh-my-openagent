@@ -43,6 +43,7 @@ export type {
   ModelResolutionResult,
 } from "./model-resolution-types"
 export * from "./model-availability"
+export * from "./extract-provider-hint"
 export * from "./fallback-model-availability"
 export * from "./connected-providers-cache"
 export * from "./context-limit-resolver"

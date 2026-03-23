@@ -1,6 +1,7 @@
 import { log } from "./logger"
 import * as connectedProvidersCache from "./connected-providers-cache"
 import { fuzzyMatchModel } from "./model-availability"
+import { extractProviderHint } from "./extract-provider-hint"
 import type { FallbackEntry } from "./model-requirements"
 import { transformModelForProvider } from "./provider-model-id-transform"
 import { normalizeModel } from "./model-normalization"
@@ -45,6 +46,7 @@ export function resolveModelPipeline(
   const availableModels = constraints.availableModels
   const fallbackChain = policy?.fallbackChain
   const systemDefaultModel = policy?.systemDefaultModel
+  const connectedProviders = constraints.connectedProviders ?? connectedProvidersCache.readConnectedProvidersCache()
 
   const normalizedUiModel = normalizeModel(intent?.uiSelectedModel)
   if (normalizedUiModel) {
@@ -62,8 +64,7 @@ export function resolveModelPipeline(
   if (normalizedCategoryDefault) {
     attempted.push(normalizedCategoryDefault)
     if (availableModels.size > 0) {
-      const parts = normalizedCategoryDefault.split("/")
-      const providerHint = parts.length >= 2 ? [parts[0]] : undefined
+      const providerHint = extractProviderHint(normalizedCategoryDefault, connectedProviders)
       const match = fuzzyMatchModel(normalizedCategoryDefault, availableModels, providerHint)
       if (match) {
         log("Model resolved via category default (fuzzy matched)", {
@@ -73,18 +74,17 @@ export function resolveModelPipeline(
         return { model: match, provenance: "category-default", attempted }
       }
     } else {
-      const connectedProviders = constraints.connectedProviders ?? connectedProvidersCache.readConnectedProvidersCache()
       if (connectedProviders === null) {
         log("Model resolved via category default (no cache, first run)", {
           model: normalizedCategoryDefault,
         })
         return { model: normalizedCategoryDefault, provenance: "category-default", attempted }
       }
-      const parts = normalizedCategoryDefault.split("/")
-      if (parts.length >= 2) {
-        const provider = parts[0]
+      const providerHint = extractProviderHint(normalizedCategoryDefault, connectedProviders)
+      const provider = providerHint?.[0]
+      if (provider) {
         if (connectedProviders.includes(provider)) {
-          const modelName = parts.slice(1).join("/")
+          const modelName = normalizedCategoryDefault.split("/").slice(1).join("/")
           const transformedModel = `${provider}/${transformModelForProvider(provider, modelName)}`
           log("Model resolved via category default (connected provider)", {
             model: transformedModel,
@@ -103,17 +103,16 @@ export function resolveModelPipeline(
   const userFallbackModels = intent?.userFallbackModels
   if (userFallbackModels && userFallbackModels.length > 0) {
     if (availableModels.size === 0) {
-      const connectedProviders = constraints.connectedProviders ?? connectedProvidersCache.readConnectedProvidersCache()
       const connectedSet = connectedProviders ? new Set(connectedProviders) : null
 
       if (connectedSet !== null) {
         for (const model of userFallbackModels) {
           attempted.push(model)
-          const parts = model.split("/")
-          if (parts.length >= 2) {
-            const provider = parts[0]
+          const providerHint = extractProviderHint(model, connectedProviders)
+          const provider = providerHint?.[0]
+          if (provider) {
             if (connectedSet.has(provider)) {
-              const modelName = parts.slice(1).join("/")
+              const modelName = model.split("/").slice(1).join("/")
               const transformedModel = `${provider}/${transformModelForProvider(provider, modelName)}`
               log("Model resolved via user fallback_models (connected provider)", { model: transformedModel, original: model })
               return { model: transformedModel, provenance: "provider-fallback", attempted }
@@ -125,8 +124,7 @@ export function resolveModelPipeline(
     } else {
       for (const model of userFallbackModels) {
         attempted.push(model)
-        const parts = model.split("/")
-        const providerHint = parts.length >= 2 ? [parts[0]] : undefined
+        const providerHint = extractProviderHint(model, connectedProviders)
         const match = fuzzyMatchModel(model, availableModels, providerHint)
         if (match) {
           log("Model resolved via user fallback_models (availability confirmed)", { model: model, match })
@@ -139,7 +137,6 @@ export function resolveModelPipeline(
 
   if (fallbackChain && fallbackChain.length > 0) {
     if (availableModels.size === 0) {
-      const connectedProviders = constraints.connectedProviders ?? connectedProvidersCache.readConnectedProvidersCache()
       const connectedSet = connectedProviders ? new Set(connectedProviders) : null
 
       if (connectedSet === null) {
