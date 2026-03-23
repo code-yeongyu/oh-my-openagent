@@ -3027,10 +3027,10 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
       prompt: "Test",
       agent: "test-agent",
       status: "running",
-      startedAt: new Date(Date.now() - 25 * 60 * 1000),
+      startedAt: new Date(Date.now() - 50 * 60 * 1000),
       progress: {
         toolCalls: 1,
-        lastUpdate: new Date(Date.now() - 21 * 60 * 1000),
+        lastUpdate: new Date(Date.now() - 46 * 60 * 1000),
       },
     }
 

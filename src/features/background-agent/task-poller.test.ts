@@ -117,13 +117,13 @@ describe("checkAndInterruptStaleTasks", () => {
   })
 
   it("should use DEFAULT_MESSAGE_STALENESS_TIMEOUT_MS when messageStalenessTimeoutMs is not configured", async () => {
-    //#given — task started 35 minutes ago, no config for messageStalenessTimeoutMs
+    //#given — task started 65 minutes ago, no config for messageStalenessTimeoutMs
     const task = createRunningTask({
-      startedAt: new Date(Date.now() - 35 * 60 * 1000),
+      startedAt: new Date(Date.now() - 65 * 60 * 1000),
       progress: undefined,
     })
 
-    //#when — default is 30 minutes (1_800_000ms)
+    //#when — default is 60 minutes (3_600_000ms)
     await checkAndInterruptStaleTasks({
       tasks: [task],
       client: mockClient as never,
