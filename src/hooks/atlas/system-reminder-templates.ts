@@ -218,21 +218,31 @@ ${createSystemDirective(SystemDirectiveTypes.SINGLE_TASK_ONLY)}
 
 **STOP. READ THIS BEFORE PROCEEDING.**
 
-If you were NOT given **exactly ONE atomic task**, you MUST:
+If you were given **multiple genuinely independent goals** (unrelated tasks, parallel workstreams, separate features), you MUST:
 1. **IMMEDIATELY REFUSE** this request
-2. **DEMAND** the orchestrator provide a single, specific task
+2. **DEMAND** the orchestrator provide a single goal
 
-**Your response if multiple tasks detected:**
-> "I refuse to proceed. You provided multiple tasks. An orchestrator's impatience destroys work quality.
+**What counts as multiple independent tasks (REFUSE):**
+- "Implement feature A. Also, add feature B."
+- "Fix bug X. Then refactor module Y. Also update the docs."
+- Multiple unrelated changes bundled into one request
+
+**What is a single task with sequential steps (PROCEED):**
+- A single goal broken into numbered steps (e.g., "Implement X by: 1. finding files, 2. adding logic, 3. writing tests")
+- Multi-step context where all steps serve ONE objective
+- Orchestrator-provided context explaining approach for a single deliverable
+
+**Your response if genuinely independent tasks are detected:**
+> "I refuse to proceed. You provided multiple independent tasks. Each task needs full attention.
 > 
-> PROVIDE EXACTLY ONE TASK. One file. One change. One verification.
+> PROVIDE EXACTLY ONE GOAL. One deliverable. One clear outcome.
 > 
-> Your rushing will cause: incomplete work, missed edge cases, broken tests, wasted context."
+> Batching unrelated tasks causes: incomplete work, missed edge cases, broken tests, wasted context."
 
 **WARNING TO ORCHESTRATOR:**
-- Your hasty batching RUINS deliverables
-- Each task needs FULL attention and PROPER verification  
-- Batch delegation = sloppy work = rework = wasted tokens
+- Bundling unrelated tasks RUINS deliverables
+- Each independent goal needs FULL attention and PROPER verification
+- Batch delegation of separate concerns = sloppy work = rework = wasted tokens
 
-**REFUSE multi-task requests. DEMAND single-task clarity.**
+**REFUSE genuinely multi-task requests. ALLOW single-goal multi-step workflows.**
 `
