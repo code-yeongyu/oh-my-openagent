@@ -1,6 +1,6 @@
 import * as p from "@clack/prompts"
 import color from "picocolors"
-import { existsSync, readFileSync, writeFileSync, renameSync, copyFileSync, mkdirSync, realpathSync } from "node:fs"
+import { existsSync, readFileSync, writeFileSync, renameSync, copyFileSync, mkdirSync, realpathSync, statSync, chmodSync } from "node:fs"
 import { dirname } from "node:path"
 import { getConfigContext } from "../config-manager"
 import { parseJsonc } from "../../shared"
@@ -59,7 +59,11 @@ function writeConfigAtomically(configPath: string, config: OhMyOpenCodeConfig): 
     }
 
     const tempPath = `${targetPath}.tmp`
+    const existingPerms = existsSync(targetPath) ? statSync(targetPath).mode : undefined
     writeFileSync(tempPath, JSON.stringify(config, null, 2) + "\n")
+    if (existingPerms) {
+      chmodSync(tempPath, existingPerms)
+    }
     renameSync(tempPath, targetPath)
     return true
   } catch {
