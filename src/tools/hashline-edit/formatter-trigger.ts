@@ -25,15 +25,24 @@ export interface FormatterClient {
   }
 }
 
-let cachedFormatters: Map<string, Array<{ command: string[]; environment: Record<string, string> }>> | null = null
+type FormatterDefinition = { command: string[]; environment: Record<string, string> }
+type FormatterMap = Map<string, FormatterDefinition[]>
+
+const cachedFormattersByDirectory = new Map<string, FormatterMap>()
+
+function getFormatterCacheKey(directory: string): string {
+  return path.resolve(directory)
+}
 
 export async function resolveFormatters(
   client: FormatterClient,
   directory: string,
-): Promise<Map<string, Array<{ command: string[]; environment: Record<string, string> }>>> {
+): Promise<FormatterMap> {
+  const cacheKey = getFormatterCacheKey(directory)
+  const cachedFormatters = cachedFormattersByDirectory.get(cacheKey)
   if (cachedFormatters) return cachedFormatters
 
-  const result = new Map<string, Array<{ command: string[]; environment: Record<string, string> }>>()
+  const result = new Map<string, FormatterDefinition[]>()
 
   try {
     const response = await client.config.get({ query: { directory } })
@@ -68,11 +77,12 @@ export async function resolveFormatters(
         result.set(normalizedExt, existing)
       }
     }
+
+    cachedFormattersByDirectory.set(cacheKey, result)
   } catch (error) {
     log("[formatter-trigger] Failed to fetch formatter config", { error })
   }
 
-  cachedFormatters = result
   return result
 }
 
@@ -118,5 +128,5 @@ export async function runFormattersForFile(
 }
 
 export function clearFormatterCache(): void {
-  cachedFormatters = null
+  cachedFormattersByDirectory.clear()
 }
