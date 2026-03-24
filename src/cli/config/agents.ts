@@ -180,8 +180,9 @@ async function editAgentField(
     if (!state.config.agents) state.config.agents = {}
     const agentsMutable = state.config.agents as Record<string, ExtendedAgentConfig>
     if (!agentsMutable[agentName]) agentsMutable[agentName] = {}
+    const existingFallbacks = agent.fallback_models ?? []
     if (finalFallback) {
-      agentsMutable[agentName].fallback_models = [finalFallback]
+      agentsMutable[agentName].fallback_models = [finalFallback, ...existingFallbacks.slice(1)]
     } else {
       delete agentsMutable[agentName].fallback_models
     }

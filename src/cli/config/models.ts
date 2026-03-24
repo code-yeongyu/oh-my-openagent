@@ -18,8 +18,9 @@ export function getModelsByProvider(): ProviderMap {
       const data = JSON.parse(content)
       if (typeof data === "object" && data !== null && !Array.isArray(data)) {
         for (const [provider, models] of Object.entries(data)) {
-          // Skip special keys like "connected"
+          // Skip special keys and prototype pollution vectors
           if (provider === "connected" || provider === "updatedAt") continue
+          if (provider === "__proto__" || provider === "constructor" || provider === "prototype") continue
           if (Array.isArray(models)) {
             result[provider] = models.filter((m): m is string => typeof m === "string").sort()
           }
