@@ -10,6 +10,8 @@
 > Мейнтейнер разрабатывает и поддерживает oh-my-opencode в режиме реального времени с помощью Jobdori — ИИ-ассистента на базе глубоко кастомизированной версии [OpenClaw](https://github.com/openclaw/openclaw).
 > Каждая фича, каждый фикс, каждый триаж issue — в прямом эфире в нашем Discord.
 >
+> [![Building in Public](./.github/assets/building-in-public.png)](https://discord.gg/PUwSMR9XNk)
+>
 > [**→ Смотрите в #building-in-public**](https://discord.gg/PUwSMR9XNk)
 
 
