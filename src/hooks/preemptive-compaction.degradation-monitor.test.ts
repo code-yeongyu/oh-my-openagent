@@ -1,3 +1,5 @@
+/// <reference types="bun-types" />
+
 import { beforeEach, describe, expect, it, mock } from "bun:test"
 
 const logMock = mock(() => {})
@@ -8,11 +10,19 @@ mock.module("../shared/logger", () => ({
 
 const { createPreemptiveCompactionHook } = await import("./preemptive-compaction")
 
-function createMockCtx() {
+type AssistantHistoryMessage = {
+  info: {
+    id: string
+    role: "assistant"
+  }
+  parts: Array<{ type: string; text?: string }>
+}
+
+function createMockCtx(sessionHistory: AssistantHistoryMessage[]) {
   return {
     client: {
       session: {
-        messages: mock(() => Promise.resolve({ data: [] })),
+        messages: mock(() => Promise.resolve({ data: sessionHistory })),
         summarize: mock(() => Promise.resolve({})),
       },
       tui: {
@@ -21,6 +31,22 @@ function createMockCtx() {
     },
     directory: "/tmp/test",
   }
+}
+
+function appendAssistantHistory(
+  sessionHistory: AssistantHistoryMessage[],
+  input: {
+    id: string
+    parts: AssistantHistoryMessage["parts"]
+  },
+): void {
+  sessionHistory.push({
+    info: {
+      id: input.id,
+      role: "assistant",
+    },
+    parts: input.parts,
+  })
 }
 
 function buildAssistantUpdate(input: {
@@ -69,7 +95,9 @@ describe("preemptive-compaction post-compaction degradation monitor", () => {
   })
 
   it("triggers recovery summarize after three consecutive no-text tail messages", async () => {
-    const ctx = createMockCtx()
+    // given
+    const sessionHistory: AssistantHistoryMessage[] = []
+    const ctx = createMockCtx(sessionHistory)
     const hook = createPreemptiveCompactionHook(ctx as never, {} as never)
     const sessionID = "ses_tail_recovery"
 
@@ -82,10 +110,17 @@ describe("preemptive-compaction post-compaction degradation monitor", () => {
 
     const stepOnlyParts = [{ type: "step-start" }, { type: "step-finish" }]
 
+    // when
+    appendAssistantHistory(sessionHistory, { id: "msg_1", parts: stepOnlyParts })
     await hook.event(buildAssistantUpdate({ sessionID, id: "msg_1", parts: stepOnlyParts }))
+
+    appendAssistantHistory(sessionHistory, { id: "msg_2", parts: stepOnlyParts })
     await hook.event(buildAssistantUpdate({ sessionID, id: "msg_2", parts: stepOnlyParts }))
+
+    appendAssistantHistory(sessionHistory, { id: "msg_3", parts: stepOnlyParts })
     await hook.event(buildAssistantUpdate({ sessionID, id: "msg_3", parts: stepOnlyParts }))
 
+    // then
     expect(ctx.client.session.summarize).toHaveBeenCalledTimes(1)
     expect(ctx.client.tui.showToast).toHaveBeenCalledTimes(1)
     expect(logMock).toHaveBeenCalledWith(
@@ -98,7 +133,9 @@ describe("preemptive-compaction post-compaction degradation monitor", () => {
   })
 
   it("resets no-text streak when assistant emits text content", async () => {
-    const ctx = createMockCtx()
+    // given
+    const sessionHistory: AssistantHistoryMessage[] = []
+    const ctx = createMockCtx(sessionHistory)
     const hook = createPreemptiveCompactionHook(ctx as never, {} as never)
     const sessionID = "ses_tail_reset"
 
@@ -109,30 +146,48 @@ describe("preemptive-compaction post-compaction degradation monitor", () => {
       },
     })
 
+    // when
+    appendAssistantHistory(sessionHistory, {
+      id: "msg_1",
+      parts: [{ type: "step-start" }, { type: "step-finish" }],
+    })
     await hook.event(buildAssistantUpdate({
       sessionID,
       id: "msg_1",
       parts: [{ type: "step-start" }, { type: "step-finish" }],
     }))
 
+    appendAssistantHistory(sessionHistory, {
+      id: "msg_2",
+      parts: [{ type: "text", text: "Recovered response" }],
+    })
     await hook.event(buildAssistantUpdate({
       sessionID,
       id: "msg_2",
       parts: [{ type: "text", text: "Recovered response" }],
     }))
 
+    appendAssistantHistory(sessionHistory, {
+      id: "msg_3",
+      parts: [{ type: "step-start" }, { type: "step-finish" }],
+    })
     await hook.event(buildAssistantUpdate({
       sessionID,
       id: "msg_3",
       parts: [{ type: "step-start" }, { type: "step-finish" }],
     }))
 
+    appendAssistantHistory(sessionHistory, {
+      id: "msg_4",
+      parts: [{ type: "step-start" }, { type: "step-finish" }],
+    })
     await hook.event(buildAssistantUpdate({
       sessionID,
       id: "msg_4",
       parts: [{ type: "step-start" }, { type: "step-finish" }],
     }))
 
+    // then
     expect(ctx.client.session.summarize).not.toHaveBeenCalled()
   })
 })
