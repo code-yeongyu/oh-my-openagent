@@ -464,4 +464,212 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     expect(result).toContain("session_id: ses_test_12345678")
     expect(result).not.toContain("subagent:")
   })
+
+  test("preserves restricted tool permissions for resumed explore sessions", async () => {
+    //#given - a resumed explore session should not regain delegation tools
+    const promptAsyncCalls: Array<{ path: { id: string }; body: Record<string, unknown> }> = []
+    const mockClient = {
+      session: {
+        messages: async () => ({
+          data: [
+            { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+            {
+              info: {
+                id: "msg_002",
+                role: "assistant",
+                time: { created: 2000 },
+                finish: "end_turn",
+                agent: "explore",
+              },
+              parts: [{ type: "text", text: "Response" }],
+            },
+          ],
+        }),
+        promptAsync: async (input: { path: { id: string }; body: Record<string, unknown> }) => {
+          promptAsyncCalls.push(input)
+          return {}
+        },
+        status: async () => ({
+          data: { ses_test: { type: "idle" } },
+        }),
+      },
+    }
+
+    const { executeSyncContinuation } = require("./sync-continuation")
+
+    const deps = {
+      pollSyncSession: async () => null,
+      fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
+    }
+
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-123",
+      metadata: () => {},
+    }
+
+    const mockExecutorCtx = {
+      client: mockClient,
+      syncPollTimeoutMs: 100,
+    }
+
+    const args = {
+      session_id: "ses_test_12345678",
+      prompt: "continue working",
+      description: "resume explore task",
+      load_skills: [],
+      run_in_background: false,
+    }
+
+    //#when
+    await executeSyncContinuation(args, mockCtx, mockExecutorCtx, deps)
+
+    //#then
+    expect(promptAsyncCalls).toHaveLength(1)
+    expect(promptAsyncCalls[0]?.body.tools).toEqual({
+      task: false,
+      call_omo_agent: false,
+      question: false,
+      write: false,
+      edit: false,
+    })
+  })
+
+  test("preserves restricted tool permissions for resumed librarian sessions", async () => {
+    //#given - a resumed librarian session should stay read-only for delegation tools
+    const promptAsyncCalls: Array<{ path: { id: string }; body: Record<string, unknown> }> = []
+    const mockClient = {
+      session: {
+        messages: async () => ({
+          data: [
+            { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+            {
+              info: {
+                id: "msg_002",
+                role: "assistant",
+                time: { created: 2000 },
+                finish: "end_turn",
+                agent: "librarian",
+              },
+              parts: [{ type: "text", text: "Response" }],
+            },
+          ],
+        }),
+        promptAsync: async (input: { path: { id: string }; body: Record<string, unknown> }) => {
+          promptAsyncCalls.push(input)
+          return {}
+        },
+        status: async () => ({
+          data: { ses_test: { type: "idle" } },
+        }),
+      },
+    }
+
+    const { executeSyncContinuation } = require("./sync-continuation")
+
+    const deps = {
+      pollSyncSession: async () => null,
+      fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
+    }
+
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-123",
+      metadata: () => {},
+    }
+
+    const mockExecutorCtx = {
+      client: mockClient,
+      syncPollTimeoutMs: 100,
+    }
+
+    const args = {
+      session_id: "ses_test_12345678",
+      prompt: "continue researching",
+      description: "resume librarian task",
+      load_skills: [],
+      run_in_background: false,
+    }
+
+    //#when
+    await executeSyncContinuation(args, mockCtx, mockExecutorCtx, deps)
+
+    //#then
+    expect(promptAsyncCalls).toHaveLength(1)
+    expect(promptAsyncCalls[0]?.body.tools).toEqual({
+      task: false,
+      call_omo_agent: false,
+      question: false,
+      write: false,
+      edit: false,
+    })
+  })
+
+  test("keeps plan-family task delegation available during sync continuation", async () => {
+    //#given - a resumed plan-family session should keep its intended task capability
+    const promptAsyncCalls: Array<{ path: { id: string }; body: Record<string, unknown> }> = []
+    const mockClient = {
+      session: {
+        messages: async () => ({
+          data: [
+            { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+            {
+              info: {
+                id: "msg_002",
+                role: "assistant",
+                time: { created: 2000 },
+                finish: "end_turn",
+                agent: "prometheus",
+              },
+              parts: [{ type: "text", text: "Response" }],
+            },
+          ],
+        }),
+        promptAsync: async (input: { path: { id: string }; body: Record<string, unknown> }) => {
+          promptAsyncCalls.push(input)
+          return {}
+        },
+        status: async () => ({
+          data: { ses_test: { type: "idle" } },
+        }),
+      },
+    }
+
+    const { executeSyncContinuation } = require("./sync-continuation")
+
+    const deps = {
+      pollSyncSession: async () => null,
+      fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
+    }
+
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-123",
+      metadata: () => {},
+    }
+
+    const mockExecutorCtx = {
+      client: mockClient,
+      syncPollTimeoutMs: 100,
+    }
+
+    const args = {
+      session_id: "ses_test_12345678",
+      prompt: "continue planning",
+      description: "resume plan task",
+      load_skills: [],
+      run_in_background: false,
+    }
+
+    //#when
+    await executeSyncContinuation(args, mockCtx, mockExecutorCtx, deps)
+
+    //#then
+    expect(promptAsyncCalls).toHaveLength(1)
+    expect(promptAsyncCalls[0]?.body.tools).toEqual({
+      task: true,
+      call_omo_agent: true,
+      question: false,
+    })
+  })
 })
