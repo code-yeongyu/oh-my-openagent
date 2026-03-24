@@ -5,21 +5,14 @@ import { normalizeSDKResponse } from "../../shared"
 import { log } from "../../shared/logger"
 import { getAgentConfigKey } from "../../shared/agent-display-names"
 
-import {
-  ABORT_WINDOW_MS,
-  CONTINUATION_COOLDOWN_MS,
-  DEFAULT_SKIP_AGENTS,
-  FAILURE_RESET_WINDOW_MS,
-  HOOK_NAME,
-  MAX_CONSECUTIVE_FAILURES,
-} from "./constants"
+import { ABORT_WINDOW_MS, CONTINUATION_COOLDOWN_MS, DEFAULT_SKIP_AGENTS, FAILURE_RESET_WINDOW_MS, HOOK_NAME, MAX_CONSECUTIVE_FAILURES } from "./constants"
 import { isLastAssistantMessageAborted } from "./abort-detection"
 import { hasUnansweredQuestion } from "./pending-question-detection"
 import { shouldStopForStagnation } from "./stagnation-detection"
 import { getIncompleteCount } from "./todo"
 import type { MessageInfo, ResolvedMessageInfo, Todo } from "./types"
 import { resolveLatestMessageInfo } from "./resolve-message-info"
-import { isCompactionGuardActive } from "./compaction-guard"
+import { acknowledgeCompactionGuard, isCompactionGuardActive } from "./compaction-guard"
 import type { SessionStateStore } from "./session-state"
 import { startCountdown } from "./countdown"
 
@@ -43,6 +36,7 @@ export async function handleSessionIdle(args: {
   log(`[${HOOK_NAME}] session.idle`, { sessionID })
 
   const state = sessionStateStore.getState(sessionID)
+  const observedCompactionEpoch = state.recentCompactionEpoch
   if (state.isRecovering) {
     log(`[${HOOK_NAME}] Skipped: in recovery`, { sessionID })
     return
@@ -150,9 +144,18 @@ export async function handleSessionIdle(args: {
     resolvedInfo = { ...resolvedInfo, agent: sessionAgent }
   }
 
+  const acknowledgedCompaction = resolvedInfo?.agent ? acknowledgeCompactionGuard(state, observedCompactionEpoch) : false
   const compactionGuardActive = isCompactionGuardActive(state, Date.now())
 
-  log(`[${HOOK_NAME}] Agent check`, { sessionID, agentName: resolvedInfo?.agent, skipAgents, compactionGuardActive })
+  log(`[${HOOK_NAME}] Agent check`, {
+    sessionID,
+    agentName: resolvedInfo?.agent,
+    skipAgents,
+    compactionGuardActive,
+    observedCompactionEpoch,
+    currentCompactionEpoch: state.recentCompactionEpoch,
+    acknowledgedCompaction,
+  })
 
   const resolvedAgentName = resolvedInfo?.agent
   if (resolvedAgentName && skipAgents.some(s => getAgentConfigKey(s) === getAgentConfigKey(resolvedAgentName))) {
@@ -163,8 +166,9 @@ export async function handleSessionIdle(args: {
     log(`[${HOOK_NAME}] Skipped: compaction occurred but no agent info resolved`, { sessionID })
     return
   }
-  if (state.recentCompactionAt && resolvedInfo?.agent) {
-    state.recentCompactionAt = undefined
+  if (compactionGuardActive) {
+    log(`[${HOOK_NAME}] Skipped: compaction guard still armed for current epoch`, { sessionID, observedCompactionEpoch, currentCompactionEpoch: state.recentCompactionEpoch })
+    return
   }
 
   if (isContinuationStopped?.(sessionID)) {
