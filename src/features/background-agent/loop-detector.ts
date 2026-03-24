@@ -36,6 +36,14 @@ export function recordToolCall(
   settings: CircuitBreakerSettings,
   toolInput?: Record<string, unknown> | null
 ): ToolCallWindow {
+  if (toolInput === undefined || toolInput === null) {
+    return {
+      lastSignature: `${toolName}::__unknown-input__`,
+      consecutiveCount: 1,
+      threshold: settings.consecutiveThreshold,
+    }
+  }
+
   const signature = createToolCallSignature(toolName, toolInput)
 
   if (window && window.lastSignature === signature) {

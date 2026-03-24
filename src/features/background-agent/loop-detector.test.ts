@@ -1,3 +1,5 @@
+/// <reference types="bun-types" />
+
 import { describe, expect, test } from "bun:test"
 import {
   createToolCallSignature,
@@ -19,7 +21,7 @@ function buildWindow(
 }
 
 function buildWindowWithInputs(
-  calls: Array<{ tool: string; input?: Record<string, unknown> }>,
+  calls: Array<{ tool: string; input?: Record<string, unknown> | null }>,
   override?: Parameters<typeof resolveCircuitBreakerSettings>[0]
 ) {
   const settings = resolveCircuitBreakerSettings(override)
@@ -148,7 +150,12 @@ describe("loop-detector", () => {
 
     describe("#given the same tool is called consecutively", () => {
       test("#when evaluated #then it triggers", () => {
-        const window = buildWindow(Array.from({ length: 20 }, () => "read"))
+        const window = buildWindowWithInputs(
+          Array.from({ length: 20 }, () => ({
+            tool: "read",
+            input: { filePath: "/src/same.ts" },
+          }))
+        )
 
         const result = detectRepetitiveToolUse(window)
 
@@ -176,7 +183,12 @@ describe("loop-detector", () => {
 
     describe("#given threshold boundary", () => {
       test("#when below threshold #then it does not trigger", () => {
-        const belowThresholdWindow = buildWindow(Array.from({ length: 19 }, () => "read"))
+        const belowThresholdWindow = buildWindowWithInputs(
+          Array.from({ length: 19 }, () => ({
+            tool: "read",
+            input: { filePath: "/src/same.ts" },
+          }))
+        )
 
         const result = detectRepetitiveToolUse(belowThresholdWindow)
 
@@ -184,7 +196,12 @@ describe("loop-detector", () => {
       })
 
       test("#when equal to threshold #then it triggers", () => {
-        const atThresholdWindow = buildWindow(Array.from({ length: 20 }, () => "read"))
+        const atThresholdWindow = buildWindowWithInputs(
+          Array.from({ length: 20 }, () => ({
+            tool: "read",
+            input: { filePath: "/src/same.ts" },
+          }))
+        )
 
         const result = detectRepetitiveToolUse(atThresholdWindow)
 
@@ -224,16 +241,22 @@ describe("loop-detector", () => {
       })
     })
 
-    describe("#given tool calls with no input", () => {
-      test("#when evaluated #then it triggers", () => {
+    describe("#given tool calls with undefined input", () => {
+      test("#when evaluated #then it does not trigger", () => {
         const calls = Array.from({ length: 20 }, () => ({ tool: "read" }))
         const window = buildWindowWithInputs(calls)
         const result = detectRepetitiveToolUse(window)
-        expect(result).toEqual({
-          triggered: true,
-          toolName: "read",
-          repeatedCount: 20,
-        })
+        expect(result).toEqual({ triggered: false })
+      })
+    })
+
+    describe("#given tool calls with null input", () => {
+      test("#when evaluated #then it does not trigger", () => {
+        const calls = Array.from({ length: 20 }, () => ({ tool: "read", input: null }))
+        const window = buildWindowWithInputs(calls)
+        const result = detectRepetitiveToolUse(window)
+
+        expect(result).toEqual({ triggered: false })
       })
     })
   })
