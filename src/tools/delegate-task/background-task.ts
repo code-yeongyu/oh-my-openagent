@@ -8,6 +8,7 @@ import { formatDetailedError } from "./error-formatting"
 import { getSessionTools } from "../../shared/session-tools-store"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { QUESTION_DENIED_SESSION_PERMISSION } from "../../shared/question-denied-session-permission"
+import { setSessionFallbackChain } from "../../hooks/model-fallback/hook"
 
 export async function executeBackgroundTask(
   args: DelegateTaskArgs,
@@ -56,6 +57,9 @@ export async function executeBackgroundTask(
       sessionId = updated?.sessionID
     }
 
+    if (sessionId) {
+      setSessionFallbackChain(sessionId, fallbackChain)
+    }
     if (args.category && sessionId) {
       SessionCategoryRegistry.register(sessionId, args.category)
     }
