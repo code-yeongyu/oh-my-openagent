@@ -7,8 +7,10 @@ import * as shared from "../shared"
 import * as sisyphusJunior from "../agents/sisyphus-junior"
 import type { OhMyOpenCodeConfig } from "../config"
 import * as agentLoader from "../features/claude-code-agent-loader"
+import * as sessionState from "../features/claude-code-session-state"
 import * as skillLoader from "../features/opencode-skill-loader"
 import { getAgentDisplayName } from "../shared/agent-display-names"
+import * as sessionModelState from "../shared/session-model-state"
 import { applyAgentConfig } from "./agent-config-handler"
 import type { PluginComponents } from "./plugin-components-loader"
 
@@ -53,6 +55,8 @@ describe("applyAgentConfig builtin override protection", () => {
   let discoverOpencodeProjectSkillsSpy: ReturnType<typeof spyOn>
   let loadUserAgentsSpy: ReturnType<typeof spyOn>
   let loadProjectAgentsSpy: ReturnType<typeof spyOn>
+  let getMainSessionIDSpy: ReturnType<typeof spyOn>
+  let getSessionModelSpy: ReturnType<typeof spyOn>
   let migrateAgentConfigSpy: ReturnType<typeof spyOn>
   let logSpy: ReturnType<typeof spyOn>
 
@@ -123,6 +127,8 @@ describe("applyAgentConfig builtin override protection", () => {
 
     loadUserAgentsSpy = spyOn(agentLoader, "loadUserAgents").mockReturnValue({})
     loadProjectAgentsSpy = spyOn(agentLoader, "loadProjectAgents").mockReturnValue({})
+    getMainSessionIDSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(undefined)
+    getSessionModelSpy = spyOn(sessionModelState, "getSessionModel").mockReturnValue(undefined)
 
     migrateAgentConfigSpy = spyOn(shared, "migrateAgentConfig").mockImplementation(
       (config: Record<string, unknown>) => config,
@@ -140,6 +146,8 @@ describe("applyAgentConfig builtin override protection", () => {
     discoverOpencodeProjectSkillsSpy.mockRestore()
     loadUserAgentsSpy.mockRestore()
     loadProjectAgentsSpy.mockRestore()
+    getMainSessionIDSpy.mockRestore()
+    getSessionModelSpy.mockRestore()
     migrateAgentConfigSpy.mockRestore()
     logSpy.mockRestore()
   })
@@ -164,6 +172,56 @@ describe("applyAgentConfig builtin override protection", () => {
 
     // then
     expect(result[BUILTIN_SISYPHUS_DISPLAY_NAME]).toEqual(builtinSisyphusConfig)
+  })
+
+  test("reuses the main session model when config.model is missing", async () => {
+    // given
+    const createBuiltinAgentsMock = agents.createBuiltinAgents as unknown as {
+      mock: { calls: unknown[][] }
+    }
+    getMainSessionIDSpy.mockReturnValue("ses_main")
+    getSessionModelSpy.mockReturnValue({ providerID: "openai", modelID: "gpt-5.4" })
+
+    const config: Record<string, unknown> = {
+      agent: {},
+    }
+
+    // when
+    await applyAgentConfig({
+      config,
+      pluginConfig: createPluginConfig(),
+      ctx: { directory: "/tmp" },
+      pluginComponents: createPluginComponents(),
+    })
+
+    // then
+    expect(createBuiltinAgentsMock.mock.calls).toHaveLength(1)
+    expect(createBuiltinAgentsMock.mock.calls[0]?.[3]).toBe("openai/gpt-5.4")
+    expect(createBuiltinAgentsMock.mock.calls[0]?.[9]).toBe("openai/gpt-5.4")
+  })
+
+  test("prefers config.model over the persisted main session model when both exist", async () => {
+    // given
+    const createBuiltinAgentsMock = agents.createBuiltinAgents as unknown as {
+      mock: { calls: unknown[][] }
+    }
+    getMainSessionIDSpy.mockReturnValue("ses_main")
+    getSessionModelSpy.mockReturnValue({ providerID: "openai", modelID: "gpt-5.4" })
+
+    const config = createBaseConfig()
+
+    // when
+    await applyAgentConfig({
+      config,
+      pluginConfig: createPluginConfig(),
+      ctx: { directory: "/tmp" },
+      pluginComponents: createPluginComponents(),
+    })
+
+    // then
+    expect(createBuiltinAgentsMock.mock.calls).toHaveLength(1)
+    expect(createBuiltinAgentsMock.mock.calls[0]?.[3]).toBe("anthropic/claude-opus-4-6")
+    expect(createBuiltinAgentsMock.mock.calls[0]?.[9]).toBe("anthropic/claude-opus-4-6")
   })
 
   test("filters user agents whose key differs from a builtin key only by case", async () => {

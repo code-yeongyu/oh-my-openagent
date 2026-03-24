@@ -2,8 +2,10 @@ import { createBuiltinAgents } from "../agents";
 import { createSisyphusJuniorAgentWithOverrides } from "../agents/sisyphus-junior";
 import type { OhMyOpenCodeConfig } from "../config";
 import { log, migrateAgentConfig } from "../shared";
+import { getMainSessionID } from "../features/claude-code-session-state";
 import { AGENT_NAME_MAP } from "../shared/migration";
 import { getAgentDisplayName } from "../shared/agent-display-names";
+import { getSessionModel } from "../shared/session-model-state";
 import {
   discoverConfigSourceSkills,
   discoverOpencodeGlobalSkills,
@@ -26,6 +28,28 @@ type AgentConfigRecord = Record<string, Record<string, unknown> | undefined> & {
   build?: Record<string, unknown>;
   plan?: Record<string, unknown>;
 };
+
+function resolveCurrentModel(config: Record<string, unknown>): string | undefined {
+  const configModel = config.model;
+  if (typeof configModel === "string") {
+    const trimmedModel = configModel.trim();
+    if (trimmedModel.length > 0) {
+      return trimmedModel;
+    }
+  }
+
+  const mainSessionID = getMainSessionID();
+  if (!mainSessionID) {
+    return undefined;
+  }
+
+  const sessionModel = getSessionModel(mainSessionID);
+  if (!sessionModel?.providerID || !sessionModel.modelID) {
+    return undefined;
+  }
+
+  return `${sessionModel.providerID}/${sessionModel.modelID}`;
+}
 
 function getConfiguredDefaultAgent(config: Record<string, unknown>): string | undefined {
   const defaultAgent = config.default_agent;
@@ -77,7 +101,7 @@ export async function applyAgentConfig(params: {
 
   const browserProvider =
     params.pluginConfig.browser_automation_engine?.provider ?? "playwright";
-  const currentModel = params.config.model as string | undefined;
+  const currentModel = resolveCurrentModel(params.config);
   const disabledSkills = new Set<string>(params.pluginConfig.disabled_skills ?? []);
   const useTaskSystem = params.pluginConfig.experimental?.task_system ?? false;
   const disableOmoEnv = params.pluginConfig.experimental?.disable_omo_env ?? false;
