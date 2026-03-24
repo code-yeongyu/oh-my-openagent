@@ -7,7 +7,7 @@
 > [!TIP]
 > **Building in Public**
 >
-> 维护者正在使用 Jobdori 实时开发和维护 oh-my-opencode。Jobdori 是基于 [OpenClaw](https://github.com/openclaw/openclaw) 深度定制的 AI 助手。
+> 维护者正在使用 Jobdori 实时开发和维护 oh-my-opencode。Jobdori 是基于 OpenClaw 深度定制的 AI 助手。
 > 每个功能开发、每次修复、每次 Issue 分类，都在 Discord 上实时进行。
 >
 > [![Building in Public](./.github/assets/building-in-public.png)](https://discord.gg/PUwSMR9XNk)
