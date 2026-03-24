@@ -1,6 +1,8 @@
-import { describe, test, expect } from "bun:test"
+import { afterEach, describe, test, expect } from "bun:test"
 
 import { createChatMessageHandler } from "./chat-message"
+import { _resetForTesting, setMainSession, subagentSessions } from "../features/claude-code-session-state"
+import { clearSessionModel, getSessionModel, setSessionModel } from "../shared/session-model-state"
 
 type ChatMessagePart = { type: string; text?: string; [key: string]: unknown }
 type ChatMessageHandlerOutput = { message: Record<string, unknown>; parts: ChatMessagePart[] }
@@ -29,6 +31,13 @@ function createMockHandlerArgs(overrides?: {
     _appliedSessions: appliedSessions,
   }
 }
+
+afterEach(() => {
+  _resetForTesting()
+  clearSessionModel("test-session")
+  clearSessionModel("main-session")
+  clearSessionModel("subagent-session")
+})
 
 function createMockInput(agent?: string, model?: { providerID: string; modelID: string }) {
   return {
@@ -141,5 +150,101 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
     //#then
     expect(output.parts).toHaveLength(1)
     expect(output.parts[0].text).toContain("[BACKGROUND TASK COMPLETED]")
+  })
+
+  test("reuses the stored model for subsequent messages in the main session when the UI sends none", async () => {
+    //#given
+    setMainSession("test-session")
+    setSessionModel("test-session", { providerID: "openai", modelID: "gpt-5.4" })
+    const args = createMockHandlerArgs({ shouldOverride: false })
+    const handler = createChatMessageHandler(args)
+    const input = createMockInput("sisyphus")
+    const output = createMockOutput()
+
+    //#when
+    await handler(input, output)
+
+    //#then
+    expect(output.message["model"]).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
+    expect(getSessionModel("test-session")).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
+  })
+
+  test("does not reuse a stored model for the first message of a session", async () => {
+    //#given
+    setMainSession("test-session")
+    setSessionModel("test-session", { providerID: "openai", modelID: "gpt-5.4" })
+    const args = createMockHandlerArgs({ shouldOverride: true })
+    const handler = createChatMessageHandler(args)
+    const input = createMockInput("sisyphus")
+    const output = createMockOutput()
+
+    //#when
+    await handler(input, output)
+
+    //#then
+    expect(output.message["model"]).toBeUndefined()
+  })
+
+  test("does not reuse the main-session model for subagent sessions", async () => {
+    //#given
+    setMainSession("main-session")
+    setSessionModel("main-session", { providerID: "openai", modelID: "gpt-5.4" })
+    subagentSessions.add("subagent-session")
+    const args = createMockHandlerArgs({ shouldOverride: false })
+    const handler = createChatMessageHandler(args)
+    const input = {
+      sessionID: "subagent-session",
+      agent: "oracle",
+    }
+    const output = createMockOutput()
+
+    //#when
+    await handler(input, output)
+
+    //#then
+    expect(output.message["model"]).toBeUndefined()
+    expect(getSessionModel("subagent-session")).toBeUndefined()
+  })
+
+  test("does not override explicit agent model overrides with stored session model", async () => {
+    //#given
+    setMainSession("test-session")
+    setSessionModel("test-session", { providerID: "openai", modelID: "gpt-5.4" })
+    const args = createMockHandlerArgs({
+      shouldOverride: false,
+      pluginConfig: {
+        agents: {
+          sisyphus: { model: "anthropic/claude-opus-4-6" },
+        },
+      },
+    })
+    const handler = createChatMessageHandler(args)
+    const input = createMockInput("sisyphus")
+    const output = createMockOutput()
+
+    //#when
+    await handler(input, output)
+
+    //#then
+    expect(output.message["model"]).toBeUndefined()
+    expect(getSessionModel("test-session")).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
+  })
+
+  test("respects a mid-conversation model switch instead of reusing the previous stored model", async () => {
+    //#given
+    setMainSession("test-session")
+    setSessionModel("test-session", { providerID: "anthropic", modelID: "claude-opus-4-6" })
+    const args = createMockHandlerArgs({ shouldOverride: false })
+    const handler = createChatMessageHandler(args)
+    const nextModel = { providerID: "openai", modelID: "gpt-5.4" }
+    const input = createMockInput("sisyphus", nextModel)
+    const output = createMockOutput()
+
+    //#when
+    await handler(input, output)
+
+    //#then
+    expect(output.message["model"]).toBeUndefined()
+    expect(getSessionModel("test-session")).toEqual(nextModel)
   })
 })
