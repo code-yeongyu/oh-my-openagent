@@ -120,11 +120,13 @@ export function createToolExecuteAfterHandler(input: {
     }
 
     if (toolOutput.output && typeof toolOutput.output === "string") {
-      const gitStats = collectGitDiffStats(ctx.directory)
+      const boulderState = readBoulderState(ctx.directory)
+      const worktreePath = boulderState?.worktree_path?.trim()
+      const verificationDirectory = worktreePath ? worktreePath : ctx.directory
+      const gitStats = collectGitDiffStats(verificationDirectory)
       const fileChanges = formatFileChanges(gitStats)
       const extractedSessionId = extractSessionIdFromOutput(toolOutput.output)
 
-      const boulderState = readBoulderState(ctx.directory)
       if (boulderState) {
         const progress = getPlanProgress(boulderState.active_plan)
         const {
