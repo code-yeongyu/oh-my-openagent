@@ -41,9 +41,9 @@ export function createToolExecuteBeforeHandler(args: {
   }
 
   return async (input, output): Promise<void> => {
-    await hooks.writeExistingFileGuard?.["tool.execute.before"]?.(input, output)
     await hooks.questionLabelTruncator?.["tool.execute.before"]?.(input, output)
     await hooks.claudeCodeHooks?.["tool.execute.before"]?.(input, output)
+    await hooks.writeExistingFileGuard?.["tool.execute.before"]?.(input, output)
     await hooks.nonInteractiveEnv?.["tool.execute.before"]?.(input, output)
     await hooks.commentChecker?.["tool.execute.before"]?.(input, output)
     await hooks.directoryAgentsInjector?.["tool.execute.before"]?.(input, output)
