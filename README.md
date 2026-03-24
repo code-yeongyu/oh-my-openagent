@@ -1,7 +1,7 @@
 > [!TIP]
 > **Building in Public**
 >
-> The maintainer builds and maintains oh-my-opencode in real-time with Jobdori, an AI assistant built on a heavily customized fork of [OpenClaw](https://github.com/openclaw/openclaw).
+> The maintainer builds and maintains oh-my-opencode in real-time with Jobdori, an AI assistant built on a heavily customized fork of OpenClaw.
 > Every feature, every fix, every issue triage — live in our Discord.
 >
 > [![Building in Public](./.github/assets/building-in-public.png)](https://discord.gg/PUwSMR9XNk)

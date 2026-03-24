@@ -7,7 +7,7 @@
 > [!TIP]
 > **Building in Public**
 >
-> 메인테이너가 Jobdori를 통해 oh-my-opencode를 실시간으로 개발하고 있습니다. Jobdori는 [OpenClaw](https://github.com/openclaw/openclaw)를 기반으로 대폭 커스터마이징된 AI 어시스턴트입니다.
+> 메인테이너가 Jobdori를 통해 oh-my-opencode를 실시간으로 개발하고 있습니다. Jobdori는 OpenClaw를 기반으로 대폭 커스터마이징된 AI 어시스턴트입니다.
 > 모든 기능 개발, 버그 수정, 이슈 트리아지를 Discord에서 실시간으로 확인하세요.
 >
 > [![Building in Public](./.github/assets/building-in-public.png)](https://discord.gg/PUwSMR9XNk)
