@@ -12,6 +12,7 @@ export interface TaskProgress {
   lastUpdate: Date
   lastMessage?: string
   lastMessageAt?: Date
+  countedToolPartIDs?: Set<string>
 }
 
 export interface BackgroundTask {

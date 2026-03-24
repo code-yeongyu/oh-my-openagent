@@ -36,6 +36,8 @@ interface MessagePartInfo {
   sessionID?: string
   type?: string
   tool?: string
+  id?: string
+  state?: { status?: string }
 }
 
 interface EventProperties {
@@ -694,8 +696,16 @@ export class BackgroundManager {
       task.progress.lastUpdate = new Date()
 
       if (partInfo?.type === "tool" || partInfo?.tool) {
-        task.progress.toolCalls += 1
-        task.progress.lastTool = partInfo.tool
+        const countedToolPartIDs = task.progress.countedToolPartIDs ?? new Set<string>()
+        const partId = partInfo.id
+        const isRunning = partInfo.state?.status === "running"
+        const alreadyCounted = partId !== undefined && countedToolPartIDs.has(partId)
+        if (!alreadyCounted) {
+          if (partId !== undefined && isRunning) countedToolPartIDs.add(partId)
+          task.progress.countedToolPartIDs = countedToolPartIDs
+          task.progress.toolCalls += 1
+          task.progress.lastTool = partInfo.tool
+        }
       }
     }
 
