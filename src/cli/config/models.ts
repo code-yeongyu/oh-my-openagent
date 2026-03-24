@@ -9,7 +9,7 @@ export function getModelsByProvider(): ProviderMap {
   const modelsJsonPath = join(cacheDir, "models.json")
   const providerModelsJsonPath = join(cacheDir, "provider-models.json")
   
-  const result: ProviderMap = {}
+  const result: ProviderMap = Object.create(null)
 
   // Try provider-models.json first (preferred format)
   if (existsSync(providerModelsJsonPath)) {
@@ -49,9 +49,10 @@ export function getModelsByProvider(): ProviderMap {
              }
            }
         } 
-        // Handle provider map format
+         // Handle provider map format
         else {
           for (const [providerId, providerData] of Object.entries(data)) {
+            if (providerId === "__proto__" || providerId === "constructor" || providerId === "prototype") continue
             if (providerData && typeof providerData === 'object' && 'models' in providerData) {
               const modelsMap = (providerData as any).models
               if (modelsMap && typeof modelsMap === 'object') {

@@ -155,7 +155,12 @@ async function editAgentField(
   }
 
   if (field === "fallback_model") {
-    const currentFallback = agent.fallback_models?.[0]
+    const fallbackArray = Array.isArray(agent.fallback_models) 
+      ? agent.fallback_models 
+      : agent.fallback_models 
+        ? [String(agent.fallback_models)] 
+        : []
+    const currentFallback = fallbackArray[0]
     const model = await selectModelWithCacheLoader(
       `Select fallback model for "${agentName}":`,
       currentFallback
@@ -180,9 +185,9 @@ async function editAgentField(
     if (!state.config.agents) state.config.agents = {}
     const agentsMutable = state.config.agents as Record<string, ExtendedAgentConfig>
     if (!agentsMutable[agentName]) agentsMutable[agentName] = {}
-    const existingFallbacks = agent.fallback_models ?? []
+    const existingFallbacks = fallbackArray.slice(1)
     if (finalFallback) {
-      agentsMutable[agentName].fallback_models = [finalFallback, ...existingFallbacks.slice(1)]
+      agentsMutable[agentName].fallback_models = [finalFallback, ...existingFallbacks]
     } else {
       delete agentsMutable[agentName].fallback_models
     }

@@ -136,6 +136,8 @@ export async function editCategories(state: ConfigEditorState): Promise<void> {
         message: "Enter new category name:",
         validate: (value) => {
           if (!value.trim()) return "Category name is required"
+          if (value.trim() === "__new__" || value.trim() === "__back__") return "Invalid category name"
+          if (value.trim() === "__proto__" || value.trim() === "constructor" || value.trim() === "prototype") return "Reserved name"
           if (categoryNames.includes(value.trim())) return "Category already exists"
           return undefined
         },

@@ -121,15 +121,18 @@ async function setFallbackForAllAgents(state: ConfigEditorState): Promise<void> 
 
   for (const agentName of AGENT_NAMES) {
     if (!agentsMutable[agentName]) agentsMutable[agentName] = {}
+    const existing = agentsMutable[agentName].fallback_models
+    const existingArray = Array.isArray(existing) ? existing : existing ? [String(existing)] : []
     if (finalModel) {
-      agentsMutable[agentName].fallback_models = [finalModel]
+      agentsMutable[agentName].fallback_models = [finalModel, ...existingArray.slice(1)]
     } else {
       delete agentsMutable[agentName].fallback_models
     }
   }
 
   state.modified = true
-  s.stop(`Set fallback model "${finalModel}" for all agents ${color.green("[OK]")}`)
+  const displayModel = finalModel ?? "(cleared)"
+  s.stop(`Set fallback model "${displayModel}" for all agents ${color.green("[OK]")}`)
 }
 
 async function setDefaultBashPermissions(state: ConfigEditorState): Promise<void> {
