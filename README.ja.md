@@ -4,6 +4,15 @@
 > コアメンテナーのQが負傷したため、今週は Issue/PR への返信とリリースが遅れる可能性があります。
 > ご理解とご支援に感謝します。
 
+> [!TIP]
+> **Building in Public**
+>
+> メンテナーが Jobdori を使い、oh-my-opencode をリアルタイムで開発・メンテナンスしています。Jobdori は [OpenClaw](https://github.com/openclaw/openclaw) をベースに大幅カスタマイズされた AI アシスタントです。
+> すべての機能開発、修正、Issue トリアージを Discord でライブでご覧いただけます。
+>
+> [**→ #building-in-public で確認する**](https://discord.gg/PUwSMR9XNk)
+
+
 > [!NOTE]
 >
 > [![Sisyphus Labs - Sisyphus is the agent that codes like your team.](./.github/assets/sisyphuslabs.png?v=2)](https://sisyphuslabs.ai)
