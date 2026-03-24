@@ -206,12 +206,17 @@ async function editAgentField(
   }
 
   if (field === "permissions") {
+    const existingPerm = agent.permission
+    const hasBash = existingPerm?.bash !== undefined
+    const hasEdit = existingPerm?.edit !== undefined
+    const hasWebfetch = existingPerm?.webfetch !== undefined
+
     const permAction = await p.select({
       message: "Select permission to configure:",
       options: [
-        { value: "bash", label: "Bash Permissions", hint: "rm, mv, cp, *" },
-        { value: "edit", label: "Edit Permission" },
-        { value: "webfetch", label: "Webfetch Permission" },
+        { value: "bash", label: "Bash Permissions", hint: hasBash ? "configured" : "rm, mv, cp, *" },
+        { value: "edit", label: "Edit Permission", hint: hasEdit ? "configured" : "not set" },
+        { value: "webfetch", label: "Webfetch Permission", hint: hasWebfetch ? "configured" : "not set" },
         { value: "back", label: "Back" },
       ],
     })
@@ -219,12 +224,16 @@ async function editAgentField(
     if (p.isCancel(permAction) || permAction === "back") return false
 
     if (permAction === "bash") {
+      const existingBash = existingPerm?.bash
+      const isSimple = typeof existingBash === "string"
+      const bashHint = isSimple ? `current: ${existingBash}` : (typeof existingBash === "object" ? "current: detailed" : "not set")
+
       const bashAction = await p.select({
         message: "Configure bash permissions:",
         options: [
-          { value: "simple", label: "Simple (one value for all commands)", hint: "ask, allow, or deny for all" },
-          { value: "detailed", label: "Detailed (per-command)", hint: "set rm, mv, cp, * separately" },
-          { value: "clear", label: "Clear bash permissions" },
+          { value: "simple", label: "Simple (one value for all commands)", hint: isSimple ? `current: ${existingBash}` : "ask, allow, or deny for all" },
+          { value: "detailed", label: "Detailed (per-command)", hint: !isSimple && existingBash ? "current: detailed" : "set rm, mv, cp, * separately" },
+          { value: "clear", label: "Clear bash permissions", hint: hasBash ? "configured" : undefined },
           { value: "back", label: "Back" },
         ],
       })
@@ -243,13 +252,15 @@ async function editAgentField(
         }
         p.log.success("Cleared bash permissions")
       } else if (bashAction === "simple") {
+        const currentSimple = typeof existingBash === "string" ? existingBash : undefined
         const value = await p.select({
           message: "Select bash permission level:",
           options: [
-            { value: "ask", label: "Ask", hint: "Prompt before executing any bash command" },
-            { value: "allow", label: "Allow", hint: "Execute bash commands without prompting" },
-            { value: "deny", label: "Deny", hint: "Block all bash commands" },
+            { value: "ask", label: "Ask", hint: currentSimple === "ask" ? "current" : "Prompt before executing any bash command" },
+            { value: "allow", label: "Allow", hint: currentSimple === "allow" ? "current" : "Execute bash commands without prompting" },
+            { value: "deny", label: "Deny", hint: currentSimple === "deny" ? "current" : "Block all bash commands" },
           ],
+          initialValue: currentSimple ?? "ask",
         })
 
         if (p.isCancel(value)) return false

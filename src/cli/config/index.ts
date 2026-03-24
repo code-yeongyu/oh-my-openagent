@@ -83,10 +83,13 @@ async function editRootDefaults(state: ConfigEditorState): Promise<void> {
   if (p.isCancel(model)) return
 
   const finalModel = model?.trim() || undefined
-  state.config.default_run_agent = finalModel
-  state.modified = true
-
-  p.log.success(`Updated default_run_agent to ${finalModel ?? "(none)"}`)
+  if (finalModel !== currentModel) {
+    state.config.default_run_agent = finalModel
+    state.modified = true
+    p.log.success(`Updated default_run_agent to ${finalModel ?? "(none)"}`)
+  } else {
+    p.log.info("No changes to default_run_agent")
+  }
 }
 
 async function showMainMenu(state: ConfigEditorState): Promise<"exit" | "continue"> {

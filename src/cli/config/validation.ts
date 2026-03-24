@@ -6,6 +6,8 @@ import { AGENT_NAMES } from "./types"
 export function validateConfig(state: ConfigEditorState): ValidationWarning[] {
   const warnings: ValidationWarning[] = []
   const agents = state.config.agents ?? {}
+  const categories = state.config.categories ?? {}
+  const validCategories = Object.keys(categories)
 
   for (const agentName of AGENT_NAMES) {
     const agent = agents[agentName]
@@ -13,6 +15,15 @@ export function validateConfig(state: ConfigEditorState): ValidationWarning[] {
 
     const hasModel = agent.model && agent.model.length > 0
     const hasCategory = agent.category && agent.category.length > 0
+    const categoryExists = hasCategory && agent.category && validCategories.includes(agent.category)
+
+    if (hasCategory && agent.category && !categoryExists) {
+      warnings.push({
+        type: "missing-model",
+        agent: agentName,
+        message: `Agent "${agentName}" has undefined category "${agent.category}"`,
+      })
+    }
 
     if (!hasModel && !hasCategory) {
       warnings.push({
