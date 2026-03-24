@@ -21,16 +21,9 @@ interface MessageWithParts {
   parts: Part[]
 }
 
-interface ThinkingPart {
-  thinking?: string
-  text?: string
-}
-
-interface MessageInfoExtended {
-  id: string
-  role: string
-  sessionID?: string
-  modelID?: string
+type SignedThinkingPart = Part & {
+  type: "thinking" | "redacted_thinking"
+  signature: string
 }
 
 type MessagesTransformHook = {
@@ -83,57 +76,45 @@ function startsWithThinkingBlock(parts: Part[]): boolean {
 
   const firstPart = parts[0]
   const type = firstPart.type as string
-  return type === "thinking" || type === "reasoning"
+  return type === "thinking" || type === "redacted_thinking" || type === "reasoning"
 }
 
-/**
- * Find the most recent thinking content from previous assistant messages
- */
-function findPreviousThinkingContent(
+function isSignedThinkingPart(part: Part): part is SignedThinkingPart {
+  const type = part.type as string
+  if (type !== "thinking" && type !== "redacted_thinking") {
+    return false
+  }
+
+  const signature = (part as { signature?: unknown }).signature
+  return typeof signature === "string" && signature.length > 0
+}
+
+function findPreviousThinkingPart(
   messages: MessageWithParts[],
   currentIndex: number
-): string {
+): SignedThinkingPart | null {
   // Search backwards from current message
   for (let i = currentIndex - 1; i >= 0; i--) {
     const msg = messages[i]
     if (msg.info.role !== "assistant") continue
 
-    // Look for thinking parts
     if (!msg.parts) continue
     for (const part of msg.parts) {
-      const type = part.type as string
-      if (type === "thinking" || type === "reasoning") {
-        const thinking = (part as unknown as ThinkingPart).thinking || (part as unknown as ThinkingPart).text
-        if (thinking && typeof thinking === "string" && thinking.trim().length > 0) {
-          return thinking
-        }
+      if (isSignedThinkingPart(part)) {
+        return part
       }
     }
   }
 
-  return ""
+  return null
 }
 
-/**
- * Prepend a thinking block to a message's parts array
- */
-function prependThinkingBlock(message: MessageWithParts, thinkingContent: string): void {
+function prependThinkingBlock(message: MessageWithParts, thinkingPart: SignedThinkingPart): void {
   if (!message.parts) {
     message.parts = []
   }
 
-  // Create synthetic thinking part
-  const thinkingPart = {
-    type: "thinking" as const,
-    id: `prt_0000000000_synthetic_thinking`,
-    sessionID: (message.info as unknown as MessageInfoExtended).sessionID || "",
-    messageID: message.info.id,
-    thinking: thinkingContent,
-    synthetic: true,
-  }
-
-  // Prepend to parts array
-  message.parts.unshift(thinkingPart as unknown as Part)
+  message.parts.unshift(thinkingPart)
 }
 
 /**
@@ -150,7 +131,8 @@ export function createThinkingBlockValidatorHook(): MessagesTransformHook {
 
       // Get the model info from the last user message
       const lastUserMessage = messages.findLast(m => m.info.role === "user")
-      const modelID = (lastUserMessage?.info as unknown as MessageInfoExtended)?.modelID || ""
+      const modelIDValue = (lastUserMessage?.info as { modelID?: unknown } | undefined)?.modelID
+      const modelID = typeof modelIDValue === "string" ? modelIDValue : ""
 
       // Only process if extended thinking might be enabled
       if (!isExtendedThinkingModel(modelID)) {
@@ -166,13 +148,12 @@ export function createThinkingBlockValidatorHook(): MessagesTransformHook {
 
         // Check if message has content parts but doesn't start with thinking
         if (hasContentParts(msg.parts) && !startsWithThinkingBlock(msg.parts)) {
-          // Find thinking content from previous turns
-          const previousThinking = findPreviousThinkingContent(messages, i)
+          const previousThinkingPart = findPreviousThinkingPart(messages, i)
+          if (!previousThinkingPart) {
+            continue
+          }
 
-          // Prepend thinking block with content from previous turn or placeholder
-          const thinkingContent = previousThinking || "[Continuing from previous reasoning]"
-
-          prependThinkingBlock(msg, thinkingContent)
+          prependThinkingBlock(msg, previousThinkingPart)
         }
       }
     },
