@@ -46,3 +46,4 @@ export { createWriteExistingFileGuardHook } from "./write-existing-file-guard";
 export { createHashlineReadEnhancerHook } from "./hashline-read-enhancer";
 export { createSecretLeakGuardHook } from "./secret-leak-guard";
 export { createEnvFileWriteGuardHook } from "./env-file-write-guard"
+export { createJsonErrorRecoveryHook } from "./json-error-recovery"

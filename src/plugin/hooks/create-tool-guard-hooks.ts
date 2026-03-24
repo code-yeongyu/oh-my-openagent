@@ -13,6 +13,7 @@ import {
   createHashlineReadEnhancerHook,
   createSecretLeakGuardHook,
   createEnvFileWriteGuardHook,
+  createJsonErrorRecoveryHook,
 } from "../../hooks"
 import {
   getOpenCodeVersion,
@@ -34,6 +35,7 @@ export type ToolGuardHooks = {
   hashlineReadEnhancer: ReturnType<typeof createHashlineReadEnhancerHook> | null
   secretLeakGuard: ReturnType<typeof createSecretLeakGuardHook> | null
   envFileWriteGuard: ReturnType<typeof createEnvFileWriteGuardHook> | null
+  jsonErrorRecovery: ReturnType<typeof createJsonErrorRecoveryHook> | null
 }
 
 export function createToolGuardHooks(args: {
@@ -103,6 +105,10 @@ export function createToolGuardHooks(args: {
     ? safeHook("env-file-write-guard", () => createEnvFileWriteGuardHook(pluginConfig.security?.env_file_guard))
     : null
 
+  const jsonErrorRecovery = isHookEnabled("json-error-recovery")
+    ? safeHook("json-error-recovery", () => createJsonErrorRecoveryHook(ctx))
+    : null
+
   return {
     commentChecker,
     toolOutputTruncator,
@@ -115,5 +121,6 @@ export function createToolGuardHooks(args: {
     hashlineReadEnhancer,
     secretLeakGuard,
     envFileWriteGuard,
+    jsonErrorRecovery,
   }
 }
