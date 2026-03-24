@@ -157,15 +157,69 @@ describe("expandProfile", () => {
     })
   })
 
+  describe("economy profile", () => {
+    test("should set morpheus to haiku", () => {
+      //#given
+      //#when
+      const result = expandProfile("economy")
+
+      //#then
+      expect(result.agents?.morpheus?.model).toBe(
+        "google-vertex-anthropic/claude-haiku-4-5@20251001"
+      )
+    })
+
+    test("should set oracle to haiku", () => {
+      //#given
+      //#when
+      const result = expandProfile("economy")
+
+      //#then
+      expect(result.agents?.oracle?.model).toBe(
+        "google-vertex-anthropic/claude-haiku-4-5@20251001"
+      )
+    })
+
+    test("should set source category to haiku", () => {
+      //#given
+      //#when
+      const result = expandProfile("economy")
+
+      //#then
+      expect(result.categories?.["source"]?.model).toBe(
+        "google-vertex-anthropic/claude-haiku-4-5@20251001"
+      )
+    })
+
+    test("should set merovingian to gemini 3.1 pro", () => {
+      //#given
+      //#when
+      const result = expandProfile("economy")
+
+      //#then
+      expect(result.agents?.merovingian?.model).toBe("google-vertex/gemini-3.1-pro-preview")
+    })
+
+    test("should set bullet-time category to gemini 2.5 flash", () => {
+      //#given
+      //#when
+      const result = expandProfile("economy")
+
+      //#then
+      expect(result.categories?.["bullet-time"]?.model).toBe("google-vertex/gemini-2.5-flash")
+    })
+  })
+
   describe("PROFILE_NAMES", () => {
-    test("should export all three profile names", () => {
+    test("should export all four profile names", () => {
       //#given
       //#when
       //#then
       expect(PROFILE_NAMES).toContain("budget")
+      expect(PROFILE_NAMES).toContain("economy")
       expect(PROFILE_NAMES).toContain("balanced")
       expect(PROFILE_NAMES).toContain("performance")
-      expect(PROFILE_NAMES).toHaveLength(3)
+      expect(PROFILE_NAMES).toHaveLength(4)
     })
   })
 })

@@ -23,8 +23,8 @@ import { WebsearchConfigSchema } from "./websearch"
 
 export const MatrixxConfigSchema = z.object({
   $schema: z.string().optional(),
-  /** Predefined model profile: "budget" | "balanced" | "performance". Expanded at config load time; explicit agents/categories override profile defaults. */
-  profile: z.enum(["budget", "balanced", "performance"]).optional(),
+  /** Predefined model profile: "budget" | "economy" | "balanced" | "performance". Expanded at config load time; explicit agents/categories override profile defaults. */
+  profile: z.enum(["budget", "economy", "balanced", "performance"]).optional(),
   /** Enable new task system (default: false) */
   new_task_system_enabled: z.boolean().optional(),
   /** Default agent name for `matrixx run` (env: OPENCODE_DEFAULT_AGENT) */

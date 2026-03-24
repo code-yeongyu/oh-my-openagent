@@ -1,10 +1,11 @@
 import type { MatrixxConfig } from "./schema/matrixx-config"
 
-export const PROFILE_NAMES = ["budget", "balanced", "performance"] as const
+export const PROFILE_NAMES = ["budget", "economy", "balanced", "performance"] as const
 export type ProfileName = (typeof PROFILE_NAMES)[number]
 
 const OPUS = "google-vertex-anthropic/claude-opus-4-6@default"
 const SONNET = "google-vertex-anthropic/claude-sonnet-4-6@default"
+const HAIKU = "google-vertex-anthropic/claude-haiku-4-5@20251001"
 const GEMINI_PRO = "google-vertex/gemini-3.1-pro-preview"
 const GEMINI_FLASH = "google-vertex/gemini-3-flash-preview"
 const GEMINI_FAST = "google-vertex/gemini-2.5-flash"
@@ -34,6 +35,34 @@ const PROFILES: Record<ProfileName, Partial<MatrixxConfig>> = {
       "red-pill": { model: GEMINI_FAST },
       "blue-pill": { model: GEMINI_FAST },
       broadcast: { model: GEMINI_FAST },
+      "bullet-time": { model: GEMINI_FAST },
+    },
+  },
+
+  economy: {
+    agents: {
+      morpheus: { model: HAIKU },
+      oracle: { model: HAIKU },
+      cipher: { model: HAIKU },
+      niobe: { model: HAIKU },
+      sentinel: { model: HAIKU },
+      seraph: { model: HAIKU },
+      merovingian: { model: GEMINI_PRO },
+      smith: { model: GEMINI_PRO },
+      architect: { model: GEMINI_FLASH },
+      construct: { model: GEMINI_FLASH },
+      trinity: { model: GEMINI_FAST },
+      operator: { model: GEMINI_FAST },
+    },
+    categories: {
+      source: { model: HAIKU },
+      "dsl-engineering": { model: HAIKU },
+      "deep-jack": { model: GEMINI_PRO },
+      "matrix-bend": { model: GEMINI_PRO },
+      construct: { model: GEMINI_PRO },
+      "red-pill": { model: GEMINI_PRO },
+      "blue-pill": { model: HAIKU },
+      broadcast: { model: GEMINI_FLASH },
       "bullet-time": { model: GEMINI_FAST },
     },
   },
