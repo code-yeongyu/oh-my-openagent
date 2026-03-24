@@ -4,6 +4,15 @@
 > Ключевой мейнтейнер Q получил травму, поэтому на этой неделе ответы по issue/PR и релизы могут задерживаться.
 > Спасибо за терпение и поддержку.
 
+> [!TIP]
+> **Building in Public**
+>
+> Мейнтейнер разрабатывает и поддерживает oh-my-opencode в режиме реального времени с помощью Jobdori — ИИ-ассистента на базе глубоко кастомизированной версии [OpenClaw](https://github.com/openclaw/openclaw).
+> Каждая фича, каждый фикс, каждый триаж issue — в прямом эфире в нашем Discord.
+>
+> [**→ Смотрите в #building-in-public**](https://discord.gg/PUwSMR9XNk)
+
+
 > [!NOTE]
 >
 > [![Sisyphus Labs - Sisyphus is the agent that codes like your team.](./.github/assets/sisyphuslabs.png?v=2)](https://sisyphuslabs.ai)
