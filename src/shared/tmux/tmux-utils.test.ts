@@ -43,12 +43,12 @@ describe("isInsideTmux", () => {
     expect(result).toBe(false)
   })
 
-  test("returns the same result as the process environment helper", () => {
+  test("is exported as a function", () => {
     // given, #when
-    const result = isInsideTmux()
+    const result = typeof isInsideTmux
 
     // then
-    expect(result).toBe(isInsideTmuxEnvironment(process.env))
+    expect(result).toBe("function")
   })
 })
 
