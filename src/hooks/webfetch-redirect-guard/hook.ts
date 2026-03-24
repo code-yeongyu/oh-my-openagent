@@ -56,6 +56,10 @@ function isRedirectLoopError(output: string): boolean {
   return WEBFETCH_REDIRECT_ERROR_PATTERNS.some((pattern) => pattern.test(output))
 }
 
+function isToolErrorOutput(output: string): boolean {
+  return output.trimStart().toLowerCase().startsWith("error:")
+}
+
 function buildRedirectLimitMessage(url?: string): string {
   const suffix = url ? ` for ${url}` : ""
   return `Error: WebFetch failed: exceeded maximum redirects (${MAX_WEBFETCH_REDIRECTS})${suffix}`
@@ -111,7 +115,7 @@ export function createWebFetchRedirectGuardHook(_ctx: PluginInput) {
         return
       }
 
-      if (isRedirectLoopError(output.output)) {
+      if (isToolErrorOutput(output.output) && isRedirectLoopError(output.output)) {
         output.output = buildRedirectLimitMessage()
       }
     },

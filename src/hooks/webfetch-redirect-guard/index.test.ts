@@ -49,7 +49,7 @@ function createFetchMock(
   implementation: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>,
 ): typeof fetch {
   return Object.assign(implementation, {
-    preconnect: originalFetch.preconnect,
+    preconnect: Reflect.get(originalFetch, "preconnect"),
   })
 }
 
@@ -149,6 +149,20 @@ describe("createWebFetchRedirectGuardHook", () => {
 
         expect(output.output).toBe(
           "Error: WebFetch failed: exceeded maximum redirects (10)",
+        )
+      })
+    })
+
+    describe("#when successful fetched content mentions redirect loops", () => {
+      it("#then should keep the content unchanged", async () => {
+        const hook = createWebFetchRedirectGuardHook({} as never)
+        const input = createInput()
+        const output = createAfterOutput("This page explains why browsers hit too many redirects in some setups.")
+
+        await hook["tool.execute.after"](input, output)
+
+        expect(output.output).toBe(
+          "This page explains why browsers hit too many redirects in some setups.",
         )
       })
     })
