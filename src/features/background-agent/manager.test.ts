@@ -1668,7 +1668,7 @@ describe("BackgroundManager.resume model persistence", () => {
     // then - model should be passed in prompt body
     expect(promptCalls).toHaveLength(1)
     expect(promptCalls[0].body.model).toEqual({ providerID: "anthropic", modelID: "claude-sonnet-4-20250514" })
-    expect(promptCalls[0].body.agent).toBe("explore")
+    expect("agent" in promptCalls[0].body).toBe(false)
   })
 
   test("should NOT pass model when task has no model (backward compatibility)", async () => {
@@ -1806,9 +1806,9 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       expect(task.sessionID).toBeUndefined()
     })
 
-    test("should return immediately even with concurrency limit", async () => {
-      // given
-      const config = { defaultConcurrency: 1 }
+  test("should return immediately even with concurrency limit", async () => {
+    // given
+    const config = { defaultConcurrency: 1 }
       manager.shutdown()
       manager = new BackgroundManager({ client: mockClient, directory: tmpdir() } as unknown as PluginInput, config)
 
@@ -1828,9 +1828,76 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
 
       // then
       expect(endTime - startTime).toBeLessThan(100) // Should be instant
-      expect(task1.status).toBe("pending")
-      expect(task2.status).toBe("pending")
+    expect(task1.status).toBe("pending")
+    expect(task2.status).toBe("pending")
+  })
+
+  test("should omit agent when launch has model and keep agent without model", async () => {
+    // given
+    const promptBodies: Array<Record<string, unknown>> = []
+    let resolveFirstPromptStarted: (() => void) | undefined
+    let resolveSecondPromptStarted: (() => void) | undefined
+    const firstPromptStarted = new Promise<void>((resolve) => {
+      resolveFirstPromptStarted = resolve
     })
+    const secondPromptStarted = new Promise<void>((resolve) => {
+      resolveSecondPromptStarted = resolve
+    })
+    const customClient = {
+      session: {
+        create: async (_args?: unknown) => ({ data: { id: `ses_${crypto.randomUUID()}` } }),
+        get: async () => ({ data: { directory: "/test/dir" } }),
+        prompt: async () => ({}),
+        promptAsync: async (args: { path: { id: string }; body: Record<string, unknown> }) => {
+          promptBodies.push(args.body)
+          if (promptBodies.length === 1) {
+            resolveFirstPromptStarted?.()
+          }
+          if (promptBodies.length === 2) {
+            resolveSecondPromptStarted?.()
+          }
+          return {}
+        },
+        messages: async () => ({ data: [] }),
+        todo: async () => ({ data: [] }),
+        status: async () => ({ data: {} }),
+        abort: async () => ({}),
+      },
+    }
+    manager.shutdown()
+    manager = new BackgroundManager({ client: customClient, directory: tmpdir() } as unknown as PluginInput)
+
+    const launchInputWithModel = {
+      description: "Test task with model",
+      prompt: "Do something",
+      agent: "test-agent",
+      parentSessionID: "parent-session",
+      parentMessageID: "parent-message",
+      model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
+    }
+    const launchInputWithoutModel = {
+      description: "Test task without model",
+      prompt: "Do something else",
+      agent: "test-agent",
+      parentSessionID: "parent-session",
+      parentMessageID: "parent-message",
+    }
+
+    // when
+    const taskWithModel = await manager.launch(launchInputWithModel)
+    await firstPromptStarted
+    const taskWithoutModel = await manager.launch(launchInputWithoutModel)
+    await secondPromptStarted
+
+    // then
+    expect(taskWithModel.status).toBe("pending")
+    expect(taskWithoutModel.status).toBe("pending")
+    expect(promptBodies).toHaveLength(2)
+    expect(promptBodies[0].model).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-6" })
+    expect("agent" in promptBodies[0]).toBe(false)
+    expect(promptBodies[1].agent).toBe("test-agent")
+    expect("model" in promptBodies[1]).toBe(false)
+  })
 
     test("should queue multiple tasks without blocking", async () => {
       // given
