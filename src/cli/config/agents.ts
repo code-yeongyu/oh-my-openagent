@@ -42,8 +42,9 @@ function formatAgentStatus(state: ConfigEditorState, agentName: string): string 
     parts.push(`cat: ${color.yellow(agent.category)}`)
   }
 
-  if (agent.fallback_models?.length) {
-    parts.push(`fallback: ${color.dim(agent.fallback_models[0])}${agent.fallback_models.length > 1 ? " +" + (agent.fallback_models.length - 1) : ""}`)
+  const fbArray = Array.isArray(agent.fallback_models) ? agent.fallback_models : agent.fallback_models ? [String(agent.fallback_models)] : []
+  if (fbArray.length) {
+    parts.push(`fallback: ${color.dim(fbArray[0])}${fbArray.length > 1 ? " +" + (fbArray.length - 1) : ""}`)
   }
 
   if (agent.permission) {
@@ -69,13 +70,14 @@ async function editAgentField(
   const agents = getAgentsRecord(state)
   const agent = agents[agentName] ?? {}
   const categories = getCategoriesFromConfig(state)
+  const fbArray = Array.isArray(agent.fallback_models) ? agent.fallback_models : agent.fallback_models ? [String(agent.fallback_models)] : []
 
   const field = await p.select({
     message: `Editing "${agentName}" - Select field to edit:`,
     options: [
       { value: "model", label: "Model", hint: agent.model ? `current: ${agent.model}` : "not set" },
       { value: "category", label: "Category", hint: agent.category ? `current: ${agent.category}` : "not set" },
-      { value: "fallback_model", label: "Fallback Model", hint: agent.fallback_models?.length ? `current: ${agent.fallback_models[0]}${agent.fallback_models.length > 1 ? " +" + (agent.fallback_models.length - 1) : ""}` : "not set" },
+      { value: "fallback_model", label: "Fallback Model", hint: fbArray.length ? `current: ${fbArray[0]}${fbArray.length > 1 ? " +" + (fbArray.length - 1) : ""}` : "not set" },
       { value: "permissions", label: "Permissions", hint: agent.permission ? "configured" : "not set" },
       { value: "back", label: "Back to agent list" },
     ],
@@ -187,7 +189,10 @@ async function editAgentField(
     if (!agentsMutable[agentName]) agentsMutable[agentName] = {}
     const existingFallbacks = fallbackArray.slice(1)
     if (finalFallback) {
-      agentsMutable[agentName].fallback_models = [finalFallback, ...existingFallbacks]
+      const filtered = existingFallbacks.filter(f => f !== finalFallback)
+      agentsMutable[agentName].fallback_models = [finalFallback, ...filtered]
+    } else if (existingFallbacks.length > 0) {
+      agentsMutable[agentName].fallback_models = existingFallbacks
     } else {
       delete agentsMutable[agentName].fallback_models
     }
