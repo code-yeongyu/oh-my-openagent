@@ -23,6 +23,36 @@ function createParams(overrides: {
 }
 
 describe("applyToolConfig", () => {
+  describe("#given config permission sets webfetch and external_directory", () => {
+    describe("#when applying tool config", () => {
+      it("#then should preserve explicit deny over OmO defaults", () => {
+        const params = createParams({})
+        params.config.permission = {
+          webfetch: "deny",
+          external_directory: "deny",
+        }
+
+        applyToolConfig(params)
+
+        const permission = params.config.permission as Record<string, unknown>
+        expect(permission.webfetch).toBe("deny")
+        expect(permission.external_directory).toBe("deny")
+        expect(permission.task).toBe("deny")
+      })
+
+      it("#then should allow webfetch and external_directory by default", () => {
+        const params = createParams({})
+
+        applyToolConfig(params)
+
+        const permission = params.config.permission as Record<string, unknown>
+        expect(permission.webfetch).toBe("allow")
+        expect(permission.external_directory).toBe("allow")
+        expect(permission.task).toBe("deny")
+      })
+    })
+  })
+
   describe("#given task_system is enabled", () => {
     describe("#when applying tool config", () => {
       it("#then should deny todowrite and todoread globally", () => {
