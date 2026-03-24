@@ -176,7 +176,7 @@ The `opencode-antigravity-auth` plugin uses different model names than the built
 
 **Available models (Gemini CLI quota)**:
 
-- `google/gemini-2.5-flash`, `google/gemini-2.5-pro`, `google/gemini-3-flash-preview`, `google/gemini-3-pro-preview`
+- `google/gemini-2.5-flash`, `google/gemini-2.5-pro`, `google/gemini-3-flash-preview`, `google/gemini-3.1-pro-preview`
 
 > **Note**: Legacy tier-suffixed names like `google/antigravity-gemini-3-pro-high` still work but variants are recommended. Use `--variant=high` with the base model name instead.
 
@@ -294,7 +294,7 @@ Not all models behave the same way. Understanding which models are "similar" hel
 
 | Model                 | Provider(s)                      | Notes                                                       |
 | --------------------- | -------------------------------- | ----------------------------------------------------------- |
-| **Gemini 3 Pro**      | google, github-copilot, opencode | Excels at visual/frontend tasks. Different reasoning style. |
+| **Gemini 3.1 Pro**    | google, github-copilot, opencode | Excels at visual/frontend tasks. Different reasoning style. |
 | **Gemini 3 Flash**    | google, github-copilot, opencode | Fast, good for doc search and light tasks.                  |
 | **MiniMax M2.5**      | venice                           | Fast and smart. Good for utility tasks.                     |
 | **MiniMax M2.5 Free** | opencode                         | Free-tier MiniMax. Fast for search/retrieval.               |
@@ -317,7 +317,7 @@ Based on your subscriptions, here's how the agents were configured:
 | Agent        | Role             | Default Chain                                   | What It Does                                                                             |
 | ------------ | ---------------- | ----------------------------------------------- | ---------------------------------------------------------------------------------------- |
 | **Sisyphus** | Main ultraworker | Opus (max) → Kimi K2.5 → GLM 5 → Big Pickle     | Primary coding agent. Orchestrates everything. **Never use GPT — no GPT prompt exists.** |
-| **Metis**    | Plan review      | Opus (max) → Kimi K2.5 → GPT-5.4 → Gemini 3 Pro | Reviews Prometheus plans for gaps.                                                       |
+| **Metis**    | Plan review      | Opus (max) → Kimi K2.5 → GPT-5.4 → Gemini 3.1 Pro | Reviews Prometheus plans for gaps.                                                       |
 
 **Dual-Prompt Agents** (auto-switch between Claude and GPT prompts):
 
@@ -327,7 +327,7 @@ Priority: **Claude > GPT > Claude-like models**
 
 | Agent          | Role              | Default Chain                                              | GPT Prompt?                                                      |
 | -------------- | ----------------- | ---------------------------------------------------------- | ---------------------------------------------------------------- |
-| **Prometheus** | Strategic planner | Opus (max) → **GPT-5.4 (high)** → Kimi K2.5 → Gemini 3 Pro | Yes — XML-tagged, principle-driven (~300 lines vs ~1,100 Claude) |
+| **Prometheus** | Strategic planner | Opus (max) → **GPT-5.4 (high)** → Kimi K2.5 → Gemini 3.1 Pro | Yes — XML-tagged, principle-driven (~300 lines vs ~1,100 Claude) |
 | **Atlas**      | Todo orchestrator | **Kimi K2.5** → Sonnet → GPT-5.4                           | Yes — GPT-optimized todo management                              |
 
 **GPT-Native Agents** (built for GPT, don't override to Claude):
@@ -335,8 +335,8 @@ Priority: **Claude > GPT > Claude-like models**
 | Agent          | Role                   | Default Chain                          | Notes                                                  |
 | -------------- | ---------------------- | -------------------------------------- | ------------------------------------------------------ |
 | **Hephaestus** | Deep autonomous worker | GPT-5.3-codex (medium) only            | "Codex on steroids." No fallback. Requires GPT access. |
-| **Oracle**     | Architecture/debugging | GPT-5.4 (high) → Gemini 3 Pro → Opus   | High-IQ strategic backup. GPT preferred.               |
-| **Momus**      | High-accuracy reviewer | GPT-5.4 (medium) → Opus → Gemini 3 Pro | Verification agent. GPT preferred.                     |
+| **Oracle**     | Architecture/debugging | GPT-5.4 (high) → Gemini 3.1 Pro → Opus  | High-IQ strategic backup. GPT preferred.               |
+| **Momus**      | High-accuracy reviewer | GPT-5.4 (medium) → Opus → Gemini 3.1 Pro | Verification agent. GPT preferred.                     |
 
 **Utility Agents** (speed over intelligence):
 
