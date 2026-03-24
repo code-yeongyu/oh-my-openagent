@@ -66,7 +66,7 @@ export function detectConfigFile(basePath: string): {
   return { format: "none", path: jsonPath }
 }
 
-const PLUGIN_CONFIG_NAMES = ["oh-my-openagent", "oh-my-opencode"] as const
+const PLUGIN_CONFIG_NAMES = ["oh-my-opencode", "oh-my-openagent"] as const
 
 export function detectPluginConfigFile(dir: string): {
   format: "json" | "jsonc" | "none"
