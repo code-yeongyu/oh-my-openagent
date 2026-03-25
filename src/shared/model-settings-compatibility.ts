@@ -1,83 +1,55 @@
-import { normalizeModelID } from "./model-normalization"
+import { detectHeuristicModelFamily } from "./model-capability-heuristics"
 
-type CompatibilityField = "variant" | "reasoningEffort"
+type CompatibilityField = "variant" | "reasoningEffort" | "temperature" | "topP" | "maxTokens" | "thinking"
 
 type DesiredModelSettings = {
   variant?: string
   reasoningEffort?: string
+  temperature?: number
+  topP?: number
+  maxTokens?: number
+  thinking?: Record<string, unknown>
 }
 
-type VariantCapabilities = {
+type CompatibilityCapabilities = {
   variants?: string[]
+  reasoningEfforts?: string[]
+  supportsTemperature?: boolean
+  supportsTopP?: boolean
+  maxOutputTokens?: number
+  supportsThinking?: boolean
 }
 
 export type ModelSettingsCompatibilityInput = {
   providerID: string
   modelID: string
   desired: DesiredModelSettings
-  capabilities?: VariantCapabilities
+  capabilities?: CompatibilityCapabilities
 }
 
 export type ModelSettingsCompatibilityChange = {
   field: CompatibilityField
   from: string
   to?: string
-  reason: "unsupported-by-model-family" | "unknown-model-family" | "unsupported-by-model-metadata"
+  reason:
+    | "unsupported-by-model-family"
+    | "unknown-model-family"
+    | "unsupported-by-model-metadata"
+    | "max-output-limit"
 }
 
 export type ModelSettingsCompatibilityResult = {
   variant?: string
   reasoningEffort?: string
+  temperature?: number
+  topP?: number
+  maxTokens?: number
+  thinking?: Record<string, unknown>
   changes: ModelSettingsCompatibilityChange[]
 }
 
-// ---------------------------------------------------------------------------
-// Unified model family registry — detection rules + capabilities in ONE row.
-// New model family = one entry. Zero code changes anywhere else.
-// Order matters: more-specific patterns first (claude-opus before claude).
-// ---------------------------------------------------------------------------
-
-type FamilyDefinition = {
-  /** Substring(s) in normalised model ID that identify this family (OR) */
-  includes?: string[]
-  /** Regex when substring matching isn't enough */
-  pattern?: RegExp
-  /** Supported variant levels (ordered low -> max) */
-  variants: string[]
-  /** Supported reasoning-effort levels. Omit = not supported. */
-  reasoningEffort?: string[]
-}
-
-const MODEL_FAMILY_REGISTRY: ReadonlyArray<readonly [string, FamilyDefinition]> = [
-  ["claude-opus", { pattern: /claude(?:-\d+(?:-\d+)*)?-opus/, variants: ["low", "medium", "high", "max"] }],
-  ["claude-non-opus", { includes: ["claude"], variants: ["low", "medium", "high"] }],
-  ["openai-reasoning", { pattern: /^o\d(?:$|-)/, variants: ["low", "medium", "high"], reasoningEffort: ["none", "minimal", "low", "medium", "high"] }],
-  ["gpt-5", { includes: ["gpt-5"], variants: ["low", "medium", "high", "xhigh", "max"], reasoningEffort: ["none", "minimal", "low", "medium", "high", "xhigh"] }],
-  ["gpt-legacy", { includes: ["gpt"], variants: ["low", "medium", "high"] }],
-  ["gemini", { includes: ["gemini"], variants: ["low", "medium", "high"] }],
-  ["kimi", { includes: ["kimi", "k2"], variants: ["low", "medium", "high"] }],
-  ["glm", { includes: ["glm"], variants: ["low", "medium", "high"] }],
-  ["minimax", { includes: ["minimax"], variants: ["low", "medium", "high"] }],
-  ["deepseek", { includes: ["deepseek"], variants: ["low", "medium", "high"] }],
-  ["mistral", { includes: ["mistral", "codestral"], variants: ["low", "medium", "high"] }],
-  ["llama", { includes: ["llama"], variants: ["low", "medium", "high"] }],
-]
-
 const VARIANT_LADDER = ["low", "medium", "high", "xhigh", "max"]
 const REASONING_LADDER = ["none", "minimal", "low", "medium", "high", "xhigh"]
-
-// ---------------------------------------------------------------------------
-// Model family detection — single pass over the registry
-// ---------------------------------------------------------------------------
-
-function detectFamily(_providerID: string, modelID: string): FamilyDefinition | undefined {
-  const model = normalizeModelID(modelID).toLowerCase()
-  for (const [, def] of MODEL_FAMILY_REGISTRY) {
-    if (def.pattern?.test(model)) return def
-    if (def.includes?.some((s) => model.includes(s))) return def
-  }
-  return undefined
-}
 
 // ---------------------------------------------------------------------------
 // Generic resolution — one function for both fields
@@ -96,11 +68,18 @@ function downgradeWithinLadder(value: string, allowed: string[], ladder: string[
   return undefined
 }
 
-function normalizeCapabilitiesVariants(capabilities: VariantCapabilities | undefined): string[] | undefined {
+function normalizeCapabilitiesVariants(capabilities: CompatibilityCapabilities | undefined): string[] | undefined {
   if (!capabilities?.variants || capabilities.variants.length === 0) {
     return undefined
   }
   return capabilities.variants.map((v) => v.toLowerCase())
+}
+
+function normalizeCapabilitiesReasoningEfforts(capabilities: CompatibilityCapabilities | undefined): string[] | undefined {
+  if (!capabilities?.reasoningEfforts || capabilities.reasoningEfforts.length === 0) {
+    return undefined
+  }
+  return capabilities.reasoningEfforts.map((value) => value.toLowerCase())
 }
 
 type FieldResolution = { value?: string; reason?: ModelSettingsCompatibilityChange["reason"] }
@@ -146,10 +125,11 @@ function resolveField(
 export function resolveCompatibleModelSettings(
   input: ModelSettingsCompatibilityInput,
 ): ModelSettingsCompatibilityResult {
-  const family = detectFamily(input.providerID, input.modelID)
+  const family = detectHeuristicModelFamily(input.modelID)
   const familyKnown = family !== undefined
   const changes: ModelSettingsCompatibilityChange[] = []
   const metadataVariants = normalizeCapabilitiesVariants(input.capabilities)
+  const metadataReasoningEfforts = normalizeCapabilitiesReasoningEfforts(input.capabilities)
 
   let variant = input.desired.variant
   if (variant !== undefined) {
@@ -164,12 +144,68 @@ export function resolveCompatibleModelSettings(
   let reasoningEffort = input.desired.reasoningEffort
   if (reasoningEffort !== undefined) {
     const normalized = reasoningEffort.toLowerCase()
-    const resolved = resolveField(normalized, family?.reasoningEffort, REASONING_LADDER, familyKnown)
+    const resolved = resolveField(normalized, family?.reasoningEfforts, REASONING_LADDER, familyKnown, metadataReasoningEfforts)
     if (resolved.value !== normalized && resolved.reason) {
       changes.push({ field: "reasoningEffort", from: reasoningEffort, to: resolved.value, reason: resolved.reason })
     }
     reasoningEffort = resolved.value
   }
 
-  return { variant, reasoningEffort, changes }
+  let temperature = input.desired.temperature
+  if (temperature !== undefined && input.capabilities?.supportsTemperature === false) {
+    changes.push({
+      field: "temperature",
+      from: String(temperature),
+      to: undefined,
+      reason: "unsupported-by-model-metadata",
+    })
+    temperature = undefined
+  }
+
+  let topP = input.desired.topP
+  if (topP !== undefined && input.capabilities?.supportsTopP === false) {
+    changes.push({
+      field: "topP",
+      from: String(topP),
+      to: undefined,
+      reason: "unsupported-by-model-metadata",
+    })
+    topP = undefined
+  }
+
+  let maxTokens = input.desired.maxTokens
+  if (
+    maxTokens !== undefined &&
+    input.capabilities?.maxOutputTokens !== undefined &&
+    maxTokens > input.capabilities.maxOutputTokens
+  ) {
+    changes.push({
+      field: "maxTokens",
+      from: String(maxTokens),
+      to: String(input.capabilities.maxOutputTokens),
+      reason: "max-output-limit",
+    })
+    maxTokens = input.capabilities.maxOutputTokens
+  }
+
+  let thinking = input.desired.thinking
+  if (thinking !== undefined && input.capabilities?.supportsThinking === false) {
+    changes.push({
+      field: "thinking",
+      from: JSON.stringify(thinking),
+      to: undefined,
+      reason: "unsupported-by-model-metadata",
+    })
+    thinking = undefined
+  }
+
+  return {
+    variant,
+    reasoningEffort,
+    ...(input.desired.temperature !== undefined ? { temperature } : {}),
+    ...(input.desired.topP !== undefined ? { topP } : {}),
+    ...(input.desired.maxTokens !== undefined ? { maxTokens } : {}),
+    ...(input.desired.thinking !== undefined ? { thinking } : {}),
+    changes,
+  }
 }

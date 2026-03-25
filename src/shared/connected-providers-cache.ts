@@ -11,18 +11,37 @@ interface ConnectedProvidersCache {
 	updatedAt: string
 }
 
-interface ModelMetadata {
+export interface ModelMetadata {
 	id: string
 	provider?: string
 	context?: number
 	output?: number
 	name?: string
+	variants?: Record<string, unknown>
+	limit?: {
+		context?: number
+		input?: number
+		output?: number
+	}
+	modalities?: {
+		input?: string[]
+		output?: string[]
+	}
+	capabilities?: Record<string, unknown>
+	reasoning?: boolean
+	temperature?: boolean
+	tool_call?: boolean
+	[key: string]: unknown
 }
 
-interface ProviderModelsCache {
+export interface ProviderModelsCache {
 	models: Record<string, string[] | ModelMetadata[]>
 	connected: string[]
 	updatedAt: string
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null
 }
 
 export function createConnectedProvidersCacheStore(
@@ -119,7 +138,7 @@ export function createConnectedProvidersCacheStore(
 		return existsSync(cacheFile)
 	}
 
-	function writeProviderModelsCache(data: { models: Record<string, string[]>; connected: string[] }): void {
+	function writeProviderModelsCache(data: { models: Record<string, string[] | ModelMetadata[]>; connected: string[] }): void {
 		ensureCacheDir()
 		const cacheFile = getCacheFilePath(PROVIDER_MODELS_CACHE_FILE)
 
@@ -164,14 +183,27 @@ export function createConnectedProvidersCacheStore(
 
 			writeConnectedProvidersCache(connected)
 
-			const modelsByProvider: Record<string, string[]> = {}
+			const modelsByProvider: Record<string, ModelMetadata[]> = {}
 			const allProviders = result.data?.all ?? []
 
 			for (const provider of allProviders) {
 				if (provider.models) {
-					const modelIds = Object.keys(provider.models)
-					if (modelIds.length > 0) {
-						modelsByProvider[provider.id] = modelIds
+					const modelMetadata = Object.entries(provider.models).map(([modelID, rawMetadata]) => {
+						if (!isRecord(rawMetadata)) {
+							return { id: modelID }
+						}
+
+						const normalizedID = typeof rawMetadata.id === "string"
+							? rawMetadata.id
+							: modelID
+
+						return {
+							id: normalizedID,
+							...rawMetadata,
+						} satisfies ModelMetadata
+					})
+					if (modelMetadata.length > 0) {
+						modelsByProvider[provider.id] = modelMetadata
 					}
 				}
 			}
@@ -198,6 +230,32 @@ export function createConnectedProvidersCacheStore(
 		writeProviderModelsCache,
 		updateConnectedProvidersCache,
 	}
+}
+
+export function findProviderModelMetadata(
+	providerID: string,
+	modelID: string,
+	cache: ProviderModelsCache | null = defaultConnectedProvidersCacheStore.readProviderModelsCache(),
+): ModelMetadata | undefined {
+	const providerModels = cache?.models?.[providerID]
+	if (!providerModels) {
+		return undefined
+	}
+
+	for (const entry of providerModels) {
+		if (typeof entry === "string") {
+			if (entry === modelID) {
+				return { id: entry }
+			}
+			continue
+		}
+
+		if (entry?.id === modelID) {
+			return entry
+		}
+	}
+
+	return undefined
 }
 
 const defaultConnectedProvidersCacheStore = createConnectedProvidersCacheStore(

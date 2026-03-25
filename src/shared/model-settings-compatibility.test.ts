@@ -418,6 +418,63 @@ describe("resolveCompatibleModelSettings", () => {
     ])
   })
 
+  test("drops unsupported temperature when capability metadata disables it", () => {
+    const result = resolveCompatibleModelSettings({
+      providerID: "openai",
+      modelID: "gpt-5.4",
+      desired: { temperature: 0.7 },
+      capabilities: { supportsTemperature: false },
+    })
+
+    expect(result.temperature).toBeUndefined()
+    expect(result.changes).toEqual([
+      {
+        field: "temperature",
+        from: "0.7",
+        to: undefined,
+        reason: "unsupported-by-model-metadata",
+      },
+    ])
+  })
+
+  test("drops thinking when model capabilities say it is unsupported", () => {
+    const result = resolveCompatibleModelSettings({
+      providerID: "openai",
+      modelID: "gpt-5.4",
+      desired: { thinking: { type: "enabled", budgetTokens: 4096 } },
+      capabilities: { supportsThinking: false },
+    })
+
+    expect(result.thinking).toBeUndefined()
+    expect(result.changes).toEqual([
+      {
+        field: "thinking",
+        from: "{\"type\":\"enabled\",\"budgetTokens\":4096}",
+        to: undefined,
+        reason: "unsupported-by-model-metadata",
+      },
+    ])
+  })
+
+  test("clamps maxTokens to the model output limit", () => {
+    const result = resolveCompatibleModelSettings({
+      providerID: "openai",
+      modelID: "gpt-5.4",
+      desired: { maxTokens: 200_000 },
+      capabilities: { maxOutputTokens: 128_000 },
+    })
+
+    expect(result.maxTokens).toBe(128_000)
+    expect(result.changes).toEqual([
+      {
+        field: "maxTokens",
+        from: "200000",
+        to: "128000",
+        reason: "max-output-limit",
+      },
+    ])
+  })
+
   // Passthrough: undefined desired values produce no changes
   test("no-op when desired settings are empty", () => {
     const result = resolveCompatibleModelSettings({

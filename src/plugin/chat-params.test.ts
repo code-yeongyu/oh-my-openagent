@@ -113,7 +113,6 @@ describe("createChatParamsHandler", () => {
 
     //#then
     expect(output).toEqual({
-      temperature: 0.4,
       topP: 0.7,
       topK: 1,
       options: {
@@ -131,6 +130,88 @@ describe("createChatParamsHandler", () => {
         thinking: { type: "disabled" },
         maxTokens: 4096,
       },
+    })
+  })
+
+  test("drops unsupported temperature and clamps maxTokens from bundled model capabilities", async () => {
+    //#given
+    setSessionPromptParams("ses_chat_params", {
+      temperature: 0.7,
+      options: {
+        maxTokens: 200_000,
+      },
+    })
+
+    const handler = createChatParamsHandler({
+      anthropicEffort: null,
+    })
+
+    const input = {
+      sessionID: "ses_chat_params",
+      agent: { name: "oracle" },
+      model: { providerID: "openai", modelID: "gpt-5.4" },
+      provider: { id: "openai" },
+      message: {},
+    }
+
+    const output = {
+      temperature: 0.1,
+      topP: 1,
+      topK: 1,
+      options: {},
+    }
+
+    //#when
+    await handler(input, output)
+
+    //#then
+    expect(output).toEqual({
+      topP: 1,
+      topK: 1,
+      options: {
+        maxTokens: 128_000,
+      },
+    })
+  })
+
+  test("drops unsupported reasoning settings from bundled model capabilities", async () => {
+    //#given
+    setSessionPromptParams("ses_chat_params", {
+      temperature: 0.4,
+      options: {
+        reasoningEffort: "high",
+        thinking: { type: "enabled", budgetTokens: 4096 },
+      },
+    })
+
+    const handler = createChatParamsHandler({
+      anthropicEffort: null,
+    })
+
+    const input = {
+      sessionID: "ses_chat_params",
+      agent: { name: "oracle" },
+      model: { providerID: "openai", modelID: "gpt-4.1" },
+      provider: { id: "openai" },
+      message: {},
+    }
+
+    const output = {
+      temperature: 0.1,
+      topP: 1,
+      topK: 1,
+      options: {},
+    }
+
+    //#when
+    await handler(input, output)
+
+    //#then
+    expect(output).toEqual({
+      temperature: 0.4,
+      topP: 1,
+      topK: 1,
+      options: {},
     })
   })
 })
