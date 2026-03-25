@@ -56,9 +56,7 @@ export async function sendSyncPrompt(
   const promptArgs = {
     path: { id: input.sessionID },
     body: {
-      // When a custom model is configured, omit the agent name so opencode's
-      // built-in agent fallback chain does not override the user-specified model.
-      ...(input.categoryModel ? {} : { agent: input.agentToUse }),
+      agent: input.agentToUse,
       system: input.systemContent,
       tools,
       parts: [createInternalAgentTextPart(effectivePrompt)],
