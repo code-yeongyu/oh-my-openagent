@@ -81,6 +81,53 @@ describe("getModelCapabilities", () => {
     })
   })
 
+  test("reads structured runtime capabilities from the SDK v2 shape", () => {
+    const result = getModelCapabilities({
+      providerID: "openai",
+      modelID: "gpt-5.4",
+      runtimeModel: {
+        capabilities: {
+          reasoning: true,
+          temperature: false,
+          toolcall: true,
+          input: {
+            text: true,
+            image: true,
+          },
+          output: {
+            text: true,
+          },
+        },
+      },
+      bundledSnapshot,
+    })
+
+    expect(result).toMatchObject({
+      canonicalModelID: "gpt-5.4",
+      reasoning: true,
+      supportsThinking: true,
+      supportsTemperature: false,
+      toolCall: true,
+      modalities: {
+        input: ["text", "image"],
+        output: ["text"],
+      },
+    })
+  })
+
+  test("accepts runtime variant arrays without corrupting them into numeric keys", () => {
+    const result = getModelCapabilities({
+      providerID: "openai",
+      modelID: "gpt-5.4",
+      runtimeModel: {
+        variants: ["low", "medium", "high", "xhigh"],
+      },
+      bundledSnapshot,
+    })
+
+    expect(result.variants).toEqual(["low", "medium", "high", "xhigh"])
+  })
+
   test("normalizes thinking suffix aliases before snapshot lookup", () => {
     const result = getModelCapabilities({
       providerID: "anthropic",
@@ -151,6 +198,21 @@ describe("getModelCapabilities", () => {
 
     expect(result).toMatchObject({
       canonicalModelID: "o3-mini",
+      family: "openai-reasoning",
+      variants: ["low", "medium", "high"],
+      reasoningEfforts: ["none", "minimal", "low", "medium", "high"],
+    })
+  })
+
+  test("detects prefixed o-series model IDs through the heuristic fallback", () => {
+    const result = getModelCapabilities({
+      providerID: "azure-openai",
+      modelID: "openai/o3-mini",
+      bundledSnapshot,
+    })
+
+    expect(result).toMatchObject({
+      canonicalModelID: "openai/o3-mini",
       family: "openai-reasoning",
       variants: ["low", "medium", "high"],
       reasoningEfforts: ["none", "minimal", "low", "medium", "high"],

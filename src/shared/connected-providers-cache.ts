@@ -198,8 +198,8 @@ export function createConnectedProvidersCacheStore(
 							: modelID
 
 						return {
-							id: normalizedID,
 							...rawMetadata,
+							id: normalizedID,
 						} satisfies ModelMetadata
 					})
 					if (modelMetadata.length > 0) {

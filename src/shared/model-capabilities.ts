@@ -72,7 +72,7 @@ const MODEL_ID_OVERRIDES: Record<string, ModelCapabilityOverride> = {
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null
+  return typeof value === "object" && value !== null && !Array.isArray(value)
 }
 
 function normalizeLookupModelID(modelID: string): string {
@@ -97,6 +97,11 @@ function readStringArray(value: unknown): string[] | undefined {
 }
 
 function normalizeVariantKeys(value: unknown): string[] | undefined {
+  const arrayVariants = readStringArray(value)
+  if (arrayVariants) {
+    return arrayVariants.map((variant) => variant.toLowerCase())
+  }
+
   if (!isRecord(value)) {
     return undefined
   }
@@ -105,13 +110,30 @@ function normalizeVariantKeys(value: unknown): string[] | undefined {
   return variants.length > 0 ? variants : undefined
 }
 
+function readModalityKeys(value: unknown): string[] | undefined {
+  const stringArray = readStringArray(value)
+  if (stringArray) {
+    return stringArray.map((entry) => entry.toLowerCase())
+  }
+
+  if (!isRecord(value)) {
+    return undefined
+  }
+
+  const enabled = Object.entries(value)
+    .filter(([, supported]) => supported === true)
+    .map(([modality]) => modality.toLowerCase())
+
+  return enabled.length > 0 ? enabled : undefined
+}
+
 function normalizeModalities(value: unknown): ModelCapabilities["modalities"] | undefined {
   if (!isRecord(value)) {
     return undefined
   }
 
-  const input = readStringArray(value.input)
-  const output = readStringArray(value.output)
+  const input = readModalityKeys(value.input)
+  const output = readModalityKeys(value.output)
 
   if (!input && !output) {
     return undefined
@@ -145,12 +167,18 @@ function getOverride(modelID: string): ModelCapabilityOverride | undefined {
   return MODEL_ID_OVERRIDES[normalizeLookupModelID(modelID)]
 }
 
+function readRuntimeModelCapabilities(runtimeModel: Record<string, unknown> | undefined): Record<string, unknown> | undefined {
+  return isRecord(runtimeModel?.capabilities) ? runtimeModel.capabilities : undefined
+}
+
 function readRuntimeModelLimitOutput(runtimeModel: Record<string, unknown> | undefined): number | undefined {
   if (!runtimeModel) {
     return undefined
   }
 
-  const limit = runtimeModel.limit
+  const limit = isRecord(runtimeModel.limit)
+    ? runtimeModel.limit
+    : readRuntimeModelCapabilities(runtimeModel)?.limit
   if (!isRecord(limit)) {
     return undefined
   }
@@ -163,8 +191,98 @@ function readRuntimeModelBoolean(runtimeModel: Record<string, unknown> | undefin
     return undefined
   }
 
+  const runtimeCapabilities = readRuntimeModelCapabilities(runtimeModel)
+
   for (const key of keys) {
     const value = runtimeModel[key]
+    if (typeof value === "boolean") {
+      return value
+    }
+
+    const capabilityValue = runtimeCapabilities?.[key]
+    if (typeof capabilityValue === "boolean") {
+      return capabilityValue
+    }
+  }
+
+  return undefined
+}
+
+function readRuntimeModelModalities(runtimeModel: Record<string, unknown> | undefined): ModelCapabilities["modalities"] | undefined {
+  if (!runtimeModel) {
+    return undefined
+  }
+
+  const rootModalities = normalizeModalities(runtimeModel.modalities)
+  if (rootModalities) {
+    return rootModalities
+  }
+
+  const runtimeCapabilities = readRuntimeModelCapabilities(runtimeModel)
+  if (!runtimeCapabilities) {
+    return undefined
+  }
+
+  const nestedModalities = normalizeModalities(runtimeCapabilities.modalities)
+  if (nestedModalities) {
+    return nestedModalities
+  }
+
+  const capabilityModalities = normalizeModalities(runtimeCapabilities)
+  if (capabilityModalities) {
+    return capabilityModalities
+  }
+
+  return undefined
+}
+
+function readRuntimeModelVariants(runtimeModel: Record<string, unknown> | undefined): string[] | undefined {
+  if (!runtimeModel) {
+    return undefined
+  }
+
+  const rootVariants = normalizeVariantKeys(runtimeModel.variants)
+  if (rootVariants) {
+    return rootVariants
+  }
+
+  const runtimeCapabilities = readRuntimeModelCapabilities(runtimeModel)
+  if (!runtimeCapabilities) {
+    return undefined
+  }
+
+  return normalizeVariantKeys(runtimeCapabilities.variants)
+}
+
+function readRuntimeModelTopPSupport(runtimeModel: Record<string, unknown> | undefined): boolean | undefined {
+  return readRuntimeModelBoolean(runtimeModel, ["topP", "top_p"])
+}
+
+function readRuntimeModelToolCallSupport(runtimeModel: Record<string, unknown> | undefined): boolean | undefined {
+  return readRuntimeModelBoolean(runtimeModel, ["toolCall", "tool_call", "toolcall"])
+}
+
+function readRuntimeModelReasoningSupport(runtimeModel: Record<string, unknown> | undefined): boolean | undefined {
+  return readRuntimeModelBoolean(runtimeModel, ["reasoning"])
+}
+
+function readRuntimeModelTemperatureSupport(runtimeModel: Record<string, unknown> | undefined): boolean | undefined {
+  return readRuntimeModelBoolean(runtimeModel, ["temperature"])
+}
+
+function readRuntimeModelThinkingSupport(runtimeModel: Record<string, unknown> | undefined): boolean | undefined {
+  const capabilityValue = readRuntimeModelReasoningSupport(runtimeModel)
+  if (capabilityValue !== undefined) {
+    return capabilityValue
+  }
+
+  const runtimeCapabilities = readRuntimeModelCapabilities(runtimeModel)
+  if (!runtimeCapabilities) {
+    return undefined
+  }
+
+  for (const key of ["thinking", "supportsThinking"] as const) {
+    const value = runtimeCapabilities[key]
     if (typeof value === "boolean") {
       return value
     }
@@ -194,7 +312,7 @@ export function getModelCapabilities(input: GetModelCapabilitiesInput): ModelCap
   const bundledSnapshot = input.bundledSnapshot ?? bundledModelCapabilitiesSnapshot
   const snapshotEntry = runtimeSnapshot?.models?.[canonicalModelID] ?? bundledSnapshot.models[canonicalModelID]
   const heuristicFamily = detectHeuristicModelFamily(canonicalModelID)
-  const runtimeVariants = normalizeVariantKeys(runtimeModel?.variants)
+  const runtimeVariants = readRuntimeModelVariants(runtimeModel)
 
   return {
     requestedModelID,
@@ -202,27 +320,27 @@ export function getModelCapabilities(input: GetModelCapabilitiesInput): ModelCap
     family: snapshotEntry?.family ?? heuristicFamily?.family,
     variants: runtimeVariants ?? override?.variants ?? heuristicFamily?.variants,
     reasoningEfforts: override?.reasoningEfforts ?? heuristicFamily?.reasoningEfforts,
-    reasoning: readRuntimeModelBoolean(runtimeModel, ["reasoning"]) ?? snapshotEntry?.reasoning,
+    reasoning: readRuntimeModelReasoningSupport(runtimeModel) ?? snapshotEntry?.reasoning,
     supportsThinking:
       override?.supportsThinking
       ?? heuristicFamily?.supportsThinking
-      ?? readRuntimeModelBoolean(runtimeModel, ["reasoning"])
+      ?? readRuntimeModelThinkingSupport(runtimeModel)
       ?? snapshotEntry?.reasoning,
     supportsTemperature:
-      readRuntimeModelBoolean(runtimeModel, ["temperature"])
+      readRuntimeModelTemperatureSupport(runtimeModel)
       ?? override?.supportsTemperature
       ?? snapshotEntry?.temperature,
     supportsTopP:
-      readRuntimeModelBoolean(runtimeModel, ["topP", "top_p"])
+      readRuntimeModelTopPSupport(runtimeModel)
       ?? override?.supportsTopP,
     maxOutputTokens:
       readRuntimeModelLimitOutput(runtimeModel)
       ?? snapshotEntry?.limit?.output,
     toolCall:
-      readRuntimeModelBoolean(runtimeModel, ["toolCall", "tool_call"])
+      readRuntimeModelToolCallSupport(runtimeModel)
       ?? snapshotEntry?.toolCall,
     modalities:
-      normalizeModalities(runtimeModel?.modalities)
+      readRuntimeModelModalities(runtimeModel)
       ?? snapshotEntry?.modalities,
   }
 }

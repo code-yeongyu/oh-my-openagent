@@ -8,7 +8,7 @@ export const MODELS_DEV_SOURCE_URL = "https://models.dev/api.json"
 const MODEL_CAPABILITIES_CACHE_FILE = "model-capabilities.json"
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null
+  return typeof value === "object" && value !== null && !Array.isArray(value)
 }
 
 function readBoolean(value: unknown): boolean | undefined {
@@ -84,17 +84,24 @@ function mergeSnapshotEntries(
     return incoming
   }
 
+  const mergedModalities = existing.modalities || incoming.modalities
+    ? {
+        ...existing.modalities,
+        ...incoming.modalities,
+      }
+    : undefined
+  const mergedLimit = existing.limit || incoming.limit
+    ? {
+        ...existing.limit,
+        ...incoming.limit,
+      }
+    : undefined
+
   return {
     ...existing,
     ...incoming,
-    modalities: {
-      ...existing.modalities,
-      ...incoming.modalities,
-    },
-    limit: {
-      ...existing.limit,
-      ...incoming.limit,
-    },
+    ...(mergedModalities ? { modalities: mergedModalities } : {}),
+    ...(mergedLimit ? { limit: mergedLimit } : {}),
   }
 }
 

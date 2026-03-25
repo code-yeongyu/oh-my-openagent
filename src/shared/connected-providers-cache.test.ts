@@ -229,4 +229,38 @@ describe("updateConnectedProvidersCache", () => {
 			limit: { output: 128000 },
 		})
 	})
+
+	test("keeps normalized fallback ids when raw metadata id is not a string", async () => {
+		const mockClient = {
+			provider: {
+				list: async () => ({
+					data: {
+						connected: ["openai"],
+						all: [
+							{
+								id: "openai",
+								models: {
+									"o3-mini": {
+										id: 123,
+										name: "o3-mini",
+									},
+								},
+							},
+						],
+					},
+				}),
+			},
+		}
+
+		await testCacheStore.updateConnectedProvidersCache(mockClient)
+		const cache = testCacheStore.readProviderModelsCache()
+
+		expect(cache?.models.openai).toEqual([
+			{ id: "o3-mini", name: "o3-mini" },
+		])
+		expect(findProviderModelMetadata("openai", "o3-mini", cache)).toEqual({
+			id: "o3-mini",
+			name: "o3-mini",
+		})
+	})
 })
