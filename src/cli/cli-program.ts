@@ -32,6 +32,7 @@ program
   .option("--zai-coding-plan <value>", "Z.ai Coding Plan subscription: no, yes (default: no)")
   .option("--kimi-for-coding <value>", "Kimi For Coding subscription: no, yes (default: no)")
   .option("--opencode-go <value>", "OpenCode Go subscription: no, yes (default: no)")
+  .option("--novita <value>", "Novita AI subscription: no, yes (default: no)")
   .option("--skip-auth", "Skip authentication setup hints")
   .addHelpText("after", `
 Examples:
@@ -39,7 +40,7 @@ Examples:
   $ bunx oh-my-opencode install --no-tui --claude=max20 --openai=yes --gemini=yes --copilot=no
   $ bunx oh-my-opencode install --no-tui --claude=no --gemini=no --copilot=yes --opencode-zen=yes
 
-Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi):
+Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi > Novita):
   Claude        Native anthropic/ models (Opus, Sonnet, Haiku)
   OpenAI        Native openai/ models (GPT-5.4 for Oracle)
   Gemini        Native google/ models (Gemini 3.1 Pro, Flash)
@@ -47,6 +48,7 @@ Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi):
   OpenCode Zen  opencode/ models (opencode/claude-opus-4-6, etc.)
    Z.ai          zai-coding-plan/glm-5 (visual-engineering fallback)
   Kimi          kimi-for-coding/k2p5 (Sisyphus/Prometheus fallback)
+  Novita        novita/ models (kimi-k2.5, glm-5, minimax-m2.5)
 `)
   .action(async (options) => {
     const args: InstallArgs = {
@@ -59,6 +61,7 @@ Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi):
       zaiCodingPlan: options.zaiCodingPlan,
       kimiForCoding: options.kimiForCoding,
       opencodeGo: options.opencodeGo,
+      novita: options.novita,
       skipAuth: options.skipAuth ?? false,
     }
     const exitCode = await install(args)

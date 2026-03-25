@@ -110,6 +110,16 @@ export async function promptInstallConfig(detected: DetectedConfig): Promise<Ins
   })
   if (!opencodeGo) return null
 
+  const novita = await selectOrCancel({
+    message: "Do you have a Novita AI subscription?",
+    options: [
+      { value: "no", label: "No", hint: "Will use other configured providers" },
+      { value: "yes", label: "Yes", hint: "Novita AI for kimi-k2.5, glm-5, minimax-m2.5" },
+    ],
+    initialValue: initial.novita,
+  })
+  if (!novita) return null
+
   return {
     hasClaude: claude !== "no",
     isMax20: claude === "max20",
@@ -120,5 +130,6 @@ export async function promptInstallConfig(detected: DetectedConfig): Promise<Ins
     hasZaiCodingPlan: zaiCodingPlan === "yes",
     hasKimiForCoding: kimiForCoding === "yes",
     hasOpencodeGo: opencodeGo === "yes",
+    hasNovita: novita === "yes",
   }
 }

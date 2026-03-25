@@ -28,10 +28,10 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     const sisyphus = AGENT_MODEL_REQUIREMENTS["sisyphus"]
 
     // #when - accessing Sisyphus requirement
-    // #then - fallbackChain has 7 entries with correct ordering
+    // #then - fallbackChain has 9 entries with correct ordering
     expect(sisyphus).toBeDefined()
     expect(sisyphus.fallbackChain).toBeArray()
-    expect(sisyphus.fallbackChain).toHaveLength(7)
+    expect(sisyphus.fallbackChain).toHaveLength(9)
     expect(sisyphus.requiresAnyModel).toBe(true)
 
     const primary = sisyphus.fallbackChain[0]
@@ -51,15 +51,23 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(fourth.model).toBe("kimi-k2.5")
 
     const fifth = sisyphus.fallbackChain[4]
-    expect(fifth.providers).toContain("openai")
-    expect(fifth.model).toBe("gpt-5.4")
-    expect(fifth.variant).toBe("medium")
+    expect(fifth.providers).toEqual(["novita"])
+    expect(fifth.model).toBe("moonshotai/kimi-k2.5")
 
     const sixth = sisyphus.fallbackChain[5]
-    expect(sixth.providers[0]).toBe("zai-coding-plan")
-    expect(sixth.model).toBe("glm-5")
+    expect(sixth.providers).toContain("openai")
+    expect(sixth.model).toBe("gpt-5.4")
+    expect(sixth.variant).toBe("medium")
 
-    const last = sisyphus.fallbackChain[6]
+    const seventh = sisyphus.fallbackChain[6]
+    expect(seventh.providers[0]).toBe("zai-coding-plan")
+    expect(seventh.model).toBe("glm-5")
+
+    const eighth = sisyphus.fallbackChain[7]
+    expect(eighth.providers[0]).toBe("novita")
+    expect(eighth.model).toBe("zai-org/glm-5")
+
+    const last = sisyphus.fallbackChain[8]
     expect(last.providers[0]).toBe("opencode")
     expect(last.model).toBe("big-pickle")
   })
@@ -79,15 +87,19 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(primary.model).toBe("minimax-m2.5")
 
     const second = librarian.fallbackChain[1]
-    expect(second.providers[0]).toBe("opencode")
-    expect(second.model).toBe("minimax-m2.5-free")
+    expect(second.providers[0]).toBe("novita")
+    expect(second.model).toBe("minimax/minimax-m2.5")
 
     const tertiary = librarian.fallbackChain[2]
-    expect(tertiary.providers).toContain("anthropic")
-    expect(tertiary.model).toBe("claude-haiku-4-5")
+    expect(tertiary.providers[0]).toBe("opencode")
+    expect(tertiary.model).toBe("minimax-m2.5-free")
 
     const quaternary = librarian.fallbackChain[3]
-    expect(quaternary.model).toBe("gpt-5-nano")
+    expect(quaternary.providers).toContain("anthropic")
+    expect(quaternary.model).toBe("claude-haiku-4-5")
+
+    const fifth = librarian.fallbackChain[4]
+    expect(fifth.model).toBe("gpt-5-nano")
   })
 
   test("explore has valid fallbackChain with grok-code-fast-1 as primary", () => {
@@ -95,10 +107,10 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     const explore = AGENT_MODEL_REQUIREMENTS["explore"]
 
     // when - accessing explore requirement
-    // then - fallbackChain: grok → opencode-go/minimax → minimax-free → haiku → nano
+    // then - fallbackChain: grok → opencode-go/minimax → novita/minimax → minimax-free → haiku → nano
     expect(explore).toBeDefined()
     expect(explore.fallbackChain).toBeArray()
-    expect(explore.fallbackChain).toHaveLength(5)
+    expect(explore.fallbackChain).toHaveLength(6)
 
     const primary = explore.fallbackChain[0]
     expect(primary.providers).toContain("github-copilot")
@@ -109,16 +121,20 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(secondary.model).toBe("minimax-m2.5")
 
     const tertiary = explore.fallbackChain[2]
-    expect(tertiary.providers).toContain("opencode")
-    expect(tertiary.model).toBe("minimax-m2.5-free")
+    expect(tertiary.providers).toContain("novita")
+    expect(tertiary.model).toBe("minimax/minimax-m2.5")
 
     const quaternary = explore.fallbackChain[3]
-    expect(quaternary.providers).toContain("anthropic")
-    expect(quaternary.model).toBe("claude-haiku-4-5")
+    expect(quaternary.providers).toContain("opencode")
+    expect(quaternary.model).toBe("minimax-m2.5-free")
 
     const fifth = explore.fallbackChain[4]
-    expect(fifth.providers).toContain("opencode")
-    expect(fifth.model).toBe("gpt-5-nano")
+    expect(fifth.providers).toContain("anthropic")
+    expect(fifth.model).toBe("claude-haiku-4-5")
+
+    const sixth = explore.fallbackChain[5]
+    expect(sixth.providers).toContain("opencode")
+    expect(sixth.model).toBe("gpt-5-nano")
   })
 
   test("multimodal-looker has valid fallbackChain with gpt-5.4 as primary", () => {
@@ -126,10 +142,10 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     const multimodalLooker = AGENT_MODEL_REQUIREMENTS["multimodal-looker"]
 
     // when - accessing multimodal-looker requirement
-    // then - fallbackChain: gpt-5.4 -> opencode-go/kimi-k2.5 -> glm-4.6v -> gpt-5-nano
+    // then - fallbackChain: gpt-5.4 -> opencode-go/kimi-k2.5 -> novita/kimi-k2.5 -> glm-4.6v -> gpt-5-nano
     expect(multimodalLooker).toBeDefined()
     expect(multimodalLooker.fallbackChain).toBeArray()
-    expect(multimodalLooker.fallbackChain).toHaveLength(4)
+    expect(multimodalLooker.fallbackChain).toHaveLength(5)
 
     const primary = multimodalLooker.fallbackChain[0]
     expect(primary.providers).toEqual(["openai", "opencode"])
@@ -141,9 +157,13 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(secondary.model).toBe("kimi-k2.5")
 
     const tertiary = multimodalLooker.fallbackChain[2]
-    expect(tertiary.model).toBe("glm-4.6v")
+    expect(tertiary.providers).toEqual(["novita"])
+    expect(tertiary.model).toBe("moonshotai/kimi-k2.5")
 
-    const last = multimodalLooker.fallbackChain[3]
+    const fourth = multimodalLooker.fallbackChain[3]
+    expect(fourth.model).toBe("glm-4.6v")
+
+    const last = multimodalLooker.fallbackChain[4]
     expect(last.providers).toEqual(["openai", "github-copilot", "opencode"])
     expect(last.model).toBe("gpt-5-nano")
   })
@@ -222,7 +242,11 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(secondary.providers[0]).toBe("opencode-go")
 
     const tertiary = atlas.fallbackChain[2]
-    expect(tertiary).toEqual({
+    expect(tertiary.model).toBe("moonshotai/kimi-k2.5")
+    expect(tertiary.providers[0]).toBe("novita")
+
+    const quaternary = atlas.fallbackChain[3]
+    expect(quaternary).toEqual({
       providers: ["openai", "github-copilot", "opencode"],
       model: "gpt-5.4",
       variant: "medium",
@@ -334,10 +358,10 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     const visualEngineering = CATEGORY_MODEL_REQUIREMENTS["visual-engineering"]
 
     // when - accessing visual-engineering requirement
-    // then - fallbackChain: gemini-3.1-pro(high) → glm-5 → opus-4-6(max) → opencode-go/glm-5 → k2p5
+    // then - fallbackChain: gemini-3.1-pro(high) → glm-5 → novita/glm-5 → opus-4-6(max) → opencode-go/glm-5 → k2p5
     expect(visualEngineering).toBeDefined()
     expect(visualEngineering.fallbackChain).toBeArray()
-    expect(visualEngineering.fallbackChain).toHaveLength(5)
+    expect(visualEngineering.fallbackChain).toHaveLength(6)
 
     const primary = visualEngineering.fallbackChain[0]
     expect(primary.providers[0]).toBe("google")
@@ -349,16 +373,20 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(second.model).toBe("glm-5")
 
     const third = visualEngineering.fallbackChain[2]
-    expect(third.model).toBe("claude-opus-4-6")
-    expect(third.variant).toBe("max")
+    expect(third.providers[0]).toBe("novita")
+    expect(third.model).toBe("zai-org/glm-5")
 
     const fourth = visualEngineering.fallbackChain[3]
-    expect(fourth.providers[0]).toBe("opencode-go")
-    expect(fourth.model).toBe("glm-5")
+    expect(fourth.model).toBe("claude-opus-4-6")
+    expect(fourth.variant).toBe("max")
 
     const fifth = visualEngineering.fallbackChain[4]
-    expect(fifth.providers[0]).toBe("kimi-for-coding")
-    expect(fifth.model).toBe("k2p5")
+    expect(fifth.providers[0]).toBe("opencode-go")
+    expect(fifth.model).toBe("glm-5")
+
+    const sixth = visualEngineering.fallbackChain[5]
+    expect(sixth.providers[0]).toBe("kimi-for-coding")
+    expect(sixth.model).toBe("k2p5")
   })
 
   test("quick has valid fallbackChain with gpt-5.4-mini as primary and claude-haiku-4-5 as secondary", () => {
@@ -437,10 +465,10 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     const writing = CATEGORY_MODEL_REQUIREMENTS["writing"]
 
     // when - accessing writing requirement
-    // then - fallbackChain: gemini-3-flash -> kimi-k2.5 -> claude-sonnet-4-6
+    // then - fallbackChain: gemini-3-flash -> kimi-k2.5 -> novita/kimi-k2.5 -> claude-sonnet-4-6
     expect(writing).toBeDefined()
     expect(writing.fallbackChain).toBeArray()
-    expect(writing.fallbackChain).toHaveLength(3)
+    expect(writing.fallbackChain).toHaveLength(4)
 
     const primary = writing.fallbackChain[0]
     expect(primary.model).toBe("gemini-3-flash")
@@ -451,8 +479,12 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(second.providers[0]).toBe("opencode-go")
 
     const third = writing.fallbackChain[2]
-    expect(third.model).toBe("claude-sonnet-4-6")
-    expect(third.providers[0]).toBe("anthropic")
+    expect(third.model).toBe("moonshotai/kimi-k2.5")
+    expect(third.providers[0]).toBe("novita")
+
+    const fourth = writing.fallbackChain[3]
+    expect(fourth.model).toBe("claude-sonnet-4-6")
+    expect(fourth.providers[0]).toBe("anthropic")
   })
 
   test("all 8 categories have valid fallbackChain arrays", () => {
@@ -547,7 +579,7 @@ describe("ModelRequirement type", () => {
     expect(requirement.variant).toBeUndefined()
   })
 
-  test("no model in fallbackChain has provider prefix", () => {
+  test("no model in fallbackChain has provider prefix except Novita models", () => {
     // given - all agent and category requirements
     const allRequirements = [
       ...Object.values(AGENT_MODEL_REQUIREMENTS),
@@ -555,10 +587,15 @@ describe("ModelRequirement type", () => {
     ]
 
     // when - checking each model in fallbackChain
-    // then - none contain "/" (provider prefix)
+    // then - only Novita provider entries contain "/" (Novita model IDs include provider prefix)
     for (const req of allRequirements) {
       for (const entry of req.fallbackChain) {
-        expect(entry.model).not.toContain("/")
+        if (entry.providers.includes("novita")) {
+          // Novita models have provider prefix (e.g., "moonshotai/kimi-k2.5")
+          expect(entry.model).toContain("/")
+        } else {
+          expect(entry.model).not.toContain("/")
+        }
       }
     }
   })

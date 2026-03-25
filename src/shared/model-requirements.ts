@@ -33,8 +33,10 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         ],
         model: "kimi-k2.5",
       },
+      { providers: ["novita"], model: "moonshotai/kimi-k2.5" },
       { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.4", variant: "medium" },
       { providers: ["zai-coding-plan", "opencode"], model: "glm-5" },
+      { providers: ["novita"], model: "zai-org/glm-5" },
       { providers: ["opencode"], model: "big-pickle" },
     ],
     requiresAnyModel: true,
@@ -73,6 +75,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   librarian: {
     fallbackChain: [
       { providers: ["opencode-go"], model: "minimax-m2.5" },
+      { providers: ["novita"], model: "minimax/minimax-m2.5" },
       { providers: ["opencode"], model: "minimax-m2.5-free" },
       { providers: ["anthropic", "opencode"], model: "claude-haiku-4-5" },
       { providers: ["opencode"], model: "gpt-5-nano" },
@@ -82,6 +85,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     fallbackChain: [
       { providers: ["github-copilot"], model: "grok-code-fast-1" },
       { providers: ["opencode-go"], model: "minimax-m2.5" },
+      { providers: ["novita"], model: "minimax/minimax-m2.5" },
       { providers: ["opencode"], model: "minimax-m2.5-free" },
       { providers: ["anthropic", "opencode"], model: "claude-haiku-4-5" },
       { providers: ["opencode"], model: "gpt-5-nano" },
@@ -91,6 +95,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     fallbackChain: [
       { providers: ["openai", "opencode"], model: "gpt-5.4", variant: "medium" },
       { providers: ["opencode-go"], model: "kimi-k2.5" },
+      { providers: ["novita"], model: "moonshotai/kimi-k2.5" },
       { providers: ["zai-coding-plan"], model: "glm-4.6v" },
       { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5-nano" },
     ],
@@ -108,6 +113,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         variant: "high",
       },
       { providers: ["opencode-go"], model: "glm-5" },
+      { providers: ["novita"], model: "zai-org/glm-5" },
       {
         providers: ["google", "github-copilot", "opencode"],
         model: "gemini-3.1-pro",
@@ -127,6 +133,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         variant: "high",
       },
       { providers: ["opencode-go"], model: "glm-5" },
+      { providers: ["novita"], model: "zai-org/glm-5" },
       { providers: ["kimi-for-coding"], model: "k2p5" },
     ],
   },
@@ -148,12 +155,14 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         variant: "high",
       },
       { providers: ["opencode-go"], model: "glm-5" },
+      { providers: ["novita"], model: "zai-org/glm-5" },
     ],
   },
   atlas: {
     fallbackChain: [
       { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-sonnet-4-6" },
       { providers: ["opencode-go"], model: "kimi-k2.5" },
+      { providers: ["novita"], model: "moonshotai/kimi-k2.5" },
       {
         providers: ["openai", "github-copilot", "opencode"],
         model: "gpt-5.4",
@@ -165,6 +174,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     fallbackChain: [
       { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-sonnet-4-6" },
       { providers: ["opencode-go"], model: "kimi-k2.5" },
+      { providers: ["novita"], model: "moonshotai/kimi-k2.5" },
       {
         providers: ["openai", "github-copilot", "opencode"],
         model: "gpt-5.4",
@@ -184,6 +194,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         variant: "high",
       },
       { providers: ["zai-coding-plan", "opencode"], model: "glm-5" },
+      { providers: ["novita"], model: "zai-org/glm-5" },
       {
         providers: ["anthropic", "github-copilot", "opencode"],
         model: "claude-opus-4-6",
@@ -211,6 +222,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         variant: "max",
       },
       { providers: ["opencode-go"], model: "glm-5" },
+      { providers: ["novita"], model: "zai-org/glm-5" },
     ],
   },
   deep: {
@@ -264,6 +276,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         model: "gemini-3-flash",
       },
       { providers: ["opencode-go"], model: "minimax-m2.5" },
+      { providers: ["novita"], model: "minimax/minimax-m2.5" },
       { providers: ["opencode"], model: "gpt-5-nano" },
     ],
   },
@@ -279,6 +292,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         variant: "medium",
       },
       { providers: ["opencode-go"], model: "kimi-k2.5" },
+      { providers: ["novita"], model: "moonshotai/kimi-k2.5" },
       {
         providers: ["google", "github-copilot", "opencode"],
         model: "gemini-3-flash",
@@ -298,9 +312,11 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         variant: "high",
       },
       { providers: ["zai-coding-plan", "opencode"], model: "glm-5" },
+      { providers: ["novita"], model: "zai-org/glm-5" },
       { providers: ["kimi-for-coding"], model: "k2p5" },
       { providers: ["opencode-go"], model: "glm-5" },
       { providers: ["opencode"], model: "kimi-k2.5" },
+      { providers: ["novita"], model: "moonshotai/kimi-k2.5" },
       {
         providers: [
           "opencode",
@@ -321,6 +337,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         model: "gemini-3-flash",
       },
       { providers: ["opencode-go"], model: "kimi-k2.5" },
+      { providers: ["novita"], model: "moonshotai/kimi-k2.5" },
       {
         providers: ["anthropic", "github-copilot", "opencode"],
         model: "claude-sonnet-4-6",
