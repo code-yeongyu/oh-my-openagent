@@ -1,7 +1,10 @@
 import type { OhMyOpenCodeConfig } from "../config";
 import { getAgentDisplayName } from "../shared/agent-display-names";
 
-type AgentWithPermission = { permission?: Record<string, unknown> };
+type AgentWithToolAccess = {
+  permission?: Record<string, unknown>;
+  tools?: Record<string, unknown>;
+};
 
 function getConfigQuestionPermission(): string | null {
   const configContent = process.env.OPENCODE_CONFIG_CONTENT;
@@ -14,9 +17,9 @@ function getConfigQuestionPermission(): string | null {
   }
 }
 
-function agentByKey(agentResult: Record<string, unknown>, key: string): AgentWithPermission | undefined {
+function agentByKey(agentResult: Record<string, unknown>, key: string): AgentWithToolAccess | undefined {
   return (agentResult[key] ?? agentResult[getAgentDisplayName(key)]) as
-    | AgentWithPermission
+    | AgentWithToolAccess
     | undefined;
 }
 
@@ -123,6 +126,12 @@ export function applyToolConfig(params: {
   // Keep all three in sync when modifying.
   const athena = agentByKey(params.agentResult, "athena");
   if (athena) {
+    athena.tools = {
+      ...athena.tools,
+      prepare_council_prompt: true,
+      council_finalize: true,
+      athena_council: true,
+    };
     athena.permission = {
       ...athena.permission,
       task: "allow",
@@ -134,6 +143,12 @@ export function applyToolConfig(params: {
   }
   const athenaJunior = agentByKey(params.agentResult, "athena-junior");
   if (athenaJunior) {
+    athenaJunior.tools = {
+      ...athenaJunior.tools,
+      prepare_council_prompt: true,
+      council_finalize: true,
+      athena_council: true,
+    };
     athenaJunior.permission = {
       ...athenaJunior.permission,
       prepare_council_prompt: "allow",

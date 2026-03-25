@@ -297,4 +297,51 @@ describe("applyToolConfig", () => {
       )
     })
   })
+
+  describe("#given council tools are globally hidden", () => {
+    describe("#when applying tool config for Athena agents", () => {
+      it.each(["athena", "athena-junior"])(
+        "#then should expose council tools via agent tools for %s",
+        (agentName) => {
+          const params = createParams({ agents: [agentName] })
+
+          applyToolConfig(params)
+
+          const agent = params.agentResult[agentName] as {
+            tools?: Record<string, unknown>
+            permission: Record<string, unknown>
+          }
+          expect(agent.tools?.prepare_council_prompt).toBe(true)
+          expect(agent.tools?.council_finalize).toBe(true)
+          expect(agent.tools?.athena_council).toBe(true)
+          expect(agent.permission.prepare_council_prompt).toBe("allow")
+          expect(agent.permission.council_finalize).toBe("allow")
+          expect(agent.permission.athena_council).toBe("allow")
+        },
+      )
+    })
+
+    describe("#when applying tool config for non-Athena agents", () => {
+      it.each(["atlas", "sisyphus", "prometheus", "hephaestus", "sisyphus-junior"])(
+        "#then should keep council tools hidden for %s",
+        (agentName) => {
+          const params = createParams({ agents: [agentName] })
+
+          applyToolConfig(params)
+
+          const tools = params.config.tools as Record<string, unknown>
+          const agent = params.agentResult[agentName] as {
+            tools?: Record<string, unknown>
+            permission: Record<string, unknown>
+          }
+          expect(tools.prepare_council_prompt).toBe(false)
+          expect(tools.council_finalize).toBe(false)
+          expect(tools.athena_council).toBe(false)
+          expect(agent.tools?.prepare_council_prompt).toBeUndefined()
+          expect(agent.tools?.council_finalize).toBeUndefined()
+          expect(agent.tools?.athena_council).toBeUndefined()
+        },
+      )
+    })
+  })
 })
