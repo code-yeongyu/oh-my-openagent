@@ -1,11 +1,8 @@
 import * as p from "@clack/prompts"
 import color from "picocolors"
-import type { AgentOverrideConfig } from "../../config/schema"
-import type { ConfigEditorState, AgentName, BashPermissionValue, BashCommand } from "./types"
+import type { ConfigEditorState, AgentName, BashPermissionValue, BashCommand, AgentConfigExtended } from "./types"
 import { AGENT_NAMES, BASH_COMMANDS } from "./types"
 import { selectModelWithCacheLoader } from "./ui-utils"
-
-type ExtendedAgentConfig = AgentOverrideConfig & { fallback_models?: string[] }
 
 const SYMBOLS = {
   check: color.green("[OK]"),
@@ -16,8 +13,8 @@ const SYMBOLS = {
   warn: color.yellow("[!]"),
 }
 
-function getAgentsRecord(state: ConfigEditorState): Record<string, ExtendedAgentConfig> {
-  return (state.config.agents ?? {}) as Record<string, ExtendedAgentConfig>
+function getAgentsRecord(state: ConfigEditorState): Record<string, AgentConfigExtended> {
+  return (state.config.agents ?? {}) as Record<string, AgentConfigExtended>
 }
 
 function getCategoriesFromConfig(state: ConfigEditorState): string[] {
@@ -114,7 +111,7 @@ async function editAgentField(
     }
 
     if (!state.config.agents) state.config.agents = {}
-    const agentsMutable = state.config.agents as Record<string, ExtendedAgentConfig>
+    const agentsMutable = state.config.agents as Record<string, AgentConfigExtended>
     if (!agentsMutable[agentName]) agentsMutable[agentName] = {}
     agentsMutable[agentName].model = finalModel
     state.modified = true
@@ -152,7 +149,7 @@ async function editAgentField(
     }
 
     if (!state.config.agents) state.config.agents = {}
-    const agentsMutable = state.config.agents as Record<string, ExtendedAgentConfig>
+    const agentsMutable = state.config.agents as Record<string, AgentConfigExtended>
     if (!agentsMutable[agentName]) agentsMutable[agentName] = {}
     agentsMutable[agentName].category = finalCategory
     state.modified = true
@@ -189,7 +186,7 @@ async function editAgentField(
     }
 
     if (!state.config.agents) state.config.agents = {}
-    const agentsMutable = state.config.agents as Record<string, ExtendedAgentConfig>
+    const agentsMutable = state.config.agents as Record<string, AgentConfigExtended>
     if (!agentsMutable[agentName]) agentsMutable[agentName] = {}
     const existingFallbacks = fallbackArray.slice(1)
     if (finalFallback) {
@@ -242,7 +239,7 @@ async function editAgentField(
 
       if (bashAction === "clear") {
         if (!state.config.agents) state.config.agents = {}
-        const agentsMutable = state.config.agents as Record<string, ExtendedAgentConfig>
+        const agentsMutable = state.config.agents as Record<string, AgentConfigExtended>
         if (!agentsMutable[agentName]) agentsMutable[agentName] = {}
         const perm = agentsMutable[agentName].permission
         if (perm) {
@@ -266,7 +263,7 @@ async function editAgentField(
         if (p.isCancel(value)) return false
 
         if (!state.config.agents) state.config.agents = {}
-        const agentsMutable = state.config.agents as Record<string, ExtendedAgentConfig>
+        const agentsMutable = state.config.agents as Record<string, AgentConfigExtended>
         if (!agentsMutable[agentName]) agentsMutable[agentName] = {}
         if (!agentsMutable[agentName].permission) agentsMutable[agentName].permission = {}
         agentsMutable[agentName].permission!.bash = value as BashPermissionValue
@@ -298,7 +295,7 @@ async function editAgentField(
         }
 
         if (!state.config.agents) state.config.agents = {}
-        const agentsMutable = state.config.agents as Record<string, ExtendedAgentConfig>
+        const agentsMutable = state.config.agents as Record<string, AgentConfigExtended>
         if (!agentsMutable[agentName]) agentsMutable[agentName] = {}
         if (!agentsMutable[agentName].permission) agentsMutable[agentName].permission = {}
         agentsMutable[agentName].permission!.bash = newPerms
@@ -307,25 +304,36 @@ async function editAgentField(
         p.log.success("Updated detailed bash permissions")
       }
     } else {
+      const currentPerm = existingPerm?.[permAction as "edit" | "webfetch"]
       const value = await p.select({
         message: `Select ${permAction} permission:`,
         options: [
-          { value: "ask", label: "Ask" },
-          { value: "allow", label: "Allow" },
-          { value: "deny", label: "Deny" },
+          { value: "ask", label: "Ask", hint: currentPerm === "ask" ? "current" : undefined },
+          { value: "allow", label: "Allow", hint: currentPerm === "allow" ? "current" : undefined },
+          { value: "deny", label: "Deny", hint: currentPerm === "deny" ? "current" : undefined },
+          { value: "__clear__", label: color.red("Clear permission"), hint: currentPerm ? "remove override" : undefined },
         ],
+        initialValue: currentPerm ?? "ask",
       })
 
       if (p.isCancel(value)) return false
 
       if (!state.config.agents) state.config.agents = {}
-      const agentsMutable = state.config.agents as Record<string, ExtendedAgentConfig>
+      const agentsMutable = state.config.agents as Record<string, AgentConfigExtended>
       if (!agentsMutable[agentName]) agentsMutable[agentName] = {}
       if (!agentsMutable[agentName].permission) agentsMutable[agentName].permission = {}
-      agentsMutable[agentName].permission![permAction as "edit" | "webfetch"] = value as BashPermissionValue
-      state.modified = true
 
-      p.log.success(`Updated ${permAction} permission to "${value}"`)
+      if (value === "__clear__") {
+        delete agentsMutable[agentName].permission![permAction as "edit" | "webfetch"]
+        if (Object.keys(agentsMutable[agentName].permission!).length === 0) {
+          delete agentsMutable[agentName].permission
+        }
+        p.log.success(`Cleared ${permAction} permission`)
+      } else {
+        agentsMutable[agentName].permission![permAction as "edit" | "webfetch"] = value as BashPermissionValue
+        p.log.success(`Updated ${permAction} permission to "${value}"`)
+      }
+      state.modified = true
     }
   }
 

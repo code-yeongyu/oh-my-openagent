@@ -179,6 +179,10 @@ async function promptSaveChanges(state: ConfigEditorState): Promise<number> {
   s.start("Saving configuration...")
 
   const backupPath = createBackupWithCopy(state.configPath)
+  if (!backupPath) {
+    p.log.warn("Warning: Could not create backup (file may not exist yet)")
+  }
+
   const success = writeConfigAtomically(state.configPath, state.config)
 
   if (!success) {

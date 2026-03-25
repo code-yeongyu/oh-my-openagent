@@ -1,14 +1,11 @@
 import * as p from "@clack/prompts"
 import color from "picocolors"
-import type { AgentOverrideConfig } from "../../config/schema"
-import type { ConfigEditorState, BashPermissionValue } from "./types"
+import type { ConfigEditorState, BashPermissionValue, AgentConfigExtended } from "./types"
 import { AGENT_NAMES } from "./types"
 import { selectModelWithCacheLoader } from "./ui-utils"
 
-type ExtendedAgentConfig = AgentOverrideConfig & { fallback_models?: string[] }
-
-function getAgentsRecord(state: ConfigEditorState): Record<string, ExtendedAgentConfig> {
-  return (state.config.agents ?? {}) as Record<string, ExtendedAgentConfig>
+function getAgentsRecord(state: ConfigEditorState): Record<string, AgentConfigExtended> {
+  return (state.config.agents ?? {}) as Record<string, AgentConfigExtended>
 }
 
 async function setModelForAllAgents(state: ConfigEditorState): Promise<void> {
@@ -42,7 +39,7 @@ async function setModelForAllAgents(state: ConfigEditorState): Promise<void> {
     s.start("Clearing models for all agents...")
 
     if (!state.config.agents) state.config.agents = {}
-    const agentsMutable = state.config.agents as Record<string, ExtendedAgentConfig>
+    const agentsMutable = state.config.agents as Record<string, AgentConfigExtended>
 
     for (const agentName of AGENT_NAMES) {
       if (!agentsMutable[agentName]) agentsMutable[agentName] = {}
@@ -70,7 +67,7 @@ async function setModelForAllAgents(state: ConfigEditorState): Promise<void> {
   s.start("Applying model to all agents...")
 
   if (!state.config.agents) state.config.agents = {}
-  const agentsMutable = state.config.agents as Record<string, ExtendedAgentConfig>
+  const agentsMutable = state.config.agents as Record<string, AgentConfigExtended>
 
   for (const agentName of AGENT_NAMES) {
     if (!agentsMutable[agentName]) agentsMutable[agentName] = {}
@@ -117,7 +114,7 @@ async function setFallbackForAllAgents(state: ConfigEditorState): Promise<void> 
   s.start("Applying fallback model to all agents...")
 
   if (!state.config.agents) state.config.agents = {}
-  const agentsMutable = state.config.agents as Record<string, ExtendedAgentConfig>
+  const agentsMutable = state.config.agents as Record<string, AgentConfigExtended>
 
   for (const agentName of AGENT_NAMES) {
     if (!agentsMutable[agentName]) agentsMutable[agentName] = {}
@@ -162,7 +159,7 @@ async function setDefaultBashPermissions(state: ConfigEditorState): Promise<void
   s.start("Applying bash permissions to all agents...")
 
   if (!state.config.agents) state.config.agents = {}
-  const agentsMutable = state.config.agents as Record<string, ExtendedAgentConfig>
+  const agentsMutable = state.config.agents as Record<string, AgentConfigExtended>
 
   for (const agentName of AGENT_NAMES) {
     if (!agentsMutable[agentName]) agentsMutable[agentName] = {}

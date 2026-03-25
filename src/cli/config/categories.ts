@@ -36,7 +36,8 @@ function formatCategoryStatus(state: ConfigEditorState, categoryName: string): s
 
 async function editCategory(
   state: ConfigEditorState,
-  categoryName: string
+  categoryName: string,
+  isNew = false
 ): Promise<boolean> {
   const categories = getCategories(state)
   const category = categories[categoryName] ?? {}
@@ -151,15 +152,19 @@ export async function editCategories(state: ConfigEditorState): Promise<void> {
 
       const trimmedName = newName.trim()
 
+      p.log.info(`Creating new category "${trimmedName}"...`)
+      const shouldContinue = await editCategory(state, trimmedName, true)
+      if (!shouldContinue) {
+        p.log.info("Category creation cancelled")
+        continue
+      }
+
       if (!state.config.categories) state.config.categories = {}
       const categoriesMutable = state.config.categories as MutableCategories
-      categoriesMutable[trimmedName] = {}
+      categoriesMutable[trimmedName] = categoriesMutable[trimmedName] || {}
       state.modified = true
 
       p.log.success(`Created category "${trimmedName}"`)
-
-      const shouldContinue = await editCategory(state, trimmedName)
-      if (!shouldContinue) continue
     } else {
       const shouldContinue = await editCategory(state, selected as string)
       if (!shouldContinue) continue

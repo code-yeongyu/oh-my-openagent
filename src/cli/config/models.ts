@@ -41,6 +41,8 @@ export function getModelsByProvider(): ProviderMap {
         // Handle array format (legacy)
         if (Array.isArray(data)) {
            for (const item of data) {
+             if (!item || typeof item !== "object") continue
+             if (item.provider === "__proto__" || item.provider === "constructor" || item.provider === "prototype") continue
              if (item.provider && item.id) {
                if (!result[item.provider]) result[item.provider] = []
                if (!result[item.provider].includes(item.id)) {
