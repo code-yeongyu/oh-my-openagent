@@ -143,7 +143,7 @@ describe("look-at tool", () => {
   })
 
   describe("createLookAt error handling", () => {
-    // given sync prompt throws and no messages available
+    // given async prompt submission throws and no messages available
     // when LookAt tool executed
     // then returns no-response error (fetches messages after catching prompt error)
     test("returns no-response error when prompt fails and no messages exist", async () => {
@@ -151,7 +151,7 @@ describe("look-at tool", () => {
         session: {
           get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "ses_test_prompt_fail" } }),
-          prompt: async () => { throw new Error("Network connection failed") },
+          promptAsync: async () => { throw new Error("Network connection failed") },
           messages: async () => ({ data: [] }),
         },
       }
@@ -180,7 +180,7 @@ describe("look-at tool", () => {
       expect(result).toContain("multimodal-looker")
     })
 
-    // given sync prompt succeeds
+    // given async prompt submission succeeds
     // when LookAt tool executed and no assistant message found
     // then returns error about no response
     test("returns error when no assistant message after successful prompt", async () => {
@@ -188,7 +188,7 @@ describe("look-at tool", () => {
         session: {
           get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "ses_test_no_msg" } }),
-          prompt: async () => ({}),
+          promptAsync: async () => ({}),
           messages: async () => ({ data: [] }),
         },
       }
@@ -225,7 +225,7 @@ describe("look-at tool", () => {
         session: {
           get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ error: "Internal server error" }),
-          prompt: async () => ({}),
+          promptAsync: async () => ({}),
           messages: async () => ({ data: [] }),
         },
       }
@@ -258,10 +258,9 @@ describe("look-at tool", () => {
   describe("createLookAt model passthrough", () => {
     // given multimodal-looker agent has resolved model info
     // when LookAt tool executed
-    // then model info should be passed to sync prompt
-    test("passes multimodal-looker model to sync prompt when available", async () => {
+    // then model info should be passed to async prompt submission
+    test("passes multimodal-looker model to async prompt when available", async () => {
       setVisionCapableModelsCache(new Map([["google/gemini-3-flash", { providerID: "google", modelID: "gemini-3-flash" }]]))
-
       let promptBody: any
 
       const mockClient = {
@@ -279,10 +278,11 @@ describe("look-at tool", () => {
         session: {
           get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "ses_model_passthrough" } }),
-          prompt: async (input: any) => {
+          promptAsync: async (input: any) => {
             promptBody = input.body
             return { data: {} }
           },
+          status: async () => ({ data: { ses_model_passthrough: { type: "idle" } } }),
           messages: async () => ({
             data: [
               { info: { role: "assistant", time: { created: 1 } }, parts: [{ type: "text", text: "done" }] },
@@ -319,14 +319,11 @@ describe("look-at tool", () => {
     })
   })
 
-  describe("createLookAt sync prompt (race condition fix)", () => {
-    // given look_at needs response immediately after prompt returns
-    // when tool is executed
-    // then must use synchronous prompt (session.prompt), NOT async (session.promptAsync)
-    test("uses synchronous prompt to avoid race condition with polling", async () => {
+  describe("createLookAt async child session orchestration", () => {
+    test("uses promptAsync and polls session status/messages", async () => {
       const syncPrompt = mock(async () => ({}))
       const asyncPrompt = mock(async () => ({}))
-      const statusFn = mock(async () => ({ data: {} }))
+      const statusFn = mock(async () => ({ data: { ses_sync_test: { type: "idle" } } }))
 
       const mockClient = {
         app: {
@@ -368,15 +365,15 @@ describe("look-at tool", () => {
       )
 
       expect(result).toBe("result")
-      expect(syncPrompt).toHaveBeenCalledTimes(1)
-      expect(asyncPrompt).not.toHaveBeenCalled()
-      expect(statusFn).not.toHaveBeenCalled()
+      expect(syncPrompt).toHaveBeenCalledTimes(0)
+      expect(asyncPrompt).toHaveBeenCalledTimes(1)
+      expect(statusFn).toHaveBeenCalledTimes(1)
     })
 
-    // given sync prompt throws (JSON parse error even on success)
+    // given async prompt throws
     // when tool is executed
     // then catches error gracefully and still fetches messages
-    test("catches sync prompt errors and still fetches messages", async () => {
+    test("catches async prompt errors and still fetches messages", async () => {
       const mockClient = {
         app: {
           agents: async () => ({ data: [] }),
@@ -384,9 +381,8 @@ describe("look-at tool", () => {
         session: {
           get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "ses_sync_error" } }),
-          prompt: async () => { throw new Error("JSON parse error") },
-          promptAsync: async () => ({}),
-          status: async () => ({ data: {} }),
+          promptAsync: async () => { throw new Error("JSON parse error") },
+          status: async () => ({ data: { ses_sync_error: { type: "idle" } } }),
           messages: async () => ({
             data: [
               { info: { role: "assistant", time: { created: 1 } }, parts: [{ type: "text", text: "result despite error" }] },
@@ -419,10 +415,57 @@ describe("look-at tool", () => {
       expect(result).toBe("result despite error")
     })
 
-    // given sync prompt throws and no messages available
+    test("returns structured assistant error for aborted empty response", async () => {
+      const mockClient = {
+        app: {
+          agents: async () => ({ data: [] }),
+        },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_aborted_empty" } }),
+          promptAsync: async () => { throw new Error("prompt timed out after 120000ms") },
+          status: async () => ({ data: { ses_aborted_empty: { type: "idle" } } }),
+          messages: async () => ({
+            data: [
+              {
+                role: "assistant",
+                time: { created: 1 },
+                error: { name: "MessageAbortedError", data: { message: "The operation was aborted." } },
+              },
+            ],
+          }),
+        },
+      }
+
+      const tool = createLookAt({
+        client: mockClient,
+        directory: "/project",
+      } as any)
+
+      const toolContext: ToolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        directory: "/project",
+        worktree: "/project",
+        abort: new AbortController().signal,
+        metadata: () => {},
+        ask: async () => {},
+      }
+
+      const result = await tool.execute(
+        { file_path: "/test/file.png", goal: "analyze" },
+        toolContext,
+      )
+
+      expect(result).toContain("MessageAbortedError")
+      expect(result).toContain("aborted")
+    })
+
+    // given async prompt throws and no messages available
     // when tool is executed
     // then returns error about no response
-    test("returns no-response error when sync prompt fails and no messages", async () => {
+    test("returns no-response error when async prompt fails and no messages", async () => {
       const mockClient = {
         app: {
           agents: async () => ({ data: [] }),
@@ -430,8 +473,7 @@ describe("look-at tool", () => {
         session: {
           get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "ses_sync_no_msg" } }),
-          prompt: async () => { throw new Error("Connection refused") },
-          promptAsync: async () => ({}),
+          promptAsync: async () => { throw new Error("Connection refused") },
           status: async () => ({ data: {} }),
           messages: async () => ({ data: [] }),
         },
@@ -460,6 +502,56 @@ describe("look-at tool", () => {
 
       expect(result).toContain("Error")
       expect(result).toContain("multimodal-looker")
+    })
+
+    test("aborts child session when parent abort signal fires while waiting", async () => {
+      const abortController = new AbortController()
+      const abortChild = mock(async () => ({ data: {} }))
+      let statusCalls = 0
+
+      const mockClient = {
+        app: {
+          agents: async () => ({ data: [] }),
+        },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_wait_abort" } }),
+          promptAsync: async () => ({ data: {} }),
+          status: async () => {
+            statusCalls += 1
+            if (statusCalls === 1) {
+              abortController.abort(new Error("user cancelled"))
+            }
+            return { data: { ses_wait_abort: { type: "busy" } } }
+          },
+          abort: abortChild,
+          messages: async () => ({ data: [] }),
+        },
+      }
+
+      const tool = createLookAt({
+        client: mockClient,
+        directory: "/project",
+      } as any)
+
+      const toolContext: ToolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        directory: "/project",
+        worktree: "/project",
+        abort: abortController.signal,
+        metadata: () => {},
+        ask: async () => {},
+      }
+
+      const result = await tool.execute(
+        { file_path: "/test/file.png", goal: "analyze" },
+        toolContext,
+      )
+
+      expect(abortChild).toHaveBeenCalledWith({ path: { id: "ses_wait_abort" } })
+      expect(result).toContain("aborted")
     })
   })
 
@@ -510,7 +602,7 @@ describe("look-at tool", () => {
         session: {
           get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "ses_msg_throw" } }),
-          prompt: async () => ({}),
+          promptAsync: async () => ({}),
           messages: async () => { throw new Error("Unexpected server error") },
         },
       }
@@ -556,7 +648,7 @@ describe("look-at tool", () => {
   describe("createLookAt with image_data", () => {
     // given base64 image data is provided
     // when LookAt tool executed
-    // then should send data URL to sync prompt
+    // then should send data URL to async prompt submission
     test("sends data URL when image_data provided", async () => {
       let promptBody: any
 
@@ -567,10 +659,11 @@ describe("look-at tool", () => {
         session: {
           get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "ses_image_data_test" } }),
-          prompt: async (input: any) => {
+          promptAsync: async (input: any) => {
             promptBody = input.body
             return { data: {} }
           },
+          status: async () => ({ data: { ses_image_data_test: { type: "idle" } } }),
           messages: async () => ({
             data: [
               { info: { role: "assistant", time: { created: 1 } }, parts: [{ type: "text", text: "analyzed" }] },
@@ -620,10 +713,11 @@ describe("look-at tool", () => {
         session: {
           get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "ses_raw_base64_test" } }),
-          prompt: async (input: any) => {
+          promptAsync: async (input: any) => {
             promptBody = input.body
             return { data: {} }
           },
+          status: async () => ({ data: { ses_raw_base64_test: { type: "idle" } } }),
           messages: async () => ({
             data: [
               { info: { role: "assistant", time: { created: 1 } }, parts: [{ type: "text", text: "analyzed" }] },
