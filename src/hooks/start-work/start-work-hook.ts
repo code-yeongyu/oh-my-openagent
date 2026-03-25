@@ -11,6 +11,7 @@ import {
   clearBoulderState,
 } from "../../features/boulder-state"
 import { log } from "../../shared/logger"
+import { getAgentDisplayName } from "../../shared/agent-display-names"
 import { updateSessionAgent } from "../../features/claude-code-session-state"
 import { detectWorktreePath } from "./worktree-detector"
 import { parseUserRequest } from "./parse-user-request"
@@ -23,6 +24,7 @@ interface StartWorkHookInput {
 }
 
 interface StartWorkHookOutput {
+  message?: Record<string, unknown>
   parts: Array<{ type: string; text?: string }>
 }
 
@@ -79,6 +81,9 @@ export function createStartWorkHook(ctx: PluginInput) {
 
       log(`[${HOOK_NAME}] Processing start-work command`, { sessionID: input.sessionID })
       updateSessionAgent(input.sessionID, "atlas")
+      if (output.message) {
+        output.message["agent"] = getAgentDisplayName("atlas")
+      }
 
       const existingState = readBoulderState(ctx.directory)
       const sessionId = input.sessionID
