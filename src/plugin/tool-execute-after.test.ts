@@ -1,10 +1,4 @@
-declare const describe: (name: string, fn: () => void) => void
-declare const it: (name: string, fn: () => void | Promise<void>) => void
-declare const expect: (actual: unknown) => {
-  toEqual(expected: unknown): void
-  toBe(expected: unknown): void
-}
-
+import { describe, expect, it } from "bun:test"
 import { createToolExecuteAfterHandler } from "./tool-execute-after"
 
 describe("createToolExecuteAfterHandler", () => {
@@ -17,7 +11,7 @@ describe("createToolExecuteAfterHandler", () => {
       hooks: {
         toolOutputTruncator: {
           "tool.execute.after": async (
-            _input: { tool: string; sessionID: string; callID: string },
+            _input: { tool: string; sessionID: string; callID: string; args: unknown },
             output: { title: string; output: string; metadata: Record<string, unknown> },
           ) => {
             callOrder.push("truncator")
@@ -26,7 +20,7 @@ describe("createToolExecuteAfterHandler", () => {
         },
         claudeCodeHooks: {
           "tool.execute.after": async (
-            _input: { tool: string; sessionID: string; callID: string },
+            _input: { tool: string; sessionID: string; callID: string; args: unknown },
             output: { title: string; output: string; metadata: Record<string, unknown> },
           ) => {
             callOrder.push("claude")
