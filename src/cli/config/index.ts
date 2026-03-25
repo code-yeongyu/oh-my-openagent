@@ -25,7 +25,8 @@ function loadConfig(path: string): OhMyOpenCodeConfig | null {
     const content = readFileSync(path, "utf-8")
     const config = parseJsonc<OhMyOpenCodeConfig>(content)
     return config ?? {}
-  } catch {
+  } catch (err) {
+    console.error(`Error loading config: ${err}`)
     return null
   }
 }
@@ -158,13 +159,23 @@ async function promptSaveChanges(state: ConfigEditorState): Promise<number> {
     initialValue: true,
   })
 
-  if (p.isCancel(confirmSave) || !confirmSave) {
+  if (p.isCancel(confirmSave)) {
+    p.log.info("Save cancelled.")
+    return 1
+  }
+
+  if (!confirmSave) {
     const discard = await p.confirm({
       message: "Discard changes?",
       initialValue: false,
     })
 
-    if (p.isCancel(discard) || !discard) {
+    if (p.isCancel(discard)) {
+      p.log.info("Discard cancelled.")
+      return 1
+    }
+
+    if (!discard) {
       p.log.info("Returning to menu...")
       await runMenuLoop(state)
       return promptSaveChanges(state)

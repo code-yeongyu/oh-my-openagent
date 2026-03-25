@@ -178,9 +178,13 @@ async function editAgentField(
       const custom = await p.text({
         message: "Enter custom fallback model:",
         initialValue: currentFallback ?? "",
+        validate: (value) => {
+          if (!value.trim()) return "Model name is required"
+          return undefined
+        },
       })
       if (p.isCancel(custom)) return false
-      finalFallback = custom
+      finalFallback = custom.trim() || undefined
     } else {
       finalFallback = model as string
     }

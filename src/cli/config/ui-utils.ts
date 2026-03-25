@@ -51,9 +51,11 @@ export async function selectModelWithCacheLoader(message: string, initialValue?:
     })
 
     if (p.isCancel(model)) return model
-    if (model === "__back__") return selectModelWithCacheLoader(message, initialValue)
-    
-    return model
+    if (model === "__back__") {
+      p.log.info("Going back to provider selection...")
+    } else {
+      return model
+    }
   }
 
   if (selection === "__load_all__") {

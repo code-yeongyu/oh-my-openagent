@@ -121,7 +121,10 @@ async function setFallbackForAllAgents(state: ConfigEditorState): Promise<void> 
     const existing = agentsMutable[agentName].fallback_models
     const existingArray = Array.isArray(existing) ? existing : existing ? [String(existing)] : []
     if (finalModel) {
-      agentsMutable[agentName].fallback_models = [finalModel, ...existingArray.slice(1)]
+      const secondaries = existingArray.slice(1).filter(f => f !== finalModel)
+      agentsMutable[agentName].fallback_models = [finalModel, ...secondaries]
+    } else if (existingArray.length > 1) {
+      agentsMutable[agentName].fallback_models = existingArray.slice(1)
     } else {
       delete agentsMutable[agentName].fallback_models
     }

@@ -1,13 +1,13 @@
 import * as p from "@clack/prompts"
 import color from "picocolors"
 import type { ConfigEditorState, ValidationWarning, AgentConfigExtended } from "./types"
-import { AGENT_NAMES } from "./types"
+import { AGENT_NAMES, BUILTIN_CATEGORIES } from "./types"
 
 export function validateConfig(state: ConfigEditorState): ValidationWarning[] {
   const warnings: ValidationWarning[] = []
   const agents = state.config.agents ?? {}
   const categories = state.config.categories ?? {}
-  const validCategories = Object.keys(categories)
+  const validCategories = [...BUILTIN_CATEGORIES, ...Object.keys(categories)]
 
   for (const agentName of AGENT_NAMES) {
     const agent = agents[agentName]
@@ -25,11 +25,14 @@ export function validateConfig(state: ConfigEditorState): ValidationWarning[] {
       })
     }
 
-    if (!hasModel && !hasCategory) {
+    const hasPermission = agent.permission && Object.keys(agent.permission).length > 0
+    const hasAnySetting = hasModel || hasCategory || hasPermission
+
+    if (!hasAnySetting) {
       warnings.push({
         type: "missing-model",
         agent: agentName,
-        message: `Agent "${agentName}" has no model or category set`,
+        message: `Agent "${agentName}" has no model, category, or permissions configured`,
       })
     }
   }
