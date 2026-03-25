@@ -324,6 +324,27 @@ describe("resolveCompatibleModelSettings", () => {
     })
   })
 
+  test("GPT-5 downgrades unsupported max variant to xhigh", () => {
+    const result = resolveCompatibleModelSettings({
+      providerID: "openai",
+      modelID: "gpt-5.4",
+      desired: { variant: "max" },
+    })
+
+    expect(result).toEqual({
+      variant: "xhigh",
+      reasoningEffort: undefined,
+      changes: [
+        {
+          field: "variant",
+          from: "max",
+          to: "xhigh",
+          reason: "unsupported-by-model-family",
+        },
+      ],
+    })
+  })
+
   // Reasoning effort: "none" and "minimal" are valid per Vercel AI SDK
   test("GPT-5 keeps none reasoningEffort", () => {
     const result = resolveCompatibleModelSettings({

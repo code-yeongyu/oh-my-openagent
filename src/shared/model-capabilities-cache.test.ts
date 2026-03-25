@@ -97,6 +97,37 @@ describe("model-capabilities-cache", () => {
     })
   })
 
+  test("merges repeated snapshot entries without materializing empty optional objects", () => {
+    const raw = {
+      openai: {
+        models: {
+          "gpt-5.4": {
+            id: "gpt-5.4",
+            family: "gpt",
+          },
+        },
+      },
+      alias: {
+        models: {
+          "gpt-5.4-preview": {
+            id: "gpt-5.4",
+            reasoning: true,
+          },
+        },
+      },
+    }
+
+    const snapshot = buildModelCapabilitiesSnapshotFromModelsDev(raw)
+
+    expect(snapshot.models["gpt-5.4"]).toEqual({
+      id: "gpt-5.4",
+      family: "gpt",
+      reasoning: true,
+    })
+    expect(snapshot.models["gpt-5.4"]).not.toHaveProperty("modalities")
+    expect(snapshot.models["gpt-5.4"]).not.toHaveProperty("limit")
+  })
+
   test("refresh writes cache and preserves unrelated files in the cache directory", async () => {
     //#given
     const sentinelPath = join(testCacheDir, "keep-me.json")

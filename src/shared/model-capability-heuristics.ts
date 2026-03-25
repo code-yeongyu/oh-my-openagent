@@ -24,14 +24,14 @@ export const HEURISTIC_MODEL_FAMILY_REGISTRY: ReadonlyArray<HeuristicModelFamily
   },
   {
     family: "openai-reasoning",
-    pattern: /^o\d(?:$|-)/,
+    pattern: /(?:^|\/)o\d(?:$|-)/,
     variants: ["low", "medium", "high"],
     reasoningEfforts: ["none", "minimal", "low", "medium", "high"],
   },
   {
     family: "gpt-5",
     includes: ["gpt-5"],
-    variants: ["low", "medium", "high", "xhigh", "max"],
+    variants: ["low", "medium", "high", "xhigh"],
     reasoningEfforts: ["none", "minimal", "low", "medium", "high", "xhigh"],
   },
   {

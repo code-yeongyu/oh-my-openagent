@@ -1,5 +1,6 @@
 import bundledModelCapabilitiesSnapshotJson from "../generated/model-capabilities.generated.json"
 import { findProviderModelMetadata, type ModelMetadata } from "./connected-providers-cache"
+import { resolveModelIDAlias } from "./model-capability-aliases"
 import { detectHeuristicModelFamily } from "./model-capability-heuristics"
 
 export type ModelCapabilitiesSnapshotEntry = {
@@ -41,6 +42,7 @@ export type ModelCapabilities = {
     input?: string[]
     output?: string[]
   }
+  diagnostics: ModelCapabilitiesDiagnostics
 }
 
 type GetModelCapabilitiesInput = {
@@ -52,7 +54,6 @@ type GetModelCapabilitiesInput = {
 }
 
 type ModelCapabilityOverride = {
-  canonicalModelID?: string
   variants?: string[]
   reasoningEfforts?: string[]
   supportsThinking?: boolean
@@ -60,19 +61,42 @@ type ModelCapabilityOverride = {
   supportsTopP?: boolean
 }
 
-const MODEL_ID_OVERRIDES: Record<string, ModelCapabilityOverride> = {
-  "claude-opus-4-6-thinking": { canonicalModelID: "claude-opus-4-6" },
-  "claude-sonnet-4-6-thinking": { canonicalModelID: "claude-sonnet-4-6" },
-  "claude-opus-4-5-thinking": { canonicalModelID: "claude-opus-4-5-20251101" },
-  "gpt-5.3-codex-spark": { canonicalModelID: "gpt-5.3-codex" },
-  "gemini-3.1-pro-high": { canonicalModelID: "gemini-3.1-pro-preview" },
-  "gemini-3.1-pro-low": { canonicalModelID: "gemini-3.1-pro-preview" },
-  "gemini-3-pro-high": { canonicalModelID: "gemini-3-pro-preview" },
-  "gemini-3-pro-low": { canonicalModelID: "gemini-3-pro-preview" },
+type DiagnosticSource =
+  | "none"
+  | "runtime"
+  | "runtime-snapshot"
+  | "bundled-snapshot"
+  | "override"
+  | "heuristic"
+  | "canonical"
+  | "exact-alias"
+  | "pattern-alias"
+
+export type ModelCapabilitiesDiagnostics = {
+  resolutionMode: "snapshot-backed" | "alias-backed" | "heuristic-backed" | "unknown"
+  canonicalization: {
+    source: "canonical" | "exact-alias" | "pattern-alias"
+    ruleID?: string
+  }
+  snapshot: {
+    source: "runtime-snapshot" | "bundled-snapshot" | "none"
+  }
+  family: { source: "snapshot" | "heuristic" | "none" }
+  variants: { source: Exclude<DiagnosticSource, "runtime-snapshot" | "bundled-snapshot" | "exact-alias" | "pattern-alias"> }
+  reasoningEfforts: { source: Exclude<DiagnosticSource, "runtime-snapshot" | "bundled-snapshot" | "canonical" | "exact-alias" | "pattern-alias" | "runtime"> }
+  reasoning: { source: "runtime" | "runtime-snapshot" | "bundled-snapshot" | "none" }
+  supportsThinking: { source: "runtime" | "override" | "heuristic" | "runtime-snapshot" | "bundled-snapshot" | "none" }
+  supportsTemperature: { source: "runtime" | "override" | "runtime-snapshot" | "bundled-snapshot" | "none" }
+  supportsTopP: { source: "runtime" | "override" | "none" }
+  maxOutputTokens: { source: "runtime" | "runtime-snapshot" | "bundled-snapshot" | "none" }
+  toolCall: { source: "runtime" | "runtime-snapshot" | "bundled-snapshot" | "none" }
+  modalities: { source: "runtime" | "runtime-snapshot" | "bundled-snapshot" | "none" }
 }
 
+const MODEL_ID_OVERRIDES: Record<string, ModelCapabilityOverride> = {}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null
+  return typeof value === "object" && value !== null && !Array.isArray(value)
 }
 
 function normalizeLookupModelID(modelID: string): string {
@@ -97,6 +121,11 @@ function readStringArray(value: unknown): string[] | undefined {
 }
 
 function normalizeVariantKeys(value: unknown): string[] | undefined {
+  const arrayVariants = readStringArray(value)
+  if (arrayVariants) {
+    return arrayVariants.map((variant) => variant.toLowerCase())
+  }
+
   if (!isRecord(value)) {
     return undefined
   }
@@ -105,13 +134,30 @@ function normalizeVariantKeys(value: unknown): string[] | undefined {
   return variants.length > 0 ? variants : undefined
 }
 
+function readModalityKeys(value: unknown): string[] | undefined {
+  const stringArray = readStringArray(value)
+  if (stringArray) {
+    return stringArray.map((entry) => entry.toLowerCase())
+  }
+
+  if (!isRecord(value)) {
+    return undefined
+  }
+
+  const enabled = Object.entries(value)
+    .filter(([, supported]) => supported === true)
+    .map(([modality]) => modality.toLowerCase())
+
+  return enabled.length > 0 ? enabled : undefined
+}
+
 function normalizeModalities(value: unknown): ModelCapabilities["modalities"] | undefined {
   if (!isRecord(value)) {
     return undefined
   }
 
-  const input = readStringArray(value.input)
-  const output = readStringArray(value.output)
+  const input = readModalityKeys(value.input)
+  const output = readModalityKeys(value.output)
 
   if (!input && !output) {
     return undefined
@@ -127,22 +173,12 @@ function normalizeSnapshot(snapshot: ModelCapabilitiesSnapshot | typeof bundledM
   return snapshot as ModelCapabilitiesSnapshot
 }
 
-function getCanonicalModelID(modelID: string): string {
-  const normalizedModelID = normalizeLookupModelID(modelID)
-  const override = MODEL_ID_OVERRIDES[normalizedModelID]
-  if (override?.canonicalModelID) {
-    return override.canonicalModelID
-  }
-
-  if (normalizedModelID.startsWith("claude-") && normalizedModelID.endsWith("-thinking")) {
-    return normalizedModelID.replace(/-thinking$/i, "")
-  }
-
-  return normalizedModelID
-}
-
 function getOverride(modelID: string): ModelCapabilityOverride | undefined {
   return MODEL_ID_OVERRIDES[normalizeLookupModelID(modelID)]
+}
+
+function readRuntimeModelCapabilities(runtimeModel: Record<string, unknown> | undefined): Record<string, unknown> | undefined {
+  return isRecord(runtimeModel?.capabilities) ? runtimeModel.capabilities : undefined
 }
 
 function readRuntimeModelLimitOutput(runtimeModel: Record<string, unknown> | undefined): number | undefined {
@@ -150,7 +186,9 @@ function readRuntimeModelLimitOutput(runtimeModel: Record<string, unknown> | und
     return undefined
   }
 
-  const limit = runtimeModel.limit
+  const limit = isRecord(runtimeModel.limit)
+    ? runtimeModel.limit
+    : readRuntimeModelCapabilities(runtimeModel)?.limit
   if (!isRecord(limit)) {
     return undefined
   }
@@ -163,8 +201,103 @@ function readRuntimeModelBoolean(runtimeModel: Record<string, unknown> | undefin
     return undefined
   }
 
+  const runtimeCapabilities = readRuntimeModelCapabilities(runtimeModel)
+
   for (const key of keys) {
     const value = runtimeModel[key]
+    if (typeof value === "boolean") {
+      return value
+    }
+
+    const capabilityValue = runtimeCapabilities?.[key]
+    if (typeof capabilityValue === "boolean") {
+      return capabilityValue
+    }
+  }
+
+  return undefined
+}
+
+function readRuntimeModelModalities(runtimeModel: Record<string, unknown> | undefined): ModelCapabilities["modalities"] | undefined {
+  if (!runtimeModel) {
+    return undefined
+  }
+
+  const rootModalities = normalizeModalities(runtimeModel.modalities)
+  if (rootModalities) {
+    return rootModalities
+  }
+
+  const runtimeCapabilities = readRuntimeModelCapabilities(runtimeModel)
+  if (!runtimeCapabilities) {
+    return undefined
+  }
+
+  const nestedModalities = normalizeModalities(runtimeCapabilities.modalities)
+  if (nestedModalities) {
+    return nestedModalities
+  }
+
+  const capabilityModalities = normalizeModalities(runtimeCapabilities)
+  if (capabilityModalities) {
+    return capabilityModalities
+  }
+
+  return undefined
+}
+
+function readRuntimeModelVariants(runtimeModel: Record<string, unknown> | undefined): string[] | undefined {
+  if (!runtimeModel) {
+    return undefined
+  }
+
+  const rootVariants = normalizeVariantKeys(runtimeModel.variants)
+  if (rootVariants) {
+    return rootVariants
+  }
+
+  const runtimeCapabilities = readRuntimeModelCapabilities(runtimeModel)
+  if (!runtimeCapabilities) {
+    return undefined
+  }
+
+  return normalizeVariantKeys(runtimeCapabilities.variants)
+}
+
+function readRuntimeModelTopPSupport(runtimeModel: Record<string, unknown> | undefined): boolean | undefined {
+  return readRuntimeModelBoolean(runtimeModel, ["topP", "top_p"])
+}
+
+function readRuntimeModelToolCallSupport(runtimeModel: Record<string, unknown> | undefined): boolean | undefined {
+  return readRuntimeModelBoolean(runtimeModel, ["toolCall", "tool_call", "toolcall"])
+}
+
+function readRuntimeModelReasoningSupport(runtimeModel: Record<string, unknown> | undefined): boolean | undefined {
+  return readRuntimeModelBoolean(runtimeModel, ["reasoning"])
+}
+
+function readRuntimeModelTemperatureSupport(runtimeModel: Record<string, unknown> | undefined): boolean | undefined {
+  return readRuntimeModelBoolean(runtimeModel, ["temperature"])
+}
+
+function readRuntimeModelThinkingSupport(runtimeModel: Record<string, unknown> | undefined): boolean | undefined {
+  const capabilityValue = readRuntimeModelReasoningSupport(runtimeModel)
+  if (capabilityValue !== undefined) {
+    return capabilityValue
+  }
+
+  const rootThinkingSupport = readRuntimeModelBoolean(runtimeModel, ["thinking", "supportsThinking"])
+  if (rootThinkingSupport !== undefined) {
+    return rootThinkingSupport
+  }
+
+  const runtimeCapabilities = readRuntimeModelCapabilities(runtimeModel)
+  if (!runtimeCapabilities) {
+    return undefined
+  }
+
+  for (const key of ["thinking", "supportsThinking"] as const) {
+    const value = runtimeCapabilities[key]
     if (typeof value === "boolean") {
       return value
     }
@@ -184,8 +317,9 @@ export function getBundledModelCapabilitiesSnapshot(): ModelCapabilitiesSnapshot
 }
 
 export function getModelCapabilities(input: GetModelCapabilitiesInput): ModelCapabilities {
-  const requestedModelID = normalizeLookupModelID(input.modelID)
-  const canonicalModelID = getCanonicalModelID(input.modelID)
+  const canonicalization = resolveModelIDAlias(input.modelID)
+  const requestedModelID = canonicalization.requestedModelID
+  const canonicalModelID = canonicalization.canonicalModelID
   const override = getOverride(input.modelID)
   const runtimeModel = readRuntimeModel(
     input.runtimeModel ?? findProviderModelMetadata(input.providerID, input.modelID),
@@ -194,7 +328,89 @@ export function getModelCapabilities(input: GetModelCapabilitiesInput): ModelCap
   const bundledSnapshot = input.bundledSnapshot ?? bundledModelCapabilitiesSnapshot
   const snapshotEntry = runtimeSnapshot?.models?.[canonicalModelID] ?? bundledSnapshot.models[canonicalModelID]
   const heuristicFamily = detectHeuristicModelFamily(canonicalModelID)
-  const runtimeVariants = normalizeVariantKeys(runtimeModel?.variants)
+  const runtimeVariants = readRuntimeModelVariants(runtimeModel)
+  const snapshotSource: ModelCapabilitiesDiagnostics["snapshot"]["source"] =
+    runtimeSnapshot?.models?.[canonicalModelID]
+      ? "runtime-snapshot"
+      : bundledSnapshot.models[canonicalModelID]
+      ? "bundled-snapshot"
+      : "none"
+  const familySource: ModelCapabilitiesDiagnostics["family"]["source"] =
+    snapshotEntry?.family
+      ? "snapshot"
+      : heuristicFamily?.family
+      ? "heuristic"
+      : "none"
+  const variantsSource: ModelCapabilitiesDiagnostics["variants"]["source"] =
+    runtimeVariants
+      ? "runtime"
+      : override?.variants
+      ? "override"
+      : heuristicFamily?.variants
+      ? "heuristic"
+      : "none"
+  const reasoningEffortsSource: ModelCapabilitiesDiagnostics["reasoningEfforts"]["source"] =
+    override?.reasoningEfforts
+      ? "override"
+      : heuristicFamily?.reasoningEfforts
+      ? "heuristic"
+      : "none"
+  const reasoningSource: ModelCapabilitiesDiagnostics["reasoning"]["source"] =
+    readRuntimeModelReasoningSupport(runtimeModel) !== undefined
+      ? "runtime"
+      : snapshotEntry?.reasoning !== undefined
+      ? snapshotSource
+      : "none"
+  const supportsThinkingSource: ModelCapabilitiesDiagnostics["supportsThinking"]["source"] =
+    override?.supportsThinking !== undefined
+      ? "override"
+      : heuristicFamily?.supportsThinking !== undefined
+      ? "heuristic"
+      : readRuntimeModelThinkingSupport(runtimeModel) !== undefined
+      ? "runtime"
+      : snapshotEntry?.reasoning !== undefined
+      ? snapshotSource
+      : "none"
+  const supportsTemperatureSource: ModelCapabilitiesDiagnostics["supportsTemperature"]["source"] =
+    readRuntimeModelTemperatureSupport(runtimeModel) !== undefined
+      ? "runtime"
+      : override?.supportsTemperature !== undefined
+      ? "override"
+      : snapshotEntry?.temperature !== undefined
+      ? snapshotSource
+      : "none"
+  const supportsTopPSource: ModelCapabilitiesDiagnostics["supportsTopP"]["source"] =
+    readRuntimeModelTopPSupport(runtimeModel) !== undefined
+      ? "runtime"
+      : override?.supportsTopP !== undefined
+      ? "override"
+      : "none"
+  const maxOutputTokensSource: ModelCapabilitiesDiagnostics["maxOutputTokens"]["source"] =
+    readRuntimeModelLimitOutput(runtimeModel) !== undefined
+      ? "runtime"
+      : snapshotEntry?.limit?.output !== undefined
+      ? snapshotSource
+      : "none"
+  const toolCallSource: ModelCapabilitiesDiagnostics["toolCall"]["source"] =
+    readRuntimeModelToolCallSupport(runtimeModel) !== undefined
+      ? "runtime"
+      : snapshotEntry?.toolCall !== undefined
+      ? snapshotSource
+      : "none"
+  const modalitiesSource: ModelCapabilitiesDiagnostics["modalities"]["source"] =
+    readRuntimeModelModalities(runtimeModel) !== undefined
+      ? "runtime"
+      : snapshotEntry?.modalities !== undefined
+      ? snapshotSource
+      : "none"
+  const resolutionMode: ModelCapabilitiesDiagnostics["resolutionMode"] =
+    snapshotSource !== "none" && canonicalization.source === "canonical"
+      ? "snapshot-backed"
+      : snapshotSource !== "none"
+      ? "alias-backed"
+      : familySource === "heuristic" || variantsSource === "heuristic" || reasoningEffortsSource === "heuristic"
+      ? "heuristic-backed"
+      : "unknown"
 
   return {
     requestedModelID,
@@ -202,27 +418,45 @@ export function getModelCapabilities(input: GetModelCapabilitiesInput): ModelCap
     family: snapshotEntry?.family ?? heuristicFamily?.family,
     variants: runtimeVariants ?? override?.variants ?? heuristicFamily?.variants,
     reasoningEfforts: override?.reasoningEfforts ?? heuristicFamily?.reasoningEfforts,
-    reasoning: readRuntimeModelBoolean(runtimeModel, ["reasoning"]) ?? snapshotEntry?.reasoning,
+    reasoning: readRuntimeModelReasoningSupport(runtimeModel) ?? snapshotEntry?.reasoning,
     supportsThinking:
       override?.supportsThinking
       ?? heuristicFamily?.supportsThinking
-      ?? readRuntimeModelBoolean(runtimeModel, ["reasoning"])
+      ?? readRuntimeModelThinkingSupport(runtimeModel)
       ?? snapshotEntry?.reasoning,
     supportsTemperature:
-      readRuntimeModelBoolean(runtimeModel, ["temperature"])
+      readRuntimeModelTemperatureSupport(runtimeModel)
       ?? override?.supportsTemperature
       ?? snapshotEntry?.temperature,
     supportsTopP:
-      readRuntimeModelBoolean(runtimeModel, ["topP", "top_p"])
+      readRuntimeModelTopPSupport(runtimeModel)
       ?? override?.supportsTopP,
     maxOutputTokens:
       readRuntimeModelLimitOutput(runtimeModel)
       ?? snapshotEntry?.limit?.output,
     toolCall:
-      readRuntimeModelBoolean(runtimeModel, ["toolCall", "tool_call"])
+      readRuntimeModelToolCallSupport(runtimeModel)
       ?? snapshotEntry?.toolCall,
     modalities:
-      normalizeModalities(runtimeModel?.modalities)
+      readRuntimeModelModalities(runtimeModel)
       ?? snapshotEntry?.modalities,
+    diagnostics: {
+      resolutionMode,
+      canonicalization: {
+        source: canonicalization.source,
+        ...(canonicalization.ruleID ? { ruleID: canonicalization.ruleID } : {}),
+      },
+      snapshot: { source: snapshotSource },
+      family: { source: familySource },
+      variants: { source: variantsSource },
+      reasoningEfforts: { source: reasoningEffortsSource },
+      reasoning: { source: reasoningSource },
+      supportsThinking: { source: supportsThinkingSource },
+      supportsTemperature: { source: supportsTemperatureSource },
+      supportsTopP: { source: supportsTopPSource },
+      maxOutputTokens: { source: maxOutputTokensSource },
+      toolCall: { source: toolCallSource },
+      modalities: { source: modalitiesSource },
+    },
   }
 }
