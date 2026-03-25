@@ -273,6 +273,28 @@ describe("detectCompletionInSessionMessages", () => {
       // #then
       expect(detected).toBe(true)
     })
+
+    test("#when promise is VERIFIED #then semantic completion should NOT trigger", async () => {
+      // #given
+      const messages: SessionMessage[] = [
+        {
+          info: { role: "assistant" },
+          parts: [{ type: "text", text: "The task is complete. All work has been finished." }],
+        },
+      ]
+      const ctx = createPluginInput(messages)
+
+      // #when
+      const detected = await detectCompletionInSessionMessages(ctx, {
+        sessionID: "session-123",
+        promise: "VERIFIED",
+        apiTimeoutMs: 1000,
+        directory: "/tmp",
+      })
+
+      // #then
+      expect(detected).toBe(false)
+    })
   })
 })
 

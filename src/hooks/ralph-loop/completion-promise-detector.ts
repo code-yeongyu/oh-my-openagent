@@ -49,8 +49,9 @@ export function detectCompletionInTranscript(
 				if (entry.type === "user") continue
 				if (startedAt && entry.timestamp && entry.timestamp < startedAt) continue
 				if (pattern.test(line)) return true
-				// Fallback: check for semantic completion
-				if (detectSemanticCompletion(line)) {
+				// Fallback: semantic completion only for DONE promise and assistant entries
+				const isAssistantEntry = entry.type === "assistant" || entry.type === "text"
+				if (promise === "DONE" && isAssistantEntry && detectSemanticCompletion(line)) {
 					log("[ralph-loop] WARNING: Semantic completion detected in transcript (agent used natural language instead of <promise>DONE</promise>)")
 					return true
 				}
@@ -118,8 +119,8 @@ export async function detectCompletionInSessionMessages(
 				return true
 			}
 
-			// Fallback: check for semantic completion
-			if (detectSemanticCompletion(responseText)) {
+			// Fallback: semantic completion only for DONE promise
+			if (options.promise === "DONE" && detectSemanticCompletion(responseText)) {
 				log("[ralph-loop] WARNING: Semantic completion detected (agent used natural language instead of <promise>DONE</promise>)", {
 					sessionID: options.sessionID,
 				})
