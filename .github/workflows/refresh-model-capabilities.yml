@@ -28,6 +28,9 @@ jobs:
       - name: Refresh bundled model capabilities snapshot
         run: bun run build:model-capabilities
 
+      - name: Validate capability guardrails
+        run: bun run test:model-capabilities
+
       - name: Create refresh pull request
         uses: peter-evans/create-pull-request@v7
         with:
