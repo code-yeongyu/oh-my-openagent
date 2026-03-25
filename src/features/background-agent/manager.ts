@@ -550,6 +550,9 @@ export class BackgroundManager {
           existingTask.error = errorMessage
         }
         existingTask.completedAt = new Date()
+        if (existingTask.rootSessionID) {
+          this.unregisterRootDescendant(existingTask.rootSessionID)
+        }
         if (existingTask.concurrencyKey) {
           this.concurrencyManager.release(existingTask.concurrencyKey)
           existingTask.concurrencyKey = undefined
@@ -826,6 +829,9 @@ export class BackgroundManager {
       const errorMessage = error instanceof Error ? error.message : String(error)
       existingTask.error = errorMessage
       existingTask.completedAt = new Date()
+      if (existingTask.rootSessionID) {
+        this.unregisterRootDescendant(existingTask.rootSessionID)
+      }
 
       // Release concurrency on error to prevent slot leaks
       if (existingTask.concurrencyKey) {
@@ -1022,6 +1028,9 @@ export class BackgroundManager {
       task.status = "error"
       task.error = errorMsg
       task.completedAt = new Date()
+      if (task.rootSessionID) {
+        this.unregisterRootDescendant(task.rootSessionID)
+      }
       this.taskHistory.record(task.parentSessionID, { id: task.id, sessionID: task.sessionID, agent: task.agent, description: task.description, status: "error", category: task.category, startedAt: task.startedAt, completedAt: task.completedAt })
 
       if (task.concurrencyKey) {
@@ -1354,8 +1363,12 @@ export class BackgroundManager {
       log("[background-agent] Cancelled pending task:", { taskId, key })
     }
 
+    const wasRunning = task.status === "running"
     task.status = "cancelled"
     task.completedAt = new Date()
+    if (wasRunning && task.rootSessionID) {
+      this.unregisterRootDescendant(task.rootSessionID)
+    }
     if (reason) {
       task.error = reason
     }
@@ -1475,6 +1488,10 @@ export class BackgroundManager {
     task.status = "completed"
     task.completedAt = new Date()
     this.taskHistory.record(task.parentSessionID, { id: task.id, sessionID: task.sessionID, agent: task.agent, description: task.description, status: "completed", category: task.category, startedAt: task.startedAt, completedAt: task.completedAt })
+
+    if (task.rootSessionID) {
+      this.unregisterRootDescendant(task.rootSessionID)
+    }
 
     removeTaskToastTracking(task.id)
 
@@ -1714,6 +1731,9 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
         task.status = "error"
         task.error = errorMessage
         task.completedAt = new Date()
+        if (!wasPending && task.rootSessionID) {
+          this.unregisterRootDescendant(task.rootSessionID)
+        }
         this.taskHistory.record(task.parentSessionID, { id: task.id, sessionID: task.sessionID, agent: task.agent, description: task.description, status: "error", category: task.category, startedAt: task.startedAt, completedAt: task.completedAt })
         if (task.concurrencyKey) {
           this.concurrencyManager.release(task.concurrencyKey)
