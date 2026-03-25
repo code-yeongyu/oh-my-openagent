@@ -79,14 +79,18 @@ export function createToolGuardHooks(args: {
     const currentVersion = getOpenCodeVersion()
     const hasNativeSupport =
       currentVersion !== null && isOpenCodeVersionAtLeast(OPENCODE_NATIVE_AGENTS_INJECTION_VERSION)
-    if (hasNativeSupport) {
+    const crossProject = pluginConfig.experimental?.cross_project_agents_injection ?? false
+    if (hasNativeSupport && !crossProject) {
       log("directory-agents-injector auto-disabled due to native OpenCode support", {
         currentVersion,
         nativeVersion: OPENCODE_NATIVE_AGENTS_INJECTION_VERSION,
       })
     } else {
       directoryAgentsInjector = safeHook("directory-agents-injector", () =>
-        createDirectoryAgentsInjectorHook(ctx, modelCacheState))
+        createDirectoryAgentsInjectorHook(ctx, modelCacheState, {
+          crossProject,
+          nativeSupport: hasNativeSupport,
+        }))
     }
   }
 

@@ -23,5 +23,6 @@ export interface AgentsMdInjectedPathsStorage {
 export interface AgentsMdDiscoveryInput {
   readonly startDir: string;
   readonly rootDir: string;
+  readonly unbounded?: boolean;
   readonly cache?: AgentsMdCache;
 }

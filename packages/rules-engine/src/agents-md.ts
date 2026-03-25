@@ -7,6 +7,7 @@ export interface FindAgentsMdUpInput {
   readonly startDir: string;
   readonly rootDir: string;
   readonly skipRoot?: boolean;
+  readonly unbounded?: boolean;
   readonly cache?: AgentsMdCache;
 }
 
@@ -14,7 +15,8 @@ export async function findAgentsMdUp(input: FindAgentsMdUpInput): Promise<string
   const startDir = resolve(input.startDir);
   const rootDir = resolve(input.rootDir);
   const skipRoot = input.skipRoot ?? true;
-  const cacheKey = [startDir, rootDir, skipRoot ? "1" : "0"].join("\0");
+  const unbounded = input.unbounded ?? false;
+  const cacheKey = [startDir, rootDir, skipRoot ? "1" : "0", unbounded ? "1" : "0"].join("\0");
   const cached = input.cache?.get(cacheKey);
   if (cached) return [...cached];
   const found: string[] = [];
@@ -27,7 +29,8 @@ export async function findAgentsMdUp(input: FindAgentsMdUpInput): Promise<string
     }
     if (isRootDir) break;
     const parent = dirname(current);
-    if (parent === current || !isSameOrChildPath(parent, rootDir)) break;
+    if (parent === current) break;
+    if (!unbounded && !isSameOrChildPath(parent, rootDir)) break;
     current = parent;
   }
   const result = found.reverse();

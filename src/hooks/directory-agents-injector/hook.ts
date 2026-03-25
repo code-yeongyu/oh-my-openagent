@@ -38,6 +38,7 @@ interface EventInput {
 export function createDirectoryAgentsInjectorHook(
   ctx: PluginInput,
   modelCacheState?: { anthropicContext1MEnabled: boolean },
+  options?: { crossProject?: boolean; nativeSupport?: boolean },
 ): DirectoryAgentsInjectorHook {
   const sessionCaches = new Map<string, Set<string>>();
   const agentsMdCache = createAgentsMdCache();
@@ -56,6 +57,8 @@ export function createDirectoryAgentsInjectorHook(
         filePath: output.title,
         sessionID: input.sessionID,
         output,
+        crossProject: options?.crossProject,
+        nativeSupport: options?.nativeSupport,
       });
       return;
     }

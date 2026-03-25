@@ -15,6 +15,7 @@ export async function findAgentsMdUp(input: AgentsMdDiscoveryInput): Promise<str
   return findAgentsMdUpCore({
     startDir: input.startDir,
     rootDir: input.rootDir,
+    unbounded: input.unbounded,
     cache: input.cache,
   });
 }

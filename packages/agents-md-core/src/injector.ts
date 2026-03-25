@@ -1,6 +1,6 @@
 import type { AgentsMdCache } from "@oh-my-opencode/rules-engine";
 import { promises as fsPromises } from "node:fs";
-import { dirname } from "node:path";
+import { dirname, relative } from "node:path";
 
 import { findAgentsMdUp, resolveFilePath } from "./finder";
 import { formatAgentsMdContextBlock } from "./formatter";
@@ -20,11 +20,17 @@ export async function processFilePathForAgentsInjection(input: {
   readonly filePath: string;
   readonly sessionID: string;
   readonly output: AgentsMdContextOutput;
+  readonly crossProject?: boolean;
+  readonly nativeSupport?: boolean;
 }): Promise<void> {
   if (typeof input.output.output !== "string") return;
 
   const resolved = resolveFilePath(input.rootDirectory, input.filePath);
   if (!resolved) return;
+
+  const outside = relative(input.rootDirectory, resolved).startsWith("..");
+
+  if (input.nativeSupport && !outside) return;
 
   const dir = dirname(resolved);
   const cache = getSessionCache({
@@ -36,6 +42,7 @@ export async function processFilePathForAgentsInjection(input: {
   const agentsPaths = await findAgentsMdUp({
     startDir: dir,
     rootDir: input.rootDirectory,
+    unbounded: input.crossProject && outside,
     cache: input.agentsMdCache,
   });
 
