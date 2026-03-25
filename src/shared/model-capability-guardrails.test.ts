@@ -29,7 +29,7 @@ describe("model-capability-guardrails", () => {
     const brokenSnapshot: ModelCapabilitiesSnapshot = {
       ...bundledSnapshot,
       models: Object.fromEntries(
-        Object.entries(bundledSnapshot.models).filter(([modelID]) => modelID !== "gemini-3.1-pro-preview"),
+        Object.entries(bundledSnapshot.models).filter(([modelID]) => modelID !== "gemini-3.1-pro"),
       ),
     }
 
@@ -42,7 +42,7 @@ describe("model-capability-guardrails", () => {
       expect.objectContaining({
         kind: "alias-target-missing-from-snapshot",
         aliasModelID: "gemini-3.1-pro-high",
-        canonicalModelID: "gemini-3.1-pro-preview",
+        canonicalModelID: "gemini-3.1-pro",
       }),
     )
   })
@@ -70,7 +70,7 @@ describe("model-capability-guardrails", () => {
       expect.objectContaining({
         kind: "exact-alias-collides-with-snapshot",
         aliasModelID: "gemini-3.1-pro-high",
-        canonicalModelID: "gemini-3.1-pro-preview",
+        canonicalModelID: "gemini-3.1-pro",
       }),
     )
   })
@@ -84,7 +84,7 @@ describe("model-capability-guardrails", () => {
       expect.objectContaining({
         kind: "built-in-model-relies-on-alias",
         modelID: "gemini-3.1-pro-high",
-        canonicalModelID: "gemini-3.1-pro-preview",
+        canonicalModelID: "gemini-3.1-pro",
         ruleID: "gemini-3.1-pro-tier-alias",
       }),
     )

@@ -18,9 +18,19 @@ describe("model-capability-aliases", () => {
 
     expect(result).toEqual({
       requestedModelID: "gemini-3.1-pro-high",
-      canonicalModelID: "gemini-3.1-pro-preview",
+      canonicalModelID: "gemini-3.1-pro",
       source: "exact-alias",
       ruleID: "gemini-3.1-pro-tier-alias",
+    })
+  })
+
+  test("does not resolve prototype keys as aliases", () => {
+    const result = resolveModelIDAlias("constructor")
+
+    expect(result).toEqual({
+      requestedModelID: "constructor",
+      canonicalModelID: "constructor",
+      source: "canonical",
     })
   })
 

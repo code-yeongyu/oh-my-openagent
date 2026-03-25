@@ -23,13 +23,13 @@ const EXACT_ALIAS_RULES: ReadonlyArray<ExactAliasRule> = [
   {
     aliasModelID: "gemini-3.1-pro-high",
     ruleID: "gemini-3.1-pro-tier-alias",
-    canonicalModelID: "gemini-3.1-pro-preview",
+    canonicalModelID: "gemini-3.1-pro",
     rationale: "OmO historically encoded Gemini tier selection in the model name instead of variant metadata.",
   },
   {
     aliasModelID: "gemini-3.1-pro-low",
     ruleID: "gemini-3.1-pro-tier-alias",
-    canonicalModelID: "gemini-3.1-pro-preview",
+    canonicalModelID: "gemini-3.1-pro",
     rationale: "OmO historically encoded Gemini tier selection in the model name instead of variant metadata.",
   },
   {
@@ -52,7 +52,7 @@ const EXACT_ALIAS_RULES: ReadonlyArray<ExactAliasRule> = [
   },
 ]
 
-const EXACT_ALIAS_RULES_BY_MODEL: Readonly<Record<string, ExactAliasRule>> = Object.fromEntries(
+const EXACT_ALIAS_RULES_BY_MODEL: ReadonlyMap<string, ExactAliasRule> = new Map(
   EXACT_ALIAS_RULES.map((rule) => [rule.aliasModelID, rule]),
 )
 
@@ -64,7 +64,7 @@ function normalizeLookupModelID(modelID: string): string {
 
 export function resolveModelIDAlias(modelID: string): ModelIDAliasResolution {
   const normalizedModelID = normalizeLookupModelID(modelID)
-  const exactRule = EXACT_ALIAS_RULES_BY_MODEL[normalizedModelID]
+  const exactRule = EXACT_ALIAS_RULES_BY_MODEL.get(normalizedModelID)
   if (exactRule) {
     return {
       requestedModelID: normalizedModelID,

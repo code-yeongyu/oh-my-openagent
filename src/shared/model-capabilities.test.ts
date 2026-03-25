@@ -27,8 +27,8 @@ describe("getModelCapabilities", () => {
         },
         toolCall: true,
       },
-      "gemini-3.1-pro-preview": {
-        id: "gemini-3.1-pro-preview",
+      "gemini-3.1-pro": {
+        id: "gemini-3.1-pro",
         family: "gemini",
         reasoning: true,
         temperature: true,
@@ -193,7 +193,7 @@ describe("getModelCapabilities", () => {
     })
 
     expect(result).toMatchObject({
-      canonicalModelID: "gemini-3.1-pro-preview",
+      canonicalModelID: "gemini-3.1-pro",
       family: "gemini",
       supportsThinking: true,
       supportsTemperature: true,
