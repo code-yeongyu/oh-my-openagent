@@ -147,6 +147,37 @@ describe("disabled_mcps schema", () => {
   })
 })
 
+describe("OhMyOpenCodeConfigSchema - model_capabilities", () => {
+  test("accepts valid model capabilities config", () => {
+    const input = {
+      model_capabilities: {
+        enabled: true,
+        auto_refresh_on_start: true,
+        refresh_timeout_ms: 5000,
+        source_url: "https://models.dev/api.json",
+      },
+    }
+
+    const result = OhMyOpenCodeConfigSchema.safeParse(input)
+
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.model_capabilities).toEqual(input.model_capabilities)
+    }
+  })
+
+  test("rejects invalid model capabilities config", () => {
+    const result = OhMyOpenCodeConfigSchema.safeParse({
+      model_capabilities: {
+        refresh_timeout_ms: -1,
+        source_url: "not-a-url",
+      },
+    })
+
+    expect(result.success).toBe(false)
+  })
+})
+
 describe("AgentOverrideConfigSchema", () => {
   describe("category field", () => {
     test("accepts category as optional string", () => {

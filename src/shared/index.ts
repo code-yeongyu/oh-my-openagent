@@ -43,6 +43,9 @@ export type {
   ModelResolutionResult,
 } from "./model-resolution-types"
 export * from "./model-availability"
+export * from "./model-capabilities"
+export * from "./model-capabilities-cache"
+export * from "./model-capability-heuristics"
 export * from "./model-settings-compatibility"
 export * from "./fallback-model-availability"
 export * from "./connected-providers-cache"

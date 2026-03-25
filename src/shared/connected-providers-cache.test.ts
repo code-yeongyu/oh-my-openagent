@@ -7,6 +7,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import {
 	createConnectedProvidersCacheStore,
+	findProviderModelMetadata,
 } from "./connected-providers-cache"
 
 let fakeUserCacheRoot = ""
@@ -68,8 +69,14 @@ describe("updateConnectedProvidersCache", () => {
 		expect(cache).not.toBeNull()
 		expect(cache!.connected).toEqual(["openai", "anthropic"])
 		expect(cache!.models).toEqual({
-			openai: ["gpt-5.3-codex", "gpt-5.4"],
-			anthropic: ["claude-opus-4-6", "claude-sonnet-4-6"],
+			openai: [
+				{ id: "gpt-5.3-codex", name: "GPT-5.3 Codex" },
+				{ id: "gpt-5.4", name: "GPT-5.4" },
+			],
+			anthropic: [
+				{ id: "claude-opus-4-6", name: "Claude Opus 4.6" },
+				{ id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6" },
+			],
 		})
 	})
 
@@ -173,5 +180,53 @@ describe("updateConnectedProvidersCache", () => {
 				rmSync(sentinelPath, { force: true })
 			}
 		}
+	})
+
+	test("findProviderModelMetadata returns rich cached metadata", async () => {
+		//#given
+		const mockClient = {
+			provider: {
+				list: async () => ({
+					data: {
+						connected: ["openai"],
+						all: [
+							{
+								id: "openai",
+								models: {
+									"gpt-5.4": {
+										id: "gpt-5.4",
+										name: "GPT-5.4",
+										temperature: false,
+										variants: {
+											low: {},
+											high: {},
+										},
+										limit: { output: 128000 },
+									},
+								},
+							},
+						],
+					},
+				}),
+			},
+		}
+
+		await testCacheStore.updateConnectedProvidersCache(mockClient)
+		const cache = testCacheStore.readProviderModelsCache()
+
+		//#when
+		const result = findProviderModelMetadata("openai", "gpt-5.4", cache)
+
+		//#then
+		expect(result).toEqual({
+			id: "gpt-5.4",
+			name: "GPT-5.4",
+			temperature: false,
+			variants: {
+				low: {},
+				high: {},
+			},
+			limit: { output: 128000 },
+		})
 	})
 })
