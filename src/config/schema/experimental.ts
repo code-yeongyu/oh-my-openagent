@@ -23,7 +23,7 @@ export const ExperimentalConfigSchema = z.object({
   /** Maximum number of tools to register. When set, lower-priority tools are excluded to stay within provider limits (e.g., OpenAI's 128-tool cap). Accounts for ~20 OpenCode built-in tools. */
   max_tools: z.number().int().min(1).optional(),
   /** Allow AGENTS.md discovery beyond the project root when reading files from other projects (default: false) */
-  cross_project_agents_injection: z.boolean().optional(),
+  cross_project_agents_md_injection: z.boolean().optional(),
 })
 
 export type ExperimentalConfig = z.infer<typeof ExperimentalConfigSchema>

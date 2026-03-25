@@ -79,7 +79,7 @@ export function createToolGuardHooks(args: {
     const currentVersion = getOpenCodeVersion()
     const hasNativeSupport =
       currentVersion !== null && isOpenCodeVersionAtLeast(OPENCODE_NATIVE_AGENTS_INJECTION_VERSION)
-    const crossProject = pluginConfig.experimental?.cross_project_agents_injection ?? false
+    const crossProject = pluginConfig.experimental?.cross_project_agents_md_injection ?? false
     if (hasNativeSupport && !crossProject) {
       log("directory-agents-injector auto-disabled due to native OpenCode support", {
         currentVersion,
