@@ -7,8 +7,8 @@ import {
 } from "../../shared/model-suggestion-retry"
 import { formatDetailedError } from "./error-formatting"
 import { getAgentToolRestrictions } from "../../shared/agent-tool-restrictions"
+import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
 import { setSessionTools } from "../../shared/session-tools-store"
-import { setSessionPromptParams } from "../../shared/session-prompt-params-state"
 import { createInternalAgentTextPart } from "../../shared/internal-initiator-marker"
 
 type SendSyncPromptDeps = {
@@ -54,25 +54,7 @@ export async function sendSyncPrompt(
   }
   setSessionTools(input.sessionID, tools)
 
-  if (input.categoryModel) {
-    const promptOptions: Record<string, unknown> = {
-      ...(input.categoryModel.reasoningEffort ? { reasoningEffort: input.categoryModel.reasoningEffort } : {}),
-      ...(input.categoryModel.thinking ? { thinking: input.categoryModel.thinking } : {}),
-      ...(input.categoryModel.maxTokens !== undefined ? { maxTokens: input.categoryModel.maxTokens } : {}),
-    }
-
-    if (
-      input.categoryModel.temperature !== undefined ||
-      input.categoryModel.top_p !== undefined ||
-      Object.keys(promptOptions).length > 0
-    ) {
-      setSessionPromptParams(input.sessionID, {
-        ...(input.categoryModel.temperature !== undefined ? { temperature: input.categoryModel.temperature } : {}),
-        ...(input.categoryModel.top_p !== undefined ? { topP: input.categoryModel.top_p } : {}),
-        ...(Object.keys(promptOptions).length > 0 ? { options: promptOptions } : {}),
-      })
-    }
-  }
+  applySessionPromptParams(input.sessionID, input.categoryModel)
 
   const promptArgs = {
     path: { id: input.sessionID },

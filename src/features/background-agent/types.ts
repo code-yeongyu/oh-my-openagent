@@ -1,4 +1,5 @@
 import type { FallbackEntry } from "../../shared/model-requirements"
+import type { DelegatedModelConfig } from "../../shared/model-resolution-types"
 import type { SessionPermissionRule } from "../../shared/question-denied-session-permission"
 
 export type BackgroundTaskStatus =
@@ -23,17 +24,6 @@ export interface TaskProgress {
   lastUpdate: Date
   lastMessage?: string
   lastMessageAt?: Date
-}
-
-type DelegatedModelConfig = {
-  providerID: string
-  modelID: string
-  variant?: string
-  reasoningEffort?: string
-  temperature?: number
-  top_p?: number
-  maxTokens?: number
-  thinking?: { type: "enabled" | "disabled"; budgetTokens?: number }
 }
 
 export interface BackgroundTask {
