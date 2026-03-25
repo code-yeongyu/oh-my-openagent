@@ -135,9 +135,7 @@ export async function startTask(
   promptWithModelSuggestionRetry(client, {
     path: { id: sessionID },
     body: {
-      // When a model is explicitly provided, omit the agent name so opencode's
-      // built-in agent fallback chain does not override the user-specified model.
-      ...(launchModel ? {} : { agent: input.agent }),
+      agent: input.agent,
       ...(launchModel ? { model: launchModel } : {}),
       ...(launchVariant ? { variant: launchVariant } : {}),
       system: input.skillContent,
@@ -222,9 +220,7 @@ export async function resumeTask(
   client.session.promptAsync({
     path: { id: task.sessionID },
     body: {
-      // When a model is explicitly provided, omit the agent name so opencode's
-      // built-in agent fallback chain does not override the user-specified model.
-      ...(resumeModel ? {} : { agent: task.agent }),
+      agent: task.agent,
       ...(resumeModel ? { model: resumeModel } : {}),
       ...(resumeVariant ? { variant: resumeVariant } : {}),
       tools: {

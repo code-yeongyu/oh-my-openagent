@@ -1668,7 +1668,7 @@ describe("BackgroundManager.resume model persistence", () => {
     // then - model should be passed in prompt body
     expect(promptCalls).toHaveLength(1)
     expect(promptCalls[0].body.model).toEqual({ providerID: "anthropic", modelID: "claude-sonnet-4-20250514" })
-    expect("agent" in promptCalls[0].body).toBe(false)
+    expect(promptCalls[0].body.agent).toBe("explore")
   })
 
   test("should NOT pass model when task has no model (backward compatibility)", async () => {
@@ -1832,7 +1832,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
     expect(task2.status).toBe("pending")
   })
 
-  test("should omit agent when launch has model and keep agent without model", async () => {
+  test("should keep agent when launch has model and keep agent without model", async () => {
     // given
     const promptBodies: Array<Record<string, unknown>> = []
     let resolveFirstPromptStarted: (() => void) | undefined
@@ -1894,7 +1894,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
     expect(taskWithoutModel.status).toBe("pending")
     expect(promptBodies).toHaveLength(2)
     expect(promptBodies[0].model).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-6" })
-    expect("agent" in promptBodies[0]).toBe(false)
+    expect(promptBodies[0].agent).toBe("test-agent")
     expect(promptBodies[1].agent).toBe("test-agent")
     expect("model" in promptBodies[1]).toBe(false)
   })
@@ -4752,6 +4752,53 @@ describe("BackgroundManager - tool permission spread order", () => {
     manager.shutdown()
   })
 
+  test("startTask keeps agent when explicit model is configured", async () => {
+    //#given
+    const promptCalls: Array<{ path: { id: string }; body: Record<string, unknown> }> = []
+    const client = {
+      session: {
+        get: async () => ({ data: { directory: "/test/dir" } }),
+        create: async () => ({ data: { id: "session-1" } }),
+        promptAsync: async (args: { path: { id: string }; body: Record<string, unknown> }) => {
+          promptCalls.push(args)
+          return {}
+        },
+      },
+    }
+    const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
+    const task: BackgroundTask = {
+      id: "task-explicit-model",
+      status: "pending",
+      queuedAt: new Date(),
+      description: "test task",
+      prompt: "test prompt",
+      agent: "sisyphus-junior",
+      parentSessionID: "parent-session",
+      parentMessageID: "parent-message",
+      model: { providerID: "openai", modelID: "gpt-5.4", variant: "medium" },
+    }
+    const input: import("./types").LaunchInput = {
+      description: task.description,
+      prompt: task.prompt,
+      agent: task.agent,
+      parentSessionID: task.parentSessionID,
+      parentMessageID: task.parentMessageID,
+      model: task.model,
+    }
+
+    //#when
+    await (manager as unknown as { startTask: (item: { task: BackgroundTask; input: import("./types").LaunchInput }) => Promise<void> })
+      .startTask({ task, input })
+
+    //#then
+    expect(promptCalls).toHaveLength(1)
+    expect(promptCalls[0].body.agent).toBe("sisyphus-junior")
+    expect(promptCalls[0].body.model).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
+    expect(promptCalls[0].body.variant).toBe("medium")
+
+    manager.shutdown()
+  })
+
   test("resume respects explore agent restrictions", async () => {
     //#given
     let capturedTools: Record<string, unknown> | undefined
@@ -4793,6 +4840,50 @@ describe("BackgroundManager - tool permission spread order", () => {
     expect(capturedTools?.task).toBe(false)
     expect(capturedTools?.write).toBe(false)
     expect(capturedTools?.edit).toBe(false)
+
+    manager.shutdown()
+  })
+
+  test("resume keeps agent when explicit model is configured", async () => {
+    //#given
+    let promptCall: { path: { id: string }; body: Record<string, unknown> } | undefined
+    const client = {
+      session: {
+        promptAsync: async (args: { path: { id: string }; body: Record<string, unknown> }) => {
+          promptCall = args
+          return {}
+        },
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
+    const task: BackgroundTask = {
+      id: "task-explicit-model-resume",
+      sessionID: "session-3",
+      parentSessionID: "parent-session",
+      parentMessageID: "parent-message",
+      description: "resume task",
+      prompt: "resume prompt",
+      agent: "explore",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+      model: { providerID: "anthropic", modelID: "claude-sonnet-4-20250514" },
+    }
+    getTaskMap(manager).set(task.id, task)
+
+    //#when
+    await manager.resume({
+      sessionId: "session-3",
+      prompt: "continue",
+      parentSessionID: "parent-session",
+      parentMessageID: "parent-message",
+    })
+
+    //#then
+    expect(promptCall).toBeDefined()
+    expect(promptCall?.body.agent).toBe("explore")
+    expect(promptCall?.body.model).toEqual({ providerID: "anthropic", modelID: "claude-sonnet-4-20250514" })
 
     manager.shutdown()
   })
