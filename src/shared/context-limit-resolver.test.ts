@@ -28,12 +28,12 @@ describe("resolveActualContextLimit", () => {
     resetContextLimitEnv()
   })
 
-  it("returns the default Anthropic limit when 1M mode is disabled despite a cached limit", () => {
+  it("returns the cached limit for Anthropic providers when modelContextLimitsCache has an entry", () => {
     // given
     delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
     delete process.env[VERTEX_CONTEXT_ENV_KEY]
     const modelContextLimitsCache = new Map<string, number>()
-    modelContextLimitsCache.set("anthropic/claude-sonnet-4-5", 123456)
+    modelContextLimitsCache.set("anthropic/claude-sonnet-4-5", 1_000_000)
 
     // when
     const actualLimit = resolveActualContextLimit("anthropic", "claude-sonnet-4-5", {
@@ -42,7 +42,21 @@ describe("resolveActualContextLimit", () => {
     })
 
     // then
-    expect(actualLimit).toBe(200000)
+    expect(actualLimit).toBe(1_000_000)
+  })
+
+  it("falls back to Anthropic default when no cached limit exists and 1M mode is disabled", () => {
+    // given
+    delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+    delete process.env[VERTEX_CONTEXT_ENV_KEY]
+
+    // when
+    const actualLimit = resolveActualContextLimit("anthropic", "claude-sonnet-4-5", {
+      anthropicContext1MEnabled: false,
+    })
+
+    // then
+    expect(actualLimit).toBe(200_000)
   })
 
   it("treats Anthropics aliases as Anthropic providers", () => {

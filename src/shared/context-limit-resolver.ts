@@ -25,9 +25,12 @@ export function resolveActualContextLimit(
   modelID: string,
   modelCacheState?: ContextLimitModelCacheState,
 ): number | null {
+  const cached = modelCacheState?.modelContextLimitsCache?.get(`${providerID}/${modelID}`)
+  if (cached) return cached
+
   if (isAnthropicProvider(providerID)) {
     return getAnthropicActualLimit(modelCacheState)
   }
 
-  return modelCacheState?.modelContextLimitsCache?.get(`${providerID}/${modelID}`) ?? null
+  return null
 }
