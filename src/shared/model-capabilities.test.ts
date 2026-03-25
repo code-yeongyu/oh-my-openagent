@@ -115,6 +115,22 @@ describe("getModelCapabilities", () => {
     })
   })
 
+  test("respects root-level thinking flags when providers do not nest them under capabilities", () => {
+    const result = getModelCapabilities({
+      providerID: "custom-proxy",
+      modelID: "gpt-5.4",
+      runtimeModel: {
+        supportsThinking: true,
+      },
+      bundledSnapshot,
+    })
+
+    expect(result).toMatchObject({
+      canonicalModelID: "gpt-5.4",
+      supportsThinking: true,
+    })
+  })
+
   test("accepts runtime variant arrays without corrupting them into numeric keys", () => {
     const result = getModelCapabilities({
       providerID: "openai",

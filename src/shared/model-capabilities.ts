@@ -276,6 +276,11 @@ function readRuntimeModelThinkingSupport(runtimeModel: Record<string, unknown> |
     return capabilityValue
   }
 
+  const rootThinkingSupport = readRuntimeModelBoolean(runtimeModel, ["thinking", "supportsThinking"])
+  if (rootThinkingSupport !== undefined) {
+    return rootThinkingSupport
+  }
+
   const runtimeCapabilities = readRuntimeModelCapabilities(runtimeModel)
   if (!runtimeCapabilities) {
     return undefined
