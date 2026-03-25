@@ -24,14 +24,14 @@ describe("model-capability-aliases", () => {
     })
   })
 
-  test("normalizes decorated thinking aliases through a named pattern rule", () => {
+  test("normalizes legacy Claude thinking aliases through a named exact rule", () => {
     const result = resolveModelIDAlias("claude-opus-4-6-thinking")
 
     expect(result).toEqual({
       requestedModelID: "claude-opus-4-6-thinking",
       canonicalModelID: "claude-opus-4-6",
-      source: "pattern-alias",
-      ruleID: "anthropic-thinking-suffix",
+      source: "exact-alias",
+      ruleID: "claude-opus-4-6-thinking-legacy-alias",
     })
   })
 })

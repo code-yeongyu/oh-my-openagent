@@ -30,6 +30,7 @@
     "prepare": "bun run build",
     "postinstall": "node postinstall.mjs",
     "prepublishOnly": "bun run clean && bun run build",
+    "test:model-capabilities": "bun test src/shared/model-capability-aliases.test.ts src/shared/model-capability-guardrails.test.ts src/shared/model-capabilities.test.ts src/cli/doctor/checks/model-resolution.test.ts --bail",
     "typecheck": "tsc --noEmit",
     "test": "bun test"
   },

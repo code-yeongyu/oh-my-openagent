@@ -1,10 +1,13 @@
-type ExactAliasRule = {
+export type ExactAliasRule = {
+  aliasModelID: string
   ruleID: string
   canonicalModelID: string
+  rationale: string
 }
 
-type PatternAliasRule = {
+export type PatternAliasRule = {
   ruleID: string
+  description: string
   match: (normalizedModelID: string) => boolean
   canonicalize: (normalizedModelID: string) => string
 }
@@ -16,36 +19,44 @@ export type ModelIDAliasResolution = {
   ruleID?: string
 }
 
-const EXACT_ALIAS_RULES: Record<string, ExactAliasRule> = {
-  "gpt-5.3-codex-spark": {
-    ruleID: "gpt-5.3-codex-spark-alias",
-    canonicalModelID: "gpt-5.3-codex",
-  },
-  "gemini-3.1-pro-high": {
-    ruleID: "gemini-3.1-pro-tier-alias",
-    canonicalModelID: "gemini-3.1-pro-preview",
-  },
-  "gemini-3.1-pro-low": {
-    ruleID: "gemini-3.1-pro-tier-alias",
-    canonicalModelID: "gemini-3.1-pro-preview",
-  },
-  "gemini-3-pro-high": {
-    ruleID: "gemini-3-pro-tier-alias",
-    canonicalModelID: "gemini-3-pro-preview",
-  },
-  "gemini-3-pro-low": {
-    ruleID: "gemini-3-pro-tier-alias",
-    canonicalModelID: "gemini-3-pro-preview",
-  },
-}
-
-const PATTERN_ALIAS_RULES: ReadonlyArray<PatternAliasRule> = [
+const EXACT_ALIAS_RULES: ReadonlyArray<ExactAliasRule> = [
   {
-    ruleID: "anthropic-thinking-suffix",
-    match: (normalizedModelID) => normalizedModelID.startsWith("claude-") && normalizedModelID.endsWith("-thinking"),
-    canonicalize: (normalizedModelID) => normalizedModelID.replace(/-thinking$/i, ""),
+    aliasModelID: "gemini-3.1-pro-high",
+    ruleID: "gemini-3.1-pro-tier-alias",
+    canonicalModelID: "gemini-3.1-pro-preview",
+    rationale: "OmO historically encoded Gemini tier selection in the model name instead of variant metadata.",
+  },
+  {
+    aliasModelID: "gemini-3.1-pro-low",
+    ruleID: "gemini-3.1-pro-tier-alias",
+    canonicalModelID: "gemini-3.1-pro-preview",
+    rationale: "OmO historically encoded Gemini tier selection in the model name instead of variant metadata.",
+  },
+  {
+    aliasModelID: "gemini-3-pro-high",
+    ruleID: "gemini-3-pro-tier-alias",
+    canonicalModelID: "gemini-3-pro-preview",
+    rationale: "Legacy Gemini 3 tier suffixes still need to land on the canonical preview model.",
+  },
+  {
+    aliasModelID: "gemini-3-pro-low",
+    ruleID: "gemini-3-pro-tier-alias",
+    canonicalModelID: "gemini-3-pro-preview",
+    rationale: "Legacy Gemini 3 tier suffixes still need to land on the canonical preview model.",
+  },
+  {
+    aliasModelID: "claude-opus-4-6-thinking",
+    ruleID: "claude-opus-4-6-thinking-legacy-alias",
+    canonicalModelID: "claude-opus-4-6",
+    rationale: "OmO historically used a legacy compatibility suffix before models.dev shipped canonical thinking variants for newer Claude families.",
   },
 ]
+
+const EXACT_ALIAS_RULES_BY_MODEL: Readonly<Record<string, ExactAliasRule>> = Object.fromEntries(
+  EXACT_ALIAS_RULES.map((rule) => [rule.aliasModelID, rule]),
+)
+
+const PATTERN_ALIAS_RULES: ReadonlyArray<PatternAliasRule> = []
 
 function normalizeLookupModelID(modelID: string): string {
   return modelID.trim().toLowerCase()
@@ -53,7 +64,7 @@ function normalizeLookupModelID(modelID: string): string {
 
 export function resolveModelIDAlias(modelID: string): ModelIDAliasResolution {
   const normalizedModelID = normalizeLookupModelID(modelID)
-  const exactRule = EXACT_ALIAS_RULES[normalizedModelID]
+  const exactRule = EXACT_ALIAS_RULES_BY_MODEL[normalizedModelID]
   if (exactRule) {
     return {
       requestedModelID: normalizedModelID,
@@ -81,4 +92,12 @@ export function resolveModelIDAlias(modelID: string): ModelIDAliasResolution {
     canonicalModelID: normalizedModelID,
     source: "canonical",
   }
+}
+
+export function getExactModelIDAliasRules(): ReadonlyArray<ExactAliasRule> {
+  return EXACT_ALIAS_RULES
+}
+
+export function getPatternModelIDAliasRules(): ReadonlyArray<PatternAliasRule> {
+  return PATTERN_ALIAS_RULES
 }

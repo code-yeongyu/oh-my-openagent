@@ -161,7 +161,7 @@ describe("getModelCapabilities", () => {
     expect(result.variants).toEqual(["low", "medium", "high", "xhigh"])
   })
 
-  test("normalizes thinking suffix aliases before snapshot lookup", () => {
+  test("normalizes the legacy Claude Opus thinking alias before snapshot lookup", () => {
     const result = getModelCapabilities({
       providerID: "anthropic",
       modelID: "claude-opus-4-6-thinking",
@@ -178,8 +178,8 @@ describe("getModelCapabilities", () => {
     expect(result.diagnostics).toMatchObject({
       resolutionMode: "alias-backed",
       canonicalization: {
-        source: "pattern-alias",
-        ruleID: "anthropic-thinking-suffix",
+        source: "exact-alias",
+        ruleID: "claude-opus-4-6-thinking-legacy-alias",
       },
       snapshot: { source: "bundled-snapshot" },
     })
