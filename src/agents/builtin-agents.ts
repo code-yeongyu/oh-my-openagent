@@ -12,6 +12,11 @@ import { createMetisAgent, metisPromptMetadata } from "./metis"
 import { createAtlasAgent, atlasPromptMetadata } from "./atlas"
 import { createMomusAgent, momusPromptMetadata } from "./momus"
 import { createHephaestusAgent } from "./hephaestus"
+import { createCreditPlannerAgentWithOverrides, CREDIT_PLANNER_PROMPT_METADATA } from "./credit-agents/credit-planner"
+import { createCreditExecutorAgentWithOverrides, CREDIT_EXECUTOR_PROMPT_METADATA } from "./credit-agents/credit-executor"
+import { createCreditTesterAgentWithOverrides, CREDIT_TESTER_PROMPT_METADATA } from "./credit-agents/credit-tester"
+import { createCreditServerAgentWithOverrides, CREDIT_SERVER_PROMPT_METADATA } from "./credit-agents/credit-server"
+import { createCreditPlanReviewerAgentWithOverrides, CREDIT_PLAN_REVIEWER_PROMPT_METADATA } from "./credit-agents/credit-plan-reviewer"
 import type { AvailableCategory } from "./dynamic-agent-prompt-builder"
 import {
   fetchAvailableModels,
@@ -38,9 +43,12 @@ const agentSources: Record<BuiltinAgentName, AgentSource> = {
   "multimodal-looker": createMultimodalLookerAgent,
   metis: createMetisAgent,
   momus: createMomusAgent,
-  // Note: Atlas is handled specially in createBuiltinAgents()
-  // because it needs OrchestratorContext, not just a model string
   atlas: createAtlasAgent as AgentFactory,
+  "credit-planner": createCreditPlannerAgentWithOverrides as AgentFactory,
+  "credit-executor": createCreditExecutorAgentWithOverrides as AgentFactory,
+  "credit-tester": createCreditTesterAgentWithOverrides as AgentFactory,
+  "credit-server": createCreditServerAgentWithOverrides as AgentFactory,
+  "credit-plan-reviewer": createCreditPlanReviewerAgentWithOverrides as AgentFactory,
 }
 
 /**
@@ -55,6 +63,11 @@ const agentMetadata: Partial<Record<BuiltinAgentName, AgentPromptMetadata>> = {
   metis: metisPromptMetadata,
   momus: momusPromptMetadata,
   atlas: atlasPromptMetadata,
+  "credit-planner": CREDIT_PLANNER_PROMPT_METADATA,
+  "credit-executor": CREDIT_EXECUTOR_PROMPT_METADATA,
+  "credit-tester": CREDIT_TESTER_PROMPT_METADATA,
+  "credit-server": CREDIT_SERVER_PROMPT_METADATA,
+  "credit-plan-reviewer": CREDIT_PLAN_REVIEWER_PROMPT_METADATA,
 }
 
 export async function createBuiltinAgents(
@@ -131,6 +144,46 @@ export async function createBuiltinAgents(
       name: agent.name,
       description: agent.description,
       metadata: buildCustomAgentMetadata(agent.name, agent.description),
+    })
+  }
+
+  if (!disabledAgentNames.has("credit-planner") && agentMetadata["credit-planner"]) {
+    availableAgents.push({
+      name: "credit-planner",
+      description: "Feature implementation planner for Agentic Loop. Analyzes requests, explores codebase, generates structured Change Plans with files, APIs, DB changes, and test flows. (CreditPlanner - OhMyOpenCode)",
+      metadata: agentMetadata["credit-planner"],
+    })
+  }
+
+  if (!disabledAgentNames.has("credit-executor") && agentMetadata["credit-executor"]) {
+    availableAgents.push({
+      name: "credit-executor",
+      description: "Change Plan executor for Agentic Loop. Implements features exactly as specified in Change Plans. Deterministic execution, no reinterpretation. (CreditExecutor - OhMyOpenCode)",
+      metadata: agentMetadata["credit-executor"],
+    })
+  }
+
+  if (!disabledAgentNames.has("credit-tester") && agentMetadata["credit-tester"]) {
+    availableAgents.push({
+      name: "credit-tester",
+      description: "Feature validation tester for Agentic Loop. Executes test flows, verifies implementation against Change Plan, reports failures. (CreditTester - OhMyOpenCode)",
+      metadata: agentMetadata["credit-tester"],
+    })
+  }
+
+  if (!disabledAgentNames.has("credit-server") && agentMetadata["credit-server"]) {
+    availableAgents.push({
+      name: "credit-server",
+      description: "LSP server management for euler-lsp with PostgreSQL, Redis, and monitoring. Handles server lifecycle, DB setup, config insertion, and health monitoring. (CreditServer - OhMyOpenCode)",
+      metadata: agentMetadata["credit-server"],
+    })
+  }
+
+  if (!disabledAgentNames.has("credit-plan-reviewer") && agentMetadata["credit-plan-reviewer"]) {
+    availableAgents.push({
+      name: "credit-plan-reviewer",
+      description: "Rigorous plan reviewer for Euler LSP. Validates Change Plans for architectural correctness, completeness, and risk assessment. Provides APPROVE/REJECT/CONDITIONAL verdicts. (CreditPlanReviewer - OhMyOpenCode)",
+      metadata: agentMetadata["credit-plan-reviewer"],
     })
   }
 

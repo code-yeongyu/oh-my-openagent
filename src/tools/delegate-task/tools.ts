@@ -20,6 +20,7 @@ import {
   executeBackgroundTask,
   executeSyncTask,
 } from "./executor"
+import { getSessionMemoryBankContext } from "../../features/claude-code-session-state"
 
 export { resolveCategoryConfig } from "./categories"
 export type { SyncSessionCreatedEvent, DelegateTaskToolOptions, BuildSystemContentInput } from "./types"
@@ -153,6 +154,7 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
       }
 
       const parentContext = await resolveParentContext(ctx, options.client)
+      const memoryBankContext = getSessionMemoryBankContext(ctx.sessionID)
 
       if (args.session_id) {
         if (runInBackground) {
@@ -222,6 +224,7 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
             model: categoryModel,
             availableCategories,
             availableSkills,
+            memoryBankContext,
           })
           return executeUnstableAgentTask(args, ctx, options, parentContext, agentToUse, categoryModel, systemContent, actualModel)
         }
@@ -244,6 +247,7 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
         model: categoryModel,
         availableCategories,
         availableSkills,
+        memoryBankContext,
       })
 
       if (runInBackground) {

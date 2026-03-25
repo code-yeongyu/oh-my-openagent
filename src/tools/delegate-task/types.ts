@@ -82,4 +82,5 @@ export interface BuildSystemContentInput {
   agentName?: string
   availableCategories?: AvailableCategory[]
   availableSkills?: AvailableSkill[]
+  memoryBankContext?: string
 }

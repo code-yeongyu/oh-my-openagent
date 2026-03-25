@@ -40,6 +40,7 @@ export function buildSystemContent(input: BuildSystemContentInput): string | und
     agentName,
     availableCategories,
     availableSkills,
+    memoryBankContext,
   } = input
 
   const planAgentPrepend = isPlanAgent(agentName)
@@ -49,12 +50,16 @@ export function buildSystemContent(input: BuildSystemContentInput): string | und
   const effectiveMaxPromptTokens = maxPromptTokens
     ?? (usesFreeOrLocalModel(model) ? FREE_OR_LOCAL_PROMPT_TOKEN_LIMIT : undefined)
 
+  const combinedContext = memoryBankContext
+    ? `<MemoryBankContext>\n${memoryBankContext}\n</MemoryBankContext>\n\n${agentsContext ?? planAgentPrepend}`
+    : (agentsContext ?? planAgentPrepend)
+
   return buildSystemContentWithTokenLimit(
     {
       skillContent,
       skillContents,
       categoryPromptAppend,
-      agentsContext: agentsContext ?? planAgentPrepend,
+      agentsContext: combinedContext,
       planAgentPrepend,
     },
     effectiveMaxPromptTokens

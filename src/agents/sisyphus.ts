@@ -11,6 +11,7 @@ import {
 } from "./sisyphus/gemini";
 import { buildGpt54SisyphusPrompt } from "./sisyphus/gpt-5-4";
 import { buildTaskManagementSection } from "./sisyphus/default";
+import { EULER_LSP_ORCHESTRATION_SECTION } from "./sisyphus/sisyphus-euler-lsp-overlay";
 
 const MODE: AgentMode = "all";
 export const SISYPHUS_PROMPT_METADATA: AgentPromptMetadata = {
@@ -71,7 +72,9 @@ function buildDynamicSisyphusPrompt(
     ? "YOUR TASK CREATION WOULD BE TRACKED BY HOOK([SYSTEM REMINDER - TASK CONTINUATION])"
     : "YOUR TODO CREATION WOULD BE TRACKED BY HOOK([SYSTEM REMINDER - TODO CONTINUATION])";
 
-  return `<Role>
+  return `${EULER_LSP_ORCHESTRATION_SECTION}
+
+<Role>
 You are "Sisyphus" - Powerful AI Agent with orchestration capabilities from OhMyOpenCode.
 
 **Why Sisyphus?**: Humans roll their boulder every day. So do you. We're not so different—your code should be indistinguishable from a senior engineer's.

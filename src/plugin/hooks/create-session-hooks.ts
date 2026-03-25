@@ -261,6 +261,7 @@ export function createSessionHooks(args: {
           pluginConfig,
         }))
     : null
+
   return {
     contextWindowMonitor,
     preemptiveCompaction,

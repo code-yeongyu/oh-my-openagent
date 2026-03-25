@@ -7,6 +7,7 @@ import { setSessionFallbackChain } from "../../hooks/model-fallback/hook"
 import { createOrGetSession } from "./session-creator"
 import { waitForCompletion } from "./completion-poller"
 import { processMessages } from "./message-processor"
+import { getSessionMemoryBankContext } from "../../features/claude-code-session-state"
 
 type SessionWithPromptAsync = {
   promptAsync: (opts: { path: { id: string }; body: Record<string, unknown> }) => Promise<unknown>
@@ -53,6 +54,19 @@ export async function executeSync(
   log(`[call_omo_agent] Sending prompt to session ${sessionID}`)
   log(`[call_omo_agent] Prompt text:`, args.prompt.substring(0, 100))
 
+  const memoryBankContext = getSessionMemoryBankContext(toolContext.sessionID)
+  const enhancedPrompt = memoryBankContext
+    ? `<MemoryBankContext>\n${memoryBankContext}\n</MemoryBankContext>\n\n${args.prompt}`
+    : args.prompt
+
+  if (memoryBankContext) {
+    log(`[call_omo_agent] Injected memory-bank context from parent session`, {
+      parentSessionID: toolContext.sessionID,
+      subagentSessionID: sessionID,
+      contextLength: memoryBankContext.length,
+    })
+  }
+
   try {
     await (ctx.client.session as unknown as SessionWithPromptAsync).promptAsync({
       path: { id: sessionID },
@@ -63,7 +77,7 @@ export async function executeSync(
           task: false,
           question: false,
         },
-        parts: [{ type: "text", text: args.prompt }],
+        parts: [{ type: "text", text: enhancedPrompt }],
       },
     })
   } catch (error) {

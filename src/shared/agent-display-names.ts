@@ -4,7 +4,7 @@
  * Display names include suffixes for UI/logs (e.g., "Sisyphus (Ultraworker)").
  */
 export const AGENT_DISPLAY_NAMES: Record<string, string> = {
-  sisyphus: "Sisyphus (Ultraworker)",
+  sisyphus: "Sisy (Ultraworker)",
   hephaestus: "Hephaestus (Deep Agent)",
   prometheus: "Prometheus (Plan Builder)",
   atlas: "Atlas (Plan Executor)",

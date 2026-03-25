@@ -10,6 +10,7 @@ import { formatDuration } from "./time-formatter"
 import { formatDetailedError } from "./error-formatting"
 import { syncTaskDeps, type SyncTaskDeps } from "./sync-task-deps"
 import { setSessionFallbackChain, clearSessionFallbackChain } from "../../hooks/model-fallback/hook"
+import { getAgentSpecificTimeout } from "./timing"
 
 export async function executeSyncTask(
   args: DelegateTaskArgs,
@@ -113,12 +114,13 @@ export async function executeSyncTask(
     }
 
     try {
+      const effectiveTimeout = syncPollTimeoutMs ?? getAgentSpecificTimeout(agentToUse)
       const pollError = await deps.pollSyncSession(ctx, client, {
         sessionID,
         agentToUse,
         toastManager,
         taskId,
-      }, syncPollTimeoutMs)
+      }, effectiveTimeout)
       if (pollError) {
         return pollError
       }

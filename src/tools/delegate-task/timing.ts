@@ -7,6 +7,14 @@ const DEFAULT_POLL_TIMEOUT_MS = 10 * 60 * 1000
 let MAX_POLL_TIME_MS = DEFAULT_POLL_TIMEOUT_MS
 let SESSION_CONTINUATION_STABILITY_MS = 5000
 
+const AGENT_SPECIFIC_TIMEOUTS: Record<string, number> = {
+  "credit-planner": 15 * 60 * 1000,
+  "credit-plan-reviewer": 10 * 60 * 1000,
+  "credit-executor": 20 * 60 * 1000,
+  "credit-tester": 15 * 60 * 1000,
+  "credit-server": 10 * 60 * 1000,
+}
+
 export const DEFAULT_SYNC_POLL_TIMEOUT_MS = DEFAULT_POLL_TIMEOUT_MS
 
 export function getDefaultSyncPollTimeoutMs(): number {
@@ -43,4 +51,9 @@ export function __setTimingConfig(overrides: Partial<ReturnType<typeof getTiming
   if (overrides.WAIT_FOR_SESSION_TIMEOUT_MS !== undefined) WAIT_FOR_SESSION_TIMEOUT_MS = overrides.WAIT_FOR_SESSION_TIMEOUT_MS
   if (overrides.MAX_POLL_TIME_MS !== undefined) MAX_POLL_TIME_MS = overrides.MAX_POLL_TIME_MS
   if (overrides.SESSION_CONTINUATION_STABILITY_MS !== undefined) SESSION_CONTINUATION_STABILITY_MS = overrides.SESSION_CONTINUATION_STABILITY_MS
+}
+
+export function getAgentSpecificTimeout(agentName: string): number {
+  const normalizedName = agentName.toLowerCase().replace(/[_-]/g, "-")
+  return AGENT_SPECIFIC_TIMEOUTS[normalizedName] ?? MAX_POLL_TIME_MS
 }

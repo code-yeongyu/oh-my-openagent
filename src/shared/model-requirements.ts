@@ -170,6 +170,62 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.4", variant: "medium" },
     ],
   },
+  "credit-planner": {
+    fallbackChain: [
+      {
+        providers: ["anthropic", "github-copilot", "opencode"],
+        model: "claude-opus-4-6",
+        variant: "max",
+      },
+      { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.4", variant: "high" },
+    ],
+  },
+  "credit-plan-reviewer": {
+    fallbackChain: [
+      {
+        providers: ["openai", "github-copilot", "opencode"],
+        model: "gpt-5.4",
+        variant: "xhigh",
+      },
+      {
+        providers: ["anthropic", "github-copilot", "opencode"],
+        model: "claude-opus-4-6",
+        variant: "max",
+      },
+    ],
+  },
+  "credit-executor": {
+    fallbackChain: [
+      {
+        providers: ["openai", "venice", "opencode"],
+        model: "gpt-5.3-codex",
+        variant: "medium",
+      },
+      {
+        providers: ["anthropic", "github-copilot", "opencode"],
+        model: "claude-opus-4-6",
+        variant: "max",
+      },
+    ],
+  },
+  "credit-tester": {
+    fallbackChain: [
+      {
+        providers: ["anthropic", "github-copilot", "opencode"],
+        model: "claude-sonnet-4-6",
+      },
+      { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.4", variant: "medium" },
+    ],
+  },
+  "credit-server": {
+    fallbackChain: [
+      {
+        providers: ["anthropic", "github-copilot", "opencode"],
+        model: "claude-sonnet-4-6",
+      },
+      { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.4", variant: "medium" },
+    ],
+  },
 };
 
 export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {

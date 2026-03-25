@@ -104,6 +104,45 @@ export function isGeminiModel(model: string): boolean {
   return modelName.startsWith("gemini-");
 }
 
+const KIMI_PROVIDERS = ["kimi-for-coding/", "kimi/", "moonshot/"];
+
+export function isKimiModel(model: string): boolean {
+  if (KIMI_PROVIDERS.some((prefix) => model.startsWith(prefix))) return true;
+
+  const modelName = extractModelName(model).toLowerCase();
+  return (
+    modelName.startsWith("kimi-") ||
+    modelName.startsWith("k2p5") ||
+    modelName.startsWith("k2.5")
+  );
+}
+
+const GLM_PROVIDERS = ["z.ai/", "glm/"];
+
+export function isGlmModel(model: string): boolean {
+  if (GLM_PROVIDERS.some((prefix) => model.startsWith(prefix))) return true;
+
+  const modelName = extractModelName(model).toLowerCase();
+  return (
+    modelName.startsWith("glm-") ||
+    modelName.startsWith("glm") ||
+    modelName.includes("glm")
+  );
+}
+
+const MINIMAX_PROVIDERS = ["minimax/", "minimaxai/"];
+
+export function isMinimaxModel(model: string): boolean {
+  if (MINIMAX_PROVIDERS.some((prefix) => model.startsWith(prefix))) return true;
+
+  const modelName = extractModelName(model).toLowerCase();
+  return (
+    modelName.startsWith("minimax-") ||
+    modelName.startsWith("minimax") ||
+    modelName.includes("minimax")
+  );
+}
+
 export type BuiltinAgentName =
   | "sisyphus"
   | "hephaestus"
@@ -113,7 +152,12 @@ export type BuiltinAgentName =
   | "multimodal-looker"
   | "metis"
   | "momus"
-  | "atlas";
+  | "atlas"
+  | "credit-planner"
+  | "credit-executor"
+  | "credit-tester"
+  | "credit-server"
+  | "credit-plan-reviewer";
 
 export type OverridableAgentName = "build" | BuiltinAgentName;
 

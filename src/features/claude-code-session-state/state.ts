@@ -20,6 +20,7 @@ export function _resetForTesting(): void {
 }
 
 const sessionAgentMap = new Map<string, string>()
+const sessionMemoryBankContext = new Map<string, string>()
 
 export function setSessionAgent(sessionID: string, agent: string): void {
   if (!sessionAgentMap.has(sessionID)) {
@@ -37,4 +38,16 @@ export function getSessionAgent(sessionID: string): string | undefined {
 
 export function clearSessionAgent(sessionID: string): void {
   sessionAgentMap.delete(sessionID)
+}
+
+export function setSessionMemoryBankContext(sessionID: string, context: string): void {
+  sessionMemoryBankContext.set(sessionID, context)
+}
+
+export function getSessionMemoryBankContext(sessionID: string): string | undefined {
+  return sessionMemoryBankContext.get(sessionID)
+}
+
+export function clearSessionMemoryBankContext(sessionID: string): void {
+  sessionMemoryBankContext.delete(sessionID)
 }
