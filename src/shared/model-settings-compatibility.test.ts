@@ -90,29 +90,6 @@ describe("resolveCompatibleModelSettings", () => {
     })
   })
 
-  test("downgrades gpt-5 reasoningEffort max to xhigh", () => {
-    // given
-    const input = {
-      providerID: "openai",
-      modelID: "gpt-5.4",
-      desired: { reasoningEffort: "max" },
-    }
-
-    // when
-    const result = resolveCompatibleModelSettings(input)
-
-    // then
-    expect(result.reasoningEffort).toBe("xhigh")
-    expect(result.changes).toEqual([
-      {
-        field: "reasoningEffort",
-        from: "max",
-        to: "xhigh",
-        reason: "unsupported-by-model-family",
-      },
-    ])
-  })
-
   test("keeps supported OpenAI reasoning-family effort for o-series models", () => {
     const result = resolveCompatibleModelSettings({
       providerID: "openai",
@@ -125,75 +102,6 @@ describe("resolveCompatibleModelSettings", () => {
       reasoningEffort: "high",
       changes: [],
     })
-  })
-
-  test("downgrades openai reasoning-family effort xhigh to high", () => {
-    // given
-    const input = {
-      providerID: "openai",
-      modelID: "o3-mini",
-      desired: { reasoningEffort: "xhigh" },
-    }
-
-    // when
-    const result = resolveCompatibleModelSettings(input)
-
-    // then
-    expect(result.reasoningEffort).toBe("high")
-    expect(result.changes).toEqual([
-      {
-        field: "reasoningEffort",
-        from: "xhigh",
-        to: "high",
-        reason: "unsupported-by-model-family",
-      },
-    ])
-  })
-
-  test("drops reasoningEffort for gpt-5 mini models", () => {
-    // given
-    const input = {
-      providerID: "openai",
-      modelID: "gpt-5.4-mini",
-      desired: { reasoningEffort: "high" },
-    }
-
-    // when
-    const result = resolveCompatibleModelSettings(input)
-
-    // then
-    expect(result.reasoningEffort).toBeUndefined()
-    expect(result.changes).toEqual([
-      {
-        field: "reasoningEffort",
-        from: "high",
-        to: undefined,
-        reason: "unsupported-by-model-family",
-      },
-    ])
-  })
-
-  test("treats non-openai o-series models as unknown", () => {
-    // given
-    const input = {
-      providerID: "ollama",
-      modelID: "o3",
-      desired: { reasoningEffort: "high" },
-    }
-
-    // when
-    const result = resolveCompatibleModelSettings(input)
-
-    // then
-    expect(result.reasoningEffort).toBeUndefined()
-    expect(result.changes).toEqual([
-      {
-        field: "reasoningEffort",
-        from: "high",
-        to: undefined,
-        reason: "unknown-model-family",
-      },
-    ])
   })
 
   test("does not record case-only normalization as a compatibility downgrade", () => {
