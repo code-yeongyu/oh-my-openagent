@@ -32,6 +32,41 @@ describe("discoverInstalledPlugins", () => {
     }
   })
 
+  it("preserves scoped package name from npm plugin keys", () => {
+    //#given
+    const pluginsHome = process.env.CLAUDE_PLUGINS_HOME as string
+    const installPath = join(createTemporaryDirectory("omo-plugin-install-"), "@myorg", "my-plugin")
+    mkdirSync(installPath, { recursive: true })
+
+    const databasePath = join(pluginsHome, "installed_plugins.json")
+    writeFileSync(
+      databasePath,
+      JSON.stringify({
+        version: 2,
+        plugins: {
+          "@myorg/my-plugin@1.0.0": [
+            {
+              scope: "user",
+              installPath,
+              version: "1.0.0",
+              installedAt: "2026-03-25T00:00:00Z",
+              lastUpdated: "2026-03-25T00:00:00Z",
+            },
+          ],
+        },
+      }),
+      "utf-8",
+    )
+
+    //#when
+    const discovered = discoverInstalledPlugins()
+
+    //#then
+    expect(discovered.errors).toHaveLength(0)
+    expect(discovered.plugins).toHaveLength(1)
+    expect(discovered.plugins[0]?.name).toBe("@myorg/my-plugin")
+  })
+
   it("derives package name from file URL plugin keys", () => {
     //#given
     const pluginsHome = process.env.CLAUDE_PLUGINS_HOME as string

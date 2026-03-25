@@ -81,7 +81,14 @@ function loadPluginManifest(installPath: string): PluginManifest | null {
 
 function derivePluginNameFromKey(pluginKey: string): string {
   const keyWithoutSource = pluginKey.startsWith("npm:") ? pluginKey.slice(4) : pluginKey
-  const versionSeparator = keyWithoutSource.lastIndexOf("@")
+
+  let versionSeparator: number
+  if (keyWithoutSource.startsWith("@")) {
+    const scopeEnd = keyWithoutSource.indexOf("/")
+    versionSeparator = scopeEnd > 0 ? keyWithoutSource.indexOf("@", scopeEnd) : -1
+  } else {
+    versionSeparator = keyWithoutSource.lastIndexOf("@")
+  }
   const keyWithoutVersion = versionSeparator > 0 ? keyWithoutSource.slice(0, versionSeparator) : keyWithoutSource
 
   if (keyWithoutVersion.startsWith("file://")) {
@@ -90,6 +97,10 @@ function derivePluginNameFromKey(pluginKey: string): string {
     } catch {
       return basename(keyWithoutVersion)
     }
+  }
+
+  if (keyWithoutVersion.startsWith("@") && keyWithoutVersion.includes("/")) {
+    return keyWithoutVersion
   }
 
   if (keyWithoutVersion.includes("/") || keyWithoutVersion.includes("\\")) {
