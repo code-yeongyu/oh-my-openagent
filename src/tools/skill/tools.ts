@@ -64,13 +64,18 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
     if (!force && cachedDescription) return cachedDescription
     const skills = await getSkills()
     const commands = getCommands()
-    const skillInfos = skills.map(loadedSkillToInfo)
+    // Exclude agent-restricted skills from the description: they must not be
+    // visible to agents that are not their designated owner.  The execute-time
+    // check already enforces the restriction at call time.
+    const publicSkills = skills.filter((s) => !s.definition.agent)
+    const skillInfos = publicSkills.map(loadedSkillToInfo)
     cachedDescription = formatCombinedDescription(skillInfos, commands)
     return cachedDescription
   }
 
   if (options.skills !== undefined) {
-    const skillInfos = options.skills.map(loadedSkillToInfo)
+    const publicSkills = options.skills.filter((s) => !s.definition.agent)
+    const skillInfos = publicSkills.map(loadedSkillToInfo)
     const commandsForDescription = options.commands ?? []
     let needsAsyncRefresh = false
 
