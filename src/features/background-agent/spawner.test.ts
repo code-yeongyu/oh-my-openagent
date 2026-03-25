@@ -1,5 +1,5 @@
 import { describe, test, expect, mock, afterEach } from "bun:test"
-import { startTask } from "./spawner"
+import { createTask, startTask } from "./spawner"
 import type { BackgroundTask } from "./types"
 import {
   clearSessionPromptParams,
