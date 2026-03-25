@@ -31,6 +31,20 @@ describe("runtime-fallback error classifier", () => {
     expect(signal).toBeDefined()
   })
 
+  test("detects too-many-requests auto-retry status signals without countdown text", () => {
+    //#given
+    const info = {
+      status:
+        "Too Many Requests: Sorry, you've exhausted this model's rate limit. Please try a different model.",
+    }
+
+    //#when
+    const signal = extractAutoRetrySignal(info)
+
+    //#then
+    expect(signal).toBeDefined()
+  })
+
   test("treats cooling-down retry messages as retryable", () => {
     //#given
     const error = {
