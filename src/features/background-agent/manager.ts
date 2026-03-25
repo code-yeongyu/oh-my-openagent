@@ -15,36 +15,8 @@ import {
   resolveInheritedPromptTools,
   createInternalAgentTextPart,
 } from "../../shared"
+import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
 import { setSessionTools } from "../../shared/session-tools-store"
-import { setSessionPromptParams } from "../../shared/session-prompt-params-state"
-
-type PromptParamsModel = {
-  reasoningEffort?: string
-  thinking?: { type: "enabled" | "disabled"; budgetTokens?: number }
-  maxTokens?: number
-  temperature?: number
-  top_p?: number
-}
-
-function applySessionPromptParams(sessionID: string, model: PromptParamsModel): void {
-  const promptOptions: Record<string, unknown> = {
-    ...(model.reasoningEffort ? { reasoningEffort: model.reasoningEffort } : {}),
-    ...(model.thinking ? { thinking: model.thinking } : {}),
-    ...(model.maxTokens !== undefined ? { maxTokens: model.maxTokens } : {}),
-  }
-
-  if (
-    model.temperature !== undefined ||
-    model.top_p !== undefined ||
-    Object.keys(promptOptions).length > 0
-  ) {
-    setSessionPromptParams(sessionID, {
-      ...(model.temperature !== undefined ? { temperature: model.temperature } : {}),
-      ...(model.top_p !== undefined ? { topP: model.top_p } : {}),
-      ...(Object.keys(promptOptions).length > 0 ? { options: promptOptions } : {}),
-    })
-  }
-}
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { ConcurrencyManager } from "./concurrency"
 import type { BackgroundTaskConfig, TmuxConfig } from "../../config/schema"

@@ -156,7 +156,9 @@ export function createChatParamsHandler(args: {
       providerID: normalizedInput.model.providerID,
       modelID: normalizedInput.model.modelID,
       desired: {
-        variant: normalizedInput.message.variant,
+        variant: typeof normalizedInput.message.variant === "string"
+          ? normalizedInput.message.variant
+          : undefined,
         reasoningEffort: typeof output.options.reasoningEffort === "string"
           ? output.options.reasoningEffort
           : undefined,

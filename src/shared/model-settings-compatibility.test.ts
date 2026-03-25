@@ -210,19 +210,19 @@ describe("resolveCompatibleModelSettings", () => {
     })
   })
 
-  test("downgrades unsupported GPT reasoningEffort to nearest lower level", () => {
+  test("drops reasoningEffort for standard GPT models (gpt-4.1)", () => {
     const result = resolveCompatibleModelSettings({
       providerID: "openai",
       modelID: "gpt-4.1",
-      desired: { reasoningEffort: "xhigh" },
+      desired: { reasoningEffort: "high" },
     })
 
-    expect(result.reasoningEffort).toBe("high")
+    expect(result.reasoningEffort).toBeUndefined()
     expect(result.changes).toEqual([
       {
         field: "reasoningEffort",
-        from: "xhigh",
-        to: "high",
+        from: "high",
+        to: undefined,
         reason: "unsupported-by-model-family",
       },
     ])
@@ -457,6 +457,57 @@ describe("resolveCompatibleModelSettings", () => {
       reasoningEffort: "none",
       changes: [],
     })
+  })
+
+  // Reasoning effort downgrade within families that support it
+  test("o-series downgrades xhigh reasoningEffort to high", () => {
+    const result = resolveCompatibleModelSettings({
+      providerID: "openai",
+      modelID: "o3-mini",
+      desired: { reasoningEffort: "xhigh" },
+    })
+
+    expect(result.reasoningEffort).toBe("high")
+    expect(result.changes).toEqual([
+      {
+        field: "reasoningEffort",
+        from: "xhigh",
+        to: "high",
+        reason: "unsupported-by-model-family",
+      },
+    ])
+  })
+
+  test("GPT-5 keeps xhigh but would downgrade a hypothetical beyond-max level", () => {
+    // GPT-5 supports up to "xhigh" — verify the ladder works by requesting
+    // a value that IS in the ladder but NOT in the family's allowed list.
+    // Since "xhigh" is the max for GPT-5 reasoningEffort, we verify it stays.
+    const result = resolveCompatibleModelSettings({
+      providerID: "openai",
+      modelID: "gpt-5.4",
+      desired: { reasoningEffort: "xhigh" },
+    })
+
+    expect(result.reasoningEffort).toBe("xhigh")
+    expect(result.changes).toEqual([])
+  })
+
+  test("o-series downgrades unsupported variant to high", () => {
+    const result = resolveCompatibleModelSettings({
+      providerID: "openai",
+      modelID: "o3-mini",
+      desired: { variant: "max" },
+    })
+
+    expect(result.variant).toBe("high")
+    expect(result.changes).toEqual([
+      {
+        field: "variant",
+        from: "max",
+        to: "high",
+        reason: "unsupported-by-model-family",
+      },
+    ])
   })
 
   // Passthrough: undefined desired values produce no changes

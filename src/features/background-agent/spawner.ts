@@ -2,7 +2,7 @@ import type { BackgroundTask, LaunchInput, ResumeInput } from "./types"
 import type { OpencodeClient, OnSubagentSessionCreated, QueueItem } from "./constants"
 import { TMUX_CALLBACK_DELAY_MS } from "./constants"
 import { log, getAgentToolRestrictions, promptWithModelSuggestionRetry, createInternalAgentTextPart } from "../../shared"
-import { setSessionPromptParams } from "../../shared/session-prompt-params-state"
+import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
 import { subagentSessions } from "../claude-code-session-state"
 import { getTaskToastManager } from "../task-toast-manager"
 import { isInsideTmux } from "../../shared/tmux"
@@ -136,25 +136,7 @@ export async function startTask(
     : undefined
   const launchVariant = input.model?.variant
 
-  if (input.model) {
-    const promptOptions: Record<string, unknown> = {
-      ...(input.model.reasoningEffort ? { reasoningEffort: input.model.reasoningEffort } : {}),
-      ...(input.model.thinking ? { thinking: input.model.thinking } : {}),
-      ...(input.model.maxTokens !== undefined ? { maxTokens: input.model.maxTokens } : {}),
-    }
-
-    if (
-      input.model.temperature !== undefined ||
-      input.model.top_p !== undefined ||
-      Object.keys(promptOptions).length > 0
-    ) {
-      setSessionPromptParams(sessionID, {
-        ...(input.model.temperature !== undefined ? { temperature: input.model.temperature } : {}),
-        ...(input.model.top_p !== undefined ? { topP: input.model.top_p } : {}),
-        ...(Object.keys(promptOptions).length > 0 ? { options: promptOptions } : {}),
-      })
-    }
-  }
+  applySessionPromptParams(sessionID, input.model)
 
   promptWithModelSuggestionRetry(client, {
     path: { id: sessionID },
@@ -244,25 +226,7 @@ export async function resumeTask(
     : undefined
   const resumeVariant = task.model?.variant
 
-  if (task.model) {
-    const promptOptions: Record<string, unknown> = {
-      ...(task.model.reasoningEffort ? { reasoningEffort: task.model.reasoningEffort } : {}),
-      ...(task.model.thinking ? { thinking: task.model.thinking } : {}),
-      ...(task.model.maxTokens !== undefined ? { maxTokens: task.model.maxTokens } : {}),
-    }
-
-    if (
-      task.model.temperature !== undefined ||
-      task.model.top_p !== undefined ||
-      Object.keys(promptOptions).length > 0
-    ) {
-      setSessionPromptParams(task.sessionID, {
-        ...(task.model.temperature !== undefined ? { temperature: task.model.temperature } : {}),
-        ...(task.model.top_p !== undefined ? { topP: task.model.top_p } : {}),
-        ...(Object.keys(promptOptions).length > 0 ? { options: promptOptions } : {}),
-      })
-    }
-  }
+  applySessionPromptParams(task.sessionID, task.model)
 
   client.session.promptAsync({
     path: { id: task.sessionID },
