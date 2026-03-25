@@ -205,7 +205,7 @@ When GitHub Copilot is the best available provider, oh-my-openagent uses these m
 
 | Agent         | Model                             |
 | ------------- | --------------------------------- |
-| **Sisyphus**  | `github-copilot/claude-opus-4-6`  |
+| **Sisyphus**  | `github-copilot/claude-opus-4.6`  |
 | **Oracle**    | `github-copilot/gpt-5.4`          |
 | **Explore**   | `github-copilot/grok-code-fast-1` |
 | **Librarian** | `github-copilot/gemini-3-flash`   |
