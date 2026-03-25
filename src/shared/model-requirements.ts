@@ -50,7 +50,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["github-copilot"], model: "gpt-5.4", variant: "medium" },
       { providers: ["minimax"], model: "MiniMax-M2.7" },
     ],
-    requiresProvider: ["openai", "github-copilot", "venice", "opencode"],
+    requiresProvider: ["openai", "github-copilot", "venice", "opencode", "minimax"],
   },
   oracle: {
     fallbackChain: [

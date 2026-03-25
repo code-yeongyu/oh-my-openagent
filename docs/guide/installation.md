@@ -78,7 +78,7 @@ Ask the user these questions to determine CLI options:
    - If **yes** → `--minimax=yes`
    - If **no** → `--minimax=no` (default)
 
-**Provider Priority**: Native (anthropic/, openai/, google/) > MiniMax > Kimi for Coding > GitHub Copilot > OpenCode Go > OpenCode Zen > Z.ai Coding Plan
+**Provider Priority**: Native (anthropic/, openai/, google/) > Kimi for Coding > GitHub Copilot > OpenCode Go > OpenCode Zen > Z.ai Coding Plan > MiniMax
 
 MUST STRONGLY WARNING, WHEN USER SAID THEY DON'T HAVE CLAUDE SUBSCRIPTION, SISYPHUS AGENT MIGHT NOT WORK IDEALLY.
 
