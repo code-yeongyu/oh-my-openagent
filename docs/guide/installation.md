@@ -416,7 +416,7 @@ GPT (5.3-codex, 5.2) > Claude Opus (decent fallback) > Gemini (acceptable)
 When multiple providers are available, oh-my-openagent uses this priority:
 
 ```
-Native (anthropic/, openai/, google/) > Kimi for Coding > GitHub Copilot > Venice > OpenCode Zen > Z.ai Coding Plan
+Native (anthropic/, openai/, google/) > Kimi for Coding > GitHub Copilot > Venice > OpenCode Zen > Z.ai Coding Plan > MiniMax
 ```
 
 ### ⚠️ Warning
