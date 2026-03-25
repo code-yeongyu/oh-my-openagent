@@ -148,6 +148,8 @@ export function createEventHandler(args: {
           body: { parts: Array<{ type: "text"; text: string }> };
           query: { directory: string };
         }) => Promise<unknown>;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        summarize: (...args: any[]) => Promise<unknown>;
       };
     };
   };
@@ -195,7 +197,6 @@ export function createEventHandler(args: {
     await Promise.resolve(hooks.claudeCodeHooks?.event?.(input));
     await Promise.resolve(hooks.backgroundNotificationHook?.event?.(input));
     await Promise.resolve(hooks.sessionNotification?.(input));
-    await Promise.resolve(hooks.gptPermissionContinuation?.handler?.(input));
     await Promise.resolve(hooks.todoContinuationEnforcer?.handler?.(input));
     await Promise.resolve(hooks.unstableAgentBabysitter?.event?.(input));
     await Promise.resolve(hooks.contextWindowMonitor?.event?.(input));
@@ -503,6 +504,17 @@ export function createEventHandler(args: {
             sessionID === getMainSessionID() &&
             !hooks.stopContinuationGuard?.isStopped(sessionID)
           ) {
+            // Trigger compaction before sending "continue" to avoid double-sending continuation
+            await pluginContext.client.session
+              .summarize({
+                path: { id: sessionID },
+                body: { auto: true },
+                query: { directory: pluginContext.directory },
+              })
+              .catch((err: unknown) => {
+                log("[event] compaction before recovery continue failed:", { sessionID, error: err });
+              });
+
             await pluginContext.client.session
               .prompt({
                 path: { id: sessionID },

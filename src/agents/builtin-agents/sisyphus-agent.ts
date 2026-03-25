@@ -52,7 +52,7 @@ export function maybeCreateSisyphusConfig(input: {
   if (disabledAgents.includes("sisyphus") || !meetsSisyphusAnyModelRequirement) return undefined
 
   let sisyphusResolution = applyModelResolution({
-    uiSelectedModel: sisyphusOverride?.model ? undefined : uiSelectedModel,
+    uiSelectedModel: sisyphusOverride?.model !== undefined ? undefined : uiSelectedModel,
     userModel: sisyphusOverride?.model,
     requirement: sisyphusRequirement,
     availableModels,

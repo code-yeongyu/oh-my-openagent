@@ -283,8 +283,6 @@ NOW.
 
 </ultrawork-mode>
 
----
-
 `
 
 export function getGeminiUltraworkMessage(): string {

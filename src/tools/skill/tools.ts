@@ -7,6 +7,7 @@ import { getAllSkills, extractSkillTemplate, clearSkillCache } from "../../featu
 import { injectGitMasterConfig } from "../../features/opencode-skill-loader/skill-content"
 import type { SkillMcpManager, SkillMcpClientInfo, SkillMcpServerContext } from "../../features/skill-mcp-manager"
 import type { Tool, Resource, Prompt } from "@modelcontextprotocol/sdk/types.js"
+import { sanitizeJsonSchema } from "../../plugin/normalize-tool-arg-schemas"
 import { discoverCommandsSync } from "../slashcommand/command-discovery"
 import type { CommandInfo } from "../slashcommand/types"
 import { formatLoadedCommand } from "../slashcommand/command-output-formatter"
@@ -155,7 +156,7 @@ async function formatMcpCapabilities(
           sections.push("")
           sections.push("**inputSchema:**")
           sections.push("```json")
-          sections.push(JSON.stringify(t.inputSchema, null, 2))
+          sections.push(JSON.stringify(sanitizeJsonSchema(t.inputSchema), null, 2))
           sections.push("```")
           sections.push("")
         }

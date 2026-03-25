@@ -1,6 +1,6 @@
 # Configuration Reference
 
-Complete reference for `oh-my-opencode.jsonc` configuration. This document covers every available option with examples.
+Complete reference for `oh-my-openagent.jsonc` configuration. This document covers every available option with examples.
 
 ---
 
@@ -53,13 +53,13 @@ Complete reference for `oh-my-opencode.jsonc` configuration. This document cover
 
 Priority order (project overrides user):
 
-1. `.opencode/oh-my-opencode.jsonc` / `.opencode/oh-my-opencode.json`
+1. `.opencode/oh-my-openagent.jsonc` / `.opencode/oh-my-openagent.json`
 2. User config (`.jsonc` preferred over `.json`):
 
 | Platform    | Path                                      |
 | ----------- | ----------------------------------------- |
-| macOS/Linux | `~/.config/opencode/oh-my-opencode.jsonc` |
-| Windows     | `%APPDATA%\opencode\oh-my-opencode.jsonc` |
+| macOS/Linux | `~/.config/opencode/oh-my-openagent.jsonc` |
+| Windows     | `%APPDATA%\opencode\oh-my-openagent.jsonc` |
 
 JSONC supports `// line comments`, `/* block comments */`, and trailing commas.
 
@@ -67,11 +67,11 @@ Enable schema autocomplete:
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json"
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-openagent.schema.json"
 }
 ```
 
-Run `bunx oh-my-opencode install` for guided setup. Run `opencode models` to list available models.
+Run `bunx oh-my-openagent install` for guided setup. Run `opencode models` to list available models.
 
 ### Quick Start Example
 
@@ -79,7 +79,7 @@ Here's a practical starting configuration:
 
 ```jsonc
 {
-  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json",
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-openagent.schema.json",
 
   "agents": {
     // Main orchestrator: Claude Opus or Kimi K2.5 work best
@@ -423,7 +423,7 @@ Available agents: `sisyphus`, `hephaestus`, `prometheus`, `athena`, `athena-juni
 | `ultrabrain`         | `openai/gpt-5.4` (xhigh)        | Deep logical reasoning, complex architecture   |
 | `deep`               | `openai/gpt-5.3-codex` (medium) | Autonomous problem-solving, thorough research  |
 | `artistry`           | `google/gemini-3.1-pro` (high)  | Creative/unconventional approaches             |
-| `quick`              | `anthropic/claude-haiku-4-5`    | Trivial tasks, typo fixes, single-file changes |
+| `quick`              | `openai/gpt-5.4-mini`           | Trivial tasks, typo fixes, single-file changes |
 | `unspecified-low`    | `anthropic/claude-sonnet-4-6`   | General tasks, low effort                      |
 | `unspecified-high`   | `anthropic/claude-opus-4-6` (max) | General tasks, high effort                   |
 | `writing`            | `google/gemini-3-flash`         | Documentation, prose, technical writing        |
@@ -483,12 +483,12 @@ Disable categories: `{ "disabled_categories": ["ultrabrain"] }`
 | **ultrabrain**         | `gpt-5.4`           | `gpt-5.4` → `gemini-3.1-pro` → `claude-opus-4-6`               |
 | **deep**               | `gpt-5.3-codex`     | `gpt-5.3-codex` → `claude-opus-4-6` → `gemini-3.1-pro`         |
 | **artistry**           | `gemini-3.1-pro`    | `gemini-3.1-pro` → `claude-opus-4-6` → `gpt-5.4`               |
-| **quick**              | `claude-haiku-4-5`  | `claude-haiku-4-5` → `gemini-3-flash` → `gpt-5-nano`           |
+| **quick**              | `gpt-5.4-mini`    | `gpt-5.4-mini` → `claude-haiku-4-5` → `gemini-3-flash` → `minimax-m2.5` → `gpt-5-nano` |
 | **unspecified-low**    | `claude-sonnet-4-6` | `claude-sonnet-4-6` → `gpt-5.3-codex` → `gemini-3-flash`       |
 | **unspecified-high**   | `claude-opus-4-6`   | `claude-opus-4-6` → `gpt-5.4 (high)` → `glm-5` → `k2p5` → `kimi-k2.5` |
 | **writing**            | `gemini-3-flash`    | `gemini-3-flash` → `claude-sonnet-4-6`                         |
 
-Run `bunx oh-my-opencode doctor --verbose` to see effective model resolution for your config.
+Run `bunx oh-my-openagent doctor --verbose` to see effective model resolution for your config.
 
 ---
 
@@ -615,15 +615,14 @@ Disable built-in skills: `{ "disabled_skills": ["playwright"] }`
 Disable built-in hooks via `disabled_hooks`:
 
 ```json
-{ "disabled_hooks": ["comment-checker", "gpt-permission-continuation"] }
+{ "disabled_hooks": ["comment-checker"] }
 ```
 
-Available hooks: `gpt-permission-continuation`, `todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `tool-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-context-window-limit-recovery`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `compaction-context-injector`, `thinking-block-validator`, `claude-code-hooks`, `ralph-loop`, `preemptive-compaction`, `auto-slash-command`, `sisyphus-junior-notepad`, `no-sisyphus-gpt`, `start-work`, `runtime-fallback`
+Available hooks: `todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `tool-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-context-window-limit-recovery`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `compaction-context-injector`, `thinking-block-validator`, `claude-code-hooks`, `ralph-loop`, `preemptive-compaction`, `auto-slash-command`, `sisyphus-junior-notepad`, `no-sisyphus-gpt`, `start-work`, `runtime-fallback`
 
 **Notes:**
 
 - `directory-agents-injector` — auto-disabled on OpenCode 1.1.37+ (native AGENTS.md support)
-- `gpt-permission-continuation` — resumes GPT sessions only when the last assistant reply ends with a permission-seeking tail like `If you want, ...`. Disable it if you prefer GPT sessions to wait for explicit user follow-up.
 - `no-sisyphus-gpt` — **do not disable**. It blocks incompatible GPT models for Sisyphus while allowing the dedicated GPT-5.4 prompt path.
 - `startup-toast` is a sub-feature of `auto-update-checker`. Disable just the toast by adding `startup-toast` to `disabled_hooks`.
 

@@ -39,7 +39,7 @@ export async function findAvailablePort(startPort: number = DEFAULT_PORT): Promi
 }
 
 export async function startCallbackServer(startPort: number = DEFAULT_PORT): Promise<CallbackServer> {
-  const port = await findAvailablePort(startPort)
+  const requestedPort = await findAvailablePort(startPort).catch(() => 0)
 
   let resolveCallback: ((result: OAuthCallbackResult) => void) | null = null
   let rejectCallback: ((error: Error) => void) | null = null
@@ -55,7 +55,7 @@ export async function startCallbackServer(startPort: number = DEFAULT_PORT): Pro
   }, TIMEOUT_MS)
 
   const server = Bun.serve({
-    port,
+    port: requestedPort,
     hostname: "127.0.0.1",
     fetch(request: Request): Response {
       const url = new URL(request.url)
@@ -93,9 +93,10 @@ export async function startCallbackServer(startPort: number = DEFAULT_PORT): Pro
       })
     },
   })
+  const activePort = server.port ?? requestedPort
 
   return {
-    port,
+    port: activePort,
     waitForCallback: () => callbackPromise,
     close: () => {
       clearTimeout(timeoutId)

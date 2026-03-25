@@ -248,8 +248,7 @@ exports[`generateModelConfig single native provider uses OpenAI models when only
       "variant": "medium",
     },
     "quick": {
-      "model": "openai/gpt-5.3-codex",
-      "variant": "low",
+      "model": "openai/gpt-5.4-mini",
     },
     "ultrabrain": {
       "model": "openai/gpt-5.4",
@@ -334,8 +333,7 @@ exports[`generateModelConfig single native provider uses OpenAI models with isMa
       "variant": "medium",
     },
     "quick": {
-      "model": "openai/gpt-5.3-codex",
-      "variant": "low",
+      "model": "openai/gpt-5.4-mini",
     },
     "ultrabrain": {
       "model": "openai/gpt-5.4",
@@ -551,7 +549,7 @@ exports[`generateModelConfig all native providers uses preferred models from fal
       "variant": "medium",
     },
     "quick": {
-      "model": "anthropic/claude-haiku-4-5",
+      "model": "openai/gpt-5.4-mini",
     },
     "ultrabrain": {
       "model": "openai/gpt-5.4",
@@ -644,7 +642,7 @@ exports[`generateModelConfig all native providers uses preferred models with isM
       "variant": "medium",
     },
     "quick": {
-      "model": "anthropic/claude-haiku-4-5",
+      "model": "openai/gpt-5.4-mini",
     },
     "ultrabrain": {
       "model": "openai/gpt-5.4",
@@ -720,7 +718,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
       "variant": "medium",
     },
     "quick": {
-      "model": "opencode/claude-haiku-4-5",
+      "model": "opencode/gpt-5.4-mini",
     },
     "ultrabrain": {
       "model": "opencode/gpt-5.4",
@@ -795,7 +793,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
       "variant": "medium",
     },
     "quick": {
-      "model": "opencode/claude-haiku-4-5",
+      "model": "opencode/gpt-5.4-mini",
     },
     "ultrabrain": {
       "model": "opencode/gpt-5.4",
@@ -866,7 +864,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models when 
       "variant": "high",
     },
     "quick": {
-      "model": "github-copilot/claude-haiku-4.5",
+      "model": "github-copilot/gpt-5.4-mini",
     },
     "ultrabrain": {
       "model": "github-copilot/gemini-3.1-pro-preview",
@@ -936,7 +934,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
       "variant": "high",
     },
     "quick": {
-      "model": "github-copilot/claude-haiku-4.5",
+      "model": "github-copilot/gpt-5.4-mini",
     },
     "ultrabrain": {
       "model": "github-copilot/gemini-3.1-pro-preview",
@@ -1128,7 +1126,7 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
       "variant": "medium",
     },
     "quick": {
-      "model": "anthropic/claude-haiku-4-5",
+      "model": "opencode/gpt-5.4-mini",
     },
     "ultrabrain": {
       "model": "opencode/gpt-5.4",
@@ -1203,7 +1201,7 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
       "variant": "medium",
     },
     "quick": {
-      "model": "github-copilot/claude-haiku-4.5",
+      "model": "openai/gpt-5.4-mini",
     },
     "ultrabrain": {
       "model": "openai/gpt-5.4",
@@ -1425,7 +1423,7 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
       "variant": "medium",
     },
     "quick": {
-      "model": "github-copilot/claude-haiku-4.5",
+      "model": "github-copilot/gpt-5.4-mini",
     },
     "ultrabrain": {
       "model": "opencode/gpt-5.4",
@@ -1521,7 +1519,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
       "variant": "medium",
     },
     "quick": {
-      "model": "anthropic/claude-haiku-4-5",
+      "model": "openai/gpt-5.4-mini",
     },
     "ultrabrain": {
       "model": "openai/gpt-5.4",
@@ -1617,7 +1615,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
       "variant": "medium",
     },
     "quick": {
-      "model": "anthropic/claude-haiku-4-5",
+      "model": "openai/gpt-5.4-mini",
     },
     "ultrabrain": {
       "model": "openai/gpt-5.4",

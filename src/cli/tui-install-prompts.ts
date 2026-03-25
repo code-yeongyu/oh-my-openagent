@@ -54,7 +54,7 @@ export async function promptInstallConfig(detected: DetectedConfig): Promise<Ins
     message: "Will you integrate Google Gemini?",
     options: [
       { value: "no", label: "No", hint: "Frontend/docs agents will use fallback" },
-      { value: "yes", label: "Yes", hint: "Beautiful UI generation with Gemini 3 Pro" },
+      { value: "yes", label: "Yes", hint: "Beautiful UI generation with Gemini 3.1 Pro" },
     ],
     initialValue: initial.gemini,
   })

@@ -1,8 +1,8 @@
-# Oh-My-OpenCode Features Reference
+# Oh-My-OpenAgent Features Reference
 
 ## Agents
 
-Oh-My-OpenCode provides 11 specialized AI agents. Each has distinct expertise, optimized models, and tool permissions.
+Oh-My-OpenAgent provides 11 specialized AI agents. Each has distinct expertise, optimized models, and tool permissions.
 
 ### Core Agents
 
@@ -90,7 +90,7 @@ When running inside tmux:
 - Each pane shows agent output live
 - Auto-cleanup when agents complete
 
-Customize agent models, prompts, and permissions in `oh-my-opencode.json`.
+Customize agent models, prompts, and permissions in `oh-my-openagent.json`.
 
 ## Category System
 
@@ -111,7 +111,7 @@ By combining these two concepts, you can generate optimal agents through `task`.
 | `ultrabrain`         | `openai/gpt-5.4` (xhigh)        | Deep logical reasoning, complex architecture decisions requiring extensive analysis                                         |
 | `deep`               | `openai/gpt-5.3-codex` (medium) | Goal-oriented autonomous problem-solving. Thorough research before action. For hairy problems requiring deep understanding. |
 | `artistry`           | `google/gemini-3.1-pro` (high)  | Highly creative/artistic tasks, novel ideas                                                                                 |
-| `quick`              | `anthropic/claude-haiku-4-5`    | Trivial tasks - single file changes, typo fixes, simple modifications                                                       |
+| `quick`              | `openai/gpt-5.4-mini`           | Trivial tasks - single file changes, typo fixes, simple modifications                                                       |
 | `unspecified-low`    | `anthropic/claude-sonnet-4-6`   | Tasks that don't fit other categories, low effort required                                                                  |
 | `unspecified-high`   | `anthropic/claude-opus-4-6` (max) | Tasks that don't fit other categories, high effort required                                                               |
 | `writing`            | `google/gemini-3-flash`         | Documentation, prose, technical writing                                                                                     |
@@ -129,7 +129,7 @@ task({
 
 ### Custom Categories
 
-You can define custom categories in `oh-my-opencode.json`.
+You can define custom categories in `oh-my-openagent.json`.
 
 #### Category Configuration Schema
 
@@ -237,7 +237,7 @@ Skills provide specialized workflows with embedded MCP servers and detailed inst
 
 ### Browser Automation Options
 
-Oh-My-OpenCode provides two browser automation providers, configurable via `browser_automation_engine.provider`.
+Oh-My-OpenAgent provides two browser automation providers, configurable via `browser_automation_engine.provider`.
 
 #### Option 1: Playwright MCP (Default)
 
@@ -558,7 +558,7 @@ Requires `experimental.task_system: true` in config.
 
 #### Task System Details
 
-**Note on Claude Code Alignment**: This implementation follows Claude Code's internal Task tool signatures (`TaskCreate`, `TaskUpdate`, `TaskList`, `TaskGet`) and field naming conventions (`subject`, `blockedBy`, `blocks`, etc.). However, Anthropic has not published official documentation for these tools. This is Oh My OpenCode's own implementation based on observed Claude Code behavior and internal specifications.
+**Note on Claude Code Alignment**: This implementation follows Claude Code's internal Task tool signatures (`TaskCreate`, `TaskUpdate`, `TaskList`, `TaskGet`) and field naming conventions (`subject`, `blockedBy`, `blocks`, etc.). However, Anthropic has not published official documentation for these tools. This is Oh My OpenAgent's own implementation based on observed Claude Code behavior and internal specifications.
 
 **Task Schema**:
 
@@ -680,7 +680,6 @@ Hooks intercept and modify behavior at key points in the agent lifecycle across 
 | **ralph-loop**              | Event + Message     | Manages self-referential loop continuation.                                                                                                                 |
 | **start-work**              | Message             | Handles /start-work command execution.                                                                                                                      |
 | **auto-slash-command**      | Message             | Automatically executes slash commands from prompts.                                                                                                         |
-| **gpt-permission-continuation** | Event           | Auto-continues GPT sessions when the final assistant reply ends with a permission-seeking tail such as `If you want, ...`.                               |
 | **stop-continuation-guard** | Event + Message     | Guards the stop-continuation mechanism.                                                                                                                     |
 | **category-skill-reminder** | Event + PostToolUse | Reminds agents about available category skills for delegation.                                                                                              |
 | **anthropic-effort**        | Params              | Adjusts Anthropic API effort level based on context.                                                                                                        |
@@ -735,7 +734,6 @@ Hooks intercept and modify behavior at key points in the agent lifecycle across 
 
 | Hook                           | Event | Description                                                |
 | ------------------------------ | ----- | ---------------------------------------------------------- |
-| **gpt-permission-continuation** | Event | Continues GPT replies that end in a permission-seeking tail. |
 | **todo-continuation-enforcer** | Event | Enforces todo completion — yanks idle agents back to work. |
 | **compaction-todo-preserver**  | Event | Preserves todo state during session compaction.            |
 | **unstable-agent-babysitter**  | Event | Handles unstable agent behavior with recovery strategies.  |
@@ -787,11 +785,9 @@ Disable specific hooks in config:
 
 ```json
 {
-  "disabled_hooks": ["comment-checker", "gpt-permission-continuation"]
+  "disabled_hooks": ["comment-checker"]
 }
 ```
-
-Use `gpt-permission-continuation` when you want GPT sessions to stop at permission-seeking endings instead of auto-resuming.
 
 ## MCPs
 
@@ -848,7 +844,7 @@ When a skill MCP has `oauth` configured:
 Pre-authenticate via CLI:
 
 ```bash
-bunx oh-my-opencode mcp oauth login <server-name> --server-url https://api.example.com
+bunx oh-my-openagent mcp oauth login <server-name> --server-url https://api.example.com
 ```
 
 ## Context Injection

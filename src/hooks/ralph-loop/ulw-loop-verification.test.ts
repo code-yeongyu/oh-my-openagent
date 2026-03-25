@@ -366,7 +366,7 @@ describe("ulw-loop verification", () => {
 		expect(toastCalls.some((toast) => toast.title === "ULTRAWORK LOOP COMPLETE!")).toBe(false)
 	})
 
-	test("#given parent session emits VERIFIED #when oracle session is not tracked #then ulw loop continues instead of completing", async () => {
+	test("#given parent session emits VERIFIED #when oracle session is not tracked #then ulw loop completes from parent session evidence", async () => {
 		const hook = createRalphLoopHook(createMockPluginInput(), {
 			getTranscriptPath: (sessionID) => sessionID === "ses-oracle" ? oracleTranscriptPath : parentTranscriptPath,
 		})
@@ -379,17 +379,13 @@ describe("ulw-loop verification", () => {
 		await hook.event({ event: { type: "session.idle", properties: { sessionID: "session-123" } } })
 		writeFileSync(
 			parentTranscriptPath,
-			`${JSON.stringify({ type: "tool_result", timestamp: new Date().toISOString(), tool_output: { output: "done <promise>DONE</promise>" } })}\n${JSON.stringify({ type: "tool_result", timestamp: new Date().toISOString(), tool_output: { output: `bad parent leak <promise>${ULTRAWORK_VERIFICATION_PROMISE}</promise>` } })}\n`,
+			`${JSON.stringify({ type: "tool_result", timestamp: new Date().toISOString(), tool_output: { output: "done <promise>DONE</promise>" } })}\n${JSON.stringify({ type: "tool_result", timestamp: new Date().toISOString(), tool_output: { output: `verified <promise>${ULTRAWORK_VERIFICATION_PROMISE}</promise>` } })}\n`,
 		)
 
 		await hook.event({ event: { type: "session.idle", properties: { sessionID: "session-123" } } })
 
-		expect(hook.getState()).not.toBeNull()
-		expect(hook.getState()?.iteration).toBe(2)
-		expect(hook.getState()?.completion_promise).toBe("DONE")
-		expect(hook.getState()?.verification_pending).toBeUndefined()
-		expect(promptCalls).toHaveLength(2)
-		expect(promptCalls[1]?.text).toContain("Verification failed")
+		expect(hook.getState()).toBeNull()
+		expect(toastCalls.some((toast) => toast.title === "ULTRAWORK LOOP COMPLETE!")).toBe(true)
 	})
 
 	test("#given oracle verification fails #when loop restarts #then old oracle session is aborted", async () => {

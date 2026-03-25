@@ -166,8 +166,6 @@ A task is complete when:
 
 </ultrawork-mode>
 
----
-
 `;
 
 export function getGptUltraworkMessage(): string {

@@ -5,7 +5,6 @@ export interface TodoContinuationEnforcerOptions {
   backgroundManager?: BackgroundManager
   skipAgents?: string[]
   isContinuationStopped?: (sessionID: string) => boolean
-  shouldSkipContinuation?: (sessionID: string) => boolean
 }
 
 export interface TodoContinuationEnforcer {
@@ -36,6 +35,8 @@ export interface SessionState {
   stagnationCount: number
   consecutiveFailures: number
   recentCompactionAt?: number
+  recentCompactionEpoch?: number
+  acknowledgedCompactionEpoch?: number
 }
 
 export interface MessageInfo {

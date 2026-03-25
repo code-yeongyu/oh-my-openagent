@@ -5,6 +5,17 @@
 > 양해와 응원에 감사드립니다.
 
 > [!TIP]
+> **Building in Public**
+>
+> 메인테이너가 Jobdori를 통해 oh-my-opencode를 실시간으로 개발하고 있습니다. Jobdori는 OpenClaw를 기반으로 대폭 커스터마이징된 AI 어시스턴트입니다.
+> 모든 기능 개발, 버그 수정, 이슈 트리아지를 Discord에서 실시간으로 확인하세요.
+>
+> [![Building in Public](./.github/assets/building-in-public.png)](https://discord.gg/PUwSMR9XNk)
+>
+> [**→ #building-in-public에서 확인하기**](https://discord.gg/PUwSMR9XNk)
+
+
+> [!TIP]
 > 저희와 함께 하세요!
 >
 > | [<img alt="Discord link" src="https://img.shields.io/discord/1452487457085063218?color=5865F2&label=discord&labelColor=black&logo=discord&logoColor=white&style=flat-square" width="156px" />](https://discord.gg/PUwSMR9XNk) | [Discord 커뮤니티](https://discord.gg/PUwSMR9XNk)에 가입하여 기여자 및 다른 `oh-my-opencode` 사용자들과 소통하세요. |

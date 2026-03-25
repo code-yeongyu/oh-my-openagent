@@ -7,7 +7,7 @@ import {
   getOpenCodeConfigDir,
   addConfigLoadError,
   parseJsonc,
-  detectConfigFile,
+  detectPluginConfigFile,
   migrateConfigFile,
 } from "./shared";
 
@@ -162,20 +162,19 @@ export function loadPluginConfig(
 ): OhMyOpenCodeConfig {
   // User-level config path - prefer .jsonc over .json
   const configDir = getOpenCodeConfigDir({ binary: "opencode" });
-  const userBasePath = path.join(configDir, "oh-my-opencode");
-  const userDetected = detectConfigFile(userBasePath);
+  const userDetected = detectPluginConfigFile(configDir);
   const userConfigPath =
     userDetected.format !== "none"
       ? userDetected.path
-      : userBasePath + ".json";
+      : path.join(configDir, "oh-my-opencode.json");
 
   // Project-level config path - prefer .jsonc over .json
-  const projectBasePath = path.join(directory, ".opencode", "oh-my-opencode");
-  const projectDetected = detectConfigFile(projectBasePath);
+  const projectBasePath = path.join(directory, ".opencode");
+  const projectDetected = detectPluginConfigFile(projectBasePath);
   const projectConfigPath =
     projectDetected.format !== "none"
       ? projectDetected.path
-      : projectBasePath + ".json";
+      : path.join(projectBasePath, "oh-my-opencode.json");
 
   // Load user config first (base)
   let config: OhMyOpenCodeConfig =

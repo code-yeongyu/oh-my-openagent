@@ -7,7 +7,7 @@ const OPENAI_ONLY_AGENT_OVERRIDES: Record<string, AgentConfig> = {
 
 const OPENAI_ONLY_CATEGORY_OVERRIDES: Record<string, CategoryConfig> = {
   artistry: { model: "openai/gpt-5.4", variant: "xhigh" },
-  quick: { model: "openai/gpt-5.3-codex", variant: "low" },
+  quick: { model: "openai/gpt-5.4-mini" },
   "visual-engineering": { model: "openai/gpt-5.4", variant: "high" },
   writing: { model: "openai/gpt-5.4", variant: "medium" },
 }

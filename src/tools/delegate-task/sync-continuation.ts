@@ -85,10 +85,10 @@ export async function executeSyncContinuation(
     const allowTask = isPlanFamily(resumeAgent)
     const effectivePrompt = buildTaskPrompt(args.prompt, resumeAgent)
     const tools = {
-      ...(resumeAgent ? getAgentToolRestrictions(resumeAgent) : {}),
       task: allowTask,
       call_omo_agent: true,
       question: false,
+      ...(resumeAgent ? getAgentToolRestrictions(resumeAgent) : {}),
     }
     setSessionTools(args.session_id!, tools)
 

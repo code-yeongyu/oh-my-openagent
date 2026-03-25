@@ -585,3 +585,123 @@ describe("createEventHandler - retry dedupe lifecycle", () => {
 		expect(promptCalls).toEqual([sessionID, sessionID])
 	})
 })
+
+describe("createEventHandler - session recovery compaction", () => {
+	it("triggers compaction before sending continue after session error recovery", async () => {
+		//#given
+		const sessionID = "ses_recovery_compaction"
+		setMainSession(sessionID)
+		const callOrder: string[] = []
+
+		const eventHandler = createEventHandler({
+			ctx: {
+				directory: "/tmp",
+				client: {
+					session: {
+						abort: async () => ({}),
+						summarize: async () => {
+							callOrder.push("summarize")
+							return {}
+						},
+						prompt: async () => {
+							callOrder.push("prompt")
+							return {}
+						},
+					},
+				},
+			} as any,
+			pluginConfig: {} as any,
+			firstMessageVariantGate: {
+				markSessionCreated: () => {},
+				clear: () => {},
+			},
+			managers: {
+				tmuxSessionManager: {
+					onSessionCreated: async () => {},
+					onSessionDeleted: async () => {},
+				},
+			} as any,
+			hooks: {
+				sessionRecovery: {
+					isRecoverableError: () => true,
+					handleSessionRecovery: async () => true,
+				},
+				stopContinuationGuard: { isStopped: () => false },
+			} as any,
+		})
+
+		//#when
+		await eventHandler({
+			event: {
+				type: "session.error",
+				properties: {
+					sessionID,
+					messageID: "msg_123",
+					error: { name: "Error", message: "tool_result block(s) that are not immediately" },
+				},
+			},
+		} as any)
+
+		//#then - summarize (compaction) must be called before prompt (continue)
+		expect(callOrder).toEqual(["summarize", "prompt"])
+	})
+
+	it("sends continue even if compaction fails", async () => {
+		//#given
+		const sessionID = "ses_recovery_compaction_fail"
+		setMainSession(sessionID)
+		const callOrder: string[] = []
+
+		const eventHandler = createEventHandler({
+			ctx: {
+				directory: "/tmp",
+				client: {
+					session: {
+						abort: async () => ({}),
+						summarize: async () => {
+							callOrder.push("summarize")
+							throw new Error("compaction failed")
+						},
+						prompt: async () => {
+							callOrder.push("prompt")
+							return {}
+						},
+					},
+				},
+			} as any,
+			pluginConfig: {} as any,
+			firstMessageVariantGate: {
+				markSessionCreated: () => {},
+				clear: () => {},
+			},
+			managers: {
+				tmuxSessionManager: {
+					onSessionCreated: async () => {},
+					onSessionDeleted: async () => {},
+				},
+			} as any,
+			hooks: {
+				sessionRecovery: {
+					isRecoverableError: () => true,
+					handleSessionRecovery: async () => true,
+				},
+				stopContinuationGuard: { isStopped: () => false },
+			} as any,
+		})
+
+		//#when
+		await eventHandler({
+			event: {
+				type: "session.error",
+				properties: {
+					sessionID,
+					messageID: "msg_456",
+					error: { name: "Error", message: "tool_result block(s) that are not immediately" },
+				},
+			},
+		} as any)
+
+		//#then - continue is still sent even when compaction fails
+		expect(callOrder).toEqual(["summarize", "prompt"])
+	})
+})

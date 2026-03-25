@@ -168,6 +168,26 @@ describe("session-manager storage", () => {
     expect(todos).toEqual([])
   })
 
+  test("readSessionTodos only reads the exact session todo file", async () => {
+    // given
+    writeFileSync(
+      join(TEST_TODO_DIR, "ses_1.json"),
+      JSON.stringify([{ id: "todo_exact", content: "Exact match", status: "pending" }]),
+    )
+    writeFileSync(
+      join(TEST_TODO_DIR, "ses_10.json"),
+      JSON.stringify([{ id: "todo_collision", content: "Wrong session", status: "completed" }]),
+    )
+
+    // when
+    const todos = await readSessionTodos("ses_1")
+
+    // then
+    expect(todos).toHaveLength(1)
+    expect(todos[0].id).toBe("todo_exact")
+    expect(todos[0].content).toBe("Exact match")
+  })
+
   test("getSessionInfo returns null for non-existent session", async () => {
     // when
     const info = await getSessionInfo("ses_nonexistent")

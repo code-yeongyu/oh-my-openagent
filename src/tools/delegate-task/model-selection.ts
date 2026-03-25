@@ -3,6 +3,7 @@ import { normalizeModel } from "../../shared/model-normalization"
 import { fuzzyMatchModel } from "../../shared/model-availability"
 import { transformModelForProvider } from "../../shared/provider-model-id-transform"
 import { hasConnectedProvidersCache, hasProviderModelsCache } from "../../shared/connected-providers-cache"
+import { log } from "../../shared/logger"
 import { parseModelString, parseVariantFromModelID } from "./model-string-parser"
 
 function isExplicitHighModel(model: string): boolean {
@@ -48,6 +49,7 @@ export function resolveModelForDelegateTask(input: {
   userModel?: string
   userFallbackModels?: string[]
   categoryDefaultModel?: string
+  isUserConfiguredCategoryModel?: boolean
   fallbackChain?: FallbackEntry[]
   availableModels: Set<string>
   systemDefaultModel?: string
@@ -67,6 +69,13 @@ export function resolveModelForDelegateTask(input: {
   const explicitHighBaseModel = categoryDefault ? getExplicitHighBaseModel(categoryDefault) : null
   const explicitHighModel = explicitHighBaseModel ? categoryDefault : undefined
   if (categoryDefault) {
+    if (input.isUserConfiguredCategoryModel) {
+      log("[resolveModelForDelegateTask] using user-configured category model (bypass validation)", {
+        categoryDefaultModel: categoryDefault,
+      })
+      return { model: categoryDefault }
+    }
+
     if (input.availableModels.size === 0) {
       return { model: categoryDefault }
     }

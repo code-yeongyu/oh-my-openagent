@@ -52,8 +52,6 @@ export function createNonInteractiveEnvHook(_ctx: PluginInput) {
       // The env vars (GIT_EDITOR=:, EDITOR=:, etc.) must ALWAYS be injected
       // for git commands to prevent interactive prompts.
 
-      // The bash tool always runs in a Unix-like shell (bash/sh), even on Windows
-      // (via Git Bash, WSL, etc.), so always use unix export syntax.
       const envPrefix = buildEnvPrefix(NON_INTERACTIVE_ENV, "unix")
       
       // Check if the command already starts with the prefix to avoid stacking.

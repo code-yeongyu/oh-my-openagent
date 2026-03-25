@@ -8,7 +8,7 @@ Think of AI models as developers on a team. Each has a different brain, differen
 
 This isn't a bug. It's the foundation of the entire system.
 
-Oh My OpenCode assigns each agent a model that matches its _working style_ — like building a team where each person is in the role that fits their personality.
+Oh My OpenAgent assigns each agent a model that matches its _working style_ — like building a team where each person is in the role that fits their personality.
 
 ### Sisyphus: The Sociable Lead
 
@@ -121,6 +121,7 @@ Principle-driven, explicit reasoning, deep technical capability. Best for agents
 | ----------------- | ----------------------------------------------------------------------------------------------- |
 | **GPT-5.3 Codex** | Deep coding powerhouse. Autonomous exploration. Required for Hephaestus.                        |
 | **GPT-5.4**       | High intelligence, strategic reasoning. Default for Oracle, Momus, and a key fallback for Prometheus / Atlas. Uses xhigh variant for Momus. |
+| **GPT-5.4 Mini**  | Fast + strong reasoning. Good for lightweight autonomous tasks. Default for quick category. |
 | **GPT-5-Nano**    | Ultra-cheap, fast. Good for simple utility tasks.                                               |
 
 ### Other Models
@@ -170,7 +171,7 @@ When agents delegate work, they don't pick a model name — they pick a **catego
 | `ultrabrain`         | Maximum reasoning needed   | GPT-5.4 → Gemini 3.1 Pro → Claude Opus → opencode-go/glm-5 |
 | `deep`               | Deep coding, complex logic | GPT-5.3 Codex → Claude Opus → Gemini 3.1 Pro |
 | `artistry`           | Creative, novel approaches | Gemini 3.1 Pro → Claude Opus → GPT-5.4       |
-| `quick`              | Simple, fast tasks         | Claude Haiku → Gemini Flash → opencode-go/minimax-m2.5 → GPT-5-Nano |
+| `quick`              | Simple, fast tasks         | GPT-5.4 Mini → Claude Haiku → Gemini Flash → opencode-go/minimax-m2.5 → GPT-5-Nano |
 | `unspecified-high`   | General complex work       | Claude Opus → GPT-5.4 → GLM 5 → K2P5 → opencode-go/glm-5 → Kimi K2.5 |
 | `unspecified-low`    | General standard work      | Claude Sonnet → GPT-5.3 Codex → opencode-go/kimi-k2.5 → Gemini Flash |
 | `writing`            | Text, docs, prose          | Gemini Flash → opencode-go/kimi-k2.5 → Claude Sonnet |
@@ -185,7 +186,7 @@ See the [Orchestration System Guide](./orchestration.md) for how agents dispatch
 
 ```jsonc
 {
-  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json",
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-openagent.schema.json",
 
   "agents": {
     // Main orchestrator: Claude Opus or Kimi K2.5 work best

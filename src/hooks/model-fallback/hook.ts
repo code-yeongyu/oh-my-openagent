@@ -130,14 +130,21 @@ export function getNextFallback(
 
   const providerModelsCache = readProviderModelsCache()
   const connectedProviders = providerModelsCache?.connected ?? readConnectedProvidersCache()
-  const connectedSet = connectedProviders ? new Set(connectedProviders) : null
+  const connectedSet = connectedProviders
+    ? new Set(connectedProviders.map((provider) => provider.toLowerCase()))
+    : null
 
   const isReachable = (entry: FallbackEntry): boolean => {
     if (!connectedSet) return true
 
     // Gate only on provider connectivity. Provider model lists can be stale/incomplete,
     // especially after users manually add models to opencode.json.
-    return entry.providers.some((p) => connectedSet.has(p))
+    if (entry.providers.some((provider) => connectedSet.has(provider.toLowerCase()))) {
+      return true
+    }
+
+    const preferredProvider = state.providerID.toLowerCase()
+    return connectedSet.has(preferredProvider)
   }
 
   while (state.attemptCount < fallbackChain.length) {

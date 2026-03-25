@@ -9,6 +9,7 @@ import { getSessionTools } from "../../shared/session-tools-store"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { COUNCIL_DEFAULTS } from "../../agents/athena/constants"
 import { QUESTION_DENIED_SESSION_PERMISSION } from "../../shared/question-denied-session-permission"
+import { setSessionFallbackChain } from "../../hooks/model-fallback/hook"
 
 export async function executeBackgroundTask(
   args: DelegateTaskArgs,
@@ -59,6 +60,9 @@ export async function executeBackgroundTask(
       sessionId = updated?.sessionID
     }
 
+    if (sessionId) {
+      setSessionFallbackChain(sessionId, fallbackChain)
+    }
     if (args.category && sessionId) {
       SessionCategoryRegistry.register(sessionId, args.category)
     }
@@ -91,7 +95,7 @@ Do NOT poll background_output repeatedly \u2014 background_wait will return when
       : `System notifies on completion. Use \`background_output\` with task_id="${task.id}" to check.`
 
     const taskMetadataBlock = sessionId
-      ? `\n\n<task_metadata>\nsession_id: ${sessionId}\ntask_id: ${sessionId}\nbackground_task_id: ${task.id}\n</task_metadata>`
+      ? `\n\n<task_metadata>\nsession_id: ${sessionId}\ntask_id: ${task.id}\nbackground_task_id: ${task.id}\n</task_metadata>`
       : ""
 
     return `Background task launched.

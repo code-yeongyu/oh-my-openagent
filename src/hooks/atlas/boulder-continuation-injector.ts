@@ -16,6 +16,8 @@ export async function injectBoulderContinuation(input: {
   total: number
   agent?: string
   worktreePath?: string
+  preferredTaskSessionId?: string
+  preferredTaskTitle?: string
   backgroundManager?: BackgroundManager
   sessionState: SessionState
 }): Promise<void> {
@@ -27,6 +29,8 @@ export async function injectBoulderContinuation(input: {
     total,
     agent,
     worktreePath,
+    preferredTaskSessionId,
+    preferredTaskTitle,
     backgroundManager,
     sessionState,
   } = input
@@ -41,9 +45,13 @@ export async function injectBoulderContinuation(input: {
   }
 
   const worktreeContext = worktreePath ? `\n\n[Worktree: ${worktreePath}]` : ""
+  const preferredSessionContext = preferredTaskSessionId
+    ? `\n\n[Preferred reuse session for current top-level plan task${preferredTaskTitle ? `: ${preferredTaskTitle}` : ""}: ${preferredTaskSessionId}]`
+    : ""
   const prompt =
     BOULDER_CONTINUATION_PROMPT.replace(/{PLAN_NAME}/g, planName) +
     `\n\n[Status: ${total - remaining}/${total} completed, ${remaining} remaining]` +
+    preferredSessionContext +
     worktreeContext
   const promptAgent = normalizeAgentForPrompt(agent ?? "atlas") ?? "atlas"
 

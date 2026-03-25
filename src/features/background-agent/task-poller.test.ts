@@ -1,5 +1,5 @@
 declare const require: (name: string) => any
-const { describe, it, expect, mock } = require("bun:test")
+const { describe, it, expect, mock, spyOn, beforeEach, afterEach } = require("bun:test")
 
 import { checkAndInterruptStaleTasks, pruneStaleTasksAndNotifications } from "./task-poller"
 import type { BackgroundTask } from "./types"
@@ -29,6 +29,18 @@ describe("checkAndInterruptStaleTasks", () => {
       ...overrides,
     }
   }
+  const originalDateNow = Date.now
+  let fixedTime: number
+
+  beforeEach(() => {
+    fixedTime = Date.now()
+    spyOn(globalThis.Date, "now").mockReturnValue(fixedTime)
+  })
+
+  afterEach(() => {
+    Date.now = originalDateNow
+  })
+
 
   it("should interrupt tasks with lastUpdate exceeding stale timeout", async () => {
     //#given
@@ -117,13 +129,13 @@ describe("checkAndInterruptStaleTasks", () => {
   })
 
   it("should use DEFAULT_MESSAGE_STALENESS_TIMEOUT_MS when messageStalenessTimeoutMs is not configured", async () => {
-    //#given — task started 35 minutes ago, no config for messageStalenessTimeoutMs
+    //#given — task started 65 minutes ago, no config for messageStalenessTimeoutMs
     const task = createRunningTask({
-      startedAt: new Date(Date.now() - 35 * 60 * 1000),
+      startedAt: new Date(Date.now() - 65 * 60 * 1000),
       progress: undefined,
     })
 
-    //#when — default is 30 minutes (1_800_000ms)
+    //#when — default is 60 minutes (3_600_000ms)
     await checkAndInterruptStaleTasks({
       tasks: [task],
       client: mockClient as never,
