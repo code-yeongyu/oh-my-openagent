@@ -227,6 +227,47 @@ describe("resolveSubagentExecution", () => {
     connectedSpy.mockRestore()
   })
 
+  test("does not apply object-style fallback settings when the subagent primary model matches directly", async () => {
+    //#given
+    const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+      models: { openai: ["gpt-5.4-preview"] },
+      connected: ["openai"],
+      updatedAt: "2026-03-03T00:00:00.000Z",
+    })
+    const connectedSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
+    const args = createBaseArgs({ subagent_type: "explore" })
+    const executorCtx = createExecutorContext(
+      async () => ([
+        { name: "explore", mode: "subagent", model: "openai/gpt-5.4-preview" },
+      ]),
+      {
+        agentOverrides: {
+          explore: {
+            fallback_models: [
+              {
+                model: "openai/gpt-5.4",
+                variant: "low",
+                reasoningEffort: "high",
+              },
+            ],
+          },
+        } as ExecutorContext["agentOverrides"],
+      }
+    )
+
+    //#when
+    const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep")
+
+    //#then
+    expect(result.error).toBeUndefined()
+    expect(result.categoryModel).toEqual({
+      providerID: "openai",
+      modelID: "gpt-5.4-preview",
+    })
+    cacheSpy.mockRestore()
+    connectedSpy.mockRestore()
+  })
+
   test("matches promoted fallback settings after fuzzy model resolution", async () => {
     //#given
     const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({

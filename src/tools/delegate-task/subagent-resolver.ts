@@ -142,12 +142,17 @@ Create the work plan directly - that's your job as the planning agent.`,
       )
       fallbackChain = configuredFallbackChain ?? agentRequirement?.fallbackChain
 
-      // Apply per-model settings: prefer resolver's exact entry, fall back to prefix match on user config
+      // Only promote fallback-only settings when resolution actually selected a fallback model.
       const resolvedFallbackEntry = (resolution && !('skipped' in resolution)) ? resolution.fallbackEntry : undefined
-      const effectiveEntry = resolvedFallbackEntry
-        ?? (categoryModel && fallbackChain
-          ? findMostSpecificFallbackEntry(categoryModel.providerID, categoryModel.modelID, fallbackChain)
-          : undefined)
+      const matchedFallback = (resolution && !('skipped' in resolution)) ? resolution.matchedFallback === true : false
+      const effectiveEntry = matchedFallback && categoryModel
+        ? (
+            resolvedFallbackEntry
+            ?? (configuredFallbackChain
+              ? findMostSpecificFallbackEntry(categoryModel.providerID, categoryModel.modelID, configuredFallbackChain)
+              : undefined)
+          )
+        : undefined
 
       if (categoryModel && effectiveEntry) {
         categoryModel = {

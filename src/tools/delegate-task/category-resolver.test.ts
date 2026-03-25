@@ -169,6 +169,52 @@ describe("resolveCategoryExecution", () => {
 		agentsSpy.mockRestore()
 	})
 
+	test("does not apply object-style fallback settings when the configured primary model matches directly", async () => {
+		//#given
+		const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+			models: { openai: ["gpt-5.4-preview"] },
+			connected: ["openai"],
+			updatedAt: "2026-03-03T00:00:00.000Z",
+		})
+		const agentsSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
+		const args = {
+			category: "deep",
+			prompt: "test prompt",
+			description: "Test task",
+			run_in_background: false,
+			load_skills: [],
+			blockedBy: undefined,
+			enableSkillTools: false,
+		}
+		const executorCtx = createMockExecutorContext()
+		executorCtx.userCategories = {
+			deep: {
+				model: "openai/gpt-5.4-preview",
+				fallback_models: [
+					{
+						model: "openai/gpt-5.4",
+						variant: "low",
+						reasoningEffort: "high",
+					},
+				],
+			},
+		}
+
+		//#when
+		const result = await resolveCategoryExecution(args, executorCtx, undefined, "anthropic/claude-sonnet-4-6")
+
+		//#then
+		expect(result.error).toBeUndefined()
+		expect(result.actualModel).toBe("openai/gpt-5.4-preview")
+		expect(result.categoryModel).toEqual({
+			providerID: "openai",
+			modelID: "gpt-5.4-preview",
+			variant: "medium",
+		})
+		cacheSpy.mockRestore()
+		agentsSpy.mockRestore()
+	})
+
 	test("matches promoted fallback settings after fuzzy model resolution", async () => {
 		//#given
 		const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({

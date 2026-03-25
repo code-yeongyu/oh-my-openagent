@@ -89,6 +89,7 @@ Available categories: ${allCategoryNames}`,
   let categoryModel: DelegatedModelConfig | undefined
   let isModelResolutionSkipped = false
   let fallbackEntry: FallbackEntry | undefined
+  let matchedFallback = false
 
   const overrideModel = sisyphusJuniorModel
   const explicitCategoryModel = userCategories?.[args.category!]?.model
@@ -122,8 +123,14 @@ Available categories: ${allCategoryNames}`,
     if (resolution && "skipped" in resolution) {
       isModelResolutionSkipped = true
     } else if (resolution) {
-      const { model: resolvedModel, variant: resolvedVariant, fallbackEntry: resolvedFallbackEntry } = resolution
+      const {
+        model: resolvedModel,
+        variant: resolvedVariant,
+        fallbackEntry: resolvedFallbackEntry,
+        matchedFallback: resolvedMatchedFallback,
+      } = resolution
       fallbackEntry = resolvedFallbackEntry
+      matchedFallback = resolvedMatchedFallback === true
       actualModel = resolvedModel
 
       if (!parseModelString(actualModel)) {
@@ -202,13 +209,15 @@ Available categories: ${categoryNames.join(", ")}`,
     defaultProviderID,
   )
 
-  // Apply per-model settings from the source that provided the match:
-  // 1. fallbackEntry from resolver (built-in chain match) — exact, no lookup needed
-  // 2. configuredFallbackChain (user's fallback_models) — prefix match against user config
-  const effectiveEntry = fallbackEntry
-    ?? (categoryModel && configuredFallbackChain
-      ? findMostSpecificFallbackEntry(categoryModel.providerID, categoryModel.modelID, configuredFallbackChain)
-      : undefined)
+  // Only promote fallback-only settings when resolution actually selected a fallback model.
+  const effectiveEntry = matchedFallback && categoryModel
+    ? (
+        fallbackEntry
+        ?? (configuredFallbackChain
+          ? findMostSpecificFallbackEntry(categoryModel.providerID, categoryModel.modelID, configuredFallbackChain)
+          : undefined)
+      )
+    : undefined
 
   if (categoryModel && effectiveEntry) {
     categoryModel = {
