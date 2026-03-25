@@ -1,5 +1,6 @@
 declare const require: (name: string) => any
 const { describe, test, expect, beforeEach, afterEach, spyOn } = require("bun:test")
+import { getSessionPromptParams, clearSessionPromptParams } from "../../shared/session-prompt-params-state"
 import { tmpdir } from "node:os"
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { BackgroundTask, ResumeInput } from "./types"
@@ -1636,6 +1637,9 @@ describe("BackgroundManager.resume model persistence", () => {
    })
 
   afterEach(() => {
+    clearSessionPromptParams("session-1")
+    clearSessionPromptParams("session-advanced")
+    clearSessionPromptParams("session-2")
     manager.shutdown()
   })
 
@@ -1669,6 +1673,60 @@ describe("BackgroundManager.resume model persistence", () => {
     expect(promptCalls).toHaveLength(1)
     expect(promptCalls[0].body.model).toEqual({ providerID: "anthropic", modelID: "claude-sonnet-4-20250514" })
     expect(promptCalls[0].body.agent).toBe("explore")
+  })
+
+  test("should preserve promoted per-model settings when resuming a task", async () => {
+    // given - task resumed after fallback promotion
+    const taskWithAdvancedModel: BackgroundTask = {
+      id: "task-with-advanced-model",
+      sessionID: "session-advanced",
+      parentSessionID: "parent-session",
+      parentMessageID: "msg-1",
+      description: "task with advanced model settings",
+      prompt: "original prompt",
+      agent: "explore",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+      model: {
+        providerID: "openai",
+        modelID: "gpt-5.4-preview",
+        variant: "minimal",
+        reasoningEffort: "high",
+        temperature: 0.25,
+        top_p: 0.55,
+        maxTokens: 8192,
+        thinking: { type: "disabled" },
+      },
+      concurrencyGroup: "explore",
+    }
+    getTaskMap(manager).set(taskWithAdvancedModel.id, taskWithAdvancedModel)
+
+    // when
+    await manager.resume({
+      sessionId: "session-advanced",
+      prompt: "continue the work",
+      parentSessionID: "parent-session-2",
+      parentMessageID: "msg-2",
+    })
+
+    // then
+    expect(promptCalls).toHaveLength(1)
+    expect(promptCalls[0].body.model).toEqual({
+      providerID: "openai",
+      modelID: "gpt-5.4-preview",
+    })
+    expect(promptCalls[0].body.variant).toBe("minimal")
+    expect(promptCalls[0].body.options).toBeUndefined()
+    expect(getSessionPromptParams("session-advanced")).toEqual({
+      temperature: 0.25,
+      topP: 0.55,
+      options: {
+        reasoningEffort: "high",
+        thinking: { type: "disabled" },
+        maxTokens: 8192,
+      },
+    })
   })
 
   test("should NOT pass model when task has no model (backward compatibility)", async () => {

@@ -121,7 +121,7 @@ describe("resolveModelForDelegateTask", () => {
 					availableModels: new Set(["openai/gpt-5.2"]),
 				})
 
-				expect(result).toEqual({ model: "openai/gpt-5.2", variant: "high" })
+				expect(result).toEqual({ model: "openai/gpt-5.2", variant: "high", matchedFallback: true })
 			})
 
 			test("#then resolves a space-separated variant against the base available model", () => {
@@ -130,7 +130,7 @@ describe("resolveModelForDelegateTask", () => {
 					availableModels: new Set(["openai/gpt-5.2"]),
 				})
 
-				expect(result).toEqual({ model: "openai/gpt-5.2", variant: "medium" })
+				expect(result).toEqual({ model: "openai/gpt-5.2", variant: "medium", matchedFallback: true })
 			})
 		})
 	})

@@ -53,7 +53,7 @@ export function resolveModelForDelegateTask(input: {
   fallbackChain?: FallbackEntry[]
   availableModels: Set<string>
   systemDefaultModel?: string
-}): { model: string; variant?: string } | { skipped: true } | undefined {
+}): { model: string; variant?: string; fallbackEntry?: FallbackEntry; matchedFallback?: boolean } | { skipped: true } | undefined {
   const userModel = normalizeModel(input.userModel)
   if (userModel) {
     return { model: userModel }
@@ -97,7 +97,7 @@ export function resolveModelForDelegateTask(input: {
     if (input.availableModels.size === 0) {
       const first = userFallbackModels[0] ? parseUserFallbackModel(userFallbackModels[0]) : undefined
       if (first) {
-        return { model: first.baseModel, variant: first.variant }
+        return { model: first.baseModel, variant: first.variant, matchedFallback: true }
       }
     } else {
       for (const fallbackModel of userFallbackModels) {
@@ -106,7 +106,7 @@ export function resolveModelForDelegateTask(input: {
 
         const match = fuzzyMatchModel(parsedFallback.baseModel, input.availableModels, parsedFallback.providerHint)
         if (match) {
-          return { model: match, variant: parsedFallback.variant }
+          return { model: match, variant: parsedFallback.variant, matchedFallback: true }
         }
       }
     }
@@ -119,7 +119,7 @@ export function resolveModelForDelegateTask(input: {
       const provider = first?.providers?.[0]
       if (provider) {
         const transformedModelId = transformModelForProvider(provider, first.model)
-        return { model: `${provider}/${transformedModelId}`, variant: first.variant }
+        return { model: `${provider}/${transformedModelId}`, variant: first.variant, fallbackEntry: first, matchedFallback: true }
       }
     } else {
       for (const entry of fallbackChain) {
@@ -128,20 +128,20 @@ export function resolveModelForDelegateTask(input: {
           const match = fuzzyMatchModel(fullModel, input.availableModels, [provider])
           if (match) {
             if (explicitHighModel && entry.variant === "high" && match === explicitHighBaseModel) {
-              return { model: explicitHighModel }
+              return { model: explicitHighModel, fallbackEntry: entry, matchedFallback: true }
             }
 
-            return { model: match, variant: entry.variant }
+            return { model: match, variant: entry.variant, fallbackEntry: entry, matchedFallback: true }
           }
         }
 
         const crossProviderMatch = fuzzyMatchModel(entry.model, input.availableModels)
         if (crossProviderMatch) {
           if (explicitHighModel && entry.variant === "high" && crossProviderMatch === explicitHighBaseModel) {
-            return { model: explicitHighModel }
+            return { model: explicitHighModel, fallbackEntry: entry, matchedFallback: true }
           }
 
-          return { model: crossProviderMatch, variant: entry.variant }
+          return { model: crossProviderMatch, variant: entry.variant, fallbackEntry: entry, matchedFallback: true }
         }
       }
     }

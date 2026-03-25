@@ -178,7 +178,18 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
         : undefined
 
       let agentToUse: string
-      let categoryModel: { providerID: string; modelID: string; variant?: string } | undefined
+      let categoryModel:
+        | {
+            providerID: string
+            modelID: string
+            variant?: string
+            reasoningEffort?: string
+            temperature?: number
+            top_p?: number
+            maxTokens?: number
+            thinking?: { type: "enabled" | "disabled"; budgetTokens?: number }
+          }
+        | undefined
       let categoryPromptAppend: string | undefined
       let modelInfo: import("../../features/task-toast-manager/types").ModelFallbackInfo | undefined
       let actualModel: string | undefined
@@ -226,7 +237,7 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
           return executeUnstableAgentTask(args, ctx, options, parentContext, agentToUse, categoryModel, systemContent, actualModel)
         }
       } else {
-        const resolution = await resolveSubagentExecution(args, options, parentContext.agent, categoryExamples, inheritedModel)
+        const resolution = await resolveSubagentExecution(args, options, parentContext.agent, categoryExamples)
         if (resolution.error) {
           return resolution.error
         }

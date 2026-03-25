@@ -71,6 +71,17 @@ export interface DelegateTaskToolOptions {
   syncPollTimeoutMs?: number
 }
 
+export interface DelegatedModelConfig {
+  providerID: string
+  modelID: string
+  variant?: string
+  reasoningEffort?: string
+  temperature?: number
+  top_p?: number
+  maxTokens?: number
+  thinking?: { type: "enabled" | "disabled"; budgetTokens?: number }
+}
+
 export interface BuildSystemContentInput {
   skillContent?: string
   skillContents?: string[]
@@ -78,7 +89,7 @@ export interface BuildSystemContentInput {
   agentsContext?: string
   planAgentPrepend?: string
   maxPromptTokens?: number
-  model?: { providerID: string; modelID: string; variant?: string }
+  model?: DelegatedModelConfig
   agentName?: string
   availableCategories?: AvailableCategory[]
   availableSkills?: AvailableSkill[]

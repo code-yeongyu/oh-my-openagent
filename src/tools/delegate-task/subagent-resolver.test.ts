@@ -175,4 +175,286 @@ describe("resolveSubagentExecution", () => {
     ])
     cacheSpy.mockRestore()
   })
+
+  test("promotes object-style fallback model settings to categoryModel when subagent fallback becomes initial model", async () => {
+    //#given
+    const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+      models: { openai: ["gpt-5.4"] },
+      connected: ["openai"],
+      updatedAt: "2026-03-03T00:00:00.000Z",
+    })
+    const connectedSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
+    const args = createBaseArgs({ subagent_type: "explore" })
+    const executorCtx = createExecutorContext(
+      async () => ([
+        { name: "explore", mode: "subagent", model: "quotio/claude-haiku-4-5-unavailable" },
+      ]),
+      {
+        agentOverrides: {
+          explore: {
+            fallback_models: [
+              {
+                model: "openai/gpt-5.4 high",
+                variant: "low",
+                reasoningEffort: "high",
+                temperature: 0.2,
+                top_p: 0.8,
+                maxTokens: 2048,
+                thinking: { type: "disabled" },
+              },
+            ],
+          },
+        } as ExecutorContext["agentOverrides"],
+      }
+    )
+
+    //#when
+    const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep")
+
+    //#then
+    expect(result.error).toBeUndefined()
+    expect(result.categoryModel).toEqual({
+      providerID: "openai",
+      modelID: "gpt-5.4",
+      variant: "low",
+      reasoningEffort: "high",
+      temperature: 0.2,
+      top_p: 0.8,
+      maxTokens: 2048,
+      thinking: { type: "disabled" },
+    })
+    cacheSpy.mockRestore()
+    connectedSpy.mockRestore()
+  })
+
+  test("does not apply object-style fallback settings when the subagent primary model matches directly", async () => {
+    //#given
+    const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+      models: { openai: ["gpt-5.4-preview"] },
+      connected: ["openai"],
+      updatedAt: "2026-03-03T00:00:00.000Z",
+    })
+    const connectedSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
+    const args = createBaseArgs({ subagent_type: "explore" })
+    const executorCtx = createExecutorContext(
+      async () => ([
+        { name: "explore", mode: "subagent", model: "openai/gpt-5.4-preview" },
+      ]),
+      {
+        agentOverrides: {
+          explore: {
+            fallback_models: [
+              {
+                model: "openai/gpt-5.4",
+                variant: "low",
+                reasoningEffort: "high",
+              },
+            ],
+          },
+        } as ExecutorContext["agentOverrides"],
+      }
+    )
+
+    //#when
+    const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep")
+
+    //#then
+    expect(result.error).toBeUndefined()
+    expect(result.categoryModel).toEqual({
+      providerID: "openai",
+      modelID: "gpt-5.4-preview",
+    })
+    cacheSpy.mockRestore()
+    connectedSpy.mockRestore()
+  })
+
+  test("matches promoted fallback settings after fuzzy model resolution", async () => {
+    //#given
+    const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+      models: { openai: ["gpt-5.4-preview"] },
+      connected: ["openai"],
+      updatedAt: "2026-03-03T00:00:00.000Z",
+    })
+    const connectedSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
+    const args = createBaseArgs({ subagent_type: "explore" })
+    const executorCtx = createExecutorContext(
+      async () => ([
+        { name: "explore", mode: "subagent", model: "quotio/claude-haiku-4-5-unavailable" },
+      ]),
+      {
+        agentOverrides: {
+          explore: {
+            fallback_models: [
+              {
+                model: "openai/gpt-5.4",
+                variant: "low",
+                reasoningEffort: "high",
+                temperature: 0.3,
+                top_p: 0.4,
+                maxTokens: 2222,
+                thinking: { type: "disabled" },
+              },
+            ],
+          },
+        } as ExecutorContext["agentOverrides"],
+      }
+    )
+
+    //#when
+    const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep")
+
+    //#then
+    expect(result.error).toBeUndefined()
+    expect(result.categoryModel).toEqual({
+      providerID: "openai",
+      modelID: "gpt-5.4-preview",
+      variant: "low",
+      reasoningEffort: "high",
+      temperature: 0.3,
+      top_p: 0.4,
+      maxTokens: 2222,
+      thinking: { type: "disabled" },
+    })
+    cacheSpy.mockRestore()
+    connectedSpy.mockRestore()
+  })
+
+  test("prefers exact promoted fallback match over earlier fuzzy prefix match", async () => {
+    //#given
+    const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+      models: { openai: ["gpt-5.4-preview"] },
+      connected: ["openai"],
+      updatedAt: "2026-03-03T00:00:00.000Z",
+    })
+    const connectedSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
+    const args = createBaseArgs({ subagent_type: "explore" })
+    const executorCtx = createExecutorContext(
+      async () => ([
+        { name: "explore", mode: "subagent", model: "quotio/claude-haiku-4-5-unavailable" },
+      ]),
+      {
+        agentOverrides: {
+          explore: {
+            fallback_models: [
+              {
+                model: "openai/gpt-5.4",
+                variant: "low",
+                reasoningEffort: "medium",
+              },
+              {
+                model: "openai/gpt-5.4-preview",
+                variant: "max",
+                reasoningEffort: "high",
+              },
+            ],
+          },
+        } as ExecutorContext["agentOverrides"],
+      }
+    )
+
+    //#when
+    const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep")
+
+    //#then
+    expect(result.error).toBeUndefined()
+    expect(result.categoryModel).toEqual({
+      providerID: "openai",
+      modelID: "gpt-5.4-preview",
+      variant: "max",
+      reasoningEffort: "high",
+    })
+    cacheSpy.mockRestore()
+    connectedSpy.mockRestore()
+  })
+
+  test("matches promoted fallback settings when fuzzy resolution extends configured model without hyphen", async () => {
+    //#given
+    const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+      models: { openai: ["gpt-5.4o"] },
+      connected: ["openai"],
+      updatedAt: "2026-03-03T00:00:00.000Z",
+    })
+    const connectedSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
+    const args = createBaseArgs({ subagent_type: "explore" })
+    const executorCtx = createExecutorContext(
+      async () => ([
+        { name: "explore", mode: "subagent", model: "quotio/claude-haiku-4-5-unavailable" },
+      ]),
+      {
+        agentOverrides: {
+          explore: {
+            fallback_models: [
+              {
+                model: "openai/gpt-5.4",
+                variant: "low",
+                reasoningEffort: "high",
+              },
+            ],
+          },
+        } as ExecutorContext["agentOverrides"],
+      }
+    )
+
+    //#when
+    const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep")
+
+    //#then
+    expect(result.error).toBeUndefined()
+    expect(result.categoryModel).toEqual({
+      providerID: "openai",
+      modelID: "gpt-5.4o",
+      variant: "low",
+      reasoningEffort: "high",
+    })
+    cacheSpy.mockRestore()
+    connectedSpy.mockRestore()
+  })
+
+  test("prefers the most specific prefix match when fallback entries share a prefix", async () => {
+    //#given
+    const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+      models: { openai: ["gpt-4o-preview"] },
+      connected: ["openai"],
+      updatedAt: "2026-03-03T00:00:00.000Z",
+    })
+    const connectedSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
+    const args = createBaseArgs({ subagent_type: "explore" })
+    const executorCtx = createExecutorContext(
+      async () => ([
+        { name: "explore", mode: "subagent", model: "quotio/claude-haiku-4-5-unavailable" },
+      ]),
+      {
+        agentOverrides: {
+          explore: {
+            fallback_models: [
+              {
+                model: "openai/gpt-4",
+                variant: "low",
+                reasoningEffort: "medium",
+              },
+              {
+                model: "openai/gpt-4o",
+                variant: "max",
+                reasoningEffort: "high",
+              },
+            ],
+          },
+        } as ExecutorContext["agentOverrides"],
+      }
+    )
+
+    //#when
+    const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep")
+
+    //#then
+    expect(result.error).toBeUndefined()
+    expect(result.categoryModel).toEqual({
+      providerID: "openai",
+      modelID: "gpt-4o-preview",
+      variant: "max",
+      reasoningEffort: "high",
+    })
+    cacheSpy.mockRestore()
+    connectedSpy.mockRestore()
+  })
 })

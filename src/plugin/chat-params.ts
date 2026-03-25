@@ -1,3 +1,5 @@
+import { getSessionPromptParams } from "../shared/session-prompt-params-state"
+
 export type ChatParamsInput = {
   sessionID: string
   agent: { name?: string }
@@ -81,6 +83,22 @@ export function createChatParamsHandler(args: {
     const normalizedInput = buildChatParamsInput(input)
     if (!normalizedInput) return
     if (!isChatParamsOutput(output)) return
+
+    const storedPromptParams = getSessionPromptParams(normalizedInput.sessionID)
+    if (storedPromptParams) {
+      if (storedPromptParams.temperature !== undefined) {
+        output.temperature = storedPromptParams.temperature
+      }
+      if (storedPromptParams.topP !== undefined) {
+        output.topP = storedPromptParams.topP
+      }
+      if (storedPromptParams.options) {
+        output.options = {
+          ...output.options,
+          ...storedPromptParams.options,
+        }
+      }
+    }
 
     await args.anthropicEffort?.["chat.params"]?.(normalizedInput, output)
   }
