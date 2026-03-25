@@ -40,7 +40,7 @@ describe("OpenClaw Dispatcher", () => {
 
       expect(result.success).toBe(true)
       expect(fetchSpy).toHaveBeenCalled()
-      const call = fetchSpy.mock.calls[0]
+      const call = fetchSpy.mock.calls.find(c => c[0] === "https://example.com")
       expect(call[0]).toBe("https://example.com")
       expect(call[1]?.method).toBe("POST")
       expect(call[1]?.body).toBe('{"foo":"bar"}')

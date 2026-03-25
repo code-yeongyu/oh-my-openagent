@@ -1,6 +1,6 @@
 # Configuration Reference
 
-Complete reference for `oh-my-opencode.jsonc` configuration. This document covers every available option with examples.
+Complete reference for `oh-my-openagent.jsonc` configuration. This document covers every available option with examples.
 
 ---
 
@@ -44,13 +44,13 @@ Complete reference for `oh-my-opencode.jsonc` configuration. This document cover
 
 Priority order (project overrides user):
 
-1. `.opencode/oh-my-opencode.jsonc` / `.opencode/oh-my-opencode.json`
+1. `.opencode/oh-my-openagent.jsonc` / `.opencode/oh-my-openagent.json`
 2. User config (`.jsonc` preferred over `.json`):
 
 | Platform    | Path                                      |
 | ----------- | ----------------------------------------- |
-| macOS/Linux | `~/.config/opencode/oh-my-opencode.jsonc` |
-| Windows     | `%APPDATA%\opencode\oh-my-opencode.jsonc` |
+| macOS/Linux | `~/.config/opencode/oh-my-openagent.jsonc` |
+| Windows     | `%APPDATA%\opencode\oh-my-openagent.jsonc` |
 
 JSONC supports `// line comments`, `/* block comments */`, and trailing commas.
 
@@ -58,11 +58,11 @@ Enable schema autocomplete:
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json"
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-openagent.schema.json"
 }
 ```
 
-Run `bunx oh-my-opencode install` for guided setup. Run `opencode models` to list available models.
+Run `bunx oh-my-openagent install` for guided setup. Run `opencode models` to list available models.
 
 ### Quick Start Example
 
@@ -70,7 +70,7 @@ Here's a practical starting configuration:
 
 ```jsonc
 {
-  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json",
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-openagent.schema.json",
 
   "agents": {
     // Main orchestrator: Claude Opus or Kimi K2.5 work best
@@ -291,7 +291,7 @@ Disable categories: `{ "disabled_categories": ["ultrabrain"] }`
 | **unspecified-high**   | `claude-opus-4-6`   | `claude-opus-4-6` → `gpt-5.4 (high)` → `glm-5` → `k2p5` → `kimi-k2.5` |
 | **writing**            | `gemini-3-flash`    | `gemini-3-flash` → `claude-sonnet-4-6` → `minimax-m2.7`        |
 
-Run `bunx oh-my-opencode doctor --verbose` to see effective model resolution for your config.
+Run `bunx oh-my-openagent doctor --verbose` to see effective model resolution for your config.
 
 ---
 

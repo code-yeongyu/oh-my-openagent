@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 const mockShowConfigErrorsIfAny = mock(async () => {})
 const mockShowModelCacheWarningIfNeeded = mock(async () => {})
 const mockUpdateAndShowConnectedProvidersCacheStatus = mock(async () => {})
+const mockRefreshModelCapabilitiesOnStartup = mock(async () => {})
 const mockShowLocalDevToast = mock(async () => {})
 const mockShowVersionToast = mock(async () => {})
 const mockRunBackgroundUpdateCheck = mock(async () => {})
@@ -20,6 +21,10 @@ mock.module("./hook/model-cache-warning", () => ({
 mock.module("./hook/connected-providers-status", () => ({
   updateAndShowConnectedProvidersCacheStatus:
     mockUpdateAndShowConnectedProvidersCacheStatus,
+}))
+
+mock.module("./hook/model-capabilities-status", () => ({
+  refreshModelCapabilitiesOnStartup: mockRefreshModelCapabilitiesOnStartup,
 }))
 
 mock.module("./hook/startup-toasts", () => ({
@@ -78,6 +83,7 @@ beforeEach(() => {
   mockShowConfigErrorsIfAny.mockClear()
   mockShowModelCacheWarningIfNeeded.mockClear()
   mockUpdateAndShowConnectedProvidersCacheStatus.mockClear()
+  mockRefreshModelCapabilitiesOnStartup.mockClear()
   mockShowLocalDevToast.mockClear()
   mockShowVersionToast.mockClear()
   mockRunBackgroundUpdateCheck.mockClear()
@@ -112,6 +118,7 @@ describe("createAutoUpdateCheckerHook", () => {
     expect(mockShowConfigErrorsIfAny).not.toHaveBeenCalled()
     expect(mockShowModelCacheWarningIfNeeded).not.toHaveBeenCalled()
     expect(mockUpdateAndShowConnectedProvidersCacheStatus).not.toHaveBeenCalled()
+    expect(mockRefreshModelCapabilitiesOnStartup).not.toHaveBeenCalled()
     expect(mockShowLocalDevToast).not.toHaveBeenCalled()
     expect(mockShowVersionToast).not.toHaveBeenCalled()
     expect(mockRunBackgroundUpdateCheck).not.toHaveBeenCalled()
@@ -129,6 +136,7 @@ describe("createAutoUpdateCheckerHook", () => {
     //#then - startup checks, toast, and background check run
     expect(mockShowConfigErrorsIfAny).toHaveBeenCalledTimes(1)
     expect(mockUpdateAndShowConnectedProvidersCacheStatus).toHaveBeenCalledTimes(1)
+    expect(mockRefreshModelCapabilitiesOnStartup).toHaveBeenCalledTimes(1)
     expect(mockShowModelCacheWarningIfNeeded).toHaveBeenCalledTimes(1)
     expect(mockShowVersionToast).toHaveBeenCalledTimes(1)
     expect(mockRunBackgroundUpdateCheck).toHaveBeenCalledTimes(1)
@@ -146,6 +154,7 @@ describe("createAutoUpdateCheckerHook", () => {
     //#then - no startup actions run
     expect(mockShowConfigErrorsIfAny).not.toHaveBeenCalled()
     expect(mockUpdateAndShowConnectedProvidersCacheStatus).not.toHaveBeenCalled()
+    expect(mockRefreshModelCapabilitiesOnStartup).not.toHaveBeenCalled()
     expect(mockShowModelCacheWarningIfNeeded).not.toHaveBeenCalled()
     expect(mockShowLocalDevToast).not.toHaveBeenCalled()
     expect(mockShowVersionToast).not.toHaveBeenCalled()
@@ -165,6 +174,7 @@ describe("createAutoUpdateCheckerHook", () => {
     //#then - side effects execute only once
     expect(mockShowConfigErrorsIfAny).toHaveBeenCalledTimes(1)
     expect(mockUpdateAndShowConnectedProvidersCacheStatus).toHaveBeenCalledTimes(1)
+    expect(mockRefreshModelCapabilitiesOnStartup).toHaveBeenCalledTimes(1)
     expect(mockShowModelCacheWarningIfNeeded).toHaveBeenCalledTimes(1)
     expect(mockShowVersionToast).toHaveBeenCalledTimes(1)
     expect(mockRunBackgroundUpdateCheck).toHaveBeenCalledTimes(1)
@@ -183,6 +193,7 @@ describe("createAutoUpdateCheckerHook", () => {
     //#then - local dev toast is shown and background check is skipped
     expect(mockShowConfigErrorsIfAny).toHaveBeenCalledTimes(1)
     expect(mockUpdateAndShowConnectedProvidersCacheStatus).toHaveBeenCalledTimes(1)
+    expect(mockRefreshModelCapabilitiesOnStartup).toHaveBeenCalledTimes(1)
     expect(mockShowModelCacheWarningIfNeeded).toHaveBeenCalledTimes(1)
     expect(mockShowLocalDevToast).toHaveBeenCalledTimes(1)
     expect(mockShowVersionToast).not.toHaveBeenCalled()
@@ -205,6 +216,7 @@ describe("createAutoUpdateCheckerHook", () => {
     //#then - no startup actions run
     expect(mockShowConfigErrorsIfAny).not.toHaveBeenCalled()
     expect(mockUpdateAndShowConnectedProvidersCacheStatus).not.toHaveBeenCalled()
+    expect(mockRefreshModelCapabilitiesOnStartup).not.toHaveBeenCalled()
     expect(mockShowModelCacheWarningIfNeeded).not.toHaveBeenCalled()
     expect(mockShowLocalDevToast).not.toHaveBeenCalled()
     expect(mockShowVersionToast).not.toHaveBeenCalled()

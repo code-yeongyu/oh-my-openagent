@@ -8,6 +8,7 @@ import { buildAgent, isFactory } from "../agent-builder"
 import { applyOverrides } from "./agent-overrides"
 import { applyEnvironmentContext } from "./environment-context"
 import { applyModelResolution, getFirstFallbackModel } from "./model-resolution"
+import { log } from "../../shared/logger"
 
 export function collectPendingBuiltinAgents(input: {
   agentSources: Record<BuiltinAgentName, import("../agent-builder").AgentSource>
@@ -69,13 +70,19 @@ export function collectPendingBuiltinAgents(input: {
     const isPrimaryAgent = isFactory(source) && source.mode === "primary"
 
     let resolution = applyModelResolution({
-      uiSelectedModel: (isPrimaryAgent && !override?.model) ? uiSelectedModel : undefined,
+      uiSelectedModel: (isPrimaryAgent && override?.model === undefined) ? uiSelectedModel : undefined,
       userModel: override?.model,
       requirement,
       availableModels,
       systemDefaultModel,
     })
-    if (!resolution && isFirstRunNoCache && !override?.model) {
+    if (!resolution) {
+      if (override?.model) {
+        log("[agent-registration] User-configured model could not be resolved, falling back", {
+          agent: agentName,
+          configuredModel: override.model,
+        })
+      }
       resolution = getFirstFallbackModel(requirement)
     }
     if (!resolution) continue

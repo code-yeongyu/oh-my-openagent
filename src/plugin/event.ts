@@ -16,7 +16,7 @@ import {
   setSessionFallbackChain,
   setPendingModelFallback,
 } from "../hooks/model-fallback/hook";
-import { getFallbackModelsForSession } from "../hooks/runtime-fallback/fallback-models";
+import { getRawFallbackModels } from "../hooks/runtime-fallback/fallback-models";
 import { resetMessageCursor } from "../shared";
 import { getAgentConfigKey } from "../shared/agent-display-names";
 import { readConnectedProvidersCache } from "../shared/connected-providers-cache";
@@ -25,6 +25,7 @@ import { shouldRetryError } from "../shared/model-error-classifier";
 import { buildFallbackChainFromModels } from "../shared/fallback-chain-from-models";
 import { extractRetryAttempt, normalizeRetryStatusMessage } from "../shared/retry-status-utils";
 import { clearSessionModel, getSessionModel, setSessionModel } from "../shared/session-model-state";
+import { clearSessionPromptParams } from "../shared/session-prompt-params-state";
 import { deleteSessionTools } from "../shared/session-tools-store";
 import { lspManager } from "../tools";
 
@@ -110,10 +111,10 @@ function applyUserConfiguredFallbackChain(
   pluginConfig: OhMyOpenCodeConfig,
 ): void {
   const agentKey = getAgentConfigKey(agentName);
-  const configuredFallbackModels = getFallbackModelsForSession(sessionID, agentKey, pluginConfig);
-  if (configuredFallbackModels.length === 0) return;
+  const rawFallbackModels = getRawFallbackModels(sessionID, agentKey, pluginConfig);
+  if (!rawFallbackModels || rawFallbackModels.length === 0) return;
 
-  const fallbackChain = buildFallbackChainFromModels(configuredFallbackModels, currentProviderID);
+  const fallbackChain = buildFallbackChainFromModels(rawFallbackModels, currentProviderID);
 
   if (fallbackChain && fallbackChain.length > 0) {
     setSessionFallbackChain(sessionID, fallbackChain);
@@ -148,6 +149,8 @@ export function createEventHandler(args: {
           body: { parts: Array<{ type: "text"; text: string }> };
           query: { directory: string };
         }) => Promise<unknown>;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        summarize: (...args: any[]) => Promise<unknown>;
       };
     };
   };
@@ -328,6 +331,7 @@ export function createEventHandler(args: {
         resetMessageCursor(sessionInfo.id);
         firstMessageVariantGate.clear(sessionInfo.id);
         clearSessionModel(sessionInfo.id);
+        clearSessionPromptParams(sessionInfo.id);
         syncSubagentSessions.delete(sessionInfo.id);
         if (wasSyncSubagentSession) {
           subagentSessions.delete(sessionInfo.id);
@@ -502,6 +506,17 @@ export function createEventHandler(args: {
             sessionID === getMainSessionID() &&
             !hooks.stopContinuationGuard?.isStopped(sessionID)
           ) {
+            // Trigger compaction before sending "continue" to avoid double-sending continuation
+            await pluginContext.client.session
+              .summarize({
+                path: { id: sessionID },
+                body: { auto: true },
+                query: { directory: pluginContext.directory },
+              })
+              .catch((err: unknown) => {
+                log("[event] compaction before recovery continue failed:", { sessionID, error: err });
+              });
+
             await pluginContext.client.session
               .prompt({
                 path: { id: sessionID },

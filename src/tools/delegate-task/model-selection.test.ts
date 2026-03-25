@@ -102,6 +102,16 @@ describe("resolveModelForDelegateTask", () => {
 
 				expect(result).toEqual({ model: "anthropic/claude-sonnet-4-6" })
 			})
+
+			test("#then trusts user-configured category model without fuzzy validation", () => {
+				const result = resolveModelForDelegateTask({
+					categoryDefaultModel: "new-api-openai/gpt-5.4-high",
+					isUserConfiguredCategoryModel: true,
+					availableModels: new Set(["openai/gpt-5.4"]),
+				})
+
+				expect(result).toEqual({ model: "new-api-openai/gpt-5.4-high" })
+			})
 		})
 
 		describe("#when user fallback models include variant syntax", () => {
@@ -111,7 +121,7 @@ describe("resolveModelForDelegateTask", () => {
 					availableModels: new Set(["openai/gpt-5.2"]),
 				})
 
-				expect(result).toEqual({ model: "openai/gpt-5.2", variant: "high" })
+				expect(result).toEqual({ model: "openai/gpt-5.2", variant: "high", matchedFallback: true })
 			})
 
 			test("#then resolves a space-separated variant against the base available model", () => {
@@ -120,7 +130,7 @@ describe("resolveModelForDelegateTask", () => {
 					availableModels: new Set(["openai/gpt-5.2"]),
 				})
 
-				expect(result).toEqual({ model: "openai/gpt-5.2", variant: "medium" })
+				expect(result).toEqual({ model: "openai/gpt-5.2", variant: "medium", matchedFallback: true })
 			})
 		})
 	})

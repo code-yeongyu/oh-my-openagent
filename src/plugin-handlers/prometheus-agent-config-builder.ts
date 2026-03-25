@@ -27,6 +27,7 @@ export async function buildPrometheusAgentConfig(params: {
   pluginPrometheusOverride: PrometheusOverride | undefined;
   userCategories: Record<string, CategoryConfig> | undefined;
   currentModel: string | undefined;
+  disabledTools?: readonly string[];
 }): Promise<Record<string, unknown>> {
   const categoryConfig = params.pluginPrometheusOverride?.category
     ? resolveCategoryConfig(params.pluginPrometheusOverride.category, params.userCategories)
@@ -38,10 +39,14 @@ export async function buildPrometheusAgentConfig(params: {
     connectedProviders: connectedProviders ?? undefined,
   });
 
+  const configuredPrometheusModel =
+    params.pluginPrometheusOverride?.model ?? categoryConfig?.model;
+
   const modelResolution = resolveModelPipeline({
     intent: {
-      uiSelectedModel: params.currentModel,
-      userModel: params.pluginPrometheusOverride?.model ?? categoryConfig?.model,
+      uiSelectedModel: configuredPrometheusModel ? undefined : params.currentModel,
+      userModel: params.pluginPrometheusOverride?.model,
+      categoryDefaultModel: categoryConfig?.model,
     },
     constraints: { availableModels },
     policy: {
@@ -69,7 +74,7 @@ export async function buildPrometheusAgentConfig(params: {
     ...(resolvedModel ? { model: resolvedModel } : {}),
     ...(variantToUse ? { variant: variantToUse } : {}),
     mode: "all",
-    prompt: getPrometheusPrompt(resolvedModel),
+    prompt: getPrometheusPrompt(resolvedModel, params.disabledTools),
     permission: PROMETHEUS_PERMISSION,
     description: `${(params.configAgentPlan?.description as string) ?? "Plan agent"} (Prometheus - OhMyOpenCode)`,
     color: (params.configAgentPlan?.color as string) ?? "#FF5722",

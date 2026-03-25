@@ -7,6 +7,7 @@ import {
 import { log } from "../../shared/logger"
 
 import { DEFAULT_SKIP_AGENTS, HOOK_NAME } from "./constants"
+import { armCompactionGuard } from "./compaction-guard"
 import type { SessionStateStore } from "./session-state"
 import { handleSessionIdle } from "./idle-event"
 import { handleNonIdleEvent } from "./non-idle-events"
@@ -64,9 +65,9 @@ export function createTodoContinuationHandler(args: {
       const sessionID = (props?.sessionID ?? (props?.info as { id?: string } | undefined)?.id) as string | undefined
       if (sessionID) {
         const state = sessionStateStore.getState(sessionID)
-        state.recentCompactionAt = Date.now()
+        const compactionEpoch = armCompactionGuard(state, Date.now())
         sessionStateStore.cancelCountdown(sessionID)
-        log(`[${HOOK_NAME}] Session compacted: marked recentCompactionAt`, { sessionID })
+        log(`[${HOOK_NAME}] Session compacted: armed compaction guard`, { sessionID, compactionEpoch })
       }
       return
     }

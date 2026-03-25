@@ -2,6 +2,7 @@ import type { BackgroundTask, LaunchInput, ResumeInput } from "./types"
 import type { OpencodeClient, OnSubagentSessionCreated, QueueItem } from "./constants"
 import { TMUX_CALLBACK_DELAY_MS } from "./constants"
 import { log, getAgentToolRestrictions, promptWithModelSuggestionRetry, createInternalAgentTextPart } from "../../shared"
+import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
 import { subagentSessions } from "../claude-code-session-state"
 import { getTaskToastManager } from "../task-toast-manager"
 import { isInsideTmux } from "../../shared/tmux"
@@ -128,9 +129,14 @@ export async function startTask(
   })
 
   const launchModel = input.model
-    ? { providerID: input.model.providerID, modelID: input.model.modelID }
+    ? {
+        providerID: input.model.providerID,
+        modelID: input.model.modelID,
+      }
     : undefined
   const launchVariant = input.model?.variant
+
+  applySessionPromptParams(sessionID, input.model)
 
   promptWithModelSuggestionRetry(client, {
     path: { id: sessionID },
@@ -213,9 +219,14 @@ export async function resumeTask(
   })
 
   const resumeModel = task.model
-    ? { providerID: task.model.providerID, modelID: task.model.modelID }
+    ? {
+        providerID: task.model.providerID,
+        modelID: task.model.modelID,
+      }
     : undefined
   const resumeVariant = task.model?.variant
+
+  applySessionPromptParams(task.sessionID, task.model)
 
   client.session.promptAsync({
     path: { id: task.sessionID },

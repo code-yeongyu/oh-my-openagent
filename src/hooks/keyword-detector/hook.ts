@@ -1,6 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { detectKeywordsWithType, extractPromptText } from "./detector"
-import { isPlannerAgent } from "./constants"
+import { isPlannerAgent, isNonOmoAgent } from "./constants"
 import { log } from "../../shared"
 import {
   isSystemDirective,
@@ -44,6 +44,12 @@ export function createKeywordDetectorHook(ctx: PluginInput, _collector?: Context
       }
 
       const currentAgent = getSessionAgent(input.sessionID) ?? input.agent
+
+      // Skip all keyword injection for non-OMO agents (e.g., OpenCode-Builder, Plan)
+      if (isNonOmoAgent(currentAgent)) {
+        log(`[keyword-detector] Skipping keyword injection for non-OMO agent`, { sessionID: input.sessionID, agent: currentAgent })
+        return
+      }
 
       // Remove system-reminder content to prevent automated system messages from triggering mode keywords
       const cleanText = removeSystemReminders(promptText)

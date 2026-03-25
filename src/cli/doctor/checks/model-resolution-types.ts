@@ -1,3 +1,4 @@
+import type { ModelCapabilitiesDiagnostics } from "../../../shared/model-capabilities"
 import type { ModelRequirement } from "../../../shared/model-requirements"
 
 export interface AgentResolutionInfo {
@@ -7,6 +8,7 @@ export interface AgentResolutionInfo {
   userVariant?: string
   effectiveModel: string
   effectiveResolution: string
+  capabilityDiagnostics?: ModelCapabilitiesDiagnostics
 }
 
 export interface CategoryResolutionInfo {
@@ -16,6 +18,7 @@ export interface CategoryResolutionInfo {
   userVariant?: string
   effectiveModel: string
   effectiveResolution: string
+  capabilityDiagnostics?: ModelCapabilitiesDiagnostics
 }
 
 export interface ModelResolutionInfo {

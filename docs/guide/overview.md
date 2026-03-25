@@ -1,6 +1,6 @@
-# What Is Oh My OpenCode?
+# What Is Oh My OpenAgent?
 
-Oh My OpenCode is a multi-model agent orchestration harness for OpenCode. It transforms a single AI agent into a coordinated development team that actually ships code.
+Oh My OpenAgent is a multi-model agent orchestration harness for OpenCode. It transforms a single AI agent into a coordinated development team that actually ships code.
 
 Not locked to Claude. Not locked to OpenAI. Not locked to anyone.
 
@@ -15,7 +15,7 @@ Just better results, cheaper models, real orchestration.
 Paste this into your LLM agent session:
 
 ```
-Install and configure oh-my-opencode by following the instructions here:
+Install and configure oh-my-openagent by following the instructions here:
 https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/heads/dev/docs/guide/installation.md
 ```
 
@@ -41,13 +41,13 @@ We used to call this "Claude Code on steroids." That was wrong.
 
 This isn't about making Claude Code better. It's about breaking free from the idea that one model, one provider, one way of working is enough. Anthropic wants you locked in. OpenAI wants you locked in. Everyone wants you locked in.
 
-Oh My OpenCode doesn't play that game. It orchestrates across models, picking the right brain for the right job. Claude for orchestration. GPT for deep reasoning. Gemini for frontend. GPT-5.4 Mini for quick tasks. All working together, automatically.
+Oh My OpenAgent doesn't play that game. It orchestrates across models, picking the right brain for the right job. Claude for orchestration. GPT for deep reasoning. Gemini for frontend. GPT-5.4 Mini for quick tasks. All working together, automatically.
 
 ---
 
 ## How It Works: Agent Orchestration
 
-Instead of one agent doing everything, Oh My OpenCode uses **specialized agents that delegate to each other** based on task type.
+Instead of one agent doing everything, Oh My OpenAgent uses **specialized agents that delegate to each other** based on task type.
 
 **The Architecture:**
 
@@ -154,7 +154,7 @@ Use Prometheus for multi-day projects, critical production changes, complex refa
 
 ## Agent Model Matching
 
-Different agents work best with different models. Oh My OpenCode automatically assigns optimal models, but you can customize everything.
+Different agents work best with different models. Oh My OpenAgent automatically assigns optimal models, but you can customize everything.
 
 ### Default Configuration
 
@@ -168,7 +168,7 @@ You can override specific agents or categories in your config:
 
 ```jsonc
 {
-  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json",
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-openagent.schema.json",
 
   "agents": {
     // Main orchestrator: Claude Opus or Kimi K2.5 work best
@@ -220,7 +220,7 @@ You can override specific agents or categories in your config:
 
 **Different-behavior models**:
 
-- Gemini 3 Pro — excels at visual/frontend tasks
+- Gemini 3.1 Pro — excels at visual/frontend tasks
 - MiniMax M2.7 / M2.7-highspeed — fast and smart for utility tasks
 - Grok Code Fast 1 — optimized for code grep/search
 
@@ -232,7 +232,7 @@ See the [Agent-Model Matching Guide](./agent-model-matching.md) for complete det
 
 Claude Code is good. But it's a single agent running a single model doing everything alone.
 
-Oh My OpenCode turns that into a coordinated team:
+Oh My OpenAgent turns that into a coordinated team:
 
 **Parallel execution.** Claude Code processes one thing at a time. OmO fires background agents in parallel — research, implementation, and verification happening simultaneously. Like having 5 engineers instead of 1.
 
@@ -246,7 +246,7 @@ Oh My OpenCode turns that into a coordinated team:
 
 **Discipline enforcement.** Todo enforcer yanks idle agents back to work. Comment checker strips AI slop. Ralph Loop keeps going until 100% done. The system doesn't let the agent slack off.
 
-**The fundamental advantage.** Models have different temperaments. Claude thinks deeply. GPT reasons architecturally. Gemini visualizes. Haiku moves fast. Single-model tools force you to pick one personality for all tasks. Oh My OpenCode leverages them all, routing by task type. This isn't a temporary hack — it's the only architecture that makes sense as models specialize further. The gap between multi-model orchestration and single-model limitation widens every month. We're betting on that future.
+**The fundamental advantage.** Models have different temperaments. Claude thinks deeply. GPT reasons architecturally. Gemini visualizes. Haiku moves fast. Single-model tools force you to pick one personality for all tasks. Oh My OpenAgent leverages them all, routing by task type. This isn't a temporary hack — it's the only architecture that makes sense as models specialize further. The gap between multi-model orchestration and single-model limitation widens every month. We're betting on that future.
 
 ---
 
@@ -256,7 +256,7 @@ Before acting on any request, Sisyphus classifies your true intent.
 
 Are you asking for research? Implementation? Investigation? A fix? The Intent Gate figures out what you actually want, not just the literal words you typed. This means the agent understands context, nuance, and the real goal behind your request.
 
-Claude Code doesn't have this. It takes your prompt and runs. Oh My OpenCode thinks first, then acts.
+Claude Code doesn't have this. It takes your prompt and runs. Oh My OpenAgent thinks first, then acts.
 
 ---
 

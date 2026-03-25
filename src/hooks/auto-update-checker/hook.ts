@@ -5,11 +5,17 @@ import type { AutoUpdateCheckerOptions } from "./types"
 import { runBackgroundUpdateCheck } from "./hook/background-update-check"
 import { showConfigErrorsIfAny } from "./hook/config-errors-toast"
 import { updateAndShowConnectedProvidersCacheStatus } from "./hook/connected-providers-status"
+import { refreshModelCapabilitiesOnStartup } from "./hook/model-capabilities-status"
 import { showModelCacheWarningIfNeeded } from "./hook/model-cache-warning"
 import { showLocalDevToast, showVersionToast } from "./hook/startup-toasts"
 
 export function createAutoUpdateCheckerHook(ctx: PluginInput, options: AutoUpdateCheckerOptions = {}) {
-  const { showStartupToast = true, isSisyphusEnabled = false, autoUpdate = true } = options
+  const {
+    showStartupToast = true,
+    isSisyphusEnabled = false,
+    autoUpdate = true,
+    modelCapabilities,
+  } = options
   const isCliRunMode = process.env.OPENCODE_CLI_RUN_MODE === "true"
 
   const getToastMessage = (isUpdate: boolean, latestVersion?: string): string => {
@@ -43,6 +49,7 @@ export function createAutoUpdateCheckerHook(ctx: PluginInput, options: AutoUpdat
 
         await showConfigErrorsIfAny(ctx)
         await updateAndShowConnectedProvidersCacheStatus(ctx)
+        await refreshModelCapabilitiesOnStartup(modelCapabilities)
         await showModelCacheWarningIfNeeded(ctx)
 
         if (localDevVersion) {

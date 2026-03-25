@@ -4,6 +4,17 @@
 > 核心维护者 Q 因受伤，本周 issue/PR 回复和发布可能会延迟。
 > 感谢你的耐心与支持。
 
+> [!TIP]
+> **Building in Public**
+>
+> 维护者正在使用 Jobdori 实时开发和维护 oh-my-opencode。Jobdori 是基于 OpenClaw 深度定制的 AI 助手。
+> 每个功能开发、每次修复、每次 Issue 分类，都在 Discord 上实时进行。
+>
+> [![Building in Public](./.github/assets/building-in-public.png)](https://discord.gg/PUwSMR9XNk)
+>
+> [**→ 在 #building-in-public 频道中查看**](https://discord.gg/PUwSMR9XNk)
+
+
 > [!NOTE]
 >
 > [![Sisyphus Labs - Sisyphus is the agent that codes like your team.](./.github/assets/sisyphuslabs.png?v=2)](https://sisyphuslabs.ai)

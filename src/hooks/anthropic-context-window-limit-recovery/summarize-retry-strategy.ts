@@ -114,6 +114,7 @@ export async function runSummarizeRetryStrategy(params: {
           body: summarizeBody as never,
           query: { directory: params.directory },
         })
+        clearSessionState(params.autoCompactState, params.sessionID)
         return
       } catch {
         const remainingTimeMs = SUMMARIZE_RETRY_TOTAL_TIMEOUT_MS - (Date.now() - retryState.firstAttemptTime)

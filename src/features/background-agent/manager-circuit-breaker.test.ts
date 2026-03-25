@@ -1,3 +1,5 @@
+/// <reference types="bun-types" />
+
 import { describe, expect, test } from "bun:test"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { tmpdir } from "node:os"
@@ -38,8 +40,8 @@ async function flushAsyncWork() {
 }
 
 describe("BackgroundManager circuit breaker", () => {
-  describe("#given the same tool is called consecutively", () => {
-    test("#when consecutive tool events arrive #then the task is cancelled", async () => {
+  describe("#given flat-format tool events have no state.input", () => {
+    test("#when 20 consecutive read events arrive #then the task keeps running", async () => {
       const manager = createManager({
         circuitBreaker: {
           consecutiveThreshold: 20,
@@ -71,8 +73,8 @@ describe("BackgroundManager circuit breaker", () => {
 
       await flushAsyncWork()
 
-      expect(task.status).toBe("cancelled")
-      expect(task.error).toContain("read 20 consecutive times")
+      expect(task.status).toBe("running")
+      expect(task.progress?.toolCalls).toBe(20)
     })
   })
 
@@ -126,7 +128,7 @@ describe("BackgroundManager circuit breaker", () => {
   })
 
   describe("#given the absolute cap is configured lower than the repetition detector needs", () => {
-    test("#when the raw tool-call cap is reached #then the backstop still cancels the task", async () => {
+    test("#when repeated flat-format tool events reach maxToolCalls #then the backstop still cancels the task", async () => {
       const manager = createManager({
         maxToolCalls: 3,
         circuitBreaker: {
@@ -150,10 +152,10 @@ describe("BackgroundManager circuit breaker", () => {
       }
       getTaskMap(manager).set(task.id, task)
 
-      for (const toolName of ["read", "grep", "edit"]) {
+      for (let i = 0; i < 3; i++) {
         manager.handleEvent({
           type: "message.part.updated",
-          properties: { sessionID: task.sessionID, type: "tool", tool: toolName },
+          properties: { sessionID: task.sessionID, type: "tool", tool: "read" },
         })
       }
 

@@ -1,3 +1,13 @@
+> [!TIP]
+> **Building in Public**
+>
+> The maintainer builds and maintains oh-my-opencode in real-time with Jobdori, an AI assistant built on a heavily customized fork of OpenClaw.
+> Every feature, every fix, every issue triage — live in our Discord.
+>
+> [![Building in Public](./.github/assets/building-in-public.png)](https://discord.gg/PUwSMR9XNk)
+>
+> [**→ Watch it happen in #building-in-public**](https://discord.gg/PUwSMR9XNk)
+
 > [!NOTE]
 >
 > [![Sisyphus Labs - Sisyphus is the agent that codes like your team.](./.github/assets/sisyphuslabs.png?v=2)](https://sisyphuslabs.ai)

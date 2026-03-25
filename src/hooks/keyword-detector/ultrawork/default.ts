@@ -293,8 +293,6 @@ NOW.
 
 </ultrawork-mode>
 
----
-
 `
 
 export function getDefaultUltraworkMessage(): string {

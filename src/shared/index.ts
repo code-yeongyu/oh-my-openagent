@@ -35,7 +35,7 @@ export * from "./agent-tool-restrictions"
 export * from "./model-requirements"
 export * from "./model-resolver"
 export { normalizeModel, normalizeModelID } from "./model-normalization"
-export { normalizeFallbackModels } from "./model-resolver"
+export { normalizeFallbackModels, flattenToFallbackModelStrings } from "./model-resolver"
 export { resolveModelPipeline } from "./model-resolution-pipeline"
 export type {
   ModelResolutionRequest,
@@ -43,6 +43,10 @@ export type {
   ModelResolutionResult,
 } from "./model-resolution-types"
 export * from "./model-availability"
+export * from "./model-capabilities"
+export * from "./model-capabilities-cache"
+export * from "./model-capability-heuristics"
+export * from "./model-settings-compatibility"
 export * from "./fallback-model-availability"
 export * from "./connected-providers-cache"
 export * from "./context-limit-resolver"

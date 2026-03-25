@@ -3,6 +3,7 @@ import { install } from "./install"
 import { run } from "./run"
 import { getLocalVersion } from "./get-local-version"
 import { doctor } from "./doctor"
+import { refreshModelCapabilities } from "./refresh-model-capabilities"
 import { createMcpOAuthCommand } from "./mcp-oauth"
 import type { InstallArgs } from "./types"
 import type { RunOptions } from "./run"
@@ -42,7 +43,7 @@ Examples:
 Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi):
   Claude        Native anthropic/ models (Opus, Sonnet, Haiku)
   OpenAI        Native openai/ models (GPT-5.4 for Oracle)
-  Gemini        Native google/ models (Gemini 3 Pro, Flash)
+  Gemini        Native google/ models (Gemini 3.1 Pro, Flash)
   Copilot       github-copilot/ models (fallback)
   OpenCode Zen  opencode/ models (opencode/claude-opus-4-6, etc.)
    Z.ai          zai-coding-plan/glm-5 (visual-engineering fallback)
@@ -173,6 +174,21 @@ Examples:
       json: options.json ?? false,
     }
     const exitCode = await doctor(doctorOptions)
+    process.exit(exitCode)
+  })
+
+program
+  .command("refresh-model-capabilities")
+  .description("Refresh the cached models.dev-based model capabilities snapshot")
+  .option("-d, --directory <path>", "Working directory to read oh-my-opencode config from")
+  .option("--source-url <url>", "Override the models.dev source URL")
+  .option("--json", "Output refresh summary as JSON")
+  .action(async (options) => {
+    const exitCode = await refreshModelCapabilities({
+      directory: options.directory,
+      sourceUrl: options.sourceUrl,
+      json: options.json ?? false,
+    })
     process.exit(exitCode)
   })
 

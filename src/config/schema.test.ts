@@ -147,6 +147,37 @@ describe("disabled_mcps schema", () => {
   })
 })
 
+describe("OhMyOpenCodeConfigSchema - model_capabilities", () => {
+  test("accepts valid model capabilities config", () => {
+    const input = {
+      model_capabilities: {
+        enabled: true,
+        auto_refresh_on_start: true,
+        refresh_timeout_ms: 5000,
+        source_url: "https://models.dev/api.json",
+      },
+    }
+
+    const result = OhMyOpenCodeConfigSchema.safeParse(input)
+
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.model_capabilities).toEqual(input.model_capabilities)
+    }
+  })
+
+  test("rejects invalid model capabilities config", () => {
+    const result = OhMyOpenCodeConfigSchema.safeParse({
+      model_capabilities: {
+        refresh_timeout_ms: -1,
+        source_url: "not-a-url",
+      },
+    })
+
+    expect(result.success).toBe(false)
+  })
+})
+
 describe("AgentOverrideConfigSchema", () => {
   describe("category field", () => {
     test("accepts category as optional string", () => {
@@ -368,6 +399,26 @@ describe("CategoryConfigSchema", () => {
     expect(result.success).toBe(true)
     if (result.success) {
       expect(result.data.reasoningEffort).toBe("xhigh")
+    }
+  })
+
+  test("accepts reasoningEffort values none and minimal", () => {
+    // given
+    const noneConfig = { reasoningEffort: "none" }
+    const minimalConfig = { reasoningEffort: "minimal" }
+
+    // when
+    const noneResult = CategoryConfigSchema.safeParse(noneConfig)
+    const minimalResult = CategoryConfigSchema.safeParse(minimalConfig)
+
+    // then
+    expect(noneResult.success).toBe(true)
+    expect(minimalResult.success).toBe(true)
+    if (noneResult.success) {
+      expect(noneResult.data.reasoningEffort).toBe("none")
+    }
+    if (minimalResult.success) {
+      expect(minimalResult.data.reasoningEffort).toBe("minimal")
     }
   })
 

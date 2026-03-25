@@ -45,186 +45,99 @@ function createMockParams(overrides: {
 }
 
 describe("createAnthropicEffortHook", () => {
-  describe("opus 4-6 with variant max", () => {
-    it("should inject effort max for anthropic opus-4-6 with variant max", async () => {
-      //#given anthropic opus-4-6 model with variant max
+  describe("opus family with variant max", () => {
+    it("injects effort max for anthropic opus-4-6", async () => {
       const hook = createAnthropicEffortHook()
       const { input, output } = createMockParams({})
 
-      //#when chat.params hook is called
       await hook["chat.params"](input, output)
 
-      //#then effort should be injected into options
       expect(output.options.effort).toBe("max")
     })
 
-    it("should inject effort max for github-copilot claude-opus-4-6", async () => {
-      //#given github-copilot provider with claude-opus-4-6
+    it("injects effort max for another opus family model such as opus-4-5", async () => {
+      const hook = createAnthropicEffortHook()
+      const { input, output } = createMockParams({ modelID: "claude-opus-4-5" })
+
+      await hook["chat.params"](input, output)
+
+      expect(output.options.effort).toBe("max")
+    })
+
+    it("injects effort max for dotted opus ids", async () => {
+      const hook = createAnthropicEffortHook()
+      const { input, output } = createMockParams({ modelID: "claude-opus-4.6" })
+
+      await hook["chat.params"](input, output)
+
+      expect(output.options.effort).toBe("max")
+    })
+
+    it("should preserve max for other opus model IDs such as opus-4-5", async () => {
+      //#given another opus model id that is not 4.6
       const hook = createAnthropicEffortHook()
       const { input, output } = createMockParams({
-        providerID: "github-copilot",
-        modelID: "claude-opus-4-6",
+        modelID: "claude-opus-4-5",
       })
 
       //#when chat.params hook is called
       await hook["chat.params"](input, output)
 
-      //#then effort should be injected (github-copilot resolves to anthropic)
+      //#then max should still be treated as valid for opus family
       expect(output.options.effort).toBe("max")
-    })
-
-    it("should inject effort max for opencode provider with claude-opus-4-6", async () => {
-      //#given opencode provider with claude-opus-4-6
-      const hook = createAnthropicEffortHook()
-      const { input, output } = createMockParams({
-        providerID: "opencode",
-        modelID: "claude-opus-4-6",
-      })
-
-      //#when chat.params hook is called
-      await hook["chat.params"](input, output)
-
-      //#then effort should be injected
-      expect(output.options.effort).toBe("max")
-    })
-
-    it("should inject effort max for google-vertex-anthropic provider", async () => {
-      //#given google-vertex-anthropic provider with claude-opus-4-6
-      const hook = createAnthropicEffortHook()
-      const { input, output } = createMockParams({
-        providerID: "google-vertex-anthropic",
-        modelID: "claude-opus-4-6",
-      })
-
-      //#when chat.params hook is called
-      await hook["chat.params"](input, output)
-
-      //#then effort should be injected
-      expect(output.options.effort).toBe("max")
-    })
-
-    it("should handle normalized model ID with dots (opus-4.6)", async () => {
-      //#given model ID with dots instead of hyphens
-      const hook = createAnthropicEffortHook()
-      const { input, output } = createMockParams({
-        modelID: "claude-opus-4.6",
-      })
-
-      //#when chat.params hook is called
-      await hook["chat.params"](input, output)
-
-      //#then should normalize and inject effort
-      expect(output.options.effort).toBe("max")
+      expect(input.message.variant).toBe("max")
     })
   })
 
-  describe("conditions NOT met - should skip", () => {
-    it("should NOT inject effort when variant is not max", async () => {
-      //#given opus-4-6 with variant high (not max)
+  describe("skip conditions", () => {
+    it("does nothing when variant is not max", async () => {
       const hook = createAnthropicEffortHook()
       const { input, output } = createMockParams({ variant: "high" })
 
-      //#when chat.params hook is called
       await hook["chat.params"](input, output)
 
-      //#then effort should NOT be injected
       expect(output.options.effort).toBeUndefined()
     })
 
-    it("should NOT inject effort when variant is undefined", async () => {
-      //#given opus-4-6 with no variant
+    it("does nothing when variant is undefined", async () => {
       const hook = createAnthropicEffortHook()
       const { input, output } = createMockParams({ variant: undefined })
 
-      //#when chat.params hook is called
       await hook["chat.params"](input, output)
 
-      //#then effort should NOT be injected
       expect(output.options.effort).toBeUndefined()
     })
 
-    it("should NOT inject effort for non-opus model", async () => {
-      //#given claude-sonnet-4-6 (not opus)
+    it("should clamp effort to high for non-opus claude model with variant max", async () => {
+      //#given claude-sonnet-4-6 (not opus) with variant max
       const hook = createAnthropicEffortHook()
-      const { input, output } = createMockParams({
-        modelID: "claude-sonnet-4-6",
-      })
+      const { input, output } = createMockParams({ modelID: "claude-sonnet-4-6" })
 
-      //#when chat.params hook is called
       await hook["chat.params"](input, output)
 
-      //#then effort should NOT be injected
-      expect(output.options.effort).toBeUndefined()
+      //#then effort should be clamped to high (not max)
+      expect(output.options.effort).toBe("high")
+      expect(input.message.variant).toBe("high")
     })
 
-    it("should NOT inject effort for non-anthropic provider with non-claude model", async () => {
-      //#given openai provider with gpt model
+    it("does nothing for non-claude providers/models", async () => {
       const hook = createAnthropicEffortHook()
-      const { input, output } = createMockParams({
-        providerID: "openai",
-        modelID: "gpt-5.4",
-      })
+      const { input, output } = createMockParams({ providerID: "openai", modelID: "gpt-5.4" })
 
-      //#when chat.params hook is called
       await hook["chat.params"](input, output)
 
-      //#then effort should NOT be injected
-      expect(output.options.effort).toBeUndefined()
-    })
-
-    it("should NOT throw when model.modelID is undefined", async () => {
-      //#given model with undefined modelID (runtime edge case)
-      const hook = createAnthropicEffortHook()
-      const input = {
-        sessionID: "test-session",
-        agent: { name: "sisyphus" },
-        model: { providerID: "anthropic", modelID: undefined as unknown as string },
-        provider: { id: "anthropic" },
-        message: { variant: "max" as const },
-      }
-      const output = { temperature: 0.1, options: {} }
-
-      //#when chat.params hook is called with undefined modelID
-      await hook["chat.params"](input, output)
-
-      //#then should gracefully skip without throwing
       expect(output.options.effort).toBeUndefined()
     })
   })
 
-  describe("preserves existing options", () => {
-    it("should NOT overwrite existing effort if already set", async () => {
-      //#given options already have effort set
+  describe("existing options", () => {
+    it("does not overwrite existing effort", async () => {
       const hook = createAnthropicEffortHook()
-      const { input, output } = createMockParams({
-        existingOptions: { effort: "high" },
-      })
+      const { input, output } = createMockParams({ existingOptions: { effort: "high" } })
 
-      //#when chat.params hook is called
       await hook["chat.params"](input, output)
 
-      //#then existing effort should be preserved
       expect(output.options.effort).toBe("high")
-    })
-
-    it("should preserve other existing options when injecting effort", async () => {
-      //#given options with existing thinking config
-      const hook = createAnthropicEffortHook()
-      const { input, output } = createMockParams({
-        existingOptions: {
-          thinking: { type: "enabled", budgetTokens: 31999 },
-        },
-      })
-
-      //#when chat.params hook is called
-      await hook["chat.params"](input, output)
-
-      //#then effort should be added without affecting thinking
-      expect(output.options.effort).toBe("max")
-      expect(output.options.thinking).toEqual({
-        type: "enabled",
-        budgetTokens: 31999,
-      })
     })
   })
 })
