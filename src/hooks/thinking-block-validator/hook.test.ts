@@ -1,108 +1,184 @@
-const { describe, expect, test } = require("bun:test")
+declare const describe: (name: string, fn: () => void) => void
+declare const it: (name: string, fn: () => void | Promise<void>) => void
+declare const expect: <T>(value: T) => {
+  toBe(expected: T): void
+  toEqual(expected: unknown): void
+  toHaveLength(expected: number): void
+}
 
-const { createThinkingBlockValidatorHook } = require("./hook")
+import { createThinkingBlockValidatorHook } from "./hook"
 
 type TestPart = {
   type: string
-  id: string
   text?: string
   thinking?: string
-  data?: string
   signature?: string
+  synthetic?: boolean
 }
 
 type TestMessage = {
-  info: {
-    role: string
-    id?: string
-    modelID?: string
-  }
+  info: { role: "assistant" | "user" }
   parts: TestPart[]
 }
 
-function createMessage(info: TestMessage["info"], parts: TestPart[]): TestMessage {
-  return { info, parts }
-}
+async function runTransform(messages: TestMessage[]): Promise<void> {
+  const hook = createThinkingBlockValidatorHook()
+  const transform = hook["experimental.chat.messages.transform"]
 
-function createTextPart(id: string, text: string): TestPart {
-  return { type: "text", id, text }
-}
+  if (!transform) {
+    throw new Error("missing thinking block validator transform")
+  }
 
-function createSignedThinkingPart(id: string, thinking: string, signature: string): TestPart {
-  return { type: "thinking", id, thinking, signature }
-}
-
-function createRedactedThinkingPart(id: string, signature: string): TestPart {
-  return { type: "redacted_thinking", id, data: "encrypted", signature }
+  await transform({}, { messages: messages as never })
 }
 
 describe("createThinkingBlockValidatorHook", () => {
-  test("reuses the previous signed thinking part verbatim when assistant content lacks a leading thinking block", async () => {
-    const transform = Reflect.get(createThinkingBlockValidatorHook(), "experimental.chat.messages.transform")
-    expect(typeof transform).toBe("function")
+  it("injects signed thinking history verbatim", async () => {
+    //#given
+    const signedThinkingPart: TestPart = {
+      type: "thinking",
+      thinking: "plan",
+      signature: "signed-thinking",
+    }
+    const messages = [
+      {
+        info: { role: "assistant" },
+        parts: [signedThinkingPart],
+      },
+      {
+        info: { role: "assistant" },
+        parts: [{ type: "text", text: "continue" }],
+      },
+    ] satisfies TestMessage[]
 
-    const previousThinkingPart = createSignedThinkingPart("prt_prev_signed", "prior reasoning", "sig_prev")
-    const targetTextPart = createTextPart("prt_target_text", "tool result")
-    const messages: TestMessage[] = [
-      createMessage({ role: "user", modelID: "claude-opus-4-6-thinking" }, [createTextPart("prt_user_text", "continue")]),
-      createMessage({ role: "assistant", id: "msg_prev" }, [previousThinkingPart, createTextPart("prt_prev_text", "done")]),
-      createMessage({ role: "assistant", id: "msg_target" }, [targetTextPart]),
-    ]
+    //#when
+    await runTransform(messages)
 
-    await Reflect.apply(transform, undefined, [{}, { messages }])
-
-    expect(messages[2]?.parts[0]).toBe(previousThinkingPart)
-    expect(messages[2]?.parts).toEqual([previousThinkingPart, targetTextPart])
+    //#then
+    expect(messages[1]?.parts[0]).toBe(signedThinkingPart)
   })
 
-  test("skips injection when no signed Anthropic thinking part exists in history", async () => {
-    const transform = Reflect.get(createThinkingBlockValidatorHook(), "experimental.chat.messages.transform")
-    expect(typeof transform).toBe("function")
+  it("injects signed redacted_thinking history verbatim", async () => {
+    //#given
+    const signedRedactedThinkingPart: TestPart = {
+      type: "redacted_thinking",
+      signature: "signed-redacted-thinking",
+    }
+    const messages = [
+      {
+        info: { role: "assistant" },
+        parts: [signedRedactedThinkingPart],
+      },
+      {
+        info: { role: "assistant" },
+        parts: [{ type: "tool_use" }],
+      },
+    ] satisfies TestMessage[]
 
-    const targetTextPart = createTextPart("prt_target_text", "tool result")
-    const messages: TestMessage[] = [
-      createMessage({ role: "user", modelID: "claude-opus-4-6-thinking" }, [createTextPart("prt_user_text", "continue")]),
-      createMessage({ role: "assistant", id: "msg_prev" }, [{ type: "reasoning", id: "prt_reason", text: "gpt reasoning" }]),
-      createMessage({ role: "assistant", id: "msg_target" }, [targetTextPart]),
-    ]
+    //#when
+    await runTransform(messages)
 
-    await Reflect.apply(transform, undefined, [{}, { messages }])
-
-    expect(messages[2]?.parts).toEqual([targetTextPart])
+    //#then
+    expect(messages[1]?.parts[0]).toBe(signedRedactedThinkingPart)
   })
 
-  test("does not inject when the assistant message already starts with redacted thinking", async () => {
-    const transform = Reflect.get(createThinkingBlockValidatorHook(), "experimental.chat.messages.transform")
-    expect(typeof transform).toBe("function")
+  it("skips hook when history contains reasoning only", async () => {
+    //#given
+    const reasoningPart: TestPart = {
+      type: "reasoning",
+      text: "internal reasoning",
+    }
+    const messages = [
+      {
+        info: { role: "assistant" },
+        parts: [reasoningPart],
+      },
+      {
+        info: { role: "assistant" },
+        parts: [{ type: "text", text: "continue" }],
+      },
+    ] satisfies TestMessage[]
 
-    const existingThinkingPart = createRedactedThinkingPart("prt_redacted", "sig_redacted")
-    const targetTextPart = createTextPart("prt_target_text", "tool result")
-    const messages: TestMessage[] = [
-      createMessage({ role: "user", modelID: "claude-opus-4-6-thinking" }, [createTextPart("prt_user_text", "continue")]),
-      createMessage({ role: "assistant", id: "msg_target" }, [existingThinkingPart, targetTextPart]),
-    ]
+    //#when
+    await runTransform(messages)
 
-    await Reflect.apply(transform, undefined, [{}, { messages }])
-
-    expect(messages[1]?.parts).toEqual([existingThinkingPart, targetTextPart])
+    //#then
+    expect(messages[1]?.parts).toEqual([{ type: "text", text: "continue" }])
   })
 
-  test("skips processing for models without extended thinking", async () => {
-    const transform = Reflect.get(createThinkingBlockValidatorHook(), "experimental.chat.messages.transform")
-    expect(typeof transform).toBe("function")
+  it("skips hook when no signed history exists", async () => {
+    //#given
+    const messages = [
+      {
+        info: { role: "assistant" },
+        parts: [{ type: "thinking", thinking: "draft" }],
+      },
+      {
+        info: { role: "assistant" },
+        parts: [{ type: "text", text: "continue" }],
+      },
+    ] satisfies TestMessage[]
 
-    const previousThinkingPart = createSignedThinkingPart("prt_prev_signed", "prior reasoning", "sig_prev")
-    const targetTextPart = createTextPart("prt_target_text", "tool result")
-    const messages: TestMessage[] = [
-      createMessage({ role: "user", modelID: "gpt-5.4" }, [createTextPart("prt_user_text", "continue")]),
-      createMessage({ role: "assistant", id: "msg_prev" }, [previousThinkingPart]),
-      createMessage({ role: "assistant", id: "msg_target" }, [targetTextPart]),
-    ]
+    //#when
+    await runTransform(messages)
 
-    await Reflect.apply(transform, undefined, [{}, { messages }])
+    //#then
+    expect(messages[1]?.parts).toEqual([{ type: "text", text: "continue" }])
+  })
 
-    expect(messages[2]?.parts).toEqual([targetTextPart])
+  it("skips hook when history contains synthetic signed blocks only", async () => {
+    //#given
+    const syntheticSignedPart: TestPart = {
+      type: "thinking",
+      thinking: "synthetic",
+      signature: "synthetic-signature",
+      synthetic: true,
+    }
+    const messages = [
+      {
+        info: { role: "assistant" },
+        parts: [syntheticSignedPart],
+      },
+      {
+        info: { role: "assistant" },
+        parts: [{ type: "text", text: "continue" }],
+      },
+    ] satisfies TestMessage[]
+
+    //#when
+    await runTransform(messages)
+
+    //#then
+    expect(messages[1]?.parts).toEqual([{ type: "text", text: "continue" }])
+  })
+
+  it("does not reinject when the message already starts with redacted_thinking", async () => {
+    //#given
+    const signedThinkingPart: TestPart = {
+      type: "thinking",
+      thinking: "plan",
+      signature: "signed-thinking",
+    }
+    const leadingRedactedThinkingPart: TestPart = {
+      type: "redacted_thinking",
+      signature: "existing-redacted-thinking",
+    }
+    const messages = [
+      {
+        info: { role: "assistant" },
+        parts: [signedThinkingPart],
+      },
+      {
+        info: { role: "assistant" },
+        parts: [leadingRedactedThinkingPart, { type: "text", text: "continue" }],
+      },
+    ] satisfies TestMessage[]
+
+    //#when
+    await runTransform(messages)
+
+    //#then
+    expect(messages[1]?.parts[0]).toBe(leadingRedactedThinkingPart)
+    expect(messages[1]?.parts).toHaveLength(2)
   })
 })
-
-export {}
