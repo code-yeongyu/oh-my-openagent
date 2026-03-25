@@ -77,8 +77,8 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   librarian: {
     fallbackChain: [
-      { providers: ["opencode-go"], model: "minimax-m2.5" },
-      { providers: ["opencode"], model: "minimax-m2.5-free" },
+      { providers: ["opencode-go"], model: "minimax-m2.7" },
+      { providers: ["opencode"], model: "minimax-m2.7-highspeed" },
       { providers: ["anthropic", "opencode"], model: "claude-haiku-4-5" },
       { providers: ["opencode"], model: "gpt-5-nano" },
     ],
@@ -86,8 +86,8 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   explore: {
     fallbackChain: [
       { providers: ["github-copilot"], model: "grok-code-fast-1" },
-      { providers: ["opencode-go"], model: "minimax-m2.5" },
-      { providers: ["opencode"], model: "minimax-m2.5-free" },
+      { providers: ["opencode-go"], model: "minimax-m2.7-highspeed" },
+      { providers: ["opencode"], model: "minimax-m2.7" },
       { providers: ["anthropic", "opencode"], model: "claude-haiku-4-5" },
       { providers: ["opencode"], model: "gpt-5-nano" },
     ],
@@ -164,6 +164,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         model: "gpt-5.4",
         variant: "medium",
       },
+      { providers: ["opencode-go"], model: "minimax-m2.7" },
     ],
   },
   "sisyphus-junior": {
@@ -175,6 +176,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         model: "gpt-5.4",
         variant: "medium",
       },
+      { providers: ["opencode-go"], model: "minimax-m2.7" },
       { providers: ["opencode"], model: "big-pickle" },
     ],
   },
@@ -268,7 +270,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         providers: ["google", "github-copilot", "opencode"],
         model: "gemini-3-flash",
       },
-      { providers: ["opencode-go"], model: "minimax-m2.5" },
+      { providers: ["opencode-go"], model: "minimax-m2.7" },
       { providers: ["opencode"], model: "gpt-5-nano" },
     ],
   },
@@ -288,6 +290,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         providers: ["google", "github-copilot", "opencode"],
         model: "gemini-3-flash",
       },
+      { providers: ["opencode-go"], model: "minimax-m2.7" },
     ],
   },
   "unspecified-high": {
@@ -330,6 +333,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         providers: ["anthropic", "github-copilot", "opencode"],
         model: "claude-sonnet-4-6",
       },
+      { providers: ["opencode-go"], model: "minimax-m2.7" },
     ],
   },
 };
