@@ -33,7 +33,10 @@ export function createMessagesTransformHandler(args: {
 }): (input: Record<string, never>, output: MessagesTransformOutput) => Promise<void> {
   return async (input, output): Promise<void> => {
     const sanitizedMessages = output.messages.map((message) => sanitizeStringFields(message))
-    output.messages.splice(0, output.messages.length, ...sanitizedMessages)
+    output.messages.length = 0
+    for (const message of sanitizedMessages) {
+      output.messages.push(message)
+    }
 
     await args.hooks.contextInjectorMessagesTransform?.[
       "experimental.chat.messages.transform"
@@ -44,6 +47,9 @@ export function createMessagesTransformHandler(args: {
     ]?.(input, output)
 
     const postHookSanitizedMessages = output.messages.map((message) => sanitizeStringFields(message))
-    output.messages.splice(0, output.messages.length, ...postHookSanitizedMessages)
+    output.messages.length = 0
+    for (const message of postHookSanitizedMessages) {
+      output.messages.push(message)
+    }
   }
 }
