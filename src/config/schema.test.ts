@@ -371,6 +371,26 @@ describe("CategoryConfigSchema", () => {
     }
   })
 
+  test("accepts reasoningEffort values none and minimal", () => {
+    // given
+    const noneConfig = { reasoningEffort: "none" }
+    const minimalConfig = { reasoningEffort: "minimal" }
+
+    // when
+    const noneResult = CategoryConfigSchema.safeParse(noneConfig)
+    const minimalResult = CategoryConfigSchema.safeParse(minimalConfig)
+
+    // then
+    expect(noneResult.success).toBe(true)
+    expect(minimalResult.success).toBe(true)
+    if (noneResult.success) {
+      expect(noneResult.data.reasoningEffort).toBe("none")
+    }
+    if (minimalResult.success) {
+      expect(minimalResult.data.reasoningEffort).toBe("minimal")
+    }
+  })
+
   test("rejects non-string variant", () => {
     // given
     const config = { model: "openai/gpt-5.4", variant: 123 }

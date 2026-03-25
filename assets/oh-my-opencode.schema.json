@@ -309,6 +309,8 @@
             "reasoningEffort": {
               "type": "string",
               "enum": [
+                "none",
+                "minimal",
                 "low",
                 "medium",
                 "high",
@@ -590,6 +592,8 @@
             "reasoningEffort": {
               "type": "string",
               "enum": [
+                "none",
+                "minimal",
                 "low",
                 "medium",
                 "high",
@@ -871,6 +875,8 @@
             "reasoningEffort": {
               "type": "string",
               "enum": [
+                "none",
+                "minimal",
                 "low",
                 "medium",
                 "high",
@@ -1152,6 +1158,8 @@
             "reasoningEffort": {
               "type": "string",
               "enum": [
+                "none",
+                "minimal",
                 "low",
                 "medium",
                 "high",
@@ -1436,6 +1444,8 @@
             "reasoningEffort": {
               "type": "string",
               "enum": [
+                "none",
+                "minimal",
                 "low",
                 "medium",
                 "high",
@@ -1717,6 +1727,8 @@
             "reasoningEffort": {
               "type": "string",
               "enum": [
+                "none",
+                "minimal",
                 "low",
                 "medium",
                 "high",
@@ -1998,6 +2010,8 @@
             "reasoningEffort": {
               "type": "string",
               "enum": [
+                "none",
+                "minimal",
                 "low",
                 "medium",
                 "high",
@@ -2279,6 +2293,8 @@
             "reasoningEffort": {
               "type": "string",
               "enum": [
+                "none",
+                "minimal",
                 "low",
                 "medium",
                 "high",
@@ -2560,6 +2576,8 @@
             "reasoningEffort": {
               "type": "string",
               "enum": [
+                "none",
+                "minimal",
                 "low",
                 "medium",
                 "high",
@@ -2841,6 +2859,8 @@
             "reasoningEffort": {
               "type": "string",
               "enum": [
+                "none",
+                "minimal",
                 "low",
                 "medium",
                 "high",
@@ -3122,6 +3142,8 @@
             "reasoningEffort": {
               "type": "string",
               "enum": [
+                "none",
+                "minimal",
                 "low",
                 "medium",
                 "high",
@@ -3403,6 +3425,8 @@
             "reasoningEffort": {
               "type": "string",
               "enum": [
+                "none",
+                "minimal",
                 "low",
                 "medium",
                 "high",
@@ -3684,6 +3708,8 @@
             "reasoningEffort": {
               "type": "string",
               "enum": [
+                "none",
+                "minimal",
                 "low",
                 "medium",
                 "high",
@@ -3965,6 +3991,8 @@
             "reasoningEffort": {
               "type": "string",
               "enum": [
+                "none",
+                "minimal",
                 "low",
                 "medium",
                 "high",
@@ -4143,6 +4171,8 @@
           "reasoningEffort": {
             "type": "string",
             "enum": [
+              "none",
+              "minimal",
               "low",
               "medium",
               "high",

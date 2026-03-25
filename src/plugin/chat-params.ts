@@ -1,4 +1,6 @@
+import { normalizeSDKResponse } from "../shared/normalize-sdk-response"
 import { getSessionPromptParams } from "../shared/session-prompt-params-state"
+import { resolveCompatibleModelSettings } from "../shared"
 
 export type ChatParamsInput = {
   sessionID: string
@@ -17,6 +19,25 @@ export type ChatParamsOutput = {
   topP?: number
   topK?: number
   options: Record<string, unknown>
+}
+
+type ProviderListClient = {
+  provider?: {
+    list?: () => Promise<unknown>
+  }
+}
+
+type ProviderModelMetadata = {
+  variants?: Record<string, unknown>
+}
+
+type ProviderListEntry = {
+  id?: string
+  models?: Record<string, ProviderModelMetadata>
+}
+
+type ProviderListData = {
+  all?: ProviderListEntry[]
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -49,7 +70,11 @@ function buildChatParamsInput(raw: unknown): ChatParamsHookInput | null {
   if (!agentName) return null
 
   const providerID = model.providerID
-  const modelID = model.modelID
+  const modelID = typeof model.modelID === "string"
+    ? model.modelID
+    : typeof model.id === "string"
+      ? model.id
+      : undefined
   const providerId = provider.id
   const variant = message.variant
 
@@ -76,8 +101,33 @@ function isChatParamsOutput(raw: unknown): raw is ChatParamsOutput {
   return isRecord(raw.options)
 }
 
+async function getVariantCapabilities(
+  client: ProviderListClient | undefined,
+  model: { providerID: string; modelID: string },
+): Promise<string[] | undefined> {
+  const providerList = client?.provider?.list
+  if (typeof providerList !== "function") {
+    return undefined
+  }
+
+  try {
+    const response = await providerList()
+    const data = normalizeSDKResponse<ProviderListData>(response, {})
+    const providerEntry = data.all?.find((entry) => entry.id === model.providerID)
+    const variants = providerEntry?.models?.[model.modelID]?.variants
+    if (!variants) {
+      return undefined
+    }
+
+    return Object.keys(variants)
+  } catch {
+    return undefined
+  }
+}
+
 export function createChatParamsHandler(args: {
   anthropicEffort: { "chat.params"?: (input: ChatParamsHookInput, output: ChatParamsOutput) => Promise<void> } | null
+  client?: ProviderListClient
 }): (input: unknown, output: unknown) => Promise<void> {
   return async (input, output): Promise<void> => {
     const normalizedInput = buildChatParamsInput(input)
@@ -98,6 +148,37 @@ export function createChatParamsHandler(args: {
           ...storedPromptParams.options,
         }
       }
+    }
+
+    const variantCapabilities = await getVariantCapabilities(args.client, normalizedInput.model)
+
+    const compatibility = resolveCompatibleModelSettings({
+      providerID: normalizedInput.model.providerID,
+      modelID: normalizedInput.model.modelID,
+      desired: {
+        variant: normalizedInput.message.variant,
+        reasoningEffort: typeof output.options.reasoningEffort === "string"
+          ? output.options.reasoningEffort
+          : undefined,
+      },
+      capabilities: {
+        variants: variantCapabilities,
+      },
+    })
+
+    if (normalizedInput.rawMessage) {
+      if (compatibility.variant !== undefined) {
+        normalizedInput.rawMessage.variant = compatibility.variant
+      } else {
+        delete normalizedInput.rawMessage.variant
+      }
+    }
+    normalizedInput.message = normalizedInput.rawMessage as { variant?: string }
+
+    if (compatibility.reasoningEffort !== undefined) {
+      output.options.reasoningEffort = compatibility.reasoningEffort
+    } else if ("reasoningEffort" in output.options) {
+      delete output.options.reasoningEffort
     }
 
     await args.anthropicEffort?.["chat.params"]?.(normalizedInput, output)
