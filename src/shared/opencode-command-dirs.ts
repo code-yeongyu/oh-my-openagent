@@ -14,7 +14,6 @@ function getParentOpencodeConfigDir(configDir: string): string | null {
 export function getOpenCodeCommandDirs(options: OpenCodeConfigDirOptions): string[] {
   const configDir = getOpenCodeConfigDir(options)
   const parentConfigDir = getParentOpencodeConfigDir(configDir)
-
   return Array.from(
     new Set([
       join(configDir, "commands"),
@@ -27,7 +26,6 @@ export function getOpenCodeCommandDirs(options: OpenCodeConfigDirOptions): strin
 export function getOpenCodeSkillDirs(options: OpenCodeConfigDirOptions): string[] {
   const configDir = getOpenCodeConfigDir(options)
   const parentConfigDir = getParentOpencodeConfigDir(configDir)
-
   return Array.from(
     new Set([
       join(configDir, "skills"),

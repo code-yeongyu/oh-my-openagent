@@ -27,8 +27,8 @@ describe("opencode-command-dirs", () => {
 
           expect(dirs).toContain("/home/user/.config/opencode/profiles/opus/skills")
           expect(dirs).toContain("/home/user/.config/opencode/profiles/opus/skill")
-          expect(dirs).toContain("/home/user/.config/opencode/skills")
           expect(dirs).toContain("/home/user/.config/opencode/skill")
+          expect(dirs).toContain("/home/user/.config/opencode/skills")
           expect(dirs).toHaveLength(4)
         })
       })
