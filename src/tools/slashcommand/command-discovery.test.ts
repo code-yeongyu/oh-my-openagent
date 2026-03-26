@@ -181,4 +181,27 @@ Use parent opencode commit command.
     expect(commitCommand?.scope).toBe("opencode")
     expect(commitCommand?.content).toContain("Use parent opencode commit command.")
   })
+
+  it("discovers ancestor project opencode commands from plural commands directory", () => {
+    const projectRoot = join(projectDir, "workspace")
+    const childDir = join(projectRoot, "apps", "cli")
+    const commandsDir = join(projectRoot, ".opencode", "commands")
+
+    mkdirSync(childDir, { recursive: true })
+    mkdirSync(commandsDir, { recursive: true })
+    writeFileSync(
+      join(commandsDir, "ancestor.md"),
+      `---
+description: Discover command from ancestor plural directory
+---
+Use ancestor command.
+`,
+    )
+
+    const commands = discoverCommandsSync(childDir)
+    const ancestorCommand = commands.find((command) => command.name === "ancestor")
+
+    expect(ancestorCommand?.scope).toBe("opencode-project")
+    expect(ancestorCommand?.content).toContain("Use ancestor command.")
+  })
 })

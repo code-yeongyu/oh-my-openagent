@@ -3,6 +3,7 @@ import { basename, join } from "path"
 import {
   parseFrontmatter,
   sanitizeModelField,
+  findProjectOpencodeCommandDirs,
   getOpenCodeCommandDirs,
   discoverPluginCommandDefinitions,
 } from "../../shared"
@@ -82,14 +83,16 @@ export function discoverCommandsSync(
   const userCommandsDir = join(getClaudeConfigDir(), "commands")
   const projectCommandsDir = join(directory ?? process.cwd(), ".claude", "commands")
   const opencodeGlobalDirs = getOpenCodeCommandDirs({ binary: "opencode" })
-  const opencodeProjectDir = join(directory ?? process.cwd(), ".opencode", "command")
+  const opencodeProjectDirs = findProjectOpencodeCommandDirs(directory ?? process.cwd())
 
   const userCommands = discoverCommandsFromDir(userCommandsDir, "user")
   const opencodeGlobalCommands = opencodeGlobalDirs.flatMap((commandsDir) =>
     discoverCommandsFromDir(commandsDir, "opencode")
   )
   const projectCommands = discoverCommandsFromDir(projectCommandsDir, "project")
-  const opencodeProjectCommands = discoverCommandsFromDir(opencodeProjectDir, "opencode-project")
+  const opencodeProjectCommands = opencodeProjectDirs.flatMap((commandsDir) =>
+    discoverCommandsFromDir(commandsDir, "opencode-project"),
+  )
   const pluginCommands = discoverPluginCommands(options)
 
   const builtinCommandsMap = loadBuiltinCommands()
