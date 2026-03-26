@@ -24,8 +24,30 @@ interface MessagePart {
   id?: string
 }
 
+function isValidToolUseID(id: string | undefined): id is string {
+  return typeof id === "string" && /^(toolu_|call_)/.test(id)
+}
+
+function normalizeMessagePart(part: { type: string; id?: string; callID?: string }): MessagePart | null {
+  if (part.type === "tool" || part.type === "tool_use") {
+    if (!isValidToolUseID(part.callID)) {
+      return null
+    }
+
+    return {
+      type: "tool_use",
+      id: part.callID,
+    }
+  }
+
+  return {
+    type: part.type,
+    id: part.id,
+  }
+}
+
 function extractToolUseIds(parts: MessagePart[]): string[] {
-  return parts.filter((part): part is ToolUsePart => part.type === "tool_use" && !!part.id).map((part) => part.id)
+  return parts.filter((part): part is ToolUsePart => part.type === "tool_use" && isValidToolUseID(part.id)).map((part) => part.id)
 }
 
 async function readPartsFromSDKFallback(
@@ -39,10 +61,7 @@ async function readPartsFromSDKFallback(
     const target = messages.find((m) => m.info?.id === messageID)
     if (!target?.parts) return []
 
-    return target.parts.map((part) => ({
-      type: part.type === "tool" ? "tool_use" : part.type,
-      id: "callID" in part ? (part as { callID?: string }).callID : part.id,
-    }))
+    return target.parts.map((part) => normalizeMessagePart(part)).filter((part): part is MessagePart => part !== null)
   } catch {
     return []
   }
@@ -59,10 +78,7 @@ export async function recoverToolResultMissing(
       parts = await readPartsFromSDKFallback(client, sessionID, failedAssistantMsg.info.id)
     } else {
       const storedParts = readParts(failedAssistantMsg.info.id)
-      parts = storedParts.map((part) => ({
-        type: part.type === "tool" ? "tool_use" : part.type,
-        id: "callID" in part ? (part as { callID?: string }).callID : part.id,
-      }))
+      parts = storedParts.map((part) => normalizeMessagePart(part)).filter((part): part is MessagePart => part !== null)
     }
   }
 
