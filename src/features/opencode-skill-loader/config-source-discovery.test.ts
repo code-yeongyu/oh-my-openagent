@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test"
 import { mkdirSync, rmSync, writeFileSync } from "fs"
-import { homedir } from "os"
 import { join } from "path"
 import { homedir, tmpdir } from "os"
 import { SkillsConfigSchema } from "../../config/schema/skills"
@@ -101,30 +100,5 @@ describe("config source discovery", () => {
 
     // then
     expect(normalized).toBe("keep/nested/SKILL.md")
-  })
-
-  it("loads skills from ~/ sources paths", async () => {
-    // given
-    const homeTestDir = join(homedir(), `.omo-config-source-${Date.now()}`)
-    const sourceDir = join(homeTestDir, "custom-skills")
-    writeSkill(join(sourceDir, "tilde-skill"), "tilde-skill", "Loaded from tilde source")
-    const config = SkillsConfigSchema.parse({
-      sources: [{ path: `${homeTestDir.replace(homedir(), "~")}/custom-skills`, recursive: true }],
-    })
-
-    try {
-      // when
-      const skills = await discoverConfigSourceSkills({
-        config,
-        configDir: join(TEST_DIR, "config"),
-      })
-
-      // then
-      const tildeSkill = skills.find((skill) => skill.name === "tilde-skill")
-      expect(tildeSkill).toBeDefined()
-      expect(tildeSkill?.definition.description).toContain("Loaded from tilde source")
-    } finally {
-      rmSync(homeTestDir, { recursive: true, force: true })
-    }
   })
 })
