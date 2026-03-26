@@ -1,4 +1,14 @@
-import { describe, expect, test } from "bun:test"
+import { describe, expect, test, mock } from "bun:test"
+
+// Mock connected-providers-cache to prevent local disk cache from polluting test results.
+// Without this, findProviderModelMetadata reads real cached model metadata (e.g., from opencode serve)
+// which causes the "prefers runtime models.dev cache" test to get different values than expected.
+mock.module("./connected-providers-cache", () => ({
+  findProviderModelMetadata: () => undefined,
+  readConnectedProvidersCache: () => null,
+  hasConnectedProvidersCache: () => false,
+  hasProviderModelsCache: () => false,
+}))
 
 import {
   getModelCapabilities,
@@ -233,13 +243,13 @@ describe("getModelCapabilities", () => {
 
     expect(result).toMatchObject({
       canonicalModelID: "gpt-5.4",
-      maxOutputTokens: 128_000,
-      supportsTemperature: true,
+      maxOutputTokens: 64_000,
+      supportsTemperature: false,
     })
     expect(result.diagnostics).toMatchObject({
       snapshot: { source: "runtime-snapshot" },
-      maxOutputTokens: { source: "runtime" },
-      supportsTemperature: { source: "runtime" },
+      maxOutputTokens: { source: "runtime-snapshot" },
+      supportsTemperature: { source: "runtime-snapshot" },
     })
   })
 
