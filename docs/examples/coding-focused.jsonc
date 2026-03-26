@@ -1,0 +1,50 @@
+// oh-my-openagent coding-focused configuration
+// Optimized for hands-on coding: Sisyphus + Hephaestus as primary workers.
+// Uses stronger models for implementation, lighter models for support agents.
+{
+  "agents": {
+    // Sisyphus with GPT 5.4 — strong coding performance
+    "sisyphus": {
+      "model": "openai/gpt-5.4",
+      "variant": "high"
+    },
+
+    // Hephaestus with GPT-5.3-codex — deep autonomous coding
+    "hephaestus": {
+      "model": "openai/gpt-5.3-codex",
+      "variant": "max"
+    },
+
+    // Atlas for orchestration when using /start-work
+    "atlas": {
+      "model": "anthropic/claude-sonnet-4-6",
+      "variant": "max"
+    },
+
+    // Prometheus for planning (Opus for best results)
+    "prometheus": {
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max"
+    },
+
+    // Lightweight agents for support tasks
+    "explore": {
+      "model": "anthropic/claude-haiku-4-5"
+    },
+    "librarian": {
+      "model": "opencode-go/kimi-k2.5"
+    }
+  },
+
+  "categories": {
+    "quick": {
+      "model": "anthropic/claude-sonnet-4-6",
+      "description": "Fast implementation tasks"
+    },
+    "deep": {
+      "model": "openai/gpt-5.4",
+      "variant": "high",
+      "description": "Complex multi-file changes"
+    }
+  }
+}

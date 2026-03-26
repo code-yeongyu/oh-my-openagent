@@ -6,6 +6,7 @@ import { findOpenCodeBinary, getOpenCodeVersion, compareVersions } from "./syste
 import { getPluginInfo } from "./system-plugin"
 import { getLatestPluginVersion, getLoadedPluginVersion, getSuggestedInstallTag } from "./system-loaded-version"
 import { parseJsonc } from "../../../shared"
+import { PLUGIN_NAME, LEGACY_PLUGIN_NAME } from "../../../shared/plugin-identity"
 
 function isConfigValid(configPath: string | null): boolean {
   if (!configPath) return true
@@ -88,6 +89,22 @@ export async function checkSystem(): Promise<CheckResult> {
       severity: "error",
       affects: ["all agents"],
     })
+  }
+
+  // Detect legacy package name in plugin config
+  if (pluginInfo.entry && !pluginInfo.isLocalDev) {
+    const isLegacyName = pluginInfo.entry === LEGACY_PLUGIN_NAME
+      || pluginInfo.entry.startsWith(`${LEGACY_PLUGIN_NAME}@`)
+    if (isLegacyName) {
+      const suggestedEntry = pluginInfo.entry.replace(LEGACY_PLUGIN_NAME, PLUGIN_NAME)
+      issues.push({
+        title: "Using legacy package name",
+        description: `Your opencode.json references "${LEGACY_PLUGIN_NAME}" which has been renamed to "${PLUGIN_NAME}". The old name may stop working in a future release.`,
+        fix: `Update your opencode.json plugin entry: "${pluginInfo.entry}" → "${suggestedEntry}"`,
+        severity: "warning",
+        affects: ["plugin loading"],
+      })
+    }
   }
 
   if (loadedInfo.expectedVersion && loadedInfo.loadedVersion && loadedInfo.expectedVersion !== loadedInfo.loadedVersion) {

@@ -1,0 +1,56 @@
+// oh-my-openagent planning-focused configuration
+// Optimized for large projects: Prometheus planning → Atlas orchestration.
+// Uses Opus for planning and review, Sonnet for implementation.
+{
+  "agents": {
+    // Sisyphus with Sonnet — reliable implementation
+    "sisyphus": {
+      "model": "anthropic/claude-sonnet-4-6",
+      "variant": "max"
+    },
+
+    // Hephaestus as alternative worker
+    "hephaestus": {
+      "model": "openai/gpt-5.3-codex"
+    },
+
+    // Atlas with Opus — strong orchestration and task decomposition
+    "atlas": {
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
+      "prompt_append": "Leverage quick & deep agents in parallel when tasks are independent."
+    },
+
+    // Prometheus with Opus — best planning quality
+    "prometheus": {
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
+      "prompt_append": "Leverage quick & deep agents in parallel when tasks are independent."
+    },
+
+    // Support agents
+    "explore": {
+      "model": "anthropic/claude-haiku-4-5"
+    },
+    "librarian": {
+      "model": "anthropic/claude-haiku-4-5"
+    }
+  },
+
+  "categories": {
+    "quick": {
+      "model": "anthropic/claude-sonnet-4-6",
+      "description": "Scaffolding, config changes, simple fixes"
+    },
+    "deep": {
+      "model": "anthropic/claude-sonnet-4-6",
+      "variant": "max",
+      "description": "Core module implementation, refactoring"
+    },
+    "unspecified-high": {
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
+      "description": "High-stakes tasks requiring maximum quality"
+    }
+  }
+}

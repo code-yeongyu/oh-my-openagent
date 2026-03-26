@@ -1,0 +1,59 @@
+// oh-my-openagent default configuration
+// Copy this file to your project root as .opencode/oh-my-openagent.jsonc
+// or to ~/.config/opencode/oh-my-openagent.jsonc for global config.
+//
+// The legacy name oh-my-opencode.jsonc is also supported.
+{
+  // Agent model overrides
+  // Each agent can be configured with a specific model, variant, and prompt.
+  "agents": {
+    // Sisyphus: Main worker agent. Handles coding, debugging, refactoring.
+    // Best with: Opus (strongest), Sonnet (good), GPT 5.4 (officially supported)
+    "sisyphus": {
+      "model": "anthropic/claude-sonnet-4-6"
+    },
+
+    // Hephaestus: Deep autonomous worker, optimized for GPT models.
+    // Best with: GPT-5.3-codex (primary), GPT 5.4
+    "hephaestus": {
+      "model": "openai/gpt-5.3-codex"
+    },
+
+    // Atlas: Orchestrator agent. Reads plans and delegates tasks to Sisyphus-Junior.
+    // Best with: Opus (recommended), GPT (has optimized prompt)
+    "atlas": {
+      "model": "anthropic/claude-sonnet-4-6"
+    },
+
+    // Prometheus: Strategic planner. Creates detailed work plans.
+    // Best with: Opus (recommended)
+    "prometheus": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+
+    // Explore: Codebase explorer (grep, file listing). Lightweight and fast.
+    "explore": {
+      "model": "anthropic/claude-haiku-4-5"
+    },
+
+    // Librarian: External documentation and code search.
+    "librarian": {
+      "model": "anthropic/claude-haiku-4-5"
+    }
+  },
+
+  // Category configurations for Sisyphus-Junior tasks
+  // Categories control which model is used when Atlas delegates work.
+  "categories": {
+    "quick": {
+      "model": "anthropic/claude-sonnet-4-6",
+      "variant": "normal",
+      "description": "Fast tasks: scaffolding, simple fixes, file moves"
+    },
+    "deep": {
+      "model": "anthropic/claude-sonnet-4-6",
+      "variant": "max",
+      "description": "Complex tasks: architecture, multi-file refactoring"
+    }
+  }
+}
