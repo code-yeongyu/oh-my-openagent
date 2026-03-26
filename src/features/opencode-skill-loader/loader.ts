@@ -48,6 +48,20 @@ export async function loadOpencodeProjectSkills(directory?: string): Promise<Rec
   return skillsToCommandDefinitionRecord(deduplicateSkillsByName(allSkills.flat()))
 }
 
+export async function loadProjectAgentsSkills(directory?: string): Promise<Record<string, CommandDefinition>> {
+  const agentsProjectSkillDirs = findProjectAgentsSkillDirs(directory ?? process.cwd())
+  const allSkills = await Promise.all(
+    agentsProjectSkillDirs.map((skillsDir) => loadSkillsFromDir({ skillsDir, scope: "project" })),
+  )
+  return skillsToCommandDefinitionRecord(deduplicateSkillsByName(allSkills.flat()))
+}
+
+export async function loadGlobalAgentsSkills(): Promise<Record<string, CommandDefinition>> {
+  const agentsGlobalDir = join(homedir(), ".agents", "skills")
+  const skills = await loadSkillsFromDir({ skillsDir: agentsGlobalDir, scope: "user" })
+  return skillsToCommandDefinitionRecord(skills)
+}
+
 export interface DiscoverSkillsOptions {
   includeClaudeCodePaths?: boolean
   directory?: string
