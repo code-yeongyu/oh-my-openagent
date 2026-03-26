@@ -250,7 +250,7 @@ Use nested command.
     )
 
     const commands = discoverCommandsSync(projectDir)
-    const nestedCommand = commands.find((command) => command.name === "refactor:code")
+    const nestedCommand = commands.find((command) => command.name === "refactor/code")
 
     expect(nestedCommand?.content).toContain("Use nested command.")
     expect(nestedCommand?.scope).toBe("opencode-project")

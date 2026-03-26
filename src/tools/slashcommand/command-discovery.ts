@@ -18,6 +18,8 @@ export interface CommandDiscoveryOptions {
   enabledPluginsOverride?: Record<string, boolean>
 }
 
+const NESTED_COMMAND_SEPARATOR = "/"
+
 function discoverCommandsFromDir(
   commandsDir: string,
   scope: CommandScope,
@@ -31,7 +33,9 @@ function discoverCommandsFromDir(
   for (const entry of entries) {
     if (entry.isDirectory()) {
       if (entry.name.startsWith(".")) continue
-      const nestedPrefix = prefix ? `${prefix}:${entry.name}` : entry.name
+      const nestedPrefix = prefix
+        ? `${prefix}${NESTED_COMMAND_SEPARATOR}${entry.name}`
+        : entry.name
       commands.push(
         ...discoverCommandsFromDir(join(commandsDir, entry.name), scope, nestedPrefix),
       )
@@ -42,7 +46,9 @@ function discoverCommandsFromDir(
 
     const commandPath = join(commandsDir, entry.name)
     const baseCommandName = basename(entry.name, ".md")
-    const commandName = prefix ? `${prefix}:${baseCommandName}` : baseCommandName
+    const commandName = prefix
+      ? `${prefix}${NESTED_COMMAND_SEPARATOR}${baseCommandName}`
+      : baseCommandName
 
     try {
       const content = readFileSync(commandPath, "utf-8")
