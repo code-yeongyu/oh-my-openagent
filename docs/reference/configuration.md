@@ -162,7 +162,7 @@ Disable agents entirely: `{ "disabled_agents": ["oracle", "multimodal-looker"] }
 | Option            | Type          | Description                                            |
 | ----------------- | ------------- | ------------------------------------------------------ |
 | `model`           | string        | Model override (`provider/model`)                      |
-| `fallback_models` | string\|array | Fallback models on API errors                          |
+| `fallback_models` | string\|array | Fallback models on API errors. Supports strings or mixed arrays of strings and object entries with per-model settings. |
 | `temperature`     | number        | Sampling temperature                                   |
 | `top_p`           | number        | Top-p sampling                                         |
 | `prompt`          | string        | Replace system prompt                                  |
@@ -240,7 +240,7 @@ Domain-specific model delegation used by the `task()` tool. When Sisyphus delega
 | Option              | Type          | Default | Description                                                         |
 | ------------------- | ------------- | ------- | ------------------------------------------------------------------- |
 | `model`             | string        | -       | Model override                                                      |
-| `fallback_models`   | string\|array | -       | Fallback models on API errors                                       |
+| `fallback_models`   | string\|array | -       | Fallback models on API errors. Supports strings or mixed arrays of strings and object entries with per-model settings. |
 | `temperature`       | number        | -       | Sampling temperature                                                |
 | `top_p`             | number        | -       | Top-p sampling                                                      |
 | `maxTokens`         | number        | -       | Max response tokens                                                 |
@@ -590,11 +590,204 @@ Define `fallback_models` per agent or category:
   "agents": {
     "sisyphus": {
       "model": "anthropic/claude-opus-4-6",
-      "fallback_models": ["openai/gpt-5.4", "google/gemini-3.1-pro"]
+      "fallback_models": [
+        "openai/gpt-5.4",
+        {
+          "model": "google/gemini-3.1-pro",
+          "variant": "high"
+        }
+      ]
     }
   }
 }
 ```
+
+`fallback_models` also supports object-style entries so you can attach settings to a specific fallback model:
+
+```json
+{
+  "agents": {
+    "sisyphus": {
+      "model": "anthropic/claude-opus-4-6",
+      "fallback_models": [
+        "openai/gpt-5.4",
+        {
+          "model": "anthropic/claude-sonnet-4-6",
+          "variant": "high",
+          "thinking": { "type": "enabled", "budgetTokens": 12000 }
+        },
+        {
+          "model": "openai/gpt-5.3-codex",
+          "reasoningEffort": "high",
+          "temperature": 0.2,
+          "top_p": 0.95,
+          "maxTokens": 8192
+        }
+      ]
+    }
+  }
+}
+```
+
+Mixed arrays are allowed, so string entries and object entries can appear together in the same fallback chain.
+
+#### Object-style `fallback_models`
+
+Object entries use the following shape:
+
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| `model` | string | Fallback model ID. Provider prefix is optional when OmO can inherit the current/default provider. |
+| `variant` | string | Explicit variant override for this fallback entry. |
+| `reasoningEffort` | string | OpenAI reasoning effort override for this fallback entry. |
+| `temperature` | number | Temperature applied if this fallback model becomes active. |
+| `top_p` | number | Top-p applied if this fallback model becomes active. |
+| `maxTokens` | number | Max response tokens applied if this fallback model becomes active. |
+| `thinking` | object | Anthropic thinking config applied if this fallback model becomes active. |
+
+Per-model settings are **fallback-only**. They are promoted only when that specific fallback model is actually selected, so they do not override your primary model settings when the primary model resolves successfully.
+
+`thinking` uses the same shape as the normal agent/category option:
+
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| `type` | string | `enabled` or `disabled` |
+| `budgetTokens` | number | Optional Anthropic thinking budget |
+
+Object entries can also omit the provider prefix when OmO can infer it from the current/default provider. If you provide both inline variant syntax in `model` and an explicit `variant` field, the explicit `variant` field wins.
+
+#### Full examples
+
+**1. Simple string chain**
+
+Use strings when you only need an ordered fallback chain:
+
+```json
+{
+  "agents": {
+    "atlas": {
+      "model": "anthropic/claude-sonnet-4-6",
+      "fallback_models": [
+        "anthropic/claude-haiku-4-5",
+        "openai/gpt-5.4",
+        "google/gemini-3.1-pro"
+      ]
+    }
+  }
+}
+```
+
+**2. Same-provider shorthand**
+
+If the primary model already establishes the provider, fallback entries can omit the prefix:
+
+```json
+{
+  "agents": {
+    "atlas": {
+      "model": "openai/gpt-5.4",
+      "fallback_models": [
+        "gpt-5.4-mini",
+        {
+          "model": "gpt-5.3-codex",
+          "reasoningEffort": "medium",
+          "maxTokens": 4096
+        }
+      ]
+    }
+  }
+}
+```
+
+In this example OmO treats `gpt-5.4-mini` and `gpt-5.3-codex` as OpenAI fallback entries because the current/default provider is already `openai`.
+
+**3. Mixed cross-provider chain**
+
+Mix string entries and object entries when only some fallback models need special settings:
+
+```json
+{
+  "agents": {
+    "sisyphus": {
+      "model": "anthropic/claude-opus-4-6",
+      "fallback_models": [
+        "openai/gpt-5.4",
+        {
+          "model": "anthropic/claude-sonnet-4-6",
+          "variant": "high",
+          "thinking": { "type": "enabled", "budgetTokens": 12000 }
+        },
+        {
+          "model": "google/gemini-3.1-pro",
+          "variant": "high"
+        }
+      ]
+    }
+  }
+}
+```
+
+**4. Category-level fallback chain**
+
+`fallback_models` works the same way under `categories`:
+
+```json
+{
+  "categories": {
+    "deep": {
+      "model": "openai/gpt-5.3-codex",
+      "fallback_models": [
+        {
+          "model": "openai/gpt-5.4",
+          "reasoningEffort": "xhigh",
+          "maxTokens": 12000
+        },
+        {
+          "model": "anthropic/claude-opus-4-6",
+          "variant": "max",
+          "temperature": 0.2
+        },
+        "google/gemini-3.1-pro(high)"
+      ]
+    }
+  }
+}
+```
+
+**5. Full object entry with every supported field**
+
+This shows every supported object-style parameter in one place:
+
+```json
+{
+  "agents": {
+    "oracle": {
+      "model": "openai/gpt-5.4",
+      "fallback_models": [
+        {
+          "model": "openai/gpt-5.3-codex(low)",
+          "variant": "xhigh",
+          "reasoningEffort": "high",
+          "temperature": 0.3,
+          "top_p": 0.9,
+          "maxTokens": 8192,
+          "thinking": {
+            "type": "disabled"
+          }
+        }
+      ]
+    }
+  }
+}
+```
+
+In this example the explicit `"variant": "xhigh"` overrides the inline `(low)` suffix in `"model"`.
+
+This final example is a **complete shape reference**. In real configs, prefer provider-appropriate settings:
+
+- use `reasoningEffort` for OpenAI reasoning models
+- use `thinking` for Anthropic thinking-capable models
+- use `variant`, `temperature`, `top_p`, and `maxTokens` only when that fallback model supports them
 
 ### Hashline Edit
 
