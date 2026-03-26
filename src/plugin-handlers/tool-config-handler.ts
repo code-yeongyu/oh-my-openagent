@@ -40,9 +40,7 @@ export function applyToolConfig(params: {
     LspCodeActionResolve: false,
     "task_*": false,
     teammate: false,
-    prepare_council_prompt: false,
-    council_finalize: false,
-    athena_council: false,
+
     ...(params.pluginConfig.experimental?.task_system
       ? { todowrite: false, todoread: false }
       : {}),
@@ -126,12 +124,6 @@ export function applyToolConfig(params: {
   // Keep all three in sync when modifying.
   const athena = agentByKey(params.agentResult, "athena");
   if (athena) {
-    athena.tools = {
-      ...athena.tools,
-      prepare_council_prompt: true,
-      council_finalize: true,
-      athena_council: true,
-    };
     athena.permission = {
       ...athena.permission,
       task: "allow",
@@ -143,12 +135,6 @@ export function applyToolConfig(params: {
   }
   const athenaJunior = agentByKey(params.agentResult, "athena-junior");
   if (athenaJunior) {
-    athenaJunior.tools = {
-      ...athenaJunior.tools,
-      prepare_council_prompt: true,
-      council_finalize: true,
-      athena_council: true,
-    };
     athenaJunior.permission = {
       ...athenaJunior.permission,
       prepare_council_prompt: "allow",

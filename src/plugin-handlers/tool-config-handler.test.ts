@@ -301,19 +301,15 @@ describe("applyToolConfig", () => {
   describe("#given council tools are globally hidden", () => {
     describe("#when applying tool config for Athena agents", () => {
       it.each(["athena", "athena-junior"])(
-        "#then should expose council tools via agent tools for %s",
+        "#then should allow council tools permission for %s",
         (agentName) => {
           const params = createParams({ agents: [agentName] })
 
           applyToolConfig(params)
 
           const agent = params.agentResult[agentName] as {
-            tools?: Record<string, unknown>
             permission: Record<string, unknown>
           }
-          expect(agent.tools?.prepare_council_prompt).toBe(true)
-          expect(agent.tools?.council_finalize).toBe(true)
-          expect(agent.tools?.athena_council).toBe(true)
           expect(agent.permission.prepare_council_prompt).toBe("allow")
           expect(agent.permission.council_finalize).toBe("allow")
           expect(agent.permission.athena_council).toBe("allow")
@@ -323,20 +319,20 @@ describe("applyToolConfig", () => {
 
     describe("#when applying tool config for non-Athena agents", () => {
       it.each(["atlas", "sisyphus", "prometheus", "hephaestus", "sisyphus-junior"])(
-        "#then should keep council tools hidden for %s",
+        "#then should deny council tools permission for %s",
         (agentName) => {
           const params = createParams({ agents: [agentName] })
 
           applyToolConfig(params)
 
-          const tools = params.config.tools as Record<string, unknown>
+          const permission = params.config.permission as Record<string, unknown>
           const agent = params.agentResult[agentName] as {
             tools?: Record<string, unknown>
             permission: Record<string, unknown>
           }
-          expect(tools.prepare_council_prompt).toBe(false)
-          expect(tools.council_finalize).toBe(false)
-          expect(tools.athena_council).toBe(false)
+          expect(permission.prepare_council_prompt).toBe("deny")
+          expect(permission.council_finalize).toBe("deny")
+          expect(permission.athena_council).toBe("deny")
           expect(agent.tools?.prepare_council_prompt).toBeUndefined()
           expect(agent.tools?.council_finalize).toBeUndefined()
           expect(agent.tools?.athena_council).toBeUndefined()
