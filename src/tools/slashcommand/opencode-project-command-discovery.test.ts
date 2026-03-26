@@ -1,4 +1,3 @@
-import { execFileSync } from "node:child_process"
 import { afterEach, beforeEach, describe, expect, it } from "bun:test"
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -27,9 +26,12 @@ describe("opencode project command discovery", () => {
     const nestedDirectory = join(repositoryDir, "packages", "app", "src")
 
     mkdirSync(nestedDirectory, { recursive: true })
-    execFileSync("git", ["init"], {
+    // Use Bun.spawnSync instead of execFileSync to avoid mock leakage
+    // from parallel test files (e.g. image-converter.test.ts mocks execFileSync globally)
+    Bun.spawnSync(["git", "init"], {
       cwd: repositoryDir,
-      stdio: ["ignore", "ignore", "ignore"],
+      stdout: "ignore",
+      stderr: "ignore",
     })
 
     writeCommand(
