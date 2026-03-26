@@ -145,3 +145,8 @@ export async function discoverConfigPathsSkills(directory?: string): Promise<Loa
   )
   return deduplicateSkillsByName(results.flat())
 }
+
+export async function loadConfigPathsSkills(directory?: string): Promise<Record<string, CommandDefinition>> {
+  const skills = await discoverConfigPathsSkills(directory)
+  return skillsToCommandDefinitionRecord(skills)
+}

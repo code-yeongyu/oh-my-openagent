@@ -13,6 +13,7 @@ import {
   loadProjectSkills,
   loadOpencodeGlobalSkills,
   loadOpencodeProjectSkills,
+  loadConfigPathsSkills,
   skillsToCommandDefinitionRecord,
 } from "../features/opencode-skill-loader";
 import type { PluginComponents } from "./plugin-components-loader";
@@ -31,6 +32,7 @@ export async function applyCommandConfig(params: {
 
   const [
     configSourceSkills,
+    configPathsSkills,
     userCommands,
     projectCommands,
     opencodeGlobalCommands,
@@ -44,6 +46,7 @@ export async function applyCommandConfig(params: {
       config: params.pluginConfig.skills,
       configDir: params.ctx.directory,
     }),
+    loadConfigPathsSkills(params.ctx.directory),
     includeClaudeCommands ? loadUserCommands() : Promise.resolve({}),
     includeClaudeCommands ? loadProjectCommands(params.ctx.directory) : Promise.resolve({}),
     loadOpencodeGlobalCommands(),
@@ -57,6 +60,7 @@ export async function applyCommandConfig(params: {
   params.config.command = {
     ...builtinCommands,
     ...skillsToCommandDefinitionRecord(configSourceSkills),
+    ...configPathsSkills,
     ...userCommands,
     ...userSkills,
     ...opencodeGlobalCommands,

@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { isAbsolute, join } from "node:path"
 import { parseJsoncSafe } from "../../shared/jsonc-parser"
+import { getOpenCodeConfigDir } from "../../shared/opencode-config-dir"
 import { log } from "../../shared/logger"
 
 interface OpencodeSkillsConfig {
@@ -11,14 +12,14 @@ interface OpencodeSkillsConfig {
 }
 
 function getConfigPaths(directory: string): string[] {
-	const cross = join(homedir(), ".config")
+	const globalDir = getOpenCodeConfigDir({ binary: "opencode" })
 	return [
 		join(directory, ".opencode", "opencode.json"),
 		join(directory, ".opencode", "opencode.jsonc"),
 		join(directory, "opencode.json"),
 		join(directory, "opencode.jsonc"),
-		join(cross, "opencode", "opencode.json"),
-		join(cross, "opencode", "opencode.jsonc"),
+		join(globalDir, "opencode.json"),
+		join(globalDir, "opencode.jsonc"),
 	]
 }
 

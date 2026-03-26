@@ -6,12 +6,21 @@ import { tmpdir } from "os"
 const TEST_DIR = join(tmpdir(), "config-skills-paths-test-" + Date.now())
 
 describe("opencode-config-skills-paths", () => {
+	let originalConfigDir: string | undefined
+
 	beforeEach(() => {
 		mkdirSync(TEST_DIR, { recursive: true })
+		originalConfigDir = process.env.OPENCODE_CONFIG_DIR
+		process.env.OPENCODE_CONFIG_DIR = join(TEST_DIR, ".global-config")
 	})
 
 	afterEach(() => {
 		rmSync(TEST_DIR, { recursive: true, force: true })
+		if (originalConfigDir === undefined) {
+			delete process.env.OPENCODE_CONFIG_DIR
+		} else {
+			process.env.OPENCODE_CONFIG_DIR = originalConfigDir
+		}
 	})
 
 	describe("#given opencode.json with skills.paths", () => {
@@ -93,15 +102,15 @@ describe("opencode-config-skills-paths", () => {
 
 				const opencodeDir = join(TEST_DIR, ".opencode")
 				mkdirSync(opencodeDir, { recursive: true })
-				writeFileSync(
-					join(opencodeDir, "opencode.jsonc"),
-					`{
-						// Plugin skill paths
-						"skills": {
-							"paths": ["${pluginSkillsDir}"]
-						}
-					}`
-				)
+				const jsoncContent = [
+					"{",
+					"  // Plugin skill paths",
+					"  \"skills\": {",
+					`    "paths": [${JSON.stringify(pluginSkillsDir)}]`,
+					"  }",
+					"}",
+				].join("\n")
+				writeFileSync(join(opencodeDir, "opencode.jsonc"), jsoncContent)
 
 				const { readOpenCodeSkillsPaths } = await import("./opencode-config-skills-paths")
 				const paths = readOpenCodeSkillsPaths(TEST_DIR)
