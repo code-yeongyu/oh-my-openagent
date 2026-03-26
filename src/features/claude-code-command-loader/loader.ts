@@ -7,7 +7,6 @@ import {
   findProjectOpencodeCommandDirs,
   getClaudeConfigDir,
   getOpenCodeCommandDirs,
-  getOpenCodeConfigDir,
 } from "../../shared"
 import { log } from "../../shared/logger"
 import type { CommandScope, CommandDefinition, CommandFrontmatter, LoadedCommand } from "./types"
@@ -51,7 +50,7 @@ async function loadCommandsFromDir(
     if (entry.isDirectory()) {
       if (entry.name.startsWith(".")) continue
       const subDirPath = join(commandsDir, entry.name)
-      const subPrefix = prefix ? `${prefix}:${entry.name}` : entry.name
+      const subPrefix = prefix ? `${prefix}/${entry.name}` : entry.name
       const subCommands = await loadCommandsFromDir(subDirPath, scope, visited, subPrefix)
       commands.push(...subCommands)
       continue
@@ -61,7 +60,7 @@ async function loadCommandsFromDir(
 
     const commandPath = join(commandsDir, entry.name)
     const baseCommandName = basename(entry.name, ".md")
-    const commandName = prefix ? `${prefix}:${baseCommandName}` : baseCommandName
+    const commandName = prefix ? `${prefix}/${baseCommandName}` : baseCommandName
 
     try {
       const content = await fs.readFile(commandPath, "utf-8")
