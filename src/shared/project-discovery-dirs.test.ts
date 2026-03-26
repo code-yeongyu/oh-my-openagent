@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test"
-import { mkdirSync, rmSync } from "node:fs"
+import { mkdirSync, realpathSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import {
@@ -10,6 +10,10 @@ import {
 } from "./project-discovery-dirs"
 
 const TEST_DIR = join(tmpdir(), `project-discovery-dirs-${Date.now()}`)
+
+function canonicalPath(path: string): string {
+  return realpathSync(path)
+}
 
 describe("project-discovery-dirs", () => {
   beforeEach(() => {
@@ -33,9 +37,9 @@ describe("project-discovery-dirs", () => {
 
     // then
     expect(directories).toEqual([
-      join(projectDir, ".opencode", "skills"),
-      join(projectDir, ".opencode", "skill"),
-      join(TEST_DIR, ".opencode", "skills"),
+      canonicalPath(join(projectDir, ".opencode", "skills")),
+      canonicalPath(join(projectDir, ".opencode", "skill")),
+      canonicalPath(join(TEST_DIR, ".opencode", "skills")),
     ])
   })
 
@@ -51,8 +55,8 @@ describe("project-discovery-dirs", () => {
 
     // then
     expect(directories).toEqual([
-      join(projectDir, ".opencode", "commands"),
-      join(TEST_DIR, ".opencode", "command"),
+      canonicalPath(join(projectDir, ".opencode", "commands")),
+      canonicalPath(join(TEST_DIR, ".opencode", "command")),
     ])
   })
 
@@ -68,7 +72,21 @@ describe("project-discovery-dirs", () => {
     const agentsDirectories = findProjectAgentsSkillDirs(childDir)
 
     // then
-    expect(claudeDirectories).toEqual([join(projectDir, ".claude", "skills")])
-    expect(agentsDirectories).toEqual([join(TEST_DIR, ".agents", "skills")])
+    expect(claudeDirectories).toEqual([canonicalPath(join(projectDir, ".claude", "skills"))])
+    expect(agentsDirectories).toEqual([canonicalPath(join(TEST_DIR, ".agents", "skills"))])
+  })
+
+  it("#given a stop directory #when finding ancestor dirs #then it does not scan beyond the stop boundary", () => {
+    // given
+    const projectDir = join(TEST_DIR, "project")
+    const childDir = join(projectDir, "apps", "cli")
+    mkdirSync(join(projectDir, ".opencode", "skills"), { recursive: true })
+    mkdirSync(join(TEST_DIR, ".opencode", "skills"), { recursive: true })
+
+    // when
+    const directories = findProjectOpencodeSkillDirs(childDir, projectDir)
+
+    // then
+    expect(directories).toEqual([canonicalPath(join(projectDir, ".opencode", "skills"))])
   })
 })
