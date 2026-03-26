@@ -3,7 +3,12 @@ import { join, basename } from "path"
 import { parseFrontmatter } from "../../shared/frontmatter"
 import { sanitizeModelField } from "../../shared/model-sanitizer"
 import { isMarkdownFile } from "../../shared/file-utils"
-import { getClaudeConfigDir, getOpenCodeConfigDir } from "../../shared"
+import {
+  findProjectOpencodeCommandDirs,
+  getClaudeConfigDir,
+  getOpenCodeCommandDirs,
+  getOpenCodeConfigDir,
+} from "../../shared"
 import { log } from "../../shared/logger"
 import type { CommandScope, CommandDefinition, CommandFrontmatter, LoadedCommand } from "./types"
 
@@ -99,9 +104,25 @@ $ARGUMENTS
   return commands
 }
 
+function deduplicateLoadedCommandsByName(commands: LoadedCommand[]): LoadedCommand[] {
+  const seen = new Set<string>()
+  const deduplicatedCommands: LoadedCommand[] = []
+
+  for (const command of commands) {
+    if (seen.has(command.name)) {
+      continue
+    }
+
+    seen.add(command.name)
+    deduplicatedCommands.push(command)
+  }
+
+  return deduplicatedCommands
+}
+
 function commandsToRecord(commands: LoadedCommand[]): Record<string, CommandDefinition> {
   const result: Record<string, CommandDefinition> = {}
-  for (const cmd of commands) {
+  for (const cmd of deduplicateLoadedCommandsByName(commands)) {
     const { name: _name, argumentHint: _argumentHint, ...openCodeCompatible } = cmd.definition
     result[cmd.name] = openCodeCompatible as CommandDefinition
   }
@@ -121,16 +142,21 @@ export async function loadProjectCommands(directory?: string): Promise<Record<st
 }
 
 export async function loadOpencodeGlobalCommands(): Promise<Record<string, CommandDefinition>> {
-  const configDir = getOpenCodeConfigDir({ binary: "opencode" })
-  const opencodeCommandsDir = join(configDir, "command")
-  const commands = await loadCommandsFromDir(opencodeCommandsDir, "opencode")
-  return commandsToRecord(commands)
+  const opencodeCommandDirs = getOpenCodeCommandDirs({ binary: "opencode" })
+  const allCommands = await Promise.all(
+    opencodeCommandDirs.map((commandsDir) => loadCommandsFromDir(commandsDir, "opencode")),
+  )
+  return commandsToRecord(allCommands.flat())
 }
 
 export async function loadOpencodeProjectCommands(directory?: string): Promise<Record<string, CommandDefinition>> {
-  const opencodeProjectDir = join(directory ?? process.cwd(), ".opencode", "command")
-  const commands = await loadCommandsFromDir(opencodeProjectDir, "opencode-project")
-  return commandsToRecord(commands)
+  const opencodeProjectDirs = findProjectOpencodeCommandDirs(directory ?? process.cwd())
+  const allCommands = await Promise.all(
+    opencodeProjectDirs.map((commandsDir) =>
+      loadCommandsFromDir(commandsDir, "opencode-project"),
+    ),
+  )
+  return commandsToRecord(allCommands.flat())
 }
 
 export async function loadAllCommands(directory?: string): Promise<Record<string, CommandDefinition>> {

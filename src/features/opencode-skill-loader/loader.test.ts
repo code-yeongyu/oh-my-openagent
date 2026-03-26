@@ -615,5 +615,92 @@ Skill body.
       expect(skill).toBeDefined()
       expect(skill?.scope).toBe("project")
     })
+
+    it("#given a skill in ancestor .agents/skills/ #when discoverProjectAgentsSkills is called from child directory #then it discovers the ancestor skill", async () => {
+      // given
+      const skillContent = `---
+name: ancestor-agent-skill
+description: A skill from ancestor .agents/skills directory
+---
+Skill body.
+`
+      const projectDir = join(TEST_DIR, "project")
+      const childDir = join(projectDir, "apps", "worker")
+      const agentsProjectSkillsDir = join(projectDir, ".agents", "skills")
+      const skillDir = join(agentsProjectSkillsDir, "ancestor-agent-skill")
+      mkdirSync(childDir, { recursive: true })
+      mkdirSync(skillDir, { recursive: true })
+      writeFileSync(join(skillDir, "SKILL.md"), skillContent)
+
+      // when
+      const { discoverProjectAgentsSkills } = await import("./loader")
+      const skills = await discoverProjectAgentsSkills(childDir)
+      const skill = skills.find((candidate) => candidate.name === "ancestor-agent-skill")
+
+      // then
+      expect(skill).toBeDefined()
+      expect(skill?.scope).toBe("project")
+    })
+  })
+
+  describe("opencode project skill discovery", () => {
+    it("#given a skill in ancestor .opencode/skills/ #when discoverOpencodeProjectSkills is called from child directory #then it discovers the ancestor skill", async () => {
+      // given
+      const skillContent = `---
+name: ancestor-opencode-skill
+description: A skill from ancestor .opencode/skills directory
+---
+Skill body.
+`
+      const projectDir = join(TEST_DIR, "project")
+      const childDir = join(projectDir, "packages", "cli")
+      const skillsDir = join(projectDir, ".opencode", "skills", "ancestor-opencode-skill")
+      mkdirSync(childDir, { recursive: true })
+      mkdirSync(skillsDir, { recursive: true })
+      writeFileSync(join(skillsDir, "SKILL.md"), skillContent)
+
+      // when
+      const { discoverOpencodeProjectSkills } = await import("./loader")
+      const skills = await discoverOpencodeProjectSkills(childDir)
+      const skill = skills.find((candidate) => candidate.name === "ancestor-opencode-skill")
+
+      // then
+      expect(skill).toBeDefined()
+      expect(skill?.scope).toBe("opencode-project")
+    })
+
+    it("#given a skill in .opencode/skill/ #when discoverOpencodeProjectSkills is called #then it discovers the singular alias directory", async () => {
+      // given
+      const skillContent = `---
+name: singular-opencode-skill
+description: A skill from .opencode/skill directory
+---
+Skill body.
+`
+      const singularSkillDir = join(
+        TEST_DIR,
+        ".opencode",
+        "skill",
+        "singular-opencode-skill",
+      )
+      mkdirSync(singularSkillDir, { recursive: true })
+      writeFileSync(join(singularSkillDir, "SKILL.md"), skillContent)
+
+      // when
+      const { discoverOpencodeProjectSkills } = await import("./loader")
+      const originalCwd = process.cwd()
+      process.chdir(TEST_DIR)
+
+      try {
+        const skills = await discoverOpencodeProjectSkills()
+        const skill = skills.find((candidate) => candidate.name === "singular-opencode-skill")
+
+        // then
+        expect(skill).toBeDefined()
+        expect(skill?.scope).toBe("opencode-project")
+      } finally {
+        process.chdir(originalCwd)
+      }
+    })
   })
 })

@@ -17,8 +17,9 @@ export function getOpenCodeCommandDirs(options: OpenCodeConfigDirOptions): strin
 
   return Array.from(
     new Set([
+      join(configDir, "commands"),
       join(configDir, "command"),
-      ...(parentConfigDir ? [join(parentConfigDir, "command")] : []),
+      ...(parentConfigDir ? [join(parentConfigDir, "commands"), join(parentConfigDir, "command")] : []),
     ])
   )
 }
@@ -30,7 +31,8 @@ export function getOpenCodeSkillDirs(options: OpenCodeConfigDirOptions): string[
   return Array.from(
     new Set([
       join(configDir, "skills"),
-      ...(parentConfigDir ? [join(parentConfigDir, "skills")] : []),
+      join(configDir, "skill"),
+      ...(parentConfigDir ? [join(parentConfigDir, "skills"), join(parentConfigDir, "skill")] : []),
     ])
   )
 }

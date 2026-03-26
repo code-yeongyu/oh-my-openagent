@@ -3,6 +3,7 @@ import { basename, join } from "path"
 import {
   parseFrontmatter,
   sanitizeModelField,
+  findProjectOpencodeCommandDirs,
   getOpenCodeCommandDirs,
   discoverPluginCommandDefinitions,
 } from "../../shared"
@@ -75,6 +76,22 @@ function discoverPluginCommands(options?: CommandDiscoveryOptions): CommandInfo[
   }))
 }
 
+function deduplicateCommandInfosByName(commands: CommandInfo[]): CommandInfo[] {
+  const seen = new Set<string>()
+  const deduplicatedCommands: CommandInfo[] = []
+
+  for (const command of commands) {
+    if (seen.has(command.name)) {
+      continue
+    }
+
+    seen.add(command.name)
+    deduplicatedCommands.push(command)
+  }
+
+  return deduplicatedCommands
+}
+
 export function discoverCommandsSync(
   directory?: string,
   options?: CommandDiscoveryOptions,
@@ -82,14 +99,16 @@ export function discoverCommandsSync(
   const userCommandsDir = join(getClaudeConfigDir(), "commands")
   const projectCommandsDir = join(directory ?? process.cwd(), ".claude", "commands")
   const opencodeGlobalDirs = getOpenCodeCommandDirs({ binary: "opencode" })
-  const opencodeProjectDir = join(directory ?? process.cwd(), ".opencode", "command")
+  const opencodeProjectDirs = findProjectOpencodeCommandDirs(directory ?? process.cwd())
 
   const userCommands = discoverCommandsFromDir(userCommandsDir, "user")
   const opencodeGlobalCommands = opencodeGlobalDirs.flatMap((commandsDir) =>
     discoverCommandsFromDir(commandsDir, "opencode")
   )
   const projectCommands = discoverCommandsFromDir(projectCommandsDir, "project")
-  const opencodeProjectCommands = discoverCommandsFromDir(opencodeProjectDir, "opencode-project")
+  const opencodeProjectCommands = opencodeProjectDirs.flatMap((commandsDir) =>
+    discoverCommandsFromDir(commandsDir, "opencode-project"),
+  )
   const pluginCommands = discoverPluginCommands(options)
 
   const builtinCommandsMap = loadBuiltinCommands()
@@ -107,12 +126,12 @@ export function discoverCommandsSync(
     scope: "builtin",
   }))
 
-  return [
+  return deduplicateCommandInfosByName([
     ...projectCommands,
     ...userCommands,
     ...opencodeProjectCommands,
     ...opencodeGlobalCommands,
     ...builtinCommands,
     ...pluginCommands,
-  ]
+  ])
 }
