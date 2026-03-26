@@ -96,6 +96,8 @@ export async function applyAgentConfig(params: {
   const includeClaudeAgents = params.pluginConfig.claude_code?.agents ?? true;
   const userAgents = includeClaudeAgents ? loadUserAgents() : {};
   const projectAgents = includeClaudeAgents ? loadProjectAgents(params.ctx.directory) : {};
+  const opencodeGlobalAgents = loadOpencodeGlobalAgents();
+  const opencodeProjectAgents = loadOpencodeProjectAgents(params.ctx.directory);
   const rawPluginAgents = params.pluginComponents.agents;
 
   const pluginAgents = Object.fromEntries(
@@ -113,6 +115,8 @@ export async function applyAgentConfig(params: {
     ...Object.entries(configAgent ?? {}),
     ...Object.entries(userAgents),
     ...Object.entries(projectAgents),
+    ...Object.entries(opencodeGlobalAgents),
+    ...Object.entries(opencodeProjectAgents),
     ...Object.entries(pluginAgents).filter(([, config]) => config !== undefined),
   ]
     .filter(([, config]) => config != null)
@@ -138,9 +142,6 @@ export async function applyAgentConfig(params: {
     useTaskSystem,
     disableOmoEnv,
   );
-
-  const opencodeGlobalAgents = loadOpencodeGlobalAgents();
-  const opencodeProjectAgents = loadOpencodeProjectAgents(params.ctx.directory);
 
   const disabledAgentNames = new Set(
     (migratedDisabledAgents ?? []).map(a => a.toLowerCase())

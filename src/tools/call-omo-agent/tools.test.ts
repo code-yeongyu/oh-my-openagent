@@ -13,7 +13,7 @@ function createMockCtx(agents: Array<{ name: string; mode?: string }> = []): Plu
   return {
     client: {
       app: {
-        agents: mock(() => Promise.resolve(agents)),
+        agents: mock(() => Promise.resolve({ data: agents })),
       },
     },
     directory: "/test",

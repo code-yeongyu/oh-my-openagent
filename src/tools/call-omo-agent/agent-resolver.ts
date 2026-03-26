@@ -29,8 +29,8 @@ export async function resolveCallableAgents(
     });
 
     const dynamicAgents = agents
-      .filter((a) => a.mode !== "primary")
-      .map((a) => a.name.toLowerCase());
+      .filter((a) => a && typeof a.name === "string" && a.name.trim().length > 0 && a.mode !== "primary")
+      .map((a) => a.name.trim().toLowerCase());
 
     const merged = new Set([...ALLOWED_AGENTS, ...dynamicAgents]);
     return [...merged];
