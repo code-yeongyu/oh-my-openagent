@@ -1,6 +1,11 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
+import { mkdtempSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 
 import { createChatParamsHandler, type ChatParamsOutput } from "./chat-params"
+import * as dataPathModule from "../shared/data-path"
+import { writeProviderModelsCache } from "../shared"
 import {
   clearSessionPromptParams,
   getSessionPromptParams,
@@ -8,8 +13,25 @@ import {
 } from "../shared/session-prompt-params-state"
 
 describe("createChatParamsHandler", () => {
+  let tempCacheRoot = ""
+  let getCacheDirSpy: ReturnType<typeof spyOn>
+
+  beforeEach(() => {
+    tempCacheRoot = mkdtempSync(join(tmpdir(), "chat-params-cache-"))
+    getCacheDirSpy = spyOn(dataPathModule, "getOmoOpenCodeCacheDir").mockReturnValue(
+      join(tempCacheRoot, "oh-my-opencode"),
+    )
+    writeProviderModelsCache({ connected: [], models: {} })
+  })
+
   afterEach(() => {
     clearSessionPromptParams("ses_chat_params")
+    clearSessionPromptParams("ses_chat_params_temperature")
+    writeProviderModelsCache({ connected: [], models: {} })
+    getCacheDirSpy?.mockRestore()
+    if (tempCacheRoot) {
+      rmSync(tempCacheRoot, { recursive: true, force: true })
+    }
   })
 
   test("normalizes object-style agent payload and runs chat.params hooks", async () => {
@@ -31,7 +53,7 @@ describe("createChatParamsHandler", () => {
       message: {},
     }
 
-    const output = {
+    const output: ChatParamsOutput = {
       temperature: 0.1,
       topP: 1,
       topK: 1,
@@ -63,7 +85,7 @@ describe("createChatParamsHandler", () => {
       message,
     }
 
-    const output = {
+    const output: ChatParamsOutput = {
       temperature: 0.1,
       topP: 1,
       topK: 1,
@@ -79,6 +101,25 @@ describe("createChatParamsHandler", () => {
 
   test("applies stored prompt params for the session", async () => {
     //#given
+    writeProviderModelsCache({
+      connected: ["openai"],
+      models: {
+        openai: [
+          {
+            id: "gpt-5.4",
+            name: "GPT-5.4",
+            temperature: true,
+            reasoning: true,
+            variants: {
+              low: {},
+              high: {},
+            },
+            limit: { output: 128_000 },
+          },
+        ],
+      },
+    })
+
     setSessionPromptParams("ses_chat_params_temperature", {
       temperature: 0.4,
       topP: 0.7,
@@ -134,7 +175,7 @@ describe("createChatParamsHandler", () => {
     })
   })
 
-  test("preserves gpt-5.4 temperature and clamps maxTokens from bundled model capabilities", async () => {
+  test("drops gpt-5.4 temperature and clamps maxTokens from bundled model capabilities", async () => {
     //#given
     setSessionPromptParams("ses_chat_params_temperature", {
       temperature: 0.7,
@@ -155,7 +196,7 @@ describe("createChatParamsHandler", () => {
       message: {},
     }
 
-    const output = {
+    const output: ChatParamsOutput = {
       temperature: 0.1,
       topP: 1,
       topK: 1,
@@ -167,7 +208,6 @@ describe("createChatParamsHandler", () => {
 
     //#then
     expect(output).toEqual({
-      temperature: 0.7,
       topP: 1,
       topK: 1,
       options: {

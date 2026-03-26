@@ -101,4 +101,39 @@ describe("discoverInstalledPlugins", () => {
     expect(discovered.plugins).toHaveLength(1)
     expect(discovered.plugins[0]?.name).toBe("oh-my-opencode")
   })
+
+  it("derives canonical package name from npm plugin keys", () => {
+    //#given
+    const pluginsHome = process.env.CLAUDE_PLUGINS_HOME as string
+    const installPath = join(createTemporaryDirectory("omo-plugin-install-"), "oh-my-openagent")
+    mkdirSync(installPath, { recursive: true })
+
+    const databasePath = join(pluginsHome, "installed_plugins.json")
+    writeFileSync(
+      databasePath,
+      JSON.stringify({
+        version: 2,
+        plugins: {
+          "oh-my-openagent@3.13.1": [
+            {
+              scope: "user",
+              installPath,
+              version: "3.13.1",
+              installedAt: "2026-03-26T00:00:00Z",
+              lastUpdated: "2026-03-26T00:00:00Z",
+            },
+          ],
+        },
+      }),
+      "utf-8",
+    )
+
+    //#when
+    const discovered = discoverInstalledPlugins()
+
+    //#then
+    expect(discovered.errors).toHaveLength(0)
+    expect(discovered.plugins).toHaveLength(1)
+    expect(discovered.plugins[0]?.name).toBe("oh-my-openagent")
+  })
 })
