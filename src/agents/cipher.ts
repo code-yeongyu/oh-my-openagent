@@ -34,13 +34,15 @@ export const CIPHER_PROMPT_METADATA: AgentPromptMetadata = {
   category: "specialist",
   cost: "EXPENSIVE",
   promptAlias: "Cipher",
-  keyTrigger: "DSL/grammar/parser/transpiler/language-design mentioned → fire `cipher`",
+  keyTrigger: "DSL/grammar/parser/transpiler/language-design mentioned → fire `cipher`; textX scoping/FQNImportURI/ModelRepository/register_scope_providers/import resolution in a DSL → ALWAYS fire `cipher` regardless of task size or apparent simplicity",
   triggers: [
     { domain: "DSL Design", trigger: "Custom language, grammar, or syntax design needed" },
     { domain: "Parser Engineering", trigger: "Parser implementation, ANTLR4, textX, tree-sitter grammars" },
     { domain: "Type System Design", trigger: "Type system, semantic analysis, constraint checking for custom languages" },
     { domain: "Code Generation", trigger: "Transpiler, code generator, model-to-text transformation" },
     { domain: "Metamodeling", trigger: "Metamodel design, EMF-style modeling, textX/PyEcore" },
+    { domain: "textX Scoping", trigger: "Scope providers, register_scope_providers, FQNImportURI, cross-reference resolution, PlainNameGlobalRepo — ALWAYS Cipher even for single-file changes" },
+    { domain: "textX Multi-file", trigger: "Multi-file DSL models, ModelRepository, import URI patterns, GlobalModelRepository — ALWAYS Cipher even for single-file changes" },
   ],
   useWhen: [
     "Designing a new DSL or extending existing one",
@@ -52,6 +54,10 @@ export const CIPHER_PROMPT_METADATA: AgentPromptMetadata = {
     "Metamodeling with textX, PyEcore, or EMF-style tools",
     "Adding IDE/LSP support for custom languages",
     "Both external DSLs (custom syntax) and internal DSLs (fluent APIs)",
+    "Implementing or debugging textX scoping (register_scope_providers, FQNImportURI, callable scope signatures)",
+    "Multi-file model loading with ModelRepository or PlainNameGlobalRepo",
+    "Cross-reference resolution in textX grammars",
+    "Fixing imports or scoping in any textX-based DSL — regardless of file count",
   ],
   avoidWhen: [
     "General-purpose programming tasks",
@@ -148,9 +154,9 @@ export function createCipherAgent(model: string): AgentConfig {
   } as AgentConfig
 
   if (isGptModel(model)) {
-    return { ...base, maxTokens: 64000, reasoningEffort: "medium", textVerbosity: "high" } as AgentConfig
+    return { ...base, maxTokens: 32000, reasoningEffort: "medium", textVerbosity: "high" } as AgentConfig
   }
 
-  return { ...base, maxTokens: 64000, thinking: { type: "enabled", budgetTokens: 32000 } } as AgentConfig
+  return { ...base, maxTokens: 32000, thinking: { type: "enabled", budgetTokens: 20000 } } as AgentConfig
 }
 createCipherAgent.mode = MODE
