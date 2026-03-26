@@ -235,4 +235,24 @@ Use plural command.
     expect(duplicates).toHaveLength(1)
     expect(duplicates[0]?.content).toContain("Use plural command.")
   })
+
+  it("discovers nested opencode project commands", () => {
+    const commandsDir = join(projectDir, ".opencode", "commands", "refactor")
+
+    mkdirSync(commandsDir, { recursive: true })
+    writeFileSync(
+      join(commandsDir, "code.md"),
+      `---
+description: Nested command
+---
+Use nested command.
+`,
+    )
+
+    const commands = discoverCommandsSync(projectDir)
+    const nestedCommand = commands.find((command) => command.name === "refactor/code")
+
+    expect(nestedCommand?.content).toContain("Use nested command.")
+    expect(nestedCommand?.scope).toBe("opencode-project")
+  })
 })
