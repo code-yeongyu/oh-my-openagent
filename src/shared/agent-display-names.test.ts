@@ -1,5 +1,11 @@
-import { describe, it, expect } from "bun:test"
-import { AGENT_DISPLAY_NAMES, getAgentDisplayName, getAgentConfigKey } from "./agent-display-names"
+import { describe, it, expect, beforeEach, afterEach } from "bun:test"
+import {
+  AGENT_DISPLAY_NAMES,
+  getAgentDisplayName,
+  getAgentConfigKey,
+  applyUserDisplayNames,
+  resetUserDisplayNames,
+} from "./agent-display-names"
 
 describe("getAgentDisplayName", () => {
   it("returns display name for lowercase config key (new format)", () => {
@@ -198,3 +204,115 @@ describe("AGENT_DISPLAY_NAMES", () => {
     expect(AGENT_DISPLAY_NAMES).toEqual(expectedMappings)
   })
 })
+
+describe("#given user-defined display name overrides via config", () => {
+  beforeEach(() => {
+    resetUserDisplayNames()
+  })
+
+  afterEach(() => {
+    resetUserDisplayNames()
+  })
+
+  describe("#when getAgentDisplayName called", () => {
+    it("#then returns user override instead of built-in default", () => {
+      applyUserDisplayNames({ sisyphus: "Builder" })
+      expect(getAgentDisplayName("sisyphus")).toBe("Builder")
+    })
+
+    it("#then handles case-insensitive config keys", () => {
+      applyUserDisplayNames({ Sisyphus: "Builder" })
+      expect(getAgentDisplayName("sisyphus")).toBe("Builder")
+    })
+
+    it("#then returns default display name for agents without overrides", () => {
+      applyUserDisplayNames({ sisyphus: "Builder" })
+      expect(getAgentDisplayName("oracle")).toBe("oracle")
+      expect(getAgentDisplayName("atlas")).toBe("Atlas (Plan Executor)")
+    })
+
+    it("#then overrides identity-mapped agents (display name === config key)", () => {
+      applyUserDisplayNames({ oracle: "Wise One" })
+      expect(getAgentDisplayName("oracle")).toBe("Wise One")
+    })
+
+    it("#then applies multiple overrides simultaneously", () => {
+      applyUserDisplayNames({
+        sisyphus: "Builder",
+        oracle: "Wise One",
+        prometheus: "Plan Master",
+      })
+      expect(getAgentDisplayName("sisyphus")).toBe("Builder")
+      expect(getAgentDisplayName("oracle")).toBe("Wise One")
+      expect(getAgentDisplayName("prometheus")).toBe("Plan Master")
+    })
+
+    it("#then treats empty overrides object as no-op", () => {
+      applyUserDisplayNames({})
+      expect(getAgentDisplayName("sisyphus")).toBe("Sisyphus (Ultraworker)")
+      expect(getAgentDisplayName("oracle")).toBe("oracle")
+    })
+  })
+
+  describe("#when getAgentConfigKey called", () => {
+    it("#then resolves user override display name back to config key", () => {
+      applyUserDisplayNames({ sisyphus: "Builder" })
+      expect(getAgentConfigKey("Builder")).toBe("sisyphus")
+    })
+
+    it("#then resolves user override case-insensitively", () => {
+      applyUserDisplayNames({ sisyphus: "Builder" })
+      expect(getAgentConfigKey("builder")).toBe("sisyphus")
+    })
+
+    it("#then still resolves built-in display names when overrides are active", () => {
+      applyUserDisplayNames({ sisyphus: "Builder" })
+      expect(getAgentConfigKey("Hephaestus (Deep Agent)")).toBe("hephaestus")
+      expect(getAgentConfigKey("Atlas (Plan Executor)")).toBe("atlas")
+    })
+
+    it("#then resolves overridden identity-mapped agent", () => {
+      applyUserDisplayNames({ oracle: "Wise One" })
+      expect(getAgentConfigKey("Wise One")).toBe("oracle")
+    })
+
+    it("#then resolves multiple overrides back to config keys", () => {
+      applyUserDisplayNames({
+        sisyphus: "Builder",
+        oracle: "Wise One",
+        prometheus: "Plan Master",
+      })
+      expect(getAgentConfigKey("Builder")).toBe("sisyphus")
+      expect(getAgentConfigKey("Wise One")).toBe("oracle")
+      expect(getAgentConfigKey("Plan Master")).toBe("prometheus")
+    })
+  })
+
+  describe("#when resetUserDisplayNames called", () => {
+    it("#then restores built-in display names", () => {
+      applyUserDisplayNames({ sisyphus: "Builder" })
+      expect(getAgentDisplayName("sisyphus")).toBe("Builder")
+
+      resetUserDisplayNames()
+      expect(getAgentDisplayName("sisyphus")).toBe("Sisyphus (Ultraworker)")
+    })
+
+    it("#then restores built-in reverse lookups", () => {
+      applyUserDisplayNames({ sisyphus: "Builder" })
+      expect(getAgentConfigKey("Builder")).toBe("sisyphus")
+
+      resetUserDisplayNames()
+      expect(getAgentConfigKey("Builder")).toBe("builder")
+      expect(getAgentConfigKey("Sisyphus (Ultraworker)")).toBe("sisyphus")
+    })
+  })
+
+  describe("#when AGENT_DISPLAY_NAMES constant accessed directly", () => {
+    it("#then remains unchanged by user overrides", () => {
+      applyUserDisplayNames({ sisyphus: "Builder" })
+      expect(AGENT_DISPLAY_NAMES.sisyphus).toBe("Sisyphus (Ultraworker)")
+      expect(AGENT_DISPLAY_NAMES.oracle).toBe("oracle")
+    })
+  })
+})
+

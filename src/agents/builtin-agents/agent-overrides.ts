@@ -41,7 +41,7 @@ export function mergeAgentConfig(
   directory?: string
 ): AgentConfig {
   const migratedOverride = migrateAgentConfig(override as Record<string, unknown>) as AgentOverrideConfig
-  const { prompt_append, ...rest } = migratedOverride
+  const { prompt_append, display_name: _, ...rest } = migratedOverride
   const merged = deepMerge(base, rest as Partial<AgentConfig>)
 
   if (merged.prompt && typeof merged.prompt === 'string' && merged.prompt.startsWith('file://')) {

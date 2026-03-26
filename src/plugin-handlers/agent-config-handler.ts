@@ -3,7 +3,7 @@ import { createSisyphusJuniorAgentWithOverrides } from "../agents/sisyphus-junio
 import type { OhMyOpenCodeConfig } from "../config";
 import { log, migrateAgentConfig } from "../shared";
 import { AGENT_NAME_MAP } from "../shared/migration";
-import { getAgentDisplayName } from "../shared/agent-display-names";
+import { getAgentDisplayName, applyUserDisplayNames } from "../shared/agent-display-names";
 import {
   discoverConfigSourceSkills,
   discoverGlobalAgentsSkills,
@@ -28,6 +28,18 @@ type AgentConfigRecord = Record<string, Record<string, unknown> | undefined> & {
   build?: Record<string, unknown>;
   plan?: Record<string, unknown>;
 };
+
+function applyDisplayNameOverrides(pluginConfig: OhMyOpenCodeConfig): void {
+  if (!pluginConfig.agents) return
+  const displayNames = Object.fromEntries(
+    Object.entries(pluginConfig.agents)
+      .filter(([, cfg]) => cfg?.display_name)
+      .map(([key, cfg]) => [key, cfg!.display_name!]),
+  )
+  if (Object.keys(displayNames).length > 0) {
+    applyUserDisplayNames(displayNames)
+  }
+}
 
 function getConfiguredDefaultAgent(config: Record<string, unknown>): string | undefined {
   const defaultAgent = config.default_agent;
@@ -281,6 +293,8 @@ export async function applyAgentConfig(params: {
       ...configAgent,
     };
   }
+
+  applyDisplayNameOverrides(params.pluginConfig);
 
   if (params.config.agent) {
     params.config.agent = remapAgentKeysToDisplayNames(
