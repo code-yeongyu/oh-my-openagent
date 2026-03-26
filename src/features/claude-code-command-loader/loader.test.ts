@@ -55,6 +55,22 @@ describe("claude-code command loader", () => {
     expect(commands.singular?.description).toBe("(opencode-project) Singular command")
   })
 
+  it("#given duplicate project command names across ancestors #when loadOpencodeProjectCommands is called #then the nearest directory wins", async () => {
+    // given
+    const projectRoot = join(TEST_DIR, "project")
+    const childDir = join(projectRoot, "apps", "desktop")
+    const ancestorDir = join(TEST_DIR, ".opencode", "commands")
+    const projectDir = join(projectRoot, ".opencode", "commands")
+    writeCommand(ancestorDir, "duplicate", "Ancestor command")
+    writeCommand(projectDir, "duplicate", "Nearest command")
+
+    // when
+    const commands = await loadOpencodeProjectCommands(childDir)
+
+    // then
+    expect(commands.duplicate?.description).toBe("(opencode-project) Nearest command")
+  })
+
   it("#given a global .opencode/commands directory #when loadOpencodeGlobalCommands is called #then it loads the plural alias directory", async () => {
     // given
     const opencodeConfigDir = join(TEST_DIR, "opencode-config")
@@ -66,5 +82,20 @@ describe("claude-code command loader", () => {
 
     // then
     expect(commands["global-plural"]?.description).toBe("(opencode) Global plural command")
+  })
+
+  it("#given duplicate global command names across profile and parent dirs #when loadOpencodeGlobalCommands is called #then the profile dir wins", async () => {
+    // given
+    const opencodeRootDir = join(TEST_DIR, "opencode-root")
+    const profileConfigDir = join(opencodeRootDir, "profiles", "codex")
+    process.env.OPENCODE_CONFIG_DIR = profileConfigDir
+    writeCommand(join(opencodeRootDir, "commands"), "duplicate-global", "Parent global command")
+    writeCommand(join(profileConfigDir, "commands"), "duplicate-global", "Profile global command")
+
+    // when
+    const commands = await loadOpencodeGlobalCommands()
+
+    // then
+    expect(commands["duplicate-global"]?.description).toBe("(opencode) Profile global command")
   })
 })

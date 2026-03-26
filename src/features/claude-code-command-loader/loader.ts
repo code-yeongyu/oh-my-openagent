@@ -104,9 +104,25 @@ $ARGUMENTS
   return commands
 }
 
+function deduplicateLoadedCommandsByName(commands: LoadedCommand[]): LoadedCommand[] {
+  const seen = new Set<string>()
+  const deduplicatedCommands: LoadedCommand[] = []
+
+  for (const command of commands) {
+    if (seen.has(command.name)) {
+      continue
+    }
+
+    seen.add(command.name)
+    deduplicatedCommands.push(command)
+  }
+
+  return deduplicatedCommands
+}
+
 function commandsToRecord(commands: LoadedCommand[]): Record<string, CommandDefinition> {
   const result: Record<string, CommandDefinition> = {}
-  for (const cmd of commands) {
+  for (const cmd of deduplicateLoadedCommandsByName(commands)) {
     const { name: _name, argumentHint: _argumentHint, ...openCodeCompatible } = cmd.definition
     result[cmd.name] = openCodeCompatible as CommandDefinition
   }
