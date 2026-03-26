@@ -268,7 +268,7 @@ Disable categories: `{ "disabled_categories": ["ultrabrain"] }`
 | Agent                 | Default Model       | Provider Priority                                                            |
 | --------------------- | ------------------- | ---------------------------------------------------------------------------- |
 | **Sisyphus**          | `claude-opus-4-6`   | `claude-opus-4-6` → `glm-5` → `big-pickle`                                   |
-| **Hephaestus**        | `gpt-5.3-codex`     | `gpt-5.3-codex` → `gpt-5.4` (GitHub Copilot fallback)                        |
+| **Hephaestus**        | `gpt-5.4`           | `gpt-5.4`                                                                    |
 | **oracle**            | `gpt-5.4`           | `gpt-5.4` → `gemini-3.1-pro` → `claude-opus-4-6`                             |
 | **librarian**         | `minimax-m2.7`      | `minimax-m2.7` → `minimax-m2.7-highspeed` → `claude-haiku-4-5` → `gpt-5-nano` |
 | **explore**           | `grok-code-fast-1`  | `grok-code-fast-1` → `minimax-m2.7-highspeed` → `minimax-m2.7` → `claude-haiku-4-5` → `gpt-5-nano` |

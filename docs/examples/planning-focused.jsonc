@@ -14,7 +14,7 @@
 
     // Implementation: uses planning outputs
     "hephaestus": {
-      "model": "openai/gpt-5.3-codex",
+      "model": "openai/gpt-5.4",
       "prompt_append": "Follow established plans precisely. Ask for clarification when plans are ambiguous.",
     },
 

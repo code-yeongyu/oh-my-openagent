@@ -285,7 +285,7 @@ Not all models behave the same way. Understanding which models are "similar" hel
 
 | Model             | Provider(s)                      | Notes                                             |
 | ----------------- | -------------------------------- | ------------------------------------------------- |
-| **GPT-5.3-codex** | openai, github-copilot, opencode | Deep coding powerhouse. Required for Hephaestus.  |
+| **GPT-5.3-codex** | openai, github-copilot, opencode | Deep coding powerhouse. Still available for deep category and explicit overrides. |
 | **GPT-5.4**       | openai, github-copilot, opencode | High intelligence. Default for Oracle.            |
 | **GPT-5.4 Mini**  | openai, github-copilot, opencode | Fast + strong reasoning. Default for quick category.     |
 | **GPT-5-Nano**    | opencode                         | Ultra-cheap, fast. Good for simple utility tasks. |
@@ -334,7 +334,7 @@ Priority: **Claude > GPT > Claude-like models**
 
 | Agent          | Role                   | Default Chain                          | Notes                                                  |
 | -------------- | ---------------------- | -------------------------------------- | ------------------------------------------------------ |
-| **Hephaestus** | Deep autonomous worker | GPT-5.3-codex (medium) only            | "Codex on steroids." No fallback. Requires GPT access. |
+| **Hephaestus** | Deep autonomous worker | GPT-5.4 (medium) only                  | "Codex on steroids." No fallback. Requires GPT access. |
 | **Oracle**     | Architecture/debugging | GPT-5.4 (high) → Gemini 3.1 Pro → Opus  | High-IQ strategic backup. GPT preferred.               |
 | **Momus**      | High-accuracy reviewer | GPT-5.4 (medium) → Opus → Gemini 3.1 Pro | Verification agent. GPT preferred.                     |
 

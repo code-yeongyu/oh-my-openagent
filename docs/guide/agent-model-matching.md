@@ -27,7 +27,7 @@ Using Sisyphus with older GPT models would be like taking your best project mana
 
 Hephaestus is the developer who stays in their room coding all day. Doesn't talk much. Might seem socially awkward. But give them a hard technical problem and they'll emerge three hours later with a solution nobody else could have found.
 
-**This is why Hephaestus uses GPT-5.3 Codex.** Codex is built for exactly this:
+**This is why Hephaestus uses GPT-5.4.** GPT-5.4 is built for exactly this:
 
 - Deep, autonomous exploration without hand-holding
 - Multi-file reasoning across complex codebases
@@ -82,7 +82,7 @@ These agents are built for GPT's principle-driven style. Their prompts assume au
 
 | Agent          | Role                    | Fallback Chain                         | Notes                                            |
 | -------------- | ----------------------- | -------------------------------------- | ------------------------------------------------ |
-| **Hephaestus** | Autonomous deep worker  | GPT-5.3 Codex → GPT-5.4 (Copilot)     | Requires GPT access. GPT-5.4 via Copilot as fallback. The craftsman. |
+| **Hephaestus** | Autonomous deep worker  | GPT-5.4                               | Requires GPT access. The craftsman. |
 | **Oracle**     | Architecture consultant | GPT-5.4 → Gemini 3.1 Pro → Claude Opus → opencode-go/glm-5 | Read-only high-IQ consultation.                  |
 | **Momus**      | Ruthless reviewer       | GPT-5.4 → Claude Opus → Gemini 3.1 Pro → opencode-go/glm-5 | Verification and plan review. GPT-5.4 uses xhigh variant. |
 
@@ -119,7 +119,7 @@ Principle-driven, explicit reasoning, deep technical capability. Best for agents
 
 | Model             | Strengths                                                                                       |
 | ----------------- | ----------------------------------------------------------------------------------------------- |
-| **GPT-5.3 Codex** | Deep coding powerhouse. Autonomous exploration. Required for Hephaestus.                        |
+| **GPT-5.3 Codex** | Deep coding powerhouse. Autonomous exploration. Still available for deep category and explicit overrides. |
 | **GPT-5.4**       | High intelligence, strategic reasoning. Default for Oracle, Momus, and a key fallback for Prometheus / Atlas. Uses xhigh variant for Momus. |
 | **GPT-5.4 Mini**  | Fast + strong reasoning. Good for lightweight autonomous tasks. Default for quick category. |
 | **GPT-5-Nano**    | Ultra-cheap, fast. Good for simple utility tasks.                                               |
