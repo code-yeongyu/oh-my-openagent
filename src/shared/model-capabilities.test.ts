@@ -233,13 +233,13 @@ describe("getModelCapabilities", () => {
 
     expect(result).toMatchObject({
       canonicalModelID: "gpt-5.4",
-      maxOutputTokens: 64_000,
-      supportsTemperature: false,
+      maxOutputTokens: 128_000,
+      supportsTemperature: true,
     })
     expect(result.diagnostics).toMatchObject({
       snapshot: { source: "runtime-snapshot" },
-      maxOutputTokens: { source: "runtime-snapshot" },
-      supportsTemperature: { source: "runtime-snapshot" },
+      maxOutputTokens: { source: "runtime" },
+      supportsTemperature: { source: "runtime" },
     })
   })
 

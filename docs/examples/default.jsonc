@@ -1,59 +1,71 @@
-// oh-my-openagent default configuration
-// Copy this file to your project root as .opencode/oh-my-openagent.jsonc
-// or to ~/.config/opencode/oh-my-openagent.jsonc for global config.
-//
-// The legacy name oh-my-opencode.jsonc is also supported.
 {
-  // Agent model overrides
-  // Each agent can be configured with a specific model, variant, and prompt.
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/dev/assets/oh-my-opencode.schema.json",
+
+  // Balanced defaults for general development.
+  // Tuned for reliability across diverse tasks without overspending.
+
   "agents": {
-    // Sisyphus: Main worker agent. Handles coding, debugging, refactoring.
-    // Best with: Opus (strongest), Sonnet (good), GPT 5.4 (officially supported)
+    // Main orchestrator: handles delegation and drives tasks to completion
     "sisyphus": {
-      "model": "anthropic/claude-sonnet-4-6"
+      "model": "anthropic/claude-opus-4-6",
+      "ultrawork": { "model": "anthropic/claude-opus-4-6", "variant": "max" },
     },
 
-    // Hephaestus: Deep autonomous worker, optimized for GPT models.
-    // Best with: GPT-5.3-codex (primary), GPT 5.4
+    // Deep autonomous worker: end-to-end implementation
     "hephaestus": {
-      "model": "openai/gpt-5.3-codex"
+      "model": "openai/gpt-5.3-codex",
+      "prompt_append": "Explore thoroughly, then implement. Prefer small, testable changes.",
     },
 
-    // Atlas: Orchestrator agent. Reads plans and delegates tasks to Sisyphus-Junior.
-    // Best with: Opus (recommended), GPT (has optimized prompt)
-    "atlas": {
-      "model": "anthropic/claude-sonnet-4-6"
-    },
-
-    // Prometheus: Strategic planner. Creates detailed work plans.
-    // Best with: Opus (recommended)
+    // Strategic planner: interview mode before execution
     "prometheus": {
-      "model": "anthropic/claude-opus-4-6"
+      "prompt_append": "Always interview first. Validate scope before planning.",
     },
 
-    // Explore: Codebase explorer (grep, file listing). Lightweight and fast.
-    "explore": {
-      "model": "anthropic/claude-haiku-4-5"
-    },
+    // Architecture consultant: complex design and debugging
+    "oracle": { "model": "openai/gpt-5.4", "variant": "high" },
 
-    // Librarian: External documentation and code search.
-    "librarian": {
-      "model": "anthropic/claude-haiku-4-5"
-    }
+    // Documentation and code search
+    "librarian": { "model": "google/gemini-3-flash" },
+
+    // Fast codebase exploration
+    "explore": { "model": "github-copilot/grok-code-fast-1" },
+
+    // Visual tasks: UI/UX, images, diagrams
+    "multimodal-looker": { "model": "google/gemini-3.1-pro" },
+
+    // Plan consultant: reviews and improves plans
+    "metis": {},
+
+    // Critic and reviewer
+    "momus": {},
+
+    // Continuation and long-running task handler
+    "atlas": {},
+
+    // Lightweight task executor for simple jobs
+    "sisyphus-junior": { "model": "opencode/gpt-5-nano" },
   },
 
-  // Category configurations for Sisyphus-Junior tasks
-  // Categories control which model is used when Atlas delegates work.
   "categories": {
-    "quick": {
-      "model": "anthropic/claude-sonnet-4-6",
-      "variant": "normal",
-      "description": "Fast tasks: scaffolding, simple fixes, file moves"
+    "quick": { "model": "opencode/gpt-5-nano" },
+    "unspecified-low": { "model": "anthropic/claude-sonnet-4-6" },
+    "unspecified-high": { "model": "anthropic/claude-opus-4-6", "variant": "max" },
+    "writing": { "model": "google/gemini-3-flash" },
+    "visual-engineering": { "model": "google/gemini-3.1-pro", "variant": "high" },
+    "deep": { "model": "openai/gpt-5.3-codex" },
+    "ultrabrain": { "model": "openai/gpt-5.4", "variant": "xhigh" },
+  },
+
+  // Conservative concurrency for cost control
+  "background_task": {
+    "providerConcurrency": {
+      "anthropic": 3,
+      "openai": 3,
+      "google": 5,
+      "opencode": 10,
     },
-    "deep": {
-      "model": "anthropic/claude-sonnet-4-6",
-      "variant": "max",
-      "description": "Complex tasks: architecture, multi-file refactoring"
-    }
-  }
+  },
+
+  "experimental": { "aggressive_truncation": true },
 }

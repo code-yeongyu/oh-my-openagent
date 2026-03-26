@@ -83,18 +83,18 @@ export async function checkSystem(): Promise<CheckResult> {
 
   if (!pluginInfo.registered) {
     issues.push({
-      title: "oh-my-opencode is not registered",
+      title: `${PLUGIN_NAME} is not registered`,
       description: "Plugin entry is missing from OpenCode configuration.",
-      fix: "Run: bunx oh-my-opencode install",
+      fix: `Run: bunx ${PLUGIN_NAME} install`,
       severity: "error",
       affects: ["all agents"],
     })
   }
 
-  // Detect legacy package name in plugin config
   if (pluginInfo.entry && !pluginInfo.isLocalDev) {
     const isLegacyName = pluginInfo.entry === LEGACY_PLUGIN_NAME
       || pluginInfo.entry.startsWith(`${LEGACY_PLUGIN_NAME}@`)
+
     if (isLegacyName) {
       const suggestedEntry = pluginInfo.entry.replace(LEGACY_PLUGIN_NAME, PLUGIN_NAME)
       issues.push({
@@ -125,7 +125,7 @@ export async function checkSystem(): Promise<CheckResult> {
     issues.push({
       title: "Loaded plugin is outdated",
       description: `Loaded ${systemInfo.loadedVersion}, latest ${latestVersion}.`,
-      fix: `Update: cd "${loadedInfo.cacheDir}" && bun add oh-my-opencode@${installTag}`,
+      fix: `Update: cd "${loadedInfo.cacheDir}" && bun add ${PLUGIN_NAME}@${installTag}`,
       severity: "warning",
       affects: ["plugin features"],
     })

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 
-import { createChatParamsHandler } from "./chat-params"
+import { createChatParamsHandler, type ChatParamsOutput } from "./chat-params"
 import {
   clearSessionPromptParams,
   getSessionPromptParams,
@@ -79,7 +79,7 @@ describe("createChatParamsHandler", () => {
 
   test("applies stored prompt params for the session", async () => {
     //#given
-    setSessionPromptParams("ses_chat_params", {
+    setSessionPromptParams("ses_chat_params_temperature", {
       temperature: 0.4,
       topP: 0.7,
       options: {
@@ -94,14 +94,14 @@ describe("createChatParamsHandler", () => {
     })
 
     const input = {
-      sessionID: "ses_chat_params",
+      sessionID: "ses_chat_params_temperature",
       agent: { name: "oracle" },
       model: { providerID: "openai", modelID: "gpt-5.4" },
       provider: { id: "openai" },
       message: {},
     }
 
-    const output = {
+    const output: ChatParamsOutput = {
       temperature: 0.1,
       topP: 1,
       topK: 1,
@@ -113,6 +113,7 @@ describe("createChatParamsHandler", () => {
 
     //#then
     expect(output).toEqual({
+      temperature: 0.4,
       topP: 0.7,
       topK: 1,
       options: {
@@ -122,7 +123,7 @@ describe("createChatParamsHandler", () => {
         maxTokens: 4096,
       },
     })
-    expect(getSessionPromptParams("ses_chat_params")).toEqual({
+    expect(getSessionPromptParams("ses_chat_params_temperature")).toEqual({
       temperature: 0.4,
       topP: 0.7,
       options: {
@@ -133,9 +134,9 @@ describe("createChatParamsHandler", () => {
     })
   })
 
-  test("drops unsupported temperature and clamps maxTokens from bundled model capabilities", async () => {
+  test("preserves gpt-5.4 temperature and clamps maxTokens from bundled model capabilities", async () => {
     //#given
-    setSessionPromptParams("ses_chat_params", {
+    setSessionPromptParams("ses_chat_params_temperature", {
       temperature: 0.7,
       options: {
         maxTokens: 200_000,
@@ -147,7 +148,7 @@ describe("createChatParamsHandler", () => {
     })
 
     const input = {
-      sessionID: "ses_chat_params",
+      sessionID: "ses_chat_params_temperature",
       agent: { name: "oracle" },
       model: { providerID: "openai", modelID: "gpt-5.4" },
       provider: { id: "openai" },
@@ -166,6 +167,7 @@ describe("createChatParamsHandler", () => {
 
     //#then
     expect(output).toEqual({
+      temperature: 0.7,
       topP: 1,
       topK: 1,
       options: {
