@@ -1,4 +1,4 @@
-import { describe, test, expect, mock, beforeEach } from "bun:test"
+import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test"
 
 mock.module("../../shared", () => ({
   log: mock(() => {}),
@@ -82,6 +82,10 @@ function createDefaultArgs(taskOverrides: Partial<BackgroundTask> = {}) {
 }
 
 describe("tryFallbackRetry", () => {
+  afterAll(() => {
+    mock.restore()
+  })
+
   beforeEach(() => {
     ;(shouldRetryError as any).mockImplementation(() => true)
     ;(selectFallbackProvider as any).mockImplementation((providers: string[]) => providers[0])
@@ -274,8 +278,8 @@ describe("tryFallbackRetry", () => {
 
   describe("#given disconnected fallback providers with connected preferred provider", () => {
     test("keeps fallback entry and selects connected preferred provider", () => {
-      ;(readProviderModelsCache as any).mockReturnValue({ connected: ["provider-a"] })
-      ;(selectFallbackProvider as any).mockImplementation(
+      ;(readProviderModelsCache as any).mockReturnValueOnce({ connected: ["provider-a"] })
+      ;(selectFallbackProvider as any).mockImplementationOnce(
         (_providers: string[], preferredProviderID?: string) => preferredProviderID ?? "provider-b",
       )
 
