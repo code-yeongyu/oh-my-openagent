@@ -274,3 +274,13 @@ export function createModelFallbackHook(args?: { toast?: FallbackToast; onApplie
     },
   }
 }
+
+/**
+ * Resets all module-global state for testing.
+ * Clears pending fallbacks, toast keys, and session chains.
+ */
+export function _resetForTesting(): void {
+  pendingModelFallbacks.clear()
+  lastToastKey.clear()
+  sessionFallbackChains.clear()
+}

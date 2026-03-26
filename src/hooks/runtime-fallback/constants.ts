@@ -11,7 +11,7 @@ import type { RuntimeFallbackConfig } from "../../config"
  */
 export const DEFAULT_CONFIG: Required<RuntimeFallbackConfig> = {
   enabled: false,
-  retry_on_errors: [429, 500, 502, 503, 504],
+  retry_on_errors: [402, 429, 500, 502, 503, 504],
   max_fallback_attempts: 3,
   cooldown_seconds: 60,
   timeout_seconds: 30,
@@ -37,6 +37,11 @@ export const RETRYABLE_ERROR_PATTERNS = [
   /try.?again/i,
   /credit.*balance.*too.*low/i,
   /insufficient.?(?:credits?|funds?|balance)/i,
+  /subscription.*quota/i,
+  /billing.?(?:hard.?)?limit/i,
+  /payment.?required/i,
+  /out\s+of\s+credits?/i,
+  /(?:^|\s)402(?:\s|$)/,
   /(?:^|\s)429(?:\s|$)/,
   /(?:^|\s)503(?:\s|$)/,
   /(?:^|\s)529(?:\s|$)/,

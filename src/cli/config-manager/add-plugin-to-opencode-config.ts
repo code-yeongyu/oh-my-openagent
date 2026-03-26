@@ -41,37 +41,39 @@ export async function addPluginToOpenCodeConfig(currentVersion: string): Promise
     const config = parseResult.config
     const plugins = config.plugin ?? []
 
-    // Check for existing plugin (either current or legacy name)
-    const currentNameIndex = plugins.findIndex(
+    const canonicalEntries = plugins.filter(
       (plugin) => plugin === PLUGIN_NAME || plugin.startsWith(`${PLUGIN_NAME}@`)
     )
-    const legacyNameIndex = plugins.findIndex(
+    const legacyEntries = plugins.filter(
       (plugin) => plugin === LEGACY_PLUGIN_NAME || plugin.startsWith(`${LEGACY_PLUGIN_NAME}@`)
     )
+    const otherPlugins = plugins.filter(
+      (plugin) => !(plugin === PLUGIN_NAME || plugin.startsWith(`${PLUGIN_NAME}@`))
+        && !(plugin === LEGACY_PLUGIN_NAME || plugin.startsWith(`${LEGACY_PLUGIN_NAME}@`))
+    )
 
-    // If either name exists, update to new name
-    if (currentNameIndex !== -1) {
-      if (plugins[currentNameIndex] === pluginEntry) {
-        return { success: true, configPath: path }
-      }
-      plugins[currentNameIndex] = pluginEntry
-    } else if (legacyNameIndex !== -1) {
-      // Upgrade legacy name to new name
-      plugins[legacyNameIndex] = pluginEntry
+    const normalizedPlugins = [...otherPlugins]
+
+    if (canonicalEntries.length > 0) {
+      normalizedPlugins.push(canonicalEntries[0])
+    } else if (legacyEntries.length > 0) {
+      const versionMatch = legacyEntries[0].match(/@(.+)$/)
+      const preservedVersion = versionMatch ? versionMatch[1] : null
+      normalizedPlugins.push(preservedVersion ? `${PLUGIN_NAME}@${preservedVersion}` : pluginEntry)
     } else {
-      plugins.push(pluginEntry)
+      normalizedPlugins.push(pluginEntry)
     }
 
-    config.plugin = plugins
+    config.plugin = normalizedPlugins
 
     if (format === "jsonc") {
       const content = readFileSync(path, "utf-8")
-      const pluginArrayRegex = /"plugin"\s*:\s*\[([\s\S]*?)\]/
+      const pluginArrayRegex = /((?:"plugin"|plugin)\s*:\s*)\[([\s\S]*?)\]/
       const match = content.match(pluginArrayRegex)
 
       if (match) {
-        const formattedPlugins = plugins.map((p) => `"${p}"`).join(",\n    ")
-        const newContent = content.replace(pluginArrayRegex, `"plugin": [\n    ${formattedPlugins}\n  ]`)
+        const formattedPlugins = normalizedPlugins.map((p) => `"${p}"`).join(",\n    ")
+        const newContent = content.replace(pluginArrayRegex, `$1[\n    ${formattedPlugins}\n  ]`)
         writeFileSync(path, newContent)
       } else {
         const newContent = content.replace(/(\{)/, `$1\n  "plugin": ["${pluginEntry}"],`)

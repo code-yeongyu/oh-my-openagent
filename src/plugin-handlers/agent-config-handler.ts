@@ -6,8 +6,10 @@ import { AGENT_NAME_MAP } from "../shared/migration";
 import { getAgentDisplayName } from "../shared/agent-display-names";
 import {
   discoverConfigSourceSkills,
+  discoverGlobalAgentsSkills,
   discoverOpencodeGlobalSkills,
   discoverOpencodeProjectSkills,
+  discoverProjectAgentsSkills,
   discoverProjectClaudeSkills,
   discoverUserClaudeSkills,
 } from "../features/opencode-skill-loader";
@@ -52,8 +54,10 @@ export async function applyAgentConfig(params: {
     discoveredConfigSourceSkills,
     discoveredUserSkills,
     discoveredProjectSkills,
+    discoveredProjectAgentsSkills,
     discoveredOpencodeGlobalSkills,
     discoveredOpencodeProjectSkills,
+    discoveredGlobalAgentsSkills,
   ] = await Promise.all([
     discoverConfigSourceSkills({
       config: params.pluginConfig.skills,
@@ -63,16 +67,22 @@ export async function applyAgentConfig(params: {
     includeClaudeSkillsForAwareness
        ? discoverProjectClaudeSkills(params.ctx.directory)
        : Promise.resolve([]),
+    includeClaudeSkillsForAwareness
+      ? discoverProjectAgentsSkills(params.ctx.directory)
+      : Promise.resolve([]),
     discoverOpencodeGlobalSkills(),
     discoverOpencodeProjectSkills(params.ctx.directory),
+    includeClaudeSkillsForAwareness ? discoverGlobalAgentsSkills() : Promise.resolve([]),
   ]);
 
   const allDiscoveredSkills = [
     ...discoveredConfigSourceSkills,
     ...discoveredOpencodeProjectSkills,
     ...discoveredProjectSkills,
+    ...discoveredProjectAgentsSkills,
     ...discoveredOpencodeGlobalSkills,
     ...discoveredUserSkills,
+    ...discoveredGlobalAgentsSkills,
   ];
 
   const browserProvider =

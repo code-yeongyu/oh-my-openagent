@@ -181,4 +181,78 @@ Use parent opencode commit command.
     expect(commitCommand?.scope).toBe("opencode")
     expect(commitCommand?.content).toContain("Use parent opencode commit command.")
   })
+
+  it("discovers ancestor project opencode commands from plural commands directory", () => {
+    const projectRoot = join(projectDir, "workspace")
+    const childDir = join(projectRoot, "apps", "cli")
+    const commandsDir = join(projectRoot, ".opencode", "commands")
+
+    mkdirSync(childDir, { recursive: true })
+    mkdirSync(commandsDir, { recursive: true })
+    writeFileSync(
+      join(commandsDir, "ancestor.md"),
+      `---
+description: Discover command from ancestor plural directory
+---
+Use ancestor command.
+`,
+    )
+
+    const commands = discoverCommandsSync(childDir)
+    const ancestorCommand = commands.find((command) => command.name === "ancestor")
+
+    expect(ancestorCommand?.scope).toBe("opencode-project")
+    expect(ancestorCommand?.content).toContain("Use ancestor command.")
+  })
+
+  it("deduplicates same-named opencode commands while keeping the higher-priority alias", () => {
+    const commandsRoot = join(projectDir, ".opencode")
+    const singularDir = join(commandsRoot, "command")
+    const pluralDir = join(commandsRoot, "commands")
+
+    mkdirSync(singularDir, { recursive: true })
+    mkdirSync(pluralDir, { recursive: true })
+    writeFileSync(
+      join(singularDir, "duplicate.md"),
+      `---
+description: Singular duplicate command
+---
+Use singular command.
+`,
+    )
+    writeFileSync(
+      join(pluralDir, "duplicate.md"),
+      `---
+description: Plural duplicate command
+---
+Use plural command.
+`,
+    )
+
+    const commands = discoverCommandsSync(projectDir)
+    const duplicates = commands.filter((command) => command.name === "duplicate")
+
+    expect(duplicates).toHaveLength(1)
+    expect(duplicates[0]?.content).toContain("Use plural command.")
+  })
+
+  it("discovers nested opencode project commands", () => {
+    const commandsDir = join(projectDir, ".opencode", "commands", "refactor")
+
+    mkdirSync(commandsDir, { recursive: true })
+    writeFileSync(
+      join(commandsDir, "code.md"),
+      `---
+description: Nested command
+---
+Use nested command.
+`,
+    )
+
+    const commands = discoverCommandsSync(projectDir)
+    const nestedCommand = commands.find((command) => command.name === "refactor/code")
+
+    expect(nestedCommand?.content).toContain("Use nested command.")
+    expect(nestedCommand?.scope).toBe("opencode-project")
+  })
 })

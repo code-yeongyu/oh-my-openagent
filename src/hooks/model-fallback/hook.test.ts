@@ -3,6 +3,24 @@ const { beforeEach, describe, expect, mock, test } = require("bun:test")
 
 const readConnectedProvidersCacheMock = mock(() => null)
 const readProviderModelsCacheMock = mock(() => null)
+const selectFallbackProviderMock = mock((providers: string[], preferredProviderID?: string) => {
+  const connectedProviders = readConnectedProvidersCacheMock()
+  if (connectedProviders) {
+    const connectedSet = new Set(connectedProviders.map((provider: string) => provider.toLowerCase()))
+
+    for (const provider of providers) {
+      if (connectedSet.has(provider.toLowerCase())) {
+        return provider
+      }
+    }
+
+    if (preferredProviderID && connectedSet.has(preferredProviderID.toLowerCase())) {
+      return preferredProviderID
+    }
+  }
+
+  return providers[0] || preferredProviderID || "opencode"
+})
 const transformModelForProviderMock = mock((provider: string, model: string) => {
   if (provider === "github-copilot") {
     return model
@@ -31,6 +49,10 @@ mock.module("../../shared/provider-model-id-transform", () => ({
   transformModelForProvider: transformModelForProviderMock,
 }))
 
+mock.module("../../shared/model-error-classifier", () => ({
+  selectFallbackProvider: selectFallbackProviderMock,
+}))
+
 import {
   clearPendingModelFallback,
   createModelFallbackHook,
@@ -44,6 +66,7 @@ describe("model fallback hook", () => {
     readProviderModelsCacheMock.mockReturnValue(null)
     readConnectedProvidersCacheMock.mockClear()
     readProviderModelsCacheMock.mockClear()
+    selectFallbackProviderMock.mockClear()
 
     clearPendingModelFallback("ses_model_fallback_main")
     clearPendingModelFallback("ses_model_fallback_ghcp")

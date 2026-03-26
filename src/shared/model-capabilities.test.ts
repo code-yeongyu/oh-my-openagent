@@ -1,4 +1,14 @@
-import { describe, expect, test } from "bun:test"
+import { describe, expect, test, mock } from "bun:test"
+
+// Mock connected-providers-cache to prevent local disk cache from polluting test results.
+// Without this, findProviderModelMetadata reads real cached model metadata (e.g., from opencode serve)
+// which causes the "prefers runtime models.dev cache" test to get different values than expected.
+mock.module("./connected-providers-cache", () => ({
+  findProviderModelMetadata: () => undefined,
+  readConnectedProvidersCache: () => null,
+  hasConnectedProvidersCache: () => false,
+  hasProviderModelsCache: () => false,
+}))
 
 import {
   getModelCapabilities,
@@ -27,8 +37,8 @@ describe("getModelCapabilities", () => {
         },
         toolCall: true,
       },
-      "gemini-3.1-pro-preview": {
-        id: "gemini-3.1-pro-preview",
+      "gemini-3.1-pro": {
+        id: "gemini-3.1-pro",
         family: "gemini",
         reasoning: true,
         temperature: true,
@@ -161,7 +171,7 @@ describe("getModelCapabilities", () => {
     expect(result.variants).toEqual(["low", "medium", "high", "xhigh"])
   })
 
-  test("normalizes thinking suffix aliases before snapshot lookup", () => {
+  test("normalizes the legacy Claude Opus thinking alias before snapshot lookup", () => {
     const result = getModelCapabilities({
       providerID: "anthropic",
       modelID: "claude-opus-4-6-thinking",
@@ -178,8 +188,8 @@ describe("getModelCapabilities", () => {
     expect(result.diagnostics).toMatchObject({
       resolutionMode: "alias-backed",
       canonicalization: {
-        source: "pattern-alias",
-        ruleID: "anthropic-thinking-suffix",
+        source: "exact-alias",
+        ruleID: "claude-opus-4-6-thinking-legacy-alias",
       },
       snapshot: { source: "bundled-snapshot" },
     })
@@ -193,7 +203,7 @@ describe("getModelCapabilities", () => {
     })
 
     expect(result).toMatchObject({
-      canonicalModelID: "gemini-3.1-pro-preview",
+      canonicalModelID: "gemini-3.1-pro",
       family: "gemini",
       supportsThinking: true,
       supportsTemperature: true,
