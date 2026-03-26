@@ -13,7 +13,7 @@ describe("createCipherAgent", () => {
     expect(config.model).toBe(model)
     expect(config.mode).toBe("all")
     expect(config.temperature).toBe(0.1)
-    expect(config.thinking).toEqual({ type: "enabled", budgetTokens: 32000 })
+    expect(config.thinking).toEqual({ type: "enabled", budgetTokens: 20000 })
     expect(config.reasoningEffort).toBeUndefined()
   })
 

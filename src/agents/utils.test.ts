@@ -29,7 +29,7 @@ describe("createBuiltinAgents with model overrides", () => {
 
       // #then
       expect(agents.morpheus.model).toBe("anthropic/claude-opus-4-6")
-      expect(agents.morpheus.thinking).toEqual({ type: "enabled", budgetTokens: 32000 })
+      expect(agents.morpheus.thinking).toEqual({ type: "enabled", budgetTokens: 8000 })
       expect(agents.morpheus.reasoningEffort).toBeUndefined()
     } finally {
       fetchSpy.mockRestore()
@@ -220,7 +220,7 @@ describe("createBuiltinAgents with model overrides", () => {
 
     // #then
     expect(agents.merovingian.model).toBe("anthropic/claude-sonnet-4")
-    expect(agents.merovingian.thinking).toEqual({ type: "enabled", budgetTokens: 32000 })
+    expect(agents.merovingian.thinking).toEqual({ type: "enabled", budgetTokens: 16000 })
     expect(agents.merovingian.reasoningEffort).toBeUndefined()
     expect(agents.merovingian.textVerbosity).toBeUndefined()
   })
