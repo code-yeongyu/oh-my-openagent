@@ -1,6 +1,6 @@
 import { existsSync, realpathSync } from "node:fs"
 import { homedir } from "node:os"
-import { join, resolve } from "node:path"
+import { join, resolve, win32 } from "node:path"
 
 import type {
   OpenCodeBinaryType,
@@ -31,7 +31,7 @@ function getTauriConfigDir(identifier: string): string {
 
     case "win32": {
       const appData = process.env.APPDATA || join(homedir(), "AppData", "Roaming")
-      return join(appData, identifier)
+      return win32.join(appData, identifier)
     }
 
     case "linux":
@@ -71,7 +71,10 @@ export function getOpenCodeConfigDir(options: OpenCodeConfigDirOptions): string 
   }
 
   const identifier = isDevBuild(version) ? TAURI_APP_IDENTIFIER_DEV : TAURI_APP_IDENTIFIER
-  const tauriDir = resolveConfigPath(getTauriConfigDir(identifier))
+  const tauriDirBase = getTauriConfigDir(identifier)
+  const tauriDir = process.platform === "win32"
+    ? (win32.isAbsolute(tauriDirBase) ? win32.normalize(tauriDirBase) : win32.resolve(tauriDirBase))
+    : resolveConfigPath(tauriDirBase)
 
   if (checkExisting) {
     const legacyDir = getCliConfigDir()

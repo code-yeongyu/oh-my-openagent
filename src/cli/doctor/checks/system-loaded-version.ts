@@ -1,7 +1,7 @@
-import { existsSync, readFileSync, realpathSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { join } from "node:path"
-
+import { resolveSymlink } from "../../../shared/file-utils"
 import { getLatestVersion } from "../../../hooks/auto-update-checker/checker"
 import { extractChannel } from "../../../hooks/auto-update-checker"
 import { PACKAGE_NAME } from "../constants"
@@ -38,12 +38,7 @@ function resolveOpenCodeCacheDir(): string {
 
 function resolveExistingDir(dirPath: string): string {
   if (!existsSync(dirPath)) return dirPath
-
-  try {
-    return realpathSync(dirPath)
-  } catch {
-    return dirPath
-  }
+  return resolveSymlink(dirPath)
 }
 
 function readPackageJson(filePath: string): PackageJsonShape | null {

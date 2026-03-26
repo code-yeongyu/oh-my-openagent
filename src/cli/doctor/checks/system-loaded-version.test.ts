@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it } from "bun:test"
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
 import { PACKAGE_NAME } from "../constants"
+import { resolveSymlink } from "../../../shared/file-utils"
 
 const systemLoadedVersionModulePath = "./system-loaded-version?system-loaded-version-test"
 
@@ -125,7 +126,7 @@ describe("system loaded version", () => {
       const loadedVersion = getLoadedPluginVersion()
 
       //#then
-      expect(loadedVersion.cacheDir).toBe(realpathSync(symlinkConfigDir))
+      expect(loadedVersion.cacheDir).toBe(resolveSymlink(symlinkConfigDir))
       expect(loadedVersion.expectedVersion).toBe("4.5.6")
       expect(loadedVersion.loadedVersion).toBe("4.5.6")
     })
