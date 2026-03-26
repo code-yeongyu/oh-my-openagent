@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process"
 import { afterEach, beforeEach, describe, expect, it } from "bun:test"
 import { mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -97,5 +98,28 @@ describe("claude-code command loader", () => {
 
     // then
     expect(commands["duplicate-global"]?.description).toBe("(opencode) Profile global command")
+  })
+
+  it("#given nested project opencode commands in a worktree #when loadOpencodeProjectCommands is called #then it preserves slash names and stops at the worktree root", async () => {
+    // given
+    const repositoryDir = join(TEST_DIR, "repo")
+    const nestedDirectory = join(repositoryDir, "packages", "app", "src")
+    mkdirSync(nestedDirectory, { recursive: true })
+    execFileSync("git", ["init"], {
+      cwd: repositoryDir,
+      stdio: ["ignore", "ignore", "ignore"],
+    })
+    writeCommand(join(repositoryDir, ".opencode", "commands", "deploy"), "staging", "Deploy staging")
+    writeCommand(join(repositoryDir, ".opencode", "command"), "release", "Release command")
+    writeCommand(join(TEST_DIR, ".opencode", "commands"), "outside", "Outside command")
+
+    // when
+    const commands = await loadOpencodeProjectCommands(nestedDirectory)
+
+    // then
+    expect(commands["deploy/staging"]?.description).toBe("(opencode-project) Deploy staging")
+    expect(commands.release?.description).toBe("(opencode-project) Release command")
+    expect(commands.outside).toBeUndefined()
+    expect(commands["deploy:staging"]).toBeUndefined()
   })
 })
