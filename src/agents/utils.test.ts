@@ -642,7 +642,7 @@ describe("createBuiltinAgents with requiresProvider gating (hephaestus)", () => 
 
       // #then
       expect(agents.hephaestus).toBeDefined()
-      expect(agents.hephaestus.model).toBe("openai/gpt-5.3-codex")
+      expect(agents.hephaestus.model).toBe("openai/gpt-5.4")
     } finally {
       cacheSpy.mockRestore()
       fetchSpy.mockRestore()
