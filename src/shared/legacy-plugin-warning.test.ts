@@ -6,40 +6,22 @@ import { checkForLegacyPluginEntry } from "./legacy-plugin-warning"
 
 describe("checkForLegacyPluginEntry", () => {
   let testConfigDir = ""
-  let originalXdgConfigHome: string | undefined
-  let originalOpenCodeConfigDir: string | undefined
 
   beforeEach(() => {
-    originalXdgConfigHome = process.env.XDG_CONFIG_HOME
-    originalOpenCodeConfigDir = process.env.OPENCODE_CONFIG_DIR
     testConfigDir = join(tmpdir(), `omo-legacy-check-${Date.now()}-${Math.random().toString(36).slice(2)}`)
-    mkdirSync(join(testConfigDir, "opencode"), { recursive: true })
-    process.env.XDG_CONFIG_HOME = testConfigDir
-    delete process.env.OPENCODE_CONFIG_DIR
+    mkdirSync(testConfigDir, { recursive: true })
   })
 
   afterEach(() => {
-    if (originalXdgConfigHome === undefined) {
-      delete process.env.XDG_CONFIG_HOME
-    } else {
-      process.env.XDG_CONFIG_HOME = originalXdgConfigHome
-    }
-
-    if (originalOpenCodeConfigDir === undefined) {
-      delete process.env.OPENCODE_CONFIG_DIR
-    } else {
-      process.env.OPENCODE_CONFIG_DIR = originalOpenCodeConfigDir
-    }
-
     rmSync(testConfigDir, { recursive: true, force: true })
   })
 
   it("detects a bare legacy plugin entry", () => {
     // given
-    writeFileSync(join(testConfigDir, "opencode", "opencode.json"), JSON.stringify({ plugin: ["oh-my-opencode"] }, null, 2))
+    writeFileSync(join(testConfigDir, "opencode.json"), JSON.stringify({ plugin: ["oh-my-opencode"] }, null, 2))
 
     // when
-    const result = checkForLegacyPluginEntry()
+    const result = checkForLegacyPluginEntry(testConfigDir)
 
     // then
     expect(result.hasLegacyEntry).toBe(true)
@@ -49,10 +31,10 @@ describe("checkForLegacyPluginEntry", () => {
 
   it("detects a version-pinned legacy plugin entry", () => {
     // given
-    writeFileSync(join(testConfigDir, "opencode", "opencode.json"), JSON.stringify({ plugin: ["oh-my-opencode@3.10.0"] }, null, 2))
+    writeFileSync(join(testConfigDir, "opencode.json"), JSON.stringify({ plugin: ["oh-my-opencode@3.10.0"] }, null, 2))
 
     // when
-    const result = checkForLegacyPluginEntry()
+    const result = checkForLegacyPluginEntry(testConfigDir)
 
     // then
     expect(result.hasLegacyEntry).toBe(true)
@@ -62,10 +44,10 @@ describe("checkForLegacyPluginEntry", () => {
 
   it("does not flag a canonical plugin entry", () => {
     // given
-    writeFileSync(join(testConfigDir, "opencode", "opencode.json"), JSON.stringify({ plugin: ["oh-my-openagent"] }, null, 2))
+    writeFileSync(join(testConfigDir, "opencode.json"), JSON.stringify({ plugin: ["oh-my-openagent"] }, null, 2))
 
     // when
-    const result = checkForLegacyPluginEntry()
+    const result = checkForLegacyPluginEntry(testConfigDir)
 
     // then
     expect(result.hasLegacyEntry).toBe(false)
@@ -75,10 +57,10 @@ describe("checkForLegacyPluginEntry", () => {
 
   it("detects legacy entries in quoted jsonc config", () => {
     // given
-    writeFileSync(join(testConfigDir, "opencode", "opencode.jsonc"), '{\n  "plugin": ["oh-my-opencode"]\n}\n')
+    writeFileSync(join(testConfigDir, "opencode.jsonc"), '{\n  "plugin": ["oh-my-opencode"]\n}\n')
 
     // when
-    const result = checkForLegacyPluginEntry()
+    const result = checkForLegacyPluginEntry(testConfigDir)
 
     // then
     expect(result.hasLegacyEntry).toBe(true)
@@ -86,8 +68,10 @@ describe("checkForLegacyPluginEntry", () => {
   })
 
   it("returns no warning data when config is missing", () => {
+    // given — empty dir, no config files
+
     // when
-    const result = checkForLegacyPluginEntry()
+    const result = checkForLegacyPluginEntry(testConfigDir)
 
     // then
     expect(result.hasLegacyEntry).toBe(false)

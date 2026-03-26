@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from "node:fs"
+import { join } from "node:path"
 
 import { parseJsoncSafe } from "./jsonc-parser"
 import { getOpenCodeConfigPaths } from "./opencode-config-dir"
@@ -14,7 +15,15 @@ export interface LegacyPluginCheckResult {
   legacyEntries: string[]
 }
 
-function getOpenCodeConfigPath(): string | null {
+function getOpenCodeConfigPath(overrideConfigDir?: string): string | null {
+  if (overrideConfigDir) {
+    const jsonPath = join(overrideConfigDir, "opencode.json")
+    const jsoncPath = join(overrideConfigDir, "opencode.jsonc")
+    if (existsSync(jsoncPath)) return jsoncPath
+    if (existsSync(jsonPath)) return jsonPath
+    return null
+  }
+
   const { configJsonc, configJson } = getOpenCodeConfigPaths({ binary: "opencode", version: null })
 
   if (existsSync(configJsonc)) return configJsonc
@@ -30,8 +39,8 @@ function isCanonicalPluginEntry(entry: string): boolean {
   return entry === PLUGIN_NAME || entry.startsWith(`${PLUGIN_NAME}@`)
 }
 
-export function checkForLegacyPluginEntry(): LegacyPluginCheckResult {
-  const configPath = getOpenCodeConfigPath()
+export function checkForLegacyPluginEntry(overrideConfigDir?: string): LegacyPluginCheckResult {
+  const configPath = getOpenCodeConfigPath(overrideConfigDir)
   if (!configPath) {
     return { hasLegacyEntry: false, hasCanonicalEntry: false, legacyEntries: [] }
   }
