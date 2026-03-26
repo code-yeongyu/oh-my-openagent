@@ -178,8 +178,8 @@ describe("getModelCapabilities", () => {
     expect(result.diagnostics).toMatchObject({
       resolutionMode: "alias-backed",
       canonicalization: {
-        source: "exact-alias",
-        ruleID: "claude-opus-4-6-thinking-legacy-alias",
+        source: "pattern-alias",
+        ruleID: "claude-thinking-legacy-alias",
       },
       snapshot: { source: "bundled-snapshot" },
     })
@@ -202,8 +202,58 @@ describe("getModelCapabilities", () => {
     expect(result.diagnostics).toMatchObject({
       resolutionMode: "alias-backed",
       canonicalization: {
-        source: "exact-alias",
+        source: "pattern-alias",
         ruleID: "gemini-3.1-pro-tier-alias",
+      },
+      snapshot: { source: "bundled-snapshot" },
+    })
+  })
+
+  test("canonicalizes provider-prefixed gemini aliases without changing the transport-facing request", () => {
+    const result = getModelCapabilities({
+      providerID: "google",
+      modelID: "google/gemini-3.1-pro-high",
+      bundledSnapshot,
+    })
+
+    expect(result).toMatchObject({
+      requestedModelID: "google/gemini-3.1-pro-high",
+      canonicalModelID: "gemini-3.1-pro",
+      family: "gemini",
+      supportsThinking: true,
+      supportsTemperature: true,
+      maxOutputTokens: 65_000,
+    })
+    expect(result.diagnostics).toMatchObject({
+      resolutionMode: "alias-backed",
+      canonicalization: {
+        source: "pattern-alias",
+        ruleID: "gemini-3.1-pro-tier-alias",
+      },
+      snapshot: { source: "bundled-snapshot" },
+    })
+  })
+
+  test("canonicalizes provider-prefixed Claude thinking aliases to bare snapshot IDs", () => {
+    const result = getModelCapabilities({
+      providerID: "anthropic",
+      modelID: "anthropic/claude-opus-4-6-thinking",
+      bundledSnapshot,
+    })
+
+    expect(result).toMatchObject({
+      requestedModelID: "anthropic/claude-opus-4-6-thinking",
+      canonicalModelID: "claude-opus-4-6",
+      family: "claude-opus",
+      supportsThinking: true,
+      supportsTemperature: true,
+      maxOutputTokens: 128_000,
+    })
+    expect(result.diagnostics).toMatchObject({
+      resolutionMode: "alias-backed",
+      canonicalization: {
+        source: "pattern-alias",
+        ruleID: "claude-thinking-legacy-alias",
       },
       snapshot: { source: "bundled-snapshot" },
     })
@@ -272,7 +322,8 @@ describe("getModelCapabilities", () => {
     })
 
     expect(result).toMatchObject({
-      canonicalModelID: "openai/o3-mini",
+      requestedModelID: "openai/o3-mini",
+      canonicalModelID: "o3-mini",
       family: "openai-reasoning",
       variants: ["low", "medium", "high"],
       reasoningEfforts: ["none", "minimal", "low", "medium", "high"],
