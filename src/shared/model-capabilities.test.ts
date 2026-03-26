@@ -1,4 +1,4 @@
-import { describe, expect, test, mock } from "bun:test"
+import { afterAll, describe, expect, test, mock } from "bun:test"
 
 // Mock connected-providers-cache to prevent local disk cache from polluting test results.
 // Without this, findProviderModelMetadata reads real cached model metadata (e.g., from opencode serve)
@@ -9,6 +9,10 @@ mock.module("./connected-providers-cache", () => ({
   hasConnectedProvidersCache: () => false,
   hasProviderModelsCache: () => false,
 }))
+
+afterAll(() => {
+  mock.restore()
+})
 
 import {
   getModelCapabilities,

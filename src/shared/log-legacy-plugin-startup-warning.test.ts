@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, mock } from "bun:test"
+import { afterAll, beforeEach, describe, expect, it, mock } from "bun:test"
 import type { LegacyPluginCheckResult } from "./legacy-plugin-warning"
 
 function createLegacyPluginCheckResult(
@@ -23,6 +23,10 @@ mock.module("./legacy-plugin-warning", () => ({
 mock.module("./logger", () => ({
   log: mockLog,
 }))
+
+afterAll(() => {
+  mock.restore()
+})
 
 async function importFreshStartupWarningModule(): Promise<typeof import("./log-legacy-plugin-startup-warning")> {
   return import(`./log-legacy-plugin-startup-warning?test=${Date.now()}-${Math.random()}`)
