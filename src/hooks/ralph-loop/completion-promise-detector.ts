@@ -9,6 +9,20 @@ interface OpenCodeSessionMessage {
 	parts?: Array<{ type: string; text?: string }>
 }
 
+interface TranscriptEntry {
+	type?: string
+	timestamp?: string
+	content?: string
+	tool_output?: { output?: string } | string
+}
+
+function extractTranscriptEntryText(entry: TranscriptEntry): string {
+	if (typeof entry.content === "string") return entry.content
+	if (typeof entry.tool_output === "string") return entry.tool_output
+	if (entry.tool_output && typeof entry.tool_output === "object" && typeof entry.tool_output.output === "string") return entry.tool_output.output
+	return ""
+}
+
 function escapeRegex(str: string): string {
 	return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 }
@@ -45,13 +59,15 @@ export function detectCompletionInTranscript(
 
 		for (const line of lines) {
 			try {
-				const entry = JSON.parse(line) as { type?: string; timestamp?: string }
+				const entry = JSON.parse(line) as TranscriptEntry
 				if (entry.type === "user") continue
 				if (startedAt && entry.timestamp && entry.timestamp < startedAt) continue
-				if (pattern.test(line)) return true
+				const entryText = extractTranscriptEntryText(entry)
+				if (!entryText) continue
+				if (pattern.test(entryText)) return true
 				// Fallback: semantic completion only for DONE promise and assistant entries
 				const isAssistantEntry = entry.type === "assistant" || entry.type === "text"
-				if (promise === "DONE" && isAssistantEntry && detectSemanticCompletion(line)) {
+				if (promise === "DONE" && isAssistantEntry && detectSemanticCompletion(entryText)) {
 					log("[ralph-loop] WARNING: Semantic completion detected in transcript (agent used natural language instead of <promise>DONE</promise>)")
 					return true
 				}
