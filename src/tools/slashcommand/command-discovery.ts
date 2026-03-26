@@ -76,6 +76,22 @@ function discoverPluginCommands(options?: CommandDiscoveryOptions): CommandInfo[
   }))
 }
 
+function deduplicateCommandInfosByName(commands: CommandInfo[]): CommandInfo[] {
+  const seen = new Set<string>()
+  const deduplicatedCommands: CommandInfo[] = []
+
+  for (const command of commands) {
+    if (seen.has(command.name)) {
+      continue
+    }
+
+    seen.add(command.name)
+    deduplicatedCommands.push(command)
+  }
+
+  return deduplicatedCommands
+}
+
 export function discoverCommandsSync(
   directory?: string,
   options?: CommandDiscoveryOptions,
@@ -110,12 +126,12 @@ export function discoverCommandsSync(
     scope: "builtin",
   }))
 
-  return [
+  return deduplicateCommandInfosByName([
     ...projectCommands,
     ...userCommands,
     ...opencodeProjectCommands,
     ...opencodeGlobalCommands,
     ...builtinCommands,
     ...pluginCommands,
-  ]
+  ])
 }

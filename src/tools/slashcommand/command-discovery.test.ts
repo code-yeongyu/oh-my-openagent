@@ -204,4 +204,35 @@ Use ancestor command.
     expect(ancestorCommand?.scope).toBe("opencode-project")
     expect(ancestorCommand?.content).toContain("Use ancestor command.")
   })
+
+  it("deduplicates same-named opencode commands while keeping the higher-priority alias", () => {
+    const commandsRoot = join(projectDir, ".opencode")
+    const singularDir = join(commandsRoot, "command")
+    const pluralDir = join(commandsRoot, "commands")
+
+    mkdirSync(singularDir, { recursive: true })
+    mkdirSync(pluralDir, { recursive: true })
+    writeFileSync(
+      join(singularDir, "duplicate.md"),
+      `---
+description: Singular duplicate command
+---
+Use singular command.
+`,
+    )
+    writeFileSync(
+      join(pluralDir, "duplicate.md"),
+      `---
+description: Plural duplicate command
+---
+Use plural command.
+`,
+    )
+
+    const commands = discoverCommandsSync(projectDir)
+    const duplicates = commands.filter((command) => command.name === "duplicate")
+
+    expect(duplicates).toHaveLength(1)
+    expect(duplicates[0]?.content).toContain("Use plural command.")
+  })
 })
