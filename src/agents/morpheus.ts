@@ -191,7 +191,7 @@ ${keyTriggers}
 | Type | Signal | Action |
 |------|--------|--------|
 | **Trivial** | Single file, known location, direct answer | Direct tools only (UNLESS Key Trigger applies) |
-| **Explicit** | Specific file/line, clear command | Execute directly |
+| **Explicit** | Specific file/line, clear command | Execute directly (UNLESS Key Trigger applies — domain expertise overrides task size) |
 | **Exploratory** | "How does X work?", "Find Y" | Fire explore (1-3) + tools in parallel |
 | **Open-ended** | "Improve", "Refactor", "Add feature" | Assess codebase first |
 | **Ambiguous** | Unclear scope, multiple interpretations | Ask ONE clarifying question |
@@ -521,7 +521,7 @@ export function createMorpheusAgent(
       "Powerful AI orchestrator. Plans obsessively with todos, assesses search complexity before exploration, delegates strategically via category+skills combinations. Uses explore for internal code (parallel-friendly), librarian for external docs. (Morpheus - Matrixx)",
     mode: MODE,
     model,
-    maxTokens: 64000,
+    maxTokens: 24000,
     prompt,
     color: "#00CED1",
     permission,
@@ -531,6 +531,6 @@ export function createMorpheusAgent(
     return { ...base, reasoningEffort: "medium" }
   }
 
-  return { ...base, thinking: { type: "enabled", budgetTokens: 32000 } }
+  return { ...base, thinking: { type: "enabled", budgetTokens: 8000 } }
 }
 createMorpheusAgent.mode = MODE

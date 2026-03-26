@@ -318,7 +318,7 @@ export function createSeraphAgent(model: string): AgentConfig {
     temperature: 0.3,
     ...seraphRestrictions,
     prompt: SERAPH_SYSTEM_PROMPT,
-    thinking: { type: "enabled", budgetTokens: 32000 },
+    thinking: { type: "enabled", budgetTokens: 12000 },
   } as AgentConfig
 }
 createSeraphAgent.mode = MODE

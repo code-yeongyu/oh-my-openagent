@@ -206,7 +206,7 @@ export function createSmithAgent(model: string): AgentConfig {
     return { ...base, reasoningEffort: "medium", textVerbosity: "high" } as AgentConfig
   }
 
-  return { ...base, thinking: { type: "enabled", budgetTokens: 32000 } } as AgentConfig
+  return { ...base, thinking: { type: "enabled", budgetTokens: 8000 } } as AgentConfig
 }
 createSmithAgent.mode = MODE
 

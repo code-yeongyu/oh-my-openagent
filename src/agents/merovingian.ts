@@ -164,7 +164,7 @@ export function createOracleAgent(model: string): AgentConfig {
     return { ...base, reasoningEffort: "medium", textVerbosity: "high" } as AgentConfig
   }
 
-  return { ...base, thinking: { type: "enabled", budgetTokens: 32000 } } as AgentConfig
+  return { ...base, thinking: { type: "enabled", budgetTokens: 16000 } } as AgentConfig
 }
 createOracleAgent.mode = MODE
 
