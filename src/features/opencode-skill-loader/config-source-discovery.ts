@@ -1,6 +1,7 @@
 import { promises as fs } from "fs"
 import { homedir } from "os"
 import { dirname, extname, isAbsolute, join, relative } from "path"
+import { homedir } from "os"
 import picomatch from "picomatch"
 import type { SkillsConfig } from "../../config/schema"
 import { normalizeSkillsConfig } from "./merger/skills-config-normalizer"
