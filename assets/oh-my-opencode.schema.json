@@ -4661,6 +4661,10 @@
           "type": "number",
           "minimum": 60000
         },
+        "sessionGoneTimeoutMs": {
+          "type": "number",
+          "minimum": 10000
+        },
         "syncPollTimeoutMs": {
           "type": "number",
           "minimum": 60000

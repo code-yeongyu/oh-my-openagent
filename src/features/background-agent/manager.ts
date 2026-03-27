@@ -1787,6 +1787,53 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
     })
   }
 
+  private async verifySessionExists(sessionID: string): Promise<boolean> {
+    try {
+      const result = await this.client.session.get({ path: { id: sessionID } })
+      return !!result.data
+    } catch {
+      return false
+    }
+  }
+
+  private async failCrashedTask(task: BackgroundTask, errorMessage: string): Promise<void> {
+    task.status = "error"
+    task.error = errorMessage
+    task.completedAt = new Date()
+    if (task.rootSessionID) {
+      this.unregisterRootDescendant(task.rootSessionID)
+    }
+    this.taskHistory.record(task.parentSessionID, { id: task.id, sessionID: task.sessionID, agent: task.agent, description: task.description, status: "error", category: task.category, startedAt: task.startedAt, completedAt: task.completedAt })
+    if (task.concurrencyKey) {
+      this.concurrencyManager.release(task.concurrencyKey)
+      task.concurrencyKey = undefined
+    }
+
+    const completionTimer = this.completionTimers.get(task.id)
+    if (completionTimer) {
+      clearTimeout(completionTimer)
+      this.completionTimers.delete(task.id)
+    }
+    const idleTimer = this.idleDeferralTimers.get(task.id)
+    if (idleTimer) {
+      clearTimeout(idleTimer)
+      this.idleDeferralTimers.delete(task.id)
+    }
+
+    this.cleanupPendingByParent(task)
+    this.clearNotificationsForTask(task.id)
+    removeTaskToastTracking(task.id)
+    this.scheduleTaskRemoval(task.id)
+    if (task.sessionID) {
+      SessionCategoryRegistry.remove(task.sessionID)
+    }
+
+    this.markForNotification(task)
+    this.enqueueNotificationForParent(task.parentSessionID, () => this.notifyParentSession(task)).catch(err => {
+      log("[background-agent] Error in notifyParentSession for crashed task:", { taskId: task.id, error: err })
+    })
+  }
+
   private async pollRunningTasks(): Promise<void> {
     if (this.pollingInFlight) return
     this.pollingInFlight = true
@@ -1848,11 +1895,20 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
         }
 
         // Session is idle or no longer in status response (completed/disappeared)
+        const sessionGoneFromStatus = !sessionStatus
         const completionSource = sessionStatus?.type === "idle"
           ? "polling (idle status)"
           : "polling (session gone from status)"
         const hasValidOutput = await this.validateSessionHasOutput(sessionID)
         if (!hasValidOutput) {
+          if (sessionGoneFromStatus) {
+            const sessionExists = await this.verifySessionExists(sessionID)
+            if (!sessionExists) {
+              log("[background-agent] Session no longer exists (crashed), marking task as error:", task.id)
+              await this.failCrashedTask(task, "Subagent session no longer exists (process likely crashed). The session disappeared without producing any output.")
+              continue
+            }
+          }
           log("[background-agent] Polling idle/gone but no valid output yet, waiting:", task.id)
           continue
         }

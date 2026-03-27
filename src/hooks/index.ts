@@ -53,3 +53,4 @@ export { createJsonErrorRecoveryHook, JSON_ERROR_TOOL_EXCLUDE_LIST, JSON_ERROR_P
 export { createReadImageResizerHook } from "./read-image-resizer"
 export { createTodoDescriptionOverrideHook } from "./todo-description-override"
 export { createWebFetchRedirectGuardHook } from "./webfetch-redirect-guard"
+export { createLegacyPluginToastHook } from "./legacy-plugin-toast"

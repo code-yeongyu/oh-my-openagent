@@ -195,6 +195,7 @@ export function createEventHandler(args: {
 
   const dispatchToHooks = async (input: EventInput): Promise<void> => {
     await Promise.resolve(hooks.autoUpdateChecker?.event?.(input));
+    await Promise.resolve(hooks.legacyPluginToast?.event?.(input));
     await Promise.resolve(hooks.claudeCodeHooks?.event?.(input));
     await Promise.resolve(hooks.backgroundNotificationHook?.event?.(input));
     await Promise.resolve(hooks.sessionNotification?.(input));
