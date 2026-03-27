@@ -80,7 +80,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
 
     const second = librarian.fallbackChain[1]
     expect(second.providers[0]).toBe("opencode")
-    expect(second.model).toBe("minimax-m2.5")
+    expect(second.model).toBe("minimax-m2.7-highspeed")
 
     const tertiary = librarian.fallbackChain[2]
     expect(tertiary.providers).toContain("anthropic")
@@ -106,11 +106,11 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
 
     const secondary = explore.fallbackChain[1]
     expect(secondary.providers).toContain("opencode-go")
-    expect(secondary.model).toBe("minimax-m2.7")
+    expect(secondary.model).toBe("minimax-m2.7-highspeed")
 
     const tertiary = explore.fallbackChain[2]
     expect(tertiary.providers).toContain("opencode")
-    expect(tertiary.model).toBe("minimax-m2.5")
+    expect(tertiary.model).toBe("minimax-m2.7")
 
     const quaternary = explore.fallbackChain[3]
     expect(quaternary.providers).toContain("anthropic")
