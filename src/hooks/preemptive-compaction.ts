@@ -112,6 +112,7 @@ export function createPreemptiveCompactionHook(
     if (usageRatio < PREEMPTIVE_COMPACTION_THRESHOLD || !cached.modelID) return
 
     compactionInProgress.add(sessionID)
+    lastCompactionTime.set(sessionID, Date.now())
 
     try {
       const { providerID: targetProviderID, modelID: targetModelID } = resolveCompactionModel(
@@ -132,7 +133,6 @@ export function createPreemptiveCompactionHook(
       )
 
       compactedSessions.add(sessionID)
-      lastCompactionTime.set(sessionID, Date.now())
     } catch (error) {
       log("[preemptive-compaction] Compaction failed", { sessionID, error: String(error) })
     } finally {

@@ -284,6 +284,74 @@ describe("preemptive-compaction", () => {
     })
   })
 
+  // #given compaction fails
+  // #when tool.execute.after is called again immediately
+  // #then should NOT retry due to cooldown
+  it("should enforce cooldown even after failed compaction to prevent rapid retry loops", async () => {
+    //#given
+    const hook = createPreemptiveCompactionHook(ctx as never, {} as never)
+    const sessionID = "ses_fail_cooldown"
+    ctx.client.session.summarize.mockRejectedValueOnce(new Error("rate limited"))
+
+    await hook.event({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            role: "assistant",
+            sessionID,
+            providerID: "anthropic",
+            modelID: "claude-sonnet-4-6",
+            finish: true,
+            tokens: {
+              input: 170000,
+              output: 0,
+              reasoning: 0,
+              cache: { read: 10000, write: 0 },
+            },
+          },
+        },
+      },
+    })
+
+    await hook["tool.execute.after"](
+      { tool: "bash", sessionID, callID: "call_fail" },
+      { title: "", output: "test", metadata: null }
+    )
+
+    expect(ctx.client.session.summarize).toHaveBeenCalledTimes(1)
+
+    //#when - message.updated clears compactedSessions, but cooldown should still block
+    await hook.event({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            role: "assistant",
+            sessionID,
+            providerID: "anthropic",
+            modelID: "claude-sonnet-4-6",
+            finish: true,
+            tokens: {
+              input: 170000,
+              output: 0,
+              reasoning: 0,
+              cache: { read: 10000, write: 0 },
+            },
+          },
+        },
+      },
+    })
+
+    await hook["tool.execute.after"](
+      { tool: "bash", sessionID, callID: "call_fail_2" },
+      { title: "", output: "test", metadata: null }
+    )
+
+    //#then - should NOT have retried
+    expect(ctx.client.session.summarize).toHaveBeenCalledTimes(1)
+  })
+
   it("should use 1M limit when model cache flag is enabled", async () => {
     //#given
     const hook = createPreemptiveCompactionHook(ctx as never, {}, {
@@ -399,17 +467,48 @@ describe("preemptive-compaction", () => {
         { title: "", output: "test", metadata: null },
       )
 
-      await hook["tool.execute.after"](
-        { tool: "bash", sessionID, callID: "call_timeout_2" },
-        { title: "", output: "test", metadata: null },
-      )
-
-      //#then
-      expect(ctx.client.session.summarize).toHaveBeenCalledTimes(2)
+      //#then - first call timed out
+      expect(ctx.client.session.summarize).toHaveBeenCalledTimes(1)
       expect(logMock).toHaveBeenCalledWith("[preemptive-compaction] Compaction failed", {
         sessionID,
         error: expect.stringContaining("Compaction summarize timed out"),
       })
+
+      //#when - advance past cooldown, clear compactedSessions via message.updated, then retry
+      const originalNow = Date.now
+      Date.now = () => originalNow() + 61_000
+      try {
+        await hook.event({
+          event: {
+            type: "message.updated",
+            properties: {
+              info: {
+                role: "assistant",
+                sessionID,
+                providerID: "anthropic",
+                modelID: "claude-sonnet-4-6",
+                finish: true,
+                tokens: {
+                  input: 170000,
+                  output: 0,
+                  reasoning: 0,
+                  cache: { read: 10000, write: 0 },
+                },
+              },
+            },
+          },
+        })
+
+        await hook["tool.execute.after"](
+          { tool: "bash", sessionID, callID: "call_timeout_2" },
+          { title: "", output: "test", metadata: null },
+        )
+
+        //#then - should have retried after cooldown
+        expect(ctx.client.session.summarize).toHaveBeenCalledTimes(2)
+      } finally {
+        Date.now = originalNow
+      }
     } finally {
       restoreTimeouts()
     }
