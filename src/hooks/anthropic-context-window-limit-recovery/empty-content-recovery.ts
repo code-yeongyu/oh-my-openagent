@@ -1,6 +1,7 @@
 import {
   findEmptyMessages,
   findEmptyMessageByIndex,
+  findMessagesWithEmptyTextParts,
   injectTextPart,
   replaceEmptyTextParts,
 } from "../session-recovery/storage"
@@ -79,7 +80,9 @@ export async function fixEmptyMessages(params: {
 
   if (!fixed) {
     const emptyMessageIds = findEmptyMessages(params.sessionID)
-    if (emptyMessageIds.length === 0) {
+    const emptyTextPartIds = findMessagesWithEmptyTextParts(params.sessionID)
+    const allIds = [...new Set([...emptyMessageIds, ...emptyTextPartIds])]
+    if (allIds.length === 0) {
       await params.client.tui
         .showToast({
           body: {
@@ -93,7 +96,7 @@ export async function fixEmptyMessages(params: {
       return false
     }
 
-    for (const messageID of emptyMessageIds) {
+    for (const messageID of allIds) {
       const replaced = replaceEmptyTextParts(messageID, PLACEHOLDER_TEXT)
       if (replaced) {
         fixed = true

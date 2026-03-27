@@ -4,6 +4,7 @@ import { normalizeSDKResponse } from "../../shared"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
 import {
   findEmptyMessages,
+  findMessagesWithEmptyTextParts,
   injectTextPart,
   replaceEmptyTextParts,
 } from "../session-recovery/storage"
@@ -114,12 +115,14 @@ export async function sanitizeEmptyMessagesBeforeSummarize(
   }
 
   const emptyMessageIds = findEmptyMessages(sessionID)
-  if (emptyMessageIds.length === 0) {
+  const emptyTextPartIds = findMessagesWithEmptyTextParts(sessionID)
+  const allIds = [...new Set([...emptyMessageIds, ...emptyTextPartIds])]
+  if (allIds.length === 0) {
     return 0
   }
 
   let fixedCount = 0
-  for (const messageID of emptyMessageIds) {
+  for (const messageID of allIds) {
     const replaced = replaceEmptyTextParts(messageID, PLACEHOLDER_TEXT)
     if (replaced) {
       fixedCount++
@@ -135,7 +138,7 @@ export async function sanitizeEmptyMessagesBeforeSummarize(
     log("[auto-compact] pre-summarize sanitization fixed empty messages", {
       sessionID,
       fixedCount,
-      totalEmpty: emptyMessageIds.length,
+      totalEmpty: allIds.length,
     })
   }
 
