@@ -6,7 +6,7 @@ Oh-My-OpenAgent provides 11 specialized AI agents. Each has distinct expertise, 
 
 ### Core Agents
 
-Core-agent tab cycling is deterministic. The fixed priority order is Sisyphus, Hephaestus, Prometheus, and Atlas. Remaining agents follow after that stable core ordering.
+Core-agent tab cycling is deterministic via injected runtime order field. The fixed priority order is Sisyphus (order: 1), Hephaestus (order: 2), Prometheus (order: 3), and Atlas (order: 4). Remaining agents follow after that stable core ordering.
 
 | Agent                 | Model              | Purpose                                                                                                                                                                                                                                                                                                                                                          |
 | --------------------- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -90,7 +90,7 @@ When running inside tmux:
 - Watch multiple agents work in real-time
 - Each pane shows agent output live
 - Auto-cleanup when agents complete
-- **Stable agent ordering**: the core tab cycle stays deterministic with Sisyphus, Hephaestus, Prometheus, and Atlas first
+- **Stable agent ordering**: core-agent tab cycling is deterministic via injected runtime order field (Sisyphus: 1, Hephaestus: 2, Prometheus: 3, Atlas: 4)
 
 Customize agent models, prompts, and permissions in `oh-my-opencode.jsonc`.
 
@@ -192,6 +192,10 @@ When you use a Category, a special agent called **Sisyphus-Junior** performs the
 
 ## Advanced Configuration
 
+### Rename Compatibility
+
+The published package and binary remain `oh-my-opencode`. Inside `opencode.json`, the compatibility layer now prefers the plugin entry `oh-my-openagent`, while legacy `oh-my-opencode` entries still load with a warning. Plugin config files (`oh-my-openagent.json[c]` or legacy `oh-my-opencode.json[c]`) are recognized during the transition. Run `bunx oh-my-opencode doctor` to check for legacy package name warnings.
+
 ### Fallback Models
 
 Configure per-agent fallback chains with arrays that can mix plain model strings and per-model objects:
@@ -214,24 +218,35 @@ When a model errors, the runtime can move through the configured fallback array.
 
 ### File-Based Prompts
 
-Load agent system prompts from external files using `file://` URLs:
+Load agent system prompts from external files using `file://` URLs in the `prompt` field, or append additional content with `prompt_append`. The `prompt_append` field also works on categories.
 
 ```jsonc
 {
   "agents": {
     "sisyphus": {
       "prompt": "file:///path/to/custom-prompt.md"
+    },
+    "oracle": {
+      "prompt_append": "file:///path/to/additional-context.md"
+    }
+  },
+  "categories": {
+    "deep": {
+      "prompt_append": "file:///path/to/deep-category-append.md"
     }
   }
 }
 ```
 
+Supports `~` expansion for home directory and relative `file://` paths.
+
 Useful for:
 - Version controlling prompts separately from config
 - Sharing prompts across projects
 - Keeping configuration files concise
+- Adding category-specific context without duplicating base prompts
 
-The file content is loaded at runtime and injected as the agent's system prompt.
+The file content is loaded at runtime and injected into the agent's system prompt.
 
 ### Session Recovery
 
@@ -902,6 +917,38 @@ Pre-authenticate via CLI:
 ```bash
 bunx oh-my-opencode mcp oauth login <server-name> --server-url https://api.example.com
 ```
+
+## Model Capabilities
+
+Model capabilities are models.dev-backed, with a refreshable cache and compatibility diagnostics. The system combines bundled models.dev snapshot data, optional refreshed cache data, provider runtime metadata, and heuristics when exact metadata is unavailable.
+
+### Refreshing Capabilities
+
+Update the local cache with the latest model information:
+
+```bash
+bunx oh-my-opencode refresh-model-capabilities
+```
+
+Configure automatic refresh at startup:
+
+```jsonc
+{
+  "model_capabilities": {
+    "enabled": true,
+    "auto_refresh_on_start": true,
+    "refresh_timeout_ms": 5000,
+    "source_url": "https://models.dev/api.json"
+  }
+}
+```
+
+### Capability Diagnostics
+
+Run `bunx oh-my-opencode doctor` to see capability diagnostics including:
+- effective model resolution for agents and categories
+- warnings when configured models rely on compatibility fallback
+- override compatibility details alongside model resolution output
 
 ## Context Injection
 

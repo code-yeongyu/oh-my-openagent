@@ -4423,6 +4423,11 @@
         },
         "model_fallback_title": {
           "type": "boolean"
+        },
+        "max_tools": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
         }
       },
       "additionalProperties": false

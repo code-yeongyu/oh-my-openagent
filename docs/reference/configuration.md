@@ -30,6 +30,7 @@ Complete reference for Oh My OpenCode plugin configuration. During the rename tr
   - [LSP](#lsp)
 - [Advanced](#advanced)
   - [Runtime Fallback](#runtime-fallback)
+  - [Model Capabilities](#model-capabilities)
   - [Hashline Edit](#hashline-edit)
   - [Experimental](#experimental)
 - [Reference](#reference)
@@ -52,7 +53,7 @@ User config is loaded first, then project config overrides it. In each directory
 | macOS/Linux | `~/.config/opencode/oh-my-openagent.json[c]`, `~/.config/opencode/oh-my-opencode.json[c]` |
 | Windows     | `%APPDATA%\opencode\oh-my-openagent.json[c]`, `%APPDATA%\opencode\oh-my-opencode.json[c]` |
 
-**Rename compatibility:** OpenCode plugin registration now prefers `oh-my-openagent`, while legacy `oh-my-opencode` entries and config basenames still load during the transition. If both plugin config basenames exist in the same directory, the legacy `oh-my-opencode.*` file currently wins.
+**Rename compatibility:** The published package and CLI binary remain `oh-my-opencode`. OpenCode plugin registration prefers `oh-my-openagent`, while legacy `oh-my-opencode` entries and config basenames still load during the transition. Config detection checks `oh-my-opencode` before `oh-my-openagent`, so if both plugin config basenames exist in the same directory, the legacy `oh-my-opencode.*` file currently wins.
 JSONC supports `// line comments`, `/* block comments */`, and trailing commas.
 
 Enable schema autocomplete:
@@ -158,6 +159,8 @@ Override built-in agent settings. Available agents: `sisyphus`, `hephaestus`, `p
 
 Disable agents entirely: `{ "disabled_agents": ["oracle", "multimodal-looker"] }`
 
+Core agents receive an injected runtime `order` field for deterministic Tab cycling in the UI: Sisyphus = 1, Hephaestus = 2, Prometheus = 3, Atlas = 4. This is not a user-configurable config key.
+
 #### Agent Options
 
 | Option            | Type           | Description                                                     |
@@ -177,7 +180,7 @@ Disable agents entirely: `{ "disabled_agents": ["oracle", "multimodal-looker"] }
 | `variant`         | string        | Model variant: `max`, `high`, `medium`, `low`, `xhigh`. Normalized to supported values |
 | `maxTokens`       | number        | Max response tokens                                    |
 | `thinking`        | object        | Anthropic extended thinking                            |
-| `reasoningEffort` | string        | OpenAI reasoning: `low`, `medium`, `high`, `xhigh`. Normalized to supported values     |
+| `reasoningEffort` | string        | OpenAI reasoning: `none`, `minimal`, `low`, `medium`, `high`, `xhigh`. Normalized to supported values |
 | `textVerbosity`   | string        | Text verbosity: `low`, `medium`, `high`                |
 | `providerOptions` | object        | Provider-specific options                              |
 
@@ -250,7 +253,7 @@ Object entries support: `model`, `variant`, `reasoningEffort`, `temperature`, `t
 
 #### File URIs for Prompts
 
-Both `prompt` and `prompt_append` support loading content from files via `file://` URIs:
+Both `prompt` and `prompt_append` support loading content from files via `file://` URIs. Category-level `prompt_append` supports the same URI forms.
 
 ```jsonc
 {
@@ -264,11 +267,18 @@ Both `prompt` and `prompt_append` support loading content from files via `file:/
     "explore": {
       "prompt_append": "file://~/home/dir/prompt.txt"
     }
+  },
+  "categories": {
+    "custom": {
+      "model": "anthropic/claude-sonnet-4-6",
+      "prompt_append": "file://./category-context.md"
+    }
   }
 }
 ```
 
-Paths can be absolute (`file:///abs/path`), relative to project root (`file://./rel/path`), or home-relative (`file://~/home/path`).
+Paths can be absolute (`file:///abs/path`), relative to project root (`file://./rel/path`), or home-relative (`file://~/home/path`). If a file URI cannot be decoded, resolved, or read, OmO inserts a warning placeholder into the prompt instead of failing hard.
+
 ### Categories
 
 Domain-specific model delegation used by the `task()` tool. When Sisyphus delegates work, it picks a category, not a model name.
@@ -310,15 +320,27 @@ Disable categories: `{ "disabled_categories": ["ultrabrain"] }`
 
 ### Model Resolution
 
-3-step priority at runtime:
+Runtime priority:
 
-1. **User override** - model set in config → used exactly as-is. Even on cold cache (first run without model availability data), explicit user configuration takes precedence over hardcoded fallback chains
-2. **Provider fallback chain** - tries each provider in priority order until available
-3. **System default** - falls back to OpenCode's configured default model
+1. **UI-selected model** - model chosen in the OpenCode UI, for primary agents
+2. **User override** - model set in config → used exactly as-is. Even on cold cache, explicit user configuration takes precedence over hardcoded fallback chains
+3. **Category default** - model inherited from the assigned category config
+4. **User `fallback_models`** - user-configured fallback list is tried before built-in fallback chains
+5. **Provider fallback chain** - built-in provider/model chain from OmO source
+6. **System default** - OpenCode's configured default model
 
 #### Model Settings Compatibility
 
-`variant` and `reasoningEffort` values are automatically normalized to what each model supports. If you specify a variant or reasoning effort level that a model does not support, it is adjusted to the closest supported value rather than causing errors.
+Model settings are compatibility-normalized against model capabilities instead of failing hard.
+
+Normalized fields:
+
+- `variant` - downgraded to the closest supported value
+- `reasoningEffort` - downgraded to the closest supported value, or removed if unsupported
+- `temperature` - removed if unsupported by the model metadata
+- `top_p` - removed if unsupported by the model metadata
+- `maxTokens` - capped to the model's reported max output limit
+- `thinking` - removed if the target model does not support thinking
 
 Examples:
 - Claude models do not support `reasoningEffort` - it is removed automatically
@@ -326,21 +348,23 @@ Examples:
 - o-series models support `none` through `high` - `xhigh` is downgraded to `high`
 - GPT-5 supports `none`, `minimal`, `low`, `medium`, `high`, `xhigh` - all pass through
 
+Capability data comes from provider runtime metadata first. OmO also ships bundled models.dev-backed capability data, supports a refreshable local models.dev cache, and falls back to heuristic family detection plus alias rules when exact metadata is unavailable. `bunx oh-my-opencode doctor` surfaces capability diagnostics and warns when a configured model relies on compatibility fallback.
+
 
 #### Agent Provider Chains
 
 | Agent                 | Default Model       | Provider Priority                                                            |
 | --------------------- | ------------------- | ---------------------------------------------------------------------------- |
-| **Sisyphus**          | `claude-opus-4-6`   | `claude-opus-4-6` → `glm-5` → `big-pickle`                                   |
-| **Hephaestus**        | `gpt-5.4`           | `gpt-5.4`                                                                    |
-| **oracle**            | `gpt-5.4`           | `gpt-5.4` → `gemini-3.1-pro` → `claude-opus-4-6`                             |
+| **Sisyphus**          | `claude-opus-4-6`   | `claude-opus-4-6 (max)` → `kimi-k2.5` via OpenCode Go / Kimi providers → `gpt-5.4 (medium)` → `glm-5` → `big-pickle` |
+| **Hephaestus**        | `gpt-5.4`           | `gpt-5.4 (medium)`                                                           |
+| **oracle**            | `gpt-5.4`           | `gpt-5.4 (high)` → `gemini-3.1-pro (high)` → `claude-opus-4-6 (max)` → `glm-5` |
 | **librarian**         | `minimax-m2.7`      | `opencode-go/minimax-m2.7` → `opencode/minimax-m2.5` → `claude-haiku-4-5` → `gpt-5-nano` |
 | **explore**           | `grok-code-fast-1`  | `grok-code-fast-1` → `opencode-go/minimax-m2.7` → `opencode/minimax-m2.5` → `claude-haiku-4-5` → `gpt-5-nano` |
-| **multimodal-looker** | `gpt-5.4`           | `gpt-5.4` → `k2p5` → `glm-4.6v` → `gpt-5-nano`                                |
-| **Prometheus**        | `claude-opus-4-6`   | `claude-opus-4-6` → `gpt-5.4` → `gemini-3.1-pro`                             |
-| **Metis**             | `claude-opus-4-6`   | `claude-opus-4-6` → `gpt-5.4` → `gemini-3.1-pro`                             |
-| **Momus**             | `gpt-5.4`           | `gpt-5.4` → `claude-opus-4-6` → `gemini-3.1-pro`                             |
-| **Atlas**             | `claude-sonnet-4-6` | `claude-sonnet-4-6` → `gpt-5.4`                                              |
+| **multimodal-looker** | `gpt-5.4`           | `gpt-5.4 (medium)` → `kimi-k2.5` → `glm-4.6v` → `gpt-5-nano`                |
+| **Prometheus**        | `claude-opus-4-6`   | `claude-opus-4-6 (max)` → `gpt-5.4 (high)` → `glm-5` → `gemini-3.1-pro`     |
+| **Metis**             | `claude-opus-4-6`   | `claude-opus-4-6 (max)` → `gpt-5.4 (high)` → `glm-5` → `k2p5`               |
+| **Momus**             | `gpt-5.4`           | `gpt-5.4 (xhigh)` → `claude-opus-4-6 (max)` → `gemini-3.1-pro (high)` → `glm-5` |
+| **Atlas**             | `claude-sonnet-4-6` | `claude-sonnet-4-6` → `kimi-k2.5` → `gpt-5.4 (medium)` → `minimax-m2.7`     |
 
 #### Category Provider Chains
 
@@ -853,6 +877,34 @@ This final example is a **complete shape reference**. In real configs, prefer pr
 - use `reasoningEffort` for OpenAI reasoning models
 - use `thinking` for Anthropic thinking-capable models
 - use `variant`, `temperature`, `top_p`, and `maxTokens` only when that fallback model supports them
+
+### Model Capabilities
+
+OmO can refresh a local models.dev capability snapshot on startup. This cache is controlled by `model_capabilities`.
+
+```jsonc
+{
+  "model_capabilities": {
+    "enabled": true,
+    "auto_refresh_on_start": true,
+    "refresh_timeout_ms": 5000,
+    "source_url": "https://models.dev/api.json"
+  }
+}
+```
+
+| Option | Default behavior | Description |
+| ------ | ---------------- | ----------- |
+| `enabled` | enabled unless explicitly set to `false` | Master switch for model capability refresh behavior |
+| `auto_refresh_on_start` | refresh on startup unless explicitly set to `false` | Refresh the local models.dev cache during startup checks |
+| `refresh_timeout_ms` | `5000` | Timeout for the startup refresh attempt |
+| `source_url` | `https://models.dev/api.json` | Override the models.dev source URL |
+
+Notes:
+
+- Startup refresh runs through the auto-update checker hook.
+- Manual refresh is available via `bunx oh-my-opencode refresh-model-capabilities`.
+- Provider runtime metadata still takes priority when OmO resolves capabilities for compatibility checks.
 
 ### Hashline Edit
 

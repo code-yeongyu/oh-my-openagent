@@ -82,7 +82,7 @@ These agents are built for GPT's principle-driven style. Their prompts assume au
 
 | Agent          | Role                    | Fallback Chain                         | Notes                                            |
 | -------------- | ----------------------- | -------------------------------------- | ------------------------------------------------ |
-| **Hephaestus** | Autonomous deep worker  | GPT-5.4                               | Requires GPT access. The craftsman. |
+| **Hephaestus** | Autonomous deep worker  | GPT-5.4 (medium)                      | Requires GPT access. The craftsman. |
 | **Oracle**     | Architecture consultant | GPT-5.4 → Gemini 3.1 Pro → Claude Opus → opencode-go/glm-5 | Read-only high-IQ consultation.                  |
 | **Momus**      | Ruthless reviewer       | GPT-5.4 → Claude Opus → Gemini 3.1 Pro → opencode-go/glm-5 | Verification and plan review. GPT-5.4 uses xhigh variant. |
 
@@ -92,8 +92,8 @@ These agents do grep, search, and retrieval. They intentionally use the fastest,
 
 | Agent                 | Role               | Fallback Chain                                 | Notes                                                 |
 | --------------------- | ------------------ | ---------------------------------------------- | ----------------------------------------------------- |
-| **Explore**           | Fast codebase grep | Grok Code Fast → opencode-go/minimax-m2.7 → opencode/minimax-m2.5 → Haiku → GPT-5-Nano | Speed is everything. Fire 10 in parallel.             |
-| **Librarian**         | Docs/code search   | opencode-go/minimax-m2.7 → opencode/minimax-m2.5 → Haiku → GPT-5-Nano                  | Doc retrieval doesn't need deep reasoning.            |
+| **Explore**           | Fast codebase grep | Grok Code Fast → opencode-go/minimax-m2.7 → opencode/minimax-m2.5 → Haiku → GPT-5-Nano | Speed is everything. Fire 10 in parallel. Uses opencode-go/minimax-m2.7 where the provider catalog exposes it, falling back to opencode/minimax-m2.5. |
+| **Librarian**         | Docs/code search   | opencode-go/minimax-m2.7 → opencode/minimax-m2.5 → Haiku → GPT-5-Nano                  | Doc retrieval doesn't need deep reasoning. Uses opencode-go/minimax-m2.7 where the provider catalog exposes it, falling back to opencode/minimax-m2.5. |
 | **Multimodal Looker** | Vision/screenshots | GPT-5.4 → opencode-go/kimi-k2.5 → GLM-4.6v → GPT-5-Nano                                 | Uses the first available multimodal-capable fallback. |
 | **Sisyphus-Junior**   | Category executor  | Claude Sonnet → opencode-go/kimi-k2.5 → GPT-5.4 → MiniMax M2.7 → Big Pickle              | Handles delegated category tasks. Sonnet-tier default. |
 
@@ -132,7 +132,7 @@ Principle-driven, explicit reasoning, deep technical capability. Best for agents
 | **Gemini 3 Flash**   | Fast. Good for doc search and light tasks.                                                                   |
 | **Grok Code Fast 1** | Blazing fast code grep. Default for Explore agent.                                                           |
 | **MiniMax M2.7**     | Fast and smart. Used where provider catalogs expose the newer MiniMax line, especially through OpenCode Go. |
-| **MiniMax M2.7 Highspeed** | Ultra-fast variant. You may still see it in older docs, logs, or provider catalogs during the transition. |
+| **MiniMax M2.5**     | Legacy OpenCode catalog entry still used in some fallback chains for compatibility. |
 
 ### OpenCode Go
 
@@ -257,17 +257,43 @@ Run `opencode models` to see available models, `opencode auth login` to authenti
 
 Each agent has a fallback chain. The system tries models in priority order until it finds one available through your connected providers. You don't need to configure providers per model. Just authenticate (`opencode auth login`) and the system figures out which models are available and where.
 
-Core-agent tab cycling is now deterministic. The fixed priority order is Sisyphus, Hephaestus, Prometheus, and Atlas, then the remaining agents follow.
+Core-agent tab cycling is deterministic via injected runtime order field. The fixed priority order is Sisyphus (order: 1), Hephaestus (order: 2), Prometheus (order: 3), and Atlas (order: 4), then the remaining agents follow.
 
 Your explicit configuration always wins. If you set a specific model for an agent, that choice takes precedence even when resolution data is cold.
 
 Variant and `reasoningEffort` overrides are normalized to model-supported values, so cross-provider overrides degrade gracefully instead of failing hard.
+
+Model capabilities are models.dev-backed, with a refreshable cache and capability diagnostics. Use `bunx oh-my-opencode refresh-model-capabilities` to update the cache, or configure `model_capabilities.auto_refresh_on_start` to refresh at startup.
 
 To see which models your agents will actually use, run `bunx oh-my-opencode doctor`. This shows effective model resolution based on your current authentication and config.
 
 ```
 Agent Request → User Override (if configured) → Fallback Chain → System Default
 ```
+
+### File-Based Prompts
+
+You can load agent system prompts from external files using `file://` URLs in the `prompt` field, or append additional content with `prompt_append`. The `prompt_append` field also works on categories.
+
+```jsonc
+{
+  "agents": {
+    "sisyphus": {
+      "prompt": "file:///path/to/custom-prompt.md"
+    },
+    "oracle": {
+      "prompt_append": "file:///path/to/additional-context.md"
+    }
+  },
+  "categories": {
+    "deep": {
+      "prompt_append": "file:///path/to/deep-category-append.md"
+    }
+  }
+}
+```
+
+The file content is loaded at runtime and injected into the agent's system prompt. Supports `~` expansion for home directory and relative `file://` paths.
 
 ---
 
