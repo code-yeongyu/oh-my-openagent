@@ -190,6 +190,21 @@ describe("getPlatformPackageCandidates", () => {
     ]);
   });
 
+
+
+  test("supports renamed package family via packageBaseName override", () => {
+    // #given Linux x64 with glibc and renamed package base
+    const input = { platform: "linux", arch: "x64", libcFamily: "glibc", packageBaseName: "oh-my-openagent" };
+
+    // #when getting package candidates
+    const result = getPlatformPackageCandidates(input);
+
+    // #then returns renamed package family candidates
+    expect(result).toEqual([
+      "oh-my-openagent-linux-x64",
+      "oh-my-openagent-linux-x64-baseline",
+    ]);
+  });
   test("returns only one candidate for ARM64", () => {
     // #given non-x64 platform
     const input = { platform: "linux", arch: "arm64", libcFamily: "glibc" };
