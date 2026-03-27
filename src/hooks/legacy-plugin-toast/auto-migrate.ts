@@ -1,4 +1,5 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs"
+import { join } from "node:path"
 
 import { parseJsoncSafe } from "../../shared/jsonc-parser"
 import { getOpenCodeConfigPaths } from "../../shared/opencode-config-dir"
@@ -31,15 +32,23 @@ function toLegacyCanonical(entry: string): string {
   return entry
 }
 
-function detectOpenCodeConfigPath(): string | null {
+function detectOpenCodeConfigPath(overrideConfigDir?: string): string | null {
+  if (overrideConfigDir) {
+    const jsoncPath = join(overrideConfigDir, "opencode.jsonc")
+    const jsonPath = join(overrideConfigDir, "opencode.json")
+    if (existsSync(jsoncPath)) return jsoncPath
+    if (existsSync(jsonPath)) return jsonPath
+    return null
+  }
+
   const paths = getOpenCodeConfigPaths({ binary: "opencode", version: null })
   if (existsSync(paths.configJsonc)) return paths.configJsonc
   if (existsSync(paths.configJson)) return paths.configJson
   return null
 }
 
-export function autoMigrateLegacyPluginEntry(): MigrationResult {
-  const configPath = detectOpenCodeConfigPath()
+export function autoMigrateLegacyPluginEntry(overrideConfigDir?: string): MigrationResult {
+  const configPath = detectOpenCodeConfigPath(overrideConfigDir)
   if (!configPath) return { migrated: false, from: null, to: null, configPath: null }
 
   try {

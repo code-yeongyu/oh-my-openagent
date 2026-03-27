@@ -288,29 +288,100 @@ describe("checkAndInterruptStaleTasks", () => {
     expect(task.status).toBe("running")
   })
 
-  it("should use default stale timeout when session status is unknown/missing", async () => {
-    //#given — lastUpdate exceeds stale timeout, session not in status map
+  it("should use session-gone timeout when session is missing from status map (with progress)", async () => {
+    //#given — lastUpdate 2min ago, session completely gone from status
     const task = createRunningTask({
       startedAt: new Date(Date.now() - 300_000),
       progress: {
         toolCalls: 1,
-        lastUpdate: new Date(Date.now() - 200_000),
+        lastUpdate: new Date(Date.now() - 120_000),
       },
     })
 
-    //#when — empty sessionStatuses (session not found)
+    //#when — empty sessionStatuses (session gone), sessionGoneTimeoutMs = 60s
     await checkAndInterruptStaleTasks({
       tasks: [task],
       client: mockClient as never,
-      config: { staleTimeoutMs: 180_000 },
+      config: { staleTimeoutMs: 180_000, sessionGoneTimeoutMs: 60_000 },
       concurrencyManager: mockConcurrencyManager as never,
       notifyParentSession: mockNotify,
       sessionStatuses: {},
     })
 
-    //#then — unknown session treated as potentially stale, apply default timeout
+    //#then — cancelled because session gone timeout (60s) < timeSinceLastUpdate (120s)
     expect(task.status).toBe("cancelled")
-    expect(task.error).toContain("Stale timeout")
+    expect(task.error).toContain("session gone from status registry")
+  })
+
+  it("should use session-gone timeout when session is missing from status map (no progress)", async () => {
+    //#given — task started 2min ago, no progress, session completely gone
+    const task = createRunningTask({
+      startedAt: new Date(Date.now() - 120_000),
+      progress: undefined,
+    })
+
+    //#when — session gone, sessionGoneTimeoutMs = 60s
+    await checkAndInterruptStaleTasks({
+      tasks: [task],
+      client: mockClient as never,
+      config: { messageStalenessTimeoutMs: 600_000, sessionGoneTimeoutMs: 60_000 },
+      concurrencyManager: mockConcurrencyManager as never,
+      notifyParentSession: mockNotify,
+      sessionStatuses: {},
+    })
+
+    //#then — cancelled because session gone timeout (60s) < runtime (120s)
+    expect(task.status).toBe("cancelled")
+    expect(task.error).toContain("session gone from status registry")
+  })
+
+  it("should NOT use session-gone timeout when session is idle (present in status map)", async () => {
+    //#given — lastUpdate 2min ago, session is idle (present in status but not active)
+    const task = createRunningTask({
+      startedAt: new Date(Date.now() - 300_000),
+      progress: {
+        toolCalls: 1,
+        lastUpdate: new Date(Date.now() - 120_000),
+      },
+    })
+
+    //#when — session is idle (present in map), staleTimeoutMs = 180s
+    await checkAndInterruptStaleTasks({
+      tasks: [task],
+      client: mockClient as never,
+      config: { staleTimeoutMs: 180_000, sessionGoneTimeoutMs: 60_000 },
+      concurrencyManager: mockConcurrencyManager as never,
+      notifyParentSession: mockNotify,
+      sessionStatuses: { "ses-1": { type: "idle" } },
+    })
+
+    //#then — still running because normal staleTimeout (180s) > timeSinceLastUpdate (120s)
+    expect(task.status).toBe("running")
+  })
+
+  it("should use default session-gone timeout when not configured", async () => {
+    //#given — lastUpdate 2min ago, session gone, no sessionGoneTimeoutMs config
+    const task = createRunningTask({
+      startedAt: new Date(Date.now() - 300_000),
+      progress: {
+        toolCalls: 1,
+        lastUpdate: new Date(Date.now() - 120_000),
+      },
+    })
+
+    //#when — no config (default sessionGoneTimeoutMs = 60_000)
+    await checkAndInterruptStaleTasks({
+      tasks: [task],
+      client: mockClient as never,
+      config: undefined,
+      concurrencyManager: mockConcurrencyManager as never,
+      notifyParentSession: mockNotify,
+      sessionStatuses: {},
+    })
+
+    //#then — cancelled because default session gone timeout (60s) < timeSinceLastUpdate (120s)
+    expect(task.status).toBe("cancelled")
+    expect(task.error).toContain("session gone from status registry")
   })
 
   it("should NOT interrupt task when session is busy (OpenCode status), even if lastUpdate exceeds stale timeout", async () => {

@@ -3478,12 +3478,12 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
     //#when — no progress update for 15 minutes
     await manager["checkAndInterruptStaleTasks"]({})
 
-    //#then — killed after messageStalenessTimeout
+    //#then — killed because session gone from status registry
     expect(task.status).toBe("cancelled")
-    expect(task.error).toContain("no activity")
+    expect(task.error).toContain("session gone from status registry")
   })
 
-  test("should NOT interrupt task with no lastUpdate within messageStalenessTimeout", async () => {
+  test("should NOT interrupt task with no lastUpdate within session-gone timeout", async () => {
     //#given
     const client = {
       session: {
@@ -3492,7 +3492,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
         abort: async () => ({}),
       },
     }
-    const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput, { messageStalenessTimeoutMs: 600_000 })
+    const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput, { messageStalenessTimeoutMs: 600_000, sessionGoneTimeoutMs: 600_000 })
 
     const task: BackgroundTask = {
       id: "task-fresh-no-update",
@@ -3509,7 +3509,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
 
     getTaskMap(manager).set(task.id, task)
 
-    //#when — only 5 min since start, within 10min timeout
+    //#when — only 5 min since start, within 10min session-gone timeout
     await manager["checkAndInterruptStaleTasks"]({})
 
     //#then — task survives
@@ -4263,7 +4263,7 @@ describe("BackgroundManager.pruneStaleTasksAndNotifications - removes pruned tas
     expect(retainedTask?.status).toBe("error")
     expect(getTaskMap(manager).has(staleTask.id)).toBe(true)
     expect(notifications).toHaveLength(1)
-    expect(notifications[0]).toContain("[ALL BACKGROUND TASKS COMPLETE]")
+    expect(notifications[0]).toContain("[ALL BACKGROUND TASKS FINISHED")
     expect(notifications[0]).toContain(staleTask.description)
     expect(getCompletionTimers(manager).has(staleTask.id)).toBe(true)
     expect(removeTaskCalls).toContain(staleTask.id)

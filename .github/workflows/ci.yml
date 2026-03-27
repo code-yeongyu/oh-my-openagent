@@ -67,6 +67,8 @@ jobs:
           bun test src/shared/opencode-message-dir.test.ts
           # session-recovery mock isolation (recover-tool-result-missing mocks ./storage)
           bun test src/hooks/session-recovery/recover-tool-result-missing.test.ts
+          # legacy-plugin-toast mock isolation (hook.test.ts mocks ./auto-migrate)
+          bun test src/hooks/legacy-plugin-toast/hook.test.ts
 
       - name: Run remaining tests
         run: |
@@ -98,6 +100,7 @@ jobs:
             src/tools/call-omo-agent/subagent-session-creator.test.ts \
             src/hooks/anthropic-context-window-limit-recovery/empty-content-recovery-sdk.test.ts src/hooks/anthropic-context-window-limit-recovery/parser.test.ts src/hooks/anthropic-context-window-limit-recovery/pruning-deduplication.test.ts src/hooks/anthropic-context-window-limit-recovery/recovery-deduplication.test.ts src/hooks/anthropic-context-window-limit-recovery/storage.test.ts \
             src/hooks/session-recovery/detect-error-type.test.ts src/hooks/session-recovery/index.test.ts src/hooks/session-recovery/recover-empty-content-message-sdk.test.ts src/hooks/session-recovery/resume.test.ts src/hooks/session-recovery/storage \
+            src/hooks/legacy-plugin-toast/auto-migrate.test.ts \
             src/hooks/claude-code-compatibility \
             src/hooks/context-injection \
             src/hooks/provider-toast \

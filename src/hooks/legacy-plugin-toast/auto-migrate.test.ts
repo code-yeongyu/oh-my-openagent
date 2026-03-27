@@ -10,12 +10,10 @@ describe("autoMigrateLegacyPluginEntry", () => {
   beforeEach(() => {
     testConfigDir = join(tmpdir(), `omo-legacy-migrate-${Date.now()}-${Math.random().toString(36).slice(2)}`)
     mkdirSync(testConfigDir, { recursive: true })
-    process.env.OPENCODE_CONFIG_DIR = testConfigDir
   })
 
   afterEach(() => {
     rmSync(testConfigDir, { recursive: true, force: true })
-    delete process.env.OPENCODE_CONFIG_DIR
   })
 
   describe("#given opencode.json has a bare legacy plugin entry", () => {
@@ -27,7 +25,7 @@ describe("autoMigrateLegacyPluginEntry", () => {
       )
 
       // when
-      const result = autoMigrateLegacyPluginEntry()
+      const result = autoMigrateLegacyPluginEntry(testConfigDir)
 
       // then
       expect(result.migrated).toBe(true)
@@ -47,7 +45,7 @@ describe("autoMigrateLegacyPluginEntry", () => {
       )
 
       // when
-      const result = autoMigrateLegacyPluginEntry()
+      const result = autoMigrateLegacyPluginEntry(testConfigDir)
 
       // then
       expect(result.migrated).toBe(true)
@@ -67,7 +65,7 @@ describe("autoMigrateLegacyPluginEntry", () => {
       )
 
       // when
-      const result = autoMigrateLegacyPluginEntry()
+      const result = autoMigrateLegacyPluginEntry(testConfigDir)
 
       // then
       expect(result.migrated).toBe(true)
@@ -81,7 +79,7 @@ describe("autoMigrateLegacyPluginEntry", () => {
       // given - empty dir
 
       // when
-      const result = autoMigrateLegacyPluginEntry()
+      const result = autoMigrateLegacyPluginEntry(testConfigDir)
 
       // then
       expect(result.migrated).toBe(false)
@@ -98,7 +96,7 @@ describe("autoMigrateLegacyPluginEntry", () => {
       )
 
       // when
-      const result = autoMigrateLegacyPluginEntry()
+      const result = autoMigrateLegacyPluginEntry(testConfigDir)
 
       // then
       expect(result.migrated).toBe(true)
@@ -116,7 +114,7 @@ describe("autoMigrateLegacyPluginEntry", () => {
       writeFileSync(join(testConfigDir, "opencode.json"), original)
 
       // when
-      const result = autoMigrateLegacyPluginEntry()
+      const result = autoMigrateLegacyPluginEntry(testConfigDir)
 
       // then
       expect(result.migrated).toBe(false)
