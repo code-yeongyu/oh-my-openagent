@@ -67,6 +67,9 @@ const RETRYABLE_MESSAGE_PATTERNS = [
   "504",
   "429",
   "529",
+  "model_not_supported",
+  "model is not supported",
+  "model not supported",
 ]
 
 const AUTO_RETRY_GATE_PATTERNS = [

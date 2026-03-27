@@ -45,6 +45,7 @@ export const RETRYABLE_ERROR_PATTERNS = [
   /(?:^|\s)429(?:\s|$)/,
   /(?:^|\s)503(?:\s|$)/,
   /(?:^|\s)529(?:\s|$)/,
+  /model.?not.?supported/i,
 ]
 
 /**
