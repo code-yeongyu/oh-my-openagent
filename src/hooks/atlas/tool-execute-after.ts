@@ -14,7 +14,7 @@ import { shouldPauseForFinalWaveApproval } from "./final-wave-approval-gate"
 import { HOOK_NAME } from "./hook-name"
 import { DIRECT_WORK_REMINDER } from "./system-reminder-templates"
 import { isSisyphusPath } from "./sisyphus-path"
-import { extractSessionIdFromOutput, validateSubagentSessionId } from "./subagent-session-id"
+import { extractSessionIdFromMetadata, extractSessionIdFromOutput, validateSubagentSessionId } from "./subagent-session-id"
 import {
   buildCompletionGate,
   buildFinalWaveApprovalReminder,
@@ -105,7 +105,9 @@ export function createToolExecuteAfterHandler(input: {
       return
     }
 
-    if (toolInput.tool !== "task") {
+    const metadataSessionId = extractSessionIdFromMetadata(toolOutput.metadata)
+    const isPluginToolWithSession = toolInput.tool !== "task" && !!metadataSessionId
+    if (toolInput.tool !== "task" && !isPluginToolWithSession) {
       return
     }
 
@@ -115,6 +117,7 @@ export function createToolExecuteAfterHandler(input: {
       pendingTaskRefs.delete(toolInput.callID)
     }
     const isBackgroundLaunch = outputStr.includes("Background task launched") || outputStr.includes("Background task continued")
+      || outputStr.includes("Background delegate launched")
     if (isBackgroundLaunch) {
       return
     }
@@ -125,7 +128,7 @@ export function createToolExecuteAfterHandler(input: {
       const verificationDirectory = worktreePath ? worktreePath : ctx.directory
       const gitStats = collectGitDiffStats(verificationDirectory)
       const fileChanges = formatFileChanges(gitStats)
-      const extractedSessionId = extractSessionIdFromOutput(toolOutput.output)
+      const extractedSessionId = metadataSessionId ?? extractSessionIdFromOutput(toolOutput.output)
 
       if (boulderState) {
         const progress = getPlanProgress(boulderState.active_plan)
