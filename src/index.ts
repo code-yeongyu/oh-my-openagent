@@ -13,6 +13,7 @@ import { loadPluginConfig } from "./plugin-config"
 import { createModelCacheState } from "./plugin-state"
 import { createFirstMessageVariantGate } from "./shared/first-message-variant"
 import { injectServerAuthIntoClient, log, logLegacyPluginStartupWarning } from "./shared"
+import { detectExternalSkillPlugin, getSkillPluginConflictWarning } from "./shared/external-plugin-detector"
 import { startTmuxCheck } from "./tools"
 
 let activePluginDispose: PluginDispose | null = null
@@ -24,6 +25,12 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     directory: ctx.directory,
   })
   logLegacyPluginStartupWarning()
+
+  // Detect conflicting skill plugins (e.g., opencode-skills)
+  const skillPluginCheck = detectExternalSkillPlugin(ctx.directory)
+  if (skillPluginCheck.detected && skillPluginCheck.pluginName) {
+    console.warn(getSkillPluginConflictWarning(skillPluginCheck.pluginName))
+  }
 
   injectServerAuthIntoClient(ctx.client)
   startTmuxCheck()
