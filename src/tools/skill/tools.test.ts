@@ -581,3 +581,64 @@ describe("skill tool - dynamic description cache invalidation", () => {
   })
 })
 
+
+
+describe("skill tool - browserProvider forwarding", () => {
+  it("passes browserProvider to getAllSkills during execution", async () => {
+    // given: a skill tool configured with agent-browser as browserProvider
+    // and a pre-provided agent-browser skill (simulating what skill-context provides)
+    const agentBrowserSkill = createMockSkill("agent-browser")
+    const tool = createSkillTool({
+      skills: [agentBrowserSkill],
+      browserProvider: "agent-browser",
+    })
+
+    // when: executing skill("agent-browser")
+    const result = await tool.execute({ name: "agent-browser" }, mockContext)
+
+    // then: skill should resolve successfully (not filtered out)
+    expect(result).toContain("Skill: agent-browser")
+  })
+
+  it("description includes agent-browser when browserProvider is agent-browser", () => {
+    // given
+    const agentBrowserSkill = createMockSkill("agent-browser")
+
+    // when
+    const tool = createSkillTool({
+      skills: [agentBrowserSkill],
+      browserProvider: "agent-browser",
+    })
+
+    // then
+    expect(tool.description).toContain("agent-browser")
+  })
+})
+
+describe("skill tool - nativeSkills integration", () => {
+  it("merges native skills exposed by PluginInput.skills.all()", async () => {
+    //#given
+    const tool = createSkillTool({
+      skills: [],
+      nativeSkills: {
+        async all() {
+          return [{
+            name: "external-plugin-skill",
+            description: "Skill from config.skills.paths",
+            location: "/external/skills/external-plugin-skill/SKILL.md",
+            content: "External plugin skill body",
+          }]
+        },
+        async get() { return undefined },
+        async dirs() { return [] },
+      },
+    })
+
+    //#when
+    const result = await tool.execute({ name: "external-plugin-skill" }, mockContext)
+
+    //#then
+    expect(result).toContain("external-plugin-skill")
+    expect(result).toContain("Test skill body content")
+  })
+})

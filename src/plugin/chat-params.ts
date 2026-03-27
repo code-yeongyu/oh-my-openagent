@@ -1,3 +1,7 @@
+import { normalizeSDKResponse } from "../shared/normalize-sdk-response"
+import { getSessionPromptParams } from "../shared/session-prompt-params-state"
+import { getModelCapabilities, resolveCompatibleModelSettings } from "../shared"
+
 export type ChatParamsInput = {
   sessionID: string
   agent: { name?: string }
@@ -47,7 +51,11 @@ function buildChatParamsInput(raw: unknown): ChatParamsHookInput | null {
   if (!agentName) return null
 
   const providerID = model.providerID
-  const modelID = model.modelID
+  const modelID = typeof model.modelID === "string"
+    ? model.modelID
+    : typeof model.id === "string"
+      ? model.id
+      : undefined
   const providerId = provider.id
   const variant = message.variant
 
@@ -76,11 +84,98 @@ function isChatParamsOutput(raw: unknown): raw is ChatParamsOutput {
 
 export function createChatParamsHandler(args: {
   anthropicEffort: { "chat.params"?: (input: ChatParamsHookInput, output: ChatParamsOutput) => Promise<void> } | null
+  client?: unknown
 }): (input: unknown, output: unknown) => Promise<void> {
   return async (input, output): Promise<void> => {
     const normalizedInput = buildChatParamsInput(input)
     if (!normalizedInput) return
     if (!isChatParamsOutput(output)) return
+
+    const storedPromptParams = getSessionPromptParams(normalizedInput.sessionID)
+    if (storedPromptParams) {
+      if (storedPromptParams.temperature !== undefined) {
+        output.temperature = storedPromptParams.temperature
+      }
+      if (storedPromptParams.topP !== undefined) {
+        output.topP = storedPromptParams.topP
+      }
+      if (storedPromptParams.options) {
+        output.options = {
+          ...output.options,
+          ...storedPromptParams.options,
+        }
+      }
+    }
+
+    const capabilities = getModelCapabilities({
+      providerID: normalizedInput.model.providerID,
+      modelID: normalizedInput.model.modelID,
+    })
+
+    const compatibility = resolveCompatibleModelSettings({
+      providerID: normalizedInput.model.providerID,
+      modelID: normalizedInput.model.modelID,
+      desired: {
+        variant: typeof normalizedInput.message.variant === "string"
+          ? normalizedInput.message.variant
+          : undefined,
+        reasoningEffort: typeof output.options.reasoningEffort === "string"
+          ? output.options.reasoningEffort
+          : undefined,
+        temperature: typeof output.temperature === "number" ? output.temperature : undefined,
+        topP: typeof output.topP === "number" ? output.topP : undefined,
+        maxTokens: typeof output.options.maxTokens === "number" ? output.options.maxTokens : undefined,
+        thinking: isRecord(output.options.thinking) ? output.options.thinking : undefined,
+      },
+      capabilities,
+    })
+
+    if (normalizedInput.rawMessage) {
+      if (compatibility.variant !== undefined) {
+        normalizedInput.rawMessage.variant = compatibility.variant
+      } else {
+        delete normalizedInput.rawMessage.variant
+      }
+    }
+    normalizedInput.message = normalizedInput.rawMessage as { variant?: string }
+
+    if (compatibility.reasoningEffort !== undefined) {
+      output.options.reasoningEffort = compatibility.reasoningEffort
+    } else if ("reasoningEffort" in output.options) {
+      delete output.options.reasoningEffort
+    }
+
+    if ("temperature" in compatibility) {
+      if (compatibility.temperature !== undefined) {
+        output.temperature = compatibility.temperature
+      } else {
+        delete output.temperature
+      }
+    }
+
+    if ("topP" in compatibility) {
+      if (compatibility.topP !== undefined) {
+        output.topP = compatibility.topP
+      } else {
+        delete output.topP
+      }
+    }
+
+    if ("maxTokens" in compatibility) {
+      if (compatibility.maxTokens !== undefined) {
+        output.options.maxTokens = compatibility.maxTokens
+      } else {
+        delete output.options.maxTokens
+      }
+    }
+
+    if ("thinking" in compatibility) {
+      if (compatibility.thinking !== undefined) {
+        output.options.thinking = compatibility.thinking
+      } else {
+        delete output.options.thinking
+      }
+    }
 
     await args.anthropicEffort?.["chat.params"]?.(normalizedInput, output)
   }

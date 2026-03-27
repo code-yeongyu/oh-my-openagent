@@ -6,7 +6,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { clearBoulderState, readBoulderState, writeBoulderState } from "../../features/boulder-state"
 import type { BoulderState } from "../../features/boulder-state"
-import { _resetForTesting, subagentSessions } from "../../features/claude-code-session-state"
+import { _resetForTesting, setSessionAgent, subagentSessions } from "../../features/claude-code-session-state"
 
 const { createAtlasHook } = await import("./index")
 
@@ -16,7 +16,7 @@ describe("atlas hook idle-event session lineage", () => {
   let testDirectory = ""
   let promptCalls: Array<unknown> = []
 
-  function writeIncompleteBoulder(): void {
+  function writeIncompleteBoulder(overrides: Partial<BoulderState> = {}): void {
     const planPath = join(testDirectory, "test-plan.md")
     writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
 
@@ -25,6 +25,7 @@ describe("atlas hook idle-event session lineage", () => {
       started_at: "2026-01-02T10:00:00Z",
       session_ids: [MAIN_SESSION_ID],
       plan_name: "test-plan",
+      ...overrides,
     }
 
     writeBoulderState(testDirectory, state)
@@ -103,6 +104,7 @@ describe("atlas hook idle-event session lineage", () => {
 
     writeIncompleteBoulder()
     subagentSessions.add(subagentSessionID)
+    setSessionAgent(subagentSessionID, "atlas")
 
     const hook = createHook({
       [subagentSessionID]: intermediateParentSessionID,
@@ -117,6 +119,65 @@ describe("atlas hook idle-event session lineage", () => {
     })
 
     assert.equal(readBoulderState(testDirectory)?.session_ids.includes(subagentSessionID), true)
+    assert.equal(promptCalls.length, 1)
+  })
+
+  it("does not inject continuation for boulder-lineage subagent with non-matching agent", async () => {
+    const subagentSessionID = "subagent-session-agent-mismatch"
+
+    writeIncompleteBoulder({ agent: "atlas" })
+    subagentSessions.add(subagentSessionID)
+    setSessionAgent(subagentSessionID, "sisyphus-junior")
+
+    const hook = createHook({
+      [subagentSessionID]: MAIN_SESSION_ID,
+    })
+
+    await hook.handler({
+      event: {
+        type: "session.idle",
+        properties: { sessionID: subagentSessionID },
+      },
+    })
+
+    assert.equal(readBoulderState(testDirectory)?.session_ids.includes(subagentSessionID), true)
+    assert.equal(promptCalls.length, 0)
+  })
+
+  it("injects continuation for boulder-lineage subagent with matching agent", async () => {
+    const subagentSessionID = "subagent-session-agent-match"
+
+    writeIncompleteBoulder({ agent: "atlas" })
+    subagentSessions.add(subagentSessionID)
+    setSessionAgent(subagentSessionID, "atlas")
+
+    const hook = createHook({
+      [subagentSessionID]: MAIN_SESSION_ID,
+    })
+
+    await hook.handler({
+      event: {
+        type: "session.idle",
+        properties: { sessionID: subagentSessionID },
+      },
+    })
+
+    assert.equal(promptCalls.length, 1)
+  })
+
+  it("injects continuation for explicitly tracked boulder session regardless of agent", async () => {
+    writeIncompleteBoulder({ agent: "atlas" })
+    setSessionAgent(MAIN_SESSION_ID, "hephaestus")
+
+    const hook = createHook()
+
+    await hook.handler({
+      event: {
+        type: "session.idle",
+        properties: { sessionID: MAIN_SESSION_ID },
+      },
+    })
+
     assert.equal(promptCalls.length, 1)
   })
 })

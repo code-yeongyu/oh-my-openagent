@@ -1,5 +1,5 @@
 import type { ModelFallbackInfo } from "../../features/task-toast-manager/types"
-import type { DelegateTaskArgs, ToolContextWithMetadata } from "./types"
+import type { DelegateTaskArgs, ToolContextWithMetadata, DelegatedModelConfig } from "./types"
 import type { ExecutorContext, ParentContext } from "./executor-types"
 import { getTaskToastManager } from "../../features/task-toast-manager"
 import { storeToolMetadata } from "../../features/tool-metadata-store"
@@ -17,7 +17,7 @@ export async function executeSyncTask(
   executorCtx: ExecutorContext,
   parentContext: ParentContext,
   agentToUse: string,
-  categoryModel: { providerID: string; modelID: string; variant?: string } | undefined,
+  categoryModel: DelegatedModelConfig | undefined,
   systemContent: string | undefined,
   modelInfo?: ModelFallbackInfo,
   fallbackChain?: import("../../shared/model-requirements").FallbackEntry[],
@@ -149,9 +149,23 @@ export async function executeSyncTask(
 
       const duration = formatDuration(startTime)
 
+      // 检测模型路由是否与父 session 不同，给用户可见的提示
+      const actualModelStr = categoryModel
+        ? `${categoryModel.providerID}/${categoryModel.modelID}`
+        : undefined
+      const parentModelStr = parentContext.model
+        ? `${parentContext.model.providerID}/${parentContext.model.modelID}`
+        : undefined
+      const modelRoutingNote =
+        actualModelStr && parentModelStr && actualModelStr !== parentModelStr
+          ? `\n⚠️  Model routing: parent used ${parentModelStr}, this subagent used ${actualModelStr} (via category: ${args.category ?? "unknown"})`
+          : actualModelStr
+            ? `\nModel: ${actualModelStr}${args.category ? ` (category: ${args.category})` : ""}`
+            : ""
+
       return `Task completed in ${duration}.
 
-Agent: ${agentToUse}${args.category ? ` (category: ${args.category})` : ""}
+Agent: ${agentToUse}${args.category ? ` (category: ${args.category})` : ""}${modelRoutingNote}
 
 ---
 

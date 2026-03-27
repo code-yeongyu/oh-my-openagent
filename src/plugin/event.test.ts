@@ -4,6 +4,7 @@ import { createEventHandler } from "./event"
 import { createChatMessageHandler } from "./chat-message"
 import { _resetForTesting, setMainSession } from "../features/claude-code-session-state"
 import { clearPendingModelFallback, createModelFallbackHook } from "../hooks/model-fallback/hook"
+import { getSessionPromptParams, setSessionPromptParams } from "../shared/session-prompt-params-state"
 
 type EventInput = { event: { type: string; properties?: unknown } }
 
@@ -441,6 +442,45 @@ describe("createEventHandler - event forwarding", () => {
 		expect(disconnectedSessions).toEqual([sessionID])
 		expect(deletedSessions).toEqual([sessionID])
 	})
+
+	it("clears stored prompt params on session.deleted", async () => {
+		//#given
+		const eventHandler = createEventHandler({
+			ctx: {} as never,
+			pluginConfig: {} as never,
+			firstMessageVariantGate: {
+				markSessionCreated: () => {},
+				clear: () => {},
+			},
+			managers: {
+				skillMcpManager: {
+					disconnectSession: async () => {},
+				},
+				tmuxSessionManager: {
+					onSessionCreated: async () => {},
+					onSessionDeleted: async () => {},
+				},
+			} as never,
+			hooks: {} as never,
+		})
+		const sessionID = "ses_prompt_params_deleted"
+		setSessionPromptParams(sessionID, {
+			temperature: 0.4,
+			topP: 0.7,
+			options: { reasoningEffort: "high" },
+		})
+
+		//#when
+		await eventHandler({
+			event: {
+				type: "session.deleted",
+				properties: { info: { id: sessionID } },
+			},
+		})
+
+		//#then
+		expect(getSessionPromptParams(sessionID)).toBeUndefined()
+	})
 })
 
 describe("createEventHandler - retry dedupe lifecycle", () => {
@@ -703,5 +743,67 @@ describe("createEventHandler - session recovery compaction", () => {
 
 		//#then - continue is still sent even when compaction fails
 		expect(callOrder).toEqual(["summarize", "prompt"])
+	})
+
+	it("continues dispatching later event hooks when an earlier hook throws", async () => {
+		//#given
+		const runtimeFallbackCalls: EventInput[] = []
+
+		const eventHandler = createEventHandler({
+			ctx: {
+				directory: "/tmp",
+				client: {
+					session: {
+						abort: async () => ({}),
+						prompt: async () => ({}),
+					},
+				},
+			} as any,
+			pluginConfig: {} as any,
+			firstMessageVariantGate: {
+				markSessionCreated: () => {},
+				clear: () => {},
+			},
+			managers: {
+				tmuxSessionManager: {
+					onSessionCreated: async () => {},
+					onSessionDeleted: async () => {},
+				},
+			} as any,
+			hooks: {
+				autoUpdateChecker: {
+					event: async () => {
+						throw new Error("upstream hook failed")
+					},
+				},
+				runtimeFallback: {
+					event: async (input: EventInput) => {
+						runtimeFallbackCalls.push(input)
+					},
+				},
+				stopContinuationGuard: { isStopped: () => false },
+			} as any,
+		})
+
+		//#when
+		let thrownError: unknown
+		try {
+			await eventHandler({
+				event: {
+					type: "session.error",
+					properties: {
+						sessionID: "ses_hook_isolation",
+						error: { name: "Error", message: "retry me" },
+					},
+				},
+			} as any)
+		} catch (error) {
+			thrownError = error
+		}
+
+		//#then
+		expect(thrownError).toBeUndefined()
+		expect(runtimeFallbackCalls).toHaveLength(1)
+		expect(runtimeFallbackCalls[0]?.event.type).toBe("session.error")
 	})
 })

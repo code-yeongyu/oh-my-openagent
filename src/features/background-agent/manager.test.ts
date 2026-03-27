@@ -1,5 +1,6 @@
 declare const require: (name: string) => any
 const { describe, test, expect, beforeEach, afterEach, spyOn } = require("bun:test")
+import { getSessionPromptParams, clearSessionPromptParams } from "../../shared/session-prompt-params-state"
 import { tmpdir } from "node:os"
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { BackgroundTask, ResumeInput } from "./types"
@@ -1636,6 +1637,9 @@ describe("BackgroundManager.resume model persistence", () => {
    })
 
   afterEach(() => {
+    clearSessionPromptParams("session-1")
+    clearSessionPromptParams("session-advanced")
+    clearSessionPromptParams("session-2")
     manager.shutdown()
   })
 
@@ -1669,6 +1673,60 @@ describe("BackgroundManager.resume model persistence", () => {
     expect(promptCalls).toHaveLength(1)
     expect(promptCalls[0].body.model).toEqual({ providerID: "anthropic", modelID: "claude-sonnet-4-20250514" })
     expect(promptCalls[0].body.agent).toBe("explore")
+  })
+
+  test("should preserve promoted per-model settings when resuming a task", async () => {
+    // given - task resumed after fallback promotion
+    const taskWithAdvancedModel: BackgroundTask = {
+      id: "task-with-advanced-model",
+      sessionID: "session-advanced",
+      parentSessionID: "parent-session",
+      parentMessageID: "msg-1",
+      description: "task with advanced model settings",
+      prompt: "original prompt",
+      agent: "explore",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+      model: {
+        providerID: "openai",
+        modelID: "gpt-5.4-preview",
+        variant: "minimal",
+        reasoningEffort: "high",
+        temperature: 0.25,
+        top_p: 0.55,
+        maxTokens: 8192,
+        thinking: { type: "disabled" },
+      },
+      concurrencyGroup: "explore",
+    }
+    getTaskMap(manager).set(taskWithAdvancedModel.id, taskWithAdvancedModel)
+
+    // when
+    await manager.resume({
+      sessionId: "session-advanced",
+      prompt: "continue the work",
+      parentSessionID: "parent-session-2",
+      parentMessageID: "msg-2",
+    })
+
+    // then
+    expect(promptCalls).toHaveLength(1)
+    expect(promptCalls[0].body.model).toEqual({
+      providerID: "openai",
+      modelID: "gpt-5.4-preview",
+    })
+    expect(promptCalls[0].body.variant).toBe("minimal")
+    expect(promptCalls[0].body.options).toBeUndefined()
+    expect(getSessionPromptParams("session-advanced")).toEqual({
+      temperature: 0.25,
+      topP: 0.55,
+      options: {
+        reasoningEffort: "high",
+        thinking: { type: "disabled" },
+        maxTokens: 8192,
+      },
+    })
   })
 
   test("should NOT pass model when task has no model (backward compatibility)", async () => {
@@ -2425,6 +2483,133 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       expect(promptAsyncSessionIDs).not.toContain(createdSessionID)
       expect(abortCalls).toEqual([createdSessionID])
       expect(getConcurrencyManager(manager).getCount("test-agent")).toBe(0)
+    })
+
+    test("should release descendant quota when task completes", async () => {
+      manager.shutdown()
+      manager = new BackgroundManager(
+        {
+          client: createMockClientWithSessionChain({
+            "session-root": { directory: "/test/dir" },
+          }),
+          directory: tmpdir(),
+        } as unknown as PluginInput,
+        { maxDescendants: 1 },
+      )
+      stubNotifyParentSession(manager)
+
+      const input = {
+        description: "Test task",
+        prompt: "Do something",
+        agent: "test-agent",
+        parentSessionID: "session-root",
+        parentMessageID: "parent-message",
+      }
+
+      const task = await manager.launch(input)
+      const internalTask = getTaskMap(manager).get(task.id)!
+      internalTask.status = "running"
+      internalTask.sessionID = "child-session-complete"
+      internalTask.rootSessionID = "session-root"
+
+      // Complete via internal method (session.status events go through the poller, not handleEvent)
+      await tryCompleteTaskForTest(manager, internalTask)
+
+      await expect(manager.launch(input)).resolves.toBeDefined()
+    })
+
+    test("should release descendant quota when running task is cancelled", async () => {
+      manager.shutdown()
+      manager = new BackgroundManager(
+        {
+          client: createMockClientWithSessionChain({
+            "session-root": { directory: "/test/dir" },
+          }),
+          directory: tmpdir(),
+        } as unknown as PluginInput,
+        { maxDescendants: 1 },
+      )
+
+      const input = {
+        description: "Test task",
+        prompt: "Do something",
+        agent: "test-agent",
+        parentSessionID: "session-root",
+        parentMessageID: "parent-message",
+      }
+
+      const task = await manager.launch(input)
+      const internalTask = getTaskMap(manager).get(task.id)!
+      internalTask.status = "running"
+      internalTask.sessionID = "child-session-cancel"
+
+      await manager.cancelTask(task.id)
+
+      await expect(manager.launch(input)).resolves.toBeDefined()
+    })
+
+    test("should release descendant quota when task errors", async () => {
+      manager.shutdown()
+      manager = new BackgroundManager(
+        {
+          client: createMockClientWithSessionChain({
+            "session-root": { directory: "/test/dir" },
+          }),
+          directory: tmpdir(),
+        } as unknown as PluginInput,
+        { maxDescendants: 1 },
+      )
+
+      const input = {
+        description: "Test task",
+        prompt: "Do something",
+        agent: "test-agent",
+        parentSessionID: "session-root",
+        parentMessageID: "parent-message",
+      }
+
+      const task = await manager.launch(input)
+      const internalTask = getTaskMap(manager).get(task.id)!
+      internalTask.status = "running"
+      internalTask.sessionID = "child-session-error"
+
+      manager.handleEvent({
+        type: "session.error",
+        properties: { sessionID: internalTask.sessionID, info: { id: internalTask.sessionID } },
+      })
+      await new Promise((resolve) => setTimeout(resolve, 100))
+
+      await expect(manager.launch(input)).resolves.toBeDefined()
+    })
+
+    test("should not double-decrement quota when pending task is cancelled", async () => {
+      manager.shutdown()
+      manager = new BackgroundManager(
+        {
+          client: createMockClientWithSessionChain({
+            "session-root": { directory: "/test/dir" },
+          }),
+          directory: tmpdir(),
+        } as unknown as PluginInput,
+        { maxDescendants: 2 },
+      )
+
+      const input = {
+        description: "Test task",
+        prompt: "Do something",
+        agent: "test-agent",
+        parentSessionID: "session-root",
+        parentMessageID: "parent-message",
+      }
+
+      const task1 = await manager.launch(input)
+      const task2 = await manager.launch(input)
+
+      await manager.cancelTask(task1.id)
+      await manager.cancelTask(task2.id)
+
+      await expect(manager.launch(input)).resolves.toBeDefined()
+      await expect(manager.launch(input)).resolves.toBeDefined()
     })
   })
 
@@ -3293,12 +3478,12 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
     //#when — no progress update for 15 minutes
     await manager["checkAndInterruptStaleTasks"]({})
 
-    //#then — killed after messageStalenessTimeout
+    //#then — killed because session gone from status registry
     expect(task.status).toBe("cancelled")
-    expect(task.error).toContain("no activity")
+    expect(task.error).toContain("session gone from status registry")
   })
 
-  test("should NOT interrupt task with no lastUpdate within messageStalenessTimeout", async () => {
+  test("should NOT interrupt task with no lastUpdate within session-gone timeout", async () => {
     //#given
     const client = {
       session: {
@@ -3307,7 +3492,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
         abort: async () => ({}),
       },
     }
-    const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput, { messageStalenessTimeoutMs: 600_000 })
+    const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput, { messageStalenessTimeoutMs: 600_000, sessionGoneTimeoutMs: 600_000 })
 
     const task: BackgroundTask = {
       id: "task-fresh-no-update",
@@ -3324,7 +3509,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
 
     getTaskMap(manager).set(task.id, task)
 
-    //#when — only 5 min since start, within 10min timeout
+    //#when — only 5 min since start, within 10min session-gone timeout
     await manager["checkAndInterruptStaleTasks"]({})
 
     //#then — task survives
@@ -3543,6 +3728,9 @@ describe("BackgroundManager.handleEvent - session.deleted cascade", () => {
       properties: { info: { id: parentSessionID } },
     })
 
+    // Flush twice: cancelTask now awaits session.abort() before cleanupPendingByParent,
+    // so we need additional microtask ticks to let the cascade complete fully.
+    await flushBackgroundNotifications()
     await flushBackgroundNotifications()
 
     // then
@@ -4078,7 +4266,7 @@ describe("BackgroundManager.pruneStaleTasksAndNotifications - removes pruned tas
     expect(retainedTask?.status).toBe("error")
     expect(getTaskMap(manager).has(staleTask.id)).toBe(true)
     expect(notifications).toHaveLength(1)
-    expect(notifications[0]).toContain("[ALL BACKGROUND TASKS COMPLETE]")
+    expect(notifications[0]).toContain("[ALL BACKGROUND TASKS FINISHED")
     expect(notifications[0]).toContain(staleTask.description)
     expect(getCompletionTimers(manager).has(staleTask.id)).toBe(true)
     expect(removeTaskCalls).toContain(staleTask.id)

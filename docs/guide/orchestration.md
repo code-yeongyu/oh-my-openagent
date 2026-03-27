@@ -420,7 +420,7 @@ Atlas is automatically activated when you run `/start-work`. You don't need to m
 
 | Aspect          | Hephaestus                                 | Sisyphus + `ulw` / `ultrawork`                       |
 | --------------- | ------------------------------------------ | ---------------------------------------------------- |
-| **Model**       | GPT-5.3 Codex (medium reasoning)           | Claude Opus 4.6 / GPT-5.4 / GLM 5 depending on setup |
+| **Model**       | GPT-5.4 (medium reasoning)                 | Claude Opus 4.6 / GPT-5.4 / GLM 5 depending on setup |
 | **Approach**    | Autonomous deep worker                     | Keyword-activated ultrawork mode                     |
 | **Best For**    | Complex architectural work, deep reasoning | General complex tasks, "just do it" scenarios        |
 | **Planning**    | Self-plans during execution                | Uses Prometheus plans if available                   |
@@ -443,8 +443,8 @@ Switch to Hephaestus (Tab → Select Hephaestus) when:
    - "Integrate our Rust core with the TypeScript frontend"
    - "Migrate from MongoDB to PostgreSQL with zero downtime"
 
-4. **You specifically want GPT-5.3 Codex reasoning**
-   - Some problems benefit from GPT-5.3 Codex's training characteristics
+4. **You specifically want GPT-5.4 reasoning**
+   - Some problems benefit from GPT-5.4's training characteristics
 
 **When to Use Sisyphus + `ulw`:**
 
@@ -469,7 +469,7 @@ Use the `ulw` keyword in Sisyphus when:
 **Recommendation:**
 
 - **For most users**: Use `ulw` keyword in Sisyphus. It's the default path and works excellently for 90% of complex tasks.
-- **For power users**: Switch to Hephaestus when you specifically need GPT-5.3 Codex's reasoning style or want the "AmpCode deep mode" experience of fully autonomous exploration and execution.
+- **For power users**: Switch to Hephaestus when you specifically need GPT-5.4's reasoning style or want the "AmpCode deep mode" experience of fully autonomous exploration and execution.
 
 ---
 
@@ -520,7 +520,7 @@ Type `exit` or start a new session. Atlas is primarily entered via `/start-work`
 
 **For most tasks**: Type `ulw` in Sisyphus.
 
-**Use Hephaestus when**: You specifically need GPT-5.3 Codex's reasoning style for deep architectural work or complex debugging.
+**Use Hephaestus when**: You specifically need GPT-5.4's reasoning style for deep architectural work or complex debugging.
 
 ---
 

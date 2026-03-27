@@ -202,7 +202,7 @@ exports[`generateModelConfig single native provider uses OpenAI models when only
       "variant": "medium",
     },
     "hephaestus": {
-      "model": "openai/gpt-5.3-codex",
+      "model": "openai/gpt-5.4",
       "variant": "medium",
     },
     "librarian": {
@@ -287,7 +287,7 @@ exports[`generateModelConfig single native provider uses OpenAI models with isMa
       "variant": "medium",
     },
     "hephaestus": {
-      "model": "openai/gpt-5.3-codex",
+      "model": "openai/gpt-5.4",
       "variant": "medium",
     },
     "librarian": {
@@ -508,7 +508,7 @@ exports[`generateModelConfig all native providers uses preferred models from fal
       "model": "anthropic/claude-haiku-4-5",
     },
     "hephaestus": {
-      "model": "openai/gpt-5.3-codex",
+      "model": "openai/gpt-5.4",
       "variant": "medium",
     },
     "metis": {
@@ -601,7 +601,7 @@ exports[`generateModelConfig all native providers uses preferred models with isM
       "model": "anthropic/claude-haiku-4-5",
     },
     "hephaestus": {
-      "model": "openai/gpt-5.3-codex",
+      "model": "openai/gpt-5.4",
       "variant": "medium",
     },
     "metis": {
@@ -677,7 +677,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
       "model": "opencode/claude-haiku-4-5",
     },
     "hephaestus": {
-      "model": "opencode/gpt-5.3-codex",
+      "model": "opencode/gpt-5.4",
       "variant": "medium",
     },
     "metis": {
@@ -752,7 +752,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
       "model": "opencode/claude-haiku-4-5",
     },
     "hephaestus": {
-      "model": "opencode/gpt-5.3-codex",
+      "model": "opencode/gpt-5.4",
       "variant": "medium",
     },
     "metis": {
@@ -1085,7 +1085,7 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
       "model": "anthropic/claude-haiku-4-5",
     },
     "hephaestus": {
-      "model": "opencode/gpt-5.3-codex",
+      "model": "opencode/gpt-5.4",
       "variant": "medium",
     },
     "metis": {
@@ -1160,7 +1160,7 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
       "model": "github-copilot/gpt-5-mini",
     },
     "hephaestus": {
-      "model": "openai/gpt-5.3-codex",
+      "model": "openai/gpt-5.4",
       "variant": "medium",
     },
     "metis": {
@@ -1379,7 +1379,7 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
       "model": "opencode/claude-haiku-4-5",
     },
     "hephaestus": {
-      "model": "opencode/gpt-5.3-codex",
+      "model": "github-copilot/gpt-5.4",
       "variant": "medium",
     },
     "librarian": {
@@ -1475,7 +1475,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
       "model": "anthropic/claude-haiku-4-5",
     },
     "hephaestus": {
-      "model": "openai/gpt-5.3-codex",
+      "model": "openai/gpt-5.4",
       "variant": "medium",
     },
     "librarian": {
@@ -1571,7 +1571,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
       "model": "anthropic/claude-haiku-4-5",
     },
     "hephaestus": {
-      "model": "openai/gpt-5.3-codex",
+      "model": "openai/gpt-5.4",
       "variant": "medium",
     },
     "librarian": {

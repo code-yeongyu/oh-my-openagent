@@ -203,6 +203,7 @@ But for any substantial changes, USE \`task\`.
 \`\`\`
 task(
   category="...",
+  load_skills=[],
   prompt="[specific single task with clear acceptance criteria]"
 )
 \`\`\`

@@ -11,6 +11,7 @@ import {
   createRulesInjectorHook,
   createTasksTodowriteDisablerHook,
   createWriteExistingFileGuardHook,
+  createBashFileReadGuardHook,
   createHashlineReadEnhancerHook,
   createReadImageResizerHook,
   createJsonErrorRecoveryHook,
@@ -34,6 +35,7 @@ export type ToolGuardHooks = {
   rulesInjector: ReturnType<typeof createRulesInjectorHook> | null
   tasksTodowriteDisabler: ReturnType<typeof createTasksTodowriteDisablerHook> | null
   writeExistingFileGuard: ReturnType<typeof createWriteExistingFileGuardHook> | null
+  bashFileReadGuard: ReturnType<typeof createBashFileReadGuardHook> | null
   hashlineReadEnhancer: ReturnType<typeof createHashlineReadEnhancerHook> | null
   jsonErrorRecovery: ReturnType<typeof createJsonErrorRecoveryHook> | null
   readImageResizer: ReturnType<typeof createReadImageResizerHook> | null
@@ -103,6 +105,10 @@ export function createToolGuardHooks(args: {
     ? safeHook("write-existing-file-guard", () => createWriteExistingFileGuardHook(ctx))
     : null
 
+  const bashFileReadGuard = isHookEnabled("bash-file-read-guard")
+    ? safeHook("bash-file-read-guard", () => createBashFileReadGuardHook())
+    : null
+
   const hashlineReadEnhancer = isHookEnabled("hashline-read-enhancer")
     ? safeHook("hashline-read-enhancer", () => createHashlineReadEnhancerHook(ctx, { hashline_edit: { enabled: pluginConfig.hashline_edit ?? false } }))
     : null
@@ -132,6 +138,7 @@ export function createToolGuardHooks(args: {
     rulesInjector,
     tasksTodowriteDisabler,
     writeExistingFileGuard,
+    bashFileReadGuard,
     hashlineReadEnhancer,
     jsonErrorRecovery,
     readImageResizer,

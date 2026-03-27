@@ -1282,6 +1282,7 @@ session_id: ses_untrusted_999
       }
       writeBoulderState(TEST_DIR, state)
       subagentSessions.add(subagentSessionID)
+      updateSessionAgent(subagentSessionID, "atlas")
 
       const mockInput = createMockPluginInput()
       const hook = createAtlasHook(mockInput)

@@ -1,0 +1,46 @@
+name: Refresh Model Capabilities
+
+on:
+  schedule:
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    if: github.repository == 'code-yeongyu/oh-my-openagent'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+        env:
+          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/napi"
+
+      - name: Refresh bundled model capabilities snapshot
+        run: bun run build:model-capabilities
+
+      - name: Validate capability guardrails
+        run: bun run test:model-capabilities
+
+      - name: Create refresh pull request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          commit-message: "chore: refresh model capabilities snapshot"
+          title: "chore: refresh model capabilities snapshot"
+          body: |
+            Automated refresh of `src/generated/model-capabilities.generated.json` from `https://models.dev/api.json`.
+
+            This keeps the bundled capability snapshot aligned with upstream model metadata without relying on manual refreshes.
+          branch: automation/refresh-model-capabilities
+          delete-branch: true
+          labels: |
+            maintenance

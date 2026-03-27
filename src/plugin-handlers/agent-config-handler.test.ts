@@ -8,6 +8,7 @@ import * as sisyphusJunior from "../agents/sisyphus-junior"
 import type { OhMyOpenCodeConfig } from "../config"
 import * as agentLoader from "../features/claude-code-agent-loader"
 import * as skillLoader from "../features/opencode-skill-loader"
+import type { LoadedSkill } from "../features/opencode-skill-loader"
 import { getAgentDisplayName } from "../shared/agent-display-names"
 import { applyAgentConfig } from "./agent-config-handler"
 import type { PluginComponents } from "./plugin-components-loader"
@@ -51,6 +52,8 @@ describe("applyAgentConfig builtin override protection", () => {
   let discoverProjectClaudeSkillsSpy: ReturnType<typeof spyOn>
   let discoverOpencodeGlobalSkillsSpy: ReturnType<typeof spyOn>
   let discoverOpencodeProjectSkillsSpy: ReturnType<typeof spyOn>
+  let discoverProjectAgentsSkillsSpy: ReturnType<typeof spyOn>
+  let discoverGlobalAgentsSkillsSpy: ReturnType<typeof spyOn>
   let loadUserAgentsSpy: ReturnType<typeof spyOn>
   let loadProjectAgentsSpy: ReturnType<typeof spyOn>
   let migrateAgentConfigSpy: ReturnType<typeof spyOn>
@@ -60,6 +63,7 @@ describe("applyAgentConfig builtin override protection", () => {
     name: "Builtin Sisyphus",
     prompt: "builtin prompt",
     mode: "primary",
+    order: 1,
   }
 
   const builtinOracleConfig: AgentConfig = {
@@ -120,6 +124,14 @@ describe("applyAgentConfig builtin override protection", () => {
       skillLoader,
       "discoverOpencodeProjectSkills",
     ).mockResolvedValue([])
+    discoverProjectAgentsSkillsSpy = spyOn(
+      skillLoader,
+      "discoverProjectAgentsSkills",
+    ).mockResolvedValue([])
+    discoverGlobalAgentsSkillsSpy = spyOn(
+      skillLoader,
+      "discoverGlobalAgentsSkills",
+    ).mockResolvedValue([])
 
     loadUserAgentsSpy = spyOn(agentLoader, "loadUserAgents").mockReturnValue({})
     loadProjectAgentsSpy = spyOn(agentLoader, "loadProjectAgents").mockReturnValue({})
@@ -138,6 +150,8 @@ describe("applyAgentConfig builtin override protection", () => {
     discoverProjectClaudeSkillsSpy.mockRestore()
     discoverOpencodeGlobalSkillsSpy.mockRestore()
     discoverOpencodeProjectSkillsSpy.mockRestore()
+    discoverProjectAgentsSkillsSpy.mockRestore()
+    discoverGlobalAgentsSkillsSpy.mockRestore()
     loadUserAgentsSpy.mockRestore()
     loadProjectAgentsSpy.mockRestore()
     migrateAgentConfigSpy.mockRestore()
@@ -277,5 +291,46 @@ describe("applyAgentConfig builtin override protection", () => {
 
     // then
     expect(createSisyphusJuniorAgentSpy).toHaveBeenCalledWith(undefined, "openai/gpt-5.4", false)
+  })
+
+  test("includes project and global .agents skills in builtin agent awareness", async () => {
+    // given
+    const projectAgentsSkill = {
+      name: "project-agent-skill",
+      definition: {
+        name: "project-agent-skill",
+        description: "Project agent skill",
+        template: "template",
+      },
+      scope: "project",
+    } satisfies LoadedSkill
+    const globalAgentsSkill = {
+      name: "global-agent-skill",
+      definition: {
+        name: "global-agent-skill",
+        description: "Global agent skill",
+        template: "template",
+      },
+      scope: "user",
+    } satisfies LoadedSkill
+    discoverProjectAgentsSkillsSpy.mockResolvedValue([projectAgentsSkill])
+    discoverGlobalAgentsSkillsSpy.mockResolvedValue([globalAgentsSkill])
+
+    // when
+    await applyAgentConfig({
+      config: createBaseConfig(),
+      pluginConfig: createPluginConfig(),
+      ctx: { directory: "/tmp" },
+      pluginComponents: createPluginComponents(),
+    })
+
+    // then
+    const discoveredSkills = createBuiltinAgentsSpy.mock.calls[0]?.[6]
+    expect(discoveredSkills).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "project-agent-skill" }),
+        expect.objectContaining({ name: "global-agent-skill" }),
+      ]),
+    )
   })
 })

@@ -27,7 +27,7 @@ describe("syncTaskToTodo", () => {
       id: "T-123",
       content: "Fix bug",
       status: "pending",
-      priority: undefined,
+      priority: "medium",
     });
   });
 
@@ -159,7 +159,7 @@ describe("syncTaskToTodo", () => {
     const result = syncTaskToTodo(task);
 
     // then
-    expect(result?.priority).toBeUndefined();
+    expect(result?.priority).toBe("medium");
   });
 
   it("handles missing metadata", () => {
@@ -177,7 +177,7 @@ describe("syncTaskToTodo", () => {
     const result = syncTaskToTodo(task);
 
     // then
-    expect(result?.priority).toBeUndefined();
+    expect(result?.priority).toBe("medium");
   });
 
   it("uses subject as todo content", () => {

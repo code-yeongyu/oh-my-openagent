@@ -1,6 +1,6 @@
 import type { SkillScope, LoadedSkill } from "../../features/opencode-skill-loader/types"
 import type { SkillMcpManager } from "../../features/skill-mcp-manager"
-import type { GitMasterConfig } from "../../config/schema"
+import type { BrowserAutomationProvider, GitMasterConfig } from "../../config/schema"
 import type { CommandInfo } from "../slashcommand/types"
 
 export interface SkillArgs {
@@ -35,8 +35,16 @@ export interface SkillLoadOptions {
   disabledSkills?: Set<string>
   /** Project directory for skill discovery and base directory resolution. Must be ctx.directory from PluginContext — process.cwd() is unsafe in OpenCode. */
   directory: string
+  /** Browser automation provider for provider-gated skill filtering */
+  browserProvider?: BrowserAutomationProvider
   /** Include Claude marketplace plugin commands in discovery (default: true) */
   pluginsEnabled?: boolean
   /** Override plugin enablement from Claude settings by plugin key */
   enabledPluginsOverride?: Record<string, boolean>
+  /** Native skill accessor from PluginInput for discovering skills registered via config.skills.paths */
+  nativeSkills?: {
+    all(): Promise<{ name: string; description: string; location: string; content: string }[]>
+    get(name: string): Promise<{ name: string; description: string; location: string; content: string } | undefined>
+    dirs(): Promise<string[]>
+  }
 }

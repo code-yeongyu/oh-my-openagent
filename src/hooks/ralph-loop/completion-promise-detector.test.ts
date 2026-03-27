@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 import { describe, expect, test } from "bun:test"
 import type { PluginInput } from "@opencode-ai/plugin"
-import { detectCompletionInSessionMessages } from "./completion-promise-detector"
+import { detectCompletionInSessionMessages, detectSemanticCompletion } from "./completion-promise-detector"
 
 type SessionMessage = {
   info?: { role?: string }
@@ -182,6 +182,150 @@ describe("detectCompletionInSessionMessages", () => {
       })
 
       expect(detected).toBe(false)
+    })
+  })
+
+  describe("#given semantic completion patterns", () => {
+    test("#when agent says 'task is complete' #then should detect semantic completion", async () => {
+      // #given
+      const messages: SessionMessage[] = [
+        {
+          info: { role: "assistant" },
+          parts: [{ type: "text", text: "The task is complete. All work has been finished." }],
+        },
+      ]
+      const ctx = createPluginInput(messages)
+
+      // #when
+      const detected = await detectCompletionInSessionMessages(ctx, {
+        sessionID: "session-123",
+        promise: "DONE",
+        apiTimeoutMs: 1000,
+        directory: "/tmp",
+      })
+
+      // #then
+      expect(detected).toBe(true)
+    })
+
+    test("#when agent says 'all items are done' #then should detect semantic completion", async () => {
+      // #given
+      const messages: SessionMessage[] = [
+        {
+          info: { role: "assistant" },
+          parts: [{ type: "text", text: "All items are done and marked as complete." }],
+        },
+      ]
+      const ctx = createPluginInput(messages)
+
+      // #when
+      const detected = await detectCompletionInSessionMessages(ctx, {
+        sessionID: "session-123",
+        promise: "DONE",
+        apiTimeoutMs: 1000,
+        directory: "/tmp",
+      })
+
+      // #then
+      expect(detected).toBe(true)
+    })
+
+    test("#when agent says 'nothing left to do' #then should detect semantic completion", async () => {
+      // #given
+      const messages: SessionMessage[] = [
+        {
+          info: { role: "assistant" },
+          parts: [{ type: "text", text: "There is nothing left to do. Everything is finished." }],
+        },
+      ]
+      const ctx = createPluginInput(messages)
+
+      // #when
+      const detected = await detectCompletionInSessionMessages(ctx, {
+        sessionID: "session-123",
+        promise: "DONE",
+        apiTimeoutMs: 1000,
+        directory: "/tmp",
+      })
+
+      // #then
+      expect(detected).toBe(true)
+    })
+
+    test("#when agent says 'successfully completed all' #then should detect semantic completion", async () => {
+      // #given
+      const messages: SessionMessage[] = [
+        {
+          info: { role: "assistant" },
+          parts: [{ type: "text", text: "I have successfully completed all the required tasks." }],
+        },
+      ]
+      const ctx = createPluginInput(messages)
+
+      // #when
+      const detected = await detectCompletionInSessionMessages(ctx, {
+        sessionID: "session-123",
+        promise: "DONE",
+        apiTimeoutMs: 1000,
+        directory: "/tmp",
+      })
+
+      // #then
+      expect(detected).toBe(true)
+    })
+
+    test("#when promise is VERIFIED #then semantic completion should NOT trigger", async () => {
+      // #given
+      const messages: SessionMessage[] = [
+        {
+          info: { role: "assistant" },
+          parts: [{ type: "text", text: "The task is complete. All work has been finished." }],
+        },
+      ]
+      const ctx = createPluginInput(messages)
+
+      // #when
+      const detected = await detectCompletionInSessionMessages(ctx, {
+        sessionID: "session-123",
+        promise: "VERIFIED",
+        apiTimeoutMs: 1000,
+        directory: "/tmp",
+      })
+
+      // #then
+      expect(detected).toBe(false)
+    })
+  })
+})
+
+describe("detectSemanticCompletion", () => {
+  describe("#given semantic completion patterns", () => {
+    test("#when text contains 'task is complete' #then should return true", () => {
+      expect(detectSemanticCompletion("The task is complete.")).toBe(true)
+    })
+
+    test("#when text contains 'all items are done' #then should return true", () => {
+      expect(detectSemanticCompletion("All items are done.")).toBe(true)
+    })
+
+    test("#when text contains 'nothing left to do' #then should return true", () => {
+      expect(detectSemanticCompletion("There is nothing left to do.")).toBe(true)
+    })
+
+    test("#when text contains 'successfully completed all' #then should return true", () => {
+      expect(detectSemanticCompletion("Successfully completed all tasks.")).toBe(true)
+    })
+
+    test("#when text contains 'everything is finished' #then should return true", () => {
+      expect(detectSemanticCompletion("Everything is finished.")).toBe(true)
+    })
+
+    test("#when text does NOT contain completion patterns #then should return false", () => {
+      expect(detectSemanticCompletion("Working on the next task.")).toBe(false)
+    })
+
+    test("#when text is empty #then should return false", () => {
+      expect(detectSemanticCompletion("")).toBe(false)
     })
   })
 })

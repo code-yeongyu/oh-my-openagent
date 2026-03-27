@@ -9,12 +9,19 @@ import {
 import { loadBuiltinCommands } from "../features/builtin-commands";
 import {
   discoverConfigSourceSkills,
+  loadGlobalAgentsSkills,
+  loadProjectAgentsSkills,
   loadUserSkills,
   loadProjectSkills,
   loadOpencodeGlobalSkills,
   loadOpencodeProjectSkills,
   skillsToCommandDefinitionRecord,
 } from "../features/opencode-skill-loader";
+import {
+  detectExternalSkillPlugin,
+  getSkillPluginConflictWarning,
+  log,
+} from "../shared";
 import type { PluginComponents } from "./plugin-components-loader";
 
 export async function applyCommandConfig(params: {
@@ -29,6 +36,12 @@ export async function applyCommandConfig(params: {
   const includeClaudeCommands = params.pluginConfig.claude_code?.commands ?? true;
   const includeClaudeSkills = params.pluginConfig.claude_code?.skills ?? true;
 
+  // Detect conflicting skill plugins
+  const externalSkillPlugin = detectExternalSkillPlugin(params.ctx.directory);
+  if (includeClaudeSkills && externalSkillPlugin.detected) {
+    log(getSkillPluginConflictWarning(externalSkillPlugin.pluginName!));
+  }
+
   const [
     configSourceSkills,
     userCommands,
@@ -36,7 +49,9 @@ export async function applyCommandConfig(params: {
     opencodeGlobalCommands,
     opencodeProjectCommands,
     userSkills,
+    globalAgentsSkills,
     projectSkills,
+    projectAgentsSkills,
     opencodeGlobalSkills,
     opencodeProjectSkills,
   ] = await Promise.all([
@@ -49,7 +64,9 @@ export async function applyCommandConfig(params: {
     loadOpencodeGlobalCommands(),
     loadOpencodeProjectCommands(params.ctx.directory),
     includeClaudeSkills ? loadUserSkills() : Promise.resolve({}),
+    includeClaudeSkills ? loadGlobalAgentsSkills() : Promise.resolve({}),
     includeClaudeSkills ? loadProjectSkills(params.ctx.directory) : Promise.resolve({}),
+    includeClaudeSkills ? loadProjectAgentsSkills(params.ctx.directory) : Promise.resolve({}),
     loadOpencodeGlobalSkills(),
     loadOpencodeProjectSkills(params.ctx.directory),
   ]);
@@ -59,11 +76,13 @@ export async function applyCommandConfig(params: {
     ...skillsToCommandDefinitionRecord(configSourceSkills),
     ...userCommands,
     ...userSkills,
+    ...globalAgentsSkills,
     ...opencodeGlobalCommands,
     ...opencodeGlobalSkills,
     ...systemCommands,
     ...projectCommands,
     ...projectSkills,
+    ...projectAgentsSkills,
     ...opencodeProjectCommands,
     ...opencodeProjectSkills,
     ...params.pluginComponents.commands,

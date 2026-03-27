@@ -35,6 +35,11 @@ Task NOT complete without:
 - ${verificationText}
 </Verification>
 
+<Termination>
+STOP after first successful verification. Do NOT re-verify.
+Maximum status checks: 2. Then stop regardless.
+</Termination>
+
 <Style>
 - Start immediately. No acknowledgments.
 - Match user's communication style.
