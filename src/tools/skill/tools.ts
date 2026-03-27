@@ -189,7 +189,7 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
 
   const getSkills = async (): Promise<LoadedSkill[]> => {
     clearSkillCache()
-    const discovered = await getAllSkills({disabledSkills: options?.disabledSkills})
+    const discovered = await getAllSkills({disabledSkills: options?.disabledSkills, browserProvider: options?.browserProvider})
     const allSkills = !options.skills
       ? discovered
       : [...discovered, ...options.skills.filter(s => !new Set(discovered.map(d => d.name)).has(s.name))]

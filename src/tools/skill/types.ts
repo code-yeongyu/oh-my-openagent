@@ -1,6 +1,6 @@
 import type { SkillScope, LoadedSkill } from "../../features/opencode-skill-loader/types"
 import type { SkillMcpManager } from "../../features/skill-mcp-manager"
-import type { GitMasterConfig } from "../../config/schema"
+import type { BrowserAutomationProvider, GitMasterConfig } from "../../config/schema"
 import type { CommandInfo } from "../slashcommand/types"
 
 export interface SkillArgs {
@@ -33,6 +33,8 @@ export interface SkillLoadOptions {
   /** Git master configuration for watermark/co-author settings */
   gitMasterConfig?: GitMasterConfig
   disabledSkills?: Set<string>
+  /** Browser automation provider for provider-gated skill filtering */
+  browserProvider?: BrowserAutomationProvider
   /** Include Claude marketplace plugin commands in discovery (default: true) */
   pluginsEnabled?: boolean
   /** Override plugin enablement from Claude settings by plugin key */
