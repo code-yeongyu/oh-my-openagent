@@ -38,7 +38,7 @@ export async function applyCommandConfig(params: {
 
   // Detect conflicting skill plugins
   const externalSkillPlugin = detectExternalSkillPlugin(params.ctx.directory);
-  if (externalSkillPlugin.detected) {
+  if (includeClaudeSkills && externalSkillPlugin.detected) {
     log(getSkillPluginConflictWarning(externalSkillPlugin.pluginName!));
   }
 
