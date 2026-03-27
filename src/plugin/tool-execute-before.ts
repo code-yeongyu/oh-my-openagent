@@ -55,6 +55,7 @@ export function createToolExecuteBeforeHandler(args: {
     await hooks.questionLabelTruncator?.["tool.execute.before"]?.(input, output)
     await hooks.claudeCodeHooks?.["tool.execute.before"]?.(input, output)
     await hooks.nonInteractiveEnv?.["tool.execute.before"]?.(input, output)
+    await hooks.bashFileReadGuard?.["tool.execute.before"]?.(input, output)
     await hooks.commentChecker?.["tool.execute.before"]?.(input, output)
     await hooks.directoryAgentsInjector?.["tool.execute.before"]?.(input, output)
     await hooks.directoryReadmeInjector?.["tool.execute.before"]?.(input, output)
