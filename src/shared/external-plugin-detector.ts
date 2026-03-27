@@ -120,35 +120,7 @@ function matchesSkillPlugin(entry: string): string | null {
   return null
 }
 
-/**
- * Check if a plugin entry matches a known skill plugin.
- * Handles various formats: "name", "name@version", "npm:name", "file://path/name"
- */
-function matchesSkillPlugin(entry: string): string | null {
-  const normalized = entry.toLowerCase()
-  for (const known of KNOWN_SKILL_PLUGINS) {
-    // Exact match
-    if (normalized === known) return known
-    // Version suffix: "opencode-skills@1.2.3"
-    if (normalized.startsWith(`${known}@`)) return known
-    // npm: prefix
-    if (normalized === `npm:${known}` || normalized.startsWith(`npm:${known}@`)) return known
-    // file:// path ending exactly with package name
-    if (normalized.startsWith("file://") && (
-      normalized.endsWith(`/${known}`) || 
-      normalized.endsWith(`\\${known}`)
-    )) return known
-  }
-  return null
-}
-
 export interface ExternalNotifierResult {
-  detected: boolean
-  pluginName: string | null
-  allPlugins: string[]
-}
-
-export interface ExternalSkillPluginResult {
   detected: boolean
   pluginName: string | null
   allPlugins: string[]
@@ -171,32 +143,6 @@ export function detectExternalNotificationPlugin(directory: string): ExternalNot
     const match = matchesNotificationPlugin(plugin)
     if (match) {
       log(`Detected external notification plugin: ${plugin}`)
-      return {
-        detected: true,
-        pluginName: match,
-        allPlugins: plugins,
-      }
-    }
-  }
-
-  return {
-    detected: false,
-    pluginName: null,
-    allPlugins: plugins,
-  }
-}
-
-/**
- * Detect if any external skill plugin is configured.
- * Returns information about detected plugins for logging/warning.
- */
-export function detectExternalSkillPlugin(directory: string): ExternalSkillPluginResult {
-  const plugins = loadOpencodePlugins(directory)
-  
-  for (const plugin of plugins) {
-    const match = matchesSkillPlugin(plugin)
-    if (match) {
-      log(`Detected external skill plugin: ${plugin}`)
       return {
         detected: true,
         pluginName: match,
@@ -267,18 +213,4 @@ Both oh-my-opencode and ${pluginName} scan ~/.config/opencode/skills/ and regist
    1. Remove ${pluginName} from your opencode.json plugins to use oh-my-opencode's skill loading
    2. Or disable oh-my-opencode's skill loading by setting "claude_code.skills": false in oh-my-opencode.json
    3. Or uninstall oh-my-opencode if you prefer ${pluginName}'s skill management`
-}
-
-/**
- * Generate a warning message for users with conflicting skill plugins.
- */
-export function getSkillPluginConflictWarning(pluginName: string): string {
-  return `[oh-my-openagent] WARNING: External skill plugin detected: ${pluginName}
-
-Both oh-my-openagent and ${pluginName} scan ~/.config/opencode/skills/ and register tools.
-Running both simultaneously causes "Duplicate tool names detected" errors.
-
-To fix this issue, either:
-1. Remove ${pluginName} from your opencode.json plugins
-2. Or disable skills in oh-my-openagent by setting "claude_code": { "skills": false } in oh-my-openagent.json`
 }
