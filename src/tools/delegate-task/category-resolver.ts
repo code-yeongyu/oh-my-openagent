@@ -133,6 +133,16 @@ Available categories: ${allCategoryNames}`,
 
     if (resolution && "skipped" in resolution) {
       isModelResolutionSkipped = true
+      const userModelOverride = explicitCategoryModel ?? overrideModel
+      if (userModelOverride) {
+        actualModel = userModelOverride
+        const parsedModel = parseModelString(actualModel)
+        const variantToUse = userCategories?.[args.category!]?.variant ?? resolved.config.variant
+        categoryModel = parsedModel
+          ? applyCategoryParams({ ...parsedModel, variant: variantToUse }, resolved.config)
+          : undefined
+        modelInfo = { model: actualModel, type: "user-defined", source: "override" }
+      }
     } else if (resolution) {
       const {
         model: resolvedModel,
