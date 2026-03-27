@@ -744,4 +744,66 @@ describe("createEventHandler - session recovery compaction", () => {
 		//#then - continue is still sent even when compaction fails
 		expect(callOrder).toEqual(["summarize", "prompt"])
 	})
+
+	it("continues dispatching later event hooks when an earlier hook throws", async () => {
+		//#given
+		const runtimeFallbackCalls: EventInput[] = []
+
+		const eventHandler = createEventHandler({
+			ctx: {
+				directory: "/tmp",
+				client: {
+					session: {
+						abort: async () => ({}),
+						prompt: async () => ({}),
+					},
+				},
+			} as any,
+			pluginConfig: {} as any,
+			firstMessageVariantGate: {
+				markSessionCreated: () => {},
+				clear: () => {},
+			},
+			managers: {
+				tmuxSessionManager: {
+					onSessionCreated: async () => {},
+					onSessionDeleted: async () => {},
+				},
+			} as any,
+			hooks: {
+				autoUpdateChecker: {
+					event: async () => {
+						throw new Error("upstream hook failed")
+					},
+				},
+				runtimeFallback: {
+					event: async (input: EventInput) => {
+						runtimeFallbackCalls.push(input)
+					},
+				},
+				stopContinuationGuard: { isStopped: () => false },
+			} as any,
+		})
+
+		//#when
+		let thrownError: unknown
+		try {
+			await eventHandler({
+				event: {
+					type: "session.error",
+					properties: {
+						sessionID: "ses_hook_isolation",
+						error: { name: "Error", message: "retry me" },
+					},
+				},
+			} as any)
+		} catch (error) {
+			thrownError = error
+		}
+
+		//#then
+		expect(thrownError).toBeUndefined()
+		expect(runtimeFallbackCalls).toHaveLength(1)
+		expect(runtimeFallbackCalls[0]?.event.type).toBe("session.error")
+	})
 })
