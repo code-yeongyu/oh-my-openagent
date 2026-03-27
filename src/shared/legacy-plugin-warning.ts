@@ -13,6 +13,7 @@ export interface LegacyPluginCheckResult {
   hasLegacyEntry: boolean
   hasCanonicalEntry: boolean
   legacyEntries: string[]
+  configPath: string | null
 }
 
 function getOpenCodeConfigPath(overrideConfigDir?: string): string | null {
@@ -42,14 +43,14 @@ function isCanonicalPluginEntry(entry: string): boolean {
 export function checkForLegacyPluginEntry(overrideConfigDir?: string): LegacyPluginCheckResult {
   const configPath = getOpenCodeConfigPath(overrideConfigDir)
   if (!configPath) {
-    return { hasLegacyEntry: false, hasCanonicalEntry: false, legacyEntries: [] }
+    return { hasLegacyEntry: false, hasCanonicalEntry: false, legacyEntries: [], configPath: null }
   }
 
   try {
     const content = readFileSync(configPath, "utf-8")
     const parseResult = parseJsoncSafe<OpenCodeConfig>(content)
     if (!parseResult.data) {
-      return { hasLegacyEntry: false, hasCanonicalEntry: false, legacyEntries: [] }
+      return { hasLegacyEntry: false, hasCanonicalEntry: false, legacyEntries: [], configPath }
     }
 
     const legacyEntries = (parseResult.data.plugin ?? []).filter(isLegacyPluginEntry)
@@ -59,8 +60,9 @@ export function checkForLegacyPluginEntry(overrideConfigDir?: string): LegacyPlu
       hasLegacyEntry: legacyEntries.length > 0,
       hasCanonicalEntry,
       legacyEntries,
+      configPath,
     }
   } catch {
-    return { hasLegacyEntry: false, hasCanonicalEntry: false, legacyEntries: [] }
+    return { hasLegacyEntry: false, hasCanonicalEntry: false, legacyEntries: [], configPath: null }
   }
 }

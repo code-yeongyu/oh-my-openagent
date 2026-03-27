@@ -27,6 +27,7 @@ describe("checkForLegacyPluginEntry", () => {
     expect(result.hasLegacyEntry).toBe(true)
     expect(result.hasCanonicalEntry).toBe(false)
     expect(result.legacyEntries).toEqual(["oh-my-opencode"])
+    expect(result.configPath).toBe(join(testConfigDir, "opencode.json"))
   })
 
   it("detects a version-pinned legacy plugin entry", () => {
@@ -77,5 +78,6 @@ describe("checkForLegacyPluginEntry", () => {
     expect(result.hasLegacyEntry).toBe(false)
     expect(result.hasCanonicalEntry).toBe(false)
     expect(result.legacyEntries).toEqual([])
+    expect(result.configPath).toBeNull()
   })
 })
