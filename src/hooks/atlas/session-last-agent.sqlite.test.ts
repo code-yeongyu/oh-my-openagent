@@ -1,8 +1,14 @@
 const { describe, expect, mock, test } = require("bun:test")
 
-mock.module("../../shared", () => ({
+mock.module("../../shared/opencode-message-dir", () => ({
   getMessageDir: () => null,
+}))
+
+mock.module("../../shared/opencode-storage-detection", () => ({
   isSqliteBackend: () => true,
+}))
+
+mock.module("../../shared/normalize-sdk-response", () => ({
   normalizeSDKResponse: <TData>(response: { data?: TData }, fallback: TData): TData => response.data ?? fallback,
 }))
 

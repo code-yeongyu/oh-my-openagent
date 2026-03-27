@@ -31,6 +31,20 @@ describe("runtime-fallback error classifier", () => {
     expect(signal).toBeDefined()
   })
 
+  test("detects too-many-requests auto-retry status signals without countdown text", () => {
+    //#given
+    const info = {
+      status:
+        "Too Many Requests: Sorry, you've exhausted this model's rate limit. Please try a different model.",
+    }
+
+    //#when
+    const signal = extractAutoRetrySignal(info)
+
+    //#then
+    expect(signal).toBeDefined()
+  })
+
   test("treats cooling-down retry messages as retryable", () => {
     //#given
     const error = {
@@ -164,5 +178,102 @@ describe("extractStatusCode", () => {
       cause: { statusCode: 503 },
     }
     expect(extractStatusCode(error)).toBe(400)
+  })
+})
+
+describe("quota error detection (fixes #2747)", () => {
+  test("classifies prettified subscription quota error as quota_exceeded", () => {
+    //#given
+    const error = {
+      name: "AI_APICallError",
+      message: "Subscription quota exceeded. You can continue using free models.",
+    }
+
+    //#when
+    const errorType = classifyErrorType(error)
+    const retryable = isRetryableError(error, [402, 429, 500, 502, 503, 504])
+
+    //#then
+    expect(errorType).toBe("quota_exceeded")
+    expect(retryable).toBe(true)
+  })
+
+  test("classifies billing hard limit error as quota_exceeded", () => {
+    //#given
+    const error = { message: "You have reached your billing hard limit." }
+
+    //#when
+    const errorType = classifyErrorType(error)
+
+    //#then
+    expect(errorType).toBe("quota_exceeded")
+  })
+
+  test("classifies exhausted capacity error as quota_exceeded", () => {
+    //#given
+    const error = { message: "You have exhausted your capacity on this model." }
+
+    //#when
+    const errorType = classifyErrorType(error)
+
+    //#then
+    expect(errorType).toBe("quota_exceeded")
+  })
+
+  test("classifies out of credits error as quota_exceeded", () => {
+    //#given
+    const error = { message: "Out of credits. Please add more credits to continue." }
+
+    //#when
+    const errorType = classifyErrorType(error)
+
+    //#then
+    expect(errorType).toBe("quota_exceeded")
+  })
+
+  test("treats HTTP 402 Payment Required as retryable", () => {
+    //#given
+    const error = { statusCode: 402, message: "Payment Required" }
+
+    //#when
+    const retryable = isRetryableError(error, [402, 429, 500, 502, 503, 504])
+
+    //#then
+    expect(retryable).toBe(true)
+  })
+
+  test("matches subscription quota pattern in RETRYABLE_ERROR_PATTERNS", () => {
+    //#given
+    const error = { message: "Subscription quota exceeded. You can continue using free models." }
+
+    //#when
+    const retryable = isRetryableError(error, [429, 503])
+
+    //#then
+    expect(retryable).toBe(true)
+  })
+
+  test("classifies QuotaExceededError by errorName even without quota keywords in message", () => {
+    //#given
+    const error = { name: "QuotaExceededError", message: "Request failed." }
+
+    //#when
+    const errorType = classifyErrorType(error)
+
+    //#then
+    expect(errorType).toBe("quota_exceeded")
+  })
+
+  test("detects payment required errors as retryable", () => {
+    //#given
+    const error = { message: "Error 402: payment required for this request" }
+
+    //#when
+    const errorType = classifyErrorType(error)
+    const retryable = isRetryableError(error, [429, 503])
+
+    //#then
+    expect(errorType).toBe("quota_exceeded")
+    expect(retryable).toBe(true)
   })
 })

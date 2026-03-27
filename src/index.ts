@@ -12,7 +12,7 @@ import { createPluginDispose, type PluginDispose } from "./plugin-dispose"
 import { loadPluginConfig } from "./plugin-config"
 import { createModelCacheState } from "./plugin-state"
 import { createFirstMessageVariantGate } from "./shared/first-message-variant"
-import { injectServerAuthIntoClient, log } from "./shared"
+import { injectServerAuthIntoClient, log, logLegacyPluginStartupWarning } from "./shared"
 import { startTmuxCheck } from "./tools"
 
 let activePluginDispose: PluginDispose | null = null
@@ -23,6 +23,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   log("[OhMyOpenCodePlugin] ENTRY - plugin loading", {
     directory: ctx.directory,
   })
+  logLegacyPluginStartupWarning()
 
   injectServerAuthIntoClient(ctx.client)
   startTmuxCheck()
@@ -89,6 +90,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   activePluginDispose = dispose
 
   return {
+    name: "oh-my-openagent",
     ...pluginInterface,
 
     "experimental.session.compacting": async (

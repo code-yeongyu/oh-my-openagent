@@ -53,8 +53,8 @@ describe("generateModelConfig OpenAI-only model catalog", () => {
     const result = generateModelConfig(config)
 
     // #then
-    expect(result.agents?.explore).toEqual({ model: "opencode-go/minimax-m2.5" })
-    expect(result.agents?.librarian).toEqual({ model: "opencode-go/minimax-m2.5" })
+    expect(result.agents?.explore).toEqual({ model: "opencode-go/minimax-m2.7" })
+    expect(result.agents?.librarian).toEqual({ model: "opencode-go/minimax-m2.7" })
     expect(result.categories?.quick).toEqual({ model: "openai/gpt-5.4-mini" })
   })
 })

@@ -22,6 +22,10 @@ function flushWithTimeout(): Promise<void> {
   return new Promise<void>((resolve) => setTimeout(resolve, 10))
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null
+}
+
 describe("scheduleDeferredModelOverride", () => {
   let tempDir: string
   let dbPath: string
@@ -60,9 +64,7 @@ describe("scheduleDeferredModelOverride", () => {
     const db = new Database(dbPath)
     db.run(
       `INSERT INTO message (id, session_id, data) VALUES (?, ?, ?)`,
-      id,
-      "ses_test",
-      JSON.stringify({ model }),
+      [id, "ses_test", JSON.stringify({ model })],
     )
     db.close()
   }
@@ -178,7 +180,7 @@ describe("scheduleDeferredModelOverride", () => {
     )
   })
 
-  test("should not crash when DB file exists but is corrupted", async () => {
+  test("should log a DB failure when DB file exists but is corrupted", async () => {
     //#given
     const { chmodSync, writeFileSync } = await import("node:fs")
     const corruptedDbPath = join(tempDir, "opencode", "opencode.db")
@@ -194,9 +196,16 @@ describe("scheduleDeferredModelOverride", () => {
     await flushMicrotasks(5)
 
     //#then
-    expect(logSpy).toHaveBeenCalledWith(
-      expect.stringContaining("Failed to open DB"),
-      expect.objectContaining({ messageId: "msg_corrupt" }),
+    const failureCall = logSpy.mock.calls.find(([message, metadata]) =>
+      typeof message === "string"
+      && (
+        message.includes("Failed to open DB")
+        || message.includes("Deferred DB update failed with error")
+      )
+      && isRecord(metadata)
+      && metadata.messageId === "msg_corrupt"
     )
+
+    expect(failureCall).toBeDefined()
   })
 })

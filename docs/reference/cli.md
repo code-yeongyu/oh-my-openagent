@@ -1,15 +1,15 @@
 # CLI Reference
 
-Complete reference for the `oh-my-openagent` command-line interface.
+Complete reference for the published `oh-my-opencode` CLI. During the rename transition, OpenCode plugin registration now prefers `oh-my-openagent` inside `opencode.json`.
 
 ## Basic Usage
 
 ```bash
 # Display help
-bunx oh-my-openagent
+bunx oh-my-opencode
 
 # Or with npx
-npx oh-my-openagent
+npx oh-my-opencode
 ```
 
 ## Commands
@@ -27,20 +27,20 @@ npx oh-my-openagent
 
 ## install
 
-Interactive installation tool for initial Oh-My-OpenAgent setup. Provides a TUI based on `@clack/prompts`.
+Interactive installation tool for initial Oh My OpenCode setup. Provides a TUI based on `@clack/prompts`.
 
 ### Usage
 
 ```bash
-bunx oh-my-openagent install
+bunx oh-my-opencode install
 ```
 
 ### Installation Process
 
 1. **Provider Selection**: Choose your AI provider (Claude, ChatGPT, or Gemini)
 2. **API Key Input**: Enter the API key for your selected provider
-3. **Configuration File Creation**: Generates `opencode.json` or `oh-my-openagent.json` files
-4. **Plugin Registration**: Automatically registers the oh-my-openagent plugin in OpenCode settings
+3. **Configuration File Creation**: Writes the plugin config file used by the current install path. Existing installs still commonly use `oh-my-opencode.json`, while renamed `oh-my-openagent.json[c]` files are also recognized.
+4. **Plugin Registration**: Registers `oh-my-openagent` in OpenCode settings, or upgrades a legacy `oh-my-opencode` entry during the compatibility window
 
 ### Options
 
@@ -53,12 +53,18 @@ bunx oh-my-openagent install
 
 ## doctor
 
-Diagnoses your environment to ensure Oh-My-OpenAgent is functioning correctly. Performs 17+ health checks.
+Diagnoses your environment to ensure Oh My OpenCode is functioning correctly. Performs 17+ health checks covering installation, configuration, authentication, dependencies, and tools.
 
+The doctor command detects common issues including:
+- Legacy plugin entry references in `opencode.json` (warns when `oh-my-opencode` is still used instead of `oh-my-openagent`)
+- Configuration file validity and JSONC parsing errors
+- Model resolution and fallback chain verification
+- API key validity for configured providers
+- Missing or misconfigured MCP servers
 ### Usage
 
 ```bash
-bunx oh-my-openagent doctor
+bunx oh-my-opencode doctor
 ```
 
 ### Diagnostic Categories
@@ -83,7 +89,7 @@ bunx oh-my-openagent doctor
 ### Example Output
 
 ```
-oh-my-openagent doctor
+oh-my-opencode doctor
 
 ┌──────────────────────────────────────────────────┐
 │  Oh-My-OpenAgent Doctor                           │
@@ -94,7 +100,8 @@ Installation
   ✓ Plugin registered in opencode.json
 
 Configuration
-  ✓ oh-my-openagent.json is valid
+  ✓ oh-my-opencode.jsonc is valid
+  ✓ Model resolution: all agents have valid fallback chains
   ⚠ categories.visual-engineering: using default model
 
 Authentication
@@ -109,7 +116,6 @@ Dependencies
 
 Summary: 10 passed, 1 warning, 1 failed
 ```
-
 ---
 
 ## run
@@ -119,7 +125,7 @@ Executes OpenCode sessions and monitors task completion.
 ### Usage
 
 ```bash
-bunx oh-my-openagent run [prompt]
+bunx oh-my-opencode run [prompt]
 ```
 
 ### Options
@@ -148,16 +154,16 @@ Manages OAuth 2.1 authentication for remote MCP servers.
 
 ```bash
 # Login to an OAuth-protected MCP server
-bunx oh-my-openagent mcp oauth login <server-name> --server-url https://api.example.com
+bunx oh-my-opencode mcp oauth login <server-name> --server-url https://api.example.com
 
 # Login with explicit client ID and scopes
-bunx oh-my-openagent mcp oauth login my-api --server-url https://api.example.com --client-id my-client --scopes "read,write"
+bunx oh-my-opencode mcp oauth login my-api --server-url https://api.example.com --client-id my-client --scopes "read,write"
 
 # Remove stored OAuth tokens
-bunx oh-my-openagent mcp oauth logout <server-name>
+bunx oh-my-opencode mcp oauth logout <server-name>
 
 # Check OAuth token status
-bunx oh-my-openagent mcp oauth status [server-name]
+bunx oh-my-opencode mcp oauth status [server-name]
 ```
 
 ### Options
@@ -178,8 +184,18 @@ Tokens are stored in `~/.config/opencode/mcp-oauth.json` with `0600` permissions
 
 The CLI searches for configuration files in the following locations (in priority order):
 
-1. **Project Level**: `.opencode/oh-my-openagent.json`
-2. **User Level**: `~/.config/opencode/oh-my-openagent.json`
+1. **Project Level**: `.opencode/oh-my-openagent.jsonc`, `.opencode/oh-my-openagent.json`, `.opencode/oh-my-opencode.jsonc`, or `.opencode/oh-my-opencode.json`
+2. **User Level**: `~/.config/opencode/oh-my-openagent.jsonc`, `~/.config/opencode/oh-my-openagent.json`, `~/.config/opencode/oh-my-opencode.jsonc`, or `~/.config/opencode/oh-my-opencode.json`
+
+**Naming Note**: The published package and binary are still `oh-my-opencode`. Inside `opencode.json`, the compatibility layer now prefers the plugin entry `oh-my-openagent`. Plugin config loading recognizes both `oh-my-openagent.*` and legacy `oh-my-opencode.*` basenames. If both basenames exist in the same directory, the legacy `oh-my-opencode.*` file currently wins.
+
+### Filename Compatibility
+
+Both `.jsonc` and `.json` extensions are supported. JSONC (JSON with Comments) is preferred as it allows:
+- Comments (both `//` and `/* */` styles)
+- Trailing commas in arrays and objects
+
+If both `.jsonc` and `.json` exist in the same directory, the `.jsonc` file takes precedence.
 
 ### JSONC Support
 
@@ -219,31 +235,40 @@ bun install -g opencode@latest
 
 ```bash
 # Reinstall plugin
-bunx oh-my-openagent install
+bunx oh-my-opencode install
 ```
 
 ### Doctor Check Failures
 
 ```bash
 # Diagnose with detailed information
-bunx oh-my-openagent doctor --verbose
+bunx oh-my-opencode doctor --verbose
 
 # Check specific category only
-bunx oh-my-openagent doctor --category authentication
+bunx oh-my-opencode doctor --category authentication
 ```
 
+### "Using legacy package name" Warning
+
+The doctor warns if it finds the legacy plugin entry `oh-my-opencode` in `opencode.json`. Update the plugin array to the canonical `oh-my-openagent` entry:
+
+```bash
+# Replace the legacy plugin entry in user config
+jq '.plugin = (.plugin // [] | map(if . == "oh-my-opencode" then "oh-my-openagent" else . end))' \
+  ~/.config/opencode/opencode.json > /tmp/opencode.json && mv /tmp/opencode.json ~/.config/opencode/opencode.json
+```
 ---
 
 ## Non-Interactive Mode
 
-Use the `--no-tui` option for CI/CD environments.
+Use JSON output for CI or scripted diagnostics.
 
 ```bash
 # Run doctor in CI environment
-bunx oh-my-openagent doctor --no-tui --json
+bunx oh-my-opencode doctor --json
 
 # Save results to file
-bunx oh-my-openagent doctor --json > doctor-report.json
+bunx oh-my-opencode doctor --json > doctor-report.json
 ```
 
 ---

@@ -6,15 +6,16 @@ Oh-My-OpenAgent provides 11 specialized AI agents. Each has distinct expertise, 
 
 ### Core Agents
 
+Core-agent tab cycling is deterministic. The fixed priority order is Sisyphus, Hephaestus, Prometheus, and Atlas. Remaining agents follow after that stable core ordering.
+
 | Agent                 | Model              | Purpose                                                                                                                                                                                                                                                                                                                                                          |
 | --------------------- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Sisyphus**          | `claude-opus-4-6`  | The default orchestrator. Plans, delegates, and executes complex tasks using specialized subagents with aggressive parallel execution. Todo-driven workflow with extended thinking (32k budget). Fallback: `glm-5` → `big-pickle`.                                                                                                                               |
-| **Hephaestus**        | `gpt-5.3-codex`    | The Legitimate Craftsman. Autonomous deep worker inspired by AmpCode's deep mode. Goal-oriented execution with thorough research before action. Explores codebase patterns, completes tasks end-to-end without premature stopping. Named after the Greek god of forge and craftsmanship. Fallback: `gpt-5.4` on GitHub Copilot. Requires a GPT-capable provider. |
+| **Sisyphus**          | `claude-opus-4-6`  | The default orchestrator. Plans, delegates, and executes complex tasks using specialized subagents with aggressive parallel execution. Todo-driven workflow with extended thinking (32k budget). Fallback: `glm-5` → `big-pickle`.                                                                                                                                 |
+| **Hephaestus**        | `gpt-5.4`          | The Legitimate Craftsman. Autonomous deep worker inspired by AmpCode's deep mode. Goal-oriented execution with thorough research before action. Explores codebase patterns, completes tasks end-to-end without premature stopping. Named after the Greek god of forge and craftsmanship. Requires a GPT-capable provider. |
 | **Oracle**            | `gpt-5.4`          | Architecture decisions, code review, debugging. Read-only consultation with stellar logical reasoning and deep analysis. Inspired by AmpCode. Fallback: `gemini-3.1-pro` → `claude-opus-4-6`.                                                                                                                                                                    |
-| **Librarian**         | `gemini-3-flash`   | Multi-repo analysis, documentation lookup, OSS implementation examples. Deep codebase understanding with evidence-based answers. Fallback: `minimax-m2.5-free` → `big-pickle`.                                                                                                                                                                                   |
-| **Explore**           | `grok-code-fast-1` | Fast codebase exploration and contextual grep. Fallback: `minimax-m2.5-free` → `claude-haiku-4-5` → `gpt-5-nano`.                                                                                                                                                                                                                                                |
-| **Multimodal-Looker** | `gpt-5.3-codex`    | Visual content specialist. Analyzes PDFs, images, diagrams to extract information. Fallback: `k2p5` → `gemini-3-flash` → `glm-4.6v` → `gpt-5-nano`.                                                                                                                                                                                                              |
-
+| **Librarian**         | `minimax-m2.7`     | Multi-repo analysis, documentation lookup, OSS implementation examples. Deep codebase understanding with evidence-based answers. Primary OpenCode Go path uses MiniMax M2.7. Other provider catalogs may still fall back to MiniMax M2.5, then `claude-haiku-4-5` and `gpt-5-nano`.                                                                                  |
+| **Explore**           | `grok-code-fast-1` | Fast codebase exploration and contextual grep. Primary path stays on Grok Code Fast 1. MiniMax M2.7 is now used where provider catalogs expose it, while some OpenCode fallback paths still use MiniMax M2.5 for catalog compatibility.                                                                                                                          |
+| **Multimodal-Looker** | `gpt-5.4`          | Visual content specialist. Analyzes PDFs, images, diagrams to extract information. Fallback: `k2p5` → `glm-4.6v` → `gpt-5-nano`.                                                                                                                                                                                                                                  |
 ### Planning Agents
 
 | Agent          | Model             | Purpose                                                                                                                                            |
@@ -89,8 +90,9 @@ When running inside tmux:
 - Watch multiple agents work in real-time
 - Each pane shows agent output live
 - Auto-cleanup when agents complete
+- **Stable agent ordering**: the core tab cycle stays deterministic with Sisyphus, Hephaestus, Prometheus, and Atlas first
 
-Customize agent models, prompts, and permissions in `oh-my-openagent.json`.
+Customize agent models, prompts, and permissions in `oh-my-opencode.jsonc`.
 
 ## Category System
 
@@ -129,7 +131,7 @@ task({
 
 ### Custom Categories
 
-You can define custom categories in `oh-my-openagent.json`.
+You can define custom categories in your plugin config file. During the rename transition, both `oh-my-openagent.json[c]` and legacy `oh-my-opencode.json[c]` basenames are recognized.
 
 #### Category Configuration Schema
 
@@ -188,6 +190,60 @@ When you use a Category, a special agent called **Sisyphus-Junior** performs the
 - **Characteristic**: Cannot **re-delegate** tasks to other agents.
 - **Purpose**: Prevents infinite delegation loops and ensures focus on the assigned task.
 
+## Advanced Configuration
+
+### Fallback Models
+
+Configure per-agent fallback chains with arrays that can mix plain model strings and per-model objects:
+
+```jsonc
+{
+  "agents": {
+    "sisyphus": {
+      "fallback_models": [
+        "opencode/glm-5",
+        { "model": "openai/gpt-5.4", "variant": "high" },
+        { "model": "anthropic/claude-sonnet-4-6", "thinking": { "type": "enabled", "budgetTokens": 64000 } }
+      ]
+    }
+  }
+}
+```
+
+When a model errors, the runtime can move through the configured fallback array. Object entries let you tune the backup model itself instead of only swapping the model name.
+
+### File-Based Prompts
+
+Load agent system prompts from external files using `file://` URLs:
+
+```jsonc
+{
+  "agents": {
+    "sisyphus": {
+      "prompt": "file:///path/to/custom-prompt.md"
+    }
+  }
+}
+```
+
+Useful for:
+- Version controlling prompts separately from config
+- Sharing prompts across projects
+- Keeping configuration files concise
+
+The file content is loaded at runtime and injected as the agent's system prompt.
+
+### Session Recovery
+
+The system automatically recovers from common session failures without user intervention:
+
+- **Missing tool results**: reconstructs recoverable tool state and skips invalid tool-part IDs instead of failing the whole recovery pass
+- **Thinking block violations**: Recovers from API thinking block mismatches
+- **Empty messages**: Reconstructs message history when content is missing
+- **Context window limits**: Gracefully handles Claude context window exceeded errors with intelligent compaction
+- **JSON parse errors**: Recovers from malformed tool outputs
+
+Recovery happens transparently during agent execution. You see the result, not the failure.
 ## Skills
 
 Skills provide specialized workflows with embedded MCP servers and detailed instructions. A Skill is a mechanism that injects **specialized knowledge (Context)** and **tools (MCP)** for specific domains into agents.
@@ -844,7 +900,7 @@ When a skill MCP has `oauth` configured:
 Pre-authenticate via CLI:
 
 ```bash
-bunx oh-my-openagent mcp oauth login <server-name> --server-url https://api.example.com
+bunx oh-my-opencode mcp oauth login <server-name> --server-url https://api.example.com
 ```
 
 ## Context Injection

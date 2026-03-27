@@ -78,12 +78,16 @@ export function collectPendingBuiltinAgents(input: {
     })
     if (!resolution) {
       if (override?.model) {
-        log("[agent-registration] User-configured model could not be resolved, falling back", {
+        // User explicitly configured a model but resolution failed (e.g., cold cache).
+        // Honor the user's choice directly instead of falling back to hardcoded chain.
+        log("[agent-registration] User-configured model not resolved, using as-is", {
           agent: agentName,
           configuredModel: override.model,
         })
+        resolution = { model: override.model, provenance: "override" as const }
+      } else {
+        resolution = getFirstFallbackModel(requirement)
       }
-      resolution = getFirstFallbackModel(requirement)
     }
     if (!resolution) continue
     const { model, variant: resolvedVariant } = resolution

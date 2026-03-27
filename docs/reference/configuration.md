@@ -1,6 +1,6 @@
 # Configuration Reference
 
-Complete reference for `oh-my-openagent.jsonc` configuration. This document covers every available option with examples.
+Complete reference for Oh My OpenCode plugin configuration. During the rename transition, the runtime recognizes both `oh-my-openagent.json[c]` and legacy `oh-my-opencode.json[c]` files.
 
 ---
 
@@ -42,27 +42,28 @@ Complete reference for `oh-my-openagent.jsonc` configuration. This document cove
 
 ### File Locations
 
-Priority order (project overrides user):
+User config is loaded first, then project config overrides it. In each directory, the compatibility layer recognizes both the renamed and legacy basenames.
 
-1. `.opencode/oh-my-openagent.jsonc` / `.opencode/oh-my-openagent.json`
+1. Project config: `.opencode/oh-my-openagent.json[c]` or `.opencode/oh-my-opencode.json[c]`
 2. User config (`.jsonc` preferred over `.json`):
 
-| Platform    | Path                                      |
-| ----------- | ----------------------------------------- |
-| macOS/Linux | `~/.config/opencode/oh-my-openagent.jsonc` |
-| Windows     | `%APPDATA%\opencode\oh-my-openagent.jsonc` |
+| Platform    | Path candidates |
+| ----------- | --------------- |
+| macOS/Linux | `~/.config/opencode/oh-my-openagent.json[c]`, `~/.config/opencode/oh-my-opencode.json[c]` |
+| Windows     | `%APPDATA%\opencode\oh-my-openagent.json[c]`, `%APPDATA%\opencode\oh-my-opencode.json[c]` |
 
+**Rename compatibility:** OpenCode plugin registration now prefers `oh-my-openagent`, while legacy `oh-my-opencode` entries and config basenames still load during the transition. If both plugin config basenames exist in the same directory, the legacy `oh-my-opencode.*` file currently wins.
 JSONC supports `// line comments`, `/* block comments */`, and trailing commas.
 
 Enable schema autocomplete:
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-openagent.schema.json"
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json"
 }
 ```
 
-Run `bunx oh-my-openagent install` for guided setup. Run `opencode models` to list available models.
+Run `bunx oh-my-opencode install` for guided setup. Run `opencode models` to list available models.
 
 ### Quick Start Example
 
@@ -70,7 +71,7 @@ Here's a practical starting configuration:
 
 ```jsonc
 {
-  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-openagent.schema.json",
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json",
 
   "agents": {
     // Main orchestrator: Claude Opus or Kimi K2.5 work best
@@ -93,19 +94,19 @@ Here's a practical starting configuration:
   },
 
   "categories": {
-    // quick — trivial tasks
+    // quick - trivial tasks
     "quick": { "model": "opencode/gpt-5-nano" },
 
-    // unspecified-low — moderate tasks
+    // unspecified-low - moderate tasks
     "unspecified-low": { "model": "anthropic/claude-sonnet-4-6" },
 
-    // unspecified-high — complex work
+    // unspecified-high - complex work
     "unspecified-high": { "model": "anthropic/claude-opus-4-6", "variant": "max" },
 
-    // writing — docs/prose
+    // writing - docs/prose
     "writing": { "model": "google/gemini-3-flash" },
 
-    // visual-engineering — Gemini dominates visual tasks
+    // visual-engineering - Gemini dominates visual tasks
     "visual-engineering": {
       "model": "google/gemini-3.1-pro",
       "variant": "high",
@@ -159,24 +160,24 @@ Disable agents entirely: `{ "disabled_agents": ["oracle", "multimodal-looker"] }
 
 #### Agent Options
 
-| Option            | Type          | Description                                            |
-| ----------------- | ------------- | ------------------------------------------------------ |
-| `model`           | string        | Model override (`provider/model`)                      |
-| `fallback_models` | string\|array | Fallback models on API errors. Supports strings or mixed arrays of strings and object entries with per-model settings. |
-| `temperature`     | number        | Sampling temperature                                   |
-| `top_p`           | number        | Top-p sampling                                         |
-| `prompt`          | string        | Replace system prompt                                  |
-| `prompt_append`   | string        | Append to system prompt                                |
+| Option            | Type           | Description                                                     |
+| ----------------- | -------------- | --------------------------------------------------------------- |
+| `model`           | string         | Model override (`provider/model`)                               |
+| `fallback_models` | string\|array  | Fallback models on API errors. Supports strings or mixed arrays of strings and object entries with per-model settings |
+| `temperature`     | number         | Sampling temperature                                            |
+| `top_p`           | number         | Top-p sampling                                                  |
+| `prompt`          | string         | Replace system prompt. Supports `file://` URIs                  |
+| `prompt_append`   | string         | Append to system prompt. Supports `file://` URIs                |
 | `tools`           | array         | Allowed tools list                                     |
 | `disable`         | boolean       | Disable this agent                                     |
 | `mode`            | string        | Agent mode                                             |
 | `color`           | string        | UI color                                               |
 | `permission`      | object        | Per-tool permissions (see below)                       |
 | `category`        | string        | Inherit model from category                            |
-| `variant`         | string        | Model variant: `max`, `high`, `medium`, `low`, `xhigh` |
+| `variant`         | string        | Model variant: `max`, `high`, `medium`, `low`, `xhigh`. Normalized to supported values |
 | `maxTokens`       | number        | Max response tokens                                    |
 | `thinking`        | object        | Anthropic extended thinking                            |
-| `reasoningEffort` | string        | OpenAI reasoning: `low`, `medium`, `high`, `xhigh`     |
+| `reasoningEffort` | string        | OpenAI reasoning: `low`, `medium`, `high`, `xhigh`. Normalized to supported values     |
 | `textVerbosity`   | string        | Text verbosity: `low`, `medium`, `high`                |
 | `providerOptions` | object        | Provider-specific options                              |
 
@@ -216,6 +217,58 @@ Control what tools an agent can use:
 | `doom_loop`          | `ask` / `allow` / `deny`                                                    |
 | `external_directory` | `ask` / `allow` / `deny`                                                    |
 
+
+#### Fallback Models with Per-Model Settings
+
+`fallback_models` accepts either a single model string or an array. Array entries can be plain strings or objects with individual model settings:
+
+```jsonc
+{
+  "agents": {
+    "sisyphus": {
+      "model": "anthropic/claude-opus-4-6",
+      "fallback_models": [
+        // Simple string fallback
+        "openai/gpt-5.4",
+        // Object with per-model settings
+        {
+          "model": "google/gemini-3.1-pro",
+          "variant": "high",
+          "temperature": 0.2
+        },
+        {
+          "model": "anthropic/claude-sonnet-4-6",
+          "thinking": { "type": "enabled", "budgetTokens": 64000 }
+        }
+      ]
+    }
+  }
+}
+```
+
+Object entries support: `model`, `variant`, `reasoningEffort`, `temperature`, `top_p`, `maxTokens`, `thinking`.
+
+#### File URIs for Prompts
+
+Both `prompt` and `prompt_append` support loading content from files via `file://` URIs:
+
+```jsonc
+{
+  "agents": {
+    "sisyphus": {
+      "prompt_append": "file:///absolute/path/to/prompt.txt"
+    },
+    "oracle": {
+      "prompt": "file://./relative/to/project/prompt.md"
+    },
+    "explore": {
+      "prompt_append": "file://~/home/dir/prompt.txt"
+    }
+  }
+}
+```
+
+Paths can be absolute (`file:///abs/path`), relative to project root (`file://./rel/path`), or home-relative (`file://~/home/path`).
 ### Categories
 
 Domain-specific model delegation used by the `task()` tool. When Sisyphus delegates work, it picks a category, not a model name.
@@ -240,16 +293,16 @@ Domain-specific model delegation used by the `task()` tool. When Sisyphus delega
 | Option              | Type          | Default | Description                                                         |
 | ------------------- | ------------- | ------- | ------------------------------------------------------------------- |
 | `model`             | string        | -       | Model override                                                      |
-| `fallback_models`   | string\|array | -       | Fallback models on API errors. Supports strings or mixed arrays of strings and object entries with per-model settings. |
+| `fallback_models`   | string\|array | -       | Fallback models on API errors. Supports strings or mixed arrays of strings and object entries with per-model settings |
 | `temperature`       | number        | -       | Sampling temperature                                                |
 | `top_p`             | number        | -       | Top-p sampling                                                      |
 | `maxTokens`         | number        | -       | Max response tokens                                                 |
 | `thinking`          | object        | -       | Anthropic extended thinking                                         |
-| `reasoningEffort`   | string        | -       | OpenAI reasoning effort                                             |
+| `reasoningEffort`   | string        | -       | OpenAI reasoning effort. Unsupported values are normalized          |
 | `textVerbosity`     | string        | -       | Text verbosity                                                      |
 | `tools`             | array         | -       | Allowed tools                                                       |
 | `prompt_append`     | string        | -       | Append to system prompt                                             |
-| `variant`           | string        | -       | Model variant                                                       |
+| `variant`           | string        | -       | Model variant. Unsupported values are normalized                    |
 | `description`       | string        | -       | Shown in `task()` tool prompt                                       |
 | `is_unstable_agent` | boolean       | `false` | Force background mode + monitoring. Auto-enabled for Gemini models. |
 
@@ -259,20 +312,31 @@ Disable categories: `{ "disabled_categories": ["ultrabrain"] }`
 
 3-step priority at runtime:
 
-1. **User override** — model set in config → used exactly as-is
-2. **Provider fallback chain** — tries each provider in priority order until available
-3. **System default** — falls back to OpenCode's configured default model
+1. **User override** - model set in config → used exactly as-is. Even on cold cache (first run without model availability data), explicit user configuration takes precedence over hardcoded fallback chains
+2. **Provider fallback chain** - tries each provider in priority order until available
+3. **System default** - falls back to OpenCode's configured default model
+
+#### Model Settings Compatibility
+
+`variant` and `reasoningEffort` values are automatically normalized to what each model supports. If you specify a variant or reasoning effort level that a model does not support, it is adjusted to the closest supported value rather than causing errors.
+
+Examples:
+- Claude models do not support `reasoningEffort` - it is removed automatically
+- GPT-4.1 does not support reasoning - `reasoningEffort` is removed
+- o-series models support `none` through `high` - `xhigh` is downgraded to `high`
+- GPT-5 supports `none`, `minimal`, `low`, `medium`, `high`, `xhigh` - all pass through
+
 
 #### Agent Provider Chains
 
 | Agent                 | Default Model       | Provider Priority                                                            |
 | --------------------- | ------------------- | ---------------------------------------------------------------------------- |
 | **Sisyphus**          | `claude-opus-4-6`   | `claude-opus-4-6` → `glm-5` → `big-pickle`                                   |
-| **Hephaestus**        | `gpt-5.3-codex`     | `gpt-5.3-codex` → `gpt-5.4` (GitHub Copilot fallback)                        |
+| **Hephaestus**        | `gpt-5.4`           | `gpt-5.4`                                                                    |
 | **oracle**            | `gpt-5.4`           | `gpt-5.4` → `gemini-3.1-pro` → `claude-opus-4-6`                             |
-| **librarian**         | `gemini-3-flash`    | `gemini-3-flash` → `minimax-m2.5-free` → `big-pickle`                        |
-| **explore**           | `grok-code-fast-1`  | `grok-code-fast-1` → `minimax-m2.5-free` → `claude-haiku-4-5` → `gpt-5-nano` |
-| **multimodal-looker** | `gpt-5.3-codex`     | `gpt-5.3-codex` → `k2p5` → `gemini-3-flash` → `glm-4.6v` → `gpt-5-nano`      |
+| **librarian**         | `minimax-m2.7`      | `opencode-go/minimax-m2.7` → `opencode/minimax-m2.5` → `claude-haiku-4-5` → `gpt-5-nano` |
+| **explore**           | `grok-code-fast-1`  | `grok-code-fast-1` → `opencode-go/minimax-m2.7` → `opencode/minimax-m2.5` → `claude-haiku-4-5` → `gpt-5-nano` |
+| **multimodal-looker** | `gpt-5.4`           | `gpt-5.4` → `k2p5` → `glm-4.6v` → `gpt-5-nano`                                |
 | **Prometheus**        | `claude-opus-4-6`   | `claude-opus-4-6` → `gpt-5.4` → `gemini-3.1-pro`                             |
 | **Metis**             | `claude-opus-4-6`   | `claude-opus-4-6` → `gpt-5.4` → `gemini-3.1-pro`                             |
 | **Momus**             | `gpt-5.4`           | `gpt-5.4` → `claude-opus-4-6` → `gemini-3.1-pro`                             |
@@ -286,12 +350,12 @@ Disable categories: `{ "disabled_categories": ["ultrabrain"] }`
 | **ultrabrain**         | `gpt-5.4`           | `gpt-5.4` → `gemini-3.1-pro` → `claude-opus-4-6`               |
 | **deep**               | `gpt-5.3-codex`     | `gpt-5.3-codex` → `claude-opus-4-6` → `gemini-3.1-pro`         |
 | **artistry**           | `gemini-3.1-pro`    | `gemini-3.1-pro` → `claude-opus-4-6` → `gpt-5.4`               |
-| **quick**              | `gpt-5.4-mini`    | `gpt-5.4-mini` → `claude-haiku-4-5` → `gemini-3-flash` → `minimax-m2.5` → `gpt-5-nano` |
-| **unspecified-low**    | `claude-sonnet-4-6` | `claude-sonnet-4-6` → `gpt-5.3-codex` → `gemini-3-flash`       |
+| **quick**              | `gpt-5.4-mini`    | `gpt-5.4-mini` → `claude-haiku-4-5` → `gemini-3-flash` → `minimax-m2.7` → `gpt-5-nano` |
+| **unspecified-low**    | `claude-sonnet-4-6` | `claude-sonnet-4-6` → `gpt-5.3-codex` → `gemini-3-flash` → `minimax-m2.7` |
 | **unspecified-high**   | `claude-opus-4-6`   | `claude-opus-4-6` → `gpt-5.4 (high)` → `glm-5` → `k2p5` → `kimi-k2.5` |
-| **writing**            | `gemini-3-flash`    | `gemini-3-flash` → `claude-sonnet-4-6`                         |
+| **writing**            | `gemini-3-flash`    | `gemini-3-flash` → `claude-sonnet-4-6` → `minimax-m2.7`        |
 
-Run `bunx oh-my-openagent doctor --verbose` to see effective model resolution for your config.
+Run `bunx oh-my-opencode doctor --verbose` to see effective model resolution for your config.
 
 ---
 
@@ -425,9 +489,10 @@ Available hooks: `todo-continuation-enforcer`, `context-window-monitor`, `sessio
 
 **Notes:**
 
-- `directory-agents-injector` — auto-disabled on OpenCode 1.1.37+ (native AGENTS.md support)
-- `no-sisyphus-gpt` — **do not disable**. It blocks incompatible GPT models for Sisyphus while allowing the dedicated GPT-5.4 prompt path.
+- `directory-agents-injector` - auto-disabled on OpenCode 1.1.37+ (native AGENTS.md support)
+- `no-sisyphus-gpt` - **do not disable**. It blocks incompatible GPT models for Sisyphus while allowing the dedicated GPT-5.4 prompt path.
 - `startup-toast` is a sub-feature of `auto-update-checker`. Disable just the toast by adding `startup-toast` to `disabled_hooks`.
+- `session-recovery` - automatically recovers from recoverable session errors (missing tool results, unavailable tools, thinking block violations). Shows toast notifications during recovery. Enable `experimental.auto_resume` for automatic retry after recovery.
 
 ### Commands
 
@@ -504,7 +569,7 @@ Force-enable session notifications:
 { "notification": { "force_enable": true } }
 ```
 
-`force_enable` (`false`) — force session-notification even if external notification plugins are detected.
+`force_enable` (`false`) - force session-notification even if external notification plugins are detected.
 
 ### MCPs
 

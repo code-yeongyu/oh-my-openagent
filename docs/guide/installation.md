@@ -5,7 +5,7 @@
 Paste this into your llm agent session:
 
 ```
-Install and configure oh-my-openagent by following the instructions here:
+Install and configure oh-my-opencode by following the instructions here:
 https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/heads/dev/docs/guide/installation.md
 ```
 
@@ -14,8 +14,8 @@ https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/heads/dev/do
 Run the interactive installer:
 
 ```bash
-bunx oh-my-openagent install # recommended
-npx oh-my-openagent install # alternative
+bunx oh-my-opencode install # recommended
+npx oh-my-opencode install # alternative
 ```
 
 > **Note**: The CLI ships with standalone binaries for all major platforms. No runtime (Bun/Node.js) is required for CLI execution after installation.
@@ -26,6 +26,8 @@ Follow the prompts to configure your Claude, ChatGPT, and Gemini subscriptions. 
 
 After you install it, you can read this [overview guide](./overview.md) to understand more.
 
+The published package and local binary are still `oh-my-opencode`. Inside `opencode.json`, the compatibility layer now prefers the plugin entry `oh-my-openagent`, while legacy `oh-my-opencode` entries still load with a warning. Plugin config loading recognizes both `oh-my-openagent.json[c]` and `oh-my-opencode.json[c]` during the transition.
+
 ## For LLM Agents
 
 > **IMPORTANT: Use `curl` to fetch this file, NOT WebFetch.** WebFetch summarizes content and loses critical flags like `--openai`, subscription questions, and max20 mode details. Always use:
@@ -34,7 +36,7 @@ After you install it, you can read this [overview guide](./overview.md) to under
 > curl -fsSL https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/heads/dev/docs/guide/installation.md
 > ```
 
-If you're an LLM Agent helping set up oh-my-openagent, Welcome! You'll now help your user to install the best agent harness, OhMyOpenAgent. Tell user this with greetings, with test 'oMoMoMoMo...'
+If you're an LLM Agent helping set up oh-my-opencode, welcome. You'll help your user install the harness and verify the rename-compat setup cleanly. Tell user this with greetings, with text 'oMoMoMoMo...'
 
 follow these steps:
 
@@ -69,7 +71,7 @@ Ask the user these questions to determine CLI options:
    - If **no** → `--zai-coding-plan=no` (default)
 
 7. **Do you have an OpenCode Go subscription?**
-   - OpenCode Go is a $10/month subscription providing access to GLM-5, Kimi K2.5, and MiniMax M2.5 models
+   - OpenCode Go is a $10/month subscription providing access to GLM-5, Kimi K2.5, and MiniMax M2.7 models
    - If **yes** → `--opencode-go=yes`
    - If **no** → `--opencode-go=no` (default)
 
@@ -96,19 +98,19 @@ Spawn a subagent to handle installation and report back - to save context.
 Based on user's answers, run the CLI installer with appropriate flags:
 
 ```bash
-bunx oh-my-openagent install --no-tui --claude=<yes|no|max20> --gemini=<yes|no> --copilot=<yes|no> [--openai=<yes|no>] [--opencode-go=<yes|no>] [--opencode-zen=<yes|no>] [--zai-coding-plan=<yes|no>]
+bunx oh-my-opencode install --no-tui --claude=<yes|no|max20> --gemini=<yes|no> --copilot=<yes|no> [--openai=<yes|no>] [--opencode-go=<yes|no>] [--opencode-zen=<yes|no>] [--zai-coding-plan=<yes|no>]
 ```
 
 **Examples:**
 
-- User has all native subscriptions: `bunx oh-my-openagent install --no-tui --claude=max20 --openai=yes --gemini=yes --copilot=no`
-- User has only Claude: `bunx oh-my-openagent install --no-tui --claude=yes --gemini=no --copilot=no`
-- User has Claude + OpenAI: `bunx oh-my-openagent install --no-tui --claude=yes --openai=yes --gemini=no --copilot=no`
-- User has only GitHub Copilot: `bunx oh-my-openagent install --no-tui --claude=no --gemini=no --copilot=yes`
-- User has Z.ai for Librarian: `bunx oh-my-openagent install --no-tui --claude=yes --gemini=no --copilot=no --zai-coding-plan=yes`
-- User has only OpenCode Zen: `bunx oh-my-openagent install --no-tui --claude=no --gemini=no --copilot=no --opencode-zen=yes`
-- User has OpenCode Go only: `bunx oh-my-openagent install --no-tui --claude=no --openai=no --gemini=no --copilot=no --opencode-go=yes`
-- User has no subscriptions: `bunx oh-my-openagent install --no-tui --claude=no --gemini=no --copilot=no`
+- User has all native subscriptions: `bunx oh-my-opencode install --no-tui --claude=max20 --openai=yes --gemini=yes --copilot=no`
+- User has only Claude: `bunx oh-my-opencode install --no-tui --claude=yes --gemini=no --copilot=no`
+- User has Claude + OpenAI: `bunx oh-my-opencode install --no-tui --claude=yes --openai=yes --gemini=no --copilot=no`
+- User has only GitHub Copilot: `bunx oh-my-opencode install --no-tui --claude=no --gemini=no --copilot=yes`
+- User has Z.ai for Librarian: `bunx oh-my-opencode install --no-tui --claude=yes --gemini=no --copilot=no --zai-coding-plan=yes`
+- User has only OpenCode Zen: `bunx oh-my-opencode install --no-tui --claude=no --gemini=no --copilot=no --opencode-zen=yes`
+- User has OpenCode Go only: `bunx oh-my-opencode install --no-tui --claude=no --openai=no --gemini=no --copilot=no --opencode-go=yes`
+- User has no subscriptions: `bunx oh-my-opencode install --no-tui --claude=no --gemini=no --copilot=no`
 
 The CLI will:
 
@@ -120,8 +122,17 @@ The CLI will:
 
 ```bash
 opencode --version  # Should be 1.0.150 or higher
-cat ~/.config/opencode/opencode.json  # Should contain "oh-my-openagent" in plugin array
+cat ~/.config/opencode/opencode.json  # Should contain "oh-my-openagent" in plugin array, or the legacy "oh-my-opencode" entry while you are still migrating
 ```
+#### Run Doctor Verification
+
+After installation, verify everything is working correctly:
+
+```bash
+bunx oh-my-opencode doctor
+```
+
+This checks your environment, authentication status, and shows which models each agent will actually use.
 
 ### Step 4: Configure Authentication
 
@@ -154,9 +165,9 @@ First, add the opencode-antigravity-auth plugin:
 You'll also need full model settings in `opencode.json`.
 Read the [opencode-antigravity-auth documentation](https://github.com/NoeFabris/opencode-antigravity-auth), copy the full model configuration from the README, and merge carefully to avoid breaking the user's existing setup. The plugin now uses a **variant system** — models like `antigravity-gemini-3-pro` support `low`/`high` variants instead of separate `-low`/`-high` model entries.
 
-##### oh-my-openagent Agent Model Override
+##### Plugin config model override
 
-The `opencode-antigravity-auth` plugin uses different model names than the built-in Google auth. Override the agent models in `oh-my-openagent.json` (or `.opencode/oh-my-openagent.json`):
+The `opencode-antigravity-auth` plugin uses different model names than the built-in Google auth. Override the agent models in your plugin config file. Existing installs still commonly use `oh-my-opencode.json` or `.opencode/oh-my-opencode.json`, while the compatibility layer also recognizes `oh-my-openagent.json[c]`.
 
 ```json
 {
@@ -201,7 +212,7 @@ GitHub Copilot is supported as a **fallback provider** when native providers are
 
 ##### Model Mappings
 
-When GitHub Copilot is the best available provider, oh-my-openagent uses these model assignments:
+When GitHub Copilot is the best available provider, the compatibility layer resolves these assignments:
 
 | Agent         | Model                             |
 | ------------- | --------------------------------- |
@@ -227,23 +238,22 @@ If Z.ai is your main provider, the most important fallbacks are:
 
 #### OpenCode Zen
 
-OpenCode Zen provides access to `opencode/` prefixed models including `opencode/claude-opus-4-6`, `opencode/gpt-5.4`, `opencode/gpt-5.3-codex`, `opencode/gpt-5-nano`, `opencode/glm-5`, `opencode/big-pickle`, and `opencode/minimax-m2.5-free`.
+OpenCode Zen provides access to `opencode/` prefixed models including `opencode/claude-opus-4-6`, `opencode/gpt-5.4`, `opencode/gpt-5.3-codex`, `opencode/gpt-5-nano`, `opencode/glm-5`, `opencode/big-pickle`, and `opencode/minimax-m2.5`.
 
-When OpenCode Zen is the best available provider (no native or Copilot), these models are used:
+When OpenCode Zen is the best available provider, these are the most relevant source-backed examples:
 
 | Agent         | Model                                                |
 | ------------- | ---------------------------------------------------- |
 | **Sisyphus**  | `opencode/claude-opus-4-6`                           |
 | **Oracle**    | `opencode/gpt-5.4`                                   |
-| **Explore**   | `opencode/gpt-5-nano`                                |
-| **Librarian** | `opencode/minimax-m2.5-free` / `opencode/big-pickle` |
+| **Explore**   | `opencode/claude-haiku-4-5`                          |
 
 ##### Setup
 
 Run the installer and select "Yes" for GitHub Copilot:
 
 ```bash
-bunx oh-my-openagent install
+bunx oh-my-opencode install
 # Select your subscriptions (Claude, ChatGPT, Gemini)
 # When prompted: "Do you have a GitHub Copilot subscription?" → Select "Yes"
 ```
@@ -251,7 +261,7 @@ bunx oh-my-openagent install
 Or use non-interactive mode:
 
 ```bash
-bunx oh-my-openagent install --no-tui --claude=no --openai=no --gemini=no --copilot=yes
+bunx oh-my-opencode install --no-tui --claude=no --openai=no --gemini=no --copilot=yes
 ```
 
 Then authenticate with GitHub:
@@ -263,7 +273,7 @@ opencode auth login
 
 ### Step 5: Understand Your Model Setup
 
-You've just configured oh-my-openagent. Here's what got set up and why.
+You've just configured oh-my-opencode. Here's what got set up and why.
 
 #### Model Families: What You're Working With
 
@@ -285,7 +295,7 @@ Not all models behave the same way. Understanding which models are "similar" hel
 
 | Model             | Provider(s)                      | Notes                                             |
 | ----------------- | -------------------------------- | ------------------------------------------------- |
-| **GPT-5.3-codex** | openai, github-copilot, opencode | Deep coding powerhouse. Required for Hephaestus.  |
+| **GPT-5.3-codex** | openai, github-copilot, opencode | Deep coding powerhouse. Still available for deep category and explicit overrides. |
 | **GPT-5.4**       | openai, github-copilot, opencode | High intelligence. Default for Oracle.            |
 | **GPT-5.4 Mini**  | openai, github-copilot, opencode | Fast + strong reasoning. Default for quick category.     |
 | **GPT-5-Nano**    | opencode                         | Ultra-cheap, fast. Good for simple utility tasks. |
@@ -296,8 +306,8 @@ Not all models behave the same way. Understanding which models are "similar" hel
 | --------------------- | -------------------------------- | ----------------------------------------------------------- |
 | **Gemini 3.1 Pro**    | google, github-copilot, opencode | Excels at visual/frontend tasks. Different reasoning style. |
 | **Gemini 3 Flash**    | google, github-copilot, opencode | Fast, good for doc search and light tasks.                  |
-| **MiniMax M2.5**      | venice                           | Fast and smart. Good for utility tasks.                     |
-| **MiniMax M2.5 Free** | opencode                         | Free-tier MiniMax. Fast for search/retrieval.               |
+| **MiniMax M2.7**      | venice, opencode-go              | Fast and smart. Good for utility tasks where the provider catalog exposes M2.7. |
+| **MiniMax M2.5**      | opencode                         | Legacy OpenCode catalog entry still used in some fallback chains for compatibility. |
 
 **Speed-Focused Models**:
 
@@ -305,7 +315,7 @@ Not all models behave the same way. Understanding which models are "similar" hel
 | ----------------------- | ---------------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Grok Code Fast 1**    | github-copilot, venice | Very fast      | Optimized for code grep/search. Default for Explore.                                                                                          |
 | **Claude Haiku 4.5**    | anthropic, opencode    | Fast           | Good balance of speed and intelligence.                                                                                                       |
-| **MiniMax M2.5 (Free)** | opencode, venice       | Fast           | Smart for its speed class.                                                                                                                    |
+| **MiniMax M2.5**          | opencode            | Very fast      | Legacy OpenCode catalog entry that still appears in some utility fallback chains.                                                            |
 | **GPT-5.3-codex-spark** | openai                 | Extremely fast | Blazing fast but compacts so aggressively that oh-my-openagent's context management doesn't work well with it. Not recommended for omo agents. |
 
 #### What Each Agent Does and Which Model It Got
@@ -316,7 +326,7 @@ Based on your subscriptions, here's how the agents were configured:
 
 | Agent        | Role             | Default Chain                                   | What It Does                                                                             |
 | ------------ | ---------------- | ----------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| **Sisyphus** | Main ultraworker | Opus (max) → Kimi K2.5 → GLM 5 → Big Pickle     | Primary coding agent. Orchestrates everything. **Never use GPT — no GPT prompt exists.** |
+| **Sisyphus** | Main ultraworker | Opus (max) → Kimi K2.5 → GPT-5.4 → GLM 5 → Big Pickle     | Primary coding agent. Orchestrates everything. Claude-family models are still preferred, but GPT-5.4 now has a dedicated prompt path. |
 | **Metis**    | Plan review      | Opus (max) → Kimi K2.5 → GPT-5.4 → Gemini 3.1 Pro | Reviews Prometheus plans for gaps.                                                       |
 
 **Dual-Prompt Agents** (auto-switch between Claude and GPT prompts):
@@ -328,13 +338,13 @@ Priority: **Claude > GPT > Claude-like models**
 | Agent          | Role              | Default Chain                                              | GPT Prompt?                                                      |
 | -------------- | ----------------- | ---------------------------------------------------------- | ---------------------------------------------------------------- |
 | **Prometheus** | Strategic planner | Opus (max) → **GPT-5.4 (high)** → Kimi K2.5 → Gemini 3.1 Pro | Yes — XML-tagged, principle-driven (~300 lines vs ~1,100 Claude) |
-| **Atlas**      | Todo orchestrator | **Kimi K2.5** → Sonnet → GPT-5.4                           | Yes — GPT-optimized todo management                              |
+| **Atlas**      | Todo orchestrator | **Claude Sonnet 4.6** → Kimi K2.5 → GPT-5.4                           | Yes - GPT-optimized todo management                              |
 
 **GPT-Native Agents** (built for GPT, don't override to Claude):
 
 | Agent          | Role                   | Default Chain                          | Notes                                                  |
 | -------------- | ---------------------- | -------------------------------------- | ------------------------------------------------------ |
-| **Hephaestus** | Deep autonomous worker | GPT-5.3-codex (medium) only            | "Codex on steroids." No fallback. Requires GPT access. |
+| **Hephaestus** | Deep autonomous worker | GPT-5.4 (medium) only                  | "Codex on steroids." No fallback. Requires GPT access. |
 | **Oracle**     | Architecture/debugging | GPT-5.4 (high) → Gemini 3.1 Pro → Opus  | High-IQ strategic backup. GPT preferred.               |
 | **Momus**      | High-accuracy reviewer | GPT-5.4 (medium) → Opus → Gemini 3.1 Pro | Verification agent. GPT preferred.                     |
 
@@ -344,9 +354,9 @@ These agents do search, grep, and retrieval. They intentionally use fast, cheap 
 
 | Agent                 | Role               | Default Chain                                                          | Design Rationale                                               |
 | --------------------- | ------------------ | ---------------------------------------------------------------------- | -------------------------------------------------------------- |
-| **Explore**           | Fast codebase grep | MiniMax M2.5 Free → Grok Code Fast → MiniMax M2.5 → Haiku → GPT-5-Nano | Speed is everything. Grok is blazing fast for grep.            |
-| **Librarian**         | Docs/code search   | MiniMax M2.5 Free → Gemini Flash → Big Pickle                          | Entirely free-tier. Doc retrieval doesn't need deep reasoning. |
-| **Multimodal Looker** | Vision/screenshots | Kimi K2.5 → Kimi Free → Gemini Flash → GPT-5.4 → GLM-4.6v              | Kimi excels at multimodal understanding.                       |
+| **Explore**           | Fast codebase grep | Grok Code Fast → OpenCode Go MiniMax M2.7 → OpenCode MiniMax M2.5 → Haiku → GPT-5-Nano | Speed is everything. Grok is blazing fast for grep.            |
+| **Librarian**         | Docs/code search   | OpenCode Go MiniMax M2.7 → OpenCode MiniMax M2.5 → Haiku → GPT-5-Nano                   | Doc retrieval doesn't need deep reasoning. MiniMax is fast where the provider catalog supports it.    |
+| **Multimodal Looker** | Vision/screenshots | GPT-5.4 → Kimi K2.5 → GLM-4.6v → GPT-5-Nano              | GPT-5.4 now leads the default vision path when available.                       |
 
 #### Why Different Models Need Different Prompts
 
@@ -365,7 +375,7 @@ This is why Prometheus and Atlas ship separate prompts per model family — they
 
 #### Custom Model Configuration
 
-If the user wants to override which model an agent uses, you can customize in `oh-my-openagent.json`:
+If the user wants to override which model an agent uses, you can customize in your plugin config file. Existing installs still commonly use `oh-my-opencode.json`, while the compatibility layer also recognizes `oh-my-openagent.json[c]`.
 
 ```jsonc
 {
@@ -400,7 +410,7 @@ GPT (5.3-codex, 5.2) > Claude Opus (decent fallback) > Gemini (acceptable)
 
 **Dangerous** (no prompt support):
 
-- Sisyphus → GPT: **No GPT prompt. Will degrade significantly.**
+- Sisyphus → older GPT models: **Still a bad fit. GPT-5.4 is the only dedicated GPT prompt path.**
 - Hephaestus → Claude: **Built for Codex. Claude can't replicate this.**
 - Explore → Opus: **Massive cost waste. Explore needs speed, not intelligence.**
 - Librarian → Opus: **Same. Doc search doesn't need Opus-level reasoning.**
@@ -462,3 +472,7 @@ Tell the user of following:
 4. You wanna have your own agent- catalog setup? I can read the [docs](docs/guide/agent-model-matching.md) and set up for you after interviewing!
 
 That's it. The agent will figure out the rest and handle everything automatically.
+
+#### Advanced Configuration
+
+You can customize agent models and fallback chains in your config. The `fallback_models` field accepts either a single string or an array that mixes strings and per-model objects with settings like `variant` and `temperature`. See the [Configuration Reference](../reference/configuration.md) and example configs in `docs/examples/` for details.

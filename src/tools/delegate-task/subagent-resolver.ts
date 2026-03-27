@@ -125,11 +125,25 @@ Create the work plan directly - that's your job as the planning agent.`,
         systemDefaultModel: undefined,
       })
 
-      if (resolution && !('skipped' in resolution)) {
+      const resolutionSkipped = resolution && 'skipped' in resolution
+
+      if (resolution && !resolutionSkipped) {
         const normalized = normalizeModelFormat(resolution.model)
         if (normalized) {
           const variantToUse = agentOverride?.variant ?? resolution.variant
           categoryModel = variantToUse ? { ...normalized, variant: variantToUse } : normalized
+        }
+      } else if (resolutionSkipped && agentOverride?.model) {
+        // Cold cache: resolution was skipped but user explicitly configured a model.
+        // Honor the user override directly — don't fall through to hardcoded fallback chain.
+        const normalized = normalizeModelFormat(agentOverride.model)
+        if (normalized) {
+          const variantToUse = agentOverride?.variant
+          categoryModel = variantToUse ? { ...normalized, variant: variantToUse } : normalized
+          log("[delegate-task] Cold cache: using explicit user override for subagent", {
+            agent: agentToUse,
+            model: agentOverride.model,
+          })
         }
       }
 
@@ -140,7 +154,9 @@ Create the work plan directly - that's your job as the planning agent.`,
         normalizedAgentFallbackModels,
         defaultProviderID,
       )
-      fallbackChain = configuredFallbackChain ?? agentRequirement?.fallbackChain
+      // Don't assign hardcoded fallback chain when resolution was skipped (cold cache)
+      // — the chain may contain model IDs that don't exist in the provider yet.
+      fallbackChain = configuredFallbackChain ?? (resolutionSkipped ? undefined : agentRequirement?.fallbackChain)
 
       // Only promote fallback-only settings when resolution actually selected a fallback model.
       const resolvedFallbackEntry = (resolution && !('skipped' in resolution)) ? resolution.fallbackEntry : undefined

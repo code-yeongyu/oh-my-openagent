@@ -162,7 +162,7 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 
 **Sisyphus** (`claude-opus-4-6` / **`kimi-k2.5`** / **`glm-5`**)는 당신의 메인 오케스트레이터입니다. 공격적인 병렬 실행으로 계획을 세우고, 전문가들에게 위임하며, 완료될 때까지 밀어붙입니다. 중간에 포기하는 법이 없습니다.
 
-**Hephaestus** (`gpt-5.3-codex`)는 당신의 자율 딥 워커입니다. 레시피가 아니라 목표를 주세요. 베이비시터 없이 알아서 코드베이스를 탐색하고, 패턴을 연구하며, 끝에서 끝까지 전부 해냅니다. *진정한 장인(The Legitimate Craftsman).*
+**Hephaestus** (`gpt-5.4`)는 당신의 자율 딥 워커입니다. 레시피가 아니라 목표를 주세요. 베이비시터 없이 알아서 코드베이스를 탐색하고, 패턴을 연구하며, 끝에서 끝까지 전부 해냅니다. *진정한 장인(The Legitimate Craftsman).*
 
 **Prometheus** (`claude-opus-4-6` / **`kimi-k2.5`** / **`glm-5`**)는 당신의 전략 플래너입니다. 인터뷰 모드로 작동합니다. 코드 한 줄 만지기 전에 질문을 던져 스코프를 파악하고 상세한 계획부터 세웁니다.
 
@@ -170,7 +170,7 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 
 > Anthropic이 [우리 때문에 OpenCode를 막아버렸습니다.](https://x.com/thdxr/status/2010149530486911014) 그래서 Hephaestus의 별명이 "진정한 장인(The Legitimate Craftsman)"인 겁니다. (어디서 많이 들어본 이름이죠?) 아이러니를 노렸습니다.
 >
-> Opus에서 제일 잘 돌아가긴 하지만, Kimi K2.5 + GPT-5.3 Codex 조합만으로도 바닐라 Claude Code는 가볍게 바릅니다. 설정도 필요 없습니다.
+> Opus에서 제일 잘 돌아가긴 하지만, Kimi K2.5 + GPT-5.4 조합만으로도 바닐라 Claude Code는 가볍게 바릅니다. 설정도 필요 없습니다.
 
 ### 에이전트 오케스트레이션
 

@@ -93,9 +93,9 @@ Sisyphus still works best on Claude-family models, Kimi, and GLM. GPT-5.4 now ha
 
 Named with intentional irony. Anthropic blocked OpenCode from using their API because of this project. So the team built an autonomous GPT-native agent instead.
 
-Hephaestus runs on GPT-5.3 Codex. Give him a goal, not a recipe. He explores the codebase, researches patterns, and executes end-to-end without hand-holding. He is the legitimate craftsman because he was born from necessity, not privilege.
+Hephaestus runs on GPT-5.4. Give him a goal, not a recipe. He explores the codebase, researches patterns, and executes end-to-end without hand-holding. He is the legitimate craftsman because he was born from necessity, not privilege.
 
-Use Hephaestus when you need deep architectural reasoning, complex debugging across many files, or cross-domain knowledge synthesis. Switch to him explicitly when the work demands GPT-5.3 Codex's particular strengths.
+Use Hephaestus when you need deep architectural reasoning, complex debugging across many files, or cross-domain knowledge synthesis. Switch to him explicitly when the work demands GPT-5.4's particular strengths.
 
 **Why this beats vanilla Codex CLI:**
 
@@ -214,14 +214,13 @@ You can override specific agents or categories in your config:
 
 **GPT models** (explicit reasoning, principle-driven):
 
-- GPT-5.3-codex — deep coding powerhouse, required for Hephaestus
-- GPT-5.4 — high intelligence, default for Oracle
+- GPT-5.4 — deep coding powerhouse, required for Hephaestus and default for Oracle
 - GPT-5-Nano — ultra-cheap, fast utility tasks
 
 **Different-behavior models**:
 
 - Gemini 3.1 Pro — excels at visual/frontend tasks
-- MiniMax M2.5 — fast and smart for utility tasks
+- MiniMax M2.7 / M2.7-highspeed — fast and smart for utility tasks
 - Grok Code Fast 1 — optimized for code grep/search
 
 See the [Agent-Model Matching Guide](./agent-model-matching.md) for complete details on which models work best for each agent, safe vs dangerous overrides, and provider priority chains.

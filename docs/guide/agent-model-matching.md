@@ -27,7 +27,7 @@ Using Sisyphus with older GPT models would be like taking your best project mana
 
 Hephaestus is the developer who stays in their room coding all day. Doesn't talk much. Might seem socially awkward. But give them a hard technical problem and they'll emerge three hours later with a solution nobody else could have found.
 
-**This is why Hephaestus uses GPT-5.3 Codex.** Codex is built for exactly this:
+**This is why Hephaestus uses GPT-5.4.** GPT-5.4 is built for exactly this:
 
 - Deep, autonomous exploration without hand-holding
 - Multi-file reasoning across complex codebases
@@ -82,7 +82,7 @@ These agents are built for GPT's principle-driven style. Their prompts assume au
 
 | Agent          | Role                    | Fallback Chain                         | Notes                                            |
 | -------------- | ----------------------- | -------------------------------------- | ------------------------------------------------ |
-| **Hephaestus** | Autonomous deep worker  | GPT-5.3 Codex → GPT-5.4 (Copilot)     | Requires GPT access. GPT-5.4 via Copilot as fallback. The craftsman. |
+| **Hephaestus** | Autonomous deep worker  | GPT-5.4                               | Requires GPT access. The craftsman. |
 | **Oracle**     | Architecture consultant | GPT-5.4 → Gemini 3.1 Pro → Claude Opus → opencode-go/glm-5 | Read-only high-IQ consultation.                  |
 | **Momus**      | Ruthless reviewer       | GPT-5.4 → Claude Opus → Gemini 3.1 Pro → opencode-go/glm-5 | Verification and plan review. GPT-5.4 uses xhigh variant. |
 
@@ -92,10 +92,10 @@ These agents do grep, search, and retrieval. They intentionally use the fastest,
 
 | Agent                 | Role               | Fallback Chain                                 | Notes                                                 |
 | --------------------- | ------------------ | ---------------------------------------------- | ----------------------------------------------------- |
-| **Explore**           | Fast codebase grep | Grok Code Fast → opencode-go/minimax-m2.5 → MiniMax Free → Haiku → GPT-5-Nano | Speed is everything. Fire 10 in parallel.             |
-| **Librarian**         | Docs/code search   | opencode-go/minimax-m2.5 → MiniMax Free → Haiku → GPT-5-Nano                  | Doc retrieval doesn't need deep reasoning.            |
-| **Multimodal Looker** | Vision/screenshots | GPT-5.4 → opencode-go/kimi-k2.5 → GLM-4.6v → GPT-5-Nano                       | Uses the first available multimodal-capable fallback. |
-| **Sisyphus-Junior**   | Category executor  | Claude Sonnet → opencode-go/kimi-k2.5 → GPT-5.4 → Big Pickle                  | Handles delegated category tasks. Sonnet-tier default. |
+| **Explore**           | Fast codebase grep | Grok Code Fast → opencode-go/minimax-m2.7 → opencode/minimax-m2.5 → Haiku → GPT-5-Nano | Speed is everything. Fire 10 in parallel.             |
+| **Librarian**         | Docs/code search   | opencode-go/minimax-m2.7 → opencode/minimax-m2.5 → Haiku → GPT-5-Nano                  | Doc retrieval doesn't need deep reasoning.            |
+| **Multimodal Looker** | Vision/screenshots | GPT-5.4 → opencode-go/kimi-k2.5 → GLM-4.6v → GPT-5-Nano                                 | Uses the first available multimodal-capable fallback. |
+| **Sisyphus-Junior**   | Category executor  | Claude Sonnet → opencode-go/kimi-k2.5 → GPT-5.4 → MiniMax M2.7 → Big Pickle              | Handles delegated category tasks. Sonnet-tier default. |
 
 ---
 
@@ -119,7 +119,7 @@ Principle-driven, explicit reasoning, deep technical capability. Best for agents
 
 | Model             | Strengths                                                                                       |
 | ----------------- | ----------------------------------------------------------------------------------------------- |
-| **GPT-5.3 Codex** | Deep coding powerhouse. Autonomous exploration. Required for Hephaestus.                        |
+| **GPT-5.3 Codex** | Deep coding powerhouse. Autonomous exploration. Still available for deep category and explicit overrides. |
 | **GPT-5.4**       | High intelligence, strategic reasoning. Default for Oracle, Momus, and a key fallback for Prometheus / Atlas. Uses xhigh variant for Momus. |
 | **GPT-5.4 Mini**  | Fast + strong reasoning. Good for lightweight autonomous tasks. Default for quick category. |
 | **GPT-5-Nano**    | Ultra-cheap, fast. Good for simple utility tasks.                                               |
@@ -131,7 +131,8 @@ Principle-driven, explicit reasoning, deep technical capability. Best for agents
 | **Gemini 3.1 Pro**   | Excels at visual/frontend tasks. Different reasoning style. Default for `visual-engineering` and `artistry`. |
 | **Gemini 3 Flash**   | Fast. Good for doc search and light tasks.                                                                   |
 | **Grok Code Fast 1** | Blazing fast code grep. Default for Explore agent.                                                           |
-| **MiniMax M2.5**     | Fast and smart. Good for utility tasks and search/retrieval.                                                 |
+| **MiniMax M2.7**     | Fast and smart. Used where provider catalogs expose the newer MiniMax line, especially through OpenCode Go. |
+| **MiniMax M2.7 Highspeed** | Ultra-fast variant. You may still see it in older docs, logs, or provider catalogs during the transition. |
 
 ### OpenCode Go
 
@@ -143,11 +144,11 @@ A premium subscription tier ($10/month) that provides reliable access to Chinese
 | ------------------------ | --------------------------------------------------------------------- |
 | **opencode-go/kimi-k2.5** | Vision-capable, Claude-like reasoning. Used by Sisyphus, Atlas, Sisyphus-Junior, Multimodal Looker. |
 | **opencode-go/glm-5**     | Text-only orchestration model. Used by Oracle, Prometheus, Metis, Momus.                           |
-| **opencode-go/minimax-m2.5** | Ultra-cheap, fast responses. Used by Librarian, Explore for utility work.                          |
+| **opencode-go/minimax-m2.7** | Ultra-cheap, fast responses. Used by Librarian, Explore, Atlas, and Sisyphus-Junior for utility work. |
 
 **When It Gets Used:**
 
-OpenCode Go models appear in fallback chains as intermediate options. They bridge the gap between premium Claude access and free-tier alternatives. The system tries OpenCode Go models before falling back to free tiers (MiniMax Free, Big Pickle) or GPT alternatives.
+OpenCode Go models appear in fallback chains as intermediate options. They bridge the gap between premium Claude access and free-tier alternatives. The system tries OpenCode Go models before falling back to cheaper provider-specific entries like MiniMax or Big Pickle, then GPT alternatives where applicable.
 
 **Go-Only Scenarios:**
 
@@ -155,7 +156,7 @@ Some model identifiers like `k2p5` (paid Kimi K2.5) and `glm-5` may only be avai
 
 ### About Free-Tier Fallbacks
 
-You may see model names like `kimi-k2.5-free`, `minimax-m2.5-free`, or `big-pickle` (GLM 4.6) in the source code or logs. These are free-tier versions of the same model families, served through the OpenCode Zen provider. They exist as lower-priority entries in fallback chains.
+You may see model names like `kimi-k2.5-free`, `minimax-m2.7`, `minimax-m2.5`, or `big-pickle` (GLM 4.6) in the source code or logs. These are provider-specific or speed-optimized entries in fallback chains. The exact MiniMax model can differ by provider catalog.
 
 You don't need to configure them. The system includes them so it degrades gracefully when you don't have every paid subscription. If you have the paid version, the paid version is always preferred.
 
@@ -171,7 +172,7 @@ When agents delegate work, they don't pick a model name — they pick a **catego
 | `ultrabrain`         | Maximum reasoning needed   | GPT-5.4 → Gemini 3.1 Pro → Claude Opus → opencode-go/glm-5 |
 | `deep`               | Deep coding, complex logic | GPT-5.3 Codex → Claude Opus → Gemini 3.1 Pro |
 | `artistry`           | Creative, novel approaches | Gemini 3.1 Pro → Claude Opus → GPT-5.4       |
-| `quick`              | Simple, fast tasks         | GPT-5.4 Mini → Claude Haiku → Gemini Flash → opencode-go/minimax-m2.5 → GPT-5-Nano |
+| `quick`              | Simple, fast tasks         | GPT-5.4 Mini → Claude Haiku → Gemini Flash → opencode-go/minimax-m2.7 → GPT-5-Nano |
 | `unspecified-high`   | General complex work       | Claude Opus → GPT-5.4 → GLM 5 → K2P5 → opencode-go/glm-5 → Kimi K2.5 |
 | `unspecified-low`    | General standard work      | Claude Sonnet → GPT-5.3 Codex → opencode-go/kimi-k2.5 → Gemini Flash |
 | `writing`            | Text, docs, prose          | Gemini Flash → opencode-go/kimi-k2.5 → Claude Sonnet |
@@ -186,7 +187,7 @@ See the [Orchestration System Guide](./orchestration.md) for how agents dispatch
 
 ```jsonc
 {
-  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-openagent.schema.json",
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json",
 
   "agents": {
     // Main orchestrator: Claude Opus or Kimi K2.5 work best
@@ -254,7 +255,15 @@ Run `opencode models` to see available models, `opencode auth login` to authenti
 
 ### How Model Resolution Works
 
-Each agent has a fallback chain. The system tries models in priority order until it finds one available through your connected providers. You don't need to configure providers per model — just authenticate (`opencode auth login`) and the system figures out which models are available and where.
+Each agent has a fallback chain. The system tries models in priority order until it finds one available through your connected providers. You don't need to configure providers per model. Just authenticate (`opencode auth login`) and the system figures out which models are available and where.
+
+Core-agent tab cycling is now deterministic. The fixed priority order is Sisyphus, Hephaestus, Prometheus, and Atlas, then the remaining agents follow.
+
+Your explicit configuration always wins. If you set a specific model for an agent, that choice takes precedence even when resolution data is cold.
+
+Variant and `reasoningEffort` overrides are normalized to model-supported values, so cross-provider overrides degrade gracefully instead of failing hard.
+
+To see which models your agents will actually use, run `bunx oh-my-opencode doctor`. This shows effective model resolution based on your current authentication and config.
 
 ```
 Agent Request → User Override (if configured) → Fallback Chain → System Default
