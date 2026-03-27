@@ -159,8 +159,15 @@ describe("integration: --session-id", () => {
 
 describe("integration: --on-complete", () => {
   let spawnSpy: ReturnType<typeof spyOn>
+  let originalPlatform: NodeJS.Platform
+  let originalEnv: Record<string, string | undefined>
 
   beforeEach(() => {
+    originalPlatform = process.platform
+    originalEnv = {
+      SHELL: process.env.SHELL,
+      PSModulePath: process.env.PSModulePath,
+    }
     spyOn(console, "error").mockImplementation(() => {})
     spawnSpy = spyOn(spawnWithWindowsHideModule, "spawnWithWindowsHide").mockReturnValue({
       exited: Promise.resolve(0),
@@ -172,11 +179,22 @@ describe("integration: --on-complete", () => {
   })
 
   afterEach(() => {
+    Object.defineProperty(process, "platform", { value: originalPlatform })
+    for (const [key, value] of Object.entries(originalEnv)) {
+      if (value !== undefined) {
+        process.env[key] = value
+      } else {
+        delete process.env[key]
+      }
+    }
     spawnSpy.mockRestore()
   })
 
   it("passes all 4 env vars as strings to spawned process", async () => {
     // given
+    Object.defineProperty(process, "platform", { value: "linux" })
+    process.env.SHELL = "/bin/bash"
+    delete process.env.PSModulePath
     spawnSpy.mockClear()
 
     // when
@@ -206,8 +224,15 @@ describe("integration: option combinations", () => {
   let mockStdout: MockWriteStream
   let mockStderr: MockWriteStream
   let spawnSpy: ReturnType<typeof spyOn>
+  let originalPlatform: NodeJS.Platform
+  let originalEnv: Record<string, string | undefined>
 
   beforeEach(() => {
+    originalPlatform = process.platform
+    originalEnv = {
+      SHELL: process.env.SHELL,
+      PSModulePath: process.env.PSModulePath,
+    }
     spyOn(console, "log").mockImplementation(() => {})
     spyOn(console, "error").mockImplementation(() => {})
     mockStdout = createMockWriteStream()
@@ -222,11 +247,22 @@ describe("integration: option combinations", () => {
   })
 
   afterEach(() => {
+    Object.defineProperty(process, "platform", { value: originalPlatform })
+    for (const [key, value] of Object.entries(originalEnv)) {
+      if (value !== undefined) {
+        process.env[key] = value
+      } else {
+        delete process.env[key]
+      }
+    }
     spawnSpy?.mockRestore?.()
   })
 
   it("json output and on-complete hook can both execute", async () => {
     // given - json manager active + on-complete hook ready
+    Object.defineProperty(process, "platform", { value: "linux" })
+    process.env.SHELL = "/bin/bash"
+    delete process.env.PSModulePath
     const result: RunResult = {
       sessionId: "session-123",
       success: true,

@@ -186,6 +186,8 @@ Show version information.
 bunx oh-my-opencode version
 ```
 
+`--on-complete` runs through your current shell when possible: `sh` on Unix shells, `pwsh` for PowerShell on non-Windows, `powershell.exe` for PowerShell on Windows, and `cmd.exe` as the Windows fallback.
+
 ---
 
 ## mcp oauth
