@@ -135,6 +135,89 @@ describe("resolveModelForDelegateTask", () => {
 		})
 	})
 
+	describe("#given provider cache exists and connected providers are known", () => {
+		let readConnectedProvidersSpy: ReturnType<typeof spyOn> | undefined
+
+		beforeEach(() => {
+			hasConnectedProvidersSpy = spyOn(connectedProvidersCache, "hasConnectedProvidersCache").mockReturnValue(true)
+			hasProviderModelsSpy = spyOn(connectedProvidersCache, "hasProviderModelsCache").mockReturnValue(true)
+		})
+
+		afterEach(() => {
+			readConnectedProvidersSpy?.mockRestore()
+		})
+
+		describe("#when availableModels is empty and fallback chain starts with unauthenticated provider", () => {
+			test("#then skips unauthenticated providers and resolves to first connected one", () => {
+				readConnectedProvidersSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai", "anthropic"])
+
+				const result = resolveModelForDelegateTask({
+					fallbackChain: [
+						{ providers: ["xai"], model: "grok-code-fast-1" },
+						{ providers: ["opencode-go"], model: "minimax-m2.7" },
+						{ providers: ["anthropic", "opencode"], model: "claude-haiku-4-5" },
+						{ providers: ["opencode"], model: "gpt-5-nano" },
+					],
+					availableModels: new Set(),
+				})
+
+				expect(result).toBeDefined()
+				expect(result).not.toHaveProperty("skipped")
+				const resolved = result as { model: string; variant?: string }
+				expect(resolved.model).toBe("anthropic/claude-haiku-4-5")
+			})
+
+			test("#then resolves first provider in entry that is connected", () => {
+				readConnectedProvidersSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai", "github-copilot"])
+
+				const result = resolveModelForDelegateTask({
+					fallbackChain: [
+						{ providers: ["opencode-go"], model: "minimax-m2.7" },
+						{ providers: ["openai", "github-copilot"], model: "gpt-5.4", variant: "high" },
+					],
+					availableModels: new Set(),
+				})
+
+				expect(result).toBeDefined()
+				const resolved = result as { model: string; variant?: string }
+				expect(resolved.model).toBe("openai/gpt-5.4")
+				expect(resolved.variant).toBe("high")
+			})
+
+			test("#then falls through to system default when no provider in chain is connected", () => {
+				readConnectedProvidersSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["anthropic"])
+
+				const result = resolveModelForDelegateTask({
+					fallbackChain: [
+						{ providers: ["xai"], model: "grok-code-fast-1" },
+						{ providers: ["opencode-go"], model: "minimax-m2.7" },
+					],
+					availableModels: new Set(),
+					systemDefaultModel: "anthropic/claude-sonnet-4-6",
+				})
+
+				expect(result).toEqual({ model: "anthropic/claude-sonnet-4-6" })
+			})
+		})
+
+		describe("#when connected providers cache is null (not yet populated)", () => {
+			test("#then falls back to first entry in chain (legacy behavior)", () => {
+				readConnectedProvidersSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(null)
+
+				const result = resolveModelForDelegateTask({
+					fallbackChain: [
+						{ providers: ["xai"], model: "grok-code-fast-1" },
+					],
+					availableModels: new Set(),
+				})
+
+				expect(result).toBeDefined()
+				const resolved = result as { model: string }
+				expect(resolved.model).toBe("xai/grok-code-fast-1")
+			})
+		})
+	})
+
 	describe("#given only connected providers cache exists (no provider-models cache)", () => {
 		beforeEach(() => {
 			hasConnectedProvidersSpy = spyOn(connectedProvidersCache, "hasConnectedProvidersCache").mockReturnValue(true)
