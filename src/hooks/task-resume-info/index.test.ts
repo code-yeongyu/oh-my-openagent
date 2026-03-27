@@ -87,7 +87,7 @@ describe("createTaskResumeInfoHook", () => {
         const output = {
           title: "task",
           output:
-            'Done.\nSession ID: ses_abc123\nto continue: task(session_id="ses_abc123", prompt="...")',
+            'Done.\nSession ID: ses_abc123\nto continue: task(session_id="ses_abc123", load_skills=[], prompt="...")',
           metadata: {},
         }
 
