@@ -31,6 +31,8 @@ export const RETRYABLE_ERROR_PATTERNS = [
   /cool(?:ing)?\s+down/i,
   /exhausted\s+your\s+capacity/i,
   /usage\s+limit\s+has\s+been\s+reached/i,
+  /model.{0,20}?not.{0,10}?supported/i,
+  /model_not_supported/i,
   /service.?unavailable/i,
   /overloaded/i,
   /temporarily.?unavailable/i,
