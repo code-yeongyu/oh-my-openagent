@@ -1,7 +1,7 @@
 export { isInsideTmux, getCurrentPaneId } from "./tmux-utils/environment"
 export type { SplitDirection } from "./tmux-utils/environment"
 
-export { isServerRunning, resetServerCheck } from "./tmux-utils/server-health"
+export { isServerRunning, resetServerCheck, markServerRunningInProcess } from "./tmux-utils/server-health"
 
 export { getPaneDimensions } from "./tmux-utils/pane-dimensions"
 export type { PaneDimensions } from "./tmux-utils/pane-dimensions"
