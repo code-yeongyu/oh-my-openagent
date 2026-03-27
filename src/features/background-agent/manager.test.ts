@@ -3728,6 +3728,9 @@ describe("BackgroundManager.handleEvent - session.deleted cascade", () => {
       properties: { info: { id: parentSessionID } },
     })
 
+    // Flush twice: cancelTask now awaits session.abort() before cleanupPendingByParent,
+    // so we need additional microtask ticks to let the cascade complete fully.
+    await flushBackgroundNotifications()
     await flushBackgroundNotifications()
 
     // then

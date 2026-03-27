@@ -538,7 +538,7 @@ export class BackgroundManager {
         })(),
         parts: [createInternalAgentTextPart(input.prompt)],
       },
-    }).catch((error) => {
+    }).catch(async (error) => {
       log("[background-agent] promptAsync error:", error)
       const existingTask = this.findBySession(sessionID)
       if (existingTask) {
@@ -561,7 +561,8 @@ export class BackgroundManager {
         removeTaskToastTracking(existingTask.id)
 
         // Abort the session to prevent infinite polling hang
-        this.client.session.abort({
+        // Awaited to prevent dangling promise during subagent teardown (Bun/WebKit SIGABRT)
+        await this.client.session.abort({
           path: { id: sessionID },
         }).catch(() => {})
 
@@ -823,7 +824,7 @@ export class BackgroundManager {
         })(),
         parts: [createInternalAgentTextPart(input.prompt)],
       },
-    }).catch((error) => {
+    }).catch(async (error) => {
       log("[background-agent] resume prompt error:", error)
       existingTask.status = "interrupt"
       const errorMessage = error instanceof Error ? error.message : String(error)
@@ -842,8 +843,9 @@ export class BackgroundManager {
       removeTaskToastTracking(existingTask.id)
 
       // Abort the session to prevent infinite polling hang
+      // Awaited to prevent dangling promise during subagent teardown (Bun/WebKit SIGABRT)
       if (existingTask.sessionID) {
-        this.client.session.abort({
+        await this.client.session.abort({
           path: { id: existingTask.sessionID },
         }).catch(() => {})
       }
@@ -1392,7 +1394,8 @@ export class BackgroundManager {
     }
 
     if (abortSession && task.sessionID) {
-      this.client.session.abort({
+      // Awaited to prevent dangling promise during subagent teardown (Bun/WebKit SIGABRT)
+      await this.client.session.abort({
         path: { id: task.sessionID },
       }).catch(() => {})
 
@@ -1510,7 +1513,8 @@ export class BackgroundManager {
     }
 
     if (task.sessionID) {
-      this.client.session.abort({
+      // Awaited to prevent dangling promise during subagent teardown (Bun/WebKit SIGABRT)
+      await this.client.session.abort({
         path: { id: task.sessionID },
       }).catch(() => {})
 
