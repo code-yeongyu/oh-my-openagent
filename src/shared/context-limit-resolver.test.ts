@@ -45,7 +45,7 @@ describe("resolveActualContextLimit", () => {
     expect(actualLimit).toBe(1_000_000)
   })
 
-  it("returns default 200K for older Anthropic models even when cached limit is higher", () => {
+  it("returns cached limit for Anthropic models when modelContextLimitsCache has entry", () => {
     // given
     delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
     delete process.env[VERTEX_CONTEXT_ENV_KEY]
@@ -59,7 +59,7 @@ describe("resolveActualContextLimit", () => {
     })
 
     // then
-    expect(actualLimit).toBe(200_000)
+    expect(actualLimit).toBe(500_000)
   })
 
   it("returns default 200K for Anthropic models without cached limit and 1M mode disabled", () => {

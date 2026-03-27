@@ -29,6 +29,9 @@ export function applyToolConfig(params: {
     ? { todowrite: "deny", todoread: "deny" }
     : {}
 
+  const existingPermission = params.config.permission as Record<string, unknown> | undefined;
+  const skillDeniedByHost = existingPermission?.skill === "deny";
+
   params.config.tools = {
     ...(params.config.tools as Record<string, unknown>),
     "grep_app_*": false,
@@ -39,6 +42,9 @@ export function applyToolConfig(params: {
     teammate: false,
     ...(params.pluginConfig.experimental?.task_system
       ? { todowrite: false, todoread: false }
+      : {}),
+    ...(skillDeniedByHost
+      ? { skill: false, skill_mcp: false }
       : {}),
   };
 
