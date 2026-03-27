@@ -188,9 +188,9 @@ export function loadPluginConfig(
     migrateLegacyConfigFile(projectDetected.path);
   }
 
-  // Load user config first (base)
+  // Load user config first (base). Parse empty config through Zod to apply field defaults.
   let config: OhMyOpenCodeConfig =
-    loadConfigFromPath(userConfigPath, ctx) ?? {};
+    loadConfigFromPath(userConfigPath, ctx) ?? OhMyOpenCodeConfigSchema.parse({});
 
   // Override with project config
   const projectConfig = loadConfigFromPath(projectConfigPath, ctx);
