@@ -150,7 +150,34 @@ export function createToolRegistry(args: {
     normalizeToolArgSchemas(toolDefinition)
   }
 
-  const filteredTools = filterDisabledTools(allTools, pluginConfig.disabled_tools)
+  const filteredTools: ToolsRecord = filterDisabledTools(allTools, pluginConfig.disabled_tools)
+
+  const maxTools = pluginConfig.experimental?.max_tools
+  if (maxTools) {
+    const estimatedBuiltinTools = 20
+    const pluginToolBudget = maxTools - estimatedBuiltinTools
+    const toolEntries = Object.entries(filteredTools)
+    if (pluginToolBudget > 0 && toolEntries.length > pluginToolBudget) {
+      const excess = toolEntries.length - pluginToolBudget
+      log(`[tool-registry] Tool count (${toolEntries.length} plugin + ~${estimatedBuiltinTools} builtin = ~${toolEntries.length + estimatedBuiltinTools}) exceeds max_tools=${maxTools}. Trimming ${excess} lower-priority tools.`)
+      const lowPriorityTools = [
+        "session_list", "session_read", "session_search", "session_info",
+        "call_omo_agent", "interactive_bash", "look_at",
+        "task_create", "task_get", "task_list", "task_update",
+      ]
+      let removed = 0
+      for (const toolName of lowPriorityTools) {
+        if (removed >= excess) break
+        if (filteredTools[toolName]) {
+          delete filteredTools[toolName]
+          removed += 1
+        }
+      }
+      if (removed < excess) {
+        log(`[tool-registry] WARNING: Could not trim enough tools. ${toolEntries.length - removed} plugin tools remain.`)
+      }
+    }
+  }
 
   return {
     filteredTools,
