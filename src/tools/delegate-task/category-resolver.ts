@@ -12,7 +12,18 @@ import { buildFallbackChainFromModels, findMostSpecificFallbackEntry } from "../
 import { getAvailableModelsForDelegateTask } from "./available-models"
 import { resolveModelForDelegateTask } from "./model-selection"
 
+import type { CategoryConfig } from "../../config/schema"
 import type { DelegatedModelConfig } from "./types"
+
+function applyCategoryParams(base: DelegatedModelConfig, config: CategoryConfig): DelegatedModelConfig {
+  const result = { ...base }
+  if (config.temperature !== undefined) result.temperature = config.temperature
+  if (config.top_p !== undefined) result.top_p = config.top_p
+  if (config.maxTokens !== undefined) result.maxTokens = config.maxTokens
+  if (config.reasoningEffort !== undefined) result.reasoningEffort = config.reasoningEffort
+  if (config.thinking !== undefined) result.thinking = config.thinking
+  return result
+}
 
 export interface CategoryResolutionResult {
   agentToUse: string
@@ -106,7 +117,7 @@ Available categories: ${allCategoryNames}`,
       const parsedModel = parseModelString(actualModel)
       const variantToUse = userCategories?.[args.category!]?.variant ?? resolved.config.variant
       categoryModel = parsedModel
-        ? (variantToUse ? { ...parsedModel, variant: variantToUse } : parsedModel)
+        ? applyCategoryParams({ ...parsedModel, variant: variantToUse }, resolved.config)
         : undefined
     }
   } else {
@@ -165,7 +176,7 @@ Available categories: ${allCategoryNames}`,
       const parsedModel = parseModelString(actualModel)
       const variantToUse = userCategories?.[args.category!]?.variant ?? resolvedVariant ?? resolved.config.variant
       categoryModel = parsedModel
-        ? (variantToUse ? { ...parsedModel, variant: variantToUse } : parsedModel)
+        ? applyCategoryParams({ ...parsedModel, variant: variantToUse }, resolved.config)
         : undefined
     }
   }
@@ -223,11 +234,11 @@ Available categories: ${categoryNames.join(", ")}`,
     categoryModel = {
       ...categoryModel,
       variant: userCategories?.[args.category!]?.variant ?? effectiveEntry.variant ?? categoryModel.variant,
-      reasoningEffort: effectiveEntry.reasoningEffort,
-      temperature: effectiveEntry.temperature,
-      top_p: effectiveEntry.top_p,
-      maxTokens: effectiveEntry.maxTokens,
-      thinking: effectiveEntry.thinking,
+      reasoningEffort: effectiveEntry.reasoningEffort ?? categoryModel.reasoningEffort,
+      temperature: effectiveEntry.temperature ?? categoryModel.temperature,
+      top_p: effectiveEntry.top_p ?? categoryModel.top_p,
+      maxTokens: effectiveEntry.maxTokens ?? categoryModel.maxTokens,
+      thinking: effectiveEntry.thinking ?? categoryModel.thinking,
     }
   }
 
