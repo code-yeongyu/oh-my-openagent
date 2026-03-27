@@ -92,8 +92,8 @@ These agents do grep, search, and retrieval. They intentionally use the fastest,
 
 | Agent                 | Role               | Fallback Chain                                 | Notes                                                 |
 | --------------------- | ------------------ | ---------------------------------------------- | ----------------------------------------------------- |
-| **Explore**           | Fast codebase grep | Grok Code Fast → opencode-go/minimax-m2.7-highspeed → MiniMax M2.7 → Haiku → GPT-5-Nano | Speed is everything. Fire 10 in parallel.             |
-| **Librarian**         | Docs/code search   | opencode-go/minimax-m2.7 → MiniMax M2.7-highspeed → Haiku → GPT-5-Nano                  | Doc retrieval doesn't need deep reasoning.            |
+| **Explore**           | Fast codebase grep | Grok Code Fast → opencode-go/minimax-m2.7 → opencode/minimax-m2.5 → Haiku → GPT-5-Nano | Speed is everything. Fire 10 in parallel.             |
+| **Librarian**         | Docs/code search   | opencode-go/minimax-m2.7 → opencode/minimax-m2.5 → Haiku → GPT-5-Nano                  | Doc retrieval doesn't need deep reasoning.            |
 | **Multimodal Looker** | Vision/screenshots | GPT-5.4 → opencode-go/kimi-k2.5 → GLM-4.6v → GPT-5-Nano                                 | Uses the first available multimodal-capable fallback. |
 | **Sisyphus-Junior**   | Category executor  | Claude Sonnet → opencode-go/kimi-k2.5 → GPT-5.4 → MiniMax M2.7 → Big Pickle              | Handles delegated category tasks. Sonnet-tier default. |
 
@@ -131,8 +131,8 @@ Principle-driven, explicit reasoning, deep technical capability. Best for agents
 | **Gemini 3.1 Pro**   | Excels at visual/frontend tasks. Different reasoning style. Default for `visual-engineering` and `artistry`. |
 | **Gemini 3 Flash**   | Fast. Good for doc search and light tasks.                                                                   |
 | **Grok Code Fast 1** | Blazing fast code grep. Default for Explore agent.                                                           |
-| **MiniMax M2.7**     | Fast and smart. Good for utility tasks and search/retrieval. Upgraded from M2.5 with better reasoning.       |
-| **MiniMax M2.7 Highspeed** | Ultra-fast variant. Optimized for latency-sensitive tasks like codebase grep.                           |
+| **MiniMax M2.7**     | Fast and smart. Used where provider catalogs expose the newer MiniMax line, especially through OpenCode Go. |
+| **MiniMax M2.7 Highspeed** | Ultra-fast variant. You may still see it in older docs, logs, or provider catalogs during the transition. |
 
 ### OpenCode Go
 
@@ -144,11 +144,11 @@ A premium subscription tier ($10/month) that provides reliable access to Chinese
 | ------------------------ | --------------------------------------------------------------------- |
 | **opencode-go/kimi-k2.5** | Vision-capable, Claude-like reasoning. Used by Sisyphus, Atlas, Sisyphus-Junior, Multimodal Looker. |
 | **opencode-go/glm-5**     | Text-only orchestration model. Used by Oracle, Prometheus, Metis, Momus.                           |
-| **opencode-go/minimax-m2.7** | Ultra-cheap, fast responses. Used by Librarian, Explore, Atlas, Sisyphus-Junior for utility work.   |
+| **opencode-go/minimax-m2.7** | Ultra-cheap, fast responses. Used by Librarian, Explore, Atlas, and Sisyphus-Junior for utility work. |
 
 **When It Gets Used:**
 
-OpenCode Go models appear in fallback chains as intermediate options. They bridge the gap between premium Claude access and free-tier alternatives. The system tries OpenCode Go models before falling back to free tiers (MiniMax M2.7-highspeed, Big Pickle) or GPT alternatives.
+OpenCode Go models appear in fallback chains as intermediate options. They bridge the gap between premium Claude access and free-tier alternatives. The system tries OpenCode Go models before falling back to cheaper provider-specific entries like MiniMax or Big Pickle, then GPT alternatives where applicable.
 
 **Go-Only Scenarios:**
 
@@ -156,7 +156,7 @@ Some model identifiers like `k2p5` (paid Kimi K2.5) and `glm-5` may only be avai
 
 ### About Free-Tier Fallbacks
 
-You may see model names like `kimi-k2.5-free`, `minimax-m2.7-highspeed`, or `big-pickle` (GLM 4.6) in the source code or logs. These are free-tier or speed-optimized versions of the same model families. They exist as lower-priority entries in fallback chains.
+You may see model names like `kimi-k2.5-free`, `minimax-m2.7`, `minimax-m2.5`, or `big-pickle` (GLM 4.6) in the source code or logs. These are provider-specific or speed-optimized entries in fallback chains. The exact MiniMax model can differ by provider catalog.
 
 You don't need to configure them. The system includes them so it degrades gracefully when you don't have every paid subscription. If you have the paid version, the paid version is always preferred.
 
@@ -187,7 +187,7 @@ See the [Orchestration System Guide](./orchestration.md) for how agents dispatch
 
 ```jsonc
 {
-  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-openagent.schema.json",
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json",
 
   "agents": {
     // Main orchestrator: Claude Opus or Kimi K2.5 work best
@@ -255,7 +255,15 @@ Run `opencode models` to see available models, `opencode auth login` to authenti
 
 ### How Model Resolution Works
 
-Each agent has a fallback chain. The system tries models in priority order until it finds one available through your connected providers. You don't need to configure providers per model — just authenticate (`opencode auth login`) and the system figures out which models are available and where.
+Each agent has a fallback chain. The system tries models in priority order until it finds one available through your connected providers. You don't need to configure providers per model. Just authenticate (`opencode auth login`) and the system figures out which models are available and where.
+
+Core-agent tab cycling is now deterministic. The fixed priority order is Sisyphus, Hephaestus, Prometheus, and Atlas, then the remaining agents follow.
+
+Your explicit configuration always wins. If you set a specific model for an agent, that choice takes precedence even when resolution data is cold.
+
+Variant and `reasoningEffort` overrides are normalized to model-supported values, so cross-provider overrides degrade gracefully instead of failing hard.
+
+To see which models your agents will actually use, run `bunx oh-my-opencode doctor`. This shows effective model resolution based on your current authentication and config.
 
 ```
 Agent Request → User Override (if configured) → Fallback Chain → System Default
