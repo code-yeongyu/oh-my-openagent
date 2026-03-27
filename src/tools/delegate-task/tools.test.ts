@@ -465,7 +465,7 @@ describe("sisyphus-task", () => {
        expect(args.subagent_type).toBe("Sisyphus-Junior")
     }, { timeout: 10000 })
 
-    test("category overrides subagent_type and still maps to sisyphus-junior", async () => {
+    test("rejects when both category and subagent_type are provided", async () => {
       //#given
       const { createDelegateTask } = require("./tools")
 
@@ -507,14 +507,7 @@ describe("sisyphus-task", () => {
         abort: new AbortController().signal,
       }
 
-      const args: {
-        description: string
-        prompt: string
-        category: string
-        subagent_type: string
-        run_in_background: boolean
-        load_skills: string[]
-      } = {
+      const args = {
         description: "Override test",
         prompt: "Do something",
         category: "quick",
@@ -523,12 +516,8 @@ describe("sisyphus-task", () => {
         load_skills: [],
       }
 
-      //#when
-      const result = await tool.execute(args, toolContext)
-
-      //#then
-      expect(args.subagent_type).toBe("Sisyphus-Junior")
-      expect(result).toContain("Background task launched")
+      //#when + #then
+      await expect(tool.execute(args, toolContext)).rejects.toThrow("mutually exclusive")
     }, { timeout: 10000 })
 
     test("proceeds without error when systemDefaultModel is undefined", async () => {
