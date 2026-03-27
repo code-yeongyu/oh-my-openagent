@@ -57,17 +57,20 @@ export function createKeywordDetectorHook(ctx: PluginInput, _collector?: Context
       let detectedKeywords = detectKeywordsWithType(cleanText, currentAgent, modelID)
 
       if (isPlannerAgent(currentAgent)) {
+        const preFilterCount = detectedKeywords.length
         detectedKeywords = detectedKeywords.filter((k) => k.type !== "ultrawork")
+        if (preFilterCount > detectedKeywords.length) {
+          log(`[keyword-detector] Filtered ultrawork keywords for planner agent`, { sessionID: input.sessionID, agent: currentAgent })
+        }
       }
 
       if (detectedKeywords.length === 0) {
         return
       }
 
-      // Skip keyword detection for background task sessions to prevent mode injection
-      // (e.g., [analyze-mode]) which incorrectly triggers Prometheus restrictions
       const isBackgroundTaskSession = subagentSessions.has(input.sessionID)
       if (isBackgroundTaskSession) {
+        log(`[keyword-detector] Skipping keyword injection for background task session`, { sessionID: input.sessionID })
         return
       }
 
