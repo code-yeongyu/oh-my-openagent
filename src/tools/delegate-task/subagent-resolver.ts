@@ -13,6 +13,7 @@ import { log } from "../../shared/logger"
 import { getAvailableModelsForDelegateTask } from "./available-models"
 import type { FallbackEntry } from "../../shared/model-requirements"
 import { resolveModelForDelegateTask } from "./model-selection"
+import { fuzzyMatchModel } from "../../shared/model-availability"
 
 export async function resolveSubagentExecution(
   args: DelegateTaskArgs,
@@ -109,8 +110,9 @@ Create the work plan directly - that's your job as the planning agent.`,
       ?? (agentOverride?.category ? userCategories?.[agentOverride.category]?.fallback_models : undefined)
     )
 
+    const availableModels = await getAvailableModelsForDelegateTask(client)
+
     if (agentOverride?.model || agentCategoryModel || agentRequirement || matchedAgent.model) {
-      const availableModels = await getAvailableModelsForDelegateTask(client)
 
       const normalizedMatchedModel = matchedAgent.model
         ? normalizeModelFormat(matchedAgent.model)
@@ -192,7 +194,15 @@ Create the work plan directly - that's your job as the planning agent.`,
     if (!categoryModel && matchedAgent.model) {
       const normalizedMatchedModel = normalizeModelFormat(matchedAgent.model)
       if (normalizedMatchedModel) {
-        categoryModel = normalizedMatchedModel
+        const fullModel = `${normalizedMatchedModel.providerID}/${normalizedMatchedModel.modelID}`
+        if (availableModels.size === 0 || fuzzyMatchModel(fullModel, availableModels, [normalizedMatchedModel.providerID])) {
+          categoryModel = normalizedMatchedModel
+        } else {
+          log("[delegate-task] Skipping unavailable agent default model", {
+            agent: agentToUse,
+            model: fullModel,
+          })
+        }
       }
     }
   } catch (error) {

@@ -88,7 +88,7 @@ describe("resolveSubagentExecution", () => {
   test("normalizes matched agent model string before returning categoryModel", async () => {
     //#given
     const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
-      models: { openai: ["grok-3"] },
+      models: { openai: ["grok-3", "gpt-5.3-codex"] },
       connected: ["openai"],
       updatedAt: "2026-03-03T00:00:00.000Z",
     })
@@ -406,6 +406,56 @@ describe("resolveSubagentExecution", () => {
       variant: "low",
       reasoningEffort: "high",
     })
+    cacheSpy.mockRestore()
+    connectedSpy.mockRestore()
+  })
+
+  test("does not use unavailable matchedAgent.model as fallback for custom subagent", async () => {
+    //#given
+    const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+      models: { minimaxi: ["MiniMax-M2.7"] },
+      connected: ["minimaxi"],
+      updatedAt: "2026-03-03T00:00:00.000Z",
+    })
+    const connectedSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["minimaxi"])
+    const args = createBaseArgs({ subagent_type: "my-custom-agent" })
+    const executorCtx = createExecutorContext(
+      async () => ([
+        { name: "my-custom-agent", mode: "subagent", model: "minimaxi/MiniMax-M2.7-highspeed" },
+      ]),
+    )
+
+    //#when
+    const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep")
+
+    //#then
+    expect(result.error).toBeUndefined()
+    expect(result.categoryModel?.modelID).not.toBe("MiniMax-M2.7-highspeed")
+    cacheSpy.mockRestore()
+    connectedSpy.mockRestore()
+  })
+
+  test("uses matchedAgent.model as fallback when model is available", async () => {
+    //#given
+    const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+      models: { minimaxi: ["MiniMax-M2.7-highspeed"] },
+      connected: ["minimaxi"],
+      updatedAt: "2026-03-03T00:00:00.000Z",
+    })
+    const connectedSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["minimaxi"])
+    const args = createBaseArgs({ subagent_type: "my-custom-agent" })
+    const executorCtx = createExecutorContext(
+      async () => ([
+        { name: "my-custom-agent", mode: "subagent", model: "minimaxi/MiniMax-M2.7-highspeed" },
+      ]),
+    )
+
+    //#when
+    const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep")
+
+    //#then
+    expect(result.error).toBeUndefined()
+    expect(result.categoryModel).toEqual({ providerID: "minimaxi", modelID: "MiniMax-M2.7-highspeed" })
     cacheSpy.mockRestore()
     connectedSpy.mockRestore()
   })
