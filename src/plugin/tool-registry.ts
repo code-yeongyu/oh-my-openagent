@@ -1,4 +1,5 @@
 import type { ToolDefinition } from "@opencode-ai/plugin"
+import type { SkillLoadOptions } from "../tools/skill/types"
 
 import type {
   AvailableCategory,
@@ -112,6 +113,7 @@ export function createToolRegistry(args: {
     mcpManager: managers.skillMcpManager,
     getSessionID: getSessionIDForMcp,
     gitMasterConfig: pluginConfig.git_master,
+    nativeSkills: "skills" in ctx ? (ctx as { skills: SkillLoadOptions["nativeSkills"] }).skills : undefined,
   })
 
   // task_system defaults to true since v3.14 — delegation (oracle, subagents) requires it

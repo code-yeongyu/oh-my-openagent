@@ -37,4 +37,10 @@ export interface SkillLoadOptions {
   pluginsEnabled?: boolean
   /** Override plugin enablement from Claude settings by plugin key */
   enabledPluginsOverride?: Record<string, boolean>
+  /** Native skill accessor from PluginInput for discovering skills registered via config.skills.paths */
+  nativeSkills?: {
+    all(): Promise<{ name: string; description: string; location: string; content: string }[]>
+    get(name: string): Promise<{ name: string; description: string; location: string; content: string } | undefined>
+    dirs(): Promise<string[]>
+  }
 }

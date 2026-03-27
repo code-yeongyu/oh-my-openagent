@@ -190,10 +190,33 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
   const getSkills = async (): Promise<LoadedSkill[]> => {
     clearSkillCache()
     const discovered = await getAllSkills({disabledSkills: options?.disabledSkills})
-    if (!options.skills) return discovered
-    const discoveredNames = new Set(discovered.map(s => s.name))
-    const extras = options.skills.filter(s => !discoveredNames.has(s.name))
-    return [...discovered, ...extras]
+    const allSkills = !options.skills
+      ? discovered
+      : [...discovered, ...options.skills.filter(s => !new Set(discovered.map(d => d.name)).has(s.name))]
+
+    if (options.nativeSkills) {
+      const knownNames = new Set(allSkills.map(s => s.name))
+      try {
+        const nativeAll = await options.nativeSkills.all()
+        for (const native of nativeAll) {
+          if (knownNames.has(native.name)) continue
+          allSkills.push({
+            name: native.name,
+            path: native.location,
+            definition: {
+              name: native.name,
+              description: native.description,
+              template: native.content,
+            },
+            scope: "config",
+          })
+        }
+      } catch {
+        // Native skill discovery may not be available
+      }
+    }
+
+    return allSkills
   }
 
   const getCommands = (): CommandInfo[] => {

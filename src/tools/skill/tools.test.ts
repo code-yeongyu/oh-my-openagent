@@ -581,3 +581,32 @@ describe("skill tool - dynamic description cache invalidation", () => {
   })
 })
 
+
+
+describe("skill tool - nativeSkills integration", () => {
+  it("merges native skills exposed by PluginInput.skills.all()", async () => {
+    //#given
+    const tool = createSkillTool({
+      skills: [],
+      nativeSkills: {
+        async all() {
+          return [{
+            name: "external-plugin-skill",
+            description: "Skill from config.skills.paths",
+            location: "/external/skills/external-plugin-skill/SKILL.md",
+            content: "External plugin skill body",
+          }]
+        },
+        async get() { return undefined },
+        async dirs() { return [] },
+      },
+    })
+
+    //#when
+    const result = await tool.execute({ name: "external-plugin-skill" }, mockContext)
+
+    //#then
+    expect(result).toContain("external-plugin-skill")
+    expect(result).toContain("Test skill body content")
+  })
+})
