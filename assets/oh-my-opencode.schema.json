@@ -4661,6 +4661,10 @@
           "type": "number",
           "minimum": 60000
         },
+        "taskTtlMs": {
+          "type": "number",
+          "minimum": 300000
+        },
         "sessionGoneTimeoutMs": {
           "type": "number",
           "minimum": 10000

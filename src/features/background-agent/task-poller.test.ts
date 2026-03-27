@@ -597,6 +597,132 @@ describe("pruneStaleTasksAndNotifications", () => {
     expect(pruned).toContain("old-task")
   })
 
+  it("#given running task with recent progress #when startedAt exceeds TTL #then should NOT prune", () => {
+    //#given
+    const tasks = new Map<string, BackgroundTask>()
+    const activeTask: BackgroundTask = {
+      id: "active-task",
+      parentSessionID: "parent",
+      parentMessageID: "msg",
+      description: "active",
+      prompt: "active",
+      agent: "oracle",
+      status: "running",
+      startedAt: new Date(Date.now() - 45 * 60 * 1000),
+      progress: {
+        toolCalls: 10,
+        lastUpdate: new Date(Date.now() - 5 * 60 * 1000),
+      },
+    }
+    tasks.set("active-task", activeTask)
+
+    const pruned: string[] = []
+    const notifications = new Map<string, BackgroundTask[]>()
+
+    //#when
+    pruneStaleTasksAndNotifications({
+      tasks,
+      notifications,
+      onTaskPruned: (taskId) => pruned.push(taskId),
+    })
+
+    //#then
+    expect(pruned).toEqual([])
+  })
+
+  it("#given running task with stale progress #when lastUpdate exceeds TTL #then should prune", () => {
+    //#given
+    const tasks = new Map<string, BackgroundTask>()
+    const staleTask: BackgroundTask = {
+      id: "stale-task",
+      parentSessionID: "parent",
+      parentMessageID: "msg",
+      description: "stale",
+      prompt: "stale",
+      agent: "oracle",
+      status: "running",
+      startedAt: new Date(Date.now() - 60 * 60 * 1000),
+      progress: {
+        toolCalls: 10,
+        lastUpdate: new Date(Date.now() - 35 * 60 * 1000),
+      },
+    }
+    tasks.set("stale-task", staleTask)
+
+    const pruned: string[] = []
+    const notifications = new Map<string, BackgroundTask[]>()
+
+    //#when
+    pruneStaleTasksAndNotifications({
+      tasks,
+      notifications,
+      onTaskPruned: (taskId) => pruned.push(taskId),
+    })
+
+    //#then
+    expect(pruned).toContain("stale-task")
+  })
+
+  it("#given custom taskTtlMs #when task exceeds custom TTL #then should prune", () => {
+    //#given
+    const tasks = new Map<string, BackgroundTask>()
+    const task: BackgroundTask = {
+      id: "custom-ttl-task",
+      parentSessionID: "parent",
+      parentMessageID: "msg",
+      description: "custom",
+      prompt: "custom",
+      agent: "explore",
+      status: "running",
+      startedAt: new Date(Date.now() - 61 * 60 * 1000),
+    }
+    tasks.set("custom-ttl-task", task)
+
+    const pruned: string[] = []
+    const notifications = new Map<string, BackgroundTask[]>()
+
+    //#when
+    pruneStaleTasksAndNotifications({
+      tasks,
+      notifications,
+      taskTtlMs: 60 * 60 * 1000,
+      onTaskPruned: (taskId) => pruned.push(taskId),
+    })
+
+    //#then
+    expect(pruned).toContain("custom-ttl-task")
+  })
+
+  it("#given custom taskTtlMs #when task within custom TTL #then should NOT prune", () => {
+    //#given
+    const tasks = new Map<string, BackgroundTask>()
+    const task: BackgroundTask = {
+      id: "within-ttl-task",
+      parentSessionID: "parent",
+      parentMessageID: "msg",
+      description: "within",
+      prompt: "within",
+      agent: "explore",
+      status: "running",
+      startedAt: new Date(Date.now() - 45 * 60 * 1000),
+    }
+    tasks.set("within-ttl-task", task)
+
+    const pruned: string[] = []
+    const notifications = new Map<string, BackgroundTask[]>()
+
+    //#when
+    pruneStaleTasksAndNotifications({
+      tasks,
+      notifications,
+      taskTtlMs: 60 * 60 * 1000,
+      onTaskPruned: (taskId) => pruned.push(taskId),
+    })
+
+    //#then
+    expect(pruned).toEqual([])
+  })
+
   it("should prune terminal tasks when completion time exceeds terminal TTL", () => {
     //#given
     const tasks = new Map<string, BackgroundTask>()

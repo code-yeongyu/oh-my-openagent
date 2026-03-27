@@ -27,8 +27,10 @@ export function pruneStaleTasksAndNotifications(args: {
   tasks: Map<string, BackgroundTask>
   notifications: Map<string, BackgroundTask[]>
   onTaskPruned: (taskId: string, task: BackgroundTask, errorMessage: string) => void
+  taskTtlMs?: number
 }): void {
   const { tasks, notifications, onTaskPruned } = args
+  const effectiveTtl = args.taskTtlMs ?? TASK_TTL_MS
   const now = Date.now()
   const tasksWithPendingNotifications = new Set<string>()
 
@@ -53,18 +55,22 @@ export function pruneStaleTasksAndNotifications(args: {
       continue
     }
 
+    const lastActivity = task.status === "running" && task.progress?.lastUpdate
+      ? task.progress.lastUpdate.getTime()
+      : undefined
     const timestamp = task.status === "pending"
       ? task.queuedAt?.getTime()
-      : task.startedAt?.getTime()
+      : (lastActivity ?? task.startedAt?.getTime())
 
     if (!timestamp) continue
 
     const age = now - timestamp
-    if (age <= TASK_TTL_MS) continue
+    if (age <= effectiveTtl) continue
 
+    const ttlMinutes = Math.round(effectiveTtl / 60000)
     const errorMessage = task.status === "pending"
-      ? "Task timed out while queued (30 minutes)"
-      : "Task timed out after 30 minutes"
+      ? `Task timed out while queued (${ttlMinutes} minutes)`
+      : `Task timed out after ${ttlMinutes} minutes of inactivity`
 
     onTaskPruned(taskId, task, errorMessage)
   }
@@ -78,7 +84,7 @@ export function pruneStaleTasksAndNotifications(args: {
     const validNotifications = queued.filter((task) => {
       if (!task.startedAt) return false
       const age = now - task.startedAt.getTime()
-      return age <= TASK_TTL_MS
+      return age <= effectiveTtl
     })
 
     if (validNotifications.length === 0) {

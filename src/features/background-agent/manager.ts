@@ -1751,6 +1751,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
     pruneStaleTasksAndNotifications({
       tasks: this.tasks,
       notifications: this.notifications,
+      taskTtlMs: this.config?.taskTtlMs,
       onTaskPruned: (taskId, task, errorMessage) => {
         const wasPending = task.status === "pending"
         log("[background-agent] Pruning stale task:", { taskId, status: task.status, age: Math.round(((wasPending ? task.queuedAt?.getTime() : task.startedAt?.getTime()) ? (Date.now() - (wasPending ? task.queuedAt!.getTime() : task.startedAt!.getTime())) : 0) / 1000) + "s" })
