@@ -11,12 +11,23 @@ export function getMainSessionID(): string | undefined {
   return _mainSessionID
 }
 
+const registeredAgentNames = new Set<string>()
+
+export function registerAgentName(name: string): void {
+  registeredAgentNames.add(name.toLowerCase())
+}
+
+export function isAgentRegistered(name: string): boolean {
+  return registeredAgentNames.has(name.toLowerCase())
+}
+
 /** @internal For testing only */
 export function _resetForTesting(): void {
   _mainSessionID = undefined
   subagentSessions.clear()
   syncSubagentSessions.clear()
   sessionAgentMap.clear()
+  registeredAgentNames.clear()
 }
 
 const sessionAgentMap = new Map<string, string>()

@@ -4,6 +4,7 @@ import type { OhMyOpenCodeConfig } from "../config";
 import { log, migrateAgentConfig } from "../shared";
 import { AGENT_NAME_MAP } from "../shared/migration";
 import { getAgentDisplayName } from "../shared/agent-display-names";
+import { registerAgentName } from "../features/claude-code-session-state";
 import {
   discoverConfigSourceSkills,
   discoverGlobalAgentsSkills,
@@ -292,6 +293,9 @@ export async function applyAgentConfig(params: {
   }
 
   const agentResult = params.config.agent as Record<string, unknown>;
+  for (const name of Object.keys(agentResult)) {
+    registerAgentName(name);
+  }
   log("[config-handler] agents loaded", { agentKeys: Object.keys(agentResult) });
   return agentResult;
 }
