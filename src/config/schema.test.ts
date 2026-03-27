@@ -969,6 +969,45 @@ describe("GitMasterConfigSchema", () => {
   })
 })
 
+describe("OhMyOpenCodeConfigSchema - git_master defaults (#2040)", () => {
+  test("git_master defaults are applied when section is missing from config", () => {
+    //#given
+    const config = {}
+
+    //#when
+    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.git_master).toBeDefined()
+      expect(result.data.git_master.commit_footer).toBe(true)
+      expect(result.data.git_master.include_co_authored_by).toBe(true)
+      expect(result.data.git_master.git_env_prefix).toBe("GIT_MASTER=1")
+    }
+  })
+
+  test("git_master respects explicit false values", () => {
+    //#given
+    const config = {
+      git_master: {
+        commit_footer: false,
+        include_co_authored_by: false,
+      },
+    }
+
+    //#when
+    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.git_master.commit_footer).toBe(false)
+      expect(result.data.git_master.include_co_authored_by).toBe(false)
+    }
+  })
+})
+
 describe("skills schema", () => {
   test("accepts skills.sources configuration", () => {
     //#given
