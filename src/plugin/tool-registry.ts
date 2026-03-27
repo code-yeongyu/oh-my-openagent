@@ -114,7 +114,8 @@ export function createToolRegistry(args: {
     gitMasterConfig: pluginConfig.git_master,
   })
 
-  const taskSystemEnabled = pluginConfig.experimental?.task_system ?? false
+  // task_system defaults to true since v3.14 — delegation (oracle, subagents) requires it
+  const taskSystemEnabled = pluginConfig.experimental?.task_system ?? true
   const taskToolsRecord: Record<string, ToolDefinition> = taskSystemEnabled
     ? {
         task_create: createTaskCreateTool(pluginConfig, ctx),
