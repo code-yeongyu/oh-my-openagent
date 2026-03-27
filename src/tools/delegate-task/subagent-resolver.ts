@@ -53,6 +53,14 @@ Create the work plan directly - that's your job as the planning agent.`,
     }
   }
 
+  if (parentAgent && getAgentConfigKey(agentName) === getAgentConfigKey(parentAgent)) {
+    return {
+      agentToUse: "",
+      categoryModel: undefined,
+      error: `Cannot spawn "${agentName}" from within itself. Self-delegation creates infinite recursion. Use category-based delegation to spawn a Sisyphus-Junior worker instead (e.g., category="quick" or category="deep").`,
+    }
+  }
+
   let agentToUse = agentName
   let categoryModel: DelegatedModelConfig | undefined
   let fallbackChain: FallbackEntry[] | undefined = undefined

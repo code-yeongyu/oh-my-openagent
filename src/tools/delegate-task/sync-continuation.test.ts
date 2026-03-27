@@ -530,6 +530,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
       task: false,
       call_omo_agent: false,
       question: false,
+      switch_agent: false,
       write: false,
       edit: false,
     })
@@ -600,6 +601,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
       task: false,
       call_omo_agent: false,
       question: false,
+      switch_agent: false,
       write: false,
       edit: false,
     })
