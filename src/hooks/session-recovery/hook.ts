@@ -54,9 +54,25 @@ export function createSessionRecoveryHook(ctx: PluginInput, options?: SessionRec
     if (!errorType) return false
 
     const sessionID = info.sessionID
-    const assistantMsgID = info.id
+    let assistantMsgID = info.id
 
-    if (!sessionID || !assistantMsgID) return false
+    if (!sessionID) return false
+
+    if (!assistantMsgID) {
+      try {
+        const messagesResp = await ctx.client.session.messages({
+          path: { id: sessionID },
+          query: { directory: ctx.directory },
+        })
+        const msgs = (messagesResp as { data?: MessageData[] }).data
+        const lastAssistant = msgs?.findLast((m) => m.info?.role === "assistant" && m.info?.error)
+        assistantMsgID = lastAssistant?.info?.id
+      } catch {
+        log("[session-recovery] Failed to fetch messages for messageID fallback", { sessionID })
+      }
+    }
+
+    if (!assistantMsgID) return false
     if (processingErrors.has(assistantMsgID)) return false
     processingErrors.add(assistantMsgID)
 
