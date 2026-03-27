@@ -3,6 +3,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { subagentSessions, syncSubagentSessions } from "../../features/claude-code-session-state"
 import { clearSessionFallbackChain, setSessionFallbackChain } from "../../hooks/model-fallback/hook"
 import { getAgentToolRestrictions, log } from "../../shared"
+import type { DelegatedModelConfig } from "../../shared/model-resolution-types"
 import type { FallbackEntry } from "../../shared/model-requirements"
 import { waitForCompletion } from "./completion-poller"
 import { processMessages } from "./message-processor"
@@ -46,6 +47,7 @@ export async function executeSync(
   deps: ExecuteSyncDeps = defaultDeps,
   fallbackChain?: FallbackEntry[],
   spawnReservation?: SpawnReservation,
+  model?: DelegatedModelConfig,
 ): Promise<string> {
   let sessionID: string | undefined
   let createdSessionForExecution = false
@@ -88,6 +90,8 @@ export async function executeSync(
             question: false,
           },
           parts: [{ type: "text", text: args.prompt }],
+          ...(model ? { model: { providerID: model.providerID, modelID: model.modelID } } : {}),
+          ...(model?.variant ? { variant: model.variant } : {}),
         },
       })
     } catch (error) {

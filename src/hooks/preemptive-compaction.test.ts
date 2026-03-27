@@ -451,7 +451,9 @@ describe("preemptive-compaction", () => {
 
     expect(ctx.client.session.summarize).toHaveBeenCalledTimes(1)
 
-    // when - new message with high tokens (context grew after compaction)
+    // when - advance past the 60s cooldown window, then new message with high tokens
+    const originalNow = Date.now
+    Date.now = () => originalNow() + 61_000
     await hook.event({
       event: {
         type: "message.updated",
@@ -480,6 +482,7 @@ describe("preemptive-compaction", () => {
 
     // then - summarize should fire again
     expect(ctx.client.session.summarize).toHaveBeenCalledTimes(2)
+    Date.now = originalNow
   })
 
   // #given modelContextLimitsCache has model-specific limit (256k)

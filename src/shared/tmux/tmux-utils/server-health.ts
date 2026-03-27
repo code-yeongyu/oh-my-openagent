@@ -1,11 +1,20 @@
 let serverAvailable: boolean | null = null
 let serverCheckUrl: string | null = null
+let inProcessServerRunning = false
 
 function delay(milliseconds: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, milliseconds))
 }
 
+export function markServerRunningInProcess(): void {
+	inProcessServerRunning = true
+}
+
 export async function isServerRunning(serverUrl: string): Promise<boolean> {
+	if (inProcessServerRunning) {
+		return true
+	}
+
 	if (serverCheckUrl === serverUrl && serverAvailable === true) {
 		return true
 	}

@@ -9,7 +9,7 @@ import { buildEffectiveResolution, getEffectiveModel } from "./model-resolution-
 import type { AgentResolutionInfo, CategoryResolutionInfo, ModelResolutionInfo, OmoConfig } from "./model-resolution-types"
 
 function parseProviderModel(value: string): { providerID: string; modelID: string } | null {
-  const slashIndex = value.indexOf("/")
+  const slashIndex = value.lastIndexOf("/")
   if (slashIndex <= 0 || slashIndex === value.length - 1) {
     return null
   }

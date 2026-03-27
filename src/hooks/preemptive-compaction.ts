@@ -10,6 +10,7 @@ import { createPostCompactionDegradationMonitor } from "./preemptive-compaction-
 
 const PREEMPTIVE_COMPACTION_TIMEOUT_MS = 120_000
 const PREEMPTIVE_COMPACTION_THRESHOLD = 0.78
+const PREEMPTIVE_COMPACTION_COOLDOWN_MS = 60_000
 
 declare function setTimeout(handler: () => void, timeout?: number): unknown
 declare function clearTimeout(timeoutID: unknown): void
@@ -68,6 +69,7 @@ export function createPreemptiveCompactionHook(
 ) {
   const compactionInProgress = new Set<string>()
   const compactedSessions = new Set<string>()
+  const lastCompactionTime = new Map<string, number>()
   const tokenCache = new Map<string, CachedCompactionState>()
 
   const postCompactionMonitor = createPostCompactionDegradationMonitor({
@@ -84,6 +86,9 @@ export function createPreemptiveCompactionHook(
   ) => {
     const { sessionID } = input
     if (compactedSessions.has(sessionID) || compactionInProgress.has(sessionID)) return
+
+    const lastTime = lastCompactionTime.get(sessionID)
+    if (lastTime && Date.now() - lastTime < PREEMPTIVE_COMPACTION_COOLDOWN_MS) return
 
     const cached = tokenCache.get(sessionID)
     if (!cached) return
@@ -127,6 +132,7 @@ export function createPreemptiveCompactionHook(
       )
 
       compactedSessions.add(sessionID)
+      lastCompactionTime.set(sessionID, Date.now())
     } catch (error) {
       log("[preemptive-compaction] Compaction failed", { sessionID, error: String(error) })
     } finally {
@@ -142,6 +148,7 @@ export function createPreemptiveCompactionHook(
       if (sessionID) {
         compactionInProgress.delete(sessionID)
         compactedSessions.delete(sessionID)
+        lastCompactionTime.delete(sessionID)
         tokenCache.delete(sessionID)
         postCompactionMonitor.clear(sessionID)
       }
