@@ -2375,6 +2375,14 @@
       "created_at": "2026-03-28T17:46:50Z",
       "repoId": 1108837393,
       "pullRequestNo": 2919
+    },
+    {
+      "name": "lorenzo-dallamuta",
+      "id": 66994937,
+      "comment_id": 4148848505,
+      "created_at": "2026-03-28T21:30:15Z",
+      "repoId": 1108837393,
+      "pullRequestNo": 2925
     }
   ]
 }
