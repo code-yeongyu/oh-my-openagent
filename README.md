@@ -9,8 +9,10 @@
 
 <h1>Matrixx</h1>
 
+[![npm](https://img.shields.io/npm/v/opencode-matrixx.svg)](https://www.npmjs.com/package/opencode-matrixx)
+
 **Multi-model agent orchestration for [OpenCode](https://github.com/sst/opencode).**<br/>
-**12 specialized agents. 41 lifecycle hooks. 25+ tools. One plugin.**
+**13 specialized agents. 41 lifecycle hooks. 25+ tools. One plugin.**
 
 *Use your existing ChatGPT, Claude, and Gemini subscriptions. OpenCode covers them all.*
 
@@ -30,7 +32,7 @@ Matrixx turns a single agent into a **coordinated team** — each model doing wh
 
 | Problem | Matrixx Solution |
 |---------|------------------|
-| One model does everything poorly | **12 specialists** — right model for the right job |
+| One model does everything poorly | **13 specialists** — right model for the right job |
 | Agent forgets what it was doing | **Todo Continuation** — forces completion, no exceptions |
 | Slow sequential tool calls | **Parallel background agents** — 5+ running simultaneously |
 | AI-generated code looks like AI | **Comment Checker** — code indistinguishable from human-written |
@@ -127,7 +129,7 @@ Every agent, model, temperature, and permission is fully customizable. [**Meet t
 
 | | |
 |---|---|
-| **Agent Orchestration** | 12 agents, parallel background execution, category-based routing, session continuity |
+| **Agent Orchestration** | 13 agents, parallel background execution, category-based routing, session continuity |
 | **Developer Tools** | LSP (goto def, rename, diagnostics), AST-Grep (search & replace), Tmux terminal |
 | **41 Lifecycle Hooks** | Context injection, think mode, comment checking, todo enforcement, error recovery |
 | **36 Built-in Skills** | DSL engineering (11), research & leadership (12), security (9), browser, git, frontend |
@@ -186,14 +188,22 @@ Sentinel never modifies code — it reports findings with CWE IDs, exact locatio
 
 ## Get Started
 
-**For humans** — paste this into Claude Code, AmpCode, Cursor, or any LLM agent:
+### Install
+
+```bash
+npm install -g opencode-matrixx
+```
+
+### Via LLM agent
+
+Paste this into Claude Code, AmpCode, Cursor, or any LLM agent:
 
 ```
 Install and configure matrixx by following the instructions here:
 https://raw.githubusercontent.com/klpanagi/matrixx/refs/heads/dev/docs/guide/installation.md
 ```
 
-**For LLM agents** — fetch and follow:
+**For LLM agents** — fetch and follow directly:
 
 ```bash
 curl -s https://raw.githubusercontent.com/klpanagi/matrixx/refs/heads/dev/docs/guide/installation.md
@@ -216,6 +226,8 @@ We strongly recommend letting an agent handle installation. [Manual guide &rarr;
 | [Categories & Skills](docs/category-skill-guide.md) | Task categories, skill injection, delegation patterns |
 
 ---
+
+If this saves you time, a ⭐ goes a long way.
 
 **Curious about the philosophy?** Read the [Ultrawork Manifesto](docs/ultrawork-manifesto.md) — originally authored by [code-yeongyu](https://github.com/code-yeongyu), the creator of oh-my-opencode.
 
