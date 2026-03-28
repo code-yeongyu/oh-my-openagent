@@ -72,8 +72,9 @@ export function createAnthropicContextWindowLimitRecoveryHook(
         }
 
         const lastAssistant = await getLastAssistant(sessionID, ctx.client, ctx.directory)
-        const providerID = parsed.providerID ?? (lastAssistant?.providerID as string | undefined)
-        const modelID = parsed.modelID ?? (lastAssistant?.modelID as string | undefined)
+        const lastAssistantInfo = lastAssistant?.info
+        const providerID = parsed.providerID ?? (lastAssistantInfo?.providerID as string | undefined)
+        const modelID = parsed.modelID ?? (lastAssistantInfo?.modelID as string | undefined)
 
         await ctx.client.tui
           .showToast({
@@ -136,14 +137,15 @@ export function createAnthropicContextWindowLimitRecoveryHook(
 
       const errorData = autoCompactState.errorDataBySession.get(sessionID)
       const lastAssistant = await getLastAssistant(sessionID, ctx.client, ctx.directory)
+      const lastAssistantInfo = lastAssistant?.info
 
-      if (lastAssistant?.summary === true) {
+      if (lastAssistantInfo?.summary === true && lastAssistant?.hasContent) {
         autoCompactState.pendingCompact.delete(sessionID)
         return
       }
 
-      const providerID = errorData?.providerID ?? (lastAssistant?.providerID as string | undefined)
-      const modelID = errorData?.modelID ?? (lastAssistant?.modelID as string | undefined)
+      const providerID = errorData?.providerID ?? (lastAssistantInfo?.providerID as string | undefined)
+      const modelID = errorData?.modelID ?? (lastAssistantInfo?.modelID as string | undefined)
 
       await ctx.client.tui
         .showToast({
