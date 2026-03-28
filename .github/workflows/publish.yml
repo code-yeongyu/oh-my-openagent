@@ -50,7 +50,6 @@ jobs:
           # These files use mock.module() which pollutes module cache
           # Run them in separate processes to prevent cross-file contamination
           bun test src/plugin-handlers
-          bun test src/hooks/atlas
           bun test src/hooks/compaction-context-injector
           bun test src/features/tmux-subagent
           bun test src/cli/doctor/formatter.test.ts
@@ -72,19 +71,13 @@ jobs:
             src/cli/config-manager.test.ts \
             src/cli/doctor/runner.test.ts src/cli/doctor/checks \
             src/tools/ast-grep src/tools/background-task src/tools/delegate-task \
-            src/tools/glob src/tools/grep src/tools/interactive-bash \
+            src/tools/glob src/tools/grep src/tools/hashline-edit src/tools/interactive-bash \
             src/tools/look-at src/tools/lsp src/tools/session-manager \
             src/tools/skill src/tools/skill-mcp src/tools/slashcommand src/tools/task \
             src/tools/call-omo-agent/background-agent-executor.test.ts \
             src/tools/call-omo-agent/background-executor.test.ts \
             src/tools/call-omo-agent/subagent-session-creator.test.ts \
-            src/hooks/anthropic-context-window-limit-recovery \
-            src/hooks/claude-code-compatibility \
-            src/hooks/context-injection \
-            src/hooks/provider-toast \
-            src/hooks/session-notification \
-            src/hooks/sisyphus \
-            src/hooks/todo-continuation-enforcer \
+            src/hooks \
             src/features/background-agent \
             src/features/builtin-commands \
             src/features/builtin-skills \
