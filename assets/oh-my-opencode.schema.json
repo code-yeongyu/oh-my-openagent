@@ -4261,8 +4261,15 @@
         },
         "replace_plan": {
           "type": "boolean"
+        },
+        "tdd": {
+          "default": true,
+          "type": "boolean"
         }
       },
+      "required": [
+        "tdd"
+      ],
       "additionalProperties": false
     },
     "comment_checker": {
@@ -4885,6 +4892,11 @@
       "additionalProperties": false
     },
     "git_master": {
+      "default": {
+        "commit_footer": true,
+        "include_co_authored_by": true,
+        "git_env_prefix": "GIT_MASTER=1"
+      },
       "type": "object",
       "properties": {
         "commit_footer": {
@@ -5035,5 +5047,8 @@
       }
     }
   },
+  "required": [
+    "git_master"
+  ],
   "additionalProperties": false
 }
