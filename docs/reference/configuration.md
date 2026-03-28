@@ -43,17 +43,24 @@ Complete reference for Oh My OpenCode plugin configuration. During the rename tr
 
 ### File Locations
 
-User config is loaded first, then project config overrides it. In each directory, the compatibility layer recognizes both the renamed and legacy basenames.
+User config is loaded first, then project config overrides it. In each directory, the compatibility layer recognizes both the canonical and legacy basenames.
 
 1. Project config: `.opencode/oh-my-openagent.json[c]` or `.opencode/oh-my-opencode.json[c]`
 2. User config (`.jsonc` preferred over `.json`):
 
-| Platform    | Path candidates |
-| ----------- | --------------- |
+| Platform    | Path candidates                                                                           |
+| ----------- | ----------------------------------------------------------------------------------------- |
 | macOS/Linux | `~/.config/opencode/oh-my-openagent.json[c]`, `~/.config/opencode/oh-my-opencode.json[c]` |
 | Windows     | `%APPDATA%\opencode\oh-my-openagent.json[c]`, `%APPDATA%\opencode\oh-my-opencode.json[c]` |
 
-**Rename compatibility:** The published package and CLI binary remain `oh-my-opencode`. OpenCode plugin registration prefers `oh-my-openagent`, while legacy `oh-my-opencode` entries and config basenames still load during the transition. Config detection checks `oh-my-opencode` before `oh-my-openagent`, so if both plugin config basenames exist in the same directory, the legacy `oh-my-opencode.*` file currently wins.
+**Canonical contract:** The published package and CLI binary remain `oh-my-opencode`, but the canonical plugin config filename is `oh-my-openagent.jsonc`.
+
+- Per directory precedence is `oh-my-openagent.jsonc` → `oh-my-openagent.json` → `oh-my-opencode.jsonc` → `oh-my-opencode.json`
+- If canonical and legacy config files coexist, the canonical file wins
+- Legacy `oh-my-opencode.*` files and plain `.json` files remain compatibility inputs during the transition
+- Project config still overrides user config after each layer resolves its winning file
+
+If you run `bunx oh-my-opencode install`, the installer writes the canonical config path and keeps legacy files readable for compatibility.
 JSONC supports `// line comments`, `/* block comments */`, and trailing commas.
 
 Enable schema autocomplete:
@@ -163,26 +170,26 @@ Core agents receive an injected runtime `order` field for deterministic Tab cycl
 
 #### Agent Options
 
-| Option            | Type           | Description                                                     |
-| ----------------- | -------------- | --------------------------------------------------------------- |
-| `model`           | string         | Model override (`provider/model`)                               |
-| `fallback_models` | string\|array  | Fallback models on API errors. Supports strings or mixed arrays of strings and object entries with per-model settings |
-| `temperature`     | number         | Sampling temperature                                            |
-| `top_p`           | number         | Top-p sampling                                                  |
-| `prompt`          | string         | Replace system prompt. Supports `file://` URIs                  |
-| `prompt_append`   | string         | Append to system prompt. Supports `file://` URIs                |
-| `tools`           | array         | Allowed tools list                                     |
-| `disable`         | boolean       | Disable this agent                                     |
-| `mode`            | string        | Agent mode                                             |
-| `color`           | string        | UI color                                               |
-| `permission`      | object        | Per-tool permissions (see below)                       |
-| `category`        | string        | Inherit model from category                            |
-| `variant`         | string        | Model variant: `max`, `high`, `medium`, `low`, `xhigh`. Normalized to supported values |
-| `maxTokens`       | number        | Max response tokens                                    |
-| `thinking`        | object        | Anthropic extended thinking                            |
-| `reasoningEffort` | string        | OpenAI reasoning: `none`, `minimal`, `low`, `medium`, `high`, `xhigh`. Normalized to supported values |
-| `textVerbosity`   | string        | Text verbosity: `low`, `medium`, `high`                |
-| `providerOptions` | object        | Provider-specific options                              |
+| Option            | Type          | Description                                                                                                           |
+| ----------------- | ------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `model`           | string        | Model override (`provider/model`)                                                                                     |
+| `fallback_models` | string\|array | Fallback models on API errors. Supports strings or mixed arrays of strings and object entries with per-model settings |
+| `temperature`     | number        | Sampling temperature                                                                                                  |
+| `top_p`           | number        | Top-p sampling                                                                                                        |
+| `prompt`          | string        | Replace system prompt. Supports `file://` URIs                                                                        |
+| `prompt_append`   | string        | Append to system prompt. Supports `file://` URIs                                                                      |
+| `tools`           | array         | Allowed tools list                                                                                                    |
+| `disable`         | boolean       | Disable this agent                                                                                                    |
+| `mode`            | string        | Agent mode                                                                                                            |
+| `color`           | string        | UI color                                                                                                              |
+| `permission`      | object        | Per-tool permissions (see below)                                                                                      |
+| `category`        | string        | Inherit model from category                                                                                           |
+| `variant`         | string        | Model variant: `max`, `high`, `medium`, `low`, `xhigh`. Normalized to supported values                                |
+| `maxTokens`       | number        | Max response tokens                                                                                                   |
+| `thinking`        | object        | Anthropic extended thinking                                                                                           |
+| `reasoningEffort` | string        | OpenAI reasoning: `none`, `minimal`, `low`, `medium`, `high`, `xhigh`. Normalized to supported values                 |
+| `textVerbosity`   | string        | Text verbosity: `low`, `medium`, `high`                                                                               |
+| `providerOptions` | object        | Provider-specific options                                                                                             |
 
 #### Anthropic Extended Thinking
 
@@ -220,7 +227,6 @@ Control what tools an agent can use:
 | `doom_loop`          | `ask` / `allow` / `deny`                                                    |
 | `external_directory` | `ask` / `allow` / `deny`                                                    |
 
-
 #### Fallback Models with Per-Model Settings
 
 `fallback_models` accepts either a single model string or an array. Array entries can be plain strings or objects with individual model settings:
@@ -237,15 +243,15 @@ Control what tools an agent can use:
         {
           "model": "google/gemini-3.1-pro",
           "variant": "high",
-          "temperature": 0.2
+          "temperature": 0.2,
         },
         {
           "model": "anthropic/claude-sonnet-4-6",
-          "thinking": { "type": "enabled", "budgetTokens": 64000 }
-        }
-      ]
-    }
-  }
+          "thinking": { "type": "enabled", "budgetTokens": 64000 },
+        },
+      ],
+    },
+  },
 }
 ```
 
@@ -259,21 +265,21 @@ Both `prompt` and `prompt_append` support loading content from files via `file:/
 {
   "agents": {
     "sisyphus": {
-      "prompt_append": "file:///absolute/path/to/prompt.txt"
+      "prompt_append": "file:///absolute/path/to/prompt.txt",
     },
     "oracle": {
-      "prompt": "file://./relative/to/project/prompt.md"
+      "prompt": "file://./relative/to/project/prompt.md",
     },
     "explore": {
-      "prompt_append": "file://~/home/dir/prompt.txt"
-    }
+      "prompt_append": "file://~/home/dir/prompt.txt",
+    },
   },
   "categories": {
     "custom": {
       "model": "anthropic/claude-sonnet-4-6",
-      "prompt_append": "file://./category-context.md"
-    }
-  }
+      "prompt_append": "file://./category-context.md",
+    },
+  },
 }
 ```
 
@@ -285,36 +291,36 @@ Domain-specific model delegation used by the `task()` tool. When Sisyphus delega
 
 #### Built-in Categories
 
-| Category             | Default Model                   | Description                                    |
-| -------------------- | ------------------------------- | ---------------------------------------------- |
-| `visual-engineering` | `google/gemini-3.1-pro` (high)  | Frontend, UI/UX, design, animation             |
-| `ultrabrain`         | `openai/gpt-5.4` (xhigh)        | Deep logical reasoning, complex architecture   |
-| `deep`               | `openai/gpt-5.3-codex` (medium) | Autonomous problem-solving, thorough research  |
-| `artistry`           | `google/gemini-3.1-pro` (high)  | Creative/unconventional approaches             |
-| `quick`              | `openai/gpt-5.4-mini`           | Trivial tasks, typo fixes, single-file changes |
-| `unspecified-low`    | `anthropic/claude-sonnet-4-6`   | General tasks, low effort                      |
-| `unspecified-high`   | `anthropic/claude-opus-4-6` (max) | General tasks, high effort                   |
-| `writing`            | `google/gemini-3-flash`         | Documentation, prose, technical writing        |
+| Category             | Default Model                     | Description                                    |
+| -------------------- | --------------------------------- | ---------------------------------------------- |
+| `visual-engineering` | `google/gemini-3.1-pro` (high)    | Frontend, UI/UX, design, animation             |
+| `ultrabrain`         | `openai/gpt-5.4` (xhigh)          | Deep logical reasoning, complex architecture   |
+| `deep`               | `openai/gpt-5.3-codex` (medium)   | Autonomous problem-solving, thorough research  |
+| `artistry`           | `google/gemini-3.1-pro` (high)    | Creative/unconventional approaches             |
+| `quick`              | `openai/gpt-5.4-mini`             | Trivial tasks, typo fixes, single-file changes |
+| `unspecified-low`    | `anthropic/claude-sonnet-4-6`     | General tasks, low effort                      |
+| `unspecified-high`   | `anthropic/claude-opus-4-6` (max) | General tasks, high effort                     |
+| `writing`            | `google/gemini-3-flash`           | Documentation, prose, technical writing        |
 
 > **Note**: Built-in defaults only apply if the category is present in your config. Otherwise the system default model is used.
 
 #### Category Options
 
-| Option              | Type          | Default | Description                                                         |
-| ------------------- | ------------- | ------- | ------------------------------------------------------------------- |
-| `model`             | string        | -       | Model override                                                      |
+| Option              | Type          | Default | Description                                                                                                           |
+| ------------------- | ------------- | ------- | --------------------------------------------------------------------------------------------------------------------- |
+| `model`             | string        | -       | Model override                                                                                                        |
 | `fallback_models`   | string\|array | -       | Fallback models on API errors. Supports strings or mixed arrays of strings and object entries with per-model settings |
-| `temperature`       | number        | -       | Sampling temperature                                                |
-| `top_p`             | number        | -       | Top-p sampling                                                      |
-| `maxTokens`         | number        | -       | Max response tokens                                                 |
-| `thinking`          | object        | -       | Anthropic extended thinking                                         |
-| `reasoningEffort`   | string        | -       | OpenAI reasoning effort. Unsupported values are normalized          |
-| `textVerbosity`     | string        | -       | Text verbosity                                                      |
-| `tools`             | array         | -       | Allowed tools                                                       |
-| `prompt_append`     | string        | -       | Append to system prompt                                             |
-| `variant`           | string        | -       | Model variant. Unsupported values are normalized                    |
-| `description`       | string        | -       | Shown in `task()` tool prompt                                       |
-| `is_unstable_agent` | boolean       | `false` | Force background mode + monitoring. Auto-enabled for Gemini models. |
+| `temperature`       | number        | -       | Sampling temperature                                                                                                  |
+| `top_p`             | number        | -       | Top-p sampling                                                                                                        |
+| `maxTokens`         | number        | -       | Max response tokens                                                                                                   |
+| `thinking`          | object        | -       | Anthropic extended thinking                                                                                           |
+| `reasoningEffort`   | string        | -       | OpenAI reasoning effort. Unsupported values are normalized                                                            |
+| `textVerbosity`     | string        | -       | Text verbosity                                                                                                        |
+| `tools`             | array         | -       | Allowed tools                                                                                                         |
+| `prompt_append`     | string        | -       | Append to system prompt                                                                                               |
+| `variant`           | string        | -       | Model variant. Unsupported values are normalized                                                                      |
+| `description`       | string        | -       | Shown in `task()` tool prompt                                                                                         |
+| `is_unstable_agent` | boolean       | `false` | Force background mode + monitoring. Auto-enabled for Gemini models.                                                   |
 
 Disable categories: `{ "disabled_categories": ["ultrabrain"] }`
 
@@ -343,6 +349,7 @@ Normalized fields:
 - `thinking` - removed if the target model does not support thinking
 
 Examples:
+
 - Claude models do not support `reasoningEffort` - it is removed automatically
 - GPT-4.1 does not support reasoning - `reasoningEffort` is removed
 - o-series models support `none` through `high` - `xhigh` is downgraded to `high`
@@ -350,34 +357,33 @@ Examples:
 
 Capability data comes from provider runtime metadata first. OmO also ships bundled models.dev-backed capability data, supports a refreshable local models.dev cache, and falls back to heuristic family detection plus alias rules when exact metadata is unavailable. `bunx oh-my-opencode doctor` surfaces capability diagnostics and warns when a configured model relies on compatibility fallback.
 
-
 #### Agent Provider Chains
 
-| Agent                 | Default Model       | Provider Priority                                                            |
-| --------------------- | ------------------- | ---------------------------------------------------------------------------- |
+| Agent                 | Default Model       | Provider Priority                                                                                                    |
+| --------------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------- |
 | **Sisyphus**          | `claude-opus-4-6`   | `claude-opus-4-6 (max)` → `kimi-k2.5` via OpenCode Go / Kimi providers → `gpt-5.4 (medium)` → `glm-5` → `big-pickle` |
-| **Hephaestus**        | `gpt-5.4`           | `gpt-5.4 (medium)`                                                           |
-| **oracle**            | `gpt-5.4`           | `gpt-5.4 (high)` → `gemini-3.1-pro (high)` → `claude-opus-4-6 (max)` → `glm-5` |
-| **librarian**         | `minimax-m2.7`      | `opencode-go/minimax-m2.7` → `opencode/minimax-m2.5` → `claude-haiku-4-5` → `gpt-5-nano` |
-| **explore**           | `grok-code-fast-1`  | `grok-code-fast-1` → `opencode-go/minimax-m2.7` → `opencode/minimax-m2.5` → `claude-haiku-4-5` → `gpt-5-nano` |
-| **multimodal-looker** | `gpt-5.4`           | `gpt-5.4 (medium)` → `kimi-k2.5` → `glm-4.6v` → `gpt-5-nano`                |
-| **Prometheus**        | `claude-opus-4-6`   | `claude-opus-4-6 (max)` → `gpt-5.4 (high)` → `glm-5` → `gemini-3.1-pro`     |
-| **Metis**             | `claude-opus-4-6`   | `claude-opus-4-6 (max)` → `gpt-5.4 (high)` → `glm-5` → `k2p5`               |
-| **Momus**             | `gpt-5.4`           | `gpt-5.4 (xhigh)` → `claude-opus-4-6 (max)` → `gemini-3.1-pro (high)` → `glm-5` |
-| **Atlas**             | `claude-sonnet-4-6` | `claude-sonnet-4-6` → `kimi-k2.5` → `gpt-5.4 (medium)` → `minimax-m2.7`     |
+| **Hephaestus**        | `gpt-5.4`           | `gpt-5.4 (medium)`                                                                                                   |
+| **oracle**            | `gpt-5.4`           | `gpt-5.4 (high)` → `gemini-3.1-pro (high)` → `claude-opus-4-6 (max)` → `glm-5`                                       |
+| **librarian**         | `minimax-m2.7`      | `opencode-go/minimax-m2.7` → `opencode/minimax-m2.5` → `claude-haiku-4-5` → `gpt-5-nano`                             |
+| **explore**           | `grok-code-fast-1`  | `grok-code-fast-1` → `opencode-go/minimax-m2.7` → `opencode/minimax-m2.5` → `claude-haiku-4-5` → `gpt-5-nano`        |
+| **multimodal-looker** | `gpt-5.4`           | `gpt-5.4 (medium)` → `kimi-k2.5` → `glm-4.6v` → `gpt-5-nano`                                                         |
+| **Prometheus**        | `claude-opus-4-6`   | `claude-opus-4-6 (max)` → `gpt-5.4 (high)` → `glm-5` → `gemini-3.1-pro`                                              |
+| **Metis**             | `claude-opus-4-6`   | `claude-opus-4-6 (max)` → `gpt-5.4 (high)` → `glm-5` → `k2p5`                                                        |
+| **Momus**             | `gpt-5.4`           | `gpt-5.4 (xhigh)` → `claude-opus-4-6 (max)` → `gemini-3.1-pro (high)` → `glm-5`                                      |
+| **Atlas**             | `claude-sonnet-4-6` | `claude-sonnet-4-6` → `kimi-k2.5` → `gpt-5.4 (medium)` → `minimax-m2.7`                                              |
 
 #### Category Provider Chains
 
-| Category               | Default Model       | Provider Priority                                              |
-| ---------------------- | ------------------- | -------------------------------------------------------------- |
-| **visual-engineering** | `gemini-3.1-pro`    | `gemini-3.1-pro` → `glm-5` → `claude-opus-4-6`                 |
-| **ultrabrain**         | `gpt-5.4`           | `gpt-5.4` → `gemini-3.1-pro` → `claude-opus-4-6`               |
-| **deep**               | `gpt-5.3-codex`     | `gpt-5.3-codex` → `claude-opus-4-6` → `gemini-3.1-pro`         |
-| **artistry**           | `gemini-3.1-pro`    | `gemini-3.1-pro` → `claude-opus-4-6` → `gpt-5.4`               |
-| **quick**              | `gpt-5.4-mini`    | `gpt-5.4-mini` → `claude-haiku-4-5` → `gemini-3-flash` → `minimax-m2.7` → `gpt-5-nano` |
-| **unspecified-low**    | `claude-sonnet-4-6` | `claude-sonnet-4-6` → `gpt-5.3-codex` → `gemini-3-flash` → `minimax-m2.7` |
-| **unspecified-high**   | `claude-opus-4-6`   | `claude-opus-4-6` → `gpt-5.4 (high)` → `glm-5` → `k2p5` → `kimi-k2.5` |
-| **writing**            | `gemini-3-flash`    | `gemini-3-flash` → `claude-sonnet-4-6` → `minimax-m2.7`        |
+| Category               | Default Model       | Provider Priority                                                                      |
+| ---------------------- | ------------------- | -------------------------------------------------------------------------------------- |
+| **visual-engineering** | `gemini-3.1-pro`    | `gemini-3.1-pro` → `glm-5` → `claude-opus-4-6`                                         |
+| **ultrabrain**         | `gpt-5.4`           | `gpt-5.4` → `gemini-3.1-pro` → `claude-opus-4-6`                                       |
+| **deep**               | `gpt-5.3-codex`     | `gpt-5.3-codex` → `claude-opus-4-6` → `gemini-3.1-pro`                                 |
+| **artistry**           | `gemini-3.1-pro`    | `gemini-3.1-pro` → `claude-opus-4-6` → `gpt-5.4`                                       |
+| **quick**              | `gpt-5.4-mini`      | `gpt-5.4-mini` → `claude-haiku-4-5` → `gemini-3-flash` → `minimax-m2.7` → `gpt-5-nano` |
+| **unspecified-low**    | `claude-sonnet-4-6` | `claude-sonnet-4-6` → `gpt-5.3-codex` → `gemini-3-flash` → `minimax-m2.7`              |
+| **unspecified-high**   | `claude-opus-4-6`   | `claude-opus-4-6` → `gpt-5.4 (high)` → `glm-5` → `k2p5` → `kimi-k2.5`                  |
+| **writing**            | `gemini-3-flash`    | `gemini-3-flash` → `claude-sonnet-4-6` → `minimax-m2.7`                                |
 
 Run `bunx oh-my-opencode doctor --verbose` to see effective model resolution for your config.
 
@@ -472,10 +478,7 @@ Disable built-in skills: `{ "disabled_skills": ["playwright"] }`
 ```json
 {
   "skills": {
-    "sources": [
-      { "path": "./my-skills", "recursive": true },
-      "https://example.com/skill.yaml"
-    ],
+    "sources": [{ "path": "./my-skills", "recursive": true }, "https://example.com/skill.yaml"],
     "enable": ["my-skill"],
     "disable": ["other-skill"],
     "my-skill": {
@@ -724,23 +727,23 @@ Mixed arrays are allowed, so string entries and object entries can appear togeth
 
 Object entries use the following shape:
 
-| Field | Type | Description |
-| ----- | ---- | ----------- |
-| `model` | string | Fallback model ID. Provider prefix is optional when OmO can inherit the current/default provider. |
-| `variant` | string | Explicit variant override for this fallback entry. |
-| `reasoningEffort` | string | OpenAI reasoning effort override for this fallback entry. |
-| `temperature` | number | Temperature applied if this fallback model becomes active. |
-| `top_p` | number | Top-p applied if this fallback model becomes active. |
-| `maxTokens` | number | Max response tokens applied if this fallback model becomes active. |
-| `thinking` | object | Anthropic thinking config applied if this fallback model becomes active. |
+| Field             | Type   | Description                                                                                       |
+| ----------------- | ------ | ------------------------------------------------------------------------------------------------- |
+| `model`           | string | Fallback model ID. Provider prefix is optional when OmO can inherit the current/default provider. |
+| `variant`         | string | Explicit variant override for this fallback entry.                                                |
+| `reasoningEffort` | string | OpenAI reasoning effort override for this fallback entry.                                         |
+| `temperature`     | number | Temperature applied if this fallback model becomes active.                                        |
+| `top_p`           | number | Top-p applied if this fallback model becomes active.                                              |
+| `maxTokens`       | number | Max response tokens applied if this fallback model becomes active.                                |
+| `thinking`        | object | Anthropic thinking config applied if this fallback model becomes active.                          |
 
 Per-model settings are **fallback-only**. They are promoted only when that specific fallback model is actually selected, so they do not override your primary model settings when the primary model resolves successfully.
 
 `thinking` uses the same shape as the normal agent/category option:
 
-| Field | Type | Description |
-| ----- | ---- | ----------- |
-| `type` | string | `enabled` or `disabled` |
+| Field          | Type   | Description                        |
+| -------------- | ------ | ---------------------------------- |
+| `type`         | string | `enabled` or `disabled`            |
 | `budgetTokens` | number | Optional Anthropic thinking budget |
 
 Object entries can also omit the provider prefix when OmO can infer it from the current/default provider. If you provide both inline variant syntax in `model` and an explicit `variant` field, the explicit `variant` field wins.
@@ -756,11 +759,7 @@ Use strings when you only need an ordered fallback chain:
   "agents": {
     "atlas": {
       "model": "anthropic/claude-sonnet-4-6",
-      "fallback_models": [
-        "anthropic/claude-haiku-4-5",
-        "openai/gpt-5.4",
-        "google/gemini-3.1-pro"
-      ]
+      "fallback_models": ["anthropic/claude-haiku-4-5", "openai/gpt-5.4", "google/gemini-3.1-pro"]
     }
   }
 }
@@ -888,17 +887,17 @@ OmO can refresh a local models.dev capability snapshot on startup. This cache is
     "enabled": true,
     "auto_refresh_on_start": true,
     "refresh_timeout_ms": 5000,
-    "source_url": "https://models.dev/api.json"
-  }
+    "source_url": "https://models.dev/api.json",
+  },
 }
 ```
 
-| Option | Default behavior | Description |
-| ------ | ---------------- | ----------- |
-| `enabled` | enabled unless explicitly set to `false` | Master switch for model capability refresh behavior |
+| Option                  | Default behavior                                    | Description                                              |
+| ----------------------- | --------------------------------------------------- | -------------------------------------------------------- |
+| `enabled`               | enabled unless explicitly set to `false`            | Master switch for model capability refresh behavior      |
 | `auto_refresh_on_start` | refresh on startup unless explicitly set to `false` | Refresh the local models.dev cache during startup checks |
-| `refresh_timeout_ms` | `5000` | Timeout for the startup refresh attempt |
-| `source_url` | `https://models.dev/api.json` | Override the models.dev source URL |
+| `refresh_timeout_ms`    | `5000`                                              | Timeout for the startup refresh attempt                  |
+| `source_url`            | `https://models.dev/api.json`                       | Override the models.dev source URL                       |
 
 Notes:
 
