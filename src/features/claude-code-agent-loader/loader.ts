@@ -1,62 +1,68 @@
-import { existsSync, readdirSync, readFileSync } from "fs"
-import { join, basename } from "path"
-import { parseFrontmatter } from "../../shared/frontmatter"
-import { isMarkdownFile } from "../../shared/file-utils"
-import { getClaudeConfigDir } from "../../shared"
-import type { AgentScope, AgentFrontmatter, ClaudeCodeAgentConfig, LoadedAgent } from "./types"
-import { mapClaudeModelToOpenCode } from "./claude-model-mapper"
+import { existsSync, readdirSync, readFileSync } from 'fs';
+import { basename, join } from 'path';
+import { getClaudeConfigDir } from '../../shared';
+import { isMarkdownFile } from '../../shared/file-utils';
+import { parseFrontmatter } from '../../shared/frontmatter';
+import { mapClaudeModelToOpenCode } from './claude-model-mapper';
+import type { AgentFrontmatter, AgentScope, ClaudeCodeAgentConfig, LoadedAgent } from './types';
 
-function parseToolsConfig(toolsStr?: string): Record<string, boolean> | undefined {
-  if (!toolsStr) return undefined
+function parseToolsConfig(tools?: string | string[]): Record<string, boolean> | undefined {
+  if (!tools) return undefined;
 
-  const tools = toolsStr.split(",").map((t) => t.trim()).filter(Boolean)
-  if (tools.length === 0) return undefined
+  const list = Array.isArray(tools)
+    ? tools.map((t) => t.trim()).filter(Boolean)
+    : tools
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean);
 
-  const result: Record<string, boolean> = {}
-  for (const tool of tools) {
-    result[tool.toLowerCase()] = true
+  if (list.length === 0) return undefined;
+
+  const result: Record<string, boolean> = {};
+  for (const tool of list) {
+    result[tool.toLowerCase()] = true;
   }
-  return result
+  return result;
 }
 
 function loadAgentsFromDir(agentsDir: string, scope: AgentScope): LoadedAgent[] {
   if (!existsSync(agentsDir)) {
-    return []
+    return [];
   }
 
-  const entries = readdirSync(agentsDir, { withFileTypes: true })
-  const agents: LoadedAgent[] = []
+  const entries = readdirSync(agentsDir, { withFileTypes: true });
+  const agents: LoadedAgent[] = [];
 
   for (const entry of entries) {
-    if (!isMarkdownFile(entry)) continue
+    if (!isMarkdownFile(entry)) continue;
 
-    const agentPath = join(agentsDir, entry.name)
-    const agentName = basename(entry.name, ".md")
+    const agentPath = join(agentsDir, entry.name);
+    const agentName = basename(entry.name, '.md');
 
     try {
-      const content = readFileSync(agentPath, "utf-8")
-      const { data, body } = parseFrontmatter<AgentFrontmatter>(content)
+      const content = readFileSync(agentPath, 'utf-8');
+      const { data, body } = parseFrontmatter<AgentFrontmatter>(content);
 
-       const name = data.name || agentName
-       const originalDescription = data.description || ""
+      const name = data.name || agentName;
+      const originalDescription = data.description || '';
 
-       const formattedDescription = `(${scope}) ${originalDescription}`
+      const formattedDescription = `(${scope}) ${originalDescription}`;
 
-       const mappedModelOverride = mapClaudeModelToOpenCode(data.model)
-       const modelString = mappedModelOverride
-         ? `${mappedModelOverride.providerID}/${mappedModelOverride.modelID}`
-         : undefined
+      const mappedModelOverride = mapClaudeModelToOpenCode(data.model);
+      const modelString = mappedModelOverride
+        ? `${mappedModelOverride.providerID}/${mappedModelOverride.modelID}`
+        : undefined;
 
-       const config: ClaudeCodeAgentConfig = {
-         description: formattedDescription,
-         mode: data.mode || "subagent",
-         prompt: body.trim(),
-         ...(modelString ? { model: modelString } : {}),
-       }
+      const config: ClaudeCodeAgentConfig = {
+        description: formattedDescription,
+        mode: data.mode || 'subagent',
+        prompt: body.trim(),
+        ...(modelString ? { model: modelString } : {}),
+      };
 
-       const toolsConfig = parseToolsConfig(data.tools)
+      const toolsConfig = parseToolsConfig(data.tools);
       if (toolsConfig) {
-        config.tools = toolsConfig
+        config.tools = toolsConfig;
       }
 
       agents.push({
@@ -64,33 +70,31 @@ function loadAgentsFromDir(agentsDir: string, scope: AgentScope): LoadedAgent[] 
         path: agentPath,
         config,
         scope,
-      })
-    } catch {
-      continue
-    }
+      });
+    } catch {}
   }
 
-  return agents
+  return agents;
 }
 
 export function loadUserAgents(): Record<string, ClaudeCodeAgentConfig> {
-  const userAgentsDir = join(getClaudeConfigDir(), "agents")
-  const agents = loadAgentsFromDir(userAgentsDir, "user")
+  const userAgentsDir = join(getClaudeConfigDir(), 'agents');
+  const agents = loadAgentsFromDir(userAgentsDir, 'user');
 
-  const result: Record<string, ClaudeCodeAgentConfig> = {}
+  const result: Record<string, ClaudeCodeAgentConfig> = {};
   for (const agent of agents) {
-    result[agent.name] = agent.config
+    result[agent.name] = agent.config;
   }
-  return result
+  return result;
 }
 
 export function loadProjectAgents(directory?: string): Record<string, ClaudeCodeAgentConfig> {
-  const projectAgentsDir = join(directory ?? process.cwd(), ".claude", "agents")
-  const agents = loadAgentsFromDir(projectAgentsDir, "project")
+  const projectAgentsDir = join(directory ?? process.cwd(), '.claude', 'agents');
+  const agents = loadAgentsFromDir(projectAgentsDir, 'project');
 
-  const result: Record<string, ClaudeCodeAgentConfig> = {}
+  const result: Record<string, ClaudeCodeAgentConfig> = {};
   for (const agent of agents) {
-    result[agent.name] = agent.config
+    result[agent.name] = agent.config;
   }
-  return result
+  return result;
 }
