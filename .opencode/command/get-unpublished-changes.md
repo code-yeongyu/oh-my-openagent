@@ -26,7 +26,7 @@ For each commit, you MUST:
 
 <version-context>
 <published-version>
-!`npm view oh-my-opencode version 2>/dev/null || echo "not published"`
+!`npm view matrixx version 2>/dev/null || echo "not published"`
 </published-version>
 <local-version>
 !`node -p "require('./package.json').version" 2>/dev/null || echo "unknown"`
@@ -38,13 +38,13 @@ For each commit, you MUST:
 
 <git-context>
 <commits-since-release>
-!`npm view oh-my-opencode version 2>/dev/null | xargs -I{} git log "v{}"..HEAD --oneline 2>/dev/null || echo "no commits since release"`
+!`npm view matrixx version 2>/dev/null | xargs -I{} git log "v{}"..HEAD --oneline 2>/dev/null || echo "no commits since release"`
 </commits-since-release>
 <diff-stat>
-!`npm view oh-my-opencode version 2>/dev/null | xargs -I{} git diff "v{}"..HEAD --stat 2>/dev/null || echo "no diff available"`
+!`npm view matrixx version 2>/dev/null | xargs -I{} git diff "v{}"..HEAD --stat 2>/dev/null || echo "no diff available"`
 </diff-stat>
 <files-changed-summary>
-!`npm view oh-my-opencode version 2>/dev/null | xargs -I{} git diff "v{}"..HEAD --stat 2>/dev/null | tail -1 || echo ""`
+!`npm view matrixx version 2>/dev/null | xargs -I{} git diff "v{}"..HEAD --stat 2>/dev/null | tail -1 || echo ""`
 </files-changed-summary>
 </git-context>
 

@@ -1,8 +1,8 @@
 >
-> [![Welcome to the Martix!](./.github/assets/orchestrator-architect.png?v=3)](https://github.com/code-yeongyu/oh-my-opencode/releases/tag/v3.0.0)
+> [![Welcome to the Matrix!](./.github/assets/orchestrator-architect.png?v=3)](https://github.com/klpanagi/matrixx)
 >
-> This project is based on oh-my-opencode!
-> Head to https://github.com/code-yeongyu/oh-my-opencode for more information on the core idea that forged this modified version - The Matrixx!
+> Matrixx is **highly inspired by** [oh-my-opencode](https://github.com/code-yeongyu/oh-my-opencode) — the project that pioneered the "oh-my-zsh for OpenCode" concept.
+> Full credit to [code-yeongyu](https://github.com/code-yeongyu) for the original vision.
 >
 
 <div align="center">
@@ -217,6 +217,6 @@ We strongly recommend letting an agent handle installation. [Manual guide &rarr;
 
 ---
 
-**Curious about the philosophy?** Read the [Ultrawork Manifesto](docs/ultrawork-manifesto.md) from the creator of oh-my-opencode.
+**Curious about the philosophy?** Read the [Ultrawork Manifesto](docs/ultrawork-manifesto.md) — originally authored by [code-yeongyu](https://github.com/code-yeongyu), the creator of oh-my-opencode.
 
 <sub>Productivity might spike too hard. Don't let your coworker notice. Actually — let's see who wins.</sub>

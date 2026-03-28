@@ -1,10 +1,10 @@
 ---
-description: Publish oh-my-opencode to npm via GitHub Actions workflow
+description: Publish matrixx to npm via GitHub Actions workflow
 argument-hint: <patch|minor|major>
 ---
 
 <command-instruction>
-You are the release manager for oh-my-opencode. Execute the FULL publish workflow from start to finish.
+You are the release manager for matrixx. Execute the FULL publish workflow from start to finish.
 
 ## CRITICAL: ARGUMENT REQUIREMENT
 
@@ -67,7 +67,7 @@ Run: `git status --porcelain`
 
 Check if there are unpushed commits:
 ```bash
-git log origin/master..HEAD --oneline
+git log origin/dev..HEAD --oneline
 ```
 
 **If there are unpushed commits, you MUST sync before triggering workflow:**
@@ -277,7 +277,7 @@ gh release view "v${NEW_VERSION}" --json url --jq '.url'
 
 Poll npm registry until the new version appears:
 ```bash
-npm view oh-my-opencode version
+npm view matrixx version
 ```
 
 Compare with expected version. If not matching after 2 minutes, warn user about npm propagation delay.
@@ -314,7 +314,7 @@ After publish-platform workflow completes, verify all 7 platform packages are pu
 ```bash
 PLATFORMS="darwin-arm64 darwin-x64 linux-x64 linux-arm64 linux-x64-musl linux-arm64-musl windows-x64"
 for PLATFORM in $PLATFORMS; do
-  npm view "oh-my-opencode-${PLATFORM}" version
+  npm view "matrixx-${PLATFORM}" version
 done
 ```
 
@@ -323,13 +323,13 @@ All 7 packages should show the same version as the main package (`${NEW_VERSION}
 **Expected packages:**
 | Package | Description |
 |---------|-------------|
-| `oh-my-opencode-darwin-arm64` | macOS Apple Silicon |
-| `oh-my-opencode-darwin-x64` | macOS Intel |
-| `oh-my-opencode-linux-x64` | Linux x64 (glibc) |
-| `oh-my-opencode-linux-arm64` | Linux ARM64 (glibc) |
-| `oh-my-opencode-linux-x64-musl` | Linux x64 (musl/Alpine) |
-| `oh-my-opencode-linux-arm64-musl` | Linux ARM64 (musl/Alpine) |
-| `oh-my-opencode-windows-x64` | Windows x64 |
+| `matrixx-darwin-arm64` | macOS Apple Silicon |
+| `matrixx-darwin-x64` | macOS Intel |
+| `matrixx-linux-x64` | Linux x64 (glibc) |
+| `matrixx-linux-arm64` | Linux ARM64 (glibc) |
+| `matrixx-linux-x64-musl` | Linux x64 (musl/Alpine) |
+| `matrixx-linux-arm64-musl` | Linux ARM64 (musl/Alpine) |
+| `matrixx-windows-x64` | Windows x64 |
 
 If any platform package version doesn't match, warn the user and suggest checking the publish-platform workflow logs.
 
@@ -339,8 +339,8 @@ If any platform package version doesn't match, warn the user and suggest checkin
 
 Report success to user with:
 - New version number
-- GitHub release URL: https://github.com/code-yeongyu/oh-my-opencode/releases/tag/v{version}
-- npm package URL: https://www.npmjs.com/package/oh-my-opencode
+  - GitHub release URL: https://github.com/klpanagi/matrixx/releases/tag/v{version}
+- npm package URL: https://www.npmjs.com/package/matrixx
 - Platform packages status: List all 7 platform packages with their versions
 
 ---
@@ -362,7 +362,7 @@ Respond to user in English.
 
 <current-context>
 <published-version>
-!`npm view oh-my-opencode version 2>/dev/null || echo "not published"`
+!`npm view matrixx version 2>/dev/null || echo "not published"`
 </published-version>
 <local-version>
 !`node -p "require('./package.json').version" 2>/dev/null || echo "unknown"`
@@ -371,6 +371,6 @@ Respond to user in English.
 !`git status --porcelain`
 </git-status>
 <recent-commits>
-!`npm view oh-my-opencode version 2>/dev/null | xargs -I{} git log "v{}"..HEAD --oneline 2>/dev/null | head -15 || echo "no commits"`
+!`npm view matrixx version 2>/dev/null | xargs -I{} git log "v{}"..HEAD --oneline 2>/dev/null | head -15 || echo "no commits"`
 </recent-commits>
 </current-context>
