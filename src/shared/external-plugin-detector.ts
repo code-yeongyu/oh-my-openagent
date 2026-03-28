@@ -3,14 +3,14 @@
  * Used to prevent crashes from concurrent notification plugins.
  */
 
-import * as fs from "node:fs"
-import * as path from "node:path"
-import * as os from "node:os"
-import { log } from "./logger"
-import { parseJsoncSafe } from "./jsonc-parser"
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+import { parseJsoncSafe } from "./jsonc-parser";
+import { log } from "./logger";
 
 interface OpencodeConfig {
-  plugin?: string[]
+	plugin?: string[];
 }
 
 /**
@@ -19,59 +19,54 @@ interface OpencodeConfig {
  * which can cause crashes on Windows due to resource contention.
  */
 const KNOWN_NOTIFICATION_PLUGINS = [
-  "opencode-notifier",
-  "@mohak34/opencode-notifier",
-  "mohak34/opencode-notifier",
-]
+	"opencode-notifier",
+	"@mohak34/opencode-notifier",
+	"mohak34/opencode-notifier",
+];
 
 /**
  * Known skill plugins that conflict with oh-my-opencode's skill loading.
  * Both plugins scan ~/.config/opencode/skills/ and register tools independently,
  * causing "Duplicate tool names detected" warnings and HTTP 400 errors.
  */
-const KNOWN_SKILL_PLUGINS = [
-  "opencode-skills",
-  "@opencode/skills",
-]
+const KNOWN_SKILL_PLUGINS = ["opencode-skills", "@opencode/skills"];
 
 function getWindowsAppdataDir(): string | null {
-  return process.env.APPDATA || null
+	return process.env.APPDATA || null;
 }
 
 function getConfigPaths(directory: string): string[] {
-  const crossPlatformDir = path.join(os.homedir(), ".config")
-  const paths = [
-    path.join(directory, ".opencode", "opencode.json"),
-    path.join(directory, ".opencode", "opencode.jsonc"),
-    path.join(crossPlatformDir, "opencode", "opencode.json"),
-    path.join(crossPlatformDir, "opencode", "opencode.jsonc"),
-  ]
+	const crossPlatformDir = path.join(os.homedir(), ".config");
+	const paths = [
+		path.join(directory, ".opencode", "opencode.json"),
+		path.join(directory, ".opencode", "opencode.jsonc"),
+		path.join(crossPlatformDir, "opencode", "opencode.json"),
+		path.join(crossPlatformDir, "opencode", "opencode.jsonc"),
+	];
 
-  if (process.platform === "win32") {
-    const appdataDir = getWindowsAppdataDir()
-    if (appdataDir) {
-      paths.push(path.join(appdataDir, "opencode", "opencode.json"))
-      paths.push(path.join(appdataDir, "opencode", "opencode.jsonc"))
-    }
-  }
+	if (process.platform === "win32") {
+		const appdataDir = getWindowsAppdataDir();
+		if (appdataDir) {
+			paths.push(path.join(appdataDir, "opencode", "opencode.json"));
+			paths.push(path.join(appdataDir, "opencode", "opencode.jsonc"));
+		}
+	}
 
-  return paths
+	return paths;
 }
 
 function loadOpencodePlugins(directory: string): string[] {
-  for (const configPath of getConfigPaths(directory)) {
-    try {
-      if (!fs.existsSync(configPath)) continue
-      const content = fs.readFileSync(configPath, "utf-8")
-      const result = parseJsoncSafe<OpencodeConfig>(content)
-      if (result.data) {
-        return result.data.plugin ?? []
-      }
-    } catch {
-      continue
-    }
-  }
-  return []
+	for (const configPath of getConfigPaths(directory)) {
+		try {
+			if (!fs.existsSync(configPath)) continue;
+			const content = fs.readFileSync(configPath, "utf-8");
+			const result = parseJsoncSafe<OpencodeConfig>(content);
+			if (result.data) {
+				return result.data.plugin ?? [];
+			}
+		} catch {}
+	}
+	return [];
 }
 
 /**
@@ -79,23 +74,29 @@ function loadOpencodePlugins(directory: string): string[] {
  * Handles various formats: "name", "name@version", "npm:name", "file://path/name"
  */
 function matchesNotificationPlugin(entry: string): string | null {
-  const normalized = entry.toLowerCase()
-  for (const known of KNOWN_NOTIFICATION_PLUGINS) {
-    // Exact match
-    if (normalized === known) return known
-    // Version suffix: "opencode-notifier@1.2.3"
-    if (normalized.startsWith(`${known}@`)) return known
-    // Scoped package: "@mohak34/opencode-notifier" or "@mohak34/opencode-notifier@1.2.3"
-    if (normalized === `@mohak34/${known}` || normalized.startsWith(`@mohak34/${known}@`)) return known
-    // npm: prefix
-    if (normalized === `npm:${known}` || normalized.startsWith(`npm:${known}@`)) return known
-    // file:// path ending exactly with package name
-    if (normalized.startsWith("file://") && (
-      normalized.endsWith(`/${known}`) || 
-      normalized.endsWith(`\\${known}`)
-    )) return known
-  }
-  return null
+	const normalized = entry.toLowerCase();
+	for (const known of KNOWN_NOTIFICATION_PLUGINS) {
+		// Exact match
+		if (normalized === known) return known;
+		// Version suffix: "opencode-notifier@1.2.3"
+		if (normalized.startsWith(`${known}@`)) return known;
+		// Scoped package: "@mohak34/opencode-notifier" or "@mohak34/opencode-notifier@1.2.3"
+		if (
+			normalized === `@mohak34/${known}` ||
+			normalized.startsWith(`@mohak34/${known}@`)
+		)
+			return known;
+		// npm: prefix
+		if (normalized === `npm:${known}` || normalized.startsWith(`npm:${known}@`))
+			return known;
+		// file:// path ending exactly with package name
+		if (
+			normalized.startsWith("file://") &&
+			(normalized.endsWith(`/${known}`) || normalized.endsWith(`\\${known}`))
+		)
+			return known;
+	}
+	return null;
 }
 
 /**
@@ -103,92 +104,98 @@ function matchesNotificationPlugin(entry: string): string | null {
  * Handles various formats: "name", "name@version", "npm:name", "file://path/name"
  */
 function matchesSkillPlugin(entry: string): string | null {
-  const normalized = entry.toLowerCase()
-  for (const known of KNOWN_SKILL_PLUGINS) {
-    // Exact match
-    if (normalized === known) return known
-    // Version suffix: "opencode-skills@1.2.3"
-    if (normalized.startsWith(`${known}@`)) return known
-    // npm: prefix
-    if (normalized === `npm:${known}` || normalized.startsWith(`npm:${known}@`)) return known
-    // file:// path ending exactly with package name
-    if (normalized.startsWith("file://") && (
-      normalized.endsWith(`/${known}`) || 
-      normalized.endsWith(`\\${known}`)
-    )) return known
-  }
-  return null
+	const normalized = entry.toLowerCase();
+	for (const known of KNOWN_SKILL_PLUGINS) {
+		// Exact match
+		if (normalized === known) return known;
+		// Version suffix: "opencode-skills@1.2.3"
+		if (normalized.startsWith(`${known}@`)) return known;
+		// npm: prefix
+		if (normalized === `npm:${known}` || normalized.startsWith(`npm:${known}@`))
+			return known;
+		// file:// path ending exactly with package name
+		if (
+			normalized.startsWith("file://") &&
+			(normalized.endsWith(`/${known}`) || normalized.endsWith(`\\${known}`))
+		)
+			return known;
+	}
+	return null;
 }
 
 export interface ExternalNotifierResult {
-  detected: boolean
-  pluginName: string | null
-  allPlugins: string[]
+	detected: boolean;
+	pluginName: string | null;
+	allPlugins: string[];
 }
 
 export interface ExternalSkillPluginResult {
-  detected: boolean
-  pluginName: string | null
-  allPlugins: string[]
+	detected: boolean;
+	pluginName: string | null;
+	allPlugins: string[];
 }
 
 /**
  * Detect if any external notification plugin is configured.
  * Returns information about detected plugins for logging/warning.
  */
-export function detectExternalNotificationPlugin(directory: string): ExternalNotifierResult {
-  const plugins = loadOpencodePlugins(directory)
-  
-  for (const plugin of plugins) {
-    const match = matchesNotificationPlugin(plugin)
-    if (match) {
-      log(`Detected external notification plugin: ${plugin}`)
-      return {
-        detected: true,
-        pluginName: match,
-        allPlugins: plugins,
-      }
-    }
-  }
+export function detectExternalNotificationPlugin(
+	directory: string,
+): ExternalNotifierResult {
+	const plugins = loadOpencodePlugins(directory);
 
-  return {
-    detected: false,
-    pluginName: null,
-    allPlugins: plugins,
-  }
+	for (const plugin of plugins) {
+		const match = matchesNotificationPlugin(plugin);
+		if (match) {
+			log(`Detected external notification plugin: ${plugin}`);
+			return {
+				detected: true,
+				pluginName: match,
+				allPlugins: plugins,
+			};
+		}
+	}
+
+	return {
+		detected: false,
+		pluginName: null,
+		allPlugins: plugins,
+	};
 }
 
 /**
  * Detect if any external skill plugin is configured.
  * Returns information about detected plugins for logging/warning.
  */
-export function detectExternalSkillPlugin(directory: string): ExternalSkillPluginResult {
-  const plugins = loadOpencodePlugins(directory)
-  
-  for (const plugin of plugins) {
-    const match = matchesSkillPlugin(plugin)
-    if (match) {
-      log(`Detected external skill plugin: ${plugin}`)
-      return {
-        detected: true,
-        pluginName: match,
-        allPlugins: plugins,
-      }
-    }
-  }
+export function detectExternalSkillPlugin(
+	directory: string,
+): ExternalSkillPluginResult {
+	const plugins = loadOpencodePlugins(directory);
 
-  return {
-    detected: false,
-    pluginName: null,
-    allPlugins: plugins,
-  }
+	for (const plugin of plugins) {
+		const match = matchesSkillPlugin(plugin);
+		if (match) {
+			log(`Detected external skill plugin: ${plugin}`);
+			return {
+				detected: true,
+				pluginName: match,
+				allPlugins: plugins,
+			};
+		}
+	}
+
+	return {
+		detected: false,
+		pluginName: null,
+		allPlugins: plugins,
+	};
 }
 
 /**
  * Generate a warning message for users with conflicting notification plugins.
  */
 export function getNotificationConflictWarning(pluginName: string): string {
-  return `[oh-my-opencode] External notification plugin detected: ${pluginName}
+	return `[oh-my-opencode] External notification plugin detected: ${pluginName}
 
 Both oh-my-opencode and ${pluginName} listen to session.idle events.
    Running both simultaneously can cause crashes on Windows.
@@ -197,20 +204,20 @@ Both oh-my-opencode and ${pluginName} listen to session.idle events.
 
    To use oh-my-opencode's notifications instead, either:
    1. Remove ${pluginName} from your opencode.json plugins
-   2. Or set "notification": { "force_enable": true } in oh-my-opencode.json`
+   2. Or set "notification": { "force_enable": true } in oh-my-openagent.jsonc`;
 }
 
 /**
  * Generate a warning message for users with conflicting skill plugins.
  */
 export function getSkillPluginConflictWarning(pluginName: string): string {
-  return `[oh-my-opencode] External skill plugin detected: ${pluginName}
+	return `[oh-my-opencode] External skill plugin detected: ${pluginName}
 
 Both oh-my-opencode and ${pluginName} scan ~/.config/opencode/skills/ and register tools independently.
    Running both simultaneously causes "Duplicate tool names detected" warnings and HTTP 400 errors.
 
    Consider either:
    1. Remove ${pluginName} from your opencode.json plugins to use oh-my-opencode's skill loading
-   2. Or disable oh-my-opencode's skill loading by setting "claude_code.skills": false in oh-my-opencode.json
-   3. Or uninstall oh-my-opencode if you prefer ${pluginName}'s skill management`
+   2. Or disable oh-my-opencode's skill loading by setting "claude_code.skills": false in oh-my-openagent.jsonc
+   3. Or uninstall oh-my-opencode if you prefer ${pluginName}'s skill management`;
 }

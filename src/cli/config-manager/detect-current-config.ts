@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import {
-	detectPluginConfigFile,
+	getPluginConfigFileCandidates,
 	LEGACY_PLUGIN_NAME,
 	PLUGIN_NAME,
 	parseJsonc,
@@ -17,53 +17,40 @@ function detectProvidersFromOmoConfig(): {
 	hasKimiForCoding: boolean;
 	hasOpencodeGo: boolean;
 } {
-	const detectedConfig = detectPluginConfigFile(getConfigDir());
-	if (detectedConfig.format === "none" || !existsSync(detectedConfig.path)) {
-		return {
-			hasOpenAI: true,
-			hasOpencodeZen: true,
-			hasZaiCodingPlan: false,
-			hasKimiForCoding: false,
-			hasOpencodeGo: false,
-		};
-	}
+	for (const candidatePath of getPluginConfigFileCandidates(getConfigDir())) {
+		if (!existsSync(candidatePath)) continue;
 
-	try {
-		const content = readFileSync(detectedConfig.path, "utf-8");
-		const omoConfig = parseJsonc<Record<string, unknown>>(content);
-		if (!omoConfig || typeof omoConfig !== "object") {
+		try {
+			const content = readFileSync(candidatePath, "utf-8");
+			const omoConfig = parseJsonc<Record<string, unknown>>(content);
+			if (!omoConfig || typeof omoConfig !== "object") {
+				continue;
+			}
+
+			const configStr = JSON.stringify(omoConfig);
+			const hasOpenAI = configStr.includes('"openai/');
+			const hasOpencodeZen = configStr.includes('"opencode/');
+			const hasZaiCodingPlan = configStr.includes('"zai-coding-plan/');
+			const hasKimiForCoding = configStr.includes('"kimi-for-coding/');
+			const hasOpencodeGo = configStr.includes('"opencode-go/');
+
 			return {
-				hasOpenAI: true,
-				hasOpencodeZen: true,
-				hasZaiCodingPlan: false,
-				hasKimiForCoding: false,
-				hasOpencodeGo: false,
+				hasOpenAI,
+				hasOpencodeZen,
+				hasZaiCodingPlan,
+				hasKimiForCoding,
+				hasOpencodeGo,
 			};
-		}
-
-		const configStr = JSON.stringify(omoConfig);
-		const hasOpenAI = configStr.includes('"openai/');
-		const hasOpencodeZen = configStr.includes('"opencode/');
-		const hasZaiCodingPlan = configStr.includes('"zai-coding-plan/');
-		const hasKimiForCoding = configStr.includes('"kimi-for-coding/');
-		const hasOpencodeGo = configStr.includes('"opencode-go/');
-
-		return {
-			hasOpenAI,
-			hasOpencodeZen,
-			hasZaiCodingPlan,
-			hasKimiForCoding,
-			hasOpencodeGo,
-		};
-	} catch {
-		return {
-			hasOpenAI: true,
-			hasOpencodeZen: true,
-			hasZaiCodingPlan: false,
-			hasKimiForCoding: false,
-			hasOpencodeGo: false,
-		};
+		} catch {}
 	}
+
+	return {
+		hasOpenAI: true,
+		hasOpencodeZen: true,
+		hasZaiCodingPlan: false,
+		hasKimiForCoding: false,
+		hasOpencodeGo: false,
+	};
 }
 
 function isOurPlugin(plugin: string): boolean {

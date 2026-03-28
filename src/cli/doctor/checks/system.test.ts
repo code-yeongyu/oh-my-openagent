@@ -41,11 +41,13 @@ const mockGetSuggestedInstallTag = mock(() => "latest");
 const mockGetPluginConfigFileState = mock(() => ({
 	canonicalJsoncPath: "/Users/test/.config/opencode/oh-my-openagent.jsonc",
 	canonicalJsonPath: "/Users/test/.config/opencode/oh-my-openagent.json",
+	canonicalPaths: [] as string[],
 	canonicalPath: null as string | null,
 	legacyJsoncPath: "/Users/test/.config/opencode/oh-my-opencode.jsonc",
 	legacyJsonPath: "/Users/test/.config/opencode/oh-my-opencode.json",
 	legacyPaths: [] as string[],
 	hasCanonical: false,
+	hasMultipleCanonical: false,
 	hasLegacy: false,
 }));
 
@@ -93,11 +95,13 @@ describe("system check", () => {
 		mockGetPluginConfigFileState.mockReturnValue({
 			canonicalJsoncPath: "/Users/test/.config/opencode/oh-my-openagent.jsonc",
 			canonicalJsonPath: "/Users/test/.config/opencode/oh-my-openagent.json",
+			canonicalPaths: [],
 			canonicalPath: null,
 			legacyJsoncPath: "/Users/test/.config/opencode/oh-my-opencode.jsonc",
 			legacyJsonPath: "/Users/test/.config/opencode/oh-my-opencode.json",
 			legacyPaths: [],
 			hasCanonical: false,
+			hasMultipleCanonical: false,
 			hasLegacy: false,
 		});
 		mockGetLoadedPluginVersion.mockReturnValue({
@@ -275,11 +279,13 @@ describe("system check", () => {
 				canonicalJsoncPath:
 					"/Users/test/.config/opencode/oh-my-openagent.jsonc",
 				canonicalJsonPath: "/Users/test/.config/opencode/oh-my-openagent.json",
+				canonicalPaths: [],
 				canonicalPath: null,
 				legacyJsoncPath: "/Users/test/.config/opencode/oh-my-opencode.jsonc",
 				legacyJsonPath: "/Users/test/.config/opencode/oh-my-opencode.json",
 				legacyPaths: ["/Users/test/.config/opencode/oh-my-opencode.jsonc"],
 				hasCanonical: false,
+				hasMultipleCanonical: false,
 				hasLegacy: true,
 			});
 			const { checkSystem } = await importFreshSystemModule();
@@ -310,11 +316,13 @@ describe("system check", () => {
 				canonicalJsoncPath:
 					"/Users/test/.config/opencode/oh-my-openagent.jsonc",
 				canonicalJsonPath: "/Users/test/.config/opencode/oh-my-openagent.json",
+				canonicalPaths: ["/Users/test/.config/opencode/oh-my-openagent.jsonc"],
 				canonicalPath: "/Users/test/.config/opencode/oh-my-openagent.jsonc",
 				legacyJsoncPath: "/Users/test/.config/opencode/oh-my-opencode.jsonc",
 				legacyJsonPath: "/Users/test/.config/opencode/oh-my-opencode.json",
 				legacyPaths: ["/Users/test/.config/opencode/oh-my-opencode.jsonc"],
 				hasCanonical: true,
+				hasMultipleCanonical: false,
 				hasLegacy: true,
 			});
 			const { checkSystem } = await importFreshSystemModule();
@@ -346,11 +354,13 @@ describe("system check", () => {
 				canonicalJsoncPath:
 					"/Users/test/.config/opencode/oh-my-openagent.jsonc",
 				canonicalJsonPath: "/Users/test/.config/opencode/oh-my-openagent.json",
+				canonicalPaths: ["/Users/test/.config/opencode/oh-my-openagent.jsonc"],
 				canonicalPath: "/Users/test/.config/opencode/oh-my-openagent.jsonc",
 				legacyJsoncPath: "/Users/test/.config/opencode/oh-my-opencode.jsonc",
 				legacyJsonPath: "/Users/test/.config/opencode/oh-my-opencode.json",
 				legacyPaths: [],
 				hasCanonical: true,
+				hasMultipleCanonical: false,
 				hasLegacy: false,
 			});
 			const { checkSystem } = await importFreshSystemModule();
@@ -370,6 +380,46 @@ describe("system check", () => {
 						issue.title === "Canonical and legacy config files coexist",
 				),
 			).toBe(false);
+		});
+
+		it("adds a warning when canonical json and jsonc files coexist", async () => {
+			//#given
+			mockGetPluginInfo.mockReturnValue({
+				registered: true,
+				entry: PLUGIN_NAME,
+				isPinned: false,
+				pinnedVersion: null,
+				configPath: null,
+				isLocalDev: false,
+			});
+			mockGetPluginConfigFileState.mockReturnValue({
+				canonicalJsoncPath:
+					"/Users/test/.config/opencode/oh-my-openagent.jsonc",
+				canonicalJsonPath: "/Users/test/.config/opencode/oh-my-openagent.json",
+				canonicalPaths: [
+					"/Users/test/.config/opencode/oh-my-openagent.jsonc",
+					"/Users/test/.config/opencode/oh-my-openagent.json",
+				],
+				canonicalPath: "/Users/test/.config/opencode/oh-my-openagent.jsonc",
+				legacyJsoncPath: "/Users/test/.config/opencode/oh-my-opencode.jsonc",
+				legacyJsonPath: "/Users/test/.config/opencode/oh-my-opencode.json",
+				legacyPaths: [],
+				hasCanonical: true,
+				hasMultipleCanonical: true,
+				hasLegacy: false,
+			});
+			const { checkSystem } = await importFreshSystemModule();
+
+			//#when
+			const result = await checkSystem();
+
+			//#then
+			const canonicalIssue = result.issues.find(
+				(issue) => issue.title === "Multiple canonical config files coexist",
+			);
+			expect(canonicalIssue?.severity).toBe("warning");
+			expect(canonicalIssue?.description).toContain("oh-my-openagent.jsonc");
+			expect(canonicalIssue?.description).toContain("oh-my-openagent.json");
 		});
 	});
 });

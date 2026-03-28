@@ -70,13 +70,26 @@ export function detectConfigFile(basePath: string): {
 
 const PLUGIN_CONFIG_NAMES = ["oh-my-openagent", "oh-my-opencode"] as const;
 
+export function getPluginConfigFileCandidates(dir: string): string[] {
+	return PLUGIN_CONFIG_NAMES.flatMap((name) => [
+		join(dir, `${name}.jsonc`),
+		join(dir, `${name}.json`),
+	]);
+}
+
 export function detectPluginConfigFile(dir: string): {
 	format: "json" | "jsonc" | "none";
 	path: string;
 } {
-	for (const name of PLUGIN_CONFIG_NAMES) {
-		const result = detectConfigFile(join(dir, name));
-		if (result.format !== "none") return result;
+	const candidates = getPluginConfigFileCandidates(dir);
+
+	for (const candidate of candidates) {
+		if (!existsSync(candidate)) continue;
+		return {
+			format: candidate.endsWith(".jsonc") ? "jsonc" : "json",
+			path: candidate,
+		};
 	}
-	return { format: "none", path: join(dir, PLUGIN_CONFIG_NAMES[0] + ".jsonc") };
+
+	return { format: "none", path: candidates[0] };
 }

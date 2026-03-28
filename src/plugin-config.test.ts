@@ -385,4 +385,22 @@ describe("loadPluginConfig", () => {
 			existsSync(join(projectDir, ".opencode", "oh-my-openagent.jsonc")),
 		).toBe(true);
 	});
+
+	it("falls back to legacy config when canonical config is malformed", () => {
+		writeFileSync(
+			join(userConfigDir, "oh-my-openagent.jsonc"),
+			"{ invalid jsonc",
+			"utf-8",
+		);
+		writeFileSync(
+			join(userConfigDir, "oh-my-opencode.jsonc"),
+			JSON.stringify({ disabled_hooks: ["legacy-fallback-hook"] }, null, 2) +
+				"\n",
+			"utf-8",
+		);
+
+		const result = loadPluginConfig(projectDir, {});
+
+		expect(result.disabled_hooks).toEqual(["legacy-fallback-hook"]);
+	});
 });

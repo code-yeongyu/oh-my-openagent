@@ -26,11 +26,13 @@ interface OpenCodeConfigShape {
 export interface PluginConfigFileState {
 	canonicalJsoncPath: string;
 	canonicalJsonPath: string;
+	canonicalPaths: string[];
 	canonicalPath: string | null;
 	legacyJsoncPath: string;
 	legacyJsonPath: string;
 	legacyPaths: string[];
 	hasCanonical: boolean;
+	hasMultipleCanonical: boolean;
 	hasLegacy: boolean;
 }
 
@@ -56,6 +58,9 @@ export function getPluginConfigFileState(): PluginConfigFileState {
 		: existsSync(canonicalJsonPath)
 			? canonicalJsonPath
 			: null;
+	const canonicalPaths = [canonicalJsoncPath, canonicalJsonPath].filter(
+		(path) => existsSync(path),
+	);
 
 	const legacyPaths = [legacyJsoncPath, legacyJsonPath].filter((path) =>
 		existsSync(path),
@@ -64,11 +69,13 @@ export function getPluginConfigFileState(): PluginConfigFileState {
 	return {
 		canonicalJsoncPath,
 		canonicalJsonPath,
+		canonicalPaths,
 		canonicalPath,
 		legacyJsoncPath,
 		legacyJsonPath,
 		legacyPaths,
 		hasCanonical: canonicalPath !== null,
+		hasMultipleCanonical: canonicalPaths.length > 1,
 		hasLegacy: legacyPaths.length > 0,
 	};
 }

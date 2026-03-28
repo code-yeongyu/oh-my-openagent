@@ -139,4 +139,53 @@ describe("writeOmoConfig", () => {
 		const savedSisyphus = getRecord(savedAgents.sisyphus);
 		expect(savedSisyphus.model).toBe("canonical/provider-model");
 	});
+
+	it("updates an existing canonical json file in place instead of creating a second canonical file", () => {
+		const canonicalJsonPath = join(testConfigDir, "oh-my-openagent.json");
+		writeFileSync(
+			canonicalJsonPath,
+			JSON.stringify(
+				{ agents: { sisyphus: { model: "canonical-json/provider-model" } } },
+				null,
+				2,
+			) + "\n",
+			"utf-8",
+		);
+
+		const result = writeOmoConfig(installConfig);
+
+		expect(result.success).toBe(true);
+		expect(result.configPath).toBe(canonicalJsonPath);
+		expect(existsSync(canonicalConfigPath)).toBe(false);
+
+		const savedConfig = parseJsonc<Record<string, unknown>>(
+			readFileSync(canonicalJsonPath, "utf-8"),
+		);
+		const savedAgents = getRecord(savedConfig.agents);
+		const savedSisyphus = getRecord(savedAgents.sisyphus);
+		expect(savedSisyphus.model).toBe("canonical-json/provider-model");
+	});
+
+	it("falls back to legacy config when canonical config is malformed", () => {
+		writeFileSync(canonicalConfigPath, "{ invalid jsonc", "utf-8");
+		writeFileSync(
+			legacyConfigPath,
+			JSON.stringify(
+				{ agents: { sisyphus: { model: "legacy-fallback/provider-model" } } },
+				null,
+				2,
+			) + "\n",
+			"utf-8",
+		);
+
+		const result = writeOmoConfig(installConfig);
+
+		expect(result.success).toBe(true);
+		const savedConfig = parseJsonc<Record<string, unknown>>(
+			readFileSync(canonicalConfigPath, "utf-8"),
+		);
+		const savedAgents = getRecord(savedConfig.agents);
+		const savedSisyphus = getRecord(savedAgents.sisyphus);
+		expect(savedSisyphus.model).toBe("legacy-fallback/provider-model");
+	});
 });

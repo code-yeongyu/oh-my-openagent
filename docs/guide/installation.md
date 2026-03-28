@@ -115,7 +115,7 @@ bunx oh-my-opencode install --no-tui --claude=<yes|no|max20> --gemini=<yes|no> -
 The CLI will:
 
 - Register the plugin in `opencode.json`
-- Write or update the canonical OMO config file at `~/.config/opencode/oh-my-openagent.jsonc` (or the equivalent `OPENCODE_CONFIG_DIR` location)
+- Write or update the canonical OMO config using the `oh-my-openagent` basename, preferring `oh-my-openagent.jsonc` for new installs and preserving an existing canonical `.json` file during migration
 - Configure agent models based on subscription flags
 - Show which auth steps are needed
 

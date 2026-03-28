@@ -149,6 +149,31 @@ describe("detectCurrentConfig - single package detection", () => {
 		expect(result.hasOpenAI).toBe(true);
 		expect(result.hasOpencodeGo).toBe(false);
 	});
+
+	it("falls back to legacy omo config when canonical config is malformed", () => {
+		// given
+		writeFileSync(
+			testConfigPath,
+			JSON.stringify({ plugin: ["oh-my-openagent"] }, null, 2) + "\n",
+			"utf-8",
+		);
+		writeFileSync(canonicalOmoConfigPath, "{ invalid jsonc", "utf-8");
+		writeFileSync(
+			legacyOmoConfigPath,
+			JSON.stringify(
+				{ agents: { atlas: { model: "opencode-go/kimi-k2.5" } } },
+				null,
+				2,
+			) + "\n",
+			"utf-8",
+		);
+
+		// when
+		const result = detectCurrentConfig();
+
+		// then
+		expect(result.hasOpencodeGo).toBe(true);
+	});
 });
 
 describe("addPluginToOpenCodeConfig - single package writes", () => {

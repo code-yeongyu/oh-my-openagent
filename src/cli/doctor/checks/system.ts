@@ -137,6 +137,16 @@ export async function checkSystem(): Promise<CheckResult> {
 		}
 	}
 
+	if (pluginConfigFileState.hasMultipleCanonical) {
+		issues.push({
+			title: "Multiple canonical config files coexist",
+			description: `Detected multiple canonical OMO config files: ${pluginConfigFileState.canonicalPaths.join(", ")}. The runtime prefers "${pluginConfigFileState.canonicalJsoncPath}", but keeping both canonical files can make edits land in the wrong file.`,
+			fix: `Keep only one canonical config file, preferably "${pluginConfigFileState.canonicalJsoncPath}", and remove the extra canonical file(s): ${pluginConfigFileState.canonicalPaths.filter((path) => path !== pluginConfigFileState.canonicalJsoncPath).join(", ")}`,
+			severity: "warning",
+			affects: ["plugin loading", "doctor"],
+		});
+	}
+
 	if (pluginConfigFileState.hasCanonical && pluginConfigFileState.hasLegacy) {
 		issues.push({
 			title: "Canonical and legacy config files coexist",
@@ -145,10 +155,9 @@ export async function checkSystem(): Promise<CheckResult> {
 			severity: "warning",
 			affects: ["plugin loading", "doctor"],
 		});
-	} else if (
-		!pluginConfigFileState.hasCanonical &&
-		pluginConfigFileState.hasLegacy
-	) {
+	}
+
+	if (!pluginConfigFileState.hasCanonical && pluginConfigFileState.hasLegacy) {
 		issues.push({
 			title: "Using legacy config filename",
 			description: `Detected legacy OMO config file(s): ${pluginConfigFileState.legacyPaths.join(", ")}. Legacy files still load for compatibility, but the canonical config path is "${pluginConfigFileState.canonicalJsoncPath}".`,
