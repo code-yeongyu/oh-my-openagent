@@ -1,10 +1,12 @@
 declare const require: (name: string) => any
 const { afterEach, describe, expect, mock, test } = require("bun:test")
 
+const PROVIDER_ID = "cliproxyapi"
+
 mock.module("../shared/connected-providers-cache", () => ({
-  readConnectedProvidersCache: () => ["quotio"],
+  readConnectedProvidersCache: () => [PROVIDER_ID],
   readProviderModelsCache: () => ({
-    connected: ["quotio"],
+    connected: [PROVIDER_ID],
   }),
 }))
 
@@ -16,16 +18,21 @@ import { _resetForTesting } from "../features/claude-code-session-state"
 import { SessionCategoryRegistry } from "../shared/session-category-registry"
 
 const PRIMARY_MODEL = {
-  providerID: "quotio",
+  providerID: PROVIDER_ID,
   modelID: "claude-opus-4-6",
 }
 
 const PRIMARY_MODEL_STRING = `${PRIMARY_MODEL.providerID}/${PRIMARY_MODEL.modelID}`
 
-const QUOTIO_FALLBACKS = [
-  "quotio/claude-sonnet-4-6",
-  "quotio/gpt-5.4",
-  "quotio/kimi-k2.5",
+const FIRST_FALLBACK_MODEL = {
+  providerID: PROVIDER_ID,
+  modelID: "claude-sonnet-4-6",
+}
+
+const CLIPROXYAPI_FALLBACKS = [
+  `${PROVIDER_ID}/claude-sonnet-4-6`,
+  `${PROVIDER_ID}/gpt-5.4`,
+  `${PROVIDER_ID}/kimi-k2.5`,
 ]
 
 type HarnessMode = "none" | "model" | "runtime" | "both"
@@ -41,7 +48,7 @@ function createPluginConfig(mode: HarnessMode) {
   return {
     agents: {
       sisyphus: {
-        fallback_models: QUOTIO_FALLBACKS,
+        fallback_models: CLIPROXYAPI_FALLBACKS,
       },
     },
     ...(mode === "runtime" || mode === "both"
@@ -244,7 +251,7 @@ async function triggerSessionError(
         model: PRIMARY_MODEL_STRING,
         error: {
           statusCode: 529,
-          message: "Overloaded upstream for quotio/claude-opus-4-6",
+          message: `Overloaded upstream for ${PRIMARY_MODEL_STRING}`,
         },
       },
     },
@@ -294,7 +301,7 @@ async function triggerAssistantMessageError(
           path: { cwd: "/tmp", root: "/tmp" },
           error: {
             statusCode: 529,
-            message: "Overloaded upstream for quotio/claude-opus-4-6",
+            message: `Overloaded upstream for ${PRIMARY_MODEL_STRING}`,
           },
         },
       },
@@ -307,9 +314,9 @@ afterEach(() => {
   SessionCategoryRegistry.clear()
 })
 
-describe("Quotio-only fallback matrix", () => {
-  test("no fallback leaves retryable session.error on the primary Quotio model", async () => {
-    const sessionID = "quotio-none-session-error"
+describe("CLIProxyAPI-only fallback matrix", () => {
+  test("no fallback leaves retryable session.error on the primary CLIProxyAPI model", async () => {
+    const sessionID = "cliproxyapi-none-session-error"
     const harness = createHarness({ mode: "none" })
 
     await primeMainSession(harness.eventHandler, sessionID)
@@ -327,8 +334,8 @@ describe("Quotio-only fallback matrix", () => {
     expect(output.message["model"]).toBeUndefined()
   })
 
-  test("model fallback switches Quotio session.error failures to the next Quotio model", async () => {
-    const sessionID = "quotio-model-session-error"
+  test("model fallback switches CLIProxyAPI session.error failures to the next CLIProxyAPI model", async () => {
+    const sessionID = "cliproxyapi-model-session-error"
     const harness = createHarness({ mode: "model" })
 
     await primeMainSession(harness.eventHandler, sessionID)
@@ -343,14 +350,11 @@ describe("Quotio-only fallback matrix", () => {
     expect(harness.abortCalls).toEqual([sessionID])
     expect(harness.promptCalls).toEqual([sessionID])
     expect(harness.promptAsyncCalls).toEqual([])
-    expect(output.message["model"]).toEqual({
-      providerID: "quotio",
-      modelID: "claude-sonnet-4-6",
-    })
+    expect(output.message["model"]).toEqual(FIRST_FALLBACK_MODEL)
   })
 
-  test("model fallback switches Quotio session.status retry signals to the next Quotio model", async () => {
-    const sessionID = "quotio-model-session-status"
+  test("model fallback switches CLIProxyAPI session.status retry signals to the next CLIProxyAPI model", async () => {
+    const sessionID = "cliproxyapi-model-session-status"
     const harness = createHarness({ mode: "model" })
 
     await primeMainSession(harness.eventHandler, sessionID)
@@ -365,14 +369,11 @@ describe("Quotio-only fallback matrix", () => {
     expect(harness.abortCalls).toEqual([sessionID])
     expect(harness.promptCalls).toEqual([sessionID])
     expect(harness.promptAsyncCalls).toEqual([])
-    expect(output.message["model"]).toEqual({
-      providerID: "quotio",
-      modelID: "claude-sonnet-4-6",
-    })
+    expect(output.message["model"]).toEqual(FIRST_FALLBACK_MODEL)
   })
 
-  test("model fallback switches Quotio assistant message.updated errors to the next Quotio model", async () => {
-    const sessionID = "quotio-model-message-updated"
+  test("model fallback switches CLIProxyAPI assistant message.updated errors to the next CLIProxyAPI model", async () => {
+    const sessionID = "cliproxyapi-model-message-updated"
     const harness = createHarness({ mode: "model" })
 
     await primeMainSession(harness.eventHandler, sessionID)
@@ -387,14 +388,11 @@ describe("Quotio-only fallback matrix", () => {
     expect(harness.abortCalls).toEqual([sessionID])
     expect(harness.promptCalls).toEqual([sessionID])
     expect(harness.promptAsyncCalls).toEqual([])
-    expect(output.message["model"]).toEqual({
-      providerID: "quotio",
-      modelID: "claude-sonnet-4-6",
-    })
+    expect(output.message["model"]).toEqual(FIRST_FALLBACK_MODEL)
   })
 
-  test("runtime fallback retries Quotio session.error failures through promptAsync and overrides the next message model", async () => {
-    const sessionID = "quotio-runtime-session-error"
+  test("runtime fallback retries CLIProxyAPI session.error failures through promptAsync and overrides the next message model", async () => {
+    const sessionID = "cliproxyapi-runtime-session-error"
     const harness = createHarness({ mode: "runtime" })
 
     await primeMainSession(harness.eventHandler, sessionID)
@@ -408,18 +406,12 @@ describe("Quotio-only fallback matrix", () => {
     expect(harness.abortCalls).toEqual([])
     expect(harness.promptCalls).toEqual([])
     expect(harness.promptAsyncCalls).toHaveLength(1)
-    expect(harness.promptAsyncCalls[0]?.model).toEqual({
-      providerID: "quotio",
-      modelID: "claude-sonnet-4-6",
-    })
-    expect(output.message["model"]).toEqual({
-      providerID: "quotio",
-      modelID: "claude-sonnet-4-6",
-    })
+    expect(harness.promptAsyncCalls[0]?.model).toEqual(FIRST_FALLBACK_MODEL)
+    expect(output.message["model"]).toEqual(FIRST_FALLBACK_MODEL)
   })
 
-  test("runtime fallback retries Quotio session.status auto-retry signals through promptAsync", async () => {
-    const sessionID = "quotio-runtime-session-status"
+  test("runtime fallback retries CLIProxyAPI session.status auto-retry signals through promptAsync", async () => {
+    const sessionID = "cliproxyapi-runtime-session-status"
     const harness = createHarness({ mode: "runtime" })
 
     await primeMainSession(harness.eventHandler, sessionID)
@@ -433,18 +425,12 @@ describe("Quotio-only fallback matrix", () => {
     expect(harness.abortCalls).toEqual([sessionID])
     expect(harness.promptCalls).toEqual([])
     expect(harness.promptAsyncCalls).toHaveLength(1)
-    expect(harness.promptAsyncCalls[0]?.model).toEqual({
-      providerID: "quotio",
-      modelID: "claude-sonnet-4-6",
-    })
-    expect(output.message["model"]).toEqual({
-      providerID: "quotio",
-      modelID: "claude-sonnet-4-6",
-    })
+    expect(harness.promptAsyncCalls[0]?.model).toEqual(FIRST_FALLBACK_MODEL)
+    expect(output.message["model"]).toEqual(FIRST_FALLBACK_MODEL)
   })
 
-  test("runtime fallback retries Quotio assistant message.updated errors through promptAsync", async () => {
-    const sessionID = "quotio-runtime-message-updated"
+  test("runtime fallback retries CLIProxyAPI assistant message.updated errors through promptAsync", async () => {
+    const sessionID = "cliproxyapi-runtime-message-updated"
     const harness = createHarness({ mode: "runtime" })
 
     await primeMainSession(harness.eventHandler, sessionID)
@@ -458,18 +444,12 @@ describe("Quotio-only fallback matrix", () => {
     expect(harness.abortCalls).toEqual([])
     expect(harness.promptCalls).toEqual([])
     expect(harness.promptAsyncCalls).toHaveLength(1)
-    expect(harness.promptAsyncCalls[0]?.model).toEqual({
-      providerID: "quotio",
-      modelID: "claude-sonnet-4-6",
-    })
-    expect(output.message["model"]).toEqual({
-      providerID: "quotio",
-      modelID: "claude-sonnet-4-6",
-    })
+    expect(harness.promptAsyncCalls[0]?.model).toEqual(FIRST_FALLBACK_MODEL)
+    expect(output.message["model"]).toEqual(FIRST_FALLBACK_MODEL)
   })
 
-  test("model+runtime prefers the runtime path for Quotio session.error failures", async () => {
-    const sessionID = "quotio-both-session-error"
+  test("model+runtime prefers the runtime path for CLIProxyAPI session.error failures", async () => {
+    const sessionID = "cliproxyapi-both-session-error"
     const harness = createHarness({ mode: "both" })
 
     await primeMainSession(harness.eventHandler, sessionID)
@@ -483,18 +463,12 @@ describe("Quotio-only fallback matrix", () => {
     expect(harness.abortCalls).toEqual([])
     expect(harness.promptCalls).toEqual([])
     expect(harness.promptAsyncCalls).toHaveLength(1)
-    expect(harness.promptAsyncCalls[0]?.model).toEqual({
-      providerID: "quotio",
-      modelID: "claude-sonnet-4-6",
-    })
-    expect(output.message["model"]).toEqual({
-      providerID: "quotio",
-      modelID: "claude-sonnet-4-6",
-    })
+    expect(harness.promptAsyncCalls[0]?.model).toEqual(FIRST_FALLBACK_MODEL)
+    expect(output.message["model"]).toEqual(FIRST_FALLBACK_MODEL)
   })
 
-  test("model+runtime prefers the runtime path for Quotio session.status retry signals", async () => {
-    const sessionID = "quotio-both-session-status"
+  test("model+runtime prefers the runtime path for CLIProxyAPI session.status retry signals", async () => {
+    const sessionID = "cliproxyapi-both-session-status"
     const harness = createHarness({ mode: "both" })
 
     await primeMainSession(harness.eventHandler, sessionID)
@@ -508,18 +482,12 @@ describe("Quotio-only fallback matrix", () => {
     expect(harness.abortCalls).toEqual([sessionID])
     expect(harness.promptCalls).toEqual([])
     expect(harness.promptAsyncCalls).toHaveLength(1)
-    expect(harness.promptAsyncCalls[0]?.model).toEqual({
-      providerID: "quotio",
-      modelID: "claude-sonnet-4-6",
-    })
-    expect(output.message["model"]).toEqual({
-      providerID: "quotio",
-      modelID: "claude-sonnet-4-6",
-    })
+    expect(harness.promptAsyncCalls[0]?.model).toEqual(FIRST_FALLBACK_MODEL)
+    expect(output.message["model"]).toEqual(FIRST_FALLBACK_MODEL)
   })
 
-  test("model+runtime prefers the runtime path for Quotio assistant message.updated errors", async () => {
-    const sessionID = "quotio-both-message-updated"
+  test("model+runtime prefers the runtime path for CLIProxyAPI assistant message.updated errors", async () => {
+    const sessionID = "cliproxyapi-both-message-updated"
     const harness = createHarness({ mode: "both" })
 
     await primeMainSession(harness.eventHandler, sessionID)
@@ -533,13 +501,7 @@ describe("Quotio-only fallback matrix", () => {
     expect(harness.abortCalls).toEqual([])
     expect(harness.promptCalls).toEqual([])
     expect(harness.promptAsyncCalls).toHaveLength(1)
-    expect(harness.promptAsyncCalls[0]?.model).toEqual({
-      providerID: "quotio",
-      modelID: "claude-sonnet-4-6",
-    })
-    expect(output.message["model"]).toEqual({
-      providerID: "quotio",
-      modelID: "claude-sonnet-4-6",
-    })
+    expect(harness.promptAsyncCalls[0]?.model).toEqual(FIRST_FALLBACK_MODEL)
+    expect(output.message["model"]).toEqual(FIRST_FALLBACK_MODEL)
   })
 })
