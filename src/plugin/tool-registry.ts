@@ -1,4 +1,5 @@
 import type { ToolDefinition } from "@opencode-ai/plugin"
+import type { SkillLoadOptions } from "../tools/skill/types"
 
 import type {
   AvailableCategory,
@@ -37,6 +38,63 @@ import { normalizeToolArgSchemas } from "./normalize-tool-arg-schemas"
 export type ToolRegistryResult = {
   filteredTools: ToolsRecord
   taskSystemEnabled: boolean
+}
+
+const LOW_PRIORITY_TOOL_ORDER = [
+  "session_list",
+  "session_read",
+  "session_search",
+  "session_info",
+  "interactive_bash",
+  "look_at",
+  "call_omo_agent",
+  "task_create",
+  "task_get",
+  "task_list",
+  "task_update",
+  "background_output",
+  "background_cancel",
+  "hashline_edit",
+  "ast_grep_replace",
+  "ast_grep_search",
+  "glob",
+  "grep",
+  "skill_mcp",
+  "skill",
+  "task",
+  "lsp_rename",
+  "lsp_prepare_rename",
+  "lsp_find_references",
+  "lsp_goto_definition",
+  "lsp_symbols",
+  "lsp_diagnostics",
+] as const
+
+function trimToolsToCap(filteredTools: ToolsRecord, maxTools: number): void {
+  const toolNames = Object.keys(filteredTools)
+  if (toolNames.length <= maxTools) return
+
+  const removableToolNames = [
+    ...LOW_PRIORITY_TOOL_ORDER.filter((toolName) => toolNames.includes(toolName)),
+    ...toolNames
+      .filter((toolName) => !LOW_PRIORITY_TOOL_ORDER.includes(toolName as (typeof LOW_PRIORITY_TOOL_ORDER)[number]))
+      .sort(),
+  ]
+
+  let currentCount = toolNames.length
+  let removed = 0
+
+  for (const toolName of removableToolNames) {
+    if (currentCount <= maxTools) break
+    if (!filteredTools[toolName]) continue
+    delete filteredTools[toolName]
+    currentCount -= 1
+    removed += 1
+  }
+
+  log(
+    `[tool-registry] Trimmed ${removed} tools to satisfy max_tools=${maxTools}. Final plugin tool count=${currentCount}.`,
+  )
 }
 
 export function createToolRegistry(args: {
@@ -112,9 +170,12 @@ export function createToolRegistry(args: {
     mcpManager: managers.skillMcpManager,
     getSessionID: getSessionIDForMcp,
     gitMasterConfig: pluginConfig.git_master,
+    browserProvider: skillContext.browserProvider,
+    nativeSkills: "skills" in ctx ? (ctx as { skills: SkillLoadOptions["nativeSkills"] }).skills : undefined,
   })
 
-  const taskSystemEnabled = pluginConfig.experimental?.task_system ?? false
+  // task_system defaults to true since v3.14 — delegation (oracle, subagents) requires it
+  const taskSystemEnabled = pluginConfig.experimental?.task_system ?? true
   const taskToolsRecord: Record<string, ToolDefinition> = taskSystemEnabled
     ? {
         task_create: createTaskCreateTool(pluginConfig, ctx),
@@ -126,7 +187,7 @@ export function createToolRegistry(args: {
 
   const hashlineEnabled = pluginConfig.hashline_edit ?? false
   const hashlineToolsRecord: Record<string, ToolDefinition> = hashlineEnabled
-    ? { edit: createHashlineEditTool() }
+    ? { edit: createHashlineEditTool(ctx) }
     : {}
 
   const allTools: Record<string, ToolDefinition> = {
@@ -150,7 +211,12 @@ export function createToolRegistry(args: {
     normalizeToolArgSchemas(toolDefinition)
   }
 
-  const filteredTools = filterDisabledTools(allTools, pluginConfig.disabled_tools)
+  const filteredTools: ToolsRecord = filterDisabledTools(allTools, pluginConfig.disabled_tools)
+
+  const maxTools = pluginConfig.experimental?.max_tools
+  if (maxTools) {
+    trimToolsToCap(filteredTools, maxTools)
+  }
 
   return {
     filteredTools,

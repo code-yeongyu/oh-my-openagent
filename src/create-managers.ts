@@ -7,8 +7,10 @@ import { BackgroundManager } from "./features/background-agent"
 import { SkillMcpManager } from "./features/skill-mcp-manager"
 import { initTaskToastManager } from "./features/task-toast-manager"
 import { TmuxSessionManager } from "./features/tmux-subagent"
+import { registerManagerForCleanup } from "./features/background-agent/process-cleanup"
 import { createConfigHandler } from "./plugin-handlers"
 import { log } from "./shared"
+import { markServerRunningInProcess } from "./shared/tmux/tmux-utils/server-health"
 
 export type Managers = {
   tmuxSessionManager: TmuxSessionManager
@@ -26,7 +28,16 @@ export function createManagers(args: {
 }): Managers {
   const { ctx, pluginConfig, tmuxConfig, modelCacheState, backgroundNotificationHookEnabled } = args
 
+  markServerRunningInProcess()
   const tmuxSessionManager = new TmuxSessionManager(ctx, tmuxConfig)
+
+  registerManagerForCleanup({
+    shutdown: async () => {
+      await tmuxSessionManager.cleanup().catch((error) => {
+        log("[create-managers] tmux cleanup error during process shutdown:", error)
+      })
+    },
+  })
 
   const backgroundManager = new BackgroundManager(
     ctx,

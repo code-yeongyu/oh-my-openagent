@@ -246,7 +246,13 @@ describe("parseConfigPartially", () => {
       const result = parseConfigPartially({});
 
       expect(result).not.toBeNull();
-      expect(Object.keys(result!).length).toBe(0);
+      expect(result).toEqual({
+        git_master: {
+          commit_footer: true,
+          include_co_authored_by: true,
+          git_env_prefix: "GIT_MASTER=1",
+        },
+      });
     });
   });
 

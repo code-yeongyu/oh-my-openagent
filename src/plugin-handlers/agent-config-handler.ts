@@ -4,10 +4,13 @@ import type { OhMyOpenCodeConfig } from "../config";
 import { log, migrateAgentConfig } from "../shared";
 import { AGENT_NAME_MAP } from "../shared/migration";
 import { getAgentDisplayName } from "../shared/agent-display-names";
+import { registerAgentName } from "../features/claude-code-session-state";
 import {
   discoverConfigSourceSkills,
+  discoverGlobalAgentsSkills,
   discoverOpencodeGlobalSkills,
   discoverOpencodeProjectSkills,
+  discoverProjectAgentsSkills,
   discoverProjectClaudeSkills,
   discoverUserClaudeSkills,
 } from "../features/opencode-skill-loader";
@@ -52,8 +55,10 @@ export async function applyAgentConfig(params: {
     discoveredConfigSourceSkills,
     discoveredUserSkills,
     discoveredProjectSkills,
+    discoveredProjectAgentsSkills,
     discoveredOpencodeGlobalSkills,
     discoveredOpencodeProjectSkills,
+    discoveredGlobalAgentsSkills,
   ] = await Promise.all([
     discoverConfigSourceSkills({
       config: params.pluginConfig.skills,
@@ -63,23 +68,29 @@ export async function applyAgentConfig(params: {
     includeClaudeSkillsForAwareness
        ? discoverProjectClaudeSkills(params.ctx.directory)
        : Promise.resolve([]),
+    includeClaudeSkillsForAwareness
+      ? discoverProjectAgentsSkills(params.ctx.directory)
+      : Promise.resolve([]),
     discoverOpencodeGlobalSkills(),
     discoverOpencodeProjectSkills(params.ctx.directory),
+    includeClaudeSkillsForAwareness ? discoverGlobalAgentsSkills() : Promise.resolve([]),
   ]);
 
   const allDiscoveredSkills = [
     ...discoveredConfigSourceSkills,
     ...discoveredOpencodeProjectSkills,
     ...discoveredProjectSkills,
+    ...discoveredProjectAgentsSkills,
     ...discoveredOpencodeGlobalSkills,
     ...discoveredUserSkills,
+    ...discoveredGlobalAgentsSkills,
   ];
 
   const browserProvider =
     params.pluginConfig.browser_automation_engine?.provider ?? "playwright";
   const currentModel = params.config.model as string | undefined;
   const disabledSkills = new Set<string>(params.pluginConfig.disabled_skills ?? []);
-  const useTaskSystem = params.pluginConfig.experimental?.task_system ?? false;
+  const useTaskSystem = params.pluginConfig.experimental?.task_system ?? true;
   const disableOmoEnv = params.pluginConfig.experimental?.disable_omo_env ?? false;
 
   const includeClaudeAgents = params.pluginConfig.claude_code?.agents ?? true;
@@ -186,6 +197,7 @@ export async function applyAgentConfig(params: {
         pluginPrometheusOverride: prometheusOverride,
         userCategories: params.pluginConfig.categories,
         currentModel,
+        disabledTools: params.pluginConfig.disabled_tools,
       });
     }
 
@@ -281,6 +293,9 @@ export async function applyAgentConfig(params: {
   }
 
   const agentResult = params.config.agent as Record<string, unknown>;
+  for (const name of Object.keys(agentResult)) {
+    registerAgentName(name);
+  }
   log("[config-handler] agents loaded", { agentKeys: Object.keys(agentResult) });
   return agentResult;
 }

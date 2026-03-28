@@ -129,6 +129,19 @@ describe("model-resolution check", () => {
       expect(visual!.userOverride).toBe("google/gemini-3-flash-preview")
       expect(visual!.userVariant).toBe("high")
     })
+
+    it("attaches snapshot-backed capability diagnostics for built-in models", async () => {
+      const { getModelResolutionInfoWithOverrides } = await import("./model-resolution")
+
+      const info = getModelResolutionInfoWithOverrides({})
+      const sisyphus = info.agents.find((a) => a.name === "sisyphus")
+
+      expect(sisyphus).toBeDefined()
+      expect(sisyphus!.capabilityDiagnostics).toMatchObject({
+        resolutionMode: "snapshot-backed",
+        snapshot: { source: "bundled-snapshot" },
+      })
+    })
   })
 
   describe("checkModelResolution", () => {
@@ -162,6 +175,23 @@ describe("model-resolution check", () => {
       expect(result.details!.some((d) => d.includes("Categories:"))).toBe(true)
       // Should have legend
       expect(result.details!.some((d) => d.includes("user override"))).toBe(true)
+      expect(result.details!.some((d) => d.includes("capabilities: snapshot-backed"))).toBe(true)
+    })
+
+    it("collects warnings when configured models rely on compatibility fallback", async () => {
+      const { collectCapabilityResolutionIssues, getModelResolutionInfoWithOverrides } = await import("./model-resolution")
+
+      const info = getModelResolutionInfoWithOverrides({
+        agents: {
+          oracle: { model: "custom/unknown-llm" },
+        },
+      })
+
+      const issues = collectCapabilityResolutionIssues(info)
+
+      expect(issues).toHaveLength(1)
+      expect(issues[0]?.title).toContain("compatibility fallback")
+      expect(issues[0]?.description).toContain("oracle=custom/unknown-llm")
     })
   })
 

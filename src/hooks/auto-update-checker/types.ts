@@ -1,3 +1,5 @@
+import type { ModelCapabilitiesConfig } from "../../config/schema/model-capabilities"
+
 export interface NpmDistTags {
   latest: string
   [key: string]: string
@@ -26,4 +28,5 @@ export interface AutoUpdateCheckerOptions {
   showStartupToast?: boolean
   isSisyphusEnabled?: boolean
   autoUpdate?: boolean
+  modelCapabilities?: ModelCapabilitiesConfig
 }

@@ -16,7 +16,7 @@ import {
   setSessionFallbackChain,
   setPendingModelFallback,
 } from "../hooks/model-fallback/hook";
-import { getFallbackModelsForSession } from "../hooks/runtime-fallback/fallback-models";
+import { getRawFallbackModels } from "../hooks/runtime-fallback/fallback-models";
 import { resetMessageCursor } from "../shared";
 import { getAgentConfigKey } from "../shared/agent-display-names";
 import { readConnectedProvidersCache } from "../shared/connected-providers-cache";
@@ -25,6 +25,7 @@ import { shouldRetryError } from "../shared/model-error-classifier";
 import { buildFallbackChainFromModels } from "../shared/fallback-chain-from-models";
 import { extractRetryAttempt, normalizeRetryStatusMessage } from "../shared/retry-status-utils";
 import { clearSessionModel, getSessionModel, setSessionModel } from "../shared/session-model-state";
+import { clearSessionPromptParams } from "../shared/session-prompt-params-state";
 import { deleteSessionTools } from "../shared/session-tools-store";
 import { lspManager } from "../tools";
 
@@ -110,10 +111,10 @@ function applyUserConfiguredFallbackChain(
   pluginConfig: OhMyOpenCodeConfig,
 ): void {
   const agentKey = getAgentConfigKey(agentName);
-  const configuredFallbackModels = getFallbackModelsForSession(sessionID, agentKey, pluginConfig);
-  if (configuredFallbackModels.length === 0) return;
+  const rawFallbackModels = getRawFallbackModels(sessionID, agentKey, pluginConfig);
+  if (!rawFallbackModels || rawFallbackModels.length === 0) return;
 
-  const fallbackChain = buildFallbackChainFromModels(configuredFallbackModels, currentProviderID);
+  const fallbackChain = buildFallbackChainFromModels(rawFallbackModels, currentProviderID);
 
   if (fallbackChain && fallbackChain.length > 0) {
     setSessionFallbackChain(sessionID, fallbackChain);
@@ -148,6 +149,8 @@ export function createEventHandler(args: {
           body: { parts: Array<{ type: "text"; text: string }> };
           query: { directory: string };
         }) => Promise<unknown>;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        summarize: (...args: any[]) => Promise<unknown>;
       };
     };
   };
@@ -190,31 +193,68 @@ export function createEventHandler(args: {
     return "opencode";
   };
 
+  const getEventSessionID = (input: EventInput): string | undefined => {
+    const properties = input.event.properties;
+    if (
+      !properties ||
+      typeof properties !== "object" ||
+      !("sessionID" in properties) ||
+      typeof properties.sessionID !== "string"
+    ) {
+      return undefined;
+    }
+    return properties.sessionID;
+  };
+
+  const runEventHookSafely = async (
+    hookName: string,
+    handler: ((input: EventInput) => unknown | Promise<unknown>) | null | undefined,
+    input: EventInput,
+  ): Promise<void> => {
+    if (!handler) return;
+
+    try {
+      await Promise.resolve(handler(input));
+    } catch (error) {
+      log("[event] hook execution failed", {
+        hook: hookName,
+        eventType: input.event.type,
+        sessionID: getEventSessionID(input),
+        error,
+      });
+    }
+  };
+
   const dispatchToHooks = async (input: EventInput): Promise<void> => {
-    await Promise.resolve(hooks.autoUpdateChecker?.event?.(input));
-    await Promise.resolve(hooks.claudeCodeHooks?.event?.(input));
-    await Promise.resolve(hooks.backgroundNotificationHook?.event?.(input));
-    await Promise.resolve(hooks.sessionNotification?.(input));
-    await Promise.resolve(hooks.todoContinuationEnforcer?.handler?.(input));
-    await Promise.resolve(hooks.unstableAgentBabysitter?.event?.(input));
-    await Promise.resolve(hooks.contextWindowMonitor?.event?.(input));
-    await Promise.resolve(hooks.preemptiveCompaction?.event?.(input));
-    await Promise.resolve(hooks.directoryAgentsInjector?.event?.(input));
-    await Promise.resolve(hooks.directoryReadmeInjector?.event?.(input));
-    await Promise.resolve(hooks.rulesInjector?.event?.(input));
-    await Promise.resolve(hooks.thinkMode?.event?.(input));
-    await Promise.resolve(hooks.anthropicContextWindowLimitRecovery?.event?.(input));
-    await Promise.resolve(hooks.runtimeFallback?.event?.(input));
-    await Promise.resolve(hooks.agentUsageReminder?.event?.(input));
-    await Promise.resolve(hooks.categorySkillReminder?.event?.(input));
-    await Promise.resolve(hooks.interactiveBashSession?.event?.(input as EventInput));
-    await Promise.resolve(hooks.ralphLoop?.event?.(input));
-    await Promise.resolve(hooks.stopContinuationGuard?.event?.(input));
-    await Promise.resolve(hooks.compactionContextInjector?.event?.(input));
-    await Promise.resolve(hooks.compactionTodoPreserver?.event?.(input));
-    await Promise.resolve(hooks.writeExistingFileGuard?.event?.(input));
-    await Promise.resolve(hooks.atlasHook?.handler?.(input));
-    await Promise.resolve(hooks.autoSlashCommand?.event?.(input));
+    await runEventHookSafely("autoUpdateChecker", hooks.autoUpdateChecker?.event, input);
+    await runEventHookSafely("legacyPluginToast", hooks.legacyPluginToast?.event, input);
+    await runEventHookSafely("claudeCodeHooks", hooks.claudeCodeHooks?.event, input);
+    await runEventHookSafely("backgroundNotificationHook", hooks.backgroundNotificationHook?.event, input);
+    await runEventHookSafely("sessionNotification", hooks.sessionNotification, input);
+    await runEventHookSafely("todoContinuationEnforcer", hooks.todoContinuationEnforcer?.handler, input);
+    await runEventHookSafely("unstableAgentBabysitter", hooks.unstableAgentBabysitter?.event, input);
+    await runEventHookSafely("contextWindowMonitor", hooks.contextWindowMonitor?.event, input);
+    await runEventHookSafely("preemptiveCompaction", hooks.preemptiveCompaction?.event, input);
+    await runEventHookSafely("directoryAgentsInjector", hooks.directoryAgentsInjector?.event, input);
+    await runEventHookSafely("directoryReadmeInjector", hooks.directoryReadmeInjector?.event, input);
+    await runEventHookSafely("rulesInjector", hooks.rulesInjector?.event, input);
+    await runEventHookSafely("thinkMode", hooks.thinkMode?.event, input);
+    await runEventHookSafely(
+      "anthropicContextWindowLimitRecovery",
+      hooks.anthropicContextWindowLimitRecovery?.event,
+      input,
+    );
+    await runEventHookSafely("runtimeFallback", hooks.runtimeFallback?.event, input);
+    await runEventHookSafely("agentUsageReminder", hooks.agentUsageReminder?.event, input);
+    await runEventHookSafely("categorySkillReminder", hooks.categorySkillReminder?.event, input);
+    await runEventHookSafely("interactiveBashSession", hooks.interactiveBashSession?.event, input as EventInput);
+    await runEventHookSafely("ralphLoop", hooks.ralphLoop?.event, input);
+    await runEventHookSafely("stopContinuationGuard", hooks.stopContinuationGuard?.event, input);
+    await runEventHookSafely("compactionContextInjector", hooks.compactionContextInjector?.event, input);
+    await runEventHookSafely("compactionTodoPreserver", hooks.compactionTodoPreserver?.event, input);
+    await runEventHookSafely("writeExistingFileGuard", hooks.writeExistingFileGuard?.event, input);
+    await runEventHookSafely("atlasHook", hooks.atlasHook?.handler, input);
+    await runEventHookSafely("autoSlashCommand", hooks.autoSlashCommand?.event, input);
   };
 
   const recentSyntheticIdles = new Map<string, number>();
@@ -328,6 +368,7 @@ export function createEventHandler(args: {
         resetMessageCursor(sessionInfo.id);
         firstMessageVariantGate.clear(sessionInfo.id);
         clearSessionModel(sessionInfo.id);
+        clearSessionPromptParams(sessionInfo.id);
         syncSubagentSessions.delete(sessionInfo.id);
         if (wasSyncSubagentSession) {
           subagentSessions.delete(sessionInfo.id);
@@ -502,6 +543,17 @@ export function createEventHandler(args: {
             sessionID === getMainSessionID() &&
             !hooks.stopContinuationGuard?.isStopped(sessionID)
           ) {
+            // Trigger compaction before sending "continue" to avoid double-sending continuation
+            await pluginContext.client.session
+              .summarize({
+                path: { id: sessionID },
+                body: { auto: true },
+                query: { directory: pluginContext.directory },
+              })
+              .catch((err: unknown) => {
+                log("[event] compaction before recovery continue failed:", { sessionID, error: err });
+              });
+
             await pluginContext.client.session
               .prompt({
                 path: { id: sessionID },

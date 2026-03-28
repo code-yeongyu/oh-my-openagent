@@ -71,6 +71,9 @@ export interface DelegateTaskToolOptions {
   syncPollTimeoutMs?: number
 }
 
+import type { DelegatedModelConfig } from "../../shared/model-resolution-types"
+export type { DelegatedModelConfig }
+
 export interface BuildSystemContentInput {
   skillContent?: string
   skillContents?: string[]
@@ -78,7 +81,7 @@ export interface BuildSystemContentInput {
   agentsContext?: string
   planAgentPrepend?: string
   maxPromptTokens?: number
-  model?: { providerID: string; modelID: string; variant?: string }
+  model?: DelegatedModelConfig
   agentName?: string
   availableCategories?: AvailableCategory[]
   availableSkills?: AvailableSkill[]

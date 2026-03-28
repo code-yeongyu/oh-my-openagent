@@ -8,6 +8,7 @@ import { buildAgent, isFactory } from "../agent-builder"
 import { applyOverrides } from "./agent-overrides"
 import { applyEnvironmentContext } from "./environment-context"
 import { applyModelResolution, getFirstFallbackModel } from "./model-resolution"
+import { log } from "../../shared/logger"
 
 export function collectPendingBuiltinAgents(input: {
   agentSources: Record<BuiltinAgentName, import("../agent-builder").AgentSource>
@@ -69,14 +70,24 @@ export function collectPendingBuiltinAgents(input: {
     const isPrimaryAgent = isFactory(source) && source.mode === "primary"
 
     let resolution = applyModelResolution({
-      uiSelectedModel: (isPrimaryAgent && !override?.model) ? uiSelectedModel : undefined,
+      uiSelectedModel: (isPrimaryAgent && override?.model === undefined) ? uiSelectedModel : undefined,
       userModel: override?.model,
       requirement,
       availableModels,
       systemDefaultModel,
     })
-    if (!resolution && isFirstRunNoCache && !override?.model) {
-      resolution = getFirstFallbackModel(requirement)
+    if (!resolution) {
+      if (override?.model) {
+        // User explicitly configured a model but resolution failed (e.g., cold cache).
+        // Honor the user's choice directly instead of falling back to hardcoded chain.
+        log("[agent-registration] User-configured model not resolved, using as-is", {
+          agent: agentName,
+          configuredModel: override.model,
+        })
+        resolution = { model: override.model, provenance: "override" as const }
+      } else {
+        resolution = getFirstFallbackModel(requirement)
+      }
     }
     if (!resolution) continue
     const { model, variant: resolvedVariant } = resolution

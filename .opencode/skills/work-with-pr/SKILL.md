@@ -282,6 +282,18 @@ Once all three gates pass:
 gh pr merge "$PR_NUMBER" --squash --delete-branch
 ```
 
+### Sync .sisyphus state back to main repo
+
+Before removing the worktree, copy `.sisyphus/` state back. When `.sisyphus/` is gitignored, files written there during worktree execution are not committed or merged — they would be lost on worktree removal.
+
+```bash
+# Sync .sisyphus state from worktree to main repo (preserves task state, plans, notepads)
+if [ -d "$WORKTREE_PATH/.sisyphus" ]; then
+  mkdir -p "$ORIGINAL_DIR/.sisyphus"
+  cp -r "$WORKTREE_PATH/.sisyphus/"* "$ORIGINAL_DIR/.sisyphus/" 2>/dev/null || true
+fi
+```
+
 ### Clean up the worktree
 
 The worktree served its purpose — remove it to avoid disk bloat:

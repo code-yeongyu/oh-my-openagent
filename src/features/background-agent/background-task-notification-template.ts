@@ -1,6 +1,6 @@
 import type { BackgroundTask } from "./types"
 
-export type BackgroundTaskNotificationStatus = "COMPLETED" | "CANCELLED" | "INTERRUPTED"
+export type BackgroundTaskNotificationStatus = "COMPLETED" | "CANCELLED" | "INTERRUPTED" | "ERROR"
 
 export function buildBackgroundTaskNotificationText(input: {
   task: BackgroundTask
@@ -15,21 +15,43 @@ export function buildBackgroundTaskNotificationText(input: {
   const errorInfo = task.error ? `\n**Error:** ${task.error}` : ""
 
   if (allComplete) {
-    const completedTasksText = completedTasks
-      .map((t) => `- \`${t.id}\`: ${t.description}`)
-      .join("\n")
+    const succeededTasks = completedTasks.filter((t) => t.status === "completed")
+    const failedTasks = completedTasks.filter((t) => t.status !== "completed")
+
+    const succeededText = succeededTasks.length > 0
+      ? succeededTasks.map((t) => `- \`${t.id}\`: ${t.description}`).join("\n")
+      : ""
+    const failedText = failedTasks.length > 0
+      ? failedTasks.map((t) => `- \`${t.id}\`: ${t.description} [${t.status.toUpperCase()}]${t.error ? ` - ${t.error}` : ""}`).join("\n")
+      : ""
+
+    const hasFailures = failedTasks.length > 0
+    const header = hasFailures
+      ? `[ALL BACKGROUND TASKS FINISHED - ${failedTasks.length} FAILED]`
+      : "[ALL BACKGROUND TASKS COMPLETE]"
+
+    let body = ""
+    if (succeededText) {
+      body += `**Completed:**\n${succeededText}\n`
+    }
+    if (failedText) {
+      body += `\n**Failed:**\n${failedText}\n`
+    }
+    if (!body) {
+      body = `- \`${task.id}\`: ${task.description} [${task.status.toUpperCase()}]${task.error ? ` - ${task.error}` : ""}\n`
+    }
 
     return `<system-reminder>
-[ALL BACKGROUND TASKS COMPLETE]
+${header}
 
-**Completed:**
-${completedTasksText || `- \`${task.id}\`: ${task.description}`}
+${body.trim()}
 
-Use \`background_output(task_id="<id>")\` to retrieve each result.
+Use \`background_output(task_id="<id>")\` to retrieve each result.${hasFailures ? `\n\n**ACTION REQUIRED:** ${failedTasks.length} task(s) failed. Check errors above and decide whether to retry or proceed.` : ""}
 </system-reminder>`
   }
 
   const agentInfo = task.category ? `${task.agent} (${task.category})` : task.agent
+  const isFailure = statusText !== "COMPLETED"
 
   return `<system-reminder>
 [BACKGROUND TASK ${statusText}]
@@ -39,7 +61,7 @@ Use \`background_output(task_id="<id>")\` to retrieve each result.
 **Duration:** ${duration}${errorInfo}
 
 **${remainingCount} task${remainingCount === 1 ? "" : "s"} still in progress.** You WILL be notified when ALL complete.
-Do NOT poll - continue productive work.
+${isFailure ? "**ACTION REQUIRED:** This task failed. Check the error and decide whether to retry, cancel remaining tasks, or continue." : "Do NOT poll - continue productive work."}
 
 Use \`background_output(task_id="${task.id}")\` to retrieve this result when ready.
 </system-reminder>`

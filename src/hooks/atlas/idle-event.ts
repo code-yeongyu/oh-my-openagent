@@ -5,6 +5,8 @@ import {
   readBoulderState,
   readCurrentTopLevelTask,
 } from "../../features/boulder-state"
+import { getSessionAgent, isAgentRegistered, subagentSessions } from "../../features/claude-code-session-state"
+import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { log } from "../../shared/logger"
 import { injectBoulderContinuation } from "./boulder-continuation-injector"
 import { HOOK_NAME } from "./hook-name"
@@ -134,6 +136,31 @@ export async function handleAtlasSessionIdle(input: {
       sessionID,
       plan: boulderState.plan_name,
     })
+  }
+
+  if (subagentSessions.has(sessionID)) {
+    const sessionAgent = getSessionAgent(sessionID)
+    const agentKey = getAgentConfigKey(sessionAgent ?? "")
+    const requiredAgentName = boulderState.agent ?? (isAgentRegistered("atlas") ? "atlas" : undefined)
+    if (!requiredAgentName || !isAgentRegistered(requiredAgentName)) {
+      log(`[${HOOK_NAME}] Skipped: boulder agent is unavailable for continuation`, {
+        sessionID,
+        requiredAgent: boulderState.agent ?? "unknown",
+      })
+      return
+    }
+    const requiredAgentKey = getAgentConfigKey(requiredAgentName)
+    const agentMatches =
+      agentKey === requiredAgentKey ||
+      (requiredAgentKey === getAgentConfigKey("atlas") && agentKey === getAgentConfigKey("sisyphus"))
+    if (!agentMatches) {
+      log(`[${HOOK_NAME}] Skipped: subagent agent does not match boulder agent`, {
+        sessionID,
+        agent: sessionAgent ?? "unknown",
+          requiredAgent: requiredAgentName,
+        })
+        return
+      }
   }
 
   const sessionState = getState(sessionID)

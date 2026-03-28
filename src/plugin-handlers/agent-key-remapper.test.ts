@@ -12,10 +12,10 @@ describe("remapAgentKeysToDisplayNames", () => {
     // when remapping
     const result = remapAgentKeysToDisplayNames(agents)
 
-    // then known agents get display name keys only
+    // then known agents get display name keys and config key aliases
     expect(result["Sisyphus (Ultraworker)"]).toBeDefined()
     expect(result["oracle"]).toBeDefined()
-    expect(result["sisyphus"]).toBeUndefined()
+    expect(result["sisyphus"]).toBeDefined()
   })
 
   it("preserves unknown agent keys unchanged", () => {
@@ -46,20 +46,20 @@ describe("remapAgentKeysToDisplayNames", () => {
     // when remapping
     const result = remapAgentKeysToDisplayNames(agents)
 
-    // then all get display name keys without lowercase duplicates
+    // then all get display name keys with config key aliases preserved
     expect(result["Sisyphus (Ultraworker)"]).toBeDefined()
-    expect(result["sisyphus"]).toBeUndefined()
+    expect(result["sisyphus"]).toBeDefined()
     expect(result["Hephaestus (Deep Agent)"]).toBeDefined()
-    expect(result["hephaestus"]).toBeUndefined()
+    expect(result["hephaestus"]).toBeDefined()
     expect(result["Prometheus (Plan Builder)"]).toBeDefined()
-    expect(result["prometheus"]).toBeUndefined()
+    expect(result["prometheus"]).toBeDefined()
     expect(result["Atlas (Plan Executor)"]).toBeDefined()
-    expect(result["atlas"]).toBeUndefined()
+    expect(result["atlas"]).toBeDefined()
     expect(result["Metis (Plan Consultant)"]).toBeDefined()
-    expect(result["metis"]).toBeUndefined()
+    expect(result["metis"]).toBeDefined()
     expect(result["Momus (Plan Critic)"]).toBeDefined()
-    expect(result["momus"]).toBeUndefined()
+    expect(result["momus"]).toBeDefined()
     expect(result["Sisyphus-Junior"]).toBeDefined()
-    expect(result["sisyphus-junior"]).toBeUndefined()
+    expect(result["sisyphus-junior"]).toBeDefined()
   })
 })

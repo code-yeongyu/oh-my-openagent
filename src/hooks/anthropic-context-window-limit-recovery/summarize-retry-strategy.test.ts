@@ -98,9 +98,9 @@ describe("runSummarizeRetryStrategy", () => {
     }) as typeof setTimeout
 
     autoCompactState.retryStateBySession.set(sessionID, {
-      attempt: 1,
+      attempt: 0,
       lastAttemptTime: Date.now(),
-      firstAttemptTime: Date.now() - 119700,
+      firstAttemptTime: Date.now() - 119900,
     })
     summarizeMock.mockRejectedValueOnce(new Error("rate limited"))
 
@@ -117,6 +117,6 @@ describe("runSummarizeRetryStrategy", () => {
     //#then
     expect(timeoutCalls.length).toBe(1)
     expect(timeoutCalls[0]!.delay).toBeGreaterThan(0)
-    expect(timeoutCalls[0]!.delay).toBeLessThanOrEqual(500)
+    expect(timeoutCalls[0]!.delay).toBeLessThanOrEqual(300)
   })
 })

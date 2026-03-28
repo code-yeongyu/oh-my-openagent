@@ -91,6 +91,11 @@ export function isGpt5_3CodexModel(model: string): boolean {
 
 const GEMINI_PROVIDERS = ["google/", "google-vertex/"];
 
+export function isMiniMaxModel(model: string): boolean {
+  const modelName = extractModelName(model).toLowerCase();
+  return modelName.includes("minimax");
+}
+
 export function isGeminiModel(model: string): boolean {
   if (GEMINI_PROVIDERS.some((prefix) => model.startsWith(prefix))) return true;
 
@@ -123,7 +128,7 @@ export type AgentName = BuiltinAgentName;
 export type AgentOverrideConfig = Partial<AgentConfig> & {
   prompt_append?: string;
   variant?: string;
-  fallback_models?: string | string[];
+  fallback_models?: string | (string | import("../config/schema/fallback-models").FallbackModelObject)[];
 };
 
 export type AgentOverrides = Partial<

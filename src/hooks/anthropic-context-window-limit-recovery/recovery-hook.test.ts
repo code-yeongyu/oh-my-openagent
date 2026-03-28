@@ -6,8 +6,11 @@ import * as originalLogger from "../../shared/logger"
 
 const executeCompactMock = mock(async () => {})
 const getLastAssistantMock = mock(async () => ({
-  providerID: "anthropic",
-  modelID: "claude-sonnet-4-6",
+  info: {
+    providerID: "anthropic",
+    modelID: "claude-sonnet-4-6",
+  },
+  hasContent: true,
 }))
 const parseAnthropicTokenLimitErrorMock = mock(() => ({
   providerID: "anthropic",
@@ -111,6 +114,45 @@ describe("createAnthropicContextWindowLimitRecoveryHook", () => {
       expect(getClearTimeoutCalls()).toEqual([1 as ReturnType<typeof setTimeout>])
       expect(executeCompactMock).toHaveBeenCalledTimes(1)
       expect(executeCompactMock.mock.calls[0]?.[0]).toBe("session-race")
+    } finally {
+      restore()
+    }
+  })
+
+  test("does not treat empty summary assistant messages as successful compaction", async () => {
+    //#given
+    const { restore, getClearTimeoutCalls } = setupDelayedTimeoutMocks()
+    getLastAssistantMock.mockResolvedValueOnce({
+      info: {
+        summary: true,
+        providerID: "anthropic",
+        modelID: "claude-sonnet-4-6",
+      },
+      hasContent: false,
+    })
+    const { createAnthropicContextWindowLimitRecoveryHook } = await import("./recovery-hook")
+    const hook = createAnthropicContextWindowLimitRecoveryHook(createMockContext())
+
+    try {
+      //#when
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: { sessionID: "session-empty-summary", error: "prompt is too long" },
+        },
+      })
+
+      await hook.event({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: "session-empty-summary" },
+        },
+      })
+
+      //#then
+      expect(getClearTimeoutCalls()).toEqual([1 as ReturnType<typeof setTimeout>])
+      expect(executeCompactMock).toHaveBeenCalledTimes(1)
+      expect(executeCompactMock.mock.calls[0]?.[0]).toBe("session-empty-summary")
     } finally {
       restore()
     }

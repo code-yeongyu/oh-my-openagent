@@ -10,9 +10,16 @@ import type { Diagnostic } from "./types"
 
 export const lsp_diagnostics: ToolDefinition = tool({
   description:
-    'Get errors, warnings, hints from language server BEFORE running build. For directories, provide \'extension\' parameter (e.g., extension=".ts").',
+    'Get errors, warnings, hints from language server BEFORE running build. Use filePath for a single file, or filePath with extension for a directory. Do NOT pass both filePath and directory — use filePath for everything.',
   args: {
-    filePath: tool.schema.string(),
+    filePath: tool.schema
+      .string()
+      .optional()
+      .describe("File or directory path to check diagnostics for"),
+    directory: tool.schema
+      .string()
+      .optional()
+      .describe("Alias for filePath when checking a directory. Do NOT provide both filePath and directory."),
     severity: tool.schema
       .enum(["error", "warning", "information", "hint", "all"])
       .optional()
@@ -20,11 +27,20 @@ export const lsp_diagnostics: ToolDefinition = tool({
     extension: tool.schema
       .string()
       .optional()
-      .describe("Required if filePath is a directory. E.g., '.ts', '.py', '.go'"),
+      .describe("Required if target is a directory. E.g., '.ts', '.py', '.go', '.java'"),
   },
   execute: async (args, _context) => {
     try {
-      const absPath = resolve(args.filePath)
+      // Accept either filePath or directory (treat directory as alias for filePath)
+      const targetPath = args.filePath || args.directory
+      if (!targetPath) {
+        throw new Error("Provide either 'filePath' or 'directory' parameter.")
+      }
+      if (args.filePath && args.directory) {
+        // Instead of erroring, just use filePath and ignore directory
+        // This prevents model confusion from causing hard failures
+      }
+      const absPath = resolve(targetPath)
 
       if (isDirectoryPath(absPath)) {
         if (!args.extension) {
@@ -37,8 +53,8 @@ export const lsp_diagnostics: ToolDefinition = tool({
         return await aggregateDiagnosticsForDirectory(absPath, args.extension, args.severity)
       }
 
-      const result = await withLspClient(args.filePath, async (client) => {
-        return (await client.diagnostics(args.filePath)) as { items?: Diagnostic[] } | Diagnostic[] | null
+      const result = await withLspClient(targetPath, async (client) => {
+        return (await client.diagnostics(targetPath)) as { items?: Diagnostic[] } | Diagnostic[] | null
       })
 
       let diagnostics: Diagnostic[] = []

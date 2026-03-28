@@ -15,7 +15,7 @@ function getConfigQuestionPermission(): string | null {
 }
 
 function agentByKey(agentResult: Record<string, unknown>, key: string): AgentWithPermission | undefined {
-  return (agentResult[key] ?? agentResult[getAgentDisplayName(key)]) as
+  return (agentResult[getAgentDisplayName(key)] ?? agentResult[key]) as
     | AgentWithPermission
     | undefined;
 }
@@ -25,9 +25,13 @@ export function applyToolConfig(params: {
   pluginConfig: OhMyOpenCodeConfig;
   agentResult: Record<string, unknown>;
 }): void {
-  const denyTodoTools = params.pluginConfig.experimental?.task_system
+  const taskSystemEnabled = params.pluginConfig.experimental?.task_system ?? true
+  const denyTodoTools = taskSystemEnabled
     ? { todowrite: "deny", todoread: "deny" }
     : {}
+
+  const existingPermission = params.config.permission as Record<string, unknown> | undefined;
+  const skillDeniedByHost = existingPermission?.skill === "deny";
 
   params.config.tools = {
     ...(params.config.tools as Record<string, unknown>),
@@ -37,14 +41,19 @@ export function applyToolConfig(params: {
     LspCodeActionResolve: false,
     "task_*": false,
     teammate: false,
-    ...(params.pluginConfig.experimental?.task_system
+    ...(taskSystemEnabled
       ? { todowrite: false, todoread: false }
+      : {}),
+    ...(skillDeniedByHost
+      ? { skill: false, skill_mcp: false }
       : {}),
   };
 
   const isCliRunMode = process.env.OPENCODE_CLI_RUN_MODE === "true";
   const configQuestionPermission = getConfigQuestionPermission();
+  const isQuestionDisabledByPlugin = params.pluginConfig.disabled_tools?.includes("question") ?? false;
   const questionPermission =
+    isQuestionDisabledByPlugin ? "deny" :
     configQuestionPermission === "deny" ? "deny" :
     isCliRunMode ? "deny" :
     "allow";

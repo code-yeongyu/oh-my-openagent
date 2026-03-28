@@ -1,6 +1,6 @@
 {
   "name": "oh-my-opencode",
-  "version": "3.11.0",
+  "version": "3.14.0",
   "description": "The Best AI Agent Harness - Batteries-Included OpenCode Plugin with Multi-Model Orchestration, Parallel Background Agents, and Crafted LSP/AST Tools",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -25,10 +25,12 @@
     "build:all": "bun run build && bun run build:binaries",
     "build:binaries": "bun run script/build-binaries.ts",
     "build:schema": "bun run script/build-schema.ts",
+    "build:model-capabilities": "bun run script/build-model-capabilities.ts",
     "clean": "rm -rf dist",
     "prepare": "bun run build",
     "postinstall": "node postinstall.mjs",
     "prepublishOnly": "bun run clean && bun run build",
+    "test:model-capabilities": "bun test src/shared/model-capability-aliases.test.ts src/shared/model-capability-guardrails.test.ts src/shared/model-capabilities.test.ts src/cli/doctor/checks/model-resolution.test.ts --bail",
     "typecheck": "tsc --noEmit",
     "test": "bun test"
   },
@@ -76,17 +78,17 @@
     "typescript": "^5.7.3"
   },
   "optionalDependencies": {
-    "oh-my-opencode-darwin-arm64": "3.11.0",
-    "oh-my-opencode-darwin-x64": "3.11.0",
-    "oh-my-opencode-darwin-x64-baseline": "3.11.0",
-    "oh-my-opencode-linux-arm64": "3.11.0",
-    "oh-my-opencode-linux-arm64-musl": "3.11.0",
-    "oh-my-opencode-linux-x64": "3.11.0",
-    "oh-my-opencode-linux-x64-baseline": "3.11.0",
-    "oh-my-opencode-linux-x64-musl": "3.11.0",
-    "oh-my-opencode-linux-x64-musl-baseline": "3.11.0",
-    "oh-my-opencode-windows-x64": "3.11.0",
-    "oh-my-opencode-windows-x64-baseline": "3.11.0"
+    "oh-my-opencode-darwin-arm64": "3.14.0",
+    "oh-my-opencode-darwin-x64": "3.14.0",
+    "oh-my-opencode-darwin-x64-baseline": "3.14.0",
+    "oh-my-opencode-linux-arm64": "3.14.0",
+    "oh-my-opencode-linux-arm64-musl": "3.14.0",
+    "oh-my-opencode-linux-x64": "3.14.0",
+    "oh-my-opencode-linux-x64-baseline": "3.14.0",
+    "oh-my-opencode-linux-x64-musl": "3.14.0",
+    "oh-my-opencode-linux-x64-musl-baseline": "3.14.0",
+    "oh-my-opencode-windows-x64": "3.14.0",
+    "oh-my-opencode-windows-x64-baseline": "3.14.0"
   },
   "overrides": {
     "@opencode-ai/sdk": "^1.2.24"

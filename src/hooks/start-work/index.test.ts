@@ -12,7 +12,6 @@ import {
 import type { BoulderState } from "../../features/boulder-state"
 import * as sessionState from "../../features/claude-code-session-state"
 import * as worktreeDetector from "./worktree-detector"
-import * as worktreeDetector from "./worktree-detector"
 
 describe("start-work hook", () => {
   let testDir: string
@@ -26,6 +25,9 @@ describe("start-work hook", () => {
   }
 
   beforeEach(() => {
+    sessionState._resetForTesting()
+    sessionState.registerAgentName("atlas")
+    sessionState.registerAgentName("sisyphus")
     testDir = join(tmpdir(), `start-work-test-${randomUUID()}`)
     sisyphusDir = join(testDir, ".sisyphus")
     if (!existsSync(testDir)) {
@@ -38,6 +40,7 @@ describe("start-work hook", () => {
   })
 
   afterEach(() => {
+    sessionState._resetForTesting()
     clearBoulderState(testDir)
     if (existsSync(testDir)) {
       rmSync(testDir, { recursive: true, force: true })
@@ -403,6 +406,47 @@ describe("start-work hook", () => {
       // then
       expect(updateSpy).toHaveBeenCalledWith("ses-prometheus-to-sisyphus", "atlas")
       updateSpy.mockRestore()
+    })
+
+    test("should stamp the outgoing message with Atlas so follow-up events keep the handoff", async () => {
+      // given
+      const hook = createStartWorkHook(createMockPluginInput())
+      const output = {
+        message: {} as Record<string, unknown>,
+        parts: [{ type: "text", text: "<session-context></session-context>" }],
+      }
+
+      // when
+      await hook["chat.message"](
+        { sessionID: "ses-prometheus-to-atlas" },
+        output
+      )
+
+      // then
+      expect(output.message.agent).toBe("Atlas (Plan Executor)")
+    })
+
+    test("should keep the current agent when Atlas is unavailable", async () => {
+      // given
+      sessionState._resetForTesting()
+      sessionState.registerAgentName("sisyphus")
+      sessionState.updateSessionAgent("ses-prometheus-to-sisyphus", "sisyphus")
+
+      const hook = createStartWorkHook(createMockPluginInput())
+      const output = {
+        message: {} as Record<string, unknown>,
+        parts: [{ type: "text", text: "<session-context></session-context>" }],
+      }
+
+      // when
+      await hook["chat.message"](
+        { sessionID: "ses-prometheus-to-sisyphus" },
+        output
+      )
+
+      // then
+      expect(output.message.agent).toBe("Sisyphus (Ultraworker)")
+      expect(sessionState.getSessionAgent("ses-prometheus-to-sisyphus")).toBe("sisyphus")
     })
   })
 

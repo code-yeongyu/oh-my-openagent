@@ -465,7 +465,7 @@ describe("sisyphus-task", () => {
        expect(args.subagent_type).toBe("Sisyphus-Junior")
     }, { timeout: 10000 })
 
-    test("category overrides subagent_type and still maps to sisyphus-junior", async () => {
+    test("rejects when both category and subagent_type are provided", async () => {
       //#given
       const { createDelegateTask } = require("./tools")
 
@@ -507,14 +507,7 @@ describe("sisyphus-task", () => {
         abort: new AbortController().signal,
       }
 
-      const args: {
-        description: string
-        prompt: string
-        category: string
-        subagent_type: string
-        run_in_background: boolean
-        load_skills: string[]
-      } = {
+      const args = {
         description: "Override test",
         prompt: "Do something",
         category: "quick",
@@ -523,12 +516,8 @@ describe("sisyphus-task", () => {
         load_skills: [],
       }
 
-      //#when
-      const result = await tool.execute(args, toolContext)
-
-      //#then
-      expect(args.subagent_type).toBe("Sisyphus-Junior")
-      expect(result).toContain("Background task launched")
+      //#when + #then
+      await expect(tool.execute(args, toolContext)).rejects.toThrow("mutually exclusive")
     }, { timeout: 10000 })
 
     test("proceeds without error when systemDefaultModel is undefined", async () => {
@@ -1460,6 +1449,44 @@ describe("sisyphus-task", () => {
       // then
       expect(launchCalled).toBe(true)
       expect(result).toContain("Background task launched")
+    }, { timeout: 10000 })
+
+    test("#given direct subagent with inherited unstable model and run_in_background=false #when executing #then supervised execution is used", async () => {
+      const { createDelegateTask } = require("./tools")
+      const mockManager = { launch: async () => ({}) }
+      const mockClient = {
+        app: { agents: async () => ({ data: [{ name: "oracle", mode: "subagent", model: { providerID: "openai", modelID: "gpt-5.4" } }] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        session: {
+          create: async () => ({ data: { id: "test-session" } }),
+          prompt: async () => ({ data: {} }),
+          promptAsync: async () => ({ data: {} }),
+          messages: async () => ({ data: [] }),
+          status: async () => ({ data: {} }),
+        },
+      }
+      const tool = createDelegateTask({ manager: mockManager, client: mockClient })
+      const executeUnstableAgentTaskSpy = spyOn(executor, "executeUnstableAgentTask").mockResolvedValue("SUPERVISED TASK COMPLETED SUCCESSFULLY")
+      spyOn(executor, "resolveParentContext").mockResolvedValue({
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        model: { providerID: "google", modelID: "gemini-3.1-pro" },
+      })
+
+      const result = await tool.execute(
+        {
+          description: "Direct unstable subagent",
+          prompt: "Inspect architecture",
+          subagent_type: "oracle",
+          run_in_background: false,
+          load_skills: [],
+        },
+        { sessionID: "parent-session", messageID: "parent-message", agent: "sisyphus", abort: new AbortController().signal }
+      )
+
+      expect(executeUnstableAgentTaskSpy).toHaveBeenCalled()
+      expect(result).toContain("SUPERVISED TASK COMPLETED SUCCESSFULLY")
     }, { timeout: 10000 })
   })
 

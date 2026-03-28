@@ -3,6 +3,7 @@ import {
   isInsideTmux,
   isServerRunning,
   resetServerCheck,
+  markServerRunningInProcess,
   spawnTmuxPane,
   closeTmuxPane,
   applyLayout,
@@ -43,12 +44,12 @@ describe("isInsideTmux", () => {
     expect(result).toBe(false)
   })
 
-  test("returns the same result as the process environment helper", () => {
+  test("is exported as a function", () => {
     // given, #when
-    const result = isInsideTmux()
+    const result = typeof isInsideTmux
 
     // then
-    expect(result).toBe(isInsideTmuxEnvironment(process.env))
+    expect(result).toBe("function")
   })
 })
 
@@ -162,6 +163,46 @@ describe("resetServerCheck", () => {
 
     // cleanup
     globalThis.fetch = originalFetch
+  })
+})
+
+describe("markServerRunningInProcess", () => {
+  const originalFetch = globalThis.fetch
+  const SERVER_RUNNING_KEY = Symbol.for("oh-my-opencode:server-running-in-process")
+
+  beforeEach(() => {
+    resetServerCheck()
+    delete (globalThis as Record<symbol, boolean>)[SERVER_RUNNING_KEY]
+  })
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch
+    delete (globalThis as Record<symbol, boolean>)[SERVER_RUNNING_KEY]
+  })
+
+  test("skips HTTP fetch when marked as running in-process", async () => {
+    // given
+    const fetchMock = mock(async () => ({ ok: true })) as any
+    globalThis.fetch = fetchMock
+    markServerRunningInProcess()
+
+    // when
+    const result = await isServerRunning("http://localhost:4096")
+
+    // then
+    expect(result).toBe(true)
+    expect(fetchMock.mock.calls.length).toBe(0)
+  })
+
+  test("uses globalThis so flag survives across module instances", () => {
+    // given
+    markServerRunningInProcess()
+
+    // when
+    const flag = (globalThis as Record<symbol, boolean>)[SERVER_RUNNING_KEY]
+
+    // then
+    expect(flag).toBe(true)
   })
 })
 

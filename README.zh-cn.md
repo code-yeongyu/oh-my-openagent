@@ -4,6 +4,17 @@
 > 核心维护者 Q 因受伤，本周 issue/PR 回复和发布可能会延迟。
 > 感谢你的耐心与支持。
 
+> [!TIP]
+> **Building in Public**
+>
+> 维护者正在使用 Jobdori 实时开发和维护 oh-my-opencode。Jobdori 是基于 OpenClaw 深度定制的 AI 助手。
+> 每个功能开发、每次修复、每次 Issue 分类，都在 Discord 上实时进行。
+>
+> [![Building in Public](./.github/assets/building-in-public.png)](https://discord.gg/PUwSMR9XNk)
+>
+> [**→ 在 #building-in-public 频道中查看**](https://discord.gg/PUwSMR9XNk)
+
+
 > [!NOTE]
 >
 > [![Sisyphus Labs - Sisyphus is the agent that codes like your team.](./.github/assets/sisyphuslabs.png?v=2)](https://sisyphuslabs.ai)
@@ -158,7 +169,7 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 
 **Sisyphus** (`claude-opus-4-6` / **`kimi-k2.5`** / **`glm-5`**) 是你的主指挥官。他负责制定计划、分配任务给专家团队，并以极其激进的并行策略推动任务直至完成。他从不半途而废。
 
-**Hephaestus** (`gpt-5.3-codex`) 是你的自主深度工作者。你只需要给他目标，不要给他具体做法。他会自动探索代码库模式，从头到尾独立执行任务，绝不会中途要你当保姆。*名副其实的正牌工匠。*
+**Hephaestus** (`gpt-5.4`) 是你的自主深度工作者。你只需要给他目标，不要给他具体做法。他会自动探索代码库模式，从头到尾独立执行任务，绝不会中途要你当保姆。*名副其实的正牌工匠。*
 
 **Prometheus** (`claude-opus-4-6` / **`kimi-k2.5`** / **`glm-5`**) 是你的战略规划师。他通过访谈模式，在动一行代码之前，先通过提问确定范围并构建详尽的执行计划。
 
@@ -166,7 +177,7 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 
 > Anthropic [因为我们屏蔽了 OpenCode](https://x.com/thdxr/status/2010149530486911014)。这就是为什么我们将 Hephaestus 命名为“正牌工匠 (The Legitimate Craftsman)”。这是一个故意的讽刺。
 >
-> 我们在 Opus 上运行得最好，但仅仅使用 Kimi K2.5 + GPT-5.3 Codex 就足以碾压原版的 Claude Code。完全不需要配置。
+> 我们在 Opus 上运行得最好，但仅仅使用 Kimi K2.5 + GPT-5.4 就足以碾压原版的 Claude Code。完全不需要配置。
 
 ### 智能体调度机制
 

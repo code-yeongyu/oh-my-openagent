@@ -1,8 +1,7 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin"
-import type { DelegateTaskArgs, ToolContextWithMetadata, DelegateTaskToolOptions } from "./types"
+import type { DelegateTaskArgs, DelegatedModelConfig, ToolContextWithMetadata, DelegateTaskToolOptions } from "./types"
 import { CATEGORY_DESCRIPTIONS } from "./constants"
 import { SISYPHUS_JUNIOR_AGENT } from "./sisyphus-junior-agent"
-import { resolveTaskRouting } from "./task-routing-resolver"
 import { mergeCategories } from "../../shared/merge-categories"
 import { log } from "../../shared/logger"
 import { buildSystemContent } from "./prompt-builder"
@@ -15,6 +14,8 @@ import {
   resolveParentContext,
   executeBackgroundContinuation,
   executeSyncContinuation,
+  resolveCategoryExecution,
+  resolveSubagentExecution,
   executeUnstableAgentTask,
   executeBackgroundTask,
   executeSyncTask,
@@ -75,13 +76,13 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
   - category: For task delegation (uses Sisyphus-Junior with category-optimized model)
   - subagent_type: For direct agent invocation (explore, librarian, oracle, etc.)
   
-  **DO NOT provide both.** If category is provided, subagent_type is ignored.
+  **DO NOT provide both.** category and subagent_type are mutually exclusive.
   
   - load_skills: ALWAYS REQUIRED. Pass [] if no skills needed, or ["skill-1", "skill-2"] for category tasks.
   - category: Use predefined category → Spawns Sisyphus-Junior with category config
     Available categories:
   ${categoryList}
-  - subagent_type: Use specific agent directly (explore, librarian, oracle, metis, momus)
+  - subagent_type: Use a specific callable non-primary agent directly (for example: explore, librarian, oracle, metis, momus)
   - run_in_background: REQUIRED. true=async (returns task_id), false=sync (waits). Use background=true ONLY for parallel exploration with 5+ independent queries.
   - session_id: Existing Task session to continue (from previous task output). Continues agent with FULL CONTEXT PRESERVED - saves tokens, maintains continuity.
   - command: The command that triggered this task (optional, for slash command tracking).
@@ -101,20 +102,23 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
       prompt: tool.schema.string().describe("Full detailed prompt for the agent"),
       run_in_background: tool.schema.boolean().describe("REQUIRED. true=async (returns task_id), false=sync (waits). Use false for task delegation, true ONLY for parallel exploration."),
       category: tool.schema.string().optional().describe(`REQUIRED if subagent_type not provided. Do NOT provide both category and subagent_type.`),
-      subagent_type: tool.schema.string().optional().describe("REQUIRED if category not provided. Do NOT provide both category and subagent_type."),
+      subagent_type: tool.schema.string().optional().describe("REQUIRED if category not provided. Do NOT provide both category and subagent_type. Must be a callable non-primary agent name returned by app.agents()."),
       session_id: tool.schema.string().optional().describe("Existing Task session to continue"),
       command: tool.schema.string().optional().describe("The command that triggered this task"),
     },
     async execute(args: DelegateTaskArgs, toolContext) {
       const ctx = toolContext as ToolContextWithMetadata
 
+      if (args.category && args.subagent_type) {
+        throw new Error(
+          `Invalid arguments: 'category' and 'subagent_type' are mutually exclusive. Provide EXACTLY ONE.\n` +
+          `  - You provided: category="${args.category}", subagent_type="${args.subagent_type}"\n` +
+          `  - Use category for task delegation (e.g., category="${categoryExamples.split(", ")[0]}")\n` +
+          `  - Use subagent_type for direct agent invocation (e.g., subagent_type="explore")\n` +
+          `  - subagent_type must be a callable non-primary agent name returned by app.agents()`
+        )
+      }
       if (args.category) {
-        if (args.subagent_type && args.subagent_type !== SISYPHUS_JUNIOR_AGENT) {
-          log("[task] category provided - overriding subagent_type to sisyphus-junior", {
-            category: args.category,
-            subagent_type: args.subagent_type,
-          })
-        }
         args.subagent_type = SISYPHUS_JUNIOR_AGENT
       }
       await ctx.metadata?.({
@@ -176,27 +180,40 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
         ? `${parentContext.model.providerID}/${parentContext.model.modelID}`
         : undefined
 
-      const resolution = await resolveTaskRouting(args, {
-        options,
-        parentContext,
-        categoryExamples,
-        inheritedModel,
-        systemDefaultModel,
-      })
-      if (resolution.error) {
-        return resolution.error
-      }
+      let agentToUse: string
+      let categoryModel: DelegatedModelConfig | undefined
+      let categoryPromptAppend: string | undefined
+      let modelInfo: import("../../features/task-toast-manager/types").ModelFallbackInfo | undefined
+      let actualModel: string | undefined
+      let isUnstableAgent = false
+      let fallbackChain: import("../../shared/model-requirements").FallbackEntry[] | undefined
+      let maxPromptTokens: number | undefined
 
-      const {
-        agentToUse,
-        categoryModel,
-        categoryPromptAppend,
-        maxPromptTokens,
-        modelInfo,
-        actualModel,
-        isUnstableAgent,
-        fallbackChain,
-      } = resolution
+      if (args.category) {
+        const resolution = await resolveCategoryExecution(args, options, inheritedModel, systemDefaultModel)
+        if (resolution.error) {
+          return resolution.error
+        }
+        agentToUse = resolution.agentToUse
+        categoryModel = resolution.categoryModel
+        categoryPromptAppend = resolution.categoryPromptAppend
+        modelInfo = resolution.modelInfo
+        actualModel = resolution.actualModel
+        isUnstableAgent = resolution.isUnstableAgent
+        fallbackChain = resolution.fallbackChain
+        maxPromptTokens = resolution.maxPromptTokens
+
+      } else {
+        const resolution = await resolveSubagentExecution(args, options, parentContext.agent, categoryExamples, inheritedModel)
+        if (resolution.error) {
+          return resolution.error
+        }
+        agentToUse = resolution.agentToUse
+        categoryModel = resolution.categoryModel
+        actualModel = resolution.actualModel
+        isUnstableAgent = resolution.isUnstableAgent
+        fallbackChain = resolution.fallbackChain
+      }
 
       const isRunInBackgroundExplicitlyFalse = args.run_in_background === false || args.run_in_background === "false" as unknown as boolean
 

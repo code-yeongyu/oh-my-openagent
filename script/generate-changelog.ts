@@ -34,6 +34,72 @@ async function generateChangelog(previousTag: string): Promise<string[]> {
   return notes
 }
 
+async function getChangedFiles(previousTag: string): Promise<string[]> {
+  try {
+    const diff = await $`git diff --name-only ${previousTag}..HEAD`.text()
+    return diff
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+  } catch {
+    return []
+  }
+}
+
+function touchesAnyPath(files: string[], candidates: string[]): boolean {
+  return files.some((file) => candidates.some((candidate) => file === candidate || file.startsWith(`${candidate}/`)))
+}
+
+function buildReleaseFraming(files: string[]): string[] {
+  const bullets: string[] = []
+
+  if (
+    touchesAnyPath(files, [
+      "src/index.ts",
+      "src/plugin-config.ts",
+      "bin/platform.js",
+      "postinstall.mjs",
+      "docs",
+    ])
+  ) {
+    bullets.push("Rename transition updates across package detection, plugin/config compatibility, and install surfaces.")
+  }
+
+  if (touchesAnyPath(files, ["src/tools/delegate-task", "src/plugin/tool-registry.ts"])) {
+    bullets.push("Task and tool behavior updates, including delegate-task contract and runtime registration behavior.")
+  }
+
+  if (
+    touchesAnyPath(files, [
+      "src/plugin/tool-registry.ts",
+      "src/plugin-handlers/agent-config-handler.ts",
+      "src/plugin-handlers/tool-config-handler.ts",
+      "src/hooks/tasks-todowrite-disabler",
+    ])
+  ) {
+    bullets.push("Task-system default behavior alignment so omitted configuration behaves consistently across runtime paths.")
+  }
+
+  if (touchesAnyPath(files, [".github/workflows", "docs/guide/installation.md", "postinstall.mjs"])) {
+    bullets.push("Install and publish workflow hardening, including safer release sequencing and package/install fixes.")
+  }
+
+  if (bullets.length === 0) {
+    return []
+  }
+
+  return [
+    "## Minor Compatibility and Stability Release",
+    "",
+    "This release carries compatibility-facing behavior changes and operational hardening. Read the summary below before upgrading or publishing.",
+    "",
+    ...bullets.map((bullet) => `- ${bullet}`),
+    "",
+    "## Commit Summary",
+    "",
+  ]
+}
+
 async function getContributors(previousTag: string): Promise<string[]> {
   const notes: string[] = []
 
@@ -78,9 +144,11 @@ async function main() {
     process.exit(0)
   }
 
+  const changedFiles = await getChangedFiles(previousTag)
   const changelog = await generateChangelog(previousTag)
   const contributors = await getContributors(previousTag)
-  const notes = [...changelog, ...contributors]
+  const framing = buildReleaseFraming(changedFiles)
+  const notes = [...framing, ...changelog, ...contributors]
 
   if (notes.length === 0) {
     console.log("No notable changes")

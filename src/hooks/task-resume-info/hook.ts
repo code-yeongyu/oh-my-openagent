@@ -30,7 +30,7 @@ export function createTaskResumeInfoHook() {
 
     output.output =
       outputText.trimEnd() +
-      `\n\nto continue: task(session_id="${sessionId}", prompt="...")`
+      `\n\nto continue: task(session_id="${sessionId}", load_skills=[], prompt="...")`
   }
 
   return {

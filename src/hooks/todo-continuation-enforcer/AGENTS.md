@@ -38,7 +38,7 @@ session.idle
 ## CONSTANTS
 
 ```typescript
-DEFAULT_SKIP_AGENTS = ["prometheus", "compaction"]
+DEFAULT_SKIP_AGENTS = ["prometheus", "compaction", "plan"]
 CONTINUATION_COOLDOWN_MS = 30_000     // 30s between injections
 MAX_CONSECUTIVE_FAILURES = 5          // Then 5min pause (exponential backoff)
 FAILURE_RESET_WINDOW_MS = 5 * 60_000  // 5min window for failure reset
