@@ -621,7 +621,7 @@ describe("skill tool - nativeSkills integration", () => {
     const tool = createSkillTool({
       skills: [createMockSkill("seeded-skill")],
       nativeSkills: {
-        async all() {
+        all() {
           return [{
             name: "native-visible-skill",
             description: "Native skill exposed from config",
@@ -629,13 +629,14 @@ describe("skill tool - nativeSkills integration", () => {
             content: "Native visible skill body",
           }]
         },
-        async get() { return undefined },
-        async dirs() { return [] },
+        get() { return undefined },
+        dirs() { return [] },
       },
     })
 
     //#when
     expect(tool.description).toContain("seeded-skill")
+    expect(tool.description).toContain("native-visible-skill")
     await tool.execute({ name: "native-visible-skill" }, mockContext)
 
     //#then

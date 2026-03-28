@@ -562,7 +562,7 @@ describe("ralph-loop", () => {
       })
       hook.startLoop("session-123", "Build something", { completionPromise: "COMPLETE" })
 
-      writeFileSync(transcriptPath, JSON.stringify({ type: "tool_result", tool_name: "write", tool_output: { output: "Task done <promise>COMPLETE</promise>" } }) + "\n")
+      writeFileSync(transcriptPath, JSON.stringify({ type: "assistant", content: "Task done <promise>COMPLETE</promise>" }) + "\n")
 
       // when - session goes idle (transcriptPath now derived from sessionID via getTranscriptPath)
       await hook.event({
@@ -1020,7 +1020,7 @@ Original task: Build something`
       expect(hook.getState()?.iteration).toBe(2)
     })
 
-    test("should detect completion from tool_result entry in transcript", async () => {
+    test("should NOT detect completion from tool_result entry in transcript", async () => {
       // given - transcript contains a tool_result with completion promise
       const transcriptPath = join(TEST_DIR, "transcript.jsonl")
       const toolResultEntry = JSON.stringify({
@@ -1044,16 +1044,15 @@ Original task: Build something`
         },
       })
 
-      // then - loop should complete (tool_result contains actual completion output)
-      expect(promptCalls.length).toBe(0)
-      expect(toastCalls.some((t) => t.title === "Ralph Loop Complete!")).toBe(true)
-      expect(hook.getState()).toBeNull()
+      expect(promptCalls.length).toBe(1)
+      expect(toastCalls.some((t) => t.title === "Ralph Loop Complete!")).toBe(false)
+      expect(hook.getState()?.iteration).toBe(2)
     })
 
     test("should check transcript BEFORE API to optimize performance", async () => {
       // given - transcript has completion promise
       const transcriptPath = join(TEST_DIR, "transcript.jsonl")
-      writeFileSync(transcriptPath, JSON.stringify({ type: "tool_result", tool_name: "write", tool_output: { output: "<promise>DONE</promise>" } }) + "\n")
+      writeFileSync(transcriptPath, JSON.stringify({ type: "assistant", content: "<promise>DONE</promise>" }) + "\n")
       mockSessionMessages = [
         { info: { role: "assistant" }, parts: [{ type: "text", text: "No promise here" }] },
       ]
@@ -1083,7 +1082,7 @@ Original task: Build something`
       const hook = createRalphLoopHook(createMockPluginInput(), {
         getTranscriptPath: () => transcriptPath,
       })
-      writeFileSync(transcriptPath, JSON.stringify({ type: "tool_result", tool_name: "write", tool_output: { output: "<promise>DONE</promise>" } }) + "\n")
+      writeFileSync(transcriptPath, JSON.stringify({ type: "assistant", content: "<promise>DONE</promise>" }) + "\n")
       hook.startLoop("test-id", "Build API", { ultrawork: true })
 
       // when - idle event triggered
@@ -1100,7 +1099,7 @@ Original task: Build something`
       const hook = createRalphLoopHook(createMockPluginInput(), {
         getTranscriptPath: () => transcriptPath,
       })
-      writeFileSync(transcriptPath, JSON.stringify({ type: "tool_result", tool_name: "write", tool_output: { output: "<promise>DONE</promise>" } }) + "\n")
+      writeFileSync(transcriptPath, JSON.stringify({ type: "assistant", content: "<promise>DONE</promise>" }) + "\n")
       hook.startLoop("test-id", "Build API")
 
       // when - idle event triggered

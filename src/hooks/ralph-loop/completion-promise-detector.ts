@@ -63,6 +63,7 @@ export function detectCompletionInTranscript(
 			try {
 				const entry = JSON.parse(line) as TranscriptEntry
 				if (entry.type === "user") continue
+				if (entry.type !== "assistant" && entry.type !== "text") continue
 				if (startedAt && entry.timestamp && entry.timestamp < startedAt) continue
 				const entryText = extractTranscriptEntryText(entry)
 				if (!entryText) continue
@@ -128,7 +129,7 @@ export async function detectCompletionInSessionMessages(
 
 			let responseText = ""
 			for (const part of assistant.parts) {
-				if (part.type !== "text" && part.type !== "tool_result") continue
+				if (part.type !== "text") continue
 				responseText += `${responseText ? "\n" : ""}${part.text ?? ""}`
 			}
 

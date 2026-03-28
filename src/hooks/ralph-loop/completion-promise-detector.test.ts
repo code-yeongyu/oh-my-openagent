@@ -110,7 +110,7 @@ describe("detectCompletionInSessionMessages", () => {
   })
 
   describe("#given promise appears in tool_result part (not text part)", () => {
-    test("#when Oracle returns VERIFIED via task() tool_result #then should detect completion", async () => {
+    test("#when Oracle returns VERIFIED via task() tool_result #then should NOT detect completion", async () => {
       const messages: SessionMessage[] = [
         {
           info: { role: "assistant" },
@@ -137,10 +137,10 @@ describe("detectCompletionInSessionMessages", () => {
         sinceMessageIndex: 0,
       })
 
-      expect(detected).toBe(true)
+      expect(detected).toBe(false)
     })
 
-    test("#when DONE appears only in tool_result part #then should detect completion", async () => {
+    test("#when DONE appears only in tool_result part #then should NOT detect completion", async () => {
       const messages: SessionMessage[] = [
         {
           info: { role: "assistant" },
@@ -159,7 +159,7 @@ describe("detectCompletionInSessionMessages", () => {
         directory: "/tmp",
       })
 
-      expect(detected).toBe(true)
+      expect(detected).toBe(false)
     })
 
     test("#when promise appears in tool_use part (not tool_result) #then should NOT detect completion", async () => {
