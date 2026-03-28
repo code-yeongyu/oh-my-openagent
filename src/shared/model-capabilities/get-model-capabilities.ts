@@ -5,6 +5,7 @@ import { detectHeuristicModelFamily } from "../model-capability-heuristics"
 import { getBundledModelCapabilitiesSnapshot } from "./bundled-snapshot"
 import {
 	readRuntimeModel,
+	readRuntimeModelLimitContext,
 	readRuntimeModelLimitOutput,
 	readRuntimeModelModalities,
 	readRuntimeModelReasoningSupport,
@@ -48,6 +49,7 @@ export function getModelCapabilities(input: GetModelCapabilitiesInput): ModelCap
 	const runtimeThinking = readRuntimeModelThinkingSupport(runtimeModel)
 	const runtimeTemperature = readRuntimeModelTemperatureSupport(runtimeModel)
 	const runtimeTopP = readRuntimeModelTopPSupport(runtimeModel)
+	const runtimeContextWindowTokens = readRuntimeModelLimitContext(runtimeModel)
 	const runtimeMaxOutputTokens = readRuntimeModelLimitOutput(runtimeModel)
 	const runtimeToolCall = readRuntimeModelToolCallSupport(runtimeModel)
 	const runtimeModalities = readRuntimeModelModalities(runtimeModel)
@@ -86,6 +88,12 @@ export function getModelCapabilities(input: GetModelCapabilitiesInput): ModelCap
 			: "none"
 	const supportsTopPSource: ModelCapabilitiesDiagnostics["supportsTopP"]["source"] =
 		runtimeTopP !== undefined ? "runtime" : override?.supportsTopP !== undefined ? "override" : "none"
+	const contextWindowTokensSource: ModelCapabilitiesDiagnostics["contextWindowTokens"]["source"] =
+		runtimeContextWindowTokens !== undefined
+			? "runtime"
+			: snapshotEntry?.limit?.context !== undefined
+			? snapshotSource
+			: "none"
 	const maxOutputTokensSource: ModelCapabilitiesDiagnostics["maxOutputTokens"]["source"] =
 		runtimeMaxOutputTokens !== undefined
 			? "runtime"
@@ -115,6 +123,7 @@ export function getModelCapabilities(input: GetModelCapabilitiesInput): ModelCap
 		supportsThinking: override?.supportsThinking ?? heuristicFamily?.supportsThinking ?? runtimeThinking ?? snapshotEntry?.reasoning,
 		supportsTemperature: runtimeTemperature ?? override?.supportsTemperature ?? snapshotEntry?.temperature,
 		supportsTopP: runtimeTopP ?? override?.supportsTopP,
+		contextWindowTokens: runtimeContextWindowTokens ?? snapshotEntry?.limit?.context,
 		maxOutputTokens: runtimeMaxOutputTokens ?? snapshotEntry?.limit?.output,
 		toolCall: runtimeToolCall ?? snapshotEntry?.toolCall,
 		modalities: runtimeModalities ?? snapshotEntry?.modalities,
@@ -132,6 +141,7 @@ export function getModelCapabilities(input: GetModelCapabilitiesInput): ModelCap
 			supportsThinking: { source: supportsThinkingSource },
 			supportsTemperature: { source: supportsTemperatureSource },
 			supportsTopP: { source: supportsTopPSource },
+			contextWindowTokens: { source: contextWindowTokensSource },
 			maxOutputTokens: { source: maxOutputTokensSource },
 			toolCall: { source: toolCallSource },
 			modalities: { source: modalitiesSource },

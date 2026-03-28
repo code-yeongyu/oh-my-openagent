@@ -1,7 +1,19 @@
 import process from "node:process"
-import { afterEach, describe, expect, it } from "bun:test"
+import { afterAll, afterEach, describe, expect, it, mock } from "bun:test"
 
-import { resolveActualContextLimit } from "./context-limit-resolver"
+const getModelCapabilitiesMock = mock(() => ({
+  contextWindowTokens: undefined as number | undefined,
+}))
+
+mock.module("./model-capabilities", () => ({
+  getModelCapabilities: getModelCapabilitiesMock,
+}))
+
+afterAll(() => {
+  mock.restore()
+})
+
+const { resolveActualContextLimit } = await import("./context-limit-resolver")
 
 const ANTHROPIC_CONTEXT_ENV_KEY = "ANTHROPIC_1M_CONTEXT"
 const VERTEX_CONTEXT_ENV_KEY = "VERTEX_ANTHROPIC_1M_CONTEXT"
@@ -26,6 +38,10 @@ function resetContextLimitEnv(): void {
 describe("resolveActualContextLimit", () => {
   afterEach(() => {
     resetContextLimitEnv()
+    getModelCapabilitiesMock.mockReset()
+    getModelCapabilitiesMock.mockImplementation(() => ({
+      contextWindowTokens: undefined,
+    }))
   })
 
   it("returns cached limit for Anthropic 4.6 models when 1M mode is disabled (GA support)", () => {
@@ -73,6 +89,46 @@ describe("resolveActualContextLimit", () => {
 
     // then
     expect(actualLimit).toBe(200_000)
+  })
+
+  it("uses dynamically discovered limits when cache is empty", () => {
+    // given
+    delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+    delete process.env[VERTEX_CONTEXT_ENV_KEY]
+    getModelCapabilitiesMock.mockImplementation(({ providerID, modelID }) => ({
+      contextWindowTokens:
+        providerID === "openai" && modelID === "gpt-5.4"
+          ? 1_050_000
+          : undefined,
+    }))
+
+    // when
+    const actualLimit = resolveActualContextLimit("openai", "gpt-5.4", {
+      anthropicContext1MEnabled: false,
+    })
+
+    // then
+    expect(actualLimit).toBe(1_050_000)
+  })
+
+  it("uses dynamically discovered Anthropic limits before falling back to the 200K default", () => {
+    // given
+    delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+    delete process.env[VERTEX_CONTEXT_ENV_KEY]
+    getModelCapabilitiesMock.mockImplementation(({ providerID, modelID }) => ({
+      contextWindowTokens:
+        providerID === "anthropic" && modelID === "claude-sonnet-4-5"
+          ? 500_000
+          : undefined,
+    }))
+
+    // when
+    const actualLimit = resolveActualContextLimit("anthropic", "claude-sonnet-4-5", {
+      anthropicContext1MEnabled: false,
+    })
+
+    // then
+    expect(actualLimit).toBe(500_000)
   })
 
   it("explicit 1M mode takes priority over cached limit", () => {
@@ -181,7 +237,7 @@ describe("resolveActualContextLimit", () => {
     expect(actualLimit).toBe(500_000)
   })
 
-  it("returns null for non-Anthropic providers without a cached limit", () => {
+  it("returns null for non-Anthropic providers when neither cache nor metadata knows the limit", () => {
     // given
     delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
     delete process.env[VERTEX_CONTEXT_ENV_KEY]
