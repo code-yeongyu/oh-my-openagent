@@ -64,6 +64,11 @@ describe("runtime-fallback", () => {
 
   function createMockPluginConfigWithCategoryFallback(fallbackModels: string[]): OhMyOpenCodeConfig {
     return {
+      git_master: {
+        commit_footer: true,
+        include_co_authored_by: true,
+        git_env_prefix: "GIT_MASTER=1",
+      },
       categories: {
         test: {
           fallback_models: fallbackModels,
@@ -79,6 +84,11 @@ describe("runtime-fallback", () => {
     variant?: string,
   ): OhMyOpenCodeConfig {
     return {
+      git_master: {
+        commit_footer: true,
+        include_co_authored_by: true,
+        git_env_prefix: "GIT_MASTER=1",
+      },
       categories: {
         [categoryName]: {
           model,
@@ -270,6 +280,39 @@ describe("runtime-fallback", () => {
 
       const errorLog = logCalls.find((c) => c.msg.includes("session.error received"))
       expect(errorLog).toBeDefined()
+    })
+
+    test("should trigger fallback when session.error says you've reached your usage limit", async () => {
+      const hook = createRuntimeFallbackHook(createMockPluginInput(), {
+        config: createMockConfig({ notify_on_fallback: false }),
+        pluginConfig: createMockPluginConfigWithCategoryFallback(["zai-coding-plan/glm-5.1"]),
+      })
+      const sessionID = "test-session-usage-limit"
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "kimi-for-coding/k2p5" } },
+        },
+      })
+
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: {
+            sessionID,
+            error: { message: "You've reached your usage limit for this month. Please upgrade to continue." },
+          },
+        },
+      })
+
+      const fallbackLog = logCalls.find((c) => c.msg.includes("Preparing fallback"))
+      expect(fallbackLog).toBeDefined()
+      expect(fallbackLog?.data).toMatchObject({ from: "kimi-for-coding/k2p5", to: "zai-coding-plan/glm-5.1" })
+
+      const skipLog = logCalls.find((c) => c.msg.includes("Error not retryable"))
+      expect(skipLog).toBeUndefined()
     })
 
     test("should continue fallback chain when fallback model is not found", async () => {
@@ -767,7 +810,13 @@ describe("runtime-fallback", () => {
     test("should log when no fallback models configured", async () => {
       const hook = createRuntimeFallbackHook(createMockPluginInput(), {
         config: createMockConfig(),
-        pluginConfig: {},
+        pluginConfig: {
+          git_master: {
+            commit_footer: true,
+            include_co_authored_by: true,
+            git_env_prefix: "GIT_MASTER=1",
+          },
+        },
       })
       const sessionID = "test-session-no-fallbacks"
 
@@ -2299,6 +2348,11 @@ describe("runtime-fallback", () => {
   describe("fallback models configuration", () => {
     function createMockPluginConfigWithAgentFallback(agentName: string, fallbackModels: string[]): OhMyOpenCodeConfig {
       return {
+        git_master: {
+          commit_footer: true,
+          include_co_authored_by: true,
+          git_env_prefix: "GIT_MASTER=1",
+        },
         agents: {
           [agentName]: {
             fallback_models: fallbackModels,
@@ -2496,6 +2550,11 @@ describe("runtime-fallback", () => {
         {
           config: createMockConfig({ notify_on_fallback: false }),
           pluginConfig: {
+            git_master: {
+              commit_footer: true,
+              include_co_authored_by: true,
+              git_env_prefix: "GIT_MASTER=1",
+            },
             categories: {
               test: {
                 fallback_models: ["provider-a/model-a", "provider-b/model-b"],
@@ -2548,6 +2607,11 @@ describe("runtime-fallback", () => {
       const hook = createRuntimeFallbackHook(createMockPluginInput(), {
         config: createMockConfig({ notify_on_fallback: false }),
         pluginConfig: {
+          git_master: {
+            commit_footer: true,
+            include_co_authored_by: true,
+            git_env_prefix: "GIT_MASTER=1",
+          },
           categories: {
             test: {
               fallback_models: ["provider-a/model-a", "provider-b/model-b"],
@@ -2605,6 +2669,11 @@ describe("runtime-fallback", () => {
         {
           config: createMockConfig({ notify_on_fallback: false }),
           pluginConfig: {
+            git_master: {
+              commit_footer: true,
+              include_co_authored_by: true,
+              git_env_prefix: "GIT_MASTER=1",
+            },
             categories: {
               test: {
                 fallback_models: ["provider-a/model-a", "provider-b/model-b"],
@@ -2647,6 +2716,11 @@ describe("runtime-fallback", () => {
       const hook = createRuntimeFallbackHook(createMockPluginInput(), {
         config: createMockConfig({ notify_on_fallback: false }),
         pluginConfig: {
+          git_master: {
+            commit_footer: true,
+            include_co_authored_by: true,
+            git_env_prefix: "GIT_MASTER=1",
+          },
           categories: {
             test: {
               fallback_models: ["provider-a/model-a", "provider-b/model-b"],
