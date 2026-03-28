@@ -248,7 +248,7 @@ jobs:
         run: |
           VERSION="${{ inputs.version }}"
           if [ -z "$VERSION" ]; then
-            PREV=$(curl -s https://registry.npmjs.org/opencode-matrixx/latest | jq -r '.version // "0.0.0"')
+            PREV=$(curl -s https://registry.npmjs.org/opencode-matrixx/latest | jq -r '.version // "0.0.0"' 2>/dev/null || echo "0.0.0")
             BASE="${PREV%%-*}"
             IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE"
             case "${{ inputs.bump }}" in
@@ -366,7 +366,7 @@ jobs:
           fi
           
           if [ -z "$PREV_TAG" ]; then
-            PREV_TAG=$(curl -s https://registry.npmjs.org/opencode-matrixx/latest | jq -r '.version // "0.0.0"')
+            PREV_TAG=$(curl -s https://registry.npmjs.org/opencode-matrixx/latest | jq -r '.version // "0.0.0"' 2>/dev/null || echo "0.0.0")
           fi
           
           echo "Comparing v${PREV_TAG}..v${VERSION}"
