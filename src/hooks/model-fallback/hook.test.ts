@@ -288,6 +288,48 @@ describe("model fallback hook", () => {
     clearPendingModelFallback(sessionID)
   })
 
+  test("does not skip the first fallback entry when the current model is unknown", async () => {
+    //#given
+    const sessionID = "ses_model_fallback_unknown_current_model"
+    clearPendingModelFallback(sessionID)
+
+    const hook = createModelFallbackHook() as unknown as {
+      "chat.message"?: (
+        input: { sessionID: string },
+        output: { message: Record<string, unknown>; parts: Array<{ type: string; text?: string }> },
+      ) => Promise<void>
+    }
+
+    setSessionFallbackChain(sessionID, [
+      { providers: ["anthropic"], model: "claude-opus-4-6", variant: "max" },
+      { providers: ["opencode"], model: "kimi-k2.5" },
+    ])
+
+    expect(
+      setPendingModelFallback(
+        sessionID,
+        "Sisyphus (Ultraworker)",
+        "anthropic",
+      ),
+    ).toBe(true)
+
+    const output = {
+      message: {},
+      parts: [{ type: "text", text: "continue" }],
+    }
+
+    //#when
+    await hook["chat.message"]?.({ sessionID }, output)
+
+    //#then
+    expect(output.message["model"]).toEqual({
+      providerID: "anthropic",
+      modelID: "claude-opus-4-6",
+    })
+    expect(output.message["variant"]).toBe("max")
+    clearPendingModelFallback(sessionID)
+  })
+
   test("uses connected preferred provider when fallback entry providers are disconnected", async () => {
     //#given
     const sessionID = "ses_model_fallback_preferred_provider"
