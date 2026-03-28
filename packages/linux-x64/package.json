@@ -1,6 +1,6 @@
 {
   "name": "opencode-matrixx-linux-x64",
-  "version": "3.5.3",
+  "version": "0.0.1",
   "description": "Platform-specific binary for opencode-matrixx (linux-x64)",
   "license": "MIT",
   "repository": {
