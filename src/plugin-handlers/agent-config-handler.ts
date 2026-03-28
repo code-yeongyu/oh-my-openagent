@@ -90,7 +90,7 @@ export async function applyAgentConfig(params: {
     params.pluginConfig.browser_automation_engine?.provider ?? "playwright";
   const currentModel = params.config.model as string | undefined;
   const disabledSkills = new Set<string>(params.pluginConfig.disabled_skills ?? []);
-  const useTaskSystem = params.pluginConfig.experimental?.task_system ?? false;
+  const useTaskSystem = params.pluginConfig.experimental?.task_system ?? true;
   const disableOmoEnv = params.pluginConfig.experimental?.disable_omo_env ?? false;
 
   const includeClaudeAgents = params.pluginConfig.claude_code?.agents ?? true;

@@ -1,6 +1,7 @@
 const { describe, expect, test } = require("bun:test")
 const { createToolExecuteBeforeHandler } = require("./tool-execute-before")
 const { createToolRegistry } = require("./tool-registry")
+const { builtinTools } = require("../tools")
 
 describe("createToolExecuteBeforeHandler", () => {
   test("does not execute subagent question blocker hook for question tool", async () => {
@@ -265,6 +266,44 @@ describe("createToolRegistry", () => {
         )
 
         expect(result.filteredTools.edit).toBeDefined()
+      })
+    })
+  })
+
+  describe("#given max_tools is lower than or equal to builtin tool count", () => {
+    describe("#when creating the tool registry", () => {
+      test("#then it trims to the exact configured cap", () => {
+        const result = createToolRegistry(
+          createRegistryInput({
+            experimental: { max_tools: Object.keys(builtinTools).length },
+          }),
+        )
+
+        expect(Object.keys(result.filteredTools)).toHaveLength(Object.keys(builtinTools).length)
+      })
+    })
+  })
+
+  describe("#given max_tools is set below the full plugin tool count", () => {
+    describe("#when creating the tool registry", () => {
+      test("#then it enforces the exact cap deterministically", () => {
+        const result = createToolRegistry(
+          createRegistryInput({
+            experimental: { max_tools: 10 },
+          }),
+        )
+
+        expect(Object.keys(result.filteredTools)).toHaveLength(10)
+      })
+
+      test("#then it keeps the task tool when lower-priority tools can satisfy the cap", () => {
+        const result = createToolRegistry(
+          createRegistryInput({
+            experimental: { max_tools: 10 },
+          }),
+        )
+
+        expect(result.filteredTools.task).toBeDefined()
       })
     })
   })

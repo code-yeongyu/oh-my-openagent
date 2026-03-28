@@ -616,6 +616,33 @@ describe("skill tool - browserProvider forwarding", () => {
 })
 
 describe("skill tool - nativeSkills integration", () => {
+  it("includes native skills in the description even when skills are pre-seeded", async () => {
+    //#given
+    const tool = createSkillTool({
+      skills: [createMockSkill("seeded-skill")],
+      nativeSkills: {
+        async all() {
+          return [{
+            name: "native-visible-skill",
+            description: "Native skill exposed from config",
+            location: "/external/skills/native-visible-skill/SKILL.md",
+            content: "Native visible skill body",
+          }]
+        },
+        async get() { return undefined },
+        async dirs() { return [] },
+      },
+    })
+
+    //#when
+    expect(tool.description).toContain("seeded-skill")
+    await tool.execute({ name: "native-visible-skill" }, mockContext)
+
+    //#then
+    expect(tool.description).toContain("seeded-skill")
+    expect(tool.description).toContain("native-visible-skill")
+  })
+
   it("merges native skills exposed by PluginInput.skills.all()", async () => {
     //#given
     const tool = createSkillTool({
@@ -639,6 +666,6 @@ describe("skill tool - nativeSkills integration", () => {
 
     //#then
     expect(result).toContain("external-plugin-skill")
-    expect(result).toContain("Test skill body content")
+    expect(result).toContain("External plugin skill body")
   })
 })

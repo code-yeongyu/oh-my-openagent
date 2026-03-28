@@ -76,13 +76,13 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
   - category: For task delegation (uses Sisyphus-Junior with category-optimized model)
   - subagent_type: For direct agent invocation (explore, librarian, oracle, etc.)
   
-  **DO NOT provide both.** If category is provided, subagent_type is ignored.
+  **DO NOT provide both.** category and subagent_type are mutually exclusive.
   
   - load_skills: ALWAYS REQUIRED. Pass [] if no skills needed, or ["skill-1", "skill-2"] for category tasks.
   - category: Use predefined category → Spawns Sisyphus-Junior with category config
     Available categories:
   ${categoryList}
-  - subagent_type: Use specific agent directly (explore, librarian, oracle, metis, momus)
+  - subagent_type: Use a specific callable non-primary agent directly (for example: explore, librarian, oracle, metis, momus)
   - run_in_background: REQUIRED. true=async (returns task_id), false=sync (waits). Use background=true ONLY for parallel exploration with 5+ independent queries.
   - session_id: Existing Task session to continue (from previous task output). Continues agent with FULL CONTEXT PRESERVED - saves tokens, maintains continuity.
   - command: The command that triggered this task (optional, for slash command tracking).
@@ -102,7 +102,7 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
       prompt: tool.schema.string().describe("Full detailed prompt for the agent"),
       run_in_background: tool.schema.boolean().describe("REQUIRED. true=async (returns task_id), false=sync (waits). Use false for task delegation, true ONLY for parallel exploration."),
       category: tool.schema.string().optional().describe(`REQUIRED if subagent_type not provided. Do NOT provide both category and subagent_type.`),
-      subagent_type: tool.schema.string().optional().describe("REQUIRED if category not provided. Do NOT provide both category and subagent_type. Valid values: explore, librarian, oracle, metis, momus"),
+      subagent_type: tool.schema.string().optional().describe("REQUIRED if category not provided. Do NOT provide both category and subagent_type. Must be a callable non-primary agent name returned by app.agents()."),
       session_id: tool.schema.string().optional().describe("Existing Task session to continue"),
       command: tool.schema.string().optional().describe("The command that triggered this task"),
     },
@@ -115,7 +115,7 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
           `  - You provided: category="${args.category}", subagent_type="${args.subagent_type}"\n` +
           `  - Use category for task delegation (e.g., category="${categoryExamples.split(", ")[0]}")\n` +
           `  - Use subagent_type for direct agent invocation (e.g., subagent_type="explore")\n` +
-          `  - Valid subagent_type values: explore, librarian, oracle, metis, momus`
+          `  - subagent_type must be a callable non-primary agent name returned by app.agents()`
         )
       }
       if (args.category) {

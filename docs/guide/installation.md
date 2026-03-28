@@ -238,7 +238,7 @@ If Z.ai is your main provider, the most important fallbacks are:
 
 #### OpenCode Zen
 
-OpenCode Zen provides access to `opencode/` prefixed models including `opencode/claude-opus-4-6`, `opencode/gpt-5.4`, `opencode/gpt-5.3-codex`, `opencode/gpt-5-nano`, `opencode/glm-5`, `opencode/big-pickle`, and `opencode/minimax-m2.5`.
+OpenCode Zen provides access to `opencode/` prefixed models including `opencode/claude-opus-4-6`, `opencode/gpt-5.4`, `opencode/gpt-5.3-codex`, `opencode/gpt-5-nano`, `opencode/glm-5`, `opencode/big-pickle`, `opencode/minimax-m2.7`, and `opencode/minimax-m2.7-highspeed`.
 
 When OpenCode Zen is the best available provider, these are the most relevant source-backed examples:
 
@@ -250,26 +250,21 @@ When OpenCode Zen is the best available provider, these are the most relevant so
 
 ##### Setup
 
-Run the installer and select "Yes" for GitHub Copilot:
+Run the installer and select "Yes" for OpenCode Zen:
 
 ```bash
 bunx oh-my-opencode install
-# Select your subscriptions (Claude, ChatGPT, Gemini)
-# When prompted: "Do you have a GitHub Copilot subscription?" → Select "Yes"
+# Select your subscriptions (Claude, ChatGPT, Gemini, OpenCode Zen, etc.)
+# When prompted: "Do you have access to OpenCode Zen (opencode/ models)?" → Select "Yes"
 ```
 
 Or use non-interactive mode:
 
 ```bash
-bunx oh-my-opencode install --no-tui --claude=no --openai=no --gemini=no --copilot=yes
+bunx oh-my-opencode install --no-tui --claude=no --openai=no --gemini=no --opencode-zen=yes
 ```
 
-Then authenticate with GitHub:
-
-```bash
-opencode auth login
-# Select: GitHub → Authenticate via OAuth
-```
+This provider uses the `opencode/` model catalog. If your OpenCode environment prompts for provider authentication, follow the OpenCode provider flow for `opencode/` models instead of reusing the fallback-provider auth steps above.
 
 ### Step 5: Understand Your Model Setup
 
@@ -306,8 +301,8 @@ Not all models behave the same way. Understanding which models are "similar" hel
 | --------------------- | -------------------------------- | ----------------------------------------------------------- |
 | **Gemini 3.1 Pro**    | google, github-copilot, opencode | Excels at visual/frontend tasks. Different reasoning style. |
 | **Gemini 3 Flash**    | google, github-copilot, opencode | Fast, good for doc search and light tasks.                  |
-| **MiniMax M2.7**      | venice, opencode-go              | Fast and smart. Good for utility tasks where the provider catalog exposes M2.7. |
-| **MiniMax M2.5**      | opencode                         | Legacy OpenCode catalog entry still used in some fallback chains for compatibility. |
+| **MiniMax M2.7**      | opencode-go, opencode            | Fast and smart. Utility fallbacks use `minimax-m2.7` or `minimax-m2.7-highspeed` depending on the chain. |
+| **MiniMax M2.7 Highspeed** | opencode                    | Faster OpenCode Zen variant used in utility fallback chains where the runtime prefers the high-speed catalog entry. |
 
 **Speed-Focused Models**:
 
@@ -315,7 +310,7 @@ Not all models behave the same way. Understanding which models are "similar" hel
 | ----------------------- | ---------------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Grok Code Fast 1**    | github-copilot, venice | Very fast      | Optimized for code grep/search. Default for Explore.                                                                                          |
 | **Claude Haiku 4.5**    | anthropic, opencode    | Fast           | Good balance of speed and intelligence.                                                                                                       |
-| **MiniMax M2.5**          | opencode            | Very fast      | Legacy OpenCode catalog entry that still appears in some utility fallback chains.                                                            |
+| **MiniMax M2.7 Highspeed** | opencode           | Very fast      | OpenCode Zen high-speed utility fallback used by runtime chains such as Librarian.                                                           |
 | **GPT-5.3-codex-spark** | openai                 | Extremely fast | Blazing fast but compacts so aggressively that oh-my-openagent's context management doesn't work well with it. Not recommended for omo agents. |
 
 #### What Each Agent Does and Which Model It Got
@@ -354,8 +349,8 @@ These agents do search, grep, and retrieval. They intentionally use fast, cheap 
 
 | Agent                 | Role               | Default Chain                                                          | Design Rationale                                               |
 | --------------------- | ------------------ | ---------------------------------------------------------------------- | -------------------------------------------------------------- |
-| **Explore**           | Fast codebase grep | Grok Code Fast → OpenCode Go MiniMax M2.7 → OpenCode MiniMax M2.5 → Haiku → GPT-5-Nano | Speed is everything. Grok is blazing fast for grep.            |
-| **Librarian**         | Docs/code search   | OpenCode Go MiniMax M2.7 → OpenCode MiniMax M2.5 → Haiku → GPT-5-Nano                   | Doc retrieval doesn't need deep reasoning. MiniMax is fast where the provider catalog supports it.    |
+| **Explore**           | Fast codebase grep | Grok Code Fast → OpenCode Go MiniMax M2.7 Highspeed → OpenCode MiniMax M2.7 → Haiku → GPT-5-Nano | Speed is everything. Grok is blazing fast for grep.            |
+| **Librarian**         | Docs/code search   | OpenCode Go MiniMax M2.7 → OpenCode MiniMax M2.7 Highspeed → Haiku → GPT-5-Nano                   | Doc retrieval doesn't need deep reasoning. MiniMax is fast where the provider catalog supports it.    |
 | **Multimodal Looker** | Vision/screenshots | GPT-5.4 (medium) → Kimi K2.5 → GLM-4.6v → GPT-5-Nano | GPT-5.4 now leads the default vision path when available. |
 
 #### Why Different Models Need Different Prompts

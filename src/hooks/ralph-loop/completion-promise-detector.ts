@@ -39,6 +39,8 @@ const SEMANTIC_COMPLETION_PATTERNS = [
 	/\bnothing\s+(?:left|more|remaining)\s+to\s+(?:do|implement|fix)\b/i,
 ]
 
+const SEMANTIC_DONE_FALLBACK_ENABLED = false
+
 export function detectSemanticCompletion(text: string): boolean {
 	return SEMANTIC_COMPLETION_PATTERNS.some((pattern) => pattern.test(text))
 }
@@ -65,9 +67,8 @@ export function detectCompletionInTranscript(
 				const entryText = extractTranscriptEntryText(entry)
 				if (!entryText) continue
 				if (pattern.test(entryText)) return true
-				// Fallback: semantic completion only for DONE promise and assistant entries
 				const isAssistantEntry = entry.type === "assistant" || entry.type === "text"
-				if (promise === "DONE" && isAssistantEntry && detectSemanticCompletion(entryText)) {
+				if (SEMANTIC_DONE_FALLBACK_ENABLED && promise === "DONE" && isAssistantEntry && detectSemanticCompletion(entryText)) {
 					log("[ralph-loop] WARNING: Semantic completion detected in transcript (agent used natural language instead of <promise>DONE</promise>)")
 					return true
 				}
@@ -135,8 +136,7 @@ export async function detectCompletionInSessionMessages(
 				return true
 			}
 
-			// Fallback: semantic completion only for DONE promise
-			if (options.promise === "DONE" && detectSemanticCompletion(responseText)) {
+			if (SEMANTIC_DONE_FALLBACK_ENABLED && options.promise === "DONE" && detectSemanticCompletion(responseText)) {
 				log("[ralph-loop] WARNING: Semantic completion detected (agent used natural language instead of <promise>DONE</promise>)", {
 					sessionID: options.sessionID,
 				})

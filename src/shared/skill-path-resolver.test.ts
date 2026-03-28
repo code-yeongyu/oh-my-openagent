@@ -125,4 +125,28 @@ describe("resolveSkillPathReferences", () => {
 		//#then
 		expect(result).toBe("/skills/frontend/scripts/search.py")
 	})
+
+	it("does not resolve traversal paths that escape the base directory", () => {
+		//#given
+		const content = "Read @data/../../../../etc/passwd before running"
+		const basePath = "/skills/frontend"
+
+		//#when
+		const result = resolveSkillPathReferences(content, basePath)
+
+		//#then
+		expect(result).toBe("Read @data/../../../../etc/passwd before running")
+	})
+
+	it("does not resolve directory traversal with trailing slash", () => {
+		//#given
+		const content = "Inspect @data/../../../secret/"
+		const basePath = "/skills/frontend"
+
+		//#when
+		const result = resolveSkillPathReferences(content, basePath)
+
+		//#then
+		expect(result).toBe("Inspect @data/../../../secret/")
+	})
 })

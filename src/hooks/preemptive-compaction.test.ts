@@ -669,4 +669,43 @@ describe("preemptive-compaction", () => {
 
     expect(ctx.client.session.summarize).toHaveBeenCalled()
   })
+
+  it("should ignore stale cached Anthropic limits for older models", async () => {
+    const modelContextLimitsCache = new Map<string, number>()
+    modelContextLimitsCache.set("anthropic/claude-sonnet-4-5", 500000)
+
+    const hook = createPreemptiveCompactionHook(ctx as never, {} as never, {
+      anthropicContext1MEnabled: false,
+      modelContextLimitsCache,
+    })
+    const sessionID = "ses_old_anthropic_limit"
+
+    await hook.event({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            role: "assistant",
+            sessionID,
+            providerID: "anthropic",
+            modelID: "claude-sonnet-4-5",
+            finish: true,
+            tokens: {
+              input: 170000,
+              output: 0,
+              reasoning: 0,
+              cache: { read: 10000, write: 0 },
+            },
+          },
+        },
+      },
+    })
+
+    await hook["tool.execute.after"](
+      { tool: "bash", sessionID, callID: "call_1" },
+      { title: "", output: "test", metadata: null }
+    )
+
+    expect(ctx.client.session.summarize).toHaveBeenCalled()
+  })
 })

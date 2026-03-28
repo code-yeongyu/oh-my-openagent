@@ -186,7 +186,7 @@ describe("detectCompletionInSessionMessages", () => {
   })
 
   describe("#given semantic completion patterns", () => {
-    test("#when agent says 'task is complete' #then should detect semantic completion", async () => {
+    test("#when agent says 'task is complete' without explicit promise #then should NOT detect completion", async () => {
       // #given
       const messages: SessionMessage[] = [
         {
@@ -205,10 +205,10 @@ describe("detectCompletionInSessionMessages", () => {
       })
 
       // #then
-      expect(detected).toBe(true)
+      expect(detected).toBe(false)
     })
 
-    test("#when agent says 'all items are done' #then should detect semantic completion", async () => {
+    test("#when agent says 'all items are done' without explicit promise #then should NOT detect completion", async () => {
       // #given
       const messages: SessionMessage[] = [
         {
@@ -227,10 +227,10 @@ describe("detectCompletionInSessionMessages", () => {
       })
 
       // #then
-      expect(detected).toBe(true)
+      expect(detected).toBe(false)
     })
 
-    test("#when agent says 'nothing left to do' #then should detect semantic completion", async () => {
+    test("#when agent says 'nothing left to do' without explicit promise #then should NOT detect completion", async () => {
       // #given
       const messages: SessionMessage[] = [
         {
@@ -249,10 +249,10 @@ describe("detectCompletionInSessionMessages", () => {
       })
 
       // #then
-      expect(detected).toBe(true)
+      expect(detected).toBe(false)
     })
 
-    test("#when agent says 'successfully completed all' #then should detect semantic completion", async () => {
+    test("#when agent says 'successfully completed all' without explicit promise #then should NOT detect completion", async () => {
       // #given
       const messages: SessionMessage[] = [
         {
@@ -271,7 +271,7 @@ describe("detectCompletionInSessionMessages", () => {
       })
 
       // #then
-      expect(detected).toBe(true)
+      expect(detected).toBe(false)
     })
 
     test("#when promise is VERIFIED #then semantic completion should NOT trigger", async () => {
@@ -288,6 +288,75 @@ describe("detectCompletionInSessionMessages", () => {
       const detected = await detectCompletionInSessionMessages(ctx, {
         sessionID: "session-123",
         promise: "VERIFIED",
+        apiTimeoutMs: 1000,
+        directory: "/tmp",
+      })
+
+      // #then
+      expect(detected).toBe(false)
+    })
+
+    test("#when completion text appears inside a quote #then should NOT detect completion", async () => {
+      // #given
+      const messages: SessionMessage[] = [
+        {
+          info: { role: "assistant" },
+          parts: [{ type: "text", text: 'The user wrote: "the task is complete". I am still working.' }],
+        },
+      ]
+      const ctx = createPluginInput(messages)
+
+      // #when
+      const detected = await detectCompletionInSessionMessages(ctx, {
+        sessionID: "session-quoted",
+        promise: "DONE",
+        apiTimeoutMs: 1000,
+        directory: "/tmp",
+      })
+
+      // #then
+      expect(detected).toBe(false)
+    })
+
+    test("#when tool_result says all items are complete #then should NOT detect completion", async () => {
+      // #given
+      const messages: SessionMessage[] = [
+        {
+          info: { role: "assistant" },
+          parts: [
+            { type: "tool_result", text: "Background agent report: all items are complete." },
+            { type: "text", text: "Still validating the final behavior." },
+          ],
+        },
+      ]
+      const ctx = createPluginInput(messages)
+
+      // #when
+      const detected = await detectCompletionInSessionMessages(ctx, {
+        sessionID: "session-tool-result-semantic",
+        promise: "DONE",
+        apiTimeoutMs: 1000,
+        directory: "/tmp",
+      })
+
+      // #then
+      expect(detected).toBe(false)
+    })
+
+    test("#when assistant says complete but not actually done #then should NOT detect completion", async () => {
+      // #given
+      const messages: SessionMessage[] = [
+        {
+          info: { role: "assistant" },
+          parts: [{ type: "text", text: "The implementation looks complete, but I still need to run the tests." }],
+        },
+      ]
+      const ctx = createPluginInput(messages)
+
+      // #when
+      const detected = await detectCompletionInSessionMessages(ctx, {
+        sessionID: "session-not-actually-done",
+        promise: "DONE",
         apiTimeoutMs: 1000,
         directory: "/tmp",
       })

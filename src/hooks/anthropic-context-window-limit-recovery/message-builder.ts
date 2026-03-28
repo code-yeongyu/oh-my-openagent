@@ -8,7 +8,7 @@ import {
   injectTextPart,
   replaceEmptyTextParts,
 } from "../session-recovery/storage"
-import { replaceEmptyTextPartsAsync } from "../session-recovery/storage/empty-text"
+import { findMessagesWithEmptyTextPartsFromSDK, replaceEmptyTextPartsAsync } from "../session-recovery/storage/empty-text"
 import { injectTextPartAsync } from "../session-recovery/storage/text-part-injector"
 import type { Client } from "./client"
 
@@ -86,12 +86,14 @@ export async function sanitizeEmptyMessagesBeforeSummarize(
 ): Promise<number> {
   if (client && isSqliteBackend()) {
     const emptyMessageIds = await findEmptyMessageIdsFromSDK(client, sessionID)
-    if (emptyMessageIds.length === 0) {
+    const emptyTextPartIds = await findMessagesWithEmptyTextPartsFromSDK(client, sessionID)
+    const allIds = [...new Set([...emptyMessageIds, ...emptyTextPartIds])]
+    if (allIds.length === 0) {
       return 0
     }
 
     let fixedCount = 0
-    for (const messageID of emptyMessageIds) {
+    for (const messageID of allIds) {
       const replaced = await replaceEmptyTextPartsAsync(client, sessionID, messageID, PLACEHOLDER_TEXT)
       if (replaced) {
         fixedCount++
@@ -107,7 +109,7 @@ export async function sanitizeEmptyMessagesBeforeSummarize(
       log("[auto-compact] pre-summarize sanitization fixed empty messages", {
         sessionID,
         fixedCount,
-        totalEmpty: emptyMessageIds.length,
+        totalEmpty: allIds.length,
       })
     }
 

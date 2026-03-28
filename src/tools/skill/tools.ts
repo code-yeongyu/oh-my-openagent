@@ -105,6 +105,11 @@ async function extractSkillBody(skill: LoadedSkill): Promise<string> {
     return templateMatch ? templateMatch[1].trim() : fullTemplate
   }
 
+  if (skill.scope === "config" && skill.definition.template) {
+    const templateMatch = skill.definition.template.match(/<skill-instruction>([\s\S]*?)<\/skill-instruction>/)
+    return templateMatch ? templateMatch[1].trim() : skill.definition.template
+  }
+
   if (skill.path) {
     return extractSkillTemplate(skill)
   }
@@ -235,11 +240,13 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
     return cachedDescription
   }
 
-  // Eagerly build description when callers pre-provide skills/commands.
   if (options.skills !== undefined) {
     const skillInfos = options.skills.map(loadedSkillToInfo)
     const commandsForDescription = options.commands ?? []
     cachedDescription = formatCombinedDescription(skillInfos, commandsForDescription)
+    if (options.nativeSkills) {
+      void buildDescription()
+    }
   } else if (options.commands !== undefined) {
     cachedDescription = formatCombinedDescription([], options.commands)
   } else {
@@ -248,6 +255,9 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
 
   return tool({
     get description() {
+      if (cachedDescription === null) {
+        void buildDescription()
+      }
       return cachedDescription ?? TOOL_DESCRIPTION_PREFIX
     },
     args: {
@@ -259,8 +269,8 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
     },
     async execute(args: SkillArgs, ctx?: { agent?: string }) {
       const skills = await getSkills()
-      cachedDescription = null
       const commands = getCommands()
+      cachedDescription = formatCombinedDescription(skills.map(loadedSkillToInfo), commands)
 
       const requestedName = args.name.replace(/^\//, "")
 

@@ -1,8 +1,9 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { BackgroundManager } from "../../features/background-agent"
+import { isAgentRegistered } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
 import { createInternalAgentTextPart, resolveInheritedPromptTools } from "../../shared"
-import { getAgentDisplayName } from "../../shared/agent-display-names"
+import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { HOOK_NAME } from "./hook-name"
 import { BOULDER_CONTINUATION_PROMPT } from "./system-reminder-templates"
 import { resolveRecentPromptContextForSession } from "./recent-model-resolver"
@@ -48,24 +49,33 @@ export async function injectBoulderContinuation(input: {
   const preferredSessionContext = preferredTaskSessionId
     ? `\n\n[Preferred reuse session for current top-level plan task${preferredTaskTitle ? `: ${preferredTaskTitle}` : ""}: ${preferredTaskSessionId}]`
     : ""
-  const prompt =
-    BOULDER_CONTINUATION_PROMPT.replace(/{PLAN_NAME}/g, planName) +
-    `\n\n[Status: ${total - remaining}/${total} completed, ${remaining} remaining]` +
-    preferredSessionContext +
-    worktreeContext
+	const prompt =
+		BOULDER_CONTINUATION_PROMPT.replace(/{PLAN_NAME}/g, planName) +
+		`\n\n[Status: ${total - remaining}/${total} completed, ${remaining} remaining]` +
+		preferredSessionContext +
+		worktreeContext
+	const continuationAgent = agent ?? (isAgentRegistered("atlas") ? "atlas" : undefined)
 
-  try {
-    log(`[${HOOK_NAME}] Injecting boulder continuation`, { sessionID, planName, remaining })
+	if (!continuationAgent || !isAgentRegistered(continuationAgent)) {
+		log(`[${HOOK_NAME}] Skipped injection: continuation agent unavailable`, {
+			sessionID,
+			agent: continuationAgent ?? agent ?? "unknown",
+		})
+		return
+	}
+
+	try {
+		log(`[${HOOK_NAME}] Injecting boulder continuation`, { sessionID, planName, remaining })
 
     const promptContext = await resolveRecentPromptContextForSession(ctx, sessionID)
     const inheritedTools = resolveInheritedPromptTools(sessionID, promptContext.tools)
 
-    await ctx.client.session.promptAsync({
-      path: { id: sessionID },
-      body: {
-        agent: getAgentDisplayName(agent ?? "atlas"),
-        ...(promptContext.model !== undefined ? { model: promptContext.model } : {}),
-        ...(inheritedTools ? { tools: inheritedTools } : {}),
+		await ctx.client.session.promptAsync({
+			path: { id: sessionID },
+			body: {
+				agent: getAgentConfigKey(continuationAgent),
+				...(promptContext.model !== undefined ? { model: promptContext.model } : {}),
+				...(inheritedTools ? { tools: inheritedTools } : {}),
         parts: [createInternalAgentTextPart(prompt)],
       },
       query: { directory: ctx.directory },

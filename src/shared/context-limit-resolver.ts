@@ -19,6 +19,10 @@ function getAnthropicActualLimit(modelCacheState?: ContextLimitModelCacheState):
     : DEFAULT_ANTHROPIC_ACTUAL_LIMIT
 }
 
+function supportsCachedAnthropicLimit(modelID: string): boolean {
+  return /^claude-(opus|sonnet)-4(?:-|\.)6(?:-high)?$/.test(modelID)
+}
+
 export function resolveActualContextLimit(
   providerID: string,
   modelID: string,
@@ -29,7 +33,7 @@ export function resolveActualContextLimit(
     if (explicit1M === 1_000_000) return explicit1M
 
     const cachedLimit = modelCacheState?.modelContextLimitsCache?.get(`${providerID}/${modelID}`)
-    if (cachedLimit) return cachedLimit
+    if (cachedLimit && supportsCachedAnthropicLimit(modelID)) return cachedLimit
 
     return DEFAULT_ANTHROPIC_ACTUAL_LIMIT
   }
