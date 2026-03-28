@@ -1,6 +1,6 @@
 {
   "name": "opencode-matrixx-linux-arm64-musl",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "Platform-specific binary for opencode-matrixx (linux-arm64-musl)",
   "license": "MIT",
   "repository": {

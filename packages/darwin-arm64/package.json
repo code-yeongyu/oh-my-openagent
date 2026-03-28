@@ -1,6 +1,6 @@
 {
   "name": "opencode-matrixx-darwin-arm64",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "Platform-specific binary for opencode-matrixx (darwin-arm64)",
   "license": "MIT",
   "repository": {
