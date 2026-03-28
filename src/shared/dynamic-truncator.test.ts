@@ -125,11 +125,11 @@ describe("getContextWindowUsage", () => {
     expect(usage?.remainingTokens).toBe(82144)
   })
 
-  it("returns null for non-anthropic providers without a cached limit", async () => {
+  it("returns null when neither cache nor metadata knows the context limit", async () => {
     // given
     const ctx = createContextUsageMockContext(180000, {
-      providerID: "openai",
-      modelID: "gpt-5",
+      providerID: "custom-no-meta",
+      modelID: "model-without-limit",
     })
 
     // when

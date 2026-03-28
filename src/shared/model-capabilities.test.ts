@@ -68,6 +68,9 @@ describe("getModelCapabilities", () => {
       providerID: "anthropic",
       modelID: "claude-opus-4-6",
       runtimeModel: {
+        limit: {
+          context: 750_000,
+        },
         variants: {
           low: {},
           medium: {},
@@ -81,6 +84,7 @@ describe("getModelCapabilities", () => {
       canonicalModelID: "claude-opus-4-6",
       family: "claude-opus",
       variants: ["low", "medium", "high"],
+      contextWindowTokens: 750_000,
       supportsThinking: true,
       supportsTemperature: true,
       maxOutputTokens: 128_000,
@@ -90,6 +94,7 @@ describe("getModelCapabilities", () => {
       resolutionMode: "snapshot-backed",
       canonicalization: { source: "canonical" },
       snapshot: { source: "bundled-snapshot" },
+      contextWindowTokens: { source: "runtime" },
       variants: { source: "runtime" },
     })
   })
@@ -108,6 +113,9 @@ describe("getModelCapabilities", () => {
             text: true,
             image: true,
           },
+          limit: {
+            context: 900_000,
+          },
           output: {
             text: true,
           },
@@ -118,6 +126,7 @@ describe("getModelCapabilities", () => {
 
     expect(result).toMatchObject({
       canonicalModelID: "gpt-5.4",
+      contextWindowTokens: 900_000,
       reasoning: true,
       supportsThinking: true,
       supportsTemperature: false,
@@ -131,6 +140,7 @@ describe("getModelCapabilities", () => {
       resolutionMode: "snapshot-backed",
       reasoning: { source: "runtime" },
       supportsThinking: { source: "runtime" },
+      contextWindowTokens: { source: "runtime" },
       toolCall: { source: "runtime" },
     })
   })
@@ -278,7 +288,7 @@ describe("getModelCapabilities", () => {
         "gpt-5.4": {
           ...bundledSnapshot.models["gpt-5.4"],
           limit: {
-            context: 1_050_000,
+            context: 1_200_000,
             output: 64_000,
           },
         },
@@ -294,11 +304,13 @@ describe("getModelCapabilities", () => {
 
     expect(result).toMatchObject({
       canonicalModelID: "gpt-5.4",
+      contextWindowTokens: 1_200_000,
       maxOutputTokens: 64_000,
       supportsTemperature: false,
     })
     expect(result.diagnostics).toMatchObject({
       snapshot: { source: "runtime-snapshot" },
+      contextWindowTokens: { source: "runtime-snapshot" },
       maxOutputTokens: { source: "runtime-snapshot" },
       supportsTemperature: { source: "runtime-snapshot" },
     })

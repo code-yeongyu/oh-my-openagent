@@ -39,6 +39,7 @@ export type ModelCapabilitiesDiagnostics = {
 	supportsThinking: { source: "runtime" | "override" | "heuristic" | "runtime-snapshot" | "bundled-snapshot" | "none" }
 	supportsTemperature: { source: "runtime" | "override" | "runtime-snapshot" | "bundled-snapshot" | "none" }
 	supportsTopP: { source: "runtime" | "override" | "none" }
+	contextWindowTokens: { source: "runtime" | "runtime-snapshot" | "bundled-snapshot" | "none" }
 	maxOutputTokens: { source: "runtime" | "runtime-snapshot" | "bundled-snapshot" | "none" }
 	toolCall: { source: "runtime" | "runtime-snapshot" | "bundled-snapshot" | "none" }
 	modalities: { source: "runtime" | "runtime-snapshot" | "bundled-snapshot" | "none" }
@@ -54,6 +55,7 @@ export type ModelCapabilities = {
 	supportsThinking?: boolean
 	supportsTemperature?: boolean
 	supportsTopP?: boolean
+	contextWindowTokens?: number
 	maxOutputTokens?: number
 	toolCall?: boolean
 	modalities?: {
