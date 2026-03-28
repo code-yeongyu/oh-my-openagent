@@ -16,11 +16,13 @@ export const DEFAULT_CONFIG: Required<RuntimeFallbackConfig> = {
   cooldown_seconds: 60,
   timeout_seconds: 30,
   notify_on_fallback: true,
+  error_patterns_to_fallback: [],
 }
 
 /**
- * Error patterns that indicate rate limiting or temporary failures
+ * Built-in error patterns that indicate rate limiting or temporary failures
  * These are checked in addition to HTTP status codes
+ * Extend via `error_patterns_to_fallback` in config
  */
 export const RETRYABLE_ERROR_PATTERNS = [
   /rate.?limit/i,

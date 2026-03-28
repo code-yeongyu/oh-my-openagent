@@ -66,6 +66,7 @@ export interface RuntimeFallbackHook {
 export interface HookDeps {
   ctx: RuntimeFallbackPluginInput
   config: Required<RuntimeFallbackConfig>
+  patterns: RegExp[]
   options: RuntimeFallbackOptions | undefined
   pluginConfig: OhMyOpenCodeConfig | undefined
   sessionStates: Map<string, FallbackState>

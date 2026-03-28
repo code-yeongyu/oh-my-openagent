@@ -96,7 +96,7 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
         errorType: classifyErrorType(error),
       })
 
-      if (!isRetryableError(error, config.retry_on_errors)) {
+      if (!isRetryableError(error, config.retry_on_errors, deps.patterns)) {
         log(`[${HOOK_NAME}] message.updated error not retryable, skipping fallback`, {
           sessionID,
           statusCode: extractStatusCode(error, config.retry_on_errors),

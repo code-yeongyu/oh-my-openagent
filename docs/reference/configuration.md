@@ -658,19 +658,21 @@ Auto-switches to backup models on API errors.
     "max_fallback_attempts": 3,
     "cooldown_seconds": 60,
     "timeout_seconds": 30,
-    "notify_on_fallback": true
+    "notify_on_fallback": true,
+    "error_patterns_to_fallback": ["extra inputs are not permitted", "unsupported.?parameter"]
   }
 }
 ```
 
-| Option                  | Default             | Description                                                                                                                    |
-| ----------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `enabled`               | `false`             | Enable runtime fallback                                                                                                        |
-| `retry_on_errors`       | `[400,429,503,529]` | HTTP codes that trigger fallback. Also handles classified provider key errors.                                                 |
-| `max_fallback_attempts` | `3`                 | Max fallback attempts per session (1–20)                                                                                       |
-| `cooldown_seconds`      | `60`                | Seconds before retrying a failed model                                                                                         |
-| `timeout_seconds`       | `30`                | Seconds before forcing next fallback. **Set to `0` to disable timeout-based escalation and provider retry message detection.** |
-| `notify_on_fallback`    | `true`              | Toast notification on model switch                                                                                             |
+| Option                        | Default             | Description                                                                                                                    |
+| ----------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `enabled`                     | `false`             | Enable runtime fallback                                                                                                        |
+| `retry_on_errors`             | `[400,429,503,529]` | HTTP codes that trigger fallback. Also handles classified provider key errors.                                                 |
+| `max_fallback_attempts`       | `3`                 | Max fallback attempts per session (1–20)                                                                                       |
+| `cooldown_seconds`            | `60`                | Seconds before retrying a failed model                                                                                         |
+| `timeout_seconds`             | `30`                | Seconds before forcing next fallback. **Set to `0` to disable timeout-based escalation and provider retry message detection.** |
+| `notify_on_fallback`          | `true`              | Toast notification on model switch                                                                                             |
+| `error_patterns_to_fallback`  | `[]`                | Regex patterns (as strings) merged with built-in patterns — any match triggers fallback, evaluated case-insensitively.         |
 
 Define `fallback_models` per agent or category:
 
