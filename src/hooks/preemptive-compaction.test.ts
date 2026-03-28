@@ -66,6 +66,13 @@ function setupImmediateTimeouts(): () => void {
   }
 }
 
+function createModelLimitState(entries: Array<[string, number]>) {
+  return {
+    anthropicContext1MEnabled: false,
+    modelContextLimitsCache: new Map<string, number>(entries),
+  }
+}
+
 describe("preemptive-compaction", () => {
   let ctx: ReturnType<typeof createMockCtx>
 
@@ -137,7 +144,11 @@ describe("preemptive-compaction", () => {
   // #when tool.execute.after runs
   // #then should trigger summarize
   it("should trigger compaction when usage exceeds threshold", async () => {
-    const hook = createPreemptiveCompactionHook(ctx as never, {} as never)
+    const hook = createPreemptiveCompactionHook(
+      ctx as never,
+      {} as never,
+      createModelLimitState([["anthropic/claude-sonnet-4-6", 1_000_000]]),
+    )
     const sessionID = "ses_high"
 
     // 800K input + 10K cache = 811K → above the 78% preemptive threshold of a 1M window
@@ -174,7 +185,11 @@ describe("preemptive-compaction", () => {
 
   it("should trigger compaction for google-vertex-anthropic provider", async () => {
     //#given google-vertex-anthropic usage above threshold
-    const hook = createPreemptiveCompactionHook(ctx as never, {} as never)
+    const hook = createPreemptiveCompactionHook(
+      ctx as never,
+      {} as never,
+      createModelLimitState([["google-vertex-anthropic/claude-sonnet-4-6", 1_000_000]]),
+    )
     const sessionID = "ses_vertex_anthropic_high"
 
     await hook.event({
@@ -249,7 +264,11 @@ describe("preemptive-compaction", () => {
 
   it("should log summarize errors instead of swallowing them", async () => {
     //#given
-    const hook = createPreemptiveCompactionHook(ctx as never, {} as never)
+    const hook = createPreemptiveCompactionHook(
+      ctx as never,
+      {} as never,
+      createModelLimitState([["anthropic/claude-sonnet-4-6", 1_000_000]]),
+    )
     const sessionID = "ses_log_error"
     const summarizeError = new Error("summarize failed")
     ctx.client.session.summarize.mockRejectedValueOnce(summarizeError)
@@ -340,7 +359,11 @@ describe("preemptive-compaction", () => {
   // #then should NOT retry due to cooldown
   it("should enforce cooldown even after failed compaction to prevent rapid retry loops", async () => {
     //#given
-    const hook = createPreemptiveCompactionHook(ctx as never, {} as never)
+    const hook = createPreemptiveCompactionHook(
+      ctx as never,
+      {} as never,
+      createModelLimitState([["anthropic/claude-sonnet-4-6", 1_000_000]]),
+    )
     const sessionID = "ses_fail_cooldown"
     ctx.client.session.summarize.mockRejectedValueOnce(new Error("rate limited"))
 
@@ -483,7 +506,11 @@ describe("preemptive-compaction", () => {
   it("should clear in-progress lock when summarize times out", async () => {
     //#given
     const restoreTimeouts = setupImmediateTimeouts()
-    const hook = createPreemptiveCompactionHook(ctx as never, {} as never)
+    const hook = createPreemptiveCompactionHook(
+      ctx as never,
+      {} as never,
+      createModelLimitState([["anthropic/claude-sonnet-4-6", 1_000_000]]),
+    )
     const sessionID = "ses_timeout"
 
     ctx.client.session.summarize
@@ -571,7 +598,11 @@ describe("preemptive-compaction", () => {
   // #when tool.execute.after runs after new high-token message
   // #then should trigger compaction again (re-compaction)
   it("should allow re-compaction when context grows after successful compaction", async () => {
-    const hook = createPreemptiveCompactionHook(ctx as never, {} as never)
+    const hook = createPreemptiveCompactionHook(
+      ctx as never,
+      {} as never,
+      createModelLimitState([["anthropic/claude-sonnet-4-6", 1_000_000]]),
+    )
     const sessionID = "ses_recompact"
 
     // given - first compaction cycle

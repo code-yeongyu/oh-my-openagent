@@ -74,15 +74,21 @@ describe("getContextWindowUsage", () => {
     expect(usage?.remainingTokens).toBe(700000)
   })
 
-  it("uses 200K limit when model cache flag is disabled and env vars are unset", async () => {
+  it("uses explicit Anthropic limits from the model cache when available", async () => {
     //#given
     delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
     delete process.env[VERTEX_CONTEXT_ENV_KEY]
-    const ctx = createContextUsageMockContext(150000)
+    const modelContextLimitsCache = new Map<string, number>()
+    modelContextLimitsCache.set("anthropic/claude-sonnet-4-5", 200000)
+    const ctx = createContextUsageMockContext(150000, {
+      providerID: "anthropic",
+      modelID: "claude-sonnet-4-5",
+    })
 
     //#when
     const usage = await getContextWindowUsage(ctx as never, "ses_default", {
       anthropicContext1MEnabled: false,
+      modelContextLimitsCache,
     })
 
     //#then
