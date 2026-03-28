@@ -1,27 +1,27 @@
-import { z } from "zod"
-import { AnyMcpNameSchema } from "../../mcp/types"
-import { BuiltinSkillNameSchema } from "./agent-names"
-import { AgentOverridesSchema } from "./agent-overrides"
-import { BabysittingConfigSchema } from "./babysitting"
-import { BackgroundTaskConfigSchema } from "./background-task"
-import { BrowserAutomationConfigSchema } from "./browser-automation"
-import { CategoriesConfigSchema } from "./categories"
-import { ClaudeCodeConfigSchema } from "./claude-code"
-import { CommentCheckerConfigSchema } from "./comment-checker"
-import { BuiltinCommandNameSchema } from "./commands"
-import { ExperimentalConfigSchema } from "./experimental"
-import { GitMasterConfigSchema } from "./git-master"
-import { NotificationConfigSchema } from "./notification"
-import { OpenClawConfigSchema } from "./openclaw"
-import { ModelCapabilitiesConfigSchema } from "./model-capabilities"
-import { RalphLoopConfigSchema } from "./ralph-loop"
-import { RuntimeFallbackConfigSchema } from "./runtime-fallback"
-import { SkillsConfigSchema } from "./skills"
-import { SisyphusConfigSchema } from "./sisyphus"
-import { SisyphusAgentConfigSchema } from "./sisyphus-agent"
-import { TmuxConfigSchema } from "./tmux"
-import { StartWorkConfigSchema } from "./start-work"
-import { WebsearchConfigSchema } from "./websearch"
+import { z } from 'zod';
+import { AnyMcpNameSchema } from '../../mcp/types';
+import { BuiltinSkillNameSchema } from './agent-names';
+import { AgentOverridesSchema } from './agent-overrides';
+import { BabysittingConfigSchema } from './babysitting';
+import { BackgroundTaskConfigSchema } from './background-task';
+import { BrowserAutomationConfigSchema } from './browser-automation';
+import { CategoriesConfigSchema } from './categories';
+import { ClaudeCodeConfigSchema } from './claude-code';
+import { BuiltinCommandNameSchema } from './commands';
+import { CommentCheckerConfigSchema } from './comment-checker';
+import { ExperimentalConfigSchema } from './experimental';
+import { GitMasterConfigSchema } from './git-master';
+import { ModelCapabilitiesConfigSchema } from './model-capabilities';
+import { NotificationConfigSchema } from './notification';
+import { OpenClawConfigSchema } from './openclaw';
+import { RalphLoopConfigSchema } from './ralph-loop';
+import { RuntimeFallbackConfigSchema } from './runtime-fallback';
+import { SisyphusConfigSchema } from './sisyphus';
+import { SisyphusAgentConfigSchema } from './sisyphus-agent';
+import { SkillsConfigSchema } from './skills';
+import { StartWorkConfigSchema } from './start-work';
+import { TmuxConfigSchema } from './tmux';
+import { WebsearchConfigSchema } from './websearch';
 
 export const OhMyOpenCodeConfigSchema = z.object({
   $schema: z.string().optional(),
@@ -63,7 +63,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   git_master: GitMasterConfigSchema.default({
     commit_footer: true,
     include_co_authored_by: true,
-    git_env_prefix: "GIT_MASTER=1",
+    git_env_prefix: 'GIT_MASTER=1',
   }),
   browser_automation_engine: BrowserAutomationConfigSchema.optional(),
   websearch: WebsearchConfigSchema.optional(),
@@ -72,6 +72,6 @@ export const OhMyOpenCodeConfigSchema = z.object({
   start_work: StartWorkConfigSchema.optional(),
   /** Migration history to prevent re-applying migrations (e.g., model version upgrades) */
   _migrations: z.array(z.string()).optional(),
-})
+});
 
-export type OhMyOpenCodeConfig = z.infer<typeof OhMyOpenCodeConfigSchema>
+export type OhMyOpenCodeConfig = z.infer<typeof OhMyOpenCodeConfigSchema>;

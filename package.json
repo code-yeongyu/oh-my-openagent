@@ -1,7 +1,7 @@
 {
-  "name": "oh-my-opencode",
-  "version": "3.11.0",
-  "description": "The Best AI Agent Harness - Batteries-Included OpenCode Plugin with Multi-Model Orchestration, Parallel Background Agents, and Crafted LSP/AST Tools",
+  "name": "@robinmordasiewicz/oh-my-opencode",
+  "version": "3.11.0-fork.2",
+  "description": "Fork of oh-my-opencode with Claude Code plugin loader fix (parseToolsConfig handles YAML list and CSV string formats). Temporary package until upstream PR merges.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "type": "module",
