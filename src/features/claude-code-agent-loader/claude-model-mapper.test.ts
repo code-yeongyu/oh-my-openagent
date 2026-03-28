@@ -19,20 +19,20 @@ describe("mapClaudeModelToOpenCode", () => {
   })
 
   describe("#given Claude Code alias", () => {
-    it("#when called with sonnet #then maps to anthropic claude-sonnet-4-6 object", () => {
-      expect(mapClaudeModelToOpenCode("sonnet")).toEqual({ providerID: "anthropic", modelID: "claude-sonnet-4-6" })
+    it("#when called with sonnet #then maps to anthropic claude-sonnet alias", () => {
+      expect(mapClaudeModelToOpenCode("sonnet")).toEqual({ providerID: "anthropic", modelID: "claude-sonnet" })
     })
 
-    it("#when called with opus #then maps to anthropic claude-opus-4-6 object", () => {
-      expect(mapClaudeModelToOpenCode("opus")).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-6" })
+    it("#when called with opus #then maps to anthropic claude-opus alias", () => {
+      expect(mapClaudeModelToOpenCode("opus")).toEqual({ providerID: "anthropic", modelID: "claude-opus" })
     })
 
-    it("#when called with haiku #then maps to anthropic claude-haiku-4-5 object", () => {
-      expect(mapClaudeModelToOpenCode("haiku")).toEqual({ providerID: "anthropic", modelID: "claude-haiku-4-5" })
+    it("#when called with haiku #then maps to anthropic claude-haiku alias", () => {
+      expect(mapClaudeModelToOpenCode("haiku")).toEqual({ providerID: "anthropic", modelID: "claude-haiku" })
     })
 
     it("#when called with Sonnet (capitalized) #then maps case-insensitively to object", () => {
-      expect(mapClaudeModelToOpenCode("Sonnet")).toEqual({ providerID: "anthropic", modelID: "claude-sonnet-4-6" })
+      expect(mapClaudeModelToOpenCode("Sonnet")).toEqual({ providerID: "anthropic", modelID: "claude-sonnet" })
     })
   })
 

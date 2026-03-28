@@ -25,7 +25,7 @@ type FallbackCallback = (input: {
 
 export type ModelFallbackState = {
   providerID: string
-  modelID: string
+  modelID?: string
   fallbackChain: FallbackEntry[]
   attemptCount: number
   pending: boolean
@@ -65,7 +65,7 @@ export function setPendingModelFallback(
   sessionID: string,
   agentName: string,
   currentProviderID: string,
-  currentModelID: string,
+  currentModelID?: string,
 ): boolean {
   const agentKey = getAgentConfigKey(agentName)
   const requirements = AGENT_MODEL_REQUIREMENTS[agentKey]
@@ -103,7 +103,7 @@ export function setPendingModelFallback(
 
   const state: ModelFallbackState = {
     providerID: currentProviderID,
-    modelID: currentModelID,
+    ...(currentModelID ? { modelID: currentModelID } : {}),
     fallbackChain,
     attemptCount: 0,
     pending: true,
