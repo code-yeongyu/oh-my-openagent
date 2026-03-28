@@ -158,7 +158,7 @@ export async function getLastAssistant(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   client: any,
   directory: string,
-): Promise<Record<string, unknown> | null> {
+): Promise<{ info: Record<string, unknown>; hasContent: boolean } | null> {
   try {
     const resp = await (client as Client).session.messages({
       path: { id: sessionID },
@@ -175,7 +175,15 @@ export async function getLastAssistant(
       return info?.role === "assistant"
     })
     if (!last) return null
-    return (last as { info?: Record<string, unknown> }).info ?? null
+
+    const message = last as SDKMessage & { info?: Record<string, unknown> }
+    const info = message.info
+    if (!info) return null
+
+    return {
+      info,
+      hasContent: messageHasContentFromSDK(message),
+    }
   } catch {
     return null
   }
