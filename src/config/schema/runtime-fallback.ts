@@ -14,7 +14,14 @@ export const RuntimeFallbackConfigSchema = z.object({
   /** Show toast notification when switching to fallback model (default: true) */
   notify_on_fallback: z.boolean().optional(),
   /** Regex patterns (as strings) merged with built-in patterns — any match triggers fallback. */
-  error_patterns_to_fallback: z.array(z.string()).optional(),
+  error_patterns_to_fallback: z.array(z.string().refine(pattern => { 
+    try { 
+      new RegExp(pattern); 
+      return true 
+    } catch { 
+      return false 
+    } 
+  }, { message: "invalid regex pattern" })).optional(),
 })
 
 export type RuntimeFallbackConfig = z.infer<typeof RuntimeFallbackConfigSchema>
