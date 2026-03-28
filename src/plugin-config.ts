@@ -1,33 +1,35 @@
-import * as fs from "fs";
-import * as path from "path";
-import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig } from "./config";
+import * as fs from 'fs';
+import * as path from 'path';
+import { type OhMyOpenCodeConfig, OhMyOpenCodeConfigSchema } from './config';
 import {
-  log,
-  deepMerge,
-  getOpenCodeConfigDir,
   addConfigLoadError,
-  parseJsonc,
+  deepMerge,
   detectPluginConfigFile,
+  getOpenCodeConfigDir,
+  log,
   migrateConfigFile,
-} from "./shared";
-import { migrateLegacyConfigFile } from "./shared/migrate-legacy-config-file";
-import { LEGACY_CONFIG_BASENAME } from "./shared/plugin-identity";
+  parseJsonc,
+} from './shared';
+import { migrateLegacyConfigFile } from './shared/migrate-legacy-config-file';
+import { LEGACY_CONFIG_BASENAME } from './shared/plugin-identity';
 
 const PARTIAL_STRING_ARRAY_KEYS = new Set([
-  "disabled_mcps",
-  "disabled_agents",
-  "disabled_skills",
-  "disabled_hooks",
-  "disabled_commands",
-  "disabled_tools",
+  'disabled_mcps',
+  'disabled_agents',
+  'disabled_skills',
+  'disabled_hooks',
+  'disabled_commands',
+  'disabled_tools',
 ]);
 
-export function parseConfigPartially(
-  rawConfig: Record<string, unknown>
-): OhMyOpenCodeConfig | null {
+export function parseConfigPartially(rawConfig: Record<string, unknown>): OhMyOpenCodeConfig | null {
   const fullResult = OhMyOpenCodeConfigSchema.safeParse(rawConfig);
   if (fullResult.success) {
-    return fullResult.data;
+    const inputKeys = new Set(Object.keys(rawConfig));
+    const filtered = Object.fromEntries(
+      Object.entries(fullResult.data as Record<string, unknown>).filter(([key]) => inputKeys.has(key)),
+    );
+    return filtered as OhMyOpenCodeConfig;
   }
 
   const partialConfig: Record<string, unknown> = {};
@@ -36,7 +38,7 @@ export function parseConfigPartially(
   for (const key of Object.keys(rawConfig)) {
     if (PARTIAL_STRING_ARRAY_KEYS.has(key)) {
       const sectionValue = rawConfig[key];
-      if (Array.isArray(sectionValue) && sectionValue.every((value) => typeof value === "string")) {
+      if (Array.isArray(sectionValue) && sectionValue.every((value) => typeof value === 'string')) {
         partialConfig[key] = sectionValue;
       }
       continue;
@@ -51,8 +53,8 @@ export function parseConfigPartially(
     } else {
       const sectionErrors = sectionResult.error.issues
         .filter((i) => i.path[0] === key)
-        .map((i) => `${i.path.join(".")}: ${i.message}`)
-        .join(", ");
+        .map((i) => `${i.path.join('.')}: ${i.message}`)
+        .join(', ');
       if (sectionErrors) {
         invalidSections.push(`${key}: ${sectionErrors}`);
       }
@@ -60,19 +62,16 @@ export function parseConfigPartially(
   }
 
   if (invalidSections.length > 0) {
-    log("Partial config loaded — invalid sections skipped:", invalidSections);
+    log('Partial config loaded — invalid sections skipped:', invalidSections);
   }
 
   return partialConfig as OhMyOpenCodeConfig;
 }
 
-export function loadConfigFromPath(
-  configPath: string,
-  _ctx: unknown
-): OhMyOpenCodeConfig | null {
+export function loadConfigFromPath(configPath: string, _ctx: unknown): OhMyOpenCodeConfig | null {
   try {
     if (fs.existsSync(configPath)) {
-      const content = fs.readFileSync(configPath, "utf-8");
+      const content = fs.readFileSync(configPath, 'utf-8');
       const rawConfig = parseJsonc<Record<string, unknown>>(content);
 
       migrateConfigFile(configPath, rawConfig);
@@ -84,9 +83,7 @@ export function loadConfigFromPath(
         return result.data;
       }
 
-      const errorMsg = result.error.issues
-        .map((i) => `${i.path.join(".")}: ${i.message}`)
-        .join(", ");
+      const errorMsg = result.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join(', ');
       log(`Config validation error in ${configPath}:`, result.error.issues);
       addConfigLoadError({
         path: configPath,
@@ -109,88 +106,47 @@ export function loadConfigFromPath(
   return null;
 }
 
-export function mergeConfigs(
-  base: OhMyOpenCodeConfig,
-  override: OhMyOpenCodeConfig
-): OhMyOpenCodeConfig {
+export function mergeConfigs(base: OhMyOpenCodeConfig, override: OhMyOpenCodeConfig): OhMyOpenCodeConfig {
   return {
     ...base,
     ...override,
     agents: deepMerge(base.agents, override.agents),
     categories: deepMerge(base.categories, override.categories),
-    disabled_agents: [
-      ...new Set([
-        ...(base.disabled_agents ?? []),
-        ...(override.disabled_agents ?? []),
-      ]),
-    ],
-    disabled_mcps: [
-      ...new Set([
-        ...(base.disabled_mcps ?? []),
-        ...(override.disabled_mcps ?? []),
-      ]),
-    ],
-    disabled_hooks: [
-      ...new Set([
-        ...(base.disabled_hooks ?? []),
-        ...(override.disabled_hooks ?? []),
-      ]),
-    ],
-    disabled_commands: [
-      ...new Set([
-        ...(base.disabled_commands ?? []),
-        ...(override.disabled_commands ?? []),
-      ]),
-    ],
-    disabled_skills: [
-      ...new Set([
-        ...(base.disabled_skills ?? []),
-        ...(override.disabled_skills ?? []),
-      ]),
-    ],
-    disabled_tools: [
-      ...new Set([
-        ...(base.disabled_tools ?? []),
-        ...(override.disabled_tools ?? []),
-      ]),
-    ],
+    disabled_agents: [...new Set([...(base.disabled_agents ?? []), ...(override.disabled_agents ?? [])])],
+    disabled_mcps: [...new Set([...(base.disabled_mcps ?? []), ...(override.disabled_mcps ?? [])])],
+    disabled_hooks: [...new Set([...(base.disabled_hooks ?? []), ...(override.disabled_hooks ?? [])])],
+    disabled_commands: [...new Set([...(base.disabled_commands ?? []), ...(override.disabled_commands ?? [])])],
+    disabled_skills: [...new Set([...(base.disabled_skills ?? []), ...(override.disabled_skills ?? [])])],
+    disabled_tools: [...new Set([...(base.disabled_tools ?? []), ...(override.disabled_tools ?? [])])],
     claude_code: deepMerge(base.claude_code, override.claude_code),
   };
 }
 
-export function loadPluginConfig(
-  directory: string,
-  ctx: unknown
-): OhMyOpenCodeConfig {
+export function loadPluginConfig(directory: string, ctx: unknown): OhMyOpenCodeConfig {
   // User-level config path - prefer .jsonc over .json
-  const configDir = getOpenCodeConfigDir({ binary: "opencode" });
+  const configDir = getOpenCodeConfigDir({ binary: 'opencode' });
   const userDetected = detectPluginConfigFile(configDir);
   const userConfigPath =
-    userDetected.format !== "none"
-      ? userDetected.path
-      : path.join(configDir, "oh-my-opencode.json");
+    userDetected.format !== 'none' ? userDetected.path : path.join(configDir, 'oh-my-opencode.json');
 
   // Auto-copy legacy config file to canonical name if needed
-  if (userDetected.format !== "none" && path.basename(userDetected.path).startsWith(LEGACY_CONFIG_BASENAME)) {
+  if (userDetected.format !== 'none' && path.basename(userDetected.path).startsWith(LEGACY_CONFIG_BASENAME)) {
     migrateLegacyConfigFile(userDetected.path);
   }
 
   // Project-level config path - prefer .jsonc over .json
-  const projectBasePath = path.join(directory, ".opencode");
+  const projectBasePath = path.join(directory, '.opencode');
   const projectDetected = detectPluginConfigFile(projectBasePath);
   const projectConfigPath =
-    projectDetected.format !== "none"
-      ? projectDetected.path
-      : path.join(projectBasePath, "oh-my-opencode.json");
+    projectDetected.format !== 'none' ? projectDetected.path : path.join(projectBasePath, 'oh-my-opencode.json');
 
   // Auto-copy legacy project config file to canonical name if needed
-  if (projectDetected.format !== "none" && path.basename(projectDetected.path).startsWith(LEGACY_CONFIG_BASENAME)) {
+  if (projectDetected.format !== 'none' && path.basename(projectDetected.path).startsWith(LEGACY_CONFIG_BASENAME)) {
     migrateLegacyConfigFile(projectDetected.path);
   }
 
   // Load user config first (base). Parse empty config through Zod to apply field defaults.
-  let config: OhMyOpenCodeConfig =
-    loadConfigFromPath(userConfigPath, ctx) ?? OhMyOpenCodeConfigSchema.parse({});
+  let config: OhMyOpenCodeConfig = loadConfigFromPath(userConfigPath, ctx) ?? OhMyOpenCodeConfigSchema.parse({});
 
   // Override with project config
   const projectConfig = loadConfigFromPath(projectConfigPath, ctx);
@@ -202,7 +158,7 @@ export function loadPluginConfig(
     ...config,
   };
 
-  log("Final merged config", {
+  log('Final merged config', {
     agents: config.agents,
     disabled_agents: config.disabled_agents,
     disabled_mcps: config.disabled_mcps,
