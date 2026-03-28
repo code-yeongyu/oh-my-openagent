@@ -11,6 +11,13 @@ import { sanitizeJsonSchema } from "../../plugin/normalize-tool-arg-schemas"
 import { discoverCommandsSync } from "../slashcommand/command-discovery"
 import type { CommandInfo } from "../slashcommand/types"
 import { formatLoadedCommand } from "../slashcommand/command-output-formatter"
+
+type NativeSkillEntry = {
+  name: string
+  description: string
+  location: string
+  content: string
+}
 // Priority: project > user > opencode/opencode-project > builtin/config
 const scopePriority: Record<string, number> = {
   project: 4,
@@ -33,6 +40,46 @@ function loadedSkillToInfo(skill: LoadedSkill): SkillInfo {
     metadata: skill.metadata,
     allowedTools: skill.allowedTools,
   }
+}
+
+function nativeSkillToLoadedSkill(native: NativeSkillEntry): LoadedSkill {
+  return {
+    name: native.name,
+    path: native.location,
+    definition: {
+      name: native.name,
+      description: native.description,
+      template: native.content,
+    },
+    scope: "config",
+  }
+}
+
+function mergeNativeSkills(skills: LoadedSkill[], nativeSkills: NativeSkillEntry[]): void {
+  const knownNames = new Set(skills.map(skill => skill.name))
+  for (const native of nativeSkills) {
+    if (knownNames.has(native.name)) continue
+    skills.push(nativeSkillToLoadedSkill(native))
+    knownNames.add(native.name)
+  }
+}
+
+function mergeNativeSkillInfos(skillInfos: SkillInfo[], nativeSkills: NativeSkillEntry[]): void {
+  const knownNames = new Set(skillInfos.map(skill => skill.name))
+  for (const native of nativeSkills) {
+    if (knownNames.has(native.name)) continue
+    skillInfos.push({
+      name: native.name,
+      description: native.description,
+      location: native.location,
+      scope: "config",
+    })
+    knownNames.add(native.name)
+  }
+}
+
+function isPromiseLike<T>(value: T | Promise<T>): value is Promise<T> {
+  return typeof value === "object" && value !== null && "then" in value
 }
 
 function formatCombinedDescription(skills: SkillInfo[], commands: CommandInfo[]): string {
@@ -103,6 +150,11 @@ async function extractSkillBody(skill: LoadedSkill): Promise<string> {
     const fullTemplate = await skill.lazyContent.load()
     const templateMatch = fullTemplate.match(/<skill-instruction>([\s\S]*?)<\/skill-instruction>/)
     return templateMatch ? templateMatch[1].trim() : fullTemplate
+  }
+
+  if (skill.scope === "config" && skill.definition.template) {
+    const templateMatch = skill.definition.template.match(/<skill-instruction>([\s\S]*?)<\/skill-instruction>/)
+    return templateMatch ? templateMatch[1].trim() : skill.definition.template
   }
 
   if (skill.path) {
@@ -195,22 +247,9 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
       : [...discovered, ...options.skills.filter(s => !new Set(discovered.map(d => d.name)).has(s.name))]
 
     if (options.nativeSkills) {
-      const knownNames = new Set(allSkills.map(s => s.name))
       try {
         const nativeAll = await options.nativeSkills.all()
-        for (const native of nativeAll) {
-          if (knownNames.has(native.name)) continue
-          allSkills.push({
-            name: native.name,
-            path: native.location,
-            definition: {
-              name: native.name,
-              description: native.description,
-              template: native.content,
-            },
-            scope: "config",
-          })
-        }
+        mergeNativeSkills(allSkills, nativeAll)
       } catch {
         // Native skill discovery may not be available
       }
@@ -235,11 +274,28 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
     return cachedDescription
   }
 
-  // Eagerly build description when callers pre-provide skills/commands.
   if (options.skills !== undefined) {
     const skillInfos = options.skills.map(loadedSkillToInfo)
     const commandsForDescription = options.commands ?? []
+    let needsAsyncRefresh = false
+
+    if (options.nativeSkills) {
+      try {
+        const nativeAll = options.nativeSkills.all()
+        if (isPromiseLike(nativeAll)) {
+          needsAsyncRefresh = true
+        } else {
+          mergeNativeSkillInfos(skillInfos, nativeAll)
+        }
+      } catch {
+        // Native skill discovery may not be available
+      }
+    }
+
     cachedDescription = formatCombinedDescription(skillInfos, commandsForDescription)
+    if (needsAsyncRefresh) {
+      void buildDescription()
+    }
   } else if (options.commands !== undefined) {
     cachedDescription = formatCombinedDescription([], options.commands)
   } else {
@@ -248,6 +304,9 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
 
   return tool({
     get description() {
+      if (cachedDescription === null) {
+        void buildDescription()
+      }
       return cachedDescription ?? TOOL_DESCRIPTION_PREFIX
     },
     args: {
@@ -259,8 +318,8 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
     },
     async execute(args: SkillArgs, ctx?: { agent?: string }) {
       const skills = await getSkills()
-      cachedDescription = null
       const commands = getCommands()
+      cachedDescription = formatCombinedDescription(skills.map(loadedSkillToInfo), commands)
 
       const requestedName = args.name.replace(/^\//, "")
 

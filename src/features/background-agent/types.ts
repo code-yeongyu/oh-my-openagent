@@ -66,6 +66,8 @@ export interface BackgroundTask {
   lastMsgCount?: number
   /** Number of consecutive polls with stable message count */
   stablePolls?: number
+  /** Number of consecutive polls where session was missing from status map */
+  consecutiveMissedPolls?: number
 }
 
 export interface LaunchInput {

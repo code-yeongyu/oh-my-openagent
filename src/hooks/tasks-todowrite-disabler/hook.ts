@@ -9,7 +9,7 @@ export interface TasksTodowriteDisablerConfig {
 export function createTasksTodowriteDisablerHook(
   config: TasksTodowriteDisablerConfig,
 ) {
-  const isTaskSystemEnabled = config.experimental?.task_system ?? false;
+  const isTaskSystemEnabled = config.experimental?.task_system ?? true;
 
   return {
     "tool.execute.before": async (

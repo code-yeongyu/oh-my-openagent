@@ -167,33 +167,47 @@ jobs:
 
       - name: Calculate version
         id: version
+        env:
+          RAW_VERSION: ${{ inputs.version }}
+          BUMP: ${{ inputs.bump }}
         run: |
-          VERSION="${{ inputs.version }}"
+          VERSION="$RAW_VERSION"
           if [ -z "$VERSION" ]; then
             PREV=$(curl -s https://registry.npmjs.org/oh-my-opencode/latest | jq -r '.version // "0.0.0"')
             BASE="${PREV%%-*}"
             IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE"
-            case "${{ inputs.bump }}" in
+            case "$BUMP" in
               major) VERSION="$((MAJOR+1)).0.0" ;;
               minor) VERSION="${MAJOR}.$((MINOR+1)).0" ;;
               *) VERSION="${MAJOR}.${MINOR}.$((PATCH+1))" ;;
             esac
           fi
+
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$ ]]; then
+            echo "::error::Invalid version: $VERSION"
+            exit 1
+          fi
+
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          
+
           if [[ "$VERSION" == *"-"* ]]; then
-            DIST_TAG=$(echo "$VERSION" | cut -d'-' -f2 | cut -d'.' -f1)
+            DIST_TAG=$(printf '%s' "$VERSION" | cut -d'-' -f2 | cut -d'.' -f1)
+            if ! [[ "$DIST_TAG" =~ ^[a-z][a-z0-9-]*$ ]]; then
+              echo "::error::Invalid dist_tag: $DIST_TAG"
+              exit 1
+            fi
             echo "dist_tag=${DIST_TAG:-next}" >> $GITHUB_OUTPUT
           else
             echo "dist_tag=" >> $GITHUB_OUTPUT
           fi
-          
+
           echo "Version: $VERSION"
 
       - name: Check if already published
         id: check
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/oh-my-opencode/${VERSION}")
           if [ "$STATUS" = "200" ]; then
             echo "skip=true" >> $GITHUB_OUTPUT
@@ -204,15 +218,16 @@ jobs:
 
       - name: Update version
         if: steps.check.outputs.skip != 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
           jq --arg v "$VERSION" '.version = $v' package.json > tmp.json && mv tmp.json package.json
-          
+
           for platform in darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline; do
             jq --arg v "$VERSION" '.version = $v' "packages/${platform}/package.json" > tmp.json
             mv tmp.json "packages/${platform}/package.json"
           done
-          
+
           jq --arg v "$VERSION" '.optionalDependencies = (.optionalDependencies | to_entries | map(.value = $v) | from_entries)' package.json > tmp.json && mv tmp.json package.json
 
       - name: Build main package
@@ -225,33 +240,22 @@ jobs:
 
       - name: Publish oh-my-opencode
         if: steps.check.outputs.skip != 'true'
-        run: |
-          TAG_ARG=""
-          if [ -n "${{ steps.version.outputs.dist_tag }}" ]; then
-            TAG_ARG="--tag ${{ steps.version.outputs.dist_tag }}"
-          fi
-          npm publish --access public --provenance $TAG_ARG
         env:
+          DIST_TAG: ${{ steps.version.outputs.dist_tag }}
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
-
-      - name: Commit version bump
-        if: steps.check.outputs.skip != 'true'
         run: |
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git config user.name "github-actions[bot]"
-          git add package.json packages/*/package.json
-          git diff --cached --quiet || git commit -m "release: v${{ steps.version.outputs.version }}"
-          git tag -f "v${{ steps.version.outputs.version }}"
-          git push origin --tags --force
-          git push origin HEAD
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          if [ -n "$DIST_TAG" ]; then
+            npm publish --access public --provenance --tag "$DIST_TAG"
+          else
+            npm publish --access public --provenance
+          fi
 
       - name: Check if oh-my-openagent already published
         id: check-openagent
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/oh-my-openagent/${VERSION}")
           if [ "$STATUS" = "200" ]; then
             echo "skip=true" >> $GITHUB_OUTPUT
@@ -262,9 +266,12 @@ jobs:
 
       - name: Publish oh-my-openagent
         if: steps.check-openagent.outputs.skip != 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          DIST_TAG: ${{ steps.version.outputs.dist_tag }}
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+          NPM_CONFIG_PROVENANCE: true
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          
           # Update package name, version, and optionalDependencies for oh-my-openagent
           jq --arg v "$VERSION" '
             .name = "oh-my-openagent" |
@@ -275,39 +282,31 @@ jobs:
               from_entries
             )
           ' package.json > tmp.json && mv tmp.json package.json
-          
-          TAG_ARG=""
-          if [ -n "${{ steps.version.outputs.dist_tag }}" ]; then
-            TAG_ARG="--tag ${{ steps.version.outputs.dist_tag }}"
+
+          if [ -n "$DIST_TAG" ]; then
+            npm publish --access public --provenance --tag "$DIST_TAG"
+          else
+            npm publish --access public --provenance
           fi
-          npm publish --access public --provenance $TAG_ARG || echo "::warning::oh-my-openagent publish failed"
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
-          NPM_CONFIG_PROVENANCE: true
 
       - name: Restore package.json
-        if: steps.check-openagent.outputs.skip != 'true'
+        if: always() && steps.check-openagent.outputs.skip != 'true'
         run: |
           git checkout -- package.json
 
-  trigger-platform:
-    runs-on: ubuntu-latest
+  publish-platform:
     needs: publish-main
     if: inputs.skip_platform != true
-    steps:
-      - name: Trigger platform publish workflow
-        run: |
-          gh workflow run publish-platform.yml \
-            --repo ${{ github.repository }} \
-            --ref ${{ github.ref }} \
-            -f version=${{ needs.publish-main.outputs.version }} \
-            -f dist_tag=${{ needs.publish-main.outputs.dist_tag }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    uses: ./.github/workflows/publish-platform.yml
+    with:
+      version: ${{ needs.publish-main.outputs.version }}
+      dist_tag: ${{ needs.publish-main.outputs.dist_tag }}
+    secrets: inherit
 
   release:
     runs-on: ubuntu-latest
-    needs: publish-main
+    needs: [publish-main, publish-platform]
+    if: always() && needs.publish-main.result == 'success' && (inputs.skip_platform == true || needs.publish-platform.result == 'success')
     steps:
       - uses: actions/checkout@v4
         with:
@@ -331,13 +330,53 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Create GitHub release
+      - name: Apply release version to source tree
+        env:
+          VERSION: ${{ needs.publish-main.outputs.version }}
         run: |
-          VERSION="${{ needs.publish-main.outputs.version }}"
+          jq --arg v "$VERSION" '.version = $v' package.json > tmp.json && mv tmp.json package.json
+
+          for platform in darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline; do
+            jq --arg v "$VERSION" '.version = $v' "packages/${platform}/package.json" > tmp.json
+            mv tmp.json "packages/${platform}/package.json"
+          done
+
+          jq --arg v "$VERSION" '.optionalDependencies = (.optionalDependencies | to_entries | map(.value = $v) | from_entries)' package.json > tmp.json && mv tmp.json package.json
+
+      - name: Commit version bump
+        env:
+          VERSION: ${{ needs.publish-main.outputs.version }}
+        run: |
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git add package.json packages/*/package.json
+          git diff --cached --quiet || git commit -m "release: v${VERSION}"
+
+      - name: Create release tag
+        env:
+          VERSION: ${{ needs.publish-main.outputs.version }}
+        run: |
+          if git rev-parse "v${VERSION}" >/dev/null 2>&1; then
+            echo "::error::Tag v${VERSION} already exists"
+            exit 1
+          fi
+          git tag "v${VERSION}"
+
+      - name: Push release state
+        env:
+          VERSION: ${{ needs.publish-main.outputs.version }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git push origin HEAD
+          git push origin "v${VERSION}"
+
+      - name: Create GitHub release
+        env:
+          VERSION: ${{ needs.publish-main.outputs.version }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
           gh release view "v${VERSION}" >/dev/null 2>&1 || \
             gh release create "v${VERSION}" --title "v${VERSION}" --notes-file /tmp/changelog.md
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Delete draft release
         run: gh release delete next --yes 2>/dev/null || true
@@ -346,13 +385,13 @@ jobs:
 
       - name: Merge to master
         continue-on-error: true
+        env:
+          VERSION: ${{ needs.publish-main.outputs.version }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          VERSION="${{ needs.publish-main.outputs.version }}"
           git stash --include-untracked || true
           git checkout master
           git reset --hard "v${VERSION}"
           git push -f origin master || echo "::warning::Failed to push to master"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

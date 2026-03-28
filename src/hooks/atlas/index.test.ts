@@ -9,7 +9,7 @@ import {
   readBoulderState,
 } from "../../features/boulder-state"
 import type { BoulderState } from "../../features/boulder-state"
-import { _resetForTesting, subagentSessions, updateSessionAgent } from "../../features/claude-code-session-state"
+import { _resetForTesting, registerAgentName, subagentSessions, updateSessionAgent } from "../../features/claude-code-session-state"
 import type { PendingTaskRef } from "./types"
 
 const TEST_STORAGE_ROOT = join(tmpdir(), `atlas-message-storage-${randomUUID()}`)
@@ -90,6 +90,9 @@ describe("atlas hook", () => {
   }
 
   beforeEach(() => {
+    _resetForTesting()
+    registerAgentName("atlas")
+    registerAgentName("sisyphus")
     TEST_DIR = join(tmpdir(), `atlas-test-${randomUUID()}`)
     SISYPHUS_DIR = join(TEST_DIR, ".sisyphus")
     if (!existsSync(TEST_DIR)) {
@@ -102,6 +105,7 @@ describe("atlas hook", () => {
   })
 
   afterEach(() => {
+    _resetForTesting()
     clearBoulderState(TEST_DIR)
     if (existsSync(TEST_DIR)) {
       rmSync(TEST_DIR, { recursive: true, force: true })
@@ -1182,9 +1186,11 @@ session_id: ses_untrusted_999
 
      beforeEach(() => {
        _resetForTesting()
-       subagentSessions.clear()
-       setupMessageStorage(MAIN_SESSION_ID, "atlas")
-     })
+       registerAgentName("atlas")
+       registerAgentName("sisyphus")
+        subagentSessions.clear()
+        setupMessageStorage(MAIN_SESSION_ID, "atlas")
+      })
 
     afterEach(() => {
       cleanupMessageStorage(MAIN_SESSION_ID)

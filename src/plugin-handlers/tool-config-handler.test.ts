@@ -15,7 +15,7 @@ function createParams(overrides: {
   return {
     config: { tools: {}, permission: {} } as Record<string, unknown>,
     pluginConfig: {
-      experimental: { task_system: overrides.taskSystem ?? false },
+      experimental: overrides.taskSystem === undefined ? undefined : { task_system: overrides.taskSystem },
       disabled_tools: overrides.disabledTools,
     } as OhMyOpenCodeConfig,
     agentResult: agentResult as Record<string, unknown>,
@@ -212,6 +212,30 @@ describe("applyToolConfig", () => {
         }
         expect(agent.permission.todowrite).toBeUndefined()
         expect(agent.permission.todoread).toBeUndefined()
+      })
+    })
+  })
+
+  describe("#given task_system is undefined", () => {
+    describe("#when applying tool config", () => {
+      it.each([
+        "atlas",
+        "sisyphus",
+        "hephaestus",
+        "prometheus",
+        "sisyphus-junior",
+      ])("#then should deny todo tools for %s agent by default", (agentName) => {
+        const params = createParams({
+          agents: [agentName],
+        })
+
+        applyToolConfig(params)
+
+        const agent = params.agentResult[agentName] as {
+          permission: Record<string, unknown>
+        }
+        expect(agent.permission.todowrite).toBe("deny")
+        expect(agent.permission.todoread).toBe("deny")
       })
     })
   })

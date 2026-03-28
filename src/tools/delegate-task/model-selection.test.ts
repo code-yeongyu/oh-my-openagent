@@ -76,7 +76,9 @@ describe("resolveModelForDelegateTask", () => {
 		})
 
 		describe("#when availableModels is empty (cache exists but empty)", () => {
-			test("#then falls through to category default model (existing behavior)", () => {
+			test("#then keeps the category default when its provider is connected", () => {
+				const readConnectedProvidersSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["anthropic"])
+
 				const result = resolveModelForDelegateTask({
 					categoryDefaultModel: "anthropic/claude-sonnet-4-6",
 					fallbackChain: [
@@ -87,6 +89,40 @@ describe("resolveModelForDelegateTask", () => {
 				})
 
 				expect(result).toEqual({ model: "anthropic/claude-sonnet-4-6" })
+				readConnectedProvidersSpy.mockRestore()
+			})
+
+			test("#then skips a disconnected category default and resolves via a connected fallback", () => {
+				const readConnectedProvidersSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
+
+				const result = resolveModelForDelegateTask({
+					categoryDefaultModel: "anthropic/claude-sonnet-4-6",
+					fallbackChain: [
+						{ providers: ["openai"], model: "gpt-5.4", variant: "high" },
+					],
+					availableModels: new Set(),
+					systemDefaultModel: "anthropic/claude-sonnet-4-6",
+				})
+
+				expect(result).toEqual({
+					model: "openai/gpt-5.4",
+					variant: "high",
+					fallbackEntry: { providers: ["openai"], model: "gpt-5.4", variant: "high" },
+					matchedFallback: true,
+				})
+				readConnectedProvidersSpy.mockRestore()
+			})
+
+			test("#then skips disconnected user fallback models and keeps the first connected fallback", () => {
+				const readConnectedProvidersSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
+
+				const result = resolveModelForDelegateTask({
+					userFallbackModels: ["anthropic/claude-sonnet-4-6", "openai/gpt-5.4"],
+					availableModels: new Set(),
+				})
+
+				expect(result).toEqual({ model: "openai/gpt-5.4", matchedFallback: true })
+				readConnectedProvidersSpy.mockRestore()
 			})
 		})
 
@@ -225,16 +261,23 @@ describe("resolveModelForDelegateTask", () => {
 		})
 
 		describe("#when availableModels is empty", () => {
-			test("#then falls through to existing resolution (cache partially ready)", () => {
+			test("#then uses connected providers to avoid disconnected category defaults", () => {
+				const readConnectedProvidersSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
+
 				const result = resolveModelForDelegateTask({
 					categoryDefaultModel: "anthropic/claude-sonnet-4-6",
 					fallbackChain: [
-						{ providers: ["anthropic"], model: "claude-sonnet-4-6" },
+						{ providers: ["openai"], model: "gpt-5.4" },
 					],
 					availableModels: new Set(),
 				})
 
-				expect(result).toBeDefined()
+				expect(result).toEqual({
+					model: "openai/gpt-5.4",
+					fallbackEntry: { providers: ["openai"], model: "gpt-5.4" },
+					matchedFallback: true,
+				})
+				readConnectedProvidersSpy.mockRestore()
 			})
 		})
 	})

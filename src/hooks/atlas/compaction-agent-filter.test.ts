@@ -6,7 +6,7 @@ import { join } from "node:path"
 import { randomUUID } from "node:crypto"
 
 import { clearBoulderState, writeBoulderState } from "../../features/boulder-state"
-import { _resetForTesting } from "../../features/claude-code-session-state"
+import { _resetForTesting, registerAgentName } from "../../features/claude-code-session-state"
 import type { BoulderState } from "../../features/boulder-state"
 
 const TEST_STORAGE_ROOT = join(tmpdir(), `atlas-compaction-storage-${randomUUID()}`)
@@ -66,6 +66,8 @@ describe("atlas hook compaction agent filtering", () => {
     mkdirSync(testDirectory, { recursive: true })
     clearBoulderState(testDirectory)
     _resetForTesting()
+    registerAgentName("atlas")
+    registerAgentName("sisyphus")
   })
 
   afterEach(() => {
