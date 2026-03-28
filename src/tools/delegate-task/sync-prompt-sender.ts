@@ -1,4 +1,5 @@
 import type { DelegateTaskArgs, OpencodeClient, DelegatedModelConfig } from "./types"
+import type { SisyphusAgentConfig } from "../../config/schema"
 import { isPlanFamily } from "./constants"
 import { buildTaskPrompt } from "./prompt-builder"
 import {
@@ -41,11 +42,13 @@ export async function sendSyncPrompt(
     categoryModel: DelegatedModelConfig | undefined
     toastManager: { removeTask: (id: string) => void } | null | undefined
     taskId: string | undefined
+    sisyphusAgentConfig?: SisyphusAgentConfig
   },
   deps: SendSyncPromptDeps = sendSyncPromptDeps
 ): Promise<string | null> {
   const allowTask = isPlanFamily(input.agentToUse)
-  const effectivePrompt = buildTaskPrompt(input.args.prompt, input.agentToUse)
+  const tddEnabled = input.sisyphusAgentConfig?.tdd
+  const effectivePrompt = buildTaskPrompt(input.args.prompt, input.agentToUse, tddEnabled)
   const tools = {
     task: allowTask,
     call_omo_agent: true,

@@ -23,7 +23,8 @@ export async function executeBackgroundTask(
   const { manager } = executorCtx
 
   try {
-    const effectivePrompt = buildTaskPrompt(args.prompt, agentToUse)
+    const tddEnabled = executorCtx.sisyphusAgentConfig?.tdd
+    const effectivePrompt = buildTaskPrompt(args.prompt, agentToUse, tddEnabled)
     const task = await manager.launch({
       description: args.description,
       prompt: effectivePrompt,
