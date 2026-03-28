@@ -4267,9 +4267,6 @@
           "type": "boolean"
         }
       },
-      "required": [
-        "tdd"
-      ],
       "additionalProperties": false
     },
     "comment_checker": {
