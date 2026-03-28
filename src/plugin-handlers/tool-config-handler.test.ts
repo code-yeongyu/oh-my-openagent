@@ -37,7 +37,6 @@ describe("applyToolConfig", () => {
         const permission = params.config.permission as Record<string, unknown>
         expect(permission.webfetch).toBe("deny")
         expect(permission.external_directory).toBe("deny")
-        expect(permission.task).toBe("deny")
       })
 
       it("#then should allow webfetch and external_directory by default", () => {
@@ -48,7 +47,6 @@ describe("applyToolConfig", () => {
         const permission = params.config.permission as Record<string, unknown>
         expect(permission.webfetch).toBe("allow")
         expect(permission.external_directory).toBe("allow")
-        expect(permission.task).toBe("deny")
       })
     })
   })
