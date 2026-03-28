@@ -6,7 +6,7 @@ import { parseFrontmatter } from '../../shared/frontmatter';
 import { mapClaudeModelToOpenCode } from './claude-model-mapper';
 import type { AgentFrontmatter, AgentScope, ClaudeCodeAgentConfig, LoadedAgent } from './types';
 
-function parseToolsConfig(tools?: string | string[]): Record<string, boolean> | undefined {
+export function parseToolsConfig(tools?: string | string[]): Record<string, boolean> | undefined {
   if (!tools) return undefined;
 
   const list = Array.isArray(tools)

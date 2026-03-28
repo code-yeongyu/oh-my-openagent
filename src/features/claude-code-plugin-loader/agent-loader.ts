@@ -7,7 +7,7 @@ import { mapClaudeModelToOpenCode } from '../claude-code-agent-loader/claude-mod
 import type { AgentFrontmatter, ClaudeCodeAgentConfig } from '../claude-code-agent-loader/types';
 import type { LoadedPlugin } from './types';
 
-function parseToolsConfig(tools?: string | string[]): Record<string, boolean> | undefined {
+export function parseToolsConfig(tools?: string | string[]): Record<string, boolean> | undefined {
   if (!tools) return undefined;
 
   const list = Array.isArray(tools)
