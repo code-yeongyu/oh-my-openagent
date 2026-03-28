@@ -44,7 +44,7 @@ describe("resolveActualContextLimit", () => {
     expect(actualLimit).toBe(1_000_000)
   })
 
-  it("returns default 200K for older Anthropic models when 1M mode is disabled", () => {
+  it("returns the cached limit for older Anthropic models when 1M mode is disabled", () => {
     // given
     delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
     delete process.env[VERTEX_CONTEXT_ENV_KEY]
@@ -58,7 +58,7 @@ describe("resolveActualContextLimit", () => {
     })
 
     // then
-    expect(actualLimit).toBe(200_000)
+    expect(actualLimit).toBe(500_000)
   })
 
   it("returns default 200K for Anthropic models without cached limit and 1M mode disabled", () => {
@@ -124,6 +124,29 @@ describe("resolveActualContextLimit", () => {
     expect(actualLimit).toBe(1_000_000)
   })
 
+  it("supports Anthropic alias model IDs when the cached limit already knows they are 1M", () => {
+    // given
+    delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+    delete process.env[VERTEX_CONTEXT_ENV_KEY]
+    const modelContextLimitsCache = new Map<string, number>()
+    modelContextLimitsCache.set("anthropic/claude-opus", 1_000_000)
+    modelContextLimitsCache.set("anthropic/claude-sonnet", 1_000_000)
+
+    // when
+    const opusLimit = resolveActualContextLimit("anthropic", "claude-opus", {
+      anthropicContext1MEnabled: false,
+      modelContextLimitsCache,
+    })
+    const sonnetLimit = resolveActualContextLimit("anthropic", "claude-sonnet", {
+      anthropicContext1MEnabled: false,
+      modelContextLimitsCache,
+    })
+
+    // then
+    expect(opusLimit).toBe(1_000_000)
+    expect(sonnetLimit).toBe(1_000_000)
+  })
+
   it("supports Anthropic 4.6 high-variant model IDs without widening older models", () => {
     // given
     delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
@@ -141,7 +164,7 @@ describe("resolveActualContextLimit", () => {
     expect(actualLimit).toBe(500_000)
   })
 
-  it("ignores stale cached limits for older Anthropic models with suffixed IDs", () => {
+  it("returns cached limits for older Anthropic models with suffixed IDs", () => {
     // given
     delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
     delete process.env[VERTEX_CONTEXT_ENV_KEY]
@@ -155,7 +178,7 @@ describe("resolveActualContextLimit", () => {
     })
 
     // then
-    expect(actualLimit).toBe(200_000)
+    expect(actualLimit).toBe(500_000)
   })
 
   it("returns null for non-Anthropic providers without a cached limit", () => {

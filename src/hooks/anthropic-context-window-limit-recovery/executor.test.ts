@@ -362,6 +362,41 @@ describe("executeCompact lock management", () => {
     truncateSpy.mockRestore()
   })
 
+  test("skips aggressive truncation when aggressive_truncation is disabled", async () => {
+    // given: Over token limit, but aggressive truncation is explicitly disabled
+    autoCompactState.errorDataBySession.set(sessionID, {
+      errorType: "token_limit",
+      currentTokens: 250000,
+      maxTokens: 200000,
+    })
+
+    const truncateSpy = spyOn(
+      recoveryStrategy,
+      "runAggressiveTruncationStrategy",
+    ).mockImplementation(async (params) => ({
+      handled: true,
+      nextTruncateAttempt: params.truncateAttempt + 1,
+    }))
+
+    // when
+    await executeCompact(
+      sessionID,
+      msg,
+      autoCompactState,
+      mockClient,
+      directory,
+      {},
+      { aggressive_truncation: false },
+    )
+
+    // then
+    expect(truncateSpy).not.toHaveBeenCalled()
+    expect(mockClient.session.summarize).toHaveBeenCalled()
+    expect(autoCompactState.compactionInProgress.has(sessionID)).toBe(false)
+
+    truncateSpy.mockRestore()
+  })
+
   test("does NOT call summarize when truncation is sufficient", async () => {
     // given: Over token limit with truncation returning sufficient
     autoCompactState.errorDataBySession.set(sessionID, {

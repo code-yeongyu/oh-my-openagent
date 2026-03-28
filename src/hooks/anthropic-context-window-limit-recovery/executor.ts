@@ -21,8 +21,6 @@ export async function executeCompact(
   pluginConfig: OhMyOpenCodeConfig,
   _experimental?: ExperimentalConfig
 ): Promise<void> {
-  void _experimental
-
   if (autoCompactState.compactionInProgress.has(sessionID)) {
     await client.tui
       .showToast({
@@ -48,8 +46,12 @@ export async function executeCompact(
       errorData?.maxTokens &&
       errorData.currentTokens > errorData.maxTokens;
 
-    // Aggressive Truncation - always try when over limit
+    const aggressiveTruncationEnabled =
+      _experimental?.aggressive_truncation !== false
+
+    // Aggressive Truncation - try when over limit unless explicitly disabled
     if (
+      aggressiveTruncationEnabled &&
       isOverLimit &&
       truncateState.truncateAttempt < TRUNCATE_CONFIG.maxTruncateAttempts
     ) {
