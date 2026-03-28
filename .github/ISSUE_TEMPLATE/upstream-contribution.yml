@@ -1,0 +1,21 @@
+name: Upstream Contribution
+description: Bug fix or feature to submit as PR to upstream
+labels: ["upstream-pr"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What change should be contributed upstream?
+    validations:
+      required: true
+  - type: textarea
+    id: affected-files
+    attributes:
+      label: Affected Files
+      description: Which source files need changes?
+  - type: textarea
+    id: test-plan
+    attributes:
+      label: Test Plan
+      description: How will this be tested before submitting upstream?

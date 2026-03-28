@@ -1,0 +1,16 @@
+name: Ops Task
+description: Local operational changes (CI/CD, build, publish) — fork-only work
+labels: ["ops"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What operational change is needed?
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria
+      description: How do we verify this is complete?

@@ -1,0 +1,106 @@
+name: Sync Upstream
+
+on:
+  schedule:
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    if: github.repository == 'f5xc-salesdemos/oh-my-openagent'
+    outputs:
+      status: ${{ steps.sync.outputs.status }}
+    steps:
+      - name: Sync dev from upstream
+        id: sync
+        run: |
+          RESPONSE=$(gh api \
+            --method POST \
+            "repos/${{ github.repository }}/merge-upstream" \
+            -f branch=dev \
+            2>&1) || true
+
+          if echo "$RESPONSE" | grep -q '"merge_type"'; then
+            echo "status=success" >> "$GITHUB_OUTPUT"
+          elif echo "$RESPONSE" | grep -qi 'conflict'; then
+            echo "status=conflict" >> "$GITHUB_OUTPUT"
+          else
+            echo "status=up-to-date" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create issue on conflict
+        if: steps.sync.outputs.status == 'conflict'
+        run: |
+          gh issue create \
+            --repo "$REPO" \
+            --title "Upstream sync conflict on dev branch" \
+            --label "ops" \
+            --body "The scheduled upstream sync encountered a merge conflict. Manual resolution required:
+
+          \`\`\`bash
+          git fetch upstream
+          git checkout dev
+          git merge upstream/dev
+          # resolve conflicts
+          git push origin dev
+          \`\`\`"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+
+  rebase-ops:
+    needs: sync
+    if: needs.sync.outputs.status == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ops
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Rebase ops onto dev
+        id: rebase
+        run: |
+          git fetch origin dev
+          if git rebase origin/dev; then
+            echo "status=success" >> "$GITHUB_OUTPUT"
+          else
+            git rebase --abort
+            echo "status=conflict" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Push rebased ops
+        if: steps.rebase.outputs.status == 'success'
+        run: git push --force-with-lease origin ops
+
+      - name: Create issue on rebase conflict
+        if: steps.rebase.outputs.status == 'conflict'
+        run: |
+          gh issue create \
+            --repo "$REPO" \
+            --title "Ops branch rebase conflict after upstream sync" \
+            --label "ops" \
+            --body "The ops branch could not be automatically rebased onto dev. Manual resolution required:
+
+          \`\`\`bash
+          git checkout ops
+          git fetch origin dev
+          git rebase origin/dev
+          # resolve conflicts
+          git push --force-with-lease origin ops
+          \`\`\`"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
