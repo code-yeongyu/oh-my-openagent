@@ -130,6 +130,57 @@ describe("createAnthropicEffortHook", () => {
     })
   })
 
+  describe("provider guard", () => {
+    it("skips effort for google-vertex-anthropic provider", async () => {
+      //#given opus on vertex with variant max
+      const hook = createAnthropicEffortHook()
+      const { input, output } = createMockParams({
+        providerID: "google-vertex-anthropic",
+        modelID: "claude-opus-4-6",
+      })
+
+      //#when chat.params hook is called
+      await hook["chat.params"](input, output)
+
+      //#then effort should not be injected (vertex rejects the beta header)
+      expect(output.options.effort).toBeUndefined()
+      //#and variant should remain unchanged (provider guard returned before clamping)
+      expect(input.message.variant).toBe("max")
+    })
+
+    it("skips effort for non-opus model on google-vertex-anthropic", async () => {
+      //#given sonnet on vertex with variant max
+      const hook = createAnthropicEffortHook()
+      const { input, output } = createMockParams({
+        providerID: "google-vertex-anthropic",
+        modelID: "claude-sonnet-4-6",
+      })
+
+      //#when chat.params hook is called
+      await hook["chat.params"](input, output)
+
+      //#then effort should not be injected (provider guard fires before model check)
+      expect(output.options.effort).toBeUndefined()
+      //#and variant should remain unchanged (provider guard returned before clamping)
+      expect(input.message.variant).toBe("max")
+    })
+
+    it("still injects effort for direct anthropic provider with opus", async () => {
+      //#given opus on direct anthropic with variant max
+      const hook = createAnthropicEffortHook()
+      const { input, output } = createMockParams({
+        providerID: "anthropic",
+        modelID: "claude-opus-4-6",
+      })
+
+      //#when chat.params hook is called
+      await hook["chat.params"](input, output)
+
+      //#then effort should be injected normally
+      expect(output.options.effort).toBe("max")
+    })
+  })
+
   describe("existing options", () => {
     it("does not overwrite existing effort", async () => {
       const hook = createAnthropicEffortHook()

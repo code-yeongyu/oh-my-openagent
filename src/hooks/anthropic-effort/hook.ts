@@ -1,6 +1,9 @@
 import { log, normalizeModelID } from "../../shared"
 
 const OPUS_PATTERN = /claude-.*opus/i
+// Google Vertex Anthropic rejects the `effort-2025-11-24` beta header with a 400.
+// See: https://github.com/code-yeongyu/oh-my-openagent/issues/2940
+const EFFORT_UNSUPPORTED_PROVIDERS = new Set(["google-vertex-anthropic"])
 
 function isClaudeProvider(providerID: string, modelID: string): boolean {
   if (["anthropic", "google-vertex-anthropic", "opencode"].includes(providerID)) return true
@@ -52,6 +55,14 @@ export function createAnthropicEffortHook() {
       if (!model?.modelID || !model?.providerID) return
       if (message.variant !== "max") return
       if (!isClaudeProvider(model.providerID, model.modelID)) return
+      if (EFFORT_UNSUPPORTED_PROVIDERS.has(model.providerID)) {
+        log("anthropic-effort: skipped effort injection (provider does not support effort header)", {
+          sessionID: input.sessionID,
+          provider: model.providerID,
+          model: model.modelID,
+        })
+        return
+      }
       if (output.options.effort !== undefined) return
 
       const opus = isOpusModel(model.modelID)
