@@ -91,9 +91,15 @@ export function createToolGuardHooks(args: {
     ? safeHook("empty-task-response-detector", () => createEmptyTaskResponseDetectorHook(ctx))
     : null
 
+  const claudeCodeDisabled = pluginConfig.claude_code
+    && !pluginConfig.claude_code.hooks
+    && !pluginConfig.claude_code.skills
+    && !pluginConfig.claude_code.agents
   const rulesInjector = isHookEnabled("rules-injector")
     ? safeHook("rules-injector", () =>
-        createRulesInjectorHook(ctx, modelCacheState))
+        createRulesInjectorHook(ctx, modelCacheState, {
+          skipClaudeUserRules: claudeCodeDisabled ?? false,
+        }))
     : null
 
   const tasksTodowriteDisabler = isHookEnabled("tasks-todowrite-disabler")
