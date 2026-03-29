@@ -10,9 +10,11 @@ import { TmuxSessionManager } from "./features/tmux-subagent"
 import { registerManagerForCleanup } from "./features/background-agent/process-cleanup"
 import { createConfigHandler } from "./plugin-handlers"
 import { log } from "./shared"
+import type { ResolvedMultiplexer } from "./shared/tmux"
 import { markServerRunningInProcess } from "./shared/tmux/tmux-utils/server-health"
 
 export type Managers = {
+  resolvedMultiplexer: ResolvedMultiplexer
   tmuxSessionManager: TmuxSessionManager
   backgroundManager: BackgroundManager
   skillMcpManager: SkillMcpManager
@@ -23,13 +25,21 @@ export function createManagers(args: {
   ctx: PluginContext
   pluginConfig: OhMyOpenCodeConfig
   tmuxConfig: TmuxConfig
+  resolvedMultiplexer: ResolvedMultiplexer
   modelCacheState: ModelCacheState
   backgroundNotificationHookEnabled: boolean
 }): Managers {
-  const { ctx, pluginConfig, tmuxConfig, modelCacheState, backgroundNotificationHookEnabled } = args
+  const {
+    ctx,
+    pluginConfig,
+    tmuxConfig,
+    resolvedMultiplexer,
+    modelCacheState,
+    backgroundNotificationHookEnabled,
+  } = args
 
   markServerRunningInProcess()
-  const tmuxSessionManager = new TmuxSessionManager(ctx, tmuxConfig)
+  const tmuxSessionManager = new TmuxSessionManager(ctx, tmuxConfig, resolvedMultiplexer)
 
   registerManagerForCleanup({
     shutdown: async () => {
@@ -44,12 +54,17 @@ export function createManagers(args: {
     pluginConfig.background_task,
     {
       tmuxConfig,
-		onSubagentSessionCreated: async (event: SubagentSessionCreatedEvent) => {
-			log("[index] onSubagentSessionCreated callback received", {
-				sessionID: event.sessionID,
-				parentID: event.parentID,
+      resolvedMultiplexer,
+      onSubagentSessionCreated: async (event: SubagentSessionCreatedEvent) => {
+        log("[index] onSubagentSessionCreated callback received", {
+          sessionID: event.sessionID,
+          parentID: event.parentID,
           title: event.title,
         })
+
+        if (resolvedMultiplexer.paneBackend !== "tmux") {
+          return
+        }
 
         await tmuxSessionManager.onSessionCreated({
           type: "session.created",
@@ -84,6 +99,7 @@ export function createManagers(args: {
   })
 
   return {
+    resolvedMultiplexer,
     tmuxSessionManager,
     backgroundManager,
     skillMcpManager,

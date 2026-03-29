@@ -1,16 +1,35 @@
 import { spawn } from "bun"
+import { getTmuxPath } from "../tools/interactive-bash/tmux-path-resolver"
+import {
+  getCurrentPaneId,
+  getResolvedMultiplexerRuntime,
+  isInsideTmux,
+} from "../shared/tmux"
 
 export function getCurrentTmuxSession(): string | null {
-  const env = process.env.TMUX
-  if (!env) return null
-  const match = env.match(/(\d+)$/)
-  return match ? `session-${match[1]}` : null // Wait, TMUX env is /tmp/tmux-501/default,1234,0
+  const resolvedMultiplexer = getResolvedMultiplexerRuntime()
+  if (resolvedMultiplexer && resolvedMultiplexer.paneBackend !== "tmux") {
+    return null
+  }
+
+  if (!isInsideTmux(resolvedMultiplexer ?? undefined)) {
+    return null
+  }
+
+  const paneId = getCurrentPaneId(resolvedMultiplexer ?? undefined)
+  if (!paneId) return null
+
+  const match = paneId.match(/(\d+)$/)
+  return match ? `session-${match[1]}` : null
   // Reference tmux.js gets session name via `tmux display-message -p '#S'`
 }
 
 export async function getTmuxSessionName(): Promise<string | null> {
   try {
-    const proc = spawn(["tmux", "display-message", "-p", "#S"], {
+    const tmuxPath = await getTmuxPath()
+    if (!tmuxPath) return null
+
+    const proc = spawn([tmuxPath, "display-message", "-p", "#S"], {
       stdout: "pipe",
       stderr: "ignore",
     })
@@ -27,8 +46,11 @@ export async function getTmuxSessionName(): Promise<string | null> {
 
 export async function captureTmuxPane(paneId: string, lines = 15): Promise<string | null> {
   try {
+    const tmuxPath = await getTmuxPath()
+    if (!tmuxPath) return null
+
     const proc = spawn(
-      ["tmux", "capture-pane", "-p", "-t", paneId, "-S", `-${lines}`],
+      [tmuxPath, "capture-pane", "-p", "-t", paneId, "-S", `-${lines}`],
       {
         stdout: "pipe",
         stderr: "ignore",
@@ -46,7 +68,10 @@ export async function captureTmuxPane(paneId: string, lines = 15): Promise<strin
 
 export async function sendToPane(paneId: string, text: string, confirm = true): Promise<boolean> {
   try {
-    const literalProc = spawn(["tmux", "send-keys", "-t", paneId, "-l", "--", text], {
+    const tmuxPath = await getTmuxPath()
+    if (!tmuxPath) return false
+
+    const literalProc = spawn([tmuxPath, "send-keys", "-t", paneId, "-l", "--", text], {
       stdout: "ignore",
       stderr: "ignore",
     })
@@ -55,7 +80,7 @@ export async function sendToPane(paneId: string, text: string, confirm = true): 
 
     if (!confirm) return true
 
-    const enterProc = spawn(["tmux", "send-keys", "-t", paneId, "Enter"], {
+    const enterProc = spawn([tmuxPath, "send-keys", "-t", paneId, "Enter"], {
       stdout: "ignore",
       stderr: "ignore",
     })
@@ -67,8 +92,16 @@ export async function sendToPane(paneId: string, text: string, confirm = true): 
 }
 
 export async function isTmuxAvailable(): Promise<boolean> {
+  const resolvedMultiplexer = getResolvedMultiplexerRuntime()
+  if (resolvedMultiplexer && resolvedMultiplexer.paneBackend !== "tmux") {
+    return false
+  }
+
   try {
-    const proc = spawn(["tmux", "-V"], {
+    const tmuxPath = await getTmuxPath()
+    if (!tmuxPath) return false
+
+    const proc = spawn([tmuxPath, "-V"], {
       stdout: "ignore",
       stderr: "ignore",
     })

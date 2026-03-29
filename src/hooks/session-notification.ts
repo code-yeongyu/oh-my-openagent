@@ -10,6 +10,15 @@ import {
 import * as sessionNotificationSender from "./session-notification-sender"
 import { hasIncompleteTodos } from "./session-todo-status"
 import { createIdleNotificationScheduler } from "./session-notification-scheduler"
+import {
+  createDisabledMultiplexerRuntime,
+  getResolvedMultiplexerRuntime,
+  type ResolvedMultiplexer,
+} from "../shared/tmux"
+import {
+  createCmuxNotificationAdapter,
+  type CmuxNotificationAdapter,
+} from "./cmux-notification-adapter"
 
 interface SessionNotificationConfig {
   title?: string
@@ -30,10 +39,24 @@ interface SessionNotificationConfig {
 }
 export function createSessionNotification(
   ctx: PluginInput,
-  config: SessionNotificationConfig = {}
+  config: SessionNotificationConfig = {},
+  options: {
+    resolvedMultiplexer?: ResolvedMultiplexer
+    cmuxNotificationAdapter?: CmuxNotificationAdapter
+  } = {},
 ) {
   const currentPlatform: Platform = sessionNotificationSender.detectPlatform()
   const defaultSoundPath = sessionNotificationSender.getDefaultSoundPath(currentPlatform)
+  const resolvedMultiplexer =
+    options.resolvedMultiplexer
+    ?? getResolvedMultiplexerRuntime()
+    ?? createDisabledMultiplexerRuntime()
+  const cmuxNotificationAdapter =
+    options.cmuxNotificationAdapter
+    ?? createCmuxNotificationAdapter({
+      runtime: resolvedMultiplexer,
+      environment: process.env,
+    })
 
   startBackgroundCheck(currentPlatform)
 
@@ -61,12 +84,18 @@ export function createSessionNotification(
         typeof hookCtx.client.session.get !== "function"
         && typeof hookCtx.client.session.messages !== "function"
       ) {
-        await sessionNotificationSender.sendSessionNotification(
-          hookCtx,
-          platform,
+        const deliveredViaCmux = await cmuxNotificationAdapter.send(
           mergedConfig.title,
           mergedConfig.message,
         )
+        if (!deliveredViaCmux && platform !== "unsupported") {
+          await sessionNotificationSender.sendSessionNotification(
+            hookCtx,
+            platform,
+            mergedConfig.title,
+            mergedConfig.message,
+          )
+        }
         return
       }
 
@@ -75,6 +104,15 @@ export function createSessionNotification(
         baseTitle: mergedConfig.title,
         baseMessage: mergedConfig.message,
       })
+
+      const deliveredViaCmux = await cmuxNotificationAdapter.send(content.title, content.message)
+      if (deliveredViaCmux) {
+        return
+      }
+
+      if (platform === "unsupported") {
+        return
+      }
 
       await sessionNotificationSender.sendSessionNotification(hookCtx, platform, content.title, content.message)
     },
@@ -134,7 +172,7 @@ export function createSessionNotification(
   }
 
   return async ({ event }: { event: { type: string; properties?: unknown } }) => {
-    if (currentPlatform === "unsupported") return
+    if (currentPlatform === "unsupported" && !cmuxNotificationAdapter.canSendViaCmux()) return
 
     const props = event.properties as Record<string, unknown> | undefined
 
@@ -172,12 +210,18 @@ export function createSessionNotification(
       if (!shouldNotifyForSession(sessionID)) return
 
       scheduler.markSessionActivity(sessionID)
-      await sessionNotificationSender.sendSessionNotification(
-        ctx,
-        currentPlatform,
+      const deliveredViaCmux = await cmuxNotificationAdapter.send(
         mergedConfig.title,
         mergedConfig.permissionMessage,
       )
+      if (!deliveredViaCmux && currentPlatform !== "unsupported") {
+        await sessionNotificationSender.sendSessionNotification(
+          ctx,
+          currentPlatform,
+          mergedConfig.title,
+          mergedConfig.permissionMessage,
+        )
+      }
       if (mergedConfig.playSound && mergedConfig.soundPath) {
         await sessionNotificationSender.playSessionNotificationSound(ctx, currentPlatform, mergedConfig.soundPath)
       }
@@ -199,7 +243,10 @@ export function createSessionNotification(
               ? mergedConfig.permissionMessage
               : mergedConfig.questionMessage
 
-            await sessionNotificationSender.sendSessionNotification(ctx, currentPlatform, mergedConfig.title, message)
+            const deliveredViaCmux = await cmuxNotificationAdapter.send(mergedConfig.title, message)
+            if (!deliveredViaCmux && currentPlatform !== "unsupported") {
+              await sessionNotificationSender.sendSessionNotification(ctx, currentPlatform, mergedConfig.title, message)
+            }
             if (mergedConfig.playSound && mergedConfig.soundPath) {
               await sessionNotificationSender.playSessionNotificationSound(ctx, currentPlatform, mergedConfig.soundPath)
             }

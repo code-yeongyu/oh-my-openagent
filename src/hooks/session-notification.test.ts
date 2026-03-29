@@ -3,6 +3,8 @@ import { createSessionNotification } from "./session-notification"
 import { setMainSession, subagentSessions, _resetForTesting } from "../features/claude-code-session-state"
 import * as utils from "./session-notification-utils"
 import * as sender from "./session-notification-sender"
+import type { ResolvedMultiplexer } from "../shared/tmux"
+import type { CmuxNotificationAdapter } from "./cmux-notification-adapter"
 
 const originalSetTimeout = globalThis.setTimeout
 const originalClearTimeout = globalThis.clearTimeout
@@ -31,6 +33,42 @@ describe("session-notification", () => {
       },
       directory: "/tmp/test",
     } as any
+  }
+
+  function createCmuxRuntime(): ResolvedMultiplexer {
+    return {
+      platform: "darwin",
+      mode: "cmux-shim",
+      paneBackend: "tmux",
+      notificationBackend: "cmux",
+      tmux: {
+        path: "/usr/bin/tmux",
+        reachable: true,
+        insideEnvironment: true,
+        paneId: "%1",
+        explicitDisable: false,
+      },
+      cmux: {
+        path: "/usr/local/bin/cmux",
+        reachable: true,
+        notifyCapable: true,
+        socketPath: "/tmp/cmux.sock",
+        endpointType: "unix",
+        workspaceId: "workspace-1",
+        surfaceId: "surface-1",
+        hintStrength: "strong",
+        explicitDisable: false,
+      },
+    }
+  }
+
+  function createCmuxAdapter(overrides: Partial<CmuxNotificationAdapter> = {}): CmuxNotificationAdapter {
+    return {
+      canSendViaCmux: () => true,
+      hasDowngraded: () => false,
+      send: async () => false,
+      ...overrides,
+    }
   }
 
   beforeEach(() => {
@@ -385,6 +423,126 @@ describe("session-notification", () => {
 
     // then - only one notification should be sent
     expect(notificationCalls).toHaveLength(1)
+  })
+
+  test("routes idle notifications through cmux without desktop fallback when cmux send succeeds", async () => {
+    const sessionID = "cmux-success"
+    let cmuxSendCalls = 0
+
+    const cmuxAdapter = createCmuxAdapter({
+      send: async () => {
+        cmuxSendCalls += 1
+        return true
+      },
+    })
+
+    const hook = createSessionNotification(
+      createMockPluginInput(),
+      {
+        idleConfirmationDelay: 10,
+        skipIfIncompleteTodos: false,
+        enforceMainSessionFilter: false,
+      },
+      {
+        resolvedMultiplexer: createCmuxRuntime(),
+        cmuxNotificationAdapter: cmuxAdapter,
+      },
+    )
+
+    await hook({
+      event: {
+        type: "session.idle",
+        properties: { sessionID },
+      },
+    })
+
+    await new Promise((resolve) => setTimeout(resolve, 50))
+
+    expect(cmuxSendCalls).toBe(1)
+    expect(notificationCalls).toHaveLength(0)
+  })
+
+  test("falls back to desktop notification when cmux send fails", async () => {
+    const sessionID = "cmux-fallback"
+    let cmuxSendCalls = 0
+
+    const cmuxAdapter = createCmuxAdapter({
+      send: async () => {
+        cmuxSendCalls += 1
+        return false
+      },
+    })
+
+    const hook = createSessionNotification(
+      createMockPluginInput(),
+      {
+        idleConfirmationDelay: 10,
+        skipIfIncompleteTodos: false,
+        enforceMainSessionFilter: false,
+      },
+      {
+        resolvedMultiplexer: createCmuxRuntime(),
+        cmuxNotificationAdapter: cmuxAdapter,
+      },
+    )
+
+    await hook({
+      event: {
+        type: "session.idle",
+        properties: { sessionID },
+      },
+    })
+
+    await new Promise((resolve) => setTimeout(resolve, 50))
+
+    expect(cmuxSendCalls).toBe(1)
+    expect(notificationCalls).toHaveLength(1)
+  })
+
+  test("suppresses duplicate idle notifications while using cmux backend", async () => {
+    const sessionID = "cmux-duplicate"
+    let cmuxSendCalls = 0
+
+    const cmuxAdapter = createCmuxAdapter({
+      send: async () => {
+        cmuxSendCalls += 1
+        return true
+      },
+    })
+
+    const hook = createSessionNotification(
+      createMockPluginInput(),
+      {
+        idleConfirmationDelay: 10,
+        skipIfIncompleteTodos: false,
+        enforceMainSessionFilter: false,
+      },
+      {
+        resolvedMultiplexer: createCmuxRuntime(),
+        cmuxNotificationAdapter: cmuxAdapter,
+      },
+    )
+
+    await hook({
+      event: {
+        type: "session.idle",
+        properties: { sessionID },
+      },
+    })
+
+    await new Promise((resolve) => setTimeout(resolve, 50))
+
+    await hook({
+      event: {
+        type: "session.idle",
+        properties: { sessionID },
+      },
+    })
+
+    await new Promise((resolve) => setTimeout(resolve, 50))
+
+    expect(cmuxSendCalls).toBe(1)
+    expect(notificationCalls).toHaveLength(0)
   })
 
   function createSenderMockCtx() {

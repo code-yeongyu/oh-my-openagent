@@ -23,6 +23,7 @@ Complete reference for Oh My OpenCode plugin configuration. During the rename tr
   - [Commands](#commands)
   - [Browser Automation](#browser-automation)
   - [Tmux Integration](#tmux-integration)
+  - [Cmux Integration](#cmux-integration)
   - [Git Master](#git-master)
   - [Comment Checker](#comment-checker)
   - [Notification](#notification)
@@ -565,6 +566,61 @@ Run background subagents in separate tmux panes. Requires running inside tmux wi
 | `main_pane_min_width`  | `120`           | Min main pane columns                                                               |
 | `agent_pane_min_width` | `40`            | Min agent pane columns                                                              |
 
+### Cmux Integration
+
+Cmux integration provides notification routing when running inside a cmux workspace. The plugin probes for cmux availability at runtime and selects a notification backend based on live capability detection.
+
+#### Runtime Model: ResolvedMultiplexer
+
+The runtime evaluates tmux and cmux availability to determine operating mode:
+
+| Mode               | Conditions                                     | Pane Control | Notifications |
+| ------------------ | ---------------------------------------------- | ------------ | ------------- |
+| `cmux-shim`        | Live cmux + live tmux pane control             | tmux         | cmux          |
+| `tmux-only`        | Live tmux pane control, no live cmux           | tmux         | desktop       |
+| `cmux-notify-only` | Live cmux (no pane control), tmux unavailable  | none         | cmux          |
+| `none`             | Neither tmux nor cmux available                | none         | desktop       |
+
+#### Backend Precedence Semantics
+
+**Pane Backend**: Tmux is used for pane control when available. Cmux provides notifications only; it does not manage panes.
+
+**Notification Backend**:
+- Cmux-first when the runtime detects a live, notification-capable cmux endpoint
+- Silent fallback to desktop notifications on any failure (non-zero exit, timeout, connection refused)
+- Once downgraded to desktop, cmux notifications remain disabled for the session
+
+#### Detection and Probing
+
+The runtime probes cmux availability using these signals:
+
+1. **Binary discovery**: Locates `cmux` executable in PATH
+2. **Socket path resolution**: Reads `CMUX_SOCKET_PATH` environment variable (unix socket or relay endpoint)
+3. **Reachability probe**: Executes `cmux ping` against the resolved endpoint (250ms timeout)
+4. **Capability gating**: Executes `cmux notify --help` to verify notification support (300ms timeout)
+
+**Endpoint types**: Unix domain sockets (`/tmp/cmux.sock`) and relay addresses (`host:port`) are both supported.
+
+**Hint strength**: Strong hints (both `CMUX_WORKSPACE_ID` and `CMUX_SURFACE_ID` present) preserve cmux-shim mode even in nested tmux environments. Weak hints (e.g., `TERM_PROGRAM=ghostty`) are tolerated but do not override failed probes.
+
+#### Environment Variables
+
+| Variable                        | Description                                           |
+| ------------------------------- | ----------------------------------------------------- |
+| `CMUX_SOCKET_PATH`              | Path to cmux socket (unix) or relay endpoint (host:port) |
+| `CMUX_WORKSPACE_ID`             | Cmux workspace identifier                             |
+| `CMUX_SURFACE_ID`               | Cmux surface identifier                               |
+| `OH_MY_OPENCODE_DISABLE_CMUX`   | Set to `1` or `true` to disable cmux integration      |
+| `OH_MY_OPENCODE_DISABLE_TMUX`   | Set to `1` or `true` to disable tmux integration      |
+
+#### Behavior Boundaries
+
+- **Notifications**: Delivered via `cmux notify` when a live cmux endpoint is detected
+- **Pane Control**: Tmux manages panes. Cmux does not create or control panes.
+- **Guarantee**: Tmux-compatible pane control remains available when tmux is live
+
+The `interactive_bash` tool always uses tmux subcommands for pane operations, regardless of cmux availability.
+
 ### Git Master
 
 Configure git commit behavior:
@@ -970,9 +1026,14 @@ When enabled, two companion hooks are active: `hashline-read-enhancer` (annotate
 
 ### Environment Variables
 
-| Variable              | Description                                                       |
-| --------------------- | ----------------------------------------------------------------- |
-| `OPENCODE_CONFIG_DIR` | Override OpenCode config directory (useful for profile isolation) |
+| Variable                       | Description                                                                 |
+| ------------------------------ | --------------------------------------------------------------------------- |
+| `OPENCODE_CONFIG_DIR`          | Override OpenCode config directory (useful for profile isolation)           |
+| `CMUX_SOCKET_PATH`             | Path to cmux socket (unix) or relay endpoint (host:port) for cmux integration |
+| `CMUX_WORKSPACE_ID`            | Cmux workspace identifier (enables strong cmux hints)                       |
+| `CMUX_SURFACE_ID`              | Cmux surface identifier (enables strong cmux hints)                         |
+| `OH_MY_OPENCODE_DISABLE_CMUX`  | Set to `1` or `true` to disable cmux integration                            |
+| `OH_MY_OPENCODE_DISABLE_TMUX`  | Set to `1` or `true` to disable tmux integration                            |
 
 ### Provider-Specific
 

@@ -1,6 +1,7 @@
 import type { HookName, OhMyOpenCodeConfig } from "../../config"
 import type { PluginContext } from "../types"
 import type { ModelCacheState } from "../../plugin-state"
+import type { ResolvedMultiplexer } from "../../shared/tmux"
 
 import { createSessionHooks } from "./create-session-hooks"
 import { createToolGuardHooks } from "./create-tool-guard-hooks"
@@ -12,8 +13,16 @@ export function createCoreHooks(args: {
   modelCacheState: ModelCacheState
   isHookEnabled: (hookName: HookName) => boolean
   safeHookEnabled: boolean
+  resolvedMultiplexer: ResolvedMultiplexer
 }) {
-  const { ctx, pluginConfig, modelCacheState, isHookEnabled, safeHookEnabled } = args
+  const {
+    ctx,
+    pluginConfig,
+    modelCacheState,
+    isHookEnabled,
+    safeHookEnabled,
+    resolvedMultiplexer,
+  } = args
 
   const session = createSessionHooks({
     ctx,
@@ -21,6 +30,7 @@ export function createCoreHooks(args: {
     modelCacheState,
     isHookEnabled,
     safeHookEnabled,
+    resolvedMultiplexer,
   })
 
   const tool = createToolGuardHooks({

@@ -12,9 +12,14 @@ import { createPluginDispose, type PluginDispose } from "./plugin-dispose"
 import { loadPluginConfig } from "./plugin-config"
 import { createModelCacheState } from "./plugin-state"
 import { createFirstMessageVariantGate } from "./shared/first-message-variant"
-import { injectServerAuthIntoClient, log, logLegacyPluginStartupWarning } from "./shared"
+import {
+  injectServerAuthIntoClient,
+  log,
+  logLegacyPluginStartupWarning,
+  resolveMultiplexerRuntime,
+  setResolvedMultiplexerRuntime,
+} from "./shared"
 import { detectExternalSkillPlugin, getSkillPluginConflictWarning } from "./shared/external-plugin-detector"
-import { startTmuxCheck } from "./tools"
 
 let activePluginDispose: PluginDispose | null = null
 
@@ -33,7 +38,6 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   }
 
   injectServerAuthIntoClient(ctx.client)
-  startTmuxCheck()
   await activePluginDispose?.()
 
   const pluginConfig = loadPluginConfig(ctx.directory, ctx)
@@ -54,10 +58,17 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
   const modelCacheState = createModelCacheState()
 
+  const resolvedMultiplexer = await resolveMultiplexerRuntime({
+    environment: process.env,
+    tmuxEnabled: tmuxConfig.enabled,
+  })
+  setResolvedMultiplexerRuntime(resolvedMultiplexer)
+
   const managers = createManagers({
     ctx,
     pluginConfig,
     tmuxConfig,
+    resolvedMultiplexer,
     modelCacheState,
     backgroundNotificationHookEnabled: isHookEnabled("background-notification"),
   })
@@ -77,6 +88,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     safeHookEnabled,
     mergedSkills: toolsResult.mergedSkills,
     availableSkills: toolsResult.availableSkills,
+    resolvedMultiplexer,
   })
 
   const dispose = createPluginDispose({

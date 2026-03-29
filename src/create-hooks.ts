@@ -4,6 +4,7 @@ import type { LoadedSkill } from "./features/opencode-skill-loader/types"
 import type { BackgroundManager } from "./features/background-agent"
 import type { PluginContext } from "./plugin/types"
 import type { ModelCacheState } from "./plugin-state"
+import type { ResolvedMultiplexer } from "./shared/tmux"
 
 import { createCoreHooks } from "./plugin/hooks/create-core-hooks"
 import { createContinuationHooks } from "./plugin/hooks/create-continuation-hooks"
@@ -34,6 +35,7 @@ export function createHooks(args: {
   safeHookEnabled: boolean
   mergedSkills: LoadedSkill[]
   availableSkills: AvailableSkill[]
+  resolvedMultiplexer: ResolvedMultiplexer
 }) {
   const {
     ctx,
@@ -44,6 +46,7 @@ export function createHooks(args: {
     safeHookEnabled,
     mergedSkills,
     availableSkills,
+    resolvedMultiplexer,
   } = args
 
   const core = createCoreHooks({
@@ -52,6 +55,7 @@ export function createHooks(args: {
     modelCacheState,
     isHookEnabled,
     safeHookEnabled,
+    resolvedMultiplexer,
   })
 
   const continuation = createContinuationHooks({

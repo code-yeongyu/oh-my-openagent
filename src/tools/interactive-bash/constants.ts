@@ -11,7 +11,7 @@ export const BLOCKED_TMUX_SUBCOMMANDS = [
   "pipep",
 ]
 
-export const INTERACTIVE_BASH_DESCRIPTION = `WARNING: This is TMUX ONLY. Pass tmux subcommands directly (without 'tmux' prefix).
+export const INTERACTIVE_BASH_DESCRIPTION = `WARNING: This remains TMUX ONLY in phase 1 (cmux notify does not add pane control). Pass tmux subcommands directly (without 'tmux' prefix).
 
 Examples: new-session -d -s omo-dev, send-keys -t omo-dev "vim" Enter
 

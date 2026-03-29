@@ -20,7 +20,11 @@ import { setSessionTools } from "../../shared/session-tools-store"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { ConcurrencyManager } from "./concurrency"
 import type { BackgroundTaskConfig, TmuxConfig } from "../../config/schema"
-import { isInsideTmux } from "../../shared/tmux"
+import {
+  createDisabledMultiplexerRuntime,
+  getResolvedMultiplexerRuntime,
+} from "../../shared/tmux"
+import type { ResolvedMultiplexer } from "../../shared/tmux"
 import {
   shouldRetryError,
   hasMoreFallbacks,
@@ -141,6 +145,7 @@ export class BackgroundManager {
   private shutdownTriggered = false
   private config?: BackgroundTaskConfig
   private tmuxEnabled: boolean
+  private resolvedMultiplexer: ResolvedMultiplexer
   private onSubagentSessionCreated?: OnSubagentSessionCreated
   private onShutdown?: () => void | Promise<void>
 
@@ -161,6 +166,7 @@ export class BackgroundManager {
     config?: BackgroundTaskConfig,
     options?: {
       tmuxConfig?: TmuxConfig
+      resolvedMultiplexer?: ResolvedMultiplexer
       onSubagentSessionCreated?: OnSubagentSessionCreated
       onShutdown?: () => void | Promise<void>
       enableParentSessionNotifications?: boolean
@@ -175,6 +181,10 @@ export class BackgroundManager {
     this.concurrencyManager = new ConcurrencyManager(config)
     this.config = config
     this.tmuxEnabled = options?.tmuxConfig?.enabled ?? false
+    this.resolvedMultiplexer =
+      options?.resolvedMultiplexer
+      ?? getResolvedMultiplexerRuntime()
+      ?? createDisabledMultiplexerRuntime()
     this.onSubagentSessionCreated = options?.onSubagentSessionCreated
     this.onShutdown = options?.onShutdown
     this.rootDescendantCounts = new Map()
@@ -455,12 +465,17 @@ export class BackgroundManager {
     log("[background-agent] tmux callback check", {
       hasCallback: !!this.onSubagentSessionCreated,
       tmuxEnabled: this.tmuxEnabled,
-      isInsideTmux: isInsideTmux(),
+      paneBackend: this.resolvedMultiplexer.paneBackend,
+      multiplexerMode: this.resolvedMultiplexer.mode,
       sessionID,
       parentID: input.parentSessionID,
     })
 
-    if (this.onSubagentSessionCreated && this.tmuxEnabled && isInsideTmux()) {
+    if (
+      this.onSubagentSessionCreated
+      && this.tmuxEnabled
+      && this.resolvedMultiplexer.paneBackend === "tmux"
+    ) {
       log("[background-agent] Invoking tmux callback NOW", { sessionID })
       await this.onSubagentSessionCreated({
         sessionID,

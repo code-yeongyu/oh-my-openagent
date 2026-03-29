@@ -5,7 +5,11 @@ import { log, getAgentToolRestrictions, promptWithModelSuggestionRetry, createIn
 import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
 import { subagentSessions } from "../claude-code-session-state"
 import { getTaskToastManager } from "../task-toast-manager"
-import { isInsideTmux } from "../../shared/tmux"
+import {
+  createDisabledMultiplexerRuntime,
+  getResolvedMultiplexerRuntime,
+} from "../../shared/tmux"
+import type { ResolvedMultiplexer } from "../../shared/tmux"
 import type { ConcurrencyManager } from "./concurrency"
 
 export interface SpawnerContext {
@@ -13,6 +17,7 @@ export interface SpawnerContext {
   directory: string
   concurrencyManager: ConcurrencyManager
   tmuxEnabled: boolean
+  resolvedMultiplexer?: ResolvedMultiplexer
   onSubagentSessionCreated?: OnSubagentSessionCreated
   onTaskError: (task: BackgroundTask, error: Error) => void
 }
@@ -38,7 +43,19 @@ export async function startTask(
   ctx: SpawnerContext
 ): Promise<void> {
   const { task, input } = item
-  const { client, directory, concurrencyManager, tmuxEnabled, onSubagentSessionCreated, onTaskError } = ctx
+  const {
+    client,
+    directory,
+    concurrencyManager,
+    tmuxEnabled,
+    resolvedMultiplexer,
+    onSubagentSessionCreated,
+    onTaskError,
+  } = ctx
+  const multiplexerRuntime =
+    resolvedMultiplexer
+    ?? getResolvedMultiplexerRuntime()
+    ?? createDisabledMultiplexerRuntime()
 
   log("[background-agent] Starting task:", {
     taskId: task.id,
@@ -83,12 +100,17 @@ export async function startTask(
   log("[background-agent] tmux callback check", {
     hasCallback: !!onSubagentSessionCreated,
     tmuxEnabled,
-    isInsideTmux: isInsideTmux(),
+    paneBackend: multiplexerRuntime.paneBackend,
+    multiplexerMode: multiplexerRuntime.mode,
     sessionID,
     parentID: input.parentSessionID,
   })
 
-  if (onSubagentSessionCreated && tmuxEnabled && isInsideTmux()) {
+  if (
+    onSubagentSessionCreated
+    && tmuxEnabled
+    && multiplexerRuntime.paneBackend === "tmux"
+  ) {
     log("[background-agent] Invoking tmux callback NOW", { sessionID })
     await onSubagentSessionCreated({
       sessionID,

@@ -3,12 +3,15 @@ import type { TmuxConfig } from "../../config/schema"
 import type { TrackedSession, CapacityConfig, WindowState } from "./types"
 import { log, normalizeSDKResponse } from "../../shared"
 import {
+  createDisabledMultiplexerRuntime,
+  getResolvedMultiplexerRuntime,
   isInsideTmux as defaultIsInsideTmux,
   getCurrentPaneId as defaultGetCurrentPaneId,
   POLL_INTERVAL_BACKGROUND_MS,
   SESSION_READY_POLL_INTERVAL_MS,
   SESSION_READY_TIMEOUT_MS,
 } from "../../shared/tmux"
+import type { ResolvedMultiplexer } from "../../shared/tmux"
 import { queryWindowState } from "./pane-state-querier"
 import { decideSpawnActions, decideCloseAction, type SessionMapping } from "./decision-engine"
 import { executeActions, executeAction } from "./action-executor"
@@ -30,6 +33,38 @@ interface DeferredSession {
 export interface TmuxUtilDeps {
   isInsideTmux: () => boolean
   getCurrentPaneId: () => string | undefined
+}
+
+function isTmuxUtilDeps(value: unknown): value is TmuxUtilDeps {
+  if (!value || typeof value !== "object") {
+    return false
+  }
+
+  const candidate = value as Partial<TmuxUtilDeps>
+  return (
+    typeof candidate.isInsideTmux === "function"
+    && typeof candidate.getCurrentPaneId === "function"
+  )
+}
+
+function createRuntimeFromLegacyDeps(deps: TmuxUtilDeps): ResolvedMultiplexer {
+  const runtime = createDisabledMultiplexerRuntime()
+  const insideTmux = deps.isInsideTmux()
+  if (!insideTmux) {
+    return runtime
+  }
+
+  return {
+    ...runtime,
+    mode: "tmux-only",
+    paneBackend: "tmux",
+    tmux: {
+      ...runtime.tmux,
+      reachable: true,
+      insideEnvironment: true,
+      paneId: deps.getCurrentPaneId(),
+    },
+  }
 }
 
 const defaultTmuxDeps: TmuxUtilDeps = {
@@ -67,11 +102,25 @@ export class TmuxSessionManager {
   private deferredAttachTickScheduled = false
   private nullStateCount = 0
   private deps: TmuxUtilDeps
+  private resolvedMultiplexer: ResolvedMultiplexer
   private pollingManager: TmuxPollingManager
-  constructor(ctx: PluginInput, tmuxConfig: TmuxConfig, deps: TmuxUtilDeps = defaultTmuxDeps) {
+  constructor(
+    ctx: PluginInput,
+    tmuxConfig: TmuxConfig,
+    runtimeOrDeps: ResolvedMultiplexer | TmuxUtilDeps = createDisabledMultiplexerRuntime(),
+    deps: TmuxUtilDeps = defaultTmuxDeps,
+  ) {
     this.client = ctx.client
     this.tmuxConfig = tmuxConfig
-    this.deps = deps
+
+    if (isTmuxUtilDeps(runtimeOrDeps)) {
+      this.deps = runtimeOrDeps
+      this.resolvedMultiplexer = getResolvedMultiplexerRuntime() ?? createRuntimeFromLegacyDeps(runtimeOrDeps)
+    } else {
+      this.deps = deps
+      this.resolvedMultiplexer = runtimeOrDeps
+    }
+
     const defaultPort = process.env.OPENCODE_PORT ?? "4096"
     const fallbackUrl = `http://localhost:${defaultPort}`
     try {
@@ -86,7 +135,7 @@ export class TmuxSessionManager {
     } catch {
       this.serverUrl = fallbackUrl
     }
-    this.sourcePaneId = deps.getCurrentPaneId()
+    this.sourcePaneId = this.resolvedMultiplexer.tmux.paneId ?? this.deps.getCurrentPaneId()
     this.pollingManager = new TmuxPollingManager(
       this.client,
       this.sessions,
@@ -97,10 +146,12 @@ export class TmuxSessionManager {
       tmuxConfig: this.tmuxConfig,
       serverUrl: this.serverUrl,
       sourcePaneId: this.sourcePaneId,
+      multiplexerMode: this.resolvedMultiplexer.mode,
+      paneBackend: this.resolvedMultiplexer.paneBackend,
     })
   }
   private isEnabled(): boolean {
-    return this.tmuxConfig.enabled && this.deps.isInsideTmux()
+    return this.tmuxConfig.enabled && this.resolvedMultiplexer.paneBackend === "tmux"
   }
 
   private getCapacityConfig(): CapacityConfig {
@@ -440,7 +491,8 @@ export class TmuxSessionManager {
     log("[tmux-session-manager] onSessionCreated called", {
       enabled,
       tmuxConfigEnabled: this.tmuxConfig.enabled,
-      isInsideTmux: this.deps.isInsideTmux(),
+      isInsideTmux: this.resolvedMultiplexer.paneBackend === "tmux",
+      multiplexerMode: this.resolvedMultiplexer.mode,
       eventType: event.type,
       infoId: event.properties?.info?.id,
       infoParentID: event.properties?.info?.parentID,

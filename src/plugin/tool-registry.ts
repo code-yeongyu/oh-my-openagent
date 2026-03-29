@@ -20,7 +20,7 @@ import {
   createSessionManagerTools,
   createDelegateTask,
   discoverCommandsSync,
-  interactive_bash,
+  createInteractiveBashTool,
   createTaskCreateTool,
   createTaskGetTool,
   createTaskList,
@@ -100,7 +100,7 @@ function trimToolsToCap(filteredTools: ToolsRecord, maxTools: number): void {
 export function createToolRegistry(args: {
   ctx: PluginContext
   pluginConfig: OhMyOpenCodeConfig
-  managers: Pick<Managers, "backgroundManager" | "tmuxSessionManager" | "skillMcpManager">
+  managers: Pick<Managers, "resolvedMultiplexer" | "backgroundManager" | "tmuxSessionManager" | "skillMcpManager">
   skillContext: SkillContext
   availableCategories: AvailableCategory[]
 }): ToolRegistryResult {
@@ -134,6 +134,10 @@ export function createToolRegistry(args: {
     availableSkills: skillContext.availableSkills,
     syncPollTimeoutMs: pluginConfig.background_task?.syncPollTimeoutMs,
     onSyncSessionCreated: async (event) => {
+      if (managers.resolvedMultiplexer.paneBackend !== "tmux") {
+        return
+      }
+
       log("[index] onSyncSessionCreated callback", {
         sessionID: event.sessionID,
         parentID: event.parentID,
@@ -202,7 +206,7 @@ export function createToolRegistry(args: {
     task: delegateTask,
     skill_mcp: skillMcpTool,
     skill: skillTool,
-    interactive_bash,
+    interactive_bash: createInteractiveBashTool(managers.resolvedMultiplexer),
     ...taskToolsRecord,
     ...hashlineToolsRecord,
   }
