@@ -5,9 +5,8 @@ import type { FallbackEntry } from "./model-requirements"
 import { transformModelForProvider } from "./provider-model-id-transform"
 import { normalizeModel } from "./model-normalization"
 import { resolveExplicitModel } from "./explicit-model-resolution"
-import { resolveExplicitFallbackModel } from "./explicit-fallback-model-resolution"
+import { resolveConfiguredFallbackEntry } from "./explicit-fallback-model-resolution"
 import type { FallbackModelObject } from "../config/schema/fallback-models"
-import { parseModelString, parseVariantFromModelID } from "./model-string-parser"
 
 export type ModelResolutionRequest = {
   intent?: {
@@ -39,40 +38,6 @@ export type ModelResolutionResult = {
   attempted?: string[]
   reason?: string
 }
-
-function parseConfiguredFallbackModel(
-  fallbackModel: string | FallbackModelObject,
-): { baseModel: string; providerHint?: string[]; variant?: string } | undefined {
-  const configuredModel = typeof fallbackModel === "string" ? fallbackModel : fallbackModel.model
-  const normalizedFallback = normalizeModel(configuredModel)
-  if (!normalizedFallback) {
-    return undefined
-  }
-
-  const parsedFullModel = parseModelString(normalizedFallback)
-  if (parsedFullModel) {
-    return {
-      baseModel: `${parsedFullModel.providerID}/${parsedFullModel.modelID}`,
-      providerHint: [parsedFullModel.providerID],
-      variant: typeof fallbackModel === "string"
-        ? parsedFullModel.variant
-        : fallbackModel.variant ?? parsedFullModel.variant,
-    }
-  }
-
-  const parsedModel = parseVariantFromModelID(normalizedFallback)
-  if (!parsedModel.modelID) {
-    return undefined
-  }
-
-  return {
-    baseModel: parsedModel.modelID,
-    variant: typeof fallbackModel === "string"
-      ? parsedModel.variant
-      : fallbackModel.variant ?? parsedModel.variant,
-  }
-}
-
 
 export function resolveModelPipeline(
   request: ModelResolutionRequest,
@@ -141,43 +106,25 @@ export function resolveModelPipeline(
   if (userFallbackModels && userFallbackModels.length > 0) {
     if (availableModels.size === 0) {
       const connectedProviders = constraints.connectedProviders ?? connectedProvidersCache.readConnectedProvidersCache()
-      const connectedSet = connectedProviders ? new Set(connectedProviders) : null
 
-      if (connectedSet !== null) {
+      if (connectedProviders !== null) {
         for (const model of userFallbackModels) {
           attempted.push(typeof model === "string" ? model : model.model)
-          const parsedFallback = parseConfiguredFallbackModel(model)
-          if (!parsedFallback) {
-            continue
-          }
-
-          if (parsedFallback.providerHint?.some((provider) => connectedSet.has(provider))) {
-              log("Model resolved via user fallback_models (connected provider)", {
-                model: parsedFallback.baseModel,
-                original: typeof model === "string" ? model : model.model,
-              })
-              return {
-                model: parsedFallback.baseModel,
-                provenance: "provider-fallback",
-                attempted,
-                ...(parsedFallback.variant ? { variant: parsedFallback.variant } : {}),
-              }
-          }
-        }
-        log("No connected provider found in user fallback_models, falling through to hardcoded chain")
-      }
-    } else {
-      for (const model of userFallbackModels) {
-        attempted.push(typeof model === "string" ? model : model.model)
-        if (typeof model === "string") {
-          const resolvedFallback = resolveExplicitFallbackModel(model, { availableModels })
+          const resolvedFallback = resolveConfiguredFallbackEntry(model, {
+            availableModels,
+            connectedProviders,
+          })
           if (!resolvedFallback) {
             continue
           }
 
-          log("Model resolved via user fallback_models (availability confirmed)", {
+          if (!resolvedFallback.model.includes("/")) {
+            continue
+          }
+
+          log("Model resolved via user fallback_models (connected provider)", {
             model: resolvedFallback.model,
-            original: model,
+            original: resolvedFallback.original,
           })
           return {
             model: resolvedFallback.model,
@@ -186,30 +133,27 @@ export function resolveModelPipeline(
             ...(resolvedFallback.variant ? { variant: resolvedFallback.variant } : {}),
           }
         }
-
-        const parsedFallback = parseConfiguredFallbackModel(model)
-        if (!parsedFallback) {
-          continue
-        }
-
-        const match = fuzzyMatchModel(
-          parsedFallback.baseModel,
+        log("No connected provider found in user fallback_models, falling through to hardcoded chain")
+      }
+    } else {
+      for (const model of userFallbackModels) {
+        attempted.push(typeof model === "string" ? model : model.model)
+        const resolvedFallback = resolveConfiguredFallbackEntry(model, {
           availableModels,
-          parsedFallback.providerHint,
-        )
-        if (!match) {
+        })
+        if (!resolvedFallback) {
           continue
         }
 
         log("Model resolved via user fallback_models (availability confirmed)", {
-          model: match,
-          original: model.model,
+          model: resolvedFallback.model,
+          original: resolvedFallback.original,
         })
         return {
-          model: match,
+          model: resolvedFallback.model,
           provenance: "provider-fallback",
           attempted,
-          ...(parsedFallback.variant ? { variant: parsedFallback.variant } : {}),
+          ...(resolvedFallback.variant ? { variant: resolvedFallback.variant } : {}),
         }
       }
       log("No available model found in user fallback_models, falling through to hardcoded chain")

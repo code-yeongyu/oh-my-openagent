@@ -5,9 +5,8 @@ import { fuzzyMatchModel } from "../../shared/model-availability"
 import { transformModelForProvider } from "../../shared/provider-model-id-transform"
 import { hasConnectedProvidersCache, hasProviderModelsCache, readConnectedProvidersCache } from "../../shared/connected-providers-cache"
 import { log } from "../../shared/logger"
-import { parseModelString, parseVariantFromModelID } from "./model-string-parser"
 import { resolveExplicitModel } from "../../shared/explicit-model-resolution"
-import { resolveExplicitFallbackModel } from "../../shared/explicit-fallback-model-resolution"
+import { resolveConfiguredFallbackEntry } from "../../shared/explicit-fallback-model-resolution"
 
 function isExplicitHighModel(model: string): boolean {
   return /(?:^|\/)[^/]+-high$/.test(model)
@@ -16,37 +15,6 @@ function isExplicitHighModel(model: string): boolean {
 function getExplicitHighBaseModel(model: string): string | null {
   return isExplicitHighModel(model) ? model.replace(/-high$/, "") : null
 }
-
-function parseUserFallbackModel(fallbackModel: string): {
-  baseModel: string
-  providerHint?: string[]
-  variant?: string
-} | undefined {
-  const normalizedFallback = normalizeModel(fallbackModel)
-  if (!normalizedFallback) {
-    return undefined
-  }
-
-  const parsedFullModel = parseModelString(normalizedFallback)
-  if (parsedFullModel) {
-    return {
-      baseModel: `${parsedFullModel.providerID}/${parsedFullModel.modelID}`,
-      providerHint: [parsedFullModel.providerID],
-      variant: parsedFullModel.variant,
-    }
-  }
-
-  const parsedModel = parseVariantFromModelID(normalizedFallback)
-  if (!parsedModel.modelID) {
-    return undefined
-  }
-
-  return {
-    baseModel: parsedModel.modelID,
-    variant: parsedModel.variant,
-  }
-}
-
 
 export function resolveModelForDelegateTask(input: {
   userModel?: string
@@ -117,52 +85,32 @@ export function resolveModelForDelegateTask(input: {
   if (userFallbackModels && userFallbackModels.length > 0) {
     if (input.availableModels.size === 0) {
       for (const fallbackModel of userFallbackModels) {
-        const parsedFallback = parseUserFallbackModel(
-          typeof fallbackModel === "string" ? fallbackModel : fallbackModel.model,
-        )
-        if (!parsedFallback) continue
-
-        if (
-          connectedProviders &&
-          parsedFallback.providerHint &&
-          !parsedFallback.providerHint.some((provider) => connectedProviders.includes(provider))
-        ) {
+        const resolvedFallback = resolveConfiguredFallbackEntry(fallbackModel, {
+          availableModels: input.availableModels,
+          connectedProviders,
+          preserveObjectVariant: false,
+        })
+        if (!resolvedFallback) {
           continue
         }
 
-        return typeof fallbackModel === "string"
-          ? { model: parsedFallback.baseModel, variant: parsedFallback.variant, matchedFallback: true }
-          : { model: parsedFallback.baseModel, matchedFallback: true }
+        return resolvedFallback.variant
+          ? { model: resolvedFallback.model, variant: resolvedFallback.variant, matchedFallback: true }
+          : { model: resolvedFallback.model, matchedFallback: true }
       }
     } else {
       for (const fallbackModel of userFallbackModels) {
-        if (typeof fallbackModel === "string") {
-          const resolvedFallback = resolveExplicitFallbackModel(fallbackModel, {
-            availableModels: input.availableModels,
-          })
-          if (resolvedFallback) {
-            return {
-              model: resolvedFallback.model,
-              variant: resolvedFallback.variant,
-              matchedFallback: true,
-            }
-          }
+        const resolvedFallback = resolveConfiguredFallbackEntry(fallbackModel, {
+          availableModels: input.availableModels,
+          preserveObjectVariant: false,
+        })
+        if (!resolvedFallback) {
           continue
         }
 
-        const parsedFallback = parseUserFallbackModel(fallbackModel.model)
-        if (!parsedFallback) {
-          continue
-        }
-
-        const match = fuzzyMatchModel(
-          parsedFallback.baseModel,
-          input.availableModels,
-          parsedFallback.providerHint,
-        )
-        if (match) {
-          return { model: match, matchedFallback: true }
-        }
+        return resolvedFallback.variant
+          ? { model: resolvedFallback.model, variant: resolvedFallback.variant, matchedFallback: true }
+          : { model: resolvedFallback.model, matchedFallback: true }
       }
     }
   }
