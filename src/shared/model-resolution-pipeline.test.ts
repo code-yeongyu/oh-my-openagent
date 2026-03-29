@@ -1,7 +1,12 @@
-import { describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, mock, spyOn, test } from "bun:test"
 import { resolveModelPipeline } from "./model-resolution-pipeline"
+import * as connectedProvidersCache from "./connected-providers-cache"
 
 describe("resolveModelPipeline", () => {
+  afterEach(() => {
+    mock.restore()
+  })
+
   test("does not return unused explicit user config metadata in override result", () => {
     // given
     const result = resolveModelPipeline({
@@ -21,5 +26,50 @@ describe("resolveModelPipeline", () => {
     // then
     expect(result).toEqual({ model: "openai/gpt-5.3-codex", provenance: "override" })
     expect(hasExplicitUserConfigField).toBe(false)
+  })
+
+  test("keeps explicit fallback_models stable against available concrete versions", () => {
+    // given
+    const result = resolveModelPipeline({
+      intent: {
+        userFallbackModels: ["openai/gpt-5"],
+      },
+      constraints: {
+        availableModels: new Set(["openai/gpt-5.4"]),
+      },
+    })
+
+    // then
+    expect(result).toEqual({
+      model: "openai/gpt-5",
+      provenance: "provider-fallback",
+      attempted: ["openai/gpt-5"],
+    })
+  })
+
+  test("keeps explicit fallback_models stable on cold cache with connected providers", () => {
+    // given
+    const readConnectedProvidersSpy = spyOn(
+      connectedProvidersCache,
+      "readConnectedProvidersCache",
+    ).mockReturnValue(["openai"])
+
+    const result = resolveModelPipeline({
+      intent: {
+        userFallbackModels: ["openai/gpt-5"],
+      },
+      constraints: {
+        availableModels: new Set<string>(),
+      },
+    })
+
+    readConnectedProvidersSpy.mockRestore()
+
+    // then
+    expect(result).toEqual({
+      model: "openai/gpt-5",
+      provenance: "provider-fallback",
+      attempted: ["openai/gpt-5"],
+    })
   })
 })
