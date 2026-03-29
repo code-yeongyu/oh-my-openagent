@@ -2,6 +2,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { loadClaudeHooksConfig } from "../config"
 import { loadPluginExtendedConfig } from "../config-loader"
 import { executeStopHooks, type StopContext } from "../stop"
+import { executeSessionStartHooks, executeSessionEndHooks } from "../session-start"
 import type { PluginConfig } from "../types"
 import { createInternalAgentTextPart, isHookDisabled, log } from "../../../shared"
 import {
@@ -26,11 +27,55 @@ export function createSessionEventHandler(ctx: PluginInput, config: PluginConfig
 			return
 		}
 
+		if (event.type === "session.created") {
+			const props = event.properties as Record<string, unknown> | undefined
+			const sessionInfo = props?.info as { id?: string; parentID?: string } | undefined
+			if (sessionInfo?.parentID) return
+
+			if (!isHookDisabled(config, "SessionStart")) {
+				const claudeConfig = await loadClaudeHooksConfig()
+				const extendedConfig = await loadPluginExtendedConfig()
+				const result = await executeSessionStartHooks(
+					{ sessionId: sessionInfo?.id ?? "", cwd: ctx.directory },
+					claudeConfig,
+					extendedConfig
+				)
+				for (const message of result.messages) {
+					if (message.trim()) {
+						ctx.client.session
+							.prompt({
+								path: { id: sessionInfo?.id ?? "" },
+								body: {
+									parts: [createInternalAgentTextPart(message)],
+								},
+								query: { directory: ctx.directory },
+							})
+							.catch((err: unknown) =>
+								log("Failed to inject SessionStart hook output", { error: String(err) }),
+							)
+					}
+				}
+			}
+			return
+		}
+
 		if (event.type === "session.deleted") {
 			const props = event.properties as Record<string, unknown> | undefined
-			const sessionInfo = props?.info as { id?: string } | undefined
+			const sessionInfo = props?.info as { id?: string; parentID?: string } | undefined
 			if (sessionInfo?.id) {
 				clearSessionHookState(sessionInfo.id)
+			}
+
+			if (!sessionInfo?.parentID && !isHookDisabled(config, "SessionEnd")) {
+				const claudeConfig = await loadClaudeHooksConfig()
+				const extendedConfig = await loadPluginExtendedConfig()
+				executeSessionEndHooks(
+					{ sessionId: sessionInfo?.id ?? "", cwd: ctx.directory },
+					claudeConfig,
+					extendedConfig
+				).catch((err: unknown) =>
+					log("SessionEnd hook error", { error: String(err) }),
+				)
 			}
 			return
 		}

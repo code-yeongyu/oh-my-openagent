@@ -9,6 +9,8 @@ export type ClaudeHookEvent =
   | "UserPromptSubmit"
   | "Stop"
   | "PreCompact"
+  | "SessionStart"
+  | "SessionEnd"
 
 export interface HookMatcher {
   matcher: string
@@ -36,6 +38,8 @@ export interface ClaudeHooksConfig {
   UserPromptSubmit?: HookMatcher[]
   Stop?: HookMatcher[]
   PreCompact?: HookMatcher[]
+  SessionStart?: HookMatcher[]
+  SessionEnd?: HookMatcher[]
 }
 
 export interface PreToolUseInput {
@@ -98,6 +102,20 @@ export interface PreCompactInput {
   session_id: string
   cwd: string
   hook_event_name: "PreCompact"
+  hook_source?: HookSource
+}
+
+export interface SessionStartInput {
+  session_id: string
+  cwd: string
+  hook_event_name: "SessionStart"
+  hook_source?: HookSource
+}
+
+export interface SessionEndInput {
+  session_id: string
+  cwd: string
+  hook_event_name: "SessionEnd"
   hook_source?: HookSource
 }
 
