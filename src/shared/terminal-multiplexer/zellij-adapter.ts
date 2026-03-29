@@ -20,8 +20,8 @@ export class ZellijAdapter implements Multiplexer {
   private labelToSpawned = new Map<string, boolean>()
   private hasCreatedFirstPane = false
   private anchorPaneId: string | null = null
-  private anchorReadyPromise: Promise<string> | null = null
-  private anchorReadyResolver: ((paneId: string) => void) | null = null
+  private anchorReadyPromise: Promise<string | null> | null = null
+  private anchorReadyResolver: ((paneId: string | null) => void) | null = null
   private config: ZellijAdapterConfig
   private sessionID: string | null = null
   private storage: ZellijStorage
@@ -164,18 +164,23 @@ export class ZellijAdapter implements Multiplexer {
         }
       } else {
         log("[ZellijAdapter.spawnPane] WARNING: anchor pane ID not captured, releasing anchorReadyPromise")
-        this.anchorReadyPromise = null
+        this.anchorReadyResolver?.(null)
         this.anchorReadyResolver = null
+        this.anchorReadyPromise = null
         this.hasCreatedFirstPane = false
       }
     } else if (this.anchorReadyPromise) {
       const anchorId = await this.anchorReadyPromise
-      const stackProc = this.spawn(["zellij", "action", "stack-panes", "--", anchorId, paneId], {
-        stdout: "pipe",
-        stderr: "pipe",
-      })
-      await stackProc.exited
-      log("[ZellijAdapter.spawnPane] stacked with anchor", { anchorPaneId: anchorId, newPaneId: paneId })
+      if (anchorId) {
+        const stackProc = this.spawn(["zellij", "action", "stack-panes", "--", anchorId, paneId], {
+          stdout: "pipe",
+          stderr: "pipe",
+        })
+        await stackProc.exited
+        log("[ZellijAdapter.spawnPane] stacked with anchor", { anchorPaneId: anchorId, newPaneId: paneId })
+      } else {
+        log("[ZellijAdapter.spawnPane] anchor pane failed, skipping stack", { label })
+      }
     }
 
     this.labelToSpawned.set(label, true)
