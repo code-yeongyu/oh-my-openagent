@@ -5,11 +5,14 @@ const mockConfig = { enabled: true, sessionPrefix: "omo-test" }
 
 function makeTrackingSpawn() {
   const calls: string[][] = []
+  const encoder = new TextEncoder()
   const fn = (args: string[]) => {
     calls.push([...args])
+    const isCat = args[0] === "cat"
+    const content = isCat ? "%1\n" : ""
     return {
       exited: Promise.resolve(0),
-      stdout: new ReadableStream({ start(c) { c.close() } }),
+      stdout: new ReadableStream({ start(c) { if (content) c.enqueue(encoder.encode(content)); c.close() } }),
       stderr: new ReadableStream({ start(c) { c.close() } }),
     }
   }

@@ -61,11 +61,23 @@ export class TmuxAdapter implements Multiplexer {
     const splitDirection = direction === "horizontal" ? "-h" : "-v"
     const targetPaneId = splitFrom?.nativeId
 
+    if (!this.config.enabled) {
+      log("[TmuxAdapter.spawnPane] disabled by config")
+      return { label }
+    }
+
+    if (!isInsideTmux()) {
+      log("[TmuxAdapter.spawnPane] not inside tmux")
+      return { label }
+    }
+
     const tmux = await getTmuxPath()
     if (!tmux) {
       log("[TmuxAdapter.spawnPane] tmux not found")
       return { label }
     }
+
+    const fallbackPaneId = getCurrentPaneId()
 
     const args = [
       "split-window",
@@ -74,7 +86,7 @@ export class TmuxAdapter implements Multiplexer {
       "-P",
       "-F",
       "#{pane_id}",
-      ...(targetPaneId ? ["-t", targetPaneId] : []),
+      ...(targetPaneId ? ["-t", targetPaneId] : fallbackPaneId ? ["-t", fallbackPaneId] : []),
       cmd,
     ]
 

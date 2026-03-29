@@ -203,24 +203,21 @@ describe("ZellijAdapter", () => {
     it("loads persisted state when sessionID is set", async () => {
       //#given
       const sessionID = "test-session-load"
-      const persistedState = {
+      const storage = makeMockStorage()
+      storage.saveZellijState({
         sessionID,
         anchorPaneId: "pane-123",
         hasCreatedFirstPane: true,
         updatedAt: Date.now(),
-      }
-      saveZellijState(persistedState)
-
-      const adapter = makeAdapter()
+      })
+      const adapter = new ZellijAdapter(mockConfig, storage, makeMockSpawn() as any)
 
       //#when
-      adapter.setSessionID(sessionID)
+      await adapter.setSessionID(sessionID)
 
-      //#then - state should be loaded (verified by checking internal state via spawnPane behavior)
-      expect(adapter).toBeDefined()
-
-      //#cleanup
-      clearZellijState(sessionID)
+      //#then - state was loaded: hasCreatedFirstPane and anchorPaneId set from storage
+      expect((adapter as any).hasCreatedFirstPane).toBe(true)
+      expect((adapter as any).anchorPaneId).toBe("pane-123")
     })
 
     it("handles missing persisted state gracefully", async () => {
@@ -316,24 +313,21 @@ describe("ZellijAdapter", () => {
     it("clears state when anchor pane is invalid", async () => {
       //#given
       const sessionID = "test-validate-invalid"
-      const persistedState = {
+      const storage = makeMockStorage()
+      storage.saveZellijState({
         sessionID,
-        anchorPaneId: "stale-pane-999",
+        anchorPaneId: null,
         hasCreatedFirstPane: true,
         updatedAt: Date.now(),
-      }
-      saveZellijState(persistedState)
-
-      const adapter = makeAdapter()
+      })
+      const adapter = new ZellijAdapter(mockConfig, storage, makeMockSpawn() as any)
 
       //#when
-      adapter.setSessionID(sessionID)
+      await adapter.setSessionID(sessionID)
 
-      //#then - state should be cleared because anchor pane is invalid
-      expect(adapter).toBeDefined()
-
-      //#cleanup
-      clearZellijState(sessionID)
+      //#then - anchorPaneId was null so validateAnchorPane returned false → hasCreatedFirstPane cleared
+      expect((adapter as any).hasCreatedFirstPane).toBe(false)
+      expect((adapter as any).anchorPaneId).toBeNull()
     })
 
     it("keeps state when anchor pane is valid", async () => {
@@ -423,26 +417,23 @@ describe("ZellijAdapter", () => {
     })
 
     it("recovers gracefully when anchor pane becomes invalid", async () => {
-      //#given persisted state with invalid anchor pane
+      //#given persisted state with stale but non-null anchor pane ID
       const sessionID = "invalid-anchor-test"
-      const invalidState = {
+      const storage = makeMockStorage()
+      storage.saveZellijState({
         sessionID,
         anchorPaneId: "pane-that-no-longer-exists-12345",
         hasCreatedFirstPane: true,
         updatedAt: Date.now(),
-      }
-      saveZellijState(invalidState)
+      })
 
       //#when loading state and spawning new pane
-      const adapter = makeAdapter()
-      adapter.setSessionID(sessionID)
+      const adapter = new ZellijAdapter(mockConfig, storage, makeMockSpawn() as any)
+      await adapter.setSessionID(sessionID)
       const handle = await adapter.spawnPane("echo new", { label: "omo-new-after-invalid" })
 
-      //#then should spawn successfully with new anchor
+      //#then should spawn successfully despite stale anchor pane ID
       expect(handle.label).toBe("omo-new-after-invalid")
-
-      //#cleanup
-      clearZellijState(sessionID)
     })
   })
 })
