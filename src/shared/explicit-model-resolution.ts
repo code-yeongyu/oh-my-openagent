@@ -5,7 +5,10 @@ import { normalizeModel, normalizeModelID } from "./model-normalization"
 import { transformModelForProvider } from "./provider-model-id-transform"
 
 function canonicalizeExplicitModelID(modelID: string): string {
-  return resolveModelIDAlias(modelID).canonicalModelID
+  const resolution = resolveModelIDAlias(modelID)
+  return resolution.source === "canonical"
+    ? modelID.trim()
+    : resolution.canonicalModelID
 }
 
 function isFloatingFamilyAlias(modelID: string): boolean {

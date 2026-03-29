@@ -99,5 +99,17 @@ describe("transformModelForProvider", () => {
 			const result = transformModelForProvider("unknown-provider", "some-model")
 			expect(result).toBe("some-model")
 		})
+
+		test("does not canonicalize unsupported model families across providers on cold cache", () => {
+			const result = transformModelForProvider("openai", "claude-opus-4-6")
+
+			expect(result).toBe("claude-opus-4-6")
+		})
+
+		test("does not rewrite claude-style ids for unknown providers on cold cache", () => {
+			const result = transformModelForProvider("unknown-provider", "claude-opus-4-6")
+
+			expect(result).toBe("claude-opus-4-6")
+		})
 	})
 })
