@@ -152,6 +152,15 @@ describe("resolveModelForDelegateTask", () => {
 		})
 
 		describe("#when user fallback models include variant syntax", () => {
+			test("#then keeps an explicit fallback family alias stable against concrete available models", () => {
+				const result = resolveModelForDelegateTask({
+					userFallbackModels: ["openai/gpt-5"],
+					availableModels: new Set(["openai/gpt-5.4"]),
+				})
+
+				expect(result).toEqual({ model: "openai/gpt-5", variant: undefined, matchedFallback: true })
+			})
+
 			test("#then resolves a parenthesized variant against the base available model", () => {
 				const result = resolveModelForDelegateTask({
 					userFallbackModels: ["openai/gpt-5.2(high)"],

@@ -271,7 +271,7 @@ exports[`generateModelConfig single native provider uses OpenAI models when only
       "variant": "medium",
     },
     "quick": {
-      "model": "openai/gpt-5.4-mini",
+      "model": "openai/gpt-5-mini",
     },
     "ultrabrain": {
       "model": "openai/gpt-5.4",
@@ -361,7 +361,7 @@ exports[`generateModelConfig single native provider uses OpenAI models with isMa
       "variant": "medium",
     },
     "quick": {
-      "model": "openai/gpt-5.4-mini",
+      "model": "openai/gpt-5-mini",
     },
     "ultrabrain": {
       "model": "openai/gpt-5.4",

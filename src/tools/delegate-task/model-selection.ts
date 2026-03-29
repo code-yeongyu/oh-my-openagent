@@ -5,6 +5,8 @@ import { transformModelForProvider } from "../../shared/provider-model-id-transf
 import { hasConnectedProvidersCache, hasProviderModelsCache, readConnectedProvidersCache } from "../../shared/connected-providers-cache"
 import { log } from "../../shared/logger"
 import { parseModelString, parseVariantFromModelID } from "./model-string-parser"
+import { resolveExplicitModel } from "../../shared/explicit-model-resolution"
+import { resolveExplicitFallbackModel } from "../../shared/explicit-fallback-model-resolution"
 
 function isExplicitHighModel(model: string): boolean {
   return /(?:^|\/)[^/]+-high$/.test(model)
@@ -129,12 +131,15 @@ export function resolveModelForDelegateTask(input: {
       }
     } else {
       for (const fallbackModel of userFallbackModels) {
-        const parsedFallback = parseUserFallbackModel(fallbackModel)
-        if (!parsedFallback) continue
-
-        const match = fuzzyMatchModel(parsedFallback.baseModel, input.availableModels, parsedFallback.providerHint)
-        if (match) {
-          return { model: match, variant: parsedFallback.variant, matchedFallback: true }
+        const resolvedFallback = resolveExplicitFallbackModel(fallbackModel, {
+          availableModels: input.availableModels,
+        })
+        if (resolvedFallback) {
+          return {
+            model: resolvedFallback.model,
+            variant: resolvedFallback.variant,
+            matchedFallback: true,
+          }
         }
       }
     }
