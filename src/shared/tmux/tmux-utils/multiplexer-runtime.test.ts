@@ -6,6 +6,7 @@ import {
   type ResolvedMultiplexer,
 } from "./multiplexer-runtime"
 import {
+  probeCmuxReachability,
   resetMultiplexerPathCacheForTesting,
   type CmuxRuntimeProbe,
   type TmuxRuntimeProbe,
@@ -170,7 +171,14 @@ describe("multiplexer runtime resolution", () => {
     expect(runtime.notificationBackend).toBe("desktop")
   })
 
-  test("treats relay endpoint addresses as valid cmux socket targets", () => {
+  test("treats relay endpoint addresses as valid cmux socket targets", async () => {
+    const derivedProbe = await probeCmuxReachability({
+      environment: {
+        CMUX_SOCKET_PATH: "127.0.0.1:7777",
+        OH_MY_OPENCODE_DISABLE_CMUX: "1",
+      },
+    })
+
     const runtime = resolveRuntime({
       environment: {
         TMUX: undefined,
@@ -178,16 +186,25 @@ describe("multiplexer runtime resolution", () => {
         CMUX_SOCKET_PATH: "127.0.0.1:7777",
       },
       cmuxProbe: {
-        endpointType: "relay",
-        socketPath: "127.0.0.1:7777",
+        endpointType: derivedProbe.endpointType,
+        socketPath: derivedProbe.socketPath,
       },
     })
 
+    expect(derivedProbe.endpointType).toBe("relay")
     expect(runtime.mode).toBe("cmux-notify-only")
     expect(runtime.cmux.endpointType).toBe("relay")
   })
 
-  test("keeps weak ghostty hint as non-authoritative on non-mac platforms", () => {
+  test("keeps weak ghostty hint as non-authoritative on non-mac platforms", async () => {
+    const derivedProbe = await probeCmuxReachability({
+      environment: {
+        TERM_PROGRAM: "ghostty",
+        CMUX_SOCKET_PATH: undefined,
+        OH_MY_OPENCODE_DISABLE_CMUX: "1",
+      },
+    })
+
     const runtime = resolveRuntime({
       platform: "linux",
       environment: {
@@ -204,14 +221,15 @@ describe("multiplexer runtime resolution", () => {
       cmuxProbe: {
         reachable: false,
         path: "/usr/local/bin/cmux",
-        socketPath: undefined,
-        endpointType: "missing",
-        hintStrength: "weak",
+        socketPath: derivedProbe.socketPath,
+        endpointType: derivedProbe.endpointType,
+        hintStrength: derivedProbe.hintStrength,
         notifyCapable: false,
         failureKind: "missing-socket",
       },
     })
 
+    expect(derivedProbe.hintStrength).toBe("weak")
     expect(runtime.mode).toBe("none")
     expect(runtime.cmux.hintStrength).toBe("weak")
     expect(runtime.platform).toBe("linux")

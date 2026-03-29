@@ -53,6 +53,43 @@ export function tokenizeCommand(cmd: string): string[] {
   return tokens
 }
 
+function hasTmuxTargetFlag(tokens: string[]): boolean {
+  return tokens.some((token, index) => {
+    if (token === "-t") {
+      return typeof tokens[index + 1] === "string" && tokens[index + 1].length > 0
+    }
+
+    return token.startsWith("-t") && token.length > 2
+  })
+}
+
+function hasDetachedFlag(tokens: string[]): boolean {
+  return tokens.some((token) => {
+    if (token === "-d") {
+      return true
+    }
+
+    if (!token.startsWith("-") || token.startsWith("--")) {
+      return false
+    }
+
+    return token.slice(1).includes("d")
+  })
+}
+
+function canRunWithoutPaneControl(tokens: string[]): boolean {
+  const subcommand = tokens[0]?.toLowerCase()
+  if (!subcommand) {
+    return false
+  }
+
+  const isDetachedNewSession =
+    (subcommand === "new-session" || subcommand === "new")
+    && hasDetachedFlag(tokens)
+
+  return isDetachedNewSession || hasTmuxTargetFlag(tokens)
+}
+
 export function createInteractiveBashTool(
   runtime?: ResolvedMultiplexer,
 ): ToolDefinition {
@@ -68,19 +105,19 @@ export function createInteractiveBashTool(
           ?? getResolvedMultiplexerRuntime()
           ?? createDisabledMultiplexerRuntime()
 
-        if (resolvedRuntime.paneBackend !== "tmux") {
+        const parts = tokenizeCommand(args.tmux_command)
+
+        if (parts.length === 0) {
+          return "Error: Empty tmux command"
+        }
+
+        if (resolvedRuntime.paneBackend !== "tmux" && !canRunWithoutPaneControl(parts)) {
           return `Error: interactive_bash is TMUX-only and pane control is unavailable in '${resolvedRuntime.mode}' runtime.`
         }
 
         const tmuxPath = await getTmuxPath()
         if (!tmuxPath) {
           return "Error: tmux executable is not reachable"
-        }
-
-        const parts = tokenizeCommand(args.tmux_command)
-
-        if (parts.length === 0) {
-          return "Error: Empty tmux command"
         }
 
         const subcommand = parts[0].toLowerCase()

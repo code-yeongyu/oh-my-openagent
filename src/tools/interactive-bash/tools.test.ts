@@ -41,6 +41,33 @@ function createTmuxEnabledRuntime(): ResolvedMultiplexer {
   }
 }
 
+function createPaneUnavailableRuntime(): ResolvedMultiplexer {
+  return {
+    platform: process.platform,
+    mode: "cmux-notify-only",
+    paneBackend: "none",
+    notificationBackend: "cmux",
+    tmux: {
+      path: "/usr/bin/tmux",
+      reachable: false,
+      insideEnvironment: false,
+      paneId: undefined,
+      explicitDisable: false,
+    },
+    cmux: {
+      path: "/usr/local/bin/cmux",
+      reachable: true,
+      notifyCapable: true,
+      socketPath: "/tmp/cmux.sock",
+      endpointType: "unix",
+      workspaceId: "workspace-1",
+      surfaceId: "surface-1",
+      hintStrength: "strong",
+      explicitDisable: false,
+    },
+  }
+}
+
 describe("interactive_bash runtime resolution", () => {
   afterEach(() => {
     resetResolvedMultiplexerRuntimeForTesting()
@@ -72,6 +99,62 @@ describe("interactive_bash runtime resolution", () => {
       const result = await interactive_bash.execute({ tmux_command: "capture-pane -p" }, mockToolContext)
 
       expect(result).toBe("Error: tmux executable is not reachable")
+    } finally {
+      getTmuxPathSpy.mockRestore()
+    }
+  })
+
+  test("allows detached new-session commands when pane control is unavailable", async () => {
+    const getTmuxPathSpy = spyOn(tmuxPathResolver, "getTmuxPath").mockResolvedValue(null)
+
+    try {
+      const tool = createInteractiveBashTool(createPaneUnavailableRuntime())
+
+      const result = await tool.execute(
+        { tmux_command: "new-session -d -s omo-dev" },
+        mockToolContext,
+      )
+
+      expect(result).toBe("Error: tmux executable is not reachable")
+      expect(getTmuxPathSpy).toHaveBeenCalledTimes(1)
+    } finally {
+      getTmuxPathSpy.mockRestore()
+    }
+  })
+
+  test("allows targeted tmux commands when pane control is unavailable", async () => {
+    const getTmuxPathSpy = spyOn(tmuxPathResolver, "getTmuxPath").mockResolvedValue(null)
+
+    try {
+      const tool = createInteractiveBashTool(createPaneUnavailableRuntime())
+
+      const result = await tool.execute(
+        { tmux_command: "send-keys -t omo-dev \"vim\" Enter" },
+        mockToolContext,
+      )
+
+      expect(result).toBe("Error: tmux executable is not reachable")
+      expect(getTmuxPathSpy).toHaveBeenCalledTimes(1)
+    } finally {
+      getTmuxPathSpy.mockRestore()
+    }
+  })
+
+  test("blocks untargeted pane-control commands when pane backend is unavailable", async () => {
+    const getTmuxPathSpy = spyOn(tmuxPathResolver, "getTmuxPath").mockResolvedValue(null)
+
+    try {
+      const tool = createInteractiveBashTool(createPaneUnavailableRuntime())
+
+      const result = await tool.execute(
+        { tmux_command: "send-keys \"vim\" Enter" },
+        mockToolContext,
+      )
+
+      expect(result).toBe(
+        "Error: interactive_bash is TMUX-only and pane control is unavailable in 'cmux-notify-only' runtime.",
+      )
+      expect(getTmuxPathSpy).toHaveBeenCalledTimes(0)
     } finally {
       getTmuxPathSpy.mockRestore()
     }

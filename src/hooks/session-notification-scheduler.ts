@@ -48,12 +48,6 @@ export function createIdleNotificationScheduler(options: {
         notificationVersions.delete(id)
       })
     }
-    if (executingNotifications.size > maxSessions) {
-      const sessionsToRemove = Array.from(executingNotifications).slice(0, executingNotifications.size - maxSessions)
-      sessionsToRemove.forEach((id) => {
-        executingNotifications.delete(id)
-      })
-    }
     if (scheduledAt.size > maxSessions) {
       const sessionsToRemove = Array.from(scheduledAt.keys()).slice(0, scheduledAt.size - maxSessions)
       sessionsToRemove.forEach((id) => {
@@ -89,6 +83,15 @@ export function createIdleNotificationScheduler(options: {
     }
   }
 
+  function hasStaleNotificationVersion(sessionID: string, version: number): boolean {
+    const latestVersion = notificationVersions.get(sessionID)
+    if (latestVersion === undefined) {
+      return !executingNotifications.has(sessionID)
+    }
+
+    return latestVersion !== version
+  }
+
   async function executeNotification(sessionID: string, version: number): Promise<void> {
     if (executingNotifications.has(sessionID)) {
       pendingTimers.delete(sessionID)
@@ -96,7 +99,7 @@ export function createIdleNotificationScheduler(options: {
       return
     }
 
-    if (notificationVersions.get(sessionID) !== version) {
+    if (hasStaleNotificationVersion(sessionID, version)) {
       pendingTimers.delete(sessionID)
       scheduledAt.delete(sessionID)
       return
@@ -119,13 +122,13 @@ export function createIdleNotificationScheduler(options: {
     try {
       if (options.config.skipIfIncompleteTodos) {
         const hasPendingWork = await options.hasIncompleteTodos(options.ctx, sessionID)
-        if (notificationVersions.get(sessionID) !== version) {
+        if (hasStaleNotificationVersion(sessionID, version)) {
           return
         }
         if (hasPendingWork) return
       }
 
-      if (notificationVersions.get(sessionID) !== version) {
+      if (hasStaleNotificationVersion(sessionID, version)) {
         return
       }
 
@@ -139,7 +142,7 @@ export function createIdleNotificationScheduler(options: {
         return
       }
 
-      if (notificationVersions.get(sessionID) !== version) {
+      if (hasStaleNotificationVersion(sessionID, version)) {
         return
       }
 
