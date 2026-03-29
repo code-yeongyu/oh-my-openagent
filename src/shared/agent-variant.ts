@@ -1,5 +1,7 @@
 import type { OhMyOpenCodeConfig } from "../config"
+import { getModelCapabilities } from "./model-capabilities"
 import { AGENT_MODEL_REQUIREMENTS, CATEGORY_MODEL_REQUIREMENTS } from "./model-requirements"
+import { normalizeModelID } from "./model-normalization"
 
 export function resolveAgentVariant(
   config: OhMyOpenCodeConfig,
@@ -67,10 +69,25 @@ function findVariantInChain(
   fallbackChain: { providers: string[]; model: string; variant?: string }[],
   currentModel: { providerID: string; modelID: string },
 ): string | undefined {
+  const currentCapabilities = getModelCapabilities(currentModel)
+  const currentFamily = currentCapabilities.family
+  const normalizedCurrentModelID = normalizeModelID(currentModel.modelID.trim().toLowerCase())
+
   for (const entry of fallbackChain) {
+    if (!entry.providers.includes(currentModel.providerID)) {
+      continue
+    }
+
+    const normalizedEntryModelID = normalizeModelID(entry.model.trim().toLowerCase())
+    const entryCapabilities = getModelCapabilities({
+      providerID: currentModel.providerID,
+      modelID: entry.model,
+    })
+    const entryFamily = entryCapabilities.family
+
     if (
-      entry.providers.includes(currentModel.providerID)
-      && entry.model === currentModel.modelID
+      normalizedEntryModelID === normalizedCurrentModelID
+      || (entryFamily !== undefined && entryFamily === currentFamily)
     ) {
       return entry.variant
     }
@@ -79,7 +96,17 @@ function findVariantInChain(
   // Some providers expose identical model IDs (e.g. OpenAI models via different providers).
   // If we didn't find an exact provider+model match, fall back to model-only matching.
   for (const entry of fallbackChain) {
-    if (entry.model === currentModel.modelID) {
+    const normalizedEntryModelID = normalizeModelID(entry.model.trim().toLowerCase())
+    const entryCapabilities = getModelCapabilities({
+      providerID: currentModel.providerID,
+      modelID: entry.model,
+    })
+    const entryFamily = entryCapabilities.family
+
+    if (
+      normalizedEntryModelID === normalizedCurrentModelID
+      || (entryFamily !== undefined && entryFamily === currentFamily)
+    ) {
       return entry.variant
     }
   }

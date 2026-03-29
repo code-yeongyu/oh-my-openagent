@@ -16,6 +16,16 @@ function isAnthropicProvider(providerID: string): boolean {
   return normalized === "anthropic" || normalized === "google-vertex-anthropic" || normalized === "aws-bedrock-anthropic"
 }
 
+function getContextLimitLookupProviderIDs(providerID: string): string[] {
+  if (!isAnthropicProvider(providerID)) {
+    return [providerID]
+  }
+
+  return providerID === "anthropic"
+    ? [providerID]
+    : [providerID, "anthropic"]
+}
+
 function getLegacyAnthropicProviderMinimum(
   providerID: string,
   modelCacheState?: ContextLimitModelCacheState,
@@ -36,7 +46,19 @@ function getConfiguredContextLimit(
   modelID: string,
   modelCacheState?: ContextLimitModelCacheState,
 ): number | null {
-  return modelCacheState?.modelContextLimitsCache?.get(`${providerID}/${modelID}`) ?? null
+  const cache = modelCacheState?.modelContextLimitsCache
+  if (!cache) {
+    return null
+  }
+
+  for (const lookupProviderID of getContextLimitLookupProviderIDs(providerID)) {
+    const limit = cache.get(`${lookupProviderID}/${modelID}`)
+    if (limit !== undefined) {
+      return limit
+    }
+  }
+
+  return null
 }
 
 function getDiscoveredContextLimit(
@@ -44,14 +66,35 @@ function getDiscoveredContextLimit(
   modelID: string,
   options?: ContextLimitResolverOptions,
 ): number | null {
-  return (options?.getModelCapabilities ?? getModelCapabilities)({ providerID, modelID }).contextWindowTokens ?? null
+  const getCapabilities = options?.getModelCapabilities ?? getModelCapabilities
+
+  for (const lookupProviderID of getContextLimitLookupProviderIDs(providerID)) {
+    const limit = getCapabilities({ providerID: lookupProviderID, modelID }).contextWindowTokens
+    if (limit !== undefined) {
+      return limit
+    }
+  }
+
+  return null
 }
 
 function getConfiguredProviderMinimumContextLimit(
   providerID: string,
   modelCacheState?: ContextLimitModelCacheState,
 ): number | null {
-  return modelCacheState?.providerContextLimitMinimumsCache?.get(providerID) ?? null
+  const cache = modelCacheState?.providerContextLimitMinimumsCache
+  if (!cache) {
+    return null
+  }
+
+  for (const lookupProviderID of getContextLimitLookupProviderIDs(providerID)) {
+    const limit = cache.get(lookupProviderID)
+    if (limit !== undefined) {
+      return limit
+    }
+  }
+
+  return null
 }
 
 export function resolveActualContextLimit(

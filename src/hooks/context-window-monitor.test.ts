@@ -107,7 +107,9 @@ describe("context-window-monitor", () => {
   // #when tool.execute.after is called
   // #then context reminder should be appended to output
   it("should append context reminder with actual token counts when usage exceeds threshold", async () => {
-    const hook = createContextWindowMonitorHook(ctx as never)
+    const hook = createContextWindowMonitorHook(ctx as never, {
+      modelContextLimitsCache: new Map([["anthropic/test-claude-threshold", 200_000]]),
+    })
     const sessionID = "ses_high_usage"
 
     // 150K input + 10K cache read = 160K, which is 80% of 200K limit
@@ -119,6 +121,7 @@ describe("context-window-monitor", () => {
             role: "assistant",
             sessionID,
             providerID: "anthropic",
+            modelID: "test-claude-threshold",
             finish: true,
             tokens: {
               input: 150000,
@@ -145,7 +148,9 @@ describe("context-window-monitor", () => {
 
   it("should append context reminder for google-vertex-anthropic provider", async () => {
     //#given cached usage for google-vertex-anthropic above threshold
-    const hook = createContextWindowMonitorHook(ctx as never)
+    const hook = createContextWindowMonitorHook(ctx as never, {
+      modelContextLimitsCache: new Map([["google-vertex-anthropic/test-vertex-threshold", 200_000]]),
+    })
     const sessionID = "ses_vertex_anthropic_high_usage"
 
     await hook.event({
@@ -156,6 +161,7 @@ describe("context-window-monitor", () => {
             role: "assistant",
             sessionID,
             providerID: "google-vertex-anthropic",
+            modelID: "test-vertex-threshold",
             finish: true,
             tokens: {
               input: 150000,

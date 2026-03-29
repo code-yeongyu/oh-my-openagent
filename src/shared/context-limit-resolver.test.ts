@@ -191,6 +191,26 @@ describe("resolveActualContextLimit", () => {
     expect(actualLimit).toBe(1_000_000)
   })
 
+  it("reuses Anthropic metadata for compatible alias providers", () => {
+    // given
+    delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+    delete process.env[VERTEX_CONTEXT_ENV_KEY]
+    getModelCapabilitiesMock.mockImplementation(({ providerID, modelID }) => ({
+      contextWindowTokens:
+        providerID === "anthropic" && modelID === "claude-sonnet-4-6"
+          ? 200_000
+          : undefined,
+    }))
+
+    // when
+    const actualLimit = resolveActualContextLimit("aws-bedrock-anthropic", "claude-sonnet-4-6", {
+      anthropicContext1MEnabled: false,
+    }, { getModelCapabilities: getModelCapabilitiesMock })
+
+    // then
+    expect(actualLimit).toBe(200_000)
+  })
+
   it("supports Anthropic alias model IDs when the cached limit already knows they are 1M", () => {
     // given
     delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
