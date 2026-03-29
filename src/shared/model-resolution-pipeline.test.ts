@@ -79,4 +79,55 @@ describe("resolveModelPipeline", () => {
       attempted: ["openai/gpt-5"],
     })
   })
+
+  test("fuzzy-resolves object fallback_models entries to available concrete models", () => {
+    // given
+    const result = resolveModelPipeline({
+      intent: {
+        userFallbackModels: [
+          { model: "openai/gpt-5.4", variant: "high", reasoningEffort: "high" },
+        ],
+      },
+      constraints: {
+        availableModels: new Set(["openai/gpt-5.4-preview"]),
+      },
+    })
+
+    // then
+    expect(result).toEqual({
+      model: "openai/gpt-5.4-preview",
+      provenance: "provider-fallback",
+      variant: "high",
+      attempted: ["openai/gpt-5.4"],
+    })
+  })
+
+  test("uses object fallback_models entries on cold cache when their provider is connected", () => {
+    // given
+    const readConnectedProvidersSpy = spyOn(
+      connectedProvidersCache,
+      "readConnectedProvidersCache",
+    ).mockReturnValue(["openai"])
+
+    const result = resolveModelPipeline({
+      intent: {
+        userFallbackModels: [
+          { model: "openai/gpt-5.4", variant: "high", reasoningEffort: "high" },
+        ],
+      },
+      constraints: {
+        availableModels: new Set<string>(),
+      },
+    })
+
+    readConnectedProvidersSpy.mockRestore()
+
+    // then
+    expect(result).toEqual({
+      model: "openai/gpt-5.4",
+      provenance: "provider-fallback",
+      variant: "high",
+      attempted: ["openai/gpt-5.4"],
+    })
+  })
 })

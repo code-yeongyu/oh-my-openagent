@@ -25,7 +25,7 @@ export type ModelResolutionResult = {
 export type ExtendedModelResolutionInput = {
 	uiSelectedModel?: string
 	userModel?: string
-	userFallbackModels?: string[]
+	userFallbackModels?: (string | FallbackModelObject)[]
 	categoryDefaultModel?: string
 	fallbackChain?: FallbackEntry[]
 	availableModels: Set<string>
