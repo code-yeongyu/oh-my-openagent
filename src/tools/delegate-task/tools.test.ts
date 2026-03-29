@@ -9,6 +9,7 @@ import { clearSkillCache } from "../../features/opencode-skill-loader/skill-cont
 import { __setTimingConfig, __resetTimingConfig } from "./timing"
 import * as connectedProvidersCache from "../../shared/connected-providers-cache"
 import * as executor from "./executor"
+import * as logger from "../../shared/logger"
 
 const SYSTEM_DEFAULT_MODEL = "anthropic/claude-sonnet-4-6"
 
@@ -465,7 +466,7 @@ describe("sisyphus-task", () => {
        expect(args.subagent_type).toBe("Sisyphus-Junior")
     }, { timeout: 10000 })
 
-    test("rejects when both category and subagent_type are provided", async () => {
+    test("logs and proceeds when both category and subagent_type are provided", async () => {
       //#given
       const { createDelegateTask } = require("./tools")
 
@@ -516,8 +517,15 @@ describe("sisyphus-task", () => {
         load_skills: [],
       }
 
+      const logSpy = spyOn(logger, "log").mockImplementation(() => {})
+
       //#when + #then
-      await expect(tool.execute(args, toolContext)).rejects.toThrow("mutually exclusive")
+      await expect(tool.execute(args, toolContext)).resolves.toBeDefined()
+      expect(logSpy).toHaveBeenCalledWith("[task] category provided with subagent_type - ignoring subagent_type", {
+        category: "quick",
+        subagent_type: "oracle",
+      })
+      expect(args.subagent_type).toBe("Sisyphus-Junior")
     }, { timeout: 10000 })
 
     test("proceeds without error when systemDefaultModel is undefined", async () => {

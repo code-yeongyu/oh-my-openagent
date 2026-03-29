@@ -73,13 +73,13 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
   \`\`\`
   
   REQUIRED: Provide ONE of:
-  - category: For task delegation (uses Sisyphus-Junior with category-optimized model)
+  - category: For task delegation (spawns a focused executor with category-optimized model)
   - subagent_type: For direct agent invocation (explore, librarian, oracle, etc.)
   
-  **DO NOT provide both.** category and subagent_type are mutually exclusive.
+  **DO NOT provide both.** Providing both will cause an error.
   
   - load_skills: ALWAYS REQUIRED. Pass [] if no skills needed, or ["skill-1", "skill-2"] for category tasks.
-  - category: Use predefined category → Spawns Sisyphus-Junior with category config
+  - category: Use predefined category → Spawns executor with category-optimized config
     Available categories:
   ${categoryList}
   - subagent_type: Use a specific callable non-primary agent directly (for example: explore, librarian, oracle, metis, momus)
@@ -110,13 +110,11 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
       const ctx = toolContext as ToolContextWithMetadata
 
       if (args.category && args.subagent_type) {
-        throw new Error(
-          `Invalid arguments: 'category' and 'subagent_type' are mutually exclusive. Provide EXACTLY ONE.\n` +
-          `  - You provided: category="${args.category}", subagent_type="${args.subagent_type}"\n` +
-          `  - Use category for task delegation (e.g., category="${categoryExamples.split(", ")[0]}")\n` +
-          `  - Use subagent_type for direct agent invocation (e.g., subagent_type="explore")\n` +
-          `  - subagent_type must be a callable non-primary agent name returned by app.agents()`
-        )
+        log("[task] category provided with subagent_type - ignoring subagent_type", {
+          category: args.category,
+          subagent_type: args.subagent_type,
+        })
+        args.subagent_type = undefined
       }
       if (args.category) {
         args.subagent_type = SISYPHUS_JUNIOR_AGENT
