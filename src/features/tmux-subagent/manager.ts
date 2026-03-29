@@ -101,7 +101,7 @@ export class TmuxSessionManager {
     } catch {
       this.serverUrl = fallbackUrl
     }
-    this.sourcePaneId = deps.getCurrentPaneId()
+    this.sourcePaneId = this.deps.getCurrentPaneId()
     this.pollingManager = new TmuxPollingManager(
       this.client,
       this.sessions,
@@ -138,6 +138,17 @@ export class TmuxSessionManager {
 
   private removeTrackedSession(sessionId: string): void {
     this.sessions.delete(sessionId)
+
+    const handle = this.sessionHandles.get(sessionId)
+    if (handle && this.adapter) {
+      this.sessionHandles.delete(sessionId)
+      this.adapter.closePane(handle).catch((err) => {
+        log("[tmux-session-manager] error closing adapter pane handle", {
+          sessionId,
+          error: String(err),
+        })
+      })
+    }
 
     if (this.sessions.size === 0) {
       this.pollingManager.stopPolling()
@@ -709,7 +720,8 @@ export class TmuxSessionManager {
     try {
       const shell = process.env.SHELL ?? "bash"
       const escapedUrl = shellEscapeForDoubleQuotedCommand(this.serverUrl)
-      const cmd = `${shell} -c "opencode attach ${escapedUrl} --session ${sessionId}"`
+      const escapedSessionId = shellEscapeForDoubleQuotedCommand(sessionId)
+      const cmd = `${shell} -c "opencode attach ${escapedUrl} --session ${escapedSessionId}"`
       const handle = await this.adapter.spawnPane(cmd, {
         label: sessionId,
         displayName: title ? `Agent: ${title}` : undefined,
@@ -750,6 +762,20 @@ export class TmuxSessionManager {
     }
 
     await this.retryPendingCloses()
+
+    if (this.adapter && this.sessionHandles.size > 0) {
+      for (const [sessionId, handle] of this.sessionHandles) {
+        try {
+          await this.adapter.closePane(handle)
+        } catch (error) {
+          log("[tmux-session-manager] cleanup error closing adapter handle", {
+            sessionId,
+            error: String(error),
+          })
+        }
+      }
+      this.sessionHandles.clear()
+    }
 
     log("[tmux-session-manager] cleanup complete")
   }

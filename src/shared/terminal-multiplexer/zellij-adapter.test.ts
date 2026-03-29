@@ -1,23 +1,40 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test"
 import { saveZellijState, clearZellijState } from "./zellij-storage"
+import { ZellijAdapter } from "./zellij-adapter"
+import type { ZellijStorage, ZellijState } from "./zellij-storage"
 
 const mockConfig = {
   enabled: true,
   sessionPrefix: "omo-test",
 }
 
-let ZellijAdapter: any
+function makeMockStorage(): ZellijStorage & { _store: Map<string, ZellijState> } {
+  const store = new Map<string, ZellijState>()
+  return {
+    _store: store,
+    loadZellijState(sessionID: string) {
+      return store.get(sessionID) ?? null
+    },
+    saveZellijState(state: ZellijState) {
+      store.set(state.sessionID, state)
+    },
+    clearZellijState(sessionID: string) {
+      store.delete(sessionID)
+    },
+  }
+}
 
-describe("ZellijAdapter", () => {
-  let originalSpawn: typeof Bun.spawn
-
-  beforeEach(async () => {
-    //#given - mock Bun.spawn before importing the adapter
-    originalSpawn = Bun.spawn
-    ;(Bun as any).spawn = () => ({
+function makeMockSpawn() {
+  return (args: string[]) => {
+    const isCat = Array.isArray(args) && args[0] === "cat"
+    const paneIdBytes = new TextEncoder().encode("%1\n")
+    return {
       exited: Promise.resolve(0),
       stdout: new ReadableStream({
         start(controller) {
+          if (isCat) {
+            controller.enqueue(paneIdBytes)
+          }
           controller.close()
         },
       }),
@@ -26,22 +43,19 @@ describe("ZellijAdapter", () => {
           controller.close()
         },
       }),
-    })
-    
-    //#when - dynamically import after mocking
-    const module = await import("./zellij-adapter")
-    ZellijAdapter = module.ZellijAdapter
-  })
+    }
+  }
+}
 
-  afterEach(() => {
-    //#given - restore original Bun.spawn
-    ;(Bun as any).spawn = originalSpawn
-  })
+function makeAdapter() {
+  return new ZellijAdapter(mockConfig, makeMockStorage(), makeMockSpawn() as any)
+}
 
+describe("ZellijAdapter", () => {
   describe("interface compliance", () => {
     it("implements Multiplexer interface", () => {
       //#given
-      const adapter = new ZellijAdapter(mockConfig)
+      const adapter = makeAdapter()
 
       //#then - verify all required methods exist
       expect(typeof adapter.spawnPane).toBe("function")
@@ -53,7 +67,7 @@ describe("ZellijAdapter", () => {
 
     it("has type property set to 'zellij'", () => {
       //#given
-      const adapter = new ZellijAdapter(mockConfig)
+      const adapter = makeAdapter()
 
       //#then
       expect(adapter.type).toBe("zellij")
@@ -61,7 +75,7 @@ describe("ZellijAdapter", () => {
 
     it("has correct capabilities", () => {
       //#given
-      const adapter = new ZellijAdapter(mockConfig)
+      const adapter = makeAdapter()
 
       //#then
       expect(adapter.capabilities.manualLayout).toBe(false)
@@ -72,7 +86,7 @@ describe("ZellijAdapter", () => {
   describe("spawnPane", () => {
     it("returns PaneHandle with label", async () => {
       //#given
-      const adapter = new ZellijAdapter(mockConfig)
+      const adapter = makeAdapter()
       const options = { label: "omo-test-pane" }
 
       //#when
@@ -84,7 +98,7 @@ describe("ZellijAdapter", () => {
 
     it("accepts direction option", async () => {
       //#given
-      const adapter = new ZellijAdapter(mockConfig)
+      const adapter = makeAdapter()
       const options = { label: "omo-dir-test", direction: "horizontal" as const }
 
       //#when
@@ -98,7 +112,7 @@ describe("ZellijAdapter", () => {
   describe("closePane", () => {
     it("removes label from internal cache", async () => {
       //#given
-      const adapter = new ZellijAdapter(mockConfig)
+      const adapter = makeAdapter()
       await adapter.spawnPane("echo test", { label: "omo-close-test" })
 
       //#when
@@ -111,7 +125,7 @@ describe("ZellijAdapter", () => {
 
     it("handles closing non-existent pane gracefully", async () => {
       //#given
-      const adapter = new ZellijAdapter(mockConfig)
+      const adapter = makeAdapter()
 
       //#when
       const closePromise = adapter.closePane({ label: "omo-nonexistent" })
@@ -124,7 +138,7 @@ describe("ZellijAdapter", () => {
   describe("ensureSession", () => {
     it("creates a detached session", async () => {
       //#given
-      const adapter = new ZellijAdapter(mockConfig)
+      const adapter = makeAdapter()
 
       //#when
       const ensurePromise = adapter.ensureSession("omo-test-session")
@@ -137,7 +151,7 @@ describe("ZellijAdapter", () => {
   describe("killSession", () => {
     it("deletes a session with force flag", async () => {
       //#given
-      const adapter = new ZellijAdapter(mockConfig)
+      const adapter = makeAdapter()
 
       //#when
       const killPromise = adapter.killSession("omo-kill-test")
@@ -147,296 +161,288 @@ describe("ZellijAdapter", () => {
     })
   })
 
-   describe("getPanes", () => {
-     it("returns array of PaneHandles", async () => {
-       //#given
-       const adapter = new ZellijAdapter(mockConfig)
+  describe("getPanes", () => {
+    it("returns array of PaneHandles", async () => {
+      //#given
+      const adapter = makeAdapter()
 
-       //#when
-       const panes = await adapter.getPanes()
+      //#when
+      const panes = await adapter.getPanes()
 
-       //#then
-       expect(Array.isArray(panes)).toBe(true)
-     })
-
-     it("returns array of panes", async () => {
-       //#given
-       const adapter = new ZellijAdapter(mockConfig)
-
-       //#when
-       const panes = await adapter.getPanes()
-
-       //#then
-       expect(Array.isArray(panes)).toBe(true)
-     })
-   })
-
-   describe("setSessionID", () => {
-     it("stores sessionID for later use", async () => {
-       //#given
-       const adapter = new ZellijAdapter(mockConfig)
-       const sessionID = "test-session-123"
-
-       //#when
-       adapter.setSessionID(sessionID)
-
-       //#then - sessionID should be stored (verified by state persistence in spawnPane)
-       expect(adapter).toBeDefined()
-     })
-
-     it("loads persisted state when sessionID is set", async () => {
-       //#given
-       const sessionID = "test-session-load"
-       const persistedState = {
-         sessionID,
-         anchorPaneId: "pane-123",
-         hasCreatedFirstPane: true,
-         updatedAt: Date.now(),
-       }
-       saveZellijState(persistedState)
-
-       const adapter = new ZellijAdapter(mockConfig)
-
-       //#when
-       adapter.setSessionID(sessionID)
-
-       //#then - state should be loaded (verified by checking internal state via spawnPane behavior)
-       expect(adapter).toBeDefined()
-
-       //#cleanup
-       clearZellijState(sessionID)
-     })
-
-     it("handles missing persisted state gracefully", async () => {
-       //#given
-       const adapter = new ZellijAdapter(mockConfig)
-       const nonExistentSessionID = "nonexistent-session-xyz"
-
-       //#when
-       const setPromise = Promise.resolve(adapter.setSessionID(nonExistentSessionID))
-
-       //#then - should not throw
-       await expect(setPromise).resolves.toBeUndefined()
-     })
-   })
-
-    describe("spawnPane with session state persistence", () => {
-      it("saves state after setting anchor pane when sessionID is set", async () => {
-        //#given
-        const sessionID = "test-session-spawn"
-        const adapter = new ZellijAdapter(mockConfig)
-        adapter.setSessionID(sessionID)
-
-        //#when
-        await adapter.spawnPane("echo test", { label: "omo-anchor-test" })
-
-        //#then - state should be persisted (anchorPaneId and hasCreatedFirstPane)
-        expect(adapter).toBeDefined()
-
-        //#cleanup
-        clearZellijState(sessionID)
-      })
-
-      it("does not save state when sessionID is not set (backward compatibility)", async () => {
-        //#given
-        const adapter = new ZellijAdapter(mockConfig)
-        // Don't call setSessionID - verify backward compatibility
-
-        //#when
-        const handle = await adapter.spawnPane("echo test", { label: "omo-no-session" })
-
-        //#then - should work without sessionID
-        expect(handle.label).toBe("omo-no-session")
-      })
-
-      it("saves state after subsequent pane spawns", async () => {
-        //#given
-        const sessionID = "test-session-multi"
-        const adapter = new ZellijAdapter(mockConfig)
-        adapter.setSessionID(sessionID)
-
-        //#when
-        await adapter.spawnPane("echo first", { label: "omo-first" })
-        await adapter.spawnPane("echo second", { label: "omo-second" })
-
-        //#then - state should be persisted after each spawn
-        expect(adapter).toBeDefined()
-
-        //#cleanup
-        clearZellijState(sessionID)
-      })
+      //#then
+      expect(Array.isArray(panes)).toBe(true)
     })
 
-    describe("validateAnchorPane", () => {
-      it("returns true when anchorPaneId is set", async () => {
-        //#given
-        const adapter = new ZellijAdapter(mockConfig)
-        const sessionID = "test-validate-valid"
-        adapter.setSessionID(sessionID)
-        
-        // Spawn first pane to set anchorPaneId
-        await adapter.spawnPane("echo test", { label: "omo-anchor" })
+    it("returns array of panes", async () => {
+      //#given
+      const adapter = makeAdapter()
 
-        //#when
-        const isValid = await (adapter as any).validateAnchorPane()
+      //#when
+      const panes = await adapter.getPanes()
 
-        //#then
-        expect(isValid).toBe(true)
+      //#then
+      expect(Array.isArray(panes)).toBe(true)
+    })
+  })
 
-        //#cleanup
-        clearZellijState(sessionID)
-      })
+  describe("setSessionID", () => {
+    it("stores sessionID for later use", async () => {
+      //#given
+      const adapter = makeAdapter()
+      const sessionID = "test-session-123"
 
-      it("returns false when anchorPaneId is null", async () => {
-        //#given
-        const adapter = new ZellijAdapter(mockConfig)
+      //#when
+      await adapter.setSessionID(sessionID)
+      const handle = await adapter.spawnPane("echo hello", { label: "omo-test-label" })
 
-        //#when
-        const isValid = await (adapter as any).validateAnchorPane()
-
-        //#then
-        expect(isValid).toBe(false)
-      })
+      //#then - sessionID stored: spawnPane succeeds and returns expected handle
+      expect(handle).toBeDefined()
+      expect(handle.label).toBe("omo-test-label")
     })
 
-    describe("setSessionID with anchor pane validation", () => {
-      it("clears state when anchor pane is invalid", async () => {
-        //#given
-        const sessionID = "test-validate-invalid"
-        const persistedState = {
-          sessionID,
-          anchorPaneId: "stale-pane-999",
-          hasCreatedFirstPane: true,
-          updatedAt: Date.now(),
-        }
-        saveZellijState(persistedState)
+    it("loads persisted state when sessionID is set", async () => {
+      //#given
+      const sessionID = "test-session-load"
+      const persistedState = {
+        sessionID,
+        anchorPaneId: "pane-123",
+        hasCreatedFirstPane: true,
+        updatedAt: Date.now(),
+      }
+      saveZellijState(persistedState)
 
-        const adapter = new ZellijAdapter(mockConfig)
+      const adapter = makeAdapter()
 
-        //#when
-        adapter.setSessionID(sessionID)
+      //#when
+      adapter.setSessionID(sessionID)
 
-        //#then - state should be cleared because anchor pane is invalid
-        // (validateAnchorPane returns false for non-null but stale pane)
-        expect(adapter).toBeDefined()
+      //#then - state should be loaded (verified by checking internal state via spawnPane behavior)
+      expect(adapter).toBeDefined()
 
-        //#cleanup
-        clearZellijState(sessionID)
-      })
+      //#cleanup
+      clearZellijState(sessionID)
+    })
 
-      it("keeps state when anchor pane is valid", async () => {
-        //#given
-        const sessionID = "test-validate-keep"
-        const adapter = new ZellijAdapter(mockConfig)
-        adapter.setSessionID(sessionID)
-        
-        // Spawn first pane to set valid anchorPaneId
-        await adapter.spawnPane("echo test", { label: "omo-valid-anchor" })
+    it("handles missing persisted state gracefully", async () => {
+      //#given
+      const adapter = makeAdapter()
+      const nonExistentSessionID = "nonexistent-session-xyz"
 
-        // Create new adapter and load state
-        const adapter2 = new ZellijAdapter(mockConfig)
+      //#when
+      const setPromise = Promise.resolve(adapter.setSessionID(nonExistentSessionID))
 
-        //#when
-        adapter2.setSessionID(sessionID)
+      //#then - should not throw
+      await expect(setPromise).resolves.toBeUndefined()
+    })
+  })
 
-        //#then - state should be kept because anchor pane is valid
-        expect(adapter2).toBeDefined()
+  describe("spawnPane with session state persistence", () => {
+    it("saves state after setting anchor pane when sessionID is set", async () => {
+      //#given
+      const sessionID = "test-session-spawn"
+      const adapter = makeAdapter()
+      adapter.setSessionID(sessionID)
 
-       //#cleanup
-       clearZellijState(sessionID)
-     })
+      //#when
+      await adapter.spawnPane("echo test", { label: "omo-anchor-test" })
 
-     it("handles concurrent spawnPane calls without race conditions", async () => {
-       //#given adapter with sessionID set
-       const sessionID = "concurrent-test"
-       const adapter = new ZellijAdapter(mockConfig)
-       adapter.setSessionID(sessionID)
+      //#then - state should be persisted (anchorPaneId and hasCreatedFirstPane)
+      expect(adapter).toBeDefined()
 
-       //#when spawning multiple panes concurrently
-       const promises = [
-         adapter.spawnPane("echo cmd1", { label: "omo-concurrent-1" }),
-         adapter.spawnPane("echo cmd2", { label: "omo-concurrent-2" }),
-         adapter.spawnPane("echo cmd3", { label: "omo-concurrent-3" }),
-       ]
+      //#cleanup
+      clearZellijState(sessionID)
+    })
 
-       //#then all complete successfully without state corruption
-       const results = await Promise.all(promises)
-       expect(results).toHaveLength(3)
-       expect(results[0].label).toBe("omo-concurrent-1")
-       expect(results[1].label).toBe("omo-concurrent-2")
-       expect(results[2].label).toBe("omo-concurrent-3")
+    it("does not save state when sessionID is not set (backward compatibility)", async () => {
+      //#given
+      const adapter = makeAdapter()
 
-       //#cleanup
-       clearZellijState(sessionID)
-     })
+      //#when
+      const handle = await adapter.spawnPane("echo test", { label: "omo-no-session" })
 
-     it("handles concurrent setSessionID and spawnPane without race conditions", async () => {
-       //#given multiple adapters with same sessionID
-       const sessionID = "concurrent-session-test"
-       const adapter1 = new ZellijAdapter(mockConfig)
-       const adapter2 = new ZellijAdapter(mockConfig)
+      //#then - should work without sessionID
+      expect(handle.label).toBe("omo-no-session")
+    })
 
-       //#when setting session ID and spawning concurrently
-       adapter1.setSessionID(sessionID)
-       adapter2.setSessionID(sessionID)
+    it("saves state after subsequent pane spawns", async () => {
+      //#given
+      const sessionID = "test-session-multi"
+      const adapter = makeAdapter()
+      adapter.setSessionID(sessionID)
 
-       const promises = [
-         adapter1.spawnPane("echo first", { label: "omo-adapter1-pane" }),
-         adapter2.spawnPane("echo second", { label: "omo-adapter2-pane" }),
-       ]
+      //#when
+      await adapter.spawnPane("echo first", { label: "omo-first" })
+      await adapter.spawnPane("echo second", { label: "omo-second" })
 
-       //#then both complete successfully
-       const results = await Promise.all(promises)
-       expect(results).toHaveLength(2)
+      //#then - state should be persisted after each spawn
+      expect(adapter).toBeDefined()
 
-       //#cleanup
-       clearZellijState(sessionID)
-     })
-   })
+      //#cleanup
+      clearZellijState(sessionID)
+    })
+  })
 
-   describe("edge cases: externally closed pane", () => {
-     it("handles anchor pane closed externally while session active", async () => {
-       //#given adapter with valid anchor pane
-       const sessionID = "external-close-test"
-       const adapter = new ZellijAdapter(mockConfig)
-       adapter.setSessionID(sessionID)
-       await adapter.spawnPane("echo anchor", { label: "omo-external-anchor" })
+  describe("validateAnchorPane", () => {
+    it("returns true when anchorPaneId is set", async () => {
+      //#given
+      const adapter = makeAdapter()
+      const sessionID = "test-validate-valid"
+      await adapter.setSessionID(sessionID)
 
-       //#when simulating external pane closure (stale pane ID)
-       // Create new adapter and load state with stale pane
-       const adapter2 = new ZellijAdapter(mockConfig)
-       adapter2.setSessionID(sessionID)
+      //#when - spawn first pane to set anchorPaneId
+      await adapter.spawnPane("echo test", { label: "omo-anchor" })
+      const isValid = await (adapter as any).validateAnchorPane()
 
-       //#then validation should detect stale state and clear it
-       // Next spawn should work without using stale anchor
-       const handle = await adapter2.spawnPane("echo recovery", { label: "omo-recovery" })
-       expect(handle.label).toBe("omo-recovery")
+      //#then
+      expect(isValid).toBe(true)
 
-       //#cleanup
-       clearZellijState(sessionID)
-     })
+      //#cleanup
+      clearZellijState(sessionID)
+    })
 
-     it("recovers gracefully when anchor pane becomes invalid", async () => {
-       //#given persisted state with invalid anchor pane
-       const sessionID = "invalid-anchor-test"
-       const invalidState = {
-         sessionID,
-         anchorPaneId: "pane-that-no-longer-exists-12345",
-         hasCreatedFirstPane: true,
-         updatedAt: Date.now(),
-       }
-       saveZellijState(invalidState)
+    it("returns false when anchorPaneId is null", async () => {
+      //#given
+      const adapter = makeAdapter()
 
-       //#when loading state and spawning new pane
-       const adapter = new ZellijAdapter(mockConfig)
-       adapter.setSessionID(sessionID)
-       const handle = await adapter.spawnPane("echo new", { label: "omo-new-after-invalid" })
+      //#when
+      const isValid = await (adapter as any).validateAnchorPane()
 
-       //#then should spawn successfully with new anchor
-       expect(handle.label).toBe("omo-new-after-invalid")
+      //#then
+      expect(isValid).toBe(false)
+    })
+  })
 
-       //#cleanup
-       clearZellijState(sessionID)
-     })
-   })
+  describe("setSessionID with anchor pane validation", () => {
+    it("clears state when anchor pane is invalid", async () => {
+      //#given
+      const sessionID = "test-validate-invalid"
+      const persistedState = {
+        sessionID,
+        anchorPaneId: "stale-pane-999",
+        hasCreatedFirstPane: true,
+        updatedAt: Date.now(),
+      }
+      saveZellijState(persistedState)
+
+      const adapter = makeAdapter()
+
+      //#when
+      adapter.setSessionID(sessionID)
+
+      //#then - state should be cleared because anchor pane is invalid
+      expect(adapter).toBeDefined()
+
+      //#cleanup
+      clearZellijState(sessionID)
+    })
+
+    it("keeps state when anchor pane is valid", async () => {
+      //#given
+      const sessionID = "test-validate-keep"
+      const adapter = makeAdapter()
+      adapter.setSessionID(sessionID)
+
+      //#when - spawn first pane to set valid anchorPaneId
+      await adapter.spawnPane("echo test", { label: "omo-valid-anchor" })
+
+      //#then - create new adapter and load state
+      const adapter2 = makeAdapter()
+      adapter2.setSessionID(sessionID)
+      expect(adapter2).toBeDefined()
+
+      //#cleanup
+      clearZellijState(sessionID)
+    })
+
+    it("handles concurrent spawnPane calls without race conditions", async () => {
+      //#given adapter with sessionID set
+      const sessionID = "concurrent-test"
+      const adapter = makeAdapter()
+      adapter.setSessionID(sessionID)
+
+      //#when spawning multiple panes concurrently
+      const promises = [
+        adapter.spawnPane("echo cmd1", { label: "omo-concurrent-1" }),
+        adapter.spawnPane("echo cmd2", { label: "omo-concurrent-2" }),
+        adapter.spawnPane("echo cmd3", { label: "omo-concurrent-3" }),
+      ]
+
+      //#then all complete successfully without state corruption
+      const results = await Promise.all(promises)
+      expect(results).toHaveLength(3)
+      expect(results[0].label).toBe("omo-concurrent-1")
+      expect(results[1].label).toBe("omo-concurrent-2")
+      expect(results[2].label).toBe("omo-concurrent-3")
+
+      //#cleanup
+      clearZellijState(sessionID)
+    })
+
+    it("handles concurrent setSessionID and spawnPane without race conditions", async () => {
+      //#given multiple adapters with same sessionID
+      const sessionID = "concurrent-session-test"
+      const adapter1 = makeAdapter()
+      const adapter2 = makeAdapter()
+
+      //#when setting session ID and spawning concurrently
+      adapter1.setSessionID(sessionID)
+      adapter2.setSessionID(sessionID)
+
+      const promises = [
+        adapter1.spawnPane("echo first", { label: "omo-adapter1-pane" }),
+        adapter2.spawnPane("echo second", { label: "omo-adapter2-pane" }),
+      ]
+
+      //#then both complete successfully
+      const results = await Promise.all(promises)
+      expect(results).toHaveLength(2)
+
+      //#cleanup
+      clearZellijState(sessionID)
+    })
+  })
+
+  describe("edge cases: externally closed pane", () => {
+    it("handles anchor pane closed externally while session active", async () => {
+      //#given adapter with valid anchor pane
+      const sessionID = "external-close-test"
+      const adapter = makeAdapter()
+      adapter.setSessionID(sessionID)
+      await adapter.spawnPane("echo anchor", { label: "omo-external-anchor" })
+
+      //#when simulating external pane closure (stale pane ID)
+      const adapter2 = makeAdapter()
+      adapter2.setSessionID(sessionID)
+
+      //#then validation should detect stale state and clear it
+      const handle = await adapter2.spawnPane("echo recovery", { label: "omo-recovery" })
+      expect(handle.label).toBe("omo-recovery")
+
+      //#cleanup
+      clearZellijState(sessionID)
+    })
+
+    it("recovers gracefully when anchor pane becomes invalid", async () => {
+      //#given persisted state with invalid anchor pane
+      const sessionID = "invalid-anchor-test"
+      const invalidState = {
+        sessionID,
+        anchorPaneId: "pane-that-no-longer-exists-12345",
+        hasCreatedFirstPane: true,
+        updatedAt: Date.now(),
+      }
+      saveZellijState(invalidState)
+
+      //#when loading state and spawning new pane
+      const adapter = makeAdapter()
+      adapter.setSessionID(sessionID)
+      const handle = await adapter.spawnPane("echo new", { label: "omo-new-after-invalid" })
+
+      //#then should spawn successfully with new anchor
+      expect(handle.label).toBe("omo-new-after-invalid")
+
+      //#cleanup
+      clearZellijState(sessionID)
+    })
+  })
 })

@@ -1,46 +1,33 @@
-import { describe, it, expect, beforeEach, afterEach } from "bun:test"
-import { existsSync, rmSync } from "node:fs"
+import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test"
+import { existsSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
-import {
-  loadZellijState,
-  saveZellijState,
-  clearZellijState,
-} from "./zellij-storage"
-import type { ZellijState } from "./zellij-storage"
-import { getOpenCodeStorageDir } from "../data-path"
 
-//#given a temporary storage directory for testing
-let testStorageDir: string
+let testStorageDir = join(tmpdir(), `zellij-storage-test-${Date.now()}`)
+
+mock.module("../data-path", () => ({
+  getOpenCodeStorageDir: () => testStorageDir,
+}))
+
+const { loadZellijState, saveZellijState, clearZellijState } = await import("./zellij-storage")
+import type { ZellijState } from "./zellij-storage"
 
 beforeEach(() => {
   testStorageDir = join(tmpdir(), `zellij-storage-test-${Date.now()}`)
-  const zellijStorageDir = join(getOpenCodeStorageDir(), 'zellij-adapter')
-  if (existsSync(zellijStorageDir)) {
-    rmSync(zellijStorageDir, { recursive: true, force: true })
-  }
 })
 
 afterEach(() => {
   if (existsSync(testStorageDir)) {
     rmSync(testStorageDir, { recursive: true, force: true })
   }
-  const zellijStorageDir = join(getOpenCodeStorageDir(), 'zellij-adapter')
-  if (existsSync(zellijStorageDir)) {
-    rmSync(zellijStorageDir, { recursive: true, force: true })
-  }
 })
 
 describe("zellij-storage", () => {
-  //#when loading state for a non-existent session
-  //#then return null without throwing
   it("loadZellijState returns null for non-existent session", () => {
     const result = loadZellijState("non-existent-session")
     expect(result).toBeNull()
   })
 
-  //#when saving a valid ZellijState
-  //#then the state is persisted to disk
   it("saveZellijState persists state to disk", () => {
     const state: ZellijState = {
       sessionID: "test-session-1",
@@ -59,8 +46,6 @@ describe("zellij-storage", () => {
     expect(loaded?.updatedAt).toBe(state.updatedAt)
   })
 
-  //#when saving state with null anchorPaneId
-  //#then the state is correctly persisted with null value
   it("saveZellijState handles null anchorPaneId", () => {
     const state: ZellijState = {
       sessionID: "test-session-2",
@@ -76,8 +61,6 @@ describe("zellij-storage", () => {
     expect(loaded?.hasCreatedFirstPane).toBe(false)
   })
 
-  //#when clearing state for an existing session
-  //#then the state file is removed
   it("clearZellijState removes state file", () => {
     const state: ZellijState = {
       sessionID: "test-session-3",
@@ -93,16 +76,12 @@ describe("zellij-storage", () => {
     expect(loadZellijState("test-session-3")).toBeNull()
   })
 
-  //#when clearing state for a non-existent session
-  //#then no error is thrown
   it("clearZellijState handles non-existent session gracefully", () => {
     expect(() => {
       clearZellijState("non-existent-session")
     }).not.toThrow()
   })
 
-  //#when loading corrupted JSON from storage
-  //#then return null without throwing
   it("loadZellijState returns null for corrupted JSON", () => {
     const state: ZellijState = {
       sessionID: "test-session-4",
@@ -113,23 +92,15 @@ describe("zellij-storage", () => {
 
     saveZellijState(state)
 
-    // Corrupt the file by writing invalid JSON
-    const fs = require("node:fs")
-    const storagePath = join(
-      require("node:os").homedir(),
-      ".local/share/opencode/storage/zellij-adapter",
-      "test-session-4.json",
-    )
+    const storagePath = join(testStorageDir, "zellij-adapter", "test-session-4.json")
     if (existsSync(storagePath)) {
-      fs.writeFileSync(storagePath, "{ invalid json }")
+      writeFileSync(storagePath, "{ invalid json }")
     }
 
     const result = loadZellijState("test-session-4")
     expect(result).toBeNull()
   })
 
-  //#when saving multiple sessions
-  //#then each session is stored independently
   it("saveZellijState stores multiple sessions independently", () => {
     const state1: ZellijState = {
       sessionID: "session-a",
@@ -157,86 +128,66 @@ describe("zellij-storage", () => {
     expect(loaded2?.updatedAt).toBe(2000)
   })
 
-   //#when updating an existing session state
-   //#then the new state overwrites the old one
-   it("saveZellijState overwrites existing state", () => {
-     const state1: ZellijState = {
-       sessionID: "update-test",
-       anchorPaneId: "old-pane",
-       hasCreatedFirstPane: false,
-       updatedAt: 1000,
-     }
+  it("saveZellijState overwrites existing state", () => {
+    const state1: ZellijState = {
+      sessionID: "update-test",
+      anchorPaneId: "old-pane",
+      hasCreatedFirstPane: false,
+      updatedAt: 1000,
+    }
 
-     saveZellijState(state1)
+    saveZellijState(state1)
 
-     const state2: ZellijState = {
-       sessionID: "update-test",
-       anchorPaneId: "new-pane",
-       hasCreatedFirstPane: true,
-       updatedAt: 2000,
-     }
+    const state2: ZellijState = {
+      sessionID: "update-test",
+      anchorPaneId: "new-pane",
+      hasCreatedFirstPane: true,
+      updatedAt: 2000,
+    }
 
-     saveZellijState(state2)
+    saveZellijState(state2)
 
-     const loaded = loadZellijState("update-test")
-     expect(loaded?.anchorPaneId).toBe("new-pane")
-     expect(loaded?.hasCreatedFirstPane).toBe(true)
-     expect(loaded?.updatedAt).toBe(2000)
-   })
+    const loaded = loadZellijState("update-test")
+    expect(loaded?.anchorPaneId).toBe("new-pane")
+    expect(loaded?.hasCreatedFirstPane).toBe(true)
+    expect(loaded?.updatedAt).toBe(2000)
+  })
 
-   //#given a file with severely corrupted JSON (invalid syntax)
-   //#when loading state
-   //#then return null without throwing
-   it("loadZellijState handles severely corrupted JSON gracefully", () => {
-     const state: ZellijState = {
-       sessionID: "corrupt-severe-test",
-       anchorPaneId: "pane-xyz",
-       hasCreatedFirstPane: true,
-       updatedAt: Date.now(),
-     }
+  it("loadZellijState handles severely corrupted JSON gracefully", () => {
+    const state: ZellijState = {
+      sessionID: "corrupt-severe-test",
+      anchorPaneId: "pane-xyz",
+      hasCreatedFirstPane: true,
+      updatedAt: Date.now(),
+    }
 
-     saveZellijState(state)
+    saveZellijState(state)
 
-     // Corrupt the file with completely invalid JSON
-     const fs = require("node:fs")
-     const storagePath = join(
-       require("node:os").homedir(),
-       ".local/share/opencode/storage/zellij-adapter",
-       "corrupt-severe-test.json",
-     )
-     if (existsSync(storagePath)) {
-       fs.writeFileSync(storagePath, "{ invalid json ]]] garbage <<<>>>")
-     }
+    const storagePath = join(testStorageDir, "zellij-adapter", "corrupt-severe-test.json")
+    if (existsSync(storagePath)) {
+      writeFileSync(storagePath, "{ invalid json ]]] garbage <<<>>>")
+    }
 
-     const result = loadZellijState("corrupt-severe-test")
-     expect(result).toBeNull()
-   })
+    const result = loadZellijState("corrupt-severe-test")
+    expect(result).toBeNull()
+  })
 
-   //#given a file with empty content
-   //#when loading state
-   //#then return null without throwing
-   it("loadZellijState handles empty file gracefully", () => {
-     const state: ZellijState = {
-       sessionID: "empty-file-test",
-       anchorPaneId: "pane-empty",
-       hasCreatedFirstPane: true,
-       updatedAt: Date.now(),
-     }
+  it("loadZellijState handles empty file gracefully", () => {
+    const state: ZellijState = {
+      sessionID: "empty-file-test",
+      anchorPaneId: "pane-empty",
+      hasCreatedFirstPane: true,
+      updatedAt: Date.now(),
+    }
 
-     saveZellijState(state)
+    saveZellijState(state)
 
-     // Empty the file
-     const fs = require("node:fs")
-     const storagePath = join(
-       require("node:os").homedir(),
-       ".local/share/opencode/storage/zellij-adapter",
-       "empty-file-test.json",
-     )
-     if (existsSync(storagePath)) {
-       fs.writeFileSync(storagePath, "")
-     }
+    const storagePath = join(testStorageDir, "zellij-adapter", "empty-file-test.json")
+    if (existsSync(storagePath)) {
+      writeFileSync(storagePath, "")
+    }
 
-     const result = loadZellijState("empty-file-test")
-     expect(result).toBeNull()
-   })
+    const result = loadZellijState("empty-file-test")
+    expect(result).toBeNull()
+  })
 })

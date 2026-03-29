@@ -1,12 +1,11 @@
 import { spawn } from "bun"
 import type { Multiplexer, PaneHandle, SpawnOptions, MultiplexerCapabilities } from "./types"
 import {
-  spawnTmuxPane,
   closeTmuxPane,
   getCurrentPaneId,
   isInsideTmux,
 } from "../tmux/tmux-utils"
-import { getTmuxPath } from "../../tools/interactive-bash/utils"
+import { getTmuxPath } from "../../tools/interactive-bash/tmux-path-resolver"
 import { log } from "../logger"
 
 export interface TmuxAdapterConfig {
@@ -62,33 +61,43 @@ export class TmuxAdapter implements Multiplexer {
     const splitDirection = direction === "horizontal" ? "-h" : "-v"
     const targetPaneId = splitFrom?.nativeId
 
-    const result = await spawnTmuxPane(
-      "default-session",
-      label,
-      this.config as any,
-      "http://localhost:3000",
-      targetPaneId,
-      splitDirection as "-h" | "-v"
-    )
-
-    if (result.success && result.paneId) {
-      this.labelToPaneId.set(label, result.paneId)
-
-      const tmux = await getTmuxPath()
-      if (tmux) {
-        spawn([tmux, "select-pane", "-t", result.paneId, "-T", label], {
-          stdout: "ignore",
-          stderr: "ignore",
-        })
-      }
-
-      return {
-        label,
-        nativeId: result.paneId,
-      }
+    const tmux = await getTmuxPath()
+    if (!tmux) {
+      log("[TmuxAdapter.spawnPane] tmux not found")
+      return { label }
     }
 
-    return { label }
+    const args = [
+      "split-window",
+      splitDirection,
+      "-d",
+      "-P",
+      "-F",
+      "#{pane_id}",
+      ...(targetPaneId ? ["-t", targetPaneId] : []),
+      cmd,
+    ]
+
+    const proc = spawn([tmux, ...args], { stdout: "pipe", stderr: "pipe" })
+    const exitCode = await proc.exited
+    const stdout = await new Response(proc.stdout).text()
+    const paneId = stdout.trim()
+
+    if (exitCode !== 0 || !paneId) {
+      return { label }
+    }
+
+    this.labelToPaneId.set(label, paneId)
+
+    spawn([tmux, "select-pane", "-t", paneId, "-T", label], {
+      stdout: "ignore",
+      stderr: "ignore",
+    })
+
+    return {
+      label,
+      nativeId: paneId,
+    }
   }
 
   async closePane(handle: PaneHandle): Promise<void> {

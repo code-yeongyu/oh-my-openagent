@@ -147,21 +147,21 @@ export class ZellijAdapter implements Multiplexer {
     // Clean up temp file
     this.spawn(["rm", idFile], { stdout: "pipe" })
 
-    // Track anchor or stack with anchor
     if (isFirstPane) {
-      this.anchorPaneId = paneId
-      this.anchorReadyResolver?.(paneId)
-      this.anchorReadyResolver = null
-      log("[ZellijAdapter.spawnPane] set anchor pane", { paneId })
-      
-      // Save state after setting anchor pane
-      if (this.sessionID) {
-        this.storage.saveZellijState({
-          sessionID: this.sessionID,
-          anchorPaneId: this.anchorPaneId,
-          hasCreatedFirstPane: this.hasCreatedFirstPane,
-          updatedAt: Date.now(),
-        })
+      if (paneId) {
+        this.anchorPaneId = paneId
+        this.anchorReadyResolver?.(paneId)
+        this.anchorReadyResolver = null
+        log("[ZellijAdapter.spawnPane] set anchor pane", { paneId })
+
+        if (this.sessionID) {
+          this.storage.saveZellijState({
+            sessionID: this.sessionID,
+            anchorPaneId: this.anchorPaneId,
+            hasCreatedFirstPane: this.hasCreatedFirstPane,
+            updatedAt: Date.now(),
+          })
+        }
       }
     } else if (this.anchorReadyPromise) {
       const anchorId = await this.anchorReadyPromise
@@ -175,7 +175,6 @@ export class ZellijAdapter implements Multiplexer {
 
     this.labelToSpawned.set(label, true)
 
-    // Save state after any changes to hasCreatedFirstPane
     if (this.sessionID && isFirstPane) {
       this.storage.saveZellijState({
         sessionID: this.sessionID,

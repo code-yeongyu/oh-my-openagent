@@ -1,13 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test"
 import type { Multiplexer, PaneHandle, SpawnOptions } from "./types"
 
-const mockSpawn = mock(() =>
-  Promise.resolve({
-    exitCode: 0,
-    stdout: Buffer.from(""),
-    stderr: Buffer.from(""),
-  })
-)
+const mockSpawn = mock(() => ({
+  exited: Promise.resolve(0),
+  stdout: new ReadableStream({ start(c) { c.close() } }),
+  stderr: new ReadableStream({ start(c) { c.close() } }),
+}))
 
 const mockConfig = {
   enabled: true,
@@ -17,11 +15,12 @@ const mockConfig = {
 type AdapterConfig = typeof mockConfig
 
 let TmuxAdapter: new (config: AdapterConfig) => Multiplexer
-let ZellijAdapter: new (config: AdapterConfig) => Multiplexer
+let ZellijAdapter: new (config: AdapterConfig, storage?: unknown, spawnFn?: typeof mockSpawn) => Multiplexer
 
 try {
   TmuxAdapter = require("./tmux-adapter").TmuxAdapter
-} catch {
+} catch (e) {
+  console.error(e)
   TmuxAdapter = class NotImplementedTmuxAdapter implements Multiplexer {
     type = "tmux" as const
     capabilities = { manualLayout: true, persistentLabels: false }
@@ -48,7 +47,8 @@ try {
 
 try {
   ZellijAdapter = require("./zellij-adapter").ZellijAdapter
-} catch {
+} catch (e) {
+  console.error(e)
   ZellijAdapter = class NotImplementedZellijAdapter implements Multiplexer {
     type = "zellij" as const
     capabilities = { manualLayout: false, persistentLabels: true }
@@ -75,7 +75,7 @@ try {
 
 describe.each([
   ["TmuxAdapter", () => new TmuxAdapter(mockConfig)],
-  ["ZellijAdapter", () => new ZellijAdapter(mockConfig)],
+  ["ZellijAdapter", () => new ZellijAdapter(mockConfig, undefined, mockSpawn)],
 ])("%s contract", (_name, createAdapter) => {
   let originalSpawn: typeof Bun.spawn
 

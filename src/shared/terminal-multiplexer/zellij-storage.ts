@@ -15,13 +15,12 @@ export interface ZellijStorage {
   clearZellijState(sessionID: string): void
 }
 
-const ZELLIJ_ADAPTER_STORAGE = join(
-  getOpenCodeStorageDir(),
-  "zellij-adapter",
-)
+function getZellijStorageDir(): string {
+  return join(getOpenCodeStorageDir(), "zellij-adapter")
+}
 
 function getStoragePath(sessionID: string): string {
-  return join(ZELLIJ_ADAPTER_STORAGE, `${sessionID}.json`)
+  return join(getZellijStorageDir(), `${sessionID}.json`)
 }
 
 export function loadZellijState(sessionID: string): ZellijState | null {
@@ -38,8 +37,9 @@ export function loadZellijState(sessionID: string): ZellijState | null {
 }
 
 export function saveZellijState(state: ZellijState): void {
-  if (!existsSync(ZELLIJ_ADAPTER_STORAGE)) {
-    mkdirSync(ZELLIJ_ADAPTER_STORAGE, { recursive: true })
+  const storageDir = getZellijStorageDir()
+  if (!existsSync(storageDir)) {
+    mkdirSync(storageDir, { recursive: true })
   }
 
   const filePath = getStoragePath(state.sessionID)
