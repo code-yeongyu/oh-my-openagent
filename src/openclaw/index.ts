@@ -55,7 +55,10 @@ export async function wakeOpenClaw(
       ...(replyThread !== undefined && { replyThread }),
     }
 
-    const tmuxSession = enrichedContext.tmuxSession ?? getCurrentTmuxSession() ?? undefined
+    const tmuxSession =
+      enrichedContext.tmuxSession
+      ?? (await getCurrentTmuxSession())
+      ?? undefined
 
     let tmuxTail = enrichedContext.tmuxTail
     if (!tmuxTail && (event === "stop" || event === "session-end") && process.env.TMUX) {

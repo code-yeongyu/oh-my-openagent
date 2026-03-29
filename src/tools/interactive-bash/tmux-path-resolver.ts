@@ -240,7 +240,16 @@ async function runProbeCommand(
       clearTimeout(timeoutHandle)
     }
 
-    const exitCode = timedOut ? null : await proc.exited.catch(() => null)
+    if (timedOut) {
+      return {
+        exitCode: null,
+        stdout: "",
+        stderr: "",
+        timedOut: true,
+      }
+    }
+
+    const exitCode = await proc.exited.catch(() => null)
     const stdout = await new Response(proc.stdout).text().catch(() => "")
     const stderr = await new Response(proc.stderr).text().catch(() => "")
 
@@ -266,8 +275,12 @@ function findCommandPath(
 ): string | null {
   try {
     const probeEnvironment = toProbeEnvironment(environment)
-    const whichOptions =
-      probeEnvironment.PATH !== undefined
+    const hasExplicitPathOverride =
+      environment !== undefined
+      && Object.prototype.hasOwnProperty.call(environment, "PATH")
+    const whichOptions = hasExplicitPathOverride
+      ? { PATH: probeEnvironment.PATH ?? "" }
+      : probeEnvironment.PATH !== undefined
         ? { PATH: probeEnvironment.PATH }
         : undefined
 

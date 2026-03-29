@@ -578,7 +578,7 @@ The runtime evaluates tmux and cmux availability to determine operating mode:
 | ------------------ | ---------------------------------------------- | ------------ | ------------- |
 | `cmux-shim`        | Live cmux + live tmux pane control             | tmux         | cmux (if capable), else desktop |
 | `tmux-only`        | Live tmux pane control, no live cmux           | tmux         | desktop       |
-| `cmux-notify-only` | Live cmux (no pane control), tmux unavailable  | none         | cmux (if capable), else desktop |
+| `cmux-notify-only` | Live cmux, tmux pane control unavailable       | none         | cmux (if capable), else desktop |
 | `none`             | Neither tmux nor cmux available                | none         | desktop       |
 
 #### Backend Precedence Semantics

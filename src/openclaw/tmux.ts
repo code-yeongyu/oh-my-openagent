@@ -6,7 +6,7 @@ import {
   isInsideTmux,
 } from "../shared/tmux"
 
-export function getCurrentTmuxSession(): string | null {
+export async function getCurrentTmuxSession(): Promise<string | null> {
   const resolvedMultiplexer = getResolvedMultiplexerRuntime()
   if (resolvedMultiplexer && resolvedMultiplexer.paneBackend !== "tmux") {
     return null
@@ -19,9 +19,7 @@ export function getCurrentTmuxSession(): string | null {
   const paneId = getCurrentPaneId(resolvedMultiplexer ?? undefined)
   if (!paneId) return null
 
-  const match = paneId.match(/(\d+)$/)
-  return match ? `session-${match[1]}` : null
-  // Reference tmux.js gets session name via `tmux display-message -p '#S'`
+  return getTmuxSessionName()
 }
 
 export async function getTmuxSessionName(): Promise<string | null> {
