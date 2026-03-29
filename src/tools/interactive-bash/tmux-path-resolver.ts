@@ -260,22 +260,37 @@ async function runProbeCommand(
   }
 }
 
-function findCommandPath(commandName: string): string | null {
+function findCommandPath(
+  commandName: string,
+  environment?: Record<string, string | undefined>,
+): string | null {
   try {
-    const discovered = Bun.which(commandName)
+    const probeEnvironment = toProbeEnvironment(environment)
+    const whichOptions =
+      probeEnvironment.PATH !== undefined
+        ? { PATH: probeEnvironment.PATH }
+        : undefined
+
+    const discovered = Bun.which(commandName, whichOptions)
     return discovered ?? null
   } catch {
     return null
   }
 }
 
-async function resolveExecutablePath(commandName: string, verifyArgs: string[]): Promise<string | null> {
-  const discovered = findCommandPath(commandName)
+async function resolveExecutablePath(
+  commandName: string,
+  verifyArgs: string[],
+  environment?: Record<string, string | undefined>,
+): Promise<string | null> {
+  const discovered = findCommandPath(commandName, environment)
   if (!discovered) {
     return null
   }
 
-  const verification = await runProbeCommand([discovered, ...verifyArgs])
+  const verification = await runProbeCommand([discovered, ...verifyArgs], {
+    environment,
+  })
   if (verification.timedOut || verification.exitCode !== 0) {
     return null
   }
@@ -283,20 +298,20 @@ async function resolveExecutablePath(commandName: string, verifyArgs: string[]):
   return discovered
 }
 
-async function findTmuxPath(): Promise<string | null> {
-  if (isTruthyFlag(process.env[TMUX_DISABLE_ENV_KEY])) {
+async function findTmuxPath(environment: Record<string, string | undefined> = process.env): Promise<string | null> {
+  if (isTruthyFlag(environment[TMUX_DISABLE_ENV_KEY])) {
     return null
   }
 
-  return resolveExecutablePath("tmux", ["-V"])
+  return resolveExecutablePath("tmux", ["-V"], environment)
 }
 
-async function findCmuxPath(): Promise<string | null> {
-  if (isTruthyFlag(process.env[CMUX_DISABLE_ENV_KEY])) {
+async function findCmuxPath(environment: Record<string, string | undefined> = process.env): Promise<string | null> {
+  if (isTruthyFlag(environment[CMUX_DISABLE_ENV_KEY])) {
     return null
   }
 
-  return resolveExecutablePath("cmux", ["--help"])
+  return resolveExecutablePath("cmux", ["--help"], environment)
 }
 
 export async function getTmuxPath(): Promise<string | null> {
@@ -356,7 +371,9 @@ export async function probeTmuxRuntime(options: ProbeOptions = {}): Promise<Tmux
     }
   }
 
-  const path = await getTmuxPath()
+  const path = options.environment
+    ? await findTmuxPath(environment)
+    : await getTmuxPath()
   const paneId = normalizeEnvValue(environment.TMUX_PANE)
   const hasTmuxEnvironment = Boolean(normalizeEnvValue(environment.TMUX))
 
@@ -413,7 +430,9 @@ export async function probeCmuxReachability(options: ProbeOptions = {}): Promise
     }
   }
 
-  const path = await getCmuxPath()
+  const path = options.environment
+    ? await findCmuxPath(environment)
+    : await getCmuxPath()
   if (!path) {
     return {
       path: null,
@@ -521,7 +540,8 @@ export async function probeCmuxNotificationCapability(
     }
   }
 
-  const cmuxBinary = options.cmuxPath ?? await getCmuxPath()
+  const cmuxBinary = options.cmuxPath
+    ?? (options.environment ? await findCmuxPath(environment) : await getCmuxPath())
   if (!cmuxBinary) {
     return {
       capable: false,

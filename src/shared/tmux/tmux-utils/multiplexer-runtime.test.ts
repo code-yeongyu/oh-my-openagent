@@ -1,10 +1,15 @@
-import { describe, expect, test } from "bun:test"
+import { describe, expect, spyOn, test } from "bun:test"
 import {
   createDisabledMultiplexerRuntime,
   resolveMultiplexerFromProbes,
+  resolveMultiplexerRuntime,
   type ResolvedMultiplexer,
 } from "./multiplexer-runtime"
-import type { CmuxRuntimeProbe, TmuxRuntimeProbe } from "../../../tools/interactive-bash/tmux-path-resolver"
+import {
+  resetMultiplexerPathCacheForTesting,
+  type CmuxRuntimeProbe,
+  type TmuxRuntimeProbe,
+} from "../../../tools/interactive-bash/tmux-path-resolver"
 
 function createTmuxProbe(overrides: Partial<TmuxRuntimeProbe> = {}): TmuxRuntimeProbe {
   return {
@@ -233,5 +238,42 @@ describe("multiplexer runtime resolution", () => {
     expect(runtime.paneBackend).toBe("none")
     expect(runtime.tmux.reachable).toBe(false)
     expect(runtime.tmux.insideEnvironment).toBe(true)
+  })
+
+  test("skips tmux and cmux path probing when both backends are disabled", async () => {
+    resetMultiplexerPathCacheForTesting()
+    const whichSpy = spyOn(Bun, "which").mockImplementation(() => null)
+
+    try {
+      await resolveMultiplexerRuntime({
+        environment: {},
+        tmuxEnabled: false,
+        cmuxEnabled: false,
+      })
+
+      expect(whichSpy).toHaveBeenCalledTimes(0)
+    } finally {
+      whichSpy.mockRestore()
+    }
+  })
+
+  test("only probes cmux path when tmux backend is disabled", async () => {
+    resetMultiplexerPathCacheForTesting()
+    const whichSpy = spyOn(Bun, "which").mockImplementation(() => null)
+
+    try {
+      await resolveMultiplexerRuntime({
+        environment: {
+          CMUX_SOCKET_PATH: "/tmp/cmux.sock",
+        },
+        tmuxEnabled: false,
+        cmuxEnabled: true,
+      })
+
+      expect(whichSpy.mock.calls.length).toBeGreaterThan(0)
+      expect(whichSpy.mock.calls.every((call) => call[0] === "cmux")).toBe(true)
+    } finally {
+      whichSpy.mockRestore()
+    }
   })
 })

@@ -4,7 +4,6 @@ import type { TrackedSession, CapacityConfig, WindowState } from "./types"
 import { log, normalizeSDKResponse } from "../../shared"
 import {
   createDisabledMultiplexerRuntime,
-  getResolvedMultiplexerRuntime,
   isInsideTmux as defaultIsInsideTmux,
   getCurrentPaneId as defaultGetCurrentPaneId,
   POLL_INTERVAL_BACKGROUND_MS,
@@ -115,7 +114,7 @@ export class TmuxSessionManager {
 
     if (isTmuxUtilDeps(runtimeOrDeps)) {
       this.deps = runtimeOrDeps
-      this.resolvedMultiplexer = getResolvedMultiplexerRuntime() ?? createRuntimeFromLegacyDeps(runtimeOrDeps)
+      this.resolvedMultiplexer = createRuntimeFromLegacyDeps(runtimeOrDeps)
     } else {
       this.deps = deps
       this.resolvedMultiplexer = runtimeOrDeps

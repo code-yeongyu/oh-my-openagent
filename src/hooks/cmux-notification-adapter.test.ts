@@ -104,11 +104,11 @@ describe("cmux notification adapter", () => {
     expect(adapter.hasDowngraded()).toBe(true)
   })
 
-  test("falls back to desktop on connection-refused failures", async () => {
+  test("falls back to desktop when output reports connection-refused", async () => {
     const adapter = createCmuxNotificationAdapter({
       runtime: createResolvedMultiplexer(),
       executeCommand: async () => createResult({
-        exitCode: 1,
+        exitCode: 0,
         stderr: "dial tcp 127.0.0.1:7777: connect: connection refused",
       }),
     })

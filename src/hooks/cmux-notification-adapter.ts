@@ -115,13 +115,13 @@ function shouldDowngrade(result: CmuxNotifyCommandResult): boolean {
     return true
   }
 
-  if (result.exitCode === 0) {
-    return false
-  }
-
   const combinedOutput = `${result.stderr}\n${result.stdout}`
   if (isConnectionRefusedText(combinedOutput)) {
     return true
+  }
+
+  if (result.exitCode === 0) {
+    return false
   }
 
   return true

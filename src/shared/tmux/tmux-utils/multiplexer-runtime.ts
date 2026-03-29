@@ -78,6 +78,29 @@ function resolveMode(input: {
   return "none"
 }
 
+function createDisabledTmuxProbe(): TmuxRuntimeProbe {
+  return {
+    path: null,
+    reachable: false,
+    paneControlReachable: false,
+    explicitDisable: false,
+  }
+}
+
+function createDisabledCmuxProbe(): CmuxRuntimeProbe {
+  return {
+    path: null,
+    socketPath: undefined,
+    endpointType: "missing",
+    workspaceId: undefined,
+    surfaceId: undefined,
+    hintStrength: "none",
+    reachable: false,
+    explicitDisable: false,
+    notifyCapable: false,
+  }
+}
+
 export function createDisabledMultiplexerRuntime(platform: NodeJS.Platform = process.platform): ResolvedMultiplexer {
   return {
     platform,
@@ -174,10 +197,19 @@ export async function resolveMultiplexerRuntime(
   const tmuxEnabled = options.tmuxEnabled ?? true
   const cmuxEnabled = options.cmuxEnabled ?? true
 
-  const [tmuxProbe, cmuxProbe] = await Promise.all([
-    options.tmuxProbe ? Promise.resolve(options.tmuxProbe) : probeTmuxRuntime({ environment }),
-    options.cmuxProbe ? Promise.resolve(options.cmuxProbe) : probeCmuxRuntime({ environment }),
-  ])
+  const tmuxProbePromise = options.tmuxProbe
+    ? Promise.resolve(options.tmuxProbe)
+    : tmuxEnabled
+      ? probeTmuxRuntime({ environment })
+      : Promise.resolve(createDisabledTmuxProbe())
+
+  const cmuxProbePromise = options.cmuxProbe
+    ? Promise.resolve(options.cmuxProbe)
+    : cmuxEnabled
+      ? probeCmuxRuntime({ environment })
+      : Promise.resolve(createDisabledCmuxProbe())
+
+  const [tmuxProbe, cmuxProbe] = await Promise.all([tmuxProbePromise, cmuxProbePromise])
 
   const resolved = resolveMultiplexerFromProbes({
     platform,

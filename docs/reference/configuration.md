@@ -576,9 +576,9 @@ The runtime evaluates tmux and cmux availability to determine operating mode:
 
 | Mode               | Conditions                                     | Pane Control | Notifications |
 | ------------------ | ---------------------------------------------- | ------------ | ------------- |
-| `cmux-shim`        | Live cmux + live tmux pane control             | tmux         | cmux          |
+| `cmux-shim`        | Live cmux + live tmux pane control             | tmux         | cmux (if capable), else desktop |
 | `tmux-only`        | Live tmux pane control, no live cmux           | tmux         | desktop       |
-| `cmux-notify-only` | Live cmux (no pane control), tmux unavailable  | none         | cmux          |
+| `cmux-notify-only` | Live cmux (no pane control), tmux unavailable  | none         | cmux (if capable), else desktop |
 | `none`             | Neither tmux nor cmux available                | none         | desktop       |
 
 #### Backend Precedence Semantics
@@ -601,7 +601,7 @@ The runtime probes cmux availability using these signals:
 
 **Endpoint types**: Unix domain sockets (`/tmp/cmux.sock`) and relay addresses (`host:port`) are both supported.
 
-**Hint strength**: Strong hints (both `CMUX_WORKSPACE_ID` and `CMUX_SURFACE_ID` present) preserve cmux-shim mode even in nested tmux environments. Weak hints (e.g., `TERM_PROGRAM=ghostty`) are tolerated but do not override failed probes.
+**Hint strength**: Strong hints (both `CMUX_WORKSPACE_ID` and `CMUX_SURFACE_ID` present) and weak hints (e.g., `TERM_PROGRAM=ghostty`) are recorded in the runtime metadata but do not affect mode resolution or probe results.
 
 #### Environment Variables
 
@@ -615,7 +615,7 @@ The runtime probes cmux availability using these signals:
 
 #### Behavior Boundaries
 
-- **Notifications**: Delivered via `cmux notify` when a live cmux endpoint is detected
+- **Notifications**: Delivered via `cmux notify` when a live, notification-capable cmux endpoint is detected
 - **Pane Control**: Tmux manages panes. Cmux does not create or control panes.
 - **Guarantee**: Tmux-compatible pane control remains available when tmux is live
 

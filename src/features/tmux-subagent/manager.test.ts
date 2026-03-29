@@ -3,6 +3,7 @@ import type { TmuxConfig } from '../../config/schema'
 import type { WindowState, PaneAction } from './types'
 import type { ActionResult, ExecuteContext } from './action-executor'
 import type { TmuxUtilDeps } from './manager'
+import type { ResolvedMultiplexer } from '../../shared/tmux'
 import * as sharedModule from '../../shared'
 
 type ExecuteActionsResult = {
@@ -40,6 +41,8 @@ const mockTmuxDeps: TmuxUtilDeps = {
   getCurrentPaneId: mockGetCurrentPaneId,
 }
 
+let mockedResolvedMultiplexerRuntime: ResolvedMultiplexer | null = null
+
 mock.module('./pane-state-querier', () => ({
   queryWindowState: mockQueryWindowState,
   paneExists: mockPaneExists,
@@ -61,8 +64,13 @@ mock.module('./action-executor', () => ({
 
 mock.module('../../shared/tmux', () => {
   const { isInsideTmux, getCurrentPaneId } = require('../../shared/tmux/tmux-utils')
+  const {
+    createDisabledMultiplexerRuntime,
+  } = require('../../shared/tmux/tmux-utils/multiplexer-runtime')
   const { POLL_INTERVAL_BACKGROUND_MS, SESSION_TIMEOUT_MS, SESSION_MISSING_GRACE_MS } = require('../../shared/tmux/constants')
   return {
+    createDisabledMultiplexerRuntime,
+    getResolvedMultiplexerRuntime: () => mockedResolvedMultiplexerRuntime,
     isInsideTmux,
     getCurrentPaneId,
     POLL_INTERVAL_BACKGROUND_MS,
@@ -135,6 +143,7 @@ describe('TmuxSessionManager', () => {
     mockExecuteAction.mockClear()
     mockIsInsideTmux.mockClear()
     mockGetCurrentPaneId.mockClear()
+    mockedResolvedMultiplexerRuntime = null
     trackedSessions.clear()
 
     mockQueryWindowState.mockImplementation(async () => createWindowState())
@@ -225,6 +234,54 @@ describe('TmuxSessionManager', () => {
 
       // then
       expect(manager).toBeDefined()
+    })
+
+    test('legacy deps constructor ignores global multiplexer cache', async () => {
+      // given
+      mockIsInsideTmux.mockReturnValue(true)
+      mockedResolvedMultiplexerRuntime = {
+        platform: 'darwin',
+        mode: 'none',
+        paneBackend: 'none',
+        notificationBackend: 'desktop',
+        tmux: {
+          path: null,
+          reachable: false,
+          insideEnvironment: false,
+          paneId: undefined,
+          explicitDisable: false,
+        },
+        cmux: {
+          path: null,
+          reachable: false,
+          notifyCapable: false,
+          socketPath: undefined,
+          endpointType: 'missing',
+          workspaceId: undefined,
+          surfaceId: undefined,
+          hintStrength: 'none',
+          explicitDisable: false,
+        },
+      }
+
+      const { TmuxSessionManager } = await import('./manager')
+      const ctx = createMockContext()
+      const config: TmuxConfig = {
+        enabled: true,
+        layout: 'main-vertical',
+        main_pane_size: 60,
+        main_pane_min_width: 80,
+        agent_pane_min_width: 40,
+      }
+      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+
+      // when
+      await manager.onSessionCreated(
+        createSessionCreatedEvent('ses_cache_ignored', 'ses_parent', 'Cache Ignored')
+      )
+
+      // then
+      expect(mockExecuteActions).toHaveBeenCalledTimes(1)
     })
 
     test('falls back to default port when serverUrl has port 0', async () => {
