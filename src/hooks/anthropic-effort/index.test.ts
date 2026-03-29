@@ -45,7 +45,7 @@ function createMockParams(overrides: {
 }
 
 describe("createAnthropicEffortHook", () => {
-  describe("opus family with variant max", () => {
+  describe("opus 4.6+ — should inject effort max", () => {
     it("injects effort max for anthropic opus-4-6", async () => {
       const hook = createAnthropicEffortHook()
       const { input, output } = createMockParams({})
@@ -53,39 +53,132 @@ describe("createAnthropicEffortHook", () => {
       await hook["chat.params"](input, output)
 
       expect(output.options.effort).toBe("max")
+      expect(input.message.variant).toBe("max")
     })
 
-    it("injects effort max for another opus family model such as opus-4-5", async () => {
-      const hook = createAnthropicEffortHook()
-      const { input, output } = createMockParams({ modelID: "claude-opus-4-5" })
-
-      await hook["chat.params"](input, output)
-
-      expect(output.options.effort).toBe("max")
-    })
-
-    it("injects effort max for dotted opus ids", async () => {
+    it("injects effort max for dotted opus-4.6", async () => {
       const hook = createAnthropicEffortHook()
       const { input, output } = createMockParams({ modelID: "claude-opus-4.6" })
 
       await hook["chat.params"](input, output)
 
       expect(output.options.effort).toBe("max")
+      expect(input.message.variant).toBe("max")
     })
 
-    it("should preserve max for other opus model IDs such as opus-4-5", async () => {
-      //#given another opus model id that is not 4.6
+    it("injects effort max for opus-4-6 with date suffix", async () => {
       const hook = createAnthropicEffortHook()
-      const { input, output } = createMockParams({
-        modelID: "claude-opus-4-5",
-      })
+      const { input, output } = createMockParams({ modelID: "claude-opus-4-6-20260301" })
 
-      //#when chat.params hook is called
       await hook["chat.params"](input, output)
 
-      //#then max should still be treated as valid for opus family
       expect(output.options.effort).toBe("max")
       expect(input.message.variant).toBe("max")
+    })
+
+    it("injects effort max for future opus-5-0", async () => {
+      const hook = createAnthropicEffortHook()
+      const { input, output } = createMockParams({ modelID: "claude-opus-5-0" })
+
+      await hook["chat.params"](input, output)
+
+      expect(output.options.effort).toBe("max")
+      expect(input.message.variant).toBe("max")
+    })
+  })
+
+  describe("opus < 4.6 — should inject effort high", () => {
+    it("clamps to high for opus-4-5", async () => {
+      const hook = createAnthropicEffortHook()
+      const { input, output } = createMockParams({ modelID: "claude-opus-4-5" })
+
+      await hook["chat.params"](input, output)
+
+      expect(output.options.effort).toBe("high")
+      expect(input.message.variant).toBe("high")
+    })
+
+    it("clamps to high for opus-4-5 with date suffix", async () => {
+      const hook = createAnthropicEffortHook()
+      const { input, output } = createMockParams({ modelID: "claude-opus-4-5-20251101" })
+
+      await hook["chat.params"](input, output)
+
+      expect(output.options.effort).toBe("high")
+      expect(input.message.variant).toBe("high")
+    })
+  })
+
+  describe("sonnet 4.6+ — should inject effort high", () => {
+    it("injects effort high for sonnet-4-6", async () => {
+      const hook = createAnthropicEffortHook()
+      const { input, output } = createMockParams({ modelID: "claude-sonnet-4-6" })
+
+      await hook["chat.params"](input, output)
+
+      expect(output.options.effort).toBe("high")
+      expect(input.message.variant).toBe("high")
+    })
+
+    it("injects effort high for sonnet-4-6 with date suffix", async () => {
+      const hook = createAnthropicEffortHook()
+      const { input, output } = createMockParams({ modelID: "claude-sonnet-4-6-20260501" })
+
+      await hook["chat.params"](input, output)
+
+      expect(output.options.effort).toBe("high")
+      expect(input.message.variant).toBe("high")
+    })
+
+    it("injects effort high for future sonnet-5-0", async () => {
+      const hook = createAnthropicEffortHook()
+      const { input, output } = createMockParams({ modelID: "claude-sonnet-5-0" })
+
+      await hook["chat.params"](input, output)
+
+      expect(output.options.effort).toBe("high")
+      expect(input.message.variant).toBe("high")
+    })
+  })
+
+  describe("unsupported models — should NOT inject effort", () => {
+    it("skips haiku-4-5", async () => {
+      const hook = createAnthropicEffortHook()
+      const { input, output } = createMockParams({ modelID: "claude-haiku-4-5" })
+
+      await hook["chat.params"](input, output)
+
+      expect(output.options.effort).toBeUndefined()
+      expect(input.message.variant).toBe("max")
+    })
+
+    it("skips haiku-4-5 with date suffix", async () => {
+      const hook = createAnthropicEffortHook()
+      const { input, output } = createMockParams({ modelID: "claude-haiku-4-5-20251001" })
+
+      await hook["chat.params"](input, output)
+
+      expect(output.options.effort).toBeUndefined()
+      expect(input.message.variant).toBe("max")
+    })
+
+    it("skips sonnet-4 (date suffix, no real minor version)", async () => {
+      const hook = createAnthropicEffortHook()
+      const { input, output } = createMockParams({ modelID: "claude-sonnet-4-20250514" })
+
+      await hook["chat.params"](input, output)
+
+      expect(output.options.effort).toBeUndefined()
+      expect(input.message.variant).toBe("max")
+    })
+
+    it("skips non-claude models", async () => {
+      const hook = createAnthropicEffortHook()
+      const { input, output } = createMockParams({ providerID: "openai", modelID: "gpt-5.4" })
+
+      await hook["chat.params"](input, output)
+
+      expect(output.options.effort).toBeUndefined()
     })
   })
 
@@ -102,27 +195,6 @@ describe("createAnthropicEffortHook", () => {
     it("does nothing when variant is undefined", async () => {
       const hook = createAnthropicEffortHook()
       const { input, output } = createMockParams({ variant: undefined })
-
-      await hook["chat.params"](input, output)
-
-      expect(output.options.effort).toBeUndefined()
-    })
-
-    it("should clamp effort to high for non-opus claude model with variant max", async () => {
-      //#given claude-sonnet-4-6 (not opus) with variant max
-      const hook = createAnthropicEffortHook()
-      const { input, output } = createMockParams({ modelID: "claude-sonnet-4-6" })
-
-      await hook["chat.params"](input, output)
-
-      //#then effort should be clamped to high (not max)
-      expect(output.options.effort).toBe("high")
-      expect(input.message.variant).toBe("high")
-    })
-
-    it("does nothing for non-claude providers/models", async () => {
-      const hook = createAnthropicEffortHook()
-      const { input, output } = createMockParams({ providerID: "openai", modelID: "gpt-5.4" })
 
       await hook["chat.params"](input, output)
 
