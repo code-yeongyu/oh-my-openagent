@@ -8,24 +8,26 @@ Entry point `index.ts` orchestrates 5-step initialization: loadConfig → create
 
 ## KEY FILES
 
-| File | Purpose |
-|------|---------|
-| `index.ts` | Plugin entry, exports `OhMyOpenCodePlugin` |
-| `plugin-config.ts` | JSONC parse, multi-level merge, Zod v4 validation |
-| `create-managers.ts` | TmuxSessionManager, BackgroundManager, SkillMcpManager, ConfigHandler |
-| `create-tools.ts` | SkillContext + AvailableCategories + ToolRegistry (26 tools) |
-| `create-hooks.ts` | 3-tier: Core(39) + Continuation(7) + Skill(2) = 48 hooks |
+| File                  | Purpose                                                                                                                         |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `index.ts`            | Plugin entry, exports `OhMyOpenCodePlugin`                                                                                      |
+| `plugin-config.ts`    | JSONC parse, multi-level merge, Zod v4 validation                                                                               |
+| `create-managers.ts`  | TmuxSessionManager, BackgroundManager, SkillMcpManager, ConfigHandler                                                           |
+| `create-tools.ts`     | SkillContext + AvailableCategories + ToolRegistry (26 tools)                                                                    |
+| `create-hooks.ts`     | 3-tier: Core(39) + Continuation(7) + Skill(2) = 48 hooks                                                                        |
 | `plugin-interface.ts` | 8 OpenCode hook handlers: config, tool, chat.message, chat.params, chat.headers, event, tool.execute.before, tool.execute.after |
 
 ## CONFIG LOADING
 
 ```
 loadPluginConfig(directory, ctx)
-  1. User: ~/.config/opencode/oh-my-opencode.jsonc
-  2. Project: .opencode/oh-my-opencode.jsonc
+  1. User: canonical-first search in ~/.config/opencode/
+     (oh-my-openagent.jsonc → oh-my-openagent.json → oh-my-opencode.jsonc → oh-my-opencode.json)
+  2. Project: canonical-first search in .opencode/
+     (oh-my-openagent.jsonc → oh-my-openagent.json → oh-my-opencode.jsonc → oh-my-opencode.json)
   3. mergeConfigs(user, project) → deepMerge for agents/categories, Set union for disabled_*
   4. Zod safeParse → defaults for omitted fields
-  5. migrateConfigFile() → legacy key transformation
+  5. migrateConfigFile() → legacy key transformation when a legacy basename is loaded
 ```
 
 ## HOOK COMPOSITION
