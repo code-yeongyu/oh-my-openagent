@@ -83,6 +83,10 @@ describe("tmux-path-resolver probe environment", () => {
   })
 
   test("probeCmuxNotificationCapability returns promptly after probe timeout", async () => {
+    if (process.platform === "win32") {
+      return
+    }
+
     const tempDirectory = mkdtempSync(join(tmpdir(), "tmux-path-resolver-timeout-"))
     const fakeCmuxPath = join(tempDirectory, "cmux")
     const slowCmuxScript = `#!/bin/sh

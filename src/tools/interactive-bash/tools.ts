@@ -54,9 +54,7 @@ export function tokenizeCommand(cmd: string): string[] {
 }
 
 export function createInteractiveBashTool(
-  runtime: ResolvedMultiplexer =
-    getResolvedMultiplexerRuntime()
-    ?? createDisabledMultiplexerRuntime(),
+  runtime?: ResolvedMultiplexer,
 ): ToolDefinition {
   return tool({
     description: INTERACTIVE_BASH_DESCRIPTION,
@@ -65,8 +63,13 @@ export function createInteractiveBashTool(
     },
     execute: async (args) => {
       try {
-        if (runtime.paneBackend !== "tmux") {
-          return `Error: interactive_bash is TMUX-only and pane control is unavailable in '${runtime.mode}' runtime.`
+        const resolvedRuntime =
+          runtime
+          ?? getResolvedMultiplexerRuntime()
+          ?? createDisabledMultiplexerRuntime()
+
+        if (resolvedRuntime.paneBackend !== "tmux") {
+          return `Error: interactive_bash is TMUX-only and pane control is unavailable in '${resolvedRuntime.mode}' runtime.`
         }
 
         const tmuxPath = await getTmuxPath()

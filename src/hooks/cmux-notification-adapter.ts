@@ -83,7 +83,20 @@ async function runCmuxNotifyCommand(input: {
     clearTimeout(timeoutHandle)
   }
 
-  const exitCode = timedOut ? null : await proc.exited.catch(() => null)
+  if (timedOut) {
+    // Do not await stdout/stderr after timeout: a process that ignores TERM
+    // may keep pipes open and block fallback completion.
+    void proc.exited.catch(() => {})
+
+    return {
+      exitCode: null,
+      stdout: "",
+      stderr: "",
+      timedOut: true,
+    }
+  }
+
+  const exitCode = await proc.exited.catch(() => null)
   const stdout = await new Response(proc.stdout).text().catch(() => "")
   const stderr = await new Response(proc.stderr).text().catch(() => "")
 

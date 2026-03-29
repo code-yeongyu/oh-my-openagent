@@ -1,4 +1,7 @@
 import { describe, expect, test } from "bun:test"
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import {
   createCmuxNotificationAdapter,
   type CmuxNotifyCommandResult,
@@ -138,5 +141,49 @@ describe("cmux notification adapter", () => {
     expect(firstDelivered).toBe(false)
     expect(secondDelivered).toBe(false)
     expect(callCount).toBe(1)
+  })
+
+  test("returns promptly on timeout when cmux process ignores TERM", async () => {
+    if (process.platform === "win32") {
+      return
+    }
+
+    const tempDirectory = mkdtempSync(join(tmpdir(), "cmux-notify-timeout-"))
+    const fakeCmuxPath = join(tempDirectory, "cmux")
+    const slowCmuxScript = `#!/bin/sh
+if [ "$1" = "notify" ]; then
+  trap '' TERM
+  /bin/sleep 1
+  exit 0
+fi
+
+exit 1
+`
+
+    writeFileSync(fakeCmuxPath, slowCmuxScript)
+    chmodSync(fakeCmuxPath, 0o755)
+
+    const runtime = createResolvedMultiplexer()
+    runtime.cmux.path = fakeCmuxPath
+
+    try {
+      const adapter = createCmuxNotificationAdapter({
+        runtime,
+        environment: {
+          PATH: tempDirectory,
+        },
+        timeoutMs: 40,
+      })
+
+      const startedAt = Date.now()
+      const delivered = await adapter.send("OpenCode", "Task complete")
+      const elapsedMs = Date.now() - startedAt
+
+      expect(delivered).toBe(false)
+      expect(adapter.hasDowngraded()).toBe(true)
+      expect(elapsedMs).toBeLessThan(500)
+    } finally {
+      rmSync(tempDirectory, { recursive: true, force: true })
+    }
   })
 })
