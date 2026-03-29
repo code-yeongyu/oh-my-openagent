@@ -166,6 +166,7 @@ export class ZellijAdapter implements Multiplexer {
         log("[ZellijAdapter.spawnPane] WARNING: anchor pane ID not captured, releasing anchorReadyPromise")
         this.anchorReadyPromise = null
         this.anchorReadyResolver = null
+        this.hasCreatedFirstPane = false
       }
     } else if (this.anchorReadyPromise) {
       const anchorId = await this.anchorReadyPromise
