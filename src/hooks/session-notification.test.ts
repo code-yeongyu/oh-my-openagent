@@ -499,6 +499,113 @@ describe("session-notification", () => {
     expect(notificationCalls).toHaveLength(1)
   })
 
+  test("retries idle notification when cmux fails on unsupported platform", async () => {
+    const sessionID = "cmux-unsupported-retry"
+    let cmuxSendCalls = 0
+    let cmuxNotifyCommandCalls = 0
+    let cmuxAvailable = true
+    const detectPlatformSpy = spyOn(sender, "detectPlatform").mockReturnValue("unsupported")
+
+    try {
+      const cmuxAdapter = createCmuxAdapter({
+        canSendViaCmux: () => cmuxAvailable,
+        hasDowngraded: () => !cmuxAvailable,
+        send: async () => {
+          cmuxSendCalls += 1
+
+          if (!cmuxAvailable) {
+            return false
+          }
+
+          cmuxNotifyCommandCalls += 1
+          cmuxAvailable = false
+          return false
+        },
+      })
+
+      const hook = createSessionNotification(
+        createMockPluginInput(),
+        {
+          idleConfirmationDelay: 10,
+          skipIfIncompleteTodos: false,
+          enforceMainSessionFilter: false,
+        },
+        {
+          resolvedMultiplexer: createCmuxRuntime(),
+          cmuxNotificationAdapter: cmuxAdapter,
+        },
+      )
+
+      await hook({
+        event: {
+          type: "session.idle",
+          properties: { sessionID },
+        },
+      })
+
+      await new Promise((resolve) => setTimeout(resolve, 50))
+
+      await hook({
+        event: {
+          type: "session.idle",
+          properties: { sessionID },
+        },
+      })
+
+      await new Promise((resolve) => setTimeout(resolve, 50))
+
+      expect(cmuxSendCalls).toBe(2)
+      expect(cmuxNotifyCommandCalls).toBe(1)
+      expect(notificationCalls).toHaveLength(0)
+    } finally {
+      detectPlatformSpy.mockRestore()
+    }
+  })
+
+  test("skips unsupported idle scheduling when cmux was never available", async () => {
+    const sessionID = "cmux-unsupported-unavailable"
+    let cmuxSendCalls = 0
+    const detectPlatformSpy = spyOn(sender, "detectPlatform").mockReturnValue("unsupported")
+
+    try {
+      const cmuxAdapter = createCmuxAdapter({
+        canSendViaCmux: () => false,
+        hasDowngraded: () => false,
+        send: async () => {
+          cmuxSendCalls += 1
+          return false
+        },
+      })
+
+      const hook = createSessionNotification(
+        createMockPluginInput(),
+        {
+          idleConfirmationDelay: 10,
+          skipIfIncompleteTodos: false,
+          enforceMainSessionFilter: false,
+        },
+        {
+          resolvedMultiplexer: createCmuxRuntime(),
+          cmuxNotificationAdapter: cmuxAdapter,
+        },
+      )
+
+      await hook({
+        event: {
+          type: "session.idle",
+          properties: { sessionID },
+        },
+      })
+
+      await new Promise((resolve) => setTimeout(resolve, 50))
+
+      expect(cmuxSendCalls).toBe(0)
+      expect(notificationCalls).toHaveLength(0)
+    } finally {
+      detectPlatformSpy.mockRestore()
+    }
+  })
+
   test("suppresses duplicate idle notifications while using cmux backend", async () => {
     const sessionID = "cmux-duplicate"
     let cmuxSendCalls = 0

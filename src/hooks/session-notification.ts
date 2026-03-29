@@ -88,15 +88,21 @@ export function createSessionNotification(
           mergedConfig.title,
           mergedConfig.message,
         )
-        if (!deliveredViaCmux && platform !== "unsupported") {
-          await sessionNotificationSender.sendSessionNotification(
-            hookCtx,
-            platform,
-            mergedConfig.title,
-            mergedConfig.message,
-          )
+        if (deliveredViaCmux) {
+          return true
         }
-        return
+
+        if (platform === "unsupported") {
+          return false
+        }
+
+        await sessionNotificationSender.sendSessionNotification(
+          hookCtx,
+          platform,
+          mergedConfig.title,
+          mergedConfig.message,
+        )
+        return true
       }
 
       const content = await buildReadyNotificationContent(hookCtx, {
@@ -107,14 +113,15 @@ export function createSessionNotification(
 
       const deliveredViaCmux = await cmuxNotificationAdapter.send(content.title, content.message)
       if (deliveredViaCmux) {
-        return
+        return true
       }
 
       if (platform === "unsupported") {
-        return
+        return false
       }
 
       await sessionNotificationSender.sendSessionNotification(hookCtx, platform, content.title, content.message)
+      return true
     },
     playSound: sessionNotificationSender.playSessionNotificationSound,
   })
@@ -172,7 +179,13 @@ export function createSessionNotification(
   }
 
   return async ({ event }: { event: { type: string; properties?: unknown } }) => {
-    if (currentPlatform === "unsupported" && !cmuxNotificationAdapter.canSendViaCmux()) return
+    const cannotDeliverOnUnsupportedPlatform =
+      currentPlatform === "unsupported" && !cmuxNotificationAdapter.canSendViaCmux()
+    const shouldFastExitUnsupportedEvent =
+      cannotDeliverOnUnsupportedPlatform
+      && (event.type !== "session.idle" || !cmuxNotificationAdapter.hasDowngraded())
+
+    if (shouldFastExitUnsupportedEvent) return
 
     const props = event.properties as Record<string, unknown> | undefined
 

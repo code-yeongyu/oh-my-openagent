@@ -16,7 +16,7 @@ export function createIdleNotificationScheduler(options: {
   platform: Platform
   config: SessionNotificationConfig
   hasIncompleteTodos: (ctx: PluginInput, sessionID: string) => Promise<boolean>
-  send: (ctx: PluginInput, platform: Platform, sessionID: string) => Promise<void>
+  send: (ctx: PluginInput, platform: Platform, sessionID: string) => Promise<boolean>
   playSound: (ctx: PluginInput, platform: Platform, soundPath: string) => Promise<void>
 }) {
   const notifiedSessions = new Set<string>()
@@ -134,9 +134,21 @@ export function createIdleNotificationScheduler(options: {
         return
       }
 
-      notifiedSessions.add(sessionID)
+      const delivered = await options.send(options.ctx, options.platform, sessionID)
+      if (!delivered) {
+        return
+      }
 
-      await options.send(options.ctx, options.platform, sessionID)
+      if (notificationVersions.get(sessionID) !== version) {
+        return
+      }
+
+      if (sessionActivitySinceIdle.has(sessionID)) {
+        sessionActivitySinceIdle.delete(sessionID)
+        return
+      }
+
+      notifiedSessions.add(sessionID)
 
       if (options.config.playSound && options.config.soundPath) {
         await options.playSound(options.ctx, options.platform, options.config.soundPath)

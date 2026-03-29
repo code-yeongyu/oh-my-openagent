@@ -1,10 +1,11 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, spyOn, test } from "bun:test"
 import {
   resetResolvedMultiplexerRuntimeForTesting,
   setResolvedMultiplexerRuntime,
   type ResolvedMultiplexer,
 } from "../../shared/tmux"
 import { createInteractiveBashTool, interactive_bash } from "./tools"
+import * as tmuxPathResolver from "./tmux-path-resolver"
 
 const mockToolContext = {
   sessionID: "test-session",
@@ -47,20 +48,32 @@ describe("interactive_bash runtime resolution", () => {
 
   test("createInteractiveBashTool without runtime resolves current runtime on execute", async () => {
     resetResolvedMultiplexerRuntimeForTesting()
-    const tool = createInteractiveBashTool()
-    setResolvedMultiplexerRuntime(createTmuxEnabledRuntime())
+    const getTmuxPathSpy = spyOn(tmuxPathResolver, "getTmuxPath").mockResolvedValue(null)
 
-    const result = await tool.execute({ tmux_command: "capture-pane -p" }, mockToolContext)
+    try {
+      const tool = createInteractiveBashTool()
+      setResolvedMultiplexerRuntime(createTmuxEnabledRuntime())
 
-    expect(result).not.toContain("pane control is unavailable")
+      const result = await tool.execute({ tmux_command: "capture-pane -p" }, mockToolContext)
+
+      expect(result).toBe("Error: tmux executable is not reachable")
+    } finally {
+      getTmuxPathSpy.mockRestore()
+    }
   })
 
   test("interactive_bash singleton resolves current runtime on execute", async () => {
     resetResolvedMultiplexerRuntimeForTesting()
-    setResolvedMultiplexerRuntime(createTmuxEnabledRuntime())
+    const getTmuxPathSpy = spyOn(tmuxPathResolver, "getTmuxPath").mockResolvedValue(null)
 
-    const result = await interactive_bash.execute({ tmux_command: "capture-pane -p" }, mockToolContext)
+    try {
+      setResolvedMultiplexerRuntime(createTmuxEnabledRuntime())
 
-    expect(result).not.toContain("pane control is unavailable")
+      const result = await interactive_bash.execute({ tmux_command: "capture-pane -p" }, mockToolContext)
+
+      expect(result).toBe("Error: tmux executable is not reachable")
+    } finally {
+      getTmuxPathSpy.mockRestore()
+    }
   })
 })

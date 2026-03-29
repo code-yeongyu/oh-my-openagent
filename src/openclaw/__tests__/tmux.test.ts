@@ -1,7 +1,12 @@
-import { beforeEach, describe, expect, test } from "bun:test"
+import { beforeEach, describe, expect, spyOn, test } from "bun:test"
 import { resetMultiplexerPathCacheForTesting } from "../../tools/interactive-bash/tmux-path-resolver"
-import { resetResolvedMultiplexerRuntimeForTesting } from "../../shared/tmux"
+import {
+  createDisabledMultiplexerRuntime,
+  resetResolvedMultiplexerRuntimeForTesting,
+  setResolvedMultiplexerRuntime,
+} from "../../shared/tmux"
 import { analyzePaneContent, getCurrentTmuxSession } from "../tmux"
+import * as tmuxPathResolver from "../../tools/interactive-bash/tmux-path-resolver"
 
 describe("openclaw tmux helpers", () => {
   beforeEach(() => {
@@ -21,16 +26,17 @@ describe("openclaw tmux helpers", () => {
   test("getCurrentTmuxSession does not synthesize a session from TMUX_PANE", async () => {
     const originalTmux = process.env.TMUX
     const originalTmuxPane = process.env.TMUX_PANE
-    const originalDisableTmuxFlag = process.env.OH_MY_OPENCODE_DISABLE_TMUX
+    const getTmuxPathSpy = spyOn(tmuxPathResolver, "getTmuxPath").mockResolvedValue("/usr/bin/tmux")
 
     try {
       process.env.TMUX = "/tmp/tmux-501/default,1,0"
       process.env.TMUX_PANE = "%42"
-      process.env.OH_MY_OPENCODE_DISABLE_TMUX = "1"
+      setResolvedMultiplexerRuntime(createDisabledMultiplexerRuntime())
 
       const sessionName = await getCurrentTmuxSession()
 
       expect(sessionName).toBeNull()
+      expect(getTmuxPathSpy).not.toHaveBeenCalled()
     } finally {
       if (originalTmux === undefined) {
         delete process.env.TMUX
@@ -44,11 +50,7 @@ describe("openclaw tmux helpers", () => {
         process.env.TMUX_PANE = originalTmuxPane
       }
 
-      if (originalDisableTmuxFlag === undefined) {
-        delete process.env.OH_MY_OPENCODE_DISABLE_TMUX
-      } else {
-        process.env.OH_MY_OPENCODE_DISABLE_TMUX = originalDisableTmuxFlag
-      }
+      getTmuxPathSpy.mockRestore()
     }
   })
 })
