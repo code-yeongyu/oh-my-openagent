@@ -19,12 +19,13 @@ export async function resolveSubagentExecution(
   args: DelegateTaskArgs,
   executorCtx: ExecutorContext,
   parentAgent: string | undefined,
-  categoryExamples: string
-): Promise<{ agentToUse: string; categoryModel: DelegatedModelConfig | undefined; fallbackChain?: FallbackEntry[]; error?: string }> {
+  categoryExamples: string,
+  inheritedModel?: string,
+): Promise<{ agentToUse: string; categoryModel: DelegatedModelConfig | undefined; actualModel?: string; isUnstableAgent: boolean; fallbackChain?: FallbackEntry[]; error?: string }> {
   const { client, agentOverrides, userCategories } = executorCtx
 
   if (!args.subagent_type?.trim()) {
-    return { agentToUse: "", categoryModel: undefined, error: `Agent name cannot be empty.` }
+    return { agentToUse: "", categoryModel: undefined, isUnstableAgent: false, error: `Agent name cannot be empty.` }
   }
 
   const agentName = args.subagent_type.trim()
@@ -33,6 +34,7 @@ export async function resolveSubagentExecution(
     return {
       agentToUse: "",
       categoryModel: undefined,
+      isUnstableAgent: false,
       error: `Cannot use subagent_type="${SISYPHUS_JUNIOR_AGENT}" directly. Use category parameter instead (e.g., ${categoryExamples}).
 
 Sisyphus-Junior is spawned automatically when you specify a category. Pick the appropriate category for your task domain.`,
@@ -43,6 +45,7 @@ Sisyphus-Junior is spawned automatically when you specify a category. Pick the a
     return {
       agentToUse: "",
       categoryModel: undefined,
+      isUnstableAgent: false,
     error: `You are a plan-family agent (plan/prometheus). You cannot delegate to other plan-family agents via task.
 
 Create the work plan directly - that's your job as the planning agent.`,
@@ -52,6 +55,7 @@ Create the work plan directly - that's your job as the planning agent.`,
   let agentToUse = agentName
   let categoryModel: DelegatedModelConfig | undefined
   let fallbackChain: FallbackEntry[] | undefined = undefined
+  let actualModel: string | undefined
 
   try {
     const agentsResult = await client.app.agents()
@@ -81,6 +85,7 @@ Create the work plan directly - that's your job as the planning agent.`,
         return {
           agentToUse: "",
           categoryModel: undefined,
+          isUnstableAgent: false,
     error: `Cannot call primary agent "${isPrimaryAgent.name}" via task. Primary agents are top-level orchestrators.`,
         }
       }
@@ -92,6 +97,7 @@ Create the work plan directly - that's your job as the planning agent.`,
       return {
         agentToUse: "",
         categoryModel: undefined,
+        isUnstableAgent: false,
         error: `Unknown agent: "${agentToUse}". Available agents: ${availableAgents}`,
       }
     }
@@ -124,6 +130,7 @@ Create the work plan directly - that's your job as the planning agent.`,
       const resolution = resolveModelForDelegateTask({
         userModel: agentOverride?.model ?? agentCategoryModel,
         userFallbackModels: flattenToFallbackModelStrings(normalizedAgentFallbackModels),
+        inheritedModel,
         categoryDefaultModel: matchedAgentModelStr,
         fallbackChain: agentRequirement?.fallbackChain,
         availableModels,
@@ -133,25 +140,28 @@ Create the work plan directly - that's your job as the planning agent.`,
       const resolutionSkipped = resolution && 'skipped' in resolution
 
       if (resolution && !resolutionSkipped) {
+        actualModel = resolution.model
         const normalized = normalizeModelFormat(resolution.model)
         if (normalized) {
           const variantToUse = agentOverride?.variant ?? resolution.variant
           categoryModel = variantToUse ? { ...normalized, variant: variantToUse } : normalized
         }
       } else if (resolutionSkipped && (agentOverride?.model ?? agentCategoryModel)) {
-        // Cold cache: resolution was skipped but user explicitly configured a model.
-        // Honor the user override directly — don't fall through to hardcoded fallback chain.
-        const normalized = normalizeModelFormat((agentOverride?.model ?? agentCategoryModel)!)
-        if (normalized) {
-          const agentCategoryVariant = agentOverride?.category
-            ? userCategories?.[agentOverride.category]?.variant
-            : undefined
-          const variantToUse = agentOverride?.variant ?? agentCategoryVariant
-          categoryModel = variantToUse ? { ...normalized, variant: variantToUse } : normalized
-          log("[delegate-task] Cold cache: using explicit user override for subagent", {
-            agent: agentToUse,
-            model: agentOverride?.model ?? agentCategoryModel,
-          })
+        const userModelOverride = agentOverride?.model ?? agentCategoryModel
+        if (userModelOverride) {
+          actualModel = userModelOverride
+          const normalized = normalizeModelFormat(userModelOverride)
+          if (normalized) {
+            const agentCategoryVariant = agentOverride?.category
+              ? userCategories?.[agentOverride.category]?.variant
+              : undefined
+            const variantToUse = agentOverride?.variant ?? agentCategoryVariant
+            categoryModel = variantToUse ? { ...normalized, variant: variantToUse } : normalized
+            log("[delegate-task] Cold cache: using explicit user override for subagent", {
+              agent: agentToUse,
+              model: agentOverride?.model ?? agentCategoryModel,
+            })
+          }
         }
       }
 
@@ -197,6 +207,7 @@ Create the work plan directly - that's your job as the planning agent.`,
         const fullModel = `${normalizedMatchedModel.providerID}/${normalizedMatchedModel.modelID}`
         if (availableModels.size === 0 || fuzzyMatchModel(fullModel, availableModels, [normalizedMatchedModel.providerID])) {
           categoryModel = normalizedMatchedModel
+          actualModel = fullModel
         } else {
           log("[delegate-task] Skipping unavailable agent default model", {
             agent: agentToUse,
@@ -216,9 +227,15 @@ Create the work plan directly - that's your job as the planning agent.`,
     return {
       agentToUse: "",
       categoryModel: undefined,
+      isUnstableAgent: false,
       error: `Failed to delegate to agent "${agentToUse}": ${errorMessage}`,
     }
   }
 
-  return { agentToUse, categoryModel, fallbackChain }
+  const resolvedModel = actualModel?.toLowerCase()
+  const isUnstableAgent = resolvedModel
+    ? resolvedModel.includes("gemini") || resolvedModel.includes("minimax") || resolvedModel.includes("kimi")
+    : false
+
+  return { agentToUse, categoryModel, actualModel, isUnstableAgent, fallbackChain }
 }

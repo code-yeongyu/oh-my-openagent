@@ -203,39 +203,43 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
         fallbackChain = resolution.fallbackChain
         maxPromptTokens = resolution.maxPromptTokens
 
-        const isRunInBackgroundExplicitlyFalse = args.run_in_background === false || args.run_in_background === "false" as unknown as boolean
-
-        log("[task] unstable agent detection", {
-          category: args.category,
-          actualModel,
-          isUnstableAgent,
-          run_in_background_value: args.run_in_background,
-          run_in_background_type: typeof args.run_in_background,
-          isRunInBackgroundExplicitlyFalse,
-          willForceBackground: isUnstableAgent && isRunInBackgroundExplicitlyFalse,
-        })
-
-        if (isUnstableAgent && isRunInBackgroundExplicitlyFalse) {
-          const systemContent = buildSystemContent({
-            skillContent,
-            skillContents,
-            categoryPromptAppend,
-            agentName: agentToUse,
-            maxPromptTokens,
-            model: categoryModel,
-            availableCategories,
-            availableSkills,
-          })
-          return executeUnstableAgentTask(args, ctx, options, parentContext, agentToUse, categoryModel, systemContent, actualModel)
-        }
       } else {
-        const resolution = await resolveSubagentExecution(args, options, parentContext.agent, categoryExamples)
+        const resolution = await resolveSubagentExecution(args, options, parentContext.agent, categoryExamples, inheritedModel)
         if (resolution.error) {
           return resolution.error
         }
         agentToUse = resolution.agentToUse
         categoryModel = resolution.categoryModel
+        actualModel = resolution.actualModel
+        isUnstableAgent = resolution.isUnstableAgent
         fallbackChain = resolution.fallbackChain
+      }
+
+      const isRunInBackgroundExplicitlyFalse = args.run_in_background === false || args.run_in_background === "false" as unknown as boolean
+
+      log("[task] unstable agent detection", {
+        category: args.category,
+        subagent_type: args.subagent_type,
+        actualModel,
+        isUnstableAgent,
+        run_in_background_value: args.run_in_background,
+        run_in_background_type: typeof args.run_in_background,
+        isRunInBackgroundExplicitlyFalse,
+        willForceBackground: isUnstableAgent && isRunInBackgroundExplicitlyFalse,
+      })
+
+      if (isUnstableAgent && isRunInBackgroundExplicitlyFalse) {
+        const systemContent = buildSystemContent({
+          skillContent,
+          skillContents,
+          categoryPromptAppend,
+          agentName: agentToUse,
+          maxPromptTokens,
+          model: categoryModel,
+          availableCategories,
+          availableSkills,
+        })
+        return executeUnstableAgentTask(args, ctx, options, parentContext, agentToUse, categoryModel, systemContent, actualModel)
       }
 
       const systemContent = buildSystemContent({

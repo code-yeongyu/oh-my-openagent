@@ -1450,6 +1450,44 @@ describe("sisyphus-task", () => {
       expect(launchCalled).toBe(true)
       expect(result).toContain("Background task launched")
     }, { timeout: 10000 })
+
+    test("#given direct subagent with inherited unstable model and run_in_background=false #when executing #then supervised execution is used", async () => {
+      const { createDelegateTask } = require("./tools")
+      const mockManager = { launch: async () => ({}) }
+      const mockClient = {
+        app: { agents: async () => ({ data: [{ name: "oracle", mode: "subagent", model: { providerID: "openai", modelID: "gpt-5.4" } }] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        session: {
+          create: async () => ({ data: { id: "test-session" } }),
+          prompt: async () => ({ data: {} }),
+          promptAsync: async () => ({ data: {} }),
+          messages: async () => ({ data: [] }),
+          status: async () => ({ data: {} }),
+        },
+      }
+      const tool = createDelegateTask({ manager: mockManager, client: mockClient })
+      const executeUnstableAgentTaskSpy = spyOn(executor, "executeUnstableAgentTask").mockResolvedValue("SUPERVISED TASK COMPLETED SUCCESSFULLY")
+      spyOn(executor, "resolveParentContext").mockResolvedValue({
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        model: { providerID: "google", modelID: "gemini-3.1-pro" },
+      })
+
+      const result = await tool.execute(
+        {
+          description: "Direct unstable subagent",
+          prompt: "Inspect architecture",
+          subagent_type: "oracle",
+          run_in_background: false,
+          load_skills: [],
+        },
+        { sessionID: "parent-session", messageID: "parent-message", agent: "sisyphus", abort: new AbortController().signal }
+      )
+
+      expect(executeUnstableAgentTaskSpy).toHaveBeenCalled()
+      expect(result).toContain("SUPERVISED TASK COMPLETED SUCCESSFULLY")
+    }, { timeout: 10000 })
   })
 
   describe("session_id with background parameter", () => {
