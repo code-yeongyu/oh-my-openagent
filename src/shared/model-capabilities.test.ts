@@ -279,6 +279,40 @@ describe("getModelCapabilities", () => {
     })
   })
 
+  test("resolves stable Claude family aliases through bundled snapshot metadata", () => {
+    const bundledSnapshot = getBundledModelCapabilitiesSnapshot()
+
+    const opus = getModelCapabilities({
+      providerID: "anthropic",
+      modelID: "claude-opus",
+      bundledSnapshot,
+    })
+    const sonnet = getModelCapabilities({
+      providerID: "anthropic",
+      modelID: "claude-sonnet",
+      bundledSnapshot,
+    })
+    const haiku = getModelCapabilities({
+      providerID: "anthropic",
+      modelID: "claude-haiku",
+      bundledSnapshot,
+    })
+
+    for (const result of [opus, sonnet, haiku]) {
+      expect(result.diagnostics).toMatchObject({
+        resolutionMode: "snapshot-backed",
+        canonicalization: { source: "canonical" },
+        snapshot: { source: "bundled-snapshot" },
+      })
+      expect(result.contextWindowTokens).toBeGreaterThan(0)
+      expect(result.maxOutputTokens).toBeGreaterThan(0)
+    }
+
+    expect(opus.family).toBe("claude-opus")
+    expect(sonnet.family).toBe("claude-sonnet")
+    expect(haiku.family).toBe("claude-haiku")
+  })
+
   test("prefers runtime models.dev cache over bundled snapshot", () => {
     findProviderModelMetadataSpy = spyOn(connectedProvidersCache, "findProviderModelMetadata").mockReturnValue(undefined)
     const runtimeSnapshot: ModelCapabilitiesSnapshot = {

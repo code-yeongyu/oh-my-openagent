@@ -178,7 +178,7 @@ Available categories: ${allCategoryNames}`,
           modelInfo: undefined,
           actualModel: undefined,
           isUnstableAgent: false,
-          error: `Invalid model format "${actualModel}". Expected "provider/model" format (e.g., "anthropic/claude-sonnet-4-6").`,
+          error: `Invalid model format "${actualModel}". Expected "provider/model" format (e.g., "anthropic/claude-sonnet").`,
         }
       }
 

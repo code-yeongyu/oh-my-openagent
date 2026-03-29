@@ -1,5 +1,5 @@
 import type { ModelCapabilitiesSnapshot } from "./model-capabilities"
-import { getBundledModelCapabilitiesSnapshot } from "./model-capabilities"
+import { getBundledModelCapabilitiesSnapshot, resolveSnapshotModelKey } from "./model-capabilities"
 import {
   getExactModelIDAliasRules,
   getPatternModelIDAliasRules,
@@ -135,7 +135,7 @@ export function collectModelCapabilityGuardrailIssues(
       })
     }
 
-    if (!snapshotModelIDs.has(aliasResolution.canonicalModelID)) {
+    if (!resolveSnapshotModelKey(snapshot, aliasResolution.canonicalModelID)) {
       issues.push({
         kind: "built-in-model-missing-from-snapshot",
         modelID: aliasResolution.requestedModelID,

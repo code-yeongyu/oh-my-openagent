@@ -23,7 +23,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(primary.variant).toBe("high")
   })
 
-  test("sisyphus has claude-opus-4-6 as primary with k2p5, kimi-k2.5, gpt-5.4 medium fallbacks", () => {
+  test("sisyphus has claude-opus as primary with k2p5, kimi-k2.5, gpt-5.4 medium fallbacks", () => {
     // #given - sisyphus agent requirement
     const sisyphus = AGENT_MODEL_REQUIREMENTS["sisyphus"]
 
@@ -36,7 +36,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
 
     const primary = sisyphus.fallbackChain[0]
     expect(primary.providers).toEqual(["anthropic", "github-copilot", "opencode"])
-    expect(primary.model).toBe("claude-opus-4-6")
+    expect(primary.model).toBe("claude-opus")
     expect(primary.variant).toBe("max")
 
     const second = sisyphus.fallbackChain[1]
@@ -84,7 +84,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
 
     const tertiary = librarian.fallbackChain[2]
     expect(tertiary.providers).toContain("anthropic")
-    expect(tertiary.model).toBe("claude-haiku-4-5")
+    expect(tertiary.model).toBe("claude-haiku")
 
     const quaternary = librarian.fallbackChain[3]
     expect(quaternary.model).toBe("gpt-5-nano")
@@ -114,7 +114,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
 
     const quaternary = explore.fallbackChain[3]
     expect(quaternary.providers).toContain("anthropic")
-    expect(quaternary.model).toBe("claude-haiku-4-5")
+    expect(quaternary.model).toBe("claude-haiku")
 
     const fifth = explore.fallbackChain[4]
     expect(fifth.providers).toContain("opencode")
@@ -148,34 +148,34 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(last.model).toBe("gpt-5-nano")
   })
 
-  test("prometheus has claude-opus-4-6 as primary", () => {
+  test("prometheus has claude-opus as primary", () => {
     // #given - prometheus agent requirement
     const prometheus = AGENT_MODEL_REQUIREMENTS["prometheus"]
 
     // #when - accessing Prometheus requirement
-    // #then - claude-opus-4-6 is first
+    // #then - claude-opus is first
     expect(prometheus).toBeDefined()
     expect(prometheus.fallbackChain).toBeArray()
     expect(prometheus.fallbackChain.length).toBeGreaterThan(1)
 
     const primary = prometheus.fallbackChain[0]
-    expect(primary.model).toBe("claude-opus-4-6")
+    expect(primary.model).toBe("claude-opus")
     expect(primary.providers).toEqual(["anthropic", "github-copilot", "opencode"])
     expect(primary.variant).toBe("max")
   })
 
-  test("metis has claude-opus-4-6 as primary", () => {
+  test("metis has claude-opus as primary", () => {
     // #given - metis agent requirement
     const metis = AGENT_MODEL_REQUIREMENTS["metis"]
 
     // #when - accessing Metis requirement
-    // #then - claude-opus-4-6 is first
+    // #then - claude-opus is first
     expect(metis).toBeDefined()
     expect(metis.fallbackChain).toBeArray()
     expect(metis.fallbackChain.length).toBeGreaterThan(1)
 
     const primary = metis.fallbackChain[0]
-    expect(primary.model).toBe("claude-opus-4-6")
+    expect(primary.model).toBe("claude-opus")
     expect(primary.providers).toEqual(["anthropic", "github-copilot", "opencode"])
     expect(primary.variant).toBe("max")
 
@@ -203,18 +203,18 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(primary.providers[0]).toBe("openai")
   })
 
-  test("atlas has valid fallbackChain with claude-sonnet-4-6 as primary", () => {
+  test("atlas has valid fallbackChain with claude-sonnet as primary", () => {
     // given - atlas agent requirement
     const atlas = AGENT_MODEL_REQUIREMENTS["atlas"]
 
     // when - accessing Atlas requirement
-    // then - fallbackChain exists with claude-sonnet-4-6 as first entry
+    // then - fallbackChain exists with claude-sonnet as first entry
     expect(atlas).toBeDefined()
     expect(atlas.fallbackChain).toBeArray()
     expect(atlas.fallbackChain).toHaveLength(4)
 
     const primary = atlas.fallbackChain[0]
-    expect(primary.model).toBe("claude-sonnet-4-6")
+    expect(primary.model).toBe("claude-sonnet")
     expect(primary.providers[0]).toBe("anthropic")
 
     const secondary = atlas.fallbackChain[1]
@@ -341,7 +341,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     const visualEngineering = CATEGORY_MODEL_REQUIREMENTS["visual-engineering"]
 
     // when - accessing visual-engineering requirement
-    // then - fallbackChain: gemini-3.1-pro(high) → glm-5 → opus-4-6(max) → opencode-go/glm-5 → k2p5
+    // then - fallbackChain: gemini-3.1-pro(high) → glm-5 → claude-opus(max) → opencode-go/glm-5 → k2p5
     expect(visualEngineering).toBeDefined()
     expect(visualEngineering.fallbackChain).toBeArray()
     expect(visualEngineering.fallbackChain).toHaveLength(5)
@@ -356,7 +356,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(second.model).toBe("glm-5")
 
     const third = visualEngineering.fallbackChain[2]
-    expect(third.model).toBe("claude-opus-4-6")
+    expect(third.model).toBe("claude-opus")
     expect(third.variant).toBe("max")
 
     const fourth = visualEngineering.fallbackChain[3]
@@ -368,7 +368,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(fifth.model).toBe("k2p5")
   })
 
-  test("quick has valid fallbackChain with gpt-5.4-mini as primary and claude-haiku-4-5 as secondary", () => {
+  test("quick has valid fallbackChain with gpt-5.4-mini as primary and claude-haiku as secondary", () => {
     // given - quick category requirement
     const quick = CATEGORY_MODEL_REQUIREMENTS["quick"]
 
@@ -383,37 +383,37 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(primary.providers).toContain("openai")
 
     const secondary = quick.fallbackChain[1]
-    expect(secondary.model).toBe("claude-haiku-4-5")
+    expect(secondary.model).toBe("claude-haiku")
     expect(secondary.providers).toContain("anthropic")
   })
 
-  test("unspecified-low has valid fallbackChain with claude-sonnet-4-6 as primary", () => {
+  test("unspecified-low has valid fallbackChain with claude-sonnet as primary", () => {
     // given - unspecified-low category requirement
     const unspecifiedLow = CATEGORY_MODEL_REQUIREMENTS["unspecified-low"]
 
     // when - accessing unspecified-low requirement
-    // then - fallbackChain exists with claude-sonnet-4-6 as first entry
+    // then - fallbackChain exists with claude-sonnet as first entry
     expect(unspecifiedLow).toBeDefined()
     expect(unspecifiedLow.fallbackChain).toBeArray()
     expect(unspecifiedLow.fallbackChain.length).toBeGreaterThan(0)
 
     const primary = unspecifiedLow.fallbackChain[0]
-    expect(primary.model).toBe("claude-sonnet-4-6")
+    expect(primary.model).toBe("claude-sonnet")
     expect(primary.providers[0]).toBe("anthropic")
   })
 
-  test("unspecified-high has claude-opus-4-6 as primary and gpt-5.4 as secondary", () => {
+  test("unspecified-high has claude-opus as primary and gpt-5.4 as secondary", () => {
     // #given - unspecified-high category requirement
     const unspecifiedHigh = CATEGORY_MODEL_REQUIREMENTS["unspecified-high"]
 
     // #when - accessing unspecified-high requirement
-    // #then - claude-opus-4-6 is first and gpt-5.4 is second
+    // #then - claude-opus is first and gpt-5.4 is second
     expect(unspecifiedHigh).toBeDefined()
     expect(unspecifiedHigh.fallbackChain).toBeArray()
     expect(unspecifiedHigh.fallbackChain.length).toBeGreaterThan(1)
 
     const primary = unspecifiedHigh.fallbackChain[0]
-    expect(primary.model).toBe("claude-opus-4-6")
+    expect(primary.model).toBe("claude-opus")
     expect(primary.variant).toBe("max")
     expect(primary.providers).toEqual(["anthropic", "github-copilot", "opencode"])
 
@@ -444,7 +444,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     const writing = CATEGORY_MODEL_REQUIREMENTS["writing"]
 
     // when - accessing writing requirement
-    // then - fallbackChain: gemini-3-flash -> kimi-k2.5 -> claude-sonnet-4-6 -> minimax-m2.7
+    // then - fallbackChain: gemini-3-flash -> kimi-k2.5 -> claude-sonnet -> minimax-m2.7
     expect(writing).toBeDefined()
     expect(writing.fallbackChain).toBeArray()
     expect(writing.fallbackChain).toHaveLength(4)
@@ -458,7 +458,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(second.providers[0]).toBe("opencode-go")
 
     const third = writing.fallbackChain[2]
-    expect(third.model).toBe("claude-sonnet-4-6")
+    expect(third.model).toBe("claude-sonnet")
     expect(third.providers[0]).toBe("anthropic")
 
     const fourth = writing.fallbackChain[3]
@@ -505,14 +505,14 @@ describe("FallbackEntry type", () => {
     // given - a valid FallbackEntry object
     const entry: FallbackEntry = {
       providers: ["anthropic", "github-copilot", "opencode"],
-      model: "claude-opus-4-6",
+      model: "claude-opus",
       variant: "high",
     }
 
     // when - accessing properties
     // then - all properties are accessible
     expect(entry.providers).toEqual(["anthropic", "github-copilot", "opencode"])
-    expect(entry.model).toBe("claude-opus-4-6")
+    expect(entry.model).toBe("claude-opus")
     expect(entry.variant).toBe("high")
   })
 
@@ -534,7 +534,7 @@ describe("ModelRequirement type", () => {
     // given - a valid ModelRequirement object
     const requirement: ModelRequirement = {
       fallbackChain: [
-        { providers: ["anthropic", "github-copilot"], model: "claude-opus-4-6", variant: "max" },
+        { providers: ["anthropic", "github-copilot"], model: "claude-opus", variant: "max" },
         { providers: ["openai", "github-copilot"], model: "gpt-5.4", variant: "high" },
       ],
     }
@@ -543,7 +543,7 @@ describe("ModelRequirement type", () => {
     // then - fallbackChain is accessible with correct structure
     expect(requirement.fallbackChain).toBeArray()
     expect(requirement.fallbackChain).toHaveLength(2)
-    expect(requirement.fallbackChain[0].model).toBe("claude-opus-4-6")
+    expect(requirement.fallbackChain[0].model).toBe("claude-opus")
     expect(requirement.fallbackChain[1].model).toBe("gpt-5.4")
   })
 
