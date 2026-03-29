@@ -22,7 +22,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     fallbackChain: [
       {
         providers: ["anthropic", "github-copilot", "opencode"],
-        model: "claude-opus-4-6",
+        model: "claude-opus",
         variant: "max",
       },
       { providers: ["opencode-go"], model: "kimi-k2.5" },
@@ -68,7 +68,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       },
       {
         providers: ["anthropic", "github-copilot", "opencode"],
-        model: "claude-opus-4-6",
+        model: "claude-opus",
         variant: "max",
       },
       { providers: ["opencode-go"], model: "glm-5" },
@@ -78,7 +78,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     fallbackChain: [
       { providers: ["opencode-go"], model: "minimax-m2.7" },
       { providers: ["opencode"], model: "minimax-m2.7-highspeed" },
-      { providers: ["anthropic", "opencode"], model: "claude-haiku-4-5" },
+      { providers: ["anthropic", "opencode"], model: "claude-haiku" },
       { providers: ["opencode"], model: "gpt-5-nano" },
     ],
   },
@@ -87,7 +87,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["github-copilot", "xai"], model: "grok-code-fast-1" },
       { providers: ["opencode-go"], model: "minimax-m2.7-highspeed" },
       { providers: ["opencode"], model: "minimax-m2.7" },
-      { providers: ["anthropic", "opencode"], model: "claude-haiku-4-5" },
+      { providers: ["anthropic", "opencode"], model: "claude-haiku" },
       { providers: ["opencode"], model: "gpt-5-nano" },
     ],
   },
@@ -103,7 +103,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     fallbackChain: [
       {
         providers: ["anthropic", "github-copilot", "opencode"],
-        model: "claude-opus-4-6",
+        model: "claude-opus",
         variant: "max",
       },
       {
@@ -122,7 +122,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     fallbackChain: [
       {
         providers: ["anthropic", "github-copilot", "opencode"],
-        model: "claude-opus-4-6",
+        model: "claude-opus",
         variant: "max",
       },
       {
@@ -143,7 +143,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       },
       {
         providers: ["anthropic", "github-copilot", "opencode"],
-        model: "claude-opus-4-6",
+        model: "claude-opus",
         variant: "max",
       },
       {
@@ -156,7 +156,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   atlas: {
     fallbackChain: [
-      { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-sonnet-4-6" },
+      { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-sonnet" },
       { providers: ["opencode-go"], model: "kimi-k2.5" },
       {
         providers: ["openai", "github-copilot", "opencode"],
@@ -168,7 +168,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   "sisyphus-junior": {
     fallbackChain: [
-      { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-sonnet-4-6" },
+      { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-sonnet" },
       { providers: ["opencode-go"], model: "kimi-k2.5" },
       {
         providers: ["openai", "github-copilot", "opencode"],
@@ -192,7 +192,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["zai-coding-plan", "opencode"], model: "glm-5" },
       {
         providers: ["anthropic", "github-copilot", "opencode"],
-        model: "claude-opus-4-6",
+        model: "claude-opus",
         variant: "max",
       },
       { providers: ["opencode-go"], model: "glm-5" },
@@ -213,7 +213,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       },
       {
         providers: ["anthropic", "github-copilot", "opencode"],
-        model: "claude-opus-4-6",
+        model: "claude-opus",
         variant: "max",
       },
       { providers: ["opencode-go"], model: "glm-5" },
@@ -228,7 +228,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       },
       {
         providers: ["anthropic", "github-copilot", "opencode"],
-        model: "claude-opus-4-6",
+        model: "claude-opus",
         variant: "max",
       },
       {
@@ -247,7 +247,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       },
       {
         providers: ["anthropic", "github-copilot", "opencode"],
-        model: "claude-opus-4-6",
+        model: "claude-opus",
         variant: "max",
       },
       { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.4" },
@@ -262,7 +262,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       },
       {
         providers: ["anthropic", "github-copilot", "opencode"],
-        model: "claude-haiku-4-5",
+        model: "claude-haiku",
       },
       {
         providers: ["google", "github-copilot", "opencode"],
@@ -276,7 +276,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     fallbackChain: [
       {
         providers: ["anthropic", "github-copilot", "opencode"],
-        model: "claude-sonnet-4-6",
+        model: "claude-sonnet",
       },
       {
         providers: ["openai", "opencode"],
@@ -295,7 +295,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     fallbackChain: [
       {
         providers: ["anthropic", "github-copilot", "opencode"],
-        model: "claude-opus-4-6",
+        model: "claude-opus",
         variant: "max",
       },
       {
@@ -329,7 +329,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["opencode-go"], model: "kimi-k2.5" },
       {
         providers: ["anthropic", "github-copilot", "opencode"],
-        model: "claude-sonnet-4-6",
+        model: "claude-sonnet",
       },
       { providers: ["opencode-go"], model: "minimax-m2.7" },
     ],

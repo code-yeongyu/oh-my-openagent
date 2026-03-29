@@ -12,8 +12,20 @@ export type HeuristicModelFamilyDefinition = {
 export const HEURISTIC_MODEL_FAMILY_REGISTRY: ReadonlyArray<HeuristicModelFamilyDefinition> = [
   {
     family: "claude-opus",
-    pattern: /claude(?:-\d+(?:-\d+)*)?-opus/,
+    pattern: /claude(?:[-.]\d+(?:[-.]\d+)*)?-opus/,
     variants: ["low", "medium", "high", "max"],
+    supportsThinking: true,
+  },
+  {
+    family: "claude-sonnet",
+    pattern: /claude(?:[-.]\d+(?:[-.]\d+)*)?-sonnet/,
+    variants: ["low", "medium", "high"],
+    supportsThinking: true,
+  },
+  {
+    family: "claude-haiku",
+    pattern: /claude(?:[-.]\d+(?:[-.]\d+)*)?-haiku/,
+    variants: ["low", "medium", "high"],
     supportsThinking: true,
   },
   {

@@ -32,7 +32,7 @@ const MODE: AgentMode = "subagent"
 const BLOCKED_TOOLS = ["task"]
 
 export const SISYPHUS_JUNIOR_DEFAULTS = {
-  model: "anthropic/claude-sonnet-4-6",
+  model: "anthropic/claude-sonnet",
   temperature: 0.1,
 } as const
 

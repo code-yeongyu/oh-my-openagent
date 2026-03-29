@@ -1,4 +1,5 @@
 import { findProviderModelMetadata } from "../connected-providers-cache"
+import { resolveStableFamilyAlias } from "../model-availability"
 import { resolveModelIDAlias } from "../model-capability-aliases"
 import { detectHeuristicModelFamily } from "../model-capability-heuristics"
 
@@ -20,9 +21,22 @@ import type {
 	ModelCapabilities,
 	ModelCapabilitiesDiagnostics,
 	ModelCapabilityOverride,
+	ModelCapabilitiesSnapshot,
 } from "./types"
 
 const MODEL_ID_OVERRIDES: Record<string, ModelCapabilityOverride> = {}
+
+export function resolveSnapshotModelKey(
+	snapshot: ModelCapabilitiesSnapshot,
+	modelID: string,
+): string | undefined {
+	if (snapshot.models[modelID]) {
+		return modelID
+	}
+
+	const stableFamilyAliasMatch = resolveStableFamilyAlias(modelID, Object.keys(snapshot.models))
+	return stableFamilyAliasMatch ?? undefined
+}
 
 function normalizeLookupModelID(modelID: string): string {
 	return modelID.trim().toLowerCase()
@@ -40,8 +54,13 @@ export function getModelCapabilities(input: GetModelCapabilitiesInput): ModelCap
 	)
 	const runtimeSnapshot = input.runtimeSnapshot
 	const bundledSnapshot = input.bundledSnapshot ?? getBundledModelCapabilitiesSnapshot()
-	const snapshotEntry = runtimeSnapshot?.models?.[canonicalization.canonicalModelID]
-		?? bundledSnapshot.models[canonicalization.canonicalModelID]
+	const runtimeSnapshotModelKey = runtimeSnapshot
+		? resolveSnapshotModelKey(runtimeSnapshot, canonicalization.canonicalModelID)
+		: undefined
+	const bundledSnapshotModelKey = resolveSnapshotModelKey(bundledSnapshot, canonicalization.canonicalModelID)
+	const snapshotEntry =
+		(runtimeSnapshotModelKey ? runtimeSnapshot?.models?.[runtimeSnapshotModelKey] : undefined)
+		?? (bundledSnapshotModelKey ? bundledSnapshot.models[bundledSnapshotModelKey] : undefined)
 	const heuristicFamily = detectHeuristicModelFamily(canonicalization.canonicalModelID)
 
 	const runtimeVariants = readRuntimeModelVariants(runtimeModel)
@@ -55,9 +74,9 @@ export function getModelCapabilities(input: GetModelCapabilitiesInput): ModelCap
 	const runtimeModalities = readRuntimeModelModalities(runtimeModel)
 
 	const snapshotSource: ModelCapabilitiesDiagnostics["snapshot"]["source"] =
-		runtimeSnapshot?.models?.[canonicalization.canonicalModelID]
+		runtimeSnapshotModelKey
 			? "runtime-snapshot"
-			: bundledSnapshot.models[canonicalization.canonicalModelID]
+			: bundledSnapshotModelKey
 			? "bundled-snapshot"
 			: "none"
 	const familySource: ModelCapabilitiesDiagnostics["family"]["source"] =

@@ -248,6 +248,23 @@ describe("fuzzyMatchModel", () => {
 		expect(result).toBe("anthropic/claude-opus-4-6")
 	})
 
+	it("prefers the best family match for stable claude family aliases", () => {
+		const available = new Set([
+			"anthropic/claude-opus-4",
+			"anthropic/claude-opus-4-5",
+			"anthropic/claude-opus-4-6",
+			"anthropic/claude-sonnet-4",
+			"anthropic/claude-sonnet-4-5",
+			"anthropic/claude-sonnet-4-6",
+			"anthropic/claude-haiku-3-5",
+			"anthropic/claude-haiku-4-5",
+		])
+
+		expect(fuzzyMatchModel("claude-opus", available, ["anthropic"])).toBe("anthropic/claude-opus-4-6")
+		expect(fuzzyMatchModel("claude-sonnet", available, ["anthropic"])).toBe("anthropic/claude-sonnet-4-6")
+		expect(fuzzyMatchModel("claude-haiku", available, ["anthropic"])).toBe("anthropic/claude-haiku-4-5")
+	})
+
 	// given github-copilot serves claude versions with dot notation
 	// when fallback chain uses hyphen notation in requested model
 	// then normalize both forms and match github-copilot model
