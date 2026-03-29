@@ -187,10 +187,13 @@ describe("AGENT_DISPLAY_NAMES", () => {
       "sisyphus-junior": "Sisyphus-Junior",
       metis: "Metis (Plan Consultant)",
       momus: "Momus (Plan Critic)",
+      athena: "Athena (Council)",
+      "athena-junior": "Athena-Junior (Council)",
       oracle: "oracle",
       librarian: "librarian",
       explore: "explore",
       "multimodal-looker": "multimodal-looker",
+      "council-member": "council-member",
     }
 
     // when checking the constant
