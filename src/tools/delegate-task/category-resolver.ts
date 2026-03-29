@@ -7,7 +7,7 @@ import { SISYPHUS_JUNIOR_AGENT } from "./sisyphus-junior-agent"
 import { resolveCategoryConfig } from "./categories"
 import { parseModelString } from "./model-string-parser"
 import { CATEGORY_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
-import { normalizeFallbackModels, flattenToFallbackModelStrings } from "../../shared/model-resolver"
+import { normalizeFallbackModels } from "../../shared/model-resolver"
 import { buildFallbackChainFromModels, findMostSpecificFallbackEntry } from "../../shared/fallback-chain-from-models"
 import { getAvailableModelsForDelegateTask } from "./available-models"
 import { resolveModelForDelegateTask } from "./model-selection"
@@ -137,7 +137,7 @@ Available categories: ${allCategoryNames}`,
   } else {
     const resolution = resolveModelForDelegateTask({
       userModel: explicitCategoryModel ?? overrideModel,
-      userFallbackModels: flattenToFallbackModelStrings(normalizedConfiguredFallbackModels),
+      userFallbackModels: normalizedConfiguredFallbackModels,
       categoryDefaultModel: resolved.model,
       isUserConfiguredCategoryModel: resolved.isUserConfiguredModel,
       fallbackChain: requirement.fallbackChain,
