@@ -1,0 +1,59 @@
+{
+  "milestone": "exa-mcp-tools",
+  "round": 1,
+  "status": "pass",
+  "assertionsSummary": {
+    "total": 10,
+    "passed": 10,
+    "failed": 0,
+    "blocked": 0
+  },
+  "passedAssertions": [
+    "VAL-SCHEMA-001",
+    "VAL-SCHEMA-002",
+    "VAL-SCHEMA-003",
+    "VAL-MCP-001",
+    "VAL-MCP-002",
+    "VAL-MCP-003",
+    "VAL-MCP-004",
+    "VAL-QUALITY-001",
+    "VAL-QUALITY-002",
+    "VAL-CROSS-001"
+  ],
+  "failedAssertions": [],
+  "blockedAssertions": [],
+  "appliedUpdates": [],
+  "previousRound": null,
+  "validationDetails": {
+    "VAL-SCHEMA-001": {
+      "evidence": "Code review of src/config/schema/websearch.ts - ExaToolSchema enum contains all 8 tools: web_search_exa, get_code_context_exa, company_research_exa, web_search_advanced_exa, crawling_exa, people_search_exa, deep_researcher_start, deep_researcher_check"
+    },
+    "VAL-SCHEMA-002": {
+      "evidence": "Code review of src/config/schema/websearch.ts - exa_tools field uses z.union([z.array(ExaToolSchema), z.literal('all'), z.literal('default')])"
+    },
+    "VAL-SCHEMA-003": {
+      "evidence": "Test 'empty/unconfigured falls back to web_search_exa (backward compatible)' passes - resolveExaTools() returns ['web_search_exa'] when exa_tools is undefined"
+    },
+    "VAL-MCP-001": {
+      "evidence": "Test '\"all\" preset loads all 8 tools' passes - URL contains all 8 tool parameters"
+    },
+    "VAL-MCP-002": {
+      "evidence": "Test '\"default\" preset loads 3 default tools' passes - URL contains web_search_exa, get_code_context_exa, company_research_exa only"
+    },
+    "VAL-MCP-003": {
+      "evidence": "Test 'custom array selects specific tools only' passes - URL contains only specified tools"
+    },
+    "VAL-MCP-004": {
+      "evidence": "Tests 'empty/unconfigured falls back to web_search_exa' and 'empty array falls back to web_search_exa' both pass"
+    },
+    "VAL-QUALITY-001": {
+      "evidence": "Command 'bun run typecheck' exits with code 0"
+    },
+    "VAL-QUALITY-002": {
+      "evidence": "Command 'bun test src/mcp/websearch.test.ts' - 15 tests pass, 0 fail"
+    },
+    "VAL-CROSS-001": {
+      "evidence": "End-to-end verified through test suite covering config flow from schema to URL construction"
+    }
+  }
+}
