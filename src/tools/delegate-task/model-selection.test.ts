@@ -179,6 +179,29 @@ describe("resolveModelForDelegateTask", () => {
 				expect(result).toEqual({ model: "openai/gpt-5.2", variant: "medium", matchedFallback: true })
 			})
 		})
+
+		describe("#when user fallback models are object entries with promoted settings", () => {
+			test("#then fuzzy-resolves the object entry to the available concrete model", () => {
+				const result = resolveModelForDelegateTask({
+					userFallbackModels: [{ model: "openai/gpt-5.4", reasoningEffort: "high" }],
+					availableModels: new Set(["openai/gpt-5.4-preview"]),
+				})
+
+				expect(result).toEqual({ model: "openai/gpt-5.4-preview", matchedFallback: true })
+			})
+
+			test("#then prefers a later exact object entry over an earlier fuzzy prefix match", () => {
+				const result = resolveModelForDelegateTask({
+					userFallbackModels: [
+						{ model: "openai/gpt-5.4", reasoningEffort: "medium" },
+						{ model: "openai/gpt-5.4-preview", reasoningEffort: "high" },
+					],
+					availableModels: new Set(["openai/gpt-5.4-preview"]),
+				})
+
+				expect(result).toEqual({ model: "openai/gpt-5.4-preview", matchedFallback: true })
+			})
+		})
 	})
 
 	describe("#given provider cache exists and connected providers are known", () => {
