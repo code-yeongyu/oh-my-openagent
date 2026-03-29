@@ -107,10 +107,15 @@ export function readFirstValidPluginConfigFile<T = unknown>(
 		if (!existsSync(candidate)) continue;
 
 		try {
+			const parsed = parseJsonc<unknown>(readFileSync(candidate, "utf-8"));
+			if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+				continue;
+			}
+
 			return {
 				format: candidate.endsWith(".jsonc") ? "jsonc" : "json",
 				path: candidate,
-				data: parseJsonc<T>(readFileSync(candidate, "utf-8")),
+				data: parsed as T,
 			};
 		} catch {}
 	}

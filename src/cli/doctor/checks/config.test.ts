@@ -77,5 +77,140 @@ describe("config check", () => {
 				rmSync(tempProject, { recursive: true, force: true });
 			}
 		});
+
+		it("fails when the only plugin config is malformed", async () => {
+			const originalEnv = process.env.OPENCODE_CONFIG_DIR;
+			const originalCwd = process.cwd();
+			const tempBase = join(
+				tmpdir(),
+				`omo-doctor-config-broken-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+			);
+			const tempProject = join(
+				tmpdir(),
+				`omo-doctor-config-broken-project-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+			);
+
+			try {
+				mkdirSync(tempBase, { recursive: true });
+				mkdirSync(tempProject, { recursive: true });
+				process.env.OPENCODE_CONFIG_DIR = tempBase;
+				process.chdir(tempProject);
+
+				const brokenPath = join(tempBase, "oh-my-openagent.jsonc");
+				writeFileSync(brokenPath, "{ invalid jsonc", "utf-8");
+
+				const freshConfig = await import(
+					`./config?test=${Date.now()}-${Math.random()}`
+				);
+				const result = await freshConfig.checkConfig();
+
+				expect(result.status).toBe("fail");
+				expect(result.details).toContain(`Path: ${brokenPath}`);
+				expect(
+					result.issues.some(
+						(issue) => issue.title === "Invalid configuration",
+					),
+				).toBe(true);
+			} finally {
+				if (originalEnv === undefined) delete process.env.OPENCODE_CONFIG_DIR;
+				else process.env.OPENCODE_CONFIG_DIR = originalEnv;
+				process.chdir(originalCwd);
+				rmSync(tempBase, { recursive: true, force: true });
+				rmSync(tempProject, { recursive: true, force: true });
+			}
+		});
+
+		it("fails when only the project plugin config is malformed", async () => {
+			const originalEnv = process.env.OPENCODE_CONFIG_DIR;
+			const originalCwd = process.cwd();
+			const tempBase = join(
+				tmpdir(),
+				`omo-doctor-config-empty-user-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+			);
+			const tempProject = join(
+				tmpdir(),
+				`omo-doctor-config-broken-project-only-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+			);
+
+			try {
+				mkdirSync(tempBase, { recursive: true });
+				mkdirSync(join(tempProject, ".opencode"), { recursive: true });
+				process.env.OPENCODE_CONFIG_DIR = tempBase;
+				process.chdir(tempProject);
+
+				const brokenPath = join(
+					tempProject,
+					".opencode",
+					"oh-my-openagent.jsonc",
+				);
+				writeFileSync(brokenPath, "{ invalid jsonc", "utf-8");
+
+				const freshConfig = await import(
+					`./config?test=${Date.now()}-${Math.random()}`
+				);
+				const result = await freshConfig.checkConfig();
+
+				expect(result.status).toBe("fail");
+				expect(result.details).toContain(`Path: ${brokenPath}`);
+			} finally {
+				if (originalEnv === undefined) delete process.env.OPENCODE_CONFIG_DIR;
+				else process.env.OPENCODE_CONFIG_DIR = originalEnv;
+				process.chdir(originalCwd);
+				rmSync(tempBase, { recursive: true, force: true });
+				rmSync(tempProject, { recursive: true, force: true });
+			}
+		});
+
+		it("applies legacy agent-name migrations before collecting config warnings", async () => {
+			const originalEnv = process.env.OPENCODE_CONFIG_DIR;
+			const originalCwd = process.cwd();
+			const tempBase = join(
+				tmpdir(),
+				`omo-doctor-config-migrate-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+			);
+			const tempProject = join(
+				tmpdir(),
+				`omo-doctor-config-migrate-project-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+			);
+
+			try {
+				mkdirSync(tempBase, { recursive: true });
+				mkdirSync(tempProject, { recursive: true });
+				process.env.OPENCODE_CONFIG_DIR = tempBase;
+				process.chdir(tempProject);
+
+				writeFileSync(
+					join(tempBase, "oh-my-opencode.jsonc"),
+					JSON.stringify(
+						{
+							agents: {
+								omo: { model: "not-a-provider-model" },
+							},
+						},
+						null,
+						2,
+					) + "\n",
+					"utf-8",
+				);
+
+				const freshConfig = await import(
+					`./config?test=${Date.now()}-${Math.random()}`
+				);
+				const result = await freshConfig.checkConfig();
+
+				expect(result.status).toBe("warn");
+				expect(
+					result.issues.some(
+						(issue) => issue.title === "Invalid agent override: sisyphus",
+					),
+				).toBe(true);
+			} finally {
+				if (originalEnv === undefined) delete process.env.OPENCODE_CONFIG_DIR;
+				else process.env.OPENCODE_CONFIG_DIR = originalEnv;
+				process.chdir(originalCwd);
+				rmSync(tempBase, { recursive: true, force: true });
+				rmSync(tempProject, { recursive: true, force: true });
+			}
+		});
 	});
 });

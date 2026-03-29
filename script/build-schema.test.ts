@@ -1,18 +1,26 @@
-import { describe, expect, test } from "bun:test"
-import { createOhMyOpenCodeJsonSchema } from "./build-schema-document"
+import { describe, expect, test } from "bun:test";
+import { createOhMyOpenCodeJsonSchema } from "./build-schema-document";
 
 describe("build-schema-document", () => {
-  test("generates schema with skills property", () => {
-    // given
-    const expectedDraft = "http://json-schema.org/draft-07/schema#"
+	test("generates schema with skills property", () => {
+		// given
+		const expectedDraft = "http://json-schema.org/draft-07/schema#";
 
-    // when
-    const schema = createOhMyOpenCodeJsonSchema()
+		// when
+		const schema = createOhMyOpenCodeJsonSchema();
 
-    // then
-    expect(schema.$schema).toBe(expectedDraft)
-    expect(schema.title).toBe("Oh My OpenCode Configuration")
-    expect(schema.properties).toBeDefined()
-    expect(schema.properties.skills).toBeDefined()
-  })
-})
+		// then
+		expect(schema.$schema).toBe(expectedDraft);
+		expect(schema.title).toBe("Oh My OpenCode Configuration");
+		expect(schema.properties).toBeDefined();
+		expect(schema.properties.skills).toBeDefined();
+	});
+
+	test("does not require git_master at the schema root when runtime supplies defaults", () => {
+		const schema = createOhMyOpenCodeJsonSchema();
+
+		expect(Array.isArray(schema.required) ? schema.required : []).not.toContain(
+			"git_master",
+		);
+	});
+});

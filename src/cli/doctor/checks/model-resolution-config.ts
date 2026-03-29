@@ -1,55 +1,51 @@
-import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { loadPluginConfig } from "../../../plugin-config";
+import {
+	type OhMyOpenCodeConfig,
+	OhMyOpenCodeConfigSchema,
+} from "../../../config";
+import { loadConfigFromPath, mergeConfigs } from "../../../plugin-config";
 import {
 	getOpenCodeConfigPaths,
 	getPluginConfigFileCandidates,
-	readFirstValidPluginConfigFile,
 } from "../../../shared";
 import type { OmoConfig } from "./model-resolution-types";
 
-const USER_CONFIG_DIR = getOpenCodeConfigPaths({
-	binary: "opencode",
-	version: null,
-}).configDir;
-const PROJECT_CONFIG_DIR = join(process.cwd(), ".opencode");
+function getUserConfigDir(): string {
+	return getOpenCodeConfigPaths({
+		binary: "opencode",
+		version: null,
+	}).configDir;
+}
+
+function getProjectConfigDir(): string {
+	return join(process.cwd(), ".opencode");
+}
+
+function loadFirstRuntimeLikeConfig(
+	directory: string,
+): OhMyOpenCodeConfig | null {
+	for (const candidatePath of getPluginConfigFileCandidates(directory)) {
+		const loadedConfig = loadConfigFromPath(
+			candidatePath,
+			{},
+			{ migrate: true, persistMigration: false },
+		);
+		if (loadedConfig) return loadedConfig;
+	}
+
+	return null;
+}
 
 export function loadOmoConfig(): OmoConfig | null {
-	const hasAnyConfig =
-		getPluginConfigFileCandidates(PROJECT_CONFIG_DIR).some((path) => {
-			try {
-				readFileSync(path, "utf-8");
-				return true;
-			} catch {
-				return false;
-			}
-		}) ||
-		getPluginConfigFileCandidates(USER_CONFIG_DIR).some((path) => {
-			try {
-				readFileSync(path, "utf-8");
-				return true;
-			} catch {
-				return false;
-			}
-		});
+	const userConfig = loadFirstRuntimeLikeConfig(getUserConfigDir());
+	const projectConfig = loadFirstRuntimeLikeConfig(getProjectConfigDir());
 
-	if (!hasAnyConfig) return null;
+	if (!userConfig && !projectConfig) return null;
 
-	try {
-		return loadPluginConfig(process.cwd(), {});
-	} catch {
-		const projectDetected =
-			readFirstValidPluginConfigFile<OmoConfig>(PROJECT_CONFIG_DIR);
-		if (projectDetected.format !== "none") {
-			return projectDetected.data;
-		}
-
-		const userDetected =
-			readFirstValidPluginConfigFile<OmoConfig>(USER_CONFIG_DIR);
-		if (userDetected.format !== "none") {
-			return userDetected.data;
-		}
-
-		return null;
+	let config = userConfig ?? OhMyOpenCodeConfigSchema.parse({});
+	if (projectConfig) {
+		config = mergeConfigs(config, projectConfig);
 	}
+
+	return config;
 }

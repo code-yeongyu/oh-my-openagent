@@ -268,6 +268,36 @@ describe("loadJsonFile", () => {
 		}
 	});
 
+	it("falls back to legacy user config when canonical user config has a non-object root", () => {
+		const originalEnv = process.env.OPENCODE_CONFIG_DIR;
+		const tempBase = join(
+			tmpdir(),
+			`omo-test-user-nonobject-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+		);
+		try {
+			mkdirSync(tempBase, { recursive: true });
+			process.env.OPENCODE_CONFIG_DIR = tempBase;
+
+			writeFileSync(join(tempBase, "oh-my-openagent.jsonc"), "null", "utf-8");
+			writeFileSync(
+				join(tempBase, "oh-my-opencode.jsonc"),
+				'{\n  "lsp": {\n    "legacy-user-nonobject": {\n      "command": ["legacy-user-nonobject-cmd"],\n      "extensions": [".lun"]\n    }\n  }\n}',
+				"utf-8",
+			);
+
+			const servers = getMergedServers();
+			const found = servers.find(
+				(s) => s.id === "legacy-user-nonobject" && s.source === "user",
+			);
+			expect(found !== undefined).toBe(true);
+			expect(found?.command?.[0]).toBe("legacy-user-nonobject-cmd");
+		} finally {
+			if (originalEnv === undefined) delete process.env.OPENCODE_CONFIG_DIR;
+			else process.env.OPENCODE_CONFIG_DIR = originalEnv;
+			rmSync(tempBase, { recursive: true, force: true });
+		}
+	});
+
 	it("prefers canonical project config over legacy project config", () => {
 		const originalCwd = process.cwd();
 		const tempProject = join(

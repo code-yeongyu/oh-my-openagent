@@ -324,11 +324,11 @@ bunx oh-my-opencode refresh-model-capabilities
 
 ### Options
 
-| Option               | Description                                          |
-| -------------------- | ---------------------------------------------------- |
-| `-d, --directory`    | Working directory to read oh-my-opencode config from |
-| `--source-url <url>` | Override the models.dev source URL                   |
-| `--json`             | Output refresh summary as JSON                       |
+| Option               | Description                                  |
+| -------------------- | -------------------------------------------- |
+| `-d, --directory`    | Working directory to read plugin config from |
+| `--source-url <url>` | Override the models.dev source URL           |
+| `--json`             | Output refresh summary as JSON               |
 
 ### Configuration
 

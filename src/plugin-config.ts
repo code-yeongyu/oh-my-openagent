@@ -74,13 +74,28 @@ export function parseConfigPartially(
 export function loadConfigFromPath(
 	configPath: string,
 	_ctx: unknown,
+	options: { migrate?: boolean; persistMigration?: boolean } = {},
 ): OhMyOpenCodeConfig | null {
+	const shouldMigrate = options.migrate ?? true;
+	const persistMigration = options.persistMigration ?? true;
 	try {
 		if (fs.existsSync(configPath)) {
 			const content = fs.readFileSync(configPath, "utf-8");
 			const rawConfig = parseJsonc<Record<string, unknown>>(content);
 
-			migrateConfigFile(configPath, rawConfig);
+			if (
+				!rawConfig ||
+				typeof rawConfig !== "object" ||
+				Array.isArray(rawConfig)
+			) {
+				throw new TypeError("Plugin config root must be an object");
+			}
+
+			if (shouldMigrate) {
+				migrateConfigFile(configPath, rawConfig, {
+					persist: persistMigration,
+				});
+			}
 
 			const result = OhMyOpenCodeConfigSchema.safeParse(rawConfig);
 

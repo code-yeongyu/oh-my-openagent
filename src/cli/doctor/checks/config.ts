@@ -1,9 +1,12 @@
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { OhMyOpenCodeConfigSchema } from "../../../config";
 import {
 	getOpenCodeConfigDir,
-	readFirstValidPluginConfigFile,
+	getPluginConfigFileCandidates,
+	migrateConfigFile,
+	parseJsonc,
 } from "../../../shared";
 import { CHECK_IDS, CHECK_NAMES } from "../constants";
 import type { CheckResult, DoctorIssue } from "../types";
@@ -11,8 +14,13 @@ import { getModelResolutionInfoWithOverrides } from "./model-resolution";
 import { loadAvailableModelsFromCache } from "./model-resolution-cache";
 import type { OmoConfig } from "./model-resolution-types";
 
-const USER_CONFIG_DIR = getOpenCodeConfigDir({ binary: "opencode" });
-const PROJECT_CONFIG_DIR = join(process.cwd(), ".opencode");
+function getUserConfigDir(): string {
+	return getOpenCodeConfigDir({ binary: "opencode" });
+}
+
+function getProjectConfigDir(): string {
+	return join(process.cwd(), ".opencode");
+}
 
 interface ConfigValidationResult {
 	exists: boolean;
@@ -20,63 +28,97 @@ interface ConfigValidationResult {
 	valid: boolean;
 	config: OmoConfig | null;
 	errors: string[];
+	terminal: boolean;
 }
 
-function findValidConfig(): { path: string; config: OmoConfig } | null {
-	const projectConfig =
-		readFirstValidPluginConfigFile<OmoConfig>(PROJECT_CONFIG_DIR);
-	if (projectConfig.format !== "none" && projectConfig.data) {
-		return { path: projectConfig.path, config: projectConfig.data };
-	}
+function inspectConfigDir(directory: string): ConfigValidationResult {
+	let firstExistingPath: string | null = null;
+	let fallbackError: string | null = null;
 
-	const userConfig = readFirstValidPluginConfigFile<OmoConfig>(USER_CONFIG_DIR);
-	if (userConfig.format !== "none" && userConfig.data) {
-		return { path: userConfig.path, config: userConfig.data };
-	}
+	for (const candidatePath of getPluginConfigFileCandidates(directory)) {
+		if (!existsSync(candidatePath)) continue;
+		firstExistingPath ??= candidatePath;
 
-	return null;
-}
+		let rawConfig: unknown;
+		try {
+			rawConfig = parseJsonc<unknown>(readFileSync(candidatePath, "utf-8"));
+		} catch (error) {
+			fallbackError ??=
+				error instanceof Error ? error.message : "Failed to parse config";
+			continue;
+		}
 
-function validateConfig(): ConfigValidationResult {
-	const validConfig = findValidConfig();
-	if (!validConfig) {
-		return { exists: false, path: null, valid: true, config: null, errors: [] };
-	}
+		if (
+			!rawConfig ||
+			typeof rawConfig !== "object" ||
+			Array.isArray(rawConfig)
+		) {
+			fallbackError ??= "Plugin config root must be an object";
+			continue;
+		}
 
-	try {
-		const rawConfig = validConfig.config;
+		migrateConfigFile(candidatePath, rawConfig as Record<string, unknown>, {
+			persist: false,
+		});
+
 		const schemaResult = OhMyOpenCodeConfigSchema.safeParse(rawConfig);
-
 		if (!schemaResult.success) {
 			return {
 				exists: true,
-				path: validConfig.path,
+				path: candidatePath,
 				valid: false,
-				config: rawConfig,
+				config: rawConfig as OmoConfig,
 				errors: schemaResult.error.issues.map(
 					(issue) => `${issue.path.join(".")}: ${issue.message}`,
 				),
+				terminal: true,
 			};
 		}
 
 		return {
 			exists: true,
-			path: validConfig.path,
+			path: candidatePath,
 			valid: true,
-			config: rawConfig,
+			config: rawConfig as OmoConfig,
 			errors: [],
-		};
-	} catch (error) {
-		return {
-			exists: true,
-			path: validConfig.path,
-			valid: false,
-			config: null,
-			errors: [
-				error instanceof Error ? error.message : "Failed to parse config",
-			],
+			terminal: false,
 		};
 	}
+
+	if (firstExistingPath) {
+		return {
+			exists: true,
+			path: firstExistingPath,
+			valid: false,
+			config: null,
+			errors: [fallbackError ?? "Failed to parse config"],
+			terminal: false,
+		};
+	}
+
+	return {
+		exists: false,
+		path: null,
+		valid: true,
+		config: null,
+		errors: [],
+		terminal: false,
+	};
+}
+
+function validateConfig(): ConfigValidationResult {
+	const projectConfig = inspectConfigDir(getProjectConfigDir());
+	if ((projectConfig.exists && projectConfig.valid) || projectConfig.terminal) {
+		return projectConfig;
+	}
+
+	const userConfig = inspectConfigDir(getUserConfigDir());
+	if (userConfig.exists && userConfig.valid) {
+		return userConfig;
+	}
+
+	if (projectConfig.exists) return projectConfig;
+	return userConfig;
 }
 
 function collectModelResolutionIssues(config: OmoConfig): DoctorIssue[] {
