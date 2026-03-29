@@ -109,14 +109,9 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
     async execute(args: DelegateTaskArgs, toolContext) {
       const ctx = toolContext as ToolContextWithMetadata
 
+      let categoryOverrideNote: string | undefined
       if (args.category && args.subagent_type) {
-        throw new Error(
-          `Invalid arguments: 'category' and 'subagent_type' are mutually exclusive. Provide EXACTLY ONE.\n` +
-          `  - You provided: category="${args.category}", subagent_type="${args.subagent_type}"\n` +
-          `  - Use category for task delegation (e.g., category="${categoryExamples.split(", ")[0]}")\n` +
-          `  - Use subagent_type for direct agent invocation (e.g., subagent_type="explore")\n` +
-          `  - subagent_type must be a callable non-primary agent name returned by app.agents()`
-        )
+        categoryOverrideNote = `[Note: You provided both category="${args.category}" and subagent_type="${args.subagent_type}". category takes precedence \u2014 subagent_type was ignored. Next time, provide ONLY category.]`
       }
       if (args.category) {
         args.subagent_type = SISYPHUS_JUNIOR_AGENT
@@ -226,7 +221,8 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
             availableCategories,
             availableSkills,
           })
-          return executeUnstableAgentTask(args, ctx, options, parentContext, agentToUse, categoryModel, systemContent, actualModel)
+          const result = await executeUnstableAgentTask(args, ctx, options, parentContext, agentToUse, categoryModel, systemContent, actualModel)
+          return categoryOverrideNote ? `${categoryOverrideNote}\n\n${result}` : result
         }
       } else {
         const resolution = await resolveSubagentExecution(args, options, parentContext.agent, categoryExamples)
@@ -249,11 +245,13 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
         availableSkills,
       })
 
+      const prependNote = (result: string) => categoryOverrideNote ? `${categoryOverrideNote}\n\n${result}` : result
+
       if (runInBackground) {
-        return executeBackgroundTask(args, ctx, options, parentContext, agentToUse, categoryModel, systemContent, fallbackChain)
+        return prependNote(await executeBackgroundTask(args, ctx, options, parentContext, agentToUse, categoryModel, systemContent, fallbackChain))
       }
 
-      return executeSyncTask(args, ctx, options, parentContext, agentToUse, categoryModel, systemContent, modelInfo, fallbackChain)
+      return prependNote(await executeSyncTask(args, ctx, options, parentContext, agentToUse, categoryModel, systemContent, modelInfo, fallbackChain))
     },
   })
 }
