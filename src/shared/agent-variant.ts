@@ -73,22 +73,30 @@ function findVariantInChain(
   const currentFamily = currentCapabilities.family
   const normalizedCurrentModelID = normalizeModelID(currentModel.modelID.trim().toLowerCase())
 
+  // Prefer exact provider+model matches before falling back to family-level matches.
   for (const entry of fallbackChain) {
     if (!entry.providers.includes(currentModel.providerID)) {
       continue
     }
 
     const normalizedEntryModelID = normalizeModelID(entry.model.trim().toLowerCase())
+    if (normalizedEntryModelID === normalizedCurrentModelID) {
+      return entry.variant
+    }
+  }
+
+  for (const entry of fallbackChain) {
+    if (!entry.providers.includes(currentModel.providerID)) {
+      continue
+    }
+
     const entryCapabilities = getModelCapabilities({
       providerID: currentModel.providerID,
       modelID: entry.model,
     })
     const entryFamily = entryCapabilities.family
 
-    if (
-      normalizedEntryModelID === normalizedCurrentModelID
-      || (entryFamily !== undefined && entryFamily === currentFamily)
-    ) {
+    if (entryFamily !== undefined && entryFamily === currentFamily) {
       return entry.variant
     }
   }
@@ -97,16 +105,20 @@ function findVariantInChain(
   // If we didn't find an exact provider+model match, fall back to model-only matching.
   for (const entry of fallbackChain) {
     const normalizedEntryModelID = normalizeModelID(entry.model.trim().toLowerCase())
+
+    if (normalizedEntryModelID === normalizedCurrentModelID) {
+      return entry.variant
+    }
+  }
+
+  for (const entry of fallbackChain) {
     const entryCapabilities = getModelCapabilities({
       providerID: currentModel.providerID,
       modelID: entry.model,
     })
     const entryFamily = entryCapabilities.family
 
-    if (
-      normalizedEntryModelID === normalizedCurrentModelID
-      || (entryFamily !== undefined && entryFamily === currentFamily)
-    ) {
+    if (entryFamily !== undefined && entryFamily === currentFamily) {
       return entry.variant
     }
   }

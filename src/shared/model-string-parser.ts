@@ -46,7 +46,7 @@ export function parseModelString(
     return undefined
   }
 
-  const providerID = parts[0]?.trim()
+  const providerID = parts[0]?.trim().toLowerCase()
   const rawModelID = parts.slice(1).join("/").trim()
   if (!providerID || !rawModelID) {
     return undefined
