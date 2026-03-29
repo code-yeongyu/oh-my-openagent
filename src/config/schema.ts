@@ -21,6 +21,7 @@ export * from "./schema/runtime-fallback"
 export * from "./schema/skills"
 export * from "./schema/sisyphus"
 export * from "./schema/sisyphus-agent"
+export * from "./schema/terminal"
 export * from "./schema/tmux"
 export * from "./schema/websearch"
 

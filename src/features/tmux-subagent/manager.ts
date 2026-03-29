@@ -1,7 +1,9 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { TmuxConfig } from "../../config/schema"
 import type { TrackedSession, CapacityConfig, WindowState } from "./types"
+import type { Multiplexer, PaneHandle } from "../../shared/terminal-multiplexer/types"
 import { log, normalizeSDKResponse } from "../../shared"
+import { shellEscapeForDoubleQuotedCommand } from "../../shared/shell-env"
 import {
   isInsideTmux as defaultIsInsideTmux,
   getCurrentPaneId as defaultGetCurrentPaneId,
@@ -55,10 +57,12 @@ const MAX_CLOSE_RETRY_COUNT = 3
  */
 export class TmuxSessionManager {
   private client: OpencodeClient
+  private adapter: Multiplexer | null
   private tmuxConfig: TmuxConfig
   private serverUrl: string
   private sourcePaneId: string | undefined
   private sessions = new Map<string, TrackedSession>()
+  private sessionHandles = new Map<string, PaneHandle>()
   private pendingSessions = new Set<string>()
   private spawnQueue: Promise<void> = Promise.resolve()
   private deferredSessions = new Map<string, DeferredSession>()
@@ -68,10 +72,21 @@ export class TmuxSessionManager {
   private nullStateCount = 0
   private deps: TmuxUtilDeps
   private pollingManager: TmuxPollingManager
-  constructor(ctx: PluginInput, tmuxConfig: TmuxConfig, deps: TmuxUtilDeps = defaultTmuxDeps) {
+  constructor(ctx: PluginInput, adapterOrConfig: Multiplexer | TmuxConfig, tmuxConfigOrDeps?: TmuxConfig | TmuxUtilDeps, deps: TmuxUtilDeps = defaultTmuxDeps) {
     this.client = ctx.client
-    this.tmuxConfig = tmuxConfig
-    this.deps = deps
+    // Support both old 2-arg API (ctx, tmuxConfig) and new 3-arg API (ctx, adapter, tmuxConfig)
+    if (adapterOrConfig && 'type' in adapterOrConfig && 'capabilities' in adapterOrConfig) {
+      // New API: (ctx, adapter, tmuxConfig, deps?)
+      this.adapter = adapterOrConfig as Multiplexer
+      this.tmuxConfig = tmuxConfigOrDeps as TmuxConfig
+      if (deps !== defaultTmuxDeps) this.deps = deps
+      else this.deps = defaultTmuxDeps
+    } else {
+      // Old API: (ctx, tmuxConfig, deps?)
+      this.adapter = null
+      this.tmuxConfig = adapterOrConfig as TmuxConfig
+      this.deps = (tmuxConfigOrDeps as TmuxUtilDeps | undefined) ?? defaultTmuxDeps
+    }
     const defaultPort = process.env.OPENCODE_PORT ?? "4096"
     const fallbackUrl = `http://localhost:${defaultPort}`
     try {
@@ -100,6 +115,7 @@ export class TmuxSessionManager {
     })
   }
   private isEnabled(): boolean {
+    if (this.adapter) return true
     return this.tmuxConfig.enabled && this.deps.isInsideTmux()
   }
 
@@ -470,6 +486,11 @@ export class TmuxSessionManager {
       log("[tmux-session-manager] session already tracked or pending", { sessionId })
       return
     }
+    if (this.adapter) {
+      await this.spawnWithAdapter(sessionId, title)
+      return
+    }
+
     const sourcePaneId = this.sourcePaneId
 
     this.pendingSessions.add(sessionId)
@@ -681,6 +702,23 @@ export class TmuxSessionManager {
     }
 
     this.removeTrackedSession(sessionId)
+  }
+
+  private async spawnWithAdapter(sessionId: string, title: string): Promise<void> {
+    if (!this.adapter) return
+    try {
+      const shell = process.env.SHELL ?? "bash"
+      const escapedUrl = shellEscapeForDoubleQuotedCommand(this.serverUrl)
+      const cmd = `${shell} -c "opencode attach ${escapedUrl} --session ${sessionId}"`
+      const handle = await this.adapter.spawnPane(cmd, {
+        label: sessionId,
+        displayName: title ? `Agent: ${title}` : undefined,
+      })
+      this.sessionHandles.set(sessionId, handle)
+      log("[tmux-session-manager] adapter spawned pane", { sessionId, title })
+    } catch (error) {
+      log("[tmux-session-manager] adapter spawn failed", { sessionId, error: String(error) })
+    }
   }
 
   createEventHandler(): (input: { event: { type: string; properties?: unknown } }) => Promise<void> {

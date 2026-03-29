@@ -11,6 +11,7 @@ import { registerManagerForCleanup } from "./features/background-agent/process-c
 import { createConfigHandler } from "./plugin-handlers"
 import { log } from "./shared"
 import { markServerRunningInProcess } from "./shared/tmux/tmux-utils/server-health"
+import { detectMultiplexer, createMultiplexer } from "./shared/terminal-multiplexer/detection"
 
 export type Managers = {
   tmuxSessionManager: TmuxSessionManager
@@ -19,17 +20,30 @@ export type Managers = {
   configHandler: ReturnType<typeof createConfigHandler>
 }
 
-export function createManagers(args: {
+export async function createManagers(args: {
   ctx: PluginContext
   pluginConfig: OhMyOpenCodeConfig
   tmuxConfig: TmuxConfig
   modelCacheState: ModelCacheState
   backgroundNotificationHookEnabled: boolean
-}): Managers {
+}): Promise<Managers> {
   const { ctx, pluginConfig, tmuxConfig, modelCacheState, backgroundNotificationHookEnabled } = args
 
   markServerRunningInProcess()
-  const tmuxSessionManager = new TmuxSessionManager(ctx, tmuxConfig)
+
+  const terminalConfig = pluginConfig.terminal
+  let adapter = null
+
+  if (terminalConfig?.provider === "zellij" || (terminalConfig?.provider === "auto" && await detectMultiplexer() === "zellij")) {
+    adapter = createMultiplexer("zellij", {
+      zellij: terminalConfig?.zellij ? { enabled: terminalConfig.zellij.enabled } : undefined,
+    })
+    log("[create-managers] zellij adapter created")
+  }
+
+  const tmuxSessionManager = adapter
+    ? new TmuxSessionManager(ctx, adapter, tmuxConfig)
+    : new TmuxSessionManager(ctx, tmuxConfig)
 
   registerManagerForCleanup({
     shutdown: async () => {
