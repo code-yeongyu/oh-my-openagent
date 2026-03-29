@@ -107,6 +107,30 @@ Direct skill.
       expect(skills[0].name).toBe("direct-skill")
     })
 
+    it("preserves nested skill path names during recursive discovery", async () => {
+      // given
+      const nestedSkillDir = join(SKILLS_DIR, "superpowers", "brainstorming")
+      mkdirSync(nestedSkillDir, { recursive: true })
+      writeFileSync(
+        join(nestedSkillDir, "SKILL.md"),
+        `---
+name: brainstorming
+description: Nested brainstorming skill
+---
+Nested skill.
+`
+      )
+
+      // when
+      const { discoverSkillsInDirAsync } = await import("./async-loader")
+      const skills = await discoverSkillsInDirAsync(SKILLS_DIR)
+
+      // then
+      expect(skills).toHaveLength(1)
+      expect(skills[0]?.name).toBe("superpowers/brainstorming")
+      expect(skills[0]?.definition.name).toBe("superpowers/brainstorming")
+    })
+
     it("skips entries starting with dot", async () => {
       // given
       const validContent = `---
