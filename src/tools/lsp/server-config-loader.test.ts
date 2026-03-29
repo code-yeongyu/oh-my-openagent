@@ -234,6 +234,40 @@ describe("loadJsonFile", () => {
 		}
 	});
 
+	it("falls back to legacy user config when canonical user config is malformed", () => {
+		const originalEnv = process.env.OPENCODE_CONFIG_DIR;
+		const tempBase = join(
+			tmpdir(),
+			`omo-test-user-fallback-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+		);
+		try {
+			mkdirSync(tempBase, { recursive: true });
+			process.env.OPENCODE_CONFIG_DIR = tempBase;
+
+			writeFileSync(
+				join(tempBase, "oh-my-openagent.jsonc"),
+				"{ invalid jsonc",
+				"utf-8",
+			);
+			writeFileSync(
+				join(tempBase, "oh-my-opencode.jsonc"),
+				'{\n  "lsp": {\n    "legacy-user-fallback": {\n      "command": ["legacy-user-fallback-cmd"],\n      "extensions": [".luf"]\n    }\n  }\n}',
+				"utf-8",
+			);
+
+			const servers = getMergedServers();
+			const found = servers.find(
+				(s) => s.id === "legacy-user-fallback" && s.source === "user",
+			);
+			expect(found !== undefined).toBe(true);
+			expect(found?.command?.[0]).toBe("legacy-user-fallback-cmd");
+		} finally {
+			if (originalEnv === undefined) delete process.env.OPENCODE_CONFIG_DIR;
+			else process.env.OPENCODE_CONFIG_DIR = originalEnv;
+			rmSync(tempBase, { recursive: true, force: true });
+		}
+	});
+
 	it("prefers canonical project config over legacy project config", () => {
 		const originalCwd = process.cwd();
 		const tempProject = join(

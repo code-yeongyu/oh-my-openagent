@@ -1,164 +1,183 @@
-import { readFileSync } from "node:fs"
-import { join } from "node:path"
+import { join } from "node:path";
 
-import { OhMyOpenCodeConfigSchema } from "../../../config"
-import { detectPluginConfigFile, getOpenCodeConfigDir, parseJsonc } from "../../../shared"
-import { CHECK_IDS, CHECK_NAMES, PACKAGE_NAME } from "../constants"
-import type { CheckResult, DoctorIssue } from "../types"
-import { loadAvailableModelsFromCache } from "./model-resolution-cache"
-import { getModelResolutionInfoWithOverrides } from "./model-resolution"
-import type { OmoConfig } from "./model-resolution-types"
+import { OhMyOpenCodeConfigSchema } from "../../../config";
+import {
+	getOpenCodeConfigDir,
+	readFirstValidPluginConfigFile,
+} from "../../../shared";
+import { CHECK_IDS, CHECK_NAMES } from "../constants";
+import type { CheckResult, DoctorIssue } from "../types";
+import { getModelResolutionInfoWithOverrides } from "./model-resolution";
+import { loadAvailableModelsFromCache } from "./model-resolution-cache";
+import type { OmoConfig } from "./model-resolution-types";
 
-const USER_CONFIG_DIR = getOpenCodeConfigDir({ binary: "opencode" })
-const PROJECT_CONFIG_DIR = join(process.cwd(), ".opencode")
+const USER_CONFIG_DIR = getOpenCodeConfigDir({ binary: "opencode" });
+const PROJECT_CONFIG_DIR = join(process.cwd(), ".opencode");
 
 interface ConfigValidationResult {
-  exists: boolean
-  path: string | null
-  valid: boolean
-  config: OmoConfig | null
-  errors: string[]
+	exists: boolean;
+	path: string | null;
+	valid: boolean;
+	config: OmoConfig | null;
+	errors: string[];
 }
 
-function findConfigPath(): string | null {
-  const projectConfig = detectPluginConfigFile(PROJECT_CONFIG_DIR)
-  if (projectConfig.format !== "none") return projectConfig.path
+function findValidConfig(): { path: string; config: OmoConfig } | null {
+	const projectConfig =
+		readFirstValidPluginConfigFile<OmoConfig>(PROJECT_CONFIG_DIR);
+	if (projectConfig.format !== "none" && projectConfig.data) {
+		return { path: projectConfig.path, config: projectConfig.data };
+	}
 
-  const userConfig = detectPluginConfigFile(USER_CONFIG_DIR)
-  if (userConfig.format !== "none") return userConfig.path
+	const userConfig = readFirstValidPluginConfigFile<OmoConfig>(USER_CONFIG_DIR);
+	if (userConfig.format !== "none" && userConfig.data) {
+		return { path: userConfig.path, config: userConfig.data };
+	}
 
-  return null
+	return null;
 }
 
 function validateConfig(): ConfigValidationResult {
-  const configPath = findConfigPath()
-  if (!configPath) {
-    return { exists: false, path: null, valid: true, config: null, errors: [] }
-  }
+	const validConfig = findValidConfig();
+	if (!validConfig) {
+		return { exists: false, path: null, valid: true, config: null, errors: [] };
+	}
 
-  try {
-    const content = readFileSync(configPath, "utf-8")
-    const rawConfig = parseJsonc<OmoConfig>(content)
-    const schemaResult = OhMyOpenCodeConfigSchema.safeParse(rawConfig)
+	try {
+		const rawConfig = validConfig.config;
+		const schemaResult = OhMyOpenCodeConfigSchema.safeParse(rawConfig);
 
-    if (!schemaResult.success) {
-      return {
-        exists: true,
-        path: configPath,
-        valid: false,
-        config: rawConfig,
-        errors: schemaResult.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`),
-      }
-    }
+		if (!schemaResult.success) {
+			return {
+				exists: true,
+				path: validConfig.path,
+				valid: false,
+				config: rawConfig,
+				errors: schemaResult.error.issues.map(
+					(issue) => `${issue.path.join(".")}: ${issue.message}`,
+				),
+			};
+		}
 
-    return { exists: true, path: configPath, valid: true, config: rawConfig, errors: [] }
-  } catch (error) {
-    return {
-      exists: true,
-      path: configPath,
-      valid: false,
-      config: null,
-      errors: [error instanceof Error ? error.message : "Failed to parse config"],
-    }
-  }
+		return {
+			exists: true,
+			path: validConfig.path,
+			valid: true,
+			config: rawConfig,
+			errors: [],
+		};
+	} catch (error) {
+		return {
+			exists: true,
+			path: validConfig.path,
+			valid: false,
+			config: null,
+			errors: [
+				error instanceof Error ? error.message : "Failed to parse config",
+			],
+		};
+	}
 }
 
 function collectModelResolutionIssues(config: OmoConfig): DoctorIssue[] {
-  const issues: DoctorIssue[] = []
-  const availableModels = loadAvailableModelsFromCache()
-  const resolution = getModelResolutionInfoWithOverrides(config)
+	const issues: DoctorIssue[] = [];
+	const availableModels = loadAvailableModelsFromCache();
+	const resolution = getModelResolutionInfoWithOverrides(config);
 
-  const invalidAgentOverrides = resolution.agents.filter(
-    (agent) => agent.userOverride && !agent.userOverride.includes("/")
-  )
-  const invalidCategoryOverrides = resolution.categories.filter(
-    (category) => category.userOverride && !category.userOverride.includes("/")
-  )
+	const invalidAgentOverrides = resolution.agents.filter(
+		(agent) => agent.userOverride && !agent.userOverride.includes("/"),
+	);
+	const invalidCategoryOverrides = resolution.categories.filter(
+		(category) => category.userOverride && !category.userOverride.includes("/"),
+	);
 
-  for (const invalidAgent of invalidAgentOverrides) {
-    issues.push({
-      title: `Invalid agent override: ${invalidAgent.name}`,
-      description: `Override '${invalidAgent.userOverride}' must be in provider/model format.`,
-      severity: "warning",
-      affects: [invalidAgent.name],
-    })
-  }
+	for (const invalidAgent of invalidAgentOverrides) {
+		issues.push({
+			title: `Invalid agent override: ${invalidAgent.name}`,
+			description: `Override '${invalidAgent.userOverride}' must be in provider/model format.`,
+			severity: "warning",
+			affects: [invalidAgent.name],
+		});
+	}
 
-  for (const invalidCategory of invalidCategoryOverrides) {
-    issues.push({
-      title: `Invalid category override: ${invalidCategory.name}`,
-      description: `Override '${invalidCategory.userOverride}' must be in provider/model format.`,
-      severity: "warning",
-      affects: [invalidCategory.name],
-    })
-  }
+	for (const invalidCategory of invalidCategoryOverrides) {
+		issues.push({
+			title: `Invalid category override: ${invalidCategory.name}`,
+			description: `Override '${invalidCategory.userOverride}' must be in provider/model format.`,
+			severity: "warning",
+			affects: [invalidCategory.name],
+		});
+	}
 
-  if (availableModels.cacheExists) {
-    const providerSet = new Set(availableModels.providers)
-    const unknownProviders = [
-      ...resolution.agents.map((agent) => agent.userOverride),
-      ...resolution.categories.map((category) => category.userOverride),
-    ]
-      .filter((value): value is string => Boolean(value))
-      .map((value) => value.split("/")[0])
-      .filter((provider) => provider.length > 0 && !providerSet.has(provider))
+	if (availableModels.cacheExists) {
+		const providerSet = new Set(availableModels.providers);
+		const unknownProviders = [
+			...resolution.agents.map((agent) => agent.userOverride),
+			...resolution.categories.map((category) => category.userOverride),
+		]
+			.filter((value): value is string => Boolean(value))
+			.map((value) => value.split("/")[0])
+			.filter((provider) => provider.length > 0 && !providerSet.has(provider));
 
-    if (unknownProviders.length > 0) {
-      const uniqueProviders = [...new Set(unknownProviders)]
-      issues.push({
-        title: "Model override uses unavailable provider",
-        description: `Provider(s) not found in OpenCode model cache: ${uniqueProviders.join(", ")}`,
-        severity: "warning",
-        affects: ["model resolution"],
-      })
-    }
-  }
+		if (unknownProviders.length > 0) {
+			const uniqueProviders = [...new Set(unknownProviders)];
+			issues.push({
+				title: "Model override uses unavailable provider",
+				description: `Provider(s) not found in OpenCode model cache: ${uniqueProviders.join(", ")}`,
+				severity: "warning",
+				affects: ["model resolution"],
+			});
+		}
+	}
 
-  return issues
+	return issues;
 }
 
 export async function checkConfig(): Promise<CheckResult> {
-  const validation = validateConfig()
-  const issues: DoctorIssue[] = []
+	const validation = validateConfig();
+	const issues: DoctorIssue[] = [];
 
-  if (!validation.exists) {
-    return {
-      name: CHECK_NAMES[CHECK_IDS.CONFIG],
-      status: "pass",
-      message: "No custom config found; defaults are used",
-      details: undefined,
-      issues,
-    }
-  }
+	if (!validation.exists) {
+		return {
+			name: CHECK_NAMES[CHECK_IDS.CONFIG],
+			status: "pass",
+			message: "No custom config found; defaults are used",
+			details: undefined,
+			issues,
+		};
+	}
 
-  if (!validation.valid) {
-    issues.push(
-      ...validation.errors.map((error) => ({
-        title: "Invalid configuration",
-        description: error,
-        severity: "error" as const,
-        affects: ["plugin startup"],
-      }))
-    )
+	if (!validation.valid) {
+		issues.push(
+			...validation.errors.map((error) => ({
+				title: "Invalid configuration",
+				description: error,
+				severity: "error" as const,
+				affects: ["plugin startup"],
+			})),
+		);
 
-    return {
-      name: CHECK_NAMES[CHECK_IDS.CONFIG],
-      status: "fail",
-      message: `Configuration invalid (${issues.length} issue${issues.length > 1 ? "s" : ""})`,
-      details: validation.path ? [`Path: ${validation.path}`] : undefined,
-      issues,
-    }
-  }
+		return {
+			name: CHECK_NAMES[CHECK_IDS.CONFIG],
+			status: "fail",
+			message: `Configuration invalid (${issues.length} issue${issues.length > 1 ? "s" : ""})`,
+			details: validation.path ? [`Path: ${validation.path}`] : undefined,
+			issues,
+		};
+	}
 
-  if (validation.config) {
-    issues.push(...collectModelResolutionIssues(validation.config))
-  }
+	if (validation.config) {
+		issues.push(...collectModelResolutionIssues(validation.config));
+	}
 
-  return {
-    name: CHECK_NAMES[CHECK_IDS.CONFIG],
-    status: issues.length > 0 ? "warn" : "pass",
-    message: issues.length > 0 ? `${issues.length} configuration warning(s)` : "Configuration is valid",
-    details: validation.path ? [`Path: ${validation.path}`] : undefined,
-    issues,
-  }
+	return {
+		name: CHECK_NAMES[CHECK_IDS.CONFIG],
+		status: issues.length > 0 ? "warn" : "pass",
+		message:
+			issues.length > 0
+				? `${issues.length} configuration warning(s)`
+				: "Configuration is valid",
+		details: validation.path ? [`Path: ${validation.path}`] : undefined,
+		issues,
+	};
 }

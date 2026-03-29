@@ -8,14 +8,15 @@ Oh-My-OpenAgent provides 11 specialized AI agents. Each has distinct expertise, 
 
 Core-agent tab cycling is deterministic via injected runtime order field. The fixed priority order is Sisyphus (order: 1), Hephaestus (order: 2), Prometheus (order: 3), and Atlas (order: 4). Remaining agents follow after that stable core ordering.
 
-| Agent                 | Model              | Purpose                                                                                                                                                                                                                                                                                                                                                          |
-| --------------------- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Sisyphus**          | `claude-opus-4-6`  | The default orchestrator. Plans, delegates, and executes complex tasks using specialized subagents with aggressive parallel execution. Todo-driven workflow with extended thinking (32k budget). Fallback: `glm-5` → `big-pickle`.                                                                                                                                 |
+| Agent                 | Model              | Purpose                                                                                                                                                                                                                                                                                                                   |
+| --------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Sisyphus**          | `claude-opus-4-6`  | The default orchestrator. Plans, delegates, and executes complex tasks using specialized subagents with aggressive parallel execution. Todo-driven workflow with extended thinking (32k budget). Fallback: `glm-5` → `big-pickle`.                                                                                        |
 | **Hephaestus**        | `gpt-5.4`          | The Legitimate Craftsman. Autonomous deep worker inspired by AmpCode's deep mode. Goal-oriented execution with thorough research before action. Explores codebase patterns, completes tasks end-to-end without premature stopping. Named after the Greek god of forge and craftsmanship. Requires a GPT-capable provider. |
-| **Oracle**            | `gpt-5.4`          | Architecture decisions, code review, debugging. Read-only consultation with stellar logical reasoning and deep analysis. Inspired by AmpCode. Fallback: `gemini-3.1-pro` → `claude-opus-4-6`.                                                                                                                                                                    |
-| **Librarian**         | `minimax-m2.7`     | Multi-repo analysis, documentation lookup, OSS implementation examples. Deep codebase understanding with evidence-based answers. Primary OpenCode Go path uses MiniMax M2.7. Other provider catalogs may still fall back to MiniMax M2.5, then `claude-haiku-4-5` and `gpt-5-nano`.                                                                                  |
-| **Explore**           | `grok-code-fast-1` | Fast codebase exploration and contextual grep. Primary path stays on Grok Code Fast 1. MiniMax M2.7 is now used where provider catalogs expose it, while some OpenCode fallback paths still use MiniMax M2.5 for catalog compatibility.                                                                                                                          |
-| **Multimodal-Looker** | `gpt-5.4`          | Visual content specialist. Analyzes PDFs, images, diagrams to extract information. Fallback: `k2p5` → `glm-4.6v` → `gpt-5-nano`.                                                                                                                                                                                                                                  |
+| **Oracle**            | `gpt-5.4`          | Architecture decisions, code review, debugging. Read-only consultation with stellar logical reasoning and deep analysis. Inspired by AmpCode. Fallback: `gemini-3.1-pro` → `claude-opus-4-6`.                                                                                                                             |
+| **Librarian**         | `minimax-m2.7`     | Multi-repo analysis, documentation lookup, OSS implementation examples. Deep codebase understanding with evidence-based answers. Primary OpenCode Go path uses MiniMax M2.7. Other provider catalogs may still fall back to MiniMax M2.5, then `claude-haiku-4-5` and `gpt-5-nano`.                                       |
+| **Explore**           | `grok-code-fast-1` | Fast codebase exploration and contextual grep. Primary path stays on Grok Code Fast 1. MiniMax M2.7 is now used where provider catalogs expose it, while some OpenCode fallback paths still use MiniMax M2.5 for catalog compatibility.                                                                                   |
+| **Multimodal-Looker** | `gpt-5.4`          | Visual content specialist. Analyzes PDFs, images, diagrams to extract information. Fallback: `k2p5` → `glm-4.6v` → `gpt-5-nano`.                                                                                                                                                                                          |
+
 ### Planning Agents
 
 | Agent          | Model             | Purpose                                                                                                                                            |
@@ -92,7 +93,7 @@ When running inside tmux:
 - Auto-cleanup when agents complete
 - **Stable agent ordering**: core-agent tab cycling is deterministic via injected runtime order field (Sisyphus: 1, Hephaestus: 2, Prometheus: 3, Atlas: 4)
 
-Customize agent models, prompts, and permissions in `oh-my-opencode.jsonc`.
+Customize agent models, prompts, and permissions in the canonical `oh-my-openagent.jsonc` config file.
 
 ## Category System
 
@@ -107,16 +108,16 @@ By combining these two concepts, you can generate optimal agents through `task`.
 
 ### Built-in Categories
 
-| Category             | Default Model                   | Use Cases                                                                                                                   |
-| -------------------- | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `visual-engineering` | `google/gemini-3.1-pro`         | Frontend, UI/UX, design, styling, animation                                                                                 |
-| `ultrabrain`         | `openai/gpt-5.4` (xhigh)        | Deep logical reasoning, complex architecture decisions requiring extensive analysis                                         |
-| `deep`               | `openai/gpt-5.3-codex` (medium) | Goal-oriented autonomous problem-solving. Thorough research before action. For hairy problems requiring deep understanding. |
-| `artistry`           | `google/gemini-3.1-pro` (high)  | Highly creative/artistic tasks, novel ideas                                                                                 |
-| `quick`              | `openai/gpt-5.4-mini`           | Trivial tasks - single file changes, typo fixes, simple modifications                                                       |
-| `unspecified-low`    | `anthropic/claude-sonnet-4-6`   | Tasks that don't fit other categories, low effort required                                                                  |
-| `unspecified-high`   | `anthropic/claude-opus-4-6` (max) | Tasks that don't fit other categories, high effort required                                                               |
-| `writing`            | `google/gemini-3-flash`         | Documentation, prose, technical writing                                                                                     |
+| Category             | Default Model                     | Use Cases                                                                                                                   |
+| -------------------- | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `visual-engineering` | `google/gemini-3.1-pro`           | Frontend, UI/UX, design, styling, animation                                                                                 |
+| `ultrabrain`         | `openai/gpt-5.4` (xhigh)          | Deep logical reasoning, complex architecture decisions requiring extensive analysis                                         |
+| `deep`               | `openai/gpt-5.3-codex` (medium)   | Goal-oriented autonomous problem-solving. Thorough research before action. For hairy problems requiring deep understanding. |
+| `artistry`           | `google/gemini-3.1-pro` (high)    | Highly creative/artistic tasks, novel ideas                                                                                 |
+| `quick`              | `openai/gpt-5.4-mini`             | Trivial tasks - single file changes, typo fixes, simple modifications                                                       |
+| `unspecified-low`    | `anthropic/claude-sonnet-4-6`     | Tasks that don't fit other categories, low effort required                                                                  |
+| `unspecified-high`   | `anthropic/claude-opus-4-6` (max) | Tasks that don't fit other categories, high effort required                                                                 |
+| `writing`            | `google/gemini-3-flash`           | Documentation, prose, technical writing                                                                                     |
 
 ### Usage
 
@@ -207,10 +208,13 @@ Configure per-agent fallback chains with arrays that can mix plain model strings
       "fallback_models": [
         "opencode/glm-5",
         { "model": "openai/gpt-5.4", "variant": "high" },
-        { "model": "anthropic/claude-sonnet-4-6", "thinking": { "type": "enabled", "budgetTokens": 64000 } }
-      ]
-    }
-  }
+        {
+          "model": "anthropic/claude-sonnet-4-6",
+          "thinking": { "type": "enabled", "budgetTokens": 64000 },
+        },
+      ],
+    },
+  },
 }
 ```
 
@@ -224,23 +228,24 @@ Load agent system prompts from external files using `file://` URLs in the `promp
 {
   "agents": {
     "sisyphus": {
-      "prompt": "file:///path/to/custom-prompt.md"
+      "prompt": "file:///path/to/custom-prompt.md",
     },
     "oracle": {
-      "prompt_append": "file:///path/to/additional-context.md"
-    }
+      "prompt_append": "file:///path/to/additional-context.md",
+    },
   },
   "categories": {
     "deep": {
-      "prompt_append": "file:///path/to/deep-category-append.md"
-    }
-  }
+      "prompt_append": "file:///path/to/deep-category-append.md",
+    },
+  },
 }
 ```
 
 Supports `~` expansion for home directory and relative `file://` paths.
 
 Useful for:
+
 - Version controlling prompts separately from config
 - Sharing prompts across projects
 - Keeping configuration files concise
@@ -259,6 +264,7 @@ The system automatically recovers from common session failures without user inte
 - **JSON parse errors**: Recovers from malformed tool outputs
 
 Recovery happens transparently during agent execution. You see the result, not the failure.
+
 ## Skills
 
 Skills provide specialized workflows with embedded MCP servers and detailed instructions. A Skill is a mechanism that injects **specialized knowledge (Context)** and **tools (MCP)** for specific domains into agents.
@@ -938,14 +944,15 @@ Configure automatic refresh at startup:
     "enabled": true,
     "auto_refresh_on_start": true,
     "refresh_timeout_ms": 5000,
-    "source_url": "https://models.dev/api.json"
-  }
+    "source_url": "https://models.dev/api.json",
+  },
 }
 ```
 
 ### Capability Diagnostics
 
 Run `bunx oh-my-opencode doctor` to see capability diagnostics including:
+
 - effective model resolution for agents and categories
 - warnings when configured models rely on compatibility fallback
 - override compatibility details alongside model resolution output

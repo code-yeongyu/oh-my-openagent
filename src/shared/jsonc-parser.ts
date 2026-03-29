@@ -93,3 +93,27 @@ export function detectPluginConfigFile(dir: string): {
 
 	return { format: "none", path: candidates[0] };
 }
+
+export function readFirstValidPluginConfigFile<T = unknown>(
+	dir: string,
+): {
+	format: "json" | "jsonc" | "none";
+	path: string;
+	data: T | null;
+} {
+	const candidates = getPluginConfigFileCandidates(dir);
+
+	for (const candidate of candidates) {
+		if (!existsSync(candidate)) continue;
+
+		try {
+			return {
+				format: candidate.endsWith(".jsonc") ? "jsonc" : "json",
+				path: candidate,
+				data: parseJsonc<T>(readFileSync(candidate, "utf-8")),
+			};
+		} catch {}
+	}
+
+	return { format: "none", path: candidates[0], data: null };
+}

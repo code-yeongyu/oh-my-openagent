@@ -14,15 +14,15 @@ npx oh-my-opencode
 
 ## Commands
 
-| Command                       | Description                                            |
-| ----------------------------- | ------------------------------------------------------ |
-| `install`                     | Interactive setup wizard                               |
-| `doctor`                      | Environment diagnostics and health checks              |
-| `run`                         | OpenCode session runner with task completion enforcement |
-| `get-local-version`           | Display local version information and update check     |
-| `refresh-model-capabilities`  | Refresh the cached models.dev-based model capabilities |
-| `version`                     | Show version information                               |
-| `mcp oauth`                   | MCP OAuth authentication management                    |
+| Command                      | Description                                              |
+| ---------------------------- | -------------------------------------------------------- |
+| `install`                    | Interactive setup wizard                                 |
+| `doctor`                     | Environment diagnostics and health checks                |
+| `run`                        | OpenCode session runner with task completion enforcement |
+| `get-local-version`          | Display local version information and update check       |
+| `refresh-model-capabilities` | Refresh the cached models.dev-based model capabilities   |
+| `version`                    | Show version information                                 |
+| `mcp oauth`                  | MCP OAuth authentication management                      |
 
 ---
 
@@ -40,23 +40,23 @@ bunx oh-my-opencode install
 
 1. **Subscription Selection**: Choose which providers and subscriptions you actually have
 2. **Plugin Registration**: Registers `oh-my-openagent` in OpenCode settings, or upgrades a legacy `oh-my-opencode` entry during the compatibility window
-3. **Configuration File Creation**: Writes the generated OmO config to `oh-my-opencode.json` in the active OpenCode config directory
+3. **Configuration File Creation**: Writes the generated OmO config to the canonical `oh-my-openagent.jsonc` path in the active OpenCode config directory (or preserves an existing canonical `.json` file)
 4. **Authentication Hints**: Shows the `opencode auth login` steps for the providers you selected, unless `--skip-auth` is set
 
 ### Options
 
-| Option | Description |
-| ------ | ----------- |
-| `--no-tui` | Run in non-interactive mode without TUI |
-| `--claude <no\|yes\|max20>` | Claude subscription mode |
-| `--openai <no\|yes>` | OpenAI / ChatGPT subscription |
-| `--gemini <no\|yes>` | Gemini integration |
-| `--copilot <no\|yes>` | GitHub Copilot subscription |
-| `--opencode-zen <no\|yes>` | OpenCode Zen access |
-| `--zai-coding-plan <no\|yes>` | Z.ai Coding Plan subscription |
-| `--kimi-for-coding <no\|yes>` | Kimi for Coding subscription |
-| `--opencode-go <no\|yes>` | OpenCode Go subscription |
-| `--skip-auth` | Skip authentication setup hints |
+| Option                        | Description                             |
+| ----------------------------- | --------------------------------------- |
+| `--no-tui`                    | Run in non-interactive mode without TUI |
+| `--claude <no\|yes\|max20>`   | Claude subscription mode                |
+| `--openai <no\|yes>`          | OpenAI / ChatGPT subscription           |
+| `--gemini <no\|yes>`          | Gemini integration                      |
+| `--copilot <no\|yes>`         | GitHub Copilot subscription             |
+| `--opencode-zen <no\|yes>`    | OpenCode Zen access                     |
+| `--zai-coding-plan <no\|yes>` | Z.ai Coding Plan subscription           |
+| `--kimi-for-coding <no\|yes>` | Kimi for Coding subscription            |
+| `--opencode-go <no\|yes>`     | OpenCode Go subscription                |
+| `--skip-auth`                 | Skip authentication setup hints         |
 
 ---
 
@@ -65,10 +65,12 @@ bunx oh-my-opencode install
 Diagnoses your environment to ensure Oh My OpenCode is functioning correctly. The current checks are grouped into system, config, tools, and models.
 
 The doctor command detects common issues including:
+
 - Legacy plugin entry references in `opencode.json` (warns when `oh-my-opencode` is still used instead of `oh-my-openagent`)
 - Configuration file validity and JSONC parsing errors
 - Model resolution and fallback chain verification
 - Missing or misconfigured MCP servers
+
 ### Usage
 
 ```bash
@@ -77,20 +79,20 @@ bunx oh-my-opencode doctor
 
 ### Diagnostic Categories
 
-| Category          | Check Items                                                                          |
-| ----------------- | ------------------------------------------------------------------------------------ |
-| **System**        | OpenCode binary, version (>= 1.0.150), plugin registration, legacy package name warning |
-| **Config**        | Configuration file validity, JSONC parsing, Zod schema validation                    |
-| **Tools**         | AST-Grep, LSP servers, GitHub CLI, MCP servers                                       |
-| **Models**        | Model capabilities cache, model resolution, agent/category overrides, availability   |
+| Category   | Check Items                                                                             |
+| ---------- | --------------------------------------------------------------------------------------- |
+| **System** | OpenCode binary, version (>= 1.0.150), plugin registration, legacy package name warning |
+| **Config** | Configuration file validity, JSONC parsing, Zod schema validation                       |
+| **Tools**  | AST-Grep, LSP servers, GitHub CLI, MCP servers                                          |
+| **Models** | Model capabilities cache, model resolution, agent/category overrides, availability      |
 
 ### Options
 
-| Option       | Description                               |
-| ------------ | ----------------------------------------- |
-| `--status`   | Show compact system dashboard             |
-| `--verbose`  | Show detailed diagnostic information      |
-| `--json`     | Output results in JSON format             |
+| Option      | Description                          |
+| ----------- | ------------------------------------ |
+| `--status`  | Show compact system dashboard        |
+| `--verbose` | Show detailed diagnostic information |
+| `--json`    | Output results in JSON format        |
 
 ### Example Output
 
@@ -106,7 +108,7 @@ System
   ✓ Plugin registered in opencode.json
 
 Config
-  ✓ oh-my-opencode.jsonc is valid
+  ✓ oh-my-openagent.jsonc is valid
   ✓ Model resolution: all agents have valid fallback chains
   ⚠ categories.visual-engineering: using default model
 
@@ -120,6 +122,7 @@ Models
 
 Summary: 10 passed, 1 warning, 0 failed
 ```
+
 ---
 
 ## run
@@ -134,18 +137,18 @@ bunx oh-my-opencode run <message>
 
 ### Options
 
-| Option                | Description                                                         |
-| --------------------- | ------------------------------------------------------------------- |
-| `-a, --agent <name>`  | Agent to use (default: from CLI/env/config, fallback: Sisyphus)     |
-| `-m, --model <provider/model>` | Model override (e.g., anthropic/claude-sonnet-4)             |
-| `-d, --directory <path>` | Working directory                                                |
-| `-p, --port <port>`  | Server port (attaches if port already in use)                       |
-| `--attach <url>`      | Attach to existing opencode server URL                              |
-| `--on-complete <command>` | Shell command to run after completion                          |
-| `--json`              | Output structured JSON result to stdout                             |
-| `--no-timestamp`      | Disable timestamp prefix in run output                              |
-| `--verbose`           | Show full event stream (default: messages/tools only)               |
-| `--session-id <id>`   | Resume existing session instead of creating new one                 |
+| Option                         | Description                                                     |
+| ------------------------------ | --------------------------------------------------------------- |
+| `-a, --agent <name>`           | Agent to use (default: from CLI/env/config, fallback: Sisyphus) |
+| `-m, --model <provider/model>` | Model override (e.g., anthropic/claude-sonnet-4)                |
+| `-d, --directory <path>`       | Working directory                                               |
+| `-p, --port <port>`            | Server port (attaches if port already in use)                   |
+| `--attach <url>`               | Attach to existing opencode server URL                          |
+| `--on-complete <command>`      | Shell command to run after completion                           |
+| `--json`                       | Output structured JSON result to stdout                         |
+| `--no-timestamp`               | Disable timestamp prefix in run output                          |
+| `--verbose`                    | Show full event stream (default: messages/tools only)           |
+| `--session-id <id>`            | Resume existing session instead of creating new one             |
 
 ---
 
@@ -161,14 +164,15 @@ bunx oh-my-opencode get-local-version
 
 ### Options
 
-| Option            | Description                                    |
-| ----------------- | ---------------------------------------------- |
-| `-d, --directory` | Working directory to check config from         |
-| `--json`          | Output in JSON format for scripting            |
+| Option            | Description                            |
+| ----------------- | -------------------------------------- |
+| `-d, --directory` | Working directory to check config from |
+| `--json`          | Output in JSON format for scripting    |
 
 ### Output
 
 Shows:
+
 - Current installed version
 - Latest available version on npm
 - Whether you're up to date
@@ -231,11 +235,12 @@ The runtime loads user config as the base config, then merges project config on 
 1. **Project Level**: `.opencode/oh-my-openagent.jsonc`, `.opencode/oh-my-openagent.json`, `.opencode/oh-my-opencode.jsonc`, or `.opencode/oh-my-opencode.json`
 2. **User Level**: `~/.config/opencode/oh-my-openagent.jsonc`, `~/.config/opencode/oh-my-openagent.json`, `~/.config/opencode/oh-my-opencode.jsonc`, or `~/.config/opencode/oh-my-opencode.json`
 
-**Naming Note**: The published package and binary are still `oh-my-opencode`. Inside `opencode.json`, the compatibility layer now prefers the plugin entry `oh-my-openagent`. Plugin config loading recognizes both `oh-my-openagent.*` and legacy `oh-my-opencode.*` basenames. If both basenames exist in the same directory, the legacy `oh-my-opencode.*` file currently wins.
+**Naming Note**: The published package and binary are still `oh-my-opencode`. Inside `opencode.json`, the compatibility layer now prefers the plugin entry `oh-my-openagent`. Plugin config loading recognizes both `oh-my-openagent.*` and legacy `oh-my-opencode.*` basenames. If both basenames exist in the same directory, the canonical `oh-my-openagent.*` file wins.
 
 ### Filename Compatibility
 
 Both `.jsonc` and `.json` extensions are supported. JSONC (JSON with Comments) is preferred as it allows:
+
 - Comments (both `//` and `/* */` styles)
 - Trailing commas in arrays and objects
 
@@ -304,6 +309,7 @@ The doctor warns if it finds the legacy plugin entry `oh-my-opencode` in `openco
 jq '.plugin = (.plugin // [] | map(if . == "oh-my-opencode" then "oh-my-openagent" else . end))' \
   ~/.config/opencode/opencode.json > /tmp/opencode.json && mv /tmp/opencode.json ~/.config/opencode/opencode.json
 ```
+
 ---
 
 ## refresh-model-capabilities
@@ -318,11 +324,11 @@ bunx oh-my-opencode refresh-model-capabilities
 
 ### Options
 
-| Option            | Description                                         |
-| ----------------- | --------------------------------------------------- |
-| `-d, --directory` | Working directory to read oh-my-opencode config from |
-| `--source-url <url>` | Override the models.dev source URL               |
-| `--json`          | Output refresh summary as JSON                      |
+| Option               | Description                                          |
+| -------------------- | ---------------------------------------------------- |
+| `-d, --directory`    | Working directory to read oh-my-opencode config from |
+| `--source-url <url>` | Override the models.dev source URL                   |
+| `--json`             | Output refresh summary as JSON                       |
 
 ### Configuration
 
@@ -334,8 +340,8 @@ Configure automatic refresh behavior in your plugin config:
     "enabled": true,
     "auto_refresh_on_start": true,
     "refresh_timeout_ms": 5000,
-    "source_url": "https://models.dev/api.json"
-  }
+    "source_url": "https://models.dev/api.json",
+  },
 }
 ```
 
