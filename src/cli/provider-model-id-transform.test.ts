@@ -68,19 +68,19 @@ describe("transformModelForProvider", () => {
 	})
 
 	describe("anthropic provider", () => {
-		test("transforms claude-opus-4-6 to claude-opus-4.6", () => {
+		test("keeps claude-opus-4-6 unchanged for anthropic", () => {
 			const result = transformModelForProvider("anthropic", "claude-opus-4-6")
-			expect(result).toBe("claude-opus-4.6")
+			expect(result).toBe("claude-opus-4-6")
 		})
 
-		test("transforms claude-sonnet-4-6 to claude-sonnet-4.6", () => {
+		test("keeps claude-sonnet-4-6 unchanged for anthropic", () => {
 			const result = transformModelForProvider("anthropic", "claude-sonnet-4-6")
-			expect(result).toBe("claude-sonnet-4.6")
+			expect(result).toBe("claude-sonnet-4-6")
 		})
 
-		test("transforms claude-haiku-4-5 to claude-haiku-4.5", () => {
+		test("keeps claude-haiku-4-5 unchanged for anthropic", () => {
 			const result = transformModelForProvider("anthropic", "claude-haiku-4-5")
-			expect(result).toBe("claude-haiku-4.5")
+			expect(result).toBe("claude-haiku-4-5")
 		})
 	})
 

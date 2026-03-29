@@ -6,9 +6,11 @@ import { clearSkillCache } from "../features/opencode-skill-loader/skill-content
 import * as connectedProvidersCache from "../shared/connected-providers-cache"
 import * as modelAvailability from "../shared/model-availability"
 import * as shared from "../shared"
+import { transformModelForProvider } from "../shared/provider-model-id-transform"
 
 const TEST_DEFAULT_MODEL = "anthropic/claude-opus-4-6"
 let createBuiltinAgents: (typeof import("./builtin-agents"))["createBuiltinAgents"]
+const EXPECTED_FIRST_RUN_SISYPHUS_MODEL = `anthropic/${transformModelForProvider("anthropic", "claude-opus")}`
 
 async function importFreshBuiltinAgentsModule(): Promise<typeof import("./builtin-agents")> {
   return import(`./builtin-agents?test=${Date.now()}-${Math.random()}`)
@@ -45,7 +47,7 @@ describe("createBuiltinAgents with model overrides", () => {
       const agents = await createBuiltinAgents([], {}, undefined, TEST_DEFAULT_MODEL, undefined, undefined, [], {})
 
       // #then
-      expect(agents.sisyphus.model).toBe("anthropic/claude-opus-4-6")
+      expect(agents.sisyphus.model).toBe(`anthropic/${transformModelForProvider("anthropic", "claude-opus-4-6")}`)
       expect(agents.sisyphus.thinking).toEqual({ type: "enabled", budgetTokens: 32000 })
       expect(agents.sisyphus.reasoningEffort).toBeUndefined()
     } finally {
@@ -180,7 +182,13 @@ describe("createBuiltinAgents with model overrides", () => {
 
       // #then
       expect(agents.sisyphus).toBeDefined()
+<<<<<<< HEAD
       expect(agents.sisyphus.model).toBe("anthropic/claude-opus-4.6")
+||||||| parent of 42e8d245 (Fix dynamic model resolution and cache-aware context limits)
+      expect(agents.sisyphus.model).toBe("anthropic/claude-opus-4-6")
+=======
+      expect(agents.sisyphus.model).toBe(EXPECTED_FIRST_RUN_SISYPHUS_MODEL)
+>>>>>>> 42e8d245 (Fix dynamic model resolution and cache-aware context limits)
     } finally {
       cacheSpy.mockRestore()
       fetchSpy.mockRestore()
@@ -918,7 +926,13 @@ describe("createBuiltinAgents with requiresAnyModel gating (sisyphus)", () => {
 
       // #then
       expect(agents.sisyphus).toBeDefined()
+<<<<<<< HEAD
       expect(agents.sisyphus.model).toBe("anthropic/claude-opus-4.6")
+||||||| parent of 42e8d245 (Fix dynamic model resolution and cache-aware context limits)
+      expect(agents.sisyphus.model).toBe("anthropic/claude-opus-4-6")
+=======
+      expect(agents.sisyphus.model).toBe(EXPECTED_FIRST_RUN_SISYPHUS_MODEL)
+>>>>>>> 42e8d245 (Fix dynamic model resolution and cache-aware context limits)
     } finally {
       cacheSpy.mockRestore()
       fetchSpy.mockRestore()

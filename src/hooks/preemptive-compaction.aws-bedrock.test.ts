@@ -28,7 +28,9 @@ describe("preemptive-compaction aws-bedrock-anthropic", () => {
     // given
     const ctx = createMockContext()
     const pluginConfig = OhMyOpenCodeConfigSchema.parse({})
-    const hook = createPreemptiveCompactionHook(ctx, pluginConfig)
+    const hook = createPreemptiveCompactionHook(ctx, pluginConfig, {
+      modelContextLimitsCache: new Map([["aws-bedrock-anthropic/claude-sonnet-4-6", 200_000]]),
+    })
     const sessionID = "ses_aws_bedrock_anthropic_high"
 
     await hook.event({
