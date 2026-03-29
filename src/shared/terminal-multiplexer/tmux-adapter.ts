@@ -149,7 +149,10 @@ export class TmuxAdapter implements Multiplexer {
     const lines = stdout.trim().split("\n").filter(Boolean)
 
     for (const line of lines) {
-      const [paneId, title] = line.split(",")
+      const commaIndex = line.indexOf(",")
+      if (commaIndex === -1) continue
+      const paneId = line.slice(0, commaIndex)
+      const title = line.slice(commaIndex + 1)
       if (paneId && title) {
         panes.push({
           label: title,

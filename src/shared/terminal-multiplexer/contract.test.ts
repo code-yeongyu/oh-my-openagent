@@ -1,11 +1,28 @@
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test"
 import type { Multiplexer, PaneHandle, SpawnOptions } from "./types"
 
-const mockSpawn = mock(() => ({
-  exited: Promise.resolve(0),
-  stdout: new ReadableStream({ start(c) { c.close() } }),
-  stderr: new ReadableStream({ start(c) { c.close() } }),
-}))
+const mockSpawn = mock((args: string[]) => {
+  const isCat = args[0] === "cat"
+  const isZellijListSessions = args[0] === "zellij" && args[1] === "list-sessions"
+  const isTmuxListPanes = args[0] === "tmux" && args.includes("list-panes")
+
+  let output = ""
+  if (isCat) output = "%1\n"
+  else if (isZellijListSessions) output = "omo-contract-pane\n"
+  else if (isTmuxListPanes) output = "%1,omo-contract-pane\n"
+
+  const bytes = output ? new TextEncoder().encode(output) : null
+  return {
+    exited: Promise.resolve(0),
+    stdout: new ReadableStream({
+      start(c) {
+        if (bytes) c.enqueue(bytes)
+        c.close()
+      },
+    }),
+    stderr: new ReadableStream({ start(c) { c.close() } }),
+  }
+})
 
 const mockConfig = {
   enabled: true,
@@ -132,6 +149,10 @@ describe.each([
       //#then
       expect(handle).toBeDefined()
       expect(handle.label).toBe("omo-direction-test")
+      const allArgs = (mockSpawn.mock.calls as Array<[string[]]>).flatMap(([a]) => a)
+      if (allArgs.length > 0) {
+        expect(allArgs.some(arg => arg === "horizontal" || arg === "-h")).toBe(true)
+      }
     })
   })
 
@@ -182,9 +203,11 @@ describe.each([
       const panes = await adapter.getPanes()
 
       //#then
+      expect(Array.isArray(panes)).toBe(true)
       for (const pane of panes) {
         expect(pane.label).toBeDefined()
         expect(typeof pane.label).toBe("string")
+        expect(pane.label.length).toBeGreaterThan(0)
       }
     })
   })

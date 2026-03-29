@@ -171,7 +171,7 @@ export class ZellijAdapter implements Multiplexer {
       }
     } else if (this.anchorReadyPromise) {
       const anchorId = await this.anchorReadyPromise
-      if (anchorId) {
+      if (anchorId && paneId) {
         const stackProc = this.spawn(["zellij", "action", "stack-panes", "--", anchorId, paneId], {
           stdout: "pipe",
           stderr: "pipe",
@@ -179,7 +179,7 @@ export class ZellijAdapter implements Multiplexer {
         await stackProc.exited
         log("[ZellijAdapter.spawnPane] stacked with anchor", { anchorPaneId: anchorId, newPaneId: paneId })
       } else {
-        log("[ZellijAdapter.spawnPane] anchor pane failed, skipping stack", { label })
+        log("[ZellijAdapter.spawnPane] skipping stack: anchor or pane ID unavailable", { label, anchorId: anchorId ?? null, paneId })
       }
     }
 

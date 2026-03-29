@@ -47,8 +47,8 @@ function makeMockSpawn() {
   }
 }
 
-function makeAdapter() {
-  return new ZellijAdapter(mockConfig, makeMockStorage(), makeMockSpawn() as any)
+function makeAdapter(storage?: ZellijStorage) {
+  return new ZellijAdapter(mockConfig, storage ?? makeMockStorage(), makeMockSpawn() as any)
 }
 
 describe("ZellijAdapter", () => {
@@ -237,17 +237,18 @@ describe("ZellijAdapter", () => {
     it("saves state after setting anchor pane when sessionID is set", async () => {
       //#given
       const sessionID = "test-session-spawn"
-      const adapter = makeAdapter()
-      adapter.setSessionID(sessionID)
+      const storage = makeMockStorage()
+      const adapter = makeAdapter(storage)
+      await adapter.setSessionID(sessionID)
 
       //#when
       await adapter.spawnPane("echo test", { label: "omo-anchor-test" })
 
-      //#then - state should be persisted (anchorPaneId and hasCreatedFirstPane)
-      expect(adapter).toBeDefined()
-
-      //#cleanup
-      clearZellijState(sessionID)
+      //#then - state persisted: anchorPaneId and hasCreatedFirstPane set
+      const saved = storage.loadZellijState(sessionID)
+      expect(saved).not.toBeNull()
+      expect(saved?.hasCreatedFirstPane).toBe(true)
+      expect(saved?.anchorPaneId).toBe("%1")
     })
 
     it("does not save state when sessionID is not set (backward compatibility)", async () => {
@@ -264,18 +265,18 @@ describe("ZellijAdapter", () => {
     it("saves state after subsequent pane spawns", async () => {
       //#given
       const sessionID = "test-session-multi"
-      const adapter = makeAdapter()
-      adapter.setSessionID(sessionID)
+      const storage = makeMockStorage()
+      const adapter = makeAdapter(storage)
+      await adapter.setSessionID(sessionID)
 
       //#when
       await adapter.spawnPane("echo first", { label: "omo-first" })
       await adapter.spawnPane("echo second", { label: "omo-second" })
 
-      //#then - state should be persisted after each spawn
-      expect(adapter).toBeDefined()
-
-      //#cleanup
-      clearZellijState(sessionID)
+      //#then - state remains persisted after subsequent spawns
+      const saved = storage.loadZellijState(sessionID)
+      expect(saved).not.toBeNull()
+      expect(saved?.hasCreatedFirstPane).toBe(true)
     })
   })
 

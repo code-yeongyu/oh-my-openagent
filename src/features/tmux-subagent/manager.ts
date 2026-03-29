@@ -482,7 +482,7 @@ export class TmuxSessionManager {
     const sessionId = info.id
     const title = info.title ?? "Subagent"
 
-    if (!this.sourcePaneId) {
+    if (!this.sourcePaneId && !this.adapter) {
       log("[tmux-session-manager] no source pane id")
       return
     }
@@ -492,13 +492,19 @@ export class TmuxSessionManager {
     if (
       this.sessions.has(sessionId) ||
       this.pendingSessions.has(sessionId) ||
-      this.deferredSessions.has(sessionId)
+      this.deferredSessions.has(sessionId) ||
+      this.sessionHandles.has(sessionId)
     ) {
       log("[tmux-session-manager] session already tracked or pending", { sessionId })
       return
     }
     if (this.adapter) {
       await this.spawnWithAdapter(sessionId, title)
+      return
+    }
+
+    if (!this.sourcePaneId) {
+      log("[tmux-session-manager] no source pane id")
       return
     }
 
@@ -641,9 +647,23 @@ export class TmuxSessionManager {
 
   async onSessionDeleted(event: { sessionID: string }): Promise<void> {
     if (!this.isEnabled()) return
-    if (!this.sourcePaneId) return
 
     this.removeDeferredSession(event.sessionID)
+
+    const handle = this.sessionHandles.get(event.sessionID)
+    if (handle) {
+      try {
+        await this.adapter?.closePane(handle)
+      } catch (error) {
+        log("[tmux-session-manager] onSessionDeleted adapter close error", {
+          sessionId: event.sessionID,
+          error: String(error),
+        })
+      }
+      this.sessionHandles.delete(event.sessionID)
+    }
+
+    if (!this.sourcePaneId) return
 
     const tracked = this.sessions.get(event.sessionID)
     if (!tracked) return

@@ -24,7 +24,9 @@ async function findBinary(name: string): Promise<boolean> {
   }
 }
 
-export async function detectMultiplexer(): Promise<MultiplexerType | null> {
+export async function detectMultiplexer(
+  findBinaryImpl: (name: string) => Promise<boolean> = findBinary
+): Promise<MultiplexerType | null> {
   if (cachedMultiplexer !== undefined) {
     return cachedMultiplexer
   }
@@ -41,8 +43,8 @@ export async function detectMultiplexer(): Promise<MultiplexerType | null> {
     return "zellij"
   }
 
-  const tmuxAvailable = await findBinary("tmux")
-  const zellijAvailable = await findBinary("zellij")
+  const tmuxAvailable = await findBinaryImpl("tmux")
+  const zellijAvailable = await findBinaryImpl("zellij")
 
   if (tmuxAvailable) {
     log("[detectMultiplexer] tmux binary found")

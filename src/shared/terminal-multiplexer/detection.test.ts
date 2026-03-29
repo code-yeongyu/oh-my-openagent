@@ -99,15 +99,13 @@ describe("detectMultiplexer", () => {
 
   it("returns null when no multiplexer is detected", async () => {
     //#given
-    // No env vars set, and we can't mock spawn easily for binary detection
-    // This test verifies the fallback behavior
+    // env vars already cleared by beforeEach
 
     //#when
-    resetDetectionCache()
-    const result = await detectMultiplexer()
+    const result = await detectMultiplexer(async () => false)
 
     //#then
-    expect(result === null || result === "tmux" || result === "zellij").toBe(true)
+    expect(result).toBeNull()
   })
 })
 

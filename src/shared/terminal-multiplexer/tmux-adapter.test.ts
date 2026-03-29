@@ -167,7 +167,7 @@ describe("TmuxAdapter", () => {
 
     it("accepts session name and creates session", async () => {
       //#given
-      const sessionName = "omo-test-session"
+      const sessionName = `omo-test-session-${Math.random().toString(36).slice(2, 8)}`
       createdSessions.push(sessionName)
 
       //#when
@@ -179,7 +179,7 @@ describe("TmuxAdapter", () => {
 
     it("succeeds when session already exists", async () => {
       //#given
-      const sessionName = "omo-existing-session"
+      const sessionName = `omo-existing-session-${Math.random().toString(36).slice(2, 8)}`
       createdSessions.push(sessionName)
       await adapter.ensureSession(sessionName)
 
@@ -211,7 +211,7 @@ describe("TmuxAdapter", () => {
 
     it("accepts session name and kills session", async () => {
       //#given
-      const sessionName = "omo-kill-test"
+      const sessionName = `omo-kill-test-${Math.random().toString(36).slice(2, 8)}`
       createdSessions.push(sessionName)
       await adapter.ensureSession(sessionName)
 
@@ -224,7 +224,7 @@ describe("TmuxAdapter", () => {
 
     it("handles killing non-existent session gracefully", async () => {
       //#given
-      const sessionName = "omo-nonexistent-session"
+      const sessionName = `omo-nonexistent-session-${Math.random().toString(36).slice(2, 8)}`
 
       //#when
       const killPromise = adapter.killSession(sessionName)
