@@ -76,7 +76,7 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
   - category: For task delegation (uses Sisyphus-Junior with category-optimized model)
   - subagent_type: For direct agent invocation (explore, librarian, oracle, etc.)
   
-  **DO NOT provide both.** If category is provided, subagent_type is ignored.
+  If both are provided, category takes precedence and subagent_type is silently ignored.
   
   - load_skills: ALWAYS REQUIRED. Pass [] if no skills needed, or ["skill-1", "skill-2"] for category tasks.
   - category: Use predefined category → Spawns Sisyphus-Junior with category config
@@ -101,8 +101,8 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
       description: tool.schema.string().describe("Short task description (3-5 words)"),
       prompt: tool.schema.string().describe("Full detailed prompt for the agent"),
       run_in_background: tool.schema.boolean().describe("REQUIRED. true=async (returns task_id), false=sync (waits). Use false for task delegation, true ONLY for parallel exploration."),
-      category: tool.schema.string().optional().describe(`REQUIRED if subagent_type not provided. Do NOT provide both category and subagent_type.`),
-      subagent_type: tool.schema.string().optional().describe("REQUIRED if category not provided. Do NOT provide both category and subagent_type. Valid values: explore, librarian, oracle, metis, momus"),
+      category: tool.schema.string().optional().describe(`REQUIRED if subagent_type not provided. If both provided, category takes precedence.`),
+      subagent_type: tool.schema.string().optional().describe("REQUIRED if category not provided. If both provided, category takes precedence and this is ignored. Valid values: explore, librarian, oracle, metis, momus"),
       session_id: tool.schema.string().optional().describe("Existing Task session to continue"),
       command: tool.schema.string().optional().describe("The command that triggered this task"),
     },
@@ -110,13 +110,11 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
       const ctx = toolContext as ToolContextWithMetadata
 
       if (args.category && args.subagent_type) {
-        throw new Error(
-          `Invalid arguments: 'category' and 'subagent_type' are mutually exclusive. Provide EXACTLY ONE.\n` +
-          `  - You provided: category="${args.category}", subagent_type="${args.subagent_type}"\n` +
-          `  - Use category for task delegation (e.g., category="${categoryExamples.split(", ")[0]}")\n` +
-          `  - Use subagent_type for direct agent invocation (e.g., subagent_type="explore")\n` +
-          `  - Valid subagent_type values: explore, librarian, oracle, metis, momus`
-        )
+        log("[task] both category and subagent_type provided — preferring category, ignoring subagent_type", {
+          category: args.category,
+          subagent_type: args.subagent_type,
+        })
+        args.subagent_type = undefined
       }
       if (args.category) {
         args.subagent_type = SISYPHUS_JUNIOR_AGENT

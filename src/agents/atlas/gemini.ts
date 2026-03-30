@@ -58,7 +58,7 @@ ${buildAntiDuplicationSection()}
 <delegation_system>
 ## How to Delegate
 
-Use \`task()\` with EITHER category OR agent (mutually exclusive):
+Use \`task()\` with category or agent (if both provided, category takes precedence):
 
 \`\`\`typescript
 // Category + Skills (spawns Sisyphus-Junior)

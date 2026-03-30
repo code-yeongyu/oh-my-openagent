@@ -18,12 +18,6 @@ export const DELEGATE_TASK_ERROR_PATTERNS: DelegateTaskErrorPattern[] = [
       "Add load_skills=[] parameter (empty array if no skills needed). Note: Calling Skill tool does NOT populate this.",
   },
   {
-    pattern: "category OR subagent_type",
-    errorType: "mutual_exclusion",
-    fixHint:
-      "Provide ONLY one of: category (e.g., 'general', 'quick') OR subagent_type (e.g., 'oracle', 'explore')",
-  },
-  {
     pattern: "Must provide either category or subagent_type",
     errorType: "missing_category_or_agent",
     fixHint: "Add either category='general' OR subagent_type='explore'",

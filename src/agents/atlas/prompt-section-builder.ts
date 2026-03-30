@@ -100,5 +100,5 @@ export function buildDecisionMatrix(agents: AvailableAgent[], userCategories?: R
 ${categoryRows.join("\n")}
 ${agentRows.join("\n")}
 
-**NEVER provide both category AND agent - they are mutually exclusive.**`
+If both category and agent are provided, category takes precedence.`
 }
