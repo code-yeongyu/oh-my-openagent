@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { extractSessionIdFromOutput } from "./subagent-session-id"
+import { extractSessionIdFromMetadata, extractSessionIdFromOutput } from "./subagent-session-id"
 
 describe("extractSessionIdFromOutput", () => {
   test("extracts Session ID blocks from background output", () => {
@@ -75,5 +75,46 @@ debug log: session_id: ses_wrong_body_789`
 
     // then
     expect(result).toBe("ses_real_metadata_456")
+  })
+})
+
+describe("extractSessionIdFromMetadata", () => {
+  test("extracts sessionId from tool metadata object", () => {
+    // given
+    const metadata = { sessionId: "ses_plugin_abc123" }
+
+    // when
+    const result = extractSessionIdFromMetadata(metadata)
+
+    // then
+    expect(result).toBe("ses_plugin_abc123")
+  })
+
+  test("returns undefined for metadata without sessionId", () => {
+    // given
+    const metadata = { title: "some task" }
+
+    // when
+    const result = extractSessionIdFromMetadata(metadata)
+
+    // then
+    expect(result).toBeUndefined()
+  })
+
+  test("returns undefined for non-object metadata", () => {
+    expect(extractSessionIdFromMetadata(null)).toBeUndefined()
+    expect(extractSessionIdFromMetadata(undefined)).toBeUndefined()
+    expect(extractSessionIdFromMetadata("string")).toBeUndefined()
+  })
+
+  test("rejects sessionId values that don't start with ses_", () => {
+    // given
+    const metadata = { sessionId: "not-a-session-id" }
+
+    // when
+    const result = extractSessionIdFromMetadata(metadata)
+
+    // then
+    expect(result).toBeUndefined()
   })
 })
