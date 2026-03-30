@@ -1,0 +1,243 @@
+{
+  "audit_scope": "inventory-only",
+  "evidence": {
+    "local_host_config": "C:\\Users\\RedFox\\.config\\opencode\\opencode.json",
+    "local_plugin_config": "C:\\Users\\RedFox\\.config\\opencode\\oh-my-opencode.json",
+    "local_plugins": [
+      "C:\\Users\\RedFox\\.config\\opencode\\plugins\\heartbeat-status.js",
+      "C:\\Users\\RedFox\\.config\\opencode\\plugins\\tls-certificate-retry.js"
+    ],
+    "installed_schema": "C:\\Users\\RedFox\\.config\\opencode\\node_modules\\oh-my-openagent\\dist\\oh-my-opencode.schema.json",
+    "repo_references": [
+      "src/plugin-config.ts",
+      "src/shared/jsonc-parser.ts",
+      "src/cli/config-manager/add-plugin-to-opencode-config.ts",
+      "docs/guide/installation.md",
+      "docs/reference/configuration.md"
+    ]
+  },
+  "categories": {
+    "config_only_deltas": [
+      {
+        "id": "host-default-agent-prometheus",
+        "summary": "Local OpenCode host config sets default_agent = prometheus.",
+        "evidence": {
+          "file": "C:\\Users\\RedFox\\.config\\opencode\\opencode.json",
+          "path": "default_agent",
+          "value": "prometheus"
+        }
+      },
+      {
+        "id": "agent-category-model-pinning-openai-gpt-5-4",
+        "summary": "Configured local agents and categories pin to openai/gpt-5.4 with variant xhigh and textVerbosity high.",
+        "evidence": {
+          "file": "C:\\Users\\RedFox\\.config\\opencode\\oh-my-opencode.json",
+          "model": "openai/gpt-5.4",
+          "variant": "xhigh",
+          "textVerbosity": "high",
+          "agents": [
+            "sisyphus",
+            "hephaestus",
+            "oracle",
+            "librarian",
+            "explore",
+            "multimodal-looker",
+            "prometheus",
+            "metis",
+            "momus",
+            "atlas",
+            "sisyphus-junior"
+          ],
+          "categories": [
+            "visual-engineering",
+            "ultrabrain",
+            "deep",
+            "artistry",
+            "quick",
+            "unspecified-low",
+            "unspecified-high",
+            "writing"
+          ]
+        }
+      },
+      {
+        "id": "prompt-append-additions",
+        "summary": "Local config adds custom prompt_append text for selected execution/planning agents.",
+        "evidence": {
+          "file": "C:\\Users\\RedFox\\.config\\opencode\\oh-my-opencode.json",
+          "agents": [
+            "sisyphus",
+            "hephaestus",
+            "prometheus",
+            "atlas",
+            "sisyphus-junior"
+          ]
+        }
+      },
+      {
+        "id": "supported-runtime-knob-differences",
+        "summary": "Local config changes supported runtime knobs beyond the upstream baseline.",
+        "evidence": {
+          "file": "C:\\Users\\RedFox\\.config\\opencode\\oh-my-opencode.json",
+          "required_knobs": [
+            {
+              "path": "hashline_edit",
+              "value": true
+            },
+            {
+              "path": "background_task.staleTimeoutMs",
+              "value": 600000
+            },
+            {
+              "path": "babysitting.timeout_ms",
+              "value": 300000
+            },
+            {
+              "path": "model_capabilities.refresh_timeout_ms",
+              "value": 10000
+            },
+            {
+              "path": "experimental.auto_resume",
+              "value": true
+            },
+            {
+              "path": "notification.force_enable",
+              "value": true
+            }
+          ],
+          "adjacent_supported_keys": [
+            "background_task.defaultConcurrency",
+            "background_task.providerConcurrency.openai",
+            "background_task.modelConcurrency.openai/gpt-5.4",
+            "model_capabilities.enabled",
+            "model_capabilities.auto_refresh_on_start",
+            "experimental.task_system",
+            "sisyphus_agent.planner_enabled",
+            "sisyphus_agent.replace_plan",
+            "sisyphus_agent.default_builder_enabled"
+          ]
+        }
+      }
+    ],
+    "plugin_code_deltas": [
+      {
+        "id": "heartbeat-status-plugin",
+        "summary": "Custom heartbeat plugin tracks tool/message activity, todo summaries, retry/error state, and provider blocks before emitting status toasts/logs.",
+        "evidence": {
+          "file": "C:\\Users\\RedFox\\.config\\opencode\\plugins\\heartbeat-status.js",
+          "status_modes": [
+            "busy",
+            "retry",
+            "idle"
+          ],
+          "notable_signals": [
+            "tool activity",
+            "message updates",
+            "todo.updated",
+            "session.error hard-block detection"
+          ]
+        }
+      },
+      {
+        "id": "tls-certificate-retry-plugin",
+        "summary": "Custom TLS retry plugin reconstructs the last user payload, retries retryable certificate/connectivity failures after 60 seconds, and stops on hard provider blocks.",
+        "evidence": {
+          "file": "C:\\Users\\RedFox\\.config\\opencode\\plugins\\tls-certificate-retry.js",
+          "retry_delay_ms": 60000,
+          "guardrails": [
+            "retryable certificate/connectivity patterns only",
+            "single scheduled retry timer per session",
+            "hard 403 provider/account/proxy blocks stop auto-retry"
+          ]
+        }
+      }
+    ],
+    "intended_extension_points": [
+      {
+        "id": "schema-supported-agent-and-runtime-overrides",
+        "summary": "Installed schema supports agent/category overrides, prompt_append, and the audited runtime knobs.",
+        "evidence": {
+          "file": "C:\\Users\\RedFox\\.config\\opencode\\node_modules\\oh-my-openagent\\dist\\oh-my-opencode.schema.json",
+          "supported_paths": [
+            "agents.*.model",
+            "agents.*.variant",
+            "agents.*.textVerbosity",
+            "agents.*.prompt_append",
+            "categories.*.model",
+            "categories.*.variant",
+            "categories.*.textVerbosity",
+            "hashline_edit",
+            "background_task.staleTimeoutMs",
+            "babysitting.timeout_ms",
+            "model_capabilities.refresh_timeout_ms",
+            "experimental.auto_resume",
+            "notification.force_enable"
+          ]
+        }
+      },
+      {
+        "id": "config-merge-semantics",
+        "summary": "User config loads before project config; agents/categories deep-merge and disabled arrays union.",
+        "evidence": {
+          "file": "src/plugin-config.ts",
+          "merge_rules": [
+            "user config first",
+            "project config overrides second",
+            "agents deepMerge",
+            "categories deepMerge",
+            "disabled_* arrays union"
+          ]
+        }
+      },
+      {
+        "id": "explicit-plugin-array-registration",
+        "summary": "OpenCode host config expects explicit plugin array registration and normalizes canonical versus legacy entries.",
+        "evidence": {
+          "file": "src/cli/config-manager/add-plugin-to-opencode-config.ts",
+          "preferred_entry": "oh-my-openagent",
+          "legacy_entry": "oh-my-opencode"
+        }
+      },
+      {
+        "id": "legacy-alias-basename-compatibility",
+        "summary": "Legacy oh-my-opencode alias/basename handling remains compatibility behavior and should not be treated as drift.",
+        "evidence": {
+          "file": "src/shared/jsonc-parser.ts",
+          "detection_order": [
+            "oh-my-opencode",
+            "oh-my-openagent"
+          ]
+        }
+      }
+    ],
+    "suspicious_runtime_drift": [
+      {
+        "id": "missing-visible-plugin-registration",
+        "summary": "The inspected local opencode.json has no plugin array entry, so the active plugin load path is not visible in the host config.",
+        "evidence": {
+          "file": "C:\\Users\\RedFox\\.config\\opencode\\opencode.json",
+          "observed_keys": [
+            "$schema",
+            "default_agent"
+          ],
+          "missing_key": "plugin"
+        }
+      },
+      {
+        "id": "unsupported-sisyphus-tasks-enabled",
+        "summary": "Local config sets sisyphus.tasks.enabled even though the installed schema does not allow that property.",
+        "evidence": {
+          "config_file": "C:\\Users\\RedFox\\.config\\opencode\\oh-my-opencode.json",
+          "schema_file": "C:\\Users\\RedFox\\.config\\opencode\\node_modules\\oh-my-openagent\\dist\\oh-my-opencode.schema.json",
+          "unsupported_path": "sisyphus.tasks.enabled",
+          "allowed_paths": [
+            "sisyphus.tasks.storage_path",
+            "sisyphus.tasks.task_list_id",
+            "sisyphus.tasks.claude_code_compat"
+          ],
+          "observed_value": true
+        }
+      }
+    ]
+  }
+}
