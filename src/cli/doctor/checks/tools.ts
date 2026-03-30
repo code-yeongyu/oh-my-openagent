@@ -47,10 +47,10 @@ function buildToolIssues(summary: ToolsSummary): DoctorIssue[] {
 
   if (!summary.commentChecker) {
     issues.push({
-      title: "Comment checker unavailable",
-      description: "Comment checker binary is not installed.",
-      fix: "Install @code-yeongyu/comment-checker",
-      severity: "warning",
+      title: "Comment checker unavailable (optional)",
+      description: "Comment checker binary is not installed. This is optional -- the comment-checker hook will be automatically disabled without it.",
+      fix: "To enable: npm install -g @code-yeongyu/comment-checker",
+      severity: "info",
       affects: ["comment-checker hook"],
     })
   }
