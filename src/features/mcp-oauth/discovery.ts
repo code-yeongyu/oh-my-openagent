@@ -5,6 +5,10 @@ export interface OAuthServerMetadata {
   resource: string
 }
 
+type MetadataFetchResult =
+  | { ok: true; json: Record<string, unknown> }
+  | { ok: false; status: number }
+
 const discoveryCache = new Map<string, OAuthServerMetadata>()
 const pendingDiscovery = new Map<string, Promise<OAuthServerMetadata>>()
 
@@ -24,7 +28,7 @@ function readStringField(source: Record<string, unknown>, field: string): string
   return value
 }
 
-async function fetchMetadata(url: string): Promise<{ ok: true; json: Record<string, unknown> } | { ok: false; status: number }> {
+async function fetchMetadata(url: string): Promise<MetadataFetchResult> {
   const response = await fetch(url, { headers: { accept: "application/json" } })
   if (!response.ok) {
     return { ok: false, status: response.status }
@@ -65,7 +69,7 @@ async function fetchAuthorizationServerMetadata(issuer: string, resource: string
   const metadataUrl = new URL(`/.well-known/oauth-authorization-server${issuerPath}`, issuerUrl).toString()
   const metadata = await fetchMetadata(metadataUrl)
 
-  if (!metadata.ok) {
+  if (metadata.ok === false) {
     if (metadata.status === 404 && issuerPath !== "") {
       const rootMetadataUrl = new URL("/.well-known/oauth-authorization-server", issuerUrl).toString()
       const rootMetadata = await fetchMetadata(rootMetadataUrl)
@@ -110,7 +114,7 @@ export async function discoverOAuthServerMetadata(resource: string): Promise<OAu
       return fetchAuthorizationServerMetadata(authServers[0], resource)
     }
 
-    if (prmResponse.status !== 404) {
+    if (prmResponse.ok === false && prmResponse.status !== 404) {
       throw new Error(`OAuth protected resource metadata fetch failed (${prmResponse.status})`)
     }
 
