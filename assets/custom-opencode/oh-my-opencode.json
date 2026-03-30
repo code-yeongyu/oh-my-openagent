@@ -1,0 +1,144 @@
+{
+  "$schema": "./node_modules/oh-my-openagent/dist/oh-my-opencode.schema.json",
+  "agents": {
+    "sisyphus": {
+      "model": "openai/gpt-5.4",
+      "variant": "xhigh",
+      "textVerbosity": "high",
+      "prompt_append": "Before substantive work in any repository, first check whether the root AGENTS.md exists and matches the current project. If it is missing, outdated, or clearly incomplete, create or refresh it immediately before major edits. Keep it concise and factual. Add nested AGENTS.md files only when the repository is large or conventions differ by subtree. Maintain these files as you learn the repo's structure, commands, tests, conventions, and gotchas. If execution begins via /start-work, an approved Prometheus handoff, or an active boulder, treat that as explicit permission to implement. In execution mode, drive the plan to completion, keep delegating and verifying until all planned work is done, and do not stop at interim summaries or partial progress. Return control early only for destructive or irreversible actions, materially missing information, or hard environment blockers that cannot be solved from the repo."
+    },
+    "hephaestus": {
+      "model": "openai/gpt-5.4",
+      "variant": "xhigh",
+      "textVerbosity": "high",
+      "prompt_append": "Before substantive work in any repository, first check whether the root AGENTS.md exists and matches the current project. If it is missing, outdated, or clearly incomplete, create or refresh it immediately before major edits. Keep it concise and factual. Add nested AGENTS.md files only when the repository is large or conventions differ by subtree. Maintain these files as you learn the repo's structure, commands, tests, conventions, and gotchas. If execution begins via /start-work, an approved Prometheus handoff, or an active boulder, treat that as explicit permission to implement. In execution mode, drive the plan to completion, keep delegating and verifying until all planned work is done, and do not stop at interim summaries or partial progress. Return control early only for destructive or irreversible actions, materially missing information, or hard environment blockers that cannot be solved from the repo."
+    },
+    "oracle": {
+      "model": "openai/gpt-5.4",
+      "variant": "xhigh",
+      "textVerbosity": "high"
+    },
+    "librarian": {
+      "model": "openai/gpt-5.4",
+      "variant": "xhigh",
+      "textVerbosity": "high"
+    },
+    "explore": {
+      "model": "openai/gpt-5.4",
+      "variant": "xhigh",
+      "textVerbosity": "high"
+    },
+    "multimodal-looker": {
+      "model": "openai/gpt-5.4",
+      "variant": "xhigh",
+      "textVerbosity": "high"
+    },
+    "prometheus": {
+      "model": "openai/gpt-5.4",
+      "variant": "xhigh",
+      "textVerbosity": "high",
+      "prompt_append": "Before substantive work in any repository, first check whether the root AGENTS.md exists and matches the current project. If it is missing, outdated, or clearly incomplete, create or refresh it immediately before major edits. Keep it concise and factual. Add nested AGENTS.md files only when the repository is large or conventions differ by subtree. Maintain these files as you learn the repo's structure, commands, tests, conventions, and gotchas. You are the planning and negotiation front door. Stay in planning mode, resolve scope and tradeoffs with the user, and finish with a concrete executable plan plus /start-work guidance. Do not execute the plan yourself unless the user explicitly overrides this role."
+    },
+    "metis": {
+      "model": "openai/gpt-5.4",
+      "variant": "xhigh",
+      "textVerbosity": "high"
+    },
+    "momus": {
+      "model": "openai/gpt-5.4",
+      "variant": "xhigh",
+      "textVerbosity": "high"
+    },
+    "atlas": {
+      "model": "openai/gpt-5.4",
+      "variant": "xhigh",
+      "textVerbosity": "high",
+      "prompt_append": "Before substantive work in any repository, first check whether the root AGENTS.md exists and matches the current project. If it is missing, outdated, or clearly incomplete, create or refresh it immediately before major edits. Keep it concise and factual. Add nested AGENTS.md files only when the repository is large or conventions differ by subtree. Maintain these files as you learn the repo's structure, commands, tests, conventions, and gotchas. If execution begins via /start-work, an approved Prometheus handoff, or an active boulder, treat that as explicit permission to implement. In execution mode, drive the plan to completion, keep delegating and verifying until all planned work is done, and do not stop at interim summaries or partial progress. Return control early only for destructive or irreversible actions, materially missing information, or hard environment blockers that cannot be solved from the repo."
+    },
+    "sisyphus-junior": {
+      "model": "openai/gpt-5.4",
+      "variant": "xhigh",
+      "textVerbosity": "high",
+      "prompt_append": "Before substantive work in any repository, first check whether the root AGENTS.md exists and matches the current project. If it is missing, outdated, or clearly incomplete, create or refresh it immediately before major edits. Keep it concise and factual. Add nested AGENTS.md files only when the repository is large or conventions differ by subtree. Maintain these files as you learn the repo's structure, commands, tests, conventions, and gotchas. If execution begins via /start-work, an approved Prometheus handoff, or an active boulder, treat that as explicit permission to implement. In execution mode, drive the plan to completion, keep delegating and verifying until all planned work is done, and do not stop at interim summaries or partial progress. Return control early only for destructive or irreversible actions, materially missing information, or hard environment blockers that cannot be solved from the repo."
+    }
+  },
+  "categories": {
+    "visual-engineering": {
+      "model": "openai/gpt-5.4",
+      "variant": "xhigh",
+      "textVerbosity": "high"
+    },
+    "ultrabrain": {
+      "model": "openai/gpt-5.4",
+      "variant": "xhigh",
+      "textVerbosity": "high"
+    },
+    "deep": {
+      "model": "openai/gpt-5.4",
+      "variant": "xhigh",
+      "textVerbosity": "high"
+    },
+    "artistry": {
+      "model": "openai/gpt-5.4",
+      "variant": "xhigh",
+      "textVerbosity": "high"
+    },
+    "quick": {
+      "model": "openai/gpt-5.4",
+      "variant": "xhigh",
+      "textVerbosity": "high"
+    },
+    "unspecified-low": {
+      "model": "openai/gpt-5.4",
+      "variant": "xhigh",
+      "textVerbosity": "high"
+    },
+    "unspecified-high": {
+      "model": "openai/gpt-5.4",
+      "variant": "xhigh",
+      "textVerbosity": "high"
+    },
+    "writing": {
+      "model": "openai/gpt-5.4",
+      "variant": "xhigh",
+      "textVerbosity": "high"
+    }
+  },
+  "background_task": {
+    "defaultConcurrency": 4,
+    "staleTimeoutMs": 600000,
+    "providerConcurrency": {
+      "openai": 4
+    },
+    "modelConcurrency": {
+      "openai/gpt-5.4": 4
+    }
+  },
+  "hashline_edit": true,
+  "sisyphus": {
+    "tasks": {
+      "storage_path": ".sisyphus/tasks",
+      "claude_code_compat": false
+    }
+  },
+  "sisyphus_agent": {
+    "planner_enabled": true,
+    "replace_plan": true,
+    "default_builder_enabled": false
+  },
+  "babysitting": {
+    "timeout_ms": 300000
+  },
+  "model_capabilities": {
+    "enabled": true,
+    "auto_refresh_on_start": true,
+    "refresh_timeout_ms": 10000
+  },
+  "experimental": {
+    "auto_resume": true,
+    "task_system": false
+  },
+  "notification": {
+    "force_enable": true
+  }
+}
