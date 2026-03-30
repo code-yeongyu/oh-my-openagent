@@ -17,14 +17,10 @@ export const FallbackModelObjectSchema = z.object({
 
 export type FallbackModelObject = z.infer<typeof FallbackModelObjectSchema>
 
-export const FallbackModelStringArraySchema = z.array(z.string())
-export const FallbackModelObjectArraySchema = z.array(FallbackModelObjectSchema)
 export const FallbackModelMixedArraySchema = z.array(z.union([z.string(), FallbackModelObjectSchema]))
 
 export const FallbackModelsSchema = z.union([
   z.string(),
-  FallbackModelStringArraySchema,
-  FallbackModelObjectArraySchema,
   FallbackModelMixedArraySchema,
 ])
 
