@@ -1,4 +1,5 @@
 import { log, normalizeModelID } from "../../shared"
+import { OMO_INTERNAL_INITIATOR_MARKER } from "../../shared/internal-initiator-marker"
 
 const OPUS_PATTERN = /claude-.*opus/i
 const INTERNAL_SKIP_AGENTS = new Set(["title", "summary", "compaction"])
@@ -25,6 +26,26 @@ interface ChatParamsInput {
   model: { providerID: string; modelID: string }
   provider: { id: string }
   message: { variant?: string }
+  rawMessage?: Record<string, unknown>
+}
+
+function isInternalAgentMessage(rawMessage: Record<string, unknown> | undefined): boolean {
+  if (!rawMessage) return false
+  const content = rawMessage.content
+  if (typeof content === "string") {
+    return content.includes(OMO_INTERNAL_INITIATOR_MARKER)
+  }
+  if (Array.isArray(content)) {
+    for (const part of content) {
+      if (typeof part === "object" && part !== null && "text" in part) {
+        const textPart = part as Record<string, unknown>
+        if (typeof textPart.text === "string" && textPart.text.includes(OMO_INTERNAL_INITIATOR_MARKER)) {
+          return true
+        }
+      }
+    }
+  }
+  return false
 }
 
 interface ChatParamsOutput {
@@ -54,11 +75,12 @@ export function createAnthropicEffortHook() {
       input: ChatParamsInput,
       output: ChatParamsOutput
     ): Promise<void> => {
-      const { agent, model, message } = input
+      const { agent, model, message, rawMessage } = input
       if (!model?.modelID || !model?.providerID) return
       if (message.variant !== "max") return
       if (!isClaudeProvider(model.providerID, model.modelID)) return
       if (shouldSkipForInternalAgent(agent?.name)) return
+      if (isInternalAgentMessage(rawMessage)) return
       if (output.options.effort !== undefined) return
 
       const opus = isOpusModel(model.modelID)
