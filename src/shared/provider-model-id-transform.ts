@@ -11,9 +11,10 @@ function applyCompatibilityFallback(provider: string, model: string): string {
 		return trimmedModel
 	}
 
-	return trimmedModel
-		.toLowerCase()
-		.replace(/(claude-(?:opus|sonnet|haiku)-)(\d)(?:[.-]?(\d+))(?=$|[-@:])/g, "$1$2.$3")
+	return trimmedModel.replace(
+		/(claude-(?:opus|sonnet|haiku)-)(\d)(?:[.-]?(\d+))(?=$|[-@:])/gi,
+		"$1$2.$3",
+	)
 }
 
 function extractProviderModelID(entry: string | ModelMetadata): string | null {

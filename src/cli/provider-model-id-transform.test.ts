@@ -90,6 +90,12 @@ describe("transformModelForProvider", () => {
 			expect(result).toBe("claude-sonnet-4.5")
 		})
 
+		test("preserves casing for github-copilot custom model ids on cold cache", () => {
+			const result = transformModelForProvider("github-copilot", "CustomModelX")
+
+			expect(result).toBe("CustomModelX")
+		})
+
 		test("uses bundled metadata for google models when cache is unavailable", () => {
 			const result = transformModelForProvider("google", "gemini-3-flash")
 			expect(result).toBe("gemini-3-flash")
