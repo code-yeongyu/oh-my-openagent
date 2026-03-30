@@ -38,6 +38,15 @@ function parsePluginVersion(entry: string): string | null {
   return null
 }
 
+function isManagedWrapperEntry(entry: string): boolean {
+  const normalizedEntry = entry.replaceAll("\\", "/")
+
+  return normalizedEntry === `${PLUGIN_NAME}.js`
+    || normalizedEntry.endsWith(`/${PLUGIN_NAME}.js`)
+    || normalizedEntry === `${LEGACY_PLUGIN_NAME}.js`
+    || normalizedEntry.endsWith(`/${LEGACY_PLUGIN_NAME}.js`)
+}
+
 function findPluginEntry(entries: string[]): { entry: string; isLocalDev: boolean } | null {
   for (const entry of entries) {
     // Check for current package name
@@ -51,6 +60,10 @@ function findPluginEntry(entries: string[]): { entry: string; isLocalDev: boolea
     // Check for file:// paths that include either name
     if (entry.startsWith("file://") && (entry.includes(PLUGIN_NAME) || entry.includes(LEGACY_PLUGIN_NAME))) {
       return { entry, isLocalDev: true }
+    }
+    // Check for managed wrapper-file paths that point at the preferred plugin entry.
+    if (isManagedWrapperEntry(entry)) {
+      return { entry, isLocalDev: false }
     }
   }
 
