@@ -74,6 +74,9 @@ exports[`generateModelConfig single native provider uses Claude models when only
     "explore": {
       "model": "anthropic/claude-haiku-4-5",
     },
+    "librarian": {
+      "model": "anthropic/claude-haiku-4-5",
+    },
     "metis": {
       "model": "anthropic/claude-opus-4-6",
       "variant": "max",
@@ -134,6 +137,9 @@ exports[`generateModelConfig single native provider uses Claude models with isMa
       "model": "anthropic/claude-sonnet-4-6",
     },
     "explore": {
+      "model": "anthropic/claude-haiku-4-5",
+    },
+    "librarian": {
       "model": "anthropic/claude-haiku-4-5",
     },
     "metis": {
@@ -493,6 +499,9 @@ exports[`generateModelConfig all native providers uses preferred models from fal
       "model": "openai/gpt-5.4",
       "variant": "medium",
     },
+    "librarian": {
+      "model": "anthropic/claude-haiku-4-5",
+    },
     "metis": {
       "model": "anthropic/claude-opus-4-6",
       "variant": "max",
@@ -567,6 +576,9 @@ exports[`generateModelConfig all native providers uses preferred models with isM
     "hephaestus": {
       "model": "openai/gpt-5.4",
       "variant": "medium",
+    },
+    "librarian": {
+      "model": "anthropic/claude-haiku-4-5",
     },
     "metis": {
       "model": "anthropic/claude-opus-4-6",
@@ -795,6 +807,9 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models when 
       "model": "github-copilot/gpt-5.4",
       "variant": "medium",
     },
+    "librarian": {
+      "model": "github-copilot/gpt-5-mini",
+    },
     "metis": {
       "model": "github-copilot/claude-opus-4.6",
       "variant": "max",
@@ -864,6 +879,9 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
     "hephaestus": {
       "model": "github-copilot/gpt-5.4",
       "variant": "medium",
+    },
+    "librarian": {
+      "model": "github-copilot/gpt-5-mini",
     },
     "metis": {
       "model": "github-copilot/claude-opus-4.6",
@@ -1052,6 +1070,9 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
       "model": "opencode/gpt-5.4",
       "variant": "medium",
     },
+    "librarian": {
+      "model": "anthropic/claude-haiku-4-5",
+    },
     "metis": {
       "model": "anthropic/claude-opus-4-6",
       "variant": "max",
@@ -1126,6 +1147,9 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
     "hephaestus": {
       "model": "openai/gpt-5.4",
       "variant": "medium",
+    },
+    "librarian": {
+      "model": "github-copilot/gpt-5-mini",
     },
     "metis": {
       "model": "github-copilot/claude-opus-4.6",
@@ -1260,6 +1284,9 @@ exports[`generateModelConfig mixed provider scenarios uses Gemini + Claude combi
       "model": "anthropic/claude-sonnet-4-6",
     },
     "explore": {
+      "model": "anthropic/claude-haiku-4-5",
+    },
+    "librarian": {
       "model": "anthropic/claude-haiku-4-5",
     },
     "metis": {
