@@ -11,8 +11,18 @@ import {
   MODELS_DEV_SOURCE_URL,
 } from "./model-capabilities-cache"
 
+const originalFetch = globalThis.fetch
+
 let fakeUserCacheRoot = ""
 let testCacheDir = ""
+
+function createFetchMock(
+  implementation: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>,
+): typeof fetch {
+  return Object.assign(implementation, {
+    preconnect: Reflect.get(originalFetch, "preconnect"),
+  })
+}
 
 describe("model-capabilities-cache", () => {
   beforeEach(() => {
@@ -98,6 +108,7 @@ describe("model-capabilities-cache", () => {
   })
 
   test("merges repeated snapshot entries without materializing empty optional objects", () => {
+    //#given
     const raw = {
       openai: {
         models: {
@@ -117,8 +128,10 @@ describe("model-capabilities-cache", () => {
       },
     }
 
+    //#when
     const snapshot = buildModelCapabilitiesSnapshotFromModelsDev(raw)
 
+    //#then
     expect(snapshot.models["gpt-5.4"]).toEqual({
       id: "gpt-5.4",
       family: "gpt",
@@ -128,6 +141,45 @@ describe("model-capabilities-cache", () => {
     expect(snapshot.models["gpt-5.4"]).not.toHaveProperty("limit")
   })
 
+  test("preserves true boolean capabilities when a later provider reports false", () => {
+    //#given
+    const raw = {
+      openai: {
+        models: {
+          "gpt-4.1-mini": {
+            id: "openai/gpt-4.1-mini",
+            family: "gpt",
+            reasoning: true,
+            temperature: true,
+            tool_call: true,
+          },
+        },
+      },
+      "nano-gpt": {
+        models: {
+          "openai/gpt-4.1-mini": {
+            id: "openai/gpt-4.1-mini",
+            reasoning: false,
+            temperature: false,
+            tool_call: false,
+          },
+        },
+      },
+    }
+
+    //#when
+    const snapshot = buildModelCapabilitiesSnapshotFromModelsDev(raw)
+
+    //#then
+    expect(snapshot.models["openai/gpt-4.1-mini"]).toEqual({
+      id: "openai/gpt-4.1-mini",
+      family: "gpt",
+      reasoning: true,
+      temperature: true,
+      toolCall: true,
+    })
+  })
+
   test("refresh writes cache and preserves unrelated files in the cache directory", async () => {
     //#given
     const sentinelPath = join(testCacheDir, "keep-me.json")
@@ -135,7 +187,7 @@ describe("model-capabilities-cache", () => {
     mkdirSync(testCacheDir, { recursive: true })
     writeFileSync(sentinelPath, JSON.stringify({ keep: true }))
 
-    const fetchImpl: typeof fetch = async () =>
+    const fetchImpl = createFetchMock(async () =>
       new Response(JSON.stringify({
         openai: {
           models: {
@@ -150,7 +202,7 @@ describe("model-capabilities-cache", () => {
       }), {
         status: 200,
         headers: { "content-type": "application/json" },
-      })
+      }))
 
     //#when
     const snapshot = await store.refreshModelCapabilitiesCache({ fetchImpl })

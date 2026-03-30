@@ -96,10 +96,18 @@ function mergeSnapshotEntries(
         ...incoming.limit,
       }
     : undefined
-
   return {
     ...existing,
     ...incoming,
+    reasoning: existing.reasoning === true || incoming.reasoning === true
+      ? true
+      : (existing.reasoning ?? incoming.reasoning),
+    temperature: existing.temperature === true || incoming.temperature === true
+      ? true
+      : (existing.temperature ?? incoming.temperature),
+    toolCall: existing.toolCall === true || incoming.toolCall === true
+      ? true
+      : (existing.toolCall ?? incoming.toolCall),
     ...(mergedModalities ? { modalities: mergedModalities } : {}),
     ...(mergedLimit ? { limit: mergedLimit } : {}),
   }
