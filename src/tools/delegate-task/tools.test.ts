@@ -465,7 +465,7 @@ describe("sisyphus-task", () => {
        expect(args.subagent_type).toBe("Sisyphus-Junior")
     }, { timeout: 10000 })
 
-    test("rejects when both category and subagent_type are provided", async () => {
+    test("prefers category over subagent_type when both are provided", async () => {
       //#given
       const { createDelegateTask } = require("./tools")
 
@@ -516,8 +516,11 @@ describe("sisyphus-task", () => {
         load_skills: [],
       }
 
-      //#when + #then
-      await expect(tool.execute(args, toolContext)).rejects.toThrow("mutually exclusive")
+      //#when
+      await tool.execute(args, toolContext)
+
+      //#then - category takes precedence, subagent_type is overridden to sisyphus-junior
+      expect(args.subagent_type).toBe("Sisyphus-Junior")
     }, { timeout: 10000 })
 
     test("proceeds without error when systemDefaultModel is undefined", async () => {
