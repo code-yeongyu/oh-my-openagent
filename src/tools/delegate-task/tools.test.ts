@@ -3132,6 +3132,35 @@ describe("sisyphus-task", () => {
       // then
       expect(result).toBe(prompt)
     })
+
+    test("excludes TDD line when tddEnabled is false", () => {
+      // given
+      const { buildTaskPrompt } = require("./tools")
+      const prompt = "Create a work plan for this feature"
+
+      // when
+      const result = buildTaskPrompt(prompt, "plan", false)
+
+      // then
+      expect(result).toContain(prompt)
+      expect(result).toContain("Answer in English.")
+      expect(result).toContain("Write the plan in English.")
+      expect(result).toContain("Plan well for ultrawork execution.")
+      expect(result).toContain("Include a clear atomic commit strategy.")
+      expect(result).not.toContain("Use TDD-oriented planning.")
+    })
+
+    test("includes TDD line when tddEnabled is true", () => {
+      // given
+      const { buildTaskPrompt } = require("./tools")
+      const prompt = "Create a work plan for this feature"
+
+      // when
+      const result = buildTaskPrompt(prompt, "plan", true)
+
+      // then
+      expect(result).toContain("Use TDD-oriented planning.")
+    })
   })
 
   describe("modelInfo detection via resolveCategoryConfig", () => {

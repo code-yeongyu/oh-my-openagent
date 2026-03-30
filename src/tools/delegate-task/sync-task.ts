@@ -126,6 +126,7 @@ export async function executeSyncTask(
       categoryModel,
       toastManager,
       taskId,
+      sisyphusAgentConfig: executorCtx.sisyphusAgentConfig,
     })
     if (promptError) {
       return promptError

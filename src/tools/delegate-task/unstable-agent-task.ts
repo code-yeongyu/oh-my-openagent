@@ -20,12 +20,13 @@ export async function executeUnstableAgentTask(
   systemContent: string | undefined,
   actualModel: string | undefined
 ): Promise<string> {
-  const { manager, client, syncPollTimeoutMs } = executorCtx
+  const { manager, client, syncPollTimeoutMs, sisyphusAgentConfig } = executorCtx
   let cleanupReason: string | undefined
   let launchedTaskID: string | undefined
 
   try {
-    const effectivePrompt = buildTaskPrompt(args.prompt, agentToUse)
+    const tddEnabled = sisyphusAgentConfig?.tdd
+    const effectivePrompt = buildTaskPrompt(args.prompt, agentToUse, tddEnabled)
     const task = await manager.launch({
       description: args.description,
       prompt: effectivePrompt,

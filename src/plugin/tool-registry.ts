@@ -132,6 +132,7 @@ export function createToolRegistry(args: {
     disabledSkills: skillContext.disabledSkills,
     availableCategories,
     availableSkills: skillContext.availableSkills,
+    sisyphusAgentConfig: pluginConfig.sisyphus_agent,
     syncPollTimeoutMs: pluginConfig.background_task?.syncPollTimeoutMs,
     onSyncSessionCreated: async (event) => {
       log("[index] onSyncSessionCreated callback", {

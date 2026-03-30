@@ -4261,6 +4261,10 @@
         },
         "replace_plan": {
           "type": "boolean"
+        },
+        "tdd": {
+          "default": true,
+          "type": "boolean"
         }
       },
       "additionalProperties": false
