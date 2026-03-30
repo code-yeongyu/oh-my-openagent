@@ -1,6 +1,7 @@
 import { log, normalizeModelID } from "../../shared"
 
 const OPUS_PATTERN = /claude-.*opus/i
+const INTERNAL_SKIP_AGENTS = new Set(["title", "summary", "compaction"])
 
 function isClaudeProvider(providerID: string, modelID: string): boolean {
   if (["anthropic", "google-vertex-anthropic", "opencode"].includes(providerID)) return true
@@ -11,6 +12,11 @@ function isClaudeProvider(providerID: string, modelID: string): boolean {
 function isOpusModel(modelID: string): boolean {
   const normalized = normalizeModelID(modelID)
   return OPUS_PATTERN.test(normalized)
+}
+
+function shouldSkipForInternalAgent(agentName: string | undefined): boolean {
+  if (!agentName) return false
+  return INTERNAL_SKIP_AGENTS.has(agentName.trim().toLowerCase())
 }
 
 interface ChatParamsInput {
@@ -48,10 +54,11 @@ export function createAnthropicEffortHook() {
       input: ChatParamsInput,
       output: ChatParamsOutput
     ): Promise<void> => {
-      const { model, message } = input
+      const { agent, model, message } = input
       if (!model?.modelID || !model?.providerID) return
       if (message.variant !== "max") return
       if (!isClaudeProvider(model.providerID, model.modelID)) return
+      if (shouldSkipForInternalAgent(agent?.name)) return
       if (output.options.effort !== undefined) return
 
       const opus = isOpusModel(model.modelID)
