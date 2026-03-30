@@ -537,15 +537,15 @@ describe("generateModelConfig", () => {
       expect(result.agents?.librarian?.model).toBe("zai-coding-plan/glm-4.7")
     })
 
-    test("librarian is omitted when no librarian provider matches", () => {
+    test("librarian falls back to Claude when no dedicated provider matches", () => {
       // #given only Claude is available (no opencode-go or ZAI)
       const config = createConfig({ hasClaude: true })
 
       // #when generateModelConfig is called
       const result = generateModelConfig(config)
 
-      // #then librarian should be omitted when its dedicated providers are unavailable
-      expect(result.agents?.librarian).toBeUndefined()
+      // #then librarian should fall back to claude-haiku
+      expect(result.agents?.librarian?.model).toBe("anthropic/claude-haiku-4-5")
     })
   })
 

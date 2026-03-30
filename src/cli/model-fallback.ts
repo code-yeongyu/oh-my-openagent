@@ -58,6 +58,12 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
         agents[role] = { model: "opencode-go/minimax-m2.7" }
       } else if (avail.zai) {
         agents[role] = { model: ZAI_MODEL }
+      } else if (avail.native.claude) {
+        agents[role] = { model: "anthropic/claude-haiku-4-5" }
+      } else if (avail.copilot) {
+        agents[role] = { model: "github-copilot/gpt-5-mini" }
+      } else if (avail.native.openai) {
+        agents[role] = { model: "openai/gpt-5.4-mini" }
       }
       continue
     }
