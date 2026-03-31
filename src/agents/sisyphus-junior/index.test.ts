@@ -143,6 +143,44 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
     })
   })
 
+  describe("reasoning configuration", () => {
+    test("#given GPT model #when agent is created #then uses reasoningEffort", () => {
+      // given
+      const override = { model: "openai/gpt-5.4" }
+
+      // when
+      const result = createSisyphusJuniorAgentWithOverrides(override)
+
+      // then
+      expect(result.reasoningEffort).toBe("medium")
+      expect(result.thinking).toBeUndefined()
+    })
+
+    test("#given Claude model #when agent is created #then injects thinking", () => {
+      // given
+      const override = { model: "anthropic/claude-sonnet-4-6" }
+
+      // when
+      const result = createSisyphusJuniorAgentWithOverrides(override)
+
+      // then
+      expect(result.reasoningEffort).toBeUndefined()
+      expect(result.thinking).toEqual({ type: "enabled", budgetTokens: 32000 })
+    })
+
+    test("#given GLM reasoning model #when agent is created #then skips injected thinking", () => {
+      // given
+      const override = { model: "z-ai/glm-5" }
+
+      // when
+      const result = createSisyphusJuniorAgentWithOverrides(override)
+
+      // then
+      expect(result.reasoningEffort).toBeUndefined()
+      expect(result.thinking).toBeUndefined()
+    })
+  })
+
   describe("tool safety (task blocked, call_omo_agent allowed)", () => {
     test("task remains blocked, call_omo_agent is allowed via tools format", () => {
       // given
