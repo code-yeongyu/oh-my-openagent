@@ -1,4 +1,4 @@
-import { spawn } from "bun"
+import { spawn as bunSpawn } from "bun"
 import type { Multiplexer, PaneHandle, SpawnOptions, MultiplexerCapabilities } from "./types"
 import {
   closeTmuxPane,
@@ -7,6 +7,8 @@ import {
 } from "../tmux/tmux-utils"
 import { getTmuxPath } from "../../tools/interactive-bash/tmux-path-resolver"
 import { log } from "../logger"
+
+type SpawnFn = typeof bunSpawn
 
 export interface TmuxAdapterConfig {
   enabled: boolean
@@ -26,19 +28,27 @@ export class TmuxAdapter implements Multiplexer {
 
   private labelToPaneId = new Map<string, string>()
   private config: TmuxAdapterConfig
+  private spawn: SpawnFn
+  private overrideTmuxPath: string | undefined
 
-  constructor(config: TmuxAdapterConfig) {
+  constructor(config: TmuxAdapterConfig, spawnFn: SpawnFn = bunSpawn, tmuxPath?: string) {
     this.config = config
+    this.spawn = spawnFn
+    this.overrideTmuxPath = tmuxPath
+  }
+
+  private async resolveTmuxPath(): Promise<string | null> {
+    return this.overrideTmuxPath ?? await getTmuxPath()
   }
 
   async ensureSession(name: string): Promise<void> {
-    const tmux = await getTmuxPath()
+    const tmux = await this.resolveTmuxPath()
     if (!tmux) {
       log("[TmuxAdapter.ensureSession] tmux not found")
       return
     }
 
-    const proc = spawn([tmux, "new-session", "-d", "-s", name], {
+    const proc = this.spawn([tmux, "new-session", "-d", "-s", name], {
       stdout: "pipe",
       stderr: "pipe",
     })
@@ -46,13 +56,13 @@ export class TmuxAdapter implements Multiplexer {
   }
 
   async killSession(name: string): Promise<void> {
-    const tmux = await getTmuxPath()
+    const tmux = await this.resolveTmuxPath()
     if (!tmux) {
       log("[TmuxAdapter.killSession] tmux not found")
       return
     }
 
-    const proc = spawn([tmux, "kill-session", "-t", name], {
+    const proc = this.spawn([tmux, "kill-session", "-t", name], {
       stdout: "pipe",
       stderr: "pipe",
     })
@@ -75,7 +85,7 @@ export class TmuxAdapter implements Multiplexer {
       return { label }
     }
 
-    const tmux = await getTmuxPath()
+    const tmux = await this.resolveTmuxPath()
     if (!tmux) {
       log("[TmuxAdapter.spawnPane] tmux not found")
       return { label }
@@ -94,7 +104,7 @@ export class TmuxAdapter implements Multiplexer {
       cmd,
     ]
 
-    const proc = spawn([tmux, ...args], { stdout: "pipe", stderr: "pipe" })
+    const proc = this.spawn([tmux, ...args], { stdout: "pipe", stderr: "pipe" })
     const exitCode = await proc.exited
     const stdout = await new Response(proc.stdout).text()
     const paneId = stdout.trim()
@@ -105,7 +115,7 @@ export class TmuxAdapter implements Multiplexer {
 
     this.labelToPaneId.set(label, paneId)
 
-    spawn([tmux, "select-pane", "-t", paneId, "-T", label], {
+    this.spawn([tmux, "select-pane", "-t", paneId, "-T", label], {
       stdout: "ignore",
       stderr: "ignore",
     })
@@ -126,12 +136,12 @@ export class TmuxAdapter implements Multiplexer {
   }
 
   async getPanes(): Promise<PaneHandle[]> {
-    const tmux = await getTmuxPath()
+    const tmux = await this.resolveTmuxPath()
     if (!tmux) {
       return []
     }
 
-    const proc = spawn(
+    const proc = this.spawn(
       [
         tmux,
         "list-panes",

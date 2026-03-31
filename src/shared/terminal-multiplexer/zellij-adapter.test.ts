@@ -1,5 +1,4 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test"
-import { saveZellijState, clearZellijState } from "./zellij-storage"
 import { ZellijAdapter } from "./zellij-adapter"
 import type { ZellijStorage, ZellijState } from "./zellij-storage"
 
@@ -293,9 +292,6 @@ describe("ZellijAdapter", () => {
 
       //#then
       expect(isValid).toBe(true)
-
-      //#cleanup
-      clearZellijState(sessionID)
     })
 
     it("returns false when anchorPaneId is null", async () => {
@@ -371,9 +367,6 @@ describe("ZellijAdapter", () => {
       expect(results[0].label).toBe("omo-concurrent-1")
       expect(results[1].label).toBe("omo-concurrent-2")
       expect(results[2].label).toBe("omo-concurrent-3")
-
-      //#cleanup
-      clearZellijState(sessionID)
     })
 
     it("handles concurrent setSessionID and spawnPane without race conditions", async () => {
@@ -394,9 +387,6 @@ describe("ZellijAdapter", () => {
       //#then both complete successfully
       const results = await Promise.all(promises)
       expect(results).toHaveLength(2)
-
-      //#cleanup
-      clearZellijState(sessionID)
     })
   })
 
@@ -415,9 +405,6 @@ describe("ZellijAdapter", () => {
       //#then validation should detect stale state and clear it
       const handle = await adapter2.spawnPane("echo recovery", { label: "omo-recovery" })
       expect(handle.label).toBe("omo-recovery")
-
-      //#cleanup
-      clearZellijState(sessionID)
     })
 
     it("recovers gracefully when anchor pane becomes invalid", async () => {

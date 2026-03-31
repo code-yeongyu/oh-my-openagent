@@ -185,6 +185,13 @@ export class ZellijAdapter implements Multiplexer {
       } else {
         log("[ZellijAdapter.spawnPane] skipping stack: anchor or pane ID unavailable", { label, anchorId: anchorId ?? null, paneId })
       }
+    } else if (this.anchorPaneId && paneId) {
+      const stackProc = this.spawn(["zellij", "action", "stack-panes", "--", this.anchorPaneId, paneId], {
+        stdout: "pipe",
+        stderr: "pipe",
+      })
+      await stackProc.exited
+      log("[ZellijAdapter.spawnPane] stacked with restored anchor", { anchorPaneId: this.anchorPaneId, newPaneId: paneId })
     }
 
     this.labelToSpawned.set(label, true)
@@ -215,7 +222,7 @@ export class ZellijAdapter implements Multiplexer {
         // Kill the opencode attach process for this session
          // This will trigger --close-on-exit to close the pane
          // Using -9 (SIGKILL) for immediate termination since process may ignore SIGTERM
-         const proc = this.spawn(["pkill", "-9", "-f", `opencode attach.*${sessionId}`], {
+         const proc = this.spawn(["pkill", "-9", "-f", `--session ${sessionId}( |$)`], {
            stdout: "pipe",
            stderr: "pipe",
          })

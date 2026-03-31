@@ -5,11 +5,13 @@ const mockSpawn = mock((args: string[]) => {
   const isCat = args[0] === "cat"
   const isZellijListSessions = args[0] === "zellij" && args[1] === "list-sessions"
   const isTmuxListPanes = args[0] === "tmux" && args.includes("list-panes")
+  const isTmuxSplitWindow = args[0] === "tmux" && args.includes("split-window")
 
   let output = ""
   if (isCat) output = "%1\n"
   else if (isZellijListSessions) output = "omo-contract-pane\n"
   else if (isTmuxListPanes) output = "%1,omo-contract-pane\n"
+  else if (isTmuxSplitWindow) output = "%1\n"
 
   const bytes = output ? new TextEncoder().encode(output) : null
   return {
@@ -31,7 +33,7 @@ const mockConfig = {
 
 type AdapterConfig = typeof mockConfig
 
-let TmuxAdapter: new (config: AdapterConfig) => Multiplexer
+let TmuxAdapter: new (config: AdapterConfig, spawnFn?: typeof mockSpawn, tmuxPath?: string) => Multiplexer
 let ZellijAdapter: new (config: AdapterConfig, storage?: unknown, spawnFn?: typeof mockSpawn) => Multiplexer
 
 try {
@@ -42,7 +44,7 @@ try {
     type = "tmux" as const
     enabled = true
     capabilities = { manualLayout: true, persistentLabels: false }
-    constructor(_config: AdapterConfig) {
+    constructor(_config: AdapterConfig, _spawnFn?: unknown, _tmuxPath?: string) {
       throw new Error("TmuxAdapter not implemented yet")
     }
     async ensureSession(_name: string): Promise<void> {
@@ -93,21 +95,27 @@ try {
 }
 
 describe.each([
-  ["TmuxAdapter", () => new TmuxAdapter(mockConfig)],
+  ["TmuxAdapter", () => new TmuxAdapter(mockConfig, mockSpawn, "tmux")],
   ["ZellijAdapter", () => new ZellijAdapter(mockConfig, undefined, mockSpawn)],
 ])("%s contract", (_name, createAdapter) => {
-  let originalSpawn: typeof Bun.spawn
+  let savedTMUX: string | undefined
+  let savedTMUX_PANE: string | undefined
 
   beforeEach(() => {
-    //#given - mock Bun.spawn to avoid real subprocess calls
-    originalSpawn = Bun.spawn
-    ;(Bun as any).spawn = mockSpawn
+    //#given - set env for isInsideTmux() and getCurrentPaneId()
+    savedTMUX = process.env.TMUX
+    savedTMUX_PANE = process.env.TMUX_PANE
+    process.env.TMUX = "/tmp/tmux-test/default,12345,0"
+    process.env.TMUX_PANE = "%0"
     mockSpawn.mockClear()
   })
 
   afterEach(() => {
-    //#given - restore original Bun.spawn
-    ;(Bun as any).spawn = originalSpawn
+    //#cleanup - restore env
+    if (savedTMUX === undefined) delete process.env.TMUX
+    else process.env.TMUX = savedTMUX
+    if (savedTMUX_PANE === undefined) delete process.env.TMUX_PANE
+    else process.env.TMUX_PANE = savedTMUX_PANE
   })
 
   describe("spawnPane", () => {
@@ -152,9 +160,7 @@ describe.each([
       expect(handle).toBeDefined()
       expect(handle.label).toBe("omo-direction-test")
       const allArgs = (mockSpawn.mock.calls as Array<[string[]]>).flatMap(([a]) => a)
-      if (allArgs.length > 0) {
-        expect(allArgs.some(arg => arg === "horizontal" || arg === "-h")).toBe(true)
-      }
+      expect(allArgs.some(arg => arg === "horizontal" || arg === "-h")).toBe(true)
     })
   })
 

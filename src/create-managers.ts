@@ -32,11 +32,12 @@ export async function createManagers(args: {
   markServerRunningInProcess()
 
   const terminalConfig = pluginConfig.terminal
+  const provider = terminalConfig?.provider ?? "auto"
   let adapter = null
 
-  if (terminalConfig?.provider === "zellij" || (terminalConfig?.provider === "auto" && await detectMultiplexer() === "zellij")) {
+  if (provider === "zellij" || (provider === "auto" && await detectMultiplexer() === "zellij")) {
     adapter = createMultiplexer("zellij", {
-      zellij: terminalConfig?.zellij ? { enabled: terminalConfig.zellij.enabled } : undefined,
+      zellij: terminalConfig?.zellij ? { enabled: terminalConfig.zellij.enabled, sessionPrefix: terminalConfig.zellij.session_prefix } : undefined,
     })
     log("[create-managers] zellij adapter created")
   }

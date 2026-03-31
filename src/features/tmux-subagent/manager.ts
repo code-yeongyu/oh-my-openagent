@@ -546,7 +546,12 @@ export class TmuxSessionManager {
       return
     }
     if (this.adapter) {
-      await this.spawnWithAdapter(sessionId, title)
+      this.pendingSessions.add(sessionId)
+      try {
+        await this.spawnWithAdapter(sessionId, title)
+      } finally {
+        this.pendingSessions.delete(sessionId)
+      }
       return
     }
 
