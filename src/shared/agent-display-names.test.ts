@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test"
-import { AGENT_DISPLAY_NAMES, getAgentDisplayName, getAgentConfigKey } from "./agent-display-names"
+import { AGENT_DISPLAY_NAMES, getAgentConfigKey, getAgentDisplayName, getAgentListDisplayName, normalizeAgentForPrompt } from "./agent-display-names"
 
 describe("getAgentDisplayName", () => {
   it("returns display name for lowercase config key (new format)", () => {
@@ -173,6 +173,26 @@ describe("getAgentConfigKey", () => {
     expect(getAgentConfigKey("Metis (Plan Consultant)")).toBe("metis")
     expect(getAgentConfigKey("Momus (Plan Critic)")).toBe("momus")
     expect(getAgentConfigKey("Sisyphus-Junior")).toBe("sisyphus-junior")
+  })
+
+  it("resolves atlas even when the UI ordering prefix is present", () => {
+    expect(getAgentConfigKey(getAgentListDisplayName("atlas"))).toBe("atlas")
+  })
+})
+
+describe("getAgentListDisplayName", () => {
+  it("keeps sisyphus unchanged for list display", () => {
+    expect(getAgentListDisplayName("sisyphus")).toBe("Sisyphus (Ultraworker)")
+  })
+
+  it("applies invisible atlas sort prefix for list display", () => {
+    expect(getAgentListDisplayName("atlas")).toBe("\u200BAtlas (Plan Executor)")
+  })
+})
+
+describe("normalizeAgentForPrompt", () => {
+  it("strips atlas UI ordering prefix back to canonical display name", () => {
+    expect(normalizeAgentForPrompt(getAgentListDisplayName("atlas"))).toBe("Atlas (Plan Executor)")
   })
 })
 

@@ -4,7 +4,7 @@ import { describe, test, expect, spyOn, beforeEach, afterEach } from "bun:test"
 import { resolveCategoryConfig, createConfigHandler } from "./config-handler"
 import type { CategoryConfig } from "../config/schema"
 import type { OhMyOpenCodeConfig } from "../config"
-import { getAgentDisplayName } from "../shared/agent-display-names"
+import { getAgentDisplayName, getAgentListDisplayName } from "../shared/agent-display-names"
 
 import * as agents from "../agents"
 import * as sisyphusJunior from "../agents/sisyphus-junior"
@@ -198,10 +198,10 @@ describe("Plan agent demote behavior", () => {
     // #then
     const keys = Object.keys(config.agent as Record<string, unknown>)
     const coreAgents = [
-      getAgentDisplayName("sisyphus"),
-      getAgentDisplayName("hephaestus"),
-      getAgentDisplayName("prometheus"),
-      getAgentDisplayName("atlas"),
+      getAgentListDisplayName("sisyphus"),
+      getAgentListDisplayName("hephaestus"),
+      getAgentListDisplayName("prometheus"),
+      getAgentListDisplayName("atlas"),
     ]
     const ordered = keys.filter((key) => coreAgents.includes(key))
     expect(ordered).toEqual(coreAgents)
@@ -1158,11 +1158,11 @@ describe("config-handler plugin loading error boundary (#1559)", () => {
 
 describe("per-agent todowrite/todoread deny when task_system enabled", () => {
   const AGENTS_WITH_TODO_DENY = new Set([
-    getAgentDisplayName("sisyphus"),
-    getAgentDisplayName("hephaestus"),
-    getAgentDisplayName("atlas"),
-    getAgentDisplayName("prometheus"),
-    getAgentDisplayName("sisyphus-junior"),
+    getAgentListDisplayName("sisyphus"),
+    getAgentListDisplayName("hephaestus"),
+    getAgentListDisplayName("atlas"),
+    getAgentListDisplayName("prometheus"),
+    getAgentListDisplayName("sisyphus-junior"),
   ])
 
   test("denies todowrite and todoread for primary agents when task_system is enabled", async () => {
