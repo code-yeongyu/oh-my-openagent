@@ -210,6 +210,35 @@ describe("createMultiplexer", () => {
 })
 
 describe("resetDetectionCache", () => {
+  let savedTmux: string | undefined
+  let savedZellij: string | undefined
+  let savedZellijSession: string | undefined
+
+  beforeEach(() => {
+    savedTmux = process.env.TMUX
+    savedZellij = process.env.ZELLIJ
+    savedZellijSession = process.env.ZELLIJ_SESSION_NAME
+  })
+
+  afterEach(() => {
+    resetDetectionCache()
+    if (savedTmux !== undefined) {
+      process.env.TMUX = savedTmux
+    } else {
+      delete process.env.TMUX
+    }
+    if (savedZellij !== undefined) {
+      process.env.ZELLIJ = savedZellij
+    } else {
+      delete process.env.ZELLIJ
+    }
+    if (savedZellijSession !== undefined) {
+      process.env.ZELLIJ_SESSION_NAME = savedZellijSession
+    } else {
+      delete process.env.ZELLIJ_SESSION_NAME
+    }
+  })
+
   it("clears cached detection result", async () => {
     //#given
     process.env.TMUX = "/tmp/tmux-1000/default,1234,0"

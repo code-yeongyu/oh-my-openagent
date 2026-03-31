@@ -40,6 +40,7 @@ try {
   console.error(e)
   TmuxAdapter = class NotImplementedTmuxAdapter implements Multiplexer {
     type = "tmux" as const
+    enabled = true
     capabilities = { manualLayout: true, persistentLabels: false }
     constructor(_config: AdapterConfig) {
       throw new Error("TmuxAdapter not implemented yet")
@@ -68,6 +69,7 @@ try {
   console.error(e)
   ZellijAdapter = class NotImplementedZellijAdapter implements Multiplexer {
     type = "zellij" as const
+    enabled = true
     capabilities = { manualLayout: false, persistentLabels: true }
     constructor(_config: AdapterConfig) {
       throw new Error("ZellijAdapter not implemented yet")

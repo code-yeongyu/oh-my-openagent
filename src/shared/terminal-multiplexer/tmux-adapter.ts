@@ -20,6 +20,10 @@ export class TmuxAdapter implements Multiplexer {
     persistentLabels: false,
   }
 
+  get enabled(): boolean {
+    return this.config.enabled
+  }
+
   private labelToPaneId = new Map<string, string>()
   private config: TmuxAdapterConfig
 

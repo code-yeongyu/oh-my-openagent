@@ -20,6 +20,7 @@ export interface SpawnOptions {
 export interface Multiplexer {
   type: MultiplexerType
   capabilities: MultiplexerCapabilities
+  enabled: boolean
 
   ensureSession(name: string): Promise<void>
   killSession(name: string): Promise<void>

@@ -20,6 +20,9 @@ function getZellijStorageDir(): string {
 }
 
 function getStoragePath(sessionID: string): string {
+  if (!/^[a-zA-Z0-9_\-]+$/.test(sessionID)) {
+    throw new Error(`Invalid sessionID for storage path: ${JSON.stringify(sessionID)}`)
+  }
   return join(getZellijStorageDir(), `${sessionID}.json`)
 }
 

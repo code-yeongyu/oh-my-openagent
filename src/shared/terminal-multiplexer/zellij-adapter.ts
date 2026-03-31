@@ -17,6 +17,10 @@ export class ZellijAdapter implements Multiplexer {
     persistentLabels: true,
   }
 
+  get enabled(): boolean {
+    return this.config.enabled
+  }
+
   private labelToSpawned = new Map<string, boolean>()
   private hasCreatedFirstPane = false
   private anchorPaneId: string | null = null

@@ -334,19 +334,22 @@ describe("ZellijAdapter", () => {
     it("keeps state when anchor pane is valid", async () => {
       //#given
       const sessionID = "test-validate-keep"
-      const adapter = makeAdapter()
+      const sharedStorage = makeMockStorage()
+      const adapter = makeAdapter(sharedStorage)
       adapter.setSessionID(sessionID)
 
       //#when - spawn first pane to set valid anchorPaneId
       await adapter.spawnPane("echo test", { label: "omo-valid-anchor" })
 
-      //#then - create new adapter and load state
-      const adapter2 = makeAdapter()
+      //#then - create new adapter with same storage and verify persisted state
+      const adapter2 = makeAdapter(sharedStorage)
       adapter2.setSessionID(sessionID)
-      expect(adapter2).toBeDefined()
+      const loadedState = sharedStorage.loadZellijState(sessionID)
+      expect(loadedState).not.toBeNull()
+      expect(loadedState!.anchorPaneId).toBe("%1")
 
       //#cleanup
-      clearZellijState(sessionID)
+      sharedStorage.clearZellijState(sessionID)
     })
 
     it("handles concurrent spawnPane calls without race conditions", async () => {
