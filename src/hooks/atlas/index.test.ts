@@ -9,7 +9,7 @@ import {
   readBoulderState,
 } from "../../features/boulder-state"
 import type { BoulderState } from "../../features/boulder-state"
-import { _resetForTesting, subagentSessions, updateSessionAgent } from "../../features/claude-code-session-state"
+import { _resetForTesting, registerAgentName, subagentSessions, updateSessionAgent } from "../../features/claude-code-session-state"
 import type { PendingTaskRef } from "./types"
 
 const TEST_STORAGE_ROOT = join(tmpdir(), `atlas-message-storage-${randomUUID()}`)
@@ -90,6 +90,9 @@ describe("atlas hook", () => {
   }
 
   beforeEach(() => {
+    _resetForTesting()
+    registerAgentName("atlas")
+    registerAgentName("sisyphus")
     TEST_DIR = join(tmpdir(), `atlas-test-${randomUUID()}`)
     SISYPHUS_DIR = join(TEST_DIR, ".sisyphus")
     if (!existsSync(TEST_DIR)) {
@@ -102,6 +105,7 @@ describe("atlas hook", () => {
   })
 
   afterEach(() => {
+    _resetForTesting()
     clearBoulderState(TEST_DIR)
     if (existsSync(TEST_DIR)) {
       rmSync(TEST_DIR, { recursive: true, force: true })
@@ -1182,9 +1186,11 @@ session_id: ses_untrusted_999
 
      beforeEach(() => {
        _resetForTesting()
-       subagentSessions.clear()
-       setupMessageStorage(MAIN_SESSION_ID, "atlas")
-     })
+       registerAgentName("atlas")
+       registerAgentName("sisyphus")
+        subagentSessions.clear()
+        setupMessageStorage(MAIN_SESSION_ID, "atlas")
+      })
 
     afterEach(() => {
       cleanupMessageStorage(MAIN_SESSION_ID)
@@ -1675,6 +1681,39 @@ session_id: ses_untrusted_999
        const callArgs = mockInput._promptMock.mock.calls[0][0]
        expect(callArgs.body.agent).toBe("Sisyphus (Ultraworker)")
      })
+
+    test("should preserve display-name agent in continuation prompt when boulder agent uses display form", async () => {
+      // given - boulder state uses display-form agent name
+      const planPath = join(TEST_DIR, "test-plan.md")
+      writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
+
+      const state: BoulderState = {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: [MAIN_SESSION_ID],
+        plan_name: "test-plan",
+        agent: "Atlas (Plan Executor)",
+      }
+      writeBoulderState(TEST_DIR, state)
+      registerAgentName("Atlas (Plan Executor)")
+
+      const mockInput = createMockPluginInput()
+      const hook = createAtlasHook(mockInput)
+
+      // when
+      await hook.handler({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: MAIN_SESSION_ID },
+        },
+      })
+
+      // then
+      expect(mockInput._promptMock).toHaveBeenCalled()
+      const callArgs = mockInput._promptMock.mock.calls[0][0]
+      expect(callArgs.body.agent).toBe("Atlas (Plan Executor)")
+      expect(callArgs.body.agent).not.toBe("atlas")
+    })
 
     test("should debounce rapid continuation injections (prevent infinite loop)", async () => {
       // given - boulder state with incomplete plan

@@ -253,6 +253,17 @@ describe("quota error detection (fixes #2747)", () => {
     expect(retryable).toBe(true)
   })
 
+  test("treats hard usage-limit wording as retryable", () => {
+    //#given
+    const error = { message: "You've reached your usage limit for this month. Please upgrade to continue." }
+
+    //#when
+    const retryable = isRetryableError(error, [429, 503])
+
+    //#then
+    expect(retryable).toBe(true)
+  })
+
   test("classifies QuotaExceededError by errorName even without quota keywords in message", () => {
     //#given
     const error = { name: "QuotaExceededError", message: "Request failed." }

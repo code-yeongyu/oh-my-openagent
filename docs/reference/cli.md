@@ -201,10 +201,10 @@ Manages OAuth 2.1 authentication for remote MCP servers.
 bunx oh-my-opencode mcp oauth login <server-name> --server-url https://api.example.com
 
 # Login with explicit client ID and scopes
-bunx oh-my-opencode mcp oauth login my-api --server-url https://api.example.com --client-id my-client --scopes "read,write"
+bunx oh-my-opencode mcp oauth login my-api --server-url https://api.example.com --client-id my-client --scopes read write
 
 # Remove stored OAuth tokens
-bunx oh-my-opencode mcp oauth logout <server-name>
+bunx oh-my-opencode mcp oauth logout <server-name> --server-url https://api.example.com
 
 # Check OAuth token status
 bunx oh-my-opencode mcp oauth status [server-name]
@@ -216,7 +216,7 @@ bunx oh-my-opencode mcp oauth status [server-name]
 | -------------------- | ------------------------------------------------------------------------- |
 | `--server-url <url>` | MCP server URL (required for login)                                       |
 | `--client-id <id>`   | OAuth client ID (optional if server supports Dynamic Client Registration) |
-| `--scopes <scopes>`  | Comma-separated OAuth scopes                                              |
+| `--scopes <scopes>`  | OAuth scopes as separate variadic arguments (for example: `--scopes read write`) |
 
 ### Token Storage
 

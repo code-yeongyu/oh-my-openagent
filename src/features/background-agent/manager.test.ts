@@ -3312,6 +3312,9 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
         prompt: async () => ({}),
         promptAsync: async () => ({}),
         abort: async () => ({}),
+        get: async () => {
+          throw new Error("missing")
+        },
       },
     }
     const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput, { staleTimeoutMs: 180_000 })
@@ -3348,6 +3351,9 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
         prompt: async () => ({}),
         promptAsync: async () => ({}),
         abort: async () => ({}),
+        get: async () => {
+          throw new Error("missing")
+        },
       },
     }
     const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput, { staleTimeoutMs: 180_000 })
@@ -3437,6 +3443,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
       status: "running",
       startedAt: new Date(Date.now() - 15 * 60 * 1000),
       progress: undefined,
+      consecutiveMissedPolls: 2,
     }
 
     getTaskMap(manager).set(task.id, task)
@@ -3471,6 +3478,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
       status: "running",
       startedAt: new Date(Date.now() - 15 * 60 * 1000),
       progress: undefined,
+      consecutiveMissedPolls: 2,
     }
 
     getTaskMap(manager).set(task.id, task)

@@ -3,14 +3,23 @@ import { buildPlanAgentSystemPrepend, isPlanAgent } from "./constants"
 import { buildSystemContentWithTokenLimit } from "./token-limiter"
 
 const FREE_OR_LOCAL_PROMPT_TOKEN_LIMIT = 24000
-const PLAN_AGENT_PROMPT_APPEND = `
+const PLAN_AGENT_PROMPT_BASE = `
 
 Additional requirements for this planning request:
 - Answer in English.
 - Write the plan in English.
 - Plan well for ultrawork execution.
-- Use TDD-oriented planning.
 - Include a clear atomic commit strategy.`
+
+const TDD_LINE = "- Use TDD-oriented planning."
+
+function buildPlanAgentPromptAppend(tddEnabled: boolean): string {
+  if (tddEnabled) {
+    return `${PLAN_AGENT_PROMPT_BASE}
+${TDD_LINE}`
+  }
+  return PLAN_AGENT_PROMPT_BASE
+}
 
 function usesFreeOrLocalModel(model: { providerID: string; modelID: string; variant?: string } | undefined): boolean {
   if (!model) {
@@ -61,10 +70,11 @@ export function buildSystemContent(input: BuildSystemContentInput): string | und
   )
 }
 
-export function buildTaskPrompt(prompt: string, agentName: string | undefined): string {
+export function buildTaskPrompt(prompt: string, agentName: string | undefined, tddEnabled?: boolean): string {
   if (!isPlanAgent(agentName)) {
     return prompt
   }
 
-  return `${prompt}${PLAN_AGENT_PROMPT_APPEND}`
+  const effectiveTdd = tddEnabled ?? true
+  return `${prompt}${buildPlanAgentPromptAppend(effectiveTdd)}`
 }

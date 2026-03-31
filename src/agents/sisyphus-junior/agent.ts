@@ -12,7 +12,7 @@
 
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode } from "../types"
-import { isGptModel, isGeminiModel } from "../types"
+import { isGlmModel, isGptModel, isGeminiModel } from "../types"
 import type { AgentOverrideConfig } from "../../config/schema"
 import {
   createAgentToolRestrictions,
@@ -121,6 +121,10 @@ export function createSisyphusJuniorAgentWithOverrides(
 
   if (isGptModel(model)) {
     return { ...base, reasoningEffort: "medium" } as AgentConfig
+  }
+
+  if (isGlmModel(model)) {
+    return base as AgentConfig
   }
 
   return {

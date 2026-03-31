@@ -50,6 +50,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     main_pane_size: pluginConfig.tmux?.main_pane_size ?? 60,
     main_pane_min_width: pluginConfig.tmux?.main_pane_min_width ?? 120,
     agent_pane_min_width: pluginConfig.tmux?.agent_pane_min_width ?? 40,
+    isolation: pluginConfig.tmux?.isolation ?? "session",
   }
 
   const modelCacheState = createModelCacheState()

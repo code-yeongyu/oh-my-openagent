@@ -1,3 +1,5 @@
+import { getAgentConfigKey } from "../../shared/agent-display-names"
+
 export const subagentSessions = new Set<string>()
 export const syncSubagentSessions = new Set<string>()
 
@@ -14,7 +16,13 @@ export function getMainSessionID(): string | undefined {
 const registeredAgentNames = new Set<string>()
 
 export function registerAgentName(name: string): void {
-  registeredAgentNames.add(name.toLowerCase())
+  const normalizedName = name.toLowerCase()
+  registeredAgentNames.add(normalizedName)
+
+  const configKey = getAgentConfigKey(name).toLowerCase()
+  if (configKey !== normalizedName) {
+    registeredAgentNames.add(configKey)
+  }
 }
 
 export function isAgentRegistered(name: string): boolean {

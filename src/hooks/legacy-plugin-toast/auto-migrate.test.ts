@@ -2,7 +2,9 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test"
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { autoMigrateLegacyPluginEntry } from "./auto-migrate"
+async function importFreshAutoMigrateModule(): Promise<typeof import("./auto-migrate")> {
+  return import(`./auto-migrate?test=${Date.now()}-${Math.random()}`)
+}
 
 describe("autoMigrateLegacyPluginEntry", () => {
   let testConfigDir = ""
@@ -17,12 +19,14 @@ describe("autoMigrateLegacyPluginEntry", () => {
   })
 
   describe("#given opencode.json has a bare legacy plugin entry", () => {
-    it("#then replaces oh-my-opencode with oh-my-openagent", () => {
+    it("#then replaces oh-my-opencode with oh-my-openagent", async () => {
       // given
       writeFileSync(
         join(testConfigDir, "opencode.json"),
         JSON.stringify({ plugin: ["oh-my-opencode"] }, null, 2) + "\n",
       )
+
+      const { autoMigrateLegacyPluginEntry } = await importFreshAutoMigrateModule()
 
       // when
       const result = autoMigrateLegacyPluginEntry(testConfigDir)
@@ -37,12 +41,14 @@ describe("autoMigrateLegacyPluginEntry", () => {
   })
 
   describe("#given opencode.json has a version-pinned legacy entry", () => {
-    it("#then preserves the version suffix", () => {
+    it("#then preserves the version suffix", async () => {
       // given
       writeFileSync(
         join(testConfigDir, "opencode.json"),
         JSON.stringify({ plugin: ["oh-my-opencode@3.10.0"] }, null, 2) + "\n",
       )
+
+      const { autoMigrateLegacyPluginEntry } = await importFreshAutoMigrateModule()
 
       // when
       const result = autoMigrateLegacyPluginEntry(testConfigDir)
@@ -57,12 +63,14 @@ describe("autoMigrateLegacyPluginEntry", () => {
   })
 
   describe("#given both canonical and legacy entries exist", () => {
-    it("#then removes legacy entry and keeps canonical", () => {
+    it("#then removes legacy entry and keeps canonical", async () => {
       // given
       writeFileSync(
         join(testConfigDir, "opencode.json"),
         JSON.stringify({ plugin: ["oh-my-openagent", "oh-my-opencode"] }, null, 2) + "\n",
       )
+
+      const { autoMigrateLegacyPluginEntry } = await importFreshAutoMigrateModule()
 
       // when
       const result = autoMigrateLegacyPluginEntry(testConfigDir)
@@ -75,8 +83,9 @@ describe("autoMigrateLegacyPluginEntry", () => {
   })
 
   describe("#given no config file exists", () => {
-    it("#then returns migrated false", () => {
+    it("#then returns migrated false", async () => {
       // given - empty dir
+      const { autoMigrateLegacyPluginEntry } = await importFreshAutoMigrateModule()
 
       // when
       const result = autoMigrateLegacyPluginEntry(testConfigDir)
@@ -88,12 +97,14 @@ describe("autoMigrateLegacyPluginEntry", () => {
   })
 
   describe("#given opencode.jsonc has comments and a legacy entry", () => {
-    it("#then preserves comments and replaces entry", () => {
+    it("#then preserves comments and replaces entry", async () => {
       // given
       writeFileSync(
         join(testConfigDir, "opencode.jsonc"),
         '{\n  // my config\n  "plugin": ["oh-my-opencode"]\n}\n',
       )
+
+      const { autoMigrateLegacyPluginEntry } = await importFreshAutoMigrateModule()
 
       // when
       const result = autoMigrateLegacyPluginEntry(testConfigDir)
@@ -108,10 +119,12 @@ describe("autoMigrateLegacyPluginEntry", () => {
   })
 
   describe("#given only canonical entry exists", () => {
-    it("#then returns migrated false and leaves file untouched", () => {
+    it("#then returns migrated false and leaves file untouched", async () => {
       // given
       const original = JSON.stringify({ plugin: ["oh-my-openagent"] }, null, 2) + "\n"
       writeFileSync(join(testConfigDir, "opencode.json"), original)
+
+      const { autoMigrateLegacyPluginEntry } = await importFreshAutoMigrateModule()
 
       // when
       const result = autoMigrateLegacyPluginEntry(testConfigDir)

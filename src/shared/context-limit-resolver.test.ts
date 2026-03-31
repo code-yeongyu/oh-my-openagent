@@ -45,7 +45,7 @@ describe("resolveActualContextLimit", () => {
     expect(actualLimit).toBe(1_000_000)
   })
 
-  it("returns cached limit for Anthropic models when modelContextLimitsCache has entry", () => {
+  it("returns default 200K for older Anthropic models when 1M mode is disabled", () => {
     // given
     delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
     delete process.env[VERTEX_CONTEXT_ENV_KEY]
@@ -59,7 +59,7 @@ describe("resolveActualContextLimit", () => {
     })
 
     // then
-    expect(actualLimit).toBe(500_000)
+    expect(actualLimit).toBe(200_000)
   })
 
   it("returns default 200K for Anthropic models without cached limit and 1M mode disabled", () => {
@@ -124,6 +124,40 @@ describe("resolveActualContextLimit", () => {
 
     // then
     expect(actualLimit).toBe(1_000_000)
+  })
+
+  it("supports Anthropic 4.6 high-variant model IDs without widening older models", () => {
+    // given
+    delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+    delete process.env[VERTEX_CONTEXT_ENV_KEY]
+    const modelContextLimitsCache = new Map<string, number>()
+    modelContextLimitsCache.set("anthropic/claude-sonnet-4-6-high", 500_000)
+
+    // when
+    const actualLimit = resolveActualContextLimit("anthropic", "claude-sonnet-4-6-high", {
+      anthropicContext1MEnabled: false,
+      modelContextLimitsCache,
+    })
+
+    // then
+    expect(actualLimit).toBe(500_000)
+  })
+
+  it("ignores stale cached limits for older Anthropic models with suffixed IDs", () => {
+    // given
+    delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+    delete process.env[VERTEX_CONTEXT_ENV_KEY]
+    const modelContextLimitsCache = new Map<string, number>()
+    modelContextLimitsCache.set("anthropic/claude-sonnet-4-5-high", 500_000)
+
+    // when
+    const actualLimit = resolveActualContextLimit("anthropic", "claude-sonnet-4-5-high", {
+      anthropicContext1MEnabled: false,
+      modelContextLimitsCache,
+    })
+
+    // then
+    expect(actualLimit).toBe(200_000)
   })
 
   it("returns null for non-Anthropic providers without a cached limit", () => {

@@ -8,6 +8,7 @@ describe("checkAndInterruptStaleTasks", () => {
   const mockClient = {
     session: {
       abort: mock(() => Promise.resolve()),
+      get: mock(() => Promise.resolve({ data: { id: "ses-1" } })),
     },
   }
   const mockConcurrencyManager = {
@@ -35,6 +36,11 @@ describe("checkAndInterruptStaleTasks", () => {
   beforeEach(() => {
     fixedTime = Date.now()
     spyOn(globalThis.Date, "now").mockReturnValue(fixedTime)
+    mockClient.session.abort.mockClear()
+    mockClient.session.get.mockReset()
+    mockClient.session.get.mockResolvedValue({ data: { id: "ses-1" } })
+    mockConcurrencyManager.release.mockClear()
+    mockNotify.mockClear()
   })
 
   afterEach(() => {
@@ -288,6 +294,59 @@ describe("checkAndInterruptStaleTasks", () => {
     expect(task.status).toBe("running")
   })
 
+  it("should NOT cancel healthy task on first missing status poll", async () => {
+    //#given — one missing poll should not be enough to declare the session gone
+    const task = createRunningTask({
+      startedAt: new Date(Date.now() - 300_000),
+      progress: {
+        toolCalls: 1,
+        lastUpdate: new Date(Date.now() - 120_000),
+      },
+    })
+
+    //#when
+    await checkAndInterruptStaleTasks({
+      tasks: [task],
+      client: mockClient as never,
+      config: { staleTimeoutMs: 180_000, sessionGoneTimeoutMs: 60_000 },
+      concurrencyManager: mockConcurrencyManager as never,
+      notifyParentSession: mockNotify,
+      sessionStatuses: {},
+    })
+
+    //#then
+    expect(task.status).toBe("running")
+    expect(task.consecutiveMissedPolls).toBe(1)
+    expect(mockClient.session.get).not.toHaveBeenCalled()
+  })
+
+  it("should NOT cancel task when session.get confirms the session still exists", async () => {
+    //#given — repeated missing polls but direct lookup still succeeds
+    const task = createRunningTask({
+      startedAt: new Date(Date.now() - 300_000),
+      progress: {
+        toolCalls: 1,
+        lastUpdate: new Date(Date.now() - 120_000),
+      },
+      consecutiveMissedPolls: 2,
+    })
+
+    //#when
+    await checkAndInterruptStaleTasks({
+      tasks: [task],
+      client: mockClient as never,
+      config: { staleTimeoutMs: 180_000, sessionGoneTimeoutMs: 60_000 },
+      concurrencyManager: mockConcurrencyManager as never,
+      notifyParentSession: mockNotify,
+      sessionStatuses: {},
+    })
+
+    //#then
+    expect(task.status).toBe("running")
+    expect(task.consecutiveMissedPolls).toBe(0)
+    expect(mockClient.session.get).toHaveBeenCalledWith({ path: { id: "ses-1" } })
+  })
+
   it("should use session-gone timeout when session is missing from status map (with progress)", async () => {
     //#given — lastUpdate 2min ago, session completely gone from status
     const task = createRunningTask({
@@ -296,7 +355,10 @@ describe("checkAndInterruptStaleTasks", () => {
         toolCalls: 1,
         lastUpdate: new Date(Date.now() - 120_000),
       },
+      consecutiveMissedPolls: 2,
     })
+
+    mockClient.session.get.mockRejectedValue(new Error("missing"))
 
     //#when — empty sessionStatuses (session gone), sessionGoneTimeoutMs = 60s
     await checkAndInterruptStaleTasks({
@@ -318,7 +380,10 @@ describe("checkAndInterruptStaleTasks", () => {
     const task = createRunningTask({
       startedAt: new Date(Date.now() - 120_000),
       progress: undefined,
+      consecutiveMissedPolls: 2,
     })
+
+    mockClient.session.get.mockRejectedValue(new Error("missing"))
 
     //#when — session gone, sessionGoneTimeoutMs = 60s
     await checkAndInterruptStaleTasks({
@@ -343,7 +408,10 @@ describe("checkAndInterruptStaleTasks", () => {
         toolCalls: 1,
         lastUpdate: new Date(Date.now() - 120_000),
       },
+      consecutiveMissedPolls: 2,
     })
+
+    mockClient.session.get.mockRejectedValue(new Error("missing"))
 
     //#when — session is idle (present in map), staleTimeoutMs = 180s
     await checkAndInterruptStaleTasks({
@@ -367,7 +435,10 @@ describe("checkAndInterruptStaleTasks", () => {
         toolCalls: 1,
         lastUpdate: new Date(Date.now() - 120_000),
       },
+      consecutiveMissedPolls: 2,
     })
+
+    mockClient.session.get.mockRejectedValue(new Error("missing"))
 
     //#when — no config (default sessionGoneTimeoutMs = 60_000)
     await checkAndInterruptStaleTasks({

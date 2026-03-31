@@ -4040,843 +4040,6 @@
             }
           },
           "additionalProperties": false
-        },
-        "council-member": {
-          "type": "object",
-          "properties": {
-            "model": {
-              "type": "string"
-            },
-            "fallback_models": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
-                }
-              ]
-            },
-            "variant": {
-              "type": "string"
-            },
-            "category": {
-              "type": "string"
-            },
-            "skills": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "temperature": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 2
-            },
-            "top_p": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1
-            },
-            "prompt": {
-              "type": "string"
-            },
-            "prompt_append": {
-              "type": "string"
-            },
-            "tools": {
-              "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
-              "additionalProperties": {
-                "type": "boolean"
-              }
-            },
-            "disable": {
-              "type": "boolean"
-            },
-            "description": {
-              "type": "string"
-            },
-            "mode": {
-              "type": "string",
-              "enum": [
-                "subagent",
-                "primary",
-                "all"
-              ]
-            },
-            "color": {
-              "type": "string",
-              "pattern": "^#[0-9A-Fa-f]{6}$"
-            },
-            "permission": {
-              "type": "object",
-              "properties": {
-                "edit": {
-                  "type": "string",
-                  "enum": [
-                    "ask",
-                    "allow",
-                    "deny"
-                  ]
-                },
-                "bash": {
-                  "anyOf": [
-                    {
-                      "type": "string",
-                      "enum": [
-                        "ask",
-                        "allow",
-                        "deny"
-                      ]
-                    },
-                    {
-                      "type": "object",
-                      "propertyNames": {
-                        "type": "string"
-                      },
-                      "additionalProperties": {
-                        "type": "string",
-                        "enum": [
-                          "ask",
-                          "allow",
-                          "deny"
-                        ]
-                      }
-                    }
-                  ]
-                },
-                "webfetch": {
-                  "type": "string",
-                  "enum": [
-                    "ask",
-                    "allow",
-                    "deny"
-                  ]
-                },
-                "task": {
-                  "type": "string",
-                  "enum": [
-                    "ask",
-                    "allow",
-                    "deny"
-                  ]
-                },
-                "doom_loop": {
-                  "type": "string",
-                  "enum": [
-                    "ask",
-                    "allow",
-                    "deny"
-                  ]
-                },
-                "external_directory": {
-                  "type": "string",
-                  "enum": [
-                    "ask",
-                    "allow",
-                    "deny"
-                  ]
-                }
-              },
-              "additionalProperties": false
-            },
-            "maxTokens": {
-              "type": "number"
-            },
-            "thinking": {
-              "type": "object",
-              "properties": {
-                "type": {
-                  "type": "string",
-                  "enum": [
-                    "enabled",
-                    "disabled"
-                  ]
-                },
-                "budgetTokens": {
-                  "type": "number"
-                }
-              },
-              "required": [
-                "type"
-              ],
-              "additionalProperties": false
-            },
-            "reasoningEffort": {
-              "type": "string",
-              "enum": [
-                "low",
-                "medium",
-                "high",
-                "xhigh"
-              ]
-            },
-            "textVerbosity": {
-              "type": "string",
-              "enum": [
-                "low",
-                "medium",
-                "high"
-              ]
-            },
-            "providerOptions": {
-              "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
-              "additionalProperties": {}
-            },
-            "ultrawork": {
-              "type": "object",
-              "properties": {
-                "model": {
-                  "type": "string"
-                },
-                "variant": {
-                  "type": "string"
-                }
-              },
-              "additionalProperties": false
-            },
-            "compaction": {
-              "type": "object",
-              "properties": {
-                "model": {
-                  "type": "string"
-                },
-                "variant": {
-                  "type": "string"
-                }
-              },
-              "additionalProperties": false
-            }
-          },
-          "additionalProperties": false
-        },
-        "athena": {
-          "type": "object",
-          "properties": {
-            "model": {
-              "type": "string"
-            },
-            "fallback_models": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
-                }
-              ]
-            },
-            "variant": {
-              "type": "string"
-            },
-            "category": {
-              "type": "string"
-            },
-            "skills": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "temperature": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 2
-            },
-            "top_p": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1
-            },
-            "prompt": {
-              "type": "string"
-            },
-            "prompt_append": {
-              "type": "string"
-            },
-            "tools": {
-              "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
-              "additionalProperties": {
-                "type": "boolean"
-              }
-            },
-            "disable": {
-              "type": "boolean"
-            },
-            "description": {
-              "type": "string"
-            },
-            "mode": {
-              "type": "string",
-              "enum": [
-                "subagent",
-                "primary",
-                "all"
-              ]
-            },
-            "color": {
-              "type": "string",
-              "pattern": "^#[0-9A-Fa-f]{6}$"
-            },
-            "permission": {
-              "type": "object",
-              "properties": {
-                "edit": {
-                  "type": "string",
-                  "enum": [
-                    "ask",
-                    "allow",
-                    "deny"
-                  ]
-                },
-                "bash": {
-                  "anyOf": [
-                    {
-                      "type": "string",
-                      "enum": [
-                        "ask",
-                        "allow",
-                        "deny"
-                      ]
-                    },
-                    {
-                      "type": "object",
-                      "propertyNames": {
-                        "type": "string"
-                      },
-                      "additionalProperties": {
-                        "type": "string",
-                        "enum": [
-                          "ask",
-                          "allow",
-                          "deny"
-                        ]
-                      }
-                    }
-                  ]
-                },
-                "webfetch": {
-                  "type": "string",
-                  "enum": [
-                    "ask",
-                    "allow",
-                    "deny"
-                  ]
-                },
-                "task": {
-                  "type": "string",
-                  "enum": [
-                    "ask",
-                    "allow",
-                    "deny"
-                  ]
-                },
-                "doom_loop": {
-                  "type": "string",
-                  "enum": [
-                    "ask",
-                    "allow",
-                    "deny"
-                  ]
-                },
-                "external_directory": {
-                  "type": "string",
-                  "enum": [
-                    "ask",
-                    "allow",
-                    "deny"
-                  ]
-                }
-              },
-              "additionalProperties": false
-            },
-            "maxTokens": {
-              "type": "number"
-            },
-            "thinking": {
-              "type": "object",
-              "properties": {
-                "type": {
-                  "type": "string",
-                  "enum": [
-                    "enabled",
-                    "disabled"
-                  ]
-                },
-                "budgetTokens": {
-                  "type": "number"
-                }
-              },
-              "required": [
-                "type"
-              ],
-              "additionalProperties": false
-            },
-            "reasoningEffort": {
-              "type": "string",
-              "enum": [
-                "low",
-                "medium",
-                "high",
-                "xhigh"
-              ]
-            },
-            "textVerbosity": {
-              "type": "string",
-              "enum": [
-                "low",
-                "medium",
-                "high"
-              ]
-            },
-            "providerOptions": {
-              "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
-              "additionalProperties": {}
-            },
-            "ultrawork": {
-              "type": "object",
-              "properties": {
-                "model": {
-                  "type": "string"
-                },
-                "variant": {
-                  "type": "string"
-                }
-              },
-              "additionalProperties": false
-            },
-            "compaction": {
-              "type": "object",
-              "properties": {
-                "model": {
-                  "type": "string"
-                },
-                "variant": {
-                  "type": "string"
-                }
-              },
-              "additionalProperties": false
-            },
-            "council": {
-              "type": "object",
-              "properties": {
-                "members": {
-                  "minItems": 2,
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "model": {
-                        "type": "string",
-                        "minLength": 1
-                      },
-                      "variant": {
-                        "type": "string"
-                      },
-                      "name": {
-                        "type": "string",
-                        "minLength": 1,
-                        "pattern": "^[a-zA-Z0-9][a-zA-Z0-9 .\\-]*$"
-                      },
-                      "temperature": {
-                        "type": "number",
-                        "minimum": 0,
-                        "maximum": 2
-                      }
-                    },
-                    "required": [
-                      "model",
-                      "name"
-                    ],
-                    "additionalProperties": false
-                  }
-                },
-                "retry_on_fail": {
-                  "default": 0,
-                  "type": "number",
-                  "minimum": 0,
-                  "maximum": 5
-                },
-                "retry_failed_if_others_finished": {
-                  "default": false,
-                  "type": "boolean"
-                },
-                "cancel_retrying_on_quorum": {
-                  "default": true,
-                  "type": "boolean"
-                },
-                "stuck_threshold_seconds": {
-                  "default": 120,
-                  "type": "number",
-                  "minimum": 30
-                },
-                "member_max_running_seconds": {
-                  "default": 1800,
-                  "type": "number",
-                  "minimum": 60
-                }
-              },
-              "required": [
-                "members"
-              ],
-              "additionalProperties": false
-            },
-            "bulk_launch": {
-              "default": false,
-              "type": "boolean"
-            },
-            "non_interactive_mode": {
-              "default": "delegation",
-              "type": "string",
-              "enum": [
-                "delegation",
-                "solo"
-              ]
-            },
-            "non_interactive_members": {
-              "default": "all",
-              "type": "string",
-              "enum": [
-                "all",
-                "custom"
-              ]
-            },
-            "non_interactive_member_list": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            }
-          },
-          "additionalProperties": false
-        },
-        "athena-junior": {
-          "type": "object",
-          "properties": {
-            "model": {
-              "type": "string"
-            },
-            "fallback_models": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
-                }
-              ]
-            },
-            "variant": {
-              "type": "string"
-            },
-            "category": {
-              "type": "string"
-            },
-            "skills": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "temperature": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 2
-            },
-            "top_p": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1
-            },
-            "prompt": {
-              "type": "string"
-            },
-            "prompt_append": {
-              "type": "string"
-            },
-            "tools": {
-              "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
-              "additionalProperties": {
-                "type": "boolean"
-              }
-            },
-            "disable": {
-              "type": "boolean"
-            },
-            "description": {
-              "type": "string"
-            },
-            "mode": {
-              "type": "string",
-              "enum": [
-                "subagent",
-                "primary",
-                "all"
-              ]
-            },
-            "color": {
-              "type": "string",
-              "pattern": "^#[0-9A-Fa-f]{6}$"
-            },
-            "permission": {
-              "type": "object",
-              "properties": {
-                "edit": {
-                  "type": "string",
-                  "enum": [
-                    "ask",
-                    "allow",
-                    "deny"
-                  ]
-                },
-                "bash": {
-                  "anyOf": [
-                    {
-                      "type": "string",
-                      "enum": [
-                        "ask",
-                        "allow",
-                        "deny"
-                      ]
-                    },
-                    {
-                      "type": "object",
-                      "propertyNames": {
-                        "type": "string"
-                      },
-                      "additionalProperties": {
-                        "type": "string",
-                        "enum": [
-                          "ask",
-                          "allow",
-                          "deny"
-                        ]
-                      }
-                    }
-                  ]
-                },
-                "webfetch": {
-                  "type": "string",
-                  "enum": [
-                    "ask",
-                    "allow",
-                    "deny"
-                  ]
-                },
-                "task": {
-                  "type": "string",
-                  "enum": [
-                    "ask",
-                    "allow",
-                    "deny"
-                  ]
-                },
-                "doom_loop": {
-                  "type": "string",
-                  "enum": [
-                    "ask",
-                    "allow",
-                    "deny"
-                  ]
-                },
-                "external_directory": {
-                  "type": "string",
-                  "enum": [
-                    "ask",
-                    "allow",
-                    "deny"
-                  ]
-                }
-              },
-              "additionalProperties": false
-            },
-            "maxTokens": {
-              "type": "number"
-            },
-            "thinking": {
-              "type": "object",
-              "properties": {
-                "type": {
-                  "type": "string",
-                  "enum": [
-                    "enabled",
-                    "disabled"
-                  ]
-                },
-                "budgetTokens": {
-                  "type": "number"
-                }
-              },
-              "required": [
-                "type"
-              ],
-              "additionalProperties": false
-            },
-            "reasoningEffort": {
-              "type": "string",
-              "enum": [
-                "low",
-                "medium",
-                "high",
-                "xhigh"
-              ]
-            },
-            "textVerbosity": {
-              "type": "string",
-              "enum": [
-                "low",
-                "medium",
-                "high"
-              ]
-            },
-            "providerOptions": {
-              "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
-              "additionalProperties": {}
-            },
-            "ultrawork": {
-              "type": "object",
-              "properties": {
-                "model": {
-                  "type": "string"
-                },
-                "variant": {
-                  "type": "string"
-                }
-              },
-              "additionalProperties": false
-            },
-            "compaction": {
-              "type": "object",
-              "properties": {
-                "model": {
-                  "type": "string"
-                },
-                "variant": {
-                  "type": "string"
-                }
-              },
-              "additionalProperties": false
-            },
-            "council": {
-              "type": "object",
-              "properties": {
-                "members": {
-                  "minItems": 2,
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "model": {
-                        "type": "string",
-                        "minLength": 1
-                      },
-                      "variant": {
-                        "type": "string"
-                      },
-                      "name": {
-                        "type": "string",
-                        "minLength": 1,
-                        "pattern": "^[a-zA-Z0-9][a-zA-Z0-9 .\\-]*$"
-                      },
-                      "temperature": {
-                        "type": "number",
-                        "minimum": 0,
-                        "maximum": 2
-                      }
-                    },
-                    "required": [
-                      "model",
-                      "name"
-                    ],
-                    "additionalProperties": false
-                  }
-                },
-                "retry_on_fail": {
-                  "default": 0,
-                  "type": "number",
-                  "minimum": 0,
-                  "maximum": 5
-                },
-                "retry_failed_if_others_finished": {
-                  "default": false,
-                  "type": "boolean"
-                },
-                "cancel_retrying_on_quorum": {
-                  "default": true,
-                  "type": "boolean"
-                },
-                "stuck_threshold_seconds": {
-                  "default": 120,
-                  "type": "number",
-                  "minimum": 30
-                },
-                "member_max_running_seconds": {
-                  "default": 1800,
-                  "type": "number",
-                  "minimum": 60
-                }
-              },
-              "required": [
-                "members"
-              ],
-              "additionalProperties": false
-            },
-            "bulk_launch": {
-              "default": false,
-              "type": "boolean"
-            },
-            "non_interactive_mode": {
-              "default": "delegation",
-              "type": "string",
-              "enum": [
-                "delegation",
-                "solo"
-              ]
-            },
-            "non_interactive_members": {
-              "default": "all",
-              "type": "string",
-              "enum": [
-                "all",
-                "custom"
-              ]
-            },
-            "non_interactive_member_list": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            }
-          },
-          "additionalProperties": false
         }
       },
       "additionalProperties": false
@@ -5098,6 +4261,10 @@
         },
         "replace_plan": {
           "type": "boolean"
+        },
+        "tdd": {
+          "default": true,
+          "type": "boolean"
         }
       },
       "additionalProperties": false
@@ -5156,6 +4323,10 @@
                   "maximum": 10
                 }
               },
+              "required": [
+                "enabled",
+                "turns"
+              ],
               "additionalProperties": false
             },
             "protected_tools": {
@@ -5184,6 +4355,9 @@
                       "type": "boolean"
                     }
                   },
+                  "required": [
+                    "enabled"
+                  ],
                   "additionalProperties": false
                 },
                 "supersede_writes": {
@@ -5198,6 +4372,10 @@
                       "type": "boolean"
                     }
                   },
+                  "required": [
+                    "enabled",
+                    "aggressive"
+                  ],
                   "additionalProperties": false
                 },
                 "purge_errors": {
@@ -5214,12 +4392,21 @@
                       "maximum": 20
                     }
                   },
+                  "required": [
+                    "enabled",
+                    "turns"
+                  ],
                   "additionalProperties": false
                 }
               },
               "additionalProperties": false
             }
           },
+          "required": [
+            "enabled",
+            "notification",
+            "protected_tools"
+          ],
           "additionalProperties": false
         },
         "task_system": {
@@ -5388,6 +4575,11 @@
           ]
         }
       },
+      "required": [
+        "enabled",
+        "default_max_iterations",
+        "default_strategy"
+      ],
       "additionalProperties": false
     },
     "runtime_fallback": {
@@ -5691,9 +4883,17 @@
           "type": "number"
         }
       },
+      "required": [
+        "timeout_ms"
+      ],
       "additionalProperties": false
     },
     "git_master": {
+      "default": {
+        "commit_footer": true,
+        "include_co_authored_by": true,
+        "git_env_prefix": "GIT_MASTER=1"
+      },
       "type": "object",
       "properties": {
         "commit_footer": {
@@ -5716,6 +4916,11 @@
           "type": "string"
         }
       },
+      "required": [
+        "commit_footer",
+        "include_co_authored_by",
+        "git_env_prefix"
+      ],
       "additionalProperties": false
     },
     "browser_automation_engine": {
@@ -5732,6 +4937,9 @@
           ]
         }
       },
+      "required": [
+        "provider"
+      ],
       "additionalProperties": false
     },
     "websearch": {
@@ -5780,8 +4988,25 @@
           "default": 40,
           "type": "number",
           "minimum": 20
+        },
+        "isolation": {
+          "default": "session",
+          "type": "string",
+          "enum": [
+            "inline",
+            "window",
+            "session"
+          ]
         }
       },
+      "required": [
+        "enabled",
+        "layout",
+        "main_pane_size",
+        "main_pane_min_width",
+        "agent_pane_min_width",
+        "isolation"
+      ],
       "additionalProperties": false
     },
     "sisyphus": {
@@ -5801,6 +5026,9 @@
               "type": "boolean"
             }
           },
+          "required": [
+            "claude_code_compat"
+          ],
           "additionalProperties": false
         }
       },
@@ -5814,6 +5042,9 @@
           "type": "boolean"
         }
       },
+      "required": [
+        "auto_commit"
+      ],
       "additionalProperties": false
     },
     "_migrations": {
@@ -5823,5 +5054,8 @@
       }
     }
   },
+  "required": [
+    "git_master"
+  ],
   "additionalProperties": false
 }

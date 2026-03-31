@@ -17,6 +17,11 @@ import {
   setPendingModelFallback,
 } from "../hooks/model-fallback/hook";
 import { getRawFallbackModels } from "../hooks/runtime-fallback/fallback-models";
+import {
+  clearBackgroundOutputConsumptionsForParentSession,
+  clearBackgroundOutputConsumptionsForTaskSession,
+  restoreBackgroundOutputConsumption,
+} from "../shared/background-output-consumption";
 import { resetMessageCursor } from "../shared";
 import { getAgentConfigKey } from "../shared/agent-display-names";
 import { readConnectedProvidersCache } from "../shared/connected-providers-cache";
@@ -366,6 +371,8 @@ export function createEventHandler(args: {
         clearPendingModelFallback(sessionInfo.id);
         clearSessionFallbackChain(sessionInfo.id);
         resetMessageCursor(sessionInfo.id);
+        clearBackgroundOutputConsumptionsForParentSession(sessionInfo.id);
+        clearBackgroundOutputConsumptionsForTaskSession(sessionInfo.id);
         firstMessageVariantGate.clear(sessionInfo.id);
         clearSessionModel(sessionInfo.id);
         clearSessionPromptParams(sessionInfo.id);
@@ -380,6 +387,12 @@ export function createEventHandler(args: {
           sessionID: sessionInfo.id,
         });
       }
+    }
+
+    if (event.type === "message.removed") {
+      const messageID = props?.messageID as string | undefined;
+      const sessionID = props?.sessionID as string | undefined;
+      restoreBackgroundOutputConsumption(sessionID, messageID);
     }
 
     if (event.type === "message.updated") {

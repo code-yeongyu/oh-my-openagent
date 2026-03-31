@@ -56,10 +56,33 @@ jobs:
         env:
           BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/napi"
 
+      - name: Validate release inputs
+        id: validate
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_DIST_TAG: ${{ inputs.dist_tag }}
+        run: |
+          VERSION="$INPUT_VERSION"
+          DIST_TAG="$INPUT_DIST_TAG"
+
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$ ]]; then
+            echo "::error::Invalid version: $VERSION"
+            exit 1
+          fi
+
+          if [ -n "$DIST_TAG" ] && ! [[ "$DIST_TAG" =~ ^[a-z][a-z0-9-]*$ ]]; then
+            echo "::error::Invalid dist_tag: $DIST_TAG"
+            exit 1
+          fi
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "dist_tag=$DIST_TAG" >> $GITHUB_OUTPUT
+
       - name: Check if already published
         id: check
+        env:
+          VERSION: ${{ steps.validate.outputs.version }}
         run: |
-          VERSION="${{ inputs.version }}"
           PLATFORM_KEY="${{ matrix.platform }}"
           PLATFORM_KEY="${PLATFORM_KEY//-/_}"
           
@@ -96,15 +119,18 @@ jobs:
 
       - name: Update version in package.json
         if: steps.check.outputs.skip != 'true'
+        env:
+          VERSION: ${{ steps.validate.outputs.version }}
         run: |
-          VERSION="${{ inputs.version }}"
           cd packages/${{ matrix.platform }}
           jq --arg v "$VERSION" '.version = $v' package.json > tmp.json && mv tmp.json package.json
 
       - name: Set root package version
         if: steps.check.outputs.skip != 'true'
+        env:
+          VERSION: ${{ steps.validate.outputs.version }}
         run: |
-          jq --arg v "${{ inputs.version }}" '.version = $v' package.json > tmp.json && mv tmp.json package.json
+          jq --arg v "$VERSION" '.version = $v' package.json > tmp.json && mv tmp.json package.json
 
       - name: Pre-download baseline compile target
         if: steps.check.outputs.skip != 'true' && endsWith(matrix.platform, '-baseline')
@@ -226,11 +252,33 @@ jobs:
       matrix:
         platform: [darwin-arm64, darwin-x64, darwin-x64-baseline, linux-x64, linux-x64-baseline, linux-arm64, linux-x64-musl, linux-x64-musl-baseline, linux-arm64-musl, windows-x64, windows-x64-baseline]
     steps:
+      - name: Validate release inputs
+        id: validate
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_DIST_TAG: ${{ inputs.dist_tag }}
+        run: |
+          VERSION="$INPUT_VERSION"
+          DIST_TAG="$INPUT_DIST_TAG"
+
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$ ]]; then
+            echo "::error::Invalid version: $VERSION"
+            exit 1
+          fi
+
+          if [ -n "$DIST_TAG" ] && ! [[ "$DIST_TAG" =~ ^[a-z][a-z0-9-]*$ ]]; then
+            echo "::error::Invalid dist_tag: $DIST_TAG"
+            exit 1
+          fi
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "dist_tag=$DIST_TAG" >> $GITHUB_OUTPUT
+
       - name: Check if already published
         id: check
+        env:
+          VERSION: ${{ steps.validate.outputs.version }}
         run: |
-          VERSION="${{ inputs.version }}"
-          
           OC_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/oh-my-opencode-${{ matrix.platform }}/${VERSION}")
           OA_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/oh-my-openagent-${{ matrix.platform }}/${VERSION}")
           
@@ -288,38 +336,38 @@ jobs:
 
       - name: Publish oh-my-opencode-${{ matrix.platform }}
         if: steps.check.outputs.skip_opencode != 'true' && steps.download.outcome == 'success'
-        run: |
-          cd packages/${{ matrix.platform }}
-          
-          TAG_ARG=""
-          if [ -n "${{ inputs.dist_tag }}" ]; then
-            TAG_ARG="--tag ${{ inputs.dist_tag }}"
-          fi
-          
-          npm publish --access public --provenance $TAG_ARG
         env:
+          DIST_TAG: ${{ steps.validate.outputs.dist_tag }}
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
+        run: |
+          cd packages/${{ matrix.platform }}
+
+          if [ -n "$DIST_TAG" ]; then
+            npm publish --access public --provenance --tag "$DIST_TAG"
+          else
+            npm publish --access public --provenance
+          fi
         timeout-minutes: 15
 
       - name: Publish oh-my-openagent-${{ matrix.platform }}
         if: steps.check.outputs.skip_openagent != 'true' && steps.download.outcome == 'success'
+        env:
+          DIST_TAG: ${{ steps.validate.outputs.dist_tag }}
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+          NPM_CONFIG_PROVENANCE: true
         run: |
           cd packages/${{ matrix.platform }}
-          
+
           # Rename package for oh-my-openagent
           jq --arg name "oh-my-openagent-${{ matrix.platform }}" \
              --arg desc "Platform-specific binary for oh-my-openagent (${{ matrix.platform }})" \
              '.name = $name | .description = $desc | .bin = {"oh-my-openagent": (.bin | to_entries | .[0].value)}' \
              package.json > tmp.json && mv tmp.json package.json
-          
-          TAG_ARG=""
-          if [ -n "${{ inputs.dist_tag }}" ]; then
-            TAG_ARG="--tag ${{ inputs.dist_tag }}"
+
+          if [ -n "$DIST_TAG" ]; then
+            npm publish --access public --provenance --tag "$DIST_TAG"
+          else
+            npm publish --access public --provenance
           fi
-          
-          npm publish --access public --provenance $TAG_ARG
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
-          NPM_CONFIG_PROVENANCE: true
         timeout-minutes: 15

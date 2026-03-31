@@ -19,7 +19,7 @@ export async function executeSyncContinuation(
   executorCtx: ExecutorContext,
   deps: SyncContinuationDeps = syncContinuationDeps
 ): Promise<string> {
-  const { client, syncPollTimeoutMs } = executorCtx
+  const { client, syncPollTimeoutMs, sisyphusAgentConfig } = executorCtx
   const toastManager = getTaskToastManager()
   const taskId = `resume_sync_${args.session_id!.slice(0, 8)}`
   const startTime = new Date()
@@ -83,7 +83,8 @@ export async function executeSyncContinuation(
     }
 
     const allowTask = isPlanFamily(resumeAgent)
-    const effectivePrompt = buildTaskPrompt(args.prompt, resumeAgent)
+    const tddEnabled = sisyphusAgentConfig?.tdd
+    const effectivePrompt = buildTaskPrompt(args.prompt, resumeAgent, tddEnabled)
     const tools = {
       task: allowTask,
       call_omo_agent: true,

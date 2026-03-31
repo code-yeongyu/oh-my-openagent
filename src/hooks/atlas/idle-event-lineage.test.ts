@@ -6,7 +6,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { clearBoulderState, readBoulderState, writeBoulderState } from "../../features/boulder-state"
 import type { BoulderState } from "../../features/boulder-state"
-import { _resetForTesting, setSessionAgent, subagentSessions } from "../../features/claude-code-session-state"
+import { _resetForTesting, registerAgentName, setSessionAgent, subagentSessions } from "../../features/claude-code-session-state"
 
 const { createAtlasHook } = await import("./index")
 
@@ -64,6 +64,8 @@ describe("atlas hook idle-event session lineage", () => {
     promptCalls = []
     clearBoulderState(testDirectory)
     _resetForTesting()
+    registerAgentName("atlas")
+    registerAgentName("sisyphus")
     subagentSessions.clear()
   })
 
