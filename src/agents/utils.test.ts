@@ -278,7 +278,7 @@ describe("createBuiltinAgents with model overrides", () => {
     fetchSpy.mockRestore()
   })
 
-  test("includes custom agents in orchestrator prompts when provided via config", async () => {
+  test("does not advertise custom agents in orchestrator prompts when provided via config", async () => {
     // #given
     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
       new Set([
@@ -313,9 +313,9 @@ describe("createBuiltinAgents with model overrides", () => {
       )
 
       // #then
-      expect(agents.sisyphus.prompt).toContain("researcher")
-      expect(agents.hephaestus.prompt).toContain("researcher")
-      expect(agents.atlas.prompt).toContain("researcher")
+      expect(agents.sisyphus.prompt).not.toContain("researcher")
+      expect(agents.hephaestus.prompt).not.toContain("researcher")
+      expect(agents.atlas.prompt).not.toContain("researcher")
     } finally {
       fetchSpy.mockRestore()
     }
@@ -429,7 +429,7 @@ describe("createBuiltinAgents with model overrides", () => {
     }
   })
 
-  test("deduplicates custom agents case-insensitively", async () => {
+  test("does not advertise duplicate custom agents case-insensitively", async () => {
     // #given
     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
       new Set(["anthropic/claude-opus-4-6", "openai/gpt-5.4"])
@@ -455,13 +455,13 @@ describe("createBuiltinAgents with model overrides", () => {
 
       // #then
       const matches = (agents.sisyphus?.prompt ?? "").match(/Custom agent: researcher/gi) ?? []
-      expect(matches.length).toBe(1)
+      expect(matches.length).toBe(0)
     } finally {
       fetchSpy.mockRestore()
     }
   })
 
-  test("sanitizes custom agent strings for markdown tables", async () => {
+  test("does not surface custom agent strings in orchestrator prompts", async () => {
     // #given
     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
       new Set(["anthropic/claude-opus-4-6", "openai/gpt-5.4"])
@@ -488,7 +488,7 @@ describe("createBuiltinAgents with model overrides", () => {
       )
 
       // #then
-      expect(agents.sisyphus.prompt).toContain("Line1 Alpha \\| Beta")
+      expect(agents.sisyphus.prompt).not.toContain("Line1 Alpha \\| Beta")
     } finally {
       fetchSpy.mockRestore()
     }
