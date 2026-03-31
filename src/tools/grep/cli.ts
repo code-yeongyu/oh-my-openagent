@@ -23,6 +23,9 @@ function buildRgArgs(options: GrepOptions): string[] {
     `--max-filesize=${options.maxFilesize ?? DEFAULT_MAX_FILESIZE}`,
     `--max-count=${Math.min(options.maxCount ?? DEFAULT_MAX_COUNT, DEFAULT_MAX_COUNT)}`,
     `--max-columns=${Math.min(options.maxColumns ?? DEFAULT_MAX_COLUMNS, DEFAULT_MAX_COLUMNS)}`,
+    // Normalize path separators to forward slashes on Windows so the
+    // parseOutput regex doesn't break on drive-letter colons (e.g. C:\...)
+    "--path-separator=/",
   ]
 
   if (options.context !== undefined && options.context > 0) {
@@ -95,7 +98,8 @@ function buildArgs(options: GrepOptions, backend: GrepBackend): string[] {
   return backend === "rg" ? buildRgArgs(options) : buildGrepArgs(options)
 }
 
-function parseOutput(output: string, filesOnly = false): GrepMatch[] {
+/** @internal Exported for testing only */
+export function parseOutput(output: string, filesOnly = false): GrepMatch[] {
   if (!output.trim()) return []
 
   const matches: GrepMatch[] = []
@@ -114,7 +118,8 @@ function parseOutput(output: string, filesOnly = false): GrepMatch[] {
       continue
     }
 
-    const match = line.match(/^(.+?):(\d+):(.*)$/)
+    // Handle optional Windows drive letter (e.g. C:/path/file.ts:42:content)
+    const match = line.match(/^([A-Za-z]:\/.*?|.+?):(\d+):(.*)$/)
     if (match) {
       matches.push({
         file: match[1],
@@ -127,7 +132,8 @@ function parseOutput(output: string, filesOnly = false): GrepMatch[] {
   return matches
 }
 
-function parseCountOutput(output: string): CountResult[] {
+/** @internal Exported for testing only */
+export function parseCountOutput(output: string): CountResult[] {
   if (!output.trim()) return []
 
   const results: CountResult[] = []
@@ -136,7 +142,8 @@ function parseCountOutput(output: string): CountResult[] {
   for (const line of lines) {
     if (!line.trim()) continue
 
-    const match = line.match(/^(.+?):(\d+)$/)
+    // Handle optional Windows drive letter (e.g. C:/path/file.ts:42)
+    const match = line.match(/^([A-Za-z]:\/.*?|.+?):(\d+)$/)
     if (match) {
       results.push({
         file: match[1],
