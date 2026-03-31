@@ -10,6 +10,43 @@ import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { QUESTION_DENIED_SESSION_PERMISSION } from "../../shared/question-denied-session-permission"
 import { setSessionFallbackChain } from "../../hooks/model-fallback/hook"
 
+function continueSessionSetup(args: {
+  taskID: string
+  manager: ExecutorContext["manager"]
+  timing: ReturnType<typeof getTimingConfig>
+  fallbackChain?: FallbackEntry[]
+  category?: string
+}): void {
+  if (!args.fallbackChain && !args.category) {
+    return
+  }
+
+  void (async () => {
+    const waitStart = Date.now()
+    while (Date.now() - waitStart < args.timing.WAIT_FOR_SESSION_TIMEOUT_MS) {
+      await new Promise(resolve => setTimeout(resolve, args.timing.WAIT_FOR_SESSION_INTERVAL_MS))
+      const updated = args.manager.getTask(args.taskID)
+      if (!updated) {
+        return
+      }
+      if (updated.status === "error" || updated.status === "cancelled" || updated.status === "interrupt") {
+        return
+      }
+
+      const sessionId = updated.sessionID
+      if (!sessionId) {
+        continue
+      }
+
+      setSessionFallbackChain(sessionId, args.fallbackChain)
+      if (args.category) {
+        SessionCategoryRegistry.register(sessionId, args.category)
+      }
+      return
+    }
+  })()
+}
+
 export async function executeBackgroundTask(
   args: DelegateTaskArgs,
   ctx: ToolContextWithMetadata,
@@ -50,12 +87,25 @@ export async function executeBackgroundTask(
     const waitStart = Date.now()
     let sessionId = task.sessionID
     while (!sessionId && Date.now() - waitStart < timing.WAIT_FOR_SESSION_TIMEOUT_MS) {
+      const updated = manager.getTask(task.id)
+      if (updated?.status === "error" || updated?.status === "cancelled" || updated?.status === "interrupt") {
+        return `Task failed to start (status: ${updated.status}).\n\nTask ID: ${task.id}`
+      }
+      sessionId = updated?.sessionID
+      if (sessionId) {
+        break
+      }
       if (ctx.abort?.aborted) {
-        return `Task aborted while waiting for session to start.\n\nTask ID: ${task.id}`
+        continueSessionSetup({
+          taskID: task.id,
+          manager,
+          timing,
+          fallbackChain,
+          category: args.category,
+        })
+        break
       }
       await new Promise(resolve => setTimeout(resolve, timing.WAIT_FOR_SESSION_INTERVAL_MS))
-      const updated = manager.getTask(task.id)
-      sessionId = updated?.sessionID
     }
 
     if (sessionId) {
