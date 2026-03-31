@@ -194,7 +194,7 @@ When you use a Category, a special agent called **Sisyphus-Junior** performs the
 
 ### Rename Compatibility
 
-The published package and binary remain `oh-my-opencode`. Inside `opencode.json`, the compatibility layer now prefers the plugin entry `oh-my-openagent`, while legacy `oh-my-opencode` entries still load with a warning. Plugin config files (`oh-my-openagent.json[c]` or legacy `oh-my-opencode.json[c]`) are recognized during the transition. Run `bunx oh-my-opencode doctor` to check for legacy package name warnings.
+The published package and binary remain `oh-my-opencode`. On current OpenCode releases, the installer writes a managed `file://.../node_modules/oh-my-opencode/dist/index.js` entry into `opencode.json` and tracks the dependency through the OpenCode config directory's `package.json`. Direct package-name entries remain part of the rename-compat transition, and legacy `oh-my-opencode` entries still warn when detected. Plugin config files (`oh-my-openagent.json[c]` or legacy `oh-my-opencode.json[c]`) are recognized during the transition. Run `bunx oh-my-opencode doctor` to check for legacy package name warnings.
 
 ### Fallback Models
 

@@ -50,7 +50,9 @@ function findPluginEntry(entries: string[]): { entry: string; isLocalDev: boolea
     }
     // Check for file:// paths that include either name
     if (entry.startsWith("file://") && (entry.includes(PLUGIN_NAME) || entry.includes(LEGACY_PLUGIN_NAME))) {
-      return { entry, isLocalDev: true }
+      const isManagedInstall = entry.includes(`/node_modules/${PLUGIN_NAME}/dist/index.js`)
+        || entry.includes(`/node_modules/${LEGACY_PLUGIN_NAME}/dist/index.js`)
+      return { entry, isLocalDev: !isManagedInstall }
     }
   }
 

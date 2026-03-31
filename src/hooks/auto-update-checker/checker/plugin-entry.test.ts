@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import * as fs from "node:fs"
 import * as os from "node:os"
 import * as path from "node:path"
+import { pathToFileURL } from "node:url"
 import { findPluginEntry } from "./plugin-entry"
 
 describe("findPluginEntry", () => {
@@ -61,6 +62,48 @@ describe("findPluginEntry", () => {
   test("returns pinned for explicit semver", () => {
     // #given plugin is configured with explicit version
     fs.writeFileSync(configPath, JSON.stringify({ plugin: ["oh-my-opencode@3.5.2"] }))
+
+    // #when plugin entry is detected
+    const pluginInfo = findPluginEntry(temporaryDirectory)
+
+    // #then explicit semver is treated as pin
+    expect(pluginInfo).not.toBeNull()
+    expect(pluginInfo?.isPinned).toBe(true)
+    expect(pluginInfo?.pinnedVersion).toBe("3.5.2")
+  })
+
+  test("reads channel intent from installer-managed file entries", () => {
+    // #given plugin is configured as a managed file:// entry
+    const workspacePackageJson = path.join(temporaryDirectory, ".opencode", "package.json")
+    fs.writeFileSync(workspacePackageJson, JSON.stringify({
+      dependencies: {
+        "oh-my-opencode": "latest",
+      },
+    }))
+    fs.writeFileSync(configPath, JSON.stringify({
+      plugin: [pathToFileURL(path.join(temporaryDirectory, ".opencode", "node_modules", "oh-my-opencode", "dist", "index.js")).toString()],
+    }))
+
+    // #when plugin entry is detected
+    const pluginInfo = findPluginEntry(temporaryDirectory)
+
+    // #then latest is treated as channel, not pin
+    expect(pluginInfo).not.toBeNull()
+    expect(pluginInfo?.isPinned).toBe(false)
+    expect(pluginInfo?.pinnedVersion).toBe("latest")
+  })
+
+  test("reads pinned versions from installer-managed file entries", () => {
+    // #given plugin is configured as a managed file:// entry with a pinned dependency
+    const workspacePackageJson = path.join(temporaryDirectory, ".opencode", "package.json")
+    fs.writeFileSync(workspacePackageJson, JSON.stringify({
+      dependencies: {
+        "oh-my-opencode": "3.5.2",
+      },
+    }))
+    fs.writeFileSync(configPath, JSON.stringify({
+      plugin: [pathToFileURL(path.join(temporaryDirectory, ".opencode", "node_modules", "oh-my-opencode", "dist", "index.js")).toString()],
+    }))
 
     // #when plugin entry is detected
     const pluginInfo = findPluginEntry(temporaryDirectory)

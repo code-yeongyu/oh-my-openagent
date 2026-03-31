@@ -111,7 +111,7 @@ Fetch the installation guide and follow it:
 curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/heads/dev/docs/guide/installation.md
 ```
 
-**Note**: Use the published package and binary name `oh-my-opencode`. Inside `opencode.json`, the compatibility layer now prefers the plugin entry `oh-my-openagent`, while legacy `oh-my-opencode` entries still load with a warning. Plugin config files still commonly use `oh-my-opencode.json` or `oh-my-opencode.jsonc`, and both legacy and renamed basenames are recognized during the transition.
+**Note**: Use the published package and binary name `oh-my-opencode`. For reliable installs on current OpenCode releases, the installer registers a managed `file://.../node_modules/oh-my-opencode/dist/index.js` plugin entry in `opencode.json` and keeps the dependency in the OpenCode config directory's `package.json`. Direct package-name entries are now mainly for migration compatibility. Plugin config files still commonly use `oh-my-opencode.json` or `oh-my-opencode.jsonc`, and both legacy and renamed basenames are recognized during the transition.
 
 ---
 
