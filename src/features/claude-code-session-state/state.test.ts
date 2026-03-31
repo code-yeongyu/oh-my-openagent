@@ -1,4 +1,6 @@
-import { describe, test, expect, beforeEach, afterEach } from "bun:test"
+/// <reference path="../../../bun-test.d.ts" />
+
+import { describe, it as test, expect, beforeEach, afterEach } from "bun:test"
 import {
   setSessionAgent,
   getSessionAgent,
@@ -51,7 +53,7 @@ describe("claude-code-session-state", () => {
       // given - no session set
 
       // when / then
-      expect(getSessionAgent("unknown-session")).toBeUndefined()
+      expect(getSessionAgent("unknown-session")).toBe(undefined)
     })
   })
 
@@ -80,7 +82,7 @@ describe("claude-code-session-state", () => {
       clearSessionAgent(sessionID)
 
       // then
-      expect(getSessionAgent(sessionID)).toBeUndefined()
+      expect(getSessionAgent(sessionID)).toBe(undefined)
     })
   })
 
@@ -100,7 +102,7 @@ describe("claude-code-session-state", () => {
       // given - explicit reset to ensure clean state (parallel test isolation)
       _resetForTesting()
       // then
-      expect(getMainSessionID()).toBeUndefined()
+      expect(getMainSessionID()).toBe(undefined)
     })
   })
 
@@ -112,6 +114,21 @@ describe("claude-code-session-state", () => {
       // when / then
       expect(isAgentRegistered("atlas")).toBe(true)
       expect(isAgentRegistered("Atlas (Plan Executor)")).toBe(true)
+    })
+
+    describe("#given atlas display name with zero-width prefix", () => {
+      describe("#when checking registration without the zero-width prefix", () => {
+        test("#then it treats the display name as registered", () => {
+          // given
+          registerAgentName("\u200BAtlas (Plan Executor)")
+
+          // when
+          const isRegistered = isAgentRegistered("Atlas (Plan Executor)")
+
+          // then
+          expect(isRegistered).toBe(true)
+        })
+      })
     })
   })
 
@@ -135,7 +152,7 @@ describe("claude-code-session-state", () => {
       const sessionID = "test-prometheus-session"
 
       // when / then - this is the bug: agent is undefined
-      expect(getSessionAgent(sessionID)).toBeUndefined()
+      expect(getSessionAgent(sessionID)).toBe(undefined)
     })
   })
 
