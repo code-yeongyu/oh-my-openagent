@@ -2414,6 +2414,91 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       expect(manager.getTask(secondTask.id)?.sessionID).toBe(secondSessionID)
     })
 
+    test("should keep sibling launch running when concurrent launches share a parent and the first is cancelled during session creation", async () => {
+      // given
+      const firstSessionID = "ses-first-concurrent-cancelled"
+      const secondSessionID = "ses-second-concurrent-survives"
+      let createCallCount = 0
+      let resolveFirstCreate: ((value: { data: { id: string } }) => void) | undefined
+      let resolveFirstCreateStarted: (() => void) | undefined
+      let resolveSecondPromptAsync: (() => void) | undefined
+      const firstCreateStarted = new Promise<void>((resolve) => {
+        resolveFirstCreateStarted = resolve
+      })
+      const secondPromptAsyncStarted = new Promise<void>((resolve) => {
+        resolveSecondPromptAsync = resolve
+      })
+
+      manager.shutdown()
+      manager = new BackgroundManager(
+        {
+          client: {
+            session: {
+              create: async () => {
+                createCallCount += 1
+                if (createCallCount === 1) {
+                  resolveFirstCreateStarted?.()
+                  return await new Promise<{ data: { id: string } }>((resolve) => {
+                    resolveFirstCreate = resolve
+                  })
+                }
+
+                return { data: { id: secondSessionID } }
+              },
+              get: async () => ({ data: { directory: "/test/dir" } }),
+              prompt: async () => ({}),
+              promptAsync: async ({ path }: { path: { id: string } }) => {
+                if (path.id === secondSessionID) {
+                  resolveSecondPromptAsync?.()
+                }
+
+                return {}
+              },
+              messages: async () => ({ data: [] }),
+              todo: async () => ({ data: [] }),
+              status: async () => ({ data: {} }),
+              abort: async () => ({}),
+            },
+          },
+          directory: tmpdir(),
+        } as unknown as PluginInput,
+        { defaultConcurrency: 1 }
+      )
+
+      const input = {
+        description: "Test task",
+        prompt: "Do something",
+        agent: "test-agent",
+        parentSessionID: "parent-session",
+        parentMessageID: "parent-message",
+      }
+
+      // when
+      const [firstTask, secondTask] = await Promise.all([
+        manager.launch(input),
+        manager.launch(input),
+      ])
+      await firstCreateStarted
+
+      const cancelled = await manager.cancelTask(firstTask.id, {
+        source: "test",
+        abortSession: false,
+      })
+      resolveFirstCreate?.({ data: { id: firstSessionID } })
+
+      await Promise.race([
+        secondPromptAsyncStarted,
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), 100)),
+      ])
+
+      // then
+      expect(cancelled).toBe(true)
+      expect(createCallCount).toBe(2)
+      expect(manager.getTask(firstTask.id)?.status).toBe("cancelled")
+      expect(manager.getTask(secondTask.id)?.status).toBe("running")
+      expect(manager.getTask(secondTask.id)?.sessionID).toBe(secondSessionID)
+    })
+
     test("should keep task cancelled and abort the session when cancellation wins during session creation", async () => {
       // given
       const createdSessionID = "ses-cancelled-during-create"
