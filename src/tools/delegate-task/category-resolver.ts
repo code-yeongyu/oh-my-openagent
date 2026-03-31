@@ -45,11 +45,25 @@ export async function resolveCategoryExecution(
 ): Promise<CategoryResolutionResult> {
   const { client, userCategories, sisyphusJuniorModel } = executorCtx
 
-  const availableModels = await getAvailableModelsForDelegateTask(client)
-
   const categoryName = args.category!
   const enabledCategories = mergeCategories(userCategories)
   const categoryExists = enabledCategories[categoryName] !== undefined
+
+  if (!categoryExists) {
+    const allCategoryNames = Object.keys(enabledCategories).join(", ")
+    return {
+      agentToUse: "",
+      categoryModel: undefined,
+      categoryPromptAppend: undefined,
+      maxPromptTokens: undefined,
+      modelInfo: undefined,
+      actualModel: undefined,
+      isUnstableAgent: false,
+      error: `Unknown category: "${categoryName}". Available: ${allCategoryNames}`,
+    }
+  }
+
+  const availableModels = await getAvailableModelsForDelegateTask(client)
 
   const resolved = resolveCategoryConfig(categoryName, {
     userCategories,

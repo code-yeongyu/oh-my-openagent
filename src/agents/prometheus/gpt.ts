@@ -363,7 +363,7 @@ Wave 2: [dependent tasks with categories]
   **Must NOT do**: [specific exclusions]
 
   **Recommended Agent Profile**:
-  - Category: \`[name]\` — Reason: [why]
+  - Category: \`[category-from-available-categories-above]\` — Reason: [why]
   - Skills: [\`skill-1\`] — [why needed]
   - Omitted: [\`skill-x\`] — [why not needed]
 
