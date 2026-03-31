@@ -15,6 +15,7 @@ import { createChatMessageHandler } from "./chat-message"
 import { createModelFallbackHook } from "../hooks/model-fallback/hook"
 import { createRuntimeFallbackHook } from "../hooks/runtime-fallback"
 import { _resetForTesting } from "../features/claude-code-session-state"
+import { _resetForTesting as _resetModelFallbackForTesting } from "../hooks/model-fallback/hook"
 import { SessionCategoryRegistry } from "../shared/session-category-registry"
 
 const PRIMARY_MODEL = {
@@ -311,6 +312,7 @@ async function triggerAssistantMessageError(
 
 afterEach(() => {
   _resetForTesting()
+  _resetModelFallbackForTesting()
   SessionCategoryRegistry.clear()
 })
 

@@ -1,5 +1,15 @@
 declare const require: (name: string) => any
-const { describe, test, expect, beforeEach, afterEach, spyOn } = require("bun:test")
+const { describe, test, expect, beforeEach, afterEach, spyOn, mock } = require("bun:test")
+
+mock.module("../../shared/connected-providers-cache", () => ({
+  readConnectedProvidersCache: () => null,
+  readProviderModelsCache: () => null,
+  hasConnectedProvidersCache: () => false,
+  hasProviderModelsCache: () => false,
+  writeProviderModelsCache: () => {},
+  updateConnectedProvidersCache: () => {},
+}))
+
 import { getSessionPromptParams, clearSessionPromptParams } from "../../shared/session-prompt-params-state"
 import { tmpdir } from "node:os"
 import type { PluginInput } from "@opencode-ai/plugin"
