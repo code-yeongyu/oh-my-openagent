@@ -3,14 +3,18 @@ import { join } from "node:path";
 import { GITHUB_INSTRUCTIONS_PATTERN, RULE_EXTENSIONS } from "./constants";
 
 function isGitHubInstructionsDir(dir: string): boolean {
-  return dir.includes(".github/instructions") || dir.endsWith(".github/instructions");
+	const normalizedDir = dir.replace(/\\/g, "/");
+	return (
+		normalizedDir.includes(".github/instructions") ||
+		normalizedDir.endsWith(".github/instructions")
+	);
 }
 
 function isValidRuleFile(fileName: string, dir: string): boolean {
-  if (isGitHubInstructionsDir(dir)) {
-    return GITHUB_INSTRUCTIONS_PATTERN.test(fileName);
-  }
-  return RULE_EXTENSIONS.some((ext) => fileName.endsWith(ext));
+	if (isGitHubInstructionsDir(dir)) {
+		return GITHUB_INSTRUCTIONS_PATTERN.test(fileName);
+	}
+	return RULE_EXTENSIONS.some((ext) => fileName.endsWith(ext));
 }
 
 /**
@@ -20,24 +24,24 @@ function isValidRuleFile(fileName: string, dir: string): boolean {
  * @param results - Array to accumulate results
  */
 export function findRuleFilesRecursive(dir: string, results: string[]): void {
-  if (!existsSync(dir)) return;
+	if (!existsSync(dir)) return;
 
-  try {
-    const entries = readdirSync(dir, { withFileTypes: true });
-    for (const entry of entries) {
-      const fullPath = join(dir, entry.name);
+	try {
+		const entries = readdirSync(dir, { withFileTypes: true });
+		for (const entry of entries) {
+			const fullPath = join(dir, entry.name);
 
-      if (entry.isDirectory()) {
-        findRuleFilesRecursive(fullPath, results);
-      } else if (entry.isFile()) {
-        if (isValidRuleFile(entry.name, dir)) {
-          results.push(fullPath);
-        }
-      }
-    }
-  } catch {
-    // Permission denied or other errors - silently skip
-  }
+			if (entry.isDirectory()) {
+				findRuleFilesRecursive(fullPath, results);
+			} else if (entry.isFile()) {
+				if (isValidRuleFile(entry.name, dir)) {
+					results.push(fullPath);
+				}
+			}
+		}
+	} catch {
+		// Permission denied or other errors - silently skip
+	}
 }
 
 /**
@@ -47,9 +51,9 @@ export function findRuleFilesRecursive(dir: string, results: string[]): void {
  * @returns Real path or original path if resolution fails
  */
 export function safeRealpathSync(filePath: string): string {
-  try {
-    return realpathSync(filePath);
-  } catch {
-    return filePath;
-  }
+	try {
+		return realpathSync(filePath);
+	} catch {
+		return filePath;
+	}
 }
