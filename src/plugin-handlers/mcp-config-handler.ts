@@ -40,8 +40,8 @@ export async function applyMcpConfig(params: {
 
   const merged = {
     ...createBuiltinMcps(disabledMcps, params.pluginConfig),
-    ...(userMcp ?? {}),
     ...mcpResult.servers,
+    ...(userMcp ?? {}),
     ...params.pluginComponents.mcpServers,
   } as Record<string, McpEntry>;
 
