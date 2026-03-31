@@ -69,6 +69,10 @@ jobs:
           bun test src/hooks/session-recovery/recover-tool-result-missing.test.ts
           # legacy-plugin-toast mock isolation (hook.test.ts mocks ./auto-migrate)
           bun test src/hooks/legacy-plugin-toast/hook.test.ts
+          # src/plugin — ALL isolated (mock.module pollution crosses between files)
+          for f in src/plugin/*.test.ts; do bun test "$f"; done
+          # src/features/background-agent — ALL isolated (mock.module pollution)
+          for f in src/features/background-agent/*.test.ts; do bun test "$f"; done
 
       - name: Run remaining tests
         run: |
@@ -78,6 +82,8 @@ jobs:
           # Excluded from src/cli: doctor/formatter.test.ts, doctor/format-default.test.ts
           # Excluded from src/tools: call-omo-agent/sync-executor.test.ts, call-omo-agent/session-creator.test.ts, session-manager (all)
           # Excluded from src/hooks/anthropic-context-window-limit-recovery: recovery-hook.test.ts, executor.test.ts
+          # Excluded: src/plugin/* (all run isolated above)
+          # Excluded: src/features/background-agent/* (all run isolated above)
           # Build src/shared file list excluding mock-heavy files already run in isolation
           SHARED_FILES=$(find src/shared -name '*.test.ts' \
             ! -name 'model-capabilities.test.ts' \
@@ -85,6 +91,7 @@ jobs:
             ! -name 'model-error-classifier.test.ts' \
             ! -name 'opencode-message-dir.test.ts' \
             | sort | tr '\n' ' ')
+          # plugin and background-agent fully isolated above — excluded from remaining
           bun test bin script src/config src/mcp src/index.test.ts \
             src/agents $SHARED_FILES \
             src/cli/run src/cli/config-manager src/cli/mcp-oauth \
@@ -107,7 +114,6 @@ jobs:
             src/hooks/session-notification \
             src/hooks/sisyphus \
             src/hooks/todo-continuation-enforcer \
-            src/features/background-agent \
             src/features/builtin-commands \
             src/features/builtin-skills \
             src/features/claude-code-session-state \

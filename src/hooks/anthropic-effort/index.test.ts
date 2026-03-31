@@ -108,6 +108,25 @@ describe("createAnthropicEffortHook", () => {
       expect(output.options.effort).toBeUndefined()
     })
 
+    describe("#given internal hidden agents", () => {
+      const internalAgents = ["title", "summary", "compaction"] as const
+
+      for (const agentName of internalAgents) {
+        it(`skips effort injection for ${agentName} agent`, async () => {
+          // given
+          const hook = createAnthropicEffortHook()
+          const { input, output } = createMockParams({ agentName })
+
+          // when
+          await hook["chat.params"](input, output)
+
+          // then
+          expect(output.options.effort).toBeUndefined()
+          expect(input.message.variant).toBe("max")
+        })
+      }
+    })
+
     it("should clamp effort to high for non-opus claude model with variant max", async () => {
       //#given claude-sonnet-4-6 (not opus) with variant max
       const hook = createAnthropicEffortHook()

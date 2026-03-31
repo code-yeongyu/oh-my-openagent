@@ -4261,6 +4261,10 @@
         },
         "replace_plan": {
           "type": "boolean"
+        },
+        "tdd": {
+          "default": true,
+          "type": "boolean"
         }
       },
       "additionalProperties": false
@@ -4984,6 +4988,15 @@
           "default": 40,
           "type": "number",
           "minimum": 20
+        },
+        "isolation": {
+          "default": "session",
+          "type": "string",
+          "enum": [
+            "inline",
+            "window",
+            "session"
+          ]
         }
       },
       "required": [
@@ -4991,7 +5004,8 @@
         "layout",
         "main_pane_size",
         "main_pane_min_width",
-        "agent_pane_min_width"
+        "agent_pane_min_width",
+        "isolation"
       ],
       "additionalProperties": false
     },

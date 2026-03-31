@@ -6,6 +6,8 @@ import {
   updateSessionAgent,
   setMainSession,
   getMainSessionID,
+  registerAgentName,
+  isAgentRegistered,
   _resetForTesting,
 } from "./state"
 
@@ -99,6 +101,17 @@ describe("claude-code-session-state", () => {
       _resetForTesting()
       // then
       expect(getMainSessionID()).toBeUndefined()
+    })
+  })
+
+  describe("agent registration", () => {
+    test("should register config-key lookup when given a display name", () => {
+      // given
+      registerAgentName("Atlas (Plan Executor)")
+
+      // when / then
+      expect(isAgentRegistered("atlas")).toBe(true)
+      expect(isAgentRegistered("Atlas (Plan Executor)")).toBe(true)
     })
   })
 

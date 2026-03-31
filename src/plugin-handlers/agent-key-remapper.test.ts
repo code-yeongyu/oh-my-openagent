@@ -12,10 +12,10 @@ describe("remapAgentKeysToDisplayNames", () => {
     // when remapping
     const result = remapAgentKeysToDisplayNames(agents)
 
-    // then known agents get display name keys and config key aliases
+    // then known agents get display name keys only
     expect(result["Sisyphus (Ultraworker)"]).toBeDefined()
     expect(result["oracle"]).toBeDefined()
-    expect(result["sisyphus"]).toBeDefined()
+    expect(result["sisyphus"]).toBeUndefined()
   })
 
   it("preserves unknown agent keys unchanged", () => {
@@ -38,6 +38,7 @@ describe("remapAgentKeysToDisplayNames", () => {
       hephaestus: {},
       prometheus: {},
       atlas: {},
+      athena: {},
       metis: {},
       momus: {},
       "sisyphus-junior": {},
@@ -46,20 +47,37 @@ describe("remapAgentKeysToDisplayNames", () => {
     // when remapping
     const result = remapAgentKeysToDisplayNames(agents)
 
-    // then all get display name keys with config key aliases preserved
+    // then all get display name keys
     expect(result["Sisyphus (Ultraworker)"]).toBeDefined()
-    expect(result["sisyphus"]).toBeDefined()
+    expect(result["sisyphus"]).toBeUndefined()
     expect(result["Hephaestus (Deep Agent)"]).toBeDefined()
-    expect(result["hephaestus"]).toBeDefined()
+    expect(result["hephaestus"]).toBeUndefined()
     expect(result["Prometheus (Plan Builder)"]).toBeDefined()
-    expect(result["prometheus"]).toBeDefined()
+    expect(result["prometheus"]).toBeUndefined()
     expect(result["Atlas (Plan Executor)"]).toBeDefined()
-    expect(result["atlas"]).toBeDefined()
+    expect(result["atlas"]).toBeUndefined()
+    expect(result["Athena (Council)"]).toBeDefined()
+    expect(result["athena"]).toBeUndefined()
     expect(result["Metis (Plan Consultant)"]).toBeDefined()
-    expect(result["metis"]).toBeDefined()
+    expect(result["metis"]).toBeUndefined()
     expect(result["Momus (Plan Critic)"]).toBeDefined()
-    expect(result["momus"]).toBeDefined()
+    expect(result["momus"]).toBeUndefined()
     expect(result["Sisyphus-Junior"]).toBeDefined()
-    expect(result["sisyphus-junior"]).toBeDefined()
+    expect(result["sisyphus-junior"]).toBeUndefined()
+  })
+
+  it("does not emit both config and display keys for remapped agents", () => {
+    // given one remapped agent
+    const agents = {
+      sisyphus: { prompt: "test", mode: "primary" },
+    }
+
+    // when remapping
+    const result = remapAgentKeysToDisplayNames(agents)
+
+    // then only display key is emitted
+    expect(Object.keys(result)).toEqual(["Sisyphus (Ultraworker)"])
+    expect(result["Sisyphus (Ultraworker)"]).toBeDefined()
+    expect(result["sisyphus"]).toBeUndefined()
   })
 })

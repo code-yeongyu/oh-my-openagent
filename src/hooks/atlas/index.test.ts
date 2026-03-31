@@ -1679,8 +1679,41 @@ session_id: ses_untrusted_999
        // then - should call prompt for sisyphus
        expect(mockInput._promptMock).toHaveBeenCalled()
        const callArgs = mockInput._promptMock.mock.calls[0][0]
-       expect(callArgs.body.agent).toBe("sisyphus")
+       expect(callArgs.body.agent).toBe("Sisyphus (Ultraworker)")
      })
+
+    test("should preserve display-name agent in continuation prompt when boulder agent uses display form", async () => {
+      // given - boulder state uses display-form agent name
+      const planPath = join(TEST_DIR, "test-plan.md")
+      writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
+
+      const state: BoulderState = {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: [MAIN_SESSION_ID],
+        plan_name: "test-plan",
+        agent: "Atlas (Plan Executor)",
+      }
+      writeBoulderState(TEST_DIR, state)
+      registerAgentName("Atlas (Plan Executor)")
+
+      const mockInput = createMockPluginInput()
+      const hook = createAtlasHook(mockInput)
+
+      // when
+      await hook.handler({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: MAIN_SESSION_ID },
+        },
+      })
+
+      // then
+      expect(mockInput._promptMock).toHaveBeenCalled()
+      const callArgs = mockInput._promptMock.mock.calls[0][0]
+      expect(callArgs.body.agent).toBe("Atlas (Plan Executor)")
+      expect(callArgs.body.agent).not.toBe("atlas")
+    })
 
     test("should debounce rapid continuation injections (prevent infinite loop)", async () => {
       // given - boulder state with incomplete plan
