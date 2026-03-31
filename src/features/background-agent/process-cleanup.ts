@@ -4,14 +4,17 @@ type ProcessCleanupEvent = NodeJS.Signals | "beforeExit" | "exit"
 
 function registerProcessSignal(
   signal: ProcessCleanupEvent,
-  handler: () => void,
+  handler: () => void | Promise<void>,
   exitAfter: boolean
 ): () => void {
   const listener = () => {
-    handler()
+    const cleanupResult = handler()
     if (exitAfter) {
       process.exitCode = 0
-      setTimeout(() => process.exit(), 6000)
+      const exitTimeout = setTimeout(() => process.exit(), 6000)
+      void Promise.resolve(cleanupResult).finally(() => {
+        clearTimeout(exitTimeout)
+      })
     }
   }
   process.on(signal, listener)
@@ -34,8 +37,8 @@ export function registerManagerForCleanup(manager: CleanupTarget): void {
 
   let cleanupPromise: Promise<void> | undefined
 
-  const cleanupAll = () => {
-    if (cleanupPromise) return
+  const cleanupAll = (): Promise<void> => {
+    if (cleanupPromise) return cleanupPromise
     const promises: Promise<void>[] = []
     for (const m of cleanupManagers) {
       try {
@@ -52,6 +55,8 @@ export function registerManagerForCleanup(manager: CleanupTarget): void {
     cleanupPromise.then(() => {
       log("[background-agent] All shutdown cleanup completed")
     })
+
+    return cleanupPromise
   }
 
   const registerSignal = (signal: ProcessCleanupEvent, exitAfter: boolean): void => {

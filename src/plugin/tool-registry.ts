@@ -54,7 +54,7 @@ const LOW_PRIORITY_TOOL_ORDER = [
   "task_update",
   "background_output",
   "background_cancel",
-  "hashline_edit",
+  "edit",
   "ast_grep_replace",
   "ast_grep_search",
   "glob",
@@ -70,7 +70,7 @@ const LOW_PRIORITY_TOOL_ORDER = [
   "lsp_diagnostics",
 ] as const
 
-function trimToolsToCap(filteredTools: ToolsRecord, maxTools: number): void {
+export function trimToolsToCap(filteredTools: ToolsRecord, maxTools: number): void {
   const toolNames = Object.keys(filteredTools)
   if (toolNames.length <= maxTools) return
 
