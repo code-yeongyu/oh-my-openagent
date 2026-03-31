@@ -1,0 +1,28 @@
+{
+  "name": "oh-my-opencode",
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:22",
+  "features": {
+    "ghcr.io/shyim/devcontainer-features/bun:latest": {
+      "version": "1.3.6"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "biomejs.biome",
+        "oven-sh.bun-vscode"
+      ],
+      "settings": {
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "typescript.tsdk": "node_modules/typescript/lib",
+        "typescript.preferences.importModuleSpecifier": "relative"
+      }
+    }
+  },
+  "postCreateCommand": "bun install",
+  "forwardPorts": [],
+  "remoteUser": "node"
+}
