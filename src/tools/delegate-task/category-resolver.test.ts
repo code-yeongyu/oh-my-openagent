@@ -124,7 +124,7 @@ describe("resolveCategoryExecution", () => {
 		})
 		const agentsSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
 		const args = {
-			category: "deep",
+			category: "quick",
 			prompt: "test prompt",
 			description: "Test task",
 			run_in_background: false,
@@ -134,7 +134,7 @@ describe("resolveCategoryExecution", () => {
 		}
 		const executorCtx = createMockExecutorContext()
 		executorCtx.userCategories = {
-			deep: {
+			quick: {
 				fallback_models: [
 					{
 						model: "openai/gpt-5.4 high",
@@ -178,7 +178,7 @@ describe("resolveCategoryExecution", () => {
 		})
 		const agentsSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
 		const args = {
-			category: "deep",
+			category: "quick",
 			prompt: "test prompt",
 			description: "Test task",
 			run_in_background: false,
@@ -188,7 +188,7 @@ describe("resolveCategoryExecution", () => {
 		}
 		const executorCtx = createMockExecutorContext()
 		executorCtx.userCategories = {
-			deep: {
+			quick: {
 				model: "openai/gpt-5.4-preview",
 				fallback_models: [
 					{
@@ -209,7 +209,7 @@ describe("resolveCategoryExecution", () => {
 		expect(result.categoryModel).toEqual({
 			providerID: "openai",
 			modelID: "gpt-5.4-preview",
-			variant: "medium",
+			variant: undefined,
 		})
 		cacheSpy.mockRestore()
 		agentsSpy.mockRestore()
@@ -224,7 +224,7 @@ describe("resolveCategoryExecution", () => {
 		})
 		const agentsSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
 		const args = {
-			category: "deep",
+			category: "quick",
 			prompt: "test prompt",
 			description: "Test task",
 			run_in_background: false,
@@ -234,7 +234,7 @@ describe("resolveCategoryExecution", () => {
 		}
 		const executorCtx = createMockExecutorContext()
 		executorCtx.userCategories = {
-			deep: {
+			quick: {
 				fallback_models: [
 					{
 						model: "openai/gpt-5.4",
@@ -278,7 +278,7 @@ describe("resolveCategoryExecution", () => {
 		})
 		const agentsSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
 		const args = {
-			category: "deep",
+			category: "quick",
 			prompt: "test prompt",
 			description: "Test task",
 			run_in_background: false,
@@ -288,7 +288,7 @@ describe("resolveCategoryExecution", () => {
 		}
 		const executorCtx = createMockExecutorContext()
 		executorCtx.userCategories = {
-			deep: {
+			quick: {
 				fallback_models: [
 					{
 						model: "openai/gpt-5.4",
@@ -329,7 +329,7 @@ describe("resolveCategoryExecution", () => {
 		})
 		const agentsSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
 		const args = {
-			category: "deep",
+			category: "quick",
 			prompt: "test prompt",
 			description: "Test task",
 			run_in_background: false,
@@ -339,7 +339,7 @@ describe("resolveCategoryExecution", () => {
 		}
 		const executorCtx = createMockExecutorContext()
 		executorCtx.userCategories = {
-			deep: {
+			quick: {
 				fallback_models: [
 					{
 						model: "openai/gpt-5.4",
