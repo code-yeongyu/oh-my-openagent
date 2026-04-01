@@ -265,8 +265,8 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
     })
   }
 
-  const buildDescription = async (): Promise<string> => {
-    if (cachedDescription) return cachedDescription
+  const buildDescription = async (force = false): Promise<string> => {
+    if (!force && cachedDescription) return cachedDescription
     const skills = await getSkills()
     const commands = getCommands()
     const skillInfos = skills.map(loadedSkillToInfo)
@@ -294,7 +294,7 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
 
     cachedDescription = formatCombinedDescription(skillInfos, commandsForDescription)
     if (needsAsyncRefresh) {
-      void buildDescription()
+      void buildDescription(true)
     }
   } else if (options.commands !== undefined) {
     cachedDescription = formatCombinedDescription([], options.commands)
