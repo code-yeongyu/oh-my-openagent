@@ -12,6 +12,7 @@ import { createPluginInterface } from "./plugin-interface"
 import { createPluginDispose, type PluginDispose } from "./plugin-dispose"
 
 import { loadPluginConfig } from "./plugin-config"
+import { initDisplayNameOverrides } from "./shared/display-name-initializer"
 import { createModelCacheState } from "./plugin-state"
 import { createFirstMessageVariantGate } from "./shared/first-message-variant"
 import { injectServerAuthIntoClient, log, logLegacyPluginStartupWarning } from "./shared"
@@ -38,6 +39,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   await activePluginDispose?.()
 
   const pluginConfig = loadPluginConfig(ctx.directory, ctx)
+  initDisplayNameOverrides(pluginConfig)
 
   const posthog = createPluginPostHog()
   const distinctId = getPostHogDistinctId()
