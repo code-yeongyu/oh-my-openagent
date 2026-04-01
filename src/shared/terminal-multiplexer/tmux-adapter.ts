@@ -1,7 +1,6 @@
 import { spawn as bunSpawn } from "bun"
 import type { Multiplexer, PaneHandle, SpawnOptions, MultiplexerCapabilities } from "./types"
 import {
-  closeTmuxPane,
   getCurrentPaneId,
   isInsideTmux,
 } from "../tmux/tmux-utils"
@@ -129,10 +128,31 @@ export class TmuxAdapter implements Multiplexer {
   async closePane(handle: PaneHandle): Promise<void> {
     const paneId = handle.nativeId || this.labelToPaneId.get(handle.label)
 
-    if (paneId) {
-      await closeTmuxPane(paneId)
-      this.labelToPaneId.delete(handle.label)
+    if (!paneId) {
+      return
     }
+
+    const tmux = await this.resolveTmuxPath()
+    if (!tmux) {
+      log("[TmuxAdapter.closePane] tmux not found")
+      return
+    }
+
+    const ctrlCProc = this.spawn([tmux, "send-keys", "-t", paneId, "C-c"], {
+      stdout: "pipe",
+      stderr: "pipe",
+    })
+    await ctrlCProc.exited
+
+    await new Promise(resolve => setTimeout(resolve, 250))
+
+    const killProc = this.spawn([tmux, "kill-pane", "-t", paneId], {
+      stdout: "pipe",
+      stderr: "pipe",
+    })
+    await killProc.exited
+
+    this.labelToPaneId.delete(handle.label)
   }
 
   async getPanes(): Promise<PaneHandle[]> {

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test"
+import { describe, it, expect, beforeEach } from "bun:test"
 import { TmuxAdapter } from "./tmux-adapter"
 
 const mockConfig = {
@@ -6,12 +6,93 @@ const mockConfig = {
   sessionPrefix: "omo-test",
 }
 
+const MOCK_TMUX_PATH = "/mock/tmux"
+
+function makeMockSpawn() {
+  const panes = new Map<string, string>()
+  let nextPaneId = 0
+
+  return (args: string[], _opts?: any) => {
+    const subcommand = args[1]
+
+    if (subcommand === "split-window") {
+      const paneId = `%${nextPaneId++}`
+      panes.set(paneId, "")
+      const bytes = new TextEncoder().encode(`${paneId}\n`)
+      return {
+        exited: Promise.resolve(0),
+        stdout: new ReadableStream({
+          start(c: ReadableStreamDefaultController) {
+            c.enqueue(bytes)
+            c.close()
+          },
+        }),
+        stderr: new ReadableStream({
+          start(c: ReadableStreamDefaultController) { c.close() },
+        }),
+      }
+    }
+
+    if (subcommand === "select-pane") {
+      const tIdx = args.indexOf("-t")
+      const titleIdx = args.indexOf("-T")
+      if (tIdx !== -1 && titleIdx !== -1) {
+        panes.set(args[tIdx + 1], args[titleIdx + 1])
+      }
+      return {
+        exited: Promise.resolve(0),
+        stdout: new ReadableStream({ start(c: ReadableStreamDefaultController) { c.close() } }),
+        stderr: new ReadableStream({ start(c: ReadableStreamDefaultController) { c.close() } }),
+      }
+    }
+
+    if (subcommand === "list-panes") {
+      const lines = Array.from(panes.entries())
+        .map(([id, title]) => `${id},${title}`)
+        .join("\n")
+      const bytes = new TextEncoder().encode(lines ? lines + "\n" : "")
+      return {
+        exited: Promise.resolve(0),
+        stdout: new ReadableStream({
+          start(c: ReadableStreamDefaultController) {
+            c.enqueue(bytes)
+            c.close()
+          },
+        }),
+        stderr: new ReadableStream({ start(c: ReadableStreamDefaultController) { c.close() } }),
+      }
+    }
+
+    if (subcommand === "kill-pane") {
+      const tIdx = args.indexOf("-t")
+      if (tIdx !== -1) {
+        panes.delete(args[tIdx + 1])
+      }
+      return {
+        exited: Promise.resolve(0),
+        stdout: new ReadableStream({ start(c: ReadableStreamDefaultController) { c.close() } }),
+        stderr: new ReadableStream({ start(c: ReadableStreamDefaultController) { c.close() } }),
+      }
+    }
+
+    return {
+      exited: Promise.resolve(0),
+      stdout: new ReadableStream({ start(c: ReadableStreamDefaultController) { c.close() } }),
+      stderr: new ReadableStream({ start(c: ReadableStreamDefaultController) { c.close() } }),
+    }
+  }
+}
+
+function makeAdapter() {
+  return new TmuxAdapter(mockConfig, makeMockSpawn() as any, MOCK_TMUX_PATH)
+}
+
 describe("TmuxAdapter", () => {
   let adapter: TmuxAdapter
 
   beforeEach(() => {
-    //#given - create fresh adapter instance
-    adapter = new TmuxAdapter(mockConfig)
+    //#given - create fresh adapter instance with mock spawn
+    adapter = makeAdapter()
   })
 
   describe("interface properties", () => {
@@ -148,27 +229,9 @@ describe("TmuxAdapter", () => {
   })
 
   describe("ensureSession", () => {
-    const createdSessions: string[] = []
-
-    beforeEach(() => {
-      createdSessions.length = 0
-    })
-
-    afterEach(async () => {
-      for (const sessionName of createdSessions) {
-        try {
-          await adapter.killSession(sessionName)
-        } catch {
-          // Ignore errors if session doesn't exist
-        }
-      }
-      createdSessions.length = 0
-    })
-
     it("accepts session name and creates session", async () => {
       //#given
       const sessionName = `omo-test-session-${Math.random().toString(36).slice(2, 8)}`
-      createdSessions.push(sessionName)
 
       //#when
       const ensurePromise = adapter.ensureSession(sessionName)
@@ -180,7 +243,6 @@ describe("TmuxAdapter", () => {
     it("succeeds when session already exists", async () => {
       //#given
       const sessionName = `omo-existing-session-${Math.random().toString(36).slice(2, 8)}`
-      createdSessions.push(sessionName)
       await adapter.ensureSession(sessionName)
 
       //#when
@@ -192,27 +254,9 @@ describe("TmuxAdapter", () => {
   })
 
   describe("killSession", () => {
-    const createdSessions: string[] = []
-
-    beforeEach(() => {
-      createdSessions.length = 0
-    })
-
-    afterEach(async () => {
-      for (const sessionName of createdSessions) {
-        try {
-          await adapter.killSession(sessionName)
-        } catch {
-          // Ignore errors if session doesn't exist
-        }
-      }
-      createdSessions.length = 0
-    })
-
     it("accepts session name and kills session", async () => {
       //#given
       const sessionName = `omo-kill-test-${Math.random().toString(36).slice(2, 8)}`
-      createdSessions.push(sessionName)
       await adapter.ensureSession(sessionName)
 
       //#when
