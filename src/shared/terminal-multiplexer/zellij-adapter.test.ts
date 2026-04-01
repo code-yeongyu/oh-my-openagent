@@ -122,9 +122,8 @@ describe("ZellijAdapter", () => {
       //#when
       await adapter.closePane({ label: "omo-close-test" })
 
-      //#then - label should be removed from cache
-      const panes = await adapter.getPanes()
-      expect(panes.some((p: any) => p.label === "omo-close-test")).toBe(false)
+      //#then - label should be removed from internal labelToSpawned map
+      expect((adapter as any).labelToSpawned.has("omo-close-test")).toBe(false)
     })
 
     it("handles closing non-existent pane gracefully", async () => {

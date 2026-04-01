@@ -126,7 +126,7 @@ export class ZellijAdapter implements Multiplexer {
 
     // Wrap command to capture pane ID
     const idFile = `/tmp/opencode-pane-${Date.now()}-${Math.random().toString(36).slice(2)}`
-    const wrappedCmd = `echo \\$ZELLIJ_PANE_ID > ${idFile}; exec ${cmd}`
+    const wrappedCmd = `echo $ZELLIJ_PANE_ID > ${idFile}; exec ${cmd}`
     const cmdArgs = ["bash", "-c", wrappedCmd]
 
     const zellijCmd = isFirstPane
