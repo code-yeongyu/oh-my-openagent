@@ -1,4 +1,6 @@
-import { describe, test, expect } from "bun:test"
+/// <reference types="bun-types" />
+
+import { describe, test, expect, mock } from "bun:test"
 import { tmpdir } from "node:os"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { BackgroundManager } from "./manager"
@@ -78,6 +80,7 @@ function createManagerWithClient(clientOverrides: Record<string, unknown> = {}):
   const client = {
     session: {
       status: async () => ({ data: {} }),
+      get: async () => ({ data: { id: "ses-default" } }),
       prompt: async () => ({}),
       promptAsync: async () => ({}),
       abort: async () => ({}),
@@ -97,6 +100,46 @@ function createManagerWithClient(clientOverrides: Record<string, unknown> = {}):
   return new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
 }
 
+describe("BackgroundManager verifySessionExists", () => {
+  describe("#given session.get reports a not-found response", () => {
+    test("#when verifySessionExists runs #then it returns false", async () => {
+      //#given
+      const manager = createManagerWithClient({
+        get: async () => ({
+          error: { message: "Session not found", status: 404 },
+          data: undefined,
+        }),
+      })
+
+      //#when
+      const result = await manager["verifySessionExists"]("ses-missing")
+      await manager.shutdown()
+
+      //#then
+      expect(result).toBe(false)
+    })
+  })
+
+  describe("#given session.get reports a transient transport error", () => {
+    test("#when verifySessionExists runs #then it returns true", async () => {
+      //#given
+      const manager = createManagerWithClient({
+        get: async () => ({
+          error: { message: "Network timeout", status: 500 },
+          data: undefined,
+        }),
+      })
+
+      //#when
+      const result = await manager["verifySessionExists"]("ses-transient")
+      await manager.shutdown()
+
+      //#then
+      expect(result).toBe(true)
+    })
+  })
+})
+
 describe("BackgroundManager pollRunningTasks", () => {
   describe("#given a running task whose session is no longer in status response", () => {
     test("#when pollRunningTasks runs #then completes the task instead of leaving it running", async () => {
@@ -113,6 +156,31 @@ describe("BackgroundManager pollRunningTasks", () => {
       //#then
       expect(task.status).toBe("completed")
       expect(task.completedAt).toBeDefined()
+    })
+
+    test("#when the first missing-status poll has no output #then it does not fail the task yet", async () => {
+      //#given
+      const getSession = mock(async () => ({
+        error: { message: "Session not found", status: 404 },
+        data: undefined,
+      }))
+      const manager = createManagerWithClient({
+        get: getSession,
+        messages: async () => ({ data: [] }),
+      })
+      const task = createRunningTask("ses-first-miss")
+      injectTask(manager, task)
+
+      //#when
+      const poll = manager["pollRunningTasks"]
+      await poll.call(manager)
+      await manager.shutdown()
+
+      //#then
+      expect(task.status).toBe("running")
+      expect(task.error).toBeUndefined()
+      expect(task.consecutiveMissedPolls).toBe(1)
+      expect(getSession).not.toHaveBeenCalled()
     })
   })
 

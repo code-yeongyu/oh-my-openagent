@@ -53,6 +53,10 @@ import { join } from "node:path"
 import { pruneStaleTasksAndNotifications } from "./task-poller"
 import { checkAndInterruptStaleTasks } from "./task-poller"
 import { removeTaskToastTracking } from "./remove-task-toast-tracking"
+import {
+  MIN_SESSION_GONE_POLLS,
+  verifySessionExists as verifySessionStillExists,
+} from "./session-existence"
 import { isActiveSessionStatus, isTerminalSessionStatus } from "./session-status-classifier"
 import {
   detectRepetitiveToolUse,
@@ -1819,12 +1823,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
   }
 
   private async verifySessionExists(sessionID: string): Promise<boolean> {
-    try {
-      const result = await this.client.session.get({ path: { id: sessionID } })
-      return !!result.data
-    } catch {
-      return false
-    }
+    return verifySessionStillExists(this.client, sessionID)
   }
 
   private async failCrashedTask(task: BackgroundTask, errorMessage: string): Promise<void> {
@@ -1927,18 +1926,22 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
 
         // Session is idle or no longer in status response (completed/disappeared)
         const sessionGoneFromStatus = !sessionStatus
+        const sessionGoneThresholdReached = sessionGoneFromStatus
+          && (task.consecutiveMissedPolls ?? 0) >= MIN_SESSION_GONE_POLLS
         const completionSource = sessionStatus?.type === "idle"
           ? "polling (idle status)"
           : "polling (session gone from status)"
         const hasValidOutput = await this.validateSessionHasOutput(sessionID)
         if (!hasValidOutput) {
-          if (sessionGoneFromStatus) {
+          if (sessionGoneThresholdReached) {
             const sessionExists = await this.verifySessionExists(sessionID)
             if (!sessionExists) {
               log("[background-agent] Session no longer exists (crashed), marking task as error:", task.id)
               await this.failCrashedTask(task, "Subagent session no longer exists (process likely crashed). The session disappeared without producing any output.")
               continue
             }
+
+            task.consecutiveMissedPolls = 0
           }
           log("[background-agent] Polling idle/gone but no valid output yet, waiting:", task.id)
           continue

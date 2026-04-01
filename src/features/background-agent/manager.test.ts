@@ -3556,6 +3556,10 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
       session: {
         prompt: async () => ({}),
         promptAsync: async () => ({}),
+        get: async () => ({
+          error: { message: "Session not found", status: 404 },
+          data: undefined,
+        }),
         abort: async () => ({}),
       },
     }

@@ -14,10 +14,9 @@ import {
   TASK_TTL_MS,
 } from "./constants"
 import { removeTaskToastTracking } from "./remove-task-toast-tracking"
+import { MIN_SESSION_GONE_POLLS, verifySessionExists } from "./session-existence"
 
 import { isActiveSessionStatus } from "./session-status-classifier"
-
-const MIN_SESSION_GONE_POLLS = 3
 const TERMINAL_TASK_STATUSES = new Set<BackgroundTask["status"]>([
   "completed",
   "error",
@@ -98,15 +97,6 @@ export function pruneStaleTasksAndNotifications(args: {
 }
 
 export type SessionStatusMap = Record<string, { type: string }>
-
-async function verifySessionExists(client: OpencodeClient, sessionID: string): Promise<boolean> {
-  try {
-    const result = await client.session.get({ path: { id: sessionID } })
-    return !!result.data
-  } catch {
-    return false
-  }
-}
 
 export async function checkAndInterruptStaleTasks(args: {
   tasks: Iterable<BackgroundTask>
