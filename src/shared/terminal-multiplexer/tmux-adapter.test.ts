@@ -8,28 +8,39 @@ const mockConfig = {
 
 const MOCK_TMUX_PATH = "/mock/tmux"
 
+function emptyStream() {
+  return new ReadableStream({
+    start(c: ReadableStreamDefaultController) { c.close() },
+  })
+}
+
+function streamOf(text: string) {
+  const bytes = new TextEncoder().encode(text)
+  return new ReadableStream({
+    start(c: ReadableStreamDefaultController) {
+      c.enqueue(bytes)
+      c.close()
+    },
+  })
+}
+
 function makeMockSpawn() {
   const panes = new Map<string, string>()
+  const sessions = new Set<string>()
+  const calls: string[][] = []
   let nextPaneId = 0
 
-  return (args: string[], _opts?: any) => {
+  function spawn(args: string[], _opts?: any) {
+    calls.push([...args])
     const subcommand = args[1]
 
     if (subcommand === "split-window") {
       const paneId = `%${nextPaneId++}`
       panes.set(paneId, "")
-      const bytes = new TextEncoder().encode(`${paneId}\n`)
       return {
         exited: Promise.resolve(0),
-        stdout: new ReadableStream({
-          start(c: ReadableStreamDefaultController) {
-            c.enqueue(bytes)
-            c.close()
-          },
-        }),
-        stderr: new ReadableStream({
-          start(c: ReadableStreamDefaultController) { c.close() },
-        }),
+        stdout: streamOf(`${paneId}\n`),
+        stderr: emptyStream(),
       }
     }
 
@@ -41,8 +52,8 @@ function makeMockSpawn() {
       }
       return {
         exited: Promise.resolve(0),
-        stdout: new ReadableStream({ start(c: ReadableStreamDefaultController) { c.close() } }),
-        stderr: new ReadableStream({ start(c: ReadableStreamDefaultController) { c.close() } }),
+        stdout: emptyStream(),
+        stderr: emptyStream(),
       }
     }
 
@@ -50,16 +61,10 @@ function makeMockSpawn() {
       const lines = Array.from(panes.entries())
         .map(([id, title]) => `${id},${title}`)
         .join("\n")
-      const bytes = new TextEncoder().encode(lines ? lines + "\n" : "")
       return {
         exited: Promise.resolve(0),
-        stdout: new ReadableStream({
-          start(c: ReadableStreamDefaultController) {
-            c.enqueue(bytes)
-            c.close()
-          },
-        }),
-        stderr: new ReadableStream({ start(c: ReadableStreamDefaultController) { c.close() } }),
+        stdout: streamOf(lines ? lines + "\n" : ""),
+        stderr: emptyStream(),
       }
     }
 
@@ -70,29 +75,80 @@ function makeMockSpawn() {
       }
       return {
         exited: Promise.resolve(0),
-        stdout: new ReadableStream({ start(c: ReadableStreamDefaultController) { c.close() } }),
-        stderr: new ReadableStream({ start(c: ReadableStreamDefaultController) { c.close() } }),
+        stdout: emptyStream(),
+        stderr: emptyStream(),
       }
     }
 
-    return {
-      exited: Promise.resolve(0),
-      stdout: new ReadableStream({ start(c: ReadableStreamDefaultController) { c.close() } }),
-      stderr: new ReadableStream({ start(c: ReadableStreamDefaultController) { c.close() } }),
+    if (subcommand === "new-session") {
+      const sIdx = args.indexOf("-s")
+      if (sIdx !== -1) {
+        const name = args[sIdx + 1]
+        if (sessions.has(name)) {
+          return {
+            exited: Promise.resolve(1),
+            stdout: emptyStream(),
+            stderr: streamOf(`duplicate session: ${name}\n`),
+          }
+        }
+        sessions.add(name)
+      }
+      return {
+        exited: Promise.resolve(0),
+        stdout: emptyStream(),
+        stderr: emptyStream(),
+      }
     }
+
+    if (subcommand === "kill-session") {
+      const tIdx = args.indexOf("-t")
+      if (tIdx !== -1) {
+        const name = args[tIdx + 1]
+        if (!sessions.has(name)) {
+          return {
+            exited: Promise.resolve(1),
+            stdout: emptyStream(),
+            stderr: streamOf(`session not found: ${name}\n`),
+          }
+        }
+        sessions.delete(name)
+      }
+      return {
+        exited: Promise.resolve(0),
+        stdout: emptyStream(),
+        stderr: emptyStream(),
+      }
+    }
+
+    if (subcommand === "send-keys") {
+      return {
+        exited: Promise.resolve(0),
+        stdout: emptyStream(),
+        stderr: emptyStream(),
+      }
+    }
+
+    throw new Error(`makeMockSpawn: unhandled tmux subcommand "${subcommand}"`)
   }
+
+  return { spawn, sessions, calls, panes }
 }
 
 function makeAdapter() {
-  return new TmuxAdapter(mockConfig, makeMockSpawn() as any, MOCK_TMUX_PATH)
+  const mock = makeMockSpawn()
+  const adapter = new TmuxAdapter(mockConfig, mock.spawn as any, MOCK_TMUX_PATH)
+  return { adapter, mock }
 }
 
 describe("TmuxAdapter", () => {
   let adapter: TmuxAdapter
+  let mock: ReturnType<typeof makeMockSpawn>
 
   beforeEach(() => {
     //#given - create fresh adapter instance with mock spawn
-    adapter = makeAdapter()
+    const result = makeAdapter()
+    adapter = result.adapter
+    mock = result.mock
   })
 
   describe("interface properties", () => {
@@ -229,51 +285,55 @@ describe("TmuxAdapter", () => {
   })
 
   describe("ensureSession", () => {
-    it("accepts session name and creates session", async () => {
+    it("calls new-session with correct arguments", async () => {
       //#given
-      const sessionName = `omo-test-session-${Math.random().toString(36).slice(2, 8)}`
+      const sessionName = "omo-test-session"
 
       //#when
-      const ensurePromise = adapter.ensureSession(sessionName)
-
-      //#then
-      await expect(ensurePromise).resolves.toBeUndefined()
-    })
-
-    it("succeeds when session already exists", async () => {
-      //#given
-      const sessionName = `omo-existing-session-${Math.random().toString(36).slice(2, 8)}`
       await adapter.ensureSession(sessionName)
 
-      //#when
+      //#then
+      const newSessionCall = mock.calls.find(c => c[1] === "new-session")
+      expect(newSessionCall).toEqual([MOCK_TMUX_PATH, "new-session", "-d", "-s", sessionName])
+      expect(mock.sessions.has(sessionName)).toBe(true)
+    })
+
+    it("handles duplicate session without throwing", async () => {
+      //#given
+      const sessionName = "omo-existing-session"
+      await adapter.ensureSession(sessionName)
+
+      //#when - second call triggers duplicate (mock returns exit 1)
       const ensurePromise = adapter.ensureSession(sessionName)
 
-      //#then - should not throw
+      //#then - adapter silently handles the non-zero exit
       await expect(ensurePromise).resolves.toBeUndefined()
     })
   })
 
   describe("killSession", () => {
-    it("accepts session name and kills session", async () => {
+    it("calls kill-session with correct arguments", async () => {
       //#given
-      const sessionName = `omo-kill-test-${Math.random().toString(36).slice(2, 8)}`
+      const sessionName = "omo-kill-test"
       await adapter.ensureSession(sessionName)
 
       //#when
-      const killPromise = adapter.killSession(sessionName)
+      await adapter.killSession(sessionName)
 
       //#then
-      await expect(killPromise).resolves.toBeUndefined()
+      const killCall = mock.calls.find(c => c[1] === "kill-session")
+      expect(killCall).toEqual([MOCK_TMUX_PATH, "kill-session", "-t", sessionName])
+      expect(mock.sessions.has(sessionName)).toBe(false)
     })
 
     it("handles killing non-existent session gracefully", async () => {
       //#given
-      const sessionName = `omo-nonexistent-session-${Math.random().toString(36).slice(2, 8)}`
+      const sessionName = "omo-nonexistent-session"
 
-      //#when
+      //#when - mock returns exit 1 for non-existent session
       const killPromise = adapter.killSession(sessionName)
 
-      //#then - should not throw
+      //#then - adapter silently handles the non-zero exit
       await expect(killPromise).resolves.toBeUndefined()
     })
   })
