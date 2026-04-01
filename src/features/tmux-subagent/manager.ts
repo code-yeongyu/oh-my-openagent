@@ -537,7 +537,7 @@ export class TmuxSessionManager {
           return
         }
 
-        if (this.isIsolated()) {
+        if (this.isIsolated() && !this.isolatedWindowPaneId) {
           log("[tmux-session-manager] isolated container failed, skipping inline fallback to preserve isolation", { sessionId })
           return
         }
