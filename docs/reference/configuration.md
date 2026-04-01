@@ -645,6 +645,9 @@ Auto-switches to backup models on API errors.
 
 ```json
 { "runtime_fallback": true }
+```
+
+```json
 { "runtime_fallback": false }
 ```
 
@@ -987,10 +990,12 @@ Install [`opencode-antigravity-auth`](https://github.com/NoeFabris/opencode-anti
 ```json
 {
   "agents": {
-    "explore": { "model": "ollama/qwen3-coder", "stream": false }
+    "explore": { "model": "ollama/qwen3-coder" }
   }
 }
 ```
+
+**Note:** The `stream` option should be configured in your OpenCode settings or via environment variables, not in the agent config. See [Ollama Troubleshooting](../troubleshooting/ollama.md) for details on disabling streaming.
 
 Common models: `ollama/qwen3-coder`, `ollama/ministral-3:14b`, `ollama/lfm2.5-thinking`
 
