@@ -4,7 +4,6 @@ import type { ZellijStorage, ZellijState } from "./zellij-storage"
 
 const mockConfig = {
   enabled: true,
-  sessionPrefix: "omo-test",
 }
 
 function makeMockStorage(): ZellijStorage & { _store: Map<string, ZellijState> } {

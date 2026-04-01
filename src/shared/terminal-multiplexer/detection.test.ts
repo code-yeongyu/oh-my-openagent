@@ -156,7 +156,6 @@ describe("createMultiplexer", () => {
     const config = {
       zellij: {
         enabled: true,
-        sessionPrefix: "omo-",
       },
     }
 

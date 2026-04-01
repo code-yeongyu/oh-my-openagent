@@ -2,7 +2,6 @@ import { z } from "zod"
 
 export const ZellijConfigSchema = z.object({
   enabled: z.boolean().default(false),
-  session_prefix: z.string().optional(),
 })
 
 export const TerminalConfigSchema = z.object({

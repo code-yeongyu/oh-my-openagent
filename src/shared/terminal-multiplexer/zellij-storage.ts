@@ -51,8 +51,12 @@ export function saveZellijState(state: ZellijState): void {
 
 export function clearZellijState(sessionID: string): void {
   const filePath = getStoragePath(sessionID)
-  if (existsSync(filePath)) {
+  try {
     unlinkSync(filePath)
+  } catch (err: unknown) {
+    if (err instanceof Error && "code" in err && (err as NodeJS.ErrnoException).code !== "ENOENT") {
+      throw err
+    }
   }
 }
 

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "bun:test"
 import { ZellijAdapter } from "./zellij-adapter"
 
-const mockConfig = { enabled: true, sessionPrefix: "omo-test" }
+const mockConfig = { enabled: true }
 
 function makeTrackingSpawn() {
   const calls: string[][] = []

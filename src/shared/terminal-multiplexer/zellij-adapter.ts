@@ -7,7 +7,6 @@ type SpawnFn = typeof bunSpawn
 
 export interface ZellijAdapterConfig {
   enabled: boolean
-  sessionPrefix?: string
 }
 
 export class ZellijAdapter implements Multiplexer {
@@ -55,6 +54,13 @@ export class ZellijAdapter implements Multiplexer {
         this.hasCreatedFirstPane = false
         log("[ZellijAdapter] Anchor pane invalid, reset state")
       }
+    } else {
+      this.anchorPaneId = null
+      this.hasCreatedFirstPane = false
+      this.anchorReadyPromise = null
+      this.anchorReadyResolver = null
+      this.labelToSpawned.clear()
+      log("[ZellijAdapter.setSessionID] no persisted state, cleared in-memory state", { sessionID })
     }
   }
 
@@ -245,7 +251,7 @@ export class ZellijAdapter implements Multiplexer {
         // Kill the opencode attach process for this session
          // This will trigger --close-on-exit to close the pane
          // Using -9 (SIGKILL) for immediate termination since process may ignore SIGTERM
-         const proc = this.spawn(["pkill", "-9", "-f", `--session ${sessionId}( |$)`], {
+         const proc = this.spawn(["pkill", "-9", "-f", "--", `--session ${sessionId}( |$)`], {
            stdout: "pipe",
            stderr: "pipe",
          })

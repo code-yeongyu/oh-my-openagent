@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "bun:test"
+import { describe, it, expect, beforeEach, afterEach } from "bun:test"
 import { TmuxAdapter } from "./tmux-adapter"
 
 const mockConfig = {
@@ -144,11 +144,25 @@ describe("TmuxAdapter", () => {
   let adapter: TmuxAdapter
   let mock: ReturnType<typeof makeMockSpawn>
 
+  let savedTmux: string | undefined
+  let savedTmuxPane: string | undefined
+
   beforeEach(() => {
     //#given - create fresh adapter instance with mock spawn
+    savedTmux = process.env.TMUX
+    savedTmuxPane = process.env.TMUX_PANE
+    process.env.TMUX = "/tmp/tmux-1000/default,12345,0"
+    process.env.TMUX_PANE = "%0"
     const result = makeAdapter()
     adapter = result.adapter
     mock = result.mock
+  })
+
+  afterEach(() => {
+    if (savedTmux === undefined) delete process.env.TMUX
+    else process.env.TMUX = savedTmux
+    if (savedTmuxPane === undefined) delete process.env.TMUX_PANE
+    else process.env.TMUX_PANE = savedTmuxPane
   })
 
   describe("interface properties", () => {
@@ -175,11 +189,10 @@ describe("TmuxAdapter", () => {
 
       //#then
       expect(handle.label).toBe(label)
-      if (handle.nativeId) {
-        const panes = await adapter.getPanes()
-        const found = panes.find((p) => p.label === label)
-        expect(found).toBeDefined()
-      }
+      expect(handle.nativeId).toBeDefined()
+      const panes = await adapter.getPanes()
+      const found = panes.find((p) => p.label === label)
+      expect(found).toBeDefined()
     })
 
     it("clears label mapping when closePane is called", async () => {
@@ -218,10 +231,12 @@ describe("TmuxAdapter", () => {
       }
 
       //#when
-      const handle = await adapter.spawnPane("ls", options)
+      await adapter.spawnPane("ls", options)
 
       //#then
-      expect(handle.label).toBe("omo-direction-test")
+      const splitCall = mock.calls.find((c) => c[1] === "split-window")
+      expect(splitCall).toBeDefined()
+      expect(splitCall).toContain("-v")
     })
 
     it("defaults to horizontal direction", async () => {
@@ -229,10 +244,12 @@ describe("TmuxAdapter", () => {
       const options: any = { label: "omo-default-direction" }
 
       //#when
-      const handle = await adapter.spawnPane("echo test", options)
+      await adapter.spawnPane("echo test", options)
 
       //#then
-      expect(handle.label).toBe("omo-default-direction")
+      const splitCall = mock.calls.find((c) => c[1] === "split-window")
+      expect(splitCall).toBeDefined()
+      expect(splitCall).toContain("-h")
     })
   })
 
