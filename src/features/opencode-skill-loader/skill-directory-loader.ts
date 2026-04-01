@@ -13,7 +13,7 @@ export async function loadSkillsFromDir(options: {
 }): Promise<LoadedSkill[]> {
   const namePrefix = options.namePrefix ?? ""
   const depth = options.depth ?? 0
-  const maxDepth = options.maxDepth ?? 2
+  const maxDepth = options.maxDepth ?? 4
 
   const entries = await fs.readdir(options.skillsDir, { withFileTypes: true }).catch(() => [])
   const skillMap = new Map<string, LoadedSkill>()
