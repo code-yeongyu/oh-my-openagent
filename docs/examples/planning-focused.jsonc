@@ -80,7 +80,7 @@
     "visual-engineering": { "model": "google/gemini-3.1-pro", "variant": "high" },
 
     // Deep research and analysis
-    "deep": { "model": "openai/gpt-5.3-codex" },
+    "deep": { "model": "openai/gpt-5.4" },
 
     // Strategic reasoning
     "ultrabrain": { "model": "openai/gpt-5.4", "variant": "xhigh" },
