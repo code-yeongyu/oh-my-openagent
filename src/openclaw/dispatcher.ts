@@ -141,18 +141,17 @@ export async function wakeCommandGateway(
       return shellEscapeArg(value)
     })
 
-    // Always use sh -c to handle the shell command string correctly
     const proc = spawn(["sh", "-c", interpolated], {
       env: { ...process.env },
       stdout: "ignore",
       stderr: "ignore",
+      detached: process.platform !== "win32",
     })
 
-    // Handle timeout manually
     let timeoutId: ReturnType<typeof setTimeout> | undefined
     const timeoutPromise = new Promise<never>((_, reject) => {
       timeoutId = setTimeout(() => {
-        proc.kill()
+        terminateCommandProcess(proc, "SIGKILL")
         reject(new Error("Command timed out"))
       }, timeout)
     })
@@ -177,4 +176,25 @@ export async function wakeCommandGateway(
       error: error instanceof Error ? error.message : "Unknown error",
     }
   }
+}
+
+type KillableProcess = {
+  pid?: number
+  kill: (signal?: NodeJS.Signals) => void
+}
+
+export function terminateCommandProcess(proc: KillableProcess, signal: NodeJS.Signals): void {
+  try {
+    if (process.platform !== "win32" && proc.pid) {
+      try {
+        process.kill(-proc.pid, signal)
+        return
+      } catch {
+        proc.kill(signal)
+        return
+      }
+    }
+
+    proc.kill(signal)
+  } catch {}
 }

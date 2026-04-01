@@ -14,6 +14,7 @@ import { createModelCacheState } from "./plugin-state"
 import { createFirstMessageVariantGate } from "./shared/first-message-variant"
 import { injectServerAuthIntoClient, log, logLegacyPluginStartupWarning } from "./shared"
 import { detectExternalSkillPlugin, getSkillPluginConflictWarning } from "./shared/external-plugin-detector"
+import { lspManager } from "./tools/lsp/client"
 import { startTmuxCheck } from "./tools"
 
 let activePluginDispose: PluginDispose | null = null
@@ -83,6 +84,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const dispose = createPluginDispose({
     backgroundManager: managers.backgroundManager,
     skillMcpManager: managers.skillMcpManager,
+    lspManager,
     disposeHooks: hooks.disposeHooks,
   })
 
