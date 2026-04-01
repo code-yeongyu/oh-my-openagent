@@ -435,13 +435,14 @@ Sisyphus agents can also be customized under `agents` using their names: `Sisyph
 
 ### Sisyphus Tasks
 
-Enable the Sisyphus Tasks system for cross-session task tracking.
+File-based task persistence with dependency tracking, used for cross-session task management. The task system is controlled by `experimental.task_system` (defaults to `true` since v3.14). When enabled, `TodoWrite`/`TodoRead` are intercepted and replaced with the Task tools (`task_create`, `task_get`, `task_list`, `task_update`).
+
+The `sisyphus.tasks` section configures **storage options** only:
 
 ```json
 {
   "sisyphus": {
     "tasks": {
-      "enabled": false,
       "storage_path": ".sisyphus/tasks",
       "claude_code_compat": false
     }
@@ -451,9 +452,17 @@ Enable the Sisyphus Tasks system for cross-session task tracking.
 
 | Option               | Default           | Description                                |
 | -------------------- | ----------------- | ------------------------------------------ |
-| `enabled`            | `false`           | Enable Sisyphus Tasks system               |
 | `storage_path`       | `.sisyphus/tasks` | Storage path (relative to project root)    |
+| `task_list_id`       | -                 | Force task list ID (alternative to env `ULTRAWORK_TASK_LIST_ID`) |
 | `claude_code_compat` | `false`           | Enable Claude Code path compatibility mode |
+
+To disable the task system entirely, set `experimental.task_system` to `false`:
+
+```json
+{
+  "experimental": { "task_system": false }
+}
+```
 
 ---
 
