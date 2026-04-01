@@ -16,9 +16,7 @@ export function initDisplayNameOverrides(pluginConfig: OhMyOpenCodeConfig): void
       }
     }
   }
-  if (Object.keys(agentOverrides).length > 0) {
-    setAgentDisplayNameOverrides(agentOverrides)
-  }
+  setAgentDisplayNameOverrides(agentOverrides)
 
   const categoryOverrides: Record<string, string> = {}
   if (pluginConfig.categories) {
@@ -28,7 +26,5 @@ export function initDisplayNameOverrides(pluginConfig: OhMyOpenCodeConfig): void
       }
     }
   }
-  if (Object.keys(categoryOverrides).length > 0) {
-    setCategoryDisplayNameOverrides(categoryOverrides)
-  }
+  setCategoryDisplayNameOverrides(categoryOverrides)
 }

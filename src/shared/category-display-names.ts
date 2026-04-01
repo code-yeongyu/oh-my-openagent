@@ -23,8 +23,9 @@ export function getCategoryDisplayName(categoryKey: string): string {
  * (since most categories use their key as the default display name).
  */
 export function getCategoryConfigKey(displayName: string): string {
+  const normalized = displayName.trim().toLowerCase()
   for (const [key, name] of Object.entries(categoryDisplayNameOverrides)) {
-    if (name === displayName) return key
+    if (name.toLowerCase() === normalized) return key
   }
   return displayName
 }

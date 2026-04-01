@@ -268,7 +268,9 @@ function renderPlanAgentCategoryRows(categories: AvailableCategory[]): string[] 
   return sorted.map((category) => {
     const bestFor = category.description || category.name
     const model = category.model || ""
-    const label = category.displayName ?? category.name
+    const label = category.displayName && category.displayName !== category.name
+      ? `${category.name} (${category.displayName})`
+      : category.name
     return `| \`${label}\` | ${bestFor} | ${model} |`
   })
 }

@@ -50,7 +50,9 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
   const availableSkills: AvailableSkill[] = options.availableSkills ?? []
 
   const categoryList = availableCategories.map(cat => {
-    const label = cat.displayName ?? cat.name
+    const label = cat.displayName && cat.displayName !== cat.name
+      ? `${cat.name} (${cat.displayName})`
+      : cat.name
     const desc = cat.description
     return desc ? `  - ${label}: ${desc}` : `  - ${label}`
   }).join("\n")

@@ -41,14 +41,16 @@ describe("initDisplayNameOverrides", () => {
     setCategoryDisplayNameOverrides({})
   })
 
-  it("#given empty config #when initDisplayNameOverrides called #then no overrides applied", () => {
-    // given empty config
+  it("#given empty config #when initDisplayNameOverrides called #then overrides reset to empty", () => {
+    // given previous overrides exist
+    setAgentDisplayNameOverrides({ sisyphus: "Old Name" })
+    setCategoryDisplayNameOverrides({ quick: "Old Cat" })
     const config = {} as OhMyOpenCodeConfig
 
-    // when initDisplayNameOverrides called
+    // when initDisplayNameOverrides called with empty config
     initDisplayNameOverrides(config)
 
-    // then defaults preserved
+    // then overrides are cleared and defaults restored
     expect(getAgentDisplayName("sisyphus")).toBe("Sisyphus (Ultraworker)")
     expect(getCategoryDisplayName("quick")).toBe("quick")
   })

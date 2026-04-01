@@ -11,9 +11,11 @@
  */
 
 let agentDisplayNameOverrides: Record<string, string> = {}
+let cachedReverseMap: Record<string, string> | null = null
 
 export function setAgentDisplayNameOverrides(overrides: Record<string, string>): void {
   agentDisplayNameOverrides = overrides
+  cachedReverseMap = null
 }
 
 export const AGENT_DISPLAY_NAMES: Record<string, string> = {
@@ -93,12 +95,14 @@ export function getAgentListDisplayName(configKey: string): string {
 }
 
 function buildReverseDisplayNames(): Record<string, string> {
+  if (cachedReverseMap) return cachedReverseMap
   const base = Object.fromEntries(
     Object.entries(AGENT_DISPLAY_NAMES).map(([key, displayName]) => [displayName.toLowerCase(), key]),
   )
   for (const [key, displayName] of Object.entries(agentDisplayNameOverrides)) {
-    base[displayName.toLowerCase()] = key
+    base[displayName.toLowerCase()] = key.toLowerCase()
   }
+  cachedReverseMap = base
   return base
 }
 

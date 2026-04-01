@@ -57,6 +57,34 @@ describe("getCategoryConfigKey", () => {
     setCategoryDisplayNameOverrides({})
   })
 
+  it("#given override set #when getCategoryConfigKey called with different casing #then returns config key", () => {
+    // given override with capitalized display name
+    setCategoryDisplayNameOverrides({ deep: "Whale" })
+
+    // when reverse lookup with different casing
+    const result = getCategoryConfigKey("whale")
+
+    // then still resolves to config key (case-insensitive)
+    expect(result).toBe("deep")
+
+    // cleanup
+    setCategoryDisplayNameOverrides({})
+  })
+
+  it("#given override set #when getCategoryConfigKey called with leading/trailing spaces #then returns config key", () => {
+    // given override
+    setCategoryDisplayNameOverrides({ deep: "Whale" })
+
+    // when reverse lookup with extra whitespace
+    const result = getCategoryConfigKey("  Whale  ")
+
+    // then still resolves to config key (trimmed)
+    expect(result).toBe("deep")
+
+    // cleanup
+    setCategoryDisplayNameOverrides({})
+  })
+
   it("#given no overrides #when getCategoryConfigKey called #then returns input as-is", () => {
     // given no overrides
     setCategoryDisplayNameOverrides({})
