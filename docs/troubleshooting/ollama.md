@@ -16,7 +16,7 @@ This occurs when agents attempt tool calls (e.g., `explore` agent using `mcp_gre
 
 Ollama returns **NDJSON** (newline-delimited JSON) when `stream: true` is used in API requests:
 
-```json
+```ndjson
 {"message":{"tool_calls":[{"function":{"name":"read","arguments":{"filePath":"README.md"}}}]}, "done":false}
 {"message":{"content":""}, "done":true}
 ```
