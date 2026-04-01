@@ -32,11 +32,19 @@ const LSP_BOOTSTRAP_SCRIPT = [
   "finish(run(process.execPath, [dist, 'mcp'], 'inherit'))",
 ].join(";")
 
+// Tools suppressed from lsp-tools-mcp when useOpenCodeExperimental is enabled.
+// OpenCode's built-in LSP tool covers these; OMO keeps diagnostics, rename, and symbols.
+export const LSP_EXPERIMENTAL_DISABLED_TOOLS = ["lsp_goto_definition", "lsp_find_references"] as const
+
+export const LSP_TOOLS_MCP_DISABLED_TOOLS_ENV = "LSP_TOOLS_MCP_DISABLED_TOOLS"
+
 type LspMcpConfigOptions = {
   readonly cwd?: string
   readonly moduleUrl?: string
   readonly exists?: (path: string) => boolean
   readonly resolveExecutable?: RuntimeExecutableResolver
+  /** Tool names to suppress from lsp-tools-mcp (comma-separated via env var). */
+  readonly disabledTools?: readonly string[]
 }
 
 type LspCommandCandidate = {
@@ -155,13 +163,18 @@ function resolveLspCommand(options: LspMcpConfigOptions = {}): LspCommandCandida
 
 export function createLspMcpConfig(options: LspMcpConfigOptions = {}): LocalMcpConfig {
   const resolvedCommand = resolveLspCommand(options)
+  const environment: Record<string, string> = {
+    LSP_TOOLS_MCP_PROJECT_CONFIG: PROJECT_LSP_CONFIG,
+  }
+
+  if (options.disabledTools && options.disabledTools.length > 0) {
+    environment[LSP_TOOLS_MCP_DISABLED_TOOLS_ENV] = options.disabledTools.join(",")
+  }
 
   return {
     type: "local",
     command: resolvedCommand.command,
     enabled: resolvedCommand.exists,
-    environment: {
-      LSP_TOOLS_MCP_PROJECT_CONFIG: PROJECT_LSP_CONFIG,
-    },
+    environment,
   }
 }

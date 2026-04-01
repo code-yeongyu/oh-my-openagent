@@ -2,7 +2,7 @@ import { createWebsearchConfig } from "./websearch"
 import { context7 } from "./context7"
 import { grep_app } from "./grep-app"
 import { createAstGrepMcpConfig } from "./ast-grep"
-import { createLspMcpConfig, type LocalMcpConfig } from "./lsp"
+import { createLspMcpConfig, LSP_EXPERIMENTAL_DISABLED_TOOLS, type LocalMcpConfig } from "./lsp"
 import type { RuntimeExecutableResolver } from "./runtime-executable"
 import type { OhMyOpenCodeConfig } from "../config/schema"
 
@@ -42,7 +42,13 @@ export function createBuiltinMcps(disabledMcps: string[] = [], config?: OhMyOpen
   }
 
   if (!disabledMcps.includes("lsp")) {
-    mcps.lsp = createLspMcpConfig({ resolveExecutable: options.resolveExecutable })
+    const useOpenCodeExperimental =
+      (config?.lsp?.useOpenCodeExperimental ?? false) &&
+      (process.env.OPENCODE_EXPERIMENTAL_LSP_TOOL === "true" || process.env.OPENCODE_EXPERIMENTAL === "true")
+    mcps.lsp = createLspMcpConfig({
+      resolveExecutable: options.resolveExecutable,
+      disabledTools: useOpenCodeExperimental ? LSP_EXPERIMENTAL_DISABLED_TOOLS : undefined,
+    })
   }
 
   if (!disabledMcps.includes("ast_grep")) {

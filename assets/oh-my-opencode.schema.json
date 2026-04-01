@@ -6521,6 +6521,19 @@
       ],
       "additionalProperties": false
     },
+    "lsp": {
+      "type": "object",
+      "properties": {
+        "useOpenCodeExperimental": {
+          "default": false,
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "useOpenCodeExperimental"
+      ],
+      "additionalProperties": false
+    },
     "browser_automation_engine": {
       "type": "object",
       "properties": {

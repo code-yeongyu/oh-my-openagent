@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Experimental OpenCode LSP Integration**: New `lsp.useOpenCodeExperimental` config option to use OpenCode's built-in unified LSP tool instead of custom implementations. When enabled, `lsp_goto_definition` and `lsp_find_references` are replaced by OpenCode's `lsp` tool, gaining hover, implementation search, and call hierarchy features. `lsp_diagnostics`, `lsp_symbols`, `lsp_prepare_rename`, and `lsp_rename` remain available. Default: `false` (safe rollout). See [migration guide](docs/migration/opencode-lsp.md) for details.
 - `default_mode` config auto-activates ultrawork and ralph loop without typing commands. Set it once in your plugin config and every new session starts in high-agency mode. (PR #4190)
 - Toast i18n with English and Chinese locales, backed by plugin config. UI messages now respect your language setting. (PR #3884)
 - `disabled_providers` config schema and helper. Block providers you do not use from appearing in model resolution and fallback chains. (PR #4031)

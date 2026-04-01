@@ -58,7 +58,7 @@ Confirm:
 **Your Mission**: Ensure zero regressions, behavior preservation.
 
 **Tool Guidance** (recommend to Prometheus):
-- \`lsp_find_references\`: Map all usages before changes
+- \`lsp_find_references\` (or unified \`lsp\` tool with \`findReferences\` op if experimental): Map all usages before changes
 - \`lsp_rename\` / \`lsp_prepare_rename\`: Safe symbol renames
 - \`ast_grep_search\`: Find structural patterns to preserve
 - \`ast_grep_replace(dryRun=true)\`: Preview transformations
@@ -264,12 +264,14 @@ call_omo_agent(subagent_type="librarian", prompt="I'm looking for proven impleme
 
 ## TOOL REFERENCE
 
-- **\`lsp_find_references\`**: Map impact before changes - Refactoring
-- **\`lsp_rename\`**: Safe symbol renames - Refactoring
-- **\`ast_grep_search\`**: Find structural patterns - Refactoring, Build
-- **\`explore\` agent**: Codebase pattern discovery - Build, Research
-- **\`librarian\` agent**: External docs, best practices - Build, Architecture, Research
-- **\`oracle\` agent**: Read-only consultation. High-IQ debugging, architecture - Architecture
+| Tool | When to Use | Intent |
+|------|-------------|--------|
+| \`lsp_find_references\` / \`lsp\` (findReferences) | Map impact before changes | Refactoring |
+| \`lsp_rename\` | Safe symbol renames | Refactoring |
+| \`ast_grep_search\` | Find structural patterns | Refactoring, Build |
+| \`explore\` agent | Codebase pattern discovery | Build, Research |
+| \`librarian\` agent | External docs, best practices | Build, Architecture, Research |
+| \`oracle\` agent | Read-only consultation. High-IQ debugging, architecture | Architecture |
 
 ---
 
