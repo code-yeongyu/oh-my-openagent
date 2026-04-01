@@ -93,7 +93,7 @@ describe("sisyphus-task", () => {
 
       // when / #then
       expect(category).toBeDefined()
-      expect(category.model).toBe("openai/gpt-5.3-codex")
+      expect(category.model).toBe("openai/gpt-5.4")
       expect(category.variant).toBe("medium")
     })
 
@@ -705,8 +705,8 @@ describe("sisyphus-task", () => {
     })
 
     test("blocks requiresModel when availability is known and missing the required model", () => {
-      // given
-      const categoryName = "deep"
+      // given - artistry has requiresModel: gemini-3.1-pro
+      const categoryName = "artistry"
       const availableModels = new Set<string>(["anthropic/claude-opus-4-6"])
 
       // when
@@ -720,8 +720,8 @@ describe("sisyphus-task", () => {
     })
 
     test("blocks requiresModel when availability is empty", () => {
-      // given
-      const categoryName = "deep"
+      // given - artistry has requiresModel: gemini-3.1-pro
+      const categoryName = "artistry"
       const availableModels = new Set<string>()
 
       // when

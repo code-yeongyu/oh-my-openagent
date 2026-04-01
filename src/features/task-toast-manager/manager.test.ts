@@ -288,15 +288,15 @@ describe("TaskToastManager", () => {
         agent: "sisyphus-junior",
         isBackground: true,
         category: "deep",
-        modelInfo: { model: "openai/gpt-5.3-codex", type: "category-default" as const },
+        modelInfo: { model: "openai/gpt-5.4", type: "category-default" as const },
       }
 
       // when - addTask is called
       toastManager.addTask(task)
 
-      // then - toast should show model name before category like "gpt-5.3-codex: deep"
+      // then - toast should show model name before category like "gpt-5.4: deep"
       const call = mockClient.tui.showToast.mock.calls[0][0]
-      expect(call.body.message).toContain("gpt-5.3-codex: deep")
+      expect(call.body.message).toContain("gpt-5.4: deep")
       expect(call.body.message).not.toContain("sisyphus-junior/deep")
     })
 

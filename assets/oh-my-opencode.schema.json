@@ -57,7 +57,8 @@
           "cancel-ralph",
           "refactor",
           "start-work",
-          "stop-continuation"
+          "stop-continuation",
+          "remove-ai-slops"
         ]
       }
     },
