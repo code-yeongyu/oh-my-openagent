@@ -15,18 +15,24 @@ export function getMainSessionID(): string | undefined {
 
 const registeredAgentNames = new Set<string>()
 
+const ZERO_WIDTH_CHARACTERS_REGEX = /[\u200B\u200C\u200D\uFEFF]/g
+
+function normalizeRegisteredAgentName(name: string): string {
+  return name.replace(ZERO_WIDTH_CHARACTERS_REGEX, "").toLowerCase()
+}
+
 export function registerAgentName(name: string): void {
-  const normalizedName = name.toLowerCase()
+  const normalizedName = normalizeRegisteredAgentName(name)
   registeredAgentNames.add(normalizedName)
 
-  const configKey = getAgentConfigKey(name).toLowerCase()
+  const configKey = normalizeRegisteredAgentName(getAgentConfigKey(name))
   if (configKey !== normalizedName) {
     registeredAgentNames.add(configKey)
   }
 }
 
 export function isAgentRegistered(name: string): boolean {
-  return registeredAgentNames.has(name.toLowerCase())
+  return registeredAgentNames.has(normalizeRegisteredAgentName(name))
 }
 
 /** @internal For testing only */
