@@ -1,3 +1,5 @@
+/// <reference path="../../bun-test.d.ts" />
+
 import { afterEach, beforeEach, describe, expect, it } from "bun:test"
 import { mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -79,5 +81,27 @@ describe("checkForLegacyPluginEntry", () => {
     expect(result.hasCanonicalEntry).toBe(false)
     expect(result.legacyEntries).toEqual([])
     expect(result.configPath).toBeNull()
+  })
+
+  describe("#given a project-local .opencode config contains a legacy plugin entry", () => {
+    it("#then detects the project-local config path", () => {
+      // given
+      const projectDir = join(testConfigDir, "project")
+      const projectConfigDir = join(projectDir, ".opencode")
+      mkdirSync(projectConfigDir, { recursive: true })
+      writeFileSync(
+        join(projectConfigDir, "opencode.json"),
+        JSON.stringify({ plugin: ["oh-my-opencode"] }, null, 2),
+      )
+
+      // when
+      const result = checkForLegacyPluginEntry(undefined, projectDir)
+
+      // then
+      expect(result.hasLegacyEntry).toBe(true)
+      expect(result.hasCanonicalEntry).toBe(false)
+      expect(result.legacyEntries).toEqual(["oh-my-opencode"])
+      expect(result.configPath).toBe(join(projectConfigDir, "opencode.json"))
+    })
   })
 })

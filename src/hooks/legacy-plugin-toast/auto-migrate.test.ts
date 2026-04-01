@@ -1,3 +1,5 @@
+/// <reference path="../../../bun-test.d.ts" />
+
 import { afterEach, beforeEach, describe, expect, it } from "bun:test"
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -115,6 +117,37 @@ describe("autoMigrateLegacyPluginEntry", () => {
       expect(content).toContain("// my config")
       expect(content).toContain("oh-my-openagent")
       expect(content).not.toContain("oh-my-opencode")
+    })
+  })
+
+  describe("#given opencode.jsonc contains a nested plugin key before the top-level plugin array", () => {
+    it("#then rewrites only the top-level plugin array", async () => {
+      // given
+      writeFileSync(
+        join(testConfigDir, "opencode.jsonc"),
+        `{
+  "nested": {
+    "plugin": ["oh-my-opencode"]
+  },
+  "plugin": ["oh-my-opencode@latest"]
+}
+`,
+      )
+
+      const { autoMigrateLegacyPluginEntry } = await importFreshAutoMigrateModule()
+
+      // when
+      const result = autoMigrateLegacyPluginEntry(testConfigDir)
+
+      // then
+      expect(result.migrated).toBe(true)
+      const content = readFileSync(join(testConfigDir, "opencode.jsonc"), "utf-8")
+      expect(content).toContain(`"nested": {
+    "plugin": ["oh-my-opencode"]
+  }`)
+      expect(content).toContain(`"plugin": [
+    "oh-my-openagent@latest"
+  ]`)
     })
   })
 

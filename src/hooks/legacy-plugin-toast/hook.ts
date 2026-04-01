@@ -1,3 +1,5 @@
+import { dirname } from "node:path"
+
 import type { PluginInput } from "@opencode-ai/plugin"
 
 import { checkForLegacyPluginEntry } from "../../shared/legacy-plugin-warning"
@@ -17,10 +19,10 @@ export function createLegacyPluginToastHook(ctx: PluginInput) {
 
       fired = true
 
-      const result = checkForLegacyPluginEntry()
+      const result = checkForLegacyPluginEntry(undefined, ctx.directory)
       if (!result.hasLegacyEntry) return
 
-      const migration = autoMigrateLegacyPluginEntry()
+      const migration = autoMigrateLegacyPluginEntry(result.configPath ? dirname(result.configPath) : undefined)
 
       if (migration.migrated) {
         log("[legacy-plugin-toast] Auto-migrated opencode.json plugin entry", {
