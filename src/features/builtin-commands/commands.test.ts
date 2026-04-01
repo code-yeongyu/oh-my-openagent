@@ -59,6 +59,16 @@ describe("loadBuiltinCommands", () => {
     //#then
     expect(commands.handoff.description).toContain("context summary")
   })
+
+  test("should preassign Sisyphus as the native agent for start-work", () => {
+    //#given - no disabled commands
+
+    //#when
+    const commands = loadBuiltinCommands()
+
+    //#then
+    expect(commands["start-work"].agent).toBe("sisyphus")
+  })
 })
 
 describe("loadBuiltinCommands — remove-ai-slops", () => {

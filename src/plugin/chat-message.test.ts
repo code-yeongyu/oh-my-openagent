@@ -1,7 +1,14 @@
-import { afterEach, describe, test, expect } from "bun:test"
+import { afterEach, beforeEach, describe, test, expect } from "bun:test"
+import { mkdirSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { randomUUID } from "node:crypto"
 
 import { createChatMessageHandler } from "./chat-message"
-import { _resetForTesting, setMainSession, subagentSessions } from "../features/claude-code-session-state"
+import { createAutoSlashCommandHook } from "../hooks/auto-slash-command"
+import { createStartWorkHook } from "../hooks/start-work"
+import { readBoulderState } from "../features/boulder-state"
+import { _resetForTesting, setMainSession, subagentSessions, registerAgentName, updateSessionAgent, getSessionAgent } from "../features/claude-code-session-state"
 import { clearSessionModel, getSessionModel, setSessionModel } from "../shared/session-model-state"
 
 type ChatMessagePart = { type: string; text?: string; [key: string]: unknown }
@@ -37,6 +44,55 @@ afterEach(() => {
   clearSessionModel("test-session")
   clearSessionModel("main-session")
   clearSessionModel("subagent-session")
+})
+
+describe("createChatMessageHandler - /start-work integration", () => {
+  let testDir = ""
+  let originalWorkingDirectory = ""
+
+  beforeEach(() => {
+    testDir = join(tmpdir(), `chat-message-start-work-${randomUUID()}`)
+    originalWorkingDirectory = process.cwd()
+    mkdirSync(join(testDir, ".sisyphus", "plans"), { recursive: true })
+    writeFileSync(join(testDir, ".sisyphus", "plans", "worker-plan.md"), "# Plan\n- [ ] Task 1")
+    process.chdir(testDir)
+    _resetForTesting()
+    registerAgentName("prometheus")
+    registerAgentName("sisyphus")
+  })
+
+  afterEach(() => {
+    process.chdir(originalWorkingDirectory)
+    rmSync(testDir, { recursive: true, force: true })
+  })
+
+  test("falls back to Sisyphus through the full chat.message slash-command path when Atlas is unavailable", async () => {
+    // given
+    updateSessionAgent("test-session", "prometheus")
+    const args = createMockHandlerArgs()
+    args.hooks.autoSlashCommand = createAutoSlashCommandHook({ skills: [] })
+    args.hooks.startWork = createStartWorkHook({
+      directory: testDir,
+      client: { tui: { showToast: async () => {} } },
+    } as never)
+    const handler = createChatMessageHandler(args)
+    const input = createMockInput("prometheus")
+    const output: ChatMessageHandlerOutput = {
+      message: {},
+      parts: [{ type: "text", text: "/start-work" }],
+    }
+
+    // when
+    await handler(input, output)
+
+    // then
+    expect(output.message["agent"]).toBe("Sisyphus (Ultraworker)")
+    expect(output.parts[0].text).toContain("<auto-slash-command>")
+    expect(output.parts[0].text).toContain("Auto-Selected Plan")
+    expect(output.parts[0].text).toContain("boulder.json has been created")
+    expect(getSessionAgent("test-session")).toBe("sisyphus")
+    expect(readBoulderState(testDir)?.agent).toBe("sisyphus")
+  })
 })
 
 function createMockInput(agent?: string, model?: { providerID: string; modelID: string }) {
