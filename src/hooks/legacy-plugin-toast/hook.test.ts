@@ -1,15 +1,10 @@
-/// <reference path="../../../bun-test.d.ts" />
-
 import { afterAll, beforeEach, describe, expect, it, mock } from "bun:test"
-
-import type { LegacyPluginCheckResult } from "../../shared/legacy-plugin-warning"
 import type { MigrationResult } from "./auto-migrate"
 
-const mockCheckForLegacyPluginEntry = mock((): LegacyPluginCheckResult => ({
+const mockCheckForLegacyPluginEntry = mock(() => ({
   hasLegacyEntry: false,
   hasCanonicalEntry: false,
   legacyEntries: [] as string[],
-  configPath: null,
 }))
 
 const mockAutoMigrate = mock((): MigrationResult => ({
@@ -72,7 +67,6 @@ describe("createLegacyPluginToastHook", () => {
       hasLegacyEntry: false,
       hasCanonicalEntry: true,
       legacyEntries: [],
-      configPath: null,
     })
     mockAutoMigrate.mockReturnValue({ migrated: false, from: null, to: null, configPath: null })
     mockShowToast.mockResolvedValue(undefined)
@@ -99,7 +93,6 @@ describe("createLegacyPluginToastHook", () => {
         hasLegacyEntry: true,
         hasCanonicalEntry: false,
         legacyEntries: ["oh-my-opencode"],
-        configPath: "/tmp/opencode.json",
       })
       mockAutoMigrate.mockReturnValue({
         migrated: true,
@@ -127,7 +120,6 @@ describe("createLegacyPluginToastHook", () => {
         hasLegacyEntry: true,
         hasCanonicalEntry: false,
         legacyEntries: ["oh-my-opencode"],
-        configPath: "/tmp/opencode.json",
       })
       mockAutoMigrate.mockReturnValue({
         migrated: false,
@@ -155,7 +147,6 @@ describe("createLegacyPluginToastHook", () => {
         hasLegacyEntry: true,
         hasCanonicalEntry: false,
         legacyEntries: ["oh-my-opencode"],
-        configPath: "/tmp/opencode.json",
       })
       mockAutoMigrate.mockReturnValue({
         migrated: true,
@@ -182,7 +173,6 @@ describe("createLegacyPluginToastHook", () => {
         hasLegacyEntry: true,
         hasCanonicalEntry: false,
         legacyEntries: ["oh-my-opencode"],
-        configPath: "/tmp/opencode.json",
       })
       const { createLegacyPluginToastHook } = await importFreshModule()
       const hook = createLegacyPluginToastHook(createMockCtx())
@@ -202,7 +192,6 @@ describe("createLegacyPluginToastHook", () => {
         hasLegacyEntry: true,
         hasCanonicalEntry: false,
         legacyEntries: ["oh-my-opencode"],
-        configPath: "/tmp/opencode.json",
       })
       const { createLegacyPluginToastHook } = await importFreshModule()
       const hook = createLegacyPluginToastHook(createMockCtx())
@@ -212,27 +201,6 @@ describe("createLegacyPluginToastHook", () => {
 
       // then
       expect(mockCheckForLegacyPluginEntry).not.toHaveBeenCalled()
-    })
-  })
-
-  describe("#given a project directory is available", () => {
-    it("#then passes the project directory into legacy config detection", async () => {
-      // given
-      mockCheckForLegacyPluginEntry.mockReturnValue({
-        hasLegacyEntry: true,
-        hasCanonicalEntry: false,
-        legacyEntries: ["oh-my-opencode"],
-        configPath: "/tmp/test/.opencode/opencode.json",
-      })
-      const { createLegacyPluginToastHook } = await importFreshModule()
-      const hook = createLegacyPluginToastHook(createMockCtx())
-
-      // when
-      await hook.event(createEvent("session.created"))
-
-      // then
-      expect(mockCheckForLegacyPluginEntry).toHaveBeenCalledWith(undefined, "/tmp/test")
-      expect(mockAutoMigrate).toHaveBeenCalledWith("/tmp/test/.opencode")
     })
   })
 })

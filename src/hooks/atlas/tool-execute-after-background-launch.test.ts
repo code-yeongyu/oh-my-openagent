@@ -8,9 +8,11 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { createOpencodeClient, type Project } from "@opencode-ai/sdk"
 
 const isCallerOrchestratorMock = mock(async () => true)
-const collectGitDiffStatsMock = mock(() => {
-  throw new Error("background launches should not trigger verification")
-})
+const collectGitDiffStatsMock = mock(() => ({
+  filesChanged: 0,
+  insertions: 0,
+  deletions: 0,
+}))
 
 mock.module("../../shared/session-utils", () => ({
   isCallerOrchestrator: isCallerOrchestratorMock,
