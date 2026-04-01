@@ -1,4 +1,7 @@
-import { describe, expect, it, beforeEach, mock, spyOn } from "bun:test"
+import { describe, expect, it, beforeEach, afterEach, spyOn } from "bun:test"
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import type { LoadedSkill } from "../../features/opencode-skill-loader/types"
 import type {
   AutoSlashCommandHookInput,
@@ -39,11 +42,45 @@ function createMockOutput(text: string): AutoSlashCommandHookOutput {
 }
 
 describe("createAutoSlashCommandHook", () => {
+  let tempDir = ""
+  let originalWorkingDirectory = ""
+
   beforeEach(() => {
     logMock.mockClear()
+    tempDir = mkdtempSync(join(tmpdir(), "omo-auto-slash-hook-test-"))
+    originalWorkingDirectory = process.cwd()
+  })
+
+  afterEach(() => {
+    process.chdir(originalWorkingDirectory)
+    rmSync(tempDir, { recursive: true, force: true })
   })
 
   describe("slash command replacement", () => {
+    it("should resolve project commands from provided directory even when cwd differs", async () => {
+      // given
+      const projectDir = join(tempDir, "project")
+      const commandDir = join(projectDir, ".claude", "commands")
+      mkdirSync(commandDir, { recursive: true })
+      writeFileSync(
+        join(commandDir, "project-only-command.md"),
+        `---\ndescription: Project command\n---\nExecute from project directory.\n`,
+      )
+      process.chdir("/tmp")
+
+      const hook = createAutoSlashCommandHook({ directory: projectDir })
+      const input = createMockInput(`test-session-project-${Date.now()}`)
+      const output = createMockOutput("/project-only-command")
+
+      // when
+      await hook["chat.message"](input, output)
+
+      // then
+      expect(output.parts[0].text).toContain("<auto-slash-command>")
+      expect(output.parts[0].text).toContain("Execute from project directory.")
+      expect(output.parts[0].text).toContain("**Scope**: project")
+    })
+
     it("should not modify message when command not found", async () => {
       // given a slash command that doesn't exist
       const hook = createAutoSlashCommandHook()

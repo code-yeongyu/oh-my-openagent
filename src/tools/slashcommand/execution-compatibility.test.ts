@@ -60,4 +60,32 @@ describe("slashcommand discovery and execution compatibility", () => {
     expect(result.replacementText).toContain("Execute from parent config.")
     expect(result.replacementText).toContain("**Scope**: opencode")
   })
+
+  it("executes project commands using the provided directory even when cwd differs", async () => {
+    // given
+    const projectDir = join(tempDir, "project")
+    const commandDir = join(projectDir, ".claude", "commands")
+    const commandName = "project-only-command"
+
+    mkdirSync(commandDir, { recursive: true })
+    writeFileSync(
+      join(commandDir, `${commandName}.md`),
+      `---\ndescription: Project command\n---\nExecute from project directory.\n`,
+    )
+    process.chdir("/tmp")
+
+    expect(discoverCommandsSync(projectDir).some(command => command.name === commandName)).toBe(true)
+
+    // when
+    const result = await executeSlashCommand({
+      command: commandName,
+      args: "",
+      raw: `/${commandName}`,
+    }, { skills: [], directory: projectDir })
+
+    // then
+    expect(result.success).toBe(true)
+    expect(result.replacementText).toContain("Execute from project directory.")
+    expect(result.replacementText).toContain("**Scope**: project")
+  })
 })
