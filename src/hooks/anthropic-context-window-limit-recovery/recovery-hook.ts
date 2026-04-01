@@ -5,6 +5,7 @@ import type { ExperimentalConfig, OhMyOpenCodeConfig } from "../../config"
 import { parseAnthropicTokenLimitError } from "./parser"
 import { executeCompact, getLastAssistant } from "./executor"
 import { attemptDeduplicationRecovery } from "./deduplication-recovery"
+import { clearSessionState } from "./state"
 import { log } from "../../shared/logger"
 
 export interface AnthropicContextWindowLimitRecoveryOptions {
@@ -17,6 +18,7 @@ function createRecoveryState(): AutoCompactState {
     pendingCompact: new Set<string>(),
     errorDataBySession: new Map<string, ParsedTokenLimitError>(),
     retryStateBySession: new Map(),
+    retryTimerBySession: new Map(),
     truncateStateBySession: new Map(),
     emptyContentAttemptBySession: new Map(),
     compactionInProgress: new Set<string>(),
@@ -30,7 +32,7 @@ export function createAnthropicContextWindowLimitRecoveryHook(
 ) {
   const autoCompactState = createRecoveryState()
   const experimental = options?.experimental
-  const pluginConfig = options?.pluginConfig!
+  const pluginConfig = options?.pluginConfig ?? {} as OhMyOpenCodeConfig
   const pendingCompactionTimeoutBySession = new Map<string, ReturnType<typeof setTimeout>>()
 
   const eventHandler = async ({ event }: { event: { type: string; properties?: unknown } }) => {
@@ -45,12 +47,7 @@ export function createAnthropicContextWindowLimitRecoveryHook(
           pendingCompactionTimeoutBySession.delete(sessionInfo.id)
         }
 
-        autoCompactState.pendingCompact.delete(sessionInfo.id)
-        autoCompactState.errorDataBySession.delete(sessionInfo.id)
-        autoCompactState.retryStateBySession.delete(sessionInfo.id)
-        autoCompactState.truncateStateBySession.delete(sessionInfo.id)
-        autoCompactState.emptyContentAttemptBySession.delete(sessionInfo.id)
-        autoCompactState.compactionInProgress.delete(sessionInfo.id)
+        clearSessionState(autoCompactState, sessionInfo.id)
       }
       return
     }

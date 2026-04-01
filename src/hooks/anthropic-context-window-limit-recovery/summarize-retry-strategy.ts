@@ -2,7 +2,13 @@ import type { AutoCompactState } from "./types"
 import type { OhMyOpenCodeConfig } from "../../config"
 import { RETRY_CONFIG } from "./types"
 import type { Client } from "./client"
-import { clearSessionState, getEmptyContentAttempt, getOrCreateRetryState } from "./state"
+import {
+  clearRetryTimer,
+  clearSessionState,
+  getEmptyContentAttempt,
+  getOrCreateRetryState,
+  setRetryTimer,
+} from "./state"
 import { sanitizeEmptyMessagesBeforeSummarize } from "./message-builder"
 import { fixEmptyMessages } from "./empty-content-recovery"
 
@@ -19,6 +25,11 @@ export async function runSummarizeRetryStrategy(params: {
   errorType?: string
   messageIndex?: number
 }): Promise<void> {
+  if (!params.autoCompactState.pendingCompact.has(params.sessionID)) {
+    clearRetryTimer(params.autoCompactState, params.sessionID)
+    return
+  }
+
   const retryState = getOrCreateRetryState(params.autoCompactState, params.sessionID)
   const now = Date.now()
 
@@ -42,6 +53,8 @@ export async function runSummarizeRetryStrategy(params: {
     return
   }
 
+  clearRetryTimer(params.autoCompactState, params.sessionID)
+
   if (params.errorType?.includes("non-empty content")) {
     const attempt = getEmptyContentAttempt(params.autoCompactState, params.sessionID)
     if (attempt < 3) {
@@ -52,9 +65,11 @@ export async function runSummarizeRetryStrategy(params: {
         messageIndex: params.messageIndex,
       })
       if (fixed) {
-        setTimeout(() => {
+        const timeout = setTimeout(() => {
+          params.autoCompactState.retryTimerBySession.delete(params.sessionID)
           void runSummarizeRetryStrategy(params)
         }, 500)
+        setRetryTimer(params.autoCompactState, params.sessionID, timeout)
         return
       }
     } else {
@@ -138,9 +153,11 @@ export async function runSummarizeRetryStrategy(params: {
           Math.pow(RETRY_CONFIG.backoffFactor, retryState.attempt - 1)
         const cappedDelay = Math.min(delay, RETRY_CONFIG.maxDelayMs, remainingTimeMs)
 
-        setTimeout(() => {
+        const timeout = setTimeout(() => {
+          params.autoCompactState.retryTimerBySession.delete(params.sessionID)
           void runSummarizeRetryStrategy(params)
         }, cappedDelay)
+        setRetryTimer(params.autoCompactState, params.sessionID, timeout)
         return
       }
     } else {

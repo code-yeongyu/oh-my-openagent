@@ -90,6 +90,7 @@ describe("executeCompact lock management", () => {
       pendingCompact: new Set<string>(),
       errorDataBySession: new Map(),
       retryStateBySession: new Map(),
+      retryTimerBySession: new Map(),
       truncateStateBySession: new Map(),
       emptyContentAttemptBySession: new Map(),
       compactionInProgress: new Set<string>(),

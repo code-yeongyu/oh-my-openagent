@@ -12,6 +12,7 @@ function createAutoCompactState(): AutoCompactState {
     pendingCompact: new Set<string>(),
     errorDataBySession: new Map<string, ParsedTokenLimitError>(),
     retryStateBySession: new Map<string, RetryState>(),
+    retryTimerBySession: new Map(),
     truncateStateBySession: new Map(),
     emptyContentAttemptBySession: new Map(),
     compactionInProgress: new Set<string>(),
@@ -97,10 +98,11 @@ describe("runSummarizeRetryStrategy", () => {
       return 1 as unknown as ReturnType<typeof setTimeout>
     }) as typeof setTimeout
 
+    autoCompactState.pendingCompact.add(sessionID)
     autoCompactState.retryStateBySession.set(sessionID, {
       attempt: 0,
       lastAttemptTime: Date.now(),
-      firstAttemptTime: Date.now() - 119900,
+      firstAttemptTime: Date.now() - 100000,
     })
     summarizeMock.mockRejectedValueOnce(new Error("rate limited"))
 
@@ -117,6 +119,36 @@ describe("runSummarizeRetryStrategy", () => {
     //#then
     expect(timeoutCalls.length).toBe(1)
     expect(timeoutCalls[0]!.delay).toBeGreaterThan(0)
-    expect(timeoutCalls[0]!.delay).toBeLessThanOrEqual(300)
+    expect(timeoutCalls[0]!.delay).toBeLessThanOrEqual(2000)
+  })
+
+  test("#given pending retry timer after session cleanup #when scheduled callback fires #then it does not recreate retry state", async () => {
+    //#given
+    let scheduledCallback: (() => void) | undefined
+    globalThis.setTimeout = ((callback: (...args: unknown[]) => void, _delay?: number) => {
+      scheduledCallback = () => callback()
+      return 1 as unknown as ReturnType<typeof setTimeout>
+    }) as typeof setTimeout
+
+    autoCompactState.pendingCompact.add(sessionID)
+    summarizeMock.mockRejectedValueOnce(new Error("rate limited"))
+
+    await runSummarizeRetryStrategy({
+      sessionID,
+      msg: { providerID: "anthropic", modelID: "claude-sonnet-4-6" },
+      autoCompactState,
+      client: client as never,
+      directory,
+      pluginConfig: {} as OhMyOpenCodeConfig,
+    })
+
+    autoCompactState.pendingCompact.delete(sessionID)
+    autoCompactState.retryStateBySession.delete(sessionID)
+
+    //#when
+    scheduledCallback?.()
+
+    //#then
+    expect(autoCompactState.retryStateBySession.has(sessionID)).toBe(false)
   })
 })
