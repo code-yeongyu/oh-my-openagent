@@ -23,16 +23,21 @@ function makeMockStorage(): ZellijStorage & { _store: Map<string, ZellijState> }
   }
 }
 
-function makeMockSpawn() {
+function makeMockSpawn(knownPaneIds: string[] = ["%1"]) {
   return (args: string[]) => {
     const isCat = Array.isArray(args) && args[0] === "cat"
+    const isListPanes = Array.isArray(args) && args.includes("list-panes")
     const paneIdBytes = new TextEncoder().encode("%1\n")
+    const listPanesOutput = knownPaneIds.map(id => `terminal_${id}`).join("\n") + "\n"
+    const listPanesBytes = new TextEncoder().encode(listPanesOutput)
     return {
       exited: Promise.resolve(0),
       stdout: new ReadableStream({
         start(controller) {
           if (isCat) {
             controller.enqueue(paneIdBytes)
+          } else if (isListPanes) {
+            controller.enqueue(listPanesBytes)
           }
           controller.close()
         },
@@ -209,7 +214,7 @@ describe("ZellijAdapter", () => {
         hasCreatedFirstPane: true,
         updatedAt: Date.now(),
       })
-      const adapter = new ZellijAdapter(mockConfig, storage, makeMockSpawn() as any)
+      const adapter = new ZellijAdapter(mockConfig, storage, makeMockSpawn(["%1", "pane-123"]) as any)
 
       //#when
       await adapter.setSessionID(sessionID)

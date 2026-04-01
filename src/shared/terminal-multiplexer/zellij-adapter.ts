@@ -59,7 +59,30 @@ export class ZellijAdapter implements Multiplexer {
   }
 
   private async validateAnchorPane(): Promise<boolean> {
-    return this.anchorPaneId !== null
+    if (this.anchorPaneId === null) {
+      return false
+    }
+
+    try {
+      const proc = this.spawn(["zellij", "action", "list-panes"], {
+        stdout: "pipe",
+        stderr: "pipe",
+      })
+      await proc.exited
+      const output = (await new Response(proc.stdout).text()).trim()
+
+      // Pane IDs appear as terminal_N in list-panes output
+      const exists = output.includes(`terminal_${this.anchorPaneId}`)
+      if (!exists) {
+        log("[ZellijAdapter.validateAnchorPane] Anchor pane not found in list-panes", {
+          anchorPaneId: this.anchorPaneId,
+        })
+      }
+      return exists
+    } catch {
+      log("[ZellijAdapter.validateAnchorPane] Failed to list panes, assuming invalid")
+      return false
+    }
   }
 
   async ensureSession(name: string): Promise<void> {
@@ -214,7 +237,7 @@ export class ZellijAdapter implements Multiplexer {
       log("[ZellijAdapter.closePane] called", { label: handle.label })
       
       // Extract session ID from label (format: "omo-subagent-ses_XXXXX")
-      const match = handle.label.match(/ses_[a-zA-Z0-9]+/)
+      const match = handle.label.match(/ses_[a-zA-Z0-9_-]+/)
       if (match) {
         const sessionId = match[0]
         log("[ZellijAdapter.closePane] extracted sessionId", { sessionId, label: handle.label })
