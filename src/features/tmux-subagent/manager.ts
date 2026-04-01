@@ -118,7 +118,7 @@ export class TmuxSessionManager {
     })
   }
   private isEnabled(): boolean {
-    if (this.adapter) return this.adapter.enabled
+    if (this.adapter) return this.tmuxConfig.enabled && this.adapter.enabled
     return this.tmuxConfig.enabled && this.deps.isInsideTmux()
   }
 

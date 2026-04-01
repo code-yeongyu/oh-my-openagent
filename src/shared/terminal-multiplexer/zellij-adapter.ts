@@ -80,8 +80,9 @@ export class ZellijAdapter implements Multiplexer {
       await proc.exited
       const output = (await new Response(proc.stdout).text()).trim()
 
-      // Pane IDs appear as terminal_N in list-panes output
-      const exists = output.includes(`terminal_${this.anchorPaneId}`)
+      // Pane IDs appear as terminal_N in list-panes output; use word boundary to avoid substring matches (e.g. terminal_1 matching terminal_10)
+      const pattern = new RegExp(`\\bterminal_${this.anchorPaneId}\\b`)
+      const exists = pattern.test(output)
       if (!exists) {
         log("[ZellijAdapter.validateAnchorPane] Anchor pane not found in list-panes", {
           anchorPaneId: this.anchorPaneId,
@@ -142,88 +143,96 @@ export class ZellijAdapter implements Multiplexer {
       ? ["zellij", "action", "new-pane", "-d", direction, "-n", paneName, "--close-on-exit", "--", ...cmdArgs]
       : ["zellij", "action", "new-pane", "-d", "down", "-n", paneName, "--close-on-exit", "--", ...cmdArgs]
 
-    const proc = this.spawn(zellijCmd, {
-      stdout: "pipe",
-      stderr: "pipe",
-    })
-
-    // Log spawn command with isFirstPane flag
-    log("[ZellijAdapter.spawnPane] spawning pane", {
-      label,
-      direction,
-      isFirstPane,
-      command: cmd,
-      fullCommand: zellijCmd.join(" "),
-    })
-
-    await proc.exited
-
-    // Wait for pane to start and write its ID (with timeout)
     let paneId = ""
-    const maxAttempts = 10  // 1 second total (100ms per attempt)
-    for (let i = 0; i < maxAttempts; i++) {
-      try {
-        const idProc = this.spawn(["cat", idFile], { stdout: "pipe", stderr: "pipe" })
-        await idProc.exited
-        const content = (await new Response(idProc.stdout).text()).trim()
-        if (content) {
-          paneId = content
-          break
+    try {
+      const proc = this.spawn(zellijCmd, {
+        stdout: "pipe",
+        stderr: "pipe",
+      })
+
+      log("[ZellijAdapter.spawnPane] spawning pane", {
+        label,
+        direction,
+        isFirstPane,
+        command: cmd,
+        fullCommand: zellijCmd.join(" "),
+      })
+
+      await proc.exited
+
+      const maxAttempts = 10
+      for (let i = 0; i < maxAttempts; i++) {
+        try {
+          const idProc = this.spawn(["cat", idFile], { stdout: "pipe", stderr: "pipe" })
+          await idProc.exited
+          const content = (await new Response(idProc.stdout).text()).trim()
+          if (content) {
+            paneId = content
+            break
+          }
+        } catch {
+          // File doesn't exist yet
         }
-      } catch {
-        // File doesn't exist yet
+        await new Promise(resolve => setTimeout(resolve, 100))
       }
-      await new Promise(resolve => setTimeout(resolve, 100))
-    }
 
-    if (!paneId) {
-      log("[ZellijAdapter.spawnPane] WARNING: Could not read pane ID", { idFile })
-    }
+      if (!paneId) {
+        log("[ZellijAdapter.spawnPane] WARNING: Could not read pane ID", { idFile })
+      }
 
-    // Clean up temp file
-    this.spawn(["rm", idFile], { stdout: "pipe" })
+      this.spawn(["rm", idFile], { stdout: "pipe" })
 
-    if (isFirstPane) {
-      if (paneId) {
-        this.anchorPaneId = paneId
-        this.anchorReadyResolver?.(paneId)
-        this.anchorReadyResolver = null
-        log("[ZellijAdapter.spawnPane] set anchor pane", { paneId })
+      if (isFirstPane) {
+        if (paneId) {
+          this.anchorPaneId = paneId
+          this.anchorReadyResolver?.(paneId)
+          this.anchorReadyResolver = null
+          log("[ZellijAdapter.spawnPane] set anchor pane", { paneId })
 
-        if (this.sessionID) {
-          this.storage.saveZellijState({
-            sessionID: this.sessionID,
-            anchorPaneId: this.anchorPaneId,
-            hasCreatedFirstPane: this.hasCreatedFirstPane,
-            updatedAt: Date.now(),
-          })
+          if (this.sessionID) {
+            this.storage.saveZellijState({
+              sessionID: this.sessionID,
+              anchorPaneId: this.anchorPaneId,
+              hasCreatedFirstPane: this.hasCreatedFirstPane,
+              updatedAt: Date.now(),
+            })
+          }
+        } else {
+          log("[ZellijAdapter.spawnPane] WARNING: anchor pane ID not captured, releasing anchorReadyPromise")
+          this.anchorReadyResolver?.(null)
+          this.anchorReadyResolver = null
+          this.anchorReadyPromise = null
+          this.hasCreatedFirstPane = false
         }
-      } else {
-        log("[ZellijAdapter.spawnPane] WARNING: anchor pane ID not captured, releasing anchorReadyPromise")
+      } else if (this.anchorReadyPromise) {
+        const anchorId = await this.anchorReadyPromise
+        if (anchorId && paneId) {
+          const stackProc = this.spawn(["zellij", "action", "stack-panes", "--", anchorId, paneId], {
+            stdout: "pipe",
+            stderr: "pipe",
+          })
+          await stackProc.exited
+          log("[ZellijAdapter.spawnPane] stacked with anchor", { anchorPaneId: anchorId, newPaneId: paneId })
+        } else {
+          log("[ZellijAdapter.spawnPane] skipping stack: anchor or pane ID unavailable", { label, anchorId: anchorId ?? null, paneId })
+        }
+      } else if (this.anchorPaneId && paneId) {
+        const stackProc = this.spawn(["zellij", "action", "stack-panes", "--", this.anchorPaneId, paneId], {
+          stdout: "pipe",
+          stderr: "pipe",
+        })
+        await stackProc.exited
+        log("[ZellijAdapter.spawnPane] stacked with restored anchor", { anchorPaneId: this.anchorPaneId, newPaneId: paneId })
+      }
+    } catch (error) {
+      if (isFirstPane) {
+        log("[ZellijAdapter.spawnPane] first-pane spawn failed, releasing anchorReadyPromise", { label, error })
         this.anchorReadyResolver?.(null)
         this.anchorReadyResolver = null
         this.anchorReadyPromise = null
         this.hasCreatedFirstPane = false
       }
-    } else if (this.anchorReadyPromise) {
-      const anchorId = await this.anchorReadyPromise
-      if (anchorId && paneId) {
-        const stackProc = this.spawn(["zellij", "action", "stack-panes", "--", anchorId, paneId], {
-          stdout: "pipe",
-          stderr: "pipe",
-        })
-        await stackProc.exited
-        log("[ZellijAdapter.spawnPane] stacked with anchor", { anchorPaneId: anchorId, newPaneId: paneId })
-      } else {
-        log("[ZellijAdapter.spawnPane] skipping stack: anchor or pane ID unavailable", { label, anchorId: anchorId ?? null, paneId })
-      }
-    } else if (this.anchorPaneId && paneId) {
-      const stackProc = this.spawn(["zellij", "action", "stack-panes", "--", this.anchorPaneId, paneId], {
-        stdout: "pipe",
-        stderr: "pipe",
-      })
-      await stackProc.exited
-      log("[ZellijAdapter.spawnPane] stacked with restored anchor", { anchorPaneId: this.anchorPaneId, newPaneId: paneId })
+      throw error
     }
 
     this.labelToSpawned.set(label, true)

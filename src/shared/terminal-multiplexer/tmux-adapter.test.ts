@@ -256,13 +256,15 @@ describe("TmuxAdapter", () => {
   describe("closePane", () => {
     it("accepts PaneHandle and closes pane", async () => {
       //#given
-      const handle = { label: "omo-close-test" }
+      const handle = await adapter.spawnPane("echo hello", { label: "omo-close-test", direction: "horizontal" })
 
       //#when
-      const closePromise = adapter.closePane(handle)
+      await adapter.closePane(handle)
 
       //#then
-      await expect(closePromise).resolves.toBeUndefined()
+      const killCall = mock.calls.find((c) => c[1] === "kill-pane")
+      expect(killCall).toBeDefined()
+      expect(killCall).toContain(handle.nativeId)
     })
 
     it("handles closing non-existent pane gracefully", async () => {

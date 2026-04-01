@@ -93,9 +93,8 @@ describe("zellij-storage", () => {
     saveZellijState(state)
 
     const storagePath = join(testStorageDir, "zellij-adapter", "test-session-4.json")
-    if (existsSync(storagePath)) {
-      writeFileSync(storagePath, "{ invalid json }")
-    }
+    expect(existsSync(storagePath)).toBe(true)
+    writeFileSync(storagePath, "{ invalid json }")
 
     const result = loadZellijState("test-session-4")
     expect(result).toBeNull()
