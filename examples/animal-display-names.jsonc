@@ -1,0 +1,66 @@
+// Example: Custom display names using animal themes
+// Each agent and category gets a display name matching its role.
+// Copy the relevant sections into your .opencode/oh-my-opencode.jsonc
+{
+  "agents": {
+    "sisyphus": {
+      "display_name": "Ox (Ultraworker)"
+    },
+    "hephaestus": {
+      "display_name": "Beaver (Deep Agent)"
+    },
+    "oracle": {
+      "display_name": "Owl"
+    },
+    "librarian": {
+      "display_name": "Dolphin"
+    },
+    "explore": {
+      "display_name": "Hawk"
+    },
+    "metis": {
+      "display_name": "Fox (Plan Consultant)"
+    },
+    "momus": {
+      "display_name": "Raven (Plan Critic)"
+    },
+    "atlas": {
+      "display_name": "Elephant (Plan Executor)"
+    },
+    "prometheus": {
+      "display_name": "Wolf (Plan Builder)"
+    },
+    "sisyphus-junior": {
+      "display_name": "Ant"
+    },
+    "multimodal-looker": {
+      "display_name": "Eagle"
+    }
+  },
+  "categories": {
+    "visual-engineering": {
+      "display_name": "Peacock"
+    },
+    "ultrabrain": {
+      "display_name": "Octopus"
+    },
+    "deep": {
+      "display_name": "Whale"
+    },
+    "artistry": {
+      "display_name": "Butterfly"
+    },
+    "quick": {
+      "display_name": "Hummingbird"
+    },
+    "unspecified-low": {
+      "display_name": "Sparrow"
+    },
+    "unspecified-high": {
+      "display_name": "Falcon"
+    },
+    "writing": {
+      "display_name": "Nightingale"
+    }
+  }
+}
