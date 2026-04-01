@@ -21,7 +21,7 @@ import {
   buildAntiDuplicationSection,
   categorizeTools,
 } from "../dynamic-agent-prompt-builder";
-const MODE: AgentMode = "all";
+const MODE: AgentMode = "primary";
 
 function buildTodoDisciplineSection(useTaskSystem: boolean): string {
   if (useTaskSystem) {

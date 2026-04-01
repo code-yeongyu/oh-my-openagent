@@ -170,7 +170,7 @@ describe("createHephaestusAgent", () => {
 
     // then
     expect(config).toHaveProperty("description");
-    expect(config).toHaveProperty("mode", "all");
+    expect(config).toHaveProperty("mode", "primary");
     expect(config).toHaveProperty("model", "openai/gpt-5.4");
     expect(config).toHaveProperty("maxTokens", 32000);
     expect(config).toHaveProperty("prompt");
