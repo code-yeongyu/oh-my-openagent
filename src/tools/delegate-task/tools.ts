@@ -4,6 +4,7 @@ import { CATEGORY_DESCRIPTIONS } from "./constants"
 import { SISYPHUS_JUNIOR_AGENT } from "./sisyphus-junior-agent"
 import { mergeCategories } from "../../shared/merge-categories"
 import { getCategoryDisplayName } from "../../shared/category-display-names"
+import { sanitizeDisplayNameForMarkdown } from "../../shared/markdown-display-name"
 import { log } from "../../shared/logger"
 import { buildSystemContent } from "./prompt-builder"
 import type {
@@ -50,8 +51,9 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
   const availableSkills: AvailableSkill[] = options.availableSkills ?? []
 
   const categoryList = availableCategories.map(cat => {
-    const suffix = cat.displayName && cat.displayName !== cat.name
-      ? ` (${cat.displayName})`
+    const safeName = cat.displayName ? sanitizeDisplayNameForMarkdown(cat.displayName) : undefined
+    const suffix = safeName && safeName !== cat.name
+      ? ` (${safeName})`
       : ""
     const desc = cat.description
     return desc ? `  - \`${cat.name}\`${suffix}: ${desc}` : `  - \`${cat.name}\`${suffix}`

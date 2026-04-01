@@ -2,6 +2,7 @@ import type {
   AvailableCategory,
   AvailableSkill,
 } from "./dynamic-agent-prompt-types"
+import { sanitizeDisplayNameForMarkdown } from "../shared/markdown-display-name"
 
 function buildSkillsSection(skills: AvailableSkill[]): string {
   const builtinSkills = skills.filter((skill) => skill.location === "plugin")
@@ -54,10 +55,11 @@ export function buildCategorySkillsDelegationGuide(
   }
 
   const categoryRows = categories.map((category) => {
-    const suffix = category.displayName && category.displayName !== category.name
-      ? ` (${category.displayName})`
+    const safeName = category.displayName ? sanitizeDisplayNameForMarkdown(category.displayName) : undefined
+    const suffix = safeName && safeName !== category.name
+      ? ` (${safeName})`
       : ""
-    const description = category.description?.trim() || category.displayName || category.name
+    const description = category.description?.trim() || safeName || category.name
     return `- \`${category.name}\`${suffix} — ${description}`
   })
 

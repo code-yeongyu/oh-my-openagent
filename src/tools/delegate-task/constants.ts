@@ -4,6 +4,7 @@ import type {
  } from "../../agents/dynamic-agent-prompt-builder"
 import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { truncateDescription } from "../../shared/truncate-description"
+import { sanitizeDisplayNameForMarkdown } from "../../shared/markdown-display-name"
 export {
   CATEGORY_DESCRIPTIONS,
   CATEGORY_PROMPT_APPENDS,
@@ -266,10 +267,11 @@ WHY THIS FORMAT IS MANDATORY:
 function renderPlanAgentCategoryRows(categories: AvailableCategory[]): string[] {
   const sorted = [...categories].sort((a, b) => a.name.localeCompare(b.name))
   return sorted.map((category) => {
-    const bestFor = category.description || category.displayName || category.name
+    const safeName = category.displayName ? sanitizeDisplayNameForMarkdown(category.displayName) : undefined
+    const bestFor = category.description || safeName || category.name
     const model = category.model || ""
-    const displaySuffix = category.displayName && category.displayName !== category.name
-      ? ` (${category.displayName})`
+    const displaySuffix = safeName && safeName !== category.name
+      ? ` (${safeName})`
       : ""
     return `| \`${category.name}\`${displaySuffix} | ${bestFor} | ${model} |`
   })
