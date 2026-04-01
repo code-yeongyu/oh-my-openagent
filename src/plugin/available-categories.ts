@@ -11,6 +11,7 @@ export function createAvailableCategories(
   return Object.entries(categories).map(([name, categoryConfig]) => {
     const model =
       typeof categoryConfig.model === "string" ? categoryConfig.model : undefined
+    const displayName = pluginConfig.categories?.[name]?.display_name
 
     return {
       name,
@@ -19,6 +20,7 @@ export function createAvailableCategories(
         CATEGORY_DESCRIPTIONS[name] ??
         "General tasks",
       model,
+      ...(displayName !== undefined && { displayName }),
     }
   })
 }

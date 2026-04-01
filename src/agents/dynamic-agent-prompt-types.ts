@@ -21,4 +21,5 @@ export interface AvailableCategory {
   name: string
   description: string
   model?: string
+  displayName?: string
 }
