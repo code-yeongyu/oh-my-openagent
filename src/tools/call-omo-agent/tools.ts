@@ -27,6 +27,12 @@ function resolveModelAndFallbackChain(args: {
     ?? (agentOverrides
       ? Object.entries(agentOverrides).find(([key]) => key.toLowerCase() === agentConfigKey)?.[1]
       : undefined)
+  const agentCategoryModel = agentOverride?.category
+    ? userCategories?.[agentOverride.category]?.model
+    : undefined
+  const agentCategoryVariant = agentOverride?.category
+    ? userCategories?.[agentOverride.category]?.variant
+    : undefined
 
   let model: DelegatedModelConfig | undefined
   if (agentOverride?.model) {
@@ -37,6 +43,18 @@ function resolveModelAndFallbackChain(args: {
         agent: subagentType,
         model: agentOverride.model,
         variant: agentOverride.variant,
+      })
+    }
+  } else if (agentCategoryModel) {
+    const normalized = normalizeModelFormat(agentCategoryModel)
+    if (normalized) {
+      const variantToUse = agentOverride?.variant ?? agentCategoryVariant
+      model = variantToUse ? { ...normalized, variant: variantToUse } : normalized
+      log("[call_omo_agent] Resolved model override from agent category", {
+        agent: subagentType,
+        category: agentOverride?.category,
+        model: agentCategoryModel,
+        variant: variantToUse,
       })
     }
   }
