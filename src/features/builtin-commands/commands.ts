@@ -6,6 +6,7 @@ import { STOP_CONTINUATION_TEMPLATE } from "./templates/stop-continuation"
 import { REFACTOR_TEMPLATE } from "./templates/refactor"
 import { START_WORK_TEMPLATE } from "./templates/start-work"
 import { HANDOFF_TEMPLATE } from "./templates/handoff"
+import { REMOVE_AI_SLOPS_TEMPLATE } from "./templates/remove-ai-slops"
 
 const BUILTIN_COMMAND_DEFINITIONS: Record<BuiltinCommandName, Omit<CommandDefinition, "name">> = {
   "init-deep": {
@@ -77,6 +78,16 @@ $ARGUMENTS
     template: `<command-instruction>
 ${STOP_CONTINUATION_TEMPLATE}
 </command-instruction>`,
+  },
+  "remove-ai-slops": {
+    description: "(builtin) Remove AI-generated code smells from branch changes and critically review the results",
+    template: `<command-instruction>
+${REMOVE_AI_SLOPS_TEMPLATE}
+</command-instruction>
+
+<user-request>
+$ARGUMENTS
+</user-request>`,
   },
   handoff: {
     description: "(builtin) Create a detailed context summary for continuing work in a new session",

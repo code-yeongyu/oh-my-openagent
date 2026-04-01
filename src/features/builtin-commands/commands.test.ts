@@ -1,6 +1,7 @@
 import { describe, test, expect } from "bun:test"
 import { loadBuiltinCommands } from "./commands"
 import { HANDOFF_TEMPLATE } from "./templates/handoff"
+import { REMOVE_AI_SLOPS_TEMPLATE } from "./templates/remove-ai-slops"
 import type { BuiltinCommandName } from "./types"
 
 describe("loadBuiltinCommands", () => {
@@ -57,6 +58,77 @@ describe("loadBuiltinCommands", () => {
 
     //#then
     expect(commands.handoff.description).toContain("context summary")
+  })
+})
+
+describe("loadBuiltinCommands — remove-ai-slops", () => {
+  test("should include remove-ai-slops command in loaded commands", () => {
+    //#given
+    const disabledCommands: BuiltinCommandName[] = []
+
+    //#when
+    const commands = loadBuiltinCommands(disabledCommands)
+
+    //#then
+    expect(commands["remove-ai-slops"]).toBeDefined()
+    expect(commands["remove-ai-slops"].name).toBe("remove-ai-slops")
+  })
+
+  test("should exclude remove-ai-slops when disabled", () => {
+    //#given
+    const disabledCommands: BuiltinCommandName[] = ["remove-ai-slops"]
+
+    //#when
+    const commands = loadBuiltinCommands(disabledCommands)
+
+    //#then
+    expect(commands["remove-ai-slops"]).toBeUndefined()
+  })
+
+  test("should include remove-ai-slops template content in command template", () => {
+    //#given - no disabled commands
+
+    //#when
+    const commands = loadBuiltinCommands()
+
+    //#then
+    expect(commands["remove-ai-slops"].template).toContain(REMOVE_AI_SLOPS_TEMPLATE)
+  })
+
+  test("should have correct description for remove-ai-slops", () => {
+    //#given - no disabled commands
+
+    //#when
+    const commands = loadBuiltinCommands()
+
+    //#then
+    expect(commands["remove-ai-slops"].description).toContain("AI-generated code smells")
+  })
+})
+
+describe("REMOVE_AI_SLOPS_TEMPLATE", () => {
+  test("should include phase structure", () => {
+    //#given - the template string
+
+    //#when / #then
+    expect(REMOVE_AI_SLOPS_TEMPLATE).toContain("Identify Changed Files")
+    expect(REMOVE_AI_SLOPS_TEMPLATE).toContain("Parallel AI Slop Removal")
+    expect(REMOVE_AI_SLOPS_TEMPLATE).toContain("Critical Review")
+  })
+
+  test("should reference ai-slop-remover skill", () => {
+    //#given - the template string
+
+    //#when / #then
+    expect(REMOVE_AI_SLOPS_TEMPLATE).toContain("ai-slop-remover")
+  })
+
+  test("should include safety verification checklist", () => {
+    //#given - the template string
+
+    //#when / #then
+    expect(REMOVE_AI_SLOPS_TEMPLATE).toContain("Safety Verification")
+    expect(REMOVE_AI_SLOPS_TEMPLATE).toContain("Behavior Preservation")
   })
 })
 
