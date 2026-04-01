@@ -35,9 +35,9 @@ describe("hashline-read-enhancer", () => {
         "(End of file - total 2 lines)",
         "</content>",
         "",
-        "<system-reminder>",
+        "---",
         "1: keep this unchanged",
-        "</system-reminder>",
+        "---",
       ].join("\n"),
       metadata: {},
     }

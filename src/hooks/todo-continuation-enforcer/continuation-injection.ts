@@ -132,7 +132,9 @@ export async function injectContinuation(args: {
 [Status: ${todos.length - freshIncompleteCount}/${todos.length} completed, ${freshIncompleteCount} remaining]
 
 Remaining tasks:
-${todoList}`
+${todoList}
+
+System directive: You MUST reply. DO NOT output an empty response. Proceed with your tasks.`
 
   const injectionState = sessionStateStore.getExistingState(sessionID)
   if (injectionState) {

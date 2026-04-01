@@ -189,7 +189,7 @@ describe("start-work hook", () => {
       expect(output.parts[0].text).not.toContain("Multiple Plans Found")
     })
 
-    test("should wrap multiple plans message in system-reminder tag", async () => {
+    test("should wrap multiple plans message in system-directive tag", async () => {
       // given - multiple incomplete plans
       const plansDir = join(testDir, ".sisyphus", "plans")
       mkdirSync(plansDir, { recursive: true })
@@ -211,9 +211,9 @@ describe("start-work hook", () => {
         output
       )
 
-      // then - should use system-reminder tag format
-      expect(output.parts[0].text).toContain("<system-reminder>")
-      expect(output.parts[0].text).toContain("</system-reminder>")
+      // then - should use system-directive tag format
+      expect(output.parts[0].text).toContain("---")
+      expect(output.parts[0].text).toContain("---")
       expect(output.parts[0].text).toContain("Multiple Plans Found")
     })
 

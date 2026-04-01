@@ -279,7 +279,7 @@ Briefly announce "Consulting Oracle for [reason]" before invocation.
 
 **Collect Oracle results before your final answer. No exceptions.**
 
-- Oracle takes minutes. When done with your own work: **end your response** — wait for the \`<system-reminder>\`.
+- Oracle takes minutes. When done with your own work: **end your response** — wait for the \`---\`.
 - Do NOT poll \`background_output\` on a running Oracle. The notification will come.
 - Never cancel Oracle.
 </Oracle_Usage>`

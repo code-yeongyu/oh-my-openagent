@@ -8,60 +8,60 @@ import {
 
 describe("system-directive utilities", () => {
   describe("hasSystemReminder", () => {
-    test("should return true for messages containing <system-reminder> tags", () => {
-      const text = `<system-reminder>
+    test("should return true for messages containing --- tags", () => {
+      const text = `---
 Some system content
-</system-reminder>`
+---`
       expect(hasSystemReminder(text)).toBe(true)
     })
 
-    test("should return false for messages without system-reminder tags", () => {
+    test("should return false for messages without system-directive tags", () => {
       const text = "Just a normal user message"
       expect(hasSystemReminder(text)).toBe(false)
     })
 
     test("should be case-insensitive for tag names", () => {
-      const text = `<SYSTEM-REMINDER>content</SYSTEM-REMINDER>`
+      const text = `---content---`
       expect(hasSystemReminder(text)).toBe(true)
     })
 
-    test("should detect system-reminder in mixed content", () => {
+    test("should detect system-directive in mixed content", () => {
       const text = `User text here
-<system-reminder>
+---
 System content
-</system-reminder>
+---
 More user text`
       expect(hasSystemReminder(text)).toBe(true)
     })
 
-    test("should handle empty system-reminder tags", () => {
-      const text = `<system-reminder></system-reminder>`
+    test("should handle empty system-directive tags", () => {
+      const text = `------`
       expect(hasSystemReminder(text)).toBe(true)
     })
 
-    test("should handle multiline system-reminder content", () => {
-      const text = `<system-reminder>
+    test("should handle multiline system-directive content", () => {
+      const text = `---
 Line 1
 Line 2
 Line 3
-</system-reminder>`
+---`
       expect(hasSystemReminder(text)).toBe(true)
     })
   })
 
   describe("removeSystemReminders", () => {
-    test("should remove system-reminder tags and content", () => {
-      const text = `<system-reminder>
+    test("should remove system-directive tags and content", () => {
+      const text = `---
 System content that should be removed
-</system-reminder>`
+---`
       expect(removeSystemReminders(text)).toBe("")
     })
 
-    test("should preserve user text outside system-reminder tags", () => {
+    test("should preserve user text outside system-directive tags", () => {
       const text = `User message here
-<system-reminder>
+---
 System content to remove
-</system-reminder>
+---
 More user text`
       const result = removeSystemReminders(text)
       expect(result).toContain("User message here")
@@ -69,10 +69,10 @@ More user text`
       expect(result).not.toContain("System content to remove")
     })
 
-    test("should remove multiple system-reminder blocks", () => {
-      const text = `<system-reminder>First block</system-reminder>
+    test("should remove multiple system-directive blocks", () => {
+      const text = `---First block---
 User text
-<system-reminder>Second block</system-reminder>`
+---Second block---`
       const result = removeSystemReminders(text)
       expect(result).toContain("User text")
       expect(result).not.toContain("First block")
@@ -80,21 +80,21 @@ User text
     })
 
     test("should be case-insensitive for tag names", () => {
-      const text = `<SYSTEM-REMINDER>Content</SYSTEM-REMINDER>`
+      const text = `---Content---`
       expect(removeSystemReminders(text)).toBe("")
     })
 
     test("should handle nested tags correctly", () => {
-      const text = `<system-reminder>
+      const text = `---
 Outer content
 <inner>Some inner tag</inner>
-</system-reminder>`
+---`
       expect(removeSystemReminders(text)).toBe("")
     })
 
     test("should trim whitespace from result", () => {
       const text = `
-<system-reminder>Remove this</system-reminder>
+---Remove this---
 
 User text
 
@@ -107,7 +107,7 @@ User text
       expect(removeSystemReminders("")).toBe("")
     })
 
-    test("should handle text with no system-reminder tags", () => {
+    test("should handle text with no system-directive tags", () => {
       const text = "Just normal user text without any system reminders"
       expect(removeSystemReminders(text)).toBe(text)
     })
@@ -117,7 +117,7 @@ User text
 \`\`\`javascript
 const x = 1;
 \`\`\`
-<system-reminder>System info</system-reminder>`
+---System info---`
       const result = removeSystemReminders(text)
       expect(result).toContain("Here's some code:")
       expect(result).toContain("```javascript")
@@ -131,8 +131,8 @@ const x = 1;
       expect(isSystemDirective(directive)).toBe(true)
     })
 
-    test("should return false for system-reminder tags", () => {
-      const text = `<system-reminder>content</system-reminder>`
+    test("should return false for system-directive tags", () => {
+      const text = `---content---`
       expect(isSystemDirective(text)).toBe(false)
     })
 
@@ -147,21 +147,21 @@ const x = 1;
   })
 
   describe("integration with keyword detection", () => {
-    test("should prevent search keywords in system-reminders from triggering mode", () => {
-      const text = `<system-reminder>
+    test("should prevent search keywords in system-directives from triggering mode", () => {
+      const text = `---
 The system will search for the file and find all occurrences.
 Please locate and scan the directory.
-</system-reminder>`
+---`
 
       // After removing system reminders, no search keywords should remain
       const cleanText = removeSystemReminders(text)
       expect(cleanText).not.toMatch(/\b(search|find|locate|scan)\b/i)
     })
 
-    test("should preserve search keywords in user text while removing system-reminder keywords", () => {
-      const text = `<system-reminder>
+    test("should preserve search keywords in user text while removing system-directive keywords", () => {
+      const text = `---
 System will find and locate files.
-</system-reminder>
+---
 
 Please search for the bug in the code.`
 
@@ -171,15 +171,15 @@ Please search for the bug in the code.`
     })
 
     test("should handle complex mixed content with multiple modes", () => {
-      const text = `<system-reminder>
+      const text = `---
 System will search and investigate.
-</system-reminder>
+---
 
 User wants to explore the codebase and analyze the implementation.
 
-<system-reminder>
+---
 Another system reminder with research keyword.
-</system-reminder>`
+---`
 
       const cleanText = removeSystemReminders(text)
       expect(cleanText).toContain("explore")

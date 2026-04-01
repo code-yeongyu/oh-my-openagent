@@ -75,7 +75,7 @@ export function createContextWindowMonitorHook(
     const usedTokens = totalInputTokens.toLocaleString()
     const limitTokens = ANTHROPIC_DISPLAY_LIMIT.toLocaleString()
 
-    output.output += `\n\n${CONTEXT_REMINDER}
+    output.output += `\n\n\n${CONTEXT_REMINDER}
 [Context Status: ${usedPct}% used (${usedTokens}/${limitTokens} tokens), ${remainingPct}% remaining]`
   }
 

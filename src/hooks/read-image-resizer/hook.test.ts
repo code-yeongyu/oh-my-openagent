@@ -1,30 +1,17 @@
 /// <reference types="bun-types" />
 
-import { beforeEach, describe, expect, it, mock } from "bun:test"
+import { beforeEach, describe, expect, it, mock, spyOn, afterEach } from "bun:test"
 import type { PluginInput } from "@opencode-ai/plugin"
 
 import type { ImageDimensions, ResizeResult } from "./types"
+import * as imageDimensionsModule from "./image-dimensions"
+import * as imageResizerModule from "./image-resizer"
+import * as sessionModelStateModule from "../../shared/session-model-state"
 
-const mockParseImageDimensions = mock((): ImageDimensions | null => null)
-const mockCalculateTargetDimensions = mock((): ImageDimensions | null => null)
-const mockResizeImage = mock(async (): Promise<ResizeResult | null> => null)
-const mockGetSessionModel = mock((_sessionID: string) => ({
-  providerID: "anthropic",
-  modelID: "claude-sonnet-4-6",
-} as { providerID: string; modelID: string } | undefined))
-
-mock.module("./image-dimensions", () => ({
-  parseImageDimensions: mockParseImageDimensions,
-}))
-
-mock.module("./image-resizer", () => ({
-  calculateTargetDimensions: mockCalculateTargetDimensions,
-  resizeImage: mockResizeImage,
-}))
-
-mock.module("../../shared/session-model-state", () => ({
-  getSessionModel: mockGetSessionModel,
-}))
+let mockParseImageDimensions: ReturnType<typeof spyOn>
+let mockCalculateTargetDimensions: ReturnType<typeof spyOn>
+let mockResizeImage: ReturnType<typeof spyOn>
+let mockGetSessionModel: ReturnType<typeof spyOn>
 
 import { createReadImageResizerHook } from "./hook"
 
@@ -52,11 +39,17 @@ function createInput(tool: string): { tool: string; sessionID: string; callID: s
 
 describe("createReadImageResizerHook", () => {
   beforeEach(() => {
-    mockParseImageDimensions.mockReset()
-    mockCalculateTargetDimensions.mockReset()
-    mockResizeImage.mockReset()
-    mockGetSessionModel.mockReset()
-    mockGetSessionModel.mockReturnValue({ providerID: "anthropic", modelID: "claude-sonnet-4-6" })
+    mockParseImageDimensions = spyOn(imageDimensionsModule, "parseImageDimensions").mockReturnValue(null as any)
+    mockCalculateTargetDimensions = spyOn(imageResizerModule, "calculateTargetDimensions").mockReturnValue(null as any)
+    mockResizeImage = spyOn(imageResizerModule, "resizeImage").mockResolvedValue(null as any)
+    mockGetSessionModel = spyOn(sessionModelStateModule, "getSessionModel").mockReturnValue({ providerID: "anthropic", modelID: "claude-sonnet-4-6" } as any)
+  })
+
+  afterEach(() => {
+    mockParseImageDimensions.mockRestore()
+    mockCalculateTargetDimensions.mockRestore()
+    mockResizeImage.mockRestore()
+    mockGetSessionModel.mockRestore()
   })
 
   it("skips non-Read tools", async () => {

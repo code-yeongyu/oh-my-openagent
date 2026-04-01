@@ -342,7 +342,7 @@ result = task(..., run_in_background=false)  // Never wait synchronously for exp
 ### Background Result Collection:
 1. Launch parallel agents \u2192 receive task_ids
 2. Continue immediate work
-3. System sends \`<system-reminder>\` on each task completion — then call \`background_output(task_id="...")\`
+3. System sends \`---\` on each task completion — then call \`background_output(task_id="...")\`
 4. Need results not yet ready? **End your response.** The notification will trigger your next turn.
 5. Cleanup: Cancel disposable tasks individually via \`background_cancel(taskId="...")\`
 

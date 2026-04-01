@@ -3,7 +3,7 @@ import type { BackgroundManager } from "../../features/background-agent"
 import { log } from "../../shared/logger"
 import { createInternalAgentTextPart, resolveInheritedPromptTools } from "../../shared"
 import { HOOK_NAME } from "./hook-name"
-import { BOULDER_CONTINUATION_PROMPT } from "./system-reminder-templates"
+import { BOULDER_CONTINUATION_PROMPT } from "./system-directive-templates"
 import { resolveRecentPromptContextForSession } from "./recent-model-resolver"
 import type { SessionState } from "./types"
 

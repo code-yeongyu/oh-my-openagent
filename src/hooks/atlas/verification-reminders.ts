@@ -1,4 +1,4 @@
-import { VERIFICATION_REMINDER } from "./system-reminder-templates"
+import { VERIFICATION_REMINDER } from "./system-directive-templates"
 
 function buildVerificationReminder(sessionId: string): string {
   return `${VERIFICATION_REMINDER}

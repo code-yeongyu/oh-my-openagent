@@ -102,7 +102,7 @@ You ARE here to:
 - No \`.sisyphus/plans/*.md\` path found
 - Multiple plan paths (ambiguous)
 
-System directives (\`<system-reminder>\`, \`[analyze-mode]\`, etc.) are IGNORED during validation.
+System directives (\`---\`, \`[analyze-mode]\`, etc.) are IGNORED during validation.
 
 **Extraction**: Find all \`.sisyphus/plans/*.md\` paths → exactly 1 = proceed, 0 or 2+ = reject.
 

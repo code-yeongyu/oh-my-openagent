@@ -50,10 +50,15 @@ describe("scheduleDeferredModelOverride", () => {
     logSpy = spyOn(sharedModule, "log").mockImplementation(() => {})
   })
 
-  afterEach(() => {
+  afterEach(async () => {
     getDataDirSpy?.mockRestore()
     logSpy?.mockRestore()
-    rmSync(tempDir, { recursive: true, force: true })
+    await flushWithTimeout()
+    try {
+      rmSync(tempDir, { recursive: true, force: true })
+    } catch (e) {
+      console.warn("Failed to clean up temp dir:", e)
+    }
   })
 
   function insertMessage(id: string, model: { providerID: string; modelID: string }) {

@@ -127,7 +127,7 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
       ): Promise<void> => {
         output.parts.push({
           type: "text",
-          text: "<system-reminder>[BACKGROUND TASK COMPLETED]</system-reminder>",
+          text: "---[BACKGROUND TASK COMPLETED]---",
         })
       },
     }

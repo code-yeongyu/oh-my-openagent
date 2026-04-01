@@ -14,7 +14,7 @@ describe("MOMUS_SYSTEM_PROMPT policy requirements", () => {
     // Should mention that system directives are ignored
     expect(prompt.toLowerCase()).toMatch(/system directive.*ignore|ignore.*system directive/)
     // Should give examples of system directive patterns
-    expect(prompt).toMatch(/<system-reminder>|system-reminder/)
+    expect(prompt).toMatch(/---|system-directive/)
   })
 
   test("should extract paths containing .sisyphus/plans/ and ending in .md", () => {

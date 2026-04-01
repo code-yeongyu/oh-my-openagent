@@ -72,8 +72,16 @@ export async function pollSyncSession(
       })
     }
 
-    if (sessionStatus && sessionStatus.type !== "idle") {
-      continue
+    if (sessionStatus) {
+      if (sessionStatus.type === "error" || sessionStatus.type === "retry") {
+        const errMessage = (sessionStatus as { message?: string }).message || "Unknown session error";
+        log("[task] Poll complete - session error detected", { sessionID: input.sessionID, error: errMessage })
+        if (input.toastManager && input.taskId) input.toastManager.removeTask(input.taskId)
+        return `Task failed with session error: ${errMessage}\n\nSession ID: ${input.sessionID}`
+      }
+      if (sessionStatus.type !== "idle") {
+        continue
+      }
     }
 
     let messagesResult: { data?: unknown } | SessionMessage[]

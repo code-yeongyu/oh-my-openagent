@@ -130,6 +130,8 @@ bunx oh-my-opencode run     # Non-interactive session
 
 - Logger writes to `/tmp/oh-my-opencode.log` — check there for debugging
 - Background tasks: 5 concurrent per model/provider (configurable)
+- Root-cause note [2026-03-31]: when `BackgroundManager.notifyParentSession()` sends the `[ALL BACKGROUND TASKS COMPLETE]` synthetic notification with `noReply: false`, the parent session receives a service-only internal user turn (`<system-reminder> ... [ALL BACKGROUND TASKS COMPLETE] ... internal initiator marker`). Gemini can answer with only the internal initiator marker (`<!-- OMO_INTERNAL_INITIATOR -->` / legacy marker variant), which renders as an apparently empty assistant message. This is an OMO orchestration bug, not an upstream empty response. The structural fix is to avoid forcing a model reply for all-complete service notifications, or to keep the internal marker completely out of model-visible text.
+- Fix note [2026-04-01]: `BackgroundManager.notifyParentSession()` now auto-continues when the all-complete notification yields a non-visible assistant reply (empty, marker-only, reasoning-only, or service-only). Detection lives in `src/features/background-agent/parent-session-auto-continue.ts`; the manager retries with a capped continuation prompt that explicitly forbids internal markers/comments and tells the agent to call `background_output` or continue with a visible reply.
 - Plugin load timeout: 10s for Claude Code plugins
 - Model fallback priority: Claude > OpenAI > Gemini > Copilot > OpenCode Zen > Z.ai > Kimi
 - Config migration runs automatically on legacy keys (agent names, hook names, model versions)

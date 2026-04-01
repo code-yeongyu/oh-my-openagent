@@ -237,7 +237,7 @@ boulder.json has been created. Read the plan and begin execution.`
 
           contextInfo += `
 
-<system-reminder>
+---
 ## Multiple Plans Found
 
 Current Time: ${timestamp}
@@ -247,7 +247,7 @@ ${planList}
 
 Ask the user which plan to work on. Present the options above and wait for their response.
 ${worktreeBlock}
-</system-reminder>`
+---`
         }
       }
 

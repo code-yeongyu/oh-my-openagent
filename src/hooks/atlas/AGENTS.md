@@ -34,7 +34,7 @@ session.idle event
 | `atlas-hook.ts` | `createAtlasHook()` — composes event + tool handlers, maintains session state |
 | `event-handler.ts` | `createAtlasEventHandler()` — decision gate for session.idle events |
 | `boulder-continuation-injector.ts` | Build + inject continuation prompt into session |
-| `system-reminder-templates.ts` | Templates for continuation reminder messages |
+| `system-directive-templates.ts` | Templates for continuation reminder messages |
 | `tool-execute-before.ts` | Block write/edit based on session policy |
 | `tool-execute-after.ts` | Inject verification reminders post-tool |
 | `write-edit-tool-policy.ts` | Policy: which sessions can write/edit? |

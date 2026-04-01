@@ -36,7 +36,7 @@ export function createKeywordDetectorHook(ctx: PluginInput, _collector?: Context
 
       const currentAgent = getSessionAgent(input.sessionID) ?? input.agent
 
-      // Remove system-reminder content to prevent automated system messages from triggering mode keywords
+      // Remove system-directive content to prevent automated system messages from triggering mode keywords
       const cleanText = removeSystemReminders(promptText)
       const modelID = input.model?.modelID
       let detectedKeywords = detectKeywordsWithType(cleanText, currentAgent, modelID)

@@ -43,12 +43,15 @@ import { tryFallbackRetry } from "./fallback-retry-handler"
 import { registerManagerForCleanup, unregisterManagerForCleanup } from "./process-cleanup"
 import { isCompactionAgent, findNearestMessageExcludingCompaction } from "./compaction-aware-message-resolver"
 import { handleSessionIdleBackgroundEvent } from "./session-idle-event-handler"
+import { buildAutoContinuePrompt, shouldAutoContinueParentSession } from "./parent-session-auto-continue"
 import { MESSAGE_STORAGE } from "../hook-message-injector"
 import { join } from "node:path"
 import { pruneStaleTasksAndNotifications } from "./task-poller"
 import { checkAndInterruptStaleTasks } from "./task-poller"
 
 type OpencodeClient = PluginInput["client"]
+
+const PARENT_NOTIFICATION_AUTO_CONTINUE_MAX_RETRIES = 2
 
 
 interface MessagePartInfo {
@@ -1267,6 +1270,10 @@ export class BackgroundManager {
       ? Array.from(this.tasks.values())
         .filter(t => t.parentSessionID === task.parentSessionID && t.status !== "running" && t.status !== "pending")
       : []
+    const completedTaskSummaries = (completedTasks.length > 0 ? completedTasks : [task]).map((completedTask) => ({
+      id: completedTask.id,
+      description: completedTask.description,
+    }))
 
     const statusText = task.status === "completed" ? "COMPLETED" : task.status === "interrupt" ? "INTERRUPTED" : "CANCELLED"
     const errorInfo = task.error ? `\n**Error:** ${task.error}` : ""
@@ -1277,17 +1284,22 @@ export class BackgroundManager {
           .map(t => `- \`${t.id}\`: ${t.description}`)
           .join("\n")
 
-        notification = `<system-reminder>
+        notification = `---
 [ALL BACKGROUND TASKS COMPLETE]
 
 **Completed:**
 ${completedTasksText || `- \`${task.id}\`: ${task.description}`}
 
 Use \`background_output(task_id="<id>")\` to retrieve each result.
-</system-reminder>`
+
+System directive: You MUST now call the 'background_output' tool to read the results or continue your work. DO NOT output an empty response.
+
+[SYSTEM DIRECTIVE: OH-MY-OPENCODE - CONTEXT PIN]
+Remember your original role and task. Do not adopt a new persona or abandon the plan.
+---`
     } else {
       // Individual completion - silent notification
-      notification = `<system-reminder>
+      notification = `---
 [BACKGROUND TASK ${statusText}]
 **ID:** \`${task.id}\`
 **Description:** ${task.description}
@@ -1297,7 +1309,7 @@ Use \`background_output(task_id="<id>")\` to retrieve each result.
 Do NOT poll - continue productive work.
 
 Use \`background_output(task_id="${task.id}")\` to retrieve this result when ready.
-</system-reminder>`
+---`
     }
 
       let agent: string | undefined = task.parentAgent
@@ -1356,21 +1368,62 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
         })
 
         try {
-          await this.client.session.promptAsync({
-            path: { id: task.parentSessionID },
-            body: {
+          let promptText = notification
+          let attempt = 0
+
+          while (true) {
+            await this.client.session.promptAsync({
+              path: { id: task.parentSessionID },
+              body: {
+                noReply: !allComplete,
+                ...(agent !== undefined ? { agent } : {}),
+                ...(model !== undefined ? { model } : {}),
+                ...(resolvedTools ? { tools: resolvedTools } : {}),
+                parts: [createInternalAgentTextPart(promptText)],
+              },
+            })
+            log("[background-agent] Sent notification to parent session:", {
+              taskId: task.id,
+              allComplete,
               noReply: !allComplete,
-              ...(agent !== undefined ? { agent } : {}),
-              ...(model !== undefined ? { model } : {}),
-              ...(resolvedTools ? { tools: resolvedTools } : {}),
-              parts: [createInternalAgentTextPart(notification)],
-            },
-          })
-          log("[background-agent] Sent notification to parent session:", {
-            taskId: task.id,
-            allComplete,
-            noReply: !allComplete,
-          })
+              attempt,
+            })
+
+            if (!allComplete) {
+              break
+            }
+
+            const messagesResp = await this.client.session.messages({
+              path: { id: task.parentSessionID },
+            }).catch((error) => {
+              log("[background-agent] Failed to read parent session after notification:", {
+                taskId: task.id,
+                parentSessionID: task.parentSessionID,
+                error: String(error),
+              })
+              return null
+            })
+
+            if (!messagesResp || !shouldAutoContinueParentSession(messagesResp)) {
+              break
+            }
+
+            attempt += 1
+            if (attempt > PARENT_NOTIFICATION_AUTO_CONTINUE_MAX_RETRIES) {
+              log("[background-agent] Auto-continue retry budget exhausted for parent notification:", {
+                taskId: task.id,
+                parentSessionID: task.parentSessionID,
+              })
+              break
+            }
+
+            promptText = buildAutoContinuePrompt(completedTaskSummaries, attempt)
+            log("[background-agent] Auto-continuing parent session after empty/service-only reply:", {
+              taskId: task.id,
+              parentSessionID: task.parentSessionID,
+              attempt,
+            })
+          }
         } catch (error) {
           if (isAbortedSessionError(error)) {
             log("[background-agent] Parent session aborted while sending notification; continuing cleanup:", {

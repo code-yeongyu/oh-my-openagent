@@ -1,9 +1,16 @@
-import { describe, expect, test } from "bun:test"
+import { describe, expect, test, mock } from "bun:test"
+
+mock.module("./connected-providers-cache", () => ({
+  readConnectedProvidersCache: () => null,
+}))
+
 import { resolveModelPipeline } from "./model-resolution-pipeline"
+import { normalizeModel } from "./model-normalization"
 
 describe("resolveModelPipeline", () => {
   test("does not return unused explicit user config metadata in override result", () => {
     // given
+    console.log("NORMALIZE:", normalizeModel("openai/gpt-5.3-codex"))
     const result = resolveModelPipeline({
       intent: {
         userModel: "openai/gpt-5.3-codex",
@@ -12,6 +19,7 @@ describe("resolveModelPipeline", () => {
         availableModels: new Set<string>(),
       },
     })
+    console.log("RESULT:", result)
 
     // when
     const hasExplicitUserConfigField = result
@@ -23,3 +31,4 @@ describe("resolveModelPipeline", () => {
     expect(hasExplicitUserConfigField).toBe(false)
   })
 })
+

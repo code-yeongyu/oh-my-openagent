@@ -65,8 +65,22 @@ export function startCountdown(args: {
     }
   }, 1000)
 
-  state.countdownTimer = setTimeout(() => {
+  state.countdownTimer = setTimeout(async () => {
     sessionStateStore.cancelCountdown(sessionID)
+
+    try {
+      const statusRes = await ctx.client.session.status()
+      const allStatuses = (statusRes as any).data || statusRes || {}
+      const currentStatus = allStatuses[sessionID]
+      
+      if (currentStatus && currentStatus.type !== "idle") {
+        log(`[${HOOK_NAME}] Session is not idle (status: ${currentStatus.type}), cancelling continuation`, { sessionID })
+        return
+      }
+    } catch (e) {
+      log(`[${HOOK_NAME}] Failed to check session status, proceeding anyway`, { sessionID, error: String(e) })
+    }
+
     injectContinuation({
       ctx,
       sessionID,

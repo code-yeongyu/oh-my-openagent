@@ -1,25 +1,19 @@
-import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test"
-
-const mockLogin = mock(() => Promise.resolve({ accessToken: "test-token", expiresAt: 1710000000 }))
-
-mock.module("../../features/mcp-oauth/provider", () => ({
-  McpOAuthProvider: class MockMcpOAuthProvider {
-    constructor(public options: { serverUrl: string; clientId?: string; scopes?: string[] }) {}
-    async login() {
-      return mockLogin()
-    }
-  },
-}))
-
-const { login } = await import("./login")
+import { describe, it, expect, beforeEach, afterEach, spyOn } from "bun:test"
+import { McpOAuthProvider } from "../../features/mcp-oauth/provider"
+import { login } from "./login"
 
 describe("login command", () => {
+  let loginSpy: ReturnType<typeof spyOn>
+
   beforeEach(() => {
-    mockLogin.mockClear()
+    loginSpy = spyOn(McpOAuthProvider.prototype, "login").mockResolvedValue({
+      accessToken: "test-token",
+      expiresAt: 1710000000,
+    } as any)
   })
 
   afterEach(() => {
-    // cleanup
+    loginSpy.mockRestore()
   })
 
   it("returns error code when server-url is not provided", async () => {
@@ -46,7 +40,7 @@ describe("login command", () => {
 
     // then
     expect(exitCode).toBe(0)
-    expect(mockLogin).toHaveBeenCalledTimes(1)
+    expect(loginSpy).toHaveBeenCalledTimes(1)
   })
 
   it("returns error code when login throws", async () => {
@@ -55,7 +49,7 @@ describe("login command", () => {
     const options = {
       serverUrl: "https://oauth.example.com",
     }
-    mockLogin.mockRejectedValueOnce(new Error("Network error"))
+    loginSpy.mockRejectedValueOnce(new Error("Network error"))
 
     // when
     const exitCode = await login(serverName, options)
@@ -78,3 +72,4 @@ describe("login command", () => {
     expect(exitCode).toBe(1)
   })
 })
+

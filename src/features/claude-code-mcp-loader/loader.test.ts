@@ -1,26 +1,29 @@
-import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test"
+import { describe, it, expect, beforeEach, afterEach, spyOn } from "bun:test"
 import { mkdirSync, writeFileSync, rmSync } from "fs"
 import { join } from "path"
 import { tmpdir } from "os"
+import * as osModule from "os"
+import * as claudeConfigDir from "../../shared/claude-config-dir"
+import * as logger from "../../shared/logger"
 
 const TEST_DIR = join(tmpdir(), "mcp-loader-test-" + Date.now())
 const TEST_HOME = join(TEST_DIR, "home")
+
+let homedirSpy: ReturnType<typeof spyOn>
+let getClaudeConfigDirSpy: ReturnType<typeof spyOn>
+let logSpy: ReturnType<typeof spyOn>
 
 describe("getSystemMcpServerNames", () => {
   beforeEach(() => {
     mkdirSync(TEST_DIR, { recursive: true })
     mkdirSync(TEST_HOME, { recursive: true })
-    mock.module("os", () => ({
-      homedir: () => TEST_HOME,
-      tmpdir,
-    }))
-    mock.module("../../shared", () => ({
-      getClaudeConfigDir: () => join(TEST_HOME, ".claude"),
-    }))
+    homedirSpy = spyOn(osModule, "homedir").mockReturnValue(TEST_HOME)
+    getClaudeConfigDirSpy = spyOn(claudeConfigDir, "getClaudeConfigDir").mockReturnValue(join(TEST_HOME, ".claude"))
   })
 
   afterEach(() => {
-    mock.restore()
+    homedirSpy.mockRestore()
+    getClaudeConfigDirSpy.mockRestore()
     rmSync(TEST_DIR, { recursive: true, force: true })
   })
 
@@ -236,20 +239,15 @@ describe("loadMcpConfigs", () => {
   beforeEach(() => {
     mkdirSync(TEST_DIR, { recursive: true })
     mkdirSync(TEST_HOME, { recursive: true })
-    mock.module("os", () => ({
-      homedir: () => TEST_HOME,
-      tmpdir,
-    }))
-    mock.module("../../shared", () => ({
-      getClaudeConfigDir: () => join(TEST_HOME, ".claude"),
-    }))
-    mock.module("../../shared/logger", () => ({
-      log: () => {},
-    }))
+    homedirSpy = spyOn(osModule, "homedir").mockReturnValue(TEST_HOME)
+    getClaudeConfigDirSpy = spyOn(claudeConfigDir, "getClaudeConfigDir").mockReturnValue(join(TEST_HOME, ".claude"))
+    logSpy = spyOn(logger, "log").mockImplementation(() => {})
   })
 
   afterEach(() => {
-    mock.restore()
+    homedirSpy.mockRestore()
+    getClaudeConfigDirSpy.mockRestore()
+    logSpy.mockRestore()
     rmSync(TEST_DIR, { recursive: true, force: true })
   })
 

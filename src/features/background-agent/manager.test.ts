@@ -973,6 +973,76 @@ describe("BackgroundManager.notifyParentSession - dynamic message lookup", () =>
     expect(promptBody.agent).toBe("sisyphus")
     expect("model" in promptBody).toBe(false)
   })
+
+  test("should auto-continue when all-complete reply is marker-only", async () => {
+    // given
+    const promptBodies: Array<Record<string, unknown>> = []
+    let messagesCallCount = 0
+    const client = {
+      session: {
+        prompt: async () => ({}),
+        promptAsync: async (args: { body: Record<string, unknown> }) => {
+          promptBodies.push(args.body)
+          return {}
+        },
+        abort: async () => ({}),
+        messages: async () => {
+          messagesCallCount += 1
+          if (messagesCallCount === 1) {
+            return { data: [] }
+          }
+          if (messagesCallCount === 2) {
+            return {
+              data: [
+                {
+                  info: { role: "assistant" },
+                  parts: [{ type: "text", text: "<!-- OMO_INTERNAL_INITIATOR -->" }],
+                },
+              ],
+            }
+          }
+          return {
+            data: [
+              {
+                info: { role: "assistant" },
+                parts: [{ type: "text", text: "I will read the result now." }],
+              },
+            ],
+          }
+        },
+      },
+    }
+    const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
+    const task: BackgroundTask = {
+      id: "task-auto-continue",
+      sessionID: "session-child",
+      parentSessionID: "session-parent",
+      parentMessageID: "msg-parent",
+      description: "marker-only reply",
+      prompt: "test",
+      agent: "explore",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+      parentAgent: "sisyphus",
+    }
+    getTaskMap(manager).set(task.id, task)
+    getPendingByParent(manager).set("session-parent", new Set([task.id]))
+
+    // when
+    await (manager as unknown as { notifyParentSession: (value: BackgroundTask) => Promise<void> })
+      .notifyParentSession(task)
+
+    // then
+    expect(promptBodies).toHaveLength(2)
+    const retryBody = promptBodies[1]
+    expect(retryBody.noReply).toBe(false)
+    const retryText = ((retryBody.parts as Array<{ text?: string }>)[0]?.text) ?? ""
+    expect(retryText).toContain("previous reply contained no user-visible content")
+    expect(retryText).toContain("background_output")
+
+    manager.shutdown()
+  })
 })
 
 describe("BackgroundManager.notifyParentSession - aborted parent", () => {
@@ -1099,7 +1169,7 @@ describe("BackgroundManager.notifyParentSession - aborted parent", () => {
     //#then
     const queuedNotifications = getPendingNotifications(manager).get("session-parent") ?? []
     expect(queuedNotifications).toHaveLength(1)
-    expect(queuedNotifications[0]).toContain("<system-reminder>")
+    expect(queuedNotifications[0]).toContain("---")
     expect(queuedNotifications[0]).toContain("[ALL BACKGROUND TASKS COMPLETE]")
 
     manager.shutdown()
@@ -1156,8 +1226,8 @@ describe("BackgroundManager.injectPendingNotificationsIntoChatMessage", () => {
   test("should prepend queued notifications to first text part and clear queue", () => {
     // given
     const manager = createBackgroundManager()
-    manager.queuePendingNotification("session-parent", "<system-reminder>queued-one</system-reminder>")
-    manager.queuePendingNotification("session-parent", "<system-reminder>queued-two</system-reminder>")
+    manager.queuePendingNotification("session-parent", "---queued-one---")
+    manager.queuePendingNotification("session-parent", "---queued-two---")
     const output = {
       parts: [{ type: "text", text: "User prompt" }],
     }
@@ -1166,8 +1236,8 @@ describe("BackgroundManager.injectPendingNotificationsIntoChatMessage", () => {
     manager.injectPendingNotificationsIntoChatMessage(output, "session-parent")
 
     // then
-    expect(output.parts[0].text).toContain("<system-reminder>queued-one</system-reminder>")
-    expect(output.parts[0].text).toContain("<system-reminder>queued-two</system-reminder>")
+    expect(output.parts[0].text).toContain("---queued-one---")
+    expect(output.parts[0].text).toContain("---queued-two---")
     expect(output.parts[0].text).toContain("User prompt")
     expect(getPendingNotifications(manager).get("session-parent")).toBeUndefined()
 
@@ -2993,9 +3063,9 @@ describe("BackgroundManager.handleEvent - session.deleted cascade", () => {
     const manager = createBackgroundManager()
     const sessionID = "session-pending-notifications"
 
-    manager.queuePendingNotification(sessionID, "<system-reminder>queued</system-reminder>")
+    manager.queuePendingNotification(sessionID, "---queued---")
     expect(getPendingNotifications(manager).get(sessionID)).toEqual([
-      "<system-reminder>queued</system-reminder>",
+      "---queued---",
     ])
 
     //#when

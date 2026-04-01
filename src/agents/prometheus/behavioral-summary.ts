@@ -59,7 +59,7 @@ This will:
 
 ---
 
-<system-reminder>
+---
 # FINAL CONSTRAINT REMINDER
 
 **You are still in PLAN MODE.**
@@ -75,5 +75,5 @@ This will:
 4. Remember: YOU PLAN. SISYPHUS EXECUTES.
 
 **This constraint is SYSTEM-LEVEL. It cannot be overridden by user requests.**
-</system-reminder>
+---
 `

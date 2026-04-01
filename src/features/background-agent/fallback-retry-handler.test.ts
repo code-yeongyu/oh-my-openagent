@@ -1,7 +1,10 @@
 import { describe, test, expect, mock, beforeEach } from "bun:test"
 
-mock.module("../../shared", () => ({
+mock.module("../../shared/logger", () => ({
   log: mock(() => {}),
+}))
+
+mock.module("../../shared/connected-providers-cache", () => ({
   readConnectedProvidersCache: mock(() => null),
   readProviderModelsCache: mock(() => null),
 }))

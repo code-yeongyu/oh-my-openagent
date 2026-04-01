@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test"
 import { SkillMcpManager } from "./manager"
+import { McpOAuthProvider } from "../mcp-oauth/provider"
 import type { SkillMcpClientInfo, SkillMcpServerContext } from "./types"
 import type { ClaudeCodeMcpServer } from "../claude-code-mcp-loader/types"
 
@@ -22,33 +23,8 @@ mock.module("@modelcontextprotocol/sdk/client/streamableHttp.js", () => ({
   },
 }))
 
-const mockTokens = mock(() => null as { accessToken: string; refreshToken?: string; expiresAt?: number } | null)
-const mockLogin = mock(() => Promise.resolve({ accessToken: "new-token" }))
-
-mock.module("../mcp-oauth/provider", () => ({
-  McpOAuthProvider: class MockMcpOAuthProvider {
-    constructor(public options: { serverUrl: string; clientId?: string; scopes?: string[] }) {}
-    tokens() {
-      return mockTokens()
-    }
-    async login() {
-      return mockLogin()
-    }
-  },
-}))
-
-
-
-
-
-
-
-
-
-
-
-
-
+let mockTokens: ReturnType<typeof spyOn>
+let mockLogin: ReturnType<typeof spyOn>
 
 describe("SkillMcpManager", () => {
   let manager: SkillMcpManager
@@ -57,10 +33,14 @@ describe("SkillMcpManager", () => {
     manager = new SkillMcpManager()
     mockHttpConnect.mockClear()
     mockHttpClose.mockClear()
+    mockTokens = spyOn(McpOAuthProvider.prototype, "tokens").mockReturnValue(null as any)
+    mockLogin = spyOn(McpOAuthProvider.prototype, "login").mockResolvedValue({ accessToken: "new-token" } as any)
   })
 
   afterEach(async () => {
     await manager.disconnectAll()
+    mockTokens.mockRestore()
+    mockLogin.mockRestore()
   })
 
   describe("getOrCreateClient", () => {

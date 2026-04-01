@@ -19,19 +19,21 @@ export function buildBackgroundTaskNotificationText(input: {
       .map((t) => `- \`${t.id}\`: ${t.description}`)
       .join("\n")
 
-    return `<system-reminder>
+    return `---
 [ALL BACKGROUND TASKS COMPLETE]
 
 **Completed:**
 ${completedTasksText || `- \`${task.id}\`: ${task.description}`}
 
 Use \`background_output(task_id="<id>")\` to retrieve each result.
-</system-reminder>`
+
+System directive: You MUST now call the 'background_output' tool to read the results or continue your work. DO NOT output an empty response.
+---`
   }
 
   const agentInfo = task.category ? `${task.agent} (${task.category})` : task.agent
 
-  return `<system-reminder>
+  return `---
 [BACKGROUND TASK ${statusText}]
 **ID:** \`${task.id}\`
 **Description:** ${task.description}
@@ -42,5 +44,5 @@ Use \`background_output(task_id="<id>")\` to retrieve each result.
 Do NOT poll - continue productive work.
 
 Use \`background_output(task_id="${task.id}")\` to retrieve this result when ready.
-</system-reminder>`
+---`
 }

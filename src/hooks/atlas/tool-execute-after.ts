@@ -4,7 +4,7 @@ import { log } from "../../shared/logger"
 import { isCallerOrchestrator } from "../../shared/session-utils"
 import { collectGitDiffStats, formatFileChanges } from "../../shared/git-worktree"
 import { HOOK_NAME } from "./hook-name"
-import { DIRECT_WORK_REMINDER } from "./system-reminder-templates"
+import { DIRECT_WORK_REMINDER } from "./system-directive-templates"
 import { isSisyphusPath } from "./sisyphus-path"
 import { extractSessionIdFromOutput } from "./subagent-session-id"
 import { buildOrchestratorReminder, buildStandaloneVerificationReminder } from "./verification-reminders"
@@ -87,16 +87,16 @@ ${fileChanges}
 
 ${originalResponse}
 
-<system-reminder>
+---
 ${buildOrchestratorReminder(boulderState.plan_name, progress, subagentSessionId, autoCommit)}
-</system-reminder>`
+---`
         log(`[${HOOK_NAME}] Output transformed for orchestrator mode (boulder)`, {
           plan: boulderState.plan_name,
           progress: `${progress.completed}/${progress.total}`,
           fileCount: gitStats.length,
         })
       } else {
-        toolOutput.output += `\n<system-reminder>\n${buildStandaloneVerificationReminder(subagentSessionId)}\n</system-reminder>`
+        toolOutput.output += `\n---\n${buildStandaloneVerificationReminder(subagentSessionId)}\n---`
 
         log(`[${HOOK_NAME}] Verification reminder appended for orchestrator`, {
           sessionID: toolInput.sessionID,

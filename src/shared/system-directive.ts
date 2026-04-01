@@ -30,20 +30,20 @@ export function isSystemDirective(text: string): boolean {
  * Checks if a message contains system-generated content that should be excluded
  * from keyword detection and mode triggering.
  * @param text - The message text to check
- * @returns true if the message contains system-reminder tags
+ * @returns true if the message contains system-directive tags
  */
 export function hasSystemReminder(text: string): boolean {
-  return /<system-reminder>[\s\S]*?<\/system-reminder>/i.test(text)
+  return /---[\s\S]*?---/i.test(text)
 }
 
 /**
- * Removes system-reminder tag content from text.
+ * Removes system-directive tag content from text.
  * This prevents automated system messages from triggering mode keywords.
  * @param text - The message text to clean
- * @returns text with system-reminder content removed
+ * @returns text with system-directive content removed
  */
 export function removeSystemReminders(text: string): string {
-  return text.replace(/<system-reminder>[\s\S]*?<\/system-reminder>/gi, "").trim()
+  return text.replace(/---[\s\S]*?---/gi, "").trim()
 }
 
 export const SystemDirectiveTypes = {
