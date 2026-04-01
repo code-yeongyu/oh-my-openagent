@@ -266,12 +266,12 @@ WHY THIS FORMAT IS MANDATORY:
 function renderPlanAgentCategoryRows(categories: AvailableCategory[]): string[] {
   const sorted = [...categories].sort((a, b) => a.name.localeCompare(b.name))
   return sorted.map((category) => {
-    const bestFor = category.description || category.name
+    const bestFor = category.description || category.displayName || category.name
     const model = category.model || ""
-    const label = category.displayName && category.displayName !== category.name
-      ? `${category.name}\` (${category.displayName})`
-      : `${category.name}\``
-    return `| \`${label} | ${bestFor} | ${model} |`
+    const displaySuffix = category.displayName && category.displayName !== category.name
+      ? ` (${category.displayName})`
+      : ""
+    return `| \`${category.name}\`${displaySuffix} | ${bestFor} | ${model} |`
   })
 }
 
