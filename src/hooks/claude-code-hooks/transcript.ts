@@ -97,6 +97,10 @@ export function clearTranscriptCache(sessionId?: string): void {
   }
 }
 
+export function hasTranscriptCacheEntry(sessionId: string): boolean {
+  return transcriptCache.has(sessionId)
+}
+
 function isCacheValid(entry: TranscriptCacheEntry): boolean {
   return Date.now() - entry.createdAt < TRANSCRIPT_CACHE_TTL_MS
 }

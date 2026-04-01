@@ -1,16 +1,24 @@
 import type { PluginInput } from "@opencode-ai/plugin"
+import type { ContextCollector } from "../../../features/context-injector"
 import { loadClaudeHooksConfig } from "../config"
 import { loadPluginExtendedConfig } from "../config-loader"
 import { executeStopHooks, type StopContext } from "../stop"
+import { clearTranscriptCache } from "../transcript"
+import { clearToolInputCache, stopToolInputCacheCleanup } from "../tool-input-cache"
 import type { PluginConfig } from "../types"
 import { createInternalAgentTextPart, isHookDisabled, log } from "../../../shared"
 import {
+	clearAllSessionHookState,
 	clearSessionHookState,
 	sessionErrorState,
 	sessionInterruptState,
 } from "../session-hook-state"
 
-export function createSessionEventHandler(ctx: PluginInput, config: PluginConfig) {
+export function createSessionEventHandler(
+	ctx: PluginInput,
+	config: PluginConfig,
+	contextCollector?: ContextCollector,
+) {
 	return async (input: { event: { type: string; properties?: unknown } }) => {
 		const { event } = input
 
@@ -30,6 +38,9 @@ export function createSessionEventHandler(ctx: PluginInput, config: PluginConfig
 			const props = event.properties as Record<string, unknown> | undefined
 			const sessionInfo = props?.info as { id?: string } | undefined
 			if (sessionInfo?.id) {
+				clearTranscriptCache(sessionInfo.id)
+				clearToolInputCache(sessionInfo.id)
+				contextCollector?.clear(sessionInfo.id)
 				clearSessionHookState(sessionInfo.id)
 			}
 			return
@@ -108,4 +119,11 @@ export function createSessionEventHandler(ctx: PluginInput, config: PluginConfig
 
 		clearSessionHookState(sessionID)
 	}
+}
+
+export function disposeSessionEventHandler(contextCollector?: ContextCollector): void {
+	clearTranscriptCache()
+	stopToolInputCacheCleanup()
+	contextCollector?.clearAll()
+	clearAllSessionHookState()
 }
