@@ -347,6 +347,38 @@ describe("checkAndInterruptStaleTasks", () => {
     expect(mockClient.session.get).toHaveBeenCalledWith({ path: { id: "ses-1" } })
   })
 
+  it("should NOT cancel task when session.get returns a transient error response", async () => {
+    //#given — repeated missing polls but lookup failed with a retryable transport error
+    const task = createRunningTask({
+      startedAt: new Date(Date.now() - 300_000),
+      progress: {
+        toolCalls: 1,
+        lastUpdate: new Date(Date.now() - 120_000),
+      },
+      consecutiveMissedPolls: 2,
+    })
+
+    mockClient.session.get.mockResolvedValue({
+      error: { message: "Network timeout", status: 500 },
+      data: undefined,
+    })
+
+    //#when
+    await checkAndInterruptStaleTasks({
+      tasks: [task],
+      client: mockClient as never,
+      config: { staleTimeoutMs: 180_000, sessionGoneTimeoutMs: 60_000 },
+      concurrencyManager: mockConcurrencyManager as never,
+      notifyParentSession: mockNotify,
+      sessionStatuses: {},
+    })
+
+    //#then
+    expect(task.status).toBe("running")
+    expect(task.consecutiveMissedPolls).toBe(0)
+    expect(mockClient.session.get).toHaveBeenCalledWith({ path: { id: "ses-1" } })
+  })
+
   it("should use session-gone timeout when session is missing from status map (with progress)", async () => {
     //#given — lastUpdate 2min ago, session completely gone from status
     const task = createRunningTask({
