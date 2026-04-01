@@ -118,6 +118,7 @@ export function createToolExecuteAfterHandler(input: {
     }
     const isBackgroundLaunch = outputStr.includes("Background task launched") || outputStr.includes("Background task continued")
       || outputStr.includes("Background delegate launched")
+      || outputStr.includes("Background agent task launched")
     if (isBackgroundLaunch) {
       return
     }
