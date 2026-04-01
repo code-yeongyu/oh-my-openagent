@@ -1,7 +1,8 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 
 import { parseJsoncSafe } from "../../shared/jsonc-parser"
+import { migrateLegacyPluginEntry } from "../../shared/migrate-legacy-plugin-entry"
 import { getOpenCodeConfigPaths } from "../../shared/opencode-config-dir"
 import { LEGACY_PLUGIN_NAME, PLUGIN_NAME } from "../../shared/plugin-identity"
 
@@ -18,10 +19,6 @@ interface OpenCodeConfig {
 
 function isLegacyEntry(entry: string): boolean {
   return entry === LEGACY_PLUGIN_NAME || entry.startsWith(`${LEGACY_PLUGIN_NAME}@`)
-}
-
-function isCanonicalEntry(entry: string): boolean {
-  return entry === PLUGIN_NAME || entry.startsWith(`${PLUGIN_NAME}@`)
 }
 
 function toLegacyCanonical(entry: string): string {
@@ -60,29 +57,13 @@ export function autoMigrateLegacyPluginEntry(overrideConfigDir?: string): Migrat
     const legacyEntries = plugins.filter(isLegacyEntry)
     if (legacyEntries.length === 0) return { migrated: false, from: null, to: null, configPath }
 
-    const hasCanonical = plugins.some(isCanonicalEntry)
     const from = legacyEntries[0]
     const to = toLegacyCanonical(from)
 
-    const normalized = hasCanonical
-      ? plugins.filter((p) => !isLegacyEntry(p))
-      : plugins.map((p) => (isLegacyEntry(p) ? toLegacyCanonical(p) : p))
-
-    const isJsonc = configPath.endsWith(".jsonc")
-    if (isJsonc) {
-      const pluginArrayRegex = /((?:"plugin"|plugin)\s*:\s*)\[([\s\S]*?)\]/
-      const match = content.match(pluginArrayRegex)
-      if (match) {
-        const formattedPlugins = normalized.map((p) => `"${p}"`).join(",\n    ")
-        const newContent = content.replace(pluginArrayRegex, `$1[\n    ${formattedPlugins}\n  ]`)
-        writeFileSync(configPath, newContent)
-        return { migrated: true, from, to, configPath }
-      }
+    if (!migrateLegacyPluginEntry(configPath)) {
+      return { migrated: false, from: null, to: null, configPath }
     }
 
-    const parsed = JSON.parse(content) as Record<string, unknown>
-    parsed.plugin = normalized
-    writeFileSync(configPath, JSON.stringify(parsed, null, 2) + "\n")
     return { migrated: true, from, to, configPath }
   } catch {
     return { migrated: false, from: null, to: null, configPath }

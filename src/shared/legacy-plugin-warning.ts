@@ -16,20 +16,36 @@ export interface LegacyPluginCheckResult {
   configPath: string | null
 }
 
-function getOpenCodeConfigPath(overrideConfigDir?: string): string | null {
+function getConfigPathFromDirectory(configDir: string): string | null {
+  const jsonPath = join(configDir, "opencode.json")
+  const jsoncPath = join(configDir, "opencode.jsonc")
+
+  if (existsSync(jsoncPath)) return jsoncPath
+  if (existsSync(jsonPath)) return jsonPath
+  return null
+}
+
+function getOpenCodeConfigPathsToCheck(overrideConfigDir?: string, projectDir?: string): string[] {
   if (overrideConfigDir) {
-    const jsonPath = join(overrideConfigDir, "opencode.json")
-    const jsoncPath = join(overrideConfigDir, "opencode.jsonc")
-    if (existsSync(jsoncPath)) return jsoncPath
-    if (existsSync(jsonPath)) return jsonPath
-    return null
+    const overridePath = getConfigPathFromDirectory(overrideConfigDir)
+    return overridePath ? [overridePath] : []
+  }
+
+  const configPaths: string[] = []
+
+  if (projectDir) {
+    const projectConfigPath = getConfigPathFromDirectory(join(projectDir, ".opencode"))
+    if (projectConfigPath) {
+      configPaths.push(projectConfigPath)
+    }
   }
 
   const { configJsonc, configJson } = getOpenCodeConfigPaths({ binary: "opencode", version: null })
 
-  if (existsSync(configJsonc)) return configJsonc
-  if (existsSync(configJson)) return configJson
-  return null
+  if (existsSync(configJsonc)) configPaths.push(configJsonc)
+  else if (existsSync(configJson)) configPaths.push(configJson)
+
+  return configPaths
 }
 
 function isLegacyPluginEntry(entry: string): boolean {
@@ -40,29 +56,51 @@ function isCanonicalPluginEntry(entry: string): boolean {
   return entry === PLUGIN_NAME || entry.startsWith(`${PLUGIN_NAME}@`)
 }
 
-export function checkForLegacyPluginEntry(overrideConfigDir?: string): LegacyPluginCheckResult {
-  const configPath = getOpenCodeConfigPath(overrideConfigDir)
-  if (!configPath) {
+export function checkForLegacyPluginEntry(
+  overrideConfigDir?: string,
+  projectDir?: string,
+): LegacyPluginCheckResult {
+  const configPaths = getOpenCodeConfigPathsToCheck(overrideConfigDir, projectDir)
+  if (configPaths.length === 0) {
     return { hasLegacyEntry: false, hasCanonicalEntry: false, legacyEntries: [], configPath: null }
   }
 
-  try {
-    const content = readFileSync(configPath, "utf-8")
-    const parseResult = parseJsoncSafe<OpenCodeConfig>(content)
-    if (!parseResult.data) {
-      return { hasLegacyEntry: false, hasCanonicalEntry: false, legacyEntries: [], configPath }
-    }
+  let hasCanonicalEntry = false
+  let detectedConfigPath: string | null = null
 
-    const legacyEntries = (parseResult.data.plugin ?? []).filter(isLegacyPluginEntry)
-    const hasCanonicalEntry = (parseResult.data.plugin ?? []).some(isCanonicalPluginEntry)
+  for (const configPath of configPaths) {
+    detectedConfigPath ??= configPath
 
-    return {
-      hasLegacyEntry: legacyEntries.length > 0,
-      hasCanonicalEntry,
-      legacyEntries,
-      configPath,
+    try {
+      const content = readFileSync(configPath, "utf-8")
+      const parseResult = parseJsoncSafe<OpenCodeConfig>(content)
+      if (!parseResult.data) {
+        continue
+      }
+
+      const pluginEntries = parseResult.data.plugin ?? []
+      const legacyEntries = pluginEntries.filter(isLegacyPluginEntry)
+      const fileHasCanonicalEntry = pluginEntries.some(isCanonicalPluginEntry)
+
+      if (legacyEntries.length > 0) {
+        return {
+          hasLegacyEntry: true,
+          hasCanonicalEntry: fileHasCanonicalEntry,
+          legacyEntries,
+          configPath,
+        }
+      }
+
+      hasCanonicalEntry ||= fileHasCanonicalEntry
+    } catch {
+      continue
     }
-  } catch {
-    return { hasLegacyEntry: false, hasCanonicalEntry: false, legacyEntries: [], configPath: null }
+  }
+
+  return {
+    hasLegacyEntry: false,
+    hasCanonicalEntry,
+    legacyEntries: [],
+    configPath: detectedConfigPath,
   }
 }
