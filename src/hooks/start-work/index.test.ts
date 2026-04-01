@@ -1,7 +1,7 @@
 import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test"
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
-import { tmpdir, homedir } from "node:os"
+import { tmpdir } from "node:os"
 import { randomUUID } from "node:crypto"
 import { createStartWorkHook } from "./index"
 import {
@@ -447,6 +447,69 @@ describe("start-work hook", () => {
       // then
       expect(output.message.agent).toBe("Sisyphus (Ultraworker)")
       expect(sessionState.getSessionAgent("ses-prometheus-to-sisyphus")).toBe("sisyphus")
+    })
+
+    test("should fall back to Sisyphus instead of keeping Prometheus when Atlas is unavailable", async () => {
+      // given
+      sessionState._resetForTesting()
+      sessionState.registerAgentName("prometheus")
+      sessionState.registerAgentName("sisyphus")
+      sessionState.updateSessionAgent("ses-prometheus-to-worker", "prometheus")
+
+      const plansDir = join(testDir, ".sisyphus", "plans")
+      mkdirSync(plansDir, { recursive: true })
+      writeFileSync(join(plansDir, "worker-plan.md"), "# Plan\n- [ ] Task 1")
+
+      const hook = createStartWorkHook(createMockPluginInput())
+      const output = {
+        message: {} as Record<string, unknown>,
+        parts: [{ type: "text", text: "<session-context></session-context>" }],
+      }
+
+      // when
+      await hook["chat.message"](
+        { sessionID: "ses-prometheus-to-worker" },
+        output
+      )
+
+      // then
+      expect(output.message.agent).toBe("Sisyphus (Ultraworker)")
+      expect(sessionState.getSessionAgent("ses-prometheus-to-worker")).toBe("sisyphus")
+      expect(readBoulderState(testDir)?.agent).toBe("sisyphus")
+    })
+
+    test("should rewrite stale Prometheus boulder state to Sisyphus when resuming without Atlas", async () => {
+      // given
+      sessionState._resetForTesting()
+      sessionState.registerAgentName("prometheus")
+      sessionState.registerAgentName("sisyphus")
+      sessionState.updateSessionAgent("ses-prometheus-resume", "prometheus")
+
+      const planPath = join(testDir, "resume-plan.md")
+      writeFileSync(planPath, "# Plan\n- [ ] Task 1")
+      writeBoulderState(testDir, {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: ["old-session"],
+        plan_name: "resume-plan",
+        agent: "prometheus",
+      })
+
+      const hook = createStartWorkHook(createMockPluginInput())
+      const output = {
+        message: {} as Record<string, unknown>,
+        parts: [{ type: "text", text: "<session-context></session-context>" }],
+      }
+
+      // when
+      await hook["chat.message"](
+        { sessionID: "ses-prometheus-resume" },
+        output
+      )
+
+      // then
+      expect(output.message.agent).toBe("Sisyphus (Ultraworker)")
+      expect(readBoulderState(testDir)?.agent).toBe("sisyphus")
     })
   })
 

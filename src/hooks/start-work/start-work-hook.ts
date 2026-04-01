@@ -11,7 +11,7 @@ import {
   clearBoulderState,
 } from "../../features/boulder-state"
 import { log } from "../../shared/logger"
-import { getAgentDisplayName } from "../../shared/agent-display-names"
+import { getAgentConfigKey, getAgentDisplayName } from "../../shared/agent-display-names"
 import { getSessionAgent, isAgentRegistered, updateSessionAgent } from "../../features/claude-code-session-state"
 import { detectWorktreePath } from "./worktree-detector"
 import { parseUserRequest } from "./parse-user-request"
@@ -80,9 +80,12 @@ export function createStartWorkHook(ctx: PluginInput) {
       if (!promptText.includes("<session-context>")) return
 
       log(`[${HOOK_NAME}] Processing start-work command`, { sessionID: input.sessionID })
+      const currentSessionAgent = getSessionAgent(input.sessionID)
       const activeAgent = isAgentRegistered("atlas")
         ? "atlas"
-        : getSessionAgent(input.sessionID) ?? "sisyphus"
+        : currentSessionAgent && getAgentConfigKey(currentSessionAgent) !== "prometheus"
+          ? currentSessionAgent
+          : "sisyphus"
       const activeAgentDisplayName = getAgentDisplayName(activeAgent)
       updateSessionAgent(input.sessionID, activeAgent)
       if (output.message) {
@@ -162,17 +165,20 @@ No incomplete plans available. Create a new plan with: /plan "your task"`
 
         if (!progress.isComplete) {
           const effectiveWorktree = worktreePath ?? existingState.worktree_path
+          const sessionAlreadyTracked = existingState.session_ids.includes(sessionId)
+          const updatedSessions = sessionAlreadyTracked
+            ? existingState.session_ids
+            : [...existingState.session_ids, sessionId]
+          const shouldRewriteState = existingState.agent !== activeAgent || worktreePath !== undefined
 
-          if (worktreePath !== undefined) {
-            const updatedSessions = existingState.session_ids.includes(sessionId)
-              ? existingState.session_ids
-              : [...existingState.session_ids, sessionId]
+          if (shouldRewriteState) {
             writeBoulderState(ctx.directory, {
               ...existingState,
-              worktree_path: worktreePath,
+              agent: activeAgent,
+              ...(worktreePath !== undefined ? { worktree_path: worktreePath } : {}),
               session_ids: updatedSessions,
             })
-          } else {
+          } else if (!sessionAlreadyTracked) {
             appendSessionId(ctx.directory, sessionId)
           }
 
