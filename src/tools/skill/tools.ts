@@ -323,8 +323,13 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
 
       const requestedName = args.name.replace(/^\//, "")
 
-      // Check skills first (exact match, case-insensitive)
-      const matchedSkill = skills.find(s => s.name.toLowerCase() === requestedName.toLowerCase())
+      // Check skills first (exact match on full name, then fallback to last segment for frontmatter-name lookups)
+      const lower = requestedName.toLowerCase()
+      const matchedSkill = skills.find(s => s.name.toLowerCase() === lower)
+        ?? skills.find(s => {
+          const segments = s.name.split("/")
+          return segments[segments.length - 1].toLowerCase() === lower
+        })
 
       if (matchedSkill) {
         if (matchedSkill.definition.agent && (!ctx?.agent || matchedSkill.definition.agent !== ctx.agent)) {
