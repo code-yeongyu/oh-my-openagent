@@ -1,10 +1,15 @@
-import { describe, it, expect } from "bun:test"
+import { describe, it, expect, afterEach } from "bun:test"
 import { initDisplayNameOverrides } from "./display-name-initializer"
 import { getAgentDisplayName, setAgentDisplayNameOverrides } from "./agent-display-names"
 import { getCategoryDisplayName, setCategoryDisplayNameOverrides } from "./category-display-names"
 import type { OhMyOpenCodeConfig } from "../config"
 
 describe("initDisplayNameOverrides", () => {
+  afterEach(() => {
+    setAgentDisplayNameOverrides({})
+    setCategoryDisplayNameOverrides({})
+  })
+
   it("#given config with agent display_name #when initDisplayNameOverrides called #then agent override applied", () => {
     // given config with agent display_name
     const config = {
@@ -18,9 +23,6 @@ describe("initDisplayNameOverrides", () => {
 
     // then agent override applied
     expect(getAgentDisplayName("sisyphus")).toBe("Ox (Ultraworker)")
-
-    // cleanup
-    setAgentDisplayNameOverrides({})
   })
 
   it("#given config with category display_name #when initDisplayNameOverrides called #then category override applied", () => {
@@ -36,9 +38,6 @@ describe("initDisplayNameOverrides", () => {
 
     // then category override applied
     expect(getCategoryDisplayName("deep")).toBe("Whale")
-
-    // cleanup
-    setCategoryDisplayNameOverrides({})
   })
 
   it("#given empty config #when initDisplayNameOverrides called #then overrides reset to empty", () => {
@@ -68,8 +67,5 @@ describe("initDisplayNameOverrides", () => {
 
     // then defaults preserved
     expect(getAgentDisplayName("sisyphus")).toBe("Sisyphus (Ultraworker)")
-
-    // cleanup
-    setAgentDisplayNameOverrides({})
   })
 })

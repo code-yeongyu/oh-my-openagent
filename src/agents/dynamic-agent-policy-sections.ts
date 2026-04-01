@@ -64,10 +64,10 @@ export function buildUltraworkSection(
     lines.push("**Categories** (for implementation tasks):")
     for (const category of categories) {
       const shortDescription = category.description || category.name
-      const categoryLabel = category.displayName && category.displayName !== category.name
-        ? `${category.name} (${category.displayName})`
-        : category.name
-      lines.push(`- \`${categoryLabel}\`: ${shortDescription}`)
+      const categorySuffix = category.displayName && category.displayName !== category.name
+        ? ` (${category.displayName})`
+        : ""
+      lines.push(`- \`${category.name}\`${categorySuffix}: ${shortDescription}`)
     }
     lines.push("")
   }

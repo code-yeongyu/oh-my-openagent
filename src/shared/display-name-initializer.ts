@@ -11,7 +11,7 @@ export function initDisplayNameOverrides(pluginConfig: OhMyOpenCodeConfig): void
   const agentOverrides: Record<string, string> = {}
   if (pluginConfig.agents) {
     for (const [agentKey, agentConfig] of Object.entries(pluginConfig.agents)) {
-      if (agentConfig?.display_name) {
+      if (agentConfig?.display_name !== undefined) {
         agentOverrides[agentKey] = agentConfig.display_name
       }
     }
@@ -21,7 +21,7 @@ export function initDisplayNameOverrides(pluginConfig: OhMyOpenCodeConfig): void
   const categoryOverrides: Record<string, string> = {}
   if (pluginConfig.categories) {
     for (const [categoryKey, categoryConfig] of Object.entries(pluginConfig.categories)) {
-      if (categoryConfig?.display_name) {
+      if (categoryConfig?.display_name !== undefined) {
         categoryOverrides[categoryKey] = categoryConfig.display_name
       }
     }

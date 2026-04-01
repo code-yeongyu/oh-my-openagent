@@ -1,4 +1,4 @@
-import { describe, it, expect } from "bun:test"
+import { describe, it, expect, afterEach } from "bun:test"
 import { AGENT_DISPLAY_NAMES, getAgentConfigKey, getAgentDisplayName, getAgentListDisplayName, normalizeAgentForPrompt, normalizeAgentForPromptKey, setAgentDisplayNameOverrides } from "./agent-display-names"
 
 describe("getAgentDisplayName", () => {
@@ -275,6 +275,10 @@ describe("AGENT_DISPLAY_NAMES", () => {
 })
 
 describe("setAgentDisplayNameOverrides", () => {
+  afterEach(() => {
+    setAgentDisplayNameOverrides({})
+  })
+
   it("#given config overrides set #when getAgentDisplayName called #then returns override value", () => {
     // given override for sisyphus
     setAgentDisplayNameOverrides({ sisyphus: "Ox (Ultraworker)" })
@@ -284,9 +288,6 @@ describe("setAgentDisplayNameOverrides", () => {
 
     // then returns override value
     expect(result).toBe("Ox (Ultraworker)")
-
-    // cleanup
-    setAgentDisplayNameOverrides({})
   })
 
   it("#given config overrides set #when getAgentConfigKey called with override name #then resolves to config key", () => {
@@ -298,9 +299,6 @@ describe("setAgentDisplayNameOverrides", () => {
 
     // then resolves to config key
     expect(result).toBe("oracle")
-
-    // cleanup
-    setAgentDisplayNameOverrides({})
   })
 
   it("#given no overrides #when getAgentDisplayName called #then returns hardcoded default", () => {

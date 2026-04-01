@@ -50,11 +50,11 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
   const availableSkills: AvailableSkill[] = options.availableSkills ?? []
 
   const categoryList = availableCategories.map(cat => {
-    const label = cat.displayName && cat.displayName !== cat.name
-      ? `${cat.name} (${cat.displayName})`
-      : cat.name
+    const suffix = cat.displayName && cat.displayName !== cat.name
+      ? ` (${cat.displayName})`
+      : ""
     const desc = cat.description
-    return desc ? `  - ${label}: ${desc}` : `  - ${label}`
+    return desc ? `  - \`${cat.name}\`${suffix}: ${desc}` : `  - \`${cat.name}\`${suffix}`
   }).join("\n")
 
   const description = `Spawn agent task with category-based or direct agent selection.

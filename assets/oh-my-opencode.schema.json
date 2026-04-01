@@ -284,7 +284,8 @@
               "type": "string"
             },
             "display_name": {
-              "type": "string"
+              "type": "string",
+              "minLength": 1
             },
             "mode": {
               "type": "string",
@@ -637,7 +638,8 @@
               "type": "string"
             },
             "display_name": {
-              "type": "string"
+              "type": "string",
+              "minLength": 1
             },
             "mode": {
               "type": "string",
@@ -990,7 +992,8 @@
               "type": "string"
             },
             "display_name": {
-              "type": "string"
+              "type": "string",
+              "minLength": 1
             },
             "mode": {
               "type": "string",
@@ -1343,7 +1346,8 @@
               "type": "string"
             },
             "display_name": {
-              "type": "string"
+              "type": "string",
+              "minLength": 1
             },
             "mode": {
               "type": "string",
@@ -1699,7 +1703,8 @@
               "type": "string"
             },
             "display_name": {
-              "type": "string"
+              "type": "string",
+              "minLength": 1
             },
             "mode": {
               "type": "string",
@@ -2052,7 +2057,8 @@
               "type": "string"
             },
             "display_name": {
-              "type": "string"
+              "type": "string",
+              "minLength": 1
             },
             "mode": {
               "type": "string",
@@ -2405,7 +2411,8 @@
               "type": "string"
             },
             "display_name": {
-              "type": "string"
+              "type": "string",
+              "minLength": 1
             },
             "mode": {
               "type": "string",
@@ -2758,7 +2765,8 @@
               "type": "string"
             },
             "display_name": {
-              "type": "string"
+              "type": "string",
+              "minLength": 1
             },
             "mode": {
               "type": "string",
@@ -3111,7 +3119,8 @@
               "type": "string"
             },
             "display_name": {
-              "type": "string"
+              "type": "string",
+              "minLength": 1
             },
             "mode": {
               "type": "string",
@@ -3464,7 +3473,8 @@
               "type": "string"
             },
             "display_name": {
-              "type": "string"
+              "type": "string",
+              "minLength": 1
             },
             "mode": {
               "type": "string",
@@ -3817,7 +3827,8 @@
               "type": "string"
             },
             "display_name": {
-              "type": "string"
+              "type": "string",
+              "minLength": 1
             },
             "mode": {
               "type": "string",
@@ -4170,7 +4181,8 @@
               "type": "string"
             },
             "display_name": {
-              "type": "string"
+              "type": "string",
+              "minLength": 1
             },
             "mode": {
               "type": "string",
@@ -4523,7 +4535,8 @@
               "type": "string"
             },
             "display_name": {
-              "type": "string"
+              "type": "string",
+              "minLength": 1
             },
             "mode": {
               "type": "string",
@@ -4876,7 +4889,8 @@
               "type": "string"
             },
             "display_name": {
-              "type": "string"
+              "type": "string",
+              "minLength": 1
             },
             "mode": {
               "type": "string",
@@ -5052,7 +5066,8 @@
             "type": "string"
           },
           "display_name": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           },
           "model": {
             "type": "string"

@@ -20,7 +20,7 @@ export const AgentOverrideConfigSchema = z.object({
   disable: z.boolean().optional(),
   description: z.string().optional(),
   /** Custom display name shown in UI and prompts. Overrides the default display name. */
-  display_name: z.string().optional(),
+  display_name: z.string().trim().min(1).optional(),
   mode: z.enum(["subagent", "primary", "all"]).optional(),
   color: z
     .string()

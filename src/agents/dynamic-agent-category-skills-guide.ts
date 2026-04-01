@@ -54,11 +54,11 @@ export function buildCategorySkillsDelegationGuide(
   }
 
   const categoryRows = categories.map((category) => {
-    const label = category.displayName && category.displayName !== category.name
-      ? `${category.name} (${category.displayName})`
-      : category.name
+    const suffix = category.displayName && category.displayName !== category.name
+      ? ` (${category.displayName})`
+      : ""
     const description = category.description || category.name
-    return `- \`${label}\` — ${description}`
+    return `- \`${category.name}\`${suffix} — ${description}`
   })
 
   const customSkills = skills.filter((skill) => skill.location !== "plugin")
