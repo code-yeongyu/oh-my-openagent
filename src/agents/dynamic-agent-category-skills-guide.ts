@@ -57,7 +57,7 @@ export function buildCategorySkillsDelegationGuide(
     const suffix = category.displayName && category.displayName !== category.name
       ? ` (${category.displayName})`
       : ""
-    const description = category.description || category.name
+    const description = category.description?.trim() || category.displayName || category.name
     return `- \`${category.name}\`${suffix} — ${description}`
   })
 

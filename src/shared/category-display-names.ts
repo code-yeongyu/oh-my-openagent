@@ -27,5 +27,5 @@ export function getCategoryConfigKey(displayName: string): string {
   for (const [key, name] of Object.entries(categoryDisplayNameOverrides)) {
     if (name.toLowerCase() === normalized) return key
   }
-  return displayName
+  return normalized
 }

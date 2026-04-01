@@ -95,4 +95,15 @@ describe("getCategoryConfigKey", () => {
     // then returns input as-is
     expect(result).toBe("quick")
   })
+
+  it("#given no overrides #when getCategoryConfigKey called with mixed-case and whitespace #then returns normalized", () => {
+    // given no overrides
+    setCategoryDisplayNameOverrides({})
+
+    // when getCategoryConfigKey called with leading/trailing spaces and mixed casing
+    const result = getCategoryConfigKey("  Quick  ")
+
+    // then returns normalized (trimmed + lowercased)
+    expect(result).toBe("quick")
+  })
 })

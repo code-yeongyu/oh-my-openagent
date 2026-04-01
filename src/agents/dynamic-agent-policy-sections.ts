@@ -63,7 +63,7 @@ export function buildUltraworkSection(
   if (categories.length > 0) {
     lines.push("**Categories** (for implementation tasks):")
     for (const category of categories) {
-      const shortDescription = category.description || category.name
+      const shortDescription = category.description?.trim() || category.displayName || category.name
       const categorySuffix = category.displayName && category.displayName !== category.name
         ? ` (${category.displayName})`
         : ""
