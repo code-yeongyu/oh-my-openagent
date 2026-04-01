@@ -42,6 +42,9 @@ export class ZellijAdapter implements Multiplexer {
     if (loaded) {
       this.anchorPaneId = loaded.anchorPaneId
       this.hasCreatedFirstPane = loaded.hasCreatedFirstPane
+      this.anchorReadyPromise = null
+      this.anchorReadyResolver = null
+      this.labelToSpawned.clear()
       log("[ZellijAdapter.setSessionID] loaded persisted state", {
         sessionID,
         anchorPaneId: this.anchorPaneId,

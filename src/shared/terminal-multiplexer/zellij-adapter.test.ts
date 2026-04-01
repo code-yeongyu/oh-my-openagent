@@ -174,17 +174,6 @@ describe("ZellijAdapter", () => {
       //#then
       expect(Array.isArray(panes)).toBe(true)
     })
-
-    it("returns array of panes", async () => {
-      //#given
-      const adapter = makeAdapter()
-
-      //#when
-      const panes = await adapter.getPanes()
-
-      //#then
-      expect(Array.isArray(panes)).toBe(true)
-    })
   })
 
   describe("setSessionID", () => {
