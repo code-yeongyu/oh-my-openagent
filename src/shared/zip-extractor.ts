@@ -1,6 +1,9 @@
 import { spawn, spawnSync } from "bun"
 import { release } from "os"
 
+import { validateArchiveEntries } from "./archive-entry-validator"
+import { listZipEntriesWithPowerShell, listZipEntriesWithTar } from "./zip-entry-listing"
+
 const WINDOWS_BUILD_WITH_TAR = 17134
 
 function getWindowsBuildNumber(): number | null {
@@ -41,6 +44,9 @@ function getWindowsZipExtractor(): WindowsZipExtractor {
 }
 
 export async function extractZip(archivePath: string, destDir: string): Promise<void> {
+  const entries = await listZipEntries(archivePath)
+  validateArchiveEntries(entries, destDir)
+
   let proc
   
   if (process.platform === "win32") {
@@ -80,4 +86,17 @@ export async function extractZip(archivePath: string, destDir: string): Promise<
     const stderr = await new Response(proc.stderr).text()
     throw new Error(`zip extraction failed (exit ${exitCode}): ${stderr}`)
   }
+}
+
+async function listZipEntries(archivePath: string) {
+  if (process.platform === "win32") {
+    const extractor = getWindowsZipExtractor()
+    if (extractor === "tar") {
+      return listZipEntriesWithTar(archivePath)
+    }
+
+    return listZipEntriesWithPowerShell(archivePath, escapePowerShellPath, extractor)
+  }
+
+  return listZipEntriesWithTar(archivePath)
 }
