@@ -9,7 +9,7 @@ type RemoteMcpConfig = {
   oauth?: false
 }
 
-export function createWebsearchConfig(config?: WebsearchConfig): RemoteMcpConfig {
+export function createWebsearchConfig(config?: WebsearchConfig): RemoteMcpConfig | undefined {
   const provider = config?.provider || "exa"
 
   if (provider === "tavily") {
