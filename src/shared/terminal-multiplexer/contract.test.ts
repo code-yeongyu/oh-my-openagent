@@ -212,6 +212,7 @@ describe.each([
 
       //#then
       expect(Array.isArray(panes)).toBe(true)
+      expect(panes.length).toBeGreaterThan(0)
       for (const pane of panes) {
         expect(pane.label).toBeDefined()
         expect(typeof pane.label).toBe("string")

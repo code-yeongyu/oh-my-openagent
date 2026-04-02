@@ -159,7 +159,12 @@ export class ZellijAdapter implements Multiplexer {
         fullCommand: zellijCmd.join(" "),
       })
 
-      await proc.exited
+      const exitCode = await proc.exited
+
+      if (exitCode !== 0) {
+        const stderr = await new Response(proc.stderr).text()
+        throw new Error(`zellij new-pane failed with exit code ${exitCode}: ${stderr.trim()}`)
+      }
 
       const maxAttempts = 10
       for (let i = 0; i < maxAttempts; i++) {

@@ -32,8 +32,22 @@ export function loadZellijState(sessionID: string): ZellijState | null {
 
   try {
     const content = readFileSync(filePath, "utf-8")
-    const state = JSON.parse(content) as ZellijState
-    return state
+    const parsed: unknown = JSON.parse(content)
+
+    const record = parsed as Record<string, unknown>
+    const anchorPaneId = record.anchorPaneId
+    if (
+      typeof parsed !== "object" ||
+      parsed === null ||
+      typeof record.sessionID !== "string" ||
+      (typeof anchorPaneId !== "string" && anchorPaneId !== null) ||
+      typeof record.hasCreatedFirstPane !== "boolean" ||
+      typeof record.updatedAt !== "number"
+    ) {
+      return null
+    }
+
+    return parsed as ZellijState
   } catch {
     return null
   }

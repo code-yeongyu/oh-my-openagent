@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test"
-import { existsSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, rmSync, writeFileSync, mkdirSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 
@@ -186,5 +186,22 @@ describe("zellij-storage", () => {
 
     const result = loadZellijState("empty-file-test")
     expect(result).toBeNull()
+  })
+
+  it("loadZellijState returns null for valid JSON with wrong shape", () => {
+    const storagePath = join(testStorageDir, "zellij-adapter", "wrong-shape-test.json")
+    mkdirSync(join(testStorageDir, "zellij-adapter"), { recursive: true })
+
+    writeFileSync(storagePath, JSON.stringify({ foo: "bar", count: 42 }))
+    expect(loadZellijState("wrong-shape-test")).toBeNull()
+
+    writeFileSync(storagePath, JSON.stringify({ sessionID: 123, anchorPaneId: null, hasCreatedFirstPane: true, updatedAt: 1000 }))
+    expect(loadZellijState("wrong-shape-test")).toBeNull()
+
+    writeFileSync(storagePath, JSON.stringify({ sessionID: "ok", anchorPaneId: null, hasCreatedFirstPane: "not-bool", updatedAt: 1000 }))
+    expect(loadZellijState("wrong-shape-test")).toBeNull()
+
+    writeFileSync(storagePath, JSON.stringify([1, 2, 3]))
+    expect(loadZellijState("wrong-shape-test")).toBeNull()
   })
 })
