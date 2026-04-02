@@ -70,10 +70,10 @@ jobs:
           bun test src/hooks/session-recovery/recover-tool-result-missing.test.ts
           # legacy-plugin-toast mock isolation (hook.test.ts mocks ./auto-migrate)
           bun test src/hooks/legacy-plugin-toast/hook.test.ts
-          # src/plugin — ALL isolated (mock.module pollution crosses between files)
-          for f in src/plugin/*.test.ts; do bun test "$f"; done
-          # src/features/background-agent — ALL isolated (mock.module pollution)
-          for f in src/features/background-agent/*.test.ts; do bun test "$f"; done
+          # src/plugin - ALL isolated (mock.module pollution crosses between files)
+          for f in $(find src/plugin -name '*.test.ts' | sort); do bun test "$f"; done
+          # src/features/background-agent - ALL isolated (mock.module pollution)
+          for f in $(find src/features/background-agent -name '*.test.ts' | sort); do bun test "$f"; done
 
       - name: Run remaining tests
         run: |
