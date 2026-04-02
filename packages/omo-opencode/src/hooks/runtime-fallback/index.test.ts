@@ -2790,7 +2790,7 @@ describe("runtime-fallback", () => {
           },
         }),
         {
-          config: createMockConfig({ notify_on_fallback: false }),
+          config: createMockConfig({ notify_on_fallback: false, retry_on_errors: [402] }),
           pluginConfig: createMockPluginConfigWithAgentFallback("atlas", ["zai-coding-plan/glm-5"]),
         },
       )
@@ -2802,7 +2802,7 @@ describe("runtime-fallback", () => {
           properties: {
             sessionID,
             model: "chutes/moonshotai/Kimi-K2.5-TEE",
-            error: { statusCode: 402, message: "Payment Required" },
+            error: { statusCode: 402, message: "unexpected upstream status" },
             agent: "atlas",
           },
         },
