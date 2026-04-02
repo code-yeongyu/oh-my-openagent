@@ -16,8 +16,7 @@ function createSystemInfo(): SystemInfo {
 
 function createTools(): ToolsSummary {
   return {
-    lspInstalled: 1,
-    lspTotal: 4,
+    lspServers: [{ id: "typescript", extensions: [".ts", ".tsx", ".js", ".jsx"] }],
     astGrepCli: true,
     astGrepNapi: false,
     commentChecker: true,

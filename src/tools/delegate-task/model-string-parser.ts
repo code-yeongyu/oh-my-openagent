@@ -4,12 +4,13 @@ const KNOWN_VARIANTS = new Set([
   "high",
   "xhigh",
   "max",
+  "minimal",
   "none",
   "auto",
   "thinking",
 ])
 
-function parseVariantFromModelID(rawModelID: string): { modelID: string; variant?: string } {
+export function parseVariantFromModelID(rawModelID: string): { modelID: string; variant?: string } {
   const trimmedModelID = rawModelID.trim()
   if (!trimmedModelID) {
     return { modelID: "" }

@@ -146,6 +146,19 @@ describe("think-mode switcher", () => {
         expect(getHighVariant("custom-llm/gemini-3.1-pro")).toBe("custom-llm/gemini-3-1-pro-high")
       })
 
+      it("should handle multi-slash model IDs (#2852)", () => {
+        // given model IDs with multiple slashes (e.g. aws/anthropic/claude-sonnet-4)
+        const variant = getHighVariant("aws/anthropic/claude-sonnet-4-6")
+
+        // then should split at last slash, preserving full provider prefix
+        expect(variant).toBe("aws/anthropic/claude-sonnet-4-6-high")
+      })
+
+      it("should return null for multi-slash unknown models", () => {
+        // given multi-slash model ID without high variant mapping
+        expect(getHighVariant("aws/anthropic/unknown-model")).toBeNull()
+      })
+
       it("should return null for prefixed models without high variant mapping", () => {
         // given prefixed model IDs without high variant mapping
         expect(getHighVariant("vertex_ai/unknown-model")).toBeNull()

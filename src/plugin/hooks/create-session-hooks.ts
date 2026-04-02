@@ -16,7 +16,6 @@ import {
   createRalphLoopHook,
   createEditErrorRecoveryHook,
   createDelegateTaskRetryHook,
-  createDelegateTaskEnglishDirectiveHook,
   createTaskResumeInfoHook,
   createStartWorkHook,
   createPrometheusMdOnlyHook,
@@ -26,6 +25,7 @@ import {
   createQuestionLabelTruncatorHook,
   createPreemptiveCompactionHook,
   createRuntimeFallbackHook,
+  createLegacyPluginToastHook,
 } from "../../hooks"
 import { createAnthropicEffortHook } from "../../hooks/anthropic-effort"
 import {
@@ -61,7 +61,7 @@ export type SessionHooks = {
   taskResumeInfo: ReturnType<typeof createTaskResumeInfoHook> | null
   anthropicEffort: ReturnType<typeof createAnthropicEffortHook> | null
   runtimeFallback: ReturnType<typeof createRuntimeFallbackHook> | null
-  delegateTaskEnglishDirective: ReturnType<typeof createDelegateTaskEnglishDirectiveHook> | null
+  legacyPluginToast: ReturnType<typeof createLegacyPluginToastHook> | null
 }
 
 export function createSessionHooks(args: {
@@ -155,7 +155,7 @@ export function createSessionHooks(args: {
 
   // Model fallback hook (configurable via model_fallback config + disabled_hooks)
   // This handles automatic model switching when model errors occur
-  const isModelFallbackConfigEnabled = pluginConfig.model_fallback ?? true
+  const isModelFallbackConfigEnabled = pluginConfig.model_fallback ?? false
   const modelFallback = isModelFallbackConfigEnabled && isHookEnabled("model-fallback")
     ? safeHook("model-fallback", () =>
       createModelFallbackHook({
@@ -186,6 +186,7 @@ export function createSessionHooks(args: {
           showStartupToast: isHookEnabled("startup-toast"),
           isSisyphusEnabled: pluginConfig.sisyphus_agent?.disabled !== true,
           autoUpdate: pluginConfig.auto_update ?? true,
+          modelCapabilities: pluginConfig.model_capabilities,
         }))
     : null
 
@@ -215,10 +216,6 @@ export function createSessionHooks(args: {
 
   const delegateTaskRetry = isHookEnabled("delegate-task-retry")
     ? safeHook("delegate-task-retry", () => createDelegateTaskRetryHook(ctx))
-    : null
-
-  const delegateTaskEnglishDirective = isHookEnabled("delegate-task-english-directive")
-    ? safeHook("delegate-task-english-directive", () => createDelegateTaskEnglishDirectiveHook())
     : null
 
   const startWork = isHookEnabled("start-work")
@@ -267,6 +264,11 @@ export function createSessionHooks(args: {
           pluginConfig,
         }))
     : null
+
+  const legacyPluginToast = isHookEnabled("legacy-plugin-toast")
+    ? safeHook("legacy-plugin-toast", () => createLegacyPluginToastHook(ctx))
+    : null
+
   return {
     contextWindowMonitor,
     preemptiveCompaction,
@@ -282,7 +284,6 @@ export function createSessionHooks(args: {
     ralphLoop,
     editErrorRecovery,
     delegateTaskRetry,
-    delegateTaskEnglishDirective,
     startWork,
     prometheusMdOnly,
     sisyphusJuniorNotepad,
@@ -292,5 +293,6 @@ export function createSessionHooks(args: {
     taskResumeInfo,
     anthropicEffort,
     runtimeFallback,
+    legacyPluginToast,
   }
 }

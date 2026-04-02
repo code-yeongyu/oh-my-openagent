@@ -2,6 +2,7 @@ import type { CategoryConfig, CategoriesConfig } from "../../config/schema"
 import { DEFAULT_CATEGORIES, CATEGORY_PROMPT_APPENDS } from "./constants"
 import { resolveModel } from "../../shared/model-resolver"
 import { isModelAvailable } from "../../shared/model-availability"
+import { normalizeModel } from "../../shared/model-normalization"
 import { CATEGORY_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
 import { log } from "../../shared/logger"
 
@@ -16,6 +17,7 @@ export interface ResolveCategoryConfigResult {
   config: CategoryConfig
   promptAppend: string
   model: string | undefined
+  isUserConfiguredModel: boolean
 }
 
 /**
@@ -56,6 +58,7 @@ export function resolveCategoryConfig(
     inheritedModel: defaultConfig?.model, // Category's built-in model takes precedence over system default
     systemDefault: systemDefaultModel,
   })
+  const isUserConfiguredModel = normalizeModel(userConfig?.model) !== undefined
   const config: CategoryConfig = {
     ...defaultConfig,
     ...userConfig,
@@ -70,5 +73,5 @@ export function resolveCategoryConfig(
       : userConfig.prompt_append
   }
 
-  return { config, promptAppend, model }
+  return { config, promptAppend, model, isUserConfiguredModel }
 }

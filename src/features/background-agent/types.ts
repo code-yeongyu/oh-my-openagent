@@ -1,4 +1,5 @@
 import type { FallbackEntry } from "../../shared/model-requirements"
+import type { DelegatedModelConfig } from "../../shared/model-resolution-types"
 import type { SessionPermissionRule } from "../../shared/question-denied-session-permission"
 
 export type BackgroundTaskStatus =
@@ -9,9 +10,17 @@ export type BackgroundTaskStatus =
   | "cancelled"
   | "interrupt"
 
+export interface ToolCallWindow {
+  lastSignature: string
+  consecutiveCount: number
+  threshold: number
+}
+
 export interface TaskProgress {
   toolCalls: number
   lastTool?: string
+  toolCallWindow?: ToolCallWindow
+  countedToolPartIDs?: Set<string>
   lastUpdate: Date
   lastMessage?: string
   lastMessageAt?: Date
@@ -35,7 +44,7 @@ export interface BackgroundTask {
   error?: string
   progress?: TaskProgress
   parentModel?: { providerID: string; modelID: string }
-  model?: { providerID: string; modelID: string; variant?: string }
+  model?: DelegatedModelConfig
   /** Fallback chain for runtime retry on model errors */
   fallbackChain?: FallbackEntry[]
   /** Number of fallback retry attempts made */
@@ -57,6 +66,8 @@ export interface BackgroundTask {
   lastMsgCount?: number
   /** Number of consecutive polls with stable message count */
   stablePolls?: number
+  /** Number of consecutive polls where session was missing from status map */
+  consecutiveMissedPolls?: number
 }
 
 export interface LaunchInput {
@@ -68,7 +79,7 @@ export interface LaunchInput {
   parentModel?: { providerID: string; modelID: string }
   parentAgent?: string
   parentTools?: Record<string, boolean>
-  model?: { providerID: string; modelID: string; variant?: string }
+  model?: DelegatedModelConfig
   /** Fallback chain for runtime retry on model errors */
   fallbackChain?: FallbackEntry[]
   isUnstableAgent?: boolean

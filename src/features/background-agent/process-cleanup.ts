@@ -4,14 +4,17 @@ type ProcessCleanupEvent = NodeJS.Signals | "beforeExit" | "exit"
 
 function registerProcessSignal(
   signal: ProcessCleanupEvent,
-  handler: () => void,
+  handler: () => void | Promise<void>,
   exitAfter: boolean
 ): () => void {
   const listener = () => {
-    handler()
+    const cleanupResult = handler()
     if (exitAfter) {
       process.exitCode = 0
-      setTimeout(() => process.exit(), 6000).unref()
+      const exitTimeout = setTimeout(() => process.exit(), 6000)
+      void Promise.resolve(cleanupResult).finally(() => {
+        clearTimeout(exitTimeout)
+      })
     }
   }
   process.on(signal, listener)
@@ -32,16 +35,28 @@ export function registerManagerForCleanup(manager: CleanupTarget): void {
   if (cleanupRegistered) return
   cleanupRegistered = true
 
-  const cleanupAll = () => {
+  let cleanupPromise: Promise<void> | undefined
+
+  const cleanupAll = (): Promise<void> => {
+    if (cleanupPromise) return cleanupPromise
+    const promises: Promise<void>[] = []
     for (const m of cleanupManagers) {
       try {
-        void Promise.resolve(m.shutdown()).catch((error) => {
-          log("[background-agent] Error during async shutdown cleanup:", error)
-        })
+        promises.push(
+          Promise.resolve(m.shutdown()).catch((error) => {
+            log("[background-agent] Error during async shutdown cleanup:", error)
+          })
+        )
       } catch (error) {
         log("[background-agent] Error during shutdown cleanup:", error)
       }
     }
+    cleanupPromise = Promise.allSettled(promises).then(() => {})
+    cleanupPromise.then(() => {
+      log("[background-agent] All shutdown cleanup completed")
+    })
+
+    return cleanupPromise
   }
 
   const registerSignal = (signal: ProcessCleanupEvent, exitAfter: boolean): void => {

@@ -1,7 +1,6 @@
 import process from "node:process"
 
 const DEFAULT_ANTHROPIC_ACTUAL_LIMIT = 200_000
-
 export type ContextLimitModelCacheState = {
   anthropicContext1MEnabled: boolean
   modelContextLimitsCache?: Map<string, number>
@@ -20,13 +19,23 @@ function getAnthropicActualLimit(modelCacheState?: ContextLimitModelCacheState):
     : DEFAULT_ANTHROPIC_ACTUAL_LIMIT
 }
 
+function supportsCachedAnthropicLimit(modelID: string): boolean {
+  return /^claude-(opus|sonnet)-4(?:-|\.)6(?:-high)?$/.test(modelID)
+}
+
 export function resolveActualContextLimit(
   providerID: string,
   modelID: string,
   modelCacheState?: ContextLimitModelCacheState,
 ): number | null {
   if (isAnthropicProvider(providerID)) {
-    return getAnthropicActualLimit(modelCacheState)
+    const explicit1M = getAnthropicActualLimit(modelCacheState)
+    if (explicit1M === 1_000_000) return explicit1M
+
+    const cachedLimit = modelCacheState?.modelContextLimitsCache?.get(`${providerID}/${modelID}`)
+    if (cachedLimit && supportsCachedAnthropicLimit(modelID)) return cachedLimit
+
+    return DEFAULT_ANTHROPIC_ACTUAL_LIMIT
   }
 
   return modelCacheState?.modelContextLimitsCache?.get(`${providerID}/${modelID}`) ?? null

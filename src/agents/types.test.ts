@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import { isGptModel, isGeminiModel, isGpt5_4Model } from "./types";
+import { isGptModel, isGeminiModel, isGlmModel, isGpt5_4Model, isMiniMaxModel } from "./types";
 
 describe("isGpt5_4Model", () => {
   test("detects gpt-5.4 models", () => {
@@ -76,6 +76,48 @@ describe("isGptModel", () => {
 
   test("opencode provider is not gpt", () => {
     expect(isGptModel("opencode/claude-opus-4-6")).toBe(false);
+  });
+});
+
+describe("isMiniMaxModel", () => {
+  test("detects minimax models with provider prefix", () => {
+    expect(isMiniMaxModel("opencode-go/minimax-m2.7")).toBe(true);
+    expect(isMiniMaxModel("opencode/minimax-m2.7-highspeed")).toBe(true);
+    expect(isMiniMaxModel("opencode-go/minimax-m2.5")).toBe(true);
+    expect(isMiniMaxModel("opencode/minimax-m2.5-free")).toBe(true);
+  });
+
+  test("detects minimax models without provider prefix", () => {
+    expect(isMiniMaxModel("minimax-m2.7")).toBe(true);
+    expect(isMiniMaxModel("minimax-m2.7-highspeed")).toBe(true);
+    expect(isMiniMaxModel("minimax-m2.5")).toBe(true);
+  });
+
+  test("does not match non-minimax models", () => {
+    expect(isMiniMaxModel("openai/gpt-5.4")).toBe(false);
+    expect(isMiniMaxModel("anthropic/claude-opus-4-6")).toBe(false);
+    expect(isMiniMaxModel("google/gemini-3.1-pro")).toBe(false);
+    expect(isMiniMaxModel("opencode-go/kimi-k2.5")).toBe(false);
+  });
+});
+
+describe("isGlmModel", () => {
+  test("#given GLM models with provider prefix #then returns true", () => {
+    expect(isGlmModel("z-ai/glm-5")).toBe(true);
+    expect(isGlmModel("opencode/glm-5")).toBe(true);
+    expect(isGlmModel("opencode-go/glm-5-turbo")).toBe(true);
+    expect(isGlmModel("opencode/glm-4.6v")).toBe(true);
+  });
+
+  test("#given GLM models without provider prefix #then returns true", () => {
+    expect(isGlmModel("glm-5")).toBe(true);
+    expect(isGlmModel("glm-5-turbo")).toBe(true);
+  });
+
+  test("#given non-GLM models #then returns false", () => {
+    expect(isGlmModel("openai/gpt-5.4")).toBe(false);
+    expect(isGlmModel("anthropic/claude-opus-4-6")).toBe(false);
+    expect(isGlmModel("google/gemini-3.1-pro")).toBe(false);
   });
 });
 

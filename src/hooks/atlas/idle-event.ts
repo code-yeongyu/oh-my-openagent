@@ -1,5 +1,12 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { getPlanProgress, readBoulderState } from "../../features/boulder-state"
+import {
+  getPlanProgress,
+  getTaskSessionState,
+  readBoulderState,
+  readCurrentTopLevelTask,
+} from "../../features/boulder-state"
+import { getSessionAgent, isAgentRegistered, subagentSessions } from "../../features/claude-code-session-state"
+import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { log } from "../../shared/logger"
 import { injectBoulderContinuation } from "./boulder-continuation-injector"
 import { HOOK_NAME } from "./hook-name"
@@ -8,6 +15,7 @@ import type { AtlasHookOptions, SessionState } from "./types"
 
 const CONTINUATION_COOLDOWN_MS = 5000
 const FAILURE_BACKOFF_MS = 5 * 60 * 1000
+const MAX_CONSECUTIVE_PROMPT_FAILURES = 10
 const RETRY_DELAY_MS = CONTINUATION_COOLDOWN_MS + 1000
 
 function hasRunningBackgroundTasks(sessionID: string, options?: AtlasHookOptions): boolean {
@@ -31,6 +39,14 @@ async function injectContinuation(input: {
   input.sessionState.lastContinuationInjectedAt = Date.now()
 
   try {
+    const currentBoulder = readBoulderState(input.ctx.directory)
+    const currentTask = currentBoulder
+      ? readCurrentTopLevelTask(currentBoulder.active_plan)
+      : null
+    const preferredTaskSession = currentTask
+      ? getTaskSessionState(input.ctx.directory, currentTask.key)
+      : null
+
     await injectBoulderContinuation({
       ctx: input.ctx,
       sessionID: input.sessionID,
@@ -39,6 +55,8 @@ async function injectContinuation(input: {
       total: input.progress.total,
       agent: input.agent,
       worktreePath: input.worktreePath,
+      preferredTaskSessionId: preferredTaskSession?.session_id,
+      preferredTaskTitle: preferredTaskSession?.task_title,
       backgroundManager: input.options?.backgroundManager,
       sessionState: input.sessionState,
     })
@@ -62,7 +80,7 @@ function scheduleRetry(input: {
   sessionState.pendingRetryTimer = setTimeout(async () => {
     sessionState.pendingRetryTimer = undefined
 
-    if (sessionState.promptFailureCount >= 2) return
+    if (sessionState.promptFailureCount >= MAX_CONSECUTIVE_PROMPT_FAILURES) return
     if (sessionState.waitingForFinalWaveApproval) return
 
     const currentBoulder = readBoulderState(ctx.directory)
@@ -72,7 +90,6 @@ function scheduleRetry(input: {
     const currentProgress = getPlanProgress(currentBoulder.active_plan)
     if (currentProgress.isComplete) return
     if (options?.isContinuationStopped?.(sessionID)) return
-    if (options?.shouldSkipContinuation?.(sessionID)) return
     if (hasRunningBackgroundTasks(sessionID, options)) return
 
     await injectContinuation({
@@ -121,6 +138,31 @@ export async function handleAtlasSessionIdle(input: {
     })
   }
 
+  if (subagentSessions.has(sessionID)) {
+    const sessionAgent = getSessionAgent(sessionID)
+    const agentKey = getAgentConfigKey(sessionAgent ?? "")
+    const requiredAgentName = boulderState.agent ?? (isAgentRegistered("atlas") ? "atlas" : undefined)
+    if (!requiredAgentName || !isAgentRegistered(requiredAgentName)) {
+      log(`[${HOOK_NAME}] Skipped: boulder agent is unavailable for continuation`, {
+        sessionID,
+        requiredAgent: boulderState.agent ?? "unknown",
+      })
+      return
+    }
+    const requiredAgentKey = getAgentConfigKey(requiredAgentName)
+    const agentMatches =
+      agentKey === requiredAgentKey ||
+      (requiredAgentKey === getAgentConfigKey("atlas") && agentKey === getAgentConfigKey("sisyphus"))
+    if (!agentMatches) {
+      log(`[${HOOK_NAME}] Skipped: subagent agent does not match boulder agent`, {
+        sessionID,
+        agent: sessionAgent ?? "unknown",
+          requiredAgent: requiredAgentName,
+        })
+        return
+      }
+  }
+
   const sessionState = getState(sessionID)
   const now = Date.now()
 
@@ -135,7 +177,7 @@ export async function handleAtlasSessionIdle(input: {
     return
   }
 
-  if (sessionState.promptFailureCount >= 2) {
+  if (sessionState.promptFailureCount >= MAX_CONSECUTIVE_PROMPT_FAILURES) {
     const timeSinceLastFailure =
       sessionState.lastFailureAt !== undefined ? now - sessionState.lastFailureAt : Number.POSITIVE_INFINITY
     if (timeSinceLastFailure < FAILURE_BACKOFF_MS) {
@@ -158,11 +200,6 @@ export async function handleAtlasSessionIdle(input: {
 
   if (options?.isContinuationStopped?.(sessionID)) {
     log(`[${HOOK_NAME}] Skipped: continuation stopped for session`, { sessionID })
-    return
-  }
-
-  if (options?.shouldSkipContinuation?.(sessionID)) {
-    log(`[${HOOK_NAME}] Skipped: another continuation hook already injected`, { sessionID })
     return
   }
 

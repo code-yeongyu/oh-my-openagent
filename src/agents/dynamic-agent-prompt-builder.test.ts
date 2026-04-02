@@ -181,7 +181,7 @@ describe("buildParallelDelegationSection", () => {
 
   it("#given non-Claude model with deep category #when building #then returns aggressive delegation section", () => {
     //#given
-    const model = "google/gemini-3-pro"
+    const model = "google/gemini-3.1-pro"
     const categories = [deepCategory, otherCategory]
 
     //#when
@@ -237,7 +237,7 @@ describe("buildParallelDelegationSection", () => {
 describe("buildNonClaudePlannerSection", () => {
   it("#given non-Claude model #when building #then returns plan agent section", () => {
     //#given
-    const model = "google/gemini-3-pro"
+    const model = "google/gemini-3.1-pro"
 
     //#when
     const result = buildNonClaudePlannerSection(model)
@@ -271,5 +271,4 @@ describe("buildNonClaudePlannerSection", () => {
     expect(result).not.toBe("")
   })
 })
-
 

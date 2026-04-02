@@ -1,3 +1,5 @@
+/// <reference types="bun-types" />
+
 import { describe, test, expect, afterEach } from "bun:test"
 import * as fs from "fs"
 import * as path from "path"
@@ -287,6 +289,19 @@ describe("migrateHookNames", () => {
     expect(removed).toHaveLength(1)
   })
 
+  test("removes gpt-permission-continuation from disabled hooks", () => {
+    // given: Config with removed GPT permission continuation hook
+    const hooks = ["gpt-permission-continuation", "comment-checker"]
+
+    // when: Migrate hook names
+    const { migrated, changed, removed } = migrateHookNames(hooks)
+
+    // then: Removed hook should be filtered out
+    expect(changed).toBe(true)
+    expect(migrated).toEqual(["comment-checker"])
+    expect(removed).toEqual(["gpt-permission-continuation"])
+  })
+
   test("handles mixed migration and removal", () => {
     // given: Config with both legacy rename and removed hooks
     const hooks = ["anthropic-auto-compact", "preemptive-compaction", "sisyphus-orchestrator"]
@@ -398,6 +413,31 @@ describe("migrateConfigFile", () => {
     expect(needsWrite).toBe(true)
     expect(rawConfig.disabled_hooks).toContain("anthropic-context-window-limit-recovery")
     expect(rawConfig.disabled_hooks).not.toContain("anthropic-auto-compact")
+  })
+
+  test("removes deleted hook names from disabled_hooks", () => {
+    const rawConfig: Record<string, unknown> = {
+      disabled_hooks: ["delegate-task-english-directive", "comment-checker"],
+    }
+
+    const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
+
+    expect(needsWrite).toBe(true)
+    expect(rawConfig.disabled_hooks).toEqual(["comment-checker"])
+  })
+
+  test("removes gpt-permission-continuation from disabled_hooks", () => {
+    // given: Config with removed GPT permission continuation hook
+    const rawConfig: Record<string, unknown> = {
+      disabled_hooks: ["gpt-permission-continuation", "comment-checker"],
+    }
+
+    // when: Migrate config file
+    const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
+
+    // then: Removed hook should be filtered out
+    expect(needsWrite).toBe(true)
+    expect(rawConfig.disabled_hooks).toEqual(["comment-checker"])
   })
 
   test("does not write if no migration needed", () => {
@@ -524,6 +564,12 @@ describe("MODEL_VERSION_MAP", () => {
     // given/when: Check MODEL_VERSION_MAP
     // then: Should contain correct mapping
     expect(MODEL_VERSION_MAP["anthropic/claude-opus-4-5"]).toBe("anthropic/claude-opus-4-6")
+  })
+
+  test("maps openai/gpt-5.3-codex to openai/gpt-5.4 for deep category migration", () => {
+    // given/when: Check MODEL_VERSION_MAP
+    // then: gpt-5.3-codex should migrate to gpt-5.4
+    expect(MODEL_VERSION_MAP["openai/gpt-5.3-codex"]).toBe("openai/gpt-5.4")
   })
 })
 

@@ -1,4 +1,5 @@
-import type { DelegateTaskArgs, OpencodeClient } from "./types"
+import type { DelegateTaskArgs, OpencodeClient, DelegatedModelConfig } from "./types"
+import type { SisyphusAgentConfig } from "../../config/schema"
 import { isPlanFamily } from "./constants"
 import { buildTaskPrompt } from "./prompt-builder"
 import {
@@ -7,6 +8,7 @@ import {
 } from "../../shared/model-suggestion-retry"
 import { formatDetailedError } from "./error-formatting"
 import { getAgentToolRestrictions } from "../../shared/agent-tool-restrictions"
+import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
 import { setSessionTools } from "../../shared/session-tools-store"
 import { createInternalAgentTextPart } from "../../shared/internal-initiator-marker"
 
@@ -37,14 +39,16 @@ export async function sendSyncPrompt(
     agentToUse: string
     args: DelegateTaskArgs
     systemContent: string | undefined
-    categoryModel: { providerID: string; modelID: string; variant?: string } | undefined
+    categoryModel: DelegatedModelConfig | undefined
     toastManager: { removeTask: (id: string) => void } | null | undefined
     taskId: string | undefined
+    sisyphusAgentConfig?: SisyphusAgentConfig
   },
   deps: SendSyncPromptDeps = sendSyncPromptDeps
 ): Promise<string | null> {
   const allowTask = isPlanFamily(input.agentToUse)
-  const effectivePrompt = buildTaskPrompt(input.args.prompt, input.agentToUse)
+  const tddEnabled = input.sisyphusAgentConfig?.tdd
+  const effectivePrompt = buildTaskPrompt(input.args.prompt, input.agentToUse, tddEnabled)
   const tools = {
     task: allowTask,
     call_omo_agent: true,
@@ -52,6 +56,8 @@ export async function sendSyncPrompt(
     ...getAgentToolRestrictions(input.agentToUse),
   }
   setSessionTools(input.sessionID, tools)
+
+  applySessionPromptParams(input.sessionID, input.categoryModel)
 
   const promptArgs = {
     path: { id: input.sessionID },
@@ -61,7 +67,12 @@ export async function sendSyncPrompt(
       tools,
       parts: [createInternalAgentTextPart(effectivePrompt)],
       ...(input.categoryModel
-        ? { model: { providerID: input.categoryModel.providerID, modelID: input.categoryModel.modelID } }
+        ? {
+            model: {
+              providerID: input.categoryModel.providerID,
+              modelID: input.categoryModel.modelID,
+            },
+          }
         : {}),
       ...(input.categoryModel?.variant ? { variant: input.categoryModel.variant } : {}),
     },

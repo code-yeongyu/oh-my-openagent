@@ -43,12 +43,15 @@ function loadAgentsFromDir(agentsDir: string, scope: AgentScope): LoadedAgent[] 
        const formattedDescription = `(${scope}) ${originalDescription}`
 
        const mappedModelOverride = mapClaudeModelToOpenCode(data.model)
+       const modelString = mappedModelOverride
+         ? `${mappedModelOverride.providerID}/${mappedModelOverride.modelID}`
+         : undefined
 
        const config: ClaudeCodeAgentConfig = {
          description: formattedDescription,
          mode: data.mode || "subagent",
          prompt: body.trim(),
-         ...(mappedModelOverride ? { model: mappedModelOverride } : {}),
+         ...(modelString ? { model: modelString } : {}),
        }
 
        const toolsConfig = parseToolsConfig(data.tools)

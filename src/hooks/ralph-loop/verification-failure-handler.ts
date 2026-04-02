@@ -68,6 +68,10 @@ export async function handleFailedVerification(
 		return false
 	}
 
+	if (state.verification_session_id) {
+		ctx.client.session.abort({ path: { id: state.verification_session_id } }).catch(() => {})
+	}
+
 	const resumedState = loopState.restartAfterFailedVerification(
 		parentSessionID,
 		messageCountAtStart,

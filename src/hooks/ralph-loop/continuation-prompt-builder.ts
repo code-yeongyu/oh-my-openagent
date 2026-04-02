@@ -25,6 +25,8 @@ You already emitted <promise>{{INITIAL_PROMISE}}</promise>. This does NOT finish
 REQUIRED NOW:
 - Call Oracle using task(subagent_type="oracle", load_skills=[], run_in_background=false, ...)
 - Ask Oracle to verify whether the original task is actually complete
+- Include the original task in the Oracle request
+- Explicitly tell Oracle to review skeptically and critically, and to look for reasons the task may still be incomplete or wrong
 - The system will inspect the Oracle session directly for the verification result
 - If Oracle does not verify, continue fixing the task and do not consider it complete
 
@@ -40,6 +42,7 @@ REQUIRED NOW:
 - Oracle does not lie. Treat the verification result as ground truth
 - Do not claim completion early or argue with the failed verification
 - After fixing the remaining issues, request Oracle review again using task(subagent_type="oracle", load_skills=[], run_in_background=false, ...)
+- Include the original task in the Oracle request and tell Oracle to review skeptically and critically
 - Only when the work is ready for review again, output: <promise>{{PROMISE}}</promise>
 
 Original task:

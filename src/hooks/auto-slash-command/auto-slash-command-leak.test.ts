@@ -58,19 +58,84 @@ describe("createAutoSlashCommandHook leak prevention", () => {
   })
 
   describe("#given hook with sessionProcessedCommandExecutions", () => {
-    describe("#when same command executed twice for same session", () => {
-      it("#then second execution is deduplicated", async () => {
-        const hook = createAutoSlashCommandHook()
-        const input = createCommandInput("session-dedup", "leak-test-command")
-        const firstOutput = createCommandOutput("first")
-        const secondOutput = createCommandOutput("second")
+    describe("#when same command executed twice after fallback dedup window", () => {
+      it("#then second execution is treated as intentional rerun", async () => {
+        //#given
+        const nowSpy = spyOn(Date, "now")
+        try {
+          const hook = createAutoSlashCommandHook()
+          const input = createCommandInput("session-dedup", "leak-test-command")
+          const firstOutput = createCommandOutput("first")
+          const secondOutput = createCommandOutput("second")
 
-        await hook["command.execute.before"](input, firstOutput)
-        await hook["command.execute.before"](input, secondOutput)
+          //#when
+          nowSpy.mockReturnValue(0)
+          await hook["command.execute.before"](input, firstOutput)
+          nowSpy.mockReturnValue(101)
+          await hook["command.execute.before"](input, secondOutput)
 
-        expect(executeSlashCommandMock).toHaveBeenCalledTimes(1)
-        expect(firstOutput.parts[0].text).toContain(AUTO_SLASH_COMMAND_TAG_OPEN)
-        expect(secondOutput.parts[0].text).toBe("second")
+          //#then
+          expect(executeSlashCommandMock).toHaveBeenCalledTimes(2)
+          expect(firstOutput.parts[0].text).toContain(AUTO_SLASH_COMMAND_TAG_OPEN)
+          expect(secondOutput.parts[0].text).toContain(AUTO_SLASH_COMMAND_TAG_OPEN)
+        } finally {
+          nowSpy.mockRestore()
+        }
+      })
+    })
+
+    describe("#when same command is repeated within fallback dedup window", () => {
+      it("#then duplicate dispatch is suppressed", async () => {
+        //#given
+        const nowSpy = spyOn(Date, "now")
+        try {
+          const hook = createAutoSlashCommandHook()
+          const input = createCommandInput("session-dedup", "leak-test-command")
+          const firstOutput = createCommandOutput("first")
+          const secondOutput = createCommandOutput("second")
+
+          //#when
+          nowSpy.mockReturnValue(0)
+          await hook["command.execute.before"](input, firstOutput)
+          nowSpy.mockReturnValue(99)
+          await hook["command.execute.before"](input, secondOutput)
+
+          //#then
+          expect(executeSlashCommandMock).toHaveBeenCalledTimes(1)
+          expect(firstOutput.parts[0].text).toContain(AUTO_SLASH_COMMAND_TAG_OPEN)
+          expect(secondOutput.parts[0].text).toBe("second")
+        } finally {
+          nowSpy.mockRestore()
+        }
+      })
+    })
+
+    describe("#when same event identifier is dispatched twice", () => {
+      it("#then second dispatch is deduplicated regardless of elapsed seconds", async () => {
+        //#given
+        const nowSpy = spyOn(Date, "now")
+        try {
+          const hook = createAutoSlashCommandHook()
+          const input: CommandExecuteBeforeInput = {
+            ...createCommandInput("session-dedup", "leak-test-command"),
+            eventID: "event-1",
+          }
+          const firstOutput = createCommandOutput("first")
+          const secondOutput = createCommandOutput("second")
+
+          //#when
+          nowSpy.mockReturnValue(0)
+          await hook["command.execute.before"](input, firstOutput)
+          nowSpy.mockReturnValue(29_999)
+          await hook["command.execute.before"](input, secondOutput)
+
+          //#then
+          expect(executeSlashCommandMock).toHaveBeenCalledTimes(1)
+          expect(firstOutput.parts[0].text).toContain(AUTO_SLASH_COMMAND_TAG_OPEN)
+          expect(secondOutput.parts[0].text).toBe("second")
+        } finally {
+          nowSpy.mockRestore()
+        }
       })
     })
   })

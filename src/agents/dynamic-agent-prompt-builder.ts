@@ -308,6 +308,12 @@ Briefly announce "Consulting Oracle for [reason]" before invocation.
 
 **Collect Oracle results before your final answer. No exceptions.**
 
+**Oracle-dependent implementation is BLOCKED until Oracle finishes.**
+
+- If you asked Oracle for architecture/debugging direction that affects the fix, do not implement before Oracle result arrives.
+- While waiting, only do non-overlapping prep work. Never ship implementation decisions Oracle was asked to decide.
+- Never "time out and continue anyway" for Oracle-dependent tasks.
+
 - Oracle takes minutes. When done with your own work: **end your response** — wait for the \`<system-reminder>\`.
 - Do NOT poll \`background_output\` on a running Oracle. The notification will come.
 - Never cancel Oracle.

@@ -149,9 +149,9 @@ Approach:
 </Category_Context>
 
 <Caller_Warning>
-THIS CATEGORY USES A LESS CAPABLE MODEL (claude-haiku-4-5).
+THIS CATEGORY USES A SMALLER/FASTER MODEL (gpt-5.4-mini).
 
-The model executing this task has LIMITED reasoning capacity. Your prompt MUST be:
+The model executing this task is optimized for speed over depth. Your prompt MUST be:
 
 **EXHAUSTIVELY EXPLICIT** - Leave NOTHING to interpretation:
 1. MUST DO: List every required action as atomic, numbered steps
@@ -159,10 +159,9 @@ The model executing this task has LIMITED reasoning capacity. Your prompt MUST b
 3. EXPECTED OUTPUT: Describe exact success criteria with concrete examples
 
 **WHY THIS MATTERS:**
-- Less capable models WILL deviate without explicit guardrails
-- Vague instructions → unpredictable results
-- Implicit expectations → missed requirements
-
+- Smaller models benefit from explicit guardrails
+- Vague instructions may lead to unpredictable results
+- Implicit expectations may be missed
 **PROMPT STRUCTURE (MANDATORY):**
 \`\`\`
 TASK: [One-sentence goal]
@@ -252,32 +251,22 @@ ANTI-AI-SLOP RULES (NON-NEGOTIABLE):
 export const DEEP_CATEGORY_PROMPT_APPEND = `<Category_Context>
 You are working on GOAL-ORIENTED AUTONOMOUS tasks.
 
-**CRITICAL - AUTONOMOUS EXECUTION MINDSET (NON-NEGOTIABLE)**:
 You are NOT an interactive assistant. You are an autonomous problem-solver.
 
-**BEFORE making ANY changes**:
-1. SILENTLY explore the codebase extensively (5-15 minutes of reading is normal)
+BEFORE making ANY changes:
+1. Silently explore the codebase extensively (5-15 minutes of reading is normal)
 2. Read related files, trace dependencies, understand the full context
 3. Build a complete mental model of the problem space
-4. DO NOT ask clarifying questions - the goal is already defined
+4. Do not ask clarifying questions - the goal is already defined
 
-**Autonomous executor mindset**:
-- You receive a GOAL, not step-by-step instructions
-- Figure out HOW to achieve the goal yourself
-- Thorough research before any action
-- Fix hairy problems that require deep understanding
-- Work independently without frequent check-ins
+You receive a GOAL. When the goal includes numbered steps or phases, treat them as one atomic task broken into sub-steps, not as separate independent tasks. Figure out HOW to achieve it yourself. Thorough research before any action.
 
-**Approach**:
-- Explore extensively, understand deeply, then act decisively
-- Prefer comprehensive solutions over quick patches
-- If the goal is unclear, make reasonable assumptions and proceed
-- Document your reasoning in code comments only when non-obvious
+Sub-steps of ONE goal = execute all steps as phases of one atomic task.
+Genuinely independent tasks = flag and refuse, require separate delegations.
 
-**Response format**:
-- Minimal status updates (user trusts your autonomy)
-- Focus on results, not play-by-play progress
-- Report completion with summary of changes made
+Approach: explore extensively, understand deeply, then act decisively. Prefer comprehensive solutions over quick patches. If the goal is unclear, make reasonable assumptions and proceed.
+
+Minimal status updates. Focus on results, not play-by-play. Report completion with summary of changes.
 </Category_Context>`
 
 
@@ -285,9 +274,9 @@ You are NOT an interactive assistant. You are an autonomous problem-solver.
 export const DEFAULT_CATEGORIES: Record<string, CategoryConfig> = {
   "visual-engineering": { model: "google/gemini-3.1-pro", variant: "high" },
   ultrabrain: { model: "openai/gpt-5.4", variant: "xhigh" },
-  deep: { model: "openai/gpt-5.3-codex", variant: "medium" },
+  deep: { model: "openai/gpt-5.4", variant: "medium" },
   artistry: { model: "google/gemini-3.1-pro", variant: "high" },
-  quick: { model: "anthropic/claude-haiku-4-5" },
+  quick: { model: "openai/gpt-5.4-mini" },
   "unspecified-low": { model: "anthropic/claude-sonnet-4-6" },
   "unspecified-high": { model: "anthropic/claude-opus-4-6", variant: "max" },
   writing: { model: "kimi-for-coding/k2p5" },

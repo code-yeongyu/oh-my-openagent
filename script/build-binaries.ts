@@ -101,7 +101,9 @@ async function main() {
   console.log("\n✅ All platform binaries built successfully!\n");
 }
 
-main().catch((error) => {
-  console.error("Fatal error:", error);
-  process.exit(1);
-});
+if (import.meta.main) {
+  main().catch((error) => {
+    console.error("Fatal error:", error);
+    process.exit(1);
+  });
+}

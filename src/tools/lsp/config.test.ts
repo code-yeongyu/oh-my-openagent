@@ -21,7 +21,7 @@ describe("isServerInstalled", () => {
     try {
       rmSync(tempDir, { recursive: true, force: true })
     } catch (e) {
-      console.error(`Failed to clean up temp dir: ${e}`)
+      // cleanup failed — ignored
     }
 
     if (process.platform === "win32") {

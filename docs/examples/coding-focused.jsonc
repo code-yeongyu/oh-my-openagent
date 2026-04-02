@@ -1,0 +1,88 @@
+{
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/dev/assets/oh-my-opencode.schema.json",
+
+  // Optimized for intensive coding sessions.
+  // Prioritizes deep implementation agents and fast feedback loops.
+
+  "agents": {
+    // Primary orchestrator: aggressive parallel delegation
+    "sisyphus": {
+      "model": "kimi-for-coding/k2p5",
+      "ultrawork": { "model": "anthropic/claude-opus-4-6", "variant": "max" },
+      "prompt_append": "Delegate heavily to hephaestus for implementation. Parallelize exploration.",
+    },
+
+    // Heavy lifter: maximum autonomy for coding tasks
+    "hephaestus": {
+      "model": "openai/gpt-5.4",
+      "prompt_append": "You are the primary implementation agent. Own the codebase. Explore, decide, execute. Use LSP and AST-grep aggressively.",
+      "permission": { "edit": "allow", "bash": { "git": "allow", "test": "allow" } },
+    },
+
+    // Lightweight planner: quick planning for coding tasks
+    "prometheus": {
+      "model": "opencode/gpt-5-nano",
+      "prompt_append": "Keep plans concise. Focus on file structure and key decisions.",
+    },
+
+    // Debugging and architecture
+    "oracle": { "model": "openai/gpt-5.4", "variant": "high" },
+
+    // Fast docs lookup
+    "librarian": { "model": "github-copilot/grok-code-fast-1" },
+
+    // Rapid codebase navigation
+    "explore": { "model": "github-copilot/grok-code-fast-1" },
+
+    // Frontend and visual work
+    "multimodal-looker": { "model": "google/gemini-3.1-pro" },
+
+    // Plan review: minimal overhead
+    "metis": { "model": "opencode/gpt-5-nano" },
+
+    // Code review focus
+    "momus": { "prompt_append": "Focus on code quality, edge cases, and test coverage." },
+
+    // Long-running coding sessions
+    "atlas": {},
+
+    // Quick fixes and small tasks
+    "sisyphus-junior": { "model": "opencode/gpt-5-nano" },
+  },
+
+  "categories": {
+    // Trivial changes: fastest possible
+    "quick": { "model": "opencode/gpt-5-nano" },
+
+    // Standard coding tasks: good quality, fast
+    "unspecified-low": { "model": "anthropic/claude-sonnet-4-6" },
+
+    // Complex refactors: best quality
+    "unspecified-high": { "model": "openai/gpt-5.3-codex" },
+
+    // Visual work
+    "visual-engineering": { "model": "google/gemini-3.1-pro", "variant": "high" },
+
+    // Deep autonomous work
+    "deep": { "model": "openai/gpt-5.4" },
+
+    // Architecture decisions
+    "ultrabrain": { "model": "openai/gpt-5.4", "variant": "xhigh" },
+  },
+
+  // High concurrency for parallel agent work
+  "background_task": {
+    "defaultConcurrency": 8,
+    "providerConcurrency": {
+      "anthropic": 5,
+      "openai": 5,
+      "google": 10,
+      "github-copilot": 10,
+      "opencode": 15,
+    },
+  },
+
+  // Enable all coding aids
+  "hashline_edit": true,
+  "experimental": { "aggressive_truncation": true, "task_system": true },
+}

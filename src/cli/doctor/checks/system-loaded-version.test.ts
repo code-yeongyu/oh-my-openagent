@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it } from "bun:test"
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
 import { PACKAGE_NAME } from "../constants"
+import { resolveSymlink } from "../../../shared/file-utils"
 
 const systemLoadedVersionModulePath = "./system-loaded-version?system-loaded-version-test"
 
@@ -103,6 +104,31 @@ describe("system loaded version", () => {
       expect(loadedVersion.installedPackagePath).toBe(join(cacheDir, "node_modules", PACKAGE_NAME, "package.json"))
       expect(loadedVersion.expectedVersion).toBe("2.3.4")
       expect(loadedVersion.loadedVersion).toBe("2.3.4")
+    })
+
+    it("resolves symlinked config directories before selecting install path", () => {
+      //#given
+      const realConfigDir = createTemporaryDirectory("omo-real-config-")
+      const symlinkBaseDir = createTemporaryDirectory("omo-symlink-base-")
+      const symlinkConfigDir = join(symlinkBaseDir, "config-link")
+
+      symlinkSync(realConfigDir, symlinkConfigDir, process.platform === "win32" ? "junction" : "dir")
+      process.env.OPENCODE_CONFIG_DIR = symlinkConfigDir
+
+      writeJson(join(realConfigDir, "package.json"), {
+        dependencies: { [PACKAGE_NAME]: "4.5.6" },
+      })
+      writeJson(join(realConfigDir, "node_modules", PACKAGE_NAME, "package.json"), {
+        version: "4.5.6",
+      })
+
+      //#when
+      const loadedVersion = getLoadedPluginVersion()
+
+      //#then
+      expect(loadedVersion.cacheDir).toBe(resolveSymlink(symlinkConfigDir))
+      expect(loadedVersion.expectedVersion).toBe("4.5.6")
+      expect(loadedVersion.loadedVersion).toBe("4.5.6")
     })
   })
 

@@ -1,3 +1,5 @@
+/// <reference types="bun-types" />
+
 import { describe, expect, test } from "bun:test"
 import {
   AgentOverrideConfigSchema,
@@ -142,6 +144,37 @@ describe("disabled_mcps schema", () => {
         "my-custom-mcp-123",
       ])
     }
+  })
+})
+
+describe("OhMyOpenCodeConfigSchema - model_capabilities", () => {
+  test("accepts valid model capabilities config", () => {
+    const input = {
+      model_capabilities: {
+        enabled: true,
+        auto_refresh_on_start: true,
+        refresh_timeout_ms: 5000,
+        source_url: "https://models.dev/api.json",
+      },
+    }
+
+    const result = OhMyOpenCodeConfigSchema.safeParse(input)
+
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.model_capabilities).toEqual(input.model_capabilities)
+    }
+  })
+
+  test("rejects invalid model capabilities config", () => {
+    const result = OhMyOpenCodeConfigSchema.safeParse({
+      model_capabilities: {
+        refresh_timeout_ms: -1,
+        source_url: "not-a-url",
+      },
+    })
+
+    expect(result.success).toBe(false)
   })
 })
 
@@ -369,6 +402,26 @@ describe("CategoryConfigSchema", () => {
     }
   })
 
+  test("accepts reasoningEffort values none and minimal", () => {
+    // given
+    const noneConfig = { reasoningEffort: "none" }
+    const minimalConfig = { reasoningEffort: "minimal" }
+
+    // when
+    const noneResult = CategoryConfigSchema.safeParse(noneConfig)
+    const minimalResult = CategoryConfigSchema.safeParse(minimalConfig)
+
+    // then
+    expect(noneResult.success).toBe(true)
+    expect(minimalResult.success).toBe(true)
+    if (noneResult.success) {
+      expect(noneResult.data.reasoningEffort).toBe("none")
+    }
+    if (minimalResult.success) {
+      expect(minimalResult.data.reasoningEffort).toBe("minimal")
+    }
+  })
+
   test("rejects non-string variant", () => {
     // given
     const config = { model: "openai/gpt-5.4", variant: 123 }
@@ -398,6 +451,17 @@ describe("HookNameSchema", () => {
   test("rejects removed beast-mode-system hook name", () => {
     //#given
     const input = "beast-mode-system"
+
+    //#when
+    const result = HookNameSchema.safeParse(input)
+
+    //#then
+    expect(result.success).toBe(false)
+  })
+
+  test("rejects removed delegate-task-english-directive hook name", () => {
+    //#given
+    const input = "delegate-task-english-directive"
 
     //#when
     const result = HookNameSchema.safeParse(input)
@@ -902,6 +966,45 @@ describe("GitMasterConfigSchema", () => {
     const result = GitMasterConfigSchema.safeParse(config)
 
     expect(result.success).toBe(false)
+  })
+})
+
+describe("OhMyOpenCodeConfigSchema - git_master defaults (#2040)", () => {
+  test("git_master defaults are applied when section is missing from config", () => {
+    //#given
+    const config = {}
+
+    //#when
+    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.git_master).toBeDefined()
+      expect(result.data.git_master.commit_footer).toBe(true)
+      expect(result.data.git_master.include_co_authored_by).toBe(true)
+      expect(result.data.git_master.git_env_prefix).toBe("GIT_MASTER=1")
+    }
+  })
+
+  test("git_master respects explicit false values", () => {
+    //#given
+    const config = {
+      git_master: {
+        commit_footer: false,
+        include_co_authored_by: false,
+      },
+    }
+
+    //#when
+    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.git_master.commit_footer).toBe(false)
+      expect(result.data.git_master.include_co_authored_by).toBe(false)
+    }
   })
 })
 

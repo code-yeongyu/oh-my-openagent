@@ -1,5 +1,5 @@
 import { describe, expect, test, beforeEach, afterEach } from "bun:test"
-import { detectExternalNotificationPlugin, getNotificationConflictWarning } from "./external-plugin-detector"
+import { detectExternalNotificationPlugin, getNotificationConflictWarning, detectExternalSkillPlugin, getSkillPluginConflictWarning } from "./external-plugin-detector"
 import * as fs from "node:fs"
 import * as path from "node:path"
 import * as os from "node:os"
@@ -283,6 +283,150 @@ describe("external-plugin-detector", () => {
       expect(warning).toContain("session.idle")
       expect(warning).toContain("auto-disabled")
       expect(warning).toContain("force_enable")
+    })
+  })
+
+  describe("detectExternalSkillPlugin", () => {
+    test("should return detected=false when no plugins configured", () => {
+      // given - empty directory
+      // when
+      const result = detectExternalSkillPlugin(tempDir)
+      // then
+      expect(result.detected).toBe(false)
+      expect(result.pluginName).toBeNull()
+    })
+
+    test("should return detected=false when only oh-my-opencode is configured", () => {
+      // given - opencode.json with only oh-my-opencode
+      const opencodeDir = path.join(tempDir, ".opencode")
+      fs.mkdirSync(opencodeDir, { recursive: true })
+      fs.writeFileSync(
+        path.join(opencodeDir, "opencode.json"),
+        JSON.stringify({ plugin: ["oh-my-opencode"] })
+      )
+
+      // when
+      const result = detectExternalSkillPlugin(tempDir)
+
+      // then
+      expect(result.detected).toBe(false)
+      expect(result.pluginName).toBeNull()
+      expect(result.allPlugins).toContain("oh-my-opencode")
+    })
+
+    test("should detect opencode-skills plugin", () => {
+      // given - opencode.json with opencode-skills
+      const opencodeDir = path.join(tempDir, ".opencode")
+      fs.mkdirSync(opencodeDir, { recursive: true })
+      fs.writeFileSync(
+        path.join(opencodeDir, "opencode.json"),
+        JSON.stringify({ plugin: ["oh-my-opencode", "opencode-skills"] })
+      )
+
+      // when
+      const result = detectExternalSkillPlugin(tempDir)
+
+      // then
+      expect(result.detected).toBe(true)
+      expect(result.pluginName).toBe("opencode-skills")
+    })
+
+    test("should detect opencode-skills with version suffix", () => {
+      // given - opencode.json with versioned opencode-skills
+      const opencodeDir = path.join(tempDir, ".opencode")
+      fs.mkdirSync(opencodeDir, { recursive: true })
+      fs.writeFileSync(
+        path.join(opencodeDir, "opencode.json"),
+        JSON.stringify({ plugin: ["oh-my-opencode", "opencode-skills@1.2.3"] })
+      )
+
+      // when
+      const result = detectExternalSkillPlugin(tempDir)
+
+      // then
+      expect(result.detected).toBe(true)
+      expect(result.pluginName).toBe("opencode-skills")
+    })
+
+    test("should detect @opencode/skills scoped package", () => {
+      // given - opencode.json with scoped package name
+      const opencodeDir = path.join(tempDir, ".opencode")
+      fs.mkdirSync(opencodeDir, { recursive: true })
+      fs.writeFileSync(
+        path.join(opencodeDir, "opencode.json"),
+        JSON.stringify({ plugin: ["oh-my-opencode", "@opencode/skills"] })
+      )
+
+      // when
+      const result = detectExternalSkillPlugin(tempDir)
+
+      // then
+      expect(result.detected).toBe(true)
+      expect(result.pluginName).toBe("@opencode/skills")
+    })
+
+    test("should detect npm:opencode-skills", () => {
+      // given - npm prefix
+      const opencodeDir = path.join(tempDir, ".opencode")
+      fs.mkdirSync(opencodeDir, { recursive: true })
+      fs.writeFileSync(
+        path.join(opencodeDir, "opencode.json"),
+        JSON.stringify({ plugin: ["npm:opencode-skills"] })
+      )
+
+      // when
+      const result = detectExternalSkillPlugin(tempDir)
+
+      // then
+      expect(result.detected).toBe(true)
+      expect(result.pluginName).toBe("opencode-skills")
+    })
+
+    test("should detect file:///path/to/opencode-skills", () => {
+      // given - file path
+      const opencodeDir = path.join(tempDir, ".opencode")
+      fs.mkdirSync(opencodeDir, { recursive: true })
+      fs.writeFileSync(
+        path.join(opencodeDir, "opencode.json"),
+        JSON.stringify({ plugin: ["file:///home/user/plugins/opencode-skills"] })
+      )
+
+      // when
+      const result = detectExternalSkillPlugin(tempDir)
+
+      // then
+      expect(result.detected).toBe(true)
+      expect(result.pluginName).toBe("opencode-skills")
+    })
+
+    test("should NOT match opencode-skills-extra (suffix variation)", () => {
+      // given - plugin with similar name but different suffix
+      const opencodeDir = path.join(tempDir, ".opencode")
+      fs.mkdirSync(opencodeDir, { recursive: true })
+      fs.writeFileSync(
+        path.join(opencodeDir, "opencode.json"),
+        JSON.stringify({ plugin: ["opencode-skills-extra"] })
+      )
+
+      // when
+      const result = detectExternalSkillPlugin(tempDir)
+
+      // then
+      expect(result.detected).toBe(false)
+      expect(result.pluginName).toBeNull()
+    })
+  })
+
+  describe("getSkillPluginConflictWarning", () => {
+    test("should generate warning message with plugin name", () => {
+      // when
+      const warning = getSkillPluginConflictWarning("opencode-skills")
+
+      // then
+      expect(warning).toContain("opencode-skills")
+      expect(warning).toContain("Duplicate tool names detected")
+      expect(warning).toContain("claude_code")
+      expect(warning).toContain("skills")
     })
   })
 })

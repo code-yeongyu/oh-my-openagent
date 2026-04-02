@@ -31,6 +31,7 @@ export async function waitForEventProcessorShutdown(
 
 export async function run(options: RunOptions): Promise<number> {
   process.env.OPENCODE_CLI_RUN_MODE = "true"
+  process.env.OPENCODE_CLIENT = "run"
 
   const startTime = Date.now()
   const {
@@ -47,10 +48,11 @@ export async function run(options: RunOptions): Promise<number> {
 
   const pluginConfig = loadPluginConfig(directory, { command: "run" })
   const resolvedAgent = resolveRunAgent(options, pluginConfig)
-  const resolvedModel = resolveRunModel(options.model)
   const abortController = new AbortController()
 
   try {
+    const resolvedModel = resolveRunModel(options.model)
+
     const { client, cleanup: serverCleanup } = await createServerConnection({
       port: options.port,
       attach: options.attach,

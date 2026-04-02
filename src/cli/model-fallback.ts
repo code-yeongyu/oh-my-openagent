@@ -21,7 +21,7 @@ const ZAI_MODEL = "zai-coding-plan/glm-4.7"
 const MINIMAX_STANDARD_MODEL_ID = "MiniMax-M2.5"
 const MINIMAX_HIGHSPEED_MODEL_ID = "MiniMax-M2.5-highspeed"
 
-const ULTIMATE_FALLBACK = "opencode/glm-4.7-free"
+const ULTIMATE_FALLBACK = "opencode/gpt-5-nano"
 const SCHEMA_URL = "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json"
 
 function getMiniMaxModelId(config: InstallConfig): string {
@@ -75,7 +75,7 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
   for (const [role, req] of Object.entries(CLI_AGENT_MODEL_REQUIREMENTS)) {
     if (role === "librarian") {
       if (avail.opencodeGo) {
-        agents[role] = { model: "opencode-go/minimax-m2.5" }
+        agents[role] = { model: "opencode-go/minimax-m2.7" }
       } else if (avail.zai) {
         agents[role] = { model: ZAI_MODEL }
       }
@@ -88,7 +88,7 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
       } else if (avail.opencodeZen) {
         agents[role] = { model: "opencode/claude-haiku-4-5" }
       } else if (avail.opencodeGo) {
-        agents[role] = { model: "opencode-go/minimax-m2.5" }
+        agents[role] = { model: "opencode-go/minimax-m2.7" }
       } else if (avail.copilot) {
         agents[role] = { model: "github-copilot/gpt-5-mini" }
       } else if (avail.minimaxCodingPlan) {

@@ -7,14 +7,27 @@ import { SISYPHUS_JUNIOR_AGENT } from "./sisyphus-junior-agent"
 import { resolveCategoryConfig } from "./categories"
 import { parseModelString } from "./model-string-parser"
 import { CATEGORY_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
-import { normalizeFallbackModels } from "../../shared/model-resolver"
-import { buildFallbackChainFromModels } from "../../shared/fallback-chain-from-models"
+import { normalizeFallbackModels, flattenToFallbackModelStrings } from "../../shared/model-resolver"
+import { buildFallbackChainFromModels, findMostSpecificFallbackEntry } from "../../shared/fallback-chain-from-models"
 import { getAvailableModelsForDelegateTask } from "./available-models"
 import { resolveModelForDelegateTask } from "./model-selection"
 
+import type { CategoryConfig } from "../../config/schema"
+import type { DelegatedModelConfig } from "./types"
+
+function applyCategoryParams(base: DelegatedModelConfig, config: CategoryConfig): DelegatedModelConfig {
+  const result = { ...base }
+  if (config.temperature !== undefined) result.temperature = config.temperature
+  if (config.top_p !== undefined) result.top_p = config.top_p
+  if (config.maxTokens !== undefined) result.maxTokens = config.maxTokens
+  if (config.reasoningEffort !== undefined) result.reasoningEffort = config.reasoningEffort
+  if (config.thinking !== undefined) result.thinking = config.thinking
+  return result
+}
+
 export interface CategoryResolutionResult {
   agentToUse: string
-  categoryModel: { providerID: string; modelID: string; variant?: string } | undefined
+  categoryModel: DelegatedModelConfig | undefined
   categoryPromptAppend: string | undefined
   maxPromptTokens?: number
   modelInfo: ModelFallbackInfo | undefined
@@ -32,11 +45,25 @@ export async function resolveCategoryExecution(
 ): Promise<CategoryResolutionResult> {
   const { client, userCategories, sisyphusJuniorModel } = executorCtx
 
-  const availableModels = await getAvailableModelsForDelegateTask(client)
-
   const categoryName = args.category!
   const enabledCategories = mergeCategories(userCategories)
   const categoryExists = enabledCategories[categoryName] !== undefined
+
+  if (!categoryExists) {
+    const allCategoryNames = Object.keys(enabledCategories).join(", ")
+    return {
+      agentToUse: "",
+      categoryModel: undefined,
+      categoryPromptAppend: undefined,
+      maxPromptTokens: undefined,
+      modelInfo: undefined,
+      actualModel: undefined,
+      isUnstableAgent: false,
+      error: `Unknown category: "${categoryName}". Available: ${allCategoryNames}`,
+    }
+  }
+
+  const availableModels = await getAvailableModelsForDelegateTask(client)
 
   const resolved = resolveCategoryConfig(categoryName, {
     userCategories,
@@ -84,7 +111,10 @@ Available categories: ${allCategoryNames}`,
   const normalizedConfiguredFallbackModels = normalizeFallbackModels(resolved.config.fallback_models)
   let actualModel: string | undefined
   let modelInfo: ModelFallbackInfo | undefined
-  let categoryModel: { providerID: string; modelID: string; variant?: string } | undefined
+  let categoryModel: DelegatedModelConfig | undefined
+  let isModelResolutionSkipped = false
+  let fallbackEntry: FallbackEntry | undefined
+  let matchedFallback = false
 
   const overrideModel = sisyphusJuniorModel
   const explicitCategoryModel = userCategories?.[args.category!]?.model
@@ -98,19 +128,44 @@ Available categories: ${allCategoryNames}`,
       modelInfo = explicitCategoryModel || overrideModel
         ? { model: actualModel, type: "user-defined", source: "override" }
         : { model: actualModel, type: "system-default", source: "system-default" }
+      const parsedModel = parseModelString(actualModel)
+      const variantToUse = userCategories?.[args.category!]?.variant ?? resolved.config.variant
+      categoryModel = parsedModel
+        ? applyCategoryParams({ ...parsedModel, variant: variantToUse ?? parsedModel.variant }, resolved.config)
+        : undefined
     }
   } else {
     const resolution = resolveModelForDelegateTask({
       userModel: explicitCategoryModel ?? overrideModel,
-      userFallbackModels: normalizedConfiguredFallbackModels,
+      userFallbackModels: flattenToFallbackModelStrings(normalizedConfiguredFallbackModels),
       categoryDefaultModel: resolved.model,
+      isUserConfiguredCategoryModel: resolved.isUserConfiguredModel,
       fallbackChain: requirement.fallbackChain,
       availableModels,
       systemDefaultModel,
     })
 
-    if (resolution) {
-      const { model: resolvedModel, variant: resolvedVariant } = resolution
+    if (resolution && "skipped" in resolution) {
+      isModelResolutionSkipped = true
+      const userModelOverride = explicitCategoryModel ?? overrideModel
+      if (userModelOverride) {
+        actualModel = userModelOverride
+        const parsedModel = parseModelString(actualModel)
+        const variantToUse = userCategories?.[args.category!]?.variant ?? resolved.config.variant
+        categoryModel = parsedModel
+          ? applyCategoryParams({ ...parsedModel, variant: variantToUse ?? parsedModel.variant }, resolved.config)
+          : undefined
+        modelInfo = { model: actualModel, type: "user-defined", source: "override" }
+      }
+    } else if (resolution) {
+      const {
+        model: resolvedModel,
+        variant: resolvedVariant,
+        fallbackEntry: resolvedFallbackEntry,
+        matchedFallback: resolvedMatchedFallback,
+      } = resolution
+      fallbackEntry = resolvedFallbackEntry
+      matchedFallback = resolvedMatchedFallback === true
       actualModel = resolvedModel
 
       if (!parseModelString(actualModel)) {
@@ -145,7 +200,7 @@ Available categories: ${allCategoryNames}`,
       const parsedModel = parseModelString(actualModel)
       const variantToUse = userCategories?.[args.category!]?.variant ?? resolvedVariant ?? resolved.config.variant
       categoryModel = parsedModel
-        ? (variantToUse ? { ...parsedModel, variant: variantToUse } : parsedModel)
+        ? applyCategoryParams({ ...parsedModel, variant: variantToUse ?? parsedModel.variant }, resolved.config)
         : undefined
     }
   }
@@ -156,7 +211,7 @@ Available categories: ${allCategoryNames}`,
   }
   const categoryPromptAppend = resolved.promptAppend || undefined
 
-  if (!categoryModel && !actualModel) {
+  if (!categoryModel && !actualModel && !isModelResolutionSkipped) {
     const categoryNames = Object.keys(enabledCategories)
     return {
       agentToUse: "",
@@ -178,9 +233,8 @@ Available categories: ${categoryNames.join(", ")}`,
     }
   }
 
-  const unstableModel = actualModel?.toLowerCase()
-  const categoryConfigModel = resolved.config.model?.toLowerCase()
-  const isUnstableAgent = resolved.config.is_unstable_agent === true || [unstableModel, categoryConfigModel].some(m => m ? m.includes("gemini") || m.includes("minimax") || m.includes("kimi") : false)
+  const resolvedModel = actualModel?.toLowerCase()
+  const isUnstableAgent = resolved.config.is_unstable_agent ?? (resolvedModel ? resolvedModel.includes("gemini") || resolvedModel.includes("minimax") || resolvedModel.includes("kimi") : false)
 
   const defaultProviderID = categoryModel?.providerID
     ?? parseModelString(actualModel ?? "")?.providerID
@@ -190,6 +244,28 @@ Available categories: ${categoryNames.join(", ")}`,
     defaultProviderID,
   )
 
+  // Only promote fallback-only settings when resolution actually selected a fallback model.
+  const effectiveEntry = matchedFallback && categoryModel
+    ? (
+        fallbackEntry
+        ?? (configuredFallbackChain
+          ? findMostSpecificFallbackEntry(categoryModel.providerID, categoryModel.modelID, configuredFallbackChain)
+          : undefined)
+      )
+    : undefined
+
+  if (categoryModel && effectiveEntry) {
+    categoryModel = {
+      ...categoryModel,
+      variant: userCategories?.[args.category!]?.variant ?? effectiveEntry.variant ?? categoryModel.variant,
+      reasoningEffort: effectiveEntry.reasoningEffort ?? categoryModel.reasoningEffort,
+      temperature: effectiveEntry.temperature ?? categoryModel.temperature,
+      top_p: effectiveEntry.top_p ?? categoryModel.top_p,
+      maxTokens: effectiveEntry.maxTokens ?? categoryModel.maxTokens,
+      thinking: effectiveEntry.thinking ?? categoryModel.thinking,
+    }
+  }
+
   return {
     agentToUse: SISYPHUS_JUNIOR_AGENT,
     categoryModel,
@@ -198,6 +274,7 @@ Available categories: ${categoryNames.join(", ")}`,
     modelInfo,
     actualModel,
     isUnstableAgent,
-    fallbackChain: configuredFallbackChain ?? requirement?.fallbackChain,
+    // Don't use hardcoded fallback chain when resolution was skipped (cold cache)
+    fallbackChain: configuredFallbackChain ?? (isModelResolutionSkipped ? undefined : requirement?.fallbackChain),
   }
 }

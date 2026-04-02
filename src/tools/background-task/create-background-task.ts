@@ -80,16 +80,18 @@ export function createBackgroundTask(
         const waitStart = Date.now()
         let sessionId = task.sessionID
         while (!sessionId && Date.now() - waitStart < WAIT_FOR_SESSION_TIMEOUT_MS) {
-          if (ctx.abort?.aborted) {
-            await manager.cancelTask(task.id)
-            return `Task aborted and cancelled while waiting for session to start.\n\nTask ID: ${task.id}`
-          }
-          await delay(WAIT_FOR_SESSION_INTERVAL_MS)
           const updated = manager.getTask(task.id)
-          if (!updated || updated.status === "error" || updated.status === "cancelled" || updated.status === "interrupt") {
-            return `Task ${!updated ? "was deleted" : `entered error state`}\.\n\nTask ID: ${task.id}`
+          if (updated?.status === "error" || updated?.status === "cancelled" || updated?.status === "interrupt") {
+            return `Task ${`entered error state`}\.\n\nTask ID: ${task.id}`
           }
           sessionId = updated?.sessionID
+          if (sessionId) {
+            break
+          }
+          if (ctx.abort?.aborted) {
+            break
+          }
+          await delay(WAIT_FOR_SESSION_INTERVAL_MS)
         }
 
         const bgMeta = {

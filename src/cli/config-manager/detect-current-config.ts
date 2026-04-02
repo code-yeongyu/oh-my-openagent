@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs"
-import { parseJsonc } from "../../shared"
+import { parseJsonc, LEGACY_PLUGIN_NAME, PLUGIN_NAME } from "../../shared"
 import type { DetectedConfig } from "../types"
 import { getOmoConfigPath } from "./config-context"
 import { detectConfigFormat } from "./opencode-config-format"
@@ -10,6 +10,7 @@ function detectProvidersFromOmoConfig(): {
   hasOpencodeZen: boolean
   hasZaiCodingPlan: boolean
   hasKimiForCoding: boolean
+  hasOpencodeGo: boolean
   hasMinimaxCnCodingPlan: boolean
   hasMinimaxCodingPlan: boolean
   minimaxModelVariant: "standard" | "highspeed"
@@ -21,6 +22,7 @@ function detectProvidersFromOmoConfig(): {
       hasOpencodeZen: true,
       hasZaiCodingPlan: false,
       hasKimiForCoding: false,
+      hasOpencodeGo: false,
       hasMinimaxCnCodingPlan: false,
       hasMinimaxCodingPlan: false,
       minimaxModelVariant: "standard",
@@ -36,6 +38,7 @@ function detectProvidersFromOmoConfig(): {
         hasOpencodeZen: true,
         hasZaiCodingPlan: false,
         hasKimiForCoding: false,
+        hasOpencodeGo: false,
         hasMinimaxCnCodingPlan: false,
         hasMinimaxCodingPlan: false,
         minimaxModelVariant: "standard",
@@ -47,6 +50,7 @@ function detectProvidersFromOmoConfig(): {
     const hasOpencodeZen = configStr.includes('"opencode/')
     const hasZaiCodingPlan = configStr.includes('"zai-coding-plan/')
     const hasKimiForCoding = configStr.includes('"kimi-for-coding/')
+    const hasOpencodeGo = configStr.includes('"opencode-go/')
     const hasMinimaxCnCodingPlan = configStr.includes('"minimax-cn-coding-plan/')
     const hasMinimaxCodingPlan = configStr.includes('"minimax-coding-plan/')
     const minimaxModelVariant = configStr.includes('MiniMax-M2.5-highspeed') ? "highspeed" : "standard"
@@ -56,6 +60,7 @@ function detectProvidersFromOmoConfig(): {
       hasOpencodeZen,
       hasZaiCodingPlan,
       hasKimiForCoding,
+      hasOpencodeGo,
       hasMinimaxCnCodingPlan,
       hasMinimaxCodingPlan,
       minimaxModelVariant,
@@ -66,11 +71,17 @@ function detectProvidersFromOmoConfig(): {
       hasOpencodeZen: true,
       hasZaiCodingPlan: false,
       hasKimiForCoding: false,
+      hasOpencodeGo: false,
       hasMinimaxCnCodingPlan: false,
       hasMinimaxCodingPlan: false,
       minimaxModelVariant: "standard",
     }
   }
+}
+
+function isOurPlugin(plugin: string): boolean {
+  return plugin === PLUGIN_NAME || plugin.startsWith(`${PLUGIN_NAME}@`) ||
+         plugin === LEGACY_PLUGIN_NAME || plugin.startsWith(`${LEGACY_PLUGIN_NAME}@`)
 }
 
 export function detectCurrentConfig(): DetectedConfig {
@@ -102,7 +113,7 @@ export function detectCurrentConfig(): DetectedConfig {
 
   const openCodeConfig = parseResult.config
   const plugins = openCodeConfig.plugin ?? []
-  result.isInstalled = plugins.some((p) => p.startsWith("oh-my-opencode"))
+  result.isInstalled = plugins.some(isOurPlugin)
 
   if (!result.isInstalled) {
     return result
@@ -111,12 +122,13 @@ export function detectCurrentConfig(): DetectedConfig {
   const providers = openCodeConfig.provider as Record<string, unknown> | undefined
   result.hasGemini = providers ? "google" in providers : false
 
-  const { hasOpenAI, hasOpencodeZen, hasZaiCodingPlan, hasKimiForCoding, hasMinimaxCnCodingPlan, hasMinimaxCodingPlan, minimaxModelVariant } =
+  const { hasOpenAI, hasOpencodeZen, hasZaiCodingPlan, hasKimiForCoding, hasOpencodeGo, hasMinimaxCnCodingPlan, hasMinimaxCodingPlan, minimaxModelVariant } =
     detectProvidersFromOmoConfig()
   result.hasOpenAI = hasOpenAI
   result.hasOpencodeZen = hasOpencodeZen
   result.hasZaiCodingPlan = hasZaiCodingPlan
   result.hasKimiForCoding = hasKimiForCoding
+  result.hasOpencodeGo = hasOpencodeGo
   result.hasMinimaxCnCodingPlan = hasMinimaxCnCodingPlan
   result.hasMinimaxCodingPlan = hasMinimaxCodingPlan
   result.minimaxModelVariant = minimaxModelVariant

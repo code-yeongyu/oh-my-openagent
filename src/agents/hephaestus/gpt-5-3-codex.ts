@@ -21,7 +21,7 @@ import {
   buildAntiDuplicationSection,
   categorizeTools,
 } from "../dynamic-agent-prompt-builder";
-const MODE: AgentMode = "all";
+const MODE: AgentMode = "primary";
 
 function buildTodoDisciplineSection(useTaskSystem: boolean): string {
   if (useTaskSystem) {
@@ -161,6 +161,10 @@ Asking the user is the LAST resort after exhausting creative alternatives.
 - User asks "did you do X?" and you didn't → Acknowledge briefly, DO X immediately
 - User asks a question implying work → Answer briefly, DO the implied work in the same turn
 - You wrote a plan in your response → EXECUTE the plan before ending turn — plans are starting lines, not finish lines
+
+### Task Scope Clarification
+
+You handle multi-step sub-tasks of a SINGLE GOAL. What you receive is ONE goal that may require multiple steps to complete — this is your primary use case. Only reject when given MULTIPLE INDEPENDENT goals in one request.
 
 ## Hard Constraints
 

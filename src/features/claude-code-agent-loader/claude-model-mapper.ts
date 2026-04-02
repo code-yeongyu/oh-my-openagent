@@ -20,7 +20,16 @@ function mapClaudeModelString(model: string | undefined): string | undefined {
   const aliasResult = CLAUDE_CODE_ALIAS_MAP.get(trimmed.toLowerCase())
   if (aliasResult) return aliasResult
 
-  if (trimmed.includes("/")) return trimmed
+  if (trimmed.includes("/")) {
+    const [providerID, ...modelParts] = trimmed.split("/")
+    const modelID = modelParts.join("/")
+
+    if (providerID.length === 0 || modelID.length === 0) return trimmed
+
+    return modelID.startsWith("claude-")
+      ? `${providerID}/${normalizeModelID(modelID)}`
+      : trimmed
+  }
 
   const normalized = normalizeModelID(trimmed)
 

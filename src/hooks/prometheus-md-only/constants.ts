@@ -17,7 +17,7 @@ export const PLANNING_CONSULT_WARNING = `
 
 ${createSystemDirective(SystemDirectiveTypes.PROMETHEUS_READ_ONLY)}
 
-You are being invoked by ${getAgentDisplayName("prometheus")}, a READ-ONLY planning agent.
+You are being invoked by ${getAgentDisplayName("prometheus")}, a planning agent restricted to .sisyphus/*.md plan files only.
 
 **CRITICAL CONSTRAINTS:**
 - DO NOT modify any files (no Write, Edit, or any file mutations)

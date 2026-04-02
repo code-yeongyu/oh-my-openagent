@@ -411,10 +411,7 @@ describe("createWriteExistingFileGuardHook", () => {
     try {
       symlinkSync(targetFile, symlinkPath)
     } catch (error) {
-      console.warn(
-        "Skipping symlink test: symlinks are not supported or cannot be created in this environment.",
-        error
-      )
+      // Symlinks not supported in this environment — skip
       return
     }
 

@@ -33,6 +33,9 @@ export function applyProviderConfig(params: {
   const providers = params.config.provider as
     | Record<string, ProviderConfig>
     | undefined;
+  const modelContextLimitsCache = params.modelCacheState.modelContextLimitsCache;
+
+  modelContextLimitsCache.clear()
 
   const anthropicBeta = providers?.anthropic?.options?.headers?.["anthropic-beta"];
   params.modelCacheState.anthropicContext1MEnabled =
@@ -61,7 +64,7 @@ export function applyProviderConfig(params: {
       const contextLimit = modelConfig?.limit?.context;
       if (!contextLimit) continue;
 
-      params.modelCacheState.modelContextLimitsCache.set(
+      modelContextLimitsCache.set(
         `${providerID}/${modelID}`,
         contextLimit,
       );

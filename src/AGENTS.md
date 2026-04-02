@@ -14,7 +14,7 @@ Entry point `index.ts` orchestrates 5-step initialization: loadConfig → create
 | `plugin-config.ts` | JSONC parse, multi-level merge, Zod v4 validation |
 | `create-managers.ts` | TmuxSessionManager, BackgroundManager, SkillMcpManager, ConfigHandler |
 | `create-tools.ts` | SkillContext + AvailableCategories + ToolRegistry (26 tools) |
-| `create-hooks.ts` | 3-tier: Core(37) + Continuation(7) + Skill(2) = 46 hooks |
+| `create-hooks.ts` | 3-tier: Core(39) + Continuation(7) + Skill(2) = 48 hooks |
 | `plugin-interface.ts` | 8 OpenCode hook handlers: config, tool, chat.message, chat.params, chat.headers, event, tool.execute.before, tool.execute.after |
 
 ## CONFIG LOADING
@@ -32,10 +32,10 @@ loadPluginConfig(directory, ctx)
 
 ```
 createHooks()
-  ├─→ createCoreHooks()           # 37 hooks
+  ├─→ createCoreHooks()           # 39 hooks
   │   ├─ createSessionHooks()     # 23: contextWindowMonitor, thinkMode, ralphLoop, modelFallback, runtimeFallback, noSisyphusGpt, noHephaestusNonGpt, anthropicEffort, intentGate...
-  │   ├─ createToolGuardHooks()   # 10: commentChecker, rulesInjector, writeExistingFileGuard, jsonErrorRecovery, hashlineReadEnhancer...
+  │   ├─ createToolGuardHooks()   # 12: commentChecker, rulesInjector, writeExistingFileGuard, jsonErrorRecovery, hashlineReadEnhancer...
   │   └─ createTransformHooks()   # 4: claudeCodeHooks, keywordDetector, contextInjector, thinkingBlockValidator
-  ├─→ createContinuationHooks()   # 7: todoContinuationEnforcer, atlas, stopContinuationGuard, ralphLoopActivator...
+  ├─→ createContinuationHooks()   # 7: todoContinuationEnforcer, atlas, stopContinuationGuard, compactionContextInjector...
   └─→ createSkillHooks()          # 2: categorySkillReminder, autoSlashCommand
 ```

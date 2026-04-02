@@ -2,6 +2,7 @@ import type { CallOmoAgentArgs } from "./types"
 import type { BackgroundManager } from "../../features/background-agent"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { log } from "../../shared"
+import type { DelegatedModelConfig } from "../../shared/model-resolution-types"
 import type { FallbackEntry } from "../../shared/model-requirements"
 import { resolveMessageContext } from "../../features/hook-message-injector"
 import { getSessionAgent } from "../../features/claude-code-session-state"
@@ -20,6 +21,7 @@ export async function executeBackground(
   manager: BackgroundManager,
   client: PluginInput["client"],
   fallbackChain?: FallbackEntry[],
+  model?: DelegatedModelConfig,
 ): Promise<string> {
   try {
     const messageDir = getMessageDir(toolContext.sessionID)
@@ -50,6 +52,7 @@ export async function executeBackground(
       parentMessageID: toolContext.messageID,
       parentAgent,
       parentTools: getSessionTools(toolContext.sessionID),
+      model,
       fallbackChain,
     })
 
@@ -58,15 +61,18 @@ export async function executeBackground(
     const waitStart = Date.now()
     let sessionId = task.sessionID
     while (!sessionId && Date.now() - waitStart < WAIT_FOR_SESSION_TIMEOUT_MS) {
-      if (toolContext.abort?.aborted) {
-        return `Task aborted while waiting for session to start.\n\nTask ID: ${task.id}`
-      }
       const updated = manager.getTask(task.id)
       if (updated?.status === "error" || updated?.status === "cancelled" || updated?.status === "interrupt") {
         return `Task failed to start (status: ${updated.status}).\n\nTask ID: ${task.id}`
       }
+      sessionId = updated?.sessionID
+      if (sessionId) {
+        break
+      }
+      if (toolContext.abort?.aborted) {
+        break
+      }
       await new Promise(resolve => setTimeout(resolve, WAIT_FOR_SESSION_INTERVAL_MS))
-      sessionId = manager.getTask(task.id)?.sessionID
     }
 
     await toolContext.metadata?.({

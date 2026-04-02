@@ -165,6 +165,210 @@ describe("createCallOmoAgent", () => {
     ])
   })
 
+  test("forwards model override from agent config to background executor (#2852)", async () => {
+    //#given
+    const launch = mock((_input: { model?: { providerID: string; modelID: string }; fallbackChain?: unknown[] }) => Promise.resolve({
+      id: "task-model",
+      sessionID: "sub-session",
+      description: "Test task",
+      agent: "explore",
+      status: "pending",
+    }))
+    const managerWithLaunch = {
+      launch,
+      getTask: mock(() => undefined),
+    }
+    const toolDef = createCallOmoAgent(
+      mockCtx,
+      managerWithLaunch,
+      [],
+      {
+        explore: {
+          model: "aws/anthropic/claude-sonnet-4",
+        },
+      },
+    )
+    const executeFunc = toolDef.execute as Function
+
+    //#when
+    await executeFunc(
+      {
+        description: "Test model override",
+        prompt: "Test prompt",
+        subagent_type: "explore",
+        run_in_background: true,
+      },
+      { sessionID: "test", messageID: "msg", agent: "test", abort: new AbortController().signal }
+    )
+
+    //#then
+    const firstLaunchCall = launch.mock.calls[0]
+    if (firstLaunchCall === undefined) {
+      throw new Error("Expected launch to be called")
+    }
+
+    const [launchArgs] = firstLaunchCall
+    expect(launchArgs.model).toEqual({
+      providerID: "aws",
+      modelID: "anthropic/claude-sonnet-4",
+    })
+  })
+
+  test("forwards model variant from agent config to background executor (#2852)", async () => {
+    //#given
+    const launch = mock((_input: { model?: { providerID: string; modelID: string; variant?: string } }) => Promise.resolve({
+      id: "task-variant",
+      sessionID: "sub-session",
+      description: "Test task",
+      agent: "explore",
+      status: "pending",
+    }))
+    const managerWithLaunch = {
+      launch,
+      getTask: mock(() => undefined),
+    }
+    const toolDef = createCallOmoAgent(
+      mockCtx,
+      managerWithLaunch,
+      [],
+      {
+        explore: {
+          model: "openai/gpt-5.4",
+          variant: "high",
+        },
+      },
+    )
+    const executeFunc = toolDef.execute as Function
+
+    //#when
+    await executeFunc(
+      {
+        description: "Test variant",
+        prompt: "Test prompt",
+        subagent_type: "explore",
+        run_in_background: true,
+      },
+      { sessionID: "test", messageID: "msg", agent: "test", abort: new AbortController().signal }
+    )
+
+    //#then
+    const firstLaunchCall = launch.mock.calls[0]
+    if (firstLaunchCall === undefined) {
+      throw new Error("Expected launch to be called")
+    }
+
+    const [launchArgs] = firstLaunchCall
+    expect(launchArgs.model).toEqual({
+      providerID: "openai",
+      modelID: "gpt-5.4",
+      variant: "high",
+    })
+  })
+
+  test("parses inline model variant from agent config override", async () => {
+    //#given
+    const launch = mock((_input: { model?: { providerID: string; modelID: string; variant?: string } }) => Promise.resolve({
+      id: "task-inline-variant",
+      sessionID: "sub-session",
+      description: "Test task",
+      agent: "explore",
+      status: "pending",
+    }))
+    const managerWithLaunch = {
+      launch,
+      getTask: mock(() => undefined),
+    }
+    const toolDef = createCallOmoAgent(
+      mockCtx,
+      managerWithLaunch,
+      [],
+      {
+        explore: {
+          model: "openai/gpt-5.4 high",
+        },
+      },
+    )
+    const executeFunc = toolDef.execute as Function
+
+    //#when
+    await executeFunc(
+      {
+        description: "Test inline variant",
+        prompt: "Test prompt",
+        subagent_type: "explore",
+        run_in_background: true,
+      },
+      { sessionID: "test", messageID: "msg", agent: "test", abort: new AbortController().signal }
+    )
+
+    //#then
+    const firstLaunchCall = launch.mock.calls[0]
+    if (firstLaunchCall === undefined) {
+      throw new Error("Expected launch to be called")
+    }
+
+    const [launchArgs] = firstLaunchCall
+    expect(launchArgs.model).toEqual({
+      providerID: "openai",
+      modelID: "gpt-5.4",
+      variant: "high",
+    })
+  })
+
+  test("forwards category-derived model override to background executor", async () => {
+    //#given
+    const launch = mock((_input: { model?: { providerID: string; modelID: string } }) => Promise.resolve({
+      id: "task-category-model",
+      sessionID: "sub-session",
+      description: "Test task",
+      agent: "explore",
+      status: "pending",
+    }))
+    const managerWithLaunch = {
+      launch,
+      getTask: mock(() => undefined),
+    }
+    const toolDef = createCallOmoAgent(
+      mockCtx,
+      managerWithLaunch,
+      [],
+      {
+        explore: {
+          category: "research",
+        },
+      },
+      {
+        research: {
+          model: "openai/gpt-5.4",
+        },
+      },
+    )
+    const executeFunc = toolDef.execute as Function
+
+    //#when
+    await executeFunc(
+      {
+        description: "Test category model override",
+        prompt: "Test prompt",
+        subagent_type: "explore",
+        run_in_background: true,
+      },
+      { sessionID: "test", messageID: "msg", agent: "test", abort: new AbortController().signal }
+    )
+
+    //#then
+    const firstLaunchCall = launch.mock.calls[0]
+    if (firstLaunchCall === undefined) {
+      throw new Error("Expected launch to be called")
+    }
+
+    const [launchArgs] = firstLaunchCall
+    expect(launchArgs.model).toEqual({
+      providerID: "openai",
+      modelID: "gpt-5.4",
+    })
+  })
+
   test("should return a tool error when sync spawn depth validation fails", async () => {
     //#given
     reserveSubagentSpawnMock.mockRejectedValueOnce(new Error("Subagent spawn blocked: child depth 4 exceeds background_task.maxDepth=3."))

@@ -60,10 +60,18 @@ describe("Atlas final verification approval gate", () => {
       }
     })
 
-    Reflect.set(client.session, "get", async () => {
+    Reflect.set(client.session, "get", async ({ path }: { path: { id: string } }) => {
+      const parentID = path.id === "ses_final_wave_review"
+        ? "atlas-final-wave-session"
+        : path.id === "ses_feature_task"
+          ? "atlas-non-final-session"
+          : "main-session-123"
       return {
-        data: { parentID: "main-session-123" } as Session,
-        request: new Request("http://localhost/session/main-session-123"),
+        data: {
+          id: path.id,
+          parentID,
+        } as Session,
+        request: new Request(`http://localhost/session/${path.id}`),
         response: new Response(),
       }
     })

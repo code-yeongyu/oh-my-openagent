@@ -21,6 +21,13 @@ export function getErrorMessage(error: unknown): string {
     }
   }
 
+  const errorObj2 = error as Record<string, unknown>
+  const name = errorObj2.name
+  if (typeof name === "string" && name.length > 0) {
+    const nameColonMatch = name.match(/:\s*(.+)/)
+    if (nameColonMatch) return nameColonMatch[1].trim().toLowerCase()
+  }
+
   try {
     return JSON.stringify(error).toLowerCase()
   } catch {
@@ -28,18 +35,28 @@ export function getErrorMessage(error: unknown): string {
   }
 }
 
+const DEFAULT_RETRY_PATTERN = new RegExp(`\\b(${DEFAULT_CONFIG.retry_on_errors.join("|")})\\b`)
+
 export function extractStatusCode(error: unknown, retryOnErrors?: number[]): number | undefined {
   if (!error) return undefined
 
   const errorObj = error as Record<string, unknown>
 
-  const statusCode = errorObj.statusCode ?? errorObj.status ?? (errorObj.data as Record<string, unknown>)?.statusCode
-  if (typeof statusCode === "number") {
+  const statusCode = [
+    errorObj.statusCode,
+    errorObj.status,
+    (errorObj.data as Record<string, unknown>)?.statusCode,
+    (errorObj.error as Record<string, unknown>)?.statusCode,
+    (errorObj.cause as Record<string, unknown>)?.statusCode,
+  ].find((code): code is number => typeof code === "number")
+
+  if (statusCode !== undefined) {
     return statusCode
   }
 
-  const codes = retryOnErrors ?? DEFAULT_CONFIG.retry_on_errors
-  const pattern = new RegExp(`\\b(${codes.join("|")})\\b`)
+  const pattern = retryOnErrors 
+    ? new RegExp(`\\b(${retryOnErrors.join("|")})\\b`)
+    : DEFAULT_RETRY_PATTERN
   const message = getErrorMessage(error)
   const statusMatch = message.match(pattern)
   if (statusMatch) {
@@ -102,6 +119,21 @@ export function classifyErrorType(error: unknown): string | undefined {
     return "model_not_found"
   }
 
+  if (
+    errorName?.includes("quotaexceeded") ||
+    errorName?.includes("insufficientquota") ||
+    errorName?.includes("billingerror") ||
+    /quota.?exceeded/i.test(message) ||
+    /subscription.*quota/i.test(message) ||
+    /insufficient.?quota/i.test(message) ||
+    /billing.?(?:hard.?)?limit/i.test(message) ||
+    /exhausted\s+your\s+capacity/i.test(message) ||
+    /out\s+of\s+credits?/i.test(message) ||
+    /payment.?required/i.test(message)
+  ) {
+    return "quota_exceeded"
+  }
+
   return undefined
 }
 
@@ -135,7 +167,7 @@ export function extractAutoRetrySignal(info: Record<string, unknown> | undefined
   const combined = candidates.join("\n")
   if (!combined) return undefined
 
-  const isAutoRetry = AUTO_RETRY_PATTERNS.every((test) => test(combined))
+  const isAutoRetry = AUTO_RETRY_PATTERNS.some((test) => test(combined))
   if (isAutoRetry) {
     return { signal: combined }
   }
@@ -168,6 +200,10 @@ export function isRetryableError(error: unknown, retryOnErrors: number[]): boole
   }
 
   if (errorType === "model_not_found") {
+    return true
+  }
+
+  if (errorType === "quota_exceeded") {
     return true
   }
 

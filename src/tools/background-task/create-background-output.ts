@@ -10,11 +10,13 @@ import { formatTaskResult } from "./task-result-format"
 import { formatTaskStatus } from "./task-status-format"
 
 import { getAgentDisplayName } from "../../shared/agent-display-names"
+import { recordBackgroundOutputConsumption } from "../../shared/background-output-consumption"
 
 const SISYPHUS_JUNIOR_AGENT = getAgentDisplayName("sisyphus-junior")
 
 type ToolContextWithMetadata = {
   sessionID: string
+  messageID?: string
   metadata?: (input: { title?: string; metadata?: Record<string, unknown> }) => void
   callID?: string
   callId?: string
@@ -53,7 +55,7 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
           "Wait for completion (default: false). System notifies when done, so blocking is rarely needed."
         ),
       timeout: tool.schema.number().optional().describe("Max wait time in ms (default: 60000, max: 600000)"),
-      full_session: tool.schema.boolean().optional().describe("Return full session messages with filters (default: true)"),
+      full_session: tool.schema.boolean().optional().describe("Return full session messages with filters (default: false)"),
       include_thinking: tool.schema.boolean().optional().describe("Include thinking/reasoning parts in full_session output (default: false)"),
       message_limit: tool.schema.number().optional().describe("Max messages to return (capped at 100)"),
       since_message_id: tool.schema.string().optional().describe("Return messages after this message ID (exclusive)"),
@@ -122,10 +124,7 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
         }
 
         const isActive = isTaskActiveStatus(resolvedTask.status)
-        const fullSessionProvided = args.full_session !== undefined
-        const fullSession = fullSessionProvided
-          ? (args.full_session ?? true)
-          : true
+        const fullSession = args.full_session ?? false
         const includeThinking = isActive || (args.include_thinking ?? false)
         const includeToolResults = isActive || (args.include_tool_results ?? false)
 
@@ -142,6 +141,7 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
         }
 
         if (resolvedTask.status === "completed") {
+          recordBackgroundOutputConsumption(ctx.sessionID, ctx.messageID, resolvedTask.sessionID)
           return await formatTaskResult(resolvedTask, client)
         }
 
