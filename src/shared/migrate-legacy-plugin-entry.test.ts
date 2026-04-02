@@ -1,4 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test"
+/// <reference path="../../bun-test.d.ts" />
+
+import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -49,6 +51,43 @@ describe("migrateLegacyPluginEntry", () => {
         const content = readFileSync(configPath, "utf-8")
         expect(content).toContain('"oh-my-openagent"')
         expect(content).not.toContain("oh-my-opencode")
+      })
+    })
+  })
+
+  describe("#given renaming the temp file fails after writing the migrated config", () => {
+    describe("#when migrating the config", () => {
+      it("#then keeps the original config untouched and writes the migrated content to a sibling temp file", async () => {
+        const configPath = join(testDir, "opencode.json")
+        const originalContent = JSON.stringify({ plugin: ["oh-my-opencode@latest"] }, null, 2)
+        const tempPath = `${configPath}.tmp`
+        writeFileSync(configPath, originalContent)
+
+        const fs = await import("node:fs")
+        const originalRenameSync = fs.renameSync
+
+        mock.module("node:fs", () => ({
+          ...fs,
+          renameSync: () => {
+            throw new Error("simulated rename failure")
+          },
+        }))
+
+        try {
+          const { migrateLegacyPluginEntry } = await importFreshMigrationModule()
+
+          const result = migrateLegacyPluginEntry(configPath)
+
+          expect(result).toBe(false)
+          expect(readFileSync(configPath, "utf-8")).toBe(originalContent)
+          expect(readFileSync(tempPath, "utf-8")).toContain("oh-my-openagent@latest")
+          expect(readFileSync(tempPath, "utf-8")).not.toContain("oh-my-opencode")
+        } finally {
+          mock.module("node:fs", () => ({
+            ...fs,
+            renameSync: originalRenameSync,
+          }))
+        }
       })
     })
   })
