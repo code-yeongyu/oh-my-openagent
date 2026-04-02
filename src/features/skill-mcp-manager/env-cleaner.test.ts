@@ -112,8 +112,8 @@ describe("createCleanMcpEnvironment", () => {
       process.env.PATH = "/usr/bin"
       process.env.NPM_CONFIG_REGISTRY = "https://private.registry.com"
       const customEnv = {
-        MCP_API_KEY: "secret-key",
-        CUSTOM_VAR: "custom-value",
+        SAFE_CUSTOM_VAR: "custom-value",
+        ANOTHER_SAFE_VAR: "another-value",
       }
 
       // when
@@ -122,8 +122,8 @@ describe("createCleanMcpEnvironment", () => {
       // then
       expect(cleanEnv.PATH).toBe("/usr/bin")
       expect(cleanEnv.NPM_CONFIG_REGISTRY).toBeUndefined()
-      expect(cleanEnv.MCP_API_KEY).toBe("secret-key")
-      expect(cleanEnv.CUSTOM_VAR).toBe("custom-value")
+      expect(cleanEnv.SAFE_CUSTOM_VAR).toBe("custom-value")
+      expect(cleanEnv.ANOTHER_SAFE_VAR).toBe("another-value")
     })
 
     it("custom env can override process.env values", () => {
@@ -138,6 +138,25 @@ describe("createCleanMcpEnvironment", () => {
 
       // then
       expect(cleanEnv.NODE_ENV).toBe("production")
+    })
+
+    it("filters secret keys from customEnv that would bypass process.env filtering", () => {
+      // given - customEnv tries to inject secrets that should be filtered
+      process.env.PATH = "/usr/bin"
+      const customEnv = {
+        MCP_API_KEY: "secret-key-that-should-be-filtered",
+        CUSTOM_SECRET: "another-secret",
+        SAFE_VAR: "safe-value",
+      }
+
+      // when
+      const cleanEnv = createCleanMcpEnvironment(customEnv)
+
+      // then - secret keys from customEnv are filtered despite not being in process.env
+      expect(cleanEnv.MCP_API_KEY).toBeUndefined()
+      expect(cleanEnv.CUSTOM_SECRET).toBeUndefined()
+      expect(cleanEnv.SAFE_VAR).toBe("safe-value")
+      expect(cleanEnv.PATH).toBe("/usr/bin")
     })
   })
 
