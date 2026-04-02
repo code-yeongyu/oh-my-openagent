@@ -50,8 +50,8 @@ function makeMockSpawn(knownPaneIds: string[] = ["%1"]) {
   }
 }
 
-function makeAdapter(storage?: ZellijStorage) {
-  return new ZellijAdapter(mockConfig, storage ?? makeMockStorage(), makeMockSpawn() as any)
+function makeAdapter(storage?: ZellijStorage, spawn?: ReturnType<typeof makeMockSpawn>) {
+  return new ZellijAdapter(mockConfig, storage ?? makeMockStorage(), (spawn ?? makeMockSpawn()) as any)
 }
 
 describe("ZellijAdapter", () => {
@@ -394,7 +394,7 @@ describe("ZellijAdapter", () => {
       await adapter.spawnPane("echo anchor", { label: "omo-external-anchor" })
 
       //#when simulating external pane closure (stale pane ID via new adapter with same storage)
-      const adapter2 = makeAdapter(sharedStorage)
+      const adapter2 = makeAdapter(sharedStorage, makeMockSpawn([]))
       await adapter2.setSessionID(sessionID)
 
       //#then validation should detect stale state and clear it
