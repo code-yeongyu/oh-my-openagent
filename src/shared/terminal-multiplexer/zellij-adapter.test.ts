@@ -386,15 +386,16 @@ describe("ZellijAdapter", () => {
 
   describe("edge cases: externally closed pane", () => {
     it("handles anchor pane closed externally while session active", async () => {
-      //#given adapter with valid anchor pane
+      //#given adapter with valid anchor pane (shared storage so adapter2 sees state)
       const sessionID = "external-close-test"
-      const adapter = makeAdapter()
-      adapter.setSessionID(sessionID)
+      const sharedStorage = makeMockStorage()
+      const adapter = makeAdapter(sharedStorage)
+      await adapter.setSessionID(sessionID)
       await adapter.spawnPane("echo anchor", { label: "omo-external-anchor" })
 
-      //#when simulating external pane closure (stale pane ID)
-      const adapter2 = makeAdapter()
-      adapter2.setSessionID(sessionID)
+      //#when simulating external pane closure (stale pane ID via new adapter with same storage)
+      const adapter2 = makeAdapter(sharedStorage)
+      await adapter2.setSessionID(sessionID)
 
       //#then validation should detect stale state and clear it
       const handle = await adapter2.spawnPane("echo recovery", { label: "omo-recovery" })

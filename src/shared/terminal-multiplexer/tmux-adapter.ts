@@ -192,7 +192,6 @@ export class TmuxAdapter implements Multiplexer {
           label: title,
           nativeId: paneId,
         })
-        this.labelToPaneId.set(title, paneId)
       }
     }
 

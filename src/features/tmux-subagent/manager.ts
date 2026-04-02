@@ -828,6 +828,7 @@ export class TmuxSessionManager {
       log("[tmux-session-manager] adapter spawned pane", { sessionId, title })
     } catch (error) {
       log("[tmux-session-manager] adapter spawn failed", { sessionId, error: String(error) })
+      throw error
     }
   }
 
