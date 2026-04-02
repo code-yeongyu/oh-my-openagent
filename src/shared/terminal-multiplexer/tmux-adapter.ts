@@ -72,7 +72,7 @@ export class TmuxAdapter implements Multiplexer {
     const { label, splitFrom, direction = "horizontal" } = options
 
     const splitDirection = direction === "horizontal" ? "-h" : "-v"
-    const targetPaneId = splitFrom?.nativeId
+    const targetPaneId = splitFrom?.nativeId ?? (splitFrom?.label ? this.labelToPaneId.get(splitFrom.label) : undefined)
 
     if (!this.config.enabled) {
       log("[TmuxAdapter.spawnPane] disabled by config")

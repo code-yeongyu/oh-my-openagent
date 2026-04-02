@@ -163,9 +163,8 @@ describe("zellij-storage", () => {
     saveZellijState(state)
 
     const storagePath = join(testStorageDir, "zellij-adapter", "corrupt-severe-test.json")
-    if (existsSync(storagePath)) {
-      writeFileSync(storagePath, "{ invalid json ]]] garbage <<<>>>")
-    }
+    expect(existsSync(storagePath)).toBe(true)
+    writeFileSync(storagePath, "{ invalid json ]]] garbage <<<>>>")
 
     const result = loadZellijState("corrupt-severe-test")
     expect(result).toBeNull()
@@ -182,9 +181,8 @@ describe("zellij-storage", () => {
     saveZellijState(state)
 
     const storagePath = join(testStorageDir, "zellij-adapter", "empty-file-test.json")
-    if (existsSync(storagePath)) {
-      writeFileSync(storagePath, "")
-    }
+    expect(existsSync(storagePath)).toBe(true)
+    writeFileSync(storagePath, "")
 
     const result = loadZellijState("empty-file-test")
     expect(result).toBeNull()

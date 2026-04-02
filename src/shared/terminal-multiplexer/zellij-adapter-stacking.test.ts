@@ -27,7 +27,7 @@ describe("ZellijAdapter pane stacking and naming", () => {
       const adapter = new ZellijAdapter(mockConfig, undefined, fn)
 
       //#when
-      await adapter.spawnPane("echo cmd", { label: "pane-1", direction: "right" })
+      await adapter.spawnPane("echo cmd", { label: "pane-1", direction: "horizontal" })
 
       //#then the new-pane call should include -d right
       const newPaneCall = calls.find(args => args[2] === "new-pane")

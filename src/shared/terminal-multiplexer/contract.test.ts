@@ -160,7 +160,7 @@ describe.each([
       expect(handle).toBeDefined()
       expect(handle.label).toBe("omo-direction-test")
       const allArgs = (mockSpawn.mock.calls as Array<[string[]]>).flatMap(([a]) => a)
-      expect(allArgs.some(arg => arg === "horizontal" || arg === "-h")).toBe(true)
+      expect(allArgs.some(arg => arg === "right" || arg === "-h")).toBe(true)
     })
   })
 

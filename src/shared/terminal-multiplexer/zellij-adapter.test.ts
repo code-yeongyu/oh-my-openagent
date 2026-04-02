@@ -331,10 +331,11 @@ describe("ZellijAdapter", () => {
 
       //#then - create new adapter with same storage and verify persisted state
       const adapter2 = makeAdapter(sharedStorage)
-      adapter2.setSessionID(sessionID)
-      const loadedState = sharedStorage.loadZellijState(sessionID)
-      expect(loadedState).not.toBeNull()
-      expect(loadedState!.anchorPaneId).toBe("%1")
+      await adapter2.setSessionID(sessionID)
+
+      //#then - adapter2's internal state was restored from persisted storage
+      expect((adapter2 as any).hasCreatedFirstPane).toBe(true)
+      expect((adapter2 as any).anchorPaneId).toBe("%1")
 
       //#cleanup
       sharedStorage.clearZellijState(sessionID)
@@ -362,10 +363,11 @@ describe("ZellijAdapter", () => {
     })
 
     it("handles concurrent setSessionID and spawnPane without race conditions", async () => {
-      //#given multiple adapters with same sessionID
+      //#given multiple adapters sharing storage with same sessionID
       const sessionID = "concurrent-session-test"
-      const adapter1 = makeAdapter()
-      const adapter2 = makeAdapter()
+      const sharedStorage = makeMockStorage()
+      const adapter1 = makeAdapter(sharedStorage)
+      const adapter2 = makeAdapter(sharedStorage)
 
       //#when setting session ID and spawning concurrently
       adapter1.setSessionID(sessionID)

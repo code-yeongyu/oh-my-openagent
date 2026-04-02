@@ -112,7 +112,8 @@ export class ZellijAdapter implements Multiplexer {
   }
 
   async spawnPane(cmd: string, options: SpawnOptions): Promise<PaneHandle> {
-    const { label, displayName, direction = "down" } = options
+    const { label, displayName, direction = "vertical" } = options
+    const zellijDirection = direction === "horizontal" ? "right" : "down"
     const paneName = displayName ?? label
     
     // Check if this is the first pane BEFORE any async operations
@@ -140,7 +141,7 @@ export class ZellijAdapter implements Multiplexer {
     const cmdArgs = ["bash", "-c", wrappedCmd]
 
     const zellijCmd = isFirstPane
-      ? ["zellij", "action", "new-pane", "-d", direction, "-n", paneName, "--close-on-exit", "--", ...cmdArgs]
+      ? ["zellij", "action", "new-pane", "-d", zellijDirection, "-n", paneName, "--close-on-exit", "--", ...cmdArgs]
       : ["zellij", "action", "new-pane", "-d", "down", "-n", paneName, "--close-on-exit", "--", ...cmdArgs]
 
     let paneId = ""
