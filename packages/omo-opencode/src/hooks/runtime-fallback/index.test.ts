@@ -2770,7 +2770,7 @@ describe("runtime-fallback", () => {
       expect(promptCalls).toHaveLength(1)
     })
 
-    test("should retry atlas quota failures with display-name agent and zai fallback", async () => {
+    test("should preserve display-name agent and parsed fallback model during auto-retry", async () => {
       const promptCalls: Array<Record<string, unknown>> = []
       const hook = createRuntimeFallbackHook(
         createMockPluginInput({
