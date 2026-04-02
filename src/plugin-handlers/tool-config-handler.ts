@@ -25,7 +25,7 @@ export function applyToolConfig(params: {
   pluginConfig: OhMyOpenCodeConfig;
   agentResult: Record<string, unknown>;
 }): void {
-  const taskSystemEnabled = params.pluginConfig.experimental?.task_system ?? true
+  const taskSystemEnabled = params.pluginConfig.experimental?.task_system ?? false
   const denyTodoTools = taskSystemEnabled
     ? { todowrite: "deny", todoread: "deny" }
     : {}
