@@ -25,6 +25,10 @@ type StartWorkHookOutput = { parts: Array<{ type: string; text?: string }> }
 
 type SessionModelOverride = { providerID: string; modelID: string }
 
+type RawLoopCommand =
+  | { command: "ralph-loop" | "ulw-loop"; args: string }
+  | { command: "cancel-ralph"; args: "" }
+
 function isStartWorkHookOutput(value: unknown): value is StartWorkHookOutput {
   if (typeof value !== "object" || value === null) return false
   const record = value as Record<string, unknown>
@@ -82,6 +86,33 @@ function getStoredMainSessionModel(
   }
 
   return getSessionModel(input.sessionID)
+}
+
+function parseRawLoopSlashCommand(promptText: string): RawLoopCommand | null {
+  const trimmed = promptText.trim()
+
+  if (!trimmed.startsWith("/")) {
+    return null
+  }
+
+  const cancelMatch = trimmed.match(/^\/cancel-ralph(?:\s+.*)?$/i)
+  if (cancelMatch) {
+    return { command: "cancel-ralph", args: "" }
+  }
+
+  const loopMatch = trimmed.match(/^\/(ralph-loop|ulw-loop)\s*([\s\S]*)$/i)
+  if (!loopMatch) {
+    return null
+  }
+
+  const command = loopMatch[1]?.toLowerCase()
+  const args = loopMatch[2]?.trim() ?? ""
+
+  if (command === "ralph-loop" || command === "ulw-loop") {
+    return { command, args }
+  }
+
+  return null
 }
 
 export function createChatMessageHandler(args: {
@@ -201,19 +232,24 @@ export function createChatMessageHandler(args: {
       const isCancelRalphTemplate = promptText.includes(
         "Cancel the currently active Ralph Loop",
       )
+      const rawLoopCommand =
+        !isRalphLoopTemplate && !isUlwLoopTemplate && !isCancelRalphTemplate
+          ? parseRawLoopSlashCommand(promptText)
+          : null
 
-      if (isRalphLoopTemplate || isUlwLoopTemplate) {
+      if (isRalphLoopTemplate || isUlwLoopTemplate || rawLoopCommand?.command === "ralph-loop" || rawLoopCommand?.command === "ulw-loop") {
         const taskMatch = promptText.match(/<user-task>\s*([\s\S]*?)\s*<\/user-task>/i)
-        const rawTask = taskMatch?.[1]?.trim() || ""
+        const rawTask = taskMatch?.[1]?.trim() || rawLoopCommand?.args || ""
         const parsedArguments = parseRalphLoopArguments(rawTask)
+        const ultrawork = isUlwLoopTemplate || rawLoopCommand?.command === "ulw-loop"
 
         hooks.ralphLoop.startLoop(input.sessionID, parsedArguments.prompt, {
-          ultrawork: isUlwLoopTemplate,
+          ultrawork,
           maxIterations: parsedArguments.maxIterations,
           completionPromise: parsedArguments.completionPromise,
           strategy: parsedArguments.strategy,
         })
-      } else if (isCancelRalphTemplate) {
+      } else if (isCancelRalphTemplate || rawLoopCommand?.command === "cancel-ralph") {
         hooks.ralphLoop.cancelLoop(input.sessionID)
       }
     }

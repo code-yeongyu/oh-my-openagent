@@ -348,6 +348,22 @@ describe("createAutoSlashCommandHook", () => {
       expect(output.parts[0].text).toContain("/ralph-loop Command")
     })
 
+    it("should inject template for known builtin commands like ulw-loop", async () => {
+      //#given
+      const hook = createAutoSlashCommandHook()
+      const input = createCommandInput("ulw-loop", '"Ship feature" --strategy=continue')
+      const output = createCommandOutput("original")
+
+      //#when
+      await hook["command.execute.before"](input, output)
+
+      //#then
+      expect(output.parts[0].text).toContain("<auto-slash-command>")
+      expect(output.parts[0].text).toContain("/ulw-loop Command")
+      expect(output.parts[0].text).toContain("<user-task>")
+      expect(output.parts[0].text).toContain('"Ship feature" --strategy=continue')
+    })
+
     it("should pass command arguments correctly", async () => {
       //#given
       const hook = createAutoSlashCommandHook()

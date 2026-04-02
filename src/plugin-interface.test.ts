@@ -170,3 +170,90 @@ describe("createPluginInterface - command.execute.before", () => {
     expect(readBoulderState(testDir)?.agent).toBe("atlas")
   })
 })
+
+describe("createPluginInterface - ulw-loop native command smoke", () => {
+  let testDir = ""
+
+  beforeEach(() => {
+    testDir = join(tmpdir(), `plugin-interface-ulw-loop-${randomUUID()}`)
+    mkdirSync(testDir, { recursive: true })
+    _resetForTesting()
+    registerAgentName("sisyphus")
+  })
+
+  afterEach(() => {
+    _resetForTesting()
+    rmSync(testDir, { recursive: true, force: true })
+  })
+
+  test("starts the ultrawork loop from the native command flow with parsed arguments intact", async () => {
+    // given
+    const startLoopCalls: Array<{
+      sessionID: string
+      prompt: string
+      options: Record<string, unknown>
+    }> = []
+    const pluginInterface = createPluginInterface({
+      ctx: {
+        directory: testDir,
+        client: { tui: { showToast: async () => {} } },
+      } as never,
+      pluginConfig: {} as never,
+      firstMessageVariantGate: {
+        shouldOverride: () => false,
+        markApplied: () => {},
+        markSessionCreated: () => {},
+        clear: () => {},
+      },
+      managers: {} as never,
+      hooks: {
+        autoSlashCommand: createAutoSlashCommandHook({ skills: [] }),
+        ralphLoop: {
+          startLoop: (sessionID: string, prompt: string, options?: Record<string, unknown>) => {
+            startLoopCalls.push({ sessionID, prompt, options: options ?? {} })
+            return true
+          },
+          cancelLoop: () => true,
+          getState: () => null,
+        },
+      } as never,
+      tools: {},
+    })
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "original" }],
+    }
+
+    // when
+    await pluginInterface["command.execute.before"]?.(
+      {
+        command: "ulw-loop",
+        sessionID: "ses-ulw-native",
+        arguments: '"Ship feature" --strategy=continue',
+      },
+      output as never,
+    )
+    await pluginInterface["chat.message"]?.(
+      {
+        sessionID: "ses-ulw-native",
+        agent: "sisyphus",
+      } as never,
+      output as never,
+    )
+
+    // then
+    expect(output.parts[0]?.text).toContain("/ulw-loop Command")
+    expect(startLoopCalls).toEqual([
+      {
+        sessionID: "ses-ulw-native",
+        prompt: "Ship feature",
+        options: {
+          ultrawork: true,
+          maxIterations: undefined,
+          completionPromise: undefined,
+          strategy: "continue",
+        },
+      },
+    ])
+  })
+})
