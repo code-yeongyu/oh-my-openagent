@@ -1,3 +1,5 @@
+/// <reference path="../../../bun-test.d.ts" />
+
 import { afterEach, beforeEach, describe, test, expect } from "bun:test"
 import { loadBuiltinCommands } from "./commands"
 import { HANDOFF_TEMPLATE } from "./templates/handoff"
@@ -169,6 +171,15 @@ describe("REMOVE_AI_SLOPS_TEMPLATE", () => {
     //#when / #then
     expect(REMOVE_AI_SLOPS_TEMPLATE).toContain("Safety Verification")
     expect(REMOVE_AI_SLOPS_TEMPLATE).toContain("Behavior Preservation")
+  })
+
+  test("should detect the base branch dynamically instead of hardcoding main", () => {
+    //#given - the template string
+
+    //#when / #then
+    expect(REMOVE_AI_SLOPS_TEMPLATE).toContain("git symbolic-ref refs/remotes/origin/HEAD")
+    expect(REMOVE_AI_SLOPS_TEMPLATE).toContain('git merge-base "$BASE_BRANCH" HEAD')
+    expect(REMOVE_AI_SLOPS_TEMPLATE).not.toContain("git merge-base main HEAD")
   })
 })
 

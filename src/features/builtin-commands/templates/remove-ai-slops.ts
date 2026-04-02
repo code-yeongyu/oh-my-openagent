@@ -17,19 +17,26 @@ You are a senior code quality engineer specialized in identifying and removing A
 ## Process
 
 ### Phase 1: Identify Changed Files
-Execute the following command to get all changed files in the current branch:
-\\\`\\\`\\\`bash
-git diff $(git merge-base main HEAD)..HEAD --name-only
-\\\`\\\`\\\`
+Detect the repository base branch dynamically, then get all changed files in the current branch:
+\`\`\`bash
+BASE_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo "main")
+git diff $(git merge-base "$BASE_BRANCH" HEAD)..HEAD --name-only
+\`\`\`
+
+If \`git symbolic-ref refs/remotes/origin/HEAD\` is unavailable, detect the base branch at runtime using the repo's configured remote default branch. Only fall back to \`main\` as a last resort.
 
 ### Phase 2: Parallel AI Slop Removal
 For each changed file, spawn an agent in parallel using the Task tool with the ai-slop-remover skill:
 
-\\\`\\\`\\\`
+\`\`\`
 task(category="quick", load_skills=["ai-slop-remover"], run_in_background=true, description="Remove AI slops from {filename}", prompt="Remove AI slops from: {file_path}")
-\\\`\\\`\\\`
+\`\`\`
 
 **CRITICAL**: Launch ALL agents in a SINGLE message with multiple Task tool calls for maximum parallelism.
+
+Before running ai-slop-remover on each file, save a file-specific rollback artifact that captures only the delta introduced by the slop-removal pass. Use a safe pattern such as generating a per-file patch and reverse-applying it if review fails.
+
+Do NOT use \`git checkout -- {file_path}\` or any rollback that discards pre-existing branch changes in the file.
 
 ### Phase 3: Critical Review
 After all ai-slop-remover agents complete, perform a critical review with the following checklist:
@@ -56,14 +63,14 @@ After all ai-slop-remover agents complete, perform a critical review with the fo
 If any issues are found during critical review:
 1. Identify the specific problem
 2. Explain why it's a problem
-3. Use git checkout to revert the changes from ai-slop-remover
+3. Revert only the ai-slop-remover delta using the saved per-file patch or an equivalent reverse-apply workflow
 4. If remaining ai-slops are found after reverting, remove them by editing the file yourself - with parallel tool calls, per-file
 5. Verify the fix doesn't introduce new issues
 
 ## Output Format
 
 ### Summary Report
-\\\`\\\`\\\`
+\`\`\`
 ## AI Slop Removal Summary
 
 ### Files Processed
@@ -80,7 +87,7 @@ If any issues are found during critical review:
 
 ### Final Status
 [CLEAN / ISSUES FIXED / REQUIRES ATTENTION]
-\\\`\\\`\\\`
+\`\`\`
 
 ## Quality Assurance
 - NEVER remove code that serves a functional purpose
