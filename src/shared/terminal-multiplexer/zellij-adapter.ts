@@ -29,6 +29,7 @@ export class ZellijAdapter implements Multiplexer {
   private sessionID: string | null = null
   private storage: ZellijStorage
   private spawn: SpawnFn
+  private pendingSpawns = 0
 
   constructor(config: ZellijAdapterConfig, storage: ZellijStorage = defaultZellijStorage, spawnFn: SpawnFn = bunSpawn) {
     this.config = config
@@ -115,6 +116,8 @@ export class ZellijAdapter implements Multiplexer {
     const { label, displayName, direction = "vertical" } = options
     const zellijDirection = direction === "horizontal" ? "right" : "down"
     const paneName = displayName ?? label
+    
+    this.pendingSpawns++
     
     // Check if this is the first pane BEFORE any async operations
     const isFirstPane = !this.hasCreatedFirstPane
@@ -208,7 +211,6 @@ export class ZellijAdapter implements Multiplexer {
           this.anchorReadyResolver?.(null)
           this.anchorReadyResolver = null
           this.anchorReadyPromise = null
-          this.hasCreatedFirstPane = false
         }
       } else if (this.anchorReadyPromise) {
         const anchorId = await this.anchorReadyPromise
@@ -235,13 +237,15 @@ export class ZellijAdapter implements Multiplexer {
         log("[ZellijAdapter.spawnPane] first-pane spawn failed, releasing anchorReadyPromise", { label, error })
         this.anchorReadyResolver?.(null)
         this.anchorReadyResolver = null
-        this.anchorReadyPromise = null
-        this.hasCreatedFirstPane = false
+      this.anchorReadyPromise = null
+          this.hasCreatedFirstPane = false
       }
+      this.pendingSpawns--
       throw error
     }
 
     this.labelToSpawned.set(label, true)
+    this.pendingSpawns--
 
     if (this.sessionID && isFirstPane) {
       this.storage.saveZellijState({
@@ -289,7 +293,7 @@ export class ZellijAdapter implements Multiplexer {
       
       this.labelToSpawned.delete(handle.label)
 
-      if (this.labelToSpawned.size === 0) {
+      if (this.labelToSpawned.size === 0 && this.pendingSpawns === 0) {
         this.anchorPaneId = null
         this.hasCreatedFirstPane = false
         log("[ZellijAdapter.closePane] last pane closed, reset anchor state")

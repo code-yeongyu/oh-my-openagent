@@ -40,7 +40,7 @@ export async function createManagers(args: {
     adapter = createMultiplexer("zellij", {
       zellij: { enabled: true },
     })
-    const zellijSessionName = process.env.ZELLIJ_SESSION_NAME
+    const zellijSessionName = process.env.ZELLIJ_SESSION_NAME ?? (process.env.ZELLIJ ? "default" : undefined)
     if (zellijSessionName && adapter.setSessionID) {
       await adapter.setSessionID(zellijSessionName)
     }

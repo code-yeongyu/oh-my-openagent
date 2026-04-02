@@ -370,8 +370,8 @@ describe("ZellijAdapter", () => {
       const adapter2 = makeAdapter(sharedStorage)
 
       //#when setting session ID and spawning concurrently
-      adapter1.setSessionID(sessionID)
-      adapter2.setSessionID(sessionID)
+      await adapter1.setSessionID(sessionID)
+      await adapter2.setSessionID(sessionID)
 
       const promises = [
         adapter1.spawnPane("echo first", { label: "omo-adapter1-pane" }),
@@ -381,6 +381,25 @@ describe("ZellijAdapter", () => {
       //#then both complete successfully
       const results = await Promise.all(promises)
       expect(results).toHaveLength(2)
+    })
+
+    it("does not reset anchor when closePane races with in-flight spawnPane", async () => {
+      //#given adapter with first pane already spawned
+      const storage = makeMockStorage()
+      const adapter = makeAdapter(storage)
+      await adapter.setSessionID("race-close-test")
+      await adapter.spawnPane("echo first", { label: "omo-race-first" })
+
+      //#when spawnPane is in-flight and closePane removes the last tracked pane
+      const spawnPromise = adapter.spawnPane("echo second", { label: "omo-race-second" })
+      await adapter.closePane({ label: "omo-race-first" })
+
+      //#then spawn completes and the new pane is tracked (anchor not reset mid-spawn)
+      const handle = await spawnPromise
+      expect(handle.label).toBe("omo-race-second")
+      const panes = await adapter.getPanes()
+      expect(panes.length).toBe(1)
+      expect(panes[0].label).toBe("omo-race-second")
     })
   })
 

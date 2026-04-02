@@ -117,6 +117,10 @@ export class TmuxSessionManager {
       sourcePaneId: this.sourcePaneId,
     })
   }
+  // When a non-tmux adapter (e.g. zellij) is injected, its own `enabled` flag is
+  // authoritative. The legacy `tmuxConfig.enabled` only gates the tmux-specific path
+  // because the adapter is only created when its own config (`zellijEnabled`) is true
+  // in create-managers.ts — so there is no bypass risk.
   private isEnabled(): boolean {
     if (this.adapter) return this.adapter.enabled
     return this.tmuxConfig.enabled && this.deps.isInsideTmux()

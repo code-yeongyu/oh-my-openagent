@@ -150,9 +150,11 @@ export class TmuxAdapter implements Multiplexer {
       stdout: "pipe",
       stderr: "pipe",
     })
-    await killProc.exited
+    const killExitCode = await killProc.exited
 
-    this.labelToPaneId.delete(handle.label)
+    if (killExitCode === 0) {
+      this.labelToPaneId.delete(handle.label)
+    }
   }
 
   async getPanes(): Promise<PaneHandle[]> {
