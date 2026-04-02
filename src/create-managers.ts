@@ -35,11 +35,8 @@ export async function createManagers(args: {
   const provider = terminalConfig?.provider ?? "auto"
   let adapter = null
 
-  const zellijEnabled = terminalConfig?.zellij?.enabled ?? true
-  if (zellijEnabled && (provider === "zellij" || (provider === "auto" && await detectMultiplexer() === "zellij"))) {
-    adapter = createMultiplexer("zellij", {
-      zellij: { enabled: true },
-    })
+  if (provider === "zellij" || (provider === "auto" && await detectMultiplexer() === "zellij")) {
+    adapter = createMultiplexer("zellij")
     const zellijSessionName = process.env.ZELLIJ_SESSION_NAME ?? (process.env.ZELLIJ ? "default" : undefined)
     if (zellijSessionName && adapter.setSessionID) {
       await adapter.setSessionID(zellijSessionName)
@@ -47,9 +44,7 @@ export async function createManagers(args: {
     log("[create-managers] zellij adapter created", { zellijSessionName })
   }
 
-  const tmuxSessionManager = adapter
-    ? new TmuxSessionManager(ctx, adapter, tmuxConfig)
-    : new TmuxSessionManager(ctx, tmuxConfig)
+  const tmuxSessionManager = new TmuxSessionManager(ctx, adapter, tmuxConfig)
 
   registerManagerForCleanup({
     shutdown: async () => {

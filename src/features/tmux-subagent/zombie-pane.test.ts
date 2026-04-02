@@ -146,7 +146,7 @@ function getCloseSessionById(target: object): (sessionId: string) => Promise<voi
 function createManager(
   TmuxSessionManager: typeof import("./manager").TmuxSessionManager,
 ): import("./manager").TmuxSessionManager {
-  return Reflect.construct(TmuxSessionManager, [createContext(), createConfig(), mockTmuxDeps])
+  return Reflect.construct(TmuxSessionManager, [createContext(), null, createConfig(), mockTmuxDeps])
 }
 
 describe("TmuxSessionManager zombie pane handling", () => {

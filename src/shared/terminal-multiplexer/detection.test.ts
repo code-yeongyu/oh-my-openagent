@@ -134,40 +134,17 @@ describe("createMultiplexer", () => {
     expect(adapter.type).toBe("zellij")
   })
 
-  it("passes tmux config to TmuxAdapter", () => {
+  it("creates ZellijAdapter for zellij type", () => {
     //#given
-    const config = {
-      tmux: {
-        enabled: true,
-        sessionPrefix: "omo-",
-      },
-    }
-
     //#when
-    const adapter = createMultiplexer("tmux", config)
-
-    //#then
-    expect(adapter).toBeInstanceOf(TmuxAdapter)
-    expect(adapter.type).toBe("tmux")
-  })
-
-  it("passes zellij config to ZellijAdapter", () => {
-    //#given
-    const config = {
-      zellij: {
-        enabled: true,
-      },
-    }
-
-    //#when
-    const adapter = createMultiplexer("zellij", config)
+    const adapter = createMultiplexer("zellij")
 
     //#then
     expect(adapter).toBeInstanceOf(ZellijAdapter)
     expect(adapter.type).toBe("zellij")
   })
 
-  it("uses default config when none provided", () => {
+  it("uses default when none provided", () => {
     //#given
     //#when
     const tmuxAdapter = createMultiplexer("tmux")

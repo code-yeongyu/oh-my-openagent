@@ -1,7 +1,7 @@
 import { spawn } from "bun"
 import type { MultiplexerType, Multiplexer } from "./types"
-import { TmuxAdapter, type TmuxAdapterConfig } from "./tmux-adapter"
-import { ZellijAdapter, type ZellijAdapterConfig } from "./zellij-adapter"
+import { TmuxAdapter } from "./tmux-adapter"
+import { ZellijAdapter } from "./zellij-adapter"
 import { defaultZellijStorage, type ZellijStorage } from "./zellij-storage"
 import { log } from "../logger"
 
@@ -65,18 +65,14 @@ export async function detectMultiplexer(
 
 export function createMultiplexer(
   type: MultiplexerType,
-  config?: { tmux?: TmuxAdapterConfig; zellij?: ZellijAdapterConfig },
   zellijStorage: ZellijStorage = defaultZellijStorage
 ): Multiplexer {
-  const tmuxConfig: TmuxAdapterConfig = config?.tmux || { enabled: true }
-  const zellijConfig: ZellijAdapterConfig = config?.zellij || { enabled: true }
-
   if (type === "tmux") {
-    return new TmuxAdapter(tmuxConfig)
+    return new TmuxAdapter()
   }
 
   if (type === "zellij") {
-    return new ZellijAdapter(zellijConfig, zellijStorage)
+    return new ZellijAdapter(zellijStorage)
   }
 
   throw new Error(`Unknown multiplexer type: ${type}`)

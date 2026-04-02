@@ -75,21 +75,11 @@ export class TmuxSessionManager {
   private deps: TmuxUtilDeps
   private pollingManager: TmuxPollingManager
   private isolatedWindowPaneId: string | undefined
-  constructor(ctx: PluginInput, adapterOrConfig: Multiplexer | TmuxConfig, tmuxConfigOrDeps?: TmuxConfig | TmuxUtilDeps, deps: TmuxUtilDeps = defaultTmuxDeps) {
+  constructor(ctx: PluginInput, adapter: Multiplexer | null, tmuxConfig: TmuxConfig, deps: TmuxUtilDeps = defaultTmuxDeps) {
     this.client = ctx.client
-    // Support both old 2-arg API (ctx, tmuxConfig) and new 3-arg API (ctx, adapter, tmuxConfig)
-    if (adapterOrConfig && 'type' in adapterOrConfig && 'capabilities' in adapterOrConfig) {
-      // New API: (ctx, adapter, tmuxConfig, deps?)
-      this.adapter = adapterOrConfig as Multiplexer
-      this.tmuxConfig = tmuxConfigOrDeps as TmuxConfig
-      if (deps !== defaultTmuxDeps) this.deps = deps
-      else this.deps = defaultTmuxDeps
-    } else {
-      // Old API: (ctx, tmuxConfig, deps?)
-      this.adapter = null
-      this.tmuxConfig = adapterOrConfig as TmuxConfig
-      this.deps = (tmuxConfigOrDeps as TmuxUtilDeps | undefined) ?? defaultTmuxDeps
-    }
+    this.adapter = adapter
+    this.tmuxConfig = tmuxConfig
+    this.deps = deps
     const defaultPort = process.env.OPENCODE_PORT ?? "4096"
     const fallbackUrl = `http://localhost:${defaultPort}`
     try {
@@ -117,12 +107,8 @@ export class TmuxSessionManager {
       sourcePaneId: this.sourcePaneId,
     })
   }
-  // When a non-tmux adapter (e.g. zellij) is injected, its own `enabled` flag is
-  // authoritative. The legacy `tmuxConfig.enabled` only gates the tmux-specific path
-  // because the adapter is only created when its own config (`zellijEnabled`) is true
-  // in create-managers.ts — so there is no bypass risk.
   private isEnabled(): boolean {
-    if (this.adapter) return this.adapter.enabled
+    if (this.adapter) return true
     return this.tmuxConfig.enabled && this.deps.isInsideTmux()
   }
 
@@ -732,20 +718,10 @@ export class TmuxSessionManager {
 
     this.removeDeferredSession(event.sessionID)
 
-    const handle = this.sessionHandles.get(event.sessionID)
-    if (handle) {
-      try {
-        await this.adapter?.closePane(handle)
-        this.sessionHandles.delete(event.sessionID)
-      } catch (error) {
-        log("[tmux-session-manager] onSessionDeleted adapter close error", {
-          sessionId: event.sessionID,
-          error: String(error),
-        })
-      }
+    if (!this.sourcePaneId) {
+      this.removeTrackedSession(event.sessionID)
+      return
     }
-
-    if (!this.sourcePaneId) return
 
     const tracked = this.sessions.get(event.sessionID)
     if (!tracked) return

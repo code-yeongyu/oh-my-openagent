@@ -26,15 +26,8 @@ const mockSpawn = mock((args: string[]) => {
   }
 })
 
-const mockConfig = {
-  enabled: true,
-  sessionPrefix: "omo-test",
-}
-
-type AdapterConfig = typeof mockConfig
-
-let TmuxAdapter: new (config: AdapterConfig, spawnFn?: typeof mockSpawn, tmuxPath?: string) => Multiplexer
-let ZellijAdapter: new (config: AdapterConfig, storage?: unknown, spawnFn?: typeof mockSpawn) => Multiplexer
+let TmuxAdapter: new (spawnFn?: typeof mockSpawn, tmuxPath?: string) => Multiplexer
+let ZellijAdapter: new (storage?: unknown, spawnFn?: typeof mockSpawn) => Multiplexer
 
 try {
   TmuxAdapter = require("./tmux-adapter").TmuxAdapter
@@ -42,9 +35,8 @@ try {
   console.error(e)
   TmuxAdapter = class NotImplementedTmuxAdapter implements Multiplexer {
     type = "tmux" as const
-    enabled = true
     capabilities = { manualLayout: true, persistentLabels: false }
-    constructor(_config: AdapterConfig, _spawnFn?: unknown, _tmuxPath?: string) {
+    constructor(_spawnFn?: unknown, _tmuxPath?: string) {
       throw new Error("TmuxAdapter not implemented yet")
     }
     async ensureSession(_name: string): Promise<void> {
@@ -71,9 +63,8 @@ try {
   console.error(e)
   ZellijAdapter = class NotImplementedZellijAdapter implements Multiplexer {
     type = "zellij" as const
-    enabled = true
     capabilities = { manualLayout: false, persistentLabels: true }
-    constructor(_config: AdapterConfig) {
+    constructor() {
       throw new Error("ZellijAdapter not implemented yet")
     }
     async ensureSession(_name: string): Promise<void> {
@@ -95,8 +86,8 @@ try {
 }
 
 describe.each([
-  ["TmuxAdapter", () => new TmuxAdapter(mockConfig, mockSpawn, "tmux")],
-  ["ZellijAdapter", () => new ZellijAdapter(mockConfig, undefined, mockSpawn)],
+  ["TmuxAdapter", () => new TmuxAdapter(mockSpawn, "tmux")],
+  ["ZellijAdapter", () => new ZellijAdapter(undefined, mockSpawn)],
 ])("%s contract", (_name, createAdapter) => {
   let savedTMUX: string | undefined
   let savedTMUX_PANE: string | undefined

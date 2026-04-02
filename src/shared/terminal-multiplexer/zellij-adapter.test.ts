@@ -2,10 +2,6 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test"
 import { ZellijAdapter } from "./zellij-adapter"
 import type { ZellijStorage, ZellijState } from "./zellij-storage"
 
-const mockConfig = {
-  enabled: true,
-}
-
 function makeMockStorage(): ZellijStorage & { _store: Map<string, ZellijState> } {
   const store = new Map<string, ZellijState>()
   return {
@@ -51,7 +47,7 @@ function makeMockSpawn(knownPaneIds: string[] = ["%1"]) {
 }
 
 function makeAdapter(storage?: ZellijStorage, spawn?: ReturnType<typeof makeMockSpawn>) {
-  return new ZellijAdapter(mockConfig, storage ?? makeMockStorage(), (spawn ?? makeMockSpawn()) as any)
+  return new ZellijAdapter(storage ?? makeMockStorage(), (spawn ?? makeMockSpawn()) as any)
 }
 
 describe("ZellijAdapter", () => {
@@ -121,8 +117,8 @@ describe("ZellijAdapter", () => {
       //#when
       await adapter.closePane({ label: "omo-close-test" })
 
-      //#then - label should be removed from internal labelToSpawned map
-      expect((adapter as any).labelToSpawned.has("omo-close-test")).toBe(false)
+      //#then - label should be removed from internal spawnedPanes map
+      expect((adapter as any).spawnedPanes.has("omo-close-test")).toBe(false)
     })
 
     it("handles closing non-existent pane gracefully", async () => {
@@ -201,7 +197,7 @@ describe("ZellijAdapter", () => {
         hasCreatedFirstPane: true,
         updatedAt: Date.now(),
       })
-      const adapter = new ZellijAdapter(mockConfig, storage, makeMockSpawn(["%1", "pane-123"]) as any)
+      const adapter = new ZellijAdapter(storage, makeMockSpawn(["%1", "pane-123"]) as any)
 
       //#when
       await adapter.setSessionID(sessionID)
@@ -309,7 +305,7 @@ describe("ZellijAdapter", () => {
         hasCreatedFirstPane: true,
         updatedAt: Date.now(),
       })
-      const adapter = new ZellijAdapter(mockConfig, storage, makeMockSpawn() as any)
+      const adapter = new ZellijAdapter(storage, makeMockSpawn() as any)
 
       //#when
       await adapter.setSessionID(sessionID)
@@ -433,7 +429,7 @@ describe("ZellijAdapter", () => {
       })
 
       //#when loading state and spawning new pane
-      const adapter = new ZellijAdapter(mockConfig, storage, makeMockSpawn() as any)
+      const adapter = new ZellijAdapter(storage, makeMockSpawn() as any)
       await adapter.setSessionID(sessionID)
       const handle = await adapter.spawnPane("echo new", { label: "omo-new-after-invalid" })
 

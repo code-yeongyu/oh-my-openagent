@@ -1,11 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test"
 import { TmuxAdapter } from "./tmux-adapter"
 
-const mockConfig = {
-  enabled: true,
-  sessionPrefix: "omo-test",
-}
-
 const MOCK_TMUX_PATH = "/mock/tmux"
 
 function emptyStream() {
@@ -136,7 +131,7 @@ function makeMockSpawn() {
 
 function makeAdapter() {
   const mock = makeMockSpawn()
-  const adapter = new TmuxAdapter(mockConfig, mock.spawn as any, MOCK_TMUX_PATH)
+  const adapter = new TmuxAdapter(mock.spawn as any, MOCK_TMUX_PATH)
   return { adapter, mock }
 }
 

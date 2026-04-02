@@ -20,7 +20,6 @@ export interface SpawnOptions {
 export interface Multiplexer {
   type: MultiplexerType
   capabilities: MultiplexerCapabilities
-  enabled: boolean
 
   setSessionID?(sessionID: string): Promise<void>
 

@@ -1,8 +1,6 @@
 import { describe, it, expect, beforeEach } from "bun:test"
 import { ZellijAdapter } from "./zellij-adapter"
 
-const mockConfig = { enabled: true }
-
 function makeTrackingSpawn() {
   const calls: string[][] = []
   const encoder = new TextEncoder()
@@ -24,7 +22,7 @@ describe("ZellijAdapter pane stacking and naming", () => {
     it("uses the provided direction flag for the anchor pane", async () => {
       //#given
       const { calls, fn } = makeTrackingSpawn()
-      const adapter = new ZellijAdapter(mockConfig, undefined, fn)
+      const adapter = new ZellijAdapter(undefined, fn)
 
       //#when
       await adapter.spawnPane("echo cmd", { label: "pane-1", direction: "horizontal" })
@@ -39,7 +37,7 @@ describe("ZellijAdapter pane stacking and naming", () => {
     it("defaults to -d down when no direction provided for anchor pane", async () => {
       //#given
       const { calls, fn } = makeTrackingSpawn()
-      const adapter = new ZellijAdapter(mockConfig, undefined, fn)
+      const adapter = new ZellijAdapter(undefined, fn)
 
       //#when
       await adapter.spawnPane("echo cmd", { label: "pane-anchor-default" })
@@ -53,7 +51,7 @@ describe("ZellijAdapter pane stacking and naming", () => {
     it("uses label as pane name when no displayName provided", async () => {
       //#given
       const { calls, fn } = makeTrackingSpawn()
-      const adapter = new ZellijAdapter(mockConfig, undefined, fn)
+      const adapter = new ZellijAdapter(undefined, fn)
 
       //#when
       await adapter.spawnPane("echo cmd", { label: "my-label" })
@@ -67,7 +65,7 @@ describe("ZellijAdapter pane stacking and naming", () => {
     it("uses displayName as pane name when provided", async () => {
       //#given
       const { calls, fn } = makeTrackingSpawn()
-      const adapter = new ZellijAdapter(mockConfig, undefined, fn)
+      const adapter = new ZellijAdapter(undefined, fn)
 
       //#when
       await adapter.spawnPane("echo cmd", { label: "ses_abc123", displayName: "Agent: My Task" })
@@ -83,7 +81,7 @@ describe("ZellijAdapter pane stacking and naming", () => {
     it("always uses -d down for non-anchor panes regardless of direction option", async () => {
       //#given - first pane establishes anchor
       const { calls, fn } = makeTrackingSpawn()
-      const adapter = new ZellijAdapter(mockConfig, undefined, fn)
+      const adapter = new ZellijAdapter(undefined, fn)
       await adapter.spawnPane("echo first", { label: "anchor-pane" })
       calls.length = 0
 
@@ -100,7 +98,7 @@ describe("ZellijAdapter pane stacking and naming", () => {
     it("calls stack-panes after spawning subsequent pane", async () => {
       //#given - first pane establishes anchor
       const { calls, fn } = makeTrackingSpawn()
-      const adapter = new ZellijAdapter(mockConfig, undefined, fn)
+      const adapter = new ZellijAdapter(undefined, fn)
       await adapter.spawnPane("echo first", { label: "anchor-pane" })
       calls.length = 0
 
@@ -115,7 +113,7 @@ describe("ZellijAdapter pane stacking and naming", () => {
     it("does not call stack-panes for the first pane", async () => {
       //#given fresh adapter (no anchor established yet)
       const { calls, fn } = makeTrackingSpawn()
-      const adapter = new ZellijAdapter(mockConfig, undefined, fn)
+      const adapter = new ZellijAdapter(undefined, fn)
 
       //#when spawning only the first pane
       await adapter.spawnPane("echo first", { label: "only-pane" })
@@ -128,7 +126,7 @@ describe("ZellijAdapter pane stacking and naming", () => {
     it("uses displayName for non-anchor pane name", async () => {
       //#given
       const { calls, fn } = makeTrackingSpawn()
-      const adapter = new ZellijAdapter(mockConfig, undefined, fn)
+      const adapter = new ZellijAdapter(undefined, fn)
       await adapter.spawnPane("echo first", { label: "anchor" })
       calls.length = 0
 

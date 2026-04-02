@@ -9,11 +9,6 @@ import { log } from "../logger"
 
 type SpawnFn = typeof bunSpawn
 
-export interface TmuxAdapterConfig {
-  enabled: boolean
-  sessionPrefix?: string
-}
-
 export class TmuxAdapter implements Multiplexer {
   type = "tmux" as const
   capabilities: MultiplexerCapabilities = {
@@ -21,17 +16,11 @@ export class TmuxAdapter implements Multiplexer {
     persistentLabels: false,
   }
 
-  get enabled(): boolean {
-    return this.config.enabled
-  }
-
   private labelToPaneId = new Map<string, string>()
-  private config: TmuxAdapterConfig
   private spawn: SpawnFn
   private overrideTmuxPath: string | undefined
 
-  constructor(config: TmuxAdapterConfig, spawnFn: SpawnFn = bunSpawn, tmuxPath?: string) {
-    this.config = config
+  constructor(spawnFn: SpawnFn = bunSpawn, tmuxPath?: string) {
     this.spawn = spawnFn
     this.overrideTmuxPath = tmuxPath
   }
@@ -73,11 +62,6 @@ export class TmuxAdapter implements Multiplexer {
 
     const splitDirection = direction === "horizontal" ? "-h" : "-v"
     const targetPaneId = splitFrom?.nativeId ?? (splitFrom?.label ? this.labelToPaneId.get(splitFrom.label) : undefined)
-
-    if (!this.config.enabled) {
-      log("[TmuxAdapter.spawnPane] disabled by config")
-      return { label }
-    }
 
     if (!isInsideTmux()) {
       log("[TmuxAdapter.spawnPane] not inside tmux")
