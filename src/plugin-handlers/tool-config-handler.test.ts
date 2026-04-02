@@ -224,7 +224,7 @@ describe("applyToolConfig", () => {
         "hephaestus",
         "prometheus",
         "sisyphus-junior",
-      ])("#then should deny todo tools for %s agent by default", (agentName) => {
+      ])("#then should NOT deny todo tools for %s agent by default", (agentName) => {
         const params = createParams({
           agents: [agentName],
         })
@@ -234,8 +234,8 @@ describe("applyToolConfig", () => {
         const agent = params.agentResult[agentName] as {
           permission: Record<string, unknown>
         }
-        expect(agent.permission.todowrite).toBe("deny")
-        expect(agent.permission.todoread).toBe("deny")
+        expect(agent.permission.todowrite).toBeUndefined()
+        expect(agent.permission.todoread).toBeUndefined()
       })
     })
   })
