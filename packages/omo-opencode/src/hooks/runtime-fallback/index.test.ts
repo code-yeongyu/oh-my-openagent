@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 import type { OhMyOpenCodeConfig, RuntimeFallbackConfig } from "../../config"
+import { registerAgentName } from "../../features/claude-code-session-state"
+import { getAgentDisplayName } from "../../shared/agent-display-names"
 import {
   clearAllDelegatedChildSessionBootstrap,
   getDelegatedChildSessionBootstrap,
@@ -12,6 +14,7 @@ import {
   releaseAllPromptAsyncReservationsForTesting,
   releasePromptAsyncReservation,
 } from "../shared/prompt-async-gate"
+import { AGENT_NAMES } from "./agent-resolver"
 import type { RuntimeFallbackPluginInput } from "./types"
 
 type RuntimeFallbackModule = typeof import("./hook")
@@ -2606,6 +2609,8 @@ describe("runtime-fallback", () => {
       }
     }
 
+    const runtimeFallbackAgentCases = AGENT_NAMES.map((agentConfigKey) => [agentConfigKey, getAgentDisplayName(agentConfigKey)] as const)
+
     test("should use agent-level fallback_models", async () => {
       const input = createMockPluginInput()
       const hook = createRuntimeFallbackHook(input, {
@@ -2663,51 +2668,56 @@ describe("runtime-fallback", () => {
       expect(fallbackLog?.data).toMatchObject({ to: "openai/gpt-5.4" })
     })
 
-    test("should preserve resolved agent during auto-retry", async () => {
-      const promptCalls: Array<Record<string, unknown>> = []
-      const hook = createRuntimeFallbackHook(
-        createMockPluginInput({
-          session: {
-            messages: async () => ({
-              data: [
-                {
-                  info: { role: "user" },
-                  parts: [{ type: "text", text: "test" }],
-                },
-              ],
-            }),
-            promptAsync: async (args: unknown) => {
-              promptCalls.push(args as Record<string, unknown>)
-              return {}
+    test("should preserve display-name agents and parsed fallback models during auto-retry", async () => {
+      expect(runtimeFallbackAgentCases.length).toBeGreaterThan(0)
+
+      for (const [index, [agentConfigKey, agentDisplayName]] of runtimeFallbackAgentCases.entries()) {
+        registerAgentName(agentDisplayName)
+        const promptCalls: Array<Record<string, unknown>> = []
+        const fallbackModelProviderID = `provider-${index}`
+        const fallbackModelID = `model-${index}`
+        const fallbackModel = `${fallbackModelProviderID}/${fallbackModelID}`
+        const hook = createRuntimeFallbackHook(
+          createMockPluginInput({
+            session: {
+              messages: async () => ({
+                data: [
+                  {
+                    info: { role: "user" },
+                    parts: [{ type: "text", text: "test" }],
+                  },
+                ],
+              }),
+              promptAsync: async (args: unknown) => {
+                promptCalls.push(args as Record<string, unknown>)
+                return {}
+              },
+            },
+          }),
+          {
+            config: createMockConfig({ notify_on_fallback: false }),
+            pluginConfig: createMockPluginConfigWithAgentFallback(agentConfigKey, [fallbackModel]),
+          },
+        )
+        const sessionID = `test-preserve-agent-on-retry-${agentConfigKey}`
+
+        await hook.event({
+          event: {
+            type: "session.error",
+            properties: {
+              sessionID,
+              model: "source-provider/source-model",
+              error: { statusCode: 503, message: "Service unavailable" },
+              agent: agentConfigKey,
             },
           },
-        }),
-        {
-          config: createMockConfig({ notify_on_fallback: false }),
-          pluginConfig: createMockPluginConfigWithAgentFallback("prometheus", [
-            "github-copilot/claude-opus-4.7",
-            "openai/gpt-5.4",
-          ]),
-        },
-      )
-      const sessionID = "test-preserve-agent-on-retry"
+        })
 
-      await hook.event({
-        event: {
-          type: "session.error",
-          properties: {
-            sessionID,
-            model: "anthropic/claude-opus-4-7",
-            error: { statusCode: 503, message: "Service unavailable" },
-            agent: "prometheus",
-          },
-        },
-      })
-
-      expect(promptCalls.length).toBe(1)
-      const callBody = promptCalls[0]?.body as Record<string, unknown>
-      expect(callBody?.agent).toBe("prometheus")
-      expect(callBody?.model).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
+        expect(promptCalls.length).toBe(1)
+        const callBody = promptCalls[0]?.body as Record<string, unknown>
+        expect(callBody?.agent).toBe(agentDisplayName)
+        expect(callBody?.model).toEqual({ providerID: fallbackModelProviderID, modelID: fallbackModelID })
+      }
     })
 
     test("should not dispatch a second fallback prompt while the accepted retry session is still active", async () => {
@@ -2770,7 +2780,16 @@ describe("runtime-fallback", () => {
       expect(promptCalls).toHaveLength(1)
     })
 
-    test("should preserve display-name agent and parsed fallback model during auto-retry", async () => {
+    test("should honor explicit retry_on_errors status codes during auto-retry", async () => {
+      expect(runtimeFallbackAgentCases.length).toBeGreaterThan(0)
+
+      const selectedAgentCase = runtimeFallbackAgentCases[0]
+      if (!selectedAgentCase) {
+        return
+      }
+
+      const [agentConfigKey, agentDisplayName] = selectedAgentCase
+      registerAgentName(agentDisplayName)
       const promptCalls: Array<Record<string, unknown>> = []
       const hook = createRuntimeFallbackHook(
         createMockPluginInput({
@@ -2791,27 +2810,27 @@ describe("runtime-fallback", () => {
         }),
         {
           config: createMockConfig({ notify_on_fallback: false, retry_on_errors: [402] }),
-          pluginConfig: createMockPluginConfigWithAgentFallback("atlas", ["zai-coding-plan/glm-5"]),
+          pluginConfig: createMockPluginConfigWithAgentFallback(agentConfigKey, ["provider-402/model-402"]),
         },
       )
-      const sessionID = "test-atlas-quota-retry"
+      const sessionID = "test-explicit-402-retry"
 
       await hook.event({
         event: {
           type: "session.error",
           properties: {
             sessionID,
-            model: "chutes/moonshotai/Kimi-K2.5-TEE",
+            model: "source-provider/source-model",
             error: { statusCode: 402, message: "unexpected upstream status" },
-            agent: "atlas",
+            agent: agentConfigKey,
           },
         },
       })
 
       expect(promptCalls.length).toBe(1)
       const callBody = promptCalls[0]?.body as Record<string, unknown>
-      expect(callBody?.agent).toBe("Atlas (Plan Executor)")
-      expect(callBody?.model).toEqual({ providerID: "zai-coding-plan", modelID: "glm-5" })
+      expect(callBody?.agent).toBe(agentDisplayName)
+      expect(callBody?.model).toEqual({ providerID: "provider-402", modelID: "model-402" })
     })
   })
 
