@@ -255,4 +255,15 @@ Use nested command.
     expect(nestedCommand?.content).toContain("Use nested command.")
     expect(nestedCommand?.scope).toBe("opencode-project")
   })
+
+  it("keeps builtin start-work routed to Atlas during static discovery", () => {
+    // given
+
+    // when
+    const commands = discoverCommandsSync(projectDir)
+    const startWorkCommand = commands.find((command) => command.name === "start-work")
+
+    // then
+    expect(startWorkCommand?.metadata.agent).toBe("atlas")
+  })
 })

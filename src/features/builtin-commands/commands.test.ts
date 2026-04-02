@@ -69,11 +69,21 @@ describe("loadBuiltinCommands", () => {
     expect(commands.handoff.description).toContain("context summary")
   })
 
-  test("should preassign Sisyphus as the native agent for start-work", () => {
+  test("should default start-work to Atlas for static slash-command discovery", () => {
     //#given - no disabled commands
 
     //#when
     const commands = loadBuiltinCommands()
+
+    //#then
+    expect(commands["start-work"].agent).toBe("atlas")
+  })
+
+  test("should preassign Sisyphus as the native agent for start-work when command config checks registered agents", () => {
+    //#given - no atlas registration
+
+    //#when
+    const commands = loadBuiltinCommands(undefined, { useRegisteredAgents: true })
 
     //#then
     expect(commands["start-work"].agent).toBe("sisyphus")
@@ -84,7 +94,7 @@ describe("loadBuiltinCommands", () => {
     registerAgentName("atlas")
 
     //#when
-    const commands = loadBuiltinCommands()
+    const commands = loadBuiltinCommands(undefined, { useRegisteredAgents: true })
 
     //#then
     expect(commands["start-work"].agent).toBe("atlas")

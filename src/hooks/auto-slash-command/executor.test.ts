@@ -192,4 +192,24 @@ describe("auto-slash command executor plugin dispatch", () => {
     expect(result.replacementText).not.toContain("$ARGUMENTS")
     expect(result.replacementText).not.toContain("${user_message}")
   })
+
+  it("renders Atlas as the builtin start-work agent during slash-command execution", async () => {
+    // given
+
+    // when
+    const result = await executeSlashCommand(
+      {
+        command: "start-work",
+        args: "",
+        raw: "/start-work",
+      },
+      {
+        skills: [],
+      },
+    )
+
+    // then
+    expect(result.success).toBe(true)
+    expect(result.replacementText).toContain("**Agent**: atlas")
+  })
 })

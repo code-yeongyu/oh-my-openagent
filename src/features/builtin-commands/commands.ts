@@ -9,7 +9,21 @@ import { START_WORK_TEMPLATE } from "./templates/start-work"
 import { HANDOFF_TEMPLATE } from "./templates/handoff"
 import { REMOVE_AI_SLOPS_TEMPLATE } from "./templates/remove-ai-slops"
 
-function createBuiltinCommandDefinitions(): Record<BuiltinCommandName, Omit<CommandDefinition, "name">> {
+export interface LoadBuiltinCommandsOptions {
+  useRegisteredAgents?: boolean
+}
+
+function resolveStartWorkAgent(options?: LoadBuiltinCommandsOptions): "atlas" | "sisyphus" {
+  if (options?.useRegisteredAgents) {
+    return isAgentRegistered("atlas") ? "atlas" : "sisyphus"
+  }
+
+  return "atlas"
+}
+
+function createBuiltinCommandDefinitions(
+  options?: LoadBuiltinCommandsOptions,
+): Record<BuiltinCommandName, Omit<CommandDefinition, "name">> {
   return {
     "init-deep": {
       description: "(builtin) Initialize hierarchical AGENTS.md knowledge base",
@@ -60,7 +74,7 @@ ${REFACTOR_TEMPLATE}
     },
     "start-work": {
       description: "(builtin) Start Sisyphus work session from Prometheus plan",
-      agent: isAgentRegistered("atlas") ? "atlas" : "sisyphus",
+      agent: resolveStartWorkAgent(options),
       template: `<command-instruction>
 ${START_WORK_TEMPLATE}
 </command-instruction>
@@ -111,9 +125,10 @@ $ARGUMENTS
 }
 
 export function loadBuiltinCommands(
-  disabledCommands?: BuiltinCommandName[]
+  disabledCommands?: BuiltinCommandName[],
+  options?: LoadBuiltinCommandsOptions,
 ): BuiltinCommands {
-  const builtinCommandDefinitions = createBuiltinCommandDefinitions()
+  const builtinCommandDefinitions = createBuiltinCommandDefinitions(options)
   const disabled = new Set(disabledCommands ?? [])
   const commands: BuiltinCommands = {}
 
