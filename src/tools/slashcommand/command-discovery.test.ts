@@ -267,3 +267,52 @@ Use nested command.
     expect(startWorkCommand?.metadata.agent).toBe("atlas")
   })
 })
+
+describe("non-directory commands path", () => {
+  let testDir: string
+  let savedEnv: Record<string, string | undefined>
+
+  beforeEach(() => {
+    testDir = mkdtempSync(join(tmpdir(), "omo-cmd-file-"))
+    savedEnv = {
+      CLAUDE_CONFIG_DIR: process.env.CLAUDE_CONFIG_DIR,
+      OPENCODE_CONFIG_DIR: process.env.OPENCODE_CONFIG_DIR,
+    }
+    process.env.CLAUDE_CONFIG_DIR = join(testDir, "claude-config")
+    process.env.OPENCODE_CONFIG_DIR = join(testDir, "opencode-config")
+    mkdirSync(join(testDir, "claude-config"), { recursive: true })
+    mkdirSync(join(testDir, "opencode-config"), { recursive: true })
+  })
+
+  afterEach(() => {
+    Object.entries(savedEnv).forEach(([k, v]) => {
+      if (v === undefined) delete process.env[k]
+      else process.env[k] = v
+    })
+    rmSync(testDir, { recursive: true, force: true })
+  })
+
+  it("#given .claude/commands is a file #when discoverCommandsSync runs #then returns without crashing", () => {
+    const projectDir = join(testDir, "project")
+    mkdirSync(join(projectDir, ".claude"), { recursive: true })
+    writeFileSync(join(projectDir, ".claude", "commands"), "")  // file, not directory
+
+    // Should not throw
+    const commands = discoverCommandsSync(projectDir)
+    expect(commands).toBeInstanceOf(Array)
+  })
+
+  it("#given .claude/commands is a directory #when discoverCommandsSync runs #then discovers commands normally", () => {
+    const projectDir = join(testDir, "project")
+    mkdirSync(join(projectDir, ".claude", "commands"), { recursive: true })
+    writeFileSync(
+      join(projectDir, ".claude", "commands", "test-cmd.md"),
+      "---\ndescription: Test\n---\nTest command content.\n",
+    )
+
+    const commands = discoverCommandsSync(projectDir)
+    const testCmd = commands.find((c) => c.name === "test-cmd")
+    expect(testCmd).toBeDefined()
+    expect(testCmd?.content).toContain("Test command content.")
+  })
+})
