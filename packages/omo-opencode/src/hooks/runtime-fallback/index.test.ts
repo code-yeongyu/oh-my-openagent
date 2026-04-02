@@ -2769,6 +2769,50 @@ describe("runtime-fallback", () => {
 
       expect(promptCalls).toHaveLength(1)
     })
+
+    test("should retry atlas quota failures with display-name agent and zai fallback", async () => {
+      const promptCalls: Array<Record<string, unknown>> = []
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput({
+          session: {
+            messages: async () => ({
+              data: [
+                {
+                  info: { role: "user" },
+                  parts: [{ type: "text", text: "test" }],
+                },
+              ],
+            }),
+            promptAsync: async (args: unknown) => {
+              promptCalls.push(args as Record<string, unknown>)
+              return {}
+            },
+          },
+        }),
+        {
+          config: createMockConfig({ notify_on_fallback: false }),
+          pluginConfig: createMockPluginConfigWithAgentFallback("atlas", ["zai-coding-plan/glm-5"]),
+        },
+      )
+      const sessionID = "test-atlas-quota-retry"
+
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: {
+            sessionID,
+            model: "chutes/moonshotai/Kimi-K2.5-TEE",
+            error: { statusCode: 402, message: "Payment Required" },
+            agent: "atlas",
+          },
+        },
+      })
+
+      expect(promptCalls.length).toBe(1)
+      const callBody = promptCalls[0]?.body as Record<string, unknown>
+      expect(callBody?.agent).toBe("Atlas (Plan Executor)")
+      expect(callBody?.model).toEqual({ providerID: "zai-coding-plan", modelID: "glm-5" })
+    })
   })
 
   describe("cooldown mechanism", () => {
