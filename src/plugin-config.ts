@@ -20,6 +20,7 @@ const PARTIAL_STRING_ARRAY_KEYS = new Set([
   "disabled_hooks",
   "disabled_commands",
   "disabled_tools",
+  "mcp_env_allowlist",
 ]);
 
 export function parseConfigPartially(
@@ -152,6 +153,12 @@ export function mergeConfigs(
       ...new Set([
         ...(base.disabled_tools ?? []),
         ...(override.disabled_tools ?? []),
+      ]),
+    ],
+    mcp_env_allowlist: [
+      ...new Set([
+        ...(base.mcp_env_allowlist ?? []),
+        ...(override.mcp_env_allowlist ?? []),
       ]),
     ],
     claude_code: deepMerge(base.claude_code, override.claude_code),
