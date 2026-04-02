@@ -3,7 +3,6 @@ import type { DelegateTaskArgs, DelegatedModelConfig, ToolContextWithMetadata, D
 import { CATEGORY_DESCRIPTIONS } from "./constants"
 import { SISYPHUS_JUNIOR_AGENT } from "./sisyphus-junior-agent"
 import { mergeCategories } from "../../shared/merge-categories"
-import { getCategoryDisplayName } from "../../shared/category-display-names"
 import { sanitizeDisplayNameForMarkdown } from "../../shared/markdown-display-name"
 import { log } from "../../shared/logger"
 import { buildSystemContent } from "./prompt-builder"
@@ -39,7 +38,7 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
       const userDesc = userCategories?.[name]?.description
       const builtinDesc = CATEGORY_DESCRIPTIONS[name]
       const description = userDesc || builtinDesc || "General tasks"
-      const displayName = getCategoryDisplayName(name)
+      const displayName = categoryConfig.display_name
       return {
         name,
         description,
