@@ -1,8 +1,17 @@
-import { describe, test, expect } from "bun:test"
+import { afterEach, beforeEach, describe, test, expect } from "bun:test"
 import { loadBuiltinCommands } from "./commands"
 import { HANDOFF_TEMPLATE } from "./templates/handoff"
 import { REMOVE_AI_SLOPS_TEMPLATE } from "./templates/remove-ai-slops"
 import type { BuiltinCommandName } from "./types"
+import { _resetForTesting, registerAgentName } from "../claude-code-session-state"
+
+beforeEach(() => {
+  _resetForTesting()
+})
+
+afterEach(() => {
+  _resetForTesting()
+})
 
 describe("loadBuiltinCommands", () => {
   test("should include handoff command in loaded commands", () => {
@@ -68,6 +77,17 @@ describe("loadBuiltinCommands", () => {
 
     //#then
     expect(commands["start-work"].agent).toBe("sisyphus")
+  })
+
+  test("should preassign Atlas as the native agent for start-work when Atlas is registered", () => {
+    //#given
+    registerAgentName("atlas")
+
+    //#when
+    const commands = loadBuiltinCommands()
+
+    //#then
+    expect(commands["start-work"].agent).toBe("atlas")
   })
 })
 
