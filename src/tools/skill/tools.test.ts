@@ -172,6 +172,34 @@ describe("skill tool - MCP schema display", () => {
   })
 
   describe("formatMcpCapabilities with inputSchema", () => {
+    it("uses the tool context sessionID when the fallback getter is empty", async () => {
+      // given
+      loadedSkills = [
+        createMockSkillWithMcp("test-skill", {
+          playwright: { command: "npx", args: ["-y", "@anthropic-ai/mcp-playwright"] },
+        }),
+      ]
+
+      const listToolsSpy = spyOn(manager, "listTools").mockResolvedValue([])
+      spyOn(manager, "listResources").mockResolvedValue([])
+      spyOn(manager, "listPrompts").mockResolvedValue([])
+
+      const tool = createSkillTool({
+        skills: loadedSkills,
+        mcpManager: manager,
+        getSessionID: () => "",
+      })
+
+      // when
+      await tool.execute({ name: "test-skill" }, mockContext)
+
+      // then
+      expect(listToolsSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ sessionID: mockContext.sessionID }),
+        expect.any(Object),
+      )
+    })
+
     it("displays tool inputSchema when available", async () => {
       // given
       const mockToolsWithSchema: McpTool[] = [
