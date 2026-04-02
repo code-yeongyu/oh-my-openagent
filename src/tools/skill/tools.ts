@@ -1,5 +1,6 @@
 import { dirname } from "node:path"
 import { tool, type ToolDefinition } from "@opencode-ai/plugin"
+import type { ToolContext } from "@opencode-ai/plugin/tool"
 import { TOOL_DESCRIPTION_NO_SKILLS, TOOL_DESCRIPTION_PREFIX } from "./constants"
 import type { SkillArgs, SkillInfo, SkillLoadOptions } from "./types"
 import type { LoadedSkill } from "../../features/opencode-skill-loader"
@@ -316,7 +317,7 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
         .optional()
         .describe("Optional arguments or context for command invocation. Example: name='publish', user_message='patch'"),
     },
-    async execute(args: SkillArgs, ctx?: { agent?: string }) {
+    async execute(args: SkillArgs, ctx?: ToolContext) {
       const skills = await getSkills()
       const commands = getCommands()
       cachedDescription = formatCombinedDescription(skills.map(loadedSkillToInfo), commands)
@@ -359,11 +360,17 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
           body,
         ]
 
-        if (options.mcpManager && options.getSessionID && matchedSkill.mcpConfig) {
+        if (options.mcpManager && matchedSkill.mcpConfig) {
+          const sessionID = ctx?.sessionID || options.getSessionID?.()
+
+          if (!sessionID) {
+            return output.join("\n")
+          }
+
           const mcpInfo = await formatMcpCapabilities(
             matchedSkill,
             options.mcpManager,
-            options.getSessionID()
+            sessionID
           )
           if (mcpInfo) {
             output.push(mcpInfo)
