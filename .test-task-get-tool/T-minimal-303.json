@@ -1,0 +1,9 @@
+{
+  "id": "T-minimal-303",
+  "subject": "Minimal task",
+  "description": "Minimal",
+  "status": "pending",
+  "blocks": [],
+  "blockedBy": [],
+  "threadID": "test-session-123"
+}

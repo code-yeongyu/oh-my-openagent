@@ -1,0 +1,9 @@
+{
+  "id": "T-test-123",
+  "subject": "Test task",
+  "description": "Test description",
+  "status": "pending",
+  "blocks": [],
+  "blockedBy": [],
+  "threadID": "test-session-123"
+}
