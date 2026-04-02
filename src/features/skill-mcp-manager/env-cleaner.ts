@@ -28,18 +28,22 @@ export const EXCLUDED_ENV_PATTERNS: RegExp[] = [
 export function createCleanMcpEnvironment(
   customEnv: Record<string, string> = {}
 ): Record<string, string> {
-  const cleanEnv: Record<string, string> = {}
+  const mergedEnv: Record<string, string> = {}
 
   for (const [key, value] of Object.entries(process.env)) {
     if (value === undefined) continue
+    mergedEnv[key] = value
+  }
 
+  Object.assign(mergedEnv, customEnv)
+
+  const cleanEnv: Record<string, string> = {}
+  for (const [key, value] of Object.entries(mergedEnv)) {
     const shouldExclude = EXCLUDED_ENV_PATTERNS.some((pattern) => pattern.test(key))
     if (!shouldExclude) {
       cleanEnv[key] = value
     }
   }
-
-  Object.assign(cleanEnv, customEnv)
 
   return cleanEnv
 }
