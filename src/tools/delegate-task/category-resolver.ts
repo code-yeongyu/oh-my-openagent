@@ -131,7 +131,7 @@ Available categories: ${allCategoryNames}`,
       const parsedModel = parseModelString(actualModel)
       const variantToUse = userCategories?.[args.category!]?.variant ?? resolved.config.variant
       categoryModel = parsedModel
-        ? applyCategoryParams({ ...parsedModel, variant: variantToUse }, resolved.config)
+        ? applyCategoryParams({ ...parsedModel, variant: variantToUse ?? parsedModel.variant }, resolved.config)
         : undefined
     }
   } else {
@@ -153,7 +153,7 @@ Available categories: ${allCategoryNames}`,
         const parsedModel = parseModelString(actualModel)
         const variantToUse = userCategories?.[args.category!]?.variant ?? resolved.config.variant
         categoryModel = parsedModel
-          ? applyCategoryParams({ ...parsedModel, variant: variantToUse }, resolved.config)
+          ? applyCategoryParams({ ...parsedModel, variant: variantToUse ?? parsedModel.variant }, resolved.config)
           : undefined
         modelInfo = { model: actualModel, type: "user-defined", source: "override" }
       }
@@ -200,7 +200,7 @@ Available categories: ${allCategoryNames}`,
       const parsedModel = parseModelString(actualModel)
       const variantToUse = userCategories?.[args.category!]?.variant ?? resolvedVariant ?? resolved.config.variant
       categoryModel = parsedModel
-        ? applyCategoryParams({ ...parsedModel, variant: variantToUse }, resolved.config)
+        ? applyCategoryParams({ ...parsedModel, variant: variantToUse ?? parsedModel.variant }, resolved.config)
         : undefined
     }
   }

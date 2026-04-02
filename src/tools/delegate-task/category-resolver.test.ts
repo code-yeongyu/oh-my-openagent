@@ -169,6 +169,42 @@ describe("resolveCategoryExecution", () => {
 		agentsSpy.mockRestore()
 	})
 
+	test("preserves inline variant from category model string when no explicit variant is configured", async () => {
+		//#given
+		const args = {
+			category: "quick",
+			prompt: "test prompt",
+			description: "Test task",
+			run_in_background: false,
+			load_skills: [],
+			blockedBy: undefined,
+			enableSkillTools: false,
+		}
+		const executorCtx = createMockExecutorContext()
+		executorCtx.userCategories = {
+			quick: {
+				model: "openai/gpt-5.4 high",
+			},
+		}
+
+		//#when
+		const result = await resolveCategoryExecution(args, executorCtx, undefined, "anthropic/claude-sonnet-4-6")
+
+		//#then
+		expect(result.error).toBeUndefined()
+		expect(result.actualModel).toBeDefined()
+		expect(result.categoryModel).toBeDefined()
+		if (!result.actualModel || !result.categoryModel) {
+			throw new Error("Expected resolved model and category model")
+		}
+		expect(result.actualModel).toBe("openai/gpt-5.4 high")
+		expect(result.categoryModel).toEqual({
+			providerID: "openai",
+			modelID: "gpt-5.4",
+			variant: "high",
+		})
+	})
+
 	test("does not apply object-style fallback settings when the configured primary model matches directly", async () => {
 		//#given
 		const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
