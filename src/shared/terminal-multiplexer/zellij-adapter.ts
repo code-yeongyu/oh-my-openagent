@@ -288,6 +288,13 @@ export class ZellijAdapter implements Multiplexer {
       }
       
       this.labelToSpawned.delete(handle.label)
+
+      if (this.labelToSpawned.size === 0) {
+        this.anchorPaneId = null
+        this.hasCreatedFirstPane = false
+        log("[ZellijAdapter.closePane] last pane closed, reset anchor state")
+      }
+
       log("[ZellijAdapter.closePane] completed", { label: handle.label })
     }
 

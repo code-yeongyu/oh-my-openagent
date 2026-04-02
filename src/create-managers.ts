@@ -40,7 +40,11 @@ export async function createManagers(args: {
     adapter = createMultiplexer("zellij", {
       zellij: { enabled: true },
     })
-    log("[create-managers] zellij adapter created")
+    const zellijSessionName = process.env.ZELLIJ_SESSION_NAME
+    if (zellijSessionName && adapter.setSessionID) {
+      await adapter.setSessionID(zellijSessionName)
+    }
+    log("[create-managers] zellij adapter created", { zellijSessionName })
   }
 
   const tmuxSessionManager = adapter

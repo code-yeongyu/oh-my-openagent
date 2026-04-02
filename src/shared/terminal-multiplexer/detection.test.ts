@@ -217,6 +217,9 @@ describe("resetDetectionCache", () => {
     savedTmux = process.env.TMUX
     savedZellij = process.env.ZELLIJ
     savedZellijSession = process.env.ZELLIJ_SESSION_NAME
+    delete process.env.TMUX
+    delete process.env.ZELLIJ
+    delete process.env.ZELLIJ_SESSION_NAME
   })
 
   afterEach(() => {

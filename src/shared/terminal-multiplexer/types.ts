@@ -22,6 +22,8 @@ export interface Multiplexer {
   capabilities: MultiplexerCapabilities
   enabled: boolean
 
+  setSessionID?(sessionID: string): Promise<void>
+
   ensureSession(name: string): Promise<void>
   killSession(name: string): Promise<void>
 
