@@ -1,7 +1,7 @@
 import { z } from "zod"
 
 export const ZellijConfigSchema = z.object({
-  enabled: z.boolean().default(false),
+  enabled: z.boolean().default(true),
 })
 
 export const TerminalConfigSchema = z.object({

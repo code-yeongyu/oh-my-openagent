@@ -35,9 +35,10 @@ export async function createManagers(args: {
   const provider = terminalConfig?.provider ?? "auto"
   let adapter = null
 
-  if (provider === "zellij" || (provider === "auto" && await detectMultiplexer() === "zellij")) {
+  const zellijEnabled = terminalConfig?.zellij?.enabled ?? true
+  if (zellijEnabled && (provider === "zellij" || (provider === "auto" && await detectMultiplexer() === "zellij"))) {
     adapter = createMultiplexer("zellij", {
-      zellij: { enabled: terminalConfig?.zellij?.enabled ?? true },
+      zellij: { enabled: true },
     })
     log("[create-managers] zellij adapter created")
   }

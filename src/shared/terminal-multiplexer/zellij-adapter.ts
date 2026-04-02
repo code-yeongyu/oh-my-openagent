@@ -287,30 +287,10 @@ export class ZellijAdapter implements Multiplexer {
     }
 
   async getPanes(): Promise<PaneHandle[]> {
-    const proc = this.spawn(["zellij", "list-sessions", "-n"], {
-      stdout: "pipe",
-      stderr: "pipe",
-    })
-
-    const exitCode = await proc.exited
-    const stdout = await new Response(proc.stdout).text()
-
-    if (exitCode !== 0) {
-      return []
-    }
-
     const panes: PaneHandle[] = []
-    const lines = stdout.trim().split("\n").filter(Boolean)
-
-    for (const line of lines) {
-      const sessionName = line.trim()
-      if (sessionName) {
-        panes.push({
-          label: sessionName,
-        })
-      }
+    for (const [label] of this.labelToSpawned) {
+      panes.push({ label })
     }
-
     return panes
   }
 }

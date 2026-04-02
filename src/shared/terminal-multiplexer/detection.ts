@@ -31,16 +31,16 @@ export async function detectMultiplexer(
     return cachedMultiplexer
   }
 
-  if (process.env.TMUX) {
-    log("[detectMultiplexer] Found $TMUX env var")
-    cachedMultiplexer = "tmux"
-    return "tmux"
-  }
-
   if (process.env.ZELLIJ || process.env.ZELLIJ_SESSION_NAME) {
     log("[detectMultiplexer] Found $ZELLIJ or $ZELLIJ_SESSION_NAME env var")
     cachedMultiplexer = "zellij"
     return "zellij"
+  }
+
+  if (process.env.TMUX) {
+    log("[detectMultiplexer] Found $TMUX env var")
+    cachedMultiplexer = "tmux"
+    return "tmux"
   }
 
   const tmuxAvailable = await findBinaryImpl("tmux")

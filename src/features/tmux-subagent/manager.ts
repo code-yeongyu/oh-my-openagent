@@ -118,7 +118,7 @@ export class TmuxSessionManager {
     })
   }
   private isEnabled(): boolean {
-    if (this.adapter) return this.tmuxConfig.enabled && this.adapter.enabled
+    if (this.adapter) return this.adapter.enabled
     return this.tmuxConfig.enabled && this.deps.isInsideTmux()
   }
 
@@ -732,13 +732,13 @@ export class TmuxSessionManager {
     if (handle) {
       try {
         await this.adapter?.closePane(handle)
+        this.sessionHandles.delete(event.sessionID)
       } catch (error) {
         log("[tmux-session-manager] onSessionDeleted adapter close error", {
           sessionId: event.sessionID,
           error: String(error),
         })
       }
-      this.sessionHandles.delete(event.sessionID)
     }
 
     if (!this.sourcePaneId) return

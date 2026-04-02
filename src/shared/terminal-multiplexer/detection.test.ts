@@ -71,7 +71,7 @@ describe("detectMultiplexer", () => {
     expect(result).toBe("zellij")
   })
 
-  it("prefers $TMUX over $ZELLIJ when both are set", async () => {
+  it("prefers $ZELLIJ over $TMUX when both are set", async () => {
     //#given
     process.env.TMUX = "/tmp/tmux-1000/default,1234,0"
     process.env.ZELLIJ = "/tmp/zellij-1000/default"
@@ -80,7 +80,7 @@ describe("detectMultiplexer", () => {
     const result = await detectMultiplexer()
 
     //#then
-    expect(result).toBe("tmux")
+    expect(result).toBe("zellij")
   })
 
   it("caches detection result on subsequent calls", async () => {
