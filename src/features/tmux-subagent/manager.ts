@@ -172,6 +172,51 @@ export class TmuxSessionManager {
     }
   }
 
+  private async cleanupIsolatedContainerAfterSessionDeletion(
+    tracked: TrackedSession,
+    isolatedPaneAlreadyClosed: boolean,
+    state: WindowState,
+  ): Promise<void> {
+    if (tracked.paneId !== this.isolatedWindowPaneId) {
+      return
+    }
+
+    if (this.sessions.size > 0) {
+      return
+    }
+
+    this.isolatedWindowPaneId = undefined
+
+    if (isolatedPaneAlreadyClosed) {
+      return
+    }
+
+    try {
+      const result = await executeAction(
+        { type: "close", paneId: tracked.paneId, sessionId: tracked.sessionId },
+        {
+          config: this.tmuxConfig,
+          serverUrl: this.serverUrl,
+          windowState: state,
+          sourcePaneId: this.sourcePaneId ?? tracked.paneId,
+        },
+      )
+
+      if (!result.success) {
+        log("[tmux-session-manager] failed to close isolated container pane after anchor session deletion", {
+          sessionId: tracked.sessionId,
+          paneId: tracked.paneId,
+        })
+      }
+    } catch (error) {
+      log("[tmux-session-manager] failed to cleanup isolated container pane after anchor session deletion", {
+        sessionId: tracked.sessionId,
+        paneId: tracked.paneId,
+        error: String(error),
+      })
+    }
+  }
+
   private markSessionClosePending(sessionId: string): void {
     const tracked = this.sessions.get(sessionId)
     if (!tracked) return
@@ -698,8 +743,12 @@ export class TmuxSessionManager {
     const closeAction = decideCloseAction(state, event.sessionID, this.getSessionMappings())
     if (!closeAction) {
       this.removeTrackedSession(event.sessionID)
+      await this.cleanupIsolatedContainerAfterSessionDeletion(tracked, false, state)
       return
     }
+
+    const isolatedPaneAlreadyClosed =
+      closeAction.type === "close" && closeAction.paneId === tracked.paneId
 
     try {
       const result = await executeAction(closeAction, {
@@ -723,6 +772,11 @@ export class TmuxSessionManager {
     }
 
     this.removeTrackedSession(event.sessionID)
+    await this.cleanupIsolatedContainerAfterSessionDeletion(
+      tracked,
+      isolatedPaneAlreadyClosed,
+      state,
+    )
   }
 
 
