@@ -3,10 +3,11 @@ import { join, dirname } from "node:path"
 import { spawnSync } from "node:child_process"
 import { getInstalledRipgrepPath, downloadAndInstallRipgrep } from "./downloader"
 import { getDataDir } from "../../shared/data-path"
+import { log } from "../../shared/logger"
 
 export type GrepBackend = "rg" | "grep"
 
-interface ResolvedCli {
+export interface ResolvedCli {
   path: string
   backend: GrepBackend
 }
@@ -89,7 +90,7 @@ export function resolveGrepCli(): ResolvedCli {
 export async function resolveGrepCliWithAutoInstall(): Promise<ResolvedCli> {
   const current = resolveGrepCli()
 
-  if (current.backend === "rg") {
+  if (current.backend === "rg" && current.path !== "rg") {
     return current
   }
 
@@ -103,7 +104,18 @@ export async function resolveGrepCliWithAutoInstall(): Promise<ResolvedCli> {
     const rgPath = await downloadAndInstallRipgrep()
     cachedCli = { path: rgPath, backend: "rg" }
     return cachedCli
-  } catch {
+  } catch (error) {
+    if (current.backend === "grep") {
+      log("[oh-my-opencode] Failed to auto-install ripgrep. Falling back to GNU grep.", {
+        error: error instanceof Error ? error.message : String(error),
+        grep_path: current.path,
+      })
+    } else {
+      log("[oh-my-opencode] Failed to auto-install ripgrep and GNU grep was not found.", {
+        error: error instanceof Error ? error.message : String(error),
+      })
+    }
+
     return current
   }
 }

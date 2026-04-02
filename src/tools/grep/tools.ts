@@ -2,6 +2,7 @@ import { resolve } from "node:path"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
 import { runRg, runRgCount } from "./cli"
+import { resolveGrepCliWithAutoInstall } from "./constants"
 import { formatGrepResult, formatCountResult } from "./result-formatter"
 
 export function createGrepTools(ctx: PluginInput): Record<string, ToolDefinition> {
@@ -42,13 +43,14 @@ export function createGrepTools(ctx: PluginInput): Record<string, ToolDefinition
         const paths = [searchPath]
         const outputMode = args.output_mode ?? "files_with_matches"
         const headLimit = args.head_limit ?? 0
+        const cli = await resolveGrepCliWithAutoInstall()
 
         if (outputMode === "count") {
           const results = await runRgCount({
             pattern: args.pattern,
             paths,
             globs,
-          })
+          }, cli)
           const limited = headLimit > 0 ? results.slice(0, headLimit) : results
           return formatCountResult(limited)
         }
@@ -60,7 +62,7 @@ export function createGrepTools(ctx: PluginInput): Record<string, ToolDefinition
           context: 0,
           outputMode,
           headLimit,
-        })
+        }, cli)
 
         return formatGrepResult(result)
       } catch (e) {
