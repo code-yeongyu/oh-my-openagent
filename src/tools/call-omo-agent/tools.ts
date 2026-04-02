@@ -7,10 +7,10 @@ import type { DelegatedModelConfig } from "../../shared/model-resolution-types"
 import type { FallbackEntry } from "../../shared/model-requirements"
 import { AGENT_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
 import { getAgentConfigKey } from "../../shared/agent-display-names"
-import { normalizeModelFormat } from "../../shared/model-format-normalizer"
 import { normalizeFallbackModels } from "../../shared/model-resolver"
 import { buildFallbackChainFromModels } from "../../shared/fallback-chain-from-models"
 import { log } from "../../shared"
+import { parseModelString } from "../delegate-task/model-string-parser"
 import { executeBackground } from "./background-executor"
 import { executeSync } from "./sync-executor"
 
@@ -36,7 +36,7 @@ function resolveModelAndFallbackChain(args: {
 
   let model: DelegatedModelConfig | undefined
   if (agentOverride?.model) {
-    const normalized = normalizeModelFormat(agentOverride.model)
+    const normalized = parseModelString(agentOverride.model)
     if (normalized) {
       model = agentOverride.variant ? { ...normalized, variant: agentOverride.variant } : normalized
       log("[call_omo_agent] Resolved model override from agent config", {
@@ -46,7 +46,7 @@ function resolveModelAndFallbackChain(args: {
       })
     }
   } else if (agentCategoryModel) {
-    const normalized = normalizeModelFormat(agentCategoryModel)
+    const normalized = parseModelString(agentCategoryModel)
     if (normalized) {
       const variantToUse = agentOverride?.variant ?? agentCategoryVariant
       model = variantToUse ? { ...normalized, variant: variantToUse } : normalized
