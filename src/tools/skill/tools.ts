@@ -324,7 +324,19 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
       const requestedName = args.name.replace(/^\//, "")
 
       // Check skills first (exact match, case-insensitive)
-      const matchedSkill = skills.find(s => s.name.toLowerCase() === requestedName.toLowerCase())
+      let matchedSkill = skills.find(s => s.name.toLowerCase() === requestedName.toLowerCase())
+
+      // Fallback: try matching by short name (basename) for namespaced skills
+      // e.g. "systematic-debugging" matches "superpowers/systematic-debugging"
+      if (!matchedSkill) {
+        const shortNameMatches = skills.filter(s => {
+          const parts = s.name.split("/")
+          return parts.length > 1 && parts[parts.length - 1].toLowerCase() === requestedName.toLowerCase()
+        })
+        if (shortNameMatches.length === 1) {
+          matchedSkill = shortNameMatches[0]
+        }
+      }
 
       if (matchedSkill) {
         if (matchedSkill.definition.agent && (!ctx?.agent || matchedSkill.definition.agent !== ctx.agent)) {
