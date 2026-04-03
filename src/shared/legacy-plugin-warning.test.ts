@@ -69,8 +69,6 @@ describe("checkForLegacyPluginEntry", () => {
   })
 
   it("returns no warning data when config is missing", () => {
-    // given — empty dir, no config files
-
     // when
     const result = checkForLegacyPluginEntry(testConfigDir)
 

@@ -118,7 +118,7 @@ export function migrateConfigFile(
       fs.copyFileSync(configPath, backupPath)
       backupSucceeded = true
     } catch {
-      // Original file may not exist yet — skip backup
+      backupSucceeded = false
     }
 
     let writeSucceeded = false
