@@ -628,9 +628,9 @@ export class BackgroundManager {
 
   private getConcurrencyKeyFromInput(input: LaunchInput): string {
     if (input.model) {
-      return `${input.model.providerID}/${input.model.modelID}`
+      return `${input.model.providerID}/${input.model.modelID}/${input.taskId}`
     }
-    return input.agent
+    return `${input.agent}/${input.taskId}`
   }
 
   /**
