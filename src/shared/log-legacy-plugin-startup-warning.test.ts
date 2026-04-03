@@ -26,7 +26,7 @@ mock.module("./logger", () => ({
   log: mockLog,
 }))
 
-mock.module("./migrate-legacy-plugin-entry", () => ({
+mock.module("./plugin-entry-migrator", () => ({
   migrateLegacyPluginEntry: mockMigrateLegacyPluginEntry,
 }))
 

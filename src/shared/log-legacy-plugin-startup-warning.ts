@@ -1,6 +1,6 @@
 import { checkForLegacyPluginEntry } from "./legacy-plugin-warning"
 import { log } from "./logger"
-import { migrateLegacyPluginEntry } from "./migrate-legacy-plugin-entry"
+import { migrateLegacyPluginEntry } from "./plugin-entry-migrator"
 import { LEGACY_PLUGIN_NAME, PLUGIN_NAME } from "./plugin-identity"
 
 function toCanonicalEntry(entry: string): string {
