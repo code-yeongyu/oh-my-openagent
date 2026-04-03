@@ -43,18 +43,6 @@ const DEFERRED_SESSION_TTL_MS = 5 * 60 * 1000
 const MAX_DEFERRED_QUEUE_SIZE = 20
 const MAX_CLOSE_RETRY_COUNT = 3
 
-/**
- * State-first Tmux Session Manager
- * 
- * Architecture:
- * 1. QUERY: Get actual tmux pane state (source of truth)
- * 2. DECIDE: Pure function determines actions based on state
- * 3. EXECUTE: Execute actions with verification
- * 4. UPDATE: Update internal cache only after tmux confirms success
- * 
- * The internal `sessions` Map is just a cache for sessionId<->paneId mapping.
- * The REAL source of truth is always queried from tmux.
- */
 export class TmuxSessionManager {
   private client: OpencodeClient
   private tmuxConfig: TmuxConfig
@@ -78,16 +66,20 @@ export class TmuxSessionManager {
     this.deps = deps
     const defaultPort = process.env.OPENCODE_PORT ?? "4096"
     const fallbackUrl = `http://localhost:${defaultPort}`
+    const rawServerUrl = ctx.serverUrl?.toString()
     try {
-      const raw = ctx.serverUrl?.toString()
-      if (raw) {
-        const parsed = new URL(raw)
+      if (rawServerUrl) {
+        const parsed = new URL(rawServerUrl)
         const port = parsed.port || (parsed.protocol === 'https:' ? '443' : '80')
-        this.serverUrl = port === '0' ? fallbackUrl : raw
+        this.serverUrl = port === '0' ? fallbackUrl : rawServerUrl
       } else {
         this.serverUrl = fallbackUrl
       }
-    } catch {
+    } catch (error) {
+      log("[tmux-session-manager] failed to parse server URL, using fallback", {
+        serverUrl: rawServerUrl,
+        error: String(error),
+      })
       this.serverUrl = fallbackUrl
     }
     this.sourcePaneId = deps.getCurrentPaneId()
@@ -124,7 +116,13 @@ export class TmuxSessionManager {
   ): Promise<string | null> {
     if (!this.isIsolated()) return null
     if (this.isolatedWindowPaneId) {
-      const state = await queryWindowState(this.isolatedWindowPaneId).catch(() => null)
+      const state = await queryWindowState(this.isolatedWindowPaneId).catch((error) => {
+        log("[tmux-session-manager] failed to query isolated window state", {
+          paneId: this.isolatedWindowPaneId,
+          error: String(error),
+        })
+        return null
+      })
       if (state) return null
       this.isolatedContainerPaneId = undefined
       this.isolatedWindowPaneId = undefined
@@ -736,7 +734,11 @@ export class TmuxSessionManager {
 
   private async enqueueSpawn(run: () => Promise<void>): Promise<void> {
     this.spawnQueue = this.spawnQueue
-      .catch(() => undefined)
+      .catch((error) => {
+        log("[tmux-session-manager] recovering spawn queue after previous failure", {
+          error: String(error),
+        })
+      })
       .then(run)
       .catch((err) => {
         log("[tmux-session-manager] spawn queue task failed", {
