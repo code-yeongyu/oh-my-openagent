@@ -1,5 +1,6 @@
 import type { OhMyOpenCodeConfig } from "../config";
 import { getAgentDisplayName, getAgentListDisplayName } from "../shared/agent-display-names";
+import { isTaskSystemEnabled } from "../shared";
 
 type AgentWithPermission = { permission?: Record<string, unknown> };
 
@@ -25,7 +26,7 @@ export function applyToolConfig(params: {
   pluginConfig: OhMyOpenCodeConfig;
   agentResult: Record<string, unknown>;
 }): void {
-  const taskSystemEnabled = params.pluginConfig.experimental?.task_system ?? false
+  const taskSystemEnabled = isTaskSystemEnabled(params.pluginConfig)
   const denyTodoTools = taskSystemEnabled
     ? { todowrite: "deny", todoread: "deny" }
     : {}

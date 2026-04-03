@@ -1281,6 +1281,10 @@ describe("per-agent todowrite/todoread deny when task_system enabled", () => {
     await handler(config)
 
     //#then
+    const lastCall =
+      createBuiltinAgentsMock.mock.calls[createBuiltinAgentsMock.mock.calls.length - 1]
+    expect(lastCall?.[11]).toBe(false)
+
     const agentResult = config.agent as Record<string, { permission?: Record<string, unknown> }>
     expect(agentResult[getAgentDisplayName("sisyphus")]?.permission?.todowrite).toBeUndefined()
     expect(agentResult[getAgentDisplayName("sisyphus")]?.permission?.todoread).toBeUndefined()
@@ -1315,6 +1319,10 @@ describe("per-agent todowrite/todoread deny when task_system enabled", () => {
     await handler(config)
 
     //#then
+    const lastCall =
+      createBuiltinAgentsMock.mock.calls[createBuiltinAgentsMock.mock.calls.length - 1]
+    expect(lastCall?.[11]).toBe(false)
+
     const agentResult = config.agent as Record<string, { permission?: Record<string, unknown> }>
     expect(agentResult[getAgentDisplayName("sisyphus")]?.permission?.todowrite).toBeUndefined()
     expect(agentResult[getAgentDisplayName("sisyphus")]?.permission?.todoread).toBeUndefined()

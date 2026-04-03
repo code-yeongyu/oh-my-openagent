@@ -218,6 +218,16 @@ describe("applyToolConfig", () => {
 
   describe("#given task_system is undefined", () => {
     describe("#when applying tool config", () => {
+      it("#then should not disable todo tools globally by default", () => {
+        const params = createParams({})
+
+        applyToolConfig(params)
+
+        const tools = params.config.tools as Record<string, unknown>
+        expect(tools.todowrite).toBeUndefined()
+        expect(tools.todoread).toBeUndefined()
+      })
+
       it.each([
         "atlas",
         "sisyphus",

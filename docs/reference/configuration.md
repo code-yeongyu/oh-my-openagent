@@ -955,7 +955,7 @@ When enabled, two companion hooks are active: `hashline-read-enhancer` (annotate
 | `aggressive_truncation`                  | `false`    | Aggressively truncate when token limit exceeded                                      |
 | `auto_resume`                            | `false`    | Auto-resume after thinking block recovery                                            |
 | `disable_omo_env`                        | `false`    | Disable auto-injected `<omo-env>` block (date/time/locale). Improves cache hit rate. |
-| `task_system`                            | `true`     | Enable Sisyphus task system                                                          |
+| `task_system`                            | `false`    | Enable Sisyphus task system                                                          |
 | `dynamic_context_pruning.enabled`        | `false`    | Auto-prune old tool outputs to manage context window                                 |
 | `dynamic_context_pruning.notification`   | `detailed` | Pruning notifications: `off` / `minimal` / `detailed`                                |
 | `turn_protection.turns`                  | `3`        | Recent turns protected from pruning (1–10)                                           |
