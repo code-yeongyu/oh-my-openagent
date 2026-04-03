@@ -68,6 +68,21 @@ describe("validateArchiveEntries", () => {
 		expect(rejectEscapeSymlink).toThrow(/symlink target/i)
 	})
 
+	it("rejects hard-link targets that escape the extraction directory", () => {
+		//#given
+		const destDir = "/tmp/archive-root"
+
+		//#when
+		const rejectEscapeHardLink = () =>
+			validateArchiveEntries(
+				[{ path: "bin/tool", type: "hardlink", linkPath: "../../etc/passwd" }],
+				destDir
+			)
+
+		//#then
+		expect(rejectEscapeHardLink).toThrow(/hard link target/i)
+	})
+
 	it("accepts contained files, directories, and symlinks", () => {
 		//#given
 		const destDir = "/tmp/archive-root"
@@ -118,6 +133,39 @@ describe("archive extraction preflight", () => {
 
 		//#then
 		expect(errorMessage).toMatch(/path traversal/i)
+	})
+
+	it("rejects tar archives with hard-link traversal before extraction", async () => {
+		//#given
+		const rootDir = createTestDir()
+		const archivePath = join(rootDir, "malicious-hard-link.tar.gz")
+		const destDir = join(rootDir, "dest")
+		mkdirSync(destDir, { recursive: true })
+		const scriptPath = writePythonScript(
+			rootDir,
+			"make-malicious-hard-link-tar.py",
+			[
+				"import sys",
+				"import tarfile",
+				"with tarfile.open(sys.argv[1], 'w:gz') as archive:",
+				"    info = tarfile.TarInfo('bin/tool')",
+				"    info.type = tarfile.LNKTYPE",
+				"    info.linkname = '../../etc/passwd'",
+				"    archive.addfile(info)",
+			].join("\n")
+		)
+		runCommand(`python3 "${scriptPath}" "${archivePath}"`)
+
+		//#when
+		let errorMessage = ""
+		try {
+			await extractTarGz(archivePath, destDir)
+		} catch (error) {
+			errorMessage = error instanceof Error ? error.message : String(error)
+		}
+
+		//#then
+		expect(errorMessage).toMatch(/hard link target|path traversal/i)
 	})
 
 	it("rejects zip archives with symlink escapes before extraction", async () => {
