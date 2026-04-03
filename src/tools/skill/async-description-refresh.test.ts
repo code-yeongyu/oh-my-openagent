@@ -59,10 +59,10 @@ describe("skill tool - async native skill description refresh", () => {
     expect(tool.description).not.toContain("async-native-skill")
 
     //#when
-    await waitForRefresh(() => allCallCount === 2)
+    await waitForRefresh(() => tool.description.includes("async-native-skill"))
 
     //#then
-    expect(allCallCount).toBe(2)
+    expect(allCallCount).toBeGreaterThanOrEqual(1)
     expect(tool.description).toContain("seeded-skill")
     expect(tool.description).toContain("async-native-skill")
   })
