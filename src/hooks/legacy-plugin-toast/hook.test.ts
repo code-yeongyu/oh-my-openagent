@@ -53,7 +53,9 @@ function createEvent(type: string, parentID?: string) {
 }
 
 async function importFreshModule() {
-  return import(`./hook?t=${Date.now()}-${Math.random()}`)
+  const module = await import(`./hook?t=${Date.now()}-${Math.random()}`)
+  mock.restore()
+  return module
 }
 
 describe("createLegacyPluginToastHook", () => {

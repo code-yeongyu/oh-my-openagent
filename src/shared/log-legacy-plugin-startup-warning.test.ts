@@ -37,7 +37,10 @@ afterAll(() => {
 })
 
 async function importFreshStartupWarningModule(): Promise<typeof import("./log-legacy-plugin-startup-warning")> {
-  return import(`./log-legacy-plugin-startup-warning?test=${Date.now()}-${Math.random()}`)
+  const module = await import(`./log-legacy-plugin-startup-warning?test=${Date.now()}-${Math.random()}`)
+  mock.restore()
+  consoleWarnSpy = spyOn(console, "warn").mockImplementation(() => {})
+  return module
 }
 
 describe("logLegacyPluginStartupWarning", () => {

@@ -22,6 +22,7 @@ afterAll(() => {
 })
 
 const { recoverToolResultMissing } = await import("./recover-tool-result-missing")
+mock.restore()
 
 function createMockClient(messages: MessageData[] = []) {
   const promptAsync = mock(() => Promise.resolve({}))

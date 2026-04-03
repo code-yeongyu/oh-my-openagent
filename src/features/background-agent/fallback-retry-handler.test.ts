@@ -17,13 +17,14 @@ mock.module("../../shared/provider-model-id-transform", () => ({
   transformModelForProvider: mock((_provider: string, model: string) => model),
 }))
 
-import { tryFallbackRetry } from "./fallback-retry-handler"
-import { shouldRetryError } from "../../shared/model-error-classifier"
-import { selectFallbackProvider } from "../../shared/model-error-classifier"
-import { readProviderModelsCache } from "../../shared"
 import type { BackgroundTask } from "./types"
 import type { ConcurrencyManager } from "./concurrency"
 import type { OpencodeClient, QueueItem } from "./constants"
+
+const { tryFallbackRetry } = await import("./fallback-retry-handler")
+const { shouldRetryError, selectFallbackProvider } = await import("../../shared/model-error-classifier")
+const { readProviderModelsCache } = await import("../../shared")
+mock.restore()
 
 function createDeferredPromise(): {
   promise: Promise<void>

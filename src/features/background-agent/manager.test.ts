@@ -20,6 +20,7 @@ import { MIN_IDLE_TIME_MS } from "./constants"
 import { BackgroundManager } from "./manager"
 import { ConcurrencyManager } from "./concurrency"
 import { initTaskToastManager, _resetTaskToastManagerForTesting } from "../task-toast-manager/manager"
+mock.restore()
 
 
 const TASK_TTL_MS = 30 * 60 * 1000

@@ -1,19 +1,23 @@
 declare const require: (name: string) => any
-const { afterEach, afterAll, describe, expect, mock, test } = require("bun:test")
-
-mock.module("../shared/connected-providers-cache", () => ({
-  readConnectedProvidersCache: () => null,
-  readProviderModelsCache: () => null,
-}))
-
-afterAll(() => { mock.restore() })
+const { afterEach, describe, expect, spyOn, test } = require("bun:test")
 
 import { createEventHandler } from "./event"
 import { createChatMessageHandler } from "./chat-message"
 import { _resetForTesting, setMainSession } from "../features/claude-code-session-state"
 import { createModelFallbackHook, clearPendingModelFallback } from "../hooks/model-fallback/hook"
+import * as connectedProvidersCache from "../shared/connected-providers-cache"
+
+let readConnectedProvidersCacheSpy: { mockRestore: () => void } | undefined
+let readProviderModelsCacheSpy: { mockRestore: () => void } | undefined
+
+function setupConnectedProviderCacheMocks(): void {
+  readConnectedProvidersCacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(null)
+  readProviderModelsCacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue(null)
+}
+
 describe("createEventHandler - model fallback", () => {
   const createHandler = (args?: { hooks?: any; pluginConfig?: any }) => {
+    setupConnectedProviderCacheMocks()
     const abortCalls: string[] = []
     const promptCalls: string[] = []
 
@@ -54,6 +58,10 @@ describe("createEventHandler - model fallback", () => {
   }
 
   afterEach(() => {
+    readConnectedProvidersCacheSpy?.mockRestore()
+    readProviderModelsCacheSpy?.mockRestore()
+    readConnectedProvidersCacheSpy = undefined
+    readProviderModelsCacheSpy = undefined
     _resetForTesting()
   })
 
@@ -442,6 +450,7 @@ describe("createEventHandler - model fallback", () => {
 
     const modelFallback = createModelFallbackHook()
 
+    setupConnectedProviderCacheMocks()
     const eventHandler = createEventHandler({
       ctx: {
         directory: "/tmp",

@@ -1,3 +1,4 @@
+import type { ModelCapabilitiesSnapshot } from "./model-capabilities"
 import { afterAll, describe, expect, test, mock } from "bun:test"
 
 // Mock connected-providers-cache to prevent local disk cache from polluting test results.
@@ -14,11 +15,8 @@ afterAll(() => {
   mock.restore()
 })
 
-import {
-  getModelCapabilities,
-  getBundledModelCapabilitiesSnapshot,
-  type ModelCapabilitiesSnapshot,
-} from "./model-capabilities"
+const { getModelCapabilities, getBundledModelCapabilitiesSnapshot } = await import("./model-capabilities")
+mock.restore()
 import { AGENT_MODEL_REQUIREMENTS, CATEGORY_MODEL_REQUIREMENTS } from "./model-requirements"
 
 describe("getModelCapabilities", () => {

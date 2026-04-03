@@ -1,9 +1,13 @@
 /// <reference types="bun-types" />
 
-import { beforeEach, describe, expect, it, mock } from "bun:test"
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
 import type { PluginInput } from "@opencode-ai/plugin"
 
 import type { ImageDimensions, ResizeResult } from "./types"
+import * as imageDimensions from "./image-dimensions"
+import * as imageResizer from "./image-resizer"
+import * as sessionModelState from "../../shared/session-model-state"
+import { createReadImageResizerHook } from "./hook"
 
 const mockParseImageDimensions = mock((): ImageDimensions | null => null)
 const mockCalculateTargetDimensions = mock((): ImageDimensions | null => null)
@@ -13,20 +17,17 @@ const mockGetSessionModel = mock((_sessionID: string) => ({
   modelID: "claude-sonnet-4-6",
 } as { providerID: string; modelID: string } | undefined))
 
-mock.module("./image-dimensions", () => ({
-  parseImageDimensions: mockParseImageDimensions,
-}))
+let parseImageDimensionsSpy: { mockRestore: () => void } | undefined
+let calculateTargetDimensionsSpy: { mockRestore: () => void } | undefined
+let resizeImageSpy: { mockRestore: () => void } | undefined
+let getSessionModelSpy: { mockRestore: () => void } | undefined
 
-mock.module("./image-resizer", () => ({
-  calculateTargetDimensions: mockCalculateTargetDimensions,
-  resizeImage: mockResizeImage,
-}))
-
-mock.module("../../shared/session-model-state", () => ({
-  getSessionModel: mockGetSessionModel,
-}))
-
-import { createReadImageResizerHook } from "./hook"
+function setupHookSpies(): void {
+  parseImageDimensionsSpy = spyOn(imageDimensions, "parseImageDimensions").mockImplementation(mockParseImageDimensions)
+  calculateTargetDimensionsSpy = spyOn(imageResizer, "calculateTargetDimensions").mockImplementation(mockCalculateTargetDimensions)
+  resizeImageSpy = spyOn(imageResizer, "resizeImage").mockImplementation(mockResizeImage)
+  getSessionModelSpy = spyOn(sessionModelState, "getSessionModel").mockImplementation(mockGetSessionModel)
+}
 
 type ToolOutput = {
   title: string
@@ -52,11 +53,23 @@ function createInput(tool: string): { tool: string; sessionID: string; callID: s
 
 describe("createReadImageResizerHook", () => {
   beforeEach(() => {
+    setupHookSpies()
     mockParseImageDimensions.mockReset()
     mockCalculateTargetDimensions.mockReset()
     mockResizeImage.mockReset()
     mockGetSessionModel.mockReset()
     mockGetSessionModel.mockReturnValue({ providerID: "anthropic", modelID: "claude-sonnet-4-6" })
+  })
+
+  afterEach(() => {
+    parseImageDimensionsSpy?.mockRestore()
+    calculateTargetDimensionsSpy?.mockRestore()
+    resizeImageSpy?.mockRestore()
+    getSessionModelSpy?.mockRestore()
+    parseImageDimensionsSpy = undefined
+    calculateTargetDimensionsSpy = undefined
+    resizeImageSpy = undefined
+    getSessionModelSpy = undefined
   })
 
   it("skips non-Read tools", async () => {

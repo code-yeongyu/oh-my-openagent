@@ -57,12 +57,13 @@ afterAll(() => {
   mock.restore()
 })
 
-import {
+const {
   clearPendingModelFallback,
   createModelFallbackHook,
   setSessionFallbackChain,
   setPendingModelFallback,
-} from "./hook"
+} = await import("./hook")
+mock.restore()
 
 describe("model fallback hook", () => {
   beforeEach(() => {
@@ -452,3 +453,5 @@ describe("model fallback hook", () => {
     clearPendingModelFallback(sessionID)
   })
 })
+
+export {}

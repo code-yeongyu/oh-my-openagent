@@ -9,7 +9,8 @@ mock.module("./connected-providers-cache", () => ({
 
 afterAll(() => { mock.restore() })
 
-import { shouldRetryError, selectFallbackProvider } from "./model-error-classifier"
+const { shouldRetryError, selectFallbackProvider } = await import("./model-error-classifier")
+mock.restore()
 
 describe("model-error-classifier", () => {
   beforeEach(() => {
@@ -107,3 +108,5 @@ describe("model-error-classifier", () => {
     expect(result).toBe(true)
   })
 })
+
+export {}

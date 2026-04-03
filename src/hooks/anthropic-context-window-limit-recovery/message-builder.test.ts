@@ -33,7 +33,9 @@ mock.module("../session-recovery/storage/text-part-injector", () => ({
 }))
 
 async function importFreshMessageBuilder(): Promise<typeof import("./message-builder")> {
-  return import(`./message-builder?test=${Date.now()}-${Math.random()}`)
+  const module = await import(`./message-builder?test=${Date.now()}-${Math.random()}`)
+  mock.restore()
+  return module
 }
 
 afterAll(() => {
