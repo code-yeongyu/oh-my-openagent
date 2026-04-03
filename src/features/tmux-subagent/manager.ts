@@ -27,6 +27,7 @@ interface DeferredSession {
   sessionId: string
   title: string
   queuedAt: Date
+  retryIsolatedContainer: boolean
 }
 
 export interface TmuxUtilDeps {
@@ -366,8 +367,21 @@ export class TmuxSessionManager {
     }
   }
 
-  private enqueueDeferredSession(sessionId: string, title: string): void {
-    if (this.deferredSessions.has(sessionId)) return
+  private enqueueDeferredSession(
+    sessionId: string,
+    title: string,
+    retryIsolatedContainer = false,
+  ): void {
+    const existingDeferredSession = this.deferredSessions.get(sessionId)
+    if (existingDeferredSession) {
+      if (retryIsolatedContainer && !existingDeferredSession.retryIsolatedContainer) {
+        this.deferredSessions.set(sessionId, {
+          ...existingDeferredSession,
+          retryIsolatedContainer: true,
+        })
+      }
+      return
+    }
     if (this.deferredQueue.length >= MAX_DEFERRED_QUEUE_SIZE) {
       log("[tmux-session-manager] deferred queue full, dropping session", {
         sessionId,
@@ -380,6 +394,7 @@ export class TmuxSessionManager {
       sessionId,
       title,
       queuedAt: new Date(),
+      retryIsolatedContainer,
     })
     this.deferredQueue.push(sessionId)
     log("[tmux-session-manager] deferred session queued", {
@@ -430,8 +445,6 @@ export class TmuxSessionManager {
   }
 
   private async tryAttachDeferredSession(): Promise<void> {
-    const effectiveSourcePaneId = this.getEffectiveSourcePaneId()
-    if (!effectiveSourcePaneId) return
     const sessionId = this.deferredQueue[0]
     if (!sessionId) {
       this.stopDeferredAttachLoop()
@@ -458,6 +471,32 @@ export class TmuxSessionManager {
       }
       return
     }
+
+    if (deferred.retryIsolatedContainer) {
+      const isolatedPaneId = await this.spawnInIsolatedContainer(sessionId, deferred.title)
+      if (isolatedPaneId) {
+        const sessionReady = await this.waitForSessionReady(sessionId)
+        this.sessions.set(
+          sessionId,
+          createTrackedSession({
+            sessionId,
+            paneId: isolatedPaneId,
+            description: deferred.title,
+          }),
+        )
+        this.removeDeferredSession(sessionId)
+        this.pollingManager.startPolling()
+        log("[tmux-session-manager] deferred session attached in isolated window", {
+          sessionId,
+          paneId: isolatedPaneId,
+          sessionReady,
+        })
+        return
+      }
+    }
+
+    const effectiveSourcePaneId = this.getEffectiveSourcePaneId()
+    if (!effectiveSourcePaneId) return
 
     const state = await queryWindowState(effectiveSourcePaneId)
     if (!state) {
@@ -623,7 +662,7 @@ export class TmuxSessionManager {
 
         if (this.isIsolated() && !this.isolatedWindowPaneId) {
           log("[tmux-session-manager] isolated container failed, deferring session for retry", { sessionId })
-          this.enqueueDeferredSession(sessionId, title)
+          this.enqueueDeferredSession(sessionId, title, true)
           return
         }
         const sourcePaneId = this.getEffectiveSourcePaneId()

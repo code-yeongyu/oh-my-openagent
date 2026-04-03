@@ -863,6 +863,38 @@ describe('TmuxSessionManager', () => {
         logSpy.mockRestore()
       })
 
+      test('#given an isolated session deferred after container spawn failure #when deferred attach retries #then it re-attempts isolated container creation before normal pane fallback', async () => {
+        // given
+        mockIsInsideTmux.mockReturnValue(true)
+        mockSpawnTmuxSession.mockImplementation(async () => ({
+          success: false,
+        }))
+
+        const { TmuxSessionManager } = await import('./manager')
+        const ctx = createMockContext()
+        const config = createTmuxConfig({ enabled: true,
+        isolation: 'session',
+        layout: 'main-vertical',
+        main_pane_size: 60,
+        main_pane_min_width: 80,
+        agent_pane_min_width: 40, })
+        const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+
+        await manager.onSessionCreated(
+          createSessionCreatedEvent('ses_isolated_retry', 'ses_parent', 'Isolated Retry Task')
+        )
+
+        mockExecuteActions.mockClear()
+
+        // when
+        await Reflect.get(manager, 'tryAttachDeferredSession').call(manager)
+
+        // then
+        expect(mockSpawnTmuxSession).toHaveBeenCalledTimes(2)
+        expect(mockExecuteActions).toHaveBeenCalledTimes(1)
+        expect(mockExecuteActions.mock.calls[0]?.[1]?.sourcePaneId).toBe('%0')
+      })
+
       test('#given queryWindowState returns null #when onSessionCreated fires #then session is enqueued in deferred queue', async () => {
         // given
         mockIsInsideTmux.mockReturnValue(true)
