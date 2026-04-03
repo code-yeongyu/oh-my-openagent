@@ -12,18 +12,16 @@ interface RunLookAtSessionInput {
   ctx: PluginInput
   toolContext: ToolContext
   goal: string
-  filePart: LookAtFilePart
-  isBase64Input: boolean
+  fileParts: LookAtFilePart[]
 }
 
 export async function runLookAtSession({
   ctx,
   toolContext,
   goal,
-  filePart,
-  isBase64Input,
+  fileParts,
 }: RunLookAtSessionInput): Promise<string> {
-  const prompt = buildLookAtPrompt(goal, isBase64Input)
+  const prompt = buildLookAtPrompt(goal, fileParts)
   const { agentModel, agentVariant } = await resolveMultimodalLookerAgentMetadata(ctx)
 
   log(`[look_at] Creating session with parent: ${toolContext.sessionID}`)
@@ -60,7 +58,7 @@ Original error: ${createResult.error}`
   const sessionID = createResult.data.id
   log(`[look_at] Created session: ${sessionID}`)
 
-  log(`[look_at] Sending prompt with ${isBase64Input ? "base64 image" : "file"} to session ${sessionID}`)
+  log(`[look_at] Sending prompt with ${fileParts.length} file(s) to session ${sessionID}`)
   let shouldWaitForStatus = true
   try {
     await promptSyncWithModelSuggestionRetry(ctx.client, {
@@ -75,7 +73,7 @@ Original error: ${createResult.error}`
         },
         parts: [
           { type: "text", text: prompt },
-          filePart,
+          ...fileParts,
         ],
         ...(agentModel ? { model: { providerID: agentModel.providerID, modelID: agentModel.modelID } } : {}),
         ...(agentVariant ? { variant: agentVariant } : {}),
