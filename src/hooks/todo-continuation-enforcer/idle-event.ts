@@ -42,6 +42,11 @@ export async function handleSessionIdle(args: {
     return
   }
 
+  if (state.wasCancelled) {
+    log(`[${HOOK_NAME}] Skipped: session was cancelled`, { sessionID })
+    return
+  }
+
   if (state.abortDetectedAt) {
     const timeSinceAbort = Date.now() - state.abortDetectedAt
     if (timeSinceAbort < ABORT_WINDOW_MS) {

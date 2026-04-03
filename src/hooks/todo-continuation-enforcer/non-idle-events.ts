@@ -25,14 +25,20 @@ export function handleNonIdleEvent(args: {
           return
         }
       }
-      if (state) state.abortDetectedAt = undefined
+      if (state) {
+        state.abortDetectedAt = undefined
+        state.wasCancelled = false
+      }
       sessionStateStore.cancelCountdown(sessionID)
       return
     }
 
     if (role === "assistant") {
       const state = sessionStateStore.getExistingState(sessionID)
-      if (state) state.abortDetectedAt = undefined
+      if (state) {
+        state.abortDetectedAt = undefined
+        state.wasCancelled = false
+      }
       sessionStateStore.cancelCountdown(sessionID)
       return
     }
@@ -47,7 +53,10 @@ export function handleNonIdleEvent(args: {
 
     if (sessionID && role === "assistant") {
       const state = sessionStateStore.getExistingState(sessionID)
-      if (state) state.abortDetectedAt = undefined
+      if (state) {
+        state.abortDetectedAt = undefined
+        state.wasCancelled = false
+      }
       sessionStateStore.cancelCountdown(sessionID)
     }
     return
@@ -57,7 +66,10 @@ export function handleNonIdleEvent(args: {
     const sessionID = properties?.sessionID as string | undefined
     if (sessionID) {
       const state = sessionStateStore.getExistingState(sessionID)
-      if (state) state.abortDetectedAt = undefined
+      if (state) {
+        state.abortDetectedAt = undefined
+        state.wasCancelled = false
+      }
       sessionStateStore.cancelCountdown(sessionID)
     }
     return
