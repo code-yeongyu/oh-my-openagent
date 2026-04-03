@@ -10,6 +10,7 @@ import {
   selectFallbackProvider,
 } from "../../shared/model-error-classifier"
 import { transformModelForProvider } from "../../shared/provider-model-id-transform"
+import { abortWithTimeout } from "./abort-with-timeout"
 
 export async function tryFallbackRetry(args: {
   task: BackgroundTask
@@ -123,7 +124,7 @@ export async function tryFallbackRetry(args: {
   }
 
   if (previousSessionID) {
-    await client.session.abort({ path: { id: previousSessionID } }).catch(() => {})
+    await abortWithTimeout(client, previousSessionID).catch(() => {})
   }
 
   queue.push({ task, input: retryInput })

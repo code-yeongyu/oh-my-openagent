@@ -57,6 +57,7 @@ import { join } from "node:path"
 import { pruneStaleTasksAndNotifications } from "./task-poller"
 import { checkAndInterruptStaleTasks } from "./task-poller"
 import { removeTaskToastTracking } from "./remove-task-toast-tracking"
+import { abortWithTimeout } from "./abort-with-timeout"
 import {
   MIN_SESSION_GONE_POLLS,
   verifySessionExists as verifySessionStillExists,
@@ -193,9 +194,7 @@ export class BackgroundManager {
 
   private async abortSessionWithLogging(sessionID: string, reason: string): Promise<void> {
     try {
-      await this.client.session.abort({
-        path: { id: sessionID },
-      })
+      await abortWithTimeout(this.client, sessionID)
     } catch (error) {
       log(`[background-agent] Failed to abort session during ${reason}:`, {
         sessionID,
@@ -1985,9 +1984,7 @@ export class BackgroundManager {
       if (task.status === "running" && task.sessionID) {
         abortRequests.push({
           sessionID: task.sessionID,
-          promise: this.client.session.abort({
-            path: { id: task.sessionID },
-          }),
+          promise: abortWithTimeout(this.client, task.sessionID),
         })
       }
     }
