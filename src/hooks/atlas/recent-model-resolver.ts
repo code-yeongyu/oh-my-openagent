@@ -31,7 +31,7 @@ export async function resolveRecentPromptContextForSession(
       const model = info?.model
       const tools = normalizePromptTools(info?.tools)
       if (model?.providerID && model?.modelID) {
-        return { model: { providerID: model.providerID, modelID: model.modelID }, tools }
+        return { model: { providerID: model.providerID, modelID: model.modelID, ...(model.variant ? { variant: model.variant } : {}) }, tools }
       }
 
       if (info?.providerID && info?.modelID) {
@@ -54,7 +54,7 @@ export async function resolveRecentPromptContextForSession(
   if (!model?.providerID || !model?.modelID) {
     return { tools }
   }
-  return { model: { providerID: model.providerID, modelID: model.modelID }, tools }
+  return { model: { providerID: model.providerID, modelID: model.modelID, ...(model.variant ? { variant: model.variant } : {}) }, tools }
 }
 
 export async function resolveRecentModelForSession(
