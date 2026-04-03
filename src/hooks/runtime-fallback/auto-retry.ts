@@ -11,7 +11,7 @@ import { getLastUserRetryParts } from "./last-user-retry-parts"
 import { extractSessionMessages } from "./session-messages"
 import { getAgentDisplayName } from "../../shared/agent-display-names"
 
-const SESSION_TTL_MS = 30 * 60 * 1000
+const SESSION_TTL_MS = 6 * 60 * 60 * 1000
 
 declare function setTimeout(callback: () => void | Promise<void>, delay?: number): RuntimeFallbackTimeout
 declare function clearTimeout(timeout: RuntimeFallbackTimeout): void
