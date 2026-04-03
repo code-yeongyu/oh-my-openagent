@@ -13,6 +13,7 @@ import {
   TERMINAL_TASK_TTL_MS,
   TASK_TTL_MS,
 } from "./constants"
+import { abortWithTimeout } from "./abort-with-timeout"
 import { removeTaskToastTracking } from "./remove-task-toast-tracking"
 import { MIN_SESSION_GONE_POLLS, verifySessionExists } from "./session-existence"
 
@@ -167,7 +168,7 @@ export async function checkAndInterruptStaleTasks(args: {
 
       onTaskInterrupted(task)
 
-      abortPromises.push(client.session.abort({ path: { id: sessionID } }))
+      abortPromises.push(abortWithTimeout(client, sessionID))
       log(`[background-agent] Task ${task.id} interrupted: no progress since start`)
 
       try {
@@ -205,7 +206,7 @@ export async function checkAndInterruptStaleTasks(args: {
 
     onTaskInterrupted(task)
 
-    abortPromises.push(client.session.abort({ path: { id: sessionID } }))
+    abortPromises.push(abortWithTimeout(client, sessionID))
     log(`[background-agent] Task ${task.id} interrupted: stale timeout`)
 
     try {

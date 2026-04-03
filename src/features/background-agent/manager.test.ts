@@ -238,7 +238,7 @@ function stubNotifyParentSession(manager: BackgroundManager): void {
 }
 
 async function flushBackgroundNotifications(): Promise<void> {
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 12; i++) {
     await Promise.resolve()
   }
 }
@@ -2570,7 +2570,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
         abortCalled,
         new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), 100)),
       ])
-      await Promise.resolve()
+      await flushBackgroundNotifications()
 
       // then
       const updatedTask = manager.getTask(task.id)
