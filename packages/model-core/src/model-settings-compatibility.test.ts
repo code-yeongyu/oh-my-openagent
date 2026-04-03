@@ -137,22 +137,15 @@ describe("resolveCompatibleModelSettings", () => {
     ])
   })
 
-  test("drops reasoningEffort for Claude family", () => {
+  test("keeps reasoningEffort for Claude family", () => {
     const result = resolveCompatibleModelSettings({
       providerID: "anthropic",
       modelID: "claude-sonnet-4-6",
       desired: { reasoningEffort: "high" },
     })
 
-    expect(result.reasoningEffort).toBeUndefined()
-    expect(result.changes).toEqual([
-      {
-        field: "reasoningEffort",
-        from: "high",
-        to: undefined,
-        reason: "unsupported-by-model-family",
-      },
-    ])
+    expect(result.reasoningEffort).toBe("high")
+    expect(result.changes).toEqual([])
   })
 
   test("handles combined variant and reasoningEffort normalization", () => {
@@ -164,18 +157,12 @@ describe("resolveCompatibleModelSettings", () => {
 
     expect(result).toEqual({
       variant: "high",
-      reasoningEffort: undefined,
+      reasoningEffort: "high",
       changes: [
         {
           field: "variant",
           from: "max",
           to: "high",
-          reason: "unsupported-by-model-family",
-        },
-        {
-          field: "reasoningEffort",
-          from: "high",
-          to: undefined,
           reason: "unsupported-by-model-family",
         },
       ],
