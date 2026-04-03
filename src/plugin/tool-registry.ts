@@ -29,7 +29,7 @@ import {
 } from "../tools"
 import { getMainSessionID } from "../features/claude-code-session-state"
 import { filterDisabledTools } from "../shared/disabled-tools"
-import { log } from "../shared"
+import { isTaskSystemEnabled, log } from "../shared"
 
 import type { Managers } from "../create-managers"
 import type { SkillContext } from "./skill-context"
@@ -175,8 +175,7 @@ export function createToolRegistry(args: {
     nativeSkills: "skills" in ctx ? (ctx as { skills: SkillLoadOptions["nativeSkills"] }).skills : undefined,
   })
 
-  // task_system defaults to true since v3.14 — delegation (oracle, subagents) requires it
-  const taskSystemEnabled = pluginConfig.experimental?.task_system ?? true
+  const taskSystemEnabled = isTaskSystemEnabled(pluginConfig)
   const taskToolsRecord: Record<string, ToolDefinition> = taskSystemEnabled
     ? {
         task_create: createTaskCreateTool(pluginConfig, ctx),
