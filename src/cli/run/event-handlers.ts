@@ -103,7 +103,6 @@ export function handleMessagePartUpdated(ctx: RunContext, payload: EventPayload,
   if (payload.type !== "message.part.updated") return
 
   const props = payload.properties as MessagePartUpdatedProps | undefined
-  // Current OpenCode puts sessionID inside part; legacy puts it in info
   const partSid = getPartSessionId(props)
   const infoSid = getInfoSessionId(props)
   if ((partSid ?? infoSid) !== ctx.sessionID) return

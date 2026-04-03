@@ -30,7 +30,6 @@ export function createWebsearchConfig(config?: WebsearchConfig): RemoteMcpConfig
     }
   }
 
-  // Default to Exa
   return {
     type: "remote" as const,
     url: process.env.EXA_API_KEY
@@ -42,5 +41,4 @@ export function createWebsearchConfig(config?: WebsearchConfig): RemoteMcpConfig
   }
 }
 
-// Backward compatibility: export static instance using default config
 export const websearch = createWebsearchConfig()

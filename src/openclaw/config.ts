@@ -89,11 +89,9 @@ export function resolveGateway(
     return null
   }
 
-  // Validate based on gateway type
   if (gateway.type === "command") {
     if (!gateway.command) return null
   } else {
-    // HTTP gateway
     if (!gateway.url) return null
   }
 
