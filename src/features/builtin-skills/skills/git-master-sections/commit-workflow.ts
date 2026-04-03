@@ -35,18 +35,18 @@ git log --oneline $(git merge-base HEAD main 2>/dev/null || git merge-base HEAD 
 <style_detection>
 **THIS PHASE HAS MANDATORY OUTPUT** - You MUST print the analysis result before moving to Phase 2.
 
-### 1.1 Language Detection
+### 1.1 Language Profile Detection
 
 \`\`\`
 Count from git log -30:
-- Korean characters: N commits
-- English only: M commits
-- Mixed: K commits
+- Dominant language/script patterns: N commits
+- Secondary language/script patterns: M commits
+- Mixed/ambiguous: K commits
 
 DECISION:
-- If Korean >= 50% -> KOREAN
-- If English >= 50% -> ENGLISH  
-- If Mixed -> Use MAJORITY language
+- Preserve the dominant repository language pattern in commit messages
+- If multiple languages are common, follow the nearest recent examples for the same module
+- Never restrict output to specific languages; support any language used by the repo (e.g., Japanese, Korean, English, etc.)
 \`\`\`
 
 ### 1.2 Commit Style Classification
@@ -79,9 +79,9 @@ STYLE DETECTION RESULT
 ======================
 Analyzed: 30 commits from git log
 
-Language: [KOREAN | ENGLISH]
-  - Korean commits: N (X%)
-  - English commits: M (Y%)
+Language profile: [DOMINANT_LANGUAGE_OR_SCRIPT]
+  - Dominant pattern: N (X%)
+  - Secondary pattern: M (Y%)
 
 Style: [SEMANTIC | PLAIN | SENTENCE | SHORT]
   - Semantic (feat:, fix:, etc): N (X%)
@@ -93,7 +93,7 @@ Reference examples from repo:
   2. "actual commit message from log"
   3. "actual commit message from log"
 
-All commits will follow: [LANGUAGE] + [STYLE]
+All commits will follow: [DOMINANT_LANGUAGE_OR_SCRIPT] + [STYLE]
 \`\`\`
 
 **IF YOU SKIP THIS OUTPUT, YOUR COMMITS WILL BE WRONG. STOP AND REDO.**
@@ -435,17 +435,19 @@ git log -1 --oneline
 **Based on COMMIT_CONFIG from Phase 1:**
 
 \`\`\`
-IF style == SEMANTIC AND language == KOREAN:
-  -> "feat: 로그인 기능 추가"
-  
-IF style == SEMANTIC AND language == ENGLISH:
-  -> "feat: add login feature"
-  
-IF style == PLAIN AND language == KOREAN:
-  -> "로그인 기능 추가"
-  
-IF style == PLAIN AND language == ENGLISH:
-  -> "Add login feature"
+IF style == SEMANTIC:
+  -> Use a semantic prefix + repository language message
+  -> Examples:
+     - "feat: add login feature"
+     - "feat: ログイン機能を追加"
+     - "feat: 로그인 기능 추가"
+
+IF style == PLAIN:
+  -> Use plain repository language message without semantic prefix
+  -> Examples:
+     - "Add login feature"
+     - "ログイン機能を追加"
+     - "로그인 기능 추가"
   
 IF style == SHORT:
   -> "format" / "type fix" / "lint"
