@@ -42,6 +42,7 @@ const defaultTmuxDeps: TmuxUtilDeps = {
 const DEFERRED_SESSION_TTL_MS = 5 * 60 * 1000
 const MAX_DEFERRED_QUEUE_SIZE = 20
 const MAX_CLOSE_RETRY_COUNT = 3
+const MAX_ISOLATED_CONTAINER_NULL_STATE_COUNT = 2
 
 export class TmuxSessionManager {
   private client: OpencodeClient
@@ -60,6 +61,7 @@ export class TmuxSessionManager {
   private pollingManager: TmuxPollingManager
   private isolatedContainerPaneId: string | undefined
   private isolatedWindowPaneId: string | undefined
+  private isolatedContainerNullStateCount = 0
   constructor(ctx: PluginInput, tmuxConfig: TmuxConfig, deps: TmuxUtilDeps = defaultTmuxDeps) {
     this.client = ctx.client
     this.tmuxConfig = tmuxConfig
@@ -123,9 +125,22 @@ export class TmuxSessionManager {
         })
         return null
       })
-      if (state) return null
+      if (state) {
+        this.isolatedContainerNullStateCount = 0
+        return null
+      }
+      this.isolatedContainerNullStateCount += 1
+      log("[tmux-session-manager] isolated container state query returned null", {
+        paneId: this.isolatedWindowPaneId,
+        nullStateCount: this.isolatedContainerNullStateCount,
+        maxNullStateCount: MAX_ISOLATED_CONTAINER_NULL_STATE_COUNT,
+      })
+      if (this.isolatedContainerNullStateCount < MAX_ISOLATED_CONTAINER_NULL_STATE_COUNT) {
+        return null
+      }
       this.isolatedContainerPaneId = undefined
       this.isolatedWindowPaneId = undefined
+      this.isolatedContainerNullStateCount = 0
     }
 
     const isolation = this.tmuxConfig.isolation
@@ -138,6 +153,7 @@ export class TmuxSessionManager {
     if (result.success && result.paneId) {
       this.isolatedContainerPaneId = result.paneId
       this.isolatedWindowPaneId = result.paneId
+      this.isolatedContainerNullStateCount = 0
       log("[tmux-session-manager] isolated container created", {
         isolation,
         paneId: result.paneId,
@@ -179,6 +195,7 @@ export class TmuxSessionManager {
       return
     }
 
+    this.isolatedContainerNullStateCount = 0
     this.isolatedWindowPaneId = nextAnchor.paneId
     log("[tmux-session-manager] reassigned isolated container anchor pane", {
       sessionId: nextAnchor.sessionId,
@@ -201,6 +218,7 @@ export class TmuxSessionManager {
     }
 
     const isolatedContainerPaneId = this.isolatedContainerPaneId
+    this.isolatedContainerNullStateCount = 0
     this.isolatedContainerPaneId = undefined
     this.isolatedWindowPaneId = undefined
 
@@ -604,7 +622,8 @@ export class TmuxSessionManager {
         }
 
         if (this.isIsolated() && !this.isolatedWindowPaneId) {
-          log("[tmux-session-manager] isolated container failed, skipping inline fallback to preserve isolation", { sessionId })
+          log("[tmux-session-manager] isolated container failed, deferring session for retry", { sessionId })
+          this.enqueueDeferredSession(sessionId, title)
           return
         }
         const sourcePaneId = this.getEffectiveSourcePaneId()
@@ -862,6 +881,7 @@ export class TmuxSessionManager {
     }
 
     await this.retryPendingCloses()
+    this.isolatedContainerNullStateCount = 0
     this.isolatedContainerPaneId = undefined
     this.isolatedWindowPaneId = undefined
 
