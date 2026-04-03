@@ -25,10 +25,10 @@ If the session is nearly empty or has no meaningful context, inform the user the
 
 Execute these tools to gather concrete data:
 
-1. session_read({ session_id: "$SESSION_ID" }) — full session history
-2. todoread() — current task progress
-3. Bash({ command: "git diff --stat HEAD~10..HEAD" }) — recent file changes
-4. Bash({ command: "git status --porcelain" }) — uncommitted changes
+1. session_read({ session_id: "$SESSION_ID" }) - full session history
+2. todoread() - current task progress
+3. Bash({ command: "git diff --stat HEAD~10..HEAD" }) - recent file changes
+4. Bash({ command: "git status --porcelain" }) - uncommitted changes
 
 Suggested execution order:
 

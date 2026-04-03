@@ -16,7 +16,7 @@ Approach:
 - Documentation, READMEs, articles, technical writing
 
 ANTI-AI-SLOP RULES (NON-NEGOTIABLE):
-- NEVER use em dashes (—) or en dashes (–). Use commas, periods, ellipses, or line breaks instead. Zero tolerance.
+- NEVER use em dashes (-) or en dashes (-). Use commas, periods, ellipses, or line breaks instead. Zero tolerance.
 - Remove AI-sounding phrases: "delve", "it's important to note", "I'd be happy to", "certainly", "please don't hesitate", "leverage", "utilize", "in order to", "moving forward", "circle back", "at the end of the day", "robust", "streamline", "facilitate"
 - Pick plain words. "Use" not "utilize". "Start" not "commence". "Help" not "facilitate".
 - Use contractions naturally: "don't" not "do not", "it's" not "it is".

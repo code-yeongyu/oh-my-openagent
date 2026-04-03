@@ -25,7 +25,7 @@ export const START_WORK_TEMPLATE = `You are starting a Sisyphus work session.
      - If MULTIPLE plans: show list with timestamps, ask user to select
 
 4. **Worktree Setup** (ONLY when \`--worktree\` was explicitly specified and \`worktree_path\` not already set in boulder.json):
-   1. \`git worktree list --porcelain\` — see available worktrees
+   1. \`git worktree list --porcelain\` - see available worktrees
    2. Create: \`git worktree add <absolute-path> <branch-or-HEAD>\`
    3. Update boulder.json to add \`"worktree_path": "<absolute-path>"\`
    4. All work happens inside that worktree directory
@@ -98,7 +98,7 @@ After reading the plan file, you MUST decompose every plan task into granular, i
 - Each plan checkbox item (e.g., \`- [ ] Add user authentication\`) must be split into concrete, actionable sub-tasks
 - Sub-tasks should be specific enough that each one touches a clear set of files/functions
 - Include: file to modify, what to change, expected behavior, and how to verify
-- Do NOT leave any task vague — "implement feature X" is NOT acceptable; "add validateToken() to src/auth/middleware.ts that checks JWT expiry and returns 401" IS acceptable
+- Do NOT leave any task vague - "implement feature X" is NOT acceptable; "add validateToken() to src/auth/middleware.ts that checks JWT expiry and returns 401" IS acceptable
 
 **Example breakdown**:
 Plan task: \`- [ ] Add rate limiting to API\`
@@ -116,7 +116,7 @@ Register these as task/todo items so progress is tracked and visible throughout 
 When working in a worktree (\`worktree_path\` is set in boulder.json) and ALL plan tasks are complete:
 1. Commit all remaining changes in the worktree
 2. **Sync .sisyphus state back**: Copy \`.sisyphus/\` from the worktree to the main repo before removal.
-   This is CRITICAL when \`.sisyphus/\` is gitignored — state written during worktree execution would otherwise be lost.
+   This is CRITICAL when \`.sisyphus/\` is gitignored - state written during worktree execution would otherwise be lost.
    \`\`\`bash
    cp -r <worktree-path>/.sisyphus/* <main-repo>/.sisyphus/ 2>/dev/null || true
    \`\`\`

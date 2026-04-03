@@ -33,7 +33,7 @@ export function buildToolSelectionTable(
 
   if (tools.length > 0) {
     rows.push(
-      `- ${getToolsPromptDisplay(tools)} — **FREE** — Not Complex, Scope Clear, No Implicit Assumptions`,
+      `- ${getToolsPromptDisplay(tools)} - **FREE** - Not Complex, Scope Clear, No Implicit Assumptions`,
     )
   }
 
@@ -47,7 +47,7 @@ export function buildToolSelectionTable(
   for (const agent of sortedAgents) {
     const shortDescription = agent.description.split(".")[0] || agent.description
     rows.push(
-      `- \`${agent.name}\` agent — **${agent.metadata.cost}** — ${shortDescription}`,
+      `- \`${agent.name}\` agent - **${agent.metadata.cost}** - ${shortDescription}`,
     )
   }
 
@@ -91,8 +91,8 @@ export function buildLibrarianSection(agents: AvailableAgent[]): string {
 
 Search **external references** (docs, OSS, web). Fire proactively when unfamiliar libraries are involved.
 
-**Contextual Grep (Internal)** — search OUR codebase, find patterns in THIS repo, project-specific logic.
-**Reference Grep (External)** — search EXTERNAL resources, official API docs, library best practices, OSS implementation examples.
+**Contextual Grep (Internal)** - search OUR codebase, find patterns in THIS repo, project-specific logic.
+**Reference Grep (External)** - search EXTERNAL resources, official API docs, library best practices, OSS implementation examples.
 
 **Trigger phrases** (fire librarian immediately):
 ${useWhen.map((entry) => `- "${entry}"`).join("\n")}`
@@ -103,7 +103,7 @@ export function buildDelegationTable(agents: AvailableAgent[]): string {
 
   for (const agent of agents) {
     for (const trigger of agent.metadata.triggers) {
-      rows.push(`- **${trigger.domain}** → \`${agent.name}\` — ${trigger.trigger}`)
+      rows.push(`- **${trigger.domain}** → \`${agent.name}\` - ${trigger.trigger}`)
     }
   }
 

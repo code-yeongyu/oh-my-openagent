@@ -61,7 +61,7 @@ export function parseConfigPartially(
   }
 
   if (invalidSections.length > 0) {
-    log("Partial config loaded — invalid sections skipped:", invalidSections);
+    log("Partial config loaded - invalid sections skipped:", invalidSections);
   }
 
   return partialConfig as OhMyOpenCodeConfig;
@@ -91,7 +91,7 @@ export function loadConfigFromPath(
       log(`Config validation error in ${configPath}:`, result.error.issues);
       addConfigLoadError({
         path: configPath,
-        error: `Partial config loaded — invalid sections skipped: ${errorMsg}`,
+        error: `Partial config loaded - invalid sections skipped: ${errorMsg}`,
       });
 
       const partialResult = parseConfigPartially(rawConfig);
