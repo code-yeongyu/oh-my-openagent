@@ -176,9 +176,11 @@ export function getPlanProgress(planPath: string): PlanProgress {
   try {
     const content = readFileSync(planPath, "utf-8")
     
-    // Match markdown checkboxes: - [ ] or - [x] or - [X]
-    const uncheckedMatches = content.match(/^\s*[-*]\s*\[\s*\]/gm) || []
-    const checkedMatches = content.match(/^\s*[-*]\s*\[[xX]\]/gm) || []
+    // Match only top-level markdown checkboxes (no leading whitespace).
+    // Nested checkboxes (e.g. under Acceptance Criteria) are excluded
+    // to align with readCurrentTopLevelTask() semantics.
+    const uncheckedMatches = content.match(/^[-*]\s*\[\s*\]/gm) || []
+    const checkedMatches = content.match(/^[-*]\s*\[[xX]\]/gm) || []
 
     const total = uncheckedMatches.length + checkedMatches.length
     const completed = checkedMatches.length
