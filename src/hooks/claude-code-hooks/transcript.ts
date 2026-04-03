@@ -28,10 +28,6 @@ export function appendTranscriptEntry(
   appendFileSync(path, line)
 }
 
-// ============================================================================
-// Claude Code Compatible Transcript Builder
-// ============================================================================
-
 interface OpenCodeMessagePart {
   type: string
   tool?: string
@@ -59,12 +55,6 @@ interface DisabledTranscriptEntry {
     }>
   }
 }
-
-// ============================================================================
-// Session-scoped transcript cache to avoid full session.messages() rebuild
-// on every tool call. Cache stores base entries from initial fetch;
-// subsequent calls append new tool entries without re-fetching.
-// ============================================================================
 
 interface TranscriptCacheEntry {
   baseEntries: string[]
@@ -172,7 +162,6 @@ export async function buildTranscriptFromSession(
       baseEntries = cached.baseEntries
       previousTempPath = cached.tempPath
     } else {
-      // Fetch full session messages (only on first call or cache expiry)
       const response = await client.session.messages({
         path: { id: sessionId },
         query: { directory },
@@ -186,7 +175,6 @@ export async function buildTranscriptFromSession(
         ? parseMessagesToEntries(messages as OpenCodeMessage[])
         : []
 
-      // Clean up old temp file if exists
       if (cached?.tempPath) {
         try { unlinkSync(cached.tempPath) } catch { /* ignore */ }
       }
@@ -198,7 +186,6 @@ export async function buildTranscriptFromSession(
       })
     }
 
-    // Append current tool call
     const allEntries = [...baseEntries, buildCurrentEntry(currentToolName, currentToolInput)]
 
     if (previousTempPath) {
@@ -211,7 +198,6 @@ export async function buildTranscriptFromSession(
     )
     writeFileSync(tempPath, allEntries.join("\n") + "\n")
 
-    // Update cache temp path for cleanup tracking
     const cacheEntry = transcriptCache.get(sessionId)
     if (cacheEntry) {
       cacheEntry.baseEntries = allEntries
@@ -234,9 +220,6 @@ export async function buildTranscriptFromSession(
   }
 }
 
-/**
- * Delete temp transcript file (call in finally block)
- */
 export function deleteTempTranscript(path: string | null): void {
   if (!path) return
   try {
