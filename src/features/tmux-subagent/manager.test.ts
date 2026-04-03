@@ -1091,6 +1091,7 @@ describe('TmuxSessionManager', () => {
         paneId: '%isolated-session-ses_first',
         sessionId: 'ses_first',
       })
+      expect(Reflect.get(manager, 'isolatedContainerPaneId')).toBeUndefined()
       expect(Reflect.get(manager, 'isolatedWindowPaneId')).toBeUndefined()
     })
 
@@ -1177,18 +1178,25 @@ describe('TmuxSessionManager', () => {
 
       // then
       expect(mockExecuteAction).toHaveBeenCalledTimes(0)
+      expect(Reflect.get(manager, 'isolatedContainerPaneId')).toBe('%isolated-session-ses_first')
       expect(Reflect.get(manager, 'isolatedWindowPaneId')).toBe('%mock')
 
       // when
       await manager.onSessionDeleted({ sessionID: 'ses_second' })
 
       // then
-      expect(mockExecuteAction).toHaveBeenCalledTimes(1)
+      expect(mockExecuteAction).toHaveBeenCalledTimes(2)
       expect(mockExecuteAction.mock.calls[0]?.[0]).toEqual({
         type: 'close',
         paneId: '%mock',
         sessionId: 'ses_second',
       })
+      expect(mockExecuteAction.mock.calls[1]?.[0]).toEqual({
+        type: 'close',
+        paneId: '%isolated-session-ses_first',
+        sessionId: 'ses_second',
+      })
+      expect(Reflect.get(manager, 'isolatedContainerPaneId')).toBeUndefined()
       expect(Reflect.get(manager, 'isolatedWindowPaneId')).toBeUndefined()
     })
 
