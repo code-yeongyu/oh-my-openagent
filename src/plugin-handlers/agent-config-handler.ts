@@ -1,7 +1,7 @@
 import { createBuiltinAgents } from "../agents";
 import { createSisyphusJuniorAgentWithOverrides } from "../agents/sisyphus-junior";
 import type { OhMyOpenCodeConfig } from "../config";
-import { log, migrateAgentConfig } from "../shared";
+import { isTaskSystemEnabled, log, migrateAgentConfig } from "../shared";
 import { AGENT_NAME_MAP } from "../shared/migration";
 import { getAgentDisplayName } from "../shared/agent-display-names";
 import { registerAgentName } from "../features/claude-code-session-state";
@@ -90,7 +90,7 @@ export async function applyAgentConfig(params: {
     params.pluginConfig.browser_automation_engine?.provider ?? "playwright";
   const currentModel = params.config.model as string | undefined;
   const disabledSkills = new Set<string>(params.pluginConfig.disabled_skills ?? []);
-  const useTaskSystem = params.pluginConfig.experimental?.task_system ?? false;
+  const useTaskSystem = isTaskSystemEnabled(params.pluginConfig);
   const disableOmoEnv = params.pluginConfig.experimental?.disable_omo_env ?? false;
 
   const includeClaudeAgents = params.pluginConfig.claude_code?.agents ?? true;
