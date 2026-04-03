@@ -165,10 +165,12 @@ export async function buildTranscriptFromSession(
 ): Promise<string | null> {
   try {
     let baseEntries: string[]
+    let previousTempPath: string | null = null
 
     const cached = transcriptCache.get(sessionId)
     if (cached && isCacheValid(cached)) {
       baseEntries = cached.baseEntries
+      previousTempPath = cached.tempPath
     } else {
       // Fetch full session messages (only on first call or cache expiry)
       const response = await client.session.messages({
@@ -199,6 +201,10 @@ export async function buildTranscriptFromSession(
     // Append current tool call
     const allEntries = [...baseEntries, buildCurrentEntry(currentToolName, currentToolInput)]
 
+    if (previousTempPath) {
+      try { unlinkSync(previousTempPath) } catch { /* ignore */ }
+    }
+
     const tempPath = join(
       tmpdir(),
       `opencode-transcript-${sessionId}-${randomUUID()}.jsonl`
@@ -208,7 +214,9 @@ export async function buildTranscriptFromSession(
     // Update cache temp path for cleanup tracking
     const cacheEntry = transcriptCache.get(sessionId)
     if (cacheEntry) {
+      cacheEntry.baseEntries = allEntries
       cacheEntry.tempPath = tempPath
+      cacheEntry.createdAt = Date.now()
     }
 
     return tempPath
