@@ -1,4 +1,4 @@
-import { existsSync, copyFileSync, renameSync } from "node:fs"
+import { closeSync, existsSync, fsyncSync, openSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs"
 import { join, dirname, basename } from "node:path"
 
 import { log } from "./logger"
@@ -10,6 +10,49 @@ function buildCanonicalPath(legacyPath: string): string {
   return join(dir, `${CONFIG_BASENAME}${ext}`)
 }
 
+function writeFileAtomically(filePath: string, content: string): void {
+  const tempPath = `${filePath}.tmp`
+  writeFileSync(tempPath, content, "utf-8")
+  const tempFileDescriptor = openSync(tempPath, "r")
+  try {
+    fsyncSync(tempFileDescriptor)
+  } finally {
+    closeSync(tempFileDescriptor)
+  }
+  renameSync(tempPath, filePath)
+}
+
+function archiveLegacyConfigFile(legacyPath: string): boolean {
+  const backupPath = `${legacyPath}.bak`
+
+  try {
+    renameSync(legacyPath, backupPath)
+    log("[migrateLegacyConfigFile] Legacy config was migrated and renamed to backup. Update the canonical file only.", {
+      legacyPath,
+      backupPath,
+    })
+    return true
+  } catch (renameError) {
+    try {
+      rmSync(legacyPath)
+      log("[migrateLegacyConfigFile] Legacy config was migrated and removed after backup rename failed. Update the canonical file only.", {
+        legacyPath,
+        backupPath,
+        renameError,
+      })
+      return true
+    } catch (removeError) {
+      log("[migrateLegacyConfigFile] WARNING: canonical config was written but the legacy file still exists and will be ignored. Remove or rename it manually.", {
+        legacyPath,
+        backupPath,
+        renameError,
+        removeError,
+      })
+      return false
+    }
+  }
+}
+
 export function migrateLegacyConfigFile(legacyPath: string): boolean {
   if (!existsSync(legacyPath)) return false
   if (!basename(legacyPath).startsWith(LEGACY_CONFIG_BASENAME)) return false
@@ -18,14 +61,17 @@ export function migrateLegacyConfigFile(legacyPath: string): boolean {
   if (existsSync(canonicalPath)) return false
 
   try {
-    copyFileSync(legacyPath, canonicalPath)
-    log("[migrateLegacyConfigFile] Copied legacy config to canonical path", {
+    const content = readFileSync(legacyPath, "utf-8")
+    writeFileAtomically(canonicalPath, content)
+    const archivedLegacyConfig = archiveLegacyConfigFile(legacyPath)
+    log("[migrateLegacyConfigFile] Migrated legacy config to canonical path", {
       from: legacyPath,
       to: canonicalPath,
+      archivedLegacyConfig,
     })
-    return true
+    return archivedLegacyConfig
   } catch (error) {
-    log("[migrateLegacyConfigFile] Failed to copy legacy config file", { legacyPath, error })
+    log("[migrateLegacyConfigFile] Failed to migrate legacy config file", { legacyPath, error })
     return false
   }
 }

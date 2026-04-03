@@ -3,7 +3,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { checkForLegacyPluginEntry } from "../../shared/legacy-plugin-warning"
 import { log } from "../../shared/logger"
 import { LEGACY_PLUGIN_NAME, PLUGIN_NAME } from "../../shared/plugin-identity"
-import { autoMigrateLegacyPluginEntry } from "./auto-migrate"
+import { autoMigrateLegacyPluginEntry } from "./auto-migrate-runner"
 
 export function createLegacyPluginToastHook(ctx: PluginInput) {
   let fired = false

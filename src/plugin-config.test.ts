@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, mock, spyOn } from "bun:test";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import * as shared from "./shared"
@@ -320,5 +320,34 @@ describe("loadPluginConfig", () => {
 
     // then
     expect(config.mcp_env_allowlist).toEqual(["USER_ONLY_TOKEN"])
+  })
+
+  it("should ignore edits to the renamed legacy backup after migration", () => {
+    // given
+    const rootDir = mkdtempSync(join(tmpdir(), "omo-plugin-config-legacy-"))
+    const userConfigDir = join(rootDir, "user-config")
+    const projectDir = join(rootDir, "project")
+    const projectConfigDir = join(projectDir, ".opencode")
+    const legacyConfigPath = join(projectConfigDir, "oh-my-opencode.jsonc")
+    const backupConfigPath = `${legacyConfigPath}.bak`
+    const canonicalConfigPath = join(projectConfigDir, "oh-my-openagent.jsonc")
+
+    tempDirs.push(rootDir)
+    mkdirSync(userConfigDir, { recursive: true })
+    mkdirSync(projectConfigDir, { recursive: true })
+    writeFileSync(legacyConfigPath, JSON.stringify({ agents: { oracle: { model: "openai/gpt-5.4" } } }))
+
+    spyOn(shared, "getOpenCodeConfigDir").mockReturnValue(userConfigDir)
+
+    // when
+    loadPluginConfig(projectDir, {})
+    writeFileSync(backupConfigPath, JSON.stringify({ agents: { oracle: { model: "openai/gpt-5-nano" } } }))
+    const reloadedConfig = loadPluginConfig(projectDir, {})
+
+    // then
+    expect(existsSync(legacyConfigPath)).toBe(false)
+    expect(existsSync(backupConfigPath)).toBe(true)
+    expect(readFileSync(canonicalConfigPath, "utf-8")).toContain('"openai/gpt-5.4"')
+    expect(reloadedConfig.agents?.oracle?.model).toBe("openai/gpt-5.4")
   })
 })
