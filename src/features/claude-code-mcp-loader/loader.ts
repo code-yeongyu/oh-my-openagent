@@ -59,7 +59,10 @@ export function getSystemMcpServerNames(): Set<string> {
       if (!config?.mcpServers) continue
 
       for (const [name, serverConfig] of Object.entries(config.mcpServers)) {
-        if (serverConfig.disabled) continue
+        if (serverConfig.disabled) {
+          names.delete(name)
+          continue
+        }
         if (!shouldLoadMcpServer(serverConfig, cwd)) continue
         names.add(name)
       }
