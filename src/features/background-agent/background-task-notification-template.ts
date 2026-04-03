@@ -1,14 +1,21 @@
-import type { BackgroundTask } from "./types"
+import type { BackgroundTaskStatus } from "./types"
 
 export type BackgroundTaskNotificationStatus = "COMPLETED" | "CANCELLED" | "INTERRUPTED" | "ERROR"
 
+export interface BackgroundTaskNotificationTask {
+  id: string
+  description: string
+  status: BackgroundTaskStatus
+  error?: string
+}
+
 export function buildBackgroundTaskNotificationText(input: {
-  task: BackgroundTask
+  task: BackgroundTaskNotificationTask
   duration: string
   statusText: BackgroundTaskNotificationStatus
   allComplete: boolean
   remainingCount: number
-  completedTasks: BackgroundTask[]
+  completedTasks: BackgroundTaskNotificationTask[]
 }): string {
   const { task, duration, statusText, allComplete, remainingCount, completedTasks } = input
 
@@ -50,14 +57,12 @@ Use \`background_output(task_id="<id>")\` to retrieve each result.${hasFailures 
 </system-reminder>`
   }
 
-  const agentInfo = task.category ? `${task.agent} (${task.category})` : task.agent
   const isFailure = statusText !== "COMPLETED"
 
   return `<system-reminder>
 [BACKGROUND TASK ${statusText}]
 **ID:** \`${task.id}\`
 **Description:** ${task.description}
-**Agent:** ${agentInfo}
 **Duration:** ${duration}${errorInfo}
 
 **${remainingCount} task${remainingCount === 1 ? "" : "s"} still in progress.** You WILL be notified when ALL complete.
