@@ -150,12 +150,12 @@ Available categories: ${allCategoryNames}`,
       const userModelOverride = explicitCategoryModel ?? overrideModel
       if (userModelOverride) {
         actualModel = userModelOverride
-        const parsedModel = parseModelString(actualModel)
+        const parsedModel = parseModelString(userModelOverride)
         const variantToUse = userCategories?.[args.category!]?.variant ?? resolved.config.variant
         categoryModel = parsedModel
           ? applyCategoryParams({ ...parsedModel, variant: variantToUse ?? parsedModel.variant }, resolved.config)
           : undefined
-        modelInfo = { model: actualModel, type: "user-defined", source: "override" }
+        modelInfo = { model: userModelOverride, type: "user-defined", source: "override" }
       }
     } else if (resolution) {
       const {
@@ -275,6 +275,6 @@ Available categories: ${categoryNames.join(", ")}`,
     actualModel,
     isUnstableAgent,
     // Don't use hardcoded fallback chain when resolution was skipped (cold cache)
-    fallbackChain: configuredFallbackChain ?? (isModelResolutionSkipped ? undefined : requirement?.fallbackChain),
+    fallbackChain: configuredFallbackChain ?? ((isModelResolutionSkipped || explicitCategoryModel) ? undefined : requirement?.fallbackChain),
   }
 }
