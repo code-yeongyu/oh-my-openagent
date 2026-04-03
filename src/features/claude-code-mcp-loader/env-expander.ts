@@ -9,11 +9,13 @@ export function expandEnvVars(value: string): string {
     /\$\{([^}:]+)(?::-([^}]*))?\}/g,
     (_, varName: string, defaultValue?: string) => {
       if (!isAllowedMcpEnvVar(varName)) {
-        if (isSensitiveMcpEnvVar(varName)) {
-          log(`Blocked MCP env var expansion for sensitive variable "${varName}"`, {
-            varName,
-          })
-        }
+        const isSensitive = isSensitiveMcpEnvVar(varName)
+        const reason = isSensitive ? "sensitive variable" : "not in allowlist"
+
+        log(`Blocked MCP env var expansion for ${reason} "${varName}"`, {
+          varName,
+          sensitive: isSensitive,
+        })
 
         if (defaultValue !== undefined) return defaultValue
         return ""

@@ -42,6 +42,41 @@ describe("expandEnvVars", () => {
     })
   })
 
+  describe("#given a benign environment variable in the builtin allowlist", () => {
+    it("#when expanding the value #then it returns the env value", () => {
+      // given
+      process.env.TMPDIR = "/tmp/omo"
+      process.env.LANG = "en_US.UTF-8"
+      process.env.XDG_CONFIG_HOME = "/Users/tester/.config"
+
+      // when
+      const expanded = expandEnvVars(
+        "${TMPDIR}|${LANG}|${XDG_CONFIG_HOME}"
+      )
+
+      // then
+      expect(expanded).toBe("/tmp/omo|en_US.UTF-8|/Users/tester/.config")
+    })
+  })
+
+  describe("#given a blocked non-sensitive environment variable reference", () => {
+    it("#when expanding the value #then it returns an empty string and logs a warning", () => {
+      // given
+      process.env.PROJECT_ROOT = "/Users/tester/project"
+      const logSpy = spyOn(shared, "log").mockImplementation(() => {})
+
+      // when
+      const expanded = expandEnvVars("${PROJECT_ROOT}")
+
+      // then
+      expect(expanded).toBe("")
+      expect(logSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Blocked MCP env var expansion"),
+        expect.objectContaining({ varName: "PROJECT_ROOT" })
+      )
+    })
+  })
+
   describe("#given a blocked variable with a default value", () => {
     it("#when expanding the value #then it uses the default instead of the sensitive env var", () => {
       // given
