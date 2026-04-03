@@ -27,49 +27,18 @@ const KNOWN_SKILL_PLUGINS = [
   "@opencode/skills",
 ]
 
-/**
- * Check if a plugin entry matches a known notification plugin.
- * Handles various formats: "name", "name@version", "npm:name", "file://path/name"
- */
-function matchesNotificationPlugin(entry: string): string | null {
+function matchesKnownPlugin(entry: string, knownPlugins: readonly string[]): string | null {
   const normalized = entry.toLowerCase()
-  for (const known of KNOWN_NOTIFICATION_PLUGINS) {
-    // Exact match
+  for (const known of knownPlugins) {
     if (normalized === known) return known
-    // Version suffix: "opencode-notifier@1.2.3"
     if (normalized.startsWith(`${known}@`)) return known
-    // Scoped package: "@mohak34/opencode-notifier" or "@mohak34/opencode-notifier@1.2.3"
-    if (normalized === `@mohak34/${known}` || normalized.startsWith(`@mohak34/${known}@`)) return known
-    // npm: prefix
     if (normalized === `npm:${known}` || normalized.startsWith(`npm:${known}@`)) return known
-    // file:// path ending exactly with package name
     if (normalized.startsWith("file://") && (
-      normalized.endsWith(`/${known}`) || 
+      normalized.endsWith(`/${known}`) ||
       normalized.endsWith(`\\${known}`)
     )) return known
   }
-  return null
-}
 
-/**
- * Check if a plugin entry matches a known skill plugin.
- * Handles various formats: "name", "name@version", "npm:name", "file://path/name"
- */
-function matchesSkillPlugin(entry: string): string | null {
-  const normalized = entry.toLowerCase()
-  for (const known of KNOWN_SKILL_PLUGINS) {
-    // Exact match
-    if (normalized === known) return known
-    // Version suffix: "opencode-skills@1.2.3"
-    if (normalized.startsWith(`${known}@`)) return known
-    // npm: prefix
-    if (normalized === `npm:${known}` || normalized.startsWith(`npm:${known}@`)) return known
-    // file:// path ending exactly with package name
-    if (normalized.startsWith("file://") && (
-      normalized.endsWith(`/${known}`) || 
-      normalized.endsWith(`\\${known}`)
-    )) return known
-  }
   return null
 }
 
@@ -91,9 +60,9 @@ export interface ExternalSkillPluginResult {
  */
 export function detectExternalNotificationPlugin(directory: string): ExternalNotifierResult {
   const plugins = loadOpencodePlugins(directory)
-  
+
   for (const plugin of plugins) {
-    const match = matchesNotificationPlugin(plugin)
+    const match = matchesKnownPlugin(plugin, KNOWN_NOTIFICATION_PLUGINS)
     if (match) {
       log(`Detected external notification plugin: ${plugin}`)
       return {
@@ -117,9 +86,9 @@ export function detectExternalNotificationPlugin(directory: string): ExternalNot
  */
 export function detectExternalSkillPlugin(directory: string): ExternalSkillPluginResult {
   const plugins = loadOpencodePlugins(directory)
-  
+
   for (const plugin of plugins) {
-    const match = matchesSkillPlugin(plugin)
+    const match = matchesKnownPlugin(plugin, KNOWN_SKILL_PLUGINS)
     if (match) {
       log(`Detected external skill plugin: ${plugin}`)
       return {

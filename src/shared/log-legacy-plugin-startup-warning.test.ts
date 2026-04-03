@@ -1,3 +1,5 @@
+/// <reference path="../../bun-test.d.ts" />
+
 import { afterAll, afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
 import type { LegacyPluginCheckResult } from "./legacy-plugin-warning"
 
@@ -26,7 +28,7 @@ mock.module("./logger", () => ({
   log: mockLog,
 }))
 
-mock.module("./plugin-entry-migrator", () => ({
+mock.module("./migrate-legacy-plugin-entry", () => ({
   migrateLegacyPluginEntry: mockMigrateLegacyPluginEntry,
 }))
 
@@ -143,7 +145,7 @@ describe("logLegacyPluginStartupWarning", () => {
       logLegacyPluginStartupWarning()
 
       //#then
-      const calls = consoleWarnSpy.mock.calls.map((c) => c[0] as string)
+      const calls = consoleWarnSpy.mock.calls.map((call: string[]) => call[0] ?? "")
       expect(calls.some((c) => c.includes("Auto-migrated"))).toBe(true)
     })
   })
