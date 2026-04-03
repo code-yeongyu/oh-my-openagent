@@ -17,7 +17,6 @@ import { log } from "../../shared/logger"
 
 const SUMMARIZE_RETRY_TOTAL_TIMEOUT_MS = 120_000
 
-declare function setTimeout(handler: () => void, timeout?: number): unknown
 
 async function showToastSafely(
   client: Client,
