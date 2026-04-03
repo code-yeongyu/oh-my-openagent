@@ -7,6 +7,60 @@ import { clearPendingModelFallback, createModelFallbackHook } from "../hooks/mod
 import { getSessionPromptParams, setSessionPromptParams } from "../shared/session-prompt-params-state"
 
 type EventInput = { event: { type: string; properties?: unknown } }
+type EventHandlerArgs = Parameters<typeof createEventHandler>[0]
+type EventHandlerInput = Parameters<ReturnType<typeof createEventHandler>>[0]
+type ChatMessageHandlerArgs = Parameters<typeof createChatMessageHandler>[0]
+
+function asEventHandlerInput(input: EventInput): EventHandlerInput {
+	return input as unknown as EventHandlerInput
+}
+
+function asEventHandlerContext(ctx: unknown): EventHandlerArgs["ctx"] {
+	return ctx as unknown as EventHandlerArgs["ctx"]
+}
+
+function asChatMessageHandlerContext(ctx: unknown): ChatMessageHandlerArgs["ctx"] {
+	return ctx as unknown as ChatMessageHandlerArgs["ctx"]
+}
+
+function asPluginConfig(config: unknown): EventHandlerArgs["pluginConfig"] {
+	return config as unknown as EventHandlerArgs["pluginConfig"]
+}
+
+function asChatPluginConfig(config: unknown): ChatMessageHandlerArgs["pluginConfig"] {
+	return config as unknown as ChatMessageHandlerArgs["pluginConfig"]
+}
+
+function createEventHandlerManagers(
+	overrides: Record<string, unknown> = {},
+): EventHandlerArgs["managers"] {
+	return {
+		...({} as EventHandlerArgs["managers"]),
+		tmuxSessionManager: {
+			onSessionCreated: async () => {},
+			onSessionDeleted: async () => {},
+		},
+		...overrides,
+	} as unknown as EventHandlerArgs["managers"]
+}
+
+function createEventHandlerHooks(
+	overrides: Record<string, unknown>,
+): EventHandlerArgs["hooks"] {
+	return {
+		...({} as EventHandlerArgs["hooks"]),
+		...overrides,
+	} as unknown as EventHandlerArgs["hooks"]
+}
+
+function createChatMessageHandlerHooks(
+	overrides: Record<string, unknown>,
+): ChatMessageHandlerArgs["hooks"] {
+	return {
+		...({} as ChatMessageHandlerArgs["hooks"]),
+		...overrides,
+	} as unknown as ChatMessageHandlerArgs["hooks"]
+}
 
 afterEach(() => {
 	_resetForTesting()
@@ -429,12 +483,12 @@ describe("createEventHandler - event forwarding", () => {
 		const sessionID = "ses_forward_delete_event"
 
 		//#when
-		await eventHandler({
+		await eventHandler(asEventHandlerInput({
 			event: {
 				type: "session.deleted",
 				properties: { info: { id: sessionID } },
 			},
-		} as any)
+		}))
 
 		//#then
 		expect(forwardedEvents.length).toBe(1)
@@ -471,12 +525,12 @@ describe("createEventHandler - event forwarding", () => {
 		})
 
 		//#when
-		await eventHandler({
+		await eventHandler(asEventHandlerInput({
 			event: {
 				type: "session.deleted",
 				properties: { info: { id: sessionID } },
 			},
-		})
+		}))
 
 		//#then
 		expect(getSessionPromptParams(sessionID)).toBeUndefined()
@@ -495,7 +549,7 @@ describe("createEventHandler - retry dedupe lifecycle", () => {
 		const modelFallback = createModelFallbackHook()
 
 		const eventHandler = createEventHandler({
-			ctx: {
+			ctx: asEventHandlerContext({
 				directory: "/tmp",
 				client: {
 					session: {
@@ -509,41 +563,37 @@ describe("createEventHandler - retry dedupe lifecycle", () => {
 						},
 					},
 				},
-			} as any,
-			pluginConfig: {} as any,
+			}),
+			pluginConfig: asPluginConfig({}),
 			firstMessageVariantGate: {
 				markSessionCreated: () => {},
 				clear: () => {},
 			},
-			managers: {
-				tmuxSessionManager: {
-					onSessionCreated: async () => {},
-					onSessionDeleted: async () => {},
-				},
+			managers: createEventHandlerManagers({
 				skillMcpManager: {
 					disconnectSession: async () => {},
 				},
-			} as any,
-			hooks: {
+			}),
+			hooks: createEventHandlerHooks({
 				modelFallback,
 				stopContinuationGuard: { isStopped: () => false },
-			} as any,
+			}),
 		})
 
 		const chatMessageHandler = createChatMessageHandler({
-			ctx: {
+			ctx: asChatMessageHandlerContext({
 				client: {
 					tui: {
 						showToast: async () => ({}),
 					},
 				},
-			} as any,
-			pluginConfig: {} as any,
+			}),
+			pluginConfig: asChatPluginConfig({}),
 			firstMessageVariantGate: {
 				shouldOverride: () => false,
 				markApplied: () => {},
 			},
-			hooks: {
+			hooks: createChatMessageHandlerHooks({
 				modelFallback,
 				stopContinuationGuard: null,
 				keywordDetector: null,
@@ -551,7 +601,7 @@ describe("createEventHandler - retry dedupe lifecycle", () => {
 				autoSlashCommand: null,
 				startWork: null,
 				ralphLoop: null,
-			} as any,
+			}),
 		})
 
 		const retryStatus = {
@@ -561,7 +611,7 @@ describe("createEventHandler - retry dedupe lifecycle", () => {
 			next: 476,
 		} as const
 
-		await eventHandler({
+		await eventHandler(asEventHandlerInput({
 			event: {
 				type: "message.updated",
 				properties: {
@@ -575,10 +625,10 @@ describe("createEventHandler - retry dedupe lifecycle", () => {
 					},
 				},
 			},
-		} as any)
+		}))
 
 		//#when - first retry key is handled
-		await eventHandler({
+		await eventHandler(asEventHandlerInput({
 			event: {
 				type: "session.status",
 				properties: {
@@ -586,7 +636,7 @@ describe("createEventHandler - retry dedupe lifecycle", () => {
 					status: retryStatus,
 				},
 			},
-		} as any)
+		}))
 
 		const firstOutput = { message: {}, parts: [] as Array<{ type: string; text?: string }> }
 		await chatMessageHandler(
@@ -599,7 +649,7 @@ describe("createEventHandler - retry dedupe lifecycle", () => {
 		)
 
 		//#when - session recovers to non-retry idle state
-		await eventHandler({
+		await eventHandler(asEventHandlerInput({
 			event: {
 				type: "session.status",
 				properties: {
@@ -607,10 +657,10 @@ describe("createEventHandler - retry dedupe lifecycle", () => {
 					status: { type: "idle" },
 				},
 			},
-		} as any)
+		}))
 
 		//#when - same retry key appears again after recovery
-		await eventHandler({
+		await eventHandler(asEventHandlerInput({
 			event: {
 				type: "session.status",
 				properties: {
@@ -618,7 +668,7 @@ describe("createEventHandler - retry dedupe lifecycle", () => {
 					status: retryStatus,
 				},
 			},
-		} as any)
+		}))
 
 		//#then
 		expect(abortCalls).toEqual([sessionID, sessionID])
@@ -634,7 +684,7 @@ describe("createEventHandler - session recovery compaction", () => {
 		const callOrder: string[] = []
 
 		const eventHandler = createEventHandler({
-			ctx: {
+			ctx: asEventHandlerContext({
 				directory: "/tmp",
 				client: {
 					session: {
@@ -649,29 +699,24 @@ describe("createEventHandler - session recovery compaction", () => {
 						},
 					},
 				},
-			} as any,
-			pluginConfig: {} as any,
+			}),
+			pluginConfig: asPluginConfig({}),
 			firstMessageVariantGate: {
 				markSessionCreated: () => {},
 				clear: () => {},
 			},
-			managers: {
-				tmuxSessionManager: {
-					onSessionCreated: async () => {},
-					onSessionDeleted: async () => {},
-				},
-			} as any,
-			hooks: {
+			managers: createEventHandlerManagers(),
+			hooks: createEventHandlerHooks({
 				sessionRecovery: {
 					isRecoverableError: () => true,
 					handleSessionRecovery: async () => true,
 				},
 				stopContinuationGuard: { isStopped: () => false },
-			} as any,
+			}),
 		})
 
 		//#when
-		await eventHandler({
+		await eventHandler(asEventHandlerInput({
 			event: {
 				type: "session.error",
 				properties: {
@@ -680,7 +725,7 @@ describe("createEventHandler - session recovery compaction", () => {
 					error: { name: "Error", message: "tool_result block(s) that are not immediately" },
 				},
 			},
-		} as any)
+		}))
 
 		//#then - summarize (compaction) must be called before prompt (continue)
 		expect(callOrder).toEqual(["summarize", "prompt"])
@@ -693,7 +738,7 @@ describe("createEventHandler - session recovery compaction", () => {
 		const callOrder: string[] = []
 
 		const eventHandler = createEventHandler({
-			ctx: {
+			ctx: asEventHandlerContext({
 				directory: "/tmp",
 				client: {
 					session: {
@@ -708,29 +753,24 @@ describe("createEventHandler - session recovery compaction", () => {
 						},
 					},
 				},
-			} as any,
-			pluginConfig: {} as any,
+			}),
+			pluginConfig: asPluginConfig({}),
 			firstMessageVariantGate: {
 				markSessionCreated: () => {},
 				clear: () => {},
 			},
-			managers: {
-				tmuxSessionManager: {
-					onSessionCreated: async () => {},
-					onSessionDeleted: async () => {},
-				},
-			} as any,
-			hooks: {
+			managers: createEventHandlerManagers(),
+			hooks: createEventHandlerHooks({
 				sessionRecovery: {
 					isRecoverableError: () => true,
 					handleSessionRecovery: async () => true,
 				},
 				stopContinuationGuard: { isStopped: () => false },
-			} as any,
+			}),
 		})
 
 		//#when
-		await eventHandler({
+		await eventHandler(asEventHandlerInput({
 			event: {
 				type: "session.error",
 				properties: {
@@ -739,7 +779,7 @@ describe("createEventHandler - session recovery compaction", () => {
 					error: { name: "Error", message: "tool_result block(s) that are not immediately" },
 				},
 			},
-		} as any)
+		}))
 
 		//#then - continue is still sent even when compaction fails
 		expect(callOrder).toEqual(["summarize", "prompt"])
@@ -750,7 +790,7 @@ describe("createEventHandler - session recovery compaction", () => {
 		const runtimeFallbackCalls: EventInput[] = []
 
 		const eventHandler = createEventHandler({
-			ctx: {
+			ctx: asEventHandlerContext({
 				directory: "/tmp",
 				client: {
 					session: {
@@ -758,19 +798,14 @@ describe("createEventHandler - session recovery compaction", () => {
 						prompt: async () => ({}),
 					},
 				},
-			} as any,
-			pluginConfig: {} as any,
+			}),
+			pluginConfig: asPluginConfig({}),
 			firstMessageVariantGate: {
 				markSessionCreated: () => {},
 				clear: () => {},
 			},
-			managers: {
-				tmuxSessionManager: {
-					onSessionCreated: async () => {},
-					onSessionDeleted: async () => {},
-				},
-			} as any,
-			hooks: {
+			managers: createEventHandlerManagers(),
+			hooks: createEventHandlerHooks({
 				autoUpdateChecker: {
 					event: async () => {
 						throw new Error("upstream hook failed")
@@ -782,13 +817,13 @@ describe("createEventHandler - session recovery compaction", () => {
 					},
 				},
 				stopContinuationGuard: { isStopped: () => false },
-			} as any,
+			}),
 		})
 
 		//#when
 		let thrownError: unknown
 		try {
-			await eventHandler({
+			await eventHandler(asEventHandlerInput({
 				event: {
 					type: "session.error",
 					properties: {
@@ -796,7 +831,7 @@ describe("createEventHandler - session recovery compaction", () => {
 						error: { name: "Error", message: "retry me" },
 					},
 				},
-			} as any)
+			}))
 		} catch (error) {
 			thrownError = error
 		}
