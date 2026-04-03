@@ -46,16 +46,20 @@ describe("expandEnvVars", () => {
     it("#when expanding the value #then it returns the env value", () => {
       // given
       process.env.TMPDIR = "/tmp/omo"
+      process.env.TEMP = "C:\\Temp"
+      process.env.USERPROFILE = "C:\\Users\\tester"
       process.env.LANG = "en_US.UTF-8"
       process.env.XDG_CONFIG_HOME = "/Users/tester/.config"
 
       // when
       const expanded = expandEnvVars(
-        "${TMPDIR}|${LANG}|${XDG_CONFIG_HOME}"
+        "${TMPDIR}|${TEMP}|${USERPROFILE}|${LANG}|${XDG_CONFIG_HOME}"
       )
 
       // then
-      expect(expanded).toBe("/tmp/omo|en_US.UTF-8|/Users/tester/.config")
+      expect(expanded).toBe(
+        "/tmp/omo|C:\\Temp|C:\\Users\\tester|en_US.UTF-8|/Users/tester/.config"
+      )
     })
   })
 
