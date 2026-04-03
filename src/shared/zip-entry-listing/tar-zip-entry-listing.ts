@@ -11,11 +11,11 @@ function parseTarListedZipEntry(line: string): ArchiveEntry | null {
 	}
 
 	const [, rawType, rawEntryPath] = match
-	if (rawType === "l") {
+	if (rawType === "l" || rawType === "h") {
 		const arrowIndex = rawEntryPath.lastIndexOf(" -> ")
 		return {
 			path: arrowIndex === -1 ? rawEntryPath : rawEntryPath.slice(0, arrowIndex),
-			type: "symlink",
+			type: rawType === "l" ? "symlink" : "hardlink",
 			linkPath: arrowIndex === -1 ? undefined : rawEntryPath.slice(arrowIndex + 4),
 		}
 	}

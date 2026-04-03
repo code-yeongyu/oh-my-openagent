@@ -2,7 +2,7 @@ import { dirname, isAbsolute, relative, resolve, sep } from "node:path"
 
 export type ArchiveEntry = {
 	path: string
-	type: "file" | "directory" | "symlink"
+	type: "file" | "directory" | "symlink" | "hardlink"
 	linkPath?: string
 }
 
@@ -49,26 +49,35 @@ export function validateArchiveEntries(entries: ArchiveEntry[], destDir: string)
 
 	for (const entry of entries) {
 		const resolvedEntryPath = resolveContainedPath(resolvedDestDir, entry.path, "path")
-		if (entry.type !== "symlink") {
+		if (entry.type !== "symlink" && entry.type !== "hardlink") {
 			continue
 		}
 
 		if (!entry.linkPath) {
-			throw new Error(`Unsafe archive entry: symlink target missing for ${entry.path}`)
+			throw new Error(
+				`Unsafe archive entry: ${entry.type === "symlink" ? "symlink" : "hard link"} target missing for ${entry.path}`
+			)
 		}
 
 		const normalizedLinkPath = normalizeArchivePath(entry.linkPath)
+		const linkTypeLabel = entry.type === "symlink" ? "symlink target" : "hard link target"
 		if (isArchiveAbsolutePath(normalizedLinkPath)) {
-			throw new Error(`Unsafe archive entry: symlink target uses an absolute path (${entry.linkPath})`)
+			throw new Error(
+				`Unsafe archive entry: ${linkTypeLabel} uses an absolute path (${entry.linkPath})`
+			)
 		}
 
 		if (containsTraversalSegment(normalizedLinkPath)) {
-			throw new Error(`Unsafe archive entry: symlink target contains path traversal (${entry.linkPath})`)
+			throw new Error(
+				`Unsafe archive entry: ${linkTypeLabel} contains path traversal (${entry.linkPath})`
+			)
 		}
 
 		const resolvedLinkPath = resolve(dirname(resolvedEntryPath), normalizedLinkPath)
 		if (escapesDirectory(resolvedDestDir, resolvedLinkPath)) {
-			throw new Error(`Unsafe archive entry: symlink target escapes extraction directory (${entry.linkPath})`)
+			throw new Error(
+				`Unsafe archive entry: ${linkTypeLabel} escapes extraction directory (${entry.linkPath})`
+			)
 		}
 	}
 }

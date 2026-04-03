@@ -78,15 +78,15 @@ function parseTarEntry(line: string): ArchiveEntry | null {
   }
 
   const [, rawType, rawEntryPath] = match
-  if (rawType === "l") {
+  if (rawType === "l" || rawType === "h") {
     const arrowIndex = rawEntryPath.lastIndexOf(" -> ")
     if (arrowIndex === -1) {
-      return { path: rawEntryPath, type: "symlink" }
+      return { path: rawEntryPath, type: rawType === "l" ? "symlink" : "hardlink" }
     }
 
     return {
       path: rawEntryPath.slice(0, arrowIndex),
-      type: "symlink",
+      type: rawType === "l" ? "symlink" : "hardlink",
       linkPath: rawEntryPath.slice(arrowIndex + 4),
     }
   }
