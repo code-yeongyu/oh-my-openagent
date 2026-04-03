@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
+import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
@@ -6,19 +6,30 @@ const TEST_CACHE_DIR = join(import.meta.dir, "__test-cache__")
 const TEST_OPENCODE_CACHE_DIR = join(TEST_CACHE_DIR, "opencode")
 const TEST_USER_CONFIG_DIR = "/tmp/opencode-config"
 
-mock.module("./constants", () => ({
-  CACHE_DIR: TEST_OPENCODE_CACHE_DIR,
-  USER_CONFIG_DIR: TEST_USER_CONFIG_DIR,
-  PACKAGE_NAME: "oh-my-opencode",
-}))
+let importCounter = 0
 
-mock.module("../../shared/logger", () => ({
-  log: () => {},
-}))
+async function importFreshCacheModule(): Promise<typeof import("./cache")> {
+  mock.module("./constants", () => ({
+    CACHE_DIR: TEST_OPENCODE_CACHE_DIR,
+    USER_CONFIG_DIR: TEST_USER_CONFIG_DIR,
+    PACKAGE_NAME: "oh-my-opencode",
+    NPM_REGISTRY_URL: "https://registry.npmjs.org/-/package/oh-my-opencode/dist-tags",
+    NPM_FETCH_TIMEOUT: 5000,
+    VERSION_FILE: join(TEST_OPENCODE_CACHE_DIR, "version"),
+    USER_OPENCODE_CONFIG: join(TEST_USER_CONFIG_DIR, "opencode.json"),
+    USER_OPENCODE_CONFIG_JSONC: join(TEST_USER_CONFIG_DIR, "opencode.jsonc"),
+    INSTALLED_PACKAGE_JSON: join(TEST_OPENCODE_CACHE_DIR, "node_modules", "oh-my-opencode", "package.json"),
+    getWindowsAppdataDir: () => null,
+  }))
 
-afterAll(() => {
+  mock.module("../../shared/logger", () => ({
+    log: () => {},
+  }))
+
+  const cacheModule = await import(`./cache?test=${importCounter++}`)
   mock.restore()
-})
+  return cacheModule
+}
 
 function resetTestCache(): void {
   if (existsSync(TEST_CACHE_DIR)) {
@@ -66,7 +77,7 @@ describe("invalidatePackage", () => {
   })
 
   it("invalidates the installed package from the OpenCode cache directory", async () => {
-    const { invalidatePackage } = await import("./cache")
+    const { invalidatePackage } = await importFreshCacheModule()
 
     const result = invalidatePackage()
 

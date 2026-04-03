@@ -1,5 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { afterAll, beforeEach, describe, expect, it, mock } from "bun:test"
+import { beforeEach, describe, expect, it, mock } from "bun:test"
 
 type PluginEntry = {
   entry: string
@@ -35,28 +35,29 @@ const mockShowAutoUpdatedToast = mock(
 
 const mockSyncCachePackageJsonToIntent = mock(() => false)
 
-mock.module("../checker", () => ({
-  findPluginEntry: mockFindPluginEntry,
-  getCachedVersion: mockGetCachedVersion,
-  getLatestVersion: mockGetLatestVersion,
-  revertPinnedVersion: mock(() => false),
-  syncCachePackageJsonToIntent: mockSyncCachePackageJsonToIntent,
-}))
-mock.module("../version-channel", () => ({ extractChannel: mockExtractChannel }))
-mock.module("../cache", () => ({ invalidatePackage: mockInvalidatePackage }))
-mock.module("../../../cli/config-manager", () => ({ runBunInstallWithDetails: mockRunBunInstallWithDetails }))
-mock.module("./update-toasts", () => ({
-  showUpdateAvailableToast: mockShowUpdateAvailableToast,
-  showAutoUpdatedToast: mockShowAutoUpdatedToast,
-}))
-mock.module("../../../shared/logger", () => ({ log: () => {} }))
+let importCounter = 0
 
-afterAll(() => {
+async function importFreshBackgroundUpdateCheck(): Promise<typeof import("./background-update-check")> {
+  mock.module("../checker", () => ({
+    findPluginEntry: mockFindPluginEntry,
+    getCachedVersion: mockGetCachedVersion,
+    getLatestVersion: mockGetLatestVersion,
+    revertPinnedVersion: mock(() => false),
+    syncCachePackageJsonToIntent: mockSyncCachePackageJsonToIntent,
+  }))
+  mock.module("../version-channel", () => ({ extractChannel: mockExtractChannel }))
+  mock.module("../cache", () => ({ invalidatePackage: mockInvalidatePackage }))
+  mock.module("../../../cli/config-manager", () => ({ runBunInstallWithDetails: mockRunBunInstallWithDetails }))
+  mock.module("./update-toasts", () => ({
+    showUpdateAvailableToast: mockShowUpdateAvailableToast,
+    showAutoUpdatedToast: mockShowAutoUpdatedToast,
+  }))
+  mock.module("../../../shared/logger", () => ({ log: () => {} }))
+
+  const backgroundUpdateCheckModule = await import(`./background-update-check?test=${importCounter++}`)
   mock.restore()
-})
-
-const modulePath = "./background-update-check?test"
-const { runBackgroundUpdateCheck } = await import(modulePath)
+  return backgroundUpdateCheckModule
+}
 
 describe("runBackgroundUpdateCheck", () => {
   const mockCtx = { directory: "/test" } as PluginInput
@@ -85,6 +86,7 @@ describe("runBackgroundUpdateCheck", () => {
   describe("#given no plugin entry found", () => {
     it("returns early without showing any toast", async () => {
       //#given
+      const { runBackgroundUpdateCheck } = await importFreshBackgroundUpdateCheck()
       mockFindPluginEntry.mockReturnValue(null)
       //#when
       await runBackgroundUpdateCheck(mockCtx, true, getToastMessage)
@@ -99,6 +101,7 @@ describe("runBackgroundUpdateCheck", () => {
   describe("#given no version available", () => {
     it("returns early when neither cached nor pinned version exists", async () => {
       //#given
+      const { runBackgroundUpdateCheck } = await importFreshBackgroundUpdateCheck()
       mockFindPluginEntry.mockReturnValue(createPluginEntry({ entry: "oh-my-opencode" }))
       mockGetCachedVersion.mockReturnValue(null)
       //#when
@@ -114,6 +117,7 @@ describe("runBackgroundUpdateCheck", () => {
   describe("#given latest version fetch fails", () => {
     it("returns early without toasts", async () => {
       //#given
+      const { runBackgroundUpdateCheck } = await importFreshBackgroundUpdateCheck()
       mockGetLatestVersion.mockResolvedValue(null)
       //#when
       await runBackgroundUpdateCheck(mockCtx, true, getToastMessage)
@@ -128,6 +132,7 @@ describe("runBackgroundUpdateCheck", () => {
   describe("#given already on latest version", () => {
     it("returns early without any action", async () => {
       //#given
+      const { runBackgroundUpdateCheck } = await importFreshBackgroundUpdateCheck()
       mockGetCachedVersion.mockReturnValue("3.4.0")
       mockGetLatestVersion.mockResolvedValue("3.4.0")
       //#when
@@ -143,6 +148,7 @@ describe("runBackgroundUpdateCheck", () => {
   describe("#given update available with autoUpdate disabled", () => {
     it("shows update notification but does not install", async () => {
       //#given
+      const { runBackgroundUpdateCheck } = await importFreshBackgroundUpdateCheck()
       const autoUpdate = false
       //#when
       await runBackgroundUpdateCheck(mockCtx, autoUpdate, getToastMessage)
@@ -156,6 +162,7 @@ describe("runBackgroundUpdateCheck", () => {
   describe("#given user has pinned a specific version", () => {
     it("shows pinned-version toast without auto-updating", async () => {
       //#given
+      const { runBackgroundUpdateCheck } = await importFreshBackgroundUpdateCheck()
       mockFindPluginEntry.mockReturnValue(createPluginEntry({ isPinned: true, pinnedVersion: "3.4.0" }))
       //#when
       await runBackgroundUpdateCheck(mockCtx, true, getToastMessage)
@@ -167,6 +174,7 @@ describe("runBackgroundUpdateCheck", () => {
 
     it("toast message mentions version pinned", async () => {
       //#given
+      const { runBackgroundUpdateCheck } = await importFreshBackgroundUpdateCheck()
       let capturedToastMessage: ToastMessageGetter | undefined
       mockFindPluginEntry.mockReturnValue(createPluginEntry({ isPinned: true, pinnedVersion: "3.4.0" }))
       mockShowUpdateAvailableToast.mockImplementation(
@@ -191,6 +199,7 @@ describe("runBackgroundUpdateCheck", () => {
   describe("#given unpinned with auto-update and install succeeds", () => {
     it("syncs cache, invalidates, installs, and shows auto-updated toast", async () => {
       //#given
+      const { runBackgroundUpdateCheck } = await importFreshBackgroundUpdateCheck()
       mockRunBunInstallWithDetails.mockResolvedValue({ success: true })
       //#when
       await runBackgroundUpdateCheck(mockCtx, true, getToastMessage)
@@ -204,6 +213,7 @@ describe("runBackgroundUpdateCheck", () => {
 
     it("syncs before invalidate and install (correct order)", async () => {
       //#given
+      const { runBackgroundUpdateCheck } = await importFreshBackgroundUpdateCheck()
       const callOrder: string[] = []
       mockSyncCachePackageJsonToIntent.mockImplementation(() => {
         callOrder.push("sync")
@@ -226,6 +236,7 @@ describe("runBackgroundUpdateCheck", () => {
   describe("#given unpinned with auto-update and install fails", () => {
     it("falls back to notification-only toast", async () => {
       //#given
+      const { runBackgroundUpdateCheck } = await importFreshBackgroundUpdateCheck()
       mockRunBunInstallWithDetails.mockResolvedValue({ success: false })
       //#when
       await runBackgroundUpdateCheck(mockCtx, true, getToastMessage)
@@ -239,6 +250,7 @@ describe("runBackgroundUpdateCheck", () => {
   describe("#given sync fails with file_not_found", () => {
     it("aborts update and shows notification-only toast", async () => {
       //#given
+      const { runBackgroundUpdateCheck } = await importFreshBackgroundUpdateCheck()
       mockSyncCachePackageJsonToIntent.mockReturnValue({
         synced: false,
         error: "file_not_found",
@@ -258,6 +270,7 @@ describe("runBackgroundUpdateCheck", () => {
   describe("#given sync fails with plugin_not_in_deps", () => {
     it("aborts update and shows notification-only toast", async () => {
       //#given
+      const { runBackgroundUpdateCheck } = await importFreshBackgroundUpdateCheck()
       mockSyncCachePackageJsonToIntent.mockReturnValue({
         synced: false,
         error: "plugin_not_in_deps",
@@ -277,6 +290,7 @@ describe("runBackgroundUpdateCheck", () => {
   describe("#given sync fails with parse_error", () => {
     it("aborts update and shows notification-only toast", async () => {
       //#given
+      const { runBackgroundUpdateCheck } = await importFreshBackgroundUpdateCheck()
       mockSyncCachePackageJsonToIntent.mockReturnValue({
         synced: false,
         error: "parse_error",
@@ -296,6 +310,7 @@ describe("runBackgroundUpdateCheck", () => {
   describe("#given sync fails with write_error", () => {
     it("aborts update and shows notification-only toast", async () => {
       //#given
+      const { runBackgroundUpdateCheck } = await importFreshBackgroundUpdateCheck()
       mockSyncCachePackageJsonToIntent.mockReturnValue({
         synced: false,
         error: "write_error",

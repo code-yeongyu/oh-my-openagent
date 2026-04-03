@@ -1,30 +1,34 @@
-import { afterAll, afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
+import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import type { PluginEntryInfo } from "./plugin-entry"
 
 const TEST_CACHE_DIR = join(import.meta.dir, "__test-sync-cache__")
 
-mock.module("../constants", () => ({
-  CACHE_DIR: TEST_CACHE_DIR,
-  PACKAGE_NAME: "oh-my-opencode",
-  NPM_REGISTRY_URL: "https://registry.npmjs.org/-/package/oh-my-opencode/dist-tags",
-  NPM_FETCH_TIMEOUT: 5000,
-  VERSION_FILE: join(TEST_CACHE_DIR, "version"),
-  USER_CONFIG_DIR: "/tmp/opencode-config",
-  USER_OPENCODE_CONFIG: "/tmp/opencode-config/opencode.json",
-  USER_OPENCODE_CONFIG_JSONC: "/tmp/opencode-config/opencode.jsonc",
-  INSTALLED_PACKAGE_JSON: join(TEST_CACHE_DIR, "node_modules", "oh-my-opencode", "package.json"),
-  getWindowsAppdataDir: () => null,
-}))
+let importCounter = 0
 
-mock.module("../../../shared/logger", () => ({
-  log: () => {},
-}))
+async function importFreshSyncPackageJsonModule(): Promise<typeof import("./sync-package-json")> {
+  mock.module("../constants", () => ({
+    CACHE_DIR: TEST_CACHE_DIR,
+    PACKAGE_NAME: "oh-my-opencode",
+    NPM_REGISTRY_URL: "https://registry.npmjs.org/-/package/oh-my-opencode/dist-tags",
+    NPM_FETCH_TIMEOUT: 5000,
+    VERSION_FILE: join(TEST_CACHE_DIR, "version"),
+    USER_CONFIG_DIR: "/tmp/opencode-config",
+    USER_OPENCODE_CONFIG: "/tmp/opencode-config/opencode.json",
+    USER_OPENCODE_CONFIG_JSONC: "/tmp/opencode-config/opencode.jsonc",
+    INSTALLED_PACKAGE_JSON: join(TEST_CACHE_DIR, "node_modules", "oh-my-opencode", "package.json"),
+    getWindowsAppdataDir: () => null,
+  }))
 
-afterAll(() => {
+  mock.module("../../../shared/logger", () => ({
+    log: () => {},
+  }))
+
+  const syncPackageJsonModule = await import(`./sync-package-json?test=${importCounter++}`)
   mock.restore()
-})
+  return syncPackageJsonModule
+}
 
 function resetTestCache(currentVersion = "3.10.0"): void {
   if (existsSync(TEST_CACHE_DIR)) {
@@ -62,7 +66,7 @@ describe("syncCachePackageJsonToIntent", () => {
   describe("#given cache package.json with pinned semver version", () => {
     describe("#when opencode.json intent is latest tag", () => {
       it("#then updates package.json to use latest", async () => {
-        const { syncCachePackageJsonToIntent } = await import("./sync-package-json")
+        const { syncCachePackageJsonToIntent } = await importFreshSyncPackageJsonModule()
 
         const pluginInfo: PluginEntryInfo = {
           entry: "oh-my-opencode@latest",
@@ -81,7 +85,7 @@ describe("syncCachePackageJsonToIntent", () => {
 
     describe("#when opencode.json intent is next tag", () => {
       it("#then updates package.json to use next", async () => {
-        const { syncCachePackageJsonToIntent } = await import("./sync-package-json")
+        const { syncCachePackageJsonToIntent } = await importFreshSyncPackageJsonModule()
 
         const pluginInfo: PluginEntryInfo = {
           entry: "oh-my-opencode@next",
@@ -100,7 +104,7 @@ describe("syncCachePackageJsonToIntent", () => {
 
     describe("#when opencode.json has no version (implies latest)", () => {
       it("#then updates package.json to use latest", async () => {
-        const { syncCachePackageJsonToIntent } = await import("./sync-package-json")
+        const { syncCachePackageJsonToIntent } = await importFreshSyncPackageJsonModule()
 
         const pluginInfo: PluginEntryInfo = {
           entry: "oh-my-opencode",
@@ -121,7 +125,7 @@ describe("syncCachePackageJsonToIntent", () => {
   describe("#given cache package.json already matches intent", () => {
     it("#then returns synced false with no error", async () => {
       resetTestCache("latest")
-      const { syncCachePackageJsonToIntent } = await import("./sync-package-json")
+      const { syncCachePackageJsonToIntent } = await importFreshSyncPackageJsonModule()
 
       const pluginInfo: PluginEntryInfo = {
         entry: "oh-my-opencode@latest",
@@ -141,7 +145,7 @@ describe("syncCachePackageJsonToIntent", () => {
   describe("#given cache package.json does not exist", () => {
     it("#then returns file_not_found error", async () => {
       cleanupTestCache()
-      const { syncCachePackageJsonToIntent } = await import("./sync-package-json")
+      const { syncCachePackageJsonToIntent } = await importFreshSyncPackageJsonModule()
 
       const pluginInfo: PluginEntryInfo = {
         entry: "oh-my-opencode@latest",
@@ -166,7 +170,7 @@ describe("syncCachePackageJsonToIntent", () => {
         JSON.stringify({ dependencies: { other: "1.0.0" } }, null, 2)
       )
 
-      const { syncCachePackageJsonToIntent } = await import("./sync-package-json")
+      const { syncCachePackageJsonToIntent } = await importFreshSyncPackageJsonModule()
 
       const pluginInfo: PluginEntryInfo = {
         entry: "oh-my-opencode@latest",
@@ -185,7 +189,7 @@ describe("syncCachePackageJsonToIntent", () => {
   describe("#given user explicitly changed from one semver to another", () => {
     it("#then updates package.json to new version", async () => {
       resetTestCache("3.9.0")
-      const { syncCachePackageJsonToIntent } = await import("./sync-package-json")
+      const { syncCachePackageJsonToIntent } = await importFreshSyncPackageJsonModule()
 
       const pluginInfo: PluginEntryInfo = {
         entry: "oh-my-opencode@3.10.0",
@@ -204,7 +208,7 @@ describe("syncCachePackageJsonToIntent", () => {
 
   describe("#given cache package.json with other dependencies", () => {
     it("#then other dependencies are preserved when updating plugin version", async () => {
-      const { syncCachePackageJsonToIntent } = await import("./sync-package-json")
+      const { syncCachePackageJsonToIntent } = await importFreshSyncPackageJsonModule()
 
       const pluginInfo: PluginEntryInfo = {
         entry: "oh-my-opencode@latest",
@@ -230,7 +234,7 @@ describe("syncCachePackageJsonToIntent", () => {
       mkdirSync(TEST_CACHE_DIR, { recursive: true })
       writeFileSync(join(TEST_CACHE_DIR, "package.json"), "{ invalid json }")
 
-      const { syncCachePackageJsonToIntent } = await import("./sync-package-json")
+      const { syncCachePackageJsonToIntent } = await importFreshSyncPackageJsonModule()
 
       const pluginInfo: PluginEntryInfo = {
         entry: "oh-my-opencode@latest",
@@ -268,7 +272,7 @@ describe("syncCachePackageJsonToIntent", () => {
       }))
 
       try {
-        const { syncCachePackageJsonToIntent } = await import("./sync-package-json")
+        const { syncCachePackageJsonToIntent } = await importFreshSyncPackageJsonModule()
 
         const pluginInfo: PluginEntryInfo = {
           entry: "oh-my-opencode@latest",
@@ -318,7 +322,7 @@ describe("syncCachePackageJsonToIntent", () => {
       }))
 
       try {
-        const { syncCachePackageJsonToIntent } = await import("./sync-package-json")
+        const { syncCachePackageJsonToIntent } = await importFreshSyncPackageJsonModule()
 
         const pluginInfo: PluginEntryInfo = {
           entry: "oh-my-opencode@latest",

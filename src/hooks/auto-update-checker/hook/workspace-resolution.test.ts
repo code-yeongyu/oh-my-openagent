@@ -1,7 +1,8 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { afterAll, afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
+import * as shared from "../../../shared"
 
 type PluginEntry = {
   entry: string
@@ -45,68 +46,71 @@ const mockRunBunInstallWithDetails = mock(
   }
 )
 
-mock.module("../checker", () => ({
-  findPluginEntry: mockFindPluginEntry,
-  getCachedVersion: mockGetCachedVersion,
-  getLatestVersion: mockGetLatestVersion,
-  revertPinnedVersion: mock(() => false),
-  syncCachePackageJsonToIntent: mockSyncCachePackageJsonToIntent,
-}))
-mock.module("../version-channel", () => ({ extractChannel: mockExtractChannel }))
-mock.module("../cache", () => ({ invalidatePackage: mockInvalidatePackage }))
-mock.module("../../../cli/config-manager", () => ({
-  runBunInstallWithDetails: mockRunBunInstallWithDetails,
-}))
-mock.module("./update-toasts", () => ({
-  showUpdateAvailableToast: mockShowUpdateAvailableToast,
-  showAutoUpdatedToast: mockShowAutoUpdatedToast,
-}))
-mock.module("../../../shared/logger", () => ({ log: () => {} }))
-mock.module("../../../shared", () => ({
-  getOpenCodeCacheDir: () => TEST_CACHE_DIR,
-  getOpenCodeConfigPaths: () => ({
+let importCounter = 0
+let getOpenCodeCacheDirSpy: { mockRestore: () => void } | undefined
+let getOpenCodeConfigPathsSpy: { mockRestore: () => void } | undefined
+
+async function importFreshBackgroundUpdateCheck(): Promise<typeof import("./background-update-check")> {
+  mock.module("../checker", () => ({
+    findPluginEntry: mockFindPluginEntry,
+    getCachedVersion: mockGetCachedVersion,
+    getLatestVersion: mockGetLatestVersion,
+    revertPinnedVersion: mock(() => false),
+    syncCachePackageJsonToIntent: mockSyncCachePackageJsonToIntent,
+  }))
+  mock.module("../version-channel", () => ({ extractChannel: mockExtractChannel }))
+  mock.module("../cache", () => ({ invalidatePackage: mockInvalidatePackage }))
+  mock.module("../../../cli/config-manager", () => ({
+    runBunInstallWithDetails: mockRunBunInstallWithDetails,
+  }))
+  mock.module("./update-toasts", () => ({
+    showUpdateAvailableToast: mockShowUpdateAvailableToast,
+    showAutoUpdatedToast: mockShowAutoUpdatedToast,
+  }))
+  mock.module("../../../shared/logger", () => ({ log: () => {} }))
+  getOpenCodeCacheDirSpy = spyOn(shared, "getOpenCodeCacheDir").mockReturnValue(TEST_CACHE_DIR)
+  getOpenCodeConfigPathsSpy = spyOn(shared, "getOpenCodeConfigPaths").mockReturnValue({
     configDir: TEST_CONFIG_DIR,
     configJson: join(TEST_CONFIG_DIR, "opencode.json"),
     configJsonc: join(TEST_CONFIG_DIR, "opencode.jsonc"),
     packageJson: join(TEST_CONFIG_DIR, "package.json"),
     omoConfig: join(TEST_CONFIG_DIR, "oh-my-opencode.json"),
-  }),
-  getOpenCodeConfigDir: () => TEST_CONFIG_DIR,
-}))
+  })
 
-// Mock constants BEFORE importing the module
-const ORIGINAL_PACKAGE_NAME = "oh-my-opencode"
-mock.module("../constants", () => ({
-  PACKAGE_NAME: ORIGINAL_PACKAGE_NAME,
-  CACHE_DIR: TEST_CACHE_DIR,
-  USER_CONFIG_DIR: TEST_CONFIG_DIR,
-}))
+  mock.module("../constants", () => ({
+    PACKAGE_NAME: "oh-my-opencode",
+    CACHE_DIR: TEST_CACHE_DIR,
+    USER_CONFIG_DIR: TEST_CONFIG_DIR,
+    NPM_REGISTRY_URL: "https://registry.npmjs.org/-/package/oh-my-opencode/dist-tags",
+    NPM_FETCH_TIMEOUT: 5000,
+    VERSION_FILE: join(TEST_CACHE_DIR, "version"),
+    USER_OPENCODE_CONFIG: join(TEST_CONFIG_DIR, "opencode.json"),
+    USER_OPENCODE_CONFIG_JSONC: join(TEST_CONFIG_DIR, "opencode.jsonc"),
+    INSTALLED_PACKAGE_JSON: join(TEST_CACHE_DIR, "node_modules", "oh-my-opencode", "package.json"),
+    getWindowsAppdataDir: () => null,
+  }))
 
-// Need to mock getOpenCodeCacheDir and getOpenCodeConfigPaths before importing the module
-mock.module("../../../shared/data-path", () => ({
-  getDataDir: () => join(TEST_DIR, "data"),
-  getOpenCodeStorageDir: () => join(TEST_DIR, "data", "opencode", "storage"),
-  getCacheDir: () => TEST_DIR,
-  getOmoOpenCodeCacheDir: () => join(TEST_DIR, "oh-my-opencode"),
-  getOpenCodeCacheDir: () => TEST_CACHE_DIR,
-}))
-mock.module("../../../shared/opencode-config-dir", () => ({
-  getOpenCodeConfigDir: () => TEST_CONFIG_DIR,
-  getOpenCodeConfigPaths: () => ({
-    configDir: TEST_CONFIG_DIR,
-    configJson: join(TEST_CONFIG_DIR, "opencode.json"),
-    configJsonc: join(TEST_CONFIG_DIR, "opencode.jsonc"),
-    packageJson: join(TEST_CONFIG_DIR, "package.json"),
-    omoConfig: join(TEST_CONFIG_DIR, "oh-my-opencode.json"),
-  }),
-}))
+  mock.module("../../../shared/data-path", () => ({
+    getDataDir: () => join(TEST_DIR, "data"),
+    getOpenCodeStorageDir: () => join(TEST_DIR, "data", "opencode", "storage"),
+    getCacheDir: () => TEST_DIR,
+    getOmoOpenCodeCacheDir: () => join(TEST_DIR, "oh-my-opencode"),
+    getOpenCodeCacheDir: () => TEST_CACHE_DIR,
+  }))
+  mock.module("../../../shared/opencode-config-dir", () => ({
+    getOpenCodeConfigDir: () => TEST_CONFIG_DIR,
+    getOpenCodeConfigPaths: () => ({
+      configDir: TEST_CONFIG_DIR,
+      configJson: join(TEST_CONFIG_DIR, "opencode.json"),
+      configJsonc: join(TEST_CONFIG_DIR, "opencode.jsonc"),
+      packageJson: join(TEST_CONFIG_DIR, "package.json"),
+      omoConfig: join(TEST_CONFIG_DIR, "oh-my-opencode.json"),
+    }),
+  }))
 
-afterAll(() => {
-  mock.restore()
-})
-
-const modulePath = "./background-update-check?test"
-const { runBackgroundUpdateCheck } = await import(modulePath)
+  const backgroundUpdateCheckModule = await import(`./background-update-check?test=${importCounter++}`)
+  return backgroundUpdateCheckModule
+}
 
 describe("workspace resolution", () => {
   const mockCtx = { directory: "/test" } as PluginInput
@@ -138,6 +142,11 @@ describe("workspace resolution", () => {
   })
 
   afterEach(() => {
+    getOpenCodeCacheDirSpy?.mockRestore()
+    getOpenCodeConfigPathsSpy?.mockRestore()
+    getOpenCodeCacheDirSpy = undefined
+    getOpenCodeConfigPathsSpy = undefined
+    mock.restore()
     if (existsSync(TEST_DIR)) {
       rmSync(TEST_DIR, { recursive: true, force: true })
     }
@@ -146,6 +155,7 @@ describe("workspace resolution", () => {
   describe("#given config-dir install exists but cache-dir does not", () => {
     it("installs to config-dir, not cache-dir", async () => {
       //#given - config-dir has installation, cache-dir does not
+      const { runBackgroundUpdateCheck } = await importFreshBackgroundUpdateCheck()
       mkdirSync(join(TEST_CONFIG_DIR, "node_modules", "oh-my-opencode"), { recursive: true })
       writeFileSync(
         join(TEST_CONFIG_DIR, "package.json"),
@@ -171,6 +181,7 @@ describe("workspace resolution", () => {
   describe("#given both config-dir and cache-dir exist", () => {
     it("prefers config-dir over cache-dir", async () => {
       //#given - both directories have installations
+      const { runBackgroundUpdateCheck } = await importFreshBackgroundUpdateCheck()
       mkdirSync(join(TEST_CONFIG_DIR, "node_modules", "oh-my-opencode"), { recursive: true })
       writeFileSync(
         join(TEST_CONFIG_DIR, "package.json"),
@@ -203,6 +214,7 @@ describe("workspace resolution", () => {
   describe("#given only cache-dir install exists", () => {
     it("falls back to cache-dir", async () => {
       //#given - only cache-dir has installation
+      const { runBackgroundUpdateCheck } = await importFreshBackgroundUpdateCheck()
       mkdirSync(join(TEST_CACHE_DIR, "node_modules", "oh-my-opencode"), { recursive: true })
       writeFileSync(
         join(TEST_CACHE_DIR, "package.json"),
