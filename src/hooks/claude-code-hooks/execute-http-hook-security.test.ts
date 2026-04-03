@@ -1,3 +1,5 @@
+/// <reference types="bun-types" />
+
 import { describe, it, expect, mock, beforeEach, afterEach } from "bun:test"
 import type { HookHttp } from "./types"
 
@@ -82,6 +84,20 @@ describe("executeHttpHook TLS security", () => {
       expect(mockFetch).toHaveBeenCalledTimes(1)
     })
 
+    it("#when hook uses http://localhost #then does not log insecure warning", async () => {
+      mock.module("../../shared", () => ({
+        log: mockLog,
+      }))
+      mockLog.mockReset()
+      const { executeHttpHook } = await importFreshExecuteHttpHook()
+      const hook: HookHttp = { type: "http", url: "http://localhost:8080/hooks" }
+
+      const result = await executeHttpHook(hook, "{}")
+
+      expect(result.exitCode).toBe(0)
+      expect(mockLog).not.toHaveBeenCalled()
+    })
+
     it("#when hook uses http://127.0.0.1 #then allows execution", async () => {
       const { executeHttpHook } = await import("./execute-http-hook")
       const hook: HookHttp = { type: "http", url: "http://127.0.0.1:8080/hooks" }
@@ -139,7 +155,7 @@ describe("executeHttpHook TLS security", () => {
       expect(mockFetch).toHaveBeenCalledTimes(1)
     })
 
-    it("#when hook uses plain http:// URL #then writes warning log", async () => {
+    it("#when hook uses plain remote http:// URL #then writes warning log", async () => {
       mock.module("../../shared", () => ({
         log: mockLog,
       }))
@@ -187,7 +203,7 @@ describe("executeHttpHook TLS security", () => {
       process.env = { ...originalEnv, NODE_ENV: "production" }
     })
 
-    it("#when hook uses https:// URL #then fetch uses manual redirect handling", async () => {
+    it("#when hook uses https:// URL #then fetch rejects redirects manually", async () => {
       mockFetch.mockImplementation(() =>
         Promise.resolve(new Response("redirect", { status: 302, statusText: "Found" }))
       )
