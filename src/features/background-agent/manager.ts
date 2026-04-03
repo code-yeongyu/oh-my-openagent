@@ -901,7 +901,12 @@ export class BackgroundManager {
         name: extractErrorName(assistantError),
         message: extractErrorMessage(assistantError),
       }
-      this.tryFallbackRetry(task, errorInfo, "message.updated")
+      void this.tryFallbackRetry(task, errorInfo, "message.updated").catch((error) => {
+        log("[background-agent] Error handling message.updated fallback retry:", {
+          error,
+          taskId: task.id,
+        })
+      })
     }
 
     if (event.type === "message.part.updated" || event.type === "message.part.delta") {
@@ -1015,62 +1020,18 @@ export class BackgroundManager {
       const errorMessage = props ? getSessionErrorMessage(props) : undefined
 
       const errorInfo = { name: errorName, message: errorMessage }
-      if (this.tryFallbackRetry(task, errorInfo, "session.error")) return
-
-      // Original error handling (no retry)
-      const errorMsg = errorMessage ?? "Session error"
-      const canRetry =
-        shouldRetryError(errorInfo) &&
-        !!task.fallbackChain &&
-        hasMoreFallbacks(task.fallbackChain, task.attemptCount ?? 0)
-      log("[background-agent] Session error - no retry:", {
-        taskId: task.id,
+      void this.handleSessionErrorEvent({
+        errorInfo,
+        errorMessage,
         errorName,
-        errorMessage: errorMsg?.slice(0, 100),
-        hasFallbackChain: !!task.fallbackChain,
-        canRetry,
+        task,
+      }).catch((error) => {
+        log("[background-agent] Error handling session.error event:", {
+          error,
+          taskId: task.id,
+        })
       })
-
-      task.status = "error"
-      task.error = errorMsg
-      task.completedAt = new Date()
-      if (task.rootSessionID) {
-        this.unregisterRootDescendant(task.rootSessionID)
-      }
-      this.taskHistory.record(task.parentSessionID, { id: task.id, sessionID: task.sessionID, agent: task.agent, description: task.description, status: "error", category: task.category, startedAt: task.startedAt, completedAt: task.completedAt })
-
-      if (task.concurrencyKey) {
-        this.concurrencyManager.release(task.concurrencyKey)
-        task.concurrencyKey = undefined
-      }
-
-      const completionTimer = this.completionTimers.get(task.id)
-      if (completionTimer) {
-        clearTimeout(completionTimer)
-        this.completionTimers.delete(task.id)
-      }
-
-      const idleTimer = this.idleDeferralTimers.get(task.id)
-      if (idleTimer) {
-        clearTimeout(idleTimer)
-        this.idleDeferralTimers.delete(task.id)
-      }
-
-      this.cleanupPendingByParent(task)
-      this.clearNotificationsForTask(task.id)
-      const toastManager = getTaskToastManager()
-      if (toastManager) {
-        toastManager.removeTask(task.id)
-      }
-      this.scheduleTaskRemoval(task.id)
-      if (task.sessionID) {
-        SessionCategoryRegistry.remove(task.sessionID)
-      }
-
-      this.markForNotification(task)
-      this.enqueueNotificationForParent(task.parentSessionID, () => this.notifyParentSession(task)).catch(err => {
-        log("[background-agent] Error in notifyParentSession for errored task:", { taskId: task.id, error: err })
-      })
+      return
     }
 
     if (event.type === "session.deleted") {
@@ -1141,15 +1102,87 @@ export class BackgroundManager {
 
       const errorMessage = typeof status.message === "string" ? status.message : undefined
       const errorInfo = { name: "SessionRetry", message: errorMessage }
-      this.tryFallbackRetry(task, errorInfo, "session.status")
+      void this.tryFallbackRetry(task, errorInfo, "session.status").catch((error) => {
+        log("[background-agent] Error handling session.status fallback retry:", {
+          error,
+          taskId: task.id,
+        })
+      })
     }
+  }
+
+  private async handleSessionErrorEvent(args: {
+    task: BackgroundTask
+    errorInfo: { name?: string; message?: string }
+    errorName: string | undefined
+    errorMessage: string | undefined
+  }): Promise<void> {
+    const { task, errorInfo, errorMessage, errorName } = args
+
+    if (await this.tryFallbackRetry(task, errorInfo, "session.error")) {
+      return
+    }
+
+    const errorMsg = errorMessage ?? "Session error"
+    const canRetry =
+      shouldRetryError(errorInfo) &&
+      !!task.fallbackChain &&
+      hasMoreFallbacks(task.fallbackChain, task.attemptCount ?? 0)
+    log("[background-agent] Session error - no retry:", {
+      taskId: task.id,
+      errorName,
+      errorMessage: errorMsg?.slice(0, 100),
+      hasFallbackChain: !!task.fallbackChain,
+      canRetry,
+    })
+
+    task.status = "error"
+    task.error = errorMsg
+    task.completedAt = new Date()
+    if (task.rootSessionID) {
+      this.unregisterRootDescendant(task.rootSessionID)
+    }
+    this.taskHistory.record(task.parentSessionID, { id: task.id, sessionID: task.sessionID, agent: task.agent, description: task.description, status: "error", category: task.category, startedAt: task.startedAt, completedAt: task.completedAt })
+
+    if (task.concurrencyKey) {
+      this.concurrencyManager.release(task.concurrencyKey)
+      task.concurrencyKey = undefined
+    }
+
+    const completionTimer = this.completionTimers.get(task.id)
+    if (completionTimer) {
+      clearTimeout(completionTimer)
+      this.completionTimers.delete(task.id)
+    }
+
+    const idleTimer = this.idleDeferralTimers.get(task.id)
+    if (idleTimer) {
+      clearTimeout(idleTimer)
+      this.idleDeferralTimers.delete(task.id)
+    }
+
+    this.cleanupPendingByParent(task)
+    this.clearNotificationsForTask(task.id)
+    const toastManager = getTaskToastManager()
+    if (toastManager) {
+      toastManager.removeTask(task.id)
+    }
+    this.scheduleTaskRemoval(task.id)
+    if (task.sessionID) {
+      SessionCategoryRegistry.remove(task.sessionID)
+    }
+
+    this.markForNotification(task)
+    this.enqueueNotificationForParent(task.parentSessionID, () => this.notifyParentSession(task)).catch(err => {
+      log("[background-agent] Error in notifyParentSession for errored task:", { taskId: task.id, error: err })
+    })
   }
 
   private tryFallbackRetry(
     task: BackgroundTask,
     errorInfo: { name?: string; message?: string },
     source: string,
-  ): boolean {
+  ): Promise<boolean> {
     const previousSessionID = task.sessionID
     const result = tryFallbackRetry({
       task,
@@ -1161,10 +1194,12 @@ export class BackgroundManager {
       queuesByKey: this.queuesByKey,
       processKey: (key: string) => this.processKey(key),
     })
-    if (result && previousSessionID) {
-      subagentSessions.delete(previousSessionID)
-    }
-    return result
+    return result.then((retried) => {
+      if (retried && previousSessionID) {
+        subagentSessions.delete(previousSessionID)
+      }
+      return retried
+    })
   }
 
   markForNotification(task: BackgroundTask): void {
@@ -1889,7 +1924,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
             ? (sessionStatus as { message?: string }).message
             : undefined
           const errorInfo = { name: "SessionRetry", message: retryMessage }
-          if (this.tryFallbackRetry(task, errorInfo, "polling:session.status")) {
+          if (await this.tryFallbackRetry(task, errorInfo, "polling:session.status")) {
             continue
           }
         }
@@ -1981,6 +2016,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
     log("[background-agent] Shutting down BackgroundManager")
     this.stopPolling()
     const trackedSessionIDs = new Set<string>()
+    const abortRequests: Array<{ sessionID: string; promise: Promise<unknown> }> = []
 
     // Abort all running sessions to prevent zombie processes (#1240)
     for (const task of this.tasks.values()) {
@@ -1989,9 +2025,24 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
       }
 
       if (task.status === "running" && task.sessionID) {
-        this.client.session.abort({
-          path: { id: task.sessionID },
-        }).catch(() => {})
+        abortRequests.push({
+          sessionID: task.sessionID,
+          promise: this.client.session.abort({
+            path: { id: task.sessionID },
+          }),
+        })
+      }
+    }
+
+    if (abortRequests.length > 0) {
+      const abortResults = await Promise.allSettled(abortRequests.map((request) => request.promise))
+      for (const [index, abortResult] of abortResults.entries()) {
+        if (abortResult.status === "fulfilled") continue
+
+        log("[background-agent] Error aborting session during shutdown:", {
+          error: abortResult.reason,
+          sessionID: abortRequests[index]?.sessionID,
+        })
       }
     }
 
