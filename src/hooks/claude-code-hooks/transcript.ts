@@ -4,7 +4,7 @@ import { tmpdir } from "os"
 import { randomUUID } from "crypto"
 import type { TranscriptEntry } from "./types"
 import { transformToolName } from "../../shared/tool-name"
-import { getClaudeConfigDir } from "../../shared"
+import { getClaudeConfigDir, log } from "../../shared"
 
 const TRANSCRIPT_DIR = join(getClaudeConfigDir(), "transcripts")
 
@@ -74,13 +74,21 @@ export function clearTranscriptCache(sessionId?: string): void {
   if (sessionId) {
     const entry = transcriptCache.get(sessionId)
     if (entry?.tempPath) {
-      try { unlinkSync(entry.tempPath) } catch { /* ignore */ }
+      try {
+        unlinkSync(entry.tempPath)
+      } catch (error) {
+        log("[transcript] failed to clean up cached temp transcript", { error })
+      }
     }
     transcriptCache.delete(sessionId)
   } else {
     for (const [, entry] of transcriptCache) {
       if (entry.tempPath) {
-        try { unlinkSync(entry.tempPath) } catch { /* ignore */ }
+        try {
+          unlinkSync(entry.tempPath)
+        } catch (error) {
+          log("[transcript] failed to clean up cached temp transcript", { error })
+        }
       }
     }
     transcriptCache.clear()
@@ -176,7 +184,11 @@ export async function buildTranscriptFromSession(
         : []
 
       if (cached?.tempPath) {
-        try { unlinkSync(cached.tempPath) } catch { /* ignore */ }
+        try {
+          unlinkSync(cached.tempPath)
+        } catch (error) {
+          log("[transcript] failed to clean up stale temp transcript", { error })
+        }
       }
 
       transcriptCache.set(sessionId, {
@@ -189,7 +201,11 @@ export async function buildTranscriptFromSession(
     const allEntries = [...baseEntries, buildCurrentEntry(currentToolName, currentToolInput)]
 
     if (previousTempPath) {
-      try { unlinkSync(previousTempPath) } catch { /* ignore */ }
+      try {
+        unlinkSync(previousTempPath)
+      } catch (error) {
+        log("[transcript] failed to clean up previous temp transcript", { error })
+      }
     }
 
     const tempPath = join(
@@ -206,7 +222,8 @@ export async function buildTranscriptFromSession(
     }
 
     return tempPath
-  } catch {
+  } catch (error) {
+    log("[transcript] failed to build transcript from session", { error })
     try {
       const tempPath = join(
         tmpdir(),
@@ -214,7 +231,8 @@ export async function buildTranscriptFromSession(
       )
       writeFileSync(tempPath, buildCurrentEntry(currentToolName, currentToolInput) + "\n")
       return tempPath
-    } catch {
+    } catch (fallbackError) {
+      log("[transcript] failed to write fallback transcript", { error: fallbackError })
       return null
     }
   }
@@ -224,7 +242,7 @@ export function deleteTempTranscript(path: string | null): void {
   if (!path) return
   try {
     unlinkSync(path)
-  } catch {
-    // Ignore deletion errors
+  } catch (error) {
+    log("[transcript] failed to delete temp transcript", { error })
   }
 }
