@@ -508,3 +508,78 @@ describe("resolveSubagentExecution", () => {
     connectedSpy.mockRestore()
   })
 })
+
+describe("resolveSubagentExecution - agent name sanitization", () => {
+  let logSpy: ReturnType<typeof spyOn> | undefined
+
+  beforeEach(() => {
+    logSpy = spyOn(logger, "log").mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    logSpy?.mockRestore()
+  })
+
+  test("strips backslash-wrapped agent names like \\hephaestus\\", async () => {
+    //#given
+    const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+      models: {},
+      connected: [],
+      updatedAt: "2026-03-03T00:00:00.000Z",
+    })
+    const args = createBaseArgs({ subagent_type: "\\hephaestus\\" })
+    const executorCtx = createExecutorContext(async () => ([
+      { name: "Hephaestus (Deep Agent)", mode: "subagent", model: "openai/gpt-5.3-codex" },
+    ]))
+
+    //#when
+    const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep")
+
+    //#then
+    expect(result.error).toBeUndefined()
+    expect(result.agentToUse).toBe("Hephaestus (Deep Agent)")
+    cacheSpy.mockRestore()
+  })
+
+  test("strips double-quoted agent names", async () => {
+    //#given
+    const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+      models: {},
+      connected: [],
+      updatedAt: "2026-03-03T00:00:00.000Z",
+    })
+    const args = createBaseArgs({ subagent_type: '"oracle"' })
+    const executorCtx = createExecutorContext(async () => ([
+      { name: "oracle", mode: "subagent" },
+    ]))
+
+    //#when
+    const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep")
+
+    //#then
+    expect(result.error).toBeUndefined()
+    expect(result.agentToUse).toBe("oracle")
+    cacheSpy.mockRestore()
+  })
+
+  test("strips single-quoted agent names", async () => {
+    //#given
+    const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+      models: {},
+      connected: [],
+      updatedAt: "2026-03-03T00:00:00.000Z",
+    })
+    const args = createBaseArgs({ subagent_type: "'explore'" })
+    const executorCtx = createExecutorContext(async () => ([
+      { name: "explore", mode: "subagent" },
+    ]))
+
+    //#when
+    const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep")
+
+    //#then
+    expect(result.error).toBeUndefined()
+    expect(result.agentToUse).toBe("explore")
+    cacheSpy.mockRestore()
+  })
+})

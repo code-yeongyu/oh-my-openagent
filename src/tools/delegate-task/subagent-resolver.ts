@@ -27,7 +27,9 @@ export async function resolveSubagentExecution(
     return { agentToUse: "", categoryModel: undefined, error: `Agent name cannot be empty.` }
   }
 
-  const agentName = args.subagent_type.trim()
+  // Strip wrapping characters (backslashes, quotes) that LLMs sometimes add around agent names
+  // e.g. \hephaestus\ -> hephaestus, "oracle" -> oracle, 'explore' -> explore
+  const agentName = args.subagent_type.trim().replace(/^[\\\/"']+|[\\\/"']+$/g, "").trim()
 
   if (agentName.toLowerCase() === SISYPHUS_JUNIOR_AGENT.toLowerCase()) {
     return {
