@@ -151,4 +151,53 @@ describe("runSummarizeRetryStrategy", () => {
     //#then
     expect(autoCompactState.retryStateBySession.has(sessionID)).toBe(false)
   })
+
+  test("#given max empty-content recovery attempts reached #when summarize retry exits early #then it clears full recovery state", async () => {
+    //#given
+    autoCompactState.pendingCompact.add(sessionID)
+    autoCompactState.errorDataBySession.set(sessionID, {
+      currentTokens: 250000,
+      maxTokens: 200000,
+      errorType: "non-empty content",
+    })
+    autoCompactState.retryStateBySession.set(sessionID, {
+      attempt: 1,
+      lastAttemptTime: Date.now(),
+      firstAttemptTime: Date.now(),
+    })
+    autoCompactState.truncateStateBySession.set(sessionID, {
+      truncateAttempt: 2,
+    })
+    autoCompactState.emptyContentAttemptBySession.set(sessionID, 3)
+    autoCompactState.retryTimerBySession.set(
+      sessionID,
+      1 as unknown as ReturnType<typeof setTimeout>,
+    )
+
+    //#when
+    await runSummarizeRetryStrategy({
+      sessionID,
+      msg: { providerID: "anthropic", modelID: "claude-sonnet-4-6" },
+      autoCompactState,
+      client: client as never,
+      directory,
+      pluginConfig: {} as OhMyOpenCodeConfig,
+      errorType: "non-empty content",
+    })
+
+    //#then
+    expect(autoCompactState.pendingCompact.has(sessionID)).toBe(false)
+    expect(autoCompactState.errorDataBySession.has(sessionID)).toBe(false)
+    expect(autoCompactState.retryStateBySession.has(sessionID)).toBe(false)
+    expect(autoCompactState.retryTimerBySession.has(sessionID)).toBe(false)
+    expect(autoCompactState.truncateStateBySession.has(sessionID)).toBe(false)
+    expect(autoCompactState.emptyContentAttemptBySession.has(sessionID)).toBe(false)
+    expect(showToastMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: expect.objectContaining({
+          title: "Recovery Failed",
+        }),
+      }),
+    )
+  })
 })

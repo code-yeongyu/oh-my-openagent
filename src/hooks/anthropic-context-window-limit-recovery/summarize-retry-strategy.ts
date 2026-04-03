@@ -73,6 +73,7 @@ export async function runSummarizeRetryStrategy(params: {
         return
       }
     } else {
+      clearSessionState(params.autoCompactState, params.sessionID)
       await params.client.tui
         .showToast({
           body: {
