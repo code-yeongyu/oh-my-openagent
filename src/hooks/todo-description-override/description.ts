@@ -13,7 +13,7 @@ GOOD:
 
 BAD:
 - "Implement email validation" (where? how? what result?)
-- "Add dark mode" (this is a feature, not a todo)
+- "Add dark mode" (feature, not a todo)
 - "Fix auth" (what file? what changes? what's expected?)
 
 ## Granularity Rules

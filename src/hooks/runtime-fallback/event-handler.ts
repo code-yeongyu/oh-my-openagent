@@ -101,7 +101,7 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
     const resolvedAgent = await helpers.resolveAgentForSessionFromContext(sessionID, agent)
 
     if (sessionRetryInFlight.has(sessionID)) {
-      log(`[${HOOK_NAME}] session.error skipped — retry in flight`, {
+      log(`[${HOOK_NAME}] session.error skipped - retry in flight`, {
         sessionID,
         retryInFlight: true,
       })
