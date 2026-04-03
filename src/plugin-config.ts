@@ -177,6 +177,13 @@ export function loadPluginConfig(
       ? userDetected.path
       : path.join(configDir, "oh-my-opencode.json");
 
+  if (userDetected.legacyPath) {
+    log("Canonical plugin config detected alongside legacy config. Remove the legacy file to avoid confusion.", {
+      canonicalPath: userDetected.path,
+      legacyPath: userDetected.legacyPath,
+    });
+  }
+
   // Auto-copy legacy config file to canonical name if needed
   if (userDetected.format !== "none" && path.basename(userDetected.path).startsWith(LEGACY_CONFIG_BASENAME)) {
     migrateLegacyConfigFile(userDetected.path);
@@ -189,6 +196,13 @@ export function loadPluginConfig(
     projectDetected.format !== "none"
       ? projectDetected.path
       : path.join(projectBasePath, "oh-my-opencode.json");
+
+  if (projectDetected.legacyPath) {
+    log("Canonical plugin config detected alongside legacy config. Remove the legacy file to avoid confusion.", {
+      canonicalPath: projectDetected.path,
+      legacyPath: projectDetected.legacyPath,
+    });
+  }
 
   // Auto-copy legacy project config file to canonical name if needed
   if (projectDetected.format !== "none" && path.basename(projectDetected.path).startsWith(LEGACY_CONFIG_BASENAME)) {
