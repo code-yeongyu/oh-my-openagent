@@ -3,15 +3,8 @@
  * Used to prevent crashes from concurrent notification plugins.
  */
 
-import * as fs from "node:fs"
-import * as path from "node:path"
-import * as os from "node:os"
+import { loadOpencodePlugins } from "./load-opencode-plugins"
 import { log } from "./logger"
-import { parseJsoncSafe } from "./jsonc-parser"
-
-interface OpencodeConfig {
-  plugin?: string[]
-}
 
 /**
  * Known notification plugins that conflict with oh-my-opencode's session-notification.
@@ -33,46 +26,6 @@ const KNOWN_SKILL_PLUGINS = [
   "opencode-skills",
   "@opencode/skills",
 ]
-
-function getWindowsAppdataDir(): string | null {
-  return process.env.APPDATA || null
-}
-
-function getConfigPaths(directory: string): string[] {
-  const crossPlatformDir = path.join(os.homedir(), ".config")
-  const paths = [
-    path.join(directory, ".opencode", "opencode.json"),
-    path.join(directory, ".opencode", "opencode.jsonc"),
-    path.join(crossPlatformDir, "opencode", "opencode.json"),
-    path.join(crossPlatformDir, "opencode", "opencode.jsonc"),
-  ]
-
-  if (process.platform === "win32") {
-    const appdataDir = getWindowsAppdataDir()
-    if (appdataDir) {
-      paths.push(path.join(appdataDir, "opencode", "opencode.json"))
-      paths.push(path.join(appdataDir, "opencode", "opencode.jsonc"))
-    }
-  }
-
-  return paths
-}
-
-function loadOpencodePlugins(directory: string): string[] {
-  for (const configPath of getConfigPaths(directory)) {
-    try {
-      if (!fs.existsSync(configPath)) continue
-      const content = fs.readFileSync(configPath, "utf-8")
-      const result = parseJsoncSafe<OpencodeConfig>(content)
-      if (result.data) {
-        return result.data.plugin ?? []
-      }
-    } catch {
-      continue
-    }
-  }
-  return []
-}
 
 /**
  * Check if a plugin entry matches a known notification plugin.
