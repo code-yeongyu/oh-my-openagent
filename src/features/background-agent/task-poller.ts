@@ -119,6 +119,7 @@ export async function checkAndInterruptStaleTasks(args: {
   const staleTimeoutMs = config?.staleTimeoutMs ?? DEFAULT_STALE_TIMEOUT_MS
   const sessionGoneTimeoutMs = config?.sessionGoneTimeoutMs ?? DEFAULT_SESSION_GONE_TIMEOUT_MS
   const now = Date.now()
+  const abortPromises: Array<Promise<unknown>> = []
 
   const messageStalenessMs = config?.messageStalenessTimeoutMs ?? DEFAULT_MESSAGE_STALENESS_TIMEOUT_MS
 
@@ -166,7 +167,7 @@ export async function checkAndInterruptStaleTasks(args: {
 
       onTaskInterrupted(task)
 
-      client.session.abort({ path: { id: sessionID } }).catch(() => {})
+      abortPromises.push(client.session.abort({ path: { id: sessionID } }))
       log(`[background-agent] Task ${task.id} interrupted: no progress since start`)
 
       try {
@@ -204,7 +205,7 @@ export async function checkAndInterruptStaleTasks(args: {
 
     onTaskInterrupted(task)
 
-    client.session.abort({ path: { id: sessionID } }).catch(() => {})
+    abortPromises.push(client.session.abort({ path: { id: sessionID } }))
     log(`[background-agent] Task ${task.id} interrupted: stale timeout`)
 
     try {
@@ -212,5 +213,9 @@ export async function checkAndInterruptStaleTasks(args: {
     } catch (err) {
       log("[background-agent] Error in notifyParentSession for stale task:", { taskId: task.id, error: err })
     }
+  }
+
+  if (abortPromises.length > 0) {
+    await Promise.allSettled(abortPromises)
   }
 }

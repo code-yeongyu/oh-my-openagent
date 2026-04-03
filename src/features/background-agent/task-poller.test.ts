@@ -16,6 +16,20 @@ describe("checkAndInterruptStaleTasks", () => {
   }
   const mockNotify = mock(() => Promise.resolve())
 
+  function createDeferredPromise(): {
+    promise: Promise<void>
+    resolve: () => void
+  } {
+    let resolvePromise = () => {}
+    const promise = new Promise<void>((resolve) => {
+      resolvePromise = resolve
+    })
+    return {
+      promise,
+      resolve: resolvePromise,
+    }
+  }
+
   function createRunningTask(overrides: Partial<BackgroundTask> = {}): BackgroundTask {
     return {
       id: "task-1",
@@ -112,6 +126,39 @@ describe("checkAndInterruptStaleTasks", () => {
     //#then
     expect(task.status).toBe("cancelled")
     expect(task.error).toContain("no activity")
+  })
+
+  it("should await abort before resolving for no-progress stale interruption", async () => {
+    //#given
+    const task = createRunningTask({
+      startedAt: new Date(Date.now() - 15 * 60 * 1000),
+      progress: undefined,
+    })
+    const deferred = createDeferredPromise()
+    mockClient.session.abort.mockImplementationOnce(() => deferred.promise)
+
+    //#when
+    const interruptPromise = checkAndInterruptStaleTasks({
+      tasks: [task],
+      client: mockClient as never,
+      config: { messageStalenessTimeoutMs: 600_000 },
+      concurrencyManager: mockConcurrencyManager as never,
+      notifyParentSession: mockNotify,
+    })
+    let settled = false
+    void interruptPromise.then(() => {
+      settled = true
+    })
+
+    await Promise.resolve()
+
+    //#then
+    expect(settled).toBe(false)
+
+    deferred.resolve()
+    await interruptPromise
+
+    expect(settled).toBe(true)
   })
 
   it("should NOT interrupt tasks with NO progress.lastUpdate that are within messageStalenessTimeoutMs", async () => {
@@ -405,6 +452,45 @@ describe("checkAndInterruptStaleTasks", () => {
     //#then — cancelled because session gone timeout (60s) < timeSinceLastUpdate (120s)
     expect(task.status).toBe("cancelled")
     expect(task.error).toContain("session gone from status registry")
+  })
+
+  it("should await abort before resolving for session-gone interruption", async () => {
+    //#given
+    const task = createRunningTask({
+      startedAt: new Date(Date.now() - 300_000),
+      progress: {
+        toolCalls: 1,
+        lastUpdate: new Date(Date.now() - 120_000),
+      },
+      consecutiveMissedPolls: 2,
+    })
+    const deferred = createDeferredPromise()
+    mockClient.session.get.mockRejectedValue(new Error("missing"))
+    mockClient.session.abort.mockImplementationOnce(() => deferred.promise)
+
+    //#when
+    const interruptPromise = checkAndInterruptStaleTasks({
+      tasks: [task],
+      client: mockClient as never,
+      config: { staleTimeoutMs: 180_000, sessionGoneTimeoutMs: 60_000 },
+      concurrencyManager: mockConcurrencyManager as never,
+      notifyParentSession: mockNotify,
+      sessionStatuses: {},
+    })
+    let settled = false
+    void interruptPromise.then(() => {
+      settled = true
+    })
+
+    await Promise.resolve()
+
+    //#then
+    expect(settled).toBe(false)
+
+    deferred.resolve()
+    await interruptPromise
+
+    expect(settled).toBe(true)
   })
 
   it("should use session-gone timeout when session is missing from status map (no progress)", async () => {

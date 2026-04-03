@@ -11,7 +11,7 @@ import {
 } from "../../shared/model-error-classifier"
 import { transformModelForProvider } from "../../shared/provider-model-id-transform"
 
-export function tryFallbackRetry(args: {
+export async function tryFallbackRetry(args: {
   task: BackgroundTask
   errorInfo: { name?: string; message?: string }
   source: string
@@ -20,7 +20,7 @@ export function tryFallbackRetry(args: {
   idleDeferralTimers: Map<string, ReturnType<typeof setTimeout>>
   queuesByKey: Map<string, QueueItem[]>
   processKey: (key: string) => void
-}): boolean {
+}): Promise<boolean> {
   const { task, errorInfo, source, concurrencyManager, client, idleDeferralTimers, queuesByKey, processKey } = args
   const fallbackChain = task.fallbackChain
   const canRetry =
@@ -84,15 +84,13 @@ export function tryFallbackRetry(args: {
     task.concurrencyKey = undefined
   }
 
-  if (task.sessionID) {
-    client.session.abort({ path: { id: task.sessionID } }).catch(() => {})
-  }
-
   const idleTimer = idleDeferralTimers.get(task.id)
   if (idleTimer) {
     clearTimeout(idleTimer)
     idleDeferralTimers.delete(task.id)
   }
+
+  const previousSessionID = task.sessionID
 
   task.attemptCount = selectedAttemptCount
   const transformedModelId = transformModelForProvider(providerID, nextFallback.model)
@@ -123,6 +121,11 @@ export function tryFallbackRetry(args: {
     category: task.category,
     isUnstableAgent: task.isUnstableAgent,
   }
+
+  if (previousSessionID) {
+    await client.session.abort({ path: { id: previousSessionID } }).catch(() => {})
+  }
+
   queue.push({ task, input: retryInput })
   queuesByKey.set(key, queue)
   processKey(key)
