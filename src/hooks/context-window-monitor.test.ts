@@ -138,6 +138,8 @@ describe("context-window-monitor", () => {
     )
 
     expect(output.output).toContain("context remaining")
+    expect(output.output).toContain("400,000-token context window")
+    expect(output.output).toContain("[Context Status: 80.0% used (320,000/400,000 tokens), 20.0% remaining]")
     expect(ctx.client.session.messages).not.toHaveBeenCalled()
   })
 
