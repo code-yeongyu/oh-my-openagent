@@ -14,6 +14,7 @@ import { getAvailableModelsForDelegateTask } from "./available-models"
 import type { FallbackEntry } from "../../shared/model-requirements"
 import { resolveModelForDelegateTask } from "./model-selection"
 import { fuzzyMatchModel } from "../../shared/model-availability"
+import { loadUserAgents, loadProjectAgents } from "../../features/claude-code-agent-loader"
 
 export async function resolveSubagentExecution(
   args: DelegateTaskArgs,
@@ -53,18 +54,60 @@ Create the work plan directly - that's your job as the planning agent.`,
   let categoryModel: DelegatedModelConfig | undefined
   let fallbackChain: FallbackEntry[] | undefined = undefined
 
+  type AgentInfo = {
+    name: string
+    mode?: "subagent" | "primary" | "all"
+    model?: string | { providerID: string; modelID: string }
+  }
+
   try {
     const agentsResult = await client.app.agents()
-    type AgentInfo = {
-      name: string
-      mode?: "subagent" | "primary" | "all"
-      model?: string | { providerID: string; modelID: string }
-    }
     const agents = normalizeSDKResponse(agentsResult, [] as AgentInfo[], {
       preferResponseOnMissingData: true,
     })
 
-    const callableAgents = agents.filter((a) => a.mode !== "primary")
+    // Load user and project agents
+    const userAgentsRecord = loadUserAgents()
+    const projectAgentsRecord = loadProjectAgents(executorCtx.directory)
+
+    // Convert user/project agent configs to AgentInfo format
+    const userAgentsList: AgentInfo[] = Object.entries(userAgentsRecord).map(([name, config]) => ({
+      name,
+      mode: config.mode as "subagent" | "primary" | "all",
+      model: config.model,
+    }))
+
+    const projectAgentsList: AgentInfo[] = Object.entries(projectAgentsRecord).map(([name, config]) => ({
+      name,
+      mode: config.mode as "subagent" | "primary" | "all",
+      model: config.model,
+    }))
+
+    // Merge user and project agents into the server's agent list
+    // Server agents take precedence; user/project agents fill in gaps
+    const mergedAgentMap = new Map<string, AgentInfo>()
+
+    // First add server agents (they take precedence)
+    for (const agent of agents) {
+      mergedAgentMap.set(agent.name.toLowerCase(), agent)
+    }
+
+    // Then add user agents (server wins on collision)
+    for (const agent of userAgentsList) {
+      if (!mergedAgentMap.has(agent.name.toLowerCase())) {
+        mergedAgentMap.set(agent.name.toLowerCase(), agent)
+      }
+    }
+
+    // Then add project agents (server wins on collision)
+    for (const agent of projectAgentsList) {
+      if (!mergedAgentMap.has(agent.name.toLowerCase())) {
+        mergedAgentMap.set(agent.name.toLowerCase(), agent)
+      }
+    }
+
+    const mergedAgents = Array.from(mergedAgentMap.values())
+    const callableAgents = mergedAgents.filter((a) => a.mode !== "primary")
 
     const resolvedDisplayName = getAgentDisplayName(agentToUse)
     const matchedAgent = callableAgents.find(

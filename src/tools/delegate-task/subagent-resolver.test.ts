@@ -1,10 +1,18 @@
 declare const require: (name: string) => any
-const { describe, test, expect, beforeEach, afterEach, spyOn, mock } = require("bun:test")
+const { describe, test, expect, beforeEach, afterEach, spyOn, mock, vi } = require("bun:test")
 import { resolveSubagentExecution } from "./subagent-resolver"
 import type { DelegateTaskArgs } from "./types"
 import type { ExecutorContext } from "./executor-types"
 import * as logger from "../../shared/logger"
 import * as connectedProvidersCache from "../../shared/connected-providers-cache"
+
+const mockLoadUserAgents = vi.fn().mockReturnValue({})
+const mockLoadProjectAgents = vi.fn().mockReturnValue({})
+
+vi.mock("../../features/claude-code-agent-loader", () => ({
+  loadUserAgents: mockLoadUserAgents,
+  loadProjectAgents: mockLoadProjectAgents,
+}))
 
 function createBaseArgs(overrides?: Partial<DelegateTaskArgs>): DelegateTaskArgs {
   return {
@@ -506,5 +514,133 @@ describe("resolveSubagentExecution", () => {
     })
     cacheSpy.mockRestore()
     connectedSpy.mockRestore()
+  })
+
+  test("resolves user agent from loadUserAgents when calling task(subagent_type=...)", async () => {
+    //#given
+    const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+      models: { openai: ["gpt-5.4"] },
+      connected: ["openai"],
+      updatedAt: "2026-03-03T00:00:00.000Z",
+    })
+    const connectedSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
+
+    mockLoadUserAgents.mockReturnValue({
+      "my-user-agent": {
+        description: "A user agent",
+        mode: "subagent",
+        prompt: "Do something",
+        model: "openai/gpt-5.4",
+      },
+    })
+    mockLoadProjectAgents.mockReturnValue({})
+
+    const args = createBaseArgs({ subagent_type: "my-user-agent" })
+    const executorCtx = createExecutorContext(async () => [])
+
+    //#when
+    const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep")
+
+    //#then
+    expect(result.error).toBeUndefined()
+    expect(result.agentToUse).toBe("my-user-agent")
+    expect(result.categoryModel?.modelID).toBe("gpt-5.4")
+
+    cacheSpy.mockRestore()
+    connectedSpy.mockRestore()
+  })
+
+  test("resolves project agent from loadProjectAgents when calling task(subagent_type=...)", async () => {
+    //#given
+    const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+      models: { anthropic: ["claude-sonnet-4"] },
+      connected: ["anthropic"],
+      updatedAt: "2026-03-03T00:00:00.000Z",
+    })
+    const connectedSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["anthropic"])
+
+    mockLoadUserAgents.mockReturnValue({})
+    mockLoadProjectAgents.mockReturnValue({
+      "my-project-agent": {
+        description: "A project agent",
+        mode: "subagent",
+        prompt: "Do project work",
+        model: "anthropic/claude-sonnet-4",
+      },
+    })
+
+    const args = createBaseArgs({ subagent_type: "my-project-agent" })
+    const executorCtx = createExecutorContext(async () => [])
+
+    //#when
+    const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep")
+
+    //#then
+    expect(result.error).toBeUndefined()
+    expect(result.agentToUse).toBe("my-project-agent")
+    expect(result.categoryModel?.modelID).toBe("claude-sonnet-4")
+
+    cacheSpy.mockRestore()
+    connectedSpy.mockRestore()
+  })
+
+  test("server agent takes precedence over user agent with same name", async () => {
+    //#given
+    const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+      models: { openai: ["gpt-5.4"] },
+      connected: ["openai"],
+      updatedAt: "2026-03-03T00:00:00.000Z",
+    })
+    const connectedSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
+
+    mockLoadUserAgents.mockReturnValue({
+      "explore": {
+        description: "User explore agent",
+        mode: "subagent",
+        prompt: "User prompt",
+        model: "openai/gpt-3.5",
+      },
+    })
+    mockLoadProjectAgents.mockReturnValue({})
+
+    // Server has "explore" agent
+    const args = createBaseArgs({ subagent_type: "explore" })
+    const executorCtx = createExecutorContext(async () => ([
+      { name: "explore", mode: "subagent", model: "openai/gpt-5.4" },
+    ]))
+
+    //#when
+    const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep")
+
+    //#then
+    expect(result.error).toBeUndefined()
+    expect(result.agentToUse).toBe("explore")
+    // Should use server's model, not user's
+    expect(result.categoryModel?.modelID).toBe("gpt-5.4")
+
+    cacheSpy.mockRestore()
+    connectedSpy.mockRestore()
+  })
+
+  test("filters out primary agents from user/project when resolving", async () => {
+    //#given
+    mockLoadUserAgents.mockReturnValue({
+      "my-primary-agent": {
+        description: "A primary agent",
+        mode: "primary",
+        prompt: "I am primary",
+      },
+    })
+    mockLoadProjectAgents.mockReturnValue({})
+
+    const args = createBaseArgs({ subagent_type: "my-primary-agent" })
+    const executorCtx = createExecutorContext(async () => [])
+
+    //#when
+    const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep")
+
+    //#then
+    expect(result.error).toContain("Unknown agent")
+    expect(result.agentToUse).toBe("")
   })
 })
