@@ -35,6 +35,10 @@ import { subagentSessions } from "../claude-code-session-state"
 import { getTaskToastManager } from "../task-toast-manager"
 import { formatDuration } from "./duration-formatter"
 import {
+  buildBackgroundTaskNotificationText,
+  type BackgroundTaskNotificationTask,
+} from "./background-task-notification-template"
+import {
   isAbortedSessionError,
   extractErrorName,
   extractErrorMessage,
@@ -151,7 +155,7 @@ export class BackgroundManager {
   private queuesByKey: Map<string, QueueItem[]> = new Map()
   private processingKeys: Set<string> = new Set()
   private completionTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
-  private completedTaskSummaries: Map<string, Array<{id: string, description: string, status: string, error?: string}>> = new Map()
+  private completedTaskSummaries: Map<string, BackgroundTaskNotificationTask[]> = new Map()
   private idleDeferralTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
   private notificationQueueByParent: Map<string, Promise<void>> = new Map()
   private rootDescendantCounts: Map<string, number>
@@ -1597,56 +1601,14 @@ export class BackgroundManager {
         : task.status === "error"
           ? "ERROR"
           : "CANCELLED"
-    const errorInfo = task.error ? `\n**Error:** ${task.error}` : ""
-
-    let notification: string
-    if (allComplete) {
-        const succeededTasks = completedTasks.filter(t => t.status === "completed")
-        const failedTasks = completedTasks.filter(t => t.status !== "completed")
-
-        const succeededText = succeededTasks.length > 0
-          ? succeededTasks.map(t => `- \`${t.id}\`: ${t.description}`).join("\n")
-          : ""
-        const failedText = failedTasks.length > 0
-          ? failedTasks.map(t => `- \`${t.id}\`: ${t.description} [${t.status.toUpperCase()}]${t.error ? ` - ${t.error}` : ""}`).join("\n")
-          : ""
-
-        const hasFailures = failedTasks.length > 0
-        const header = hasFailures
-          ? `[ALL BACKGROUND TASKS FINISHED - ${failedTasks.length} FAILED]`
-          : "[ALL BACKGROUND TASKS COMPLETE]"
-
-        let body = ""
-        if (succeededText) {
-          body += `**Completed:**\n${succeededText}\n`
-        }
-        if (failedText) {
-          body += `\n**Failed:**\n${failedText}\n`
-        }
-        if (!body) {
-          body = `- \`${task.id}\`: ${task.description} [${task.status.toUpperCase()}]${task.error ? ` - ${task.error}` : ""}\n`
-        }
-
-        notification = `<system-reminder>
-${header}
-
-${body.trim()}
-
-Use \`background_output(task_id="<id>")\` to retrieve each result.${hasFailures ? `\n\n**ACTION REQUIRED:** ${failedTasks.length} task(s) failed. Check errors above and decide whether to retry or proceed.` : ""}
-</system-reminder>`
-    } else {
-      notification = `<system-reminder>
-[BACKGROUND TASK ${statusText}]
-**ID:** \`${task.id}\`
-**Description:** ${task.description}
-**Duration:** ${duration}${errorInfo}
-
-**${remainingCount} task${remainingCount === 1 ? "" : "s"} still in progress.** You WILL be notified when ALL complete.
-${statusText === "COMPLETED" ? "Do NOT poll - continue productive work." : "**ACTION REQUIRED:** This task failed. Check the error and decide whether to retry, cancel remaining tasks, or continue."}
-
-Use \`background_output(task_id="${task.id}")\` to retrieve this result when ready.
-</system-reminder>`
-    }
+    const notification = buildBackgroundTaskNotificationText({
+      task,
+      duration,
+      statusText,
+      allComplete,
+      remainingCount,
+      completedTasks,
+    })
 
       let agent: string | undefined = task.parentAgent
       let model: { providerID: string; modelID: string } | undefined
