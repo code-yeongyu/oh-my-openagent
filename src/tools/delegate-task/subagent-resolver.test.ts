@@ -624,6 +624,13 @@ describe("resolveSubagentExecution", () => {
 
   test("project agent takes precedence over user agent with same name", async () => {
     //#given
+    const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+      models: { minimaxi: ["MiniMax-M2.7-highspeed", "claude-3-haiku"] },
+      connected: ["minimaxi"],
+      updatedAt: "2026-03-03T00:00:00.000Z",
+    })
+    const connectedSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["minimaxi"])
+
     mockLoadUserAgents.mockReturnValue({
       "my-custom-agent": {
         description: "User agent",
@@ -650,6 +657,10 @@ describe("resolveSubagentExecution", () => {
     //#then
     expect(result.error).toBeUndefined()
     expect(result.agentToUse).toBe("my-custom-agent")
+    expect(result.categoryModel?.modelID).toBe("MiniMax-M2.7-highspeed")
+
+    cacheSpy.mockRestore()
+    connectedSpy.mockRestore()
   })
 
   test("filters out primary agents from user/project when resolving", async () => {

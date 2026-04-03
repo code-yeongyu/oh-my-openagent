@@ -84,7 +84,7 @@ Create the work plan directly - that's your job as the planning agent.`,
     }))
 
     // Merge user and project agents into the server's agent list
-    // Server agents take precedence; user/project agents fill in gaps
+    // Server agents take precedence; project agents override user agents
     const mergedAgentMap = new Map<string, AgentInfo>()
 
     // First add server agents (they take precedence)
@@ -92,15 +92,15 @@ Create the work plan directly - that's your job as the planning agent.`,
       mergedAgentMap.set(agent.name.toLowerCase(), agent)
     }
 
-    // Then add user agents (server/project agents win on collision)
-    for (const agent of userAgentsList) {
+    // Then add project agents (overrides user agents, server wins on collision)
+    for (const agent of projectAgentsList) {
       if (!mergedAgentMap.has(agent.name.toLowerCase())) {
         mergedAgentMap.set(agent.name.toLowerCase(), agent)
       }
     }
 
-    // Then add project agents (overrides user agents, server wins on collision)
-    for (const agent of projectAgentsList) {
+    // Then add user agents (only if not already added by server or project)
+    for (const agent of userAgentsList) {
       if (!mergedAgentMap.has(agent.name.toLowerCase())) {
         mergedAgentMap.set(agent.name.toLowerCase(), agent)
       }
