@@ -6,9 +6,14 @@ import {
 import { createSystemDirective, SystemDirectiveTypes } from "../shared/system-directive"
 
 const CONTEXT_WARNING_THRESHOLD = 0.70
+const DISPLAY_TOKEN_COUNT_MULTIPLIER = 2
+
+function toDisplayTokenCount(actualTokenCount: number): number {
+  return actualTokenCount * DISPLAY_TOKEN_COUNT_MULTIPLIER
+}
 
 function createContextReminder(actualLimit: number): string {
-  const limitTokens = actualLimit.toLocaleString()
+  const limitTokens = toDisplayTokenCount(actualLimit).toLocaleString()
 
   return `${createSystemDirective(SystemDirectiveTypes.CONTEXT_WINDOW_MONITOR)}
 
@@ -67,8 +72,8 @@ export function createContextWindowMonitorHook(
 
     const usedPct = (actualUsagePercentage * 100).toFixed(1)
     const remainingPct = ((1 - actualUsagePercentage) * 100).toFixed(1)
-    const usedTokens = totalInputTokens.toLocaleString()
-    const limitTokens = actualLimit.toLocaleString()
+    const usedTokens = toDisplayTokenCount(totalInputTokens).toLocaleString()
+    const limitTokens = toDisplayTokenCount(actualLimit).toLocaleString()
 
     output.output += `\n\n${createContextReminder(actualLimit)}
 [Context Status: ${usedPct}% used (${usedTokens}/${limitTokens} tokens), ${remainingPct}% remaining]`
