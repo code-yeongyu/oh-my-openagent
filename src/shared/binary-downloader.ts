@@ -116,6 +116,10 @@ async function listTarEntries(archivePath: string, cwd?: string): Promise<Archiv
   }
 
   if (exitCode !== 0) {
+    if (/Member name contains '\.\.'/i.test(stderr) || /Removing leading [`']\.\.\//i.test(stderr)) {
+      throw new Error(`tar archive contains path traversal entries: ${stderr}`)
+    }
+
     throw new Error(`tar entry listing failed (exit ${exitCode}): ${stderr}`)
   }
 
