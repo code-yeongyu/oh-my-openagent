@@ -141,8 +141,6 @@ Create the work plan directly - that's your job as the planning agent.`,
           categoryModel = variantToUse ? { ...normalized, variant: variantToUse } : normalized
         }
       } else if (resolutionSkipped && (agentOverride?.model ?? agentCategoryModel)) {
-        // Cold cache: resolution was skipped but user explicitly configured a model.
-        // Honor the user override directly — don't fall through to hardcoded fallback chain.
         const normalized = normalizeModelFormat((agentOverride?.model ?? agentCategoryModel)!)
         if (normalized) {
           const agentCategoryVariant = agentOverride?.category
@@ -164,8 +162,6 @@ Create the work plan directly - that's your job as the planning agent.`,
         normalizedAgentFallbackModels,
         defaultProviderID,
       )
-      // Don't assign hardcoded fallback chain when resolution was skipped (cold cache)
-      // — the chain may contain model IDs that don't exist in the provider yet.
       fallbackChain = configuredFallbackChain ?? (resolutionSkipped ? undefined : agentRequirement?.fallbackChain)
 
       // Only promote fallback-only settings when resolution actually selected a fallback model.

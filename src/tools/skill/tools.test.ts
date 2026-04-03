@@ -732,14 +732,14 @@ describe("skill tool - short name resolution", () => {
     ]
     const tool = createSkillTool({ skills: loadedSkills })
 
-    // when / then — should not resolve (ambiguous), should suggest both
+    // when / then, should not resolve (ambiguous), should suggest both
     await expect(tool.execute({ name: "debugging" }, mockContext)).rejects.toThrow(
       "not found"
     )
   })
 
   it("prefers exact match over short name match", async () => {
-    // given — "debugging" exists as both exact and as part of a namespace
+    // given, "debugging" exists as both exact and as part of a namespace
     const loadedSkills = [
       createMockSkill("debugging"),
       createMockSkill("superpowers/debugging"),
@@ -749,7 +749,7 @@ describe("skill tool - short name resolution", () => {
     // when
     const result = await tool.execute({ name: "debugging" }, mockContext)
 
-    // then — should match "debugging" exactly, not "superpowers/debugging"
+    // then, should match "debugging" exactly, not "superpowers/debugging"
     expect(result).toContain("## Skill: debugging")
   })
 })

@@ -2,11 +2,9 @@ import { spawn as bunSpawn } from "bun"
 import { spawn as nodeSpawn, type ChildProcess } from "node:child_process"
 import { existsSync, statSync } from "fs"
 import { log } from "../../shared/logger"
-// Bun spawn segfaults on Windows (oven-sh/bun#25798) — unfixed as of v1.3.8+
 function shouldUseNodeSpawn(): boolean {
   return process.platform === "win32"
 }
-// Prevents segfaults when libuv gets a non-existent cwd (oven-sh/bun#25798)
 export function validateCwd(cwd: string): { valid: boolean; error?: string } {
   try {
     if (!existsSync(cwd)) {
@@ -24,7 +22,6 @@ export function validateCwd(cwd: string): { valid: boolean; error?: string } {
 interface StreamReader {
   read(): Promise<{ done: boolean; value: Uint8Array | undefined }>
 }
-// Bridges Bun Subprocess and Node.js ChildProcess under a common API
 export interface UnifiedProcess {
   stdin: { write(chunk: Uint8Array | string): void }
   stdout: { getReader(): StreamReader }
