@@ -5,7 +5,7 @@ import { readZipSymlinkTarget } from "./read-zip-symlink-target"
 
 export function parseZipInfoListedEntry(line: string): ArchiveEntry | null {
 	const match = line.match(
-		/^([dl-])\S*\s+\S+\s+\S+\s+\d+\s+\S+\s+\d+\s+\S+\s+\S+\s+\S+\s+(.*)$/
+		/^([-dl?])\S*\s+\S+\s+\S+\s+\d+\s+\S+\s+\d+\s+\S+\s+\S+\s+\S+\s+(.*)$/
 	)
 	if (!match) {
 		return null
