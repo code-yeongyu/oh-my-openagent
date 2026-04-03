@@ -4,13 +4,10 @@ import { log } from "../../shared"
 
 const DEFAULT_HTTP_HOOK_TIMEOUT_S = 30
 const ALLOWED_SCHEMES = new Set(["http:", "https:"])
-
-function isProduction(): boolean {
-  return process.env.NODE_ENV === "production"
-}
+const LOCALHOST_HOSTNAMES = new Set(["localhost", "127.0.0.1", "::1", "[::1]"])
 
 function isLocalhost(url: URL): boolean {
-  return url.hostname === "localhost" || url.hostname === "127.0.0.1"
+  return LOCALHOST_HOSTNAMES.has(url.hostname)
 }
 
 function isPlainHttp(url: URL): boolean {
@@ -68,10 +65,10 @@ export async function executeHttpHook(
 
   if (isPlainHttp(parsed)) {
     log("HTTP hook URL uses insecure protocol", { url: hook.url })
-    if (isProduction() && !isLocalhost(parsed)) {
+    if (!isLocalhost(parsed)) {
       return {
         exitCode: 1,
-        stderr: "HTTP hook URL must use HTTPS in production. Plain HTTP is only allowed for localhost/127.0.0.1.",
+        stderr: "HTTP hook URL must use HTTPS. Plain HTTP is only allowed for localhost, 127.0.0.1, and ::1.",
       }
     }
   }
@@ -84,6 +81,7 @@ export async function executeHttpHook(
       method: "POST",
       headers,
       body: stdin,
+      redirect: "manual",
       signal: AbortSignal.timeout(timeoutS * 1000),
     })
 
