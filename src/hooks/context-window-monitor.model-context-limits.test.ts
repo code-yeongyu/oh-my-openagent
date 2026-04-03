@@ -86,8 +86,8 @@ describe("context-window-monitor modelContextLimitsCache", () => {
 
     // then
     expect(output.output).toContain("context remaining")
-    expect(output.output).toContain("524,288-token context window")
-    expect(output.output).toContain("[Context Status: 72.5% used (380,000/524,288 tokens), 27.5% remaining]")
+    expect(output.output).toContain("262,144-token context window")
+    expect(output.output).toContain("[Context Status: 72.5% used (190,000/262,144 tokens), 27.5% remaining]")
     expect(output.output).not.toContain("1,000,000")
   })
 
@@ -215,9 +215,8 @@ describe("context-window-monitor modelContextLimitsCache", () => {
         const output = createOutput()
         await hook["tool.execute.after"]({ tool: "bash", sessionID, callID: "call_1" }, output)
 
-        // then — 360K/500K = 72%, above 70% threshold, uses cached 500K limit
         expect(output.output).toContain("context remaining")
-        expect(output.output).toContain("1,000,000-token context window")
+        expect(output.output).toContain("500,000-token context window")
       })
     })
   })
@@ -262,7 +261,7 @@ describe("context-window-monitor modelContextLimitsCache", () => {
 
         // then
         expect(output.output).toContain("context remaining")
-        expect(output.output).toContain("400,000-token context window")
+        expect(output.output).toContain("200,000-token context window")
       })
     })
   })
