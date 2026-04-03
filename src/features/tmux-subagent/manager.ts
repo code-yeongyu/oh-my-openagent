@@ -604,7 +604,8 @@ export class TmuxSessionManager {
         }
 
         if (this.isIsolated() && !this.isolatedWindowPaneId) {
-          log("[tmux-session-manager] isolated container failed, skipping inline fallback to preserve isolation", { sessionId })
+          log("[tmux-session-manager] isolated container failed, deferring session for retry", { sessionId })
+          this.enqueueDeferredSession(sessionId, title)
           return
         }
         const sourcePaneId = this.getEffectiveSourcePaneId()
