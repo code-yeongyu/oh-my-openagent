@@ -6,6 +6,10 @@ import { log } from "../shared";
 
 type McpEntry = Record<string, unknown>;
 
+function isDisabledMcpEntry(value: unknown): value is McpEntry & { enabled: false } {
+  return typeof value === "object" && value !== null && (value as McpEntry).enabled === false;
+}
+
 function captureUserDisabledMcps(
   userMcp: Record<string, unknown> | undefined
 ): Set<string> {
@@ -13,12 +17,7 @@ function captureUserDisabledMcps(
   if (!userMcp) return disabled;
 
   for (const [name, value] of Object.entries(userMcp)) {
-    if (
-      value &&
-      typeof value === "object" &&
-      "enabled" in value &&
-      (value as McpEntry).enabled === false
-    ) {
+    if (isDisabledMcpEntry(value)) {
       disabled.add(name);
     }
   }
