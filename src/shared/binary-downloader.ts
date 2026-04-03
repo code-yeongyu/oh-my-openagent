@@ -51,7 +51,6 @@ export async function extractTarGz(
     if (isTarTraversalErrorOutput(stderr)) {
       throw new Error(`Unsafe archive entry: path contains path traversal (${archivePath})`)
     }
-
     throw new Error(`tar extraction failed (exit ${exitCode}): ${stderr}`);
   }
 }
@@ -116,10 +115,6 @@ async function listTarEntries(archivePath: string, cwd?: string): Promise<Archiv
   }
 
   if (exitCode !== 0) {
-    if (/Member name contains '\.\.'/i.test(stderr) || /Removing leading [`']\.\.\//i.test(stderr)) {
-      throw new Error(`tar archive contains path traversal entries: ${stderr}`)
-    }
-
     throw new Error(`tar entry listing failed (exit ${exitCode}): ${stderr}`)
   }
 
