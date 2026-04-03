@@ -1,6 +1,20 @@
-import { describe, expect, it } from "bun:test";
-import { mergeConfigs, parseConfigPartially } from "./plugin-config";
+import { afterEach, describe, expect, it, mock, spyOn } from "bun:test";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import * as shared from "./shared"
+import { loadPluginConfig, mergeConfigs, parseConfigPartially } from "./plugin-config";
 import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig } from "./config";
+
+const tempDirs: string[] = []
+
+afterEach(() => {
+  mock.restore()
+
+  for (const dir of tempDirs.splice(0)) {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
 
 describe("mergeConfigs", () => {
   describe("categories merging", () => {
@@ -277,3 +291,34 @@ describe("parseConfigPartially", () => {
     });
   });
 });
+
+describe("loadPluginConfig", () => {
+  it("should only honor mcp_env_allowlist from user config", () => {
+    // given
+    const rootDir = mkdtempSync(join(tmpdir(), "omo-plugin-config-"))
+    const userConfigDir = join(rootDir, "user-config")
+    const projectDir = join(rootDir, "project")
+    const projectConfigDir = join(projectDir, ".opencode")
+
+    tempDirs.push(rootDir)
+    mkdirSync(userConfigDir, { recursive: true })
+    mkdirSync(projectConfigDir, { recursive: true })
+
+    writeFileSync(
+      join(userConfigDir, "oh-my-openagent.jsonc"),
+      JSON.stringify({ mcp_env_allowlist: ["USER_ONLY_TOKEN"] })
+    )
+    writeFileSync(
+      join(projectConfigDir, "oh-my-openagent.jsonc"),
+      JSON.stringify({ mcp_env_allowlist: ["PROJECT_TOKEN"] })
+    )
+
+    spyOn(shared, "getOpenCodeConfigDir").mockReturnValue(userConfigDir)
+
+    // when
+    const config = loadPluginConfig(projectDir, {})
+
+    // then
+    expect(config.mcp_env_allowlist).toEqual(["USER_ONLY_TOKEN"])
+  })
+})
