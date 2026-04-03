@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
+import { afterAll, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
 import { AUTO_SLASH_COMMAND_TAG_OPEN } from "./constants"
 import type {
   AutoSlashCommandHookInput,
@@ -18,6 +18,10 @@ const executeSlashCommandMock = mock(
 mock.module("./executor", () => ({
   executeSlashCommand: executeSlashCommandMock,
 }))
+
+afterAll(() => {
+  mock.restore()
+})
 
 const logMock = spyOn(shared, "log").mockImplementation(() => {})
 

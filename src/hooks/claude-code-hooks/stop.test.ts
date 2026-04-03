@@ -1,4 +1,4 @@
-import { describe, it, expect, mock, beforeEach } from "bun:test"
+import { describe, it, expect, mock, beforeEach, afterAll } from "bun:test"
 import type { ClaudeHooksConfig } from "./types"
 import type { StopContext } from "./stop"
 
@@ -16,6 +16,8 @@ mock.module("../../shared/logger", () => ({
   log: () => {},
   getLogFilePath: () => "/tmp/test.log",
 }))
+
+afterAll(() => { mock.restore() })
 
 const { executeStopHooks } = await import("./stop")
 

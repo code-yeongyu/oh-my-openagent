@@ -1,5 +1,5 @@
 declare const require: (name: string) => any
-const { afterEach, describe, expect, mock, test } = require("bun:test")
+const { afterEach, afterAll, describe, expect, mock, test } = require("bun:test")
 
 const PROVIDER_ID = "cliproxyapi"
 
@@ -9,6 +9,8 @@ mock.module("../shared/connected-providers-cache", () => ({
     connected: [PROVIDER_ID],
   }),
 }))
+
+afterAll(() => { mock.restore() })
 
 import { createEventHandler } from "./event"
 import { createChatMessageHandler } from "./chat-message"

@@ -19,6 +19,8 @@ mock.module("./opencode-storage-detection", () => ({
   resetSqliteBackendCache: () => {},
 }))
 
+afterAll(() => { mock.restore() })
+
 const { getMessageDir } = await import("./opencode-message-dir")
 
 describe("getMessageDir", () => {

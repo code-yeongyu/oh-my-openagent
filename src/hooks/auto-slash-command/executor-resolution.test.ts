@@ -1,4 +1,4 @@
-import { describe, expect, it, mock } from "bun:test"
+import { afterAll, describe, expect, it, mock } from "bun:test"
 import type { LoadedSkill } from "../../features/opencode-skill-loader"
 
 mock.module("../../shared", () => ({
@@ -26,6 +26,10 @@ mock.module("../../tools/slashcommand", () => ({
 mock.module("../../features/opencode-skill-loader", () => ({
   discoverAllSkills: async (): Promise<LoadedSkill[]> => [],
 }))
+
+afterAll(() => {
+  mock.restore()
+})
 
 const { executeSlashCommand } = await import("./executor")
 

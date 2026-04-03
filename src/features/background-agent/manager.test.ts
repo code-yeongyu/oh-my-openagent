@@ -1,5 +1,5 @@
 declare const require: (name: string) => any
-const { describe, test, expect, beforeEach, afterEach, spyOn, mock } = require("bun:test")
+const { describe, test, expect, beforeEach, afterEach, afterAll, spyOn, mock } = require("bun:test")
 
 mock.module("../../shared/connected-providers-cache", () => ({
   readConnectedProvidersCache: () => null,
@@ -9,6 +9,8 @@ mock.module("../../shared/connected-providers-cache", () => ({
   writeProviderModelsCache: () => {},
   updateConnectedProvidersCache: () => {},
 }))
+
+afterAll(() => { mock.restore() })
 
 import { getSessionPromptParams, clearSessionPromptParams } from "../../shared/session-prompt-params-state"
 import { tmpdir } from "node:os"

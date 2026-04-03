@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test"
+import { afterAll, describe, it, expect, beforeEach, afterEach, mock } from "bun:test"
 
 const mockLogin = mock(() => Promise.resolve({ accessToken: "test-token", expiresAt: 1710000000 }))
 
@@ -10,6 +10,10 @@ mock.module("../../features/mcp-oauth/provider", () => ({
     }
   },
 }))
+
+afterAll(() => {
+  mock.restore()
+})
 
 const { login } = await import("./login")
 

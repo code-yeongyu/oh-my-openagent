@@ -1,4 +1,4 @@
-const { describe, expect, mock, test } = require("bun:test")
+const { describe, expect, mock, test, afterAll } = require("bun:test")
 
 mock.module("../../shared/opencode-message-dir", () => ({
   getMessageDir: () => null,
@@ -11,6 +11,8 @@ mock.module("../../shared/opencode-storage-detection", () => ({
 mock.module("../../shared/normalize-sdk-response", () => ({
   normalizeSDKResponse: <TData>(response: { data?: TData }, fallback: TData): TData => response.data ?? fallback,
 }))
+
+afterAll(() => { mock.restore() })
 
 const { getLastAgentFromSession } = await import("./session-last-agent")
 

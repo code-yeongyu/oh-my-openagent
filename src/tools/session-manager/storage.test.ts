@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, afterEach, mock } from "bun:test"
+import { describe, test, expect, beforeEach, afterEach, afterAll, mock } from "bun:test"
 import { mkdirSync, writeFileSync, rmSync, existsSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
@@ -59,6 +59,9 @@ mock.module("../../shared/opencode-message-dir", () => ({
     return null
   },
 }))
+
+afterAll(() => { mock.restore() })
+
 const { getAllSessions, getMessageDir, sessionExists, readSessionMessages, readSessionTodos, getSessionInfo } =
   await import("./storage")
 

@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 
-import { beforeEach, describe, expect, it, mock } from "bun:test"
+import { afterAll, beforeEach, describe, expect, it, mock } from "bun:test"
 import { PLUGIN_NAME } from "../../../shared"
 import type { PluginInfo } from "./system-plugin"
 
@@ -46,6 +46,10 @@ mock.module("./system-loaded-version", () => ({
   getLatestPluginVersion: mockGetLatestPluginVersion,
   getSuggestedInstallTag: mockGetSuggestedInstallTag,
 }))
+
+afterAll(() => {
+  mock.restore()
+})
 
 describe("system check", () => {
   beforeEach(() => {

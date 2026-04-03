@@ -24,6 +24,7 @@ import {
 import { detectWorktreePath } from "./worktree-detector"
 import { parseUserRequest } from "./parse-user-request"
 import { buildStartWorkContextInfo } from "./context-info-builder"
+import { createWorktreeActiveBlock } from "./worktree-block"
 
 export const HOOK_NAME = "start-work" as const
 const START_WORK_TEMPLATE_MARKER = "You are starting a Sisyphus work session."
@@ -42,18 +43,6 @@ interface StartWorkCommandExecuteBeforeInput {
 interface StartWorkHookOutput {
   message?: Record<string, unknown>
   parts: Array<{ type: string; text?: string }>
-}
-
-function createWorktreeActiveBlock(worktreePath: string): string {
-  return `
-## Worktree Active
-
-**Worktree**: \`${worktreePath}\`
-
-**CRITICAL - DO NOT FORGET**: You are working inside a git worktree. ALL operations MUST be performed exclusively within this worktree directory.
-- Every file read, write, edit, and git operation MUST target paths under: \`${worktreePath}\`
-- When delegating tasks to subagents, you MUST include the worktree path in your delegation prompt so they also operate exclusively within the worktree
-- NEVER operate on the main repository directory - always use the worktree path above`
 }
 
 function resolveWorktreeContext(

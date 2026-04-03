@@ -1,5 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { beforeEach, describe, expect, it, mock } from "bun:test"
+import { afterAll, beforeEach, describe, expect, it, mock } from "bun:test"
 
 type PluginEntry = {
   entry: string
@@ -50,6 +50,10 @@ mock.module("./update-toasts", () => ({
   showAutoUpdatedToast: mockShowAutoUpdatedToast,
 }))
 mock.module("../../../shared/logger", () => ({ log: () => {} }))
+
+afterAll(() => {
+  mock.restore()
+})
 
 const modulePath = "./background-update-check?test"
 const { runBackgroundUpdateCheck } = await import(modulePath)

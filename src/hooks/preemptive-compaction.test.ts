@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 
-import { describe, it, expect, mock, beforeEach, afterEach } from "bun:test"
+import { afterAll, describe, it, expect, mock, beforeEach, afterEach } from "bun:test"
 
 const ANTHROPIC_CONTEXT_ENV_KEY = "ANTHROPIC_1M_CONTEXT"
 const VERTEX_CONTEXT_ENV_KEY = "VERTEX_ANTHROPIC_1M_CONTEXT"
@@ -27,6 +27,10 @@ const logMock = mock(() => {})
 mock.module("../shared/logger", () => ({
   log: logMock,
 }))
+
+afterAll(() => {
+  mock.restore()
+})
 
 const { createPreemptiveCompactionHook } = await import("./preemptive-compaction")
 

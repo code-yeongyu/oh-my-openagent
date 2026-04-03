@@ -1,4 +1,4 @@
-const { beforeEach, describe, expect, mock, test } = require("bun:test")
+const { beforeEach, describe, expect, mock, test, afterAll } = require("bun:test")
 
 const executeStopHooks = mock(async (context: { parentSessionId?: string }) => ({
   block: false,
@@ -18,6 +18,8 @@ mock.module("../config-loader", () => ({
 mock.module("../stop", () => ({
   executeStopHooks,
 }))
+
+afterAll(() => { mock.restore() })
 
 const { createSessionEventHandler } = await import("./session-event-handler")
 

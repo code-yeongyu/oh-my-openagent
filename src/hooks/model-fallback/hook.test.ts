@@ -1,5 +1,5 @@
 declare const require: (name: string) => any
-const { beforeEach, describe, expect, mock, test } = require("bun:test")
+const { beforeEach, describe, expect, mock, test, afterAll } = require("bun:test")
 
 const readConnectedProvidersCacheMock = mock(() => null)
 const readProviderModelsCacheMock = mock(() => null)
@@ -52,6 +52,10 @@ mock.module("../../shared/provider-model-id-transform", () => ({
 mock.module("../../shared/model-error-classifier", () => ({
   selectFallbackProvider: selectFallbackProviderMock,
 }))
+
+afterAll(() => {
+  mock.restore()
+})
 
 import {
   clearPendingModelFallback,

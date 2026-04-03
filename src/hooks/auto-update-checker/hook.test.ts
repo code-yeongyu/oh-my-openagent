@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
+import { afterAll, afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 
 const mockShowConfigErrorsIfAny = mock(async () => {})
 const mockShowModelCacheWarningIfNeeded = mock(async () => {})
@@ -44,6 +44,10 @@ mock.module("./checker", () => ({
 mock.module("../../shared/logger", () => ({
   log: () => {},
 }))
+
+afterAll(() => {
+  mock.restore()
+})
 
 type HookFactory = typeof import("./hook").createAutoUpdateCheckerHook
 

@@ -1,4 +1,4 @@
-import { describe, expect, test, beforeEach, afterEach, mock } from "bun:test"
+import { describe, expect, test, beforeEach, afterEach, mock, afterAll } from "bun:test"
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
@@ -32,6 +32,8 @@ mock.module("../../shared/opencode-message-dir", () => ({
 mock.module("../../shared/opencode-storage-detection", () => ({
   isSqliteBackend: () => false,
 }))
+
+afterAll(() => { mock.restore() })
 
 const { createAtlasHook } = await import("./index")
 const { createToolExecuteAfterHandler } = await import("./tool-execute-after")

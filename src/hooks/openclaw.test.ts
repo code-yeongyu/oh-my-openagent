@@ -1,10 +1,14 @@
-import { beforeEach, describe, expect, mock, test } from "bun:test"
+import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test"
 
 const wakeOpenClawMock = mock(async () => null)
 
 mock.module("../openclaw", () => ({
   wakeOpenClaw: wakeOpenClawMock,
 }))
+
+afterAll(() => {
+  mock.restore()
+})
 
 describe("createOpenClawHook", () => {
   beforeEach(() => {

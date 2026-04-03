@@ -1,10 +1,12 @@
 declare const require: (name: string) => any
-const { afterEach, describe, expect, mock, test } = require("bun:test")
+const { afterEach, afterAll, describe, expect, mock, test } = require("bun:test")
 
 mock.module("../shared/connected-providers-cache", () => ({
   readConnectedProvidersCache: () => null,
   readProviderModelsCache: () => null,
 }))
+
+afterAll(() => { mock.restore() })
 
 import { createEventHandler } from "./event"
 import { createChatMessageHandler } from "./chat-message"

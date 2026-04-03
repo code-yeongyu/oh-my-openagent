@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
+import { afterAll, afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
@@ -15,6 +15,10 @@ mock.module("./constants", () => ({
 mock.module("../../shared/logger", () => ({
   log: () => {},
 }))
+
+afterAll(() => {
+  mock.restore()
+})
 
 function resetTestCache(): void {
   if (existsSync(TEST_CACHE_DIR)) {

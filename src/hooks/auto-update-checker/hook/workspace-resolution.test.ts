@@ -1,5 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
+import { afterAll, afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
@@ -100,6 +100,10 @@ mock.module("../../../shared/opencode-config-dir", () => ({
     omoConfig: join(TEST_CONFIG_DIR, "oh-my-opencode.json"),
   }),
 }))
+
+afterAll(() => {
+  mock.restore()
+})
 
 const modulePath = "./background-update-check?test"
 const { runBackgroundUpdateCheck } = await import(modulePath)

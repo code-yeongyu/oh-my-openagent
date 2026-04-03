@@ -13,6 +13,7 @@ import {
   writeBoulderState,
 } from "../../features/boulder-state"
 import { log } from "../../shared/logger"
+import { createWorktreeActiveBlock } from "./worktree-block"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { HOOK_NAME } from "./start-work-hook"
 
@@ -158,7 +159,9 @@ Looking for new plans...`
     appendSessionId(directory, sessionId)
   }
 
-  const worktreeDisplay = effectiveWorktree ? worktreeBlock.replace(worktreePath ?? "", effectiveWorktree) : worktreeBlock
+  const worktreeDisplay = effectiveWorktree
+    ? (worktreeBlock || createWorktreeActiveBlock(effectiveWorktree))
+    : worktreeBlock
 
   return `
 ## Active Work Session Found

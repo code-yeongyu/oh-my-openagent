@@ -1,4 +1,4 @@
-import { describe, test, expect, mock, beforeEach, spyOn } from 'bun:test'
+import { describe, test, expect, mock, beforeEach, spyOn, afterAll } from 'bun:test'
 import type { TmuxConfig } from '../../config/schema'
 import type { WindowState, PaneAction } from './types'
 import type { ActionResult, ExecuteContext } from './action-executor'
@@ -76,6 +76,8 @@ mock.module('./pane-state-querier', () => ({
       ? state.agentPanes.reduce((o, p) => (p.left < o.left ? p : o))
       : null,
 }))
+
+afterAll(() => { mock.restore() })
 
 mock.module('./action-executor', () => ({
   executeActions: mockExecuteActions,

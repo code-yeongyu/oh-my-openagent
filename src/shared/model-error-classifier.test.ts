@@ -1,11 +1,13 @@
 declare const require: (name: string) => any
-const { describe, expect, test, beforeEach, mock } = require("bun:test")
+const { describe, expect, test, beforeEach, mock, afterAll } = require("bun:test")
 
 const readConnectedProvidersCacheMock = mock(() => null)
 
 mock.module("./connected-providers-cache", () => ({
   readConnectedProvidersCache: readConnectedProvidersCacheMock,
 }))
+
+afterAll(() => { mock.restore() })
 
 import { shouldRetryError, selectFallbackProvider } from "./model-error-classifier"
 

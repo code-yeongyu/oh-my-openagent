@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 
-import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
+import { afterEach, beforeEach, describe, expect, it, mock, afterAll } from "bun:test"
 import { existsSync, mkdirSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -22,6 +22,8 @@ mock.module("../../shared/git-worktree", () => ({
   collectGitDiffStats: collectGitDiffStatsMock,
   formatFileChanges: mock(() => "No file changes"),
 }))
+
+afterAll(() => { mock.restore() })
 
 const { createToolExecuteAfterHandler } = await import("./tool-execute-after")
 
