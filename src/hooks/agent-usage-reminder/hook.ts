@@ -41,6 +41,8 @@ const ORCHESTRATOR_AGENTS = new Set([
   "prometheus",
 ]);
 
+const MAX_REMINDERS = 3;
+
 function isOrchestratorAgent(agentName: string): boolean {
   return ORCHESTRATOR_AGENTS.has(getAgentConfigKey(agentName));
 }
@@ -99,6 +101,10 @@ export function createAgentUsageReminderHook(_ctx: PluginInput) {
     const state = getOrCreateState(sessionID);
 
     if (state.agentUsed) {
+      return;
+    }
+
+    if (state.reminderCount >= MAX_REMINDERS) {
       return;
     }
 
