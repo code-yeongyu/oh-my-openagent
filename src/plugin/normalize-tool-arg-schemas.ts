@@ -41,7 +41,6 @@ export function normalizeToolArgSchemas<TDefinition extends Pick<ToolDefinition,
   return toolDefinition
 }
 
-// Schema keywords unsupported by Gemini — strip them from MCP tool schemas
 const UNSUPPORTED_SCHEMA_KEYWORDS = new Set(["contentEncoding", "contentMediaType"])
 
 function isRecord(value: unknown): value is Record<string, unknown> {
