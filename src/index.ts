@@ -5,6 +5,7 @@ import type { HookName } from "./config"
 
 import { createHooks } from "./create-hooks"
 import { createManagers } from "./create-managers"
+import { createRuntimeTmuxConfig } from "./create-runtime-tmux-config"
 import { createTools } from "./create-tools"
 import { createPluginInterface } from "./plugin-interface"
 import { createPluginDispose, type PluginDispose } from "./plugin-dispose"
@@ -45,14 +46,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
   const firstMessageVariantGate = createFirstMessageVariantGate()
 
-  const tmuxConfig = {
-    enabled: pluginConfig.tmux?.enabled ?? false,
-    layout: pluginConfig.tmux?.layout ?? "main-vertical",
-    main_pane_size: pluginConfig.tmux?.main_pane_size ?? 60,
-    main_pane_min_width: pluginConfig.tmux?.main_pane_min_width ?? 120,
-    agent_pane_min_width: pluginConfig.tmux?.agent_pane_min_width ?? 40,
-    isolation: pluginConfig.tmux?.isolation ?? "session",
-  }
+  const tmuxConfig = createRuntimeTmuxConfig(pluginConfig)
 
   const modelCacheState = createModelCacheState()
 
