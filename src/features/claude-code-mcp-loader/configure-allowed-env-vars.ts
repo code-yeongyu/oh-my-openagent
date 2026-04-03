@@ -1,4 +1,28 @@
-const BUILTIN_ALLOWED_MCP_ENV_VARS = ["PATH", "HOME", "USER", "SHELL", "TERM"]
+const BUILTIN_ALLOWED_MCP_ENV_VARS = [
+  "PATH",
+  "HOME",
+  "USER",
+  "SHELL",
+  "TERM",
+  "TMPDIR",
+  "TMP",
+  "TEMP",
+  "PWD",
+  "OLDPWD",
+  "LANG",
+  "LC_ALL",
+  "LC_CTYPE",
+  "EDITOR",
+  "VISUAL",
+  "XDG_CONFIG_HOME",
+  "XDG_DATA_HOME",
+  "XDG_CACHE_HOME",
+  "HOSTNAME",
+  "LOGNAME",
+  "USERPROFILE",
+  "APPDATA",
+  "LOCALAPPDATA",
+]
 const SENSITIVE_MCP_ENV_VAR_PATTERN = /KEY|TOKEN|SECRET|PASSWORD|AUTH|CREDENTIAL/i
 
 let additionalAllowedMcpEnvVars = new Set<string>()

@@ -51,7 +51,6 @@ export async function extractTarGz(
     if (isTarTraversalErrorOutput(stderr)) {
       throw new Error(`Unsafe archive entry: path contains path traversal (${archivePath})`)
     }
-
     throw new Error(`tar extraction failed (exit ${exitCode}): ${stderr}`);
   }
 }
