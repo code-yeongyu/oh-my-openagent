@@ -622,6 +622,36 @@ describe("resolveSubagentExecution", () => {
     connectedSpy.mockRestore()
   })
 
+  test("project agent takes precedence over user agent with same name", async () => {
+    //#given
+    mockLoadUserAgents.mockReturnValue({
+      "my-custom-agent": {
+        description: "User agent",
+        mode: "subagent",
+        prompt: "User prompt",
+        model: "minimaxi/claude-3-haiku",
+      },
+    })
+    mockLoadProjectAgents.mockReturnValue({
+      "my-custom-agent": {
+        description: "Project agent",
+        mode: "subagent",
+        prompt: "Project prompt",
+        model: "minimaxi/MiniMax-M2.7-highspeed",
+      },
+    })
+
+    const args = createBaseArgs({ subagent_type: "my-custom-agent" })
+    const executorCtx = createExecutorContext(async () => [])
+
+    //#when
+    const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep")
+
+    //#then
+    expect(result.error).toBeUndefined()
+    expect(result.agentToUse).toBe("my-custom-agent")
+  })
+
   test("filters out primary agents from user/project when resolving", async () => {
     //#given
     mockLoadUserAgents.mockReturnValue({

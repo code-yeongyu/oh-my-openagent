@@ -92,14 +92,14 @@ Create the work plan directly - that's your job as the planning agent.`,
       mergedAgentMap.set(agent.name.toLowerCase(), agent)
     }
 
-    // Then add user agents (server wins on collision)
+    // Then add user agents (server/project agents win on collision)
     for (const agent of userAgentsList) {
       if (!mergedAgentMap.has(agent.name.toLowerCase())) {
         mergedAgentMap.set(agent.name.toLowerCase(), agent)
       }
     }
 
-    // Then add project agents (server wins on collision)
+    // Then add project agents (overrides user agents, server wins on collision)
     for (const agent of projectAgentsList) {
       if (!mergedAgentMap.has(agent.name.toLowerCase())) {
         mergedAgentMap.set(agent.name.toLowerCase(), agent)
