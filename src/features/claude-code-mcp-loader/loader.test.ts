@@ -138,6 +138,41 @@ describe("getSystemMcpServerNames", () => {
     }
   })
 
+  it("removes a server name when a higher-precedence config disables it", async () => {
+    // given
+    writeFileSync(join(TEST_HOME, ".claude.json"), JSON.stringify({
+      mcpServers: {
+        playwright: {
+          command: "npx",
+          args: ["@playwright/mcp@latest"],
+        },
+      },
+    }))
+    writeFileSync(join(TEST_DIR, ".mcp.json"), JSON.stringify({
+      mcpServers: {
+        playwright: {
+          command: "npx",
+          args: ["@playwright/mcp@latest"],
+          disabled: true,
+        },
+      },
+    }))
+
+    const originalCwd = process.cwd()
+    process.chdir(TEST_DIR)
+
+    try {
+      // when
+      const { getSystemMcpServerNames } = await import("./loader")
+      const names = getSystemMcpServerNames()
+
+      // then
+      expect(names.has("playwright")).toBe(false)
+    } finally {
+      process.chdir(originalCwd)
+    }
+  })
+
    it("merges server names from multiple .mcp.json files", async () => {
      // given
      mkdirSync(join(TEST_DIR, ".claude"), { recursive: true })
