@@ -1,5 +1,5 @@
 /**
- * Sisyphus agent — multi-model orchestrator.
+ * Sisyphus agent - multi-model orchestrator.
  *
  * This directory contains model-specific prompt variants:
  * - default.ts: Base implementation for Claude and general models

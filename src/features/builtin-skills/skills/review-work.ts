@@ -4,11 +4,11 @@ export const reviewWorkSkill: BuiltinSkill = {
 	name: "review-work",
 	description:
 		"Post-implementation review orchestrator. Launches 5 parallel background sub-agents: Oracle (goal/constraint verification), Oracle (code quality), Oracle (security), unspecified-high (hands-on QA execution), unspecified-high (context mining from GitHub/git/Slack/Notion). All must pass for review to pass. MUST USE after completing any significant implementation work. Triggers: 'review work', 'review my work', 'review changes', 'QA my work', 'verify implementation', 'check my work', 'validate changes', 'post-implementation review'.",
-	template: `# Review Work — 5-Agent Parallel Review Orchestrator
+	template: `# Review Work - 5-Agent Parallel Review Orchestrator
 
 Launch 5 specialized sub-agents in parallel to review completed implementation work from every angle. All 5 must pass for the review to pass. If even ONE fails, the review fails.
 
-The 5 agents cover complementary concerns — together they form a comprehensive review that no single reviewer could match:
+The 5 agents cover complementary concerns - together they form a comprehensive review that no single reviewer could match:
 
 | # | Agent | Type | Role | Focus Level |
 |---|-------|------|------|-------------|
@@ -22,7 +22,7 @@ The 5 agents cover complementary concerns — together they form a comprehensive
 
 ## Phase 0: Gather Review Context
 
-Before launching agents, collect these inputs. Extract from conversation history first — the user's original request, constraints discussed, and decisions made are usually already in the thread. Only ask if truly missing.
+Before launching agents, collect these inputs. Extract from conversation history first - the user's original request, constraints discussed, and decisions made are usually already in the thread. Only ask if truly missing.
 
 <required_inputs>
 
@@ -31,7 +31,7 @@ Before launching agents, collect these inputs. Extract from conversation history
 - **BACKGROUND**: Why this work was needed. Business context, user stories, related systems, prior decisions that informed the approach.
 - **CHANGED_FILES**: Auto-collect via \`git diff --name-only HEAD~1\` or against the appropriate base (branch point, specific commit).
 - **DIFF**: Auto-collect via \`git diff HEAD~1\` or against the appropriate base.
-- **FILE_CONTENTS**: Read the full content of each changed file (not just the diff). Oracle agents cannot read files — they need full context in the prompt.
+- **FILE_CONTENTS**: Read the full content of each changed file (not just the diff). Oracle agents cannot read files - they need full context in the prompt.
 - **RUN_COMMAND**: How to start/run the application. Check \`package.json\` scripts, \`Makefile\`, \`docker-compose.yml\`, or ask the user.
 
 </required_inputs>
@@ -54,7 +54,7 @@ git diff HEAD~1  # or: git diff main...HEAD
 # Check docker-compose.yml -> services
 \`\`\`
 
-For GOAL, CONSTRAINTS, BACKGROUND — review the full conversation history. The user's original message almost always contains the goal. Constraints often emerge during discussion. If anything critical is ambiguous, ask ONE focused question — not a checklist.
+For GOAL, CONSTRAINTS, BACKGROUND - review the full conversation history. The user's original message almost always contains the goal. Constraints often emerge during discussion. If anything critical is ambiguous, ask ONE focused question - not a checklist.
 
 ---
 
@@ -64,11 +64,11 @@ Launch ALL 5 in a single turn. Every agent uses \`run_in_background=true\`. No s
 
 **Oracle agents receive everything in the prompt** (they cannot read files or run commands). Include DIFF + FILE_CONTENTS + all context directly in the prompt text.
 
-**unspecified-high agents are autonomous** — they can read files, run commands, and use tools. Give them goals and pointers, not raw content dumps.
+**unspecified-high agents are autonomous** - they can read files, run commands, and use tools. Give them goals and pointers, not raw content dumps.
 
 ---
 
-### Agent 1: Goal & Constraint Verification (Oracle) — MAIN
+### Agent 1: Goal & Constraint Verification (Oracle) - MAIN
 
 This agent answers: "Did we build exactly what was asked, within the rules we were given?"
 
@@ -82,30 +82,30 @@ task(
 <review_type>GOAL & CONSTRAINT VERIFICATION</review_type>
 
 <original_goal>
-{GOAL — paste the user's original request and any clarifications}
+{GOAL - paste the user's original request and any clarifications}
 </original_goal>
 
 <constraints>
-{CONSTRAINTS — every rule, requirement, or limitation discussed}
+{CONSTRAINTS - every rule, requirement, or limitation discussed}
 </constraints>
 
 <background>
-{BACKGROUND — why this work was needed, broader context}
+{BACKGROUND - why this work was needed, broader context}
 </background>
 
 <changed_files>
-{CHANGED_FILES — list of modified file paths}
+{CHANGED_FILES - list of modified file paths}
 </changed_files>
 
 <file_contents>
-{FILE_CONTENTS — full content of every changed file, clearly delimited per file}
+{FILE_CONTENTS - full content of every changed file, clearly delimited per file}
 </file_contents>
 
 <diff>
-{DIFF — the actual git diff}
+{DIFF - the actual git diff}
 </diff>
 
-Review whether this implementation correctly and completely achieves the stated goal within the given constraints. Be obsessively thorough — the point of this review is to catch what the implementer missed.
+Review whether this implementation correctly and completely achieves the stated goal within the given constraints. Be obsessively thorough - the point of this review is to catch what the implementer missed.
 
 REVIEW CHECKLIST:
 
@@ -115,7 +115,7 @@ REVIEW CHECKLIST:
 
 3. **Requirement Gaps**: Requirements the user clearly wanted but didn't spell out. Things implied by the goal or background that a thoughtful engineer would have included.
 
-4. **Over-Engineering**: Anything added that wasn't requested — unnecessary abstractions, extra features, premature optimizations, speculative generality. Flag these as scope creep.
+4. **Over-Engineering**: Anything added that wasn't requested - unnecessary abstractions, extra features, premature optimizations, speculative generality. Flag these as scope creep.
 
 5. **Edge Cases**: Given the goal, what inputs or scenarios would break this? Trace through at least 5 edge cases mentally.
 
@@ -132,7 +132,7 @@ OUTPUT FORMAT:
 </goal_breakdown>
 <constraint_compliance>
   For each constraint:
-  - [ACHIEVED/MISSED] Constraint description — evidence
+  - [ACHIEVED/MISSED] Constraint description - evidence
 </constraint_compliance>
 <findings>
   - [PASS/FAIL/WARN] Category: Description
@@ -145,7 +145,7 @@ OUTPUT FORMAT:
 
 ---
 
-### Agent 2: QA via App Execution (unspecified-high) — MAIN
+### Agent 2: QA via App Execution (unspecified-high) - MAIN
 
 This agent answers: "Does it actually work when you run it?"
 
@@ -158,7 +158,7 @@ task(
   load_skills=["playwright", "dev-browser"],
   description="QA by actually running and using the application",
   prompt="""
-<review_type>QA — HANDS-ON APP EXECUTION</review_type>
+<review_type>QA - HANDS-ON APP EXECUTION</review_type>
 
 <original_goal>
 {GOAL}
@@ -173,10 +173,10 @@ task(
 </changed_files>
 
 <run_command>
-{RUN_COMMAND — how to start the application, or "unknown" if not determined}
+{RUN_COMMAND - how to start the application, or "unknown" if not determined}
 </run_command>
 
-You are a QA engineer. Your job is to RUN the application and verify it works through hands-on testing. You do not review code — you test behavior.
+You are a QA engineer. Your job is to RUN the application and verify it works through hands-on testing. You do not review code - you test behavior.
 
 MANDATORY PROCESS (follow in order):
 
@@ -229,7 +229,7 @@ Work through the task list in priority order (P0 first). For each test:
 - **Backend API**: Use curl/httpie to hit endpoints with various payloads, verify response codes and bodies.
 - **Mobile/Desktop**: If not directly runnable, write integration tests and execute them.
 
-If the app cannot be started (build failure), that's an immediate FAIL — no need to continue.
+If the app cannot be started (build failure), that's an immediate FAIL - no need to continue.
 
 ### Step 5: Compile Results
 
@@ -257,7 +257,7 @@ OUTPUT FORMAT:
 
 ---
 
-### Agent 3: Code Quality Review (Oracle) — MAIN
+### Agent 3: Code Quality Review (Oracle) - MAIN
 
 This agent answers: "Is the code well-written, maintainable, and consistent with the codebase?"
 
@@ -275,7 +275,7 @@ task(
 </changed_files>
 
 <file_contents>
-{FILE_CONTENTS — full content of changed files AND neighboring files that show existing patterns}
+{FILE_CONTENTS - full content of changed files AND neighboring files that show existing patterns}
 </file_contents>
 
 <diff>
@@ -332,11 +332,11 @@ OUTPUT FORMAT:
 
 ---
 
-### Agent 4: Security Review (Oracle) — SUB
+### Agent 4: Security Review (Oracle) - SUB
 
 This agent answers: "Are there security vulnerabilities in these changes?"
 
-This is supplementary — it focuses exclusively on security. It does NOT comment on code style, architecture, or functionality unless those directly create a security risk.
+This is supplementary - it focuses exclusively on security. It does NOT comment on code style, architecture, or functionality unless those directly create a security risk.
 
 \`\`\`
 task(
@@ -352,14 +352,14 @@ task(
 </changed_files>
 
 <file_contents>
-{FILE_CONTENTS — full content of changed files}
+{FILE_CONTENTS - full content of changed files}
 </file_contents>
 
 <diff>
 {DIFF}
 </diff>
 
-You are a security engineer. Review this diff exclusively for security vulnerabilities and anti-patterns. Ignore code style, naming, architecture — unless it directly creates a security risk.
+You are a security engineer. Review this diff exclusively for security vulnerabilities and anti-patterns. Ignore code style, naming, architecture - unless it directly creates a security risk.
 
 SECURITY CHECKLIST:
 
@@ -390,7 +390,7 @@ OUTPUT FORMAT:
 
 ---
 
-### Agent 5: Context Mining (unspecified-high) — MAIN
+### Agent 5: Context Mining (unspecified-high) - MAIN
 
 This agent answers: "Did we miss any context that should have informed this implementation?"
 
@@ -401,7 +401,7 @@ task(
   load_skills=["git-master"],
   description="Mine all accessible contexts for missed requirements or background knowledge",
   prompt="""
-<review_type>CONTEXT MINING — MISSED REQUIREMENTS & BACKGROUND</review_type>
+<review_type>CONTEXT MINING - MISSED REQUIREMENTS & BACKGROUND</review_type>
 
 <original_goal>
 {GOAL}
@@ -424,14 +424,14 @@ You are an investigator. Your mission: search every accessible information sourc
 SOURCES TO SEARCH (use every available tool):
 
 1. **Git History** (ALWAYS search):
-   - \`git log --oneline -20 -- {each changed file}\` — recent changes and their reasons
-   - \`git blame {critical sections}\` — who wrote what and when
-   - \`git log --all --grep="{keywords from goal}"\` — related commits
+   - \`git log --oneline -20 -- {each changed file}\` - recent changes and their reasons
+   - \`git blame {critical sections}\` - who wrote what and when
+   - \`git log --all --grep="{keywords from goal}"\` - related commits
    - Look for reverted commits, TODO/FIXME/HACK comments in history
 
 2. **GitHub** (if \`gh\` CLI available):
-   - \`gh issue list --search "{keywords}"\` — related open/closed issues
-   - \`gh pr list --search "{keywords}" --state all\` — related PRs and their review comments
+   - \`gh issue list --search "{keywords}"\` - related open/closed issues
+   - \`gh pr list --search "{keywords}" --state all\` - related PRs and their review comments
    - Check if any issue is specifically linked to this work
    - Look at review comments on past PRs touching these files
 
@@ -450,7 +450,7 @@ SOURCES TO SEARCH (use every available tool):
 WHAT TO LOOK FOR:
 
 - Requirements mentioned in issues/PRs that the implementation misses
-- Past decisions explaining WHY code was written a certain way — and whether new changes respect those reasons
+- Past decisions explaining WHY code was written a certain way - and whether new changes respect those reasons
 - Related systems or features affected by these changes
 - Warnings from previous developers (PR review comments, inline TODOs, commit messages)
 - Migration or deprecation notes that affect the changed code
@@ -461,7 +461,7 @@ OUTPUT FORMAT:
 <confidence>HIGH / MEDIUM / LOW</confidence>
 <summary>1-3 sentence overall assessment</summary>
 <sources_searched>
-  - [SEARCHED/SKIPPED] Source name — what was searched (or why it wasn't accessible)
+  - [SEARCHED/SKIPPED] Source name - what was searched (or why it wasn't accessible)
 </sources_searched>
 <discovered_context>
   For each discovery:
@@ -485,11 +485,11 @@ As each completes, collect via \`background_output(task_id="...")\`. Store each 
 
 | Agent | Verdict | Notes |
 |-------|---------|-------|
-| 1. Goal Verification | pending | — |
-| 2. QA Execution | pending | — |
-| 3. Code Quality | pending | — |
-| 4. Security | pending | — |
-| 5. Context Mining | pending | — |
+| 1. Goal Verification | pending | - |
+| 2. QA Execution | pending | - |
+| 3. Code Quality | pending | - |
+| 4. Security | pending | - |
+| 5. Context Mining | pending | - |
 
 Do NOT deliver the final report until ALL 5 have completed.
 
@@ -500,14 +500,14 @@ Do NOT deliver the final report until ALL 5 have completed.
 <verdict_logic>
 
 ALL 5 agents returned PASS → **REVIEW PASSED**
-ANY agent returned FAIL → **REVIEW FAILED — criteria not met**
+ANY agent returned FAIL → **REVIEW FAILED - criteria not met**
 
 </verdict_logic>
 
 Compile the final report in this format:
 
 \`\`\`markdown
-# Review Work — Final Report
+# Review Work - Final Report
 
 ## Overall Verdict: PASSED / FAILED
 
@@ -520,7 +520,7 @@ Compile the final report in this format:
 | 5 | Context Mining | unspecified-high | PASS/FAIL | HIGH/MED/LOW |
 
 ## Blocking Issues
-[Aggregated from all agents — deduplicated, prioritized]
+[Aggregated from all agents - deduplicated, prioritized]
 
 ## Key Findings
 [Top 5-10 most important findings across all agents, grouped by theme]
@@ -530,7 +530,7 @@ Compile the final report in this format:
 [If PASSED: non-blocking suggestions worth considering]
 \`\`\`
 
-If FAILED — be specific. The user should know exactly what to fix and in what order. No vague "consider improving X" — state the problem, the file, and the fix.
+If FAILED - be specific. The user should know exactly what to fix and in what order. No vague "consider improving X" - state the problem, the file, and the fix.
 
-If PASSED — keep it short. Highlight any non-blocking suggestions, but don't turn a passing review into a lecture.`,
+If PASSED - keep it short. Highlight any non-blocking suggestions, but don't turn a passing review into a lecture.`,
 }

@@ -116,7 +116,7 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
 
   printBox(
     `${color.bold("Pro Tip:")} Include ${color.cyan("ultrawork")} (or ${color.cyan("ulw")}) in your prompt.\n` +
-      `All features work like magic—parallel agents, background tasks,\n` +
+      `All features work like magic-parallel agents, background tasks,\n` +
       `deep exploration, and relentless execution until completion.`,
     "The Magic Word",
   )

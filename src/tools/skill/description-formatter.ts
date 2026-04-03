@@ -55,7 +55,7 @@ export function formatCombinedDescription(skills: SkillInfo[], commands: Command
   return `${TOOL_DESCRIPTION_PREFIX}
 <available_items>
 Priority: project > user > opencode > builtin/plugin | Skills listed before commands
-Invoke via: skill(name="item-name") — omit leading slash for commands.
+Invoke via: skill(name="item-name") - omit leading slash for commands.
 ${availableItems.join("\n")}
 </available_items>`
 }

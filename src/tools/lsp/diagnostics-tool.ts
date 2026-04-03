@@ -11,7 +11,7 @@ import type { Diagnostic } from "./types"
 
 export const lsp_diagnostics: ToolDefinition = tool({
   description:
-    'Get errors, warnings, hints from language server BEFORE running build. Works for both single files and directories — file extension is auto-detected for directories.',
+    'Get errors, warnings, hints from language server BEFORE running build. Works for both single files and directories - file extension is auto-detected for directories.',
   args: {
     filePath: tool.schema
       .string()
