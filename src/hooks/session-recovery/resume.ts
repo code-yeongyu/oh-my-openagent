@@ -20,6 +20,7 @@ export function extractResumeConfig(userMessage: MessageData | undefined, sessio
     sessionID,
     agent: userMessage?.info?.agent,
     model: userMessage?.info?.model,
+    variant: (userMessage?.info as Record<string, unknown>)?.variant as string | undefined,
     tools: userMessage?.info?.tools,
   }
 }
@@ -33,6 +34,7 @@ export async function resumeSession(client: Client, config: ResumeConfig): Promi
         parts: [createInternalAgentTextPart(RECOVERY_RESUME_TEXT)],
         agent: config.agent,
         model: config.model,
+        ...(config.variant ? { variant: config.variant } : {}),
         ...(inheritedTools ? { tools: inheritedTools } : {}),
       },
     })

@@ -2,11 +2,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 
 import type { BackgroundManager } from "../../features/background-agent"
 import { getSessionAgent } from "../../features/claude-code-session-state"
-import {
-  createInternalAgentTextPart,
-  normalizeSDKResponse,
-  resolveInheritedPromptTools,
-} from "../../shared"
+import { createInternalAgentTextPart, normalizeSDKResponse, resolveInheritedPromptTools } from "../../shared"
 import {
   findNearestMessageWithFields,
   findNearestMessageWithFieldsFromSDK,
@@ -14,16 +10,9 @@ import {
 } from "../../features/hook-message-injector"
 import { log } from "../../shared/logger"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
-import {
-  getAgentConfigKey,
-  normalizeAgentForPromptKey,
-} from "../../shared/agent-display-names"
+import { getAgentConfigKey, normalizeAgentForPromptKey } from "../../shared/agent-display-names"
 
-import {
-  CONTINUATION_PROMPT,
-  DEFAULT_SKIP_AGENTS,
-  HOOK_NAME,
-} from "./constants"
+import { CONTINUATION_PROMPT, DEFAULT_SKIP_AGENTS, HOOK_NAME } from "./constants"
 import { isCompactionGuardActive } from "./compaction-guard"
 import { getMessageDir } from "./message-directory"
 import { getIncompleteCount } from "./todo"
@@ -117,9 +106,7 @@ export async function injectContinuation(args: {
         ? {
             providerID: previousMessage.model.providerID,
             modelID: previousMessage.model.modelID,
-            ...(previousMessage.model.variant
-              ? { variant: previousMessage.model.variant }
-              : {}),
+            ...(previousMessage.model.variant ? { variant: previousMessage.model.variant } : {}),
           }
         : undefined)
     tools = tools ?? previousMessage?.tools
@@ -127,7 +114,7 @@ export async function injectContinuation(args: {
 
   const promptAgent = normalizeAgentForPromptKey(agentName)
 
-  if (promptAgent && skipAgents.some(s => getAgentConfigKey(s) === getAgentConfigKey(promptAgent))) {
+  if (promptAgent && skipAgents.some((s) => getAgentConfigKey(s) === getAgentConfigKey(promptAgent))) {
     log(`[${HOOK_NAME}] Skipped: agent in skipAgents list`, { sessionID, agent: agentName })
     return
   }
@@ -174,11 +161,14 @@ ${todoList}`
 
     const inheritedTools = resolveInheritedPromptTools(sessionID, tools)
 
+    const variant =
+      model && "variant" in model ? ((model as Record<string, unknown>).variant as string | undefined) : undefined
     await ctx.client.session.promptAsync({
       path: { id: sessionID },
       body: {
         agent: promptAgent,
         ...(model !== undefined ? { model } : {}),
+        ...(variant ? { variant } : {}),
         ...(inheritedTools ? { tools: inheritedTools } : {}),
         parts: [createInternalAgentTextPart(prompt)],
       },

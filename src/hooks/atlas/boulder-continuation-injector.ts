@@ -50,33 +50,34 @@ export async function injectBoulderContinuation(input: {
   const preferredSessionContext = preferredTaskSessionId
     ? `\n\n[Preferred reuse session for current top-level plan task${preferredTaskTitle ? `: ${preferredTaskTitle}` : ""}: ${preferredTaskSessionId}]`
     : ""
-	const prompt =
-		BOULDER_CONTINUATION_PROMPT.replace(/{PLAN_NAME}/g, planName) +
-		`\n\n[Status: ${total - remaining}/${total} completed, ${remaining} remaining]` +
-		preferredSessionContext +
-		worktreeContext
-	const continuationAgent = agent ?? (isAgentRegistered("atlas") ? "atlas" : undefined)
+  const prompt =
+    BOULDER_CONTINUATION_PROMPT.replace(/{PLAN_NAME}/g, planName) +
+    `\n\n[Status: ${total - remaining}/${total} completed, ${remaining} remaining]` +
+    preferredSessionContext +
+    worktreeContext
+  const continuationAgent = agent ?? (isAgentRegistered("atlas") ? "atlas" : undefined)
 
-	if (!continuationAgent || !isAgentRegistered(continuationAgent)) {
-		log(`[${HOOK_NAME}] Skipped injection: continuation agent unavailable`, {
-			sessionID,
-			agent: continuationAgent ?? agent ?? "unknown",
-		})
-		return "skipped_agent_unavailable"
-	}
+  if (!continuationAgent || !isAgentRegistered(continuationAgent)) {
+    log(`[${HOOK_NAME}] Skipped injection: continuation agent unavailable`, {
+      sessionID,
+      agent: continuationAgent ?? agent ?? "unknown",
+    })
+    return "skipped_agent_unavailable"
+  }
 
-	try {
-		log(`[${HOOK_NAME}] Injecting boulder continuation`, { sessionID, planName, remaining })
+  try {
+    log(`[${HOOK_NAME}] Injecting boulder continuation`, { sessionID, planName, remaining })
 
     const promptContext = await resolveRecentPromptContextForSession(ctx, sessionID)
     const inheritedTools = resolveInheritedPromptTools(sessionID, promptContext.tools)
 
-		await ctx.client.session.promptAsync({
-			path: { id: sessionID },
-			body: {
-				agent: continuationAgent,
-				...(promptContext.model !== undefined ? { model: promptContext.model } : {}),
-				...(inheritedTools ? { tools: inheritedTools } : {}),
+    await ctx.client.session.promptAsync({
+      path: { id: sessionID },
+      body: {
+        agent: continuationAgent,
+        ...(promptContext.model !== undefined ? { model: promptContext.model } : {}),
+        ...(promptContext.variant ? { variant: promptContext.variant } : {}),
+        ...(inheritedTools ? { tools: inheritedTools } : {}),
         parts: [createInternalAgentTextPart(prompt)],
       },
       query: { directory: ctx.directory },

@@ -54,13 +54,18 @@ type BabysitterOptions = {
   config?: BabysittingConfig
 }
 
-
 async function resolveMainSessionTarget(
   ctx: BabysitterContext,
-  sessionID: string
-): Promise<{ agent?: string; model?: { providerID: string; modelID: string }; tools?: Record<string, boolean> }> {
+  sessionID: string,
+): Promise<{
+  agent?: string
+  model?: { providerID: string; modelID: string }
+  variant?: string
+  tools?: Record<string, boolean>
+}> {
   let agent = getSessionAgent(sessionID)
   let model: { providerID: string; modelID: string } | undefined
+  let variant: string | undefined
   let tools: Record<string, boolean> | undefined
 
   try {
@@ -72,7 +77,10 @@ async function resolveMainSessionTarget(
       const info = getMessageInfo(messages[i])
       if (info?.agent || info?.model || (info?.providerID && info?.modelID)) {
         agent = agent ?? info?.agent
-        model = info?.model ?? (info?.providerID && info?.modelID ? { providerID: info.providerID, modelID: info.modelID } : undefined)
+        model =
+          info?.model ??
+          (info?.providerID && info?.modelID ? { providerID: info.providerID, modelID: info.modelID } : undefined)
+        variant = (info as Record<string, unknown>)?.variant as string | undefined
         tools = resolveInheritedPromptTools(sessionID, info?.tools) ?? tools
         break
       }
@@ -81,7 +89,7 @@ async function resolveMainSessionTarget(
     log(`[${HOOK_NAME}] Failed to resolve main session agent`, { sessionID, error: String(error) })
   }
 
-  return { agent, model, tools: resolveInheritedPromptTools(sessionID, tools) }
+  return { agent, model, variant, tools: resolveInheritedPromptTools(sessionID, tools) }
 }
 
 async function getThinkingSummary(ctx: BabysitterContext, sessionID: string): Promise<string | null> {
@@ -203,7 +211,7 @@ export function createUnstableAgentBabysitterHook(ctx: BabysitterContext, option
 
       const summary = task.sessionID ? await getThinkingSummary(ctx, task.sessionID) : null
       const reminder = buildReminder(task, summary, idleMs)
-      const { agent, model, tools } = await resolveMainSessionTarget(ctx, mainSessionID)
+      const { agent, model, variant, tools } = await resolveMainSessionTarget(ctx, mainSessionID)
 
       try {
         await ctx.client.session.promptAsync({
@@ -211,6 +219,7 @@ export function createUnstableAgentBabysitterHook(ctx: BabysitterContext, option
           body: {
             ...(agent ? { agent } : {}),
             ...(model ? { model } : {}),
+            ...(variant ? { variant } : {}),
             ...(tools ? { tools } : {}),
             parts: [createInternalAgentTextPart(reminder)],
           },
