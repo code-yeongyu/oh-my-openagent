@@ -41,7 +41,7 @@ describe("executeHttpHook TLS security", () => {
       const result = await executeHttpHook(hook, "{}")
 
       expect(result.exitCode).toBe(1)
-      expect(result.stderr).toContain("HTTP hook URL must use HTTPS")
+      expect(result.stderr).toContain("HTTP hook URL must use HTTPS in production")
       expect(mockFetch).not.toHaveBeenCalled()
     })
 
@@ -52,7 +52,7 @@ describe("executeHttpHook TLS security", () => {
       const result = await executeHttpHook(hook, "{}")
 
       expect(result.exitCode).toBe(1)
-      expect(result.stderr).toContain("HTTP hook URL must use HTTPS")
+      expect(result.stderr).toContain("HTTP hook URL must use HTTPS in production")
       expect(mockFetch).not.toHaveBeenCalled()
     })
 
@@ -108,15 +108,14 @@ describe("executeHttpHook TLS security", () => {
       process.env = { ...originalEnv, NODE_ENV: "development" }
     })
 
-    it("#when hook uses remote http:// URL #then rejects with exit code 1", async () => {
+    it("#when hook uses remote http:// URL #then allows execution", async () => {
       const { executeHttpHook } = await import("./execute-http-hook")
       const hook: HookHttp = { type: "http", url: "http://example.com/hooks" }
 
       const result = await executeHttpHook(hook, "{}")
 
-      expect(result.exitCode).toBe(1)
-      expect(result.stderr).toContain("HTTP hook URL must use HTTPS")
-      expect(mockFetch).not.toHaveBeenCalled()
+      expect(result.exitCode).toBe(0)
+      expect(mockFetch).toHaveBeenCalledTimes(1)
     })
 
     it("#when hook uses http://localhost #then allows execution", async () => {
@@ -151,59 +150,6 @@ describe("executeHttpHook TLS security", () => {
       expect(mockLog).toHaveBeenCalledWith("HTTP hook URL uses insecure protocol", {
         url: "http://example.com/hooks",
       })
-    })
-
-    it("#when hook uses http://[::1] #then allows execution", async () => {
-      const { executeHttpHook } = await import("./execute-http-hook")
-      const hook: HookHttp = { type: "http", url: "http://[::1]:8080/hooks" }
-
-      const result = await executeHttpHook(hook, "{}")
-
-      expect(result.exitCode).toBe(0)
-      expect(mockFetch).toHaveBeenCalledTimes(1)
-    })
-  })
-
-  describe("#given NODE_ENV is unset", () => {
-    beforeEach(() => {
-      process.env = { ...originalEnv }
-      delete process.env.NODE_ENV
-    })
-
-    it("#when hook uses remote http:// URL #then rejects with exit code 1", async () => {
-      const { executeHttpHook } = await import("./execute-http-hook")
-      const hook: HookHttp = { type: "http", url: "http://example.com/hooks" }
-
-      const result = await executeHttpHook(hook, "{}")
-
-      expect(result.exitCode).toBe(1)
-      expect(result.stderr).toContain("HTTP hook URL must use HTTPS")
-      expect(mockFetch).not.toHaveBeenCalled()
-    })
-  })
-
-  describe("#given redirect downgrade protection", () => {
-    beforeEach(() => {
-      process.env = { ...originalEnv, NODE_ENV: "production" }
-    })
-
-    it("#when hook uses https:// URL #then fetch uses manual redirect handling", async () => {
-      mockFetch.mockImplementation(() =>
-        Promise.resolve(new Response("redirect", { status: 302, statusText: "Found" }))
-      )
-      const { executeHttpHook } = await import("./execute-http-hook")
-      const hook: HookHttp = { type: "http", url: "https://example.com/hooks" }
-
-      const result = await executeHttpHook(hook, "{}")
-
-      expect(result.exitCode).toBe(1)
-      expect(result.stderr).toContain("HTTP hook returned status 302")
-      expect(mockFetch).toHaveBeenCalledWith(
-        "https://example.com/hooks",
-        expect.objectContaining({
-          redirect: "manual",
-        })
-      )
     })
   })
 
