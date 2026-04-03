@@ -106,7 +106,7 @@ describe("context-window-monitor", () => {
   // #given token usage exceeds 70% threshold
   // #when tool.execute.after is called
   // #then context reminder should be appended to output
-  it("should append context reminder when usage exceeds threshold", async () => {
+  it("should append context reminder with doubled displayed counts when usage exceeds threshold", async () => {
     const hook = createContextWindowMonitorHook(ctx as never)
     const sessionID = "ses_high_usage"
 
