@@ -2,7 +2,12 @@ import { spawn, spawnSync } from "bun"
 import { release } from "os"
 
 import { validateArchiveEntries } from "./archive-entry-validator"
-import { listZipEntriesWithPowerShell, listZipEntriesWithTar } from "./zip-entry-listing"
+import {
+  isPythonZipListingAvailable,
+  listZipEntriesWithPowerShell,
+  listZipEntriesWithPython,
+  listZipEntriesWithTar,
+} from "./zip-entry-listing"
 
 const WINDOWS_BUILD_WITH_TAR = 17134
 
@@ -96,6 +101,10 @@ async function listZipEntries(archivePath: string) {
     }
 
     return listZipEntriesWithPowerShell(archivePath, escapePowerShellPath, extractor)
+  }
+
+  if (isPythonZipListingAvailable()) {
+    return listZipEntriesWithPython(archivePath)
   }
 
   return listZipEntriesWithTar(archivePath)

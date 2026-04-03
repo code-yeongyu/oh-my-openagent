@@ -1,16 +1,5 @@
-import { existsSync, realpathSync } from "fs"
-import { resolve } from "path"
+import { containsPath } from "../../shared/contains-path"
 import type { ClaudeCodeMcpServer } from "./types"
-
-function normalizePath(path: string): string {
-  const resolvedPath = resolve(path)
-
-  if (!existsSync(resolvedPath)) {
-    return resolvedPath
-  }
-
-  return realpathSync(resolvedPath)
-}
 
 export function shouldLoadMcpServer(
   server: Pick<ClaudeCodeMcpServer, "scope" | "projectPath">,
@@ -24,5 +13,5 @@ export function shouldLoadMcpServer(
     return false
   }
 
-  return normalizePath(server.projectPath) === normalizePath(cwd)
+  return containsPath(server.projectPath, cwd)
 }

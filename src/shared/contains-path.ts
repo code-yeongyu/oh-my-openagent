@@ -1,6 +1,22 @@
 import { existsSync, realpathSync } from "fs"
 import { basename, dirname, isAbsolute, join, normalize, relative, resolve } from "path"
 
+function findNearestExistingAncestor(resolvedPath: string): string {
+  let candidatePath = resolvedPath
+
+  while (!existsSync(candidatePath)) {
+    const parentPath = dirname(candidatePath)
+
+    if (parentPath === candidatePath) {
+      return candidatePath
+    }
+
+    candidatePath = parentPath
+  }
+
+  return candidatePath
+}
+
 function toCanonicalPath(pathToNormalize: string): string {
   const resolvedPath = resolve(pathToNormalize)
 
@@ -12,12 +28,13 @@ function toCanonicalPath(pathToNormalize: string): string {
     }
   }
 
-  const parentDirectory = dirname(resolvedPath)
-  const canonicalParentDirectory = existsSync(parentDirectory)
-    ? realpathSync.native(parentDirectory)
-    : parentDirectory
+  const nearestExistingAncestor = findNearestExistingAncestor(resolvedPath)
+  const canonicalAncestor = existsSync(nearestExistingAncestor)
+    ? realpathSync.native(nearestExistingAncestor)
+    : nearestExistingAncestor
+  const relativePathFromAncestor = relative(nearestExistingAncestor, resolvedPath)
 
-  return normalize(join(canonicalParentDirectory, basename(resolvedPath)))
+  return normalize(join(canonicalAncestor, relativePathFromAncestor || basename(resolvedPath)))
 }
 
 export function containsPath(rootPath: string, candidatePath: string): boolean {
