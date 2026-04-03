@@ -134,7 +134,6 @@ export async function wakeCommandGateway(
   try {
     const timeout = resolveCommandTimeoutMs(gatewayConfig.timeout)
 
-    // Interpolate variables with shell escaping
     const interpolated = gatewayConfig.command.replace(/\{\{(\w+)\}\}/g, (_match, key) => {
       const value = variables[key]
       if (value === undefined) return _match
