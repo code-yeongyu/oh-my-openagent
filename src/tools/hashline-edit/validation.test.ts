@@ -23,10 +23,10 @@ describe("parseLineRef", () => {
   })
 
   it("gives specific hint when literal text is used instead of line number", () => {
-    //#given — model sends "LINE#HK" instead of "1#HK"
+    //#given, model sends "LINE#HK" instead of "1#HK"
     const ref = "LINE#HK"
 
-    //#when / #then — error should mention that LINE is not a valid number
+    //#when / #then, error should mention that LINE is not a valid number
     expect(() => parseLineRef(ref)).toThrow(/not a line number/i)
   })
 
@@ -39,10 +39,10 @@ describe("parseLineRef", () => {
   })
 
   it("extracts valid line number from mixed prefix like LINE42 without throwing", () => {
-    //#given — normalizeLineRef extracts 42#VK from LINE42#VK
+    //#given, normalizeLineRef extracts 42#VK from LINE42#VK
     const ref = "LINE42#VK"
 
-    //#when / #then — should parse successfully as line 42
+    //#when / #then, should parse successfully as line 42
     const result = parseLineRef(ref)
     expect(result.line).toBe(42)
     expect(result.hash).toBe("VK")
@@ -144,11 +144,11 @@ describe("validateLineRef", () => {
   })
 
   it("suggests correct line number when hash matches a file line", () => {
-    //#given — model sends LINE#XX where XX is the actual hash for line 1
+    //#given, model sends LINE#XX where XX is the actual hash for line 1
     const lines = ["function hello() {", "  return 42", "}"]
     const hash = computeLineHash(1, lines[0])
 
-    //#when / #then — error should suggest the correct reference
+    //#when / #then, error should suggest the correct reference
     expect(() => validateLineRefs(lines, [`LINE#${hash}`])).toThrow(new RegExp(`1#${hash}`))
   })
 })
