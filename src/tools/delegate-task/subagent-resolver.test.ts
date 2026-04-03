@@ -5,14 +5,7 @@ import type { DelegateTaskArgs } from "./types"
 import type { ExecutorContext } from "./executor-types"
 import * as logger from "../../shared/logger"
 import * as connectedProvidersCache from "../../shared/connected-providers-cache"
-
-const mockLoadUserAgents = vi.fn().mockReturnValue({})
-const mockLoadProjectAgents = vi.fn().mockReturnValue({})
-
-vi.mock("../../features/claude-code-agent-loader", () => ({
-  loadUserAgents: mockLoadUserAgents,
-  loadProjectAgents: mockLoadProjectAgents,
-}))
+import * as agentLoader from "../../features/claude-code-agent-loader"
 
 function createBaseArgs(overrides?: Partial<DelegateTaskArgs>): DelegateTaskArgs {
   return {
@@ -45,14 +38,20 @@ function createExecutorContext(
 
 describe("resolveSubagentExecution", () => {
   let logSpy: ReturnType<typeof spyOn> | undefined
+  let mockLoadUserAgents: ReturnType<typeof spyOn>
+  let mockLoadProjectAgents: ReturnType<typeof spyOn>
 
   beforeEach(() => {
     mock.restore()
     logSpy = spyOn(logger, "log").mockImplementation(() => {})
+    mockLoadUserAgents = spyOn(agentLoader, "loadUserAgents").mockReturnValue({})
+    mockLoadProjectAgents = spyOn(agentLoader, "loadProjectAgents").mockReturnValue({})
   })
 
   afterEach(() => {
     logSpy?.mockRestore()
+    mockLoadUserAgents?.mockRestore()
+    mockLoadProjectAgents?.mockRestore()
   })
 
   test("returns delegation error when agent discovery fails instead of silently proceeding", async () => {
