@@ -3,10 +3,13 @@ import { release } from "os"
 
 import { validateArchiveEntries } from "./archive-entry-validator"
 import {
-  isPythonZipListingAvailable,
-  listZipEntriesWithPowerShell,
-  listZipEntriesWithPython,
-  listZipEntriesWithTar,
+	isPythonZipListingAvailable,
+	isZipInfoZipListingAvailable,
+	type PowerShellZipExtractor,
+	listZipEntriesWithPowerShell,
+	listZipEntriesWithPython,
+	listZipEntriesWithTar,
+	listZipEntriesWithZipInfo,
 } from "./zip-entry-listing"
 
 const WINDOWS_BUILD_WITH_TAR = 17134
@@ -32,9 +35,7 @@ function escapePowerShellPath(path: string): string {
   return path.replace(/'/g, "''")
 }
 
-type WindowsZipExtractor = "tar" | "pwsh" | "powershell"
-
-function getWindowsZipExtractor(): WindowsZipExtractor {
+function getWindowsZipExtractor(): "tar" | PowerShellZipExtractor {
   const buildNumber = getWindowsBuildNumber()
   
   if (buildNumber !== null && buildNumber >= WINDOWS_BUILD_WITH_TAR) {
@@ -94,8 +95,8 @@ export async function extractZip(archivePath: string, destDir: string): Promise<
 }
 
 async function listZipEntries(archivePath: string) {
-  if (process.platform === "win32") {
-    const extractor = getWindowsZipExtractor()
+	if (process.platform === "win32") {
+		const extractor = getWindowsZipExtractor()
     if (extractor === "tar") {
       return listZipEntriesWithTar(archivePath)
     }
@@ -103,9 +104,15 @@ async function listZipEntries(archivePath: string) {
     return listZipEntriesWithPowerShell(archivePath, escapePowerShellPath, extractor)
   }
 
-  if (isPythonZipListingAvailable()) {
-    return listZipEntriesWithPython(archivePath)
-  }
+	if (isPythonZipListingAvailable()) {
+		return listZipEntriesWithPython(archivePath)
+	}
 
-  return listZipEntriesWithTar(archivePath)
+	if (isZipInfoZipListingAvailable()) {
+		return listZipEntriesWithZipInfo(archivePath)
+	}
+
+	throw new Error(
+		"zip entry listing requires either python3 or zipinfo to inspect the archive safely"
+	)
 }
