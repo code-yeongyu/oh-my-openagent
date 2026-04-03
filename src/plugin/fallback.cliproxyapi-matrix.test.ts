@@ -14,9 +14,54 @@ import { createEventHandler } from "./event"
 import { createChatMessageHandler } from "./chat-message"
 import { createModelFallbackHook } from "../hooks/model-fallback/hook"
 import { createRuntimeFallbackHook } from "../hooks/runtime-fallback"
+import type { RuntimeFallbackPluginInput } from "../hooks/runtime-fallback/types"
 import { _resetForTesting } from "../features/claude-code-session-state"
 import { _resetForTesting as _resetModelFallbackForTesting } from "../hooks/model-fallback/hook"
 import { SessionCategoryRegistry } from "../shared/session-category-registry"
+
+type EventHandlerArgs = Parameters<typeof createEventHandler>[0]
+type ChatMessageHandlerArgs = Parameters<typeof createChatMessageHandler>[0]
+type HarnessContext = EventHandlerArgs["ctx"] & RuntimeFallbackPluginInput
+type HarnessEventInput = Parameters<ReturnType<typeof createHarness>["eventHandler"]>[0]
+
+function asHarnessEventInput(input: unknown): HarnessEventInput {
+  return input as unknown as HarnessEventInput
+}
+
+function asHarnessContext(ctx: unknown): HarnessContext {
+  return ctx as unknown as HarnessContext
+}
+
+function createEventHandlerManagers(
+  overrides: Record<string, unknown> = {},
+): EventHandlerArgs["managers"] {
+  return {
+    ...({} as EventHandlerArgs["managers"]),
+    tmuxSessionManager: {
+      onSessionCreated: async () => {},
+      onSessionDeleted: async () => {},
+    },
+    ...overrides,
+  } as unknown as EventHandlerArgs["managers"]
+}
+
+function createEventHandlerHooks(
+  overrides: Record<string, unknown>,
+): EventHandlerArgs["hooks"] {
+  return {
+    ...({} as EventHandlerArgs["hooks"]),
+    ...overrides,
+  } as unknown as EventHandlerArgs["hooks"]
+}
+
+function createChatMessageHandlerHooks(
+  overrides: Record<string, unknown>,
+): ChatMessageHandlerArgs["hooks"] {
+  return {
+    ...({} as ChatMessageHandlerArgs["hooks"]),
+    ...overrides,
+  } as unknown as ChatMessageHandlerArgs["hooks"]
+}
 
 const PRIMARY_MODEL = {
   providerID: PROVIDER_ID,
@@ -59,7 +104,7 @@ function createPluginConfig(mode: HarnessMode) {
           },
         }
       : {}),
-  }
+  } as unknown as EventHandlerArgs["pluginConfig"]
 }
 
 function createHarness(args: {
@@ -72,7 +117,7 @@ function createHarness(args: {
   const promptAsyncCalls: PromptAsyncCall[] = []
   const pluginConfig = createPluginConfig(args.mode)
 
-  const ctx = {
+  const ctx = asHarnessContext({
     directory: "/tmp",
     client: {
       session: {
@@ -119,7 +164,7 @@ function createHarness(args: {
         showToast: async () => ({}),
       },
     },
-  } as any
+  })
 
   const hooks: Record<string, unknown> = {
     stopContinuationGuard: null,
@@ -145,38 +190,34 @@ function createHarness(args: {
         timeout_seconds: args.sessionTimeoutMs ? 30 : 0,
         notify_on_fallback: false,
       },
-      pluginConfig,
+      pluginConfig: pluginConfig as unknown as EventHandlerArgs["pluginConfig"],
       ...(args.sessionTimeoutMs ? { session_timeout_ms: args.sessionTimeoutMs } : {}),
     })
   }
 
   const eventHandler = createEventHandler({
     ctx,
-    pluginConfig: pluginConfig as any,
+    pluginConfig: pluginConfig as unknown as EventHandlerArgs["pluginConfig"],
     firstMessageVariantGate: {
       markSessionCreated: () => {},
       clear: () => {},
     },
-    managers: {
-      tmuxSessionManager: {
-        onSessionCreated: async () => {},
-        onSessionDeleted: async () => {},
-      },
+    managers: createEventHandlerManagers({
       skillMcpManager: {
         disconnectSession: async () => {},
       },
-    } as any,
-    hooks: hooks as any,
+    }),
+    hooks: createEventHandlerHooks(hooks),
   })
 
   const chatMessageHandler = createChatMessageHandler({
     ctx,
-    pluginConfig: pluginConfig as any,
+    pluginConfig: pluginConfig as unknown as ChatMessageHandlerArgs["pluginConfig"],
     firstMessageVariantGate: {
       shouldOverride: () => false,
       markApplied: () => {},
     },
-    hooks: hooks as any,
+    hooks: createChatMessageHandlerHooks(hooks),
   })
 
   return {
@@ -192,7 +233,7 @@ async function primeMainSession(
   eventHandler: ReturnType<typeof createHarness>["eventHandler"],
   sessionID: string,
 ) {
-  await eventHandler({
+  await eventHandler(asHarnessEventInput({
     event: {
       type: "session.created",
       properties: {
@@ -202,9 +243,9 @@ async function primeMainSession(
         },
       },
     },
-  })
+  }))
 
-  await eventHandler({
+  await eventHandler(asHarnessEventInput({
     event: {
       type: "message.updated",
       properties: {
@@ -221,7 +262,7 @@ async function primeMainSession(
         },
       },
     },
-  })
+  }))
 }
 
 async function sendNextMessage(
@@ -241,7 +282,7 @@ async function triggerSessionError(
   eventHandler: ReturnType<typeof createHarness>["eventHandler"],
   sessionID: string,
 ) {
-  await eventHandler({
+  await eventHandler(asHarnessEventInput({
     event: {
       type: "session.error",
       properties: {
@@ -256,14 +297,14 @@ async function triggerSessionError(
         },
       },
     },
-  })
+  }))
 }
 
 async function triggerSessionStatusRetry(
   eventHandler: ReturnType<typeof createHarness>["eventHandler"],
   sessionID: string,
 ) {
-  await eventHandler({
+  await eventHandler(asHarnessEventInput({
     event: {
       type: "session.status",
       properties: {
@@ -279,14 +320,14 @@ async function triggerSessionStatusRetry(
         },
       },
     },
-  })
+  }))
 }
 
 async function triggerAssistantMessageError(
   eventHandler: ReturnType<typeof createHarness>["eventHandler"],
   sessionID: string,
 ) {
-  await eventHandler({
+  await eventHandler(asHarnessEventInput({
     event: {
       type: "message.updated",
       properties: {
@@ -307,7 +348,7 @@ async function triggerAssistantMessageError(
         },
       },
     },
-  })
+  }))
 }
 
 afterEach(() => {
