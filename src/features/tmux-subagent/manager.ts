@@ -172,6 +172,20 @@ export class TmuxSessionManager {
     }
   }
 
+  private reassignIsolatedContainerAnchor(): boolean {
+    const nextAnchor = this.sessions.values().next().value
+    if (!nextAnchor) {
+      return false
+    }
+
+    this.isolatedWindowPaneId = nextAnchor.paneId
+    log("[tmux-session-manager] reassigned isolated container anchor pane", {
+      sessionId: nextAnchor.sessionId,
+      paneId: nextAnchor.paneId,
+    })
+    return true
+  }
+
   private async cleanupIsolatedContainerAfterSessionDeletion(
     tracked: TrackedSession,
     isolatedPaneAlreadyClosed: boolean,
@@ -182,6 +196,10 @@ export class TmuxSessionManager {
     }
 
     if (this.sessions.size > 0) {
+      if (this.reassignIsolatedContainerAnchor()) {
+        return
+      }
+
       return
     }
 

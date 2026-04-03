@@ -1094,6 +1094,104 @@ describe('TmuxSessionManager', () => {
       expect(Reflect.get(manager, 'isolatedWindowPaneId')).toBeUndefined()
     })
 
+    test('#given session isolation with another subagent still tracked #when the anchor subagent is deleted first #then it reassigns the anchor and cleans up when the last subagent exits', async () => {
+      // given
+      mockIsInsideTmux.mockReturnValue(true)
+      mockQueryWindowState.mockImplementation(async (paneId) => {
+        if (paneId === '%isolated-session-ses_first') {
+          return createWindowState({
+            mainPane: {
+              paneId,
+              width: 110,
+              height: 44,
+              left: 0,
+              top: 0,
+              title: 'isolated',
+              isActive: true,
+            },
+            agentPanes: [
+              {
+                paneId: '%mock',
+                width: 40,
+                height: 44,
+                left: 110,
+                top: 0,
+                title: 'omo-subagent-Second Task',
+                isActive: false,
+              },
+            ],
+          })
+        }
+
+        if (paneId === '%mock') {
+          return createWindowState({
+            mainPane: {
+              paneId: '%isolated-session-ses_first',
+              width: 110,
+              height: 44,
+              left: 0,
+              top: 0,
+              title: 'isolated',
+              isActive: true,
+            },
+            agentPanes: [
+              {
+                paneId,
+                width: 40,
+                height: 44,
+                left: 110,
+                top: 0,
+                title: 'omo-subagent-Second Task',
+                isActive: false,
+              },
+            ],
+          })
+        }
+
+        return createWindowState()
+      })
+
+      const { TmuxSessionManager } = await import('./manager')
+      const ctx = createMockContext()
+      const config: TmuxConfig = {
+        enabled: true,
+        isolation: 'session',
+        layout: 'main-vertical',
+        main_pane_size: 60,
+        main_pane_min_width: 80,
+        agent_pane_min_width: 40,
+      }
+      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+
+      await manager.onSessionCreated(
+        createSessionCreatedEvent('ses_first', 'ses_parent', 'First Task')
+      )
+      await manager.onSessionCreated(
+        createSessionCreatedEvent('ses_second', 'ses_parent', 'Second Task')
+      )
+
+      mockExecuteAction.mockClear()
+
+      // when
+      await manager.onSessionDeleted({ sessionID: 'ses_first' })
+
+      // then
+      expect(mockExecuteAction).toHaveBeenCalledTimes(0)
+      expect(Reflect.get(manager, 'isolatedWindowPaneId')).toBe('%mock')
+
+      // when
+      await manager.onSessionDeleted({ sessionID: 'ses_second' })
+
+      // then
+      expect(mockExecuteAction).toHaveBeenCalledTimes(1)
+      expect(mockExecuteAction.mock.calls[0]?.[0]).toEqual({
+        type: 'close',
+        paneId: '%mock',
+        sessionId: 'ses_second',
+      })
+      expect(Reflect.get(manager, 'isolatedWindowPaneId')).toBeUndefined()
+    })
+
     test('does nothing when untracked session is deleted', async () => {
       // given
       mockIsInsideTmux.mockReturnValue(true)
