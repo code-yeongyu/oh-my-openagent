@@ -136,6 +136,51 @@ describe("createChatMessageHandler - /ulw-loop raw slash fallback", () => {
       },
     ])
   })
+
+  test("starts ultrawork loop when injected messages appear before the raw /ulw-loop command", async () => {
+    // given
+    const startLoopCalls: Array<{
+      sessionID: string
+      prompt: string
+      options: Record<string, unknown>
+    }> = []
+    const args = createMockHandlerArgs()
+    args.hooks.ralphLoop = {
+      startLoop: (sessionID: string, prompt: string, options?: Record<string, unknown>) => {
+        startLoopCalls.push({ sessionID, prompt, options: options ?? {} })
+        return true
+      },
+      cancelLoop: () => true,
+    }
+    const handler = createChatMessageHandler(args)
+    const input = createMockInput("sisyphus")
+    const output: ChatMessageHandlerOutput = {
+      message: {},
+      parts: [
+        {
+          type: "text",
+          text: "[BACKGROUND TASK COMPLETED]\nPlan finished.\n\n---\n\n/ulw-loop \"Ship feature\" --strategy=continue",
+        },
+      ],
+    }
+
+    // when
+    await handler(input, output)
+
+    // then
+    expect(startLoopCalls).toEqual([
+      {
+        sessionID: "test-session",
+        prompt: "Ship feature",
+        options: {
+          ultrawork: true,
+          maxIterations: undefined,
+          completionPromise: undefined,
+          strategy: "continue",
+        },
+      },
+    ])
+  })
 })
 
 function createMockInput(agent?: string, model?: { providerID: string; modelID: string }) {

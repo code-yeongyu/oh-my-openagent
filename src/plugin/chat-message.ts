@@ -90,17 +90,24 @@ function getStoredMainSessionModel(
 
 function parseRawLoopSlashCommand(promptText: string): RawLoopCommand | null {
   const trimmed = promptText.trim()
+  const commandText = trimmed.startsWith("/")
+    ? trimmed
+    : trimmed
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => /^\/(?:ralph-loop|ulw-loop|cancel-ralph)\b/i.test(line))
+        .at(-1)
 
-  if (!trimmed.startsWith("/")) {
+  if (!commandText) {
     return null
   }
 
-  const cancelMatch = trimmed.match(/^\/cancel-ralph(?:\s+.*)?$/i)
+  const cancelMatch = commandText.match(/^\/cancel-ralph(?:\s+.*)?$/i)
   if (cancelMatch) {
     return { command: "cancel-ralph", args: "" }
   }
 
-  const loopMatch = trimmed.match(/^\/(ralph-loop|ulw-loop)\s*([\s\S]*)$/i)
+  const loopMatch = commandText.match(/^\/(ralph-loop|ulw-loop)\s*([\s\S]*)$/i)
   if (!loopMatch) {
     return null
   }
