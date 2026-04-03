@@ -6002,7 +6002,7 @@
           "minimum": 20
         },
         "isolation": {
-          "default": "inline",
+          "default": "session",
           "type": "string",
           "enum": [
             "inline",
