@@ -94,4 +94,45 @@ describe("createAnthropicContextWindowLimitRecoveryHook", () => {
     }
   })
 
+  test("#given active pending and retry timers #when dispose is called #then it clears both timer maps", async () => {
+    //#given
+    const { createUntrackedTimeout, getClearTimeoutCalls, getScheduledTimeouts, restore, runScheduledTimeout } =
+      setupDelayedTimeoutMocks()
+    executeCompactMock.mockImplementationOnce(async (...args: Parameters<typeof executeCompactMock>) => {
+      const sessionID = args[0]
+      const autoCompactState = args[2]
+
+      autoCompactState.retryTimerBySession.set(sessionID, createUntrackedTimeout())
+    })
+    const hook = createRecoveryHook()
+
+    try {
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: { sessionID: "session-retry", error: "prompt is too long" },
+        },
+      })
+
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: { sessionID: "session-pending", error: "prompt is too long" },
+        },
+      })
+
+      runScheduledTimeout(0)
+
+      const [retryTimer, pendingTimer] = getScheduledTimeouts()
+
+      //#when
+      hook.dispose()
+
+      //#then
+      expect(getClearTimeoutCalls()).toEqual(expect.arrayContaining([retryTimer, pendingTimer]))
+    } finally {
+      restore()
+    }
+  })
+
 })
