@@ -10,38 +10,38 @@ const mockRunBackgroundUpdateCheck = mock(async () => {})
 const mockGetCachedVersion = mock(() => "3.6.0")
 const mockGetLocalDevVersion = mock<(directory: string) => string | null>(() => null)
 
-mock.module("../hook/config-errors-toast", () => ({
+mock.module("../auto-update-checker/hook/config-errors-toast", () => ({
   showConfigErrorsIfAny: mockShowConfigErrorsIfAny,
 }))
 
-mock.module("../hook/model-cache-warning", () => ({
+mock.module("../auto-update-checker/hook/model-cache-warning", () => ({
   showModelCacheWarningIfNeeded: mockShowModelCacheWarningIfNeeded,
 }))
 
-mock.module("../hook/connected-providers-status", () => ({
+mock.module("../auto-update-checker/hook/connected-providers-status", () => ({
   updateAndShowConnectedProvidersCacheStatus:
     mockUpdateAndShowConnectedProvidersCacheStatus,
 }))
 
-mock.module("../hook/model-capabilities-status", () => ({
+mock.module("../auto-update-checker/hook/model-capabilities-status", () => ({
   refreshModelCapabilitiesOnStartup: mockRefreshModelCapabilitiesOnStartup,
 }))
 
-mock.module("../hook/startup-toasts", () => ({
+mock.module("../auto-update-checker/hook/startup-toasts", () => ({
   showLocalDevToast: mockShowLocalDevToast,
   showVersionToast: mockShowVersionToast,
 }))
 
-mock.module("../hook/background-update-check", () => ({
+mock.module("../auto-update-checker/hook/background-update-check", () => ({
   runBackgroundUpdateCheck: mockRunBackgroundUpdateCheck,
 }))
 
-mock.module("../checker", () => ({
+mock.module("../auto-update-checker/checker", () => ({
   getCachedVersion: mockGetCachedVersion,
   getLocalDevVersion: mockGetLocalDevVersion,
 }))
 
-mock.module("../../../shared/logger", () => ({
+mock.module("../../shared/logger", () => ({
   log: () => {},
 }))
 
@@ -49,10 +49,10 @@ afterAll(() => {
   mock.restore()
 })
 
-type HookFactory = typeof import("../hook").createAutoUpdateCheckerHook
+type HookFactory = typeof import("../auto-update-checker/hook").createAutoUpdateCheckerHook
 
 async function importFreshHookFactory(): Promise<HookFactory> {
-  const hookModule = await import(`../hook?test-${Date.now()}-${Math.random()}`)
+  const hookModule = await import(`../auto-update-checker/hook?test-${Date.now()}-${Math.random()}`)
   return hookModule.createAutoUpdateCheckerHook
 }
 

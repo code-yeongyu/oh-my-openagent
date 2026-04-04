@@ -37,24 +37,24 @@ const mockSyncCachePackageJsonToIntent = mock(() => false)
 
 let importCounter = 0
 
-async function importFreshBackgroundUpdateCheck(): Promise<typeof import("./background-update-check")> {
-  mock.module("../checker", () => ({
+async function importFreshBackgroundUpdateCheck(): Promise<typeof import("../auto-update-checker/hook/background-update-check")> {
+  mock.module("../auto-update-checker/checker", () => ({
     findPluginEntry: mockFindPluginEntry,
     getCachedVersion: mockGetCachedVersion,
     getLatestVersion: mockGetLatestVersion,
     revertPinnedVersion: mock(() => false),
     syncCachePackageJsonToIntent: mockSyncCachePackageJsonToIntent,
   }))
-  mock.module("../version-channel", () => ({ extractChannel: mockExtractChannel }))
-  mock.module("../cache", () => ({ invalidatePackage: mockInvalidatePackage }))
-  mock.module("../../../cli/config-manager", () => ({ runBunInstallWithDetails: mockRunBunInstallWithDetails }))
-  mock.module("./update-toasts", () => ({
+  mock.module("../auto-update-checker/version-channel", () => ({ extractChannel: mockExtractChannel }))
+  mock.module("../auto-update-checker/cache", () => ({ invalidatePackage: mockInvalidatePackage }))
+  mock.module("../../cli/config-manager", () => ({ runBunInstallWithDetails: mockRunBunInstallWithDetails }))
+  mock.module("../auto-update-checker/hook/update-toasts", () => ({
     showUpdateAvailableToast: mockShowUpdateAvailableToast,
     showAutoUpdatedToast: mockShowAutoUpdatedToast,
   }))
-  mock.module("../../../shared/logger", () => ({ log: () => {} }))
+  mock.module("../../shared/logger", () => ({ log: () => {} }))
 
-  const backgroundUpdateCheckModule = await import(`./background-update-check?test=${importCounter++}`)
+  const backgroundUpdateCheckModule = await import(`../auto-update-checker/hook/background-update-check?test=${importCounter++}`)
   mock.restore()
   return backgroundUpdateCheckModule
 }

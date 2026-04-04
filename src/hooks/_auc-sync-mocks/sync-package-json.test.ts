@@ -1,14 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
-import type { PluginEntryInfo } from "../plugin-entry"
+import type { PluginEntryInfo } from "../auto-update-checker/checker/plugin-entry"
 
 const TEST_CACHE_DIR = join(import.meta.dir, "__test-sync-cache__")
 
 let importCounter = 0
 
-async function importFreshSyncPackageJsonModule(): Promise<typeof import("../sync-package-json")> {
-  mock.module("../../constants", () => ({
+async function importFreshSyncPackageJsonModule(): Promise<typeof import("../auto-update-checker/checker/sync-package-json")> {
+  mock.module("../auto-update-checker/constants", () => ({
     CACHE_DIR: TEST_CACHE_DIR,
     PACKAGE_NAME: "oh-my-opencode",
     NPM_REGISTRY_URL: "https://registry.npmjs.org/-/package/oh-my-opencode/dist-tags",
@@ -21,11 +21,11 @@ async function importFreshSyncPackageJsonModule(): Promise<typeof import("../syn
     getWindowsAppdataDir: () => null,
   }))
 
-  mock.module("../../../../shared/logger", () => ({
+  mock.module("../../shared/logger", () => ({
     log: () => {},
   }))
 
-  const syncPackageJsonModule = await import(`../sync-package-json?test=${importCounter++}`)
+  const syncPackageJsonModule = await import(`../auto-update-checker/checker/sync-package-json?test=${importCounter++}`)
   mock.restore()
   return syncPackageJsonModule
 }

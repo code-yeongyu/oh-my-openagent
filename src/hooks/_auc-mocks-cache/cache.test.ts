@@ -8,8 +8,8 @@ const TEST_USER_CONFIG_DIR = "/tmp/opencode-config"
 
 let importCounter = 0
 
-async function importFreshCacheModule(): Promise<typeof import("./cache")> {
-  mock.module("./constants", () => ({
+async function importFreshCacheModule(): Promise<typeof import("../auto-update-checker/cache")> {
+  mock.module("../auto-update-checker/constants", () => ({
     CACHE_DIR: TEST_OPENCODE_CACHE_DIR,
     USER_CONFIG_DIR: TEST_USER_CONFIG_DIR,
     PACKAGE_NAME: "oh-my-opencode",
@@ -26,7 +26,7 @@ async function importFreshCacheModule(): Promise<typeof import("./cache")> {
     log: () => {},
   }))
 
-  const cacheModule = await import(`./cache?test=${importCounter++}`)
+  const cacheModule = await import(`../auto-update-checker/cache?test=${importCounter++}`)
   mock.restore()
   return cacheModule
 }

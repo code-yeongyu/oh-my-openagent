@@ -2,7 +2,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
-import * as shared from "../../../shared"
+import * as shared from "../../shared"
 
 type PluginEntry = {
   entry: string
@@ -50,24 +50,24 @@ let importCounter = 0
 let getOpenCodeCacheDirSpy: { mockRestore: () => void } | undefined
 let getOpenCodeConfigPathsSpy: { mockRestore: () => void } | undefined
 
-async function importFreshBackgroundUpdateCheck(): Promise<typeof import("./background-update-check")> {
-  mock.module("../checker", () => ({
+async function importFreshBackgroundUpdateCheck(): Promise<typeof import("../auto-update-checker/hook/background-update-check")> {
+  mock.module("../auto-update-checker/checker", () => ({
     findPluginEntry: mockFindPluginEntry,
     getCachedVersion: mockGetCachedVersion,
     getLatestVersion: mockGetLatestVersion,
     revertPinnedVersion: mock(() => false),
     syncCachePackageJsonToIntent: mockSyncCachePackageJsonToIntent,
   }))
-  mock.module("../version-channel", () => ({ extractChannel: mockExtractChannel }))
-  mock.module("../cache", () => ({ invalidatePackage: mockInvalidatePackage }))
-  mock.module("../../../cli/config-manager", () => ({
+  mock.module("../auto-update-checker/version-channel", () => ({ extractChannel: mockExtractChannel }))
+  mock.module("../auto-update-checker/cache", () => ({ invalidatePackage: mockInvalidatePackage }))
+  mock.module("../../cli/config-manager", () => ({
     runBunInstallWithDetails: mockRunBunInstallWithDetails,
   }))
-  mock.module("./update-toasts", () => ({
+  mock.module("../auto-update-checker/hook/update-toasts", () => ({
     showUpdateAvailableToast: mockShowUpdateAvailableToast,
     showAutoUpdatedToast: mockShowAutoUpdatedToast,
   }))
-  mock.module("../../../shared/logger", () => ({ log: () => {} }))
+  mock.module("../../shared/logger", () => ({ log: () => {} }))
   getOpenCodeCacheDirSpy = spyOn(shared, "getOpenCodeCacheDir").mockReturnValue(TEST_CACHE_DIR)
   getOpenCodeConfigPathsSpy = spyOn(shared, "getOpenCodeConfigPaths").mockReturnValue({
     configDir: TEST_CONFIG_DIR,
@@ -77,7 +77,7 @@ async function importFreshBackgroundUpdateCheck(): Promise<typeof import("./back
     omoConfig: join(TEST_CONFIG_DIR, "oh-my-opencode.json"),
   })
 
-  mock.module("../constants", () => ({
+  mock.module("../auto-update-checker/constants", () => ({
     PACKAGE_NAME: "oh-my-opencode",
     CACHE_DIR: TEST_CACHE_DIR,
     USER_CONFIG_DIR: TEST_CONFIG_DIR,
@@ -90,14 +90,14 @@ async function importFreshBackgroundUpdateCheck(): Promise<typeof import("./back
     getWindowsAppdataDir: () => null,
   }))
 
-  mock.module("../../../shared/data-path", () => ({
+  mock.module("../../shared/data-path", () => ({
     getDataDir: () => join(TEST_DIR, "data"),
     getOpenCodeStorageDir: () => join(TEST_DIR, "data", "opencode", "storage"),
     getCacheDir: () => TEST_DIR,
     getOmoOpenCodeCacheDir: () => join(TEST_DIR, "oh-my-opencode"),
     getOpenCodeCacheDir: () => TEST_CACHE_DIR,
   }))
-  mock.module("../../../shared/opencode-config-dir", () => ({
+  mock.module("../../shared/opencode-config-dir", () => ({
     getOpenCodeConfigDir: () => TEST_CONFIG_DIR,
     getOpenCodeConfigPaths: () => ({
       configDir: TEST_CONFIG_DIR,
@@ -108,7 +108,7 @@ async function importFreshBackgroundUpdateCheck(): Promise<typeof import("./back
     }),
   }))
 
-  const backgroundUpdateCheckModule = await import(`./background-update-check?test=${importCounter++}`)
+  const backgroundUpdateCheckModule = await import(`../auto-update-checker/hook/background-update-check?test=${importCounter++}`)
   return backgroundUpdateCheckModule
 }
 
