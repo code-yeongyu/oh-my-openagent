@@ -493,6 +493,10 @@ export class BackgroundManager {
 
     if (this.tasks.get(task.id)?.status === "cancelled") {
       await this.abortSessionWithLogging(sessionID, "cancelled during tmux setup")
+      subagentSessions.delete(sessionID)
+      if (task.rootSessionID) {
+        this.unregisterRootDescendant(task.rootSessionID)
+      }
       this.concurrencyManager.release(concurrencyKey)
       return
     }

@@ -15,6 +15,7 @@ afterAll(() => { mock.restore() })
 import { getSessionPromptParams, clearSessionPromptParams } from "../../shared/session-prompt-params-state"
 import { tmpdir } from "node:os"
 import type { PluginInput } from "@opencode-ai/plugin"
+import { _resetForTesting as resetClaudeCodeSessionState, subagentSessions } from "../claude-code-session-state"
 import type { BackgroundTask, ResumeInput } from "./types"
 import { MIN_IDLE_TIME_MS } from "./constants"
 import { BackgroundManager } from "./manager"
@@ -211,6 +212,10 @@ function getPendingNotifications(manager: BackgroundManager): Map<string, string
 
 function getCompletionTimers(manager: BackgroundManager): Map<string, ReturnType<typeof setTimeout>> {
   return (manager as unknown as { completionTimers: Map<string, ReturnType<typeof setTimeout>> }).completionTimers
+}
+
+function getRootDescendantCounts(manager: BackgroundManager): Map<string, number> {
+  return (manager as unknown as { rootDescendantCounts: Map<string, number> }).rootDescendantCounts
 }
 
 function getQueuesByKey(
@@ -2585,6 +2590,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
 
     test("should keep task cancelled when cancelled during tmux callback before running state is assigned", async () => {
       // given
+      resetClaudeCodeSessionState()
       const originalTmuxEnvironment = process.env.TMUX
       process.env.TMUX = "test-session"
 
@@ -2674,7 +2680,10 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
         expect(promptAsyncSessionIDs).not.toContain(createdSessionID)
         expect(abortCalls).toEqual([createdSessionID])
         expect(getConcurrencyManager(manager).getCount("test-agent")).toBe(0)
+        expect(getRootDescendantCounts(manager).has("parent-session")).toBe(false)
+        expect(subagentSessions.has(createdSessionID)).toBe(false)
       } finally {
+        resetClaudeCodeSessionState()
         if (originalTmuxEnvironment === undefined) {
           delete process.env.TMUX
         } else {
