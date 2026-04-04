@@ -47,7 +47,7 @@ jobs:
           BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/napi"
 
       - name: Run tests
-        run: bun test
+        run: bun run test:ci
 
   typecheck:
     runs-on: ubuntu-latest
@@ -65,6 +65,9 @@ jobs:
 
       - name: Type check
         run: bun run typecheck
+
+      - name: Type check script tooling
+        run: bunx tsc --noEmit -p script/tsconfig.json
 
   build:
     runs-on: ubuntu-latest
