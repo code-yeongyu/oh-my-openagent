@@ -507,6 +507,108 @@ describe("resolveSubagentExecution", () => {
     cacheSpy.mockRestore()
     connectedSpy.mockRestore()
   })
+
+  test("preserves category temperature when fallback entry leaves temperature undefined", async () => {
+    //#given
+    const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+      models: { openai: ["gpt-5.4"] },
+      connected: ["openai"],
+      updatedAt: "2026-03-03T00:00:00.000Z",
+    })
+    const connectedSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
+    const args = createBaseArgs({ subagent_type: "explore" })
+    const executorCtx = createExecutorContext(
+      async () => ([
+        { name: "explore", mode: "subagent", model: "quotio/claude-haiku-4-5-unavailable" },
+      ]),
+      {
+        agentOverrides: {
+          explore: {
+            category: "research",
+          },
+        } as ExecutorContext["agentOverrides"],
+        userCategories: {
+          research: {
+            fallback_models: [
+              {
+                model: "openai/gpt-5.4",
+                variant: "max",
+              },
+            ],
+            temperature: 0.55,
+            top_p: 0.45,
+          },
+        } as ExecutorContext["userCategories"],
+      }
+    )
+
+    //#when
+    const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep")
+
+    //#then
+    expect(result.error).toBeUndefined()
+    expect(result.categoryModel).toEqual({
+      providerID: "openai",
+      modelID: "gpt-5.4",
+      variant: "max",
+      temperature: 0.55,
+      top_p: 0.45,
+    })
+    cacheSpy.mockRestore()
+    connectedSpy.mockRestore()
+  })
+
+  test("applies category tuning params in the cold-cache override path", async () => {
+    //#given
+    const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+      models: {},
+      connected: [],
+      updatedAt: "2026-03-03T00:00:00.000Z",
+    })
+    const connectedSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue([])
+    const args = createBaseArgs({ subagent_type: "explore" })
+    const executorCtx = createExecutorContext(
+      async () => ([
+        { name: "explore", mode: "subagent", model: "openai/gpt-5.4" },
+      ]),
+      {
+        agentOverrides: {
+          explore: {
+            category: "research",
+          },
+        } as ExecutorContext["agentOverrides"],
+        userCategories: {
+          research: {
+            model: "openai/gpt-5.4",
+            variant: "high",
+            temperature: 0.61,
+            top_p: 0.62,
+            maxTokens: 3200,
+            reasoningEffort: "medium",
+            thinking: { type: "disabled" },
+          },
+        } as ExecutorContext["userCategories"],
+      }
+    )
+
+    //#when
+    const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep")
+
+    //#then
+    expect(result.error).toBeUndefined()
+    expect(result.categoryModel).toEqual({
+      providerID: "openai",
+      modelID: "gpt-5.4",
+      variant: "high",
+      temperature: 0.61,
+      top_p: 0.62,
+      maxTokens: 3200,
+      reasoningEffort: "medium",
+      thinking: { type: "disabled" },
+    })
+    cacheSpy.mockRestore()
+    connectedSpy.mockRestore()
+  })
 })
 
 describe("resolveSubagentExecution - agent name sanitization", () => {
