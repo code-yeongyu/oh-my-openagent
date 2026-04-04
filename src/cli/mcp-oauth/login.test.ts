@@ -1,4 +1,4 @@
-import { afterAll, describe, it, expect, beforeEach, afterEach, mock } from "bun:test"
+import { afterAll, afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
 
 const mockLogin = mock(() => Promise.resolve({ accessToken: "test-token", expiresAt: 1710000000 }))
 
@@ -18,12 +18,18 @@ afterAll(() => {
 const { login } = await import("./login")
 
 describe("login command", () => {
+  let consoleErrorSpy: ReturnType<typeof spyOn>
+  let consoleLogSpy: ReturnType<typeof spyOn>
+
   beforeEach(() => {
     mockLogin.mockClear()
+    consoleErrorSpy = spyOn(console, "error").mockImplementation(() => {})
+    consoleLogSpy = spyOn(console, "log").mockImplementation(() => {})
   })
 
   afterEach(() => {
-    // cleanup
+    consoleErrorSpy.mockRestore()
+    consoleLogSpy.mockRestore()
   })
 
   it("returns error code when server-url is not provided", async () => {
