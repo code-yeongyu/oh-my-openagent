@@ -4,7 +4,7 @@ const replaceEmptyTextPartsAsync = mock(() => Promise.resolve(false))
 const injectTextPartAsync = mock(() => Promise.resolve(false))
 const findMessagesWithEmptyTextPartsFromSDK = mock(() => Promise.resolve([] as string[]))
 
-mock.module("../../shared", () => ({
+mock.module("../../shared/normalize-sdk-response", () => ({
   normalizeSDKResponse: (response: { data?: unknown[] }) => response.data ?? [],
 }))
 

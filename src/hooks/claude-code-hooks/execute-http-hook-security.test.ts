@@ -61,7 +61,7 @@ describe("executeHttpHook TLS security", () => {
     })
 
     it("#when hook uses remote http:// URL #then logs warning before rejection", async () => {
-      mock.module("../../shared", () => ({
+      mock.module("../../shared/logger", () => ({
         log: mockLog,
       }))
       const { executeHttpHook } = await importFreshExecuteHttpHook()
@@ -158,7 +158,7 @@ describe("executeHttpHook TLS security", () => {
     })
 
     it("#when hook uses plain remote http:// URL #then writes warning log", async () => {
-      mock.module("../../shared", () => ({
+      mock.module("../../shared/logger", () => ({
         log: mockLog,
       }))
       const { executeHttpHook } = await importFreshExecuteHttpHook()

@@ -9,7 +9,7 @@ mock.module("../../shared/opencode-storage-detection", () => ({
   isSqliteBackend: () => sqliteBackend,
 }))
 
-mock.module("../../shared", () => ({
+mock.module("../../shared/normalize-sdk-response", () => ({
   normalizeSDKResponse: <TData>(response: { data?: TData }, fallback: TData): TData => response.data ?? fallback,
 }))
 
