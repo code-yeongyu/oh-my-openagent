@@ -27,7 +27,9 @@ describe("executeHttpHook TLS security", () => {
 
   afterEach(() => {
     globalThis.fetch = originalFetch
-    process.env = originalEnv
+    process.env = { ...originalEnv }
+    mockLog.mockReset()
+    mockFetch.mockReset()
     mock.restore()
   })
 
