@@ -452,4 +452,36 @@ describe("resolveCategoryExecution", () => {
 		cacheSpy.mockRestore()
 		agentsSpy.mockRestore()
 	})
+
+	test("does not inherit hardcoded fallbackChain when user configures a category model [regression #3040]", async () => {
+		//#given
+		const args = {
+			category: "quick",
+			prompt: "test prompt",
+			description: "Test task",
+			run_in_background: false,
+			load_skills: [],
+			blockedBy: undefined,
+			enableSkillTools: false,
+		}
+		const executorCtx = createMockExecutorContext()
+		executorCtx.userCategories = {
+			quick: {
+				model: "animal-gateway-xai/grok-4-fast-non-reasoning",
+			},
+		}
+
+		//#when
+		const result = await resolveCategoryExecution(args, executorCtx, undefined, "anthropic/claude-sonnet-4-6")
+
+		//#then
+		expect(result.error).toBeUndefined()
+		expect(result.actualModel).toBe("animal-gateway-xai/grok-4-fast-non-reasoning")
+		expect(result.categoryModel).toEqual({
+			providerID: "animal-gateway-xai",
+			modelID: "grok-4-fast-non-reasoning",
+			variant: undefined,
+		})
+		expect(result.fallbackChain).toBeUndefined()
+	})
 })
