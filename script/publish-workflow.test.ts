@@ -9,14 +9,14 @@ const workflowPaths = [
 ]
 
 describe("test workflows", () => {
-  test("use bun test for workflows", () => {
+  test("use bun test isolation for workflows", () => {
     for (const workflowPath of workflowPaths) {
       // #given
       const workflow = readFileSync(workflowPath, "utf8")
 
-      // #then
+      // #then - should use run-ci-tests.ts for mock isolation
       expect(workflow).toContain("- name: Run tests")
-      expect(workflow).toContain("run: bun test")
+      expect(workflow).toContain("run-ci-tests.ts")
     }
   })
 })
