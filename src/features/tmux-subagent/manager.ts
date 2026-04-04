@@ -283,9 +283,11 @@ export class TmuxSessionManager {
     }
   }
 
-  private async tryCloseTrackedSession(tracked: TrackedSession): Promise<boolean> {
-    const state = await this.queryWindowStateSafely()
-    if (!state) return false
+  private async closeTrackedSessionPane(args: {
+    tracked: TrackedSession
+    state: WindowState
+  }): Promise<boolean> {
+    const { tracked, state } = args
 
     try {
       const result = await executeAction(
@@ -309,6 +311,37 @@ export class TmuxSessionManager {
     }
   }
 
+  private async finalizeTrackedSessionClose(args: {
+    tracked: TrackedSession
+    state: WindowState
+    isolatedPaneAlreadyClosed: boolean
+  }): Promise<void> {
+    const { tracked, state, isolatedPaneAlreadyClosed } = args
+    this.removeTrackedSession(tracked.sessionId)
+    await this.cleanupIsolatedContainerAfterSessionDeletion(
+      tracked,
+      isolatedPaneAlreadyClosed,
+      state,
+    )
+  }
+
+  private async closeTrackedSession(tracked: TrackedSession): Promise<boolean> {
+    const state = await this.queryWindowStateSafely()
+    if (!state) return false
+
+    const closed = await this.closeTrackedSessionPane({ tracked, state })
+    if (!closed) {
+      return false
+    }
+
+    await this.finalizeTrackedSessionClose({
+      tracked,
+      state,
+      isolatedPaneAlreadyClosed: true,
+    })
+    return true
+  }
+
   private async retryPendingCloses(): Promise<void> {
     const pendingSessions = Array.from(this.sessions.values()).filter(
       (tracked) => tracked.closePending,
@@ -327,14 +360,13 @@ export class TmuxSessionManager {
         continue
       }
 
-      const closed = await this.tryCloseTrackedSession(tracked)
+      const closed = await this.closeTrackedSession(tracked)
       if (closed) {
         log("[tmux-session-manager] retried close succeeded", {
           sessionId: tracked.sessionId,
           paneId: tracked.paneId,
           closeRetryCount: tracked.closeRetryCount,
         })
-        this.removeTrackedSession(tracked.sessionId)
         continue
       }
 
@@ -825,8 +857,11 @@ export class TmuxSessionManager {
 
     const closeAction = decideCloseAction(state, event.sessionID, this.getSessionMappings())
     if (!closeAction) {
-      this.removeTrackedSession(event.sessionID)
-      await this.cleanupIsolatedContainerAfterSessionDeletion(tracked, false, state)
+      await this.finalizeTrackedSessionClose({
+        tracked,
+        state,
+        isolatedPaneAlreadyClosed: false,
+      })
       return
     }
 
@@ -854,12 +889,11 @@ export class TmuxSessionManager {
       return
     }
 
-    this.removeTrackedSession(event.sessionID)
-    await this.cleanupIsolatedContainerAfterSessionDeletion(
+    await this.finalizeTrackedSessionClose({
       tracked,
-      isolatedPaneAlreadyClosed,
       state,
-    )
+      isolatedPaneAlreadyClosed,
+    })
   }
 
 
@@ -882,13 +916,11 @@ export class TmuxSessionManager {
       paneId: tracked.paneId,
     })
 
-    const closed = await this.tryCloseTrackedSession(tracked)
+    const closed = await this.closeTrackedSession(tracked)
     if (!closed) {
       this.markSessionClosePending(sessionId)
       return
     }
-
-    this.removeTrackedSession(sessionId)
   }
 
   createEventHandler(): (input: { event: { type: string; properties?: unknown } }) => Promise<void> {
