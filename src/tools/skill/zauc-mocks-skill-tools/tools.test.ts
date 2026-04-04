@@ -1,9 +1,9 @@
 import { afterAll, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
 import type { ToolContext } from "@opencode-ai/plugin/tool"
 import * as fs from "node:fs"
-import { SkillMcpManager } from "../../features/skill-mcp-manager"
-import type { LoadedSkill } from "../../features/opencode-skill-loader/types"
-import type { CommandInfo } from "../slashcommand/types"
+import { SkillMcpManager } from "../../../features/skill-mcp-manager"
+import type { LoadedSkill } from "../../../features/opencode-skill-loader/types"
+import type { CommandInfo } from "../../slashcommand/types"
 import type { Tool as McpTool } from "@modelcontextprotocol/sdk/types.js"
 
 const originalReadFileSync = fs.readFileSync.bind(fs)
