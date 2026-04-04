@@ -66,6 +66,9 @@ jobs:
       - name: Type check
         run: bun run typecheck
 
+      - name: Type check script tooling
+        run: bunx tsc --noEmit -p script/tsconfig.json
+
   build:
     runs-on: ubuntu-latest
     needs: [test, typecheck]
