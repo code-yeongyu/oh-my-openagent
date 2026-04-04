@@ -1,14 +1,14 @@
 declare const require: (name: string) => any
 const { describe, test, expect, beforeEach, afterEach, spyOn, mock } = require("bun:test")
-import type { DelegateTaskArgs } from "../types"
-import type { ExecutorContext } from "../executor-types"
-import * as logger from "../../../shared/logger"
-import * as connectedProvidersCache from "../../../shared/connected-providers-cache"
+import type { DelegateTaskArgs } from "../../types"
+import type { ExecutorContext } from "../../executor-types"
+import * as logger from "../../../../shared/logger"
+import * as connectedProvidersCache from "../../../../shared/connected-providers-cache"
 
-type SubagentResolverModule = typeof import("../subagent-resolver")
+type SubagentResolverModule = typeof import("../../subagent-resolver")
 
 async function importFreshSubagentResolverModule(): Promise<SubagentResolverModule> {
-  return await import(`../subagent-resolver?test=${Date.now()}-${Math.random()}`)
+  return await import(`../../subagent-resolver?test=${Date.now()}-${Math.random()}`)
 }
 
 function createBaseArgs(overrides?: Partial<DelegateTaskArgs>): DelegateTaskArgs {
