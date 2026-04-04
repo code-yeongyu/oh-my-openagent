@@ -19,8 +19,12 @@ mock.module("./executor", () => ({
   executeSlashCommand: executeSlashCommandMock,
 }))
 
-afterAll(() => {
+afterAll(async () => {
   mock.restore()
+  // Restore the real executor module so subsequent test files in the same batch
+  // (e.g. executor-resolution.test.ts) don't get the mocked version
+  const realExecutor = await import("./executor")
+  mock.module("./executor", () => realExecutor)
 })
 
 const logMock = spyOn(shared, "log").mockImplementation(() => {})
