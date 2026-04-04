@@ -11,7 +11,7 @@ type ToastMessageGetter = (isUpdate: boolean, version?: string) => string
 
 function createPluginEntry(overrides?: Partial<PluginEntryInfo>): PluginEntryInfo {
   return {
-    entry: "oh-my-opencode@3.4.0",
+    entry: "oh-my-openagent@3.4.0",
     isPinned: false,
     pinnedVersion: null,
     configPath: "/test/opencode.json",
@@ -50,7 +50,7 @@ function createRunner() {
       configJson: join(TEST_CONFIG_DIR, "opencode.json"),
       configJsonc: join(TEST_CONFIG_DIR, "opencode.jsonc"),
       packageJson: join(TEST_CONFIG_DIR, "package.json"),
-      omoConfig: join(TEST_CONFIG_DIR, "oh-my-opencode.json"),
+      omoConfig: join(TEST_CONFIG_DIR, "oh-my-openagent.json"),
     }),
     invalidatePackage: mockInvalidatePackage as never,
     extractChannel: mockExtractChannel,
@@ -102,11 +102,11 @@ describe("workspace resolution", () => {
   it("#given config-dir install exists but cache-dir does not #when updating #then it installs to config-dir", async () => {
     // #given
     const runBackgroundUpdateCheck = createRunner()
-    mkdirSync(join(TEST_CONFIG_DIR, "node_modules", "oh-my-opencode"), { recursive: true })
-    writeFileSync(join(TEST_CONFIG_DIR, "package.json"), JSON.stringify({ dependencies: { "oh-my-opencode": "3.4.0" } }, null, 2))
+    mkdirSync(join(TEST_CONFIG_DIR, "node_modules", "oh-my-openagent"), { recursive: true })
+    writeFileSync(join(TEST_CONFIG_DIR, "package.json"), JSON.stringify({ dependencies: { "oh-my-openagent": "3.4.0" } }, null, 2))
     writeFileSync(
-      join(TEST_CONFIG_DIR, "node_modules", "oh-my-opencode", "package.json"),
-      JSON.stringify({ name: "oh-my-opencode", version: "3.4.0" }, null, 2),
+      join(TEST_CONFIG_DIR, "node_modules", "oh-my-openagent", "package.json"),
+      JSON.stringify({ name: "oh-my-openagent", version: "3.4.0" }, null, 2),
     )
 
     // #when
@@ -119,17 +119,17 @@ describe("workspace resolution", () => {
   it("#given both config-dir and cache-dir installs exist #when updating #then it prefers config-dir", async () => {
     // #given
     const runBackgroundUpdateCheck = createRunner()
-    mkdirSync(join(TEST_CONFIG_DIR, "node_modules", "oh-my-opencode"), { recursive: true })
-    writeFileSync(join(TEST_CONFIG_DIR, "package.json"), JSON.stringify({ dependencies: { "oh-my-opencode": "3.4.0" } }, null, 2))
+    mkdirSync(join(TEST_CONFIG_DIR, "node_modules", "oh-my-openagent"), { recursive: true })
+    writeFileSync(join(TEST_CONFIG_DIR, "package.json"), JSON.stringify({ dependencies: { "oh-my-openagent": "3.4.0" } }, null, 2))
     writeFileSync(
-      join(TEST_CONFIG_DIR, "node_modules", "oh-my-opencode", "package.json"),
-      JSON.stringify({ name: "oh-my-opencode", version: "3.4.0" }, null, 2),
+      join(TEST_CONFIG_DIR, "node_modules", "oh-my-openagent", "package.json"),
+      JSON.stringify({ name: "oh-my-openagent", version: "3.4.0" }, null, 2),
     )
-    mkdirSync(join(TEST_CACHE_DIR, "node_modules", "oh-my-opencode"), { recursive: true })
-    writeFileSync(join(TEST_CACHE_DIR, "package.json"), JSON.stringify({ dependencies: { "oh-my-opencode": "3.4.0" } }, null, 2))
+    mkdirSync(join(TEST_CACHE_DIR, "node_modules", "oh-my-openagent"), { recursive: true })
+    writeFileSync(join(TEST_CACHE_DIR, "package.json"), JSON.stringify({ dependencies: { "oh-my-openagent": "3.4.0" } }, null, 2))
     writeFileSync(
-      join(TEST_CACHE_DIR, "node_modules", "oh-my-opencode", "package.json"),
-      JSON.stringify({ name: "oh-my-opencode", version: "3.4.0" }, null, 2),
+      join(TEST_CACHE_DIR, "node_modules", "oh-my-openagent", "package.json"),
+      JSON.stringify({ name: "oh-my-openagent", version: "3.4.0" }, null, 2),
     )
 
     // #when
@@ -142,11 +142,11 @@ describe("workspace resolution", () => {
   it("#given only cache-dir install exists #when updating #then it falls back to cache-dir", async () => {
     // #given
     const runBackgroundUpdateCheck = createRunner()
-    mkdirSync(join(TEST_CACHE_DIR, "node_modules", "oh-my-opencode"), { recursive: true })
-    writeFileSync(join(TEST_CACHE_DIR, "package.json"), JSON.stringify({ dependencies: { "oh-my-opencode": "3.4.0" } }, null, 2))
+    mkdirSync(join(TEST_CACHE_DIR, "node_modules", "oh-my-openagent"), { recursive: true })
+    writeFileSync(join(TEST_CACHE_DIR, "package.json"), JSON.stringify({ dependencies: { "oh-my-openagent": "3.4.0" } }, null, 2))
     writeFileSync(
-      join(TEST_CACHE_DIR, "node_modules", "oh-my-opencode", "package.json"),
-      JSON.stringify({ name: "oh-my-opencode", version: "3.4.0" }, null, 2),
+      join(TEST_CACHE_DIR, "node_modules", "oh-my-openagent", "package.json"),
+      JSON.stringify({ name: "oh-my-openagent", version: "3.4.0" }, null, 2),
     )
 
     // #when

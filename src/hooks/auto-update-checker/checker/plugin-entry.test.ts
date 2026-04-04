@@ -21,7 +21,7 @@ describe("findPluginEntry", () => {
 
   test("returns unpinned for bare package name", () => {
     // #given plugin is configured without a tag
-    fs.writeFileSync(configPath, JSON.stringify({ plugin: ["oh-my-opencode"] }))
+    fs.writeFileSync(configPath, JSON.stringify({ plugin: ["oh-my-openagent"] }))
 
     // #when plugin entry is detected
     const pluginInfo = findPluginEntry(temporaryDirectory)
@@ -34,7 +34,7 @@ describe("findPluginEntry", () => {
 
   test("returns unpinned for latest dist-tag", () => {
     // #given plugin is configured with latest dist-tag
-    fs.writeFileSync(configPath, JSON.stringify({ plugin: ["oh-my-opencode@latest"] }))
+    fs.writeFileSync(configPath, JSON.stringify({ plugin: ["oh-my-openagent@latest"] }))
 
     // #when plugin entry is detected
     const pluginInfo = findPluginEntry(temporaryDirectory)
@@ -47,7 +47,7 @@ describe("findPluginEntry", () => {
 
   test("returns unpinned for beta dist-tag", () => {
     // #given plugin is configured with beta dist-tag
-    fs.writeFileSync(configPath, JSON.stringify({ plugin: ["oh-my-opencode@beta"] }))
+    fs.writeFileSync(configPath, JSON.stringify({ plugin: ["oh-my-openagent@beta"] }))
 
     // #when plugin entry is detected
     const pluginInfo = findPluginEntry(temporaryDirectory)
@@ -60,7 +60,7 @@ describe("findPluginEntry", () => {
 
   test("returns pinned for explicit semver", () => {
     // #given plugin is configured with explicit version
-    fs.writeFileSync(configPath, JSON.stringify({ plugin: ["oh-my-opencode@3.5.2"] }))
+    fs.writeFileSync(configPath, JSON.stringify({ plugin: ["oh-my-openagent@3.5.2"] }))
 
     // #when plugin entry is detected
     const pluginInfo = findPluginEntry(temporaryDirectory)
