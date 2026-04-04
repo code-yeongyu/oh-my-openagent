@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs"
+
 import * as p from "@clack/prompts"
 import color from "picocolors"
 import { PLUGIN_NAME } from "../shared"
@@ -5,12 +7,25 @@ import type { InstallArgs } from "./types"
 import {
   addPluginToOpenCodeConfig,
   detectCurrentConfig,
+  getConfigDir,
+  getOpenCodePackagesCacheRootPath,
   getOpenCodeVersion,
   isOpenCodeInstalled,
+  repairPluginCache,
   writeOmoConfig,
 } from "./config-manager"
 import { detectedToInitialValues, formatConfigSummary, SYMBOLS } from "./install-validators"
 import { promptInstallConfig } from "./tui-install-prompts"
+
+function printPluginCacheRepairWarning(cacheDir: string, error?: string): void {
+  p.log.warn("OpenCode plugin cache could not be repaired automatically.")
+  p.log.info(`Cache directory: ${cacheDir}`)
+  p.log.info(`Manual cleanup: rm -rf "${cacheDir}"`)
+  p.log.info(`Then rerun: bunx ${PLUGIN_NAME} install`)
+  if (error) {
+    p.log.info(`Details: ${error}`)
+  }
+}
 
 export async function runTuiInstaller(args: InstallArgs, version: string): Promise<number> {
   if (!process.stdin.isTTY || !process.stdout.isTTY) {
@@ -20,6 +35,8 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
 
   const detected = detectCurrentConfig()
   const isUpdate = detected.isInstalled
+  const hadConfigDir = existsSync(getConfigDir())
+  const hadPackagesCacheDir = existsSync(getOpenCodePackagesCacheRootPath())
 
   p.intro(color.bgMagenta(color.white(isUpdate ? " oMoMoMoMo... Update " : " oMoMoMoMo... ")))
 
@@ -61,6 +78,29 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
     return 1
   }
   spinner.stop(`Config written to ${color.cyan(omoResult.configPath)}`)
+
+  spinner.start("Priming OpenCode plugin cache")
+  const pluginEntry = pluginResult.pluginEntry
+  const shouldRepairCache = Boolean(pluginEntry) && (installed || hadConfigDir || hadPackagesCacheDir)
+
+  if (!pluginEntry) {
+    spinner.stop("Skipped cache priming because the plugin entry could not be resolved")
+  } else if (!shouldRepairCache) {
+    spinner.stop("Skipped cache priming until OpenCode creates its cache workspace")
+  } else {
+    const cacheRepair = await repairPluginCache(pluginEntry)
+    const cacheDir = cacheRepair.finalInspection.location.cacheDir ?? "unknown cache path"
+
+    if (cacheRepair.status === "skipped") {
+      spinner.stop("Skipped cache priming for local plugin entries")
+    } else if (cacheRepair.success) {
+      const verb = cacheRepair.status === "repaired" ? "repaired" : "verified"
+      spinner.stop(`Plugin cache ${verb} at ${color.cyan(cacheDir)}`)
+    } else {
+      spinner.stop("Automatic cache repair failed")
+      printPluginCacheRepairWarning(cacheDir, cacheRepair.error)
+    }
+  }
 
   if (!config.hasClaude) {
     console.log()

@@ -26,7 +26,7 @@ export async function addPluginToOpenCodeConfig(currentVersion: string): Promise
     if (format === "none") {
       const config: OpenCodeConfig = { plugin: [pluginEntry] }
       writeFileSync(path, JSON.stringify(config, null, 2) + "\n")
-      return { success: true, configPath: path }
+      return { success: true, configPath: path, pluginEntry }
     }
 
     const parseResult = parseOpenCodeConfigFileWithError(path)
@@ -54,14 +54,18 @@ export async function addPluginToOpenCodeConfig(currentVersion: string): Promise
 
     const normalizedPlugins = [...otherPlugins]
 
+    let finalPluginEntry = pluginEntry
+
     if (canonicalEntries.length > 0) {
-      normalizedPlugins.push(canonicalEntries[0])
+      finalPluginEntry = canonicalEntries[0]
+      normalizedPlugins.push(finalPluginEntry)
     } else if (legacyEntries.length > 0) {
       const versionMatch = legacyEntries[0].match(/@(.+)$/)
       const preservedVersion = versionMatch ? versionMatch[1] : null
-      normalizedPlugins.push(preservedVersion ? `${PLUGIN_NAME}@${preservedVersion}` : pluginEntry)
+      finalPluginEntry = preservedVersion ? `${PLUGIN_NAME}@${preservedVersion}` : pluginEntry
+      normalizedPlugins.push(finalPluginEntry)
     } else {
-      normalizedPlugins.push(pluginEntry)
+      normalizedPlugins.push(finalPluginEntry)
     }
 
     config.plugin = normalizedPlugins
@@ -76,14 +80,14 @@ export async function addPluginToOpenCodeConfig(currentVersion: string): Promise
         const newContent = content.replace(pluginArrayRegex, `$1[\n    ${formattedPlugins}\n  ]`)
         writeFileSync(path, newContent)
       } else {
-        const newContent = content.replace(/(\{)/, `$1\n  "plugin": ["${pluginEntry}"],`)
+        const newContent = content.replace(/(\{)/, `$1\n  "plugin": ["${finalPluginEntry}"],`)
         writeFileSync(path, newContent)
       }
     } else {
       writeFileSync(path, JSON.stringify(config, null, 2) + "\n")
     }
 
-    return { success: true, configPath: path }
+    return { success: true, configPath: path, pluginEntry: finalPluginEntry }
   } catch (err) {
     return {
       success: false,

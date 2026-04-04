@@ -6,6 +6,10 @@ import { getLatestVersion } from "../../../hooks/auto-update-checker/checker"
 import { extractChannel } from "../../../hooks/auto-update-checker"
 import { PACKAGE_NAME } from "../constants"
 import { getOpenCodeCacheDir, getOpenCodeConfigPaths, parseJsonc } from "../../../shared"
+import {
+  getPackageNameFromPluginEntry,
+  resolvePluginCacheLocation,
+} from "../../config-manager/plugin-cache-entry"
 
 interface PackageJsonShape {
   version?: string
@@ -18,6 +22,13 @@ export interface LoadedVersionInfo {
   installedPackagePath: string
   expectedVersion: string | null
   loadedVersion: string | null
+}
+
+interface InstallCandidate {
+  cacheDir: string
+  cachePackagePath: string
+  installedPackagePath: string
+  packageName: string
 }
 
 function getPlatformDefaultCacheDir(platform: NodeJS.Platform = process.platform): string {
@@ -58,31 +69,38 @@ function normalizeVersion(value: string | undefined): string | null {
   return match?.[0] ?? null
 }
 
-export function getLoadedPluginVersion(): LoadedVersionInfo {
+function createInstallCandidate(cacheDir: string, packageName: string): InstallCandidate {
+  return {
+    cacheDir,
+    cachePackagePath: join(cacheDir, "package.json"),
+    installedPackagePath: join(cacheDir, "node_modules", ...packageName.split("/"), "package.json"),
+    packageName,
+  }
+}
+
+export function getLoadedPluginVersion(pluginEntry: string | null = null): LoadedVersionInfo {
   const configPaths = getOpenCodeConfigPaths({ binary: "opencode" })
   const configDir = resolveExistingDir(configPaths.configDir)
   const cacheDir = resolveExistingDir(resolveOpenCodeCacheDir())
+  const packageName = getPackageNameFromPluginEntry(pluginEntry ?? PACKAGE_NAME) ?? PACKAGE_NAME
+  const packageCacheLocation = pluginEntry ? resolvePluginCacheLocation(pluginEntry) : null
+  const packageCacheCandidate = packageCacheLocation?.source === "npm" && packageCacheLocation.cacheDir
+    ? createInstallCandidate(resolveExistingDir(packageCacheLocation.cacheDir), packageName)
+    : null
   const candidates = [
-    {
-      cacheDir: configDir,
-      cachePackagePath: join(configDir, "package.json"),
-      installedPackagePath: join(configDir, "node_modules", PACKAGE_NAME, "package.json"),
-    },
-    {
-      cacheDir,
-      cachePackagePath: join(cacheDir, "package.json"),
-      installedPackagePath: join(cacheDir, "node_modules", PACKAGE_NAME, "package.json"),
-    },
-  ]
+    packageCacheCandidate,
+    createInstallCandidate(configDir, packageName),
+    createInstallCandidate(cacheDir, packageName),
+  ].filter((candidate): candidate is InstallCandidate => Boolean(candidate))
 
   const selectedCandidate = candidates.find((candidate) => existsSync(candidate.installedPackagePath)) ?? candidates[0]
 
-  const { cacheDir: selectedDir, cachePackagePath, installedPackagePath } = selectedCandidate
+  const { cacheDir: selectedDir, cachePackagePath, installedPackagePath, packageName: selectedPackageName } = selectedCandidate
 
   const cachePackage = readPackageJson(cachePackagePath)
   const installedPackage = readPackageJson(installedPackagePath)
 
-  const expectedVersion = normalizeVersion(cachePackage?.dependencies?.[PACKAGE_NAME])
+  const expectedVersion = normalizeVersion(cachePackage?.dependencies?.[selectedPackageName])
   const loadedVersion = normalizeVersion(installedPackage?.version)
 
   return {

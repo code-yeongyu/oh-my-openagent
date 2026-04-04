@@ -29,6 +29,7 @@ export interface InstallConfig {
 export interface ConfigMergeResult {
   success: boolean
   configPath: string
+  pluginEntry?: string
   error?: string
 }
 

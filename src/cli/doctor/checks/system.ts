@@ -5,8 +5,11 @@ import type { CheckResult, DoctorIssue, SystemInfo } from "../types"
 import { findOpenCodeBinary, getOpenCodeVersion, compareVersions } from "./system-binary"
 import { getPluginInfo } from "./system-plugin"
 import { getLatestPluginVersion, getLoadedPluginVersion, getSuggestedInstallTag } from "./system-loaded-version"
+import { inspectPluginCache } from "../../config-manager/plugin-cache-health"
 import { parseJsonc } from "../../../shared"
 import { PLUGIN_NAME, LEGACY_PLUGIN_NAME } from "../../../shared/plugin-identity"
+
+const PACKAGE_CACHE_REQUIRED_VERSION = "1.3.14"
 
 function isConfigValid(configPath: string | null): boolean {
   if (!configPath) return true
@@ -32,9 +35,30 @@ function buildMessage(status: CheckResult["status"], issues: DoctorIssue[]): str
   return `${issues.length} system warning(s) detected`
 }
 
+function usesPackageCache(opencodeVersion: string | null): boolean {
+  if (!opencodeVersion) {
+    return false
+  }
+
+  return compareVersions(opencodeVersion, PACKAGE_CACHE_REQUIRED_VERSION)
+}
+
+function buildPackageCacheFix(opencodeVersion: string | null, cacheDir: string | null): string {
+  const steps = [`Run: bunx ${PLUGIN_NAME} install`]
+  if (cacheDir) {
+    steps.push(`If it still fails, remove "${cacheDir}" and rerun the installer`)
+  }
+
+  if (opencodeVersion?.startsWith(PACKAGE_CACHE_REQUIRED_VERSION)) {
+    steps.unshift(`OpenCode ${PACKAGE_CACHE_REQUIRED_VERSION} requires a populated plugin cache workspace`)
+  }
+
+  return steps.join(". ")
+}
+
 export async function gatherSystemInfo(): Promise<SystemInfo> {
   const [binaryInfo, pluginInfo] = await Promise.all([findOpenCodeBinary(), Promise.resolve(getPluginInfo())])
-  const loadedInfo = getLoadedPluginVersion()
+  const loadedInfo = getLoadedPluginVersion(pluginInfo.entry)
 
   const opencodeVersion = binaryInfo ? await getOpenCodeVersion(binaryInfo.path) : null
   const pluginVersion = pluginInfo.pinnedVersion ?? loadedInfo.expectedVersion ?? loadedInfo.loadedVersion
@@ -53,7 +77,7 @@ export async function gatherSystemInfo(): Promise<SystemInfo> {
 
 export async function checkSystem(): Promise<CheckResult> {
   const [systemInfo, pluginInfo] = await Promise.all([gatherSystemInfo(), Promise.resolve(getPluginInfo())])
-  const loadedInfo = getLoadedPluginVersion()
+  const loadedInfo = getLoadedPluginVersion(pluginInfo.entry)
   const latestVersion = await getLatestPluginVersion(systemInfo.loadedVersion)
   const installTag = getSuggestedInstallTag(systemInfo.loadedVersion)
   const issues: DoctorIssue[] = []
@@ -103,6 +127,30 @@ export async function checkSystem(): Promise<CheckResult> {
         fix: `Update your opencode.json plugin entry: "${pluginInfo.entry}" → "${suggestedEntry}"`,
         severity: "warning",
         affects: ["plugin loading"],
+      })
+    }
+  }
+
+  if (
+    pluginInfo.registered
+    && pluginInfo.entry
+    && !pluginInfo.isLocalDev
+    && usesPackageCache(systemInfo.opencodeVersion)
+  ) {
+    const packageCache = inspectPluginCache(pluginInfo.entry)
+
+    if (packageCache.status === "missing" || packageCache.status === "corrupt") {
+      const missingPaths = packageCache.missingPaths.length > 0
+        ? ` Missing: ${packageCache.missingPaths.join(", ")}.`
+        : ""
+
+      issues.push({
+        title: "Plugin package cache is missing or incomplete",
+        description:
+          `OpenCode expects a plugin cache workspace at "${packageCache.location.cacheDir}".${missingPaths}`,
+        fix: buildPackageCacheFix(systemInfo.opencodeVersion, packageCache.location.cacheDir),
+        severity: "error",
+        affects: ["plugin loading", "all agents"],
       })
     }
   }

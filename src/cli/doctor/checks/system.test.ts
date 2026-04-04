@@ -26,15 +26,32 @@ const mockGetLoadedPluginVersion = mock(() => ({
 }))
 const mockGetLatestPluginVersion = mock(async (_currentVersion: string | null) => null as string | null)
 const mockGetSuggestedInstallTag = mock(() => "latest")
+const mockInspectPluginCache = mock(() => ({
+  entry: "oh-my-openagent",
+  status: "healthy" as const,
+  location: {
+    entry: "oh-my-openagent",
+    source: "npm" as const,
+    packageName: "oh-my-openagent",
+    cacheDir: "/Users/test/.cache/opencode/packages/oh-my-openagent",
+    cachePackagePath: "/tmp/package.json",
+    cacheLockfilePath: "/tmp/package-lock.json",
+    installedPackageJsonPath: "/tmp/node_modules/oh-my-openagent/package.json",
+  },
+  requiredPaths: [],
+  missingPaths: [],
+}))
 
 const realSystemBinary = require("./system-binary")
 const realSystemPlugin = require("./system-plugin")
 const realSystemLoadedVersion = require("./system-loaded-version")
+const realPluginCacheHealth = require("../../config-manager/plugin-cache-health")
 
 afterAll(() => {
   mock.module("./system-binary", () => realSystemBinary)
   mock.module("./system-plugin", () => realSystemPlugin)
   mock.module("./system-loaded-version", () => realSystemLoadedVersion)
+  mock.module("../../config-manager/plugin-cache-health", () => realPluginCacheHealth)
   mock.restore()
 })
 
@@ -55,6 +72,10 @@ async function importFreshSystemModule(): Promise<SystemModule> {
     getSuggestedInstallTag: mockGetSuggestedInstallTag,
   }))
 
+  mock.module("../../config-manager/plugin-cache-health", () => ({
+    inspectPluginCache: mockInspectPluginCache,
+  }))
+
   return import(`./system?test=${Date.now()}-${Math.random()}`)
 }
 
@@ -67,6 +88,7 @@ describe("system check", () => {
     mockGetLoadedPluginVersion.mockReset()
     mockGetLatestPluginVersion.mockReset()
     mockGetSuggestedInstallTag.mockReset()
+    mockInspectPluginCache.mockReset()
 
     mockFindOpenCodeBinary.mockResolvedValue({ path: "/usr/local/bin/opencode" })
     mockGetOpenCodeVersion.mockResolvedValue("1.0.200")
@@ -88,6 +110,21 @@ describe("system check", () => {
     })
     mockGetLatestPluginVersion.mockResolvedValue(null)
     mockGetSuggestedInstallTag.mockReturnValue("latest")
+    mockInspectPluginCache.mockReturnValue({
+      entry: "oh-my-openagent",
+      status: "healthy",
+      location: {
+        entry: "oh-my-openagent",
+        source: "npm",
+        packageName: "oh-my-openagent",
+        cacheDir: "/Users/test/.cache/opencode/packages/oh-my-openagent",
+        cachePackagePath: "/tmp/package.json",
+        cacheLockfilePath: "/tmp/package-lock.json",
+        installedPackageJsonPath: "/tmp/node_modules/oh-my-openagent/package.json",
+      },
+      requiredPaths: [],
+      missingPaths: [],
+    })
   })
 
   describe("#given cache directory contains spaces", () => {
@@ -213,6 +250,66 @@ describe("system check", () => {
 
       //#then
       expect(result.issues.some((issue) => issue.title === "Using legacy package name")).toBe(false)
+    })
+  })
+
+  describe("#given OpenCode 1.3.14 expects a package cache workspace", () => {
+    it("adds an error when the registered package cache is missing", async () => {
+      //#given
+      mockGetOpenCodeVersion.mockResolvedValue("1.3.14")
+      mockInspectPluginCache.mockReturnValue({
+        entry: "oh-my-openagent@latest",
+        status: "missing",
+        location: {
+          entry: "oh-my-openagent@latest",
+          source: "npm",
+          packageName: "oh-my-openagent",
+          cacheDir: "/Users/test/.cache/opencode/packages/oh-my-openagent@latest",
+          cachePackagePath: "/tmp/package.json",
+          cacheLockfilePath: "/tmp/package-lock.json",
+          installedPackageJsonPath: "/tmp/node_modules/oh-my-openagent/package.json",
+        },
+        requiredPaths: [],
+        missingPaths: ["/tmp/package-lock.json"],
+      })
+      const { checkSystem } = await importFreshSystemModule()
+
+      //#when
+      const result = await checkSystem()
+
+      //#then
+      const cacheIssue = result.issues.find((issue) => issue.title === "Plugin package cache is missing or incomplete")
+      expect(cacheIssue?.severity).toBe("error")
+      expect(cacheIssue?.fix).toContain("OpenCode 1.3.14 requires a populated plugin cache workspace")
+      expect(cacheIssue?.fix).toContain(`Run: bunx ${PLUGIN_NAME} install`)
+      expect(cacheIssue?.fix).toContain('/Users/test/.cache/opencode/packages/oh-my-openagent@latest')
+    })
+
+    it("does not report a cache error when the package cache is healthy", async () => {
+      //#given
+      mockGetOpenCodeVersion.mockResolvedValue("1.3.14")
+      mockInspectPluginCache.mockReturnValue({
+        entry: "oh-my-openagent",
+        status: "healthy",
+        location: {
+          entry: "oh-my-openagent",
+          source: "npm",
+          packageName: "oh-my-openagent",
+          cacheDir: "/Users/test/.cache/opencode/packages/oh-my-openagent",
+          cachePackagePath: "/tmp/package.json",
+          cacheLockfilePath: "/tmp/package-lock.json",
+          installedPackageJsonPath: "/tmp/node_modules/oh-my-openagent/package.json",
+        },
+        requiredPaths: [],
+        missingPaths: [],
+      })
+      const { checkSystem } = await importFreshSystemModule()
+
+      //#when
+      const result = await checkSystem()
+
+      //#then
+      expect(result.issues.some((issue) => issue.title === "Plugin package cache is missing or incomplete")).toBe(false)
     })
   })
 })

@@ -1,11 +1,16 @@
+import { existsSync } from "node:fs"
+
 import color from "picocolors"
 import { PLUGIN_NAME } from "../shared"
 import type { InstallArgs } from "./types"
 import {
   addPluginToOpenCodeConfig,
   detectCurrentConfig,
+  getConfigDir,
+  getOpenCodePackagesCacheRootPath,
   getOpenCodeVersion,
   isOpenCodeInstalled,
+  repairPluginCache,
   writeOmoConfig,
 } from "./config-manager"
 import {
@@ -22,6 +27,16 @@ import {
   printWarning,
   validateNonTuiArgs,
 } from "./install-validators"
+
+function printPluginCacheRepairWarning(cacheDir: string, error?: string): void {
+  printWarning("OpenCode plugin cache could not be repaired automatically.")
+  printInfo(`Cache directory: ${cacheDir}`)
+  printInfo(`Manual cleanup: rm -rf "${cacheDir}"`)
+  printInfo(`Then rerun: bunx ${PLUGIN_NAME} install`)
+  if (error) {
+    printInfo(`Details: ${error}`)
+  }
+}
 
 export async function runCliInstaller(args: InstallArgs, version: string): Promise<number> {
   const validation = validateNonTuiArgs(args)
@@ -43,6 +58,9 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
   const isUpdate = detected.isInstalled
 
   printHeader(isUpdate)
+
+  const hadConfigDir = existsSync(getConfigDir())
+  const hadPackagesCacheDir = existsSync(getOpenCodePackagesCacheRootPath())
 
   const totalSteps = 4
   let step = 1
@@ -83,6 +101,28 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
     return 1
   }
   printSuccess(`Config written ${SYMBOLS.arrow} ${color.dim(omoResult.configPath)}`)
+
+  printStep(step++, totalSteps, "Priming OpenCode plugin cache...")
+  const pluginEntry = pluginResult.pluginEntry
+  const shouldRepairCache = Boolean(pluginEntry) && (installed || hadConfigDir || hadPackagesCacheDir)
+
+  if (!pluginEntry) {
+    printInfo("Skipped cache priming because the plugin entry could not be resolved.")
+  } else if (!shouldRepairCache) {
+    printInfo("Skipped cache priming until OpenCode creates its cache workspace.")
+  } else {
+    const cacheRepair = await repairPluginCache(pluginEntry)
+    const cacheDir = cacheRepair.finalInspection.location.cacheDir
+
+    if (cacheRepair.status === "skipped") {
+      printInfo("Skipped cache priming for local plugin entries.")
+    } else if (cacheRepair.success) {
+      const verb = cacheRepair.status === "repaired" ? "repaired" : "verified"
+      printSuccess(`Plugin cache ${verb} ${SYMBOLS.arrow} ${color.dim(cacheDir ?? "unknown cache path")}`)
+    } else {
+      printPluginCacheRepairWarning(cacheDir ?? "unknown cache path", cacheRepair.error)
+    }
+  }
 
   printBox(formatConfigSummary(config), isUpdate ? "Updated Configuration" : "Installation Complete")
 

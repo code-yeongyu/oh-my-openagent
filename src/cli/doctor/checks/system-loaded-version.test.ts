@@ -130,6 +130,61 @@ describe("system loaded version", () => {
       expect(loadedVersion.expectedVersion).toBe("4.5.6")
       expect(loadedVersion.loadedVersion).toBe("4.5.6")
     })
+
+    it("prefers the per-plugin package cache when a plugin entry is provided", () => {
+      //#given
+      const configDir = createTemporaryDirectory("omo-config-")
+      const cacheHome = createTemporaryDirectory("omo-cache-home-")
+      const cacheDir = join(cacheHome, "opencode")
+      const packageCacheDir = join(cacheDir, "packages", "oh-my-openagent@latest")
+
+      process.env.OPENCODE_CONFIG_DIR = configDir
+      process.env.XDG_CACHE_HOME = cacheHome
+
+      writeJson(join(configDir, "package.json"), {
+        dependencies: { [PACKAGE_NAME]: "1.2.3" },
+      })
+      writeJson(join(configDir, "node_modules", PACKAGE_NAME, "package.json"), {
+        version: "1.2.3",
+      })
+      writeJson(join(packageCacheDir, "package.json"), {
+        dependencies: { [PACKAGE_NAME]: "9.9.9" },
+      })
+      writeJson(join(packageCacheDir, "node_modules", PACKAGE_NAME, "package.json"), {
+        version: "9.9.9",
+      })
+
+      //#when
+      const loadedVersion = getLoadedPluginVersion("oh-my-openagent@latest")
+
+      //#then
+      expect(loadedVersion.cacheDir).toBe(packageCacheDir)
+      expect(loadedVersion.expectedVersion).toBe("9.9.9")
+      expect(loadedVersion.loadedVersion).toBe("9.9.9")
+    })
+
+    it("resolves legacy package cache installs using the legacy package directory", () => {
+      //#given
+      const cacheHome = createTemporaryDirectory("omo-legacy-cache-home-")
+      const packageCacheDir = join(cacheHome, "opencode", "packages", "oh-my-opencode@3.0.0")
+
+      process.env.XDG_CACHE_HOME = cacheHome
+
+      writeJson(join(packageCacheDir, "package.json"), {
+        dependencies: { "oh-my-opencode": "3.0.0" },
+      })
+      writeJson(join(packageCacheDir, "node_modules", "oh-my-opencode", "package.json"), {
+        version: "3.0.0",
+      })
+
+      //#when
+      const loadedVersion = getLoadedPluginVersion("oh-my-opencode@3.0.0")
+
+      //#then
+      expect(loadedVersion.cacheDir).toBe(packageCacheDir)
+      expect(loadedVersion.expectedVersion).toBe("3.0.0")
+      expect(loadedVersion.loadedVersion).toBe("3.0.0")
+    })
   })
 
   describe("getSuggestedInstallTag", () => {
