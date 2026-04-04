@@ -2,6 +2,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { existsSync, readFileSync } from "node:fs"
 import { log } from "../../shared/logger"
 import { HOOK_NAME } from "./constants"
+import { ULTRAWORK_VERIFICATION_PROMISE } from "./constants"
 import { withTimeout } from "./with-timeout"
 
 interface OpenCodeSessionMessage {
@@ -16,6 +17,8 @@ interface TranscriptEntry {
 	tool_output?: { output?: string } | string
 }
 
+const ORACLE_AGENT_PATTERN = /Agent:\s*oracle/i
+
 function extractTranscriptEntryText(entry: TranscriptEntry): string {
 	if (typeof entry.content === "string") return entry.content
 	if (typeof entry.tool_output === "string") return entry.tool_output
@@ -29,6 +32,22 @@ function escapeRegex(str: string): string {
 
 function buildPromisePattern(promise: string): RegExp {
 	return new RegExp(`<promise>\\s*${escapeRegex(promise)}\\s*</promise>`, "is")
+}
+
+function shouldInspectTranscriptEntry(
+	entry: TranscriptEntry,
+	promise: string,
+	entryText: string,
+): boolean {
+	if (entry.type === "assistant" || entry.type === "text") {
+		return true
+	}
+
+	if (entry.type !== "tool_result") {
+		return false
+	}
+
+	return promise === ULTRAWORK_VERIFICATION_PROMISE && ORACLE_AGENT_PATTERN.test(entryText)
 }
 
 export function detectCompletionInTranscript(
@@ -49,10 +68,10 @@ export function detectCompletionInTranscript(
 			try {
 				const entry = JSON.parse(line) as TranscriptEntry
 				if (entry.type === "user") continue
-				if (entry.type !== "assistant" && entry.type !== "text") continue
 				if (startedAt && entry.timestamp && entry.timestamp < startedAt) continue
 				const entryText = extractTranscriptEntryText(entry)
 				if (!entryText) continue
+				if (!shouldInspectTranscriptEntry(entry, promise, entryText)) continue
 				if (pattern.test(entryText)) return true
 			} catch {
 				continue
