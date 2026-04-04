@@ -1,15 +1,6 @@
 declare const require: (name: string) => any
 const { describe, test, expect, beforeEach, afterEach, afterAll, spyOn, mock } = require("bun:test")
 
-mock.module("../../shared/connected-providers-cache", () => ({
-  readConnectedProvidersCache: () => null,
-  readProviderModelsCache: () => null,
-  hasConnectedProvidersCache: () => false,
-  hasProviderModelsCache: () => false,
-  writeProviderModelsCache: () => {},
-  updateConnectedProvidersCache: () => {},
-}))
-
 afterAll(() => { mock.restore() })
 
 import { getSessionPromptParams, clearSessionPromptParams } from "../../shared/session-prompt-params-state"
@@ -21,6 +12,15 @@ import { MIN_IDLE_TIME_MS } from "./constants"
 import { BackgroundManager } from "./manager"
 import { ConcurrencyManager } from "./concurrency"
 import { initTaskToastManager, _resetTaskToastManagerForTesting } from "../task-toast-manager/manager"
+
+mock.module("../../shared/connected-providers-cache", () => ({
+  readConnectedProvidersCache: () => null,
+  readProviderModelsCache: () => null,
+  hasConnectedProvidersCache: () => false,
+  hasProviderModelsCache: () => false,
+  writeProviderModelsCache: () => {},
+  updateConnectedProvidersCache: () => {},
+}))
 mock.restore()
 
 
