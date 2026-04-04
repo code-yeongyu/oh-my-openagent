@@ -10,7 +10,10 @@ describe("createBuiltinMcps", () => {
     const result = createBuiltinMcps(disabledMcps)
 
     // then
-    expect(result.length).toBeGreaterThan(0)
+    expect(Object.keys(result).length).toBeGreaterThan(0)
+    expect(result.websearch).toBeDefined()
+    expect(result.context7).toBeDefined()
+    expect(result.grep_app).toBeDefined()
   })
 
   test("should filter out disabled MCPs", () => {
@@ -21,20 +24,23 @@ describe("createBuiltinMcps", () => {
     const result = createBuiltinMcps(disabledMcps)
 
     // then
-    expect(result.some((mcp) => mcp.name === "websearch")).toBe(false)
+    expect(result.websearch).toBeUndefined()
+    expect(result.context7).toBeDefined()
+    expect(result.grep_app).toBeDefined()
   })
 
   test("should return empty array when all MCPs are disabled", () => {
     // given - disable all known MCPs
-    const disabledMcps = ["websearch", "context7", "grep-app"]
+    const disabledMcps = ["websearch", "context7", "grep_app"]
 
     // when
     const result = createBuiltinMcps(disabledMcps)
 
     // then - may still have MCPs we didn't list
-    const remainingMcpNames = result.map((m) => m.name)
+    const remainingMcpNames = Object.keys(result)
     expect(remainingMcpNames).not.toContain("websearch")
     expect(remainingMcpNames).not.toContain("context7")
-    expect(remainingMcpNames).not.toContain("grep-app")
+    expect(remainingMcpNames).not.toContain("grep_app")
+    expect(remainingMcpNames).toEqual([])
   })
 })
