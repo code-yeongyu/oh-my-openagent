@@ -1,24 +1,35 @@
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import type { Prompt, Resource, Tool } from "@modelcontextprotocol/sdk/types.js"
 import type { ClaudeCodeMcpServer } from "../claude-code-mcp-loader/types"
+import { McpOAuthProvider } from "../mcp-oauth/provider"
 import { disconnectAll, disconnectSession, forceReconnect } from "./cleanup"
 import { getOrCreateClient, getOrCreateClientWithRetryImpl } from "./connection"
 import { handleStepUpIfNeeded } from "./oauth-handler"
-import type { SkillMcpClientInfo, SkillMcpManagerState, SkillMcpServerContext } from "./types"
+import type {
+  OAuthProviderFactory,
+  SkillMcpClientInfo,
+  SkillMcpManagerState,
+  SkillMcpServerContext,
+} from "./types"
 
 export class SkillMcpManager {
-  private readonly state: SkillMcpManagerState = {
-    clients: new Map(),
-    pendingConnections: new Map(),
-    disconnectedSessions: new Map(),
-    authProviders: new Map(),
-    cleanupRegistered: false,
-    cleanupInterval: null,
-    cleanupHandlers: [],
-    idleTimeoutMs: 5 * 60 * 1000,
-    shutdownGeneration: 0,
-    inFlightConnections: new Map(),
-    disposed: false,
+  private readonly state: SkillMcpManagerState
+
+  constructor(options: { createOAuthProvider?: OAuthProviderFactory } = {}) {
+    this.state = {
+      clients: new Map(),
+      pendingConnections: new Map(),
+      disconnectedSessions: new Map(),
+      authProviders: new Map(),
+      cleanupRegistered: false,
+      cleanupInterval: null,
+      cleanupHandlers: [],
+      idleTimeoutMs: 5 * 60 * 1000,
+      shutdownGeneration: 0,
+      inFlightConnections: new Map(),
+      disposed: false,
+      createOAuthProvider: options.createOAuthProvider ?? ((providerOptions) => new McpOAuthProvider(providerOptions)),
+    }
   }
 
   private getClientKey(info: SkillMcpClientInfo): string {
@@ -112,6 +123,7 @@ export class SkillMcpManager {
           error: lastError,
           config,
           authProviders: this.state.authProviders,
+          createOAuthProvider: this.state.createOAuthProvider,
         })
         if (stepUpHandled) {
           await forceReconnect(this.state, this.getClientKey(info))

@@ -1,30 +1,17 @@
 import type { ModelCapabilitiesSnapshot } from "./model-capabilities"
-import { afterAll, describe, expect, test, mock } from "bun:test"
-
-afterAll(() => {
-  mock.restore()
-})
-
-async function importFreshModelCapabilitiesModule() {
-  // Mock connected-providers-cache to prevent local disk cache from polluting test results.
-  // Without this, findProviderModelMetadata reads real cached model metadata (e.g., from opencode serve)
-  // which causes the "prefers runtime models.dev cache" test to get different values than expected.
-  mock.module("./connected-providers-cache", () => ({
-    findProviderModelMetadata: () => undefined,
-    readConnectedProvidersCache: () => null,
-    hasConnectedProvidersCache: () => false,
-    hasProviderModelsCache: () => false,
-  }))
-
-  const module = await import(`./model-capabilities?test=${Date.now()}-${Math.random()}`)
-  mock.restore()
-  return module
-}
-
-const { getModelCapabilities, getBundledModelCapabilitiesSnapshot } = await importFreshModelCapabilitiesModule()
+import { afterEach, describe, expect, test, spyOn } from "bun:test"
+import * as connectedProvidersCache from "./connected-providers-cache"
+import { getModelCapabilities, getBundledModelCapabilitiesSnapshot } from "./model-capabilities"
 import { AGENT_MODEL_REQUIREMENTS, CATEGORY_MODEL_REQUIREMENTS } from "./model-requirements"
 
 describe("getModelCapabilities", () => {
+  let findProviderModelMetadataSpy: ReturnType<typeof spyOn> | undefined
+
+  afterEach(() => {
+    findProviderModelMetadataSpy?.mockRestore()
+    findProviderModelMetadataSpy = undefined
+  })
+
   const bundledSnapshot: ModelCapabilitiesSnapshot = {
     generatedAt: "2026-03-25T00:00:00.000Z",
     sourceUrl: "https://models.dev/api.json",
@@ -76,6 +63,7 @@ describe("getModelCapabilities", () => {
   }
 
   test("uses runtime metadata before snapshot data", () => {
+    findProviderModelMetadataSpy = spyOn(connectedProvidersCache, "findProviderModelMetadata").mockReturnValue(undefined)
     const result = getModelCapabilities({
       providerID: "anthropic",
       modelID: "claude-opus-4-6",
@@ -107,6 +95,7 @@ describe("getModelCapabilities", () => {
   })
 
   test("reads structured runtime capabilities from the SDK v2 shape", () => {
+    findProviderModelMetadataSpy = spyOn(connectedProvidersCache, "findProviderModelMetadata").mockReturnValue(undefined)
     const result = getModelCapabilities({
       providerID: "openai",
       modelID: "gpt-5.4",
@@ -147,6 +136,7 @@ describe("getModelCapabilities", () => {
   })
 
   test("respects root-level thinking flags when providers do not nest them under capabilities", () => {
+    findProviderModelMetadataSpy = spyOn(connectedProvidersCache, "findProviderModelMetadata").mockReturnValue(undefined)
     const result = getModelCapabilities({
       providerID: "custom-proxy",
       modelID: "gpt-5.4",
@@ -166,6 +156,7 @@ describe("getModelCapabilities", () => {
   })
 
   test("accepts runtime variant arrays without corrupting them into numeric keys", () => {
+    findProviderModelMetadataSpy = spyOn(connectedProvidersCache, "findProviderModelMetadata").mockReturnValue(undefined)
     const result = getModelCapabilities({
       providerID: "openai",
       modelID: "gpt-5.4",
@@ -179,6 +170,7 @@ describe("getModelCapabilities", () => {
   })
 
   test("normalizes the legacy Claude Opus thinking alias before snapshot lookup", () => {
+    findProviderModelMetadataSpy = spyOn(connectedProvidersCache, "findProviderModelMetadata").mockReturnValue(undefined)
     const result = getModelCapabilities({
       providerID: "anthropic",
       modelID: "claude-opus-4-6-thinking",
@@ -203,6 +195,7 @@ describe("getModelCapabilities", () => {
   })
 
   test("maps local gemini aliases to canonical models.dev entries", () => {
+    findProviderModelMetadataSpy = spyOn(connectedProvidersCache, "findProviderModelMetadata").mockReturnValue(undefined)
     const result = getModelCapabilities({
       providerID: "google",
       modelID: "gemini-3.1-pro-high",
@@ -227,6 +220,7 @@ describe("getModelCapabilities", () => {
   })
 
   test("prefers runtime models.dev cache over bundled snapshot", () => {
+    findProviderModelMetadataSpy = spyOn(connectedProvidersCache, "findProviderModelMetadata").mockReturnValue(undefined)
     const runtimeSnapshot: ModelCapabilitiesSnapshot = {
       ...bundledSnapshot,
       models: {

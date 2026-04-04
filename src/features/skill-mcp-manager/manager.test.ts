@@ -7,7 +7,6 @@ const mockHttpConnect = mock(() => Promise.reject(new Error("Mocked HTTP connect
 const mockHttpClose = mock(() => Promise.resolve())
 let lastTransportInstance: { url?: URL; options?: { requestInit?: RequestInit } } = {}
 
-// Mock OAuth provider for OAuth integration tests
 const mockTokens = mock(() => null as { accessToken: string } | null)
 const mockLogin = mock(() => Promise.resolve({ accessToken: "test-token" }) as Promise<{ accessToken: string } | null>)
 
@@ -26,14 +25,6 @@ async function importFreshManagerModule(): Promise<typeof import("./manager")> {
     },
   }))
 
-  mock.module("../mcp-oauth/provider", () => ({
-    McpOAuthProvider: class MockMcpOAuthProvider {
-      tokens = mockTokens
-      login = mockLogin
-      constructor(_opts: unknown) {}
-    },
-  }))
-
   const module = await import(`./manager?test=${Date.now()}-${Math.random()}`)
   mock.restore()
   return module
@@ -46,7 +37,12 @@ describe("SkillMcpManager", () => {
 
   beforeEach(async () => {
     const { SkillMcpManager } = await importFreshManagerModule()
-    manager = new SkillMcpManager()
+    manager = new SkillMcpManager({
+      createOAuthProvider: () => ({
+        tokens: () => mockTokens(),
+        login: () => mockLogin(),
+      }),
+    })
     mockHttpConnect.mockClear()
     mockHttpClose.mockClear()
     mockTokens.mockClear()

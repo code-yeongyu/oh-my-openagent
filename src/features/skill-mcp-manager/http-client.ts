@@ -42,7 +42,7 @@ export async function createHttpClient(params: SkillMcpClientConnectionParams): 
 
   registerProcessCleanup(state)
 
-  const requestInit = await buildHttpRequestInit(config, state.authProviders)
+  const requestInit = await buildHttpRequestInit(config, state.authProviders, state.createOAuthProvider)
   const transport = new StreamableHTTPClientTransport(url, {
     requestInit,
   })

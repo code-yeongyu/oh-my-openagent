@@ -1,26 +1,19 @@
 declare const require: (name: string) => any
-const { describe, expect, test, beforeEach, mock, afterAll } = require("bun:test")
+const { describe, expect, test, beforeEach, afterEach, mock, spyOn } = require("bun:test")
+import * as connectedProvidersCache from "./connected-providers-cache"
 
-const readConnectedProvidersCacheMock = mock(() => null)
-
-async function importFreshModelErrorClassifierModule() {
-  mock.module("./connected-providers-cache", () => ({
-    readConnectedProvidersCache: readConnectedProvidersCacheMock,
-  }))
-
-  const module = await import(`./model-error-classifier?test=${Date.now()}-${Math.random()}`)
-  mock.restore()
-  return module
-}
-
-afterAll(() => { mock.restore() })
-
-const { shouldRetryError, selectFallbackProvider } = await importFreshModelErrorClassifierModule()
+let readConnectedProvidersCacheSpy: ReturnType<typeof spyOn> | undefined
+const { shouldRetryError, selectFallbackProvider } = await import("./model-error-classifier")
 
 describe("model-error-classifier", () => {
   beforeEach(() => {
-    readConnectedProvidersCacheMock.mockReturnValue(null)
-    readConnectedProvidersCacheMock.mockClear()
+    readConnectedProvidersCacheSpy?.mockRestore()
+    readConnectedProvidersCacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(null)
+  })
+
+  afterEach(() => {
+    readConnectedProvidersCacheSpy?.mockRestore()
+    readConnectedProvidersCacheSpy = undefined
   })
 
   test("treats overloaded retry messages as retryable", () => {
@@ -50,7 +43,7 @@ describe("model-error-classifier", () => {
 
   test("selectFallbackProvider prefers first connected provider in preference order", () => {
     //#given
-    readConnectedProvidersCacheMock.mockReturnValue(["anthropic", "nvidia"])
+    readConnectedProvidersCacheSpy?.mockReturnValue(["anthropic", "nvidia"])
 
     //#when
     const provider = selectFallbackProvider(["anthropic", "nvidia"], "nvidia")
@@ -61,7 +54,7 @@ describe("model-error-classifier", () => {
 
   test("selectFallbackProvider falls back to next connected provider when first is disconnected", () => {
     //#given
-    readConnectedProvidersCacheMock.mockReturnValue(["nvidia"])
+    readConnectedProvidersCacheSpy?.mockReturnValue(["nvidia"])
 
     //#when
     const provider = selectFallbackProvider(["anthropic", "nvidia"])
@@ -82,7 +75,7 @@ describe("model-error-classifier", () => {
 
   test("selectFallbackProvider uses connected preferred provider when fallback providers are unavailable", () => {
     //#given
-    readConnectedProvidersCacheMock.mockReturnValue(["provider-x"])
+    readConnectedProvidersCacheSpy?.mockReturnValue(["provider-x"])
 
     //#when
     const provider = selectFallbackProvider(["provider-y"], "provider-x")
