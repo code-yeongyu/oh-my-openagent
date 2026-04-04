@@ -229,9 +229,9 @@ export function createNiobeAgent(model: string): AgentConfig {
   } as AgentConfig
 
   if (isGptModel(model)) {
-    return { ...base, maxTokens: 32000, reasoningEffort: "medium", textVerbosity: "high" } as AgentConfig
+    return { ...base, maxTokens: 16000, reasoningEffort: "medium", textVerbosity: "high" } as AgentConfig
   }
 
-  return { ...base, maxTokens: 32000, thinking: { type: "enabled", budgetTokens: 16000 } } as AgentConfig
+  return { ...base, maxTokens: 16000 } as AgentConfig
 }
 createNiobeAgent.mode = MODE

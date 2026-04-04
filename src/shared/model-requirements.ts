@@ -88,25 +88,25 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   cipher: {
     fallbackChain: [
-      { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-opus-4-6", variant: "max" },
-      { providers: ["google-vertex-anthropic"], model: "claude-opus-4-6@default", variant: "max" },
-      { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.2", variant: "high" },
+      { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-sonnet-4-6" },
+      { providers: ["google-vertex-anthropic"], model: "claude-sonnet-4-6@default" },
+      { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.2" },
       { providers: ["google", "github-copilot", "opencode"], model: "gemini-3.1-pro" },
     ],
   },
   niobe: {
     fallbackChain: [
-      { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-opus-4-6", variant: "max" },
-      { providers: ["google-vertex-anthropic"], model: "claude-opus-4-6@default", variant: "max" },
-      { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.2", variant: "high" },
+      { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-sonnet-4-6" },
+      { providers: ["google-vertex-anthropic"], model: "claude-sonnet-4-6@default" },
+      { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.2" },
       { providers: ["google", "github-copilot", "opencode"], model: "gemini-3.1-pro" },
     ],
   },
   sentinel: {
     fallbackChain: [
-      { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-opus-4-6", variant: "max" },
-      { providers: ["google-vertex-anthropic"], model: "claude-opus-4-6@default", variant: "max" },
-      { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.2", variant: "high" },
+      { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-sonnet-4-6" },
+      { providers: ["google-vertex-anthropic"], model: "claude-sonnet-4-6@default" },
+      { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.2" },
       { providers: ["google", "github-copilot", "opencode"], model: "gemini-3.1-pro" },
     ],
   },

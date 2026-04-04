@@ -80,7 +80,7 @@ Give him a goal, not a recipe. Explores the codebase, matches your patterns, and
 ### Cipher — *The Language Architect*
 <img src=".github/assets/cipher.png" width="120" align="right"/>
 
-**Claude Opus 4.6** &middot; DSL specialist
+**Claude Sonnet 4.6** &middot; DSL specialist
 
 Grammars, parsers, type systems, code generators, metamodels. 11 composable skills covering textX, ANTLR4, tree-sitter, PyEcore, and more.
 
@@ -90,7 +90,7 @@ Grammars, parsers, type systems, code generators, metamodels. 11 composable skil
 ### Niobe — *The Research Navigator*
 <img src=".github/assets/niobe.png" width="120" align="right"/>
 
-**Claude Opus 4.6** &middot; Research & technical leadership
+**Claude Sonnet 4.6** &middot; Research & technical leadership
 
 Academic papers, EU proposals, systematic reviews, project management, IP exploitation. 12 composable skills covering the full research lifecycle.
 
@@ -102,7 +102,7 @@ Academic papers, EU proposals, systematic reviews, project management, IP exploi
 ### Sentinel — *The Security Auditor*
 <img src=".github/assets/sentinel.png" width="120" align="right"/>
 
-**Claude Opus 4.6** &middot; Read-only security specialist
+**Claude Sonnet 4.6** &middot; Read-only security specialist
 
 Scans for vulnerabilities but never touches code. OWASP Top 10, SAST, DAST, dependency CVEs, secret detection, crypto audit, infrastructure hardening. 9 composable skills any agent can load.
 

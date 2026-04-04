@@ -211,9 +211,9 @@ export function createSentinelAgent(model: string): AgentConfig {
   } as AgentConfig
 
   if (isGptModel(model)) {
-    return { ...base, maxTokens: 24000, reasoningEffort: "medium", textVerbosity: "high" } as AgentConfig
+    return { ...base, maxTokens: 16000, reasoningEffort: "medium", textVerbosity: "high" } as AgentConfig
   }
 
-  return { ...base, maxTokens: 24000, thinking: { type: "enabled", budgetTokens: 12000 } } as AgentConfig
+  return { ...base, maxTokens: 16000 } as AgentConfig
 }
 createSentinelAgent.mode = MODE
