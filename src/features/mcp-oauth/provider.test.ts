@@ -1,7 +1,13 @@
 import { describe, expect, it, beforeEach, afterEach, mock } from "bun:test"
 import { createHash, randomBytes } from "node:crypto"
-import { McpOAuthProvider, generateCodeVerifier, generateCodeChallenge, buildAuthorizationUrl } from "./provider"
 import type { OAuthTokenData } from "./storage"
+
+const {
+  McpOAuthProvider,
+  generateCodeVerifier,
+  generateCodeChallenge,
+  buildAuthorizationUrl,
+} = await import(new URL("./provider.ts", import.meta.url).href)
 
 describe("McpOAuthProvider", () => {
   describe("generateCodeVerifier", () => {

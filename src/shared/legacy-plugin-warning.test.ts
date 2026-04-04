@@ -2,7 +2,10 @@ import { describe, expect, it } from "bun:test"
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { checkForLegacyPluginEntry } from "./legacy-plugin-warning"
+
+const { checkForLegacyPluginEntry } = await import(
+  new URL("./legacy-plugin-warning.ts", import.meta.url).href
+)
 
 function createTestConfigDir(): string {
   return mkdtempSync(join(tmpdir(), "omo-legacy-check-"))

@@ -5,7 +5,10 @@ import { describe, expect, test } from "bun:test"
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { createConnectedProvidersCacheStore, findProviderModelMetadata } from "./connected-providers-cache"
+
+const { createConnectedProvidersCacheStore, findProviderModelMetadata } = await import(
+  new URL("./connected-providers-cache.ts", import.meta.url).href
+)
 
 function createTestCacheContext() {
 	const fakeUserCacheRoot = mkdtempSync(join(tmpdir(), "connected-providers-user-cache-"))
