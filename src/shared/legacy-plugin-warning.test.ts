@@ -1,13 +1,11 @@
 import { describe, expect, it } from "bun:test"
-import { mkdirSync, rmSync, writeFileSync } from "node:fs"
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { checkForLegacyPluginEntry } from "./legacy-plugin-warning"
 
 function createTestConfigDir(): string {
-  const testConfigDir = join(tmpdir(), `omo-legacy-check-${Date.now()}-${Math.random().toString(36).slice(2)}`)
-  mkdirSync(testConfigDir, { recursive: true })
-  return testConfigDir
+  return mkdtempSync(join(tmpdir(), "omo-legacy-check-"))
 }
 
 function cleanupTestConfigDir(testConfigDir: string): void {
