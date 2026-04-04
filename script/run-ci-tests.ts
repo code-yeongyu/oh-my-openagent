@@ -6,7 +6,7 @@ type CiTestPlan = {
   sharedTestFiles: string[]
 }
 
-const TEST_ROOTS = ["script", "src"] as const
+const TEST_ROOTS = ["bin", "script", "src"] as const
 const MODULE_MOCK_PATTERN = "mock.module("
 
 async function collectTestFiles(rootDirectory: string): Promise<string[]> {
