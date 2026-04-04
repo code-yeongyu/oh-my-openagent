@@ -16,6 +16,8 @@ import { resolveModelForDelegateTask } from "./model-selection"
 import { fuzzyMatchModel } from "../../shared/model-availability"
 import type { CategoryConfig } from "../../config/schema"
 
+type AgentMode = "subagent" | "primary" | "all" | undefined
+
 function applyCategoryParams(
   base: DelegatedModelConfig,
   config: CategoryConfig | undefined,
@@ -85,7 +87,7 @@ Create the work plan directly - that's your job as the planning agent.`,
       preferResponseOnMissingData: true,
     })
 
-    const callableAgents = agents.filter((a) => a.mode !== "primary")
+    const callableAgents = agents.filter((agent) => isTaskCallableAgentMode(agent.mode))
 
     const resolvedDisplayName = getAgentDisplayName(agentToUse)
     const matchedAgent = callableAgents.find(
@@ -93,19 +95,6 @@ Create the work plan directly - that's your job as the planning agent.`,
         || agent.name.toLowerCase() === resolvedDisplayName.toLowerCase()
     )
     if (!matchedAgent) {
-      const isPrimaryAgent = agents
-        .filter((a) => a.mode === "primary")
-        .find((agent) => agent.name.toLowerCase() === agentToUse.toLowerCase()
-          || agent.name.toLowerCase() === resolvedDisplayName.toLowerCase())
-
-      if (isPrimaryAgent) {
-        return {
-          agentToUse: "",
-          categoryModel: undefined,
-    error: `Cannot call primary agent "${isPrimaryAgent.name}" via task. Primary agents are top-level orchestrators.`,
-        }
-      }
-
       const availableAgents = callableAgents
         .map((a) => a.name)
         .sort()
@@ -238,4 +227,8 @@ Create the work plan directly - that's your job as the planning agent.`,
   }
 
   return { agentToUse, categoryModel, fallbackChain }
+}
+
+function isTaskCallableAgentMode(mode: AgentMode): boolean {
+  return mode === "all" || mode === "subagent"
 }

@@ -85,6 +85,41 @@ describe("resolveSubagentExecution", () => {
     })
   })
 
+  test("hides primary agents from task delegation lookups", async () => {
+    //#given
+    const args = createBaseArgs({ subagent_type: "sisyphus" })
+    const executorCtx = createExecutorContext(async () => ([
+      { name: "sisyphus", mode: "primary" },
+      { name: "oracle", mode: "subagent" },
+      { name: "metis", mode: "all" },
+    ]))
+
+    //#when
+    const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep")
+
+    //#then
+    expect(result.agentToUse).toBe("")
+    expect(result.categoryModel).toBeUndefined()
+    expect(result.error).toBe('Unknown agent: "sisyphus". Available agents: metis, oracle')
+  })
+
+  test("requires explicit all or subagent mode for task-callable agents", async () => {
+    //#given
+    const args = createBaseArgs({ subagent_type: "custom-worker" })
+    const executorCtx = createExecutorContext(async () => ([
+      { name: "custom-worker" },
+      { name: "oracle", mode: "subagent" },
+    ]))
+
+    //#when
+    const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep")
+
+    //#then
+    expect(result.agentToUse).toBe("")
+    expect(result.categoryModel).toBeUndefined()
+    expect(result.error).toBe('Unknown agent: "custom-worker". Available agents: oracle')
+  })
+
   test("normalizes matched agent model string before returning categoryModel", async () => {
     //#given
     const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
