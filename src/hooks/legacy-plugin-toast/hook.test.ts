@@ -1,5 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it, mock } from "bun:test"
 import type { MigrationResult } from "./auto-migrate-runner"
+import { createLegacyPluginToastHook } from "./hook"
 
 const mockCheckForLegacyPluginEntry = mock(() => ({
   hasLegacyEntry: false,
@@ -40,24 +41,6 @@ function createEvent(type: string, parentID?: string) {
   }
 }
 
-async function importFreshModule() {
-  mock.module("../../shared/legacy-plugin-warning", () => ({
-    checkForLegacyPluginEntry: mockCheckForLegacyPluginEntry,
-  }))
-
-  mock.module("../../shared/logger", () => ({
-    log: mockLog,
-  }))
-
-  mock.module("./auto-migrate-runner", () => ({
-    autoMigrateLegacyPluginEntry: mockAutoMigrate,
-  }))
-
-  const module = await import(`./hook?t=${Date.now()}-${Math.random()}`)
-  mock.restore()
-  return module
-}
-
 describe("createLegacyPluginToastHook", () => {
   beforeEach(() => {
     mockCheckForLegacyPluginEntry.mockReset()
@@ -77,8 +60,11 @@ describe("createLegacyPluginToastHook", () => {
   describe("#given no legacy entry exists", () => {
     it("#then does not show a toast", async () => {
       // given
-      const { createLegacyPluginToastHook } = await importFreshModule()
-      const hook = createLegacyPluginToastHook(createMockCtx())
+      const hook = createLegacyPluginToastHook(createMockCtx(), {
+        checkForLegacyPluginEntry: mockCheckForLegacyPluginEntry,
+        log: mockLog,
+        autoMigrateLegacyPluginEntry: mockAutoMigrate,
+      })
 
       // when
       await hook.event(createEvent("session.created"))
@@ -102,8 +88,11 @@ describe("createLegacyPluginToastHook", () => {
         to: "oh-my-openagent",
         configPath: "/tmp/opencode.json",
       })
-      const { createLegacyPluginToastHook } = await importFreshModule()
-      const hook = createLegacyPluginToastHook(createMockCtx())
+      const hook = createLegacyPluginToastHook(createMockCtx(), {
+        checkForLegacyPluginEntry: mockCheckForLegacyPluginEntry,
+        log: mockLog,
+        autoMigrateLegacyPluginEntry: mockAutoMigrate,
+      })
 
       // when
       await hook.event(createEvent("session.created"))
@@ -129,8 +118,11 @@ describe("createLegacyPluginToastHook", () => {
         to: null,
         configPath: "/tmp/opencode.json",
       })
-      const { createLegacyPluginToastHook } = await importFreshModule()
-      const hook = createLegacyPluginToastHook(createMockCtx())
+      const hook = createLegacyPluginToastHook(createMockCtx(), {
+        checkForLegacyPluginEntry: mockCheckForLegacyPluginEntry,
+        log: mockLog,
+        autoMigrateLegacyPluginEntry: mockAutoMigrate,
+      })
 
       // when
       await hook.event(createEvent("session.created"))
@@ -156,8 +148,11 @@ describe("createLegacyPluginToastHook", () => {
         to: "oh-my-openagent",
         configPath: "/tmp/opencode.json",
       })
-      const { createLegacyPluginToastHook } = await importFreshModule()
-      const hook = createLegacyPluginToastHook(createMockCtx())
+      const hook = createLegacyPluginToastHook(createMockCtx(), {
+        checkForLegacyPluginEntry: mockCheckForLegacyPluginEntry,
+        log: mockLog,
+        autoMigrateLegacyPluginEntry: mockAutoMigrate,
+      })
 
       // when
       await hook.event(createEvent("session.created"))
@@ -176,8 +171,11 @@ describe("createLegacyPluginToastHook", () => {
         hasCanonicalEntry: false,
         legacyEntries: ["oh-my-opencode"],
       })
-      const { createLegacyPluginToastHook } = await importFreshModule()
-      const hook = createLegacyPluginToastHook(createMockCtx())
+      const hook = createLegacyPluginToastHook(createMockCtx(), {
+        checkForLegacyPluginEntry: mockCheckForLegacyPluginEntry,
+        log: mockLog,
+        autoMigrateLegacyPluginEntry: mockAutoMigrate,
+      })
 
       // when
       await hook.event(createEvent("session.deleted"))
@@ -195,8 +193,11 @@ describe("createLegacyPluginToastHook", () => {
         hasCanonicalEntry: false,
         legacyEntries: ["oh-my-opencode"],
       })
-      const { createLegacyPluginToastHook } = await importFreshModule()
-      const hook = createLegacyPluginToastHook(createMockCtx())
+      const hook = createLegacyPluginToastHook(createMockCtx(), {
+        checkForLegacyPluginEntry: mockCheckForLegacyPluginEntry,
+        log: mockLog,
+        autoMigrateLegacyPluginEntry: mockAutoMigrate,
+      })
 
       // when
       await hook.event(createEvent("session.created", "parent-session-id"))

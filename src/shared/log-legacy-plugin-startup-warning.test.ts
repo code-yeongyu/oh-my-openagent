@@ -2,6 +2,7 @@
 
 import { afterAll, afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
 import type { LegacyPluginCheckResult } from "./legacy-plugin-warning"
+import { logLegacyPluginStartupWarning } from "./log-legacy-plugin-startup-warning"
 
 function createLegacyPluginCheckResult(
   overrides: Partial<LegacyPluginCheckResult> = {},
@@ -25,22 +26,8 @@ afterAll(() => {
 })
 
 async function importFreshStartupWarningModule(): Promise<typeof import("./log-legacy-plugin-startup-warning")> {
-  mock.module("./legacy-plugin-warning", () => ({
-    checkForLegacyPluginEntry: mockCheckForLegacyPluginEntry,
-  }))
-
-  mock.module("./logger", () => ({
-    log: mockLog,
-  }))
-
-  mock.module("./migrate-legacy-plugin-entry", () => ({
-    migrateLegacyPluginEntry: mockMigrateLegacyPluginEntry,
-  }))
-
-  const module = await import(`./log-legacy-plugin-startup-warning?test=${Date.now()}-${Math.random()}`)
-  mock.restore()
   consoleWarnSpy = spyOn(console, "warn").mockImplementation(() => {})
-  return module
+  return { logLegacyPluginStartupWarning }
 }
 
 describe("logLegacyPluginStartupWarning", () => {
@@ -69,7 +56,11 @@ describe("logLegacyPluginStartupWarning", () => {
       const { logLegacyPluginStartupWarning } = await importFreshStartupWarningModule()
 
       //#when
-      logLegacyPluginStartupWarning()
+      logLegacyPluginStartupWarning({
+        checkForLegacyPluginEntry: mockCheckForLegacyPluginEntry,
+        log: mockLog,
+        migrateLegacyPluginEntry: mockMigrateLegacyPluginEntry,
+      })
 
       //#then
       expect(mockLog).toHaveBeenCalledTimes(1)
@@ -93,7 +84,11 @@ describe("logLegacyPluginStartupWarning", () => {
       const { logLegacyPluginStartupWarning } = await importFreshStartupWarningModule()
 
       //#when
-      logLegacyPluginStartupWarning()
+      logLegacyPluginStartupWarning({
+        checkForLegacyPluginEntry: mockCheckForLegacyPluginEntry,
+        log: mockLog,
+        migrateLegacyPluginEntry: mockMigrateLegacyPluginEntry,
+      })
 
       //#then
       expect(consoleWarnSpy).toHaveBeenCalled()
@@ -112,7 +107,11 @@ describe("logLegacyPluginStartupWarning", () => {
       const { logLegacyPluginStartupWarning } = await importFreshStartupWarningModule()
 
       //#when
-      logLegacyPluginStartupWarning()
+      logLegacyPluginStartupWarning({
+        checkForLegacyPluginEntry: mockCheckForLegacyPluginEntry,
+        log: mockLog,
+        migrateLegacyPluginEntry: mockMigrateLegacyPluginEntry,
+      })
 
       //#then
       expect(mockMigrateLegacyPluginEntry).toHaveBeenCalledWith("/tmp/opencode.json")
@@ -125,7 +124,11 @@ describe("logLegacyPluginStartupWarning", () => {
       const { logLegacyPluginStartupWarning } = await importFreshStartupWarningModule()
 
       //#when
-      logLegacyPluginStartupWarning()
+      logLegacyPluginStartupWarning({
+        checkForLegacyPluginEntry: mockCheckForLegacyPluginEntry,
+        log: mockLog,
+        migrateLegacyPluginEntry: mockMigrateLegacyPluginEntry,
+      })
 
       //#then
       expect(mockLog).not.toHaveBeenCalled()
@@ -145,7 +148,11 @@ describe("logLegacyPluginStartupWarning", () => {
       const { logLegacyPluginStartupWarning } = await importFreshStartupWarningModule()
 
       //#when
-      logLegacyPluginStartupWarning()
+      logLegacyPluginStartupWarning({
+        checkForLegacyPluginEntry: mockCheckForLegacyPluginEntry,
+        log: mockLog,
+        migrateLegacyPluginEntry: mockMigrateLegacyPluginEntry,
+      })
 
       //#then
       const calls = consoleWarnSpy.mock.calls.map((call: string[]) => call[0] ?? "")
