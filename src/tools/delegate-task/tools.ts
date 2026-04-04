@@ -1,5 +1,5 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin"
-import type { DelegateTaskArgs, ToolContextWithMetadata, DelegateTaskToolOptions } from "./types"
+import type { DelegateTaskArgs, DelegatedModelConfig, ToolContextWithMetadata, DelegateTaskToolOptions } from "./types"
 import { CATEGORY_DESCRIPTIONS } from "./constants"
 import { SISYPHUS_JUNIOR_AGENT } from "./sisyphus-junior-agent"
 import { mergeCategories } from "../../shared/merge-categories"
@@ -23,7 +23,7 @@ import {
 
 export { resolveCategoryConfig } from "./categories"
 export type { SyncSessionCreatedEvent, DelegateTaskToolOptions, BuildSystemContentInput } from "./types"
-export { buildSystemContent } from "./prompt-builder"
+export { buildSystemContent, buildTaskPrompt } from "./prompt-builder"
 
 export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefinition {
   const { userCategories } = options
@@ -83,7 +83,7 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
     Available categories:
   ${categoryList}
   - subagent_type: Use specific agent directly (explore, librarian, oracle, metis, momus)
-  - run_in_background: true=async (returns task_id), false=sync (waits). Default: false. Use background=true ONLY for parallel exploration with 5+ independent queries.
+  - run_in_background: REQUIRED. true=async (returns task_id), false=sync (waits). Use background=true ONLY for parallel exploration with 5+ independent queries.
   - session_id: Existing Task session to continue (from previous task output). Continues agent with FULL CONTEXT PRESERVED - saves tokens, maintains continuity.
   - command: The command that triggered this task (optional, for slash command tracking).
   
@@ -100,7 +100,7 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
       load_skills: tool.schema.array(tool.schema.string()).describe("Skill names to inject. REQUIRED - pass [] if no skills needed."),
       description: tool.schema.string().describe("Short task description (3-5 words)"),
       prompt: tool.schema.string().describe("Full detailed prompt for the agent"),
-      run_in_background: tool.schema.boolean().describe("true=async (returns task_id), false=sync (waits). Default: false"),
+      run_in_background: tool.schema.boolean().describe("REQUIRED. true=async (returns task_id), false=sync (waits). Use false for task delegation, true ONLY for parallel exploration."),
       category: tool.schema.string().optional().describe(`REQUIRED if subagent_type not provided. Do NOT provide both category and subagent_type.`),
       subagent_type: tool.schema.string().optional().describe("REQUIRED if category not provided. Do NOT provide both category and subagent_type."),
       session_id: tool.schema.string().optional().describe("Existing Task session to continue"),
@@ -123,7 +123,7 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
       })
 
       if (args.run_in_background === undefined) {
-        throw new Error(`Invalid arguments: 'run_in_background' parameter is REQUIRED. Use run_in_background=false for task delegation, run_in_background=true only for parallel exploration.`)
+        throw new Error(`Invalid arguments: 'run_in_background' parameter is REQUIRED. Specify run_in_background=false for task delegation, or run_in_background=true for parallel exploration.`)
       }
       if (typeof args.load_skills === "string") {
         try {
@@ -178,7 +178,7 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
         : undefined
 
       let agentToUse: string
-      let categoryModel: { providerID: string; modelID: string; variant?: string } | undefined
+      let categoryModel: DelegatedModelConfig | undefined
       let categoryPromptAppend: string | undefined
       let modelInfo: import("../../features/task-toast-manager/types").ModelFallbackInfo | undefined
       let actualModel: string | undefined

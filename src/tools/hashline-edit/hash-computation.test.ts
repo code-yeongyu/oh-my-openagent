@@ -1,6 +1,7 @@
 import { describe, it, expect } from "bun:test"
 import {
   computeLineHash,
+  computeLegacyLineHash,
   formatHashLine,
   formatHashLines,
   streamHashLinesFromLines,
@@ -45,10 +46,62 @@ describe("computeLineHash", () => {
     expect(hash1).not.toBe(hash2)
   })
 
-  it("ignores whitespace differences", () => {
+  it("produces different hashes for different leading indentation", () => {
     //#given
     const content1 = "function hello() {"
-    const content2 = "  function hello() {  "
+    const content2 = "  function hello() {"
+
+    //#when
+    const hash1 = computeLineHash(1, content1)
+    const hash2 = computeLineHash(1, content2)
+
+    //#then
+    expect(hash1).not.toBe(hash2)
+  })
+
+  it("preserves legacy hashes for leading indentation variants", () => {
+    //#given
+    const content1 = "function hello() {"
+    const content2 = "  function hello() {"
+
+    //#when
+    const hash1 = computeLegacyLineHash(1, content1)
+    const hash2 = computeLegacyLineHash(1, content2)
+
+    //#then
+    expect(hash1).toBe(hash2)
+  })
+
+  it("preserves legacy hashes for internal whitespace variants", () => {
+    //#given
+    const content1 = "if (a && b) {"
+    const content2 = "if(a&&b){"
+
+    //#when
+    const hash1 = computeLegacyLineHash(1, content1)
+    const hash2 = computeLegacyLineHash(1, content2)
+
+    //#then
+    expect(hash1).toBe(hash2)
+  })
+
+  it("ignores trailing whitespace differences", () => {
+    //#given
+    const content1 = "function hello() {"
+    const content2 = "function hello() {  "
+
+    //#when
+    const hash1 = computeLineHash(1, content1)
+    const hash2 = computeLineHash(1, content2)
+
+    //#then
+    expect(hash1).toBe(hash2)
+  })
+
+  it("produces same hash for CRLF and LF line endings", () => {
+    //#given
+    const content1 = "function hello() {"
+    const content2 = "function hello() {\r"
 
     //#when
     const hash1 = computeLineHash(1, content1)

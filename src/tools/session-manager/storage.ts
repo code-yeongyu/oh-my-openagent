@@ -277,7 +277,7 @@ export async function readSessionTodos(sessionID: string): Promise<TodoItem[]> {
 
   try {
     const allFiles = await readdir(TODO_DIR)
-    const todoFiles = allFiles.filter((f) => f.includes(sessionID) && f.endsWith(".json"))
+    const todoFiles = allFiles.filter((f) => f === `${sessionID}.json`)
 
     for (const file of todoFiles) {
       try {

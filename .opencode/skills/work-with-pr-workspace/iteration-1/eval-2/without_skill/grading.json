@@ -1,0 +1,11 @@
+{
+  "run_id": "eval-2-without_skill",
+  "expectations": [
+    {"text": "Plan uses git worktree in a sibling directory", "passed": false, "evidence": "No worktree. Steps go directly to creating branch and modifying files."},
+    {"text": "Fix is minimal — adds null check, doesn't refactor unrelated code", "passed": true, "evidence": "Focused fix though also adds try/catch in setTimeout (reasonable secondary fix)"},
+    {"text": "Test case added for the missing worktree_path scenario", "passed": true, "evidence": "Detailed test plan for missing/null/malformed boulder.json"},
+    {"text": "Verification loop includes all 3 gates", "passed": false, "evidence": "Only mentions CI pipeline (step 5). No review-work or Cubic."},
+    {"text": "References actual atlas hook files", "passed": true, "evidence": "References idle-event.ts, storage.ts with line numbers"},
+    {"text": "Branch name follows fix/ prefix convention", "passed": true, "evidence": "fix/atlas-hook-missing-worktree-path"}
+  ]
+}

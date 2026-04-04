@@ -3,12 +3,20 @@ import { createHashlineChunkFormatter } from "./hashline-chunk-formatter"
 
 const RE_SIGNIFICANT = /[\p{L}\p{N}]/u
 
-export function computeLineHash(lineNumber: number, content: string): string {
-  const stripped = content.endsWith("\r") ? content.slice(0, -1).replace(/\s+/g, "") : content.replace(/\s+/g, "")
+function computeNormalizedLineHash(lineNumber: number, normalizedContent: string): string {
+  const stripped = normalizedContent
   const seed = RE_SIGNIFICANT.test(stripped) ? 0 : lineNumber
   const hash = Bun.hash.xxHash32(stripped, seed)
   const index = hash % 256
   return HASHLINE_DICT[index]
+}
+
+export function computeLineHash(lineNumber: number, content: string): string {
+  return computeNormalizedLineHash(lineNumber, content.replace(/\r/g, "").trimEnd())
+}
+
+export function computeLegacyLineHash(lineNumber: number, content: string): string {
+  return computeNormalizedLineHash(lineNumber, content.replace(/\r/g, "").replace(/\s+/g, ""))
 }
 
 export function formatHashLine(lineNumber: number, content: string): string {
@@ -78,15 +86,17 @@ export async function* streamHashLinesFromUtf8(
     pending += text
     const chunksToYield: string[] = []
 
+    let lastIdx = 0
     while (true) {
-      const idx = pending.indexOf("\n")
+      const idx = pending.indexOf("\n", lastIdx)
       if (idx === -1) break
-      const line = pending.slice(0, idx)
-      pending = pending.slice(idx + 1)
+      const line = pending.slice(lastIdx, idx)
+      lastIdx = idx + 1
       endedWithNewline = true
       chunksToYield.push(...pushLine(line))
     }
 
+    pending = pending.slice(lastIdx)
     if (pending.length > 0) endedWithNewline = false
     return chunksToYield
   }

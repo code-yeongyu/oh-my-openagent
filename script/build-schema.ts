@@ -8,7 +8,6 @@ async function main() {
   console.log("Generating JSON Schema...")
 
   const finalSchema = createOhMyOpenCodeJsonSchema()
-
   await Bun.write(SCHEMA_OUTPUT_PATH, JSON.stringify(finalSchema, null, 2))
   await Bun.write(DIST_SCHEMA_OUTPUT_PATH, JSON.stringify(finalSchema, null, 2))
 

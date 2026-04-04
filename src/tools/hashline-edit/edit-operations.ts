@@ -11,6 +11,14 @@ import {
 } from "./edit-operation-primitives"
 import { validateLineRefs } from "./validation"
 
+function arraysEqual(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false
+  }
+  return true
+}
+
 export interface HashlineApplyReport {
   content: string
   noopEdits: number
@@ -51,7 +59,7 @@ export function applyHashlineEditsWithReport(content: string, edits: HashlineEdi
         const next = edit.end
           ? applyReplaceLines(lines, edit.pos, edit.end, edit.lines, { skipValidation: true })
           : applySetLine(lines, edit.pos, edit.lines, { skipValidation: true })
-        if (next.join("\n") === lines.join("\n")) {
+        if (arraysEqual(next, lines)) {
           noopEdits += 1
           break
         }
@@ -62,7 +70,7 @@ export function applyHashlineEditsWithReport(content: string, edits: HashlineEdi
         const next = edit.pos
           ? applyInsertAfter(lines, edit.pos, edit.lines, { skipValidation: true })
           : applyAppend(lines, edit.lines)
-        if (next.join("\n") === lines.join("\n")) {
+        if (arraysEqual(next, lines)) {
           noopEdits += 1
           break
         }
@@ -73,7 +81,7 @@ export function applyHashlineEditsWithReport(content: string, edits: HashlineEdi
         const next = edit.pos
           ? applyInsertBefore(lines, edit.pos, edit.lines, { skipValidation: true })
           : applyPrepend(lines, edit.lines)
-        if (next.join("\n") === lines.join("\n")) {
+        if (arraysEqual(next, lines)) {
           noopEdits += 1
           break
         }

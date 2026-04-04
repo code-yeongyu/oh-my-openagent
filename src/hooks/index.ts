@@ -26,6 +26,7 @@ export { createNonInteractiveEnvHook } from "./non-interactive-env";
 export { createInteractiveBashSessionHook } from "./interactive-bash-session";
 
 export { createThinkingBlockValidatorHook } from "./thinking-block-validator";
+export { createToolPairValidatorHook } from "./tool-pair-validator";
 export { createCategorySkillReminderHook } from "./category-skill-reminder";
 export { createRalphLoopHook, type RalphLoopHook } from "./ralph-loop";
 export { createNoSisyphusGptHook } from "./no-sisyphus-gpt";
@@ -48,6 +49,10 @@ export { createPreemptiveCompactionHook } from "./preemptive-compaction";
 export { createTasksTodowriteDisablerHook } from "./tasks-todowrite-disabler";
 export { createRuntimeFallbackHook, type RuntimeFallbackHook, type RuntimeFallbackOptions } from "./runtime-fallback";
 export { createWriteExistingFileGuardHook } from "./write-existing-file-guard";
+export { createBashFileReadGuardHook } from "./bash-file-read-guard";
 export { createHashlineReadEnhancerHook } from "./hashline-read-enhancer";
 export { createJsonErrorRecoveryHook, JSON_ERROR_TOOL_EXCLUDE_LIST, JSON_ERROR_PATTERNS, JSON_ERROR_REMINDER } from "./json-error-recovery";
 export { createReadImageResizerHook } from "./read-image-resizer"
+export { createTodoDescriptionOverrideHook } from "./todo-description-override"
+export { createWebFetchRedirectGuardHook } from "./webfetch-redirect-guard"
+export { createLegacyPluginToastHook } from "./legacy-plugin-toast"

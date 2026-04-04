@@ -44,6 +44,10 @@ export function mergeAgentConfig(
   const { prompt_append, ...rest } = migratedOverride
   const merged = deepMerge(base, rest as Partial<AgentConfig>)
 
+  if (merged.prompt && typeof merged.prompt === 'string' && merged.prompt.startsWith('file://')) {
+    merged.prompt = resolvePromptAppend(merged.prompt, directory)
+  }
+
   if (prompt_append && merged.prompt) {
     merged.prompt = merged.prompt + "\n" + resolvePromptAppend(prompt_append, directory)
   }

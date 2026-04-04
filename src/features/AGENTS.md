@@ -1,6 +1,6 @@
 # src/features/ — 19 Feature Modules
 
-**Generated:** 2026-03-02
+**Generated:** 2026-03-06
 
 ## OVERVIEW
 
@@ -10,29 +10,29 @@ Standalone feature modules wired into plugin/ layer. Each is self-contained with
 
 | Module | Files | Complexity | Purpose |
 |--------|-------|------------|---------|
-| **background-agent** | 49 | HIGH | Task lifecycle, concurrency (5/model), polling, spawner pattern |
-| **tmux-subagent** | 27 | HIGH | Tmux pane management, grid planning, session orchestration |
-| **opencode-skill-loader** | 25 | HIGH | YAML frontmatter skill loading from 4 scopes |
-| **mcp-oauth** | 10 | HIGH | OAuth 2.0 + PKCE + DCR (RFC 7591) for MCP servers |
-| **builtin-skills** | 10 | LOW | 6 skills: git-master, playwright, playwright-cli, agent-browser, dev-browser, frontend-ui-ux |
-| **skill-mcp-manager** | 10 | MEDIUM | MCP client lifecycle per session (stdio + HTTP) |
+| **opencode-skill-loader** | 33 | HIGH | YAML frontmatter skill loading from 4 scopes |
+| **background-agent** | 31 | HIGH | Task lifecycle, concurrency (5/model), polling, spawner pattern |
+| **tmux-subagent** | 30 | HIGH | Tmux pane management, grid planning, session orchestration |
+| **mcp-oauth** | 18 | HIGH | OAuth 2.0 + PKCE + DCR (RFC 7591) for MCP servers |
+| **builtin-skills** | 17 | LOW | 6 skills: git-master, playwright, playwright-cli, agent-browser, dev-browser, frontend-ui-ux |
+| **skill-mcp-manager** | 12 | MEDIUM | MCP client lifecycle per session (stdio + HTTP) |
 | **claude-code-plugin-loader** | 10 | MEDIUM | Unified plugin discovery from .opencode/plugins/ |
-| **builtin-commands** | 9 | LOW | Command templates: refactor, init-deep, handoff, etc. |
-| **claude-code-mcp-loader** | 5 | MEDIUM | .mcp.json loading with ${VAR} env expansion |
-| **context-injector** | 4 | MEDIUM | AGENTS.md/README.md injection into context |
-| **boulder-state** | 4 | LOW | Persistent state for multi-step operations |
-| **hook-message-injector** | 4 | MEDIUM | System message injection for hooks |
-| **claude-tasks** | 4 | MEDIUM | Task schema + file storage + OpenCode todo sync |
-| **task-toast-manager** | 3 | MEDIUM | Task progress notifications |
-| **claude-code-agent-loader** | 3 | LOW | Load agents from .opencode/agents/ |
-| **claude-code-command-loader** | 3 | LOW | Load commands from .opencode/commands/ |
-| **claude-code-session-state** | 2 | LOW | Subagent session state tracking |
+| **builtin-commands** | 11 | LOW | Command templates: refactor, init-deep, handoff, etc. |
+| **claude-tasks** | 7 | MEDIUM | Task schema + file storage + OpenCode todo sync |
+| **claude-code-mcp-loader** | 6 | MEDIUM | .mcp.json loading with ${VAR} env expansion |
+| **context-injector** | 6 | MEDIUM | AGENTS.md/README.md injection into context |
 | **run-continuation-state** | 5 | LOW | Persistent state for `run` command continuation across sessions |
-| **tool-metadata-store** | 2 | LOW | Tool execution metadata cache |
+| **hook-message-injector** | 5 | MEDIUM | System message injection for hooks |
+| **boulder-state** | 5 | LOW | Persistent state for multi-step operations |
+| **task-toast-manager** | 4 | MEDIUM | Task progress notifications |
+| **tool-metadata-store** | 3 | LOW | Tool execution metadata cache |
+| **claude-code-session-state** | 3 | LOW | Subagent session state tracking |
+| **claude-code-command-loader** | 3 | LOW | Load commands from .opencode/commands/ |
+| **claude-code-agent-loader** | 3 | LOW | Load agents from .opencode/agents/ |
 
 ## KEY MODULES
 
-### background-agent (49 files, ~10k LOC)
+### background-agent (31 files, ~10k LOC)
 
 Core orchestration engine. `BackgroundManager` manages task lifecycle:
 - States: pending → running → completed/error/cancelled/interrupt
@@ -40,7 +40,7 @@ Core orchestration engine. `BackgroundManager` manages task lifecycle:
 - Polling: 3s interval, completion via idle events + stability detection (10s unchanged)
 - spawner/: 8 focused files composing via `SpawnerContext` interface
 
-### opencode-skill-loader (25 files, ~3.2k LOC)
+### opencode-skill-loader (33 files, ~3.2k LOC)
 
 4-scope skill discovery (project > opencode > user > global):
 - YAML frontmatter parsing from SKILL.md files
@@ -48,7 +48,7 @@ Core orchestration engine. `BackgroundManager` manages task lifecycle:
 - Template resolution with variable substitution
 - Provider gating for model-specific skills
 
-### tmux-subagent (27 files, ~3.6k LOC)
+### tmux-subagent (30 files, ~3.6k LOC)
 
 State-first tmux integration:
 - `TmuxSessionManager`: pane lifecycle, grid planning

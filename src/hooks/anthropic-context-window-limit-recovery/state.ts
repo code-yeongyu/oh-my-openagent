@@ -28,12 +28,37 @@ export function clearSessionState(
   autoCompactState: AutoCompactState,
   sessionID: string,
 ): void {
+  const retryTimer = autoCompactState.retryTimerBySession.get(sessionID)
+  if (retryTimer !== undefined) {
+    clearTimeout(retryTimer)
+    autoCompactState.retryTimerBySession.delete(sessionID)
+  }
   autoCompactState.pendingCompact.delete(sessionID)
   autoCompactState.errorDataBySession.delete(sessionID)
   autoCompactState.retryStateBySession.delete(sessionID)
   autoCompactState.truncateStateBySession.delete(sessionID)
   autoCompactState.emptyContentAttemptBySession.delete(sessionID)
   autoCompactState.compactionInProgress.delete(sessionID)
+}
+
+export function setRetryTimer(
+  autoCompactState: AutoCompactState,
+  sessionID: string,
+  timeout: ReturnType<typeof setTimeout>,
+): void {
+  const existingTimer = autoCompactState.retryTimerBySession.get(sessionID)
+  if (existingTimer !== undefined) {
+    clearTimeout(existingTimer)
+  }
+  autoCompactState.retryTimerBySession.set(sessionID, timeout)
+}
+
+export function clearRetryTimer(autoCompactState: AutoCompactState, sessionID: string): void {
+  const retryTimer = autoCompactState.retryTimerBySession.get(sessionID)
+  if (retryTimer !== undefined) {
+    clearTimeout(retryTimer)
+    autoCompactState.retryTimerBySession.delete(sessionID)
+  }
 }
 
 export function getEmptyContentAttempt(

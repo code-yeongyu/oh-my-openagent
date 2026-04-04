@@ -1,4 +1,4 @@
-export type ShellType = "unix" | "powershell" | "cmd"
+export type ShellType = "unix" | "powershell" | "cmd" | "csh"
 
 /**
  * Detect the current shell type based on environment variables.
@@ -14,6 +14,10 @@ export function detectShellType(): ShellType {
   }
 
   if (process.env.SHELL) {
+    const shell = process.env.SHELL
+    if (shell.includes("csh") || shell.includes("tcsh")) {
+      return "csh"
+    }
     return "unix"
   }
 
@@ -34,6 +38,7 @@ export function shellEscape(value: string, shellType: ShellType): string {
 
   switch (shellType) {
     case "unix":
+    case "csh":
       if (/[^a-zA-Z0-9_\-.:\/]/.test(value)) {
         return `'${value.replace(/'/g, "'\\''")}'`
       }
@@ -91,6 +96,13 @@ export function buildEnvPrefix(
       return `export ${assignments};`
     }
 
+    case "csh": {
+      const assignments = entries
+        .map(([key, value]) => `setenv ${key} ${shellEscape(value, shellType)}`)
+        .join("; ")
+      return `${assignments};`
+    }
+
     case "powershell": {
       const assignments = entries
         .map(([key, value]) => `$env:${key}=${shellEscape(value, shellType)}`)
@@ -108,4 +120,45 @@ export function buildEnvPrefix(
     default:
       return ""
   }
+}
+
+/**
+ * Escape a value for use in a double-quoted shell -c command argument.
+ * 
+ * In shell -c "..." strings, these characters have special meaning and must be escaped:
+ * - $ - variable expansion, command substitution $(...)
+ * - ` - command substitution `...`
+ * - \\ - escape character
+ * - " - end quote
+ * - ; | & - command separators
+ * - # - comment
+ * - () - grouping operators
+ * 
+ * @param value - The value to escape
+ * @returns Escaped value safe for double-quoted shell -c argument
+ * 
+ * @example
+ * ```ts
+ * // For malicious input
+ * const url = "http://localhost:3000'; cat /etc/passwd; echo '"
+ * const escaped = shellEscapeForDoubleQuotedCommand(url)
+ * // => "http://localhost:3000'\''; cat /etc/passwd; echo '"
+ * 
+ * // Usage in command:
+ * const cmd = `/bin/sh -c "opencode attach ${escaped} --session ${sessionId}"`
+ * ```
+ */
+export function shellEscapeForDoubleQuotedCommand(value: string): string {
+  // Order matters: escape backslash FIRST, then other characters
+  return value
+    .replace(/\\/g, "\\\\") // escape backslash first
+    .replace(/\$/g, "\\$") // escape dollar sign
+    .replace(/`/g, "\\`") // escape backticks
+    .replace(/"/g, "\\\"") // escape double quotes
+    .replace(/;/g, "\\;") // escape semicolon (command separator)
+    .replace(/\|/g, "\\|") // escape pipe (command separator)
+    .replace(/&/g, "\\&") // escape ampersand (command separator)
+    .replace(/#/g, "\\#") // escape hash (comment)
+    .replace(/\(/g, "\\(") // escape parentheses
+    .replace(/\)/g, "\\)") // escape parentheses
 }

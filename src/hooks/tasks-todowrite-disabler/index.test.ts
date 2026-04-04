@@ -59,7 +59,7 @@ describe("tasks-todowrite-disabler", () => {
     })
   })
 
-  describe("when experimental.task_system is disabled or undefined", () => {
+  describe("when experimental.task_system is disabled", () => {
     test("should not block TodoWrite when flag is false", async () => {
       // given
       const hook = createTasksTodowriteDisablerHook({ experimental: { task_system: false } })
@@ -78,7 +78,7 @@ describe("tasks-todowrite-disabler", () => {
       ).resolves.toBeUndefined()
     })
 
-    test("should not block TodoWrite when experimental is undefined", async () => {
+    test("should not block TodoWrite when experimental is undefined because task_system defaults to disabled", async () => {
       // given
       const hook = createTasksTodowriteDisablerHook({})
       const input = {

@@ -50,7 +50,6 @@ export async function pollForCompletion(
       return 130
     }
 
-    // ERROR CHECK FIRST — errors must not be masked by other gates
     if (eventState.mainSessionError) {
       errorCycleCount++
       if (errorCycleCount >= ERROR_GRACE_CYCLES) {
@@ -62,19 +61,15 @@ export async function pollForCompletion(
         )
         return 1
       }
-      // Continue polling during grace period to allow recovery
       continue
     } else {
-      // Reset error counter when error clears (recovery succeeded)
       errorCycleCount = 0
     }
 
-    // Watchdog: if no events received for N seconds, verify session status via API
     let mainSessionStatus: "idle" | "busy" | "retry" | null = null
     if (eventState.lastEventTimestamp !== null) {
       const timeSinceLastEvent = Date.now() - eventState.lastEventTimestamp
       if (timeSinceLastEvent > eventWatchdogMs) {
-        // Events stopped coming - verify actual session state
         console.log(
           pc.yellow(
             `\n  No events for ${Math.round(
@@ -83,7 +78,6 @@ export async function pollForCompletion(
           )
         )
 
-        // Force check session status directly
         mainSessionStatus = await getMainSessionStatus(ctx)
         if (mainSessionStatus === "idle") {
           eventState.mainSessionIdle = true
@@ -91,12 +85,10 @@ export async function pollForCompletion(
           eventState.mainSessionIdle = false
         }
 
-        // Reset timestamp to avoid repeated checks
         eventState.lastEventTimestamp = Date.now()
       }
     }
 
-    // Only call getMainSessionStatus if watchdog didn't already check
     if (mainSessionStatus === null) {
       mainSessionStatus = await getMainSessionStatus(ctx)
     }
@@ -122,15 +114,11 @@ export async function pollForCompletion(
         continue
       }
 
-      // Secondary timeout: if we've been polling for reasonable time but haven't
-      // received meaningful work via events, check if there's active work via API
-      // Only check once to avoid unnecessary API calls every poll cycle
       if (
         Date.now() - pollStartTimestamp > secondaryMeaningfulWorkTimeoutMs &&
         !secondaryTimeoutChecked
       ) {
         secondaryTimeoutChecked = true
-        // Check if session actually has pending work (children, todos, etc.)
         const childrenRes = await ctx.client.session.children({
           path: { id: ctx.sessionID },
           query: { directory: ctx.directory },
@@ -154,7 +142,6 @@ export async function pollForCompletion(
         const hasActiveWork = hasActiveChildren || hasActiveTodos
 
         if (hasActiveWork) {
-          // Assume meaningful work is happening even without events
           eventState.hasReceivedMeaningfulWork = true
           console.log(
             pc.yellow(
@@ -166,12 +153,10 @@ export async function pollForCompletion(
         }
       }
     } else {
-      // Track when first meaningful work was received
       if (firstWorkTimestamp === null) {
         firstWorkTimestamp = Date.now()
       }
 
-      // Don't check completion during stabilization period
       if (Date.now() - firstWorkTimestamp < minStabilizationMs) {
         consecutiveCompleteChecks = 0
         continue

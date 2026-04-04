@@ -53,6 +53,14 @@ describe("install CLI - binary check behavior", () => {
     isOpenCodeInstalledSpy = spyOn(configManager, "isOpenCodeInstalled").mockResolvedValue(false)
     getOpenCodeVersionSpy = spyOn(configManager, "getOpenCodeVersion").mockResolvedValue(null)
 
+    // given mock npm fetch
+    globalThis.fetch = mock(() =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ latest: "3.0.0" }),
+      } as Response)
+    ) as unknown as typeof fetch
+
     const args: InstallArgs = {
       tui: false,
       claude: "yes",
@@ -105,10 +113,10 @@ describe("install CLI - binary check behavior", () => {
     const configPath = join(tempDir, "opencode.json")
     expect(existsSync(configPath)).toBe(true)
 
-    // then opencode.json should have plugin entry
     const config = JSON.parse(readFileSync(configPath, "utf-8"))
     expect(config.plugin).toBeDefined()
-    expect(config.plugin.some((p: string) => p.includes("oh-my-opencode"))).toBe(true)
+    expect(config.plugin.some((p: string) => p.includes("oh-my-openagent"))).toBe(true)
+    expect(config.plugin.some((p: string) => p.includes("oh-my-opencode"))).toBe(false)
 
     // then exit code should be 0 (success)
     expect(exitCode).toBe(0)

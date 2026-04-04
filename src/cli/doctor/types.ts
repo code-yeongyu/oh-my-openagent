@@ -1,5 +1,3 @@
-// ===== New 3-tier doctor types =====
-
 export type DoctorMode = "default" | "status" | "verbose"
 
 export interface DoctorOptions {
@@ -47,8 +45,7 @@ export interface SystemInfo {
 }
 
 export interface ToolsSummary {
-  lspInstalled: number
-  lspTotal: number
+  lspServers: Array<{ id: string; extensions: string[] }>
   astGrepCli: boolean
   astGrepNapi: boolean
   commentChecker: boolean
@@ -73,8 +70,6 @@ export interface DoctorResult {
   summary: DoctorSummary
   exitCode: number
 }
-
-// ===== Legacy types (used by existing checks until migration) =====
 
 export type CheckCategory =
   | "installation"
@@ -124,13 +119,6 @@ export interface DependencyInfo {
   version: string | null
   path: string | null
   installHint?: string
-}
-
-export interface LspServerInfo {
-  id: string
-  installed: boolean
-  extensions: string[]
-  source: "builtin" | "config" | "plugin"
 }
 
 export interface McpServerInfo {

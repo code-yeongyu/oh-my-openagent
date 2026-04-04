@@ -65,7 +65,7 @@ export function syncTaskToTodo(task: Task): TodoInfo | null {
     id: task.id,
     content: task.subject,
     status: todoStatus,
-    priority: extractPriority(task.metadata),
+    priority: extractPriority(task.metadata) ?? "medium",
   };
 }
 

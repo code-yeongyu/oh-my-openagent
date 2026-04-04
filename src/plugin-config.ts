@@ -7,9 +7,21 @@ import {
   getOpenCodeConfigDir,
   addConfigLoadError,
   parseJsonc,
-  detectConfigFile,
+  detectPluginConfigFile,
   migrateConfigFile,
 } from "./shared";
+import { migrateLegacyConfigFile } from "./shared/migrate-legacy-config-file";
+import { LEGACY_CONFIG_BASENAME } from "./shared/plugin-identity";
+
+const PARTIAL_STRING_ARRAY_KEYS = new Set([
+  "disabled_mcps",
+  "disabled_agents",
+  "disabled_skills",
+  "disabled_hooks",
+  "disabled_commands",
+  "disabled_tools",
+  "mcp_env_allowlist",
+]);
 
 export function parseConfigPartially(
   rawConfig: Record<string, unknown>
@@ -23,6 +35,14 @@ export function parseConfigPartially(
   const invalidSections: string[] = [];
 
   for (const key of Object.keys(rawConfig)) {
+    if (PARTIAL_STRING_ARRAY_KEYS.has(key)) {
+      const sectionValue = rawConfig[key];
+      if (Array.isArray(sectionValue) && sectionValue.every((value) => typeof value === "string")) {
+        partialConfig[key] = sectionValue;
+      }
+      continue;
+    }
+
     const sectionResult = OhMyOpenCodeConfigSchema.safeParse({ [key]: rawConfig[key] });
     if (sectionResult.success) {
       const parsed = sectionResult.data as Record<string, unknown>;
@@ -41,7 +61,7 @@ export function parseConfigPartially(
   }
 
   if (invalidSections.length > 0) {
-    log("Partial config loaded — invalid sections skipped:", invalidSections);
+    log("Partial config loaded - invalid sections skipped:", invalidSections);
   }
 
   return partialConfig as OhMyOpenCodeConfig;
@@ -71,7 +91,7 @@ export function loadConfigFromPath(
       log(`Config validation error in ${configPath}:`, result.error.issues);
       addConfigLoadError({
         path: configPath,
-        error: `Partial config loaded — invalid sections skipped: ${errorMsg}`,
+        error: `Partial config loaded - invalid sections skipped: ${errorMsg}`,
       });
 
       const partialResult = parseConfigPartially(rawConfig);
@@ -129,6 +149,18 @@ export function mergeConfigs(
         ...(override.disabled_skills ?? []),
       ]),
     ],
+    disabled_tools: [
+      ...new Set([
+        ...(base.disabled_tools ?? []),
+        ...(override.disabled_tools ?? []),
+      ]),
+    ],
+    mcp_env_allowlist: [
+      ...new Set([
+        ...(base.mcp_env_allowlist ?? []),
+        ...(override.mcp_env_allowlist ?? []),
+      ]),
+    ],
     claude_code: deepMerge(base.claude_code, override.claude_code),
   };
 }
@@ -139,24 +171,48 @@ export function loadPluginConfig(
 ): OhMyOpenCodeConfig {
   // User-level config path - prefer .jsonc over .json
   const configDir = getOpenCodeConfigDir({ binary: "opencode" });
-  const userBasePath = path.join(configDir, "oh-my-opencode");
-  const userDetected = detectConfigFile(userBasePath);
+  const userDetected = detectPluginConfigFile(configDir);
   const userConfigPath =
     userDetected.format !== "none"
       ? userDetected.path
-      : userBasePath + ".json";
+      : path.join(configDir, "oh-my-opencode.json");
+
+  if (userDetected.legacyPath) {
+    log("Canonical plugin config detected alongside legacy config. Remove the legacy file to avoid confusion.", {
+      canonicalPath: userDetected.path,
+      legacyPath: userDetected.legacyPath,
+    });
+  }
+
+  // Auto-copy legacy config file to canonical name if needed
+  if (userDetected.format !== "none" && path.basename(userDetected.path).startsWith(LEGACY_CONFIG_BASENAME)) {
+    migrateLegacyConfigFile(userDetected.path);
+  }
 
   // Project-level config path - prefer .jsonc over .json
-  const projectBasePath = path.join(directory, ".opencode", "oh-my-opencode");
-  const projectDetected = detectConfigFile(projectBasePath);
+  const projectBasePath = path.join(directory, ".opencode");
+  const projectDetected = detectPluginConfigFile(projectBasePath);
   const projectConfigPath =
     projectDetected.format !== "none"
       ? projectDetected.path
-      : projectBasePath + ".json";
+      : path.join(projectBasePath, "oh-my-opencode.json");
 
-  // Load user config first (base)
+  if (projectDetected.legacyPath) {
+    log("Canonical plugin config detected alongside legacy config. Remove the legacy file to avoid confusion.", {
+      canonicalPath: projectDetected.path,
+      legacyPath: projectDetected.legacyPath,
+    });
+  }
+
+  // Auto-copy legacy project config file to canonical name if needed
+  if (projectDetected.format !== "none" && path.basename(projectDetected.path).startsWith(LEGACY_CONFIG_BASENAME)) {
+    migrateLegacyConfigFile(projectDetected.path);
+  }
+
+  // Load user config first (base). Parse empty config through Zod to apply field defaults.
+  const userConfig = loadConfigFromPath(userConfigPath, ctx)
   let config: OhMyOpenCodeConfig =
-    loadConfigFromPath(userConfigPath, ctx) ?? {};
+    userConfig ?? OhMyOpenCodeConfigSchema.parse({});
 
   // Override with project config
   const projectConfig = loadConfigFromPath(projectConfigPath, ctx);
@@ -166,6 +222,7 @@ export function loadPluginConfig(
 
   config = {
     ...config,
+    mcp_env_allowlist: userConfig?.mcp_env_allowlist ?? [],
   };
 
   log("Final merged config", {

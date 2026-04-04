@@ -12,6 +12,7 @@ function createAutoCompactState(): AutoCompactState {
     pendingCompact: new Set<string>(),
     errorDataBySession: new Map<string, ParsedTokenLimitError>(),
     retryStateBySession: new Map<string, RetryState>(),
+    retryTimerBySession: new Map(),
     truncateStateBySession: new Map(),
     emptyContentAttemptBySession: new Map(),
     compactionInProgress: new Set<string>(),
@@ -97,10 +98,11 @@ describe("runSummarizeRetryStrategy", () => {
       return 1 as unknown as ReturnType<typeof setTimeout>
     }) as typeof setTimeout
 
+    autoCompactState.pendingCompact.add(sessionID)
     autoCompactState.retryStateBySession.set(sessionID, {
-      attempt: 1,
+      attempt: 0,
       lastAttemptTime: Date.now(),
-      firstAttemptTime: Date.now() - 119700,
+      firstAttemptTime: Date.now() - 100000,
     })
     summarizeMock.mockRejectedValueOnce(new Error("rate limited"))
 
@@ -117,6 +119,85 @@ describe("runSummarizeRetryStrategy", () => {
     //#then
     expect(timeoutCalls.length).toBe(1)
     expect(timeoutCalls[0]!.delay).toBeGreaterThan(0)
-    expect(timeoutCalls[0]!.delay).toBeLessThanOrEqual(500)
+    expect(timeoutCalls[0]!.delay).toBeLessThanOrEqual(2000)
+  })
+
+  test("#given pending retry timer after session cleanup #when scheduled callback fires #then it does not recreate retry state", async () => {
+    //#given
+    let scheduledCallback: (() => void) | undefined
+    globalThis.setTimeout = ((callback: (...args: unknown[]) => void, _delay?: number) => {
+      scheduledCallback = () => callback()
+      return 1 as unknown as ReturnType<typeof setTimeout>
+    }) as typeof setTimeout
+
+    autoCompactState.pendingCompact.add(sessionID)
+    summarizeMock.mockRejectedValueOnce(new Error("rate limited"))
+
+    await runSummarizeRetryStrategy({
+      sessionID,
+      msg: { providerID: "anthropic", modelID: "claude-sonnet-4-6" },
+      autoCompactState,
+      client: client as never,
+      directory,
+      pluginConfig: {} as OhMyOpenCodeConfig,
+    })
+
+    autoCompactState.pendingCompact.delete(sessionID)
+    autoCompactState.retryStateBySession.delete(sessionID)
+
+    //#when
+    scheduledCallback?.()
+
+    //#then
+    expect(autoCompactState.retryStateBySession.has(sessionID)).toBe(false)
+  })
+
+  test("#given max empty-content recovery attempts reached #when summarize retry exits early #then it clears full recovery state", async () => {
+    //#given
+    autoCompactState.pendingCompact.add(sessionID)
+    autoCompactState.errorDataBySession.set(sessionID, {
+      currentTokens: 250000,
+      maxTokens: 200000,
+      errorType: "non-empty content",
+    })
+    autoCompactState.retryStateBySession.set(sessionID, {
+      attempt: 1,
+      lastAttemptTime: Date.now(),
+      firstAttemptTime: Date.now(),
+    })
+    autoCompactState.truncateStateBySession.set(sessionID, {
+      truncateAttempt: 2,
+    })
+    autoCompactState.emptyContentAttemptBySession.set(sessionID, 3)
+    autoCompactState.retryTimerBySession.set(
+      sessionID,
+      1 as unknown as ReturnType<typeof setTimeout>,
+    )
+
+    //#when
+    await runSummarizeRetryStrategy({
+      sessionID,
+      msg: { providerID: "anthropic", modelID: "claude-sonnet-4-6" },
+      autoCompactState,
+      client: client as never,
+      directory,
+      pluginConfig: {} as OhMyOpenCodeConfig,
+      errorType: "non-empty content",
+    })
+
+    //#then
+    expect(autoCompactState.pendingCompact.has(sessionID)).toBe(false)
+    expect(autoCompactState.errorDataBySession.has(sessionID)).toBe(false)
+    expect(autoCompactState.retryStateBySession.has(sessionID)).toBe(false)
+    expect(autoCompactState.retryTimerBySession.has(sessionID)).toBe(false)
+    expect(autoCompactState.truncateStateBySession.has(sessionID)).toBe(false)
+    expect(autoCompactState.emptyContentAttemptBySession.has(sessionID)).toBe(false)
+    expect(showToastMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: expect.objectContaining({
+          title: "Recovery Failed",
+        }),
+      }),
+    )
   })
 })

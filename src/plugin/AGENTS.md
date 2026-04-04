@@ -1,10 +1,10 @@
 # src/plugin/ — 8 OpenCode Hook Handlers + Hook Composition
 
-**Generated:** 2026-03-02
+**Generated:** 2026-03-06
 
 ## OVERVIEW
 
-Core glue layer. 20 source files assembling the 8 OpenCode hook handlers and composing 46 hooks into the PluginInterface. Every handler file corresponds to one OpenCode hook type.
+Core glue layer. 20 source files assembling the 8 OpenCode hook handlers and composing 48 hooks into the PluginInterface. Every handler file corresponds to one OpenCode hook type.
 
 ## HANDLER FILES
 
@@ -17,18 +17,17 @@ Core glue layer. 20 source files assembling the 8 OpenCode hook handlers and com
 | `tool-execute-after.ts` | `tool.execute.after` | Post-tool hooks (output truncation, comment checker, metadata) |
 | `messages-transform.ts` | `experimental.chat.messages.transform` | Context injection, thinking block validation |
 | `tool-registry.ts` | `tool` | 26 tools assembled from factories |
+| `chat-headers.ts` | `chat.headers` | Copilot x-initiator header injection |
 | `skill-context.ts` | — | Skill/browser/category context for tool creation |
 
 ## HOOK COMPOSITION (hooks/ subdir)
 
 | File | Tier | Count |
 |------|------|-------|
-| `create-session-hooks.ts` | Session | 21 |
-| `create-tool-guard-hooks.ts` | Tool Guard | 10 |
 | `create-session-hooks.ts` | Session | 23 |
-| `create-tool-guard-hooks.ts` | Tool Guard | 10 |
+| `create-tool-guard-hooks.ts` | Tool Guard | 12 |
 | `create-skill-hooks.ts` | Skill | 2 |
-| `create-core-hooks.ts` | Aggregator | Session + Guard + Transform = 37 |
+| `create-core-hooks.ts` | Aggregator | Session + Guard + Transform = 39 |
 
 ## SUPPORT FILES
 
@@ -42,6 +41,7 @@ Core glue layer. 20 source files assembling the 8 OpenCode hook handlers and com
 | `types.ts` | `PluginContext`, `PluginInterface`, `ToolsRecord`, `TmuxConfig` |
 | `ultrawork-model-override.ts` | Ultrawork mode model override logic |
 | `ultrawork-db-model-override.ts` | DB-level model override for ultrawork |
+| `config-handler.ts` | Runtime config loading and caching |
 
 ## KEY PATTERNS
 

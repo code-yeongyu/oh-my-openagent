@@ -9,6 +9,7 @@ import {
   AUTO_SLASH_COMMAND_TAG_CLOSE,
   AUTO_SLASH_COMMAND_TAG_OPEN,
 } from "./constants"
+import { createProcessedCommandStore } from "./processed-command-store"
 import type {
   AutoSlashCommandHookInput,
   AutoSlashCommandHookOutput,
@@ -17,13 +18,57 @@ import type {
 } from "./types"
 import type { LoadedSkill } from "../../features/opencode-skill-loader"
 
-const sessionProcessedCommands = new Set<string>()
-const sessionProcessedCommandExecutions = new Set<string>()
+const COMMAND_EXECUTE_FALLBACK_DEDUP_TTL_MS = 100
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null
+}
+
+function getDeletedSessionID(properties: unknown): string | null {
+  if (!isRecord(properties)) {
+    return null
+  }
+
+  const info = properties.info
+  if (!isRecord(info)) {
+    return null
+  }
+
+  return typeof info.id === "string" ? info.id : null
+}
+
+function getCommandExecutionEventID(input: CommandExecuteBeforeInput): string | null {
+  const candidateKeys = [
+    "messageID",
+    "messageId",
+    "eventID",
+    "eventId",
+    "invocationID",
+    "invocationId",
+    "commandID",
+    "commandId",
+  ]
+
+  const recordInput = input as unknown
+  if (!isRecord(recordInput)) {
+    return null
+  }
+
+  for (const key of candidateKeys) {
+    const candidateValue = recordInput[key]
+    if (typeof candidateValue === "string" && candidateValue.length > 0) {
+      return candidateValue
+    }
+  }
+
+  return null
+}
 
 export interface AutoSlashCommandHookOptions {
   skills?: LoadedSkill[]
   pluginsEnabled?: boolean
   enabledPluginsOverride?: Record<string, boolean>
+  directory?: string
 }
 
 export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions) {
@@ -31,6 +76,14 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
     skills: options?.skills,
     pluginsEnabled: options?.pluginsEnabled,
     enabledPluginsOverride: options?.enabledPluginsOverride,
+    directory: options?.directory,
+  }
+  const sessionProcessedCommands = createProcessedCommandStore()
+  const sessionProcessedCommandExecutions = createProcessedCommandStore()
+
+  const dispose = (): void => {
+    sessionProcessedCommands.clear()
+    sessionProcessedCommandExecutions.clear()
   }
 
   return {
@@ -61,7 +114,9 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
         return
       }
 
-      const commandKey = `${input.sessionID}:${input.messageID}:${parsed.command}`
+      const commandKey = input.messageID
+        ? `${input.sessionID}:${input.messageID}:${parsed.command}`
+        : `${input.sessionID}:${parsed.command}`
       if (sessionProcessedCommands.has(commandKey)) {
         return
       }
@@ -72,7 +127,12 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
         args: parsed.args,
       })
 
-      const result = await executeSlashCommand(parsed, executorOptions)
+      const executionOptions: ExecutorOptions = {
+        ...executorOptions,
+        agent: input.agent,
+      }
+
+      const result = await executeSlashCommand(parsed, executionOptions)
 
       const idx = findSlashCommandPartIndex(output.parts)
       if (idx < 0) {
@@ -101,7 +161,10 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
       input: CommandExecuteBeforeInput,
       output: CommandExecuteBeforeOutput
     ): Promise<void> => {
-      const commandKey = `${input.sessionID}:${input.command}:${Date.now()}`
+      const eventID = getCommandExecutionEventID(input)
+      const commandKey = eventID
+        ? `${input.sessionID}:event:${eventID}`
+        : `${input.sessionID}:fallback:${input.command.toLowerCase()}:${input.arguments || ""}`
       if (sessionProcessedCommandExecutions.has(commandKey)) {
         return
       }
@@ -118,7 +181,12 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
         raw: `/${input.command}${input.arguments ? " " + input.arguments : ""}`,
       }
 
-      const result = await executeSlashCommand(parsed, executorOptions)
+      const executionOptions: ExecutorOptions = {
+        ...executorOptions,
+        agent: input.agent,
+      }
+
+      const result = await executeSlashCommand(parsed, executionOptions)
 
       if (!result.success || !result.replacementText) {
         log(`[auto-slash-command] command.execute.before - command not found in our executor`, {
@@ -129,7 +197,10 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
         return
       }
 
-      sessionProcessedCommandExecutions.add(commandKey)
+      sessionProcessedCommandExecutions.add(
+        commandKey,
+        eventID ? undefined : COMMAND_EXECUTE_FALLBACK_DEDUP_TTL_MS
+      )
 
       const taggedContent = `${AUTO_SLASH_COMMAND_TAG_OPEN}\n${result.replacementText}\n${AUTO_SLASH_COMMAND_TAG_CLOSE}`
 
@@ -145,5 +216,23 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
         command: input.command,
       })
     },
+    event: async ({
+      event,
+    }: {
+      event: { type: string; properties?: unknown }
+    }): Promise<void> => {
+      if (event.type !== "session.deleted") {
+        return
+      }
+
+      const sessionID = getDeletedSessionID(event.properties)
+      if (!sessionID) {
+        return
+      }
+
+      sessionProcessedCommands.cleanupSession(sessionID)
+      sessionProcessedCommandExecutions.cleanupSession(sessionID)
+    },
+    dispose,
   }
 }

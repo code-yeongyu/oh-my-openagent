@@ -1,5 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { isGptModel } from "../../agents/types"
+import { isGptModel, isGpt5_4Model } from "../../agents/types"
 import { getSessionAgent, updateSessionAgent } from "../../features/claude-code-session-state"
 import { log } from "../../shared"
 import { getAgentConfigKey, getAgentDisplayName } from "../../shared/agent-display-names"
@@ -7,8 +7,8 @@ import { getAgentConfigKey, getAgentDisplayName } from "../../shared/agent-displ
 const TOAST_TITLE = "NEVER Use Sisyphus with GPT"
 const TOAST_MESSAGE = [
   "Sisyphus works best with Claude Opus, and works fine with Kimi/GLM models.",
-  "Do NOT use Sisyphus with GPT.",
-  "For GPT models, always use Hephaestus.",
+  "Do NOT use Sisyphus with GPT (except GPT-5.4 which has specialized support).",
+  "For GPT models (other than 5.4), always use Hephaestus.",
 ].join("\n")
 const HEPHAESTUS_DISPLAY = getAgentDisplayName("hephaestus")
 
@@ -41,7 +41,7 @@ export function createNoSisyphusGptHook(ctx: PluginInput) {
       const agentKey = getAgentConfigKey(rawAgent)
       const modelID = input.model?.modelID
 
-      if (agentKey === "sisyphus" && modelID && isGptModel(modelID)) {
+      if (agentKey === "sisyphus" && modelID && isGptModel(modelID) && !isGpt5_4Model(modelID)) {
         showToast(ctx, input.sessionID)
         input.agent = HEPHAESTUS_DISPLAY
         if (output?.message) {

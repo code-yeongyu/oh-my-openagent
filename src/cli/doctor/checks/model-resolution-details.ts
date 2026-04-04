@@ -4,6 +4,10 @@ import { getOpenCodeCacheDir } from "../../../shared"
 import type { AvailableModelsInfo, ModelResolutionInfo, OmoConfig } from "./model-resolution-types"
 import { formatModelWithVariant, getCategoryEffectiveVariant, getEffectiveVariant } from "./model-resolution-variant"
 
+function formatCapabilityResolutionLabel(mode: string | undefined): string {
+  return mode ?? "unknown"
+}
+
 export function buildModelResolutionDetails(options: {
   info: ModelResolutionInfo
   available: AvailableModelsInfo
@@ -37,7 +41,7 @@ export function buildModelResolutionDetails(options: {
       agent.effectiveModel,
       getEffectiveVariant(agent.name, agent.requirement, options.config)
     )
-    details.push(`  ${marker} ${agent.name}: ${display}`)
+    details.push(`  ${marker} ${agent.name}: ${display} [capabilities: ${formatCapabilityResolutionLabel(agent.capabilityDiagnostics?.resolutionMode)}]`)
   }
   details.push("")
   details.push("Categories:")
@@ -47,7 +51,7 @@ export function buildModelResolutionDetails(options: {
       category.effectiveModel,
       getCategoryEffectiveVariant(category.name, category.requirement, options.config)
     )
-    details.push(`  ${marker} ${category.name}: ${display}`)
+    details.push(`  ${marker} ${category.name}: ${display} [capabilities: ${formatCapabilityResolutionLabel(category.capabilityDiagnostics?.resolutionMode)}]`)
   }
   details.push("")
   details.push("● = user override, ○ = provider fallback")

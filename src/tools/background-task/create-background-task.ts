@@ -80,23 +80,27 @@ export function createBackgroundTask(
         const waitStart = Date.now()
         let sessionId = task.sessionID
         while (!sessionId && Date.now() - waitStart < WAIT_FOR_SESSION_TIMEOUT_MS) {
-          if (ctx.abort?.aborted) {
-            await manager.cancelTask(task.id)
-            return `Task aborted and cancelled while waiting for session to start.\n\nTask ID: ${task.id}`
-          }
-          await delay(WAIT_FOR_SESSION_INTERVAL_MS)
           const updated = manager.getTask(task.id)
-          if (!updated || updated.status === "error" || updated.status === "cancelled" || updated.status === "interrupt") {
-            return `Task ${!updated ? "was deleted" : `entered error state`}\.\n\nTask ID: ${task.id}`
+          if (updated?.status === "error" || updated?.status === "cancelled" || updated?.status === "interrupt") {
+            return `Task ${`entered error state`}\.\n\nTask ID: ${task.id}`
           }
           sessionId = updated?.sessionID
+          if (sessionId) {
+            break
+          }
+          if (ctx.abort?.aborted) {
+            break
+          }
+          await delay(WAIT_FOR_SESSION_INTERVAL_MS)
         }
 
         const bgMeta = {
           title: args.description,
-          metadata: { sessionId: sessionId ?? "pending" },
+          metadata: {
+            ...(sessionId ? { sessionId } : {}),
+          },
         }
-        await ctx.metadata?.(bgMeta)
+        ctx.metadata?.(bgMeta)
 
         if (ctx.callID) {
           storeToolMetadata(ctx.sessionID, ctx.callID, bgMeta)
@@ -105,7 +109,7 @@ export function createBackgroundTask(
         return `Background task launched successfully.
 
 Task ID: ${task.id}
-Session ID: ${sessionId ?? "pending"}
+Session ID: ${sessionId ?? "(not yet assigned)"}
 Description: ${task.description}
 Agent: ${task.agent}
 Status: ${task.status}

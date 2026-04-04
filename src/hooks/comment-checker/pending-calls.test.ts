@@ -35,4 +35,43 @@ describe("pending-calls cleanup interval", () => {
       globalThis.setInterval = originalSetInterval
     }
   })
+
+  test("#given cleanup timer already started #when stop cleanup runs #then interval state resets for future reuse", async () => {
+    //#given
+    const originalSetInterval = globalThis.setInterval
+    const originalClearInterval = globalThis.clearInterval
+    let intervalHandle: ReturnType<typeof setInterval> | undefined
+    let clearCalls = 0
+
+    globalThis.setInterval = ((
+      _handler: TimerHandler,
+      _timeout?: number,
+      ..._args: any[]
+    ) => {
+      intervalHandle = { unref: () => {} } as unknown as ReturnType<typeof setInterval>
+      return intervalHandle
+    }) as unknown as typeof setInterval
+
+    globalThis.clearInterval = ((handle?: ReturnType<typeof setInterval>) => {
+      if (handle === intervalHandle) {
+        clearCalls += 1
+      }
+    }) as unknown as typeof clearInterval
+
+    try {
+      const modulePath = new URL("./pending-calls.ts", import.meta.url).pathname
+      const pendingCallsModule = await import(`${modulePath}?pending-calls-test-stop`)
+      pendingCallsModule.startPendingCallCleanup()
+
+      //#when
+      pendingCallsModule.stopPendingCallCleanup()
+      pendingCallsModule.startPendingCallCleanup()
+
+      //#then
+      expect(clearCalls).toBe(1)
+    } finally {
+      globalThis.setInterval = originalSetInterval
+      globalThis.clearInterval = originalClearInterval
+    }
+  })
 })

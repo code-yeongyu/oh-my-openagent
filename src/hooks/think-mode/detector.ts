@@ -1,7 +1,7 @@
 const ENGLISH_PATTERNS = [/\bultrathink\b/i, /\bthink\b/i]
 
 const MULTILINGUAL_KEYWORDS = [
-  "생각", "고민", "검토", "제대로",
+  "생각", "검토", "제대로",
   "思考", "考虑", "考慮",
   "思考", "考え", "熟考",
   "सोच", "विचार",
@@ -32,8 +32,10 @@ const MULTILINGUAL_KEYWORDS = [
   "fikir", "berfikir",
 ]
 
-const MULTILINGUAL_PATTERNS = MULTILINGUAL_KEYWORDS.map((kw) => new RegExp(kw, "i"))
-const THINK_PATTERNS = [...ENGLISH_PATTERNS, ...MULTILINGUAL_PATTERNS]
+const COMBINED_THINK_PATTERN = new RegExp(
+  `\\b(?:ultrathink|think)\\b|${MULTILINGUAL_KEYWORDS.join("|")}`,
+  "i"
+)
 
 const CODE_BLOCK_PATTERN = /```[\s\S]*?```/g
 const INLINE_CODE_PATTERN = /`[^`]+`/g
@@ -44,7 +46,7 @@ function removeCodeBlocks(text: string): string {
 
 export function detectThinkKeyword(text: string): boolean {
   const textWithoutCode = removeCodeBlocks(text)
-  return THINK_PATTERNS.some((pattern) => pattern.test(textWithoutCode))
+  return COMBINED_THINK_PATTERN.test(textWithoutCode)
 }
 
 export function extractPromptText(

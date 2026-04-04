@@ -227,10 +227,10 @@ describe("hashline edit operations", () => {
   })
 
   it("preserves blank lines and indentation in range replace (no false unwrap)", () => {
-    //#given — reproduces the 애국가 bug where blank+indented lines collapse
+    //#given, reproduces the 애국가 bug where blank+indented lines collapse
     const lines = ["", "동해물과 백두산이 마르고 닳도록", "하느님이 보우하사 우리나라 만세", "", "무궁화 삼천리 화려강산", "대한사람 대한으로 길이 보전하세", ""]
 
-    //#when — replace the range with indented version (blank lines preserved)
+    //#when, replace the range with indented version (blank lines preserved)
     const result = applyReplaceLines(
       lines,
       anchorFor(lines, 1),
@@ -238,7 +238,7 @@ describe("hashline edit operations", () => {
       ["", "  동해물과 백두산이 마르고 닳도록", "  하느님이 보우하사 우리나라 만세", "", "  무궁화 삼천리 화려강산", "  대한사람 대한으로 길이 보전하세", ""]
     )
 
-    //#then — all 7 lines preserved with indentation, not collapsed to 3
+    //#then, all 7 lines preserved with indentation, not collapsed to 3
     expect(result).toEqual(["", "  동해물과 백두산이 마르고 닳도록", "  하느님이 보우하사 우리나라 만세", "", "  무궁화 삼천리 화려강산", "  대한사람 대한으로 길이 보전하세", ""])
   })
 

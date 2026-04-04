@@ -1,24 +1,19 @@
 import { log } from "../shared/logger"
 import type { OhMyOpenCodeConfig } from "../config"
+import {
+  resolveActualContextLimit,
+  type ContextLimitModelCacheState,
+} from "../shared/context-limit-resolver"
 
 import { resolveCompactionModel } from "./shared/compaction-model-resolver"
-const DEFAULT_ACTUAL_LIMIT = 200_000
+import { createPostCompactionDegradationMonitor } from "./preemptive-compaction-degradation-monitor"
+
 const PREEMPTIVE_COMPACTION_TIMEOUT_MS = 120_000
-
-type ModelCacheStateLike = {
-  anthropicContext1MEnabled: boolean
-  modelContextLimitsCache?: Map<string, number>
-}
-
-function getAnthropicActualLimit(modelCacheState?: ModelCacheStateLike): number {
-  return (modelCacheState?.anthropicContext1MEnabled ?? false) ||
-    process.env.ANTHROPIC_1M_CONTEXT === "true" ||
-    process.env.VERTEX_ANTHROPIC_1M_CONTEXT === "true"
-    ? 1_000_000
-    : DEFAULT_ACTUAL_LIMIT
-}
-
 const PREEMPTIVE_COMPACTION_THRESHOLD = 0.78
+const PREEMPTIVE_COMPACTION_COOLDOWN_MS = 60_000
+
+declare function setTimeout(handler: () => void, timeout?: number): unknown
+declare function clearTimeout(timeoutID: unknown): void
 
 interface TokenInfo {
   input: number
@@ -33,12 +28,12 @@ interface CachedCompactionState {
   tokens: TokenInfo
 }
 
-function withTimeout<TValue>(
+async function withTimeout<TValue>(
   promise: Promise<TValue>,
   timeoutMs: number,
   errorMessage: string,
 ): Promise<TValue> {
-  let timeoutID: ReturnType<typeof setTimeout> | undefined
+  let timeoutID: unknown
 
   const timeoutPromise = new Promise<never>((_, reject) => {
     timeoutID = setTimeout(() => {
@@ -46,15 +41,9 @@ function withTimeout<TValue>(
     }, timeoutMs)
   })
 
-  return Promise.race([promise, timeoutPromise]).finally(() => {
-    if (timeoutID !== undefined) {
-      clearTimeout(timeoutID)
-    }
+  return await Promise.race([promise, timeoutPromise]).finally(() => {
+    clearTimeout(timeoutID)
   })
-}
-
-function isAnthropicProvider(providerID: string): boolean {
-  return providerID === "anthropic" || providerID === "google-vertex-anthropic"
 }
 
 type PluginInput = {
@@ -76,11 +65,20 @@ type PluginInput = {
 export function createPreemptiveCompactionHook(
   ctx: PluginInput,
   pluginConfig: OhMyOpenCodeConfig,
-  modelCacheState?: ModelCacheStateLike,
+  modelCacheState?: ContextLimitModelCacheState,
 ) {
   const compactionInProgress = new Set<string>()
   const compactedSessions = new Set<string>()
+  const lastCompactionTime = new Map<string, number>()
   const tokenCache = new Map<string, CachedCompactionState>()
+
+  const postCompactionMonitor = createPostCompactionDegradationMonitor({
+    client: ctx.client,
+    directory: ctx.directory,
+    pluginConfig,
+    tokenCache,
+    compactionInProgress,
+  })
 
   const toolExecuteAfter = async (
     input: { tool: string; sessionID: string; callID: string },
@@ -89,33 +87,39 @@ export function createPreemptiveCompactionHook(
     const { sessionID } = input
     if (compactedSessions.has(sessionID) || compactionInProgress.has(sessionID)) return
 
+    const lastTime = lastCompactionTime.get(sessionID)
+    if (lastTime && Date.now() - lastTime < PREEMPTIVE_COMPACTION_COOLDOWN_MS) return
+
     const cached = tokenCache.get(sessionID)
     if (!cached) return
 
-    const modelSpecificLimit = !isAnthropicProvider(cached.providerID)
-      ? modelCacheState?.modelContextLimitsCache?.get(`${cached.providerID}/${cached.modelID}`)
-      : undefined
-    const actualLimit = isAnthropicProvider(cached.providerID)
-      ? getAnthropicActualLimit(modelCacheState)
-      : modelSpecificLimit ?? DEFAULT_ACTUAL_LIMIT
+    const actualLimit = resolveActualContextLimit(
+      cached.providerID,
+      cached.modelID,
+      modelCacheState,
+    )
 
-    const lastTokens = cached.tokens
-    const totalInputTokens = (lastTokens?.input ?? 0) + (lastTokens?.cache?.read ?? 0)
+    if (actualLimit === null) {
+      log("[preemptive-compaction] Skipping preemptive compaction: unknown context limit for model", {
+        providerID: cached.providerID,
+        modelID: cached.modelID,
+      })
+      return
+    }
+
+    const totalInputTokens = (cached.tokens.input ?? 0) + (cached.tokens.cache?.read ?? 0)
     const usageRatio = totalInputTokens / actualLimit
-
-    if (usageRatio < PREEMPTIVE_COMPACTION_THRESHOLD) return
-
-    const modelID = cached.modelID
-    if (!modelID) return
+    if (usageRatio < PREEMPTIVE_COMPACTION_THRESHOLD || !cached.modelID) return
 
     compactionInProgress.add(sessionID)
+    lastCompactionTime.set(sessionID, Date.now())
 
     try {
       const { providerID: targetProviderID, modelID: targetModelID } = resolveCompactionModel(
         pluginConfig,
         sessionID,
         cached.providerID,
-        modelID
+        cached.modelID,
       )
 
       await withTimeout(
@@ -140,17 +144,29 @@ export function createPreemptiveCompactionHook(
     const props = event.properties as Record<string, unknown> | undefined
 
     if (event.type === "session.deleted") {
-      const sessionInfo = props?.info as { id?: string } | undefined
-      if (sessionInfo?.id) {
-        compactionInProgress.delete(sessionInfo.id)
-        compactedSessions.delete(sessionInfo.id)
-        tokenCache.delete(sessionInfo.id)
+      const sessionID = (props?.info as { id?: string } | undefined)?.id
+      if (sessionID) {
+        compactionInProgress.delete(sessionID)
+        compactedSessions.delete(sessionID)
+        lastCompactionTime.delete(sessionID)
+        tokenCache.delete(sessionID)
+        postCompactionMonitor.clear(sessionID)
+      }
+      return
+    }
+
+    if (event.type === "session.compacted") {
+      const sessionID = (props?.sessionID as string | undefined)
+        ?? (props?.info as { id?: string } | undefined)?.id
+      if (sessionID) {
+        postCompactionMonitor.onSessionCompacted(sessionID)
       }
       return
     }
 
     if (event.type === "message.updated") {
       const info = props?.info as {
+        id?: string
         role?: string
         sessionID?: string
         providerID?: string
@@ -159,15 +175,21 @@ export function createPreemptiveCompactionHook(
         tokens?: TokenInfo
       } | undefined
 
-      if (!info || info.role !== "assistant" || !info.finish) return
-      if (!info.sessionID || !info.providerID || !info.tokens) return
+      if (!info || info.role !== "assistant" || !info.finish || !info.sessionID) return
 
-      tokenCache.set(info.sessionID, {
-        providerID: info.providerID,
-        modelID: info.modelID ?? "",
-        tokens: info.tokens,
-      })
+      if (info.providerID && info.tokens) {
+        tokenCache.set(info.sessionID, {
+          providerID: info.providerID,
+          modelID: info.modelID ?? "",
+          tokens: info.tokens,
+        })
+      }
       compactedSessions.delete(info.sessionID)
+
+      await postCompactionMonitor.onAssistantMessageUpdated({
+        sessionID: info.sessionID,
+        id: info.id,
+      })
     }
   }
 

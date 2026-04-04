@@ -42,6 +42,7 @@ export function createSkillHooks(args: {
           skills: mergedSkills,
           pluginsEnabled: pluginConfig.claude_code?.plugins ?? true,
           enabledPluginsOverride: pluginConfig.claude_code?.plugins_override,
+          directory: ctx.directory,
         }))
     : null
 

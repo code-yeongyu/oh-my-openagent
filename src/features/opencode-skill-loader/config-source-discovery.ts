@@ -1,4 +1,5 @@
 import { promises as fs } from "fs"
+import { homedir } from "os"
 import { dirname, extname, isAbsolute, join, relative } from "path"
 import picomatch from "picomatch"
 import type { SkillsConfig } from "../../config/schema"
@@ -15,6 +16,14 @@ function isHttpUrl(path: string): boolean {
 }
 
 function toAbsolutePath(path: string, configDir: string): string {
+  if (path === "~") {
+    return homedir()
+  }
+
+  if (path.startsWith("~/")) {
+    return join(homedir(), path.slice(2))
+  }
+
   if (isAbsolute(path)) {
     return path
   }
