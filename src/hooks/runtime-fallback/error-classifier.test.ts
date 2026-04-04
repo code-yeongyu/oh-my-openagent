@@ -134,7 +134,7 @@ describe("extractStatusCode", () => {
   })
 
   test("skips non-numeric status and finds deeper numeric statusCode", () => {
-    //#given — status is a string, but error.statusCode is numeric
+    //#given - status is a string, but error.statusCode is numeric
     const error = {
       status: "error",
       error: { statusCode: 429 },

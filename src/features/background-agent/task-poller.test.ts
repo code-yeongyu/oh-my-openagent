@@ -108,7 +108,7 @@ describe("checkAndInterruptStaleTasks", () => {
   })
 
   it("should interrupt tasks with NO progress.lastUpdate that exceeded messageStalenessTimeoutMs since startedAt", async () => {
-    //#given — task started 15 minutes ago, never received any progress update
+    //#given - task started 15 minutes ago, never received any progress update
     const task = createRunningTask({
       startedAt: new Date(Date.now() - 15 * 60 * 1000),
       progress: undefined,
@@ -162,7 +162,7 @@ describe("checkAndInterruptStaleTasks", () => {
   })
 
   it("should NOT interrupt tasks with NO progress.lastUpdate that are within messageStalenessTimeoutMs", async () => {
-    //#given — task started 5 minutes ago, default timeout is 10 minutes
+    //#given - task started 5 minutes ago, default timeout is 10 minutes
     const task = createRunningTask({
       startedAt: new Date(Date.now() - 5 * 60 * 1000),
       progress: undefined,
@@ -182,13 +182,13 @@ describe("checkAndInterruptStaleTasks", () => {
   })
 
   it("should use DEFAULT_MESSAGE_STALENESS_TIMEOUT_MS when messageStalenessTimeoutMs is not configured", async () => {
-    //#given — task started 65 minutes ago, no config for messageStalenessTimeoutMs
+    //#given - task started 65 minutes ago, no config for messageStalenessTimeoutMs
     const task = createRunningTask({
       startedAt: new Date(Date.now() - 65 * 60 * 1000),
       progress: undefined,
     })
 
-    //#when — default is 60 minutes (3_600_000ms)
+    //#when - default is 60 minutes (3_600_000ms)
     await checkAndInterruptStaleTasks({
       tasks: [task],
       client: mockClient as never,
@@ -203,7 +203,7 @@ describe("checkAndInterruptStaleTasks", () => {
   })
 
   it("should NOT interrupt task when session is running, even if lastUpdate exceeds stale timeout", async () => {
-    //#given — lastUpdate is 5min old but session is actively running
+    //#given - lastUpdate is 5min old but session is actively running
     const task = createRunningTask({
       startedAt: new Date(Date.now() - 300_000),
       progress: {
@@ -212,7 +212,7 @@ describe("checkAndInterruptStaleTasks", () => {
       },
     })
 
-    //#when — session status is "busy" (OpenCode's actual status for active LLM processing)
+    //#when - session status is "busy" (OpenCode's actual status for active LLM processing)
     await checkAndInterruptStaleTasks({
       tasks: [task],
       client: mockClient as never,
@@ -222,12 +222,12 @@ describe("checkAndInterruptStaleTasks", () => {
       sessionStatuses: { "ses-1": { type: "busy" } },
     })
 
-    //#then — task should survive because session is actively busy
+    //#then - task should survive because session is actively busy
     expect(task.status).toBe("running")
   })
 
   it("should NOT interrupt busy session task even with very old lastUpdate", async () => {
-    //#given — lastUpdate is 15min old, but session is still busy
+    //#given - lastUpdate is 15min old, but session is still busy
     const task = createRunningTask({
       startedAt: new Date(Date.now() - 900_000),
       progress: {
@@ -236,7 +236,7 @@ describe("checkAndInterruptStaleTasks", () => {
       },
     })
 
-    //#when — session busy, lastUpdate far exceeds any timeout
+    //#when - session busy, lastUpdate far exceeds any timeout
     await checkAndInterruptStaleTasks({
       tasks: [task],
       client: mockClient as never,
@@ -246,18 +246,18 @@ describe("checkAndInterruptStaleTasks", () => {
       sessionStatuses: { "ses-1": { type: "busy" } },
     })
 
-    //#then — busy sessions are NEVER stale-killed (babysitter + TTL prune handle these)
+    //#then - busy sessions are NEVER stale-killed (babysitter + TTL prune handle these)
     expect(task.status).toBe("running")
   })
 
   it("should NOT interrupt busy session even with no progress (undefined lastUpdate)", async () => {
-    //#given — task has no progress at all, but session is busy
+    //#given - task has no progress at all, but session is busy
     const task = createRunningTask({
       startedAt: new Date(Date.now() - 15 * 60 * 1000),
       progress: undefined,
     })
 
-    //#when — session is busy
+    //#when - session is busy
     await checkAndInterruptStaleTasks({
       tasks: [task],
       client: mockClient as never,
@@ -267,12 +267,12 @@ describe("checkAndInterruptStaleTasks", () => {
       sessionStatuses: { "ses-1": { type: "busy" } },
     })
 
-    //#then — task should survive because session is actively running
+    //#then - task should survive because session is actively running
     expect(task.status).toBe("running")
   })
 
   it("should interrupt task when session is idle and lastUpdate exceeds stale timeout", async () => {
-    //#given — lastUpdate is 5min old and session is idle
+    //#given - lastUpdate is 5min old and session is idle
     const task = createRunningTask({
       startedAt: new Date(Date.now() - 300_000),
       progress: {
@@ -281,7 +281,7 @@ describe("checkAndInterruptStaleTasks", () => {
       },
     })
 
-    //#when — session status is "idle"
+    //#when - session status is "idle"
     await checkAndInterruptStaleTasks({
       tasks: [task],
       client: mockClient as never,
@@ -291,13 +291,13 @@ describe("checkAndInterruptStaleTasks", () => {
       sessionStatuses: { "ses-1": { type: "idle" } },
     })
 
-    //#then — task should be killed because session is idle with stale lastUpdate
+    //#then - task should be killed because session is idle with stale lastUpdate
     expect(task.status).toBe("cancelled")
     expect(task.error).toContain("Stale timeout")
   })
 
   it("should NOT interrupt running session task even with very old lastUpdate", async () => {
-    //#given — lastUpdate is 15min old, but session is still running
+    //#given - lastUpdate is 15min old, but session is still running
     const task = createRunningTask({
       startedAt: new Date(Date.now() - 900_000),
       progress: {
@@ -306,7 +306,7 @@ describe("checkAndInterruptStaleTasks", () => {
       },
     })
 
-    //#when — session running, lastUpdate far exceeds any timeout
+    //#when - session running, lastUpdate far exceeds any timeout
     await checkAndInterruptStaleTasks({
       tasks: [task],
       client: mockClient as never,
@@ -316,12 +316,12 @@ describe("checkAndInterruptStaleTasks", () => {
       sessionStatuses: { "ses-1": { type: "running" } },
     })
 
-    //#then — running sessions are NEVER stale-killed (babysitter + TTL prune handle these)
+    //#then - running sessions are NEVER stale-killed (babysitter + TTL prune handle these)
     expect(task.status).toBe("running")
   })
 
   it("should NOT interrupt running session even with no progress (undefined lastUpdate)", async () => {
-    //#given — task has no progress at all, but session is running
+    //#given - task has no progress at all, but session is running
     const task = createRunningTask({
       startedAt: new Date(Date.now() - 15 * 60 * 1000),
       progress: undefined,
