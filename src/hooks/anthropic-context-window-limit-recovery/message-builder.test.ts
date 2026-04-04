@@ -5,10 +5,6 @@ const injectTextPartAsync = mock(() => Promise.resolve(false))
 const findMessagesWithEmptyTextPartsFromSDK = mock(() => Promise.resolve([] as string[]))
 
 async function importFreshMessageBuilder(): Promise<typeof import("./message-builder")> {
-  mock.module("../../shared/normalize-sdk-response", () => ({
-    normalizeSDKResponse: (response: { data?: unknown[] }) => response.data ?? [],
-  }))
-
   mock.module("../../shared/logger", () => ({
     log: () => {},
   }))
@@ -17,21 +13,21 @@ async function importFreshMessageBuilder(): Promise<typeof import("./message-bui
     isSqliteBackend: () => true,
   }))
 
-  mock.module("../session-recovery/storage.ts", () => ({
-    findEmptyMessages: () => [],
+  const emptyTextMockFactory = () => ({
     findMessagesWithEmptyTextParts: () => [],
-    injectTextPart: () => false,
     replaceEmptyTextParts: () => false,
-  }))
-
-  mock.module("../session-recovery/storage/empty-text.ts", () => ({
     replaceEmptyTextPartsAsync,
     findMessagesWithEmptyTextPartsFromSDK,
-  }))
+  })
+  mock.module("../session-recovery/storage/empty-text", emptyTextMockFactory)
+  mock.module("../session-recovery/storage/empty-text.ts", emptyTextMockFactory)
 
-  mock.module("../session-recovery/storage/text-part-injector.ts", () => ({
+  const textPartInjectorMockFactory = () => ({
+    injectTextPart: () => false,
     injectTextPartAsync,
-  }))
+  })
+  mock.module("../session-recovery/storage/text-part-injector", textPartInjectorMockFactory)
+  mock.module("../session-recovery/storage/text-part-injector.ts", textPartInjectorMockFactory)
 
   const module = await import(`./message-builder?test=${Date.now()}-${Math.random()}`)
   mock.restore()
