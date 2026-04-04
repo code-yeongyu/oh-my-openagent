@@ -5,6 +5,7 @@ import type {
   AvailableCategory,
 } from "../agents/dynamic-agent-prompt-builder"
 import type { OhMyOpenCodeConfig } from "../config"
+import { isTmuxIntegrationEnabled } from "../create-runtime-tmux-config"
 import type { PluginContext, ToolsRecord } from "./types"
 
 import {
@@ -29,7 +30,7 @@ import {
 } from "../tools"
 import { getMainSessionID } from "../features/claude-code-session-state"
 import { filterDisabledTools } from "../shared/disabled-tools"
-import { log } from "../shared"
+import { isTaskSystemEnabled, log } from "../shared"
 
 import type { Managers } from "../create-managers"
 import type { SkillContext } from "./skill-context"
@@ -54,7 +55,7 @@ const LOW_PRIORITY_TOOL_ORDER = [
   "task_update",
   "background_output",
   "background_cancel",
-  "hashline_edit",
+  "edit",
   "ast_grep_replace",
   "ast_grep_search",
   "glob",
@@ -70,7 +71,7 @@ const LOW_PRIORITY_TOOL_ORDER = [
   "lsp_diagnostics",
 ] as const
 
-function trimToolsToCap(filteredTools: ToolsRecord, maxTools: number): void {
+export function trimToolsToCap(filteredTools: ToolsRecord, maxTools: number): void {
   const toolNames = Object.keys(filteredTools)
   if (toolNames.length <= maxTools) return
 
@@ -105,6 +106,7 @@ export function createToolRegistry(args: {
   availableCategories: AvailableCategory[]
 }): ToolRegistryResult {
   const { ctx, pluginConfig, managers, skillContext, availableCategories } = args
+  const tmuxIntegrationEnabled = isTmuxIntegrationEnabled(pluginConfig)
 
   const backgroundTools = createBackgroundTools(managers.backgroundManager, ctx.client)
   const callOmoAgent = createCallOmoAgent(
@@ -153,7 +155,7 @@ export function createToolRegistry(args: {
     },
   })
 
-  const getSessionIDForMcp = (): string => getMainSessionID() || ""
+  const getSessionIDForMcp = (): string | undefined => getMainSessionID()
 
   const skillMcpTool = createSkillMcpTool({
     manager: managers.skillMcpManager,
@@ -175,8 +177,7 @@ export function createToolRegistry(args: {
     nativeSkills: "skills" in ctx ? (ctx as { skills: SkillLoadOptions["nativeSkills"] }).skills : undefined,
   })
 
-  // task_system defaults to true since v3.14 — delegation (oracle, subagents) requires it
-  const taskSystemEnabled = pluginConfig.experimental?.task_system ?? true
+  const taskSystemEnabled = isTaskSystemEnabled(pluginConfig)
   const taskToolsRecord: Record<string, ToolDefinition> = taskSystemEnabled
     ? {
         task_create: createTaskCreateTool(pluginConfig, ctx),
@@ -203,7 +204,7 @@ export function createToolRegistry(args: {
     task: delegateTask,
     skill_mcp: skillMcpTool,
     skill: skillTool,
-    interactive_bash,
+    ...(tmuxIntegrationEnabled ? { interactive_bash } : {}),
     ...taskToolsRecord,
     ...hashlineToolsRecord,
   }

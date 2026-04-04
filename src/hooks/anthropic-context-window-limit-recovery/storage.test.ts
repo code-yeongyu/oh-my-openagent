@@ -13,6 +13,7 @@ mock.module("./storage", () => {
 
 afterAll(() => {
   mock.module("./storage", () => storage)
+  mock.restore()
 })
 
 describe("truncateUntilTargetTokens", () => {

@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 
-import { describe, it, expect, mock, beforeEach, afterEach } from "bun:test"
+import { afterAll, describe, it, expect, mock, beforeEach, afterEach } from "bun:test"
 
 const ANTHROPIC_CONTEXT_ENV_KEY = "ANTHROPIC_1M_CONTEXT"
 const VERTEX_CONTEXT_ENV_KEY = "VERTEX_ANTHROPIC_1M_CONTEXT"
@@ -27,6 +27,10 @@ const logMock = mock(() => {})
 mock.module("../shared/logger", () => ({
   log: logMock,
 }))
+
+afterAll(() => {
+  mock.restore()
+})
 
 const { createPreemptiveCompactionHook } = await import("./preemptive-compaction")
 
@@ -597,7 +601,7 @@ describe("preemptive-compaction", () => {
     })
     const sessionID = "ses_kimi_limit"
 
-    // 180k total tokens — above 78% of 200k (156k) but below 78% of 256k (204k)
+    // 180k total tokens - above 78% of 200k (156k) but below 78% of 256k (204k)
     await hook.event({
       event: {
         type: "message.updated",
@@ -640,7 +644,7 @@ describe("preemptive-compaction", () => {
     })
     const sessionID = "ses_kimi_trigger"
 
-    // 210k total — above 78% of 256k (≈204k)
+    // 210k total - above 78% of 256k (≈204k)
     await hook.event({
       event: {
         type: "message.updated",

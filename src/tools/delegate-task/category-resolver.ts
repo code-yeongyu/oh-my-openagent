@@ -45,11 +45,25 @@ export async function resolveCategoryExecution(
 ): Promise<CategoryResolutionResult> {
   const { client, userCategories, sisyphusJuniorModel } = executorCtx
 
-  const availableModels = await getAvailableModelsForDelegateTask(client)
-
   const categoryName = args.category!
   const enabledCategories = mergeCategories(userCategories)
   const categoryExists = enabledCategories[categoryName] !== undefined
+
+  if (!categoryExists) {
+    const allCategoryNames = Object.keys(enabledCategories).join(", ")
+    return {
+      agentToUse: "",
+      categoryModel: undefined,
+      categoryPromptAppend: undefined,
+      maxPromptTokens: undefined,
+      modelInfo: undefined,
+      actualModel: undefined,
+      isUnstableAgent: false,
+      error: `Unknown category: "${categoryName}". Available: ${allCategoryNames}`,
+    }
+  }
+
+  const availableModels = await getAvailableModelsForDelegateTask(client)
 
   const resolved = resolveCategoryConfig(categoryName, {
     userCategories,
@@ -117,7 +131,7 @@ Available categories: ${allCategoryNames}`,
       const parsedModel = parseModelString(actualModel)
       const variantToUse = userCategories?.[args.category!]?.variant ?? resolved.config.variant
       categoryModel = parsedModel
-        ? applyCategoryParams({ ...parsedModel, variant: variantToUse }, resolved.config)
+        ? applyCategoryParams({ ...parsedModel, variant: variantToUse ?? parsedModel.variant }, resolved.config)
         : undefined
     }
   } else {
@@ -136,12 +150,12 @@ Available categories: ${allCategoryNames}`,
       const userModelOverride = explicitCategoryModel ?? overrideModel
       if (userModelOverride) {
         actualModel = userModelOverride
-        const parsedModel = parseModelString(actualModel)
+        const parsedModel = parseModelString(userModelOverride)
         const variantToUse = userCategories?.[args.category!]?.variant ?? resolved.config.variant
         categoryModel = parsedModel
-          ? applyCategoryParams({ ...parsedModel, variant: variantToUse }, resolved.config)
+          ? applyCategoryParams({ ...parsedModel, variant: variantToUse ?? parsedModel.variant }, resolved.config)
           : undefined
-        modelInfo = { model: actualModel, type: "user-defined", source: "override" }
+        modelInfo = { model: userModelOverride, type: "user-defined", source: "override" }
       }
     } else if (resolution) {
       const {
@@ -186,7 +200,7 @@ Available categories: ${allCategoryNames}`,
       const parsedModel = parseModelString(actualModel)
       const variantToUse = userCategories?.[args.category!]?.variant ?? resolvedVariant ?? resolved.config.variant
       categoryModel = parsedModel
-        ? applyCategoryParams({ ...parsedModel, variant: variantToUse }, resolved.config)
+        ? applyCategoryParams({ ...parsedModel, variant: variantToUse ?? parsedModel.variant }, resolved.config)
         : undefined
     }
   }
@@ -261,6 +275,6 @@ Available categories: ${categoryNames.join(", ")}`,
     actualModel,
     isUnstableAgent,
     // Don't use hardcoded fallback chain when resolution was skipped (cold cache)
-    fallbackChain: configuredFallbackChain ?? (isModelResolutionSkipped ? undefined : requirement?.fallbackChain),
+    fallbackChain: configuredFallbackChain ?? ((isModelResolutionSkipped || explicitCategoryModel) ? undefined : requirement?.fallbackChain),
   }
 }

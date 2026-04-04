@@ -91,6 +91,47 @@ describe("tool.execute.before ultrawork oracle verification", () => {
 		rmSync(directory, { recursive: true, force: true })
 	})
 
+	test("#given ulw-loop skill invocation carries user_message #when tool.execute.before runs #then the loop starts with that prompt", async () => {
+		const directory = join(tmpdir(), `tool-before-ulw-skill-${Date.now()}`)
+		mkdirSync(directory, { recursive: true })
+		const startLoopCalls: Array<{ sessionID: string; prompt: string; options: Record<string, unknown> }> = []
+		const handler = createToolExecuteBeforeHandler({
+			ctx: createCtx(directory) as unknown as Parameters<typeof createToolExecuteBeforeHandler>[0]["ctx"],
+			hooks: {
+				ralphLoop: {
+					startLoop: (sessionID: string, prompt: string, options?: Record<string, unknown>) => {
+						startLoopCalls.push({ sessionID, prompt, options: options ?? {} })
+						return true
+					},
+					cancelLoop: () => true,
+					getState: () => null,
+				},
+			} as unknown as Parameters<typeof createToolExecuteBeforeHandler>[0]["hooks"],
+		})
+		const output = {
+			args: {
+				name: "ulw-loop",
+				user_message: '"Ship feature" --strategy=continue',
+			},
+		}
+
+		await handler({ tool: "skill", sessionID: "ses-main", callID: "call-skill-ulw" }, output)
+
+		expect(startLoopCalls).toHaveLength(1)
+		expect(startLoopCalls[0]).toEqual({
+			sessionID: "ses-main",
+			prompt: "Ship feature",
+			options: {
+				ultrawork: true,
+				maxIterations: undefined,
+				completionPromise: undefined,
+				strategy: "continue",
+			},
+		})
+
+		rmSync(directory, { recursive: true, force: true })
+	})
+
 	test("#given ulw loop is awaiting verification #when oracle sync task metadata is persisted #then oracle session id is stored", async () => {
 		const directory = join(tmpdir(), `tool-after-ulw-${Date.now()}`)
 		mkdirSync(directory, { recursive: true })

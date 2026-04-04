@@ -1,13 +1,19 @@
-import { describe, expect, it, mock } from "bun:test"
+import { afterEach, describe, expect, it, spyOn } from "bun:test"
 import type { LoadedSkill } from "../../features/opencode-skill-loader"
+import * as shared from "../../shared"
+import * as slashcommand from "../../tools/slashcommand"
+import { executeSlashCommand } from "./executor"
 
-mock.module("../../shared", () => ({
-  resolveCommandsInText: async (content: string) => content,
-  resolveFileReferencesInText: async (content: string) => content,
-}))
+let resolveCommandsInTextSpy: { mockRestore: () => void } | undefined
+let resolveFileReferencesInTextSpy: { mockRestore: () => void } | undefined
+let discoverCommandsSyncSpy: { mockRestore: () => void } | undefined
 
-mock.module("../../tools/slashcommand", () => ({
-  discoverCommandsSync: () => [
+function setupExecutorSpies(): void {
+  resolveCommandsInTextSpy = spyOn(shared, "resolveCommandsInText")
+    .mockImplementation(async (content: string) => content)
+  resolveFileReferencesInTextSpy = spyOn(shared, "resolveFileReferencesInText")
+    .mockImplementation(async (content: string) => content)
+  discoverCommandsSyncSpy = spyOn(slashcommand, "discoverCommandsSync").mockReturnValue([
     {
       name: "shadowed",
       metadata: { name: "shadowed", description: "builtin" },
@@ -20,14 +26,19 @@ mock.module("../../tools/slashcommand", () => ({
       content: "project template",
       scope: "project",
     },
-  ],
-}))
+  ])
+}
 
-mock.module("../../features/opencode-skill-loader", () => ({
-  discoverAllSkills: async (): Promise<LoadedSkill[]> => [],
-}))
+function restoreExecutorSpies(): void {
+  resolveCommandsInTextSpy?.mockRestore()
+  resolveFileReferencesInTextSpy?.mockRestore()
+  discoverCommandsSyncSpy?.mockRestore()
+  resolveCommandsInTextSpy = undefined
+  resolveFileReferencesInTextSpy = undefined
+  discoverCommandsSyncSpy = undefined
+}
 
-const { executeSlashCommand } = await import("./executor")
+afterEach(restoreExecutorSpies)
 
 function createRestrictedSkill(): LoadedSkill {
   return {
@@ -45,6 +56,7 @@ function createRestrictedSkill(): LoadedSkill {
 describe("executeSlashCommand resolution semantics", () => {
   it("returns project command when project and builtin names collide", async () => {
     //#given
+    setupExecutorSpies()
     const parsed = {
       command: "shadowed",
       args: "",
@@ -63,6 +75,7 @@ describe("executeSlashCommand resolution semantics", () => {
 
   it("blocks slash skill invocation when invoking agent is missing", async () => {
     //#given
+    setupExecutorSpies()
     const parsed = {
       command: "restricted-skill",
       args: "",
@@ -79,6 +92,7 @@ describe("executeSlashCommand resolution semantics", () => {
 
   it("allows slash skill invocation when invoking agent matches restriction", async () => {
     //#given
+    setupExecutorSpies()
     const parsed = {
       command: "restricted-skill",
       args: "",

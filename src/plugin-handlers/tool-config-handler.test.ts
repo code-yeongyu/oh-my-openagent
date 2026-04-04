@@ -218,13 +218,23 @@ describe("applyToolConfig", () => {
 
   describe("#given task_system is undefined", () => {
     describe("#when applying tool config", () => {
+      it("#then should not disable todo tools globally by default", () => {
+        const params = createParams({})
+
+        applyToolConfig(params)
+
+        const tools = params.config.tools as Record<string, unknown>
+        expect(tools.todowrite).toBeUndefined()
+        expect(tools.todoread).toBeUndefined()
+      })
+
       it.each([
         "atlas",
         "sisyphus",
         "hephaestus",
         "prometheus",
         "sisyphus-junior",
-      ])("#then should deny todo tools for %s agent by default", (agentName) => {
+      ])("#then should NOT deny todo tools for %s agent by default", (agentName) => {
         const params = createParams({
           agents: [agentName],
         })
@@ -234,8 +244,8 @@ describe("applyToolConfig", () => {
         const agent = params.agentResult[agentName] as {
           permission: Record<string, unknown>
         }
-        expect(agent.permission.todowrite).toBe("deny")
-        expect(agent.permission.todoread).toBe("deny")
+        expect(agent.permission.todowrite).toBeUndefined()
+        expect(agent.permission.todoread).toBeUndefined()
       })
     })
   })

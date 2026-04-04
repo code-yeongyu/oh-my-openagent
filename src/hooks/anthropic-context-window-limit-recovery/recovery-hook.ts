@@ -5,11 +5,19 @@ import type { ExperimentalConfig, OhMyOpenCodeConfig } from "../../config"
 import { parseAnthropicTokenLimitError } from "./parser"
 import { executeCompact, getLastAssistant } from "./executor"
 import { attemptDeduplicationRecovery } from "./deduplication-recovery"
+import { clearSessionState } from "./state"
+import { clearAllSessionTimeouts, clearSessionTimeout } from "./session-timeout-map"
 import { log } from "../../shared/logger"
 
 export interface AnthropicContextWindowLimitRecoveryOptions {
   experimental?: ExperimentalConfig
   pluginConfig: OhMyOpenCodeConfig
+  dependencies?: {
+    executeCompact?: typeof executeCompact
+    getLastAssistant?: typeof getLastAssistant
+    log?: typeof log
+    parseAnthropicTokenLimitError?: typeof parseAnthropicTokenLimitError
+  }
 }
 
 function createRecoveryState(): AutoCompactState {
@@ -17,6 +25,7 @@ function createRecoveryState(): AutoCompactState {
     pendingCompact: new Set<string>(),
     errorDataBySession: new Map<string, ParsedTokenLimitError>(),
     retryStateBySession: new Map(),
+    retryTimerBySession: new Map(),
     truncateStateBySession: new Map(),
     emptyContentAttemptBySession: new Map(),
     compactionInProgress: new Set<string>(),
@@ -30,7 +39,14 @@ export function createAnthropicContextWindowLimitRecoveryHook(
 ) {
   const autoCompactState = createRecoveryState()
   const experimental = options?.experimental
-  const pluginConfig = options?.pluginConfig!
+  const pluginConfig = options?.pluginConfig ?? {} as OhMyOpenCodeConfig
+  const dependencies = {
+    executeCompact,
+    getLastAssistant,
+    log,
+    parseAnthropicTokenLimitError,
+    ...options?.dependencies,
+  }
   const pendingCompactionTimeoutBySession = new Map<string, ReturnType<typeof setTimeout>>()
 
   const eventHandler = async ({ event }: { event: { type: string; properties?: unknown } }) => {
@@ -39,29 +55,20 @@ export function createAnthropicContextWindowLimitRecoveryHook(
     if (event.type === "session.deleted") {
       const sessionInfo = props?.info as { id?: string } | undefined
       if (sessionInfo?.id) {
-        const timeoutID = pendingCompactionTimeoutBySession.get(sessionInfo.id)
-        if (timeoutID !== undefined) {
-          clearTimeout(timeoutID)
-          pendingCompactionTimeoutBySession.delete(sessionInfo.id)
-        }
+        clearSessionTimeout(pendingCompactionTimeoutBySession, sessionInfo.id)
 
-        autoCompactState.pendingCompact.delete(sessionInfo.id)
-        autoCompactState.errorDataBySession.delete(sessionInfo.id)
-        autoCompactState.retryStateBySession.delete(sessionInfo.id)
-        autoCompactState.truncateStateBySession.delete(sessionInfo.id)
-        autoCompactState.emptyContentAttemptBySession.delete(sessionInfo.id)
-        autoCompactState.compactionInProgress.delete(sessionInfo.id)
+        clearSessionState(autoCompactState, sessionInfo.id)
       }
       return
     }
 
     if (event.type === "session.error") {
       const sessionID = props?.sessionID as string | undefined
-      log("[auto-compact] session.error received", { sessionID, error: props?.error })
+      dependencies.log("[auto-compact] session.error received", { sessionID, error: props?.error })
       if (!sessionID) return
 
-      const parsed = parseAnthropicTokenLimitError(props?.error)
-      log("[auto-compact] parsed result", { parsed, hasError: !!props?.error })
+      const parsed = dependencies.parseAnthropicTokenLimitError(props?.error)
+      dependencies.log("[auto-compact] parsed result", { parsed, hasError: !!props?.error })
       if (parsed) {
         autoCompactState.pendingCompact.add(sessionID)
         autoCompactState.errorDataBySession.set(sessionID, parsed)
@@ -71,7 +78,11 @@ export function createAnthropicContextWindowLimitRecoveryHook(
           return
         }
 
-        const lastAssistant = await getLastAssistant(sessionID, ctx.client, ctx.directory)
+        const lastAssistant = await dependencies.getLastAssistant(
+          sessionID,
+          ctx.client,
+          ctx.directory,
+        )
         const lastAssistantInfo = lastAssistant?.info
         const providerID = parsed.providerID ?? (lastAssistantInfo?.providerID as string | undefined)
         const modelID = parsed.modelID ?? (lastAssistantInfo?.modelID as string | undefined)
@@ -87,9 +98,11 @@ export function createAnthropicContextWindowLimitRecoveryHook(
           })
           .catch(() => {})
 
+        clearSessionTimeout(pendingCompactionTimeoutBySession, sessionID)
+
         const timeoutID = setTimeout(() => {
           pendingCompactionTimeoutBySession.delete(sessionID)
-          executeCompact(
+          dependencies.executeCompact(
             sessionID,
             { providerID, modelID },
             autoCompactState,
@@ -110,9 +123,9 @@ export function createAnthropicContextWindowLimitRecoveryHook(
       const sessionID = info?.sessionID as string | undefined
 
       if (sessionID && info?.role === "assistant" && info.error) {
-        log("[auto-compact] message.updated with error", { sessionID, error: info.error })
-        const parsed = parseAnthropicTokenLimitError(info.error)
-        log("[auto-compact] message.updated parsed result", { parsed })
+        dependencies.log("[auto-compact] message.updated with error", { sessionID, error: info.error })
+        const parsed = dependencies.parseAnthropicTokenLimitError(info.error)
+        dependencies.log("[auto-compact] message.updated parsed result", { parsed })
         if (parsed) {
           parsed.providerID = info.providerID as string | undefined
           parsed.modelID = info.modelID as string | undefined
@@ -129,18 +142,18 @@ export function createAnthropicContextWindowLimitRecoveryHook(
 
       if (!autoCompactState.pendingCompact.has(sessionID)) return
 
-      const timeoutID = pendingCompactionTimeoutBySession.get(sessionID)
-      if (timeoutID !== undefined) {
-        clearTimeout(timeoutID)
-        pendingCompactionTimeoutBySession.delete(sessionID)
-      }
+      clearSessionTimeout(pendingCompactionTimeoutBySession, sessionID)
 
       const errorData = autoCompactState.errorDataBySession.get(sessionID)
-      const lastAssistant = await getLastAssistant(sessionID, ctx.client, ctx.directory)
+      const lastAssistant = await dependencies.getLastAssistant(
+        sessionID,
+        ctx.client,
+        ctx.directory,
+      )
       const lastAssistantInfo = lastAssistant?.info
 
       if (lastAssistantInfo?.summary === true && lastAssistant?.hasContent) {
-        autoCompactState.pendingCompact.delete(sessionID)
+        clearSessionState(autoCompactState, sessionID)
         return
       }
 
@@ -158,7 +171,7 @@ export function createAnthropicContextWindowLimitRecoveryHook(
         })
         .catch(() => {})
 
-      await executeCompact(
+      await dependencies.executeCompact(
         sessionID,
         { providerID, modelID },
         autoCompactState,
@@ -172,5 +185,9 @@ export function createAnthropicContextWindowLimitRecoveryHook(
 
   return {
     event: eventHandler,
+    dispose: (): void => {
+      clearAllSessionTimeouts(pendingCompactionTimeoutBySession)
+      clearAllSessionTimeouts(autoCompactState.retryTimerBySession)
+    },
   }
 }

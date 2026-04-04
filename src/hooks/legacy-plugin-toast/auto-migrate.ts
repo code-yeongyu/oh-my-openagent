@@ -1,9 +1,11 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 
 import { parseJsoncSafe } from "../../shared/jsonc-parser"
 import { getOpenCodeConfigPaths } from "../../shared/opencode-config-dir"
-import { LEGACY_PLUGIN_NAME, PLUGIN_NAME } from "../../shared/plugin-identity"
+import { PLUGIN_NAME } from "../../shared/plugin-identity"
+import { isCanonicalEntry, isLegacyEntry, toCanonicalEntry } from "../../shared/plugin-entry-migrator"
+import { migrateLegacyPluginEntry } from "./plugin-entry-migrator"
 
 export interface MigrationResult {
   migrated: boolean
@@ -14,22 +16,6 @@ export interface MigrationResult {
 
 interface OpenCodeConfig {
   plugin?: string[]
-}
-
-function isLegacyEntry(entry: string): boolean {
-  return entry === LEGACY_PLUGIN_NAME || entry.startsWith(`${LEGACY_PLUGIN_NAME}@`)
-}
-
-function isCanonicalEntry(entry: string): boolean {
-  return entry === PLUGIN_NAME || entry.startsWith(`${PLUGIN_NAME}@`)
-}
-
-function toLegacyCanonical(entry: string): string {
-  if (entry === LEGACY_PLUGIN_NAME) return PLUGIN_NAME
-  if (entry.startsWith(`${LEGACY_PLUGIN_NAME}@`)) {
-    return `${PLUGIN_NAME}${entry.slice(LEGACY_PLUGIN_NAME.length)}`
-  }
-  return entry
 }
 
 function detectOpenCodeConfigPath(overrideConfigDir?: string): string | null {
@@ -62,28 +48,16 @@ export function autoMigrateLegacyPluginEntry(overrideConfigDir?: string): Migrat
 
     const hasCanonical = plugins.some(isCanonicalEntry)
     const from = legacyEntries[0]
-    const to = toLegacyCanonical(from)
+    const to = toCanonicalEntry(from)
+    const migrated = migrateLegacyPluginEntry(configPath)
+    if (!migrated) return { migrated: false, from: null, to: null, configPath }
 
-    const normalized = hasCanonical
-      ? plugins.filter((p) => !isLegacyEntry(p))
-      : plugins.map((p) => (isLegacyEntry(p) ? toLegacyCanonical(p) : p))
-
-    const isJsonc = configPath.endsWith(".jsonc")
-    if (isJsonc) {
-      const pluginArrayRegex = /((?:"plugin"|plugin)\s*:\s*)\[([\s\S]*?)\]/
-      const match = content.match(pluginArrayRegex)
-      if (match) {
-        const formattedPlugins = normalized.map((p) => `"${p}"`).join(",\n    ")
-        const newContent = content.replace(pluginArrayRegex, `$1[\n    ${formattedPlugins}\n  ]`)
-        writeFileSync(configPath, newContent)
-        return { migrated: true, from, to, configPath }
-      }
+    return {
+      migrated: true,
+      from,
+      to: hasCanonical ? PLUGIN_NAME : to,
+      configPath,
     }
-
-    const parsed = JSON.parse(content) as Record<string, unknown>
-    parsed.plugin = normalized
-    writeFileSync(configPath, JSON.stringify(parsed, null, 2) + "\n")
-    return { migrated: true, from, to, configPath }
   } catch {
     return { migrated: false, from: null, to: null, configPath }
   }

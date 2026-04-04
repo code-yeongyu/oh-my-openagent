@@ -2,16 +2,19 @@ import type { PluginInput } from "@opencode-ai/plugin"
 
 import { normalizeSDKResponse } from "../../shared"
 
-import type { MessageInfo, ResolveLatestMessageInfoResult } from "./types"
+import type { MessageInfo, MessageWithInfo, ResolveLatestMessageInfoResult } from "./types"
 
 export async function resolveLatestMessageInfo(
   ctx: PluginInput,
-  sessionID: string
+  sessionID: string,
+  prefetchedMessages?: MessageWithInfo[]
 ): Promise<ResolveLatestMessageInfoResult> {
-  const messagesResp = await ctx.client.session.messages({
-    path: { id: sessionID },
-  })
-  const messages = normalizeSDKResponse(messagesResp, [] as Array<{ info?: MessageInfo }>)
+  const messages = prefetchedMessages ?? normalizeSDKResponse(
+    await ctx.client.session.messages({
+      path: { id: sessionID },
+    }),
+    [] as MessageWithInfo[],
+  )
   let encounteredCompaction = false
 
   for (let i = messages.length - 1; i >= 0; i--) {

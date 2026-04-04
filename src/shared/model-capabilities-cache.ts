@@ -1,7 +1,5 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs"
-import { join } from "path"
 import * as dataPath from "./data-path"
-import { log } from "./logger"
+import { createJsonFileCacheStore } from "./json-file-cache-store"
 import type { ModelCapabilitiesSnapshot, ModelCapabilitiesSnapshotEntry } from "./model-capabilities"
 
 export const MODELS_DEV_SOURCE_URL = "https://models.dev/api.json"
@@ -162,61 +160,28 @@ export async function fetchModelCapabilitiesSnapshot(args: {
 export function createModelCapabilitiesCacheStore(
   getCacheDir: () => string = dataPath.getOmoOpenCodeCacheDir,
 ) {
-  let memSnapshot: ModelCapabilitiesSnapshot | null | undefined
-
-  function getCacheFilePath(): string {
-    return join(getCacheDir(), MODEL_CAPABILITIES_CACHE_FILE)
-  }
-
-  function ensureCacheDir(): void {
-    const cacheDir = getCacheDir()
-    if (!existsSync(cacheDir)) {
-      mkdirSync(cacheDir, { recursive: true })
-    }
-  }
+  const snapshotCacheStore = createJsonFileCacheStore<ModelCapabilitiesSnapshot>({
+    getCacheDir,
+    filename: MODEL_CAPABILITIES_CACHE_FILE,
+    logPrefix: "model-capabilities-cache",
+    cacheLabel: "Cache",
+    describe: (snapshot) => ({
+      modelCount: Object.keys(snapshot.models).length,
+      generatedAt: snapshot.generatedAt,
+    }),
+    serialize: (snapshot) => `${JSON.stringify(snapshot, null, 2)}\n`,
+  })
 
   function readModelCapabilitiesCache(): ModelCapabilitiesSnapshot | null {
-    if (memSnapshot !== undefined) {
-      return memSnapshot
-    }
-
-    const cacheFile = getCacheFilePath()
-    if (!existsSync(cacheFile)) {
-      memSnapshot = null
-      log("[model-capabilities-cache] Cache file not found", { cacheFile })
-      return null
-    }
-
-    try {
-      const content = readFileSync(cacheFile, "utf-8")
-      const snapshot = JSON.parse(content) as ModelCapabilitiesSnapshot
-      memSnapshot = snapshot
-      log("[model-capabilities-cache] Read cache", {
-        modelCount: Object.keys(snapshot.models).length,
-        generatedAt: snapshot.generatedAt,
-      })
-      return snapshot
-    } catch (error) {
-      memSnapshot = null
-      log("[model-capabilities-cache] Error reading cache", { error: String(error) })
-      return null
-    }
+    return snapshotCacheStore.read()
   }
 
   function hasModelCapabilitiesCache(): boolean {
-    return existsSync(getCacheFilePath())
+    return snapshotCacheStore.has()
   }
 
   function writeModelCapabilitiesCache(snapshot: ModelCapabilitiesSnapshot): void {
-    ensureCacheDir()
-    const cacheFile = getCacheFilePath()
-
-    writeFileSync(cacheFile, JSON.stringify(snapshot, null, 2) + "\n")
-    memSnapshot = snapshot
-    log("[model-capabilities-cache] Cache written", {
-      modelCount: Object.keys(snapshot.models).length,
-      generatedAt: snapshot.generatedAt,
-    })
+    snapshotCacheStore.write(snapshot)
   }
 
   async function refreshModelCapabilitiesCache(args: {

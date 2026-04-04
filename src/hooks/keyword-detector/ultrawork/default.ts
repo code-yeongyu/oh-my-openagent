@@ -44,8 +44,8 @@ export const ULTRAWORK_DEFAULT_MESSAGE = `<ultrawork-mode>
 
 **WHEN IN DOUBT:**
 \`\`\`
-task(subagent_type="explore", load_skills=[], prompt="I'm implementing [TASK DESCRIPTION] and need to understand [SPECIFIC KNOWLEDGE GAP]. Find [X] patterns in the codebase — show file paths, implementation approach, and conventions used. I'll use this to [HOW RESULTS WILL BE USED]. Focus on src/ directories, skip test files unless test patterns are specifically needed. Return concrete file paths with brief descriptions of what each file does.", run_in_background=true)
-task(subagent_type="librarian", load_skills=[], prompt="I'm working with [LIBRARY/TECHNOLOGY] and need [SPECIFIC INFORMATION]. Find official documentation and production-quality examples for [Y] — specifically: API reference, configuration options, recommended patterns, and common pitfalls. Skip beginner tutorials. I'll use this to [DECISION THIS WILL INFORM].", run_in_background=true)
+task(subagent_type="explore", load_skills=[], prompt="I'm implementing [TASK DESCRIPTION] and need to understand [SPECIFIC KNOWLEDGE GAP]. Find [X] patterns in the codebase - show file paths, implementation approach, and conventions used. I'll use this to [HOW RESULTS WILL BE USED]. Focus on src/ directories, skip test files unless test patterns are specifically needed. Return concrete file paths with brief descriptions of what each file does.", run_in_background=true)
+task(subagent_type="librarian", load_skills=[], prompt="I'm working with [LIBRARY/TECHNOLOGY] and need [SPECIFIC INFORMATION]. Find official documentation and production-quality examples for [Y] - specifically: API reference, configuration options, recommended patterns, and common pitfalls. Skip beginner tutorials. I'll use this to [DECISION THIS WILL INFORM].", run_in_background=true)
 task(subagent_type="oracle", load_skills=[], prompt="I need architectural review of my approach to [TASK]. Here's my plan: [DESCRIBE PLAN WITH SPECIFIC FILES AND CHANGES]. My concerns are: [LIST SPECIFIC UNCERTAINTIES]. Please evaluate: correctness of approach, potential issues I'm missing, and whether a better alternative exists.", run_in_background=false)
 \`\`\`
 
@@ -202,7 +202,7 @@ BEFORE writing ANY code, you MUST define:
 | **Observable** | What can be measured/seen | "Console shows 'success', no errors" |
 | **Pass/Fail** | Binary, no ambiguity | "Returns 200 OK" not "should work" |
 
-Write these criteria explicitly. **Record them in your TODO/Task items.** Each task MUST include a "QA: [how to verify]" field. These criteria are your CONTRACT — work toward them, verify against them.
+Write these criteria explicitly. **Record them in your TODO/Task items.** Each task MUST include a "QA: [how to verify]" field. These criteria are your CONTRACT - work toward them, verify against them.
 
 ### Test Plan Template (MANDATORY for non-trivial tasks)
 
@@ -233,7 +233,7 @@ Write these criteria explicitly. **Record them in your TODO/Task items.** Each t
 
 **YOUR FAILURE MODE**: You finish coding, run lsp_diagnostics, and declare "done" without actually TESTING the feature. lsp_diagnostics catches type errors, NOT functional bugs. Your work is NOT verified until you MANUALLY test it.
 
-**WHAT MANUAL QA MEANS — execute ALL that apply:**
+**WHAT MANUAL QA MEANS - execute ALL that apply:**
 
 | If your change... | YOU MUST... |
 |---|---|
@@ -245,10 +245,10 @@ Write these criteria explicitly. **Record them in your TODO/Task items.** Each t
 | Modifies config handling | Load the config. Verify it parses correctly. |
 
 **UNACCEPTABLE QA CLAIMS:**
-- "This should work" — RUN IT.
-- "The types check out" — Types don't catch logic bugs. RUN IT.
-- "lsp_diagnostics is clean" — That's a TYPE check, not a FUNCTIONAL check. RUN IT.
-- "Tests pass" — Tests cover known cases. Does the ACTUAL FEATURE work as the user expects? RUN IT.
+- "This should work" - RUN IT.
+- "The types check out" - Types don't catch logic bugs. RUN IT.
+- "lsp_diagnostics is clean" - That's a TYPE check, not a FUNCTIONAL check. RUN IT.
+- "Tests pass" - Tests cover known cases. Does the ACTUAL FEATURE work as the user expects? RUN IT.
 
 **You have Bash, you have tools. There is ZERO excuse for not running manual QA.**
 **Manual QA is the FINAL gate before reporting completion. Skip it and your work is INCOMPLETE.**

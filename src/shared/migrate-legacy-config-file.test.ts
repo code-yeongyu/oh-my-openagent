@@ -18,15 +18,19 @@ describe("migrateLegacyConfigFile", () => {
 
   describe("#given oh-my-opencode.jsonc exists but oh-my-openagent.jsonc does not", () => {
     describe("#when migrating the config file", () => {
-      it("#then copies to oh-my-openagent.jsonc", () => {
+      it("#then writes oh-my-openagent.jsonc and renames the legacy file to a backup", () => {
         const legacyPath = join(testDir, "oh-my-opencode.jsonc")
+        const backupPath = join(testDir, "oh-my-opencode.jsonc.bak")
         writeFileSync(legacyPath, '{ "agents": {} }')
 
         const result = migrateLegacyConfigFile(legacyPath)
 
         expect(result).toBe(true)
         expect(existsSync(join(testDir, "oh-my-openagent.jsonc"))).toBe(true)
+        expect(existsSync(legacyPath)).toBe(false)
+        expect(existsSync(backupPath)).toBe(true)
         expect(readFileSync(join(testDir, "oh-my-openagent.jsonc"), "utf-8")).toBe('{ "agents": {} }')
+        expect(readFileSync(backupPath, "utf-8")).toBe('{ "agents": {} }')
       })
     })
   })

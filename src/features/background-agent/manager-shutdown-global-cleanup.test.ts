@@ -6,6 +6,20 @@ import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { BackgroundManager } from "./manager"
 import type { BackgroundTask } from "./types"
 
+function createDeferredPromise(): {
+  promise: Promise<void>
+  resolve: () => void
+} {
+  let resolvePromise = () => {}
+  const promise = new Promise<void>((resolve) => {
+    resolvePromise = resolve
+  })
+  return {
+    promise,
+    resolve: resolvePromise,
+  }
+}
+
 function createTask(overrides: Partial<BackgroundTask> & { id: string; sessionID: string }): BackgroundTask {
   return {
     parentSessionID: "parent-session",
@@ -93,5 +107,49 @@ describe("BackgroundManager shutdown global cleanup", () => {
     expect(SessionCategoryRegistry.has(runningSessionID)).toBe(false)
     expect(SessionCategoryRegistry.has(completedSessionID)).toBe(false)
     expect(SessionCategoryRegistry.has(unrelatedSessionID)).toBe(true)
+  })
+
+  test("awaits running session aborts before shutdown resolves", async () => {
+    // given
+    const runningSessionID = "ses-running-await-shutdown"
+    const deferred = createDeferredPromise()
+    const manager = createBackgroundManager()
+    const tasks = new Map<string, BackgroundTask>([
+      [
+        "task-running-await-shutdown",
+        createTask({
+          id: "task-running-await-shutdown",
+          sessionID: runningSessionID,
+        }),
+      ],
+    ])
+
+    Object.assign(manager, { tasks })
+    Object.assign(manager, {
+      client: {
+        session: {
+          abort: () => deferred.promise,
+          prompt: async () => ({}),
+          promptAsync: async () => ({}),
+        },
+      },
+    })
+
+    // when
+    const shutdownPromise = manager.shutdown()
+    let settled = false
+    void shutdownPromise.then(() => {
+      settled = true
+    })
+
+    await Promise.resolve()
+
+    // then
+    expect(settled).toBe(false)
+
+    deferred.resolve()
+    await shutdownPromise
+
+    expect(settled).toBe(true)
   })
 })

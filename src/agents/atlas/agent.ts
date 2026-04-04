@@ -29,7 +29,7 @@ import {
   buildDecisionMatrix,
 } from "./prompt-section-builder"
 
-const MODE: AgentMode = "all"
+const MODE: AgentMode = "primary"
 
 export type AtlasPromptSource = "default" | "gpt" | "gemini"
 

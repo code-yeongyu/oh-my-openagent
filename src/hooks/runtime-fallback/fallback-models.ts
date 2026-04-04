@@ -25,7 +25,7 @@ export function getFallbackModelsForSession(
 /**
  * Returns the raw fallback model entries (strings and objects) for a session.
  * Use this when per-model settings (temperature, reasoningEffort, etc.) must be
- * preserved — e.g. before passing to buildFallbackChainFromModels.
+ * preserved - e.g. before passing to buildFallbackChainFromModels.
  */
 export function getRawFallbackModels(
   sessionID: string,

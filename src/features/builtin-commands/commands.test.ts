@@ -1,7 +1,19 @@
-import { describe, test, expect } from "bun:test"
+/// <reference path="../../../bun-test.d.ts" />
+
+import { afterEach, beforeEach, describe, test, expect } from "bun:test"
 import { loadBuiltinCommands } from "./commands"
 import { HANDOFF_TEMPLATE } from "./templates/handoff"
+import { REMOVE_AI_SLOPS_TEMPLATE } from "./templates/remove-ai-slops"
 import type { BuiltinCommandName } from "./types"
+import { _resetForTesting, registerAgentName } from "../claude-code-session-state"
+
+beforeEach(() => {
+  _resetForTesting()
+})
+
+afterEach(() => {
+  _resetForTesting()
+})
 
 describe("loadBuiltinCommands", () => {
   test("should include handoff command in loaded commands", () => {
@@ -57,6 +69,117 @@ describe("loadBuiltinCommands", () => {
 
     //#then
     expect(commands.handoff.description).toContain("context summary")
+  })
+
+  test("should default start-work to Atlas for static slash-command discovery", () => {
+    //#given - no disabled commands
+
+    //#when
+    const commands = loadBuiltinCommands()
+
+    //#then
+    expect(commands["start-work"].agent).toBe("atlas")
+  })
+
+  test("should preassign Sisyphus as the native agent for start-work when command config checks registered agents", () => {
+    //#given - no atlas registration
+
+    //#when
+    const commands = loadBuiltinCommands(undefined, { useRegisteredAgents: true })
+
+    //#then
+    expect(commands["start-work"].agent).toBe("sisyphus")
+  })
+
+  test("should preassign Atlas as the native agent for start-work when Atlas is registered", () => {
+    //#given
+    registerAgentName("atlas")
+
+    //#when
+    const commands = loadBuiltinCommands(undefined, { useRegisteredAgents: true })
+
+    //#then
+    expect(commands["start-work"].agent).toBe("atlas")
+  })
+})
+
+describe("loadBuiltinCommands - remove-ai-slops", () => {
+  test("should include remove-ai-slops command in loaded commands", () => {
+    //#given
+    const disabledCommands: BuiltinCommandName[] = []
+
+    //#when
+    const commands = loadBuiltinCommands(disabledCommands)
+
+    //#then
+    expect(commands["remove-ai-slops"]).toBeDefined()
+    expect(commands["remove-ai-slops"].name).toBe("remove-ai-slops")
+  })
+
+  test("should exclude remove-ai-slops when disabled", () => {
+    //#given
+    const disabledCommands: BuiltinCommandName[] = ["remove-ai-slops"]
+
+    //#when
+    const commands = loadBuiltinCommands(disabledCommands)
+
+    //#then
+    expect(commands["remove-ai-slops"]).toBeUndefined()
+  })
+
+  test("should include remove-ai-slops template content in command template", () => {
+    //#given - no disabled commands
+
+    //#when
+    const commands = loadBuiltinCommands()
+
+    //#then
+    expect(commands["remove-ai-slops"].template).toContain(REMOVE_AI_SLOPS_TEMPLATE)
+  })
+
+  test("should have correct description for remove-ai-slops", () => {
+    //#given - no disabled commands
+
+    //#when
+    const commands = loadBuiltinCommands()
+
+    //#then
+    expect(commands["remove-ai-slops"].description).toContain("AI-generated code smells")
+  })
+})
+
+describe("REMOVE_AI_SLOPS_TEMPLATE", () => {
+  test("should include phase structure", () => {
+    //#given - the template string
+
+    //#when / #then
+    expect(REMOVE_AI_SLOPS_TEMPLATE).toContain("Identify Changed Files")
+    expect(REMOVE_AI_SLOPS_TEMPLATE).toContain("Parallel AI Slop Removal")
+    expect(REMOVE_AI_SLOPS_TEMPLATE).toContain("Critical Review")
+  })
+
+  test("should reference ai-slop-remover skill", () => {
+    //#given - the template string
+
+    //#when / #then
+    expect(REMOVE_AI_SLOPS_TEMPLATE).toContain("ai-slop-remover")
+  })
+
+  test("should include safety verification checklist", () => {
+    //#given - the template string
+
+    //#when / #then
+    expect(REMOVE_AI_SLOPS_TEMPLATE).toContain("Safety Verification")
+    expect(REMOVE_AI_SLOPS_TEMPLATE).toContain("Behavior Preservation")
+  })
+
+  test("should detect the base branch dynamically instead of hardcoding main", () => {
+    //#given - the template string
+
+    //#when / #then
+    expect(REMOVE_AI_SLOPS_TEMPLATE).toContain("git symbolic-ref refs/remotes/origin/HEAD")
+    expect(REMOVE_AI_SLOPS_TEMPLATE).toContain('git merge-base "$BASE_BRANCH" HEAD')
+    expect(REMOVE_AI_SLOPS_TEMPLATE).not.toContain("git merge-base main HEAD")
   })
 })
 

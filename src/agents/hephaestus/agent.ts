@@ -13,7 +13,7 @@ import { buildHephaestusPrompt as buildGptPrompt } from "./gpt";
 import { buildHephaestusPrompt as buildGpt53CodexPrompt } from "./gpt-5-3-codex";
 import { buildHephaestusPrompt as buildGpt54Prompt } from "./gpt-5-4";
 
-const MODE: AgentMode = "all";
+const MODE: AgentMode = "primary";
 
 export type HephaestusPromptSource = "gpt-5-4" | "gpt-5-3-codex" | "gpt";
 

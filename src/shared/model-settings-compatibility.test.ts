@@ -244,10 +244,6 @@ describe("resolveCompatibleModelSettings", () => {
     expect(result.changes).toEqual([])
   })
 
-  // -----------------------------------------------------------------------
-  // Registry coverage — every model family from FAMILY_CAPABILITIES
-  // -----------------------------------------------------------------------
-
   describe("model family registry coverage", () => {
     const familyCases: Array<{
       name: string
@@ -309,7 +305,6 @@ describe("resolveCompatibleModelSettings", () => {
     }
   })
 
-  // GPT-5 specific: supports xhigh variant and xhigh reasoningEffort
   test("GPT-5 keeps xhigh variant and reasoningEffort", () => {
     const result = resolveCompatibleModelSettings({
       providerID: "openai",
@@ -345,7 +340,6 @@ describe("resolveCompatibleModelSettings", () => {
     })
   })
 
-  // Reasoning effort: "none" and "minimal" are valid per Vercel AI SDK
   test("GPT-5 keeps none reasoningEffort", () => {
     const result = resolveCompatibleModelSettings({
       providerID: "openai",
@@ -388,7 +382,6 @@ describe("resolveCompatibleModelSettings", () => {
     })
   })
 
-  // Reasoning effort downgrade within families that support it
   test("o-series downgrades xhigh reasoningEffort to high", () => {
     const result = resolveCompatibleModelSettings({
       providerID: "openai",
@@ -408,9 +401,6 @@ describe("resolveCompatibleModelSettings", () => {
   })
 
   test("GPT-5 keeps xhigh but would downgrade a hypothetical beyond-max level", () => {
-    // GPT-5 supports up to "xhigh" — verify the ladder works by requesting
-    // a value that IS in the ladder but NOT in the family's allowed list.
-    // Since "xhigh" is the max for GPT-5 reasoningEffort, we verify it stays.
     const result = resolveCompatibleModelSettings({
       providerID: "openai",
       modelID: "gpt-5.4",

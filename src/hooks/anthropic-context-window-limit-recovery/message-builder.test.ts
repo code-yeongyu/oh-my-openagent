@@ -4,36 +4,34 @@ const replaceEmptyTextPartsAsync = mock(() => Promise.resolve(false))
 const injectTextPartAsync = mock(() => Promise.resolve(false))
 const findMessagesWithEmptyTextPartsFromSDK = mock(() => Promise.resolve([] as string[]))
 
-mock.module("../../shared", () => ({
-  normalizeSDKResponse: (response: { data?: unknown[] }) => response.data ?? [],
-}))
-
-mock.module("../../shared/logger", () => ({
-  log: () => {},
-}))
-
-mock.module("../../shared/opencode-storage-detection", () => ({
-  isSqliteBackend: () => true,
-}))
-
-mock.module("../session-recovery/storage", () => ({
-  findEmptyMessages: () => [],
-  findMessagesWithEmptyTextParts: () => [],
-  injectTextPart: () => false,
-  replaceEmptyTextParts: () => false,
-}))
-
-mock.module("../session-recovery/storage/empty-text", () => ({
-  replaceEmptyTextPartsAsync,
-  findMessagesWithEmptyTextPartsFromSDK,
-}))
-
-mock.module("../session-recovery/storage/text-part-injector", () => ({
-  injectTextPartAsync,
-}))
-
 async function importFreshMessageBuilder(): Promise<typeof import("./message-builder")> {
-  return import(`./message-builder?test=${Date.now()}-${Math.random()}`)
+  mock.module("../../shared/logger", () => ({
+    log: () => {},
+  }))
+
+  mock.module("../../shared/opencode-storage-detection", () => ({
+    isSqliteBackend: () => true,
+  }))
+
+  const emptyTextMockFactory = () => ({
+    findMessagesWithEmptyTextParts: () => [],
+    replaceEmptyTextParts: () => false,
+    replaceEmptyTextPartsAsync,
+    findMessagesWithEmptyTextPartsFromSDK,
+  })
+  mock.module("../session-recovery/storage/empty-text", emptyTextMockFactory)
+  mock.module("../session-recovery/storage/empty-text.ts", emptyTextMockFactory)
+
+  const textPartInjectorMockFactory = () => ({
+    injectTextPart: () => false,
+    injectTextPartAsync,
+  })
+  mock.module("../session-recovery/storage/text-part-injector", textPartInjectorMockFactory)
+  mock.module("../session-recovery/storage/text-part-injector.ts", textPartInjectorMockFactory)
+
+  const module = await import(`./message-builder?test=${Date.now()}-${Math.random()}`)
+  mock.restore()
+  return module
 }
 
 afterAll(() => {

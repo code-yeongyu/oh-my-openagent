@@ -82,7 +82,6 @@ function writeSecureFile(filePath: string, content: string): void {
   try {
     chmodSync(filePath, SECURE_FILE_MODE)
   } catch {
-    // Ignore
   }
 }
 
@@ -98,7 +97,6 @@ function rotateLogIfNeeded(logPath: string): void {
       renameSync(logPath, backupPath)
     }
   } catch {
-    // Ignore
   }
 }
 
@@ -110,7 +108,6 @@ function log(message: string): void {
     const logLine = `[${timestamp}] ${message}\n`
     appendFileSync(LOG_FILE_PATH, logLine, { mode: SECURE_FILE_MODE })
   } catch {
-    // Ignore
   }
 }
 
@@ -128,6 +125,31 @@ interface DaemonState {
   messagesInjected: number
   errors: number
   lastError?: string
+}
+
+interface TelegramMessage {
+  message_id?: number
+  chat?: { id?: number | string }
+  text?: string
+  reply_to_message?: { message_id?: number }
+}
+
+interface TelegramUpdate {
+  update_id?: number
+  message?: TelegramMessage
+}
+
+interface TelegramUpdatesResponse {
+  result?: TelegramUpdate[]
+}
+
+function parseTelegramUpdatesResponse(body: unknown): TelegramUpdate[] {
+  if (typeof body !== "object" || body === null) {
+    return []
+  }
+
+  const result = (body as TelegramUpdatesResponse).result
+  return Array.isArray(result) ? result : []
 }
 
 function readDaemonState(): DaemonState | null {
@@ -195,7 +217,6 @@ export async function isReplyListenerProcess(pid: number): Promise<boolean> {
       const cmdline = readFileSync(`/proc/${pid}/cmdline`, "utf-8")
       return cmdline.includes(DAEMON_IDENTITY_MARKER)
     }
-    // macOS
     const proc = spawn(["ps", "-p", String(pid), "-o", "args="], {
       stdout: "pipe",
       stderr: "ignore",
@@ -222,7 +243,6 @@ export async function isDaemonRunning(): Promise<boolean> {
   return true
 }
 
-// Input Sanitization
 export function sanitizeReplyInput(text: string): string {
   return text
     .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, "")
@@ -387,7 +407,6 @@ async function pollDiscord(
             },
           )
         } catch {
-          // Ignore
         }
       } else {
         state.errors++
@@ -427,52 +446,52 @@ async function pollTelegram(
       return
     }
 
-    const body = await response.json() as any
-    const updates = body.result || []
+    const body = await response.json()
+    const updates = parseTelegramUpdatesResponse(body)
 
     for (const update of updates) {
       const msg = update.message
       if (!msg) {
-        state.telegramLastUpdateId = update.update_id
+        state.telegramLastUpdateId = update.update_id ?? state.telegramLastUpdateId
         writeDaemonState(state)
         continue
       }
       
-      if (!msg.reply_to_message?.message_id) {
-        state.telegramLastUpdateId = update.update_id
+      if (msg.reply_to_message?.message_id === undefined) {
+        state.telegramLastUpdateId = update.update_id ?? state.telegramLastUpdateId
         writeDaemonState(state)
         continue
       }
 
-      if (String(msg.chat.id) !== replyListener.telegramChatId) {
-        state.telegramLastUpdateId = update.update_id
+      if (String(msg.chat?.id) !== replyListener.telegramChatId) {
+        state.telegramLastUpdateId = update.update_id ?? state.telegramLastUpdateId
         writeDaemonState(state)
         continue
       }
 
       const mapping = lookupByMessageId("telegram", String(msg.reply_to_message.message_id))
       if (!mapping) {
-        state.telegramLastUpdateId = update.update_id
+        state.telegramLastUpdateId = update.update_id ?? state.telegramLastUpdateId
         writeDaemonState(state)
         continue
       }
 
       const text = msg.text || ""
       if (!text) {
-        state.telegramLastUpdateId = update.update_id
+        state.telegramLastUpdateId = update.update_id ?? state.telegramLastUpdateId
         writeDaemonState(state)
         continue
       }
 
       if (!rateLimiter.canProceed()) {
         log(`WARN: Rate limit exceeded, dropping Telegram message ${msg.message_id}`)
-        state.telegramLastUpdateId = update.update_id
+        state.telegramLastUpdateId = update.update_id ?? state.telegramLastUpdateId
         writeDaemonState(state)
         state.errors++
         continue
       }
 
-      state.telegramLastUpdateId = update.update_id
+      state.telegramLastUpdateId = update.update_id ?? state.telegramLastUpdateId
       writeDaemonState(state)
 
       const success = await injectReply(mapping.tmuxPaneId, text, "telegram", config)
@@ -604,9 +623,6 @@ export async function startReplyListener(config: OpenClawConfig): Promise<{ succ
   const normalizedConfig = normalizeReplyListenerConfig(config)
   const replyListener = normalizedConfig.replyListener
   if (!replyListener?.discordBotToken && !replyListener?.telegramBotToken) {
-    // Only warn if no platforms enabled, but user might just want outbound
-    // Actually, instructions say: "Fire-and-forget for outbound, daemon process for inbound"
-    // So if no inbound config, we shouldn't start daemon.
     return {
       success: false,
       message: "No enabled reply listener platforms configured (missing bot tokens/channels)",

@@ -92,14 +92,11 @@ export function createToolGuardHooks(args: {
     : null
 
   const cc = pluginConfig.claude_code
-  const claudeCodeDisabled = cc != null
-    && cc.hooks === false
-    && cc.skills === false
-    && cc.agents === false
+  const skipClaudeUserRules = cc?.hooks === false
   const rulesInjector = isHookEnabled("rules-injector")
     ? safeHook("rules-injector", () =>
         createRulesInjectorHook(ctx, modelCacheState, {
-          skipClaudeUserRules: claudeCodeDisabled ?? false,
+          skipClaudeUserRules,
         }))
     : null
 

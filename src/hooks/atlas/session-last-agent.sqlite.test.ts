@@ -1,18 +1,22 @@
-const { describe, expect, mock, test } = require("bun:test")
+const { describe, expect, mock, test, afterAll } = require("bun:test")
 
-mock.module("../../shared/opencode-message-dir", () => ({
-  getMessageDir: () => null,
-}))
+afterAll(() => { mock.restore() })
 
-mock.module("../../shared/opencode-storage-detection", () => ({
-  isSqliteBackend: () => true,
-}))
+async function importFreshSessionLastAgentModule() {
+  mock.module("../../shared/opencode-message-dir", () => ({
+    getMessageDir: () => null,
+  }))
 
-mock.module("../../shared/normalize-sdk-response", () => ({
-  normalizeSDKResponse: <TData>(response: { data?: TData }, fallback: TData): TData => response.data ?? fallback,
-}))
+  mock.module("../../shared/opencode-storage-detection", () => ({
+    isSqliteBackend: () => true,
+  }))
 
-const { getLastAgentFromSession } = await import("./session-last-agent")
+  const module = await import(`./session-last-agent?test=${Date.now()}-${Math.random()}`)
+  mock.restore()
+  return module
+}
+
+const { getLastAgentFromSession } = await importFreshSessionLastAgentModule()
 
 function createMockClient(messages: Array<{ info?: { agent?: string } }>) {
   return {

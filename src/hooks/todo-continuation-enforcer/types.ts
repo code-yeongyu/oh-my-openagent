@@ -26,6 +26,7 @@ export interface SessionState {
   countdownTimer?: ReturnType<typeof setTimeout>
   countdownInterval?: ReturnType<typeof setInterval>
   isRecovering?: boolean
+  wasCancelled?: boolean
   countdownStartedAt?: number
   abortDetectedAt?: number
   lastIncompleteCount?: number
@@ -48,6 +49,10 @@ export interface MessageInfo {
   providerID?: string
   modelID?: string
   tools?: Record<string, ToolPermission>
+}
+
+export interface MessageWithInfo {
+  info?: MessageInfo
 }
 
 export interface ResolvedMessageInfo {

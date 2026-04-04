@@ -126,7 +126,7 @@ describe("scheduleDeferredModelOverride", () => {
   })
 
   test("should fall back to setTimeout when message never appears", async () => {
-    //#given — no message inserted
+    //#given no message inserted
 
     //#when
     const { scheduleDeferredModelOverride } = await import("./ultrawork-db-model-override")

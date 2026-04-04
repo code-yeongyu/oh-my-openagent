@@ -173,7 +173,7 @@ describe("context-window-monitor modelContextLimitsCache", () => {
         const output = createOutput()
         await hook["tool.execute.after"]({ tool: "bash", sessionID, callID: "call_1" }, output)
 
-        // then — 160K/500K = 32%, well below 70% threshold
+        // then - 160K/500K = 32%, well below 70% threshold
         expect(output.output).toBe("original")
       })
     })
@@ -215,7 +215,6 @@ describe("context-window-monitor modelContextLimitsCache", () => {
         const output = createOutput()
         await hook["tool.execute.after"]({ tool: "bash", sessionID, callID: "call_1" }, output)
 
-        // then — 360K/500K = 72%, above 70% threshold, uses cached 500K limit
         expect(output.output).toContain("context remaining")
         expect(output.output).toContain("500,000-token context window")
       })

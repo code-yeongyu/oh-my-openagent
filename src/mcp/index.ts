@@ -17,7 +17,10 @@ export function createBuiltinMcps(disabledMcps: string[] = [], config?: OhMyOpen
   const mcps: Record<string, RemoteMcpConfig> = {}
 
   if (!disabledMcps.includes("websearch")) {
-    mcps.websearch = createWebsearchConfig(config?.websearch)
+    const websearchConfig = createWebsearchConfig(config?.websearch)
+    if (websearchConfig) {
+      mcps.websearch = websearchConfig
+    }
   }
 
   if (!disabledMcps.includes("context7")) {

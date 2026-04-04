@@ -41,7 +41,6 @@ describe("resolveActualContextLimit", () => {
       modelContextLimitsCache,
     })
 
-    // then — models.dev reports 1M for GA models, resolver should respect it
     expect(actualLimit).toBe(1_000_000)
   })
 
@@ -89,7 +88,6 @@ describe("resolveActualContextLimit", () => {
       modelContextLimitsCache,
     })
 
-    // then — explicit 1M flag overrides cached 200K
     expect(actualLimit).toBe(1_000_000)
   })
 

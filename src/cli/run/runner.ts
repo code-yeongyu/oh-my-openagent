@@ -114,7 +114,6 @@ export async function run(options: RunOptions): Promise<number> {
       })
       const exitCode = await pollForCompletion(ctx, eventState, abortController)
 
-      // Abort the event stream to stop the processor
       abortController.abort()
 
       await waitForEventProcessorShutdown(eventProcessor)

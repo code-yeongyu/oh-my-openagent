@@ -1,4 +1,4 @@
-import { describe, it, expect, mock, beforeEach } from "bun:test"
+import { describe, it, expect, mock, beforeEach, afterAll } from "bun:test"
 
 const processApplyPatchEditsWithCli = mock(async () => {})
 
@@ -9,6 +9,8 @@ mock.module("./cli-runner", () => ({
   processWithCli: async () => {},
   processApplyPatchEditsWithCli,
 }))
+
+afterAll(() => { mock.restore() })
 
 const { createCommentCheckerHooks } = await import("./hook")
 

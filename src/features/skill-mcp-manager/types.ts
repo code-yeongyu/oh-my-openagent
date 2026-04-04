@@ -48,6 +48,17 @@ export interface ProcessCleanupHandler {
   listener: () => void
 }
 
+export type OAuthProviderLike = Pick<
+  McpOAuthProvider,
+  "tokens" | "login"
+>
+
+export type OAuthProviderFactory = (options: {
+  serverUrl: string
+  clientId?: string
+  scopes?: string[]
+}) => OAuthProviderLike
+
 export interface SkillMcpManagerState {
   clients: Map<string, ManagedClient>
   pendingConnections: Map<string, Promise<Client>>
@@ -60,6 +71,7 @@ export interface SkillMcpManagerState {
   shutdownGeneration: number
   inFlightConnections: Map<string, number>
   disposed: boolean
+  createOAuthProvider: OAuthProviderFactory
 }
 
 export interface SkillMcpClientConnectionParams {

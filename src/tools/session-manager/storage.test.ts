@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, afterEach, mock } from "bun:test"
+import { describe, test, expect, beforeEach, afterEach, afterAll, mock } from "bun:test"
 import { mkdirSync, writeFileSync, rmSync, existsSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
@@ -59,6 +59,9 @@ mock.module("../../shared/opencode-message-dir", () => ({
     return null
   },
 }))
+
+afterAll(() => { mock.restore() })
+
 const { getAllSessions, getMessageDir, sessionExists, readSessionMessages, readSessionTodos, getSessionInfo } =
   await import("./storage")
 
@@ -371,9 +374,9 @@ describe("session-manager storage - getMainSessions", () => {
 describe("session-manager storage - SDK path (beta mode)", () => {
   const mockClient = {
     session: {
-      list: mock(() => Promise.resolve({ data: [] })),
-      messages: mock(() => Promise.resolve({ data: [] })),
-      todo: mock(() => Promise.resolve({ data: [] })),
+      list: mock((): Promise<unknown> => Promise.resolve({ data: [] })),
+      messages: mock((): Promise<unknown> => Promise.resolve({ data: [] })),
+      todo: mock((): Promise<unknown> => Promise.resolve({ data: [] })),
     },
   }
 
@@ -497,7 +500,7 @@ describe("session-manager storage - SDK path (beta mode)", () => {
     expect(todos[1].status).toBe("completed")
   })
 
-  test("SDK path returns empty array on error", async () => {
+  test("SDK path rethrows non-transport errors", async () => {
     // given
     mockClient.session.messages.mockImplementation(() => Promise.reject(new Error("API error")))
 
@@ -509,11 +512,7 @@ describe("session-manager storage - SDK path (beta mode)", () => {
     const { setStorageClient, readSessionMessages } = await import("./storage")
     setStorageClient(mockClient as unknown as Parameters<typeof setStorageClient>[0])
 
-    // when
-    const messages = await readSessionMessages("ses_test")
-
-    // then
-    expect(messages).toEqual([])
+    await expect(readSessionMessages("ses_test")).rejects.toThrow("API error")
   })
 
   test("SDK path returns empty array when client is not set", async () => {

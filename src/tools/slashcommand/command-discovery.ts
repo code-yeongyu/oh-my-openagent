@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync } from "fs"
+import { existsSync, readdirSync, readFileSync, statSync } from "fs"
 import { basename, join } from "path"
 import {
   parseFrontmatter,
@@ -9,7 +9,7 @@ import {
 } from "../../shared"
 import type { CommandFrontmatter } from "../../features/claude-code-command-loader/types"
 import { isMarkdownFile } from "../../shared/file-utils"
-import { getClaudeConfigDir } from "../../shared"
+import { getClaudeConfigDir, log } from "../../shared"
 import { loadBuiltinCommands } from "../../features/builtin-commands"
 import type { CommandInfo, CommandMetadata, CommandScope } from "./types"
 
@@ -26,6 +26,10 @@ function discoverCommandsFromDir(
   prefix = "",
 ): CommandInfo[] {
   if (!existsSync(commandsDir)) return []
+  if (!statSync(commandsDir).isDirectory()) {
+    log(`[command-discovery] Skipping non-directory path: ${commandsDir}`)
+    return []
+  }
 
   const entries = readdirSync(commandsDir, { withFileTypes: true })
   const commands: CommandInfo[] = []

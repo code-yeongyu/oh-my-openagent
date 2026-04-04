@@ -51,10 +51,6 @@ export type ModelSettingsCompatibilityResult = {
 const VARIANT_LADDER = ["low", "medium", "high", "xhigh", "max"]
 const REASONING_LADDER = ["none", "minimal", "low", "medium", "high", "xhigh"]
 
-// ---------------------------------------------------------------------------
-// Generic resolution — one function for both fields
-// ---------------------------------------------------------------------------
-
 function downgradeWithinLadder(value: string, allowed: string[], ladder: string[]): string | undefined {
   const requestedIndex = ladder.indexOf(value)
   if (requestedIndex === -1) return undefined
@@ -91,7 +87,6 @@ function resolveField(
   familyKnown: boolean,
   metadataOverride?: string[],
 ): FieldResolution {
-  // Priority 1: runtime metadata from provider
   if (metadataOverride) {
     if (metadataOverride.includes(normalized)) return { value: normalized }
     return {
@@ -100,7 +95,6 @@ function resolveField(
     }
   }
 
-  // Priority 2: family heuristic from registry
   if (familyCaps) {
     if (familyCaps.includes(normalized)) return { value: normalized }
     return {
@@ -109,24 +103,18 @@ function resolveField(
     }
   }
 
-  // Known family but field not in registry (e.g. Claude + reasoningEffort)
   if (familyKnown) {
     return { value: undefined, reason: "unsupported-by-model-family" }
   }
 
-  // Unknown family — drop the value
   return { value: undefined, reason: "unknown-model-family" }
 }
-
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
 
 export function resolveCompatibleModelSettings(
   input: ModelSettingsCompatibilityInput,
 ): ModelSettingsCompatibilityResult {
   const family = detectHeuristicModelFamily(input.modelID)
-  const familyKnown = family !== undefined
+  const familyKnown = Boolean(family)
   const changes: ModelSettingsCompatibilityChange[] = []
   const metadataVariants = normalizeCapabilitiesVariants(input.capabilities)
   const metadataReasoningEfforts = normalizeCapabilitiesReasoningEfforts(input.capabilities)

@@ -265,6 +265,13 @@ export function createEventHandler(args: {
   const recentSyntheticIdles = new Map<string, number>();
   const recentRealIdles = new Map<string, number>();
   const DEDUP_WINDOW_MS = 500;
+  const TMUX_ACTIVITY_EVENT_TYPES = new Set([
+    "message.updated",
+    "message.part.updated",
+    "message.part.delta",
+    "message.part.removed",
+    "message.removed",
+  ]);
 
   const shouldAutoRetrySession = (sessionID: string): boolean => {
     if (syncSubagentSessions.has(sessionID)) return true;
@@ -336,6 +343,10 @@ export function createEventHandler(args: {
 
     const { event } = input;
     const props = event.properties as Record<string, unknown> | undefined;
+
+    if (TMUX_ACTIVITY_EVENT_TYPES.has(event.type)) {
+      managers.tmuxSessionManager.onEvent?.(event as { type: string; properties?: Record<string, unknown> });
+    }
 
     if (event.type === "session.created") {
       const sessionInfo = props?.info as { id?: string; title?: string; parentID?: string } | undefined;

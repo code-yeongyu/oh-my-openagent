@@ -350,10 +350,10 @@ describe("runFormattersForFile", () => {
       },
     })
 
-    //#when — run for a .go file, but only .ts formatters registered
+    //#when, run for a .go file, but only .ts formatters registered
     await runFormattersForFile(client, "/project", "/src/main.go")
 
-    //#then — no error thrown
+    //#then, no error thrown
   })
 
   it("runs formatter for matching extension", async () => {
@@ -367,10 +367,10 @@ describe("runFormattersForFile", () => {
       },
     })
 
-    //#when — echo is a safe no-op command
+    //#when, echo is a safe no-op command
     await runFormattersForFile(client, "/tmp", "/tmp/test.ts")
 
-    //#then — should complete without error
+    //#then, should complete without error
     expect(client.config.get).toHaveBeenCalledTimes(1)
   })
 })

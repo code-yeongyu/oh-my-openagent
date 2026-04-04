@@ -142,6 +142,48 @@ describe("model-resolution check", () => {
         snapshot: { source: "bundled-snapshot" },
       })
     })
+
+    it("keeps provider-prefixed overrides for transport while capability diagnostics use pattern aliases", async () => {
+      const { getModelResolutionInfoWithOverrides } = await import("./model-resolution")
+
+      const info = getModelResolutionInfoWithOverrides({
+        categories: {
+          "visual-engineering": { model: "google/gemini-3.1-pro-high" },
+        },
+      })
+
+      const visual = info.categories.find((category) => category.name === "visual-engineering")
+      expect(visual).toBeDefined()
+      expect(visual!.effectiveModel).toBe("google/gemini-3.1-pro-high")
+      expect(visual!.capabilityDiagnostics).toMatchObject({
+        resolutionMode: "alias-backed",
+        canonicalization: {
+          source: "pattern-alias",
+          ruleID: "gemini-3.1-pro-tier-alias",
+        },
+      })
+    })
+
+    it("keeps provider-prefixed Claude overrides for transport while capability diagnostics canonicalize to bare IDs", async () => {
+      const { getModelResolutionInfoWithOverrides } = await import("./model-resolution")
+
+      const info = getModelResolutionInfoWithOverrides({
+        agents: {
+          oracle: { model: "anthropic/claude-opus-4-6-thinking" },
+        },
+      })
+
+      const oracle = info.agents.find((agent) => agent.name === "oracle")
+      expect(oracle).toBeDefined()
+      expect(oracle!.effectiveModel).toBe("anthropic/claude-opus-4-6-thinking")
+      expect(oracle!.capabilityDiagnostics).toMatchObject({
+        resolutionMode: "alias-backed",
+        canonicalization: {
+          source: "pattern-alias",
+          ruleID: "claude-thinking-legacy-alias",
+        },
+      })
+    })
   })
 
   describe("checkModelResolution", () => {
