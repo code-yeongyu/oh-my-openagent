@@ -491,7 +491,12 @@ export class BackgroundManager {
       log("[background-agent] SKIP tmux callback - conditions not met")
     }
 
-    // Update task to running state
+    if (this.tasks.get(task.id)?.status === "cancelled") {
+      await this.abortSessionWithLogging(sessionID, "cancelled during tmux setup")
+      this.concurrencyManager.release(concurrencyKey)
+      return
+    }
+
     task.status = "running"
     task.startedAt = new Date()
     task.sessionID = sessionID

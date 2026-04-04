@@ -2583,6 +2583,106 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       expect(getConcurrencyManager(manager).getCount("test-agent")).toBe(0)
     })
 
+    test("should keep task cancelled when cancelled during tmux callback before running state is assigned", async () => {
+      // given
+      const originalTmuxEnvironment = process.env.TMUX
+      process.env.TMUX = "test-session"
+
+      try {
+        const createdSessionID = "ses-cancelled-during-tmux-callback"
+        const abortCalls: string[] = []
+        const promptAsyncSessionIDs: string[] = []
+        let taskID: string | undefined
+        let resolveAbortCalled: (() => void) | undefined
+        const abortCalled = new Promise<void>((resolve) => {
+          resolveAbortCalled = resolve
+        })
+
+        manager.shutdown()
+        manager = new BackgroundManager(
+          {
+            client: {
+              session: {
+                create: async () => ({ data: { id: createdSessionID } }),
+                get: async () => ({ data: { directory: "/test/dir" } }),
+                prompt: async () => ({}),
+                promptAsync: async ({ path }: { path: { id: string } }) => {
+                  promptAsyncSessionIDs.push(path.id)
+                  return {}
+                },
+                messages: async () => ({ data: [] }),
+                todo: async () => ({ data: [] }),
+                status: async () => ({ data: {} }),
+                abort: async ({ path }: { path: { id: string } }) => {
+                  abortCalls.push(path.id)
+                  resolveAbortCalled?.()
+                  return {}
+                },
+              },
+            },
+            directory: tmpdir(),
+          } as unknown as PluginInput,
+          {
+            defaultConcurrency: 1,
+          },
+          {
+            tmuxConfig: {
+              enabled: true,
+              layout: "main-vertical",
+              main_pane_size: 60,
+              main_pane_min_width: 120,
+              agent_pane_min_width: 40,
+              isolation: "inline",
+            },
+            onSubagentSessionCreated: async () => {
+              const activeTaskID = taskID ?? Array.from(getTaskMap(manager).keys())[0]
+
+              if (!activeTaskID) {
+                throw new Error("expected active task during tmux callback")
+              }
+
+              await manager.cancelTask(activeTaskID, {
+                source: "test",
+                abortSession: false,
+              })
+            },
+          }
+        )
+
+        const input = {
+          description: "Test task",
+          prompt: "Do something",
+          agent: "test-agent",
+          parentSessionID: "parent-session",
+          parentMessageID: "parent-message",
+        }
+
+        const task = await manager.launch(input)
+        taskID = task.id
+
+        // when
+        await Promise.race([
+          abortCalled,
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), 500)),
+        ])
+        await flushBackgroundNotifications()
+
+        // then
+        const updatedTask = manager.getTask(task.id)
+        expect(updatedTask?.status).toBe("cancelled")
+        expect(updatedTask?.sessionID).toBeUndefined()
+        expect(promptAsyncSessionIDs).not.toContain(createdSessionID)
+        expect(abortCalls).toEqual([createdSessionID])
+        expect(getConcurrencyManager(manager).getCount("test-agent")).toBe(0)
+      } finally {
+        if (originalTmuxEnvironment === undefined) {
+          delete process.env.TMUX
+        } else {
+          process.env.TMUX = originalTmuxEnvironment
+        }
+      }
+    })
+
     test("should release descendant quota when task completes", async () => {
       manager.shutdown()
       manager = new BackgroundManager(
