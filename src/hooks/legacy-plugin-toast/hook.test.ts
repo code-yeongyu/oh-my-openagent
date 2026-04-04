@@ -18,18 +18,6 @@ const mockAutoMigrate = mock((): MigrationResult => ({
 const mockShowToast = mock((_arg: any) => Promise.resolve())
 const mockLog = mock(() => {})
 
-mock.module("../../shared/legacy-plugin-warning", () => ({
-  checkForLegacyPluginEntry: mockCheckForLegacyPluginEntry,
-}))
-
-mock.module("../../shared/logger", () => ({
-  log: mockLog,
-}))
-
-mock.module("./auto-migrate-runner", () => ({
-  autoMigrateLegacyPluginEntry: mockAutoMigrate,
-}))
-
 afterAll(() => {
   mock.restore()
 })
@@ -53,6 +41,18 @@ function createEvent(type: string, parentID?: string) {
 }
 
 async function importFreshModule() {
+  mock.module("../../shared/legacy-plugin-warning", () => ({
+    checkForLegacyPluginEntry: mockCheckForLegacyPluginEntry,
+  }))
+
+  mock.module("../../shared/logger", () => ({
+    log: mockLog,
+  }))
+
+  mock.module("./auto-migrate-runner", () => ({
+    autoMigrateLegacyPluginEntry: mockAutoMigrate,
+  }))
+
   const module = await import(`./hook?t=${Date.now()}-${Math.random()}`)
   mock.restore()
   return module

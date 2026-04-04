@@ -1,33 +1,52 @@
 import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test"
 
-mock.module("../../shared/logger", () => ({
-  log: mock(() => {}),
-}))
-
-mock.module("../../shared/connected-providers-cache", () => ({
-  readConnectedProvidersCache: mock(() => null),
-  readProviderModelsCache: mock(() => null),
-}))
-
-mock.module("../../shared/model-error-classifier", () => ({
-  shouldRetryError: mock(() => true),
-  getNextFallback: mock((chain: Array<{ model: string }>, attempt: number) => chain[attempt]),
-  hasMoreFallbacks: mock((chain: Array<{ model: string }>, attempt: number) => attempt < chain.length),
-  selectFallbackProvider: mock((providers: string[]) => providers[0]),
-}))
-
-mock.module("../../shared/provider-model-id-transform", () => ({
-  transformModelForProvider: mock((_provider: string, model: string) => model),
-}))
+const sharedLogMock = mock(() => {})
+const readConnectedProvidersCacheMock = mock(() => null)
+const readProviderModelsCacheMock = mock(() => null)
+const shouldRetryErrorMock = mock(() => true)
+const getNextFallbackMock = mock((chain: Array<{ model: string }>, attempt: number) => chain[attempt])
+const hasMoreFallbacksMock = mock((chain: Array<{ model: string }>, attempt: number) => attempt < chain.length)
+const selectFallbackProviderMock = mock((providers: string[]) => providers[0])
+const transformModelForProviderMock = mock((_provider: string, model: string) => model)
 
 import type { BackgroundTask } from "./types"
 import type { ConcurrencyManager } from "./concurrency"
 import type { OpencodeClient, QueueItem } from "./constants"
 
-const { tryFallbackRetry } = await import("./fallback-retry-handler")
-const { shouldRetryError, selectFallbackProvider } = await import("../../shared/model-error-classifier")
-const { readProviderModelsCache } = await import("../../shared")
-mock.restore()
+async function importFreshFallbackRetryHandlerModule() {
+  mock.module("../../shared/logger", () => ({
+    log: sharedLogMock,
+  }))
+
+  mock.module("../../shared/connected-providers-cache", () => ({
+    readConnectedProvidersCache: readConnectedProvidersCacheMock,
+    readProviderModelsCache: readProviderModelsCacheMock,
+  }))
+
+  mock.module("../../shared/model-error-classifier", () => ({
+    shouldRetryError: shouldRetryErrorMock,
+    getNextFallback: getNextFallbackMock,
+    hasMoreFallbacks: hasMoreFallbacksMock,
+    selectFallbackProvider: selectFallbackProviderMock,
+  }))
+
+  mock.module("../../shared/provider-model-id-transform", () => ({
+    transformModelForProvider: transformModelForProviderMock,
+  }))
+
+  const retryHandlerModule = await import(`./fallback-retry-handler?test=${Date.now()}-${Math.random()}`)
+  mock.restore()
+
+  return {
+    tryFallbackRetry: retryHandlerModule.tryFallbackRetry,
+    shouldRetryError: shouldRetryErrorMock,
+    selectFallbackProvider: selectFallbackProviderMock,
+    readProviderModelsCache: readProviderModelsCacheMock,
+  }
+}
+
+const { tryFallbackRetry, shouldRetryError, selectFallbackProvider, readProviderModelsCache } =
+  await importFreshFallbackRetryHandlerModule()
 
 function createDeferredPromise(): {
   promise: Promise<void>

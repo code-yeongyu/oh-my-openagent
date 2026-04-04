@@ -3,14 +3,19 @@ const { describe, expect, test, beforeEach, mock, afterAll } = require("bun:test
 
 const readConnectedProvidersCacheMock = mock(() => null)
 
-mock.module("./connected-providers-cache", () => ({
-  readConnectedProvidersCache: readConnectedProvidersCacheMock,
-}))
+async function importFreshModelErrorClassifierModule() {
+  mock.module("./connected-providers-cache", () => ({
+    readConnectedProvidersCache: readConnectedProvidersCacheMock,
+  }))
+
+  const module = await import(`./model-error-classifier?test=${Date.now()}-${Math.random()}`)
+  mock.restore()
+  return module
+}
 
 afterAll(() => { mock.restore() })
 
-const { shouldRetryError, selectFallbackProvider } = await import("./model-error-classifier")
-mock.restore()
+const { shouldRetryError, selectFallbackProvider } = await importFreshModelErrorClassifierModule()
 
 describe("model-error-classifier", () => {
   beforeEach(() => {

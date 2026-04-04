@@ -20,23 +20,23 @@ const mockLog = mock(() => {})
 const mockMigrateLegacyPluginEntry = mock(() => false)
 let consoleWarnSpy: ReturnType<typeof spyOn>
 
-mock.module("./legacy-plugin-warning", () => ({
-  checkForLegacyPluginEntry: mockCheckForLegacyPluginEntry,
-}))
-
-mock.module("./logger", () => ({
-  log: mockLog,
-}))
-
-mock.module("./migrate-legacy-plugin-entry", () => ({
-  migrateLegacyPluginEntry: mockMigrateLegacyPluginEntry,
-}))
-
 afterAll(() => {
   mock.restore()
 })
 
 async function importFreshStartupWarningModule(): Promise<typeof import("./log-legacy-plugin-startup-warning")> {
+  mock.module("./legacy-plugin-warning", () => ({
+    checkForLegacyPluginEntry: mockCheckForLegacyPluginEntry,
+  }))
+
+  mock.module("./logger", () => ({
+    log: mockLog,
+  }))
+
+  mock.module("./migrate-legacy-plugin-entry", () => ({
+    migrateLegacyPluginEntry: mockMigrateLegacyPluginEntry,
+  }))
+
   const module = await import(`./log-legacy-plugin-startup-warning?test=${Date.now()}-${Math.random()}`)
   mock.restore()
   consoleWarnSpy = spyOn(console, "warn").mockImplementation(() => {})

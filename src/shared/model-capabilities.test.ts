@@ -1,22 +1,27 @@
 import type { ModelCapabilitiesSnapshot } from "./model-capabilities"
 import { afterAll, describe, expect, test, mock } from "bun:test"
 
-// Mock connected-providers-cache to prevent local disk cache from polluting test results.
-// Without this, findProviderModelMetadata reads real cached model metadata (e.g., from opencode serve)
-// which causes the "prefers runtime models.dev cache" test to get different values than expected.
-mock.module("./connected-providers-cache", () => ({
-  findProviderModelMetadata: () => undefined,
-  readConnectedProvidersCache: () => null,
-  hasConnectedProvidersCache: () => false,
-  hasProviderModelsCache: () => false,
-}))
-
 afterAll(() => {
   mock.restore()
 })
 
-const { getModelCapabilities, getBundledModelCapabilitiesSnapshot } = await import("./model-capabilities")
-mock.restore()
+async function importFreshModelCapabilitiesModule() {
+  // Mock connected-providers-cache to prevent local disk cache from polluting test results.
+  // Without this, findProviderModelMetadata reads real cached model metadata (e.g., from opencode serve)
+  // which causes the "prefers runtime models.dev cache" test to get different values than expected.
+  mock.module("./connected-providers-cache", () => ({
+    findProviderModelMetadata: () => undefined,
+    readConnectedProvidersCache: () => null,
+    hasConnectedProvidersCache: () => false,
+    hasProviderModelsCache: () => false,
+  }))
+
+  const module = await import(`./model-capabilities?test=${Date.now()}-${Math.random()}`)
+  mock.restore()
+  return module
+}
+
+const { getModelCapabilities, getBundledModelCapabilitiesSnapshot } = await importFreshModelCapabilitiesModule()
 import { AGENT_MODEL_REQUIREMENTS, CATEGORY_MODEL_REQUIREMENTS } from "./model-requirements"
 
 describe("getModelCapabilities", () => {

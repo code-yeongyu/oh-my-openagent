@@ -40,30 +40,35 @@ const transformModelForProviderMock = mock((provider: string, model: string) => 
   return model
 })
 
-mock.module("../../shared/connected-providers-cache", () => ({
-  readConnectedProvidersCache: readConnectedProvidersCacheMock,
-  readProviderModelsCache: readProviderModelsCacheMock,
-}))
-
-mock.module("../../shared/provider-model-id-transform", () => ({
-  transformModelForProvider: transformModelForProviderMock,
-}))
-
-mock.module("../../shared/model-error-classifier", () => ({
-  selectFallbackProvider: selectFallbackProviderMock,
-}))
-
 afterAll(() => {
   mock.restore()
 })
+
+async function importFreshModelFallbackHookModule() {
+  mock.module("../../shared/connected-providers-cache", () => ({
+    readConnectedProvidersCache: readConnectedProvidersCacheMock,
+    readProviderModelsCache: readProviderModelsCacheMock,
+  }))
+
+  mock.module("../../shared/provider-model-id-transform", () => ({
+    transformModelForProvider: transformModelForProviderMock,
+  }))
+
+  mock.module("../../shared/model-error-classifier", () => ({
+    selectFallbackProvider: selectFallbackProviderMock,
+  }))
+
+  const module = await import(`./hook?test=${Date.now()}-${Math.random()}`)
+  mock.restore()
+  return module
+}
 
 const {
   clearPendingModelFallback,
   createModelFallbackHook,
   setSessionFallbackChain,
   setPendingModelFallback,
-} = await import("./hook")
-mock.restore()
+} = await importFreshModelFallbackHookModule()
 
 describe("model fallback hook", () => {
   beforeEach(() => {

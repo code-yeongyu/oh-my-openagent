@@ -1,5 +1,4 @@
 import { describe, it, expect, beforeEach, afterEach, afterAll, mock, spyOn } from "bun:test"
-import { SkillMcpManager } from "./manager"
 import type { SkillMcpClientInfo, SkillMcpServerContext } from "./types"
 import type { ClaudeCodeMcpServer } from "../claude-code-mcp-loader/types"
 
@@ -8,41 +7,50 @@ const mockHttpConnect = mock(() => Promise.reject(new Error("Mocked HTTP connect
 const mockHttpClose = mock(() => Promise.resolve())
 let lastTransportInstance: { url?: URL; options?: { requestInit?: RequestInit } } = {}
 
-mock.module("@modelcontextprotocol/sdk/client/streamableHttp.js", () => ({
-  StreamableHTTPClientTransport: class MockStreamableHTTPClientTransport {
-    constructor(public url: URL, public options?: { requestInit?: RequestInit }) {
-      lastTransportInstance = { url, options }
-    }
-    async start() {
-      await mockHttpConnect()
-    }
-    async close() {
-      await mockHttpClose()
-    }
-  },
-}))
-
 // Mock OAuth provider for OAuth integration tests
 const mockTokens = mock(() => null as { accessToken: string } | null)
 const mockLogin = mock(() => Promise.resolve({ accessToken: "test-token" }) as Promise<{ accessToken: string } | null>)
 
-mock.module("../mcp-oauth/provider", () => ({
-  McpOAuthProvider: class MockMcpOAuthProvider {
-    tokens = mockTokens
-    login = mockLogin
-    constructor(_opts: unknown) {}
-  },
-}))
+async function importFreshManagerModule(): Promise<typeof import("./manager")> {
+  mock.module("@modelcontextprotocol/sdk/client/streamableHttp.js", () => ({
+    StreamableHTTPClientTransport: class MockStreamableHTTPClientTransport {
+      constructor(public url: URL, public options?: { requestInit?: RequestInit }) {
+        lastTransportInstance = { url, options }
+      }
+      async start() {
+        await mockHttpConnect()
+      }
+      async close() {
+        await mockHttpClose()
+      }
+    },
+  }))
+
+  mock.module("../mcp-oauth/provider", () => ({
+    McpOAuthProvider: class MockMcpOAuthProvider {
+      tokens = mockTokens
+      login = mockLogin
+      constructor(_opts: unknown) {}
+    },
+  }))
+
+  const module = await import(`./manager?test=${Date.now()}-${Math.random()}`)
+  mock.restore()
+  return module
+}
 
 afterAll(() => { mock.restore() })
 
 describe("SkillMcpManager", () => {
-  let manager: SkillMcpManager
+  let manager: any
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    const { SkillMcpManager } = await importFreshManagerModule()
     manager = new SkillMcpManager()
     mockHttpConnect.mockClear()
     mockHttpClose.mockClear()
+    mockTokens.mockClear()
+    mockLogin.mockClear()
   })
 
   afterEach(async () => {
