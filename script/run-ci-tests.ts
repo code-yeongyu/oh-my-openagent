@@ -82,7 +82,17 @@ async function runBunTest(testFiles: string[], label: string): Promise<void> {
   }
 
   console.log(`::group::${label}`)
-  const command = ["bun", "test", ...testFiles]
+  
+  // For directory paths, exclude _auc* directories which are separate isolated targets
+  const args = testFiles.map(tf => {
+    if (tf.includes('/') && !tf.endsWith('.test.ts')) {
+      // It's a directory path, add negation glob
+      return [tf, '!_auc-*/**/*.test.ts']
+    }
+    return tf
+  }).flat()
+  
+  const command = ["bun", "test", ...args]
   const spawnedProcess = Bun.spawn(command, {
     cwd: process.cwd(),
     stdin: "inherit",
