@@ -26,7 +26,7 @@ Follow the prompts to configure your Claude, ChatGPT, and Gemini subscriptions. 
 
 After you install it, you can read this [overview guide](./overview.md) to understand more.
 
-The published package and local binary are still `oh-my-opencode`. Inside `opencode.json`, the compatibility layer now prefers the plugin entry `oh-my-openagent`, while legacy `oh-my-opencode` entries still load with a warning. Plugin config loading recognizes both `oh-my-openagent.json[c]` and `oh-my-opencode.json[c]` during the transition. If you see a "Using legacy package name" warning from `bunx oh-my-opencode doctor`, update your `opencode.json` plugin entry from `"oh-my-opencode"` to `"oh-my-openagent"`.
+The published package and local binary are still `oh-my-opencode`. For reliable installs on current OpenCode releases, the installer now writes a managed `file://.../node_modules/oh-my-opencode/dist/index.js` entry into `opencode.json` and keeps the package dependency in the OpenCode config directory's `package.json`. Direct package-name entries in `opencode.json` are migration-only during the rename transition, and legacy `oh-my-opencode` entries still warn when detected by `bunx oh-my-opencode doctor`. Plugin config loading recognizes both `oh-my-openagent.json[c]` and `oh-my-opencode.json[c]`.
 
 ## For LLM Agents
 
@@ -114,7 +114,8 @@ bunx oh-my-opencode install --no-tui --claude=<yes|no|max20> --gemini=<yes|no> -
 
 The CLI will:
 
-- Register the plugin in `opencode.json`
+- Register the plugin in `opencode.json` using a managed `file://` entry
+- Create or update `package.json` in the active OpenCode config directory so OpenCode can install the plugin dependency
 - Configure agent models based on subscription flags
 - Show which auth steps are needed
 
@@ -122,7 +123,8 @@ The CLI will:
 
 ```bash
 opencode --version  # Should be 1.0.150 or higher
-cat ~/.config/opencode/opencode.json  # Should contain "oh-my-openagent" in plugin array, or the legacy "oh-my-opencode" entry while you are still migrating
+cat ~/.config/opencode/opencode.json   # Should contain a file://.../node_modules/oh-my-opencode/dist/index.js plugin entry
+cat ~/.config/opencode/package.json    # Should contain "oh-my-opencode" in dependencies
 ```
 #### Run Doctor Verification
 

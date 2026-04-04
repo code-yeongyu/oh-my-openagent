@@ -111,12 +111,16 @@ describe("install CLI - binary check behavior", () => {
 
     // then should create opencode.json
     const configPath = join(tempDir, "opencode.json")
+    const packageJsonPath = join(tempDir, "package.json")
     expect(existsSync(configPath)).toBe(true)
+    expect(existsSync(packageJsonPath)).toBe(true)
 
     const config = JSON.parse(readFileSync(configPath, "utf-8"))
+    const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf-8"))
     expect(config.plugin).toBeDefined()
-    expect(config.plugin.some((p: string) => p.includes("oh-my-openagent"))).toBe(true)
-    expect(config.plugin.some((p: string) => p.includes("oh-my-opencode"))).toBe(false)
+    expect(config.plugin.some((p: string) => p.startsWith("file://"))).toBe(true)
+    expect(config.plugin.some((p: string) => p.includes("/node_modules/oh-my-opencode/dist/index.js"))).toBe(true)
+    expect(packageJson.dependencies).toEqual({ "oh-my-opencode": "latest" })
 
     // then exit code should be 0 (success)
     expect(exitCode).toBe(0)

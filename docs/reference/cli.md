@@ -1,6 +1,6 @@
 # CLI Reference
 
-Complete reference for the published `oh-my-opencode` CLI. During the rename transition, OpenCode plugin registration now prefers `oh-my-openagent` inside `opencode.json`.
+Complete reference for the published `oh-my-opencode` CLI. On current OpenCode releases, the installer registers the plugin via a managed `file://.../node_modules/oh-my-opencode/dist/index.js` entry in `opencode.json`, while direct package-name entries remain part of the rename-compat path.
 
 ## Basic Usage
 
@@ -39,7 +39,7 @@ bunx oh-my-opencode install
 ### Installation Process
 
 1. **Subscription Selection**: Choose which providers and subscriptions you actually have
-2. **Plugin Registration**: Registers `oh-my-openagent` in OpenCode settings, or upgrades a legacy `oh-my-opencode` entry during the compatibility window
+2. **Plugin Registration**: Registers a managed `file://.../node_modules/oh-my-opencode/dist/index.js` entry in OpenCode settings and maintains the matching dependency in the active config directory's `package.json`
 3. **Configuration File Creation**: Writes the generated OmO config to `oh-my-opencode.json` in the active OpenCode config directory
 4. **Authentication Hints**: Shows the `opencode auth login` steps for the providers you selected, unless `--skip-auth` is set
 
@@ -65,7 +65,7 @@ bunx oh-my-opencode install
 Diagnoses your environment to ensure Oh My OpenCode is functioning correctly. The current checks are grouped into system, config, tools, and models.
 
 The doctor command detects common issues including:
-- Legacy plugin entry references in `opencode.json` (warns when `oh-my-opencode` is still used instead of `oh-my-openagent`)
+- Legacy direct package-name references in `opencode.json` (warns when `oh-my-opencode` is still used instead of `oh-my-openagent`)
 - Configuration file validity and JSONC parsing errors
 - Model resolution and fallback chain verification
 - Missing or misconfigured MCP servers
@@ -231,7 +231,7 @@ The runtime loads user config as the base config, then merges project config on 
 1. **Project Level**: `.opencode/oh-my-openagent.jsonc`, `.opencode/oh-my-openagent.json`, `.opencode/oh-my-opencode.jsonc`, or `.opencode/oh-my-opencode.json`
 2. **User Level**: `~/.config/opencode/oh-my-openagent.jsonc`, `~/.config/opencode/oh-my-openagent.json`, `~/.config/opencode/oh-my-opencode.jsonc`, or `~/.config/opencode/oh-my-opencode.json`
 
-**Naming Note**: The published package and binary are still `oh-my-opencode`. Inside `opencode.json`, the compatibility layer now prefers the plugin entry `oh-my-openagent`. Plugin config loading recognizes both `oh-my-openagent.*` and legacy `oh-my-opencode.*` basenames. If both basenames exist in the same directory, the legacy `oh-my-opencode.*` file currently wins.
+**Naming Note**: The published package and binary are still `oh-my-opencode`. On current OpenCode releases, installer-managed setups use a `file://.../node_modules/oh-my-opencode/dist/index.js` plugin entry in `opencode.json`. Plugin config loading still recognizes both `oh-my-openagent.*` and legacy `oh-my-opencode.*` basenames. If both basenames exist in the same directory, the legacy `oh-my-opencode.*` file currently wins.
 
 ### Filename Compatibility
 
@@ -297,13 +297,13 @@ bunx oh-my-opencode doctor --json
 
 ### "Using legacy package name" Warning
 
-The doctor warns if it finds the legacy plugin entry `oh-my-opencode` in `opencode.json`. Update the plugin array to the canonical `oh-my-openagent` entry:
+The doctor warns if it finds a direct legacy package-name entry like `oh-my-opencode` in `opencode.json`. The simplest fix is to rerun the installer so it rewrites the plugin registration to the managed `file://` form:
 
 ```bash
-# Replace the legacy plugin entry in user config
-jq '.plugin = (.plugin // [] | map(if . == "oh-my-opencode" then "oh-my-openagent" else . end))' \
-  ~/.config/opencode/opencode.json > /tmp/opencode.json && mv /tmp/opencode.json ~/.config/opencode/opencode.json
+bunx oh-my-opencode install
 ```
+
+If you are intentionally maintaining direct package-name entries during the rename transition, update them to `oh-my-openagent` manually.
 ---
 
 ## refresh-model-capabilities
