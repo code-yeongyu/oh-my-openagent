@@ -11,7 +11,7 @@ import {
   migrateConfigFile,
 } from "./shared";
 import { migrateLegacyConfigFile } from "./shared/migrate-legacy-config-file";
-import { LEGACY_CONFIG_BASENAME } from "./shared/plugin-identity";
+import { CONFIG_BASENAME, LEGACY_CONFIG_BASENAME } from "./shared/plugin-identity";
 
 const PARTIAL_STRING_ARRAY_KEYS = new Set([
   "disabled_mcps",
@@ -172,7 +172,7 @@ export function loadPluginConfig(
   // User-level config path - prefer .jsonc over .json
   const configDir = getOpenCodeConfigDir({ binary: "opencode" });
   const userDetected = detectPluginConfigFile(configDir);
-  const userConfigPath =
+  let userConfigPath =
     userDetected.format !== "none"
       ? userDetected.path
       : path.join(configDir, "oh-my-opencode.json");
@@ -187,12 +187,16 @@ export function loadPluginConfig(
   // Auto-copy legacy config file to canonical name if needed
   if (userDetected.format !== "none" && path.basename(userDetected.path).startsWith(LEGACY_CONFIG_BASENAME)) {
     migrateLegacyConfigFile(userDetected.path);
+    userConfigPath = path.join(
+      path.dirname(userDetected.path),
+      `${CONFIG_BASENAME}${path.extname(userDetected.path)}`
+    );
   }
 
   // Project-level config path - prefer .jsonc over .json
   const projectBasePath = path.join(directory, ".opencode");
   const projectDetected = detectPluginConfigFile(projectBasePath);
-  const projectConfigPath =
+  let projectConfigPath =
     projectDetected.format !== "none"
       ? projectDetected.path
       : path.join(projectBasePath, "oh-my-opencode.json");
@@ -207,6 +211,10 @@ export function loadPluginConfig(
   // Auto-copy legacy project config file to canonical name if needed
   if (projectDetected.format !== "none" && path.basename(projectDetected.path).startsWith(LEGACY_CONFIG_BASENAME)) {
     migrateLegacyConfigFile(projectDetected.path);
+    projectConfigPath = path.join(
+      path.dirname(projectDetected.path),
+      `${CONFIG_BASENAME}${path.extname(projectDetected.path)}`
+    );
   }
 
   // Load user config first (base). Parse empty config through Zod to apply field defaults.

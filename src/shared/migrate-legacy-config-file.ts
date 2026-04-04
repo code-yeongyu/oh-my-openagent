@@ -1,25 +1,14 @@
-import { closeSync, existsSync, fsyncSync, openSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, readFileSync, renameSync, rmSync } from "node:fs"
 import { join, dirname, basename } from "node:path"
 
 import { log } from "./logger"
 import { CONFIG_BASENAME, LEGACY_CONFIG_BASENAME } from "./plugin-identity"
+import { writeFileAtomically } from "./write-file-atomically"
 
 function buildCanonicalPath(legacyPath: string): string {
   const dir = dirname(legacyPath)
   const ext = basename(legacyPath).includes(".jsonc") ? ".jsonc" : ".json"
   return join(dir, `${CONFIG_BASENAME}${ext}`)
-}
-
-function writeFileAtomically(filePath: string, content: string): void {
-  const tempPath = `${filePath}.tmp`
-  writeFileSync(tempPath, content, "utf-8")
-  const tempFileDescriptor = openSync(tempPath, "r")
-  try {
-    fsyncSync(tempFileDescriptor)
-  } finally {
-    closeSync(tempFileDescriptor)
-  }
-  renameSync(tempPath, filePath)
 }
 
 function archiveLegacyConfigFile(legacyPath: string): boolean {

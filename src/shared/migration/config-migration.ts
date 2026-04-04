@@ -1,5 +1,6 @@
 import * as fs from "fs"
 import { log } from "../logger"
+import { writeFileAtomically } from "../write-file-atomically"
 import { AGENT_NAME_MAP, migrateAgentNames } from "./agent-names"
 import { migrateHookNames } from "./hook-names"
 import { migrateModelVersions } from "./model-versions"
@@ -123,7 +124,7 @@ export function migrateConfigFile(
 
     let writeSucceeded = false
     try {
-      fs.writeFileSync(configPath, JSON.stringify(copy, null, 2) + "\n", "utf-8")
+      writeFileAtomically(configPath, JSON.stringify(copy, null, 2) + "\n")
       writeSucceeded = true
     } catch (err) {
       log(`Failed to write migrated config to ${configPath}:`, err)

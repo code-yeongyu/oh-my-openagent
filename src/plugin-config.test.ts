@@ -8,6 +8,10 @@ import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig } from "./config";
 
 const tempDirs: string[] = []
 
+function createConfig(config: Partial<OhMyOpenCodeConfig>): OhMyOpenCodeConfig {
+  return OhMyOpenCodeConfigSchema.parse(config)
+}
+
 afterEach(() => {
   mock.restore()
 
@@ -23,7 +27,7 @@ describe("mergeConfigs", () => {
     // then should deep merge categories, not override completely
 
     it("should deep merge categories from base and override", () => {
-      const base = {
+      const base = createConfig({
         categories: {
           general: {
             model: "openai/gpt-5.4",
@@ -33,9 +37,9 @@ describe("mergeConfigs", () => {
             model: "anthropic/claude-haiku-4-5",
           },
         },
-      } as OhMyOpenCodeConfig;
+      });
 
-      const override = {
+      const override = createConfig({
         categories: {
           general: {
             temperature: 0.3,
@@ -44,7 +48,7 @@ describe("mergeConfigs", () => {
             model: "google/gemini-3.1-pro",
           },
         },
-      } as unknown as OhMyOpenCodeConfig;
+      });
 
       const result = mergeConfigs(base, override);
 
@@ -59,15 +63,15 @@ describe("mergeConfigs", () => {
     });
 
     it("should preserve base categories when override has no categories", () => {
-      const base: OhMyOpenCodeConfig = {
+      const base = createConfig({
         categories: {
           general: {
             model: "openai/gpt-5.4",
           },
         },
-      };
+      });
 
-      const override: OhMyOpenCodeConfig = {};
+      const override = createConfig({});
 
       const result = mergeConfigs(base, override);
 
@@ -75,15 +79,15 @@ describe("mergeConfigs", () => {
     });
 
     it("should use override categories when base has no categories", () => {
-      const base: OhMyOpenCodeConfig = {};
+      const base = createConfig({});
 
-      const override: OhMyOpenCodeConfig = {
+      const override = createConfig({
         categories: {
           general: {
             model: "openai/gpt-5.4",
           },
         },
-      };
+      });
 
       const result = mergeConfigs(base, override);
 
@@ -93,18 +97,18 @@ describe("mergeConfigs", () => {
 
   describe("existing behavior preservation", () => {
     it("should deep merge agents", () => {
-      const base: OhMyOpenCodeConfig = {
+      const base = createConfig({
         agents: {
           oracle: { model: "openai/gpt-5.4" },
         },
-      };
+      });
 
-      const override: OhMyOpenCodeConfig = {
+      const override = createConfig({
         agents: {
           oracle: { temperature: 0.5 },
           explore: { model: "anthropic/claude-haiku-4-5" },
         },
-      };
+      });
 
       const result = mergeConfigs(base, override);
 
@@ -114,13 +118,13 @@ describe("mergeConfigs", () => {
     });
 
     it("should merge disabled arrays without duplicates", () => {
-      const base: OhMyOpenCodeConfig = {
+      const base = createConfig({
         disabled_hooks: ["comment-checker", "think-mode"],
-      };
+      });
 
-      const override: OhMyOpenCodeConfig = {
+      const override = createConfig({
         disabled_hooks: ["think-mode", "session-recovery"],
-      };
+      });
 
       const result = mergeConfigs(base, override);
 
@@ -131,13 +135,13 @@ describe("mergeConfigs", () => {
     });
 
     it("should union disabled_tools from base and override without duplicates", () => {
-      const base: OhMyOpenCodeConfig = {
+      const base = createConfig({
         disabled_tools: ["todowrite", "interactive_bash"],
-      };
+      });
 
-      const override: OhMyOpenCodeConfig = {
+      const override = createConfig({
         disabled_tools: ["interactive_bash", "look_at"],
-      };
+      });
 
       const result = mergeConfigs(base, override);
 
@@ -349,5 +353,30 @@ describe("loadPluginConfig", () => {
     expect(existsSync(backupConfigPath)).toBe(true)
     expect(readFileSync(canonicalConfigPath, "utf-8")).toContain('"openai/gpt-5.4"')
     expect(reloadedConfig.agents?.oracle?.model).toBe("openai/gpt-5.4")
+  })
+
+  it("should load migrated legacy project config on the first load", () => {
+    // given
+    const rootDir = mkdtempSync(join(tmpdir(), "omo-plugin-config-first-load-"))
+    const userConfigDir = join(rootDir, "user-config")
+    const projectDir = join(rootDir, "project")
+    const projectConfigDir = join(projectDir, ".opencode")
+    const legacyConfigPath = join(projectConfigDir, "oh-my-opencode.jsonc")
+    const canonicalConfigPath = join(projectConfigDir, "oh-my-openagent.jsonc")
+
+    tempDirs.push(rootDir)
+    mkdirSync(userConfigDir, { recursive: true })
+    mkdirSync(projectConfigDir, { recursive: true })
+    writeFileSync(legacyConfigPath, JSON.stringify({ agents: { oracle: { model: "openai/gpt-5.4" } } }))
+
+    spyOn(shared, "getOpenCodeConfigDir").mockReturnValue(userConfigDir)
+
+    // when
+    const config = loadPluginConfig(projectDir, {})
+
+    // then
+    expect(existsSync(legacyConfigPath)).toBe(false)
+    expect(existsSync(canonicalConfigPath)).toBe(true)
+    expect(config.agents?.oracle?.model).toBe("openai/gpt-5.4")
   })
 })
