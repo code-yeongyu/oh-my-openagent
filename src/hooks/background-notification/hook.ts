@@ -17,6 +17,16 @@ interface ChatMessageOutput {
   parts: Array<{ type: string; text?: string; [key: string]: unknown }>
 }
 
+const FORWARDED_EVENT_TYPES = new Set([
+  "message.updated",
+  "message.part.updated",
+  "message.part.delta",
+  "session.idle",
+  "session.error",
+  "session.deleted",
+  "session.status",
+])
+
 /**
  * Background notification hook - handles event routing to BackgroundManager.
  *
@@ -25,6 +35,7 @@ interface ChatMessageOutput {
  */
 export function createBackgroundNotificationHook(manager: BackgroundManager) {
   const eventHandler = async ({ event }: EventInput) => {
+    if (!FORWARDED_EVENT_TYPES.has(event.type)) return
     manager.handleEvent(event)
   }
 
