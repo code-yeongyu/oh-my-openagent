@@ -12,7 +12,7 @@
 [![npm](https://img.shields.io/npm/v/opencode-matrixx.svg)](https://www.npmjs.com/package/opencode-matrixx)
 
 **Multi-model agent orchestration for [OpenCode](https://github.com/sst/opencode).**<br/>
-**13 specialized agents. 41 lifecycle hooks. 25+ tools. One plugin.**
+**14 specialized agents. 41 lifecycle hooks. 25+ tools. One plugin.**
 
 *Use your existing ChatGPT, Claude, and Gemini subscriptions. OpenCode covers them all.*
 
@@ -32,7 +32,7 @@ Matrixx turns a single agent into a **coordinated team** — each model doing wh
 
 | Problem | Matrixx Solution |
 |---------|------------------|
-| One model does everything poorly | **13 specialists** — right model for the right job |
+| One model does everything poorly | **14 specialists** — right model for the right job |
 | Agent forgets what it was doing | **Todo Continuation** — forces completion, no exceptions |
 | Slow sequential tool calls | **Parallel background agents** — 5+ running simultaneously |
 | AI-generated code looks like AI | **Comment Checker** — code indistinguishable from human-written |
@@ -108,6 +108,18 @@ Scans for vulnerabilities but never touches code. OWASP Top 10, SAST, DAST, depe
 
 </td>
 </tr>
+<tr>
+<td colspan="2">
+
+### Zion — *The Crypto Specialist*
+<img src=".github/assets/zion.png" width="120" align="right"/>
+
+**Claude Sonnet 4.6** &middot; Crypto market analyst & trader
+
+Technical analysis (RSI, MACD, Bollinger Bands, market structure, Fibonacci), on-chain analytics (MVRV, SOPR, exchange flows, whale tracking), DeFi protocol research, tokenomics modeling, and trading strategy with defined risk management. 3 composable skills covering the full crypto analysis stack.
+
+</td>
+</tr>
 </table>
 
 | Agent | Role | Model |
@@ -120,6 +132,7 @@ Scans for vulnerabilities but never touches code. OWASP Top 10, SAST, DAST, depe
 | **Operator** | Documentation & OSS search | GLM 4.7 |
 | **Trinity** | Blazing fast codebase grep | Grok Code Fast |
 | **Construct** | PDF, image & diagram analysis | Gemini 3 Flash |
+| **Zion** | Crypto market analysis, trading & DeFi | Claude Sonnet 4.6 |
 
 Every agent, model, temperature, and permission is fully customizable. [**Meet the full team &rarr;**](docs/agents.md)
 
@@ -129,10 +142,10 @@ Every agent, model, temperature, and permission is fully customizable. [**Meet t
 
 | | |
 |---|---|
-| **Agent Orchestration** | 13 agents, parallel background execution, category-based routing, session continuity |
+| **Agent Orchestration** | 14 agents, parallel background execution, category-based routing, session continuity |
 | **Developer Tools** | LSP (goto def, rename, diagnostics), AST-Grep (search & replace), Tmux terminal |
 | **41 Lifecycle Hooks** | Context injection, think mode, comment checking, todo enforcement, error recovery |
-| **36 Built-in Skills** | DSL engineering (11), research & leadership (12), security (9), browser, git, frontend |
+| **39 Built-in Skills** | DSL engineering (11), research & leadership (12), security (9), crypto (3), browser, git, frontend |
 | **Curated MCPs** | Exa (web search), Context7 (official docs), Grep.app (GitHub code search), Document Reader (office docs) |
 | **Claude Code Compat** | Full compatibility — commands, agents, skills, MCPs, hooks from `settings.json` |
 
