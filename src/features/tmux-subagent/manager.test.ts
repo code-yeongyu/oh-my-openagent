@@ -168,6 +168,10 @@ function createTmuxConfig(overrides?: Partial<TmuxConfig>): TmuxConfig {
   }
 }
 
+function getTrackedSessions(manager: object): Map<string, { paneId: string; closePending: boolean; closeRetryCount: number }> {
+  return Reflect.get(manager, 'sessions') as Map<string, { paneId: string; closePending: boolean; closeRetryCount: number }>
+}
+
 describe('TmuxSessionManager', () => {
   beforeEach(() => {
     mockQueryWindowState.mockClear()
@@ -1532,6 +1536,280 @@ describe('TmuxSessionManager', () => {
   })
 
   describe('cleanup', () => {
+    test('#given session isolation with two tracked panes #when polling closes both sessions #then it reassigns the anchor and cleans up the isolated container', async () => {
+      // given
+      mockIsInsideTmux.mockReturnValue(true)
+      mockQueryWindowState.mockImplementation(async (paneId: string) => {
+        if (paneId === '%isolated-session-ses_first') {
+          return createWindowState({
+            mainPane: {
+              paneId: '%isolated-session-ses_first',
+              width: 110,
+              height: 44,
+              left: 0,
+              top: 0,
+              title: 'isolated',
+              isActive: true,
+            },
+            agentPanes: [
+              {
+                paneId: '%mock',
+                width: 40,
+                height: 44,
+                left: 110,
+                top: 0,
+                title: 'omo-subagent-Second Task',
+                isActive: false,
+              },
+            ],
+          })
+        }
+
+        if (paneId === '%mock') {
+          return createWindowState({
+            mainPane: {
+              paneId: '%isolated-session-ses_first',
+              width: 110,
+              height: 44,
+              left: 0,
+              top: 0,
+              title: 'isolated',
+              isActive: true,
+            },
+            agentPanes: [
+              {
+                paneId: '%mock',
+                width: 40,
+                height: 44,
+                left: 110,
+                top: 0,
+                title: 'omo-subagent-Second Task',
+                isActive: false,
+              },
+            ],
+          })
+        }
+
+        return createWindowState()
+      })
+
+      const { TmuxSessionManager } = await import('./manager')
+      const manager = new TmuxSessionManager(createMockContext(), createTmuxConfig({
+        enabled: true,
+        isolation: 'session',
+      }), mockTmuxDeps)
+
+      await manager.onSessionCreated(createSessionCreatedEvent('ses_first', 'ses_parent', 'First Task'))
+      await manager.onSessionCreated(createSessionCreatedEvent('ses_second', 'ses_parent', 'Second Task'))
+      mockExecuteAction.mockClear()
+
+      const closeSessionById = Reflect.get(manager, 'closeSessionById') as (sessionId: string) => Promise<void>
+
+      // when
+      await closeSessionById.call(manager, 'ses_first')
+
+      // then
+      expect(mockExecuteAction.mock.calls[0]?.[0]).toEqual({
+        type: 'close',
+        paneId: '%isolated-session-ses_first',
+        sessionId: 'ses_first',
+      })
+      expect(Reflect.get(manager, 'isolatedContainerPaneId')).toBe('%isolated-session-ses_first')
+      expect(Reflect.get(manager, 'isolatedWindowPaneId')).toBe('%mock')
+
+      // when
+      await closeSessionById.call(manager, 'ses_second')
+
+      // then
+      expect(mockExecuteAction).toHaveBeenCalledTimes(3)
+      expect(mockExecuteAction.mock.calls[1]?.[0]).toEqual({
+        type: 'close',
+        paneId: '%mock',
+        sessionId: 'ses_second',
+      })
+      expect(mockExecuteAction.mock.calls[2]?.[0]).toEqual({
+        type: 'close',
+        paneId: '%isolated-session-ses_first',
+        sessionId: 'ses_second',
+      })
+      expect(Reflect.get(manager, 'isolatedContainerPaneId')).toBeUndefined()
+      expect(Reflect.get(manager, 'isolatedWindowPaneId')).toBeUndefined()
+    })
+
+    test('#given session isolation with two tracked panes #when process shutdown cleanup runs #then it closes panes and the isolated container through the shared close path', async () => {
+      // given
+      mockIsInsideTmux.mockReturnValue(true)
+      mockQueryWindowState.mockImplementation(async (paneId: string) => {
+        if (paneId === '%isolated-session-ses_first') {
+          return createWindowState({
+            mainPane: {
+              paneId: '%isolated-session-ses_first',
+              width: 110,
+              height: 44,
+              left: 0,
+              top: 0,
+              title: 'isolated',
+              isActive: true,
+            },
+            agentPanes: [
+              {
+                paneId: '%mock',
+                width: 40,
+                height: 44,
+                left: 110,
+                top: 0,
+                title: 'omo-subagent-Second Task',
+                isActive: false,
+              },
+            ],
+          })
+        }
+
+        if (paneId === '%mock') {
+          return createWindowState({
+            mainPane: {
+              paneId: '%isolated-session-ses_first',
+              width: 110,
+              height: 44,
+              left: 0,
+              top: 0,
+              title: 'isolated',
+              isActive: true,
+            },
+            agentPanes: [
+              {
+                paneId: '%mock',
+                width: 40,
+                height: 44,
+                left: 110,
+                top: 0,
+                title: 'omo-subagent-Second Task',
+                isActive: false,
+              },
+            ],
+          })
+        }
+
+        return createWindowState()
+      })
+
+      const { TmuxSessionManager } = await import('./manager')
+      const manager = new TmuxSessionManager(createMockContext(), createTmuxConfig({
+        enabled: true,
+        isolation: 'session',
+      }), mockTmuxDeps)
+
+      await manager.onSessionCreated(createSessionCreatedEvent('ses_first', 'ses_parent', 'First Task'))
+      await manager.onSessionCreated(createSessionCreatedEvent('ses_second', 'ses_parent', 'Second Task'))
+      mockExecuteAction.mockClear()
+
+      // when
+      await manager.cleanup()
+
+      // then
+      expect(mockExecuteAction).toHaveBeenCalledTimes(3)
+      expect(mockExecuteAction.mock.calls[0]?.[0]).toEqual({
+        type: 'close',
+        paneId: '%isolated-session-ses_first',
+        sessionId: 'ses_first',
+      })
+      expect(mockExecuteAction.mock.calls[1]?.[0]).toEqual({
+        type: 'close',
+        paneId: '%mock',
+        sessionId: 'ses_second',
+      })
+      expect(mockExecuteAction.mock.calls[2]?.[0]).toEqual({
+        type: 'close',
+        paneId: '%isolated-session-ses_first',
+        sessionId: 'ses_second',
+      })
+      expect(Reflect.get(manager, 'isolatedContainerPaneId')).toBeUndefined()
+      expect(Reflect.get(manager, 'isolatedWindowPaneId')).toBeUndefined()
+    })
+
+    test('#given an isolated anchor close that fails once #when retryPendingCloses succeeds on retry #then it reassigns the isolated anchor through the shared cleanup path', async () => {
+      // given
+      mockIsInsideTmux.mockReturnValue(true)
+      mockQueryWindowState.mockImplementation(async (paneId: string) => {
+        if (paneId === '%isolated-session-ses_first') {
+          return createWindowState({
+            mainPane: {
+              paneId: '%isolated-session-ses_first',
+              width: 110,
+              height: 44,
+              left: 0,
+              top: 0,
+              title: 'isolated',
+              isActive: true,
+            },
+            agentPanes: [
+              {
+                paneId: '%mock',
+                width: 40,
+                height: 44,
+                left: 110,
+                top: 0,
+                title: 'omo-subagent-Second Task',
+                isActive: false,
+              },
+            ],
+          })
+        }
+
+        return createWindowState()
+      })
+
+      let closeAttemptCount = 0
+      mockExecuteAction.mockImplementation(async (action: PaneAction) => {
+        if (action.type === 'close' && action.sessionId === 'ses_first') {
+          closeAttemptCount += 1
+          if (closeAttemptCount === 1) {
+            return { success: false }
+          }
+        }
+
+        return { success: true }
+      })
+
+      const { TmuxSessionManager } = await import('./manager')
+      const manager = new TmuxSessionManager(createMockContext(), createTmuxConfig({
+        enabled: true,
+        isolation: 'session',
+      }), mockTmuxDeps)
+
+      await manager.onSessionCreated(createSessionCreatedEvent('ses_first', 'ses_parent', 'First Task'))
+      await manager.onSessionCreated(createSessionCreatedEvent('ses_second', 'ses_parent', 'Second Task'))
+      mockExecuteAction.mockClear()
+
+      const closeSessionById = Reflect.get(manager, 'closeSessionById') as (sessionId: string) => Promise<void>
+      const retryPendingCloses = Reflect.get(manager, 'retryPendingCloses') as () => Promise<void>
+
+      // when
+      await closeSessionById.call(manager, 'ses_first')
+
+      // then
+      expect(getTrackedSessions(manager).get('ses_first')?.closePending).toBe(true)
+      expect(Reflect.get(manager, 'isolatedWindowPaneId')).toBe('%isolated-session-ses_first')
+
+      // when
+      await retryPendingCloses.call(manager)
+
+      // then
+      expect(getTrackedSessions(manager).has('ses_first')).toBe(false)
+      expect(Reflect.get(manager, 'isolatedContainerPaneId')).toBe('%isolated-session-ses_first')
+      expect(Reflect.get(manager, 'isolatedWindowPaneId')).toBe('%mock')
+      expect(mockExecuteAction.mock.calls[0]?.[0]).toEqual({
+        type: 'close',
+        paneId: '%isolated-session-ses_first',
+        sessionId: 'ses_first',
+      })
+      expect(mockExecuteAction.mock.calls[1]?.[0]).toEqual({
+        type: 'close',
+        paneId: '%isolated-session-ses_first',
+        sessionId: 'ses_first',
+      })
+    })
+
     test('closes all tracked panes', async () => {
       // given
       mockIsInsideTmux.mockReturnValue(true)
