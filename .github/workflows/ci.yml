@@ -146,7 +146,7 @@ jobs:
             gh release edit next \
               --title "Upcoming Changes 🍿" \
               --notes-file - \
-              --draft <<'EOF'
+              --draft <<EOF
           $NOTES
           EOF
           else
@@ -155,7 +155,7 @@ jobs:
               --title "Upcoming Changes 🍿" \
               --notes-file - \
               --draft \
-              --target "$TARGET_SHA" <<'EOF'
+              --target "$TARGET_SHA" <<EOF
           $NOTES
           EOF
           fi
