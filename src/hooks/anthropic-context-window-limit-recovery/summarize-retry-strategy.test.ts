@@ -4,6 +4,7 @@ import type { AutoCompactState, ParsedTokenLimitError, RetryState } from "./type
 import type { OhMyOpenCodeConfig } from "../../config"
 
 type TimeoutCall = {
+  handle: ReturnType<typeof setTimeout>
   delay: number
 }
 
@@ -94,8 +95,9 @@ describe("runSummarizeRetryStrategy", () => {
     //#given
     const timeoutCalls: TimeoutCall[] = []
     globalThis.setTimeout = ((_: (...args: unknown[]) => void, delay?: number) => {
-      timeoutCalls.push({ delay: delay ?? 0 })
-      return 1 as unknown as ReturnType<typeof setTimeout>
+      const handle = timeoutCalls.length + 1 as unknown as ReturnType<typeof setTimeout>
+      timeoutCalls.push({ handle, delay: delay ?? 0 })
+      return handle
     }) as typeof setTimeout
 
     autoCompactState.pendingCompact.add(sessionID)
@@ -117,9 +119,12 @@ describe("runSummarizeRetryStrategy", () => {
     })
 
     //#then
-    expect(timeoutCalls.length).toBe(1)
-    expect(timeoutCalls[0]!.delay).toBeGreaterThan(0)
-    expect(timeoutCalls[0]!.delay).toBeLessThanOrEqual(2000)
+    const retryTimer = autoCompactState.retryTimerBySession.get(sessionID)
+    const retryTimeoutCall = timeoutCalls.find(({ handle }) => handle === retryTimer)
+
+    expect(retryTimeoutCall).toBeDefined()
+    expect(retryTimeoutCall?.delay).toBeGreaterThan(0)
+    expect(retryTimeoutCall?.delay).toBeLessThanOrEqual(2000)
   })
 
   test("#given pending retry timer after session cleanup #when scheduled callback fires #then it does not recreate retry state", async () => {
