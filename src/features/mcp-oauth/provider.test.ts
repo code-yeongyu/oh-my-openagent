@@ -7,7 +7,7 @@ const {
   generateCodeVerifier,
   generateCodeChallenge,
   buildAuthorizationUrl,
-} = await import(new URL("./provider.ts", import.meta.url).href)
+} = await import(new URL("./provider.ts?real-provider-test", import.meta.url).href)
 
 describe("McpOAuthProvider", () => {
   describe("generateCodeVerifier", () => {

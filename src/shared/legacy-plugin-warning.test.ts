@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 const { checkForLegacyPluginEntry } = await import(
-  new URL("./legacy-plugin-warning.ts", import.meta.url).href
+  new URL("./legacy-plugin-warning.ts?real-legacy-plugin-warning-test", import.meta.url).href
 )
 
 function createTestConfigDir(): string {

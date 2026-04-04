@@ -7,7 +7,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 const { createConnectedProvidersCacheStore, findProviderModelMetadata } = await import(
-  new URL("./connected-providers-cache.ts", import.meta.url).href
+  new URL("./connected-providers-cache.ts?real-connected-providers-cache-test", import.meta.url).href
 )
 
 function createTestCacheContext() {
