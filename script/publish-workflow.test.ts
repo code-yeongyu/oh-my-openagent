@@ -9,14 +9,14 @@ const workflowPaths = [
 ]
 
 describe("test workflows", () => {
-  test("use the CI-safe test runner for workflows", () => {
+  test("use bun test for workflows", () => {
     for (const workflowPath of workflowPaths) {
-      // given
+      // #given
       const workflow = readFileSync(workflowPath, "utf8")
 
-      // then
+      // #then
       expect(workflow).toContain("- name: Run tests")
-      expect(workflow).toContain("run: bun run test:ci")
+      expect(workflow).toContain("run: bun test")
     }
   })
 })
