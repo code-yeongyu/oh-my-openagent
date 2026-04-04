@@ -102,6 +102,32 @@ describe("external-plugin-detector", () => {
       expect(result.pluginName).toContain("opencode-notifier")
     })
 
+    test("should safely handle tuple-format plugin entries without crashing (fixes #3122)", () => {
+      // given - opencode.json with array/tuple plugin entries
+      const opencodeDir = path.join(tempDir, ".opencode")
+      fs.mkdirSync(opencodeDir, { recursive: true })
+      fs.writeFileSync(
+        path.join(opencodeDir, "opencode.json"),
+        JSON.stringify({
+          plugin: [
+            "oh-my-opencode",
+            ["advanced-tuple-plugin", { debug: true }],
+            "opencode-notifier"
+          ]
+        })
+      )
+
+      // when
+      const result = detectExternalNotificationPlugin(tempDir)
+
+      // then - should detect opencode-notifier without crashing on the tuple entry
+      expect(result.detected).toBe(true)
+      expect(result.pluginName).toBe("opencode-notifier")
+      expect(result.allPlugins).toContain("oh-my-opencode")
+      expect(result.allPlugins).toContain("advanced-tuple-plugin")
+      expect(result.allPlugins).not.toContain(["advanced-tuple-plugin", { debug: true }])
+    })
+
     test("should handle JSONC format with comments", () => {
       // given - opencode.jsonc with comments
       const opencodeDir = path.join(tempDir, ".opencode")

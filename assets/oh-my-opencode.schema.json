@@ -36,7 +36,9 @@
           "agent-browser",
           "dev-browser",
           "frontend-ui-ux",
-          "git-master"
+          "git-master",
+          "review-work",
+          "ai-slop-remover"
         ]
       }
     },
