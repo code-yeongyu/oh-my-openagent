@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 
-import { describe, test, expect, beforeEach, afterEach, spyOn } from "bun:test"
+import { describe, test, expect, beforeEach, afterEach, spyOn, mock } from "bun:test"
 import { createBuiltinAgents } from "./builtin-agents"
 import type { AgentConfig } from "@opencode-ai/sdk"
 import { clearSkillCache } from "../features/opencode-skill-loader/skill-content"
@@ -9,6 +9,18 @@ import * as modelAvailability from "../shared/model-availability"
 import * as shared from "../shared"
 
 const TEST_DEFAULT_MODEL = "anthropic/claude-opus-4-6"
+
+beforeEach(() => {
+  mock.restore()
+  clearSkillCache()
+  connectedProvidersCache._resetMemCacheForTesting()
+})
+
+afterEach(() => {
+  clearSkillCache()
+  connectedProvidersCache._resetMemCacheForTesting()
+  mock.restore()
+})
 
 describe("createBuiltinAgents with model overrides", () => {
   test("Sisyphus with default model has thinking config when all models available", async () => {
