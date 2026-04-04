@@ -3,8 +3,7 @@ import { spawn } from "bun"
 import type { ArchiveEntry } from "../archive-entry-validator"
 import { log } from "../logger"
 
-const MAX_UNPARSED_TAR_LINE_RATIO = 0.1
-const MAX_UNPARSED_TAR_LINE_COUNT = 5
+
 
 function parseTarListedZipEntry(line: string): ArchiveEntry | null {
 	const match = line.match(
@@ -38,15 +37,9 @@ function validateParsedTarListing(
 		return
 	}
 
-	const unparsedLineRatio = unparsedLines.length / totalLineCount
-	if (
-		unparsedLineRatio > MAX_UNPARSED_TAR_LINE_RATIO ||
-		unparsedLines.length > MAX_UNPARSED_TAR_LINE_COUNT
-	) {
-		throw new Error(
-			`zip entry listing failed: tar output format drift detected (${unparsedLines.length}/${totalLineCount} lines unparsed)`
-		)
-	}
+	throw new Error(
+		`zip entry listing failed: ${unparsedLines.length}/${totalLineCount} tar listing lines could not be parsed (fail-closed)`
+	)
 }
 
 export function parseTarListingOutput(stdout: string): ArchiveEntry[] {

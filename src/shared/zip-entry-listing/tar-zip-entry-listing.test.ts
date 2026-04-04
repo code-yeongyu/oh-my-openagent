@@ -40,37 +40,27 @@ describe("parseTarListingOutput", () => {
 		mock.restore()
 	})
 
-	describe("#given tar output with a small number of unparsed lines", () => {
-		it("#when parsing the output #then logs warnings and keeps the parsed entries", () => {
+	describe("#given tar output with any unparsed lines", () => {
+		it("#when parsing the output #then throws immediately (fail-closed)", () => {
 			// given
 			const logSpy = spyOn(logger, "log").mockImplementation(() => {})
 			const listedOutput = [
 				createTarFileLine("file-1.txt"),
 				createTarFileLine("file-2.txt"),
-				createTarFileLine("file-3.txt"),
-				createTarFileLine("file-4.txt"),
-				createTarFileLine("file-5.txt"),
-				createTarFileLine("file-6.txt"),
-				createTarFileLine("file-7.txt"),
-				createTarFileLine("file-8.txt"),
-				createTarFileLine("file-9.txt"),
 				"unparsed listing line",
 			].join("\n")
 
 			// when
-			const parsedEntries = parseTarListingOutput(listedOutput)
+			const thrownError = captureThrownError(() => parseTarListingOutput(listedOutput))
 
 			// then
-			expect(parsedEntries).toHaveLength(9)
-			expect(logSpy).toHaveBeenCalledWith("warning: unparsed tar listing line", {
-				line: "unparsed listing line",
-			})
+			expect(thrownError.message).toMatch(/could not be parsed/i)
 			expect(getWarnedUnparsedLines(logSpy)).toContain("unparsed listing line")
 		})
 	})
 
-	describe("#given tar output with too many unparsed lines by ratio", () => {
-		it("#when parsing the output #then throws a format drift error", () => {
+	describe("#given tar output with multiple unparsed lines", () => {
+		it("#when parsing the output #then throws with count details", () => {
 			// given
 			const logSpy = spyOn(logger, "log").mockImplementation(() => {})
 			const listedOutput = [
@@ -90,7 +80,7 @@ describe("parseTarListingOutput", () => {
 			const thrownError = captureThrownError(() => parseTarListingOutput(listedOutput))
 
 			// then
-			expect(thrownError.message).toMatch(/format drift detected/i)
+			expect(thrownError.message).toMatch(/could not be parsed/i)
 			expect(getWarnedUnparsedLines(logSpy)).toEqual(
 				expect.arrayContaining([
 					"unparsed listing line 1",
@@ -101,7 +91,7 @@ describe("parseTarListingOutput", () => {
 	})
 
 	describe("#given tar output where every non-empty line is unparsed", () => {
-		it("#when parsing the output #then rejects the listing instead of returning an empty array", () => {
+		it("#when parsing the output #then rejects the listing", () => {
 			// given
 			const logSpy = spyOn(logger, "log").mockImplementation(() => {})
 
@@ -111,44 +101,9 @@ describe("parseTarListingOutput", () => {
 			)
 
 			// then
-			expect(thrownError.message).toMatch(/format drift detected/i)
+			expect(thrownError.message).toMatch(/could not be parsed/i)
 			expect(getWarnedUnparsedLines(logSpy)).toEqual(
 				expect.arrayContaining(["unknown format 1", "unknown format 2"])
-			)
-		})
-	})
-
-	describe("#given tar output with more than five unparsed lines", () => {
-		it("#when parsing the output #then rejects the listing even at a ten percent ratio", () => {
-			// given
-			const logSpy = spyOn(logger, "log").mockImplementation(() => {})
-			const parsedLines = Array.from({ length: 54 }, (_, index) =>
-				createTarFileLine(`file-${index + 1}.txt`)
-			)
-			const listedOutput = [
-				...parsedLines,
-				"unparsed listing line 1",
-				"unparsed listing line 2",
-				"unparsed listing line 3",
-				"unparsed listing line 4",
-				"unparsed listing line 5",
-				"unparsed listing line 6",
-			].join("\n")
-
-			// when
-			const thrownError = captureThrownError(() => parseTarListingOutput(listedOutput))
-
-			// then
-			expect(thrownError.message).toMatch(/format drift detected/i)
-			expect(getWarnedUnparsedLines(logSpy)).toEqual(
-				expect.arrayContaining([
-					"unparsed listing line 1",
-					"unparsed listing line 2",
-					"unparsed listing line 3",
-					"unparsed listing line 4",
-					"unparsed listing line 5",
-					"unparsed listing line 6",
-				])
 			)
 		})
 	})
