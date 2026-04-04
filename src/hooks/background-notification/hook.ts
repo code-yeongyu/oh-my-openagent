@@ -21,6 +21,7 @@ const FORWARDED_EVENT_TYPES = new Set([
   "message.updated",
   "message.part.updated",
   "message.part.delta",
+  "todo.updated",
   "session.idle",
   "session.error",
   "session.deleted",

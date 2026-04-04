@@ -160,6 +160,7 @@ export class BackgroundManager {
   private idleDeferralTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
   private notificationQueueByParent: Map<string, Promise<void>> = new Map()
   private observedOutputSessions: Set<string> = new Set()
+  private observedIncompleteTodosBySession: Map<string, boolean> = new Map()
   private rootDescendantCounts: Map<string, number>
   private preStartDescendantReservations: Set<string>
   private enableParentSessionNotifications: boolean
@@ -882,17 +883,27 @@ export class BackgroundManager {
   }
 
   private async checkSessionTodos(sessionID: string): Promise<boolean> {
+    const observedIncompleteTodos = this.observedIncompleteTodosBySession.get(sessionID)
+    if (observedIncompleteTodos !== undefined) {
+      return observedIncompleteTodos
+    }
+
     try {
       const response = await this.client.session.todo({
         path: { id: sessionID },
       })
       const todos = normalizeSDKResponse(response, [] as Todo[], { preferResponseOnMissingData: true })
-      if (!todos || todos.length === 0) return false
+      if (!todos || todos.length === 0) {
+        this.observedIncompleteTodosBySession.set(sessionID, false)
+        return false
+      }
 
       const incomplete = todos.filter(
         (t) => t.status !== "completed" && t.status !== "cancelled"
       )
-      return incomplete.length > 0
+      const hasIncompleteTodos = incomplete.length > 0
+      this.observedIncompleteTodosBySession.set(sessionID, hasIncompleteTodos)
+      return hasIncompleteTodos
     } catch (error) {
       log("[background-agent] Failed to check session todos:", {
         sessionID,
@@ -908,6 +919,10 @@ export class BackgroundManager {
 
   private clearSessionOutputObserved(sessionID: string): void {
     this.observedOutputSessions.delete(sessionID)
+  }
+
+  private clearSessionTodoObservation(sessionID: string): void {
+    this.observedIncompleteTodosBySession.delete(sessionID)
   }
 
   private hasOutputSignalFromPart(partInfo: MessagePartInfo | undefined): boolean {
@@ -1047,6 +1062,20 @@ export class BackgroundManager {
       }
     }
 
+    if (event.type === "todo.updated") {
+      const sessionID = typeof props?.sessionID === "string" ? props.sessionID : undefined
+      const todos = Array.isArray(props?.todos) ? props.todos : undefined
+      if (!sessionID || !todos) return
+
+      const hasIncompleteTodos = todos.some((todo) => {
+        if (!todo || typeof todo !== "object") return false
+        const status = (todo as { status?: unknown }).status
+        return status !== "completed" && status !== "cancelled"
+      })
+      this.observedIncompleteTodosBySession.set(sessionID, hasIncompleteTodos)
+      return
+    }
+
     if (event.type === "session.idle") {
       if (!props || typeof props !== "object") return
       handleSessionIdleBackgroundEvent({
@@ -1091,6 +1120,7 @@ export class BackgroundManager {
       if (!info || typeof info.id !== "string") return
       const sessionID = info.id
       this.clearSessionOutputObserved(sessionID)
+      this.clearSessionTodoObservation(sessionID)
 
       const tasksToCancel = new Map<string, BackgroundTask>()
       const directTask = this.findBySession(sessionID)
@@ -1250,6 +1280,7 @@ export class BackgroundManager {
     return result.then((retried) => {
       if (retried && previousSessionID) {
         this.clearSessionOutputObserved(previousSessionID)
+        this.clearSessionTodoObservation(previousSessionID)
         subagentSessions.delete(previousSessionID)
       }
       return retried

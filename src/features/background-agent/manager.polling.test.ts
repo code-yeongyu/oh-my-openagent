@@ -238,6 +238,43 @@ describe("BackgroundManager pollRunningTasks", () => {
       expect(task.status).toBe("completed")
       expect(messagesCallCount).toBe(0)
     })
+
+    test("#when todo state was already observed from events #then it completes without fetching todos", async () => {
+      //#given
+      let todoCallCount = 0
+      const manager = createManagerWithClient({
+        status: async () => ({ data: { "ses-idle-todo-cached": { type: "idle" } } }),
+        todo: async () => {
+          todoCallCount += 1
+          return { data: [] }
+        },
+      })
+      const task = createRunningTask("ses-idle-todo-cached")
+      injectTask(manager, task)
+
+      manager.handleEvent({
+        type: "message.part.updated",
+        properties: { sessionID: "ses-idle-todo-cached", type: "text" },
+      })
+      manager.handleEvent({
+        type: "todo.updated",
+        properties: {
+          sessionID: "ses-idle-todo-cached",
+          todos: [
+            { id: "todo-1", content: "done", status: "completed", priority: "high" },
+          ],
+        },
+      })
+
+      //#when
+      const poll = (manager as unknown as { pollRunningTasks: () => Promise<void> }).pollRunningTasks
+      await poll.call(manager)
+      manager.shutdown()
+
+      //#then
+      expect(task.status).toBe("completed")
+      expect(todoCallCount).toBe(0)
+    })
   })
 
   describe("#given a running task whose session status is busy", () => {

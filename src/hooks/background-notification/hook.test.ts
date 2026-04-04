@@ -34,4 +34,27 @@ describe("createBackgroundNotificationHook", () => {
     //#then
     expect(handleEvent).toHaveBeenCalledWith(event)
   })
+
+  test("#given todo.updated event #when event handler runs #then it forwards to manager", async () => {
+    //#given
+    const handleEvent = mock(() => {})
+    const hook = createBackgroundNotificationHook({
+      handleEvent,
+      injectPendingNotificationsIntoChatMessage: () => {},
+    } as never)
+
+    const event = {
+      type: "todo.updated",
+      properties: {
+        sessionID: "ses-1",
+        todos: [{ id: "todo-1", content: "done", status: "completed", priority: "high" }],
+      },
+    }
+
+    //#when
+    await hook.event({ event })
+
+    //#then
+    expect(handleEvent).toHaveBeenCalledWith(event)
+  })
 })

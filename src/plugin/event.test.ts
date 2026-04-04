@@ -447,6 +447,44 @@ afterEach(() => {
 })
 
 describe("createEventHandler - event forwarding", () => {
+	it("forwards message activity events to tmux session manager", async () => {
+		//#given
+		const forwardedEvents: EventInput[] = []
+		const eventHandler = createEventHandler({
+			ctx: asEventHandlerContext({}),
+			pluginConfig: asPluginConfig({}),
+			firstMessageVariantGate: {
+				markSessionCreated: () => {},
+				clear: () => {},
+			},
+			managers: createEventHandlerManagers({
+				skillMcpManager: {
+					disconnectSession: async () => {},
+				},
+				tmuxSessionManager: {
+					onEvent: (event: EventInput["event"]) => {
+						forwardedEvents.push({ event })
+					},
+					onSessionCreated: async () => {},
+					onSessionDeleted: async () => {},
+				},
+			}),
+			hooks: createEventHandlerHooks({}),
+		})
+
+		//#when
+		await eventHandler(asEventHandlerInput({
+			event: {
+				type: "message.part.delta",
+				properties: { sessionID: "ses_tmux_activity", field: "text", delta: "x" },
+			},
+		}))
+
+		//#then
+		expect(forwardedEvents.length).toBe(1)
+		expect(forwardedEvents[0]?.event.type).toBe("message.part.delta")
+	})
+
 	it("forwards session.deleted to write-existing-file-guard hook", async () => {
 		//#given
 		const forwardedEvents: EventInput[] = []

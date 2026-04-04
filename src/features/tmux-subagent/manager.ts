@@ -923,6 +923,10 @@ export class TmuxSessionManager {
     }
   }
 
+  onEvent(event: { type: string; properties?: Record<string, unknown> }): void {
+    this.pollingManager.handleEvent(event)
+  }
+
   createEventHandler(): (input: { event: { type: string; properties?: unknown } }) => Promise<void> {
     return async (input) => {
       await this.onSessionCreated(input.event as SessionCreatedEvent)
