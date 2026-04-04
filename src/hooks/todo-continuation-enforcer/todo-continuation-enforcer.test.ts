@@ -463,6 +463,97 @@ describe("todo-continuation-enforcer", () => {
     expect(promptCalls).toHaveLength(0)
   })
 
+  test("should cancel countdown on assistant activity with real message.part.updated payload shape", async () => {
+    // given - session starting countdown
+    const sessionID = "main-assistant-real-part"
+    setMainSession(sessionID)
+
+    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
+
+    // when - session goes idle
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+
+    // when - assistant part update arrives with actual sync payload shape
+    await fakeTimers.advanceBy(500)
+    await hook.handler({
+      event: {
+        type: "message.part.updated",
+        properties: {
+          sessionID,
+          part: {
+            id: "part-1",
+            messageID: "msg-1",
+            sessionID,
+            type: "text",
+            text: "working",
+          },
+          time: Date.now(),
+        },
+      },
+    })
+
+    await fakeTimers.advanceBy(3000)
+
+    // then - no continuation injected (cancelled)
+    expect(promptCalls).toHaveLength(0)
+  })
+
+  test("should cancel countdown on assistant activity with message.part.delta payload", async () => {
+    // given - session starting countdown
+    const sessionID = "main-assistant-delta"
+    setMainSession(sessionID)
+
+    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
+
+    // when - session goes idle
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+
+    // when - assistant delta arrives
+    await fakeTimers.advanceBy(500)
+    await hook.handler({
+      event: {
+        type: "message.part.delta",
+        properties: {
+          sessionID,
+          messageID: "msg-1",
+          partID: "part-1",
+          field: "text",
+          delta: "x",
+        },
+      },
+    })
+
+    await fakeTimers.advanceBy(3000)
+
+    // then - no continuation injected (cancelled)
+    expect(promptCalls).toHaveLength(0)
+  })
+
+  test("should fetch session messages only once during a single idle evaluation", async () => {
+    // given
+    const sessionID = "main-single-messages-fetch"
+    setMainSession(sessionID)
+    let messagesCallCount = 0
+    const mockInput = createMockPluginInput()
+    mockInput.client.session.messages = async () => {
+      messagesCallCount += 1
+      return { data: mockMessages }
+    }
+    const hook = createTodoContinuationEnforcer(mockInput, {})
+
+    // when
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+
+    // then
+    expect(messagesCallCount).toBe(1)
+  })
+
   test("should cancel countdown on tool execution", async () => {
     // given - session starting countdown
     const sessionID = "main-tool"
