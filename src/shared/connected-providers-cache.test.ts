@@ -6,11 +6,17 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-const { createConnectedProvidersCacheStore, findProviderModelMetadata } = await import(
-  new URL("./connected-providers-cache.ts?real-connected-providers-cache-test", import.meta.url).href
-)
+type ConnectedProvidersCacheModule = typeof import("./connected-providers-cache")
 
-function createTestCacheContext() {
+async function importFreshConnectedProvidersCacheModule(): Promise<ConnectedProvidersCacheModule> {
+  return await import(
+    new URL(`./connected-providers-cache.ts?real-connected-providers-cache-test=${Date.now()}-${Math.random()}`, import.meta.url).href
+  )
+}
+
+function createTestCacheContext(
+  createConnectedProvidersCacheStore: ConnectedProvidersCacheModule["createConnectedProvidersCacheStore"],
+) {
 	const fakeUserCacheRoot = mkdtempSync(join(tmpdir(), "connected-providers-user-cache-"))
 	const testCacheDir = join(fakeUserCacheRoot, "oh-my-opencode")
 	const testCacheStore = createConnectedProvidersCacheStore(() => testCacheDir)
@@ -30,7 +36,8 @@ function cleanupTestCacheContext(fakeUserCacheRoot: string): void {
 
 describe("updateConnectedProvidersCache", () => {
 	test("extracts models from provider.list().all response", async () => {
-		const { testCacheStore, fakeUserCacheRoot } = createTestCacheContext()
+		const { createConnectedProvidersCacheStore } = await importFreshConnectedProvidersCacheModule()
+		const { testCacheStore, fakeUserCacheRoot } = createTestCacheContext(createConnectedProvidersCacheStore)
 
 		try {
 			//#given
@@ -87,7 +94,8 @@ describe("updateConnectedProvidersCache", () => {
 	})
 
 	test("writes empty models when provider has no models", async () => {
-		const { testCacheStore, fakeUserCacheRoot } = createTestCacheContext()
+		const { createConnectedProvidersCacheStore } = await importFreshConnectedProvidersCacheModule()
+		const { testCacheStore, fakeUserCacheRoot } = createTestCacheContext(createConnectedProvidersCacheStore)
 
 		try {
 			//#given
@@ -122,7 +130,8 @@ describe("updateConnectedProvidersCache", () => {
 	})
 
 	test("writes empty models when all field is missing", async () => {
-		const { testCacheStore, fakeUserCacheRoot } = createTestCacheContext()
+		const { createConnectedProvidersCacheStore } = await importFreshConnectedProvidersCacheModule()
+		const { testCacheStore, fakeUserCacheRoot } = createTestCacheContext(createConnectedProvidersCacheStore)
 
 		try {
 			//#given
@@ -149,7 +158,8 @@ describe("updateConnectedProvidersCache", () => {
 	})
 
 	test("does nothing when client.provider.list is not available", async () => {
-		const { testCacheStore, fakeUserCacheRoot } = createTestCacheContext()
+		const { createConnectedProvidersCacheStore } = await importFreshConnectedProvidersCacheModule()
+		const { testCacheStore, fakeUserCacheRoot } = createTestCacheContext(createConnectedProvidersCacheStore)
 
 		try {
 			//#given
@@ -167,7 +177,8 @@ describe("updateConnectedProvidersCache", () => {
 	})
 
 	test("does not remove unrelated files in the cache directory", async () => {
-		const { testCacheStore, fakeUserCacheRoot } = createTestCacheContext()
+		const { createConnectedProvidersCacheStore } = await importFreshConnectedProvidersCacheModule()
+		const { testCacheStore, fakeUserCacheRoot } = createTestCacheContext(createConnectedProvidersCacheStore)
 
 		//#given
 		const realCacheDir = join(fakeUserCacheRoot, "oh-my-opencode")
@@ -210,7 +221,11 @@ describe("updateConnectedProvidersCache", () => {
 	})
 
 	test("findProviderModelMetadata returns rich cached metadata", async () => {
-		const { testCacheStore, fakeUserCacheRoot } = createTestCacheContext()
+		const {
+			createConnectedProvidersCacheStore,
+			findProviderModelMetadata,
+		} = await importFreshConnectedProvidersCacheModule()
+		const { testCacheStore, fakeUserCacheRoot } = createTestCacheContext(createConnectedProvidersCacheStore)
 
 		try {
 			//#given
@@ -264,7 +279,11 @@ describe("updateConnectedProvidersCache", () => {
 	})
 
 	test("keeps normalized fallback ids when raw metadata id is not a string", async () => {
-		const { testCacheStore, fakeUserCacheRoot } = createTestCacheContext()
+		const {
+			createConnectedProvidersCacheStore,
+			findProviderModelMetadata,
+		} = await importFreshConnectedProvidersCacheModule()
+		const { testCacheStore, fakeUserCacheRoot } = createTestCacheContext(createConnectedProvidersCacheStore)
 
 		try {
 			const mockClient = {

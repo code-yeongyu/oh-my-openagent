@@ -5,24 +5,25 @@ import type { MessageData } from "./types"
 let sqliteBackend = false
 let storedParts: Array<{ type: string; id?: string; callID?: string; [key: string]: unknown }> = []
 
-mock.module("../../shared/opencode-storage-detection", () => ({
-  isSqliteBackend: () => sqliteBackend,
-}))
-
-mock.module("../../shared/normalize-sdk-response", () => ({
-  normalizeSDKResponse: <TData>(response: { data?: TData }, fallback: TData): TData => response.data ?? fallback,
-}))
-
-mock.module("./storage", () => ({
-  readParts: () => storedParts,
-}))
-
 afterAll(() => {
   mock.restore()
 })
 
-const { recoverToolResultMissing } = await import("./recover-tool-result-missing")
-mock.restore()
+async function importFreshRecoverToolResultMissingModule() {
+  mock.module("../../shared/opencode-storage-detection", () => ({
+    isSqliteBackend: () => sqliteBackend,
+  }))
+
+  mock.module("./storage", () => ({
+    readParts: () => storedParts,
+  }))
+
+  const module = await import(`./recover-tool-result-missing?test=${Date.now()}-${Math.random()}`)
+  mock.restore()
+  return module
+}
+
+const { recoverToolResultMissing } = await importFreshRecoverToolResultMissingModule()
 
 function createMockClient(messages: MessageData[] = []) {
   const promptAsync = mock(() => Promise.resolve({}))
