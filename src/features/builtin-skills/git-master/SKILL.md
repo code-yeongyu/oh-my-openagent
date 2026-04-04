@@ -527,7 +527,7 @@ IF style == SHORT:
 
 **VALIDATION before each commit:**
 1. Does message match detected style?
-2. Does language match detected language?
+2. Does message use the repository's dominant language/script profile (from Phase 1.1)?
 3. Is it similar to examples from git log?
 
 If ANY check fails -> REWRITE message.
