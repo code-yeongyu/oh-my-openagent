@@ -17,8 +17,10 @@ jobs:
     if: github.event_name == 'pull_request'
     steps:
       - name: Check PR target branch
+        env:
+          BASE_REF: ${{ github.base_ref }}
         run: |
-          if [ "${{ github.base_ref }}" = "master" ]; then
+          if [ "$BASE_REF" = "master" ]; then
             echo "::error::PRs to master branch are not allowed. Please target the 'dev' branch instead."
             echo ""
             echo "PULL REQUESTS TO MASTER ARE BLOCKED"
@@ -27,7 +29,7 @@ jobs:
             echo "Please close this PR and create a new one targeting 'dev'."
             exit 1
           else
-            echo "PR targets '${{ github.base_ref }}' branch - OK"
+            echo "PR targets '${BASE_REF}' branch - OK"
           fi
 
   test:
@@ -132,6 +134,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create or update draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NOTES: ${{ steps.notes.outputs.notes }}
+          TARGET_SHA: ${{ github.sha }}
         run: |
           EXISTING_DRAFT=$(gh release list --json tagName,isDraft --jq '.[] | select(.isDraft == true and .tagName == "next") | .tagName')
           
@@ -140,8 +146,8 @@ jobs:
             gh release edit next \
               --title "Upcoming Changes 🍿" \
               --notes-file - \
-              --draft <<'EOF'
-          ${{ steps.notes.outputs.notes }}
+              --draft <<EOF
+          $NOTES
           EOF
           else
             echo "Creating new draft release..."
@@ -149,9 +155,7 @@ jobs:
               --title "Upcoming Changes 🍿" \
               --notes-file - \
               --draft \
-              --target ${{ github.sha }} <<'EOF'
-          ${{ steps.notes.outputs.notes }}
+              --target "$TARGET_SHA" <<EOF
+          $NOTES
           EOF
           fi
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
