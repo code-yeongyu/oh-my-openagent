@@ -24,6 +24,7 @@ function redactUrl(urlStr: string): string {
 
 export async function createHttpClient(params: SkillMcpClientConnectionParams): Promise<Client> {
   const { state, clientKey, info, config } = params
+  const shutdownGenAtStart = state.shutdownGeneration
 
   if (!config.url) {
     throw new Error(`MCP server "${info.serverName}" is configured for HTTP but missing 'url' field.`)
@@ -70,6 +71,12 @@ export async function createHttpClient(params: SkillMcpClientConnectionParams): 
       `  - Check if authentication headers are required\n` +
       `  - Ensure the server supports MCP over HTTP`
     )
+  }
+
+  if (state.shutdownGeneration !== shutdownGenAtStart) {
+    try { await client.close() } catch {}
+    try { await transport.close() } catch {}
+    throw new Error(`MCP server "${info.serverName}" connection completed after shutdown`)
   }
 
   const managedClient = {

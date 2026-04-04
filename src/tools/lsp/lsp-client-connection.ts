@@ -55,7 +55,7 @@ export class LSPClientConnection extends LSPClientTransport {
           },
         },
       },
-      ...this.server.initialization,
+      initializationOptions: this.server.initialization,
     })
     this.sendNotification("initialized")
     this.sendNotification("workspace/didChangeConfiguration", {

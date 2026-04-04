@@ -1,6 +1,6 @@
 # src/config/ — Zod v4 Schema System
 
-**Generated:** 2026-03-02
+**Generated:** 2026-03-06
 
 ## OVERVIEW
 
@@ -14,7 +14,7 @@ config/schema/
 ├── agent-names.ts              # BuiltinAgentNameSchema (11), OverridableAgentNameSchema (14)
 ├── agent-overrides.ts          # AgentOverrideConfigSchema (21 fields per agent)
 ├── categories.ts               # 8 built-in + custom categories
-├── hooks.ts                    # HookNameSchema (46 hooks)
+├── hooks.ts                    # HookNameSchema (48 hooks)
 ├── skills.ts                   # SkillsConfigSchema (sources, paths, recursive)
 ├── commands.ts                 # BuiltinCommandNameSchema
 ├── experimental.ts             # Feature flags (plugin_load_timeout_ms min 1000)

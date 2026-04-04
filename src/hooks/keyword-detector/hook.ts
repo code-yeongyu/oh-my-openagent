@@ -1,6 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { detectKeywordsWithType, extractPromptText } from "./detector"
-import { isPlannerAgent } from "./constants"
+import { isPlannerAgent, isNonOmoAgent } from "./constants"
 import { log } from "../../shared"
 import {
   isSystemDirective,
@@ -14,6 +14,14 @@ import {
 import type { ContextCollector } from "../../features/context-injector"
 
 export function createKeywordDetectorHook(ctx: PluginInput, _collector?: ContextCollector) {
+  function getRuntimeVariant(input: { variant?: string }, message: Record<string, unknown>): string | undefined {
+    if (typeof message["variant"] === "string") {
+      return message["variant"]
+    }
+
+    return typeof input.variant === "string" ? input.variant : undefined
+  }
+
   return {
     "chat.message": async (
       input: {
@@ -21,6 +29,7 @@ export function createKeywordDetectorHook(ctx: PluginInput, _collector?: Context
         agent?: string
         model?: { providerID: string; modelID: string }
         messageID?: string
+        variant?: string
       },
       output: {
         message: Record<string, unknown>
@@ -36,23 +45,32 @@ export function createKeywordDetectorHook(ctx: PluginInput, _collector?: Context
 
       const currentAgent = getSessionAgent(input.sessionID) ?? input.agent
 
+      // Skip all keyword injection for non-OMO agents (e.g., OpenCode-Builder, Plan)
+      if (isNonOmoAgent(currentAgent)) {
+        log(`[keyword-detector] Skipping keyword injection for non-OMO agent`, { sessionID: input.sessionID, agent: currentAgent })
+        return
+      }
+
       // Remove system-reminder content to prevent automated system messages from triggering mode keywords
       const cleanText = removeSystemReminders(promptText)
       const modelID = input.model?.modelID
       let detectedKeywords = detectKeywordsWithType(cleanText, currentAgent, modelID)
 
       if (isPlannerAgent(currentAgent)) {
+        const preFilterCount = detectedKeywords.length
         detectedKeywords = detectedKeywords.filter((k) => k.type !== "ultrawork")
+        if (preFilterCount > detectedKeywords.length) {
+          log(`[keyword-detector] Filtered ultrawork keywords for planner agent`, { sessionID: input.sessionID, agent: currentAgent })
+        }
       }
 
       if (detectedKeywords.length === 0) {
         return
       }
 
-      // Skip keyword detection for background task sessions to prevent mode injection
-      // (e.g., [analyze-mode]) which incorrectly triggers Prometheus restrictions
       const isBackgroundTaskSession = subagentSessions.has(input.sessionID)
       if (isBackgroundTaskSession) {
+        log(`[keyword-detector] Skipping keyword injection for background task session`, { sessionID: input.sessionID })
         return
       }
 
@@ -72,15 +90,21 @@ export function createKeywordDetectorHook(ctx: PluginInput, _collector?: Context
 
       const hasUltrawork = detectedKeywords.some((k) => k.type === "ultrawork")
       if (hasUltrawork) {
-        log(`[keyword-detector] Ultrawork mode activated`, { sessionID: input.sessionID })
+        const runtimeVariant = getRuntimeVariant(input, output.message)
+        const isRuntimeMax = runtimeVariant === "max"
 
-        output.message.variant = "max"
+        log(`[keyword-detector] Ultrawork mode activated`, {
+          sessionID: input.sessionID,
+          runtimeVariant,
+        })
 
         ctx.client.tui
           .showToast({
             body: {
               title: "Ultrawork Mode Activated",
-              message: "Maximum precision engaged. All agents at your disposal.",
+              message: isRuntimeMax
+                ? "Maximum precision engaged. All agents at your disposal."
+                : "Runtime variant preserved. All agents at your disposal.",
               variant: "success" as const,
               duration: 3000,
             },

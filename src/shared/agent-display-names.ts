@@ -11,10 +11,21 @@ export const AGENT_DISPLAY_NAMES: Record<string, string> = {
   "sisyphus-junior": "Sisyphus-Junior",
   metis: "Metis (Plan Consultant)",
   momus: "Momus (Plan Critic)",
+  athena: "Athena (Council)",
+  "athena-junior": "Athena-Junior (Council)",
   oracle: "oracle",
   librarian: "librarian",
   explore: "explore",
   "multimodal-looker": "multimodal-looker",
+  "council-member": "council-member",
+}
+
+const AGENT_LIST_SORT_PREFIXES: Record<string, string> = {
+  atlas: "\u200B",
+}
+
+function stripAgentListSortPrefix(agentName: string): string {
+  return agentName.replace(/^\u200B+/, "")
 }
 
 /**
@@ -37,6 +48,13 @@ export function getAgentDisplayName(configKey: string): string {
   return configKey
 }
 
+export function getAgentListDisplayName(configKey: string): string {
+  const displayName = getAgentDisplayName(configKey)
+  const prefix = AGENT_LIST_SORT_PREFIXES[configKey.toLowerCase()]
+
+  return prefix ? `${prefix}${displayName}` : displayName
+}
+
 const REVERSE_DISPLAY_NAMES: Record<string, string> = Object.fromEntries(
   Object.entries(AGENT_DISPLAY_NAMES).map(([key, displayName]) => [displayName.toLowerCase(), key]),
 )
@@ -46,9 +64,37 @@ const REVERSE_DISPLAY_NAMES: Record<string, string> = Object.fromEntries(
  * "Atlas (Plan Executor)" → "atlas", "atlas" → "atlas", "unknown" → "unknown"
  */
 export function getAgentConfigKey(agentName: string): string {
-  const lower = agentName.toLowerCase()
+  const lower = stripAgentListSortPrefix(agentName).toLowerCase()
   const reversed = REVERSE_DISPLAY_NAMES[lower]
   if (reversed !== undefined) return reversed
   if (AGENT_DISPLAY_NAMES[lower] !== undefined) return lower
   return lower
+}
+
+/**
+ * Normalize an agent name for prompt APIs.
+ * - Known display names -> canonical display names
+ * - Known config keys (any case) -> canonical display names
+ * - Unknown/custom names -> preserved as-is (trimmed)
+ */
+export function normalizeAgentForPrompt(agentName: string | undefined): string | undefined {
+  if (typeof agentName !== "string") {
+    return undefined
+  }
+
+  const trimmed = stripAgentListSortPrefix(agentName.trim())
+  if (!trimmed) {
+    return undefined
+  }
+
+  const lower = trimmed.toLowerCase()
+  const reversed = REVERSE_DISPLAY_NAMES[lower]
+  if (reversed !== undefined) {
+    return AGENT_DISPLAY_NAMES[reversed] ?? trimmed
+  }
+  if (AGENT_DISPLAY_NAMES[lower] !== undefined) {
+    return AGENT_DISPLAY_NAMES[lower]
+  }
+
+  return trimmed
 }

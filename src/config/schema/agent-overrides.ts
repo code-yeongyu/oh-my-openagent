@@ -35,7 +35,7 @@ export const AgentOverrideConfigSchema = z.object({
     })
     .optional(),
   /** Reasoning effort level (OpenAI). Overrides category and default settings. */
-  reasoningEffort: z.enum(["low", "medium", "high", "xhigh"]).optional(),
+  reasoningEffort: z.enum(["none", "minimal", "low", "medium", "high", "xhigh"]).optional(),
   /** Text verbosity level. */
   textVerbosity: z.enum(["low", "medium", "high"]).optional(),
   /** Provider-specific options. Passed directly to OpenCode SDK. */

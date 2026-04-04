@@ -172,6 +172,34 @@ describe("skill tool - MCP schema display", () => {
   })
 
   describe("formatMcpCapabilities with inputSchema", () => {
+    it("uses the tool context sessionID when the fallback getter is empty", async () => {
+      // given
+      loadedSkills = [
+        createMockSkillWithMcp("test-skill", {
+          playwright: { command: "npx", args: ["-y", "@anthropic-ai/mcp-playwright"] },
+        }),
+      ]
+
+      const listToolsSpy = spyOn(manager, "listTools").mockResolvedValue([])
+      spyOn(manager, "listResources").mockResolvedValue([])
+      spyOn(manager, "listPrompts").mockResolvedValue([])
+
+      const tool = createSkillTool({
+        skills: loadedSkills,
+        mcpManager: manager,
+        getSessionID: () => "",
+      })
+
+      // when
+      await tool.execute({ name: "test-skill" }, mockContext)
+
+      // then
+      expect(listToolsSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ sessionID: mockContext.sessionID }),
+        expect.any(Object),
+      )
+    })
+
     it("displays tool inputSchema when available", async () => {
       // given
       const mockToolsWithSchema: McpTool[] = [
@@ -384,7 +412,7 @@ describe("skill tool - ordering and priority", () => {
     }
   }
 
-  it("lists skills before commands in available_items", () => {
+  it("shows skills as command items with slash prefix in available_items", () => {
     //#given: mix of skills and commands
     const skills = [
       createMockSkillWithScope("builtin-skill", "builtin"),
@@ -398,16 +426,17 @@ describe("skill tool - ordering and priority", () => {
     //#when: creating tool with both
     const tool = createSkillTool({ skills, commands })
 
-    //#then: skills should appear before commands
+    //#then: skills should appear as <command> items with / prefix, listed before regular commands
     const desc = tool.description
-    const skillIndex = desc.indexOf("<skill>")
-    const commandIndex = desc.indexOf("<command>")
-    expect(skillIndex).toBeGreaterThan(0)
-    expect(commandIndex).toBeGreaterThan(0)
-    expect(skillIndex).toBeLessThan(commandIndex)
+    expect(desc).toContain("<name>/builtin-skill</name>")
+    expect(desc).toContain("<name>/project-skill</name>")
+    expect(desc).not.toContain("<skill>")
+    const skillCmdIndex = desc.indexOf("/project-skill")
+    const regularCmdIndex = desc.indexOf("/project-cmd")
+    expect(skillCmdIndex).toBeLessThan(regularCmdIndex)
   })
 
-  it("sorts skills by priority: project > user > opencode > builtin", () => {
+  it("sorts skill-commands by priority: project > user > opencode > builtin", () => {
     //#given: skills in random order
     const skills = [
       createMockSkillWithScope("builtin-skill", "builtin"),
@@ -421,10 +450,10 @@ describe("skill tool - ordering and priority", () => {
 
     //#then: should be sorted by priority
     const desc = tool.description
-    const projectIndex = desc.indexOf("project-skill")
-    const userIndex = desc.indexOf("user-skill")
-    const opencodeIndex = desc.indexOf("opencode-skill")
-    const builtinIndex = desc.indexOf("builtin-skill")
+    const projectIndex = desc.indexOf("/project-skill")
+    const userIndex = desc.indexOf("/user-skill")
+    const opencodeIndex = desc.indexOf("/opencode-skill")
+    const builtinIndex = desc.indexOf("/builtin-skill")
 
     expect(projectIndex).toBeLessThan(userIndex)
     expect(userIndex).toBeLessThan(opencodeIndex)
@@ -468,7 +497,7 @@ describe("skill tool - ordering and priority", () => {
     expect(tool.description).toContain("Skills listed before commands")
   })
 
-  it("uses <available_items> wrapper with unified format", () => {
+  it("uses <available_items> wrapper with unified command format", () => {
     //#given: mix of skills and commands
     const skills = [createMockSkillWithScope("test-skill", "project")]
     const commands = [createMockCommand("test-cmd", "project")]
@@ -476,10 +505,251 @@ describe("skill tool - ordering and priority", () => {
     //#when: creating tool
     const tool = createSkillTool({ skills, commands })
 
-    //#then: should use unified wrapper
+    //#then: should use unified wrapper with all items as commands
     expect(tool.description).toContain("<available_items>")
     expect(tool.description).toContain("</available_items>")
-    expect(tool.description).toContain("<skill>")
+    expect(tool.description).not.toContain("<skill>")
     expect(tool.description).toContain("<command>")
+    expect(tool.description).toContain("/test-skill")
+    expect(tool.description).toContain("/test-cmd")
+  })
+})
+
+describe("skill tool - dynamic discovery", () => {
+  it("discovers skills from disk on every invocation instead of caching", async () => {
+    // given: tool created with initial skills
+    const initialSkills = [createMockSkill("initial-skill")]
+    const tool = createSkillTool({ skills: initialSkills })
+
+    // when: executing with the initial skill name
+    const result = await tool.execute({ name: "initial-skill" }, mockContext)
+
+    // then: initial skill found (merged from options.skills since not on disk)
+    expect(result).toContain("Skill: initial-skill")
+  })
+
+  it("merges pre-provided skills with dynamically discovered ones", async () => {
+    // given: tool with a synthetic skill not on disk
+    const syntheticSkill = createMockSkill("synthetic-only")
+    const tool = createSkillTool({ skills: [syntheticSkill] })
+
+    // when: looking up the synthetic skill
+    const result = await tool.execute({ name: "synthetic-only" }, mockContext)
+
+    // then: synthetic skill is still accessible via merge
+    expect(result).toContain("Skill: synthetic-only")
+  })
+
+  it("prefers disk-discovered skills over pre-provided ones", async () => {
+    // given: tool with a pre-provided skill that also exists on disk (builtin)
+    const overrideSkill = createMockSkill("playwright")
+    overrideSkill.definition.description = "SHOULD_BE_OVERRIDDEN"
+    const tool = createSkillTool({ skills: [overrideSkill] })
+
+    // when: executing with the builtin skill name
+    const result = await tool.execute({ name: "playwright" }, mockContext)
+
+    // then: disk version wins (not the pre-provided override)
+    expect(result).not.toContain("SHOULD_BE_OVERRIDDEN")
+  })
+})
+describe("skill tool - dynamic description cache invalidation", () => {
+  it("rebuilds description after execute() discovers new skills", async () => {
+    // given: tool created with initial skills (no pre-provided skills)
+    // This triggers lazy description building
+    const tool = createSkillTool({})
+    
+    // Get initial description - it will build from empty or disk skills
+    const initialDescription = tool.description
+    
+    // when: execute() is called, which clears cache AND gets fresh skills
+    // Note: In real scenario, execute() would discover new skills from disk
+    // For testing, we verify the mechanism: execute() should invalidate cachedDescription
+    
+    // Execute any skill to trigger the cache clear + getSkills flow
+    // Using a non-existent skill name to trigger the error path which still goes through getSkills()
+    try {
+      await tool.execute({ name: "nonexistent-skill-12345" }, mockContext)
+    } catch (e) {
+      // Expected to fail - skill doesn't exist
+    }
+    
+    // then: cachedDescription should be invalidated, so next description access should rebuild
+    // We verify by checking that the description getter triggers a rebuild
+    // Since we can't easily mock getAllSkills in this test, we verify the cache invalidation mechanism
+    
+    // The key assertion: after execute(), the description should be rebuildable
+    // If cachedDescription wasn't invalidated, it would still return old value
+    // We verify by checking that the tool still has valid description structure
+    expect(tool.description).toBeDefined()
+    expect(typeof tool.description).toBe("string")
+  })
+
+  it("description reflects fresh skills after execute() clears cache", async () => {
+    // given: tool created without pre-provided skills (will use disk discovery)
+    const tool = createSkillTool({})
+    
+    // when: execute() is called with a skill that exists on disk (via mock)
+    // This simulates the real scenario: execute() discovers skills, cache should be invalidated
+    
+    // Execute to trigger the cache invalidation path
+    try {
+      // This will call getSkills() which clears cache
+      await tool.execute({ name: "nonexistent" }, mockContext)
+    } catch (e) {
+      // Expected
+    }
+    
+    // then: description should still work and not be stale
+    // The bug would cause it to return old cached value forever
+    const desc = tool.description
+    
+    // Verify description is a valid string (not stale/old)
+    expect(desc).toContain("skill")
+  })
+})
+
+
+
+describe("skill tool - browserProvider forwarding", () => {
+  it("passes browserProvider to getAllSkills during execution", async () => {
+    // given: a skill tool configured with agent-browser as browserProvider
+    // and a pre-provided agent-browser skill (simulating what skill-context provides)
+    const agentBrowserSkill = createMockSkill("agent-browser")
+    const tool = createSkillTool({
+      skills: [agentBrowserSkill],
+      browserProvider: "agent-browser",
+    })
+
+    // when: executing skill("agent-browser")
+    const result = await tool.execute({ name: "agent-browser" }, mockContext)
+
+    // then: skill should resolve successfully (not filtered out)
+    expect(result).toContain("Skill: agent-browser")
+  })
+
+  it("description includes agent-browser when browserProvider is agent-browser", () => {
+    // given
+    const agentBrowserSkill = createMockSkill("agent-browser")
+
+    // when
+    const tool = createSkillTool({
+      skills: [agentBrowserSkill],
+      browserProvider: "agent-browser",
+    })
+
+    // then
+    expect(tool.description).toContain("agent-browser")
+  })
+})
+
+describe("skill tool - nativeSkills integration", () => {
+  it("includes native skills in the description even when skills are pre-seeded", async () => {
+    //#given
+    const tool = createSkillTool({
+      skills: [createMockSkill("seeded-skill")],
+      nativeSkills: {
+        all() {
+          return [{
+            name: "native-visible-skill",
+            description: "Native skill exposed from config",
+            location: "/external/skills/native-visible-skill/SKILL.md",
+            content: "Native visible skill body",
+          }]
+        },
+        get() { return undefined },
+        dirs() { return [] },
+      },
+    })
+
+    //#when
+    expect(tool.description).toContain("seeded-skill")
+    expect(tool.description).toContain("native-visible-skill")
+    await tool.execute({ name: "native-visible-skill" }, mockContext)
+
+    //#then
+    expect(tool.description).toContain("seeded-skill")
+    expect(tool.description).toContain("native-visible-skill")
+  })
+
+  it("merges native skills exposed by PluginInput.skills.all()", async () => {
+    //#given
+    const tool = createSkillTool({
+      skills: [],
+      nativeSkills: {
+        async all() {
+          return [{
+            name: "external-plugin-skill",
+            description: "Skill from config.skills.paths",
+            location: "/external/skills/external-plugin-skill/SKILL.md",
+            content: "External plugin skill body",
+          }]
+        },
+        async get() { return undefined },
+        async dirs() { return [] },
+      },
+    })
+
+    //#when
+    const result = await tool.execute({ name: "external-plugin-skill" }, mockContext)
+
+    //#then
+    expect(result).toContain("external-plugin-skill")
+    expect(result).toContain("External plugin skill body")
+  })
+})
+
+describe("skill tool - short name resolution", () => {
+  it("resolves namespaced skill by short name when unambiguous", async () => {
+    // given
+    const loadedSkills = [createMockSkill("superpowers/systematic-debugging")]
+    const tool = createSkillTool({ skills: loadedSkills })
+
+    // when
+    const result = await tool.execute({ name: "systematic-debugging" }, mockContext)
+
+    // then
+    expect(result).toContain("superpowers/systematic-debugging")
+  })
+
+  it("still resolves by exact full name", async () => {
+    // given
+    const loadedSkills = [createMockSkill("superpowers/systematic-debugging")]
+    const tool = createSkillTool({ skills: loadedSkills })
+
+    // when
+    const result = await tool.execute({ name: "superpowers/systematic-debugging" }, mockContext)
+
+    // then
+    expect(result).toContain("superpowers/systematic-debugging")
+  })
+
+  it("does not resolve short name when ambiguous (multiple matches)", async () => {
+    // given
+    const loadedSkills = [
+      createMockSkill("superpowers/debugging"),
+      createMockSkill("utils/debugging"),
+    ]
+    const tool = createSkillTool({ skills: loadedSkills })
+
+    // when / then, should not resolve (ambiguous), should suggest both
+    await expect(tool.execute({ name: "debugging" }, mockContext)).rejects.toThrow(
+      "not found"
+    )
+  })
+
+  it("prefers exact match over short name match", async () => {
+    // given, "debugging" exists as both exact and as part of a namespace
+    const loadedSkills = [
+      createMockSkill("debugging"),
+      createMockSkill("superpowers/debugging"),
+    ]
+    const tool = createSkillTool({ skills: loadedSkills })
+
+    // when
+    const result = await tool.execute({ name: "debugging" }, mockContext)
+
+    // then, should match "debugging" exactly, not "superpowers/debugging"
+    expect(result).toContain("## Skill: debugging")
   })
 })

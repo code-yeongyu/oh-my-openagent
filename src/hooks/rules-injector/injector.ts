@@ -2,6 +2,7 @@ import { readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { relative, resolve } from "node:path";
 import { findProjectRoot, findRuleFiles } from "./finder";
+import type { FindRuleFilesOptions } from "./rule-file-finder";
 import {
   createContentHash,
   isDuplicateByContentHash,
@@ -82,6 +83,7 @@ export function createRuleInjectionProcessor(deps: {
   workspaceDirectory: string;
   truncator: DynamicTruncator;
   getSessionCache: (sessionID: string) => SessionInjectedRulesCache;
+  ruleFinderOptions?: FindRuleFilesOptions;
 }): {
   processFilePathForInjection: (
     filePath: string,
@@ -89,7 +91,7 @@ export function createRuleInjectionProcessor(deps: {
     output: ToolExecuteOutput
   ) => Promise<void>;
 } {
-  const { workspaceDirectory, truncator, getSessionCache } = deps;
+  const { workspaceDirectory, truncator, getSessionCache, ruleFinderOptions } = deps;
 
   async function processFilePathForInjection(
     filePath: string,
@@ -103,7 +105,7 @@ export function createRuleInjectionProcessor(deps: {
     const cache = getSessionCache(sessionID);
     const home = homedir();
 
-    const ruleFileCandidates = findRuleFiles(projectRoot, home, resolved);
+    const ruleFileCandidates = findRuleFiles(projectRoot, home, resolved, ruleFinderOptions);
     const toInject: RuleToInject[] = [];
     let dirty = false;
 

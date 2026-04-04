@@ -1,6 +1,6 @@
 import { checkAstGrepCli, checkAstGrepNapi, checkCommentChecker } from "./dependencies"
 import { getGhCliInfo } from "./tools-gh"
-import { getLspServerStats, getLspServersInfo } from "./tools-lsp"
+import { getInstalledLspServers } from "./tools-lsp"
 import { getBuiltinMcpInfo, getUserMcpInfo } from "./tools-mcp"
 import { CHECK_IDS, CHECK_NAMES } from "../constants"
 import type { CheckResult, DoctorIssue, ToolsSummary } from "../types"
@@ -13,14 +13,12 @@ export async function gatherToolsSummary(): Promise<ToolsSummary> {
     getGhCliInfo(),
   ])
 
-  const lspServers = getLspServersInfo()
-  const lspStats = getLspServerStats(lspServers)
+  const lspServers = getInstalledLspServers()
   const builtinMcp = getBuiltinMcpInfo()
   const userMcp = getUserMcpInfo()
 
   return {
-    lspInstalled: lspStats.installed,
-    lspTotal: lspStats.total,
+    lspServers,
     astGrepCli: astGrepCliInfo.installed,
     astGrepNapi: astGrepNapiInfo.installed,
     commentChecker: commentCheckerInfo.installed,
@@ -57,7 +55,7 @@ function buildToolIssues(summary: ToolsSummary): DoctorIssue[] {
     })
   }
 
-  if (summary.lspInstalled === 0) {
+  if (summary.lspServers.length === 0) {
     issues.push({
       title: "No LSP servers detected",
       description: "LSP-dependent tools will be limited until at least one server is installed.",
@@ -109,7 +107,7 @@ export async function checkTools(): Promise<CheckResult> {
     details: [
       `AST-Grep: cli=${summary.astGrepCli ? "yes" : "no"}, napi=${summary.astGrepNapi ? "yes" : "no"}`,
       `Comment checker: ${summary.commentChecker ? "yes" : "no"}`,
-      `LSP: ${summary.lspInstalled}/${summary.lspTotal}`,
+      `LSP: ${summary.lspServers.length > 0 ? `${summary.lspServers.length} server(s)` : "none"}`,
       `GH CLI: ${summary.ghCli.installed ? "installed" : "missing"}${summary.ghCli.authenticated ? " (authenticated)" : ""}`,
       `MCP: builtin=${summary.mcpBuiltin.length}, user=${summary.mcpUser.length}`,
     ],

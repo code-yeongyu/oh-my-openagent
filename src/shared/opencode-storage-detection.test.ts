@@ -108,21 +108,21 @@ describe("isSqliteBackend", () => {
     //#given
     versionReturnValue = true
 
-    //#when: first call — DB does not exist
+    //#when: first call, DB does not exist
     const first = isSqliteBackend()
 
     //#then
     expect(first).toBe(false)
     expect(versionCheckCalls.length).toBe(1)
 
-    //#when: second call — DB still does not exist (retry)
+    //#when: second call, DB still does not exist (retry)
     const second = isSqliteBackend()
 
     //#then: retried once
     expect(second).toBe(false)
     expect(versionCheckCalls.length).toBe(2)
 
-    //#when: third call — no more retries
+    //#when: third call, no more retries
     const third = isSqliteBackend()
 
     //#then: no further checks
@@ -134,7 +134,7 @@ describe("isSqliteBackend", () => {
     //#given
     versionReturnValue = true
 
-    //#when: first call — DB does not exist
+    //#when: first call, DB does not exist
     const first = isSqliteBackend()
 
     //#then
@@ -144,14 +144,14 @@ describe("isSqliteBackend", () => {
     mkdirSync(join(TEST_DATA_DIR, "opencode"), { recursive: true })
     writeFileSync(DB_PATH, "")
 
-    //#when: second call — retry finds DB
+    //#when: second call, retry finds DB
     const second = isSqliteBackend()
 
     //#then: recovers to true and caches permanently
     expect(second).toBe(true)
     expect(versionCheckCalls.length).toBe(2)
 
-    //#when: third call — cached true
+    //#when: third call, cached true
     const third = isSqliteBackend()
 
     //#then: no further checks

@@ -1,6 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { BackgroundManager } from "../../features/background-agent"
-import type { CategoriesConfig, GitMasterConfig, BrowserAutomationProvider, AgentOverrides } from "../../config/schema"
+import type { CategoriesConfig, GitMasterConfig, BrowserAutomationProvider, AgentOverrides, SisyphusAgentConfig } from "../../config/schema"
 import type {
   AvailableCategory,
   AvailableSkill,
@@ -67,9 +67,13 @@ export interface DelegateTaskToolOptions {
   availableCategories?: AvailableCategory[]
   availableSkills?: AvailableSkill[]
   agentOverrides?: AgentOverrides
+  sisyphusAgentConfig?: SisyphusAgentConfig
   onSyncSessionCreated?: (event: SyncSessionCreatedEvent) => Promise<void>
   syncPollTimeoutMs?: number
 }
+
+import type { DelegatedModelConfig } from "../../shared/model-resolution-types"
+export type { DelegatedModelConfig }
 
 export interface BuildSystemContentInput {
   skillContent?: string
@@ -78,7 +82,7 @@ export interface BuildSystemContentInput {
   agentsContext?: string
   planAgentPrepend?: string
   maxPromptTokens?: number
-  model?: { providerID: string; modelID: string; variant?: string }
+  model?: DelegatedModelConfig
   agentName?: string
   availableCategories?: AvailableCategory[]
   availableSkills?: AvailableSkill[]

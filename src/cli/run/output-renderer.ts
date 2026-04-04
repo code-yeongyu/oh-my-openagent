@@ -45,26 +45,26 @@ export function writePaddedText(
     return { output: text, atLineStart: text.endsWith("\n") }
   }
 
-  let output = ""
+  const parts: string[] = []
   let lineStart = atLineStart
 
   for (let i = 0; i < text.length; i++) {
     const ch = text[i]
     if (lineStart) {
-      output += "  "
+      parts.push("  ")
       lineStart = false
     }
 
     if (ch === "\n") {
-      output += "  \n"
+      parts.push("  \n")
       lineStart = true
       continue
     }
 
-    output += ch
+    parts.push(ch)
   }
 
-  return { output, atLineStart: lineStart }
+  return { output: parts.join(""), atLineStart: lineStart }
 }
 
 function colorizeWithProfileColor(text: string, hexColor?: string): string {

@@ -11,6 +11,7 @@ import { formatDuration } from "./time-formatter"
 import { syncContinuationDeps, type SyncContinuationDeps } from "./sync-continuation-deps"
 import { setSessionTools } from "../../shared/session-tools-store"
 import { normalizeSDKResponse } from "../../shared"
+import { buildTaskPrompt } from "./prompt-builder"
 
 export async function executeSyncContinuation(
   args: DelegateTaskArgs,
@@ -18,7 +19,7 @@ export async function executeSyncContinuation(
   executorCtx: ExecutorContext,
   deps: SyncContinuationDeps = syncContinuationDeps
 ): Promise<string> {
-  const { client, syncPollTimeoutMs } = executorCtx
+  const { client, syncPollTimeoutMs, sisyphusAgentConfig } = executorCtx
   const toastManager = getTaskToastManager()
   const taskId = `resume_sync_${args.session_id!.slice(0, 8)}`
   const startTime = new Date()
@@ -82,11 +83,13 @@ export async function executeSyncContinuation(
     }
 
     const allowTask = isPlanFamily(resumeAgent)
+    const tddEnabled = sisyphusAgentConfig?.tdd
+    const effectivePrompt = buildTaskPrompt(args.prompt, resumeAgent, tddEnabled)
     const tools = {
-      ...(resumeAgent ? getAgentToolRestrictions(resumeAgent) : {}),
       task: allowTask,
       call_omo_agent: true,
       question: false,
+      ...(resumeAgent ? getAgentToolRestrictions(resumeAgent) : {}),
     }
     setSessionTools(args.session_id!, tools)
 
@@ -97,7 +100,7 @@ export async function executeSyncContinuation(
         ...(resumeModel !== undefined ? { model: resumeModel } : {}),
         ...(resumeVariant !== undefined ? { variant: resumeVariant } : {}),
         tools,
-        parts: [{ type: "text", text: args.prompt }],
+        parts: [{ type: "text", text: effectivePrompt }],
       },
     })
    } catch (promptError) {

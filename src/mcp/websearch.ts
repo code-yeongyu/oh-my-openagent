@@ -1,4 +1,5 @@
 import type { WebsearchConfig } from "../config/schema"
+import { log } from "../shared/logger"
 
 type RemoteMcpConfig = {
   type: "remote"
@@ -8,13 +9,14 @@ type RemoteMcpConfig = {
   oauth?: false
 }
 
-export function createWebsearchConfig(config?: WebsearchConfig): RemoteMcpConfig {
+export function createWebsearchConfig(config?: WebsearchConfig): RemoteMcpConfig | undefined {
   const provider = config?.provider || "exa"
 
   if (provider === "tavily") {
     const tavilyKey = process.env.TAVILY_API_KEY
     if (!tavilyKey) {
-      throw new Error("TAVILY_API_KEY environment variable is required for Tavily provider")
+      log("[websearch] Tavily API key not found, skipping websearch MCP")
+      return undefined
     }
 
     return {
@@ -28,7 +30,6 @@ export function createWebsearchConfig(config?: WebsearchConfig): RemoteMcpConfig
     }
   }
 
-  // Default to Exa
   return {
     type: "remote" as const,
     url: process.env.EXA_API_KEY
@@ -40,5 +41,4 @@ export function createWebsearchConfig(config?: WebsearchConfig): RemoteMcpConfig
   }
 }
 
-// Backward compatibility: export static instance using default config
 export const websearch = createWebsearchConfig()

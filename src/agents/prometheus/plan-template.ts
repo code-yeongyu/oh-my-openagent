@@ -81,7 +81,7 @@ Generate plan to: \`.sisyphus/plans/{name}.md\`
 
 ## Verification Strategy (MANDATORY)
 
-> **ZERO HUMAN INTERVENTION** — ALL verification is agent-executed. No exceptions.
+> **ZERO HUMAN INTERVENTION** - ALL verification is agent-executed. No exceptions.
 > Acceptance criteria requiring "user manually tests/confirms" are FORBIDDEN.
 
 ### Test Decision
@@ -94,10 +94,10 @@ Generate plan to: \`.sisyphus/plans/{name}.md\`
 Every task MUST include agent-executed QA scenarios (see TODO template below).
 Evidence saved to \`.sisyphus/evidence/task-{N}-{scenario-slug}.{ext}\`.
 
-- **Frontend/UI**: Use Playwright (playwright skill) — Navigate, interact, assert DOM, screenshot
-- **TUI/CLI**: Use interactive_bash (tmux) — Run command, send keystrokes, validate output
-- **API/Backend**: Use Bash (curl) — Send requests, assert status + response fields
-- **Library/Module**: Use Bash (bun/node REPL) — Import, call functions, compare output
+- **Frontend/UI**: Use Playwright (playwright skill) - Navigate, interact, assert DOM, screenshot
+- **TUI/CLI**: Use interactive_bash (tmux) - Run command, send keystrokes, validate output
+- **API/Backend**: Use Bash (curl) - Send requests, assert status + response fields
+- **Library/Module**: Use Bash (bun/node REPL) - Import, call functions, compare output
 
 ---
 
@@ -110,7 +110,7 @@ Evidence saved to \`.sisyphus/evidence/task-{N}-{scenario-slug}.{ext}\`.
 > Target: 5-8 tasks per wave. Fewer than 3 per wave (except final) = under-splitting.
 
 \`\`\`
-Wave 1 (Start Immediately — foundation + scaffolding):
+Wave 1 (Start Immediately - foundation + scaffolding):
 ├── Task 1: Project scaffolding + config [quick]
 ├── Task 2: Design system tokens [quick]
 ├── Task 3: Type definitions [quick]
@@ -119,7 +119,7 @@ Wave 1 (Start Immediately — foundation + scaffolding):
 ├── Task 6: Auth middleware [quick]
 └── Task 7: Client module [quick]
 
-Wave 2 (After Wave 1 — core modules, MAX PARALLEL):
+Wave 2 (After Wave 1 - core modules, MAX PARALLEL):
 ├── Task 8: Core business logic (depends: 3, 5, 7) [deep]
 ├── Task 9: API endpoints (depends: 4, 5) [unspecified-high]
 ├── Task 10: Secondary storage impl (depends: 5) [unspecified-high]
@@ -128,7 +128,7 @@ Wave 2 (After Wave 1 — core modules, MAX PARALLEL):
 ├── Task 13: API client + hooks (depends: 4) [quick]
 └── Task 14: Telemetry middleware (depends: 5, 10) [unspecified-high]
 
-Wave 3 (After Wave 2 — integration + UI):
+Wave 3 (After Wave 2 - integration + UI):
 ├── Task 15: Main route combining modules (depends: 6, 11, 14) [deep]
 ├── Task 16: UI data visualization (depends: 12, 13) [visual-engineering]
 ├── Task 17: Deployment config A (depends: 15) [quick]
@@ -136,41 +136,36 @@ Wave 3 (After Wave 2 — integration + UI):
 ├── Task 19: Deployment config C (depends: 15) [quick]
 └── Task 20: UI request log + build (depends: 16) [visual-engineering]
 
-Wave 4 (After Wave 3 — verification):
-├── Task 21: Integration tests (depends: 15) [deep]
-├── Task 22: UI QA - Playwright (depends: 20) [unspecified-high]
-├── Task 23: E2E QA (depends: 21) [deep]
-└── Task 24: Git cleanup + tagging (depends: 21) [git]
+Wave FINAL (After ALL tasks \u2014 4 parallel reviews, then user okay):
+\u251c\u2500\u2500 Task F1: Plan compliance audit (oracle)
+\u251c\u2500\u2500 Task F2: Code quality review (unspecified-high)
+\u251c\u2500\u2500 Task F3: Real manual QA (unspecified-high)
+\u2514\u2500\u2500 Task F4: Scope fidelity check (deep)
+-> Present results -> Get explicit user okay
 
-Wave FINAL (After ALL tasks — independent review, 4 parallel):
-├── Task F1: Plan compliance audit (oracle)
-├── Task F2: Code quality review (unspecified-high)
-├── Task F3: Real manual QA (unspecified-high)
-└── Task F4: Scope fidelity check (deep)
-
-Critical Path: Task 1 → Task 5 → Task 8 → Task 11 → Task 15 → Task 21 → F1-F4
+Critical Path: Task 1 \u2192 Task 5 \u2192 Task 8 \u2192 Task 11 \u2192 Task 15 \u2192 Task 21 \u2192 F1-F4 \u2192 user okay
 Parallel Speedup: ~70% faster than sequential
 Max Concurrent: 7 (Waves 1 & 2)
 \`\`\`
 
-### Dependency Matrix (abbreviated — show ALL tasks in your generated plan)
+### Dependency Matrix (abbreviated - show ALL tasks in your generated plan)
 
-- **1-7**: — — 8-14, 1
-- **8**: 3, 5, 7 — 11, 15, 2
-- **11**: 8 — 15, 2
-- **14**: 5, 10 — 15, 2
-- **15**: 6, 11, 14 — 17-19, 21, 3
-- **21**: 15 — 23, 24, 4
+- **1-7**: - - 8-14, 1
+- **8**: 3, 5, 7 - 11, 15, 2
+- **11**: 8 - 15, 2
+- **14**: 5, 10 - 15, 2
+- **15**: 6, 11, 14 - 17-19, 21, 3
+- **21**: 15 - 23, 24, 4
 
 > This is abbreviated for reference. YOUR generated plan must include the FULL matrix for ALL tasks.
 
 ### Agent Dispatch Summary
 
-- **1**: **7** — T1-T4 → \`quick\`, T5 → \`quick\`, T6 → \`quick\`, T7 → \`quick\`
-- **2**: **7** — T8 → \`deep\`, T9 → \`unspecified-high\`, T10 → \`unspecified-high\`, T11 → \`deep\`, T12 → \`visual-engineering\`, T13 → \`quick\`, T14 → \`unspecified-high\`
-- **3**: **6** — T15 → \`deep\`, T16 → \`visual-engineering\`, T17-T19 → \`quick\`, T20 → \`visual-engineering\`
-- **4**: **4** — T21 → \`deep\`, T22 → \`unspecified-high\`, T23 → \`deep\`, T24 → \`git\`
-- **FINAL**: **4** — F1 → \`oracle\`, F2 → \`unspecified-high\`, F3 → \`unspecified-high\`, F4 → \`deep\`
+- **1**: **7** - T1-T4 → \`quick\`, T5 → \`quick\`, T6 → \`quick\`, T7 → \`quick\`
+- **2**: **7** - T8 → \`deep\`, T9 → \`unspecified-high\`, T10 → \`unspecified-high\`, T11 → \`deep\`, T12 → \`visual-engineering\`, T13 → \`quick\`, T14 → \`unspecified-high\`
+- **3**: **6** - T15 → \`deep\`, T16 → \`visual-engineering\`, T17-T19 → \`quick\`, T20 → \`visual-engineering\`
+- **4**: **4** - T21 → \`deep\`, T22 → \`unspecified-high\`, T23 → \`deep\`, T24 → \`git\`
+- **FINAL**: **4** - F1 → \`oracle\`, F2 → \`unspecified-high\`, F3 → \`unspecified-high\`, F4 → \`deep\`
 
 ---
 
@@ -229,14 +224,14 @@ Max Concurrent: 7 (Waves 1 & 2)
 
   **Acceptance Criteria**:
 
-  > **AGENT-EXECUTABLE VERIFICATION ONLY** — No human action permitted.
+  > **AGENT-EXECUTABLE VERIFICATION ONLY** - No human action permitted.
   > Every criterion MUST be verifiable by running a command or using a tool.
 
   **If TDD (tests enabled):**
   - [ ] Test file created: src/auth/login.test.ts
   - [ ] bun test src/auth/login.test.ts → PASS (3 tests, 0 failures)
 
-  **QA Scenarios (MANDATORY — task is INCOMPLETE without these):**
+  **QA Scenarios (MANDATORY - task is INCOMPLETE without these):**
 
   > **This is NOT optional. A task without QA scenarios WILL BE REJECTED.**
   >
@@ -248,18 +243,18 @@ Max Concurrent: 7 (Waves 1 & 2)
   > **The orchestrator WILL verify evidence files exist before marking task complete.**
 
   \\\`\\\`\\\`
-  Scenario: [Happy path — what SHOULD work]
+  Scenario: [Happy path - what SHOULD work]
     Tool: [Playwright / interactive_bash / Bash (curl)]
     Preconditions: [Exact setup state]
     Steps:
-      1. [Exact action — specific command/selector/endpoint, no vagueness]
-      2. [Next action — with expected intermediate state]
-      3. [Assertion — exact expected value, not "verify it works"]
+      1. [Exact action - specific command/selector/endpoint, no vagueness]
+      2. [Next action - with expected intermediate state]
+      3. [Assertion - exact expected value, not "verify it works"]
     Expected Result: [Concrete, observable, binary pass/fail]
     Failure Indicators: [What specifically would mean this failed]
     Evidence: .sisyphus/evidence/task-{N}-{scenario-slug}.{ext}
 
-  Scenario: [Failure/edge case — what SHOULD fail gracefully]
+  Scenario: [Failure/edge case - what SHOULD fail gracefully]
     Tool: [same format]
     Preconditions: [Invalid input / missing dependency / error state]
     Steps:
@@ -269,7 +264,7 @@ Max Concurrent: 7 (Waves 1 & 2)
     Evidence: .sisyphus/evidence/task-{N}-{scenario-slug}-error.{ext}
   \\\`\\\`\\\`
 
-  > **Specificity requirements — every scenario MUST use:**
+  > **Specificity requirements - every scenario MUST use:**
   > - **Selectors**: Specific CSS selectors (\`.login-button\`, not "the login button")
   > - **Data**: Concrete test data (\`"test@example.com"\`, not \`"[email]"\`)
   > - **Assertions**: Exact values (\`text contains "Welcome back"\`, not "verify it works")
@@ -277,9 +272,9 @@ Max Concurrent: 7 (Waves 1 & 2)
   > - **Negative**: At least ONE failure/error scenario per task
   >
   > **Anti-patterns (your scenario is INVALID if it looks like this):**
-  > - ❌ "Verify it works correctly" — HOW? What does "correctly" mean?
-  > - ❌ "Check the API returns data" — WHAT data? What fields? What values?
-  > - ❌ "Test the component renders" — WHERE? What selector? What content?
+  > - ❌ "Verify it works correctly" - HOW? What does "correctly" mean?
+  > - ❌ "Check the API returns data" - WHAT data? What fields? What values?
+  > - ❌ "Test the component renders" - WHERE? What selector? What content?
   > - ❌ Any scenario without an evidence path
 
   **Evidence to Capture:**
@@ -293,31 +288,34 @@ Max Concurrent: 7 (Waves 1 & 2)
 
 ---
 
-## Final Verification Wave (MANDATORY — after ALL implementation tasks)
+## Final Verification Wave (MANDATORY \u2014 after ALL implementation tasks)
 
-> 4 review agents run in PARALLEL. ALL must APPROVE. Rejection → fix → re-run.
+> 4 review agents run in PARALLEL. ALL must APPROVE. Present consolidated results to user and get explicit "okay" before completing.
+>
+> **Do NOT auto-proceed after verification. Wait for user's explicit approval before marking work complete.**
+> **Never mark F1-F4 as checked before getting user's okay.** Rejection or user feedback -> fix -> re-run -> present again -> wait for okay.
 
-- [ ] F1. **Plan Compliance Audit** — \`oracle\`
-  Read the plan end-to-end. For each "Must Have": verify implementation exists (read file, curl endpoint, run command). For each "Must NOT Have": search codebase for forbidden patterns — reject with file:line if found. Check evidence files exist in .sisyphus/evidence/. Compare deliverables against plan.
+- [ ] F1. **Plan Compliance Audit** \u2014 \`oracle\`
+  Read the plan end-to-end. For each "Must Have": verify implementation exists (read file, curl endpoint, run command). For each "Must NOT Have": search codebase for forbidden patterns \u2014 reject with file:line if found. Check evidence files exist in .sisyphus/evidence/. Compare deliverables against plan.
   Output: \`Must Have [N/N] | Must NOT Have [N/N] | Tasks [N/N] | VERDICT: APPROVE/REJECT\`
 
-- [ ] F2. **Code Quality Review** — \`unspecified-high\`
+- [ ] F2. **Code Quality Review** \u2014 \`unspecified-high\`
   Run \`tsc --noEmit\` + linter + \`bun test\`. Review all changed files for: \`as any\`/\`@ts-ignore\`, empty catches, console.log in prod, commented-out code, unused imports. Check AI slop: excessive comments, over-abstraction, generic names (data/result/item/temp).
   Output: \`Build [PASS/FAIL] | Lint [PASS/FAIL] | Tests [N pass/N fail] | Files [N clean/N issues] | VERDICT\`
 
-- [ ] F3. **Real Manual QA** — \`unspecified-high\` (+ \`playwright\` skill if UI)
-  Start from clean state. Execute EVERY QA scenario from EVERY task — follow exact steps, capture evidence. Test cross-task integration (features working together, not isolation). Test edge cases: empty state, invalid input, rapid actions. Save to \`.sisyphus/evidence/final-qa/\`.
+- [ ] F3. **Real Manual QA** \u2014 \`unspecified-high\` (+ \`playwright\` skill if UI)
+  Start from clean state. Execute EVERY QA scenario from EVERY task \u2014 follow exact steps, capture evidence. Test cross-task integration (features working together, not isolation). Test edge cases: empty state, invalid input, rapid actions. Save to \`.sisyphus/evidence/final-qa/\`.
   Output: \`Scenarios [N/N pass] | Integration [N/N] | Edge Cases [N tested] | VERDICT\`
 
-- [ ] F4. **Scope Fidelity Check** — \`deep\`
-  For each task: read "What to do", read actual diff (git log/diff). Verify 1:1 — everything in spec was built (no missing), nothing beyond spec was built (no creep). Check "Must NOT do" compliance. Detect cross-task contamination: Task N touching Task M's files. Flag unaccounted changes.
+- [ ] F4. **Scope Fidelity Check** \u2014 \`deep\`
+  For each task: read "What to do", read actual diff (git log/diff). Verify 1:1 \u2014 everything in spec was built (no missing), nothing beyond spec was built (no creep). Check "Must NOT do" compliance. Detect cross-task contamination: Task N touching Task M's files. Flag unaccounted changes.
   Output: \`Tasks [N/N compliant] | Contamination [CLEAN/N issues] | Unaccounted [CLEAN/N files] | VERDICT\`
 
 ---
 
 ## Commit Strategy
 
-- **1**: \`type(scope): desc\` — file.ts, npm test
+- **1**: \`type(scope): desc\` - file.ts, npm test
 
 ---
 

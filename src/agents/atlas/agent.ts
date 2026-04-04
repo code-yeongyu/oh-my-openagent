@@ -5,7 +5,7 @@
  * You are the conductor of a symphony of specialized agents.
  *
  * Routing:
- * 1. GPT models (openai/*, github-copilot/gpt-*) → gpt.ts (GPT-5.2 optimized)
+ * 1. GPT models (openai/*, github-copilot/gpt-*) → gpt.ts (GPT-5.4 optimized)
  * 2. Gemini models (google/*, google-vertex/*) → gemini.ts (Gemini-optimized)
  * 3. Default (Claude, etc.) → default.ts (Claude-optimized)
  */
@@ -29,7 +29,7 @@ import {
   buildDecisionMatrix,
 } from "./prompt-section-builder"
 
-const MODE: AgentMode = "all"
+const MODE: AgentMode = "primary"
 
 export type AtlasPromptSource = "default" | "gpt" | "gemini"
 

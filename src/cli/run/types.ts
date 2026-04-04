@@ -4,6 +4,7 @@ export type { OpencodeClient }
 export interface RunOptions {
   message: string
   agent?: string
+  model?: string
   timestamp?: boolean
   verbose?: boolean
   directory?: string
@@ -80,7 +81,6 @@ export interface MessageUpdatedProps {
 }
 
 export interface MessagePartUpdatedProps {
-  /** @deprecated Legacy structure — current OpenCode puts sessionID inside part */
   info?: { sessionID?: string; sessionId?: string; role?: string }
   part?: {
     id?: string
