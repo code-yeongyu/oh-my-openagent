@@ -159,6 +159,7 @@ export class BackgroundManager {
   private completedTaskSummaries: Map<string, BackgroundTaskNotificationTask[]> = new Map()
   private idleDeferralTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
   private notificationQueueByParent: Map<string, Promise<void>> = new Map()
+  private observedOutputSessions: Set<string> = new Set()
   private rootDescendantCounts: Map<string, number>
   private preStartDescendantReservations: Set<string>
   private enableParentSessionNotifications: boolean
@@ -901,6 +902,26 @@ export class BackgroundManager {
     }
   }
 
+  private markSessionOutputObserved(sessionID: string): void {
+    this.observedOutputSessions.add(sessionID)
+  }
+
+  private clearSessionOutputObserved(sessionID: string): void {
+    this.observedOutputSessions.delete(sessionID)
+  }
+
+  private hasOutputSignalFromPart(partInfo: MessagePartInfo | undefined): boolean {
+    if (!partInfo?.sessionID) return false
+    if (partInfo.tool) return true
+    if (partInfo.type === "tool" || partInfo.type === "tool_result") return true
+    if (partInfo.type === "text" || partInfo.type === "reasoning") return true
+
+    const field = typeof (partInfo as { field?: unknown }).field === "string"
+      ? (partInfo as { field?: string }).field
+      : undefined
+    return field === "text" || field === "reasoning"
+  }
+
   handleEvent(event: Event): void {
     const props = event.properties
 
@@ -910,7 +931,13 @@ export class BackgroundManager {
 
       const sessionID = (info as Record<string, unknown>)["sessionID"]
       const role = (info as Record<string, unknown>)["role"]
-      if (typeof sessionID !== "string" || role !== "assistant") return
+      if (typeof sessionID !== "string") return
+
+      if (role === "tool") {
+        this.markSessionOutputObserved(sessionID)
+      }
+
+      if (role !== "assistant") return
 
       const task = this.findBySession(sessionID)
       if (!task || task.status !== "running") return
@@ -937,6 +964,10 @@ export class BackgroundManager {
 
       const task = this.findBySession(sessionID)
       if (!task) return
+
+      if (this.hasOutputSignalFromPart(partInfo)) {
+        this.markSessionOutputObserved(sessionID)
+      }
 
       // Clear any pending idle deferral timer since the task is still active
       const existingTimer = this.idleDeferralTimers.get(task.id)
@@ -1059,6 +1090,7 @@ export class BackgroundManager {
       const info = props?.info
       if (!info || typeof info.id !== "string") return
       const sessionID = info.id
+      this.clearSessionOutputObserved(sessionID)
 
       const tasksToCancel = new Map<string, BackgroundTask>()
       const directTask = this.findBySession(sessionID)
@@ -1217,6 +1249,7 @@ export class BackgroundManager {
     })
     return result.then((retried) => {
       if (retried && previousSessionID) {
+        this.clearSessionOutputObserved(previousSessionID)
         subagentSessions.delete(previousSessionID)
       }
       return retried
@@ -1268,6 +1301,10 @@ export class BackgroundManager {
    * Prevents premature completion when session.idle fires before agent responds.
    */
   private async validateSessionHasOutput(sessionID: string): Promise<boolean> {
+    if (this.observedOutputSessions.has(sessionID)) {
+      return true
+    }
+
     try {
       const response = await this.client.session.messages({
         path: { id: sessionID },
@@ -1314,6 +1351,7 @@ export class BackgroundManager {
         return false
       }
 
+      this.markSessionOutputObserved(sessionID)
       return true
     } catch (error) {
       log("[background-agent] Error validating session output:", error)
