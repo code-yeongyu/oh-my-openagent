@@ -87,7 +87,7 @@ describe("executeHttpHook TLS security", () => {
     })
 
     it("#when hook uses http://localhost #then does not log insecure warning", async () => {
-      mock.module("../../shared", () => ({
+      mock.module("../../shared/logger", () => ({
         log: mockLog,
       }))
       mockLog.mockReset()
