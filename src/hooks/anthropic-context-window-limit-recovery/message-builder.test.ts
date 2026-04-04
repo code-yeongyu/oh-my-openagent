@@ -4,35 +4,35 @@ const replaceEmptyTextPartsAsync = mock(() => Promise.resolve(false))
 const injectTextPartAsync = mock(() => Promise.resolve(false))
 const findMessagesWithEmptyTextPartsFromSDK = mock(() => Promise.resolve([] as string[]))
 
-mock.module("../../shared/normalize-sdk-response", () => ({
-  normalizeSDKResponse: (response: { data?: unknown[] }) => response.data ?? [],
-}))
-
-mock.module("../../shared/logger", () => ({
-  log: () => {},
-}))
-
-mock.module("../../shared/opencode-storage-detection", () => ({
-  isSqliteBackend: () => true,
-}))
-
-mock.module("../session-recovery/storage", () => ({
-  findEmptyMessages: () => [],
-  findMessagesWithEmptyTextParts: () => [],
-  injectTextPart: () => false,
-  replaceEmptyTextParts: () => false,
-}))
-
-mock.module("../session-recovery/storage/empty-text", () => ({
-  replaceEmptyTextPartsAsync,
-  findMessagesWithEmptyTextPartsFromSDK,
-}))
-
-mock.module("../session-recovery/storage/text-part-injector", () => ({
-  injectTextPartAsync,
-}))
-
 async function importFreshMessageBuilder(): Promise<typeof import("./message-builder")> {
+  mock.module("../../shared/normalize-sdk-response", () => ({
+    normalizeSDKResponse: (response: { data?: unknown[] }) => response.data ?? [],
+  }))
+
+  mock.module("../../shared/logger", () => ({
+    log: () => {},
+  }))
+
+  mock.module("../../shared/opencode-storage-detection", () => ({
+    isSqliteBackend: () => true,
+  }))
+
+  mock.module("../session-recovery/storage.ts", () => ({
+    findEmptyMessages: () => [],
+    findMessagesWithEmptyTextParts: () => [],
+    injectTextPart: () => false,
+    replaceEmptyTextParts: () => false,
+  }))
+
+  mock.module("../session-recovery/storage/empty-text.ts", () => ({
+    replaceEmptyTextPartsAsync,
+    findMessagesWithEmptyTextPartsFromSDK,
+  }))
+
+  mock.module("../session-recovery/storage/text-part-injector.ts", () => ({
+    injectTextPartAsync,
+  }))
+
   const module = await import(`./message-builder?test=${Date.now()}-${Math.random()}`)
   mock.restore()
   return module
