@@ -1,9 +1,11 @@
 import { existsSync, readFileSync } from "fs"
 import { homedir } from "os"
-import { join } from "path"
+import { basename, join } from "path"
+import { fileURLToPath } from "url"
 import { log } from "../../shared/logger"
 import type {
   InstalledPluginsDatabase,
+  InstalledPluginEntryV3,
   PluginInstallation,
   PluginManifest,
   LoadedPlugin,
@@ -78,8 +80,34 @@ function loadPluginManifest(installPath: string): PluginManifest | null {
 }
 
 function derivePluginNameFromKey(pluginKey: string): string {
-  const atIndex = pluginKey.indexOf("@")
-  return atIndex > 0 ? pluginKey.substring(0, atIndex) : pluginKey
+  const keyWithoutSource = pluginKey.startsWith("npm:") ? pluginKey.slice(4) : pluginKey
+
+  let versionSeparator: number
+  if (keyWithoutSource.startsWith("@")) {
+    const scopeEnd = keyWithoutSource.indexOf("/")
+    versionSeparator = scopeEnd > 0 ? keyWithoutSource.indexOf("@", scopeEnd) : -1
+  } else {
+    versionSeparator = keyWithoutSource.lastIndexOf("@")
+  }
+  const keyWithoutVersion = versionSeparator > 0 ? keyWithoutSource.slice(0, versionSeparator) : keyWithoutSource
+
+  if (keyWithoutVersion.startsWith("file://")) {
+    try {
+      return basename(fileURLToPath(keyWithoutVersion))
+    } catch {
+      return basename(keyWithoutVersion)
+    }
+  }
+
+  if (keyWithoutVersion.startsWith("@") && keyWithoutVersion.includes("/")) {
+    return keyWithoutVersion
+  }
+
+  if (keyWithoutVersion.includes("/") || keyWithoutVersion.includes("\\")) {
+    return basename(keyWithoutVersion)
+  }
+
+  return keyWithoutVersion
 }
 
 function isPluginEnabled(
@@ -96,9 +124,38 @@ function isPluginEnabled(
   return true
 }
 
+function v3EntryToInstallation(entry: InstalledPluginEntryV3): PluginInstallation {
+  return {
+    scope: entry.scope,
+    installPath: entry.installPath,
+    version: entry.version,
+    installedAt: entry.lastUpdated,
+    lastUpdated: entry.lastUpdated,
+    gitCommitSha: entry.gitCommitSha,
+  }
+}
+
+function isValidV3Entry(entry: unknown): entry is InstalledPluginEntryV3 {
+  return (
+    entry != null &&
+    typeof entry === "object" &&
+    typeof (entry as Record<string, unknown>).name === "string" &&
+    typeof (entry as Record<string, unknown>).marketplace === "string" &&
+    typeof (entry as Record<string, unknown>).installPath === "string"
+  )
+}
+
 function extractPluginEntries(
   db: InstalledPluginsDatabase,
 ): Array<[string, PluginInstallation | undefined]> {
+  if (Array.isArray(db)) {
+    return db
+      .filter(isValidV3Entry)
+      .map((entry) => [
+        `${entry.name}@${entry.marketplace}`,
+        v3EntryToInstallation(entry),
+      ])
+  }
   if (db.version === 1) {
     return Object.entries(db.plugins).map(([key, installation]) => [key, installation])
   }
@@ -111,7 +168,7 @@ export function discoverInstalledPlugins(options?: PluginLoaderOptions): PluginL
   const plugins: LoadedPlugin[] = []
   const errors: PluginLoadError[] = []
 
-  if (!db || !db.plugins) {
+  if (!db || (!Array.isArray(db) && !db.plugins)) {
     return { plugins, errors }
   }
 

@@ -47,4 +47,38 @@ describe("injectContinuation", () => {
     expect(capturedTools).toEqual({ question: false, bash: true })
     expect(capturedText).toContain(OMO_INTERNAL_INITIATOR_MARKER)
   })
+
+  test("skips injection when agent is plan (prevents Plan Mode infinite loop)", async () => {
+    // given
+    let injected = false
+    const ctx = {
+      directory: "/tmp/test",
+      client: {
+        session: {
+          todo: async () => ({ data: [{ id: "1", content: "todo", status: "pending", priority: "high" }] }),
+          promptAsync: async () => {
+            injected = true
+            return {}
+          },
+        },
+      },
+    }
+    const sessionStateStore = {
+      getExistingState: () => ({ inFlight: false, lastInjectedAt: 0, consecutiveFailures: 0 }),
+    }
+
+    // when
+    await injectContinuation({
+      ctx: ctx as never,
+      sessionID: "ses_plan_skip",
+      resolvedInfo: {
+        agent: "plan",
+        model: { providerID: "anthropic", modelID: "claude-sonnet-4-20250514" },
+      },
+      sessionStateStore: sessionStateStore as never,
+    })
+
+    // then
+    expect(injected).toBe(false)
+  })
 })

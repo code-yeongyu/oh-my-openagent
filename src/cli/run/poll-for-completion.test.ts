@@ -1,4 +1,4 @@
-import { describe, it, expect, mock, spyOn } from "bun:test"
+import { afterEach, beforeEach, describe, it, expect, mock, spyOn } from "bun:test"
 import type { RunContext, Todo, ChildSession, SessionStatus } from "./types"
 import { createEventState } from "./events"
 import { pollForCompletion } from "./poll-for-completion"
@@ -30,11 +30,26 @@ const createMockContext = (overrides: {
   }
 }
 
+let consoleLogSpy: ReturnType<typeof spyOn>
+let consoleErrorSpy: ReturnType<typeof spyOn>
+
+function abortAfter(abortController: AbortController, delayMs: number): void {
+  setTimeout(() => abortController.abort(), delayMs)
+}
+
+beforeEach(() => {
+  consoleLogSpy = spyOn(console, "log").mockImplementation(() => {})
+  consoleErrorSpy = spyOn(console, "error").mockImplementation(() => {})
+})
+
+afterEach(() => {
+  consoleLogSpy.mockRestore()
+  consoleErrorSpy.mockRestore()
+})
+
 describe("pollForCompletion", () => {
   it("requires consecutive stability checks before exiting - not immediate", async () => {
     //#given - 0 todos, 0 children, session idle, meaningful work done
-    spyOn(console, "log").mockImplementation(() => {})
-    spyOn(console, "error").mockImplementation(() => {})
     const ctx = createMockContext()
     const eventState = createEventState()
     eventState.mainSessionIdle = true
@@ -56,8 +71,6 @@ describe("pollForCompletion", () => {
 
   it("does not check completion during stabilization period after first meaningful work", async () => {
     //#given - session idle, meaningful work done, but stabilization period not elapsed
-    spyOn(console, "log").mockImplementation(() => {})
-    spyOn(console, "error").mockImplementation(() => {})
     const ctx = createMockContext()
     const eventState = createEventState()
     eventState.mainSessionIdle = true
@@ -65,7 +78,7 @@ describe("pollForCompletion", () => {
     const abortController = new AbortController()
 
     //#when - abort after 50ms (within the 60ms stabilization period)
-    setTimeout(() => abortController.abort(), 50)
+    abortAfter(abortController, 50)
     const result = await pollForCompletion(ctx, eventState, abortController, {
       pollIntervalMs: 10,
       requiredConsecutive: 3,
@@ -80,8 +93,6 @@ describe("pollForCompletion", () => {
 
   it("does not exit when currentTool is set - resets consecutive counter", async () => {
     //#given
-    spyOn(console, "log").mockImplementation(() => {})
-    spyOn(console, "error").mockImplementation(() => {})
     const ctx = createMockContext()
     const eventState = createEventState()
     eventState.mainSessionIdle = true
@@ -90,7 +101,7 @@ describe("pollForCompletion", () => {
     const abortController = new AbortController()
 
     //#when - abort after enough time to verify it didn't exit
-    setTimeout(() => abortController.abort(), 100)
+    abortAfter(abortController, 100)
     const result = await pollForCompletion(ctx, eventState, abortController, {
       pollIntervalMs: 10,
       requiredConsecutive: 3,
@@ -105,8 +116,6 @@ describe("pollForCompletion", () => {
 
   it("resets consecutive counter when session becomes busy between checks", async () => {
     //#given
-    spyOn(console, "log").mockImplementation(() => {})
-    spyOn(console, "error").mockImplementation(() => {})
     const ctx = createMockContext()
     const eventState = createEventState()
     eventState.mainSessionIdle = true
@@ -147,8 +156,6 @@ describe("pollForCompletion", () => {
 
   it("returns 1 on session error", async () => {
     //#given
-    spyOn(console, "log").mockImplementation(() => {})
-    spyOn(console, "error").mockImplementation(() => {})
     const ctx = createMockContext()
     const eventState = createEventState()
     eventState.mainSessionIdle = true
@@ -169,14 +176,12 @@ describe("pollForCompletion", () => {
 
   it("returns 130 when aborted", async () => {
     //#given
-    spyOn(console, "log").mockImplementation(() => {})
-    spyOn(console, "error").mockImplementation(() => {})
     const ctx = createMockContext()
     const eventState = createEventState()
     const abortController = new AbortController()
 
     //#when
-    setTimeout(() => abortController.abort(), 50)
+    abortAfter(abortController, 50)
     const result = await pollForCompletion(ctx, eventState, abortController, {
       pollIntervalMs: 10,
       requiredConsecutive: 3,
@@ -188,8 +193,6 @@ describe("pollForCompletion", () => {
 
   it("does not check completion when hasReceivedMeaningfulWork is false", async () => {
     //#given
-    spyOn(console, "log").mockImplementation(() => {})
-    spyOn(console, "error").mockImplementation(() => {})
     const ctx = createMockContext()
     const eventState = createEventState()
     eventState.mainSessionIdle = true
@@ -197,7 +200,7 @@ describe("pollForCompletion", () => {
     const abortController = new AbortController()
 
     //#when
-    setTimeout(() => abortController.abort(), 100)
+    abortAfter(abortController, 100)
     const result = await pollForCompletion(ctx, eventState, abortController, {
       pollIntervalMs: 10,
       requiredConsecutive: 3,
@@ -211,8 +214,6 @@ describe("pollForCompletion", () => {
 
   it("falls back to session.status API when idle event is missing", async () => {
     //#given - mainSessionIdle not set by events, but status API says idle
-    spyOn(console, "log").mockImplementation(() => {})
-    spyOn(console, "error").mockImplementation(() => {})
     const ctx = createMockContext({
       statuses: {
         "test-session": { type: "idle" },
@@ -236,8 +237,6 @@ describe("pollForCompletion", () => {
 
   it("allows silent completion after stabilization when no meaningful work is received", async () => {
     //#given - session is idle and stable but no assistant message/tool event arrived
-    spyOn(console, "log").mockImplementation(() => {})
-    spyOn(console, "error").mockImplementation(() => {})
     const ctx = createMockContext()
     const eventState = createEventState()
     eventState.mainSessionIdle = true
@@ -257,8 +256,6 @@ describe("pollForCompletion", () => {
 
   it("uses default stabilization to avoid indefinite wait when no meaningful work arrives", async () => {
     //#given - idle with no meaningful work and no explicit minStabilization override
-    spyOn(console, "log").mockImplementation(() => {})
-    spyOn(console, "error").mockImplementation(() => {})
     const ctx = createMockContext()
     const eventState = createEventState()
     eventState.mainSessionIdle = true
@@ -277,8 +274,6 @@ describe("pollForCompletion", () => {
 
   it("coerces non-positive stabilization values to default stabilization", async () => {
     //#given - explicit zero stabilization should still wait for default window
-    spyOn(console, "log").mockImplementation(() => {})
-    spyOn(console, "error").mockImplementation(() => {})
     const ctx = createMockContext()
     const eventState = createEventState()
     eventState.mainSessionIdle = true
@@ -286,7 +281,7 @@ describe("pollForCompletion", () => {
     const abortController = new AbortController()
 
     //#when - abort before default 1s window elapses
-    setTimeout(() => abortController.abort(), 100)
+    abortAfter(abortController, 100)
     const result = await pollForCompletion(ctx, eventState, abortController, {
       pollIntervalMs: 10,
       requiredConsecutive: 1,
@@ -299,8 +294,6 @@ describe("pollForCompletion", () => {
 
   it("simulates race condition: brief idle with 0 todos does not cause immediate exit", async () => {
     //#given - simulate Sisyphus outputting text, session goes idle briefly, then tool fires
-    spyOn(console, "log").mockImplementation(() => {})
-    spyOn(console, "error").mockImplementation(() => {})
     const ctx = createMockContext()
     const eventState = createEventState()
     eventState.mainSessionIdle = true
@@ -323,7 +316,7 @@ describe("pollForCompletion", () => {
     )
 
     //#when - abort after tool stays in-flight
-    setTimeout(() => abortController.abort(), 200)
+    abortAfter(abortController, 200)
     const result = await pollForCompletion(ctx, eventState, abortController, {
       pollIntervalMs: 10,
       requiredConsecutive: 3,
@@ -335,8 +328,6 @@ describe("pollForCompletion", () => {
 
   it("returns 1 when session errors while not idle (error not masked by idle gate)", async () => {
     //#given - mainSessionIdle=false, mainSessionError=true, lastError="crash"
-    spyOn(console, "log").mockImplementation(() => {})
-    spyOn(console, "error").mockImplementation(() => {})
     const ctx = createMockContext()
     const eventState = createEventState()
     eventState.mainSessionIdle = false
@@ -359,8 +350,6 @@ describe("pollForCompletion", () => {
 
   it("returns 1 when session errors while tool is active (error not masked by tool gate)", async () => {
     //#given - mainSessionIdle=true, currentTool="bash", mainSessionError=true
-    spyOn(console, "log").mockImplementation(() => {})
-    spyOn(console, "error").mockImplementation(() => {})
     const ctx = createMockContext()
     const eventState = createEventState()
     eventState.mainSessionIdle = true

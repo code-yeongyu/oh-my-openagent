@@ -90,6 +90,69 @@ describe("discoverOAuthServerMetadata", () => {
     })
   })
 
+  test("falls back to root well-known URL when resource has a sub-path", () => {
+    // given — resource URL has a /mcp path (e.g. https://mcp.sentry.dev/mcp)
+    const resource = "https://mcp.example.com/mcp"
+    const prmUrl = new URL("/.well-known/oauth-protected-resource", resource).toString()
+    const pathSuffixedAsUrl = "https://mcp.example.com/.well-known/oauth-authorization-server/mcp"
+    const rootAsUrl = "https://mcp.example.com/.well-known/oauth-authorization-server"
+    const calls: string[] = []
+    const fetchMock = async (input: string | URL) => {
+      const url = typeof input === "string" ? input : input.toString()
+      calls.push(url)
+      if (url === prmUrl) {
+        return new Response("not found", { status: 404 })
+      }
+      if (url === pathSuffixedAsUrl) {
+        return new Response("not found", { status: 404 })
+      }
+      if (url === rootAsUrl) {
+        return new Response(
+          JSON.stringify({
+            authorization_endpoint: "https://mcp.example.com/oauth/authorize",
+            token_endpoint: "https://mcp.example.com/oauth/token",
+            registration_endpoint: "https://mcp.example.com/oauth/register",
+          }),
+          { status: 200 }
+        )
+      }
+      return new Response("not found", { status: 404 })
+    }
+    Object.defineProperty(globalThis, "fetch", { value: fetchMock, configurable: true })
+
+    // when
+    return discoverOAuthServerMetadata(resource).then((result) => {
+      // then
+      expect(result).toEqual({
+        authorizationEndpoint: "https://mcp.example.com/oauth/authorize",
+        tokenEndpoint: "https://mcp.example.com/oauth/token",
+        registrationEndpoint: "https://mcp.example.com/oauth/register",
+        resource,
+      })
+      expect(calls).toEqual([prmUrl, pathSuffixedAsUrl, rootAsUrl])
+    })
+  })
+
+  test("throws when PRM, path-suffixed AS, and root AS all return 404", () => {
+    // given
+    const resource = "https://mcp.example.com/mcp"
+    const prmUrl = new URL("/.well-known/oauth-protected-resource", resource).toString()
+    const fetchMock = async (input: string | URL) => {
+      const url = typeof input === "string" ? input : input.toString()
+      if (url === prmUrl || url.includes(".well-known/oauth-authorization-server")) {
+        return new Response("not found", { status: 404 })
+      }
+      return new Response("not found", { status: 404 })
+    }
+    Object.defineProperty(globalThis, "fetch", { value: fetchMock, configurable: true })
+
+    // when
+    const result = discoverOAuthServerMetadata(resource)
+
+    // then
+    return expect(result).rejects.toThrow("OAuth authorization server metadata not found")
+  })
+
   test("throws when both PRM and AS discovery return 404", () => {
     // given
     const resource = "https://mcp.example.com"

@@ -17,6 +17,8 @@ export const SYMBOLS = {
   star: color.yellow("*"),
 }
 
+const ANSI_COLOR_PATTERN = new RegExp("\u001b\\[[0-9;]*m", "g")
+
 function formatProvider(name: string, enabled: boolean, detail?: string): string {
   const status = enabled ? SYMBOLS.check : color.dim("○")
   const label = enabled ? color.white(name) : color.dim(name)
@@ -32,7 +34,7 @@ export function formatConfigSummary(config: InstallConfig): string {
 
   const claudeDetail = config.hasClaude ? (config.isMax20 ? "max20" : "standard") : undefined
   lines.push(formatProvider("Claude", config.hasClaude, claudeDetail))
-  lines.push(formatProvider("OpenAI/ChatGPT", config.hasOpenAI, "GPT-5.2 for Oracle"))
+  lines.push(formatProvider("OpenAI/ChatGPT", config.hasOpenAI, "GPT-5.4 for Oracle"))
   lines.push(formatProvider("Gemini", config.hasGemini))
   lines.push(formatProvider("GitHub Copilot", config.hasCopilot, "fallback"))
   lines.push(formatProvider("OpenCode Zen", config.hasOpencodeZen, "opencode/ models"))
@@ -83,7 +85,7 @@ export function printBox(content: string, title?: string): void {
   const lines = content.split("\n")
   const maxWidth =
     Math.max(
-      ...lines.map((line) => line.replace(/\x1b\[[0-9;]*m/g, "").length),
+      ...lines.map((line) => line.replace(ANSI_COLOR_PATTERN, "").length),
       title?.length ?? 0,
     ) + 4
   const border = color.dim("─".repeat(maxWidth))
@@ -101,7 +103,7 @@ export function printBox(content: string, title?: string): void {
   }
 
   for (const line of lines) {
-    const stripped = line.replace(/\x1b\[[0-9;]*m/g, "")
+    const stripped = line.replace(ANSI_COLOR_PATTERN, "")
     const padding = maxWidth - stripped.length
     console.log(color.dim("│") + ` ${line}${" ".repeat(padding - 1)}` + color.dim("│"))
   }
@@ -135,6 +137,10 @@ export function validateNonTuiArgs(args: InstallArgs): { valid: boolean; errors:
     errors.push(`Invalid --openai value: ${args.openai} (expected: no, yes)`)
   }
 
+  if (args.opencodeGo !== undefined && !["no", "yes"].includes(args.opencodeGo)) {
+    errors.push(`Invalid --opencode-go value: ${args.opencodeGo} (expected: no, yes)`)
+  }
+
   if (args.opencodeZen !== undefined && !["no", "yes"].includes(args.opencodeZen)) {
     errors.push(`Invalid --opencode-zen value: ${args.opencodeZen} (expected: no, yes)`)
   }
@@ -159,7 +165,8 @@ export function argsToConfig(args: InstallArgs): InstallConfig {
     hasCopilot: args.copilot === "yes",
     hasOpencodeZen: args.opencodeZen === "yes",
     hasZaiCodingPlan: args.zaiCodingPlan === "yes",
-    hasKimiForCoding: args.kimiForCoding === "yes",
+hasKimiForCoding: args.kimiForCoding === "yes",
+    hasOpencodeGo: args.opencodeGo === "yes",
   }
 }
 
@@ -170,7 +177,8 @@ export function detectedToInitialValues(detected: DetectedConfig): {
   copilot: BooleanArg
   opencodeZen: BooleanArg
   zaiCodingPlan: BooleanArg
-  kimiForCoding: BooleanArg
+kimiForCoding: BooleanArg
+  opencodeGo: BooleanArg
 } {
   let claude: ClaudeSubscription = "no"
   if (detected.hasClaude) {
@@ -184,6 +192,7 @@ export function detectedToInitialValues(detected: DetectedConfig): {
     copilot: detected.hasCopilot ? "yes" : "no",
     opencodeZen: detected.hasOpencodeZen ? "yes" : "no",
     zaiCodingPlan: detected.hasZaiCodingPlan ? "yes" : "no",
-    kimiForCoding: detected.hasKimiForCoding ? "yes" : "no",
+kimiForCoding: detected.hasKimiForCoding ? "yes" : "no",
+    opencodeGo: detected.hasOpencodeGo ? "yes" : "no",
   }
 }

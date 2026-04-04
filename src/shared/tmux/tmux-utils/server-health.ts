@@ -1,16 +1,30 @@
 let serverAvailable: boolean | null = null
 let serverCheckUrl: string | null = null
 
+const SERVER_RUNNING_KEY = Symbol.for("oh-my-opencode:server-running-in-process")
+
 function delay(milliseconds: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, milliseconds))
 }
 
+export function markServerRunningInProcess(): void {
+	;(globalThis as Record<symbol, boolean>)[SERVER_RUNNING_KEY] = true
+}
+
+function isMarkedRunningInProcess(): boolean {
+	return (globalThis as Record<symbol, boolean>)[SERVER_RUNNING_KEY] === true
+}
+
 export async function isServerRunning(serverUrl: string): Promise<boolean> {
+	if (isMarkedRunningInProcess()) {
+		return true
+	}
+
 	if (serverCheckUrl === serverUrl && serverAvailable === true) {
 		return true
 	}
 
-	const healthUrl = new URL("/health", serverUrl).toString()
+	const healthUrl = new URL("/global/health", serverUrl).toString()
 	const timeoutMs = 3000
 	const maxAttempts = 2
 

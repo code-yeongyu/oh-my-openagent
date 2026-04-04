@@ -11,6 +11,24 @@ import { createSkillHooks } from "./plugin/hooks/create-skill-hooks"
 
 export type CreatedHooks = ReturnType<typeof createHooks>
 
+type DisposableHook = { dispose?: () => void } | null | undefined
+
+export type DisposableCreatedHooks = {
+  claudeCodeHooks?: DisposableHook
+  commentChecker?: DisposableHook
+  runtimeFallback?: DisposableHook
+  todoContinuationEnforcer?: DisposableHook
+  autoSlashCommand?: DisposableHook
+}
+
+export function disposeCreatedHooks(hooks: DisposableCreatedHooks): void {
+	 hooks.claudeCodeHooks?.dispose?.()
+	 hooks.commentChecker?.dispose?.()
+  hooks.runtimeFallback?.dispose?.()
+  hooks.todoContinuationEnforcer?.dispose?.()
+  hooks.autoSlashCommand?.dispose?.()
+}
+
 export function createHooks(args: {
   ctx: PluginContext
   pluginConfig: OhMyOpenCodeConfig
@@ -58,9 +76,16 @@ export function createHooks(args: {
     availableSkills,
   })
 
-  return {
+  const hooks = {
     ...core,
     ...continuation,
     ...skill,
+  }
+
+  return {
+    ...hooks,
+    disposeHooks: (): void => {
+      disposeCreatedHooks(hooks)
+    },
   }
 }

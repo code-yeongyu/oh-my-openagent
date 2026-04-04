@@ -1,10 +1,22 @@
 import type { OhMyOpenCodeConfig } from "../config";
-import { getAgentDisplayName } from "../shared/agent-display-names";
+import { getAgentDisplayName, getAgentListDisplayName } from "../shared/agent-display-names";
+import { isTaskSystemEnabled } from "../shared";
 
 type AgentWithPermission = { permission?: Record<string, unknown> };
 
+function getConfigQuestionPermission(): string | null {
+  const configContent = process.env.OPENCODE_CONFIG_CONTENT;
+  if (!configContent) return null;
+  try {
+    const parsed = JSON.parse(configContent);
+    return parsed?.permission?.question ?? null;
+  } catch {
+    return null;
+  }
+}
+
 function agentByKey(agentResult: Record<string, unknown>, key: string): AgentWithPermission | undefined {
-  return (agentResult[key] ?? agentResult[getAgentDisplayName(key)]) as
+  return (agentResult[getAgentListDisplayName(key)] ?? agentResult[getAgentDisplayName(key)] ?? agentResult[key]) as
     | AgentWithPermission
     | undefined;
 }
@@ -14,9 +26,13 @@ export function applyToolConfig(params: {
   pluginConfig: OhMyOpenCodeConfig;
   agentResult: Record<string, unknown>;
 }): void {
-  const denyTodoTools = params.pluginConfig.experimental?.task_system
+  const taskSystemEnabled = isTaskSystemEnabled(params.pluginConfig)
+  const denyTodoTools = taskSystemEnabled
     ? { todowrite: "deny", todoread: "deny" }
     : {}
+
+  const existingPermission = params.config.permission as Record<string, unknown> | undefined;
+  const skillDeniedByHost = existingPermission?.skill === "deny";
 
   params.config.tools = {
     ...(params.config.tools as Record<string, unknown>),
@@ -26,13 +42,22 @@ export function applyToolConfig(params: {
     LspCodeActionResolve: false,
     "task_*": false,
     teammate: false,
-    ...(params.pluginConfig.experimental?.task_system
+    ...(taskSystemEnabled
       ? { todowrite: false, todoread: false }
+      : {}),
+    ...(skillDeniedByHost
+      ? { skill: false, skill_mcp: false }
       : {}),
   };
 
   const isCliRunMode = process.env.OPENCODE_CLI_RUN_MODE === "true";
-  const questionPermission = isCliRunMode ? "deny" : "allow";
+  const configQuestionPermission = getConfigQuestionPermission();
+  const isQuestionDisabledByPlugin = params.pluginConfig.disabled_tools?.includes("question") ?? false;
+  const questionPermission =
+    isQuestionDisabledByPlugin ? "deny" :
+    configQuestionPermission === "deny" ? "deny" :
+    isCliRunMode ? "deny" :
+    "allow";
 
   const librarian = agentByKey(params.agentResult, "librarian");
   if (librarian) {

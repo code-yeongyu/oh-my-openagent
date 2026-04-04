@@ -7,7 +7,8 @@ import { AGENT_MODEL_REQUIREMENTS, isModelAvailable } from "../../shared"
 import { buildAgent, isFactory } from "../agent-builder"
 import { applyOverrides } from "./agent-overrides"
 import { applyEnvironmentContext } from "./environment-context"
-import { applyModelResolution } from "./model-resolution"
+import { applyModelResolution, getFirstFallbackModel } from "./model-resolution"
+import { log } from "../../shared/logger"
 
 export function collectPendingBuiltinAgents(input: {
   agentSources: Record<BuiltinAgentName, import("../agent-builder").AgentSource>
@@ -21,6 +22,7 @@ export function collectPendingBuiltinAgents(input: {
   browserProvider?: BrowserAutomationProvider
   uiSelectedModel?: string
   availableModels: Set<string>
+  isFirstRunNoCache: boolean
   disabledSkills?: Set<string>
   useTaskSystem?: boolean
   disableOmoEnv?: boolean
@@ -37,6 +39,7 @@ export function collectPendingBuiltinAgents(input: {
     browserProvider,
     uiSelectedModel,
     availableModels,
+    isFirstRunNoCache,
     disabledSkills,
     disableOmoEnv = false,
   } = input
@@ -51,6 +54,7 @@ export function collectPendingBuiltinAgents(input: {
     if (agentName === "hephaestus") continue
     if (agentName === "atlas") continue
     if (agentName === "cerberus") continue
+    if (agentName === "sisyphus-junior") continue
     if (disabledAgents.some((name) => name.toLowerCase() === agentName.toLowerCase())) continue
 
     const override = agentOverrides[agentName]
@@ -66,13 +70,26 @@ export function collectPendingBuiltinAgents(input: {
 
     const isPrimaryAgent = isFactory(source) && source.mode === "primary"
 
-    const resolution = applyModelResolution({
-      uiSelectedModel: (isPrimaryAgent && !override?.model) ? uiSelectedModel : undefined,
+    let resolution = applyModelResolution({
+      uiSelectedModel: (isPrimaryAgent && override?.model === undefined) ? uiSelectedModel : undefined,
       userModel: override?.model,
       requirement,
       availableModels,
       systemDefaultModel,
     })
+    if (!resolution) {
+      if (override?.model) {
+        // User explicitly configured a model but resolution failed (e.g., cold cache).
+        // Honor the user's choice directly instead of falling back to hardcoded chain.
+        log("[agent-registration] User-configured model not resolved, using as-is", {
+          agent: agentName,
+          configuredModel: override.model,
+        })
+        resolution = { model: override.model, provenance: "override" as const }
+      } else {
+        resolution = getFirstFallbackModel(requirement)
+      }
+    }
     if (!resolution) continue
     const { model, variant: resolvedVariant } = resolution
 

@@ -54,5 +54,6 @@ export function createTodoContinuationEnforcer(
     markRecovering,
     markRecoveryComplete,
     cancelAllCountdowns,
+    dispose: () => sessionStateStore.shutdown(),
   }
 }

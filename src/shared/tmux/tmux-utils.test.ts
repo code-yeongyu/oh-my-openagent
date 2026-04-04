@@ -3,55 +3,61 @@ import {
   isInsideTmux,
   isServerRunning,
   resetServerCheck,
+  markServerRunningInProcess,
   spawnTmuxPane,
   closeTmuxPane,
   applyLayout,
 } from "./tmux-utils"
+import { isInsideTmuxEnvironment } from "./tmux-utils/environment"
+
+function createFetchMock(responseFactory: () => Promise<Response>): typeof fetch & ReturnType<typeof mock> {
+  const fetchMock = mock(async (_input: RequestInfo | URL, _init?: RequestInit) => responseFactory())
+  const preconnect = globalThis.fetch.preconnect?.bind(globalThis.fetch)
+  return Object.assign(fetchMock, {
+    preconnect,
+  }) as typeof fetch & ReturnType<typeof mock>
+}
 
 describe("isInsideTmux", () => {
   test("returns true when TMUX env is set", () => {
     // given
-    const originalTmux = process.env.TMUX
-    process.env.TMUX = "/tmp/tmux-1000/default"
+    const environment = { TMUX: "/tmp/tmux-1000/default" }
 
     // when
-    const result = isInsideTmux()
+    const result = isInsideTmuxEnvironment(environment)
 
     // then
     expect(result).toBe(true)
-
-    // cleanup
-    process.env.TMUX = originalTmux
   })
 
   test("returns false when TMUX env is not set", () => {
     // given
-    const originalTmux = process.env.TMUX
-    delete process.env.TMUX
+    const environment = {}
 
     // when
-    const result = isInsideTmux()
+    const result = isInsideTmuxEnvironment(environment)
 
     // then
     expect(result).toBe(false)
-
-    // cleanup
-    process.env.TMUX = originalTmux
   })
 
   test("returns false when TMUX env is empty string", () => {
     // given
-    const originalTmux = process.env.TMUX
-    process.env.TMUX = ""
+    const environment = { TMUX: "" }
 
     // when
-    const result = isInsideTmux()
+    const result = isInsideTmuxEnvironment(environment)
 
     // then
     expect(result).toBe(false)
+  })
 
-    // cleanup
-    process.env.TMUX = originalTmux
+  test("is exported as a function", () => {
+    // given, #when
+    const result = typeof isInsideTmux
+
+    // then
+    expect(result).toBe("function")
   })
 })
 
@@ -68,7 +74,7 @@ describe("isServerRunning", () => {
 
   test("returns true when server responds OK", async () => {
     // given
-    globalThis.fetch = mock(async () => ({ ok: true })) as any
+    globalThis.fetch = createFetchMock(async () => new Response(null, { status: 200 }))
 
     // when
     const result = await isServerRunning("http://localhost:4096")
@@ -79,9 +85,9 @@ describe("isServerRunning", () => {
 
   test("returns false when server not reachable", async () => {
     // given
-    globalThis.fetch = mock(async () => {
+    globalThis.fetch = createFetchMock(async () => {
       throw new Error("ECONNREFUSED")
-    }) as any
+    })
 
     // when
     const result = await isServerRunning("http://localhost:4096")
@@ -92,7 +98,7 @@ describe("isServerRunning", () => {
 
   test("returns false when fetch returns not ok", async () => {
     // given
-    globalThis.fetch = mock(async () => ({ ok: false })) as any
+    globalThis.fetch = createFetchMock(async () => new Response(null, { status: 500 }))
 
     // when
     const result = await isServerRunning("http://localhost:4096")
@@ -103,7 +109,7 @@ describe("isServerRunning", () => {
 
   test("caches successful result", async () => {
     // given
-    const fetchMock = mock(async () => ({ ok: true })) as any
+    const fetchMock = createFetchMock(async () => new Response(null, { status: 200 }))
     globalThis.fetch = fetchMock
 
     // when
@@ -116,9 +122,9 @@ describe("isServerRunning", () => {
 
   test("does not cache failed result", async () => {
     // given
-    const fetchMock = mock(async () => {
+    const fetchMock = createFetchMock(async () => {
       throw new Error("ECONNREFUSED")
-    }) as any
+    })
     globalThis.fetch = fetchMock
 
     // when
@@ -131,7 +137,7 @@ describe("isServerRunning", () => {
 
   test("uses different cache for different URLs", async () => {
     // given
-    const fetchMock = mock(async () => ({ ok: true })) as any
+    const fetchMock = createFetchMock(async () => new Response(null, { status: 200 }))
     globalThis.fetch = fetchMock
 
     // when
@@ -152,7 +158,7 @@ describe("resetServerCheck", () => {
   test("allows re-checking after reset", async () => {
     // given
     const originalFetch = globalThis.fetch
-    const fetchMock = mock(async () => ({ ok: true })) as any
+    const fetchMock = createFetchMock(async () => new Response(null, { status: 200 }))
     globalThis.fetch = fetchMock
 
     // when
@@ -165,6 +171,46 @@ describe("resetServerCheck", () => {
 
     // cleanup
     globalThis.fetch = originalFetch
+  })
+})
+
+describe("markServerRunningInProcess", () => {
+  const originalFetch = globalThis.fetch
+  const SERVER_RUNNING_KEY = Symbol.for("oh-my-opencode:server-running-in-process")
+
+  beforeEach(() => {
+    resetServerCheck()
+    delete (globalThis as Record<symbol, boolean>)[SERVER_RUNNING_KEY]
+  })
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch
+    delete (globalThis as Record<symbol, boolean>)[SERVER_RUNNING_KEY]
+  })
+
+  test("skips HTTP fetch when marked as running in-process", async () => {
+    // given
+    const fetchMock = createFetchMock(async () => new Response(null, { status: 200 }))
+    globalThis.fetch = fetchMock
+    markServerRunningInProcess()
+
+    // when
+    const result = await isServerRunning("http://localhost:4096")
+
+    // then
+    expect(result).toBe(true)
+    expect(fetchMock.mock.calls.length).toBe(0)
+  })
+
+  test("uses globalThis so flag survives across module instances", () => {
+    // given
+    markServerRunningInProcess()
+
+    // when
+    const flag = (globalThis as Record<symbol, boolean>)[SERVER_RUNNING_KEY]
+
+    // then
+    expect(flag).toBe(true)
   })
 })
 

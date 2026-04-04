@@ -38,6 +38,7 @@ function getTemporaryConversionPath(error: unknown): string | null {
   return null
 }
 
+
 export { normalizeArgs, validateArgs } from "./look-at-arguments"
 
 export function createLookAt(ctx: PluginInput): ToolDefinition {
@@ -136,6 +137,8 @@ Provide ONLY the extracted information that matches the goal.
 Be thorough on what was requested, concise on everything else.
 If the requested information is not found, clearly state what is missing.`
 
+      const { agentModel, agentVariant } = await resolveMultimodalLookerAgentMetadata(ctx)
+
       log(`[look_at] Creating session with parent: ${toolContext.sessionID}`)
       const parentSession = await ctx.client.session.get({
         path: { id: toolContext.sessionID },
@@ -168,8 +171,6 @@ Original error: ${createResult.error}`
 
       const sessionID = createResult.data.id
       log(`[look_at] Created session: ${sessionID}`)
-
-      const { agentModel, agentVariant } = await resolveMultimodalLookerAgentMetadata(ctx)
 
       log(`[look_at] Sending prompt with ${isBase64Input ? "base64 image" : "file"} to session ${sessionID}`)
       try {
@@ -217,6 +218,10 @@ Original error: ${createResult.error}`
 
         log(`[look_at] Got response, length: ${responseText.length}`)
         return responseText
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        log(`[look_at] Unexpected error analyzing ${sourceDescription}:`, error)
+        return `Error: Failed to analyze ${sourceDescription}: ${errorMessage}`
       } finally {
         if (tempConversionPath) {
           cleanupConvertedImage(tempConversionPath)

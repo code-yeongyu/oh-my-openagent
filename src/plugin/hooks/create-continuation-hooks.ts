@@ -56,7 +56,8 @@ export function createContinuationHooks(args: {
     : null
 
   const compactionContextInjector = isHookEnabled("compaction-context-injector")
-    ? safeHook("compaction-context-injector", () => createCompactionContextInjector(backgroundManager))
+    ? safeHook("compaction-context-injector", () =>
+        createCompactionContextInjector({ ctx, backgroundManager }))
     : null
 
   const compactionTodoPreserver = isHookEnabled("compaction-todo-preserver")
@@ -65,7 +66,7 @@ export function createContinuationHooks(args: {
 
   const todoContinuationEnforcer = isHookEnabled("todo-continuation-enforcer")
     ? safeHook("todo-continuation-enforcer", () =>
-        createTodoContinuationEnforcer(ctx, {
+      createTodoContinuationEnforcer(ctx, {
           backgroundManager,
           isContinuationStopped: stopContinuationGuard?.isStopped,
         }))

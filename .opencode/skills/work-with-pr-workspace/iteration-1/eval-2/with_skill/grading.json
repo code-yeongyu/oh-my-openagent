@@ -1,0 +1,11 @@
+{
+  "run_id": "eval-2-with_skill",
+  "expectations": [
+    {"text": "Plan uses git worktree in a sibling directory", "passed": true, "evidence": "../omo-wt/fix-atlas-worktree-path-crash"},
+    {"text": "Fix is minimal — adds null check, doesn't refactor unrelated code", "passed": true, "evidence": "3 targeted changes: readBoulderState sanitization, idle-event guard, tests"},
+    {"text": "Test case added for the missing worktree_path scenario", "passed": true, "evidence": "Tests for missing and null worktree_path"},
+    {"text": "Verification loop includes all 3 gates", "passed": true, "evidence": "Gate A (CI), Gate B (review-work), Gate C (Cubic)"},
+    {"text": "References actual atlas hook files", "passed": true, "evidence": "src/hooks/atlas/idle-event.ts, src/features/boulder-state/storage.ts"},
+    {"text": "Branch name follows fix/ prefix convention", "passed": true, "evidence": "fix/atlas-worktree-path-crash"}
+  ]
+}

@@ -44,7 +44,7 @@ export async function promptInstallConfig(detected: DetectedConfig): Promise<Ins
     message: "Do you have an OpenAI/ChatGPT Plus subscription?",
     options: [
       { value: "no", label: "No", hint: "Oracle will use fallback models" },
-      { value: "yes", label: "Yes", hint: "GPT-5.2 for Oracle (high-IQ debugging)" },
+      { value: "yes", label: "Yes", hint: "GPT-5.4 for Oracle (high-IQ debugging)" },
     ],
     initialValue: initial.openai,
   })
@@ -54,7 +54,7 @@ export async function promptInstallConfig(detected: DetectedConfig): Promise<Ins
     message: "Will you integrate Google Gemini?",
     options: [
       { value: "no", label: "No", hint: "Frontend/docs agents will use fallback" },
-      { value: "yes", label: "Yes", hint: "Beautiful UI generation with Gemini 3 Pro" },
+      { value: "yes", label: "Yes", hint: "Beautiful UI generation with Gemini 3.1 Pro" },
     ],
     initialValue: initial.gemini,
   })
@@ -74,7 +74,7 @@ export async function promptInstallConfig(detected: DetectedConfig): Promise<Ins
     message: "Do you have access to OpenCode Zen (opencode/ models)?",
     options: [
       { value: "no", label: "No", hint: "Will use other configured providers" },
-      { value: "yes", label: "Yes", hint: "opencode/claude-opus-4-6, opencode/gpt-5.2, etc." },
+      { value: "yes", label: "Yes", hint: "opencode/claude-opus-4-6, opencode/gpt-5.4, etc." },
     ],
     initialValue: initial.opencodeZen,
   })
@@ -97,8 +97,18 @@ export async function promptInstallConfig(detected: DetectedConfig): Promise<Ins
       { value: "yes", label: "Yes", hint: "Kimi K2.5 for Sisyphus/Prometheus fallback" },
     ],
     initialValue: initial.kimiForCoding,
-  })
+})
   if (!kimiForCoding) return null
+
+  const opencodeGo = await selectOrCancel({
+    message: "Do you have an OpenCode Go subscription?",
+    options: [
+      { value: "no", label: "No", hint: "Will use other configured providers" },
+      { value: "yes", label: "Yes", hint: "OpenCode Go for quick tasks" },
+    ],
+    initialValue: initial.opencodeGo,
+  })
+  if (!opencodeGo) return null
 
   return {
     hasClaude: claude !== "no",
@@ -109,5 +119,6 @@ export async function promptInstallConfig(detected: DetectedConfig): Promise<Ins
     hasOpencodeZen: opencodeZen === "yes",
     hasZaiCodingPlan: zaiCodingPlan === "yes",
     hasKimiForCoding: kimiForCoding === "yes",
+    hasOpencodeGo: opencodeGo === "yes",
   }
 }

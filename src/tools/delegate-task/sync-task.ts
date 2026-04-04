@@ -1,5 +1,5 @@
 import type { ModelFallbackInfo } from "../../features/task-toast-manager/types"
-import type { DelegateTaskArgs, ToolContextWithMetadata } from "./types"
+import type { DelegateTaskArgs, ToolContextWithMetadata, DelegatedModelConfig } from "./types"
 import type { ExecutorContext, ParentContext } from "./executor-types"
 import { getTaskToastManager } from "../../features/task-toast-manager"
 import { storeToolMetadata } from "../../features/tool-metadata-store"
@@ -17,18 +17,34 @@ export async function executeSyncTask(
   executorCtx: ExecutorContext,
   parentContext: ParentContext,
   agentToUse: string,
-  categoryModel: { providerID: string; modelID: string; variant?: string } | undefined,
+  categoryModel: DelegatedModelConfig | undefined,
   systemContent: string | undefined,
   modelInfo?: ModelFallbackInfo,
   fallbackChain?: import("../../shared/model-requirements").FallbackEntry[],
   deps: SyncTaskDeps = syncTaskDeps
 ): Promise<string> {
-  const { client, directory, onSyncSessionCreated, syncPollTimeoutMs } = executorCtx
+  const { manager, client, directory, onSyncSessionCreated, syncPollTimeoutMs } = executorCtx
   const toastManager = getTaskToastManager()
   let taskId: string | undefined
   let syncSessionID: string | undefined
+  let spawnReservation:
+    | Awaited<ReturnType<ExecutorContext["manager"]["reserveSubagentSpawn"]>>
+    | undefined
 
   try {
+    if (typeof manager?.reserveSubagentSpawn === "function") {
+      spawnReservation = await manager.reserveSubagentSpawn(parentContext.sessionID)
+    }
+
+    const spawnContext = spawnReservation?.spawnContext
+      ?? (typeof manager?.assertCanSpawn === "function"
+        ? await manager.assertCanSpawn(parentContext.sessionID)
+        : {
+            rootSessionID: parentContext.sessionID,
+            parentDepth: 0,
+            childDepth: 1,
+          })
+
     const createSessionResult = await deps.createSyncSession(client, {
       parentSessionID: parentContext.sessionID,
       agentToUse,
@@ -37,10 +53,12 @@ export async function executeSyncTask(
     })
 
     if (!createSessionResult.ok) {
+      spawnReservation?.rollback()
       return createSessionResult.error
     }
 
     const sessionID = createSessionResult.sessionID
+    spawnReservation?.commit()
     syncSessionID = sessionID
     subagentSessions.add(sessionID)
     syncSubagentSessions.add(sessionID)
@@ -90,7 +108,9 @@ export async function executeSyncTask(
         run_in_background: args.run_in_background,
         sessionId: sessionID,
         sync: true,
+        spawnDepth: spawnContext.childDepth,
         command: args.command,
+        model: categoryModel ? { providerID: categoryModel.providerID, modelID: categoryModel.modelID } : undefined,
       },
     }
     await ctx.metadata?.(syncTaskMeta)
@@ -106,6 +126,7 @@ export async function executeSyncTask(
       categoryModel,
       toastManager,
       taskId,
+      sisyphusAgentConfig: executorCtx.sisyphusAgentConfig,
     })
     if (promptError) {
       return promptError
@@ -129,9 +150,23 @@ export async function executeSyncTask(
 
       const duration = formatDuration(startTime)
 
+      // 检测模型路由是否与父 session 不同，给用户可见的提示
+      const actualModelStr = categoryModel
+        ? `${categoryModel.providerID}/${categoryModel.modelID}`
+        : undefined
+      const parentModelStr = parentContext.model
+        ? `${parentContext.model.providerID}/${parentContext.model.modelID}`
+        : undefined
+      const modelRoutingNote =
+        actualModelStr && parentModelStr && actualModelStr !== parentModelStr
+          ? `\n⚠️  Model routing: parent used ${parentModelStr}, this subagent used ${actualModelStr} (via category: ${args.category ?? "unknown"})`
+          : actualModelStr
+            ? `\nModel: ${actualModelStr}${args.category ? ` (category: ${args.category})` : ""}`
+            : ""
+
       return `Task completed in ${duration}.
 
-Agent: ${agentToUse}${args.category ? ` (category: ${args.category})` : ""}
+Agent: ${agentToUse}${args.category ? ` (category: ${args.category})` : ""}${modelRoutingNote}
 
 ---
 
@@ -146,6 +181,7 @@ session_id: ${sessionID}
       }
     }
   } catch (error) {
+    spawnReservation?.rollback()
     return formatDetailedError(error, {
       operation: "Execute task",
       args,

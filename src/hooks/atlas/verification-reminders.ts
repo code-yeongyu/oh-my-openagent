@@ -1,34 +1,77 @@
 import { VERIFICATION_REMINDER } from "./system-reminder-templates"
 
+function buildReuseHint(sessionId: string): string {
+  return `
+**PREFERRED REUSE SESSION FOR THE CURRENT TOP-LEVEL PLAN TASK**
+
+- Reuse \`${sessionId}\` first if verification fails or the result needs follow-up.
+- Start a fresh subagent session only when reuse is unavailable or would cross task boundaries.
+`
+}
+
+export function buildCompletionGate(planName: string, sessionId: string): string {
+  return `
+**COMPLETION GATE - DO NOT PROCEED UNTIL THIS IS DONE**
+
+Your completion will NOT be recorded until you complete ALL of the following:
+
+1. **Edit** the plan file \`.sisyphus/plans/${planName}.md\`:
+   - Change \`- [ ]\` to \`- [x]\` for the completed task
+   - Use \`Edit\` tool to modify the checkbox
+
+2. **Read** the plan file AGAIN:
+   \`\`\`
+   Read(".sisyphus/plans/${planName}.md")
+   \`\`\`
+   - Verify the checkbox count changed (more \`- [x]\` than before)
+
+3. **DO NOT call \`task()\` again** until you have completed steps 1 and 2 above.
+
+If anything fails while closing this out, resume the same session immediately:
+\`\`\`typescript
+task(session_id="${sessionId}", load_skills=[], prompt="fix: checkbox not recorded correctly")
+\`\`\`
+
+**Your completion is NOT tracked until the checkbox is marked in the plan file.**
+
+**VERIFICATION_REMINDER**
+${buildReuseHint(sessionId)}`
+}
+
 function buildVerificationReminder(sessionId: string): string {
-  return `${VERIFICATION_REMINDER}
+  return `**VERIFICATION_REMINDER**
+
+${VERIFICATION_REMINDER}
 
 ---
 
 **If ANY verification fails, use this immediately:**
 \`\`\`
-task(session_id="${sessionId}", prompt="fix: [describe the specific failure]")
-\`\`\``
+task(session_id="${sessionId}", load_skills=[], prompt="fix: [describe the specific failure]")
+\`\`\`
+
+${buildReuseHint(sessionId)}`
 }
 
 export function buildOrchestratorReminder(
   planName: string,
   progress: { total: number; completed: number },
   sessionId: string,
-  autoCommit: boolean = true
+  autoCommit: boolean = true,
+  includeCompletionGate: boolean = true
 ): string {
   const remaining = progress.total - progress.completed
-  
+
   const commitStep = autoCommit
     ? `
-**STEP 8: COMMIT ATOMIC UNIT**
+**STEP 7: COMMIT ATOMIC UNIT**
 
 - Stage ONLY the verified changes
 - Commit with clear message describing what was done
 `
     : ""
 
-  const nextStepNumber = autoCommit ? 9 : 8
+  const nextStepNumber = autoCommit ? 8 : 7
 
   return `
 ---
@@ -37,7 +80,9 @@ export function buildOrchestratorReminder(
 
 ---
 
-${buildVerificationReminder(sessionId)}
+${includeCompletionGate ? `${buildCompletionGate(planName, sessionId)}
+
+` : ""}${buildVerificationReminder(sessionId)}
 
 **STEP 5: READ SUBAGENT NOTEPAD (LEARNINGS, ISSUES, PROBLEMS)**
 
@@ -45,7 +90,7 @@ The subagent was instructed to record findings in notepad files. Read them NOW:
 \`\`\`
 Glob(".sisyphus/notepads/${planName}/*.md")
 \`\`\`
-Then \`Read\` each file found — especially:
+Then \`Read\` each file found - especially:
 - **learnings.md**: Patterns, conventions, successful approaches discovered
 - **issues.md**: Problems, blockers, gotchas encountered during work
 - **problems.md**: Unresolved issues, technical debt flagged
@@ -55,7 +100,7 @@ Then \`Read\` each file found — especially:
 - Adjust your plan if blockers were discovered
 - Propagate learnings to subsequent subagents
 
-**STEP 6: CHECK BOULDER STATE DIRECTLY (EVERY TIME — NO EXCEPTIONS)**
+**STEP 6: CHECK BOULDER STATE DIRECTLY (EVERY TIME - NO EXCEPTIONS)**
 
 Do NOT rely on cached progress. Read the plan file NOW:
 \`\`\`
@@ -64,24 +109,55 @@ Read(".sisyphus/plans/${planName}.md")
 Count exactly: how many \`- [ ]\` remain? How many \`- [x]\` completed?
 This is YOUR ground truth. Use it to decide what comes next.
 
-**STEP 7: MARK COMPLETION IN PLAN FILE (IMMEDIATELY)**
-
-RIGHT NOW - Do not delay. Verification passed → Mark IMMEDIATELY.
-
-Update the plan file \`.sisyphus/plans/${planName}.md\`:
-- Change \`- [ ]\` to \`- [x]\` for the completed task
-- Use \`Edit\` tool to modify the checkbox
-
-**DO THIS BEFORE ANYTHING ELSE. Unmarked = Untracked = Lost progress.**
 ${commitStep}
 **STEP ${nextStepNumber}: PROCEED TO NEXT TASK**
 
 - Read the plan file AGAIN to identify the next \`- [ ]\` task
 - Start immediately - DO NOT STOP
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 **${remaining} tasks remain. Keep bouldering.**`
+}
+
+export function buildFinalWaveApprovalReminder(
+  planName: string,
+  progress: { total: number; completed: number },
+  sessionId: string
+): string {
+  const remaining = progress.total - progress.completed
+
+  return `
+---
+
+**BOULDER STATE:** Plan: \
+\`${planName}\` | ${progress.completed}/${progress.total} done | ${remaining} remaining
+
+---
+
+${buildVerificationReminder(sessionId)}
+
+**FINAL WAVE APPROVAL GATE**
+
+The last Final Verification Wave result just passed.
+This is the ONLY point where approval-style user interaction is required.
+
+1. Read \
+\`.sisyphus/plans/${planName}.md\` again and confirm every remaining unchecked **top-level** task belongs to F1-F4.
+   Ignore nested checkboxes under Acceptance Criteria, Evidence, or Final Checklist sections.
+2. Consolidate the F1-F4 verdicts into a short summary for the user.
+3. Tell the user all final reviewers approved.
+4. Ask for explicit user approval before editing any remaining final-wave checkboxes or marking the plan complete.
+5. Wait for the user's explicit approval. Do NOT auto-continue. Do NOT call \
+\`task()\` again unless the user rejects and requests fixes.
+
+If the user rejects or requests changes:
+- delegate the required fix
+- re-run the affected final-wave reviewer
+- present the updated results again
+- wait again for explicit user approval
+
+**DO NOT mark the final-wave checkbox complete until the user explicitly says okay.**`
 }
 
 export function buildStandaloneVerificationReminder(sessionId: string): string {
@@ -90,7 +166,7 @@ export function buildStandaloneVerificationReminder(sessionId: string): string {
 
 ${buildVerificationReminder(sessionId)}
 
-**STEP 5: CHECK YOUR PROGRESS DIRECTLY (EVERY TIME — NO EXCEPTIONS)**
+**STEP 5: CHECK YOUR PROGRESS DIRECTLY (EVERY TIME - NO EXCEPTIONS)**
 
 Do NOT rely on memory or cached state. Run \`todoread\` NOW to see exact current state.
 Count pending vs completed tasks. This is your ground truth for what comes next.

@@ -12,6 +12,7 @@ import { createMetisAgent, metisPromptMetadata } from "./metis"
 import { createAtlasAgent, atlasPromptMetadata } from "./atlas"
 import { createMomusAgent, momusPromptMetadata } from "./momus"
 import { createHephaestusAgent } from "./hephaestus"
+import { createSisyphusJuniorAgentWithOverrides } from "./sisyphus-junior"
 import type { AvailableCategory } from "./dynamic-agent-prompt-builder"
 import {
   fetchAvailableModels,
@@ -44,6 +45,7 @@ const agentSources: Record<BuiltinAgentName, AgentSource> = {
   // because it needs OrchestratorContext, not just a model string
   atlas: createAtlasAgent as AgentFactory,
   cerberus: createCerberusAgent as AgentFactory,
+  "sisyphus-junior": createSisyphusJuniorAgentWithOverrides as unknown as AgentFactory,
 }
 
 /**
@@ -86,7 +88,7 @@ export async function createBuiltinAgents(
   )
   // IMPORTANT: Do NOT call OpenCode client APIs during plugin initialization.
   // This function is called from config handler, and calling client API causes deadlock.
-  // See: https://github.com/code-yeongyu/oh-my-opencode/issues/1301
+  // See: https://github.com/code-yeongyu/oh-my-openagent/issues/1301
   const availableModels = await fetchAvailableModels(undefined, {
     connectedProviders: mergedConnectedProviders.length > 0 ? mergedConnectedProviders : undefined,
   })
@@ -117,26 +119,10 @@ export async function createBuiltinAgents(
     browserProvider,
     uiSelectedModel,
     availableModels,
+    isFirstRunNoCache,
     disabledSkills,
     disableOmoEnv,
   })
-
-  const registeredAgents = parseRegisteredAgentSummaries(customAgentSummaries)
-  const builtinAgentNames = new Set(Object.keys(agentSources).map((name) => name.toLowerCase()))
-  const disabledAgentNames = new Set(disabledAgents.map((name) => name.toLowerCase()))
-
-  for (const agent of registeredAgents) {
-    const lowerName = agent.name.toLowerCase()
-    if (builtinAgentNames.has(lowerName)) continue
-    if (disabledAgentNames.has(lowerName)) continue
-    if (availableAgents.some((availableAgent) => availableAgent.name.toLowerCase() === lowerName)) continue
-
-    availableAgents.push({
-      name: agent.name,
-      description: agent.description,
-      metadata: buildCustomAgentMetadata(agent.name, agent.description),
-    })
-  }
 
   const sisyphusConfig = maybeCreateSisyphusConfig({
     disabledAgents,

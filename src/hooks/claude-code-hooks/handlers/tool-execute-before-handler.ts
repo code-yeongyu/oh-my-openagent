@@ -43,8 +43,6 @@ export function createToolExecuteBeforeHandler(ctx: PluginInput, config: PluginC
 			log("todowrite: parsed todos string to array", { sessionID: input.sessionID })
 		}
 
-		const claudeConfig = await loadClaudeHooksConfig()
-		const extendedConfig = await loadPluginExtendedConfig()
 
 		appendTranscriptEntry(input.sessionID, {
 			type: "tool_use",
@@ -58,6 +56,9 @@ export function createToolExecuteBeforeHandler(ctx: PluginInput, config: PluginC
 		if (isHookDisabled(config, "PreToolUse")) {
 			return
 		}
+
+		const claudeConfig = await loadClaudeHooksConfig()
+		const extendedConfig = await loadPluginExtendedConfig()
 
 		const preCtx: PreToolUseContext = {
 			sessionId: input.sessionID,

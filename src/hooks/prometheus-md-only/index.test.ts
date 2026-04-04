@@ -1,4 +1,4 @@
-import { describe, expect, test, beforeEach, afterEach, mock } from "bun:test"
+import { afterAll, describe, expect, test, beforeEach, afterEach, mock } from "bun:test"
 import { mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
@@ -10,6 +10,10 @@ mock.module("../../shared/opencode-storage-detection", () => ({
   isSqliteBackend: () => false,
   resetSqliteBackendCache: () => {},
 }))
+
+afterAll(() => {
+  mock.restore()
+})
 
 const { createPrometheusMdOnlyHook } = await import("./index")
 const { MESSAGE_STORAGE } = await import("../../features/hook-message-injector")
@@ -66,7 +70,7 @@ describe("prometheus-md-only", () => {
       //#when //#then
       await expect(
         hook["tool.execute.before"](input, output)
-      ).rejects.toThrow("can only write/edit .md files")
+      ).rejects.toThrow("File operations restricted to .sisyphus/*.md plan files only")
     })
 
     test("should enforce md-only restriction for Prometheus display name Plan Builder", async () => {
@@ -85,7 +89,7 @@ describe("prometheus-md-only", () => {
       //#when //#then
       await expect(
         hook["tool.execute.before"](input, output)
-      ).rejects.toThrow("can only write/edit .md files")
+      ).rejects.toThrow("File operations restricted to .sisyphus/*.md plan files only")
     })
 
     test("should enforce md-only restriction for Prometheus display name Planner", async () => {
@@ -104,7 +108,7 @@ describe("prometheus-md-only", () => {
       //#when //#then
       await expect(
         hook["tool.execute.before"](input, output)
-      ).rejects.toThrow("can only write/edit .md files")
+      ).rejects.toThrow("File operations restricted to .sisyphus/*.md plan files only")
     })
 
     test("should enforce md-only restriction for uppercase PROMETHEUS", async () => {
@@ -123,7 +127,7 @@ describe("prometheus-md-only", () => {
       //#when //#then
       await expect(
         hook["tool.execute.before"](input, output)
-      ).rejects.toThrow("can only write/edit .md files")
+      ).rejects.toThrow("File operations restricted to .sisyphus/*.md plan files only")
     })
 
     test("should not enforce restriction for non-Prometheus agent", async () => {
@@ -185,7 +189,7 @@ describe("prometheus-md-only", () => {
       // when / #then
       await expect(
         hook["tool.execute.before"](input, output)
-      ).rejects.toThrow("can only write/edit .md files")
+      ).rejects.toThrow("File operations restricted to .sisyphus/*.md plan files only")
     })
 
     test("should allow Prometheus to write .md files inside .sisyphus/", async () => {
@@ -262,7 +266,7 @@ describe("prometheus-md-only", () => {
       // when / #then
       await expect(
         hook["tool.execute.before"](input, output)
-      ).rejects.toThrow("can only write/edit .md files inside .sisyphus/")
+      ).rejects.toThrow("File operations restricted to .sisyphus/*.md plan files only")
     })
 
     test("should block Edit tool for non-.md files", async () => {
@@ -280,7 +284,7 @@ describe("prometheus-md-only", () => {
       // when / #then
       await expect(
         hook["tool.execute.before"](input, output)
-      ).rejects.toThrow("can only write/edit .md files")
+      ).rejects.toThrow("File operations restricted to .sisyphus/*.md plan files only")
     })
 
     test("should allow bash commands from Prometheus", async () => {
@@ -337,7 +341,7 @@ describe("prometheus-md-only", () => {
       ).resolves.toBeUndefined()
     })
 
-    test("should inject read-only warning when Prometheus calls task", async () => {
+    test("should inject planning warning when Prometheus calls task", async () => {
       // given
       const hook = createPrometheusMdOnlyHook(createMockPluginInput())
       const input = {
@@ -357,7 +361,7 @@ describe("prometheus-md-only", () => {
       expect(output.args.prompt).toContain("DO NOT modify any files")
     })
 
-    test("should inject read-only warning when Prometheus calls task", async () => {
+    test("should inject planning warning when Prometheus calls task", async () => {
       // given
       const hook = createPrometheusMdOnlyHook(createMockPluginInput())
       const input = {
@@ -376,7 +380,7 @@ describe("prometheus-md-only", () => {
       expect(output.args.prompt).toContain(SYSTEM_DIRECTIVE_PREFIX)
     })
 
-    test("should inject read-only warning when Prometheus calls call_omo_agent", async () => {
+    test("should inject planning warning when Prometheus calls call_omo_agent", async () => {
       // given
       const hook = createPrometheusMdOnlyHook(createMockPluginInput())
       const input = {
@@ -540,7 +544,7 @@ describe("prometheus-md-only", () => {
       // when / then - should block because boulder says prometheus
       await expect(
         hook["tool.execute.before"](input, output)
-      ).rejects.toThrow("can only write/edit .md files")
+      ).rejects.toThrow("File operations restricted to .sisyphus/*.md plan files only")
     })
 
     test("should fall back to message files when session not in boulder", async () => {
@@ -573,7 +577,7 @@ describe("prometheus-md-only", () => {
       // when / then - should block because falls back to message files (prometheus)
       await expect(
         hook["tool.execute.before"](input, output)
-      ).rejects.toThrow("can only write/edit .md files")
+      ).rejects.toThrow("File operations restricted to .sisyphus/*.md plan files only")
     })
   })
 
@@ -675,7 +679,7 @@ describe("prometheus-md-only", () => {
        // when / #then
        await expect(
          hook["tool.execute.before"](input, output)
-       ).rejects.toThrow("can only write/edit .md files inside .sisyphus/")
+       ).rejects.toThrow("File operations restricted to .sisyphus/*.md plan files only")
      })
 
      test("should allow nested .sisyphus directories (ctx.directory may be parent)", async () => {
@@ -713,7 +717,7 @@ describe("prometheus-md-only", () => {
        // when / #then
        await expect(
          hook["tool.execute.before"](input, output)
-       ).rejects.toThrow("can only write/edit .md files inside .sisyphus/")
+       ).rejects.toThrow("File operations restricted to .sisyphus/*.md plan files only")
      })
 
      test("should allow case-insensitive .SISYPHUS directory", async () => {
@@ -790,7 +794,7 @@ describe("prometheus-md-only", () => {
        // when / #then
        await expect(
          hook["tool.execute.before"](input, output)
-       ).rejects.toThrow("can only write/edit .md files")
+       ).rejects.toThrow("File operations restricted to .sisyphus/*.md plan files only")
      })
   })
 })

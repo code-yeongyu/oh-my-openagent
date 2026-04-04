@@ -26,4 +26,6 @@ export const GITHUB_INSTRUCTIONS_PATTERN = /\.instructions\.md$/;
 
 export const USER_RULE_DIR = ".claude/rules";
 
+export const OPENCODE_USER_RULE_DIRS = [".sisyphus/rules", ".opencode/rules"];
+
 export const RULE_EXTENSIONS = [".md", ".mdc"];

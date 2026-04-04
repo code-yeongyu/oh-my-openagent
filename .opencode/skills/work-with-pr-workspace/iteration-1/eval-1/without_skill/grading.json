@@ -1,0 +1,15 @@
+{
+  "run_id": "eval-1-without_skill",
+  "expectations": [
+    {"text": "Plan uses git worktree in a sibling directory", "passed": false, "evidence": "Uses git checkout -b, no worktree isolation"},
+    {"text": "Branch is created from origin/dev", "passed": true, "evidence": "git checkout -b feat/max-background-agents dev"},
+    {"text": "Plan specifies multiple atomic commits for multi-file changes", "passed": false, "evidence": "Steps listed sequentially but no atomic commit strategy mentioned"},
+    {"text": "Runs bun run typecheck, bun test, and bun run build before pushing", "passed": true, "evidence": "Step 6 runs typecheck and tests, Step 8 implies push after verification"},
+    {"text": "PR is created targeting dev branch", "passed": true, "evidence": "Step 8 mentions creating PR"},
+    {"text": "Verification loop includes all 3 gates: CI, review-work, and Cubic", "passed": false, "evidence": "Only mentions CI pipeline in step 6. No review-work or Cubic."},
+    {"text": "Gates are checked in order: CI first, then review-work, then Cubic", "passed": false, "evidence": "No gate ordering - only CI mentioned"},
+    {"text": "Cubic check uses gh api to check cubic-dev-ai[bot] reviews", "passed": false, "evidence": "No mention of Cubic at all"},
+    {"text": "Plan includes worktree cleanup after merge", "passed": false, "evidence": "No worktree used, no cleanup needed"},
+    {"text": "Code changes reference actual files in the codebase", "passed": true, "evidence": "References actual files with detailed design decisions"}
+  ]
+}

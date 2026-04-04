@@ -8,6 +8,7 @@
  */
 
 import { resolvePromptAppend } from "../builtin-agents/resolve-file-uri"
+import { buildAntiDuplicationSection } from "../dynamic-agent-prompt-builder"
 
 export function buildDefaultSisyphusJuniorPrompt(
   useTaskSystem: boolean,
@@ -23,6 +24,8 @@ Sisyphus-Junior - Focused executor from OhMyOpenCode.
 Execute tasks directly.
 </Role>
 
+${buildAntiDuplicationSection()}
+
 ${todoDiscipline}
 
 <Verification>
@@ -31,6 +34,11 @@ Task NOT complete without:
 - Build passes (if applicable)
 - ${verificationText}
 </Verification>
+
+<Termination>
+STOP after first successful verification. Do NOT re-verify.
+Maximum status checks: 2. Then stop regardless.
+</Termination>
 
 <Style>
 - Start immediately. No acknowledgments.

@@ -2,19 +2,26 @@ import { log } from "../../shared/logger"
 import { SYSTEM_DIRECTIVE_PREFIX } from "../../shared/system-directive"
 import { isCallerOrchestrator } from "../../shared/session-utils"
 import type { PluginInput } from "@opencode-ai/plugin"
+import { readBoulderState, readCurrentTopLevelTask } from "../../features/boulder-state"
 import { HOOK_NAME } from "./hook-name"
 import { ORCHESTRATOR_DELEGATION_REQUIRED, SINGLE_TASK_DIRECTIVE } from "./system-reminder-templates"
 import { isSisyphusPath } from "./sisyphus-path"
+import type { PendingTaskRef, TrackedTopLevelTaskRef } from "./types"
 import { isWriteOrEditToolName } from "./write-edit-tool-policy"
 
 export function createToolExecuteBeforeHandler(input: {
   ctx: PluginInput
   pendingFilePaths: Map<string, string>
+  pendingTaskRefs: Map<string, PendingTaskRef>
 }): (
   toolInput: { tool: string; sessionID?: string; callID?: string },
   toolOutput: { args: Record<string, unknown>; message?: string }
 ) => Promise<void> {
-  const { ctx, pendingFilePaths } = input
+  const { ctx, pendingFilePaths, pendingTaskRefs } = input
+
+  function trackTask(callID: string, task: TrackedTopLevelTaskRef): void {
+    pendingTaskRefs.set(callID, { kind: "track", task })
+  }
 
   return async (toolInput, toolOutput): Promise<void> => {
     if (!(await isCallerOrchestrator(toolInput.sessionID, ctx.client))) {
@@ -43,6 +50,46 @@ export function createToolExecuteBeforeHandler(input: {
 
     // Check task - inject single-task directive
     if (toolInput.tool === "task") {
+      if (toolInput.callID) {
+        const requestedSessionId = toolOutput.args.session_id as string | undefined
+        if (requestedSessionId) {
+          pendingTaskRefs.set(toolInput.callID, {
+            kind: "skip",
+            reason: "explicit_resume",
+          })
+        } else {
+          const boulderState = readBoulderState(ctx.directory)
+          const currentTask = boulderState
+            ? readCurrentTopLevelTask(boulderState.active_plan)
+            : null
+          if (currentTask) {
+            const task = {
+              key: currentTask.key,
+              label: currentTask.label,
+              title: currentTask.title,
+            }
+            const hasExistingClaim = [...pendingTaskRefs.values()].some((pendingTaskRef) => (
+              pendingTaskRef.kind === "track" && pendingTaskRef.task.key === task.key
+            ))
+
+            if (hasExistingClaim) {
+              pendingTaskRefs.set(toolInput.callID, {
+                kind: "skip",
+                reason: "ambiguous_task_key",
+                task,
+              })
+              log(`[${HOOK_NAME}] Skipping task session persistence for ambiguous task key`, {
+                sessionID: toolInput.sessionID,
+                callID: toolInput.callID,
+                taskKey: task.key,
+              })
+            } else {
+              trackTask(toolInput.callID, task)
+            }
+          }
+        }
+      }
+
       const prompt = toolOutput.args.prompt as string | undefined
       if (prompt && !prompt.includes(SYSTEM_DIRECTIVE_PREFIX)) {
         toolOutput.args.prompt = `<system-reminder>${SINGLE_TASK_DIRECTIVE}</system-reminder>\n` + prompt

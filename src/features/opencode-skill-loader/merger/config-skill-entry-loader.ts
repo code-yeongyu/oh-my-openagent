@@ -5,6 +5,8 @@ import { existsSync, readFileSync } from "fs"
 import { dirname, isAbsolute, resolve } from "path"
 import { homedir } from "os"
 import { parseFrontmatter } from "../../../shared/frontmatter"
+import { isWithinProject } from "../../../shared/contains-path"
+import { log } from "../../../shared/logger"
 import { sanitizeModelField } from "../../../shared/model-sanitizer"
 import { resolveSkillPathReferences } from "../../../shared/skill-path-resolver"
 import { parseAllowedTools } from "../allowed-tools-parser"
@@ -46,10 +48,22 @@ export function configEntryToLoadedSkill(
 ): LoadedSkill | null {
   let template = entry.template || ""
   let fileMetadata: SkillMetadata = {}
+  let sourcePath: string | undefined
 
   if (entry.from) {
-    const filePath = resolveFilePath(entry.from, configDir)
-    const loaded = loadSkillFromFile(filePath)
+    sourcePath = resolveFilePath(entry.from, configDir)
+    const projectRoot = configDir || process.cwd()
+
+    if (!isWithinProject(sourcePath, projectRoot)) {
+      log("[config-skill-entry-loader] Rejected skill entry file outside project root", {
+        from: entry.from,
+        filePath: sourcePath,
+        projectRoot,
+      })
+      return null
+    }
+
+    const loaded = loadSkillFromFile(sourcePath)
     if (loaded) {
       template = loaded.template
       fileMetadata = loaded.metadata
@@ -63,9 +77,7 @@ export function configEntryToLoadedSkill(
   }
 
   const description = entry.description || fileMetadata.description || ""
-  const resolvedPath = entry.from
-    ? dirname(resolveFilePath(entry.from, configDir))
-    : configDir || process.cwd()
+  const resolvedPath = sourcePath ? dirname(sourcePath) : configDir || process.cwd()
 
   const resolvedTemplate = resolveSkillPathReferences(template.trim(), resolvedPath)
   const wrappedTemplate = `<skill-instruction>
@@ -93,7 +105,7 @@ $ARGUMENTS
 
   return {
     name,
-    path: entry.from ? resolveFilePath(entry.from, configDir) : undefined,
+    path: sourcePath,
     resolvedPath,
     definition,
     scope: "config",

@@ -90,6 +90,30 @@ describe("resolveSkillPathReferences", () => {
 		expect(result).toBe("No path references here")
 	})
 
+	it("does not resolve npm scoped packages in commands", () => {
+		//#given
+		const content = "npx --package=@mycom/my_mcp_tools@beta cli my_cmd_tool XXX"
+		const basePath = "C:/Users/Admin/.config/opencode/skills/my_skills"
+
+		//#when
+		const result = resolveSkillPathReferences(content, basePath)
+
+		//#then
+		expect(result).toBe("npx --package=@mycom/my_mcp_tools@beta cli my_cmd_tool XXX")
+	})
+
+	it("does not resolve npm scoped packages without version suffix", () => {
+		//#given
+		const content = "npm install @angular/core @types/node"
+		const basePath = "/skills/frontend"
+
+		//#when
+		const result = resolveSkillPathReferences(content, basePath)
+
+		//#then
+		expect(result).toBe("npm install @angular/core @types/node")
+	})
+
 	it("handles basePath with trailing slash", () => {
 		//#given
 		const content = "@scripts/search.py"
@@ -100,5 +124,29 @@ describe("resolveSkillPathReferences", () => {
 
 		//#then
 		expect(result).toBe("/skills/frontend/scripts/search.py")
+	})
+
+	it("does not resolve traversal paths that escape the base directory", () => {
+		//#given
+		const content = "Read @data/../../../../etc/passwd before running"
+		const basePath = "/skills/frontend"
+
+		//#when
+		const result = resolveSkillPathReferences(content, basePath)
+
+		//#then
+		expect(result).toBe("Read @data/../../../../etc/passwd before running")
+	})
+
+	it("does not resolve directory traversal with trailing slash", () => {
+		//#given
+		const content = "Inspect @data/../../../secret/"
+		const basePath = "/skills/frontend"
+
+		//#when
+		const result = resolveSkillPathReferences(content, basePath)
+
+		//#then
+		expect(result).toBe("Inspect @data/../../../secret/")
 	})
 })

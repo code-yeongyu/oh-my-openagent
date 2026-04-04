@@ -1,17 +1,26 @@
-import { join } from "path"
+import { isAbsolute, relative, resolve, sep } from "node:path"
 
-/**
- * Resolves @path references in skill content to absolute paths.
- *
- * Matches @references that contain at least one slash (e.g., @scripts/search.py, @data/)
- * to avoid false positives with decorators (@param), JSDoc tags (@ts-ignore), etc.
- *
- * Email addresses are excluded since they have alphanumeric characters before @.
- */
+function looksLikeFilePath(path: string): boolean {
+	if (path.endsWith("/")) return true
+	const lastSegment = path.split("/").pop() ?? ""
+	return /\.[a-zA-Z0-9]+$/.test(lastSegment)
+}
+
 export function resolveSkillPathReferences(content: string, basePath: string): string {
 	const normalizedBase = basePath.endsWith("/") ? basePath.slice(0, -1) : basePath
 	return content.replace(
 		/(?<![a-zA-Z0-9])@([a-zA-Z0-9_-]+\/[a-zA-Z0-9_.\-\/]*)/g,
-		(_, relativePath: string) => join(normalizedBase, relativePath)
+		(match, relativePath: string) => {
+			if (!looksLikeFilePath(relativePath)) return match
+			const resolvedPath = resolve(normalizedBase, relativePath)
+			const relativePathFromBase = relative(normalizedBase, resolvedPath)
+			if (relativePathFromBase.startsWith("..") || isAbsolute(relativePathFromBase)) {
+				return match
+			}
+			if (relativePath.endsWith("/") && !resolvedPath.endsWith(sep)) {
+				return `${resolvedPath}/`
+			}
+			return resolvedPath
+		}
 	)
 }

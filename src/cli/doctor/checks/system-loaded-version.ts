@@ -1,11 +1,11 @@
 import { existsSync, readFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { join } from "node:path"
-
+import { resolveSymlink } from "../../../shared/file-utils"
 import { getLatestVersion } from "../../../hooks/auto-update-checker/checker"
 import { extractChannel } from "../../../hooks/auto-update-checker"
 import { PACKAGE_NAME } from "../constants"
-import { getOpenCodeCacheDir, parseJsonc } from "../../../shared"
+import { getOpenCodeCacheDir, getOpenCodeConfigPaths, parseJsonc } from "../../../shared"
 
 interface PackageJsonShape {
   version?: string
@@ -36,6 +36,11 @@ function resolveOpenCodeCacheDir(): string {
   return platformDefault
 }
 
+function resolveExistingDir(dirPath: string): string {
+  if (!existsSync(dirPath)) return dirPath
+  return resolveSymlink(dirPath)
+}
+
 function readPackageJson(filePath: string): PackageJsonShape | null {
   if (!existsSync(filePath)) return null
 
@@ -54,9 +59,25 @@ function normalizeVersion(value: string | undefined): string | null {
 }
 
 export function getLoadedPluginVersion(): LoadedVersionInfo {
-  const cacheDir = resolveOpenCodeCacheDir()
-  const cachePackagePath = join(cacheDir, "package.json")
-  const installedPackagePath = join(cacheDir, "node_modules", PACKAGE_NAME, "package.json")
+  const configPaths = getOpenCodeConfigPaths({ binary: "opencode" })
+  const configDir = resolveExistingDir(configPaths.configDir)
+  const cacheDir = resolveExistingDir(resolveOpenCodeCacheDir())
+  const candidates = [
+    {
+      cacheDir: configDir,
+      cachePackagePath: join(configDir, "package.json"),
+      installedPackagePath: join(configDir, "node_modules", PACKAGE_NAME, "package.json"),
+    },
+    {
+      cacheDir,
+      cachePackagePath: join(cacheDir, "package.json"),
+      installedPackagePath: join(cacheDir, "node_modules", PACKAGE_NAME, "package.json"),
+    },
+  ]
+
+  const selectedCandidate = candidates.find((candidate) => existsSync(candidate.installedPackagePath)) ?? candidates[0]
+
+  const { cacheDir: selectedDir, cachePackagePath, installedPackagePath } = selectedCandidate
 
   const cachePackage = readPackageJson(cachePackagePath)
   const installedPackage = readPackageJson(installedPackagePath)
@@ -65,7 +86,7 @@ export function getLoadedPluginVersion(): LoadedVersionInfo {
   const loadedVersion = normalizeVersion(installedPackage?.version)
 
   return {
-    cacheDir,
+    cacheDir: selectedDir,
     cachePackagePath,
     installedPackagePath,
     expectedVersion,
