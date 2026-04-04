@@ -3535,10 +3535,10 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
 
     getTaskMap(manager).set(task.id, task)
 
-    //#when — session is actively running
+    //#when - session is actively running
     await manager["checkAndInterruptStaleTasks"]({ "session-running": { type: "running" } })
 
-    //#then — task survives because session is running
+    //#then - task survives because session is running
     expect(task.status).toBe("running")
   })
 
@@ -3575,10 +3575,10 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
 
     getTaskMap(manager).set(task.id, task)
 
-    //#when — session is idle
+    //#when - session is idle
     await manager["checkAndInterruptStaleTasks"]({ "session-idle": { type: "idle" } })
 
-    //#then — killed because session is idle with stale lastUpdate
+    //#then - killed because session is idle with stale lastUpdate
     expect(task.status).toBe("cancelled")
     expect(task.error).toContain("Stale timeout")
   })
@@ -3612,15 +3612,15 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
 
     getTaskMap(manager).set(task.id, task)
 
-    //#when — session is running, lastUpdate 15min old
+    //#when - session is running, lastUpdate 15min old
     await manager["checkAndInterruptStaleTasks"]({ "session-long": { type: "running" } })
 
-    //#then — running sessions are NEVER stale-killed
+    //#then - running sessions are NEVER stale-killed
     expect(task.status).toBe("running")
   })
 
   test("should NOT interrupt running session with no progress (undefined lastUpdate)", async () => {
-    //#given — no progress at all, but session is running
+    //#given - no progress at all, but session is running
     const client = {
       session: {
         prompt: async () => ({}),
@@ -3646,10 +3646,10 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
 
     getTaskMap(manager).set(task.id, task)
 
-    //#when — session is running despite no progress
+    //#when - session is running despite no progress
     await manager["checkAndInterruptStaleTasks"]({ "session-rnp": { type: "running" } })
 
-    //#then — running sessions are NEVER killed
+    //#then - running sessions are NEVER killed
     expect(task.status).toBe("running")
   })
 
@@ -3685,10 +3685,10 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
 
     getTaskMap(manager).set(task.id, task)
 
-    //#when — no progress update for 15 minutes
+    //#when - no progress update for 15 minutes
     await manager["checkAndInterruptStaleTasks"]({})
 
-    //#then — killed because session gone from status registry
+    //#then - killed because session gone from status registry
     expect(task.status).toBe("cancelled")
     expect(task.error).toContain("session gone from status registry")
   })
@@ -3719,10 +3719,10 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
 
     getTaskMap(manager).set(task.id, task)
 
-    //#when — only 5 min since start, within 10min session-gone timeout
+    //#when - only 5 min since start, within 10min session-gone timeout
     await manager["checkAndInterruptStaleTasks"]({})
 
-    //#then — task survives
+    //#then - task survives
     expect(task.status).toBe("running")
   })
 })
