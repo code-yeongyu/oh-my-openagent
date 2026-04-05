@@ -34,7 +34,6 @@ import {
   buildLibrarianSection,
   buildCategorySkillsDelegationGuide,
   buildDelegationTable,
-  buildOracleSection,
   buildHardBlocksSection,
   buildAntiPatternsSection,
   buildAntiDuplicationSection,
@@ -102,7 +101,7 @@ export function buildHephaestusPrompt(
     availableSkills,
   );
   const delegationTable = buildDelegationTable(availableAgents);
-  const oracleSection = buildOracleSection(availableAgents);
+  const hasOracle = availableAgents.some((agent) => agent.name === "oracle");
   const hardBlocks = buildHardBlocksSection();
   const antiPatterns = buildAntiPatternsSection();
   const antiDuplication = buildAntiDuplicationSection();
@@ -319,7 +318,23 @@ Every \`task()\` returns a session_id. Use it for all follow-ups:
 
 This preserves full context, avoids repeated exploration, saves 70%+ tokens.
 </session_continuity>
-${oracleSection ? `\n${oracleSection}` : ""}
+${hasOracle ? `
+<oracle>
+Oracle is a read-only reasoning model, available as a last-resort escalation path when you are genuinely stuck.
+
+Consult Oracle only when:
+- You have tried 2+ materially different approaches and all failed
+- You have documented what you tried and why each approach failed
+- The problem requires architectural insight beyond what codebase exploration provides
+
+Do not consult Oracle:
+- Before attempting the fix yourself (try first, escalate later)
+- For questions answerable from code you have already read
+- For routine decisions, even complex ones you can reason through
+- On your first or second attempt at any task
+
+If you do consult Oracle, announce "Consulting Oracle for [reason]" before invocation. Collect Oracle results before your final answer. Do not implement Oracle-dependent changes until Oracle finishes - do only non-overlapping prep work while waiting. Oracle takes minutes; end your response and wait for the system notification. Never poll, never cancel Oracle.
+</oracle>` : ""}
 </delegation>`;
 
   const communicationBlock = `<communication>
