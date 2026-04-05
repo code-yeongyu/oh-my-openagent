@@ -10,6 +10,7 @@ const TEST_PART_STORAGE = join(TEST_DIR, "part")
 const TEST_SESSION_STORAGE = join(TEST_DIR, "session")
 const TEST_TODO_DIR = join(TEST_DIR, "todos")
 const TEST_TRANSCRIPT_DIR = join(TEST_DIR, "transcripts")
+let sqliteBackend = false
 
 mock.module("./constants", () => ({
   OPENCODE_STORAGE: TEST_DIR,
@@ -27,7 +28,7 @@ mock.module("./constants", () => ({
 }))
 
 mock.module("../../shared/opencode-storage-detection", () => ({
-  isSqliteBackend: () => false,
+  isSqliteBackend: () => sqliteBackend,
   resetSqliteBackendCache: () => {},
 }))
 
@@ -69,6 +70,7 @@ const storage = await import("./storage")
 
 describe("session-manager storage", () => {
   beforeEach(() => {
+    sqliteBackend = false
     if (existsSync(TEST_DIR)) {
       rmSync(TEST_DIR, { recursive: true, force: true })
     }
@@ -81,6 +83,8 @@ describe("session-manager storage", () => {
   })
 
   afterEach(() => {
+    sqliteBackend = false
+    storage.resetStorageClient()
     if (existsSync(TEST_DIR)) {
       rmSync(TEST_DIR, { recursive: true, force: true })
     }
@@ -234,6 +238,47 @@ describe("session-manager storage", () => {
     expect(info?.message_count).toBe(2)
     expect(info?.agents_used).toContain("build")
     expect(info?.agents_used).toContain("oracle")
+  })
+
+  test("getSessionInfo uses SDK session messages on sqlite backend", async () => {
+    sqliteBackend = true
+    const now = Date.now()
+
+    storage.setStorageClient({
+      session: {
+        messages: async () => ({
+          data: [
+            {
+              info: {
+                id: "msg_sqlite_1",
+                role: "user",
+                agent: "atlas",
+                time: { created: now - 5000, updated: now - 5000 },
+              },
+              parts: [],
+            },
+            {
+              info: {
+                id: "msg_sqlite_2",
+                role: "assistant",
+                agent: "prometheus",
+                time: { created: now, updated: now },
+              },
+              parts: [],
+            },
+          ],
+        }),
+        todo: async () => ({ data: [] }),
+      },
+    } as never)
+
+    const info = await getSessionInfo("ses_sqlite")
+
+    expect(info).not.toBeNull()
+    expect(info?.id).toBe("ses_sqlite")
+    expect(info?.message_count).toBe(2)
+    expect(info?.agents_used).toContain("atlas")
+    expect(info?.agents_used).toContain("prometheus")
   })
 })
 
