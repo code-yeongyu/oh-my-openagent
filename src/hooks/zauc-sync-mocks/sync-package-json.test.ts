@@ -1,31 +1,36 @@
-import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
+import { afterAll, afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
-import type { PluginEntryInfo } from "./plugin-entry"
+import type { PluginEntryInfo } from "../auto-update-checker/checker/plugin-entry"
 
 const TEST_CACHE_DIR = join(import.meta.dir, "__test-sync-cache__")
 
 let importCounter = 0
 
-async function importFreshSyncPackageJsonModule(): Promise<typeof import("./sync-package-json")> {
-  mock.module("../constants", () => ({
+// Capture real modules BEFORE mocking
+const _realConstants = require("../auto-update-checker/constants")
+const _realLogger = require("../../shared/logger")
+const _realNodeFs = require("node:fs")
+
+async function importFreshSyncPackageJsonModule(): Promise<typeof import("../auto-update-checker/checker/sync-package-json")> {
+  mock.module("../auto-update-checker/constants", () => ({
     CACHE_DIR: TEST_CACHE_DIR,
     PACKAGE_NAME: "oh-my-opencode",
     NPM_REGISTRY_URL: "https://registry.npmjs.org/-/package/oh-my-opencode/dist-tags",
     NPM_FETCH_TIMEOUT: 5000,
     VERSION_FILE: join(TEST_CACHE_DIR, "version"),
-    USER_CONFIG_DIR: "/tmp/opencode-config",
-    USER_OPENCODE_CONFIG: "/tmp/opencode-config/opencode.json",
-    USER_OPENCODE_CONFIG_JSONC: "/tmp/opencode-config/opencode.jsonc",
     INSTALLED_PACKAGE_JSON: join(TEST_CACHE_DIR, "node_modules", "oh-my-opencode", "package.json"),
+    getUserConfigDir: () => "/tmp/opencode-config",
+    getUserOpencodeConfig: () => "/tmp/opencode-config/opencode.json",
+    getUserOpencodeConfigJsonc: () => "/tmp/opencode-config/opencode.jsonc",
     getWindowsAppdataDir: () => null,
   }))
 
-  mock.module("../../../shared/logger", () => ({
+  mock.module("../../shared/logger", () => ({
     log: () => {},
   }))
 
-  const syncPackageJsonModule = await import(`./sync-package-json?test=${importCounter++}`)
+  const syncPackageJsonModule = await import(`../auto-update-checker/checker/sync-package-json?test=${importCounter++}`)
   mock.restore()
   return syncPackageJsonModule
 }
@@ -143,7 +148,7 @@ describe("syncCachePackageJsonToIntent", () => {
   })
 
   describe("#given cache package.json does not exist", () => {
-    it("#then returns file_not_found error", async () => {
+    it("#then creates cache package.json with the plugin dependency", async () => {
       cleanupTestCache()
       const { syncCachePackageJsonToIntent } = await importFreshSyncPackageJsonModule()
 
@@ -156,13 +161,14 @@ describe("syncCachePackageJsonToIntent", () => {
 
       const result = syncCachePackageJsonToIntent(pluginInfo)
 
-      expect(result.synced).toBe(false)
-      expect(result.error).toBe("file_not_found")
+      expect(result.synced).toBe(true)
+      expect(result.error).toBeNull()
+      expect(readCachePackageJsonVersion()).toBe("latest")
     })
   })
 
   describe("#given plugin not in cache package.json dependencies", () => {
-    it("#then returns plugin_not_in_deps error", async () => {
+    it("#then adds the plugin dependency and preserves existing dependencies", async () => {
       cleanupTestCache()
       mkdirSync(TEST_CACHE_DIR, { recursive: true })
       writeFileSync(
@@ -181,8 +187,13 @@ describe("syncCachePackageJsonToIntent", () => {
 
       const result = syncCachePackageJsonToIntent(pluginInfo)
 
-      expect(result.synced).toBe(false)
-      expect(result.error).toBe("plugin_not_in_deps")
+      expect(result.synced).toBe(true)
+      expect(result.error).toBeNull()
+
+      const content = readFileSync(join(TEST_CACHE_DIR, "package.json"), "utf-8")
+      const pkg = JSON.parse(content) as { dependencies?: Record<string, string> }
+      expect(pkg.dependencies?.["oh-my-opencode"]).toBe("latest")
+      expect(pkg.dependencies?.other).toBe("1.0.0")
     })
   })
 
@@ -346,4 +357,11 @@ describe("syncCachePackageJsonToIntent", () => {
       }
     })
   })
+})
+
+afterAll(() => {
+  mock.module("../auto-update-checker/constants", () => _realConstants)
+  mock.module("../../shared/logger", () => _realLogger)
+  mock.module("node:fs", () => _realNodeFs)
+  mock.restore()
 })

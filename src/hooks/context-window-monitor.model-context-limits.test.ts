@@ -173,7 +173,7 @@ describe("context-window-monitor modelContextLimitsCache", () => {
         const output = createOutput()
         await hook["tool.execute.after"]({ tool: "bash", sessionID, callID: "call_1" }, output)
 
-        // then — 160K/500K = 32%, well below 70% threshold
+        // then - 160K/500K = 32%, well below 70% threshold
         expect(output.output).toBe("original")
       })
     })

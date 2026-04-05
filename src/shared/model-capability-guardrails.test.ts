@@ -29,7 +29,7 @@ describe("model-capability-guardrails", () => {
     const brokenSnapshot: ModelCapabilitiesSnapshot = {
       ...bundledSnapshot,
       models: Object.fromEntries(
-        Object.entries(bundledSnapshot.models).filter(([modelID]) => modelID !== "gemini-3.1-pro"),
+        Object.entries(bundledSnapshot.models).filter(([modelID]) => modelID !== "gemini-3-pro-preview"),
       ),
     }
 
@@ -41,13 +41,13 @@ describe("model-capability-guardrails", () => {
     expect(issues).toContainEqual(
       expect.objectContaining({
         kind: "alias-target-missing-from-snapshot",
-        aliasModelID: "gemini-3.1-pro-high",
-        canonicalModelID: "gemini-3.1-pro",
+        aliasModelID: "gemini-3-pro-high",
+        canonicalModelID: "gemini-3-pro-preview",
       }),
     )
   })
 
-  test("flags exact aliases when models.dev gains a canonical entry for the alias itself", () => {
+  test("flags pattern aliases when models.dev gains a canonical entry for the alias itself", () => {
     const bundledSnapshot = getBundledModelCapabilitiesSnapshot()
     const aliasCollisionSnapshot: ModelCapabilitiesSnapshot = {
       ...bundledSnapshot,
@@ -68,9 +68,37 @@ describe("model-capability-guardrails", () => {
 
     expect(issues).toContainEqual(
       expect.objectContaining({
-        kind: "exact-alias-collides-with-snapshot",
-        aliasModelID: "gemini-3.1-pro-high",
+        kind: "pattern-alias-collides-with-snapshot",
+        modelID: "gemini-3.1-pro-high",
         canonicalModelID: "gemini-3.1-pro",
+      }),
+    )
+  })
+
+  test("flags exact aliases when models.dev gains a canonical entry for the alias itself", () => {
+    const bundledSnapshot = getBundledModelCapabilitiesSnapshot()
+    const aliasCollisionSnapshot: ModelCapabilitiesSnapshot = {
+      ...bundledSnapshot,
+      models: {
+        ...bundledSnapshot.models,
+        "gemini-3-pro-high": {
+          id: "gemini-3-pro-high",
+          family: "gemini",
+          reasoning: true,
+        },
+      },
+    }
+
+    const issues = collectModelCapabilityGuardrailIssues({
+      snapshot: aliasCollisionSnapshot,
+      requirementModelIDs: [],
+    })
+
+    expect(issues).toContainEqual(
+      expect.objectContaining({
+        kind: "exact-alias-collides-with-snapshot",
+        aliasModelID: "gemini-3-pro-high",
+        canonicalModelID: "gemini-3-pro-preview",
       }),
     )
   })

@@ -37,7 +37,13 @@ export function createTodoContinuationHandler(args: {
       const error = props?.error as { name?: string } | undefined
       if (error?.name === "MessageAbortedError" || error?.name === "AbortError") {
         const state = sessionStateStore.getState(sessionID)
+        state.wasCancelled = true
         state.abortDetectedAt = Date.now()
+        state.lastIncompleteCount = undefined
+        state.lastInjectedAt = undefined
+        state.awaitingPostInjectionProgressCheck = false
+        state.stagnationCount = 0
+        state.consecutiveFailures = 0
         log(`[${HOOK_NAME}] Abort detected via session.error`, { sessionID, errorName: error.name })
       }
 

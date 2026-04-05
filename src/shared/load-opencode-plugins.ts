@@ -5,7 +5,7 @@ import * as path from "node:path"
 import { parseJsoncSafe } from "./jsonc-parser"
 
 interface OpencodeConfig {
-  plugin?: string[]
+  plugin?: (string | [string, ...unknown[]])[]
 }
 
 function getWindowsAppdataDir(): string | null {
@@ -44,7 +44,9 @@ export function loadOpencodePlugins(directory: string): string[] {
       const result = parseJsoncSafe<OpencodeConfig>(content)
       const plugins = result.data?.plugin ?? []
 
-      for (const plugin of plugins) {
+      for (const rawPlugin of plugins) {
+        const plugin = typeof rawPlugin === "string" ? rawPlugin : Array.isArray(rawPlugin) ? rawPlugin[0] : null
+        if (typeof plugin !== "string") continue
         if (seenPluginEntries.has(plugin)) continue
         seenPluginEntries.add(plugin)
         pluginEntries.push(plugin)

@@ -8,11 +8,14 @@ import { readConnectedProvidersCache } from "./connected-providers-cache"
 const RETRYABLE_ERROR_NAMES = new Set([
   "providermodelnotfounderror",
   "ratelimiterror",
-  "quotaexceedederror",
-  "insufficientcreditserror",
   "modelunavailableerror",
   "providerconnectionerror",
   "authenticationerror",
+])
+
+const STOP_ERROR_NAMES = new Set([
+  "quotaexceedederror",
+  "insufficientcreditserror",
   "freeusagelimiterror",
 ])
 
@@ -49,6 +52,7 @@ const RETRYABLE_MESSAGE_PATTERNS = [
   "over limit",
   "overloaded",
   "bad gateway",
+  "bad request",
   "unknown provider",
   "provider not found",
   "model_not_supported",
@@ -104,6 +108,9 @@ export function isRetryableModelError(error: ErrorInfo): boolean {
     const errorNameLower = error.name.toLowerCase()
     // Explicit non-retryable takes precedence
     if (NON_RETRYABLE_ERROR_NAMES.has(errorNameLower)) {
+      return false
+    }
+    if (STOP_ERROR_NAMES.has(errorNameLower)) {
       return false
     }
     // Check if it's a known retryable error

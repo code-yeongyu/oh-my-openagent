@@ -23,15 +23,18 @@ interface PluginExtendedConfigCacheEntry {
   cachedAt: number
 }
 
-const USER_CONFIG_PATH = join(getOpenCodeConfigDir({ binary: "opencode" }), "opencode-cc-plugin.json")
 const configCache = new Map<string, PluginExtendedConfigCacheEntry>()
+
+function getUserConfigPath(): string {
+  return join(getOpenCodeConfigDir({ binary: "opencode" }), "opencode-cc-plugin.json")
+}
 
 function getProjectConfigPath(): string {
   return join(process.cwd(), ".opencode", "opencode-cc-plugin.json")
 }
 
 function getCacheKey(): string {
-  return process.cwd()
+  return `${process.cwd()}::${getUserConfigPath()}`
 }
 
 function getCachedConfig(cacheKey: string): PluginExtendedConfig | undefined {
@@ -89,7 +92,7 @@ export async function loadPluginExtendedConfig(): Promise<PluginExtendedConfig> 
     return cachedConfig
   }
 
-  const userConfig = await loadConfigFromPath(USER_CONFIG_PATH)
+  const userConfig = await loadConfigFromPath(getUserConfigPath())
   const projectConfig = await loadConfigFromPath(getProjectConfigPath())
 
   const merged: PluginExtendedConfig = {

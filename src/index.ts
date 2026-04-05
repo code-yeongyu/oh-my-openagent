@@ -5,7 +5,7 @@ import type { HookName } from "./config"
 
 import { createHooks } from "./create-hooks"
 import { createManagers } from "./create-managers"
-import { createRuntimeTmuxConfig } from "./create-runtime-tmux-config"
+import { createRuntimeTmuxConfig, isTmuxIntegrationEnabled } from "./create-runtime-tmux-config"
 import { createTools } from "./create-tools"
 import { createPluginInterface } from "./plugin-interface"
 import { createPluginDispose, type PluginDispose } from "./plugin-dispose"
@@ -33,10 +33,13 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   }
 
   injectServerAuthIntoClient(ctx.client)
-  startTmuxCheck()
   await activePluginDispose?.()
 
   const pluginConfig = loadPluginConfig(ctx.directory, ctx)
+  const tmuxIntegrationEnabled = isTmuxIntegrationEnabled(pluginConfig)
+  if (tmuxIntegrationEnabled) {
+    startTmuxCheck()
+  }
   const disabledHooks = new Set(pluginConfig.disabled_hooks ?? [])
 
   const isHookEnabled = (hookName: HookName): boolean => !disabledHooks.has(hookName)

@@ -6,10 +6,6 @@ import type { PluginInfo } from "./system-plugin"
 
 type SystemModule = typeof import("./system")
 
-async function importFreshSystemModule(): Promise<SystemModule> {
-  return import(`./system?test=${Date.now()}-${Math.random()}`)
-}
-
 const mockFindOpenCodeBinary = mock(async () => ({ path: "/usr/local/bin/opencode" }))
 const mockGetOpenCodeVersion = mock(async () => "1.0.200")
 const mockCompareVersions = mock((_leftVersion?: string, _rightVersion?: string) => true)
@@ -31,25 +27,36 @@ const mockGetLoadedPluginVersion = mock(() => ({
 const mockGetLatestPluginVersion = mock(async (_currentVersion: string | null) => null as string | null)
 const mockGetSuggestedInstallTag = mock(() => "latest")
 
-mock.module("./system-binary", () => ({
-  findOpenCodeBinary: mockFindOpenCodeBinary,
-  getOpenCodeVersion: mockGetOpenCodeVersion,
-  compareVersions: mockCompareVersions,
-}))
-
-mock.module("./system-plugin", () => ({
-  getPluginInfo: mockGetPluginInfo,
-}))
-
-mock.module("./system-loaded-version", () => ({
-  getLoadedPluginVersion: mockGetLoadedPluginVersion,
-  getLatestPluginVersion: mockGetLatestPluginVersion,
-  getSuggestedInstallTag: mockGetSuggestedInstallTag,
-}))
+const realSystemBinary = require("./system-binary")
+const realSystemPlugin = require("./system-plugin")
+const realSystemLoadedVersion = require("./system-loaded-version")
 
 afterAll(() => {
+  mock.module("./system-binary", () => realSystemBinary)
+  mock.module("./system-plugin", () => realSystemPlugin)
+  mock.module("./system-loaded-version", () => realSystemLoadedVersion)
   mock.restore()
 })
+
+async function importFreshSystemModule(): Promise<SystemModule> {
+  mock.module("./system-binary", () => ({
+    findOpenCodeBinary: mockFindOpenCodeBinary,
+    getOpenCodeVersion: mockGetOpenCodeVersion,
+    compareVersions: mockCompareVersions,
+  }))
+
+  mock.module("./system-plugin", () => ({
+    getPluginInfo: mockGetPluginInfo,
+  }))
+
+  mock.module("./system-loaded-version", () => ({
+    getLoadedPluginVersion: mockGetLoadedPluginVersion,
+    getLatestPluginVersion: mockGetLatestPluginVersion,
+    getSuggestedInstallTag: mockGetSuggestedInstallTag,
+  }))
+
+  return import(`./system?test=${Date.now()}-${Math.random()}`)
+}
 
 describe("system check", () => {
   beforeEach(() => {

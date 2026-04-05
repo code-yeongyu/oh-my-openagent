@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
+import { afterAll, afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
@@ -8,17 +8,21 @@ const TEST_USER_CONFIG_DIR = "/tmp/opencode-config"
 
 let importCounter = 0
 
-async function importFreshCacheModule(): Promise<typeof import("./cache")> {
-  mock.module("./constants", () => ({
+// Capture real modules BEFORE mocking
+const _realConstants = require("../auto-update-checker/constants")
+const _realLogger = require("../../shared/logger")
+
+async function importFreshCacheModule(): Promise<typeof import("../auto-update-checker/cache")> {
+  mock.module("../auto-update-checker/constants", () => ({
     CACHE_DIR: TEST_OPENCODE_CACHE_DIR,
-    USER_CONFIG_DIR: TEST_USER_CONFIG_DIR,
     PACKAGE_NAME: "oh-my-opencode",
     NPM_REGISTRY_URL: "https://registry.npmjs.org/-/package/oh-my-opencode/dist-tags",
     NPM_FETCH_TIMEOUT: 5000,
     VERSION_FILE: join(TEST_OPENCODE_CACHE_DIR, "version"),
-    USER_OPENCODE_CONFIG: join(TEST_USER_CONFIG_DIR, "opencode.json"),
-    USER_OPENCODE_CONFIG_JSONC: join(TEST_USER_CONFIG_DIR, "opencode.jsonc"),
     INSTALLED_PACKAGE_JSON: join(TEST_OPENCODE_CACHE_DIR, "node_modules", "oh-my-opencode", "package.json"),
+    getUserConfigDir: () => TEST_USER_CONFIG_DIR,
+    getUserOpencodeConfig: () => join(TEST_USER_CONFIG_DIR, "opencode.json"),
+    getUserOpencodeConfigJsonc: () => join(TEST_USER_CONFIG_DIR, "opencode.jsonc"),
     getWindowsAppdataDir: () => null,
   }))
 
@@ -26,7 +30,7 @@ async function importFreshCacheModule(): Promise<typeof import("./cache")> {
     log: () => {},
   }))
 
-  const cacheModule = await import(`./cache?test=${importCounter++}`)
+  const cacheModule = await import(`../auto-update-checker/cache?test=${importCounter++}`)
   mock.restore()
   return cacheModule
 }
@@ -99,4 +103,10 @@ describe("invalidatePackage", () => {
     expect(bunLock.packages?.["oh-my-opencode"]).toBeUndefined()
     expect(bunLock.packages?.other).toEqual({})
   })
+})
+
+afterAll(() => {
+  mock.module("../auto-update-checker/constants", () => _realConstants)
+  mock.module("../../shared/logger", () => _realLogger)
+  mock.restore()
 })

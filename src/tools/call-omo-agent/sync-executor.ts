@@ -3,6 +3,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { subagentSessions, syncSubagentSessions } from "../../features/claude-code-session-state"
 import { clearSessionFallbackChain, setSessionFallbackChain } from "../../hooks/model-fallback/hook"
 import { getAgentToolRestrictions, log } from "../../shared"
+import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
 import type { DelegatedModelConfig } from "../../shared/model-resolution-types"
 import type { FallbackEntry } from "../../shared/model-requirements"
 import { waitForCompletion } from "./completion-poller"
@@ -32,6 +33,24 @@ const defaultDeps: ExecuteSyncDeps = {
   processMessages,
   setSessionFallbackChain,
   clearSessionFallbackChain,
+}
+
+function buildPromptGenerationParams(model: DelegatedModelConfig | undefined): Record<string, unknown> {
+  if (!model) {
+    return {}
+  }
+
+  const promptOptions: Record<string, unknown> = {
+    ...(model.reasoningEffort ? { reasoningEffort: model.reasoningEffort } : {}),
+    ...(model.thinking ? { thinking: model.thinking } : {}),
+    ...(model.maxTokens !== undefined ? { maxTokens: model.maxTokens } : {}),
+  }
+
+  return {
+    ...(model.temperature !== undefined ? { temperature: model.temperature } : {}),
+    ...(model.top_p !== undefined ? { topP: model.top_p } : {}),
+    ...(Object.keys(promptOptions).length > 0 ? { options: promptOptions } : {}),
+  }
 }
 
 export async function executeSync(
@@ -69,6 +88,8 @@ export async function executeSync(
       appliedFallbackChain = true
     }
 
+    applySessionPromptParams(sessionID, model)
+
     await Promise.resolve(
       toolContext.metadata?.({
         title: args.description,
@@ -92,6 +113,7 @@ export async function executeSync(
           parts: [{ type: "text", text: args.prompt }],
           ...(model ? { model: { providerID: model.providerID, modelID: model.modelID } } : {}),
           ...(model?.variant ? { variant: model.variant } : {}),
+          ...buildPromptGenerationParams(model),
         },
       })
     } catch (error) {

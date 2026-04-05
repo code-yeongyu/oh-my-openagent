@@ -463,6 +463,97 @@ describe("todo-continuation-enforcer", () => {
     expect(promptCalls).toHaveLength(0)
   })
 
+  test("should cancel countdown on assistant activity with real message.part.updated payload shape", async () => {
+    // given - session starting countdown
+    const sessionID = "main-assistant-real-part"
+    setMainSession(sessionID)
+
+    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
+
+    // when - session goes idle
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+
+    // when - assistant part update arrives with actual sync payload shape
+    await fakeTimers.advanceBy(500)
+    await hook.handler({
+      event: {
+        type: "message.part.updated",
+        properties: {
+          sessionID,
+          part: {
+            id: "part-1",
+            messageID: "msg-1",
+            sessionID,
+            type: "text",
+            text: "working",
+          },
+          time: Date.now(),
+        },
+      },
+    })
+
+    await fakeTimers.advanceBy(3000)
+
+    // then - no continuation injected (cancelled)
+    expect(promptCalls).toHaveLength(0)
+  })
+
+  test("should cancel countdown on assistant activity with message.part.delta payload", async () => {
+    // given - session starting countdown
+    const sessionID = "main-assistant-delta"
+    setMainSession(sessionID)
+
+    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
+
+    // when - session goes idle
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+
+    // when - assistant delta arrives
+    await fakeTimers.advanceBy(500)
+    await hook.handler({
+      event: {
+        type: "message.part.delta",
+        properties: {
+          sessionID,
+          messageID: "msg-1",
+          partID: "part-1",
+          field: "text",
+          delta: "x",
+        },
+      },
+    })
+
+    await fakeTimers.advanceBy(3000)
+
+    // then - no continuation injected (cancelled)
+    expect(promptCalls).toHaveLength(0)
+  })
+
+  test("should fetch session messages only once during a single idle evaluation", async () => {
+    // given
+    const sessionID = "main-single-messages-fetch"
+    setMainSession(sessionID)
+    let messagesCallCount = 0
+    const mockInput = createMockPluginInput()
+    mockInput.client.session.messages = async () => {
+      messagesCallCount += 1
+      return { data: mockMessages }
+    }
+    const hook = createTodoContinuationEnforcer(mockInput, {})
+
+    // when
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+
+    // then
+    expect(messagesCallCount).toBe(1)
+  })
+
   test("should cancel countdown on tool execution", async () => {
     // given - session starting countdown
     const sessionID = "main-tool"
@@ -1179,7 +1270,7 @@ describe("todo-continuation-enforcer", () => {
     expect(promptCalls).toHaveLength(0)
   })
 
-  test("should inject when abort flag is stale (>3s old)", async () => {
+  test("should keep skipping after cancel even when the abort window is stale", async () => {
     fakeTimers.restore()
     // given - session with incomplete todos and old abort timestamp
     const sessionID = "main-stale-abort"
@@ -1208,8 +1299,7 @@ describe("todo-continuation-enforcer", () => {
 
     await wait(3000)
 
-    // then - continuation injected (abort flag is stale)
-    expect(promptCalls.length).toBeGreaterThan(0)
+    expect(promptCalls).toHaveLength(0)
   }, { timeout: 15000 })
 
   test("should clear abort flag on user message activity", async () => {
@@ -1250,6 +1340,44 @@ describe("todo-continuation-enforcer", () => {
 
     // then - continuation injected (abort flag was cleared by user activity)
     expect(promptCalls.length).toBeGreaterThan(0)
+  }, { timeout: 15000 })
+
+  test("should reset failure state and keep skipping after a cancelled run", async () => {
+    fakeTimers.restore()
+    const sessionID = "main-reset-after-cancel"
+    setMainSession(sessionID)
+    mockMessages = [
+      { info: { id: "msg-1", role: "user" } },
+      { info: { id: "msg-2", role: "assistant" } },
+    ]
+
+    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
+
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+
+    await wait(2500)
+    expect(promptCalls.length).toBeGreaterThan(0)
+
+    promptCalls.length = 0
+
+    await hook.handler({
+      event: {
+        type: "session.error",
+        properties: { sessionID, error: { name: "MessageAbortedError" } },
+      },
+    })
+
+    await wait(3100)
+
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+
+    await wait(2500)
+
+    expect(promptCalls).toHaveLength(0)
   }, { timeout: 15000 })
 
   test("should clear abort flag on assistant message activity", async () => {
@@ -1774,5 +1902,65 @@ describe("todo-continuation-enforcer", () => {
     // then - no continuation injected (all countdowns cancelled)
     expect(promptCalls).toHaveLength(0)
   })
+
+  test("should reset consecutiveFailures after user-initiated abort and resume after fresh activity [regression #2984]", async () => {
+    fakeTimers.restore()
+    const sessionID = "main-abort-recovery"
+    setMainSession(sessionID)
+    const mockInput = createMockPluginInput()
+    mockInput.client.session.todo = async () => ({
+      data: [
+        { id: "1", content: "Write tests", status: "pending", priority: "high" },
+      ],
+    })
+
+    let shouldFail = true
+    let promptCallCount = 0
+    mockInput.client.session.promptAsync = async (_opts: PromptRequestOptions) => {
+      promptCallCount++
+      if (shouldFail) {
+        throw new Error("promptAsync failed (3ms) unknown error")
+      }
+      promptCalls.push({
+        sessionID: _opts.path.id,
+        agent: _opts.body.agent,
+        model: _opts.body.model,
+        text: _opts.body.parts[0].text,
+      })
+    }
+
+    const hook = createTodoContinuationEnforcer(mockInput, {})
+
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await wait(2500)
+    expect(promptCallCount).toBe(1)
+
+    await hook.handler({
+      event: {
+        type: "session.error",
+        properties: { sessionID, error: { name: "MessageAbortedError" } },
+      },
+    })
+
+    shouldFail = false
+    await wait(9000)
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await wait(2500)
+    expect(promptCallCount).toBe(1)
+
+    await hook.handler({
+      event: {
+        type: "message.updated",
+        properties: { info: { sessionID, role: "user" } },
+      },
+    })
+
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await wait(2500)
+
+    expect(promptCallCount).toBe(2)
+    expect(promptCalls).toHaveLength(1)
+  }, { timeout: 20000 })
+
 
 })

@@ -12,9 +12,18 @@ export const EXCLUDED_ENV_PATTERNS: RegExp[] = [
   /^ANTHROPIC_API_KEY$/i,
   /^AWS_ACCESS_KEY_ID$/i,
   /^AWS_SECRET_ACCESS_KEY$/i,
+  /^GOOGLE_APPLICATION_CREDENTIALS$/i,
+  /^GOOGLE_CLOUD_PROJECT$/i,
   /^GITHUB_TOKEN$/i,
   /^DATABASE_URL$/i,
   /^OPENAI_API_KEY$/i,
+  /^AZURE_/i,
+  /^GCP_/i,
+  /^FIREBASE_/i,
+  /^HEROKU_/i,
+  /^DOCKER_AUTH/i,
+  /^KUBECONFIG$/i,
+  /^VAULT_/i,
 
   // Suffix-based patterns for common secret naming conventions
   /_KEY$/i,
@@ -22,6 +31,7 @@ export const EXCLUDED_ENV_PATTERNS: RegExp[] = [
   /_TOKEN$/i,
   /_PASSWORD$/i,
   /_CREDENTIAL$/i,
+  /_CREDENTIALS$/i,
   /_API_KEY$/i,
 ]
 

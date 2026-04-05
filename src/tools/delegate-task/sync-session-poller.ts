@@ -5,6 +5,7 @@ import { log } from "../../shared/logger"
 import { normalizeSDKResponse } from "../../shared"
 
 const NON_TERMINAL_FINISH_REASONS = new Set(["tool-calls", "unknown"])
+const PENDING_TOOL_PART_TYPES = new Set(["tool", "tool_use", "tool-call"])
 
 function wait(milliseconds: number): Promise<void> {
   const sharedBuffer = new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT)
@@ -35,6 +36,7 @@ export function isSessionComplete(messages: SessionMessage[]): boolean {
 
   if (!lastAssistant?.info?.finish) return false
   if (NON_TERMINAL_FINISH_REASONS.has(lastAssistant.info.finish)) return false
+  if (lastAssistant.parts?.some((part) => part.type && PENDING_TOOL_PART_TYPES.has(part.type))) return false
   if (!lastUser?.info?.id || !lastAssistant?.info?.id) return false
   return lastUser.info.id < lastAssistant.info.id
 }

@@ -19,6 +19,16 @@ export class TmuxPollingManager {
     private closeSessionById: (sessionId: string) => Promise<void>
   ) {}
 
+  handleEvent(event: { type: string; properties?: Record<string, unknown> }): void {
+    const sessionId = this.getEventSessionId(event)
+    if (!sessionId) return
+
+    const tracked = this.sessions.get(sessionId)
+    if (!tracked) return
+
+    tracked.activityVersion = (tracked.activityVersion ?? 0) + 1
+  }
+
   startPolling(): void {
     if (this.pollInterval) return
 
@@ -73,42 +83,29 @@ export class TmuxPollingManager {
         let shouldCloseViaStability = false
 
         if (isIdle && elapsedMs >= MIN_STABILITY_TIME_MS) {
-          try {
-            const messagesResult = await this.client.session.messages({ 
-              path: { id: sessionId } 
-            })
-            const currentMsgCount = Array.isArray(messagesResult.data) 
-              ? messagesResult.data.length 
-              : 0
+          const activityVersion = tracked.activityVersion ?? 0
 
-            if (tracked.lastMessageCount === currentMsgCount) {
-              tracked.stableIdlePolls = (tracked.stableIdlePolls ?? 0) + 1
-              
-              if (tracked.stableIdlePolls >= STABLE_POLLS_REQUIRED) {
-                const recheckResult = await this.client.session.status({ path: undefined })
-                const recheckStatuses = normalizeSDKResponse(recheckResult, {} as Record<string, { type: string }>)
-                const recheckStatus = recheckStatuses[sessionId]
-                
-                if (recheckStatus?.type === "idle") {
-                  shouldCloseViaStability = true
-                } else {
-                  tracked.stableIdlePolls = 0
-                  log("[tmux-session-manager] stability reached but session not idle on recheck, resetting", {
-                    sessionId,
-                    recheckStatus: recheckStatus?.type,
-                  })
-                }
+          if (tracked.observedIdleActivityVersion === activityVersion) {
+            tracked.stableIdlePolls = (tracked.stableIdlePolls ?? 0) + 1
+
+            if (tracked.stableIdlePolls >= STABLE_POLLS_REQUIRED) {
+              const recheckResult = await this.client.session.status({ path: undefined })
+              const recheckStatuses = normalizeSDKResponse(recheckResult, {} as Record<string, { type: string }>)
+              const recheckStatus = recheckStatuses[sessionId]
+
+              if (recheckStatus?.type === "idle") {
+                shouldCloseViaStability = true
+              } else {
+                tracked.stableIdlePolls = 0
+                log("[tmux-session-manager] stability reached but session not idle on recheck, resetting", {
+                  sessionId,
+                  recheckStatus: recheckStatus?.type,
+                })
               }
-            } else {
-              tracked.stableIdlePolls = 0
             }
-            
-            tracked.lastMessageCount = currentMsgCount
-          } catch (msgErr) {
-            log("[tmux-session-manager] failed to fetch messages for stability check", {
-              sessionId,
-              error: String(msgErr),
-            })
+          } else {
+            tracked.stableIdlePolls = 0
+            tracked.observedIdleActivityVersion = activityVersion
           }
         } else if (!isIdle) {
           tracked.stableIdlePolls = 0
@@ -120,7 +117,8 @@ export class TmuxPollingManager {
           isIdle,
           elapsedMs,
           stableIdlePolls: tracked.stableIdlePolls,
-          lastMessageCount: tracked.lastMessageCount,
+          activityVersion: tracked.activityVersion,
+          observedIdleActivityVersion: tracked.observedIdleActivityVersion,
           missingSince,
           missingTooLong,
           isTimedOut,
@@ -141,5 +139,29 @@ export class TmuxPollingManager {
     } finally {
       this.pollingInFlight = false
     }
+  }
+
+  private getEventSessionId(event: { type: string; properties?: Record<string, unknown> }): string | undefined {
+    const properties = event.properties
+    if (!properties) return undefined
+
+    if (event.type === "message.updated") {
+      const info = properties.info
+      if (!info || typeof info !== "object") return undefined
+      const sessionId = (info as { sessionID?: unknown }).sessionID
+      return typeof sessionId === "string" ? sessionId : undefined
+    }
+
+    if (
+      event.type === "message.part.updated"
+      || event.type === "message.part.delta"
+      || event.type === "message.part.removed"
+      || event.type === "message.removed"
+    ) {
+      const sessionId = properties.sessionID
+      return typeof sessionId === "string" ? sessionId : undefined
+    }
+
+    return undefined
   }
 }

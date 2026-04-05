@@ -1,9 +1,27 @@
 import { describe, expect, it, beforeEach, afterEach, mock } from "bun:test"
 import { createHash, randomBytes } from "node:crypto"
-import { McpOAuthProvider, generateCodeVerifier, generateCodeChallenge, buildAuthorizationUrl } from "./provider"
 import type { OAuthTokenData } from "./storage"
 
+type ProviderModule = typeof import("./provider")
+
+async function importFreshProviderModule(): Promise<ProviderModule> {
+  return await import(new URL(`./provider.ts?real-provider-test=${Date.now()}-${Math.random()}`, import.meta.url).href)
+}
+
 describe("McpOAuthProvider", () => {
+  let McpOAuthProvider: ProviderModule["McpOAuthProvider"]
+  let generateCodeVerifier: ProviderModule["generateCodeVerifier"]
+  let generateCodeChallenge: ProviderModule["generateCodeChallenge"]
+  let buildAuthorizationUrl: ProviderModule["buildAuthorizationUrl"]
+
+  beforeEach(async () => {
+    const providerModule = await importFreshProviderModule()
+    McpOAuthProvider = providerModule.McpOAuthProvider
+    generateCodeVerifier = providerModule.generateCodeVerifier
+    generateCodeChallenge = providerModule.generateCodeChallenge
+    buildAuthorizationUrl = providerModule.buildAuthorizationUrl
+  })
+
   describe("generateCodeVerifier", () => {
     it("returns a base64url-encoded 32-byte random string", () => {
       // given

@@ -75,6 +75,7 @@ export function createMockContext(): PluginInput {
 
 export function setupDelayedTimeoutMocks(): {
   createUntrackedTimeout: () => ReturnType<typeof setTimeout>
+  runScheduledTimeout: (index: number) => void
   restore: () => void
   getClearTimeoutCalls: () => Array<ReturnType<typeof setTimeout>>
   getScheduledTimeouts: () => Array<ReturnType<typeof setTimeout>>
@@ -83,6 +84,7 @@ export function setupDelayedTimeoutMocks(): {
   const originalClearTimeout = globalThis.clearTimeout
   const clearTimeoutCalls: Array<ReturnType<typeof setTimeout>> = []
   const scheduledTimeouts: Array<ReturnType<typeof setTimeout>> = []
+  const scheduledCallbacks: Array<() => void> = []
 
   function createTimeoutHandle(): ReturnType<typeof setTimeout> {
     const timeoutID = originalSetTimeout(() => {}, 60_000)
@@ -90,9 +92,10 @@ export function setupDelayedTimeoutMocks(): {
     return timeoutID
   }
 
-  globalThis.setTimeout = ((_: () => void, _delay?: number) => {
+  globalThis.setTimeout = ((callback: () => void, _delay?: number) => {
     const timeoutID = createTimeoutHandle()
     scheduledTimeouts.push(timeoutID)
+    scheduledCallbacks.push(callback)
     return timeoutID
   }) as typeof setTimeout
 
@@ -103,6 +106,9 @@ export function setupDelayedTimeoutMocks(): {
 
   return {
     createUntrackedTimeout: createTimeoutHandle,
+    runScheduledTimeout: (index: number) => {
+      scheduledCallbacks[index]?.()
+    },
     restore: () => {
       globalThis.setTimeout = originalSetTimeout
       globalThis.clearTimeout = originalClearTimeout

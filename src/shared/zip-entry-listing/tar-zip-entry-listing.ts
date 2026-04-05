@@ -1,6 +1,9 @@
 import { spawn } from "bun"
 
 import type { ArchiveEntry } from "../archive-entry-validator"
+import { log } from "../logger"
+
+
 
 function parseTarListedZipEntry(line: string): ArchiveEntry | null {
 	const match = line.match(
@@ -26,6 +29,48 @@ function parseTarListedZipEntry(line: string): ArchiveEntry | null {
 	}
 }
 
+function validateParsedTarListing(
+	totalLineCount: number,
+	unparsedLines: string[]
+): void {
+	if (unparsedLines.length === 0) {
+		return
+	}
+
+	throw new Error(
+		`zip entry listing failed: ${unparsedLines.length}/${totalLineCount} tar listing lines could not be parsed (fail-closed)`
+	)
+}
+
+export function parseTarListingOutput(stdout: string): ArchiveEntry[] {
+	const listingLines = stdout
+		.split(/\r?\n/)
+		.map(line => line.trim())
+		.filter(Boolean)
+
+	if (listingLines.length === 0) {
+		return []
+	}
+
+	const parsedEntries: ArchiveEntry[] = []
+	const unparsedLines: string[] = []
+
+	for (const listingLine of listingLines) {
+		const parsedEntry = parseTarListedZipEntry(listingLine)
+		if (parsedEntry === null) {
+			unparsedLines.push(listingLine)
+			log("warning: unparsed tar listing line", { line: listingLine })
+			continue
+		}
+
+		parsedEntries.push(parsedEntry)
+	}
+
+	validateParsedTarListing(listingLines.length, unparsedLines)
+
+	return parsedEntries
+}
+
 export async function listZipEntriesWithTar(
 	archivePath: string
 ): Promise<ArchiveEntry[]> {
@@ -44,10 +89,5 @@ export async function listZipEntriesWithTar(
 		throw new Error(`zip entry listing failed (exit ${exitCode}): ${stderr}`)
 	}
 
-	return stdout
-		.split(/\r?\n/)
-		.map(line => line.trim())
-		.filter(Boolean)
-		.map(line => parseTarListedZipEntry(line))
-		.filter((entry): entry is ArchiveEntry => entry !== null)
+	return parseTarListingOutput(stdout)
 }

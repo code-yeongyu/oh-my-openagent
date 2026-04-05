@@ -36,6 +36,7 @@ import { lspManager } from "../tools";
 
 import type { CreatedHooks } from "../create-hooks";
 import type { Managers } from "../create-managers";
+import { isTmuxIntegrationEnabled } from "../create-runtime-tmux-config";
 import { pruneRecentSyntheticIdles } from "./recent-synthetic-idles";
 import { normalizeSessionStatusToIdle } from "./session-status-normalizer";
 
@@ -138,7 +139,8 @@ export function createEventHandler(args: {
   managers: Managers;
   hooks: CreatedHooks;
 }): (input: EventInput) => Promise<void> {
-  const { ctx, firstMessageVariantGate, managers, hooks } = args;
+  const { ctx, pluginConfig, firstMessageVariantGate, managers, hooks } = args;
+  const tmuxIntegrationEnabled = isTmuxIntegrationEnabled(pluginConfig)
   const pluginContext = ctx as {
     directory: string;
     client: {
@@ -265,6 +267,13 @@ export function createEventHandler(args: {
   const recentSyntheticIdles = new Map<string, number>();
   const recentRealIdles = new Map<string, number>();
   const DEDUP_WINDOW_MS = 500;
+  const TMUX_ACTIVITY_EVENT_TYPES = new Set([
+    "message.updated",
+    "message.part.updated",
+    "message.part.delta",
+    "message.part.removed",
+    "message.removed",
+  ]);
 
   const shouldAutoRetrySession = (sessionID: string): boolean => {
     if (syncSubagentSessions.has(sessionID)) return true;
@@ -337,6 +346,10 @@ export function createEventHandler(args: {
     const { event } = input;
     const props = event.properties as Record<string, unknown> | undefined;
 
+    if (tmuxIntegrationEnabled && TMUX_ACTIVITY_EVENT_TYPES.has(event.type)) {
+      managers.tmuxSessionManager.onEvent?.(event as { type: string; properties?: Record<string, unknown> });
+    }
+
     if (event.type === "session.created") {
       const sessionInfo = props?.info as { id?: string; title?: string; parentID?: string } | undefined;
 
@@ -346,14 +359,16 @@ export function createEventHandler(args: {
 
       firstMessageVariantGate.markSessionCreated(sessionInfo);
 
-      await managers.tmuxSessionManager.onSessionCreated(
-        event as {
-          type: string;
-          properties?: {
-            info?: { id?: string; parentID?: string; title?: string };
-          };
-        },
-      );
+      if (tmuxIntegrationEnabled) {
+        await managers.tmuxSessionManager.onSessionCreated(
+          event as {
+            type: string;
+            properties?: {
+              info?: { id?: string; parentID?: string; title?: string };
+            };
+          },
+        );
+      }
     }
 
     if (event.type === "session.deleted") {
@@ -383,9 +398,11 @@ export function createEventHandler(args: {
         deleteSessionTools(sessionInfo.id);
         await managers.skillMcpManager.disconnectSession(sessionInfo.id);
         await lspManager.cleanupTempDirectoryClients();
-        await managers.tmuxSessionManager.onSessionDeleted({
-          sessionID: sessionInfo.id,
-        });
+        if (tmuxIntegrationEnabled) {
+          await managers.tmuxSessionManager.onSessionDeleted({
+            sessionID: sessionInfo.id,
+          });
+        }
       }
     }
 
