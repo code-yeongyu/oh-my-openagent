@@ -1,9 +1,12 @@
+/// <reference types="bun-types" />
+
 import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test"
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { randomUUID } from "node:crypto"
 import { createStartWorkHook } from "./index"
+import { createAtlasHook } from "../atlas"
 import { getAgentListDisplayName } from "../../shared/agent-display-names"
 import {
   writeBoulderState,
@@ -537,6 +540,139 @@ You are starting a Sisyphus work session.
       // then
       expect(output.message.agent).toBe("Sisyphus (Ultraworker)")
       expect(readBoulderState(testDir)?.agent).toBe("sisyphus")
+    })
+
+    test("#given start-work hands the session to Atlas #when Atlas later receives session.idle #then the same session continues the selected plan", async () => {
+      // given
+      const plansDir = join(testDir, ".sisyphus", "plans")
+      mkdirSync(plansDir, { recursive: true })
+      writeFileSync(join(plansDir, "atlas-plan.md"), "# Plan\n- [ ] Task 1\n- [ ] Task 2")
+
+      const promptAsyncMock = spyOn({
+        promptAsync: async (_request: unknown) => undefined,
+      }, "promptAsync")
+      const ctx = {
+        directory: testDir,
+        client: {
+          session: {
+            promptAsync: promptAsyncMock,
+            prompt: async (_request: unknown) => undefined,
+            messages: async () => ({ data: [] }),
+          },
+        },
+      } as unknown as Parameters<typeof createAtlasHook>[0]
+      const startWorkHook = createStartWorkHook(ctx)
+      const atlasHook = createAtlasHook(ctx)
+      const output = {
+        message: {} as Record<string, unknown>,
+        parts: [{ type: "text", text: createStartWorkPrompt({ userRequest: "atlas-plan" }) }],
+      }
+
+      // when
+      await startWorkHook["chat.message"]({ sessionID: "session-123" }, output)
+      await atlasHook.handler({ event: { type: "session.idle", properties: { sessionID: "session-123" } } })
+
+      // then
+      expect(output.message.agent).toBe(getAgentListDisplayName("atlas"))
+      expect(readBoulderState(testDir)?.session_ids).toContain("session-123")
+      expect(readBoulderState(testDir)?.agent).toBe("atlas")
+      expect(promptAsyncMock).toHaveBeenCalledTimes(1)
+      promptAsyncMock.mockRestore()
+    })
+
+    test("#given start-work hands the session to Atlas but background work is still running #when that work finishes #then Atlas resumes via retry for the same session", async () => {
+      // given
+      const plansDir = join(testDir, ".sisyphus", "plans")
+      mkdirSync(plansDir, { recursive: true })
+      writeFileSync(join(plansDir, "atlas-plan.md"), "# Plan\n- [ ] Task 1\n- [ ] Task 2")
+
+      const capturedTimers = new Map<number, { callback: Function; cleared: boolean }>()
+      let nextTimerId = 4000
+      let backgroundRunning = true
+      const originalSetTimeout = globalThis.setTimeout
+      const originalClearTimeout = globalThis.clearTimeout
+      const originalDateNow = Date.now
+      let fakeNow = 10000
+      const promptAsyncMock = spyOn({
+        promptAsync: async (_request: unknown) => undefined,
+      }, "promptAsync")
+
+      globalThis.setTimeout = ((callback: Function, delay?: number, ...args: unknown[]) => {
+        const normalized = typeof delay === "number" ? delay : 0
+        if (normalized >= 5000) {
+          const id = nextTimerId++
+          capturedTimers.set(id, { callback: () => callback(...args), cleared: false })
+          return id as unknown as ReturnType<typeof setTimeout>
+        }
+
+        return originalSetTimeout(callback as Parameters<typeof originalSetTimeout>[0], delay)
+      }) as unknown as typeof setTimeout
+
+      globalThis.clearTimeout = ((id?: number | ReturnType<typeof setTimeout>) => {
+        if (typeof id === "number" && capturedTimers.has(id)) {
+          capturedTimers.get(id)!.cleared = true
+          capturedTimers.delete(id)
+          return
+        }
+
+        originalClearTimeout(id as Parameters<typeof originalClearTimeout>[0])
+      }) as unknown as typeof clearTimeout
+
+      Date.now = () => fakeNow
+
+      const ctx = {
+        directory: testDir,
+        client: {
+          session: {
+            promptAsync: promptAsyncMock,
+            prompt: async (_request: unknown) => undefined,
+            messages: async () => ({ data: [] }),
+          },
+        },
+      } as unknown as Parameters<typeof createAtlasHook>[0]
+      const startWorkHook = createStartWorkHook(ctx)
+      const atlasHook = createAtlasHook(ctx, {
+        directory: testDir,
+        backgroundManager: {
+          getTasksByParentSession: () => backgroundRunning ? [{ status: "running" }] : [],
+        } as unknown as NonNullable<Parameters<typeof createAtlasHook>[1]>["backgroundManager"],
+      })
+      const output = {
+        message: {} as Record<string, unknown>,
+        parts: [{ type: "text", text: createStartWorkPrompt({ userRequest: "atlas-plan" }) }],
+      }
+
+      async function firePendingTimers(): Promise<void> {
+        for (const [id, entry] of capturedTimers) {
+          if (!entry.cleared) {
+            capturedTimers.delete(id)
+            fakeNow += 6000
+            await entry.callback()
+          }
+        }
+      }
+
+      try {
+        // when
+        await startWorkHook["chat.message"]({ sessionID: "session-123" }, output)
+        await atlasHook.handler({ event: { type: "session.idle", properties: { sessionID: "session-123" } } })
+        expect(promptAsyncMock).toHaveBeenCalledTimes(0)
+        expect(capturedTimers.size).toBe(1)
+
+        backgroundRunning = false
+        await firePendingTimers()
+
+        // then
+        expect(output.message.agent).toBe(getAgentListDisplayName("atlas"))
+        expect(readBoulderState(testDir)?.session_ids).toContain("session-123")
+        expect(readBoulderState(testDir)?.agent).toBe("atlas")
+        expect(promptAsyncMock).toHaveBeenCalledTimes(1)
+      } finally {
+        globalThis.setTimeout = originalSetTimeout
+        globalThis.clearTimeout = originalClearTimeout
+        Date.now = originalDateNow
+        promptAsyncMock.mockRestore()
+      }
     })
   })
 

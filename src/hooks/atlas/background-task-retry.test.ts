@@ -23,6 +23,20 @@ describe("atlas background task retry", () => {
     await Promise.resolve()
   }
 
+  function createDeferred<T>(): {
+    promise: Promise<T>
+    resolve: (value: T | PromiseLike<T>) => void
+    reject: (reason?: unknown) => void
+  } {
+    let resolve!: (value: T | PromiseLike<T>) => void
+    let reject!: (reason?: unknown) => void
+    const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+      resolve = resolvePromise
+      reject = rejectPromise
+    })
+    return { promise, resolve, reject }
+  }
+
   async function firePendingTimers(): Promise<void> {
     const entries = [...capturedTimers.entries()]
     for (const [id, entry] of entries) {
@@ -220,6 +234,245 @@ describe("atlas background task retry", () => {
 
     // then
     expect(promptMock).toHaveBeenCalledTimes(1)
+    expect(capturedTimers.size).toBe(0)
+  })
+
+  test("#given retry gate sees no running task but injector still does #when retry fires #then atlas schedules another retry and does not advance cooldown", async () => {
+    // given
+    const planPath = join(testDir, "test-plan.md")
+    writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
+    writeBoulderState(testDir, {
+      active_plan: planPath,
+      started_at: "2026-01-02T10:00:00Z",
+      session_ids: [sessionID],
+      plan_name: "test-plan",
+      agent: "atlas",
+    })
+
+    const promptAsyncMock = mock(async () => ({}))
+    let backgroundCheckCount = 0
+
+    const hook = createAtlasHook({
+      directory: testDir,
+      client: {
+        session: {
+          promptAsync: promptAsyncMock,
+          messages: async () => ({ data: [] }),
+        },
+      },
+    } as unknown as PluginInput, {
+      directory: testDir,
+      backgroundManager: {
+        getTasksByParentSession: () => {
+          backgroundCheckCount += 1
+          if (backgroundCheckCount === 1) {
+            return []
+          }
+
+          if (backgroundCheckCount === 2) {
+            return [{ status: "running" }]
+          }
+
+          return []
+        },
+      } as unknown as NonNullable<Parameters<typeof createAtlasHook>[1]>["backgroundManager"] & {
+        getTasksByParentSession: (sessionID: string) => Array<{ status: string }>
+      },
+    })
+
+    // when
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    expect(capturedTimers.size).toBe(1)
+    expect(promptAsyncMock).toHaveBeenCalledTimes(0)
+
+    await firePendingTimers()
+
+    // then
+    expect(backgroundCheckCount).toBe(4)
+    expect(capturedTimers.size).toBe(0)
+    expect(promptAsyncMock).toHaveBeenCalledTimes(1)
+  })
+
+  test("#given a retry timer is pending #when a normal idle event resumes work first #then the stale retry timer does not inject again", async () => {
+    // given
+    const planPath = join(testDir, "test-plan.md")
+    writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
+    writeBoulderState(testDir, {
+      active_plan: planPath,
+      started_at: "2026-01-02T10:00:00Z",
+      session_ids: [sessionID],
+      plan_name: "test-plan",
+      agent: "atlas",
+    })
+
+    let backgroundRunning = true
+    const promptAsyncMock = mock(async () => ({}))
+    const hook = createAtlasHook({
+      directory: testDir,
+      client: {
+        session: {
+          promptAsync: promptAsyncMock,
+          messages: async () => ({ data: [] }),
+        },
+      },
+    } as unknown as PluginInput, {
+      directory: testDir,
+      backgroundManager: {
+        getTasksByParentSession: () => backgroundRunning ? [{ status: "running" }] : [],
+      } as unknown as NonNullable<Parameters<typeof createAtlasHook>[1]>["backgroundManager"] & {
+        getTasksByParentSession: (sessionID: string) => Array<{ status: string }>
+      },
+    })
+
+    // when
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    expect(capturedTimers.size).toBe(1)
+
+    backgroundRunning = false
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    expect(promptAsyncMock).toHaveBeenCalledTimes(1)
+    expect(capturedTimers.size).toBe(0)
+
+    await firePendingTimers()
+
+    // then
+    expect(promptAsyncMock).toHaveBeenCalledTimes(1)
+  })
+
+  test("#given continuation injection is already in flight #when another idle event arrives #then atlas does not inject twice", async () => {
+    // given
+    const planPath = join(testDir, "test-plan.md")
+    writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
+    writeBoulderState(testDir, {
+      active_plan: planPath,
+      started_at: "2026-01-02T10:00:00Z",
+      session_ids: [sessionID],
+      plan_name: "test-plan",
+      agent: "atlas",
+    })
+
+    const deferredPrompt = createDeferred<{}>()
+    const promptAsyncMock = mock(() => deferredPrompt.promise)
+    const hook = createAtlasHook({
+      directory: testDir,
+      client: {
+        session: {
+          promptAsync: promptAsyncMock,
+          messages: async () => ({ data: [] }),
+        },
+      },
+    } as unknown as PluginInput)
+
+    // when
+    const firstIdle = hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await flushMicrotasks()
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    deferredPrompt.resolve({})
+    await firstIdle
+
+    // then
+    expect(promptAsyncMock).toHaveBeenCalledTimes(1)
+  })
+
+  test("#given a retry timer fires during an in-flight continuation that later fails #when the in-flight guard re-arms retry #then atlas can recover on the next retry", async () => {
+    // given
+    const planPath = join(testDir, "test-plan.md")
+    writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
+    writeBoulderState(testDir, {
+      active_plan: planPath,
+      started_at: "2026-01-02T10:00:00Z",
+      session_ids: [sessionID],
+      plan_name: "test-plan",
+      agent: "atlas",
+    })
+
+    const deferredPrompt = createDeferred<unknown>()
+    const promptAsyncMock = mock(() => deferredPrompt.promise)
+    promptAsyncMock.mockImplementationOnce(() => deferredPrompt.promise)
+    promptAsyncMock.mockImplementationOnce(async () => ({}))
+
+    const hook = createAtlasHook({
+      directory: testDir,
+      client: {
+        session: {
+          promptAsync: promptAsyncMock,
+          messages: async () => ({ data: [] }),
+        },
+      },
+    } as unknown as PluginInput, {
+      directory: testDir,
+      backgroundManager: {
+        getTasksByParentSession: () => [],
+      } as unknown as NonNullable<Parameters<typeof createAtlasHook>[1]>["backgroundManager"] & {
+        getTasksByParentSession: (sessionID: string) => Array<{ status: string }>
+      },
+    })
+
+    // when
+    const firstIdle = hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await flushMicrotasks()
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    expect(capturedTimers.size).toBe(1)
+
+    await firePendingTimers()
+    expect(capturedTimers.size).toBe(1)
+
+    deferredPrompt.reject(new Error("slow failure"))
+    await firstIdle
+    await firePendingTimers()
+
+    // then
+    expect(promptAsyncMock).toHaveBeenCalledTimes(2)
+  })
+
+  test("#given a retry-driven continuation fails once #when retry handling re-arms the chain #then atlas recovers on the next retry", async () => {
+    // given
+    const planPath = join(testDir, "test-plan.md")
+    writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
+    writeBoulderState(testDir, {
+      active_plan: planPath,
+      started_at: "2026-01-02T10:00:00Z",
+      session_ids: [sessionID],
+      plan_name: "test-plan",
+      agent: "atlas",
+    })
+
+    let backgroundRunning = true
+    const promptAsyncMock = mock(async () => ({}))
+    promptAsyncMock.mockImplementationOnce(async () => {
+      throw new Error("retry failed once")
+    })
+    promptAsyncMock.mockImplementationOnce(async () => ({}))
+
+    const hook = createAtlasHook({
+      directory: testDir,
+      client: {
+        session: {
+          promptAsync: promptAsyncMock,
+          messages: async () => ({ data: [] }),
+        },
+      },
+    } as unknown as PluginInput, {
+      directory: testDir,
+      backgroundManager: {
+        getTasksByParentSession: () => backgroundRunning ? [{ status: "running" }] : [],
+      } as unknown as NonNullable<Parameters<typeof createAtlasHook>[1]>["backgroundManager"] & {
+        getTasksByParentSession: (sessionID: string) => Array<{ status: string }>
+      },
+    })
+
+    // when
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    backgroundRunning = false
+
+    await firePendingTimers()
+    expect(promptAsyncMock).toHaveBeenCalledTimes(1)
+    expect(capturedTimers.size).toBe(1)
+
+    await firePendingTimers()
+
+    // then
+    expect(promptAsyncMock).toHaveBeenCalledTimes(2)
     expect(capturedTimers.size).toBe(0)
   })
 })

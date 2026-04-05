@@ -3,11 +3,18 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import type { RunContext } from "./types"
+import {
+  _resetForTesting,
+  registerAgentName,
+  setSessionAgent,
+  subagentSessions,
+} from "../../features/claude-code-session-state"
 import { writeState as writeRalphLoopState } from "../../hooks/ralph-loop/storage"
 
 const testDirs: string[] = []
 
 afterEach(() => {
+  _resetForTesting()
   while (testDirs.length > 0) {
     const dir = testDirs.pop()
     if (dir) {
@@ -29,6 +36,12 @@ function createMockContext(directory: string): RunContext {
         todo: mock(() => Promise.resolve({ data: [] })),
         children: mock(() => Promise.resolve({ data: [] })),
         status: mock(() => Promise.resolve({ data: {} })),
+        get: mock(async ({ path }: { path: { id: string } }) => ({
+          data: {
+            id: path.id,
+            parentID: undefined,
+          },
+        })),
       },
     } as unknown as RunContext["client"],
     sessionID: "test-session",
@@ -81,6 +94,94 @@ describe("checkCompletionConditions continuation coverage", () => {
     writeFileSync(planPath, "- [x] completed task\n", "utf-8")
     writeBoulderStateFile(directory, planPath, ["test-session"])
     const ctx = createMockContext(directory)
+    const { checkCompletionConditions } = await import("./completion")
+
+    // when
+    const result = await checkCompletionConditions(ctx)
+
+    // then
+    expect(result).toBe(true)
+  })
+
+  it("returns false when current session is a descendant of an active boulder session with unchecked plan items", async () => {
+    // given
+    spyOn(console, "log").mockImplementation(() => {})
+    registerAgentName("atlas")
+    const directory = createTempDir()
+    const planPath = join(directory, ".sisyphus", "plans", "active-descendant-plan.md")
+    mkdirSync(join(directory, ".sisyphus", "plans"), { recursive: true })
+    writeFileSync(planPath, "- [ ] unfinished task\n", "utf-8")
+    writeBoulderStateFile(directory, planPath, ["root-session"])
+
+    const ctx = createMockContext(directory)
+    ctx.sessionID = "child-session"
+    subagentSessions.add("child-session")
+    setSessionAgent("child-session", "atlas")
+    ctx.client.session.get = mock(async ({ path }: { path: { id: string } }) => ({
+      data: {
+        id: path.id,
+        parentID: path.id === "child-session" ? "root-session" : undefined,
+      },
+    })) as unknown as RunContext["client"]["session"]["get"]
+
+    const { checkCompletionConditions } = await import("./completion")
+
+    // when
+    const result = await checkCompletionConditions(ctx)
+
+    // then
+    expect(result).toBe(false)
+  })
+
+  it("returns true when current session is only in lineage but is not a registered subagent", async () => {
+    // given
+    spyOn(console, "log").mockImplementation(() => {})
+    registerAgentName("atlas")
+    const directory = createTempDir()
+    const planPath = join(directory, ".sisyphus", "plans", "lineage-non-subagent-plan.md")
+    mkdirSync(join(directory, ".sisyphus", "plans"), { recursive: true })
+    writeFileSync(planPath, "- [ ] unfinished task\n", "utf-8")
+    writeBoulderStateFile(directory, planPath, ["root-session"])
+
+    const ctx = createMockContext(directory)
+    ctx.sessionID = "lineage-only-session"
+    ctx.client.session.get = mock(async ({ path }: { path: { id: string } }) => ({
+      data: {
+        id: path.id,
+        parentID: path.id === "lineage-only-session" ? "root-session" : undefined,
+      },
+    })) as unknown as RunContext["client"]["session"]["get"]
+
+    const { checkCompletionConditions } = await import("./completion")
+
+    // when
+    const result = await checkCompletionConditions(ctx)
+
+    // then
+    expect(result).toBe(true)
+  })
+
+  it("returns true when descendant subagent has agent mismatch and atlas would not continue it", async () => {
+    // given
+    spyOn(console, "log").mockImplementation(() => {})
+    registerAgentName("atlas")
+    const directory = createTempDir()
+    const planPath = join(directory, ".sisyphus", "plans", "lineage-agent-mismatch-plan.md")
+    mkdirSync(join(directory, ".sisyphus", "plans"), { recursive: true })
+    writeFileSync(planPath, "- [ ] unfinished task\n", "utf-8")
+    writeBoulderStateFile(directory, planPath, ["root-session"])
+
+    const ctx = createMockContext(directory)
+    ctx.sessionID = "mismatch-subagent-session"
+    subagentSessions.add("mismatch-subagent-session")
+    setSessionAgent("mismatch-subagent-session", "sisyphus-junior")
+    ctx.client.session.get = mock(async ({ path }: { path: { id: string } }) => ({
+      data: {
+        id: path.id,
+        parentID: path.id === "mismatch-subagent-session" ? "root-session" : undefined,
+      },
+    })) as unknown as RunContext["client"]["session"]["get"]
+
     const { checkCompletionConditions } = await import("./completion")
 
     // when
