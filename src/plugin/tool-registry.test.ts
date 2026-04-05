@@ -81,3 +81,67 @@ describe("#given task_system configuration", () => {
     expect(result.filteredTools).toHaveProperty("task_update")
   })
 })
+
+describe("#given tmux integration is disabled", () => {
+  test("#when system tmux is available #then interactive_bash remains registered", () => {
+    const result = createToolRegistry({
+      ctx: { directory: "/tmp" } as Parameters<typeof createToolRegistry>[0]["ctx"],
+      pluginConfig: {
+        tmux: {
+          enabled: false,
+          layout: "main-vertical",
+          main_pane_size: 60,
+          main_pane_min_width: 120,
+          agent_pane_min_width: 40,
+          isolation: "inline",
+        },
+      },
+      managers: {
+        backgroundManager: {},
+        tmuxSessionManager: {},
+        skillMcpManager: {},
+      } as Parameters<typeof createToolRegistry>[0]["managers"],
+      skillContext: {
+        mergedSkills: [],
+        availableSkills: [],
+        browserProvider: "playwright",
+        disabledSkills: new Set(),
+      },
+      availableCategories: [],
+      interactiveBashEnabled: true,
+    })
+
+    expect(result.filteredTools).toHaveProperty("interactive_bash")
+  })
+
+  test("#when system tmux is unavailable #then interactive_bash is not registered", () => {
+    const result = createToolRegistry({
+      ctx: { directory: "/tmp" } as Parameters<typeof createToolRegistry>[0]["ctx"],
+      pluginConfig: {
+        tmux: {
+          enabled: false,
+          layout: "main-vertical",
+          main_pane_size: 60,
+          main_pane_min_width: 120,
+          agent_pane_min_width: 40,
+          isolation: "inline",
+        },
+      },
+      managers: {
+        backgroundManager: {},
+        tmuxSessionManager: {},
+        skillMcpManager: {},
+      } as Parameters<typeof createToolRegistry>[0]["managers"],
+      skillContext: {
+        mergedSkills: [],
+        availableSkills: [],
+        browserProvider: "playwright",
+        disabledSkills: new Set(),
+      },
+      availableCategories: [],
+      interactiveBashEnabled: false,
+    })
+
+    expect(result.filteredTools).not.toHaveProperty("interactive_bash")
+  })
+})

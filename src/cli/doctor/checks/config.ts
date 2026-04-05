@@ -9,7 +9,6 @@ import { loadAvailableModelsFromCache } from "./model-resolution-cache"
 import { getModelResolutionInfoWithOverrides } from "./model-resolution"
 import type { OmoConfig } from "./model-resolution-types"
 
-const USER_CONFIG_DIR = getOpenCodeConfigDir({ binary: "opencode" })
 const PROJECT_CONFIG_DIR = join(process.cwd(), ".opencode")
 
 interface ConfigValidationResult {
@@ -24,7 +23,8 @@ function findConfigPath(): string | null {
   const projectConfig = detectPluginConfigFile(PROJECT_CONFIG_DIR)
   if (projectConfig.format !== "none") return projectConfig.path
 
-  const userConfig = detectPluginConfigFile(USER_CONFIG_DIR)
+  const userConfigDir = getOpenCodeConfigDir({ binary: "opencode" })
+  const userConfig = detectPluginConfigFile(userConfigDir)
   if (userConfig.format !== "none") return userConfig.path
 
   return null

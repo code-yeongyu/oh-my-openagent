@@ -10,49 +10,57 @@ const mockRunBackgroundUpdateCheck = mock(async () => {})
 const mockGetCachedVersion = mock(() => "3.6.0")
 const mockGetLocalDevVersion = mock<(directory: string) => string | null>(() => null)
 
-mock.module("./hook/config-errors-toast", () => ({
-  showConfigErrorsIfAny: mockShowConfigErrorsIfAny,
-}))
-
-mock.module("./hook/model-cache-warning", () => ({
-  showModelCacheWarningIfNeeded: mockShowModelCacheWarningIfNeeded,
-}))
-
-mock.module("./hook/connected-providers-status", () => ({
-  updateAndShowConnectedProvidersCacheStatus:
-    mockUpdateAndShowConnectedProvidersCacheStatus,
-}))
-
-mock.module("./hook/model-capabilities-status", () => ({
-  refreshModelCapabilitiesOnStartup: mockRefreshModelCapabilitiesOnStartup,
-}))
-
-mock.module("./hook/startup-toasts", () => ({
-  showLocalDevToast: mockShowLocalDevToast,
-  showVersionToast: mockShowVersionToast,
-}))
-
-mock.module("./hook/background-update-check", () => ({
-  runBackgroundUpdateCheck: mockRunBackgroundUpdateCheck,
-}))
-
-mock.module("./checker", () => ({
-  getCachedVersion: mockGetCachedVersion,
-  getLocalDevVersion: mockGetLocalDevVersion,
-}))
-
-mock.module("../../shared/logger", () => ({
-  log: () => {},
-}))
+const _realConfigErrorsToast = require("../auto-update-checker/hook/config-errors-toast")
+const _realModelCacheWarning = require("../auto-update-checker/hook/model-cache-warning")
+const _realConnectedProvidersStatus = require("../auto-update-checker/hook/connected-providers-status")
+const _realModelCapabilitiesStatus = require("../auto-update-checker/hook/model-capabilities-status")
+const _realStartupToasts = require("../auto-update-checker/hook/startup-toasts")
+const _realBackgroundUpdateCheck = require("../auto-update-checker/hook/background-update-check")
+const _realChecker = require("../auto-update-checker/checker")
+const _realLogger = require("../../shared/logger")
 
 afterAll(() => {
+  mock.module("../auto-update-checker/hook/config-errors-toast", () => _realConfigErrorsToast)
+  mock.module("../auto-update-checker/hook/model-cache-warning", () => _realModelCacheWarning)
+  mock.module("../auto-update-checker/hook/connected-providers-status", () => _realConnectedProvidersStatus)
+  mock.module("../auto-update-checker/hook/model-capabilities-status", () => _realModelCapabilitiesStatus)
+  mock.module("../auto-update-checker/hook/startup-toasts", () => _realStartupToasts)
+  mock.module("../auto-update-checker/hook/background-update-check", () => _realBackgroundUpdateCheck)
+  mock.module("../auto-update-checker/checker", () => _realChecker)
+  mock.module("../../shared/logger", () => _realLogger)
   mock.restore()
 })
 
-type HookFactory = typeof import("./hook").createAutoUpdateCheckerHook
+type HookFactory = typeof import("../auto-update-checker/hook").createAutoUpdateCheckerHook
 
 async function importFreshHookFactory(): Promise<HookFactory> {
-  const hookModule = await import(`./hook?test-${Date.now()}-${Math.random()}`)
+  mock.module("../auto-update-checker/hook/config-errors-toast", () => ({
+    showConfigErrorsIfAny: mockShowConfigErrorsIfAny,
+  }))
+  mock.module("../auto-update-checker/hook/model-cache-warning", () => ({
+    showModelCacheWarningIfNeeded: mockShowModelCacheWarningIfNeeded,
+  }))
+  mock.module("../auto-update-checker/hook/connected-providers-status", () => ({
+    updateAndShowConnectedProvidersCacheStatus: mockUpdateAndShowConnectedProvidersCacheStatus,
+  }))
+  mock.module("../auto-update-checker/hook/model-capabilities-status", () => ({
+    refreshModelCapabilitiesOnStartup: mockRefreshModelCapabilitiesOnStartup,
+  }))
+  mock.module("../auto-update-checker/hook/startup-toasts", () => ({
+    showLocalDevToast: mockShowLocalDevToast,
+    showVersionToast: mockShowVersionToast,
+  }))
+  mock.module("../auto-update-checker/hook/background-update-check", () => ({
+    runBackgroundUpdateCheck: mockRunBackgroundUpdateCheck,
+  }))
+  mock.module("../auto-update-checker/checker", () => ({
+    getCachedVersion: mockGetCachedVersion,
+    getLocalDevVersion: mockGetLocalDevVersion,
+  }))
+  mock.module("../../shared/logger", () => ({
+    log: () => {},
+  }))
+  const hookModule = await import(`../auto-update-checker/hook?test-${Date.now()}-${Math.random()}`)
   return hookModule.createAutoUpdateCheckerHook
 }
 

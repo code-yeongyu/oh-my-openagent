@@ -1,26 +1,32 @@
 import { afterAll, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
 import type { ToolContext } from "@opencode-ai/plugin/tool"
 import * as fs from "node:fs"
-import { createSkillTool } from "./tools"
-import { SkillMcpManager } from "../../features/skill-mcp-manager"
-import type { LoadedSkill } from "../../features/opencode-skill-loader/types"
-import type { CommandInfo } from "../slashcommand/types"
+import { SkillMcpManager } from "../../../features/skill-mcp-manager"
+import type { LoadedSkill } from "../../../features/opencode-skill-loader/types"
+import type { CommandInfo } from "../../slashcommand/types"
 import type { Tool as McpTool } from "@modelcontextprotocol/sdk/types.js"
 
 const originalReadFileSync = fs.readFileSync.bind(fs)
 
-mock.module("node:fs", () => ({
-  ...fs,
-  readFileSync: (path: string, encoding?: string) => {
-    if (typeof path === "string" && path.includes("/skills/")) {
-      return `---
+let createSkillTool: typeof import("../tools").createSkillTool
+
+beforeEach(async () => {
+  mock.module("node:fs", () => ({
+    ...fs,
+    readFileSync: (path: string, encoding?: string) => {
+      if (typeof path === "string" && path.includes("/skills/")) {
+        return `---
 description: Test skill description
 ---
 Test skill body content`
-    }
-    return originalReadFileSync(path, encoding as BufferEncoding)
-  },
-}))
+      }
+      return originalReadFileSync(path, encoding as BufferEncoding)
+    },
+  }))
+  
+  const module = await import("../tools")
+  createSkillTool = module.createSkillTool
+})
 
 afterAll(() => {
   mock.restore()

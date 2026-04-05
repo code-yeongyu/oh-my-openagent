@@ -28,7 +28,9 @@ export function createManagers(args: {
 }): Managers {
   const { ctx, pluginConfig, tmuxConfig, modelCacheState, backgroundNotificationHookEnabled } = args
 
-  markServerRunningInProcess()
+  if (tmuxConfig.enabled) {
+    markServerRunningInProcess()
+  }
   const tmuxSessionManager = new TmuxSessionManager(ctx, tmuxConfig)
 
   registerManagerForCleanup({

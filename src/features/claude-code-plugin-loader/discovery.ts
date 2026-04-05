@@ -23,12 +23,12 @@ function getPluginsBaseDir(): string {
   return join(homedir(), ".claude", "plugins")
 }
 
-function getInstalledPluginsPath(): string {
-  return join(getPluginsBaseDir(), "installed_plugins.json")
+function getInstalledPluginsPath(pluginsBaseDir?: string): string {
+  return join(pluginsBaseDir ?? getPluginsBaseDir(), "installed_plugins.json")
 }
 
-function loadInstalledPlugins(): InstalledPluginsDatabase | null {
-  const dbPath = getInstalledPluginsPath()
+function loadInstalledPlugins(pluginsBaseDir?: string): InstalledPluginsDatabase | null {
+  const dbPath = getInstalledPluginsPath(pluginsBaseDir)
   if (!existsSync(dbPath)) {
     return null
   }
@@ -64,7 +64,7 @@ function loadClaudeSettings(): ClaudeSettings | null {
   }
 }
 
-function loadPluginManifest(installPath: string): PluginManifest | null {
+export function loadPluginManifest(installPath: string): PluginManifest | null {
   const manifestPath = join(installPath, ".claude-plugin", "plugin.json")
   if (!existsSync(manifestPath)) {
     return null
@@ -163,7 +163,9 @@ function extractPluginEntries(
 }
 
 export function discoverInstalledPlugins(options?: PluginLoaderOptions): PluginLoadResult {
-  const db = loadInstalledPlugins()
+  // Allow overriding the plugins base directory for testing
+  const pluginsBaseDir = options?.pluginsHomeOverride ?? getPluginsBaseDir()
+  const db = loadInstalledPlugins(pluginsBaseDir)
   const settings = loadClaudeSettings()
   const plugins: LoadedPlugin[] = []
   const errors: PluginLoadError[] = []
@@ -174,6 +176,7 @@ export function discoverInstalledPlugins(options?: PluginLoaderOptions): PluginL
 
   const settingsEnabledPlugins = settings?.enabledPlugins
   const overrideEnabledPlugins = options?.enabledPluginsOverride
+  const pluginManifestLoader = options?.loadPluginManifestOverride ?? loadPluginManifest
 
   for (const [pluginKey, installation] of extractPluginEntries(db)) {
     if (!installation) continue
@@ -194,7 +197,7 @@ export function discoverInstalledPlugins(options?: PluginLoaderOptions): PluginL
       continue
     }
 
-    const manifest = loadPluginManifest(installPath)
+    const manifest = pluginManifestLoader(installPath)
     const pluginName = manifest?.name || derivePluginNameFromKey(pluginKey)
 
     const loadedPlugin: LoadedPlugin = {

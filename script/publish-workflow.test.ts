@@ -1,3 +1,5 @@
+/// <reference types="bun-types" />
+
 import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
 
@@ -7,16 +9,14 @@ const workflowPaths = [
 ]
 
 describe("test workflows", () => {
-  test("use a single plain bun test step without isolated split hacks", () => {
+  test("use bun test isolation for workflows", () => {
     for (const workflowPath of workflowPaths) {
-      // given
+      // #given
       const workflow = readFileSync(workflowPath, "utf8")
 
-      // then
+      // #then - should use run-ci-tests.ts for mock isolation
       expect(workflow).toContain("- name: Run tests")
-      expect(workflow).toContain("run: bun test")
-      expect(workflow).not.toContain("Run mock-heavy tests (isolated)")
-      expect(workflow).not.toContain("Run remaining tests")
+      expect(workflow).toContain("run-ci-tests.ts")
     }
   })
 })

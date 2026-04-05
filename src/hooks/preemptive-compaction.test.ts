@@ -601,7 +601,7 @@ describe("preemptive-compaction", () => {
     })
     const sessionID = "ses_kimi_limit"
 
-    // 180k total tokens — above 78% of 200k (156k) but below 78% of 256k (204k)
+    // 180k total tokens - above 78% of 200k (156k) but below 78% of 256k (204k)
     await hook.event({
       event: {
         type: "message.updated",
@@ -644,7 +644,7 @@ describe("preemptive-compaction", () => {
     })
     const sessionID = "ses_kimi_trigger"
 
-    // 210k total — above 78% of 256k (≈204k)
+    // 210k total - above 78% of 256k (≈204k)
     await hook.event({
       event: {
         type: "message.updated",

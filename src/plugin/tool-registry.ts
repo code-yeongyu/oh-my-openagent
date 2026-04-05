@@ -5,6 +5,7 @@ import type {
   AvailableCategory,
 } from "../agents/dynamic-agent-prompt-builder"
 import type { OhMyOpenCodeConfig } from "../config"
+import { isInteractiveBashEnabled } from "../create-runtime-tmux-config"
 import type { PluginContext, ToolsRecord } from "./types"
 
 import {
@@ -103,9 +104,16 @@ export function createToolRegistry(args: {
   managers: Pick<Managers, "backgroundManager" | "tmuxSessionManager" | "skillMcpManager">
   skillContext: SkillContext
   availableCategories: AvailableCategory[]
+  interactiveBashEnabled?: boolean
 }): ToolRegistryResult {
-  const { ctx, pluginConfig, managers, skillContext, availableCategories } = args
-
+  const {
+    ctx,
+    pluginConfig,
+    managers,
+    skillContext,
+    availableCategories,
+    interactiveBashEnabled = isInteractiveBashEnabled(),
+  } = args
   const backgroundTools = createBackgroundTools(managers.backgroundManager, ctx.client)
   const callOmoAgent = createCallOmoAgent(
     ctx,
@@ -202,7 +210,7 @@ export function createToolRegistry(args: {
     task: delegateTask,
     skill_mcp: skillMcpTool,
     skill: skillTool,
-    interactive_bash,
+    ...(interactiveBashEnabled ? { interactive_bash } : {}),
     ...taskToolsRecord,
     ...hashlineToolsRecord,
   }

@@ -16,7 +16,7 @@ describe("getSystemMcpServerNames", () => {
       homedir: () => TEST_HOME,
       tmpdir,
     }))
-    mock.module("../../shared", () => ({
+    mock.module("../../shared/claude-config-dir", () => ({
       getClaudeConfigDir: () => join(TEST_HOME, ".claude"),
     }))
   })
@@ -322,7 +322,7 @@ describe("loadMcpConfigs", () => {
       homedir: () => TEST_HOME,
       tmpdir,
     }))
-    mock.module("../../shared", () => ({
+    mock.module("../../shared/claude-config-dir", () => ({
       getClaudeConfigDir: () => join(TEST_HOME, ".claude"),
     }))
     mock.module("../../shared/logger", () => ({

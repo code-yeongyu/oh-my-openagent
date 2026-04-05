@@ -1,12 +1,12 @@
-/// <reference path="../../bun-test.d.ts" />
+/// <reference path="../../../bun-test.d.ts" />
 
 import { afterAll, afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-async function importFreshMigrationModule(): Promise<typeof import("./migrate-legacy-plugin-entry")> {
-  return import(`./migrate-legacy-plugin-entry?test=${Date.now()}-${Math.random()}`)
+async function importFreshMigrationModule(): Promise<typeof import("../migrate-legacy-plugin-entry")> {
+  return import(`../migrate-legacy-plugin-entry?test=${Date.now()}-${Math.random()}`)
 }
 
 afterAll(() => {

@@ -6,6 +6,7 @@ import { parseAnthropicTokenLimitError } from "./parser"
 import { executeCompact, getLastAssistant } from "./executor"
 import { attemptDeduplicationRecovery } from "./deduplication-recovery"
 import { clearSessionState } from "./state"
+import { clearAllSessionTimeouts, clearSessionTimeout } from "./session-timeout-map"
 import { log } from "../../shared/logger"
 
 export interface AnthropicContextWindowLimitRecoveryOptions {
@@ -48,21 +49,13 @@ export function createAnthropicContextWindowLimitRecoveryHook(
   }
   const pendingCompactionTimeoutBySession = new Map<string, ReturnType<typeof setTimeout>>()
 
-  function clearPendingCompactionTimeout(sessionID: string): void {
-    const timeoutID = pendingCompactionTimeoutBySession.get(sessionID)
-    if (timeoutID !== undefined) {
-      clearTimeout(timeoutID)
-      pendingCompactionTimeoutBySession.delete(sessionID)
-    }
-  }
-
   const eventHandler = async ({ event }: { event: { type: string; properties?: unknown } }) => {
     const props = event.properties as Record<string, unknown> | undefined
 
     if (event.type === "session.deleted") {
       const sessionInfo = props?.info as { id?: string } | undefined
       if (sessionInfo?.id) {
-        clearPendingCompactionTimeout(sessionInfo.id)
+        clearSessionTimeout(pendingCompactionTimeoutBySession, sessionInfo.id)
 
         clearSessionState(autoCompactState, sessionInfo.id)
       }
@@ -105,7 +98,7 @@ export function createAnthropicContextWindowLimitRecoveryHook(
           })
           .catch(() => {})
 
-        clearPendingCompactionTimeout(sessionID)
+        clearSessionTimeout(pendingCompactionTimeoutBySession, sessionID)
 
         const timeoutID = setTimeout(() => {
           pendingCompactionTimeoutBySession.delete(sessionID)
@@ -149,7 +142,7 @@ export function createAnthropicContextWindowLimitRecoveryHook(
 
       if (!autoCompactState.pendingCompact.has(sessionID)) return
 
-      clearPendingCompactionTimeout(sessionID)
+      clearSessionTimeout(pendingCompactionTimeoutBySession, sessionID)
 
       const errorData = autoCompactState.errorDataBySession.get(sessionID)
       const lastAssistant = await dependencies.getLastAssistant(
@@ -192,5 +185,9 @@ export function createAnthropicContextWindowLimitRecoveryHook(
 
   return {
     event: eventHandler,
+    dispose: (): void => {
+      clearAllSessionTimeouts(pendingCompactionTimeoutBySession)
+      clearAllSessionTimeouts(autoCompactState.retryTimerBySession)
+    },
   }
 }

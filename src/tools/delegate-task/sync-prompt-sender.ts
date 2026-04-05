@@ -22,6 +22,24 @@ const sendSyncPromptDeps: SendSyncPromptDeps = {
   promptSyncWithModelSuggestionRetry,
 }
 
+function buildPromptGenerationParams(model: DelegatedModelConfig | undefined): Record<string, unknown> {
+  if (!model) {
+    return {}
+  }
+
+  const promptOptions: Record<string, unknown> = {
+    ...(model.reasoningEffort ? { reasoningEffort: model.reasoningEffort } : {}),
+    ...(model.thinking ? { thinking: model.thinking } : {}),
+    ...(model.maxTokens !== undefined ? { maxTokens: model.maxTokens } : {}),
+  }
+
+  return {
+    ...(model.temperature !== undefined ? { temperature: model.temperature } : {}),
+    ...(model.top_p !== undefined ? { topP: model.top_p } : {}),
+    ...(Object.keys(promptOptions).length > 0 ? { options: promptOptions } : {}),
+  }
+}
+
 function isOracleAgent(agentToUse: string): boolean {
   return agentToUse.toLowerCase() === "oracle"
 }
@@ -75,6 +93,7 @@ export async function sendSyncPrompt(
           }
         : {}),
       ...(input.categoryModel?.variant ? { variant: input.categoryModel.variant } : {}),
+      ...buildPromptGenerationParams(input.categoryModel),
     },
   }
 

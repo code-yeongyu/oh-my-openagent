@@ -1,10 +1,10 @@
 # src/plugin-handlers/ — 6-Phase Config Loading Pipeline
 
-**Generated:** 2026-03-06
+**Generated:** 2026-04-05
 
 ## OVERVIEW
 
-13 non-test files implementing the `ConfigHandler` — the `config` hook handler. Executes 6 sequential phases to register agents, tools, MCPs, and commands with OpenCode.
+14 non-test files implementing the `ConfigHandler` — the `config` hook handler. Executes 6 sequential phases to register agents, tools, MCPs, and commands with OpenCode.
 
 ## 6-PHASE PIPELINE
 

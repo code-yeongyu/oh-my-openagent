@@ -1,5 +1,6 @@
 
 import type { PluginInput } from "@opencode-ai/plugin"
+import { isAgentNotFoundError, FALLBACK_AGENT, buildFallbackBody } from "./spawner"
 import type {
   BackgroundTask,
   LaunchInput,
@@ -159,6 +160,8 @@ export class BackgroundManager {
   private completedTaskSummaries: Map<string, BackgroundTaskNotificationTask[]> = new Map()
   private idleDeferralTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
   private notificationQueueByParent: Map<string, Promise<void>> = new Map()
+  private observedOutputSessions: Set<string> = new Set()
+  private observedIncompleteTodosBySession: Map<string, boolean> = new Map()
   private rootDescendantCounts: Map<string, number>
   private preStartDescendantReservations: Set<string>
   private enableParentSessionNotifications: boolean
@@ -491,7 +494,16 @@ export class BackgroundManager {
       log("[background-agent] SKIP tmux callback - conditions not met")
     }
 
-    // Update task to running state
+    if (this.tasks.get(task.id)?.status === "cancelled") {
+      await this.abortSessionWithLogging(sessionID, "cancelled during tmux setup")
+      subagentSessions.delete(sessionID)
+      if (task.rootSessionID) {
+        this.unregisterRootDescendant(task.rootSessionID)
+      }
+      this.concurrencyManager.release(concurrencyKey)
+      return
+    }
+
     task.status = "running"
     task.startedAt = new Date()
     task.sessionID = sessionID
@@ -535,32 +547,55 @@ export class BackgroundManager {
       applySessionPromptParams(sessionID, input.model)
     }
 
+    const promptBody = {
+      agent: input.agent,
+      ...(launchModel ? { model: launchModel } : {}),
+      ...(launchVariant ? { variant: launchVariant } : {}),
+      system: input.skillContent,
+      tools: (() => {
+        const tools = {
+          task: false,
+          call_omo_agent: true,
+          question: false,
+          ...getAgentToolRestrictions(input.agent),
+        }
+        setSessionTools(sessionID, tools)
+        return tools
+      })(),
+      parts: [createInternalAgentTextPart(input.prompt)],
+    }
+
     promptWithModelSuggestionRetry(this.client, {
       path: { id: sessionID },
-      body: {
-        agent: input.agent,
-        ...(launchModel ? { model: launchModel } : {}),
-        ...(launchVariant ? { variant: launchVariant } : {}),
-        system: input.skillContent,
-        tools: (() => {
-          const tools = {
-            task: false,
-            call_omo_agent: true,
-            question: false,
-            ...getAgentToolRestrictions(input.agent),
-          }
-          setSessionTools(sessionID, tools)
-          return tools
-        })(),
-        parts: [createInternalAgentTextPart(input.prompt)],
-      },
+      body: promptBody,
     }).catch(async (error) => {
+      // Retry with fallback agent if the original agent was unregistered (e.g., after a model switch)
+      if (isAgentNotFoundError(error) && input.agent !== FALLBACK_AGENT) {
+        log("[background-agent] Agent not found, retrying with fallback agent", {
+          original: input.agent,
+          fallback: FALLBACK_AGENT,
+          taskId: task.id,
+        })
+        try {
+          const fallbackBody = buildFallbackBody(promptBody, FALLBACK_AGENT)
+          setSessionTools(sessionID, fallbackBody.tools as Record<string, boolean>)
+          await promptWithModelSuggestionRetry(this.client, {
+            path: { id: sessionID },
+            body: fallbackBody,
+          })
+          task.agent = FALLBACK_AGENT
+          return
+        } catch (retryError) {
+          log("[background-agent] Fallback agent also failed:", retryError)
+        }
+      }
+
       log("[background-agent] promptAsync error:", error)
       const existingTask = this.findBySession(sessionID)
       if (existingTask) {
         existingTask.status = "interrupt"
         const errorMessage = error instanceof Error ? error.message : String(error)
-        if (errorMessage.includes("agent.name") || errorMessage.includes("undefined")) {
+        if (errorMessage.includes("agent.name") || errorMessage.includes("undefined") || isAgentNotFoundError(error)) {
           existingTask.error = `Agent "${input.agent}" not found. Make sure the agent is registered in your opencode.json or provided by a plugin.`
         } else {
           existingTask.error = errorMessage
@@ -872,17 +907,27 @@ export class BackgroundManager {
   }
 
   private async checkSessionTodos(sessionID: string): Promise<boolean> {
+    const observedIncompleteTodos = this.observedIncompleteTodosBySession.get(sessionID)
+    if (observedIncompleteTodos !== undefined) {
+      return observedIncompleteTodos
+    }
+
     try {
       const response = await this.client.session.todo({
         path: { id: sessionID },
       })
       const todos = normalizeSDKResponse(response, [] as Todo[], { preferResponseOnMissingData: true })
-      if (!todos || todos.length === 0) return false
+      if (!todos || todos.length === 0) {
+        this.observedIncompleteTodosBySession.set(sessionID, false)
+        return false
+      }
 
       const incomplete = todos.filter(
         (t) => t.status !== "completed" && t.status !== "cancelled"
       )
-      return incomplete.length > 0
+      const hasIncompleteTodos = incomplete.length > 0
+      this.observedIncompleteTodosBySession.set(sessionID, hasIncompleteTodos)
+      return hasIncompleteTodos
     } catch (error) {
       log("[background-agent] Failed to check session todos:", {
         sessionID,
@@ -890,6 +935,30 @@ export class BackgroundManager {
       })
       return false
     }
+  }
+
+  private markSessionOutputObserved(sessionID: string): void {
+    this.observedOutputSessions.add(sessionID)
+  }
+
+  private clearSessionOutputObserved(sessionID: string): void {
+    this.observedOutputSessions.delete(sessionID)
+  }
+
+  private clearSessionTodoObservation(sessionID: string): void {
+    this.observedIncompleteTodosBySession.delete(sessionID)
+  }
+
+  private hasOutputSignalFromPart(partInfo: MessagePartInfo | undefined): boolean {
+    if (!partInfo?.sessionID) return false
+    if (partInfo.tool) return true
+    if (partInfo.type === "tool" || partInfo.type === "tool_result") return true
+    if (partInfo.type === "text" || partInfo.type === "reasoning") return true
+
+    const field = typeof (partInfo as { field?: unknown }).field === "string"
+      ? (partInfo as { field?: string }).field
+      : undefined
+    return field === "text" || field === "reasoning"
   }
 
   handleEvent(event: Event): void {
@@ -901,7 +970,13 @@ export class BackgroundManager {
 
       const sessionID = (info as Record<string, unknown>)["sessionID"]
       const role = (info as Record<string, unknown>)["role"]
-      if (typeof sessionID !== "string" || role !== "assistant") return
+      if (typeof sessionID !== "string") return
+
+      if (role === "tool") {
+        this.markSessionOutputObserved(sessionID)
+      }
+
+      if (role !== "assistant") return
 
       const task = this.findBySession(sessionID)
       if (!task || task.status !== "running") return
@@ -928,6 +1003,10 @@ export class BackgroundManager {
 
       const task = this.findBySession(sessionID)
       if (!task) return
+
+      if (this.hasOutputSignalFromPart(partInfo)) {
+        this.markSessionOutputObserved(sessionID)
+      }
 
       // Clear any pending idle deferral timer since the task is still active
       const existingTimer = this.idleDeferralTimers.get(task.id)
@@ -1007,6 +1086,20 @@ export class BackgroundManager {
       }
     }
 
+    if (event.type === "todo.updated") {
+      const sessionID = typeof props?.sessionID === "string" ? props.sessionID : undefined
+      const todos = Array.isArray(props?.todos) ? props.todos : undefined
+      if (!sessionID || !todos) return
+
+      const hasIncompleteTodos = todos.some((todo) => {
+        if (!todo || typeof todo !== "object") return false
+        const status = (todo as { status?: unknown }).status
+        return status !== "completed" && status !== "cancelled"
+      })
+      this.observedIncompleteTodosBySession.set(sessionID, hasIncompleteTodos)
+      return
+    }
+
     if (event.type === "session.idle") {
       if (!props || typeof props !== "object") return
       handleSessionIdleBackgroundEvent({
@@ -1050,6 +1143,8 @@ export class BackgroundManager {
       const info = props?.info
       if (!info || typeof info.id !== "string") return
       const sessionID = info.id
+      this.clearSessionOutputObserved(sessionID)
+      this.clearSessionTodoObservation(sessionID)
 
       const tasksToCancel = new Map<string, BackgroundTask>()
       const directTask = this.findBySession(sessionID)
@@ -1131,6 +1226,16 @@ export class BackgroundManager {
   }): Promise<void> {
     const { task, errorInfo, errorMessage, errorName } = args
 
+    // Agent-not-found errors are handled by the prompt catch block with agent fallback.
+    // Do not also trigger model fallback retry — that would race with the agent retry.
+    if (isAgentNotFoundError({ message: errorInfo.message } as Error)) {
+      log("[background-agent] Skipping session.error fallback for agent-not-found (handled by prompt catch)", {
+        taskId: task.id,
+        errorMessage: errorInfo.message?.slice(0, 100),
+      })
+      return
+    }
+
     if (await this.tryFallbackRetry(task, errorInfo, "session.error")) {
       return
     }
@@ -1208,6 +1313,8 @@ export class BackgroundManager {
     })
     return result.then((retried) => {
       if (retried && previousSessionID) {
+        this.clearSessionOutputObserved(previousSessionID)
+        this.clearSessionTodoObservation(previousSessionID)
         subagentSessions.delete(previousSessionID)
       }
       return retried
@@ -1259,6 +1366,10 @@ export class BackgroundManager {
    * Prevents premature completion when session.idle fires before agent responds.
    */
   private async validateSessionHasOutput(sessionID: string): Promise<boolean> {
+    if (this.observedOutputSessions.has(sessionID)) {
+      return true
+    }
+
     try {
       const response = await this.client.session.messages({
         path: { id: sessionID },
@@ -1305,6 +1416,7 @@ export class BackgroundManager {
         return false
       }
 
+      this.markSessionOutputObserved(sessionID)
       return true
     } catch (error) {
       log("[background-agent] Error validating session output:", error)
