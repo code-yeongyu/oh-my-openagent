@@ -34,20 +34,31 @@ const NON_RETRYABLE_ERROR_NAMES = new Set([
 ])
 
 /**
+ * Message patterns that indicate a non-retryable billing/quota error.
+ * Checked before RETRYABLE_MESSAGE_PATTERNS so that message-only errors
+ * containing quota/credit language are correctly classified as STOP.
+ */
+const STOP_MESSAGE_PATTERNS = [
+  "quota",
+  "usage limit",
+  "insufficient",
+  "free usage",
+  "usage exceeded",
+  "credit",
+  "balance",
+]
+
+/**
  * Message patterns that indicate a retryable error even without a known error name.
  */
 const RETRYABLE_MESSAGE_PATTERNS = [
   "rate_limit",
   "rate limit",
-  "quota",
-  "quota will reset after",
-  "usage limit has been reached",
   "all credentials for model",
   "cooling down",
   "exhausted your capacity",
   "not found",
   "unavailable",
-  "insufficient",
   "too many requests",
   "over limit",
   "overloaded",
@@ -63,10 +74,6 @@ const RETRYABLE_MESSAGE_PATTERNS = [
   "timeout",
   "service unavailable",
   "internal_server_error",
-  "free usage",
-  "usage exceeded",
-  "credit",
-  "balance",
   "temporarily unavailable",
   "try again",
   "503",
@@ -123,6 +130,11 @@ export function isRetryableModelError(error: ErrorInfo): boolean {
   const msg = error.message?.toLowerCase() ?? ""
   if (hasProviderAutoRetrySignal(msg)) {
     return true
+  }
+  // Check stop message patterns before retryable patterns so that
+  // billing/quota messages without a known error name are not retried
+  if (STOP_MESSAGE_PATTERNS.some((pattern) => msg.includes(pattern))) {
+    return false
   }
   return RETRYABLE_MESSAGE_PATTERNS.some((pattern) => msg.includes(pattern))
 }

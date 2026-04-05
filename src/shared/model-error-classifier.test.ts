@@ -171,6 +171,107 @@ describe("model-error-classifier", () => {
     //#then
     expect(result).toBe(true)
   })
+
+  describe("#given message-only errors with quota/billing language", () => {
+    test("#when message contains 'quota' #then classifies as non-retryable", () => {
+      //#given
+      const error = { message: "You have exceeded your quota for this billing period" }
+
+      //#when
+      const result = shouldRetryError(error)
+
+      //#then
+      expect(result).toBe(false)
+    })
+
+    test("#when message contains 'quota will reset after' #then classifies as non-retryable", () => {
+      //#given
+      const error = { message: "Request failed: quota will reset after 2026-04-10" }
+
+      //#when
+      const result = shouldRetryError(error)
+
+      //#then
+      expect(result).toBe(false)
+    })
+
+    test("#when message contains 'usage limit' #then classifies as non-retryable", () => {
+      //#given
+      const error = { message: "Your usage limit has been reached for today" }
+
+      //#when
+      const result = shouldRetryError(error)
+
+      //#then
+      expect(result).toBe(false)
+    })
+
+    test("#when message contains 'insufficient' #then classifies as non-retryable", () => {
+      //#given
+      const error = { message: "Insufficient credits to complete request" }
+
+      //#when
+      const result = shouldRetryError(error)
+
+      //#then
+      expect(result).toBe(false)
+    })
+
+    test("#when message contains 'free usage' #then classifies as non-retryable", () => {
+      //#given
+      const error = { message: "Free usage exceeded, please upgrade your plan" }
+
+      //#when
+      const result = shouldRetryError(error)
+
+      //#then
+      expect(result).toBe(false)
+    })
+
+    test("#when message contains 'credit' #then classifies as non-retryable", () => {
+      //#given
+      const error = { message: "Not enough credit remaining on your account" }
+
+      //#when
+      const result = shouldRetryError(error)
+
+      //#then
+      expect(result).toBe(false)
+    })
+
+    test("#when message contains 'balance' #then classifies as non-retryable", () => {
+      //#given
+      const error = { message: "Your account balance is too low" }
+
+      //#when
+      const result = shouldRetryError(error)
+
+      //#then
+      expect(result).toBe(false)
+    })
+
+    test("#when message contains 'usage exceeded' #then classifies as non-retryable", () => {
+      //#given
+      const error = { message: "API usage exceeded for this billing cycle" }
+
+      //#when
+      const result = shouldRetryError(error)
+
+      //#then
+      expect(result).toBe(false)
+    })
+
+    test("#when error has unknown name and quota message #then stop pattern takes precedence", () => {
+      //#given
+      const error = { name: "UnknownProviderError", message: "quota exceeded for model" }
+
+      //#when
+      const result = shouldRetryError(error)
+
+      //#then
+      expect(result).toBe(false)
+    })
+  })
 })
 
 export {}
