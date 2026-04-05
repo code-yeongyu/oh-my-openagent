@@ -16,6 +16,14 @@ import { acknowledgeCompactionGuard, isCompactionGuardActive } from "./compactio
 import type { SessionStateStore } from "./session-state"
 import { startCountdown } from "./countdown"
 
+function shouldAllowActivityProgress(modelID: string | undefined): boolean {
+  if (!modelID) {
+    return false
+  }
+
+  return !modelID.toLowerCase().includes("codex")
+}
+
 export async function handleSessionIdle(args: {
   ctx: PluginInput
   sessionID: string
@@ -182,7 +190,12 @@ export async function handleSessionIdle(args: {
     return
   }
 
-  const progressUpdate = sessionStateStore.trackContinuationProgress(sessionID, incompleteCount, todos)
+  const progressUpdate = sessionStateStore.trackContinuationProgress(
+    sessionID,
+    incompleteCount,
+    todos,
+    { allowActivityProgress: shouldAllowActivityProgress(resolvedInfo?.model?.modelID) },
+  )
   if (shouldStopForStagnation({ sessionID, incompleteCount, progressUpdate })) {
     return
   }

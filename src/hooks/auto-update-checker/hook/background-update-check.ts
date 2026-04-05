@@ -33,6 +33,10 @@ type BackgroundUpdateCheckRunner = (
   getToastMessage: (isUpdate: boolean, latestVersion?: string) => string,
 ) => Promise<void>
 
+function getCacheWorkspaceDir(deps: BackgroundUpdateCheckDeps): string {
+  return deps.join(deps.getOpenCodeCacheDir(), "packages")
+}
+
 const defaultDeps: BackgroundUpdateCheckDeps = {
   existsSync,
   join,
@@ -60,7 +64,7 @@ function getPinnedVersionToastMessage(latestVersion: string): string {
  */
 function resolveActiveInstallWorkspace(deps: BackgroundUpdateCheckDeps): string {
   const configPaths = deps.getOpenCodeConfigPaths({ binary: "opencode" })
-  const cacheDir = deps.getOpenCodeCacheDir()
+  const cacheDir = getCacheWorkspaceDir(deps)
 
   const configInstallPath = deps.join(configPaths.configDir, "node_modules", PACKAGE_NAME, "package.json")
   const cacheInstallPath = deps.join(cacheDir, "node_modules", PACKAGE_NAME, "package.json")
@@ -73,6 +77,12 @@ function resolveActiveInstallWorkspace(deps: BackgroundUpdateCheckDeps): string 
 
   if (deps.existsSync(cacheInstallPath)) {
     deps.log(`[auto-update-checker] Active workspace: cache-dir (${cacheDir})`)
+    return cacheDir
+  }
+
+  const cachePackageJsonPath = deps.join(cacheDir, "package.json")
+  if (deps.existsSync(cachePackageJsonPath)) {
+    deps.log(`[auto-update-checker] Active workspace: cache-dir (${cacheDir}, package.json present)`) 
     return cacheDir
   }
 
@@ -93,6 +103,19 @@ async function runBunInstallSafe(workspaceDir: string, deps: BackgroundUpdateChe
     deps.log("[auto-update-checker] bun install error:", errorMessage)
     return false
   }
+}
+
+async function primeCacheWorkspace(
+  activeWorkspace: string,
+  deps: BackgroundUpdateCheckDeps,
+): Promise<boolean> {
+  const cacheWorkspace = getCacheWorkspaceDir(deps)
+  if (activeWorkspace === cacheWorkspace) {
+    return true
+  }
+
+  deps.log(`[auto-update-checker] Priming cache workspace after install: ${cacheWorkspace}`)
+  return runBunInstallSafe(cacheWorkspace, deps)
 }
 
 export function createBackgroundUpdateCheckRunner(
@@ -156,6 +179,13 @@ export function createBackgroundUpdateCheckRunner(
     const installSuccess = await runBunInstallSafe(activeWorkspace, deps)
 
     if (installSuccess) {
+      const cachePrimed = await primeCacheWorkspace(activeWorkspace, deps)
+      if (!cachePrimed) {
+        await deps.showUpdateAvailableToast(ctx, latestVersion, getToastMessage)
+        deps.log("[auto-update-checker] cache workspace priming failed after install")
+        return
+      }
+
       await deps.showAutoUpdatedToast(ctx, currentVersion, latestVersion)
       deps.log(`[auto-update-checker] Update installed: ${currentVersion} → ${latestVersion}`)
       return

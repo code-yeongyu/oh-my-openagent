@@ -1,11 +1,11 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { beforeEach, describe, expect, it, mock } from "bun:test"
 
-import { createBackgroundUpdateCheckRunner } from "../auto-update-checker/hook/background-update-check"
 import type { PluginEntryInfo } from "../auto-update-checker/checker"
 import type { SyncResult } from "../auto-update-checker/checker/sync-package-json"
 
 type ToastMessageGetter = (isUpdate: boolean, version?: string) => string
+let importCounter = 0
 
 function createPluginEntry(overrides?: Partial<PluginEntryInfo>): PluginEntryInfo {
   return {
@@ -35,7 +35,9 @@ const mockSyncCachePackageJsonToIntent = mock((_pluginInfo: PluginEntryInfo): Sy
   error: null,
 }))
 
-function createRunner() {
+async function createRunner() {
+  const { createBackgroundUpdateCheckRunner } = await import(`../auto-update-checker/hook/background-update-check?test=${importCounter++}`)
+
   return createBackgroundUpdateCheckRunner({
     existsSync: () => false,
     join: (...parts) => parts.join("/"),
@@ -66,6 +68,7 @@ describe("runBackgroundUpdateCheck", () => {
     isUpdate ? `Update to ${version}` : "Up to date"
 
   beforeEach(() => {
+    importCounter += 1
     mockFindPluginEntry.mockReset()
     mockGetCachedVersion.mockReset()
     mockGetLatestVersion.mockReset()
@@ -87,7 +90,7 @@ describe("runBackgroundUpdateCheck", () => {
 
   it("#given no plugin entry #when checking in background #then it returns early", async () => {
     // #given
-    const runBackgroundUpdateCheck = createRunner()
+    const runBackgroundUpdateCheck = await createRunner()
     mockFindPluginEntry.mockReturnValue(null)
 
     // #when
@@ -101,7 +104,7 @@ describe("runBackgroundUpdateCheck", () => {
 
   it("#given no current version #when checking in background #then it returns early", async () => {
     // #given
-    const runBackgroundUpdateCheck = createRunner()
+    const runBackgroundUpdateCheck = await createRunner()
     mockFindPluginEntry.mockReturnValue(createPluginEntry({ entry: "oh-my-opencode" }))
     mockGetCachedVersion.mockReturnValue(null)
 
@@ -115,7 +118,7 @@ describe("runBackgroundUpdateCheck", () => {
 
   it("#given latest version fetch fails #when checking in background #then it returns early", async () => {
     // #given
-    const runBackgroundUpdateCheck = createRunner()
+    const runBackgroundUpdateCheck = await createRunner()
     mockGetLatestVersion.mockResolvedValue(null)
 
     // #when
@@ -128,7 +131,7 @@ describe("runBackgroundUpdateCheck", () => {
 
   it("#given current version is latest #when checking in background #then it does nothing", async () => {
     // #given
-    const runBackgroundUpdateCheck = createRunner()
+    const runBackgroundUpdateCheck = await createRunner()
     mockGetLatestVersion.mockResolvedValue("3.4.0")
 
     // #when
@@ -141,7 +144,7 @@ describe("runBackgroundUpdateCheck", () => {
 
   it("#given auto update is disabled #when checking in background #then it shows notification only", async () => {
     // #given
-    const runBackgroundUpdateCheck = createRunner()
+    const runBackgroundUpdateCheck = await createRunner()
 
     // #when
     await runBackgroundUpdateCheck(mockCtx, false, getToastMessage)
@@ -153,7 +156,7 @@ describe("runBackgroundUpdateCheck", () => {
 
   it("#given user pinned a version #when checking in background #then it skips auto update", async () => {
     // #given
-    const runBackgroundUpdateCheck = createRunner()
+    const runBackgroundUpdateCheck = await createRunner()
     mockFindPluginEntry.mockReturnValue(createPluginEntry({ isPinned: true, pinnedVersion: "3.4.0" }))
 
     // #when
@@ -166,7 +169,7 @@ describe("runBackgroundUpdateCheck", () => {
 
   it("#given unpinned update succeeds #when checking in background #then it syncs invalidates installs and toasts", async () => {
     // #given
-    const runBackgroundUpdateCheck = createRunner()
+    const runBackgroundUpdateCheck = await createRunner()
 
     // #when
     await runBackgroundUpdateCheck(mockCtx, true, getToastMessage)
@@ -174,14 +177,14 @@ describe("runBackgroundUpdateCheck", () => {
     // #then
     expect(mockSyncCachePackageJsonToIntent).toHaveBeenCalledTimes(1)
     expect(mockInvalidatePackage).toHaveBeenCalledTimes(1)
-    expect(mockRunBunInstallWithDetails).toHaveBeenCalledTimes(1)
+    expect(mockRunBunInstallWithDetails).toHaveBeenCalledTimes(2)
     expect(mockShowAutoUpdatedToast).toHaveBeenCalledWith(mockCtx, "3.4.0", "3.5.0")
     expect(mockShowUpdateAvailableToast).not.toHaveBeenCalled()
   })
 
   it("#given update succeeds #when checking in background #then it syncs before invalidate and install", async () => {
     // #given
-    const runBackgroundUpdateCheck = createRunner()
+    const runBackgroundUpdateCheck = await createRunner()
     const callOrder: string[] = []
     mockSyncCachePackageJsonToIntent.mockImplementation((_pluginInfo) => {
       callOrder.push("sync")
@@ -199,12 +202,12 @@ describe("runBackgroundUpdateCheck", () => {
     await runBackgroundUpdateCheck(mockCtx, true, getToastMessage)
 
     // #then
-    expect(callOrder).toEqual(["sync", "invalidate", "install"])
+    expect(callOrder).toEqual(["sync", "invalidate", "install", "install"])
   })
 
   it("#given install fails #when checking in background #then it falls back to notification only", async () => {
     // #given
-    const runBackgroundUpdateCheck = createRunner()
+    const runBackgroundUpdateCheck = await createRunner()
     mockRunBunInstallWithDetails.mockResolvedValue({ success: false })
 
     // #when
@@ -215,10 +218,10 @@ describe("runBackgroundUpdateCheck", () => {
     expect(mockShowAutoUpdatedToast).not.toHaveBeenCalled()
   })
 
-  for (const syncError of ["file_not_found", "plugin_not_in_deps", "parse_error", "write_error"] as const) {
+  for (const syncError of ["parse_error", "write_error"] as const) {
     it(`#given sync fails with ${syncError} #when checking in background #then it aborts and shows notification only`, async () => {
       // #given
-      const runBackgroundUpdateCheck = createRunner()
+      const runBackgroundUpdateCheck = await createRunner()
       mockSyncCachePackageJsonToIntent.mockReturnValue({
         synced: false,
         error: syncError,

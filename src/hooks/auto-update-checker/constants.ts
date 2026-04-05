@@ -7,8 +7,9 @@ export const PACKAGE_NAME = "oh-my-openagent"
 export const NPM_REGISTRY_URL = `https://registry.npmjs.org/-/package/${PACKAGE_NAME}/dist-tags`
 export const NPM_FETCH_TIMEOUT = 5000
 
-export const CACHE_DIR = getOpenCodeCacheDir()
-export const VERSION_FILE = path.join(CACHE_DIR, "version")
+export const CACHE_ROOT_DIR = getOpenCodeCacheDir()
+export const CACHE_DIR = path.join(CACHE_ROOT_DIR, "packages")
+export const VERSION_FILE = path.join(CACHE_ROOT_DIR, "version")
 
 export function getWindowsAppdataDir(): string | null {
   if (process.platform !== "win32") return null

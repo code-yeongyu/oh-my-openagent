@@ -28,6 +28,7 @@ export function handleNonIdleEvent(args: {
       if (state) {
         state.abortDetectedAt = undefined
         state.wasCancelled = false
+        sessionStateStore.recordActivity(sessionID)
       }
       sessionStateStore.cancelCountdown(sessionID)
       return
@@ -38,6 +39,7 @@ export function handleNonIdleEvent(args: {
       if (state) {
         state.abortDetectedAt = undefined
         state.wasCancelled = false
+        sessionStateStore.recordActivity(sessionID)
       }
       sessionStateStore.cancelCountdown(sessionID)
       return
@@ -56,7 +58,10 @@ export function handleNonIdleEvent(args: {
 
     if (targetSessionID) {
       const state = sessionStateStore.getExistingState(targetSessionID)
-      if (state) state.abortDetectedAt = undefined
+      if (state) {
+        state.abortDetectedAt = undefined
+        sessionStateStore.recordActivity(targetSessionID)
+      }
       sessionStateStore.cancelCountdown(targetSessionID)
     }
     return
@@ -69,6 +74,7 @@ export function handleNonIdleEvent(args: {
       if (state) {
         state.abortDetectedAt = undefined
         state.wasCancelled = false
+        sessionStateStore.recordActivity(sessionID)
       }
       sessionStateStore.cancelCountdown(sessionID)
     }
@@ -82,6 +88,7 @@ export function handleNonIdleEvent(args: {
       if (state) {
         state.abortDetectedAt = undefined
         state.wasCancelled = false
+        sessionStateStore.recordActivity(sessionID)
       }
       sessionStateStore.cancelCountdown(sessionID)
     }

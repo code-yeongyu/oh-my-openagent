@@ -65,3 +65,7 @@ export interface ResolveLatestMessageInfoResult {
   resolvedInfo?: ResolvedMessageInfo
   encounteredCompaction: boolean
 }
+
+export interface ContinuationProgressOptions {
+  allowActivityProgress?: boolean
+}
