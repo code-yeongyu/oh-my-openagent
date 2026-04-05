@@ -16,7 +16,7 @@ import type { MissionState } from "./types"
 
 describe("mission-state", () => {
   const TEST_DIR = join(tmpdir(), "mission-state-test-" + Date.now())
-  const MATRIX_DIR = join(TEST_DIR, ".matrix")
+  const MATRIX_DIR = join(TEST_DIR, ".matrixx")
 
   beforeEach(() => {
     if (!existsSync(TEST_DIR)) {
@@ -137,7 +137,7 @@ describe("mission-state", () => {
   })
 
   describe("writeMissionState", () => {
-    test("should write state and create .matrix directory if needed", () => {
+    test("should write state and create .matrixx directory if needed", () => {
       // given - state to write
       const state: MissionState = {
         active_plan: "/test/plan.md",
@@ -312,7 +312,7 @@ describe("mission-state", () => {
   describe("getPlanName", () => {
     test("should extract plan name from path", () => {
       // given
-      const path = "/home/user/.matrix/plans/project/my-feature.md"
+      const path = "/home/user/.matrixx/plans/project/my-feature.md"
       // when
       const name = getPlanName(path)
       // then

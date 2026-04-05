@@ -84,7 +84,7 @@ export function clearMissionState(directory: string): boolean {
 
 /**
  * Find Oracle plan files for this project.
- * Oracle stores plans at: {project}/.matrix/plans/{name}.md
+ * Oracle stores plans at: {project}/.matrixx/plans/{name}.md
  */
 export function findOraclePlans(directory: string): string[] {
   const plansDir = join(directory, ORACLE_PLANS_DIR)
