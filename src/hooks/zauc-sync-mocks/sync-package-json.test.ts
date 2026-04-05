@@ -19,10 +19,10 @@ async function importFreshSyncPackageJsonModule(): Promise<typeof import("../aut
     NPM_REGISTRY_URL: "https://registry.npmjs.org/-/package/oh-my-opencode/dist-tags",
     NPM_FETCH_TIMEOUT: 5000,
     VERSION_FILE: join(TEST_CACHE_DIR, "version"),
-    USER_CONFIG_DIR: "/tmp/opencode-config",
-    USER_OPENCODE_CONFIG: "/tmp/opencode-config/opencode.json",
-    USER_OPENCODE_CONFIG_JSONC: "/tmp/opencode-config/opencode.jsonc",
     INSTALLED_PACKAGE_JSON: join(TEST_CACHE_DIR, "node_modules", "oh-my-opencode", "package.json"),
+    getUserConfigDir: () => "/tmp/opencode-config",
+    getUserOpencodeConfig: () => "/tmp/opencode-config/opencode.json",
+    getUserOpencodeConfigJsonc: () => "/tmp/opencode-config/opencode.jsonc",
     getWindowsAppdataDir: () => null,
   }))
 

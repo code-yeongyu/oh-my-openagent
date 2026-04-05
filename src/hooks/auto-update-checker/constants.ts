@@ -16,9 +16,17 @@ export function getWindowsAppdataDir(): string | null {
   return process.env.APPDATA ?? path.join(os.homedir(), "AppData", "Roaming")
 }
 
-export const USER_CONFIG_DIR = getOpenCodeConfigDir({ binary: "opencode" })
-export const USER_OPENCODE_CONFIG = path.join(USER_CONFIG_DIR, "opencode.json")
-export const USER_OPENCODE_CONFIG_JSONC = path.join(USER_CONFIG_DIR, "opencode.jsonc")
+export function getUserConfigDir(): string {
+  return getOpenCodeConfigDir({ binary: "opencode" })
+}
+
+export function getUserOpencodeConfig(): string {
+  return path.join(getUserConfigDir(), "opencode.json")
+}
+
+export function getUserOpencodeConfigJsonc(): string {
+  return path.join(getUserConfigDir(), "opencode.jsonc")
+}
 
 export const INSTALLED_PACKAGE_JSON = path.join(
   CACHE_DIR,

@@ -15,14 +15,14 @@ const _realLogger = require("../../shared/logger")
 async function importFreshCacheModule(): Promise<typeof import("../auto-update-checker/cache")> {
   mock.module("../auto-update-checker/constants", () => ({
     CACHE_DIR: TEST_OPENCODE_CACHE_DIR,
-    USER_CONFIG_DIR: TEST_USER_CONFIG_DIR,
     PACKAGE_NAME: "oh-my-opencode",
     NPM_REGISTRY_URL: "https://registry.npmjs.org/-/package/oh-my-opencode/dist-tags",
     NPM_FETCH_TIMEOUT: 5000,
     VERSION_FILE: join(TEST_OPENCODE_CACHE_DIR, "version"),
-    USER_OPENCODE_CONFIG: join(TEST_USER_CONFIG_DIR, "opencode.json"),
-    USER_OPENCODE_CONFIG_JSONC: join(TEST_USER_CONFIG_DIR, "opencode.jsonc"),
     INSTALLED_PACKAGE_JSON: join(TEST_OPENCODE_CACHE_DIR, "node_modules", "oh-my-opencode", "package.json"),
+    getUserConfigDir: () => TEST_USER_CONFIG_DIR,
+    getUserOpencodeConfig: () => join(TEST_USER_CONFIG_DIR, "opencode.json"),
+    getUserOpencodeConfigJsonc: () => join(TEST_USER_CONFIG_DIR, "opencode.jsonc"),
     getWindowsAppdataDir: () => null,
   }))
 

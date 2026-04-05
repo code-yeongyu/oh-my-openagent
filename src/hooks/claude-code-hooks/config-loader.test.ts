@@ -94,6 +94,26 @@ describe("loadPluginExtendedConfig", () => {
       },
     })
   })
+
+  test("#given OPENCODE_CONFIG_DIR points at a profile dir after module import #when loading extended config #then it reads the profile config file", async () => {
+    //#given
+    const profileConfigDir = join(tempDirectory, ".config", "opencode", "profiles", "today")
+    const profileConfigPath = join(profileConfigDir, "opencode-cc-plugin.json")
+    mkdirSync(profileConfigDir, { recursive: true })
+    process.env.OPENCODE_CONFIG_DIR = profileConfigDir
+    writeConfigFile(profileConfigPath, ["profile-stop"])
+
+    //#when
+    clearPluginExtendedConfigCache()
+    const result = await loadPluginExtendedConfig()
+
+    //#then
+    expect(result).toEqual({
+      disabledHooks: {
+        Stop: ["profile-stop"],
+      },
+    })
+  })
 })
 
 function writeConfigFile(filePath: string, stopPatterns: string[]): void {
