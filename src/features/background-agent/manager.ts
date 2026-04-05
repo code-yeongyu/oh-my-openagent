@@ -1,6 +1,6 @@
 
 import type { PluginInput } from "@opencode-ai/plugin"
-import { isAgentNotFoundError } from "./spawner"
+import { isAgentNotFoundError, FALLBACK_AGENT, buildFallbackBody } from "./spawner"
 import type {
   BackgroundTask,
   LaunchInput,
@@ -547,8 +547,6 @@ export class BackgroundManager {
       applySessionPromptParams(sessionID, input.model)
     }
 
-    const FALLBACK_AGENT = "general"
-
     const promptBody = {
       agent: input.agent,
       ...(launchModel ? { model: launchModel } : {}),
@@ -579,10 +577,13 @@ export class BackgroundManager {
           taskId: task.id,
         })
         try {
+          const fallbackBody = buildFallbackBody(promptBody, FALLBACK_AGENT)
+          setSessionTools(sessionID, fallbackBody.tools as Record<string, boolean>)
           await promptWithModelSuggestionRetry(this.client, {
             path: { id: sessionID },
-            body: { ...promptBody, agent: FALLBACK_AGENT },
+            body: fallbackBody,
           })
+          task.agent = FALLBACK_AGENT
           return
         } catch (retryError) {
           log("[background-agent] Fallback agent also failed:", retryError)
@@ -1224,6 +1225,16 @@ export class BackgroundManager {
     errorMessage: string | undefined
   }): Promise<void> {
     const { task, errorInfo, errorMessage, errorName } = args
+
+    // Agent-not-found errors are handled by the prompt catch block with agent fallback.
+    // Do not also trigger model fallback retry — that would race with the agent retry.
+    if (isAgentNotFoundError({ message: errorInfo.message } as Error)) {
+      log("[background-agent] Skipping session.error fallback for agent-not-found (handled by prompt catch)", {
+        taskId: task.id,
+        errorMessage: errorInfo.message?.slice(0, 100),
+      })
+      return
+    }
 
     if (await this.tryFallbackRetry(task, errorInfo, "session.error")) {
       return

@@ -8,11 +8,27 @@ import { getTaskToastManager } from "../task-toast-manager"
 import { isInsideTmux } from "../../shared/tmux"
 import type { ConcurrencyManager } from "./concurrency"
 
-const FALLBACK_AGENT = "general"
+export const FALLBACK_AGENT = "general"
 
 export function isAgentNotFoundError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error)
   return message.includes("Agent not found")
+}
+
+export function buildFallbackBody(
+  originalBody: Record<string, unknown>,
+  fallbackAgent: string,
+): Record<string, unknown> {
+  return {
+    ...originalBody,
+    agent: fallbackAgent,
+    tools: {
+      task: false,
+      call_omo_agent: true,
+      question: false,
+      ...getAgentToolRestrictions(fallbackAgent),
+    },
+  }
 }
 
 export interface SpawnerContext {
@@ -172,8 +188,9 @@ export async function startTask(
       try {
         await promptWithModelSuggestionRetry(client, {
           path: { id: sessionID },
-          body: { ...promptBody, agent: FALLBACK_AGENT },
+          body: buildFallbackBody(promptBody, FALLBACK_AGENT),
         })
+        task.agent = FALLBACK_AGENT
         return
       } catch (retryError) {
         log("[background-agent] Fallback agent also failed:", retryError)
@@ -279,10 +296,11 @@ export async function resumeTask(
         taskId: task.id,
       })
       try {
-        await client.session.promptAsync({
+        await promptWithModelSuggestionRetry(client, {
           path: { id: task.sessionID! },
-          body: { ...resumeBody, agent: FALLBACK_AGENT },
+          body: buildFallbackBody(resumeBody, FALLBACK_AGENT),
         })
+        task.agent = FALLBACK_AGENT
         return
       } catch (retryError) {
         log("[background-agent] Resume fallback agent also failed:", retryError)

@@ -76,6 +76,14 @@ describe("background-agent spawner agent-not-found fallback", () => {
     expect(promptCalls[1].body.agent).toBe("general")
     // Original prompt content preserved in fallback
     expect(promptCalls[1].body.parts).toEqual(promptCalls[0].body.parts)
+    // Tool restrictions recomputed for fallback agent (general has no restrictions)
+    expect(promptCalls[1].body.tools).toEqual({
+      task: false,
+      call_omo_agent: true,
+      question: false,
+    })
+    // Task agent identity updated to reflect fallback
+    expect(task.agent).toBe("general")
     // Task should not have errored
     expect(onTaskError).not.toHaveBeenCalled()
   })
