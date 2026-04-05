@@ -27,10 +27,31 @@ export interface PluginComponentsResult {
   errors: PluginLoadError[]
 }
 
+const cachedPluginComponentsByKey = new Map<string, PluginComponentsResult>()
+
+function clonePluginComponentsResult(
+  result: PluginComponentsResult,
+): PluginComponentsResult {
+  return structuredClone(result)
+}
+
 function isClaudeCodePluginsDisabled(): boolean {
   const disableFlag = process.env.OPENCODE_DISABLE_CLAUDE_CODE
   const disablePluginsFlag = process.env.OPENCODE_DISABLE_CLAUDE_CODE_PLUGINS
   return disableFlag === "true" || disableFlag === "1" || disablePluginsFlag === "true" || disablePluginsFlag === "1"
+}
+
+function getPluginComponentsCacheKey(options?: PluginLoaderOptions): string {
+  const overrideEntries = Object.entries(options?.enabledPluginsOverride ?? {})
+    .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey))
+
+  return JSON.stringify({
+    enabledPluginsOverride: overrideEntries,
+  })
+}
+
+export function clearPluginComponentsCache(): void {
+  cachedPluginComponentsByKey.clear()
 }
 
 export async function loadAllPluginComponents(options?: PluginLoaderOptions): Promise<PluginComponentsResult> {
@@ -47,6 +68,12 @@ export async function loadAllPluginComponents(options?: PluginLoaderOptions): Pr
     }
   }
 
+  const cacheKey = getPluginComponentsCacheKey(options)
+  const cachedPluginComponents = cachedPluginComponentsByKey.get(cacheKey)
+  if (cachedPluginComponents) {
+    return clonePluginComponentsResult(cachedPluginComponents)
+  }
+
   const { plugins, errors } = discoverInstalledPlugins(options)
 
   const [commands, skills, agents, mcpServers, hooksConfigs] = await Promise.all([
@@ -59,7 +86,7 @@ export async function loadAllPluginComponents(options?: PluginLoaderOptions): Pr
 
   log(`Loaded ${plugins.length} plugins with ${Object.keys(commands).length} commands, ${Object.keys(skills).length} skills, ${Object.keys(agents).length} agents, ${Object.keys(mcpServers).length} MCP servers`)
 
-  return {
+  const result = {
     commands,
     skills,
     agents,
@@ -68,4 +95,8 @@ export async function loadAllPluginComponents(options?: PluginLoaderOptions): Pr
     plugins,
     errors,
   }
+
+  cachedPluginComponentsByKey.set(cacheKey, clonePluginComponentsResult(result))
+
+  return clonePluginComponentsResult(result)
 }
