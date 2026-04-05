@@ -3,7 +3,10 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { discoverInstalledPlugins } from "./discovery"
+// NOTE: Do NOT import discoverInstalledPlugins at top level.
+// loader.test.ts in the same directory mocks "./discovery" with name: "demo",
+// and when run-ci-tests.ts groups this directory together, that mock leaks.
+// Dynamic import inside each test avoids the contamination.
 
 const originalClaudePluginsHome = process.env.CLAUDE_PLUGINS_HOME
 const temporaryDirectories: string[] = []
@@ -38,7 +41,7 @@ describe("discoverInstalledPlugins", () => {
     }
   })
 
-  it("preserves scoped package name from npm plugin keys", () => {
+  it("preserves scoped package name from npm plugin keys", async () => {
     //#given
     const pluginsHome = process.env.CLAUDE_PLUGINS_HOME as string
     const installPathBase = createTemporaryDirectory("omo-scoped-plugin-")
@@ -66,6 +69,7 @@ describe("discoverInstalledPlugins", () => {
     )
 
     //#when
+    const { discoverInstalledPlugins } = await import(`./discovery?t=${Date.now()}-1`)
     const discovered = discoverInstalledPlugins({
       pluginsHomeOverride: pluginsHome,
       loadPluginManifestOverride: () => null,
@@ -77,7 +81,7 @@ describe("discoverInstalledPlugins", () => {
     expect(discovered.plugins[0]?.name).toBe("@myorg/my-plugin")
   })
 
-  it("derives package name from file URL plugin keys", () => {
+  it("derives package name from file URL plugin keys", async () => {
     //#given
     const pluginsHome = process.env.CLAUDE_PLUGINS_HOME as string
     const installPath = createTemporaryDirectory("omo-fileurl-plugin-")
@@ -103,6 +107,7 @@ describe("discoverInstalledPlugins", () => {
     )
 
     //#when
+    const { discoverInstalledPlugins } = await import(`./discovery?t=${Date.now()}-2`)
     const discovered = discoverInstalledPlugins({
       pluginsHomeOverride: pluginsHome,
       loadPluginManifestOverride: () => null,
@@ -114,7 +119,7 @@ describe("discoverInstalledPlugins", () => {
     expect(discovered.plugins[0]?.name).toBe("oh-my-opencode")
   })
 
-  it("derives canonical package name from npm plugin keys", () => {
+  it("derives canonical package name from npm plugin keys", async () => {
     //#given
     const pluginsHome = process.env.CLAUDE_PLUGINS_HOME as string
     const installPath = createTemporaryDirectory("omo-npm-plugin-")
@@ -140,6 +145,7 @@ describe("discoverInstalledPlugins", () => {
     )
 
     //#when
+    const { discoverInstalledPlugins } = await import(`./discovery?t=${Date.now()}-3`)
     const discovered = discoverInstalledPlugins({
       pluginsHomeOverride: pluginsHome,
       loadPluginManifestOverride: () => null,
