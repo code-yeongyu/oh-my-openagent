@@ -144,11 +144,13 @@ describe("background-agent spawner agent-not-found fallback", () => {
 
   test("calls onTaskError if fallback agent also fails", async () => {
     //#given
+    let callCount = 0
     const client = {
       session: {
         get: async () => ({ data: { directory: "/tmp/test" } }),
         create: async () => ({ data: { id: "session-fallback" } }),
         promptAsync: async () => {
+          callCount++
           throw new Error('Agent not found: "Sisyphus-Junior". Available agents: build, explore, general, plan')
         },
       },
@@ -188,7 +190,134 @@ describe("background-agent spawner agent-not-found fallback", () => {
     await new Promise(resolve => setTimeout(resolve, 50))
 
     //#then
+    // Verify retry was attempted (2 calls: original + fallback)
+    expect(callCount).toBe(2)
     expect(onTaskError).toHaveBeenCalled()
+  })
+
+  test("retries on agent.name/undefined error variant", async () => {
+    //#given
+    const promptCalls: any[] = []
+    let callCount = 0
+
+    const client = {
+      session: {
+        get: async () => ({ data: { directory: "/tmp/test" } }),
+        create: async () => ({ data: { id: "session-fallback" } }),
+        promptAsync: async (args: any) => {
+          callCount++
+          promptCalls.push({ body: { ...args.body } })
+          if (callCount === 1) {
+            throw new Error("Cannot read properties of undefined (reading 'agent.name')")
+          }
+          return { data: {} }
+        },
+      },
+    } as any
+
+    const onTaskError = mock(() => {})
+
+    const task = createTask({
+      description: "Test task",
+      prompt: "Do work",
+      agent: "Sisyphus-Junior",
+      parentSessionID: "ses_parent",
+      parentMessageID: "msg_parent",
+    })
+
+    const item = {
+      task,
+      input: {
+        description: task.description,
+        prompt: task.prompt,
+        agent: task.agent,
+        parentSessionID: task.parentSessionID,
+        parentMessageID: task.parentMessageID,
+        parentModel: task.parentModel,
+        parentAgent: task.parentAgent,
+        model: task.model,
+      },
+    }
+
+    const ctx = {
+      client,
+      directory: "/tmp/test",
+      concurrencyManager: { release: () => {} },
+      tmuxEnabled: false,
+      onTaskError,
+    }
+
+    //#when
+    await startTask(item as any, ctx as any)
+    await new Promise(resolve => setTimeout(resolve, 50))
+
+    //#then
+    expect(promptCalls).toHaveLength(2)
+    expect(promptCalls[0].body.agent).toBe("Sisyphus-Junior")
+    expect(promptCalls[1].body.agent).toBe("general")
+    expect(onTaskError).not.toHaveBeenCalled()
+  })
+
+  test("detects agent error from plain object with message field", async () => {
+    //#given
+    const promptCalls: any[] = []
+    let callCount = 0
+
+    const client = {
+      session: {
+        get: async () => ({ data: { directory: "/tmp/test" } }),
+        create: async () => ({ data: { id: "session-fallback" } }),
+        promptAsync: async (args: any) => {
+          callCount++
+          promptCalls.push({ body: { ...args.body } })
+          if (callCount === 1) {
+            throw { message: 'Agent not found: "Custom-Agent"', name: "UnknownError" }
+          }
+          return { data: {} }
+        },
+      },
+    } as any
+
+    const onTaskError = mock(() => {})
+
+    const task = createTask({
+      description: "Test task",
+      prompt: "Do work",
+      agent: "Custom-Agent",
+      parentSessionID: "ses_parent",
+      parentMessageID: "msg_parent",
+    })
+
+    const item = {
+      task,
+      input: {
+        description: task.description,
+        prompt: task.prompt,
+        agent: task.agent,
+        parentSessionID: task.parentSessionID,
+        parentMessageID: task.parentMessageID,
+        parentModel: task.parentModel,
+        parentAgent: task.parentAgent,
+        model: task.model,
+      },
+    }
+
+    const ctx = {
+      client,
+      directory: "/tmp/test",
+      concurrencyManager: { release: () => {} },
+      tmuxEnabled: false,
+      onTaskError,
+    }
+
+    //#when
+    await startTask(item as any, ctx as any)
+    await new Promise(resolve => setTimeout(resolve, 50))
+
+    //#then
+    expect(promptCalls).toHaveLength(2)
+    expect(promptCalls[1].body.agent).toBe("general")
+    expect(onTaskError).not.toHaveBeenCalled()
   })
 })
 

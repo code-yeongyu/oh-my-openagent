@@ -11,8 +11,19 @@ import type { ConcurrencyManager } from "./concurrency"
 export const FALLBACK_AGENT = "general"
 
 export function isAgentNotFoundError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error)
-  return message.includes("Agent not found")
+  const message =
+    typeof error === "string"
+      ? error
+      : error instanceof Error
+        ? error.message
+        : typeof error === "object" && error !== null && typeof (error as { message?: unknown }).message === "string"
+          ? (error as { message: string }).message
+          : String(error)
+  return (
+    message.includes("Agent not found") ||
+    message.includes("agent.name") ||
+    (message.includes("agent") && message.includes("undefined"))
+  )
 }
 
 export function buildFallbackBody(
