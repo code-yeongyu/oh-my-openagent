@@ -1,5 +1,21 @@
-import { describe, it, expect, beforeEach, afterEach } from "bun:test"
+import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test"
 import type { PluginComponentsResult } from "./loader"
+
+function createPluginComponentsResult(): PluginComponentsResult {
+  return {
+    commands: { "demo:command": { name: "demo:command", description: "demo", template: "demo" } },
+    skills: { "demo:skill": { name: "demo:skill", description: "skill", template: "skill" } },
+    agents: { "demo:agent": { description: "agent", mode: "subagent", prompt: "demo" } },
+    mcpServers: { "demo:mcp": { type: "local", command: ["demo"] } },
+    hooksConfigs: [{ hooks: {} }],
+    plugins: [{ name: "demo", version: "1.0.0", scope: "user", installPath: "/tmp/demo", pluginKey: "demo@test" }],
+    errors: [],
+  }
+}
+
+async function importFreshLoaderModule() {
+  return import(`./loader?plugin-loader-cache-test=${Date.now()}-${Math.random()}`)
+}
 
 describe("loadAllPluginComponents", () => {
   const originalEnv = { ...process.env }
@@ -11,6 +27,7 @@ describe("loadAllPluginComponents", () => {
 
   afterEach(() => {
     process.env = { ...originalEnv }
+    mock.restore()
   })
 
   describe("when OPENCODE_DISABLE_CLAUDE_CODE is set to 'true'", () => {
@@ -107,6 +124,147 @@ describe("loadAllPluginComponents", () => {
       // then — "yes" is not "true" or "1", should not skip
       expect(result).toBeDefined()
       expect(result).toHaveProperty("plugins")
+    })
+  })
+
+  describe("when plugin loading repeats with the same options", () => {
+    it("returns the cached result without reloading plugin dependencies", async () => {
+      // given
+      const result = createPluginComponentsResult()
+      const discoverInstalledPlugins = mock(() => ({ plugins: result.plugins, errors: result.errors }))
+      const loadPluginCommands = mock(() => result.commands)
+      const loadPluginSkillsAsCommands = mock(() => result.skills)
+      const loadPluginAgents = mock(() => result.agents)
+      const loadPluginMcpServers = mock(async () => result.mcpServers)
+      const loadPluginHooksConfigs = mock(() => result.hooksConfigs)
+
+      mock.module("./discovery", () => ({ discoverInstalledPlugins }))
+      mock.module("./command-loader", () => ({ loadPluginCommands }))
+      mock.module("./skill-loader", () => ({ loadPluginSkillsAsCommands }))
+      mock.module("./agent-loader", () => ({ loadPluginAgents }))
+      mock.module("./mcp-server-loader", () => ({ loadPluginMcpServers }))
+      mock.module("./hook-loader", () => ({ loadPluginHooksConfigs }))
+
+      const { clearPluginComponentsCache, loadAllPluginComponents } = await importFreshLoaderModule()
+      clearPluginComponentsCache()
+      const enabledPluginsOverride = { "demo@test": true }
+
+      // when
+      const firstResult = await loadAllPluginComponents({ enabledPluginsOverride })
+      const secondResult = await loadAllPluginComponents({ enabledPluginsOverride })
+
+      // then
+      expect(firstResult).toEqual(result)
+      expect(secondResult).toEqual(result)
+      expect(discoverInstalledPlugins).toHaveBeenCalledTimes(1)
+      expect(loadPluginCommands).toHaveBeenCalledTimes(1)
+      expect(loadPluginSkillsAsCommands).toHaveBeenCalledTimes(1)
+      expect(loadPluginAgents).toHaveBeenCalledTimes(1)
+      expect(loadPluginMcpServers).toHaveBeenCalledTimes(1)
+      expect(loadPluginHooksConfigs).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe("when the enabled plugin override changes", () => {
+    it("reloads plugin components for the new cache key", async () => {
+      // given
+      const result = createPluginComponentsResult()
+      const discoverInstalledPlugins = mock(() => ({ plugins: result.plugins, errors: result.errors }))
+      const loadPluginCommands = mock(() => result.commands)
+      const loadPluginSkillsAsCommands = mock(() => result.skills)
+      const loadPluginAgents = mock(() => result.agents)
+      const loadPluginMcpServers = mock(async () => result.mcpServers)
+      const loadPluginHooksConfigs = mock(() => result.hooksConfigs)
+
+      mock.module("./discovery", () => ({ discoverInstalledPlugins }))
+      mock.module("./command-loader", () => ({ loadPluginCommands }))
+      mock.module("./skill-loader", () => ({ loadPluginSkillsAsCommands }))
+      mock.module("./agent-loader", () => ({ loadPluginAgents }))
+      mock.module("./mcp-server-loader", () => ({ loadPluginMcpServers }))
+      mock.module("./hook-loader", () => ({ loadPluginHooksConfigs }))
+
+      const { clearPluginComponentsCache, loadAllPluginComponents } = await importFreshLoaderModule()
+      clearPluginComponentsCache()
+
+      // when
+      await loadAllPluginComponents({ enabledPluginsOverride: { "demo@test": true } })
+      await loadAllPluginComponents({ enabledPluginsOverride: { "demo@test": false } })
+
+      // then
+      expect(discoverInstalledPlugins).toHaveBeenCalledTimes(2)
+      expect(loadPluginCommands).toHaveBeenCalledTimes(2)
+      expect(loadPluginSkillsAsCommands).toHaveBeenCalledTimes(2)
+      expect(loadPluginAgents).toHaveBeenCalledTimes(2)
+      expect(loadPluginMcpServers).toHaveBeenCalledTimes(2)
+      expect(loadPluginHooksConfigs).toHaveBeenCalledTimes(2)
+    })
+  })
+
+  describe("when the cache is cleared", () => {
+    it("reloads plugin components on the next call", async () => {
+      // given
+      const result = createPluginComponentsResult()
+      const discoverInstalledPlugins = mock(() => ({ plugins: result.plugins, errors: result.errors }))
+      const loadPluginCommands = mock(() => result.commands)
+      const loadPluginSkillsAsCommands = mock(() => result.skills)
+      const loadPluginAgents = mock(() => result.agents)
+      const loadPluginMcpServers = mock(async () => result.mcpServers)
+      const loadPluginHooksConfigs = mock(() => result.hooksConfigs)
+
+      mock.module("./discovery", () => ({ discoverInstalledPlugins }))
+      mock.module("./command-loader", () => ({ loadPluginCommands }))
+      mock.module("./skill-loader", () => ({ loadPluginSkillsAsCommands }))
+      mock.module("./agent-loader", () => ({ loadPluginAgents }))
+      mock.module("./mcp-server-loader", () => ({ loadPluginMcpServers }))
+      mock.module("./hook-loader", () => ({ loadPluginHooksConfigs }))
+
+      const { clearPluginComponentsCache, loadAllPluginComponents } = await importFreshLoaderModule()
+      clearPluginComponentsCache()
+
+      // when
+      await loadAllPluginComponents()
+      clearPluginComponentsCache()
+      await loadAllPluginComponents()
+
+      // then
+      expect(discoverInstalledPlugins).toHaveBeenCalledTimes(2)
+      expect(loadPluginCommands).toHaveBeenCalledTimes(2)
+      expect(loadPluginSkillsAsCommands).toHaveBeenCalledTimes(2)
+      expect(loadPluginAgents).toHaveBeenCalledTimes(2)
+      expect(loadPluginMcpServers).toHaveBeenCalledTimes(2)
+      expect(loadPluginHooksConfigs).toHaveBeenCalledTimes(2)
+    })
+  })
+
+  describe("when a caller mutates a cached result", () => {
+    it("returns a fresh clone on the next cache hit", async () => {
+      // given
+      const result = createPluginComponentsResult()
+      const discoverInstalledPlugins = mock(() => ({ plugins: result.plugins, errors: result.errors }))
+      const loadPluginCommands = mock(() => result.commands)
+      const loadPluginSkillsAsCommands = mock(() => result.skills)
+      const loadPluginAgents = mock(() => result.agents)
+      const loadPluginMcpServers = mock(async () => result.mcpServers)
+      const loadPluginHooksConfigs = mock(() => result.hooksConfigs)
+
+      mock.module("./discovery", () => ({ discoverInstalledPlugins }))
+      mock.module("./command-loader", () => ({ loadPluginCommands }))
+      mock.module("./skill-loader", () => ({ loadPluginSkillsAsCommands }))
+      mock.module("./agent-loader", () => ({ loadPluginAgents }))
+      mock.module("./mcp-server-loader", () => ({ loadPluginMcpServers }))
+      mock.module("./hook-loader", () => ({ loadPluginHooksConfigs }))
+
+      const { clearPluginComponentsCache, loadAllPluginComponents } = await importFreshLoaderModule()
+      clearPluginComponentsCache()
+
+      // when
+      const firstResult = await loadAllPluginComponents()
+      firstResult.commands["demo:command"]!.description = "mutated"
+      const secondResult = await loadAllPluginComponents()
+
+      // then
+      expect(secondResult.commands["demo:command"]!.description).toBe("demo")
+      expect(discoverInstalledPlugins).toHaveBeenCalledTimes(1)
     })
   })
 })
