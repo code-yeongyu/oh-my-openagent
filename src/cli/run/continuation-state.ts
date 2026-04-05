@@ -1,15 +1,11 @@
 import { getPlanProgress, readBoulderState } from "../../features/boulder-state"
 import {
-  getSessionAgent,
-  isAgentRegistered,
-  subagentSessions,
-} from "../../features/claude-code-session-state"
-import {
   getActiveContinuationMarkerReason,
   isContinuationMarkerActive,
   readContinuationMarker,
 } from "../../features/run-continuation-state"
 import { isSessionInBoulderLineage } from "../../hooks/atlas/boulder-session-lineage"
+import { getLastAgentFromSession } from "../../hooks/atlas/session-last-agent"
 import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { readState as readRalphLoopState } from "../../hooks/ralph-loop/storage"
 import type { RunContext } from "./types"
@@ -50,30 +46,55 @@ async function hasActiveBoulderContinuation(
 
   const progress = getPlanProgress(boulder.active_plan)
   if (progress.isComplete) return false
-  if (boulder.session_ids.includes(sessionID)) return true
   if (!client) return false
-  if (!subagentSessions.has(sessionID)) return false
 
-  const requiredAgentName = boulder.agent ?? (isAgentRegistered("atlas") ? "atlas" : undefined)
-  if (!requiredAgentName || !isAgentRegistered(requiredAgentName)) {
+  const isTrackedSession = boulder.session_ids.includes(sessionID)
+  const sessionOrigin = boulder.session_origins?.[sessionID]
+  if (!isTrackedSession) {
     return false
   }
 
-  const sessionAgent = getSessionAgent(sessionID)
-  const agentKey = getAgentConfigKey(sessionAgent ?? "")
-  const requiredAgentKey = getAgentConfigKey(requiredAgentName)
-  const isEligibleSubagent =
-    agentKey === requiredAgentKey
-    || (requiredAgentKey === getAgentConfigKey("atlas") && agentKey === getAgentConfigKey("sisyphus"))
+  const isTrackedDescendant = await isTrackedDescendantSession(client, sessionID, boulder.session_ids)
 
-  if (!isEligibleSubagent) {
+  if (isTrackedSession && sessionOrigin === "direct") {
+    return true
+  }
+
+  if (isTrackedSession && sessionOrigin !== "direct" && !isTrackedDescendant) {
+    return false
+  }
+
+  const sessionAgent = await getLastAgentFromSession(sessionID, client)
+  if (!sessionAgent) {
+    return false
+  }
+
+  const requiredAgentKey = getAgentConfigKey(boulder.agent ?? "atlas")
+  const sessionAgentKey = getAgentConfigKey(sessionAgent)
+  if (
+    sessionAgentKey !== requiredAgentKey
+    && !(requiredAgentKey === getAgentConfigKey("atlas") && sessionAgentKey === getAgentConfigKey("sisyphus"))
+  ) {
+    return false
+  }
+
+  return isTrackedSession || isTrackedDescendant
+}
+
+async function isTrackedDescendantSession(
+  client: RunContext["client"],
+  sessionID: string,
+  trackedSessionIDs: string[],
+): Promise<boolean> {
+  const ancestorSessionIDs = trackedSessionIDs.filter((trackedSessionID) => trackedSessionID !== sessionID)
+  if (ancestorSessionIDs.length === 0) {
     return false
   }
 
   return isSessionInBoulderLineage({
     client,
     sessionID,
-    boulderSessionIDs: boulder.session_ids,
+    boulderSessionIDs: ancestorSessionIDs,
   })
 }
 
