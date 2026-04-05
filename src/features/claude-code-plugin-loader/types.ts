@@ -228,6 +228,12 @@ export interface PluginLoaderOptions {
   pluginsHomeOverride?: string
 
   /**
+   * Override plugin manifest loading for testing.
+   * Return null to force plugin name derivation from the plugin key.
+   */
+  loadPluginManifestOverride?: (installPath: string) => PluginManifest | null
+
+  /**
    * Override enabled plugins from oh-my-opencode config.
    * Key format: "pluginName@marketplace" (e.g., "shell-scripting@claude-code-workflows")
    * Value: true = enabled, false = disabled

@@ -64,7 +64,7 @@ function loadClaudeSettings(): ClaudeSettings | null {
   }
 }
 
-function loadPluginManifest(installPath: string): PluginManifest | null {
+export function loadPluginManifest(installPath: string): PluginManifest | null {
   const manifestPath = join(installPath, ".claude-plugin", "plugin.json")
   if (!existsSync(manifestPath)) {
     return null
@@ -176,6 +176,7 @@ export function discoverInstalledPlugins(options?: PluginLoaderOptions): PluginL
 
   const settingsEnabledPlugins = settings?.enabledPlugins
   const overrideEnabledPlugins = options?.enabledPluginsOverride
+  const pluginManifestLoader = options?.loadPluginManifestOverride ?? loadPluginManifest
 
   for (const [pluginKey, installation] of extractPluginEntries(db)) {
     if (!installation) continue
@@ -196,7 +197,7 @@ export function discoverInstalledPlugins(options?: PluginLoaderOptions): PluginL
       continue
     }
 
-    const manifest = loadPluginManifest(installPath)
+    const manifest = pluginManifestLoader(installPath)
     const pluginName = manifest?.name || derivePluginNameFromKey(pluginKey)
 
     const loadedPlugin: LoadedPlugin = {
