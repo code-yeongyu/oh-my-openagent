@@ -3,11 +3,13 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import type { RunContext } from "./types"
+import { _resetForTesting, setSessionAgent } from "../../features/claude-code-session-state"
 import { writeState as writeRalphLoopState } from "../../hooks/ralph-loop/storage"
 
 const testDirs: string[] = []
 
 afterEach(() => {
+  _resetForTesting()
   while (testDirs.length > 0) {
     const dir = testDirs.pop()
     if (dir) {
@@ -456,6 +458,38 @@ describe("checkCompletionConditions continuation coverage", () => {
 
     // then
     expect(result).toBe(true)
+  })
+
+  it("returns false when appended tracked descendant has no persisted messages but in-memory session agent matches atlas", async () => {
+    // given
+    spyOn(console, "log").mockImplementation(() => {})
+    const directory = createTempDir()
+    const planPath = join(directory, ".sisyphus", "plans", "session-agent-fallback-plan.md")
+    mkdirSync(join(directory, ".sisyphus", "plans"), { recursive: true })
+    writeFileSync(planPath, "- [ ] unfinished task\n", "utf-8")
+    writeBoulderStateFile(directory, planPath, ["ses_root_tracked", "ses_appended_child"], {
+      "ses_root_tracked": "direct",
+      "ses_appended_child": "appended",
+    })
+
+    const ctx = createMockContext(directory)
+    ctx.sessionID = "ses_appended_child"
+    setSessionAgent("ses_appended_child", "atlas")
+    ctx.client.session.get = mock(async ({ path }: { path: { id: string } }) => ({
+      data: {
+        id: path.id,
+        parentID: path.id === "ses_appended_child" ? "ses_root_tracked" : undefined,
+      },
+    })) as unknown as RunContext["client"]["session"]["get"]
+    ctx.client.session.messages = mock(async () => ({ data: [] })) as unknown as RunContext["client"]["session"]["messages"]
+
+    const { checkCompletionConditions } = await import("./completion")
+
+    // when
+    const result = await checkCompletionConditions(ctx)
+
+    // then
+    expect(result).toBe(false)
   })
 
   it("returns false when active ralph-loop continuation exists for this session", async () => {

@@ -1,4 +1,5 @@
 import { getPlanProgress, readBoulderState } from "../../features/boulder-state"
+import { getSessionAgent } from "../../features/claude-code-session-state"
 import {
   getActiveContinuationMarkerReason,
   isContinuationMarkerActive,
@@ -65,6 +66,7 @@ async function hasActiveBoulderContinuation(
   }
 
   const sessionAgent = await getLastAgentFromSession(sessionID, client)
+    ?? getSessionAgent(sessionID)
   if (!sessionAgent) {
     return false
   }
