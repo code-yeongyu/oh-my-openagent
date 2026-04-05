@@ -35,6 +35,7 @@ export type PendingTaskRef =
 export interface SessionState {
   lastEventWasAbortError?: boolean
   lastContinuationInjectedAt?: number
+  isInjectingContinuation?: boolean
   promptFailureCount: number
   lastFailureAt?: number
   pendingRetryTimer?: ReturnType<typeof setTimeout>

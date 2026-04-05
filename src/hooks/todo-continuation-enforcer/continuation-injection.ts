@@ -61,6 +61,11 @@ export async function injectContinuation(args: {
     return
   }
 
+  if (state?.wasCancelled) {
+    log(`[${HOOK_NAME}] Skipped injection: session was cancelled`, { sessionID })
+    return
+  }
+
   if (isContinuationStopped?.(sessionID)) {
     log(`[${HOOK_NAME}] Skipped injection: continuation stopped for session`, { sessionID })
     return
@@ -145,6 +150,11 @@ Remaining tasks:
 ${todoList}`
 
   const injectionState = sessionStateStore.getExistingState(sessionID)
+  if (injectionState?.wasCancelled) {
+    log(`[${HOOK_NAME}] Skipped injection: session was cancelled before prompt`, { sessionID })
+    return
+  }
+
   if (injectionState) {
     injectionState.inFlight = true
   }

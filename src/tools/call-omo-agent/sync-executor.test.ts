@@ -8,6 +8,11 @@ type PromptAsyncInput = {
     agent: string
     tools: Record<string, boolean>
     parts: Array<{ type: string; text: string }>
+    model?: { providerID: string; modelID: string }
+    variant?: string
+    temperature?: number
+    topP?: number
+    options?: Record<string, unknown>
   }
 }
 
@@ -139,6 +144,56 @@ describe("executeSync", () => {
       toolContext,
       expect.objectContaining({ client: expect.anything() })
     )
+  })
+
+  test("forwards delegated model tuning params in the sync prompt body", async () => {
+    //#given
+    const executeSync = await importExecuteSync()
+    const deps = createDependencies()
+    const toolContext = createToolContext()
+    const recorder = createPromptAsyncRecorder()
+    const args = {
+      subagent_type: "explore",
+      description: "test task",
+      prompt: "find something",
+      run_in_background: false,
+    }
+    const model = {
+      providerID: "openai",
+      modelID: "gpt-5.4",
+      variant: "high",
+      temperature: 0.12,
+      top_p: 0.34,
+      maxTokens: 5678,
+      reasoningEffort: "medium",
+      thinking: { type: "disabled" as const },
+    }
+
+    //#when
+    await executeSync(
+      args,
+      toolContext,
+      createContext(recorder.promptAsync) as never,
+      deps,
+      undefined,
+      undefined,
+      model,
+    )
+
+    //#then
+    const promptInput = recorder.getCapturedInput()
+    expect(promptInput?.body.model).toEqual({
+      providerID: "openai",
+      modelID: "gpt-5.4",
+    })
+    expect(promptInput?.body.variant).toBe("high")
+    expect(promptInput?.body.temperature).toBe(0.12)
+    expect(promptInput?.body.topP).toBe(0.34)
+    expect(promptInput?.body.options).toEqual({
+      maxTokens: 5678,
+      reasoningEffort: "medium",
+      thinking: { type: "disabled" },
+    })
   })
 
   test("records metadata with description and created session id", async () => {

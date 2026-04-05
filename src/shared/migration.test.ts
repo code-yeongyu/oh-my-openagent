@@ -565,6 +565,12 @@ describe("MODEL_VERSION_MAP", () => {
     // then: Should contain correct mapping
     expect(MODEL_VERSION_MAP["anthropic/claude-opus-4-5"]).toBe("anthropic/claude-opus-4-6")
   })
+
+  test("maps openai/gpt-5.3-codex to openai/gpt-5.4 for deep category migration", () => {
+    // given/when: Check MODEL_VERSION_MAP
+    // then: gpt-5.3-codex should migrate to gpt-5.4
+    expect(MODEL_VERSION_MAP["openai/gpt-5.3-codex"]).toBe("openai/gpt-5.4")
+  })
 })
 
 describe("migrateModelVersions", () => {

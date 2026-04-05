@@ -2,6 +2,8 @@ import { existsSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import { parse, ParseError, printParseErrorCode } from "jsonc-parser"
 
+import { CONFIG_BASENAME, LEGACY_CONFIG_BASENAME } from "./plugin-identity"
+
 export interface JsoncParseResult<T> {
   data: T | null
   errors: Array<{ message: string; offset: number; length: number }>
@@ -66,15 +68,24 @@ export function detectConfigFile(basePath: string): {
   return { format: "none", path: jsonPath }
 }
 
-const PLUGIN_CONFIG_NAMES = ["oh-my-opencode", "oh-my-openagent"] as const
-
 export function detectPluginConfigFile(dir: string): {
   format: "json" | "jsonc" | "none"
   path: string
+  legacyPath?: string
 } {
-  for (const name of PLUGIN_CONFIG_NAMES) {
-    const result = detectConfigFile(join(dir, name))
-    if (result.format !== "none") return result
+  const canonicalResult = detectConfigFile(join(dir, CONFIG_BASENAME))
+  const legacyResult = detectConfigFile(join(dir, LEGACY_CONFIG_BASENAME))
+
+  if (canonicalResult.format !== "none") {
+    return {
+      ...canonicalResult,
+      legacyPath: legacyResult.format !== "none" ? legacyResult.path : undefined,
+    }
   }
-  return { format: "none", path: join(dir, PLUGIN_CONFIG_NAMES[0] + ".json") }
+
+  if (legacyResult.format !== "none") {
+    return legacyResult
+  }
+
+  return { format: "none", path: join(dir, `${CONFIG_BASENAME}.json`) }
 }

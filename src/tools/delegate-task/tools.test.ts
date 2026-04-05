@@ -93,7 +93,7 @@ describe("sisyphus-task", () => {
 
       // when / #then
       expect(category).toBeDefined()
-      expect(category.model).toBe("openai/gpt-5.3-codex")
+      expect(category.model).toBe("openai/gpt-5.4")
       expect(category.variant).toBe("medium")
     })
 
@@ -705,8 +705,8 @@ describe("sisyphus-task", () => {
     })
 
     test("blocks requiresModel when availability is known and missing the required model", () => {
-      // given
-      const categoryName = "deep"
+      // given - artistry has requiresModel: gemini-3.1-pro
+      const categoryName = "artistry"
       const availableModels = new Set<string>(["anthropic/claude-opus-4-6"])
 
       // when
@@ -720,8 +720,8 @@ describe("sisyphus-task", () => {
     })
 
     test("blocks requiresModel when availability is empty", () => {
-      // given
-      const categoryName = "deep"
+      // given - artistry has requiresModel: gemini-3.1-pro
+      const categoryName = "artistry"
       const availableModels = new Set<string>()
 
       // when
@@ -1366,6 +1366,35 @@ describe("sisyphus-task", () => {
       )).rejects.toThrow("Invalid arguments: 'run_in_background' parameter is REQUIRED")
     })
 
+    test("#given category without description #when executing #then throws required parameter error", async () => {
+      // given
+      const { createDelegateTask } = require("./tools")
+      const mockManager = { launch: async () => ({}) }
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        session: {
+          create: async () => ({ data: { id: "test-session" } }),
+          prompt: async () => ({ data: {} }),
+          promptAsync: async () => ({ data: {} }),
+          messages: async () => ({ data: [] }),
+        },
+      }
+      const tool = createDelegateTask({ manager: mockManager, client: mockClient })
+
+      // when
+      // then
+      await expect(tool.execute(
+        {
+          prompt: "Do something",
+          category: "quick",
+          run_in_background: false,
+          load_skills: [],
+        },
+        { sessionID: "parent-session", messageID: "parent-message", agent: "sisyphus", abort: new AbortController().signal }
+      )).rejects.toThrow("Invalid arguments: 'description' parameter is REQUIRED")
+    })
+
     test("#given explicit run_in_background=false #when executing #then sync execution succeeds", async () => {
       // given
       const { createDelegateTask } = require("./tools")
@@ -1452,6 +1481,92 @@ describe("sisyphus-task", () => {
       // then
       expect(launchCalled).toBe(true)
       expect(result).toContain("Background task launched")
+    }, { timeout: 10000 })
+
+    test("#given concurrent background launches from the same parent #when one parent call aborts during session wait #then sibling launch is not interrupted", async () => {
+      // given
+      const { createDelegateTask } = require("./tools")
+      const firstAbortController = new AbortController()
+      const secondAbortController = new AbortController()
+      const taskStates = new Map([
+        ["bg_tool_first", { reads: 0, abortOnFirstRead: true, sessionID: "ses_tool_first" }],
+        ["bg_tool_second", { reads: 0, abortOnFirstRead: false, sessionID: "ses_tool_second" }],
+      ])
+      let launchCount = 0
+      const mockManager = {
+        launch: async () => {
+          launchCount += 1
+          return launchCount === 1
+            ? {
+                id: "bg_tool_first",
+                sessionID: undefined,
+                description: "Tool first",
+                agent: "Sisyphus-Junior",
+                status: "running",
+              }
+            : {
+                id: "bg_tool_second",
+                sessionID: undefined,
+                description: "Tool second",
+                agent: "Sisyphus-Junior",
+                status: "running",
+              }
+        },
+        getTask: (taskID: string) => {
+          const state = taskStates.get(taskID)
+          if (!state) return undefined
+          state.reads += 1
+          if (state.abortOnFirstRead && state.reads === 1) {
+            firstAbortController.abort()
+          }
+          return state.reads >= 2
+            ? { sessionID: state.sessionID, status: "running" }
+            : { sessionID: undefined, status: "pending" }
+        },
+      }
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        model: { list: async () => [] },
+        session: {
+          create: async () => ({ data: { id: "ses_bg_explicit_true" } }),
+          prompt: async () => ({ data: {} }),
+          promptAsync: async () => ({ data: {} }),
+          messages: async () => ({ data: [] }),
+        },
+      }
+      const tool = createDelegateTask({ manager: mockManager, client: mockClient })
+
+      // when
+      const [firstResult, secondResult] = await Promise.all([
+        tool.execute(
+          {
+            description: "Tool first",
+            prompt: "Run background",
+            category: "quick",
+            run_in_background: true,
+            load_skills: [],
+          },
+          { sessionID: "parent-session", messageID: "parent-message-1", agent: "sisyphus", abort: firstAbortController.signal }
+        ),
+        tool.execute(
+          {
+            description: "Tool second",
+            prompt: "Run background",
+            category: "quick",
+            run_in_background: true,
+            load_skills: [],
+          },
+          { sessionID: "parent-session", messageID: "parent-message-2", agent: "sisyphus", abort: secondAbortController.signal }
+        ),
+      ])
+
+      // then
+      expect(firstResult).toContain("Background task launched")
+      expect(firstResult).not.toContain("Task failed to start")
+      expect(secondResult).toContain("Background task launched")
+      expect(secondResult).toContain("session_id: ses_tool_second")
+      expect(secondResult).not.toContain("interrupt")
     }, { timeout: 10000 })
   })
 
@@ -2282,60 +2397,68 @@ describe("sisyphus-task", () => {
       expect(result).toContain("Artistry result here")
     }, { timeout: 20000 })
 
-    test("writing category (kimi) with run_in_background=false should force background but wait for result", async () => {
-      // given - writing uses kimi-for-coding/k2p5
+    test("writing category (kimi) with run_in_background=false should run sync when kimi provider is available", async () => {
+      // given - writing uses kimi model which is no longer considered unstable
+      // Override provider cache to include kimi-for-coding provider
+      providerModelsSpy.mockReturnValue({
+        models: {
+          anthropic: ["claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5"],
+          google: ["gemini-3.1-pro", "gemini-3-flash"],
+          openai: ["gpt-5.4", "gpt-5.3-codex"],
+          "kimi-for-coding": ["k2p5"],
+        },
+        connected: ["anthropic", "google", "openai", "kimi-for-coding"],
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      })
+      cacheSpy.mockReturnValue(["anthropic", "google", "openai", "kimi-for-coding"])
+
       const { createDelegateTask } = require("./tools")
       let launchCalled = false
-      
-      const launchedTask = {
-        id: "task-writing",
-        sessionID: "ses_writing_gemini",
-        description: "Writing gemini task",
-        agent: "sisyphus-junior",
-        status: "running",
-      }
+      let promptCalled = false
+
       const mockManager = {
         launch: async () => {
           launchCalled = true
-          return launchedTask
+          return { id: "should-not-be-called", sessionID: "x", description: "x", agent: "x", status: "running" }
         },
-        getTask: () => launchedTask,
       }
-      
+
+       const promptMock = async () => {
+         promptCalled = true
+         return { data: {} }
+       }
+
        const mockClient = {
          app: { agents: async () => ({ data: [] }) },
          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         model: { list: async () => [{ provider: "google", id: "gemini-3-flash" }] },
          session: {
            get: async () => ({ data: { directory: "/project" } }),
-           create: async () => ({ data: { id: "ses_writing_gemini" } }),
-           prompt: async () => ({ data: {} }),
-           promptAsync: async () => ({ data: {} }),
+           create: async () => ({ data: { id: "ses_writing_kimi" } }),
+           prompt: promptMock,
+           promptAsync: promptMock,
            messages: async () => ({
-             data: [
-               { info: { role: "assistant", time: { created: Date.now() } }, parts: [{ type: "text", text: "Writing result here" }] }
-             ]
+             data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Writing result here" }] }]
            }),
-           status: async () => ({ data: { "ses_writing_gemini": { type: "idle" } } }),
+           status: async () => ({ data: { "ses_writing_kimi": { type: "idle" } } }),
          },
        }
-       
+
        const tool = createDelegateTask({
          manager: mockManager,
          client: mockClient,
        })
-      
+
       const toolContext = {
         sessionID: "parent-session",
         messageID: "parent-message",
         agent: "sisyphus",
         abort: new AbortController().signal,
       }
-      
-      // when - writing category (gemini-3-flash)
+
+      // when - writing category (kimi) with run_in_background=false
       const result = await tool.execute(
         {
-          description: "Test writing forced background",
+          description: "Test writing sync",
           prompt: "Write something",
           category: "writing",
           run_in_background: false,
@@ -2343,11 +2466,11 @@ describe("sisyphus-task", () => {
         },
         toolContext
       )
-      
-      // then - should launch as background BUT wait for and return actual result
-      expect(launchCalled).toBe(true)
-      expect(result).toContain("SUPERVISED TASK COMPLETED")
-      expect(result).toContain("Writing result here")
+
+      // then - should run sync, NOT forced to background (kimi is not unstable)
+      expect(launchCalled).toBe(false)
+      expect(promptCalled).toBe(true)
+      expect(result).not.toContain("SUPERVISED TASK COMPLETED")
     }, { timeout: 20000 })
 
     test("is_unstable_agent=true should force background but wait for result", async () => {

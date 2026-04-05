@@ -8,7 +8,7 @@ import {
 
 export async function checkCompletionConditions(ctx: RunContext): Promise<boolean> {
   try {
-    const continuationState = getContinuationState(ctx.directory, ctx.sessionID)
+    const continuationState = await getContinuationState(ctx.directory, ctx.sessionID, ctx.client)
 
     if (continuationState.hasActiveHookMarker) {
       const reason = continuationState.activeHookMarkerReason ?? "continuation hook is active"

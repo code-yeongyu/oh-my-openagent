@@ -14,7 +14,7 @@ describe("injectBoulderContinuation", () => {
     _resetForTesting()
   })
 
-  test("normalizes config-key agent to display-name for promptAsync", async () => {
+  test("uses raw agent key for promptAsync to avoid HTTP header issues", async () => {
     // given
     registerAgentName("atlas")
     const promptAsyncMock = mock(async (_request: unknown) => undefined)
@@ -31,7 +31,7 @@ describe("injectBoulderContinuation", () => {
     } as unknown as PluginInput
 
     // when
-    await injectBoulderContinuation({
+    const result = await injectBoulderContinuation({
       ctx,
       sessionID: "ses_test_123",
       planName: "test-plan",
@@ -41,14 +41,90 @@ describe("injectBoulderContinuation", () => {
       sessionState: { promptFailureCount: 0 },
     })
 
+<<<<<<< HEAD
     // then
+    expect(result).toBe("injected")
+||||||| parent of 1b39490a (fix(atlas): use raw agent key instead of display name for API calls (#3138))
+    // then
+=======
+    // then - uses raw agent key, not display name (to avoid HTTP header validation issues)
+>>>>>>> 1b39490a (fix(atlas): use raw agent key instead of display name for API calls (#3138))
     expect(promptAsyncMock).toHaveBeenCalledTimes(1)
     expect(promptAsyncMock).toHaveBeenCalledWith(
       expect.objectContaining({
         body: expect.objectContaining({
-          agent: "Atlas (Plan Executor)",
+          agent: "atlas",
         }),
       }),
     )
+  })
+
+  test("#given background tasks are running #when injector checks again #then it reports skipped background tasks without mutating failure count", async () => {
+    // given
+    registerAgentName("atlas")
+    const promptAsyncMock = mock(async (_request: unknown) => undefined)
+    const messagesMock = mock(async () => ({ data: [] }))
+    const sessionState = { promptFailureCount: 2, lastContinuationInjectedAt: 123 }
+
+    const ctx = {
+      directory: "/tmp",
+      client: {
+        session: {
+          messages: messagesMock,
+          promptAsync: promptAsyncMock,
+        },
+      },
+    } as unknown as PluginInput
+
+    // when
+    const result = await injectBoulderContinuation({
+      ctx,
+      sessionID: "ses_test_123",
+      planName: "test-plan",
+      remaining: 1,
+      total: 2,
+      agent: "atlas",
+      backgroundManager: {
+        getTasksByParentSession: () => [{ status: "running" }],
+      } as unknown as Parameters<typeof injectBoulderContinuation>[0]["backgroundManager"],
+      sessionState,
+    })
+
+    // then
+    expect(result).toBe("skipped_background_tasks")
+    expect(promptAsyncMock).not.toHaveBeenCalled()
+    expect(sessionState.promptFailureCount).toBe(2)
+    expect(sessionState.lastContinuationInjectedAt).toBe(123)
+  })
+
+  test("#given the continuation agent is unavailable #when injector runs #then it reports skipped agent unavailable without prompting", async () => {
+    // given
+    const promptAsyncMock = mock(async (_request: unknown) => undefined)
+    const messagesMock = mock(async () => ({ data: [] }))
+
+    const ctx = {
+      directory: "/tmp",
+      client: {
+        session: {
+          messages: messagesMock,
+          promptAsync: promptAsyncMock,
+        },
+      },
+    } as unknown as PluginInput
+
+    // when
+    const result = await injectBoulderContinuation({
+      ctx,
+      sessionID: "ses_test_123",
+      planName: "test-plan",
+      remaining: 1,
+      total: 2,
+      agent: "missing-agent",
+      sessionState: { promptFailureCount: 0 },
+    })
+
+    // then
+    expect(result).toBe("skipped_agent_unavailable")
+    expect(promptAsyncMock).not.toHaveBeenCalled()
   })
 })

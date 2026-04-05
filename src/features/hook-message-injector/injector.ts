@@ -17,6 +17,7 @@ export interface StoredMessage {
 type OpencodeClient = PluginInput["client"]
 
 interface SDKMessage {
+  id?: string
   info?: {
     agent?: string
     model?: {
@@ -27,6 +28,9 @@ interface SDKMessage {
     providerID?: string
     modelID?: string
     tools?: Record<string, ToolPermission>
+    time?: {
+      created?: number
+    }
   }
 }
 
@@ -71,16 +75,22 @@ export async function findNearestMessageWithFieldsFromSDK(
   try {
     const response = await client.session.messages({ path: { id: sessionID } })
     const messages = normalizeSDKResponse(response, [] as SDKMessage[], { preferResponseOnMissingData: true })
+      .map((message) => ({
+        stored: convertSDKMessageToStoredMessage(message),
+        createdAt: message.info?.time?.created ?? Number.NEGATIVE_INFINITY,
+        id: typeof message.id === "string" ? message.id : "",
+      }))
+      .sort((left, right) => right.createdAt - left.createdAt || right.id.localeCompare(left.id))
 
-    for (let i = messages.length - 1; i >= 0; i--) {
-      const stored = convertSDKMessageToStoredMessage(messages[i])
+    for (const message of messages) {
+      const stored = message.stored
       if (stored?.agent && stored.model?.providerID && stored.model?.modelID) {
         return stored
       }
     }
 
-    for (let i = messages.length - 1; i >= 0; i--) {
-      const stored = convertSDKMessageToStoredMessage(messages[i])
+    for (const message of messages) {
+      const stored = message.stored
       if (stored?.agent || (stored?.model?.providerID && stored?.model?.modelID)) {
         return stored
       }
@@ -104,6 +114,14 @@ export async function findFirstMessageWithAgentFromSDK(
   try {
     const response = await client.session.messages({ path: { id: sessionID } })
     const messages = normalizeSDKResponse(response, [] as SDKMessage[], { preferResponseOnMissingData: true })
+      .sort((left, right) => {
+        const leftTime = left.info?.time?.created ?? Number.POSITIVE_INFINITY
+        const rightTime = right.info?.time?.created ?? Number.POSITIVE_INFINITY
+        if (leftTime !== rightTime) return leftTime - rightTime
+        const leftId = typeof left.id === "string" ? left.id : ""
+        const rightId = typeof right.id === "string" ? right.id : ""
+        return leftId.localeCompare(rightId)
+      })
 
     for (const msg of messages) {
       const stored = convertSDKMessageToStoredMessage(msg)
@@ -137,32 +155,33 @@ export function findNearestMessageWithFields(messageDir: string): StoredMessage 
   }
 
   try {
-    const files = readdirSync(messageDir)
+    const messages = readdirSync(messageDir)
       .filter((f) => f.endsWith(".json"))
-      .sort()
-      .reverse()
-
-    for (const file of files) {
-      try {
-        const content = readFileSync(join(messageDir, file), "utf-8")
-        const msg = JSON.parse(content) as StoredMessage
-        if (msg.agent && msg.model?.providerID && msg.model?.modelID) {
-          return msg
+      .map((fileName) => {
+        try {
+          const content = readFileSync(join(messageDir, fileName), "utf-8")
+          const msg = JSON.parse(content) as StoredMessage & { time?: { created?: number } }
+          return {
+            fileName,
+            msg,
+            createdAt: typeof msg.time?.created === "number" ? msg.time.created : Number.NEGATIVE_INFINITY,
+          }
+        } catch {
+          return null
         }
-      } catch {
-        continue
+      })
+      .filter((entry): entry is { fileName: string; msg: StoredMessage & { time?: { created?: number } }; createdAt: number } => entry !== null)
+      .sort((left, right) => right.createdAt - left.createdAt || right.fileName.localeCompare(left.fileName))
+
+    for (const entry of messages) {
+      if (entry.msg.agent && entry.msg.model?.providerID && entry.msg.model?.modelID) {
+        return entry.msg
       }
     }
 
-    for (const file of files) {
-      try {
-        const content = readFileSync(join(messageDir, file), "utf-8")
-        const msg = JSON.parse(content) as StoredMessage
-        if (msg.agent || (msg.model?.providerID && msg.model?.modelID)) {
-          return msg
-        }
-      } catch {
-        continue
+    for (const entry of messages) {
+      if (entry.msg.agent || (entry.msg.model?.providerID && entry.msg.model?.modelID)) {
+        return entry.msg
       }
     }
   } catch {
@@ -188,19 +207,27 @@ export function findFirstMessageWithAgent(messageDir: string): string | null {
   }
 
   try {
-    const files = readdirSync(messageDir)
+    const messages = readdirSync(messageDir)
       .filter((f) => f.endsWith(".json"))
-      .sort()
-
-    for (const file of files) {
-      try {
-        const content = readFileSync(join(messageDir, file), "utf-8")
-        const msg = JSON.parse(content) as StoredMessage
-        if (msg.agent) {
-          return msg.agent
+      .map((fileName) => {
+        try {
+          const content = readFileSync(join(messageDir, fileName), "utf-8")
+          const msg = JSON.parse(content) as StoredMessage & { time?: { created?: number } }
+          return {
+            fileName,
+            msg,
+            createdAt: typeof msg.time?.created === "number" ? msg.time.created : Number.POSITIVE_INFINITY,
+          }
+        } catch {
+          return null
         }
-      } catch {
-        continue
+      })
+      .filter((entry): entry is { fileName: string; msg: StoredMessage & { time?: { created?: number } }; createdAt: number } => entry !== null)
+      .sort((left, right) => left.createdAt - right.createdAt || left.fileName.localeCompare(right.fileName))
+
+    for (const entry of messages) {
+      if (entry.msg.agent) {
+        return entry.msg.agent
       }
     }
   } catch {

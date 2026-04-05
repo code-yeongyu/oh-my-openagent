@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, mock, test } from "bun:test"
+import { beforeEach, describe, expect, mock, test, afterAll } from "bun:test"
 import type { TmuxConfig } from "../../config/schema"
 import type { ActionResult, ExecuteContext, ExecuteActionsResult } from "./action-executor"
 import type { TmuxUtilDeps } from "./manager"
@@ -45,6 +45,8 @@ mock.module("../../shared/tmux", () => ({
   SESSION_READY_TIMEOUT_MS: 50,
   SESSION_MISSING_GRACE_MS: 1_000,
 }))
+
+afterAll(() => { mock.restore() })
 
 const mockTmuxDeps: TmuxUtilDeps = {
   isInsideTmux: mockIsInsideTmux,

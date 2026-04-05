@@ -64,7 +64,7 @@ describe("runBunInstallWithDetails", () => {
         expect(result).toEqual({ success: true })
         expect(getOpenCodeCacheDirSpy).toHaveBeenCalledTimes(1)
         expect(spawnWithWindowsHideSpy).toHaveBeenCalledWith(["bun", "install"], {
-          cwd: "/tmp/opencode-cache",
+          cwd: "/tmp/opencode-cache/packages",
           stdout: "pipe",
           stderr: "pipe",
         })
@@ -81,7 +81,7 @@ describe("runBunInstallWithDetails", () => {
         // then
         expect(result).toEqual({ success: true })
         expect(spawnWithWindowsHideSpy).toHaveBeenCalledWith(["bun", "install"], {
-          cwd: "/tmp/opencode-cache",
+          cwd: "/tmp/opencode-cache/packages",
           stdout: "pipe",
           stderr: "pipe",
         })
@@ -98,7 +98,7 @@ describe("runBunInstallWithDetails", () => {
         // then
         expect(result).toEqual({ success: true })
         expect(spawnWithWindowsHideSpy).toHaveBeenCalledWith(["bun", "install"], {
-          cwd: "/tmp/opencode-cache",
+          cwd: "/tmp/opencode-cache/packages",
           stdout: "inherit",
           stderr: "inherit",
         })
@@ -174,7 +174,7 @@ describe("runBunInstallWithDetails", () => {
           expect(outcome.result).toEqual({
             success: false,
             timedOut: true,
-            error: 'bun install timed out after 60 seconds. Try running manually: cd "/tmp/opencode-cache" && bun i',
+            error: 'bun install timed out after 60 seconds. Try running manually: cd "/tmp/opencode-cache/packages" && bun i',
           } satisfies BunInstallResult)
           expect(killCallCount).toBe(1)
         } finally {

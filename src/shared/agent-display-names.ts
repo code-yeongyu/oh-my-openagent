@@ -20,6 +20,14 @@ export const AGENT_DISPLAY_NAMES: Record<string, string> = {
   "council-member": "council-member",
 }
 
+const AGENT_LIST_SORT_PREFIXES: Record<string, string> = {
+  atlas: "\u200B",
+}
+
+function stripAgentListSortPrefix(agentName: string): string {
+  return agentName.replace(/^\u200B+/, "")
+}
+
 /**
  * Get display name for an agent config key.
  * Uses case-insensitive lookup for backward compatibility.
@@ -40,6 +48,13 @@ export function getAgentDisplayName(configKey: string): string {
   return configKey
 }
 
+export function getAgentListDisplayName(configKey: string): string {
+  const displayName = getAgentDisplayName(configKey)
+  const prefix = AGENT_LIST_SORT_PREFIXES[configKey.toLowerCase()]
+
+  return prefix ? `${prefix}${displayName}` : displayName
+}
+
 const REVERSE_DISPLAY_NAMES: Record<string, string> = Object.fromEntries(
   Object.entries(AGENT_DISPLAY_NAMES).map(([key, displayName]) => [displayName.toLowerCase(), key]),
 )
@@ -49,7 +64,7 @@ const REVERSE_DISPLAY_NAMES: Record<string, string> = Object.fromEntries(
  * "Atlas (Plan Executor)" → "atlas", "atlas" → "atlas", "unknown" → "unknown"
  */
 export function getAgentConfigKey(agentName: string): string {
-  const lower = agentName.toLowerCase()
+  const lower = stripAgentListSortPrefix(agentName).toLowerCase()
   const reversed = REVERSE_DISPLAY_NAMES[lower]
   if (reversed !== undefined) return reversed
   if (AGENT_DISPLAY_NAMES[lower] !== undefined) return lower
@@ -67,7 +82,7 @@ export function normalizeAgentForPrompt(agentName: string | undefined): string |
     return undefined
   }
 
-  const trimmed = agentName.trim()
+  const trimmed = stripAgentListSortPrefix(agentName.trim())
   if (!trimmed) {
     return undefined
   }

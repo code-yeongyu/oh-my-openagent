@@ -1,4 +1,4 @@
-import { describe, expect, it, mock } from "bun:test"
+import { describe, expect, it, mock, afterAll } from "bun:test"
 
 import { applyProviderConfig } from "../plugin-handlers/provider-config-handler"
 import { createModelCacheState } from "../plugin-state"
@@ -8,6 +8,8 @@ const logMock = mock(() => {})
 mock.module("../shared/logger", () => ({
   log: logMock,
 }))
+
+afterAll(() => { mock.restore() })
 
 const { createPreemptiveCompactionHook } = await import("./preemptive-compaction")
 

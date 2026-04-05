@@ -92,7 +92,7 @@ export function flattenToFallbackModelStrings(
 			// invalid strings like "provider/model high(low)".
 			const model = entry.model
 				.replace(/\([^()]+\)\s*$/, "")
-				.replace(/\s+([a-z][a-z0-9_-]*)\s*$/i, (match, suffix) => {
+				.replace(/\s+([a-z][a-z0-9_-]*)\s*$/i, (match: string, suffix: string) => {
 					const normalized = String(suffix).toLowerCase()
 					return KNOWN_VARIANTS.has(normalized)
 						? ""
@@ -101,7 +101,6 @@ export function flattenToFallbackModelStrings(
 				.trim()
 			return `${model}(${variant})`
 		}
-		// No explicit variant — preserve model string as-is (including any inline variant)
 		return entry.model
 	})
 }

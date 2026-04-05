@@ -102,6 +102,10 @@ exports[`generateModelConfig single native provider uses Claude models when only
     },
   },
   "categories": {
+    "deep": {
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
+    },
     "quick": {
       "model": "anthropic/claude-haiku-4-5",
     },
@@ -164,6 +168,10 @@ exports[`generateModelConfig single native provider uses Claude models with isMa
     },
   },
   "categories": {
+    "deep": {
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
+    },
     "quick": {
       "model": "anthropic/claude-haiku-4-5",
     },
@@ -244,7 +252,7 @@ exports[`generateModelConfig single native provider uses OpenAI models when only
       "variant": "xhigh",
     },
     "deep": {
-      "model": "openai/gpt-5.3-codex",
+      "model": "openai/gpt-5.4",
       "variant": "medium",
     },
     "quick": {
@@ -329,7 +337,7 @@ exports[`generateModelConfig single native provider uses OpenAI models with isMa
       "variant": "xhigh",
     },
     "deep": {
-      "model": "openai/gpt-5.3-codex",
+      "model": "openai/gpt-5.4",
       "variant": "medium",
     },
     "quick": {
@@ -395,6 +403,10 @@ exports[`generateModelConfig single native provider uses Gemini models when only
       "model": "google/gemini-3.1-pro-preview",
       "variant": "high",
     },
+    "deep": {
+      "model": "google/gemini-3.1-pro-preview",
+      "variant": "high",
+    },
     "quick": {
       "model": "google/gemini-3-flash-preview",
     },
@@ -452,6 +464,10 @@ exports[`generateModelConfig single native provider uses Gemini models with isMa
   },
   "categories": {
     "artistry": {
+      "model": "google/gemini-3.1-pro-preview",
+      "variant": "high",
+    },
+    "deep": {
       "model": "google/gemini-3.1-pro-preview",
       "variant": "high",
     },
@@ -527,7 +543,7 @@ exports[`generateModelConfig all native providers uses preferred models from fal
       "variant": "high",
     },
     "deep": {
-      "model": "openai/gpt-5.3-codex",
+      "model": "openai/gpt-5.4",
       "variant": "medium",
     },
     "quick": {
@@ -602,7 +618,7 @@ exports[`generateModelConfig all native providers uses preferred models with isM
       "variant": "high",
     },
     "deep": {
-      "model": "openai/gpt-5.3-codex",
+      "model": "openai/gpt-5.4",
       "variant": "medium",
     },
     "quick": {
@@ -678,7 +694,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
       "variant": "high",
     },
     "deep": {
-      "model": "opencode/gpt-5.3-codex",
+      "model": "opencode/gpt-5.4",
       "variant": "medium",
     },
     "quick": {
@@ -753,7 +769,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
       "variant": "high",
     },
     "deep": {
-      "model": "opencode/gpt-5.3-codex",
+      "model": "opencode/gpt-5.4",
       "variant": "medium",
     },
     "quick": {
@@ -827,6 +843,10 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models when 
       "model": "github-copilot/gemini-3.1-pro-preview",
       "variant": "high",
     },
+    "deep": {
+      "model": "github-copilot/gpt-5.4",
+      "variant": "medium",
+    },
     "quick": {
       "model": "github-copilot/gpt-5.4-mini",
     },
@@ -897,6 +917,10 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
       "model": "github-copilot/gemini-3.1-pro-preview",
       "variant": "high",
     },
+    "deep": {
+      "model": "github-copilot/gpt-5.4",
+      "variant": "medium",
+    },
     "quick": {
       "model": "github-copilot/gpt-5.4-mini",
     },
@@ -958,6 +982,9 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian whe
     },
   },
   "categories": {
+    "deep": {
+      "model": "opencode/gpt-5-nano",
+    },
     "quick": {
       "model": "opencode/gpt-5-nano",
     },
@@ -1016,6 +1043,9 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian wit
     },
   },
   "categories": {
+    "deep": {
+      "model": "opencode/gpt-5-nano",
+    },
     "quick": {
       "model": "opencode/gpt-5-nano",
     },
@@ -1086,7 +1116,7 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
       "variant": "high",
     },
     "deep": {
-      "model": "opencode/gpt-5.3-codex",
+      "model": "opencode/gpt-5.4",
       "variant": "medium",
     },
     "quick": {
@@ -1161,7 +1191,7 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
       "variant": "high",
     },
     "deep": {
-      "model": "openai/gpt-5.3-codex",
+      "model": "openai/gpt-5.4",
       "variant": "medium",
     },
     "quick": {
@@ -1229,6 +1259,10 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + ZAI combinat
     },
   },
   "categories": {
+    "deep": {
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
+    },
     "quick": {
       "model": "anthropic/claude-haiku-4-5",
     },
@@ -1293,6 +1327,10 @@ exports[`generateModelConfig mixed provider scenarios uses Gemini + Claude combi
     "artistry": {
       "model": "google/gemini-3.1-pro-preview",
       "variant": "high",
+    },
+    "deep": {
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
     },
     "quick": {
       "model": "anthropic/claude-haiku-4-5",
@@ -1369,7 +1407,7 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
       "variant": "high",
     },
     "deep": {
-      "model": "opencode/gpt-5.3-codex",
+      "model": "github-copilot/gpt-5.4",
       "variant": "medium",
     },
     "quick": {
@@ -1447,7 +1485,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
       "variant": "high",
     },
     "deep": {
-      "model": "openai/gpt-5.3-codex",
+      "model": "openai/gpt-5.4",
       "variant": "medium",
     },
     "quick": {
@@ -1525,7 +1563,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
       "variant": "high",
     },
     "deep": {
-      "model": "openai/gpt-5.3-codex",
+      "model": "openai/gpt-5.4",
       "variant": "medium",
     },
     "quick": {

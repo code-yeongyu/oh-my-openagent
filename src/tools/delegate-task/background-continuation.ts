@@ -3,6 +3,7 @@ import type { ExecutorContext, ParentContext } from "./executor-types"
 import { storeToolMetadata } from "../../features/tool-metadata-store"
 import { formatDetailedError } from "./error-formatting"
 import { getSessionTools } from "../../shared/session-tools-store"
+import { resolveCallID } from "./resolve-call-id"
 
 export async function executeBackgroundContinuation(
   args: DelegateTaskArgs,
@@ -37,8 +38,9 @@ export async function executeBackgroundContinuation(
       },
     }
     await ctx.metadata?.(bgContMeta)
-    if (ctx.callID) {
-      storeToolMetadata(ctx.sessionID, ctx.callID, bgContMeta)
+    const callID = resolveCallID(ctx)
+    if (callID) {
+      storeToolMetadata(ctx.sessionID, callID, bgContMeta)
     }
 
     return `Background task continued.

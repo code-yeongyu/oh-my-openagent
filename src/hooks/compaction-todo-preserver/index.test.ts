@@ -18,6 +18,7 @@ afterAll(() => {
       update: async () => {},
     },
   }))
+  mock.restore()
 })
 
 function createMockContext(todoResponses: Array<Todo>[]): PluginInput {

@@ -1,8 +1,18 @@
 import type { HookHttp } from "./types"
 import type { CommandResult } from "../../shared/command-executor/execute-hook-command"
+import { log } from "../../shared"
 
 const DEFAULT_HTTP_HOOK_TIMEOUT_S = 30
 const ALLOWED_SCHEMES = new Set(["http:", "https:"])
+const LOCALHOST_HOSTNAMES = new Set(["localhost", "127.0.0.1", "[::1]"])
+
+function isLocalhost(url: URL): boolean {
+  return LOCALHOST_HOSTNAMES.has(url.hostname)
+}
+
+function isPlainHttp(url: URL): boolean {
+  return url.protocol === "http:"
+}
 
 export function interpolateEnvVars(
   value: string,
@@ -40,8 +50,9 @@ export async function executeHttpHook(
   hook: HookHttp,
   stdin: string
 ): Promise<CommandResult> {
+  let parsed: URL
   try {
-    const parsed = new URL(hook.url)
+    parsed = new URL(hook.url)
     if (!ALLOWED_SCHEMES.has(parsed.protocol)) {
       return {
         exitCode: 1,
@@ -52,6 +63,16 @@ export async function executeHttpHook(
     return { exitCode: 1, stderr: `HTTP hook URL is invalid: ${hook.url}` }
   }
 
+  if (isPlainHttp(parsed)) {
+    if (!isLocalhost(parsed)) {
+      log("HTTP hook URL uses insecure protocol", { url: hook.url })
+      return {
+        exitCode: 1,
+        stderr: "HTTP hook URL must use HTTPS. Plain HTTP is only allowed for localhost, 127.0.0.1, and ::1.",
+      }
+    }
+  }
+
   const timeoutS = hook.timeout ?? DEFAULT_HTTP_HOOK_TIMEOUT_S
   const headers = resolveHeaders(hook)
 
@@ -60,6 +81,8 @@ export async function executeHttpHook(
       method: "POST",
       headers,
       body: stdin,
+      // Reject all redirects so HTTPS hooks cannot be silently rewritten to a different origin or protocol.
+      redirect: "manual",
       signal: AbortSignal.timeout(timeoutS * 1000),
     })
 
@@ -82,6 +105,7 @@ export async function executeHttpHook(
         return { exitCode: parsed.exitCode, stdout: body, stderr: "" }
       }
     } catch {
+      // Non-JSON bodies are allowed and returned as stdout below.
     }
 
     return { exitCode: 0, stdout: body, stderr: "" }

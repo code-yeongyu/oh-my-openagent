@@ -50,7 +50,7 @@ function isSignedThinkingPart(part: Part): part is SignedThinkingPart {
  * Check if there are any Anthropic-signed thinking blocks in the message history.
  *
  * Only returns true for real `type: "thinking"` blocks with a valid `signature`.
- * GPT reasoning blocks (`type: "reasoning"`) are intentionally excluded — they
+ * GPT reasoning blocks (`type: "reasoning"`) are intentionally excluded - they
  * have no Anthropic signature and must never be forwarded to the Anthropic API.
  *
  * Model-name checks are unreliable (miss GPT+thinking, custom model IDs, etc.)
@@ -93,7 +93,7 @@ function startsWithThinkingBlock(parts: Part[]): boolean {
  *
  * Returns the original Part object (including its `signature` field) so it can
  * be reused verbatim in another message.  Only `type: "thinking"` blocks with
- * both a `signature` and `thinking` field are returned — GPT `type: "reasoning"`
+ * both a `signature` and `thinking` field are returned - GPT `type: "reasoning"`
  * blocks are excluded because they lack an Anthropic signature and would be
  * rejected by the API with "Invalid `signature` in `thinking` block".
  * Synthetic parts injected by a previous run of this hook are also skipped.
@@ -106,7 +106,7 @@ function findPreviousThinkingPart(messages: MessageWithParts[], currentIndex: nu
     if (!msg.parts) continue
 
     for (const part of msg.parts) {
-      // Only Anthropic thinking blocks — type must be "thinking", not "reasoning"
+      // Only Anthropic thinking blocks - type must be "thinking", not "reasoning"
       if (!isSignedThinkingPart(part)) continue
 
       return part
@@ -145,10 +145,10 @@ export function createThinkingBlockValidatorHook(): MessagesTransformHook {
       }
 
       // Skip if there are no Anthropic-signed thinking blocks in history.
-      // This is more reliable than checking model names — works for Claude,
+      // This is more reliable than checking model names - works for Claude,
       // GPT with thinking variants, or any future model.  Crucially, GPT
       // reasoning blocks (type="reasoning", no signature) do NOT trigger this
-      // hook — only real Anthropic thinking blocks do.
+      // hook - only real Anthropic thinking blocks do.
       if (!hasSignedThinkingBlocksInHistory(messages)) {
         return
       }
@@ -164,7 +164,7 @@ export function createThinkingBlockValidatorHook(): MessagesTransformHook {
         if (hasContentParts(msg.parts) && !startsWithThinkingBlock(msg.parts)) {
           // Find the most recent real thinking part (with valid signature) from
           // previous turns.  If none exists we cannot safely inject a thinking
-          // block — a synthetic block without a signature would cause the API
+          // block - a synthetic block without a signature would cause the API
           // to reject the request with "Invalid `signature` in `thinking` block".
           const previousThinkingPart = findPreviousThinkingPart(messages, i)
 

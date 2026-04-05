@@ -118,6 +118,40 @@ describe("boulder-state", () => {
       expect(result!.session_ids).toEqual([])
     })
 
+    test("should backfill missing origin as direct only for a single tracked session", () => {
+      // given
+      const boulderFile = join(SISYPHUS_DIR, "boulder.json")
+      writeFileSync(boulderFile, JSON.stringify({
+        active_plan: "/path/to/plan.md",
+        started_at: "2026-01-01T00:00:00Z",
+        session_ids: ["session-1"],
+        plan_name: "plan",
+      }))
+
+      // when
+      const result = readBoulderState(TEST_DIR)
+
+      // then
+      expect(result?.session_origins).toEqual({ "session-1": "direct" })
+    })
+
+    test("should keep missing origins empty when multiple sessions are tracked", () => {
+      // given
+      const boulderFile = join(SISYPHUS_DIR, "boulder.json")
+      writeFileSync(boulderFile, JSON.stringify({
+        active_plan: "/path/to/plan.md",
+        started_at: "2026-01-01T00:00:00Z",
+        session_ids: ["session-1", "session-2"],
+        plan_name: "plan",
+      }))
+
+      // when
+      const result = readBoulderState(TEST_DIR)
+
+      // then
+      expect(result?.session_origins).toEqual({})
+    })
+
     test("should read valid boulder state", () => {
       // given - valid boulder.json
       const state: BoulderState = {
@@ -238,6 +272,26 @@ describe("boulder-state", () => {
       //#then - should not crash and should contain the new session
       expect(result).not.toBeNull()
       expect(result!.session_ids).toContain("ses-new")
+    })
+
+    test("should persist appended session origin when provided", () => {
+      // given
+      writeBoulderState(TEST_DIR, {
+        active_plan: "/path/to/plan.md",
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: ["session-1"],
+        session_origins: { "session-1": "direct" },
+        plan_name: "plan",
+      })
+
+      // when
+      const result = appendSessionId(TEST_DIR, "session-2", "appended")
+
+      // then
+      expect(result?.session_origins).toEqual({
+        "session-1": "direct",
+        "session-2": "appended",
+      })
     })
   })
 
@@ -545,6 +599,18 @@ describe("boulder-state", () => {
       expect(state.active_plan).toBe(planPath)
       expect(state.session_ids).toEqual([sessionId])
       expect(state.plan_name).toBe("feature")
+    })
+
+    test("should mark the initial session origin as direct", () => {
+      // given
+      const planPath = "/path/to/feature.md"
+      const sessionId = "ses-origin"
+
+      // when
+      const state = createBoulderState(planPath, sessionId)
+
+      // then
+      expect(state.session_origins).toEqual({ [sessionId]: "direct" })
     })
 
     test("should allow agent to be undefined", () => {

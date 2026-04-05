@@ -15,20 +15,27 @@ function isCompactionAgent(agent: unknown): boolean {
 
 function getLastAgentFromMessageDir(messageDir: string): string | null {
   try {
-    const files = readdirSync(messageDir)
+    const messages = readdirSync(messageDir)
       .filter((fileName) => fileName.endsWith(".json"))
-      .sort()
-
-    for (let i = files.length - 1; i >= 0; i--) {
-      const fileName = files[i]
-      try {
-        const content = readFileSync(join(messageDir, fileName), "utf-8")
-        const parsed = JSON.parse(content) as { agent?: unknown }
-        if (typeof parsed.agent === "string" && !isCompactionAgent(parsed.agent)) {
-          return parsed.agent.toLowerCase()
+      .map((fileName) => {
+        try {
+          const content = readFileSync(join(messageDir, fileName), "utf-8")
+          const parsed = JSON.parse(content) as { agent?: unknown; time?: { created?: unknown } }
+          return {
+            fileName,
+            agent: parsed.agent,
+            createdAt: typeof parsed.time?.created === "number" ? parsed.time.created : Number.NEGATIVE_INFINITY,
+          }
+        } catch {
+          return null
         }
-      } catch {
-        continue
+      })
+      .filter((message): message is { fileName: string; agent: unknown; createdAt: number } => message !== null)
+      .sort((left, right) => right.createdAt - left.createdAt || right.fileName.localeCompare(left.fileName))
+
+    for (const message of messages) {
+      if (typeof message.agent === "string" && !isCompactionAgent(message.agent)) {
+        return message.agent.toLowerCase()
       }
     }
   } catch {
@@ -43,16 +50,30 @@ export async function getLastAgentFromSession(
   client?: SessionMessagesClient
 ): Promise<string | null> {
   if (isSqliteBackend() && client) {
-    const response = await client.session.messages({ path: { id: sessionID } })
-    const messages = normalizeSDKResponse(response, [] as Array<{ info?: { agent?: string } }>, {
-      preferResponseOnMissingData: true,
-    })
+    try {
+      const response = await client.session.messages({ path: { id: sessionID } })
+      const messages = normalizeSDKResponse(response, [] as Array<{ id?: string; info?: { agent?: string; time?: { created?: number } } }>, {
+        preferResponseOnMissingData: true,
+      }).sort((left, right) => {
+        const leftTime = (left as { info?: { time?: { created?: number } } }).info?.time?.created ?? Number.NEGATIVE_INFINITY
+        const rightTime = (right as { info?: { time?: { created?: number } } }).info?.time?.created ?? Number.NEGATIVE_INFINITY
+        if (leftTime !== rightTime) {
+          return rightTime - leftTime
+        }
 
-    for (let i = messages.length - 1; i >= 0; i--) {
-      const agent = messages[i].info?.agent
-      if (typeof agent === "string" && !isCompactionAgent(agent)) {
-        return agent.toLowerCase()
+        const leftId = typeof left.id === "string" ? left.id : ""
+        const rightId = typeof right.id === "string" ? right.id : ""
+        return rightId.localeCompare(leftId)
+      })
+
+      for (const message of messages) {
+        const agent = message.info?.agent
+        if (typeof agent === "string" && !isCompactionAgent(agent)) {
+          return agent.toLowerCase()
+        }
       }
+    } catch {
+      return null
     }
 
     return null

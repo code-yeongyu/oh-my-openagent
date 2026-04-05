@@ -535,7 +535,7 @@ describe("syncAllTasksToTodos", () => {
     // when
     await syncAllTasksToTodos(mockCtx, tasks, "session-1", writer);
 
-    // then — no duplicates
+      // then, no duplicates
     const matching = writtenTodos.filter((t: TodoInfo) => t.content === "Task 1 (updated)");
     expect(matching.length).toBe(1);
     expect(matching[0].status).toBe("in_progress");

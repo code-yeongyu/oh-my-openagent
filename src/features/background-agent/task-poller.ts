@@ -13,11 +13,11 @@ import {
   TERMINAL_TASK_TTL_MS,
   TASK_TTL_MS,
 } from "./constants"
+import { abortWithTimeout } from "./abort-with-timeout"
 import { removeTaskToastTracking } from "./remove-task-toast-tracking"
+import { MIN_SESSION_GONE_POLLS, verifySessionExists } from "./session-existence"
 
 import { isActiveSessionStatus } from "./session-status-classifier"
-
-const MIN_SESSION_GONE_POLLS = 3
 const TERMINAL_TASK_STATUSES = new Set<BackgroundTask["status"]>([
   "completed",
   "error",
@@ -99,15 +99,6 @@ export function pruneStaleTasksAndNotifications(args: {
 
 export type SessionStatusMap = Record<string, { type: string }>
 
-async function verifySessionExists(client: OpencodeClient, sessionID: string): Promise<boolean> {
-  try {
-    const result = await client.session.get({ path: { id: sessionID } })
-    return !!result.data
-  } catch {
-    return false
-  }
-}
-
 export async function checkAndInterruptStaleTasks(args: {
   tasks: Iterable<BackgroundTask>
   client: OpencodeClient
@@ -129,6 +120,7 @@ export async function checkAndInterruptStaleTasks(args: {
   const staleTimeoutMs = config?.staleTimeoutMs ?? DEFAULT_STALE_TIMEOUT_MS
   const sessionGoneTimeoutMs = config?.sessionGoneTimeoutMs ?? DEFAULT_SESSION_GONE_TIMEOUT_MS
   const now = Date.now()
+  const abortPromises: Array<Promise<unknown>> = []
 
   const messageStalenessMs = config?.messageStalenessTimeoutMs ?? DEFAULT_MESSAGE_STALENESS_TIMEOUT_MS
 
@@ -176,7 +168,7 @@ export async function checkAndInterruptStaleTasks(args: {
 
       onTaskInterrupted(task)
 
-      client.session.abort({ path: { id: sessionID } }).catch(() => {})
+      abortPromises.push(abortWithTimeout(client, sessionID))
       log(`[background-agent] Task ${task.id} interrupted: no progress since start`)
 
       try {
@@ -214,7 +206,7 @@ export async function checkAndInterruptStaleTasks(args: {
 
     onTaskInterrupted(task)
 
-    client.session.abort({ path: { id: sessionID } }).catch(() => {})
+    abortPromises.push(abortWithTimeout(client, sessionID))
     log(`[background-agent] Task ${task.id} interrupted: stale timeout`)
 
     try {
@@ -222,5 +214,9 @@ export async function checkAndInterruptStaleTasks(args: {
     } catch (err) {
       log("[background-agent] Error in notifyParentSession for stale task:", { taskId: task.id, error: err })
     }
+  }
+
+  if (abortPromises.length > 0) {
+    await Promise.allSettled(abortPromises)
   }
 }

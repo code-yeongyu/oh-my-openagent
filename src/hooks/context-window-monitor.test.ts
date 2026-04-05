@@ -106,7 +106,7 @@ describe("context-window-monitor", () => {
   // #given token usage exceeds 70% threshold
   // #when tool.execute.after is called
   // #then context reminder should be appended to output
-  it("should append context reminder when usage exceeds threshold", async () => {
+  it("should append context reminder with actual token counts when usage exceeds threshold", async () => {
     const hook = createContextWindowMonitorHook(ctx as never)
     const sessionID = "ses_high_usage"
 
@@ -138,6 +138,8 @@ describe("context-window-monitor", () => {
     )
 
     expect(output.output).toContain("context remaining")
+    expect(output.output).toContain("200,000-token context window")
+    expect(output.output).toContain("[Context Status: 80.0% used (160,000/200,000 tokens), 20.0% remaining]")
     expect(ctx.client.session.messages).not.toHaveBeenCalled()
   })
 

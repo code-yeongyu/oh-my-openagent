@@ -54,7 +54,7 @@ describe("remapAgentKeysToDisplayNames", () => {
     expect(result["hephaestus"]).toBeUndefined()
     expect(result["Prometheus (Plan Builder)"]).toBeDefined()
     expect(result["prometheus"]).toBeUndefined()
-    expect(result["Atlas (Plan Executor)"]).toBeDefined()
+    expect(result["\u200BAtlas (Plan Executor)"]).toBeDefined()
     expect(result["atlas"]).toBeUndefined()
     expect(result["Athena (Council)"]).toBeDefined()
     expect(result["athena"]).toBeUndefined()

@@ -23,13 +23,11 @@ function detectConfigPath(): string | null {
 }
 
 function parsePluginVersion(entry: string): string | null {
-  // Check for current package name
   if (entry.startsWith(`${PLUGIN_NAME}@`)) {
     const value = entry.slice(PLUGIN_NAME.length + 1)
     if (!value || value === "latest") return null
     return value
   }
-  // Check for legacy package name
   if (entry.startsWith(`${LEGACY_PLUGIN_NAME}@`)) {
     const value = entry.slice(LEGACY_PLUGIN_NAME.length + 1)
     if (!value || value === "latest") return null
@@ -40,15 +38,12 @@ function parsePluginVersion(entry: string): string | null {
 
 function findPluginEntry(entries: string[]): { entry: string; isLocalDev: boolean } | null {
   for (const entry of entries) {
-    // Check for current package name
     if (entry === PLUGIN_NAME || entry.startsWith(`${PLUGIN_NAME}@`)) {
       return { entry, isLocalDev: false }
     }
-    // Check for legacy package name
     if (entry === LEGACY_PLUGIN_NAME || entry.startsWith(`${LEGACY_PLUGIN_NAME}@`)) {
       return { entry, isLocalDev: false }
     }
-    // Check for file:// paths that include either name
     if (entry.startsWith("file://") && (entry.includes(PLUGIN_NAME) || entry.includes(LEGACY_PLUGIN_NAME))) {
       return { entry, isLocalDev: true }
     }

@@ -1,4 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "bun:test"
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
+import { join } from "node:path"
+import { tmpdir } from "node:os"
 import {
   findNearestMessageWithFields,
   findFirstMessageWithAgent,
@@ -13,6 +16,7 @@ import { isSqliteBackend, resetSqliteBackendCache } from "../../shared/opencode-
 //#region Mocks
 
 const mockIsSqliteBackend = vi.fn()
+const tempDirs: string[] = []
 
 vi.mock("../../shared/opencode-storage-detection", () => ({
   isSqliteBackend: mockIsSqliteBackend,
@@ -21,15 +25,33 @@ vi.mock("../../shared/opencode-storage-detection", () => ({
 
 //#endregion
 
+afterEach(() => {
+  while (tempDirs.length > 0) {
+    const directory = tempDirs.pop()
+    if (directory) {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  }
+})
+
+function createMessageDir(): string {
+  const directory = mkdtempSync(join(tmpdir(), "omo-injector-message-dir-"))
+  tempDirs.push(directory)
+  mkdirSync(directory, { recursive: true })
+  return directory
+}
+
 //#region Test Helpers
 
 function createMockClient(messages: Array<{
+  id?: string
   info?: {
     agent?: string
     model?: { providerID?: string; modelID?: string; variant?: string }
     providerID?: string
     modelID?: string
     tools?: Record<string, boolean>
+    time?: { created?: number }
   }
 }>): {
   session: {
@@ -76,8 +98,8 @@ describe("findNearestMessageWithFieldsFromSDK", () => {
 
   it("returns nearest (most recent) message with all fields", async () => {
     const mockClient = createMockClient([
-      { info: { agent: "old-agent", model: { providerID: "old", modelID: "model" } } },
-      { info: { agent: "new-agent", model: { providerID: "new", modelID: "model" } } },
+      { id: "msg_old", info: { agent: "old-agent", model: { providerID: "old", modelID: "model" }, time: { created: 10 } } },
+      { id: "msg_new", info: { agent: "new-agent", model: { providerID: "new", modelID: "model" }, time: { created: 20 } } },
     ])
 
     const result = await findNearestMessageWithFieldsFromSDK(mockClient as any, "ses_123")
@@ -143,6 +165,38 @@ describe("findNearestMessageWithFieldsFromSDK", () => {
 
     expect(result?.tools).toEqual({ edit: true, write: false })
   })
+
+  it("uses message time.created rather than SDK array order when resolving nearest message", async () => {
+    const mockClient = createMockClient([
+      { id: "msg_newer", info: { agent: "older-array-entry", model: { providerID: "openai", modelID: "gpt-5" }, time: { created: 10 } } },
+      { id: "msg_older", info: { agent: "newest-by-time", model: { providerID: "openai", modelID: "gpt-5" }, time: { created: 100 } } },
+    ])
+
+    const result = await findNearestMessageWithFieldsFromSDK(mockClient as any, "ses_123")
+
+    expect(result?.agent).toBe("newest-by-time")
+  })
+})
+
+describe("findNearestMessageWithFields JSON backend ordering", () => {
+  it("uses message time.created rather than filename order", () => {
+    mockIsSqliteBackend.mockReturnValue(false)
+    const messageDir = createMessageDir()
+    writeFileSync(join(messageDir, "msg_ffff0000_000001.json"), JSON.stringify({
+      agent: "older-by-time",
+      model: { providerID: "openai", modelID: "gpt-5" },
+      time: { created: 10 },
+    }))
+    writeFileSync(join(messageDir, "msg_00000000_000999.json"), JSON.stringify({
+      agent: "newest-by-time",
+      model: { providerID: "openai", modelID: "gpt-5" },
+      time: { created: 100 },
+    }))
+
+    const result = findNearestMessageWithFields(messageDir)
+
+    expect(result?.agent).toBe("newest-by-time")
+  })
 })
 
 describe("findFirstMessageWithAgentFromSDK", () => {
@@ -155,6 +209,17 @@ describe("findFirstMessageWithAgentFromSDK", () => {
     const result = await findFirstMessageWithAgentFromSDK(mockClient as any, "ses_123")
 
     expect(result).toBe("first-agent")
+  })
+
+  it("uses message time.created rather than SDK array order when resolving first agent", async () => {
+    const mockClient = createMockClient([
+      { id: "msg_late", info: { agent: "later-agent", time: { created: 100 } } },
+      { id: "msg_early", info: { agent: "earliest-agent", time: { created: 10 } } },
+    ])
+
+    const result = await findFirstMessageWithAgentFromSDK(mockClient as any, "ses_123")
+
+    expect(result).toBe("earliest-agent")
   })
 
   it("skips messages without agent field", async () => {

@@ -1,18 +1,19 @@
 declare const require: (name: string) => any
-const { describe, expect, test, beforeEach, mock } = require("bun:test")
+const { describe, expect, test, beforeEach, afterEach, mock, spyOn } = require("bun:test")
+import * as connectedProvidersCache from "./connected-providers-cache"
 
-const readConnectedProvidersCacheMock = mock(() => null)
-
-mock.module("./connected-providers-cache", () => ({
-  readConnectedProvidersCache: readConnectedProvidersCacheMock,
-}))
-
-import { shouldRetryError, selectFallbackProvider } from "./model-error-classifier"
+let readConnectedProvidersCacheSpy: ReturnType<typeof spyOn> | undefined
+const { shouldRetryError, selectFallbackProvider } = await import("./model-error-classifier")
 
 describe("model-error-classifier", () => {
   beforeEach(() => {
-    readConnectedProvidersCacheMock.mockReturnValue(null)
-    readConnectedProvidersCacheMock.mockClear()
+    readConnectedProvidersCacheSpy?.mockRestore()
+    readConnectedProvidersCacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(null)
+  })
+
+  afterEach(() => {
+    readConnectedProvidersCacheSpy?.mockRestore()
+    readConnectedProvidersCacheSpy = undefined
   })
 
   test("treats overloaded retry messages as retryable", () => {
@@ -42,7 +43,7 @@ describe("model-error-classifier", () => {
 
   test("selectFallbackProvider prefers first connected provider in preference order", () => {
     //#given
-    readConnectedProvidersCacheMock.mockReturnValue(["anthropic", "nvidia"])
+    readConnectedProvidersCacheSpy?.mockReturnValue(["anthropic", "nvidia"])
 
     //#when
     const provider = selectFallbackProvider(["anthropic", "nvidia"], "nvidia")
@@ -53,7 +54,7 @@ describe("model-error-classifier", () => {
 
   test("selectFallbackProvider falls back to next connected provider when first is disconnected", () => {
     //#given
-    readConnectedProvidersCacheMock.mockReturnValue(["nvidia"])
+    readConnectedProvidersCacheSpy?.mockReturnValue(["nvidia"])
 
     //#when
     const provider = selectFallbackProvider(["anthropic", "nvidia"])
@@ -74,7 +75,7 @@ describe("model-error-classifier", () => {
 
   test("selectFallbackProvider uses connected preferred provider when fallback providers are unavailable", () => {
     //#given
-    readConnectedProvidersCacheMock.mockReturnValue(["provider-x"])
+    readConnectedProvidersCacheSpy?.mockReturnValue(["provider-x"])
 
     //#when
     const provider = selectFallbackProvider(["provider-y"], "provider-x")
@@ -83,9 +84,75 @@ describe("model-error-classifier", () => {
     expect(provider).toBe("provider-x")
   })
 
-  test("treats FreeUsageLimitError (PascalCase name) as retryable by name", () => {
+  test("treats QuotaExceededError (PascalCase name) as non-retryable STOP error", () => {
+    //#given
+    const error = { name: "QuotaExceededError" }
+
+    //#when
+    const result = shouldRetryError(error)
+
+    //#then
+    expect(result).toBe(false)
+  })
+
+  test("treats quotaexceedederror (lowercase name) as non-retryable STOP error", () => {
+    //#given
+    const error = { name: "quotaexceedederror" }
+
+    //#when
+    const result = shouldRetryError(error)
+
+    //#then
+    expect(result).toBe(false)
+  })
+
+  test("treats InsufficientCreditsError (PascalCase name) as non-retryable STOP error", () => {
+    //#given
+    const error = { name: "InsufficientCreditsError" }
+
+    //#when
+    const result = shouldRetryError(error)
+
+    //#then
+    expect(result).toBe(false)
+  })
+
+  test("treats insufficientcreditserror (lowercase name) as non-retryable STOP error", () => {
+    //#given
+    const error = { name: "insufficientcreditserror" }
+
+    //#when
+    const result = shouldRetryError(error)
+
+    //#then
+    expect(result).toBe(false)
+  })
+
+  test("treats FreeUsageLimitError (PascalCase name) as non-retryable STOP error", () => {
     //#given
     const error = { name: "FreeUsageLimitError" }
+
+    //#when
+    const result = shouldRetryError(error)
+
+    //#then
+    expect(result).toBe(false)
+  })
+
+  test("treats freeusagelimiterror (lowercase name) as non-retryable STOP error", () => {
+    //#given
+    const error = { name: "freeusagelimiterror" }
+
+    //#when
+    const result = shouldRetryError(error)
+
+    //#then
+    expect(result).toBe(false)
+  })
+
+  test("treats 'bad request' message as retryable (GitHub Copilot rolling update)", () => {
+    //#given
+    const error = { message: "400 Bad Request" }
 
     //#when
     const result = shouldRetryError(error)
@@ -94,9 +161,9 @@ describe("model-error-classifier", () => {
     expect(result).toBe(true)
   })
 
-  test("treats freeusagelimiterror (lowercase name) as retryable by name", () => {
+  test("treats 'bad request' lowercase as retryable", () => {
     //#given
-    const error = { name: "freeusagelimiterror" }
+    const error = { message: "bad request: model temporarily unavailable" }
 
     //#when
     const result = shouldRetryError(error)
@@ -105,3 +172,5 @@ describe("model-error-classifier", () => {
     expect(result).toBe(true)
   })
 })
+
+export {}

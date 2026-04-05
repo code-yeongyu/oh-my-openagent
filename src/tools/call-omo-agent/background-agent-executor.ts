@@ -52,17 +52,20 @@ export async function executeBackgroundAgent(
 
 		let sessionId = task.sessionID
 		while (!sessionId && Date.now() - waitStart < waitTimeoutMs) {
-			if (toolContext.abort?.aborted) {
-				return `Task aborted while waiting for session to start.\n\nTask ID: ${task.id}`
-			}
 			const updated = manager.getTask(task.id)
 			if (updated?.status === "error" || updated?.status === "cancelled" || updated?.status === "interrupt") {
 				return `Task failed to start (status: ${updated.status}).\n\nTask ID: ${task.id}`
 			}
+			sessionId = updated?.sessionID
+			if (sessionId) {
+				break
+			}
+			if (toolContext.abort?.aborted) {
+				break
+			}
 			await new Promise<void>((resolve) => {
 				setTimeout(resolve, waitIntervalMs)
 			})
-			sessionId = manager.getTask(task.id)?.sessionID
 		}
 
 		await toolContext.metadata?.({

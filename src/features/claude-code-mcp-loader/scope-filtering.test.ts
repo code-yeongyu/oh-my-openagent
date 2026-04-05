@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 import { mkdirSync, rmSync, writeFileSync } from "fs"
 import { tmpdir } from "os"
 import { join } from "path"
+import { shouldLoadMcpServer } from "./scope-filter"
 
 const TEST_DIR = join(tmpdir(), `mcp-scope-filtering-test-${Date.now()}`)
 const TEST_HOME = join(TEST_DIR, "home")
@@ -14,7 +15,7 @@ describe("loadMcpConfigs", () => {
       homedir: () => TEST_HOME,
       tmpdir,
     }))
-    mock.module("../../shared", () => ({
+    mock.module("../../shared/claude-config-dir", () => ({
       getClaudeConfigDir: () => join(TEST_HOME, ".claude"),
     }))
     mock.module("../../shared/logger", () => ({
@@ -25,6 +26,56 @@ describe("loadMcpConfigs", () => {
   afterEach(() => {
     mock.restore()
     rmSync(TEST_DIR, { recursive: true, force: true })
+  })
+
+  describe("#given local MCP scope checks", () => {
+    it("#when cwd exactly matches project path #then the server is loaded", () => {
+      const result = shouldLoadMcpServer(
+        {
+          scope: "local",
+          projectPath: "/tmp/repo",
+        },
+        "/tmp/repo"
+      )
+
+      expect(result).toBe(true)
+    })
+
+    it("#when cwd is a subdirectory of project path #then the server is loaded", () => {
+      const result = shouldLoadMcpServer(
+        {
+          scope: "local",
+          projectPath: "/tmp/repo",
+        },
+        "/tmp/repo/packages/app"
+      )
+
+      expect(result).toBe(true)
+    })
+
+    it("#when cwd does not overlap project path #then the server is not loaded", () => {
+      const result = shouldLoadMcpServer(
+        {
+          scope: "local",
+          projectPath: "/tmp/repo",
+        },
+        "/tmp/other"
+      )
+
+      expect(result).toBe(false)
+    })
+
+    it("#when cwd is the parent of project path #then the server is not loaded", () => {
+      const result = shouldLoadMcpServer(
+        {
+          scope: "local",
+          projectPath: "/tmp/repo",
+        },
+        "/tmp"
+      )
+
+      expect(result).toBe(false)
+    })
   })
 
   describe("#given user-scoped MCP entries with local scope metadata", () => {

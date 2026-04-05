@@ -1,9 +1,13 @@
+/// <reference types="bun-types" />
+
 import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test"
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
-import { tmpdir, homedir } from "node:os"
+import { tmpdir } from "node:os"
 import { randomUUID } from "node:crypto"
 import { createStartWorkHook } from "./index"
+import { createAtlasHook } from "../atlas"
+import { getAgentListDisplayName } from "../../shared/agent-display-names"
 import {
   writeBoulderState,
   clearBoulderState,
@@ -22,6 +26,22 @@ describe("start-work hook", () => {
       directory: testDir,
       client: {},
     } as Parameters<typeof createStartWorkHook>[0]
+  }
+
+  function createStartWorkPrompt(options?: {
+    sessionContext?: string
+    userRequest?: string
+  }): string {
+    const sessionContext = options?.sessionContext ?? ""
+    const userRequest = options?.userRequest ?? ""
+
+    return `<command-instruction>
+You are starting a Sisyphus work session.
+</command-instruction>
+
+<session-context>${sessionContext}</session-context>${userRequest ? `
+
+<user-request>${userRequest}</user-request>` : ""}`
   }
 
   beforeEach(() => {
@@ -65,6 +85,24 @@ describe("start-work hook", () => {
       expect(output.parts[0].text).toBe("Just a regular message")
     })
 
+    test("should ignore plain session-context blocks without the start-work marker", async () => {
+      // given
+      const hook = createStartWorkHook(createMockPluginInput())
+      const output = {
+        parts: [{ type: "text", text: "<session-context>Some context here</session-context>" }],
+      }
+
+      // when
+      await hook["chat.message"](
+        { sessionID: "session-123" },
+        output
+      )
+
+      // then
+      expect(output.parts[0].text).toBe("<session-context>Some context here</session-context>")
+      expect(readBoulderState(testDir)).toBeNull()
+    })
+
     test("should detect start-work command via session-context tag", async () => {
       // given - hook and start-work message
       const hook = createStartWorkHook(createMockPluginInput())
@@ -72,7 +110,7 @@ describe("start-work hook", () => {
         parts: [
           {
             type: "text",
-            text: "<session-context>Some context here</session-context>",
+            text: createStartWorkPrompt({ sessionContext: "Some context here" }),
           },
         ],
       }
@@ -102,7 +140,7 @@ describe("start-work hook", () => {
 
       const hook = createStartWorkHook(createMockPluginInput())
       const output = {
-        parts: [{ type: "text", text: "<session-context></session-context>" }],
+        parts: [{ type: "text", text: createStartWorkPrompt() }],
       }
 
       // when
@@ -123,7 +161,7 @@ describe("start-work hook", () => {
         parts: [
           {
             type: "text",
-            text: "<session-context>Session: $SESSION_ID</session-context>",
+            text: createStartWorkPrompt({ sessionContext: "Session: $SESSION_ID" }),
           },
         ],
       }
@@ -146,7 +184,7 @@ describe("start-work hook", () => {
         parts: [
           {
             type: "text",
-            text: "<session-context>Time: $TIMESTAMP</session-context>",
+            text: createStartWorkPrompt({ sessionContext: "Time: $TIMESTAMP" }),
           },
         ],
       }
@@ -177,7 +215,7 @@ describe("start-work hook", () => {
 
       const hook = createStartWorkHook(createMockPluginInput())
       const output = {
-        parts: [{ type: "text", text: "<session-context></session-context>" }],
+        parts: [{ type: "text", text: createStartWorkPrompt() }],
       }
 
       // when
@@ -205,7 +243,7 @@ describe("start-work hook", () => {
 
       const hook = createStartWorkHook(createMockPluginInput())
       const output = {
-        parts: [{ type: "text", text: "<session-context></session-context>" }],
+        parts: [{ type: "text", text: createStartWorkPrompt() }],
       }
 
       // when
@@ -233,7 +271,7 @@ describe("start-work hook", () => {
 
       const hook = createStartWorkHook(createMockPluginInput())
       const output = {
-        parts: [{ type: "text", text: "<session-context></session-context>" }],
+        parts: [{ type: "text", text: createStartWorkPrompt() }],
       }
 
       // when
@@ -274,9 +312,7 @@ describe("start-work hook", () => {
         parts: [
           {
             type: "text",
-            text: `<session-context>
-<user-request>new-plan</user-request>
-</session-context>`,
+            text: createStartWorkPrompt({ userRequest: "new-plan" }),
           },
         ],
       }
@@ -306,9 +342,7 @@ describe("start-work hook", () => {
         parts: [
           {
             type: "text",
-            text: `<session-context>
-<user-request>my-feature-plan ultrawork</user-request>
-</session-context>`,
+            text: createStartWorkPrompt({ userRequest: "my-feature-plan ultrawork" }),
           },
         ],
       }
@@ -337,9 +371,7 @@ describe("start-work hook", () => {
         parts: [
           {
             type: "text",
-            text: `<session-context>
-<user-request>api-refactor ulw</user-request>
-</session-context>`,
+            text: createStartWorkPrompt({ userRequest: "api-refactor ulw" }),
           },
         ],
       }
@@ -368,9 +400,7 @@ describe("start-work hook", () => {
         parts: [
           {
             type: "text",
-            text: `<session-context>
-<user-request>feature-implementation</user-request>
-</session-context>`,
+            text: createStartWorkPrompt({ userRequest: "feature-implementation" }),
           },
         ],
       }
@@ -394,7 +424,7 @@ describe("start-work hook", () => {
       
       const hook = createStartWorkHook(createMockPluginInput())
       const output = {
-        parts: [{ type: "text", text: "<session-context></session-context>" }],
+        parts: [{ type: "text", text: createStartWorkPrompt() }],
       }
 
       // when
@@ -408,12 +438,12 @@ describe("start-work hook", () => {
       updateSpy.mockRestore()
     })
 
-    test("should stamp the outgoing message with Atlas so follow-up events keep the handoff", async () => {
+    test("should stamp the outgoing message with Atlas list key so follow-up events keep the handoff", async () => {
       // given
       const hook = createStartWorkHook(createMockPluginInput())
       const output = {
         message: {} as Record<string, unknown>,
-        parts: [{ type: "text", text: "<session-context></session-context>" }],
+        parts: [{ type: "text", text: createStartWorkPrompt() }],
       }
 
       // when
@@ -423,7 +453,7 @@ describe("start-work hook", () => {
       )
 
       // then
-      expect(output.message.agent).toBe("Atlas (Plan Executor)")
+      expect(output.message.agent).toBe(getAgentListDisplayName("atlas"))
     })
 
     test("should keep the current agent when Atlas is unavailable", async () => {
@@ -435,7 +465,7 @@ describe("start-work hook", () => {
       const hook = createStartWorkHook(createMockPluginInput())
       const output = {
         message: {} as Record<string, unknown>,
-        parts: [{ type: "text", text: "<session-context></session-context>" }],
+        parts: [{ type: "text", text: createStartWorkPrompt() }],
       }
 
       // when
@@ -447,6 +477,202 @@ describe("start-work hook", () => {
       // then
       expect(output.message.agent).toBe("Sisyphus (Ultraworker)")
       expect(sessionState.getSessionAgent("ses-prometheus-to-sisyphus")).toBe("sisyphus")
+    })
+
+    test("should fall back to Sisyphus instead of keeping Prometheus when Atlas is unavailable", async () => {
+      // given
+      sessionState._resetForTesting()
+      sessionState.registerAgentName("prometheus")
+      sessionState.registerAgentName("sisyphus")
+      sessionState.updateSessionAgent("ses-prometheus-to-worker", "prometheus")
+
+      const plansDir = join(testDir, ".sisyphus", "plans")
+      mkdirSync(plansDir, { recursive: true })
+      writeFileSync(join(plansDir, "worker-plan.md"), "# Plan\n- [ ] Task 1")
+
+      const hook = createStartWorkHook(createMockPluginInput())
+      const output = {
+        message: {} as Record<string, unknown>,
+        parts: [{ type: "text", text: createStartWorkPrompt() }],
+      }
+
+      // when
+      await hook["chat.message"](
+        { sessionID: "ses-prometheus-to-worker" },
+        output
+      )
+
+      // then
+      expect(output.message.agent).toBe("Sisyphus (Ultraworker)")
+      expect(sessionState.getSessionAgent("ses-prometheus-to-worker")).toBe("sisyphus")
+      expect(readBoulderState(testDir)?.agent).toBe("sisyphus")
+    })
+
+    test("should rewrite stale Prometheus boulder state to Sisyphus when resuming without Atlas", async () => {
+      // given
+      sessionState._resetForTesting()
+      sessionState.registerAgentName("prometheus")
+      sessionState.registerAgentName("sisyphus")
+      sessionState.updateSessionAgent("ses-prometheus-resume", "prometheus")
+
+      const planPath = join(testDir, "resume-plan.md")
+      writeFileSync(planPath, "# Plan\n- [ ] Task 1")
+      writeBoulderState(testDir, {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: ["old-session"],
+        plan_name: "resume-plan",
+        agent: "prometheus",
+      })
+
+      const hook = createStartWorkHook(createMockPluginInput())
+      const output = {
+        message: {} as Record<string, unknown>,
+        parts: [{ type: "text", text: createStartWorkPrompt() }],
+      }
+
+      // when
+      await hook["chat.message"](
+        { sessionID: "ses-prometheus-resume" },
+        output
+      )
+
+      // then
+      expect(output.message.agent).toBe("Sisyphus (Ultraworker)")
+      expect(readBoulderState(testDir)?.agent).toBe("sisyphus")
+    })
+
+    test("#given start-work hands the session to Atlas #when Atlas later receives session.idle #then the same session continues the selected plan", async () => {
+      // given
+      const plansDir = join(testDir, ".sisyphus", "plans")
+      mkdirSync(plansDir, { recursive: true })
+      writeFileSync(join(plansDir, "atlas-plan.md"), "# Plan\n- [ ] Task 1\n- [ ] Task 2")
+
+      const promptAsyncMock = spyOn({
+        promptAsync: async (_request: unknown) => undefined,
+      }, "promptAsync")
+      const ctx = {
+        directory: testDir,
+        client: {
+          session: {
+            promptAsync: promptAsyncMock,
+            prompt: async (_request: unknown) => undefined,
+            messages: async () => ({ data: [] }),
+          },
+        },
+      } as unknown as Parameters<typeof createAtlasHook>[0]
+      const startWorkHook = createStartWorkHook(ctx)
+      const atlasHook = createAtlasHook(ctx)
+      const output = {
+        message: {} as Record<string, unknown>,
+        parts: [{ type: "text", text: createStartWorkPrompt({ userRequest: "atlas-plan" }) }],
+      }
+
+      // when
+      await startWorkHook["chat.message"]({ sessionID: "session-123" }, output)
+      await atlasHook.handler({ event: { type: "session.idle", properties: { sessionID: "session-123" } } })
+
+      // then
+      expect(output.message.agent).toBe(getAgentListDisplayName("atlas"))
+      expect(readBoulderState(testDir)?.session_ids).toContain("session-123")
+      expect(readBoulderState(testDir)?.agent).toBe("atlas")
+      expect(promptAsyncMock).toHaveBeenCalledTimes(1)
+      promptAsyncMock.mockRestore()
+    })
+
+    test("#given start-work hands the session to Atlas but background work is still running #when that work finishes #then Atlas resumes via retry for the same session", async () => {
+      // given
+      const plansDir = join(testDir, ".sisyphus", "plans")
+      mkdirSync(plansDir, { recursive: true })
+      writeFileSync(join(plansDir, "atlas-plan.md"), "# Plan\n- [ ] Task 1\n- [ ] Task 2")
+
+      const capturedTimers = new Map<number, { callback: Function; cleared: boolean }>()
+      let nextTimerId = 4000
+      let backgroundRunning = true
+      const originalSetTimeout = globalThis.setTimeout
+      const originalClearTimeout = globalThis.clearTimeout
+      const originalDateNow = Date.now
+      let fakeNow = 10000
+      const promptAsyncMock = spyOn({
+        promptAsync: async (_request: unknown) => undefined,
+      }, "promptAsync")
+
+      globalThis.setTimeout = ((callback: Function, delay?: number, ...args: unknown[]) => {
+        const normalized = typeof delay === "number" ? delay : 0
+        if (normalized >= 5000) {
+          const id = nextTimerId++
+          capturedTimers.set(id, { callback: () => callback(...args), cleared: false })
+          return id as unknown as ReturnType<typeof setTimeout>
+        }
+
+        return originalSetTimeout(callback as Parameters<typeof originalSetTimeout>[0], delay)
+      }) as unknown as typeof setTimeout
+
+      globalThis.clearTimeout = ((id?: number | ReturnType<typeof setTimeout>) => {
+        if (typeof id === "number" && capturedTimers.has(id)) {
+          capturedTimers.get(id)!.cleared = true
+          capturedTimers.delete(id)
+          return
+        }
+
+        originalClearTimeout(id as Parameters<typeof originalClearTimeout>[0])
+      }) as unknown as typeof clearTimeout
+
+      Date.now = () => fakeNow
+
+      const ctx = {
+        directory: testDir,
+        client: {
+          session: {
+            promptAsync: promptAsyncMock,
+            prompt: async (_request: unknown) => undefined,
+            messages: async () => ({ data: [] }),
+          },
+        },
+      } as unknown as Parameters<typeof createAtlasHook>[0]
+      const startWorkHook = createStartWorkHook(ctx)
+      const atlasHook = createAtlasHook(ctx, {
+        directory: testDir,
+        backgroundManager: {
+          getTasksByParentSession: () => backgroundRunning ? [{ status: "running" }] : [],
+        } as unknown as NonNullable<Parameters<typeof createAtlasHook>[1]>["backgroundManager"],
+      })
+      const output = {
+        message: {} as Record<string, unknown>,
+        parts: [{ type: "text", text: createStartWorkPrompt({ userRequest: "atlas-plan" }) }],
+      }
+
+      async function firePendingTimers(): Promise<void> {
+        for (const [id, entry] of capturedTimers) {
+          if (!entry.cleared) {
+            capturedTimers.delete(id)
+            fakeNow += 6000
+            await entry.callback()
+          }
+        }
+      }
+
+      try {
+        // when
+        await startWorkHook["chat.message"]({ sessionID: "session-123" }, output)
+        await atlasHook.handler({ event: { type: "session.idle", properties: { sessionID: "session-123" } } })
+        expect(promptAsyncMock).toHaveBeenCalledTimes(0)
+        expect(capturedTimers.size).toBe(1)
+
+        backgroundRunning = false
+        await firePendingTimers()
+
+        // then
+        expect(output.message.agent).toBe(getAgentListDisplayName("atlas"))
+        expect(readBoulderState(testDir)?.session_ids).toContain("session-123")
+        expect(readBoulderState(testDir)?.agent).toBe("atlas")
+        expect(promptAsyncMock).toHaveBeenCalledTimes(1)
+      } finally {
+        globalThis.setTimeout = originalSetTimeout
+        globalThis.clearTimeout = originalClearTimeout
+        Date.now = originalDateNow
+        promptAsyncMock.mockRestore()
+      }
     })
   })
 
@@ -469,7 +695,7 @@ describe("start-work hook", () => {
 
       const hook = createStartWorkHook(createMockPluginInput())
       const output = {
-        parts: [{ type: "text", text: "<session-context></session-context>" }],
+        parts: [{ type: "text", text: createStartWorkPrompt() }],
       }
 
       // when
@@ -490,7 +716,7 @@ describe("start-work hook", () => {
 
       const hook = createStartWorkHook(createMockPluginInput())
       const output = {
-        parts: [{ type: "text", text: "<session-context>\n<user-request>--worktree /validated/worktree</user-request>\n</session-context>" }],
+        parts: [{ type: "text", text: createStartWorkPrompt({ userRequest: "--worktree /validated/worktree" }) }],
       }
 
       // when
@@ -512,7 +738,7 @@ describe("start-work hook", () => {
 
       const hook = createStartWorkHook(createMockPluginInput())
       const output = {
-        parts: [{ type: "text", text: "<session-context>\n<user-request>--worktree /valid/wt</user-request>\n</session-context>" }],
+        parts: [{ type: "text", text: createStartWorkPrompt({ userRequest: "--worktree /valid/wt" }) }],
       }
 
       // when
@@ -532,7 +758,7 @@ describe("start-work hook", () => {
 
       const hook = createStartWorkHook(createMockPluginInput())
       const output = {
-        parts: [{ type: "text", text: "<session-context>\n<user-request>--worktree /nonexistent/wt</user-request>\n</session-context>" }],
+        parts: [{ type: "text", text: createStartWorkPrompt({ userRequest: "--worktree /nonexistent/wt" }) }],
       }
 
       // when
@@ -561,7 +787,7 @@ describe("start-work hook", () => {
 
       const hook = createStartWorkHook(createMockPluginInput())
       const output = {
-        parts: [{ type: "text", text: "<session-context>\n<user-request>--worktree /new/wt</user-request>\n</session-context>" }],
+        parts: [{ type: "text", text: createStartWorkPrompt({ userRequest: "--worktree /new/wt" }) }],
       }
 
       // when
@@ -588,7 +814,7 @@ describe("start-work hook", () => {
 
       const hook = createStartWorkHook(createMockPluginInput())
       const output = {
-        parts: [{ type: "text", text: "<session-context></session-context>" }],
+        parts: [{ type: "text", text: createStartWorkPrompt() }],
       }
 
       // when

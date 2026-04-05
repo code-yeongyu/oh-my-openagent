@@ -29,7 +29,9 @@ export async function createManagers(args: {
 }): Promise<Managers> {
   const { ctx, pluginConfig, tmuxConfig, modelCacheState, backgroundNotificationHookEnabled } = args
 
-  markServerRunningInProcess()
+  if (tmuxConfig.enabled) {
+    markServerRunningInProcess()
+  }
 
   const terminalConfig = pluginConfig.terminal
   const provider = terminalConfig?.provider ?? "auto"

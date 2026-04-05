@@ -1,5 +1,5 @@
 declare const require: (name: string) => any
-const { beforeEach, describe, expect, mock, test } = require("bun:test")
+const { beforeEach, describe, expect, mock, test, afterAll } = require("bun:test")
 
 const readConnectedProvidersCacheMock = mock(() => null)
 const readProviderModelsCacheMock = mock(() => null)
@@ -40,25 +40,35 @@ const transformModelForProviderMock = mock((provider: string, model: string) => 
   return model
 })
 
-mock.module("../../shared/connected-providers-cache", () => ({
-  readConnectedProvidersCache: readConnectedProvidersCacheMock,
-  readProviderModelsCache: readProviderModelsCacheMock,
-}))
+afterAll(() => {
+  mock.restore()
+})
 
-mock.module("../../shared/provider-model-id-transform", () => ({
-  transformModelForProvider: transformModelForProviderMock,
-}))
+async function importFreshModelFallbackHookModule() {
+  mock.module("../../shared/connected-providers-cache", () => ({
+    readConnectedProvidersCache: readConnectedProvidersCacheMock,
+    readProviderModelsCache: readProviderModelsCacheMock,
+  }))
 
-mock.module("../../shared/model-error-classifier", () => ({
-  selectFallbackProvider: selectFallbackProviderMock,
-}))
+  mock.module("../../shared/provider-model-id-transform", () => ({
+    transformModelForProvider: transformModelForProviderMock,
+  }))
 
-import {
+  mock.module("../../shared/model-error-classifier", () => ({
+    selectFallbackProvider: selectFallbackProviderMock,
+  }))
+
+  const module = await import(`./hook?test=${Date.now()}-${Math.random()}`)
+  mock.restore()
+  return module
+}
+
+const {
   clearPendingModelFallback,
   createModelFallbackHook,
   setSessionFallbackChain,
   setPendingModelFallback,
-} from "./hook"
+} = await importFreshModelFallbackHookModule()
 
 describe("model fallback hook", () => {
   beforeEach(() => {
@@ -395,7 +405,7 @@ describe("model fallback hook", () => {
     //#when
     await hook["chat.message"]?.({ sessionID }, output)
 
-    //#then — model name should be transformed from hyphen to dot notation
+    //#then - model name should be transformed from hyphen to dot notation
     expect(output.message["model"]).toEqual({
       providerID: "github-copilot",
       modelID: "claude-sonnet-4.6",
@@ -448,3 +458,5 @@ describe("model fallback hook", () => {
     clearPendingModelFallback(sessionID)
   })
 })
+
+export {}

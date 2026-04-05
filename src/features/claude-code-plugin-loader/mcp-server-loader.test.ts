@@ -6,12 +6,14 @@ import type { LoadedPlugin } from "./types"
 
 const TEST_DIR = join(tmpdir(), `plugin-mcp-loader-test-${Date.now()}`)
 const PROJECT_DIR = join(TEST_DIR, "project")
+const PROJECT_SUBDIRECTORY = join(PROJECT_DIR, "packages", "app")
 const PLUGIN_DIR = join(TEST_DIR, "plugin")
 const MCP_CONFIG_PATH = join(PLUGIN_DIR, "mcp.json")
 
 describe("loadPluginMcpServers", () => {
   beforeEach(() => {
     mkdirSync(PROJECT_DIR, { recursive: true })
+    mkdirSync(PROJECT_SUBDIRECTORY, { recursive: true })
     mkdirSync(PLUGIN_DIR, { recursive: true })
     mock.module("../../shared/logger", () => ({
       log: () => {},
@@ -24,7 +26,7 @@ describe("loadPluginMcpServers", () => {
   })
 
   describe("#given plugin MCP entries with local scope metadata", () => {
-    it("#when loading plugin MCP servers #then only entries matching the current cwd are included", async () => {
+    it("#when loading plugin MCP servers from a project subdirectory #then only entries within the same project are included", async () => {
       writeFileSync(
         MCP_CONFIG_PATH,
         JSON.stringify({
@@ -45,6 +47,12 @@ describe("loadPluginMcpServers", () => {
               scope: "local",
               projectPath: join(PROJECT_DIR, "other-project"),
             },
+            parentLocal: {
+              command: "npx",
+              args: ["parent-plugin-local"],
+              scope: "local",
+              projectPath: join(PROJECT_SUBDIRECTORY, "nested-project"),
+            },
           },
         })
       )
@@ -59,15 +67,16 @@ describe("loadPluginMcpServers", () => {
       }
 
       const originalCwd = process.cwd()
-      process.chdir(PROJECT_DIR)
+      process.chdir(PROJECT_SUBDIRECTORY)
 
       try {
-        const { loadPluginMcpServers } = await import("./mcp-server-loader")
+        const { loadPluginMcpServers } = await import(`./mcp-server-loader?t=${Date.now()}`)
         const servers = await loadPluginMcpServers([plugin])
 
         expect(servers).toHaveProperty("demo-plugin:globalServer")
         expect(servers).toHaveProperty("demo-plugin:matchingLocal")
         expect(servers).not.toHaveProperty("demo-plugin:nonMatchingLocal")
+        expect(servers).not.toHaveProperty("demo-plugin:parentLocal")
       } finally {
         process.chdir(originalCwd)
       }
