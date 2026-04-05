@@ -370,7 +370,7 @@ session_id: ses_standalone_def
       cleanupMessageStorage(sessionID)
     })
 
-     test("should append session ID to boulder state if not present", async () => {
+     test("should not append unrelated current session to boulder state if not already tracked", async () => {
        // given - boulder state without session-append-test, Atlas caller
        const sessionID = "session-append-test"
        setupMessageStorage(sessionID, "atlas")
@@ -399,10 +399,50 @@ session_id: ses_standalone_def
         output
       )
 
-      // then - sessionID should be appended
+      // then - unrelated current session should not be absorbed into boulder
       const updatedState = readBoulderState(TEST_DIR)
-      expect(updatedState?.session_ids).toContain(sessionID)
+      expect(updatedState?.session_ids).not.toContain(sessionID)
       
+      cleanupMessageStorage(sessionID)
+    })
+
+     test("should not append current session when session lookup fails during append decision", async () => {
+       // given - boulder state without session-get-failure-test, Atlas caller, and session lookup failure
+       const sessionID = "session-get-failure-test"
+       setupMessageStorage(sessionID, "atlas")
+
+      const planPath = join(TEST_DIR, "test-plan.md")
+      writeFileSync(planPath, "# Plan\n- [ ] Task 1")
+
+      const state: BoulderState = {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: ["session-1"],
+        plan_name: "test-plan",
+      }
+      writeBoulderState(TEST_DIR, state)
+
+      const hook = createAtlasHook(createMockPluginInput({
+        sessionGetMock: mock(async () => {
+          throw new Error("session lookup failed")
+        }),
+      }))
+      const output = {
+        title: "Sisyphus Task",
+        output: "Task output",
+        metadata: {},
+      }
+
+      // when
+      await hook["tool.execute.after"](
+        { tool: "task", sessionID },
+        output,
+      )
+
+      // then
+      const updatedState = readBoulderState(TEST_DIR)
+      expect(updatedState?.session_ids).not.toContain(sessionID)
+
       cleanupMessageStorage(sessionID)
     })
 
@@ -1361,7 +1401,7 @@ session_id: ses_untrusted_999
       expect(mockInput._promptMock).not.toHaveBeenCalled()
     })
 
-    test("should append subagent session to boulder before injecting continuation", async () => {
+    test("should not append lineage-only subagent session during idle without explicit boulder tracking", async () => {
       // given - active boulder plan with another registered session and current session tracked as subagent
       const subagentSessionID = "subagent-session-456"
       const planPath = join(TEST_DIR, "test-plan.md")
@@ -1380,7 +1420,7 @@ session_id: ses_untrusted_999
       const mockInput = createMockPluginInput()
       const hook = createAtlasHook(mockInput)
 
-      // when - subagent session goes idle before parent task output appends it
+      // when - subagent session goes idle before explicit tracking appends it
       await hook.handler({
         event: {
           type: "session.idle",
@@ -1388,11 +1428,9 @@ session_id: ses_untrusted_999
         },
       })
 
-      // then - session is registered into boulder and continuation is injected
-      expect(readBoulderState(TEST_DIR)?.session_ids).toContain(subagentSessionID)
-      expect(mockInput._promptMock).toHaveBeenCalled()
-      const callArgs = mockInput._promptMock.mock.calls[0][0]
-      expect(callArgs.path.id).toBe(subagentSessionID)
+      // then - lineage alone is not enough to absorb the session into boulder
+      expect(readBoulderState(TEST_DIR)?.session_ids).not.toContain(subagentSessionID)
+      expect(mockInput._promptMock).not.toHaveBeenCalled()
     })
 
     test("should inject when registered boulder session has incomplete tasks even if last agent differs", async () => {
