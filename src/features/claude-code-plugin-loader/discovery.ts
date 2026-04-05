@@ -23,12 +23,12 @@ function getPluginsBaseDir(): string {
   return join(homedir(), ".claude", "plugins")
 }
 
-function getInstalledPluginsPath(): string {
-  return join(getPluginsBaseDir(), "installed_plugins.json")
+function getInstalledPluginsPath(pluginsBaseDir?: string): string {
+  return join(pluginsBaseDir ?? getPluginsBaseDir(), "installed_plugins.json")
 }
 
-function loadInstalledPlugins(): InstalledPluginsDatabase | null {
-  const dbPath = getInstalledPluginsPath()
+function loadInstalledPlugins(pluginsBaseDir?: string): InstalledPluginsDatabase | null {
+  const dbPath = getInstalledPluginsPath(pluginsBaseDir)
   if (!existsSync(dbPath)) {
     return null
   }
@@ -163,7 +163,9 @@ function extractPluginEntries(
 }
 
 export function discoverInstalledPlugins(options?: PluginLoaderOptions): PluginLoadResult {
-  const db = loadInstalledPlugins()
+  // Allow overriding the plugins base directory for testing
+  const pluginsBaseDir = options?.pluginsHomeOverride ?? getPluginsBaseDir()
+  const db = loadInstalledPlugins(pluginsBaseDir)
   const settings = loadClaudeSettings()
   const plugins: LoadedPlugin[] = []
   const errors: PluginLoadError[] = []

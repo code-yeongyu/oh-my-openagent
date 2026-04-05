@@ -222,6 +222,12 @@ export interface ClaudeSettings {
  */
 export interface PluginLoaderOptions {
   /**
+   * Override the plugins home directory for testing.
+   * If not provided, uses CLAUDE_PLUGINS_HOME env var or ~/.claude/plugins
+   */
+  pluginsHomeOverride?: string
+
+  /**
    * Override enabled plugins from oh-my-opencode config.
    * Key format: "pluginName@marketplace" (e.g., "shell-scripting@claude-code-workflows")
    * Value: true = enabled, false = disabled

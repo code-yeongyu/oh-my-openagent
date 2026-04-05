@@ -59,7 +59,7 @@ describe("discoverInstalledPlugins", () => {
     )
 
     //#when
-    const discovered = discoverInstalledPlugins()
+    const discovered = discoverInstalledPlugins({ pluginsHomeOverride: pluginsHome })
 
     //#then
     expect(discovered.errors).toHaveLength(0)
@@ -94,7 +94,7 @@ describe("discoverInstalledPlugins", () => {
     )
 
     //#when
-    const discovered = discoverInstalledPlugins()
+    const discovered = discoverInstalledPlugins({ pluginsHomeOverride: pluginsHome })
 
     //#then
     expect(discovered.errors).toHaveLength(0)
@@ -129,7 +129,7 @@ describe("discoverInstalledPlugins", () => {
     )
 
     //#when
-    const discovered = discoverInstalledPlugins()
+    const discovered = discoverInstalledPlugins({ pluginsHomeOverride: pluginsHome })
 
     //#then
     expect(discovered.errors).toHaveLength(0)
