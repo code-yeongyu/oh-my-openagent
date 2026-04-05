@@ -4,9 +4,9 @@ const { describe, expect, test } = require("bun:test")
 import { DEFAULT_STALE_TIMEOUT_MS } from "./constants"
 
 describe("DEFAULT_STALE_TIMEOUT_MS", () => {
-  test("uses a 45 minute default", () => {
+  test("uses the expected default value", () => {
     // #given
-    const expectedTimeout = 45 * 60 * 1000
+    const expectedTimeout = 360_000_000
 
     // #when
     const timeout = DEFAULT_STALE_TIMEOUT_MS

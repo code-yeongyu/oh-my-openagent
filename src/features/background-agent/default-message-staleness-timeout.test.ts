@@ -21,9 +21,9 @@ function createRunningTask(startedAt: Date): BackgroundTask {
 }
 
 describe("DEFAULT_MESSAGE_STALENESS_TIMEOUT_MS", () => {
-  test("uses a 60 minute default", () => {
+  test("uses the expected default value", () => {
     // #given
-    const expectedTimeout = 60 * 60 * 1000
+    const expectedTimeout = 360_000_000
 
     // #when
     const timeout = DEFAULT_MESSAGE_STALENESS_TIMEOUT_MS
