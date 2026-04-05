@@ -151,7 +151,6 @@ describe("boulder-state", () => {
       // then
       expect(result?.session_origins).toEqual({})
     })
-
     test("should read valid boulder state", () => {
       // given - valid boulder.json
       const state: BoulderState = {
