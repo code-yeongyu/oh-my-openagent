@@ -2368,60 +2368,68 @@ describe("sisyphus-task", () => {
       expect(result).toContain("Artistry result here")
     }, { timeout: 20000 })
 
-    test("writing category (kimi) with run_in_background=false should force background but wait for result", async () => {
-      // given - writing uses kimi-for-coding/k2p5
+    test("writing category (kimi) with run_in_background=false should run sync when kimi provider is available", async () => {
+      // given - writing uses kimi model which is no longer considered unstable
+      // Override provider cache to include kimi-for-coding provider
+      providerModelsSpy.mockReturnValue({
+        models: {
+          anthropic: ["claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5"],
+          google: ["gemini-3.1-pro", "gemini-3-flash"],
+          openai: ["gpt-5.4", "gpt-5.3-codex"],
+          "kimi-for-coding": ["k2p5"],
+        },
+        connected: ["anthropic", "google", "openai", "kimi-for-coding"],
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      })
+      cacheSpy.mockReturnValue(["anthropic", "google", "openai", "kimi-for-coding"])
+
       const { createDelegateTask } = require("./tools")
       let launchCalled = false
-      
-      const launchedTask = {
-        id: "task-writing",
-        sessionID: "ses_writing_gemini",
-        description: "Writing gemini task",
-        agent: "sisyphus-junior",
-        status: "running",
-      }
+      let promptCalled = false
+
       const mockManager = {
         launch: async () => {
           launchCalled = true
-          return launchedTask
+          return { id: "should-not-be-called", sessionID: "x", description: "x", agent: "x", status: "running" }
         },
-        getTask: () => launchedTask,
       }
-      
+
+       const promptMock = async () => {
+         promptCalled = true
+         return { data: {} }
+       }
+
        const mockClient = {
          app: { agents: async () => ({ data: [] }) },
          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         model: { list: async () => [{ provider: "google", id: "gemini-3-flash" }] },
          session: {
            get: async () => ({ data: { directory: "/project" } }),
-           create: async () => ({ data: { id: "ses_writing_gemini" } }),
-           prompt: async () => ({ data: {} }),
-           promptAsync: async () => ({ data: {} }),
+           create: async () => ({ data: { id: "ses_writing_kimi" } }),
+           prompt: promptMock,
+           promptAsync: promptMock,
            messages: async () => ({
-             data: [
-               { info: { role: "assistant", time: { created: Date.now() } }, parts: [{ type: "text", text: "Writing result here" }] }
-             ]
+             data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Writing result here" }] }]
            }),
-           status: async () => ({ data: { "ses_writing_gemini": { type: "idle" } } }),
+           status: async () => ({ data: { "ses_writing_kimi": { type: "idle" } } }),
          },
        }
-       
+
        const tool = createDelegateTask({
          manager: mockManager,
          client: mockClient,
        })
-      
+
       const toolContext = {
         sessionID: "parent-session",
         messageID: "parent-message",
         agent: "sisyphus",
         abort: new AbortController().signal,
       }
-      
-      // when - writing category (gemini-3-flash)
+
+      // when - writing category (kimi) with run_in_background=false
       const result = await tool.execute(
         {
-          description: "Test writing forced background",
+          description: "Test writing sync",
           prompt: "Write something",
           category: "writing",
           run_in_background: false,
@@ -2429,11 +2437,11 @@ describe("sisyphus-task", () => {
         },
         toolContext
       )
-      
-      // then - should launch as background BUT wait for and return actual result
-      expect(launchCalled).toBe(true)
-      expect(result).toContain("SUPERVISED TASK COMPLETED")
-      expect(result).toContain("Writing result here")
+
+      // then - should run sync, NOT forced to background (kimi is not unstable)
+      expect(launchCalled).toBe(false)
+      expect(promptCalled).toBe(true)
+      expect(result).not.toContain("SUPERVISED TASK COMPLETED")
     }, { timeout: 20000 })
 
     test("is_unstable_agent=true should force background but wait for result", async () => {

@@ -248,6 +248,91 @@ describe("atlas hook", () => {
       cleanupMessageStorage(sessionID)
     })
 
+    test("should preserve metadata when transforming output for boulder orchestrator", async () => {
+      // given - Atlas caller with boulder state and metadata containing sessionId
+      const sessionID = "session-metadata-preserve-test"
+      setupMessageStorage(sessionID, "atlas")
+
+      const planPath = join(TEST_DIR, "metadata-plan.md")
+      writeFileSync(planPath, "# Plan\n- [ ] Task 1")
+
+      const state: BoulderState = {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: ["session-1"],
+        plan_name: "metadata-plan",
+      }
+      writeBoulderState(TEST_DIR, state)
+
+      const hook = createAtlasHook(createMockPluginInput())
+      const output = {
+        title: "Sisyphus Task",
+        output: `Task completed
+
+<task_metadata>
+session_id: ses_subagent_abc
+</task_metadata>`,
+        metadata: {
+          sessionId: "ses_subagent_abc",
+          agent: "sisyphus-junior",
+          category: "quick",
+          truncated: false,
+        } as Record<string, unknown>,
+      }
+
+      // when
+      await hook["tool.execute.after"](
+        { tool: "task", sessionID },
+        output
+      )
+
+      // then - output is transformed but metadata is preserved
+      expect(output.output).toContain("SUBAGENT WORK COMPLETED")
+      expect(output.metadata.sessionId).toBe("ses_subagent_abc")
+      expect(output.metadata.agent).toBe("sisyphus-junior")
+      expect(output.metadata.category).toBe("quick")
+      expect(output.metadata.truncated).toBe(false)
+
+      cleanupMessageStorage(sessionID)
+    })
+
+    test("should preserve metadata when appending standalone verification reminder", async () => {
+      // given - Atlas caller without boulder state, metadata containing sessionId
+      const sessionID = "session-standalone-metadata-test"
+      setupMessageStorage(sessionID, "atlas")
+
+      const hook = createAtlasHook(createMockPluginInput())
+      const output = {
+        title: "Sisyphus Task",
+        output: `Task completed
+
+<task_metadata>
+session_id: ses_standalone_def
+</task_metadata>`,
+        metadata: {
+          sessionId: "ses_standalone_def",
+          agent: "sisyphus-junior",
+          model: { providerID: "openai", modelID: "gpt-5.4" },
+          truncated: false,
+        } as Record<string, unknown>,
+      }
+
+      // when
+      await hook["tool.execute.after"](
+        { tool: "task", sessionID },
+        output
+      )
+
+      // then - standalone verification appended but metadata preserved
+      expect(output.output).toContain("LYING")
+      expect(output.metadata.sessionId).toBe("ses_standalone_def")
+      expect(output.metadata.agent).toBe("sisyphus-junior")
+      expect(output.metadata.model).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
+      expect(output.metadata.truncated).toBe(false)
+
+      cleanupMessageStorage(sessionID)
+    })
+
      test("should still transform when plan is complete (shows progress)", async () => {
        // given - boulder state with complete plan, Atlas caller
        const sessionID = "session-complete-plan-test"
@@ -2103,10 +2188,14 @@ session_id: ses_untrusted_999
       let nextFakeId = 99000
       const originalSetTimeout = globalThis.setTimeout
       const originalClearTimeout = globalThis.clearTimeout
+      const originalDateNow = Date.now
+      let fakeNow = 0
 
       beforeEach(() => {
         capturedTimers.clear()
         nextFakeId = 99000
+        fakeNow = 10000
+        Date.now = () => fakeNow
 
         globalThis.setTimeout = ((callback: Function, delay?: number, ...args: unknown[]) => {
           const normalized = typeof delay === "number" ? delay : 0
@@ -2131,12 +2220,14 @@ session_id: ses_untrusted_999
       afterEach(() => {
         globalThis.setTimeout = originalSetTimeout
         globalThis.clearTimeout = originalClearTimeout
+        Date.now = originalDateNow
       })
 
       async function firePendingTimers(): Promise<void> {
         for (const [id, entry] of capturedTimers) {
           if (!entry.cleared) {
             capturedTimers.delete(id)
+            fakeNow += 6000
             await entry.callback()
           }
         }

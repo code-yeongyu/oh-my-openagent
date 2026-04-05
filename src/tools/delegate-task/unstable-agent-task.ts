@@ -4,6 +4,7 @@ import { DEFAULT_SYNC_POLL_TIMEOUT_MS, getTimingConfig } from "./timing"
 import { buildTaskPrompt } from "./prompt-builder"
 import { cancelUnstableAgentTask } from "./cancel-unstable-agent-task"
 import { storeToolMetadata } from "../../features/tool-metadata-store"
+import { resolveCallID } from "./resolve-call-id"
 import { formatDuration } from "./time-formatter"
 import { formatDetailedError } from "./error-formatting"
 import { getSessionTools } from "../../shared/session-tools-store"
@@ -81,8 +82,9 @@ export async function executeUnstableAgentTask(
       },
     }
     await ctx.metadata?.(bgTaskMeta)
-    if (ctx.callID) {
-      storeToolMetadata(ctx.sessionID, ctx.callID, bgTaskMeta)
+    const callID = resolveCallID(ctx)
+    if (callID) {
+      storeToolMetadata(ctx.sessionID, callID, bgTaskMeta)
     }
 
     const startTime = new Date()
