@@ -6,6 +6,184 @@ import {
   getSessionPromptParams,
 } from "../../shared/session-prompt-params-state"
 
+describe("background-agent spawner agent-not-found fallback", () => {
+  afterEach(() => {
+    clearSessionPromptParams("session-fallback")
+  })
+
+  test("retries with 'general' agent when promptAsync fails with Agent not found", async () => {
+    //#given
+    const promptCalls: any[] = []
+    let callCount = 0
+
+    const client = {
+      session: {
+        get: async () => ({ data: { directory: "/tmp/test" } }),
+        create: async () => ({ data: { id: "session-fallback" } }),
+        promptAsync: async (args: any) => {
+          callCount++
+          promptCalls.push({ body: { ...args.body }, path: { ...args.path } })
+          if (callCount === 1) {
+            throw new Error('Agent not found: "Sisyphus-Junior". Available agents: build, explore, general, plan')
+          }
+          return { data: {} }
+        },
+      },
+    } as any
+
+    const onTaskError = mock(() => {})
+
+    const task = createTask({
+      description: "Implement feature",
+      prompt: "Please implement the break-even analysis",
+      agent: "Sisyphus-Junior",
+      parentSessionID: "ses_parent",
+      parentMessageID: "msg_parent",
+    })
+
+    const item = {
+      task,
+      input: {
+        description: task.description,
+        prompt: task.prompt,
+        agent: task.agent,
+        parentSessionID: task.parentSessionID,
+        parentMessageID: task.parentMessageID,
+        parentModel: task.parentModel,
+        parentAgent: task.parentAgent,
+        model: task.model,
+      },
+    }
+
+    const ctx = {
+      client,
+      directory: "/tmp/test",
+      concurrencyManager: { release: () => {} },
+      tmuxEnabled: false,
+      onTaskError,
+    }
+
+    //#when
+    await startTask(item as any, ctx as any)
+
+    // Wait for the fire-and-forget prompt chain to settle
+    await new Promise(resolve => setTimeout(resolve, 50))
+
+    //#then
+    // Should have called promptAsync twice: once with original agent, once with fallback
+    expect(promptCalls).toHaveLength(2)
+    expect(promptCalls[0].body.agent).toBe("Sisyphus-Junior")
+    expect(promptCalls[1].body.agent).toBe("general")
+    // Original prompt content preserved in fallback
+    expect(promptCalls[1].body.parts).toEqual(promptCalls[0].body.parts)
+    // Task should not have errored
+    expect(onTaskError).not.toHaveBeenCalled()
+  })
+
+  test("does not retry for non-agent-not-found errors", async () => {
+    //#given
+    const promptCalls: any[] = []
+
+    const client = {
+      session: {
+        get: async () => ({ data: { directory: "/tmp/test" } }),
+        create: async () => ({ data: { id: "session-fallback" } }),
+        promptAsync: async (args: any) => {
+          promptCalls.push(args)
+          throw new Error("Connection timeout")
+        },
+      },
+    } as any
+
+    const onTaskError = mock(() => {})
+
+    const task = createTask({
+      description: "Implement feature",
+      prompt: "Do work",
+      agent: "Sisyphus-Junior",
+      parentSessionID: "ses_parent",
+      parentMessageID: "msg_parent",
+    })
+
+    const item = {
+      task,
+      input: {
+        description: task.description,
+        prompt: task.prompt,
+        agent: task.agent,
+        parentSessionID: task.parentSessionID,
+        parentMessageID: task.parentMessageID,
+      },
+    }
+
+    const ctx = {
+      client,
+      directory: "/tmp/test",
+      concurrencyManager: { release: () => {} },
+      tmuxEnabled: false,
+      onTaskError,
+    }
+
+    //#when
+    await startTask(item as any, ctx as any)
+    await new Promise(resolve => setTimeout(resolve, 50))
+
+    //#then
+    // Only one attempt — no retry for non-agent errors
+    expect(promptCalls).toHaveLength(1)
+    expect(onTaskError).toHaveBeenCalled()
+  })
+
+  test("calls onTaskError if fallback agent also fails", async () => {
+    //#given
+    const client = {
+      session: {
+        get: async () => ({ data: { directory: "/tmp/test" } }),
+        create: async () => ({ data: { id: "session-fallback" } }),
+        promptAsync: async () => {
+          throw new Error('Agent not found: "Sisyphus-Junior". Available agents: build, explore, general, plan')
+        },
+      },
+    } as any
+
+    const onTaskError = mock(() => {})
+
+    const task = createTask({
+      description: "Implement feature",
+      prompt: "Do work",
+      agent: "Sisyphus-Junior",
+      parentSessionID: "ses_parent",
+      parentMessageID: "msg_parent",
+    })
+
+    const item = {
+      task,
+      input: {
+        description: task.description,
+        prompt: task.prompt,
+        agent: task.agent,
+        parentSessionID: task.parentSessionID,
+        parentMessageID: task.parentMessageID,
+      },
+    }
+
+    const ctx = {
+      client,
+      directory: "/tmp/test",
+      concurrencyManager: { release: () => {} },
+      tmuxEnabled: false,
+      onTaskError,
+    }
+
+    //#when
+    await startTask(item as any, ctx as any)
+    await new Promise(resolve => setTimeout(resolve, 50))
+
+    //#then
+    expect(onTaskError).toHaveBeenCalled()
+  })
+})
+
 describe("background-agent spawner fallback model promotion", () => {
   afterEach(() => {
     clearSessionPromptParams("session-123")
