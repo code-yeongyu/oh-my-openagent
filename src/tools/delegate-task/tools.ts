@@ -122,6 +122,9 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
         title: args.description,
       })
 
+      if (!args.description || typeof args.description !== "string") {
+        throw new Error(`Invalid arguments: 'description' parameter is REQUIRED. Provide a short (3-5 words) task description.`)
+      }
       if (args.run_in_background === undefined) {
         throw new Error(`Invalid arguments: 'run_in_background' parameter is REQUIRED. Specify run_in_background=false for task delegation, or run_in_background=true for parallel exploration.`)
       }

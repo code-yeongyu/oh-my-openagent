@@ -127,4 +127,52 @@ Use \`background_output(task_id="<id>")\` to retrieve each result.
       expect(notification).toBe(expectedNotification)
     })
   })
+
+  describe("#given all tasks completed with undefined descriptions", () => {
+    test("#when building the final notification #then it uses task ID as fallback instead of 'undefined'", () => {
+      // given
+      const notification = buildBackgroundTaskNotificationText({
+        task: {
+          id: "bg_abc123",
+          description: undefined as unknown as string,
+          status: "completed",
+        },
+        duration: "5s",
+        statusText: "COMPLETED",
+        allComplete: true,
+        remainingCount: 0,
+        completedTasks: [
+          { id: "bg_abc123", description: undefined as unknown as string, status: "completed" },
+          { id: "bg_def456", description: undefined as unknown as string, status: "completed" },
+        ],
+      })
+
+      // then
+      expect(notification).not.toContain(": undefined")
+      expect(notification).toContain("bg_abc123")
+      expect(notification).toContain("bg_def456")
+    })
+  })
+
+  describe("#given a single task notification with undefined description", () => {
+    test("#when building the partial notification #then it uses task ID as fallback", () => {
+      // given
+      const notification = buildBackgroundTaskNotificationText({
+        task: {
+          id: "bg_xyz789",
+          description: undefined as unknown as string,
+          status: "completed",
+        },
+        duration: "3s",
+        statusText: "COMPLETED",
+        allComplete: false,
+        remainingCount: 2,
+        completedTasks: [],
+      })
+
+      // then
+      expect(notification).not.toContain("undefined")
+      expect(notification).toContain("bg_xyz789")
+    })
+  })
 })
