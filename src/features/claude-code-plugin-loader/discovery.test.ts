@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test"
+import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -16,11 +16,18 @@ function createTemporaryDirectory(prefix: string): string {
 
 describe("discoverInstalledPlugins", () => {
   beforeEach(() => {
+    // Mock logger to avoid noise in test output
+    mock.module("../../shared/logger", () => ({
+      log: () => {},
+    }))
+    
     const pluginsHome = createTemporaryDirectory("omo-claude-plugins-")
     process.env.CLAUDE_PLUGINS_HOME = pluginsHome
   })
 
   afterEach(() => {
+    mock.restore()
+    
     if (originalClaudePluginsHome === undefined) {
       delete process.env.CLAUDE_PLUGINS_HOME
     } else {
