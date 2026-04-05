@@ -7,7 +7,6 @@ import type {
   OpenCodeConfigDirOptions,
   OpenCodeConfigPaths,
 } from "./opencode-config-dir-types"
-import { CONFIG_BASENAME } from "./plugin-identity"
 
 export type {
   OpenCodeBinaryType,
@@ -98,7 +97,7 @@ export function getOpenCodeConfigPaths(options: OpenCodeConfigDirOptions): OpenC
     configJson: join(configDir, "opencode.json"),
     configJsonc: join(configDir, "opencode.jsonc"),
     packageJson: join(configDir, "package.json"),
-    omoConfig: join(configDir, `${CONFIG_BASENAME}.json`),
+    omoConfig: join(configDir, "oh-my-opencode.json"),
   }
 }
 
