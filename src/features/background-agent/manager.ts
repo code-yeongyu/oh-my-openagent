@@ -348,7 +348,7 @@ export class BackgroundManager {
       }
 
       // Add to queue
-      const key = this.getConcurrencyKeyFromInput(input)
+      const key = this.getConcurrencyKeyFromInput(input, task.id)
       const queue = this.queuesByKey.get(key) ?? []
       queue.push({ task, input })
       this.queuesByKey.set(key, queue)
@@ -430,7 +430,7 @@ export class BackgroundManager {
       model: input.model,
     })
 
-    const concurrencyKey = this.getConcurrencyKeyFromInput(input)
+    const concurrencyKey = this.getConcurrencyKeyFromInput(input, item.task.id)
 
     const parentSession = await this.client.session.get({
       path: { id: input.parentSessionID },
@@ -661,11 +661,11 @@ export class BackgroundManager {
     return undefined
   }
 
-  private getConcurrencyKeyFromInput(input: LaunchInput): string {
+  private getConcurrencyKeyFromInput(input: LaunchInput, taskId: string): string {
     if (input.model) {
-      return `${input.model.providerID}/${input.model.modelID}/${input.taskId}`
+      return `${input.model.providerID}/${input.model.modelID}/${taskId}`
     }
-    return `${input.agent}/${input.taskId}`
+    return `${input.agent}/${taskId}`
   }
 
   /**
@@ -1511,8 +1511,8 @@ export class BackgroundManager {
 
     if (task.status === "pending") {
       const key = task.model
-        ? `${task.model.providerID}/${task.model.modelID}`
-        : task.agent
+        ? `${task.model.providerID}/${task.model.modelID}/${taskId}`
+        : `${task.agent}/${taskId}`
       const queue = this.queuesByKey.get(key)
       if (queue) {
         const index = queue.findIndex(item => item.task.id === taskId)
@@ -1896,8 +1896,8 @@ export class BackgroundManager {
         }
         if (wasPending) {
           const key = task.model
-            ? `${task.model.providerID}/${task.model.modelID}`
-            : task.agent
+            ? `${task.model.providerID}/${task.model.modelID}/${taskId}`
+            : `${task.agent}/${taskId}`
           const queue = this.queuesByKey.get(key)
           if (queue) {
             const index = queue.findIndex((item) => item.task.id === taskId)
