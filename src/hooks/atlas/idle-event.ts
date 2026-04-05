@@ -90,7 +90,10 @@ function scheduleRetry(input: {
     const currentProgress = getPlanProgress(currentBoulder.active_plan)
     if (currentProgress.isComplete) return
     if (options?.isContinuationStopped?.(sessionID)) return
-    if (hasRunningBackgroundTasks(sessionID, options)) return
+    if (hasRunningBackgroundTasks(sessionID, options)) {
+      scheduleRetry({ ctx, sessionID, sessionState, options })
+      return
+    }
 
     await injectContinuation({
       ctx,
@@ -194,6 +197,7 @@ export async function handleAtlasSessionIdle(input: {
   }
 
   if (hasRunningBackgroundTasks(sessionID, options)) {
+    scheduleRetry({ ctx, sessionID, sessionState, options })
     log(`[${HOOK_NAME}] Skipped: background tasks running`, { sessionID })
     return
   }

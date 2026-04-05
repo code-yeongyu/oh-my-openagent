@@ -1,11 +1,13 @@
 /// <reference types="bun-types" />
 
-import { afterEach, beforeEach, describe, expect, it, mock, afterAll } from "bun:test"
-import { existsSync, mkdirSync, rmSync } from "node:fs"
+import { afterEach, beforeEach, describe, expect, it, mock, afterAll, spyOn } from "bun:test"
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { createOpencodeClient, type Project } from "@opencode-ai/sdk"
+import { readBoulderState, writeBoulderState } from "../../features/boulder-state"
+import { createToolExecuteBeforeHandler } from "./tool-execute-before"
 
 const isCallerOrchestratorMock = mock(async () => true)
 const collectGitDiffStatsMock = mock(() => ({
@@ -27,6 +29,9 @@ afterAll(() => { mock.restore() })
 
 const { createToolExecuteAfterHandler } = await import("./tool-execute-after")
 
+type OpencodeClient = ReturnType<typeof createOpencodeClient>
+type SessionGetResult = Awaited<ReturnType<OpencodeClient["session"]["get"]>>
+
 describe("createToolExecuteAfterHandler background launch detection", () => {
   let testDirectory = ""
 
@@ -47,17 +52,39 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
     }
   })
 
-  function createHandler() {
-    const project = {
+  function createProject(): Project {
+    return {
       id: "project-1",
       worktree: testDirectory,
       time: {
         created: Date.now(),
       },
-    } satisfies Project
+    }
+  }
+
+  function createSessionGetResult(parentID: string | undefined): SessionGetResult {
+    return {
+      data: {
+        parentID,
+      },
+      error: undefined,
+      request: new Request("https://example.com/session"),
+      response: new Response(null, { status: 200 }),
+    } as SessionGetResult
+  }
+
+  function createHandler(parentSessionIDs?: Record<string, string | undefined>) {
+    const project = createProject()
+    const client = createOpencodeClient()
+
+    if (parentSessionIDs) {
+      spyOn(client.session, "get").mockImplementation((input) => Promise.resolve(
+        createSessionGetResult(parentSessionIDs[input.path.id]),
+      ) as never)
+    }
 
     const ctx = {
-      client: createOpencodeClient(),
+      client,
       project,
       directory: testDirectory,
       worktree: testDirectory,
@@ -96,6 +123,77 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
 
         expect(output.output).toBe("Background agent task launched successfully.")
         expect(collectGitDiffStatsMock).not.toHaveBeenCalled()
+      })
+    })
+
+    describe("#when a background task launch belongs to the active boulder task", () => {
+      it("#then it should persist the delegated session without transforming the launch output", async () => {
+        const sessionID = "ses_parent"
+        const childSessionID = "ses_child123"
+        const planPath = join(testDirectory, "background-launch-plan.md")
+        const project = createProject()
+        const client = createOpencodeClient()
+
+        spyOn(client.session, "get").mockImplementation((input) => Promise.resolve(
+          createSessionGetResult(input.path.id === childSessionID ? sessionID : undefined),
+        ) as never)
+
+        writeFileSync(planPath, `# Plan
+
+## TODOs
+- [ ] 1. Implement auth flow
+`)
+
+        writeBoulderState(testDirectory, {
+          active_plan: planPath,
+          started_at: "2026-01-02T10:00:00Z",
+          session_ids: [sessionID],
+          plan_name: "background-launch-plan",
+        })
+
+        const pendingFilePaths = new Map<string, string>()
+        const pendingTaskRefs = new Map()
+        const ctx = {
+          client,
+          project,
+          directory: testDirectory,
+          worktree: testDirectory,
+          serverUrl: new URL("https://example.com"),
+          $: Bun.$,
+        } satisfies PluginInput
+        const beforeHandler = createToolExecuteBeforeHandler({ ctx, pendingFilePaths, pendingTaskRefs })
+        const afterHandler = createToolExecuteAfterHandler({
+          ctx,
+          pendingFilePaths,
+          pendingTaskRefs,
+          autoCommit: true,
+          getState: () => ({ promptFailureCount: 0 }),
+        })
+
+        await beforeHandler(
+          { tool: "task", sessionID, callID: "call-bg-task" },
+          { args: { prompt: "Implement auth flow" } },
+        )
+
+        const output = {
+          title: "Sisyphus Task",
+          output: "Background task launched.\n\nBackground Task ID: bg_123\n\n<task_metadata>\nsession_id: ses_child123\n</task_metadata>",
+          metadata: {
+            sessionId: childSessionID,
+            agent: "sisyphus-junior",
+            category: "deep",
+          },
+        }
+
+        await afterHandler(
+          { tool: "task", sessionID, callID: "call-bg-task" },
+          output,
+        )
+
+        expect(output.output).toContain("Background task launched.")
+        expect(collectGitDiffStatsMock).not.toHaveBeenCalled()
+        expect(readBoulderState(testDirectory)?.session_ids).toContain(childSessionID)
+        expect(readBoulderState(testDirectory)?.task_sessions?.["todo:1"]?.session_id).toBe(childSessionID)
       })
     })
   })
