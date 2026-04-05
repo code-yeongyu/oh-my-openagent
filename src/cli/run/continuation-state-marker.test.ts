@@ -23,21 +23,21 @@ afterEach(() => {
 })
 
 describe("getContinuationState marker integration", () => {
-  it("reports active marker state from continuation hooks", () => {
+  it("reports active marker state from continuation hooks", async () => {
     // given
     const directory = createTempDir()
     const sessionID = "ses_marker_active"
     setContinuationMarkerSource(directory, sessionID, "todo", "active", "todos remaining")
 
     // when
-    const state = getContinuationState(directory, sessionID)
+    const state = await getContinuationState(directory, sessionID)
 
     // then
     expect(state.hasActiveHookMarker).toBe(true)
     expect(state.activeHookMarkerReason).toContain("todos")
   })
 
-  it("does not report active marker when all sources are idle/stopped", () => {
+  it("does not report active marker when all sources are idle/stopped", async () => {
     // given
     const directory = createTempDir()
     const sessionID = "ses_marker_idle"
@@ -45,7 +45,7 @@ describe("getContinuationState marker integration", () => {
     setContinuationMarkerSource(directory, sessionID, "stop", "stopped")
 
     // when
-    const state = getContinuationState(directory, sessionID)
+    const state = await getContinuationState(directory, sessionID)
 
     // then
     expect(state.hasActiveHookMarker).toBe(false)
