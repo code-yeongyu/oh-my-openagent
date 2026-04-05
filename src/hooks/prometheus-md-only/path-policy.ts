@@ -5,11 +5,11 @@ import { ALLOWED_EXTENSIONS } from "./constants"
 /**
  * Cross-platform path validator for Oracle file writes.
  * Uses path.resolve/relative instead of string matching to handle:
- * - Windows backslashes (e.g., .matrix\\plans\\x.md)
- * - Mixed separators (e.g., .matrix\\plans/x.md)
+ * - Windows backslashes (e.g., .matrixx\\plans\\x.md)
+ * - Mixed separators (e.g., .matrixx\\plans/x.md)
  * - Case-insensitive directory/extension matching
  * - Workspace confinement (blocks paths outside root or via traversal)
- * - Nested project paths (e.g., parent/.matrix/... when ctx.directory is parent)
+ * - Nested project paths (e.g., parent/.matrixx/... when ctx.directory is parent)
  */
 export function isAllowedFile(filePath: string, workspaceRoot: string): boolean {
   // 1. Resolve to absolute path
@@ -23,9 +23,9 @@ export function isAllowedFile(filePath: string, workspaceRoot: string): boolean 
     return false
   }
 
-  // 4. Check if .matrix/ or .matrix\ exists anywhere in the path (case-insensitive)
-  // This handles both direct paths (.matrix/x.md) and nested paths (project/.matrix/x.md)
-  if (!/\.matrix[/\\]/i.test(rel)) {
+  // 4. Check if .matrixx/ or .matrixx\ exists anywhere in the path (case-insensitive)
+  // This handles both direct paths (.matrixx/x.md) and nested paths (project/.matrixx/x.md)
+  if (!/\.matrixx[/\\]/i.test(rel)) {
     return false
   }
 

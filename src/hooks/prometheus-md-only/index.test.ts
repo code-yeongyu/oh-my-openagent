@@ -189,7 +189,7 @@ describe("oracle-md-only", () => {
       ).rejects.toThrow("can only write/edit .md files")
     })
 
-    test("should allow Oracle to write .md files inside .matrix/", async () => {
+    test("should allow Oracle to write .md files inside .matrixx/", async () => {
       // given
       const hook = createOracleMdOnlyHook(createMockPluginInput())
       const input = {
@@ -198,7 +198,7 @@ describe("oracle-md-only", () => {
         callID: "call-1",
       }
       const output = {
-        args: { filePath: "/tmp/test/.matrix/plans/work-plan.md" },
+        args: { filePath: "/tmp/test/.matrixx/plans/work-plan.md" },
       }
 
       // when / #then
@@ -207,7 +207,7 @@ describe("oracle-md-only", () => {
       ).resolves.toBeUndefined()
     })
 
-    test("should inject workflow reminder when Oracle writes to .matrix/plans/", async () => {
+    test("should inject workflow reminder when Oracle writes to .matrixx/plans/", async () => {
       // given
       const hook = createOracleMdOnlyHook(createMockPluginInput())
       const input = {
@@ -216,7 +216,7 @@ describe("oracle-md-only", () => {
         callID: "call-1",
       }
       const output: { args: Record<string, unknown>; message?: string } = {
-        args: { filePath: "/tmp/test/.matrix/plans/work-plan.md" },
+        args: { filePath: "/tmp/test/.matrixx/plans/work-plan.md" },
       }
 
       // when
@@ -229,7 +229,7 @@ describe("oracle-md-only", () => {
       expect(output.message).toContain("MOMUS REVIEW")
     })
 
-    test("should NOT inject workflow reminder for .matrix/drafts/", async () => {
+    test("should NOT inject workflow reminder for .matrixx/drafts/", async () => {
       // given
       const hook = createOracleMdOnlyHook(createMockPluginInput())
       const input = {
@@ -238,7 +238,7 @@ describe("oracle-md-only", () => {
         callID: "call-1",
       }
       const output: { args: Record<string, unknown>; message?: string } = {
-        args: { filePath: "/tmp/test/.matrix/drafts/notes.md" },
+        args: { filePath: "/tmp/test/.matrixx/drafts/notes.md" },
       }
 
       // when
@@ -248,7 +248,7 @@ describe("oracle-md-only", () => {
       expect(output.message).toBeUndefined()
     })
 
-    test("should block Oracle from writing .md files outside .matrix/", async () => {
+    test("should block Oracle from writing .md files outside .matrixx/", async () => {
       // given
       const hook = createOracleMdOnlyHook(createMockPluginInput())
       const input = {
@@ -263,7 +263,7 @@ describe("oracle-md-only", () => {
       // when / #then
       await expect(
         hook["tool.execute.before"](input, output)
-      ).rejects.toThrow("can only write/edit .md files inside .matrix/")
+      ).rejects.toThrow("can only write/edit .md files inside .matrixx/")
     })
 
     test("should block Edit tool for non-.md files", async () => {
@@ -465,10 +465,10 @@ describe("oracle-md-only", () => {
 
   describe("mission state priority over message files (fixes #927)", () => {
     const MISSION_DIR = join(tmpdir(), `mission-test-${randomUUID()}`)
-    const MISSION_FILE = join(MISSION_DIR, ".matrix", "mission.json")
+    const MISSION_FILE = join(MISSION_DIR, ".matrixx", "mission.json")
 
     beforeEach(() => {
-      mkdirSync(join(MISSION_DIR, ".matrix"), { recursive: true })
+      mkdirSync(join(MISSION_DIR, ".matrixx"), { recursive: true })
     })
 
     afterEach(() => {
@@ -603,7 +603,7 @@ describe("oracle-md-only", () => {
       setupMessageStorage(TEST_SESSION_ID, "oracle")
     })
 
-     test("should allow Windows-style backslash paths under .matrix/", async () => {
+     test("should allow Windows-style backslash paths under .matrixx/", async () => {
        // given
        setupMessageStorage(TEST_SESSION_ID, "oracle")
        const hook = createOracleMdOnlyHook(createMockPluginInput())
@@ -613,7 +613,7 @@ describe("oracle-md-only", () => {
          callID: "call-1",
        }
        const output = {
-         args: { filePath: ".matrix\\plans\\work-plan.md" },
+         args: { filePath: ".matrixx\\plans\\work-plan.md" },
        }
 
        // when / #then
@@ -622,7 +622,7 @@ describe("oracle-md-only", () => {
        ).resolves.toBeUndefined()
      })
 
-     test("should allow mixed separator paths under .matrix/", async () => {
+     test("should allow mixed separator paths under .matrixx/", async () => {
        // given
        setupMessageStorage(TEST_SESSION_ID, "oracle")
        const hook = createOracleMdOnlyHook(createMockPluginInput())
@@ -632,7 +632,7 @@ describe("oracle-md-only", () => {
          callID: "call-1",
        }
        const output = {
-         args: { filePath: ".matrix\\plans/work-plan.MD" },
+         args: { filePath: ".matrixx\\plans/work-plan.MD" },
        }
 
        // when / #then
@@ -651,7 +651,7 @@ describe("oracle-md-only", () => {
          callID: "call-1",
        }
        const output = {
-         args: { filePath: ".matrix/plans/work-plan.MD" },
+         args: { filePath: ".matrixx/plans/work-plan.MD" },
        }
 
        // when / #then
@@ -660,7 +660,7 @@ describe("oracle-md-only", () => {
        ).resolves.toBeUndefined()
      })
 
-     test("should block paths outside workspace root even if containing .matrix", async () => {
+     test("should block paths outside workspace root even if containing .matrixx", async () => {
        // given
        setupMessageStorage(TEST_SESSION_ID, "oracle")
        const hook = createOracleMdOnlyHook(createMockPluginInput())
@@ -670,16 +670,16 @@ describe("oracle-md-only", () => {
          callID: "call-1",
        }
        const output = {
-         args: { filePath: "/other/project/.matrix/plans/x.md" },
+         args: { filePath: "/other/project/.matrixx/plans/x.md" },
        }
 
        // when / #then
        await expect(
          hook["tool.execute.before"](input, output)
-       ).rejects.toThrow("can only write/edit .md files inside .matrix/")
+       ).rejects.toThrow("can only write/edit .md files inside .matrixx/")
      })
 
-     test("should allow nested .matrix directories (ctx.directory may be parent)", async () => {
+     test("should allow nested .matrixx directories (ctx.directory may be parent)", async () => {
        // given - when ctx.directory is parent of actual project, path includes project name
        setupMessageStorage(TEST_SESSION_ID, "oracle")
        const hook = createOracleMdOnlyHook(createMockPluginInput())
@@ -689,10 +689,10 @@ describe("oracle-md-only", () => {
          callID: "call-1",
        }
        const output = {
-         args: { filePath: "src/.matrix/plans/x.md" },
+         args: { filePath: "src/.matrixx/plans/x.md" },
        }
 
-       // when / #then - should allow because .matrix is in path
+       // when / #then - should allow because .matrixx is in path
        await expect(
          hook["tool.execute.before"](input, output)
        ).resolves.toBeUndefined()
@@ -708,27 +708,27 @@ describe("oracle-md-only", () => {
          callID: "call-1",
        }
        const output = {
-         args: { filePath: ".matrix/../secrets.md" },
+         args: { filePath: ".matrixx/../secrets.md" },
        }
 
        // when / #then
        await expect(
          hook["tool.execute.before"](input, output)
-       ).rejects.toThrow("can only write/edit .md files inside .matrix/")
+       ).rejects.toThrow("can only write/edit .md files inside .matrixx/")
      })
 
-     test("should allow case-insensitive .MATRIX directory", async () => {
-       // given
-       setupMessageStorage(TEST_SESSION_ID, "oracle")
-       const hook = createOracleMdOnlyHook(createMockPluginInput())
-       const input = {
-         tool: "Write",
-         sessionID: TEST_SESSION_ID,
-         callID: "call-1",
-       }
-       const output = {
-         args: { filePath: ".MATRIX/plans/work-plan.md" },
-       }
+      test("should allow case-insensitive .MATRIX directory", async () => {
+        // given
+        setupMessageStorage(TEST_SESSION_ID, "oracle")
+        const hook = createOracleMdOnlyHook(createMockPluginInput())
+        const input = {
+          tool: "Write",
+          sessionID: TEST_SESSION_ID,
+          callID: "call-1",
+        }
+        const output = {
+          args: { filePath: ".MATRIXX/plans/work-plan.md" },
+        }
 
        // when / #then
        await expect(
@@ -736,9 +736,9 @@ describe("oracle-md-only", () => {
        ).resolves.toBeUndefined()
      })
 
-     test("should allow nested project path with .matrix (Windows real-world case)", async () => {
+     test("should allow nested project path with .matrixx (Windows real-world case)", async () => {
        // given - simulates when ctx.directory is parent of actual project
-       // User reported: xauusd-dxy-plan\.matrix\drafts\supabase-email-templates.md
+       // User reported: xauusd-dxy-plan\.matrixx\drafts\supabase-email-templates.md
        setupMessageStorage(TEST_SESSION_ID, "oracle")
        const hook = createOracleMdOnlyHook(createMockPluginInput())
        const input = {
@@ -747,7 +747,7 @@ describe("oracle-md-only", () => {
          callID: "call-1",
        }
        const output = {
-         args: { filePath: "xauusd-dxy-plan\\.matrix\\drafts\\supabase-email-templates.md" },
+         args: { filePath: "xauusd-dxy-plan\\.matrixx\\drafts\\supabase-email-templates.md" },
        }
 
        // when / #then
@@ -766,7 +766,7 @@ describe("oracle-md-only", () => {
          callID: "call-1",
        }
        const output = {
-         args: { filePath: "my-project/.matrix\\plans/task.md" },
+         args: { filePath: "my-project/.matrixx\\plans/task.md" },
        }
 
        // when / #then
@@ -775,7 +775,7 @@ describe("oracle-md-only", () => {
        ).resolves.toBeUndefined()
      })
 
-     test("should block nested project path without .matrix", async () => {
+     test("should block nested project path without .matrixx", async () => {
        // given
        setupMessageStorage(TEST_SESSION_ID, "oracle")
        const hook = createOracleMdOnlyHook(createMockPluginInput())

@@ -12,7 +12,7 @@ import {
 
 describe("handoff-injector/storage", () => {
   const TEST_DIR = join(tmpdir(), "handoff-storage-test-" + Date.now())
-  const MATRIX_DIR = join(TEST_DIR, ".matrix")
+  const MATRIX_DIR = join(TEST_DIR, ".matrixx")
 
   beforeEach(() => {
     if (!existsSync(TEST_DIR)) {
@@ -30,7 +30,7 @@ describe("handoff-injector/storage", () => {
   })
 
   describe("getHandoffFilePath", () => {
-    test("returns path to .matrix/handoff.md", () => {
+    test("returns path to .matrixx/handoff.md", () => {
       //#given - a directory path
       const dir = "/some/project"
 
@@ -38,12 +38,12 @@ describe("handoff-injector/storage", () => {
       const result = getHandoffFilePath(dir)
 
       //#then
-      expect(result).toBe("/some/project/.matrix/handoff.md")
+      expect(result).toBe("/some/project/.matrixx/handoff.md")
     })
   })
 
   describe("getHandoffConsumedFilePath", () => {
-    test("returns path to .matrix/handoff.consumed.md", () => {
+    test("returns path to .matrixx/handoff.consumed.md", () => {
       //#given - a directory path
       const dir = "/some/project"
 
@@ -51,12 +51,12 @@ describe("handoff-injector/storage", () => {
       const result = getHandoffConsumedFilePath(dir)
 
       //#then
-      expect(result).toBe("/some/project/.matrix/handoff.consumed.md")
+      expect(result).toBe("/some/project/.matrixx/handoff.consumed.md")
     })
   })
 
   describe("handoffFileExists", () => {
-    test("returns true when .matrix/handoff.md exists", () => {
+    test("returns true when .matrixx/handoff.md exists", () => {
       //#given - handoff.md exists
       const handoffPath = join(MATRIX_DIR, "handoff.md")
       writeFileSync(handoffPath, "some content")
@@ -69,7 +69,7 @@ describe("handoff-injector/storage", () => {
     })
 
     test("returns false when file does not exist", () => {
-      //#given - .matrix dir exists but no handoff.md
+      //#given - .matrixx dir exists but no handoff.md
 
       //#when
       const result = handoffFileExists(TEST_DIR)
@@ -78,8 +78,8 @@ describe("handoff-injector/storage", () => {
       expect(result).toBe(false)
     })
 
-    test("returns false when .matrix/ dir does not exist", () => {
-      //#given - a directory with no .matrix subdirectory
+    test("returns false when .matrixx/ dir does not exist", () => {
+      //#given - a directory with no .matrixx subdirectory
       const emptyDir = join(tmpdir(), "handoff-empty-" + Date.now())
       mkdirSync(emptyDir, { recursive: true })
 
@@ -127,8 +127,8 @@ describe("handoff-injector/storage", () => {
       expect(result).toBeNull()
     })
 
-    test("returns null when .matrix/ dir does not exist", () => {
-      //#given - a directory with no .matrix subdirectory
+    test("returns null when .matrixx/ dir does not exist", () => {
+      //#given - a directory with no .matrixx subdirectory
       const emptyDir = join(tmpdir(), "handoff-nodir-" + Date.now())
       mkdirSync(emptyDir, { recursive: true })
 

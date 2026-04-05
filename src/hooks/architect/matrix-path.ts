@@ -1,3 +1,3 @@
 export function isMatrixPath(filePath: string): boolean {
-  return /\.matrix[/\\]/.test(filePath)
+  return /\.matrixx[/\\]/.test(filePath)
 }

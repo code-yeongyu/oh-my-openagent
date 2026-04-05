@@ -30,7 +30,7 @@ ${buildVerificationReminder(sessionId)}
 
 The subagent was instructed to record findings in notepad files. Read them NOW:
 \`\`\`
-Glob(".matrix/notepads/${planName}/*.md")
+Glob(".matrixx/notepads/${planName}/*.md")
 \`\`\`
 Then \`Read\` each file found — especially:
 - **learnings.md**: Patterns, conventions, successful approaches discovered
@@ -46,7 +46,7 @@ Then \`Read\` each file found — especially:
 
 Do NOT rely on cached progress. Read the plan file NOW:
 \`\`\`
-Read(".matrix/plans/${planName}.md")
+Read(".matrixx/plans/${planName}.md")
 \`\`\`
 Count exactly: how many \`- [ ]\` remain? How many \`- [x]\` completed?
 This is YOUR ground truth. Use it to decide what comes next.
@@ -55,7 +55,7 @@ This is YOUR ground truth. Use it to decide what comes next.
 
 RIGHT NOW - Do not delay. Verification passed → Mark IMMEDIATELY.
 
-Update the plan file \`.matrix/plans/${planName}.md\`:
+Update the plan file \`.matrixx/plans/${planName}.md\`:
 - Change \`- [ ]\` to \`- [x]\` for the completed task
 - Use \`Edit\` tool to modify the checkbox
 

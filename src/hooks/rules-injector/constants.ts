@@ -15,7 +15,7 @@ export const PROJECT_RULE_SUBDIRS: [string, string][] = [
   [".github", "instructions"],
   [".cursor", "rules"],
   [".claude", "rules"],
-  [".matrix", "rules"],
+  [".matrixx", "rules"],
 ];
 
 export const PROJECT_RULE_FILES: string[] = [

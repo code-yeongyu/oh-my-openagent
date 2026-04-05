@@ -202,10 +202,10 @@ describe("createWriteExistingFileGuardHook", () => {
        await expect(result).rejects.toThrow("File already exists. Use edit tool instead.")
      })
 
-    describe(".matrix/*.md exception", () => {
-      test("allows write to existing .matrix/plans/plan.md", async () => {
+    describe(".matrixx/*.md exception", () => {
+      test("allows write to existing .matrixx/plans/plan.md", async () => {
         //#given
-        const matrixDir = path.join(tempDir, ".matrix", "plans")
+        const matrixDir = path.join(tempDir, ".matrixx", "plans")
         fs.mkdirSync(matrixDir, { recursive: true })
         const planFile = path.join(matrixDir, "plan.md")
         fs.writeFileSync(planFile, "# Existing Plan")
@@ -219,9 +219,9 @@ describe("createWriteExistingFileGuardHook", () => {
         await expect(result).resolves.toBeUndefined()
       })
 
-      test("allows write to existing .matrix/notes.md", async () => {
+      test("allows write to existing .matrixx/notes.md", async () => {
         //#given
-        const matrixDir = path.join(tempDir, ".matrix")
+        const matrixDir = path.join(tempDir, ".matrixx")
         fs.mkdirSync(matrixDir, { recursive: true })
         const notesFile = path.join(matrixDir, "notes.md")
         fs.writeFileSync(notesFile, "# Notes")
@@ -235,14 +235,14 @@ describe("createWriteExistingFileGuardHook", () => {
         await expect(result).resolves.toBeUndefined()
       })
 
-      test("allows write to existing .matrix/*.md using relative path", async () => {
+      test("allows write to existing .matrixx/*.md using relative path", async () => {
         //#given
-        const matrixDir = path.join(tempDir, ".matrix")
+        const matrixDir = path.join(tempDir, ".matrixx")
         fs.mkdirSync(matrixDir, { recursive: true })
         const planFile = path.join(matrixDir, "plan.md")
         fs.writeFileSync(planFile, "# Plan")
         const input = { tool: "Write", sessionID: "ses_1", callID: "call_1" }
-        const output = { args: { filePath: ".matrix/plan.md", content: "# Updated" } }
+        const output = { args: { filePath: ".matrixx/plan.md", content: "# Updated" } }
 
         //#when
         const result = hook["tool.execute.before"]?.(input as any, output as any)
@@ -251,9 +251,9 @@ describe("createWriteExistingFileGuardHook", () => {
         await expect(result).resolves.toBeUndefined()
       })
 
-      test("blocks write to existing .matrix/file.txt (non-markdown)", async () => {
+      test("blocks write to existing .matrixx/file.txt (non-markdown)", async () => {
         //#given
-        const matrixDir = path.join(tempDir, ".matrix")
+        const matrixDir = path.join(tempDir, ".matrixx")
         fs.mkdirSync(matrixDir, { recursive: true })
         const textFile = path.join(matrixDir, "file.txt")
         fs.writeFileSync(textFile, "content")
@@ -267,9 +267,9 @@ describe("createWriteExistingFileGuardHook", () => {
         await expect(result).rejects.toThrow("File already exists. Use edit tool instead.")
       })
 
-      test("blocks write when .matrix is in parent path but not under ctx.directory", async () => {
+      test("blocks write when .matrixx is in parent path but not under ctx.directory", async () => {
         //#given
-        const fakeMorpheusParent = path.join(os.tmpdir(), ".matrix", "evil-project")
+        const fakeMorpheusParent = path.join(os.tmpdir(), ".matrixx", "evil-project")
         fs.mkdirSync(fakeMorpheusParent, { recursive: true })
         const evilFile = path.join(fakeMorpheusParent, "plan.md")
         fs.writeFileSync(evilFile, "# Evil Plan")
@@ -283,10 +283,10 @@ describe("createWriteExistingFileGuardHook", () => {
         await expect(result).rejects.toThrow("File already exists. Use edit tool instead.")
 
         // cleanup
-        fs.rmSync(path.join(os.tmpdir(), ".matrix"), { recursive: true, force: true })
+        fs.rmSync(path.join(os.tmpdir(), ".matrixx"), { recursive: true, force: true })
       })
 
-      test("blocks write to existing regular file (not in .matrix)", async () => {
+      test("blocks write to existing regular file (not in .matrixx)", async () => {
         //#given
         const regularFile = path.join(tempDir, "regular.md")
         fs.writeFileSync(regularFile, "# Regular")

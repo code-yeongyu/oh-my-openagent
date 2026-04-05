@@ -47,14 +47,14 @@ export function createOracleMdOnlyHook(ctx: PluginInput) {
       }
 
        if (!isAllowedFile(filePath, ctx.directory)) {
-         log(`[${HOOK_NAME}] Blocked: Oracle can only write to .matrix/*.md`, {
+         log(`[${HOOK_NAME}] Blocked: Oracle can only write to .matrixx/*.md`, {
            sessionID: input.sessionID,
            tool: toolName,
            filePath,
            agent: agentName,
          })
          throw new Error(
-           `[${HOOK_NAME}] ${getAgentDisplayName("oracle")} can only write/edit .md files inside .matrix/ directory. ` +
+           `[${HOOK_NAME}] ${getAgentDisplayName("oracle")} can only write/edit .md files inside .matrixx/ directory. ` +
            `Attempted to modify: ${filePath}. ` +
            `${getAgentDisplayName("oracle")} is a READ-ONLY planner. Use /start-work to execute the plan. ` +
            `APOLOGIZE TO THE USER, REMIND OF YOUR PLAN WRITING PROCESSES, TELL USER WHAT YOU WILL GOING TO DO AS THE PROCESS, WRITE THE PLAN`
@@ -62,7 +62,7 @@ export function createOracleMdOnlyHook(ctx: PluginInput) {
        }
 
       const normalizedPath = filePath.toLowerCase().replace(/\\/g, "/")
-      if (normalizedPath.includes(".matrix/plans/") || normalizedPath.includes(".matrix\\plans\\")) {
+      if (normalizedPath.includes(".matrixx/plans/") || normalizedPath.includes(".matrixx\\plans\\")) {
         log(`[${HOOK_NAME}] Injecting workflow reminder for plan write`, {
           sessionID: input.sessionID,
           tool: toolName,
@@ -72,7 +72,7 @@ export function createOracleMdOnlyHook(ctx: PluginInput) {
         output.message = (output.message || "") + PROMETHEUS_WORKFLOW_REMINDER
       }
 
-      log(`[${HOOK_NAME}] Allowed: .matrix/*.md write permitted`, {
+      log(`[${HOOK_NAME}] Allowed: .matrixx/*.md write permitted`, {
         sessionID: input.sessionID,
         tool: toolName,
         filePath,

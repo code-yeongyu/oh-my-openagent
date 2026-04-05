@@ -176,7 +176,7 @@ Looking for new plans...`
 
 ## No Plans Found
 
-No Oracle plan files found at .matrix/plans/
+No Oracle plan files found at .matrixx/plans/
 Use Oracle to create a work plan first: /plan "your task"`
         } else if (incompletePlans.length === 0) {
           contextInfo += `
