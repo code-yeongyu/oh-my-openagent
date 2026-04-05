@@ -21,8 +21,7 @@ export function isAgentNotFoundError(error: unknown): boolean {
           : String(error)
   return (
     message.includes("Agent not found") ||
-    message.includes("agent.name") ||
-    (message.includes("agent") && message.includes("undefined"))
+    message.includes("agent.name")
   )
 }
 
