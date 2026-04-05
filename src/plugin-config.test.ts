@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, mock, spyOn } from "bun:test";
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import * as shared from "./shared"
@@ -353,6 +353,42 @@ describe("loadPluginConfig", () => {
     expect(existsSync(backupConfigPath)).toBe(true)
     expect(readFileSync(canonicalConfigPath, "utf-8")).toContain('"openai/gpt-5.4"')
     expect(reloadedConfig.agents?.oracle?.model).toBe("openai/gpt-5.4")
+  })
+
+  it("should still load config from legacy path when migration fails", () => {
+    // given - legacy config exists but canonical path is not writable
+    const rootDir = mkdtempSync(join(tmpdir(), "omo-plugin-config-fail-"))
+    const userConfigDir = join(rootDir, "user-config")
+    const projectDir = join(rootDir, "project")
+    const projectConfigDir = join(projectDir, ".opencode")
+    const legacyConfigPath = join(projectConfigDir, "oh-my-opencode.json")
+
+    tempDirs.push(rootDir)
+    mkdirSync(userConfigDir, { recursive: true })
+    mkdirSync(projectConfigDir, { recursive: true })
+    writeFileSync(legacyConfigPath, JSON.stringify({ agents: { oracle: { model: "openai/gpt-5.4" } } }))
+
+    // Make the directory read-only so migration write fails
+    // (simulates Windows file lock / permission issues)
+    if (process.platform !== "win32") {
+      chmodSync(projectConfigDir, 0o555)
+    }
+
+    spyOn(shared, "getOpenCodeConfigDir").mockReturnValue(userConfigDir)
+
+    // when
+    let config: OhMyOpenCodeConfig
+    try {
+      config = loadPluginConfig(projectDir, {})
+    } finally {
+      // Restore permissions for cleanup
+      if (process.platform !== "win32") {
+        chmodSync(projectConfigDir, 0o755)
+      }
+    }
+
+    // then - should still load the config from legacy path
+    expect(config.agents?.oracle?.model).toBe("openai/gpt-5.4")
   })
 
   it("should load migrated legacy project config on the first load", () => {

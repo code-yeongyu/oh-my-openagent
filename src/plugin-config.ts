@@ -175,7 +175,7 @@ export function loadPluginConfig(
   let userConfigPath =
     userDetected.format !== "none"
       ? userDetected.path
-      : path.join(configDir, "oh-my-opencode.json");
+      : path.join(configDir, `${CONFIG_BASENAME}.json`);
 
   if (userDetected.legacyPath) {
     log("Canonical plugin config detected alongside legacy config. Remove the legacy file to avoid confusion.", {
@@ -186,11 +186,16 @@ export function loadPluginConfig(
 
   // Auto-copy legacy config file to canonical name if needed
   if (userDetected.format !== "none" && path.basename(userDetected.path).startsWith(LEGACY_CONFIG_BASENAME)) {
-    migrateLegacyConfigFile(userDetected.path);
-    userConfigPath = path.join(
+    const migrated = migrateLegacyConfigFile(userDetected.path);
+    const canonicalPath = path.join(
       path.dirname(userDetected.path),
       `${CONFIG_BASENAME}${path.extname(userDetected.path)}`
     );
+    // Only switch to canonical path if migration succeeded OR canonical file already exists
+    if (migrated || fs.existsSync(canonicalPath)) {
+      userConfigPath = canonicalPath;
+    }
+    // Otherwise keep loading from the legacy path that was detected
   }
 
   // Project-level config path - prefer .jsonc over .json
@@ -199,7 +204,7 @@ export function loadPluginConfig(
   let projectConfigPath =
     projectDetected.format !== "none"
       ? projectDetected.path
-      : path.join(projectBasePath, "oh-my-opencode.json");
+      : path.join(projectBasePath, `${CONFIG_BASENAME}.json`);
 
   if (projectDetected.legacyPath) {
     log("Canonical plugin config detected alongside legacy config. Remove the legacy file to avoid confusion.", {
@@ -210,11 +215,16 @@ export function loadPluginConfig(
 
   // Auto-copy legacy project config file to canonical name if needed
   if (projectDetected.format !== "none" && path.basename(projectDetected.path).startsWith(LEGACY_CONFIG_BASENAME)) {
-    migrateLegacyConfigFile(projectDetected.path);
-    projectConfigPath = path.join(
+    const projectMigrated = migrateLegacyConfigFile(projectDetected.path);
+    const canonicalProjectPath = path.join(
       path.dirname(projectDetected.path),
       `${CONFIG_BASENAME}${path.extname(projectDetected.path)}`
     );
+    // Only switch to canonical path if migration succeeded OR canonical file already exists
+    if (projectMigrated || fs.existsSync(canonicalProjectPath)) {
+      projectConfigPath = canonicalProjectPath;
+    }
+    // Otherwise keep loading from the legacy path that was detected
   }
 
   // Load user config first (base). Parse empty config through Zod to apply field defaults.
