@@ -31,6 +31,19 @@ export function readBoulderState(directory: string): BoulderState | null {
     if (!Array.isArray(parsed.session_ids)) {
       parsed.session_ids = []
     }
+    if (!parsed.session_origins || typeof parsed.session_origins !== "object" || Array.isArray(parsed.session_origins)) {
+      parsed.session_origins = {}
+    }
+    if (parsed.session_ids.length === 1) {
+      const soleSessionId = parsed.session_ids[0]
+      if (
+        typeof soleSessionId === "string"
+        && parsed.session_origins[soleSessionId] !== "appended"
+        && parsed.session_origins[soleSessionId] !== "direct"
+      ) {
+        parsed.session_origins[soleSessionId] = "direct"
+      }
+    }
     if (!parsed.task_sessions || typeof parsed.task_sessions !== "object" || Array.isArray(parsed.task_sessions)) {
       parsed.task_sessions = {}
     }
@@ -56,21 +69,39 @@ export function writeBoulderState(directory: string, state: BoulderState): boole
   }
 }
 
-export function appendSessionId(directory: string, sessionId: string): BoulderState | null {
+export function appendSessionId(
+  directory: string,
+  sessionId: string,
+  origin: "direct" | "appended" = "direct",
+): BoulderState | null {
   const state = readBoulderState(directory)
   if (!state) return null
+
+  if (!state.session_origins || typeof state.session_origins !== "object" || Array.isArray(state.session_origins)) {
+    state.session_origins = {}
+  }
 
   if (!state.session_ids?.includes(sessionId)) {
     if (!Array.isArray(state.session_ids)) {
       state.session_ids = []
     }
     const originalSessionIds = [...state.session_ids]
+    const originalSessionOrigins = { ...state.session_origins }
     state.session_ids.push(sessionId)
+    state.session_origins[sessionId] = origin
     if (writeBoulderState(directory, state)) {
       return state
     }
     state.session_ids = originalSessionIds
+    state.session_origins = originalSessionOrigins
     return null
+  }
+
+  if (!state.session_origins[sessionId]) {
+    state.session_origins[sessionId] = origin
+    if (!writeBoulderState(directory, state)) {
+      return null
+    }
   }
 
   return state
@@ -213,6 +244,9 @@ export function createBoulderState(
     active_plan: planPath,
     started_at: new Date().toISOString(),
     session_ids: [sessionId],
+    session_origins: {
+      [sessionId]: "direct",
+    },
     plan_name: getPlanName(planPath),
     ...(agent !== undefined ? { agent } : {}),
     ...(worktreePath !== undefined ? { worktree_path: worktreePath } : {}),
