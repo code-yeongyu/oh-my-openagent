@@ -149,6 +149,28 @@ describe("model-error-classifier", () => {
     //#then
     expect(result).toBe(false)
   })
+
+  test("treats 'bad request' message as retryable (GitHub Copilot rolling update)", () => {
+    //#given
+    const error = { message: "400 Bad Request" }
+
+    //#when
+    const result = shouldRetryError(error)
+
+    //#then
+    expect(result).toBe(true)
+  })
+
+  test("treats 'bad request' lowercase as retryable", () => {
+    //#given
+    const error = { message: "bad request: model temporarily unavailable" }
+
+    //#when
+    const result = shouldRetryError(error)
+
+    //#then
+    expect(result).toBe(true)
+  })
 })
 
 export {}

@@ -52,6 +52,7 @@ const RETRYABLE_MESSAGE_PATTERNS = [
   "over limit",
   "overloaded",
   "bad gateway",
+  "bad request",
   "unknown provider",
   "provider not found",
   "model_not_supported",
