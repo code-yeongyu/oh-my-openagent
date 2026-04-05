@@ -16,7 +16,7 @@ function createTemporaryDirectory(prefix: string): string {
 
 describe("discoverInstalledPlugins", () => {
   beforeEach(() => {
-    // Mock logger to avoid noise in test output
+    // Mock logger to avoid noise in test output and force process isolation in CI
     mock.module("../../shared/logger", () => ({
       log: () => {},
     }))
@@ -42,7 +42,9 @@ describe("discoverInstalledPlugins", () => {
   it("preserves scoped package name from npm plugin keys", () => {
     //#given
     const pluginsHome = process.env.CLAUDE_PLUGINS_HOME as string
-    const installPath = join(createTemporaryDirectory("omo-plugin-install-"), "@myorg", "my-plugin")
+    // Use unique temp directory with scoped path to prevent cross-test contamination
+    const installPathBase = createTemporaryDirectory("omo-scoped-plugin-")
+    const installPath = join(installPathBase, "@myorg", "my-plugin")
     mkdirSync(installPath, { recursive: true })
 
     const databasePath = join(pluginsHome, "installed_plugins.json")
@@ -77,8 +79,8 @@ describe("discoverInstalledPlugins", () => {
   it("derives package name from file URL plugin keys", () => {
     //#given
     const pluginsHome = process.env.CLAUDE_PLUGINS_HOME as string
-    const installPath = join(createTemporaryDirectory("omo-plugin-install-"), "oh-my-opencode")
-    mkdirSync(installPath, { recursive: true })
+    // Use unique temp directory directly to prevent cross-test contamination
+    const installPath = createTemporaryDirectory("omo-fileurl-plugin-")
 
     const databasePath = join(pluginsHome, "installed_plugins.json")
     writeFileSync(
@@ -112,8 +114,8 @@ describe("discoverInstalledPlugins", () => {
   it("derives canonical package name from npm plugin keys", () => {
     //#given
     const pluginsHome = process.env.CLAUDE_PLUGINS_HOME as string
-    const installPath = join(createTemporaryDirectory("omo-plugin-install-"), "oh-my-openagent")
-    mkdirSync(installPath, { recursive: true })
+    // Use unique temp directory directly to prevent cross-test contamination
+    const installPath = createTemporaryDirectory("omo-npm-plugin-")
 
     const databasePath = join(pluginsHome, "installed_plugins.json")
     writeFileSync(
