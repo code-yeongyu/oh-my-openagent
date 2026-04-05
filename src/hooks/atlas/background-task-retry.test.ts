@@ -339,6 +339,69 @@ describe("atlas background task retry", () => {
     expect(promptAsyncMock).toHaveBeenCalledTimes(1)
   })
 
+  test("#given a persisted descendant becomes ineligible before retry fires #when retry runs #then atlas re-checks descendant eligibility and does not inject", async () => {
+    // given
+    const descendantSessionID = "ses_descendant_retry_mismatch"
+    const planPath = join(testDir, "test-plan.md")
+    writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
+    writeBoulderState(testDir, {
+      active_plan: planPath,
+      started_at: "2026-01-02T10:00:00Z",
+      session_ids: [sessionID, descendantSessionID],
+      session_origins: {
+        [sessionID]: "direct",
+        [descendantSessionID]: "appended",
+      },
+      plan_name: "test-plan",
+      agent: "atlas",
+    })
+
+    let backgroundRunning = true
+    let descendantAgent = "atlas"
+    const promptAsyncMock = mock(async () => ({}))
+    const hook = createAtlasHook({
+      directory: testDir,
+      client: {
+        session: {
+          get: async ({ path }: { path: { id: string } }) => ({
+            data: {
+              id: path.id,
+              parentID: path.id === descendantSessionID ? sessionID : undefined,
+            },
+          }),
+          promptAsync: promptAsyncMock,
+          messages: async ({ path }: { path: { id: string } }) => ({
+            data: path.id === descendantSessionID
+              ? [{ info: { agent: descendantAgent, providerID: "openai", modelID: "gpt-5.4" } }]
+              : [],
+          }),
+        },
+      },
+    } as unknown as PluginInput, {
+      directory: testDir,
+      backgroundManager: {
+        getTasksByParentSession: (currentSessionID: string) => {
+          if (currentSessionID !== descendantSessionID) {
+            return []
+          }
+          return backgroundRunning ? [{ status: "running" }] : []
+        },
+      } as unknown as NonNullable<Parameters<typeof createAtlasHook>[1]>["backgroundManager"] & {
+        getTasksByParentSession: (sessionID: string) => Array<{ status: string }>
+      },
+    })
+
+    // when
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID: descendantSessionID } } })
+    expect(capturedTimers.size).toBe(1)
+    descendantAgent = "sisyphus-junior"
+    backgroundRunning = false
+    await firePendingTimers()
+
+    // then
+    expect(promptAsyncMock).toHaveBeenCalledTimes(0)
+  })
+
   test("#given continuation injection is already in flight #when another idle event arrives #then atlas does not inject twice", async () => {
     // given
     const planPath = join(testDir, "test-plan.md")

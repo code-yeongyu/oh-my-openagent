@@ -109,17 +109,7 @@ export function createToolExecuteAfterHandler(input: {
           : null
         const sessionState = toolInput.sessionID ? getState(toolInput.sessionID) : undefined
 
-        if (toolInput.sessionID && !boulderState.session_ids?.includes(toolInput.sessionID)) {
-          appendSessionId(ctx.directory, toolInput.sessionID)
-          log(`[${HOOK_NAME}] Appended session to boulder`, {
-            sessionID: toolInput.sessionID,
-            plan: boulderState.plan_name,
-          })
-        }
-
-        const lineageSessionIDs = toolInput.sessionID && !boulderState.session_ids.includes(toolInput.sessionID)
-          ? [...boulderState.session_ids, toolInput.sessionID]
-          : boulderState.session_ids
+        const lineageSessionIDs = boulderState.session_ids
         const subagentSessionId = await validateSubagentSessionId({
           client: ctx.client,
           sessionID: extractedSessionId,
