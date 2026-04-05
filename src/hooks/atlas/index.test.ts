@@ -1804,7 +1804,7 @@ session_id: ses_untrusted_999
        // then - should call prompt for sisyphus
        expect(mockInput._promptMock).toHaveBeenCalled()
        const callArgs = mockInput._promptMock.mock.calls[0][0]
-       expect(callArgs.body.agent).toBe("Sisyphus (Ultraworker)")
+       expect(callArgs.body.agent).toBe("sisyphus")
      })
 
     test("should preserve display-name agent in continuation prompt when boulder agent uses display form", async () => {
