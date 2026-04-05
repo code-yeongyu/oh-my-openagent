@@ -1,6 +1,6 @@
-# src/tools/ - 26 Tools Across 15 Directories
+# src/tools/ - 26 Tools Across 16 Directories
 
-**Generated:** 2026-03-06
+**Generated:** 2026-04-05
 
 ## OVERVIEW
 
@@ -98,7 +98,7 @@
 | quick | gpt-5.4-mini | Trivial tasks |
 | unspecified-low | claude-sonnet-4-6 | Moderate effort |
 | unspecified-high | claude-opus-4-6 max | High effort |
-| writing | kimi-k2p5 | Documentation |
+| writing | gemini-3-flash | Documentation |
 
 ## HOW TO ADD A TOOL
 
