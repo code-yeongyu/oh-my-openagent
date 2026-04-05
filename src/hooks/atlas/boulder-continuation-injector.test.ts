@@ -14,7 +14,7 @@ describe("injectBoulderContinuation", () => {
     _resetForTesting()
   })
 
-  test("normalizes config-key agent to display-name for promptAsync", async () => {
+  test("uses raw agent key for promptAsync to avoid HTTP header issues", async () => {
     // given
     registerAgentName("atlas")
     const promptAsyncMock = mock(async (_request: unknown) => undefined)
@@ -41,13 +41,19 @@ describe("injectBoulderContinuation", () => {
       sessionState: { promptFailureCount: 0 },
     })
 
+<<<<<<< HEAD
     // then
     expect(result).toBe("injected")
+||||||| parent of 1b39490a (fix(atlas): use raw agent key instead of display name for API calls (#3138))
+    // then
+=======
+    // then - uses raw agent key, not display name (to avoid HTTP header validation issues)
+>>>>>>> 1b39490a (fix(atlas): use raw agent key instead of display name for API calls (#3138))
     expect(promptAsyncMock).toHaveBeenCalledTimes(1)
     expect(promptAsyncMock).toHaveBeenCalledWith(
       expect.objectContaining({
         body: expect.objectContaining({
-          agent: "Atlas (Plan Executor)",
+          agent: "atlas",
         }),
       }),
     )
