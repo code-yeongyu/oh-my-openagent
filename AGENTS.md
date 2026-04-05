@@ -155,7 +155,7 @@ MatrixxPlugin(ctx)
 | Add hook | `src/hooks/` | Create dir, register in `src/plugin/hooks/create-*-hooks.ts` |
 | Add tool | `src/tools/` | Dir with index/types/constants/tools.ts |
 | Add MCP | `src/mcp/` | Create config, add to `createBuiltinMcps()` |
-| Add skill | `src/features/builtin-skills/` | Create .ts in skills/ |
+| Add skill | `src/features/builtin-skills/` | Create .ts in skills/, export from skills/index.ts, add to createBuiltinSkills() in skills.ts |
 | Add command | `src/features/builtin-commands/` | Add template + register in commands.ts |
 | Config schema | `src/config/schema/` | 21 schema component files, run `bun run build:schema` |
 | Plugin config | `src/plugin-handlers/config-handler.ts` | JSONC loading, merging, migration |
@@ -315,7 +315,8 @@ Three-tier system:
 ## NOTES
 
 - **OpenCode**: Requires >= 1.0.150
-- **1069 TypeScript files**, 176 test files, 117k+ lines
+- **1070 TypeScript files**, 176 test files, 117k+ lines
+- **Built-in skills**: 40 total — includes `tdd-enforcer` (TDD enforcement, RED-GREEN-REFACTOR, bun test conventions)
 - **Flaky tests**: matrix-loop (CI timeout), session-state (parallel pollution)
 - **Trusted deps**: @ast-grep/cli, @ast-grep/napi, @code-yeongyu/comment-checker
 - **No linter/formatter**: No ESLint, Prettier, or Biome configured
