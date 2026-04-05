@@ -185,8 +185,8 @@ describe("getAgentListDisplayName", () => {
     expect(getAgentListDisplayName("sisyphus")).toBe("Sisyphus (Ultraworker)")
   })
 
-  it("applies invisible atlas sort prefix for list display", () => {
-    expect(getAgentListDisplayName("atlas")).toBe("\u200BAtlas (Plan Executor)")
+  it("returns atlas display name without sort prefix", () => {
+    expect(getAgentListDisplayName("atlas")).toBe("Atlas (Plan Executor)")
   })
 })
 
