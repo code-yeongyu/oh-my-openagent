@@ -84,7 +84,51 @@ describe("model-error-classifier", () => {
     expect(provider).toBe("provider-x")
   })
 
-  test("treats FreeUsageLimitError (PascalCase name) as retryable by name", () => {
+  test("treats QuotaExceededError (PascalCase name) as non-retryable STOP error", () => {
+    //#given
+    const error = { name: "QuotaExceededError" }
+
+    //#when
+    const result = shouldRetryError(error)
+
+    //#then
+    expect(result).toBe(false)
+  })
+
+  test("treats quotaexceedederror (lowercase name) as non-retryable STOP error", () => {
+    //#given
+    const error = { name: "quotaexceedederror" }
+
+    //#when
+    const result = shouldRetryError(error)
+
+    //#then
+    expect(result).toBe(false)
+  })
+
+  test("treats InsufficientCreditsError (PascalCase name) as non-retryable STOP error", () => {
+    //#given
+    const error = { name: "InsufficientCreditsError" }
+
+    //#when
+    const result = shouldRetryError(error)
+
+    //#then
+    expect(result).toBe(false)
+  })
+
+  test("treats insufficientcreditserror (lowercase name) as non-retryable STOP error", () => {
+    //#given
+    const error = { name: "insufficientcreditserror" }
+
+    //#when
+    const result = shouldRetryError(error)
+
+    //#then
+    expect(result).toBe(false)
+  })
+
+  test("treats FreeUsageLimitError (PascalCase name) as non-retryable STOP error", () => {
     //#given
     const error = { name: "FreeUsageLimitError" }
 
@@ -92,10 +136,10 @@ describe("model-error-classifier", () => {
     const result = shouldRetryError(error)
 
     //#then
-    expect(result).toBe(true)
+    expect(result).toBe(false)
   })
 
-  test("treats freeusagelimiterror (lowercase name) as retryable by name", () => {
+  test("treats freeusagelimiterror (lowercase name) as non-retryable STOP error", () => {
     //#given
     const error = { name: "freeusagelimiterror" }
 
@@ -103,7 +147,7 @@ describe("model-error-classifier", () => {
     const result = shouldRetryError(error)
 
     //#then
-    expect(result).toBe(true)
+    expect(result).toBe(false)
   })
 })
 
