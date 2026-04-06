@@ -1510,7 +1510,7 @@ export class BackgroundManager {
         SessionCategoryRegistry.remove(task.sessionID)
       }
       log("[background-agent] Removed completed task from memory:", taskId)
-    }, TASK_CLEANUP_DELAY_MS)
+    }, this.config?.taskCleanupDelayMs ?? TASK_CLEANUP_DELAY_MS)
 
     this.completionTimers.set(taskId, timer)
   }
