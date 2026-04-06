@@ -47,12 +47,18 @@ function attachFallbackModels<T extends AgentConfig | CategoryConfig>(
       .filter((provider) => isProviderAvailable(provider, availability))
       .map((provider) => toFallbackModelObject(entry, provider))
   )
-  const primaryIndex = expandedFallbacks.findIndex((entry) => entry.model === config.model)
+  const uniqueFallbacks = expandedFallbacks.filter((entry, index, allEntries) =>
+    allEntries.findIndex((candidate) =>
+      candidate.model === entry.model &&
+      candidate.variant === entry.variant
+    ) === index
+  )
+  const primaryIndex = uniqueFallbacks.findIndex((entry) => entry.model === config.model)
   if (primaryIndex === -1) {
     return config
   }
 
-  const fallbackModels = expandedFallbacks.slice(primaryIndex + 1)
+  const fallbackModels = uniqueFallbacks.slice(primaryIndex + 1)
   if (fallbackModels.length === 0) {
     return config
   }
