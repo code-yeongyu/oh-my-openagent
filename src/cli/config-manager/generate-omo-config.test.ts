@@ -98,6 +98,41 @@ describe("generateOmoConfig - model fallback system", () => {
     expect((result.agents as Record<string, { model: string }>)['multimodal-looker'].model).toBe("openai/gpt-5.4")
   })
 
+  test("adds fallback_models when multiple providers are available", () => {
+    //#given
+    const config: InstallConfig = {
+      hasClaude: true,
+      isMax20: false,
+      hasOpenAI: true,
+      hasGemini: false,
+      hasCopilot: false,
+      hasOpencodeZen: false,
+      hasZaiCodingPlan: false,
+      hasKimiForCoding: false,
+      hasOpencodeGo: false,
+    }
+
+    //#when
+    const result = generateOmoConfig(config)
+    const agents = result.agents as Record<string, {
+      model: string
+      variant?: string
+      fallback_models?: Array<{ model: string; variant?: string }>
+    }>
+    const categories = result.categories as Record<string, {
+      model: string
+      variant?: string
+      fallback_models?: Array<{ model: string; variant?: string }>
+    }>
+
+    //#then
+    expect(agents.sisyphus.model).toBe("anthropic/claude-opus-4-6")
+    expect(agents.sisyphus.fallback_models?.map((entry) => entry.model)).toContain("openai/gpt-5.4")
+    expect(agents.sisyphus.fallback_models?.find((entry) => entry.model === "openai/gpt-5.4")?.variant).toBe("medium")
+    expect(categories.deep.model).toBe("openai/gpt-5.4")
+    expect(categories.deep.fallback_models?.map((entry) => entry.model)).toContain("anthropic/claude-opus-4-6")
+  })
+
   test("uses haiku for explore when Claude max20", () => {
     //#given
     const config: InstallConfig = {
