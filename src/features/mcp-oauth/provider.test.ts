@@ -1,6 +1,7 @@
-import { describe, expect, it, beforeEach, afterEach, mock, afterAll } from "bun:test"
+import { describe, expect, it, beforeEach, afterEach, mock } from "bun:test"
 import { createHash, randomBytes } from "node:crypto"
 import type { OAuthTokenData } from "./storage"
+import { resetDiscoveryCache } from "./discovery"
 
 type ProviderModule = typeof import("./provider")
 
@@ -233,6 +234,7 @@ describe("McpOAuthProvider", () => {
     beforeEach(() => {
       originalFetch = globalThis.fetch
       originalEnv = process.env.OPENCODE_CONFIG_DIR
+      resetDiscoveryCache()
       const { mkdirSync } = require("node:fs")
       const { tmpdir } = require("node:os")
       const { join } = require("node:path")
@@ -248,6 +250,7 @@ describe("McpOAuthProvider", () => {
       } else {
         process.env.OPENCODE_CONFIG_DIR = originalEnv
       }
+      resetDiscoveryCache()
     })
 
     it("exchanges refresh token and preserves it when the response omits a new one", async () => {

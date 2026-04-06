@@ -51,14 +51,14 @@ describe("detectCompletionInSessionMessages negative cases", () => {
 	})
 
 	describe("#given promise appears outside assistant text parts", () => {
-		test("#when VERIFIED appears only in tool_result part #then should NOT detect completion", async () => {
-			// #given
+		test("#when VERIFIED appears only in non-oracle tool_result part #then should NOT detect completion", async () => {
+			// #given -- oracle tool_result VERIFIED is detectable (56f2a9df); non-oracle is not
 			const messages = [
 				{
 					info: { role: "assistant" },
 					parts: [
-						{ type: "tool_result", text: 'Task completed.\n\nAgent: oracle\n\n<promise>VERIFIED</promise>' },
-						{ type: "text", text: "Oracle verified the task." },
+						{ type: "tool_result", text: 'Task completed.\n\nAgent: hephaestus\n\n<promise>VERIFIED</promise>' },
+						{ type: "text", text: "Hephaestus completed the task." },
 					],
 				},
 			]
