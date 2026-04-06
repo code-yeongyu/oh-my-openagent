@@ -1,8 +1,5 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json",
-  "title": "Oh My OpenCode Configuration",
-  "description": "Configuration schema for oh-my-opencode plugin",
   "type": "object",
   "properties": {
     "$schema": {
@@ -263,6 +260,9 @@
             },
             "tools": {
               "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
               "additionalProperties": {
                 "type": "boolean"
               }
@@ -308,6 +308,9 @@
                     },
                     {
                       "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
                       "additionalProperties": {
                         "type": "string",
                         "enum": [
@@ -397,6 +400,9 @@
             },
             "providerOptions": {
               "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
               "additionalProperties": {}
             },
             "ultrawork": {
@@ -604,6 +610,9 @@
             },
             "tools": {
               "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
               "additionalProperties": {
                 "type": "boolean"
               }
@@ -649,6 +658,9 @@
                     },
                     {
                       "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
                       "additionalProperties": {
                         "type": "string",
                         "enum": [
@@ -738,6 +750,9 @@
             },
             "providerOptions": {
               "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
               "additionalProperties": {}
             },
             "ultrawork": {
@@ -945,6 +960,9 @@
             },
             "tools": {
               "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
               "additionalProperties": {
                 "type": "boolean"
               }
@@ -990,6 +1008,9 @@
                     },
                     {
                       "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
                       "additionalProperties": {
                         "type": "string",
                         "enum": [
@@ -1079,6 +1100,9 @@
             },
             "providerOptions": {
               "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
               "additionalProperties": {}
             },
             "ultrawork": {
@@ -1286,6 +1310,9 @@
             },
             "tools": {
               "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
               "additionalProperties": {
                 "type": "boolean"
               }
@@ -1331,6 +1358,9 @@
                     },
                     {
                       "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
                       "additionalProperties": {
                         "type": "string",
                         "enum": [
@@ -1420,6 +1450,9 @@
             },
             "providerOptions": {
               "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
               "additionalProperties": {}
             },
             "ultrawork": {
@@ -1630,6 +1663,9 @@
             },
             "tools": {
               "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
               "additionalProperties": {
                 "type": "boolean"
               }
@@ -1675,6 +1711,9 @@
                     },
                     {
                       "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
                       "additionalProperties": {
                         "type": "string",
                         "enum": [
@@ -1764,6 +1803,9 @@
             },
             "providerOptions": {
               "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
               "additionalProperties": {}
             },
             "ultrawork": {
@@ -1971,6 +2013,9 @@
             },
             "tools": {
               "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
               "additionalProperties": {
                 "type": "boolean"
               }
@@ -2016,6 +2061,9 @@
                     },
                     {
                       "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
                       "additionalProperties": {
                         "type": "string",
                         "enum": [
@@ -2105,6 +2153,9 @@
             },
             "providerOptions": {
               "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
               "additionalProperties": {}
             },
             "ultrawork": {
@@ -2312,6 +2363,9 @@
             },
             "tools": {
               "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
               "additionalProperties": {
                 "type": "boolean"
               }
@@ -2357,6 +2411,9 @@
                     },
                     {
                       "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
                       "additionalProperties": {
                         "type": "string",
                         "enum": [
@@ -2446,6 +2503,9 @@
             },
             "providerOptions": {
               "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
               "additionalProperties": {}
             },
             "ultrawork": {
@@ -2653,6 +2713,9 @@
             },
             "tools": {
               "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
               "additionalProperties": {
                 "type": "boolean"
               }
@@ -2698,6 +2761,9 @@
                     },
                     {
                       "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
                       "additionalProperties": {
                         "type": "string",
                         "enum": [
@@ -2787,6 +2853,9 @@
             },
             "providerOptions": {
               "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
               "additionalProperties": {}
             },
             "ultrawork": {
@@ -2994,6 +3063,9 @@
             },
             "tools": {
               "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
               "additionalProperties": {
                 "type": "boolean"
               }
@@ -3039,6 +3111,9 @@
                     },
                     {
                       "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
                       "additionalProperties": {
                         "type": "string",
                         "enum": [
@@ -3128,6 +3203,9 @@
             },
             "providerOptions": {
               "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
               "additionalProperties": {}
             },
             "ultrawork": {
@@ -3335,6 +3413,9 @@
             },
             "tools": {
               "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
               "additionalProperties": {
                 "type": "boolean"
               }
@@ -3380,6 +3461,9 @@
                     },
                     {
                       "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
                       "additionalProperties": {
                         "type": "string",
                         "enum": [
@@ -3469,6 +3553,9 @@
             },
             "providerOptions": {
               "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
               "additionalProperties": {}
             },
             "ultrawork": {
@@ -3676,6 +3763,9 @@
             },
             "tools": {
               "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
               "additionalProperties": {
                 "type": "boolean"
               }
@@ -3721,6 +3811,9 @@
                     },
                     {
                       "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
                       "additionalProperties": {
                         "type": "string",
                         "enum": [
@@ -3810,6 +3903,9 @@
             },
             "providerOptions": {
               "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
               "additionalProperties": {}
             },
             "ultrawork": {
@@ -4017,6 +4113,9 @@
             },
             "tools": {
               "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
               "additionalProperties": {
                 "type": "boolean"
               }
@@ -4062,6 +4161,9 @@
                     },
                     {
                       "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
                       "additionalProperties": {
                         "type": "string",
                         "enum": [
@@ -4151,6 +4253,9 @@
             },
             "providerOptions": {
               "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
               "additionalProperties": {}
             },
             "ultrawork": {
@@ -4358,6 +4463,9 @@
             },
             "tools": {
               "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
               "additionalProperties": {
                 "type": "boolean"
               }
@@ -4403,6 +4511,9 @@
                     },
                     {
                       "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
                       "additionalProperties": {
                         "type": "string",
                         "enum": [
@@ -4492,6 +4603,9 @@
             },
             "providerOptions": {
               "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
               "additionalProperties": {}
             },
             "ultrawork": {
@@ -4699,6 +4813,9 @@
             },
             "tools": {
               "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
               "additionalProperties": {
                 "type": "boolean"
               }
@@ -4744,6 +4861,9 @@
                     },
                     {
                       "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
                       "additionalProperties": {
                         "type": "string",
                         "enum": [
@@ -4833,6 +4953,9 @@
             },
             "providerOptions": {
               "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
               "additionalProperties": {}
             },
             "ultrawork": {
@@ -4867,6 +4990,9 @@
     },
     "categories": {
       "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
       "additionalProperties": {
         "type": "object",
         "properties": {
@@ -5074,6 +5200,9 @@
           },
           "tools": {
             "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
             "additionalProperties": {
               "type": "boolean"
             }
@@ -5083,7 +5212,8 @@
           },
           "max_prompt_tokens": {
             "type": "integer",
-            "exclusiveMinimum": 0
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
           },
           "is_unstable_agent": {
             "type": "boolean"
@@ -5118,6 +5248,9 @@
         },
         "plugins_override": {
           "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
           "additionalProperties": {
             "type": "boolean"
           }
@@ -5141,8 +5274,8 @@
           "type": "boolean"
         },
         "tdd": {
-          "type": "boolean",
-          "default": true
+          "default": true,
+          "type": "boolean"
         }
       },
       "additionalProperties": false
@@ -5175,39 +5308,39 @@
           "type": "object",
           "properties": {
             "enabled": {
-              "type": "boolean",
-              "default": false
+              "default": false,
+              "type": "boolean"
             },
             "notification": {
+              "default": "detailed",
               "type": "string",
               "enum": [
                 "off",
                 "minimal",
                 "detailed"
-              ],
-              "default": "detailed"
+              ]
             },
             "turn_protection": {
               "type": "object",
               "properties": {
                 "enabled": {
-                  "type": "boolean",
-                  "default": true
+                  "default": true,
+                  "type": "boolean"
                 },
                 "turns": {
+                  "default": 3,
                   "type": "number",
                   "minimum": 1,
-                  "maximum": 10,
-                  "default": 3
+                  "maximum": 10
                 }
               },
+              "required": [
+                "enabled",
+                "turns"
+              ],
               "additionalProperties": false
             },
             "protected_tools": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
               "default": [
                 "task",
                 "todowrite",
@@ -5216,7 +5349,11 @@
                 "session_read",
                 "session_write",
                 "session_search"
-              ]
+              ],
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             },
             "strategies": {
               "type": "object",
@@ -5225,46 +5362,62 @@
                   "type": "object",
                   "properties": {
                     "enabled": {
-                      "type": "boolean",
-                      "default": true
+                      "default": true,
+                      "type": "boolean"
                     }
                   },
+                  "required": [
+                    "enabled"
+                  ],
                   "additionalProperties": false
                 },
                 "supersede_writes": {
                   "type": "object",
                   "properties": {
                     "enabled": {
-                      "type": "boolean",
-                      "default": true
+                      "default": true,
+                      "type": "boolean"
                     },
                     "aggressive": {
-                      "type": "boolean",
-                      "default": false
+                      "default": false,
+                      "type": "boolean"
                     }
                   },
+                  "required": [
+                    "enabled",
+                    "aggressive"
+                  ],
                   "additionalProperties": false
                 },
                 "purge_errors": {
                   "type": "object",
                   "properties": {
                     "enabled": {
-                      "type": "boolean",
-                      "default": true
+                      "default": true,
+                      "type": "boolean"
                     },
                     "turns": {
+                      "default": 5,
                       "type": "number",
                       "minimum": 1,
-                      "maximum": 20,
-                      "default": 5
+                      "maximum": 20
                     }
                   },
+                  "required": [
+                    "enabled",
+                    "turns"
+                  ],
                   "additionalProperties": false
                 }
               },
               "additionalProperties": false
             }
           },
+          "required": [
+            "enabled",
+            "notification",
+            "protected_tools"
+          ],
           "additionalProperties": false
         },
         "task_system": {
@@ -5288,7 +5441,8 @@
         },
         "max_tools": {
           "type": "integer",
-          "minimum": 1
+          "minimum": 1,
+          "maximum": 9007199254740991
         }
       },
       "additionalProperties": false
@@ -5385,6 +5539,9 @@
                   },
                   "metadata": {
                     "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
                     "additionalProperties": {}
                   },
                   "allowed-tools": {
@@ -5408,27 +5565,32 @@
       "type": "object",
       "properties": {
         "enabled": {
-          "type": "boolean",
-          "default": false
+          "default": false,
+          "type": "boolean"
         },
         "default_max_iterations": {
+          "default": 100,
           "type": "number",
           "minimum": 1,
-          "maximum": 1000,
-          "default": 100
+          "maximum": 1000
         },
         "state_dir": {
           "type": "string"
         },
         "default_strategy": {
+          "default": "continue",
           "type": "string",
           "enum": [
             "reset",
             "continue"
-          ],
-          "default": "continue"
+          ]
         }
       },
+      "required": [
+        "enabled",
+        "default_max_iterations",
+        "default_strategy"
+      ],
       "additionalProperties": false
     },
     "runtime_fallback": {
@@ -5478,6 +5640,9 @@
         },
         "providerConcurrency": {
           "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
           "additionalProperties": {
             "type": "number",
             "minimum": 0
@@ -5485,6 +5650,9 @@
         },
         "modelConcurrency": {
           "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
           "additionalProperties": {
             "type": "number",
             "minimum": 0
@@ -5492,11 +5660,13 @@
         },
         "maxDepth": {
           "type": "integer",
-          "minimum": 1
+          "minimum": 1,
+          "maximum": 9007199254740991
         },
         "maxDescendants": {
           "type": "integer",
-          "minimum": 1
+          "minimum": 1,
+          "maximum": 9007199254740991
         },
         "staleTimeoutMs": {
           "type": "number",
@@ -5520,7 +5690,8 @@
         },
         "maxToolCalls": {
           "type": "integer",
-          "minimum": 10
+          "minimum": 10,
+          "maximum": 9007199254740991
         },
         "circuitBreaker": {
           "type": "object",
@@ -5530,11 +5701,13 @@
             },
             "maxToolCalls": {
               "type": "integer",
-              "minimum": 10
+              "minimum": 10,
+              "maximum": 9007199254740991
             },
             "consecutiveThreshold": {
               "type": "integer",
-              "minimum": 5
+              "minimum": 5,
+              "maximum": 9007199254740991
             }
           },
           "additionalProperties": false
@@ -5562,7 +5735,8 @@
         },
         "refresh_timeout_ms": {
           "type": "integer",
-          "exclusiveMinimum": 0
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
         },
         "source_url": {
           "type": "string",
@@ -5575,31 +5749,38 @@
       "type": "object",
       "properties": {
         "enabled": {
-          "type": "boolean",
-          "default": false
+          "default": false,
+          "type": "boolean"
         },
         "gateways": {
+          "default": {},
           "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
           "additionalProperties": {
             "type": "object",
             "properties": {
               "type": {
+                "default": "http",
                 "type": "string",
                 "enum": [
                   "http",
                   "command"
-                ],
-                "default": "http"
+                ]
               },
               "url": {
                 "type": "string"
               },
               "method": {
-                "type": "string",
-                "default": "POST"
+                "default": "POST",
+                "type": "string"
               },
               "headers": {
                 "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
                 "additionalProperties": {
                   "type": "string"
                 }
@@ -5611,18 +5792,25 @@
                 "type": "number"
               }
             },
+            "required": [
+              "type",
+              "method"
+            ],
             "additionalProperties": false
-          },
-          "default": {}
+          }
         },
         "hooks": {
+          "default": {},
           "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
           "additionalProperties": {
             "type": "object",
             "properties": {
               "enabled": {
-                "type": "boolean",
-                "default": true
+                "default": true,
+                "type": "boolean"
               },
               "gateway": {
                 "type": "string"
@@ -5632,12 +5820,12 @@
               }
             },
             "required": [
+              "enabled",
               "gateway",
               "instruction"
             ],
             "additionalProperties": false
-          },
-          "default": {}
+          }
         },
         "replyListener": {
           "type": "object",
@@ -5652,11 +5840,11 @@
               "type": "string"
             },
             "authorizedDiscordUserIds": {
+              "default": [],
               "type": "array",
               "items": {
                 "type": "string"
-              },
-              "default": []
+              }
             },
             "telegramBotToken": {
               "type": "string"
@@ -5665,77 +5853,104 @@
               "type": "string"
             },
             "pollIntervalMs": {
-              "type": "number",
-              "default": 3000
+              "default": 3000,
+              "type": "number"
             },
             "rateLimitPerMinute": {
-              "type": "number",
-              "default": 10
+              "default": 10,
+              "type": "number"
             },
             "maxMessageLength": {
-              "type": "number",
-              "default": 500
+              "default": 500,
+              "type": "number"
             },
             "includePrefix": {
-              "type": "boolean",
-              "default": true
+              "default": true,
+              "type": "boolean"
             }
           },
+          "required": [
+            "authorizedDiscordUserIds",
+            "pollIntervalMs",
+            "rateLimitPerMinute",
+            "maxMessageLength",
+            "includePrefix"
+          ],
           "additionalProperties": false
         }
       },
+      "required": [
+        "enabled",
+        "gateways",
+        "hooks"
+      ],
       "additionalProperties": false
     },
     "babysitting": {
       "type": "object",
       "properties": {
         "timeout_ms": {
-          "type": "number",
-          "default": 120000
+          "default": 120000,
+          "type": "number"
         }
       },
+      "required": [
+        "timeout_ms"
+      ],
       "additionalProperties": false
     },
     "git_master": {
-      "type": "object",
-      "properties": {
-        "commit_footer": {
-          "type": [
-            "boolean",
-            "string"
-          ],
-          "default": true
-        },
-        "include_co_authored_by": {
-          "type": "boolean",
-          "default": true
-        },
-        "git_env_prefix": {
-          "type": "string",
-          "default": "GIT_MASTER=1"
-        }
-      },
-      "additionalProperties": false,
       "default": {
         "commit_footer": true,
         "include_co_authored_by": true,
         "git_env_prefix": "GIT_MASTER=1"
-      }
+      },
+      "type": "object",
+      "properties": {
+        "commit_footer": {
+          "default": true,
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "string"
+            }
+          ]
+        },
+        "include_co_authored_by": {
+          "default": true,
+          "type": "boolean"
+        },
+        "git_env_prefix": {
+          "default": "GIT_MASTER=1",
+          "type": "string"
+        }
+      },
+      "required": [
+        "commit_footer",
+        "include_co_authored_by",
+        "git_env_prefix"
+      ],
+      "additionalProperties": false
     },
     "browser_automation_engine": {
       "type": "object",
       "properties": {
         "provider": {
+          "default": "playwright",
           "type": "string",
           "enum": [
             "playwright",
             "agent-browser",
             "dev-browser",
             "playwright-cli"
-          ],
-          "default": "playwright"
+          ]
         }
       },
+      "required": [
+        "provider"
+      ],
       "additionalProperties": false
     },
     "websearch": {
@@ -5755,10 +5970,11 @@
       "type": "object",
       "properties": {
         "enabled": {
-          "type": "boolean",
-          "default": false
+          "default": false,
+          "type": "boolean"
         },
         "layout": {
+          "default": "main-vertical",
           "type": "string",
           "enum": [
             "main-horizontal",
@@ -5766,35 +5982,42 @@
             "tiled",
             "even-horizontal",
             "even-vertical"
-          ],
-          "default": "main-vertical"
+          ]
         },
         "main_pane_size": {
+          "default": 60,
           "type": "number",
           "minimum": 20,
-          "maximum": 80,
-          "default": 60
+          "maximum": 80
         },
         "main_pane_min_width": {
+          "default": 120,
           "type": "number",
-          "minimum": 40,
-          "default": 120
+          "minimum": 40
         },
         "agent_pane_min_width": {
+          "default": 40,
           "type": "number",
-          "minimum": 20,
-          "default": 40
+          "minimum": 20
         },
         "isolation": {
+          "default": "inline",
           "type": "string",
           "enum": [
             "inline",
             "window",
             "session"
-          ],
-          "default": "inline"
+          ]
         }
       },
+      "required": [
+        "enabled",
+        "layout",
+        "main_pane_size",
+        "main_pane_min_width",
+        "agent_pane_min_width",
+        "isolation"
+      ],
       "additionalProperties": false
     },
     "sisyphus": {
@@ -5810,10 +6033,13 @@
               "type": "string"
             },
             "claude_code_compat": {
-              "type": "boolean",
-              "default": false
+              "default": false,
+              "type": "boolean"
             }
           },
+          "required": [
+            "claude_code_compat"
+          ],
           "additionalProperties": false
         }
       },
@@ -5823,10 +6049,13 @@
       "type": "object",
       "properties": {
         "auto_commit": {
-          "type": "boolean",
-          "default": true
+          "default": true,
+          "type": "boolean"
         }
       },
+      "required": [
+        "auto_commit"
+      ],
       "additionalProperties": false
     },
     "_migrations": {
@@ -5836,5 +6065,11 @@
       }
     }
   },
-  "additionalProperties": false
+  "required": [
+    "git_master"
+  ],
+  "additionalProperties": false,
+  "$id": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json",
+  "title": "Oh My OpenCode Configuration",
+  "description": "Configuration schema for oh-my-opencode plugin"
 }
