@@ -1147,6 +1147,12 @@ The fallback retry session is now created and can be inspected directly.
     return result
   }
 
+  hasPendingParentNotificationWork(sessionID: string): boolean {
+    const hasQueuedNotification = this.notificationQueueByParent.has(sessionID)
+    const hasBufferedNotification = (this.pendingNotifications.get(sessionID)?.length ?? 0) > 0
+    return hasQueuedNotification || hasBufferedNotification
+  }
+
   findBySession(sessionID: string): BackgroundTask | undefined {
     for (const task of this.tasks.values()) {
       if (task.sessionId === sessionID) {

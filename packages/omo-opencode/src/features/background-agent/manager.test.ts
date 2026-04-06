@@ -281,6 +281,10 @@ function getDispatchedParentWakes(manager: BackgroundManager): Map<string, Pendi
   }>(manager)).parentWakeNotifier.getDispatchedParentWakes()
 }
 
+function getNotificationQueueByParent(manager: BackgroundManager): Map<string, Promise<void>> {
+  return (cast<{ notificationQueueByParent: Map<string, Promise<void>> }>(manager)).notificationQueueByParent
+}
+
 function getCompletionTimers(manager: BackgroundManager): Map<string, ReturnType<typeof setTimeout>> {
   return (cast<{ completionTimers: Map<string, ReturnType<typeof setTimeout>> }>(manager)).completionTimers
 }
@@ -345,6 +349,30 @@ function waitForParentWakeRequeue(manager: BackgroundManager, sessionID: string)
 function waitForParentWakeErrorSettle(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 260))
 }
+
+describe("BackgroundManager notification settlement", () => {
+  test("hasPendingParentNotificationWork should return true for buffered notifications", () => {
+    const manager = createBackgroundManager()
+
+    manager.queuePendingNotification("ses_parent", "done")
+
+    expect(manager.hasPendingParentNotificationWork("ses_parent")).toBe(true)
+  })
+
+  test("hasPendingParentNotificationWork should return true for queued notification promises", () => {
+    const manager = createBackgroundManager()
+
+    getNotificationQueueByParent(manager).set("ses_parent", Promise.resolve())
+
+    expect(manager.hasPendingParentNotificationWork("ses_parent")).toBe(true)
+  })
+
+  test("hasPendingParentNotificationWork should return false when no notification work remains", () => {
+    const manager = createBackgroundManager()
+
+    expect(manager.hasPendingParentNotificationWork("ses_parent")).toBe(false)
+  })
+})
 
 function createToastRemoveTaskTracker(): { removeTaskCalls: string[]; resetToastManager: () => void } {
   _resetTaskToastManagerForTesting()
