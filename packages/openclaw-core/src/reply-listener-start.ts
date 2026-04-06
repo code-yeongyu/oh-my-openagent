@@ -42,10 +42,11 @@ function getNormalizedReplyListenerConfig(config: OpenClawConfig): OpenClawConfi
 function createStartFailureResult(
   message: string,
   state: ReplyListenerDaemonState,
-): { success: false; message: string; state: ReplyListenerDaemonState } {
+): { success: false; message: string; started: false; state: ReplyListenerDaemonState } {
   return {
     success: false,
     message,
+    started: false,
     state,
   }
 }
@@ -59,13 +60,20 @@ export function resolveReplyListenerDaemonScript(currentFileUrl: string): string
 
 export async function startReplyListener(
   config: OpenClawConfig,
-): Promise<{ success: boolean; message: string; state?: ReplyListenerDaemonState; error?: string }> {
+): Promise<{
+  success: boolean
+  message: string
+  started: boolean
+  state?: ReplyListenerDaemonState
+  error?: string
+}> {
   const normalizedConfig = getNormalizedReplyListenerConfig(config)
   const replyListener = normalizedConfig.replyListener
   if (!replyListener?.discordBotToken && !replyListener?.telegramBotToken) {
     return {
       success: false,
       message: "No enabled reply listener platforms configured (missing bot tokens/channels)",
+      started: false,
     }
   }
 
@@ -77,6 +85,7 @@ export async function startReplyListener(
       return {
         success: true,
         message: "Reply listener daemon is already running",
+        started: false,
         state: state || undefined,
       }
     }
@@ -86,6 +95,7 @@ export async function startReplyListener(
       return {
         success: false,
         message: "Failed to restart reply listener daemon",
+        started: false,
         state: stopResult.state,
         error: stopResult.error ?? stopResult.message,
       }
@@ -98,6 +108,7 @@ export async function startReplyListener(
       return {
         success: false,
         message: "Timed out waiting for reply listener daemon to stop before restart",
+        started: false,
         state: readReplyListenerDaemonState() || undefined,
       }
     }
@@ -107,6 +118,7 @@ export async function startReplyListener(
     return {
       success: false,
       message: "tmux not available - reply injection requires tmux",
+      started: false,
     }
   }
 
@@ -160,6 +172,7 @@ export async function startReplyListener(
     return {
       success: true,
       message: `Reply listener daemon started with PID ${processInfo.pid}`,
+      started: true,
       state: readyState,
     }
   } catch (error) {
@@ -172,6 +185,7 @@ export async function startReplyListener(
     return {
       success: false,
       message: "Failed to start daemon",
+      started: false,
       state: stoppedState,
       error: error instanceof Error ? error.message : String(error),
     }
