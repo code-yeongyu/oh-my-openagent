@@ -48,6 +48,7 @@ export function createEventHandler(args: {
   const recentSyntheticIdles = new Map<string, number>();
   const recentRealIdles = new Map<string, number>();
   const recentAnyIdles = new Map<string, number>();
+  const deferredStopWakeSessions = new Set<string>();
   const dedupWindowMs = 500;
   const teamHandlers = createEventTeamHandlers({ pluginConfig, pluginContext, managers });
 
@@ -98,8 +99,33 @@ export function createEventHandler(args: {
     return false;
   };
 
-  const shouldDispatchOpenClawStopWake = (sessionID: string): boolean =>
-    shouldAutoRetrySession(sessionID) && !shouldSuppressOpenClawStopWake(sessionID);
+  const dispatchOpenClawStopWake = async (sessionID: string): Promise<boolean> => {
+    if (!pluginConfig.openclaw || !shouldAutoRetrySession(sessionID)) {
+      deferredStopWakeSessions.delete(sessionID);
+      return false;
+    }
+
+    if (managers.backgroundManager?.hasPendingParentNotificationWork(sessionID)) {
+      deferredStopWakeSessions.add(sessionID);
+    }
+
+    if (shouldSuppressOpenClawStopWake(sessionID)) return false;
+
+    await dispatchOpenClawSessionEvent({
+      pluginConfig,
+      pluginContext,
+      managers,
+      rawEvent: "session.idle",
+      sessionID,
+    });
+    deferredStopWakeSessions.delete(sessionID);
+    return true;
+  };
+
+  managers.backgroundManager?.setOnParentNotificationWorkSettled?.(async (sessionID) => {
+    if (!deferredStopWakeSessions.has(sessionID)) return;
+    await dispatchOpenClawStopWake(sessionID);
+  });
 
   const dispatchIdleOnlyHooks = async (input: EventInput): Promise<void> => {
     managers.tmuxSessionManager?.onEvent?.(input.event);
@@ -119,15 +145,7 @@ export function createEventHandler(args: {
     if (!shouldDispatchIdleEvent(sessionID, now)) return;
 
     await dispatchToHooks(syntheticIdle);
-    if (shouldDispatchOpenClawStopWake(sessionID)) {
-      await dispatchOpenClawSessionEvent({
-        pluginConfig,
-        pluginContext,
-        managers,
-        rawEvent: "session.idle",
-        sessionID,
-      });
-    }
+    await dispatchOpenClawStopWake(sessionID);
     await dispatchIdleOnlyHooks(syntheticIdle);
   };
 
@@ -162,6 +180,11 @@ export function createEventHandler(args: {
     const { event } = input;
     managers.tuiStateMirror?.onEvent(event);
     const props = event.properties as Record<string, unknown> | undefined;
+    const eventSessionID = resolveSessionEventID(props);
+
+    if (eventSessionID && event.type !== "session.idle" && !syntheticIdle) {
+      deferredStopWakeSessions.delete(eventSessionID);
+    }
 
     if (tmuxIntegrationEnabled && TMUX_ACTIVITY_EVENT_TYPES.has(event.type)) {
       managers.tmuxSessionManager.onEvent?.(event as { type: string; properties?: Record<string, unknown> });
@@ -196,10 +219,8 @@ export function createEventHandler(args: {
     if (event.type === "message.removed") handleMessageRemovedEvent(props);
 
     if (event.type === "session.idle") {
-      const sessionID = resolveSessionEventID(props);
-      if (sessionID && shouldDispatchOpenClawStopWake(sessionID)) {
-        await dispatchOpenClawSessionEvent({ pluginConfig, pluginContext, managers, rawEvent: event.type, sessionID });
-      }
+      const sessionID = eventSessionID;
+      if (sessionID) await dispatchOpenClawStopWake(sessionID);
       await dispatchIdleOnlyHooks(input);
       await Promise.resolve().then(() => managers.monitorManager?.handleEvent({
         type: "session.idle",
