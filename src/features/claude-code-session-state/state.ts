@@ -21,6 +21,10 @@ function normalizeRegisteredAgentName(name: string): string {
   return name.replace(ZERO_WIDTH_CHARACTERS_REGEX, "").toLowerCase()
 }
 
+function normalizeStoredAgentName(name: string): string {
+  return name.replace(ZERO_WIDTH_CHARACTERS_REGEX, "")
+}
+
 export function registerAgentName(name: string): void {
   const normalizedName = normalizeRegisteredAgentName(name)
   registeredAgentNames.add(normalizedName)
@@ -48,12 +52,12 @@ const sessionAgentMap = new Map<string, string>()
 
 export function setSessionAgent(sessionID: string, agent: string): void {
   if (!sessionAgentMap.has(sessionID)) {
-    sessionAgentMap.set(sessionID, agent)
+    sessionAgentMap.set(sessionID, normalizeStoredAgentName(agent))
   }
 }
 
 export function updateSessionAgent(sessionID: string, agent: string): void {
-  sessionAgentMap.set(sessionID, agent)
+  sessionAgentMap.set(sessionID, normalizeStoredAgentName(agent))
 }
 
 export function getSessionAgent(sessionID: string): string | undefined {

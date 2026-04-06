@@ -37,6 +37,18 @@ describe("claude-code-session-state", () => {
       expect(getSessionAgent(sessionID)).toBe(agent)
     })
 
+    test("should strip zero-width ordering prefixes before storing agent for session", () => {
+      // given
+      const sessionID = "test-session-prefixed"
+      const agent = "\u200B\u200B\u200BPrometheus (Plan Builder)"
+
+      // when
+      setSessionAgent(sessionID, agent)
+
+      // then
+      expect(getSessionAgent(sessionID)).toBe("Prometheus (Plan Builder)")
+    })
+
     test("should NOT overwrite existing agent (first-write wins)", () => {
       // given
       const sessionID = "test-session-1"
@@ -68,6 +80,18 @@ describe("claude-code-session-state", () => {
 
       // then
       expect(getSessionAgent(sessionID)).toBe("sisyphus")
+    })
+
+    test("should strip zero-width ordering prefixes when overwriting existing agent", () => {
+      // given
+      const sessionID = "test-session-prefixed-update"
+      setSessionAgent(sessionID, "sisyphus")
+
+      // when
+      updateSessionAgent(sessionID, "\u200B\u200BHephaestus (Deep Agent)")
+
+      // then
+      expect(getSessionAgent(sessionID)).toBe("Hephaestus (Deep Agent)")
     })
   })
 

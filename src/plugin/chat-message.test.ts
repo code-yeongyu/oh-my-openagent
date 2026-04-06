@@ -9,6 +9,7 @@ import { createAutoSlashCommandHook } from "../hooks/auto-slash-command"
 import { createStartWorkHook } from "../hooks/start-work"
 import { readBoulderState } from "../features/boulder-state"
 import { _resetForTesting, setMainSession, subagentSessions, registerAgentName, updateSessionAgent, getSessionAgent } from "../features/claude-code-session-state"
+import { getAgentListDisplayName } from "../shared/agent-display-names"
 import { clearSessionModel, getSessionModel, setSessionModel } from "../shared/session-model-state"
 
 type ChatMessagePart = { type: string; text?: string; [key: string]: unknown }
@@ -372,6 +373,31 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
     //#then
     expect(output.message["model"]).toBeUndefined()
     expect(getSessionModel("test-session")).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
+  })
+
+  test("treats prefixed list-display agent names as explicit model overrides", async () => {
+    //#given
+    setMainSession("test-session")
+    setSessionModel("test-session", { providerID: "openai", modelID: "gpt-5.4" })
+    const args = createMockHandlerArgs({
+      shouldOverride: false,
+      pluginConfig: {
+        agents: {
+          prometheus: { model: "anthropic/claude-opus-4-6" },
+        },
+      },
+    })
+    const handler = createChatMessageHandler(args)
+    const input = createMockInput(getAgentListDisplayName("prometheus"))
+    const output = createMockOutput()
+
+    //#when
+    await handler(input, output)
+
+    //#then
+    expect(output.message["model"]).toBeUndefined()
+    expect(getSessionModel("test-session")).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
+    expect(getSessionAgent("test-session")).toBe("Prometheus (Plan Builder)")
   })
 
   test("respects a mid-conversation model switch instead of reusing the previous stored model", async () => {

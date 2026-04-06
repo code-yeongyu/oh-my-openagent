@@ -2,6 +2,7 @@ import type { OhMyOpenCodeConfig } from "../config"
 import type { PluginContext } from "./types"
 
 import { hasConnectedProvidersCache } from "../shared"
+import { getAgentConfigKey } from "../shared/agent-display-names"
 import { getSessionModel, setSessionModel } from "../shared/session-model-state"
 import { getMainSessionID, setSessionAgent, subagentSessions } from "../features/claude-code-session-state"
 import { applyUltraworkModelOverrideOnMessage } from "./ultrawork-model-override"
@@ -46,11 +47,12 @@ function hasExplicitAgentModelOverride(
   pluginConfig: OhMyOpenCodeConfig
 ): boolean {
   const configuredAgents = pluginConfig.agents
-  if (!agent || !configuredAgents || !(agent in configuredAgents)) {
+  const normalizedAgent = typeof agent === "string" ? getAgentConfigKey(agent) : undefined
+  if (!normalizedAgent || !configuredAgents || !(normalizedAgent in configuredAgents)) {
     return false
   }
 
-  const configuredAgent = configuredAgents[agent as keyof typeof configuredAgents]
+  const configuredAgent = configuredAgents[normalizedAgent as keyof typeof configuredAgents]
   const configuredModel = configuredAgent?.model
   return typeof configuredModel === "string" && configuredModel.trim().length > 0
 }
