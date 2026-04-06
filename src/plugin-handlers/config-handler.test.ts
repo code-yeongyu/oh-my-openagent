@@ -19,6 +19,7 @@ import * as shared from "../shared"
 import * as configDir from "../shared/opencode-config-dir"
 import * as permissionCompat from "../shared/permission-compat"
 import * as modelResolver from "../shared/model-resolver"
+import * as agentPriorityOrder from "./agent-priority-order"
 
 function createPluginConfig(overrides: Partial<OhMyOpenCodeConfig> = {}): OhMyOpenCodeConfig {
   return {
@@ -115,6 +116,7 @@ afterEach(() => {
   ;(configDir.getOpenCodeConfigPaths as any)?.mockRestore?.()
   ;(permissionCompat.migrateAgentConfig as any)?.mockRestore?.()
   ;(modelResolver.resolveModelWithFallback as any)?.mockRestore?.()
+  ;(agentPriorityOrder.reorderAgentsByPriority as any)?.mockRestore?.()
 })
 
 describe("Sisyphus-Junior model inheritance", () => {
@@ -212,6 +214,7 @@ describe("Plan agent demote behavior", () => {
     // #given
     const createBuiltinAgentsMock = agents.createBuiltinAgents as unknown as {
       mockResolvedValue: (value: Record<string, unknown>) => void
+      mock: { calls: unknown[][] }
     }
     createBuiltinAgentsMock.mockResolvedValue({
       sisyphus: { name: "sisyphus", prompt: "test", mode: "primary" },
@@ -250,6 +253,52 @@ describe("Plan agent demote behavior", () => {
     ]
     const ordered = keys.filter((key) => coreAgents.includes(key))
     expect(ordered).toEqual(coreAgents)
+  })
+
+  test("assembles core agents first before priority reorder runs", async () => {
+    // #given
+    const createBuiltinAgentsMock = agents.createBuiltinAgents as unknown as {
+      mockResolvedValue: (value: Record<string, unknown>) => void
+      mock: { calls: unknown[][] }
+    }
+    createBuiltinAgentsMock.mockResolvedValue({
+      sisyphus: { name: "sisyphus", prompt: "test", mode: "primary" },
+      hephaestus: { name: "hephaestus", prompt: "test", mode: "primary" },
+      oracle: { name: "oracle", prompt: "test", mode: "subagent" },
+      atlas: { name: "atlas", prompt: "test", mode: "primary" },
+    })
+    const reorderSpy = spyOn(agentPriorityOrder, "reorderAgentsByPriority") as any
+    const pluginConfig = createPluginConfig({
+      sisyphus_agent: {
+        planner_enabled: true,
+      },
+    })
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-6",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    // #when
+    await handler(config)
+
+    // #then
+    const assembledAgentKeys = Object.keys(
+      reorderSpy.mock.calls.at(0)?.[0] as Record<string, unknown>
+    )
+    expect(assembledAgentKeys.slice(0, 4)).toEqual([
+      getAgentListDisplayName("sisyphus"),
+      getAgentListDisplayName("hephaestus"),
+      getAgentListDisplayName("prometheus"),
+      getAgentListDisplayName("atlas"),
+    ])
   })
 
   test("plan agent should be demoted to subagent without inheriting prometheus prompt", async () => {
@@ -1255,6 +1304,7 @@ describe("per-agent todowrite/todoread deny when task_system enabled", () => {
     //#given
     const createBuiltinAgentsMock = agents.createBuiltinAgents as unknown as {
       mockResolvedValue: (value: Record<string, unknown>) => void
+      mock: { calls: unknown[][] }
     }
     createBuiltinAgentsMock.mockResolvedValue({
       sisyphus: { name: "sisyphus", prompt: "test", mode: "primary" },
@@ -1296,6 +1346,7 @@ describe("per-agent todowrite/todoread deny when task_system enabled", () => {
     //#given
     const createBuiltinAgentsMock = agents.createBuiltinAgents as unknown as {
       mockResolvedValue: (value: Record<string, unknown>) => void
+      mock: { calls: unknown[][] }
     }
     createBuiltinAgentsMock.mockResolvedValue({
       sisyphus: { name: "sisyphus", prompt: "test", mode: "primary" },
