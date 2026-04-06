@@ -27,7 +27,25 @@ export interface PluginComponentsResult {
   errors: PluginLoadError[]
 }
 
+export interface PluginComponentLoadDeps {
+  discoverInstalledPlugins: typeof discoverInstalledPlugins
+  loadPluginCommands: typeof loadPluginCommands
+  loadPluginSkillsAsCommands: typeof loadPluginSkillsAsCommands
+  loadPluginAgents: typeof loadPluginAgents
+  loadPluginMcpServers: typeof loadPluginMcpServers
+  loadPluginHooksConfigs: typeof loadPluginHooksConfigs
+}
+
 const cachedPluginComponentsByKey = new Map<string, PluginComponentsResult>()
+
+const defaultPluginComponentLoadDeps: PluginComponentLoadDeps = {
+  discoverInstalledPlugins,
+  loadPluginCommands,
+  loadPluginSkillsAsCommands,
+  loadPluginAgents,
+  loadPluginMcpServers,
+  loadPluginHooksConfigs,
+}
 
 function clonePluginComponentsResult(
   result: PluginComponentsResult,
@@ -54,7 +72,10 @@ export function clearPluginComponentsCache(): void {
   cachedPluginComponentsByKey.clear()
 }
 
-export async function loadAllPluginComponents(options?: PluginLoaderOptions): Promise<PluginComponentsResult> {
+async function loadAllPluginComponentsInternal(
+  options?: PluginLoaderOptions,
+  deps: PluginComponentLoadDeps = defaultPluginComponentLoadDeps,
+): Promise<PluginComponentsResult> {
   if (isClaudeCodePluginsDisabled()) {
     log("Claude Code plugin loading disabled via OPENCODE_DISABLE_CLAUDE_CODE env var")
     return {
@@ -74,14 +95,14 @@ export async function loadAllPluginComponents(options?: PluginLoaderOptions): Pr
     return clonePluginComponentsResult(cachedPluginComponents)
   }
 
-  const { plugins, errors } = discoverInstalledPlugins(options)
+  const { plugins, errors } = deps.discoverInstalledPlugins(options)
 
   const [commands, skills, agents, mcpServers, hooksConfigs] = await Promise.all([
-    Promise.resolve(loadPluginCommands(plugins)),
-    Promise.resolve(loadPluginSkillsAsCommands(plugins)),
-    Promise.resolve(loadPluginAgents(plugins)),
-    loadPluginMcpServers(plugins),
-    Promise.resolve(loadPluginHooksConfigs(plugins)),
+    Promise.resolve(deps.loadPluginCommands(plugins)),
+    Promise.resolve(deps.loadPluginSkillsAsCommands(plugins)),
+    Promise.resolve(deps.loadPluginAgents(plugins)),
+    deps.loadPluginMcpServers(plugins),
+    Promise.resolve(deps.loadPluginHooksConfigs(plugins)),
   ])
 
   log(`Loaded ${plugins.length} plugins with ${Object.keys(commands).length} commands, ${Object.keys(skills).length} skills, ${Object.keys(agents).length} agents, ${Object.keys(mcpServers).length} MCP servers`)
@@ -99,4 +120,15 @@ export async function loadAllPluginComponents(options?: PluginLoaderOptions): Pr
   cachedPluginComponentsByKey.set(cacheKey, clonePluginComponentsResult(result))
 
   return clonePluginComponentsResult(result)
+}
+
+export async function loadAllPluginComponents(options?: PluginLoaderOptions): Promise<PluginComponentsResult> {
+  return loadAllPluginComponentsInternal(options)
+}
+
+export async function loadAllPluginComponentsWithDeps(
+  options: PluginLoaderOptions | undefined,
+  deps: PluginComponentLoadDeps,
+): Promise<PluginComponentsResult> {
+  return loadAllPluginComponentsInternal(options, deps)
 }
