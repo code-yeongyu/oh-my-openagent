@@ -456,6 +456,27 @@ You are starting a Sisyphus work session.
       expect(output.message.agent).toBe(getAgentListDisplayName("atlas"))
     })
 
+    test("should switch to Atlas even when current session is Sisyphus (regression: #3155)", async () => {
+      // given: user runs /start-work while in a Sisyphus session
+      // atlas is registered, so /start-work must always hand off to atlas
+      sessionState.updateSessionAgent("ses-sisyphus-to-atlas", "sisyphus")
+
+      const hook = createStartWorkHook(createMockPluginInput())
+      const output = {
+        message: {} as Record<string, unknown>,
+        parts: [{ type: "text", text: createStartWorkPrompt() }],
+      }
+
+      await hook["chat.message"](
+        { sessionID: "ses-sisyphus-to-atlas" },
+        output
+      )
+
+      // atlas is registered in beforeEach, so it must be selected
+      expect(output.message.agent).toBe(getAgentListDisplayName("atlas"))
+      expect(sessionState.getSessionAgent("ses-sisyphus-to-atlas")).toBe("atlas")
+    })
+
     test("should keep the current agent when Atlas is unavailable", async () => {
       // given
       sessionState._resetForTesting()
