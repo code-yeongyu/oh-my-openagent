@@ -119,6 +119,7 @@ describe("checkCompletionConditions continuation coverage", () => {
 
     const ctx = createMockContext(directory)
     ctx.sessionID = "child-session"
+    setSessionAgent("child-session", "atlas")
     ctx.client.session.get = mock(async ({ path }: { path: { id: string } }) => ({
       data: {
         id: path.id,
@@ -400,6 +401,7 @@ describe("checkCompletionConditions continuation coverage", () => {
 
     const ctx = createMockContext(directory)
     ctx.sessionID = "ses_child_after_compaction"
+    setSessionAgent("ses_child_after_compaction", "atlas")
     ctx.client.session.get = mock(async ({ path }: { path: { id: string } }) => ({
       data: {
         id: path.id,
