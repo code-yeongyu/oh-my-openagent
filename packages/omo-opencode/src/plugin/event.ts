@@ -75,6 +75,32 @@ export function createEventHandler(args: {
     return true;
   };
 
+  const shouldSuppressOpenClawStopWake = (sessionID: string): boolean => {
+    const backgroundTasks = managers.backgroundManager
+      ?.getAllDescendantTasks(sessionID)
+      .filter((task) => task.status === "pending" || task.status === "running") ?? [];
+
+    if (backgroundTasks.length > 0) {
+      log("[event] suppressing openclaw stop wake while background tasks remain active", {
+        sessionID,
+        activeBackgroundTaskCount: backgroundTasks.length,
+      });
+      return true;
+    }
+
+    if (managers.backgroundManager?.hasPendingParentNotificationWork(sessionID)) {
+      log("[event] suppressing openclaw stop wake while background notifications remain unsettled", {
+        sessionID,
+      });
+      return true;
+    }
+
+    return false;
+  };
+
+  const shouldDispatchOpenClawStopWake = (sessionID: string): boolean =>
+    shouldAutoRetrySession(sessionID) && !shouldSuppressOpenClawStopWake(sessionID);
+
   const dispatchIdleOnlyHooks = async (input: EventInput): Promise<void> => {
     managers.tmuxSessionManager?.onEvent?.(input.event);
     await runEventHookSafely("teamIdleWakeHint", teamHandlers.teamIdleWakeHint, input);
@@ -93,13 +119,15 @@ export function createEventHandler(args: {
     if (!shouldDispatchIdleEvent(sessionID, now)) return;
 
     await dispatchToHooks(syntheticIdle);
-    await dispatchOpenClawSessionEvent({
-      pluginConfig,
-      pluginContext,
-      managers,
-      rawEvent: "session.idle",
-      sessionID,
-    });
+    if (shouldDispatchOpenClawStopWake(sessionID)) {
+      await dispatchOpenClawSessionEvent({
+        pluginConfig,
+        pluginContext,
+        managers,
+        rawEvent: "session.idle",
+        sessionID,
+      });
+    }
     await dispatchIdleOnlyHooks(syntheticIdle);
   };
 
@@ -169,7 +197,7 @@ export function createEventHandler(args: {
 
     if (event.type === "session.idle") {
       const sessionID = resolveSessionEventID(props);
-      if (sessionID) {
+      if (sessionID && shouldDispatchOpenClawStopWake(sessionID)) {
         await dispatchOpenClawSessionEvent({ pluginConfig, pluginContext, managers, rawEvent: event.type, sessionID });
       }
       await dispatchIdleOnlyHooks(input);

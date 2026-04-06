@@ -1348,6 +1348,68 @@ describe("createEventHandler - event forwarding", () => {
 		})
 	})
 
+	it("does not dispatch OpenClaw for main session.idle while descendant background tasks are active", async () => {
+		const openClawSpy = spyOn(openclawRuntimeDispatch, "dispatchOpenClawEvent")
+		openClawSpy.mockResolvedValue(null)
+		setMainSession("ses_openclaw_busy")
+		const eventHandler = createEventHandler({
+			ctx: asEventHandlerContext({ directory: "/tmp/project-idle" }),
+			pluginConfig: asPluginConfig({ openclaw: { enabled: true, gateways: {}, hooks: {} } }),
+			firstMessageVariantGate: {
+				markSessionCreated: () => {},
+				clear: () => {},
+			},
+			managers: createEventHandlerManagers({
+				backgroundManager: {
+					getAllDescendantTasks: () => [{ id: "bg_1", status: "running" }],
+					hasPendingParentNotificationWork: () => false,
+				},
+				skillMcpManager: { disconnectSession: async () => {} },
+			}),
+			hooks: createEventHandlerHooks({}),
+		})
+
+		await eventHandler(asEventHandlerInput({
+			event: {
+				type: "session.idle",
+				properties: { sessionID: "ses_openclaw_busy" },
+			},
+		}))
+
+		expect(openClawSpy).not.toHaveBeenCalled()
+	})
+
+	it("does not dispatch OpenClaw for main session.idle while parent notification work is unsettled", async () => {
+		const openClawSpy = spyOn(openclawRuntimeDispatch, "dispatchOpenClawEvent")
+		openClawSpy.mockResolvedValue(null)
+		setMainSession("ses_openclaw_unsettled")
+		const eventHandler = createEventHandler({
+			ctx: asEventHandlerContext({ directory: "/tmp/project-idle" }),
+			pluginConfig: asPluginConfig({ openclaw: { enabled: true, gateways: {}, hooks: {} } }),
+			firstMessageVariantGate: {
+				markSessionCreated: () => {},
+				clear: () => {},
+			},
+			managers: createEventHandlerManagers({
+				backgroundManager: {
+					getAllDescendantTasks: () => [],
+					hasPendingParentNotificationWork: () => true,
+				},
+				skillMcpManager: { disconnectSession: async () => {} },
+			}),
+			hooks: createEventHandlerHooks({}),
+		})
+
+		await eventHandler(asEventHandlerInput({
+			event: {
+				type: "session.idle",
+				properties: { sessionID: "ses_openclaw_unsettled" },
+			},
+		}))
+
+		expect(openClawSpy).not.toHaveBeenCalled()
+	})
+
 	it("clears stored prompt params on session.deleted", async () => {
 		const eventHandler = createEventHandler({
 			ctx: {} as never,
