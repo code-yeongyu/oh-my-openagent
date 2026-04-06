@@ -20,7 +20,12 @@ export const AGENT_DISPLAY_NAMES: Record<string, string> = {
   "council-member": "council-member",
 }
 
-const AGENT_LIST_SORT_PREFIXES: Record<string, string> = {}
+const AGENT_LIST_SORT_PREFIXES: Record<string, string> = {
+  sisyphus: "\u200B",
+  hephaestus: "\u200B\u200B",
+  prometheus: "\u200B\u200B\u200B",
+  atlas: "\u200B\u200B\u200B\u200B",
+}
 
 function stripAgentListSortPrefix(agentName: string): string {
   return agentName.replace(/^\u200B+/, "")

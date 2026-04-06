@@ -181,17 +181,23 @@ describe("getAgentConfigKey", () => {
 })
 
 describe("getAgentListDisplayName", () => {
-  it("keeps sisyphus unchanged for list display", () => {
-    expect(getAgentListDisplayName("sisyphus")).toBe("Sisyphus (Ultraworker)")
+  it("applies invisible stable-sort prefixes to the core agent list", () => {
+    expect(getAgentListDisplayName("sisyphus")).toBe("\u200BSisyphus (Ultraworker)")
+    expect(getAgentListDisplayName("hephaestus")).toBe("\u200B\u200BHephaestus (Deep Agent)")
+    expect(getAgentListDisplayName("prometheus")).toBe("\u200B\u200B\u200BPrometheus (Plan Builder)")
+    expect(getAgentListDisplayName("atlas")).toBe("\u200B\u200B\u200B\u200BAtlas (Plan Executor)")
   })
 
-  it("returns atlas display name without sort prefix", () => {
-    expect(getAgentListDisplayName("atlas")).toBe("Atlas (Plan Executor)")
+  it("keeps non-core agents unprefixed for list display", () => {
+    expect(getAgentListDisplayName("oracle")).toBe("oracle")
   })
 })
 
 describe("normalizeAgentForPrompt", () => {
-  it("strips atlas UI ordering prefix back to canonical display name", () => {
+  it("strips core UI ordering prefixes back to canonical display names", () => {
+    expect(normalizeAgentForPrompt(getAgentListDisplayName("sisyphus"))).toBe("Sisyphus (Ultraworker)")
+    expect(normalizeAgentForPrompt(getAgentListDisplayName("hephaestus"))).toBe("Hephaestus (Deep Agent)")
+    expect(normalizeAgentForPrompt(getAgentListDisplayName("prometheus"))).toBe("Prometheus (Plan Builder)")
     expect(normalizeAgentForPrompt(getAgentListDisplayName("atlas"))).toBe("Atlas (Plan Executor)")
   })
 })
