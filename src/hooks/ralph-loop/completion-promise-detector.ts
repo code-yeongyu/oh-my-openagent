@@ -34,6 +34,22 @@ function buildPromisePattern(promise: string): RegExp {
 	return new RegExp(`<promise>\\s*${escapeRegex(promise)}\\s*</promise>`, "is")
 }
 
+function shouldInspectSessionMessagePart(
+	partType: string,
+	promise: string,
+	partText: string,
+): boolean {
+	if (partType === "text") {
+		return true
+	}
+
+	if (partType !== "tool_result") {
+		return false
+	}
+
+	return promise === ULTRAWORK_VERIFICATION_PROMISE && ORACLE_AGENT_PATTERN.test(partText)
+}
+
 function shouldInspectTranscriptEntry(
 	entry: TranscriptEntry,
 	promise: string,
@@ -127,14 +143,13 @@ export async function detectCompletionInSessionMessages(
 			const assistant = assistantMessages[index]
 			if (!assistant.parts) continue
 
-			let responseText = ""
 			for (const part of assistant.parts) {
-				if (part.type !== "text") continue
-				responseText += `${responseText ? "\n" : ""}${part.text ?? ""}`
-			}
-
-			if (pattern.test(responseText)) {
-				return true
+				const partText = part.text ?? ""
+				if (!partText) continue
+				if (!shouldInspectSessionMessagePart(part.type, options.promise, partText)) continue
+				if (pattern.test(partText)) {
+					return true
+				}
 			}
 		}
 
