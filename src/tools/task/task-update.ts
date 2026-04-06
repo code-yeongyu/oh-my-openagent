@@ -114,12 +114,12 @@ async function handleUpdate(
 
       const addBlocks = args.addBlocks as string[] | undefined;
       if (addBlocks) {
-        task.blocks = [...new Set([...task.blocks, ...addBlocks])];
+        task.blocks = [...new Set([...(task.blocks ?? []), ...addBlocks])];
       }
 
       const addBlockedBy = args.addBlockedBy as string[] | undefined;
       if (addBlockedBy) {
-        task.blockedBy = [...new Set([...task.blockedBy, ...addBlockedBy])];
+        task.blockedBy = [...new Set([...(task.blockedBy ?? []), ...addBlockedBy])];
       }
 
       if (validatedArgs.metadata !== undefined) {

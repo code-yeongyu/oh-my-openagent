@@ -37,7 +37,8 @@ Returns summary format: id, subject, status, owner, blockedBy (not full descript
         return JSON.stringify({ tasks: [] })
       }
 
-      const allTasks: TaskObject[] = []
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const allTasks: any[] = []
       for (const fileId of files) {
         const task = readJsonSafe(join(taskDir, `${fileId}.json`), TaskObjectSchema)
         if (task) {
@@ -55,7 +56,7 @@ Returns summary format: id, subject, status, owner, blockedBy (not full descript
       // Build summary with filtered blockedBy
       const summaries: TaskSummary[] = activeTasks.map((task) => {
         // Filter blockedBy to only include unresolved (non-completed) blockers
-        const unresolvedBlockers = task.blockedBy.filter((blockerId) => {
+        const unresolvedBlockers = (task.blockedBy ?? []).filter((blockerId: string) => {
           const blockerTask = taskMap.get(blockerId)
           // Include if blocker doesn't exist (missing) or if it's not completed
           return !blockerTask || blockerTask.status !== "completed"
