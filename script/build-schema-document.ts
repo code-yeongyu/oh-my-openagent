@@ -1,8 +1,8 @@
-import { z } from "zod"
+import { zodToJsonSchema } from "zod-to-json-schema"
 import { OhMyOpenCodeConfigSchema } from "../src/config/schema"
 
 export function createOhMyOpenCodeJsonSchema(): Record<string, unknown> {
-  const jsonSchema = z.toJSONSchema(OhMyOpenCodeConfigSchema)
+  const jsonSchema = zodToJsonSchema(OhMyOpenCodeConfigSchema) as Record<string, unknown>
 
   return {
     ...jsonSchema,
