@@ -44,11 +44,25 @@ export async function buildHttpRequestInit(
     const provider = getOrCreateAuthProvider(authProviders, config.url, config.oauth, createOAuthProvider)
     let tokenData = provider.tokens()
 
-    if (!tokenData || isTokenExpired(tokenData)) {
+    if (!tokenData) {
       try {
         tokenData = await provider.login()
       } catch {
         tokenData = null
+      }
+    }
+
+    if (tokenData && isTokenExpired(tokenData)) {
+      try {
+        tokenData = tokenData.refreshToken
+          ? await provider.refresh(tokenData.refreshToken)
+          : await provider.login()
+      } catch {
+        try {
+          tokenData = await provider.login()
+        } catch {
+          tokenData = null
+        }
       }
     }
 

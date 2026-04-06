@@ -84,23 +84,25 @@ const STOP_MESSAGE_PATTERNS = [
   "usage limit has been reached",
   "free usage limit",
   "billing limit",
+  "billing hard limit",
   "monthly limit",
   "plan limit",
+  "subscription quota",
   "subscription limit",
+  "payment required",
   "out of credits",
   "credits exhausted",
   "insufficient credits",
   "insufficient balance",
+  "credit balance",
+  "usage limit for this month",
+  "exhausted your capacity",
 ]
 
 const AUTO_RETRY_GATE_PATTERNS = [
   "rate limit",
-  "quota",
-  "usage limit",
-  "limit reached",
   "cooling down",
   "credentials for model",
-  "exhausted your capacity",
 ]
 
 function hasProviderAutoRetrySignal(message: string): boolean {

@@ -50,7 +50,7 @@ export interface ProcessCleanupHandler {
 
 export type OAuthProviderLike = Pick<
   McpOAuthProvider,
-  "tokens" | "login"
+  "tokens" | "login" | "refresh"
 >
 
 export type OAuthProviderFactory = (options: {

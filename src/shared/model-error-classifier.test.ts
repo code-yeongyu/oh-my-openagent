@@ -215,6 +215,28 @@ describe("model-error-classifier", () => {
     //#then
     expect(result).toBe(true)
   })
+
+  test("treats subscription quota message as non-retryable", () => {
+    //#given
+    const error = { message: "Subscription quota exceeded. You can continue using free models." }
+
+    //#when
+    const result = shouldRetryError(error)
+
+    //#then
+    expect(result).toBe(false)
+  })
+
+  test("treats HTTP 429 rate limit message as retryable", () => {
+    //#given
+    const error = { message: "429 Too Many Requests: rate limit reached" }
+
+    //#when
+    const result = shouldRetryError(error)
+
+    //#then
+    expect(result).toBe(true)
+  })
 })
 
 export {}

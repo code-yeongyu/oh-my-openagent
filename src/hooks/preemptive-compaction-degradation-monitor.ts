@@ -6,6 +6,7 @@ import { resolveCompactionModel } from "./shared/compaction-model-resolver"
 const PREEMPTIVE_COMPACTION_TIMEOUT_MS = 120_000
 const POST_COMPACTION_MONITOR_COUNT = 5
 const POST_COMPACTION_NO_TEXT_THRESHOLD = 3
+const RECOVERY_COMPACTION_SUPPRESSION_MS = 5_000
 
 declare function setTimeout(handler: () => void, timeout?: number): unknown
 declare function clearTimeout(timeoutID: unknown): void
@@ -74,6 +75,7 @@ export function createPostCompactionDegradationMonitor(args: {
   const postCompactionNoTextStreak = new Map<string, number>()
   const postCompactionRecoveryTriggered = new Set<string>()
   const postCompactionEpoch = new Map<string, number>()
+  const suppressRecoveryCompactionUntil = new Map<string, number>()
   const postCompactionRecoveryCount = new Map<string, number>()
 
   const MAX_RECOVERY_ATTEMPTS = 3
@@ -87,6 +89,13 @@ export function createPostCompactionDegradationMonitor(args: {
   }
 
   const onSessionCompacted = (sessionID: string): void => {
+    const suppressedUntil = suppressRecoveryCompactionUntil.get(sessionID)
+    if (suppressedUntil && suppressedUntil > Date.now()) {
+      suppressRecoveryCompactionUntil.delete(sessionID)
+      return
+    }
+    suppressRecoveryCompactionUntil.delete(sessionID)
+
     const nextEpoch = (postCompactionEpoch.get(sessionID) ?? 0) + 1
     postCompactionEpoch.set(sessionID, nextEpoch)
     postCompactionRemaining.set(sessionID, POST_COMPACTION_MONITOR_COUNT)
@@ -116,6 +125,7 @@ export function createPostCompactionDegradationMonitor(args: {
     postCompactionRecoveryTriggered.add(sessionID)
     compactionInProgress.add(sessionID)
     const recoveryEpoch = postCompactionEpoch.get(sessionID) ?? 0
+    suppressRecoveryCompactionUntil.set(sessionID, Date.now() + RECOVERY_COMPACTION_SUPPRESSION_MS)
 
     try {
       const { providerID: targetProviderID, modelID: targetModelID } = resolveCompactionModel(
@@ -148,6 +158,7 @@ export function createPostCompactionDegradationMonitor(args: {
 
       log("[preemptive-compaction] Triggered recovery after post-compaction no-text tail", { sessionID })
     } catch (error) {
+      suppressRecoveryCompactionUntil.delete(sessionID)
       log("[preemptive-compaction] Failed to recover post-compaction no-text tail", {
         sessionID,
         error: String(error),
