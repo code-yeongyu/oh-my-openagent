@@ -12,6 +12,26 @@ import { createConfigHandler } from "./plugin-handlers"
 import { log } from "./shared"
 import { markServerRunningInProcess } from "./shared/tmux/tmux-utils/server-health"
 
+type CreateManagersDeps = {
+  BackgroundManagerClass: typeof BackgroundManager
+  SkillMcpManagerClass: typeof SkillMcpManager
+  TmuxSessionManagerClass: typeof TmuxSessionManager
+  initTaskToastManagerFn: typeof initTaskToastManager
+  registerManagerForCleanupFn: typeof registerManagerForCleanup
+  createConfigHandlerFn: typeof createConfigHandler
+  markServerRunningInProcessFn: typeof markServerRunningInProcess
+}
+
+const defaultCreateManagersDeps: CreateManagersDeps = {
+  BackgroundManagerClass: BackgroundManager,
+  SkillMcpManagerClass: SkillMcpManager,
+  TmuxSessionManagerClass: TmuxSessionManager,
+  initTaskToastManagerFn: initTaskToastManager,
+  registerManagerForCleanupFn: registerManagerForCleanup,
+  createConfigHandlerFn: createConfigHandler,
+  markServerRunningInProcessFn: markServerRunningInProcess,
+}
+
 export type Managers = {
   tmuxSessionManager: TmuxSessionManager
   backgroundManager: BackgroundManager
@@ -25,15 +45,17 @@ export function createManagers(args: {
   tmuxConfig: TmuxConfig
   modelCacheState: ModelCacheState
   backgroundNotificationHookEnabled: boolean
+  deps?: Partial<CreateManagersDeps>
 }): Managers {
   const { ctx, pluginConfig, tmuxConfig, modelCacheState, backgroundNotificationHookEnabled } = args
+  const deps = { ...defaultCreateManagersDeps, ...args.deps }
 
   if (tmuxConfig.enabled) {
-    markServerRunningInProcess()
+    deps.markServerRunningInProcessFn()
   }
-  const tmuxSessionManager = new TmuxSessionManager(ctx, tmuxConfig)
+  const tmuxSessionManager = new deps.TmuxSessionManagerClass(ctx, tmuxConfig)
 
-  registerManagerForCleanup({
+  deps.registerManagerForCleanupFn({
     shutdown: async () => {
       await tmuxSessionManager.cleanup().catch((error) => {
         log("[create-managers] tmux cleanup error during process shutdown:", error)
@@ -41,7 +63,7 @@ export function createManagers(args: {
     },
   })
 
-  const backgroundManager = new BackgroundManager(
+  const backgroundManager = new deps.BackgroundManagerClass(
     ctx,
     pluginConfig.background_task,
     {
@@ -75,11 +97,11 @@ export function createManagers(args: {
     },
   )
 
-  initTaskToastManager(ctx.client)
+  deps.initTaskToastManagerFn(ctx.client)
 
-  const skillMcpManager = new SkillMcpManager()
+  const skillMcpManager = new deps.SkillMcpManagerClass()
 
-  const configHandler = createConfigHandler({
+  const configHandler = deps.createConfigHandlerFn({
     ctx: { directory: ctx.directory, client: ctx.client },
     pluginConfig,
     modelCacheState,
