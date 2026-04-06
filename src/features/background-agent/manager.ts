@@ -1242,6 +1242,12 @@ export class BackgroundManager {
       return
     }
 
+    // The usage-limit cancel path in tryFallbackRetry calls cancelTask synchronously,
+    // so the task may already be in a terminal state by the time we get here.
+    if (task.status !== "running" && task.status !== "pending") {
+      return
+    }
+
     const errorMsg = errorMessage ?? "Session error"
     const canRetry =
       shouldRetryError(errorInfo) &&
@@ -1314,7 +1320,17 @@ export class BackgroundManager {
       processKey: (key: string) => this.processKey(key),
       onUsageLimitCancel: (message) => {
         this.queuePendingNotification(task.parentSessionID, message)
-        this.scheduleUsageLimitTimeout(task)
+        // Immediately cancel the task to release its concurrency slot and free
+        // resources. Without this, session.status / message.updated flows (which
+        // ignore the false return from tryFallbackRetry) would leave the task
+        // active and hold the slot for the full safety-timeout window.
+        void this.cancelTask(task.id, {
+          source: "usage-limit",
+          reason: message,
+        }).catch((err) => {
+          log("[background-agent] Failed to cancel task after usage-limit error:", { taskId: task.id, error: err })
+          this.scheduleUsageLimitTimeout(task)
+        })
       },
     })
     return result.then((retried) => {
@@ -2176,6 +2192,11 @@ export class BackgroundManager {
       clearTimeout(timer)
     }
     this.idleDeferralTimers.clear()
+
+    for (const timer of this.usageLimitTimeouts.values()) {
+      clearTimeout(timer)
+    }
+    this.usageLimitTimeouts.clear()
 
     for (const sessionID of trackedSessionIDs) {
       subagentSessions.delete(sessionID)
