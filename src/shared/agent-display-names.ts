@@ -98,3 +98,25 @@ export function normalizeAgentForPrompt(agentName: string | undefined): string |
 
   return trimmed
 }
+
+export function normalizeAgentForPromptKey(agentName: string | undefined): string | undefined {
+  if (typeof agentName !== "string") {
+    return undefined
+  }
+
+  const trimmed = stripAgentListSortPrefix(agentName.trim())
+  if (!trimmed) {
+    return undefined
+  }
+
+  const lower = trimmed.toLowerCase()
+  const reversed = REVERSE_DISPLAY_NAMES[lower]
+  if (reversed !== undefined) {
+    return reversed
+  }
+  if (AGENT_DISPLAY_NAMES[lower] !== undefined) {
+    return lower
+  }
+
+  return trimmed
+}

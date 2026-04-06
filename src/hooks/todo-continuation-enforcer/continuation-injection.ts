@@ -14,7 +14,10 @@ import {
 } from "../../features/hook-message-injector"
 import { log } from "../../shared/logger"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
-import { getAgentConfigKey } from "../../shared/agent-display-names"
+import {
+  getAgentConfigKey,
+  normalizeAgentForPromptKey,
+} from "../../shared/agent-display-names"
 
 import {
   CONTINUATION_PROMPT,
@@ -122,12 +125,14 @@ export async function injectContinuation(args: {
     tools = tools ?? previousMessage?.tools
   }
 
-  if (agentName && skipAgents.some(s => getAgentConfigKey(s) === getAgentConfigKey(agentName))) {
+  const promptAgent = normalizeAgentForPromptKey(agentName)
+
+  if (promptAgent && skipAgents.some(s => getAgentConfigKey(s) === getAgentConfigKey(promptAgent))) {
     log(`[${HOOK_NAME}] Skipped: agent in skipAgents list`, { sessionID, agent: agentName })
     return
   }
 
-  if (!agentName) {
+  if (!promptAgent) {
     const compactionState = sessionStateStore.getExistingState(sessionID)
     if (compactionState && isCompactionGuardActive(compactionState, Date.now())) {
       log(`[${HOOK_NAME}] Skipped: agent unknown after compaction`, { sessionID })
@@ -162,7 +167,7 @@ ${todoList}`
   try {
     log(`[${HOOK_NAME}] Injecting continuation`, {
       sessionID,
-      agent: agentName,
+      agent: promptAgent,
       model,
       incompleteCount: freshIncompleteCount,
     })
@@ -172,7 +177,7 @@ ${todoList}`
     await ctx.client.session.promptAsync({
       path: { id: sessionID },
       body: {
-        agent: agentName,
+        agent: promptAgent,
         ...(model !== undefined ? { model } : {}),
         ...(inheritedTools ? { tools: inheritedTools } : {}),
         parts: [createInternalAgentTextPart(prompt)],

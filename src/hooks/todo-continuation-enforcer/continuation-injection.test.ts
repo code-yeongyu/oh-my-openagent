@@ -5,6 +5,44 @@ import { injectContinuation } from "./continuation-injection"
 import { OMO_INTERNAL_INITIATOR_MARKER } from "../../shared/internal-initiator-marker"
 
 describe("injectContinuation", () => {
+  test("normalizes built-in display names to config keys before promptAsync", async () => {
+    // given
+    let capturedAgent: string | undefined
+    const ctx = {
+      directory: "/tmp/test",
+      client: {
+        session: {
+          todo: async () => ({ data: [{ id: "1", content: "todo", status: "pending", priority: "high" }] }),
+          promptAsync: async (input: {
+            body: {
+              agent?: string
+            }
+          }) => {
+            capturedAgent = input.body.agent
+            return {}
+          },
+        },
+      },
+    }
+    const sessionStateStore = {
+      getExistingState: () => ({ inFlight: false, lastInjectedAt: 0, consecutiveFailures: 0 }),
+    }
+
+    // when
+    await injectContinuation({
+      ctx: ctx as never,
+      sessionID: "ses_display_name_agent",
+      resolvedInfo: {
+        agent: "Sisyphus (Ultraworker)",
+        model: { providerID: "anthropic", modelID: "claude-sonnet-4-20250514" },
+      },
+      sessionStateStore: sessionStateStore as never,
+    })
+
+    // then
+    expect(capturedAgent).toBe("sisyphus")
+  })
+
   test("inherits tools from resolved message info when reinjecting", async () => {
     // given
     let capturedTools: Record<string, boolean> | undefined
