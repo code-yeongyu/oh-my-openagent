@@ -63,17 +63,10 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
   spinner.stop(`Config written to ${color.cyan(omoResult.configPath)}`)
 
   if (!config.hasClaude) {
-    console.log()
-    console.log(color.bgRed(color.white(color.bold(" CRITICAL WARNING "))))
-    console.log()
-    console.log(color.red(color.bold("  Sisyphus agent is STRONGLY optimized for Claude Opus 4.5.")))
-    console.log(color.red("  Without Claude, you may experience significantly degraded performance:"))
-    console.log(color.dim("    • Reduced orchestration quality"))
-    console.log(color.dim("    • Weaker tool selection and delegation"))
-    console.log(color.dim("    • Less reliable task completion"))
-    console.log()
-    console.log(color.yellow("  Consider subscribing to Claude Pro/Max for the best experience."))
-    console.log()
+    p.log.info(
+      `${color.bold("Note:")} Sisyphus agent performs best with Claude Opus 4.5+.\n` +
+        `Other models work but may have reduced orchestration quality.`,
+    )
   }
 
   if (!config.hasClaude && !config.hasOpenAI && !config.hasGemini && !config.hasCopilot && !config.hasOpencodeZen) {
