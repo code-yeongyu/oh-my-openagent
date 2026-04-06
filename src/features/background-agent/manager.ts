@@ -30,6 +30,7 @@ import {
   POLLING_INTERVAL_MS,
   TASK_CLEANUP_DELAY_MS,
   TASK_TTL_MS,
+  USAGE_LIMIT_TASK_TIMEOUT_MS,
 } from "./constants"
 
 import { subagentSessions } from "../claude-code-session-state"
@@ -159,6 +160,7 @@ export class BackgroundManager {
   private completionTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
   private completedTaskSummaries: Map<string, BackgroundTaskNotificationTask[]> = new Map()
   private idleDeferralTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
+  private usageLimitTimeouts: Map<string, ReturnType<typeof setTimeout>> = new Map()
   private notificationQueueByParent: Map<string, Promise<void>> = new Map()
   private observedOutputSessions: Set<string> = new Set()
   private observedIncompleteTodosBySession: Map<string, boolean> = new Map()
@@ -1310,6 +1312,10 @@ export class BackgroundManager {
       idleDeferralTimers: this.idleDeferralTimers,
       queuesByKey: this.queuesByKey,
       processKey: (key: string) => this.processKey(key),
+      onUsageLimitCancel: (message) => {
+        this.queuePendingNotification(task.parentSessionID, message)
+        this.scheduleUsageLimitTimeout(task)
+      },
     })
     return result.then((retried) => {
       if (retried && previousSessionID) {
@@ -1319,6 +1325,31 @@ export class BackgroundManager {
       }
       return retried
     })
+  }
+
+  /**
+   * Schedules a safety-net cancellation for a task that was stopped due to a usage-limit
+   * error.  If the task is somehow still active after USAGE_LIMIT_TASK_TIMEOUT_MS (30 min),
+   * it is force-cancelled so it never hangs indefinitely.
+   */
+  private scheduleUsageLimitTimeout(task: BackgroundTask): void {
+    const existing = this.usageLimitTimeouts.get(task.id)
+    if (existing) return // already scheduled
+
+    const timer = setTimeout(() => {
+      this.usageLimitTimeouts.delete(task.id)
+      if (task.status === "running" || task.status === "pending") {
+        log("[background-agent] Usage-limit safety timeout expired, force-cancelling task:", task.id)
+        void this.cancelTask(task.id, {
+          source: "usage-limit-timeout",
+          reason: "Usage-limit safety timeout (30 min) expired — task force-cancelled.",
+        }).catch((err) => {
+          log("[background-agent] Failed to force-cancel after usage-limit timeout:", { taskId: task.id, error: err })
+        })
+      }
+    }, USAGE_LIMIT_TASK_TIMEOUT_MS)
+
+    this.usageLimitTimeouts.set(task.id, timer)
   }
 
   markForNotification(task: BackgroundTask): void {
@@ -1553,6 +1584,12 @@ export class BackgroundManager {
     if (idleTimer) {
       clearTimeout(idleTimer)
       this.idleDeferralTimers.delete(task.id)
+    }
+
+    const usageLimitTimer = this.usageLimitTimeouts.get(task.id)
+    if (usageLimitTimer) {
+      clearTimeout(usageLimitTimer)
+      this.usageLimitTimeouts.delete(task.id)
     }
 
     if (abortSession && task.sessionID) {

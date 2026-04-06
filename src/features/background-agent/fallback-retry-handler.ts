@@ -5,6 +5,7 @@ import type { OpencodeClient, QueueItem } from "./constants"
 import { log, readConnectedProvidersCache, readProviderModelsCache } from "../../shared"
 import {
   shouldRetryError,
+  isUsageLimitError,
   getNextFallback,
   hasMoreFallbacks,
   selectFallbackProvider,
@@ -21,11 +22,14 @@ export async function tryFallbackRetry(args: {
   idleDeferralTimers: Map<string, ReturnType<typeof setTimeout>>
   queuesByKey: Map<string, QueueItem[]>
   processKey: (key: string) => void
+  /** Called when a usage-limit error is cancelled (no ignore_usage_limit). Delivers a message to the parent session. */
+  onUsageLimitCancel?: (message: string) => void
 }): Promise<boolean> {
   const { task, errorInfo, source, concurrencyManager, client, idleDeferralTimers, queuesByKey, processKey } = args
+  const usageLimitErr = isUsageLimitError(errorInfo)
   const fallbackChain = task.fallbackChain
   const canRetry =
-    shouldRetryError(errorInfo) &&
+    (shouldRetryError(errorInfo) || usageLimitErr) &&
     fallbackChain &&
     fallbackChain.length > 0 &&
     hasMoreFallbacks(fallbackChain, task.attemptCount ?? 0)
@@ -66,12 +70,35 @@ export async function tryFallbackRetry(args: {
   }
   if (!nextFallback) return false
 
+  // Usage-limit stop errors are not automatically retried to avoid spending on a
+  // different provider without user consent.  The only exception is when the next
+  // fallback entry is explicitly marked with `ignore_usage_limit: true`.
+  if (usageLimitErr && !nextFallback.ignore_usage_limit) {
+    const currentModel = task.model
+      ? `${task.model.providerID}/${task.model.modelID}`
+      : "current model"
+    const nextModel = `${nextFallback.providers[0] ?? "?"}/${nextFallback.model}`
+    const message =
+      `⚠️ **Usage limit reached** for \`${currentModel}\` (task \`${task.id}\`: "${task.description}").\n` +
+      `Automatic fallback to \`${nextModel}\` was **blocked** to prevent unintended spending.\n\n` +
+      `To enable automatic fallback for this model, add \`"ignore_usage_limit": true\` to the relevant entry in \`fallback_models\`.\n` +
+      `The task has been cancelled.`
+    log("[background-agent] Usage-limit error — cancelling instead of falling back:", {
+      taskId: task.id,
+      source,
+      currentModel,
+      nextModel,
+    })
+    args.onUsageLimitCancel?.(message)
+    return false
+  }
+
   const providerID = selectFallbackProvider(
     nextFallback.providers,
     task.model?.providerID,
   )
 
-  log("[background-agent] Retryable error, attempting fallback:", {
+  log(`[background-agent] ${usageLimitErr ? "Usage-limit error with ignore_usage_limit=true" : "Retryable error"}, attempting fallback:`, {
     taskId: task.id,
     source,
     errorName: errorInfo.name,

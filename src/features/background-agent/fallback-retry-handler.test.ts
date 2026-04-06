@@ -4,6 +4,7 @@ const sharedLogMock = mock(() => {})
 const readConnectedProvidersCacheMock = mock(() => null)
 const readProviderModelsCacheMock = mock(() => null)
 const shouldRetryErrorMock = mock(() => true)
+const isUsageLimitErrorMock = mock(() => false)
 const getNextFallbackMock = mock((chain: Array<{ model: string }>, attempt: number) => chain[attempt])
 const hasMoreFallbacksMock = mock((chain: Array<{ model: string }>, attempt: number) => attempt < chain.length)
 const selectFallbackProviderMock = mock((providers: string[]) => providers[0])
@@ -25,6 +26,7 @@ async function importFreshFallbackRetryHandlerModule() {
 
   mock.module("../../shared/model-error-classifier", () => ({
     shouldRetryError: shouldRetryErrorMock,
+    isUsageLimitError: isUsageLimitErrorMock,
     getNextFallback: getNextFallbackMock,
     hasMoreFallbacks: hasMoreFallbacksMock,
     selectFallbackProvider: selectFallbackProviderMock,
@@ -40,12 +42,13 @@ async function importFreshFallbackRetryHandlerModule() {
   return {
     tryFallbackRetry: retryHandlerModule.tryFallbackRetry,
     shouldRetryError: shouldRetryErrorMock,
+    isUsageLimitError: isUsageLimitErrorMock,
     selectFallbackProvider: selectFallbackProviderMock,
     readProviderModelsCache: readProviderModelsCacheMock,
   }
 }
 
-const { tryFallbackRetry, shouldRetryError, selectFallbackProvider, readProviderModelsCache } =
+const { tryFallbackRetry, shouldRetryError, isUsageLimitError, selectFallbackProvider, readProviderModelsCache } =
   await importFreshFallbackRetryHandlerModule()
 
 function createDeferredPromise(): {
@@ -134,6 +137,7 @@ describe("tryFallbackRetry", () => {
 
   beforeEach(() => {
     ;(shouldRetryError as any).mockImplementation(() => true)
+    ;(isUsageLimitError as any).mockImplementation(() => false)
     ;(selectFallbackProvider as any).mockImplementation((providers: string[]) => providers[0])
     ;(readProviderModelsCache as any).mockReturnValue(null)
   })
@@ -360,6 +364,104 @@ describe("tryFallbackRetry", () => {
       expect(result).toBe(true)
       expect(args.task.model?.providerID).toBe("provider-a")
       expect(args.task.model?.modelID).toBe("fallback-model-1")
+    })
+  })
+
+  describe("#given usage-limit error (no ignore_usage_limit)", () => {
+    test("returns false and does NOT retry", async () => {
+      ;(shouldRetryError as any).mockImplementation(() => false)
+      ;(isUsageLimitError as any).mockImplementation(() => true)
+
+      const args = createDefaultArgs({
+        fallbackChain: [{ model: "fallback-model-1", providers: ["provider-a"], variant: undefined }],
+      })
+
+      const result = await tryFallbackRetry(args)
+
+      expect(result).toBe(false)
+    })
+
+    test("calls onUsageLimitCancel with a descriptive message", async () => {
+      ;(shouldRetryError as any).mockImplementation(() => false)
+      ;(isUsageLimitError as any).mockImplementation(() => true)
+
+      const onUsageLimitCancel = mock((_msg: string) => {})
+      const args = {
+        ...createDefaultArgs({
+          fallbackChain: [{ model: "fallback-model-1", providers: ["provider-a"], variant: undefined }],
+        }),
+        onUsageLimitCancel,
+      }
+
+      await tryFallbackRetry(args)
+
+      expect(onUsageLimitCancel).toHaveBeenCalledTimes(1)
+      const [message] = (onUsageLimitCancel as any).mock.calls[0]
+      expect(message).toContain("Usage limit reached")
+      expect(message).toContain("provider-a/fallback-model-1")
+      expect(message).toContain("ignore_usage_limit")
+    })
+
+    test("does not mutate task status or model", async () => {
+      ;(shouldRetryError as any).mockImplementation(() => false)
+      ;(isUsageLimitError as any).mockImplementation(() => true)
+
+      const args = createDefaultArgs({
+        fallbackChain: [{ model: "fallback-model-1", providers: ["provider-a"], variant: undefined }],
+        status: "error",
+        model: { providerID: "provider-a", modelID: "original-model" },
+      })
+
+      await tryFallbackRetry(args)
+
+      expect(args.task.status).toBe("error")
+      expect(args.task.model?.modelID).toBe("original-model")
+    })
+  })
+
+  describe("#given usage-limit error with ignore_usage_limit: true on next fallback", () => {
+    test("returns true and proceeds with fallback", async () => {
+      ;(shouldRetryError as any).mockImplementation(() => false)
+      ;(isUsageLimitError as any).mockImplementation(() => true)
+
+      const args = createDefaultArgs({
+        fallbackChain: [{ model: "fallback-model-1", providers: ["provider-a"], ignore_usage_limit: true }],
+      })
+
+      const result = await tryFallbackRetry(args)
+
+      expect(result).toBe(true)
+    })
+
+    test("does NOT call onUsageLimitCancel", async () => {
+      ;(shouldRetryError as any).mockImplementation(() => false)
+      ;(isUsageLimitError as any).mockImplementation(() => true)
+
+      const onUsageLimitCancel = mock((_msg: string) => {})
+      const args = {
+        ...createDefaultArgs({
+          fallbackChain: [{ model: "fallback-model-1", providers: ["provider-a"], ignore_usage_limit: true }],
+        }),
+        onUsageLimitCancel,
+      }
+
+      await tryFallbackRetry(args)
+
+      expect(onUsageLimitCancel).not.toHaveBeenCalled()
+    })
+
+    test("sets task model to the fallback entry", async () => {
+      ;(shouldRetryError as any).mockImplementation(() => false)
+      ;(isUsageLimitError as any).mockImplementation(() => true)
+
+      const args = createDefaultArgs({
+        fallbackChain: [{ model: "fallback-model-1", providers: ["provider-a"], ignore_usage_limit: true }],
+      })
+
+      await tryFallbackRetry(args)
+
+      expect(args.task.model?.modelID).toBe("fallback-model-1")
+      expect(args.task.status).toBe("pending")
     })
   })
 })

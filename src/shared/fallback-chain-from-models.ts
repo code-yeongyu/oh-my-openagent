@@ -68,6 +68,7 @@ export function parseFallbackModelObjectEntry(
     top_p: obj.top_p,
     maxTokens: obj.maxTokens,
     thinking: obj.thinking,
+    ignore_usage_limit: obj.ignore_usage_limit,
   }
 }
 
