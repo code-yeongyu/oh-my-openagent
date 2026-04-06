@@ -88,10 +88,9 @@ Description: ${task.description}
 Agent: ${task.agent} (subagent)
 Status: ${task.status}
 
-The system will notify you when the task completes.
-Use \`background_output\` tool with task_id="${task.id}" to check progress:
-- block=false (default): Check status immediately - returns full status info
-- block=true: Wait for completion (rarely needed since system notifies)`
+System notifies on completion. Use \`background_output\` with task_id="${task.id}" to check.
+
+Do NOT call background_output now. Wait for <system-reminder> notification first.`
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     return `Failed to launch background agent task: ${message}`
