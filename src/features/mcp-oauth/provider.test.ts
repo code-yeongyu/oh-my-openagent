@@ -287,7 +287,7 @@ describe("McpOAuthProvider", () => {
       })
       const fetchMock = Object.assign(
         async (...args: Parameters<typeof fetch>): ReturnType<typeof fetch> => fetchStub(...args),
-        { preconnect: originalFetch.preconnect.bind(originalFetch) },
+        { preconnect: originalFetch?.preconnect?.bind(originalFetch) ?? (() => {}) },
       ) satisfies typeof fetch
       globalThis.fetch = fetchMock
 

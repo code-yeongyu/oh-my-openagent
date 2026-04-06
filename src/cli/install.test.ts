@@ -13,6 +13,7 @@ const mockConsoleError = mock(() => {})
 describe("install CLI - binary check behavior", () => {
   let tempDir: string
   let originalEnv: string | undefined
+  let originalFetch: typeof globalThis.fetch
   let isOpenCodeInstalledSpy: ReturnType<typeof spyOn>
   let getOpenCodeVersionSpy: ReturnType<typeof spyOn>
 
@@ -20,6 +21,7 @@ describe("install CLI - binary check behavior", () => {
     // given temporary config directory
     tempDir = join(tmpdir(), `omo-test-${Date.now()}-${Math.random().toString(36).slice(2)}`)
     mkdirSync(tempDir, { recursive: true })
+    originalFetch = globalThis.fetch
 
     originalEnv = process.env.OPENCODE_CONFIG_DIR
     process.env.OPENCODE_CONFIG_DIR = tempDir
@@ -46,6 +48,7 @@ describe("install CLI - binary check behavior", () => {
 
     isOpenCodeInstalledSpy?.mockRestore()
     getOpenCodeVersionSpy?.mockRestore()
+    globalThis.fetch = originalFetch
   })
 
   test("non-TUI mode: should show warning but continue when OpenCode binary not found", async () => {
