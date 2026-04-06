@@ -80,7 +80,7 @@ async function resolveMainSessionTarget(
         model =
           info?.model ??
           (info?.providerID && info?.modelID ? { providerID: info.providerID, modelID: info.modelID } : undefined)
-        variant = (info as Record<string, unknown>)?.variant as string | undefined
+        variant = info?.variant
         tools = resolveInheritedPromptTools(sessionID, info?.tools) ?? tools
         break
       }

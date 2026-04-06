@@ -6,6 +6,7 @@ type MessageInfo = {
   role?: string
   agent?: string
   model?: { providerID: string; modelID: string }
+  variant?: string
   providerID?: string
   modelID?: string
   tools?: Record<string, boolean | "allow" | "deny" | "ask">
@@ -29,27 +30,27 @@ export function getMessageInfo(value: unknown): MessageInfo | undefined {
   if (!isRecord(value)) return undefined
   if (!isRecord(value.info)) return undefined
   const info = value.info
-  const modelValue = isRecord(info.model)
-    ? info.model
-    : undefined
-  const model = modelValue && typeof modelValue.providerID === "string" && typeof modelValue.modelID === "string"
-    ? { providerID: modelValue.providerID, modelID: modelValue.modelID }
-    : undefined
+  const modelValue = isRecord(info.model) ? info.model : undefined
+  const model =
+    modelValue && typeof modelValue.providerID === "string" && typeof modelValue.modelID === "string"
+      ? { providerID: modelValue.providerID, modelID: modelValue.modelID }
+      : undefined
+  const variant =
+    typeof modelValue?.variant === "string"
+      ? (modelValue.variant as string)
+      : typeof info.variant === "string"
+        ? (info.variant as string)
+        : undefined
   return {
     role: typeof info.role === "string" ? info.role : undefined,
     agent: typeof info.agent === "string" ? info.agent : undefined,
     model,
+    variant,
     providerID: typeof info.providerID === "string" ? info.providerID : undefined,
     modelID: typeof info.modelID === "string" ? info.modelID : undefined,
     tools: isRecord(info.tools)
       ? Object.entries(info.tools).reduce<Record<string, boolean | "allow" | "deny" | "ask">>((acc, [key, value]) => {
-          if (
-            value === true ||
-            value === false ||
-            value === "allow" ||
-            value === "deny" ||
-            value === "ask"
-          ) {
+          if (value === true || value === false || value === "allow" || value === "deny" || value === "ask") {
             acc[key] = value
           }
           return acc

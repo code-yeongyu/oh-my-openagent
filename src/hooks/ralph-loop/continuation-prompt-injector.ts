@@ -44,7 +44,9 @@ export async function injectContinuationPrompt(
         model =
           info.model ??
           (info.providerID && info.modelID ? { providerID: info.providerID, modelID: info.modelID } : undefined)
-        variant = (info as Record<string, unknown>).variant as string | undefined
+        variant =
+          ((info?.model as Record<string, unknown>)?.variant as string | undefined) ??
+          ((info as Record<string, unknown>)?.variant as string | undefined)
         tools = info.tools
         break
       }
