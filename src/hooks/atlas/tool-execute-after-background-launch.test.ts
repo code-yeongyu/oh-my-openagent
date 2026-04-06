@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { PluginInput } from "@opencode-ai/plugin"
-import { createOpencodeClient, type Project } from "@opencode-ai/sdk"
+import type { Project } from "@opencode-ai/sdk"
 import { readBoulderState, writeBoulderState } from "../../features/boulder-state"
 import { createToolExecuteBeforeHandler } from "./tool-execute-before"
 
@@ -29,8 +29,13 @@ afterAll(() => { mock.restore() })
 
 const { createToolExecuteAfterHandler } = await import("./tool-execute-after")
 
-type OpencodeClient = ReturnType<typeof createOpencodeClient>
-type SessionGetResult = Awaited<ReturnType<OpencodeClient["session"]["get"]>>
+type SessionGetInput = { path: { id: string } }
+type SessionGetResult = {
+  data: { parentID: string | undefined }
+  error?: undefined
+  request: Request
+  response: Response
+}
 
 describe("createToolExecuteAfterHandler background launch detection", () => {
   let testDirectory = ""
@@ -75,11 +80,15 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
 
   function createHandler(parentSessionIDs?: Record<string, string | undefined>) {
     const project = createProject()
-    const client = createOpencodeClient()
+    const client = {
+      session: {
+        get: async (input: SessionGetInput) => createSessionGetResult(parentSessionIDs?.[input.path.id]),
+      },
+    } as unknown as PluginInput["client"]
 
     if (parentSessionIDs) {
       spyOn(client.session, "get").mockImplementation((input) => Promise.resolve(
-        createSessionGetResult(parentSessionIDs[input.path.id]),
+        createSessionGetResult(parentSessionIDs[input?.path?.id ?? ""]),
       ) as never)
     }
 
@@ -132,10 +141,14 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
         const childSessionID = "ses_child123"
         const planPath = join(testDirectory, "background-launch-plan.md")
         const project = createProject()
-        const client = createOpencodeClient()
+        const client = {
+          session: {
+            get: async () => createSessionGetResult(undefined),
+          },
+        } as unknown as PluginInput["client"]
 
         spyOn(client.session, "get").mockImplementation((input) => Promise.resolve(
-          createSessionGetResult(input.path.id === childSessionID ? sessionID : undefined),
+          createSessionGetResult(input?.path?.id === childSessionID ? sessionID : undefined),
         ) as never)
 
         writeFileSync(planPath, `# Plan
@@ -202,10 +215,14 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
         const childSessionID = "ses_child_lookup_failure"
         const planPath = join(testDirectory, "background-launch-plan.md")
         const project = createProject()
-        const client = createOpencodeClient()
+        const client = {
+          session: {
+            get: async () => createSessionGetResult(undefined),
+          },
+        } as unknown as PluginInput["client"]
 
         spyOn(client.session, "get").mockImplementation((input) => {
-          if (input.path.id === childSessionID) {
+          if (input?.path?.id === childSessionID) {
             return Promise.reject(new Error("lookup failed")) as never
           }
           return Promise.resolve(createSessionGetResult(undefined)) as never
@@ -271,10 +288,14 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
         const childSessionID = "ses_outside_lineage"
         const planPath = join(testDirectory, "background-launch-plan.md")
         const project = createProject()
-        const client = createOpencodeClient()
+        const client = {
+          session: {
+            get: async () => createSessionGetResult(undefined),
+          },
+        } as unknown as PluginInput["client"]
 
         spyOn(client.session, "get").mockImplementation((input) => Promise.resolve(
-          createSessionGetResult(input.path.id === childSessionID ? "ses_unrelated_parent" : undefined),
+          createSessionGetResult(input?.path?.id === childSessionID ? "ses_unrelated_parent" : undefined),
         ) as never)
 
         writeFileSync(planPath, `# Plan
@@ -337,10 +358,14 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
         const childSessionID = "ses_unrelated_child"
         const planPath = join(testDirectory, "background-launch-plan.md")
         const project = createProject()
-        const client = createOpencodeClient()
+        const client = {
+          session: {
+            get: async () => createSessionGetResult(undefined),
+          },
+        } as unknown as PluginInput["client"]
 
         spyOn(client.session, "get").mockImplementation((input) => Promise.resolve(
-          createSessionGetResult(input.path.id === childSessionID ? sessionID : undefined),
+          createSessionGetResult(input?.path?.id === childSessionID ? sessionID : undefined),
         ) as never)
 
         writeFileSync(planPath, `# Plan
