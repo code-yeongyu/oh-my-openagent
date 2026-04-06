@@ -1205,8 +1205,8 @@ describe("per-agent todowrite/todoread deny when task_system enabled", () => {
   const AGENTS_WITH_TODO_DENY = new Set([
     getAgentListDisplayName("sisyphus"),
     getAgentListDisplayName("hephaestus"),
-    getAgentListDisplayName("atlas"),
     getAgentListDisplayName("prometheus"),
+    getAgentListDisplayName("atlas"),
     getAgentListDisplayName("sisyphus-junior"),
   ])
 
@@ -1218,8 +1218,8 @@ describe("per-agent todowrite/todoread deny when task_system enabled", () => {
     createBuiltinAgentsMock.mockResolvedValue({
       sisyphus: { name: "sisyphus", prompt: "test", mode: "primary" },
       hephaestus: { name: "hephaestus", prompt: "test", mode: "primary" },
-      atlas: { name: "atlas", prompt: "test", mode: "primary" },
       prometheus: { name: "prometheus", prompt: "test", mode: "primary" },
+      atlas: { name: "atlas", prompt: "test", mode: "primary" },
       "sisyphus-junior": { name: "sisyphus-junior", prompt: "test", mode: "subagent" },
       oracle: { name: "oracle", prompt: "test", mode: "subagent" },
     })

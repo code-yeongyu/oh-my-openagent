@@ -163,9 +163,14 @@ export async function applyAgentConfig(params: {
         getAgentDisplayName("sisyphus");
     }
 
+    // Assembly order: Sisyphus -> Hephaestus -> Prometheus -> Atlas
     const agentConfig: Record<string, unknown> = {
       sisyphus: builtinAgents.sisyphus,
     };
+
+    if (builtinAgents.hephaestus) {
+      agentConfig["hephaestus"] = builtinAgents.hephaestus;
+    }
 
     agentConfig["sisyphus-junior"] = createSisyphusJuniorAgentWithOverrides(
       params.pluginConfig.agents?.["sisyphus-junior"],
@@ -248,7 +253,7 @@ export async function applyAgentConfig(params: {
     params.config.agent = {
       ...agentConfig,
       ...Object.fromEntries(
-        Object.entries(builtinAgents).filter(([key]) => key !== "sisyphus"),
+        Object.entries(builtinAgents).filter(([key]) => key !== "sisyphus" && key !== "hephaestus"),
       ),
       ...filterDisabledAgents(filteredUserAgents),
       ...filterDisabledAgents(filteredProjectAgents),
