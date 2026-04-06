@@ -49,12 +49,16 @@ export function buildBackgroundTaskNotificationText(input: {
       body = `- \`${task.id}\`: ${safeDescription(task)} [${task.status.toUpperCase()}]${task.error ? ` - ${task.error}` : ""}\n`
     }
 
+    const outputCalls = completedTasks
+      .map((t) => `background_output(task_id="${t.id}")`)
+      .join(", ")
+
     return `<system-reminder>
 ${header}
 
 ${body.trim()}
 
-Use \`background_output(task_id="<id>")\` to retrieve each result.${hasFailures ? `\n\n**ACTION REQUIRED:** ${failedTasks.length} task(s) failed. Check errors above and decide whether to retry or proceed.` : ""}
+Use ${outputCalls} to retrieve each result.${hasFailures ? `\n\n**ACTION REQUIRED:** ${failedTasks.length} task(s) failed. Check errors above and decide whether to retry or proceed.` : ""}
 </system-reminder>`
   }
 
