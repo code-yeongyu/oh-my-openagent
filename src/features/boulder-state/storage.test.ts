@@ -399,8 +399,8 @@ describe("boulder-state", () => {
       expect(progress.isComplete).toBe(false)
     })
 
-    test("should count space-indented unchecked checkbox", () => {
-      // given - plan file with a two-space indented checkbox
+    test("should not count space-indented unchecked checkbox", () => {
+      // given - plan file with a two-space indented checkbox (not top-level)
       const planPath = join(TEST_DIR, "space-indented-plan.md")
       writeFileSync(planPath, `# Plan
   - [ ] indented task
@@ -409,14 +409,14 @@ describe("boulder-state", () => {
       // when
       const progress = getPlanProgress(planPath)
 
-      // then
-      expect(progress.total).toBe(1)
+      // then - indented checkboxes are ignored to match readCurrentTopLevelTask semantics
+      expect(progress.total).toBe(0)
       expect(progress.completed).toBe(0)
       expect(progress.isComplete).toBe(false)
     })
 
-    test("should count tab-indented unchecked checkbox", () => {
-      // given - plan file with a tab-indented checkbox
+    test("should not count tab-indented unchecked checkbox", () => {
+      // given - plan file with a tab-indented checkbox (not top-level)
       const planPath = join(TEST_DIR, "tab-indented-plan.md")
       writeFileSync(planPath, `# Plan
 	- [ ] tab-indented task
@@ -425,13 +425,13 @@ describe("boulder-state", () => {
       // when
       const progress = getPlanProgress(planPath)
 
-      // then
-      expect(progress.total).toBe(1)
+      // then - indented checkboxes are ignored to match readCurrentTopLevelTask semantics
+      expect(progress.total).toBe(0)
       expect(progress.completed).toBe(0)
       expect(progress.isComplete).toBe(false)
     })
 
-    test("should count mixed top-level checked and indented unchecked checkboxes", () => {
+    test("should count only top-level checkbox and ignore indented unchecked checkbox", () => {
       // given - plan file with checked top-level and unchecked indented task
       const planPath = join(TEST_DIR, "mixed-indented-plan.md")
       writeFileSync(planPath, `# Plan
@@ -442,14 +442,14 @@ describe("boulder-state", () => {
       // when
       const progress = getPlanProgress(planPath)
 
-      // then
-      expect(progress.total).toBe(2)
+      // then - only the top-level checkbox is counted
+      expect(progress.total).toBe(1)
       expect(progress.completed).toBe(1)
-      expect(progress.isComplete).toBe(false)
+      expect(progress.isComplete).toBe(true)
     })
 
-    test("should count space-indented completed checkbox", () => {
-      // given - plan file with a two-space indented completed checkbox
+    test("should not count space-indented completed checkbox", () => {
+      // given - plan file with a two-space indented completed checkbox (not top-level)
       const planPath = join(TEST_DIR, "indented-completed-plan.md")
       writeFileSync(planPath, `# Plan
   - [x] indented completed task
@@ -458,10 +458,10 @@ describe("boulder-state", () => {
       // when
       const progress = getPlanProgress(planPath)
 
-      // then
-      expect(progress.total).toBe(1)
-      expect(progress.completed).toBe(1)
-      expect(progress.isComplete).toBe(true)
+      // then - indented checkboxes are ignored to match readCurrentTopLevelTask semantics
+      expect(progress.total).toBe(0)
+      expect(progress.completed).toBe(0)
+      expect(progress.isComplete).toBe(false)
     })
 
     test("should return isComplete true when all checked", () => {
