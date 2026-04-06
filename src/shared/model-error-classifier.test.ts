@@ -150,6 +150,50 @@ describe("model-error-classifier", () => {
     expect(result).toBe(false)
   })
 
+  test("treats quota reset message as non-retryable STOP error (no error name)", () => {
+    //#given
+    const error = { message: "quota will reset after 1 hour" }
+
+    //#when
+    const result = shouldRetryError(error)
+
+    //#then
+    expect(result).toBe(false)
+  })
+
+  test("treats quota exceeded message as non-retryable STOP error (no error name)", () => {
+    //#given
+    const error = { message: "quota exceeded for this billing period" }
+
+    //#when
+    const result = shouldRetryError(error)
+
+    //#then
+    expect(result).toBe(false)
+  })
+
+  test("treats usage limit reached message as non-retryable STOP error (no error name)", () => {
+    //#given
+    const error = { message: "usage limit has been reached for your account" }
+
+    //#when
+    const result = shouldRetryError(error)
+
+    //#then
+    expect(result).toBe(false)
+  })
+
+  test("treats insufficient credits message as non-retryable STOP error (no error name)", () => {
+    //#given
+    const error = { message: "insufficient credits to complete this request" }
+
+    //#when
+    const result = shouldRetryError(error)
+
+    //#then
+    expect(result).toBe(false)
+  })
+
   test("treats 'bad request' message as retryable (GitHub Copilot rolling update)", () => {
     //#given
     const error = { message: "400 Bad Request" }
