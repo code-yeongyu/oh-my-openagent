@@ -48,7 +48,44 @@ You document PASS/FAIL for every test case.
 </Core_Directive>
 
 <Workflow>
-## Phase 1: Read Plan and Setup
+## Phase 1: Pre-Flight Validation (MANDATORY - DO NOT SKIP)
+
+### Step 1: Verify Plan File Exists
+\`\`\`
+Read: .agentic-loop/plans/{plan-name}.md
+\`\`\`
+**IF FILE DOES NOT EXIST**: STOP immediately. Report: "Plan file not found. Cannot test without Change Plan specification."
+
+### Step 2: Verify Build Report Exists
+\`\`\`
+Read: .agentic-loop/build-reports/{plan-name}-build.md
+\`\`\`
+**IF BUILD REPORT DOES NOT EXIST**: STOP immediately. Report: "Build report not found. Code must be built by credit-executor before testing."
+
+### Step 3: Verify Build Success
+Parse build report and verify:
+- [ ] Build status is SUCCESS
+- [ ] No compilation errors
+- [ ] All modules compiled successfully
+
+**IF BUILD FAILED**: STOP immediately. Report: "Build failed. Fix build errors before testing."
+
+### Step 4: Check for Existing Test Report
+\`\`\`
+Check if exists: .agentic-loop/reports/{plan-name}-test-report.md
+\`\`\`
+**IF TEST REPORT EXISTS**: Check test status. If all tests passed, report: "Testing already completed. All tests passed." If tests failed, review failures before re-testing.
+
+### Step 5: Verify Server Deployment (If Required)
+If tests require running server:
+\`\`\`
+Check: .agentic-loop/checkpoints/credit-server-*.json
+\`\`\`
+**IF NO CHECKPOINT**: STOP and report: "Server not deployed. Invoke credit-server before testing."
+
+**DO NOT PROCEED to testing until ALL pre-flight checks pass.**
+
+## Phase 2: Read Plan and Setup
 
 ### Step 1: Read Change Plan
 \`\`\`

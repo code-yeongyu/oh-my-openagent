@@ -10,7 +10,7 @@ const MODE: AgentMode = "subagent"
 const BLOCKED_TOOLS = ["edit", "apply_patch", "bash", "task"]
 
 export const CREDIT_PLAN_REVIEWER_DEFAULTS = {
-  model: "kimi/k2.5",
+  model: "kimi-k2.5",
   temperature: 0.1,
 } as const
 
@@ -98,6 +98,12 @@ export function createCreditPlanReviewerAgentWithOverrides(
   if (override?.top_p !== undefined) {
     base.top_p = override.top_p
   }
+
+  base.fallback_models = override?.fallback_models ?? [
+    "kimi-k2.5",
+    "gpt-5.4",
+    "claude-opus-4-6",
+  ]
 
   if (isGptModel(model)) {
     return { ...base, reasoningEffort: "high" } as AgentConfig

@@ -110,7 +110,48 @@ todowrite([
 ])
 \`\`\`
 
-## Phase 2: Pre-Validation Checklist (BEFORE Writing Code)
+## Phase 2: Pre-Flight Validation (MANDATORY - DO NOT SKIP)
+
+You MUST validate prerequisites before writing ANY code.
+
+### Step 1: Verify Plan File Exists
+\`\`\`
+Read: .agentic-loop/plans/{plan-name}.md
+\`\`\`
+**IF FILE DOES NOT EXIST**: STOP immediately. Report: "Plan file not found. Cannot proceed without approved Change Plan."
+
+### Step 2: Verify Review File Exists
+\`\`\`
+Read: .agentic-loop/reviews/{plan-name}-review.md
+\`\`\`
+**IF FILE DOES NOT EXIST**: STOP immediately. Report: "Review not found. Plan must be reviewed by credit-plan-reviewer before execution."
+
+### Step 3: Verify Review Approval
+Parse the review file and verify:
+- [ ] Verdict is "APPROVE"
+- [ ] Score is >= 30/40
+- [ ] No critical/blocking issues listed
+
+**IF NOT APPROVED**: STOP immediately. Report: "Plan not approved. Address review feedback before proceeding."
+
+### Step 4: Check for Existing Build
+\`\`\`
+Check if exists: .agentic-loop/build-reports/{plan-name}-build.md
+\`\`\`
+**IF BUILD REPORT EXISTS**: Check if build was successful. If successful, report: "Build already completed. Delegate to credit-server for deployment." If failed, review errors before retrying.
+
+**DO NOT PROCEED to implementation until ALL pre-flight checks pass.**
+
+<Pre_Flight_Checks>
+BEFORE starting implementation:
+1. Verify plan file exists at .agentic-loop/plans/{plan-name}.md
+2. Verify review file exists at .agentic-loop/reviews/{plan-name}-review.md  
+3. Verify review verdict is APPROVE (read and parse the review file)
+4. Verify build report does NOT already exist (prevent duplicate execution)
+5. If ANY check fails, STOP and report which phase is missing
+</Pre_Flight_Checks>
+
+## Phase 3: Pre-Validation Checklist (BEFORE Writing Code)
 
 ### Critical: Validate These BEFORE Implementation
 

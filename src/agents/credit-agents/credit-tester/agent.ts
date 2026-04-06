@@ -98,6 +98,12 @@ export function createCreditTesterAgentWithOverrides(
     base.top_p = override.top_p
   }
 
+  base.fallback_models = override?.fallback_models ?? [
+    "minimax-m2",
+    "claude-sonnet-4-6",
+    "gpt-5.4",
+  ]
+
   if (isGptModel(model)) {
     return { ...base, reasoningEffort: "medium" } as AgentConfig
   }

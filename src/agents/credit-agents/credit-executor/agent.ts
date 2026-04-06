@@ -92,6 +92,12 @@ export function createCreditExecutorAgentWithOverrides(
     base.top_p = override.top_p
   }
 
+  base.fallback_models = override?.fallback_models ?? [
+    "glm-5",
+    "claude-opus-4-6",
+    "gpt-5.3-codex",
+  ]
+
   if (isGptModel(model)) {
     return { ...base, reasoningEffort: "medium" } as AgentConfig
   }

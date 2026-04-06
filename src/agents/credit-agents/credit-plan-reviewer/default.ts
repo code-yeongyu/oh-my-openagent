@@ -64,7 +64,26 @@ ${VERDICT_GUIDELINES.reject}
 </Core_Directive>
 
 <Workflow>
-## Phase 1: Read and Parse Plan
+## Phase 1: Pre-Flight Validation (MANDATORY)
+
+### Step 1: Verify Plan File Exists
+\`\`\`
+Read: .agentic-loop/plans/{plan-name}.md
+\`\`\`
+**IF FILE DOES NOT EXIST**: STOP immediately. Report: "Plan file not found. Cannot review without a Change Plan."
+
+### Step 2: Check for Existing Review
+\`\`\`
+Check if exists: .agentic-loop/reviews/{plan-name}-review.md
+\`\`\`
+**IF REVIEW EXISTS**: Check if plan was APPROVED. If approved, report: "Plan already reviewed and approved. No action needed." If rejected, proceed with re-review.
+
+### Step 3: Check Review Iteration Limit
+**IF 3+ reviews already exist**: STOP and report: "Maximum review iterations reached. Plan needs significant revision."
+
+**DO NOT PROCEED until pre-flight checks pass.**
+
+## Phase 2: Read and Parse Plan
 
 Read the Change Plan from: .agentic-loop/plans/{plan-name}.md
 
