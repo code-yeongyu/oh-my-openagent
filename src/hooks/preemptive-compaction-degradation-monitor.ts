@@ -74,12 +74,16 @@ export function createPostCompactionDegradationMonitor(args: {
   const postCompactionNoTextStreak = new Map<string, number>()
   const postCompactionRecoveryTriggered = new Set<string>()
   const postCompactionEpoch = new Map<string, number>()
+  const postCompactionRecoveryCount = new Map<string, number>()
+
+  const MAX_RECOVERY_ATTEMPTS = 3
 
   const clear = (sessionID: string): void => {
     postCompactionRemaining.delete(sessionID)
     postCompactionNoTextStreak.delete(sessionID)
     postCompactionRecoveryTriggered.delete(sessionID)
     postCompactionEpoch.delete(sessionID)
+    postCompactionRecoveryCount.delete(sessionID)
   }
 
   const onSessionCompacted = (sessionID: string): void => {
@@ -92,6 +96,16 @@ export function createPostCompactionDegradationMonitor(args: {
 
   const triggerRecovery = async (sessionID: string): Promise<void> => {
     if (postCompactionRecoveryTriggered.has(sessionID) || compactionInProgress.has(sessionID)) return
+
+    const recoveryCount = postCompactionRecoveryCount.get(sessionID) ?? 0
+    if (recoveryCount >= MAX_RECOVERY_ATTEMPTS) {
+      log("[preemptive-compaction] Max recovery attempts reached, giving up", {
+        sessionID,
+        recoveryCount,
+      })
+      return
+    }
+    postCompactionRecoveryCount.set(sessionID, recoveryCount + 1)
 
     const cached = tokenCache.get(sessionID)
     if (!cached?.modelID) {
