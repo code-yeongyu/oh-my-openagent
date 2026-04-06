@@ -351,26 +351,66 @@ function waitForParentWakeErrorSettle(): Promise<void> {
 }
 
 describe("BackgroundManager notification settlement", () => {
-  test("hasPendingParentNotificationWork should return true for buffered notifications", () => {
+  test("hasPendingParentNotificationWork should return true for buffered notifications", async () => {
     const manager = createBackgroundManager()
 
     manager.queuePendingNotification("ses_parent", "done")
 
     expect(manager.hasPendingParentNotificationWork("ses_parent")).toBe(true)
+
+    await manager.shutdown()
   })
 
-  test("hasPendingParentNotificationWork should return true for queued notification promises", () => {
+  test("hasPendingParentNotificationWork should return true for queued notification promises", async () => {
     const manager = createBackgroundManager()
 
     getNotificationQueueByParent(manager).set("ses_parent", Promise.resolve())
 
     expect(manager.hasPendingParentNotificationWork("ses_parent")).toBe(true)
+
+    await manager.shutdown()
   })
 
-  test("hasPendingParentNotificationWork should return false when no notification work remains", () => {
+  test("hasPendingParentNotificationWork should return false when no notification work remains", async () => {
     const manager = createBackgroundManager()
 
     expect(manager.hasPendingParentNotificationWork("ses_parent")).toBe(false)
+
+    await manager.shutdown()
+  })
+
+  test("settlement callback should fire after queued notification work drains", async () => {
+    const manager = createBackgroundManager()
+    try {
+      const settledSessionIDs: string[] = []
+      const setOnParentNotificationWorkSettled = (manager as unknown as {
+        setOnParentNotificationWorkSettled: (callback: (sessionID: string) => void | Promise<void>) => void
+      }).setOnParentNotificationWorkSettled.bind(manager)
+      const enqueueNotificationForParent = (manager as unknown as {
+        enqueueNotificationForParent: (
+          parentSessionID: string | undefined,
+          operation: () => Promise<void>,
+        ) => Promise<void>
+      }).enqueueNotificationForParent.bind(manager)
+
+      setOnParentNotificationWorkSettled((sessionID) => {
+        settledSessionIDs.push(sessionID)
+      })
+
+      const firstNotification = enqueueNotificationForParent("ses_parent", async () => {
+        await Promise.resolve()
+      })
+
+      expect(manager.hasPendingParentNotificationWork("ses_parent")).toBe(true)
+
+      await firstNotification
+      await flushBackgroundNotifications()
+
+      expect(settledSessionIDs).toEqual(["ses_parent"])
+      expect(manager.hasPendingParentNotificationWork("ses_parent")).toBe(false)
+    } finally {
+      await manager.shutdown()
+    }
   })
 })
 
