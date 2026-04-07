@@ -1,5 +1,6 @@
 import { log } from "../../shared"
 import { getSessionAgent } from "../../features/claude-code-session-state"
+import { clearSessionModel } from "../../shared/session-model-state"
 import { classifyIntent, type ComplexityTier } from "./classifier"
 import { HAIKU_MODEL } from "./constants"
 
@@ -61,20 +62,29 @@ export function createIntentComplexityRouterHook(isEnabled: boolean) {
       sessionTiers.set(input.sessionID, tier)
 
       const agent = input.agent ?? getSessionAgent(input.sessionID) ?? ""
+      const isSisyphus = isSisyphusAgent(agent)
+      const currentModel = output.message["model"] as { providerID?: string; modelID?: string } | undefined
+
       log("[intent-complexity-router] Classified intent", {
         sessionID: input.sessionID,
         tier,
         preview: text.slice(0, 80),
         agent,
-        isSisyphus: isSisyphusAgent(agent),
-        currentModel: output.message["model"],
+        isSisyphus,
+        currentModel,
       })
 
-      // Don't downgrade on COMPLEX, and don't override if a model is already set
-      if (tier === "COMPLEX" || output.message["model"]) return
+      if (isSisyphus) {
+        const isHaikuOverride = currentModel?.modelID === HAIKU_MODEL.modelID
+        if (isHaikuOverride) {
+          delete output.message["model"]
+          clearSessionModel(input.sessionID)
+          log("[intent-complexity-router] Cleared Haiku override for Sisyphus", { sessionID: input.sessionID })
+        }
+        return
+      }
 
-      // Don't downgrade Sisyphus even if agent detection failed
-      if (isSisyphusAgent(agent)) return
+      if (tier === "COMPLEX" || currentModel) return
 
       output.message["model"] = HAIKU_MODEL
     },
