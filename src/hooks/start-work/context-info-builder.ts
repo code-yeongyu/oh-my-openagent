@@ -17,12 +17,33 @@ import { createWorktreeActiveBlock } from "./worktree-block"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { HOOK_NAME } from "./start-work-hook"
 
+function normalizePlanLookupValue(value: string): string {
+  return value
+    .trim()
+    .replace(/^["'`]+|["'`]+$/g, "")
+    .toLowerCase()
+    .replace(/[\s_]+/g, "-")
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "")
+}
+
 function findPlanByName(plans: string[], requestedName: string): string | null {
   const lowerName = requestedName.toLowerCase()
+  const normalizedRequestedName = normalizePlanLookupValue(requestedName)
   const exactMatch = plans.find((p) => getPlanName(p).toLowerCase() === lowerName)
   if (exactMatch) return exactMatch
+  const normalizedExactMatch = plans.find((planPath) =>
+    normalizePlanLookupValue(getPlanName(planPath)) === normalizedRequestedName,
+  )
+  if (normalizedExactMatch) return normalizedExactMatch
   const partialMatch = plans.find((p) => getPlanName(p).toLowerCase().includes(lowerName))
-  return partialMatch || null
+  if (partialMatch) return partialMatch
+
+  const normalizedPartialMatch = plans.find((planPath) =>
+    normalizePlanLookupValue(getPlanName(planPath)).includes(normalizedRequestedName),
+  )
+  return normalizedPartialMatch || null
 }
 
 function buildAutoSelectedPlanContext(params: {
