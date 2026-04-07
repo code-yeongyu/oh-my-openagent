@@ -16,7 +16,8 @@ function extractText(parts: ChatMessagePart[]): string {
 
 function isSisyphusAgent(agentName: string | undefined): boolean {
   if (!agentName) return false
-  return agentName.toLowerCase().includes("sisyphus")
+  const lower = agentName.toLowerCase()
+  return lower.startsWith("sisyphus") || lower === "sisyphus"
 }
 
 function isThinkingOptions(
@@ -62,6 +63,8 @@ export function createIntentComplexityRouterHook(isEnabled: boolean) {
         sessionID: input.sessionID,
         tier,
         preview: text.slice(0, 80),
+        agent: input.agent,
+        isSisyphus: isSisyphusAgent(input.agent),
       })
 
       // Only downgrade non-Sisyphus agents; Sisyphus always uses its configured model
