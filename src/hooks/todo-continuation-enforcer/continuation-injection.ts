@@ -16,7 +16,7 @@ import { log } from "../../shared/logger"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
 import {
   getAgentConfigKey,
-  normalizeAgentForPromptKey,
+  normalizeAgentForPrompt,
 } from "../../shared/agent-display-names"
 
 import {
@@ -126,7 +126,7 @@ export async function injectContinuation(args: {
     tools = tools ?? previousMessage?.tools
   }
 
-  const promptAgent = normalizeAgentForPromptKey(agentName)
+  const promptAgent = normalizeAgentForPrompt(agentName)
 
   if (promptAgent && skipAgents.some(s => getAgentConfigKey(s) === getAgentConfigKey(promptAgent))) {
     log(`[${HOOK_NAME}] Skipped: agent in skipAgents list`, { sessionID, agent: agentName })

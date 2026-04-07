@@ -40,7 +40,7 @@ describe("injectContinuation", () => {
     })
 
     // then
-    expect(capturedAgent).toBe("sisyphus")
+    expect(capturedAgent).toBe("Sisyphus - Ultraworker")
   })
 
   test("inherits tools from resolved message info when reinjecting", async () => {
