@@ -10,6 +10,9 @@ export interface JsoncParseResult<T> {
 }
 
 export function parseJsonc<T = unknown>(content: string): T {
+  // Strip UTF-8 BOM if present (Windows UTF-8 with BOM files)
+  content = content.replace(/^\uFEFF/, "")
+
   const errors: ParseError[] = []
   const result = parse(content, errors, {
     allowTrailingComma: true,

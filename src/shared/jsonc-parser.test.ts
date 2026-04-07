@@ -139,6 +139,33 @@ describe("parseJsonc", () => {
     // then
     expect(() => parseJsonc(invalid)).toThrow()
   })
+
+  test("parses JSONC with UTF-8 BOM (Windows BOM files)", () => {
+    // given - JSON with UTF-8 BOM marker
+    const bom = "\uFEFF"
+    const jsonc = `${bom}{ "key": "value" }`
+
+    // when
+    const result = parseJsonc<{ key: string }>(jsonc)
+
+    // then
+    expect(result.key).toBe("value")
+  })
+
+  test("parses JSONC with BOM and comments", () => {
+    // given - JSONC with UTF-8 BOM and comments
+    const bom = "\uFEFF"
+    const jsonc = `${bom}{
+      // Windows editor saved with BOM
+      "key": "value"
+    }`
+
+    // when
+    const result = parseJsonc<{ key: string }>(jsonc)
+
+    // then
+    expect(result.key).toBe("value")
+  })
 })
 
 describe("parseJsoncSafe", () => {
