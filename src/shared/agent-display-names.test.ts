@@ -203,10 +203,10 @@ describe("getAgentListDisplayName", () => {
 
 describe("normalizeAgentForPrompt", () => {
   it("strips core UI ordering prefixes back to canonical display names", () => {
-    expect(normalizeAgentForPrompt(getAgentListDisplayName("sisyphus"))).toBe("Sisyphus (Ultraworker)")
-    expect(normalizeAgentForPrompt(getAgentListDisplayName("hephaestus"))).toBe("Hephaestus (Deep Agent)")
-    expect(normalizeAgentForPrompt(getAgentListDisplayName("prometheus"))).toBe("Prometheus (Plan Builder)")
-    expect(normalizeAgentForPrompt(getAgentListDisplayName("atlas"))).toBe("Atlas (Plan Executor)")
+    expect(normalizeAgentForPrompt(getAgentListDisplayName("sisyphus"))).toBe("Sisyphus - Ultraworker")
+    expect(normalizeAgentForPrompt(getAgentListDisplayName("hephaestus"))).toBe("Hephaestus - Deep Agent")
+    expect(normalizeAgentForPrompt(getAgentListDisplayName("prometheus"))).toBe("Prometheus - Plan Builder")
+    expect(normalizeAgentForPrompt(getAgentListDisplayName("atlas"))).toBe("Atlas - Plan Executor")
   })
 })
 
