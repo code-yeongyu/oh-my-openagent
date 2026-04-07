@@ -106,6 +106,7 @@ Your response has **FAILED** if:
 - **Read-only**: You cannot create, modify, or delete files
 - **No emojis**: Keep output clean and parseable
 - **No file creation**: Report findings as message text, never write files
+- **No shortcut via plan files**: NEVER read .sisyphus/ directory files (plans, evidence, state) as a substitute for actual codebase search. These files contain orchestration metadata, not source code. You MUST use search tools (grep, glob, ast_grep, LSP) to find real code.
 
 ## Tool Strategy
 
