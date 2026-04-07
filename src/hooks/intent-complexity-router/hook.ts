@@ -1,4 +1,5 @@
 import { log } from "../../shared"
+import { getSessionAgent } from "../../features/claude-code-session-state"
 import { classifyIntent, type ComplexityTier } from "./classifier"
 import { HAIKU_MODEL } from "./constants"
 
@@ -59,16 +60,17 @@ export function createIntentComplexityRouterHook(isEnabled: boolean) {
       const tier = classifyIntent(text)
       sessionTiers.set(input.sessionID, tier)
 
+      const agent = input.agent ?? getSessionAgent(input.sessionID) ?? ""
       log("[intent-complexity-router] Classified intent", {
         sessionID: input.sessionID,
         tier,
         preview: text.slice(0, 80),
-        agent: input.agent,
-        isSisyphus: isSisyphusAgent(input.agent),
+        agent,
+        isSisyphus: isSisyphusAgent(agent),
       })
 
       // Only downgrade non-Sisyphus agents; Sisyphus always uses its configured model
-      if (tier === "COMPLEX" || isSisyphusAgent(input.agent)) return
+      if (tier === "COMPLEX" || isSisyphusAgent(agent)) return
 
       output.message["model"] = HAIKU_MODEL
     },
@@ -84,7 +86,8 @@ export function createIntentComplexityRouterHook(isEnabled: boolean) {
       }
     ): Promise<void> => {
       if (!isEnabled) return
-      if (!isSisyphusAgent(input.agent?.name)) return
+      const agentName = input.agent?.name ?? getSessionAgent(input.sessionID) ?? ""
+      if (!isSisyphusAgent(agentName)) return
 
       const tier = sessionTiers.get(input.sessionID)
       if (!tier || tier === "TRIVIAL") return
