@@ -675,7 +675,7 @@ describe("resolveSubagentExecution - agent name sanitization", () => {
     })
     const args = createBaseArgs({ subagent_type: "\\hephaestus\\" })
     const executorCtx = createExecutorContext(async () => ([
-      { name: "Hephaestus (Deep Agent)", mode: "subagent", model: "openai/gpt-5.3-codex" },
+      { name: "Hephaestus - Deep Agent", mode: "subagent", model: "openai/gpt-5.3-codex" },
     ]))
 
     //#when
@@ -683,7 +683,7 @@ describe("resolveSubagentExecution - agent name sanitization", () => {
 
     //#then
     expect(result.error).toBeUndefined()
-    expect(result.agentToUse).toBe("Hephaestus (Deep Agent)")
+    expect(result.agentToUse).toBe("Hephaestus - Deep Agent")
     cacheSpy.mockRestore()
   })
 

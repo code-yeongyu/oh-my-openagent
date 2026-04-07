@@ -33,7 +33,7 @@ describe("injectContinuation", () => {
       ctx: ctx as never,
       sessionID: "ses_display_name_agent",
       resolvedInfo: {
-        agent: "Sisyphus (Ultraworker)",
+        agent: "Sisyphus - Ultraworker",
         model: { providerID: "anthropic", modelID: "claude-sonnet-4-20250514" },
       },
       sessionStateStore: sessionStateStore as never,

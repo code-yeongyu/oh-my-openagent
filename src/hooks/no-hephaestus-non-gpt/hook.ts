@@ -54,11 +54,11 @@ export function createNoHephaestusNonGptHook(
         if (allowNonGptModel) {
           return
         }
-        input.agent = SISYPHUS_DISPLAY
+        input.agent = "sisyphus"
         if (output?.message) {
-          output.message.agent = SISYPHUS_DISPLAY
+          output.message.agent = "sisyphus"
         }
-        updateSessionAgent(input.sessionID, SISYPHUS_DISPLAY)
+        updateSessionAgent(input.sessionID, "sisyphus")
       }
     },
   }

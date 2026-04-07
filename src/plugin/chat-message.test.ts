@@ -87,7 +87,7 @@ describe("createChatMessageHandler - /start-work integration", () => {
     await handler(input, output)
 
     // then
-    expect(output.message["agent"]).toBe("Sisyphus (Ultraworker)")
+    expect(output.message["agent"]).toBe("sisyphus")
     expect(output.parts[0].text).toContain("<auto-slash-command>")
     expect(output.parts[0].text).toContain("Auto-Selected Plan")
     expect(output.parts[0].text).toContain("boulder.json has been created")
@@ -397,7 +397,7 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
     //#then
     expect(output.message["model"]).toBeUndefined()
     expect(getSessionModel("test-session")).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
-    expect(getSessionAgent("test-session")).toBe("Prometheus (Plan Builder)")
+    expect(getSessionAgent("test-session")).toBe("Prometheus - Plan Builder")
   })
 
   test("respects a mid-conversation model switch instead of reusing the previous stored model", async () => {

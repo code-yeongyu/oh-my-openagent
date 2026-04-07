@@ -85,12 +85,12 @@ export function createStartWorkHook(ctx: PluginInput) {
     const activeAgent = isAgentRegistered("atlas")
       ? "atlas"
       : "sisyphus"
-    const activeAgentDisplayName = activeAgent === "atlas"
-      ? getAgentListDisplayName(activeAgent)
-      : getAgentDisplayName(activeAgent)
+    const activeAgentDisplayName = getAgentDisplayName(activeAgent)
     updateSessionAgent(input.sessionID, activeAgent)
     if (output.message) {
-      output.message["agent"] = activeAgentDisplayName
+      // Use config key for agent field to avoid HTTP header validation issues
+      // Display names like "Atlas (Plan Executor)" contain parens that are invalid in headers
+      output.message["agent"] = activeAgent
     }
 
     const existingState = readBoulderState(ctx.directory)
