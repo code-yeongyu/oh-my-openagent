@@ -1962,5 +1962,188 @@ describe("todo-continuation-enforcer", () => {
     expect(promptCalls).toHaveLength(1)
   }, { timeout: 20000 })
 
+  // ============================================================
+  // TOKEN-LIMIT ERROR DETECTION TESTS (#2462)
+  // These tests verify that the enforcer does NOT retry continuation
+  // when the model returns a token-limit / context-length error.
+  // ============================================================
+
+  test("should stop continuation when session.error carries a ContextLengthError", async () => {
+    // given - session with incomplete todos
+    const sessionID = "main-token-limit-event"
+    setMainSession(sessionID)
+    mockMessages = [
+      { info: { id: "msg-1", role: "user" } },
+      { info: { id: "msg-2", role: "assistant" } },
+    ]
+
+    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
+
+    // when - token limit error event fires
+    await hook.handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          error: { name: "ContextLengthError", message: "prompt is too long: 250000 tokens > 200000 maximum" },
+        },
+      },
+    })
+
+    // when - session goes idle
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+
+    await fakeTimers.advanceBy(3000)
+
+    // then - no continuation injected (token limit error blocks retry)
+    expect(promptCalls).toHaveLength(0)
+  })
+
+  test("should stop continuation when session.error message contains token limit keywords", async () => {
+    // given - session with incomplete todos
+    const sessionID = "main-token-limit-message"
+    setMainSession(sessionID)
+    mockMessages = [
+      { info: { id: "msg-1", role: "user" } },
+      { info: { id: "msg-2", role: "assistant" } },
+    ]
+
+    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
+
+    // when - error with token limit message fires (no specific error name)
+    await hook.handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          error: { name: "APIError", message: "context_length_exceeded: the prompt is too long" },
+        },
+      },
+    })
+
+    // when - session goes idle
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+
+    await fakeTimers.advanceBy(3000)
+
+    // then - no continuation injected
+    expect(promptCalls).toHaveLength(0)
+  })
+
+  test("should stop continuation when promptAsync throws a token-limit error", async () => {
+    // given - session where promptAsync will throw a token limit error
+    const sessionID = "main-token-limit-injection"
+    setMainSession(sessionID)
+    const mockInput = createMockPluginInput()
+    mockInput.client.session.promptAsync = async () => {
+      const error = new Error("prompt is too long: 150000 tokens > 100000 maximum")
+      ;(error as any).name = "ContextLengthError"
+      throw error
+    }
+
+    const hook = createTodoContinuationEnforcer(mockInput, {})
+
+    // when - first idle triggers injection that fails with token limit
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+    await fakeTimers.advanceBy(2500, true)
+
+    // when - wait past any cooldown, try again
+    await fakeTimers.advanceClockBy(CONTINUATION_COOLDOWN_MS * 100)
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+    await fakeTimers.advanceBy(3000, true)
+
+    // then - no second injection attempt (token limit permanently stops continuation)
+    expect(promptCalls).toHaveLength(0)
+  })
+
+  test("should still allow retries for non-token-limit errors (existing behavior)", async () => {
+    // given - session where promptAsync throws a generic error
+    const sessionID = "main-generic-error-retry"
+    setMainSession(sessionID)
+    let callCount = 0
+    const mockInput = createMockPluginInput()
+    mockInput.client.session.promptAsync = async (opts: any) => {
+      callCount++
+      if (callCount === 1) {
+        throw new Error("simulated network error")
+      }
+      promptCalls.push({
+        sessionID: opts.path.id,
+        agent: opts.body.agent,
+        model: opts.body.model,
+        text: opts.body.parts[0].text,
+      })
+      return {}
+    }
+
+    const hook = createTodoContinuationEnforcer(mockInput, {})
+
+    // when - first idle triggers injection that fails with generic error
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+    await fakeTimers.advanceBy(2500, true)
+
+    // when - wait past cooldown, try again
+    await fakeTimers.advanceClockBy(CONTINUATION_COOLDOWN_MS * 2)
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+    await fakeTimers.advanceBy(2500, true)
+
+    // then - second attempt succeeds (generic errors still allow retry)
+    expect(callCount).toBe(2)
+    expect(promptCalls).toHaveLength(1)
+  }, { timeout: 30000 })
+
+  test("should clear token limit flag when user sends new message after recovery", async () => {
+    fakeTimers.restore()
+    // given - session that hit token limit
+    const sessionID = "main-token-limit-recovery"
+    setMainSession(sessionID)
+    mockMessages = [
+      { info: { id: "msg-1", role: "user" } },
+      { info: { id: "msg-2", role: "assistant" } },
+    ]
+
+    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
+
+    // when - token limit error fires
+    await hook.handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          error: { name: "ContextLengthError", message: "prompt is too long" },
+        },
+      },
+    })
+
+    // when - user sends new message (clears token limit flag via activity)
+    await hook.handler({
+      event: {
+        type: "message.updated",
+        properties: { info: { sessionID, role: "user" } },
+      },
+    })
+
+    // when - session goes idle
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+
+    await wait(2500)
+
+    // then - continuation injected (token limit flag cleared by user activity)
+    expect(promptCalls.length).toBe(1)
+  }, { timeout: 15000 })
 
 })

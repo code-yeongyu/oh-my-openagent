@@ -55,6 +55,11 @@ export async function handleSessionIdle(args: {
     return
   }
 
+  if (state.tokenLimitDetected) {
+    log(`[${HOOK_NAME}] Skipped: token limit error detected, retry would worsen context overflow`, { sessionID })
+    return
+  }
+
   if (state.abortDetectedAt) {
     const timeSinceAbort = Date.now() - state.abortDetectedAt
     if (timeSinceAbort < ABORT_WINDOW_MS) {
