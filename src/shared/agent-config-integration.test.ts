@@ -10,9 +10,9 @@ describe("Agent Config Integration", () => {
       const oldConfig = {
         Sisyphus: { model: "anthropic/claude-opus-4-6" },
         Atlas: { model: "anthropic/claude-opus-4-6" },
-        "Prometheus (Planner)": { model: "anthropic/claude-opus-4-6" },
-        "Metis (Plan Consultant)": { model: "anthropic/claude-sonnet-4-6" },
-        "Momus (Plan Reviewer)": { model: "anthropic/claude-sonnet-4-6" },
+        "Prometheus - Plan Builder": { model: "anthropic/claude-opus-4-6" },
+        "Metis - Plan Consultant": { model: "anthropic/claude-sonnet-4-6" },
+        "Momus - Plan Critic": { model: "anthropic/claude-sonnet-4-6" },
       }
 
       // when - migration is applied
@@ -28,9 +28,9 @@ describe("Agent Config Integration", () => {
       // then - old keys are removed
       expect(result.migrated).not.toHaveProperty("Sisyphus")
       expect(result.migrated).not.toHaveProperty("Atlas")
-      expect(result.migrated).not.toHaveProperty("Prometheus (Planner)")
-      expect(result.migrated).not.toHaveProperty("Metis (Plan Consultant)")
-      expect(result.migrated).not.toHaveProperty("Momus (Plan Reviewer)")
+      expect(result.migrated).not.toHaveProperty("Prometheus - Plan Builder")
+      expect(result.migrated).not.toHaveProperty("Metis - Plan Consultant")
+      expect(result.migrated).not.toHaveProperty("Momus - Plan Critic")
 
       // then - values are preserved
       expect(result.migrated.sisyphus).toEqual({ model: "anthropic/claude-opus-4-6" })
@@ -64,7 +64,7 @@ describe("Agent Config Integration", () => {
       const mixedConfig = {
         Sisyphus: { model: "anthropic/claude-opus-4-6" },
         oracle: { model: "openai/gpt-5.4" },
-        "Prometheus (Planner)": { model: "anthropic/claude-opus-4-6" },
+        "Prometheus - Plan Builder": { model: "anthropic/claude-opus-4-6" },
         librarian: { model: "opencode/big-pickle" },
       }
 
@@ -174,7 +174,7 @@ describe("Agent Config Integration", () => {
       // given - old format config
       const oldConfig = {
         Sisyphus: { model: "anthropic/claude-opus-4-6", temperature: 0.1 },
-        "Prometheus (Planner)": { model: "anthropic/claude-opus-4-6" },
+        "Prometheus - Plan Builder": { model: "anthropic/claude-opus-4-6" },
       }
 
       // when - config is migrated

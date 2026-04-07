@@ -158,6 +158,25 @@ describe("applyAgentConfig builtin override protection", () => {
     logSpy.mockRestore()
   })
 
+  test("registered agent keys are HTTP-header-safe (no parentheses) for UI selector compatibility", async () => {
+    // given builtin agents are registered via applyAgentConfig
+
+    // when applyAgentConfig runs
+    const result = await applyAgentConfig({
+      config: createBaseConfig(),
+      pluginConfig: createPluginConfig(),
+      ctx: { directory: "/tmp" },
+      pluginComponents: createPluginComponents(),
+    })
+
+    // then every registered agent key must be HTTP-header-safe (no parentheses)
+    // Parentheses in agent names cause HTTP header validation errors in
+    // x-opencode-agent-name and prevent the agents from showing in the OpenCode UI.
+    for (const key of Object.keys(result)) {
+      expect(key).not.toMatch(/[()]/)
+    }
+  })
+
   test("filters user agents whose key matches the builtin display-name alias", async () => {
     // given
     loadUserAgentsSpy.mockReturnValue({

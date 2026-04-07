@@ -1,7 +1,13 @@
 /**
  * Agent config keys to display names mapping.
  * Config keys are lowercase (e.g., "sisyphus", "atlas").
- * Display names include suffixes for UI/logs (e.g., "Sisyphus (Ultraworker)").
+ * Display names include suffixes for UI/logs (e.g., "Sisyphus - Ultraworker").
+ *
+ * IMPORTANT: Display names MUST NOT contain parentheses or other characters
+ * that are invalid in HTTP header values per RFC 7230. OpenCode passes the
+ * agent name in the `x-opencode-agent-name` header, and parentheses cause
+ * header validation failures that prevent agents from appearing in the UI
+ * type selector dropdown. Use ` - ` (space-dash-space) instead of `(...)`.
  */
 export const AGENT_DISPLAY_NAMES: Record<string, string> = {
   sisyphus: "Sisyphus - Ultraworker",
@@ -62,14 +68,29 @@ const REVERSE_DISPLAY_NAMES: Record<string, string> = Object.fromEntries(
   Object.entries(AGENT_DISPLAY_NAMES).map(([key, displayName]) => [displayName.toLowerCase(), key]),
 )
 
+// Legacy parenthesized display names for backward compatibility.
+// Old configs/sessions may reference these names; resolve them to config keys.
+const LEGACY_DISPLAY_NAMES: Record<string, string> = {
+  "sisyphus (ultraworker)": "sisyphus",
+  "hephaestus (deep agent)": "hephaestus",
+  "prometheus (plan builder)": "prometheus",
+  "atlas (plan executor)": "atlas",
+  "metis (plan consultant)": "metis",
+  "momus (plan critic)": "momus",
+  "athena (council)": "athena",
+  "athena-junior (council)": "athena-junior",
+}
+
 /**
  * Resolve an agent name (display name or config key) to its lowercase config key.
- * "Atlas (Plan Executor)" → "atlas", "atlas" → "atlas", "unknown" → "unknown"
+ * "Atlas - Plan Executor" -> "atlas", "Atlas (Plan Executor)" -> "atlas", "atlas" -> "atlas"
  */
 export function getAgentConfigKey(agentName: string): string {
   const lower = stripAgentListSortPrefix(agentName).toLowerCase()
   const reversed = REVERSE_DISPLAY_NAMES[lower]
   if (reversed !== undefined) return reversed
+  const legacy = LEGACY_DISPLAY_NAMES[lower]
+  if (legacy !== undefined) return legacy
   if (AGENT_DISPLAY_NAMES[lower] !== undefined) return lower
   return lower
 }
@@ -95,6 +116,10 @@ export function normalizeAgentForPrompt(agentName: string | undefined): string |
   if (reversed !== undefined) {
     return AGENT_DISPLAY_NAMES[reversed] ?? trimmed
   }
+  const legacy = LEGACY_DISPLAY_NAMES[lower]
+  if (legacy !== undefined) {
+    return AGENT_DISPLAY_NAMES[legacy] ?? trimmed
+  }
   if (AGENT_DISPLAY_NAMES[lower] !== undefined) {
     return AGENT_DISPLAY_NAMES[lower]
   }
@@ -116,6 +141,10 @@ export function normalizeAgentForPromptKey(agentName: string | undefined): strin
   const reversed = REVERSE_DISPLAY_NAMES[lower]
   if (reversed !== undefined) {
     return reversed
+  }
+  const legacy = LEGACY_DISPLAY_NAMES[lower]
+  if (legacy !== undefined) {
+    return legacy
   }
   if (AGENT_DISPLAY_NAMES[lower] !== undefined) {
     return lower
