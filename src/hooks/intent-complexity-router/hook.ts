@@ -86,6 +86,20 @@ export function createIntentComplexityRouterHook(isEnabled: boolean) {
 
       if (tier === "COMPLEX" || currentModel) return
 
+      const messageCount = output.parts?.length ?? 0
+      const haikuContextThreshold = 100_000
+      const estimatedTokens = messageCount * 500
+
+      if (estimatedTokens > haikuContextThreshold) {
+        log("[intent-complexity-router] Context too large for Haiku downgrade", {
+          sessionID: input.sessionID,
+          estimatedTokens,
+          haikuContextThreshold,
+          tier,
+        })
+        return
+      }
+
       output.message["model"] = HAIKU_MODEL
     },
 
