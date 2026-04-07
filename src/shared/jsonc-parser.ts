@@ -9,12 +9,16 @@ export interface JsoncParseResult<T> {
   errors: Array<{ message: string; offset: number; length: number }>
 }
 
+function stripBom(content: string): string {
+  return content.charCodeAt(0) === 0xfeff ? content.slice(1) : content
+}
+
 export function parseJsonc<T = unknown>(content: string): T {
   // Strip UTF-8 BOM if present (Windows UTF-8 with BOM files)
   content = content.replace(/^\uFEFF/, "")
 
   const errors: ParseError[] = []
-  const result = parse(content, errors, {
+  const result = parse(stripBom(content), errors, {
     allowTrailingComma: true,
     disallowComments: false,
   }) as T
@@ -31,7 +35,7 @@ export function parseJsonc<T = unknown>(content: string): T {
 
 export function parseJsoncSafe<T = unknown>(content: string): JsoncParseResult<T> {
   const errors: ParseError[] = []
-  const data = parse(content, errors, {
+  const data = parse(stripBom(content), errors, {
     allowTrailingComma: true,
     disallowComments: false,
   }) as T | null
