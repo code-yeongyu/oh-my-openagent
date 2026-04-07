@@ -87,12 +87,40 @@ describe("createChatMessageHandler - /start-work integration", () => {
     await handler(input, output)
 
     // then
-    expect(output.message["agent"]).toBe("sisyphus")
+    expect(output.message["agent"]).toBe("Sisyphus - Ultraworker")
     expect(output.parts[0].text).toContain("<auto-slash-command>")
     expect(output.parts[0].text).toContain("Auto-Selected Plan")
     expect(output.parts[0].text).toContain("boulder.json has been created")
     expect(getSessionAgent("test-session")).toBe("sisyphus")
     expect(readBoulderState(testDir)?.agent).toBe("sisyphus")
+  })
+
+  test("smoke: resolves quoted human-readable plan names through the full /start-work chat.message path", async () => {
+    // given
+    writeFileSync(join(testDir, ".sisyphus", "plans", "my-feature-plan.md"), "# Plan\n- [ ] Task 1")
+    updateSessionAgent("test-session", "prometheus")
+    const args = createMockHandlerArgs()
+    args.hooks.autoSlashCommand = createAutoSlashCommandHook({ skills: [] })
+    args.hooks.startWork = createStartWorkHook({
+      directory: testDir,
+      client: { tui: { showToast: async () => {} } },
+    } as never)
+    const handler = createChatMessageHandler(args)
+    const input = createMockInput("prometheus")
+    const output: ChatMessageHandlerOutput = {
+      message: {},
+      parts: [{ type: "text", text: "/start-work \"my feature plan\"" }],
+    }
+
+    // when
+    await handler(input, output)
+
+    // then
+    expect(output.message["agent"]).toBe("Sisyphus - Ultraworker")
+    expect(output.parts[0].text).toContain("<auto-slash-command>")
+    expect(output.parts[0].text).toContain("Auto-Selected Plan")
+    expect(output.parts[0].text).toContain("my-feature-plan")
+    expect(readBoulderState(testDir)?.plan_name).toBe("my-feature-plan")
   })
 })
 
