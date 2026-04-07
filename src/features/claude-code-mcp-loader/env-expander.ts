@@ -4,11 +4,16 @@ import {
   isSensitiveMcpEnvVar,
 } from "./configure-allowed-env-vars"
 
-export function expandEnvVars(value: string): string {
+export interface ExpandEnvVarsOptions {
+  trusted?: boolean
+}
+
+export function expandEnvVars(value: string, options: ExpandEnvVarsOptions = {}): string {
+  const { trusted = false } = options
   return value.replace(
     /\$\{([^}:]+)(?::-([^}]*))?\}/g,
     (_, varName: string, defaultValue?: string) => {
-      if (!isAllowedMcpEnvVar(varName)) {
+      if (!trusted && !isAllowedMcpEnvVar(varName)) {
         const isSensitive = isSensitiveMcpEnvVar(varName)
         const reason = isSensitive ? "sensitive variable" : "not in allowlist"
 
@@ -29,16 +34,16 @@ export function expandEnvVars(value: string): string {
   )
 }
 
-export function expandEnvVarsInObject<T>(obj: T): T {
+export function expandEnvVarsInObject<T>(obj: T, options: ExpandEnvVarsOptions = {}): T {
   if (obj === null || obj === undefined) return obj
-  if (typeof obj === "string") return expandEnvVars(obj) as T
+  if (typeof obj === "string") return expandEnvVars(obj, options) as T
   if (Array.isArray(obj)) {
-    return obj.map((item) => expandEnvVarsInObject(item)) as T
+    return obj.map((item) => expandEnvVarsInObject(item, options)) as T
   }
   if (typeof obj === "object") {
     const result: Record<string, unknown> = {}
     for (const [key, value] of Object.entries(obj)) {
-      result[key] = expandEnvVarsInObject(value)
+      result[key] = expandEnvVarsInObject(value, options)
     }
     return result as T
   }
