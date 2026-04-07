@@ -224,54 +224,83 @@ export function getPlanProgress(planPath: string): PlanProgress {
   try {
     const content = readFileSync(planPath, "utf-8")
     const lines = content.split(/\r?\n/)
-    let section: ProgressSection = "other"
-    let total = 0
-    let completed = 0
 
-    for (const line of lines) {
-      if (SECOND_LEVEL_HEADING_PATTERN.test(line)) {
-        section = TODO_HEADING_PATTERN.test(line)
-          ? "todo"
-          : FINAL_VERIFICATION_HEADING_PATTERN.test(line)
-            ? "final-wave"
-            : "other"
-        continue
-      }
+    // Check if the plan has structured sections (## TODOs / ## Final Verification Wave)
+    const hasStructuredSections = lines.some((line) => TODO_HEADING_PATTERN.test(line))
 
-      if (section !== "todo" && section !== "final-wave") {
-        continue
-      }
-
-      const checkedMatch = line.match(CHECKED_CHECKBOX_PATTERN)
-      const uncheckedMatch = checkedMatch ? null : line.match(UNCHECKED_CHECKBOX_PATTERN)
-      const match = checkedMatch ?? uncheckedMatch
-      if (!match) {
-        continue
-      }
-
-      if (match[1].length > 0) {
-        continue
-      }
-
-      const taskBody = match[2].trim()
-      const labelPattern = section === "todo" ? TODO_TASK_PATTERN : FINAL_WAVE_TASK_PATTERN
-      if (!labelPattern.test(taskBody)) {
-        continue
-      }
-
-      total++
-      if (checkedMatch) {
-        completed++
-      }
+    if (hasStructuredSections) {
+      // Structured plan: only count top-level checkboxes with numbered labels
+      // under ## TODOs and ## Final Verification Wave sections
+      return getStructuredPlanProgress(lines)
     }
 
-    return {
-      total,
-      completed,
-      isComplete: total > 0 && completed === total,
-    }
+    // Simple plan: count all top-level checkboxes anywhere
+    return getSimplePlanProgress(content)
   } catch {
     return { total: 0, completed: 0, isComplete: true }
+  }
+}
+
+function getStructuredPlanProgress(lines: string[]): PlanProgress {
+  let section: ProgressSection = "other"
+  let total = 0
+  let completed = 0
+
+  for (const line of lines) {
+    if (SECOND_LEVEL_HEADING_PATTERN.test(line)) {
+      section = TODO_HEADING_PATTERN.test(line)
+        ? "todo"
+        : FINAL_VERIFICATION_HEADING_PATTERN.test(line)
+          ? "final-wave"
+          : "other"
+      continue
+    }
+
+    if (section !== "todo" && section !== "final-wave") {
+      continue
+    }
+
+    const checkedMatch = line.match(CHECKED_CHECKBOX_PATTERN)
+    const uncheckedMatch = checkedMatch ? null : line.match(UNCHECKED_CHECKBOX_PATTERN)
+    const match = checkedMatch ?? uncheckedMatch
+    if (!match) {
+      continue
+    }
+
+    if (match[1].length > 0) {
+      continue
+    }
+
+    const taskBody = match[2].trim()
+    const labelPattern = section === "todo" ? TODO_TASK_PATTERN : FINAL_WAVE_TASK_PATTERN
+    if (!labelPattern.test(taskBody)) {
+      continue
+    }
+
+    total++
+    if (checkedMatch) {
+      completed++
+    }
+  }
+
+  return {
+    total,
+    completed,
+    isComplete: total > 0 && completed === total,
+  }
+}
+
+function getSimplePlanProgress(content: string): PlanProgress {
+  const uncheckedMatches = content.match(/^\s*[-*]\s*\[\s*\]/gm) || []
+  const checkedMatches = content.match(/^\s*[-*]\s*\[[xX]\]/gm) || []
+
+  const total = uncheckedMatches.length + checkedMatches.length
+  const completed = checkedMatches.length
+
+  return {
+    total,
+    completed,
+    isComplete: total > 0 && completed === total,
   }
 }
 
