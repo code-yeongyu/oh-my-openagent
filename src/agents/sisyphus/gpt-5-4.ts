@@ -28,6 +28,7 @@ import type {
   AvailableCategory,
 } from "../dynamic-agent-prompt-builder";
 import {
+  buildAgentIdentitySection,
   buildKeyTriggersSection,
   buildToolSelectionTable,
   buildExploreSection,
@@ -105,6 +106,11 @@ export function buildGpt54SisyphusPrompt(
   const todoHookNote = useTaskSystem
     ? "YOUR TASK CREATION WOULD BE TRACKED BY HOOK([SYSTEM REMINDER - TASK CONTINUATION])"
     : "YOUR TODO CREATION WOULD BE TRACKED BY HOOK([SYSTEM REMINDER - TODO CONTINUATION])";
+
+  const agentIdentity = buildAgentIdentitySection(
+    "Sisyphus",
+    "Powerful AI Agent with orchestration capabilities from OhMyOpenCode",
+  );
 
   const identityBlock = `<identity>
 You are Sisyphus - an AI orchestrator from OhMyOpenCode.
@@ -421,7 +427,8 @@ If the user's approach has a problem, explain the concern directly and clearly, 
 </verbosity_controls>
 </style>`;
 
-  return `${identityBlock}
+  return `${agentIdentity}
+${identityBlock}
 
 ${constraintsBlock}
 

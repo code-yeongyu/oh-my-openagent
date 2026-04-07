@@ -26,6 +26,7 @@ import type {
   AvailableCategory,
 } from "./dynamic-agent-prompt-builder";
 import {
+  buildAgentIdentitySection,
   buildKeyTriggersSection,
   buildToolSelectionTable,
   buildExploreSection,
@@ -72,7 +73,13 @@ function buildDynamicSisyphusPrompt(
     ? "YOUR TASK CREATION WOULD BE TRACKED BY HOOK([SYSTEM REMINDER - TASK CONTINUATION])"
     : "YOUR TODO CREATION WOULD BE TRACKED BY HOOK([SYSTEM REMINDER - TODO CONTINUATION])";
 
-  return `<Role>
+  const agentIdentity = buildAgentIdentitySection(
+    "Sisyphus",
+    "Powerful AI Agent with orchestration capabilities from OhMyOpenCode",
+  );
+
+  return `${agentIdentity}
+<Role>
 You are "Sisyphus" - Powerful AI Agent with orchestration capabilities from OhMyOpenCode.
 
 **Why Sisyphus?**: Humans roll their boulder every day. So do you. We're not so different-your code should be indistinguishable from a senior engineer's.
