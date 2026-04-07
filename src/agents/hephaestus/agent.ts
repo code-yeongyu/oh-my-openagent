@@ -7,7 +7,7 @@ import type {
   AvailableSkill,
   AvailableCategory,
 } from "../dynamic-agent-prompt-builder";
-import { categorizeTools } from "../dynamic-agent-prompt-builder";
+import { categorizeTools, buildAgentIdentitySection } from "../dynamic-agent-prompt-builder";
 
 import { buildHephaestusPrompt as buildGptPrompt } from "./gpt";
 import { buildHephaestusPrompt as buildGpt53CodexPrompt } from "./gpt-5-3-codex";
@@ -87,7 +87,12 @@ function buildDynamicHephaestusPrompt(ctx?: HephaestusContext): string {
       break;
   }
 
-  return basePrompt;
+  const agentIdentity = buildAgentIdentitySection(
+    "Hephaestus",
+    "Autonomous deep worker for software engineering from OhMyOpenCode",
+  );
+
+  return `${agentIdentity}\n${basePrompt}`;
 }
 
 export function createHephaestusAgent(
