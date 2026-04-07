@@ -197,7 +197,7 @@ describe("resolveCategoryExecution", () => {
 		if (!result.actualModel || !result.categoryModel) {
 			throw new Error("Expected resolved model and category model")
 		}
-		expect(result.actualModel).toBe("openai/gpt-5.4 high")
+		expect(result.actualModel).toBe("openai/gpt-5.4")
 		expect(result.categoryModel).toEqual({
 			providerID: "openai",
 			modelID: "gpt-5.4",
