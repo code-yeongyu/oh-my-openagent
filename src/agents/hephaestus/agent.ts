@@ -13,7 +13,7 @@ import { buildHephaestusPrompt as buildGptPrompt } from "./gpt";
 import { buildHephaestusPrompt as buildGpt53CodexPrompt } from "./gpt-5-3-codex";
 import { buildHephaestusPrompt as buildGpt54Prompt } from "./gpt-5-4";
 
-const MODE: AgentMode = "primary";
+const MODE: AgentMode = "all";
 
 export type HephaestusPromptSource = "gpt-5-4" | "gpt-5-3-codex" | "gpt";
 
@@ -124,7 +124,7 @@ export function createHephaestusAgent(
     color: "#D97706",
     permission: {
       question: "allow",
-      call_omo_agent: "deny",
+      task: "deny",
     } as AgentConfig["permission"],
     reasoningEffort: "medium",
   };

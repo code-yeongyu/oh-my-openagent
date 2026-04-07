@@ -675,15 +675,15 @@ describe("resolveSubagentExecution - agent name sanitization", () => {
     })
     const args = createBaseArgs({ subagent_type: "\\hephaestus\\" })
     const executorCtx = createExecutorContext(async () => ([
-      { name: "Hephaestus - Deep Agent", mode: "subagent", model: "openai/gpt-5.3-codex" },
+      { name: "hephaestus", mode: "all", model: "openai/gpt-5.3-codex" },
     ]))
 
     //#when
-    const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep")
+    const result = await resolveSubagentExecution(args, executorCtx, "atlas", "deep")
 
     //#then
     expect(result.error).toBeUndefined()
-    expect(result.agentToUse).toBe("Hephaestus - Deep Agent")
+    expect(result.agentToUse).toBe("hephaestus")
     cacheSpy.mockRestore()
   })
 
@@ -727,5 +727,109 @@ describe("resolveSubagentExecution - agent name sanitization", () => {
     expect(result.error).toBeUndefined()
     expect(result.agentToUse).toBe("explore")
     cacheSpy.mockRestore()
+  })
+})
+
+describe("resolveSubagentExecution - Atlas/Hephaestus hybrid workflow", () => {
+  let logSpy: ReturnType<typeof spyOn> | undefined
+  let resolveSubagentExecution: SubagentResolverModule["resolveSubagentExecution"]
+
+  beforeEach(async () => {
+    logSpy = spyOn(logger, "log").mockImplementation(() => {})
+    ;({ resolveSubagentExecution } = await importFreshSubagentResolverModule())
+  })
+
+  afterEach(() => {
+    logSpy?.mockRestore()
+  })
+
+  test("allows Atlas to spawn Hephaestus for complex tasks", async () => {
+    //#given
+    const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+      models: { openai: ["gpt-5.4"] },
+      connected: ["openai"],
+      updatedAt: "2026-03-03T00:00:00.000Z",
+    })
+    const args = createBaseArgs({ subagent_type: "hephaestus" })
+    const executorCtx = createExecutorContext(async () => ([
+      { name: "hephaestus", mode: "all", model: "openai/gpt-5.4" },
+      { name: "oracle", mode: "subagent" },
+    ]))
+
+    //#when
+    const result = await resolveSubagentExecution(args, executorCtx, "atlas", "deep")
+
+    //#then
+    expect(result.error).toBeUndefined()
+    expect(result.agentToUse).toBe("hephaestus")
+    cacheSpy.mockRestore()
+  })
+
+  test("blocks Hephaestus from spawning itself (recursion guard)", async () => {
+    //#given
+    const args = createBaseArgs({ subagent_type: "hephaestus" })
+    const executorCtx = createExecutorContext(async () => ([
+      { name: "hephaestus", mode: "all" },
+    ]))
+
+    //#when
+    const result = await resolveSubagentExecution(args, executorCtx, "hephaestus", "deep")
+
+    //#then
+    expect(result.agentToUse).toBe("")
+    expect(result.error).toContain("Hephaestus cannot delegate to itself")
+  })
+
+  test("blocks non-orchestrator agents from spawning Hephaestus", async () => {
+    //#given
+    const args = createBaseArgs({ subagent_type: "hephaestus" })
+    const executorCtx = createExecutorContext(async () => ([
+      { name: "hephaestus", mode: "all" },
+      { name: "oracle", mode: "subagent" },
+    ]))
+
+    //#when
+    const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep")
+
+    //#then
+    expect(result.agentToUse).toBe("")
+    expect(result.error).toContain("Hephaestus can only be spawned by orchestrator agents")
+  })
+
+  test("allows spawning Hephaestus with case-insensitive Atlas parent", async () => {
+    //#given
+    const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+      models: { openai: ["gpt-5.4"] },
+      connected: ["openai"],
+      updatedAt: "2026-03-03T00:00:00.000Z",
+    })
+    const args = createBaseArgs({ subagent_type: "Hephaestus" })
+    const executorCtx = createExecutorContext(async () => ([
+      { name: "hephaestus", mode: "all", model: "openai/gpt-5.4" },
+    ]))
+
+    //#when
+    const result = await resolveSubagentExecution(args, executorCtx, "ATLAS", "deep")
+
+    //#then
+    expect(result.error).toBeUndefined()
+    expect(result.agentToUse).toBe("hephaestus")
+    cacheSpy.mockRestore()
+  })
+
+  test("blocks spawning Hephaestus when parent agent is undefined", async () => {
+    //#given
+    const args = createBaseArgs({ subagent_type: "hephaestus" })
+    const executorCtx = createExecutorContext(async () => ([
+      { name: "hephaestus", mode: "all" },
+      { name: "oracle", mode: "subagent" },
+    ]))
+
+    //#when
+    const result = await resolveSubagentExecution(args, executorCtx, undefined, "deep")
+
+    //#then
+    expect(result.agentToUse).toBe("")
+    expect(result.error).toContain("Hephaestus can only be spawned by orchestrator agents")
   })
 })

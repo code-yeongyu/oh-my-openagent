@@ -18,6 +18,9 @@ import type { CategoryConfig } from "../../config/schema"
 
 type AgentMode = "subagent" | "primary" | "all" | undefined
 
+export const ORCHESTRATOR_CALLABLE_PRIMARY_AGENTS = ["hephaestus"]
+export const ORCHESTRATOR_ALLOWLIST = ["atlas"]
+
 function applyCategoryParams(
   base: DelegatedModelConfig,
   config: CategoryConfig | undefined,
@@ -72,6 +75,27 @@ Create the work plan directly - that's your job as the planning agent.`,
     }
   }
 
+  if (agentName.toLowerCase() === "hephaestus" && parentAgent?.toLowerCase() === "hephaestus") {
+    return {
+      agentToUse: "",
+      categoryModel: undefined,
+      error: `Hephaestus cannot delegate to itself. Hephaestus is an autonomous deep worker - complete the task directly, or escalate to Oracle if blocked after 3 attempts.`,
+    }
+  }
+
+  if (agentName.toLowerCase() === "hephaestus") {
+    const isOrchestrator = parentAgent && ORCHESTRATOR_ALLOWLIST.some(
+      (name) => parentAgent.toLowerCase() === name.toLowerCase() || parentAgent.toLowerCase().includes(name.toLowerCase())
+    )
+    if (!isOrchestrator) {
+      return {
+        agentToUse: "",
+        categoryModel: undefined,
+        error: `Hephaestus can only be spawned by orchestrator agents (atlas). Use category-based delegation instead.`,
+      }
+    }
+  }
+
   let agentToUse = agentName
   let categoryModel: DelegatedModelConfig | undefined
   let fallbackChain: FallbackEntry[] | undefined = undefined
@@ -87,7 +111,9 @@ Create the work plan directly - that's your job as the planning agent.`,
       preferResponseOnMissingData: true,
     })
 
-    const callableAgents = agents.filter((agent) => isTaskCallableAgentMode(agent.mode))
+    const callableAgents = agents.filter((agent) =>
+      isTaskCallableAgentMode(agent.mode, agent.name, parentAgent)
+    )
 
     const resolvedDisplayName = getAgentDisplayName(agentToUse)
     const matchedAgent = callableAgents.find(
@@ -229,6 +255,18 @@ Create the work plan directly - that's your job as the planning agent.`,
   return { agentToUse, categoryModel, fallbackChain }
 }
 
-function isTaskCallableAgentMode(mode: AgentMode): boolean {
-  return mode === "all" || mode === "subagent"
+function isTaskCallableAgentMode(mode: AgentMode, agentName: string, parentAgent: string | undefined): boolean {
+  if (mode === "all" || mode === "subagent") {
+    return true
+  }
+  if (mode === "primary") {
+    const isOrchestrator = parentAgent !== undefined && ORCHESTRATOR_ALLOWLIST.some(
+      (name) => parentAgent.toLowerCase() === name.toLowerCase() || parentAgent.toLowerCase().includes(name.toLowerCase())
+    )
+    const isCallablePrimary = ORCHESTRATOR_CALLABLE_PRIMARY_AGENTS.some(
+      (name) => agentName.toLowerCase() === name.toLowerCase() || agentName.toLowerCase().includes(name.toLowerCase())
+    )
+    return isOrchestrator && isCallablePrimary
+  }
+  return false
 }
