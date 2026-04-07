@@ -52,6 +52,7 @@ export interface ToolsSummary {
   ghCli: { installed: boolean; authenticated: boolean; username: string | null }
   mcpBuiltin: string[]
   mcpUser: string[]
+  tmux: { installed: boolean; version: string | null; path: string | null }
 }
 
 export interface DoctorSummary {

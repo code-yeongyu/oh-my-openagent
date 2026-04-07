@@ -1,16 +1,18 @@
 import { checkAstGrepCli, checkAstGrepNapi, checkCommentChecker } from "./dependencies"
 import { getGhCliInfo } from "./tools-gh"
 import { getInstalledLspServers } from "./tools-lsp"
+import { getTmuxInfo } from "./tools-tmux"
 import { getBuiltinMcpInfo, getUserMcpInfo } from "./tools-mcp"
 import { CHECK_IDS, CHECK_NAMES } from "../constants"
 import type { CheckResult, DoctorIssue, ToolsSummary } from "../types"
 
 export async function gatherToolsSummary(): Promise<ToolsSummary> {
-  const [astGrepCliInfo, astGrepNapiInfo, commentCheckerInfo, ghInfo] = await Promise.all([
+  const [astGrepCliInfo, astGrepNapiInfo, commentCheckerInfo, ghInfo, tmuxInfo] = await Promise.all([
     checkAstGrepCli(),
     checkAstGrepNapi(),
     checkCommentChecker(),
     getGhCliInfo(),
+    getTmuxInfo(),
   ])
 
   const lspServers = getInstalledLspServers()
@@ -27,6 +29,7 @@ export async function gatherToolsSummary(): Promise<ToolsSummary> {
       authenticated: ghInfo.authenticated,
       username: ghInfo.username,
     },
+    tmux: tmuxInfo,
     mcpBuiltin: builtinMcp.map((server) => server.id),
     mcpUser: userMcp.map((server) => server.id),
   }
@@ -82,6 +85,16 @@ function buildToolIssues(summary: ToolsSummary): DoctorIssue[] {
     })
   }
 
+  if (!summary.tmux.installed) {
+    issues.push({
+      title: "Tmux unavailable",
+      description: "tmux is not installed.",
+      fix: "Install tmux via your package manager (e.g., brew install tmux, apt install tmux)",
+      severity: "warning",
+      affects: ["tmux integration", "background terminal commands"],
+    })
+  }
+
   return issues
 }
 
@@ -109,6 +122,7 @@ export async function checkTools(): Promise<CheckResult> {
       `Comment checker: ${summary.commentChecker ? "yes" : "no"}`,
       `LSP: ${summary.lspServers.length > 0 ? `${summary.lspServers.length} server(s)` : "none"}`,
       `GH CLI: ${summary.ghCli.installed ? "installed" : "missing"}${summary.ghCli.authenticated ? " (authenticated)" : ""}`,
+      `Tmux: ${summary.tmux.installed ? `installed${summary.tmux.version ? ` (v${summary.tmux.version})` : ""}` : "missing"}`,
       `MCP: builtin=${summary.mcpBuiltin.length}, user=${summary.mcpUser.length}`,
     ],
     issues,
