@@ -1,5 +1,5 @@
 import { spawn } from "bun"
-import type { OpenClawGateway } from "./types"
+import type { OpenClawGateway, WakeResult } from "./types"
 
 const DEFAULT_HTTP_TIMEOUT_MS = 10_000
 const DEFAULT_COMMAND_TIMEOUT_MS = 5_000
@@ -66,11 +66,70 @@ export function resolveCommandTimeoutMs(
   )
 }
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null ? (value as Record<string, unknown>) : null
+}
+
+function firstStringValue(record: Record<string, unknown>, keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = record[key]
+    if (typeof value === "string" && value.trim().length > 0) return value
+    if (typeof value === "number" && Number.isFinite(value)) return String(value)
+  }
+  return undefined
+}
+
+function extractWakeMetadata(payload: unknown): Pick<WakeResult, "messageId" | "platform" | "channelId" | "threadId"> {
+  const record = asRecord(payload)
+  if (!record) return {}
+
+  const nestedCandidates = [record, asRecord(record.data), asRecord(record.result), asRecord(record.message)]
+    .filter((candidate): candidate is Record<string, unknown> => candidate !== null)
+
+  let bestMatch: Pick<WakeResult, "messageId" | "platform" | "channelId" | "threadId"> = {}
+  let bestScore = -1
+
+  for (const candidate of nestedCandidates) {
+    const messageId = firstStringValue(candidate, ["messageId", "message_id", "id"])
+    const platform = firstStringValue(candidate, ["platform", "source"])
+    const channelId = firstStringValue(candidate, ["channelId", "channel_id", "channel"])
+    const threadId = firstStringValue(candidate, ["threadId", "thread_id", "thread"])
+
+    const score =
+      (messageId ? 4 : 0)
+      + (platform ? 3 : 0)
+      + (channelId ? 2 : 0)
+      + (threadId ? 1 : 0)
+
+    if (score > bestScore) {
+      bestMatch = { messageId, platform, channelId, threadId }
+      bestScore = score
+    }
+  }
+
+  return bestScore > 0 ? bestMatch : {}
+}
+
+function parseWakeMetadata(raw: string): Pick<WakeResult, "messageId" | "platform" | "channelId" | "threadId"> {
+  const trimmed = raw.trim()
+  if (!trimmed) return {}
+  try {
+    return extractWakeMetadata(JSON.parse(trimmed))
+  } catch {
+    const messageId = trimmed.match(/message\s+id:\s*([^\s]+)/i)?.[1]
+    const platform = trimmed.match(/sent\s+via\s+([a-z0-9_-]+)/i)?.[1]?.toLowerCase()
+    return {
+      ...(messageId ? { messageId } : {}),
+      ...(platform ? { platform } : {}),
+    }
+  }
+}
+
 export async function wakeGateway(
   gatewayName: string,
   gatewayConfig: OpenClawGateway,
   payload: unknown,
-): Promise<{ gateway: string; success: boolean; error?: string; statusCode?: number }> {
+): Promise<WakeResult> {
   if (!gatewayConfig.url || !validateGatewayUrl(gatewayConfig.url)) {
     return {
       gateway: gatewayName,
@@ -107,8 +166,10 @@ export async function wakeGateway(
         statusCode: response.status,
       }
     }
-    
-    return { gateway: gatewayName, success: true, statusCode: response.status }
+
+    const metadata = parseWakeMetadata(await response.text())
+
+    return { gateway: gatewayName, success: true, statusCode: response.status, ...metadata }
   } catch (error) {
     return {
       gateway: gatewayName,
@@ -122,7 +183,7 @@ export async function wakeCommandGateway(
   gatewayName: string,
   gatewayConfig: OpenClawGateway,
   variables: Record<string, string | undefined>,
-): Promise<{ gateway: string; success: boolean; error?: string }> {
+): Promise<WakeResult> {
   if (!gatewayConfig.command) {
     return {
       gateway: gatewayName,
@@ -142,10 +203,11 @@ export async function wakeCommandGateway(
 
     const proc = spawn(["sh", "-c", interpolated], {
       env: { ...process.env },
-      stdout: "ignore",
+      stdout: "pipe",
       stderr: "ignore",
       detached: process.platform !== "win32",
     })
+    const stdoutPromise = new Response(proc.stdout).text()
 
     let timeoutId: ReturnType<typeof setTimeout> | undefined
     const timeoutPromise = new Promise<never>((_, reject) => {
@@ -167,7 +229,9 @@ export async function wakeCommandGateway(
       throw new Error(`Command exited with code ${proc.exitCode}`)
     }
 
-    return { gateway: gatewayName, success: true }
+    const metadata = parseWakeMetadata(await stdoutPromise)
+
+    return { gateway: gatewayName, success: true, ...metadata }
   } catch (error) {
     return {
       gateway: gatewayName,
