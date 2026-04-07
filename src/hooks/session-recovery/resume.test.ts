@@ -22,9 +22,35 @@ describe("session-recovery resume", () => {
     expect(config.tools).toEqual({ question: false, bash: true })
   })
 
-  test("resumeSession sends inherited tools with continuation prompt", async () => {
+  test("#given the last user message includes model variant #when extracting resume config #then the variant is preserved", () => {
+    // given
+    const model = {
+      providerID: "openai",
+      modelID: "gpt-5.3-codex",
+      variant: "max",
+    }
+    const userMessage: MessageData = {
+      info: {
+        agent: "Hephaestus",
+        model,
+      },
+    }
+
+    // when
+    const config = extractResumeConfig(userMessage, "ses_resume_variant")
+
+    // then
+    expect(config.model).toEqual(model)
+  })
+
+  test("resumeSession sends inherited tools and variant with continuation prompt", async () => {
     // given
     let promptBody: Record<string, unknown> | undefined
+    const model = {
+      providerID: "openai",
+      modelID: "gpt-5.3-codex",
+      variant: "max",
+    }
     const client = {
       session: {
         promptAsync: async (input: { body: Record<string, unknown> }) => {
@@ -38,12 +64,14 @@ describe("session-recovery resume", () => {
     const ok = await resumeSession(client as never, {
       sessionID: "ses_resume_prompt",
       agent: "Hephaestus",
-      model: { providerID: "openai", modelID: "gpt-5.3-codex" },
+      model,
       tools: { question: false, bash: true },
     })
 
     // then
     expect(ok).toBe(true)
+    expect(promptBody?.model).toEqual({ providerID: "openai", modelID: "gpt-5.3-codex" })
+    expect(promptBody?.variant).toBe("max")
     expect(promptBody?.tools).toEqual({ question: false, bash: true })
     expect(Array.isArray(promptBody?.parts)).toBe(true)
     const firstPart = (promptBody?.parts as Array<{ text?: string }>)?.[0]

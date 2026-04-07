@@ -30,6 +30,7 @@ type BabysitterContext = {
         body: {
           parts: Array<{ type: "text"; text: string }>
           agent?: string
+          variant?: string
           model?: { providerID: string; modelID: string }
           tools?: Record<string, boolean>
         }
@@ -40,6 +41,7 @@ type BabysitterContext = {
         body: {
           parts: Array<{ type: "text"; text: string }>
           agent?: string
+          variant?: string
           model?: { providerID: string; modelID: string }
           tools?: Record<string, boolean>
         }
@@ -58,9 +60,9 @@ type BabysitterOptions = {
 async function resolveMainSessionTarget(
   ctx: BabysitterContext,
   sessionID: string
-): Promise<{ agent?: string; model?: { providerID: string; modelID: string }; tools?: Record<string, boolean> }> {
+): Promise<{ agent?: string; model?: { providerID: string; modelID: string; variant?: string }; tools?: Record<string, boolean> }> {
   let agent = getSessionAgent(sessionID)
-  let model: { providerID: string; modelID: string } | undefined
+  let model: { providerID: string; modelID: string; variant?: string } | undefined
   let tools: Record<string, boolean> | undefined
 
   try {
@@ -206,11 +208,17 @@ export function createUnstableAgentBabysitterHook(ctx: BabysitterContext, option
       const { agent, model, tools } = await resolveMainSessionTarget(ctx, mainSessionID)
 
       try {
+        const launchModel = model
+          ? { providerID: model.providerID, modelID: model.modelID }
+          : undefined
+        const launchVariant = model?.variant
+
         await ctx.client.session.promptAsync({
           path: { id: mainSessionID },
           body: {
             ...(agent ? { agent } : {}),
-            ...(model ? { model } : {}),
+            ...(launchModel ? { model: launchModel } : {}),
+            ...(launchVariant ? { variant: launchVariant } : {}),
             ...(tools ? { tools } : {}),
             parts: [createInternalAgentTextPart(reminder)],
           },

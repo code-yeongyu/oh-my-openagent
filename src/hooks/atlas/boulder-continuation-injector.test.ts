@@ -121,4 +121,64 @@ describe("injectBoulderContinuation", () => {
     expect(result).toBe("skipped_agent_unavailable")
     expect(promptAsyncMock).not.toHaveBeenCalled()
   })
+
+  test("#given recent prompt context includes variant #when injecting boulder continuation #then promptAsync receives variant as a top-level field", async () => {
+    // given
+    registerAgentName("atlas")
+    const capturedRequests: Array<{
+      body?: {
+        model?: { providerID: string; modelID: string }
+        variant?: string
+      }
+    }> = []
+    const promptAsyncMock = mock(async (request: unknown) => {
+      capturedRequests.push(request as typeof capturedRequests[number])
+      return undefined
+    })
+    const recentModel = {
+      providerID: "anthropic",
+      modelID: "claude-sonnet-4-20250514",
+      variant: "max",
+    }
+    const messagesMock = mock(async () => ({
+      data: [{
+        id: "msg_1",
+        info: {
+          agent: "atlas",
+          model: recentModel,
+          time: { created: Date.now() },
+        },
+      }],
+    }))
+
+    const ctx = {
+      directory: "/tmp",
+      client: {
+        session: {
+          messages: messagesMock,
+          promptAsync: promptAsyncMock,
+        },
+      },
+    } as unknown as PluginInput
+
+    // when
+    const result = await injectBoulderContinuation({
+      ctx,
+      sessionID: "ses_test_variant",
+      planName: "test-plan",
+      remaining: 1,
+      total: 2,
+      agent: "atlas",
+      sessionState: { promptFailureCount: 0 },
+    })
+
+    // then
+    expect(result).toBe("injected")
+    expect(capturedRequests).toHaveLength(1)
+    expect(capturedRequests[0]?.body?.model).toEqual({
+      providerID: "anthropic",
+      modelID: "claude-sonnet-4-20250514",
+    })
+    expect(capturedRequests[0]?.body?.variant).toBe("max")
+  })
 })

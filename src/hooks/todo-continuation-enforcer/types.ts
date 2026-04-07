@@ -45,7 +45,7 @@ export interface MessageInfo {
   role?: string
   error?: { name?: string; data?: unknown }
   agent?: string
-  model?: { providerID: string; modelID: string }
+  model?: { providerID: string; modelID: string; variant?: string }
   providerID?: string
   modelID?: string
   tools?: Record<string, ToolPermission>
@@ -57,7 +57,7 @@ export interface MessageWithInfo {
 
 export interface ResolvedMessageInfo {
   agent?: string
-  model?: { providerID: string; modelID: string }
+  model?: { providerID: string; modelID: string; variant?: string }
   tools?: Record<string, ToolPermission>
 }
 
