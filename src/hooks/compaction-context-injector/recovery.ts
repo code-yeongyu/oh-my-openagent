@@ -72,11 +72,24 @@ export function createRecoveryLogic(
     if (reason === "session.compacted") {
       const latestPromptConfig = await resolveLatestSessionPromptConfig(ctx, sessionID)
       if (isPromptConfigRecovered(latestPromptConfig, expectedPromptConfig)) {
+        log("[compaction-context-injector] Recovery skipped — config already present after compaction", {
+          sessionID,
+          reason,
+          agent: expectedPromptConfig.agent,
+        })
         return false
       }
     }
 
     try {
+      log("[compaction-context-injector] Firing session.promptAsync recovery — cache invalidation point", {
+        sessionID,
+        reason,
+        agent: expectedPromptConfig.agent,
+        model,
+        hasTools: !!tools,
+      })
+
       await ctx.client.session.promptAsync({
         path: { id: sessionID },
         body: {

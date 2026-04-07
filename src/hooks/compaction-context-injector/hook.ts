@@ -98,6 +98,10 @@ export function createCompactionContextInjector(options?: {
         return
       }
 
+      log("[compaction-context-injector] session.compacted fired — starting recovery check", {
+        sessionID,
+      })
+
       const tailState = getTailState(sessionID)
       finalizeTrackedAssistantMessage(tailState)
       tailState.lastCompactedAt = Date.now()
