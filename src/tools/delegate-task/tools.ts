@@ -113,6 +113,11 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
     },
     async execute(args: DelegateTaskArgs, toolContext) {
       const ctx = toolContext as ToolContextWithMetadata
+      
+      try {
+        const fs = await import("fs")
+        fs.appendFileSync("/tmp/task-debug.log", `[${new Date().toISOString()}] HANDLER INVOKED args.subagent_type=${args.subagent_type}\n`)
+      } catch {}
 
       if (args.category) {
         if (args.subagent_type && args.subagent_type !== SISYPHUS_JUNIOR_AGENT) {

@@ -24,5 +24,9 @@ export function createMessagesTransformHandler(args: {
     await args.hooks.toolPairValidator?.[
       "experimental.chat.messages.transform"
     ]?.(input, output)
+
+    await args.hooks.exploreResultCache?.[
+      "experimental.chat.messages.transform"
+    ]?.(input, output)
   }
 }

@@ -6,6 +6,7 @@ import {
   createKeywordDetectorHook,
   createThinkingBlockValidatorHook,
   createToolPairValidatorHook,
+  createExploreResultCacheHook,
 } from "../../hooks"
 import {
   contextCollector,
@@ -19,6 +20,7 @@ export type TransformHooks = {
   contextInjectorMessagesTransform: ReturnType<typeof createContextInjectorMessagesTransformHook>
   thinkingBlockValidator: ReturnType<typeof createThinkingBlockValidatorHook> | null
   toolPairValidator: ReturnType<typeof createToolPairValidatorHook> | null
+  exploreResultCache: ReturnType<typeof createExploreResultCacheHook> | null
 }
 
 export function createTransformHooks(args: {
@@ -73,11 +75,20 @@ export function createTransformHooks(args: {
       )
     : null
 
+  const exploreResultCache = isHookEnabled("explore-result-cache-hook")
+    ? safeCreateHook(
+        "explore-result-cache-hook",
+        () => createExploreResultCacheHook(),
+        { enabled: safeHookEnabled },
+      )
+    : null
+
   return {
     claudeCodeHooks,
     keywordDetector,
     contextInjectorMessagesTransform,
     thinkingBlockValidator,
     toolPairValidator,
+    exploreResultCache,
   }
 }
