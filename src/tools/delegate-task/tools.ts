@@ -151,6 +151,15 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
 
       const runInBackground = args.run_in_background === true
 
+      log("[task] DEBUG: ENTRY POINT", {
+        description: args.description,
+        category: args.category,
+        subagent_type: args.subagent_type,
+        session_id: args.session_id,
+        run_in_background: runInBackground,
+        has_prompt: !!args.prompt,
+      })
+
       const { content: skillContent, contents: skillContents, error: skillError } = await resolveSkillContent(args.load_skills, {
         gitMasterConfig: options.gitMasterConfig,
         browserProvider: options.browserProvider,
@@ -186,13 +195,20 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
         ? `${parentContext.model.providerID}/${parentContext.model.modelID}`
         : undefined
 
+      log("[task] delegateTool START", {
+        category: args.category,
+        subagent_type: args.subagent_type,
+        session_id: args.session_id,
+        run_in_background: args.run_in_background,
+      })
+
       let agentToUse: string
       let categoryModel: DelegatedModelConfig | undefined
       let categoryPromptAppend: string | undefined
-      let modelInfo: import("../../features/task-toast-manager/types").ModelFallbackInfo | undefined
+      let modelInfo: unknown | undefined
       let actualModel: string | undefined
       let isUnstableAgent = false
-      let fallbackChain: import("../../shared/model-requirements").FallbackEntry[] | undefined
+      let fallbackChain: unknown[] | undefined
       let maxPromptTokens: number | undefined
 
       if (args.category) {
@@ -256,6 +272,12 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
       })
 
       const isExploreLike = !args.category && isExploreSubagent(args.subagent_type) && !args.session_id
+      log("[task] explore-cache-check", {
+        isExploreLike,
+        category: args.category,
+        subagent_type: args.subagent_type,
+        session_id: args.session_id,
+      })
       if (isExploreLike) {
         const cached = getExploreCache(parentContext.sessionID, args.subagent_type!, args.prompt)
         if (cached) {
@@ -267,16 +289,46 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
         }
       }
 
+      log("[task] DEBUG: runInBackground check", {
+        runInBackground,
+        isExploreLike,
+        subagent_type: args.subagent_type,
+        category: args.category,
+        session_id: args.session_id,
+      })
+
       if (runInBackground) {
-        const result = await executeBackgroundTask(args, ctx, options, parentContext, agentToUse, categoryModel, systemContent, fallbackChain)
+        log("[task] DEBUG: entering background execution path", {
+          subagent_type: args.subagent_type,
+        })
+        const result = await executeBackgroundTask(args, ctx, options, parentContext, agentToUse, categoryModel, systemContent, fallbackChain as any)
+        log("[task] DEBUG: background task completed", {
+          isExploreLike,
+          resultExists: !!result,
+        })
         if (isExploreLike) {
+          log("[task] DEBUG: storing explore cache", {
+            subagent_type: args.subagent_type,
+            promptLength: args.prompt?.length,
+          })
           storeExploreCache(parentContext.sessionID, args.subagent_type!, args.prompt, result)
         }
         return result
       }
 
-      const result = await executeSyncTask(args, ctx, options, parentContext, agentToUse, categoryModel, systemContent, modelInfo, fallbackChain)
+      log("[task] DEBUG: entering sync execution path", {
+        subagent_type: args.subagent_type,
+      })
+      const result = await executeSyncTask(args, ctx, options, parentContext, agentToUse, categoryModel, systemContent, modelInfo as any, fallbackChain as any)
+      log("[task] DEBUG: sync task completed", {
+        isExploreLike,
+        resultExists: !!result,
+      })
       if (isExploreLike) {
+        log("[task] DEBUG: storing explore cache (sync)", {
+          subagent_type: args.subagent_type,
+          promptLength: args.prompt?.length,
+        })
         storeExploreCache(parentContext.sessionID, args.subagent_type!, args.prompt, result)
       }
       return result
