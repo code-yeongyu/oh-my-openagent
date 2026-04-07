@@ -67,10 +67,14 @@ export function createIntentComplexityRouterHook(isEnabled: boolean) {
         preview: text.slice(0, 80),
         agent,
         isSisyphus: isSisyphusAgent(agent),
+        currentModel: output.message["model"],
       })
 
-      // Only downgrade non-Sisyphus agents; Sisyphus always uses its configured model
-      if (tier === "COMPLEX" || isSisyphusAgent(agent)) return
+      // Don't downgrade on COMPLEX, and don't override if a model is already set
+      if (tier === "COMPLEX" || output.message["model"]) return
+
+      // Don't downgrade Sisyphus even if agent detection failed
+      if (isSisyphusAgent(agent)) return
 
       output.message["model"] = HAIKU_MODEL
     },
