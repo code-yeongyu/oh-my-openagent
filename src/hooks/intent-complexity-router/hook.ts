@@ -1,4 +1,5 @@
 import { log } from "../../shared"
+import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { getSessionAgent } from "../../features/claude-code-session-state"
 import { clearSessionModel } from "../../shared/session-model-state"
 import { classifyIntent, type ComplexityTier } from "./classifier"
@@ -18,8 +19,7 @@ function extractText(parts: ChatMessagePart[]): string {
 
 function isSisyphusAgent(agentName: string | undefined): boolean {
   if (!agentName) return false
-  const lower = agentName.toLowerCase()
-  return lower.startsWith("sisyphus") || lower === "sisyphus"
+  return getAgentConfigKey(agentName) === "sisyphus"
 }
 
 function isThinkingOptions(
