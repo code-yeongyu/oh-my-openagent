@@ -129,7 +129,15 @@ export function createLookAt(ctx: PluginInput): ToolDefinition {
         return "Error: Must provide either 'file_path' or 'image_data'."
       }
 
-      const prompt = `Analyze this ${isBase64Input ? "image" : "file"} and extract the requested information.
+      const readEnabled = false
+      const subjectNoun = isBase64Input ? "image" : "file"
+      const sourceClause = readEnabled
+        ? `Use the Read tool on the provided file path to load its contents, then analyze it.`
+        : `The ${subjectNoun} is already attached to this message. Analyze it directly from the attachment. Do NOT attempt to use the Read tool. The Read tool is disabled for this invocation and the ${subjectNoun} cannot be loaded by path.`
+
+      const prompt = `Analyze the attached ${subjectNoun} and extract the requested information.
+
+${sourceClause}
 
 Goal: ${args.goal}
 
@@ -182,7 +190,7 @@ Original error: ${createResult.error}`
               task: false,
               call_omo_agent: false,
               look_at: false,
-              read: false,
+              read: readEnabled,
             },
             parts: [
               { type: "text", text: prompt },
