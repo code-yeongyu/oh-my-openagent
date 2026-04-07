@@ -371,7 +371,7 @@ export class BackgroundManager {
       this.markPreStartDescendantReservation(task)
 
       // Trigger processing (fire-and-forget)
-      this.processKey(key)
+      void this.processKey(key)
 
       return { ...task }
     } catch (error) {
@@ -408,12 +408,35 @@ export class BackgroundManager {
         } catch (error) {
           log("[background-agent] Error starting task:", error)
           this.rollbackPreStartDescendantReservation(item.task)
+
+          // Mark task as error so the parent polling loop detects the failure
+          // instead of leaving it in a zombie "running" state with no prompt sent
+          item.task.status = "error"
+          item.task.error = error instanceof Error ? error.message : String(error)
+          item.task.completedAt = new Date()
+
           if (item.task.concurrencyKey) {
             this.concurrencyManager.release(item.task.concurrencyKey)
             item.task.concurrencyKey = undefined
           } else {
             this.concurrencyManager.release(key)
           }
+
+          if (item.task.rootSessionID) {
+            this.unregisterRootDescendant(item.task.rootSessionID)
+          }
+
+          removeTaskToastTracking(item.task.id)
+
+          // Abort the orphaned session if one was created before the error
+          if (item.task.sessionID) {
+            await this.abortSessionWithLogging(item.task.sessionID, "startTask error cleanup")
+          }
+
+          this.markForNotification(item.task)
+          this.enqueueNotificationForParent(item.task.parentSessionID, () => this.notifyParentSession(item.task)).catch(err => {
+            log("[background-agent] Failed to notify on startTask error:", err)
+          })
         }
       }
     } finally {
