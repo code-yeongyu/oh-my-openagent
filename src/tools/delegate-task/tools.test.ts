@@ -2963,6 +2963,7 @@ describe("sisyphus-task", () => {
       // then - sisyphus-junior override model should be used, not category default
       expect(launchInput.model.providerID).toBe("anthropic")
       expect(launchInput.model.modelID).toBe("claude-sonnet-4-6")
+      expect(launchInput.fallbackChain).toBeUndefined()
     })
 
     test("sisyphus-junior model override works with user-defined category (#1295)", async () => {

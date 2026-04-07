@@ -484,4 +484,32 @@ describe("resolveCategoryExecution", () => {
 		})
 		expect(result.fallbackChain).toBeUndefined()
 	})
+
+	test("does not inherit hardcoded fallbackChain when sisyphus-junior model override is set [regression #2941]", async () => {
+		//#given
+		const args = {
+			category: "quick",
+			prompt: "test prompt",
+			description: "Test task",
+			run_in_background: false,
+			load_skills: [],
+			blockedBy: undefined,
+			enableSkillTools: false,
+		}
+		const executorCtx = createMockExecutorContext()
+		executorCtx.sisyphusJuniorModel = "anthropic/claude-sonnet-4-6"
+
+		//#when
+		const result = await resolveCategoryExecution(args, executorCtx, undefined, "anthropic/claude-sonnet-4-6")
+
+		//#then
+		expect(result.error).toBeUndefined()
+		expect(result.actualModel).toBe("anthropic/claude-sonnet-4-6")
+		expect(result.categoryModel).toEqual({
+			providerID: "anthropic",
+			modelID: "claude-sonnet-4-6",
+			variant: undefined,
+		})
+		expect(result.fallbackChain).toBeUndefined()
+	})
 })
