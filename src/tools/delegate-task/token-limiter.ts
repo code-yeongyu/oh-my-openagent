@@ -48,6 +48,49 @@ function reduceSegmentToFitBudget(content: string, overflowTokens: number): stri
   return truncateToTokenBudget(content, nextBudget)
 }
 
+const MARKDOWN_SECTION_PATTERN = /(?=^#{1,3} )/m
+
+export function truncateSkillByMarkdownSections(content: string, maxTokens: number): string {
+  if (!content || maxTokens <= 0) {
+    return ""
+  }
+
+  const maxChars = maxTokens * CHARACTERS_PER_TOKEN
+  if (content.length <= maxChars) {
+    return content
+  }
+
+  const sections = content.split(MARKDOWN_SECTION_PATTERN)
+  if (sections.length <= 1) {
+    return truncateToTokenBudget(content, maxTokens)
+  }
+
+  let result = ""
+  for (const section of sections) {
+    if ((result + section).length > maxChars) {
+      break
+    }
+    result += section
+  }
+
+  if (!result) {
+    const charTruncated = truncateToTokenBudget(sections[0], maxTokens)
+    return `${charTruncated}\n\n[SECTIONS OMITTED]`
+  }
+
+  return `${result.trimEnd()}\n\n[SECTIONS OMITTED]`
+}
+
+function reduceSkillToFitBudget(content: string, overflowTokens: number): string {
+  if (overflowTokens <= 0 || !content) {
+    return content
+  }
+
+  const currentTokens = estimateTokenCount(content)
+  const nextBudget = Math.max(0, currentTokens - overflowTokens)
+  return truncateSkillByMarkdownSections(content, nextBudget)
+}
+
 export function buildSystemContentWithTokenLimit(
   input: BuildSystemContentInput,
   maxTokens: number | undefined
@@ -81,7 +124,7 @@ export function buildSystemContentWithTokenLimit(
   if (overflowTokens > 0) {
     for (let index = 0; index < nextSkills.length && overflowTokens > 0; index += 1) {
       const skill = nextSkills[index]
-      const reducedSkill = reduceSegmentToFitBudget(skill, overflowTokens)
+      const reducedSkill = reduceSkillToFitBudget(skill, overflowTokens)
       nextSkills[index] = reducedSkill
       systemContent = buildCurrentContent()
       if (!systemContent) {

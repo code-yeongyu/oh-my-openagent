@@ -17,6 +17,7 @@ import {
   buildSystemContentWithTokenLimit,
   estimateTokenCount,
   truncateToTokenBudget,
+  truncateSkillByMarkdownSections,
 } from "./token-limiter"
 
 const TRUNCATION_MARKER_TOKEN_OVERHEAD = estimateTokenCount("\n[TRUNCATED]")
@@ -174,5 +175,78 @@ describe("token-limiter", () => {
     expect(result).not.toContain("SKILL_ALPHA:")
     expect(result).not.toContain("CATEGORY_APPEND:")
     expect(estimateTokenCount(result as string)).toBeLessThanOrEqual(10 + TRUNCATION_MARKER_TOKEN_OVERHEAD)
+  })
+})
+
+describe("truncateSkillByMarkdownSections", () => {
+  describe("#given skill with markdown section headers", () => {
+    test("#then keeps complete sections that fit within budget", () => {
+      // given
+      const skill = [
+        "## Overview",
+        "a".repeat(40),
+        "## Usage",
+        "b".repeat(40),
+        "## Examples",
+        "c".repeat(40),
+      ].join("\n")
+
+      // when
+      const result = truncateSkillByMarkdownSections(skill, 20)
+
+      // then
+      expect(result).toContain("## Overview")
+      expect(result).not.toContain("## Examples")
+    })
+
+    test("#then appends [SECTIONS OMITTED] when sections are dropped", () => {
+      // given
+      const skill = "## Section A\n" + "a".repeat(80) + "\n## Section B\n" + "b".repeat(80)
+
+      // when
+      const result = truncateSkillByMarkdownSections(skill, 15)
+
+      // then
+      expect(result).toContain("[SECTIONS OMITTED]")
+    })
+
+    test("#then never cuts mid-section", () => {
+      // given
+      const skill = "## Config\nkey: CRITICAL_VALUE\n## Extra\n" + "x".repeat(200)
+
+      // when
+      const result = truncateSkillByMarkdownSections(skill, 10)
+
+      // then
+      expect(result).toContain("CRITICAL_VALUE")
+      expect(result).not.toContain("## Extra")
+    })
+  })
+
+  describe("#given skill without markdown headers", () => {
+    test("#then falls back to character truncation", () => {
+      // given
+      const skill = "no headers here " + "x".repeat(200)
+
+      // when
+      const result = truncateSkillByMarkdownSections(skill, 10)
+
+      // then
+      expect(estimateTokenCount(result)).toBeLessThanOrEqual(10 + estimateTokenCount("\n[TRUNCATED]"))
+    })
+  })
+
+  describe("#given skill within budget", () => {
+    test("#then returns content unchanged", () => {
+      // given
+      const skill = "## Section\nsmall content"
+
+      // when
+      const result = truncateSkillByMarkdownSections(skill, 100)
+
+      // then
+      expect(result).toBe(skill)
+      expect(result).not.toContain("[SECTIONS OMITTED]")
+    })
   })
 })

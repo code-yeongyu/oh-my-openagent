@@ -27,6 +27,7 @@ import {
   createRuntimeFallbackHook,
   createLegacyPluginToastHook,
 } from "../../hooks"
+import { createIntentComplexityRouterHook } from "../../hooks/intent-complexity-router"
 import { createAnthropicEffortHook } from "../../hooks/anthropic-effort"
 import {
   detectExternalNotificationPlugin,
@@ -63,6 +64,7 @@ export type SessionHooks = {
   anthropicEffort: ReturnType<typeof createAnthropicEffortHook> | null
   runtimeFallback: ReturnType<typeof createRuntimeFallbackHook> | null
   legacyPluginToast: ReturnType<typeof createLegacyPluginToastHook> | null
+  intentComplexityRouter: ReturnType<typeof createIntentComplexityRouterHook> | null
 }
 
 export function createSessionHooks(args: {
@@ -270,6 +272,10 @@ export function createSessionHooks(args: {
     ? safeHook("legacy-plugin-toast", () => createLegacyPluginToastHook(ctx))
     : null
 
+  const intentComplexityRouter = isHookEnabled("intent-complexity-router")
+    ? safeHook("intent-complexity-router", () => createIntentComplexityRouterHook(true))
+    : null
+
   return {
     contextWindowMonitor,
     preemptiveCompaction,
@@ -295,5 +301,6 @@ export function createSessionHooks(args: {
     anthropicEffort,
     runtimeFallback,
     legacyPluginToast,
+    intentComplexityRouter,
   }
 }

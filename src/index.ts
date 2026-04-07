@@ -40,7 +40,10 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   if (tmuxIntegrationEnabled) {
     startTmuxCheck()
   }
-  const disabledHooks = new Set(pluginConfig.disabled_hooks ?? [])
+  const HOOKS_DISABLED_BY_DEFAULT: readonly HookName[] = ["intent-complexity-router"]
+  const disabledHooks = new Set([
+    ...(pluginConfig.disabled_hooks ?? (HOOKS_DISABLED_BY_DEFAULT as string[])),
+  ])
 
   const isHookEnabled = (hookName: HookName): boolean => !disabledHooks.has(hookName)
   const safeHookEnabled = pluginConfig.experimental?.safe_hook_creation ?? true
