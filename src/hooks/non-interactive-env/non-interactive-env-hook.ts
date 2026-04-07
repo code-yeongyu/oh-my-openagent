@@ -52,8 +52,10 @@ export function createNonInteractiveEnvHook(_ctx: PluginInput) {
       // The env vars (GIT_EDITOR=:, EDITOR=:, etc.) must ALWAYS be injected
       // for git commands to prevent interactive prompts.
 
-      const shellType = process.platform === "win32" ? "powershell" : "unix"
-      const envPrefix = buildEnvPrefix(NON_INTERACTIVE_ENV, shellType)
+      // Always use unix-style prefix: this hook only processes Bash tool commands
+      // (guarded by the tool check above), so the prefix must be bash-compatible
+      // regardless of the host OS shell (e.g., PowerShell on Windows).
+      const envPrefix = buildEnvPrefix(NON_INTERACTIVE_ENV, "unix")
       
       // Check if the command already starts with the prefix to avoid stacking.
       // This maintains the non-interactive behavior and makes the operation idempotent.
