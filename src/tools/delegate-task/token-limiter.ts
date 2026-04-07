@@ -1,6 +1,7 @@
 import type { BuildSystemContentInput } from "./types"
 
 const CHARACTERS_PER_TOKEN = 4
+const MAX_SKILL_TOKENS = 2000
 
 export function estimateTokenCount(text: string): number {
   if (!text) {
@@ -81,6 +82,13 @@ export function truncateSkillByMarkdownSections(content: string, maxTokens: numb
   return `${result.trimEnd()}\n\n[SECTIONS OMITTED]`
 }
 
+function truncateSingleSkill(skillContent: string): string {
+  if (!skillContent) return ""
+  const currentTokens = estimateTokenCount(skillContent)
+  if (currentTokens <= MAX_SKILL_TOKENS) return skillContent
+  return truncateSkillByMarkdownSections(skillContent, MAX_SKILL_TOKENS)
+}
+
 function reduceSkillToFitBudget(content: string, overflowTokens: number): string {
   if (overflowTokens <= 0 || !content) {
     return content
@@ -96,9 +104,9 @@ export function buildSystemContentWithTokenLimit(
   maxTokens: number | undefined
 ): string | undefined {
   const skillParts = input.skillContents?.length
-    ? [...input.skillContents]
+    ? input.skillContents.map(truncateSingleSkill)
     : input.skillContent
-      ? [input.skillContent]
+      ? [truncateSingleSkill(input.skillContent)]
       : []
   const categoryPromptAppend = input.categoryPromptAppend ?? ""
   const agentsContext = input.agentsContext ?? input.planAgentPrepend ?? ""
