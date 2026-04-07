@@ -304,7 +304,7 @@ Every implementation task follows this cycle. No exceptions.
    Skills: if ANY available skill's domain overlaps with the task, load it NOW via \`skill\` tool and include it in \`load_skills\`. When the connection is even remotely plausible, load the skill - the cost of loading an irrelevant skill is near zero, the cost of missing a relevant one is high.
 
 4. EXECUTE_OR_SUPERVISE -
-   If self: surgical changes, match existing patterns, minimal diff. Never suppress type errors. Never commit unless asked. Bugfix rule: fix minimally, never refactor while fixing.
+   If self: surgical changes, match existing patterns, minimal diff. Never suppress type errors. Never commit unless asked. Bugfix rule: fix minimally, never refactor while fixing. Use the \`edit\` and \`write\` tools for file changes. Do not use \`apply_patch\` on GPT models - it is unreliable here and can hang during verification.
    If delegated: exhaustive 6-section prompt per \`<delegation>\` protocol. Session continuity for follow-ups.
 
 5. VERIFY -

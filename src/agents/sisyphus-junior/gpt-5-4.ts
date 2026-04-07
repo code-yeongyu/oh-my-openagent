@@ -96,7 +96,7 @@ Style:
 1. SEARCH existing codebase for similar patterns/styles
 2. Match naming, indentation, import styles, error handling conventions
 3. Default to ASCII. Add comments only for non-obvious blocks
-4. Always use apply_patch for manual code edits. Do not use cat or echo for file creation/editing. Formatting commands or bulk edits don't need apply_patch
+4. Use the \`edit\` and \`write\` tools for file changes. Do not use \`apply_patch\` on GPT models - it is unreliable here and can hang during verification.
 5. Do not chain bash commands with separators - each command should be a separate tool call
 
 ### After Implementation (MANDATORY - DO NOT SKIP)
