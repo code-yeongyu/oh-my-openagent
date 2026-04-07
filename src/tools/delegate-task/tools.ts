@@ -20,6 +20,11 @@ import {
   executeBackgroundTask,
   executeSyncTask,
 } from "./executor"
+import {
+  isExploreSubagent,
+  getExploreCache,
+  storeExploreCache,
+} from "./explore-result-cache"
 
 export { resolveCategoryConfig } from "./categories"
 export type { SyncSessionCreatedEvent, DelegateTaskToolOptions, BuildSystemContentInput } from "./types"
@@ -250,11 +255,31 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
         availableSkills,
       })
 
-      if (runInBackground) {
-        return executeBackgroundTask(args, ctx, options, parentContext, agentToUse, categoryModel, systemContent, fallbackChain)
+      const isExploreLike = !args.category && isExploreSubagent(args.subagent_type) && !args.session_id
+      if (isExploreLike) {
+        const cached = getExploreCache(parentContext.sessionID, args.subagent_type!, args.prompt)
+        if (cached) {
+          log("[task] explore-result-cache: returning cached result, skipping agent spawn", {
+            subagent_type: args.subagent_type,
+            parentSessionID: parentContext.sessionID,
+          })
+          return cached
+        }
       }
 
-      return executeSyncTask(args, ctx, options, parentContext, agentToUse, categoryModel, systemContent, modelInfo, fallbackChain)
+      if (runInBackground) {
+        const result = await executeBackgroundTask(args, ctx, options, parentContext, agentToUse, categoryModel, systemContent, fallbackChain)
+        if (isExploreLike) {
+          storeExploreCache(parentContext.sessionID, args.subagent_type!, args.prompt, result)
+        }
+        return result
+      }
+
+      const result = await executeSyncTask(args, ctx, options, parentContext, agentToUse, categoryModel, systemContent, modelInfo, fallbackChain)
+      if (isExploreLike) {
+        storeExploreCache(parentContext.sessionID, args.subagent_type!, args.prompt, result)
+      }
+      return result
     },
   })
 }
