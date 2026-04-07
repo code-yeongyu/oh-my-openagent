@@ -15,6 +15,8 @@ export const MIN_IDLE_TIME_MS = 5000
 export const POLLING_INTERVAL_MS = 3000
 export const TASK_CLEANUP_DELAY_MS = 10 * 60 * 1000
 export const TMUX_CALLBACK_DELAY_MS = 200
+/** Safety timeout for tasks stuck after a usage-limit error: cancel after 30 minutes. */
+export const USAGE_LIMIT_TASK_TIMEOUT_MS = 30 * 60 * 1000
 
 export type ProcessCleanupEvent = NodeJS.Signals | "beforeExit" | "exit"
 

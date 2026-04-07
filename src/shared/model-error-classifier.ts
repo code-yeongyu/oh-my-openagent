@@ -118,6 +118,20 @@ export interface ErrorInfo {
 }
 
 /**
+ * Determines if an error is a usage/quota-limit stop error.
+ * These errors intentionally halt the fallback chain by default to avoid
+ * automatically spending on a different provider without user consent.
+ */
+export function isUsageLimitError(error: ErrorInfo): boolean {
+  if (error.name) {
+    const errorNameLower = error.name.toLowerCase()
+    if (STOP_ERROR_NAMES.has(errorNameLower)) return true
+  }
+  const msg = error.message?.toLowerCase() ?? ""
+  return STOP_MESSAGE_PATTERNS.some((pattern) => msg.includes(pattern))
+}
+
+/**
  * Determines if an error is a retryable model error.
  * Returns true if the error is a known retryable type OR matches retryable message patterns.
  */

@@ -13,6 +13,12 @@ export const FallbackModelObjectSchema = z.object({
       budgetTokens: z.number().optional(),
     })
     .optional(),
+  /**
+   * When true, this fallback is used even if the previous model was stopped due to a
+   * usage/quota limit. Without this flag, usage-limit errors cancel the task and notify
+   * the parent instead of triggering an automatic (potentially billable) fallback.
+   */
+  ignore_usage_limit: z.boolean().optional(),
 })
 
 export type FallbackModelObject = z.infer<typeof FallbackModelObjectSchema>

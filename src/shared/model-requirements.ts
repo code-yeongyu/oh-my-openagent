@@ -7,6 +7,8 @@ export type FallbackEntry = {
   top_p?: number;
   maxTokens?: number;
   thinking?: { type: "enabled" | "disabled"; budgetTokens?: number };
+  /** When true, this entry is used even after a usage/quota-limit stop-error. */
+  ignore_usage_limit?: boolean;
 };
 
 export type ModelRequirement = {
