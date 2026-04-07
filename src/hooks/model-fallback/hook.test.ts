@@ -94,7 +94,7 @@ describe("model fallback hook", () => {
 
     const set = setPendingModelFallback(
       "ses_model_fallback_main",
-      "Sisyphus (Ultraworker)",
+      "Sisyphus - Ultraworker",
       "anthropic",
       "claude-opus-4-6-thinking",
     )
@@ -132,7 +132,7 @@ describe("model fallback hook", () => {
     const sessionID = "ses_model_fallback_main"
 
     expect(
-      setPendingModelFallback(sessionID, "Sisyphus (Ultraworker)", "anthropic", "claude-opus-4-6-thinking"),
+      setPendingModelFallback(sessionID, "Sisyphus - Ultraworker", "anthropic", "claude-opus-4-6-thinking"),
     ).toBe(true)
 
     const firstOutput = {
@@ -154,7 +154,7 @@ describe("model fallback hook", () => {
 
     //#when - second error re-arms fallback and should advance to next entry
     expect(
-      setPendingModelFallback(sessionID, "Sisyphus (Ultraworker)", "anthropic", "claude-opus-4-6"),
+      setPendingModelFallback(sessionID, "Sisyphus - Ultraworker", "anthropic", "claude-opus-4-6"),
     ).toBe(true)
 
     const secondOutput = {
@@ -181,13 +181,13 @@ describe("model fallback hook", () => {
     //#when
     const firstSet = setPendingModelFallback(
       sessionID,
-      "Sisyphus (Ultraworker)",
+      "Sisyphus - Ultraworker",
       "anthropic",
       "claude-opus-4-6-thinking",
     )
     const secondSet = setPendingModelFallback(
       sessionID,
-      "Sisyphus (Ultraworker)",
+      "Sisyphus - Ultraworker",
       "anthropic",
       "claude-opus-4-6-thinking",
     )
@@ -218,7 +218,7 @@ describe("model fallback hook", () => {
     expect(
       setPendingModelFallback(
         sessionID,
-        "Sisyphus (Ultraworker)",
+        "Sisyphus - Ultraworker",
         "anthropic",
         "claude-opus-4-6",
       ),
@@ -262,7 +262,7 @@ describe("model fallback hook", () => {
     expect(
       setPendingModelFallback(
         sessionID,
-        "Sisyphus (Ultraworker)",
+        "Sisyphus - Ultraworker",
         "quotio",
         "claude-opus-4-6",
       ),
@@ -308,7 +308,7 @@ describe("model fallback hook", () => {
     expect(
       setPendingModelFallback(
         sessionID,
-        "Sisyphus (Ultraworker)",
+        "Sisyphus - Ultraworker",
         "provider-x",
         "current-model",
       ),
@@ -348,7 +348,7 @@ describe("model fallback hook", () => {
 
     const set = setPendingModelFallback(
       "ses_model_fallback_toast",
-      "Sisyphus (Ultraworker)",
+      "Sisyphus - Ultraworker",
       "anthropic",
       "claude-opus-4-6-thinking",
     )
@@ -389,7 +389,7 @@ describe("model fallback hook", () => {
 
     const set = setPendingModelFallback(
       sessionID,
-      "Atlas (Plan Executor)",
+      "Atlas - Plan Executor",
       "github-copilot",
       "claude-sonnet-4-5",
     )

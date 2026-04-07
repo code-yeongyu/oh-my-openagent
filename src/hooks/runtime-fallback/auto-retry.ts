@@ -133,14 +133,14 @@ export function createAutoRetryHelpers(deps: HookDeps) {
         })
 
         const retryAgent = resolvedAgent ?? getSessionAgent(sessionID)
-        const retryAgentDisplayName = retryAgent ? getAgentDisplayName(retryAgent) : undefined
         sessionAwaitingFallbackResult.add(sessionID)
         scheduleSessionFallbackTimeout(sessionID, retryAgent)
 
         await ctx.client.session.promptAsync({
           path: { id: sessionID },
           body: {
-            ...(retryAgentDisplayName ? { agent: retryAgentDisplayName } : {}),
+            // Use config key to avoid HTTP header validation issues with display names
+            ...(retryAgent ? { agent: retryAgent } : {}),
             ...retryModelPayload,
             parts: retryParts,
           },

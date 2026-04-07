@@ -40,13 +40,13 @@ describe("claude-code-session-state", () => {
     test("should strip zero-width ordering prefixes before storing agent for session", () => {
       // given
       const sessionID = "test-session-prefixed"
-      const agent = "\u200B\u200B\u200BPrometheus (Plan Builder)"
+      const agent = "\u200B\u200B\u200BPrometheus - Plan Builder"
 
       // when
       setSessionAgent(sessionID, agent)
 
       // then
-      expect(getSessionAgent(sessionID)).toBe("Prometheus (Plan Builder)")
+      expect(getSessionAgent(sessionID)).toBe("Prometheus - Plan Builder")
     })
 
     test("should NOT overwrite existing agent (first-write wins)", () => {
@@ -88,10 +88,10 @@ describe("claude-code-session-state", () => {
       setSessionAgent(sessionID, "sisyphus")
 
       // when
-      updateSessionAgent(sessionID, "\u200B\u200BHephaestus (Deep Agent)")
+      updateSessionAgent(sessionID, "\u200B\u200BHephaestus - Deep Agent")
 
       // then
-      expect(getSessionAgent(sessionID)).toBe("Hephaestus (Deep Agent)")
+      expect(getSessionAgent(sessionID)).toBe("Hephaestus - Deep Agent")
     })
   })
 
@@ -133,21 +133,21 @@ describe("claude-code-session-state", () => {
   describe("agent registration", () => {
     test("should register config-key lookup when given a display name", () => {
       // given
-      registerAgentName("Atlas (Plan Executor)")
+      registerAgentName("Atlas - Plan Executor")
 
       // when / then
       expect(isAgentRegistered("atlas")).toBe(true)
-      expect(isAgentRegistered("Atlas (Plan Executor)")).toBe(true)
+      expect(isAgentRegistered("Atlas - Plan Executor")).toBe(true)
     })
 
     describe("#given atlas display name with zero-width prefix", () => {
       describe("#when checking registration without the zero-width prefix", () => {
         test("#then it treats the display name as registered", () => {
           // given
-          registerAgentName("\u200BAtlas (Plan Executor)")
+          registerAgentName("\u200BAtlas - Plan Executor")
 
           // when
-          const isRegistered = isAgentRegistered("Atlas (Plan Executor)")
+          const isRegistered = isAgentRegistered("Atlas - Plan Executor")
 
           // then
           expect(isRegistered).toBe(true)

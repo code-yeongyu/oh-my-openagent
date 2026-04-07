@@ -4,15 +4,15 @@
  * Display names include suffixes for UI/logs (e.g., "Sisyphus (Ultraworker)").
  */
 export const AGENT_DISPLAY_NAMES: Record<string, string> = {
-  sisyphus: "Sisyphus (Ultraworker)",
-  hephaestus: "Hephaestus (Deep Agent)",
-  prometheus: "Prometheus (Plan Builder)",
-  atlas: "Atlas (Plan Executor)",
+  sisyphus: "Sisyphus - Ultraworker",
+  hephaestus: "Hephaestus - Deep Agent",
+  prometheus: "Prometheus - Plan Builder",
+  atlas: "Atlas - Plan Executor",
   "sisyphus-junior": "Sisyphus-Junior",
-  metis: "Metis (Plan Consultant)",
-  momus: "Momus (Plan Critic)",
-  athena: "Athena (Council)",
-  "athena-junior": "Athena-Junior (Council)",
+  metis: "Metis - Plan Consultant",
+  momus: "Momus - Plan Critic",
+  athena: "Athena - Council",
+  "athena-junior": "Athena-Junior - Council",
   oracle: "oracle",
   librarian: "librarian",
   explore: "explore",

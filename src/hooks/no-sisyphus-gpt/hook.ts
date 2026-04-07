@@ -43,11 +43,11 @@ export function createNoSisyphusGptHook(ctx: PluginInput) {
 
       if (agentKey === "sisyphus" && modelID && isGptModel(modelID) && !isGpt5_4Model(modelID)) {
         showToast(ctx, input.sessionID)
-        input.agent = HEPHAESTUS_DISPLAY
+        input.agent = "hephaestus"
         if (output?.message) {
-          output.message.agent = HEPHAESTUS_DISPLAY
+          output.message.agent = "hephaestus"
         }
-        updateSessionAgent(input.sessionID, HEPHAESTUS_DISPLAY)
+        updateSessionAgent(input.sessionID, "hephaestus")
       }
     },
   }

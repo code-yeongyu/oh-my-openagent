@@ -771,7 +771,7 @@ describe("createEventHandler - retry dedupe lifecycle", () => {
 						role: "user",
 						modelID: "claude-opus-4-6-thinking",
 						providerID: "anthropic",
-						agent: "Sisyphus (Ultraworker)",
+						agent: "Sisyphus - Ultraworker",
 					},
 				},
 			},
