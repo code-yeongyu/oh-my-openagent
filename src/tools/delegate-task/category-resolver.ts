@@ -275,6 +275,6 @@ Available categories: ${categoryNames.join(", ")}`,
     actualModel,
     isUnstableAgent,
     // Don't use hardcoded fallback chain when resolution was skipped (cold cache)
-    fallbackChain: configuredFallbackChain ?? ((isModelResolutionSkipped || explicitCategoryModel) ? undefined : requirement?.fallbackChain),
+    fallbackChain: configuredFallbackChain ?? ((isModelResolutionSkipped || explicitCategoryModel || overrideModel) ? undefined : requirement?.fallbackChain),
   }
 }

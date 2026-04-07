@@ -332,6 +332,25 @@ describe("model fallback hook", () => {
     clearPendingModelFallback(sessionID)
   })
 
+  test("does not fall back to hardcoded agent chain when session explicitly stores no fallback chain [regression #2941]", () => {
+    //#given
+    const sessionID = "ses_model_fallback_explicit_none"
+    clearPendingModelFallback(sessionID)
+    setSessionFallbackChain(sessionID, undefined)
+
+    //#when
+    const set = setPendingModelFallback(
+      sessionID,
+      "Sisyphus - Junior",
+      "anthropic",
+      "claude-sonnet-4-6",
+    )
+
+    //#then
+    expect(set).toBe(false)
+    clearPendingModelFallback(sessionID)
+  })
+
   test("shows toast when fallback is applied", async () => {
     //#given
     const toastCalls: Array<{ title: string; message: string }> = []

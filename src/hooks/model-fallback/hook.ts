@@ -42,8 +42,12 @@ const sessionFallbackChains = new Map<string, FallbackEntry[]>()
 
 export function setSessionFallbackChain(sessionID: string, fallbackChain: FallbackEntry[] | undefined): void {
   if (!sessionID) return
-  if (!fallbackChain || fallbackChain.length === 0) {
-    sessionFallbackChains.delete(sessionID)
+  if (!fallbackChain) {
+    sessionFallbackChains.set(sessionID, [])
+    return
+  }
+  if (fallbackChain.length === 0) {
+    sessionFallbackChains.set(sessionID, [])
     return
   }
   sessionFallbackChains.set(sessionID, fallbackChain)
@@ -65,8 +69,9 @@ export function setPendingModelFallback(
 ): boolean {
   const agentKey = getAgentConfigKey(agentName)
   const requirements = AGENT_MODEL_REQUIREMENTS[agentKey]
+  const hasSessionFallback = sessionFallbackChains.has(sessionID)
   const sessionFallback = sessionFallbackChains.get(sessionID)
-  const fallbackChain = sessionFallback && sessionFallback.length > 0
+  const fallbackChain = hasSessionFallback
     ? sessionFallback
     : requirements?.fallbackChain
 
