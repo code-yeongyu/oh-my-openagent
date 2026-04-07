@@ -119,4 +119,57 @@ describe("injectContinuation", () => {
     // then
     expect(injected).toBe(false)
   })
+
+  test("#given resolved model info includes variant #when reinjecting continuation #then promptAsync receives variant as a top-level field", async () => {
+    // given
+    let capturedBody:
+      | {
+          model?: { providerID: string; modelID: string }
+          variant?: string
+        }
+      | undefined
+    const ctx = {
+      directory: "/tmp/test",
+      client: {
+        session: {
+          todo: async () => ({ data: [{ id: "1", content: "todo", status: "pending", priority: "high" }] }),
+          promptAsync: async (input: {
+            body: {
+              model?: { providerID: string; modelID: string }
+              variant?: string
+            }
+          }) => {
+            capturedBody = input.body
+            return {}
+          },
+        },
+      },
+    }
+    const sessionStateStore = {
+      getExistingState: () => ({ inFlight: false, lastInjectedAt: 0, consecutiveFailures: 0 }),
+    }
+    const model = {
+      providerID: "openai",
+      modelID: "gpt-5.3-codex",
+      variant: "max",
+    }
+
+    // when
+    await injectContinuation({
+      ctx: ctx as never,
+      sessionID: "ses_continuation_variant",
+      resolvedInfo: {
+        agent: "Hephaestus",
+        model,
+      },
+      sessionStateStore: sessionStateStore as never,
+    })
+
+    // then
+    expect(capturedBody?.model).toEqual({
+      providerID: "openai",
+      modelID: "gpt-5.3-codex",
+    })
+    expect(capturedBody?.variant).toBe("max")
+  })
 })

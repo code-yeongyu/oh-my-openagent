@@ -71,12 +71,18 @@ export async function injectBoulderContinuation(input: {
     const promptContext = await resolveRecentPromptContextForSession(ctx, sessionID)
     const inheritedTools = resolveInheritedPromptTools(sessionID, promptContext.tools)
 
-		await ctx.client.session.promptAsync({
-			path: { id: sessionID },
-			body: {
-				agent: continuationAgent,
-				...(promptContext.model !== undefined ? { model: promptContext.model } : {}),
-				...(inheritedTools ? { tools: inheritedTools } : {}),
+    const launchModel = promptContext.model
+      ? { providerID: promptContext.model.providerID, modelID: promptContext.model.modelID }
+      : undefined
+    const launchVariant = promptContext.model?.variant
+
+    await ctx.client.session.promptAsync({
+      path: { id: sessionID },
+      body: {
+        agent: continuationAgent,
+        ...(launchModel ? { model: launchModel } : {}),
+        ...(launchVariant ? { variant: launchVariant } : {}),
+        ...(inheritedTools ? { tools: inheritedTools } : {}),
         parts: [createInternalAgentTextPart(prompt)],
       },
       query: { directory: ctx.directory },

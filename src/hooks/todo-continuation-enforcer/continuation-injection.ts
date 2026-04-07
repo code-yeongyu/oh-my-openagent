@@ -174,11 +174,17 @@ ${todoList}`
 
     const inheritedTools = resolveInheritedPromptTools(sessionID, tools)
 
+    const launchModel = model
+      ? { providerID: model.providerID, modelID: model.modelID }
+      : undefined
+    const launchVariant = model?.variant
+
     await ctx.client.session.promptAsync({
       path: { id: sessionID },
       body: {
         agent: promptAgent,
-        ...(model !== undefined ? { model } : {}),
+        ...(launchModel ? { model: launchModel } : {}),
+        ...(launchVariant ? { variant: launchVariant } : {}),
         ...(inheritedTools ? { tools: inheritedTools } : {}),
         parts: [createInternalAgentTextPart(prompt)],
       },
