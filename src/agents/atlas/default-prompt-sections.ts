@@ -212,8 +212,26 @@ task(subagent_type="librarian", load_skills=[], run_in_background=true, ...)
 \`\`\`
 
 **For task execution**: NEVER background
+
+**Choose executor based on task complexity:**
+
+| Task Type | Use | Why |
+|-----------|-----|-----|
+| Single file, <50 LOC, clear scope | \`category="quick"\` | Fast, focused execution |
+| Multi-file, known pattern | \`category="deep"\` | Autonomous with model fallback |
+| Complex, unclear scope, multi-step | \`subagent_type="hephaestus"\` | Full autonomous deep worker |
+| Frontend/UI | \`category="visual-engineering"\` | Design-optimized model |
+| Hard logic/architecture | \`category="ultrabrain"\` | High-reasoning model |
+
+**Hephaestus (autonomous deep worker)**:
 \`\`\`typescript
-task(category="...", load_skills=[...], run_in_background=false, ...)
+task(subagent_type="hephaestus", load_skills=[], run_in_background=false, prompt="...")
+\`\`\`
+Use when task is: multi-file refactor, complex debugging, unclear implementation path, or requires thorough exploration before action.
+
+**Category-based (Sisyphus-Junior variants)**:
+\`\`\`typescript
+task(category="quick", load_skills=[...], run_in_background=false, prompt="...")
 \`\`\`
 
 **Parallel task groups**: Invoke multiple in ONE message
