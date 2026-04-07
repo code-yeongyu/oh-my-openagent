@@ -1431,6 +1431,46 @@ describe("BackgroundManager.tryCompleteTask", () => {
     expect(task.concurrencyKey).toBeUndefined()
   })
 
+  test("should mark task as error when startTask throws after session creation", async () => {
+    //#given - startTask creates session but fails before sending prompt
+    const concurrencyKey = "anthropic/claude-opus-4-6"
+
+    const task = createMockTask({
+      id: "task-zombie-session",
+      parentSessionID: "parent-zombie",
+      status: "pending",
+      agent: "explore",
+    })
+    delete (task as Partial<BackgroundTask>).sessionID
+
+    const input = {
+      description: task.description,
+      prompt: task.prompt,
+      agent: task.agent,
+      parentSessionID: task.parentSessionID,
+      parentMessageID: task.parentMessageID,
+      model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
+    }
+    getTaskMap(manager).set(task.id, task)
+    getQueuesByKey(manager).set(concurrencyKey, [{ task, input }])
+
+    ;(manager as unknown as { startTask: (item: { task: BackgroundTask; input: typeof input }) => Promise<void> }).startTask = async (item) => {
+      item.task.status = "running"
+      item.task.sessionID = "ses_zombie_child"
+      item.task.startedAt = new Date()
+      item.task.concurrencyKey = concurrencyKey
+      throw new Error("crash between session creation and prompt send")
+    }
+
+    //#when
+    await processKeyForTest(manager, concurrencyKey)
+
+    //#then - task must be marked as error, not left in running zombie state
+    expect(task.status).toBe("error")
+    expect(task.error).toContain("crash between session creation and prompt send")
+    expect(task.completedAt).toBeDefined()
+  })
+
   test("should release queue slot when queued task is already interrupt", async () => {
     // given
     const concurrencyKey = "anthropic/claude-opus-4-6"
