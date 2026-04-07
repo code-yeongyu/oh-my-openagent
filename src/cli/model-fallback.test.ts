@@ -549,6 +549,58 @@ describe("generateModelConfig", () => {
     })
   })
 
+  describe("special-case agents include fallback_models", () => {
+    test("explore includes fallback_models when Copilot and Claude are both available", () => {
+      // #given both Copilot and Claude are available
+      const config = createConfig({ hasCopilot: true, hasClaude: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then explore should have fallback_models from the remaining chain entries
+      expect(result.agents?.explore?.model).toBe("anthropic/claude-haiku-4-5")
+      expect(result.agents?.explore?.fallback_models).toBeDefined()
+      expect(result.agents?.explore?.fallback_models?.length).toBeGreaterThan(0)
+    })
+
+    test("explore omits fallback_models when only one provider matches chain entries", () => {
+      // #given only Claude is available
+      const config = createConfig({ hasClaude: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then explore should not have fallback_models (only one chain entry matches)
+      expect(result.agents?.explore?.model).toBe("anthropic/claude-haiku-4-5")
+      expect(result.agents?.explore?.fallback_models).toBeUndefined()
+    })
+
+    test("librarian includes fallback_models when opencode-go and Claude are both available", () => {
+      // #given opencode-go and Claude are available
+      const config = createConfig({ hasOpencodeGo: true, hasClaude: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then librarian should have fallback_models
+      expect(result.agents?.librarian?.model).toBe("opencode-go/minimax-m2.7")
+      expect(result.agents?.librarian?.fallback_models).toBeDefined()
+      expect(result.agents?.librarian?.fallback_models?.length).toBeGreaterThan(0)
+    })
+
+    test("librarian omits fallback_models when only one provider matches", () => {
+      // #given only opencode-go is available
+      const config = createConfig({ hasOpencodeGo: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then librarian should not have fallback_models
+      expect(result.agents?.librarian?.model).toBe("opencode-go/minimax-m2.7")
+      expect(result.agents?.librarian?.fallback_models).toBeUndefined()
+    })
+  })
+
   describe("schema URL", () => {
     test("always includes correct schema URL", () => {
       // #given any config
