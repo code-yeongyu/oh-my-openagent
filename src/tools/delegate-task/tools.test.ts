@@ -1040,11 +1040,12 @@ describe("sisyphus-task", () => {
         toolContext
       )
 
-      // then - claude-opus-4-6 should be passed with max variant
+      // then - claude-opus-4-6 should be passed with max variant and capped thinking budget
       expect(launchInput.model).toEqual({
         providerID: "anthropic",
         modelID: "claude-opus-4-6",
         variant: "max",
+        thinking: { type: "enabled", budgetTokens: 16000 },
       })
     }, { timeout: 20000 })
 
