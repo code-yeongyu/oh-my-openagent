@@ -6,6 +6,7 @@ import type {
 } from "../agents/dynamic-agent-prompt-builder"
 import type { OhMyOpenCodeConfig } from "../config"
 import { isInteractiveBashEnabled } from "../create-runtime-tmux-config"
+import * as openclawRuntimeDispatch from "../openclaw/runtime-dispatch"
 import type { PluginContext, ToolsRecord } from "./types"
 
 import {
@@ -158,6 +159,18 @@ export function createToolRegistry(args: {
           },
         },
       })
+
+      if (pluginConfig.openclaw) {
+        await openclawRuntimeDispatch.dispatchOpenClawEvent({
+          config: pluginConfig.openclaw,
+          rawEvent: "session.created",
+          context: {
+            sessionId: event.sessionID,
+            projectPath: ctx.directory,
+            tmuxPaneId: managers.tmuxSessionManager.getTrackedPaneId?.(event.sessionID) ?? process.env.TMUX_PANE,
+          },
+        })
+      }
     },
   })
 
