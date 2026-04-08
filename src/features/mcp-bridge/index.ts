@@ -1,9 +1,8 @@
-import { createServer, type IncomingMessage, type ServerResponse } from "node:http"
+import { createServer } from "node:http"
 import { resolve } from "node:path"
 import { readFile, readdir, stat } from "node:fs/promises"
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js"
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod"
 import { runRg, runRgCount } from "../../tools/grep/cli"
 import { runRgFiles } from "../../tools/glob/cli"
@@ -13,14 +12,10 @@ import { formatGlobResult } from "../../tools/glob/result-formatter"
 import { runSg } from "../../tools/ast-grep/cli"
 import { formatSearchResult } from "../../tools/ast-grep/result-formatter"
 import { CLI_LANGUAGES } from "../../tools/ast-grep/constants"
+import { log } from "../../shared"
 
-const DEFAULT_PORT = 4201
-const DEFAULT_MAX_FILE_SIZE = 100 * 1024
-
-export interface McpServerOptions {
-  dir: string
-  port: number
-}
+const MCP_BRIDGE_PORT = 4201
+const MAX_FILE_SIZE = 100 * 1024
 
 function buildMcpServer(workDir: string): McpServer {
   const server = new McpServer({ name: "oh-my-openagent", version: "1.0.0" })
@@ -43,14 +38,10 @@ function buildMcpServer(workDir: string): McpServer {
         const outputMode = output_mode ?? "files_with_matches"
         const headLimit = head_limit ?? 0
 
-        process.stderr.write(`[MCP grep] pattern=${pattern} path=${searchPath} mode=${outputMode}\n`)
-
         if (outputMode === "count") {
           const results = await runRgCount({ pattern, paths: [searchPath], globs }, cli)
           const limited = headLimit > 0 ? results.slice(0, headLimit) : results
-          const text = formatCountResult(limited)
-          process.stderr.write(`[MCP grep] result_length=${text.length}\n`)
-          return { content: [{ type: "text" as const, text }] }
+          return { content: [{ type: "text" as const, text: formatCountResult(limited) }] }
         }
 
         const result = await runRg({
@@ -61,13 +52,9 @@ function buildMcpServer(workDir: string): McpServer {
           headLimit,
         }, cli)
 
-        const text = formatGrepResult(result)
-        process.stderr.write(`[MCP grep] matches=${result.matches.length} result_length=${text.length} text_preview=${text.slice(0,100)}\n`)
-        return { content: [{ type: "text" as const, text }] }
+        return { content: [{ type: "text" as const, text: formatGrepResult(result) }] }
       } catch (e) {
-        const text = `Error: ${e instanceof Error ? e.message : String(e)}`
-        process.stderr.write(`[MCP grep] error=${text}\n`)
-        return { content: [{ type: "text" as const, text }] }
+        return { content: [{ type: "text" as const, text: `Error: ${e instanceof Error ? e.message : String(e)}` }] }
       }
     }
   )
@@ -124,15 +111,14 @@ function buildMcpServer(workDir: string): McpServer {
       try {
         const absPath = resolve(workDir, file_path)
         const info = await stat(absPath)
-        if (info.size > DEFAULT_MAX_FILE_SIZE) {
+        if (info.size > MAX_FILE_SIZE) {
           return { content: [{ type: "text" as const, text: `File too large (${Math.round(info.size / 1024)}KB). Use grep or offset/limit to read sections.` }] }
         }
         const content = await readFile(absPath, "utf-8")
         const lines = content.split("\n")
         const start = offset ? offset - 1 : 0
         const end = limit ? start + limit : lines.length
-        const slice = lines.slice(start, end)
-        const numbered = slice.map((line, i) => `${start + i + 1}: ${line}`).join("\n")
+        const numbered = lines.slice(start, end).map((line, i) => `${start + i + 1}: ${line}`).join("\n")
         return { content: [{ type: "text" as const, text: numbered }] }
       } catch (e) {
         return { content: [{ type: "text" as const, text: `Error: ${e instanceof Error ? e.message : String(e)}` }] }
@@ -149,7 +135,6 @@ function buildMcpServer(workDir: string): McpServer {
     async ({ path }) => {
       try {
         const absPath = path ? resolve(workDir, path) : workDir
-        process.stderr.write(`[MCP file_list] path=${absPath}\n`)
         const entries = await readdir(absPath, { withFileTypes: true })
         const lines = entries
           .sort((a, b) => {
@@ -157,13 +142,9 @@ function buildMcpServer(workDir: string): McpServer {
             return a.name.localeCompare(b.name)
           })
           .map(e => `${e.isDirectory() ? e.name + "/" : e.name}`)
-        const text = lines.join("\n")
-        process.stderr.write(`[MCP file_list] entries=${entries.length} result_length=${text.length}\n`)
-        return { content: [{ type: "text" as const, text }] }
+        return { content: [{ type: "text" as const, text: lines.join("\n") }] }
       } catch (e) {
-        const text = `Error: ${e instanceof Error ? e.message : String(e)}`
-        process.stderr.write(`[MCP file_list] error=${text}\n`)
-        return { content: [{ type: "text" as const, text }] }
+        return { content: [{ type: "text" as const, text: `Error: ${e instanceof Error ? e.message : String(e)}` }] }
       }
     }
   )
@@ -171,22 +152,15 @@ function buildMcpServer(workDir: string): McpServer {
   return server
 }
 
-export async function startMcpServer(options: McpServerOptions): Promise<void> {
-  const { dir, port } = options
-  const workDir = resolve(dir)
-
-  const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse) => {
-    const url = new URL(req.url ?? "/", `http://localhost:${port}`)
+export function startMcpBridge(workDir: string): () => void {
+  const httpServer = createServer(async (req, res) => {
+    const url = new URL(req.url ?? "/", `http://localhost:${MCP_BRIDGE_PORT}`)
 
     res.setHeader("Access-Control-Allow-Origin", "*")
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
     res.setHeader("Access-Control-Allow-Headers", "Content-Type, mcp-session-id")
 
-    if (req.method === "OPTIONS") {
-      res.writeHead(204)
-      res.end()
-      return
-    }
+    if (req.method === "OPTIONS") { res.writeHead(204); res.end(); return }
 
     if (url.pathname === "/health") {
       res.writeHead(200, { "Content-Type": "application/json" })
@@ -202,65 +176,28 @@ export async function startMcpServer(options: McpServerOptions): Promise<void> {
       let body: unknown
       if (req.method === "POST") {
         let raw = ""
-        await new Promise<void>(r => {
-          req.on("data", chunk => { raw += chunk })
-          req.on("end", r)
-        })
-        try {
-          body = JSON.parse(raw)
-          const msg = body as { method?: string; params?: { name?: string; arguments?: unknown } }
-          if (msg.method === "tools/call") {
-            process.stderr.write(`[MCP] tool_call: ${msg.params?.name} args=${JSON.stringify(msg.params?.arguments)}\n`)
-          }
-        } catch { body = undefined }
+        await new Promise<void>(r => { req.on("data", chunk => { raw += chunk }); req.on("end", r) })
+        try { body = JSON.parse(raw) } catch { body = undefined }
       }
 
       await transport.handleRequest(req as Parameters<typeof transport.handleRequest>[0], res, body)
       return
     }
 
-    res.writeHead(404)
-    res.end()
+    res.writeHead(404); res.end()
   })
 
-  const isStdio = !process.stdin.isTTY
-
-  await new Promise<void>((resolve, reject) => {
-    httpServer.listen(port, "0.0.0.0", () => resolve())
-    httpServer.on("error", async (err: NodeJS.ErrnoException) => {
-      if (err.code === "EADDRINUSE") {
-        process.stderr.write(`[mcp-server] port ${port} in use, killing old process...\n`)
-        try {
-          const { execSync } = await import("node:child_process")
-          execSync(`fuser -k ${port}/tcp 2>/dev/null || true`)
-          await new Promise(r => setTimeout(r, 500))
-          httpServer.listen(port, "0.0.0.0", () => resolve())
-        } catch {
-          reject(err)
-        }
-      } else {
-        reject(err)
-      }
-    })
+  httpServer.listen(MCP_BRIDGE_PORT, "0.0.0.0", () => {
+    log(`[MCP bridge] listening on :${MCP_BRIDGE_PORT} dir=${workDir}`)
   })
 
-  if (isStdio) {
-    process.stderr.write(`[mcp-server] HTTP on :${port}, stdio active, dir=${workDir}\n`)
-    const stdioTransport = new StdioServerTransport()
-    const stdioServer = buildMcpServer(workDir)
-    await stdioServer.connect(stdioTransport)
-    await new Promise<void>((res) => { stdioTransport.onclose = res })
-    return
-  }
+  httpServer.on("error", (err: NodeJS.ErrnoException) => {
+    if (err.code !== "EADDRINUSE") {
+      log(`[MCP bridge] server error: ${err.message}`)
+    }
+  })
 
-  console.log(`oh-my-openagent MCP server running`)
-  console.log(`  dir:    ${workDir}`)
-  console.log(`  port:   ${port}`)
-  console.log(`  MCP:    http://0.0.0.0:${port}/sse`)
-  console.log(`  health: http://0.0.0.0:${port}/health`)
-  console.log(`  tools:  grep, glob, ast_grep_search, file_read, file_list`)
-
-  await new Promise<void>(() => {})
+  return () => { httpServer.close() }
 }
 
-export { DEFAULT_PORT }
+export { MCP_BRIDGE_PORT }

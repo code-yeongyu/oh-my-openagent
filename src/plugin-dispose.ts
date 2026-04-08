@@ -13,8 +13,9 @@ export function createPluginDispose(args: {
     stopAll: () => Promise<void>
   }
   disposeHooks: () => void
+  stopMcpBridge: () => void
 }): PluginDispose {
-  const { backgroundManager, skillMcpManager, lspManager, disposeHooks } = args
+  const { backgroundManager, skillMcpManager, lspManager, disposeHooks, stopMcpBridge } = args
   let disposePromise: Promise<void> | null = null
 
   return async (): Promise<void> => {
@@ -43,6 +44,11 @@ export function createPluginDispose(args: {
         disposeHooks()
       } catch (error) {
         log("[plugin-dispose] disposeHooks() error:", error)
+      }
+      try {
+        stopMcpBridge()
+      } catch (error) {
+        log("[plugin-dispose] stopMcpBridge() error:", error)
       }
     })()
 
