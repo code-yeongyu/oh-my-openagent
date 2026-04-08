@@ -1840,6 +1840,8 @@ export class BackgroundManager {
         const isTaskFailure = task.status === "error" || task.status === "cancelled" || task.status === "interrupt"
         const shouldReply = allComplete || isTaskFailure
 
+        const variant = task.model?.variant
+
         try {
           await this.client.session.promptAsync({
             path: { id: task.parentSessionID },
@@ -1847,6 +1849,7 @@ export class BackgroundManager {
               noReply: !shouldReply,
               ...(agent !== undefined ? { agent } : {}),
               ...(model !== undefined ? { model } : {}),
+              ...(variant !== undefined ? { variant } : {}),
               ...(resolvedTools ? { tools: resolvedTools } : {}),
               parts: [createInternalAgentTextPart(notification)],
             },

@@ -1177,6 +1177,90 @@ describe("BackgroundManager.notifyParentSession - notifications toggle", () => {
   })
 })
 
+describe("BackgroundManager.notifyParentSession - variant propagation", () => {
+  test("should propagate variant in parent notification promptAsync body", async () => {
+    //#given
+    const promptCalls: Array<{ body: Record<string, unknown> }> = []
+    const client = {
+      session: {
+        prompt: async () => ({}),
+        promptAsync: async (args: { path: { id: string }; body: Record<string, unknown> }) => {
+          promptCalls.push({ body: args.body })
+          return {}
+        },
+        abort: async () => ({}),
+        messages: async () => ({ data: [] }),
+      },
+    }
+    const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
+    const task: BackgroundTask = {
+      id: "task-variant-test",
+      sessionID: "session-child",
+      parentSessionID: "session-parent",
+      parentMessageID: "msg-parent",
+      description: "task with variant",
+      prompt: "test",
+      agent: "explore",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+      model: { providerID: "anthropic", modelID: "claude-opus-4-6", variant: "high" },
+    }
+    getPendingByParent(manager).set("session-parent", new Set([task.id]))
+
+    //#when
+    await (manager as unknown as { notifyParentSession: (task: BackgroundTask) => Promise<void> })
+      .notifyParentSession(task)
+
+    //#then
+    expect(promptCalls).toHaveLength(1)
+    expect(promptCalls[0].body.variant).toBe("high")
+
+    manager.shutdown()
+  })
+
+  test("should not include variant in promptAsync body when task has no variant", async () => {
+    //#given
+    const promptCalls: Array<{ body: Record<string, unknown> }> = []
+    const client = {
+      session: {
+        prompt: async () => ({}),
+        promptAsync: async (args: { path: { id: string }; body: Record<string, unknown> }) => {
+          promptCalls.push({ body: args.body })
+          return {}
+        },
+        abort: async () => ({}),
+        messages: async () => ({ data: [] }),
+      },
+    }
+    const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
+    const task: BackgroundTask = {
+      id: "task-no-variant",
+      sessionID: "session-child",
+      parentSessionID: "session-parent",
+      parentMessageID: "msg-parent",
+      description: "task without variant",
+      prompt: "test",
+      agent: "explore",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+      model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
+    }
+    getPendingByParent(manager).set("session-parent", new Set([task.id]))
+
+    //#when
+    await (manager as unknown as { notifyParentSession: (task: BackgroundTask) => Promise<void> })
+      .notifyParentSession(task)
+
+    //#then
+    expect(promptCalls).toHaveLength(1)
+    expect(promptCalls[0].body.variant).toBeUndefined()
+
+    manager.shutdown()
+  })
+})
+
 describe("BackgroundManager.injectPendingNotificationsIntoChatMessage", () => {
   test("should prepend queued notifications to first text part and clear queue", () => {
     // given
