@@ -201,7 +201,7 @@ describe("createEventHandler - model fallback", () => {
     expect(promptCalls).toEqual([sessionID])
     expect(output.message["model"]).toEqual({
       providerID: "anthropic",
-      modelID: "claude-opus-4.6",
+      modelID: "claude-opus-4-6",
     })
     expect(output.message["variant"]).toBe("max")
   })
