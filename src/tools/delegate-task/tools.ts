@@ -263,6 +263,9 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
         agentToUse = resolution.agentToUse
         categoryModel = resolution.categoryModel
         fallbackChain = resolution.fallbackChain
+        if (resolution.openfangAgent) {
+          args = { ...args, prompt: `[OPENFANG_AGENT: ${resolution.openfangAgent}]\n\n${args.prompt}` }
+        }
       }
 
       const systemContent = buildSystemContent({

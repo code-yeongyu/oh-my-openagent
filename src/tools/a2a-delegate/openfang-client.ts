@@ -56,8 +56,8 @@ export class OpenfangClient {
       )
     }
 
-    const body = (await response.json()) as { agents?: OpenfangAgentEntry[] }
-    const agents = body.agents ?? []
+    const data = await response.json()
+    const agents: OpenfangAgentEntry[] = Array.isArray(data) ? data : ((data as { agents?: OpenfangAgentEntry[] }).agents ?? [])
 
     const match = agents.find(
       (a) => a.name.toLowerCase() === name.toLowerCase(),

@@ -16,6 +16,14 @@ import { resolveModelForDelegateTask } from "./model-selection"
 import { fuzzyMatchModel } from "../../shared/model-availability"
 import type { CategoryConfig } from "../../config/schema"
 
+const OPENFANG_AGENT_NAMES = new Set([
+  "searcher",
+  "researcher",
+  "reasoner",
+  "planner",
+  "reviewer",
+])
+
 type AgentMode = "subagent" | "primary" | "all" | undefined
 
 function applyCategoryParams(
@@ -41,7 +49,7 @@ export async function resolveSubagentExecution(
   executorCtx: ExecutorContext,
   parentAgent: string | undefined,
   categoryExamples: string
-): Promise<{ agentToUse: string; categoryModel: DelegatedModelConfig | undefined; fallbackChain?: FallbackEntry[]; error?: string }> {
+): Promise<{ agentToUse: string; categoryModel: DelegatedModelConfig | undefined; fallbackChain?: FallbackEntry[]; error?: string; openfangAgent?: string }> {
   const { client, agentOverrides, userCategories } = executorCtx
 
   if (!args.subagent_type?.trim()) {
@@ -70,6 +78,11 @@ Sisyphus-Junior is spawned automatically when you specify a category. Pick the a
 
 Create the work plan directly - that's your job as the planning agent.`,
     }
+  }
+
+  if (OPENFANG_AGENT_NAMES.has(agentName.toLowerCase())) {
+    log("[delegate-task] Routing to openfang-relay", { requestedAgent: agentName })
+    return { agentToUse: "openfang-relay", categoryModel: undefined, openfangAgent: agentName.toLowerCase() }
   }
 
   let agentToUse = agentName
