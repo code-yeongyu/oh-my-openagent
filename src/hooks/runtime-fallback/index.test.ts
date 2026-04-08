@@ -2060,7 +2060,7 @@ describe("runtime-fallback", () => {
       expect(retriedModels).toContain("openai/gpt-5.3-codex")
     })
 
-    test("triggers fallback when message contains type:error parts (e.g. Minimax insufficient balance)", async () => {
+    test("does NOT trigger fallback for quota exhaustion in error parts without auto-retry signal (STOP classification)", async () => {
       const retriedModels: string[] = []
 
       const hook = createRuntimeFallbackHook(
@@ -2108,7 +2108,10 @@ describe("runtime-fallback", () => {
         },
       })
 
-      expect(retriedModels).toContain("openai/gpt-5.4")
+      expect(retriedModels).toHaveLength(0)
+
+      const skipLog = logCalls.find((c) => c.msg.includes("message.updated error not retryable"))
+      expect(skipLog).toBeDefined()
     })
 
     test("triggers fallback when message has mixed text and error parts", async () => {
