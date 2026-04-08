@@ -116,3 +116,42 @@ export async function handleStepUpIfNeeded(params: {
     return false
   }
 }
+
+export async function handlePostRequestAuthError(params: {
+  error: Error
+  config: ClaudeCodeMcpServer
+  authProviders: Map<string, OAuthProviderLike>
+  createOAuthProvider?: OAuthProviderFactory
+  refreshAttempted?: Set<string>
+}): Promise<boolean> {
+  const { error, config, authProviders, createOAuthProvider, refreshAttempted = new Set() } = params
+
+  if (!config.oauth || !config.url) {
+    return false
+  }
+
+  const statusMatch = /\b(401|403)\b/.exec(error.message)
+  if (!statusMatch) {
+    return false
+  }
+
+  const provider = getOrCreateAuthProvider(authProviders, config.url, config.oauth, createOAuthProvider)
+  const tokenData = provider.tokens()
+
+  if (!tokenData?.refreshToken) {
+    return false
+  }
+
+  if (refreshAttempted.has(config.url)) {
+    return false
+  }
+
+  refreshAttempted.add(config.url)
+
+  try {
+    await provider.refresh(tokenData.refreshToken)
+    return true
+  } catch {
+    return false
+  }
+}
