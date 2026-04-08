@@ -29,13 +29,7 @@ async function usesModuleMock(rootDirectory: string, testFile: string): Promise<
 }
 
 function toIsolatedTarget(testFile: string): string {
-  const pathSegments = testFile.split("/")
-
-  if (pathSegments.length <= 3) {
-    return testFile
-  }
-
-  return pathSegments.slice(0, -1).join("/")
+  return testFile
 }
 
 function isCoveredByTarget(testFile: string, isolatedTarget: string): boolean {

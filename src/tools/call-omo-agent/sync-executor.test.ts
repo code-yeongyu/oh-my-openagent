@@ -190,10 +190,10 @@ describe("executeSync", () => {
     expect(promptInput?.body.temperature).toBe(0.12)
     expect(promptInput?.body.topP).toBe(0.34)
     expect(promptInput?.body.options).toEqual({
-      maxTokens: 5678,
       reasoningEffort: "medium",
       thinking: { type: "disabled" },
     })
+    expect(promptInput?.body.maxOutputTokens).toBe(5678)
   })
 
   test("records metadata with description and created session id", async () => {
