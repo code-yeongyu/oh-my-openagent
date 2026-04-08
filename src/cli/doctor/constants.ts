@@ -37,7 +37,7 @@ export const EXIT_CODES = {
   FAILURE: 1,
 } as const
 
-export const MIN_OPENCODE_VERSION = "1.0.150"
+export const MIN_OPENCODE_VERSION = "1.4.0"
 
 export const PACKAGE_NAME = PLUGIN_NAME
 

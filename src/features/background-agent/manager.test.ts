@@ -218,6 +218,10 @@ function getRootDescendantCounts(manager: BackgroundManager): Map<string, number
   return (manager as unknown as { rootDescendantCounts: Map<string, number> }).rootDescendantCounts
 }
 
+function getPreStartDescendantReservations(manager: BackgroundManager): Set<string> {
+  return (manager as unknown as { preStartDescendantReservations: Set<string> }).preStartDescendantReservations
+}
+
 function getQueuesByKey(
   manager: BackgroundManager
 ): Map<string, Array<{ task: BackgroundTask; input: import("./types").LaunchInput }>> {
@@ -1144,7 +1148,18 @@ describe("BackgroundManager.notifyParentSession - notifications toggle", () => {
         prompt: promptMock,
         promptAsync: promptMock,
         abort: async () => ({}),
-        messages: async () => ({ data: [] }),
+        messages: async () => ({
+          data: [{
+            info: {
+              agent: "explore",
+              model: {
+                providerID: "anthropic",
+                modelID: "claude-opus-4-6",
+                variant: "high",
+              },
+            },
+          }],
+        }),
       },
     }
     const manager = new BackgroundManager(
@@ -1172,6 +1187,101 @@ describe("BackgroundManager.notifyParentSession - notifications toggle", () => {
 
     //#then
     expect(promptCalled).toBe(false)
+
+    manager.shutdown()
+  })
+})
+
+describe("BackgroundManager.notifyParentSession - variant propagation", () => {
+  test("should prefer parent session variant over child task variant in parent notification promptAsync body", async () => {
+    //#given
+    const promptCalls: Array<{ body: Record<string, unknown> }> = []
+    const client = {
+      session: {
+        prompt: async () => ({}),
+        promptAsync: async (args: { path: { id: string }; body: Record<string, unknown> }) => {
+          promptCalls.push({ body: args.body })
+          return {}
+        },
+        abort: async () => ({}),
+        messages: async () => ({
+          data: [{
+            info: {
+              agent: "explore",
+              model: {
+                providerID: "anthropic",
+                modelID: "claude-opus-4-6",
+                variant: "max",
+              },
+            },
+          }],
+        }),
+      },
+    }
+    const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
+    const task: BackgroundTask = {
+      id: "task-parent-variant-wins",
+      sessionID: "session-child",
+      parentSessionID: "session-parent",
+      parentMessageID: "msg-parent",
+      description: "task with mismatched variant",
+      prompt: "test",
+      agent: "explore",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+      model: { providerID: "anthropic", modelID: "claude-opus-4-6", variant: "high" },
+    }
+    getPendingByParent(manager).set("session-parent", new Set([task.id]))
+
+    //#when
+    await (manager as unknown as { notifyParentSession: (task: BackgroundTask) => Promise<void> })
+      .notifyParentSession(task)
+
+    //#then
+    expect(promptCalls).toHaveLength(1)
+    expect(promptCalls[0].body.variant).toBe("max")
+
+    manager.shutdown()
+  })
+
+  test("should not include variant in promptAsync body when task has no variant", async () => {
+    //#given
+    const promptCalls: Array<{ body: Record<string, unknown> }> = []
+    const client = {
+      session: {
+        prompt: async () => ({}),
+        promptAsync: async (args: { path: { id: string }; body: Record<string, unknown> }) => {
+          promptCalls.push({ body: args.body })
+          return {}
+        },
+        abort: async () => ({}),
+        messages: async () => ({ data: [] }),
+      },
+    }
+    const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
+    const task: BackgroundTask = {
+      id: "task-no-variant",
+      sessionID: "session-child",
+      parentSessionID: "session-parent",
+      parentMessageID: "msg-parent",
+      description: "task without variant",
+      prompt: "test",
+      agent: "explore",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+      model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
+    }
+    getPendingByParent(manager).set("session-parent", new Set([task.id]))
+
+    //#when
+    await (manager as unknown as { notifyParentSession: (task: BackgroundTask) => Promise<void> })
+      .notifyParentSession(task)
+
+    //#then
+    expect(promptCalls).toHaveLength(1)
+    expect(promptCalls[0].body.variant).toBeUndefined()
 
     manager.shutdown()
   })
@@ -1437,6 +1547,7 @@ describe("BackgroundManager.tryCompleteTask", () => {
 
     const task = createMockTask({
       id: "task-zombie-session",
+      sessionID: "session-zombie-placeholder",
       parentSessionID: "parent-zombie",
       status: "pending",
       agent: "explore",
@@ -1779,10 +1890,10 @@ describe("BackgroundManager.resume model persistence", () => {
     expect(getSessionPromptParams("session-advanced")).toEqual({
       temperature: 0.25,
       topP: 0.55,
+      maxOutputTokens: 8192,
       options: {
         reasoningEffort: "high",
         thinking: { type: "disabled" },
-        maxTokens: 8192,
       },
     })
   })
@@ -2377,6 +2488,46 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
 
       // then
       expect(retryTask.status).toBe("pending")
+    })
+
+    test("should only roll back the failed task reservation once when siblings still exist", async () => {
+      // given
+      const concurrencyKey = "test-agent"
+      const task = createMockTask({
+        id: "task-single-reservation-rollback",
+        sessionID: "session-single-reservation-rollback",
+        parentSessionID: "session-root",
+        status: "pending",
+        agent: "test-agent",
+        rootSessionID: "session-root",
+      })
+      delete (task as Partial<BackgroundTask>).sessionID
+
+      const input = {
+        description: task.description,
+        prompt: task.prompt,
+        agent: task.agent,
+        parentSessionID: task.parentSessionID,
+        parentMessageID: task.parentMessageID,
+      }
+
+      getTaskMap(manager).set(task.id, task)
+      getQueuesByKey(manager).set(concurrencyKey, [{ task, input }])
+      getRootDescendantCounts(manager).set("session-root", 2)
+      getPreStartDescendantReservations(manager).add(task.id)
+      stubNotifyParentSession(manager)
+
+      ;(manager as unknown as {
+        startTask: (item: { task: BackgroundTask; input: typeof input }) => Promise<void>
+      }).startTask = async () => {
+        throw new Error("session create failed")
+      }
+
+      // when
+      await processKeyForTest(manager, concurrencyKey)
+
+      // then
+      expect(getRootDescendantCounts(manager).get("session-root")).toBe(1)
     })
 
     test("should keep the next queued task when the first task is cancelled during session creation", async () => {

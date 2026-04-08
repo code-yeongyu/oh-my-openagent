@@ -3,6 +3,7 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import type { ClaudeCodeMcpServer } from "../claude-code-mcp-loader/types"
 import { createCleanMcpEnvironment } from "./env-cleaner"
 import { registerProcessCleanup, startCleanupTimer } from "./cleanup"
+import { redactSensitiveData } from "./error-redaction"
 import type { ManagedClient, SkillMcpClientConnectionParams } from "./types"
 
 function getStdioCommand(config: ClaudeCodeMcpServer, serverName: string): string {
@@ -45,10 +46,13 @@ export async function createStdioClient(params: SkillMcpClientConnectionParams):
     }
 
     const errorMessage = error instanceof Error ? error.message : String(error)
+    const fullCommand = `${command} ${args.join(" ")}`
+    const safeCommand = redactSensitiveData(fullCommand)
+    const safeErrorMessage = redactSensitiveData(errorMessage)
     throw new Error(
       `Failed to connect to MCP server "${info.serverName}".\n\n` +
-      `Command: ${command} ${args.join(" ")}\n` +
-      `Reason: ${errorMessage}\n\n` +
+      `Command: ${safeCommand}\n` +
+      `Reason: ${safeErrorMessage}\n\n` +
       `Hints:\n` +
       `  - Ensure the command is installed and available in PATH\n` +
       `  - Check if the MCP server package exists\n` +

@@ -3,6 +3,7 @@ const { afterEach, describe, expect, mock, test, afterAll } = require("bun:test"
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
+import { PART_STORAGE } from "../../shared"
 
 const testDirs: string[] = []
 const TEST_STORAGE_ROOT = join(tmpdir(), `atlas-session-last-agent-${Date.now()}`)
@@ -63,5 +64,37 @@ describe("getLastAgentFromSession JSON backend", () => {
 
     // then
     expect(result).toBe("atlas")
+  })
+
+  test("skips JSON messages whose part storage contains a compaction marker", async () => {
+    // given
+    const sessionID = "ses_json_compaction_marker"
+    const messageDir = createTempMessageDir(sessionID)
+    const compactionMessageID = "msg_test_atlas_compaction_marker"
+    const partDir = join(PART_STORAGE, compactionMessageID)
+    testDirs.push(partDir)
+    writeFileSync(join(messageDir, "msg_0001.json"), JSON.stringify({
+      id: compactionMessageID,
+      agent: "atlas",
+      time: { created: 200 },
+    }), "utf-8")
+    mkdirSync(partDir, { recursive: true })
+    writeFileSync(join(partDir, "prt_0001.json"), JSON.stringify({
+      type: "compaction",
+    }), "utf-8")
+
+    writeFileSync(join(messageDir, "msg_0002.json"), JSON.stringify({
+      id: "msg_0002",
+      agent: "sisyphus-junior",
+      time: { created: 100 },
+    }), "utf-8")
+
+    const { getLastAgentFromSession } = await import("./session-last-agent")
+
+    // when
+    const result = await getLastAgentFromSession(sessionID)
+
+    // then
+    expect(result).toBe("sisyphus-junior")
   })
 })

@@ -218,10 +218,11 @@ export function resolveModelForDelegateTask(input: {
 
       // Fast path: return the first available model from any non-hardcoded provider.
       // All models in availableModels are by definition available — no fuzzy matching needed.
+      // marked matchedFallback=true so downstream applies fallback-entry settings (variant, temperature, etc.)
       for (const [provider, models] of modelsByProvider) {
         if (models.length > 0) {
           log("[resolveModelForDelegateTask] resolved via dynamic provider fallback", { provider, model: models[0] })
-          return { model: models[0] }
+          return { model: models[0], matchedFallback: true }
         }
       }
     }

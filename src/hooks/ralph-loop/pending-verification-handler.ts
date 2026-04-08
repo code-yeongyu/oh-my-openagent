@@ -1,7 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { log } from "../../shared/logger"
 import { HOOK_NAME } from "./constants"
-import { ULTRAWORK_VERIFICATION_PROMISE } from "./constants"
+import { extractOracleSessionID, isOracleVerified } from "./oracle-verification-detector"
 import type { RalphLoopState } from "./types"
 import { handleFailedVerification } from "./verification-failure-handler"
 import { withTimeout } from "./with-timeout"
@@ -10,13 +10,6 @@ type OpenCodeSessionMessage = {
 	info?: { role?: string }
 	parts?: Array<{ type?: string; text?: string }>
 }
-
-const ORACLE_AGENT_PATTERN = /Agent:\s*oracle/i
-const TASK_METADATA_SESSION_PATTERN = /<task_metadata>[\s\S]*?session_id:\s*([^\s<]+)[\s\S]*?<\/task_metadata>/i
-const VERIFIED_PROMISE_PATTERN = new RegExp(
-	`<promise>\\s*${ULTRAWORK_VERIFICATION_PROMISE}\\s*<\\/promise>`,
-	"i",
-)
 
 function collectAssistantText(message: OpenCodeSessionMessage): string {
 	if (!Array.isArray(message.parts)) {
@@ -67,12 +60,11 @@ async function detectOracleVerificationFromParentSession(
 			}
 
 			const assistantText = collectAssistantText(message)
-			if (!VERIFIED_PROMISE_PATTERN.test(assistantText) || !ORACLE_AGENT_PATTERN.test(assistantText)) {
+			if (!isOracleVerified(assistantText)) {
 				continue
 			}
 
-			const sessionMatch = assistantText.match(TASK_METADATA_SESSION_PATTERN)
-			const detectedOracleSessionID = sessionMatch?.[1]?.trim()
+			const detectedOracleSessionID = extractOracleSessionID(assistantText)
 			if (detectedOracleSessionID) {
 				return detectedOracleSessionID
 			}

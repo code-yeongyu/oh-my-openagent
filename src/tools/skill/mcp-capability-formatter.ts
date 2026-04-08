@@ -23,6 +23,7 @@ export async function formatMcpCapabilities(
       serverName,
       skillName: skill.name,
       sessionID,
+      scope: skill.scope,
     }
     const context: SkillMcpServerContext = {
       config,

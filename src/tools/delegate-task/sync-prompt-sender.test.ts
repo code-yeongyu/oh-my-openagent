@@ -277,15 +277,15 @@ bunDescribe("sendSyncPrompt", () => {
     bunExpect(promptArgs.body.options).toEqual({
       reasoningEffort: "high",
       thinking: { type: "disabled" },
-      maxTokens: 4096,
     })
+    bunExpect(promptArgs.body.maxOutputTokens).toBe(4096)
     bunExpect(getSessionPromptParams("test-session")).toEqual({
       temperature: 0.4,
       topP: 0.7,
+      maxOutputTokens: 4096,
       options: {
         reasoningEffort: "high",
         thinking: { type: "disabled" },
-        maxTokens: 4096,
       },
     })
   })

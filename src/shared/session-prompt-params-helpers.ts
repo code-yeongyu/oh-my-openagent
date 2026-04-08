@@ -20,12 +20,12 @@ export function applySessionPromptParams(
   const promptOptions: Record<string, unknown> = {
     ...(model.reasoningEffort ? { reasoningEffort: model.reasoningEffort } : {}),
     ...(model.thinking ? { thinking: model.thinking } : {}),
-    ...(model.maxTokens !== undefined ? { maxTokens: model.maxTokens } : {}),
   }
 
   setSessionPromptParams(sessionID, {
     ...(model.temperature !== undefined ? { temperature: model.temperature } : {}),
     ...(model.top_p !== undefined ? { topP: model.top_p } : {}),
+    ...(model.maxTokens !== undefined ? { maxOutputTokens: model.maxTokens } : {}),
     ...(Object.keys(promptOptions).length > 0 ? { options: promptOptions } : {}),
   })
 }

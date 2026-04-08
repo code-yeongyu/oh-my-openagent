@@ -400,10 +400,10 @@ describe("background-agent spawner fallback model promotion", () => {
     expect(getSessionPromptParams("session-123")).toEqual({
       temperature: 0.4,
       topP: 0.7,
+      maxOutputTokens: 4096,
       options: {
         reasoningEffort: "high",
         thinking: { type: "disabled" },
-        maxTokens: 4096,
       },
     })
   })
@@ -465,5 +465,59 @@ describe("background-agent spawner fallback model promotion", () => {
       modelID: "gpt-5.4",
     })
     expect(promptCalls[0]?.body?.variant).toBe("medium")
+  })
+
+  test("strips leading zwsp from prompt body agent before promptAsync", async () => {
+    //#given
+    const promptCalls: Array<{ body?: { agent?: string } }> = []
+
+    const client = {
+      session: {
+        get: async () => ({ data: { directory: "/parent/dir" } }),
+        create: async () => ({ data: { id: "ses_child_clean_agent" } }),
+        promptAsync: async (args?: { body?: { agent?: string } }) => {
+          promptCalls.push(args ?? {})
+          return {}
+        },
+      },
+    }
+
+    const task = createTask({
+      description: "Test task",
+      prompt: "Do work",
+      agent: "\u200Bsisyphus-junior",
+      parentSessionID: "ses_parent",
+      parentMessageID: "msg_parent",
+    })
+
+    const item = {
+      task,
+      input: {
+        description: task.description,
+        prompt: task.prompt,
+        agent: task.agent,
+        parentSessionID: task.parentSessionID,
+        parentMessageID: task.parentMessageID,
+        parentModel: task.parentModel,
+        parentAgent: task.parentAgent,
+        model: task.model,
+      },
+    }
+
+    const ctx = {
+      client,
+      directory: "/fallback",
+      concurrencyManager: { release: () => {} },
+      tmuxEnabled: false,
+      onTaskError: () => {},
+    }
+
+    //#when
+    await startTask(item as any, ctx as any)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    //#then
+    expect(promptCalls).toHaveLength(1)
+    expect(promptCalls[0]?.body?.agent).toBe("sisyphus-junior")
   })
 })

@@ -1,4 +1,8 @@
 import { describe, expect, test, spyOn, beforeEach, afterEach, mock } from "bun:test"
+
+// Isolate from other tests that mock.module the logger (CI cross-contamination fix)
+mock.module("./logger", () => ({ log: (..._args: unknown[]) => {} }))
+
 import { resolveModel, resolveModelWithFallback, type ModelResolutionInput, type ExtendedModelResolutionInput, type ModelResolutionResult, type ModelSource } from "./model-resolver"
 import * as logger from "./logger"
 import * as connectedProvidersCache from "./connected-providers-cache"
