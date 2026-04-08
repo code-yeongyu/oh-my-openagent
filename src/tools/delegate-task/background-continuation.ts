@@ -51,7 +51,9 @@ Agent: ${task.agent}
 Status: ${task.status}
 
 Agent continues with full previous context preserved.
-Use \`background_output\` with task_id="${task.id}" to check progress.
+System notifies on completion. Use \`background_output\` with task_id="${task.id}" to check.
+
+Do NOT call background_output now. Wait for <system-reminder> notification first.
 
 <task_metadata>
 session_id: ${task.sessionID}

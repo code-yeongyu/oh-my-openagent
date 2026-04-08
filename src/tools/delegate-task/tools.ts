@@ -98,7 +98,7 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
     description,
     args: {
       load_skills: tool.schema.array(tool.schema.string()).describe("Skill names to inject. REQUIRED - pass [] if no skills needed."),
-      description: tool.schema.string().describe("Short task description (3-5 words)"),
+      description: tool.schema.string().optional().describe("Short task description (3-5 words). Auto-generated from prompt if omitted."),
       prompt: tool.schema.string().describe("Full detailed prompt for the agent"),
       run_in_background: tool.schema.boolean().describe("REQUIRED. true=async (returns task_id), false=sync (waits). Use false for task delegation, true ONLY for parallel exploration."),
       category: tool.schema.string().optional().describe(`REQUIRED if subagent_type not provided. Do NOT provide both category and subagent_type.`),
@@ -118,13 +118,14 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
         }
         args.subagent_type = SISYPHUS_JUNIOR_AGENT
       }
+      // Auto-generate description from prompt when missing or empty
+      if (!args.description || typeof args.description !== "string" || args.description.trim() === "") {
+        const words = (args.prompt || "").trim().split(/\s+/)
+        args.description = words.slice(0, 4).join(" ") || "Delegated task"
+      }
       await ctx.metadata?.({
         title: args.description,
       })
-
-      if (!args.description || typeof args.description !== "string") {
-        throw new Error(`Invalid arguments: 'description' parameter is REQUIRED. Provide a short (3-5 words) task description.`)
-      }
       if (args.run_in_background === undefined) {
         throw new Error(`Invalid arguments: 'run_in_background' parameter is REQUIRED. Specify run_in_background=false for task delegation, or run_in_background=true for parallel exploration.`)
       }

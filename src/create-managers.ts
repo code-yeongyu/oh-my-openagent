@@ -13,6 +13,26 @@ import { log } from "./shared"
 import { markServerRunningInProcess } from "./shared/tmux/tmux-utils/server-health"
 import { detectMultiplexer, createMultiplexer } from "./shared/terminal-multiplexer/detection"
 
+type CreateManagersDeps = {
+  BackgroundManagerClass: typeof BackgroundManager
+  SkillMcpManagerClass: typeof SkillMcpManager
+  TmuxSessionManagerClass: typeof TmuxSessionManager
+  initTaskToastManagerFn: typeof initTaskToastManager
+  registerManagerForCleanupFn: typeof registerManagerForCleanup
+  createConfigHandlerFn: typeof createConfigHandler
+  markServerRunningInProcessFn: typeof markServerRunningInProcess
+}
+
+const defaultCreateManagersDeps: CreateManagersDeps = {
+  BackgroundManagerClass: BackgroundManager,
+  SkillMcpManagerClass: SkillMcpManager,
+  TmuxSessionManagerClass: TmuxSessionManager,
+  initTaskToastManagerFn: initTaskToastManager,
+  registerManagerForCleanupFn: registerManagerForCleanup,
+  createConfigHandlerFn: createConfigHandler,
+  markServerRunningInProcessFn: markServerRunningInProcess,
+}
+
 export type Managers = {
   tmuxSessionManager: TmuxSessionManager
   backgroundManager: BackgroundManager
@@ -26,11 +46,13 @@ export async function createManagers(args: {
   tmuxConfig: TmuxConfig
   modelCacheState: ModelCacheState
   backgroundNotificationHookEnabled: boolean
+  deps?: Partial<CreateManagersDeps>
 }): Promise<Managers> {
   const { ctx, pluginConfig, tmuxConfig, modelCacheState, backgroundNotificationHookEnabled } = args
+  const deps = { ...defaultCreateManagersDeps, ...args.deps }
 
   if (tmuxConfig.enabled) {
-    markServerRunningInProcess()
+    deps.markServerRunningInProcessFn()
   }
 
   const terminalConfig = pluginConfig.terminal
@@ -46,9 +68,9 @@ export async function createManagers(args: {
     log("[create-managers] zellij adapter created", { zellijSessionName })
   }
 
-  const tmuxSessionManager = new TmuxSessionManager(ctx, adapter, tmuxConfig)
+  const tmuxSessionManager = new deps.TmuxSessionManagerClass(ctx, adapter, tmuxConfig)
 
-  registerManagerForCleanup({
+  deps.registerManagerForCleanupFn({
     shutdown: async () => {
       await tmuxSessionManager.cleanup().catch((error) => {
         log("[create-managers] tmux cleanup error during process shutdown:", error)
@@ -56,7 +78,7 @@ export async function createManagers(args: {
     },
   })
 
-  const backgroundManager = new BackgroundManager(
+  const backgroundManager = new deps.BackgroundManagerClass(
     ctx,
     pluginConfig.background_task,
     {
@@ -90,11 +112,11 @@ export async function createManagers(args: {
     },
   )
 
-  initTaskToastManager(ctx.client)
+  deps.initTaskToastManagerFn(ctx.client)
 
-  const skillMcpManager = new SkillMcpManager()
+  const skillMcpManager = new deps.SkillMcpManagerClass()
 
-  const configHandler = createConfigHandler({
+  const configHandler = deps.createConfigHandlerFn({
     ctx: { directory: ctx.directory, client: ctx.client },
     pluginConfig,
     modelCacheState,

@@ -120,6 +120,32 @@ describe("expandEnvVars", () => {
       expect(expanded).toBe("user-approved")
     })
   })
+
+  describe("#given a sensitive environment variable expanded in trusted mode", () => {
+    it("#when expanding the value #then it returns the env value bypassing the allowlist", () => {
+      // given
+      process.env.SLACK_USER_TOKEN = "xoxp-trusted"
+
+      // when
+      const expanded = expandEnvVars("${SLACK_USER_TOKEN}", { trusted: true })
+
+      // then
+      expect(expanded).toBe("xoxp-trusted")
+    })
+  })
+
+  describe("#given an unset env var expanded in trusted mode with a default", () => {
+    it("#when expanding the value #then it returns the default value", () => {
+      // given
+      delete process.env.UNSET_TRUSTED_VAR
+
+      // when
+      const expanded = expandEnvVars("${UNSET_TRUSTED_VAR:-fallback}", { trusted: true })
+
+      // then
+      expect(expanded).toBe("fallback")
+    })
+  })
 })
 
 describe("expandEnvVarsInObject", () => {
@@ -161,6 +187,71 @@ describe("expandEnvVarsInObject", () => {
         args: ["--dir", "/Users/tester"],
         headers: {
           Authorization: "Bearer ",
+        },
+      })
+    })
+  })
+
+  describe("#given a trusted skill MCP config object with sensitive env vars", () => {
+    it("#when expanding env vars in trusted mode #then it expands all referenced env vars", () => {
+      // given
+      process.env.SLACK_USER_TOKEN = "xoxp-trusted-token"
+      process.env.HOME = "/Users/tester"
+
+      // when
+      const expanded = expandEnvVarsInObject(
+        {
+          command: "npx",
+          args: [
+            "-y",
+            "mcp-remote",
+            "https://mcp.slack.com/mcp",
+            "--header",
+            "Authorization:Bearer ${SLACK_USER_TOKEN}",
+          ],
+          env: {
+            HOME_DIR: "${HOME}",
+          },
+        },
+        { trusted: true }
+      )
+
+      // then
+      expect(expanded).toEqual({
+        command: "npx",
+        args: [
+          "-y",
+          "mcp-remote",
+          "https://mcp.slack.com/mcp",
+          "--header",
+          "Authorization:Bearer xoxp-trusted-token",
+        ],
+        env: {
+          HOME_DIR: "/Users/tester",
+        },
+      })
+    })
+
+    it("#when expanding a remote http skill MCP config in trusted mode #then it expands sensitive headers", () => {
+      // given
+      process.env.SLACK_USER_TOKEN = "xoxp-trusted-token"
+
+      // when
+      const expanded = expandEnvVarsInObject(
+        {
+          url: "https://mcp.slack.com/mcp",
+          headers: {
+            Authorization: "Bearer ${SLACK_USER_TOKEN}",
+          },
+        },
+        { trusted: true }
+      )
+
+      // then
+      expect(expanded).toEqual({
+        url: "https://mcp.slack.com/mcp",
+        headers: {
+          Authorization: "Bearer xoxp-trusted-token",
         },
       })
     })

@@ -6,7 +6,13 @@ import { randomUUID } from "node:crypto"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { createAtlasHook } from "./atlas-hook"
 import { clearBoulderState, writeBoulderState } from "../../features/boulder-state"
-import { _resetForTesting, registerAgentName } from "../../features/claude-code-session-state"
+import { _resetForTesting, registerAgentName, setSessionAgent } from "../../features/claude-code-session-state"
+
+// Force process isolation in CI runner (globalThis.setTimeout override conflicts with other atlas tests)
+mock.module("../../shared/opencode-storage-detection", () => ({
+  isSqliteBackend: () => true,
+  resetSqliteBackendCache: () => {},
+}))
 
 type LongTimerCallback = (...args: unknown[]) => void | Promise<void>
 
@@ -342,6 +348,7 @@ describe("atlas background task retry", () => {
   test("#given a persisted descendant becomes ineligible before retry fires #when retry runs #then atlas re-checks descendant eligibility and does not inject", async () => {
     // given
     const descendantSessionID = "ses_descendant_retry_mismatch"
+    setSessionAgent(descendantSessionID, "atlas")
     const planPath = join(testDir, "test-plan.md")
     writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
     writeBoulderState(testDir, {

@@ -55,6 +55,11 @@ export async function handleSessionIdle(args: {
     return
   }
 
+  if (state.tokenLimitDetected) {
+    log(`[${HOOK_NAME}] Skipped: token limit error detected, retry would worsen context overflow`, { sessionID })
+    return
+  }
+
   if (state.abortDetectedAt) {
     const timeSinceAbort = Date.now() - state.abortDetectedAt
     if (timeSinceAbort < ABORT_WINDOW_MS) {
@@ -145,12 +150,19 @@ export async function handleSessionIdle(args: {
 
   let resolvedInfo: ResolvedMessageInfo | undefined
   let encounteredCompaction = false
+  let latestMessageWasCompaction = false
   try {
     const messageInfoResult = await resolveLatestMessageInfo(ctx, sessionID, prefetchedMessages)
     resolvedInfo = messageInfoResult.resolvedInfo
     encounteredCompaction = messageInfoResult.encounteredCompaction
+    latestMessageWasCompaction = messageInfoResult.latestMessageWasCompaction
   } catch (error) {
     log(`[${HOOK_NAME}] Failed to fetch messages for agent check`, { sessionID, error: String(error) })
+  }
+
+  if (latestMessageWasCompaction) {
+    log(`[${HOOK_NAME}] Skipped: latest message is a compaction marker`, { sessionID })
+    return
   }
 
   const sessionAgent = getSessionAgent(sessionID)

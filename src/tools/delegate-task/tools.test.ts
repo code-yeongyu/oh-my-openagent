@@ -180,8 +180,8 @@ describe("sisyphus-task", () => {
       //#given / #when
       const result = isPlanAgent("planner")
 
-      //#then - "planner" contains "plan" so it matches via includes
-      expect(result).toBe(true)
+      //#then - "planner" is NOT an exact match for "plan" (T37 exact match fix)
+      expect(result).toBe(false)
     })
 
     test("returns true for case-insensitive match 'PLAN'", () => {
@@ -1366,9 +1366,10 @@ describe("sisyphus-task", () => {
       )).rejects.toThrow("Invalid arguments: 'run_in_background' parameter is REQUIRED")
     })
 
-    test("#given category without description #when executing #then throws required parameter error", async () => {
+    test("#given category without description #when executing #then auto-generates description from prompt", async () => {
       // given
       const { createDelegateTask } = require("./tools")
+      let capturedTitle: string | undefined
       const mockManager = { launch: async () => ({}) }
       const mockClient = {
         app: { agents: async () => ({ data: [] }) },
@@ -1383,16 +1384,114 @@ describe("sisyphus-task", () => {
       const tool = createDelegateTask({ manager: mockManager, client: mockClient })
 
       // when
-      // then
-      await expect(tool.execute(
-        {
-          prompt: "Do something",
-          category: "quick",
-          run_in_background: false,
-          load_skills: [],
+      try {
+        await tool.execute(
+          {
+            prompt: "Fix the broken unit tests in parser module",
+            category: "quick",
+            run_in_background: false,
+            load_skills: [],
+          },
+          {
+            sessionID: "parent-session",
+            messageID: "parent-message",
+            agent: "sisyphus",
+            abort: new AbortController().signal,
+            metadata: async (meta: { title?: string }) => { capturedTitle = meta.title },
+          }
+        )
+      } catch {
+        // execution may fail due to incomplete mocks — we only care about the title
+      }
+
+      // then — description auto-generated from first 4 words of prompt
+      expect(capturedTitle).toBe("Fix the broken unit")
+    })
+
+    test("#given empty description #when executing #then auto-generates description from prompt", async () => {
+      // given
+      const { createDelegateTask } = require("./tools")
+      let capturedTitle: string | undefined
+      const mockManager = { launch: async () => ({}) }
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        session: {
+          create: async () => ({ data: { id: "test-session" } }),
+          prompt: async () => ({ data: {} }),
+          promptAsync: async () => ({ data: {} }),
+          messages: async () => ({ data: [] }),
         },
-        { sessionID: "parent-session", messageID: "parent-message", agent: "sisyphus", abort: new AbortController().signal }
-      )).rejects.toThrow("Invalid arguments: 'description' parameter is REQUIRED")
+      }
+      const tool = createDelegateTask({ manager: mockManager, client: mockClient })
+
+      // when
+      try {
+        await tool.execute(
+          {
+            description: "   ",
+            prompt: "Refactor authentication module completely",
+            category: "quick",
+            run_in_background: false,
+            load_skills: [],
+          },
+          {
+            sessionID: "parent-session",
+            messageID: "parent-message",
+            agent: "sisyphus",
+            abort: new AbortController().signal,
+            metadata: async (meta: { title?: string }) => { capturedTitle = meta.title },
+          }
+        )
+      } catch {
+        // execution may fail due to incomplete mocks
+      }
+
+      // then
+      expect(capturedTitle).toBe("Refactor authentication module completely")
+    })
+
+    test("#given explicit description #when executing #then preserves provided description", async () => {
+      // given
+      const { createDelegateTask } = require("./tools")
+      let capturedTitle: string | undefined
+      const mockManager = { launch: async () => ({}) }
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        session: {
+          create: async () => ({ data: { id: "test-session" } }),
+          prompt: async () => ({ data: {} }),
+          promptAsync: async () => ({ data: {} }),
+          messages: async () => ({ data: [] }),
+        },
+      }
+      const tool = createDelegateTask({ manager: mockManager, client: mockClient })
+
+      // when
+      try {
+        await tool.execute(
+          {
+            description: "My custom task name",
+            prompt: "Do something else entirely",
+            category: "quick",
+            run_in_background: false,
+            load_skills: [],
+          },
+          {
+            sessionID: "parent-session",
+            messageID: "parent-message",
+            agent: "sisyphus",
+            abort: new AbortController().signal,
+            metadata: async (meta: { title?: string }) => { capturedTitle = meta.title },
+          }
+        )
+      } catch {
+        // execution may fail due to incomplete mocks
+      }
+
+      // then — explicit description preserved
+      expect(capturedTitle).toBe("My custom task name")
     })
 
     test("#given explicit run_in_background=false #when executing #then sync execution succeeds", async () => {
@@ -2864,6 +2963,7 @@ describe("sisyphus-task", () => {
       // then - sisyphus-junior override model should be used, not category default
       expect(launchInput.model.providerID).toBe("anthropic")
       expect(launchInput.model.modelID).toBe("claude-sonnet-4-6")
+      expect(launchInput.fallbackChain).toBeUndefined()
     })
 
     test("sisyphus-junior model override works with user-defined category (#1295)", async () => {

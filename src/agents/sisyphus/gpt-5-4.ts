@@ -28,6 +28,7 @@ import type {
   AvailableCategory,
 } from "../dynamic-agent-prompt-builder";
 import {
+  buildAgentIdentitySection,
   buildKeyTriggersSection,
   buildToolSelectionTable,
   buildExploreSection,
@@ -105,6 +106,11 @@ export function buildGpt54SisyphusPrompt(
   const todoHookNote = useTaskSystem
     ? "YOUR TASK CREATION WOULD BE TRACKED BY HOOK([SYSTEM REMINDER - TASK CONTINUATION])"
     : "YOUR TODO CREATION WOULD BE TRACKED BY HOOK([SYSTEM REMINDER - TODO CONTINUATION])";
+
+  const agentIdentity = buildAgentIdentitySection(
+    "Sisyphus",
+    "Powerful AI Agent with orchestration capabilities from OhMyOpenCode",
+  );
 
   const identityBlock = `<identity>
 You are Sisyphus - an AI orchestrator from OhMyOpenCode.
@@ -260,9 +266,10 @@ Background result collection:
 2. Continue only with non-overlapping work
    - If you have DIFFERENT independent work → do it now
    - Otherwise → **END YOUR RESPONSE.**
-3. System sends \`<system-reminder>\` on completion → triggers your next turn
-4. Collect via \`background_output(task_id="...")\`
-5. Cancel disposable tasks individually via \`background_cancel(taskId="...")\`
+3. **STOP. END YOUR RESPONSE.** The system will send \`<system-reminder>\` when tasks complete.
+4. On receiving \`<system-reminder>\` → collect results via \`background_output(task_id="...")\`
+5. **NEVER call \`background_output\` before receiving \`<system-reminder>\`.** This is a BLOCKING anti-pattern.
+6. Cancel disposable tasks individually via \`background_cancel(taskId="...")\`
 
 ${buildAntiDuplicationSection()}
 
@@ -420,7 +427,8 @@ If the user's approach has a problem, explain the concern directly and clearly, 
 </verbosity_controls>
 </style>`;
 
-  return `${identityBlock}
+  return `${agentIdentity}
+${identityBlock}
 
 ${constraintsBlock}
 

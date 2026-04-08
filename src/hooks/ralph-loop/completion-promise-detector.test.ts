@@ -89,7 +89,7 @@ describe("detectCompletionInSessionMessages", () => {
   })
 
   describe("#given promise appears in tool_result part (not text part)", () => {
-    test("#when Oracle returns VERIFIED via task() tool_result #then should NOT detect completion", async () => {
+    test("#when Oracle returns VERIFIED via task() tool_result #then should detect completion", async () => {
       const messages = [
         {
           info: { role: "assistant" },
@@ -103,6 +103,29 @@ describe("detectCompletionInSessionMessages", () => {
           parts: [
             { type: "tool_result", text: 'Task completed.\n\nAgent: oracle\n\n<promise>VERIFIED</promise>\n\n<task_metadata>\nsession_id: ses_abc123\n</task_metadata>' },
             { type: "text", text: "Oracle verified the task." },
+          ],
+        },
+      ]
+      const ctx = createPluginInput(messages)
+
+      const detected = await detectCompletionInSessionMessages(ctx, {
+        sessionID: "session-123",
+        promise: "VERIFIED",
+        apiTimeoutMs: 1000,
+        directory: "/tmp",
+        sinceMessageIndex: 0,
+      })
+
+      expect(detected).toBe(true)
+    })
+
+    test("#when non-Oracle tool_result returns VERIFIED #then should NOT detect completion", async () => {
+      const messages = [
+        {
+          info: { role: "assistant" },
+          parts: [
+            { type: "tool_result", text: "Agent: explore\n\n<promise>VERIFIED</promise>" },
+            { type: "text", text: "Explore finished checking." },
           ],
         },
       ]

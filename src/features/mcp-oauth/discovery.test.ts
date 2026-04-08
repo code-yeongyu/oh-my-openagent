@@ -9,7 +9,7 @@ describe("discoverOAuthServerMetadata", () => {
   })
 
   afterEach(() => {
-    Object.defineProperty(globalThis, "fetch", { value: originalFetch, configurable: true })
+    Object.defineProperty(globalThis, "fetch", { value: originalFetch, configurable: true, writable: true })
   })
 
   test("returns endpoints from PRM + AS discovery", () => {
@@ -37,7 +37,7 @@ describe("discoverOAuthServerMetadata", () => {
       }
       return new Response("not found", { status: 404 })
     }
-    Object.defineProperty(globalThis, "fetch", { value: fetchMock, configurable: true })
+    Object.defineProperty(globalThis, "fetch", { value: fetchMock, configurable: true, writable: true })
 
     // when
     return discoverOAuthServerMetadata(resource).then((result) => {
@@ -75,7 +75,7 @@ describe("discoverOAuthServerMetadata", () => {
       }
       return new Response("not found", { status: 404 })
     }
-    Object.defineProperty(globalThis, "fetch", { value: fetchMock, configurable: true })
+    Object.defineProperty(globalThis, "fetch", { value: fetchMock, configurable: true, writable: true })
 
     // when
     return discoverOAuthServerMetadata(resource).then((result) => {
@@ -118,7 +118,7 @@ describe("discoverOAuthServerMetadata", () => {
       }
       return new Response("not found", { status: 404 })
     }
-    Object.defineProperty(globalThis, "fetch", { value: fetchMock, configurable: true })
+    Object.defineProperty(globalThis, "fetch", { value: fetchMock, configurable: true, writable: true })
 
     // when
     return discoverOAuthServerMetadata(resource).then((result) => {
@@ -144,7 +144,7 @@ describe("discoverOAuthServerMetadata", () => {
       }
       return new Response("not found", { status: 404 })
     }
-    Object.defineProperty(globalThis, "fetch", { value: fetchMock, configurable: true })
+    Object.defineProperty(globalThis, "fetch", { value: fetchMock, configurable: true, writable: true })
 
     // when
     const result = discoverOAuthServerMetadata(resource)
@@ -165,7 +165,7 @@ describe("discoverOAuthServerMetadata", () => {
       }
       return new Response("not found", { status: 404 })
     }
-    Object.defineProperty(globalThis, "fetch", { value: fetchMock, configurable: true })
+    Object.defineProperty(globalThis, "fetch", { value: fetchMock, configurable: true, writable: true })
 
     // when
     const result = discoverOAuthServerMetadata(resource)
@@ -192,7 +192,7 @@ describe("discoverOAuthServerMetadata", () => {
       }
       return new Response("not found", { status: 404 })
     }
-    Object.defineProperty(globalThis, "fetch", { value: fetchMock, configurable: true })
+    Object.defineProperty(globalThis, "fetch", { value: fetchMock, configurable: true, writable: true })
 
     // when
     const result = discoverOAuthServerMetadata(resource)
@@ -225,7 +225,7 @@ describe("discoverOAuthServerMetadata", () => {
       }
       return new Response("not found", { status: 404 })
     }
-    Object.defineProperty(globalThis, "fetch", { value: fetchMock, configurable: true })
+    Object.defineProperty(globalThis, "fetch", { value: fetchMock, configurable: true, writable: true })
 
     // when
     return discoverOAuthServerMetadata(resource)

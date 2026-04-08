@@ -1,6 +1,9 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { BackgroundManager } from "../../features/background-agent"
-import { isAgentRegistered } from "../../features/claude-code-session-state"
+import {
+  isAgentRegistered,
+  resolveRegisteredAgentName,
+} from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
 import { createInternalAgentTextPart, resolveInheritedPromptTools } from "../../shared"
 import { HOOK_NAME } from "./hook-name"
@@ -55,7 +58,9 @@ export async function injectBoulderContinuation(input: {
 		`\n\n[Status: ${total - remaining}/${total} completed, ${remaining} remaining]` +
 		preferredSessionContext +
 		worktreeContext
-	const continuationAgent = agent ?? (isAgentRegistered("atlas") ? "atlas" : undefined)
+	const continuationAgent = resolveRegisteredAgentName(
+		agent ?? (isAgentRegistered("atlas") ? "atlas" : undefined),
+	)
 
 	if (!continuationAgent || !isAgentRegistered(continuationAgent)) {
 		log(`[${HOOK_NAME}] Skipped injection: continuation agent unavailable`, {
@@ -71,12 +76,18 @@ export async function injectBoulderContinuation(input: {
     const promptContext = await resolveRecentPromptContextForSession(ctx, sessionID)
     const inheritedTools = resolveInheritedPromptTools(sessionID, promptContext.tools)
 
-		await ctx.client.session.promptAsync({
-			path: { id: sessionID },
-			body: {
-				agent: continuationAgent,
-				...(promptContext.model !== undefined ? { model: promptContext.model } : {}),
-				...(inheritedTools ? { tools: inheritedTools } : {}),
+    const launchModel = promptContext.model
+      ? { providerID: promptContext.model.providerID, modelID: promptContext.model.modelID }
+      : undefined
+    const launchVariant = promptContext.model?.variant
+
+    await ctx.client.session.promptAsync({
+      path: { id: sessionID },
+      body: {
+        agent: continuationAgent,
+        ...(launchModel ? { model: launchModel } : {}),
+        ...(launchVariant ? { variant: launchVariant } : {}),
+        ...(inheritedTools ? { tools: inheritedTools } : {}),
         parts: [createInternalAgentTextPart(prompt)],
       },
       query: { directory: ctx.directory },
