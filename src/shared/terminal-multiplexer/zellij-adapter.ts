@@ -273,11 +273,12 @@ export class ZellijAdapter implements Multiplexer {
     log("[ZellijAdapter.closePane] called", { label: handle.label })
 
     const sessionId = handle.label
+    const escapedSessionId = sessionId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
     // SIGKILL for immediate termination — the pane has --close-on-exit so killing
     // the process is sufficient. SIGTERM would work but pkill's exit code only tells
     // us if a matching process existed (0) or not (1), not whether it actually died,
     // making a SIGTERM→wait→SIGKILL escalation unreliable without polling.
-    const proc = this.spawn(["pkill", "-9", "-f", "--", `--session ${sessionId}( |$)`], {
+    const proc = this.spawn(["pkill", "-9", "-f", "--", `--session ${escapedSessionId}( |$)`], {
       stdout: "pipe",
       stderr: "pipe",
     })
