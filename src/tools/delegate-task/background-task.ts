@@ -10,6 +10,7 @@ import { getSessionTools } from "../../shared/session-tools-store"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { QUESTION_DENIED_SESSION_PERMISSION } from "../../shared/question-denied-session-permission"
 import { setSessionFallbackChain } from "../../hooks/model-fallback/hook"
+import { stripAgentListSortPrefix } from "../../shared/agent-display-names"
 
 function continueSessionSetup(args: {
   taskID: string
@@ -62,11 +63,12 @@ export async function executeBackgroundTask(
 
   try {
     const tddEnabled = executorCtx.sisyphusAgentConfig?.tdd
-    const effectivePrompt = buildTaskPrompt(args.prompt, agentToUse, tddEnabled)
+    const normalizedAgent = stripAgentListSortPrefix(agentToUse)
+    const effectivePrompt = buildTaskPrompt(args.prompt, normalizedAgent, tddEnabled)
     const task = await manager.launch({
       description: args.description,
       prompt: effectivePrompt,
-      agent: agentToUse,
+      agent: normalizedAgent,
       parentSessionID: parentContext.sessionID,
       parentMessageID: parentContext.messageID,
       parentModel: parentContext.model,
@@ -156,7 +158,7 @@ Do NOT call background_output now. Wait for <system-reminder> notification first
     return formatDetailedError(error, {
       operation: "Launch background task",
       args,
-      agent: agentToUse,
+      agent: stripAgentListSortPrefix(agentToUse),
       category: args.category,
     })
   }
