@@ -1,13 +1,13 @@
 import { afterEach, describe, expect, mock, spyOn, test } from "bun:test"
-import { resolveModelPipeline } from "./model-resolution-pipeline"
 import * as connectedProvidersCache from "./connected-providers-cache"
 
-// Force test-runner isolation: files that import mock.module are auto-detected
-// by run-ci-tests.ts and executed in their own bun process so they cannot be
-// contaminated by (or contaminate) mock.module calls in other test files.
+// Force CI to run this file in an isolated process to prevent
+// cross-test mock pollution from the shared test suite.
 mock.module("./logger", () => ({
   log: () => {},
 }))
+
+const { resolveModelPipeline } = await import("./model-resolution-pipeline")
 
 describe("resolveModelPipeline", () => {
   afterEach(() => {
