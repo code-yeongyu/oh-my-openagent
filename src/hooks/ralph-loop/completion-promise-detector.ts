@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from "node:fs"
 import { log } from "../../shared/logger"
 import { HOOK_NAME } from "./constants"
 import { ULTRAWORK_VERIFICATION_PROMISE } from "./constants"
+import { isOracleVerified } from "./oracle-verification-detector"
 import { withTimeout } from "./with-timeout"
 
 interface OpenCodeSessionMessage {
@@ -16,8 +17,6 @@ interface TranscriptEntry {
 	content?: string
 	tool_output?: { output?: string } | string
 }
-
-const ORACLE_AGENT_PATTERN = /Agent:\s*oracle/i
 
 function extractTranscriptEntryText(entry: TranscriptEntry): string {
 	if (typeof entry.content === "string") return entry.content
@@ -47,7 +46,7 @@ function shouldInspectSessionMessagePart(
 		return false
 	}
 
-	return promise === ULTRAWORK_VERIFICATION_PROMISE && ORACLE_AGENT_PATTERN.test(partText)
+	return promise === ULTRAWORK_VERIFICATION_PROMISE && isOracleVerified(partText)
 }
 
 function shouldInspectTranscriptEntry(
@@ -63,7 +62,7 @@ function shouldInspectTranscriptEntry(
 		return false
 	}
 
-	return promise === ULTRAWORK_VERIFICATION_PROMISE && ORACLE_AGENT_PATTERN.test(entryText)
+	return promise === ULTRAWORK_VERIFICATION_PROMISE && isOracleVerified(entryText)
 }
 
 export function detectCompletionInTranscript(
