@@ -79,12 +79,8 @@ export async function addPluginToOpenCodeConfig(currentVersion: string): Promise
 
     const normalizedPlugins = [...otherPlugins]
 
-    if (canonicalEntries.length > 0) {
-      normalizedPlugins.push(canonicalEntries[0])
-    } else if (legacyEntries.length > 0) {
-      const versionMatch = legacyEntries[0].match(/@(.+)$/)
-      const preservedVersion = versionMatch ? versionMatch[1] : null
-      normalizedPlugins.push(preservedVersion ? `${PLUGIN_NAME}@${preservedVersion}` : pluginEntry)
+    if (canonicalEntries.length > 0 || legacyEntries.length > 0) {
+      normalizedPlugins.push(pluginEntry)
     } else {
       normalizedPlugins.push(pluginEntry)
     }
