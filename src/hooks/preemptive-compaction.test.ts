@@ -314,7 +314,11 @@ describe("preemptive-compaction", () => {
   // #then should show a warning toast explaining the failure to the user
   it("should show a warning toast when preemptive compaction fails", async () => {
     //#given
-    const hook = createPreemptiveCompactionHook(ctx as never, {} as never)
+    const hook = createPreemptiveCompactionHook(
+      ctx as never,
+      {} as never,
+      createModelLimitState([["anthropic/claude-sonnet-4-6", 200_000]]),
+    )
     const sessionID = "ses_toast_on_failure"
     const summarizeError = new Error("upstream rate limited")
     ctx.client.session.summarize.mockRejectedValueOnce(summarizeError)
