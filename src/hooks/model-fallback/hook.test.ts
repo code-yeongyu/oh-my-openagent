@@ -117,7 +117,7 @@ describe("model fallback hook", () => {
     //#then
     expect(output.message["model"]).toEqual({
       providerID: "anthropic",
-      modelID: "claude-opus-4-6",
+      modelID: "claude-opus",
     })
   })
 
@@ -149,17 +149,17 @@ describe("model fallback hook", () => {
     //#then
     expect(firstOutput.message["model"]).toEqual({
       providerID: "anthropic",
-      modelID: "claude-opus-4-6",
+      modelID: "claude-opus",
     })
 
     //#when - second error re-arms fallback and should advance to next entry
     expect(
-      setPendingModelFallback(sessionID, "Sisyphus - Ultraworker", "anthropic", "claude-opus-4-6"),
+      setPendingModelFallback(sessionID, "Sisyphus - Ultraworker", "anthropic", "claude-opus"),
     ).toBe(true)
 
     const secondOutput = {
       message: {
-        model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
+        model: { providerID: "anthropic", modelID: "claude-opus" },
       },
       parts: [{ type: "text", text: "continue" }],
     }
