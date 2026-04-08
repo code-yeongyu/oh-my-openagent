@@ -18,6 +18,12 @@ export interface PluginInstallation {
   lastUpdated: string
   gitCommitSha?: string
   isLocal?: boolean
+  /**
+   * Claude Code records this on project/local-scoped installations.
+   * Absolute path (or `~`-prefixed) of the project the plugin was installed for.
+   * Used to filter project/local plugins that do not belong to the current cwd.
+   */
+  projectPath?: string
 }
 
 /**
@@ -51,6 +57,11 @@ export interface InstalledPluginEntryV3 {
   installPath: string
   lastUpdated: string
   gitCommitSha?: string
+  /**
+   * Claude Code records this on project/local-scoped installations.
+   * Absolute path (or `~`-prefixed) of the project the plugin was installed for.
+   */
+  projectPath?: string
 }
 
 /**
