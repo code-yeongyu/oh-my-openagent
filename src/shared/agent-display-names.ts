@@ -57,6 +57,13 @@ export function getAgentDisplayName(configKey: string): string {
   return configKey
 }
 
+/**
+ * @deprecated Do NOT use for config.agent keys or API-facing names.
+ * ZWSP prefixes leak into the /agent API response and break prompt_async consumers.
+ * Use getAgentDisplayName() instead. The `order` field injected by
+ * reorderAgentsByPriority() handles sort ordering without invisible characters.
+ * See: https://github.com/code-yeongyu/oh-my-openagent/issues/3238
+ */
 export function getAgentListDisplayName(configKey: string): string {
   const displayName = getAgentDisplayName(configKey)
   const prefix = AGENT_LIST_SORT_PREFIXES[configKey.toLowerCase()]
