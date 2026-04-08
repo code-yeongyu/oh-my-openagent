@@ -9,6 +9,7 @@ type MessageInfo = {
   model?: { providerID: string; modelID: string; variant?: string }
   providerID?: string
   modelID?: string
+  variant?: string
   tools?: Record<string, boolean | "allow" | "deny" | "ask">
 }
 
@@ -40,12 +41,18 @@ export function getMessageInfo(value: unknown): MessageInfo | undefined {
         ...(typeof modelValue.variant === "string" ? { variant: modelValue.variant } : {}),
       }
     : undefined
+  const variant = typeof modelValue?.variant === "string"
+    ? modelValue.variant
+    : typeof info.variant === "string"
+      ? info.variant
+      : undefined
   return {
     role: typeof info.role === "string" ? info.role : undefined,
     agent: typeof info.agent === "string" ? info.agent : undefined,
     model,
     providerID: typeof info.providerID === "string" ? info.providerID : undefined,
     modelID: typeof info.modelID === "string" ? info.modelID : undefined,
+    variant,
     tools: isRecord(info.tools)
       ? Object.entries(info.tools).reduce<Record<string, boolean | "allow" | "deny" | "ask">>((acc, [key, value]) => {
           if (

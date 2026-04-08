@@ -19,6 +19,7 @@ type MessageInfo = {
 	model?: { providerID: string; modelID: string; variant?: string }
 	modelID?: string
 	providerID?: string
+	variant?: string
 	tools?: Record<string, boolean | "allow" | "deny" | "ask">
 }
 
@@ -100,7 +101,11 @@ export async function injectContinuationPrompt(
 				model =
 					info.model ??
 					(info.providerID && info.modelID
-						? { providerID: info.providerID, modelID: info.modelID }
+						? {
+							providerID: info.providerID,
+							modelID: info.modelID,
+							...(info.variant ? { variant: info.variant } : {}),
+						}
 						: undefined)
 				tools = info.tools
 				break
