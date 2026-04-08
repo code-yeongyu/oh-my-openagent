@@ -1,5 +1,6 @@
 import type { ClaudeCodeMcpServer } from "../claude-code-mcp-loader/types"
 import { McpOAuthProvider } from "../mcp-oauth/provider"
+import { withRefreshMutex } from "../mcp-oauth/refresh-mutex"
 import type { OAuthTokenData } from "../mcp-oauth/storage"
 import { isStepUpRequired, mergeScopes } from "../mcp-oauth/step-up"
 import type { OAuthProviderFactory, OAuthProviderLike } from "./types"
@@ -52,14 +53,15 @@ export async function buildHttpRequestInit(
       }
     }
 
-    if (tokenData && isTokenExpired(tokenData)) {
-      try {
-        tokenData = tokenData.refreshToken
-          ? await provider.refresh(tokenData.refreshToken)
-          : await provider.login()
-      } catch {
+      if (tokenData && isTokenExpired(tokenData)) {
         try {
-          tokenData = await provider.login()
+          const refreshToken = tokenData.refreshToken
+          tokenData = refreshToken
+            ? await withRefreshMutex(config.url, () => provider.refresh(refreshToken))
+            : await provider.login()
+        } catch {
+          try {
+            tokenData = await provider.login()
         } catch {
           tokenData = null
         }
@@ -149,7 +151,8 @@ export async function handlePostRequestAuthError(params: {
   refreshAttempted.add(config.url)
 
   try {
-    await provider.refresh(tokenData.refreshToken)
+    const refreshToken = tokenData.refreshToken
+    await withRefreshMutex(config.url, () => provider.refresh(refreshToken))
     return true
   } catch {
     return false
