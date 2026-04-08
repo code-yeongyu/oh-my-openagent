@@ -1250,6 +1250,51 @@ describe("config-handler plugin loading error boundary (#1559)", () => {
   })
 })
 
+describe("command agent routing coherence", () => {
+  test("keeps start-work aligned with the exported Atlas agent key", async () => {
+    //#given
+    const createBuiltinAgentsMock = agents.createBuiltinAgents as unknown as {
+      mockResolvedValue: (value: Record<string, unknown>) => void
+    }
+    createBuiltinAgentsMock.mockResolvedValue({
+      sisyphus: { name: "sisyphus", prompt: "test", mode: "primary" },
+      atlas: { name: "atlas", prompt: "test", mode: "primary" },
+    })
+    ;(builtinCommands.loadBuiltinCommands as unknown as {
+      mockReturnValue: (value: Record<string, unknown>) => void
+    }).mockReturnValue({
+      "start-work": {
+        name: "start-work",
+        description: "(builtin) Start work",
+        template: "template",
+        agent: "atlas",
+      },
+    })
+    const pluginConfig = createPluginConfig({})
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-6",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    //#when
+    await handler(config)
+
+    //#then
+    const agentConfig = config.agent as Record<string, unknown>
+    const commandConfig = config.command as Record<string, { agent?: string }>
+    expect(Object.keys(agentConfig)).toContain(getAgentListDisplayName("atlas"))
+    expect(commandConfig["start-work"]?.agent).toBe(getAgentListDisplayName("atlas"))
+  })
+})
+
 describe("per-agent todowrite/todoread deny when task_system enabled", () => {
   const AGENTS_WITH_TODO_DENY = new Set([
     getAgentListDisplayName("sisyphus"),
