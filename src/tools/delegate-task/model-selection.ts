@@ -8,6 +8,15 @@ import { log } from "../../shared/logger"
 import { resolveExplicitModel } from "../../shared/explicit-model-resolution"
 import { resolveConfiguredFallbackEntry } from "../../shared/explicit-fallback-model-resolution"
 
+function parseUserFallbackModel(modelString: string): { baseModel: string; variant?: string } | undefined {
+  const emptySet = new Set<string>()
+  const resolved = resolveConfiguredFallbackEntry(modelString, { availableModels: emptySet })
+  if (!resolved) {
+    return undefined
+  }
+  return { baseModel: resolved.model, variant: resolved.variant }
+}
+
 function isExplicitHighModel(model: string): boolean {
   return /(?:^|\/)[^/]+-high$/.test(model)
 }
