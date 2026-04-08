@@ -883,6 +883,11 @@ export class TmuxSessionManager {
       return
     }
 
+    if (this.adapter && this.sessionHandles.has(event.sessionID)) {
+      this.removeTrackedSession(event.sessionID)
+      return
+    }
+
     const tracked = this.sessions.get(event.sessionID)
     if (!tracked) return
 
