@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs"
 import { parseJsonc } from "../../shared"
 import type { ConfigMergeResult, InstallConfig } from "../types"
+import { backupConfigFile } from "./backup-config"
 import { getConfigDir, getOmoConfigPath } from "./config-context"
 import { deepMergeRecord } from "./deep-merge-record"
 import { ensureConfigDirectoryExists } from "./ensure-config-directory-exists"
@@ -28,6 +29,15 @@ export function writeOmoConfig(installConfig: InstallConfig): ConfigMergeResult 
     const newConfig = generateOmoConfig(installConfig)
 
     if (existsSync(omoConfigPath)) {
+      const backupResult = backupConfigFile(omoConfigPath)
+      if (!backupResult.success) {
+        return {
+          success: false,
+          configPath: omoConfigPath,
+          error: `Failed to create backup: ${backupResult.error}`,
+        }
+      }
+
       try {
         const stat = statSync(omoConfigPath)
         const content = readFileSync(omoConfigPath, "utf-8")
