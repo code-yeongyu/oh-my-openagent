@@ -5,7 +5,7 @@ import * as skillLoader from "../features/opencode-skill-loader";
 import type { OhMyOpenCodeConfig } from "../config";
 import type { PluginComponents } from "./plugin-components-loader";
 import { applyCommandConfig } from "./command-config-handler";
-import { getAgentListDisplayName } from "../shared/agent-display-names";
+import { getAgentDisplayName } from "../shared/agent-display-names";
 
 function createPluginComponents(): PluginComponents {
   return {
@@ -119,6 +119,6 @@ describe("applyCommandConfig", () => {
 
     // then
     const commandConfig = config.command as Record<string, { agent?: string }>;
-    expect(commandConfig["start-work"]?.agent).toBe(getAgentListDisplayName("atlas"));
+    expect(commandConfig["start-work"]?.agent).toBe(getAgentDisplayName("atlas"));
   });
 });
