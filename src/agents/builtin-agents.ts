@@ -13,6 +13,7 @@ import { createAtlasAgent, atlasPromptMetadata } from "./atlas"
 import { createMomusAgent, momusPromptMetadata } from "./momus"
 import { createHephaestusAgent } from "./hephaestus"
 import { createSisyphusJuniorAgentWithOverrides } from "./sisyphus-junior"
+import { createOpenfangRelayAgent } from "./openfang-relay"
 import type { AvailableCategory } from "./dynamic-agent-prompt-builder"
 import {
   fetchAvailableModels,
@@ -42,6 +43,7 @@ const agentSources: Record<BuiltinAgentName, AgentSource> = {
   // because it needs OrchestratorContext, not just a model string
   atlas: createAtlasAgent as AgentFactory,
   "sisyphus-junior": createSisyphusJuniorAgentWithOverrides as unknown as AgentFactory,
+  "openfang-relay": createOpenfangRelayAgent as AgentFactory,
 }
 
 /**
@@ -176,6 +178,11 @@ export async function createBuiltinAgents(
   })
   if (atlasConfig) {
     result["atlas"] = atlasConfig
+  }
+
+  if (!disabledAgents.some((d) => d.toLowerCase() === "openfang-relay")) {
+    const relayModel = systemDefaultModel ?? "amazon-bedrock/us.anthropic.claude-sonnet-4-6"
+    result["openfang-relay"] = createOpenfangRelayAgent(relayModel)
   }
 
   return result

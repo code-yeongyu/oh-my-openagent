@@ -5,6 +5,7 @@ import { getLocalVersion } from "./get-local-version"
 import { doctor } from "./doctor"
 import { refreshModelCapabilities } from "./refresh-model-capabilities"
 import { createMcpOAuthCommand } from "./mcp-oauth"
+import { startMcpServer, DEFAULT_PORT } from "./mcp-server"
 import type { InstallArgs } from "./types"
 import type { RunOptions } from "./run"
 import type { GetLocalVersionOptions } from "./get-local-version/types"
@@ -200,6 +201,22 @@ program
   })
 
 program.addCommand(createMcpOAuthCommand())
+
+program
+  .command("mcp-server")
+  .description("Start MCP server exposing local workspace tools (grep, glob, ast_grep, file_read, file_list) over SSE")
+  .option("-d, --dir <path>", "Working directory to expose (default: current directory)")
+  .option("-p, --port <port>", "Port to listen on", parseInt)
+  .action(async (options) => {
+    const exitCode = await startMcpServer({
+      dir: options.dir ?? process.cwd(),
+      port: options.port ?? DEFAULT_PORT,
+    }).then(() => 0).catch((e) => {
+      console.error(`MCP server error: ${e instanceof Error ? e.message : String(e)}`)
+      return 1
+    })
+    process.exit(exitCode)
+  })
 
 export function runCli(): void {
   program.parse()

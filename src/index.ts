@@ -9,6 +9,7 @@ import { createRuntimeTmuxConfig, isTmuxIntegrationEnabled } from "./create-runt
 import { createTools } from "./create-tools"
 import { createPluginInterface } from "./plugin-interface"
 import { createPluginDispose, type PluginDispose } from "./plugin-dispose"
+import { startMcpBridge } from "./features/mcp-bridge"
 
 import { loadPluginConfig } from "./plugin-config"
 import { createModelCacheState } from "./plugin-state"
@@ -34,6 +35,8 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
   injectServerAuthIntoClient(ctx.client)
   await activePluginDispose?.()
+
+  const stopMcpBridge = startMcpBridge(ctx.directory)
 
   const pluginConfig = loadPluginConfig(ctx.directory, ctx)
   const tmuxIntegrationEnabled = isTmuxIntegrationEnabled(pluginConfig)
@@ -84,6 +87,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     skillMcpManager: managers.skillMcpManager,
     lspManager,
     disposeHooks: hooks.disposeHooks,
+    stopMcpBridge,
   })
 
   const pluginInterface = createPluginInterface({

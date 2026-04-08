@@ -44,6 +44,7 @@ export {
   createTaskUpdateTool,
 } from "./task"
 export { createHashlineEditTool } from "./hashline-edit"
+export { createA2aDelegateTool, DEFAULT_OPENFANG_BASE_URL } from "./a2a-delegate"
 
 export function createBackgroundTools(manager: BackgroundManager, client: OpencodeClient): Record<string, ToolDefinition> {
   const outputManager: BackgroundOutputManager = manager
