@@ -112,14 +112,9 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
       command: tool.schema.string().optional().describe("The command that triggered this task"),
     },
     async execute(args: DelegateTaskArgs, toolContext) {
-      const ctx = toolContext as ToolContextWithMetadata
-      
-      try {
-        const fs = await import("fs")
-        fs.appendFileSync("/tmp/task-debug.log", `[${new Date().toISOString()}] HANDLER INVOKED args.subagent_type=${args.subagent_type}\n`)
-      } catch {}
-
-      if (args.category) {
+       const ctx = toolContext as ToolContextWithMetadata
+       
+       if (args.category) {
         if (args.subagent_type && args.subagent_type !== SISYPHUS_JUNIOR_AGENT) {
           log("[task] category provided - overriding subagent_type to sisyphus-junior", {
             category: args.category,
