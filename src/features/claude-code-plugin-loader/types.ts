@@ -18,6 +18,12 @@ export interface PluginInstallation {
   lastUpdated: string
   gitCommitSha?: string
   isLocal?: boolean
+  /**
+   * Claude Code records this on project/local-scoped installations.
+   * Absolute path (or `~`-prefixed) of the project the plugin was installed for.
+   * Used to filter project/local plugins that do not belong to the current cwd.
+   */
+  projectPath?: string
 }
 
 /**
@@ -30,8 +36,8 @@ export interface InstalledPluginsDatabaseV1 {
 }
 
 /**
- * Installed plugins database v2 (current)
- * plugins stored as arrays
+ * Installed plugins database v2
+ * plugins stored as arrays keyed by plugin identifier
  */
 export interface InstalledPluginsDatabaseV2 {
   version: 2
@@ -39,10 +45,38 @@ export interface InstalledPluginsDatabaseV2 {
 }
 
 /**
+ * Installed plugins database v3 entry (current Claude Code format)
+ * A flat array of plugin entries, each containing name and marketplace fields
+ * used to construct the plugin key as "name@marketplace".
+ */
+export interface InstalledPluginEntryV3 {
+  name: string
+  marketplace: string
+  scope: PluginScope
+  version: string
+  installPath: string
+  lastUpdated: string
+  gitCommitSha?: string
+  /**
+   * Claude Code records this on project/local-scoped installations.
+   * Absolute path (or `~`-prefixed) of the project the plugin was installed for.
+   */
+  projectPath?: string
+}
+
+/**
  * Installed plugins database structure
  * Located at ~/.claude/plugins/installed_plugins.json
+ *
+ * Supports three formats:
+ * - v1: { version: 1, plugins: Record<string, PluginInstallation> }
+ * - v2: { version: 2, plugins: Record<string, PluginInstallation[]> }
+ * - v3: InstalledPluginEntryV3[] (flat array, current Claude Code format)
  */
-export type InstalledPluginsDatabase = InstalledPluginsDatabaseV1 | InstalledPluginsDatabaseV2
+export type InstalledPluginsDatabase =
+  | InstalledPluginsDatabaseV1
+  | InstalledPluginsDatabaseV2
+  | InstalledPluginEntryV3[]
 
 /**
  * Plugin author information
@@ -198,6 +232,18 @@ export interface ClaudeSettings {
  * Plugin loader options
  */
 export interface PluginLoaderOptions {
+  /**
+   * Override the plugins home directory for testing.
+   * If not provided, uses CLAUDE_PLUGINS_HOME env var or ~/.claude/plugins
+   */
+  pluginsHomeOverride?: string
+
+  /**
+   * Override plugin manifest loading for testing.
+   * Return null to force plugin name derivation from the plugin key.
+   */
+  loadPluginManifestOverride?: (installPath: string) => PluginManifest | null
+
   /**
    * Override enabled plugins from oh-my-opencode config.
    * Key format: "pluginName@marketplace" (e.g., "shell-scripting@claude-code-workflows")

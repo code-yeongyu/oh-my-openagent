@@ -4,9 +4,13 @@ export interface TrackedSession {
   description: string
   createdAt: Date
   lastSeenAt: Date
+  closePending: boolean
+  closeRetryCount: number
   // Stability detection fields (prevents premature closure)
   lastMessageCount?: number
   stableIdlePolls?: number
+  activityVersion?: number
+  observedIdleActivityVersion?: number
 }
 
 export const MIN_PANE_WIDTH = 52

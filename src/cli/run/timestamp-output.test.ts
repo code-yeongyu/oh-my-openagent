@@ -3,6 +3,10 @@
 import { describe, expect, it } from "bun:test"
 import { createTimestampTransformer, createTimestampedStdoutController } from "./timestamp-output"
 
+function createLocalDate(hours: number, minutes: number, seconds: number): Date {
+  return new Date(2026, 1, 19, hours, minutes, seconds)
+}
+
 interface MockWriteStream {
   write: (
     chunk: Uint8Array | string,
@@ -41,7 +45,7 @@ function createMockWriteStream(): MockWriteStream {
 describe("createTimestampTransformer", () => {
   it("prefixes each output line with timestamp", () => {
     // given
-    const now = () => new Date("2026-02-19T12:34:56.000Z")
+    const now = () => createLocalDate(12, 34, 56)
     const transform = createTimestampTransformer(now)
 
     // when
@@ -53,7 +57,7 @@ describe("createTimestampTransformer", () => {
 
   it("keeps line-start state across chunk boundaries", () => {
     // given
-    const now = () => new Date("2026-02-19T01:02:03.000Z")
+    const now = () => createLocalDate(1, 2, 3)
     const transform = createTimestampTransformer(now)
 
     // when
@@ -69,7 +73,7 @@ describe("createTimestampTransformer", () => {
 
   it("returns empty string for empty chunk", () => {
     // given
-    const transform = createTimestampTransformer(() => new Date("2026-02-19T01:02:03.000Z"))
+    const transform = createTimestampTransformer(() => createLocalDate(1, 2, 3))
 
     // when
     const output = transform("")

@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, afterEach, mock } from "bun:test"
+import { describe, test, expect, beforeEach, afterEach, afterAll, mock } from "bun:test"
 import { mkdirSync, writeFileSync, rmSync, existsSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
@@ -10,6 +10,7 @@ const TEST_PART_STORAGE = join(TEST_DIR, "part")
 const TEST_SESSION_STORAGE = join(TEST_DIR, "session")
 const TEST_TODO_DIR = join(TEST_DIR, "todos")
 const TEST_TRANSCRIPT_DIR = join(TEST_DIR, "transcripts")
+let sqliteBackend = false
 
 mock.module("./constants", () => ({
   OPENCODE_STORAGE: TEST_DIR,
@@ -27,7 +28,7 @@ mock.module("./constants", () => ({
 }))
 
 mock.module("../../shared/opencode-storage-detection", () => ({
-  isSqliteBackend: () => false,
+  isSqliteBackend: () => sqliteBackend,
   resetSqliteBackendCache: () => {},
 }))
 
@@ -59,6 +60,9 @@ mock.module("../../shared/opencode-message-dir", () => ({
     return null
   },
 }))
+
+afterAll(() => { mock.restore() })
+
 const { getAllSessions, getMessageDir, sessionExists, readSessionMessages, readSessionTodos, getSessionInfo } =
   await import("./storage")
 
@@ -66,6 +70,7 @@ const storage = await import("./storage")
 
 describe("session-manager storage", () => {
   beforeEach(() => {
+    sqliteBackend = false
     if (existsSync(TEST_DIR)) {
       rmSync(TEST_DIR, { recursive: true, force: true })
     }
@@ -78,6 +83,8 @@ describe("session-manager storage", () => {
   })
 
   afterEach(() => {
+    sqliteBackend = false
+    storage.resetStorageClient()
     if (existsSync(TEST_DIR)) {
       rmSync(TEST_DIR, { recursive: true, force: true })
     }
@@ -168,6 +175,26 @@ describe("session-manager storage", () => {
     expect(todos).toEqual([])
   })
 
+  test("readSessionTodos only reads the exact session todo file", async () => {
+    // given
+    writeFileSync(
+      join(TEST_TODO_DIR, "ses_1.json"),
+      JSON.stringify([{ id: "todo_exact", content: "Exact match", status: "pending" }]),
+    )
+    writeFileSync(
+      join(TEST_TODO_DIR, "ses_10.json"),
+      JSON.stringify([{ id: "todo_collision", content: "Wrong session", status: "completed" }]),
+    )
+
+    // when
+    const todos = await readSessionTodos("ses_1")
+
+    // then
+    expect(todos).toHaveLength(1)
+    expect(todos[0].id).toBe("todo_exact")
+    expect(todos[0].content).toBe("Exact match")
+  })
+
   test("getSessionInfo returns null for non-existent session", async () => {
     // when
     const info = await getSessionInfo("ses_nonexistent")
@@ -211,6 +238,47 @@ describe("session-manager storage", () => {
     expect(info?.message_count).toBe(2)
     expect(info?.agents_used).toContain("build")
     expect(info?.agents_used).toContain("oracle")
+  })
+
+  test("getSessionInfo uses SDK session messages on sqlite backend", async () => {
+    sqliteBackend = true
+    const now = Date.now()
+
+    storage.setStorageClient({
+      session: {
+        messages: async () => ({
+          data: [
+            {
+              info: {
+                id: "msg_sqlite_1",
+                role: "user",
+                agent: "atlas",
+                time: { created: now - 5000, updated: now - 5000 },
+              },
+              parts: [],
+            },
+            {
+              info: {
+                id: "msg_sqlite_2",
+                role: "assistant",
+                agent: "prometheus",
+                time: { created: now, updated: now },
+              },
+              parts: [],
+            },
+          ],
+        }),
+        todo: async () => ({ data: [] }),
+      },
+    } as never)
+
+    const info = await getSessionInfo("ses_sqlite")
+
+    expect(info).not.toBeNull()
+    expect(info?.id).toBe("ses_sqlite")
+    expect(info?.message_count).toBe(2)
+    expect(info?.agents_used).toContain("atlas")
+    expect(info?.agents_used).toContain("prometheus")
   })
 })
 
@@ -351,9 +419,9 @@ describe("session-manager storage - getMainSessions", () => {
 describe("session-manager storage - SDK path (beta mode)", () => {
   const mockClient = {
     session: {
-      list: mock(() => Promise.resolve({ data: [] })),
-      messages: mock(() => Promise.resolve({ data: [] })),
-      todo: mock(() => Promise.resolve({ data: [] })),
+      list: mock((): Promise<unknown> => Promise.resolve({ data: [] })),
+      messages: mock((): Promise<unknown> => Promise.resolve({ data: [] })),
+      todo: mock((): Promise<unknown> => Promise.resolve({ data: [] })),
     },
   }
 
@@ -477,7 +545,7 @@ describe("session-manager storage - SDK path (beta mode)", () => {
     expect(todos[1].status).toBe("completed")
   })
 
-  test("SDK path returns empty array on error", async () => {
+  test("SDK path rethrows non-transport errors", async () => {
     // given
     mockClient.session.messages.mockImplementation(() => Promise.reject(new Error("API error")))
 
@@ -489,11 +557,7 @@ describe("session-manager storage - SDK path (beta mode)", () => {
     const { setStorageClient, readSessionMessages } = await import("./storage")
     setStorageClient(mockClient as unknown as Parameters<typeof setStorageClient>[0])
 
-    // when
-    const messages = await readSessionMessages("ses_test")
-
-    // then
-    expect(messages).toEqual([])
+    await expect(readSessionMessages("ses_test")).rejects.toThrow("API error")
   })
 
   test("SDK path returns empty array when client is not set", async () => {

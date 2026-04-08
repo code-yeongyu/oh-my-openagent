@@ -11,6 +11,7 @@ export const BuiltinAgentNameSchema = z.enum([
   "metis",
   "momus",
   "atlas",
+  "sisyphus-junior",
 ])
 
 export const BuiltinSkillNameSchema = z.enum([
@@ -19,6 +20,8 @@ export const BuiltinSkillNameSchema = z.enum([
   "dev-browser",
   "frontend-ui-ux",
   "git-master",
+  "review-work",
+  "ai-slop-remover",
 ])
 
 export const OverridableAgentNameSchema = z.enum([

@@ -10,13 +10,13 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
   describe("honored fields", () => {
     test("applies model override", () => {
       // given
-      const override = { model: "openai/gpt-5.2" }
+      const override = { model: "openai/gpt-5.4" }
 
       // when
       const result = createSisyphusJuniorAgentWithOverrides(override)
 
       // then
-      expect(result.model).toBe("openai/gpt-5.2")
+      expect(result.model).toBe("openai/gpt-5.4")
     })
 
     test("applies temperature override", () => {
@@ -105,7 +105,7 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
       // given
       const override = {
         disable: true,
-        model: "openai/gpt-5.2",
+        model: "openai/gpt-5.4",
         temperature: 0.9,
       }
 
@@ -140,6 +140,44 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
       // then
       expect(result.prompt).toContain("Sisyphus-Junior")
       expect(result.prompt).not.toBe("Completely new prompt that replaces everything")
+    })
+  })
+
+  describe("reasoning configuration", () => {
+    test("#given GPT model #when agent is created #then uses reasoningEffort", () => {
+      // given
+      const override = { model: "openai/gpt-5.4" }
+
+      // when
+      const result = createSisyphusJuniorAgentWithOverrides(override)
+
+      // then
+      expect(result.reasoningEffort).toBe("medium")
+      expect(result.thinking).toBeUndefined()
+    })
+
+    test("#given Claude model #when agent is created #then injects thinking", () => {
+      // given
+      const override = { model: "anthropic/claude-sonnet-4-6" }
+
+      // when
+      const result = createSisyphusJuniorAgentWithOverrides(override)
+
+      // then
+      expect(result.reasoningEffort).toBeUndefined()
+      expect(result.thinking).toEqual({ type: "enabled", budgetTokens: 32000 })
+    })
+
+    test("#given GLM reasoning model #when agent is created #then skips injected thinking", () => {
+      // given
+      const override = { model: "z-ai/glm-5" }
+
+      // when
+      const result = createSisyphusJuniorAgentWithOverrides(override)
+
+      // then
+      expect(result.reasoningEffort).toBeUndefined()
+      expect(result.thinking).toBeUndefined()
     })
   })
 
@@ -216,7 +254,7 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
 
     test("useTaskSystem=true produces Task Discipline prompt for GPT", () => {
       //#given
-      const override = { model: "openai/gpt-5.2" }
+      const override = { model: "openai/gpt-5.4" }
 
       //#when
       const result = createSisyphusJuniorAgentWithOverrides(override, undefined, true)
@@ -253,7 +291,7 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
 
     test("useTaskSystem=true includes task_create/task_update in GPT prompt", () => {
       //#given
-      const override = { model: "openai/gpt-5.2" }
+      const override = { model: "openai/gpt-5.4" }
 
       //#when
       const result = createSisyphusJuniorAgentWithOverrides(override, undefined, true)
@@ -303,7 +341,7 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
 
     test("GPT model uses GPT-optimized prompt with Hephaestus-style sections", () => {
       // given
-      const override = { model: "openai/gpt-5.2" }
+      const override = { model: "openai/gpt-5.4" }
 
       // when
       const result = createSisyphusJuniorAgentWithOverrides(override)
@@ -312,6 +350,30 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
       expect(result.prompt).toContain("Scope Discipline")
       expect(result.prompt).toContain("<tool_usage_rules>")
       expect(result.prompt).toContain("Progress Updates")
+    })
+
+    test("GPT 5.4 model uses GPT-5.4 specific prompt", () => {
+      // given
+      const override = { model: "openai/gpt-5.4" }
+
+      // when
+      const result = createSisyphusJuniorAgentWithOverrides(override)
+
+      // then
+      expect(result.prompt).toContain("expert coding agent")
+      expect(result.prompt).toContain("<tool_usage_rules>")
+    })
+
+    test("GPT 5.3 Codex model uses GPT-5.3-codex specific prompt", () => {
+      // given
+      const override = { model: "openai/gpt-5.3-codex" }
+
+      // when
+      const result = createSisyphusJuniorAgentWithOverrides(override)
+
+      // then
+      expect(result.prompt).toContain("Senior Engineer")
+      expect(result.prompt).toContain("<tool_usage_rules>")
     })
 
     test("prompt_append is added after base prompt", () => {
@@ -331,9 +393,53 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
 })
 
 describe("getSisyphusJuniorPromptSource", () => {
-  test("returns 'gpt' for OpenAI models", () => {
+  test("returns 'gpt-5-4' for GPT 5.4 models", () => {
     // given
-    const model = "openai/gpt-5.2"
+    const model = "openai/gpt-5.4"
+
+    // when
+    const source = getSisyphusJuniorPromptSource(model)
+
+    // then
+    expect(source).toBe("gpt-5-4")
+  })
+
+  test("returns 'gpt-5-4' for GitHub Copilot GPT 5.4", () => {
+    // given
+    const model = "github-copilot/gpt-5.4"
+
+    // when
+    const source = getSisyphusJuniorPromptSource(model)
+
+    // then
+    expect(source).toBe("gpt-5-4")
+  })
+
+  test("returns 'gpt-5-3-codex' for GPT 5.3 Codex models", () => {
+    // given
+    const model = "openai/gpt-5.3-codex"
+
+    // when
+    const source = getSisyphusJuniorPromptSource(model)
+
+    // then
+    expect(source).toBe("gpt-5-3-codex")
+  })
+
+  test("returns 'gpt-5-3-codex' for GitHub Copilot GPT 5.3 Codex", () => {
+    // given
+    const model = "github-copilot/gpt-5.3-codex"
+
+    // when
+    const source = getSisyphusJuniorPromptSource(model)
+
+    // then
+    expect(source).toBe("gpt-5-3-codex")
+  })
+
+  test("returns 'gpt' for generic GPT models", () => {
+    // given
+    const model = "openai/gpt-4o"
 
     // when
     const source = getSisyphusJuniorPromptSource(model)
@@ -342,7 +448,7 @@ describe("getSisyphusJuniorPromptSource", () => {
     expect(source).toBe("gpt")
   })
 
-  test("returns 'gpt' for GitHub Copilot GPT models", () => {
+  test("returns 'gpt' for GitHub Copilot generic GPT models", () => {
     // given
     const model = "github-copilot/gpt-4o"
 
@@ -377,9 +483,35 @@ describe("getSisyphusJuniorPromptSource", () => {
 })
 
 describe("buildSisyphusJuniorPrompt", () => {
-  test("GPT model prompt contains Hephaestus-style sections", () => {
+  test("GPT 5.4 model uses GPT-5.4 optimized prompt", () => {
     // given
-    const model = "openai/gpt-5.2"
+    const model = "openai/gpt-5.4"
+
+    // when
+    const prompt = buildSisyphusJuniorPrompt(model, false)
+
+    // then
+    expect(prompt).toContain("expert coding agent")
+    expect(prompt).toContain("Scope Discipline")
+    expect(prompt).toContain("<tool_usage_rules>")
+  })
+
+  test("GPT 5.3 Codex model uses GPT-5.3-codex prompt", () => {
+    // given
+    const model = "openai/gpt-5.3-codex"
+
+    // when
+    const prompt = buildSisyphusJuniorPrompt(model, false)
+
+    // then
+    expect(prompt).toContain("Senior Engineer")
+    expect(prompt).toContain("Scope Discipline")
+    expect(prompt).toContain("<tool_usage_rules>")
+  })
+
+  test("generic GPT model uses generic GPT prompt", () => {
+    // given
+    const model = "openai/gpt-5.4"
 
     // when
     const prompt = buildSisyphusJuniorPrompt(model, false)
@@ -404,9 +536,21 @@ describe("buildSisyphusJuniorPrompt", () => {
     expect(prompt).toContain("todowrite")
   })
 
-  test("useTaskSystem=true includes Task Discipline for GPT", () => {
+  test("useTaskSystem=true includes Task Discipline for GPT 5.4", () => {
     // given
-    const model = "openai/gpt-5.2"
+    const model = "openai/gpt-5.4"
+
+    // when
+    const prompt = buildSisyphusJuniorPrompt(model, true)
+
+    // then
+    expect(prompt).toContain("Task Discipline")
+    expect(prompt).toContain("task_create")
+  })
+
+  test("useTaskSystem=true includes Task Discipline for GPT 5.3 Codex", () => {
+    // given
+    const model = "openai/gpt-5.3-codex"
 
     // when
     const prompt = buildSisyphusJuniorPrompt(model, true)

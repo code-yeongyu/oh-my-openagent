@@ -1,5 +1,7 @@
 import { DEFAULT_CONFIG, RETRYABLE_ERROR_PATTERNS } from "./constants"
 
+export { extractAutoRetrySignal } from "./auto-retry-signal"
+
 export function getErrorMessage(error: unknown): string {
   if (!error) return ""
   if (typeof error === "string") return error.toLowerCase()
@@ -21,6 +23,13 @@ export function getErrorMessage(error: unknown): string {
     }
   }
 
+  const errorObj2 = error as Record<string, unknown>
+  const name = errorObj2.name
+  if (typeof name === "string" && name.length > 0) {
+    const nameColonMatch = name.match(/:\s*(.+)/)
+    if (nameColonMatch) return nameColonMatch[1].trim().toLowerCase()
+  }
+
   try {
     return JSON.stringify(error).toLowerCase()
   } catch {
@@ -28,18 +37,28 @@ export function getErrorMessage(error: unknown): string {
   }
 }
 
+const DEFAULT_RETRY_PATTERN = new RegExp(`\\b(${DEFAULT_CONFIG.retry_on_errors.join("|")})\\b`)
+
 export function extractStatusCode(error: unknown, retryOnErrors?: number[]): number | undefined {
   if (!error) return undefined
 
   const errorObj = error as Record<string, unknown>
 
-  const statusCode = errorObj.statusCode ?? errorObj.status ?? (errorObj.data as Record<string, unknown>)?.statusCode
-  if (typeof statusCode === "number") {
+  const statusCode = [
+    errorObj.statusCode,
+    errorObj.status,
+    (errorObj.data as Record<string, unknown>)?.statusCode,
+    (errorObj.error as Record<string, unknown>)?.statusCode,
+    (errorObj.cause as Record<string, unknown>)?.statusCode,
+  ].find((code): code is number => typeof code === "number")
+
+  if (statusCode !== undefined) {
     return statusCode
   }
 
-  const codes = retryOnErrors ?? DEFAULT_CONFIG.retry_on_errors
-  const pattern = new RegExp(`\\b(${codes.join("|")})\\b`)
+  const pattern = retryOnErrors 
+    ? new RegExp(`\\b(${retryOnErrors.join("|")})\\b`)
+    : DEFAULT_RETRY_PATTERN
   const message = getErrorMessage(error)
   const statusMatch = message.match(pattern)
   if (statusMatch) {
@@ -56,6 +75,11 @@ export function extractErrorName(error: unknown): string | undefined {
   const directName = errorObj.name
   if (typeof directName === "string" && directName.length > 0) {
     return directName
+  }
+
+  const dataName = (errorObj.data as Record<string, unknown> | undefined)?.name
+  if (typeof dataName === "string" && dataName.length > 0) {
+    return dataName
   }
 
   const nestedError = errorObj.error as Record<string, unknown> | undefined
@@ -78,6 +102,7 @@ export function classifyErrorType(error: unknown): string | undefined {
   const errorName = extractErrorName(error)?.toLowerCase()
 
   if (
+    errorName?.includes("ai_loadapikeyerror") ||
     errorName?.includes("loadapi") ||
     (/api.?key.?is.?missing/i.test(message) && /environment variable/i.test(message))
   ) {
@@ -88,46 +113,28 @@ export function classifyErrorType(error: unknown): string | undefined {
     return "invalid_api_key"
   }
 
-  if (errorName?.includes("unknownerror") && /model\s+not\s+found/i.test(message)) {
+  if (
+    errorName?.includes("providermodelnotfounderror") ||
+    errorName?.includes("modelnotfounderror") ||
+    (errorName?.includes("unknownerror") && /model\s+not\s+found/i.test(message))
+  ) {
     return "model_not_found"
   }
 
-  return undefined
-}
-
-export interface AutoRetrySignal {
-  signal: string
-}
-
-export const AUTO_RETRY_PATTERNS: Array<(combined: string) => boolean> = [
-  (combined) => /retrying\s+in/i.test(combined),
-  (combined) =>
-    /(?:too\s+many\s+requests|quota\s*exceeded|usage\s+limit|rate\s+limit|limit\s+reached)/i.test(combined),
-]
-
-export function extractAutoRetrySignal(info: Record<string, unknown> | undefined): AutoRetrySignal | undefined {
-  if (!info) return undefined
-
-  const candidates: string[] = []
-
-  const directStatus = info.status
-  if (typeof directStatus === "string") candidates.push(directStatus)
-
-  const summary = info.summary
-  if (typeof summary === "string") candidates.push(summary)
-
-  const message = info.message
-  if (typeof message === "string") candidates.push(message)
-
-  const details = info.details
-  if (typeof details === "string") candidates.push(details)
-
-  const combined = candidates.join("\n")
-  if (!combined) return undefined
-
-  const isAutoRetry = AUTO_RETRY_PATTERNS.every((test) => test(combined))
-  if (isAutoRetry) {
-    return { signal: combined }
+  if (
+    errorName?.includes("quotaexceeded") ||
+    errorName?.includes("insufficientquota") ||
+    errorName?.includes("billingerror") ||
+    /quota.?exceeded/i.test(message) ||
+    /subscription.*quota/i.test(message) ||
+    /insufficient.?quota/i.test(message) ||
+    /billing.?(?:hard.?)?limit/i.test(message) ||
+    /exhausted\s+your\s+capacity/i.test(message) ||
+    /out\s+of\s+credits?/i.test(message) ||
+    /payment.?required/i.test(message) ||
+    /usage\s+limit/i.test(message)
+  ) {
+    return "quota_exceeded"
   }
 
   return undefined
@@ -159,6 +166,13 @@ export function isRetryableError(error: unknown, retryOnErrors: number[]): boole
 
   if (errorType === "model_not_found") {
     return true
+  }
+
+  if (errorType === "quota_exceeded") {
+    // When a provider signals an auto-retry (e.g. "retrying in ~2 weeks"),
+    // we should still trigger fallback to another model rather than STOP.
+    const hasAutoRetrySignal = /retrying\s+in/i.test(message)
+    return hasAutoRetrySignal
   }
 
   if (statusCode && retryOnErrors.includes(statusCode)) {

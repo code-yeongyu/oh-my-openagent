@@ -38,6 +38,7 @@ function getTemporaryConversionPath(error: unknown): string | null {
   return null
 }
 
+
 export { normalizeArgs, validateArgs } from "./look-at-arguments"
 
 export function createLookAt(ctx: PluginInput): ToolDefinition {
@@ -128,13 +129,23 @@ export function createLookAt(ctx: PluginInput): ToolDefinition {
         return "Error: Must provide either 'file_path' or 'image_data'."
       }
 
-      const prompt = `Analyze this ${isBase64Input ? "image" : "file"} and extract the requested information.
+      const readEnabled = false
+      const subjectNoun = isBase64Input ? "image" : "file"
+      const sourceClause = readEnabled
+        ? `Use the Read tool on the provided file path to load its contents, then analyze it.`
+        : `The ${subjectNoun} is already attached to this message. Analyze it directly from the attachment. Do NOT attempt to use the Read tool. The Read tool is disabled for this invocation and the ${subjectNoun} cannot be loaded by path.`
+
+      const prompt = `Analyze the attached ${subjectNoun} and extract the requested information.
+
+${sourceClause}
 
 Goal: ${args.goal}
 
 Provide ONLY the extracted information that matches the goal.
 Be thorough on what was requested, concise on everything else.
 If the requested information is not found, clearly state what is missing.`
+
+      const { agentModel, agentVariant } = await resolveMultimodalLookerAgentMetadata(ctx)
 
       log(`[look_at] Creating session with parent: ${toolContext.sessionID}`)
       const parentSession = await ctx.client.session.get({
@@ -169,8 +180,6 @@ Original error: ${createResult.error}`
       const sessionID = createResult.data.id
       log(`[look_at] Created session: ${sessionID}`)
 
-      const { agentModel, agentVariant } = await resolveMultimodalLookerAgentMetadata(ctx)
-
       log(`[look_at] Sending prompt with ${isBase64Input ? "base64 image" : "file"} to session ${sessionID}`)
       try {
         await promptSyncWithModelSuggestionRetry(ctx.client, {
@@ -181,7 +190,7 @@ Original error: ${createResult.error}`
               task: false,
               call_omo_agent: false,
               look_at: false,
-              read: false,
+              read: readEnabled,
             },
             parts: [
               { type: "text", text: prompt },
@@ -217,6 +226,10 @@ Original error: ${createResult.error}`
 
         log(`[look_at] Got response, length: ${responseText.length}`)
         return responseText
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        log(`[look_at] Unexpected error analyzing ${sourceDescription}:`, error)
+        return `Error: Failed to analyze ${sourceDescription}: ${errorMessage}`
       } finally {
         if (tempConversionPath) {
           cleanupConvertedImage(tempConversionPath)

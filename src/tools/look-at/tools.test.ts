@@ -1,8 +1,13 @@
-import { describe, expect, test, mock } from "bun:test"
+import { afterEach, describe, expect, test, mock } from "bun:test"
 import type { ToolContext } from "@opencode-ai/plugin/tool"
+import { clearVisionCapableModelsCache, setVisionCapableModelsCache } from "../../shared/vision-capable-models-cache"
 import { normalizeArgs, validateArgs, createLookAt } from "./tools"
 
 describe("look-at tool", () => {
+  afterEach(() => {
+    clearVisionCapableModelsCache()
+  })
+
   describe("normalizeArgs", () => {
     // given LLM might use `path` instead of `file_path`
     // when called with path parameter
@@ -255,6 +260,8 @@ describe("look-at tool", () => {
     // when LookAt tool executed
     // then model info should be passed to sync prompt
     test("passes multimodal-looker model to sync prompt when available", async () => {
+      setVisionCapableModelsCache(new Map([["google/gemini-3-flash", { providerID: "google", modelID: "gemini-3-flash" }]]))
+
       let promptBody: any
 
       const mockClient = {
@@ -456,6 +463,96 @@ describe("look-at tool", () => {
     })
   })
 
+  describe("createLookAt unhandled error resilience", () => {
+    const createToolContext = (): ToolContext => ({
+      sessionID: "parent-session",
+      messageID: "parent-message",
+      agent: "sisyphus",
+      directory: "/project",
+      worktree: "/project",
+      abort: new AbortController().signal,
+      metadata: () => {},
+      ask: async () => {},
+    })
+
+    // given session.create throws (network error, not error response)
+    // when LookAt tool executed
+    // then returns error string instead of crashing
+    test("catches session.create throw and returns error string", async () => {
+      const mockClient = {
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => { throw new Error("ECONNREFUSED: connection refused") },
+        },
+      }
+
+      const tool = createLookAt({
+        client: mockClient,
+        directory: "/project",
+      } as any)
+
+      const result = await tool.execute(
+        { file_path: "/test/file.png", goal: "analyze" },
+        createToolContext(),
+      )
+      expect(result).toContain("Error")
+      expect(result).toContain("ECONNREFUSED")
+    })
+
+    // given session.messages throws unexpectedly
+    // when LookAt tool executed
+    // then returns error string instead of crashing
+    test("catches session.messages throw and returns error string", async () => {
+      const mockClient = {
+        app: {
+          agents: async () => ({ data: [] }),
+        },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_msg_throw" } }),
+          prompt: async () => ({}),
+          messages: async () => { throw new Error("Unexpected server error") },
+        },
+      }
+
+      const tool = createLookAt({
+        client: mockClient,
+        directory: "/project",
+      } as any)
+
+      const result = await tool.execute(
+        { file_path: "/test/file.png", goal: "analyze" },
+        createToolContext(),
+      )
+      expect(result).toContain("Error")
+      expect(result).toContain("Unexpected server error")
+    })
+
+    // given a non-Error object is thrown
+    // when LookAt tool executed
+    // then still returns error string
+    test("handles non-Error thrown objects gracefully", async () => {
+      const mockClient = {
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => { throw "string error thrown" },
+        },
+      }
+
+      const tool = createLookAt({
+        client: mockClient,
+        directory: "/project",
+      } as any)
+
+      const result = await tool.execute(
+        { file_path: "/test/file.png", goal: "analyze" },
+        createToolContext(),
+      )
+      expect(result).toContain("Error")
+      expect(result).toContain("string error thrown")
+    })
+  })
+
   describe("createLookAt with image_data", () => {
     // given base64 image data is provided
     // when LookAt tool executed
@@ -560,6 +657,114 @@ describe("look-at tool", () => {
       expect(filePart).toBeDefined()
       expect(filePart.url).toContain("data:")
       expect(filePart.url).toContain("base64")
+    })
+  })
+
+  describe("createLookAt prompt conditional on Read availability", () => {
+    const captureLastPromptBody = () => {
+      const captured: { body: any } = { body: undefined }
+      const mockClient = {
+        app: {
+          agents: async () => ({ data: [] }),
+        },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_prompt_conditional" } }),
+          prompt: async (input: any) => {
+            captured.body = input.body
+            return { data: {} }
+          },
+          messages: async () => ({
+            data: [
+              { info: { role: "assistant", time: { created: 1 } }, parts: [{ type: "text", text: "ok" }] },
+            ],
+          }),
+        },
+      }
+      return { mockClient, captured }
+    }
+
+    const buildToolContext = (): ToolContext => ({
+      sessionID: "parent-session",
+      messageID: "parent-message",
+      agent: "sisyphus",
+      directory: "/project",
+      worktree: "/project",
+      abort: new AbortController().signal,
+      metadata: () => {},
+      ask: async () => {},
+    })
+
+    // given file_path mode where Read tool is disabled in invocation
+    // when LookAt tool sends prompt to multimodal-looker
+    // then prompt instructs agent to analyze the attached file directly without using Read
+    test("instructs agent to analyze attached file when Read is disabled (file_path mode)", async () => {
+      const { mockClient, captured } = captureLastPromptBody()
+
+      const tool = createLookAt({
+        client: mockClient,
+        directory: "/project",
+      } as any)
+
+      await tool.execute(
+        { file_path: "/test/file.png", goal: "describe contents" },
+        buildToolContext(),
+      )
+
+      expect(captured.body.tools.read).toBe(false)
+      const promptPart = captured.body.parts.find((p: any) => p.type === "text")
+      expect(promptPart).toBeDefined()
+      const promptText: string = promptPart.text
+      expect(promptText).toContain("attached")
+      expect(promptText).not.toMatch(/\bRead\s+(?:the\s+)?file\b/i)
+      expect(promptText).not.toMatch(/\buse\s+Read\b/i)
+    })
+
+    // given image_data mode where no file path exists and Read is disabled
+    // when LookAt tool sends prompt to multimodal-looker
+    // then prompt instructs agent to analyze the attached image directly without referencing Read or file path
+    test("instructs agent to analyze attached image when image_data is provided", async () => {
+      const { mockClient, captured } = captureLastPromptBody()
+
+      const tool = createLookAt({
+        client: mockClient,
+        directory: "/project",
+      } as any)
+
+      await tool.execute(
+        { image_data: "data:image/png;base64,iVBORw0KGgo=", goal: "describe image" },
+        buildToolContext(),
+      )
+
+      expect(captured.body.tools.read).toBe(false)
+      const promptPart = captured.body.parts.find((p: any) => p.type === "text")
+      expect(promptPart).toBeDefined()
+      const promptText: string = promptPart.text
+      expect(promptText).toContain("attached")
+      expect(promptText).not.toMatch(/\bRead\s+(?:the\s+)?file\b/i)
+      expect(promptText).not.toMatch(/\buse\s+Read\b/i)
+    })
+
+    // given prompt is generated for any invocation where Read is denied
+    // when LookAt tool sends prompt to multimodal-looker
+    // then prompt explicitly tells the agent NOT to attempt Read tool
+    test("explicitly warns the agent not to attempt Read when Read is disabled", async () => {
+      const { mockClient, captured } = captureLastPromptBody()
+
+      const tool = createLookAt({
+        client: mockClient,
+        directory: "/project",
+      } as any)
+
+      await tool.execute(
+        { file_path: "/test/file.pdf", goal: "extract text" },
+        buildToolContext(),
+      )
+
+      const promptPart = captured.body.parts.find((p: any) => p.type === "text")
+      const promptText: string = promptPart.text
+      // The prompt must mention the agent cannot use Read so the agent does not hallucinate
+      expect(promptText.toLowerCase()).toContain("read tool")
     })
   })
 })

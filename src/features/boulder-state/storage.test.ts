@@ -11,8 +11,11 @@ import {
   getPlanName,
   createBoulderState,
   findPrometheusPlans,
+  getTaskSessionState,
+  upsertTaskSessionState,
 } from "./storage"
 import type { BoulderState } from "./types"
+import { readCurrentTopLevelTask } from "./top-level-task"
 
 describe("boulder-state", () => {
   const TEST_DIR = join(tmpdir(), "boulder-state-test-" + Date.now())
@@ -115,6 +118,39 @@ describe("boulder-state", () => {
       expect(result!.session_ids).toEqual([])
     })
 
+    test("should backfill missing origin as direct only for a single tracked session", () => {
+      // given
+      const boulderFile = join(SISYPHUS_DIR, "boulder.json")
+      writeFileSync(boulderFile, JSON.stringify({
+        active_plan: "/path/to/plan.md",
+        started_at: "2026-01-01T00:00:00Z",
+        session_ids: ["session-1"],
+        plan_name: "plan",
+      }))
+
+      // when
+      const result = readBoulderState(TEST_DIR)
+
+      // then
+      expect(result?.session_origins).toEqual({ "session-1": "direct" })
+    })
+
+    test("should keep missing origins empty when multiple sessions are tracked", () => {
+      // given
+      const boulderFile = join(SISYPHUS_DIR, "boulder.json")
+      writeFileSync(boulderFile, JSON.stringify({
+        active_plan: "/path/to/plan.md",
+        started_at: "2026-01-01T00:00:00Z",
+        session_ids: ["session-1", "session-2"],
+        plan_name: "plan",
+      }))
+
+      // when
+      const result = readBoulderState(TEST_DIR)
+
+      // then
+      expect(result?.session_origins).toEqual({})
+    })
     test("should read valid boulder state", () => {
       // given - valid boulder.json
       const state: BoulderState = {
@@ -133,6 +169,24 @@ describe("boulder-state", () => {
       expect(result?.active_plan).toBe("/path/to/plan.md")
       expect(result?.session_ids).toEqual(["session-1", "session-2"])
       expect(result?.plan_name).toBe("my-plan")
+    })
+
+    test("should default task_sessions to empty object when missing from JSON", () => {
+      // given - boulder.json without task_sessions field
+      const boulderFile = join(SISYPHUS_DIR, "boulder.json")
+      writeFileSync(boulderFile, JSON.stringify({
+        active_plan: "/path/to/plan.md",
+        started_at: "2026-01-01T00:00:00Z",
+        session_ids: ["session-1"],
+        plan_name: "plan",
+      }))
+
+      // when
+      const result = readBoulderState(TEST_DIR)
+
+      // then
+      expect(result).not.toBeNull()
+      expect(result!.task_sessions).toEqual({})
     })
   })
 
@@ -218,6 +272,26 @@ describe("boulder-state", () => {
       expect(result).not.toBeNull()
       expect(result!.session_ids).toContain("ses-new")
     })
+
+    test("should persist appended session origin when provided", () => {
+      // given
+      writeBoulderState(TEST_DIR, {
+        active_plan: "/path/to/plan.md",
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: ["session-1"],
+        session_origins: { "session-1": "direct" },
+        plan_name: "plan",
+      })
+
+      // when
+      const result = appendSessionId(TEST_DIR, "session-2", "appended")
+
+      // then
+      expect(result?.session_origins).toEqual({
+        "session-1": "direct",
+        "session-2": "appended",
+      })
+    })
   })
 
   describe("clearBoulderState", () => {
@@ -249,63 +323,217 @@ describe("boulder-state", () => {
     })
   })
 
+  describe("task session state", () => {
+    test("should persist and read preferred session for a top-level plan task", () => {
+      // given - existing boulder state
+      const state: BoulderState = {
+        active_plan: "/plan.md",
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: ["session-1"],
+        plan_name: "plan",
+      }
+      writeBoulderState(TEST_DIR, state)
+
+      // when
+      upsertTaskSessionState(TEST_DIR, {
+        taskKey: "todo:1",
+        taskLabel: "1",
+        taskTitle: "Implement auth flow",
+        sessionId: "ses_task_123",
+        agent: "sisyphus-junior",
+        category: "deep",
+      })
+      const result = getTaskSessionState(TEST_DIR, "todo:1")
+
+      // then
+      expect(result).not.toBeNull()
+      expect(result?.session_id).toBe("ses_task_123")
+      expect(result?.task_title).toBe("Implement auth flow")
+      expect(result?.agent).toBe("sisyphus-junior")
+      expect(result?.category).toBe("deep")
+    })
+
+    test("should overwrite preferred session for the same top-level plan task", () => {
+      // given - existing boulder state with prior preferred session
+      const state: BoulderState = {
+        active_plan: "/plan.md",
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: ["session-1"],
+        plan_name: "plan",
+        task_sessions: {
+          "todo:1": {
+            task_key: "todo:1",
+            task_label: "1",
+            task_title: "Implement auth flow",
+            session_id: "ses_old",
+            updated_at: "2026-01-02T10:00:00Z",
+          },
+        },
+      }
+      writeBoulderState(TEST_DIR, state)
+
+      // when
+      upsertTaskSessionState(TEST_DIR, {
+        taskKey: "todo:1",
+        taskLabel: "1",
+        taskTitle: "Implement auth flow",
+        sessionId: "ses_new",
+      })
+      const result = getTaskSessionState(TEST_DIR, "todo:1")
+
+      // then
+      expect(result?.session_id).toBe("ses_new")
+    })
+  })
+
+  describe("readCurrentTopLevelTask", () => {
+    test("should return the first unchecked top-level task in TODOs", () => {
+      // given - plan with nested and top-level unchecked tasks
+      const planPath = join(TEST_DIR, "current-task-plan.md")
+      writeFileSync(planPath, `# Plan
+
+## TODOs
+- [x] 1. Finished task
+  - [ ] nested acceptance checkbox
+- [ ] 2. Current task
+
+## Final Verification Wave
+- [ ] F1. Final review
+`)
+
+      // when
+      const result = readCurrentTopLevelTask(planPath)
+
+      // then
+      expect(result).not.toBeNull()
+      expect(result?.key).toBe("todo:2")
+      expect(result?.title).toBe("Current task")
+    })
+
+    test("should fall back to final-wave task when implementation tasks are complete", () => {
+      // given - plan with only final-wave work remaining
+      const planPath = join(TEST_DIR, "final-wave-current-task-plan.md")
+      writeFileSync(planPath, `# Plan
+
+## TODOs
+- [x] 1. Finished task
+
+## Final Verification Wave
+- [ ] F1. Final review
+`)
+
+      // when
+      const result = readCurrentTopLevelTask(planPath)
+
+      // then
+      expect(result).not.toBeNull()
+      expect(result?.key).toBe("final-wave:f1")
+      expect(result?.title).toBe("Final review")
+    })
+  })
+
   describe("getPlanProgress", () => {
-    test("should count completed and uncompleted checkboxes", () => {
-      // given - plan file with checkboxes
+    test("should count only top-level tasks under TODOs and Final Verification Wave sections", () => {
+      // given - plan with top-level tasks in tracked sections
       const planPath = join(TEST_DIR, "test-plan.md")
       writeFileSync(planPath, `# Plan
-- [ ] Task 1
-- [x] Task 2  
-- [ ] Task 3
-- [X] Task 4
+
+## TODOs
+- [ ] 1. Task 1
+- [x] 2. Task 2
+- [ ] 3. Task 3
+- [X] 4. Task 4
+
+## Final Verification Wave
+- [ ] F1. Final review
 `)
 
       // when
       const progress = getPlanProgress(planPath)
 
       // then
-      expect(progress.total).toBe(4)
+      expect(progress.total).toBe(5)
       expect(progress.completed).toBe(2)
       expect(progress.isComplete).toBe(false)
     })
 
-    test("should count space-indented unchecked checkbox", () => {
-      // given - plan file with a two-space indented checkbox
-      const planPath = join(TEST_DIR, "space-indented-plan.md")
+    test("should ignore nested Acceptance Criteria checkboxes under TODOs (issue #3066)", () => {
+      // given - plan with 9 completed top-level tasks and unchecked nested acceptance criteria
+      const planPath = join(TEST_DIR, "issue-3066-plan.md")
       writeFileSync(planPath, `# Plan
-  - [ ] indented task
+
+## TODOs
+- [x] 1. Implement feature A
+
+  **Acceptance Criteria**
+  - [ ] criterion 1
+  - [ ] criterion 2
+
+- [x] 2. Implement feature B
+
+  **Acceptance Criteria**
+  - [ ] criterion 3
+  - [ ] criterion 4
+
+- [x] 3. Implement feature C
+- [x] 4. Implement feature D
+- [x] 5. Implement feature E
+- [x] 6. Implement feature F
+- [x] 7. Implement feature G
+- [x] 8. Implement feature H
+- [x] 9. Implement feature I
+
+## Final Verification Wave
+- [ ] F1. Final review
 `)
 
       // when
       const progress = getPlanProgress(planPath)
 
       // then
-      expect(progress.total).toBe(1)
-      expect(progress.completed).toBe(0)
+      expect(progress.total).toBe(10)
+      expect(progress.completed).toBe(9)
       expect(progress.isComplete).toBe(false)
     })
 
-    test("should count tab-indented unchecked checkbox", () => {
-      // given - plan file with a tab-indented checkbox
-      const planPath = join(TEST_DIR, "tab-indented-plan.md")
+    test("should ignore checkboxes outside TODOs and Final Verification Wave sections", () => {
+      // given - plan with checkboxes in Work Objectives, Success Criteria, and other sections
+      const planPath = join(TEST_DIR, "ignore-other-sections-plan.md")
       writeFileSync(planPath, `# Plan
-	- [ ] tab-indented task
+
+## Work Objectives
+
+### Definition of Done
+- [ ] Verifiable condition with command
+
+## TODOs
+- [x] 1. Real task one
+- [ ] 2. Real task two
+
+## Success Criteria
+
+### Final Checklist
+- [ ] All Must Have present
+- [ ] All Must NOT Have absent
+- [ ] All tests pass
 `)
 
       // when
       const progress = getPlanProgress(planPath)
 
       // then
-      expect(progress.total).toBe(1)
-      expect(progress.completed).toBe(0)
+      expect(progress.total).toBe(2)
+      expect(progress.completed).toBe(1)
       expect(progress.isComplete).toBe(false)
     })
 
-    test("should count mixed top-level checked and indented unchecked checkboxes", () => {
-      // given - plan file with checked top-level and unchecked indented task
-      const planPath = join(TEST_DIR, "mixed-indented-plan.md")
+    test("should ignore indented checkboxes under top-level tasks", () => {
+      // given - plan with indented unchecked nested checkboxes
+      const planPath = join(TEST_DIR, "nested-indented-plan.md")
       writeFileSync(planPath, `# Plan
-- [x] top-level completed task
+
+## TODOs
+- [x] 1. top-level completed task
   - [ ] nested unchecked task
 `)
 
@@ -313,16 +541,19 @@ describe("boulder-state", () => {
       const progress = getPlanProgress(planPath)
 
       // then
-      expect(progress.total).toBe(2)
+      expect(progress.total).toBe(1)
       expect(progress.completed).toBe(1)
-      expect(progress.isComplete).toBe(false)
+      expect(progress.isComplete).toBe(true)
     })
 
-    test("should count space-indented completed checkbox", () => {
-      // given - plan file with a two-space indented completed checkbox
-      const planPath = join(TEST_DIR, "indented-completed-plan.md")
+    test("should require proper task label format in TODOs", () => {
+      // given - plan with malformed labels (no numeric prefix)
+      const planPath = join(TEST_DIR, "malformed-labels-plan.md")
       writeFileSync(planPath, `# Plan
-  - [x] indented completed task
+
+## TODOs
+- [ ] no number prefix
+- [x] 1. Valid numbered task
 `)
 
       // when
@@ -334,24 +565,52 @@ describe("boulder-state", () => {
       expect(progress.isComplete).toBe(true)
     })
 
-    test("should return isComplete true when all checked", () => {
-      // given - all tasks completed
-      const planPath = join(TEST_DIR, "complete-plan.md")
+    test("should require F-prefix label format in Final Verification Wave", () => {
+      // given - plan with malformed final-wave labels
+      const planPath = join(TEST_DIR, "malformed-final-plan.md")
       writeFileSync(planPath, `# Plan
-- [x] Task 1
-- [X] Task 2
+
+## TODOs
+- [x] 1. Implementation done
+
+## Final Verification Wave
+- [ ] missing F-prefix
+- [ ] F1. Proper final review
+- [x] F2. Another final review
 `)
 
       // when
       const progress = getPlanProgress(planPath)
 
       // then
-      expect(progress.total).toBe(2)
+      expect(progress.total).toBe(3)
       expect(progress.completed).toBe(2)
+      expect(progress.isComplete).toBe(false)
+    })
+
+    test("should return isComplete true when all top-level tasks checked", () => {
+      // given - all top-level tasks completed
+      const planPath = join(TEST_DIR, "complete-plan.md")
+      writeFileSync(planPath, `# Plan
+
+## TODOs
+- [x] 1. Task 1
+- [X] 2. Task 2
+
+## Final Verification Wave
+- [x] F1. Final review
+`)
+
+      // when
+      const progress = getPlanProgress(planPath)
+
+      // then
+      expect(progress.total).toBe(3)
+      expect(progress.completed).toBe(3)
       expect(progress.isComplete).toBe(true)
     })
 
-    test("should return isComplete true for empty plan", () => {
+    test("should return isComplete false for empty plan", () => {
       // given - plan with no checkboxes
       const planPath = join(TEST_DIR, "empty-plan.md")
       writeFileSync(planPath, "# Plan\nNo tasks here")
@@ -361,7 +620,7 @@ describe("boulder-state", () => {
 
       // then
       expect(progress.total).toBe(0)
-      expect(progress.isComplete).toBe(true)
+      expect(progress.isComplete).toBe(false)
     })
 
     test("should handle non-existent file", () => {
@@ -371,6 +630,25 @@ describe("boulder-state", () => {
       // then
       expect(progress.total).toBe(0)
       expect(progress.isComplete).toBe(true)
+    })
+
+    test("should support asterisk bullet top-level tasks", () => {
+      // given - plan with asterisk bullet tasks
+      const planPath = join(TEST_DIR, "asterisk-bullet-plan.md")
+      writeFileSync(planPath, `# Plan
+
+## TODOs
+* [x] 1. Task using asterisk bullet
+* [ ] 2. Another asterisk task
+`)
+
+      // when
+      const progress = getPlanProgress(planPath)
+
+      // then
+      expect(progress.total).toBe(2)
+      expect(progress.completed).toBe(1)
+      expect(progress.isComplete).toBe(false)
     })
   })
 
@@ -415,6 +693,18 @@ describe("boulder-state", () => {
       expect(state.active_plan).toBe(planPath)
       expect(state.session_ids).toEqual([sessionId])
       expect(state.plan_name).toBe("feature")
+    })
+
+    test("should mark the initial session origin as direct", () => {
+      // given
+      const planPath = "/path/to/feature.md"
+      const sessionId = "ses-origin"
+
+      // when
+      const state = createBoulderState(planPath, sessionId)
+
+      // then
+      expect(state.session_origins).toEqual({ [sessionId]: "direct" })
     })
 
     test("should allow agent to be undefined", () => {

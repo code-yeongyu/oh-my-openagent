@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { detectConfigFile, parseJsonc, parseJsoncSafe, readJsoncFile } from "./jsonc-parser"
+import { detectConfigFile, detectPluginConfigFile, parseJsonc, parseJsoncSafe, readJsoncFile } from "./jsonc-parser"
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
@@ -105,7 +105,7 @@ describe("parseJsonc", () => {
     const jsonc = `{
       // This is an example config
       "agents": {
-        "oracle": { "model": "openai/gpt-5.2" }, // GPT for strategic reasoning
+        "oracle": { "model": "openai/gpt-5.4" }, // GPT for strategic reasoning
       },
       /* Agent overrides */
       "disabled_agents": [],
@@ -118,7 +118,7 @@ describe("parseJsonc", () => {
     }>(jsonc)
 
     // then
-    expect(result.agents.oracle.model).toBe("openai/gpt-5.2")
+    expect(result.agents.oracle.model).toBe("openai/gpt-5.4")
     expect(result.disabled_agents).toEqual([])
   })
 
@@ -138,6 +138,33 @@ describe("parseJsonc", () => {
     // when
     // then
     expect(() => parseJsonc(invalid)).toThrow()
+  })
+
+  test("parses content with UTF-8 BOM prefix", () => {
+    // given
+    const jsonc = `\uFEFF{"key": "value"}`
+
+    // when
+    const result = parseJsonc<{ key: string }>(jsonc)
+
+    // then
+    expect(result.key).toBe("value")
+  })
+
+  test("parses commented JSONC with UTF-8 BOM prefix", () => {
+    // given
+    const jsonc = `\uFEFF{
+      // Windows-saved file with BOM
+      "$schema": "https://opencode.ai/config.json",
+      "plugin": ["oh-my-openagent@3.15.3"],
+    }`
+
+    // when
+    const result = parseJsonc<{ $schema: string; plugin: string[] }>(jsonc)
+
+    // then
+    expect(result.$schema).toBe("https://opencode.ai/config.json")
+    expect(result.plugin).toEqual(["oh-my-openagent@3.15.3"])
   })
 })
 
@@ -165,6 +192,19 @@ describe("parseJsoncSafe", () => {
     // then
     expect(result.data).toBeNull()
     expect(result.errors.length).toBeGreaterThan(0)
+  })
+
+  test("returns data when content has UTF-8 BOM prefix", () => {
+    // given
+    const jsonc = `\uFEFF{"key": "value"}`
+
+    // when
+    const result = parseJsoncSafe<{ key: string }>(jsonc)
+
+    // then
+    expect(result.errors).toHaveLength(0)
+    expect(result.data).not.toBeNull()
+    expect(result.data?.key).toBe("value")
   })
 })
 
@@ -215,6 +255,28 @@ describe("readJsoncFile", () => {
 
     rmSync(testDir, { recursive: true, force: true })
   })
+
+  test("reads JSONC file written with UTF-8 BOM (Windows scenario)", () => {
+    // given
+    if (!existsSync(testDir)) mkdirSync(testDir, { recursive: true })
+    const bomBytes = Buffer.from([0xef, 0xbb, 0xbf])
+    const jsonBytes = Buffer.from(`{
+      // Created on Windows with BOM
+      "$schema": "https://opencode.ai/config.json",
+      "plugin": ["oh-my-openagent@3.15.3"]
+    }`)
+    writeFileSync(testFile, Buffer.concat([bomBytes, jsonBytes]))
+
+    // when
+    const result = readJsoncFile<{ $schema: string; plugin: string[] }>(testFile)
+
+    // then
+    expect(result).not.toBeNull()
+    expect(result?.$schema).toBe("https://opencode.ai/config.json")
+    expect(result?.plugin).toEqual(["oh-my-openagent@3.15.3"])
+
+    rmSync(testDir, { recursive: true, force: true })
+  })
 })
 
 describe("detectConfigFile", () => {
@@ -262,5 +324,107 @@ describe("detectConfigFile", () => {
 
     // then
     expect(result.format).toBe("none")
+  })
+})
+
+describe("detectPluginConfigFile", () => {
+  const testDir = join(__dirname, ".test-detect-plugin")
+
+  test("prefers oh-my-openagent over oh-my-opencode when both jsonc files exist", () => {
+    // given
+    if (!existsSync(testDir)) mkdirSync(testDir, { recursive: true })
+    writeFileSync(join(testDir, "oh-my-openagent.jsonc"), "{}")
+    writeFileSync(join(testDir, "oh-my-opencode.jsonc"), "{}")
+
+    // when
+    const result = detectPluginConfigFile(testDir)
+
+    // then
+    expect(result.format).toBe("jsonc")
+    expect(result.path).toBe(join(testDir, "oh-my-openagent.jsonc"))
+    expect(result.legacyPath).toBe(join(testDir, "oh-my-opencode.jsonc"))
+
+    rmSync(testDir, { recursive: true, force: true })
+  })
+
+  test("falls back to oh-my-opencode when oh-my-openagent doesn't exist", () => {
+    // given
+    if (!existsSync(testDir)) mkdirSync(testDir, { recursive: true })
+    writeFileSync(join(testDir, "oh-my-opencode.jsonc"), "{}")
+
+    // when
+    const result = detectPluginConfigFile(testDir)
+
+    // then
+    expect(result.format).toBe("jsonc")
+    expect(result.path).toBe(join(testDir, "oh-my-opencode.jsonc"))
+    expect(result.legacyPath).toBeUndefined()
+
+    rmSync(testDir, { recursive: true, force: true })
+  })
+
+  test("loads oh-my-openagent.json before oh-my-opencode.json when no jsonc exists", () => {
+    // given
+    if (!existsSync(testDir)) mkdirSync(testDir, { recursive: true })
+    writeFileSync(join(testDir, "oh-my-openagent.json"), "{}")
+    writeFileSync(join(testDir, "oh-my-opencode.json"), "{}")
+
+    // when
+    const result = detectPluginConfigFile(testDir)
+
+    // then
+    expect(result.format).toBe("json")
+    expect(result.path).toBe(join(testDir, "oh-my-openagent.json"))
+    expect(result.legacyPath).toBe(join(testDir, "oh-my-opencode.json"))
+
+    rmSync(testDir, { recursive: true, force: true })
+  })
+
+  test("returns none when no config files exist", () => {
+    // given
+    const emptyDir = join(testDir, "empty")
+    if (!existsSync(emptyDir)) mkdirSync(emptyDir, { recursive: true })
+
+    // when
+    const result = detectPluginConfigFile(emptyDir)
+
+    // then
+    expect(result.format).toBe("none")
+    expect(result.path).toBe(join(emptyDir, "oh-my-openagent.json"))
+
+    rmSync(testDir, { recursive: true, force: true })
+  })
+
+  test("prefers canonical jsonc over legacy json when both exist", () => {
+    // given
+    if (!existsSync(testDir)) mkdirSync(testDir, { recursive: true })
+    writeFileSync(join(testDir, "oh-my-opencode.json"), "{}")
+    writeFileSync(join(testDir, "oh-my-openagent.jsonc"), "{}")
+
+    // when
+    const result = detectPluginConfigFile(testDir)
+
+    // then
+    expect(result.format).toBe("jsonc")
+    expect(result.path).toBe(join(testDir, "oh-my-openagent.jsonc"))
+    expect(result.legacyPath).toBe(join(testDir, "oh-my-opencode.json"))
+
+    rmSync(testDir, { recursive: true, force: true })
+  })
+
+  test("loads oh-my-openagent when only canonical jsonc exists", () => {
+    // given
+    if (!existsSync(testDir)) mkdirSync(testDir, { recursive: true })
+    writeFileSync(join(testDir, "oh-my-openagent.jsonc"), "{}")
+
+    // when
+    const result = detectPluginConfigFile(testDir)
+
+    // then
+    expect(result.format).toBe("jsonc")
+    expect(result.path).toBe(join(testDir, "oh-my-openagent.jsonc"))
+    expect(result.legacyPath).toBeUndefined()
+
+    rmSync(testDir, { recursive: true, force: true })
   })
 })

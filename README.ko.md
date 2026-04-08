@@ -1,3 +1,20 @@
+> [!WARNING]
+> **임시 공지 (이번 주): 메인테이너 대응 지연 안내**
+>
+> 핵심 메인테이너 Q가 부상을 입어, 이번 주에는 이슈/PR 응답 및 릴리스가 지연될 수 있습니다.
+> 양해와 응원에 감사드립니다.
+
+> [!TIP]
+> **Building in Public**
+>
+> 메인테이너가 Jobdori를 통해 oh-my-opencode를 실시간으로 개발하고 있습니다. Jobdori는 OpenClaw를 기반으로 대폭 커스터마이징된 AI 어시스턴트입니다.
+> 모든 기능 개발, 버그 수정, 이슈 트리아지를 Discord에서 실시간으로 확인하세요.
+>
+> [![Building in Public](./.github/assets/building-in-public.png)](https://discord.gg/PUwSMR9XNk)
+>
+> [**→ #building-in-public에서 확인하기**](https://discord.gg/PUwSMR9XNk)
+
+
 > [!TIP]
 > 저희와 함께 하세요!
 >
@@ -10,9 +27,9 @@
 
 <div align="center">
 
-[![Oh My OpenCode](./.github/assets/hero.jpg)](https://github.com/code-yeongyu/oh-my-opencode#oh-my-opencode)
+[![Oh My OpenCode](./.github/assets/hero.jpg)](https://github.com/code-yeongyu/oh-my-openagent#oh-my-opencode)
 
-[![Preview](./.github/assets/omo.png)](https://github.com/code-yeongyu/oh-my-opencode#oh-my-opencode)
+[![Preview](./.github/assets/omo.png)](https://github.com/code-yeongyu/oh-my-openagent#oh-my-opencode)
 
 </div>
 
@@ -22,14 +39,14 @@
 
 <div align="center">
 
-[![GitHub Release](https://img.shields.io/github/v/release/code-yeongyu/oh-my-opencode?color=369eff&labelColor=black&logo=github&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/releases)
+[![GitHub Release](https://img.shields.io/github/v/release/code-yeongyu/oh-my-openagent?color=369eff&labelColor=black&logo=github&style=flat-square)](https://github.com/code-yeongyu/oh-my-openagent/releases)
 [![npm downloads](https://img.shields.io/npm/dt/oh-my-opencode?color=ff6b35&labelColor=black&style=flat-square)](https://www.npmjs.com/package/oh-my-opencode)
-[![GitHub Contributors](https://img.shields.io/github/contributors/code-yeongyu/oh-my-opencode?color=c4f042&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/graphs/contributors)
-[![GitHub Forks](https://img.shields.io/github/forks/code-yeongyu/oh-my-opencode?color=8ae8ff&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/network/members)
-[![GitHub Stars](https://img.shields.io/github/stars/code-yeongyu/oh-my-opencode?color=ffcb47&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/stargazers)
-[![GitHub Issues](https://img.shields.io/github/issues/code-yeongyu/oh-my-opencode?color=ff80eb&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/issues)
-[![License](https://img.shields.io/badge/license-SUL--1.0-white?labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/blob/dev/LICENSE.md)
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/code-yeongyu/oh-my-opencode)
+[![GitHub Contributors](https://img.shields.io/github/contributors/code-yeongyu/oh-my-openagent?color=c4f042&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-openagent/graphs/contributors)
+[![GitHub Forks](https://img.shields.io/github/forks/code-yeongyu/oh-my-openagent?color=8ae8ff&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-openagent/network/members)
+[![GitHub Stars](https://img.shields.io/github/stars/code-yeongyu/oh-my-openagent?color=ffcb47&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-openagent/stargazers)
+[![GitHub Issues](https://img.shields.io/github/issues/code-yeongyu/oh-my-openagent?color=ff80eb&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-openagent/issues)
+[![License](https://img.shields.io/badge/license-SUL--1.0-white?labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-openagent/blob/dev/LICENSE.md)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/code-yeongyu/oh-my-openagent)
 
 [English](README.md) | [한국어](README.ko.md) | [日本語](README.ja.md) | [简体中文](README.zh-cn.md)
 
@@ -79,7 +96,7 @@ OmO 설치하고. `ultrawork` 치세요. 끝.
 
 ```
 Install and configure oh-my-opencode by following the instructions here:
-https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/heads/dev/docs/guide/installation.md
+https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/heads/dev/docs/guide/installation.md
 ```
 
 아니면 [설치 가이드](docs/guide/installation.md)를 직접 읽으셔도 되지만, 진심으로 그냥 에이전트한테 시키세요. 사람은 설정하다 꼭 오타 냅니다.
@@ -89,7 +106,7 @@ https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/heads/dev/doc
 설치 가이드를 가져와서 따라 하세요:
 
 ```bash
-curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/heads/dev/docs/guide/installation.md
+curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/heads/dev/docs/guide/installation.md
 ```
 
 ---
@@ -99,7 +116,7 @@ curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/heads
 문서 읽는 시대는 지났습니다. 그냥 이 텍스트를 에이전트한테 붙여넣으세요:
 
 ```
-Read this and tell me why it's not just another boilerplate: https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/heads/dev/README.md
+Read this and tell me why it's not just another boilerplate: https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/heads/dev/README.md
 ```
 
 ## 핵심 기능
@@ -145,7 +162,7 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 
 **Sisyphus** (`claude-opus-4-6` / **`kimi-k2.5`** / **`glm-5`**)는 당신의 메인 오케스트레이터입니다. 공격적인 병렬 실행으로 계획을 세우고, 전문가들에게 위임하며, 완료될 때까지 밀어붙입니다. 중간에 포기하는 법이 없습니다.
 
-**Hephaestus** (`gpt-5.3-codex`)는 당신의 자율 딥 워커입니다. 레시피가 아니라 목표를 주세요. 베이비시터 없이 알아서 코드베이스를 탐색하고, 패턴을 연구하며, 끝에서 끝까지 전부 해냅니다. *진정한 장인(The Legitimate Craftsman).*
+**Hephaestus** (`gpt-5.4`)는 당신의 자율 딥 워커입니다. 레시피가 아니라 목표를 주세요. 베이비시터 없이 알아서 코드베이스를 탐색하고, 패턴을 연구하며, 끝에서 끝까지 전부 해냅니다. *진정한 장인(The Legitimate Craftsman).*
 
 **Prometheus** (`claude-opus-4-6` / **`kimi-k2.5`** / **`glm-5`**)는 당신의 전략 플래너입니다. 인터뷰 모드로 작동합니다. 코드 한 줄 만지기 전에 질문을 던져 스코프를 파악하고 상세한 계획부터 세웁니다.
 
@@ -153,7 +170,7 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 
 > Anthropic이 [우리 때문에 OpenCode를 막아버렸습니다.](https://x.com/thdxr/status/2010149530486911014) 그래서 Hephaestus의 별명이 "진정한 장인(The Legitimate Craftsman)"인 겁니다. (어디서 많이 들어본 이름이죠?) 아이러니를 노렸습니다.
 >
-> Opus에서 제일 잘 돌아가긴 하지만, Kimi K2.5 + GPT-5.3 Codex 조합만으로도 바닐라 Claude Code는 가볍게 바릅니다. 설정도 필요 없습니다.
+> Opus에서 제일 잘 돌아가긴 하지만, Kimi K2.5 + GPT-5.4 조합만으로도 바닐라 Claude Code는 가볍게 바릅니다. 설정도 필요 없습니다.
 
 ### 에이전트 오케스트레이션
 

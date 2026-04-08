@@ -1,9 +1,13 @@
+/// <reference types="bun-types" />
+
 import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test"
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
-import { tmpdir, homedir } from "node:os"
+import { tmpdir } from "node:os"
 import { randomUUID } from "node:crypto"
 import { createStartWorkHook } from "./index"
+import { createAtlasHook } from "../atlas"
+import { getAgentDisplayName, getAgentListDisplayName } from "../../shared/agent-display-names"
 import {
   writeBoulderState,
   clearBoulderState,
@@ -11,7 +15,6 @@ import {
 } from "../../features/boulder-state"
 import type { BoulderState } from "../../features/boulder-state"
 import * as sessionState from "../../features/claude-code-session-state"
-import * as worktreeDetector from "./worktree-detector"
 import * as worktreeDetector from "./worktree-detector"
 
 describe("start-work hook", () => {
@@ -25,7 +28,26 @@ describe("start-work hook", () => {
     } as Parameters<typeof createStartWorkHook>[0]
   }
 
+  function createStartWorkPrompt(options?: {
+    sessionContext?: string
+    userRequest?: string
+  }): string {
+    const sessionContext = options?.sessionContext ?? ""
+    const userRequest = options?.userRequest ?? ""
+
+    return `<command-instruction>
+You are starting a Sisyphus work session.
+</command-instruction>
+
+<session-context>${sessionContext}</session-context>${userRequest ? `
+
+<user-request>${userRequest}</user-request>` : ""}`
+  }
+
   beforeEach(() => {
+    sessionState._resetForTesting()
+    sessionState.registerAgentName("atlas")
+    sessionState.registerAgentName("sisyphus")
     testDir = join(tmpdir(), `start-work-test-${randomUUID()}`)
     sisyphusDir = join(testDir, ".sisyphus")
     if (!existsSync(testDir)) {
@@ -38,6 +60,7 @@ describe("start-work hook", () => {
   })
 
   afterEach(() => {
+    sessionState._resetForTesting()
     clearBoulderState(testDir)
     if (existsSync(testDir)) {
       rmSync(testDir, { recursive: true, force: true })
@@ -62,6 +85,24 @@ describe("start-work hook", () => {
       expect(output.parts[0].text).toBe("Just a regular message")
     })
 
+    test("should ignore plain session-context blocks without the start-work marker", async () => {
+      // given
+      const hook = createStartWorkHook(createMockPluginInput())
+      const output = {
+        parts: [{ type: "text", text: "<session-context>Some context here</session-context>" }],
+      }
+
+      // when
+      await hook["chat.message"](
+        { sessionID: "session-123" },
+        output
+      )
+
+      // then
+      expect(output.parts[0].text).toBe("<session-context>Some context here</session-context>")
+      expect(readBoulderState(testDir)).toBeNull()
+    })
+
     test("should detect start-work command via session-context tag", async () => {
       // given - hook and start-work message
       const hook = createStartWorkHook(createMockPluginInput())
@@ -69,7 +110,7 @@ describe("start-work hook", () => {
         parts: [
           {
             type: "text",
-            text: "<session-context>Some context here</session-context>",
+            text: createStartWorkPrompt({ sessionContext: "Some context here" }),
           },
         ],
       }
@@ -99,7 +140,7 @@ describe("start-work hook", () => {
 
       const hook = createStartWorkHook(createMockPluginInput())
       const output = {
-        parts: [{ type: "text", text: "<session-context></session-context>" }],
+        parts: [{ type: "text", text: createStartWorkPrompt() }],
       }
 
       // when
@@ -120,7 +161,7 @@ describe("start-work hook", () => {
         parts: [
           {
             type: "text",
-            text: "<session-context>Session: $SESSION_ID</session-context>",
+            text: createStartWorkPrompt({ sessionContext: "Session: $SESSION_ID" }),
           },
         ],
       }
@@ -143,7 +184,7 @@ describe("start-work hook", () => {
         parts: [
           {
             type: "text",
-            text: "<session-context>Time: $TIMESTAMP</session-context>",
+            text: createStartWorkPrompt({ sessionContext: "Time: $TIMESTAMP" }),
           },
         ],
       }
@@ -174,7 +215,7 @@ describe("start-work hook", () => {
 
       const hook = createStartWorkHook(createMockPluginInput())
       const output = {
-        parts: [{ type: "text", text: "<session-context></session-context>" }],
+        parts: [{ type: "text", text: createStartWorkPrompt() }],
       }
 
       // when
@@ -202,7 +243,7 @@ describe("start-work hook", () => {
 
       const hook = createStartWorkHook(createMockPluginInput())
       const output = {
-        parts: [{ type: "text", text: "<session-context></session-context>" }],
+        parts: [{ type: "text", text: createStartWorkPrompt() }],
       }
 
       // when
@@ -230,7 +271,7 @@ describe("start-work hook", () => {
 
       const hook = createStartWorkHook(createMockPluginInput())
       const output = {
-        parts: [{ type: "text", text: "<session-context></session-context>" }],
+        parts: [{ type: "text", text: createStartWorkPrompt() }],
       }
 
       // when
@@ -271,9 +312,7 @@ describe("start-work hook", () => {
         parts: [
           {
             type: "text",
-            text: `<session-context>
-<user-request>new-plan</user-request>
-</session-context>`,
+            text: createStartWorkPrompt({ userRequest: "new-plan" }),
           },
         ],
       }
@@ -303,9 +342,7 @@ describe("start-work hook", () => {
         parts: [
           {
             type: "text",
-            text: `<session-context>
-<user-request>my-feature-plan ultrawork</user-request>
-</session-context>`,
+            text: createStartWorkPrompt({ userRequest: "my-feature-plan ultrawork" }),
           },
         ],
       }
@@ -334,9 +371,7 @@ describe("start-work hook", () => {
         parts: [
           {
             type: "text",
-            text: `<session-context>
-<user-request>api-refactor ulw</user-request>
-</session-context>`,
+            text: createStartWorkPrompt({ userRequest: "api-refactor ulw" }),
           },
         ],
       }
@@ -365,9 +400,7 @@ describe("start-work hook", () => {
         parts: [
           {
             type: "text",
-            text: `<session-context>
-<user-request>feature-implementation</user-request>
-</session-context>`,
+            text: createStartWorkPrompt({ userRequest: "feature-implementation" }),
           },
         ],
       }
@@ -382,6 +415,35 @@ describe("start-work hook", () => {
       expect(output.parts[0].text).toContain("2026-01-15-feature-implementation")
       expect(output.parts[0].text).toContain("Auto-Selected Plan")
     })
+
+    test("should match quoted human-readable plan names to slugged filenames", async () => {
+      // given - saved plan uses a slugged filename
+      const plansDir = join(testDir, ".sisyphus", "plans")
+      mkdirSync(plansDir, { recursive: true })
+
+      const planPath = join(plansDir, "my-feature-plan.md")
+      writeFileSync(planPath, "# My Feature Plan\n- [ ] Task 1")
+
+      const hook = createStartWorkHook(createMockPluginInput())
+      const output = {
+        parts: [
+          {
+            type: "text",
+            text: createStartWorkPrompt({ userRequest: "\"my feature plan\"" }),
+          },
+        ],
+      }
+
+      // when
+      await hook["chat.message"](
+        { sessionID: "session-123" },
+        output,
+      )
+
+      // then
+      expect(output.parts[0].text).toContain("my-feature-plan")
+      expect(output.parts[0].text).toContain("Auto-Selected Plan")
+    })
   })
 
   describe("session agent management", () => {
@@ -391,7 +453,7 @@ describe("start-work hook", () => {
       
       const hook = createStartWorkHook(createMockPluginInput())
       const output = {
-        parts: [{ type: "text", text: "<session-context></session-context>" }],
+        parts: [{ type: "text", text: createStartWorkPrompt() }],
       }
 
       // when
@@ -403,6 +465,264 @@ describe("start-work hook", () => {
       // then
       expect(updateSpy).toHaveBeenCalledWith("ses-prometheus-to-sisyphus", "atlas")
       updateSpy.mockRestore()
+    })
+
+    test("should stamp the outgoing message with Atlas list key so follow-up events keep the handoff", async () => {
+      // given
+      const hook = createStartWorkHook(createMockPluginInput())
+      const output = {
+        message: {} as Record<string, unknown>,
+        parts: [{ type: "text", text: createStartWorkPrompt() }],
+      }
+
+      // when
+      await hook["chat.message"](
+        { sessionID: "ses-prometheus-to-atlas" },
+        output
+      )
+
+      // then
+      expect(output.message.agent).toBe(getAgentDisplayName("atlas"))
+    })
+
+    test("should switch to Atlas even when current session is Sisyphus (regression: #3155)", async () => {
+      // given: user runs /start-work while in a Sisyphus session
+      // atlas is registered, so /start-work must always hand off to atlas
+      sessionState.updateSessionAgent("ses-sisyphus-to-atlas", "sisyphus")
+
+      const hook = createStartWorkHook(createMockPluginInput())
+      const output = {
+        message: {} as Record<string, unknown>,
+        parts: [{ type: "text", text: createStartWorkPrompt() }],
+      }
+
+      await hook["chat.message"](
+        { sessionID: "ses-sisyphus-to-atlas" },
+        output
+      )
+
+      // atlas is registered in beforeEach, so it must be selected
+      expect(output.message.agent).toBe(getAgentDisplayName("atlas"))
+      expect(sessionState.getSessionAgent("ses-sisyphus-to-atlas")).toBe("atlas")
+    })
+
+    test("should keep the current agent when Atlas is unavailable", async () => {
+      // given
+      sessionState._resetForTesting()
+      sessionState.registerAgentName("sisyphus")
+      sessionState.updateSessionAgent("ses-prometheus-to-sisyphus", "sisyphus")
+
+      const hook = createStartWorkHook(createMockPluginInput())
+      const output = {
+        message: {} as Record<string, unknown>,
+        parts: [{ type: "text", text: createStartWorkPrompt() }],
+      }
+
+      // when
+      await hook["chat.message"](
+        { sessionID: "ses-prometheus-to-sisyphus" },
+        output
+      )
+
+      // then
+      expect(output.message.agent).toBe("Sisyphus - Ultraworker")
+      expect(sessionState.getSessionAgent("ses-prometheus-to-sisyphus")).toBe("sisyphus")
+    })
+
+    test("should fall back to Sisyphus instead of keeping Prometheus when Atlas is unavailable", async () => {
+      // given
+      sessionState._resetForTesting()
+      sessionState.registerAgentName("prometheus")
+      sessionState.registerAgentName("sisyphus")
+      sessionState.updateSessionAgent("ses-prometheus-to-worker", "prometheus")
+
+      const plansDir = join(testDir, ".sisyphus", "plans")
+      mkdirSync(plansDir, { recursive: true })
+      writeFileSync(join(plansDir, "worker-plan.md"), "# Plan\n- [ ] Task 1")
+
+      const hook = createStartWorkHook(createMockPluginInput())
+      const output = {
+        message: {} as Record<string, unknown>,
+        parts: [{ type: "text", text: createStartWorkPrompt() }],
+      }
+
+      // when
+      await hook["chat.message"](
+        { sessionID: "ses-prometheus-to-worker" },
+        output
+      )
+
+      // then
+      expect(output.message.agent).toBe("Sisyphus - Ultraworker")
+      expect(sessionState.getSessionAgent("ses-prometheus-to-worker")).toBe("sisyphus")
+      expect(readBoulderState(testDir)?.agent).toBe("sisyphus")
+    })
+
+    test("should rewrite stale Prometheus boulder state to Sisyphus when resuming without Atlas", async () => {
+      // given
+      sessionState._resetForTesting()
+      sessionState.registerAgentName("prometheus")
+      sessionState.registerAgentName("sisyphus")
+      sessionState.updateSessionAgent("ses-prometheus-resume", "prometheus")
+
+      const planPath = join(testDir, "resume-plan.md")
+      writeFileSync(planPath, "# Plan\n- [ ] Task 1")
+      writeBoulderState(testDir, {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: ["old-session"],
+        plan_name: "resume-plan",
+        agent: "prometheus",
+      })
+
+      const hook = createStartWorkHook(createMockPluginInput())
+      const output = {
+        message: {} as Record<string, unknown>,
+        parts: [{ type: "text", text: createStartWorkPrompt() }],
+      }
+
+      // when
+      await hook["chat.message"](
+        { sessionID: "ses-prometheus-resume" },
+        output
+      )
+
+      // then
+      expect(output.message.agent).toBe("Sisyphus - Ultraworker")
+      expect(readBoulderState(testDir)?.agent).toBe("sisyphus")
+    })
+
+    test("#given start-work hands the session to Atlas #when Atlas later receives session.idle #then the same session continues the selected plan", async () => {
+      // given
+      const plansDir = join(testDir, ".sisyphus", "plans")
+      mkdirSync(plansDir, { recursive: true })
+      writeFileSync(join(plansDir, "atlas-plan.md"), "# Plan\n- [ ] Task 1\n- [ ] Task 2")
+
+      const promptAsyncMock = spyOn({
+        promptAsync: async (_request: unknown) => undefined,
+      }, "promptAsync")
+      const ctx = {
+        directory: testDir,
+        client: {
+          session: {
+            promptAsync: promptAsyncMock,
+            prompt: async (_request: unknown) => undefined,
+            messages: async () => ({ data: [] }),
+          },
+        },
+      } as unknown as Parameters<typeof createAtlasHook>[0]
+      const startWorkHook = createStartWorkHook(ctx)
+      const atlasHook = createAtlasHook(ctx)
+      const output = {
+        message: {} as Record<string, unknown>,
+        parts: [{ type: "text", text: createStartWorkPrompt({ userRequest: "atlas-plan" }) }],
+      }
+
+      // when
+      await startWorkHook["chat.message"]({ sessionID: "session-123" }, output)
+      await atlasHook.handler({ event: { type: "session.idle", properties: { sessionID: "session-123" } } })
+
+      // then
+      expect(output.message.agent).toBe(getAgentDisplayName("atlas"))
+      expect(readBoulderState(testDir)?.session_ids).toContain("session-123")
+      expect(readBoulderState(testDir)?.agent).toBe("atlas")
+      expect(promptAsyncMock).toHaveBeenCalledTimes(1)
+      promptAsyncMock.mockRestore()
+    })
+
+    test("#given start-work hands the session to Atlas but background work is still running #when that work finishes #then Atlas resumes via retry for the same session", async () => {
+      // given
+      const plansDir = join(testDir, ".sisyphus", "plans")
+      mkdirSync(plansDir, { recursive: true })
+      writeFileSync(join(plansDir, "atlas-plan.md"), "# Plan\n- [ ] Task 1\n- [ ] Task 2")
+
+      const capturedTimers = new Map<number, { callback: Function; cleared: boolean }>()
+      let nextTimerId = 4000
+      let backgroundRunning = true
+      const originalSetTimeout = globalThis.setTimeout
+      const originalClearTimeout = globalThis.clearTimeout
+      const originalDateNow = Date.now
+      let fakeNow = 10000
+      const promptAsyncMock = spyOn({
+        promptAsync: async (_request: unknown) => undefined,
+      }, "promptAsync")
+
+      globalThis.setTimeout = ((callback: Function, delay?: number, ...args: unknown[]) => {
+        const normalized = typeof delay === "number" ? delay : 0
+        if (normalized >= 5000) {
+          const id = nextTimerId++
+          capturedTimers.set(id, { callback: () => callback(...args), cleared: false })
+          return id as unknown as ReturnType<typeof setTimeout>
+        }
+
+        return originalSetTimeout(callback as Parameters<typeof originalSetTimeout>[0], delay)
+      }) as unknown as typeof setTimeout
+
+      globalThis.clearTimeout = ((id?: number | ReturnType<typeof setTimeout>) => {
+        if (typeof id === "number" && capturedTimers.has(id)) {
+          capturedTimers.get(id)!.cleared = true
+          capturedTimers.delete(id)
+          return
+        }
+
+        originalClearTimeout(id as Parameters<typeof originalClearTimeout>[0])
+      }) as unknown as typeof clearTimeout
+
+      Date.now = () => fakeNow
+
+      const ctx = {
+        directory: testDir,
+        client: {
+          session: {
+            promptAsync: promptAsyncMock,
+            prompt: async (_request: unknown) => undefined,
+            messages: async () => ({ data: [] }),
+          },
+        },
+      } as unknown as Parameters<typeof createAtlasHook>[0]
+      const startWorkHook = createStartWorkHook(ctx)
+      const atlasHook = createAtlasHook(ctx, {
+        directory: testDir,
+        backgroundManager: {
+          getTasksByParentSession: () => backgroundRunning ? [{ status: "running" }] : [],
+        } as unknown as NonNullable<Parameters<typeof createAtlasHook>[1]>["backgroundManager"],
+      })
+      const output = {
+        message: {} as Record<string, unknown>,
+        parts: [{ type: "text", text: createStartWorkPrompt({ userRequest: "atlas-plan" }) }],
+      }
+
+      async function firePendingTimers(): Promise<void> {
+        for (const [id, entry] of capturedTimers) {
+          if (!entry.cleared) {
+            capturedTimers.delete(id)
+            fakeNow += 6000
+            await entry.callback()
+          }
+        }
+      }
+
+      try {
+        // when
+        await startWorkHook["chat.message"]({ sessionID: "session-123" }, output)
+        await atlasHook.handler({ event: { type: "session.idle", properties: { sessionID: "session-123" } } })
+        expect(promptAsyncMock).toHaveBeenCalledTimes(0)
+        expect(capturedTimers.size).toBe(1)
+
+        backgroundRunning = false
+        await firePendingTimers()
+
+        // then
+        expect(output.message.agent).toBe(getAgentDisplayName("atlas"))
+        expect(readBoulderState(testDir)?.session_ids).toContain("session-123")
+        expect(readBoulderState(testDir)?.agent).toBe("atlas")
+        expect(promptAsyncMock).toHaveBeenCalledTimes(1)
+      } finally {
+        globalThis.setTimeout = originalSetTimeout
+        globalThis.clearTimeout = originalClearTimeout
+        Date.now = originalDateNow
+        promptAsyncMock.mockRestore()
+      }
     })
   })
 
@@ -417,7 +737,7 @@ describe("start-work hook", () => {
       detectSpy.mockRestore()
     })
 
-    test("should inject model-decides instructions when no --worktree flag", async () => {
+    test("should NOT inject worktree instructions when no --worktree flag", async () => {
       // given - single plan, no worktree flag
       const plansDir = join(testDir, ".sisyphus", "plans")
       mkdirSync(plansDir, { recursive: true })
@@ -425,16 +745,16 @@ describe("start-work hook", () => {
 
       const hook = createStartWorkHook(createMockPluginInput())
       const output = {
-        parts: [{ type: "text", text: "<session-context></session-context>" }],
+        parts: [{ type: "text", text: createStartWorkPrompt() }],
       }
 
       // when
       await hook["chat.message"]({ sessionID: "session-123" }, output)
 
-      // then - model-decides instructions should appear
-      expect(output.parts[0].text).toContain("Worktree Setup Required")
-      expect(output.parts[0].text).toContain("git worktree list --porcelain")
-      expect(output.parts[0].text).toContain("git worktree add")
+      // then - no worktree instructions should appear
+      expect(output.parts[0].text).not.toContain("Worktree Setup Required")
+      expect(output.parts[0].text).not.toContain("Worktree Active")
+      expect(output.parts[0].text).not.toContain("git worktree list --porcelain")
     })
 
     test("should inject worktree path when --worktree flag is valid", async () => {
@@ -446,14 +766,16 @@ describe("start-work hook", () => {
 
       const hook = createStartWorkHook(createMockPluginInput())
       const output = {
-        parts: [{ type: "text", text: "<session-context>\n<user-request>--worktree /validated/worktree</user-request>\n</session-context>" }],
+        parts: [{ type: "text", text: createStartWorkPrompt({ userRequest: "--worktree /validated/worktree" }) }],
       }
 
       // when
       await hook["chat.message"]({ sessionID: "session-123" }, output)
 
-      // then - validated path shown, no model-decides instructions
-      expect(output.parts[0].text).toContain("**Worktree**: /validated/worktree")
+      // then - strong worktree active instructions shown
+      expect(output.parts[0].text).toContain("Worktree Active")
+      expect(output.parts[0].text).toContain("/validated/worktree")
+      expect(output.parts[0].text).toContain("subagent")
       expect(output.parts[0].text).not.toContain("Worktree Setup Required")
     })
 
@@ -466,7 +788,7 @@ describe("start-work hook", () => {
 
       const hook = createStartWorkHook(createMockPluginInput())
       const output = {
-        parts: [{ type: "text", text: "<session-context>\n<user-request>--worktree /valid/wt</user-request>\n</session-context>" }],
+        parts: [{ type: "text", text: createStartWorkPrompt({ userRequest: "--worktree /valid/wt" }) }],
       }
 
       // when
@@ -486,7 +808,7 @@ describe("start-work hook", () => {
 
       const hook = createStartWorkHook(createMockPluginInput())
       const output = {
-        parts: [{ type: "text", text: "<session-context>\n<user-request>--worktree /nonexistent/wt</user-request>\n</session-context>" }],
+        parts: [{ type: "text", text: createStartWorkPrompt({ userRequest: "--worktree /nonexistent/wt" }) }],
       }
 
       // when
@@ -515,7 +837,7 @@ describe("start-work hook", () => {
 
       const hook = createStartWorkHook(createMockPluginInput())
       const output = {
-        parts: [{ type: "text", text: "<session-context>\n<user-request>--worktree /new/wt</user-request>\n</session-context>" }],
+        parts: [{ type: "text", text: createStartWorkPrompt({ userRequest: "--worktree /new/wt" }) }],
       }
 
       // when
@@ -542,14 +864,16 @@ describe("start-work hook", () => {
 
       const hook = createStartWorkHook(createMockPluginInput())
       const output = {
-        parts: [{ type: "text", text: "<session-context></session-context>" }],
+        parts: [{ type: "text", text: createStartWorkPrompt() }],
       }
 
       // when
       await hook["chat.message"]({ sessionID: "session-789" }, output)
 
-      // then - shows existing worktree, no model-decides instructions
+      // then - shows strong worktree active instructions
+      expect(output.parts[0].text).toContain("Worktree Active")
       expect(output.parts[0].text).toContain("/existing/wt")
+      expect(output.parts[0].text).toContain("subagent")
       expect(output.parts[0].text).not.toContain("Worktree Setup Required")
     })
   })

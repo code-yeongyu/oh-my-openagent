@@ -19,6 +19,20 @@ describe("createToolOutputTruncatorHook", () => {
     hook = createToolOutputTruncatorHook({} as never)
   })
 
+  it("passes modelContextLimitsCache through to createDynamicTruncator", () => {
+    const ctx = {} as never
+    const modelContextLimitsCache = new Map<string, number>()
+    const modelCacheState = {
+      anthropicContext1MEnabled: false,
+      modelContextLimitsCache,
+    }
+
+    truncateSpy.mockClear()
+    createToolOutputTruncatorHook(ctx, { modelCacheState })
+
+    expect(truncateSpy).toHaveBeenLastCalledWith(ctx, modelCacheState)
+  })
+
   describe("tool.execute.after", () => {
     const createInput = (tool: string) => ({
       tool,

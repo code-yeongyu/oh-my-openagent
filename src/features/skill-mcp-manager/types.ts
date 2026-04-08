@@ -3,6 +3,7 @@ import type { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdi
 import type { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
 import type { ClaudeCodeMcpServer } from "../claude-code-mcp-loader/types"
 import type { McpOAuthProvider } from "../mcp-oauth/provider"
+import type { SkillScope } from "../opencode-skill-loader/types"
 
 export type SkillMcpConfig = Record<string, ClaudeCodeMcpServer>
 
@@ -10,6 +11,7 @@ export interface SkillMcpClientInfo {
   serverName: string
   skillName: string
   sessionID: string
+  scope?: SkillScope
 }
 
 export interface SkillMcpServerContext {
@@ -48,14 +50,30 @@ export interface ProcessCleanupHandler {
   listener: () => void
 }
 
+export type OAuthProviderLike = Pick<
+  McpOAuthProvider,
+  "tokens" | "login" | "refresh"
+>
+
+export type OAuthProviderFactory = (options: {
+  serverUrl: string
+  clientId?: string
+  scopes?: string[]
+}) => OAuthProviderLike
+
 export interface SkillMcpManagerState {
   clients: Map<string, ManagedClient>
   pendingConnections: Map<string, Promise<Client>>
+  disconnectedSessions: Map<string, number>
   authProviders: Map<string, McpOAuthProvider>
   cleanupRegistered: boolean
   cleanupInterval: ReturnType<typeof setInterval> | null
   cleanupHandlers: ProcessCleanupHandler[]
   idleTimeoutMs: number
+  shutdownGeneration: number
+  inFlightConnections: Map<string, number>
+  disposed: boolean
+  createOAuthProvider: OAuthProviderFactory
 }
 
 export interface SkillMcpClientConnectionParams {

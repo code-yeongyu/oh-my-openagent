@@ -26,6 +26,7 @@ import {
   createPreemptiveCompactionHook,
   createRuntimeFallbackHook,
   createLoopDetectorHook,
+  createLegacyPluginToastHook,
 } from "../../hooks"
 import { createAnthropicEffortHook } from "../../hooks/anthropic-effort"
 import {
@@ -36,6 +37,7 @@ import {
 } from "../../shared"
 import { safeCreateHook } from "../../shared/safe-create-hook"
 import { sessionExists } from "../../tools"
+import { isTmuxIntegrationEnabled } from "../../create-runtime-tmux-config"
 
 export type SessionHooks = {
   contextWindowMonitor: ReturnType<typeof createContextWindowMonitorHook> | null
@@ -62,6 +64,7 @@ export type SessionHooks = {
   anthropicEffort: ReturnType<typeof createAnthropicEffortHook> | null
   runtimeFallback: ReturnType<typeof createRuntimeFallbackHook> | null
   loopDetector: ReturnType<typeof createLoopDetectorHook> | null
+  legacyPluginToast: ReturnType<typeof createLegacyPluginToastHook> | null
 }
 
 export function createSessionHooks(args: {
@@ -153,8 +156,6 @@ export function createSessionHooks(args: {
     }
   }
 
-  // Model fallback hook (configurable via model_fallback config + disabled_hooks)
-  // This handles automatic model switching when model errors occur
   const isModelFallbackConfigEnabled = pluginConfig.model_fallback ?? false
   const modelFallback = isModelFallbackConfigEnabled && isHookEnabled("model-fallback")
     ? safeHook("model-fallback", () =>
@@ -186,6 +187,7 @@ export function createSessionHooks(args: {
           showStartupToast: isHookEnabled("startup-toast"),
           isSisyphusEnabled: pluginConfig.sisyphus_agent?.disabled !== true,
           autoUpdate: pluginConfig.auto_update ?? true,
+          modelCapabilities: pluginConfig.model_capabilities,
         }))
     : null
 
@@ -197,7 +199,9 @@ export function createSessionHooks(args: {
     ? safeHook("non-interactive-env", () => createNonInteractiveEnvHook(ctx))
     : null
 
-  const interactiveBashSession = isHookEnabled("interactive-bash-session")
+  const interactiveBashSession =
+    isHookEnabled("interactive-bash-session") &&
+    isTmuxIntegrationEnabled(pluginConfig)
     ? safeHook("interactive-bash-session", () => createInteractiveBashSessionHook(ctx))
     : null
 
@@ -267,6 +271,10 @@ export function createSessionHooks(args: {
   const loopDetector = isHookEnabled("loop-detector")
     ? safeHook("loop-detector", () => createLoopDetectorHook(ctx))
     : null
+
+  const legacyPluginToast = isHookEnabled("legacy-plugin-toast")
+    ? safeHook("legacy-plugin-toast", () => createLegacyPluginToastHook(ctx))
+    : null
   return {
     contextWindowMonitor,
     preemptiveCompaction,
@@ -292,5 +300,6 @@ export function createSessionHooks(args: {
     anthropicEffort,
     runtimeFallback,
     loopDetector,
+    legacyPluginToast,
   }
 }

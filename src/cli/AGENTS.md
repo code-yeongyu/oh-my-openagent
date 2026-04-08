@@ -1,10 +1,10 @@
 # src/cli/ — CLI: install, run, doctor, mcp-oauth
 
-**Generated:** 2026-03-02
+**Generated:** 2026-04-05
 
 ## OVERVIEW
 
-Commander.js CLI with 5 commands. Entry: `index.ts` → `runCli()` in `cli-program.ts`.
+Commander.js CLI with 6 commands. Entry: `index.ts` → `runCli()` in `cli-program.ts`.
 
 ## COMMANDS
 
@@ -15,6 +15,7 @@ Commander.js CLI with 5 commands. Entry: `index.ts` → `runCli()` in `cli-progr
 | `doctor` | 4-category health checks | System, Config, Tools, Models |
 | `get-local-version` | Version detection | Installed vs npm latest |
 | `mcp-oauth` | OAuth token management | login (PKCE), logout, status |
+| `refresh-model-capabilities` | Refresh models.dev cache | Model capabilities refresh |
 
 ## STRUCTURE
 
@@ -51,9 +52,9 @@ cli/
 
 ## MODEL FALLBACK SYSTEM
 
-Priority: Claude > OpenAI > Gemini > Copilot > OpenCode Zen > Z.ai > Kimi > big-pickle
+No single global priority. CLI install-time resolution uses per-agent fallback chains from `model-fallback-requirements.ts`.
 
-Agent-specific: librarian→ZAI, explore→Haiku/nano, hephaestus→requires OpenAI/Copilot
+Common patterns: Claude/OpenAI/Gemini are preferred when an agent chain includes them, `librarian` prefers ZAI, `sisyphus` falls back through Kimi then GLM-5, and `hephaestus` requires OpenAI-compatible providers.
 
 ## DOCTOR CHECKS
 

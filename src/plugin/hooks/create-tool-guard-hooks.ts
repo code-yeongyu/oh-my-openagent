@@ -11,10 +11,13 @@ import {
   createRulesInjectorHook,
   createTasksTodowriteDisablerHook,
   createWriteExistingFileGuardHook,
+  createBashFileReadGuardHook,
   createHashlineReadEnhancerHook,
   createReadImageResizerHook,
   createJsonErrorRecoveryHook,
   createDefinitionGatesHook,
+  createTodoDescriptionOverrideHook,
+  createWebFetchRedirectGuardHook,
 } from "../../hooks"
 import {
   getOpenCodeVersion,
@@ -33,10 +36,13 @@ export type ToolGuardHooks = {
   rulesInjector: ReturnType<typeof createRulesInjectorHook> | null
   tasksTodowriteDisabler: ReturnType<typeof createTasksTodowriteDisablerHook> | null
   writeExistingFileGuard: ReturnType<typeof createWriteExistingFileGuardHook> | null
+  bashFileReadGuard: ReturnType<typeof createBashFileReadGuardHook> | null
   hashlineReadEnhancer: ReturnType<typeof createHashlineReadEnhancerHook> | null
   jsonErrorRecovery: ReturnType<typeof createJsonErrorRecoveryHook> | null
   definitionGates: ReturnType<typeof createDefinitionGatesHook> | null
   readImageResizer: ReturnType<typeof createReadImageResizerHook> | null
+  todoDescriptionOverride: ReturnType<typeof createTodoDescriptionOverrideHook> | null
+  webfetchRedirectGuard: ReturnType<typeof createWebFetchRedirectGuardHook> | null
 }
 
 export function createToolGuardHooks(args: {
@@ -87,9 +93,13 @@ export function createToolGuardHooks(args: {
     ? safeHook("empty-task-response-detector", () => createEmptyTaskResponseDetectorHook(ctx))
     : null
 
+  const cc = pluginConfig.claude_code
+  const skipClaudeUserRules = cc?.hooks === false
   const rulesInjector = isHookEnabled("rules-injector")
     ? safeHook("rules-injector", () =>
-        createRulesInjectorHook(ctx, modelCacheState))
+        createRulesInjectorHook(ctx, modelCacheState, {
+          skipClaudeUserRules,
+        }))
     : null
 
   const tasksTodowriteDisabler = isHookEnabled("tasks-todowrite-disabler")
@@ -99,6 +109,10 @@ export function createToolGuardHooks(args: {
 
   const writeExistingFileGuard = isHookEnabled("write-existing-file-guard")
     ? safeHook("write-existing-file-guard", () => createWriteExistingFileGuardHook(ctx))
+    : null
+
+  const bashFileReadGuard = isHookEnabled("bash-file-read-guard")
+    ? safeHook("bash-file-read-guard", () => createBashFileReadGuardHook())
     : null
 
   const hashlineReadEnhancer = isHookEnabled("hashline-read-enhancer")
@@ -117,6 +131,14 @@ export function createToolGuardHooks(args: {
     ? safeHook("read-image-resizer", () => createReadImageResizerHook(ctx))
     : null
 
+  const todoDescriptionOverride = isHookEnabled("todo-description-override")
+    ? safeHook("todo-description-override", () => createTodoDescriptionOverrideHook())
+    : null
+
+  const webfetchRedirectGuard = isHookEnabled("webfetch-redirect-guard")
+    ? safeHook("webfetch-redirect-guard", () => createWebFetchRedirectGuardHook(ctx))
+    : null
+
   return {
     commentChecker,
     toolOutputTruncator,
@@ -126,9 +148,12 @@ export function createToolGuardHooks(args: {
     rulesInjector,
     tasksTodowriteDisabler,
     writeExistingFileGuard,
+    bashFileReadGuard,
     hashlineReadEnhancer,
     jsonErrorRecovery,
     definitionGates,
     readImageResizer,
+    todoDescriptionOverride,
+    webfetchRedirectGuard,
   }
 }

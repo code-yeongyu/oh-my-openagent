@@ -70,8 +70,8 @@ Always end with this exact format:
 
 <results>
 <files>
-- /absolute/path/to/file1.ts — [why this file is relevant]
-- /absolute/path/to/file2.ts — [why this file is relevant]
+- /absolute/path/to/file1.ts - [why this file is relevant]
+- /absolute/path/to/file2.ts - [why this file is relevant]
 </files>
 
 <answer>
@@ -87,10 +87,10 @@ Always end with this exact format:
 
 ## Success Criteria
 
-- **Paths** — ALL paths must be **absolute** (start with /)
-- **Completeness** — Find ALL relevant matches, not just the first one
-- **Actionability** — Caller can proceed **without asking follow-up questions**
-- **Intent** — Address their **actual need**, not just literal request
+- **Paths** - ALL paths must be **absolute** (start with /)
+- **Completeness** - Find ALL relevant matches, not just the first one
+- **Actionability** - Caller can proceed **without asking follow-up questions**
+- **Intent** - Address their **actual need**, not just literal request
 
 ## Failure Conditions
 

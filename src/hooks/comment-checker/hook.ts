@@ -3,6 +3,18 @@ import type { CommentCheckerConfig } from "../../config/schema"
 
 import z from "zod"
 
+const ApplyPatchMetadataSchema = z.object({
+  files: z.array(
+    z.object({
+      filePath: z.string(),
+      movePath: z.string().optional(),
+      before: z.string(),
+      after: z.string(),
+      type: z.string().optional(),
+    }),
+  ),
+})
+
 import {
   initializeCommentCheckerCli,
   getCommentCheckerCliPathPromise,
@@ -10,7 +22,12 @@ import {
   processWithCli,
   processApplyPatchEditsWithCli,
 } from "./cli-runner"
-import { registerPendingCall, startPendingCallCleanup, takePendingCall } from "./pending-calls"
+import {
+  registerPendingCall,
+  startPendingCallCleanup,
+  stopPendingCallCleanup,
+  takePendingCall,
+} from "./pending-calls"
 
 import * as fs from "fs"
 import { tmpdir } from "os"
@@ -104,17 +121,6 @@ export function createCommentCheckerHooks(config?: CommentCheckerConfig) {
         return
       }
 
-      const ApplyPatchMetadataSchema = z.object({
-        files: z.array(
-          z.object({
-            filePath: z.string(),
-            movePath: z.string().optional(),
-            before: z.string(),
-            after: z.string(),
-            type: z.string().optional(),
-          }),
-        ),
-      })
 
       if (toolLower === "apply_patch") {
         const parsed = ApplyPatchMetadataSchema.safeParse(output.metadata)
@@ -178,6 +184,9 @@ export function createCommentCheckerHooks(config?: CommentCheckerConfig) {
       } catch (err) {
         debugLog("tool.execute.after failed:", err)
       }
+    },
+    dispose: (): void => {
+      stopPendingCallCleanup()
     },
   }
 }

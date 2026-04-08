@@ -127,6 +127,13 @@ export class TaskToastManager {
     const queued = this.getQueuedTasks()
     const concurrencyInfo = this.getConcurrencyInfo()
 
+    const formatTaskIdentifier = (task: TrackedTask): string => {
+      const modelName = task.modelInfo?.model?.split("/").pop()
+      if (modelName && task.category) return `${modelName}: ${task.category}`
+      if (modelName) return modelName
+      if (task.category) return `${task.agent}/${task.category}`
+      return task.agent
+    }
     const lines: string[] = []
 
     const isFallback = newTask.modelInfo && (
@@ -151,9 +158,9 @@ export class TaskToastManager {
         const duration = this.formatDuration(task.startedAt)
         const bgIcon = task.isBackground ? "[BG]" : "[RUN]"
         const isNew = task.id === newTask.id ? " ← NEW" : ""
-        const categoryInfo = task.category ? `/${task.category}` : ""
+        const taskId = formatTaskIdentifier(task)
         const skillsInfo = task.skills?.length ? ` [${task.skills.join(", ")}]` : ""
-        lines.push(`${bgIcon} ${task.description} (${task.agent}${categoryInfo})${skillsInfo} - ${duration}${isNew}`)
+        lines.push(`${bgIcon} ${task.description} (${taskId})${skillsInfo} - ${duration}${isNew}`)
       }
     }
 
@@ -162,10 +169,10 @@ export class TaskToastManager {
       lines.push(`Queued (${queued.length}):`)
       for (const task of queued) {
         const bgIcon = task.isBackground ? "[Q]" : "[W]"
-        const categoryInfo = task.category ? `/${task.category}` : ""
+        const taskId = formatTaskIdentifier(task)
         const skillsInfo = task.skills?.length ? ` [${task.skills.join(", ")}]` : ""
         const isNew = task.id === newTask.id ? " ← NEW" : ""
-        lines.push(`${bgIcon} ${task.description} (${task.agent}${categoryInfo})${skillsInfo} - Queued${isNew}`)
+        lines.push(`${bgIcon} ${task.description} (${taskId})${skillsInfo} - Queued${isNew}`)
       }
     }
 

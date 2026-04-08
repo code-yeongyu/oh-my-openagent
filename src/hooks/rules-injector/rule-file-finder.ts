@@ -4,9 +4,19 @@ import {
   PROJECT_RULE_FILES,
   PROJECT_RULE_SUBDIRS,
   USER_RULE_DIR,
+  OPENCODE_USER_RULE_DIRS,
 } from "./constants";
 import type { RuleFileCandidate } from "./types";
 import { findRuleFilesRecursive, safeRealpathSync } from "./rule-file-scanner";
+
+export interface FindRuleFilesOptions {
+  /**
+   * When true, skip loading rules from ~/.claude/rules/.
+   * Use when claude_code integration is disabled to prevent
+   * Claude Code-specific instructions from leaking into non-Claude agents.
+   */
+  skipClaudeUserRules?: boolean;
+}
 
 /**
  * Find all rule files for a given context.
@@ -25,6 +35,7 @@ export function findRuleFiles(
   projectRoot: string | null,
   homeDir: string,
   currentFile: string,
+  options?: FindRuleFilesOptions,
 ): RuleFileCandidate[] {
   const candidates: RuleFileCandidate[] = [];
   const seenRealPaths = new Set<string>();
@@ -89,22 +100,31 @@ export function findRuleFiles(
     }
   }
 
-  // Search user-level rule directory (~/.claude/rules)
-  const userRuleDir = join(homeDir, USER_RULE_DIR);
-  const userFiles: string[] = [];
-  findRuleFilesRecursive(userRuleDir, userFiles);
+  // Search user-level rule directories
+  // Always search OpenCode-native dirs (~/.sisyphus/rules, ~/.opencode/rules)
+  const userRuleDirs: string[] = OPENCODE_USER_RULE_DIRS.map((dir) => join(homeDir, dir));
 
-  for (const filePath of userFiles) {
-    const realPath = safeRealpathSync(filePath);
-    if (seenRealPaths.has(realPath)) continue;
-    seenRealPaths.add(realPath);
+  // Only search ~/.claude/rules when claude_code integration is not disabled
+  if (!options?.skipClaudeUserRules) {
+    userRuleDirs.push(join(homeDir, USER_RULE_DIR));
+  }
 
-    candidates.push({
-      path: filePath,
-      realPath,
-      isGlobal: true,
-      distance: 9999, // Global rules always have max distance
-    });
+  for (const userRuleDir of userRuleDirs) {
+    const userFiles: string[] = [];
+    findRuleFilesRecursive(userRuleDir, userFiles);
+
+    for (const filePath of userFiles) {
+      const realPath = safeRealpathSync(filePath);
+      if (seenRealPaths.has(realPath)) continue;
+      seenRealPaths.add(realPath);
+
+      candidates.push({
+        path: filePath,
+        realPath,
+        isGlobal: true,
+        distance: 9999, // Global rules always have max distance
+      });
+    }
   }
 
   // Sort by distance (closest first, then global rules last)

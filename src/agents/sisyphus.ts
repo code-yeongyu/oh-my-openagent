@@ -1,6 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk";
 import type { AgentMode, AgentPromptMetadata } from "./types";
-import { isGptModel, isGeminiModel } from "./types";
+import { isGptModel, isGeminiModel, isGpt5_4Model } from "./types";
 import {
   buildGeminiToolMandate,
   buildGeminiDelegationOverride,
@@ -8,9 +8,11 @@ import {
   buildGeminiIntentGateEnforcement,
   buildGeminiToolGuide,
   buildGeminiToolCallExamples,
-} from "./sisyphus-gemini-overlays";
+} from "./sisyphus/gemini";
+import { buildGpt54SisyphusPrompt } from "./sisyphus/gpt-5-4";
+import { buildTaskManagementSection } from "./sisyphus/default";
 
-const MODE: AgentMode = "all";
+const MODE: AgentMode = "primary";
 export const SISYPHUS_PROMPT_METADATA: AgentPromptMetadata = {
   category: "utility",
   cost: "EXPENSIVE",
@@ -24,6 +26,7 @@ import type {
   AvailableCategory,
 } from "./dynamic-agent-prompt-builder";
 import {
+  buildAgentIdentitySection,
   buildKeyTriggersSection,
   buildToolSelectionTable,
   buildExploreSection,
@@ -33,120 +36,11 @@ import {
   buildOracleSection,
   buildHardBlocksSection,
   buildAntiPatternsSection,
-  buildDeepParallelSection,
+  buildParallelDelegationSection,
   buildNonClaudePlannerSection,
+  buildAntiDuplicationSection,
   categorizeTools,
 } from "./dynamic-agent-prompt-builder";
-
-function buildTaskManagementSection(useTaskSystem: boolean): string {
-  if (useTaskSystem) {
-    return `<Task_Management>
-## Task Management (CRITICAL)
-
-**DEFAULT BEHAVIOR**: Create tasks BEFORE starting any non-trivial task. This is your PRIMARY coordination mechanism.
-
-### When to Create Tasks (MANDATORY)
-
-- Multi-step task (2+ steps) → ALWAYS \`TaskCreate\` first
-- Uncertain scope → ALWAYS (tasks clarify thinking)
-- User request with multiple items → ALWAYS
-- Complex single task → \`TaskCreate\` to break down
-
-### Workflow (NON-NEGOTIABLE)
-
-1. **IMMEDIATELY on receiving request**: \`TaskCreate\` to plan atomic steps.
-  - ONLY ADD TASKS TO IMPLEMENT SOMETHING, ONLY WHEN USER WANTS YOU TO IMPLEMENT SOMETHING.
-2. **Before starting each step**: \`TaskUpdate(status="in_progress")\` (only ONE at a time)
-3. **After completing each step**: \`TaskUpdate(status="completed")\` IMMEDIATELY (NEVER batch)
-4. **If scope changes**: Update tasks before proceeding
-
-### Why This Is Non-Negotiable
-
-- **User visibility**: User sees real-time progress, not a black box
-- **Prevents drift**: Tasks anchor you to the actual request
-- **Recovery**: If interrupted, tasks enable seamless continuation
-- **Accountability**: Each task = explicit commitment
-
-### Anti-Patterns (BLOCKING)
-
-- Skipping tasks on multi-step tasks — user has no visibility, steps get forgotten
-- Batch-completing multiple tasks — defeats real-time tracking purpose
-- Proceeding without marking in_progress — no indication of what you're working on
-- Finishing without completing tasks — task appears incomplete to user
-
-**FAILURE TO USE TASKS ON NON-TRIVIAL TASKS = INCOMPLETE WORK.**
-
-### Clarification Protocol (when asking):
-
-\`\`\`
-I want to make sure I understand correctly.
-
-**What I understood**: [Your interpretation]
-**What I'm unsure about**: [Specific ambiguity]
-**Options I see**:
-1. [Option A] - [effort/implications]
-2. [Option B] - [effort/implications]
-
-**My recommendation**: [suggestion with reasoning]
-
-Should I proceed with [recommendation], or would you prefer differently?
-\`\`\`
-</Task_Management>`;
-  }
-
-  return `<Task_Management>
-## Todo Management (CRITICAL)
-
-**DEFAULT BEHAVIOR**: Create todos BEFORE starting any non-trivial task. This is your PRIMARY coordination mechanism.
-
-### When to Create Todos (MANDATORY)
-
-- Multi-step task (2+ steps) → ALWAYS create todos first
-- Uncertain scope → ALWAYS (todos clarify thinking)
-- User request with multiple items → ALWAYS
-- Complex single task → Create todos to break down
-
-### Workflow (NON-NEGOTIABLE)
-
-1. **IMMEDIATELY on receiving request**: \`todowrite\` to plan atomic steps.
-  - ONLY ADD TODOS TO IMPLEMENT SOMETHING, ONLY WHEN USER WANTS YOU TO IMPLEMENT SOMETHING.
-2. **Before starting each step**: Mark \`in_progress\` (only ONE at a time)
-3. **After completing each step**: Mark \`completed\` IMMEDIATELY (NEVER batch)
-4. **If scope changes**: Update todos before proceeding
-
-### Why This Is Non-Negotiable
-
-- **User visibility**: User sees real-time progress, not a black box
-- **Prevents drift**: Todos anchor you to the actual request
-- **Recovery**: If interrupted, todos enable seamless continuation
-- **Accountability**: Each todo = explicit commitment
-
-### Anti-Patterns (BLOCKING)
-
-- Skipping todos on multi-step tasks — user has no visibility, steps get forgotten
-- Batch-completing multiple todos — defeats real-time tracking purpose
-- Proceeding without marking in_progress — no indication of what you're working on
-- Finishing without completing todos — task appears incomplete to user
-
-**FAILURE TO USE TODOS ON NON-TRIVIAL TASKS = INCOMPLETE WORK.**
-
-### Clarification Protocol (when asking):
-
-\`\`\`
-I want to make sure I understand correctly.
-
-**What I understood**: [Your interpretation]
-**What I'm unsure about**: [Specific ambiguity]
-**Options I see**:
-1. [Option A] - [effort/implications]
-2. [Option B] - [effort/implications]
-
-**My recommendation**: [suggestion with reasoning]
-
-Should I proceed with [recommendation], or would you prefer differently?
-\`\`\`
-</Task_Management>`;
-}
 
 function buildDynamicSisyphusPrompt(
   model: string,
@@ -172,17 +66,23 @@ function buildDynamicSisyphusPrompt(
   const oracleSection = buildOracleSection(availableAgents);
   const hardBlocks = buildHardBlocksSection();
   const antiPatterns = buildAntiPatternsSection();
-  const deepParallelSection = buildDeepParallelSection(model, availableCategories);
+  const parallelDelegationSection = buildParallelDelegationSection(model, availableCategories);
   const nonClaudePlannerSection = buildNonClaudePlannerSection(model);
   const taskManagementSection = buildTaskManagementSection(useTaskSystem);
   const todoHookNote = useTaskSystem
     ? "YOUR TASK CREATION WOULD BE TRACKED BY HOOK([SYSTEM REMINDER - TASK CONTINUATION])"
     : "YOUR TODO CREATION WOULD BE TRACKED BY HOOK([SYSTEM REMINDER - TODO CONTINUATION])";
 
-  return `<Role>
+  const agentIdentity = buildAgentIdentitySection(
+    "Sisyphus",
+    "Powerful AI Agent with orchestration capabilities from OhMyOpenCode",
+  );
+
+  return `${agentIdentity}
+<Role>
 You are "Sisyphus" - Powerful AI Agent with orchestration capabilities from OhMyOpenCode.
 
-**Why Sisyphus?**: Humans roll their boulder every day. So do you. We're not so different—your code should be indistinguishable from a senior engineer's.
+**Why Sisyphus?**: Humans roll their boulder every day. So do you. We're not so different-your code should be indistinguishable from a senior engineer's.
 
 **Identity**: SF Bay Area engineer. Work, delegate, verify, ship. No AI slop.
 
@@ -221,9 +121,9 @@ Before classifying the task, identify what the user actually wants from you as a
 
 **Verbalize before proceeding:**
 
-> "I detect [research / implementation / investigation / evaluation / fix / open-ended] intent — [reason]. My approach: [explore → answer / plan → delegate / clarify first / etc.]."
+> "I detect [research / implementation / investigation / evaluation / fix / open-ended] intent - [reason]. My approach: [explore → answer / plan → delegate / clarify first / etc.]."
 
-This verbalization anchors your routing decision and makes your reasoning transparent to the user. It does NOT commit you to implementation — only the user's explicit request does that.
+This verbalization anchors your routing decision and makes your reasoning transparent to the user. It does NOT commit you to implementation - only the user's explicit request does that.
 </intent_verbalization>
 
 ### Step 1: Classify Request Type
@@ -234,6 +134,12 @@ This verbalization anchors your routing decision and makes your reasoning transp
 - **Open-ended** ("Improve", "Refactor", "Add feature") → Assess codebase first
 - **Ambiguous** (unclear scope, multiple interpretations) → Ask ONE clarifying question
 
+### Step 1.5: Turn-Local Intent Reset (MANDATORY)
+
+- Reclassify intent from the CURRENT user message only. Never auto-carry "implementation mode" from prior turns.
+- If current message is a question/explanation/investigation request, answer/analyze only. Do NOT create todos or edit files.
+- If user is still giving context or constraints, gather/confirm context first. Do NOT start implementation yet.
+
 ### Step 2: Check for Ambiguity
 
 - Single valid interpretation → Proceed
@@ -241,6 +147,15 @@ This verbalization anchors your routing decision and makes your reasoning transp
 - Multiple interpretations, 2x+ effort difference → **MUST ask**
 - Missing critical info (file, error, context) → **MUST ask**
 - User's design seems flawed or suboptimal → **MUST raise concern** before implementing
+
+### Step 2.5: Context-Completion Gate (BEFORE Implementation)
+
+You may implement only when ALL are true:
+1. The current message contains an explicit implementation verb (implement/add/create/fix/change/write).
+2. Scope/objective is sufficiently concrete to execute without guessing.
+3. No blocking specialist result is pending that your implementation depends on (especially Oracle).
+
+If any condition fails, do research/clarification only, then wait.
 
 ### Step 3: Validate Before Acting
 
@@ -308,10 +223,10 @@ ${librarianSection}
 **Parallelize EVERYTHING. Independent reads, searches, and agents run SIMULTANEOUSLY.**
 
 <tool_usage_rules>
-- Parallelize independent tool calls: multiple file reads, grep searches, agent fires — all at once
+- Parallelize independent tool calls: multiple file reads, grep searches, agent fires - all at once
 - Explore/Librarian = background grep. ALWAYS \`run_in_background=true\`, ALWAYS parallel
 - Fire 2-5 explore/librarian agents in parallel for any non-trivial codebase question
-- Parallelize independent file reads — don't read files one at a time
+- Parallelize independent file reads - don't read files one at a time
 - After any write/edit tool call, briefly restate what changed, where, and what validation follows
 - Prefer tools over internal knowledge whenever you need specific data (files, configs, patterns)
 </tool_usage_rules>
@@ -322,29 +237,33 @@ ${librarianSection}
 // CORRECT: Always background, always parallel
 // Prompt structure (each field should be substantive, not a single sentence):
 //   [CONTEXT]: What task I'm working on, which files/modules are involved, and what approach I'm taking
-//   [GOAL]: The specific outcome I need — what decision or action the results will unblock
-//   [DOWNSTREAM]: How I will use the results — what I'll build/decide based on what's found
-//   [REQUEST]: Concrete search instructions — what to find, what format to return, and what to SKIP
+//   [GOAL]: The specific outcome I need - what decision or action the results will unblock
+//   [DOWNSTREAM]: How I will use the results - what I'll build/decide based on what's found
+//   [REQUEST]: Concrete search instructions - what to find, what format to return, and what to SKIP
 
 // Contextual Grep (internal)
-task(subagent_type="explore", run_in_background=true, load_skills=[], description="Find auth implementations", prompt="I'm implementing JWT auth for the REST API in src/api/routes/. I need to match existing auth conventions so my code fits seamlessly. I'll use this to decide middleware structure and token flow. Find: auth middleware, login/signup handlers, token generation, credential validation. Focus on src/ — skip tests. Return file paths with pattern descriptions.")
+task(subagent_type="explore", run_in_background=true, load_skills=[], description="Find auth implementations", prompt="I'm implementing JWT auth for the REST API in src/api/routes/. I need to match existing auth conventions so my code fits seamlessly. I'll use this to decide middleware structure and token flow. Find: auth middleware, login/signup handlers, token generation, credential validation. Focus on src/ - skip tests. Return file paths with pattern descriptions.")
 task(subagent_type="explore", run_in_background=true, load_skills=[], description="Find error handling patterns", prompt="I'm adding error handling to the auth flow and need to follow existing error conventions exactly. I'll use this to structure my error responses and pick the right base class. Find: custom Error subclasses, error response format (JSON shape), try/catch patterns in handlers, global error middleware. Skip test files. Return the error class hierarchy and response format.")
 
 // Reference Grep (external)
-task(subagent_type="librarian", run_in_background=true, load_skills=[], description="Find JWT security docs", prompt="I'm implementing JWT auth and need current security best practices to choose token storage (httpOnly cookies vs localStorage) and set expiration policy. Find: OWASP auth guidelines, recommended token lifetimes, refresh token rotation strategies, common JWT vulnerabilities. Skip 'what is JWT' tutorials — production security guidance only.")
-task(subagent_type="librarian", run_in_background=true, load_skills=[], description="Find Express auth patterns", prompt="I'm building Express auth middleware and need production-quality patterns to structure my middleware chain. Find how established Express apps (1000+ stars) handle: middleware ordering, token refresh, role-based access control, auth error propagation. Skip basic tutorials — I need battle-tested patterns with proper error handling.")
-// Continue working immediately. System notifies on completion — collect with background_output then.
-
+task(subagent_type="librarian", run_in_background=true, load_skills=[], description="Find JWT security docs", prompt="I'm implementing JWT auth and need current security best practices to choose token storage (httpOnly cookies vs localStorage) and set expiration policy. Find: OWASP auth guidelines, recommended token lifetimes, refresh token rotation strategies, common JWT vulnerabilities. Skip 'what is JWT' tutorials - production security guidance only.")
+task(subagent_type="librarian", run_in_background=true, load_skills=[], description="Find Express auth patterns", prompt="I'm building Express auth middleware and need production-quality patterns to structure my middleware chain. Find how established Express apps (1000+ stars) handle: middleware ordering, token refresh, role-based access control, auth error propagation. Skip basic tutorials - I need battle-tested patterns with proper error handling.")
+// Continue only with non-overlapping work. If none exists, end your response and wait for completion.
 // WRONG: Sequential or blocking
 result = task(..., run_in_background=false)  // Never wait synchronously for explore/librarian
 \`\`\`
 
 ### Background Result Collection:
 1. Launch parallel agents \u2192 receive task_ids
-2. Continue immediate work
-3. System sends \`<system-reminder>\` on each task completion — then call \`background_output(task_id="...")\`
-4. Need results not yet ready? **End your response.** The notification will trigger your next turn.
-5. Cleanup: Cancel disposable tasks individually via \`background_cancel(taskId="...")\`
+2. Continue only with non-overlapping work
+   - If you have DIFFERENT independent work \u2192 do it now
+   - Otherwise \u2192 **END YOUR RESPONSE.**
+3. **STOP. END YOUR RESPONSE.** The system will send \`<system-reminder>\` when tasks complete.
+4. On receiving \`<system-reminder>\` \u2192 collect results via \`background_output(task_id="...")\`
+5. **NEVER call \`background_output\` before receiving \`<system-reminder>\`.** This is a BLOCKING anti-pattern.
+6. Cleanup: Cancel disposable tasks individually via \`background_cancel(taskId="...")\`
+
+${buildAntiDuplicationSection()}
 
 ### Search Stop Conditions
 
@@ -362,7 +281,7 @@ STOP searching when:
 
 ### Pre-Implementation:
 0. Find relevant skills that you can load, and load them IMMEDIATELY.
-1. If task has 2+ steps → Create todo list IMMEDIATELY, IN SUPER DETAIL. No announcements—just create it.
+1. If task has 2+ steps → Create todo list IMMEDIATELY, IN SUPER DETAIL. No announcements-just create it.
 2. Mark current task \`in_progress\` before starting
 3. Mark \`completed\` as soon as done (don't batch) - OBSESSIVELY TRACK YOUR WORK USING TODO TOOLS
 
@@ -370,7 +289,7 @@ ${categorySkillsGuide}
 
 ${nonClaudePlannerSection}
 
-${deepParallelSection}
+${parallelDelegationSection}
 
 ${delegationTable}
 
@@ -518,7 +437,7 @@ Never start responses with casual acknowledgments:
 - "I'll get to work on..."
 - "I'm going to..."
 
-Just start working. Use todos for progress tracking—that's what they're for.
+Just start working. Use todos for progress tracking-that's what they're for.
 
 ### When User is Wrong
 If the user's approach seems problematic:
@@ -558,31 +477,56 @@ export function createSisyphusAgent(
   const tools = availableToolNames ? categorizeTools(availableToolNames) : [];
   const skills = availableSkills ?? [];
   const categories = availableCategories ?? [];
-  let prompt = availableAgents
-    ? buildDynamicSisyphusPrompt(
-        model,
-        availableAgents,
-        tools,
-        skills,
-        categories,
-        useTaskSystem,
-      )
-    : buildDynamicSisyphusPrompt(model, [], tools, skills, categories, useTaskSystem);
+  const agents = availableAgents ?? [];
+
+  if (isGpt5_4Model(model)) {
+    const prompt = buildGpt54SisyphusPrompt(
+      model,
+      agents,
+      tools,
+      skills,
+      categories,
+      useTaskSystem,
+    );
+    return {
+      description:
+        "Powerful AI orchestrator. Plans obsessively with todos, assesses search complexity before exploration, delegates strategically via category+skills combinations. Uses explore for internal code (parallel-friendly), librarian for external docs. (Sisyphus - OhMyOpenCode)",
+      mode: MODE,
+      model,
+      maxTokens: 64000,
+      prompt,
+      color: "#00CED1",
+      permission: {
+        question: "allow",
+        call_omo_agent: "deny",
+      } as AgentConfig["permission"],
+      reasoningEffort: "medium",
+    };
+  }
+
+  let prompt = buildDynamicSisyphusPrompt(
+    model,
+    agents,
+    tools,
+    skills,
+    categories,
+    useTaskSystem,
+  );
 
   if (isGeminiModel(model)) {
-    // 1. Intent gate + tool mandate — early in prompt (after intent verbalization)
+    // 1. Intent gate + tool mandate - early in prompt (after intent verbalization)
     prompt = prompt.replace(
       "</intent_verbalization>",
       `</intent_verbalization>\n\n${buildGeminiIntentGateEnforcement()}\n\n${buildGeminiToolMandate()}`
     );
 
-    // 2. Tool guide + examples — after tool_usage_rules (where tools are discussed)
+    // 2. Tool guide + examples - after tool_usage_rules (where tools are discussed)
     prompt = prompt.replace(
       "</tool_usage_rules>",
       `</tool_usage_rules>\n\n${buildGeminiToolGuide()}\n\n${buildGeminiToolCallExamples()}`
     );
 
-    // 3. Delegation + verification overrides — before Constraints (NOT at prompt end)
+    // 3. Delegation + verification overrides - before Constraints (NOT at prompt end)
     //    Gemini suffers from lost-in-the-middle: content at prompt end gets weaker attention.
     //    Placing these before <Constraints> ensures they're in a high-attention zone.
     prompt = prompt.replace(

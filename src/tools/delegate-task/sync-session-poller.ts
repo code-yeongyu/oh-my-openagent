@@ -5,6 +5,23 @@ import { log } from "../../shared/logger"
 import { normalizeSDKResponse } from "../../shared"
 
 const NON_TERMINAL_FINISH_REASONS = new Set(["tool-calls", "unknown"])
+const PENDING_TOOL_PART_TYPES = new Set(["tool", "tool_use", "tool-call"])
+
+function wait(milliseconds: number): Promise<void> {
+  const sharedBuffer = new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT)
+  const typedArray = new Int32Array(sharedBuffer)
+  const result = Atomics.waitAsync(typedArray, 0, 0, milliseconds)
+  return result.async ? result.value.then(() => undefined) : Promise.resolve()
+}
+
+function abortSyncSession(client: OpencodeClient, sessionID: string, reason: string): void {
+  log("[task] Aborting sync session", { sessionID, reason })
+  void client.session.abort({
+    path: { id: sessionID },
+  }).catch((error: unknown) => {
+    log("[task] Failed to abort sync session", { sessionID, reason, error: String(error) })
+  })
+}
 
 export function isSessionComplete(messages: SessionMessage[]): boolean {
   let lastUser: SessionMessage | undefined
@@ -19,9 +36,12 @@ export function isSessionComplete(messages: SessionMessage[]): boolean {
 
   if (!lastAssistant?.info?.finish) return false
   if (NON_TERMINAL_FINISH_REASONS.has(lastAssistant.info.finish)) return false
+  if (lastAssistant.parts?.some((part) => part.type && PENDING_TOOL_PART_TYPES.has(part.type))) return false
   if (!lastUser?.info?.id || !lastAssistant?.info?.id) return false
   return lastUser.info.id < lastAssistant.info.id
 }
+
+const DEFAULT_MAX_ASSISTANT_TURNS = 300
 
 export async function pollSyncSession(
   ctx: ToolContextWithMetadata,
@@ -32,25 +52,30 @@ export async function pollSyncSession(
     toastManager: { removeTask: (id: string) => void } | null | undefined
     taskId: string | undefined
     anchorMessageCount?: number
+    maxAssistantTurns?: number
   },
   timeoutMs?: number
 ): Promise<string | null> {
   const syncTiming = getTimingConfig()
   const maxPollTimeMs = Math.max(timeoutMs ?? getDefaultSyncPollTimeoutMs(), 50)
+  const maxTurns = input.maxAssistantTurns ?? DEFAULT_MAX_ASSISTANT_TURNS
   const pollStart = Date.now()
   let pollCount = 0
   let timedOut = false
+  let assistantTurnCount = 0
+  let lastSeenAssistantId: string | undefined
 
-  log("[task] Starting poll loop", { sessionID: input.sessionID, agentToUse: input.agentToUse })
+  log("[task] Starting poll loop", { sessionID: input.sessionID, agentToUse: input.agentToUse, maxTurns })
 
   while (Date.now() - pollStart < maxPollTimeMs) {
     if (ctx.abort?.aborted) {
       log("[task] Aborted by user", { sessionID: input.sessionID })
+      abortSyncSession(client, input.sessionID, "parent_abort")
       if (input.toastManager && input.taskId) input.toastManager.removeTask(input.taskId)
       return `Task aborted.\n\nSession ID: ${input.sessionID}`
     }
 
-    await new Promise(resolve => setTimeout(resolve, syncTiming.POLL_INTERVAL_MS))
+    await wait(syncTiming.POLL_INTERVAL_MS)
     pollCount++
 
     let statusResult: { data?: Record<string, { type: string }> }
@@ -95,7 +120,23 @@ export async function pollSyncSession(
       break
     }
 
+    // 计数新出现的 assistant 轮次，用于熔断无限循环
     const lastAssistant = [...msgs].reverse().find((m) => m.info?.role === "assistant")
+    if (lastAssistant?.info?.id && lastAssistant.info.id !== lastSeenAssistantId) {
+      lastSeenAssistantId = lastAssistant.info.id
+      assistantTurnCount++
+      if (assistantTurnCount >= maxTurns) {
+        log("[task] Max assistant turns reached, aborting to prevent infinite loop", {
+          sessionID: input.sessionID,
+          assistantTurnCount,
+          maxTurns,
+        })
+        abortSyncSession(client, input.sessionID, "max_turns_exceeded")
+        if (input.toastManager && input.taskId) input.toastManager.removeTask(input.taskId)
+        return `Task aborted: subagent exceeded ${maxTurns} assistant turns without completing. This usually indicates an infinite tool-call loop. Session ID: ${input.sessionID}`
+      }
+    }
+
     const hasAssistantText = msgs.some((m) => {
       if (m.info?.role !== "assistant") return false
       const parts = m.parts ?? []
@@ -118,6 +159,7 @@ export async function pollSyncSession(
   if (Date.now() - pollStart >= maxPollTimeMs) {
     timedOut = true
     log("[task] Poll timeout reached", { sessionID: input.sessionID, pollCount })
+    abortSyncSession(client, input.sessionID, "poll_timeout")
   }
 
   return timedOut ? `Poll timeout reached after ${maxPollTimeMs}ms for session ${input.sessionID}` : null

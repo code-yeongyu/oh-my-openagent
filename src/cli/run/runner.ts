@@ -7,6 +7,7 @@ import { resolveSession } from "./session-resolver"
 import { createJsonOutputManager } from "./json-output"
 import { executeOnCompleteHook } from "./on-complete-hook"
 import { resolveRunAgent } from "./agent-resolver"
+import { resolveRunModel } from "./model-resolver"
 import { pollForCompletion } from "./poll-for-completion"
 import { loadAgentProfileColors } from "./agent-profile-colors"
 import { suppressRunInput } from "./stdin-suppression"
@@ -30,6 +31,7 @@ export async function waitForEventProcessorShutdown(
 
 export async function run(options: RunOptions): Promise<number> {
   process.env.OPENCODE_CLI_RUN_MODE = "true"
+  process.env.OPENCODE_CLIENT = "run"
 
   const startTime = Date.now()
   const {
@@ -49,6 +51,8 @@ export async function run(options: RunOptions): Promise<number> {
   const abortController = new AbortController()
 
   try {
+    const resolvedModel = resolveRunModel(options.model)
+
     const { client, cleanup: serverCleanup } = await createServerConnection({
       port: options.port,
       attach: options.attach,
@@ -78,6 +82,10 @@ export async function run(options: RunOptions): Promise<number> {
 
       console.log(pc.dim(`Session: ${sessionID}`))
 
+      if (resolvedModel) {
+        console.log(pc.dim(`Model: ${resolvedModel.providerID}/${resolvedModel.modelID}`))
+      }
+
       const ctx: RunContext = {
         client,
         sessionID,
@@ -96,6 +104,7 @@ export async function run(options: RunOptions): Promise<number> {
         path: { id: sessionID },
         body: {
           agent: resolvedAgent,
+          ...(resolvedModel ? { model: resolvedModel } : {}),
           tools: {
             question: false,
           },
@@ -105,7 +114,6 @@ export async function run(options: RunOptions): Promise<number> {
       })
       const exitCode = await pollForCompletion(ctx, eventState, abortController)
 
-      // Abort the event stream to stop the processor
       abortController.abort()
 
       await waitForEventProcessorShutdown(eventProcessor)

@@ -1,0 +1,10 @@
+{
+  "run_id": "eval-3-without_skill",
+  "expectations": [
+    {"text": "Plan uses git worktree in a sibling directory", "passed": false, "evidence": "git checkout -b only, no worktree"},
+    {"text": "Uses 2+ commits for the multi-file refactor", "passed": false, "evidence": "Single atomic commit: 'refactor: split delegate-task constants and category model requirements'"},
+    {"text": "Maintains backward compatibility via barrel re-export", "passed": true, "evidence": "Re-exports from new files, zero consumer changes"},
+    {"text": "Verification loop includes all 3 gates", "passed": false, "evidence": "Only mentions typecheck/test/build. No review-work or Cubic."},
+    {"text": "References actual src/tools/delegate-task/constants.ts", "passed": true, "evidence": "654 lines, detailed responsibility breakdown, full import maps"}
+  ]
+}

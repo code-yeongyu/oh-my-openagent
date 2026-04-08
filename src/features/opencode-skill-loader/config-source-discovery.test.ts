@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test"
 import { mkdirSync, rmSync, writeFileSync } from "fs"
 import { join } from "path"
-import { tmpdir } from "os"
+import { homedir, tmpdir } from "os"
 import { SkillsConfigSchema } from "../../config/schema/skills"
 import { discoverConfigSourceSkills, normalizePathForGlob } from "./config-source-discovery"
 
@@ -67,6 +67,28 @@ describe("config source discovery", () => {
     const names = skills.map((skill) => skill.name)
     expect(names).toContain("keep/kept-skill")
     expect(names).not.toContain("skip/skipped-skill")
+  })
+
+  it("loads skills from ~/ sources path", async () => {
+    // given
+    const homeSkillsDir = join(homedir(), `.omo-config-source-${Date.now()}`)
+    writeSkill(join(homeSkillsDir, "tilde-skill"), "tilde-skill", "Loaded from tilde path")
+    const config = SkillsConfigSchema.parse({
+      sources: [{ path: `~/${homeSkillsDir.split(homedir())[1]?.replace(/^\//, "")}`, recursive: true }],
+    })
+
+    try {
+      // when
+      const skills = await discoverConfigSourceSkills({
+        config,
+        configDir: join(TEST_DIR, "config"),
+      })
+
+      // then
+      expect(skills.some((skill) => skill.name === "tilde-skill")).toBe(true)
+    } finally {
+      rmSync(homeSkillsDir, { recursive: true, force: true })
+    }
   })
 
   it("normalizes windows separators before glob matching", () => {

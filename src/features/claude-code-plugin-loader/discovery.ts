@@ -1,9 +1,12 @@
 import { existsSync, readFileSync } from "fs"
 import { homedir } from "os"
-import { join } from "path"
+import { basename, join } from "path"
+import { fileURLToPath } from "url"
 import { log } from "../../shared/logger"
+import { shouldLoadPluginForCwd } from "./scope-filter"
 import type {
   InstalledPluginsDatabase,
+  InstalledPluginEntryV3,
   PluginInstallation,
   PluginManifest,
   LoadedPlugin,
@@ -21,12 +24,12 @@ function getPluginsBaseDir(): string {
   return join(homedir(), ".claude", "plugins")
 }
 
-function getInstalledPluginsPath(): string {
-  return join(getPluginsBaseDir(), "installed_plugins.json")
+function getInstalledPluginsPath(pluginsBaseDir?: string): string {
+  return join(pluginsBaseDir ?? getPluginsBaseDir(), "installed_plugins.json")
 }
 
-function loadInstalledPlugins(): InstalledPluginsDatabase | null {
-  const dbPath = getInstalledPluginsPath()
+function loadInstalledPlugins(pluginsBaseDir?: string): InstalledPluginsDatabase | null {
+  const dbPath = getInstalledPluginsPath(pluginsBaseDir)
   if (!existsSync(dbPath)) {
     return null
   }
@@ -62,7 +65,7 @@ function loadClaudeSettings(): ClaudeSettings | null {
   }
 }
 
-function loadPluginManifest(installPath: string): PluginManifest | null {
+export function loadPluginManifest(installPath: string): PluginManifest | null {
   const manifestPath = join(installPath, ".claude-plugin", "plugin.json")
   if (!existsSync(manifestPath)) {
     return null
@@ -78,8 +81,34 @@ function loadPluginManifest(installPath: string): PluginManifest | null {
 }
 
 function derivePluginNameFromKey(pluginKey: string): string {
-  const atIndex = pluginKey.indexOf("@")
-  return atIndex > 0 ? pluginKey.substring(0, atIndex) : pluginKey
+  const keyWithoutSource = pluginKey.startsWith("npm:") ? pluginKey.slice(4) : pluginKey
+
+  let versionSeparator: number
+  if (keyWithoutSource.startsWith("@")) {
+    const scopeEnd = keyWithoutSource.indexOf("/")
+    versionSeparator = scopeEnd > 0 ? keyWithoutSource.indexOf("@", scopeEnd) : -1
+  } else {
+    versionSeparator = keyWithoutSource.lastIndexOf("@")
+  }
+  const keyWithoutVersion = versionSeparator > 0 ? keyWithoutSource.slice(0, versionSeparator) : keyWithoutSource
+
+  if (keyWithoutVersion.startsWith("file://")) {
+    try {
+      return basename(fileURLToPath(keyWithoutVersion))
+    } catch {
+      return basename(keyWithoutVersion)
+    }
+  }
+
+  if (keyWithoutVersion.startsWith("@") && keyWithoutVersion.includes("/")) {
+    return keyWithoutVersion
+  }
+
+  if (keyWithoutVersion.includes("/") || keyWithoutVersion.includes("\\")) {
+    return basename(keyWithoutVersion)
+  }
+
+  return keyWithoutVersion
 }
 
 function isPluginEnabled(
@@ -96,9 +125,39 @@ function isPluginEnabled(
   return true
 }
 
+function v3EntryToInstallation(entry: InstalledPluginEntryV3): PluginInstallation {
+  return {
+    scope: entry.scope,
+    installPath: entry.installPath,
+    version: entry.version,
+    installedAt: entry.lastUpdated,
+    lastUpdated: entry.lastUpdated,
+    gitCommitSha: entry.gitCommitSha,
+    projectPath: entry.projectPath,
+  }
+}
+
+function isValidV3Entry(entry: unknown): entry is InstalledPluginEntryV3 {
+  return (
+    entry != null &&
+    typeof entry === "object" &&
+    typeof (entry as Record<string, unknown>).name === "string" &&
+    typeof (entry as Record<string, unknown>).marketplace === "string" &&
+    typeof (entry as Record<string, unknown>).installPath === "string"
+  )
+}
+
 function extractPluginEntries(
   db: InstalledPluginsDatabase,
 ): Array<[string, PluginInstallation | undefined]> {
+  if (Array.isArray(db)) {
+    return db
+      .filter(isValidV3Entry)
+      .map((entry) => [
+        `${entry.name}@${entry.marketplace}`,
+        v3EntryToInstallation(entry),
+      ])
+  }
   if (db.version === 1) {
     return Object.entries(db.plugins).map(([key, installation]) => [key, installation])
   }
@@ -106,23 +165,35 @@ function extractPluginEntries(
 }
 
 export function discoverInstalledPlugins(options?: PluginLoaderOptions): PluginLoadResult {
-  const db = loadInstalledPlugins()
+  // Allow overriding the plugins base directory for testing
+  const pluginsBaseDir = options?.pluginsHomeOverride ?? getPluginsBaseDir()
+  const db = loadInstalledPlugins(pluginsBaseDir)
   const settings = loadClaudeSettings()
   const plugins: LoadedPlugin[] = []
   const errors: PluginLoadError[] = []
 
-  if (!db || !db.plugins) {
+  if (!db || (!Array.isArray(db) && !db.plugins)) {
     return { plugins, errors }
   }
 
   const settingsEnabledPlugins = settings?.enabledPlugins
   const overrideEnabledPlugins = options?.enabledPluginsOverride
+  const pluginManifestLoader = options?.loadPluginManifestOverride ?? loadPluginManifest
+  const cwd = process.cwd()
 
   for (const [pluginKey, installation] of extractPluginEntries(db)) {
     if (!installation) continue
 
     if (!isPluginEnabled(pluginKey, settingsEnabledPlugins, overrideEnabledPlugins)) {
       log(`Plugin disabled: ${pluginKey}`)
+      continue
+    }
+
+    if (!shouldLoadPluginForCwd(installation, cwd)) {
+      log(`Skipping ${installation.scope}-scoped plugin outside current cwd: ${pluginKey}`, {
+        projectPath: installation.projectPath,
+        cwd,
+      })
       continue
     }
 
@@ -137,7 +208,7 @@ export function discoverInstalledPlugins(options?: PluginLoaderOptions): PluginL
       continue
     }
 
-    const manifest = loadPluginManifest(installPath)
+    const manifest = pluginManifestLoader(installPath)
     const pluginName = manifest?.name || derivePluginNameFromKey(pluginKey)
 
     const loadedPlugin: LoadedPlugin = {

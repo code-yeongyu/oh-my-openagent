@@ -3,7 +3,7 @@
  *
  * Routing logic:
  * 1. Planner agents (prometheus, plan) → planner.ts
- * 2. GPT 5.2 models → gpt5.2.ts
+ * 2. GPT 5.4 models → gpt5.4.ts
  * 3. Gemini models → gemini.ts
  * 4. Everything else (Claude, etc.) → default.ts
  */
@@ -21,6 +21,16 @@ export function isPlannerAgent(agentName?: string): boolean {
 
   const normalized = lowerName.replace(/[_-]+/g, " ")
   return /\bplan\b/.test(normalized)
+}
+
+/**
+ * Checks if agent is a non-OMO agent (e.g., OpenCode's built-in Builder/Plan).
+ * Non-OMO agents should not receive keyword injection (search-mode, analyze-mode, etc.).
+ */
+export function isNonOmoAgent(agentName?: string): boolean {
+  if (!agentName) return false
+  const lowerName = agentName.toLowerCase()
+  return lowerName.includes("builder") || lowerName === "plan"
 }
 
 export { isGptModel, isGeminiModel }
