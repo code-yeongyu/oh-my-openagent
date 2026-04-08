@@ -3,7 +3,7 @@ import { createSisyphusJuniorAgentWithOverrides } from "../agents/sisyphus-junio
 import type { OhMyOpenCodeConfig } from "../config";
 import { isTaskSystemEnabled, log, migrateAgentConfig } from "../shared";
 import { AGENT_NAME_MAP } from "../shared/migration";
-import { getAgentDisplayName } from "../shared/agent-display-names";
+import { getAgentDisplayName, getAgentListDisplayName } from "../shared/agent-display-names";
 import { registerAgentName } from "../features/claude-code-session-state";
 import {
   discoverConfigSourceSkills,
@@ -159,10 +159,10 @@ export async function applyAgentConfig(params: {
   if (isSisyphusEnabled && builtinAgents.sisyphus) {
     if (configuredDefaultAgent) {
       (params.config as { default_agent?: string }).default_agent =
-        getAgentDisplayName(configuredDefaultAgent);
+        getAgentListDisplayName(configuredDefaultAgent);
     } else {
       (params.config as { default_agent?: string }).default_agent =
-        getAgentDisplayName("sisyphus");
+        getAgentListDisplayName("sisyphus");
     }
 
     // Assembly order: Sisyphus -> Hephaestus -> Prometheus -> Atlas
