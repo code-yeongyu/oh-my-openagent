@@ -104,6 +104,17 @@ function compareFamilyCandidates(left: string, right: string, family: string): n
 		return rightHasNoAtSign - leftHasNoAtSign
 	}
 
+	// Prefer normalized (hyphen) form over dot form when version vectors are equal.
+	// e.g. "claude-opus-4-6" beats "claude-opus-4.6" because dots are normalizable noise.
+	// Must count dots on the raw candidate strings (not normalized ones, where dots are already converted).
+	const leftRawModelID = extractModelID(left).trim().toLowerCase()
+	const rightRawModelID = extractModelID(right).trim().toLowerCase()
+	const leftDotCount = (leftRawModelID.match(/\./g) ?? []).length
+	const rightDotCount = (rightRawModelID.match(/\./g) ?? []).length
+	if (leftDotCount !== rightDotCount) {
+		return leftDotCount - rightDotCount
+	}
+
 	return left.length - right.length
 }
 
