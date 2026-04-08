@@ -190,6 +190,41 @@ export function resolveModelForDelegateTask(input: {
         }
       }
     }
+
+    // Dynamic fallback: try all connected providers not in the hardcoded chain.
+    // This ensures user-configured providers (e.g. minimax) are used even if not listed
+    // in AGENT_MODEL_REQUIREMENTS, provided their models appear in availableModels.
+    if (fallbackChain && fallbackChain.length > 0) {
+      const hardcodedProviders = new Set<string>()
+      for (const entry of fallbackChain) {
+        for (const provider of entry.providers) {
+          hardcodedProviders.add(provider)
+        }
+      }
+
+      const modelsByProvider = new Map<string, string[]>()
+      for (const model of input.availableModels) {
+        const slashIdx = model.indexOf("/")
+        if (slashIdx === -1) continue
+        const provider = model.slice(0, slashIdx)
+        if (hardcodedProviders.has(provider)) continue
+        const list = modelsByProvider.get(provider)
+        if (list) {
+          list.push(model)
+        } else {
+          modelsByProvider.set(provider, [model])
+        }
+      }
+
+      // Fast path: return the first available model from any non-hardcoded provider.
+      // All models in availableModels are by definition available — no fuzzy matching needed.
+      for (const [provider, models] of modelsByProvider) {
+        if (models.length > 0) {
+          log("[resolveModelForDelegateTask] resolved via dynamic provider fallback", { provider, model: models[0] })
+          return { model: models[0] }
+        }
+      }
+    }
   }
 
   const systemDefaultModel = normalizeModel(input.systemDefaultModel)
