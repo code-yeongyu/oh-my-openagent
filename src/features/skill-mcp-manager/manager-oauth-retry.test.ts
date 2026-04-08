@@ -12,18 +12,18 @@ const mockGetOrCreateClientWithRetryImpl = mock(async () => ({
   close: mock(async () => {}),
 }))
 
-mock.module("./connection", () => ({
-  getOrCreateClient: mockGetOrCreateClient,
-  getOrCreateClientWithRetryImpl: mockGetOrCreateClientWithRetryImpl,
-}))
-
-mock.module("../mcp-oauth/provider", () => ({
-  McpOAuthProvider: class MockMcpOAuthProvider {},
-}))
-
 type ManagerModule = typeof import("./manager")
 
 async function importFreshManagerModule(): Promise<ManagerModule> {
+  mock.module("./connection", () => ({
+    getOrCreateClient: mockGetOrCreateClient,
+    getOrCreateClientWithRetryImpl: mockGetOrCreateClientWithRetryImpl,
+  }))
+
+  mock.module("../mcp-oauth/provider", () => ({
+    McpOAuthProvider: class MockMcpOAuthProvider {},
+  }))
+
   return await import(new URL(`./manager.ts?oauth-retry-test=${Date.now()}-${Math.random()}`, import.meta.url).href)
 }
 

@@ -1,15 +1,15 @@
-import { beforeEach, describe, expect, it, mock } from "bun:test"
+import { describe, expect, it, mock } from "bun:test"
 import type { ClaudeCodeMcpServer } from "../claude-code-mcp-loader/types"
 import type { OAuthTokenData } from "../mcp-oauth/storage"
 import type { OAuthProviderFactory, OAuthProviderLike } from "./types"
 
-mock.module("../mcp-oauth/provider", () => ({
-  McpOAuthProvider: class MockMcpOAuthProvider {},
-}))
-
 type OAuthHandlerModule = typeof import("./oauth-handler")
 
 async function importFreshOAuthHandlerModule(): Promise<OAuthHandlerModule> {
+  mock.module("../mcp-oauth/provider", () => ({
+    McpOAuthProvider: class MockMcpOAuthProvider {},
+  }))
+
   return await import(new URL(`./oauth-handler.ts?oauth-handler-test=${Date.now()}-${Math.random()}`, import.meta.url).href)
 }
 
@@ -41,10 +41,6 @@ function createConfig(serverUrl: string): ClaudeCodeMcpServer {
 }
 
 describe("oauth-handler refresh mutex wiring", () => {
-  beforeEach(() => {
-    mock.restore()
-  })
-
   it("deduplicates concurrent pre-request refresh attempts for the same server", async () => {
     // given
     const { buildHttpRequestInit } = await importFreshOAuthHandlerModule()
