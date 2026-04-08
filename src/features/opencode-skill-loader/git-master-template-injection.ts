@@ -4,15 +4,54 @@ const BASH_CODE_BLOCK_PATTERN = /```bash\r?\n([\s\S]*?)```/g
 const LEADING_GIT_COMMAND_PATTERN = /^([ \t]*(?:[A-Za-z_][A-Za-z0-9_]*=[^ \t]+\s+)*)git(?=[ \t]|$)/gm
 const INLINE_GIT_COMMAND_PATTERN = /([;&|()][ \t]*)git(?=[ \t]|$)/g
 
+// Shell detection (exposed for testing)
+export function detectShellType(): "bash" | "pwsh" {
+	if (process.platform === "win32") {
+		const shell = process.env.Shell ?? process.env.ComSpec ?? ""
+		if (/powershell|pwsh|psexec/i.test(shell)) {
+			return "pwsh"
+		}
+		// On Windows outside of known shells, assume PowerShell
+		return "pwsh"
+	}
+	const shell = process.env.SHELL ?? ""
+	if (/powershell|pwsh/i.test(shell)) {
+		return "pwsh"
+	}
+	return "bash"
+}
+
+/** Convert a bash-format env prefix ("VAR=value VAR2=value2") to PowerShell format */
+function convertEnvPrefixForPwsh(bashPrefix: string): string {
+	return bashPrefix
+		.split(" ")
+		.map((assignment) => {
+			const eqIndex = assignment.indexOf("=")
+			if (eqIndex === -1) return assignment
+			const key = assignment.slice(0, eqIndex)
+			const value = assignment.slice(eqIndex + 1)
+			return `$env:${key}='${value}'`
+		})
+		.join("; ")
+}
+
+export function getShellAwareEnvPrefix(bashPrefix: string): string {
+	if (detectShellType() === "pwsh") {
+		return convertEnvPrefixForPwsh(bashPrefix)
+	}
+	return bashPrefix
+}
+
 export function injectGitMasterConfig(template: string, config?: GitMasterConfig): string {
 	const commitFooter = config?.commit_footer ?? true
 	const includeCoAuthoredBy = config?.include_co_authored_by ?? true
 	const gitEnvPrefix = assertValidGitEnvPrefix(config?.git_env_prefix ?? "GIT_MASTER=1")
+	const shellPrefix = gitEnvPrefix ? getShellAwareEnvPrefix(gitEnvPrefix) : ""
 
-	let result = gitEnvPrefix ? injectGitEnvPrefix(template, gitEnvPrefix) : template
+	let result = gitEnvPrefix ? injectGitEnvPrefix(template, shellPrefix) : template
 
 	if (commitFooter || includeCoAuthoredBy) {
-		const injection = buildCommitFooterInjection(commitFooter, includeCoAuthoredBy, gitEnvPrefix)
+		const injection = buildCommitFooterInjection(commitFooter, includeCoAuthoredBy, shellPrefix)
 		const insertionPoint = result.indexOf("```\n</execution>")
 
 		result =
@@ -25,7 +64,7 @@ export function injectGitMasterConfig(template: string, config?: GitMasterConfig
 				: result + "\n\n" + injection
 	}
 
-	return gitEnvPrefix ? prefixGitCommandsInBashCodeBlocks(result, gitEnvPrefix) : result
+	return gitEnvPrefix ? prefixGitCommandsInBashCodeBlocks(result, shellPrefix) : result
 }
 
 function injectGitEnvPrefix(template: string, prefix: string): string {
