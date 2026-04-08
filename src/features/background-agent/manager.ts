@@ -422,10 +422,6 @@ export class BackgroundManager {
             this.concurrencyManager.release(key)
           }
 
-          if (item.task.rootSessionID) {
-            this.unregisterRootDescendant(item.task.rootSessionID)
-          }
-
           removeTaskToastTracking(item.task.id)
 
           // Abort the orphaned session if one was created before the error

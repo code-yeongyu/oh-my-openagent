@@ -218,6 +218,10 @@ function getRootDescendantCounts(manager: BackgroundManager): Map<string, number
   return (manager as unknown as { rootDescendantCounts: Map<string, number> }).rootDescendantCounts
 }
 
+function getPreStartDescendantReservations(manager: BackgroundManager): Set<string> {
+  return (manager as unknown as { preStartDescendantReservations: Set<string> }).preStartDescendantReservations
+}
+
 function getQueuesByKey(
   manager: BackgroundManager
 ): Map<string, Array<{ task: BackgroundTask; input: import("./types").LaunchInput }>> {
@@ -2524,6 +2528,46 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
 
       // then
       expect(retryTask.status).toBe("pending")
+    })
+
+    test("should only roll back the failed task reservation once when siblings still exist", async () => {
+      // given
+      const concurrencyKey = "test-agent"
+      const task = createMockTask({
+        id: "task-single-reservation-rollback",
+        sessionID: "session-single-reservation-rollback",
+        parentSessionID: "session-root",
+        status: "pending",
+        agent: "test-agent",
+        rootSessionID: "session-root",
+      })
+      delete (task as Partial<BackgroundTask>).sessionID
+
+      const input = {
+        description: task.description,
+        prompt: task.prompt,
+        agent: task.agent,
+        parentSessionID: task.parentSessionID,
+        parentMessageID: task.parentMessageID,
+      }
+
+      getTaskMap(manager).set(task.id, task)
+      getQueuesByKey(manager).set(concurrencyKey, [{ task, input }])
+      getRootDescendantCounts(manager).set("session-root", 2)
+      getPreStartDescendantReservations(manager).add(task.id)
+      stubNotifyParentSession(manager)
+
+      ;(manager as unknown as {
+        startTask: (item: { task: BackgroundTask; input: typeof input }) => Promise<void>
+      }).startTask = async () => {
+        throw new Error("session create failed")
+      }
+
+      // when
+      await processKeyForTest(manager, concurrencyKey)
+
+      // then
+      expect(getRootDescendantCounts(manager).get("session-root")).toBe(1)
     })
 
     test("should keep the next queued task when the first task is cancelled during session creation", async () => {
