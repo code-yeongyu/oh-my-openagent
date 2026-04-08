@@ -87,7 +87,7 @@ describe("createChatMessageHandler - /start-work integration", () => {
     await handler(input, output)
 
     // then
-    expect(output.message["agent"]).toBe("Sisyphus - Ultraworker")
+    expect(output.message["agent"]).toBe("sisyphus")
     expect(output.parts[0].text).toContain("<auto-slash-command>")
     expect(output.parts[0].text).toContain("Auto-Selected Plan")
     expect(output.parts[0].text).toContain("boulder.json has been created")
@@ -116,7 +116,7 @@ describe("createChatMessageHandler - /start-work integration", () => {
     await handler(input, output)
 
     // then
-    expect(output.message["agent"]).toBe("Sisyphus - Ultraworker")
+    expect(output.message["agent"]).toBe("sisyphus")
     expect(output.parts[0].text).toContain("<auto-slash-command>")
     expect(output.parts[0].text).toContain("Auto-Selected Plan")
     expect(output.parts[0].text).toContain("my-feature-plan")

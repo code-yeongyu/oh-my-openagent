@@ -7,7 +7,6 @@ import { tmpdir } from "node:os"
 import { randomUUID } from "node:crypto"
 import { createStartWorkHook } from "./index"
 import { createAtlasHook } from "../atlas"
-import { getAgentDisplayName, getAgentListDisplayName } from "../../shared/agent-display-names"
 import {
   writeBoulderState,
   clearBoulderState,
@@ -467,7 +466,7 @@ You are starting a Sisyphus work session.
       updateSpy.mockRestore()
     })
 
-    test("should stamp the outgoing message with Atlas list key so follow-up events keep the handoff", async () => {
+    test("should stamp the outgoing message with Atlas config key so OpenCode can resolve the agent", async () => {
       // given
       const hook = createStartWorkHook(createMockPluginInput())
       const output = {
@@ -481,8 +480,8 @@ You are starting a Sisyphus work session.
         output
       )
 
-      // then
-      expect(output.message.agent).toBe(getAgentDisplayName("atlas"))
+      // then - config key, not display name (matches no-sisyphus-gpt / boulder-continuation-injector convention)
+      expect(output.message.agent).toBe("atlas")
     })
 
     test("should switch to Atlas even when current session is Sisyphus (regression: #3155)", async () => {
@@ -502,7 +501,7 @@ You are starting a Sisyphus work session.
       )
 
       // atlas is registered in beforeEach, so it must be selected
-      expect(output.message.agent).toBe(getAgentDisplayName("atlas"))
+      expect(output.message.agent).toBe("atlas")
       expect(sessionState.getSessionAgent("ses-sisyphus-to-atlas")).toBe("atlas")
     })
 
@@ -525,7 +524,7 @@ You are starting a Sisyphus work session.
       )
 
       // then
-      expect(output.message.agent).toBe("Sisyphus - Ultraworker")
+      expect(output.message.agent).toBe("sisyphus")
       expect(sessionState.getSessionAgent("ses-prometheus-to-sisyphus")).toBe("sisyphus")
     })
 
@@ -553,7 +552,7 @@ You are starting a Sisyphus work session.
       )
 
       // then
-      expect(output.message.agent).toBe("Sisyphus - Ultraworker")
+      expect(output.message.agent).toBe("sisyphus")
       expect(sessionState.getSessionAgent("ses-prometheus-to-worker")).toBe("sisyphus")
       expect(readBoulderState(testDir)?.agent).toBe("sisyphus")
     })
@@ -588,7 +587,7 @@ You are starting a Sisyphus work session.
       )
 
       // then
-      expect(output.message.agent).toBe("Sisyphus - Ultraworker")
+      expect(output.message.agent).toBe("sisyphus")
       expect(readBoulderState(testDir)?.agent).toBe("sisyphus")
     })
 
@@ -623,7 +622,7 @@ You are starting a Sisyphus work session.
       await atlasHook.handler({ event: { type: "session.idle", properties: { sessionID: "session-123" } } })
 
       // then
-      expect(output.message.agent).toBe(getAgentDisplayName("atlas"))
+      expect(output.message.agent).toBe("atlas")
       expect(readBoulderState(testDir)?.session_ids).toContain("session-123")
       expect(readBoulderState(testDir)?.agent).toBe("atlas")
       expect(promptAsyncMock).toHaveBeenCalledTimes(1)
@@ -713,7 +712,7 @@ You are starting a Sisyphus work session.
         await firePendingTimers()
 
         // then
-        expect(output.message.agent).toBe(getAgentDisplayName("atlas"))
+        expect(output.message.agent).toBe("atlas")
         expect(readBoulderState(testDir)?.session_ids).toContain("session-123")
         expect(readBoulderState(testDir)?.agent).toBe("atlas")
         expect(promptAsyncMock).toHaveBeenCalledTimes(1)
