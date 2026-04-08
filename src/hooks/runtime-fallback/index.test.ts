@@ -518,7 +518,7 @@ describe("runtime-fallback", () => {
 
     test("should trigger fallback on OpenAI auto-retry signal in message.updated", async () => {
       const hook = createRuntimeFallbackHook(createMockPluginInput(), {
-        config: createMockConfig({ notify_on_fallback: false }),
+        config: createMockConfig({ notify_on_fallback: false, timeout_seconds: 30 }),
         pluginConfig: createMockPluginConfigWithCategoryFallback(["anthropic/claude-opus-4-6"]),
       })
 
