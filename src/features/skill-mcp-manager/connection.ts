@@ -38,7 +38,8 @@ export async function getOrCreateClient(params: {
     return pending
   }
 
-  const expandedConfig = expandEnvVarsInObject(config, { trusted: true })
+  const isTrusted = info.scope !== "project"
+  const expandedConfig = expandEnvVarsInObject(config, { trusted: isTrusted })
   let currentConnectionPromise!: Promise<Client>
   state.inFlightConnections.set(info.sessionID, (state.inFlightConnections.get(info.sessionID) ?? 0) + 1)
   currentConnectionPromise = (async () => {
