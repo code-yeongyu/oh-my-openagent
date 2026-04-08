@@ -20,7 +20,7 @@ npx oh-my-opencode install # alternative
 
 > **Note**: The CLI ships with standalone binaries for all major platforms. No runtime (Bun/Node.js) is required for CLI execution after installation.
 >
-> **Supported platforms**: macOS (ARM64, x64), Linux (x64, ARM64, Alpine/musl), Windows (x64)
+> **Supported platforms**: macOS (ARM64, x64), Linux (x64, ARM64, Alpine/musl), Windows (x64, ARM64)
 
 Follow the prompts to configure your Claude, ChatGPT, and Gemini subscriptions. After installation, authenticate your providers as instructed.
 

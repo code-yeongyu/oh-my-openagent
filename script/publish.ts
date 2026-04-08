@@ -18,6 +18,7 @@ const PLATFORM_PACKAGES = [
   "linux-x64-musl",
   "linux-arm64-musl",
   "windows-x64",
+  "windows-arm64",
 ]
 
 console.log("=== Publishing oh-my-opencode (multi-package) ===\n")

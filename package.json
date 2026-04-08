@@ -87,6 +87,7 @@
     "oh-my-opencode-linux-x64-baseline": "3.14.0",
     "oh-my-opencode-linux-x64-musl": "3.14.0",
     "oh-my-opencode-linux-x64-musl-baseline": "3.14.0",
+    "oh-my-opencode-windows-arm64": "3.14.0",
     "oh-my-opencode-windows-x64": "3.14.0",
     "oh-my-opencode-windows-x64-baseline": "3.14.0"
   },

@@ -25,6 +25,7 @@ export const PLATFORMS: PlatformTarget[] = [
   { dir: "linux-arm64-musl", target: "bun-linux-arm64-musl", binary: "oh-my-opencode", description: "Linux ARM64 (musl)" },
   { dir: "windows-x64", target: "bun-windows-x64", binary: "oh-my-opencode.exe", description: "Windows x64" },
   { dir: "windows-x64-baseline", target: "bun-windows-x64-baseline", binary: "oh-my-opencode.exe", description: "Windows x64 (no AVX2)" },
+  { dir: "windows-arm64", target: "bun-windows-arm64", binary: "oh-my-opencode.exe", description: "Windows ARM64" },
 ];
 
 const ENTRY_POINT = "src/cli/index.ts";
