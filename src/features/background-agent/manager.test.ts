@@ -1059,7 +1059,18 @@ describe("BackgroundManager.notifyParentSession - aborted parent", () => {
         prompt: promptMock,
         promptAsync: promptMock,
         abort: async () => ({}),
-        messages: async () => ({ data: [] }),
+        messages: async () => ({
+          data: [{
+            info: {
+              agent: "explore",
+              model: {
+                providerID: "anthropic",
+                modelID: "claude-opus-4-6",
+                variant: "high",
+              },
+            },
+          }],
+        }),
       },
     }
     const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
@@ -1215,6 +1226,58 @@ describe("BackgroundManager.notifyParentSession - variant propagation", () => {
     //#then
     expect(promptCalls).toHaveLength(1)
     expect(promptCalls[0].body.variant).toBe("high")
+
+    manager.shutdown()
+  })
+
+  test("should prefer parent session variant over child task variant in parent notification promptAsync body", async () => {
+    //#given
+    const promptCalls: Array<{ body: Record<string, unknown> }> = []
+    const client = {
+      session: {
+        prompt: async () => ({}),
+        promptAsync: async (args: { path: { id: string }; body: Record<string, unknown> }) => {
+          promptCalls.push({ body: args.body })
+          return {}
+        },
+        abort: async () => ({}),
+        messages: async () => ({
+          data: [{
+            info: {
+              agent: "explore",
+              model: {
+                providerID: "anthropic",
+                modelID: "claude-opus-4-6",
+                variant: "max",
+              },
+            },
+          }],
+        }),
+      },
+    }
+    const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
+    const task: BackgroundTask = {
+      id: "task-parent-variant-wins",
+      sessionID: "session-child",
+      parentSessionID: "session-parent",
+      parentMessageID: "msg-parent",
+      description: "task with mismatched variant",
+      prompt: "test",
+      agent: "explore",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+      model: { providerID: "anthropic", modelID: "claude-opus-4-6", variant: "high" },
+    }
+    getPendingByParent(manager).set("session-parent", new Set([task.id]))
+
+    //#when
+    await (manager as unknown as { notifyParentSession: (task: BackgroundTask) => Promise<void> })
+      .notifyParentSession(task)
+
+    //#then
+    expect(promptCalls).toHaveLength(1)
+    expect(promptCalls[0].body.variant).toBe("max")
 
     manager.shutdown()
   })
