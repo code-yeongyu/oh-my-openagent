@@ -3,6 +3,7 @@ import { resolve } from "node:path"
 import { readFile, readdir, stat } from "node:fs/promises"
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js"
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod"
 import { runRg, runRgCount } from "../../tools/grep/cli"
 import { runRgFiles } from "../../tools/glob/cli"
@@ -233,6 +234,14 @@ export async function startMcpServer(options: McpServerOptions): Promise<void> {
   console.log(`  MCP:    http://0.0.0.0:${port}/sse`)
   console.log(`  health: http://0.0.0.0:${port}/health`)
   console.log(`  tools:  grep, glob, ast_grep_search, file_read, file_list`)
+
+  if (!process.stdin.isTTY) {
+    const stdioTransport = new StdioServerTransport()
+    const stdioServer = buildMcpServer(workDir)
+    await stdioServer.connect(stdioTransport)
+    await new Promise<void>((res) => stdioTransport.onclose = res)
+    return
+  }
 
   await new Promise<void>(() => {})
 }
