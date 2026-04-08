@@ -15,6 +15,10 @@ function migrationKey(oldModel: string, newModel: string): string {
   return `model-version:${oldModel}->${newModel}`
 }
 
+function migrationPrefix(oldModel: string): string {
+  return `model-version:${oldModel}->`
+}
+
 export function migrateModelVersions(
   configs: Record<string, unknown>,
   appliedMigrations?: Set<string>
@@ -31,8 +35,13 @@ export function migrateModelVersions(
         const newModel = MODEL_VERSION_MAP[oldModel]
         const mKey = migrationKey(oldModel, newModel)
 
-        // Skip if this migration was already applied (user may have reverted)
-        if (appliedMigrations?.has(mKey)) {
+        // Skip if this migration was already applied (user may have reverted).
+        // Also recognize legacy migration keys from older plugin versions that
+        // pointed to a different target version for the same source model.
+        const prefix = migrationPrefix(oldModel)
+        const alreadyApplied = appliedMigrations?.has(mKey)
+          || (appliedMigrations != null && Array.from(appliedMigrations).some((k) => k.startsWith(prefix)))
+        if (alreadyApplied) {
           migrated[key] = value
           continue
         }
