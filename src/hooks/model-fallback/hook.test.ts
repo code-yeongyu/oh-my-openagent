@@ -37,6 +37,10 @@ const transformModelForProviderMock = mock((provider: string, model: string) => 
       .replace(/gemini-3\.1-pro(?!-)/g, "gemini-3.1-pro-preview")
       .replace(/gemini-3-flash(?!-)/g, "gemini-3-flash-preview")
   }
+  // Resolve stable family aliases for anthropic (mirrors real transformModelForProvider behavior)
+  if (model === "claude-opus") return "claude-opus-4-6"
+  if (model === "claude-sonnet") return "claude-sonnet-4-6"
+  if (model === "claude-haiku") return "claude-haiku-4-5"
   return model
 })
 
@@ -59,7 +63,6 @@ async function importFreshModelFallbackHookModule() {
   }))
 
   const module = await import(`./hook?test=${Date.now()}-${Math.random()}`)
-  mock.restore()
   return module
 }
 
@@ -117,7 +120,7 @@ describe("model fallback hook", () => {
     //#then
     expect(output.message["model"]).toEqual({
       providerID: "anthropic",
-      modelID: "claude-opus",
+      modelID: "claude-opus-4-6",
     })
   })
 
@@ -149,17 +152,17 @@ describe("model fallback hook", () => {
     //#then
     expect(firstOutput.message["model"]).toEqual({
       providerID: "anthropic",
-      modelID: "claude-opus",
+      modelID: "claude-opus-4-6",
     })
 
     //#when - second error re-arms fallback and should advance to next entry
     expect(
-      setPendingModelFallback(sessionID, "Sisyphus - Ultraworker", "anthropic", "claude-opus"),
+      setPendingModelFallback(sessionID, "Sisyphus - Ultraworker", "anthropic", "claude-opus-4-6"),
     ).toBe(true)
 
     const secondOutput = {
       message: {
-        model: { providerID: "anthropic", modelID: "claude-opus" },
+        model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
       },
       parts: [{ type: "text", text: "continue" }],
     }

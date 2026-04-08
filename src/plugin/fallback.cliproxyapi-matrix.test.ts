@@ -66,11 +66,11 @@ const PRIMARY_MODEL_STRING = `${PRIMARY_MODEL.providerID}/${PRIMARY_MODEL.modelI
 
 const FIRST_FALLBACK_MODEL = {
   providerID: PROVIDER_ID,
-  modelID: "claude-sonnet-4-6",
+  modelID: "claude-sonnet-4.6",
 }
 
 const CLIPROXYAPI_FALLBACKS = [
-  `${PROVIDER_ID}/claude-sonnet-4-6`,
+  `${PROVIDER_ID}/claude-sonnet-4.6`,
   `${PROVIDER_ID}/gpt-5.4`,
   `${PROVIDER_ID}/kimi-k2.5`,
 ]
