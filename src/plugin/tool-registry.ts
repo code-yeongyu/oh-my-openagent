@@ -27,6 +27,8 @@ import {
   createTaskList,
   createTaskUpdateTool,
   createHashlineEditTool,
+  createA2aDelegateTool,
+  DEFAULT_OPENFANG_BASE_URL,
 } from "../tools"
 import { getMainSessionID } from "../features/claude-code-session-state"
 import { filterDisabledTools } from "../shared/disabled-tools"
@@ -198,6 +200,11 @@ export function createToolRegistry(args: {
     ? { edit: createHashlineEditTool(ctx) }
     : {}
 
+  const a2aDelegateTools = createA2aDelegateTool(
+    ctx,
+    pluginConfig.openfang?.base_url ?? DEFAULT_OPENFANG_BASE_URL,
+  )
+
   const allTools: Record<string, ToolDefinition> = {
     ...builtinTools,
     ...createGrepTools(ctx),
@@ -213,6 +220,7 @@ export function createToolRegistry(args: {
     ...(interactiveBashEnabled ? { interactive_bash } : {}),
     ...taskToolsRecord,
     ...hashlineToolsRecord,
+    ...a2aDelegateTools,
   }
 
   for (const toolDefinition of Object.values(allTools)) {
