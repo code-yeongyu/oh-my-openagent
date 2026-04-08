@@ -33,7 +33,7 @@ const AGENT_LIST_SORT_PREFIXES: Record<string, string> = {
   atlas: "\u200B\u200B\u200B\u200B",
 }
 
-function stripAgentListSortPrefix(agentName: string): string {
+export function stripAgentListSortPrefix(agentName: string): string {
   return agentName.replace(/^\u200B+/, "")
 }
 

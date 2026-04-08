@@ -14,6 +14,7 @@ import { log } from "../../shared/logger"
 import {
   getAgentDisplayName,
   getAgentListDisplayName,
+  stripAgentListSortPrefix,
 } from "../../shared/agent-display-names"
 import {
   isAgentRegistered,
@@ -90,7 +91,7 @@ export function createStartWorkHook(ctx: PluginInput) {
       : getAgentDisplayName(activeAgent)
     updateSessionAgent(input.sessionID, activeAgent)
     if (output.message) {
-      output.message["agent"] = activeAgentDisplayName
+      output.message["agent"] = stripAgentListSortPrefix(activeAgentDisplayName)
     }
 
     const existingState = readBoulderState(ctx.directory)
