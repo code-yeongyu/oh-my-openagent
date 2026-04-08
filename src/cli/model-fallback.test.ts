@@ -7,6 +7,7 @@ mock.module("../shared/connected-providers-cache", () => ({
 
 import { generateModelConfig } from "./model-fallback"
 import type { InstallConfig } from "./types"
+import { transformModelForProvider } from "../shared/provider-model-id-transform"
 
 function createConfig(overrides: Partial<InstallConfig> = {}): InstallConfig {
   return {
@@ -563,7 +564,7 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then explore should have fallback_models from the remaining chain entries
-      expect(result.agents?.explore?.model).toBe("anthropic/claude-haiku-4-5")
+      expect(result.agents?.explore?.model).toBe(`anthropic/${transformModelForProvider("anthropic", "claude-haiku")}`)
       expect(result.agents?.explore?.fallback_models).toBeDefined()
       expect(result.agents?.explore?.fallback_models?.length).toBeGreaterThan(0)
     })
@@ -576,7 +577,7 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then explore should not have fallback_models (only one chain entry matches)
-      expect(result.agents?.explore?.model).toBe("anthropic/claude-haiku-4-5")
+      expect(result.agents?.explore?.model).toBe(`anthropic/${transformModelForProvider("anthropic", "claude-haiku")}`)
       expect(result.agents?.explore?.fallback_models).toBeUndefined()
     })
 
