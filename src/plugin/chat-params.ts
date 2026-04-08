@@ -101,7 +101,7 @@ export function createChatParamsHandler(args: {
         output.topP = storedPromptParams.topP
       }
       if (storedPromptParams.maxOutputTokens !== undefined) {
-        output.maxOutputTokens = storedPromptParams.maxOutputTokens
+        (output as Record<string, unknown>).maxOutputTokens = storedPromptParams.maxOutputTokens
       }
       if (storedPromptParams.options) {
         output.options = {
