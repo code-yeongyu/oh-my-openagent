@@ -65,6 +65,7 @@ describe("SkillMcpManager", () => {
           serverName: "test-server",
           skillName: "test-skill",
           sessionID: "session-1",
+          scope: "builtin",
         }
         const config: ClaudeCodeMcpServer = {}
 
@@ -80,6 +81,7 @@ describe("SkillMcpManager", () => {
           serverName: "my-mcp",
           skillName: "data-skill",
           sessionID: "session-1",
+          scope: "builtin",
         }
         const config: ClaudeCodeMcpServer = {}
 
@@ -95,6 +97,7 @@ describe("SkillMcpManager", () => {
           serverName: "custom-server",
           skillName: "custom-skill",
           sessionID: "session-1",
+        scope: "builtin",
         }
         const config: ClaudeCodeMcpServer = {}
 
@@ -112,6 +115,7 @@ describe("SkillMcpManager", () => {
           serverName: "http-server",
           skillName: "test-skill",
           sessionID: "session-1",
+        scope: "builtin",
         }
         const config: ClaudeCodeMcpServer = {
           type: "http",
@@ -130,6 +134,7 @@ describe("SkillMcpManager", () => {
           serverName: "sse-server",
           skillName: "test-skill",
           sessionID: "session-1",
+        scope: "builtin",
         }
         const config: ClaudeCodeMcpServer = {
           type: "sse",
@@ -148,6 +153,7 @@ describe("SkillMcpManager", () => {
           serverName: "inferred-http",
           skillName: "test-skill",
           sessionID: "session-1",
+        scope: "builtin",
         }
         const config: ClaudeCodeMcpServer = {
           url: "https://example.com/mcp",
@@ -165,6 +171,7 @@ describe("SkillMcpManager", () => {
           serverName: "stdio-server",
           skillName: "test-skill",
           sessionID: "session-1",
+        scope: "builtin",
         }
         const config: ClaudeCodeMcpServer = {
           type: "stdio",
@@ -184,6 +191,7 @@ describe("SkillMcpManager", () => {
           serverName: "inferred-stdio",
           skillName: "test-skill",
           sessionID: "session-1",
+        scope: "builtin",
         }
         const config: ClaudeCodeMcpServer = {
           command: "node",
@@ -202,6 +210,7 @@ describe("SkillMcpManager", () => {
           serverName: "mixed-config",
           skillName: "test-skill",
           sessionID: "session-1",
+        scope: "builtin",
         }
         const config: ClaudeCodeMcpServer = {
           type: "stdio",
@@ -224,6 +233,7 @@ describe("SkillMcpManager", () => {
           serverName: "bad-url-server",
           skillName: "test-skill",
           sessionID: "session-1",
+        scope: "builtin",
         }
         const config: ClaudeCodeMcpServer = {
           type: "http",
@@ -242,6 +252,7 @@ describe("SkillMcpManager", () => {
           serverName: "http-error-server",
           skillName: "test-skill",
           sessionID: "session-1",
+        scope: "builtin",
         }
         const config: ClaudeCodeMcpServer = {
           url: "https://nonexistent.example.com/mcp",
@@ -259,6 +270,7 @@ describe("SkillMcpManager", () => {
           serverName: "hint-server",
           skillName: "test-skill",
           sessionID: "session-1",
+        scope: "builtin",
         }
         const config: ClaudeCodeMcpServer = {
           url: "https://nonexistent.example.com/mcp",
@@ -276,6 +288,7 @@ describe("SkillMcpManager", () => {
           serverName: "mock-test-server",
           skillName: "test-skill",
           sessionID: "session-1",
+        scope: "builtin",
         }
         const config: ClaudeCodeMcpServer = {
           url: "https://example.com/mcp",
@@ -302,6 +315,7 @@ describe("SkillMcpManager", () => {
           serverName: "missing-command",
           skillName: "test-skill",
           sessionID: "session-1",
+        scope: "builtin",
         }
         const config: ClaudeCodeMcpServer = {
           type: "stdio",
@@ -320,6 +334,7 @@ describe("SkillMcpManager", () => {
           serverName: "test-server",
           skillName: "test-skill",
           sessionID: "session-1",
+        scope: "builtin",
         }
         const config: ClaudeCodeMcpServer = {
           command: "nonexistent-command-xyz",
@@ -338,6 +353,7 @@ describe("SkillMcpManager", () => {
           serverName: "test-server",
           skillName: "test-skill",
           sessionID: "session-1",
+        scope: "builtin",
         }
         const config: ClaudeCodeMcpServer = {
           command: "nonexistent-command",
@@ -358,11 +374,13 @@ describe("SkillMcpManager", () => {
         serverName: "server1",
         skillName: "skill1",
         sessionID: "session-1",
+      scope: "builtin",
       }
       const session2Info: SkillMcpClientInfo = {
         serverName: "server1",
         skillName: "skill1",
         sessionID: "session-2",
+      scope: "builtin",
       }
 
       // when
@@ -396,6 +414,7 @@ describe("SkillMcpManager", () => {
         serverName: "signal-server",
         skillName: "signal-skill",
         sessionID: "session-1",
+      scope: "builtin",
       }
       const config: ClaudeCodeMcpServer = {
         url: "https://example.com/mcp",
@@ -423,11 +442,12 @@ describe("SkillMcpManager", () => {
   describe("isConnected", () => {
     it("returns false for unconnected server", () => {
       // given
-      const info: SkillMcpClientInfo = {
-        serverName: "unknown",
-        skillName: "test",
-        sessionID: "session-1",
-      }
+        const info: SkillMcpClientInfo = {
+          serverName: "$1",
+          skillName: "$2",
+          sessionID: "$3",
+          scope: "builtin",
+        }
 
       // when / #then
       expect(manager.isConnected(info)).toBe(false)
@@ -448,6 +468,7 @@ describe("SkillMcpManager", () => {
         serverName: "test-server",
         skillName: "test-skill",
         sessionID: "session-1",
+      scope: "builtin",
       }
       const configWithoutEnv: ClaudeCodeMcpServer = {
         command: "node",
@@ -471,6 +492,7 @@ describe("SkillMcpManager", () => {
         serverName: "test-server",
         skillName: "test-skill",
         sessionID: "session-2",
+      scope: "builtin",
       }
       const configWithEnv: ClaudeCodeMcpServer = {
         command: "node",
@@ -498,6 +520,7 @@ describe("SkillMcpManager", () => {
         serverName: "auth-server",
         skillName: "test-skill",
         sessionID: "session-1",
+      scope: "builtin",
       }
       const config: ClaudeCodeMcpServer = {
         url: "https://example.com/mcp",
@@ -526,6 +549,7 @@ describe("SkillMcpManager", () => {
         serverName: "no-auth-server",
         skillName: "test-skill",
         sessionID: "session-1",
+      scope: "builtin",
       }
       const config: ClaudeCodeMcpServer = {
         url: "https://example.com/mcp",
@@ -546,6 +570,7 @@ describe("SkillMcpManager", () => {
         serverName: "retry-server",
         skillName: "retry-skill",
         sessionID: "session-retry-1",
+      scope: "builtin",
       }
       const context: SkillMcpServerContext = {
         config: {
@@ -584,6 +609,7 @@ describe("SkillMcpManager", () => {
         serverName: "fail-server",
         skillName: "fail-skill",
         sessionID: "session-fail-1",
+      scope: "builtin",
       }
       const context: SkillMcpServerContext = {
         config: {
@@ -615,6 +641,7 @@ describe("SkillMcpManager", () => {
         serverName: "error-server",
         skillName: "error-skill",
         sessionID: "session-error-1",
+      scope: "builtin",
       }
       const context: SkillMcpServerContext = {
         config: {
@@ -653,6 +680,7 @@ describe("SkillMcpManager", () => {
         serverName: "oauth-server",
         skillName: "oauth-skill",
         sessionID: "session-oauth-1",
+      scope: "builtin",
       }
       const config: ClaudeCodeMcpServer = {
         url: "https://mcp.example.com/mcp",
@@ -679,6 +707,7 @@ describe("SkillMcpManager", () => {
         serverName: "oauth-no-token",
         skillName: "oauth-skill",
         sessionID: "session-oauth-2",
+      scope: "builtin",
       }
       const config: ClaudeCodeMcpServer = {
         url: "https://mcp.example.com/mcp",
@@ -705,6 +734,7 @@ describe("SkillMcpManager", () => {
         serverName: "oauth-with-headers",
         skillName: "oauth-skill",
         sessionID: "session-oauth-3",
+      scope: "builtin",
       }
       const config: ClaudeCodeMcpServer = {
         url: "https://mcp.example.com/mcp",
@@ -734,6 +764,7 @@ describe("SkillMcpManager", () => {
         serverName: "oauth-refresh",
         skillName: "oauth-skill",
         sessionID: "session-oauth-refresh",
+      scope: "builtin",
       }
       const config: ClaudeCodeMcpServer = {
         url: "https://mcp.example.com/mcp",
@@ -766,6 +797,7 @@ describe("SkillMcpManager", () => {
         serverName: "oauth-refresh-fallback",
         skillName: "oauth-skill",
         sessionID: "session-oauth-refresh-fallback",
+      scope: "builtin",
       }
       const config: ClaudeCodeMcpServer = {
         url: "https://mcp.example.com/mcp",
@@ -799,6 +831,7 @@ describe("SkillMcpManager", () => {
         serverName: "no-oauth-server",
         skillName: "test-skill",
         sessionID: "session-no-oauth",
+      scope: "builtin",
       }
       const config: ClaudeCodeMcpServer = {
         url: "https://mcp.example.com/mcp",
@@ -824,6 +857,7 @@ describe("SkillMcpManager", () => {
         serverName: "stepup-server",
         skillName: "stepup-skill",
         sessionID: "session-stepup-1",
+      scope: "builtin",
       }
       const config: ClaudeCodeMcpServer = {
         url: "https://mcp.example.com/mcp",
@@ -869,6 +903,7 @@ describe("SkillMcpManager", () => {
         serverName: "no-stepup-server",
         skillName: "no-stepup-skill",
         sessionID: "session-no-stepup",
+      scope: "builtin",
       }
       const context: SkillMcpServerContext = {
         config: {

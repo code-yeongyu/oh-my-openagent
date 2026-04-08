@@ -94,6 +94,7 @@ function createClientInfo(serverName: string): SkillMcpClientInfo {
     serverName,
     skillName: "env-skill",
     sessionID: "session-env",
+    scope: "builtin",
   }
 }
 
