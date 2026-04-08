@@ -3,18 +3,20 @@ import * as path from "node:path"
 import { fileURLToPath } from "node:url"
 import { log } from "../../../shared/logger"
 import type { PackageJson } from "../types"
-import { INSTALLED_PACKAGE_JSON } from "../constants"
+import { INSTALLED_PACKAGE_JSON_CANDIDATES } from "../constants"
 import { findPackageJsonUp } from "./package-json-locator"
 
 export function getCachedVersion(): string | null {
-  try {
-    if (fs.existsSync(INSTALLED_PACKAGE_JSON)) {
-      const content = fs.readFileSync(INSTALLED_PACKAGE_JSON, "utf-8")
-      const pkg = JSON.parse(content) as PackageJson
-      if (pkg.version) return pkg.version
+  for (const candidate of INSTALLED_PACKAGE_JSON_CANDIDATES) {
+    try {
+      if (fs.existsSync(candidate)) {
+        const content = fs.readFileSync(candidate, "utf-8")
+        const pkg = JSON.parse(content) as PackageJson
+        if (pkg.version) return pkg.version
+      }
+    } catch {
+      // ignore; try next candidate
     }
-  } catch {
-    // ignore
   }
 
   try {
