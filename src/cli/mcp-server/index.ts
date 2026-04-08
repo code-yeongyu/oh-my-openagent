@@ -223,10 +223,21 @@ export async function startMcpServer(options: McpServerOptions): Promise<void> {
     res.end()
   })
 
+  const isStdio = !process.stdin.isTTY
+
   await new Promise<void>((resolve, reject) => {
     httpServer.listen(port, "0.0.0.0", () => resolve())
     httpServer.on("error", reject)
   })
+
+  if (isStdio) {
+    process.stderr.write(`[mcp-server] HTTP on :${port}, stdio active, dir=${workDir}\n`)
+    const stdioTransport = new StdioServerTransport()
+    const stdioServer = buildMcpServer(workDir)
+    await stdioServer.connect(stdioTransport)
+    await new Promise<void>((res) => { stdioTransport.onclose = res })
+    return
+  }
 
   console.log(`oh-my-openagent MCP server running`)
   console.log(`  dir:    ${workDir}`)
@@ -234,14 +245,6 @@ export async function startMcpServer(options: McpServerOptions): Promise<void> {
   console.log(`  MCP:    http://0.0.0.0:${port}/sse`)
   console.log(`  health: http://0.0.0.0:${port}/health`)
   console.log(`  tools:  grep, glob, ast_grep_search, file_read, file_list`)
-
-  if (!process.stdin.isTTY) {
-    const stdioTransport = new StdioServerTransport()
-    const stdioServer = buildMcpServer(workDir)
-    await stdioServer.connect(stdioTransport)
-    await new Promise<void>((res) => stdioTransport.onclose = res)
-    return
-  }
 
   await new Promise<void>(() => {})
 }
