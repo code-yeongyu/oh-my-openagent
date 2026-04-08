@@ -1,6 +1,7 @@
 import { createServer } from "node:http"
 import { resolve } from "node:path"
-import { readFile, readdir, stat } from "node:fs/promises"
+import { readFile, readdir, stat, writeFile, mkdir } from "node:fs/promises"
+import { dirname } from "node:path"
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js"
 import { z } from "zod"
@@ -149,6 +150,25 @@ function buildMcpServer(workDir: string): McpServer {
     }
   )
 
+  server.tool(
+    "file_write",
+    "Write content to a file on the local filesystem. Creates parent directories if needed.",
+    {
+      file_path: z.string().describe("Path to the file (absolute or relative to working directory)"),
+      content: z.string().describe("Content to write to the file"),
+    },
+    async ({ file_path, content }) => {
+      try {
+        const absPath = resolve(workDir, file_path)
+        await mkdir(dirname(absPath), { recursive: true })
+        await writeFile(absPath, content, "utf-8")
+        return { content: [{ type: "text" as const, text: `Written: ${file_path} (${content.length} chars)` }] }
+      } catch (e) {
+        return { content: [{ type: "text" as const, text: `Error: ${e instanceof Error ? e.message : String(e)}` }] }
+      }
+    }
+  )
+
   return server
 }
 
@@ -164,7 +184,7 @@ export function startMcpBridge(workDir: string): () => void {
 
     if (url.pathname === "/health") {
       res.writeHead(200, { "Content-Type": "application/json" })
-      res.end(JSON.stringify({ status: "ok", dir: workDir, tools: ["grep", "glob", "ast_grep_search", "file_read", "file_list"] }))
+      res.end(JSON.stringify({ status: "ok", dir: workDir, tools: ["grep", "glob", "ast_grep_search", "file_read", "file_list", "file_write"] }))
       return
     }
 

@@ -72,15 +72,19 @@ export class OpenfangClient {
     return match
   }
 
-  async sendMessage(agentId: string, message: string): Promise<string> {
+  async sendMessage(agentId: string, message: string, abort?: AbortSignal): Promise<string> {
     let response: Response
     try {
       response = await fetch(`${this.baseUrl}/api/agents/${agentId}/message`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message }),
+        signal: abort,
       })
     } catch (cause) {
+      if (cause instanceof Error && cause.name === "AbortError") {
+        throw new OpenfangClientError(`Request cancelled by caller`)
+      }
       throw new OpenfangClientError(
         `Failed to send message to agent ${agentId}: ${cause instanceof Error ? cause.message : String(cause)}`,
       )

@@ -25,8 +25,9 @@ export function createA2aDelegateTool(
         .optional()
         .describe("Optional openfang session ID for conversation continuity"),
     },
-    execute: async (args) => {
+    execute: async (args, context) => {
       const client = new OpenfangClient(baseUrl)
+      const abort = (context as { abort?: AbortSignal }).abort
 
       try {
         await client.healthCheck()
@@ -45,9 +46,12 @@ export function createA2aDelegateTool(
       }
 
       try {
-        return await client.sendMessage(agentId, args.prompt)
+        return await client.sendMessage(agentId, args.prompt, abort)
       } catch (cause) {
         const msg = cause instanceof OpenfangClientError ? cause.message : String(cause)
+        if (msg === "Request cancelled by caller") {
+          return `[CANCELLED] openfang agent "${args.agent}" task was cancelled.`
+        }
         return `openfang agent "${args.agent}" failed: ${msg}`
       }
     },

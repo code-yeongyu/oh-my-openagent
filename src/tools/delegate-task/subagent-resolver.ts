@@ -22,6 +22,7 @@ const OPENFANG_AGENT_NAMES = new Set([
   "reasoner",
   "planner",
   "reviewer",
+  "hephaestus",
 ])
 
 type AgentMode = "subagent" | "primary" | "all" | undefined
