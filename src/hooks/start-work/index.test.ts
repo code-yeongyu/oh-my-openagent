@@ -443,6 +443,122 @@ You are starting a Sisyphus work session.
       expect(output.parts[0].text).toContain("my-feature-plan")
       expect(output.parts[0].text).toContain("Auto-Selected Plan")
     })
+
+    test("should match Korean plan names after Unicode-aware normalization", async () => {
+      // given
+      const plansDir = join(testDir, ".sisyphus", "plans")
+      mkdirSync(plansDir, { recursive: true })
+
+      const planPath = join(plansDir, "결제-플로우.md")
+      writeFileSync(planPath, "# 결제 플로우\n- [ ] 작업 1")
+
+      const hook = createStartWorkHook(createMockPluginInput())
+      const output = {
+        parts: [
+          {
+            type: "text",
+            text: createStartWorkPrompt({ userRequest: "결제 플로우" }),
+          },
+        ],
+      }
+
+      // when
+      await hook["chat.message"](
+        { sessionID: "session-korean-plan" },
+        output,
+      )
+
+      // then
+      expect(output.parts[0].text).toContain("결제-플로우")
+      expect(output.parts[0].text).toContain("Auto-Selected Plan")
+    })
+
+    test("should match Japanese plan names after Unicode-aware normalization", async () => {
+      // given
+      const plansDir = join(testDir, ".sisyphus", "plans")
+      mkdirSync(plansDir, { recursive: true })
+
+      const planPath = join(plansDir, "支払い-フロー.md")
+      writeFileSync(planPath, "# 支払い フロー\n- [ ] タスク 1")
+
+      const hook = createStartWorkHook(createMockPluginInput())
+      const output = {
+        parts: [
+          {
+            type: "text",
+            text: createStartWorkPrompt({ userRequest: "支払い フロー" }),
+          },
+        ],
+      }
+
+      // when
+      await hook["chat.message"](
+        { sessionID: "session-japanese-plan" },
+        output,
+      )
+
+      // then
+      expect(output.parts[0].text).toContain("支払い-フロー")
+      expect(output.parts[0].text).toContain("Auto-Selected Plan")
+    })
+
+    test("should keep ASCII plan name matching behavior unchanged", async () => {
+      // given
+      const plansDir = join(testDir, ".sisyphus", "plans")
+      mkdirSync(plansDir, { recursive: true })
+
+      const planPath = join(plansDir, "checkout-flow.md")
+      writeFileSync(planPath, "# Checkout Flow\n- [ ] Task 1")
+
+      const hook = createStartWorkHook(createMockPluginInput())
+      const output = {
+        parts: [
+          {
+            type: "text",
+            text: createStartWorkPrompt({ userRequest: "checkout flow" }),
+          },
+        ],
+      }
+
+      // when
+      await hook["chat.message"](
+        { sessionID: "session-ascii-plan" },
+        output,
+      )
+
+      // then
+      expect(output.parts[0].text).toContain("checkout-flow")
+      expect(output.parts[0].text).toContain("Auto-Selected Plan")
+    })
+
+    test("should match mixed ASCII and non-ASCII plan names", async () => {
+      // given
+      const plansDir = join(testDir, ".sisyphus", "plans")
+      mkdirSync(plansDir, { recursive: true })
+
+      const planPath = join(plansDir, "v2-결제-flow.md")
+      writeFileSync(planPath, "# v2 결제 flow\n- [ ] Task 1")
+
+      const hook = createStartWorkHook(createMockPluginInput())
+      const output = {
+        parts: [
+          {
+            type: "text",
+            text: createStartWorkPrompt({ userRequest: "v2 결제 flow" }),
+          },
+        ],
+      }
+
+      // when
+      await hook["chat.message"](
+        { sessionID: "session-mixed-plan" },
+        output,
+      )
+
+      // then
+      expect(output.parts[0].text).toContain("v2-결제-flow")
+      expect(output.parts[0].text).toContain("Auto-Selected Plan")
+    })
   })
 
   describe("session agent management", () => {

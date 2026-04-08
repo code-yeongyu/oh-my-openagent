@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
+import { afterAll, afterEach, beforeEach, describe, expect, it, mock, test } from "bun:test"
 import type { ClaudeCodeMcpServer } from "../claude-code-mcp-loader/types"
 import type { SkillMcpClientInfo, SkillMcpManagerState } from "./types"
 
@@ -89,12 +89,15 @@ function createState(): SkillMcpManagerState {
   return state
 }
 
-function createClientInfo(serverName: string): SkillMcpClientInfo {
+function createClientInfo(
+  serverName: string,
+  scope?: SkillMcpClientInfo["scope"],
+): SkillMcpClientInfo {
   return {
     serverName,
     skillName: "env-skill",
     sessionID: "session-env",
-    scope: "builtin",
+    ...(scope !== undefined ? { scope } : {}),
   }
 }
 
@@ -126,6 +129,68 @@ afterEach(async () => {
 })
 
 describe("getOrCreateClient env var expansion", () => {
+  describe("#given a scope-sensitive stdio skill MCP config", () => {
+    test.each([
+      ["opencode-project", "Authorization:Bearer "],
+      ["local", "Authorization:Bearer "],
+      ["user", "Authorization:Bearer xoxp-scope-token"],
+      ["builtin", "Authorization:Bearer xoxp-scope-token"],
+    ] satisfies Array<[NonNullable<SkillMcpClientInfo["scope"]>, string]>) (
+      "#when creating the client for %s scope #then args expand to %s",
+      async (scope, expectedAuthorizationHeader) => {
+        // given
+        process.env.SLACK_USER_TOKEN = "xoxp-scope-token"
+        const state = createState()
+        const info = createClientInfo(`scope-${scope}`, scope)
+        const clientKey = createClientKey(info)
+        const config: ClaudeCodeMcpServer = {
+          command: "npx",
+          args: [
+            "-y",
+            "mcp-remote",
+            "https://mcp.slack.com/mcp",
+            "--header",
+            "Authorization:Bearer ${SLACK_USER_TOKEN}",
+          ],
+        }
+
+        // when
+        await getOrCreateClient({ state, clientKey, info, config })
+
+        // then
+        expect(createdStdioTransports).toHaveLength(1)
+        expect(createdStdioTransports[0]?.options.args?.[4]).toBe(expectedAuthorizationHeader)
+      },
+    )
+
+    it("#when creating the client without scope #then env vars remain trusted for backward compatibility", async () => {
+      // given
+      process.env.SLACK_USER_TOKEN = "xoxp-undefined-scope-token"
+      const state = createState()
+      const info = createClientInfo("scope-undefined")
+      const clientKey = createClientKey(info)
+      const config: ClaudeCodeMcpServer = {
+        command: "npx",
+        args: [
+          "-y",
+          "mcp-remote",
+          "https://mcp.slack.com/mcp",
+          "--header",
+          "Authorization:Bearer ${SLACK_USER_TOKEN}",
+        ],
+      }
+
+      // when
+      await getOrCreateClient({ state, clientKey, info, config })
+
+      // then
+      expect(createdStdioTransports).toHaveLength(1)
+      expect(createdStdioTransports[0]?.options.args?.[4]).toBe(
+        "Authorization:Bearer xoxp-undefined-scope-token",
+      )
+    })
+  })
+
   describe("#given a stdio skill MCP config with sensitive env vars in args", () => {
     it("#when creating the client #then sensitive env vars in args are expanded", async () => {
       // given

@@ -23,7 +23,7 @@ function normalizePlanLookupValue(value: string): string {
     .replace(/^["'`]+|["'`]+$/g, "")
     .toLowerCase()
     .replace(/[\s_]+/g, "-")
-    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/[^\p{L}\p{N}-]+/gu, "-")
     .replace(/-+/g, "-")
     .replace(/^-+|-+$/g, "")
 }

@@ -11,7 +11,7 @@ export interface SkillMcpClientInfo {
   serverName: string
   skillName: string
   sessionID: string
-  scope?: SkillScope
+  scope?: SkillScope | "local"
 }
 
 export interface SkillMcpServerContext {
