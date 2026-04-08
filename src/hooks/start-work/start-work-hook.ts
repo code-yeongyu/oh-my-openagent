@@ -13,6 +13,7 @@ import {
 import { log } from "../../shared/logger"
 import {
   isAgentRegistered,
+  resolveRegisteredAgentName,
   updateSessionAgent,
 } from "../../features/claude-code-session-state"
 import { detectWorktreePath } from "./worktree-detector"
@@ -83,7 +84,7 @@ export function createStartWorkHook(ctx: PluginInput) {
       : "sisyphus"
     updateSessionAgent(input.sessionID, activeAgent)
     if (output.message) {
-      output.message["agent"] = activeAgent
+      output.message["agent"] = resolveRegisteredAgentName(activeAgent) ?? activeAgent
     }
 
     const existingState = readBoulderState(ctx.directory)

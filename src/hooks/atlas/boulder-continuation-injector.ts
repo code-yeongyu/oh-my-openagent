@@ -1,6 +1,9 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { BackgroundManager } from "../../features/background-agent"
-import { isAgentRegistered } from "../../features/claude-code-session-state"
+import {
+  isAgentRegistered,
+  resolveRegisteredAgentName,
+} from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
 import { createInternalAgentTextPart, resolveInheritedPromptTools } from "../../shared"
 import { HOOK_NAME } from "./hook-name"
@@ -55,7 +58,9 @@ export async function injectBoulderContinuation(input: {
 		`\n\n[Status: ${total - remaining}/${total} completed, ${remaining} remaining]` +
 		preferredSessionContext +
 		worktreeContext
-	const continuationAgent = (agent ?? (isAgentRegistered("atlas") ? "atlas" : undefined))?.replace(/\u200B/g, "")
+	const continuationAgent = resolveRegisteredAgentName(
+		agent ?? (isAgentRegistered("atlas") ? "atlas" : undefined),
+	)
 
 	if (!continuationAgent || !isAgentRegistered(continuationAgent)) {
 		log(`[${HOOK_NAME}] Skipped injection: continuation agent unavailable`, {

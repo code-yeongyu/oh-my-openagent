@@ -1251,7 +1251,7 @@ describe("config-handler plugin loading error boundary (#1559)", () => {
 })
 
 describe("command agent routing coherence", () => {
-  test("keeps start-work aligned with the canonical Atlas display name", async () => {
+  test("keeps start-work aligned with the exported Atlas list key opencode matches exactly", async () => {
     //#given
     const createBuiltinAgentsMock = agents.createBuiltinAgents as unknown as {
       mockResolvedValue: (value: Record<string, unknown>) => void
@@ -1291,7 +1291,7 @@ describe("command agent routing coherence", () => {
     const agentConfig = config.agent as Record<string, unknown>
     const commandConfig = config.command as Record<string, { agent?: string }>
     expect(Object.keys(agentConfig)).toContain(getAgentListDisplayName("atlas"))
-    expect(commandConfig["start-work"]?.agent).toBe(getAgentDisplayName("atlas"))
+    expect(commandConfig["start-work"]?.agent).toBe(getAgentListDisplayName("atlas"))
   })
 })
 

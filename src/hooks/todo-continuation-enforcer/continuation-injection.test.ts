@@ -5,7 +5,7 @@ import { injectContinuation } from "./continuation-injection"
 import { OMO_INTERNAL_INITIATOR_MARKER } from "../../shared/internal-initiator-marker"
 
 describe("injectContinuation", () => {
-  test("normalizes built-in display names to config keys before promptAsync", async () => {
+  test("preserves the registered built-in agent name before promptAsync", async () => {
     // given
     let capturedAgent: string | undefined
     const ctx = {
@@ -40,7 +40,7 @@ describe("injectContinuation", () => {
     })
 
     // then
-    expect(capturedAgent).toBe("sisyphus")
+    expect(capturedAgent).toBe("Sisyphus - Ultraworker")
   })
 
   test("inherits tools from resolved message info when reinjecting", async () => {
