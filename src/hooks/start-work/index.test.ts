@@ -7,7 +7,7 @@ import { tmpdir } from "node:os"
 import { randomUUID } from "node:crypto"
 import { createStartWorkHook } from "./index"
 import { createAtlasHook } from "../atlas"
-import { getAgentListDisplayName } from "../../shared/agent-display-names"
+import { getAgentDisplayName, getAgentListDisplayName } from "../../shared/agent-display-names"
 import {
   writeBoulderState,
   clearBoulderState,
@@ -482,7 +482,7 @@ You are starting a Sisyphus work session.
       )
 
       // then
-      expect(output.message.agent).toBe(getAgentListDisplayName("atlas"))
+      expect(output.message.agent).toBe(getAgentDisplayName("atlas"))
     })
 
     test("should switch to Atlas even when current session is Sisyphus (regression: #3155)", async () => {
@@ -502,7 +502,7 @@ You are starting a Sisyphus work session.
       )
 
       // atlas is registered in beforeEach, so it must be selected
-      expect(output.message.agent).toBe(getAgentListDisplayName("atlas"))
+      expect(output.message.agent).toBe(getAgentDisplayName("atlas"))
       expect(sessionState.getSessionAgent("ses-sisyphus-to-atlas")).toBe("atlas")
     })
 
@@ -623,7 +623,7 @@ You are starting a Sisyphus work session.
       await atlasHook.handler({ event: { type: "session.idle", properties: { sessionID: "session-123" } } })
 
       // then
-      expect(output.message.agent).toBe(getAgentListDisplayName("atlas"))
+      expect(output.message.agent).toBe(getAgentDisplayName("atlas"))
       expect(readBoulderState(testDir)?.session_ids).toContain("session-123")
       expect(readBoulderState(testDir)?.agent).toBe("atlas")
       expect(promptAsyncMock).toHaveBeenCalledTimes(1)
@@ -713,7 +713,7 @@ You are starting a Sisyphus work session.
         await firePendingTimers()
 
         // then
-        expect(output.message.agent).toBe(getAgentListDisplayName("atlas"))
+        expect(output.message.agent).toBe(getAgentDisplayName("atlas"))
         expect(readBoulderState(testDir)?.session_ids).toContain("session-123")
         expect(readBoulderState(testDir)?.agent).toBe("atlas")
         expect(promptAsyncMock).toHaveBeenCalledTimes(1)
