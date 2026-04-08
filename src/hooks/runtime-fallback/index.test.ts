@@ -282,7 +282,7 @@ describe("runtime-fallback", () => {
       expect(errorLog).toBeDefined()
     })
 
-    test("should trigger fallback when session.error says you've reached your usage limit", async () => {
+    test("should NOT trigger fallback for quota exhaustion without auto-retry signal (STOP classification)", async () => {
       const hook = createRuntimeFallbackHook(createMockPluginInput(), {
         config: createMockConfig({ notify_on_fallback: false }),
         pluginConfig: createMockPluginConfigWithCategoryFallback(["zai-coding-plan/glm-5.1"]),
@@ -308,11 +308,10 @@ describe("runtime-fallback", () => {
       })
 
       const fallbackLog = logCalls.find((c) => c.msg.includes("Preparing fallback"))
-      expect(fallbackLog).toBeDefined()
-      expect(fallbackLog?.data).toMatchObject({ from: "kimi-for-coding/k2p5", to: "zai-coding-plan/glm-5.1" })
+      expect(fallbackLog).toBeUndefined()
 
       const skipLog = logCalls.find((c) => c.msg.includes("Error not retryable"))
-      expect(skipLog).toBeUndefined()
+      expect(skipLog).toBeDefined()
     })
 
     test("should continue fallback chain when fallback model is not found", async () => {
