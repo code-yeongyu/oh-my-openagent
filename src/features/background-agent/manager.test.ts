@@ -1863,10 +1863,10 @@ describe("BackgroundManager.resume model persistence", () => {
     expect(getSessionPromptParams("session-advanced")).toEqual({
       temperature: 0.25,
       topP: 0.55,
+      maxOutputTokens: 8192,
       options: {
         reasoningEffort: "high",
         thinking: { type: "disabled" },
-        maxTokens: 8192,
       },
     })
   })

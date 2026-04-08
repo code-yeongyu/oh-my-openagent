@@ -400,10 +400,10 @@ describe("background-agent spawner fallback model promotion", () => {
     expect(getSessionPromptParams("session-123")).toEqual({
       temperature: 0.4,
       topP: 0.7,
+      maxOutputTokens: 4096,
       options: {
         reasoningEffort: "high",
         thinking: { type: "disabled" },
-        maxTokens: 4096,
       },
     })
   })
