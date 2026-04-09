@@ -18,6 +18,7 @@ export type ChatParamsOutput = {
   temperature?: number
   topP?: number
   topK?: number
+  maxOutputTokens?: number
   options: Record<string, unknown>
 }
 
@@ -99,6 +100,9 @@ export function createChatParamsHandler(args: {
       if (storedPromptParams.topP !== undefined) {
         output.topP = storedPromptParams.topP
       }
+      if (storedPromptParams.maxOutputTokens !== undefined) {
+        (output as Record<string, unknown>).maxOutputTokens = storedPromptParams.maxOutputTokens
+      }
       if (storedPromptParams.options) {
         output.options = {
           ...output.options,
@@ -124,7 +128,7 @@ export function createChatParamsHandler(args: {
           : undefined,
         temperature: typeof output.temperature === "number" ? output.temperature : undefined,
         topP: typeof output.topP === "number" ? output.topP : undefined,
-        maxTokens: typeof output.options.maxTokens === "number" ? output.options.maxTokens : undefined,
+        maxTokens: typeof output.maxOutputTokens === "number" ? output.maxOutputTokens : undefined,
         thinking: isRecord(output.options.thinking) ? output.options.thinking : undefined,
       },
       capabilities,
@@ -163,9 +167,9 @@ export function createChatParamsHandler(args: {
 
     if ("maxTokens" in compatibility) {
       if (compatibility.maxTokens !== undefined) {
-        output.options.maxTokens = compatibility.maxTokens
+        output.maxOutputTokens = compatibility.maxTokens
       } else {
-        delete output.options.maxTokens
+        delete output.maxOutputTokens
       }
     }
 

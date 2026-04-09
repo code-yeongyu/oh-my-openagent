@@ -1594,8 +1594,8 @@ describe("todo-continuation-enforcer", () => {
   // when resolving agent info, preventing infinite continuation loops
   // ============================================================
 
-  test("should skip compaction agent messages when resolving agent info", async () => {
-    // given - session where last message is from compaction agent but previous was Sisyphus
+  test("should skip injection while the latest message is from the compaction agent", async () => {
+    // given - session where the latest activity is still the compaction assistant turn
     const sessionID = "main-compaction-filter"
     setMainSession(sessionID)
 
@@ -1644,9 +1644,8 @@ describe("todo-continuation-enforcer", () => {
      await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
      await fakeTimers.advanceBy(2500)
 
-     // then - continuation uses Sisyphus (skipped compaction agent)
-     expect(promptCalls.length).toBe(1)
-    expect(promptCalls[0].agent).toBe("sisyphus")
+     // then - no continuation while compaction is still the latest event
+    expect(promptCalls).toHaveLength(0)
   })
 
   test("should skip injection when only compaction agent messages exist", async () => {
@@ -1699,6 +1698,62 @@ describe("todo-continuation-enforcer", () => {
      await fakeTimers.advanceBy(3000)
 
      // then - no continuation (compaction is in default skipAgents)
+    expect(promptCalls).toHaveLength(0)
+  })
+
+  test("should skip compaction marker user messages when resolving agent info", async () => {
+    // given - latest user message is the OpenCode compaction marker, not a real turn
+    const sessionID = "main-compaction-marker-filter"
+    setMainSession(sessionID)
+
+    const mockMessagesWithCompactionMarker = [
+      { info: { id: "msg-1", role: "assistant", agent: "sisyphus", modelID: "claude-sonnet-4-6", providerID: "anthropic" } },
+      {
+        info: { id: "msg-2", role: "user", agent: "atlas", model: { providerID: "openai", modelID: "gpt-5.4" } },
+        parts: [{ type: "compaction" }],
+      },
+    ]
+
+    const mockInput = {
+      client: {
+        session: {
+          todo: async () => ({
+            data: [{ id: "1", content: "Task 1", status: "pending", priority: "high" }],
+          }),
+          messages: async () => ({ data: mockMessagesWithCompactionMarker }),
+          prompt: async (opts: any) => {
+            promptCalls.push({
+              sessionID: opts.path.id,
+              agent: opts.body.agent,
+              model: opts.body.model,
+              text: opts.body.parts[0].text,
+            })
+            return {}
+          },
+          promptAsync: async (opts: any) => {
+            promptCalls.push({
+              sessionID: opts.path.id,
+              agent: opts.body.agent,
+              model: opts.body.model,
+              text: opts.body.parts[0].text,
+            })
+            return {}
+          },
+        },
+        tui: { showToast: async () => ({}) },
+      },
+      directory: "/tmp/test",
+    } as any
+
+    const hook = createTodoContinuationEnforcer(mockInput, {
+      backgroundManager: createMockBackgroundManager(false),
+    })
+
+    // when - session goes idle
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(3000)
+
+    // then - no continuation while the compaction marker is the latest event
     expect(promptCalls).toHaveLength(0)
   })
 

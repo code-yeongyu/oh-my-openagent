@@ -14,6 +14,8 @@ function removeClientIfCurrent(state: SkillMcpManagerState, clientKey: string, c
   }
 }
 
+const PROJECT_SCOPES = new Set(["project", "opencode-project", "local"])
+
 export async function getOrCreateClient(params: {
   state: SkillMcpManagerState
   clientKey: string
@@ -38,7 +40,8 @@ export async function getOrCreateClient(params: {
     return pending
   }
 
-  const expandedConfig = expandEnvVarsInObject(config, { trusted: true })
+  const isTrusted = !PROJECT_SCOPES.has(info.scope ?? "")
+  const expandedConfig = expandEnvVarsInObject(config, { trusted: isTrusted })
   let currentConnectionPromise!: Promise<Client>
   state.inFlightConnections.set(info.sessionID, (state.inFlightConnections.get(info.sessionID) ?? 0) + 1)
   currentConnectionPromise = (async () => {

@@ -1,6 +1,6 @@
 # oh-my-opencode — O P E N C O D E Plugin
 
-**Generated:** 2026-04-05 | **Commit:** c9be5bb51 | **Branch:** dev
+**Generated:** 2026-04-08 | **Commit:** 4f196f49 | **Branch:** dev
 
 ## OVERVIEW
 

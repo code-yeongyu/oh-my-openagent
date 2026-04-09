@@ -36,7 +36,7 @@ export const ULW_LOOP_TEMPLATE = `You are starting an ULTRAWORK Loop - a self-re
 2. When you believe the work is complete, output: \`<promise>{{COMPLETION_PROMISE}}</promise>\`
 3. That does NOT finish the loop yet. The system will require Oracle verification
 4. The loop only ends after the system confirms Oracle verified the result
-5. There is no iteration limit
+5. The iteration limit is 500 for ultrawork mode, 100 for normal mode
 
 ## Rules
 

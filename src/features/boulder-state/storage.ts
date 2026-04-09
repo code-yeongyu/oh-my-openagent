@@ -226,7 +226,9 @@ export function getPlanProgress(planPath: string): PlanProgress {
     const lines = content.split(/\r?\n/)
 
     // Check if the plan has structured sections (## TODOs / ## Final Verification Wave)
-    const hasStructuredSections = lines.some((line) => TODO_HEADING_PATTERN.test(line))
+    const hasStructuredSections = lines.some(
+      (line) => TODO_HEADING_PATTERN.test(line) || FINAL_VERIFICATION_HEADING_PATTERN.test(line),
+    )
 
     if (hasStructuredSections) {
       // Structured plan: only count top-level checkboxes with numbered labels
@@ -291,8 +293,8 @@ function getStructuredPlanProgress(lines: string[]): PlanProgress {
 }
 
 function getSimplePlanProgress(content: string): PlanProgress {
-  const uncheckedMatches = content.match(/^\s*[-*]\s*\[\s*\]/gm) || []
-  const checkedMatches = content.match(/^\s*[-*]\s*\[[xX]\]/gm) || []
+  const uncheckedMatches = content.match(/^[-*]\s*\[\s*\]/gm) || []
+  const checkedMatches = content.match(/^[-*]\s*\[[xX]\]/gm) || []
 
   const total = uncheckedMatches.length + checkedMatches.length
   const completed = checkedMatches.length

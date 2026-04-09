@@ -11,6 +11,7 @@ import {
   generatePartId,
   injectHookMessage,
 } from "./injector"
+import { PART_STORAGE } from "../../shared"
 import { isSqliteBackend, resetSqliteBackendCache } from "../../shared/opencode-storage-detection"
 
 //#region Mocks
@@ -53,6 +54,7 @@ function createMockClient(messages: Array<{
     tools?: Record<string, boolean>
     time?: { created?: number }
   }
+  parts?: Array<{ type?: string }>
 }>): {
   session: {
     messages: (opts: { path: { id: string } }) => Promise<{ data: typeof messages }>
@@ -176,6 +178,24 @@ describe("findNearestMessageWithFieldsFromSDK", () => {
 
     expect(result?.agent).toBe("newest-by-time")
   })
+
+  it("skips compaction marker user messages when resolving nearest message", async () => {
+    const mockClient = createMockClient([
+      {
+        id: "msg_compaction",
+        info: { agent: "atlas", model: { providerID: "openai", modelID: "gpt-5" }, time: { created: 200 } },
+        parts: [{ type: "compaction" }],
+      },
+      {
+        id: "msg_real",
+        info: { agent: "sisyphus", model: { providerID: "anthropic", modelID: "claude-opus-4" }, time: { created: 100 } },
+      },
+    ])
+
+    const result = await findNearestMessageWithFieldsFromSDK(mockClient as any, "ses_123")
+
+    expect(result?.agent).toBe("sisyphus")
+  })
 })
 
 describe("findNearestMessageWithFields JSON backend ordering", () => {
@@ -196,6 +216,34 @@ describe("findNearestMessageWithFields JSON backend ordering", () => {
     const result = findNearestMessageWithFields(messageDir)
 
     expect(result?.agent).toBe("newest-by-time")
+  })
+
+  it("skips JSON messages whose parts contain a compaction marker", () => {
+    mockIsSqliteBackend.mockReturnValue(false)
+    const messageDir = createMessageDir()
+    const compactionMessageID = "msg_test_injector_compaction_marker"
+    const partDir = join(PART_STORAGE, compactionMessageID)
+    tempDirs.push(partDir)
+
+    writeFileSync(join(messageDir, "msg_0001.json"), JSON.stringify({
+      id: compactionMessageID,
+      agent: "atlas",
+      model: { providerID: "openai", modelID: "gpt-5" },
+      time: { created: 200 },
+    }))
+    mkdirSync(partDir, { recursive: true })
+    writeFileSync(join(partDir, "prt_0001.json"), JSON.stringify({ type: "compaction" }))
+
+    writeFileSync(join(messageDir, "msg_0002.json"), JSON.stringify({
+      id: "msg_0002",
+      agent: "sisyphus",
+      model: { providerID: "anthropic", modelID: "claude-opus-4" },
+      time: { created: 100 },
+    }))
+
+    const result = findNearestMessageWithFields(messageDir)
+
+    expect(result?.agent).toBe("sisyphus")
   })
 })
 
@@ -220,6 +268,17 @@ describe("findFirstMessageWithAgentFromSDK", () => {
     const result = await findFirstMessageWithAgentFromSDK(mockClient as any, "ses_123")
 
     expect(result).toBe("earliest-agent")
+  })
+
+  it("skips compaction marker user messages when resolving first agent", async () => {
+    const mockClient = createMockClient([
+      { id: "msg_compaction", info: { agent: "atlas", time: { created: 10 } }, parts: [{ type: "compaction" }] },
+      { id: "msg_real", info: { agent: "sisyphus", time: { created: 20 } } },
+    ])
+
+    const result = await findFirstMessageWithAgentFromSDK(mockClient as any, "ses_123")
+
+    expect(result).toBe("sisyphus")
   })
 
   it("skips messages without agent field", async () => {

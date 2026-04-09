@@ -1,6 +1,6 @@
 import { describe, it, expect } from "bun:test"
 import { remapAgentKeysToDisplayNames } from "./agent-key-remapper"
-import { getAgentListDisplayName } from "../shared/agent-display-names"
+import { getAgentDisplayName } from "../shared/agent-display-names"
 
 describe("remapAgentKeysToDisplayNames", () => {
   it("remaps known agent keys to display names", () => {
@@ -14,7 +14,7 @@ describe("remapAgentKeysToDisplayNames", () => {
     const result = remapAgentKeysToDisplayNames(agents)
 
     // then known agents get display name keys only
-    expect(result[getAgentListDisplayName("sisyphus")]).toBeDefined()
+    expect(result[getAgentDisplayName("sisyphus")]).toBeDefined()
     expect(result["oracle"]).toBeDefined()
     expect(result["sisyphus"]).toBeUndefined()
   })
@@ -49,21 +49,21 @@ describe("remapAgentKeysToDisplayNames", () => {
     const result = remapAgentKeysToDisplayNames(agents)
 
     // then all get display name keys
-    expect(result[getAgentListDisplayName("sisyphus")]).toBeDefined()
+    expect(result[getAgentDisplayName("sisyphus")]).toBeDefined()
     expect(result["sisyphus"]).toBeUndefined()
-    expect(result[getAgentListDisplayName("hephaestus")]).toBeDefined()
+    expect(result[getAgentDisplayName("hephaestus")]).toBeDefined()
     expect(result["hephaestus"]).toBeUndefined()
-    expect(result[getAgentListDisplayName("prometheus")]).toBeDefined()
+    expect(result[getAgentDisplayName("prometheus")]).toBeDefined()
     expect(result["prometheus"]).toBeUndefined()
-    expect(result[getAgentListDisplayName("atlas")]).toBeDefined()
+    expect(result[getAgentDisplayName("atlas")]).toBeDefined()
     expect(result["atlas"]).toBeUndefined()
-    expect(result[getAgentListDisplayName("athena")]).toBeDefined()
+    expect(result[getAgentDisplayName("athena")]).toBeDefined()
     expect(result["athena"]).toBeUndefined()
-    expect(result[getAgentListDisplayName("metis")]).toBeDefined()
+    expect(result[getAgentDisplayName("metis")]).toBeDefined()
     expect(result["metis"]).toBeUndefined()
-    expect(result[getAgentListDisplayName("momus")]).toBeDefined()
+    expect(result[getAgentDisplayName("momus")]).toBeDefined()
     expect(result["momus"]).toBeUndefined()
-    expect(result[getAgentListDisplayName("sisyphus-junior")]).toBeDefined()
+    expect(result[getAgentDisplayName("sisyphus-junior")]).toBeDefined()
     expect(result["sisyphus-junior"]).toBeUndefined()
   })
 
@@ -77,8 +77,8 @@ describe("remapAgentKeysToDisplayNames", () => {
     const result = remapAgentKeysToDisplayNames(agents)
 
     // then only display key is emitted
-    expect(Object.keys(result)).toEqual([getAgentListDisplayName("sisyphus")])
-    expect(result[getAgentListDisplayName("sisyphus")]).toBeDefined()
+    expect(Object.keys(result)).toEqual([getAgentDisplayName("sisyphus")])
+    expect(result[getAgentDisplayName("sisyphus")]).toBeDefined()
     expect(result["sisyphus"]).toBeUndefined()
   })
 })

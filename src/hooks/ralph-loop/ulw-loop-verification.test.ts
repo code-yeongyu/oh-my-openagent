@@ -279,8 +279,8 @@ describe("ulw-loop verification", () => {
 		await hook.event({ event: { type: "session.idle", properties: { sessionID: "session-123" } } })
 
 		expect(hook.getState()?.iteration).toBe(2)
-		expect(hook.getState()?.max_iterations).toBeUndefined()
-		expect(promptCalls[0].text).toContain("2/unbounded")
+		expect(hook.getState()?.max_iterations).toBe(500)
+		expect(promptCalls[0].text).toContain("2/500")
 	})
 
 	test("#given prior transcript completion from older run #when new ulw loop starts #then old completion is ignored", async () => {

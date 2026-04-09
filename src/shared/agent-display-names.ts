@@ -26,14 +26,24 @@ export const AGENT_DISPLAY_NAMES: Record<string, string> = {
   "council-member": "council-member",
 }
 
-const AGENT_LIST_SORT_PREFIXES: Record<string, string> = {
-  sisyphus: "\u200B",
-  hephaestus: "\u200B\u200B",
-  prometheus: "\u200B\u200B\u200B",
-  atlas: "\u200B\u200B\u200B\u200B",
-}
-
-function stripAgentListSortPrefix(agentName: string): string {
+/**
+ * Strip the legacy zero-width-space sort prefix from an agent name.
+ *
+ * v3.14.0 through v3.16.0 prefixed the four core agents (Sisyphus,
+ * Hephaestus, Prometheus, Atlas) with U+200B Zero Width Space characters
+ * so they would sort ahead of user agents in the Tab cycle. Some terminal
+ * emulators (Ghostty, certain Windows Terminal builds) render ZWSP as a
+ * visible box or extra space, breaking the status bar layout (#3259), and
+ * the prefixes also leaked through the plugin API and broke prompt_async
+ * consumers (#3238).
+ *
+ * The prefixes are no longer injected anywhere (#3242 removed all call
+ * sites and #3259 removed the constant table). This helper remains so
+ * existing user configs that still have the ZWSP baked into their
+ * `config.agent` keys from an older install continue to resolve
+ * correctly after upgrading.
+ */
+export function stripAgentListSortPrefix(agentName: string): string {
   return agentName.replace(/^\u200B+/, "")
 }
 
@@ -57,11 +67,21 @@ export function getAgentDisplayName(configKey: string): string {
   return configKey
 }
 
+/**
+ * @deprecated Use {@link getAgentDisplayName} directly.
+ *
+ * Historically this returned the display name with a ZWSP sort prefix
+ * prepended so core agents would sort ahead of user agents in the Tab
+ * cycle. The ZWSP prefixes caused visible rendering artifacts in some
+ * terminals (#3259) and leaked into the plugin API surface (#3238), so
+ * they were removed in #3242/#3259. This function is now a thin alias
+ * over {@link getAgentDisplayName} that exists only for external
+ * callers that may still import it. Sort ordering is now handled by
+ * the `order` field injection in `reorderAgentsByPriority()` plus the
+ * core-first insertion order in the same helper.
+ */
 export function getAgentListDisplayName(configKey: string): string {
-  const displayName = getAgentDisplayName(configKey)
-  const prefix = AGENT_LIST_SORT_PREFIXES[configKey.toLowerCase()]
-
-  return prefix ? `${prefix}${displayName}` : displayName
+  return getAgentDisplayName(configKey)
 }
 
 const REVERSE_DISPLAY_NAMES: Record<string, string> = Object.fromEntries(
