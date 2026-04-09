@@ -183,46 +183,30 @@ describe("getAgentConfigKey", () => {
     expect(getAgentConfigKey("Sisyphus-Junior")).toBe("sisyphus-junior")
   })
 
-  it("resolves atlas even when a legacy ZWSP sort prefix is present on the stored key", () => {
-    // Users who installed v3.14.0 through v3.16.0 may have ZWSP-prefixed agent
-    // names baked into their config.agent keys. The resolver must still find
-    // the canonical config key after strip.
-    expect(getAgentConfigKey("\u200B\u200B\u200B\u200BAtlas - Plan Executor")).toBe("atlas")
+  it("resolves atlas even when the UI ordering prefix is present", () => {
+    expect(getAgentConfigKey(getAgentListDisplayName("atlas"))).toBe("atlas")
   })
 })
 
-describe("getAgentListDisplayName (deprecated alias, GH-3259)", () => {
-  it("returns plain display names without the legacy ZWSP sort prefix", () => {
-    // ZWSP prefixes were removed in #3242/#3259. This alias is retained for
-    // external callers that may still import it, but it now behaves
-    // identically to getAgentDisplayName.
-    expect(getAgentListDisplayName("sisyphus")).toBe("Sisyphus - Ultraworker")
-    expect(getAgentListDisplayName("hephaestus")).toBe("Hephaestus - Deep Agent")
-    expect(getAgentListDisplayName("prometheus")).toBe("Prometheus - Plan Builder")
-    expect(getAgentListDisplayName("atlas")).toBe("Atlas - Plan Executor")
+describe("getAgentListDisplayName", () => {
+  it("applies invisible stable-sort prefixes to the core agent list", () => {
+    expect(getAgentListDisplayName("sisyphus")).toBe("\u200BSisyphus - Ultraworker")
+    expect(getAgentListDisplayName("hephaestus")).toBe("\u200B\u200BHephaestus - Deep Agent")
+    expect(getAgentListDisplayName("prometheus")).toBe("\u200B\u200B\u200BPrometheus - Plan Builder")
+    expect(getAgentListDisplayName("atlas")).toBe("\u200B\u200B\u200B\u200BAtlas - Plan Executor")
   })
 
-  it("matches getAgentDisplayName for unknown agents", () => {
+  it("keeps non-core agents unprefixed for list display", () => {
     expect(getAgentListDisplayName("oracle")).toBe("oracle")
-  })
-
-  it("contains no zero-width characters in any core agent output (GH-3259)", () => {
-    const coreAgents = ["sisyphus", "hephaestus", "prometheus", "atlas"]
-    for (const agent of coreAgents) {
-      const result = getAgentListDisplayName(agent)
-      expect(result).not.toMatch(/[\u200B\u200C\u200D\uFEFF]/)
-    }
   })
 })
 
 describe("normalizeAgentForPrompt", () => {
-  it("strips legacy ZWSP sort prefixes from stored agent keys back to canonical display names", () => {
-    // Configs from v3.14.0-v3.16.0 may persist ZWSP-prefixed keys. The
-    // normalizer must restore the canonical name on read.
-    expect(normalizeAgentForPrompt("\u200BSisyphus - Ultraworker")).toBe("Sisyphus - Ultraworker")
-    expect(normalizeAgentForPrompt("\u200B\u200BHephaestus - Deep Agent")).toBe("Hephaestus - Deep Agent")
-    expect(normalizeAgentForPrompt("\u200B\u200B\u200BPrometheus - Plan Builder")).toBe("Prometheus - Plan Builder")
-    expect(normalizeAgentForPrompt("\u200B\u200B\u200B\u200BAtlas - Plan Executor")).toBe("Atlas - Plan Executor")
+  it("strips core UI ordering prefixes back to canonical display names", () => {
+    expect(normalizeAgentForPrompt(getAgentListDisplayName("sisyphus"))).toBe("Sisyphus - Ultraworker")
+    expect(normalizeAgentForPrompt(getAgentListDisplayName("hephaestus"))).toBe("Hephaestus - Deep Agent")
+    expect(normalizeAgentForPrompt(getAgentListDisplayName("prometheus"))).toBe("Prometheus - Plan Builder")
+    expect(normalizeAgentForPrompt(getAgentListDisplayName("atlas"))).toBe("Atlas - Plan Executor")
   })
 })
 
