@@ -122,3 +122,32 @@ export interface ResolvedServer {
   env?: Record<string, string>
   initialization?: Record<string, unknown>
 }
+
+/**
+ * Common interface for LSP clients (direct and shared).
+ * Enables transparent cross-process LSP server sharing via Unix domain sockets.
+ */
+export interface ILSPClient {
+  definition(filePath: string, line: number, character: number): Promise<unknown>
+  references(filePath: string, line: number, character: number, includeDeclaration?: boolean): Promise<unknown>
+  documentSymbols(filePath: string): Promise<unknown>
+  workspaceSymbols(query: string): Promise<unknown>
+  diagnostics(filePath: string): Promise<{ items: Diagnostic[] }>
+  prepareRename(filePath: string, line: number, character: number): Promise<unknown>
+  rename(filePath: string, line: number, character: number, newName: string): Promise<unknown>
+  openFile(filePath: string): Promise<void>
+  isAlive(): boolean
+  stop(): Promise<void>
+}
+
+export interface IPCRequest {
+  id: number
+  method: string
+  params: Record<string, unknown>
+}
+
+export interface IPCResponse {
+  id: number
+  result?: unknown
+  error?: string
+}

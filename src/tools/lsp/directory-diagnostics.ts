@@ -4,10 +4,9 @@ import { extname, join, resolve } from "path"
 import { findServerForExtension } from "./config"
 import { findWorkspaceRoot, formatServerLookupError } from "./lsp-client-wrapper"
 import { filterDiagnosticsBySeverity, formatDiagnostic } from "./lsp-formatters"
-import { LSPClient } from "./lsp-client"
 import { lspManager } from "./lsp-server"
 import { DEFAULT_MAX_DIAGNOSTICS, DEFAULT_MAX_DIRECTORY_FILES } from "./constants"
-import type { Diagnostic } from "./types"
+import type { Diagnostic, ILSPClient } from "./types"
 
 const SKIP_DIRECTORIES = new Set(["node_modules", ".git", "dist", "build", ".next", "out"])
 
@@ -103,7 +102,7 @@ export async function aggregateDiagnosticsForDirectory(
   const allDiagnostics: FileDiagnostic[] = []
   const fileErrors: { file: string; error: string }[] = []
 
-  let client: LSPClient
+  let client: ILSPClient
   try {
     client = await lspManager.getClient(root, server)
 

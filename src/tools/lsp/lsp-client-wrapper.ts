@@ -2,9 +2,9 @@ import { extname, resolve } from "path"
 import { fileURLToPath } from "node:url"
 import { existsSync, statSync } from "fs"
 
-import { LSPClient, lspManager } from "./client"
+import { lspManager } from "./client"
 import { findServerForExtension } from "./config"
-import type { ServerLookupResult } from "./types"
+import type { ILSPClient, ServerLookupResult } from "./types"
 
 export function isDirectoryPath(filePath: string): boolean {
   if (!existsSync(filePath)) {
@@ -75,7 +75,7 @@ export function formatServerLookupError(result: Exclude<ServerLookupResult, { st
   ].join("\n")
 }
 
-export async function withLspClient<T>(filePath: string, fn: (client: LSPClient) => Promise<T>): Promise<T> {
+export async function withLspClient<T>(filePath: string, fn: (client: ILSPClient) => Promise<T>): Promise<T> {
   const absPath = resolve(filePath)
 
   if (isDirectoryPath(absPath)) {

@@ -1,14 +1,16 @@
 import { LSPClient } from "./lsp-client";
 import { registerLspManagerProcessCleanup, type LspProcessCleanupHandle } from "./lsp-manager-process-cleanup";
 import { cleanupTempDirectoryLspClients } from "./lsp-manager-temp-directory-cleanup";
-import type { ResolvedServer } from "./types";
+import { tryConnectShared, startSharedServer, type LSPSharedServer } from "./shared";
+import type { ILSPClient, ResolvedServer } from "./types";
 interface ManagedClient {
-  client: LSPClient;
+  client: ILSPClient;
   lastUsedAt: number;
   refCount: number;
   initPromise?: Promise<void>;
   isInitializing: boolean;
   initializingSince?: number;
+  sharedServer?: LSPSharedServer;
 }
 class LSPServerManager {
   private static instance: LSPServerManager;
@@ -62,12 +64,13 @@ class LSPServerManager {
     for (const [key, managed] of this.clients) {
       if (managed.refCount === 0 && now - managed.lastUsedAt > this.IDLE_TIMEOUT) {
         managed.client.stop();
+        if (managed.sharedServer) managed.sharedServer.stop();
         this.clients.delete(key);
       }
     }
   }
 
-  async getClient(root: string, server: ResolvedServer): Promise<LSPClient> {
+  async getClient(root: string, server: ResolvedServer): Promise<ILSPClient> {
     const key = this.getKey(root, server.id);
     let managed = this.clients.get(key);
     if (managed) {
@@ -77,10 +80,12 @@ class LSPServerManager {
         managed.initializingSince !== undefined &&
         now - managed.initializingSince >= this.INIT_TIMEOUT
       ) {
-        // Stale init can permanently block subsequent calls (e.g., LSP process hang)
         try {
           await managed.client.stop();
         } catch {}
+        if (managed.sharedServer) {
+          await managed.sharedServer.stop();
+        }
         this.clients.delete(key);
         managed = undefined;
       }
@@ -90,10 +95,12 @@ class LSPServerManager {
         try {
           await managed.initPromise;
         } catch {
-          // Failed init should not keep the key blocked forever.
           try {
             await managed.client.stop();
           } catch {}
+          if (managed.sharedServer) {
+            await managed.sharedServer.stop();
+          }
           this.clients.delete(key);
           managed = undefined;
         }
@@ -108,9 +115,25 @@ class LSPServerManager {
         try {
           await managed.client.stop();
         } catch {}
+        if (managed.sharedServer) {
+          await managed.sharedServer.stop();
+        }
         this.clients.delete(key);
       }
     }
+
+    try {
+      const sharedClient = await tryConnectShared(root, server.id);
+      if (sharedClient) {
+        this.clients.set(key, {
+          client: sharedClient,
+          lastUsedAt: Date.now(),
+          refCount: 1,
+          isInitializing: false,
+        });
+        return sharedClient;
+      }
+    } catch {}
 
     const client = new LSPClient(root, server);
     const initPromise = (async () => {
@@ -142,6 +165,15 @@ class LSPServerManager {
       m.isInitializing = false;
       m.initializingSince = undefined;
     }
+
+    startSharedServer(root, server, client)
+      .then((sharedServer) => {
+        if (sharedServer) {
+          const entry = this.clients.get(key);
+          if (entry) entry.sharedServer = sharedServer;
+        }
+      })
+      .catch(() => {});
 
     return client;
   }
@@ -201,6 +233,7 @@ class LSPServerManager {
     this.cleanupHandle = null;
     for (const [, managed] of this.clients) {
       await managed.client.stop();
+      if (managed.sharedServer) await managed.sharedServer.stop();
     }
     this.clients.clear();
     if (this.cleanupInterval) {
