@@ -3,7 +3,6 @@ import type { DelegateTaskArgs } from "./types"
 import type { ExecutorContext } from "./executor-types"
 import type { FallbackEntry } from "../../shared/model-requirements"
 import { mergeCategories } from "../../shared/merge-categories"
-import { SISYPHUS_JUNIOR_AGENT } from "./sisyphus-junior-agent"
 import { resolveCategoryConfig } from "./categories"
 import { parseModelString } from "./model-string-parser"
 import { CATEGORY_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
@@ -25,6 +24,17 @@ function applyCategoryParams(base: DelegatedModelConfig, config: CategoryConfig)
   return result
 }
 
+const CATEGORY_TO_OPENFANG_AGENT: Record<string, string> = {
+  "quick": "builder",
+  "deep": "builder",
+  "visual-engineering": "builder",
+  "artistry": "reasoner",
+  "ultrabrain": "reasoner",
+  "unspecified-low": "builder",
+  "unspecified-high": "builder",
+  "writing": "builder",
+}
+
 export interface CategoryResolutionResult {
   agentToUse: string
   categoryModel: DelegatedModelConfig | undefined
@@ -33,7 +43,8 @@ export interface CategoryResolutionResult {
   modelInfo: ModelFallbackInfo | undefined
   actualModel: string | undefined
   isUnstableAgent: boolean
-  fallbackChain?: FallbackEntry[]  // For runtime retry on model errors
+  fallbackChain?: FallbackEntry[]
+  openfangAgent?: string
   error?: string
 }
 
@@ -266,15 +277,17 @@ Available categories: ${categoryNames.join(", ")}`,
     }
   }
 
+  const openfangAgent = CATEGORY_TO_OPENFANG_AGENT[categoryName] ?? "builder"
+
   return {
-    agentToUse: SISYPHUS_JUNIOR_AGENT,
+    agentToUse: "openfang-relay",
+    openfangAgent,
     categoryModel,
     categoryPromptAppend,
     maxPromptTokens: resolved.config.max_prompt_tokens,
     modelInfo,
     actualModel,
     isUnstableAgent,
-    // Don't use hardcoded fallback chain when resolution was skipped (cold cache)
     fallbackChain: configuredFallbackChain ?? ((isModelResolutionSkipped || explicitCategoryModel) ? undefined : requirement?.fallbackChain),
   }
 }
