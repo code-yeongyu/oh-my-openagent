@@ -15,8 +15,8 @@ Standalone feature modules wired into plugin/ layer. Each is self-contained with
 | **tmux-subagent** | 34 | HIGH | Tmux pane management, grid planning, session orchestration |
 | **mcp-oauth** | 18 | HIGH | OAuth 2.0 + PKCE + DCR (RFC 7591) for MCP servers |
 | **builtin-skills** | 17 | LOW | 8 skills: git-master, playwright, playwright-cli, agent-browser, dev-browser, frontend-ui-ux, review-work, ai-slop-remover |
-| **skill-mcp-manager** | 14 | MEDIUM | MCP client lifecycle per session (stdio + HTTP) |
-| **claude-code-plugin-loader** | 10 | MEDIUM | Unified plugin discovery from .opencode/plugins/ |
+| **skill-mcp-manager** | 18 | HIGH | Tier-3 MCP client lifecycle per session (stdio + HTTP + OAuth step-up) |
+| **claude-code-plugin-loader** | 15 | MEDIUM | Unified plugin discovery from .opencode/plugins/ |
 | **builtin-commands** | 11 | LOW | Command templates: refactor, init-deep, handoff, etc. |
 | **claude-tasks** | 7 | MEDIUM | Task schema + file storage + OpenCode todo sync |
 | **claude-code-mcp-loader** | 6 | MEDIUM | .mcp.json loading with ${VAR} env expansion |
