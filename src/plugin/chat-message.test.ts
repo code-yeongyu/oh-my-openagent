@@ -9,6 +9,7 @@ import { createAutoSlashCommandHook } from "../hooks/auto-slash-command"
 import { createStartWorkHook } from "../hooks/start-work"
 import { readBoulderState } from "../features/boulder-state"
 import { _resetForTesting, setMainSession, subagentSessions, registerAgentName, updateSessionAgent, getSessionAgent } from "../features/claude-code-session-state"
+import { getAgentListDisplayName } from "../shared/agent-display-names"
 import { clearSessionModel, getSessionModel, setSessionModel } from "../shared/session-model-state"
 
 type ChatMessagePart = { type: string; text?: string; [key: string]: unknown }
@@ -402,10 +403,7 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
     expect(getSessionModel("test-session")).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
   })
 
-  test("treats legacy ZWSP-prefixed agent names as explicit model overrides (GH-3259)", async () => {
-    // Users upgrading from v3.14.0-v3.16.0 may still have ZWSP-prefixed agent
-    // keys persisted in their session state. The handler must strip the
-    // prefix and resolve to the canonical display name.
+  test("treats prefixed list-display agent names as explicit model overrides", async () => {
     //#given
     setMainSession("test-session")
     setSessionModel("test-session", { providerID: "openai", modelID: "gpt-5.4" })
@@ -418,7 +416,7 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
       },
     })
     const handler = createChatMessageHandler(args)
-    const input = createMockInput("\u200B\u200B\u200BPrometheus - Plan Builder")
+    const input = createMockInput(getAgentListDisplayName("prometheus"))
     const output = createMockOutput()
 
     //#when
