@@ -17,13 +17,18 @@ import { parseRalphLoopArguments } from "../ralph-loop/command-arguments"
 
 const ULTRAWORK_KEYWORD_PATTERN = /\b(ultrawork|ulw)\b/i
 const LEADING_ULTRAWORK_PATTERN = /^\s*(ultrawork|ulw)\b/i
+const TRAILING_GREETING_ULTRAWORK_PATTERN = /^\s*(?:hi|hello|hey|hiya|greetings)(?:\s+there)?\s+(ultrawork|ulw)\s*$/i
 
 function extractUltraworkTask(cleanText: string): string {
+  if (TRAILING_GREETING_ULTRAWORK_PATTERN.test(cleanText)) {
+    return ""
+  }
+
   return cleanText.replace(ULTRAWORK_KEYWORD_PATTERN, "").trim()
 }
 
-function hasLeadingUltraworkKeyword(cleanText: string): boolean {
-  return LEADING_ULTRAWORK_PATTERN.test(cleanText)
+function hasEdgeUltraworkKeyword(cleanText: string): boolean {
+  return LEADING_ULTRAWORK_PATTERN.test(cleanText) || TRAILING_GREETING_ULTRAWORK_PATTERN.test(cleanText)
 }
 
 export function createKeywordDetectorHook(
@@ -81,11 +86,11 @@ export function createKeywordDetectorHook(
         }
       }
 
-      if (!hasLeadingUltraworkKeyword(cleanText)) {
+      if (!hasEdgeUltraworkKeyword(cleanText)) {
         const preFilterCount = detectedKeywords.length
         detectedKeywords = detectedKeywords.filter((k) => k.type !== "ultrawork")
         if (preFilterCount > detectedKeywords.length) {
-          log(`[keyword-detector] Filtered non-leading ultrawork keyword`, {
+          log(`[keyword-detector] Filtered non-edge ultrawork keyword`, {
             sessionID: input.sessionID,
           })
         }
