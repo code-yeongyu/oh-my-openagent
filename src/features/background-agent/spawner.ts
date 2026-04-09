@@ -6,6 +6,7 @@ import { applySessionPromptParams } from "../../shared/session-prompt-params-hel
 import { subagentSessions } from "../claude-code-session-state"
 import { getTaskToastManager } from "../task-toast-manager"
 import { isInsideTmux } from "../../shared/tmux"
+import { stripAgentListSortPrefix } from "../../shared/agent-display-names"
 import type { ConcurrencyManager } from "./concurrency"
 
 export const FALLBACK_AGENT = "general"
@@ -168,11 +169,12 @@ export async function startTask(
       }
     : undefined
   const launchVariant = input.model?.variant
+  const normalizedAgent = stripAgentListSortPrefix(input.agent)
 
   applySessionPromptParams(sessionID, input.model)
 
   const promptBody = {
-    agent: input.agent,
+    agent: normalizedAgent,
     ...(launchModel ? { model: launchModel } : {}),
     ...(launchVariant ? { variant: launchVariant } : {}),
     system: input.skillContent,
@@ -180,7 +182,7 @@ export async function startTask(
       task: false,
       call_omo_agent: true,
       question: false,
-      ...getAgentToolRestrictions(input.agent),
+      ...getAgentToolRestrictions(normalizedAgent),
     },
     parts: [createInternalAgentTextPart(input.prompt)],
   }

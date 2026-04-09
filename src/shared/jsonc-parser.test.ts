@@ -139,6 +139,33 @@ describe("parseJsonc", () => {
     // then
     expect(() => parseJsonc(invalid)).toThrow()
   })
+
+  test("parses content with UTF-8 BOM prefix", () => {
+    // given
+    const jsonc = `\uFEFF{"key": "value"}`
+
+    // when
+    const result = parseJsonc<{ key: string }>(jsonc)
+
+    // then
+    expect(result.key).toBe("value")
+  })
+
+  test("parses commented JSONC with UTF-8 BOM prefix", () => {
+    // given
+    const jsonc = `\uFEFF{
+      // Windows-saved file with BOM
+      "$schema": "https://opencode.ai/config.json",
+      "plugin": ["oh-my-openagent@3.15.3"],
+    }`
+
+    // when
+    const result = parseJsonc<{ $schema: string; plugin: string[] }>(jsonc)
+
+    // then
+    expect(result.$schema).toBe("https://opencode.ai/config.json")
+    expect(result.plugin).toEqual(["oh-my-openagent@3.15.3"])
+  })
 })
 
 describe("parseJsoncSafe", () => {
@@ -165,6 +192,19 @@ describe("parseJsoncSafe", () => {
     // then
     expect(result.data).toBeNull()
     expect(result.errors.length).toBeGreaterThan(0)
+  })
+
+  test("returns data when content has UTF-8 BOM prefix", () => {
+    // given
+    const jsonc = `\uFEFF{"key": "value"}`
+
+    // when
+    const result = parseJsoncSafe<{ key: string }>(jsonc)
+
+    // then
+    expect(result.errors).toHaveLength(0)
+    expect(result.data).not.toBeNull()
+    expect(result.data?.key).toBe("value")
   })
 })
 
@@ -212,6 +252,28 @@ describe("readJsoncFile", () => {
 
     // then
     expect(result).toBeNull()
+
+    rmSync(testDir, { recursive: true, force: true })
+  })
+
+  test("reads JSONC file written with UTF-8 BOM (Windows scenario)", () => {
+    // given
+    if (!existsSync(testDir)) mkdirSync(testDir, { recursive: true })
+    const bomBytes = Buffer.from([0xef, 0xbb, 0xbf])
+    const jsonBytes = Buffer.from(`{
+      // Created on Windows with BOM
+      "$schema": "https://opencode.ai/config.json",
+      "plugin": ["oh-my-openagent@3.15.3"]
+    }`)
+    writeFileSync(testFile, Buffer.concat([bomBytes, jsonBytes]))
+
+    // when
+    const result = readJsoncFile<{ $schema: string; plugin: string[] }>(testFile)
+
+    // then
+    expect(result).not.toBeNull()
+    expect(result?.$schema).toBe("https://opencode.ai/config.json")
+    expect(result?.plugin).toEqual(["oh-my-openagent@3.15.3"])
 
     rmSync(testDir, { recursive: true, force: true })
   })

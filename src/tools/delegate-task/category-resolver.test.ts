@@ -197,7 +197,7 @@ describe("resolveCategoryExecution", () => {
 		if (!result.actualModel || !result.categoryModel) {
 			throw new Error("Expected resolved model and category model")
 		}
-		expect(result.actualModel).toBe("openai/gpt-5.4 high")
+		expect(result.actualModel).toBe("openai/gpt-5.4")
 		expect(result.categoryModel).toEqual({
 			providerID: "openai",
 			modelID: "gpt-5.4",
@@ -480,6 +480,34 @@ describe("resolveCategoryExecution", () => {
 		expect(result.categoryModel).toEqual({
 			providerID: "animal-gateway-xai",
 			modelID: "grok-4-fast-non-reasoning",
+			variant: undefined,
+		})
+		expect(result.fallbackChain).toBeUndefined()
+	})
+
+	test("does not inherit hardcoded fallbackChain when sisyphus-junior model override is set [regression #2941]", async () => {
+		//#given
+		const args = {
+			category: "quick",
+			prompt: "test prompt",
+			description: "Test task",
+			run_in_background: false,
+			load_skills: [],
+			blockedBy: undefined,
+			enableSkillTools: false,
+		}
+		const executorCtx = createMockExecutorContext()
+		executorCtx.sisyphusJuniorModel = "anthropic/claude-sonnet-4-6"
+
+		//#when
+		const result = await resolveCategoryExecution(args, executorCtx, undefined, "anthropic/claude-sonnet-4-6")
+
+		//#then
+		expect(result.error).toBeUndefined()
+		expect(result.actualModel).toBe("anthropic/claude-sonnet-4-6")
+		expect(result.categoryModel).toEqual({
+			providerID: "anthropic",
+			modelID: "claude-sonnet-4-6",
 			variant: undefined,
 		})
 		expect(result.fallbackChain).toBeUndefined()

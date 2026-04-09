@@ -1,7 +1,10 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 
 import type { BackgroundManager } from "../../features/background-agent"
-import { getSessionAgent } from "../../features/claude-code-session-state"
+import {
+  getSessionAgent,
+  resolveRegisteredAgentName,
+} from "../../features/claude-code-session-state"
 import {
   createInternalAgentTextPart,
   normalizeSDKResponse,
@@ -26,6 +29,7 @@ import {
 } from "./constants"
 import { isCompactionGuardActive } from "./compaction-guard"
 import { getMessageDir } from "./message-directory"
+import { isTokenLimitError } from "./token-limit-detection"
 import { getIncompleteCount } from "./todo"
 import type { ResolvedMessageInfo, Todo } from "./types"
 import type { SessionStateStore } from "./session-state"
@@ -126,6 +130,7 @@ export async function injectContinuation(args: {
   }
 
   const promptAgent = normalizeAgentForPromptKey(agentName)
+  const launchAgent = resolveRegisteredAgentName(agentName)
 
   if (promptAgent && skipAgents.some(s => getAgentConfigKey(s) === getAgentConfigKey(promptAgent))) {
     log(`[${HOOK_NAME}] Skipped: agent in skipAgents list`, { sessionID, agent: agentName })
@@ -167,18 +172,24 @@ ${todoList}`
   try {
     log(`[${HOOK_NAME}] Injecting continuation`, {
       sessionID,
-      agent: promptAgent,
+      agent: launchAgent ?? promptAgent,
       model,
       incompleteCount: freshIncompleteCount,
     })
 
     const inheritedTools = resolveInheritedPromptTools(sessionID, tools)
 
+    const launchModel = model
+      ? { providerID: model.providerID, modelID: model.modelID }
+      : undefined
+    const launchVariant = model?.variant
+
     await ctx.client.session.promptAsync({
       path: { id: sessionID },
       body: {
-        agent: promptAgent,
-        ...(model !== undefined ? { model } : {}),
+        agent: launchAgent ?? promptAgent,
+        ...(launchModel ? { model: launchModel } : {}),
+        ...(launchVariant ? { variant: launchVariant } : {}),
         ...(inheritedTools ? { tools: inheritedTools } : {}),
         parts: [createInternalAgentTextPart(prompt)],
       },
@@ -198,6 +209,14 @@ ${todoList}`
       injectionState.inFlight = false
       injectionState.lastInjectedAt = Date.now()
       injectionState.consecutiveFailures = (injectionState.consecutiveFailures ?? 0) + 1
+
+      const errorObj = error instanceof Error
+        ? { name: error.name, message: error.message }
+        : { message: String(error) }
+      if (isTokenLimitError(errorObj)) {
+        injectionState.tokenLimitDetected = true
+        log(`[${HOOK_NAME}] Token limit error detected during injection, stopping continuation`, { sessionID })
+      }
     }
   }
 }

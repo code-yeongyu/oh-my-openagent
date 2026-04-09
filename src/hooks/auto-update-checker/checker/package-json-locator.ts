@@ -1,7 +1,9 @@
 import * as fs from "node:fs"
 import * as path from "node:path"
 import type { PackageJson } from "../types"
-import { PACKAGE_NAME } from "../constants"
+import { ACCEPTED_PACKAGE_NAMES } from "../constants"
+
+const ACCEPTED_NAME_SET = new Set<string>(ACCEPTED_PACKAGE_NAMES)
 
 export function findPackageJsonUp(startPath: string): string | null {
   try {
@@ -14,7 +16,7 @@ export function findPackageJsonUp(startPath: string): string | null {
         try {
           const content = fs.readFileSync(pkgPath, "utf-8")
           const pkg = JSON.parse(content) as PackageJson
-          if (pkg.name === PACKAGE_NAME) return pkgPath
+          if (pkg.name && ACCEPTED_NAME_SET.has(pkg.name)) return pkgPath
         } catch {
           // ignore
         }

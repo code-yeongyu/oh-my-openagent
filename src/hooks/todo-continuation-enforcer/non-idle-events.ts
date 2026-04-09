@@ -28,6 +28,7 @@ export function handleNonIdleEvent(args: {
       if (state) {
         state.abortDetectedAt = undefined
         state.wasCancelled = false
+        state.tokenLimitDetected = false
         sessionStateStore.recordActivity(sessionID)
       }
       sessionStateStore.cancelCountdown(sessionID)

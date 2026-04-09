@@ -3,6 +3,7 @@ import { homedir } from "os"
 import { basename, join } from "path"
 import { fileURLToPath } from "url"
 import { log } from "../../shared/logger"
+import { shouldLoadPluginForCwd } from "./scope-filter"
 import type {
   InstalledPluginsDatabase,
   InstalledPluginEntryV3,
@@ -132,6 +133,7 @@ function v3EntryToInstallation(entry: InstalledPluginEntryV3): PluginInstallatio
     installedAt: entry.lastUpdated,
     lastUpdated: entry.lastUpdated,
     gitCommitSha: entry.gitCommitSha,
+    projectPath: entry.projectPath,
   }
 }
 
@@ -177,12 +179,21 @@ export function discoverInstalledPlugins(options?: PluginLoaderOptions): PluginL
   const settingsEnabledPlugins = settings?.enabledPlugins
   const overrideEnabledPlugins = options?.enabledPluginsOverride
   const pluginManifestLoader = options?.loadPluginManifestOverride ?? loadPluginManifest
+  const cwd = process.cwd()
 
   for (const [pluginKey, installation] of extractPluginEntries(db)) {
     if (!installation) continue
 
     if (!isPluginEnabled(pluginKey, settingsEnabledPlugins, overrideEnabledPlugins)) {
       log(`Plugin disabled: ${pluginKey}`)
+      continue
+    }
+
+    if (!shouldLoadPluginForCwd(installation, cwd)) {
+      log(`Skipping ${installation.scope}-scoped plugin outside current cwd: ${pluginKey}`, {
+        projectPath: installation.projectPath,
+        cwd,
+      })
       continue
     }
 

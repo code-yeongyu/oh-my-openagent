@@ -9,11 +9,11 @@ import type { OhMyOpenCodeConfig } from "../config"
 import * as agentLoader from "../features/claude-code-agent-loader"
 import * as skillLoader from "../features/opencode-skill-loader"
 import type { LoadedSkill } from "../features/opencode-skill-loader"
-import { getAgentDisplayName, getAgentListDisplayName } from "../shared/agent-display-names"
+import { getAgentDisplayName, getAgentDisplayName } from "../shared/agent-display-names"
 import { applyAgentConfig } from "./agent-config-handler"
 import type { PluginComponents } from "./plugin-components-loader"
 
-const BUILTIN_SISYPHUS_DISPLAY_NAME = getAgentListDisplayName("sisyphus")
+const BUILTIN_SISYPHUS_DISPLAY_NAME = getAgentDisplayName("sisyphus")
 const BUILTIN_SISYPHUS_JUNIOR_DISPLAY_NAME = getAgentDisplayName("sisyphus-junior")
 const BUILTIN_MULTIMODAL_LOOKER_DISPLAY_NAME = getAgentDisplayName("multimodal-looker")
 
@@ -158,6 +158,25 @@ describe("applyAgentConfig builtin override protection", () => {
     logSpy.mockRestore()
   })
 
+  test("registered agent keys are HTTP-header-safe (no parentheses) for UI selector compatibility", async () => {
+    // given builtin agents are registered via applyAgentConfig
+
+    // when applyAgentConfig runs
+    const result = await applyAgentConfig({
+      config: createBaseConfig(),
+      pluginConfig: createPluginConfig(),
+      ctx: { directory: "/tmp" },
+      pluginComponents: createPluginComponents(),
+    })
+
+    // then every registered agent key must be HTTP-header-safe (no parentheses)
+    // Parentheses in agent names cause HTTP header validation errors in
+    // x-opencode-agent-name and prevent the agents from showing in the OpenCode UI.
+    for (const key of Object.keys(result)) {
+      expect(key).not.toMatch(/[()]/)
+    }
+  })
+
   test("filters user agents whose key matches the builtin display-name alias", async () => {
     // given
     loadUserAgentsSpy.mockReturnValue({
@@ -291,6 +310,81 @@ describe("applyAgentConfig builtin override protection", () => {
 
     // then
     expect(createSisyphusJuniorAgentSpy).toHaveBeenCalledWith(undefined, "openai/gpt-5.4", false)
+  })
+
+  test("defaults mode to subagent for configAgent entries missing mode", async () => {
+    // given
+    const config = createBaseConfig()
+    ;(config as Record<string, unknown>).agent = {
+      "custom-reviewer": {
+        name: "custom-reviewer",
+        prompt: "Review code for security issues",
+        description: "Custom code reviewer",
+      },
+    }
+
+    // when
+    const result = await applyAgentConfig({
+      config,
+      pluginConfig: createPluginConfig(),
+      ctx: { directory: "/tmp" },
+      pluginComponents: createPluginComponents(),
+    })
+
+    // then
+    const customAgent = result["custom-reviewer"] as Record<string, unknown>
+    expect(customAgent).toBeDefined()
+    expect(customAgent.mode).toBe("subagent")
+  })
+
+  test("preserves explicit mode on configAgent entries", async () => {
+    // given
+    const config = createBaseConfig()
+    ;(config as Record<string, unknown>).agent = {
+      "custom-primary": {
+        name: "custom-primary",
+        prompt: "Primary agent",
+        mode: "primary",
+      },
+    }
+
+    // when
+    const result = await applyAgentConfig({
+      config,
+      pluginConfig: createPluginConfig(),
+      ctx: { directory: "/tmp" },
+      pluginComponents: createPluginComponents(),
+    })
+
+    // then
+    const customAgent = result["custom-primary"] as Record<string, unknown>
+    expect(customAgent).toBeDefined()
+    expect(customAgent.mode).toBe("primary")
+  })
+
+  test("defaults mode to subagent for plugin agents missing mode", async () => {
+    // given
+    const pluginComponents = createPluginComponents()
+    pluginComponents.agents = {
+      "plugin-worker": {
+        name: "plugin-worker",
+        prompt: "Do work",
+        description: "Plugin worker agent",
+      } as Record<string, unknown>,
+    }
+
+    // when
+    const result = await applyAgentConfig({
+      config: createBaseConfig(),
+      pluginConfig: createPluginConfig(),
+      ctx: { directory: "/tmp" },
+      pluginComponents,
+    })
+
+    // then
+    const pluginAgent = result["plugin-worker"] as Record<string, unknown>
+    expect(pluginAgent).toBeDefined()
+    expect(pluginAgent.mode).toBe("subagent")
   })
 
   test("includes project and global .agents skills in builtin agent awareness", async () => {

@@ -180,8 +180,8 @@ describe("sisyphus-task", () => {
       //#given / #when
       const result = isPlanAgent("planner")
 
-      //#then - "planner" contains "plan" so it matches via includes
-      expect(result).toBe(true)
+      //#then - "planner" is NOT an exact match for "plan" (T37 exact match fix)
+      expect(result).toBe(false)
     })
 
     test("returns true for case-insensitive match 'PLAN'", () => {
@@ -2963,6 +2963,7 @@ describe("sisyphus-task", () => {
       // then - sisyphus-junior override model should be used, not category default
       expect(launchInput.model.providerID).toBe("anthropic")
       expect(launchInput.model.modelID).toBe("claude-sonnet-4-6")
+      expect(launchInput.fallbackChain).toBeUndefined()
     })
 
     test("sisyphus-junior model override works with user-defined category (#1295)", async () => {

@@ -8,6 +8,7 @@ export type {
 export { categorizeTools } from "./dynamic-agent-tool-categorization"
 
 export {
+  buildAgentIdentitySection,
   buildKeyTriggersSection,
   buildToolSelectionTable,
   buildExploreSection,

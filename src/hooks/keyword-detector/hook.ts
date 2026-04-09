@@ -12,8 +12,25 @@ import {
   subagentSessions,
 } from "../../features/claude-code-session-state"
 import type { ContextCollector } from "../../features/context-injector"
+import type { RalphLoopHook } from "../ralph-loop"
+import { parseRalphLoopArguments } from "../ralph-loop/command-arguments"
 
-export function createKeywordDetectorHook(ctx: PluginInput, _collector?: ContextCollector) {
+const ULTRAWORK_KEYWORD_PATTERN = /\b(ultrawork|ulw)\b/i
+const LEADING_ULTRAWORK_PATTERN = /^\s*(ultrawork|ulw)\b/i
+
+function extractUltraworkTask(cleanText: string): string {
+  return cleanText.replace(ULTRAWORK_KEYWORD_PATTERN, "").trim()
+}
+
+function hasLeadingUltraworkKeyword(cleanText: string): boolean {
+  return LEADING_ULTRAWORK_PATTERN.test(cleanText)
+}
+
+export function createKeywordDetectorHook(
+  ctx: PluginInput,
+  _collector?: ContextCollector,
+  ralphLoop?: Pick<RalphLoopHook, "startLoop">
+) {
   function getRuntimeVariant(input: { variant?: string }, message: Record<string, unknown>): string | undefined {
     if (typeof message["variant"] === "string") {
       return message["variant"]
@@ -61,6 +78,16 @@ export function createKeywordDetectorHook(ctx: PluginInput, _collector?: Context
         detectedKeywords = detectedKeywords.filter((k) => k.type !== "ultrawork")
         if (preFilterCount > detectedKeywords.length) {
           log(`[keyword-detector] Filtered ultrawork keywords for planner agent`, { sessionID: input.sessionID, agent: currentAgent })
+        }
+      }
+
+      if (!hasLeadingUltraworkKeyword(cleanText)) {
+        const preFilterCount = detectedKeywords.length
+        detectedKeywords = detectedKeywords.filter((k) => k.type !== "ultrawork")
+        if (preFilterCount > detectedKeywords.length) {
+          log(`[keyword-detector] Filtered non-leading ultrawork keyword`, {
+            sessionID: input.sessionID,
+          })
         }
       }
 
@@ -115,6 +142,17 @@ export function createKeywordDetectorHook(ctx: PluginInput, _collector?: Context
               sessionID: input.sessionID,
             })
           )
+
+        if (ralphLoop) {
+          const userTask = extractUltraworkTask(cleanText)
+          const parsedArguments = parseRalphLoopArguments(userTask)
+          ralphLoop.startLoop(input.sessionID, parsedArguments.prompt, {
+            ultrawork: true,
+            maxIterations: parsedArguments.maxIterations,
+            completionPromise: parsedArguments.completionPromise,
+            strategy: parsedArguments.strategy,
+          })
+        }
       }
 
       const textPartIndex = output.parts.findIndex((p) => p.type === "text" && p.text !== undefined)

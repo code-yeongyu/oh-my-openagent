@@ -371,7 +371,7 @@ export class BackgroundManager {
       this.markPreStartDescendantReservation(task)
 
       // Trigger processing (fire-and-forget)
-      this.processKey(key)
+      void this.processKey(key)
 
       return { ...task }
     } catch (error) {
@@ -408,12 +408,31 @@ export class BackgroundManager {
         } catch (error) {
           log("[background-agent] Error starting task:", error)
           this.rollbackPreStartDescendantReservation(item.task)
+
+          // Mark task as error so the parent polling loop detects the failure
+          // instead of leaving it in a zombie "running" state with no prompt sent
+          item.task.status = "error"
+          item.task.error = error instanceof Error ? error.message : String(error)
+          item.task.completedAt = new Date()
+
           if (item.task.concurrencyKey) {
             this.concurrencyManager.release(item.task.concurrencyKey)
             item.task.concurrencyKey = undefined
           } else {
             this.concurrencyManager.release(key)
           }
+
+          removeTaskToastTracking(item.task.id)
+
+          // Abort the orphaned session if one was created before the error
+          if (item.task.sessionID) {
+            await this.abortSessionWithLogging(item.task.sessionID, "startTask error cleanup")
+          }
+
+          this.markForNotification(item.task)
+          this.enqueueNotificationForParent(item.task.parentSessionID, () => this.notifyParentSession(item.task)).catch(err => {
+            log("[background-agent] Failed to notify on startTask error:", err)
+          })
         }
       }
     } finally {
@@ -1760,6 +1779,7 @@ export class BackgroundManager {
       let agent: string | undefined = task.parentAgent
       let model: { providerID: string; modelID: string } | undefined
       let tools: Record<string, boolean> | undefined = task.parentTools
+      let promptContext: ReturnType<typeof resolvePromptContextFromSessionMessages> = null
 
       if (this.enableParentSessionNotifications) {
         try {
@@ -1773,7 +1793,7 @@ export class BackgroundManager {
               tools?: Record<string, boolean | "allow" | "deny" | "ask">
             }
           }>)
-          const promptContext = resolvePromptContextFromSessionMessages(
+          promptContext = resolvePromptContextFromSessionMessages(
             messages,
             task.parentSessionID,
           )
@@ -1817,6 +1837,8 @@ export class BackgroundManager {
         const isTaskFailure = task.status === "error" || task.status === "cancelled" || task.status === "interrupt"
         const shouldReply = allComplete || isTaskFailure
 
+        const variant = promptContext?.model?.variant
+
         try {
           await this.client.session.promptAsync({
             path: { id: task.parentSessionID },
@@ -1824,6 +1846,7 @@ export class BackgroundManager {
               noReply: !shouldReply,
               ...(agent !== undefined ? { agent } : {}),
               ...(model !== undefined ? { model } : {}),
+              ...(variant !== undefined ? { variant } : {}),
               ...(resolvedTools ? { tools: resolvedTools } : {}),
               parts: [createInternalAgentTextPart(notification)],
             },

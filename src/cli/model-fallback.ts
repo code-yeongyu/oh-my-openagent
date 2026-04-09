@@ -37,28 +37,52 @@ function toFallbackModelObject(entry: FallbackEntry, provider: string): Fallback
   }
 }
 
-function attachFallbackModels<T extends AgentConfig | CategoryConfig>(
-  config: T,
+function collectAvailableFallbacks(
   fallbackChain: FallbackEntry[],
   availability: ReturnType<typeof toProviderAvailability>,
-): T {
+): FallbackModelObject[] {
   const expandedFallbacks = fallbackChain.flatMap((entry) =>
     entry.providers
       .filter((provider) => isProviderAvailable(provider, availability))
       .map((provider) => toFallbackModelObject(entry, provider))
   )
-  const uniqueFallbacks = expandedFallbacks.filter((entry, index, allEntries) =>
+  return expandedFallbacks.filter((entry, index, allEntries) =>
     allEntries.findIndex((candidate) =>
       candidate.model === entry.model &&
       candidate.variant === entry.variant
     ) === index
   )
+}
+
+function attachFallbackModels<T extends AgentConfig | CategoryConfig>(
+  config: T,
+  fallbackChain: FallbackEntry[],
+  availability: ReturnType<typeof toProviderAvailability>,
+): T {
+  const uniqueFallbacks = collectAvailableFallbacks(fallbackChain, availability)
   const primaryIndex = uniqueFallbacks.findIndex((entry) => entry.model === config.model)
   if (primaryIndex === -1) {
     return config
   }
 
   const fallbackModels = uniqueFallbacks.slice(primaryIndex + 1)
+  if (fallbackModels.length === 0) {
+    return config
+  }
+
+  return {
+    ...config,
+    fallback_models: fallbackModels,
+  }
+}
+
+function attachAllFallbackModels<T extends AgentConfig | CategoryConfig>(
+  config: T,
+  fallbackChain: FallbackEntry[],
+  availability: ReturnType<typeof toProviderAvailability>,
+): T {
+  const uniqueFallbacks = collectAvailableFallbacks(fallbackChain, availability)
+  const fallbackModels = uniqueFallbacks.filter((entry) => entry.model !== config.model)
   if (fallbackModels.length === 0) {
     return config
   }
@@ -101,26 +125,32 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
 
   for (const [role, req] of Object.entries(CLI_AGENT_MODEL_REQUIREMENTS)) {
     if (role === "librarian") {
+      let agentConfig: AgentConfig | undefined
       if (avail.opencodeGo) {
-        agents[role] = { model: "opencode-go/minimax-m2.7" }
+        agentConfig = { model: "opencode-go/minimax-m2.7" }
       } else if (avail.zai) {
-        agents[role] = { model: ZAI_MODEL }
+        agentConfig = { model: ZAI_MODEL }
+      }
+      if (agentConfig) {
+        agents[role] = attachAllFallbackModels(agentConfig, req.fallbackChain, avail)
       }
       continue
     }
 
     if (role === "explore") {
+      let agentConfig: AgentConfig
       if (avail.native.claude) {
-        agents[role] = { model: "anthropic/claude-haiku-4-5" }
+        agentConfig = { model: "anthropic/claude-haiku-4-5" }
       } else if (avail.opencodeZen) {
-        agents[role] = { model: "opencode/claude-haiku-4-5" }
+        agentConfig = { model: "opencode/claude-haiku-4-5" }
       } else if (avail.opencodeGo) {
-        agents[role] = { model: "opencode-go/minimax-m2.7" }
+        agentConfig = { model: "opencode-go/minimax-m2.7" }
       } else if (avail.copilot) {
-        agents[role] = { model: "github-copilot/gpt-5-mini" }
+        agentConfig = { model: "github-copilot/gpt-5-mini" }
       } else {
-        agents[role] = { model: "opencode/gpt-5-nano" }
+        agentConfig = { model: "opencode/gpt-5-nano" }
       }
+      agents[role] = attachAllFallbackModels(agentConfig, req.fallbackChain, avail)
       continue
     }
 

@@ -123,10 +123,10 @@ describe("createChatParamsHandler", () => {
     setSessionPromptParams("ses_chat_params_temperature", {
       temperature: 0.4,
       topP: 0.7,
+      maxOutputTokens: 4096,
       options: {
         reasoningEffort: "high",
         thinking: { type: "disabled" },
-        maxTokens: 4096,
       },
     })
 
@@ -157,31 +157,29 @@ describe("createChatParamsHandler", () => {
       temperature: 0.4,
       topP: 0.7,
       topK: 1,
+      maxOutputTokens: 4096,
       options: {
         existing: true,
         reasoningEffort: "high",
         thinking: { type: "disabled" },
-        maxTokens: 4096,
       },
     })
     expect(getSessionPromptParams("ses_chat_params_temperature")).toEqual({
       temperature: 0.4,
       topP: 0.7,
+      maxOutputTokens: 4096,
       options: {
         reasoningEffort: "high",
         thinking: { type: "disabled" },
-        maxTokens: 4096,
       },
     })
   })
 
-  test("drops gpt-5.4 temperature and clamps maxTokens from bundled model capabilities", async () => {
+  test("drops gpt-5.4 temperature and clamps maxOutputTokens from bundled model capabilities", async () => {
     //#given
     setSessionPromptParams("ses_chat_params_temperature", {
       temperature: 0.7,
-      options: {
-        maxTokens: 200_000,
-      },
+      maxOutputTokens: 200_000,
     })
 
     const handler = createChatParamsHandler({
@@ -210,9 +208,8 @@ describe("createChatParamsHandler", () => {
     expect(output).toEqual({
       topP: 1,
       topK: 1,
-      options: {
-        maxTokens: 128_000,
-      },
+      maxOutputTokens: 128_000,
+      options: {},
     })
   })
 

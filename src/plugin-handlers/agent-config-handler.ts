@@ -99,10 +99,12 @@ export async function applyAgentConfig(params: {
   const rawPluginAgents = params.pluginComponents.agents;
 
   const pluginAgents = Object.fromEntries(
-    Object.entries(rawPluginAgents).map(([key, value]) => [
-      key,
-      value ? migrateAgentConfig(value as Record<string, unknown>) : value,
-    ]),
+    Object.entries(rawPluginAgents).map(([key, value]) => {
+      if (!value) return [key, value];
+      const migrated = migrateAgentConfig(value as Record<string, unknown>);
+      if (!migrated.mode) migrated.mode = "subagent";
+      return [key, migrated];
+    }),
   );
 
   const configAgent = params.config.agent as AgentConfigRecord | undefined;
@@ -219,10 +221,12 @@ export async function applyAgentConfig(params: {
               if (key in builtinAgents) return false;
               return true;
             })
-            .map(([key, value]) => [
-              key,
-              value ? migrateAgentConfig(value as Record<string, unknown>) : value,
-            ]),
+            .map(([key, value]) => {
+              if (!value) return [key, value];
+              const migrated = migrateAgentConfig(value as Record<string, unknown>);
+              if (!migrated.mode) migrated.mode = "subagent";
+              return [key, migrated];
+            }),
         )
       : {};
 
@@ -285,12 +289,23 @@ export async function applyAgentConfig(params: {
       protectedBuiltinAgentNames,
     );
 
+    const defaultedConfigAgents = configAgent
+      ? Object.fromEntries(
+          Object.entries(configAgent).map(([key, value]) => {
+            if (!value) return [key, value];
+            const migrated = migrateAgentConfig(value as Record<string, unknown>);
+            if (!migrated.mode) migrated.mode = "subagent";
+            return [key, migrated];
+          }),
+        )
+      : {};
+
     params.config.agent = {
       ...builtinAgents,
       ...filterDisabledAgents(filteredUserAgents),
       ...filterDisabledAgents(filteredProjectAgents),
       ...filterDisabledAgents(filteredPluginAgents),
-      ...configAgent,
+      ...defaultedConfigAgents,
     };
   }
 

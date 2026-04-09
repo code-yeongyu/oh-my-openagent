@@ -1,7 +1,13 @@
 /**
  * Agent config keys to display names mapping.
  * Config keys are lowercase (e.g., "sisyphus", "atlas").
- * Display names include suffixes for UI/logs (e.g., "Sisyphus (Ultraworker)").
+ * Display names include suffixes for UI/logs (e.g., "Sisyphus - Ultraworker").
+ *
+ * IMPORTANT: Display names MUST NOT contain parentheses or other characters
+ * that are invalid in HTTP header values per RFC 7230. OpenCode passes the
+ * agent name in the `x-opencode-agent-name` header, and parentheses cause
+ * header validation failures that prevent agents from appearing in the UI
+ * type selector dropdown. Use ` - ` (space-dash-space) instead of `(...)`.
  */
 export const AGENT_DISPLAY_NAMES: Record<string, string> = {
   sisyphus: "Sisyphus - Ultraworker",
@@ -20,14 +26,24 @@ export const AGENT_DISPLAY_NAMES: Record<string, string> = {
   "council-member": "council-member",
 }
 
-const AGENT_LIST_SORT_PREFIXES: Record<string, string> = {
-  sisyphus: "\u200B",
-  hephaestus: "\u200B\u200B",
-  prometheus: "\u200B\u200B\u200B",
-  atlas: "\u200B\u200B\u200B\u200B",
-}
-
-function stripAgentListSortPrefix(agentName: string): string {
+/**
+ * Strip the legacy zero-width-space sort prefix from an agent name.
+ *
+ * v3.14.0 through v3.16.0 prefixed the four core agents (Sisyphus,
+ * Hephaestus, Prometheus, Atlas) with U+200B Zero Width Space characters
+ * so they would sort ahead of user agents in the Tab cycle. Some terminal
+ * emulators (Ghostty, certain Windows Terminal builds) render ZWSP as a
+ * visible box or extra space, breaking the status bar layout (#3259), and
+ * the prefixes also leaked through the plugin API and broke prompt_async
+ * consumers (#3238).
+ *
+ * The prefixes are no longer injected anywhere (#3242 removed all call
+ * sites and #3259 removed the constant table). This helper remains so
+ * existing user configs that still have the ZWSP baked into their
+ * `config.agent` keys from an older install continue to resolve
+ * correctly after upgrading.
+ */
+export function stripAgentListSortPrefix(agentName: string): string {
   return agentName.replace(/^\u200B+/, "")
 }
 
@@ -51,25 +67,50 @@ export function getAgentDisplayName(configKey: string): string {
   return configKey
 }
 
+/**
+ * @deprecated Use {@link getAgentDisplayName} directly.
+ *
+ * Historically this returned the display name with a ZWSP sort prefix
+ * prepended so core agents would sort ahead of user agents in the Tab
+ * cycle. The ZWSP prefixes caused visible rendering artifacts in some
+ * terminals (#3259) and leaked into the plugin API surface (#3238), so
+ * they were removed in #3242/#3259. This function is now a thin alias
+ * over {@link getAgentDisplayName} that exists only for external
+ * callers that may still import it. Sort ordering is now handled by
+ * the `order` field injection in `reorderAgentsByPriority()` plus the
+ * core-first insertion order in the same helper.
+ */
 export function getAgentListDisplayName(configKey: string): string {
-  const displayName = getAgentDisplayName(configKey)
-  const prefix = AGENT_LIST_SORT_PREFIXES[configKey.toLowerCase()]
-
-  return prefix ? `${prefix}${displayName}` : displayName
+  return getAgentDisplayName(configKey)
 }
 
 const REVERSE_DISPLAY_NAMES: Record<string, string> = Object.fromEntries(
   Object.entries(AGENT_DISPLAY_NAMES).map(([key, displayName]) => [displayName.toLowerCase(), key]),
 )
 
+// Legacy parenthesized display names for backward compatibility.
+// Old configs/sessions may reference these names; resolve them to config keys.
+const LEGACY_DISPLAY_NAMES: Record<string, string> = {
+  "sisyphus (ultraworker)": "sisyphus",
+  "hephaestus (deep agent)": "hephaestus",
+  "prometheus (plan builder)": "prometheus",
+  "atlas (plan executor)": "atlas",
+  "metis (plan consultant)": "metis",
+  "momus (plan critic)": "momus",
+  "athena (council)": "athena",
+  "athena-junior (council)": "athena-junior",
+}
+
 /**
  * Resolve an agent name (display name or config key) to its lowercase config key.
- * "Atlas (Plan Executor)" → "atlas", "atlas" → "atlas", "unknown" → "unknown"
+ * "Atlas - Plan Executor" -> "atlas", "Atlas (Plan Executor)" -> "atlas", "atlas" -> "atlas"
  */
 export function getAgentConfigKey(agentName: string): string {
   const lower = stripAgentListSortPrefix(agentName).toLowerCase()
   const reversed = REVERSE_DISPLAY_NAMES[lower]
   if (reversed !== undefined) return reversed
+  const legacy = LEGACY_DISPLAY_NAMES[lower]
+  if (legacy !== undefined) return legacy
   if (AGENT_DISPLAY_NAMES[lower] !== undefined) return lower
   return lower
 }
@@ -95,6 +136,10 @@ export function normalizeAgentForPrompt(agentName: string | undefined): string |
   if (reversed !== undefined) {
     return AGENT_DISPLAY_NAMES[reversed] ?? trimmed
   }
+  const legacy = LEGACY_DISPLAY_NAMES[lower]
+  if (legacy !== undefined) {
+    return AGENT_DISPLAY_NAMES[legacy] ?? trimmed
+  }
   if (AGENT_DISPLAY_NAMES[lower] !== undefined) {
     return AGENT_DISPLAY_NAMES[lower]
   }
@@ -116,6 +161,10 @@ export function normalizeAgentForPromptKey(agentName: string | undefined): strin
   const reversed = REVERSE_DISPLAY_NAMES[lower]
   if (reversed !== undefined) {
     return reversed
+  }
+  const legacy = LEGACY_DISPLAY_NAMES[lower]
+  if (legacy !== undefined) {
+    return legacy
   }
   if (AGENT_DISPLAY_NAMES[lower] !== undefined) {
     return lower
