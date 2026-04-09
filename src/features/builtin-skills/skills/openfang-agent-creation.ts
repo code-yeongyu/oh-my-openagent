@@ -162,15 +162,16 @@ grep 'MCP server connected' /tmp/openfang.log  # tools=6 expected
 
 ## Agent Role Guidelines
 
-| Role | Agent | Tools |
-|------|-------|-------|
-| Search codebase | searcher | grep, glob, ast_grep, file_read, file_list |
-| External research | researcher | web_fetch + all search tools |
-| Deep analysis (read-only) | reasoner | file_read, file_list, ast_grep |
-| Pre-implementation planning | planner | file_read, file_list, ast_grep |
-| Review plans/code | reviewer | file_read, file_list, ast_grep |
-| Write files + implement | hephaestus | all MCP tools including file_write |
+| Role | Agent | Model | Tools |
+|------|-------|-------|-------|
+| Search codebase | searcher | Llama4-Scout | grep, glob, ast_grep, file_read, file_list |
+| External research | researcher | Llama4-Maverick | web_fetch + all search tools |
+| Deep analysis (read-only) | reasoner | Claude Sonnet 4.6 | file_read, file_list, ast_grep |
+| Pre-implementation planning | planner | Nova Pro | file_read, file_list, ast_grep |
+| Review plans/code | reviewer | Nova Pro | file_read, file_list, ast_grep |
+| Write files + implement | builder | Claude Sonnet 4.6 | ALL tools including file_write |
 
-hephaestus is the ONLY agent with file_write. All others are read-only.
+builder is the ONLY agent with file_write. All others are read-only.
+Fallback for all agents: us.anthropic.claude-haiku-4-5-20251001-v1:0
 `,
 }
