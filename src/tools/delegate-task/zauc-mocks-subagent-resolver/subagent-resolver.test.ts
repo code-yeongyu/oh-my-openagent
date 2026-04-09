@@ -683,7 +683,7 @@ describe("resolveSubagentExecution - agent name sanitization", () => {
 
     //#then
     expect(result.error).toBeUndefined()
-    expect(result.agentToUse).toBe("Hephaestus - Deep Agent")
+    expect(result.agentToUse).toBe("hephaestus")
     cacheSpy.mockRestore()
   })
 
@@ -726,6 +726,27 @@ describe("resolveSubagentExecution - agent name sanitization", () => {
     //#then
     expect(result.error).toBeUndefined()
     expect(result.agentToUse).toBe("explore")
+    cacheSpy.mockRestore()
+  })
+
+  test("resolves builtin display names to runtime-safe config keys", async () => {
+    //#given
+    const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+      models: {},
+      connected: [],
+      updatedAt: "2026-03-03T00:00:00.000Z",
+    })
+    const args = createBaseArgs({ subagent_type: "Sisyphus - Ultraworker" })
+    const executorCtx = createExecutorContext(async () => ([
+      { name: "Sisyphus - Ultraworker", mode: "subagent", model: "openai/gpt-5.3-codex" },
+    ]))
+
+    //#when
+    const result = await resolveSubagentExecution(args, executorCtx, "oracle", "deep")
+
+    //#then
+    expect(result.error).toBeUndefined()
+    expect(result.agentToUse).toBe("sisyphus")
     cacheSpy.mockRestore()
   })
 })

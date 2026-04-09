@@ -107,7 +107,13 @@ Create the work plan directly - that's your job as the planning agent.`,
       }
     }
 
-    agentToUse = matchedAgent.name
+    const runtimeSafeAgentName = getAgentConfigKey(matchedAgent.name)
+    const canonicalDisplayName = getAgentDisplayName(runtimeSafeAgentName).replace(/^\u200B+/, "")
+    const isKnownBuiltinAgent =
+      canonicalDisplayName.toLowerCase() === matchedAgent.name.toLowerCase()
+      || runtimeSafeAgentName === matchedAgent.name.toLowerCase()
+
+    agentToUse = isKnownBuiltinAgent ? runtimeSafeAgentName : matchedAgent.name
 
     const agentConfigKey = getAgentConfigKey(agentToUse)
     const agentOverride = agentOverrides?.[agentConfigKey as keyof typeof agentOverrides]
