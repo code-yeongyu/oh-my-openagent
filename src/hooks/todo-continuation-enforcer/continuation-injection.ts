@@ -19,7 +19,7 @@ import { log } from "../../shared/logger"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
 import {
   getAgentConfigKey,
-  normalizeAgentForPromptKey,
+  normalizeAgentForPrompt,
 } from "../../shared/agent-display-names"
 
 import {
@@ -129,7 +129,7 @@ export async function injectContinuation(args: {
     tools = tools ?? previousMessage?.tools
   }
 
-  const promptAgent = normalizeAgentForPromptKey(agentName)
+  const promptAgent = normalizeAgentForPrompt(agentName)
   const launchAgent = resolveRegisteredAgentName(agentName)
 
   if (promptAgent && skipAgents.some(s => getAgentConfigKey(s) === getAgentConfigKey(promptAgent))) {
