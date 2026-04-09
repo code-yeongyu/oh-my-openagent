@@ -1,3 +1,7 @@
+import { installAgentSortShim } from "./shared/agent-sort-shim"
+
+installAgentSortShim()
+
 import { initConfigContext } from "./cli/config-manager/config-context"
 import type { Plugin } from "@opencode-ai/plugin"
 

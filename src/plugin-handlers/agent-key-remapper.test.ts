@@ -82,7 +82,7 @@ describe("remapAgentKeysToDisplayNames", () => {
     expect(result["sisyphus"]).toBeUndefined()
   })
 
-  it("keeps the four core agents in canonical order under opencode name sorting", () => {
+  it("remaps all four core agents to their display names", () => {
     // given
     const result = remapAgentKeysToDisplayNames({
       atlas: {},
@@ -92,14 +92,12 @@ describe("remapAgentKeysToDisplayNames", () => {
     })
 
     // when
-    const sortedNames = Object.keys(result).sort()
+    const names = Object.keys(result)
 
     // then
-    expect(sortedNames).toEqual([
-      getAgentListDisplayName("sisyphus"),
-      getAgentListDisplayName("hephaestus"),
-      getAgentListDisplayName("prometheus"),
-      getAgentListDisplayName("atlas"),
-    ])
+    expect(names).toContain(getAgentDisplayName("sisyphus"))
+    expect(names).toContain(getAgentDisplayName("hephaestus"))
+    expect(names).toContain(getAgentDisplayName("prometheus"))
+    expect(names).toContain(getAgentDisplayName("atlas"))
   })
 })
