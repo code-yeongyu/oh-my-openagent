@@ -1,4 +1,8 @@
-import { describe, expect, test, spyOn, afterEach, beforeEach } from "bun:test";
+import { describe, expect, test, spyOn, afterEach, beforeEach, mock } from "bun:test";
+
+// Isolate from other tests that mock.module the logger (CI cross-contamination fix)
+mock.module("../shared/logger", () => ({ log: (..._args: unknown[]) => {} }))
+
 import { buildPrometheusAgentConfig } from "./prometheus-agent-config-builder";
 import * as shared from "../shared";
 import * as categoryResolver from "./category-config-resolver";

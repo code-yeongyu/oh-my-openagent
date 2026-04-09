@@ -85,7 +85,6 @@ export function createPostCompactionDegradationMonitor(args: {
     postCompactionNoTextStreak.delete(sessionID)
     postCompactionRecoveryTriggered.delete(sessionID)
     postCompactionEpoch.delete(sessionID)
-    postCompactionRecoveryCount.delete(sessionID)
   }
 
   const onSessionCompacted = (sessionID: string): void => {

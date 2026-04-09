@@ -10,6 +10,7 @@ import {
   getMainSessionID,
   registerAgentName,
   isAgentRegistered,
+  resolveRegisteredAgentName,
   _resetForTesting,
 } from "./state"
 
@@ -138,6 +139,15 @@ describe("claude-code-session-state", () => {
       // when / then
       expect(isAgentRegistered("atlas")).toBe(true)
       expect(isAgentRegistered("Atlas - Plan Executor")).toBe(true)
+    })
+
+    test("should resolve config keys back to the registered raw agent name", () => {
+      // given
+      registerAgentName("\u200B\u200B\u200B\u200BAtlas - Plan Executor")
+
+      // when / then
+      expect(resolveRegisteredAgentName("atlas")).toBe("\u200B\u200B\u200B\u200BAtlas - Plan Executor")
+      expect(resolveRegisteredAgentName("Atlas - Plan Executor")).toBe("\u200B\u200B\u200B\u200BAtlas - Plan Executor")
     })
 
     describe("#given atlas display name with zero-width prefix", () => {

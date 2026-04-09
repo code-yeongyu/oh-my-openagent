@@ -9,11 +9,11 @@ import type { OhMyOpenCodeConfig } from "../config"
 import * as agentLoader from "../features/claude-code-agent-loader"
 import * as skillLoader from "../features/opencode-skill-loader"
 import type { LoadedSkill } from "../features/opencode-skill-loader"
-import { getAgentDisplayName, getAgentListDisplayName } from "../shared/agent-display-names"
+import { getAgentDisplayName, getAgentDisplayName } from "../shared/agent-display-names"
 import { applyAgentConfig } from "./agent-config-handler"
 import type { PluginComponents } from "./plugin-components-loader"
 
-const BUILTIN_SISYPHUS_DISPLAY_NAME = getAgentListDisplayName("sisyphus")
+const BUILTIN_SISYPHUS_DISPLAY_NAME = getAgentDisplayName("sisyphus")
 const BUILTIN_SISYPHUS_JUNIOR_DISPLAY_NAME = getAgentDisplayName("sisyphus-junior")
 const BUILTIN_MULTIMODAL_LOOKER_DISPLAY_NAME = getAgentDisplayName("multimodal-looker")
 

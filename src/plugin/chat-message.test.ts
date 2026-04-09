@@ -9,7 +9,6 @@ import { createAutoSlashCommandHook } from "../hooks/auto-slash-command"
 import { createStartWorkHook } from "../hooks/start-work"
 import { readBoulderState } from "../features/boulder-state"
 import { _resetForTesting, setMainSession, subagentSessions, registerAgentName, updateSessionAgent, getSessionAgent } from "../features/claude-code-session-state"
-import { getAgentListDisplayName } from "../shared/agent-display-names"
 import { clearSessionModel, getSessionModel, setSessionModel } from "../shared/session-model-state"
 
 type ChatMessagePart = { type: string; text?: string; [key: string]: unknown }
@@ -93,6 +92,34 @@ describe("createChatMessageHandler - /start-work integration", () => {
     expect(output.parts[0].text).toContain("boulder.json has been created")
     expect(getSessionAgent("test-session")).toBe("sisyphus")
     expect(readBoulderState(testDir)?.agent).toBe("sisyphus")
+  })
+
+  test("smoke: resolves quoted human-readable plan names through the full /start-work chat.message path", async () => {
+    // given
+    writeFileSync(join(testDir, ".sisyphus", "plans", "my-feature-plan.md"), "# Plan\n- [ ] Task 1")
+    updateSessionAgent("test-session", "prometheus")
+    const args = createMockHandlerArgs()
+    args.hooks.autoSlashCommand = createAutoSlashCommandHook({ skills: [] })
+    args.hooks.startWork = createStartWorkHook({
+      directory: testDir,
+      client: { tui: { showToast: async () => {} } },
+    } as never)
+    const handler = createChatMessageHandler(args)
+    const input = createMockInput("prometheus")
+    const output: ChatMessageHandlerOutput = {
+      message: {},
+      parts: [{ type: "text", text: "/start-work \"my feature plan\"" }],
+    }
+
+    // when
+    await handler(input, output)
+
+    // then
+    expect(output.message["agent"]).toBe("sisyphus")
+    expect(output.parts[0].text).toContain("<auto-slash-command>")
+    expect(output.parts[0].text).toContain("Auto-Selected Plan")
+    expect(output.parts[0].text).toContain("my-feature-plan")
+    expect(readBoulderState(testDir)?.plan_name).toBe("my-feature-plan")
   })
 })
 
@@ -375,7 +402,10 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
     expect(getSessionModel("test-session")).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
   })
 
-  test("treats prefixed list-display agent names as explicit model overrides", async () => {
+  test("treats legacy ZWSP-prefixed agent names as explicit model overrides (GH-3259)", async () => {
+    // Users upgrading from v3.14.0-v3.16.0 may still have ZWSP-prefixed agent
+    // keys persisted in their session state. The handler must strip the
+    // prefix and resolve to the canonical display name.
     //#given
     setMainSession("test-session")
     setSessionModel("test-session", { providerID: "openai", modelID: "gpt-5.4" })
@@ -388,7 +418,7 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
       },
     })
     const handler = createChatMessageHandler(args)
-    const input = createMockInput(getAgentListDisplayName("prometheus"))
+    const input = createMockInput("\u200B\u200B\u200BPrometheus - Plan Builder")
     const output = createMockOutput()
 
     //#when

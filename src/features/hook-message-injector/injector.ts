@@ -7,6 +7,7 @@ import type { MessageMeta, OriginalMessageContext, TextPart, ToolPermission } fr
 import { log } from "../../shared/logger"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
 import { createInternalAgentTextPart, normalizeSDKResponse } from "../../shared"
+import { hasCompactionPartInStorage, isCompactionMessage } from "../../shared/compaction-marker"
 
 export interface StoredMessage {
   agent?: string
@@ -32,6 +33,7 @@ interface SDKMessage {
       created?: number
     }
   }
+  parts?: Array<{ type?: string }>
 }
 
 const processPrefix = randomBytes(4).toString("hex")
@@ -39,6 +41,10 @@ let messageCounter = 0
 let partCounter = 0
 
 function convertSDKMessageToStoredMessage(msg: SDKMessage): StoredMessage | null {
+  if (isCompactionMessage(msg)) {
+    return null
+  }
+
   const info = msg.info
   if (!info) return null
 
@@ -164,22 +170,38 @@ export function findNearestMessageWithFields(messageDir: string): StoredMessage 
           return {
             fileName,
             msg,
+            hasCompactionMarker: hasCompactionPartInStorage(
+              typeof (msg as { id?: unknown }).id === "string" ? (msg as { id?: string }).id : undefined,
+            ),
             createdAt: typeof msg.time?.created === "number" ? msg.time.created : Number.NEGATIVE_INFINITY,
           }
         } catch {
           return null
         }
       })
-      .filter((entry): entry is { fileName: string; msg: StoredMessage & { time?: { created?: number } }; createdAt: number } => entry !== null)
+      .filter((entry): entry is {
+        fileName: string
+        msg: StoredMessage & { time?: { created?: number } }
+        hasCompactionMarker: boolean
+        createdAt: number
+      } => entry !== null)
       .sort((left, right) => right.createdAt - left.createdAt || right.fileName.localeCompare(left.fileName))
 
     for (const entry of messages) {
+      if (entry.hasCompactionMarker || isCompactionMessage({ agent: entry.msg.agent })) {
+        continue
+      }
+
       if (entry.msg.agent && entry.msg.model?.providerID && entry.msg.model?.modelID) {
         return entry.msg
       }
     }
 
     for (const entry of messages) {
+      if (entry.hasCompactionMarker || isCompactionMessage({ agent: entry.msg.agent })) {
+        continue
+      }
+
       if (entry.msg.agent || (entry.msg.model?.providerID && entry.msg.model?.modelID)) {
         return entry.msg
       }
@@ -216,16 +238,28 @@ export function findFirstMessageWithAgent(messageDir: string): string | null {
           return {
             fileName,
             msg,
+            hasCompactionMarker: hasCompactionPartInStorage(
+              typeof (msg as { id?: unknown }).id === "string" ? (msg as { id?: string }).id : undefined,
+            ),
             createdAt: typeof msg.time?.created === "number" ? msg.time.created : Number.POSITIVE_INFINITY,
           }
         } catch {
           return null
         }
       })
-      .filter((entry): entry is { fileName: string; msg: StoredMessage & { time?: { created?: number } }; createdAt: number } => entry !== null)
+      .filter((entry): entry is {
+        fileName: string
+        msg: StoredMessage & { time?: { created?: number } }
+        hasCompactionMarker: boolean
+        createdAt: number
+      } => entry !== null)
       .sort((left, right) => left.createdAt - right.createdAt || left.fileName.localeCompare(right.fileName))
 
     for (const entry of messages) {
+      if (entry.hasCompactionMarker || isCompactionMessage({ agent: entry.msg.agent })) {
+        continue
+      }
+
       if (entry.msg.agent) {
         return entry.msg.agent
       }

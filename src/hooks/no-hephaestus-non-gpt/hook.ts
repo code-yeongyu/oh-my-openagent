@@ -1,8 +1,12 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { isGptModel } from "../../agents/types"
-import { getSessionAgent, updateSessionAgent } from "../../features/claude-code-session-state"
+import {
+  getSessionAgent,
+  resolveRegisteredAgentName,
+  updateSessionAgent,
+} from "../../features/claude-code-session-state"
 import { log } from "../../shared"
-import { getAgentConfigKey, getAgentDisplayName } from "../../shared/agent-display-names"
+import { getAgentConfigKey } from "../../shared/agent-display-names"
 
 const TOAST_TITLE = "NEVER Use Hephaestus with Non-GPT"
 const TOAST_MESSAGE = [
@@ -10,8 +14,6 @@ const TOAST_MESSAGE = [
   "Hephaestus is trash without GPT.",
   "For Claude/Kimi/GLM models, always use Sisyphus.",
 ].join("\n")
-const SISYPHUS_DISPLAY = getAgentDisplayName("sisyphus")
-
 type NoHephaestusNonGptHookOptions = {
   allowNonGptModel?: boolean
 }
@@ -54,9 +56,9 @@ export function createNoHephaestusNonGptHook(
         if (allowNonGptModel) {
           return
         }
-        input.agent = "sisyphus"
+        input.agent = resolveRegisteredAgentName("sisyphus") ?? "sisyphus"
         if (output?.message) {
-          output.message.agent = "sisyphus"
+          output.message.agent = resolveRegisteredAgentName("sisyphus") ?? "sisyphus"
         }
         updateSessionAgent(input.sessionID, "sisyphus")
       }

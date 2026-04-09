@@ -89,9 +89,10 @@ Create the work plan directly - that's your job as the planning agent.`,
 
     const callableAgents = agents.filter((agent) => isTaskCallableAgentMode(agent.mode))
 
-    const resolvedDisplayName = getAgentDisplayName(agentToUse)
+    const resolvedDisplayName = getAgentDisplayName(agentToUse).replace(/^\u200B+/, "")
+    const normalizedAgentToUse = agentToUse.replace(/^\u200B+/, "")
     const matchedAgent = callableAgents.find(
-      (agent) => agent.name.toLowerCase() === agentToUse.toLowerCase()
+      (agent) => agent.name.toLowerCase() === normalizedAgentToUse.toLowerCase()
         || agent.name.toLowerCase() === resolvedDisplayName.toLowerCase()
     )
     if (!matchedAgent) {

@@ -422,10 +422,6 @@ export class BackgroundManager {
             this.concurrencyManager.release(key)
           }
 
-          if (item.task.rootSessionID) {
-            this.unregisterRootDescendant(item.task.rootSessionID)
-          }
-
           removeTaskToastTracking(item.task.id)
 
           // Abort the orphaned session if one was created before the error
@@ -1783,6 +1779,7 @@ export class BackgroundManager {
       let agent: string | undefined = task.parentAgent
       let model: { providerID: string; modelID: string } | undefined
       let tools: Record<string, boolean> | undefined = task.parentTools
+      let promptContext: ReturnType<typeof resolvePromptContextFromSessionMessages> = null
 
       if (this.enableParentSessionNotifications) {
         try {
@@ -1796,7 +1793,7 @@ export class BackgroundManager {
               tools?: Record<string, boolean | "allow" | "deny" | "ask">
             }
           }>)
-          const promptContext = resolvePromptContextFromSessionMessages(
+          promptContext = resolvePromptContextFromSessionMessages(
             messages,
             task.parentSessionID,
           )
@@ -1840,6 +1837,8 @@ export class BackgroundManager {
         const isTaskFailure = task.status === "error" || task.status === "cancelled" || task.status === "interrupt"
         const shouldReply = allComplete || isTaskFailure
 
+        const variant = promptContext?.model?.variant
+
         try {
           await this.client.session.promptAsync({
             path: { id: task.parentSessionID },
@@ -1847,6 +1846,7 @@ export class BackgroundManager {
               noReply: !shouldReply,
               ...(agent !== undefined ? { agent } : {}),
               ...(model !== undefined ? { model } : {}),
+              ...(variant !== undefined ? { variant } : {}),
               ...(resolvedTools ? { tools: resolvedTools } : {}),
               parts: [createInternalAgentTextPart(notification)],
             },

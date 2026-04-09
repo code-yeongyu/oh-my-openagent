@@ -4,7 +4,7 @@ import type { ClaudeCodeMcpServer } from "../claude-code-mcp-loader/types"
 import { McpOAuthProvider } from "../mcp-oauth/provider"
 import { disconnectAll, disconnectSession, forceReconnect } from "./cleanup"
 import { getOrCreateClient, getOrCreateClientWithRetryImpl } from "./connection"
-import { handleStepUpIfNeeded } from "./oauth-handler"
+import { handlePostRequestAuthError, handleStepUpIfNeeded } from "./oauth-handler"
 import type {
   OAuthProviderFactory,
   SkillMcpClientInfo,
@@ -110,6 +110,7 @@ export class SkillMcpManager {
   ): Promise<T> {
     const maxRetries = 3
     let lastError: Error | null = null
+    const refreshAttempted = new Set<string>()
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
@@ -127,6 +128,17 @@ export class SkillMcpManager {
         })
         if (stepUpHandled) {
           await forceReconnect(this.state, this.getClientKey(info))
+          continue
+        }
+
+        const postRequestRefreshHandled = await handlePostRequestAuthError({
+          error: lastError,
+          config,
+          authProviders: this.state.authProviders,
+          createOAuthProvider: this.state.createOAuthProvider,
+          refreshAttempted,
+        })
+        if (postRequestRefreshHandled) {
           continue
         }
 

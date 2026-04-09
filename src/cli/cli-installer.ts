@@ -22,6 +22,7 @@ import {
   printWarning,
   validateNonTuiArgs,
 } from "./install-validators"
+import { getUnsupportedOpenCodeVersionMessage } from "./minimum-opencode-version"
 
 export async function runCliInstaller(args: InstallArgs, version: string): Promise<number> {
   const validation = validateNonTuiArgs(args)
@@ -57,6 +58,12 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
     printInfo("Visit https://opencode.ai/docs for installation instructions")
   } else {
     printSuccess(`OpenCode ${openCodeVersion ?? ""} detected`)
+
+    const unsupportedVersionMessage = getUnsupportedOpenCodeVersionMessage(openCodeVersion)
+    if (unsupportedVersionMessage) {
+      printWarning(unsupportedVersionMessage)
+      return 1
+    }
   }
 
   if (isUpdate) {

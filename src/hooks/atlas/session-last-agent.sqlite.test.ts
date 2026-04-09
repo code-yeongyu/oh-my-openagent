@@ -52,6 +52,30 @@ describe("getLastAgentFromSession SQLite backend ordering", () => {
     expect(result).toBe("sisyphus-junior")
   })
 
+  test("skips compaction marker user messages that retain the original agent", async () => {
+    // given
+    const client = {
+      session: {
+        messages: async () => ({
+          data: [
+            { id: "msg_real", info: { agent: "sisyphus", time: { created: 100 } } },
+            {
+              id: "msg_compaction",
+              info: { agent: "atlas", time: { created: 200 } },
+              parts: [{ type: "compaction" }],
+            },
+          ],
+        }),
+      },
+    }
+
+    // when
+    const result = await getLastAgentFromSession("ses_sqlite_compaction_marker", client as never)
+
+    // then
+    expect(result).toBe("sisyphus")
+  })
+
   test("returns null instead of throwing when SQLite message lookup fails", async () => {
     // given
     const client = {

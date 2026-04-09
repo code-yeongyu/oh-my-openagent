@@ -12,11 +12,8 @@ import {
 } from "../../features/boulder-state"
 import { log } from "../../shared/logger"
 import {
-  getAgentDisplayName,
-  getAgentListDisplayName,
-} from "../../shared/agent-display-names"
-import {
   isAgentRegistered,
+  resolveRegisteredAgentName,
   updateSessionAgent,
 } from "../../features/claude-code-session-state"
 import { detectWorktreePath } from "./worktree-detector"
@@ -85,12 +82,9 @@ export function createStartWorkHook(ctx: PluginInput) {
     const activeAgent = isAgentRegistered("atlas")
       ? "atlas"
       : "sisyphus"
-    const activeAgentDisplayName = getAgentDisplayName(activeAgent)
     updateSessionAgent(input.sessionID, activeAgent)
     if (output.message) {
-      // Use config key for agent field to avoid HTTP header validation issues
-      // Display names like "Atlas (Plan Executor)" contain parens that are invalid in headers
-      output.message["agent"] = activeAgent
+      output.message["agent"] = resolveRegisteredAgentName(activeAgent) ?? activeAgent
     }
 
     const existingState = readBoulderState(ctx.directory)
