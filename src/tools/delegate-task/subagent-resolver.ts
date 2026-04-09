@@ -68,9 +68,7 @@ export async function resolveSubagentExecution(
     return {
       agentToUse: "",
       categoryModel: undefined,
-      error: `Cannot use subagent_type="${SISYPHUS_JUNIOR_AGENT}" directly. Use category parameter instead (e.g., ${categoryExamples}).
-
-Sisyphus-Junior is spawned automatically when you specify a category. Pick the appropriate category for your task domain.`,
+      error: `Cannot use subagent_type="${SISYPHUS_JUNIOR_AGENT}". Use category parameter instead (e.g., ${categoryExamples}) — categories now route to openfang agents automatically.`,
     }
   }
 
