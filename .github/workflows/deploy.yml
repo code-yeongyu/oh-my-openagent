@@ -3,6 +3,7 @@ name: Deploy
 on:
   push:
     branches: [dev]
+  workflow_dispatch:
 
 concurrency:
   group: deploy
