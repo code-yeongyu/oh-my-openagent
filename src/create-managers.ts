@@ -7,6 +7,7 @@ import { BackgroundManager } from "./features/background-agent"
 import { SkillMcpManager } from "./features/skill-mcp-manager"
 import { initTaskToastManager } from "./features/task-toast-manager"
 import { TmuxSessionManager } from "./features/tmux-subagent"
+import * as openclawRuntimeDispatch from "./openclaw/runtime-dispatch"
 import { registerManagerForCleanup } from "./features/background-agent/process-cleanup"
 import { createConfigHandler } from "./plugin-handlers"
 import { log } from "./shared"
@@ -85,6 +86,18 @@ export function createManagers(args: {
             },
           },
         })
+
+        if (pluginConfig.openclaw) {
+        await openclawRuntimeDispatch.dispatchOpenClawEvent({
+            config: pluginConfig.openclaw,
+            rawEvent: "session.created",
+            context: {
+              sessionId: event.sessionID,
+              projectPath: ctx.directory,
+              tmuxPaneId: tmuxSessionManager.getTrackedPaneId?.(event.sessionID) ?? process.env.TMUX_PANE,
+            },
+          })
+        }
 
         log("[index] onSubagentSessionCreated callback completed")
       },

@@ -1,23 +1,66 @@
 /// <reference types="bun-types" />
 
-import { beforeEach, describe, expect, it, mock } from "bun:test"
+import { afterAll, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
 
-import { createManagers } from "./create-managers"
+import * as openclawRuntimeDispatch from "./openclaw/runtime-dispatch"
 
-class MockBackgroundManager {
-  constructor(..._args: unknown[]) {}
-}
+const markServerRunningInProcess = mock(() => {})
+let backgroundManagerOptions: {
+  onSubagentSessionCreated?: (event: { sessionID: string; parentID: string; title: string }) => Promise<void>
+} | null = null
+const trackedPaneBySession = new Map<string, string>()
 
-class MockSkillMcpManager {
-  constructor(..._args: unknown[]) {}
-}
+mock.module("./features/background-agent", () => ({
+  BackgroundManager: class BackgroundManager {
+    constructor(_ctx: unknown, _config: unknown, options: typeof backgroundManagerOptions) {
+      backgroundManagerOptions = options
+    }
+  },
+}))
 
-class MockTmuxSessionManager {
-  constructor(..._args: unknown[]) {}
+mock.module("./features/skill-mcp-manager", () => ({
+  SkillMcpManager: class SkillMcpManager {
+    constructor(..._args: unknown[]) {}
+  },
+}))
 
-  async cleanup(): Promise<void> {}
-  async onSessionCreated(..._args: unknown[]): Promise<void> {}
-}
+mock.module("./features/task-toast-manager", () => ({
+  initTaskToastManager: mock(() => {}),
+}))
+
+mock.module("./features/tmux-subagent", () => ({
+  TmuxSessionManager: class TmuxSessionManager {
+    constructor(..._args: unknown[]) {}
+
+    async cleanup(): Promise<void> {}
+    async onSessionCreated(event: { properties?: { info?: { id?: string } } }): Promise<void> {
+      const sessionID = event.properties?.info?.id
+      if (sessionID) {
+        trackedPaneBySession.set(sessionID, `%pane-${sessionID}`)
+      }
+    }
+
+    getTrackedPaneId(sessionID: string): string | undefined {
+      return trackedPaneBySession.get(sessionID)
+    }
+  },
+}))
+
+mock.module("./features/background-agent/process-cleanup", () => ({
+  registerManagerForCleanup: mock(() => {}),
+}))
+
+mock.module("./plugin-handlers", () => ({
+  createConfigHandler: mock(() => ({ kind: "config-handler" })),
+}))
+
+mock.module("./shared/tmux/tmux-utils/server-health", () => ({
+  isServerRunning: mock(async () => true),
+  markServerRunningInProcess,
+  resetServerCheck: mock(() => {}),
+}))
+
+const { createManagers } = await import("./create-managers")
 
 function createTmuxConfig(enabled: boolean) {
   return {
@@ -31,63 +74,79 @@ function createTmuxConfig(enabled: boolean) {
 }
 
 describe("createManagers", () => {
-  const markServerRunningInProcess = mock(() => {})
-  const initTaskToastManager = mock(() => ({}) as never)
-  const registerManagerForCleanup = mock(() => {})
-  const createConfigHandler = mock(() => (async () => {}) as never)
-
-  function createMockArgs(enabled: boolean): Parameters<typeof createManagers>[0] {
-    return {
-      ctx: {
-        directory: "/tmp",
-        client: {} as never,
-        project: {} as never,
-        worktree: "/tmp",
-        serverUrl: new URL("https://example.com"),
-        $: Bun.$,
-      },
-      pluginConfig: {} as never,
-      tmuxConfig: createTmuxConfig(enabled),
-      modelCacheState: {} as never,
-      backgroundNotificationHookEnabled: false,
-      deps: {
-        BackgroundManagerClass: MockBackgroundManager as never,
-        SkillMcpManagerClass: MockSkillMcpManager as never,
-        TmuxSessionManagerClass: MockTmuxSessionManager as never,
-        initTaskToastManagerFn: initTaskToastManager,
-        registerManagerForCleanupFn: registerManagerForCleanup,
-        createConfigHandlerFn: createConfigHandler,
-        markServerRunningInProcessFn: markServerRunningInProcess,
-      },
-    }
-  }
+  const dispatchOpenClawEvent = spyOn(openclawRuntimeDispatch, "dispatchOpenClawEvent")
 
   beforeEach(() => {
     markServerRunningInProcess.mockClear()
-    initTaskToastManager.mockClear()
-    registerManagerForCleanup.mockClear()
-    createConfigHandler.mockClear()
+    dispatchOpenClawEvent.mockReset()
+    backgroundManagerOptions = null
+    trackedPaneBySession.clear()
+  })
+
+  afterAll(() => {
+    mock.restore()
   })
 
   it("#given tmux integration is disabled #when managers are created #then it does not mark the tmux server as running", () => {
-    // #given
-    const args = createMockArgs(false)
+    const args = {
+      ctx: { directory: "/tmp", client: {} },
+      pluginConfig: {},
+      tmuxConfig: createTmuxConfig(false),
+      modelCacheState: {},
+      backgroundNotificationHookEnabled: false,
+    } as Parameters<typeof createManagers>[0]
 
-    // #when
     createManagers(args)
 
-    // #then
     expect(markServerRunningInProcess).not.toHaveBeenCalled()
   })
 
   it("#given tmux integration is enabled #when managers are created #then it marks the tmux server as running", () => {
-    // #given
-    const args = createMockArgs(true)
+    const args = {
+      ctx: { directory: "/tmp", client: {} },
+      pluginConfig: {},
+      tmuxConfig: createTmuxConfig(true),
+      modelCacheState: {},
+      backgroundNotificationHookEnabled: false,
+    } as Parameters<typeof createManagers>[0]
 
-    // #when
     createManagers(args)
 
-    // #then
     expect(markServerRunningInProcess).toHaveBeenCalledTimes(1)
+  })
+
+  it("#given openclaw is enabled #when the background session-created callback runs #then it dispatches openclaw with the tracked pane id", async () => {
+    const args = {
+      ctx: { directory: "/tmp/project", client: {} },
+      pluginConfig: {
+        openclaw: {
+          enabled: true,
+          gateways: {},
+          hooks: {},
+        },
+      },
+      tmuxConfig: createTmuxConfig(true),
+      modelCacheState: {},
+      backgroundNotificationHookEnabled: false,
+    } as Parameters<typeof createManagers>[0]
+
+    createManagers(args)
+
+    await backgroundManagerOptions?.onSubagentSessionCreated?.({
+      sessionID: "ses-bg-1",
+      parentID: "ses-parent",
+      title: "child task",
+    })
+
+    expect(dispatchOpenClawEvent).toHaveBeenCalledTimes(1)
+    expect(dispatchOpenClawEvent).toHaveBeenCalledWith({
+      config: args.pluginConfig.openclaw,
+      rawEvent: "session.created",
+      context: {
+        sessionId: "ses-bg-1",
+        projectPath: "/tmp/project",
+        tmuxPaneId: "%pane-ses-bg-1",
+      },
+    })
   })
 })

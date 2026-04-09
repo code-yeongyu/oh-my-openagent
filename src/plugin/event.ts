@@ -33,6 +33,7 @@ import { clearSessionModel, getSessionModel, setSessionModel } from "../shared/s
 import { clearSessionPromptParams } from "../shared/session-prompt-params-state";
 import { deleteSessionTools } from "../shared/session-tools-store";
 import { lspManager } from "../tools";
+import { dispatchOpenClawEvent } from "../openclaw/runtime-dispatch";
 
 import type { CreatedHooks } from "../create-hooks";
 import type { Managers } from "../create-managers";
@@ -341,6 +342,17 @@ export function createEventHandler(args: {
       }
       recentSyntheticIdles.set(sessionID, Date.now());
       await dispatchToHooks(syntheticIdle as EventInput);
+      if (pluginConfig.openclaw) {
+        await dispatchOpenClawEvent({
+          config: pluginConfig.openclaw,
+          rawEvent: "session.idle",
+          context: {
+            sessionId: sessionID,
+            projectPath: pluginContext.directory,
+            tmuxPaneId: managers.tmuxSessionManager.getTrackedPaneId?.(sessionID) ?? process.env.TMUX_PANE,
+          },
+        });
+      }
     }
 
     const { event } = input;
@@ -369,6 +381,18 @@ export function createEventHandler(args: {
           },
         );
       }
+
+      if (pluginConfig.openclaw && sessionInfo?.id) {
+        await dispatchOpenClawEvent({
+          config: pluginConfig.openclaw,
+          rawEvent: event.type,
+          context: {
+            sessionId: sessionInfo.id,
+            projectPath: pluginContext.directory,
+            tmuxPaneId: managers.tmuxSessionManager.getTrackedPaneId?.(sessionInfo.id) ?? process.env.TMUX_PANE,
+          },
+        });
+      }
     }
 
     if (event.type === "session.deleted") {
@@ -392,6 +416,17 @@ export function createEventHandler(args: {
         clearSessionModel(sessionInfo.id);
         clearSessionPromptParams(sessionInfo.id);
         syncSubagentSessions.delete(sessionInfo.id);
+        if (pluginConfig.openclaw) {
+          await dispatchOpenClawEvent({
+            config: pluginConfig.openclaw,
+            rawEvent: event.type,
+            context: {
+              sessionId: sessionInfo.id,
+              projectPath: pluginContext.directory,
+              tmuxPaneId: managers.tmuxSessionManager.getTrackedPaneId?.(sessionInfo.id) ?? process.env.TMUX_PANE,
+            },
+          });
+        }
         if (wasSyncSubagentSession) {
           subagentSessions.delete(sessionInfo.id);
         }
@@ -410,6 +445,21 @@ export function createEventHandler(args: {
       const messageID = props?.messageID as string | undefined;
       const sessionID = props?.sessionID as string | undefined;
       restoreBackgroundOutputConsumption(sessionID, messageID);
+    }
+
+    if (event.type === "session.idle" && pluginConfig.openclaw) {
+      const sessionID = props?.sessionID as string | undefined;
+      if (sessionID) {
+        await dispatchOpenClawEvent({
+          config: pluginConfig.openclaw,
+          rawEvent: event.type,
+          context: {
+            sessionId: sessionID,
+            projectPath: pluginContext.directory,
+            tmuxPaneId: managers.tmuxSessionManager.getTrackedPaneId?.(sessionID) ?? process.env.TMUX_PANE,
+          },
+        });
+      }
     }
 
     if (event.type === "message.updated") {

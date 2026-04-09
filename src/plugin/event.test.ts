@@ -1,7 +1,8 @@
-import { describe, it, expect, afterEach } from "bun:test"
+import { describe, it, expect, afterEach, mock, spyOn } from "bun:test"
 
 import { createEventHandler } from "./event"
 import { createChatMessageHandler } from "./chat-message"
+import * as openclawRuntimeDispatch from "../openclaw/runtime-dispatch"
 import { _resetForTesting, setMainSession } from "../features/claude-code-session-state"
 import { clearPendingModelFallback, createModelFallbackHook } from "../hooks/model-fallback/hook"
 import { getSessionPromptParams, setSessionPromptParams } from "../shared/session-prompt-params-state"
@@ -63,6 +64,7 @@ function createChatMessageHandlerHooks(
 }
 
 afterEach(() => {
+	mock.restore()
 	_resetForTesting()
 })
 
@@ -588,6 +590,54 @@ describe("createEventHandler - event forwarding", () => {
 		expect(createdSessions).toHaveLength(0)
 	})
 
+	it("dispatches OpenClaw after session.created using tracked pane metadata", async () => {
+		const openClawSpy = spyOn(openclawRuntimeDispatch, "dispatchOpenClawEvent").mockResolvedValue(null)
+		const eventHandler = createEventHandler({
+			ctx: asEventHandlerContext({ directory: "/tmp/project-created" }),
+			pluginConfig: asPluginConfig({
+				openclaw: { enabled: true, gateways: {}, hooks: {} },
+				tmux: {
+					enabled: true,
+					layout: "main-vertical",
+					main_pane_size: 60,
+					main_pane_min_width: 120,
+					agent_pane_min_width: 40,
+					isolation: "inline",
+				},
+			}),
+			firstMessageVariantGate: {
+				markSessionCreated: () => {},
+				clear: () => {},
+			},
+			managers: createEventHandlerManagers({
+				skillMcpManager: { disconnectSession: async () => {} },
+				tmuxSessionManager: {
+					onSessionCreated: async () => {},
+					onSessionDeleted: async () => {},
+					getTrackedPaneId: (sessionID: string) => (sessionID === "ses_openclaw_created" ? "%9" : undefined),
+				},
+			}),
+			hooks: createEventHandlerHooks({}),
+		})
+
+		await eventHandler(asEventHandlerInput({
+			event: {
+				type: "session.created",
+				properties: { info: { id: "ses_openclaw_created", parentID: "ses_parent" } },
+			},
+		}))
+
+		const [call] = openClawSpy.mock.calls[0] ?? []
+		expect(call).toMatchObject({
+			rawEvent: "session.created",
+			context: {
+				sessionId: "ses_openclaw_created",
+				projectPath: "/tmp/project-created",
+				tmuxPaneId: "%9",
+			},
+		})
+	})
+
 	it("forwards session.deleted to write-existing-file-guard hook", async () => {
 		//#given
 		const forwardedEvents: EventInput[] = []
@@ -645,6 +695,44 @@ describe("createEventHandler - event forwarding", () => {
 		expect(forwardedEvents[0]?.event.type).toBe("session.deleted")
 		expect(disconnectedSessions).toEqual([sessionID])
 		expect(deletedSessions).toEqual([sessionID])
+	})
+
+	it("dispatches OpenClaw for synthetic session.idle events", async () => {
+		const openClawSpy = spyOn(openclawRuntimeDispatch, "dispatchOpenClawEvent").mockResolvedValue(null)
+		const eventHandler = createEventHandler({
+			ctx: asEventHandlerContext({ directory: "/tmp/project-idle" }),
+			pluginConfig: asPluginConfig({ openclaw: { enabled: true, gateways: {}, hooks: {} } }),
+			firstMessageVariantGate: {
+				markSessionCreated: () => {},
+				clear: () => {},
+			},
+			managers: createEventHandlerManagers({
+				skillMcpManager: { disconnectSession: async () => {} },
+				tmuxSessionManager: {
+					onSessionCreated: async () => {},
+					onSessionDeleted: async () => {},
+					getTrackedPaneId: (sessionID: string) => (sessionID === "ses_openclaw_idle" ? "%3" : undefined),
+				},
+			}),
+			hooks: createEventHandlerHooks({}),
+		})
+
+		await eventHandler(asEventHandlerInput({
+			event: {
+				type: "session.status",
+				properties: { sessionID: "ses_openclaw_idle", status: { type: "idle" } },
+			},
+		}))
+
+		const [call] = openClawSpy.mock.calls[0] ?? []
+		expect(call).toMatchObject({
+			rawEvent: "session.idle",
+			context: {
+				sessionId: "ses_openclaw_idle",
+				projectPath: "/tmp/project-idle",
+				tmuxPaneId: "%3",
+			},
+		})
 	})
 
 	it("clears stored prompt params on session.deleted", async () => {

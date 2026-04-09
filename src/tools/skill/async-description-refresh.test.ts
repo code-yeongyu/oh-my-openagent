@@ -19,13 +19,15 @@ function createMockSkill(name: string): LoadedSkill {
 }
 
 async function waitForRefresh(predicate: () => boolean): Promise<void> {
-  for (let attempt = 0; attempt < 20; attempt += 1) {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
     if (predicate()) {
       return
     }
 
-    await new Promise<void>((resolve) => setTimeout(resolve, 0))
+    await new Promise<void>((resolve) => setTimeout(resolve, 10))
   }
+
+  throw new Error("Timed out waiting for async skill description refresh")
 }
 
 describe("skill tool - async native skill description refresh", () => {
