@@ -25,7 +25,8 @@ jobs:
         run: ~/.bun/bin/bun run build
 
       - name: Verify build
-        run: test -f dist/index.js || (echo "ERROR: dist/index.js not found!" && exit 1)
+        run: |
+          test -f dist/index.js || (echo "dist/index.js not found" && exit 1)
 
       - name: Deploy to server
         run: |
