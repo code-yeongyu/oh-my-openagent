@@ -29,17 +29,37 @@ describe("installAgentSortShim", () => {
       { name: "build", native: true },
       { name: "Atlas - Plan Executor", native: false },
       { name: "Sisyphus - Ultraworker", native: false },
-      { name: "plan", native: true },
+      { name: "Hephaestus - Deep Agent", native: false },
     ]
 
     const sorted = agents.toSorted((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))
 
     expect(sorted.map((a) => a.name)).toEqual([
       "Sisyphus - Ultraworker",
+      "Hephaestus - Deep Agent",
       "Atlas - Plan Executor",
       "build",
-      "plan",
     ])
+  })
+
+  it("#given array with only one known agent #when toSorted #then not intercepted", () => {
+    const agents = [
+      { name: "build", native: true },
+      { name: "Sisyphus - Ultraworker", native: false },
+      { name: "plan", native: true },
+    ]
+
+    const sorted = agents.toSorted((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))
+
+    expect(sorted.map((a) => a.name)).toEqual(["Sisyphus - Ultraworker", "build", "plan"])
+  })
+
+  it("#given array with non-object elements #when toSorted #then not intercepted", () => {
+    const mixed = [{ name: "Sisyphus - Ultraworker" }, null, "string", 42]
+
+    const sorted = mixed.toSorted(() => 0)
+
+    expect(sorted).toHaveLength(4)
   })
 
   it("#given plain string array #when toSorted #then not intercepted", () => {
