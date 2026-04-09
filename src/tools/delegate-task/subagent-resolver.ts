@@ -7,7 +7,7 @@ import { normalizeModelFormat } from "../../shared/model-format-normalizer"
 import { AGENT_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
 import { normalizeFallbackModels, flattenToFallbackModelStrings } from "../../shared/model-resolver"
 import { buildFallbackChainFromModels, findMostSpecificFallbackEntry } from "../../shared/fallback-chain-from-models"
-import { getAgentDisplayName, getAgentConfigKey } from "../../shared/agent-display-names"
+import { AGENT_DISPLAY_NAMES, getAgentDisplayName, getAgentConfigKey } from "../../shared/agent-display-names"
 import { normalizeSDKResponse } from "../../shared"
 import { log } from "../../shared/logger"
 import { getAvailableModelsForDelegateTask } from "./available-models"
@@ -108,10 +108,10 @@ Create the work plan directly - that's your job as the planning agent.`,
     }
 
     const runtimeSafeAgentName = getAgentConfigKey(matchedAgent.name)
-    const canonicalDisplayName = getAgentDisplayName(runtimeSafeAgentName).replace(/^\u200B+/, "")
-    const isKnownBuiltinAgent =
-      canonicalDisplayName.toLowerCase() === matchedAgent.name.toLowerCase()
-      || runtimeSafeAgentName === matchedAgent.name.toLowerCase()
+    const isKnownBuiltinAgent = Object.prototype.hasOwnProperty.call(
+      AGENT_DISPLAY_NAMES,
+      runtimeSafeAgentName,
+    )
 
     agentToUse = isKnownBuiltinAgent ? runtimeSafeAgentName : matchedAgent.name
 

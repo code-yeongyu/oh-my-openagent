@@ -749,4 +749,25 @@ describe("resolveSubagentExecution - agent name sanitization", () => {
     expect(result.agentToUse).toBe("sisyphus")
     cacheSpy.mockRestore()
   })
+
+  test("preserves custom mixed-case agent names instead of lowercasing them during builtin normalization", async () => {
+    //#given
+    const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+      models: {},
+      connected: [],
+      updatedAt: "2026-03-03T00:00:00.000Z",
+    })
+    const args = createBaseArgs({ subagent_type: "MyCustomAgent" })
+    const executorCtx = createExecutorContext(async () => ([
+      { name: "MyCustomAgent", mode: "subagent", model: "openai/gpt-5.3-codex" },
+    ]))
+
+    //#when
+    const result = await resolveSubagentExecution(args, executorCtx, "oracle", "deep")
+
+    //#then
+    expect(result.error).toBeUndefined()
+    expect(result.agentToUse).toBe("MyCustomAgent")
+    cacheSpy.mockRestore()
+  })
 })
