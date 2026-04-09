@@ -23,6 +23,9 @@ const OPENFANG_AGENT_NAMES = new Set([
   "planner",
   "reviewer",
   "builder",
+  "debugger",
+  "architect",
+  "test-engineer",
 ])
 
 type AgentMode = "subagent" | "primary" | "all" | undefined
