@@ -1,0 +1,42 @@
+name: Deploy
+
+on:
+  push:
+    branches: [dev]
+
+concurrency:
+  group: deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Build & Deploy to opencode-lab-clara
+    runs-on: [self-hosted, arise]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          ~/.bun/bin/bun install
+        env:
+          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/napi"
+
+      - name: Build plugin
+        run: ~/.bun/bin/bun run build
+
+      - name: Verify build
+        run: test -f dist/index.js || (echo "ERROR: dist/index.js not found!" && exit 1)
+
+      - name: Deploy to server
+        run: |
+          scp -i ~/.ssh/arise_deploy_key \
+            -o StrictHostKeyChecking=no \
+            dist/index.js \
+            ubuntu@192.168.1.11:/home/ubuntu/oh-my-openagent/dist/index.js
+
+      - name: Verify
+        run: |
+          ssh -i ~/.ssh/arise_deploy_key \
+            -o StrictHostKeyChecking=no \
+            ubuntu@192.168.1.11 \
+            'ls -lh /home/ubuntu/oh-my-openagent/dist/index.js && echo "Deploy OK"'
