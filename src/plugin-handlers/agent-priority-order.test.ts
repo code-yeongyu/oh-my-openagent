@@ -1,15 +1,15 @@
 import { describe, expect, test } from "bun:test"
 
 import { reorderAgentsByPriority } from "./agent-priority-order"
-import { getAgentDisplayName } from "../shared/agent-display-names"
+import { getAgentDisplayName, getAgentListDisplayName } from "../shared/agent-display-names"
 
 describe("reorderAgentsByPriority", () => {
   test("moves core agents to canonical order and injects runtime order fields", () => {
     // given
-    const sisyphus = getAgentDisplayName("sisyphus")
-    const hephaestus = getAgentDisplayName("hephaestus")
-    const prometheus = getAgentDisplayName("prometheus")
-    const atlas = getAgentDisplayName("atlas")
+    const sisyphus = getAgentListDisplayName("sisyphus")
+    const hephaestus = getAgentListDisplayName("hephaestus")
+    const prometheus = getAgentListDisplayName("prometheus")
+    const atlas = getAgentListDisplayName("atlas")
     const oracle = getAgentDisplayName("oracle")
 
     const agents: Record<string, unknown> = {
@@ -59,8 +59,8 @@ describe("reorderAgentsByPriority", () => {
 
   test("leaves non-object agent configs untouched while still reordering keys", () => {
     // given
-    const sisyphus = getAgentDisplayName("sisyphus")
-    const atlas = getAgentDisplayName("atlas")
+    const sisyphus = getAgentListDisplayName("sisyphus")
+    const atlas = getAgentListDisplayName("atlas")
 
     const agents: Record<string, unknown> = {
       [atlas]: "atlas-config",

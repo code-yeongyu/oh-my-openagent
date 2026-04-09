@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test"
 import { applyToolConfig } from "./tool-config-handler"
 import type { OhMyOpenCodeConfig } from "../config"
+import { getAgentListDisplayName } from "../shared/agent-display-names"
 
 function createParams(overrides: {
   taskSystem?: boolean
@@ -247,6 +248,22 @@ describe("applyToolConfig", () => {
         expect(agent.permission.todowrite).toBeUndefined()
         expect(agent.permission.todoread).toBeUndefined()
       })
+    })
+  })
+
+  describe("#given agentResult uses exported list display keys", () => {
+    it("#then should still resolve atlas permissions through the prefixed key", () => {
+      const atlasKey = getAgentListDisplayName("atlas")
+      const params = createParams({ agents: [atlasKey] })
+
+      applyToolConfig(params)
+
+      const agent = params.agentResult[atlasKey] as {
+        permission: Record<string, unknown>
+      }
+      expect(agent.permission.task).toBe("allow")
+      expect(agent.permission["task_*"]).toBe("allow")
+      expect(agent.permission.teammate).toBe("allow")
     })
   })
 
