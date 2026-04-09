@@ -25,9 +25,11 @@ jobs:
 
       - name: Install dependencies
         run: |
-          ~/.bun/bin/bun install
-        env:
-          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/napi"
+          if [ ! -d node_modules ] || [ ! -f node_modules/.bin/tsc ]; then
+            BUN_INSTALL_ALLOW_SCRIPTS="@ast-grep/napi" ~/.bun/bin/bun install --ignore-scripts 2>&1 | tail -5
+          else
+            echo "node_modules already present, skipping install"
+          fi
 
       - name: Build plugin
         run: ~/.bun/bin/bun run build
