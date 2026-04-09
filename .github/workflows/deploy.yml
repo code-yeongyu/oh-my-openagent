@@ -32,7 +32,8 @@ jobs:
           fi
 
       - name: Build plugin
-        run: ~/.bun/bin/bun run build
+        run: |
+          ~/.bun/bin/bun build src/index.ts --outdir dist --target bun --format esm
 
       - name: Verify build
         run: |
