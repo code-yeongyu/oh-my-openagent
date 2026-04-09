@@ -73,13 +73,27 @@ export class OpenfangClient {
   }
 
   async sendMessage(agentId: string, message: string, abort?: AbortSignal): Promise<string> {
+    const abortController = new AbortController()
+    const combinedSignal = abortController.signal
+
+    if (abort) {
+      abort.addEventListener("abort", () => {
+        this.stopAgent(agentId)
+        abortController.abort(abort.reason)
+      })
+      if (abort.aborted) {
+        this.stopAgent(agentId)
+        throw new OpenfangClientError(`Request cancelled by caller`)
+      }
+    }
+
     let response: Response
     try {
-      response = await fetch(`${this.baseUrl}/api/agents/${agentId}/message`, {
+      response = await fetch(`${this.baseUrl}/api/agents/${agentId}/message/stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message }),
-        signal: abort,
+        signal: combinedSignal,
       })
     } catch (cause) {
       if (cause instanceof Error && cause.name === "AbortError") {
@@ -93,13 +107,73 @@ export class OpenfangClient {
     if (!response.ok) {
       const text = await response.text().catch(() => "")
       throw new OpenfangClientError(
-        `POST /api/agents/${agentId}/message failed (${response.status}): ${text}`,
+        `POST /api/agents/${agentId}/message/stream failed (${response.status}): ${text}`,
         response.status,
       )
     }
 
-    const body = (await response.json()) as OpenfangSendMessageResponse
-    return body.response ?? ""
+    return this.consumeSseStream(response, agentId)
+  }
+
+  private async consumeSseStream(response: Response, agentId: string): Promise<string> {
+    const reader = response.body?.getReader()
+    if (!reader) {
+      throw new OpenfangClientError(`No response body from agent ${agentId}`)
+    }
+
+    const decoder = new TextDecoder()
+    const textParts: string[] = []
+    const toolLog: string[] = []
+    let buffer = ""
+    let currentEvent = ""
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split("\n")
+        buffer = lines.pop() ?? ""
+
+        for (const line of lines) {
+          if (line.startsWith("event: ")) {
+            currentEvent = line.slice(7).trim()
+            continue
+          }
+          if (!line.startsWith("data: ")) {
+            if (line === "") currentEvent = ""
+            continue
+          }
+
+          const raw = line.slice(6).trim()
+          if (!raw || raw === "[DONE]") continue
+
+          let parsed: Record<string, unknown>
+          try {
+            parsed = JSON.parse(raw) as Record<string, unknown>
+          } catch {
+            continue
+          }
+
+          if (currentEvent === "chunk" && parsed.content !== undefined) {
+            textParts.push(String(parsed.content))
+          } else if (currentEvent === "tool_use" && parsed.tool) {
+            toolLog.push(`[tool: ${parsed.tool}]`)
+          } else if (currentEvent === "tool_result" && parsed.tool) {
+            toolLog.push(`[tool_result: ${parsed.tool}]`)
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock()
+    }
+
+    const fullText = textParts.join("")
+    if (toolLog.length > 0) {
+      log("[a2a-delegate] agent tool calls", { agentId, tools: toolLog })
+    }
+    return fullText
   }
 
   async stopAgent(agentId: string): Promise<void> {
