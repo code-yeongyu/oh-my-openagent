@@ -96,11 +96,11 @@ function buildArgs(options: GrepOptions, backend: GrepBackend): string[] {
   return backend === "rg" ? buildRgArgs(options) : buildGrepArgs(options)
 }
 
-function parseOutput(output: string, filesOnly = false): GrepMatch[] {
+export function parseOutput(output: string, filesOnly = false): GrepMatch[] {
   if (!output.trim()) return []
 
   const matches: GrepMatch[] = []
-  const lines = output.split("\n")
+  const lines = output.split(/\r?\n/)
 
   for (const line of lines) {
     if (!line.trim()) continue
@@ -128,11 +128,11 @@ function parseOutput(output: string, filesOnly = false): GrepMatch[] {
   return matches
 }
 
-function parseCountOutput(output: string): CountResult[] {
+export function parseCountOutput(output: string): CountResult[] {
   if (!output.trim()) return []
 
   const results: CountResult[] = []
-  const lines = output.split("\n")
+  const lines = output.split(/\r?\n/)
 
   for (const line of lines) {
     if (!line.trim()) continue
