@@ -150,12 +150,19 @@ export async function handleSessionIdle(args: {
 
   let resolvedInfo: ResolvedMessageInfo | undefined
   let encounteredCompaction = false
+  let latestMessageWasCompaction = false
   try {
     const messageInfoResult = await resolveLatestMessageInfo(ctx, sessionID, prefetchedMessages)
     resolvedInfo = messageInfoResult.resolvedInfo
     encounteredCompaction = messageInfoResult.encounteredCompaction
+    latestMessageWasCompaction = messageInfoResult.latestMessageWasCompaction
   } catch (error) {
     log(`[${HOOK_NAME}] Failed to fetch messages for agent check`, { sessionID, error: String(error) })
+  }
+
+  if (latestMessageWasCompaction) {
+    log(`[${HOOK_NAME}] Skipped: latest message is a compaction marker`, { sessionID })
+    return
   }
 
   const sessionAgent = getSessionAgent(sessionID)

@@ -44,12 +44,22 @@ mock.module("./action-executor", () => ({
 mock.module("../../shared/tmux", () => ({
   isInsideTmux: mockIsInsideTmux,
   getCurrentPaneId: mockGetCurrentPaneId,
+  isServerRunning: mock(async () => true),
+  resetServerCheck: mock(() => {}),
+  markServerRunningInProcess: mock(() => {}),
+  getPaneDimensions: mock(async () => ({ width: 220, height: 44 })),
+  spawnTmuxPane: mock(async () => ({ success: true, paneId: "%1" })),
+  closeTmuxPane: mock(async () => ({ success: true })),
+  replaceTmuxPane: mock(async () => ({ success: true, paneId: "%1" })),
+  applyLayout: mock(async () => ({ success: true })),
+  enforceMainPaneWidth: mock(async () => ({ success: true })),
   POLL_INTERVAL_BACKGROUND_MS: 10,
   SESSION_READY_POLL_INTERVAL_MS: 10,
   SESSION_READY_TIMEOUT_MS: 50,
   SESSION_MISSING_GRACE_MS: 1_000,
   spawnTmuxWindow: mockSpawnTmuxWindow,
   spawnTmuxSession: mockSpawnTmuxSession,
+  SESSION_TIMEOUT_MS: 600_000,
 }))
 
 afterAll(() => { mock.restore() })

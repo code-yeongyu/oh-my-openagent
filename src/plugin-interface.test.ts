@@ -6,7 +6,6 @@ import { randomUUID } from "node:crypto"
 import { createPluginInterface } from "./plugin-interface"
 import { createAutoSlashCommandHook } from "./hooks/auto-slash-command"
 import { createStartWorkHook } from "./hooks/start-work"
-import { getAgentListDisplayName } from "./shared/agent-display-names"
 import { readBoulderState } from "./features/boulder-state"
 import {
   _resetForTesting,
@@ -165,7 +164,7 @@ describe("createPluginInterface - command.execute.before", () => {
     )
 
     // then
-    expect(output.message.agent).toBe(getAgentListDisplayName("atlas"))
+    expect(output.message.agent).toBe("atlas")
     expect(getSessionAgent("ses-command-atlas")).toBe("atlas")
     expect(readBoulderState(testDir)?.agent).toBe("atlas")
   })

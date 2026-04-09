@@ -1,5 +1,8 @@
 import type { OhMyOpenCodeConfig } from "../config";
-import { getAgentListDisplayName } from "../shared/agent-display-names";
+import {
+  getAgentConfigKey,
+  getAgentDisplayName,
+} from "../shared/agent-display-names";
 import {
   loadUserCommands,
   loadProjectCommands,
@@ -96,7 +99,7 @@ export async function applyCommandConfig(params: {
 function remapCommandAgentFields(commands: Record<string, Record<string, unknown>>): void {
   for (const cmd of Object.values(commands)) {
     if (cmd?.agent && typeof cmd.agent === "string") {
-      cmd.agent = getAgentListDisplayName(cmd.agent);
+      cmd.agent = getAgentDisplayName(getAgentConfigKey(cmd.agent));
     }
   }
 }

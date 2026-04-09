@@ -1,4 +1,4 @@
-import * as z from "zod"
+import { z } from "zod"
 import { OhMyOpenCodeConfigSchema } from "../src/config/schema"
 
 export function createOhMyOpenCodeJsonSchema(): Record<string, unknown> {
@@ -8,10 +8,10 @@ export function createOhMyOpenCodeJsonSchema(): Record<string, unknown> {
   }) as Record<string, unknown>
 
   return {
-    ...jsonSchema,
     $schema: "http://json-schema.org/draft-07/schema#",
     $id: "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json",
     title: "Oh My OpenCode Configuration",
     description: "Configuration schema for oh-my-opencode plugin",
+    ...jsonSchema,
   }
 }

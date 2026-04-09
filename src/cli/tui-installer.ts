@@ -10,6 +10,7 @@ import {
   writeOmoConfig,
 } from "./config-manager"
 import { detectedToInitialValues, formatConfigSummary, SYMBOLS } from "./install-validators"
+import { getUnsupportedOpenCodeVersionMessage } from "./minimum-opencode-version"
 import { promptInstallConfig } from "./tui-install-prompts"
 
 export async function runTuiInstaller(args: InstallArgs, version: string): Promise<number> {
@@ -39,6 +40,13 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
     p.note("Visit https://opencode.ai/docs for installation instructions", "Installation Guide")
   } else {
     spinner.stop(`OpenCode ${openCodeVersion ?? "installed"} ${color.green("[OK]")}`)
+
+    const unsupportedVersionMessage = getUnsupportedOpenCodeVersionMessage(openCodeVersion)
+    if (unsupportedVersionMessage) {
+      p.log.warn(unsupportedVersionMessage)
+      p.outro(color.red("Installation blocked."))
+      return 1
+    }
   }
 
   const config = await promptInstallConfig(detected)

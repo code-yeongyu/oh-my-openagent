@@ -9,7 +9,7 @@ import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { buildRetryModelPayload } from "./retry-model-payload"
 import { getLastUserRetryParts } from "./last-user-retry-parts"
 import { extractSessionMessages } from "./session-messages"
-import { getAgentDisplayName } from "../../shared/agent-display-names"
+import { resolveRegisteredAgentName } from "../../features/claude-code-session-state"
 
 const SESSION_TTL_MS = 30 * 60 * 1000
 
@@ -133,14 +133,14 @@ export function createAutoRetryHelpers(deps: HookDeps) {
         })
 
         const retryAgent = resolvedAgent ?? getSessionAgent(sessionID)
+        const launchAgent = resolveRegisteredAgentName(retryAgent)
         sessionAwaitingFallbackResult.add(sessionID)
         scheduleSessionFallbackTimeout(sessionID, retryAgent)
 
         await ctx.client.session.promptAsync({
           path: { id: sessionID },
           body: {
-            // Use config key to avoid HTTP header validation issues with display names
-            ...(retryAgent ? { agent: retryAgent } : {}),
+            ...(launchAgent ? { agent: launchAgent } : {}),
             ...retryModelPayload,
             parts: retryParts,
           },

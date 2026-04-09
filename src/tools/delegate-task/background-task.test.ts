@@ -204,6 +204,50 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
     ])
   })
 
+  testFn("strips leading zwsp from agent name before launching background task", async () => {
+    //#given - display-sorted agent names should be normalized before manager launch
+    const launchCalls: unknown[] = []
+    const manager = {
+      launch: async (input: unknown) => {
+        launchCalls.push(input)
+        return {
+          id: "bg_clean_agent",
+          sessionID: "ses_clean_agent",
+          description: "Clean agent",
+          agent: "sisyphus-junior",
+          status: "running",
+        }
+      },
+      getTask: () => ({ sessionID: "ses_clean_agent" }),
+    }
+
+    //#when
+    await executeBackgroundTask(
+      {
+        description: "Clean agent",
+        prompt: "check",
+        run_in_background: true,
+        load_skills: [],
+      },
+      {
+        sessionID: "ses_parent",
+        callID: "call_clean_agent",
+        metadata: async () => {},
+        abort: new AbortController().signal,
+      },
+      { manager },
+      { sessionID: "ses_parent", messageID: "msg_clean_agent" },
+      "\u200Bsisyphus-junior",
+      undefined,
+      undefined,
+      undefined,
+    )
+
+    //#then
+    expectFn(launchCalls).toHaveLength(1)
+    expectFn((launchCalls[0] as { agent: string }).agent).toBe("sisyphus-junior")
+  })
+
   testFn("keeps launched background task alive when parent aborts before session id resolves", async () => {
     //#given - parallel tool execution can abort the parent call after launch succeeds
     const metadataCalls: any[] = []

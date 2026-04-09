@@ -1,7 +1,10 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 
 import type { BackgroundManager } from "../../features/background-agent"
-import { getSessionAgent } from "../../features/claude-code-session-state"
+import {
+  getSessionAgent,
+  resolveRegisteredAgentName,
+} from "../../features/claude-code-session-state"
 import {
   createInternalAgentTextPart,
   normalizeSDKResponse,
@@ -127,6 +130,7 @@ export async function injectContinuation(args: {
   }
 
   const promptAgent = normalizeAgentForPromptKey(agentName)
+  const launchAgent = resolveRegisteredAgentName(agentName)
 
   if (promptAgent && skipAgents.some(s => getAgentConfigKey(s) === getAgentConfigKey(promptAgent))) {
     log(`[${HOOK_NAME}] Skipped: agent in skipAgents list`, { sessionID, agent: agentName })
@@ -168,7 +172,7 @@ ${todoList}`
   try {
     log(`[${HOOK_NAME}] Injecting continuation`, {
       sessionID,
-      agent: promptAgent,
+      agent: launchAgent ?? promptAgent,
       model,
       incompleteCount: freshIncompleteCount,
     })
@@ -183,7 +187,7 @@ ${todoList}`
     await ctx.client.session.promptAsync({
       path: { id: sessionID },
       body: {
-        agent: promptAgent,
+        agent: launchAgent ?? promptAgent,
         ...(launchModel ? { model: launchModel } : {}),
         ...(launchVariant ? { variant: launchVariant } : {}),
         ...(inheritedTools ? { tools: inheritedTools } : {}),

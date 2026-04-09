@@ -1,6 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk";
 import type { AgentMode, AgentPromptMetadata } from "../types";
-import { isGpt5_4Model, isGpt5_3CodexModel } from "../types";
+import { isGptModel, isGpt5_4Model, isGpt5_3CodexModel } from "../types";
 import type {
   AvailableAgent,
   AvailableTool,
@@ -125,6 +125,7 @@ export function createHephaestusAgent(
     permission: {
       question: "allow",
       call_omo_agent: "deny",
+      ...(isGptModel(model) ? { apply_patch: "deny" as const } : {}),
     } as AgentConfig["permission"],
     reasoningEffort: "medium",
   };

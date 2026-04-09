@@ -15,7 +15,7 @@ describe("test workflows", () => {
       const workflow = readFileSync(workflowPath, "utf8")
 
       expect(workflow).toContain("- name: Run tests")
-      expect(workflow).toContain("run: bun test")
+      expect(workflow).toMatch(/run: bun (test|run script\/run-ci-tests\.ts)/)
     }
   })
 })

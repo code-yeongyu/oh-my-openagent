@@ -18,3 +18,12 @@ export { detectCurrentConfig } from "./config-manager/detect-current-config"
 
 export type { BunInstallResult } from "./config-manager/bun-install"
 export { runBunInstall, runBunInstallWithDetails } from "./config-manager/bun-install"
+
+export type { VersionCompatibility } from "./config-manager/version-compatibility"
+export {
+  checkVersionCompatibility,
+  extractVersionFromPluginEntry,
+} from "./config-manager/version-compatibility"
+
+export type { BackupResult } from "./config-manager/backup-config"
+export { backupConfigFile } from "./config-manager/backup-config"

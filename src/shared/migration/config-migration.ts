@@ -4,6 +4,7 @@ import { writeFileAtomically } from "../write-file-atomically"
 import { AGENT_NAME_MAP, migrateAgentNames } from "./agent-names"
 import { migrateHookNames } from "./hook-names"
 import { migrateModelVersions } from "./model-versions"
+import { readAppliedMigrations, writeAppliedMigrations } from "./migrations-sidecar"
 
 export function migrateConfigFile(
   configPath: string,
@@ -12,10 +13,22 @@ export function migrateConfigFile(
   const copy = structuredClone(rawConfig)
   let needsWrite = false
 
-  // Load previously applied migrations
-  const existingMigrations = Array.isArray(copy._migrations)
+  // Load previously applied migrations from BOTH the legacy in-config
+  // `_migrations` field AND the external sidecar file. The sidecar is the
+  // new source of truth because users were editing the config file to
+  // revert auto-migrated values and accidentally dropping the `_migrations`
+  // field in the process, which produced an infinite migration loop on
+  // every startup (#3263). Reading from both sources keeps old configs
+  // that still carry `_migrations` working without a forced reset.
+  const sidecarMigrations = readAppliedMigrations(configPath)
+  const inConfigMigrations = Array.isArray(copy._migrations)
     ? new Set(copy._migrations as string[])
     : new Set<string>()
+  const existingMigrations = new Set<string>([
+    ...sidecarMigrations,
+    ...inConfigMigrations,
+  ])
+  const hadLegacyInConfigMigrations = inConfigMigrations.size > 0
   const allNewMigrations: string[] = []
 
   if (copy.agents && typeof copy.agents === "object") {
@@ -54,12 +67,29 @@ export function migrateConfigFile(
     allNewMigrations.push(...newMigrations)
   }
 
-  // Record newly applied migrations
-  if (allNewMigrations.length > 0) {
-    const updatedMigrations = Array.from(existingMigrations)
-    updatedMigrations.push(...allNewMigrations)
-    copy._migrations = updatedMigrations
+  // Record newly applied migrations. We persist the full set (existing +
+  // new) to the external sidecar file and strip the legacy `_migrations`
+  // field from the config body on its way out, so users stop having to
+  // think about a field that never should have been in their config in
+  // the first place. The in-memory `rawConfig` never re-exposes
+  // `_migrations` to downstream schema validation.
+  const newMigrationsToRecord = allNewMigrations.filter(mKey => !existingMigrations.has(mKey))
+  if (newMigrationsToRecord.length > 0 || hadLegacyInConfigMigrations) {
+    const fullMigrationSet = new Set<string>([
+      ...existingMigrations,
+      ...newMigrationsToRecord,
+    ])
+    writeAppliedMigrations(configPath, fullMigrationSet)
+  }
+  if (newMigrationsToRecord.length > 0) {
     needsWrite = true
+  }
+  if (hadLegacyInConfigMigrations) {
+    // Migrating state out of the config body is itself a config write.
+    needsWrite = true
+  }
+  if ("_migrations" in copy) {
+    delete copy._migrations
   }
 
   if (copy.omo_agent) {

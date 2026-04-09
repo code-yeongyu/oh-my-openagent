@@ -131,7 +131,8 @@ export function classifyErrorType(error: unknown): string | undefined {
     /billing.?(?:hard.?)?limit/i.test(message) ||
     /exhausted\s+your\s+capacity/i.test(message) ||
     /out\s+of\s+credits?/i.test(message) ||
-    /payment.?required/i.test(message)
+    /payment.?required/i.test(message) ||
+    /usage\s+limit/i.test(message)
   ) {
     return "quota_exceeded"
   }

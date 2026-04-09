@@ -650,6 +650,65 @@ describe("boulder-state", () => {
       expect(progress.completed).toBe(1)
       expect(progress.isComplete).toBe(false)
     })
+
+    test("should count only top-level checkboxes for simple plans with nested tasks", () => {
+      // given
+      const planPath = join(TEST_DIR, "simple-nested-plan.md")
+      writeFileSync(planPath, `# Plan
+
+- [ ] Top-level task 1
+  - [x] Nested task ignored
+- [x] Top-level task 2
+    * [ ] Another nested task ignored
+`)
+
+      // when
+      const progress = getPlanProgress(planPath)
+
+      // then
+      expect(progress.total).toBe(2)
+      expect(progress.completed).toBe(1)
+      expect(progress.isComplete).toBe(false)
+    })
+
+    test("should treat final-wave-only plans as structured mode", () => {
+      // given
+      const planPath = join(TEST_DIR, "final-wave-only-plan.md")
+      writeFileSync(planPath, `# Plan
+
+## Final Verification Wave
+- [ ] F1. Top-level final review
+  - [x] Nested verification detail ignored
+`)
+
+      // when
+      const progress = getPlanProgress(planPath)
+
+      // then
+      expect(progress.total).toBe(1)
+      expect(progress.completed).toBe(0)
+      expect(progress.isComplete).toBe(false)
+    })
+
+    test("should ignore mixed indentation levels in simple plans", () => {
+      // given
+      const planPath = join(TEST_DIR, "simple-mixed-indentation-plan.md")
+      writeFileSync(planPath, `# Plan
+
+* [x] Top-level star task
+ - [ ] Indented task ignored
+	- [x] Tab-indented task ignored
+- [ ] Top-level dash task
+`)
+
+      // when
+      const progress = getPlanProgress(planPath)
+
+      // then
+      expect(progress.total).toBe(2)
+      expect(progress.completed).toBe(1)
+      expect(progress.isComplete).toBe(false)
+    })
   })
 
   describe("getPlanName", () => {

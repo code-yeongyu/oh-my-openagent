@@ -499,6 +499,7 @@ export function createSisyphusAgent(
       permission: {
         question: "allow",
         call_omo_agent: "deny",
+        apply_patch: "deny",
       } as AgentConfig["permission"],
       reasoningEffort: "medium",
     };
@@ -538,6 +539,7 @@ export function createSisyphusAgent(
   const permission = {
     question: "allow",
     call_omo_agent: "deny",
+    ...(isGptModel(model) ? { apply_patch: "deny" as const } : {}),
   } as AgentConfig["permission"];
   const base = {
     description:

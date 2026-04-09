@@ -16,9 +16,14 @@ import type { RalphLoopHook } from "../ralph-loop"
 import { parseRalphLoopArguments } from "../ralph-loop/command-arguments"
 
 const ULTRAWORK_KEYWORD_PATTERN = /\b(ultrawork|ulw)\b/i
+const LEADING_ULTRAWORK_PATTERN = /^\s*(ultrawork|ulw)\b/i
 
 function extractUltraworkTask(cleanText: string): string {
   return cleanText.replace(ULTRAWORK_KEYWORD_PATTERN, "").trim()
+}
+
+function hasLeadingUltraworkKeyword(cleanText: string): boolean {
+  return LEADING_ULTRAWORK_PATTERN.test(cleanText)
 }
 
 export function createKeywordDetectorHook(
@@ -73,6 +78,16 @@ export function createKeywordDetectorHook(
         detectedKeywords = detectedKeywords.filter((k) => k.type !== "ultrawork")
         if (preFilterCount > detectedKeywords.length) {
           log(`[keyword-detector] Filtered ultrawork keywords for planner agent`, { sessionID: input.sessionID, agent: currentAgent })
+        }
+      }
+
+      if (!hasLeadingUltraworkKeyword(cleanText)) {
+        const preFilterCount = detectedKeywords.length
+        detectedKeywords = detectedKeywords.filter((k) => k.type !== "ultrawork")
+        if (preFilterCount > detectedKeywords.length) {
+          log(`[keyword-detector] Filtered non-leading ultrawork keyword`, {
+            sessionID: input.sessionID,
+          })
         }
       }
 

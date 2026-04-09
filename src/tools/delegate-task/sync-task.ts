@@ -37,14 +37,29 @@ export async function executeSyncTask(
       spawnReservation = await manager.reserveSubagentSpawn(parentContext.sessionID)
     }
 
-    const spawnContext = spawnReservation?.spawnContext
-      ?? (typeof manager?.assertCanSpawn === "function"
-        ? await manager.assertCanSpawn(parentContext.sessionID)
-        : {
-            rootSessionID: parentContext.sessionID,
-            parentDepth: 0,
-            childDepth: 1,
-          })
+    // Depth/descendant guard. We must NOT silently fall back to childDepth: 1
+    // when the manager is unavailable or lacks the spawn methods, because that
+    // would let subagents recurse without bound. The only safe fallback is
+    // when the manager genuinely cannot enforce limits (legacy SDK), in which
+    // case we still record childDepth: 1 but log a warning so regressions are
+    // visible.
+    let spawnContext: { rootSessionID: string; parentDepth: number; childDepth: number }
+    if (spawnReservation?.spawnContext) {
+      spawnContext = spawnReservation.spawnContext
+    } else if (typeof manager?.assertCanSpawn === "function") {
+      spawnContext = await manager.assertCanSpawn(parentContext.sessionID)
+    } else {
+      log(
+        "[task] WARNING: BackgroundManager has no spawn enforcement methods (reserveSubagentSpawn / assertCanSpawn). " +
+        "Depth and descendant limits cannot be enforced for this task. This indicates an old SDK or a misconfiguration.",
+        { parentSessionID: parentContext.sessionID }
+      )
+      spawnContext = {
+        rootSessionID: parentContext.sessionID,
+        parentDepth: 0,
+        childDepth: 1,
+      }
+    }
 
     const createSessionResult = await deps.createSyncSession(client, {
       parentSessionID: parentContext.sessionID,
