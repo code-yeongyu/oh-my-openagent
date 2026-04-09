@@ -10,6 +10,7 @@ import {
   devBrowserSkill,
   reviewWorkSkill,
   aiSlopRemoverSkill,
+  openfangAgentCreationSkill,
 } from "./skills/index"
 
 export interface CreateBuiltinSkillsOptions {
@@ -29,7 +30,7 @@ export function createBuiltinSkills(options: CreateBuiltinSkillsOptions = {}): B
     browserSkill = playwrightSkill
   }
 
-  const skills = [browserSkill, frontendUiUxSkill, gitMasterSkill, devBrowserSkill, reviewWorkSkill, aiSlopRemoverSkill]
+  const skills = [browserSkill, frontendUiUxSkill, gitMasterSkill, devBrowserSkill, reviewWorkSkill, aiSlopRemoverSkill, openfangAgentCreationSkill]
 
   if (!disabledSkills) {
     return skills
