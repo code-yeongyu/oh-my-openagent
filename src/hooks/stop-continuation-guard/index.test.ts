@@ -162,7 +162,7 @@ describe("stop-continuation-guard", () => {
     expect(guard.isStopped(session2)).toBe(false)
   })
 
-  test("should clear stopped state on new user message (chat.message)", async () => {
+  test("should NOT clear stopped state on new user message (chat.message)", async () => {
     // given - a session that was stopped
     const guard = createStopContinuationGuardHook(createMockPluginInput())
     const sessionID = "test-session-4"
@@ -172,7 +172,38 @@ describe("stop-continuation-guard", () => {
     // when - user sends a new message
     await guard["chat.message"]({ sessionID })
 
-    // then - stop state should be cleared (one-time only)
+    // then - stop state should persist (not cleared by user messages)
+    // Stop is only cleared by explicit work-starting commands (/start-work, /ralph-loop, /ulw-loop)
+    // or session deletion. This prevents /stop-continuation from being ineffective.
+    expect(guard.isStopped(sessionID)).toBe(true)
+  })
+
+  test("should persist stop state across multiple user messages", async () => {
+    // given - a session that was stopped
+    const guard = createStopContinuationGuardHook(createMockPluginInput())
+    const sessionID = "test-session-persist"
+    guard.stop(sessionID)
+
+    // when - user sends multiple messages
+    await guard["chat.message"]({ sessionID })
+    await guard["chat.message"]({ sessionID })
+    await guard["chat.message"]({ sessionID })
+
+    // then - stop state remains active
+    expect(guard.isStopped(sessionID)).toBe(true)
+  })
+
+  test("should clear stop state only via explicit clear() call", () => {
+    // given - a session that was stopped
+    const guard = createStopContinuationGuardHook(createMockPluginInput())
+    const sessionID = "test-session-explicit-clear"
+    guard.stop(sessionID)
+    expect(guard.isStopped(sessionID)).toBe(true)
+
+    // when - clear is called (simulating /start-work or /ralph-loop)
+    guard.clear(sessionID)
+
+    // then - stop state is cleared
     expect(guard.isStopped(sessionID)).toBe(false)
   })
 
