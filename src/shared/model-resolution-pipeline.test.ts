@@ -1,5 +1,12 @@
-import { describe, expect, test } from "bun:test"
+import { describe, expect, mock, test } from "bun:test"
 import { resolveModelPipeline } from "./model-resolution-pipeline"
+
+// Force test-runner isolation: files that import mock.module are auto-detected
+// by run-ci-tests.ts and executed in their own bun process so they cannot be
+// contaminated by (or contaminate) mock.module calls in other test files.
+mock.module("./logger", () => ({
+  log: () => {},
+}))
 
 describe("resolveModelPipeline", () => {
   test("does not return unused explicit user config metadata in override result", () => {
