@@ -11,6 +11,7 @@ import type { OpenClawConfig } from "../types"
 
 const originalHome = process.env.HOME
 const originalUserProfile = process.env.USERPROFILE
+const originalFetch = globalThis.fetch
 
 const tempHome = mkdtempSync(join(tmpdir(), "openclaw-reply-listener-discord-"))
 const stateDir = join(tempHome, ".omx", "state")
@@ -60,12 +61,14 @@ describe("pollDiscordReplies", () => {
   beforeEach(() => {
     process.env.HOME = tempHome
     process.env.USERPROFILE = tempHome
+    globalThis.fetch = originalFetch
     rmSync(stateDir, { recursive: true, force: true })
     mkdirSync(stateDir, { recursive: true })
   })
 
   afterEach(() => {
     mock.restore()
+    globalThis.fetch = originalFetch
   })
 
   test("records HTTP failures in daemon state when Discord returns non-ok", async () => {
