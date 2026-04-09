@@ -131,8 +131,7 @@ Available categories: ${allCategoryNames}`,
   const explicitCategoryModel = userCategories?.[args.category!]?.model
 
   if (!requirement) {
-    // Precedence: explicit category model > sisyphus-junior default > category resolved model
-    // This keeps `sisyphus-junior.model` useful as a global default while allowing
+    
     // per-category overrides via `categories[category].model`.
     actualModel = explicitCategoryModel ?? overrideModel ?? resolved.model
     if (actualModel) {
