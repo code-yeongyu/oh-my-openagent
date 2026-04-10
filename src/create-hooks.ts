@@ -8,8 +8,6 @@ import type { ModelCacheState } from "./plugin-state"
 import { createCoreHooks } from "./plugin/hooks/create-core-hooks"
 import { createContinuationHooks } from "./plugin/hooks/create-continuation-hooks"
 import { createSkillHooks } from "./plugin/hooks/create-skill-hooks"
-import { createClaudeCodeHooksHook } from "./hooks/claude-code-hooks"
-import { safeCreateHook } from "./shared/safe-create-hook"
 
 export type CreatedHooks = ReturnType<typeof createHooks>
 
@@ -80,17 +78,10 @@ export function createHooks(args: {
     availableSkills,
   })
 
-  const claudeCodeHooks = isHookEnabled("claude-code-hooks")
-    ? safeHookEnabled
-      ? safeCreateHook("claude-code-hooks", () => createClaudeCodeHooksHook(ctx, {}), { enabled: true })
-      : createClaudeCodeHooksHook(ctx, {})
-    : null
-
   const hooks = {
     ...core,
     ...continuation,
     ...skill,
-    claudeCodeHooks,
   }
 
   return {
