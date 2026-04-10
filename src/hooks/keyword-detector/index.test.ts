@@ -1,4 +1,5 @@
 import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test"
+import type { PluginInput } from "@opencode-ai/plugin"
 import { createKeywordDetectorHook } from "./index"
 import { setMainSession, updateSessionAgent, clearSessionAgent, _resetForTesting } from "../../features/claude-code-session-state"
 import { ContextCollector } from "../../features/context-injector"
@@ -31,7 +32,7 @@ describe("keyword-detector message transform", () => {
           showToast: async () => {},
         },
       },
-    } as any
+    } as unknown as PluginInput
   }
 
   test("should prepend ultrawork message to text part", async () => {
@@ -119,12 +120,12 @@ describe("keyword-detector session filtering", () => {
     return {
       client: {
         tui: {
-          showToast: async (opts: any) => {
+          showToast: async (opts: { body: { title: string } }) => {
             toastCalls.push(opts.body.title)
           },
         },
       },
-    } as any
+    } as unknown as PluginInput
   }
 
   test("should skip non-ultrawork keywords in non-main session (using mainSessionID check)", async () => {
@@ -264,12 +265,12 @@ describe("keyword-detector word boundary", () => {
     return {
       client: {
         tui: {
-          showToast: async (opts: any) => {
+          showToast: async (opts: { body: { title: string } }) => {
             toastCalls.push(opts.body.title)
           },
         },
       },
-    } as any
+    } as unknown as PluginInput
   }
 
   test("should NOT trigger ultrawork on partial matches like 'StatefulWidget' containing 'ulw'", async () => {
@@ -363,7 +364,7 @@ describe("keyword-detector system-reminder filtering", () => {
           showToast: async () => {},
         },
       },
-    } as any
+    } as unknown as PluginInput
   }
 
   test("should NOT trigger search mode from keywords inside <system-reminder> tags", async () => {
@@ -554,7 +555,7 @@ describe("keyword-detector agent-specific ultrawork messages", () => {
           showToast: async () => {},
         },
       },
-    } as any
+    } as unknown as PluginInput
   }
 
   test("should skip ultrawork injection when agent is prometheus", async () => {
@@ -771,7 +772,7 @@ describe("keyword-detector non-OMO agent skipping", () => {
           showToast: async () => {},
         },
       },
-    } as any
+    } as unknown as PluginInput
   }
 
   test("should skip all keyword injection for OpenCode-Builder agent", async () => {

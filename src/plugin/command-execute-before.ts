@@ -1,5 +1,6 @@
 import type { CreatedHooks } from "../create-hooks"
 import { parseRalphLoopArguments } from "../hooks/ralph-loop/command-arguments"
+import { log } from "../shared/logger"
 
 type CommandExecuteBeforeInput = {
   command: string
@@ -45,6 +46,13 @@ export function createCommandExecuteBeforeHandler(args: {
         })
         output.message ??= {}
         output.message[NATIVE_LOOP_TRIGGERED_FLAG] = true
+        if (hooks.stopContinuationGuard?.isStopped(sessionID)) {
+          hooks.stopContinuationGuard.clear(sessionID)
+          log("[stop-continuation] Stop state cleared by native command", {
+            sessionID,
+            command: normalizedCommand,
+          })
+        }
       } else if (normalizedCommand === "cancel-ralph") {
         hooks.ralphLoop.cancelLoop(sessionID)
         output.message ??= {}
@@ -58,6 +66,13 @@ export function createCommandExecuteBeforeHandler(args: {
       && hasPartsOutput(output)
     ) {
       await hooks.startWork["command.execute.before"]?.(input, output)
+      if (hooks.stopContinuationGuard?.isStopped(sessionID)) {
+        hooks.stopContinuationGuard.clear(sessionID)
+        log("[stop-continuation] Stop state cleared by native command", {
+          sessionID,
+          command: normalizedCommand,
+        })
+      }
     }
   }
 }

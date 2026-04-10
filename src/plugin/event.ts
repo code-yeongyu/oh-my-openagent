@@ -382,7 +382,10 @@ export function createEventHandler(args: {
         );
       }
 
-      if (pluginConfig.openclaw && sessionInfo?.id) {
+      // Skip subagent sessions — they are dispatched by specialized callbacks
+      // in create-managers.ts (async) and tool-registry.ts (sync)
+      const isSubagentSession = !!sessionInfo?.parentID;
+      if (pluginConfig.openclaw && sessionInfo?.id && !isSubagentSession) {
         await dispatchOpenClawEvent({
           config: pluginConfig.openclaw,
           rawEvent: event.type,

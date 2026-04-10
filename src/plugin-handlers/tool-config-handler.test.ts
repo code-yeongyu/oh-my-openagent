@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test"
 import { applyToolConfig } from "./tool-config-handler"
 import type { OhMyOpenCodeConfig } from "../config"
-import { getAgentListDisplayName } from "../shared/agent-display-names"
+import { getAgentDisplayName } from "../shared/agent-display-names"
 
 function createParams(overrides: {
   taskSystem?: boolean
@@ -251,9 +251,9 @@ describe("applyToolConfig", () => {
     })
   })
 
-  describe("#given agentResult uses exported list display keys", () => {
-    it("#then should still resolve atlas permissions through the prefixed key", () => {
-      const atlasKey = getAgentListDisplayName("atlas")
+  describe("#given agentResult uses clean display keys", () => {
+    it("#then should still resolve atlas permissions through the display key", () => {
+      const atlasKey = getAgentDisplayName("atlas")
       const params = createParams({ agents: [atlasKey] })
 
       applyToolConfig(params)
