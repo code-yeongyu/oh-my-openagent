@@ -6,7 +6,7 @@ import { AGENT_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
  */
 export const BUILTIN_AGENTS = Object.keys(AGENT_MODEL_REQUIREMENTS)
 
-export const CALL_OMO_AGENT_DESCRIPTION = `Spawn explore/librarian agent. run_in_background REQUIRED (true=async with task_id, false=sync).
+export const CALL_OMO_AGENT_DESCRIPTION = `Spawn a specialized agent. run_in_background REQUIRED (true=async with task_id, false=sync).
 
 Available: {agents}
 

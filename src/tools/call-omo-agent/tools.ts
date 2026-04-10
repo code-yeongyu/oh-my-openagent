@@ -101,7 +101,7 @@ export function createCallOmoAgent(
       prompt: tool.schema.string().describe("The task for the agent to perform"),
       subagent_type: tool.schema
         .string()
-        .describe("The type of specialized agent to use for this task (explore or librarian only)"),
+        .describe("The type of specialized agent to use for this task"),
       run_in_background: tool.schema
         .boolean()
         .describe("REQUIRED. true: run asynchronously (use background_output to get results), false: run synchronously and wait for completion"),
@@ -111,20 +111,19 @@ export function createCallOmoAgent(
       const toolCtx = toolContext as ToolContextWithMetadata
       log(`[call_omo_agent] Starting with agent: ${args.subagent_type}, background: ${args.run_in_background}`)
 
-      // Case-insensitive agent validation against built-in + custom agents
-      if (
-        !allowedAgents.some(
-          (name) => name.toLowerCase() === args.subagent_type.toLowerCase(),
-        )
-      ) {
+      // Case-insensitive validation — preserve the registered name's original casing
+      const matchedAgent = allowedAgents.find(
+        (name) => name.toLowerCase() === args.subagent_type.toLowerCase(),
+      )
+      if (!matchedAgent) {
         return `Error: Invalid agent type "${args.subagent_type}". Only ${allowedAgents.join(", ")} are allowed.`
       }
 
-      const normalizedAgent = args.subagent_type.toLowerCase() as AllowedAgentType
+      const normalizedAgent = matchedAgent as AllowedAgentType
       args = { ...args, subagent_type: normalizedAgent }
 
       // Check if agent is disabled
-      if (disabledAgents.some((disabled) => disabled.toLowerCase() === normalizedAgent)) {
+      if (disabledAgents.some((disabled) => disabled.toLowerCase() === normalizedAgent.toLowerCase())) {
         return `Error: Agent "${normalizedAgent}" is disabled via disabled_agents configuration. Remove it from disabled_agents in your ${CONFIG_BASENAME}.json to use it.`
       }
 
