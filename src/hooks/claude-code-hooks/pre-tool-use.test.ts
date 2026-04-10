@@ -171,5 +171,50 @@ describe("executePreToolUseHooks", () => {
 
       expect(callCount).toBe(2)
     })
+
+    it("#when hook returns allow with updatedInput #then modifiedInput is included in final result", async () => {
+      dispatchSpy.mockResolvedValue({
+        exitCode: 0,
+        stdout: JSON.stringify({
+          decision: "allow",
+          hookSpecificOutput: {
+            permissionDecision: "allow",
+            updatedInput: { file_path: "/tmp/modified.md" },
+          },
+        }),
+        stderr: "",
+      })
+
+      const config = createConfig([
+        { matcher: "Write", hooks: [{ type: "command", command: "bash modifier.sh" }] },
+      ])
+
+      const result = await executePreToolUseHooks(createContext(), config)
+
+      expect(result.decision).toBe("allow")
+      expect(result.modifiedInput).toEqual({ file_path: "/tmp/modified.md" })
+    })
+
+    it("#when hook returns allow with common fields #then fields are included in final result", async () => {
+      dispatchSpy.mockResolvedValue({
+        exitCode: 0,
+        stdout: JSON.stringify({
+          decision: "allow",
+          suppressOutput: true,
+          systemMessage: "Budget warning: approaching limit",
+        }),
+        stderr: "",
+      })
+
+      const config = createConfig([
+        { matcher: "Write", hooks: [{ type: "command", command: "bash checker.sh" }] },
+      ])
+
+      const result = await executePreToolUseHooks(createContext(), config)
+
+      expect(result.decision).toBe("allow")
+      expect(result.suppressOutput).toBe(true)
+      expect(result.systemMessage).toBe("Budget warning: approaching limit")
+    })
   })
 })
