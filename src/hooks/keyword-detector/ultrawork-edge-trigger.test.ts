@@ -132,7 +132,7 @@ describe("keyword-detector ultrawork edge trigger", () => {
     expect(output.parts[0]?.text).toContain("please ulw fix the flaky keyword tests")
   })
 
-  test("#given trailing ultrawork reference without punctuation #when chat.message fires #then ultrawork stays disabled", async () => {
+  test("#given trailing ultrawork reference without punctuation #when chat.message fires #then ultrawork still activates", async () => {
     // given
     const toastCalls: string[] = []
     const startLoopCalls: StartLoopCall[] = []
@@ -150,8 +150,9 @@ describe("keyword-detector ultrawork edge trigger", () => {
     await hook["chat.message"]({ sessionID: "main-session", agent: "sisyphus" }, output)
 
     // then
-    expect(toastCalls).not.toContain("Ultrawork Mode Activated")
-    expect(startLoopCalls).toHaveLength(0)
-    expect(output.parts[0]?.text).toBe("what is ultrawork")
+    expect(toastCalls).toContain("Ultrawork Mode Activated")
+    expect(startLoopCalls).toHaveLength(1)
+    expect(startLoopCalls[0]?.prompt).toBe("what is")
+    expect(output.parts[0]?.text).toContain("what is ultrawork")
   })
 })

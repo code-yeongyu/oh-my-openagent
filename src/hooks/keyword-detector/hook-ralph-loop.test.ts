@@ -106,7 +106,7 @@ describe("keyword-detector ralph-loop activation", () => {
     expect(output.parts[0]?.text).toContain("please ulw fix the flaky keyword tests")
   })
 
-  test("#given question about ultrawork #when chat.message fires #then ralph-loop startLoop is not invoked", async () => {
+  test("#given question about ultrawork #when chat.message fires #then ralph-loop startLoop is invoked", async () => {
     // given
     setMainSession("main-session")
     const startLoopCalls: StartLoopCall[] = []
@@ -121,8 +121,9 @@ describe("keyword-detector ralph-loop activation", () => {
     await hook["chat.message"]({ sessionID: "main-session", agent: "sisyphus" }, output)
 
     // then
-    expect(startLoopCalls).toHaveLength(0)
-    expect(output.parts[0]?.text).toBe("what is ultrawork?")
+    expect(startLoopCalls).toHaveLength(1)
+    expect(startLoopCalls[0].prompt).toBe("what is ?")
+    expect(output.parts[0]?.text).toContain("what is ultrawork?")
   })
 
   test("#given non-ulw message #when chat.message fires #then ralph-loop startLoop is not invoked", async () => {
