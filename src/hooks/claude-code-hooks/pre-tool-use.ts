@@ -143,9 +143,9 @@ export async function executePreToolUseHooks(
             output.suppressOutput !== undefined || 
             output.systemMessage !== undefined
 
-          if (decision || hasCommonFields) {
+          if (decision === "deny" || decision === "ask") {
             return {
-              decision: decision ?? "allow",
+              decision,
               reason,
               modifiedInput,
               elapsedMs: Date.now() - startTime,
@@ -157,6 +157,11 @@ export async function executePreToolUseHooks(
               suppressOutput: output.suppressOutput,
               systemMessage: output.systemMessage,
             }
+          }
+
+          // "allow" — apply modifiedInput but continue processing remaining hooks
+          if (modifiedInput) {
+            Object.assign(stdinData.tool_input, objectToSnakeCase(modifiedInput))
           }
         } catch {
         }
