@@ -13,34 +13,11 @@ import {
 } from "../../features/claude-code-session-state"
 import type { ContextCollector } from "../../features/context-injector"
 import type { RalphLoopHook } from "../ralph-loop"
-import { parseRalphLoopArguments } from "../ralph-loop/command-arguments"
-
-const ULTRAWORK_LONGHAND_PATTERN = /\bultrawork\b/i
-const ULW_SHORTHAND_PATTERN = /\bulw\b/i
-const GREETING_PREFIX_ULTRAWORK_PATTERN = /^\s*(?:hi|hello|hey|hiya|greetings)(?:\s+there)?(?:[!,.:;-]+\s*|\s+)(ultrawork|ulw)\b/i
-
-function normalizeUltraworkTask(taskText: string): string {
-  return taskText.replace(/\s+/g, " ").trim()
-}
-
-function extractUltraworkTask(cleanText: string): string {
-  const greetingPrefixedMatch = cleanText.match(GREETING_PREFIX_ULTRAWORK_PATTERN)
-
-  if (greetingPrefixedMatch) {
-    return normalizeUltraworkTask(cleanText.slice(greetingPrefixedMatch[0].length))
-  }
-
-  if (ULW_SHORTHAND_PATTERN.test(cleanText)) {
-    return normalizeUltraworkTask(cleanText.replace(ULW_SHORTHAND_PATTERN, " "))
-  }
-
-  return normalizeUltraworkTask(cleanText.replace(ULTRAWORK_LONGHAND_PATTERN, " "))
-}
 
 export function createKeywordDetectorHook(
   ctx: PluginInput,
   _collector?: ContextCollector,
-  ralphLoop?: Pick<RalphLoopHook, "startLoop">
+  _ralphLoop?: Pick<RalphLoopHook, "startLoop">
 ) {
   function getRuntimeVariant(input: { variant?: string }, message: Record<string, unknown>): string | undefined {
     if (typeof message["variant"] === "string") {
@@ -144,16 +121,6 @@ export function createKeywordDetectorHook(
             })
           )
 
-        if (ralphLoop) {
-          const userTask = extractUltraworkTask(cleanText)
-          const parsedArguments = parseRalphLoopArguments(userTask)
-          ralphLoop.startLoop(input.sessionID, parsedArguments.prompt, {
-            ultrawork: true,
-            maxIterations: parsedArguments.maxIterations,
-            completionPromise: parsedArguments.completionPromise,
-            strategy: parsedArguments.strategy,
-          })
-        }
       }
 
       const textPartIndex = output.parts.findIndex((p) => p.type === "text" && p.text !== undefined)
