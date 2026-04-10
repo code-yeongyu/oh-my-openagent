@@ -35,7 +35,6 @@ interface EventInput {
  */
 const ORCHESTRATOR_AGENTS = new Set([
   "sisyphus",
-  "sisyphus-junior",
   "atlas",
   "hephaestus",
   "prometheus",

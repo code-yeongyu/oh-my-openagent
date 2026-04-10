@@ -2,7 +2,6 @@ import type { DelegateTaskArgs } from "./types"
 import type { ExecutorContext } from "./executor-types"
 import type { DelegatedModelConfig } from "./types"
 import { isPlanFamily } from "./constants"
-import { SISYPHUS_JUNIOR_AGENT } from "./sisyphus-junior-agent"
 import { normalizeModelFormat } from "../../shared/model-format-normalizer"
 import { AGENT_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
 import { normalizeFallbackModels, flattenToFallbackModelStrings } from "../../shared/model-resolver"
@@ -64,11 +63,11 @@ export async function resolveSubagentExecution(
   // e.g. \hephaestus\ -> hephaestus, "oracle" -> oracle, 'explore' -> explore
   const agentName = args.subagent_type.trim().replace(/^[\\\/"']+|[\\\/"']+$/g, "").trim()
 
-  if (agentName.toLowerCase() === SISYPHUS_JUNIOR_AGENT.toLowerCase()) {
+  if (agentName.toLowerCase() === "sisyphus-junior") {
     return {
       agentToUse: "",
       categoryModel: undefined,
-      error: `Cannot use subagent_type="${SISYPHUS_JUNIOR_AGENT}". Use category parameter instead (e.g., ${categoryExamples}) — categories now route to openfang agents automatically.`,
+      error: `Cannot use subagent_type="sisyphus-junior". Use category parameter instead (e.g., ${categoryExamples}) — categories route to openfang agents automatically.`,
     }
   }
 

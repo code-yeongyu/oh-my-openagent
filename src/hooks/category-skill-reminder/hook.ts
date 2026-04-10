@@ -11,7 +11,6 @@ import { buildReminderMessage } from "./formatter"
  */
 const TARGET_AGENTS = new Set([
   "sisyphus",
-  "sisyphus-junior",
   "atlas",
 ])
 

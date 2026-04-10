@@ -1,7 +1,6 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin"
 import type { DelegateTaskArgs, DelegatedModelConfig, ToolContextWithMetadata, DelegateTaskToolOptions } from "./types"
 import { CATEGORY_DESCRIPTIONS } from "./constants"
-import { SISYPHUS_JUNIOR_AGENT } from "./sisyphus-junior-agent"
 import { mergeCategories } from "../../shared/merge-categories"
 import { log } from "../../shared/logger"
 import { buildSystemContent } from "./prompt-builder"
@@ -111,18 +110,16 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
       session_id: tool.schema.string().optional().describe("Existing Task session to continue"),
       command: tool.schema.string().optional().describe("The command that triggered this task"),
     },
-    async execute(args: DelegateTaskArgs, toolContext) {
+     async execute(args: DelegateTaskArgs, toolContext) {
        const ctx = toolContext as ToolContextWithMetadata
-       
-       if (args.category) {
-        if (args.subagent_type && args.subagent_type !== SISYPHUS_JUNIOR_AGENT) {
-          log("[task] category provided - overriding subagent_type, routing to openfang", {
-            category: args.category,
-            subagent_type: args.subagent_type,
-          })
-        }
-        args.subagent_type = SISYPHUS_JUNIOR_AGENT
-      }
+
+       if (args.category && args.subagent_type) {
+         log("[task] category provided - ignoring subagent_type", {
+           category: args.category,
+           subagent_type: args.subagent_type,
+         })
+         args.subagent_type = undefined
+       }
       // Auto-generate description from prompt when missing or empty
       if (!args.description || typeof args.description !== "string" || args.description.trim() === "") {
         const words = (args.prompt || "").trim().split(/\s+/)

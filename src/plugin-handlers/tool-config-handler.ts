@@ -112,16 +112,6 @@ export function applyToolConfig(params: {
       ...denyTodoTools,
     };
   }
-  const junior = agentByKey(params.agentResult, "sisyphus-junior");
-  if (junior) {
-    junior.permission = {
-      ...junior.permission,
-      task: "allow",
-      "task_*": "allow",
-      teammate: "allow",
-      ...denyTodoTools,
-    };
-  }
 
   params.config.permission = {
     webfetch: "allow",

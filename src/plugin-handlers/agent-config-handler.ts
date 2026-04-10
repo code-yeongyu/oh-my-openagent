@@ -1,5 +1,4 @@
 import { createBuiltinAgents } from "../agents";
-import { createSisyphusJuniorAgentWithOverrides } from "../agents/sisyphus-junior";
 import type { OhMyOpenCodeConfig } from "../config";
 import { isTaskSystemEnabled, log, migrateAgentConfig } from "../shared";
 import { AGENT_NAME_MAP } from "../shared/migration";
@@ -189,12 +188,6 @@ export async function applyAgentConfig(params: {
     if (builtinAgents.atlas) {
       agentConfig["atlas"] = builtinAgents.atlas;
     }
-
-    agentConfig["sisyphus-junior"] = createSisyphusJuniorAgentWithOverrides(
-      params.pluginConfig.agents?.["sisyphus-junior"],
-      (builtinAgents.atlas as { model?: string } | undefined)?.model,
-      useTaskSystem,
-    );
 
     if (builderEnabled) {
       const { name: _buildName, ...buildConfigWithoutName } =
