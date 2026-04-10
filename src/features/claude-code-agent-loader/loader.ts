@@ -19,7 +19,7 @@ function parseToolsConfig(toolsStr?: string): Record<string, boolean> | undefine
   return result
 }
 
-function loadAgentsFromDir(agentsDir: string, scope: AgentScope): LoadedAgent[] {
+function loadAgentsFromDir(agentsDir: string, scope: AgentScope, anthropicProvider?: string): LoadedAgent[] {
   if (!existsSync(agentsDir)) {
     return []
   }
@@ -42,7 +42,7 @@ function loadAgentsFromDir(agentsDir: string, scope: AgentScope): LoadedAgent[] 
 
        const formattedDescription = `(${scope}) ${originalDescription}`
 
-       const mappedModelOverride = mapClaudeModelToOpenCode(data.model)
+       const mappedModelOverride = mapClaudeModelToOpenCode(data.model, anthropicProvider)
        const modelString = mappedModelOverride
          ? `${mappedModelOverride.providerID}/${mappedModelOverride.modelID}`
          : undefined
@@ -73,9 +73,9 @@ function loadAgentsFromDir(agentsDir: string, scope: AgentScope): LoadedAgent[] 
   return agents
 }
 
-export function loadUserAgents(): Record<string, ClaudeCodeAgentConfig> {
+export function loadUserAgents(anthropicProvider?: string): Record<string, ClaudeCodeAgentConfig> {
   const userAgentsDir = join(getClaudeConfigDir(), "agents")
-  const agents = loadAgentsFromDir(userAgentsDir, "user")
+  const agents = loadAgentsFromDir(userAgentsDir, "user", anthropicProvider)
 
   const result: Record<string, ClaudeCodeAgentConfig> = {}
   for (const agent of agents) {
@@ -84,9 +84,9 @@ export function loadUserAgents(): Record<string, ClaudeCodeAgentConfig> {
   return result
 }
 
-export function loadProjectAgents(directory?: string): Record<string, ClaudeCodeAgentConfig> {
+export function loadProjectAgents(directory?: string, anthropicProvider?: string): Record<string, ClaudeCodeAgentConfig> {
   const projectAgentsDir = join(directory ?? process.cwd(), ".claude", "agents")
-  const agents = loadAgentsFromDir(projectAgentsDir, "project")
+  const agents = loadAgentsFromDir(projectAgentsDir, "project", anthropicProvider)
 
   const result: Record<string, ClaudeCodeAgentConfig> = {}
   for (const agent of agents) {

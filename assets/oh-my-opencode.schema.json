@@ -5257,6 +5257,9 @@
           "additionalProperties": {
             "type": "boolean"
           }
+        },
+        "anthropic_provider": {
+          "type": "string"
         }
       },
       "additionalProperties": false
