@@ -87,7 +87,10 @@ export function createCallOmoAgent(
   const allowedAgents = [...new Set([...BUILTIN_AGENTS, ...customAgentKeys])]
 
   const agentDescriptions = allowedAgents.map(
-    (name) => `- ${name}: Specialized agent for ${name} tasks`
+    (name) => {
+      const customDesc = agentOverrides?.[name as keyof AgentOverrides]?.description
+      return `- ${name}: ${customDesc ?? `Specialized agent for ${name} tasks`}`
+    }
   ).join("\n")
   const description = CALL_OMO_AGENT_DESCRIPTION.replace("{agents}", agentDescriptions)
 
