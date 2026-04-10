@@ -39,6 +39,10 @@ const NON_RETRYABLE_ERROR_NAMES = new Set([
 const RETRYABLE_MESSAGE_PATTERNS = [
   "rate_limit",
   "rate limit",
+  "invalid authentication credentials",
+  "authentication failed",
+  "invalid api key",
+  "unauthorized",
   "quota",
   "all credentials for model",
   "cooling down",
