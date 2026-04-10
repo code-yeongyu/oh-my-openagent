@@ -10,6 +10,7 @@ import { createSystemTransformHandler } from "./plugin/system-transform"
 import { createEventHandler } from "./plugin/event"
 import { createToolExecuteAfterHandler } from "./plugin/tool-execute-after"
 import { createToolExecuteBeforeHandler } from "./plugin/tool-execute-before"
+import { captureHoneybadgerError } from "./shared/honeybadger-client"
 
 import type { CreatedHooks } from "./create-hooks"
 import type { Managers } from "./create-managers"
@@ -29,6 +30,13 @@ export function createPluginInterface(args: {
 }): PluginInterface {
   const { ctx, pluginConfig, firstMessageVariantGate, managers, hooks, tools } =
     args
+  const eventHandler = createEventHandler({
+    ctx,
+    pluginConfig,
+    firstMessageVariantGate,
+    managers,
+    hooks,
+  })
 
   return {
     tool: tools,
@@ -62,13 +70,19 @@ export function createPluginInterface(args: {
 
     config: managers.configHandler,
 
-    event: createEventHandler({
-      ctx,
-      pluginConfig,
-      firstMessageVariantGate,
-      managers,
-      hooks,
-    }),
+    event: async (input) => {
+      try {
+        await eventHandler(input)
+      } catch (error) {
+        await captureHoneybadgerError(error, {
+          action: "plugin.event",
+          context: {
+            directory: ctx.directory,
+          },
+        })
+        throw error
+      }
+    },
 
     "tool.execute.before": createToolExecuteBeforeHandler({
       ctx,

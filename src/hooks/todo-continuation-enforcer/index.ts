@@ -9,6 +9,15 @@ import type { TodoContinuationEnforcer, TodoContinuationEnforcerOptions } from "
 
 export type { TodoContinuationEnforcer, TodoContinuationEnforcerOptions } from "./types"
 
+const activeSessionStateStores = new Set<ReturnType<typeof createSessionStateStore>>()
+
+export function _resetTodoContinuationEnforcersForTesting(): void {
+  for (const sessionStateStore of activeSessionStateStores) {
+    sessionStateStore.shutdown()
+  }
+  activeSessionStateStores.clear()
+}
+
 export function createTodoContinuationEnforcer(
   ctx: PluginInput,
   options: TodoContinuationEnforcerOptions = {}
@@ -20,6 +29,7 @@ export function createTodoContinuationEnforcer(
   } = options
 
   const sessionStateStore = createSessionStateStore()
+  activeSessionStateStores.add(sessionStateStore)
 
   const markRecovering = (sessionID: string): void => {
     const state = sessionStateStore.getState(sessionID)
@@ -54,6 +64,9 @@ export function createTodoContinuationEnforcer(
     markRecovering,
     markRecoveryComplete,
     cancelAllCountdowns,
-    dispose: () => sessionStateStore.shutdown(),
+    dispose: () => {
+      sessionStateStore.shutdown()
+      activeSessionStateStores.delete(sessionStateStore)
+    },
   }
 }

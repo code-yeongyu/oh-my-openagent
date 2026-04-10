@@ -7,6 +7,7 @@ import * as spawnWithWindowsHideModule from "../../shared/spawn-with-windows-hid
 import type { OpencodeClient } from "./types"
 import * as originalSdk from "@opencode-ai/sdk"
 import * as originalPortUtils from "../../shared/port-utils"
+import * as originalBinaryResolver from "./opencode-binary-resolver"
 
 const mockServerClose = mock(() => {})
 const mockCreateOpencode = mock(() =>
@@ -18,6 +19,7 @@ const mockCreateOpencode = mock(() =>
 const mockCreateOpencodeClient = mock(() => ({ session: {} }))
 const mockIsPortAvailable = mock(() => Promise.resolve(true))
 const mockGetAvailableServerPort = mock(() => Promise.resolve({ port: 9999, wasAutoSelected: false }))
+const mockWithWorkingOpencodePath = mock((startServer: () => Promise<unknown>) => startServer())
 
 mock.module("@opencode-ai/sdk", () => ({
   createOpencode: mockCreateOpencode,
@@ -30,9 +32,14 @@ mock.module("../../shared/port-utils", () => ({
   DEFAULT_SERVER_PORT: 4096,
 }))
 
+mock.module("./opencode-binary-resolver", () => ({
+  withWorkingOpencodePath: mockWithWorkingOpencodePath,
+}))
+
 afterAll(() => {
   mock.module("@opencode-ai/sdk", () => originalSdk)
   mock.module("../../shared/port-utils", () => originalPortUtils)
+  mock.module("./opencode-binary-resolver", () => originalBinaryResolver)
   mock.restore()
 })
 
@@ -311,6 +318,7 @@ describe("integration: server connection", () => {
     mockCreateOpencode.mockClear()
     mockCreateOpencodeClient.mockClear()
     mockServerClose.mockClear()
+    mockWithWorkingOpencodePath.mockClear()
   })
 
   afterEach(() => {
@@ -345,6 +353,7 @@ describe("integration: server connection", () => {
     expect(result.client).toBeDefined()
     expect(result.cleanup).toBeDefined()
     expect(mockCreateOpencode).toHaveBeenCalled()
+    expect(mockWithWorkingOpencodePath).toHaveBeenCalledTimes(1)
     result.cleanup()
     expect(mockServerClose).toHaveBeenCalled()
   })

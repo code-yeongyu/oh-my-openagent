@@ -28,12 +28,12 @@ describe("project-discovery-dirs", () => {
     // given
     const projectDir = join(TEST_DIR, "project")
     const childDir = join(projectDir, "apps", "cli")
-    mkdirSync(join(projectDir, ".opencode", "skill"), { recursive: true })
-    mkdirSync(join(projectDir, ".opencode", "skills"), { recursive: true })
-    mkdirSync(join(TEST_DIR, ".opencode", "skills"), { recursive: true })
+		mkdirSync(join(projectDir, ".opencode", "skill"), { recursive: true })
+		mkdirSync(join(projectDir, ".opencode", "skills"), { recursive: true })
+		mkdirSync(join(TEST_DIR, ".opencode", "skills"), { recursive: true })
 
-    // when
-    const directories = findProjectOpencodeSkillDirs(childDir)
+		// when
+		const directories = findProjectOpencodeSkillDirs(childDir, TEST_DIR)
 
     // then
     expect(directories).toEqual([
@@ -47,11 +47,11 @@ describe("project-discovery-dirs", () => {
     // given
     const projectDir = join(TEST_DIR, "project")
     const childDir = join(projectDir, "packages", "tool")
-    mkdirSync(join(projectDir, ".opencode", "commands"), { recursive: true })
-    mkdirSync(join(TEST_DIR, ".opencode", "command"), { recursive: true })
+		mkdirSync(join(projectDir, ".opencode", "commands"), { recursive: true })
+		mkdirSync(join(TEST_DIR, ".opencode", "command"), { recursive: true })
 
-    // when
-    const directories = findProjectOpencodeCommandDirs(childDir)
+		// when
+		const directories = findProjectOpencodeCommandDirs(childDir, TEST_DIR)
 
     // then
     expect(directories).toEqual([

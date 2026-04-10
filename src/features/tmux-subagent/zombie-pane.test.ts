@@ -1,8 +1,11 @@
-import { beforeEach, describe, expect, mock, test, afterAll } from "bun:test"
+import { beforeEach, describe, expect, mock, test, afterAll, spyOn } from "bun:test"
 import type { TmuxConfig } from "../../config/schema"
 import type { ActionResult, ExecuteContext, ExecuteActionsResult } from "./action-executor"
 import type { TmuxUtilDeps } from "./manager"
 import type { TrackedSession, WindowState } from "./types"
+import * as actionExecutorModule from "./action-executor"
+import * as paneStateQuerierModule from "./pane-state-querier"
+import * as sharedTmuxModule from "../../shared/tmux"
 
 const mockQueryWindowState = mock<(paneId: string) => Promise<WindowState | null>>(async () => ({
   windowWidth: 220,
@@ -27,36 +30,6 @@ const mockExecuteActions = mock<(
 
 const mockIsInsideTmux = mock<() => boolean>(() => true)
 const mockGetCurrentPaneId = mock<() => string | undefined>(() => "%0")
-
-mock.module("./pane-state-querier", () => ({
-  queryWindowState: mockQueryWindowState,
-}))
-
-mock.module("./action-executor", () => ({
-  executeAction: mockExecuteAction,
-  executeActions: mockExecuteActions,
-}))
-
-mock.module("../../shared/tmux", () => ({
-  isInsideTmux: mockIsInsideTmux,
-  getCurrentPaneId: mockGetCurrentPaneId,
-  isServerRunning: mock(async () => true),
-  resetServerCheck: mock(() => {}),
-  markServerRunningInProcess: mock(() => {}),
-  getPaneDimensions: mock(async () => ({ width: 220, height: 44 })),
-  spawnTmuxPane: mock(async () => ({ success: true, paneId: "%1" })),
-  closeTmuxPane: mock(async () => ({ success: true })),
-  replaceTmuxPane: mock(async () => ({ success: true, paneId: "%1" })),
-  spawnTmuxWindow: mock(async () => ({ success: true, windowId: "@1" })),
-  spawnTmuxSession: mock(async () => ({ success: true, sessionId: "mock" })),
-  applyLayout: mock(async () => ({ success: true })),
-  enforceMainPaneWidth: mock(async () => ({ success: true })),
-  POLL_INTERVAL_BACKGROUND_MS: 10,
-  SESSION_READY_POLL_INTERVAL_MS: 10,
-  SESSION_READY_TIMEOUT_MS: 50,
-  SESSION_MISSING_GRACE_MS: 1_000,
-  SESSION_TIMEOUT_MS: 600_000,
-}))
 
 afterAll(() => { mock.restore() })
 
@@ -185,6 +158,23 @@ describe("TmuxSessionManager zombie pane handling", () => {
     }))
     mockIsInsideTmux.mockReturnValue(true)
     mockGetCurrentPaneId.mockReturnValue("%0")
+
+    spyOn(paneStateQuerierModule, "queryWindowState").mockImplementation(mockQueryWindowState)
+    spyOn(actionExecutorModule, "executeAction").mockImplementation(mockExecuteAction)
+    spyOn(actionExecutorModule, "executeActions").mockImplementation(mockExecuteActions)
+    spyOn(sharedTmuxModule, "isInsideTmux").mockImplementation(mockIsInsideTmux)
+    spyOn(sharedTmuxModule, "getCurrentPaneId").mockImplementation(mockGetCurrentPaneId)
+    spyOn(sharedTmuxModule, "isServerRunning").mockImplementation(mock(async () => true))
+    spyOn(sharedTmuxModule, "resetServerCheck").mockImplementation(mock(() => {}))
+    spyOn(sharedTmuxModule, "markServerRunningInProcess").mockImplementation(mock(() => {}))
+    spyOn(sharedTmuxModule, "getPaneDimensions").mockImplementation(mock(async () => ({ width: 220, height: 44 })))
+    spyOn(sharedTmuxModule, "spawnTmuxPane").mockImplementation(mock(async () => ({ success: true, paneId: "%1" })) as never)
+    spyOn(sharedTmuxModule, "closeTmuxPane").mockImplementation(mock(async () => ({ success: true })) as never)
+    spyOn(sharedTmuxModule, "replaceTmuxPane").mockImplementation(mock(async () => ({ success: true, paneId: "%1" })) as never)
+    spyOn(sharedTmuxModule, "spawnTmuxWindow").mockImplementation(mock(async () => ({ success: true, windowId: "@1" })) as never)
+    spyOn(sharedTmuxModule, "spawnTmuxSession").mockImplementation(mock(async () => ({ success: true, sessionId: "mock" })) as never)
+    spyOn(sharedTmuxModule, "applyLayout").mockImplementation(mock(async () => ({ success: true })) as never)
+    spyOn(sharedTmuxModule, "enforceMainPaneWidth").mockImplementation(mock(async () => ({ success: true })) as never)
   })
 
   test("#given session in sessions Map #when onSessionDeleted called with null window state #then session stays in Map with closePending true", async () => {

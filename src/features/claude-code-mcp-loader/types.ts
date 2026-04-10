@@ -12,6 +12,7 @@ export interface ClaudeCodeMcpServer {
   args?: string[]
   env?: Record<string, string>
   headers?: Record<string, string>
+  includeTools?: string[]
   oauth?: McpOAuthConfig
   scope?: McpScope
   projectPath?: string

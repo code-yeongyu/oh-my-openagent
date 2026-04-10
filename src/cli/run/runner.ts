@@ -12,6 +12,7 @@ import { pollForCompletion } from "./poll-for-completion"
 import { loadAgentProfileColors } from "./agent-profile-colors"
 import { suppressRunInput } from "./stdin-suppression"
 import { createTimestampedStdoutController } from "./timestamp-output"
+import { captureHoneybadgerError, initHoneybadger } from "../../shared/honeybadger-client"
 
 export { resolveRunAgent }
 
@@ -32,6 +33,11 @@ export async function waitForEventProcessorShutdown(
 export async function run(options: RunOptions): Promise<number> {
   process.env.OPENCODE_CLI_RUN_MODE = "true"
   process.env.OPENCODE_CLIENT = "run"
+  initHoneybadger({
+    component: "omo-runtime",
+    surface: "omo-cli-run",
+    runtime: "bun",
+  })
 
   const startTime = Date.now()
   const {
@@ -155,6 +161,15 @@ export async function run(options: RunOptions): Promise<number> {
     if (err instanceof Error && err.name === "AbortError") {
       return 130
     }
+    await captureHoneybadgerError(err, {
+      action: "cli.run",
+      awaitDelivery: true,
+      context: {
+        command: "run",
+        directory,
+        agent: resolvedAgent,
+      },
+    })
     console.error(pc.red(`Error: ${serializeError(err)}`))
     return 1
   } finally {

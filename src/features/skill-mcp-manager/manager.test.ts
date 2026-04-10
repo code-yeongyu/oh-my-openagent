@@ -6,6 +6,7 @@ import type { OAuthTokenData } from "../mcp-oauth/storage"
 // Mock the MCP SDK transports to avoid network calls
 const mockHttpConnect = mock(() => Promise.reject(new Error("Mocked HTTP connection failure")))
 const mockHttpClose = mock(() => Promise.resolve())
+const mockClientClose = mock(() => Promise.resolve())
 let lastTransportInstance: { url?: URL; options?: { requestInit?: RequestInit } } = {}
 
 const mockTokens = mock(() => null as OAuthTokenData | null)
@@ -13,6 +14,28 @@ const mockLogin = mock(() => Promise.resolve({ accessToken: "test-token" } satis
 const mockRefresh = mock((_: string) => Promise.resolve({ accessToken: "refreshed-token" } satisfies OAuthTokenData))
 
 async function importFreshManagerModule(): Promise<typeof import("./manager")> {
+  mock.module("@modelcontextprotocol/sdk/client/index.js", () => ({
+    Client: class MockClient {
+      constructor(
+        _clientInfo: { name: string; version: string },
+        _options: { capabilities: Record<string, never> },
+      ) {}
+
+      async connect(transport: { start?: () => Promise<void> }) {
+        if (typeof transport.start === "function") {
+          await transport.start()
+          return
+        }
+
+        throw new Error("Mocked stdio connection failure")
+      }
+
+      async close() {
+        await mockClientClose()
+      }
+    },
+  }))
+
   mock.module("@modelcontextprotocol/sdk/client/streamableHttp.js", () => ({
     StreamableHTTPClientTransport: class MockStreamableHTTPClientTransport {
       constructor(public url: URL, public options?: { requestInit?: RequestInit }) {
@@ -20,6 +43,7 @@ async function importFreshManagerModule(): Promise<typeof import("./manager")> {
       }
       async start() {
         await mockHttpConnect()
+        throw new Error("Mocked HTTP connection failure")
       }
       async close() {
         await mockHttpClose()
@@ -27,8 +51,33 @@ async function importFreshManagerModule(): Promise<typeof import("./manager")> {
     },
   }))
 
+  mock.module("@modelcontextprotocol/sdk/client/stdio.js", () => ({
+    StdioClientTransport: class MockStdioClientTransport {
+      readonly close = mock(async () => {})
+
+      constructor(
+        public options: { command: string; args?: string[]; env?: Record<string, string>; stderr?: string },
+      ) {}
+    },
+  }))
+
+  const freshConnection = await import(`./connection?manager-connection=${Date.now()}-${Math.random()}`)
+  mock.module("./connection", () => ({
+    getOrCreateClient: freshConnection.getOrCreateClient,
+    getOrCreateClientWithRetryImpl: freshConnection.getOrCreateClientWithRetryImpl,
+  }))
+
   const module = await import(`./manager?test=${Date.now()}-${Math.random()}`)
   mock.restore()
+
+  const realClientModule = await import("@modelcontextprotocol/sdk/client/index.js")
+  const realHttpTransportModule = await import("@modelcontextprotocol/sdk/client/streamableHttp.js")
+  const realStdioTransportModule = await import("@modelcontextprotocol/sdk/client/stdio.js")
+  const realConnectionModule = await import("./connection")
+  mock.module("@modelcontextprotocol/sdk/client/index.js", () => realClientModule)
+  mock.module("@modelcontextprotocol/sdk/client/streamableHttp.js", () => realHttpTransportModule)
+  mock.module("@modelcontextprotocol/sdk/client/stdio.js", () => realStdioTransportModule)
+  mock.module("./connection", () => realConnectionModule)
   return module
 }
 
@@ -48,9 +97,11 @@ describe("SkillMcpManager", () => {
     })
     mockHttpConnect.mockClear()
     mockHttpClose.mockClear()
+    mockClientClose.mockClear()
     mockTokens.mockClear()
     mockLogin.mockClear()
     mockRefresh.mockClear()
+    lastTransportInstance = {}
   })
 
   afterEach(async () => {

@@ -13,6 +13,7 @@ import { createPluginDispose, type PluginDispose } from "./plugin-dispose"
 import { loadPluginConfig } from "./plugin-config"
 import { createModelCacheState } from "./plugin-state"
 import { createFirstMessageVariantGate } from "./shared/first-message-variant"
+import { captureHoneybadgerError, initHoneybadger } from "./shared/honeybadger-client"
 import { injectServerAuthIntoClient, log, logLegacyPluginStartupWarning } from "./shared"
 import { detectExternalSkillPlugin, getSkillPluginConflictWarning } from "./shared/external-plugin-detector"
 import { lspManager } from "./tools/lsp/client"
@@ -21,97 +22,113 @@ import { startTmuxCheck } from "./tools"
 let activePluginDispose: PluginDispose | null = null
 
 const OhMyOpenCodePlugin: Plugin = async (ctx) => {
+  initHoneybadger({
+    component: "omo-runtime",
+    surface: "omo-plugin",
+    runtime: "bun",
+  })
   initConfigContext("opencode", null)
   log("[OhMyOpenCodePlugin] ENTRY - plugin loading", {
     directory: ctx.directory,
   })
-  logLegacyPluginStartupWarning()
+  try {
+    logLegacyPluginStartupWarning()
 
-  const skillPluginCheck = detectExternalSkillPlugin(ctx.directory)
-  if (skillPluginCheck.detected && skillPluginCheck.pluginName) {
-    console.warn(getSkillPluginConflictWarning(skillPluginCheck.pluginName))
-  }
+    const skillPluginCheck = detectExternalSkillPlugin(ctx.directory)
+    if (skillPluginCheck.detected && skillPluginCheck.pluginName) {
+      console.warn(getSkillPluginConflictWarning(skillPluginCheck.pluginName))
+    }
 
-  injectServerAuthIntoClient(ctx.client)
-  await activePluginDispose?.()
+    injectServerAuthIntoClient(ctx.client)
+    await activePluginDispose?.()
 
-  const pluginConfig = loadPluginConfig(ctx.directory, ctx)
-  const tmuxIntegrationEnabled = isTmuxIntegrationEnabled(pluginConfig)
-  if (tmuxIntegrationEnabled) {
-    startTmuxCheck()
-  }
-  const disabledHooks = new Set(pluginConfig.disabled_hooks ?? [])
+    const pluginConfig = loadPluginConfig(ctx.directory, ctx)
+    const tmuxIntegrationEnabled = isTmuxIntegrationEnabled(pluginConfig)
+    if (tmuxIntegrationEnabled) {
+      startTmuxCheck()
+    }
+    const disabledHooks = new Set(pluginConfig.disabled_hooks ?? [])
 
-  const isHookEnabled = (hookName: HookName): boolean => !disabledHooks.has(hookName)
-  const safeHookEnabled = pluginConfig.experimental?.safe_hook_creation ?? true
+    const isHookEnabled = (hookName: HookName): boolean => !disabledHooks.has(hookName)
+    const safeHookEnabled = pluginConfig.experimental?.safe_hook_creation ?? true
 
-  const firstMessageVariantGate = createFirstMessageVariantGate()
+    const firstMessageVariantGate = createFirstMessageVariantGate()
 
-  const tmuxConfig = createRuntimeTmuxConfig(pluginConfig)
+    const tmuxConfig = createRuntimeTmuxConfig(pluginConfig)
 
-  const modelCacheState = createModelCacheState()
+    const modelCacheState = createModelCacheState()
 
-  const managers = createManagers({
-    ctx,
-    pluginConfig,
-    tmuxConfig,
-    modelCacheState,
-    backgroundNotificationHookEnabled: isHookEnabled("background-notification"),
-  })
+    const managers = createManagers({
+      ctx,
+      pluginConfig,
+      tmuxConfig,
+      modelCacheState,
+      backgroundNotificationHookEnabled: isHookEnabled("background-notification"),
+    })
 
-  const toolsResult = await createTools({
-    ctx,
-    pluginConfig,
-    managers,
-  })
+    const toolsResult = await createTools({
+      ctx,
+      pluginConfig,
+      managers,
+    })
 
-  const hooks = createHooks({
-    ctx,
-    pluginConfig,
-    modelCacheState,
-    backgroundManager: managers.backgroundManager,
-    isHookEnabled,
-    safeHookEnabled,
-    mergedSkills: toolsResult.mergedSkills,
-    availableSkills: toolsResult.availableSkills,
-  })
+    const hooks = createHooks({
+      ctx,
+      pluginConfig,
+      modelCacheState,
+      backgroundManager: managers.backgroundManager,
+      isHookEnabled,
+      safeHookEnabled,
+      mergedSkills: toolsResult.mergedSkills,
+      availableSkills: toolsResult.availableSkills,
+    })
 
-  const dispose = createPluginDispose({
-    backgroundManager: managers.backgroundManager,
-    skillMcpManager: managers.skillMcpManager,
-    lspManager,
-    disposeHooks: hooks.disposeHooks,
-  })
+    const dispose = createPluginDispose({
+      backgroundManager: managers.backgroundManager,
+      skillMcpManager: managers.skillMcpManager,
+      lspManager,
+      disposeHooks: hooks.disposeHooks,
+    })
 
-  const pluginInterface = createPluginInterface({
-    ctx,
-    pluginConfig,
-    firstMessageVariantGate,
-    managers,
-    hooks,
-    tools: toolsResult.filteredTools,
-  })
+    const pluginInterface = createPluginInterface({
+      ctx,
+      pluginConfig,
+      firstMessageVariantGate,
+      managers,
+      hooks,
+      tools: toolsResult.filteredTools,
+    })
 
-  activePluginDispose = dispose
+    activePluginDispose = dispose
 
-  return {
-    name: "oh-my-openagent",
-    ...pluginInterface,
+    return {
+      name: "oh-my-openagent",
+      ...pluginInterface,
 
-    "experimental.session.compacting": async (
-      _input: { sessionID: string },
-      output: { context: string[] },
-    ): Promise<void> => {
-      await hooks.compactionContextInjector?.capture(_input.sessionID)
-      await hooks.compactionTodoPreserver?.capture(_input.sessionID)
-      await hooks.claudeCodeHooks?.["experimental.session.compacting"]?.(
-        _input,
-        output,
-      )
-      if (hooks.compactionContextInjector) {
-        output.context.push(hooks.compactionContextInjector.inject(_input.sessionID))
-      }
-    },
+      "experimental.session.compacting": async (
+        _input: { sessionID: string },
+        output: { context: string[] },
+      ): Promise<void> => {
+        await hooks.compactionContextInjector?.capture(_input.sessionID)
+        await hooks.compactionTodoPreserver?.capture(_input.sessionID)
+        await hooks.claudeCodeHooks?.["experimental.session.compacting"]?.(
+          _input,
+          output,
+        )
+        if (hooks.compactionContextInjector) {
+          output.context.push(hooks.compactionContextInjector.inject(_input.sessionID))
+        }
+      },
+    }
+  } catch (error) {
+    await captureHoneybadgerError(error, {
+      action: "plugin.startup",
+      awaitDelivery: true,
+      context: {
+        directory: ctx.directory,
+      },
+    })
+    throw error
   }
 }
 

@@ -198,12 +198,16 @@ export function createToolRegistry(args: {
     ? { edit: createHashlineEditTool(ctx) }
     : {}
 
+  const sessionTools = createSessionManagerTools(ctx)
+
   const allTools: Record<string, ToolDefinition> = {
     ...builtinTools,
     ...createGrepTools(ctx),
     ...createGlobTools(ctx),
     ...createAstGrepTools(ctx),
-    ...createSessionManagerTools(ctx),
+    find_sessions: sessionTools.session_list,
+    read_session: sessionTools.session_read,
+    ...sessionTools,
     ...backgroundTools,
     call_omo_agent: callOmoAgent,
     ...(lookAt ? { look_at: lookAt } : {}),

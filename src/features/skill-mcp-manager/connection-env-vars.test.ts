@@ -47,24 +47,35 @@ class MockStreamableHTTPClientTransport {
   async start() {}
 }
 
-mock.module("@modelcontextprotocol/sdk/client/index.js", () => ({
-  Client: MockClient,
-}))
+const { disconnectAll } = await import("./cleanup")
 
-mock.module("@modelcontextprotocol/sdk/client/stdio.js", () => ({
-  StdioClientTransport: MockStdioClientTransport,
-}))
+async function importFreshConnectionModule() {
+  mock.module("@modelcontextprotocol/sdk/client/index.js", () => ({
+    Client: MockClient,
+  }))
 
-mock.module("@modelcontextprotocol/sdk/client/streamableHttp.js", () => ({
-  StreamableHTTPClientTransport: MockStreamableHTTPClientTransport,
-}))
+  mock.module("@modelcontextprotocol/sdk/client/stdio.js", () => ({
+    StdioClientTransport: MockStdioClientTransport,
+  }))
+
+  mock.module("@modelcontextprotocol/sdk/client/streamableHttp.js", () => ({
+    StreamableHTTPClientTransport: MockStreamableHTTPClientTransport,
+  }))
+
+  const module = await import(`./connection?env-vars-test=${Date.now()}-${Math.random()}`)
+  mock.restore()
+  const realClientModule = await import("@modelcontextprotocol/sdk/client/index.js")
+  const realStdioTransportModule = await import("@modelcontextprotocol/sdk/client/stdio.js")
+  const realHttpTransportModule = await import("@modelcontextprotocol/sdk/client/streamableHttp.js")
+  mock.module("@modelcontextprotocol/sdk/client/index.js", () => realClientModule)
+  mock.module("@modelcontextprotocol/sdk/client/stdio.js", () => realStdioTransportModule)
+  mock.module("@modelcontextprotocol/sdk/client/streamableHttp.js", () => realHttpTransportModule)
+  return module
+}
 
 afterAll(() => {
   mock.restore()
 })
-
-const { disconnectAll } = await import("./cleanup")
-const { getOrCreateClient } = await import("./connection")
 
 function createState(): SkillMcpManagerState {
   const state: SkillMcpManagerState = {
@@ -155,6 +166,7 @@ describe("getOrCreateClient env var expansion", () => {
         }
 
         // when
+        const { getOrCreateClient } = await importFreshConnectionModule()
         await getOrCreateClient({ state, clientKey, info, config })
 
         // then
@@ -181,6 +193,7 @@ describe("getOrCreateClient env var expansion", () => {
       }
 
       // when
+      const { getOrCreateClient } = await importFreshConnectionModule()
       await getOrCreateClient({ state, clientKey, info, config })
 
       // then
@@ -210,6 +223,7 @@ describe("getOrCreateClient env var expansion", () => {
       }
 
       // when
+      const { getOrCreateClient } = await importFreshConnectionModule()
       await getOrCreateClient({ state, clientKey, info, config })
 
       // then
@@ -240,6 +254,7 @@ describe("getOrCreateClient env var expansion", () => {
       }
 
       // when
+      const { getOrCreateClient } = await importFreshConnectionModule()
       await getOrCreateClient({ state, clientKey, info, config })
 
       // then
@@ -263,6 +278,7 @@ describe("getOrCreateClient env var expansion", () => {
       }
 
       // when
+      const { getOrCreateClient } = await importFreshConnectionModule()
       await getOrCreateClient({ state, clientKey, info, config })
 
       // then

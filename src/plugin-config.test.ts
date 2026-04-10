@@ -5,11 +5,41 @@ import { join } from "node:path"
 import * as shared from "./shared"
 import { loadPluginConfig, mergeConfigs, parseConfigPartially } from "./plugin-config";
 import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig } from "./config";
+import { CONFIG_BASENAME, LEGACY_CONFIG_BASENAME } from "./shared/plugin-identity";
 
 const tempDirs: string[] = []
 
 function createConfig(config: Partial<OhMyOpenCodeConfig>): OhMyOpenCodeConfig {
   return OhMyOpenCodeConfigSchema.parse(config)
+}
+
+function createLoadPluginConfigFixture(prefix: string) {
+  const rootDir = mkdtempSync(join(tmpdir(), prefix))
+  const userConfigDir = join(rootDir, "user-config")
+  const projectDir = join(rootDir, "project")
+  const projectConfigDir = join(projectDir, ".opencode")
+
+  tempDirs.push(rootDir)
+  mkdirSync(userConfigDir, { recursive: true })
+  mkdirSync(projectConfigDir, { recursive: true })
+  spyOn(shared, "getOpenCodeConfigDir").mockReturnValue(userConfigDir)
+
+  return {
+    userConfigDir,
+    projectDir,
+    projectConfigDir,
+  }
+}
+
+function writePluginConfig(
+  dir: string,
+  basename: string,
+  config: Record<string, unknown>,
+  extension: "json" | "jsonc" = "jsonc"
+) {
+  const configPath = join(dir, `${basename}.${extension}`)
+  writeFileSync(configPath, JSON.stringify(config))
+  return configPath
 }
 
 afterEach(() => {
@@ -297,32 +327,83 @@ describe("parseConfigPartially", () => {
 });
 
 describe("loadPluginConfig", () => {
-  it("should only honor mcp_env_allowlist from user config", () => {
+  it("should load project config from canonical .opencode/oh-my-openagent.jsonc", () => {
     // given
-    const rootDir = mkdtempSync(join(tmpdir(), "omo-plugin-config-"))
-    const userConfigDir = join(rootDir, "user-config")
-    const projectDir = join(rootDir, "project")
-    const projectConfigDir = join(projectDir, ".opencode")
-
-    tempDirs.push(rootDir)
-    mkdirSync(userConfigDir, { recursive: true })
-    mkdirSync(projectConfigDir, { recursive: true })
-
-    writeFileSync(
-      join(userConfigDir, "oh-my-openagent.jsonc"),
-      JSON.stringify({ mcp_env_allowlist: ["USER_ONLY_TOKEN"] })
-    )
-    writeFileSync(
-      join(projectConfigDir, "oh-my-openagent.jsonc"),
-      JSON.stringify({ mcp_env_allowlist: ["PROJECT_TOKEN"] })
-    )
-
-    spyOn(shared, "getOpenCodeConfigDir").mockReturnValue(userConfigDir)
+    const { projectConfigDir, projectDir } = createLoadPluginConfigFixture("omo-plugin-config-canonical-")
+    writePluginConfig(projectConfigDir, CONFIG_BASENAME, {
+      agents: {
+        oracle: { model: "openai/gpt-5.4" },
+      },
+    })
 
     // when
     const config = loadPluginConfig(projectDir, {})
 
     // then
+    expect(config.agents?.oracle?.model).toBe("openai/gpt-5.4")
+  })
+
+  it("should load project config from legacy .opencode/oh-my-opencode.jsonc", () => {
+    // given
+    const { projectConfigDir, projectDir } = createLoadPluginConfigFixture("omo-plugin-config-legacy-load-")
+    const legacyConfigPath = writePluginConfig(projectConfigDir, LEGACY_CONFIG_BASENAME, {
+      agents: {
+        oracle: { model: "openai/gpt-5.4" },
+      },
+    })
+    const canonicalConfigPath = join(projectConfigDir, `${CONFIG_BASENAME}.jsonc`)
+
+    // when
+    const config = loadPluginConfig(projectDir, {})
+
+    // then
+    expect(config.agents?.oracle?.model).toBe("openai/gpt-5.4")
+    expect(existsSync(legacyConfigPath)).toBe(false)
+    expect(existsSync(canonicalConfigPath)).toBe(true)
+  })
+
+  it("should prefer canonical project config when canonical and legacy files both exist", () => {
+    // given
+    const { projectConfigDir, projectDir } = createLoadPluginConfigFixture("omo-plugin-config-precedence-")
+    const legacyConfigPath = writePluginConfig(projectConfigDir, LEGACY_CONFIG_BASENAME, {
+      agents: {
+        oracle: { model: "openai/gpt-5-nano" },
+      },
+    })
+    const canonicalConfigPath = writePluginConfig(projectConfigDir, CONFIG_BASENAME, {
+      agents: {
+        oracle: { model: "openai/gpt-5.4" },
+      },
+    })
+
+    // when
+    const config = loadPluginConfig(projectDir, {})
+
+    // then
+    expect(config.agents?.oracle?.model).toBe("openai/gpt-5.4")
+    expect(existsSync(canonicalConfigPath)).toBe(true)
+    expect(existsSync(legacyConfigPath)).toBe(true)
+  })
+
+  it("should keep mcp_env_allowlist user-sourced even when project config is canonical", () => {
+    // given
+    const { userConfigDir, projectConfigDir, projectDir } = createLoadPluginConfigFixture("omo-plugin-config-")
+
+    writePluginConfig(userConfigDir, CONFIG_BASENAME, {
+      mcp_env_allowlist: ["USER_ONLY_TOKEN"],
+    })
+    writePluginConfig(projectConfigDir, CONFIG_BASENAME, {
+      agents: {
+        oracle: { model: "openai/gpt-5.4" },
+      },
+      mcp_env_allowlist: ["PROJECT_TOKEN"],
+    })
+
+    // when
+    const config = loadPluginConfig(projectDir, {})
+
+    // then
+    expect(config.agents?.oracle?.model).toBe("openai/gpt-5.4")
     expect(config.mcp_env_allowlist).toEqual(["USER_ONLY_TOKEN"])
   })
 

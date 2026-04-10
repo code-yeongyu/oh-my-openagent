@@ -7,27 +7,16 @@ import { join } from "node:path"
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { Project } from "@opencode-ai/sdk"
 import { readBoulderState, writeBoulderState } from "../../features/boulder-state"
+import * as gitWorktreeModule from "../../shared/git-worktree"
+import * as sessionUtilsModule from "../../shared/session-utils"
+import type { GitFileStat } from "../../shared/git-worktree"
 import { createToolExecuteBeforeHandler } from "./tool-execute-before"
 
 const isCallerOrchestratorMock = mock(async () => true)
-const collectGitDiffStatsMock = mock(() => ({
-  filesChanged: 0,
-  insertions: 0,
-  deletions: 0,
-}))
-
-mock.module("../../shared/session-utils", () => ({
-  isCallerOrchestrator: isCallerOrchestratorMock,
-}))
-
-mock.module("../../shared/git-worktree", () => ({
-  collectGitDiffStats: collectGitDiffStatsMock,
-  formatFileChanges: mock(() => "No file changes"),
-}))
-
-afterAll(() => { mock.restore() })
+const collectGitDiffStatsMock = mock((): GitFileStat[] => [])
 
 const { createToolExecuteAfterHandler } = await import("./tool-execute-after")
+afterAll(() => {})
 
 type SessionGetInput = { path: { id: string } }
 type SessionGetResult = {
@@ -39,6 +28,9 @@ type SessionGetResult = {
 
 describe("createToolExecuteAfterHandler background launch detection", () => {
   let testDirectory = ""
+  let isCallerOrchestratorSpy: ReturnType<typeof spyOn>
+  let collectGitDiffStatsSpy: ReturnType<typeof spyOn>
+  let formatFileChangesSpy: ReturnType<typeof spyOn>
 
   beforeEach(() => {
     testDirectory = join(tmpdir(), `atlas-background-launch-${crypto.randomUUID()}`)
@@ -49,9 +41,17 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
 
     isCallerOrchestratorMock.mockClear()
     collectGitDiffStatsMock.mockClear()
+
+    isCallerOrchestratorSpy = spyOn(sessionUtilsModule, "isCallerOrchestrator").mockImplementation(isCallerOrchestratorMock)
+    collectGitDiffStatsSpy = spyOn(gitWorktreeModule, "collectGitDiffStats").mockImplementation(collectGitDiffStatsMock)
+    formatFileChangesSpy = spyOn(gitWorktreeModule, "formatFileChanges").mockImplementation(() => "No file changes")
   })
 
   afterEach(() => {
+    isCallerOrchestratorSpy.mockRestore()
+    collectGitDiffStatsSpy.mockRestore()
+    formatFileChangesSpy.mockRestore()
+
     if (testDirectory && existsSync(testDirectory)) {
       rmSync(testDirectory, { recursive: true, force: true })
     }

@@ -39,18 +39,27 @@ class MockStdioClientTransport {
   }
 }
 
-mock.module("@modelcontextprotocol/sdk/client/index.js", () => ({
-  Client: MockClient,
-}))
+const { disconnectAll, disconnectSession } = await import("./cleanup")
 
-mock.module("@modelcontextprotocol/sdk/client/stdio.js", () => ({
-  StdioClientTransport: MockStdioClientTransport,
-}))
+async function importFreshConnectionModule() {
+  mock.module("@modelcontextprotocol/sdk/client/index.js", () => ({
+    Client: MockClient,
+  }))
+
+  mock.module("@modelcontextprotocol/sdk/client/stdio.js", () => ({
+    StdioClientTransport: MockStdioClientTransport,
+  }))
+
+  const module = await import(`./connection?race-test=${Date.now()}-${Math.random()}`)
+  mock.restore()
+  const realClientModule = await import("@modelcontextprotocol/sdk/client/index.js")
+  const realStdioTransportModule = await import("@modelcontextprotocol/sdk/client/stdio.js")
+  mock.module("@modelcontextprotocol/sdk/client/index.js", () => realClientModule)
+  mock.module("@modelcontextprotocol/sdk/client/stdio.js", () => realStdioTransportModule)
+  return module
+}
 
 afterAll(() => { mock.restore() })
-
-const { disconnectAll, disconnectSession } = await import("./cleanup")
-const { getOrCreateClient } = await import("./connection")
 
 function createDeferred<TValue>(): Deferred<TValue> {
   let resolvePromise: ((value: TValue) => void) | null = null
@@ -127,6 +136,7 @@ afterEach(async () => {
 describe("getOrCreateClient disconnect race", () => {
   it("#given pending connection for session A #when disconnectSession(A) is called before connection completes #then completed client is not added to state.clients", async () => {
     const state = createState()
+    const { getOrCreateClient } = await importFreshConnectionModule()
     const info = createClientInfo("session-a")
     const clientKey = createClientKey(info)
     const pendingConnect = createDeferred<void>()
@@ -149,6 +159,7 @@ describe("getOrCreateClient disconnect race", () => {
 
   it("#given session A in disconnectedSessions #when new connection completes with no remaining pending #then disconnectedSessions entry is cleaned up", async () => {
     const state = createState()
+    const { getOrCreateClient } = await importFreshConnectionModule()
     const info = createClientInfo("session-a")
     const clientKey = createClientKey(info)
     state.disconnectedSessions.set(info.sessionID, 1)
@@ -173,6 +184,7 @@ describe("getOrCreateClient disconnect race", () => {
 describe("getOrCreateClient disconnectAll race", () => {
   it("#given pending connection #when disconnectAll() is called before connection completes #then client is not added to state.clients", async () => {
     const state = createState()
+    const { getOrCreateClient } = await importFreshConnectionModule()
     const info = createClientInfo("session-a")
     const clientKey = createClientKey(info)
     const pendingConnect = createDeferred<void>()
@@ -190,6 +202,7 @@ describe("getOrCreateClient disconnectAll race", () => {
 
   it("#given state after disconnectAll() completed #when getOrCreateClient() is called #then it throws shut down error and registers nothing", async () => {
     const state = createState()
+    const { getOrCreateClient } = await importFreshConnectionModule()
     const info = createClientInfo("session-b")
     const clientKey = createClientKey(info)
 
@@ -208,6 +221,7 @@ describe("getOrCreateClient disconnectAll race", () => {
 describe("getOrCreateClient multi-key disconnect race", () => {
   it("#given 2 pending connections for session A #when disconnectSession(A) before both complete #then both old connections are rejected", async () => {
     const state = createState()
+    const { getOrCreateClient } = await importFreshConnectionModule()
     const infoKey1 = createClientInfo("session-a")
     const infoKey2 = { ...createClientInfo("session-a"), serverName: "server-2" }
     const clientKey1 = createClientKey(infoKey1)
@@ -236,6 +250,7 @@ describe("getOrCreateClient multi-key disconnect race", () => {
 
   it("#given a superseded pending connection #when the old connection completes #then the stale client is removed from state.clients", async () => {
     const state = createState()
+    const { getOrCreateClient } = await importFreshConnectionModule()
     const info = createClientInfo("session-a")
     const clientKey = createClientKey(info)
     const pendingConnect = createDeferred<void>()
@@ -254,6 +269,7 @@ describe("getOrCreateClient multi-key disconnect race", () => {
 
   it("#given a superseded pending connection #when a newer client already replaced the map entry #then the stale cleanup does not delete the newer client", async () => {
     const state = createState()
+    const { getOrCreateClient } = await importFreshConnectionModule()
     const info = createClientInfo("session-a")
     const clientKey = createClientKey(info)
     const pendingConnect = createDeferred<void>()
