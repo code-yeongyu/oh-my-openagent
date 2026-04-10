@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
 import { PACKAGE_NAME } from "../constants"
+import { PLUGIN_NAME } from "../../../shared/plugin-identity"
 import { resolveSymlink } from "../../../shared/file-utils"
 
 const systemLoadedVersionModulePath = "./system-loaded-version?system-loaded-version-test"
@@ -104,6 +105,28 @@ describe("system loaded version", () => {
       expect(loadedVersion.installedPackagePath).toBe(join(cacheDir, "node_modules", PACKAGE_NAME, "package.json"))
       expect(loadedVersion.expectedVersion).toBe("2.3.4")
       expect(loadedVersion.loadedVersion).toBe("2.3.4")
+    })
+
+    it("detects installs published under the canonical plugin name", () => {
+      //#given
+      const configDir = createTemporaryDirectory("omo-config-")
+
+      process.env.OPENCODE_CONFIG_DIR = configDir
+
+      writeJson(join(configDir, "package.json"), {
+        dependencies: { [PLUGIN_NAME]: "5.6.7" },
+      })
+      writeJson(join(configDir, "node_modules", PLUGIN_NAME, "package.json"), {
+        version: "5.6.7",
+      })
+
+      //#when
+      const loadedVersion = getLoadedPluginVersion()
+
+      //#then
+      expect(loadedVersion.installedPackagePath).toBe(join(configDir, "node_modules", PLUGIN_NAME, "package.json"))
+      expect(loadedVersion.expectedVersion).toBe("5.6.7")
+      expect(loadedVersion.loadedVersion).toBe("5.6.7")
     })
 
     it("resolves symlinked config directories before selecting install path", () => {
