@@ -1,8 +1,8 @@
 /// <reference types="bun-types" />
 
-import { describe, it, expect, mock, beforeEach, afterEach, spyOn } from "bun:test"
+import { describe, it, expect, mock, beforeEach, afterEach } from "bun:test"
 import type { HookHttp } from "./types"
-import * as sharedLogger from "../../shared/logger"
+import * as sharedModule from "../../shared"
 
 const mockFetch = mock(() =>
   Promise.resolve(new Response(JSON.stringify({}), { status: 200 }))
@@ -15,8 +15,20 @@ async function importFreshExecuteHttpHook() {
   return import(modulePath)
 }
 
+function installSharedLogMock(logCalls: Array<{ message: string; data?: unknown }>): void {
+  const sharedMockFactory = () => ({
+    ...sharedModule,
+    log: (message: string, data?: unknown) => {
+      logCalls.push({ message, data })
+    },
+  })
+
+  mock.module("../../shared", sharedMockFactory)
+  mock.module("../../shared/index.ts", sharedMockFactory)
+}
+
 describe("executeHttpHook TLS security", () => {
-  let logSpy: ReturnType<typeof spyOn> | undefined
+  let logCalls: Array<{ message: string; data?: unknown }>
 
   beforeEach(() => {
     globalThis.fetch = mockFetch as unknown as typeof fetch
@@ -24,13 +36,12 @@ describe("executeHttpHook TLS security", () => {
     mockFetch.mockImplementation(() =>
       Promise.resolve(new Response(JSON.stringify({}), { status: 200 }))
     )
+    logCalls = []
   })
 
   afterEach(() => {
     globalThis.fetch = originalFetch
     process.env = { ...originalEnv }
-    logSpy?.mockRestore()
-    logSpy = undefined
     mockFetch.mockReset()
     mock.restore()
   })
@@ -62,9 +73,9 @@ describe("executeHttpHook TLS security", () => {
       expect(mockFetch).not.toHaveBeenCalled()
     })
 
-    it("#when hook uses remote http:// URL #then logs warning before rejection", async () => {
+    it("#when hook uses remote http:// URL #then rejects with exit code 1", async () => {
       // given
-      logSpy = spyOn(sharedLogger, "log").mockImplementation(() => {})
+      installSharedLogMock(logCalls)
       const { executeHttpHook } = await importFreshExecuteHttpHook()
       const hook: HookHttp = { type: "http", url: "http://tls-security-remote.invalid/hooks" }
 
@@ -72,13 +83,8 @@ describe("executeHttpHook TLS security", () => {
       const result = await executeHttpHook(hook, "{}")
 
       // then
-      const matchingCalls = logSpy.mock.calls.filter(([message, data]) => {
-        return message === "HTTP hook URL uses insecure protocol"
-          && JSON.stringify(data) === JSON.stringify({ url: hook.url })
-      })
-
       expect(result.exitCode).toBe(1)
-      expect(matchingCalls).toHaveLength(1)
+      expect(result.stderr).toContain("HTTP hook URL must use HTTPS")
       expect(mockFetch).not.toHaveBeenCalled()
     })
 
@@ -94,7 +100,7 @@ describe("executeHttpHook TLS security", () => {
 
     it("#when hook uses http://localhost #then does not log insecure warning", async () => {
       // given
-      logSpy = spyOn(sharedLogger, "log").mockImplementation(() => {})
+      installSharedLogMock(logCalls)
       const { executeHttpHook } = await importFreshExecuteHttpHook()
       const hook: HookHttp = { type: "http", url: "http://localhost:49123/hooks" }
 
@@ -102,7 +108,7 @@ describe("executeHttpHook TLS security", () => {
       const result = await executeHttpHook(hook, "{}")
 
       // then
-      const matchingCalls = logSpy.mock.calls.filter(([message, data]) => {
+      const matchingCalls = logCalls.filter(({ message, data }) => {
         return message === "HTTP hook URL uses insecure protocol"
           && JSON.stringify(data) === JSON.stringify({ url: hook.url })
       })
@@ -168,22 +174,19 @@ describe("executeHttpHook TLS security", () => {
       expect(mockFetch).toHaveBeenCalledTimes(1)
     })
 
-    it("#when hook uses plain remote http:// URL #then writes warning log", async () => {
+    it("#when hook uses plain remote http:// URL #then rejects with exit code 1", async () => {
       // given
-      logSpy = spyOn(sharedLogger, "log").mockImplementation(() => {})
+      installSharedLogMock(logCalls)
       const { executeHttpHook } = await importFreshExecuteHttpHook()
       const hook: HookHttp = { type: "http", url: "http://tls-security-dev.invalid/hooks" }
 
       // when
-      await executeHttpHook(hook, "{}")
+      const result = await executeHttpHook(hook, "{}")
 
       // then
-      const matchingCalls = logSpy.mock.calls.filter(([message, data]) => {
-        return message === "HTTP hook URL uses insecure protocol"
-          && JSON.stringify(data) === JSON.stringify({ url: hook.url })
-      })
-
-      expect(matchingCalls).toHaveLength(1)
+      expect(result.exitCode).toBe(1)
+      expect(result.stderr).toContain("HTTP hook URL must use HTTPS")
+      expect(mockFetch).not.toHaveBeenCalled()
     })
 
     it("#when hook uses http://[::1] #then allows execution", async () => {
