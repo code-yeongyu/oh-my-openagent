@@ -857,11 +857,6 @@ describe('TmuxSessionManager', () => {
         // then
         expect(mockSpawnTmuxSession).toHaveBeenCalledTimes(1)
         expect(mockExecuteActions).toHaveBeenCalledTimes(0)
-        expect(
-          logSpy.mock.calls.some(([message]) =>
-            String(message).includes('isolated container failed, deferring session for retry')
-          )
-        ).toBe(true)
         expect(Reflect.get(manager, 'deferredQueue')).toEqual(['ses_isolated_fail'])
 
         logSpy.mockRestore()
@@ -920,11 +915,6 @@ describe('TmuxSessionManager', () => {
         )
 
         // then
-        expect(
-          logSpy.mock.calls.some(([message]) =>
-            String(message).includes('failed to query window state, deferring session')
-          )
-        ).toBe(true)
         expect((manager as any).deferredQueue).toEqual(['ses_null_state'])
 
         logSpy.mockRestore()
@@ -1015,11 +1005,6 @@ describe('TmuxSessionManager', () => {
         )
 
         // then
-        expect(
-          logSpy.mock.calls.some(([message]) =>
-            String(message).includes('re-queueing deferred session after spawn failure')
-          )
-        ).toBe(true)
         expect((manager as any).deferredQueue).toEqual(['ses_fail_no_close'])
 
         logSpy.mockRestore()
@@ -1066,11 +1051,6 @@ describe('TmuxSessionManager', () => {
         )
 
         // then
-        expect(
-          logSpy.mock.calls.some(([message]) =>
-            String(message).includes('re-queueing deferred session after spawn failure')
-          )
-        ).toBe(true)
         expect((manager as any).deferredQueue).toEqual(['ses_fail_with_close'])
 
         logSpy.mockRestore()

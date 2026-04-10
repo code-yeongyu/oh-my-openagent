@@ -4,15 +4,13 @@ import { join } from "node:path"
 import { tmpdir } from "node:os"
 import {
   findNearestMessageWithFields,
-  findFirstMessageWithAgent,
   findNearestMessageWithFieldsFromSDK,
   findFirstMessageWithAgentFromSDK,
   generateMessageId,
   generatePartId,
   injectHookMessage,
 } from "./injector"
-import { PART_STORAGE } from "../../shared"
-import { isSqliteBackend, resetSqliteBackendCache } from "../../shared/opencode-storage-detection"
+import { getCompactionPartStorageDir } from "../../shared/compaction-marker"
 
 //#region Mocks
 
@@ -222,7 +220,7 @@ describe("findNearestMessageWithFields JSON backend ordering", () => {
     mockIsSqliteBackend.mockReturnValue(false)
     const messageDir = createMessageDir()
     const compactionMessageID = "msg_test_injector_compaction_marker"
-    const partDir = join(PART_STORAGE, compactionMessageID)
+    const partDir = getCompactionPartStorageDir(compactionMessageID)
     tempDirs.push(partDir)
 
     writeFileSync(join(messageDir, "msg_0001.json"), JSON.stringify({
