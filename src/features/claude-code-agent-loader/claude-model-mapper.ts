@@ -9,7 +9,7 @@ const CLAUDE_CODE_ALIAS_MAP = new Map<string, string>([
   ["haiku", `${ANTHROPIC_PREFIX}claude-haiku-4-5`],
 ])
 
-function mapClaudeModelString(model: string | undefined): string | undefined {
+function mapClaudeModelString(model: string | undefined, anthropicProvider?: string): string | undefined {
   if (!model) return undefined
 
   const trimmed = model.trim()
@@ -17,8 +17,9 @@ function mapClaudeModelString(model: string | undefined): string | undefined {
 
   if (trimmed === "inherit") return undefined
 
+  const prefix = anthropicProvider ? `${anthropicProvider}/` : ANTHROPIC_PREFIX
   const aliasResult = CLAUDE_CODE_ALIAS_MAP.get(trimmed.toLowerCase())
-  if (aliasResult) return aliasResult
+  if (aliasResult) return anthropicProvider ? aliasResult.replace(ANTHROPIC_PREFIX, prefix) : aliasResult
 
   if (trimmed.includes("/")) {
     const [providerID, ...modelParts] = trimmed.split("/")
@@ -34,15 +35,16 @@ function mapClaudeModelString(model: string | undefined): string | undefined {
   const normalized = normalizeModelID(trimmed)
 
   if (normalized.startsWith("claude-")) {
-    return `${ANTHROPIC_PREFIX}${normalized}`
+    return `${prefix}${normalized}`
   }
 
   return undefined
 }
 
 export function mapClaudeModelToOpenCode(
-  model: string | undefined
+  model: string | undefined,
+  anthropicProvider?: string,
 ): { providerID: string; modelID: string } | undefined {
-  const mappedModel = mapClaudeModelString(model)
+  const mappedModel = mapClaudeModelString(model, anthropicProvider)
   return mappedModel ? normalizeModelFormat(mappedModel) : undefined
 }

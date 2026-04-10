@@ -109,4 +109,30 @@ describe("mapClaudeModelToOpenCode", () => {
       expect(mapClaudeModelToOpenCode("  claude-sonnet-4-6  ")).toEqual({ providerID: "anthropic", modelID: "claude-sonnet-4-6" })
     })
   })
+
+  describe("#given anthropicProvider override", () => {
+    it("#when called with opus and custom provider #then maps to custom provider", () => {
+      expect(mapClaudeModelToOpenCode("opus", "kiro")).toEqual({ providerID: "kiro", modelID: "claude-opus-4-6" })
+    })
+
+    it("#when called with sonnet and custom provider #then maps to custom provider", () => {
+      expect(mapClaudeModelToOpenCode("sonnet", "kiro")).toEqual({ providerID: "kiro", modelID: "claude-sonnet-4-6" })
+    })
+
+    it("#when called with haiku and custom provider #then maps to custom provider", () => {
+      expect(mapClaudeModelToOpenCode("haiku", "my-gateway")).toEqual({ providerID: "my-gateway", modelID: "claude-haiku-4-5" })
+    })
+
+    it("#when called with bare claude model and custom provider #then uses custom provider", () => {
+      expect(mapClaudeModelToOpenCode("claude-opus-4-6", "kiro")).toEqual({ providerID: "kiro", modelID: "claude-opus-4-6" })
+    })
+
+    it("#when called with explicit provider/model format #then preserves original provider", () => {
+      expect(mapClaudeModelToOpenCode("openai/gpt-5.2", "kiro")).toEqual({ providerID: "openai", modelID: "gpt-5.2" })
+    })
+
+    it("#when called without anthropicProvider #then defaults to anthropic", () => {
+      expect(mapClaudeModelToOpenCode("opus")).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-6" })
+    })
+  })
 })

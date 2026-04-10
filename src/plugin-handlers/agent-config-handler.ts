@@ -95,8 +95,9 @@ export async function applyAgentConfig(params: {
   const disableOmoEnv = params.pluginConfig.experimental?.disable_omo_env ?? false;
 
   const includeClaudeAgents = params.pluginConfig.claude_code?.agents ?? true;
-  const userAgents = includeClaudeAgents ? loadUserAgents() : {};
-  const projectAgents = includeClaudeAgents ? loadProjectAgents(params.ctx.directory) : {};
+  const anthropicProvider = params.pluginConfig.claude_code?.anthropic_provider;
+  const userAgents = includeClaudeAgents ? loadUserAgents(anthropicProvider) : {};
+  const projectAgents = includeClaudeAgents ? loadProjectAgents(params.ctx.directory, anthropicProvider) : {};
   const rawPluginAgents = params.pluginComponents.agents;
 
   const pluginAgents = Object.fromEntries(
