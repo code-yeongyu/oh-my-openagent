@@ -590,7 +590,8 @@ describe("createEventHandler - event forwarding", () => {
 		expect(createdSessions).toHaveLength(0)
 	})
 
-	it("dispatches OpenClaw after session.created using tracked pane metadata", async () => {
+	it("dispatches OpenClaw after session.created for main sessions (no parentID)", async () => {
+		//#given
 		const openClawSpy = spyOn(openclawRuntimeDispatch, "dispatchOpenClawEvent").mockResolvedValue(null)
 		const eventHandler = createEventHandler({
 			ctx: asEventHandlerContext({ directory: "/tmp/project-created" }),
@@ -620,13 +621,15 @@ describe("createEventHandler - event forwarding", () => {
 			hooks: createEventHandlerHooks({}),
 		})
 
+		//#when - main session created (no parentID)
 		await eventHandler(asEventHandlerInput({
 			event: {
 				type: "session.created",
-				properties: { info: { id: "ses_openclaw_created", parentID: "ses_parent" } },
+				properties: { info: { id: "ses_openclaw_created" } },
 			},
 		}))
 
+		//#then - OpenClaw dispatch called for main session
 		const [call] = openClawSpy.mock.calls[0] ?? []
 		expect(call).toMatchObject({
 			rawEvent: "session.created",
@@ -636,6 +639,49 @@ describe("createEventHandler - event forwarding", () => {
 				tmuxPaneId: "%9",
 			},
 		})
+	})
+
+	it("does NOT dispatch OpenClaw for subagent sessions (with parentID)", async () => {
+		//#given
+		const openClawSpy = spyOn(openclawRuntimeDispatch, "dispatchOpenClawEvent").mockResolvedValue(null)
+		const eventHandler = createEventHandler({
+			ctx: asEventHandlerContext({ directory: "/tmp/project-created" }),
+			pluginConfig: asPluginConfig({
+				openclaw: { enabled: true, gateways: {}, hooks: {} },
+				tmux: {
+					enabled: true,
+					layout: "main-vertical",
+					main_pane_size: 60,
+					main_pane_min_width: 120,
+					agent_pane_min_width: 40,
+					isolation: "inline",
+				},
+			}),
+			firstMessageVariantGate: {
+				markSessionCreated: () => {},
+				clear: () => {},
+			},
+			managers: createEventHandlerManagers({
+				skillMcpManager: { disconnectSession: async () => {} },
+				tmuxSessionManager: {
+					onSessionCreated: async () => {},
+					onSessionDeleted: async () => {},
+					getTrackedPaneId: (sessionID: string) => (sessionID === "ses_subagent" ? "%10" : undefined),
+				},
+			}),
+			hooks: createEventHandlerHooks({}),
+		})
+
+		//#when - subagent session created (with parentID)
+		await eventHandler(asEventHandlerInput({
+			event: {
+				type: "session.created",
+				properties: { info: { id: "ses_subagent", parentID: "ses_parent" } },
+			},
+		}))
+
+		//#then - OpenClaw dispatch NOT called for subagent session (handled by specialized callbacks)
+		expect(openClawSpy.mock.calls.length).toBe(0)
 	})
 
 	it("forwards session.deleted to write-existing-file-guard hook", async () => {
