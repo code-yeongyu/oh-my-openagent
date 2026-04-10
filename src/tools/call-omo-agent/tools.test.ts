@@ -369,6 +369,67 @@ describe("createCallOmoAgent", () => {
     })
   })
 
+  test("should accept custom agents defined in agentOverrides (#3229)", async () => {
+    //#given
+    const launch = mock(() => Promise.resolve({
+      id: "task-custom",
+      sessionID: "sub-session",
+      description: "Custom agent task",
+      agent: "technical-writer",
+      status: "pending",
+    }))
+    const managerWithLaunch = {
+      launch,
+      getTask: mock(() => undefined),
+    }
+    const toolDef = createCallOmoAgent(
+      mockCtx,
+      managerWithLaunch,
+      [],
+      {
+        "technical-writer": {
+          model: "anthropic/claude-sonnet-4-6",
+          prompt_append: "You are a technical writer.",
+        },
+      },
+    )
+    const executeFunc = toolDef.execute as Function
+
+    //#when
+    const result = await executeFunc(
+      {
+        description: "Write docs",
+        prompt: "Document the API",
+        subagent_type: "technical-writer",
+        run_in_background: true,
+      },
+      { sessionID: "test", messageID: "msg", agent: "test", abort: new AbortController().signal }
+    )
+
+    //#then
+    expect(result).not.toContain("Invalid agent type")
+  })
+
+  test("should reject agents not in builtins nor in agentOverrides (#3229)", async () => {
+    //#given
+    const toolDef = createCallOmoAgent(mockCtx, mockBackgroundManager, [])
+    const executeFunc = toolDef.execute as Function
+
+    //#when
+    const result = await executeFunc(
+      {
+        description: "Test",
+        prompt: "Test prompt",
+        subagent_type: "nonexistent-agent",
+        run_in_background: true,
+      },
+      { sessionID: "test", messageID: "msg", agent: "test", abort: new AbortController().signal }
+    )
+
+    //#then
+    expect(result).toContain("Invalid agent type")
+  })
+
   test("should return a tool error when sync spawn depth validation fails", async () => {
     //#given
     reserveSubagentSpawnMock.mockRejectedValueOnce(new Error("Subagent spawn blocked: child depth 4 exceeds background_task.maxDepth=3."))

@@ -1,5 +1,5 @@
 import { tool, type PluginInput, type ToolDefinition } from "@opencode-ai/plugin"
-import { ALLOWED_AGENTS, CALL_OMO_AGENT_DESCRIPTION } from "./constants"
+import { BUILTIN_AGENTS, CALL_OMO_AGENT_DESCRIPTION } from "./constants"
 import type { AllowedAgentType, CallOmoAgentArgs, ToolContextWithMetadata } from "./types"
 import type { BackgroundManager } from "../../features/background-agent"
 import type { CategoriesConfig, AgentOverrides } from "../../config/schema"
@@ -82,7 +82,11 @@ export function createCallOmoAgent(
   agentOverrides?: AgentOverrides,
   userCategories?: CategoriesConfig,
 ): ToolDefinition {
-  const agentDescriptions = ALLOWED_AGENTS.map(
+  // Merge built-in agents with user-configured custom agents
+  const customAgentKeys = agentOverrides ? Object.keys(agentOverrides) : []
+  const allowedAgents = [...new Set([...BUILTIN_AGENTS, ...customAgentKeys])]
+
+  const agentDescriptions = allowedAgents.map(
     (name) => `- ${name}: Specialized agent for ${name} tasks`
   ).join("\n")
   const description = CALL_OMO_AGENT_DESCRIPTION.replace("{agents}", agentDescriptions)
@@ -104,13 +108,13 @@ export function createCallOmoAgent(
       const toolCtx = toolContext as ToolContextWithMetadata
       log(`[call_omo_agent] Starting with agent: ${args.subagent_type}, background: ${args.run_in_background}`)
 
-      // Case-insensitive agent validation - allows "Explore", "EXPLORE", "explore" etc.
+      // Case-insensitive agent validation against built-in + custom agents
       if (
-        !ALLOWED_AGENTS.some(
+        !allowedAgents.some(
           (name) => name.toLowerCase() === args.subagent_type.toLowerCase(),
         )
       ) {
-        return `Error: Invalid agent type "${args.subagent_type}". Only ${ALLOWED_AGENTS.join(", ")} are allowed.`
+        return `Error: Invalid agent type "${args.subagent_type}". Only ${allowedAgents.join(", ")} are allowed.`
       }
 
       const normalizedAgent = args.subagent_type.toLowerCase() as AllowedAgentType

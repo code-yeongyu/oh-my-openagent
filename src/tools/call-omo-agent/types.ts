@@ -1,6 +1,4 @@
-import type { ALLOWED_AGENTS } from "./constants"
-
-export type AllowedAgentType = (typeof ALLOWED_AGENTS)[number]
+export type AllowedAgentType = string
 
 export interface CallOmoAgentArgs {
   description: string

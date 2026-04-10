@@ -1,12 +1,10 @@
-export const ALLOWED_AGENTS = [
-  "explore",
-  "librarian",
-  "oracle",
-  "hephaestus",
-  "metis",
-  "momus",
-  "multimodal-looker",
-] as const
+import { AGENT_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
+
+/**
+ * Built-in agents derived from AGENT_MODEL_REQUIREMENTS.
+ * Custom agents from user config are merged at runtime in createCallOmoAgent().
+ */
+export const BUILTIN_AGENTS = Object.keys(AGENT_MODEL_REQUIREMENTS)
 
 export const CALL_OMO_AGENT_DESCRIPTION = `Spawn explore/librarian agent. run_in_background REQUIRED (true=async with task_id, false=sync).
 
