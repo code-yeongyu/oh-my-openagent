@@ -11,6 +11,7 @@ export function migrateConfigFile(
   rawConfig: Record<string, unknown>
 ): boolean {
   const copy = structuredClone(rawConfig)
+  const originalSnapshot = JSON.stringify(rawConfig)
   let needsWrite = false
 
   // Load previously applied migrations from BOTH the legacy in-config
@@ -142,22 +143,15 @@ export function migrateConfigFile(
   }
 
   if (needsWrite) {
-    // Verify the config file content actually changed before creating a
-    // backup and rewriting.  Several migration paths set needsWrite=true
-    // without altering the config body (e.g. stripping an already-absent
+    // Verify the config body actually changed before creating a backup and
+    // rewriting.  Several migration paths set needsWrite=true without
+    // altering the config body (e.g. stripping an already-absent
     // _migrations field, or recording sidecar-only state).  Without this
     // guard the plugin creates a new .bak.<timestamp> file on every
     // startup even when the config is already up-to-date (#3222).
-    const newContent = JSON.stringify(copy, null, 2) + "\n"
-    let existingContent: string | undefined
-    try {
-      existingContent = fs.readFileSync(configPath, "utf-8")
-    } catch {
-      // File unreadable -- proceed with write to recover.
-    }
-    if (existingContent !== undefined && existingContent === newContent) {
-      // Config file is already up-to-date. Apply in-memory mutations
-      // (e.g. stripped _migrations) without touching the filesystem.
+    if (JSON.stringify(copy) === originalSnapshot) {
+      // Config body is identical after all migrations ran. Apply in-memory
+      // mutations (e.g. stripped _migrations) without touching the filesystem.
       for (const key of Object.keys(rawConfig)) {
         delete rawConfig[key]
       }
