@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
+import type { PluginInput } from "@opencode-ai/plugin"
 
 import { createKeywordDetectorHook } from "./index"
 import { _resetForTesting, setMainSession } from "../../features/claude-code-session-state"
@@ -18,7 +19,7 @@ function createMockPluginInput(toastCalls: string[] = []) {
         },
       },
     },
-  } as any
+  } as unknown as PluginInput
 }
 
 function createMockRalphLoop(startLoopCalls: StartLoopCall[]) {
