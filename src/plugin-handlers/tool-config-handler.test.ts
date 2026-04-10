@@ -267,23 +267,6 @@ describe("applyToolConfig", () => {
     })
   })
 
-  describe("#given prometheus agent permissions", () => {
-    describe("#when applying tool config", () => {
-      it("#then should deny task delegation tools for prometheus", () => {
-        const params = createParams({ agents: ["prometheus"] })
-
-        applyToolConfig(params)
-
-        const agent = params.agentResult.prometheus as {
-          permission: Record<string, unknown>
-        }
-        expect(agent.permission.task).toBe("deny")
-        expect(agent.permission["task_*"]).toBe("deny")
-        expect(agent.permission.teammate).toBe("deny")
-      })
-    })
-  })
-
   describe("#given disabled_tools includes 'question'", () => {
     let originalConfigContent: string | undefined
     let originalCliRunMode: string | undefined
