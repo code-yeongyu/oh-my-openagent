@@ -74,6 +74,40 @@ describe("keyword-detector ultrawork edge trigger", () => {
     expect(output.parts[0]?.text).toContain(" hi there ulw ")
   })
 
+  test("#given greeting before ulw with a trailing task #when chat.message fires #then ultrawork activates and preserves the task", async () => {
+    // given
+    const toastCalls: string[] = []
+    const startLoopCalls: StartLoopCall[] = []
+    const hook = createKeywordDetectorHook(
+      createMockPluginInput(toastCalls),
+      undefined,
+      createMockRalphLoop(startLoopCalls),
+    )
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "hey ulw fix the flaky keyword tests" }],
+    }
+
+    // when
+    await hook["chat.message"]({ sessionID: "main-session", agent: "sisyphus" }, output)
+
+    // then
+    expect(toastCalls).toContain("Ultrawork Mode Activated")
+    expect(startLoopCalls).toHaveLength(1)
+    expect(startLoopCalls[0]).toEqual({
+      sessionID: "main-session",
+      prompt: "fix the flaky keyword tests",
+      options: {
+        ultrawork: true,
+        maxIterations: undefined,
+        completionPromise: undefined,
+        strategy: undefined,
+      },
+    })
+    expect(output.parts[0]?.text).toContain("ULTRAWORK MODE ENABLED!")
+    expect(output.parts[0]?.text).toContain("hey ulw fix the flaky keyword tests")
+  })
+
   test("#given ulw mentioned in the middle of a sentence #when chat.message fires #then ultrawork stays disabled", async () => {
     // given
     const toastCalls: string[] = []

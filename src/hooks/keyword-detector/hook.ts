@@ -17,18 +17,20 @@ import { parseRalphLoopArguments } from "../ralph-loop/command-arguments"
 
 const ULTRAWORK_KEYWORD_PATTERN = /\b(ultrawork|ulw)\b/i
 const LEADING_ULTRAWORK_PATTERN = /^\s*(ultrawork|ulw)\b/i
-const TRAILING_GREETING_ULTRAWORK_PATTERN = /^\s*(?:hi|hello|hey|hiya|greetings)(?:\s+there)?\s+(ultrawork|ulw)\s*$/i
+const GREETING_PREFIX_ULTRAWORK_PATTERN = /^\s*(?:hi|hello|hey|hiya|greetings)(?:\s+there)?(?:[!,.:;-]+\s*|\s+)(ultrawork|ulw)\b/i
 
 function extractUltraworkTask(cleanText: string): string {
-  if (TRAILING_GREETING_ULTRAWORK_PATTERN.test(cleanText)) {
-    return ""
+  const greetingPrefixedMatch = cleanText.match(GREETING_PREFIX_ULTRAWORK_PATTERN)
+
+  if (greetingPrefixedMatch) {
+    return cleanText.slice(greetingPrefixedMatch[0].length).trim()
   }
 
   return cleanText.replace(ULTRAWORK_KEYWORD_PATTERN, "").trim()
 }
 
 function hasEdgeUltraworkKeyword(cleanText: string): boolean {
-  return LEADING_ULTRAWORK_PATTERN.test(cleanText) || TRAILING_GREETING_ULTRAWORK_PATTERN.test(cleanText)
+  return LEADING_ULTRAWORK_PATTERN.test(cleanText) || GREETING_PREFIX_ULTRAWORK_PATTERN.test(cleanText)
 }
 
 export function createKeywordDetectorHook(
