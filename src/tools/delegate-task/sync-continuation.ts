@@ -1,6 +1,6 @@
 import type { DelegateTaskArgs, ToolContextWithMetadata } from "./types"
 import type { ExecutorContext, SessionMessage } from "./executor-types"
-import { isPlanFamily } from "./constants"
+import { isPlanAgent } from "./constants"
 import { storeToolMetadata } from "../../features/tool-metadata-store"
 import { resolveCallID } from "./resolve-call-id"
 import { getTaskToastManager } from "../../features/task-toast-manager"
@@ -84,7 +84,7 @@ export async function executeSyncContinuation(
       storeToolMetadata(ctx.sessionID, callID, syncContMeta)
     }
 
-    const allowTask = isPlanFamily(resumeAgent)
+    const allowTask = isPlanAgent(resumeAgent)
     const tddEnabled = sisyphusAgentConfig?.tdd
     const effectivePrompt = buildTaskPrompt(args.prompt, resumeAgent, tddEnabled)
     const tools = {

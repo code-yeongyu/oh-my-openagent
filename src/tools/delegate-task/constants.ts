@@ -329,13 +329,13 @@ export function isPlanAgent(agentName: string | undefined): boolean {
 }
 
 /**
- * Plan family: plan + prometheus. Shares mutual delegation blocking and task tool permission.
- * Does NOT share system prompt (only isPlanAgent controls that).
+ * Plan family: plan + prometheus. Shares mutual delegation blocking only.
+ * Does NOT share system prompt or task permission (only isPlanAgent controls those).
  */
 export const PLAN_FAMILY_NAMES = ["plan", "prometheus"]
 
 /**
- * Check if the given agent belongs to the plan family (blocking + task permission).
+ * Check if the given agent belongs to the plan family for mutual delegation blocking.
  */
 export function isPlanFamily(category: string): boolean
 export function isPlanFamily(category: string | undefined): boolean

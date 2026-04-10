@@ -4105,7 +4105,7 @@ describe("sisyphus-task", () => {
       expect(promptBody.tools.task).toBe(true)
     }, { timeout: 20000 })
 
-    test("prometheus subagent should have task permission (plan family)", async () => {
+    test("prometheus subagent should NOT have task permission", async () => {
       //#given
       const { createDelegateTask } = require("./tools")
       let promptBody: any
@@ -4131,7 +4131,7 @@ describe("sisyphus-task", () => {
       )
       
       //#then
-      expect(promptBody.tools.task).toBe(true)
+      expect(promptBody.tools.task).toBe(false)
     }, { timeout: 20000 })
 
     test("non-plan subagent should NOT have task permission", async () => {
