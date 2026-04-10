@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, afterEach, spyOn } from "bun:test"
+import { describe, expect, it, beforeEach, afterEach, spyOn, mock } from "bun:test"
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -13,12 +13,7 @@ import type {
 // Import real shared module to avoid mock leaking to other test files
 import * as shared from "../../shared"
 
-// Spy on log instead of mocking the entire module
-const logMock = spyOn(shared, "log").mockImplementation(() => {})
-
-
-
-const { createAutoSlashCommandHook } = await import("./index")
+type AutoSlashCommandModule = typeof import("./hook")
 
 function createMockInput(sessionID: string, messageID?: string): AutoSlashCommandHookInput {
   return {
@@ -44,16 +39,26 @@ function createMockOutput(text: string): AutoSlashCommandHookOutput {
 describe("createAutoSlashCommandHook", () => {
   let tempDir = ""
   let originalWorkingDirectory = ""
+  let logCalls: Array<[string, unknown?]>
+  let createAutoSlashCommandHook: AutoSlashCommandModule["createAutoSlashCommandHook"]
 
-  beforeEach(() => {
-    logMock.mockClear()
+  beforeEach(async () => {
+    mock.restore()
+    logCalls = []
+    spyOn(shared, "log").mockImplementation((message: string, data?: unknown) => {
+      logCalls.push([message, data])
+    })
     tempDir = mkdtempSync(join(tmpdir(), "omo-auto-slash-hook-test-"))
     originalWorkingDirectory = process.cwd()
+
+    const autoSlashCommandModule = await import(`./hook?test=${Date.now()}-${Math.random()}`)
+    createAutoSlashCommandHook = autoSlashCommandModule.createAutoSlashCommandHook
   })
 
   afterEach(() => {
     process.chdir(originalWorkingDirectory)
     rmSync(tempDir, { recursive: true, force: true })
+    mock.restore()
   })
 
   describe("slash command replacement", () => {
@@ -237,7 +242,7 @@ describe("createAutoSlashCommandHook", () => {
 
       // when hook is called
       // then should not throw
-      await expect(hook["chat.message"](input, output)).resolves.toBeUndefined()
+      await hook["chat.message"](input, output)
     })
 
     it("should handle just slash", async () => {
@@ -374,13 +379,13 @@ describe("createAutoSlashCommandHook", () => {
       await hook["command.execute.before"](input, output)
 
       //#then
-      expect(logMock).toHaveBeenCalledWith(
+      expect(logCalls).toContainEqual([
         "[auto-slash-command] command.execute.before received",
         expect.objectContaining({
           command: "some-command",
           arguments: "arg1 arg2 arg3",
-        })
-      )
+        }),
+      ])
     })
 
   })

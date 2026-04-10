@@ -7,6 +7,9 @@ import type {
   CommandExecuteBeforeOutput,
 } from "../types"
 import * as shared from "../../../shared"
+import * as executorModule from "../executor"
+
+type AutoSlashCommandModule = typeof import("../hook")
 
 const executeSlashCommandMock = mock(
   async (parsed: { command: string; args: string; raw: string }) => ({
@@ -15,21 +18,11 @@ const executeSlashCommandMock = mock(
   })
 )
 
-mock.module("../executor", () => ({
-  executeSlashCommand: executeSlashCommandMock,
-}))
-
 afterAll(async () => {
   mock.restore()
-  // Restore the real executor module so subsequent test files in the same batch
-  // (e.g. executor-resolution.test.ts) don't get the mocked version
-  const realExecutor = await import("../executor")
-  mock.module("../executor", () => realExecutor)
 })
 
-const logMock = spyOn(shared, "log").mockImplementation(() => {})
-
-const { createAutoSlashCommandHook } = await import("../hook")
+let createAutoSlashCommandHook: AutoSlashCommandModule["createAutoSlashCommandHook"]
 
 function createChatInput(sessionID: string, messageID: string): AutoSlashCommandHookInput {
   return {
@@ -60,9 +53,14 @@ function createCommandOutput(text: string): CommandExecuteBeforeOutput {
 }
 
 describe("createAutoSlashCommandHook leak prevention", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    mock.restore()
     executeSlashCommandMock.mockClear()
-    logMock.mockClear()
+    spyOn(executorModule, "executeSlashCommand").mockImplementation(executeSlashCommandMock)
+    spyOn(shared, "log").mockImplementation(() => {})
+
+    const autoSlashCommandModule = await import(`../hook?test=${Date.now()}-${Math.random()}`)
+    createAutoSlashCommandHook = autoSlashCommandModule.createAutoSlashCommandHook
   })
 
   describe("#given hook with sessionProcessedCommandExecutions", () => {

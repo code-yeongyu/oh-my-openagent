@@ -1,4 +1,5 @@
-import { afterAll, afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
+import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
+import { createAutoUpdateCheckerHook } from "../auto-update-checker/hook"
 
 const mockShowConfigErrorsIfAny = mock(async () => {})
 const mockShowModelCacheWarningIfNeeded = mock(async () => {})
@@ -9,60 +10,6 @@ const mockShowVersionToast = mock(async () => {})
 const mockRunBackgroundUpdateCheck = mock(async () => {})
 const mockGetCachedVersion = mock(() => "3.6.0")
 const mockGetLocalDevVersion = mock<(directory: string) => string | null>(() => null)
-
-const _realConfigErrorsToast = require("../auto-update-checker/hook/config-errors-toast")
-const _realModelCacheWarning = require("../auto-update-checker/hook/model-cache-warning")
-const _realConnectedProvidersStatus = require("../auto-update-checker/hook/connected-providers-status")
-const _realModelCapabilitiesStatus = require("../auto-update-checker/hook/model-capabilities-status")
-const _realStartupToasts = require("../auto-update-checker/hook/startup-toasts")
-const _realBackgroundUpdateCheck = require("../auto-update-checker/hook/background-update-check")
-const _realChecker = require("../auto-update-checker/checker")
-const _realLogger = require("../../shared/logger")
-
-afterAll(() => {
-  mock.module("../auto-update-checker/hook/config-errors-toast", () => _realConfigErrorsToast)
-  mock.module("../auto-update-checker/hook/model-cache-warning", () => _realModelCacheWarning)
-  mock.module("../auto-update-checker/hook/connected-providers-status", () => _realConnectedProvidersStatus)
-  mock.module("../auto-update-checker/hook/model-capabilities-status", () => _realModelCapabilitiesStatus)
-  mock.module("../auto-update-checker/hook/startup-toasts", () => _realStartupToasts)
-  mock.module("../auto-update-checker/hook/background-update-check", () => _realBackgroundUpdateCheck)
-  mock.module("../auto-update-checker/checker", () => _realChecker)
-  mock.module("../../shared/logger", () => _realLogger)
-  mock.restore()
-})
-
-type HookFactory = typeof import("../auto-update-checker/hook").createAutoUpdateCheckerHook
-
-async function importFreshHookFactory(): Promise<HookFactory> {
-  mock.module("../auto-update-checker/hook/config-errors-toast", () => ({
-    showConfigErrorsIfAny: mockShowConfigErrorsIfAny,
-  }))
-  mock.module("../auto-update-checker/hook/model-cache-warning", () => ({
-    showModelCacheWarningIfNeeded: mockShowModelCacheWarningIfNeeded,
-  }))
-  mock.module("../auto-update-checker/hook/connected-providers-status", () => ({
-    updateAndShowConnectedProvidersCacheStatus: mockUpdateAndShowConnectedProvidersCacheStatus,
-  }))
-  mock.module("../auto-update-checker/hook/model-capabilities-status", () => ({
-    refreshModelCapabilitiesOnStartup: mockRefreshModelCapabilitiesOnStartup,
-  }))
-  mock.module("../auto-update-checker/hook/startup-toasts", () => ({
-    showLocalDevToast: mockShowLocalDevToast,
-    showVersionToast: mockShowVersionToast,
-  }))
-  mock.module("../auto-update-checker/hook/background-update-check", () => ({
-    runBackgroundUpdateCheck: mockRunBackgroundUpdateCheck,
-  }))
-  mock.module("../auto-update-checker/checker", () => ({
-    getCachedVersion: mockGetCachedVersion,
-    getLocalDevVersion: mockGetLocalDevVersion,
-  }))
-  mock.module("../../shared/logger", () => ({
-    log: () => {},
-  }))
-  const hookModule = await import(`../auto-update-checker/hook?test-${Date.now()}-${Math.random()}`)
-  return hookModule.createAutoUpdateCheckerHook
-}
 
 function createPluginInput() {
   return {
@@ -80,7 +27,7 @@ async function flushScheduledWork(): Promise<void> {
 }
 
 function runSessionCreatedEvent(
-  hook: ReturnType<HookFactory>,
+  hook: ReturnType<typeof createAutoUpdateCheckerHook>,
   properties?: { info?: { parentID?: string } }
 ): void {
   hook.event({
@@ -114,12 +61,22 @@ describe("createAutoUpdateCheckerHook", () => {
   it("skips startup toasts and checks in CLI run mode", async () => {
     //#given - CLI run mode enabled
     process.env.OPENCODE_CLI_RUN_MODE = "true"
-    const createAutoUpdateCheckerHook = await importFreshHookFactory()
 
     const hook = createAutoUpdateCheckerHook(createPluginInput(), {
       showStartupToast: true,
       isSisyphusEnabled: true,
       autoUpdate: true,
+    }, {
+      getCachedVersion: mockGetCachedVersion,
+      getLocalDevVersion: mockGetLocalDevVersion,
+      showConfigErrorsIfAny: mockShowConfigErrorsIfAny,
+      updateAndShowConnectedProvidersCacheStatus: mockUpdateAndShowConnectedProvidersCacheStatus,
+      refreshModelCapabilitiesOnStartup: mockRefreshModelCapabilitiesOnStartup,
+      showModelCacheWarningIfNeeded: mockShowModelCacheWarningIfNeeded,
+      showLocalDevToast: mockShowLocalDevToast,
+      showVersionToast: mockShowVersionToast,
+      runBackgroundUpdateCheck: mockRunBackgroundUpdateCheck,
+      log: () => {},
     })
 
     //#when - session.created event arrives
@@ -138,8 +95,18 @@ describe("createAutoUpdateCheckerHook", () => {
 
   it("runs all startup checks on normal session.created", async () => {
     //#given - normal mode and no local dev version
-    const createAutoUpdateCheckerHook = await importFreshHookFactory()
-    const hook = createAutoUpdateCheckerHook(createPluginInput())
+    const hook = createAutoUpdateCheckerHook(createPluginInput(), {}, {
+      getCachedVersion: mockGetCachedVersion,
+      getLocalDevVersion: mockGetLocalDevVersion,
+      showConfigErrorsIfAny: mockShowConfigErrorsIfAny,
+      updateAndShowConnectedProvidersCacheStatus: mockUpdateAndShowConnectedProvidersCacheStatus,
+      refreshModelCapabilitiesOnStartup: mockRefreshModelCapabilitiesOnStartup,
+      showModelCacheWarningIfNeeded: mockShowModelCacheWarningIfNeeded,
+      showLocalDevToast: mockShowLocalDevToast,
+      showVersionToast: mockShowVersionToast,
+      runBackgroundUpdateCheck: mockRunBackgroundUpdateCheck,
+      log: () => {},
+    })
 
     //#when - session.created event arrives on primary session
     runSessionCreatedEvent(hook)
@@ -156,8 +123,18 @@ describe("createAutoUpdateCheckerHook", () => {
 
   it("ignores subagent sessions (parentID present)", async () => {
     //#given - a subagent session with parentID
-    const createAutoUpdateCheckerHook = await importFreshHookFactory()
-    const hook = createAutoUpdateCheckerHook(createPluginInput())
+    const hook = createAutoUpdateCheckerHook(createPluginInput(), {}, {
+      getCachedVersion: mockGetCachedVersion,
+      getLocalDevVersion: mockGetLocalDevVersion,
+      showConfigErrorsIfAny: mockShowConfigErrorsIfAny,
+      updateAndShowConnectedProvidersCacheStatus: mockUpdateAndShowConnectedProvidersCacheStatus,
+      refreshModelCapabilitiesOnStartup: mockRefreshModelCapabilitiesOnStartup,
+      showModelCacheWarningIfNeeded: mockShowModelCacheWarningIfNeeded,
+      showLocalDevToast: mockShowLocalDevToast,
+      showVersionToast: mockShowVersionToast,
+      runBackgroundUpdateCheck: mockRunBackgroundUpdateCheck,
+      log: () => {},
+    })
 
     //#when - session.created event contains parentID
     runSessionCreatedEvent(hook, { info: { parentID: "parent-123" } })
@@ -175,8 +152,18 @@ describe("createAutoUpdateCheckerHook", () => {
 
   it("runs only once (hasChecked guard)", async () => {
     //#given - one hook instance in normal mode
-    const createAutoUpdateCheckerHook = await importFreshHookFactory()
-    const hook = createAutoUpdateCheckerHook(createPluginInput())
+    const hook = createAutoUpdateCheckerHook(createPluginInput(), {}, {
+      getCachedVersion: mockGetCachedVersion,
+      getLocalDevVersion: mockGetLocalDevVersion,
+      showConfigErrorsIfAny: mockShowConfigErrorsIfAny,
+      updateAndShowConnectedProvidersCacheStatus: mockUpdateAndShowConnectedProvidersCacheStatus,
+      refreshModelCapabilitiesOnStartup: mockRefreshModelCapabilitiesOnStartup,
+      showModelCacheWarningIfNeeded: mockShowModelCacheWarningIfNeeded,
+      showLocalDevToast: mockShowLocalDevToast,
+      showVersionToast: mockShowVersionToast,
+      runBackgroundUpdateCheck: mockRunBackgroundUpdateCheck,
+      log: () => {},
+    })
 
     //#when - session.created event is fired twice
     runSessionCreatedEvent(hook)
@@ -195,8 +182,18 @@ describe("createAutoUpdateCheckerHook", () => {
   it("shows localDevToast when local dev version exists", async () => {
     //#given - local dev version is present
     mockGetLocalDevVersion.mockReturnValue("3.6.0-dev")
-    const createAutoUpdateCheckerHook = await importFreshHookFactory()
-    const hook = createAutoUpdateCheckerHook(createPluginInput())
+    const hook = createAutoUpdateCheckerHook(createPluginInput(), {}, {
+      getCachedVersion: mockGetCachedVersion,
+      getLocalDevVersion: mockGetLocalDevVersion,
+      showConfigErrorsIfAny: mockShowConfigErrorsIfAny,
+      updateAndShowConnectedProvidersCacheStatus: mockUpdateAndShowConnectedProvidersCacheStatus,
+      refreshModelCapabilitiesOnStartup: mockRefreshModelCapabilitiesOnStartup,
+      showModelCacheWarningIfNeeded: mockShowModelCacheWarningIfNeeded,
+      showLocalDevToast: mockShowLocalDevToast,
+      showVersionToast: mockShowVersionToast,
+      runBackgroundUpdateCheck: mockRunBackgroundUpdateCheck,
+      log: () => {},
+    })
 
     //#when - session.created event arrives
     runSessionCreatedEvent(hook)
@@ -214,8 +211,18 @@ describe("createAutoUpdateCheckerHook", () => {
 
   it("ignores non-session.created events", async () => {
     //#given - a hook instance in normal mode
-    const createAutoUpdateCheckerHook = await importFreshHookFactory()
-    const hook = createAutoUpdateCheckerHook(createPluginInput())
+    const hook = createAutoUpdateCheckerHook(createPluginInput(), {}, {
+      getCachedVersion: mockGetCachedVersion,
+      getLocalDevVersion: mockGetLocalDevVersion,
+      showConfigErrorsIfAny: mockShowConfigErrorsIfAny,
+      updateAndShowConnectedProvidersCacheStatus: mockUpdateAndShowConnectedProvidersCacheStatus,
+      refreshModelCapabilitiesOnStartup: mockRefreshModelCapabilitiesOnStartup,
+      showModelCacheWarningIfNeeded: mockShowModelCacheWarningIfNeeded,
+      showLocalDevToast: mockShowLocalDevToast,
+      showVersionToast: mockShowVersionToast,
+      runBackgroundUpdateCheck: mockRunBackgroundUpdateCheck,
+      log: () => {},
+    })
 
     //#when - a non-session.created event arrives
     hook.event({
@@ -237,9 +244,19 @@ describe("createAutoUpdateCheckerHook", () => {
 
   it("passes correct toast message with sisyphus enabled", async () => {
     //#given - sisyphus mode enabled
-    const createAutoUpdateCheckerHook = await importFreshHookFactory()
     const hook = createAutoUpdateCheckerHook(createPluginInput(), {
       isSisyphusEnabled: true,
+    }, {
+      getCachedVersion: mockGetCachedVersion,
+      getLocalDevVersion: mockGetLocalDevVersion,
+      showConfigErrorsIfAny: mockShowConfigErrorsIfAny,
+      updateAndShowConnectedProvidersCacheStatus: mockUpdateAndShowConnectedProvidersCacheStatus,
+      refreshModelCapabilitiesOnStartup: mockRefreshModelCapabilitiesOnStartup,
+      showModelCacheWarningIfNeeded: mockShowModelCacheWarningIfNeeded,
+      showLocalDevToast: mockShowLocalDevToast,
+      showVersionToast: mockShowVersionToast,
+      runBackgroundUpdateCheck: mockRunBackgroundUpdateCheck,
+      log: () => {},
     })
 
     //#when - session.created event arrives
