@@ -1,36 +1,10 @@
-import { afterAll, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
+import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
 import type { ToolContext } from "@opencode-ai/plugin/tool"
-import * as fs from "node:fs"
 import { SkillMcpManager } from "../../../features/skill-mcp-manager"
 import type { LoadedSkill } from "../../../features/opencode-skill-loader/types"
 import type { CommandInfo } from "../../slashcommand/types"
 import type { Tool as McpTool } from "@modelcontextprotocol/sdk/types.js"
-
-const originalReadFileSync = fs.readFileSync.bind(fs)
-
-let createSkillTool: typeof import("../tools").createSkillTool
-
-beforeEach(async () => {
-  mock.module("node:fs", () => ({
-    ...fs,
-    readFileSync: (path: string, encoding?: string) => {
-      if (typeof path === "string" && path.includes("/skills/")) {
-        return `---
-description: Test skill description
----
-Test skill body content`
-      }
-      return originalReadFileSync(path, encoding as BufferEncoding)
-    },
-  }))
-  
-  const module = await import("../tools")
-  createSkillTool = module.createSkillTool
-})
-
-afterAll(() => {
-  mock.restore()
-})
+import { createSkillTool } from "../tools"
 
 function createMockSkill(name: string, options: { agent?: string } = {}): LoadedSkill {
   return {
@@ -44,6 +18,11 @@ function createMockSkill(name: string, options: { agent?: string } = {}): Loaded
       agent: options.agent,
     },
     scope: "opencode-project",
+    lazyContent: {
+      loaded: true,
+      content: "Test skill body content",
+      load: async () => "Test skill body content",
+    },
   }
 }
 
@@ -59,6 +38,11 @@ function createMockSkillWithMcp(name: string, mcpServers: Record<string, unknown
     },
     scope: "opencode-project",
     mcpConfig: mcpServers as LoadedSkill["mcpConfig"],
+    lazyContent: {
+      loaded: true,
+      content: "Test skill body content",
+      load: async () => "Test skill body content",
+    },
   }
 }
 

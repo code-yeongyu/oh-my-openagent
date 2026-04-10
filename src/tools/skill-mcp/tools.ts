@@ -4,6 +4,7 @@ import { BUILTIN_MCP_TOOL_HINTS, SKILL_MCP_DESCRIPTION } from "./constants"
 import type { SkillMcpArgs } from "./types"
 import type { SkillMcpManager, SkillMcpClientInfo, SkillMcpServerContext } from "../../features/skill-mcp-manager"
 import type { LoadedSkill } from "../../features/opencode-skill-loader/types"
+import type { ClaudeCodeMcpServer } from "../../features/claude-code-mcp-loader/types"
 
 interface SkillMcpToolOptions {
   manager: SkillMcpManager
@@ -11,10 +12,18 @@ interface SkillMcpToolOptions {
   getSessionID?: () => string | undefined
 }
 
-type OperationType = { type: "tool" | "resource" | "prompt"; name: string }
+type OperationType = { type: "tool" | "resource" | "prompt" | "list_tools"; name: string }
+
+interface ResolvedMcpServer {
+  mcpName: string
+  skill: LoadedSkill
+  config: NonNullable<LoadedSkill["mcpConfig"]>[string]
+  deprecationMessage?: string
+}
 
 function validateOperationParams(args: SkillMcpArgs): OperationType {
   const operations: OperationType[] = []
+  if (args.list_tools) operations.push({ type: "list_tools", name: "list_tools" })
   if (args.tool_name) operations.push({ type: "tool", name: args.tool_name })
   if (args.resource_name) operations.push({ type: "resource", name: args.resource_name })
   if (args.prompt_name) operations.push({ type: "prompt", name: args.prompt_name })
@@ -22,7 +31,9 @@ function validateOperationParams(args: SkillMcpArgs): OperationType {
   if (operations.length === 0) {
     throw new Error(
       `Missing operation. Exactly one of tool_name, resource_name, or prompt_name must be specified.\n\n` +
+        `Legacy compatibility: list_tools=true is also supported.\n\n` +
         `Examples:\n` +
+        `  skill_mcp(mcp_name="sqlite", list_tools=true)\n` +
         `  skill_mcp(mcp_name="sqlite", tool_name="query", arguments='{"sql": "SELECT * FROM users"}')\n` +
         `  skill_mcp(mcp_name="memory", resource_name="memory://notes")\n` +
         `  skill_mcp(mcp_name="helper", prompt_name="summarize", arguments='{"text": "..."}')`,
@@ -31,6 +42,7 @@ function validateOperationParams(args: SkillMcpArgs): OperationType {
 
   if (operations.length > 1) {
     const provided = [
+      args.list_tools ? `list_tools=true` : undefined,
       args.tool_name && `tool_name="${args.tool_name}"`,
       args.resource_name && `resource_name="${args.resource_name}"`,
       args.prompt_name && `prompt_name="${args.prompt_name}"`,
@@ -39,7 +51,7 @@ function validateOperationParams(args: SkillMcpArgs): OperationType {
       .join(", ")
 
     throw new Error(
-      `Multiple operations specified. Exactly one of tool_name, resource_name, or prompt_name must be provided.\n\n` +
+      `Multiple operations specified. Exactly one of list_tools, tool_name, resource_name, or prompt_name must be provided.\n\n` +
         `Received: ${provided}\n\n` +
         `Use separate calls for each operation.`,
     )
@@ -58,6 +70,103 @@ function findMcpServer(
     }
   }
   return null
+}
+
+function findSkillByName(skillName: string, skills: LoadedSkill[]): LoadedSkill | null {
+  for (const skill of skills) {
+    if (skill.name === skillName) {
+      return skill
+    }
+  }
+  return null
+}
+
+function formatAvailableSkills(skills: LoadedSkill[]): string {
+  const skillNames = skills.map((skill) => skill.name).sort()
+  return skillNames.length > 0 ? skillNames.map((name) => `  - "${name}"`).join("\n") : "  (none found)"
+}
+
+function resolveMcpServer(args: SkillMcpArgs, skills: LoadedSkill[]): ResolvedMcpServer {
+  if (args.mcp_name) {
+    const found = findMcpServer(args.mcp_name, skills)
+    if (!found) {
+      const builtinHint = formatBuiltinMcpHint(args.mcp_name)
+      if (builtinHint) {
+        throw new Error(builtinHint)
+      }
+
+      throw new Error(
+        `MCP server "${args.mcp_name}" not found.\n\n` +
+          `Available MCP servers in loaded skills:\n` +
+          formatAvailableMcps(skills) +
+          `\n\n` +
+          `Hint: Load the skill first using the 'skill' tool, then call skill_mcp.`,
+      )
+    }
+
+    return {
+      mcpName: args.mcp_name,
+      skill: found.skill,
+      config: found.config,
+    }
+  }
+
+  if (!args.skill_name) {
+    throw new Error(
+      `Missing target MCP server. Provide mcp_name, or use legacy skill_name compatibility during the bridge window.\n\n` +
+        `Available loaded skills:\n` +
+        formatAvailableSkills(skills),
+    )
+  }
+
+  const skill = findSkillByName(args.skill_name, skills)
+  if (!skill) {
+    throw new Error(
+      `Skill "${args.skill_name}" is not loaded.\n\n` +
+        `Available loaded skills:\n` +
+        formatAvailableSkills(skills),
+    )
+  }
+
+  const mcpConfig = skill.mcpConfig
+  if (!mcpConfig || Object.keys(mcpConfig).length === 0) {
+    throw new Error(`Skill "${skill.name}" has no MCP servers configured.`)
+  }
+
+  const serverNames = Object.keys(mcpConfig)
+  if (serverNames.length !== 1) {
+    throw new Error(
+      `Legacy skill_name compatibility is ambiguous for skill "${skill.name}".\n` +
+        `This skill exposes multiple MCP servers: ${serverNames.join(", ")}.\n` +
+        `Use mcp_name="<server>" explicitly instead.`,
+    )
+  }
+
+  const [mcpName] = serverNames
+  return {
+    mcpName,
+    skill,
+    config: mcpConfig[mcpName],
+    deprecationMessage:
+      `[deprecated] skill_name="${skill.name}" compatibility is temporary. ` +
+      `Use mcp_name="${mcpName}" instead.`,
+  }
+}
+
+function getIncludedToolNames(config: ClaudeCodeMcpServer): string[] | null {
+  return Array.isArray(config.includeTools) ? config.includeTools : null
+}
+
+function formatToolListOutput(tools: Array<{ name: string; description?: string; inputSchema?: unknown }>): string {
+  return JSON.stringify(
+    tools.map((toolDefinition) => ({
+      name: toolDefinition.name,
+      description: toolDefinition.description,
+      inputSchema: toolDefinition.inputSchema,
+    })),
+    null,
+    2,
+  )
 }
 
 function formatAvailableMcps(skills: LoadedSkill[]): string {
@@ -124,7 +233,9 @@ export function createSkillMcpTool(options: SkillMcpToolOptions): ToolDefinition
   return tool({
     description: SKILL_MCP_DESCRIPTION,
     args: {
-      mcp_name: tool.schema.string().describe("Name of the MCP server from skill config"),
+      mcp_name: tool.schema.string().optional().describe("Name of the MCP server from skill config"),
+      skill_name: tool.schema.string().optional().describe("Legacy compatibility: loaded skill name to resolve when exactly one MCP server exists"),
+      list_tools: tool.schema.boolean().optional().describe("Legacy compatibility: list available tools for the resolved MCP server"),
       tool_name: tool.schema.string().optional().describe("MCP tool to call"),
       resource_name: tool.schema.string().optional().describe("MCP resource URI to read"),
       prompt_name: tool.schema.string().optional().describe("MCP prompt to get"),
@@ -140,22 +251,7 @@ export function createSkillMcpTool(options: SkillMcpToolOptions): ToolDefinition
     async execute(args: SkillMcpArgs, toolContext: ToolContext) {
       const operation = validateOperationParams(args)
       const skills = getLoadedSkills()
-      const found = findMcpServer(args.mcp_name, skills)
-
-      if (!found) {
-        const builtinHint = formatBuiltinMcpHint(args.mcp_name)
-        if (builtinHint) {
-          throw new Error(builtinHint)
-        }
-
-        throw new Error(
-          `MCP server "${args.mcp_name}" not found.\n\n` +
-            `Available MCP servers in loaded skills:\n` +
-            formatAvailableMcps(skills) +
-            `\n\n` +
-            `Hint: Load the skill first using the 'skill' tool, then call skill_mcp.`,
-        )
-      }
+      const resolved = resolveMcpServer(args, skills)
 
       const sessionID = toolContext.sessionID || getSessionID?.()
       if (!sessionID) {
@@ -163,21 +259,30 @@ export function createSkillMcpTool(options: SkillMcpToolOptions): ToolDefinition
       }
 
       const info: SkillMcpClientInfo = {
-        serverName: args.mcp_name,
-        skillName: found.skill.name,
+        serverName: resolved.mcpName,
+        skillName: resolved.skill.name,
         sessionID,
-        scope: found.skill.scope,
+        scope: resolved.skill.scope,
       }
 
       const context: SkillMcpServerContext = {
-        config: found.config,
-        skillName: found.skill.name,
+        config: resolved.config,
+        skillName: resolved.skill.name,
       }
 
       const parsedArgs = parseArguments(args.arguments)
 
       let output: string
       switch (operation.type) {
+        case "list_tools": {
+          const availableTools = await manager.listTools(info, context)
+          const includeTools = getIncludedToolNames(resolved.config)
+          const filteredTools = includeTools
+            ? availableTools.filter((toolDefinition) => includeTools.includes(toolDefinition.name))
+            : availableTools
+          output = formatToolListOutput(filteredTools)
+          break
+        }
         case "tool": {
           const result = await manager.callTool(info, context, operation.name, parsedArgs)
           output = JSON.stringify(result, null, 2)
@@ -198,7 +303,13 @@ export function createSkillMcpTool(options: SkillMcpToolOptions): ToolDefinition
           break
         }
       }
-      return applyGrepFilter(output, args.grep)
+
+      const filteredOutput = applyGrepFilter(output, args.grep)
+      if (resolved.deprecationMessage) {
+        return `${resolved.deprecationMessage}\n\n${filteredOutput}`
+      }
+
+      return filteredOutput
     },
   })
 }

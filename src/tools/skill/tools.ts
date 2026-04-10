@@ -26,6 +26,7 @@ import {
 
 export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition {
   let cachedDescription: string | null = null
+  let descriptionRefreshPromise: Promise<string> | null = null
 
   const getSkills = async (): Promise<LoadedSkill[]> => {
     clearSkillCache()
@@ -62,23 +63,41 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
 
   const buildDescription = async (force = false): Promise<string> => {
     if (!force && cachedDescription) return cachedDescription
+
+    if (descriptionRefreshPromise) {
+      return await descriptionRefreshPromise
+    }
+
+    descriptionRefreshPromise = (async () => {
     const skills = await getSkills()
     const commands = getCommands()
     const skillInfos = skills.map(loadedSkillToInfo)
     cachedDescription = formatCombinedDescription(skillInfos, commands)
-    return cachedDescription
+      return cachedDescription
+    })()
+
+    try {
+      return await descriptionRefreshPromise
+    } finally {
+      descriptionRefreshPromise = null
+    }
   }
 
   if (options.skills !== undefined) {
     const skillInfos = options.skills.map(loadedSkillToInfo)
     const commandsForDescription = options.commands ?? []
-    let needsAsyncRefresh = false
+    let asyncNativeRefreshPromise: Promise<string> | null = null
 
     if (options.nativeSkills) {
       try {
         const nativeAll = options.nativeSkills.all()
         if (isPromiseLike(nativeAll)) {
-          needsAsyncRefresh = true
+          asyncNativeRefreshPromise = nativeAll.then((resolvedNativeSkills) => {
+            const refreshedSkillInfos = options.skills!.map(loadedSkillToInfo)
+            mergeNativeSkillInfos(refreshedSkillInfos, resolvedNativeSkills)
+            cachedDescription = formatCombinedDescription(refreshedSkillInfos, commandsForDescription)
+            return cachedDescription
+          })
         } else {
           mergeNativeSkillInfos(skillInfos, nativeAll)
         }
@@ -87,8 +106,10 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
     }
 
     cachedDescription = formatCombinedDescription(skillInfos, commandsForDescription)
-    if (needsAsyncRefresh) {
-      void buildDescription(true)
+    if (asyncNativeRefreshPromise) {
+      descriptionRefreshPromise = asyncNativeRefreshPromise.finally(() => {
+        descriptionRefreshPromise = null
+      })
     }
   } else if (options.commands !== undefined) {
     cachedDescription = formatCombinedDescription([], options.commands)

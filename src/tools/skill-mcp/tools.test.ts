@@ -93,6 +93,20 @@ describe("skill_mcp tool", () => {
       ).rejects.toThrow(/not found/)
     })
 
+    it("throws when neither mcp_name nor skill_name is provided", async () => {
+      // given
+      const tool = createSkillMcpTool({
+        manager,
+        getLoadedSkills: () => loadedSkills,
+        getSessionID: () => sessionID,
+      })
+
+      // when / #then
+      await expect(
+        tool.execute({ tool_name: "some-tool" }, mockContext)
+      ).rejects.toThrow(/Missing target MCP server/)
+    })
+
     it("includes available MCP servers in error message", async () => {
       // given
       loadedSkills = [
@@ -191,6 +205,122 @@ describe("skill_mcp tool", () => {
         "some-tool",
         {},
       )
+    })
+  })
+
+  describe("legacy skill_name compatibility", () => {
+    it("maps a single-server skill_name call and returns a deprecation notice", async () => {
+      // given
+      loadedSkills = [
+        createMockSkillWithMcp("playwright", {
+          browser: { command: "echo", args: ["test"] },
+        }),
+      ]
+      const callToolSpy = spyOn(manager, "callTool").mockResolvedValue([{ text: "ok" }] as never)
+      const tool = createSkillMcpTool({
+        manager,
+        getLoadedSkills: () => loadedSkills,
+        getSessionID: () => sessionID,
+      })
+
+      // when
+      const result = await tool.execute(
+        { skill_name: "playwright", tool_name: "browser_navigate", arguments: { url: "https://example.com" } },
+        mockContext,
+      )
+
+      // then
+      expect(result).toContain('[deprecated] skill_name="playwright" compatibility is temporary')
+      expect(result).toContain('mcp_name="browser"')
+      expect(callToolSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ serverName: "browser", skillName: "playwright" }),
+        expect.any(Object),
+        "browser_navigate",
+        { url: "https://example.com" },
+      )
+    })
+
+    it("prefers mcp_name when both mcp_name and skill_name are provided", async () => {
+      // given
+      loadedSkills = [
+        createMockSkillWithMcp("playwright", {
+          browser: { command: "echo", args: ["test"] },
+        }),
+        createMockSkillWithMcp("supabase", {
+          database: { command: "echo", args: ["test"] },
+        }),
+      ]
+      const callToolSpy = spyOn(manager, "callTool").mockResolvedValue([{ text: "ok" }] as never)
+      const tool = createSkillMcpTool({
+        manager,
+        getLoadedSkills: () => loadedSkills,
+        getSessionID: () => sessionID,
+      })
+
+      // when
+      const result = await tool.execute(
+        { mcp_name: "database", skill_name: "playwright", tool_name: "query" },
+        mockContext,
+      )
+
+      // then
+      expect(result).not.toContain("[deprecated]")
+      expect(callToolSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ serverName: "database", skillName: "supabase" }),
+        expect.any(Object),
+        "query",
+        {},
+      )
+    })
+
+    it("fails deterministically when skill_name resolves to multiple MCP servers", async () => {
+      // given
+      loadedSkills = [
+        createMockSkillWithMcp("chrome-devtools", {
+          browser: { command: "echo", args: ["test"] },
+          performance: { command: "echo", args: ["test"] },
+        }),
+      ]
+      const tool = createSkillMcpTool({
+        manager,
+        getLoadedSkills: () => loadedSkills,
+        getSessionID: () => sessionID,
+      })
+
+      // when / #then
+      await expect(
+        tool.execute({ skill_name: "chrome-devtools", tool_name: "trace" }, mockContext),
+      ).rejects.toThrow(/multiple MCP servers.*Use mcp_name/s)
+    })
+
+    it("supports legacy list_tools and respects includeTools filtering", async () => {
+      // given
+      loadedSkills = [
+        createMockSkillWithMcp("supabase", {
+          database: {
+            command: "echo",
+            args: ["test"],
+            includeTools: ["list_tables"],
+          },
+        }),
+      ]
+      spyOn(manager, "listTools").mockResolvedValue([
+        { name: "list_tables", description: "List tables", inputSchema: { type: "object" } },
+        { name: "execute_sql", description: "Execute SQL", inputSchema: { type: "object" } },
+      ] as never)
+      const tool = createSkillMcpTool({
+        manager,
+        getLoadedSkills: () => loadedSkills,
+        getSessionID: () => sessionID,
+      })
+
+      // when
+      const result = await tool.execute({ skill_name: "supabase", list_tools: true }, mockContext)
+
+      // then
+      expect(result).toContain("list_tables")
+      expect(result).not.toContain("execute_sql")
+      expect(result).toContain('[deprecated] skill_name="supabase" compatibility is temporary')
     })
   })
 })
