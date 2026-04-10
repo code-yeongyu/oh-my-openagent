@@ -23,8 +23,11 @@ import {
   validateNonTuiArgs,
 } from "./install-validators"
 import { getUnsupportedOpenCodeVersionMessage } from "./minimum-opencode-version"
+import { createCliPostHog, getPostHogDistinctId } from "../shared/posthog"
 
 export async function runCliInstaller(args: InstallArgs, version: string): Promise<number> {
+  const posthog = createCliPostHog()
+  const distinctId = getPostHogDistinctId()
   const validation = validateNonTuiArgs(args)
   if (!validation.valid) {
     printHeader(false)
@@ -62,6 +65,8 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
     const unsupportedVersionMessage = getUnsupportedOpenCodeVersionMessage(openCodeVersion)
     if (unsupportedVersionMessage) {
       printWarning(unsupportedVersionMessage)
+      posthog.capture({ distinctId, event: "install_failed", properties: { reason: "unsupported_opencode_version", is_update: isUpdate } })
+      await posthog.shutdown()
       return 1
     }
   }
@@ -77,6 +82,8 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
   const pluginResult = await addPluginToOpenCodeConfig(version)
   if (!pluginResult.success) {
     printError(`Failed: ${pluginResult.error}`)
+    posthog.capture({ distinctId, event: "install_failed", properties: { reason: "plugin_config_write_failed", is_update: isUpdate } })
+    await posthog.shutdown()
     return 1
   }
   printSuccess(
@@ -87,6 +94,8 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
   const omoResult = writeOmoConfig(config)
   if (!omoResult.success) {
     printError(`Failed: ${omoResult.error}`)
+    posthog.capture({ distinctId, event: "install_failed", properties: { reason: "omo_config_write_failed", is_update: isUpdate } })
+    await posthog.shutdown()
     return 1
   }
   printSuccess(`Config written ${SYMBOLS.arrow} ${color.dim(omoResult.configPath)}`)
@@ -128,6 +137,20 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
   console.log()
   console.log(color.dim("oMoMoMoMo... Enjoy!"))
   console.log()
+
+  posthog.capture({
+    distinctId,
+    event: "install_completed",
+    properties: {
+      is_update: isUpdate,
+      has_claude: config.hasClaude,
+      has_openai: config.hasOpenAI,
+      has_gemini: config.hasGemini,
+      has_copilot: config.hasCopilot,
+      has_opencode_zen: config.hasOpencodeZen,
+    },
+  })
+  await posthog.shutdown()
 
   if ((config.hasClaude || config.hasGemini || config.hasCopilot) && !args.skipAuth) {
     printBox(

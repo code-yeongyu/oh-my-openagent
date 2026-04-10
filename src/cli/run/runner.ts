@@ -12,6 +12,7 @@ import { pollForCompletion } from "./poll-for-completion"
 import { loadAgentProfileColors } from "./agent-profile-colors"
 import { suppressRunInput } from "./stdin-suppression"
 import { createTimestampedStdoutController } from "./timestamp-output"
+import { createCliPostHog, getPostHogDistinctId } from "../../shared/posthog"
 
 export { resolveRunAgent }
 
@@ -49,6 +50,18 @@ export async function run(options: RunOptions): Promise<number> {
   const pluginConfig = loadPluginConfig(directory, { command: "run" })
   const resolvedAgent = resolveRunAgent(options, pluginConfig)
   const abortController = new AbortController()
+
+  const posthog = createCliPostHog()
+  const distinctId = getPostHogDistinctId()
+  posthog.capture({
+    distinctId,
+    event: "run_started",
+    properties: {
+      agent: resolvedAgent,
+      has_model: !!options.model,
+      has_session_id: !!options.sessionId,
+    },
+  })
 
   try {
     const resolvedModel = resolveRunModel(options.model)
@@ -141,6 +154,28 @@ export async function run(options: RunOptions): Promise<number> {
         })
       }
 
+      if (exitCode === 0) {
+        posthog.capture({
+          distinctId,
+          event: "run_completed",
+          properties: {
+            agent: resolvedAgent,
+            duration_ms: durationMs,
+            message_count: eventState.messageCount,
+          },
+        })
+      } else if (exitCode === 1) {
+        posthog.capture({
+          distinctId,
+          event: "run_failed",
+          properties: {
+            agent: resolvedAgent,
+            exit_code: exitCode,
+            duration_ms: durationMs,
+          },
+        })
+      }
+
       return exitCode
     } catch (err) {
       cleanup()
@@ -155,9 +190,20 @@ export async function run(options: RunOptions): Promise<number> {
     if (err instanceof Error && err.name === "AbortError") {
       return 130
     }
+    posthog.captureException(err, distinctId)
+    posthog.capture({
+      distinctId,
+      event: "run_failed",
+      properties: {
+        agent: resolvedAgent,
+        error: serializeError(err),
+        duration_ms: Date.now() - startTime,
+      },
+    })
     console.error(pc.red(`Error: ${serializeError(err)}`))
     return 1
   } finally {
+    await posthog.shutdown()
     timestampOutput?.restore()
   }
 }
