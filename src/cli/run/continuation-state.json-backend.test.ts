@@ -8,6 +8,7 @@ const testDirs: string[] = []
 
 const TEST_STORAGE_ROOT = join(tmpdir(), `omo-run-json-storage-${Date.now()}`)
 const TEST_MESSAGE_STORAGE = join(TEST_STORAGE_ROOT, "message")
+const sessionLastAgentBySessionID = new Map<string, string | null>()
 
 mock.module("../../shared/opencode-storage-detection", () => ({
   isSqliteBackend: () => false,
@@ -20,9 +21,21 @@ mock.module("../../shared/opencode-message-dir", () => ({
   },
 }))
 
+mock.module("../../hooks/atlas/session-last-agent", () => ({
+  getLastAgentFromSession: async (sessionID: string) => {
+    return sessionLastAgentBySessionID.get(sessionID) ?? null
+  },
+}))
+mock.module("../../hooks/atlas/session-last-agent.ts", () => ({
+  getLastAgentFromSession: async (sessionID: string) => {
+    return sessionLastAgentBySessionID.get(sessionID) ?? null
+  },
+}))
+
 afterAll(() => { mock.restore() })
 
 afterEach(() => {
+  sessionLastAgentBySessionID.clear()
   while (testDirs.length > 0) {
     const dir = testDirs.pop()
     if (dir) {
@@ -73,6 +86,7 @@ describe("getContinuationState JSON backend descendant coverage", () => {
     }), "utf-8")
     writeJsonMessage("ses_child_session", "msg_001.json", "atlas")
     writeJsonMessage("ses_child_session", "msg_002.json", "compaction")
+    sessionLastAgentBySessionID.set("ses_child_session", "atlas")
 
     const { getContinuationState } = await import("./continuation-state")
 
@@ -150,6 +164,7 @@ describe("getContinuationState JSON backend descendant coverage", () => {
       model: { providerID: "openai", modelID: "gpt-5.4" },
       time: { created: 100 },
     }), "utf-8")
+    sessionLastAgentBySessionID.set(sessionID, "sisyphus-junior")
 
     const { getContinuationState } = await import("./continuation-state")
 

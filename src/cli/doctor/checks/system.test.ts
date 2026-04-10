@@ -1,12 +1,15 @@
 /// <reference types="bun-types" />
 
-import { afterAll, beforeEach, describe, expect, it, mock } from "bun:test"
+import { beforeEach, describe, expect, it, mock } from "bun:test"
 import { PLUGIN_NAME } from "../../../shared"
 import type { PluginInfo } from "./system-plugin"
+import type { OpenCodeBinaryInfo } from "./system-binary"
+import { checkSystem } from "./system"
 
-type SystemModule = typeof import("./system")
-
-const mockFindOpenCodeBinary = mock(async () => ({ path: "/usr/local/bin/opencode" }))
+const mockFindOpenCodeBinary = mock<() => Promise<OpenCodeBinaryInfo | null>>(async () => ({
+  binary: "opencode",
+  path: "/usr/local/bin/opencode",
+}))
 const mockGetOpenCodeVersion = mock(async () => "1.0.200")
 const mockCompareVersions = mock((_leftVersion?: string, _rightVersion?: string) => true)
 const mockGetPluginInfo = mock((): PluginInfo => ({
@@ -27,35 +30,17 @@ const mockGetLoadedPluginVersion = mock(() => ({
 const mockGetLatestPluginVersion = mock(async (_currentVersion: string | null) => null as string | null)
 const mockGetSuggestedInstallTag = mock(() => "latest")
 
-const realSystemBinary = require("./system-binary")
-const realSystemPlugin = require("./system-plugin")
-const realSystemLoadedVersion = require("./system-loaded-version")
 
-afterAll(() => {
-  mock.module("./system-binary", () => realSystemBinary)
-  mock.module("./system-plugin", () => realSystemPlugin)
-  mock.module("./system-loaded-version", () => realSystemLoadedVersion)
-  mock.restore()
-})
-
-async function importFreshSystemModule(): Promise<SystemModule> {
-  mock.module("./system-binary", () => ({
+function createSystemDeps() {
+  return {
     findOpenCodeBinary: mockFindOpenCodeBinary,
     getOpenCodeVersion: mockGetOpenCodeVersion,
     compareVersions: mockCompareVersions,
-  }))
-
-  mock.module("./system-plugin", () => ({
     getPluginInfo: mockGetPluginInfo,
-  }))
-
-  mock.module("./system-loaded-version", () => ({
     getLoadedPluginVersion: mockGetLoadedPluginVersion,
     getLatestPluginVersion: mockGetLatestPluginVersion,
     getSuggestedInstallTag: mockGetSuggestedInstallTag,
-  }))
-
-  return import(`./system?test=${Date.now()}-${Math.random()}`)
+  }
 }
 
 describe("system check", () => {
@@ -68,7 +53,10 @@ describe("system check", () => {
     mockGetLatestPluginVersion.mockReset()
     mockGetSuggestedInstallTag.mockReset()
 
-    mockFindOpenCodeBinary.mockResolvedValue({ path: "/usr/local/bin/opencode" })
+    mockFindOpenCodeBinary.mockResolvedValue({
+      binary: "opencode",
+      path: "/usr/local/bin/opencode",
+    })
     mockGetOpenCodeVersion.mockResolvedValue("1.0.200")
     mockCompareVersions.mockReturnValue(true)
     mockGetPluginInfo.mockReturnValue({
@@ -93,10 +81,8 @@ describe("system check", () => {
   describe("#given cache directory contains spaces", () => {
     it("uses a quoted cache directory in mismatch fix command", async () => {
       //#given
-      const { checkSystem } = await importFreshSystemModule()
-
       //#when
-      const result = await checkSystem()
+      const result = await checkSystem(createSystemDeps())
 
       //#then
       const mismatchIssue = result.issues.find((issue) => issue.title === "Loaded plugin version mismatch")
@@ -114,13 +100,12 @@ describe("system check", () => {
       })
       mockGetLatestPluginVersion.mockResolvedValue("3.0.0-canary.2")
       mockGetSuggestedInstallTag.mockReturnValue("canary")
-      mockCompareVersions.mockImplementation((leftVersion?: string, rightVersion?: string) => {
-        return !(leftVersion === "3.0.0-canary.1" && rightVersion === "3.0.0-canary.2")
-      })
-      const { checkSystem } = await importFreshSystemModule()
+      mockCompareVersions
+        .mockImplementationOnce(() => true)
+        .mockImplementationOnce(() => false)
 
       //#when
-      const result = await checkSystem()
+      const result = await checkSystem(createSystemDeps())
 
       //#then
       const outdatedIssue = result.issues.find((issue) => issue.title === "Loaded plugin is outdated")
@@ -141,10 +126,9 @@ describe("system check", () => {
         configPath: null,
         isLocalDev: false,
       })
-      const { checkSystem } = await importFreshSystemModule()
 
       //#when
-      const result = await checkSystem()
+      const result = await checkSystem(createSystemDeps())
 
       //#then
       const legacyEntryIssue = result.issues.find((issue) => issue.title === "Using legacy package name")
@@ -164,10 +148,9 @@ describe("system check", () => {
         configPath: null,
         isLocalDev: false,
       })
-      const { checkSystem } = await importFreshSystemModule()
 
       //#when
-      const result = await checkSystem()
+      const result = await checkSystem(createSystemDeps())
 
       //#then
       const legacyEntryIssue = result.issues.find((issue) => issue.title === "Using legacy package name")
@@ -187,10 +170,9 @@ describe("system check", () => {
         configPath: null,
         isLocalDev: false,
       })
-      const { checkSystem } = await importFreshSystemModule()
 
       //#when
-      const result = await checkSystem()
+      const result = await checkSystem(createSystemDeps())
 
       //#then
       expect(result.issues.some((issue) => issue.title === "Using legacy package name")).toBe(false)
@@ -206,10 +188,9 @@ describe("system check", () => {
         configPath: null,
         isLocalDev: true,
       })
-      const { checkSystem } = await importFreshSystemModule()
 
       //#when
-      const result = await checkSystem()
+      const result = await checkSystem(createSystemDeps())
 
       //#then
       expect(result.issues.some((issue) => issue.title === "Using legacy package name")).toBe(false)
