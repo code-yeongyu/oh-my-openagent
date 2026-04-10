@@ -1,4 +1,4 @@
-import { describe, expect, mock, spyOn, test } from "bun:test"
+import { beforeEach, describe, expect, mock, spyOn, test } from "bun:test"
 import { tool } from "@opencode-ai/plugin"
 
 import type { OhMyOpenCodeConfig } from "../config"
@@ -25,7 +25,12 @@ const syncSessionCreatedCallbacks: Array<
   ((event: { sessionID: string; parentID: string; title: string }) => Promise<void>) | undefined
 > = []
 
-mock.module("../tools", () => ({
+const trackedPaneBySession = new Map<string, string>()
+let dispatchOpenClawEvent: ReturnType<typeof spyOn>
+
+const { createToolRegistry, trimToolsToCap } = await import("./tool-registry")
+
+const toolFactories: NonNullable<Parameters<typeof createToolRegistry>[0]["toolFactories"]> = {
   builtinTools: { bash: fakeTool, read: fakeTool },
   createBackgroundTools: mock(() => ({})),
   createCallOmoAgent: mock(() => fakeTool),
@@ -47,12 +52,7 @@ mock.module("../tools", () => ({
   createTaskList: mock(() => fakeTool),
   createTaskUpdateTool: mock(() => fakeTool),
   createHashlineEditTool: mock(() => fakeTool),
-}))
-
-const trackedPaneBySession = new Map<string, string>()
-
-const { createToolRegistry, trimToolsToCap } = await import("./tool-registry")
-const dispatchOpenClawEvent = spyOn(openclawRuntimeDispatch, "dispatchOpenClawEvent")
+}
 
 function createPluginConfig(overrides: Partial<OhMyOpenCodeConfig> = {}): OhMyOpenCodeConfig {
   return {
@@ -64,6 +64,11 @@ function createPluginConfig(overrides: Partial<OhMyOpenCodeConfig> = {}): OhMyOp
     ...overrides,
   }
 }
+
+beforeEach(() => {
+  dispatchOpenClawEvent = spyOn(openclawRuntimeDispatch, "dispatchOpenClawEvent")
+  syncSessionCreatedCallbacks.length = 0
+})
 
 describe("#given tool trimming prioritization", () => {
   test("#when max_tools trims a hashline edit registration named edit #then edit is removed before higher-priority tools", () => {
@@ -100,6 +105,7 @@ describe("#given task_system configuration", () => {
         disabledSkills: new Set(),
       },
       availableCategories: [],
+      toolFactories,
     })
 
     expect(result.taskSystemEnabled).toBe(false)
@@ -129,6 +135,7 @@ describe("#given task_system configuration", () => {
         disabledSkills: new Set(),
       },
       availableCategories: [],
+      toolFactories,
     })
 
     expect(result.taskSystemEnabled).toBe(true)
@@ -168,6 +175,7 @@ describe("#given tmux integration is disabled", () => {
       },
       availableCategories: [],
       interactiveBashEnabled: true,
+      toolFactories,
     })
 
     expect(result.filteredTools).toHaveProperty("interactive_bash")
@@ -201,6 +209,7 @@ describe("#given tmux integration is disabled", () => {
       },
       availableCategories: [],
       interactiveBashEnabled: false,
+      toolFactories,
     })
 
     expect(result.filteredTools).not.toHaveProperty("interactive_bash")
@@ -246,6 +255,7 @@ describe("#given openclaw is enabled for sync task sessions", () => {
         disabledSkills: new Set(),
       },
       availableCategories: [],
+      toolFactories,
     })
 
     const onSyncSessionCreated = syncSessionCreatedCallbacks[syncSessionCreatedCallbacks.length - 1]
