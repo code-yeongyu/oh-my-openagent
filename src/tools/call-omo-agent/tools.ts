@@ -10,6 +10,7 @@ import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { normalizeFallbackModels } from "../../shared/model-resolver"
 import { buildFallbackChainFromModels } from "../../shared/fallback-chain-from-models"
 import { log } from "../../shared"
+import { CONFIG_BASENAME } from "../../shared/plugin-identity"
 import { parseModelString } from "../delegate-task/model-string-parser"
 import { executeBackground } from "./background-executor"
 import { executeSync } from "./sync-executor"
@@ -117,7 +118,7 @@ export function createCallOmoAgent(
 
       // Check if agent is disabled
       if (disabledAgents.some((disabled) => disabled.toLowerCase() === normalizedAgent)) {
-        return `Error: Agent "${normalizedAgent}" is disabled via disabled_agents configuration. Remove it from disabled_agents in your oh-my-opencode.json to use it.`
+        return `Error: Agent "${normalizedAgent}" is disabled via disabled_agents configuration. Remove it from disabled_agents in your ${CONFIG_BASENAME}.json to use it.`
       }
 
       const { model: resolvedModel, fallbackChain } = resolveModelAndFallbackChain({

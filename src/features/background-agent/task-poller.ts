@@ -1,4 +1,5 @@
 import { log } from "../../shared"
+import { CONFIG_BASENAME } from "../../shared/plugin-identity"
 
 import type { BackgroundTaskConfig } from "../../config/schema"
 import type { BackgroundTask } from "./types"
@@ -158,7 +159,7 @@ export async function checkAndInterruptStaleTasks(args: {
       const staleMinutes = Math.round(runtime / 60000)
       const reason = sessionGone ? "session gone from status registry" : "no activity"
       task.status = "cancelled"
-      task.error = `Stale timeout (${reason} for ${staleMinutes}min since start). This is a FINAL cancellation - do NOT create a replacement task. If the timeout is too short, increase 'background_task.${sessionGone ? "sessionGoneTimeoutMs" : "staleTimeoutMs"}' in .opencode/oh-my-opencode.json.`
+      task.error = `Stale timeout (${reason} for ${staleMinutes}min since start). This is a FINAL cancellation - do NOT create a replacement task. If the timeout is too short, increase 'background_task.${sessionGone ? "sessionGoneTimeoutMs" : "staleTimeoutMs"}' in .opencode/${CONFIG_BASENAME}.json.`
       task.completedAt = new Date()
 
       if (task.concurrencyKey) {
@@ -196,7 +197,7 @@ export async function checkAndInterruptStaleTasks(args: {
     const staleMinutes = Math.round(timeSinceLastUpdate / 60000)
     const reason = sessionGone ? "session gone from status registry" : "no activity"
     task.status = "cancelled"
-    task.error = `Stale timeout (${reason} for ${staleMinutes}min). This is a FINAL cancellation - do NOT create a replacement task. If the timeout is too short, increase 'background_task.${sessionGone ? "sessionGoneTimeoutMs" : "staleTimeoutMs"}' in .opencode/oh-my-opencode.json.`
+    task.error = `Stale timeout (${reason} for ${staleMinutes}min). This is a FINAL cancellation - do NOT create a replacement task. If the timeout is too short, increase 'background_task.${sessionGone ? "sessionGoneTimeoutMs" : "staleTimeoutMs"}' in .opencode/${CONFIG_BASENAME}.json.`
     task.completedAt = new Date()
 
     if (task.concurrencyKey) {

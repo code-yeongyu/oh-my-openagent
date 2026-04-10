@@ -5,6 +5,7 @@ import { existsSync, statSync } from "fs"
 import { LSPClient, lspManager } from "./client"
 import { findServerForExtension } from "./config"
 import type { ServerLookupResult } from "./types"
+import { CONFIG_BASENAME } from "../../shared/plugin-identity"
 
 export function isDirectoryPath(filePath: string): boolean {
   if (!existsSync(filePath)) {
@@ -63,7 +64,7 @@ export function formatServerLookupError(result: Exclude<ServerLookupResult, { st
     ``,
     `Available servers: ${result.availableServers.slice(0, 10).join(", ")}${result.availableServers.length > 10 ? "..." : ""}`,
     ``,
-    `To add a custom server, configure 'lsp' in oh-my-opencode.json:`,
+    `To add a custom server, configure 'lsp' in ${CONFIG_BASENAME}.json:`,
     `  {`,
     `    "lsp": {`,
     `      "my-server": {`,

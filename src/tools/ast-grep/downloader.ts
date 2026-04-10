@@ -11,6 +11,7 @@ import {
   getCachedBinaryPath as getCachedBinaryPathShared,
 } from "../../shared/binary-downloader"
 import { log } from "../../shared/logger"
+import { CACHE_DIR_NAME, PUBLISHED_PACKAGE_NAME } from "../../shared/plugin-identity"
 
 const REPO = "ast-grep/ast-grep"
 
@@ -47,12 +48,12 @@ export function getCacheDir(): string {
   if (process.platform === "win32") {
     const localAppData = process.env.LOCALAPPDATA || process.env.APPDATA
     const base = localAppData || join(homedir(), "AppData", "Local")
-    return join(base, "oh-my-opencode", "bin")
+    return join(base, CACHE_DIR_NAME, "bin")
   }
 
   const xdgCache = process.env.XDG_CACHE_HOME
   const base = xdgCache || join(homedir(), ".cache")
-  return join(base, "oh-my-opencode", "bin")
+  return join(base, CACHE_DIR_NAME, "bin")
 }
 
 export function getBinaryName(): string {
@@ -70,7 +71,7 @@ export async function downloadAstGrep(version: string = DEFAULT_VERSION): Promis
   const platformInfo = PLATFORM_MAP[platformKey]
 
   if (!platformInfo) {
-    log(`[oh-my-opencode] Unsupported platform for ast-grep: ${platformKey}`)
+    log(`[${PUBLISHED_PACKAGE_NAME}] Unsupported platform for ast-grep: ${platformKey}`)
     return null
   }
 
@@ -86,7 +87,7 @@ export async function downloadAstGrep(version: string = DEFAULT_VERSION): Promis
   const assetName = `app-${arch}-${os}.zip`
   const downloadUrl = `https://github.com/${REPO}/releases/download/${version}/${assetName}`
 
-  log(`[oh-my-opencode] Downloading ast-grep binary...`)
+  log(`[${PUBLISHED_PACKAGE_NAME}] Downloading ast-grep binary...`)
 
   try {
     const archivePath = join(cacheDir, assetName)
@@ -96,12 +97,12 @@ export async function downloadAstGrep(version: string = DEFAULT_VERSION): Promis
     cleanupArchive(archivePath)
     ensureExecutable(binaryPath)
 
-    log(`[oh-my-opencode] ast-grep binary ready.`)
+    log(`[${PUBLISHED_PACKAGE_NAME}] ast-grep binary ready.`)
 
     return binaryPath
   } catch (err) {
     log(
-      `[oh-my-opencode] Failed to download ast-grep: ${err instanceof Error ? err.message : err}`
+      `[${PUBLISHED_PACKAGE_NAME}] Failed to download ast-grep: ${err instanceof Error ? err.message : err}`
     )
     return null
   }
