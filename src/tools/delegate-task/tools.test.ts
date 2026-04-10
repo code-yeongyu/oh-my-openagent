@@ -261,6 +261,13 @@ describe("sisyphus-task", () => {
       expect(result).toBe(true)
     })
 
+    test("returns false for non-plan-family agent display names", () => {
+      //#given / #when / #then
+      expect(isPlanFamily("Momus (Plan Critic)")).toBe(false)
+      expect(isPlanFamily("Metis (Plan Consultant)")).toBe(false)
+      expect(isPlanFamily("Atlas (Plan Executor)")).toBe(false)
+    })
+
     test("returns true for 'prometheus'", () => {
       //#given / #when
       const result = isPlanFamily("prometheus")
