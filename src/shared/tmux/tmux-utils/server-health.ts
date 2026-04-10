@@ -58,4 +58,5 @@ export async function isServerRunning(serverUrl: string): Promise<boolean> {
 export function resetServerCheck(): void {
 	serverAvailable = null
 	serverCheckUrl = null
+	delete (globalThis as Record<symbol, boolean>)[SERVER_RUNNING_KEY]
 }
