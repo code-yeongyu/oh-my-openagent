@@ -1,7 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { log } from "../../shared/logger"
-import { getCachedVersion, getLocalDevVersion } from "./checker"
 import type { AutoUpdateCheckerOptions } from "./types"
+import { getCachedVersion, getLocalDevVersion } from "./checker"
 import { runBackgroundUpdateCheck } from "./hook/background-update-check"
 import { showConfigErrorsIfAny } from "./hook/config-errors-toast"
 import { updateAndShowConnectedProvidersCacheStatus } from "./hook/connected-providers-status"
@@ -9,7 +9,37 @@ import { refreshModelCapabilitiesOnStartup } from "./hook/model-capabilities-sta
 import { showModelCacheWarningIfNeeded } from "./hook/model-cache-warning"
 import { showLocalDevToast, showVersionToast } from "./hook/startup-toasts"
 
-export function createAutoUpdateCheckerHook(ctx: PluginInput, options: AutoUpdateCheckerOptions = {}) {
+interface AutoUpdateCheckerDeps {
+  getCachedVersion: typeof getCachedVersion
+  getLocalDevVersion: typeof getLocalDevVersion
+  showConfigErrorsIfAny: typeof showConfigErrorsIfAny
+  updateAndShowConnectedProvidersCacheStatus: typeof updateAndShowConnectedProvidersCacheStatus
+  refreshModelCapabilitiesOnStartup: typeof refreshModelCapabilitiesOnStartup
+  showModelCacheWarningIfNeeded: typeof showModelCacheWarningIfNeeded
+  showLocalDevToast: typeof showLocalDevToast
+  showVersionToast: typeof showVersionToast
+  runBackgroundUpdateCheck: typeof runBackgroundUpdateCheck
+  log: typeof log
+}
+
+const defaultDeps: AutoUpdateCheckerDeps = {
+  getCachedVersion,
+  getLocalDevVersion,
+  showConfigErrorsIfAny,
+  updateAndShowConnectedProvidersCacheStatus,
+  refreshModelCapabilitiesOnStartup,
+  showModelCacheWarningIfNeeded,
+  showLocalDevToast,
+  showVersionToast,
+  runBackgroundUpdateCheck,
+  log,
+}
+
+export function createAutoUpdateCheckerHook(
+  ctx: PluginInput,
+  options: AutoUpdateCheckerOptions = {},
+  deps: AutoUpdateCheckerDeps = defaultDeps,
+) {
   const {
     showStartupToast = true,
     isSisyphusEnabled = false,
@@ -40,32 +70,32 @@ export function createAutoUpdateCheckerHook(ctx: PluginInput, options: AutoUpdat
       const props = event.properties as { info?: { parentID?: string } } | undefined
       if (props?.info?.parentID) return
 
-      hasChecked = true
+        hasChecked = true
 
       setTimeout(async () => {
-        const cachedVersion = getCachedVersion()
-        const localDevVersion = getLocalDevVersion(ctx.directory)
+        const cachedVersion = deps.getCachedVersion()
+        const localDevVersion = deps.getLocalDevVersion(ctx.directory)
         const displayVersion = localDevVersion ?? cachedVersion
 
-        await showConfigErrorsIfAny(ctx)
-        await updateAndShowConnectedProvidersCacheStatus(ctx)
-        await refreshModelCapabilitiesOnStartup(modelCapabilities)
-        await showModelCacheWarningIfNeeded(ctx)
+        await deps.showConfigErrorsIfAny(ctx)
+        await deps.updateAndShowConnectedProvidersCacheStatus(ctx)
+        await deps.refreshModelCapabilitiesOnStartup(modelCapabilities)
+        await deps.showModelCacheWarningIfNeeded(ctx)
 
         if (localDevVersion) {
           if (showStartupToast) {
-            showLocalDevToast(ctx, displayVersion, isSisyphusEnabled).catch(() => {})
+            deps.showLocalDevToast(ctx, displayVersion, isSisyphusEnabled).catch(() => {})
           }
-          log("[auto-update-checker] Local development mode")
+          deps.log("[auto-update-checker] Local development mode")
           return
         }
 
         if (showStartupToast) {
-          showVersionToast(ctx, displayVersion, getToastMessage(false)).catch(() => {})
+          deps.showVersionToast(ctx, displayVersion, getToastMessage(false)).catch(() => {})
         }
 
-        runBackgroundUpdateCheck(ctx, autoUpdate, getToastMessage).catch((err) => {
-          log("[auto-update-checker] Background update check failed:", err)
+        deps.runBackgroundUpdateCheck(ctx, autoUpdate, getToastMessage).catch((err) => {
+          deps.log("[auto-update-checker] Background update check failed:", err)
         })
       }, 0)
     },
