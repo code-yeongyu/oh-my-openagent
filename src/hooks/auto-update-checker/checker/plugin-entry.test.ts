@@ -42,6 +42,7 @@ function runFindPluginEntry(
 describe("findPluginEntry", () => {
   let temporaryDirectory: string
   let configPath: string
+  let rootConfigPath: string
   let originalConfigDir: string | undefined
 
   beforeEach(() => {
@@ -50,6 +51,7 @@ describe("findPluginEntry", () => {
     const opencodeDirectory = path.join(temporaryDirectory, ".opencode")
     fs.mkdirSync(opencodeDirectory, { recursive: true })
     configPath = path.join(opencodeDirectory, "opencode.json")
+    rootConfigPath = path.join(temporaryDirectory, "opencode.json")
   })
 
   afterEach(() => {
@@ -74,6 +76,22 @@ describe("findPluginEntry", () => {
     expect(pluginInfo).not.toBeNull()
     expect(pluginInfo?.isPinned).toBe(false)
     expect(pluginInfo?.pinnedVersion).toBeNull()
+  })
+
+  test("reads project root opencode.json before .opencode config", async () => {
+    // #given project root config contains the active plugin entry
+    fs.writeFileSync(rootConfigPath, JSON.stringify({ plugin: [PLUGIN_NAME] }))
+    fs.writeFileSync(configPath, JSON.stringify({ plugin: ["some-other-plugin"] }))
+
+    // #when plugin entry is detected
+    const execution = runFindPluginEntry(temporaryDirectory)
+
+    // #then the project root config is recognized
+    expect(execution.status).toBe(0)
+    const pluginInfo = JSON.parse(execution.stdout.trim()) as PluginEntryResult
+    expect(pluginInfo).not.toBeNull()
+    expect(pluginInfo?.entry).toBe(PLUGIN_NAME)
+    expect(pluginInfo?.configPath).toBe(rootConfigPath)
   })
 
   test("returns unpinned for latest dist-tag", async () => {

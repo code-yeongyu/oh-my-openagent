@@ -56,3 +56,7 @@ export const INSTALLED_PACKAGE_JSON = path.join(
 export const INSTALLED_PACKAGE_JSON_CANDIDATES = ACCEPTED_PACKAGE_NAMES.map(
   name => path.join(CACHE_DIR, "node_modules", name, "package.json")
 )
+
+export const CONFIG_DIR_PACKAGE_JSON_CANDIDATES = ACCEPTED_PACKAGE_NAMES.map(
+  name => path.join(getUserConfigDir(), "node_modules", name, "package.json")
+)

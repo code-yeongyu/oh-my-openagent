@@ -10,6 +10,8 @@ import {
 export function getConfigPaths(directory: string): string[] {
   const userConfigDir = getUserConfigDir()
   const paths = [
+    path.join(directory, "opencode.json"),
+    path.join(directory, "opencode.jsonc"),
     path.join(directory, ".opencode", "opencode.json"),
     path.join(directory, ".opencode", "opencode.jsonc"),
     getUserOpencodeConfig(),
