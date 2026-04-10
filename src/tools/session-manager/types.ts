@@ -80,6 +80,7 @@ export interface SessionReadArgs {
   include_todos?: boolean
   include_transcript?: boolean
   limit?: number
+  focus?: string
 }
 
 export interface SessionSearchArgs {

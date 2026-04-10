@@ -67,6 +67,7 @@ export function createSessionManagerTools(ctx: PluginInput): Record<string, Tool
       include_todos: tool.schema.boolean().optional().describe("Include todo list if available (default: false)"),
       include_transcript: tool.schema.boolean().optional().describe("Include transcript log if available (default: false)"),
       limit: tool.schema.number().optional().describe("Maximum number of messages to return (default: all)"),
+      focus: tool.schema.string().optional().describe("Legacy compatibility: keyword filter (maps to search)"),
     },
     execute: async (args: SessionReadArgs, _context) => {
       try {
@@ -78,6 +79,14 @@ export function createSessionManagerTools(ctx: PluginInput): Record<string, Tool
 
         if (messages.length === 0) {
           return `Session not found: ${args.session_id}`
+        }
+
+        if (args.focus) {
+          const focusLower = args.focus.toLowerCase()
+          messages = messages.filter((msg) => {
+            const text = msg.parts.map((p) => p.text ?? "").join(" ").toLowerCase()
+            return text.includes(focusLower)
+          })
         }
 
         if (args.limit && args.limit > 0) {
@@ -154,5 +163,5 @@ export function createSessionManagerTools(ctx: PluginInput): Record<string, Tool
     },
   })
 
-  return { session_list, session_read, session_search, session_info }
+  return { session_list, session_read, session_search, session_info, find_sessions: session_search, read_session: session_read }
 }
