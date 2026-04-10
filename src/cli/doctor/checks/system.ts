@@ -8,6 +8,26 @@ import { getLatestPluginVersion, getLoadedPluginVersion, getSuggestedInstallTag 
 import { parseJsonc } from "../../../shared"
 import { PUBLISHED_PACKAGE_NAME, PLUGIN_NAME, LEGACY_PLUGIN_NAME } from "../../../shared/plugin-identity"
 
+interface SystemCheckDeps {
+  findOpenCodeBinary: typeof findOpenCodeBinary
+  getOpenCodeVersion: typeof getOpenCodeVersion
+  compareVersions: typeof compareVersions
+  getPluginInfo: typeof getPluginInfo
+  getLoadedPluginVersion: typeof getLoadedPluginVersion
+  getLatestPluginVersion: typeof getLatestPluginVersion
+  getSuggestedInstallTag: typeof getSuggestedInstallTag
+}
+
+const defaultDeps: SystemCheckDeps = {
+  findOpenCodeBinary,
+  getOpenCodeVersion,
+  compareVersions,
+  getPluginInfo,
+  getLoadedPluginVersion,
+  getLatestPluginVersion,
+  getSuggestedInstallTag,
+}
+
 function isConfigValid(configPath: string | null): boolean {
   if (!configPath) return true
   if (!existsSync(configPath)) return false
@@ -32,11 +52,14 @@ function buildMessage(status: CheckResult["status"], issues: DoctorIssue[]): str
   return `${issues.length} system warning(s) detected`
 }
 
-export async function gatherSystemInfo(): Promise<SystemInfo> {
-  const [binaryInfo, pluginInfo] = await Promise.all([findOpenCodeBinary(), Promise.resolve(getPluginInfo())])
-  const loadedInfo = getLoadedPluginVersion()
+export async function gatherSystemInfo(deps: SystemCheckDeps = defaultDeps): Promise<SystemInfo> {
+  const [binaryInfo, pluginInfo] = await Promise.all([
+    deps.findOpenCodeBinary(),
+    Promise.resolve(deps.getPluginInfo()),
+  ])
+  const loadedInfo = deps.getLoadedPluginVersion()
 
-  const opencodeVersion = binaryInfo ? await getOpenCodeVersion(binaryInfo.path) : null
+  const opencodeVersion = binaryInfo ? await deps.getOpenCodeVersion(binaryInfo.path) : null
   const pluginVersion = pluginInfo.pinnedVersion ?? loadedInfo.expectedVersion ?? loadedInfo.loadedVersion
 
   return {
@@ -51,11 +74,14 @@ export async function gatherSystemInfo(): Promise<SystemInfo> {
   }
 }
 
-export async function checkSystem(): Promise<CheckResult> {
-  const [systemInfo, pluginInfo] = await Promise.all([gatherSystemInfo(), Promise.resolve(getPluginInfo())])
-  const loadedInfo = getLoadedPluginVersion()
-  const latestVersion = await getLatestPluginVersion(systemInfo.loadedVersion)
-  const installTag = getSuggestedInstallTag(systemInfo.loadedVersion)
+export async function checkSystem(deps: SystemCheckDeps = defaultDeps): Promise<CheckResult> {
+  const [systemInfo, pluginInfo] = await Promise.all([
+    gatherSystemInfo(deps),
+    Promise.resolve(deps.getPluginInfo()),
+  ])
+  const loadedInfo = deps.getLoadedPluginVersion()
+  const latestVersion = await deps.getLatestPluginVersion(systemInfo.loadedVersion)
+  const installTag = deps.getSuggestedInstallTag(systemInfo.loadedVersion)
   const issues: DoctorIssue[] = []
 
   if (!systemInfo.opencodePath) {
@@ -70,7 +96,7 @@ export async function checkSystem(): Promise<CheckResult> {
 
   if (
     systemInfo.opencodeVersion &&
-    !compareVersions(systemInfo.opencodeVersion, MIN_OPENCODE_VERSION)
+    !deps.compareVersions(systemInfo.opencodeVersion, MIN_OPENCODE_VERSION)
   ) {
     issues.push({
       title: "OpenCode version below minimum",
@@ -120,7 +146,7 @@ export async function checkSystem(): Promise<CheckResult> {
   if (
     systemInfo.loadedVersion &&
     latestVersion &&
-    !compareVersions(systemInfo.loadedVersion, latestVersion)
+    !deps.compareVersions(systemInfo.loadedVersion, latestVersion)
   ) {
     issues.push({
       title: "Loaded plugin is outdated",
