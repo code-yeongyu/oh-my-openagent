@@ -144,9 +144,9 @@ describe("createSessionStateStore", () => {
     expect(stagnatedAgainUpdate.stagnationCount).toBe(1)
   })
 
-  test("given tool activity happens after a successful continuation without todo changes, keeps counting stagnation", () => {
+  test("given no todo changes after a successful continuation, keeps counting stagnation", () => {
     // given
-    const sessionID = "ses-activity-stagnation"
+    const sessionID = "ses-no-todo-change-stagnation"
     const state = sessionStateStore.getState(sessionID)
     const todos = [
       { id: "1", content: "Task 1", status: "pending", priority: "high" },
