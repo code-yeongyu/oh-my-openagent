@@ -24,7 +24,6 @@ import {
 } from "./agent-override-protection";
 import { buildPrometheusAgentConfig } from "./prometheus-agent-config-builder";
 import { buildPlanDemoteConfig } from "./plan-model-inheritance";
-import { getAgentListDisplayName } from "../shared/agent-display-names";
 
 type AgentConfigRecord = Record<string, Record<string, unknown> | undefined> & {
   build?: Record<string, unknown>;
@@ -160,10 +159,10 @@ export async function applyAgentConfig(params: {
   if (isSisyphusEnabled && builtinAgents.sisyphus) {
     if (configuredDefaultAgent) {
       (params.config as { default_agent?: string }).default_agent =
-        getAgentListDisplayName(configuredDefaultAgent);
+        getAgentDisplayName(configuredDefaultAgent);
     } else {
       (params.config as { default_agent?: string }).default_agent =
-        getAgentListDisplayName("sisyphus");
+        getAgentDisplayName("sisyphus");
     }
 
     // Assembly order: Sisyphus -> Hephaestus -> Prometheus -> Atlas
