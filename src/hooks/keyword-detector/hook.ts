@@ -15,22 +15,33 @@ import type { ContextCollector } from "../../features/context-injector"
 import type { RalphLoopHook } from "../ralph-loop"
 import { parseRalphLoopArguments } from "../ralph-loop/command-arguments"
 
-const ULTRAWORK_KEYWORD_PATTERN = /\b(ultrawork|ulw)\b/i
+const ULTRAWORK_LONGHAND_PATTERN = /\bultrawork\b/i
+const ULW_SHORTHAND_PATTERN = /\bulw\b/i
 const LEADING_ULTRAWORK_PATTERN = /^\s*(ultrawork|ulw)\b/i
 const GREETING_PREFIX_ULTRAWORK_PATTERN = /^\s*(?:hi|hello|hey|hiya|greetings)(?:\s+there)?(?:[!,.:;-]+\s*|\s+)(ultrawork|ulw)\b/i
+
+function normalizeUltraworkTask(taskText: string): string {
+  return taskText.replace(/\s+/g, " ").trim()
+}
 
 function extractUltraworkTask(cleanText: string): string {
   const greetingPrefixedMatch = cleanText.match(GREETING_PREFIX_ULTRAWORK_PATTERN)
 
   if (greetingPrefixedMatch) {
-    return cleanText.slice(greetingPrefixedMatch[0].length).trim()
+    return normalizeUltraworkTask(cleanText.slice(greetingPrefixedMatch[0].length))
   }
 
-  return cleanText.replace(ULTRAWORK_KEYWORD_PATTERN, "").trim()
+  if (ULW_SHORTHAND_PATTERN.test(cleanText)) {
+    return normalizeUltraworkTask(cleanText.replace(ULW_SHORTHAND_PATTERN, " "))
+  }
+
+  return normalizeUltraworkTask(cleanText.replace(ULTRAWORK_LONGHAND_PATTERN, " "))
 }
 
-function hasEdgeUltraworkKeyword(cleanText: string): boolean {
-  return LEADING_ULTRAWORK_PATTERN.test(cleanText) || GREETING_PREFIX_ULTRAWORK_PATTERN.test(cleanText)
+function shouldAllowUltraworkKeyword(cleanText: string): boolean {
+  return ULW_SHORTHAND_PATTERN.test(cleanText)
+    || LEADING_ULTRAWORK_PATTERN.test(cleanText)
+    || GREETING_PREFIX_ULTRAWORK_PATTERN.test(cleanText)
 }
 
 export function createKeywordDetectorHook(
@@ -88,11 +99,11 @@ export function createKeywordDetectorHook(
         }
       }
 
-      if (!hasEdgeUltraworkKeyword(cleanText)) {
+      if (!shouldAllowUltraworkKeyword(cleanText)) {
         const preFilterCount = detectedKeywords.length
         detectedKeywords = detectedKeywords.filter((k) => k.type !== "ultrawork")
         if (preFilterCount > detectedKeywords.length) {
-          log(`[keyword-detector] Filtered non-edge ultrawork keyword`, {
+          log(`[keyword-detector] Filtered disallowed ultrawork keyword`, {
             sessionID: input.sessionID,
           })
         }
