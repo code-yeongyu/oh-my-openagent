@@ -1,6 +1,6 @@
 import type { DelegateTaskArgs, OpencodeClient, DelegatedModelConfig } from "./types"
 import type { SisyphusAgentConfig } from "../../config/schema"
-import { isPlanAgent } from "./constants"
+import { isPlanFamily } from "./constants"
 import { buildTaskPrompt } from "./prompt-builder"
 import {
   promptSyncWithModelSuggestionRetry,
@@ -64,7 +64,7 @@ export async function sendSyncPrompt(
   },
   deps: SendSyncPromptDeps = sendSyncPromptDeps
 ): Promise<string | null> {
-  const allowTask = isPlanAgent(input.agentToUse)
+  const allowTask = isPlanFamily(input.agentToUse)
   const tddEnabled = input.sisyphusAgentConfig?.tdd
   const effectivePrompt = buildTaskPrompt(input.args.prompt, input.agentToUse, tddEnabled)
   const tools = {

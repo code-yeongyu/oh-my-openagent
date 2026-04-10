@@ -2,6 +2,7 @@ import type {
    AvailableCategory,
    AvailableSkill,
  } from "../../agents/dynamic-agent-prompt-builder"
+import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { truncateDescription } from "../../shared/truncate-description"
 export {
   CATEGORY_DESCRIPTIONS,
@@ -329,18 +330,18 @@ export function isPlanAgent(agentName: string | undefined): boolean {
 }
 
 /**
- * Plan family: plan + prometheus. Shares mutual delegation blocking only.
- * Does NOT share system prompt or task permission (only isPlanAgent controls those).
+ * Plan family: plan + prometheus. Shares mutual delegation blocking and task tool permission.
+ * Does NOT share system prompt (only isPlanAgent controls that).
  */
 export const PLAN_FAMILY_NAMES = ["plan", "prometheus"]
 
 /**
- * Check if the given agent belongs to the plan family for mutual delegation blocking.
+ * Check if the given agent belongs to the plan family (blocking + task permission).
  */
 export function isPlanFamily(category: string): boolean
 export function isPlanFamily(category: string | undefined): boolean
 export function isPlanFamily(category: string | undefined): boolean {
   if (!category) return false
-  const lowerCategory = category.toLowerCase().trim()
+  const lowerCategory = getAgentConfigKey(category).toLowerCase().trim()
   return PLAN_FAMILY_NAMES.some((name) => lowerCategory === name)
 }
