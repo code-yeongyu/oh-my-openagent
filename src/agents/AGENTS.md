@@ -20,7 +20,7 @@ Agent factories following `createXXXAgent(model) → AgentConfig` pattern. Each 
 | **Momus** | gpt-5.4 xhigh | 0.1 | subagent | claude-opus-4-6 max -> gemini-3.1-pro high | Plan reviewer |
 | **Atlas** | claude-sonnet-4-6 | 0.1 | primary | gpt-5.4 medium | Todo-list orchestrator |
 | **Prometheus** | claude-opus-4-6 max | 0.1 | — | internal planner | Strategic planner (internal) |
-| **Sisyphus-Junior** | claude-sonnet-4-6 | 0.1 | all | user-configurable | Category-spawned executor |
+| **Sisyphus-Junior** | — | — | — | — | DEPRECATED: categories now route to openfang agents (builder/reasoner) |
 
 ## TOOL RESTRICTIONS
 
@@ -83,4 +83,4 @@ Model resolution: 4-step: override → category-default → provider-fallback �
 
 - **primary**: Respects UI-selected model, uses fallback chain
 - **subagent**: Uses own fallback chain, ignores UI selection
-- **all**: Available in both contexts (Sisyphus-Junior)
+- **all**: Available in both contexts

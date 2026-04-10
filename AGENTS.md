@@ -13,7 +13,7 @@ oh-my-opencode/
 ├── src/
 │   ├── index.ts              # Plugin entry: loadConfig → createManagers → createTools → createHooks → createPluginInterface
 │   ├── plugin-config.ts      # JSONC multi-level config: user → project → defaults (Zod v4)
-│   ├── agents/               # 11 agents (Sisyphus, Hephaestus, Oracle, Librarian, Explore, Atlas, Prometheus, Metis, Momus, Multimodal-Looker, Sisyphus-Junior)
+│   ├── agents/               # 11 agents (Sisyphus, Hephaestus, Oracle, Librarian, Explore, Atlas, Prometheus, Metis, Momus, Multimodal-Looker) — Sisyphus-Junior DEPRECATED
 │   ├── hooks/                # 52 lifecycle hooks across dedicated modules and standalone files
 │   ├── tools/                # 26 tools across 16 directories
 │   ├── features/             # 19 feature modules (background-agent, skill-loader, tmux, MCP-OAuth, etc.)

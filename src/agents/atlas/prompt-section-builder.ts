@@ -41,7 +41,7 @@ export function buildCategorySection(userCategories?: Record<string, CategoryCon
 
   return `##### Option A: Use CATEGORY (for domain-specific work)
 
-Categories spawn \`Sisyphus-Junior-{category}\` with optimized settings:
+Categories route to openfang agents with optimized settings:
 
 ${categoryRows.join("\n")}
 
