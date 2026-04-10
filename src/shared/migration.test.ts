@@ -1488,15 +1488,44 @@ describe("migrateConfigFile with migration tracking via sidecar (#3263)", () => 
     // when: Migrate config file (sidecar write will fail)
     const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
 
-    // then: _migrations should be preserved as fallback since sidecar write failed
+    // then: _migrations should contain full set (existing + new) as fallback
     expect(needsWrite).toBe(true)
-    expect(rawConfig._migrations).toEqual(["model-version:openai/gpt-5.3-codex->openai/gpt-5.4"])
+    const migrations = rawConfig._migrations as string[]
+    expect(Array.isArray(migrations)).toBe(true)
+    expect(migrations).toContain("model-version:openai/gpt-5.3-codex->openai/gpt-5.4")
+    expect(migrations.length).toBeGreaterThanOrEqual(1)
     expect((rawConfig.agents as Record<string, Record<string, unknown>>).oracle.model).toBe("anthropic/claude-opus-4-6")
 
     // Sidecar should not exist because write failed
     expect(fs.existsSync(sidecarPath(testConfigPath))).toBe(false)
 
     // cleanup: restore permissions for cleanup
+    fs.chmodSync(workdir, 0o755)
+  })
+
+  test("writes _migrations into config as fallback when sidecar write fails and no prior _migrations existed", () => {
+    // given: config WITHOUT _migrations field and a read-only dir
+    const testConfigPath = tempConfigPath("sidecar-fail-no-prior")
+    const rawConfig: Record<string, unknown> = {
+      agents: {
+        oracle: { model: "anthropic/claude-opus-4-5" },
+      },
+    }
+    fs.writeFileSync(testConfigPath, JSON.stringify(rawConfig, null, 2))
+    const workdir = path.dirname(testConfigPath)
+    fs.chmodSync(workdir, 0o555)
+
+    // when: migrate runs (sidecar write will fail)
+    const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
+
+    // then: _migrations should be injected into config as fallback
+    expect(needsWrite).toBe(true)
+    expect(rawConfig._migrations).toBeDefined()
+    expect(Array.isArray(rawConfig._migrations)).toBe(true)
+    expect((rawConfig._migrations as string[]).length).toBeGreaterThan(0)
+    expect(fs.existsSync(sidecarPath(testConfigPath))).toBe(false)
+
+    // cleanup
     fs.chmodSync(workdir, 0o755)
   })
 })

@@ -75,11 +75,11 @@ export function migrateConfigFile(
   // `_migrations` to downstream schema validation.
   const newMigrationsToRecord = allNewMigrations.filter(mKey => !existingMigrations.has(mKey))
   let sidecarWriteSucceeded = false
+  const fullMigrationSet = new Set<string>([
+    ...existingMigrations,
+    ...newMigrationsToRecord,
+  ])
   if (newMigrationsToRecord.length > 0 || hadLegacyInConfigMigrations) {
-    const fullMigrationSet = new Set<string>([
-      ...existingMigrations,
-      ...newMigrationsToRecord,
-    ])
     sidecarWriteSucceeded = writeAppliedMigrations(configPath, fullMigrationSet)
   }
   if (newMigrationsToRecord.length > 0) {
@@ -91,6 +91,10 @@ export function migrateConfigFile(
   }
   if (sidecarWriteSucceeded && "_migrations" in copy) {
     delete copy._migrations
+  } else if (!sidecarWriteSucceeded && newMigrationsToRecord.length > 0) {
+    // Sidecar write failed — persist migration tracking in-config as fallback
+    ;(copy as Record<string, unknown>)._migrations = Array.from(fullMigrationSet)
+    needsWrite = true
   }
 
   if (copy.omo_agent) {
