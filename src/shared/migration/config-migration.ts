@@ -74,12 +74,13 @@ export function migrateConfigFile(
   // the first place. The in-memory `rawConfig` never re-exposes
   // `_migrations` to downstream schema validation.
   const newMigrationsToRecord = allNewMigrations.filter(mKey => !existingMigrations.has(mKey))
+  let sidecarWriteSucceeded = false
   if (newMigrationsToRecord.length > 0 || hadLegacyInConfigMigrations) {
     const fullMigrationSet = new Set<string>([
       ...existingMigrations,
       ...newMigrationsToRecord,
     ])
-    writeAppliedMigrations(configPath, fullMigrationSet)
+    sidecarWriteSucceeded = writeAppliedMigrations(configPath, fullMigrationSet)
   }
   if (newMigrationsToRecord.length > 0) {
     needsWrite = true
@@ -88,7 +89,7 @@ export function migrateConfigFile(
     // Migrating state out of the config body is itself a config write.
     needsWrite = true
   }
-  if ("_migrations" in copy) {
+  if (sidecarWriteSucceeded && "_migrations" in copy) {
     delete copy._migrations
   }
 

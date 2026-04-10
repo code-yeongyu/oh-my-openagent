@@ -1469,4 +1469,34 @@ describe("migrateConfigFile with migration tracking via sidecar (#3263)", () => 
       "model-version:anthropic/claude-opus-4-5->anthropic/claude-opus-4-6",
     ]))
   })
+
+  test("preserves _migrations in config when sidecar write fails", () => {
+    // given: Config with _migrations field and a read-only directory that will cause sidecar write to fail
+    const testConfigPath = tempConfigPath("sidecar-fail")
+    const rawConfig: Record<string, unknown> = {
+      agents: {
+        oracle: { model: "anthropic/claude-opus-4-5" },
+      },
+      _migrations: ["model-version:openai/gpt-5.3-codex->openai/gpt-5.4"],
+    }
+    fs.writeFileSync(testConfigPath, JSON.stringify(rawConfig, null, 2))
+
+    // Make the directory read-only to cause sidecar write to fail
+    const workdir = path.dirname(testConfigPath)
+    fs.chmodSync(workdir, 0o555)
+
+    // when: Migrate config file (sidecar write will fail)
+    const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
+
+    // then: _migrations should be preserved as fallback since sidecar write failed
+    expect(needsWrite).toBe(true)
+    expect(rawConfig._migrations).toEqual(["model-version:openai/gpt-5.3-codex->openai/gpt-5.4"])
+    expect((rawConfig.agents as Record<string, Record<string, unknown>>).oracle.model).toBe("anthropic/claude-opus-4-6")
+
+    // Sidecar should not exist because write failed
+    expect(fs.existsSync(sidecarPath(testConfigPath))).toBe(false)
+
+    // cleanup: restore permissions for cleanup
+    fs.chmodSync(workdir, 0o755)
+  })
 })
