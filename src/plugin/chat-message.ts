@@ -1,7 +1,7 @@
 import type { OhMyOpenCodeConfig } from "../config"
 import type { PluginContext } from "./types"
 
-import { hasConnectedProvidersCache } from "../shared"
+import { isModelCacheAvailable } from "../shared"
 import { getAgentConfigKey } from "../shared/agent-display-names"
 import { getSessionModel, setSessionModel } from "../shared/session-model-state"
 import { getMainSessionID, setSessionAgent, subagentSessions } from "../features/claude-code-session-state"
@@ -210,7 +210,7 @@ export function createChatMessageHandler(args: {
       await hooks.startWork["chat.message"]?.(input, output)
     }
 
-    if (!hasConnectedProvidersCache()) {
+    if (!isModelCacheAvailable()) {
       pluginContext.client.tui
         .showToast({
           body: {
