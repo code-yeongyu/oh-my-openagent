@@ -102,7 +102,8 @@ function parseOutput(output: string, filesOnly = false): GrepMatch[] {
   const matches: GrepMatch[] = []
   const lines = output.split("\n")
 
-  for (const line of lines) {
+  for (let line of lines) {
+    line = line.replace(/\r$/, "")
     if (!line.trim()) continue
 
     if (filesOnly) {
@@ -115,7 +116,8 @@ function parseOutput(output: string, filesOnly = false): GrepMatch[] {
       continue
     }
 
-    const match = line.match(/^(.+?):(\d+):(.*)$/)
+    // Handle Windows drive-letter paths (e.g. C:\path\file.ts:42:content)
+    const match = line.match(/^([A-Za-z]:[\\\/].*?|.+?):(\d+):(.*)$/)
     if (match) {
       matches.push({
         file: match[1],
@@ -134,10 +136,11 @@ function parseCountOutput(output: string): CountResult[] {
   const results: CountResult[] = []
   const lines = output.split("\n")
 
-  for (const line of lines) {
+  for (let line of lines) {
+    line = line.replace(/\r$/, "")
     if (!line.trim()) continue
 
-    const match = line.match(/^(.+?):(\d+)$/)
+    const match = line.match(/^([A-Za-z]:[\\\/].*?|.+?):(\d+)$/)
     if (match) {
       results.push({
         file: match[1],
