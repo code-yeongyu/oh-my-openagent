@@ -1,7 +1,7 @@
-declare const require: (name: string) => any
+declare const require: NodeJS.Require
 const { describe, test, expect, beforeEach, afterEach, spyOn, mock } = require("bun:test")
 import { DEFAULT_CATEGORIES, CATEGORY_PROMPT_APPENDS, CATEGORY_DESCRIPTIONS, isPlanAgent, PLAN_AGENT_NAMES, isPlanFamily, PLAN_FAMILY_NAMES } from "./constants"
-import { resolveCategoryConfig } from "./tools"
+import { getAgentDisplayName, getAgentListDisplayName } from "../../shared/agent-display-names"
 import type { CategoryConfig } from "../../config/schema"
 import type { DelegateTaskArgs } from "./types"
 import { __resetModelCache } from "../../shared/model-availability"
@@ -9,6 +9,20 @@ import { clearSkillCache } from "../../features/opencode-skill-loader/skill-cont
 import { __setTimingConfig, __resetTimingConfig } from "./timing"
 import * as connectedProvidersCache from "../../shared/connected-providers-cache"
 import * as executor from "./executor"
+
+const runtimeRequire = require as NodeJS.Require & { cache?: Record<string, unknown> }
+
+function clearRequireCache(modulePath: string): void {
+  const resolvedPath = runtimeRequire.resolve(modulePath)
+  if (runtimeRequire.cache?.[resolvedPath]) {
+    delete runtimeRequire.cache[resolvedPath]
+  }
+}
+
+function resolveCategoryConfig(...args: Parameters<typeof import("./tools").resolveCategoryConfig>): ReturnType<typeof import("./tools").resolveCategoryConfig> {
+  clearRequireCache("./tools")
+  return require("./tools").resolveCategoryConfig(...args)
+}
 
 const SYSTEM_DEFAULT_MODEL = "anthropic/claude-sonnet-4-6"
 
@@ -37,6 +51,7 @@ describe("sisyphus-task", () => {
 
   beforeEach(() => {
     mock.restore()
+    clearRequireCache("./tools")
     __resetModelCache()
     clearSkillCache()
     __setTimingConfig({
@@ -249,6 +264,20 @@ describe("sisyphus-task", () => {
     test("returns true for 'prometheus'", () => {
       //#given / #when
       const result = isPlanFamily("prometheus")
+      //#then
+      expect(result).toBe(true)
+    })
+
+    test("returns true for prometheus display name", () => {
+      //#given / #when
+      const result = isPlanFamily(getAgentDisplayName("prometheus"))
+      //#then
+      expect(result).toBe(true)
+    })
+
+    test("returns true for prometheus list display name with zwsp prefix", () => {
+      //#given / #when
+      const result = isPlanFamily(getAgentListDisplayName("prometheus"))
       //#then
       expect(result).toBe(true)
     })
@@ -3608,6 +3637,26 @@ describe("sisyphus-task", () => {
       expect(result).toContain("plan-family")
     })
 
+    test("prometheus display name cannot delegate to plan (cross-blocking)", async () => {
+      //#given
+      const { createDelegateTask } = require("./tools")
+      const mockClient = {
+         app: { agents: async () => ({ data: [{ name: "plan", mode: "subagent" }] }) },
+         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+         session: { get: async () => ({ data: { directory: "/project" } }), create: async () => ({ data: { id: "s" } }), prompt: async () => ({ data: {} }), promptAsync: async () => ({ data: {} }), messages: async () => ({ data: [] }), status: async () => ({ data: {} }) },
+       }
+       const tool = createDelegateTask({ manager: { launch: async () => ({}) }, client: mockClient })
+
+      //#when
+      const result = await tool.execute(
+        { description: "test", prompt: "Create a plan", subagent_type: "plan", run_in_background: false, load_skills: [] },
+        { sessionID: "p", messageID: "m", agent: getAgentDisplayName("prometheus"), abort: new AbortController().signal }
+      )
+
+      //#then
+      expect(result).toContain("plan-family")
+    })
+
     test("plan cannot delegate to prometheus (cross-blocking)", async () => {
       //#given
       const { createDelegateTask } = require("./tools")
@@ -4105,7 +4154,7 @@ describe("sisyphus-task", () => {
       expect(promptBody.tools.task).toBe(true)
     }, { timeout: 20000 })
 
-    test("prometheus subagent should NOT have task permission", async () => {
+    test("prometheus subagent should have task permission as part of the plan family", async () => {
       //#given
       const { createDelegateTask } = require("./tools")
       let promptBody: any
@@ -4130,8 +4179,8 @@ describe("sisyphus-task", () => {
         { sessionID: "p", messageID: "m", agent: "sisyphus", abort: new AbortController().signal }
       )
       
-      //#then
-      expect(promptBody.tools.task).toBe(false)
+      //#then - prometheus shares task permission with the plan family
+      expect(promptBody.tools.task).toBe(true)
     }, { timeout: 20000 })
 
     test("non-plan subagent should NOT have task permission", async () => {

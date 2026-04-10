@@ -1,5 +1,12 @@
 const { describe, test, expect, beforeEach, afterEach, mock, spyOn } = require("bun:test")
 
+function clearRequireCache(modulePath: string): void {
+  const resolvedPath = require.resolve(modulePath)
+  if (require.cache?.[resolvedPath]) {
+    delete require.cache[resolvedPath]
+  }
+}
+
 describe("executeSyncTask - cleanup on error paths", () => {
   let removeTaskCalls: string[] = []
   let addTaskCalls: any[] = []
@@ -22,6 +29,8 @@ describe("executeSyncTask - cleanup on error paths", () => {
     addTaskCalls = []
     deleteCalls = []
     addCalls = []
+
+    clearRequireCache("./sync-task")
 
     //#given - initialize real task toast manager (avoid global module mocks)
     const { initTaskToastManager, _resetTaskToastManagerForTesting } = require("../../features/task-toast-manager/manager")

@@ -605,8 +605,8 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     })
   })
 
-  test("keeps task delegation disabled during prometheus sync continuation", async () => {
-    //#given - a resumed prometheus session should stay unable to delegate tasks
+  test("keeps task delegation enabled during prometheus sync continuation", async () => {
+    //#given - a resumed prometheus session should keep plan-family task permission
     const promptAsyncCalls: Array<{ path: { id: string }; body: Record<string, unknown> }> = []
     const mockClient = {
       session: {
@@ -667,7 +667,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     //#then
     expect(promptAsyncCalls).toHaveLength(1)
     expect(promptAsyncCalls[0]?.body.tools).toEqual({
-      task: false,
+      task: true,
       call_omo_agent: true,
       question: false,
     })

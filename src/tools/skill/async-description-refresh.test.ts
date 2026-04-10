@@ -1,8 +1,19 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, it } from "bun:test"
-import { createSkillTool } from "./tools"
 import type { LoadedSkill } from "../../features/opencode-skill-loader/types"
+
+function requireFresh<T>(modulePath: string): T {
+  const resolvedPath = require.resolve(modulePath)
+  if (require.cache?.[resolvedPath]) {
+    delete require.cache[resolvedPath]
+  }
+  return require(modulePath) as T
+}
+
+function createSkillTool(...args: Parameters<typeof import("./tools").createSkillTool>): ReturnType<typeof import("./tools").createSkillTool> {
+  return requireFresh<typeof import("./tools")>("./tools").createSkillTool(...args)
+}
 
 function createMockSkill(name: string): LoadedSkill {
   return {

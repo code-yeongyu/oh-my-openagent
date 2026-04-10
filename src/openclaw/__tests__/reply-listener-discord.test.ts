@@ -9,8 +9,6 @@ import * as sessionRegistryModule from "../session-registry"
 import type { ReplyListenerDaemonState } from "../reply-listener-state"
 import type { OpenClawConfig } from "../types"
 
-const originalHome = process.env.HOME
-const originalUserProfile = process.env.USERPROFILE
 const originalFetch = globalThis.fetch
 
 const tempHome = mkdtempSync(join(tmpdir(), "openclaw-reply-listener-discord-"))
@@ -72,17 +70,18 @@ describe("pollDiscordReplies", () => {
   })
 
   test("records HTTP failures in daemon state when Discord returns non-ok", async () => {
-    const fetchSpy = spyOn(globalThis, "fetch").mockResolvedValue(
+    const fetchMock = mock(() => Promise.resolve(
       new Response("unauthorized", {
         status: 401,
       }),
-    )
+    ))
+    globalThis.fetch = fetchMock as unknown as typeof fetch
 
     const state = createState()
 
     await pollDiscordReplies(createConfig(), state, new ReplyListenerRateLimiter(10))
 
-    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
     expect(state.errors).toBe(1)
     expect(state.lastError).toBe("Discord API error: HTTP 401")
     expect(existsSync(stateFilePath)).toBe(true)
@@ -94,7 +93,8 @@ describe("pollDiscordReplies", () => {
   })
 
   test("increments messagesInjected when a Discord reply matches a registered message", async () => {
-    const fetchSpy = spyOn(globalThis, "fetch")
+    const fetchMock = mock()
+    fetchMock
       .mockResolvedValueOnce(
         new Response(
           JSON.stringify([
@@ -109,6 +109,7 @@ describe("pollDiscordReplies", () => {
         ),
       )
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
+    globalThis.fetch = fetchMock as unknown as typeof fetch
     const lookupSpy = spyOn(sessionRegistryModule, "lookupByMessageId").mockReturnValue({
       sessionId: "ses-1",
       tmuxSession: "session-1",
@@ -126,7 +127,7 @@ describe("pollDiscordReplies", () => {
 
     expect(lookupSpy).toHaveBeenCalledWith("discord-bot", "outbound-1")
     expect(injectSpy).toHaveBeenCalledWith("%7", "Ship it", "discord", createConfig())
-    expect(fetchSpy).toHaveBeenCalledTimes(2)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
     expect(state.messagesSeen).toBe(1)
     expect(state.messagesInjected).toBe(1)
     expect(state.lastDiscordMessageId).toBe("incoming-1")

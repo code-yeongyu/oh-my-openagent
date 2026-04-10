@@ -1,11 +1,19 @@
-declare const require: (name: string) => any
-const { describe, test, expect, beforeEach, afterEach, spyOn, mock } = require("bun:test")
+import { describe, test, expect, beforeEach, afterEach, mock } from "bun:test"
 import type { DelegateTaskArgs } from "../types"
 import type { ExecutorContext } from "../executor-types"
-import * as logger from "../../../shared/logger"
-import * as connectedProvidersCache from "../../../shared/connected-providers-cache"
 
 type SubagentResolverModule = typeof import("../subagent-resolver")
+
+const logMock = mock((..._args: unknown[]) => {})
+
+const readConnectedProvidersCacheMock = mock(() => null as string[] | null)
+const readProviderModelsCacheMock = mock(
+  () => null as {
+    models: Record<string, string[]>
+    connected: string[]
+    updatedAt: string
+  } | null,
+)
 
 async function importFreshSubagentResolverModule(): Promise<SubagentResolverModule> {
   return await import(`../subagent-resolver?test=${Date.now()}-${Math.random()}`)
@@ -41,17 +49,30 @@ function createExecutorContext(
 }
 
 describe("resolveSubagentExecution", () => {
-  let logSpy: ReturnType<typeof spyOn> | undefined
   let resolveSubagentExecution: SubagentResolverModule["resolveSubagentExecution"]
 
   beforeEach(async () => {
     mock.restore()
-    logSpy = spyOn(logger, "log").mockImplementation(() => {})
+    logMock.mockClear()
+    readConnectedProvidersCacheMock.mockReset()
+    readProviderModelsCacheMock.mockReset()
+    readConnectedProvidersCacheMock.mockReturnValue(null)
+    readProviderModelsCacheMock.mockReturnValue(null)
+    mock.module("../../../shared/logger", () => ({
+      log: logMock,
+    }))
+    mock.module("../../../shared/connected-providers-cache", () => ({
+      readConnectedProvidersCache: readConnectedProvidersCacheMock,
+      readProviderModelsCache: readProviderModelsCacheMock,
+      hasConnectedProvidersCache: () => readConnectedProvidersCacheMock() !== null,
+      hasProviderModelsCache: () => readProviderModelsCacheMock() !== null,
+      _resetMemCacheForTesting: () => {},
+    }))
     ;({ resolveSubagentExecution } = await importFreshSubagentResolverModule())
   })
 
   afterEach(() => {
-    logSpy?.mockRestore()
+    mock.restore()
   })
 
   test("returns delegation error when agent discovery fails instead of silently proceeding", async () => {
@@ -71,7 +92,7 @@ describe("resolveSubagentExecution", () => {
     expect(result.error).toBe("Failed to delegate to agent \"oracle\": agents API unavailable")
   })
 
-  test("logs failure details when subagent resolution throws", async () => {
+  test("returns delegation error when subagent resolution throws", async () => {
     //#given
     const args = createBaseArgs({ subagent_type: "review" })
     const executorCtx = createExecutorContext(async () => {
@@ -79,17 +100,12 @@ describe("resolveSubagentExecution", () => {
     })
 
     //#when
-    await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep")
+    const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep")
 
     //#then
-    expect(logSpy).toHaveBeenCalledTimes(1)
-    const callArgs = logSpy?.mock.calls[0]
-    expect(callArgs?.[0]).toBe("[delegate-task] Failed to resolve subagent execution")
-    expect(callArgs?.[1]).toEqual({
-      requestedAgent: "review",
-      parentAgent: "sisyphus",
-      error: "network timeout",
-    })
+    expect(result.agentToUse).toBe("")
+    expect(result.categoryModel).toBeUndefined()
+    expect(result.error).toBe('Failed to delegate to agent "review": network timeout')
   })
 
   test("hides primary agents from task delegation lookups", async () => {
@@ -129,7 +145,7 @@ describe("resolveSubagentExecution", () => {
 
   test("normalizes matched agent model string before returning categoryModel", async () => {
     //#given
-    const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+    readProviderModelsCacheMock.mockReturnValue({
       models: { openai: ["grok-3", "gpt-5.3-codex"] },
       connected: ["openai"],
       updatedAt: "2026-03-03T00:00:00.000Z",
@@ -145,12 +161,11 @@ describe("resolveSubagentExecution", () => {
     //#then
     expect(result.error).toBeUndefined()
     expect(result.categoryModel).toEqual({ providerID: "openai", modelID: "gpt-5.3-codex" })
-    cacheSpy.mockRestore()
   })
 
   test("uses agent override fallback_models for subagent runtime fallback chain", async () => {
     //#given
-    const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+    readProviderModelsCacheMock.mockReturnValue({
       models: { quotio: ["claude-haiku-4-5"] },
       connected: ["quotio"],
       updatedAt: "2026-03-03T00:00:00.000Z",
@@ -178,12 +193,11 @@ describe("resolveSubagentExecution", () => {
       { providers: ["quotio"], model: "gpt-5.2", variant: undefined },
       { providers: ["quotio"], model: "glm-5", variant: "max" },
     ])
-    cacheSpy.mockRestore()
   })
 
   test("uses category fallback_models when agent override points at category", async () => {
     //#given
-    const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+    readProviderModelsCacheMock.mockReturnValue({
       models: { anthropic: ["claude-haiku-4-5"] },
       connected: ["anthropic"],
       updatedAt: "2026-03-03T00:00:00.000Z",
@@ -215,17 +229,16 @@ describe("resolveSubagentExecution", () => {
     expect(result.fallbackChain).toEqual([
       { providers: ["anthropic"], model: "claude-haiku-4-5", variant: undefined },
     ])
-    cacheSpy.mockRestore()
   })
 
   test("promotes object-style fallback model settings to categoryModel when subagent fallback becomes initial model", async () => {
     //#given
-    const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+    readProviderModelsCacheMock.mockReturnValue({
       models: { openai: ["gpt-5.4"] },
       connected: ["openai"],
       updatedAt: "2026-03-03T00:00:00.000Z",
     })
-    const connectedSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
+    readConnectedProvidersCacheMock.mockReturnValue(["openai"])
     const args = createBaseArgs({ subagent_type: "explore" })
     const executorCtx = createExecutorContext(
       async () => ([
@@ -265,18 +278,16 @@ describe("resolveSubagentExecution", () => {
       maxTokens: 2048,
       thinking: { type: "disabled" },
     })
-    cacheSpy.mockRestore()
-    connectedSpy.mockRestore()
   })
 
   test("does not apply object-style fallback settings when the subagent primary model matches directly", async () => {
     //#given
-    const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+    readProviderModelsCacheMock.mockReturnValue({
       models: { openai: ["gpt-5.4-preview"] },
       connected: ["openai"],
       updatedAt: "2026-03-03T00:00:00.000Z",
     })
-    const connectedSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
+    readConnectedProvidersCacheMock.mockReturnValue(["openai"])
     const args = createBaseArgs({ subagent_type: "explore" })
     const executorCtx = createExecutorContext(
       async () => ([
@@ -306,18 +317,16 @@ describe("resolveSubagentExecution", () => {
       providerID: "openai",
       modelID: "gpt-5.4-preview",
     })
-    cacheSpy.mockRestore()
-    connectedSpy.mockRestore()
   })
 
   test("matches promoted fallback settings after fuzzy model resolution", async () => {
     //#given
-    const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+    readProviderModelsCacheMock.mockReturnValue({
       models: { openai: ["gpt-5.4-preview"] },
       connected: ["openai"],
       updatedAt: "2026-03-03T00:00:00.000Z",
     })
-    const connectedSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
+    readConnectedProvidersCacheMock.mockReturnValue(["openai"])
     const args = createBaseArgs({ subagent_type: "explore" })
     const executorCtx = createExecutorContext(
       async () => ([
@@ -357,18 +366,16 @@ describe("resolveSubagentExecution", () => {
       maxTokens: 2222,
       thinking: { type: "disabled" },
     })
-    cacheSpy.mockRestore()
-    connectedSpy.mockRestore()
   })
 
   test("prefers exact promoted fallback match over earlier fuzzy prefix match", async () => {
     //#given
-    const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+    readProviderModelsCacheMock.mockReturnValue({
       models: { openai: ["gpt-5.4-preview"] },
       connected: ["openai"],
       updatedAt: "2026-03-03T00:00:00.000Z",
     })
-    const connectedSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
+    readConnectedProvidersCacheMock.mockReturnValue(["openai"])
     const args = createBaseArgs({ subagent_type: "explore" })
     const executorCtx = createExecutorContext(
       async () => ([
@@ -405,18 +412,16 @@ describe("resolveSubagentExecution", () => {
       variant: "max",
       reasoningEffort: "high",
     })
-    cacheSpy.mockRestore()
-    connectedSpy.mockRestore()
   })
 
   test("matches promoted fallback settings when fuzzy resolution extends configured model without hyphen", async () => {
     //#given
-    const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+    readProviderModelsCacheMock.mockReturnValue({
       models: { openai: ["gpt-5.4o"] },
       connected: ["openai"],
       updatedAt: "2026-03-03T00:00:00.000Z",
     })
-    const connectedSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
+    readConnectedProvidersCacheMock.mockReturnValue(["openai"])
     const args = createBaseArgs({ subagent_type: "explore" })
     const executorCtx = createExecutorContext(
       async () => ([
@@ -448,18 +453,16 @@ describe("resolveSubagentExecution", () => {
       variant: "low",
       reasoningEffort: "high",
     })
-    cacheSpy.mockRestore()
-    connectedSpy.mockRestore()
   })
 
   test("does not use unavailable matchedAgent.model as fallback for custom subagent", async () => {
     //#given
-    const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+    readProviderModelsCacheMock.mockReturnValue({
       models: { minimaxi: ["MiniMax-M2.7"] },
       connected: ["minimaxi"],
       updatedAt: "2026-03-03T00:00:00.000Z",
     })
-    const connectedSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["minimaxi"])
+    readConnectedProvidersCacheMock.mockReturnValue(["minimaxi"])
     const args = createBaseArgs({ subagent_type: "my-custom-agent" })
     const executorCtx = createExecutorContext(
       async () => ([
@@ -473,18 +476,16 @@ describe("resolveSubagentExecution", () => {
     //#then
     expect(result.error).toBeUndefined()
     expect(result.categoryModel?.modelID).not.toBe("MiniMax-M2.7-highspeed")
-    cacheSpy.mockRestore()
-    connectedSpy.mockRestore()
   })
 
   test("uses matchedAgent.model as fallback when model is available", async () => {
     //#given
-    const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+    readProviderModelsCacheMock.mockReturnValue({
       models: { minimaxi: ["MiniMax-M2.7-highspeed"] },
       connected: ["minimaxi"],
       updatedAt: "2026-03-03T00:00:00.000Z",
     })
-    const connectedSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["minimaxi"])
+    readConnectedProvidersCacheMock.mockReturnValue(["minimaxi"])
     const args = createBaseArgs({ subagent_type: "my-custom-agent" })
     const executorCtx = createExecutorContext(
       async () => ([
@@ -498,18 +499,16 @@ describe("resolveSubagentExecution", () => {
     //#then
     expect(result.error).toBeUndefined()
     expect(result.categoryModel).toEqual({ providerID: "minimaxi", modelID: "MiniMax-M2.7-highspeed" })
-    cacheSpy.mockRestore()
-    connectedSpy.mockRestore()
   })
 
   test("prefers the most specific prefix match when fallback entries share a prefix", async () => {
     //#given
-    const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+    readProviderModelsCacheMock.mockReturnValue({
       models: { openai: ["gpt-4o-preview"] },
       connected: ["openai"],
       updatedAt: "2026-03-03T00:00:00.000Z",
     })
-    const connectedSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
+    readConnectedProvidersCacheMock.mockReturnValue(["openai"])
     const args = createBaseArgs({ subagent_type: "explore" })
     const executorCtx = createExecutorContext(
       async () => ([
@@ -546,18 +545,16 @@ describe("resolveSubagentExecution", () => {
       variant: "max",
       reasoningEffort: "high",
     })
-    cacheSpy.mockRestore()
-    connectedSpy.mockRestore()
   })
 
   test("preserves category temperature when fallback entry leaves temperature undefined", async () => {
     //#given
-    const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+    readProviderModelsCacheMock.mockReturnValue({
       models: { openai: ["gpt-5.4"] },
       connected: ["openai"],
       updatedAt: "2026-03-03T00:00:00.000Z",
     })
-    const connectedSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
+    readConnectedProvidersCacheMock.mockReturnValue(["openai"])
     const args = createBaseArgs({ subagent_type: "explore" })
     const executorCtx = createExecutorContext(
       async () => ([
@@ -596,18 +593,16 @@ describe("resolveSubagentExecution", () => {
       temperature: 0.55,
       top_p: 0.45,
     })
-    cacheSpy.mockRestore()
-    connectedSpy.mockRestore()
   })
 
   test("applies category tuning params in the cold-cache override path", async () => {
     //#given
-    const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+    readProviderModelsCacheMock.mockReturnValue({
       models: {},
       connected: [],
       updatedAt: "2026-03-03T00:00:00.000Z",
     })
-    const connectedSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue([])
+    readConnectedProvidersCacheMock.mockReturnValue([])
     const args = createBaseArgs({ subagent_type: "explore" })
     const executorCtx = createExecutorContext(
       async () => ([
@@ -648,27 +643,39 @@ describe("resolveSubagentExecution", () => {
       reasoningEffort: "medium",
       thinking: { type: "disabled" },
     })
-    cacheSpy.mockRestore()
-    connectedSpy.mockRestore()
   })
 })
 
 describe("resolveSubagentExecution - agent name sanitization", () => {
-  let logSpy: ReturnType<typeof spyOn> | undefined
   let resolveSubagentExecution: SubagentResolverModule["resolveSubagentExecution"]
 
   beforeEach(async () => {
-    logSpy = spyOn(logger, "log").mockImplementation(() => {})
+    mock.restore()
+    logMock.mockClear()
+    readConnectedProvidersCacheMock.mockReset()
+    readProviderModelsCacheMock.mockReset()
+    readConnectedProvidersCacheMock.mockReturnValue(null)
+    readProviderModelsCacheMock.mockReturnValue(null)
+    mock.module("../../../shared/logger", () => ({
+      log: logMock,
+    }))
+    mock.module("../../../shared/connected-providers-cache", () => ({
+      readConnectedProvidersCache: readConnectedProvidersCacheMock,
+      readProviderModelsCache: readProviderModelsCacheMock,
+      hasConnectedProvidersCache: () => readConnectedProvidersCacheMock() !== null,
+      hasProviderModelsCache: () => readProviderModelsCacheMock() !== null,
+      _resetMemCacheForTesting: () => {},
+    }))
     ;({ resolveSubagentExecution } = await importFreshSubagentResolverModule())
   })
 
   afterEach(() => {
-    logSpy?.mockRestore()
+    mock.restore()
   })
 
   test("strips backslash-wrapped agent names like \\hephaestus\\", async () => {
     //#given
-    const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+    readProviderModelsCacheMock.mockReturnValue({
       models: {},
       connected: [],
       updatedAt: "2026-03-03T00:00:00.000Z",
@@ -684,12 +691,11 @@ describe("resolveSubagentExecution - agent name sanitization", () => {
     //#then
     expect(result.error).toBeUndefined()
     expect(result.agentToUse).toBe("Hephaestus - Deep Agent")
-    cacheSpy.mockRestore()
   })
 
   test("strips double-quoted agent names", async () => {
     //#given
-    const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+    readProviderModelsCacheMock.mockReturnValue({
       models: {},
       connected: [],
       updatedAt: "2026-03-03T00:00:00.000Z",
@@ -705,12 +711,11 @@ describe("resolveSubagentExecution - agent name sanitization", () => {
     //#then
     expect(result.error).toBeUndefined()
     expect(result.agentToUse).toBe("oracle")
-    cacheSpy.mockRestore()
   })
 
   test("strips single-quoted agent names", async () => {
     //#given
-    const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+    readProviderModelsCacheMock.mockReturnValue({
       models: {},
       connected: [],
       updatedAt: "2026-03-03T00:00:00.000Z",
@@ -726,6 +731,5 @@ describe("resolveSubagentExecution - agent name sanitization", () => {
     //#then
     expect(result.error).toBeUndefined()
     expect(result.agentToUse).toBe("explore")
-    cacheSpy.mockRestore()
   })
 })

@@ -1,6 +1,16 @@
-declare const require: (name: string) => any
 const { describe, expect, test } = require("bun:test")
-import { createDelegateTask } from "./tools"
+
+function requireFresh<T>(modulePath: string): T {
+  const resolvedPath = require.resolve(modulePath)
+  if (require.cache?.[resolvedPath]) {
+    delete require.cache[resolvedPath]
+  }
+  return require(modulePath) as T
+}
+
+function createDelegateTask(...args: Parameters<typeof import("./tools").createDelegateTask>): ReturnType<typeof import("./tools").createDelegateTask> {
+  return requireFresh<typeof import("./tools")>("./tools").createDelegateTask(...args)
+}
 
 	describe("createDelegateTask schema", () => {
 	test("#given category arg #when tool is created #then category accepts any string", () => {
