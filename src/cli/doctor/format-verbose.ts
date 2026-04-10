@@ -1,4 +1,5 @@
 import color from "picocolors"
+import { PLUGIN_NAME } from "../../shared"
 import type { DoctorResult } from "./types"
 import { formatHeader, formatStatusSymbol, formatIssue } from "./format-shared"
 
@@ -12,7 +13,7 @@ export function formatVerbose(result: DoctorResult): string {
   lines.push(`${color.bold("System Information")}`)
   lines.push(`${color.dim("\u2500".repeat(40))}`)
   lines.push(`  ${formatStatusSymbol("pass")} opencode    ${systemInfo.opencodeVersion ?? "unknown"}`)
-  lines.push(`  ${formatStatusSymbol("pass")} oh-my-opencode ${systemInfo.pluginVersion ?? "unknown"}`)
+  lines.push(`  ${formatStatusSymbol("pass")} ${PLUGIN_NAME} ${systemInfo.pluginVersion ?? "unknown"}`)
   if (systemInfo.loadedVersion) {
     lines.push(`  ${formatStatusSymbol("pass")} loaded      ${systemInfo.loadedVersion}`)
   }
