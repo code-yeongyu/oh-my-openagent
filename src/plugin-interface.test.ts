@@ -15,6 +15,7 @@ import {
   updateSessionAgent,
 } from "./features/claude-code-session-state"
 
+
 describe("createPluginInterface - command.execute.before", () => {
   let testDir = ""
 

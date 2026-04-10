@@ -21,6 +21,7 @@
  *   9. <communication>  - Output format, tone guidance
  */
 
+import { GPT_APPLY_PATCH_GUIDANCE } from "../gpt-apply-patch-guard";
 import type {
   AvailableAgent,
   AvailableTool,
@@ -252,7 +253,7 @@ ${antiPatterns}
 1. **Explore**: Fire 2-5 explore/librarian agents in parallel + direct tool reads. Goal: complete understanding, not just enough context.
 2. **Plan**: List files to modify, specific changes, dependencies, complexity estimate.
 3. **Decide**: Trivial (<10 lines, single file) -> self. Complex (multi-file, >100 lines) -> delegate.
-4. **Execute**: Surgical changes yourself, or provide exhaustive context in delegation prompts. Match existing patterns. Minimal diff. Search the codebase for similar patterns before writing code. Default to ASCII. Add comments only for non-obvious blocks. Use the \`edit\` and \`write\` tools for file changes. Do not use \`apply_patch\` on GPT models - it is unreliable here and can hang during verification.
+4. **Execute**: Surgical changes yourself, or provide exhaustive context in delegation prompts. Match existing patterns. Minimal diff. Search the codebase for similar patterns before writing code. Default to ASCII. Add comments only for non-obvious blocks. ${GPT_APPLY_PATCH_GUIDANCE}
 5. **Verify**: \`lsp_diagnostics\` on all modified files (zero errors) -> run related tests (\`foo.ts\` -> \`foo.test.ts\`) -> typecheck -> build if applicable (exit 0). Fix only issues your changes caused.
 
 If verification fails, return to step 1 with a materially different approach. After three attempts: stop, revert to last working state, document what you tried, consult Oracle. If Oracle cannot resolve, ask the user.

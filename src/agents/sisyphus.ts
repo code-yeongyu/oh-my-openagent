@@ -11,6 +11,7 @@ import {
 } from "./sisyphus/gemini";
 import { buildGpt54SisyphusPrompt } from "./sisyphus/gpt-5-4";
 import { buildTaskManagementSection } from "./sisyphus/default";
+import { getGptApplyPatchPermission } from "./gpt-apply-patch-guard";
 
 const MODE: AgentMode = "primary";
 export const SISYPHUS_PROMPT_METADATA: AgentPromptMetadata = {
@@ -499,7 +500,7 @@ export function createSisyphusAgent(
       permission: {
         question: "allow",
         call_omo_agent: "deny",
-        apply_patch: "deny",
+        ...getGptApplyPatchPermission(model),
       } as AgentConfig["permission"],
       reasoningEffort: "medium",
     };
@@ -539,7 +540,7 @@ export function createSisyphusAgent(
   const permission = {
     question: "allow",
     call_omo_agent: "deny",
-    ...(isGptModel(model) ? { apply_patch: "deny" as const } : {}),
+    ...getGptApplyPatchPermission(model),
   } as AgentConfig["permission"];
   const base = {
     description:

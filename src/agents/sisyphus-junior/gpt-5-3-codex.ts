@@ -8,6 +8,7 @@
 
 import { resolvePromptAppend } from "../builtin-agents/resolve-file-uri"
 import { buildAntiDuplicationSection } from "../dynamic-agent-prompt-builder"
+import { GPT_APPLY_PATCH_GUIDANCE } from "../gpt-apply-patch-guard"
 
 export function buildGpt53CodexSisyphusJuniorPrompt(
   useTaskSystem: boolean,
@@ -92,7 +93,7 @@ Style:
 1. SEARCH existing codebase for similar patterns/styles
 2. Match naming, indentation, import styles, error handling conventions
 3. Default to ASCII. Add comments only for non-obvious blocks
-4. Use the \`edit\` and \`write\` tools for file changes. Do not use \`apply_patch\` on GPT models - it is unreliable here and can hang during verification.
+4. ${GPT_APPLY_PATCH_GUIDANCE}
 
 ### After Implementation (MANDATORY - DO NOT SKIP)
 

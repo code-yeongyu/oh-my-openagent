@@ -69,10 +69,10 @@ export function createManagers(args: {
     pluginConfig.background_task,
     {
       tmuxConfig,
-		onSubagentSessionCreated: async (event: SubagentSessionCreatedEvent) => {
-			log("[index] onSubagentSessionCreated callback received", {
-				sessionID: event.sessionID,
-				parentID: event.parentID,
+      onSubagentSessionCreated: async (event: SubagentSessionCreatedEvent) => {
+        log("[create-managers] onSubagentSessionCreated callback received", {
+          sessionID: event.sessionID,
+          parentID: event.parentID,
           title: event.title,
         })
 
@@ -88,7 +88,7 @@ export function createManagers(args: {
         })
 
         if (pluginConfig.openclaw) {
-        await openclawRuntimeDispatch.dispatchOpenClawEvent({
+          await openclawRuntimeDispatch.dispatchOpenClawEvent({
             config: pluginConfig.openclaw,
             rawEvent: "session.created",
             context: {
@@ -99,11 +99,11 @@ export function createManagers(args: {
           })
         }
 
-        log("[index] onSubagentSessionCreated callback completed")
+        log("[create-managers] onSubagentSessionCreated callback completed")
       },
       onShutdown: async () => {
         await tmuxSessionManager.cleanup().catch((error) => {
-          log("[index] tmux cleanup error during shutdown:", error)
+          log("[create-managers] tmux cleanup error during shutdown:", error)
         })
       },
       enableParentSessionNotifications: backgroundNotificationHookEnabled,

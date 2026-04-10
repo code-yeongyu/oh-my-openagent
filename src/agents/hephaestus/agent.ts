@@ -1,6 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk";
 import type { AgentMode, AgentPromptMetadata } from "../types";
-import { isGptModel, isGpt5_4Model, isGpt5_3CodexModel } from "../types";
+import { isGpt5_4Model, isGpt5_3CodexModel } from "../types";
 import type {
   AvailableAgent,
   AvailableTool,
@@ -8,6 +8,7 @@ import type {
   AvailableCategory,
 } from "../dynamic-agent-prompt-builder";
 import { categorizeTools, buildAgentIdentitySection } from "../dynamic-agent-prompt-builder";
+import { getGptApplyPatchPermission } from "../gpt-apply-patch-guard";
 
 import { buildHephaestusPrompt as buildGptPrompt } from "./gpt";
 import { buildHephaestusPrompt as buildGpt53CodexPrompt } from "./gpt-5-3-codex";
@@ -125,7 +126,7 @@ export function createHephaestusAgent(
     permission: {
       question: "allow",
       call_omo_agent: "deny",
-      ...(isGptModel(model) ? { apply_patch: "deny" as const } : {}),
+      ...getGptApplyPatchPermission(model),
     } as AgentConfig["permission"],
     reasoningEffort: "medium",
   };

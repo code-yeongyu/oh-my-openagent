@@ -1,16 +1,10 @@
 import { existsSync, readFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { join } from "node:path"
-import { parseJsonc } from "../../../shared"
+import { getOpenCodeCacheDir, parseJsonc } from "../../../shared"
 import type { AvailableModelsInfo } from "./model-resolution-types"
 
-function getOpenCodeCacheDir(): string {
-  const xdgCache = process.env.XDG_CACHE_HOME
-  if (xdgCache) return join(xdgCache, "opencode")
-  return join(homedir(), ".cache", "opencode")
-}
-
-function getOpenCodeConfigDir(): string {
+function getUserConfigDir(): string {
   const xdgConfig = process.env.XDG_CONFIG_HOME
   if (xdgConfig) return join(xdgConfig, "opencode")
   return join(homedir(), ".config", "opencode")
@@ -24,7 +18,7 @@ function getOpenCodeConfigDir(): string {
  * warnings in doctor.
  */
 function loadCustomProviderNames(): string[] {
-  const configDir = getOpenCodeConfigDir()
+  const configDir = getUserConfigDir()
   const candidatePaths = [
     join(configDir, "opencode.json"),
     join(configDir, "opencode.jsonc"),
