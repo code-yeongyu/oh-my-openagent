@@ -5,30 +5,12 @@ import type { BackgroundManager } from "./features/background-agent"
 import type { PluginContext } from "./plugin/types"
 import type { ModelCacheState } from "./plugin-state"
 
-import { createCoreHooks } from "./plugin/hooks/create-core-hooks"
-import { createContinuationHooks } from "./plugin/hooks/create-continuation-hooks"
-import { createSkillHooks } from "./plugin/hooks/create-skill-hooks"
+import { createCoreHooks, type CoreHooks } from "./plugin/hooks/create-core-hooks"
+import { createContinuationHooks, type ContinuationHooks } from "./plugin/hooks/create-continuation-hooks"
+import { createSkillHooks, type SkillHooks } from "./plugin/hooks/create-skill-hooks"
 
-export type CreatedHooks = ReturnType<typeof createHooks>
-
-type DisposableHook = { dispose?: () => void } | null | undefined
-
-export type DisposableCreatedHooks = {
-  claudeCodeHooks?: DisposableHook
-  commentChecker?: DisposableHook
-  runtimeFallback?: DisposableHook
-  todoContinuationEnforcer?: DisposableHook
-  autoSlashCommand?: DisposableHook
-  anthropicContextWindowLimitRecovery?: DisposableHook
-}
-
-export function disposeCreatedHooks(hooks: DisposableCreatedHooks): void {
-  hooks.claudeCodeHooks?.dispose?.()
-  hooks.commentChecker?.dispose?.()
-  hooks.runtimeFallback?.dispose?.()
-  hooks.todoContinuationEnforcer?.dispose?.()
-  hooks.autoSlashCommand?.dispose?.()
-  hooks.anthropicContextWindowLimitRecovery?.dispose?.()
+export type CreatedHooks = CoreHooks & ContinuationHooks & SkillHooks & {
+  disposeHooks: () => void
 }
 
 export function createHooks(args: {
@@ -40,7 +22,7 @@ export function createHooks(args: {
   safeHookEnabled: boolean
   mergedSkills: LoadedSkill[]
   availableSkills: AvailableSkill[]
-}) {
+}): CreatedHooks {
   const {
     ctx,
     pluginConfig,
@@ -78,16 +60,17 @@ export function createHooks(args: {
     availableSkills,
   })
 
-  const hooks = {
+  return {
     ...core,
     ...continuation,
     ...skill,
-  }
-
-  return {
-    ...hooks,
     disposeHooks: (): void => {
-      disposeCreatedHooks(hooks)
+      core.claudeCodeHooks?.dispose?.()
+      core.commentChecker?.dispose?.()
+      core.runtimeFallback?.dispose?.()
+      continuation.todoContinuationEnforcer?.dispose?.()
+      skill.autoSlashCommand?.dispose?.()
+      core.anthropicContextWindowLimitRecovery?.dispose?.()
     },
   }
 }

@@ -1,6 +1,5 @@
 import { describe, expect, spyOn, test } from "bun:test"
 
-import { disposeCreatedHooks } from "./create-hooks"
 import { createPluginDispose } from "./plugin-dispose"
 
 describe("createPluginDispose", () => {
@@ -90,13 +89,11 @@ describe("createPluginDispose", () => {
       },
       lspManager,
       disposeHooks: (): void => {
-        disposeCreatedHooks({
-          claudeCodeHooks,
-          commentChecker,
-          runtimeFallback,
-          todoContinuationEnforcer,
-          autoSlashCommand,
-        })
+        claudeCodeHooks?.dispose?.()
+        commentChecker?.dispose?.()
+        runtimeFallback?.dispose?.()
+        todoContinuationEnforcer?.dispose?.()
+        autoSlashCommand?.dispose?.()
       },
     })
 
