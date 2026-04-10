@@ -100,10 +100,12 @@ export async function executePreToolUseHooks(
         return {
           decision: "deny",
           reason: result.stderr || result.stdout || "Hook blocked the operation",
+          modifiedInput: accumulatedModifiedInput,
           elapsedMs: Date.now() - startTime,
           hookName: firstHookName,
           toolName: transformedToolName,
           inputLines,
+          ...accumulatedCommonFields,
         }
       }
 
@@ -111,10 +113,12 @@ export async function executePreToolUseHooks(
         return {
           decision: "ask",
           reason: result.stderr || result.stdout,
+          modifiedInput: accumulatedModifiedInput,
           elapsedMs: Date.now() - startTime,
           hookName: firstHookName,
           toolName: transformedToolName,
           inputLines,
+          ...accumulatedCommonFields,
         }
       }
 

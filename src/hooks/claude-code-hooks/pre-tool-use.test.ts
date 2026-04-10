@@ -216,5 +216,37 @@ describe("executePreToolUseHooks", () => {
       expect(result.suppressOutput).toBe(true)
       expect(result.systemMessage).toBe("Budget warning: approaching limit")
     })
+
+    it("#when first hook allows with modifiedInput and second hook denies #then deny includes accumulated modifiedInput", async () => {
+      let callCount = 0
+      dispatchSpy.mockImplementation(async () => {
+        callCount++
+        if (callCount === 1) {
+          return {
+            exitCode: 0,
+            stdout: JSON.stringify({
+              decision: "allow",
+              hookSpecificOutput: {
+                permissionDecision: "allow",
+                updatedInput: { file_path: "/tmp/modified.md" },
+              },
+            }),
+            stderr: "",
+          }
+        }
+        return { exitCode: 2, stdout: "", stderr: "BUDGET EXCEEDED" }
+      })
+
+      const config = createConfig([
+        { matcher: "*", hooks: [{ type: "command", command: "node modifier.mjs" }] },
+        { matcher: "Edit|Write", hooks: [{ type: "command", command: "bash budget-guard.sh" }] },
+      ])
+
+      const result = await executePreToolUseHooks(createContext(), config)
+
+      expect(callCount).toBe(2)
+      expect(result.decision).toBe("deny")
+      expect(result.modifiedInput).toEqual({ file_path: "/tmp/modified.md" })
+    })
   })
 })
