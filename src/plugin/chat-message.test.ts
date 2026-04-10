@@ -6,6 +6,7 @@ import { randomUUID } from "node:crypto"
 
 import { createChatMessageHandler } from "./chat-message"
 import { createAutoSlashCommandHook } from "../hooks/auto-slash-command"
+import { createKeywordDetectorHook } from "../hooks/keyword-detector"
 import { createStartWorkHook } from "../hooks/start-work"
 import { readBoulderState } from "../features/boulder-state"
 import { _resetForTesting, setMainSession, subagentSessions, registerAgentName, updateSessionAgent, getSessionAgent } from "../features/claude-code-session-state"
@@ -209,6 +210,42 @@ describe("createChatMessageHandler - /ulw-loop raw slash fallback", () => {
         },
       },
     ])
+  })
+})
+
+describe("createChatMessageHandler - plain ultrawork keyword routing", () => {
+  test("does not start ralph loop when plain ulw text flows through the full chat.message pipeline", async () => {
+    // given
+    setMainSession("test-session")
+    const startLoopCalls: Array<{
+      sessionID: string
+      prompt: string
+      options: Record<string, unknown>
+    }> = []
+    const ralphLoop = {
+      startLoop: (sessionID: string, prompt: string, options?: Record<string, unknown>) => {
+        startLoopCalls.push({ sessionID, prompt, options: options ?? {} })
+        return true
+      },
+      cancelLoop: () => true,
+    }
+    const args = createMockHandlerArgs()
+    args.hooks.ralphLoop = ralphLoop
+    args.hooks.keywordDetector = createKeywordDetectorHook(args.ctx as never, undefined, ralphLoop)
+    const handler = createChatMessageHandler(args)
+    const input = createMockInput("sisyphus")
+    const output: ChatMessageHandlerOutput = {
+      message: {},
+      parts: [{ type: "text", text: "ulw fix the flaky keyword tests" }],
+    }
+
+    // when
+    await handler(input, output)
+
+    // then
+    expect(startLoopCalls).toHaveLength(0)
+    expect(output.parts[0]?.text).toContain("ULTRAWORK MODE ENABLED!")
+    expect(output.parts[0]?.text).toContain("ulw fix the flaky keyword tests")
   })
 })
 
