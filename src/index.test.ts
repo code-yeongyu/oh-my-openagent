@@ -1,4 +1,4 @@
-import { afterAll, beforeEach, describe, expect, it, mock } from "bun:test"
+import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 
 describe("experimental.session.compacting handler", () => {
   function createCompactingHandler(hooks: {
@@ -257,83 +257,87 @@ const mockCreatePluginInterface = mock(() => ({}))
 const mockInitializeOpenClaw = mock(async () => {})
 const mockStartTmuxCheck = mock(() => {})
 
-mock.module("./cli/config-manager/config-context", () => ({
-  initConfigContext: mockInitConfigContext,
-}))
+let OhMyOpenCodePlugin: (typeof import("./index"))["default"]
 
-mock.module("./shared/external-plugin-detector", () => ({
-  detectExternalSkillPlugin: mockDetectExternalSkillPlugin,
-  getSkillPluginConflictWarning: mockGetSkillPluginConflictWarning,
-}))
+function installIndexModuleMocks(): void {
+  mock.module("./cli/config-manager/config-context", () => ({
+    initConfigContext: mockInitConfigContext,
+  }))
 
-mock.module("./shared", () => ({
-  injectServerAuthIntoClient: mockInjectServerAuthIntoClient,
-  log: mock(() => {}),
-  logLegacyPluginStartupWarning: mockLogLegacyPluginStartupWarning,
-}))
+  mock.module("./shared/external-plugin-detector", () => ({
+    detectExternalSkillPlugin: mockDetectExternalSkillPlugin,
+    getSkillPluginConflictWarning: mockGetSkillPluginConflictWarning,
+  }))
 
-mock.module("./plugin-config", () => ({
-  loadPluginConfig: mockLoadPluginConfig,
-}))
+  mock.module("./shared", () => ({
+    injectServerAuthIntoClient: mockInjectServerAuthIntoClient,
+    log: mock(() => {}),
+    logLegacyPluginStartupWarning: mockLogLegacyPluginStartupWarning,
+  }))
 
-mock.module("./create-runtime-tmux-config", () => ({
-  createRuntimeTmuxConfig: mockCreateRuntimeTmuxConfig,
-  isTmuxIntegrationEnabled: mockIsTmuxIntegrationEnabled,
-  isInteractiveBashEnabled: mockIsInteractiveBashEnabled,
-}))
+  mock.module("./plugin-config", () => ({
+    loadPluginConfig: mockLoadPluginConfig,
+  }))
 
-mock.module("./create-managers", () => ({
-  createManagers: mockCreateManagers,
-}))
+  mock.module("./create-runtime-tmux-config", () => ({
+    createRuntimeTmuxConfig: mockCreateRuntimeTmuxConfig,
+    isTmuxIntegrationEnabled: mockIsTmuxIntegrationEnabled,
+    isInteractiveBashEnabled: mockIsInteractiveBashEnabled,
+  }))
 
-mock.module("./create-tools", () => ({
-  createTools: mockCreateTools,
-}))
+  mock.module("./create-managers", () => ({
+    createManagers: mockCreateManagers,
+  }))
 
-mock.module("./create-hooks", () => ({
-  createHooks: mockCreateHooks,
-}))
+  mock.module("./create-tools", () => ({
+    createTools: mockCreateTools,
+  }))
 
-mock.module("./plugin-dispose", () => ({
-  createPluginDispose: mockCreatePluginDispose,
-}))
+  mock.module("./create-hooks", () => ({
+    createHooks: mockCreateHooks,
+  }))
 
-mock.module("./plugin-interface", () => ({
-  createPluginInterface: mockCreatePluginInterface,
-}))
+  mock.module("./plugin-dispose", () => ({
+    createPluginDispose: mockCreatePluginDispose,
+  }))
 
-mock.module("./plugin-state", () => ({
-  createModelCacheState: mock(() => ({})),
-}))
+  mock.module("./plugin-interface", () => ({
+    createPluginInterface: mockCreatePluginInterface,
+  }))
 
-mock.module("./shared/first-message-variant", () => ({
-  createFirstMessageVariantGate: mock(() => ({
-    shouldOverride: () => false,
-    markApplied: () => {},
-    markSessionCreated: () => {},
-    clear: () => {},
-  })),
-}))
+  mock.module("./plugin-state", () => ({
+    createModelCacheState: mock(() => ({})),
+  }))
 
-mock.module("./openclaw", () => ({
-  initializeOpenClaw: mockInitializeOpenClaw,
-}))
+  mock.module("./shared/first-message-variant", () => ({
+    createFirstMessageVariantGate: mock(() => ({
+      shouldOverride: () => false,
+      markApplied: () => {},
+      markSessionCreated: () => {},
+      clear: () => {},
+    })),
+  }))
 
-mock.module("./tools/interactive-bash", () => ({
-  interactive_bash: {},
-  startBackgroundCheck: mockStartTmuxCheck,
-}))
+  mock.module("./openclaw", () => ({
+    initializeOpenClaw: mockInitializeOpenClaw,
+  }))
 
-mock.module("./tools/lsp/client", () => ({
-  lspManager: {
-    cleanupTempDirectoryClients: async () => {},
-  },
-}))
+  mock.module("./tools/interactive-bash", () => ({
+    interactive_bash: {},
+    startBackgroundCheck: mockStartTmuxCheck,
+  }))
 
-const { default: OhMyOpenCodePlugin } = await import("./index")
+}
+
+async function importFreshIndexModule(): Promise<typeof import("./index")> {
+  return import(`./index?test=${Date.now()}-${Math.random()}`)
+}
 
 describe("OhMyOpenCodePlugin", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    mock.restore()
+    installIndexModuleMocks()
+    ;({ default: OhMyOpenCodePlugin } = await importFreshIndexModule())
     mockInitConfigContext.mockClear()
     mockDetectExternalSkillPlugin.mockClear()
     mockGetSkillPluginConflictWarning.mockClear()
@@ -352,7 +356,7 @@ describe("OhMyOpenCodePlugin", () => {
     mockStartTmuxCheck.mockClear()
   })
 
-  afterAll(() => {
+  afterEach(() => {
     mock.restore()
   })
 
