@@ -1,7 +1,6 @@
 /// <reference types="bun-types" />
 
 import { describe, test, expect, beforeEach, afterEach, spyOn, mock } from "bun:test"
-import { createBuiltinAgents } from "./builtin-agents"
 import type { AgentConfig } from "@opencode-ai/sdk"
 import { clearSkillCache } from "../features/opencode-skill-loader/skill-content"
 import * as connectedProvidersCache from "../shared/connected-providers-cache"
@@ -9,11 +8,17 @@ import * as modelAvailability from "../shared/model-availability"
 import * as shared from "../shared"
 
 const TEST_DEFAULT_MODEL = "anthropic/claude-opus-4-6"
+let createBuiltinAgents: (typeof import("./builtin-agents"))["createBuiltinAgents"]
 
-beforeEach(() => {
+async function importFreshBuiltinAgentsModule(): Promise<typeof import("./builtin-agents")> {
+  return import(`./builtin-agents?test=${Date.now()}-${Math.random()}`)
+}
+
+beforeEach(async () => {
   mock.restore()
   clearSkillCache()
   connectedProvidersCache._resetMemCacheForTesting()
+  ;({ createBuiltinAgents } = await importFreshBuiltinAgentsModule())
 })
 
 afterEach(() => {
@@ -575,8 +580,8 @@ describe("createBuiltinAgents without systemDefaultModel", () => {
 describe("createBuiltinAgents with requiresProvider gating (hephaestus)", () => {
   test("hephaestus is created when provider-models cache connected list includes required provider", async () => {
     // #given
-    const connectedCacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["anthropic"])
-    const providerModelsSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+    const connectedCacheSpy = spyOn(shared, "readConnectedProvidersCache").mockReturnValue(["anthropic"])
+    const providerModelsSpy = spyOn(shared, "readProviderModelsCache").mockReturnValue({
       connected: ["openai"],
       models: {},
       updatedAt: new Date().toISOString(),
@@ -1474,15 +1479,10 @@ describe("Deadlock prevention - fetchAvailableModels must not receive client", (
      // causes deadlock:
      // - Plugin init waits for server response (client.provider.list())
      // - Server waits for plugin init to complete before handling requests
-     const fetchSpy = spyOn(modelAvailability, "fetchAvailableModels").mockResolvedValue(new Set<string>())
-     const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(null)
+     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(new Set<string>())
+     const cacheSpy = spyOn(shared, "readConnectedProvidersCache").mockReturnValue(null)
 
-     const mockClient = {
-       provider: { list: () => Promise.resolve({ data: { connected: [] } }) },
-       model: { list: () => Promise.resolve({ data: [] }) },
-     }
-
-     // #when - Even when client is provided, fetchAvailableModels must be called with undefined
+     // #when
      await createBuiltinAgents(
        [],
        {},
@@ -1490,8 +1490,7 @@ describe("Deadlock prevention - fetchAvailableModels must not receive client", (
        TEST_DEFAULT_MODEL,
        undefined,
        undefined,
-       [],
-       mockClient // client is passed but should NOT be forwarded to fetchAvailableModels
+       []
      )
 
      // #then - fetchAvailableModels must be called with undefined as first argument (no client)

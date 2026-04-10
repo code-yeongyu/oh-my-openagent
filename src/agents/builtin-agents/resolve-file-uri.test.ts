@@ -90,7 +90,7 @@ describe("resolvePromptAppend", () => {
     const resolved = resolvePromptAppend(input, homeFixtureRoot)
 
     //#then
-    expect(resolved).toBe("home-content")
+    expect(resolved).toContain("[WARNING: Path rejected:")
   })
 
   test("resolves percent-encoded URI path", () => {
