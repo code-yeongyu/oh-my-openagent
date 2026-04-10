@@ -104,7 +104,7 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
       return cachedDescription ?? TOOL_DESCRIPTION_PREFIX
     },
     args: {
-      name: tool.schema.string().describe("The skill or command name (e.g., 'code-review' or 'publish'). Use without leading slash for commands."),
+      name: tool.schema.string().describe("The skill or command name (e.g., 'review-work' or 'publish'). Use without leading slash for commands."),
       user_message: tool.schema
         .string()
         .optional()
