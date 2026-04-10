@@ -105,10 +105,10 @@ export function applyToolConfig(params: {
     prometheus.permission = {
       ...prometheus.permission,
       call_omo_agent: "deny",
-      task: "deny",
+      task: "allow",
       question: questionPermission,
-      "task_*": "deny",
-      teammate: "deny",
+      "task_*": "allow",
+      teammate: "allow",
       ...denyTodoTools,
     };
   }
