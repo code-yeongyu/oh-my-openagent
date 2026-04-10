@@ -191,7 +191,7 @@ describe("sisyphus-task", () => {
       expect(result).toBe(false)
     })
 
-    test("returns true for 'planner' (matches via includes('plan'))", () => {
+    test("returns false for 'planner' (no longer matches via substring)", () => {
       //#given / #when
       const result = isPlanAgent("planner")
 
@@ -252,6 +252,19 @@ describe("sisyphus-task", () => {
       expect(PLAN_AGENT_NAMES).toEqual(["plan"])
     })
   })
+
+    test("returns false for non-plan agent display names (regression: isPlanAgent substring false-positive)", () => {
+      //#given / #when / #then
+      expect(isPlanAgent("Atlas (Plan Executor)")).toBe(false)
+      expect(isPlanAgent("Momus (Plan Critic)")).toBe(false)
+      expect(isPlanAgent("Metis (Plan Consultant)")).toBe(false)
+    })
+
+    test("returns true for 'Plan' display name casing variations", () => {
+      //#given / #when / #then
+      expect(isPlanAgent("Plan")).toBe(true)
+      expect(isPlanAgent("PLAN")).toBe(true)
+    })
 
   describe("isPlanFamily", () => {
     test("returns true for 'plan'", () => {
