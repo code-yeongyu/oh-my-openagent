@@ -912,7 +912,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
           "variant": "medium",
         },
       ],
-      "model": "opencode/claude-sonnet",
+      "model": "opencode/claude-sonnet-4-6",
     },
     "explore": {
       "fallback_models": [
@@ -936,7 +936,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
           "variant": "high",
         },
       ],
-      "model": "opencode/claude-opus",
+      "model": "opencode/claude-opus-4-6",
       "variant": "max",
     },
     "momus": {
@@ -969,7 +969,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
           "variant": "high",
         },
         {
-          "model": "opencode/claude-opus",
+          "model": "opencode/claude-opus-4-6",
           "variant": "max",
         },
       ],
@@ -986,7 +986,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
           "model": "opencode/gemini-3.1-pro",
         },
       ],
-      "model": "opencode/claude-opus",
+      "model": "opencode/claude-opus-4-6",
       "variant": "max",
     },
     "sisyphus": {
@@ -1005,7 +1005,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
           "model": "opencode/big-pickle",
         },
       ],
-      "model": "opencode/claude-opus",
+      "model": "opencode/claude-opus-4-6",
       "variant": "max",
     },
     "sisyphus-junior": {
@@ -1018,7 +1018,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
           "model": "opencode/big-pickle",
         },
       ],
-      "model": "opencode/claude-sonnet",
+      "model": "opencode/claude-sonnet-4-6",
     },
   },
   "categories": {
@@ -1038,7 +1038,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
     "deep": {
       "fallback_models": [
         {
-          "model": "opencode/claude-opus",
+          "model": "opencode/claude-opus-4-6",
           "variant": "max",
         },
         {
@@ -1070,7 +1070,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
           "variant": "high",
         },
         {
-          "model": "opencode/claude-opus",
+          "model": "opencode/claude-opus-4-6",
           "variant": "max",
         },
       ],
@@ -1087,7 +1087,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
           "model": "opencode/gemini-3-flash",
         },
       ],
-      "model": "opencode/claude-sonnet",
+      "model": "opencode/claude-sonnet-4-6",
     },
     "unspecified-low": {
       "fallback_models": [
@@ -1099,7 +1099,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
           "model": "opencode/gemini-3-flash",
         },
       ],
-      "model": "opencode/claude-sonnet",
+      "model": "opencode/claude-sonnet-4-6",
     },
     "visual-engineering": {
       "fallback_models": [
@@ -1107,7 +1107,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
           "model": "opencode/glm-5",
         },
         {
-          "model": "opencode/claude-opus",
+          "model": "opencode/claude-opus-4-6",
           "variant": "max",
         },
       ],
@@ -1117,7 +1117,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
     "writing": {
       "fallback_models": [
         {
-          "model": "opencode/claude-sonnet",
+          "model": "opencode/claude-sonnet-4-6",
         },
       ],
       "model": "opencode/gemini-3-flash",
@@ -1137,7 +1137,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
           "variant": "medium",
         },
       ],
-      "model": "opencode/claude-sonnet",
+      "model": "opencode/claude-sonnet-4-6",
     },
     "explore": {
       "fallback_models": [
@@ -1161,7 +1161,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
           "variant": "high",
         },
       ],
-      "model": "opencode/claude-opus",
+      "model": "opencode/claude-opus-4-6",
       "variant": "max",
     },
     "momus": {
@@ -1194,7 +1194,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
           "variant": "high",
         },
         {
-          "model": "opencode/claude-opus",
+          "model": "opencode/claude-opus-4-6",
           "variant": "max",
         },
       ],
@@ -1211,7 +1211,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
           "model": "opencode/gemini-3.1-pro",
         },
       ],
-      "model": "opencode/claude-opus",
+      "model": "opencode/claude-opus-4-6",
       "variant": "max",
     },
     "sisyphus": {
@@ -1230,7 +1230,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
           "model": "opencode/big-pickle",
         },
       ],
-      "model": "opencode/claude-opus",
+      "model": "opencode/claude-opus-4-6",
       "variant": "max",
     },
     "sisyphus-junior": {
@@ -1243,7 +1243,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
           "model": "opencode/big-pickle",
         },
       ],
-      "model": "opencode/claude-sonnet",
+      "model": "opencode/claude-sonnet-4-6",
     },
   },
   "categories": {
@@ -1263,7 +1263,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
     "deep": {
       "fallback_models": [
         {
-          "model": "opencode/claude-opus",
+          "model": "opencode/claude-opus-4-6",
           "variant": "max",
         },
         {
@@ -1295,7 +1295,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
           "variant": "high",
         },
         {
-          "model": "opencode/claude-opus",
+          "model": "opencode/claude-opus-4-6",
           "variant": "max",
         },
       ],
@@ -1315,7 +1315,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
           "model": "opencode/kimi-k2.5",
         },
       ],
-      "model": "opencode/claude-opus",
+      "model": "opencode/claude-opus-4-6",
       "variant": "max",
     },
     "unspecified-low": {
@@ -1328,7 +1328,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
           "model": "opencode/gemini-3-flash",
         },
       ],
-      "model": "opencode/claude-sonnet",
+      "model": "opencode/claude-sonnet-4-6",
     },
     "visual-engineering": {
       "fallback_models": [
@@ -1336,7 +1336,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
           "model": "opencode/glm-5",
         },
         {
-          "model": "opencode/claude-opus",
+          "model": "opencode/claude-opus-4-6",
           "variant": "max",
         },
       ],
@@ -1346,7 +1346,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
     "writing": {
       "fallback_models": [
         {
-          "model": "opencode/claude-sonnet",
+          "model": "opencode/claude-sonnet-4-6",
         },
       ],
       "model": "opencode/gemini-3-flash",
@@ -1366,7 +1366,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models when 
           "variant": "medium",
         },
       ],
-      "model": "github-copilot/claude-sonnet",
+      "model": "github-copilot/claude-sonnet-4.6",
     },
     "explore": {
       "fallback_models": [
@@ -1387,7 +1387,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models when 
           "variant": "high",
         },
       ],
-      "model": "github-copilot/claude-opus",
+      "model": "github-copilot/claude-opus-4.6",
       "variant": "max",
     },
     "momus": {
@@ -1414,7 +1414,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models when 
           "variant": "high",
         },
         {
-          "model": "github-copilot/claude-opus",
+          "model": "github-copilot/claude-opus-4.6",
           "variant": "max",
         },
       ],
@@ -1431,7 +1431,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models when 
           "model": "github-copilot/gemini-3.1-pro",
         },
       ],
-      "model": "github-copilot/claude-opus",
+      "model": "github-copilot/claude-opus-4.6",
       "variant": "max",
     },
     "sisyphus": {
@@ -1441,7 +1441,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models when 
           "variant": "medium",
         },
       ],
-      "model": "github-copilot/claude-opus",
+      "model": "github-copilot/claude-opus-4.6",
       "variant": "max",
     },
     "sisyphus-junior": {
@@ -1451,7 +1451,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models when 
           "variant": "medium",
         },
       ],
-      "model": "github-copilot/claude-sonnet",
+      "model": "github-copilot/claude-sonnet-4.6",
     },
   },
   "categories": {
@@ -1471,7 +1471,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models when 
     "deep": {
       "fallback_models": [
         {
-          "model": "github-copilot/claude-opus",
+          "model": "github-copilot/claude-opus-4.6",
           "variant": "max",
         },
         {
@@ -1496,7 +1496,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models when 
     "ultrabrain": {
       "fallback_models": [
         {
-          "model": "github-copilot/claude-opus",
+          "model": "github-copilot/claude-opus-4.6",
           "variant": "max",
         },
       ],
@@ -1509,7 +1509,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models when 
           "model": "github-copilot/gemini-3-flash",
         },
       ],
-      "model": "github-copilot/claude-sonnet",
+      "model": "github-copilot/claude-sonnet-4.6",
     },
     "unspecified-low": {
       "fallback_models": [
@@ -1517,12 +1517,12 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models when 
           "model": "github-copilot/gemini-3-flash",
         },
       ],
-      "model": "github-copilot/claude-sonnet",
+      "model": "github-copilot/claude-sonnet-4.6",
     },
     "visual-engineering": {
       "fallback_models": [
         {
-          "model": "github-copilot/claude-opus",
+          "model": "github-copilot/claude-opus-4.6",
           "variant": "max",
         },
       ],
@@ -1532,7 +1532,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models when 
     "writing": {
       "fallback_models": [
         {
-          "model": "github-copilot/claude-sonnet",
+          "model": "github-copilot/claude-sonnet-4.6",
         },
       ],
       "model": "github-copilot/gemini-3-flash",
@@ -1552,7 +1552,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
           "variant": "medium",
         },
       ],
-      "model": "github-copilot/claude-sonnet",
+      "model": "github-copilot/claude-sonnet-4.6",
     },
     "explore": {
       "fallback_models": [
@@ -1573,7 +1573,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
           "variant": "high",
         },
       ],
-      "model": "github-copilot/claude-opus",
+      "model": "github-copilot/claude-opus-4.6",
       "variant": "max",
     },
     "momus": {
@@ -1600,7 +1600,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
           "variant": "high",
         },
         {
-          "model": "github-copilot/claude-opus",
+          "model": "github-copilot/claude-opus-4.6",
           "variant": "max",
         },
       ],
@@ -1617,7 +1617,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
           "model": "github-copilot/gemini-3.1-pro",
         },
       ],
-      "model": "github-copilot/claude-opus",
+      "model": "github-copilot/claude-opus-4.6",
       "variant": "max",
     },
     "sisyphus": {
@@ -1627,7 +1627,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
           "variant": "medium",
         },
       ],
-      "model": "github-copilot/claude-opus",
+      "model": "github-copilot/claude-opus-4.6",
       "variant": "max",
     },
     "sisyphus-junior": {
@@ -1637,7 +1637,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
           "variant": "medium",
         },
       ],
-      "model": "github-copilot/claude-sonnet",
+      "model": "github-copilot/claude-sonnet-4.6",
     },
   },
   "categories": {
@@ -1657,7 +1657,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
     "deep": {
       "fallback_models": [
         {
-          "model": "github-copilot/claude-opus",
+          "model": "github-copilot/claude-opus-4.6",
           "variant": "max",
         },
         {
@@ -1682,7 +1682,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
     "ultrabrain": {
       "fallback_models": [
         {
-          "model": "github-copilot/claude-opus",
+          "model": "github-copilot/claude-opus-4.6",
           "variant": "max",
         },
       ],
@@ -1696,7 +1696,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
           "variant": "high",
         },
       ],
-      "model": "github-copilot/claude-opus",
+      "model": "github-copilot/claude-opus-4.6",
       "variant": "max",
     },
     "unspecified-low": {
@@ -1705,12 +1705,12 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
           "model": "github-copilot/gemini-3-flash",
         },
       ],
-      "model": "github-copilot/claude-sonnet",
+      "model": "github-copilot/claude-sonnet-4.6",
     },
     "visual-engineering": {
       "fallback_models": [
         {
-          "model": "github-copilot/claude-opus",
+          "model": "github-copilot/claude-opus-4.6",
           "variant": "max",
         },
       ],
@@ -1720,7 +1720,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
     "writing": {
       "fallback_models": [
         {
-          "model": "github-copilot/claude-sonnet",
+          "model": "github-copilot/claude-sonnet-4.6",
         },
       ],
       "model": "github-copilot/gemini-3-flash",
@@ -1858,7 +1858,7 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
     "atlas": {
       "fallback_models": [
         {
-          "model": "opencode/claude-sonnet",
+          "model": "opencode/claude-sonnet-4-6",
         },
         {
           "model": "opencode/gpt-5.4",
@@ -1888,7 +1888,7 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
     "metis": {
       "fallback_models": [
         {
-          "model": "opencode/claude-opus",
+          "model": "opencode/claude-opus-4-6",
           "variant": "max",
         },
         {
@@ -1937,7 +1937,7 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
           "variant": "max",
         },
         {
-          "model": "opencode/claude-opus",
+          "model": "opencode/claude-opus-4-6",
           "variant": "max",
         },
       ],
@@ -1947,7 +1947,7 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
     "prometheus": {
       "fallback_models": [
         {
-          "model": "opencode/claude-opus",
+          "model": "opencode/claude-opus-4-6",
           "variant": "max",
         },
         {
@@ -1964,7 +1964,7 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
     "sisyphus": {
       "fallback_models": [
         {
-          "model": "opencode/claude-opus",
+          "model": "opencode/claude-opus-4-6",
           "variant": "max",
         },
         {
@@ -1987,7 +1987,7 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
     "sisyphus-junior": {
       "fallback_models": [
         {
-          "model": "opencode/claude-sonnet",
+          "model": "opencode/claude-sonnet-4-6",
         },
         {
           "model": "opencode/gpt-5.4",
@@ -2025,7 +2025,7 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
           "variant": "max",
         },
         {
-          "model": "opencode/claude-opus",
+          "model": "opencode/claude-opus-4-6",
           "variant": "max",
         },
         {
@@ -2064,7 +2064,7 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
           "variant": "max",
         },
         {
-          "model": "opencode/claude-opus",
+          "model": "opencode/claude-opus-4-6",
           "variant": "max",
         },
       ],
@@ -2074,7 +2074,7 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
     "unspecified-high": {
       "fallback_models": [
         {
-          "model": "opencode/claude-sonnet",
+          "model": "opencode/claude-sonnet-4-6",
         },
         {
           "model": "opencode/gpt-5.3-codex",
@@ -2089,7 +2089,7 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
     "unspecified-low": {
       "fallback_models": [
         {
-          "model": "opencode/claude-sonnet",
+          "model": "opencode/claude-sonnet-4-6",
         },
         {
           "model": "opencode/gpt-5.3-codex",
@@ -2111,7 +2111,7 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
           "variant": "max",
         },
         {
-          "model": "opencode/claude-opus",
+          "model": "opencode/claude-opus-4-6",
           "variant": "max",
         },
       ],
@@ -2124,7 +2124,7 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
           "model": "anthropic/claude-sonnet-4-6",
         },
         {
-          "model": "opencode/claude-sonnet",
+          "model": "opencode/claude-sonnet-4-6",
         },
       ],
       "model": "opencode/gemini-3-flash",
@@ -2148,7 +2148,7 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
           "variant": "medium",
         },
       ],
-      "model": "github-copilot/claude-sonnet",
+      "model": "github-copilot/claude-sonnet-4.6",
     },
     "explore": {
       "fallback_models": [
@@ -2179,7 +2179,7 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
           "variant": "high",
         },
       ],
-      "model": "github-copilot/claude-opus",
+      "model": "github-copilot/claude-opus-4.6",
       "variant": "max",
     },
     "momus": {
@@ -2223,7 +2223,7 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
           "variant": "high",
         },
         {
-          "model": "github-copilot/claude-opus",
+          "model": "github-copilot/claude-opus-4.6",
           "variant": "max",
         },
       ],
@@ -2244,7 +2244,7 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
           "model": "github-copilot/gemini-3.1-pro",
         },
       ],
-      "model": "github-copilot/claude-opus",
+      "model": "github-copilot/claude-opus-4.6",
       "variant": "max",
     },
     "sisyphus": {
@@ -2258,7 +2258,7 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
           "variant": "medium",
         },
       ],
-      "model": "github-copilot/claude-opus",
+      "model": "github-copilot/claude-opus-4.6",
       "variant": "max",
     },
     "sisyphus-junior": {
@@ -2272,7 +2272,7 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
           "variant": "medium",
         },
       ],
-      "model": "github-copilot/claude-sonnet",
+      "model": "github-copilot/claude-sonnet-4.6",
     },
   },
   "categories": {
@@ -2299,7 +2299,7 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
           "variant": "medium",
         },
         {
-          "model": "github-copilot/claude-opus",
+          "model": "github-copilot/claude-opus-4.6",
           "variant": "max",
         },
         {
@@ -2331,7 +2331,7 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
           "variant": "high",
         },
         {
-          "model": "github-copilot/claude-opus",
+          "model": "github-copilot/claude-opus-4.6",
           "variant": "max",
         },
       ],
@@ -2348,7 +2348,7 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
           "model": "github-copilot/gemini-3-flash",
         },
       ],
-      "model": "github-copilot/claude-sonnet",
+      "model": "github-copilot/claude-sonnet-4.6",
     },
     "unspecified-low": {
       "fallback_models": [
@@ -2360,12 +2360,12 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
           "model": "github-copilot/gemini-3-flash",
         },
       ],
-      "model": "github-copilot/claude-sonnet",
+      "model": "github-copilot/claude-sonnet-4.6",
     },
     "visual-engineering": {
       "fallback_models": [
         {
-          "model": "github-copilot/claude-opus",
+          "model": "github-copilot/claude-opus-4.6",
           "variant": "max",
         },
       ],
@@ -2375,7 +2375,7 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
     "writing": {
       "fallback_models": [
         {
-          "model": "github-copilot/claude-sonnet",
+          "model": "github-copilot/claude-sonnet-4.6",
         },
       ],
       "model": "github-copilot/gemini-3-flash",
@@ -2606,7 +2606,7 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
     "atlas": {
       "fallback_models": [
         {
-          "model": "opencode/claude-sonnet",
+          "model": "opencode/claude-sonnet-4-6",
         },
         {
           "model": "github-copilot/gpt-5.4",
@@ -2617,7 +2617,7 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
           "variant": "medium",
         },
       ],
-      "model": "github-copilot/claude-sonnet",
+      "model": "github-copilot/claude-sonnet-4.6",
     },
     "explore": {
       "fallback_models": [
@@ -2660,7 +2660,7 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
     "metis": {
       "fallback_models": [
         {
-          "model": "opencode/claude-opus",
+          "model": "opencode/claude-opus-4-6",
           "variant": "max",
         },
         {
@@ -2672,7 +2672,7 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
           "variant": "high",
         },
       ],
-      "model": "github-copilot/claude-opus",
+      "model": "github-copilot/claude-opus-4.6",
       "variant": "max",
     },
     "momus": {
@@ -2731,11 +2731,11 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
           "variant": "high",
         },
         {
-          "model": "github-copilot/claude-opus",
+          "model": "github-copilot/claude-opus-4.6",
           "variant": "max",
         },
         {
-          "model": "opencode/claude-opus",
+          "model": "opencode/claude-opus-4-6",
           "variant": "max",
         },
       ],
@@ -2745,7 +2745,7 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
     "prometheus": {
       "fallback_models": [
         {
-          "model": "opencode/claude-opus",
+          "model": "opencode/claude-opus-4-6",
           "variant": "max",
         },
         {
@@ -2763,13 +2763,13 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
           "model": "opencode/gemini-3.1-pro",
         },
       ],
-      "model": "github-copilot/claude-opus",
+      "model": "github-copilot/claude-opus-4.6",
       "variant": "max",
     },
     "sisyphus": {
       "fallback_models": [
         {
-          "model": "opencode/claude-opus",
+          "model": "opencode/claude-opus-4-6",
           "variant": "max",
         },
         {
@@ -2793,13 +2793,13 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
           "model": "opencode/big-pickle",
         },
       ],
-      "model": "github-copilot/claude-opus",
+      "model": "github-copilot/claude-opus-4.6",
       "variant": "max",
     },
     "sisyphus-junior": {
       "fallback_models": [
         {
-          "model": "opencode/claude-sonnet",
+          "model": "opencode/claude-sonnet-4-6",
         },
         {
           "model": "github-copilot/gpt-5.4",
@@ -2813,7 +2813,7 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
           "model": "opencode/big-pickle",
         },
       ],
-      "model": "github-copilot/claude-sonnet",
+      "model": "github-copilot/claude-sonnet-4.6",
     },
   },
   "categories": {
@@ -2848,11 +2848,11 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
           "variant": "medium",
         },
         {
-          "model": "github-copilot/claude-opus",
+          "model": "github-copilot/claude-opus-4.6",
           "variant": "max",
         },
         {
-          "model": "opencode/claude-opus",
+          "model": "opencode/claude-opus-4-6",
           "variant": "max",
         },
         {
@@ -2901,11 +2901,11 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
           "variant": "high",
         },
         {
-          "model": "github-copilot/claude-opus",
+          "model": "github-copilot/claude-opus-4.6",
           "variant": "max",
         },
         {
-          "model": "opencode/claude-opus",
+          "model": "opencode/claude-opus-4-6",
           "variant": "max",
         },
       ],
@@ -2915,7 +2915,7 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
     "unspecified-high": {
       "fallback_models": [
         {
-          "model": "opencode/claude-sonnet",
+          "model": "opencode/claude-sonnet-4-6",
         },
         {
           "model": "opencode/gpt-5.3-codex",
@@ -2928,12 +2928,12 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
           "model": "opencode/gemini-3-flash",
         },
       ],
-      "model": "github-copilot/claude-sonnet",
+      "model": "github-copilot/claude-sonnet-4.6",
     },
     "unspecified-low": {
       "fallback_models": [
         {
-          "model": "opencode/claude-sonnet",
+          "model": "opencode/claude-sonnet-4-6",
         },
         {
           "model": "opencode/gpt-5.3-codex",
@@ -2946,7 +2946,7 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
           "model": "opencode/gemini-3-flash",
         },
       ],
-      "model": "github-copilot/claude-sonnet",
+      "model": "github-copilot/claude-sonnet-4.6",
     },
     "visual-engineering": {
       "fallback_models": [
@@ -2961,11 +2961,11 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
           "model": "opencode/glm-5",
         },
         {
-          "model": "github-copilot/claude-opus",
+          "model": "github-copilot/claude-opus-4.6",
           "variant": "max",
         },
         {
-          "model": "opencode/claude-opus",
+          "model": "opencode/claude-opus-4-6",
           "variant": "max",
         },
       ],
@@ -2978,10 +2978,10 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
           "model": "opencode/gemini-3-flash",
         },
         {
-          "model": "github-copilot/claude-sonnet",
+          "model": "github-copilot/claude-sonnet-4.6",
         },
         {
-          "model": "opencode/claude-sonnet",
+          "model": "opencode/claude-sonnet-4-6",
         },
       ],
       "model": "github-copilot/gemini-3-flash",
@@ -2997,10 +2997,10 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
     "atlas": {
       "fallback_models": [
         {
-          "model": "github-copilot/claude-sonnet",
+          "model": "github-copilot/claude-sonnet-4.6",
         },
         {
-          "model": "opencode/claude-sonnet",
+          "model": "opencode/claude-sonnet-4-6",
         },
         {
           "model": "openai/gpt-5.4",
@@ -3068,11 +3068,11 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
     "metis": {
       "fallback_models": [
         {
-          "model": "github-copilot/claude-opus",
+          "model": "github-copilot/claude-opus-4.6",
           "variant": "max",
         },
         {
-          "model": "opencode/claude-opus",
+          "model": "opencode/claude-opus-4-6",
           "variant": "max",
         },
         {
@@ -3178,11 +3178,11 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
           "variant": "max",
         },
         {
-          "model": "github-copilot/claude-opus",
+          "model": "github-copilot/claude-opus-4.6",
           "variant": "max",
         },
         {
-          "model": "opencode/claude-opus",
+          "model": "opencode/claude-opus-4-6",
           "variant": "max",
         },
       ],
@@ -3192,11 +3192,11 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
     "prometheus": {
       "fallback_models": [
         {
-          "model": "github-copilot/claude-opus",
+          "model": "github-copilot/claude-opus-4.6",
           "variant": "max",
         },
         {
-          "model": "opencode/claude-opus",
+          "model": "opencode/claude-opus-4-6",
           "variant": "max",
         },
         {
@@ -3227,11 +3227,11 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
     "sisyphus": {
       "fallback_models": [
         {
-          "model": "github-copilot/claude-opus",
+          "model": "github-copilot/claude-opus-4.6",
           "variant": "max",
         },
         {
-          "model": "opencode/claude-opus",
+          "model": "opencode/claude-opus-4-6",
           "variant": "max",
         },
         {
@@ -3265,10 +3265,10 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
     "sisyphus-junior": {
       "fallback_models": [
         {
-          "model": "github-copilot/claude-sonnet",
+          "model": "github-copilot/claude-sonnet-4.6",
         },
         {
-          "model": "opencode/claude-sonnet",
+          "model": "opencode/claude-sonnet-4-6",
         },
         {
           "model": "openai/gpt-5.4",
@@ -3340,11 +3340,11 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
           "variant": "max",
         },
         {
-          "model": "github-copilot/claude-opus",
+          "model": "github-copilot/claude-opus-4.6",
           "variant": "max",
         },
         {
-          "model": "opencode/claude-opus",
+          "model": "opencode/claude-opus-4-6",
           "variant": "max",
         },
         {
@@ -3418,11 +3418,11 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
           "variant": "max",
         },
         {
-          "model": "github-copilot/claude-opus",
+          "model": "github-copilot/claude-opus-4.6",
           "variant": "max",
         },
         {
-          "model": "opencode/claude-opus",
+          "model": "opencode/claude-opus-4-6",
           "variant": "max",
         },
       ],
@@ -3432,10 +3432,10 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
     "unspecified-high": {
       "fallback_models": [
         {
-          "model": "github-copilot/claude-sonnet",
+          "model": "github-copilot/claude-sonnet-4.6",
         },
         {
-          "model": "opencode/claude-sonnet",
+          "model": "opencode/claude-sonnet-4-6",
         },
         {
           "model": "openai/gpt-5.3-codex",
@@ -3460,10 +3460,10 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
     "unspecified-low": {
       "fallback_models": [
         {
-          "model": "github-copilot/claude-sonnet",
+          "model": "github-copilot/claude-sonnet-4.6",
         },
         {
-          "model": "opencode/claude-sonnet",
+          "model": "opencode/claude-sonnet-4-6",
         },
         {
           "model": "openai/gpt-5.3-codex",
@@ -3506,11 +3506,11 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
           "variant": "max",
         },
         {
-          "model": "github-copilot/claude-opus",
+          "model": "github-copilot/claude-opus-4.6",
           "variant": "max",
         },
         {
-          "model": "opencode/claude-opus",
+          "model": "opencode/claude-opus-4-6",
           "variant": "max",
         },
       ],
@@ -3529,10 +3529,10 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
           "model": "anthropic/claude-sonnet-4-6",
         },
         {
-          "model": "github-copilot/claude-sonnet",
+          "model": "github-copilot/claude-sonnet-4.6",
         },
         {
-          "model": "opencode/claude-sonnet",
+          "model": "opencode/claude-sonnet-4-6",
         },
       ],
       "model": "google/gemini-3-flash",
@@ -3548,10 +3548,10 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
     "atlas": {
       "fallback_models": [
         {
-          "model": "github-copilot/claude-sonnet",
+          "model": "github-copilot/claude-sonnet-4.6",
         },
         {
-          "model": "opencode/claude-sonnet",
+          "model": "opencode/claude-sonnet-4-6",
         },
         {
           "model": "openai/gpt-5.4",
@@ -3619,11 +3619,11 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
     "metis": {
       "fallback_models": [
         {
-          "model": "github-copilot/claude-opus",
+          "model": "github-copilot/claude-opus-4.6",
           "variant": "max",
         },
         {
-          "model": "opencode/claude-opus",
+          "model": "opencode/claude-opus-4-6",
           "variant": "max",
         },
         {
@@ -3729,11 +3729,11 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
           "variant": "max",
         },
         {
-          "model": "github-copilot/claude-opus",
+          "model": "github-copilot/claude-opus-4.6",
           "variant": "max",
         },
         {
-          "model": "opencode/claude-opus",
+          "model": "opencode/claude-opus-4-6",
           "variant": "max",
         },
       ],
@@ -3743,11 +3743,11 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
     "prometheus": {
       "fallback_models": [
         {
-          "model": "github-copilot/claude-opus",
+          "model": "github-copilot/claude-opus-4.6",
           "variant": "max",
         },
         {
-          "model": "opencode/claude-opus",
+          "model": "opencode/claude-opus-4-6",
           "variant": "max",
         },
         {
@@ -3778,11 +3778,11 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
     "sisyphus": {
       "fallback_models": [
         {
-          "model": "github-copilot/claude-opus",
+          "model": "github-copilot/claude-opus-4.6",
           "variant": "max",
         },
         {
-          "model": "opencode/claude-opus",
+          "model": "opencode/claude-opus-4-6",
           "variant": "max",
         },
         {
@@ -3816,10 +3816,10 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
     "sisyphus-junior": {
       "fallback_models": [
         {
-          "model": "github-copilot/claude-sonnet",
+          "model": "github-copilot/claude-sonnet-4.6",
         },
         {
-          "model": "opencode/claude-sonnet",
+          "model": "opencode/claude-sonnet-4-6",
         },
         {
           "model": "openai/gpt-5.4",
@@ -3891,11 +3891,11 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
           "variant": "max",
         },
         {
-          "model": "github-copilot/claude-opus",
+          "model": "github-copilot/claude-opus-4.6",
           "variant": "max",
         },
         {
-          "model": "opencode/claude-opus",
+          "model": "opencode/claude-opus-4-6",
           "variant": "max",
         },
         {
@@ -3969,11 +3969,11 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
           "variant": "max",
         },
         {
-          "model": "github-copilot/claude-opus",
+          "model": "github-copilot/claude-opus-4.6",
           "variant": "max",
         },
         {
-          "model": "opencode/claude-opus",
+          "model": "opencode/claude-opus-4-6",
           "variant": "max",
         },
       ],
@@ -3983,11 +3983,11 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
     "unspecified-high": {
       "fallback_models": [
         {
-          "model": "github-copilot/claude-opus",
+          "model": "github-copilot/claude-opus-4.6",
           "variant": "max",
         },
         {
-          "model": "opencode/claude-opus",
+          "model": "opencode/claude-opus-4-6",
           "variant": "max",
         },
         {
@@ -4018,10 +4018,10 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
     "unspecified-low": {
       "fallback_models": [
         {
-          "model": "github-copilot/claude-sonnet",
+          "model": "github-copilot/claude-sonnet-4.6",
         },
         {
-          "model": "opencode/claude-sonnet",
+          "model": "opencode/claude-sonnet-4-6",
         },
         {
           "model": "openai/gpt-5.3-codex",
@@ -4064,11 +4064,11 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
           "variant": "max",
         },
         {
-          "model": "github-copilot/claude-opus",
+          "model": "github-copilot/claude-opus-4.6",
           "variant": "max",
         },
         {
-          "model": "opencode/claude-opus",
+          "model": "opencode/claude-opus-4-6",
           "variant": "max",
         },
       ],
@@ -4087,10 +4087,10 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
           "model": "anthropic/claude-sonnet-4-6",
         },
         {
-          "model": "github-copilot/claude-sonnet",
+          "model": "github-copilot/claude-sonnet-4.6",
         },
         {
-          "model": "opencode/claude-sonnet",
+          "model": "opencode/claude-sonnet-4-6",
         },
       ],
       "model": "google/gemini-3-flash",
