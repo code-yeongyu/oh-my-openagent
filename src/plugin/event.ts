@@ -323,7 +323,6 @@ export function createEventHandler(args: {
         const emittedAt = recentSyntheticIdles.get(sessionID);
         if (emittedAt && Date.now() - emittedAt < DEDUP_WINDOW_MS) {
           recentSyntheticIdles.delete(sessionID);
-          return;
         }
         recentRealIdles.set(sessionID, Date.now());
       }
