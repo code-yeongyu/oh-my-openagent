@@ -217,10 +217,15 @@ jobs:
         if: steps.check.outputs.skip != 'true' && startsWith(matrix.platform, 'darwin-')
         run: |
           BINARY="packages/${{ matrix.platform }}/bin/oh-my-opencode"
-          codesign --sign - --force "$BINARY"
-          echo "Signature info:"
+          echo "Initial state:"
+          codesign -dvvv "$BINARY" 2>&1 || true
+          echo "Removing any existing signature:"
+          codesign --remove-signature "$BINARY" 2>&1 || true
+          echo "Applying ad-hoc signature:"
+          codesign --sign - --force --timestamp=none "$BINARY"
+          echo "Final state:"
           codesign -dvvv "$BINARY" 2>&1
-          codesign -dvvv "$BINARY" 2>&1 | grep -q "Signature=adhoc" || { echo "ERROR: binary is not ad-hoc signed"; exit 1; }
+          codesign --verify --verbose "$BINARY"
 
       - name: Compress binary
         if: steps.check.outputs.skip != 'true'
