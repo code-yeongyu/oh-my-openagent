@@ -35,9 +35,16 @@ function isSessionNotFoundError(error: unknown): boolean {
   return message.includes("not found") || message.includes("missing")
 }
 
-export async function verifySessionExists(client: OpencodeClient, sessionID: string): Promise<boolean> {
+export async function verifySessionExists(
+  client: OpencodeClient,
+  sessionID: string,
+  directory?: string
+): Promise<boolean> {
   try {
-    const response = await client.session.get({ path: { id: sessionID } })
+    const response = await client.session.get({
+      path: { id: sessionID },
+      ...(directory ? { query: { directory } } : {}),
+    })
 
     if (response.error !== undefined && response.error !== null) {
       return !isSessionNotFoundError(response.error)
