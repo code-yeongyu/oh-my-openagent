@@ -732,4 +732,24 @@ describe("resolveSubagentExecution - agent name sanitization", () => {
     expect(result.error).toBeUndefined()
     expect(result.agentToUse).toBe("explore")
   })
+
+  test("matches runtime agent names that include invisible sort prefixes", async () => {
+    //#given
+    readProviderModelsCacheMock.mockReturnValue({
+      models: {},
+      connected: [],
+      updatedAt: "2026-03-03T00:00:00.000Z",
+    })
+    const args = createBaseArgs({ subagent_type: "Sisyphus - Ultraworker" })
+    const executorCtx = createExecutorContext(async () => ([
+      { name: "\u200BSisyphus - Ultraworker", mode: "subagent", model: "openai/gpt-5.3-codex" },
+    ]))
+
+    //#when
+    const result = await resolveSubagentExecution(args, executorCtx, "oracle", "deep")
+
+    //#then
+    expect(result.error).toBeUndefined()
+    expect(result.agentToUse).toBe("Sisyphus - Ultraworker")
+  })
 })

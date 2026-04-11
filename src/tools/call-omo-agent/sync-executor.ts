@@ -6,6 +6,7 @@ import { getAgentToolRestrictions, log } from "../../shared"
 import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
 import type { DelegatedModelConfig } from "../../shared/model-resolution-types"
 import type { FallbackEntry } from "../../shared/model-requirements"
+import { stripAgentListSortPrefix } from "../../shared/agent-display-names"
 import { waitForCompletion } from "./completion-poller"
 import { processMessages } from "./message-processor"
 import { createOrGetSession } from "./session-creator"
@@ -99,14 +100,15 @@ export async function executeSync(
 
     log(`[call_omo_agent] Sending prompt to session ${sessionID}`)
     log(`[call_omo_agent] Prompt text:`, args.prompt.substring(0, 100))
+    const normalizedSubagentType = stripAgentListSortPrefix(args.subagent_type)
 
     try {
       await (ctx.client.session as unknown as SessionWithPromptAsync).promptAsync({
         path: { id: sessionID },
         body: {
-          agent: args.subagent_type,
+          agent: normalizedSubagentType,
           tools: {
-            ...getAgentToolRestrictions(args.subagent_type),
+            ...getAgentToolRestrictions(normalizedSubagentType),
             task: false,
             question: false,
           },
@@ -120,7 +122,7 @@ export async function executeSync(
       const errorMessage = error instanceof Error ? error.message : String(error)
       log(`[call_omo_agent] Prompt error:`, errorMessage)
       if (errorMessage.includes("agent.name") || errorMessage.includes("undefined")) {
-        return `Error: Agent "${args.subagent_type}" not found. Make sure the agent is registered in your opencode.json or provided by a plugin.\n\n<task_metadata>\nsession_id: ${sessionID}\n</task_metadata>`
+        return `Error: Agent "${normalizedSubagentType}" not found. Make sure the agent is registered in your opencode.json or provided by a plugin.\n\n<task_metadata>\nsession_id: ${sessionID}\n</task_metadata>`
       }
       return `Error: Failed to send prompt: ${errorMessage}\n\n<task_metadata>\nsession_id: ${sessionID}\n</task_metadata>`
     }

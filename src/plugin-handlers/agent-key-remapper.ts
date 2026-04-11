@@ -1,21 +1,17 @@
-import { getAgentDisplayName, getAgentRuntimeName } from "../shared/agent-display-names"
+import { getAgentDisplayName } from "../shared/agent-display-names"
 
 function rewriteAgentNameForListDisplay(
   key: string,
   value: unknown,
 ): unknown {
-  if (typeof value !== "object" || value === null || !("name" in value)) {
+  if (typeof value !== "object" || value === null) {
     return value
   }
 
   const agent = value as Record<string, unknown>
-  if (typeof agent.name !== "string") {
-    return value
-  }
-
   return {
     ...agent,
-    name: getAgentRuntimeName(key),
+    name: getAgentDisplayName(key),
   }
 }
 

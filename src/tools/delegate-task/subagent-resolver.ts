@@ -7,7 +7,7 @@ import { normalizeModelFormat } from "../../shared/model-format-normalizer"
 import { AGENT_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
 import { normalizeFallbackModels, flattenToFallbackModelStrings } from "../../shared/model-resolver"
 import { buildFallbackChainFromModels, findMostSpecificFallbackEntry } from "../../shared/fallback-chain-from-models"
-import { getAgentDisplayName, getAgentConfigKey } from "../../shared/agent-display-names"
+import { getAgentDisplayName, getAgentConfigKey, stripAgentListSortPrefix } from "../../shared/agent-display-names"
 import { normalizeSDKResponse } from "../../shared"
 import { log } from "../../shared/logger"
 import { getAvailableModelsForDelegateTask } from "./available-models"
@@ -89,15 +89,18 @@ Create the work plan directly - that's your job as the planning agent.`,
 
     const callableAgents = agents.filter((agent) => isTaskCallableAgentMode(agent.mode))
 
-    const resolvedDisplayName = getAgentDisplayName(agentToUse).replace(/^\u200B+/, "")
-    const normalizedAgentToUse = agentToUse.replace(/^\u200B+/, "")
+    const resolvedDisplayName = stripAgentListSortPrefix(getAgentDisplayName(agentToUse))
+    const normalizedAgentToUse = stripAgentListSortPrefix(agentToUse)
     const matchedAgent = callableAgents.find(
-      (agent) => agent.name.toLowerCase() === normalizedAgentToUse.toLowerCase()
-        || agent.name.toLowerCase() === resolvedDisplayName.toLowerCase()
+      (agent) => {
+        const normalizedListedAgentName = stripAgentListSortPrefix(agent.name)
+        return normalizedListedAgentName.toLowerCase() === normalizedAgentToUse.toLowerCase()
+          || normalizedListedAgentName.toLowerCase() === resolvedDisplayName.toLowerCase()
+      }
     )
     if (!matchedAgent) {
       const availableAgents = callableAgents
-        .map((a) => a.name)
+        .map((a) => stripAgentListSortPrefix(a.name))
         .sort()
         .join(", ")
       return {
@@ -107,7 +110,7 @@ Create the work plan directly - that's your job as the planning agent.`,
       }
     }
 
-    agentToUse = matchedAgent.name
+    agentToUse = stripAgentListSortPrefix(matchedAgent.name)
 
     const agentConfigKey = getAgentConfigKey(agentToUse)
     const agentOverride = agentOverrides?.[agentConfigKey as keyof typeof agentOverrides]

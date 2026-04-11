@@ -201,7 +201,10 @@ describe("applyAgentConfig builtin override protection", () => {
     })
 
     // then
-    expect(result[BUILTIN_SISYPHUS_DISPLAY_NAME]).toEqual(builtinSisyphusConfig)
+    expect(result[BUILTIN_SISYPHUS_DISPLAY_NAME]).toEqual({
+      ...builtinSisyphusConfig,
+      name: getAgentDisplayName("sisyphus"),
+    })
   })
 
   test("filters user agents whose key differs from a builtin key only by case", async () => {
@@ -223,7 +226,10 @@ describe("applyAgentConfig builtin override protection", () => {
     })
 
     // then
-    expect(result[BUILTIN_SISYPHUS_DISPLAY_NAME]).toEqual(builtinSisyphusConfig)
+    expect(result[BUILTIN_SISYPHUS_DISPLAY_NAME]).toEqual({
+      ...builtinSisyphusConfig,
+      name: getAgentDisplayName("sisyphus"),
+    })
     expect(result.SiSyPhUs).toBeUndefined()
   })
 
@@ -247,7 +253,10 @@ describe("applyAgentConfig builtin override protection", () => {
     })
 
     // then
-    expect(result[BUILTIN_SISYPHUS_DISPLAY_NAME]).toEqual(builtinSisyphusConfig)
+    expect(result[BUILTIN_SISYPHUS_DISPLAY_NAME]).toEqual({
+      ...builtinSisyphusConfig,
+      name: getAgentDisplayName("sisyphus"),
+    })
   })
 
   describe("#given protected builtin agents use hyphenated names", () => {

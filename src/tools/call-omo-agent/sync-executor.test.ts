@@ -280,6 +280,27 @@ describe("executeSync", () => {
     expect(deps.processMessages).not.toHaveBeenCalled()
   })
 
+  test("strips invisible sort prefixes before sending sync prompts", async () => {
+    //#given
+    const executeSync = await importExecuteSync()
+    const deps = createDependencies()
+    const toolContext = createToolContext()
+    const recorder = createPromptAsyncRecorder()
+    const args = {
+      subagent_type: "\u200BSisyphus - Ultraworker",
+      description: "prefixed agent",
+      prompt: "find something",
+      run_in_background: false,
+    }
+
+    //#when
+    await executeSync(args, toolContext, createContext(recorder.promptAsync) as never, deps)
+
+    //#then
+    const promptInput = recorder.getCapturedInput()
+    expect(promptInput?.body.agent).toBe("Sisyphus - Ultraworker")
+  })
+
   test("returns generic prompt failure with task metadata", async () => {
     //#given
     const executeSync = await importExecuteSync()
