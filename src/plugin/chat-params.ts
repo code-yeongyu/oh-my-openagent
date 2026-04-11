@@ -1,4 +1,3 @@
-import { normalizeSDKResponse } from "../shared/normalize-sdk-response"
 import { getSessionPromptParams } from "../shared/session-prompt-params-state"
 import { getModelCapabilities, resolveCompatibleModelSettings } from "../shared"
 
@@ -58,8 +57,6 @@ function buildChatParamsInput(raw: unknown): ChatParamsHookInput | null {
       ? model.id
       : undefined
   const providerId = provider.id
-  const variant = message.variant
-
   if (typeof providerID !== "string") return null
   if (typeof modelID !== "string") return null
   if (typeof providerId !== "string") return null
@@ -71,7 +68,6 @@ function buildChatParamsInput(raw: unknown): ChatParamsHookInput | null {
     provider: { id: providerId },
     message,
     rawMessage: message,
-    ...(typeof variant === "string" ? {} : {}),
   }
 }
 
