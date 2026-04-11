@@ -186,6 +186,11 @@ describe("getAgentConfigKey", () => {
   it("resolves atlas even when the UI ordering prefix is present", () => {
     expect(getAgentConfigKey(getAgentListDisplayName("atlas"))).toBe("atlas")
   })
+
+  it("resolves display names even when zero-width characters are embedded", () => {
+    expect(getAgentConfigKey("Sisyphus\u200B - Ultraworker")).toBe("sisyphus")
+    expect(getAgentConfigKey("\uFEFFAtlas - Plan Executor")).toBe("atlas")
+  })
 })
 
 describe("getAgentListDisplayName", () => {
@@ -207,6 +212,10 @@ describe("normalizeAgentForPrompt", () => {
     expect(normalizeAgentForPrompt(getAgentListDisplayName("hephaestus"))).toBe("Hephaestus - Deep Agent")
     expect(normalizeAgentForPrompt(getAgentListDisplayName("prometheus"))).toBe("Prometheus - Plan Builder")
     expect(normalizeAgentForPrompt(getAgentListDisplayName("atlas"))).toBe("Atlas - Plan Executor")
+  })
+
+  it("removes zero-width characters before returning canonical names", () => {
+    expect(normalizeAgentForPrompt("Sisyphus\u200B - Ultraworker")).toBe("Sisyphus - Ultraworker")
   })
 })
 

@@ -115,6 +115,27 @@ describe("executeSync", () => {
     expect(promptInput?.body.parts).toEqual([{ type: "text", text: "find something" }])
   })
 
+  test("removes invisible agent characters before sending the sync prompt", async () => {
+    //#given
+    const executeSync = await importExecuteSync()
+    const deps = createDependencies()
+    const toolContext = createToolContext()
+    const recorder = createPromptAsyncRecorder()
+    const args = {
+      subagent_type: "\u200BSisyphus\u200B - Ultraworker",
+      description: "test task",
+      prompt: "find something",
+      run_in_background: false,
+    }
+
+    //#when
+    await executeSync(args, toolContext, createContext(recorder.promptAsync) as never, deps)
+
+    //#then
+    const promptInput = recorder.getCapturedInput()
+    expect(promptInput?.body.agent).toBe("Sisyphus - Ultraworker")
+  })
+
   test("returns processed response with task metadata footer", async () => {
     //#given
     const executeSync = await importExecuteSync()
