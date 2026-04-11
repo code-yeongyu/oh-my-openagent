@@ -1,4 +1,4 @@
-import type { DelegateTaskArgs, ToolContextWithMetadata } from "./types"
+import type { DelegateTaskArgs, DelegateTaskToolMetadata, ToolContextWithMetadata } from "./types"
 import type { ExecutorContext, SessionMessage } from "./executor-types"
 import { isPlanFamily } from "./constants"
 import { storeToolMetadata } from "../../features/tool-metadata-store"
@@ -34,7 +34,7 @@ export async function executeSyncContinuation(
     })
   }
 
-  let syncContMeta: { title: string; metadata: Record<string, unknown> } | undefined
+  let syncContMeta: { title: string; metadata: DelegateTaskToolMetadata } | undefined
 
   let resumeAgent: string | undefined
   let resumeModel: { providerID: string; modelID: string } | undefined

@@ -3,6 +3,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { resolveMessageContext } from "../../features/hook-message-injector"
 import { getSessionAgent } from "../../features/claude-code-session-state"
 import { log } from "../../shared"
+import { resolveInheritedBeadsRuntime } from "../../features/background-agent/resolve-inherited-beads-runtime"
 import type { CallOmoAgentArgs } from "./types"
 import type { ToolContextWithMetadata } from "./tool-context-with-metadata"
 import { getMessageDir } from "./message-storage-directory"
@@ -25,6 +26,11 @@ export async function executeBackgroundAgent(
 		const sessionAgent = getSessionAgent(toolContext.sessionID)
 		const parentAgent =
 			toolContext.agent ?? sessionAgent ?? firstMessageAgent ?? prevMessage?.agent
+		const beadsRuntime = resolveInheritedBeadsRuntime({
+			manager,
+			directory: toolContext.directory,
+			parentSessionID: toolContext.sessionID,
+		})
 
 		log("[call_omo_agent] parentAgent resolution", {
 			sessionID: toolContext.sessionID,
@@ -44,6 +50,7 @@ export async function executeBackgroundAgent(
 			parentMessageID: toolContext.messageID,
 			parentAgent,
 			parentTools: getSessionTools(toolContext.sessionID),
+			beadsRuntime,
 		})
 
 		const waitStart = Date.now()
@@ -70,7 +77,10 @@ export async function executeBackgroundAgent(
 
 		await toolContext.metadata?.({
 			title: args.description,
-			metadata: { sessionId: sessionId ?? "pending" },
+			metadata: {
+				sessionId: sessionId ?? "pending",
+				...(beadsRuntime ? { beadsRuntime } : {}),
+			},
 		})
 
 		return `Background agent task launched successfully.

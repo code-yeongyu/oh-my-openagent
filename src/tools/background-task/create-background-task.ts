@@ -3,6 +3,7 @@ import type { BackgroundManager } from "../../features/background-agent"
 import type { BackgroundTaskArgs } from "./types"
 import { BACKGROUND_TASK_DESCRIPTION } from "./constants"
 import { resolveMessageContext } from "../../features/hook-message-injector"
+import { resolveInheritedBeadsRuntime } from "../../features/background-agent/resolve-inherited-beads-runtime"
 import { getSessionAgent } from "../../features/claude-code-session-state"
 import { storeToolMetadata } from "../../features/tool-metadata-store"
 import { log } from "../../shared/logger"
@@ -13,6 +14,7 @@ type ToolContextWithMetadata = {
   sessionID: string
   messageID: string
   agent: string
+  directory?: string
   abort: AbortSignal
   metadata?: (input: { title?: string; metadata?: Record<string, unknown> }) => void
   callID?: string
@@ -64,6 +66,11 @@ export function createBackgroundTask(
                 ...(prevMessage.model.variant ? { variant: prevMessage.model.variant } : {}),
               }
             : undefined
+        const beadsRuntime = resolveInheritedBeadsRuntime({
+          manager,
+          directory: ctx.directory,
+          parentSessionID: ctx.sessionID,
+        })
 
         const task = await manager.launch({
           description: args.description,
@@ -73,6 +80,7 @@ export function createBackgroundTask(
           parentMessageID: ctx.messageID,
           parentModel,
           parentAgent,
+          beadsRuntime,
         })
 
         const WAIT_FOR_SESSION_INTERVAL_MS = 50

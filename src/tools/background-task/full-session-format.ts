@@ -1,5 +1,6 @@
 import type { BackgroundTask } from "../../features/background-agent"
 import type { BackgroundOutputClient, BackgroundOutputMessagesResult, BackgroundOutputMessage } from "./clients"
+import { formatBeadsRuntimeDetailLines } from "./beads-runtime-output"
 import { extractMessages, getErrorMessage } from "./session-messages"
 import { formatMessageTime } from "./time-format"
 import { truncateText } from "./truncate-text"
@@ -108,6 +109,7 @@ export async function formatFullSession(
   lines.push(`Description: ${task.description}`)
   lines.push(`Status: ${task.status}`)
   lines.push(`Session ID: ${task.sessionID}`)
+  lines.push(...formatBeadsRuntimeDetailLines(task))
   lines.push(`Total messages: ${normalizedMessages.length}`)
   lines.push(`Returned: ${visibleMessages.length}`)
   lines.push(`Has more: ${hasMore ? "true" : "false"}`)

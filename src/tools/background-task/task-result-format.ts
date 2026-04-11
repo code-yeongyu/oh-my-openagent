@@ -1,11 +1,22 @@
 import type { BackgroundTask } from "../../features/background-agent"
 import { consumeNewMessages } from "../../shared/session-cursor"
 import type { BackgroundOutputClient, BackgroundOutputMessagesResult } from "./clients"
+import { formatBeadsRuntimeDetailLines } from "./beads-runtime-output"
 import { extractMessages, getErrorMessage } from "./session-messages"
 import { formatDuration } from "./time-format"
 
 function getTimeString(value: unknown): string {
   return typeof value === "string" ? value : ""
+}
+
+function buildTaskSummary(task: BackgroundTask, duration: string): string {
+  return [
+    `Task ID: ${task.id}`,
+    `Description: ${task.description}`,
+    `Duration: ${duration}`,
+    `Session ID: ${task.sessionID}`,
+    ...formatBeadsRuntimeDetailLines(task),
+  ].join("\n")
 }
 
 export async function formatTaskResult(task: BackgroundTask, client: BackgroundOutputClient): Promise<string> {
@@ -24,12 +35,10 @@ export async function formatTaskResult(task: BackgroundTask, client: BackgroundO
 
   const messages = extractMessages(messagesResult)
   if (!Array.isArray(messages) || messages.length === 0) {
+    const duration = formatDuration(task.startedAt ?? new Date(), task.completedAt)
     return `Task Result
 
-Task ID: ${task.id}
-Description: ${task.description}
-Duration: ${formatDuration(task.startedAt ?? new Date(), task.completedAt)}
-Session ID: ${task.sessionID}
+${buildTaskSummary(task, duration)}
 
 ---
 
@@ -38,12 +47,10 @@ Session ID: ${task.sessionID}
 
   const relevantMessages = messages.filter((m) => m.info?.role === "assistant" || m.info?.role === "tool")
   if (relevantMessages.length === 0) {
+    const duration = formatDuration(task.startedAt ?? new Date(), task.completedAt)
     return `Task Result
 
-Task ID: ${task.id}
-Description: ${task.description}
-Duration: ${formatDuration(task.startedAt ?? new Date(), task.completedAt)}
-Session ID: ${task.sessionID}
+${buildTaskSummary(task, duration)}
 
 ---
 
@@ -61,10 +68,7 @@ Session ID: ${task.sessionID}
     const duration = formatDuration(task.startedAt ?? new Date(), task.completedAt)
     return `Task Result
 
-Task ID: ${task.id}
-Description: ${task.description}
-Duration: ${duration}
-Session ID: ${task.sessionID}
+${buildTaskSummary(task, duration)}
 
 ---
 
@@ -102,10 +106,7 @@ Session ID: ${task.sessionID}
 
   return `Task Result
 
-Task ID: ${task.id}
-Description: ${task.description}
-Duration: ${duration}
-Session ID: ${task.sessionID}
+${buildTaskSummary(task, duration)}
 
 ---
 

@@ -1,4 +1,5 @@
 import type { BackgroundTask } from "../../features/background-agent"
+import { formatBeadsRuntimeTableRows } from "./beads-runtime-output"
 import { formatDuration } from "./time-format"
 import { truncateText } from "./truncate-text"
 
@@ -13,6 +14,7 @@ export function formatTaskStatus(task: BackgroundTask): string {
   }
 
   const promptPreview = truncateText(task.prompt, 500)
+  const beadsRuntimeSection = formatBeadsRuntimeTableRows(task)
 
   let progressSection = ""
   if (task.progress?.lastTool) {
@@ -62,7 +64,7 @@ ${truncated}
 | Agent | ${task.agent} |
 | Status | **${task.status}** |
 | ${durationLabel} | ${duration} |
-| Session ID | \`${task.sessionID}\` |${progressSection}
+| Session ID | \`${task.sessionID}\` |${beadsRuntimeSection}${progressSection}
 ${statusNote}
 ## Original Prompt
 

@@ -11,6 +11,7 @@ import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { QUESTION_DENIED_SESSION_PERMISSION } from "../../shared/question-denied-session-permission"
 import { setSessionFallbackChain } from "../../hooks/model-fallback/hook"
 import { stripAgentListSortPrefix } from "../../shared/agent-display-names"
+import { resolveInheritedBeadsRuntime } from "../../features/background-agent/resolve-inherited-beads-runtime"
 
 function continueSessionSetup(args: {
   taskID: string
@@ -65,6 +66,11 @@ export async function executeBackgroundTask(
     const tddEnabled = executorCtx.sisyphusAgentConfig?.tdd
     const normalizedAgent = stripAgentListSortPrefix(agentToUse)
     const effectivePrompt = buildTaskPrompt(args.prompt, normalizedAgent, tddEnabled)
+    const beadsRuntime = resolveInheritedBeadsRuntime({
+      manager,
+      directory: executorCtx.directory,
+      parentSessionID: parentContext.sessionID,
+    })
     const task = await manager.launch({
       description: args.description,
       prompt: effectivePrompt,
@@ -80,6 +86,7 @@ export async function executeBackgroundTask(
       skillContent: systemContent,
       category: args.category,
       sessionPermission: QUESTION_DENIED_SESSION_PERMISSION,
+      beadsRuntime,
     })
 
     // OpenCode TUI's `Task` tool UI calculates toolcalls by looking up
@@ -128,6 +135,7 @@ export async function executeBackgroundTask(
       command: args.command,
       ...(sessionId ? { sessionId } : {}),
       ...(categoryModel ? { model: { providerID: categoryModel.providerID, modelID: categoryModel.modelID } } : {}),
+      ...(beadsRuntime ? { beadsRuntime } : {}),
     }
 
     const unstableMeta = {

@@ -1,5 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { BackgroundManager } from "../../features/background-agent"
+import type { BeadsRuntimeTaskMetadata } from "../../features/beads-runtime"
 import type { CategoriesConfig, GitMasterConfig, BrowserAutomationProvider, AgentOverrides, SisyphusAgentConfig } from "../../config/schema"
 import type {
   AvailableCategory,
@@ -21,6 +22,22 @@ export interface DelegateTaskArgs {
     task_id: string
     task_dir?: string
   }
+  beadsRuntime?: BeadsRuntimeTaskMetadata
+}
+
+export interface DelegateTaskToolMetadata extends Record<string, unknown> {
+  prompt: string
+  agent?: string
+  category?: string
+  load_skills: string[]
+  description: string
+  run_in_background: boolean
+  command?: string
+  sessionId?: string
+  sync?: boolean
+  spawnDepth?: number
+  model?: { providerID: string; modelID: string }
+  beadsRuntime?: BeadsRuntimeTaskMetadata
 }
 
 export interface ToolContextWithMetadata {
@@ -28,7 +45,7 @@ export interface ToolContextWithMetadata {
   messageID: string
   agent: string
   abort: AbortSignal
-  metadata?: (input: { title?: string; metadata?: Record<string, unknown> }) => void | Promise<void>
+  metadata?: (input: { title?: string; metadata?: DelegateTaskToolMetadata }) => void | Promise<void>
   /**
    * Tool call ID injected by OpenCode's internal context (not in plugin ToolContext type,
    * but present at runtime via spread in fromPlugin()). Used for metadata store keying.

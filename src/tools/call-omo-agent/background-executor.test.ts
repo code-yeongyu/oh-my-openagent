@@ -1,184 +1,258 @@
 /// <reference types="bun-types" />
-import { describe, test, expect, mock } from "bun:test"
-import type { BackgroundManager } from "../../features/background-agent"
-import type { PluginInput } from "@opencode-ai/plugin"
-import { executeBackground } from "./background-executor"
+import { beforeEach, describe, expect, mock, test } from "bun:test";
+import type { PluginInput } from "@opencode-ai/plugin";
+import type { BackgroundManager } from "../../features/background-agent";
+import { executeBackground } from "./background-executor";
 
 describe("executeBackground", () => {
-  const launchMock = mock(async (_input?: { fallbackChain?: unknown }): Promise<{
-    id: string
-    sessionID: string | null
-    description: string
-    agent: string
-    status: string
-  }> => ({
-    id: "test-task-id",
-    sessionID: null,
-    description: "Test task",
-    agent: "test-agent",
-    status: "pending",
-  }))
-  const getTaskMock = mock()
+	const launchMock = mock(
+		async (_input?: {
+			fallbackChain?: unknown;
+		}): Promise<{
+			id: string;
+			sessionID: string | null;
+			description: string;
+			agent: string;
+			status: string;
+		}> => ({
+			id: "test-task-id",
+			sessionID: null,
+			description: "Test task",
+			agent: "test-agent",
+			status: "pending",
+		}),
+	);
+	const getTaskMock = mock();
 
-  const mockManager = {
-    launch: launchMock,
-    getTask: getTaskMock,
-  } as unknown as BackgroundManager
+	const mockManager = {
+		launch: launchMock,
+		getTask: getTaskMock,
+	} as unknown as BackgroundManager;
 
-  const testContext = {
-    sessionID: "test-session",
-    messageID: "test-message",
-    agent: "test-agent",
-    abort: new AbortController().signal,
-  }
+	const testContext = {
+		sessionID: "test-session",
+		messageID: "test-message",
+		agent: "test-agent",
+		abort: new AbortController().signal,
+	};
 
-  const testArgs = {
-    description: "Test background task",
-    prompt: "Test prompt",
-    subagent_type: "test-agent",
-    run_in_background: true,
-  }
+	const testArgs = {
+		description: "Test background task",
+		prompt: "Test prompt",
+		subagent_type: "test-agent",
+		run_in_background: true,
+	};
 
-  const mockClient = {
-    session: {
-      messages: mock(() => Promise.resolve({ data: [] })),
-    },
-  } as unknown as PluginInput["client"]
+	const mockClient = {
+		session: {
+			messages: mock(() => Promise.resolve({ data: [] })),
+		},
+	} as unknown as PluginInput["client"];
 
-  test("detects interrupted task as failure", async () => {
-    //#given
-    launchMock.mockResolvedValueOnce({
-      id: "test-task-id",
-      sessionID: null,
-      description: "Test task",
-      agent: "test-agent",
-      status: "pending",
-    })
-    getTaskMock.mockReturnValueOnce({
-      id: "test-task-id",
-      sessionID: null,
-      description: "Test task",
-      agent: "test-agent",
-      status: "interrupt",
-    })
+	beforeEach(() => {
+		launchMock.mockClear();
+		getTaskMock.mockClear();
+		launchMock.mockImplementation(
+			async (_input?: {
+				fallbackChain?: unknown;
+			}): Promise<{
+				id: string;
+				sessionID: string | null;
+				description: string;
+				agent: string;
+				status: string;
+			}> => ({
+				id: "test-task-id",
+				sessionID: null,
+				description: "Test task",
+				agent: "test-agent",
+				status: "pending",
+			}),
+		);
+		getTaskMock.mockImplementation(() => undefined);
+	});
 
-    //#when
-    const result = await executeBackground(testArgs, testContext, mockManager, mockClient)
+	test("detects interrupted task as failure", async () => {
+		//#given
+		launchMock.mockResolvedValueOnce({
+			id: "test-task-id",
+			sessionID: null,
+			description: "Test task",
+			agent: "test-agent",
+			status: "pending",
+		});
+		getTaskMock.mockReturnValueOnce({
+			id: "test-task-id",
+			sessionID: null,
+			description: "Test task",
+			agent: "test-agent",
+			status: "interrupt",
+		});
 
-    //#then
-    expect(result).toContain("Task failed to start")
-    expect(result).toContain("interrupt")
-    expect(result).toContain("test-task-id")
-  })
+		//#when
+		const result = await executeBackground(
+			testArgs,
+			testContext,
+			mockManager,
+			mockClient,
+		);
 
-  test("passes fallbackChain to background manager launch", async () => {
-    //#given
-    const fallbackChain = [
-      { providers: ["quotio"], model: "kimi-k2.5", variant: undefined },
-      { providers: ["openai"], model: "gpt-5.2", variant: "high" },
-    ]
-    launchMock.mockResolvedValueOnce({
-      id: "test-task-id",
-      sessionID: "sub-session",
-      description: "Test task",
-      agent: "test-agent",
-      status: "pending",
-    })
+		//#then
+		expect(result).toContain("Task failed to start");
+		expect(result).toContain("interrupt");
+		expect(result).toContain("test-task-id");
+	});
 
-    //#when
-    await executeBackground(testArgs, testContext, mockManager, mockClient, fallbackChain)
+	test("passes fallbackChain to background manager launch", async () => {
+		//#given
+		const fallbackChain = [
+			{ providers: ["quotio"], model: "kimi-k2.5", variant: undefined },
+			{ providers: ["openai"], model: "gpt-5.2", variant: "high" },
+		];
+		launchMock.mockResolvedValueOnce({
+			id: "test-task-id",
+			sessionID: "sub-session",
+			description: "Test task",
+			agent: "test-agent",
+			status: "pending",
+		});
 
-    //#then
-    const latestCall = [...launchMock.mock.calls].pop()
-    if (!latestCall) {
-      throw new Error("Expected background manager launch to be called")
-    }
-    const launchArgs = latestCall[0]
-    if (!launchArgs) {
-      throw new Error("Expected launch arguments")
-    }
-    expect(launchArgs.fallbackChain).toEqual(fallbackChain)
-  })
+		//#when
+		await executeBackground(
+			testArgs,
+			testContext,
+			mockManager,
+			mockClient,
+			fallbackChain,
+		);
 
-  test("keeps launched background task alive when parent aborts before session id resolves", async () => {
-    //#given - parent abort after launch should stop waiting, not fail the background task
-    const abortController = new AbortController()
-    launchMock.mockResolvedValueOnce({
-      id: "test-task-id",
-      sessionID: null,
-      description: "Test task",
-      agent: "test-agent",
-      status: "pending",
-    })
-    getTaskMock.mockImplementationOnce(() => {
-      abortController.abort()
-      return { id: "test-task-id", sessionID: null, description: "Test task", agent: "test-agent", status: "pending" }
-    })
+		//#then
+		const latestCall = [...launchMock.mock.calls].pop();
+		if (!latestCall) {
+			throw new Error("Expected background manager launch to be called");
+		}
+		const launchArgs = latestCall[0];
+		if (!launchArgs) {
+			throw new Error("Expected launch arguments");
+		}
+		expect(launchArgs.fallbackChain).toEqual(fallbackChain);
+	});
 
-    //#when
-    const result = await executeBackground(
-      testArgs,
-      {
-        ...testContext,
-        abort: abortController.signal,
-      },
-      mockManager,
-      mockClient
-    )
+	test("keeps launched background task alive when parent aborts before session id resolves", async () => {
+		//#given - parent abort after launch should stop waiting, not fail the background task
+		const abortController = new AbortController();
+		launchMock.mockResolvedValueOnce({
+			id: "test-task-id",
+			sessionID: null,
+			description: "Test task",
+			agent: "test-agent",
+			status: "pending",
+		});
+		getTaskMock.mockImplementationOnce(() => {
+			abortController.abort();
+			return {
+				id: "test-task-id",
+				sessionID: null,
+				description: "Test task",
+				agent: "test-agent",
+				status: "pending",
+			};
+		});
 
-    //#then - background launch should still be reported as launched
-    expect(result).toContain("Background agent task launched successfully")
-    expect(result).toContain("Task ID: test-task-id")
-    expect(result).not.toContain("Task aborted while waiting for session to start")
-  })
+		//#when
+		const result = await executeBackground(
+			testArgs,
+			{
+				...testContext,
+				abort: abortController.signal,
+			},
+			mockManager,
+			mockClient,
+		);
 
-  test("keeps sibling background launch alive when two tasks start concurrently", async () => {
-    //#given - one aborted parent call should not interrupt a sibling launch from the same parent session
-    const firstAbortController = new AbortController()
-    const secondAbortController = new AbortController()
-    const states = new Map([
-      ["task-1", { reads: 0, abortOnFirstRead: true, sessionID: "ses-1" }],
-      ["task-2", { reads: 0, abortOnFirstRead: false, sessionID: "ses-2" }],
-    ])
-    let launchCount = 0
-    launchMock.mockImplementation(async () => {
-      launchCount += 1
-      return launchCount === 1
-        ? { id: "task-1", sessionID: null, description: "Task 1", agent: "test-agent", status: "pending" }
-        : { id: "task-2", sessionID: null, description: "Task 2", agent: "test-agent", status: "pending" }
-    })
-    getTaskMock.mockImplementation((taskID: string) => {
-      const state = states.get(taskID)
-      if (!state) return undefined
-      state.reads += 1
-      if (state.abortOnFirstRead && state.reads === 1) {
-        firstAbortController.abort()
-      }
-      return state.reads >= 2
-        ? { id: taskID, sessionID: state.sessionID, description: "Task", agent: "test-agent", status: "pending" }
-        : { id: taskID, sessionID: null, description: "Task", agent: "test-agent", status: "pending" }
-    })
+		//#then - background launch should still be reported as launched
+		expect(result).toContain("Background agent task launched successfully");
+		expect(result).toContain("Task ID: test-task-id");
+		expect(result).not.toContain(
+			"Task aborted while waiting for session to start",
+		);
+	});
 
-    //#when
-    const [firstResult, secondResult] = await Promise.all([
-      executeBackground(
-        testArgs,
-        { ...testContext, abort: firstAbortController.signal },
-        mockManager,
-        mockClient,
-      ),
-      executeBackground(
-        testArgs,
-        { ...testContext, abort: secondAbortController.signal },
-        mockManager,
-        mockClient,
-      ),
-    ])
+	test("keeps sibling background launch alive when two tasks start concurrently", async () => {
+		//#given - one aborted parent call should not interrupt a sibling launch from the same parent session
+		const firstAbortController = new AbortController();
+		const secondAbortController = new AbortController();
+		const states = new Map([
+			["task-1", { reads: 0, abortOnFirstRead: true, sessionID: "ses-1" }],
+			["task-2", { reads: 0, abortOnFirstRead: false, sessionID: "ses-2" }],
+		]);
+		let launchCount = 0;
+		launchMock.mockImplementation(async () => {
+			launchCount += 1;
+			return launchCount === 1
+				? {
+						id: "task-1",
+						sessionID: null,
+						description: "Task 1",
+						agent: "test-agent",
+						status: "pending",
+					}
+				: {
+						id: "task-2",
+						sessionID: null,
+						description: "Task 2",
+						agent: "test-agent",
+						status: "pending",
+					};
+		});
+		getTaskMock.mockImplementation((taskID: string) => {
+			const state = states.get(taskID);
+			if (!state) return undefined;
+			state.reads += 1;
+			if (state.abortOnFirstRead && state.reads === 1) {
+				firstAbortController.abort();
+			}
+			return state.reads >= 2
+				? {
+						id: taskID,
+						sessionID: state.sessionID,
+						description: "Task",
+						agent: "test-agent",
+						status: "pending",
+					}
+				: {
+						id: taskID,
+						sessionID: null,
+						description: "Task",
+						agent: "test-agent",
+						status: "pending",
+					};
+		});
 
-    //#then - both launches still succeed and the sibling is not marked interrupted
-    expect(firstResult).toContain("Background agent task launched successfully")
-    expect(secondResult).toContain("Background agent task launched successfully")
-    expect(secondResult).toContain("Task ID: task-2")
-    expect(secondResult).not.toContain("interrupt")
-  })
-})
+		//#when
+		const [firstResult, secondResult] = await Promise.all([
+			executeBackground(
+				testArgs,
+				{ ...testContext, abort: firstAbortController.signal },
+				mockManager,
+				mockClient,
+			),
+			executeBackground(
+				testArgs,
+				{ ...testContext, abort: secondAbortController.signal },
+				mockManager,
+				mockClient,
+			),
+		]);
+
+		//#then - both launches still succeed and the sibling is not marked interrupted
+		expect(firstResult).toContain(
+			"Background agent task launched successfully",
+		);
+		expect(secondResult).toContain(
+			"Background agent task launched successfully",
+		);
+		expect(secondResult).toContain("Task ID: task-2");
+		expect(secondResult).not.toContain("interrupt");
+	});
+});

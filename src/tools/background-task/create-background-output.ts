@@ -4,6 +4,7 @@ import { storeToolMetadata } from "../../features/tool-metadata-store"
 import type { BackgroundOutputArgs } from "./types"
 import type { BackgroundOutputClient, BackgroundOutputManager } from "./clients"
 import { BACKGROUND_OUTPUT_DESCRIPTION } from "./constants"
+import { buildBeadsRuntimeOutputMetadata } from "./beads-runtime-output"
 import { delay } from "./delay"
 import { formatFullSession } from "./full-session-format"
 import { formatTaskResult } from "./task-result-format"
@@ -78,6 +79,7 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
             category: task.category,
             description: task.description,
             ...(task.sessionID ? { sessionId: task.sessionID } : {}),
+            ...buildBeadsRuntimeOutputMetadata(task),
           } as Record<string, unknown>,
         }
         ctx.metadata?.(meta)

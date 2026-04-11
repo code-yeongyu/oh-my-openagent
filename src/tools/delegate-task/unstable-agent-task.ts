@@ -10,6 +10,7 @@ import { formatDetailedError } from "./error-formatting"
 import { getSessionTools } from "../../shared/session-tools-store"
 import { normalizeSDKResponse } from "../../shared"
 import { QUESTION_DENIED_SESSION_PERMISSION } from "../../shared/question-denied-session-permission"
+import { resolveInheritedBeadsRuntime } from "../../features/background-agent/resolve-inherited-beads-runtime"
 
 export async function executeUnstableAgentTask(
   args: DelegateTaskArgs,
@@ -28,6 +29,11 @@ export async function executeUnstableAgentTask(
   try {
     const tddEnabled = sisyphusAgentConfig?.tdd
     const effectivePrompt = buildTaskPrompt(args.prompt, agentToUse, tddEnabled)
+    const beadsRuntime = resolveInheritedBeadsRuntime({
+      manager,
+      directory: executorCtx.directory,
+      parentSessionID: parentContext.sessionID,
+    })
     const task = await manager.launch({
       description: args.description,
       prompt: effectivePrompt,
@@ -42,6 +48,7 @@ export async function executeUnstableAgentTask(
       skillContent: systemContent,
       category: args.category,
       sessionPermission: QUESTION_DENIED_SESSION_PERMISSION,
+      beadsRuntime,
     })
     launchedTaskID = task.id
 
@@ -79,6 +86,7 @@ export async function executeUnstableAgentTask(
         sessionId: sessionID,
         command: args.command,
         model: categoryModel ? { providerID: categoryModel.providerID, modelID: categoryModel.modelID } : undefined,
+        ...(beadsRuntime ? { beadsRuntime } : {}),
       },
     }
     await ctx.metadata?.(bgTaskMeta)
