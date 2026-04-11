@@ -1,4 +1,4 @@
-import * as fs from "fs"
+import * as fs from "node:fs"
 import { log } from "../logger"
 import { writeFileAtomically } from "../write-file-atomically"
 import { AGENT_NAME_MAP, migrateAgentNames } from "./agent-names"
@@ -10,7 +10,7 @@ export function migrateConfigFile(
   configPath: string,
   rawConfig: Record<string, unknown>
 ): boolean {
-  const copy = structuredClone(rawConfig)
+  const copy = JSON.parse(JSON.stringify(rawConfig)) as Record<string, unknown>
   let needsWrite = false
 
   // Load previously applied migrations from BOTH the legacy in-config
@@ -74,14 +74,11 @@ export function migrateConfigFile(
   // the first place. The in-memory `rawConfig` never re-exposes
   // `_migrations` to downstream schema validation.
   const newMigrationsToRecord = allNewMigrations.filter(mKey => !existingMigrations.has(mKey))
-  let sidecarWriteSucceeded = false
   const fullMigrationSet = new Set<string>([
     ...existingMigrations,
     ...newMigrationsToRecord,
   ])
-  if (newMigrationsToRecord.length > 0 || hadLegacyInConfigMigrations) {
-    sidecarWriteSucceeded = writeAppliedMigrations(configPath, fullMigrationSet)
-  }
+  const shouldWriteSidecar = newMigrationsToRecord.length > 0 || hadLegacyInConfigMigrations
   if (newMigrationsToRecord.length > 0) {
     needsWrite = true
   }
@@ -89,10 +86,9 @@ export function migrateConfigFile(
     // Migrating state out of the config body is itself a config write.
     needsWrite = true
   }
-  if (sidecarWriteSucceeded && "_migrations" in copy) {
-    delete copy._migrations
-  } else if (!sidecarWriteSucceeded && newMigrationsToRecord.length > 0) {
-    // Sidecar write failed — persist migration tracking in-config as fallback
+  if (shouldWriteSidecar) {
+    // Keep `_migrations` in the first config write so a later sidecar failure
+    // does not strand the config with migrated state missing from disk.
     ;(copy as Record<string, unknown>)._migrations = Array.from(fullMigrationSet)
     needsWrite = true
   }
@@ -158,17 +154,32 @@ export function migrateConfigFile(
     }
 
     let writeSucceeded = false
+    let finalConfig = JSON.parse(JSON.stringify(copy)) as Record<string, unknown>
     try {
-      writeFileAtomically(configPath, JSON.stringify(copy, null, 2) + "\n")
+      writeFileAtomically(configPath, JSON.stringify(finalConfig, null, 2) + "\n")
       writeSucceeded = true
     } catch (err) {
       log(`Failed to write migrated config to ${configPath}:`, err)
     }
 
+    if (writeSucceeded && shouldWriteSidecar) {
+      const sidecarWriteSucceeded = writeAppliedMigrations(configPath, fullMigrationSet)
+      if (sidecarWriteSucceeded && "_migrations" in finalConfig) {
+        const configWithoutLegacyMigrations = JSON.parse(JSON.stringify(finalConfig)) as Record<string, unknown>
+        delete configWithoutLegacyMigrations._migrations
+        try {
+          writeFileAtomically(configPath, JSON.stringify(configWithoutLegacyMigrations, null, 2) + "\n")
+          finalConfig = configWithoutLegacyMigrations
+        } catch (err) {
+          log(`Failed to remove legacy _migrations fallback from ${configPath}:`, err)
+        }
+      }
+    }
+
     for (const key of Object.keys(rawConfig)) {
       delete rawConfig[key]
     }
-    Object.assign(rawConfig, copy)
+    Object.assign(rawConfig, finalConfig)
 
     if (writeSucceeded) {
       const backupMessage = backupSucceeded ? ` (backup: ${backupPath})` : ""
