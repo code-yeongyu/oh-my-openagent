@@ -3,7 +3,7 @@ import { createRequire } from "node:module"
 import { dirname, join } from "node:path"
 
 import type { DependencyInfo } from "../types"
-import { spawnWithWindowsHide } from "../../../shared/spawn-with-windows-hide"
+import { spawnWithTimeout } from "../spawn-with-timeout"
 
 async function checkBinaryExists(binary: string): Promise<{ exists: boolean; path: string | null }> {
   try {
@@ -19,16 +19,12 @@ async function checkBinaryExists(binary: string): Promise<{ exists: boolean; pat
 
 async function getBinaryVersion(binary: string): Promise<string | null> {
   try {
-    const proc = spawnWithWindowsHide([binary, "--version"], { stdout: "pipe", stderr: "pipe" })
-    const output = await new Response(proc.stdout).text()
-    await proc.exited
-    if (proc.exitCode === 0) {
-      return output.trim().split("\n")[0]
-    }
+    const result = await spawnWithTimeout([binary, "--version"], { stdout: "pipe", stderr: "pipe" })
+    if (result.timedOut || result.exitCode !== 0) return null
+    return result.stdout.trim().split("\n")[0] ?? null
   } catch {
-    // intentionally empty - version unavailable
+    return null
   }
-  return null
 }
 
 export async function checkAstGrepCli(): Promise<DependencyInfo> {
