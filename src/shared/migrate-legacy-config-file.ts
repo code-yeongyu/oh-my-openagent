@@ -58,7 +58,7 @@ export function migrateLegacyConfigFile(legacyPath: string): boolean {
       to: canonicalPath,
       archivedLegacyConfig,
     })
-    return archivedLegacyConfig
+    return true
   } catch (error) {
     log("[migrateLegacyConfigFile] Failed to migrate legacy config file", { legacyPath, error })
     return false
