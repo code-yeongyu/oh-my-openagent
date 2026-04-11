@@ -62,7 +62,20 @@ function getSharedProperties(source: PostHogSource): NonNullable<PostHogCaptureE
     plugin_name: PLUGIN_NAME,
     package_version: packageJson.version,
     runtime: "bun",
+    runtime_version: process.versions.bun ?? process.version,
     source,
+    $os: os.platform(),
+    $os_version: os.release(),
+    os_arch: os.arch(),
+    os_type: os.type(),
+    cpu_count: os.cpus().length,
+    cpu_model: os.cpus()[0]?.model,
+    total_memory_gb: Math.round(os.totalmem() / 1024 / 1024 / 1024),
+    locale: Intl.DateTimeFormat().resolvedOptions().locale,
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    shell: process.env.SHELL,
+    ci: Boolean(process.env.CI),
+    terminal: process.env.TERM_PROGRAM,
   }
 }
 

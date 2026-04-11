@@ -11,6 +11,21 @@ describe("spawnWithTimeout", () => {
       expect(result.timedOut).toBe(false)
       expect(result.exitCode).toBe(0)
       expect(result.stdout.trim()).toBe("hello")
+      expect(result.stderr).toBe("")
+    })
+  })
+
+  describe("#given a command that writes to stderr", () => {
+    it("captures stderr output", async () => {
+      // when
+      const result = await spawnWithTimeout(
+        ["bash", "-c", "echo err >&2"],
+        { stdout: "pipe", stderr: "pipe" }
+      )
+
+      // then
+      expect(result.timedOut).toBe(false)
+      expect(result.stderr.trim()).toBe("err")
     })
   })
 
@@ -37,6 +52,7 @@ describe("spawnWithTimeout", () => {
       // then
       expect(result.timedOut).toBe(true)
       expect(result.stdout).toBe("")
+      expect(result.stderr).toBe("")
     })
   })
 
@@ -51,6 +67,7 @@ describe("spawnWithTimeout", () => {
 
       // then
       expect(result.timedOut).toBe(false)
+      expect(result.exitCode).toBe(1)
     })
   })
 })

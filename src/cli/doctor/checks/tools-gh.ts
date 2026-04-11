@@ -47,7 +47,7 @@ async function getGhAuthStatus(): Promise<{
       return { authenticated: false, username: null, scopes: [], error: "gh auth status timed out" }
     }
 
-    const output = result.stdout
+    const output = result.stderr || result.stdout
     if (result.exitCode === 0) {
       const usernameMatch = output.match(/Logged in to github\.com account (\S+)/)
       const scopesMatch = output.match(/Token scopes?:\s*(.+)/i)
