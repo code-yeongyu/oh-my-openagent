@@ -191,7 +191,7 @@ describe("sisyphus-task", () => {
       expect(result).toBe(false)
     })
 
-    test("returns true for 'planner' (matches via includes('plan'))", () => {
+    test("returns false for 'planner' (no longer matches via substring)", () => {
       //#given / #when
       const result = isPlanAgent("planner")
 
@@ -251,6 +251,13 @@ describe("sisyphus-task", () => {
       //#given / #when / #then
       expect(PLAN_AGENT_NAMES).toEqual(["plan"])
     })
+
+    test("returns false for non-plan agent display names (regression: isPlanAgent display-name false-positive)", () => {
+      //#given / #when / #then
+      expect(isPlanAgent(getAgentDisplayName("metis"))).toBe(false)
+      expect(isPlanAgent(getAgentDisplayName("momus"))).toBe(false)
+      expect(isPlanAgent(getAgentDisplayName("atlas"))).toBe(false)
+    })
   })
 
   describe("isPlanFamily", () => {
@@ -294,6 +301,13 @@ describe("sisyphus-task", () => {
       const result = isPlanFamily(undefined)
       //#then
       expect(result).toBe(false)
+    })
+
+    test("returns false for non-plan-family agent display names (regression: isPlanFamily includes() false-positive)", () => {
+      //#given / #when / #then
+      expect(isPlanFamily(getAgentDisplayName("metis"))).toBe(false)
+      expect(isPlanFamily(getAgentDisplayName("momus"))).toBe(false)
+      expect(isPlanFamily(getAgentDisplayName("atlas"))).toBe(false)
     })
 
     test("PLAN_FAMILY_NAMES contains plan and prometheus", () => {
