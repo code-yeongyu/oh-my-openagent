@@ -165,6 +165,7 @@ export function resolveCompatibleModelSettings(
   if (
     maxTokens !== undefined &&
     input.capabilities?.maxOutputTokens !== undefined &&
+    input.capabilities.maxOutputTokens > 0 &&
     maxTokens > input.capabilities.maxOutputTokens
   ) {
     changes.push({
