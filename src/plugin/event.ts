@@ -37,7 +37,6 @@ import { dispatchOpenClawEvent } from "../openclaw/runtime-dispatch";
 
 import type { CreatedHooks } from "../create-hooks";
 import type { Managers } from "../create-managers";
-import { isTmuxIntegrationEnabled } from "../create-runtime-tmux-config";
 import { pruneRecentSyntheticIdles } from "./recent-synthetic-idles";
 import { normalizeSessionStatusToIdle } from "./session-status-normalizer";
 
@@ -141,7 +140,7 @@ export function createEventHandler(args: {
   hooks: CreatedHooks;
 }): (input: EventInput) => Promise<void> {
   const { ctx, pluginConfig, firstMessageVariantGate, managers, hooks } = args;
-  const tmuxIntegrationEnabled = isTmuxIntegrationEnabled(pluginConfig)
+  const tmuxIntegrationEnabled = pluginConfig.tmux?.enabled ?? false;
   const pluginContext = ctx as {
     directory: string;
     client: {
