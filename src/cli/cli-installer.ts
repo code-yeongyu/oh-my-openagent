@@ -65,7 +65,7 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
     const unsupportedVersionMessage = getUnsupportedOpenCodeVersionMessage(openCodeVersion)
     if (unsupportedVersionMessage) {
       printWarning(unsupportedVersionMessage)
-      posthog.capture({ distinctId, event: "install_failed", properties: { reason: "unsupported_opencode_version", is_update: isUpdate } })
+      posthog.capture({ distinctId, event: "install_failed", properties: { command: "install", reason: "unsupported_opencode_version", is_update: isUpdate } })
       await posthog.shutdown()
       return 1
     }
@@ -82,7 +82,7 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
   const pluginResult = await addPluginToOpenCodeConfig(version)
   if (!pluginResult.success) {
     printError(`Failed: ${pluginResult.error}`)
-    posthog.capture({ distinctId, event: "install_failed", properties: { reason: "plugin_config_write_failed", is_update: isUpdate } })
+    posthog.capture({ distinctId, event: "install_failed", properties: { command: "install", reason: "plugin_config_write_failed", is_update: isUpdate } })
     await posthog.shutdown()
     return 1
   }
@@ -94,7 +94,7 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
   const omoResult = writeOmoConfig(config)
   if (!omoResult.success) {
     printError(`Failed: ${omoResult.error}`)
-    posthog.capture({ distinctId, event: "install_failed", properties: { reason: "omo_config_write_failed", is_update: isUpdate } })
+    posthog.capture({ distinctId, event: "install_failed", properties: { command: "install", reason: "omo_config_write_failed", is_update: isUpdate } })
     await posthog.shutdown()
     return 1
   }
@@ -123,6 +123,12 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
   console.log(`  Run ${color.cyan("opencode")} to start!`)
   console.log()
 
+  printInfo(
+    "Anonymous telemetry is enabled by default. Disable it with OMO_SEND_ANONYMOUS_TELEMETRY=0 or OMO_DISABLE_POSTHOG=1.",
+  )
+  printInfo("Docs: docs/legal/privacy-policy.md and docs/legal/terms-of-service.md")
+  console.log()
+
   printBox(
     `${color.bold("Pro Tip:")} Include ${color.cyan("ultrawork")} (or ${color.cyan("ulw")}) in your prompt.\n` +
       `All features work like magic-parallel agents, background tasks,\n` +
@@ -142,6 +148,7 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
     distinctId,
     event: "install_completed",
     properties: {
+      command: "install",
       is_update: isUpdate,
       has_claude: config.hasClaude,
       has_openai: config.hasOpenAI,
