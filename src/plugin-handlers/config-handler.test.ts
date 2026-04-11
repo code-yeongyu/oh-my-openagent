@@ -3,7 +3,7 @@
 import { describe, test, expect, spyOn, beforeEach, afterEach, mock } from "bun:test"
 import type { CategoryConfig } from "../config/schema"
 import type { OhMyOpenCodeConfig } from "../config"
-import { getAgentDisplayName, getAgentRuntimeName } from "../shared/agent-display-names"
+import { getAgentDisplayName, getAgentListDisplayName, getAgentRuntimeName } from "../shared/agent-display-names"
 import { resolveCategoryConfig } from "./category-config-resolver"
 
 import * as agents from "../agents"
@@ -260,10 +260,10 @@ describe("Plan agent demote behavior", () => {
     // #then
     const keys = Object.keys(config.agent as Record<string, unknown>)
     const coreAgents = [
-      getAgentDisplayName("sisyphus"),
-      getAgentDisplayName("hephaestus"),
-      getAgentDisplayName("prometheus"),
-      getAgentDisplayName("atlas"),
+      getAgentListDisplayName("sisyphus"),
+      getAgentListDisplayName("hephaestus"),
+      getAgentListDisplayName("prometheus"),
+      getAgentListDisplayName("atlas"),
     ]
     const ordered = keys.filter((key) => coreAgents.includes(key))
     expect(ordered).toEqual(coreAgents)
@@ -308,14 +308,14 @@ describe("Plan agent demote behavior", () => {
       reorderSpy.mock.calls.at(0)?.[0] as Record<string, unknown>
     )
     expect(assembledAgentKeys.slice(0, 4)).toEqual([
-      getAgentDisplayName("sisyphus"),
-      getAgentDisplayName("hephaestus"),
-      getAgentDisplayName("prometheus"),
-      getAgentDisplayName("atlas"),
+      getAgentListDisplayName("sisyphus"),
+      getAgentListDisplayName("hephaestus"),
+      getAgentListDisplayName("prometheus"),
+      getAgentListDisplayName("atlas"),
     ])
   })
 
-  test("backfills core agent runtime names when builtin configs omit name", async () => {
+  test("backfills runtime core agent names when builtin configs omit name", async () => {
     // #given
     const createBuiltinAgentsMock = agents.createBuiltinAgents as unknown as {
       mockResolvedValue: (value: Record<string, unknown>) => void
@@ -354,19 +354,19 @@ describe("Plan agent demote behavior", () => {
 
     expect(emittedCoreEntries).toEqual([
       [
-        getAgentDisplayName("sisyphus"),
+        getAgentListDisplayName("sisyphus"),
         expect.objectContaining({ name: getAgentRuntimeName("sisyphus") }),
       ],
       [
-        getAgentDisplayName("hephaestus"),
+        getAgentListDisplayName("hephaestus"),
         expect.objectContaining({ name: getAgentRuntimeName("hephaestus") }),
       ],
       [
-        getAgentDisplayName("prometheus"),
+        getAgentListDisplayName("prometheus"),
         expect.objectContaining({ name: getAgentRuntimeName("prometheus") }),
       ],
       [
-        getAgentDisplayName("atlas"),
+        getAgentListDisplayName("atlas"),
         expect.objectContaining({ name: getAgentRuntimeName("atlas") }),
       ],
     ])
@@ -407,7 +407,7 @@ describe("Plan agent demote behavior", () => {
     expect(agents.plan).toBeDefined()
     expect(agents.plan.mode).toBe("subagent")
     expect(agents.plan.prompt).toBeUndefined()
-    expect(agents[getAgentDisplayName("prometheus")]?.prompt).toBeDefined()
+    expect(agents[getAgentListDisplayName("prometheus")]?.prompt).toBeDefined()
   })
 
   test("plan agent remains unchanged when planner is disabled", async () => {
@@ -441,7 +441,7 @@ describe("Plan agent demote behavior", () => {
 
     // #then - plan is not touched, prometheus is not created
     const agents = config.agent as Record<string, { mode?: string; name?: string; prompt?: string }>
-    expect(agents[getAgentDisplayName("prometheus")]).toBeUndefined()
+    expect(agents[getAgentListDisplayName("prometheus")]).toBeUndefined()
     expect(agents.plan).toBeDefined()
     expect(agents.plan.mode).toBe("primary")
     expect(agents.plan.prompt).toBe("original plan prompt")
@@ -472,7 +472,7 @@ describe("Plan agent demote behavior", () => {
 
     // then
     const agents = config.agent as Record<string, { mode?: string }>
-    const prometheusKey = getAgentDisplayName("prometheus")
+    const prometheusKey = getAgentListDisplayName("prometheus")
     expect(agents[prometheusKey]).toBeDefined()
     expect(agents[prometheusKey].mode).toBe("all")
   })
@@ -508,7 +508,7 @@ describe("Agent permission defaults", () => {
 
     // #then
     const agentConfig = config.agent as Record<string, { permission?: Record<string, string> }>
-    const hephaestusKey = getAgentDisplayName("hephaestus")
+    const hephaestusKey = getAgentListDisplayName("hephaestus")
     expect(agentConfig[hephaestusKey]).toBeDefined()
     expect(agentConfig[hephaestusKey].permission?.task).toBe("allow")
   })
@@ -590,7 +590,7 @@ describe("default_agent behavior with Sisyphus orchestration", () => {
   test("preserves existing display-name default_agent", async () => {
     // #given
     const pluginConfig = createPluginConfig({})
-    const displayName = getAgentDisplayName("hephaestus")
+    const displayName = getAgentListDisplayName("hephaestus")
     const config: Record<string, unknown> = {
       model: "anthropic/claude-opus-4-6",
       default_agent: displayName,
@@ -609,7 +609,7 @@ describe("default_agent behavior with Sisyphus orchestration", () => {
     await handler(config)
 
     // #then
-    expect(config.default_agent).toBe(displayName)
+    expect(config.default_agent).toBe(getAgentRuntimeName("hephaestus"))
   })
 
   test("sets default_agent to sisyphus when missing", async () => {
@@ -874,7 +874,7 @@ describe("Prometheus direct override priority over category", () => {
 
     // then - direct override's reasoningEffort wins
     const agents = config.agent as Record<string, { reasoningEffort?: string }>
-    const pKey = getAgentDisplayName("prometheus")
+    const pKey = getAgentListDisplayName("prometheus")
     expect(agents[pKey]).toBeDefined()
     expect(agents[pKey].reasoningEffort).toBe("low")
   })
@@ -915,7 +915,7 @@ describe("Prometheus direct override priority over category", () => {
 
     // then - category's reasoningEffort is applied
     const agents = config.agent as Record<string, { reasoningEffort?: string }>
-    const pKey = getAgentDisplayName("prometheus")
+    const pKey = getAgentListDisplayName("prometheus")
     expect(agents[pKey]).toBeDefined()
     expect(agents[pKey].reasoningEffort).toBe("high")
   })
@@ -957,7 +957,7 @@ describe("Prometheus direct override priority over category", () => {
 
     // then - direct temperature wins over category
     const agents = config.agent as Record<string, { temperature?: number }>
-    const pKey = getAgentDisplayName("prometheus")
+    const pKey = getAgentListDisplayName("prometheus")
     expect(agents[pKey]).toBeDefined()
     expect(agents[pKey].temperature).toBe(0.1)
   })
@@ -993,7 +993,7 @@ describe("Prometheus direct override priority over category", () => {
 
     // #then - prompt_append is appended to base prompt, not overwriting it
     const agents = config.agent as Record<string, { prompt?: string }>
-    const pKey = getAgentDisplayName("prometheus")
+    const pKey = getAgentListDisplayName("prometheus")
     expect(agents[pKey]).toBeDefined()
     expect(agents[pKey].prompt).toContain("Prometheus")
     expect(agents[pKey].prompt).toContain(customInstructions)
@@ -1218,7 +1218,7 @@ describe("Deadlock prevention - fetchAvailableModels must not receive client", (
 
     // then - regression guard: handler completes and still assembles planner config
     const agentConfig = config.agent as Record<string, unknown>
-    expect(agentConfig[getAgentDisplayName("prometheus")]).toBeDefined()
+    expect(agentConfig[getAgentListDisplayName("prometheus")]).toBeDefined()
   })
 })
 
@@ -1384,17 +1384,17 @@ describe("command agent routing coherence", () => {
     //#then
     const agentConfig = config.agent as Record<string, unknown>
     const commandConfig = config.command as Record<string, { agent?: string }>
-    expect(Object.keys(agentConfig)).toContain(getAgentDisplayName("atlas"))
-    expect(commandConfig["start-work"]?.agent).toBe(getAgentDisplayName("atlas"))
+    expect(Object.keys(agentConfig)).toContain(getAgentListDisplayName("atlas"))
+    expect(commandConfig["start-work"]?.agent).toBe(getAgentListDisplayName("atlas"))
   })
 })
 
 describe("per-agent todowrite/todoread deny when task_system enabled", () => {
   const AGENTS_WITH_TODO_DENY = new Set([
-    getAgentDisplayName("sisyphus"),
-    getAgentDisplayName("hephaestus"),
-    getAgentDisplayName("prometheus"),
-    getAgentDisplayName("atlas"),
+    getAgentListDisplayName("sisyphus"),
+    getAgentListDisplayName("hephaestus"),
+    getAgentListDisplayName("prometheus"),
+    getAgentListDisplayName("atlas"),
     getAgentDisplayName("sisyphus-junior"),
   ])
 
@@ -1475,10 +1475,10 @@ describe("per-agent todowrite/todoread deny when task_system enabled", () => {
     expect(lastCall?.[11]).toBe(false)
 
     const agentResult = config.agent as Record<string, { permission?: Record<string, unknown> }>
-    expect(agentResult[getAgentDisplayName("sisyphus")]?.permission?.todowrite).toBeUndefined()
-    expect(agentResult[getAgentDisplayName("sisyphus")]?.permission?.todoread).toBeUndefined()
-    expect(agentResult[getAgentDisplayName("hephaestus")]?.permission?.todowrite).toBeUndefined()
-    expect(agentResult[getAgentDisplayName("hephaestus")]?.permission?.todoread).toBeUndefined()
+    expect(agentResult[getAgentListDisplayName("sisyphus")]?.permission?.todowrite).toBeUndefined()
+    expect(agentResult[getAgentListDisplayName("sisyphus")]?.permission?.todoread).toBeUndefined()
+    expect(agentResult[getAgentListDisplayName("hephaestus")]?.permission?.todowrite).toBeUndefined()
+    expect(agentResult[getAgentListDisplayName("hephaestus")]?.permission?.todoread).toBeUndefined()
   })
 
   test("does not deny todowrite/todoread when task_system is undefined", async () => {
@@ -1514,8 +1514,8 @@ describe("per-agent todowrite/todoread deny when task_system enabled", () => {
     expect(lastCall?.[11]).toBe(false)
 
     const agentResult = config.agent as Record<string, { permission?: Record<string, unknown> }>
-    expect(agentResult[getAgentDisplayName("sisyphus")]?.permission?.todowrite).toBeUndefined()
-    expect(agentResult[getAgentDisplayName("sisyphus")]?.permission?.todoread).toBeUndefined()
+    expect(agentResult[getAgentListDisplayName("sisyphus")]?.permission?.todowrite).toBeUndefined()
+    expect(agentResult[getAgentListDisplayName("sisyphus")]?.permission?.todoread).toBeUndefined()
   })
 })
 
