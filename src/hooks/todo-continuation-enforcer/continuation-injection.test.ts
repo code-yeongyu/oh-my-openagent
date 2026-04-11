@@ -40,7 +40,45 @@ describe("injectContinuation", () => {
     })
 
     // then
-    expect(capturedAgent).toBe("Sisyphus - Ultraworker")
+    expect(capturedAgent).toBe("\u200BSisyphus - Ultraworker")
+  })
+
+  test("falls back to the runtime display name when only config-key agent info is available", async () => {
+    // given
+    let capturedAgent: string | undefined
+    const ctx = {
+      directory: "/tmp/test",
+      client: {
+        session: {
+          todo: async () => ({ data: [{ id: "1", content: "todo", status: "pending", priority: "high" }] }),
+          promptAsync: async (input: {
+            body: {
+              agent?: string
+            }
+          }) => {
+            capturedAgent = input.body.agent
+            return {}
+          },
+        },
+      },
+    }
+    const sessionStateStore = {
+      getExistingState: () => ({ inFlight: false, lastInjectedAt: 0, consecutiveFailures: 0 }),
+    }
+
+    // when
+    await injectContinuation({
+      ctx: ctx as never,
+      sessionID: "ses_display_name_fallback",
+      resolvedInfo: {
+        agent: "sisyphus",
+        model: { providerID: "anthropic", modelID: "claude-sonnet-4-20250514" },
+      },
+      sessionStateStore: sessionStateStore as never,
+    })
+
+    // then
+    expect(capturedAgent).toBe("\u200BSisyphus - Ultraworker")
   })
 
   test("inherits tools from resolved message info when reinjecting", async () => {

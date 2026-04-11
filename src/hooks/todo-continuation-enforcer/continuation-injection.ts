@@ -19,6 +19,7 @@ import { log } from "../../shared/logger"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
 import {
   getAgentConfigKey,
+  getAgentRuntimeName,
   normalizeAgentForPromptKey,
 } from "../../shared/agent-display-names"
 
@@ -130,7 +131,13 @@ export async function injectContinuation(args: {
   }
 
   const promptAgent = normalizeAgentForPromptKey(agentName)
-  const launchAgent = resolveRegisteredAgentName(agentName)
+  const configKey = promptAgent ?? (agentName ? getAgentConfigKey(agentName) : undefined)
+  const fallbackLaunchAgent = configKey ? getAgentRuntimeName(configKey) : undefined
+  const resolvedLaunchAgent = resolveRegisteredAgentName(agentName)
+  const launchAgent =
+    resolvedLaunchAgent && resolvedLaunchAgent !== agentName
+      ? resolvedLaunchAgent
+      : fallbackLaunchAgent ?? agentName ?? promptAgent
 
   if (promptAgent && skipAgents.some(s => getAgentConfigKey(s) === getAgentConfigKey(promptAgent))) {
     log(`[${HOOK_NAME}] Skipped: agent in skipAgents list`, { sessionID, agent: agentName })
