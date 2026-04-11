@@ -8,7 +8,7 @@
  * 4. Everything else (Claude, etc.) → default.ts
  */
 
-import { isGptModel, isGeminiModel } from "../../../agents/types"
+import { isGptModel, isGeminiModel, isQwenModel } from "../../../agents/types"
 
 /**
  * Checks if agent is a planner-type agent.
@@ -36,7 +36,7 @@ export function isNonOmoAgent(agentName?: string): boolean {
 export { isGptModel, isGeminiModel }
 
 /** Ultrawork message source type */
-export type UltraworkSource = "planner" | "gpt" | "gemini" | "default"
+export type UltraworkSource = "planner" | "gpt" | "gemini" | "qwen" | "default"
 
 /**
  * Determines which ultrawork message source to use.
@@ -55,6 +55,10 @@ export function getUltraworkSource(
     return "gpt"
   }
 
+  // Priority 2.5: Qwen models
+  if (modelID && isQwenModel(modelID)) {
+    return "qwen"
+  }
 
   // Priority 3: Gemini models
   if (modelID && isGeminiModel(modelID)) {

@@ -1,6 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk";
 import type { AgentMode, AgentPromptMetadata } from "./types";
-import { isGptModel } from "./types";
+import { isGptModel, isQwenModel } from "./types";
 import { createAgentToolRestrictions } from "../shared/permission-compat";
 
 const MODE: AgentMode = "subagent";
@@ -299,7 +299,7 @@ export function createMomusAgent(model: string): AgentConfig {
     prompt: MOMUS_DEFAULT_PROMPT,
   } as AgentConfig;
 
-  if (isGptModel(model)) {
+  if (isGptModel(model) || isQwenModel(model)) {
     return {
       ...base,
       prompt: MOMUS_GPT_PROMPT,

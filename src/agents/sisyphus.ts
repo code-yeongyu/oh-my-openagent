@@ -1,6 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk";
 import type { AgentMode, AgentPromptMetadata } from "./types";
-import { isGptModel, isGeminiModel, isGpt5_4Model } from "./types";
+import { isGptModel, isGeminiModel, isGpt5_4Model, isQwenModel } from "./types";
 import {
   buildGeminiToolMandate,
   buildGeminiDelegationOverride,
@@ -553,10 +553,24 @@ export function createSisyphusAgent(
     permission,
   };
 
-  if (isGptModel(model)) {
-    return { ...base, reasoningEffort: "medium" };
-  }
+   if (isQwenModel(model)) {
+     // Apply Qwen-specific injections (Phase 2b)
+     prompt = prompt.replace(
+       "</tool_usage_rules>",
+       `</tool_usage_rules>\n\n${buildQwenToolCallEnforcement()}`
+     );
+     prompt = prompt.replace(
+       "<Constraints>",
+       `${buildQwenDelegationReinforcement()}\n\n<Constraints>`
+     );
+     // Qwen uses reasoningEffort, not Claude's thinking.budgetTokens
+     return { ...base, reasoningEffort: "medium" };
+   }
 
-  return { ...base, thinking: { type: "enabled", budgetTokens: 32000 } };
+   if (isGptModel(model)) {
+     return { ...base, reasoningEffort: "medium" };
+   }
+
+   return { ...base, thinking: { type: "enabled", budgetTokens: 32000 } };
 }
 createSisyphusAgent.mode = MODE;

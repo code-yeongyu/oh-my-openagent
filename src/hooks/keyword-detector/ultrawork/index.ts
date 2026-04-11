@@ -21,6 +21,7 @@ export {
   getPlannerUltraworkMessage,
 } from "./planner";
 export { ULTRAWORK_GPT_MESSAGE, getGptUltraworkMessage } from "./gpt";
+export { ULTRAWORK_QWEN_MESSAGE, getQwenUltraworkMessage } from "./qwen";
 export { ULTRAWORK_GEMINI_MESSAGE, getGeminiUltraworkMessage } from "./gemini";
 export {
   ULTRAWORK_DEFAULT_MESSAGE,
@@ -30,6 +31,7 @@ export {
 import { getUltraworkSource } from "./source-detector";
 import { getPlannerUltraworkMessage } from "./planner";
 import { getGptUltraworkMessage } from "./gpt";
+import { getQwenUltraworkMessage } from "./qwen";
 import { getDefaultUltraworkMessage } from "./default";
 import { getGeminiUltraworkMessage } from "./gemini";
 
@@ -42,15 +44,17 @@ export function getUltraworkMessage(
 ): string {
   const source = getUltraworkSource(agentName, modelID);
 
-  switch (source) {
-    case "planner":
-      return getPlannerUltraworkMessage();
-    case "gpt":
-      return getGptUltraworkMessage();
-    case "gemini":
-      return getGeminiUltraworkMessage();
-    case "default":
-    default:
-      return getDefaultUltraworkMessage();
-  }
+   switch (source) {
+     case "planner":
+       return getPlannerUltraworkMessage();
+     case "gpt":
+       return getGptUltraworkMessage();
+     case "qwen":
+       return getQwenUltraworkMessage();
+     case "gemini":
+       return getGeminiUltraworkMessage();
+     case "default":
+     default:
+       return getDefaultUltraworkMessage();
+   }
 }

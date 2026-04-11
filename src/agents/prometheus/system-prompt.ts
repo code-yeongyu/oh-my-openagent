@@ -6,7 +6,8 @@ import { PROMETHEUS_PLAN_TEMPLATE } from "./plan-template"
 import { PROMETHEUS_BEHAVIORAL_SUMMARY } from "./behavioral-summary"
 import { getGptPrometheusPrompt } from "./gpt"
 import { getGeminiPrometheusPrompt } from "./gemini"
-import { isGptModel, isGeminiModel } from "../types"
+import { getQwenPrometheusPrompt } from "./qwen"
+import { isGptModel, isGeminiModel, isQwenModel } from "../types"
 
 /**
  * Combined Prometheus system prompt (Claude-optimized, default).
@@ -31,7 +32,7 @@ export const PROMETHEUS_PERMISSION = {
   question: "allow" as const,
 }
 
-export type PrometheusPromptSource = "default" | "gpt" | "gemini"
+export type PrometheusPromptSource = "default" | "gpt" | "gemini" | "qwen"
 
 /**
  * Determines which Prometheus prompt to use based on model.
@@ -42,6 +43,9 @@ export function getPrometheusPromptSource(model?: string): PrometheusPromptSourc
   }
   if (model && isGeminiModel(model)) {
     return "gemini"
+  }
+  if (model && isQwenModel(model)) {
+    return "qwen"
   }
   return "default"
 }
@@ -63,6 +67,9 @@ export function getPrometheusPrompt(model?: string, disabledTools?: readonly str
       break
     case "gemini":
       prompt = getGeminiPrometheusPrompt()
+      break
+    case "qwen":
+      prompt = getQwenPrometheusPrompt()
       break
     case "default":
     default:

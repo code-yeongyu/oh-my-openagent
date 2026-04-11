@@ -1,6 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk";
 import type { AgentMode, AgentPromptMetadata } from "../types";
-import { isGpt5_4Model, isGpt5_3CodexModel } from "../types";
+import { isGpt5_4Model, isGpt5_3CodexModel, isQwenModel } from "../types";
 import type {
   AvailableAgent,
   AvailableTool,
@@ -13,10 +13,11 @@ import { getGptApplyPatchPermission } from "../gpt-apply-patch-guard";
 import { buildHephaestusPrompt as buildGptPrompt } from "./gpt";
 import { buildHephaestusPrompt as buildGpt53CodexPrompt } from "./gpt-5-3-codex";
 import { buildHephaestusPrompt as buildGpt54Prompt } from "./gpt-5-4";
+import { buildHephaestusPrompt as buildQwenPrompt } from "./qwen";
 
 const MODE: AgentMode = "primary";
 
-export type HephaestusPromptSource = "gpt-5-4" | "gpt-5-3-codex" | "gpt";
+export type HephaestusPromptSource = "gpt-5-4" | "gpt-5-3-codex" | "gpt" | "qwen";
 
 export function getHephaestusPromptSource(
   model?: string,
@@ -26,6 +27,9 @@ export function getHephaestusPromptSource(
   }
   if (model && isGpt5_3CodexModel(model)) {
     return "gpt-5-3-codex";
+  }
+  if (model && isQwenModel(model)) {
+    return "qwen";
   }
   return "gpt";
 }
@@ -86,6 +90,15 @@ function buildDynamicHephaestusPrompt(ctx?: HephaestusContext): string {
         useTaskSystem,
       );
       break;
+    case "qwen":
+      basePrompt = buildQwenPrompt(
+        agents,
+        tools,
+        skills,
+        categories,
+        useTaskSystem,
+      );
+      break;
   }
 
   const agentIdentity = buildAgentIdentitySection(
@@ -115,21 +128,28 @@ export function createHephaestusAgent(
     useTaskSystem,
   });
 
-  return {
-    description:
-      "Autonomous Deep Worker - goal-oriented execution with GPT Codex. Explores thoroughly before acting, uses explore/librarian agents for comprehensive context, completes tasks end-to-end. Inspired by AmpCode deep mode. (Hephaestus - OhMyOpenCode)",
-    mode: MODE,
-    model,
-    maxTokens: 32000,
-    prompt,
-    color: "#D97706",
-    permission: {
-      question: "allow",
-      call_omo_agent: "deny",
-      ...getGptApplyPatchPermission(model),
-    } as AgentConfig["permission"],
-    reasoningEffort: "medium",
-  };
+   const base = {
+     description:
+       isQwenModel(model)
+         ? "Autonomous Deep Worker for software engineering. (Hephaestus - OhMyOpenCode)"
+         : "Autonomous Deep Worker - goal-oriented execution with GPT Codex. Explores thoroughly before acting, uses explore/librarian agents for comprehensive context, completes tasks end-to-end. Inspired by AmpCode deep mode. (Hephaestus - OhMyOpenCode)",
+     mode: MODE,
+     model,
+     maxTokens: 32000,
+     prompt,
+     color: "#D97706",
+     permission: {
+       question: "allow",
+       call_omo_agent: "deny",
+       ...getGptApplyPatchPermission(model),
+     } as AgentConfig["permission"],
+   };
+
+   if (isQwenModel(model)) {
+     return { ...base, reasoningEffort: "medium" };
+   }
+
+   return { ...base, thinking: { type: "enabled", budgetTokens: 32000 } };
 }
 createHephaestusAgent.mode = MODE;
 

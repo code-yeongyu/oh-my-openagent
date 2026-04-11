@@ -1,0 +1,4 @@
+understandings.md is your one stop shop for everything about this codebase. 
+1. For any questions asked, any code changes requested, or any requests pertaining to this codebase, refer to this file.
+2. Identify potential candidate files from this document. 
+3. Review each file identified, and then provide the response to the user. Ensure you mention which file each piece of information belongs to.

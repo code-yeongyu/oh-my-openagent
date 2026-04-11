@@ -12,7 +12,7 @@
 
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode } from "../types"
-import { isGlmModel, isGptModel, isGeminiModel } from "../types"
+import { isGlmModel, isGptModel, isGeminiModel, isQwenModel } from "../types"
 import type { AgentOverrideConfig } from "../../config/schema"
 import {
   createAgentToolRestrictions,
@@ -25,6 +25,7 @@ import { buildGptSisyphusJuniorPrompt } from "./gpt"
 import { buildGpt54SisyphusJuniorPrompt } from "./gpt-5-4"
 import { buildGpt53CodexSisyphusJuniorPrompt } from "./gpt-5-3-codex"
 import { buildGeminiSisyphusJuniorPrompt } from "./gemini"
+import { buildQwenSisyphusJuniorPrompt } from "./qwen"
 
 const MODE: AgentMode = "subagent"
 
@@ -38,7 +39,7 @@ export const SISYPHUS_JUNIOR_DEFAULTS = {
   temperature: 0.1,
 } as const
 
-export type SisyphusJuniorPromptSource = "default" | "gpt" | "gpt-5-4" | "gpt-5-3-codex" | "gemini"
+export type SisyphusJuniorPromptSource = "default" | "gpt" | "gpt-5-4" | "gpt-5-3-codex" | "gemini" | "qwen"
 
 export function getSisyphusJuniorPromptSource(model?: string): SisyphusJuniorPromptSource {
   if (model && isGptModel(model)) {
@@ -49,6 +50,9 @@ export function getSisyphusJuniorPromptSource(model?: string): SisyphusJuniorPro
   }
   if (model && isGeminiModel(model)) {
     return "gemini"
+  }
+  if (model && isQwenModel(model)) {
+    return "qwen"
   }
   return "default"
 }
@@ -72,6 +76,8 @@ export function buildSisyphusJuniorPrompt(
       return buildGptSisyphusJuniorPrompt(useTaskSystem, promptAppend)
     case "gemini":
       return buildGeminiSisyphusJuniorPrompt(useTaskSystem, promptAppend)
+    case "qwen":
+      return buildQwenSisyphusJuniorPrompt(useTaskSystem, promptAppend)
     case "default":
     default:
       return buildDefaultSisyphusJuniorPrompt(useTaskSystem, promptAppend)
@@ -126,18 +132,18 @@ export function createSisyphusJuniorAgentWithOverrides(
     base.top_p = override.top_p
   }
 
-  if (isGptModel(model)) {
-    return { ...base, reasoningEffort: "medium" } as AgentConfig
-  }
+   if (isGptModel(model) || isQwenModel(model)) {
+     return { ...base, reasoningEffort: "medium" } as AgentConfig
+   }
 
-  if (isGlmModel(model)) {
-    return base as AgentConfig
-  }
+   if (isGlmModel(model)) {
+     return base as AgentConfig
+   }
 
-  return {
-    ...base,
-    thinking: { type: "enabled", budgetTokens: 32000 },
-  } as AgentConfig
+   return {
+     ...base,
+     thinking: { type: "enabled", budgetTokens: 32000 },
+   } as AgentConfig
 }
 
 createSisyphusJuniorAgentWithOverrides.mode = MODE

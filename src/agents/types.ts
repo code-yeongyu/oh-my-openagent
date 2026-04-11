@@ -89,6 +89,16 @@ export function isGpt5_3CodexModel(model: string): boolean {
   return modelName.includes("gpt-5.3-codex") || modelName.includes("gpt-5-3-codex");
 }
 
+export function isQwenModel(model: string): boolean {
+  const modelName = extractModelName(model).toLowerCase();
+  return modelName.startsWith("qwen");
+}
+
+export function isQwen3CoderModel(model: string): boolean {
+  const modelName = extractModelName(model).toLowerCase();
+  return modelName.startsWith("qwen3-coder") || modelName.startsWith("qwen3.5-coder");
+}
+
 const GEMINI_PROVIDERS = ["google/", "google-vertex/"];
 
 export function isMiniMaxModel(model: string): boolean {

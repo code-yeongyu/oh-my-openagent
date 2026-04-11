@@ -12,7 +12,7 @@
 
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode, AgentPromptMetadata } from "../types"
-import { isGptModel, isGeminiModel } from "../types"
+import { isGptModel, isGeminiModel, isQwenModel } from "../types"
 import type { AvailableAgent, AvailableSkill, AvailableCategory } from "../dynamic-agent-prompt-builder"
 import { buildAgentIdentitySection, buildCategorySkillsDelegationGuide } from "../dynamic-agent-prompt-builder"
 import type { CategoryConfig } from "../../config/schema"
@@ -21,6 +21,7 @@ import { mergeCategories } from "../../shared/merge-categories"
 import { getDefaultAtlasPrompt } from "./default"
 import { getGptAtlasPrompt } from "./gpt"
 import { getGeminiAtlasPrompt } from "./gemini"
+import { getQwenAtlasPrompt } from "./qwen"
 import {
   getCategoryDescription,
   buildAgentSelectionSection,
@@ -31,7 +32,7 @@ import {
 
 const MODE: AgentMode = "primary"
 
-export type AtlasPromptSource = "default" | "gpt" | "gemini"
+export type AtlasPromptSource = "default" | "gpt" | "gemini" | "qwen"
 
 /**
  * Determines which Atlas prompt to use based on model.
@@ -42,6 +43,9 @@ export function getAtlasPromptSource(model?: string): AtlasPromptSource {
   }
   if (model && isGeminiModel(model)) {
     return "gemini"
+  }
+  if (model && isQwenModel(model)) {
+    return "qwen"
   }
   return "default"
 }
@@ -59,15 +63,17 @@ export interface OrchestratorContext {
 export function getAtlasPrompt(model?: string): string {
   const source = getAtlasPromptSource(model)
 
-  switch (source) {
-    case "gpt":
-      return getGptAtlasPrompt()
-    case "gemini":
-      return getGeminiAtlasPrompt()
-    case "default":
-    default:
-      return getDefaultAtlasPrompt()
-  }
+   switch (source) {
+     case "qwen":
+       return getQwenAtlasPrompt()
+     case "gpt":
+       return getGptAtlasPrompt()
+     case "gemini":
+       return getGeminiAtlasPrompt()
+     case "default":
+     default:
+       return getDefaultAtlasPrompt()
+   }
 }
 
 function buildDynamicOrchestratorPrompt(ctx?: OrchestratorContext): string {
