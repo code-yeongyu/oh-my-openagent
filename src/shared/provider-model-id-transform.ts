@@ -14,5 +14,11 @@ export function transformModelForProvider(provider: string, model: string): stri
 			.replace(/gemini-3\.1-pro(?!-)/g, "gemini-3.1-pro-preview")
 			.replace(/gemini-3-flash(?!-)/g, "gemini-3-flash-preview")
 	}
+	if (provider === "anthropic") {
+		return model
+			.replace("claude-opus-4-6", "claude-opus-4.6")
+			.replace("claude-sonnet-4-6", "claude-sonnet-4.6")
+			.replace("claude-haiku-4-5", "claude-haiku-4.5")
+	}
 	return model
 }

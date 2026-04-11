@@ -1,3 +1,5 @@
+/// <reference types="bun-types" />
+
 import { describe, expect, test } from "bun:test"
 
 import { generateModelConfig } from "./model-fallback"
@@ -378,7 +380,7 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then
-      expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-opus-4-6")
+      expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-opus-4.6")
     })
 
     test("Sisyphus is created when multiple fallback providers are available", () => {
@@ -395,7 +397,7 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then
-      expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-opus-4-6")
+      expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-opus-4.6")
     })
 
     test("Sisyphus resolves to gpt-5.4 medium when only OpenAI is available", () => {
@@ -572,7 +574,11 @@ describe("generateModelConfig", () => {
 
       // #then explore should not have fallback_models (only one chain entry matches)
       expect(result.agents?.explore?.model).toBe("anthropic/claude-haiku-4-5")
-      expect(result.agents?.explore?.fallback_models).toBeUndefined()
+      expect(result.agents?.explore?.fallback_models).toEqual([
+        {
+          model: "anthropic/claude-haiku-4.5",
+        },
+      ])
     })
 
     test("librarian includes fallback_models when opencode-go and Claude are both available", () => {
