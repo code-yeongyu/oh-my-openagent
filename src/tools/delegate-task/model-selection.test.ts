@@ -190,6 +190,27 @@ describe("resolveModelForDelegateTask", () => {
 				expect(result).toEqual({ model: "openai/gpt-5.4-preview", matchedFallback: true })
 			})
 
+			test("#then preserves object fallback variant on warm-cache resolution", () => {
+				const result = resolveModelForDelegateTask({
+					userFallbackModels: [{ model: "anthropic/claude-opus", variant: "max" }],
+					availableModels: new Set(["anthropic/claude-opus-4-6"]),
+				})
+
+				expect(result).toEqual({ model: "anthropic/claude-opus-4-6", variant: "max", matchedFallback: true })
+			})
+
+			test("#then preserves object fallback variant on cold-cache connected-provider resolution", () => {
+				const readConnectedProvidersSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["anthropic"])
+
+				const result = resolveModelForDelegateTask({
+					userFallbackModels: [{ model: "anthropic/claude-opus", variant: "max" }],
+					availableModels: new Set<string>(),
+				})
+
+				expect(result).toEqual({ model: "anthropic/claude-opus-4-6", variant: "max", matchedFallback: true })
+				readConnectedProvidersSpy.mockRestore()
+			})
+
 			test("#then prefers a later exact object entry over an earlier fuzzy prefix match", () => {
 				const result = resolveModelForDelegateTask({
 					userFallbackModels: [

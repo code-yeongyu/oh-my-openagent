@@ -97,7 +97,6 @@ export function resolveModelForDelegateTask(input: {
         const resolvedFallback = resolveConfiguredFallbackEntry(fallbackModel, {
           availableModels: input.availableModels,
           connectedProviders,
-          preserveObjectVariant: false,
         })
         if (!resolvedFallback) {
           continue
@@ -111,7 +110,6 @@ export function resolveModelForDelegateTask(input: {
       for (const fallbackModel of userFallbackModels) {
         const resolvedFallback = resolveConfiguredFallbackEntry(fallbackModel, {
           availableModels: input.availableModels,
-          preserveObjectVariant: false,
         })
         if (!resolvedFallback) {
           continue
