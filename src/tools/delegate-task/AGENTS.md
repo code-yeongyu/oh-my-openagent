@@ -1,6 +1,6 @@
 # src/tools/delegate-task/ — Task Delegation Engine
 
-**Generated:** 2026-04-05
+**Generated:** 2026-04-11
 
 ## OVERVIEW
 

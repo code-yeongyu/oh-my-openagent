@@ -1,6 +1,6 @@
 # src/hooks/session-recovery/ — Auto Session Error Recovery
 
-**Generated:** 2026-04-05
+**Generated:** 2026-04-11
 
 ## OVERVIEW
 

@@ -1,6 +1,6 @@
 # oh-my-opencode — OpenCode Plugin
 
-**Generated:** 2026-04-09 | **Commit:** dc7a4680 | **Branch:** dev
+**Generated:** 2026-04-11 | **Commit:** f5dc1c0e | **Branch:** dev
 
 ## OVERVIEW
 
@@ -18,7 +18,7 @@ oh-my-opencode/
 │   ├── tools/                # 26 tools across 16 directories (includes Hashline edit with LINE#ID content hashing)
 │   ├── features/             # 19 feature modules (background-agent, skill-loader, tmux, MCP-OAuth, skill-mcp-manager, etc.)
 │   ├── shared/               # 170+ utility files (barrel-exported, logger → /tmp/oh-my-opencode.log)
-│   ├── config/               # Zod v4 schema system (27 files)
+│   ├── config/               # Zod v4 schema system (32 files)
 │   ├── cli/                  # CLI: install, run, doctor, mcp-oauth (Commander.js)
 │   ├── mcp/                  # 3 built-in remote MCPs (websearch, context7, grep_app)
 │   ├── plugin/               # 10 OpenCode hook handlers + 52 hook composition

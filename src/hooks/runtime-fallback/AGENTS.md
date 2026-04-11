@@ -1,6 +1,6 @@
 # src/hooks/runtime-fallback/ — Reactive Provider Error Recovery
 
-**Generated:** 2026-04-09
+**Generated:** 2026-04-11
 
 ## OVERVIEW
 

@@ -1,6 +1,6 @@
 # src/features/skill-mcp-manager/ — Skill-Embedded MCP Client Lifecycle
 
-**Generated:** 2026-04-09
+**Generated:** 2026-04-11
 
 ## OVERVIEW
 
