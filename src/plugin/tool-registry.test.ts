@@ -37,6 +37,7 @@ describe("#given task_system configuration", () => {
         backgroundManager: {},
         tmuxSessionManager: {},
         skillMcpManager: {},
+        beadsRuntime: { activation: { enabled: false } },
       } as Parameters<typeof createToolRegistry>[0]["managers"],
       skillContext: {
         mergedSkills: [],
@@ -64,6 +65,7 @@ describe("#given task_system configuration", () => {
         backgroundManager: {},
         tmuxSessionManager: {},
         skillMcpManager: {},
+        beadsRuntime: { activation: { enabled: false } },
       } as Parameters<typeof createToolRegistry>[0]["managers"],
       skillContext: {
         mergedSkills: [],
@@ -100,6 +102,7 @@ describe("#given tmux integration is disabled", () => {
         backgroundManager: {},
         tmuxSessionManager: {},
         skillMcpManager: {},
+        beadsRuntime: { activation: { enabled: false } },
       } as Parameters<typeof createToolRegistry>[0]["managers"],
       skillContext: {
         mergedSkills: [],
@@ -131,6 +134,7 @@ describe("#given tmux integration is disabled", () => {
         backgroundManager: {},
         tmuxSessionManager: {},
         skillMcpManager: {},
+        beadsRuntime: { activation: { enabled: true } },
       } as Parameters<typeof createToolRegistry>[0]["managers"],
       skillContext: {
         mergedSkills: [],
@@ -143,5 +147,42 @@ describe("#given tmux integration is disabled", () => {
     })
 
     expect(result.filteredTools).not.toHaveProperty("interactive_bash")
+  })
+
+  test("#when beads runtime is enabled #then attach and status tools are registered", () => {
+    const result = createToolRegistry({
+      ctx: { directory: "/tmp" } as Parameters<typeof createToolRegistry>[0]["ctx"],
+      pluginConfig: {
+        experimental: { beads_runtime: true, task_system: false },
+      },
+      managers: {
+        backgroundManager: {},
+        tmuxSessionManager: {},
+        skillMcpManager: {},
+        beadsRuntime: {
+          activation: { enabled: true },
+          statusPolicy: {
+            awarenessMode: "read-reconcile-only",
+            autoClaim: false,
+            autoClose: false,
+            requiresExplicitAttach: true,
+            allowedReadCommands: [],
+            blockedOwnershipActions: [],
+            summary: "summary",
+          },
+        },
+      } as Parameters<typeof createToolRegistry>[0]["managers"],
+      skillContext: {
+        mergedSkills: [],
+        availableSkills: [],
+        browserProvider: "playwright",
+        disabledSkills: new Set(),
+      },
+      availableCategories: [],
+      interactiveBashEnabled: false,
+    })
+
+    expect(result.filteredTools).toHaveProperty("beads_runtime_attach")
+    expect(result.filteredTools).toHaveProperty("beads_runtime_status")
   })
 })

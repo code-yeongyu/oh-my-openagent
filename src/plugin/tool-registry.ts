@@ -1,5 +1,4 @@
 import type { ToolDefinition } from "@opencode-ai/plugin"
-import type { SkillLoadOptions } from "../tools/skill/types"
 
 import type {
   AvailableCategory,
@@ -12,29 +11,26 @@ import {
   builtinTools,
   createBackgroundTools,
   createCallOmoAgent,
-  createLookAt,
-  createSkillMcpTool,
-  createSkillTool,
   createGrepTools,
   createGlobTools,
   createAstGrepTools,
   createSessionManagerTools,
   createDelegateTask,
-  discoverCommandsSync,
-  interactive_bash,
-  createTaskCreateTool,
-  createTaskGetTool,
-  createTaskList,
-  createTaskUpdateTool,
-  createHashlineEditTool,
 } from "../tools"
-import { getMainSessionID } from "../features/claude-code-session-state"
 import { filterDisabledTools } from "../shared/disabled-tools"
-import { isTaskSystemEnabled, log } from "../shared"
+import { log } from "../shared"
 
 import type { Managers } from "../create-managers"
+import { createBeadsRuntimeToolRecord } from "./beads-runtime-tool-record"
 import type { SkillContext } from "./skill-context"
 import { normalizeToolArgSchemas } from "./normalize-tool-arg-schemas"
+import {
+  createHashlineEditToolRecord,
+  createInteractiveBashToolRecord,
+  createLookAtToolRecord,
+} from "./optional-tool-records"
+import { createSkillToolRecord } from "./skill-tool-record"
+import { createTaskSystemToolRecord } from "./task-system-tool-record"
 
 export type ToolRegistryResult = {
   filteredTools: ToolsRecord
@@ -55,6 +51,8 @@ const LOW_PRIORITY_TOOL_ORDER = [
   "task_update",
   "background_output",
   "background_cancel",
+  "beads_runtime_status",
+  "beads_runtime_attach",
   "edit",
   "ast_grep_replace",
   "ast_grep_search",
@@ -101,7 +99,7 @@ export function trimToolsToCap(filteredTools: ToolsRecord, maxTools: number): vo
 export function createToolRegistry(args: {
   ctx: PluginContext
   pluginConfig: OhMyOpenCodeConfig
-  managers: Pick<Managers, "backgroundManager" | "tmuxSessionManager" | "skillMcpManager">
+  managers: Pick<Managers, "backgroundManager" | "tmuxSessionManager" | "skillMcpManager" | "beadsRuntime">
   skillContext: SkillContext
   availableCategories: AvailableCategory[]
   interactiveBashEnabled?: boolean
@@ -114,6 +112,7 @@ export function createToolRegistry(args: {
     availableCategories,
     interactiveBashEnabled = isInteractiveBashEnabled(),
   } = args
+  const { taskSystemEnabled, taskToolsRecord } = createTaskSystemToolRecord(pluginConfig, ctx)
   const backgroundTools = createBackgroundTools(managers.backgroundManager, ctx.client)
   const callOmoAgent = createCallOmoAgent(
     ctx,
@@ -122,11 +121,9 @@ export function createToolRegistry(args: {
     pluginConfig.agents,
     pluginConfig.categories,
   )
-
-  const isMultimodalLookerEnabled = !(pluginConfig.disabled_agents ?? []).some(
-    (agent) => agent.toLowerCase() === "multimodal-looker",
-  )
-  const lookAt = isMultimodalLookerEnabled ? createLookAt(ctx) : null
+  const lookAtToolsRecord = createLookAtToolRecord(pluginConfig, ctx)
+  const interactiveBashToolsRecord = createInteractiveBashToolRecord(interactiveBashEnabled)
+  const hashlineToolsRecord = createHashlineEditToolRecord(pluginConfig, ctx)
 
   const delegateTask = createDelegateTask({
     manager: managers.backgroundManager,
@@ -160,43 +157,12 @@ export function createToolRegistry(args: {
       })
     },
   })
-
-  const getSessionIDForMcp = (): string | undefined => getMainSessionID()
-
-  const skillMcpTool = createSkillMcpTool({
-    manager: managers.skillMcpManager,
-    getLoadedSkills: () => skillContext.mergedSkills,
-    getSessionID: getSessionIDForMcp,
+  const skillToolsRecord = createSkillToolRecord({
+    ctx,
+    pluginConfig,
+    managers,
+    skillContext,
   })
-
-  const commands = discoverCommandsSync(ctx.directory, {
-    pluginsEnabled: pluginConfig.claude_code?.plugins ?? true,
-    enabledPluginsOverride: pluginConfig.claude_code?.plugins_override,
-  })
-  const skillTool = createSkillTool({
-    commands,
-    skills: skillContext.mergedSkills,
-    mcpManager: managers.skillMcpManager,
-    getSessionID: getSessionIDForMcp,
-    gitMasterConfig: pluginConfig.git_master,
-    browserProvider: skillContext.browserProvider,
-    nativeSkills: "skills" in ctx ? (ctx as { skills: SkillLoadOptions["nativeSkills"] }).skills : undefined,
-  })
-
-  const taskSystemEnabled = isTaskSystemEnabled(pluginConfig)
-  const taskToolsRecord: Record<string, ToolDefinition> = taskSystemEnabled
-    ? {
-        task_create: createTaskCreateTool(pluginConfig, ctx),
-        task_get: createTaskGetTool(pluginConfig),
-        task_list: createTaskList(pluginConfig),
-        task_update: createTaskUpdateTool(pluginConfig, ctx),
-      }
-    : {}
-
-  const hashlineEnabled = pluginConfig.hashline_edit ?? false
-  const hashlineToolsRecord: Record<string, ToolDefinition> = hashlineEnabled
-    ? { edit: createHashlineEditTool(ctx) }
-    : {}
 
   const sessionTools = createSessionManagerTools(ctx)
 
@@ -210,11 +176,11 @@ export function createToolRegistry(args: {
     ...sessionTools,
     ...backgroundTools,
     call_omo_agent: callOmoAgent,
-    ...(lookAt ? { look_at: lookAt } : {}),
+    ...lookAtToolsRecord,
+    ...createBeadsRuntimeToolRecord(managers.beadsRuntime, ctx.directory),
     task: delegateTask,
-    skill_mcp: skillMcpTool,
-    skill: skillTool,
-    ...(interactiveBashEnabled ? { interactive_bash } : {}),
+    ...skillToolsRecord,
+    ...interactiveBashToolsRecord,
     ...taskToolsRecord,
     ...hashlineToolsRecord,
   }
