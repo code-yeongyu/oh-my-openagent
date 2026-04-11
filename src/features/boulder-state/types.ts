@@ -19,6 +19,14 @@ export interface BoulderState {
   agent?: string
   /** Absolute path to the git worktree root where work happens */
   worktree_path?: string
+  /** Attached top-level bead identifier, when continuation work is bead-linked */
+  bead_id?: string
+  /** Command that attached the current continuation to a bead */
+  bead_source_command?: string
+  /** Absolute path to the bead worktree root inherited by continuation work */
+  bead_worktree_path?: string
+  /** ISO timestamp of the last successful bead reconciliation */
+  bead_last_reconciled_at?: string
   /** Preferred reusable subagent sessions keyed by current top-level plan task */
   task_sessions?: Record<string, TaskSessionState>
 }

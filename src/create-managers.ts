@@ -4,6 +4,8 @@ import type { PluginContext, TmuxConfig } from "./plugin/types"
 
 import type { SubagentSessionCreatedEvent } from "./features/background-agent"
 import { BackgroundManager } from "./features/background-agent"
+import type { BeadsRuntimeFeature } from "./features/beads-runtime"
+import { createBeadsRuntimeFeature } from "./features/beads-runtime"
 import { SkillMcpManager } from "./features/skill-mcp-manager"
 import { initTaskToastManager } from "./features/task-toast-manager"
 import { TmuxSessionManager } from "./features/tmux-subagent"
@@ -35,6 +37,7 @@ const defaultCreateManagersDeps: CreateManagersDeps = {
 export type Managers = {
   tmuxSessionManager: TmuxSessionManager
   backgroundManager: BackgroundManager
+  beadsRuntime: BeadsRuntimeFeature
   skillMcpManager: SkillMcpManager
   configHandler: ReturnType<typeof createConfigHandler>
 }
@@ -99,6 +102,7 @@ export function createManagers(args: {
 
   deps.initTaskToastManagerFn(ctx.client)
 
+  const beadsRuntime = createBeadsRuntimeFeature(pluginConfig)
   const skillMcpManager = new deps.SkillMcpManagerClass()
 
   const configHandler = deps.createConfigHandlerFn({
@@ -110,6 +114,7 @@ export function createManagers(args: {
   return {
     tmuxSessionManager,
     backgroundManager,
+    beadsRuntime,
     skillMcpManager,
     configHandler,
   }

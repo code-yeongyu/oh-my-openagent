@@ -1,6 +1,7 @@
 import type { FallbackEntry } from "../../shared/model-requirements"
 import type { DelegatedModelConfig } from "../../shared/model-resolution-types"
 import type { SessionPermissionRule } from "../../shared/question-denied-session-permission"
+import type { BeadsRuntimeTaskMetadata } from "../beads-runtime"
 
 export type BackgroundTaskStatus =
   | "pending"
@@ -68,6 +69,8 @@ export interface BackgroundTask {
   stablePolls?: number
   /** Number of consecutive polls where session was missing from status map */
   consecutiveMissedPolls?: number
+  /** Read-only bead metadata inherited from the top-level continuation */
+  beadsRuntime?: BeadsRuntimeTaskMetadata
 }
 
 export interface LaunchInput {
@@ -87,6 +90,7 @@ export interface LaunchInput {
   skillContent?: string
   category?: string
   sessionPermission?: SessionPermissionRule[]
+  beadsRuntime?: BeadsRuntimeTaskMetadata
 }
 
 export interface ResumeInput {
@@ -97,4 +101,5 @@ export interface ResumeInput {
   parentModel?: { providerID: string; modelID: string }
   parentAgent?: string
   parentTools?: Record<string, boolean>
+  beadsRuntime?: BeadsRuntimeTaskMetadata
 }

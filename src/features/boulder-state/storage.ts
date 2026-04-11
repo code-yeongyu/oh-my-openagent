@@ -8,6 +8,8 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from 
 import { dirname, join, basename } from "node:path"
 import type { BoulderState, PlanProgress, TaskSessionState } from "./types"
 import { BOULDER_DIR, BOULDER_FILE, PROMETHEUS_PLANS_DIR } from "./constants"
+import { applyBeadsRuntimeToBoulderState } from "./beads-runtime-state"
+import type { BeadsRuntimeTaskMetadata } from "../beads-runtime"
 
 const RESERVED_KEYS = new Set(["__proto__", "prototype", "constructor"])
 
@@ -321,8 +323,9 @@ export function createBoulderState(
   sessionId: string,
   agent?: string,
   worktreePath?: string,
+  beadsRuntime?: BeadsRuntimeTaskMetadata,
 ): BoulderState {
-  return {
+  return applyBeadsRuntimeToBoulderState({
     active_plan: planPath,
     started_at: new Date().toISOString(),
     session_ids: [sessionId],
@@ -332,5 +335,5 @@ export function createBoulderState(
     plan_name: getPlanName(planPath),
     ...(agent !== undefined ? { agent } : {}),
     ...(worktreePath !== undefined ? { worktree_path: worktreePath } : {}),
-  }
+  }, beadsRuntime)
 }

@@ -335,6 +335,7 @@ export class BackgroundManager {
         fallbackChain: input.fallbackChain,
         attemptCount: 0,
         category: input.category,
+        ...(input.beadsRuntime ? { beadsRuntime: { ...input.beadsRuntime } } : {}),
       }
 
       this.tasks.set(task.id, task)
@@ -819,6 +820,9 @@ export class BackgroundManager {
     if (input.parentTools) {
       existingTask.parentTools = input.parentTools
     }
+    if (!existingTask.beadsRuntime && input.beadsRuntime) {
+      existingTask.beadsRuntime = { ...input.beadsRuntime }
+    }
     // Reset startedAt on resume to prevent immediate completion
     // The MIN_IDLE_TIME_MS check uses startedAt, so resumed tasks need fresh timing
     existingTask.startedAt = new Date()
@@ -1060,7 +1064,10 @@ export class BackgroundManager {
 
         task.progress.toolCalls += 1
         task.progress.lastTool = partInfo.tool
-        const circuitBreaker = this.cachedCircuitBreakerSettings ?? (this.cachedCircuitBreakerSettings = resolveCircuitBreakerSettings(this.config))
+        if (!this.cachedCircuitBreakerSettings) {
+          this.cachedCircuitBreakerSettings = resolveCircuitBreakerSettings(this.config)
+        }
+        const circuitBreaker = this.cachedCircuitBreakerSettings
         if (partInfo.tool) {
          task.progress.toolCallWindow = recordToolCall(
              task.progress.toolCallWindow,
