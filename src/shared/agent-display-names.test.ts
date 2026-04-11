@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test"
-import { AGENT_DISPLAY_NAMES, getAgentConfigKey, getAgentDisplayName, getAgentListDisplayName, normalizeAgentForPrompt, normalizeAgentForPromptKey } from "./agent-display-names"
+import { AGENT_DISPLAY_NAMES, getAgentConfigKey, getAgentDisplayName, getAgentListDisplayName, getAgentRuntimeName, normalizeAgentForPrompt, normalizeAgentForPromptKey } from "./agent-display-names"
 
 describe("getAgentDisplayName", () => {
   it("returns display name for lowercase config key (new format)", () => {
@@ -194,15 +194,20 @@ describe("getAgentConfigKey", () => {
 })
 
 describe("getAgentListDisplayName", () => {
-  it("applies invisible stable-sort prefixes to the core agent list", () => {
-    expect(getAgentListDisplayName("sisyphus")).toBe("\u200BSisyphus - Ultraworker")
-    expect(getAgentListDisplayName("hephaestus")).toBe("\u200B\u200BHephaestus - Deep Agent")
-    expect(getAgentListDisplayName("prometheus")).toBe("\u200B\u200B\u200BPrometheus - Plan Builder")
-    expect(getAgentListDisplayName("atlas")).toBe("\u200B\u200B\u200B\u200BAtlas - Plan Executor")
+  it("returns clean display names for the core agent list", () => {
+    expect(getAgentListDisplayName("sisyphus")).toBe("Sisyphus - Ultraworker")
+    expect(getAgentListDisplayName("hephaestus")).toBe("Hephaestus - Deep Agent")
+    expect(getAgentListDisplayName("prometheus")).toBe("Prometheus - Plan Builder")
+    expect(getAgentListDisplayName("atlas")).toBe("Atlas - Plan Executor")
   })
 
   it("keeps non-core agents unprefixed for list display", () => {
     expect(getAgentListDisplayName("oracle")).toBe("oracle")
+  })
+
+  it("keeps runtime names identical to clean display names", () => {
+    expect(getAgentRuntimeName("sisyphus")).toBe("Sisyphus - Ultraworker")
+    expect(getAgentRuntimeName("hephaestus")).toBe("Hephaestus - Deep Agent")
   })
 })
 

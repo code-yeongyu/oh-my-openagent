@@ -1,4 +1,5 @@
 import pc from "picocolors"
+import { stripInvisibleAgentCharacters } from "../../shared/agent-display-names"
 
 export function renderAgentHeader(
   agent: string | null,
@@ -8,8 +9,9 @@ export function renderAgentHeader(
 ): void {
   if (!agent && !model) return
 
+  const cleanAgent = agent ? stripInvisibleAgentCharacters(agent) : null
   const agentLabel = agent
-    ? pc.bold(colorizeWithProfileColor(agent, agentColorsByName[agent]))
+    ? pc.bold(colorizeWithProfileColor(cleanAgent ?? agent, agentColorsByName[agent] ?? (cleanAgent ? agentColorsByName[cleanAgent] : undefined)))
     : ""
   const modelBase = model ?? ""
   const variantSuffix = variant ? ` (${variant})` : ""

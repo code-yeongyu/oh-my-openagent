@@ -82,7 +82,7 @@ describe("remapAgentKeysToDisplayNames", () => {
     expect(result["sisyphus"]).toBeUndefined()
   })
 
-  it("returns runtime core agent list names in canonical order", () => {
+  it("returns clean core agent display keys in canonical order", () => {
     // given
     const result = remapAgentKeysToDisplayNames({
       atlas: {},
@@ -116,7 +116,7 @@ describe("remapAgentKeysToDisplayNames", () => {
     // when remapping
     const result = remapAgentKeysToDisplayNames(agents)
 
-    // then keys and names both use the same runtime-facing list names
+    // then keys stay human-readable while runtime names keep list ordering
     expect(Object.keys(result).slice(0, 4)).toEqual([
       getAgentListDisplayName("sisyphus"),
       getAgentListDisplayName("hephaestus"),

@@ -108,7 +108,7 @@ describe("applyCommandConfig", () => {
     expect(commandConfig["agents-global-skill"]?.description).toContain("Agents global skill");
   });
 
-  test("normalizes Atlas command agents to the runtime list name used by opencode command routing", async () => {
+  test("normalizes Atlas command agents to the clean display name used by opencode command routing", async () => {
     // given
     loadBuiltinCommandsSpy.mockReturnValue({
       "start-work": {
@@ -133,7 +133,7 @@ describe("applyCommandConfig", () => {
     expect(commandConfig["start-work"]?.agent).toBe(getAgentListDisplayName("atlas"));
   });
 
-  test("normalizes legacy display-name command agents to the runtime list name", async () => {
+  test("normalizes legacy display-name command agents to the clean display name", async () => {
     // given
     loadBuiltinCommandsSpy.mockReturnValue({
       "start-work": {

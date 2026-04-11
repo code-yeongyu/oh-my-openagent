@@ -26,14 +26,7 @@ export const AGENT_DISPLAY_NAMES: Record<string, string> = {
   "council-member": "council-member",
 }
 
-const AGENT_LIST_SORT_PREFIXES: Record<string, string> = {
-  sisyphus: "\u200B",
-  hephaestus: "\u200B\u200B",
-  prometheus: "\u200B\u200B\u200B",
-  atlas: "\u200B\u200B\u200B\u200B",
-}
-
-const INVISIBLE_AGENT_CHARACTERS_REGEX = /[\u200B\u200C\u200D\uFEFF]/g
+const INVISIBLE_AGENT_CHARACTERS_REGEX = /\u200B|\u200C|\u200D|\uFEFF/g
 
 export function stripInvisibleAgentCharacters(agentName: string): string {
   return agentName.replace(INVISIBLE_AGENT_CHARACTERS_REGEX, "")
@@ -44,10 +37,7 @@ export function stripAgentListSortPrefix(agentName: string): string {
 }
 
 export function getAgentRuntimeName(configKey: string): string {
-  const displayName = getAgentDisplayName(configKey)
-  const prefix = AGENT_LIST_SORT_PREFIXES[configKey.toLowerCase()]
-
-  return prefix ? `${prefix}${displayName}` : displayName
+  return getAgentDisplayName(configKey)
 }
 
 /**
@@ -56,25 +46,25 @@ export function getAgentRuntimeName(configKey: string): string {
  * Returns original key if not found.
  */
 export function getAgentDisplayName(configKey: string): string {
-  // Try exact match first
   const exactMatch = AGENT_DISPLAY_NAMES[configKey]
   if (exactMatch !== undefined) return exactMatch
-  
-  // Fall back to case-insensitive search
+
   const lowerKey = configKey.toLowerCase()
   for (const [k, v] of Object.entries(AGENT_DISPLAY_NAMES)) {
     if (k.toLowerCase() === lowerKey) return v
   }
-  
-  // Unknown agent: return original key
+
   return configKey
 }
 
 /**
- * Runtime-facing agent name used for OpenCode list ordering.
+ * List-facing agent display name.
+ *
+ * This must stay human-readable. Runtime sort prefixes belong only in the
+ * agent `name` field via getAgentRuntimeName().
  */
 export function getAgentListDisplayName(configKey: string): string {
-  return getAgentRuntimeName(configKey)
+  return getAgentDisplayName(configKey)
 }
 
 const REVERSE_DISPLAY_NAMES: Record<string, string> = Object.fromEntries(
