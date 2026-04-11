@@ -9,7 +9,7 @@ import type { OhMyOpenCodeConfig } from "../config"
 import * as agentLoader from "../features/claude-code-agent-loader"
 import * as skillLoader from "../features/opencode-skill-loader"
 import type { LoadedSkill } from "../features/opencode-skill-loader"
-import { getAgentDisplayName } from "../shared/agent-display-names"
+import { getAgentDisplayName, getAgentRuntimeName } from "../shared/agent-display-names"
 import { applyAgentConfig } from "./agent-config-handler"
 import type { PluginComponents } from "./plugin-components-loader"
 
@@ -203,7 +203,7 @@ describe("applyAgentConfig builtin override protection", () => {
     // then
     expect(result[BUILTIN_SISYPHUS_DISPLAY_NAME]).toEqual({
       ...builtinSisyphusConfig,
-      name: getAgentDisplayName("sisyphus"),
+      name: getAgentRuntimeName("sisyphus"),
     })
   })
 
@@ -228,7 +228,7 @@ describe("applyAgentConfig builtin override protection", () => {
     // then
     expect(result[BUILTIN_SISYPHUS_DISPLAY_NAME]).toEqual({
       ...builtinSisyphusConfig,
-      name: getAgentDisplayName("sisyphus"),
+      name: getAgentRuntimeName("sisyphus"),
     })
     expect(result.SiSyPhUs).toBeUndefined()
   })
@@ -255,7 +255,7 @@ describe("applyAgentConfig builtin override protection", () => {
     // then
     expect(result[BUILTIN_SISYPHUS_DISPLAY_NAME]).toEqual({
       ...builtinSisyphusConfig,
-      name: getAgentDisplayName("sisyphus"),
+      name: getAgentRuntimeName("sisyphus"),
     })
   })
 

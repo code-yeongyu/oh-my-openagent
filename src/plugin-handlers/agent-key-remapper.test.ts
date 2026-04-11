@@ -1,6 +1,6 @@
 import { describe, it, expect } from "bun:test"
 import { remapAgentKeysToDisplayNames } from "./agent-key-remapper"
-import { getAgentDisplayName } from "../shared/agent-display-names"
+import { getAgentDisplayName, getAgentRuntimeName } from "../shared/agent-display-names"
 
 describe("remapAgentKeysToDisplayNames", () => {
   it("remaps known agent keys to display names", () => {
@@ -106,7 +106,7 @@ describe("remapAgentKeysToDisplayNames", () => {
     }
   })
 
-  it("preserves clean keys and rewrites core agent name fields to canonical display names", () => {
+  it("preserves clean keys but rewrites core agent name fields to runtime names for sort ordering", () => {
     // given agents with raw config-key names
     const agents = {
       sisyphus: { name: "sisyphus", prompt: "test", mode: "primary" },
@@ -119,7 +119,7 @@ describe("remapAgentKeysToDisplayNames", () => {
     // when remapping
     const result = remapAgentKeysToDisplayNames(agents)
 
-    // then keys stay HTTP-header-safe, and nested names match the lookup-safe display names
+    // then keys stay HTTP-header-safe, name fields carry ZWSP for OpenCode localeCompare sort
     expect(Object.keys(result).slice(0, 4)).toEqual([
       getAgentDisplayName("sisyphus"),
       getAgentDisplayName("hephaestus"),
@@ -127,29 +127,29 @@ describe("remapAgentKeysToDisplayNames", () => {
       getAgentDisplayName("atlas"),
     ])
     expect(result[getAgentDisplayName("sisyphus")]).toEqual({
-      name: getAgentDisplayName("sisyphus"),
+      name: getAgentRuntimeName("sisyphus"),
       prompt: "test",
       mode: "primary",
     })
     expect(result[getAgentDisplayName("hephaestus")]).toEqual({
-      name: getAgentDisplayName("hephaestus"),
+      name: getAgentRuntimeName("hephaestus"),
       prompt: "test",
       mode: "primary",
     })
     expect(result[getAgentDisplayName("prometheus")]).toEqual({
-      name: getAgentDisplayName("prometheus"),
+      name: getAgentRuntimeName("prometheus"),
       prompt: "test",
       mode: "all",
     })
     expect(result[getAgentDisplayName("atlas")]).toEqual({
-      name: getAgentDisplayName("atlas"),
+      name: getAgentRuntimeName("atlas"),
       prompt: "test",
       mode: "primary",
     })
     expect(result.oracle).toEqual({ name: "oracle", prompt: "test", mode: "subagent" })
   })
 
-  it("backfills canonical display names for core agents when builtin configs omit name", () => {
+  it("backfills runtime names for core agents when builtin configs omit name", () => {
     // given builtin-style configs without name fields
     const agents = {
       sisyphus: { prompt: "test", mode: "primary" },
@@ -161,24 +161,24 @@ describe("remapAgentKeysToDisplayNames", () => {
     // when remapping
     const result = remapAgentKeysToDisplayNames(agents)
 
-    // then OpenCode receives lookup-safe display names and uses order for sorting
+    // then OpenCode's name sort can still preserve canonical order
     expect(result[getAgentDisplayName("sisyphus")]).toEqual({
-      name: getAgentDisplayName("sisyphus"),
+      name: getAgentRuntimeName("sisyphus"),
       prompt: "test",
       mode: "primary",
     })
     expect(result[getAgentDisplayName("hephaestus")]).toEqual({
-      name: getAgentDisplayName("hephaestus"),
+      name: getAgentRuntimeName("hephaestus"),
       prompt: "test",
       mode: "primary",
     })
     expect(result[getAgentDisplayName("prometheus")]).toEqual({
-      name: getAgentDisplayName("prometheus"),
+      name: getAgentRuntimeName("prometheus"),
       prompt: "test",
       mode: "all",
     })
     expect(result[getAgentDisplayName("atlas")]).toEqual({
-      name: getAgentDisplayName("atlas"),
+      name: getAgentRuntimeName("atlas"),
       prompt: "test",
       mode: "primary",
     })

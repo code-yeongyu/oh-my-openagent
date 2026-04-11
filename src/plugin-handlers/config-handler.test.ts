@@ -355,19 +355,19 @@ describe("Plan agent demote behavior", () => {
     expect(emittedCoreEntries).toEqual([
       [
         getAgentDisplayName("sisyphus"),
-        expect.objectContaining({ name: getAgentDisplayName("sisyphus") }),
+        expect.objectContaining({ name: getAgentRuntimeName("sisyphus") }),
       ],
       [
         getAgentDisplayName("hephaestus"),
-        expect.objectContaining({ name: getAgentDisplayName("hephaestus") }),
+        expect.objectContaining({ name: getAgentRuntimeName("hephaestus") }),
       ],
       [
         getAgentDisplayName("prometheus"),
-        expect.objectContaining({ name: getAgentDisplayName("prometheus") }),
+        expect.objectContaining({ name: getAgentRuntimeName("prometheus") }),
       ],
       [
         getAgentDisplayName("atlas"),
-        expect.objectContaining({ name: getAgentDisplayName("atlas") }),
+        expect.objectContaining({ name: getAgentRuntimeName("atlas") }),
       ],
     ])
   })
@@ -536,7 +536,7 @@ describe("default_agent behavior with Sisyphus orchestration", () => {
     await handler(config)
 
     // then
-    expect(config.default_agent).toBe(getAgentDisplayName("hephaestus"))
+    expect(config.default_agent).toBe(getAgentRuntimeName("hephaestus"))
   })
 
   test("canonicalizes configured default_agent when key uses mixed case", async () => {
@@ -560,7 +560,7 @@ describe("default_agent behavior with Sisyphus orchestration", () => {
     await handler(config)
 
     // then
-    expect(config.default_agent).toBe(getAgentDisplayName("hephaestus"))
+    expect(config.default_agent).toBe(getAgentRuntimeName("hephaestus"))
   })
 
   test("canonicalizes configured default_agent key to display name", async () => {
@@ -584,7 +584,7 @@ describe("default_agent behavior with Sisyphus orchestration", () => {
     await handler(config)
 
     // #then
-    expect(config.default_agent).toBe(getAgentDisplayName("hephaestus"))
+    expect(config.default_agent).toBe(getAgentRuntimeName("hephaestus"))
   })
 
   test("preserves existing display-name default_agent", async () => {
@@ -632,7 +632,7 @@ describe("default_agent behavior with Sisyphus orchestration", () => {
     await handler(config)
 
     // #then
-    expect(config.default_agent).toBe(getAgentDisplayName("sisyphus"))
+    expect(config.default_agent).toBe(getAgentRuntimeName("sisyphus"))
   })
 
   test("uses canonical default_agent display name so OpenCode lookups match emitted agent keys", async () => {
@@ -656,7 +656,7 @@ describe("default_agent behavior with Sisyphus orchestration", () => {
     await handler(config)
 
     // then
-    expect(config.default_agent).toBe(getAgentDisplayName("hephaestus"))
+    expect(config.default_agent).toBe(getAgentRuntimeName("hephaestus"))
   })
 
   test("sets default_agent to sisyphus when configured default_agent is empty after trim", async () => {
@@ -680,7 +680,7 @@ describe("default_agent behavior with Sisyphus orchestration", () => {
     await handler(config)
 
     // then
-    expect(config.default_agent).toBe(getAgentDisplayName("sisyphus"))
+    expect(config.default_agent).toBe(getAgentRuntimeName("sisyphus"))
   })
 
   test("preserves custom default_agent names while trimming whitespace", async () => {
