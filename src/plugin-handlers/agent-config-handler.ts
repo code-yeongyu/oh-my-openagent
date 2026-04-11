@@ -2,7 +2,7 @@ import { createBuiltinAgents } from "../agents";
 import { createSisyphusJuniorAgentWithOverrides } from "../agents/sisyphus-junior";
 import type { OhMyOpenCodeConfig } from "../config";
 import { isTaskSystemEnabled, log, migrateAgentConfig } from "../shared";
-import { getAgentDisplayName, getAgentRuntimeName } from "../shared/agent-display-names";
+import { getAgentRuntimeName } from "../shared/agent-display-names";
 import { AGENT_NAME_MAP } from "../shared/migration";
 import { registerAgentName } from "../features/claude-code-session-state";
 import {
