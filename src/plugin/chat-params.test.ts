@@ -175,7 +175,7 @@ describe("createChatParamsHandler", () => {
     })
   })
 
-  test("drops gpt-5.4 temperature and clamps maxOutputTokens from bundled model capabilities", async () => {
+  test("preserves gpt-5.4 temperature and clamps maxOutputTokens from bundled model capabilities", async () => {
     //#given
     setSessionPromptParams("ses_chat_params_temperature", {
       temperature: 0.7,
@@ -206,6 +206,7 @@ describe("createChatParamsHandler", () => {
 
     //#then
     expect(output).toEqual({
+      temperature: 0.7,
       topP: 1,
       topK: 1,
       maxOutputTokens: 128_000,
