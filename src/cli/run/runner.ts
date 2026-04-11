@@ -53,17 +53,25 @@ export async function run(options: RunOptions): Promise<number> {
 
   const posthog = createCliPostHog()
   const distinctId = getPostHogDistinctId()
-  posthog.trackActive(distinctId, "run_started")
-  posthog.capture({
-    distinctId,
-    event: "run_started",
-    properties: {
-      command: "run",
-      agent: resolvedAgent,
-      has_model: !!options.model,
-      has_session_id: !!options.sessionId,
-    },
-  })
+  try {
+    posthog.trackActive(distinctId, "run_started")
+  } catch {
+    // telemetry failure is non-fatal, silently ignore
+  }
+  try {
+    posthog.capture({
+      distinctId,
+      event: "run_started",
+      properties: {
+        command: "run",
+        agent: resolvedAgent,
+        has_model: !!options.model,
+        has_session_id: !!options.sessionId,
+      },
+    })
+  } catch {
+    // telemetry failure is non-fatal, silently ignore
+  }
 
   try {
     const resolvedModel = resolveRunModel(options.model)
@@ -157,27 +165,35 @@ export async function run(options: RunOptions): Promise<number> {
       }
 
       if (exitCode === 0) {
-        posthog.capture({
-          distinctId,
-          event: "run_completed",
-          properties: {
-            command: "run",
-            agent: resolvedAgent,
-            duration_ms: durationMs,
-            message_count: eventState.messageCount,
-          },
-        })
+        try {
+          posthog.capture({
+            distinctId,
+            event: "run_completed",
+            properties: {
+              command: "run",
+              agent: resolvedAgent,
+              duration_ms: durationMs,
+              message_count: eventState.messageCount,
+            },
+          })
+        } catch {
+          // telemetry failure is non-fatal, silently ignore
+        }
       } else if (exitCode === 1) {
-        posthog.capture({
-          distinctId,
-          event: "run_failed",
-          properties: {
-            command: "run",
-            agent: resolvedAgent,
-            exit_code: exitCode,
-            duration_ms: durationMs,
-          },
-        })
+        try {
+          posthog.capture({
+            distinctId,
+            event: "run_failed",
+            properties: {
+              command: "run",
+              agent: resolvedAgent,
+              exit_code: exitCode,
+              duration_ms: durationMs,
+            },
+          })
+        } catch {
+          // telemetry failure is non-fatal, silently ignore
+        }
       }
 
       return exitCode
@@ -194,21 +210,33 @@ export async function run(options: RunOptions): Promise<number> {
     if (err instanceof Error && err.name === "AbortError") {
       return 130
     }
-    posthog.captureException(err, distinctId)
-    posthog.capture({
-      distinctId,
-      event: "run_failed",
-      properties: {
-        command: "run",
-        agent: resolvedAgent,
-        error: serializeError(err),
-        duration_ms: Date.now() - startTime,
-      },
-    })
+    try {
+      posthog.captureException(err, distinctId)
+    } catch {
+      // telemetry failure is non-fatal, silently ignore
+    }
+    try {
+      posthog.capture({
+        distinctId,
+        event: "run_failed",
+        properties: {
+          command: "run",
+          agent: resolvedAgent,
+          error: serializeError(err),
+          duration_ms: Date.now() - startTime,
+        },
+      })
+    } catch {
+      // telemetry failure is non-fatal, silently ignore
+    }
     console.error(pc.red(`Error: ${serializeError(err)}`))
     return 1
   } finally {
-    await posthog.shutdown()
+    try {
+      await posthog.shutdown()
+    } catch {
+      // telemetry failure is non-fatal, silently ignore
+    }
     timestampOutput?.restore()
   }
 }

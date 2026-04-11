@@ -19,6 +19,7 @@ describe("runCliInstaller", () => {
   afterEach(() => {
     console.log = originalConsoleLog
     console.error = originalConsoleError
+    mock.restore()
   })
 
   it("blocks installation when OpenCode is below the minimum version", async () => {
