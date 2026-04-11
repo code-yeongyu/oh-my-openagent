@@ -73,7 +73,11 @@ describe("resolveModelPipeline", () => {
     readConnectedProvidersSpy.mockRestore()
 
     // then
-		expect(result).toBeUndefined()
+		expect(result).toEqual({
+		  model: "openai/gpt-5.4",
+		  provenance: "provider-fallback",
+		  attempted: ["openai/gpt-5"],
+		})
   })
 
   test("fuzzy-resolves object fallback_models entries to available concrete models", () => {
@@ -119,6 +123,11 @@ describe("resolveModelPipeline", () => {
     readConnectedProvidersSpy.mockRestore()
 
     // then
-		expect(result).toBeUndefined()
+		expect(result).toEqual({
+		  model: "openai/gpt-5.4",
+		  provenance: "provider-fallback",
+		  variant: "high",
+		  attempted: ["openai/gpt-5.4"],
+		})
   })
 })

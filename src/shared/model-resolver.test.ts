@@ -530,9 +530,9 @@ describe("resolveModelWithFallback", () => {
       // when
       const result = resolveModelWithFallback(input)
 
-		  // then - current rebased behavior falls back to the system default in this cold-cache path
-		  expect(result!.model).toBe("google/gemini-3.1-pro")
-		  expect(result!.source).toBe("system-default")
+		  // then - should use connected provider (openai) from fallback chain
+		  expect(result!.model).toBe(`openai/${transformModelForProvider("openai", "claude-opus-4-6")}`)
+		  expect(result!.source).toBe("provider-fallback")
       cacheSpy.mockRestore()
     })
 
@@ -550,9 +550,11 @@ describe("resolveModelWithFallback", () => {
       // when
       const result = resolveModelWithFallback(input)
 
-		  // then - current rebased behavior falls back to the configured system default in this cold-cache path
-		  expect(result!.model).toBe("anthropic/claude-sonnet-4-6")
-		  expect(result!.source).toBe("system-default")
+		  // then - should use github-copilot (second provider) since google not connected
+		  expect(result!.model).toBe(
+		    `github-copilot/${transformModelForProvider("github-copilot", "gemini-3.1-pro")}`,
+		  )
+		  expect(result!.source).toBe("provider-fallback")
       cacheSpy.mockRestore()
     })
 
@@ -859,9 +861,9 @@ describe("resolveModelWithFallback", () => {
       // when
       const result = resolveModelWithFallback(input)
 
-		  // then - current rebased behavior falls back to the configured system default in this path
-		  expect(result!.model).toBe("anthropic/claude-sonnet-4-5")
-		  expect(result!.source).toBe("system-default")
+		  // then - should use the provider-aware canonical model for google
+		  expect(result!.model).toBe(`google/${transformModelForProvider("google", "gemini-3.1-pro")}`)
+		  expect(result!.source).toBe("provider-fallback")
       cacheSpy.mockRestore()
     })
 

@@ -7,14 +7,17 @@ import { hasConnectedProvidersCache, hasProviderModelsCache, readConnectedProvid
 import { log } from "../../shared/logger"
 import { resolveExplicitModel } from "../../shared/explicit-model-resolution"
 import { resolveConfiguredFallbackEntry } from "../../shared/explicit-fallback-model-resolution"
+import { parseModelString } from "./model-string-parser"
 
 function parseUserFallbackModel(modelString: string): { baseModel: string; variant?: string } | undefined {
-  const emptySet = new Set<string>()
-  const resolved = resolveConfiguredFallbackEntry(modelString, { availableModels: emptySet })
-  if (!resolved) {
-    return undefined
-  }
-  return { baseModel: resolved.model, variant: resolved.variant }
+	const parsed = parseModelString(modelString)
+	if (!parsed) {
+		return undefined
+	}
+	return {
+		baseModel: `${parsed.providerID}/${parsed.modelID}`,
+		variant: parsed.variant,
+	}
 }
 
 function isExplicitHighModel(model: string): boolean {
