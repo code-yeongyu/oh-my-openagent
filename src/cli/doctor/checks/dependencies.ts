@@ -4,6 +4,7 @@ import { dirname, join } from "node:path"
 
 import type { DependencyInfo } from "../types"
 import { spawnWithTimeout } from "../spawn-with-timeout"
+import { getCachedBinaryPath } from "../../../hooks/comment-checker/downloader"
 
 async function checkBinaryExists(binary: string): Promise<{ exists: boolean; path: string | null }> {
   try {
@@ -113,6 +114,19 @@ function findCommentCheckerPackageBinary(): string | null {
 }
 
 export async function checkCommentChecker(): Promise<DependencyInfo> {
+  // Check cached binary first (matches runtime resolution order)
+  const cachedPath = getCachedBinaryPath()
+  if (cachedPath) {
+    const version = await getBinaryVersion(cachedPath)
+    return {
+      name: "Comment Checker",
+      required: false,
+      installed: true,
+      version,
+      path: cachedPath,
+    }
+  }
+
   const binaryCheck = await checkBinaryExists("comment-checker")
   const resolvedPath = binaryCheck.exists ? binaryCheck.path : findCommentCheckerPackageBinary()
 
