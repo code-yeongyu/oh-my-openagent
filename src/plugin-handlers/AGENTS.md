@@ -1,6 +1,36 @@
 # src/plugin-handlers/ — 6-Phase Config Loading Pipeline
 
-**Generated:** 2026-04-05
+**Generated:** 2026-04-11
+
+## CRITICAL: AGENT ORDERING
+
+The canonical agent order is **sisyphus → hephaestus → prometheus → atlas**.
+
+This order is enforced by `CANONICAL_CORE_AGENT_ORDER` in `agent-priority-order.ts` and MUST NOT be changed.
+
+### Why This Matters
+
+Agent ordering has caused 15+ commits, 8+ PRs, and multiple reverts due to:
+1. ZWSP (zero-width space) prefix attempts that leaked into HTTP headers
+2. Object.entries() iteration order depending on merge sequence
+3. Multiple code paths assembling agents differently
+
+### The Permanent Fix
+
+1. `CANONICAL_CORE_AGENT_ORDER` is the ONLY source of truth
+2. Core agents are always first in canonical order
+3. Non-core agents are sorted alphabetically for determinism
+4. 100-permutation regression tests ensure order stability
+
+### Forbidden Patterns
+
+DO NOT introduce:
+- ZWSP or Unicode sort prefixes
+- Runtime sort shims or comparators
+- Alternative ordering constants
+- Object.entries() order dependencies
+
+PRs attempting these patterns will be rejected.
 
 ## OVERVIEW
 
