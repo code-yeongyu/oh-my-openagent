@@ -1,257 +1,52 @@
 import { dirname } from "node:path"
 import { tool, type ToolDefinition } from "@opencode-ai/plugin"
-import { TOOL_DESCRIPTION_NO_SKILLS, TOOL_DESCRIPTION_PREFIX } from "./constants"
-import type { SkillArgs, SkillInfo, SkillLoadOptions } from "./types"
+import type { ToolContext } from "@opencode-ai/plugin/tool"
+import { TOOL_DESCRIPTION_PREFIX } from "./constants"
+import type { SkillArgs, SkillLoadOptions } from "./types"
 import type { LoadedSkill } from "../../features/opencode-skill-loader"
-import { getAllSkills, extractSkillTemplate, clearSkillCache } from "../../features/opencode-skill-loader/skill-content"
+import { getAllSkills, clearSkillCache } from "../../features/opencode-skill-loader/skill-content"
 import { injectGitMasterConfig } from "../../features/opencode-skill-loader/skill-content"
-import type { SkillMcpManager, SkillMcpClientInfo, SkillMcpServerContext } from "../../features/skill-mcp-manager"
-import type { Tool, Resource, Prompt } from "@modelcontextprotocol/sdk/types.js"
-import { sanitizeJsonSchema } from "../../plugin/normalize-tool-arg-schemas"
 import { discoverCommandsSync } from "../slashcommand/command-discovery"
 import type { CommandInfo } from "../slashcommand/types"
 import { formatLoadedCommand } from "../slashcommand/command-output-formatter"
-
-type NativeSkillEntry = {
-  name: string
-  description: string
-  location: string
-  content: string
-}
-// Priority: project > user > opencode/opencode-project > builtin/config
-const scopePriority: Record<string, number> = {
-  project: 4,
-  user: 3,
-  opencode: 2,
-  "opencode-project": 2,
-  plugin: 1,
-  config: 1,
-  builtin: 1,
-}
-
-function loadedSkillToInfo(skill: LoadedSkill): SkillInfo {
-  return {
-    name: skill.name,
-    description: skill.definition.description || "",
-    location: skill.path,
-    scope: skill.scope,
-    license: skill.license,
-    compatibility: skill.compatibility,
-    metadata: skill.metadata,
-    allowedTools: skill.allowedTools,
-  }
-}
-
-function nativeSkillToLoadedSkill(native: NativeSkillEntry): LoadedSkill {
-  return {
-    name: native.name,
-    path: native.location,
-    definition: {
-      name: native.name,
-      description: native.description,
-      template: native.content,
-    },
-    scope: "config",
-  }
-}
-
-function mergeNativeSkills(skills: LoadedSkill[], nativeSkills: NativeSkillEntry[]): void {
-  const knownNames = new Set(skills.map(skill => skill.name))
-  for (const native of nativeSkills) {
-    if (knownNames.has(native.name)) continue
-    skills.push(nativeSkillToLoadedSkill(native))
-    knownNames.add(native.name)
-  }
-}
-
-function mergeNativeSkillInfos(skillInfos: SkillInfo[], nativeSkills: NativeSkillEntry[]): void {
-  const knownNames = new Set(skillInfos.map(skill => skill.name))
-  for (const native of nativeSkills) {
-    if (knownNames.has(native.name)) continue
-    skillInfos.push({
-      name: native.name,
-      description: native.description,
-      location: native.location,
-      scope: "config",
-    })
-    knownNames.add(native.name)
-  }
-}
-
-function isPromiseLike<T>(value: T | Promise<T>): value is Promise<T> {
-  return typeof value === "object" && value !== null && "then" in value
-}
-
-function formatCombinedDescription(skills: SkillInfo[], commands: CommandInfo[]): string {
-  const lines: string[] = []
-
-  if (skills.length === 0 && commands.length === 0) {
-    return TOOL_DESCRIPTION_NO_SKILLS
-  }
-
-  // Uses module-level scopePriority for consistent priority ordering
-
-  const allItems: string[] = []
-
-  // Skills rendered as command items (skills are also slash-invocable)
-  if (skills.length > 0) {
-    const sortedSkills = [...skills].sort((a, b) => {
-      const priorityA = scopePriority[a.scope] || 0
-      const priorityB = scopePriority[b.scope] || 0
-      return priorityB - priorityA
-    })
-    sortedSkills.forEach(skill => {
-      const parts = [
-        "  <command>",
-        `    <name>/${skill.name}</name>`,
-        `    <description>${skill.description}</description>`,
-        `    <scope>${skill.scope}</scope>`,
-      ]
-      if (skill.compatibility) {
-        parts.push(`    <compatibility>${skill.compatibility}</compatibility>`)
-      }
-      parts.push("  </command>")
-      allItems.push(parts.join("\n"))
-    })
-  }
-
-  // Sort and add commands second (commands after skills)
-  if (commands.length > 0) {
-    const sortedCommands = [...commands].sort((a, b) => {
-      const priorityA = scopePriority[a.scope] || 0
-      const priorityB = scopePriority[b.scope] || 0
-      return priorityB - priorityA // Higher priority first
-    })
-    sortedCommands.forEach(cmd => {
-      const hint = cmd.metadata.argumentHint ? ` ${cmd.metadata.argumentHint}` : ""
-      const parts = [
-        "  <command>",
-        `    <name>/${cmd.name}</name>`,
-        `    <description>${cmd.metadata.description || "(no description)"}</description>`,
-        `    <scope>${cmd.scope}</scope>`,
-      ]
-      if (hint) {
-        parts.push(`    <argument>${hint.trim()}</argument>`)
-      }
-      parts.push("  </command>")
-      allItems.push(parts.join("\n"))
-    })
-  }
-
-  if (allItems.length > 0) {
-    lines.push(`\n<available_items>\nPriority: project > user > opencode > builtin/plugin | Skills listed before commands\nInvoke via: skill(name="item-name") — omit leading slash for commands.\n${allItems.join("\n")}\n</available_items>`)
-  }
-
-  return TOOL_DESCRIPTION_PREFIX + lines.join("")
-}
-
-async function extractSkillBody(skill: LoadedSkill): Promise<string> {
-  if (skill.lazyContent) {
-    const fullTemplate = await skill.lazyContent.load()
-    const templateMatch = fullTemplate.match(/<skill-instruction>([\s\S]*?)<\/skill-instruction>/)
-    return templateMatch ? templateMatch[1].trim() : fullTemplate
-  }
-
-  if (skill.scope === "config" && skill.definition.template) {
-    const templateMatch = skill.definition.template.match(/<skill-instruction>([\s\S]*?)<\/skill-instruction>/)
-    return templateMatch ? templateMatch[1].trim() : skill.definition.template
-  }
-
-  if (skill.path) {
-    return extractSkillTemplate(skill)
-  }
-
-  const templateMatch = skill.definition.template?.match(/<skill-instruction>([\s\S]*?)<\/skill-instruction>/)
-  return templateMatch ? templateMatch[1].trim() : skill.definition.template || ""
-}
-
-async function formatMcpCapabilities(
-  skill: LoadedSkill,
-  manager: SkillMcpManager,
-  sessionID: string
-): Promise<string | null> {
-  if (!skill.mcpConfig || Object.keys(skill.mcpConfig).length === 0) {
-    return null
-  }
-
-  const sections: string[] = ["", "## Available MCP Servers", ""]
-
-  for (const [serverName, config] of Object.entries(skill.mcpConfig)) {
-    const info: SkillMcpClientInfo = {
-      serverName,
-      skillName: skill.name,
-      sessionID,
-    }
-    const context: SkillMcpServerContext = {
-      config,
-      skillName: skill.name,
-    }
-
-    sections.push(`### ${serverName}`)
-    sections.push("")
-
-    try {
-      const [tools, resources, prompts] = await Promise.all([
-        manager.listTools(info, context).catch(() => []),
-        manager.listResources(info, context).catch(() => []),
-        manager.listPrompts(info, context).catch(() => []),
-      ])
-
-      if (tools.length > 0) {
-        sections.push("**Tools:**")
-        sections.push("")
-        for (const t of tools as Tool[]) {
-          sections.push(`#### \`${t.name}\``)
-          if (t.description) {
-            sections.push(t.description)
-          }
-          sections.push("")
-          sections.push("**inputSchema:**")
-          sections.push("```json")
-          sections.push(JSON.stringify(sanitizeJsonSchema(t.inputSchema), null, 2))
-          sections.push("```")
-          sections.push("")
-        }
-      }
-      if (resources.length > 0) {
-        sections.push(`**Resources**: ${resources.map((r: Resource) => r.uri).join(", ")}`)
-      }
-      if (prompts.length > 0) {
-        sections.push(`**Prompts**: ${prompts.map((p: Prompt) => p.name).join(", ")}`)
-      }
-
-      if (tools.length === 0 && resources.length === 0 && prompts.length === 0) {
-        sections.push("*No capabilities discovered*")
-      }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error)
-      sections.push(`*Failed to connect: ${errorMessage.split("\n")[0]}*`)
-    }
-
-    sections.push("")
-    sections.push(`Use \`skill_mcp\` tool with \`mcp_name="${serverName}"\` to invoke.`)
-    sections.push("")
-  }
-
-  return sections.join("\n")
-}
+import { formatCombinedDescription } from "./description-formatter"
+import { formatMcpCapabilities } from "./mcp-capability-formatter"
+import {
+  findPartialMatches,
+  matchCommandByName,
+  matchSkillByName,
+} from "./skill-matcher"
+import { extractSkillBody } from "./skill-body"
+import {
+  isPromiseLike,
+  loadedSkillToInfo,
+  mergeNativeSkillInfos,
+  mergeNativeSkills,
+} from "./native-skills"
 
 export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition {
   let cachedDescription: string | null = null
 
   const getSkills = async (): Promise<LoadedSkill[]> => {
     clearSkillCache()
-    const discovered = await getAllSkills({disabledSkills: options?.disabledSkills, browserProvider: options?.browserProvider})
+    const discovered = await getAllSkills({
+      disabledSkills: options?.disabledSkills,
+      browserProvider: options?.browserProvider,
+    })
     const allSkills = !options.skills
       ? discovered
-      : [...discovered, ...options.skills.filter(s => !new Set(discovered.map(d => d.name)).has(s.name))]
+      : [
+          ...discovered,
+          ...options.skills.filter(
+            (skill) => !new Set(discovered.map((discoveredSkill) => discoveredSkill.name)).has(skill.name)
+          ),
+        ]
 
     if (options.nativeSkills) {
       try {
         const nativeAll = await options.nativeSkills.all()
         mergeNativeSkills(allSkills, nativeAll)
       } catch {
-        // Native skill discovery may not be available
       }
     }
 
@@ -265,8 +60,8 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
     })
   }
 
-  const buildDescription = async (): Promise<string> => {
-    if (cachedDescription) return cachedDescription
+  const buildDescription = async (force = false): Promise<string> => {
+    if (!force && cachedDescription) return cachedDescription
     const skills = await getSkills()
     const commands = getCommands()
     const skillInfos = skills.map(loadedSkillToInfo)
@@ -288,13 +83,12 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
           mergeNativeSkillInfos(skillInfos, nativeAll)
         }
       } catch {
-        // Native skill discovery may not be available
       }
     }
 
     cachedDescription = formatCombinedDescription(skillInfos, commandsForDescription)
     if (needsAsyncRefresh) {
-      void buildDescription()
+      void buildDescription(true)
     }
   } else if (options.commands !== undefined) {
     cachedDescription = formatCombinedDescription([], options.commands)
@@ -310,23 +104,30 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
       return cachedDescription ?? TOOL_DESCRIPTION_PREFIX
     },
     args: {
-      name: tool.schema.string().describe("The skill or command name (e.g., 'code-review' or 'publish'). Use without leading slash for commands."),
+      name: tool.schema.string().describe("The skill or command name (e.g., 'review-work' or 'publish'). Use without leading slash for commands."),
       user_message: tool.schema
         .string()
         .optional()
         .describe("Optional arguments or context for command invocation. Example: name='publish', user_message='patch'"),
     },
-    async execute(args: SkillArgs, ctx?: { agent?: string }) {
+    async execute(args: SkillArgs, ctx?: ToolContext) {
       const skills = await getSkills()
       const commands = getCommands()
       cachedDescription = formatCombinedDescription(skills.map(loadedSkillToInfo), commands)
 
       const requestedName = args.name.replace(/^\//, "")
-
-      // Check skills first (exact match, case-insensitive)
-      const matchedSkill = skills.find(s => s.name.toLowerCase() === requestedName.toLowerCase())
+      const matchedSkill = matchSkillByName(skills, requestedName)
 
       if (matchedSkill) {
+        await ctx?.ask({
+          permission: "skill",
+          patterns: [matchedSkill.name],
+          always: [matchedSkill.name],
+          metadata: {
+            skill: matchedSkill.name,
+          },
+        })
+
         if (matchedSkill.definition.agent && (!ctx?.agent || matchedSkill.definition.agent !== ctx.agent)) {
           throw new Error(`Skill "${matchedSkill.name}" is restricted to agent "${matchedSkill.definition.agent}"`)
         }
@@ -347,11 +148,17 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
           body,
         ]
 
-        if (options.mcpManager && options.getSessionID && matchedSkill.mcpConfig) {
+        if (options.mcpManager && matchedSkill.mcpConfig) {
+          const sessionID = ctx?.sessionID || options.getSessionID?.()
+
+          if (!sessionID) {
+            return output.join("\n")
+          }
+
           const mcpInfo = await formatMcpCapabilities(
             matchedSkill,
             options.mcpManager,
-            options.getSessionID()
+            sessionID
           )
           if (mcpInfo) {
             output.push(mcpInfo)
@@ -361,27 +168,13 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
         return output.join("\n")
       }
 
-      // Check commands (exact match, case-insensitive) - sort by priority first
-      const sortedCommands = [...commands].sort((a, b) => {
-        const priorityA = scopePriority[a.scope] || 0
-        const priorityB = scopePriority[b.scope] || 0
-        return priorityB - priorityA // Higher priority first
-      })
-      const matchedCommand = sortedCommands.find(c => c.name.toLowerCase() === requestedName.toLowerCase())
+      const matchedCommand = matchCommandByName(commands, requestedName)
 
       if (matchedCommand) {
         return await formatLoadedCommand(matchedCommand, args.user_message)
       }
 
-      // No match found — provide helpful error with partial matches
-      const allNames = [
-        ...skills.map(s => s.name),
-        ...commands.map(c => `/${c.name}`),
-      ]
-
-      const partialMatches = allNames.filter(n =>
-        n.toLowerCase().includes(requestedName.toLowerCase())
-      )
+      const partialMatches = findPartialMatches(skills, commands, requestedName)
 
       if (partialMatches.length > 0) {
         throw new Error(
@@ -389,7 +182,10 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
         )
       }
 
-      const available = allNames.join(", ")
+      const available = [
+        ...skills.map((skill) => skill.name),
+        ...commands.map((command) => `/${command.name}`),
+      ].join(", ")
       throw new Error(
         `Skill or command "${args.name}" not found. Available: ${available || "none"}`
       )

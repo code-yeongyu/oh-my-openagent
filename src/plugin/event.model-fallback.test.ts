@@ -1,17 +1,23 @@
 declare const require: (name: string) => any
-const { afterEach, describe, expect, mock, test } = require("bun:test")
-
-mock.module("../shared/connected-providers-cache", () => ({
-  readConnectedProvidersCache: () => null,
-  readProviderModelsCache: () => null,
-}))
+const { afterEach, describe, expect, spyOn, test } = require("bun:test")
 
 import { createEventHandler } from "./event"
 import { createChatMessageHandler } from "./chat-message"
 import { _resetForTesting, setMainSession } from "../features/claude-code-session-state"
 import { createModelFallbackHook, clearPendingModelFallback } from "../hooks/model-fallback/hook"
+import * as connectedProvidersCache from "../shared/connected-providers-cache"
+
+let readConnectedProvidersCacheSpy: { mockRestore: () => void } | undefined
+let readProviderModelsCacheSpy: { mockRestore: () => void } | undefined
+
+function setupConnectedProviderCacheMocks(): void {
+  readConnectedProvidersCacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(null)
+  readProviderModelsCacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue(null)
+}
+
 describe("createEventHandler - model fallback", () => {
   const createHandler = (args?: { hooks?: any; pluginConfig?: any }) => {
+    setupConnectedProviderCacheMocks()
     const abortCalls: string[] = []
     const promptCalls: string[] = []
 
@@ -52,6 +58,10 @@ describe("createEventHandler - model fallback", () => {
   }
 
   afterEach(() => {
+    readConnectedProvidersCacheSpy?.mockRestore()
+    readProviderModelsCacheSpy?.mockRestore()
+    readConnectedProvidersCacheSpy = undefined
+    readProviderModelsCacheSpy = undefined
     _resetForTesting()
   })
 
@@ -82,8 +92,8 @@ describe("createEventHandler - model fallback", () => {
             parentID: "msg_user_1",
             modelID: "claude-opus-4-6-thinking",
             providerID: "anthropic",
-            mode: "Sisyphus (Ultraworker)",
-            agent: "Sisyphus (Ultraworker)",
+            mode: "Sisyphus - Ultraworker",
+            agent: "Sisyphus - Ultraworker",
             path: { cwd: "/tmp", root: "/tmp" },
             cost: 0,
             tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
@@ -174,7 +184,7 @@ describe("createEventHandler - model fallback", () => {
             content: [],
             modelID: "claude-opus-4-6-thinking",
             providerID: "anthropic",
-            agent: "Sisyphus (Ultraworker)",
+            agent: "Sisyphus - Ultraworker",
             path: { cwd: "/tmp", root: "/tmp" },
           },
         },
@@ -236,7 +246,7 @@ describe("createEventHandler - model fallback", () => {
             role: "user",
             modelID: "claude-opus-4-6-thinking",
             providerID: "anthropic",
-            agent: "Sisyphus (Ultraworker)",
+            agent: "Sisyphus - Ultraworker",
           },
         },
       },
@@ -304,7 +314,7 @@ describe("createEventHandler - model fallback", () => {
             role: "user",
             modelID: "claude-opus-4-6",
             providerID: "quotio",
-            agent: "Sisyphus (Ultraworker)",
+            agent: "Sisyphus - Ultraworker",
           },
         },
       },
@@ -385,7 +395,7 @@ describe("createEventHandler - model fallback", () => {
             content: [],
             modelID: "claude-opus-4-6",
             providerID: "quotio",
-            agent: "Sisyphus (Ultraworker)",
+            agent: "Sisyphus - Ultraworker",
             path: { cwd: "/tmp", root: "/tmp" },
           },
         },
@@ -440,6 +450,7 @@ describe("createEventHandler - model fallback", () => {
 
     const modelFallback = createModelFallbackHook()
 
+    setupConnectedProviderCacheMocks()
     const eventHandler = createEventHandler({
       ctx: {
         directory: "/tmp",
@@ -586,7 +597,7 @@ describe("createEventHandler - model fallback", () => {
             parentID: "msg_user_disabled_1",
             modelID: "claude-opus-4-6-thinking",
             providerID: "anthropic",
-            agent: "Sisyphus (Ultraworker)",
+            agent: "Sisyphus - Ultraworker",
             path: { cwd: "/tmp", root: "/tmp" },
             cost: 0,
             tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },

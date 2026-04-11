@@ -1,10 +1,11 @@
-import { afterAll, afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { RULES_INJECTOR_STORAGE } from "./constants";
+import { createRuleInjectionProcessor } from "./injector";
 
 type StatSnapshot = { mtimeMs: number; size: number };
 
@@ -17,45 +18,6 @@ const originalReadFileSync = fs.readFileSync.bind(fs);
 const originalStatSync = fs.statSync.bind(fs);
 const originalHomedir = os.homedir.bind(os);
 
-mock.module("node:fs", () => ({
-  ...fs,
-  readFileSync: (filePath: string, encoding?: string) => {
-    if (filePath === trackedRulePath) {
-      trackedReadFileCount += 1;
-    }
-    return originalReadFileSync(filePath, encoding as never);
-  },
-  statSync: (filePath: string) => {
-    if (filePath === trackedRulePath) {
-      const next = statSnapshots.shift();
-      if (next instanceof Error) {
-        throw next;
-      }
-      if (next) {
-        return {
-          mtimeMs: next.mtimeMs,
-          size: next.size,
-          isFile: () => true,
-        } as ReturnType<typeof originalStatSync>;
-      }
-    }
-    return originalStatSync(filePath);
-  },
-}));
-
-mock.module("node:os", () => ({
-  ...os,
-  homedir: () => mockedHomeDir || originalHomedir(),
-}));
-
-mock.module("./matcher", () => ({
-  shouldApplyRule: () => ({ applies: true, reason: "matched" }),
-  isDuplicateByRealPath: (realPath: string, cache: Set<string>) =>
-    cache.has(realPath),
-  createContentHash: (content: string) => `hash:${content}`,
-  isDuplicateByContentHash: (hash: string, cache: Set<string>) => cache.has(hash),
-}));
-
 function createOutput(): { title: string; output: string; metadata: unknown } {
   return { title: "tool", output: "", metadata: {} };
 }
@@ -67,7 +29,6 @@ async function createProcessor(projectRoot: string): Promise<{
     output: { title: string; output: string; metadata: unknown }
   ) => Promise<void>;
 }> {
-  const { createRuleInjectionProcessor } = await import("./injector");
   const sessionCaches = new Map<
     string,
     { contentHashes: Set<string>; realPaths: Set<string> }
@@ -94,6 +55,33 @@ async function createProcessor(projectRoot: string): Promise<{
       }
       return cache;
     },
+    readFileSync: (filePath: fs.PathOrFileDescriptor, options?: Parameters<typeof originalReadFileSync>[1]) => {
+      if (filePath === trackedRulePath) {
+        trackedReadFileCount += 1;
+      }
+      return originalReadFileSync(filePath, options as never);
+    },
+    statSync: (filePath: fs.PathLike) => {
+      if (filePath === trackedRulePath) {
+        const next = statSnapshots.shift();
+        if (next instanceof Error) {
+          throw next;
+        }
+        if (next) {
+          return {
+            mtimeMs: next.mtimeMs,
+            size: next.size,
+            isFile: () => true,
+          } as ReturnType<typeof originalStatSync>;
+        }
+      }
+      return originalStatSync(filePath);
+    },
+    homedir: () => mockedHomeDir || originalHomedir(),
+    shouldApplyRule: () => ({ applies: true, reason: "matched" }),
+    isDuplicateByRealPath: (realPath: string, cache: Set<string>) => cache.has(realPath),
+    createContentHash: (content: string) => `hash:${content}`,
+    isDuplicateByContentHash: (hash: string, cache: Set<string>) => cache.has(hash),
   });
 }
 
@@ -102,10 +90,6 @@ function getInjectedRulesPath(sessionID: string): string {
 }
 
 describe("createRuleInjectionProcessor", () => {
-  afterAll(() => {
-    mock.restore();
-  });
-
   let testRoot: string;
   let projectRoot: string;
   let homeRoot: string;

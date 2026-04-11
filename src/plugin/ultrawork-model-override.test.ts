@@ -1,14 +1,29 @@
 import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test"
-import {
-  applyUltraworkModelOverrideOnMessage,
-  resolveUltraworkOverride,
-  detectUltrawork,
-} from "./ultrawork-model-override"
 import * as sharedModule from "../shared"
 import * as dbOverrideModule from "./ultrawork-db-model-override"
 import * as sessionStateModule from "../features/claude-code-session-state"
 
+let resolveUltraworkOverride: (typeof import("./ultrawork-model-override"))["resolveUltraworkOverride"]
+let detectUltrawork: (typeof import("./ultrawork-model-override"))["detectUltrawork"]
+let applyUltraworkModelOverrideOnMessage: (typeof import("./ultrawork-model-override"))["applyUltraworkModelOverrideOnMessage"]
+
+async function importFreshUltraworkModelOverrideModule(): Promise<typeof import("./ultrawork-model-override")> {
+  return import(`./ultrawork-model-override?test=${Date.now()}-${Math.random()}`)
+}
+
+async function loadFreshUltraworkModelOverrideModule(): Promise<void> {
+  ;({
+    resolveUltraworkOverride,
+    detectUltrawork,
+    applyUltraworkModelOverrideOnMessage,
+  } = await importFreshUltraworkModelOverrideModule())
+}
+
 describe("detectUltrawork", () => {
+  beforeEach(async () => {
+    await loadFreshUltraworkModelOverrideModule()
+  })
+
   test("should detect ultrawork keyword", () => {
     expect(detectUltrawork("ultrawork do something")).toBe(true)
   })
@@ -41,6 +56,10 @@ describe("detectUltrawork", () => {
 })
 
 describe("resolveUltraworkOverride", () => {
+  beforeEach(async () => {
+    await loadFreshUltraworkModelOverrideModule()
+  })
+
   function createOutput(text: string, agentName?: string) {
     return {
       message: {
@@ -174,7 +193,7 @@ describe("resolveUltraworkOverride", () => {
     const output = createOutput("ulw do something")
 
     //#when
-    const result = resolveUltraworkOverride(config, "Sisyphus (Ultraworker)", output)
+    const result = resolveUltraworkOverride(config, "Sisyphus - Ultraworker", output)
 
     //#then
     expect(result).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-6", variant: "max" })
@@ -203,7 +222,8 @@ describe("resolveUltraworkOverride", () => {
     //#given
     const config = createConfig("sisyphus", { model: "anthropic/claude-opus-4-6", variant: "max" })
     const output = createOutput("ultrawork do something")
-    const getSessionAgentSpy = spyOn(sessionStateModule, "getSessionAgent").mockReturnValue("sisyphus")
+    const getSessionAgentSpy = spyOn(sessionStateModule, "getSessionAgent")
+    getSessionAgentSpy.mockReturnValue("sisyphus")
 
     //#when
     const result = resolveUltraworkOverride(config, undefined, output, "ses_test")
@@ -220,9 +240,12 @@ describe("applyUltraworkModelOverrideOnMessage", () => {
   let logSpy: ReturnType<typeof spyOn>
   let dbOverrideSpy: ReturnType<typeof spyOn>
 
-  beforeEach(() => {
-    logSpy = spyOn(sharedModule, "log").mockImplementation(() => {})
-    dbOverrideSpy = spyOn(dbOverrideModule, "scheduleDeferredModelOverride").mockImplementation(() => {})
+  beforeEach(async () => {
+    logSpy = spyOn(sharedModule, "log")
+    logSpy.mockImplementation(() => {})
+    dbOverrideSpy = spyOn(dbOverrideModule, "scheduleDeferredModelOverride")
+    dbOverrideSpy.mockImplementation(() => {})
+    await loadFreshUltraworkModelOverrideModule()
   })
 
   afterEach(() => {
@@ -408,7 +431,7 @@ describe("applyUltraworkModelOverrideOnMessage", () => {
     const tui = createMockTui()
 
     //#when
-    applyUltraworkModelOverrideOnMessage(config, "Sisyphus (Ultraworker)", output, tui)
+    applyUltraworkModelOverrideOnMessage(config, "Sisyphus - Ultraworker", output, tui)
 
     //#then
     expect(dbOverrideSpy).toHaveBeenCalledWith(

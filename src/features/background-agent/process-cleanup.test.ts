@@ -1,162 +1,206 @@
-import { describe, test, expect, beforeEach, afterEach, mock } from "bun:test"
+import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test"
+
 import {
+  _resetForTesting,
   registerManagerForCleanup,
   unregisterManagerForCleanup,
-  _resetForTesting,
 } from "./process-cleanup"
 
-describe("process-cleanup", () => {
-  const registeredManagers: Array<{ shutdown: () => void }> = []
-  const mockShutdown = mock(() => {})
+type CleanupManager = {
+  shutdown: () => void | Promise<void>
+}
 
-  const processOnCalls: Array<[string, Function]> = []
-  const processOffCalls: Array<[string, Function]> = []
-  const originalProcessOn = process.on.bind(process)
-  const originalProcessOff = process.off.bind(process)
+type ProcessCleanupEvent = NodeJS.Signals | "beforeExit" | "exit"
+
+function getNewListener(
+  signal: ProcessCleanupEvent,
+  existingListeners: Function[],
+): () => void {
+  const listener = process
+    .listeners(signal)
+    .find((registeredListener) => !existingListeners.includes(registeredListener))
+
+  expect(listener).toBeDefined()
+
+  if (typeof listener !== "function") {
+    throw new Error(`Expected a ${signal} listener to be registered`)
+  }
+
+  return listener
+}
+
+async function flushMicrotasks(): Promise<void> {
+  for (let iteration = 0; iteration < 10; iteration += 1) {
+    await Promise.resolve()
+  }
+}
+
+describe("#given process cleanup registration", () => {
+  const registeredManagers: CleanupManager[] = []
+  const originalExitCode = process.exitCode
 
   beforeEach(() => {
-    mockShutdown.mockClear()
-    processOnCalls.length = 0
-    processOffCalls.length = 0
+    process.exitCode = originalExitCode
     registeredManagers.length = 0
-
-    process.on = originalProcessOn as any
-    process.off = originalProcessOff as any
     _resetForTesting()
-
-    process.on = ((event: string, listener: Function) => {
-      processOnCalls.push([event, listener])
-      return process
-    }) as any
-
-    process.off = ((event: string, listener: Function) => {
-      processOffCalls.push([event, listener])
-      return process
-    }) as any
   })
 
   afterEach(() => {
-    process.on = originalProcessOn as any
-    process.off = originalProcessOff as any
-
     for (const manager of [...registeredManagers]) {
       unregisterManagerForCleanup(manager)
     }
+
+    process.exitCode = originalExitCode
+    _resetForTesting()
   })
 
-  describe("registerManagerForCleanup", () => {
-    test("registers signal handlers on first manager", () => {
-      const manager = { shutdown: mockShutdown }
+  describe("#given the first cleanup manager", () => {
+    test("#when registerManagerForCleanup runs #then signal handlers are registered", () => {
+      const sigintListenersBefore = process.listeners("SIGINT")
+      const sigtermListenersBefore = process.listeners("SIGTERM")
+      const beforeExitListenersBefore = process.listeners("beforeExit")
+      const exitListenersBefore = process.listeners("exit")
+
+      const manager = { shutdown: mock(() => {}) }
       registeredManagers.push(manager)
 
       registerManagerForCleanup(manager)
 
-      const signals = processOnCalls.map(([signal]) => signal)
-      expect(signals).toContain("SIGINT")
-      expect(signals).toContain("SIGTERM")
-      expect(signals).toContain("beforeExit")
-      expect(signals).toContain("exit")
+      expect(process.listeners("SIGINT")).toHaveLength(sigintListenersBefore.length + 1)
+      expect(process.listeners("SIGTERM")).toHaveLength(sigtermListenersBefore.length + 1)
+      expect(process.listeners("beforeExit")).toHaveLength(beforeExitListenersBefore.length + 1)
+      expect(process.listeners("exit")).toHaveLength(exitListenersBefore.length + 1)
+
+      if (process.platform === "win32") {
+        expect(process.listeners("SIGBREAK").length).toBeGreaterThan(0)
+      }
     })
 
-    test("signal listener calls shutdown on registered manager", () => {
-      const manager = { shutdown: mockShutdown }
+    test("#when the exit listener runs #then the registered manager shuts down", () => {
+      const exitListenersBefore = process.listeners("exit")
+      const shutdown = mock(() => {})
+      const manager = { shutdown }
       registeredManagers.push(manager)
 
       registerManagerForCleanup(manager)
 
-      const exitEntry = processOnCalls.find(([signal]) => signal === "exit")
-      expect(exitEntry).toBeDefined()
-      const [, listener] = exitEntry!
-      listener()
+      const exitListener = getNewListener("exit", exitListenersBefore)
+      exitListener()
 
-      expect(mockShutdown).toHaveBeenCalled()
+      expect(shutdown).toHaveBeenCalledTimes(1)
     })
 
-    test("multiple managers all get shutdown when signal fires", () => {
-      const shutdown1 = mock(() => {})
-      const shutdown2 = mock(() => {})
-      const shutdown3 = mock(() => {})
-      const manager1 = { shutdown: shutdown1 }
-      const manager2 = { shutdown: shutdown2 }
-      const manager3 = { shutdown: shutdown3 }
-      registeredManagers.push(manager1, manager2, manager3)
+    test("#when cleanup finishes after SIGINT #then the fallback exit timer is cleared", async () => {
+      const sigintListenersBefore = process.listeners("SIGINT")
+      const timeoutHandle = setTimeout(() => undefined, 0)
+      clearTimeout(timeoutHandle)
 
-      registerManagerForCleanup(manager1)
-      registerManagerForCleanup(manager2)
-      registerManagerForCleanup(manager3)
+      const setTimeoutImplementation: typeof setTimeout = () => timeoutHandle
+      const setTimeoutSpy = spyOn(globalThis, "setTimeout").mockImplementation(
+        setTimeoutImplementation,
+      )
+      const clearTimeoutSpy = spyOn(globalThis, "clearTimeout")
 
-      const exitEntry = processOnCalls.find(([signal]) => signal === "exit")
-      expect(exitEntry).toBeDefined()
-      const [, listener] = exitEntry!
-      listener()
+      try {
+        const manager = {
+          shutdown: mock(async () => {
+            await Promise.resolve()
+          }),
+        }
+        registeredManagers.push(manager)
 
-      expect(shutdown1).toHaveBeenCalledTimes(1)
-      expect(shutdown2).toHaveBeenCalledTimes(1)
-      expect(shutdown3).toHaveBeenCalledTimes(1)
-    })
+        registerManagerForCleanup(manager)
 
-    test("does not re-register signal handlers for subsequent managers", () => {
-      const manager1 = { shutdown: mockShutdown }
-      const manager2 = { shutdown: mockShutdown }
-      registeredManagers.push(manager1, manager2)
+        const sigintListener = getNewListener("SIGINT", sigintListenersBefore)
 
-      registerManagerForCleanup(manager1)
-      const callsAfterFirst = processOnCalls.length
+        sigintListener()
+        await flushMicrotasks()
 
-      registerManagerForCleanup(manager2)
-
-      expect(processOnCalls.length).toBe(callsAfterFirst)
+        expect(setTimeoutSpy).toHaveBeenCalledTimes(1)
+        expect(clearTimeoutSpy).toHaveBeenCalledWith(timeoutHandle)
+      } finally {
+        setTimeoutSpy.mockRestore()
+        clearTimeoutSpy.mockRestore()
+        clearTimeout(timeoutHandle)
+      }
     })
   })
 
-  describe("unregisterManagerForCleanup", () => {
-    test("removes signal handlers when last manager unregisters", () => {
-      const manager = { shutdown: mockShutdown }
+  describe("#given multiple cleanup managers", () => {
+    test("#when the exit listener runs #then every registered manager shuts down", () => {
+      const exitListenersBefore = process.listeners("exit")
+      const shutdownOne = mock(() => {})
+      const shutdownTwo = mock(() => {})
+      const shutdownThree = mock(() => {})
+      const managers = [
+        { shutdown: shutdownOne },
+        { shutdown: shutdownTwo },
+        { shutdown: shutdownThree },
+      ]
+      registeredManagers.push(...managers)
+
+      for (const manager of managers) {
+        registerManagerForCleanup(manager)
+      }
+
+      const exitListener = getNewListener("exit", exitListenersBefore)
+      exitListener()
+
+      expect(shutdownOne).toHaveBeenCalledTimes(1)
+      expect(shutdownTwo).toHaveBeenCalledTimes(1)
+      expect(shutdownThree).toHaveBeenCalledTimes(1)
+    })
+
+    test("#when another manager registers #then signal handlers are not duplicated", () => {
+      const managerOne = { shutdown: mock(() => {}) }
+      const managerTwo = { shutdown: mock(() => {}) }
+      registeredManagers.push(managerOne, managerTwo)
+
+      registerManagerForCleanup(managerOne)
+      const sigintListenersAfterFirstRegistration = process.listeners("SIGINT").length
+
+      registerManagerForCleanup(managerTwo)
+
+      expect(process.listeners("SIGINT")).toHaveLength(sigintListenersAfterFirstRegistration)
+    })
+  })
+
+  describe("#given cleanup managers are unregistered", () => {
+    test("#when the last manager unregisters #then signal handlers are removed", () => {
+      const sigintListenersBefore = process.listeners("SIGINT")
+      const sigtermListenersBefore = process.listeners("SIGTERM")
+      const beforeExitListenersBefore = process.listeners("beforeExit")
+      const exitListenersBefore = process.listeners("exit")
+      const manager = { shutdown: mock(() => {}) }
       registeredManagers.push(manager)
 
       registerManagerForCleanup(manager)
       unregisterManagerForCleanup(manager)
       registeredManagers.length = 0
 
-      const offSignals = processOffCalls.map(([signal]) => signal)
-      expect(offSignals).toContain("SIGINT")
-      expect(offSignals).toContain("SIGTERM")
-      expect(offSignals).toContain("beforeExit")
-      expect(offSignals).toContain("exit")
+      expect(process.listeners("SIGINT")).toHaveLength(sigintListenersBefore.length)
+      expect(process.listeners("SIGTERM")).toHaveLength(sigtermListenersBefore.length)
+      expect(process.listeners("beforeExit")).toHaveLength(beforeExitListenersBefore.length)
+      expect(process.listeners("exit")).toHaveLength(exitListenersBefore.length)
     })
 
-    test("keeps signal handlers when other managers remain", () => {
-      const manager1 = { shutdown: mockShutdown }
-      const manager2 = { shutdown: mockShutdown }
-      registeredManagers.push(manager1, manager2)
+    test("#when one manager remains registered #then cleanup handlers stay active for it", () => {
+      const exitListenersBefore = process.listeners("exit")
+      const remainingManagerShutdown = mock(() => {})
+      const removedManagerShutdown = mock(() => {})
+      const remainingManager = { shutdown: remainingManagerShutdown }
+      const removedManager = { shutdown: removedManagerShutdown }
+      registeredManagers.push(remainingManager, removedManager)
 
-      registerManagerForCleanup(manager1)
-      registerManagerForCleanup(manager2)
+      registerManagerForCleanup(remainingManager)
+      registerManagerForCleanup(removedManager)
+      unregisterManagerForCleanup(removedManager)
 
-      unregisterManagerForCleanup(manager2)
+      const exitListener = getNewListener("exit", exitListenersBefore)
+      exitListener()
 
-      expect(processOffCalls.length).toBe(0)
-    })
-
-    test("remaining managers still get shutdown after partial unregister", () => {
-      const shutdown1 = mock(() => {})
-      const shutdown2 = mock(() => {})
-      const manager1 = { shutdown: shutdown1 }
-      const manager2 = { shutdown: shutdown2 }
-      registeredManagers.push(manager1, manager2)
-
-      registerManagerForCleanup(manager1)
-      registerManagerForCleanup(manager2)
-
-      const exitEntry = processOnCalls.find(([signal]) => signal === "exit")
-      expect(exitEntry).toBeDefined()
-      const [, listener] = exitEntry!
-      unregisterManagerForCleanup(manager2)
-
-      listener()
-
-      expect(shutdown1).toHaveBeenCalledTimes(1)
-      expect(shutdown2).not.toHaveBeenCalled()
+      expect(remainingManagerShutdown).toHaveBeenCalledTimes(1)
+      expect(removedManagerShutdown).not.toHaveBeenCalled()
     })
   })
 })

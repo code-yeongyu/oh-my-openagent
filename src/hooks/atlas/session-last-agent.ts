@@ -2,6 +2,23 @@ import { readFileSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 
 import { getMessageDir, isSqliteBackend, normalizeSDKResponse } from "../../shared"
+import { hasCompactionPartInStorage, isCompactionMessage } from "../../shared/compaction-marker"
+
+type SessionLastAgentDeps = {
+  getMessageDir: typeof getMessageDir
+  isSqliteBackend: typeof isSqliteBackend
+  normalizeSDKResponse: typeof normalizeSDKResponse
+  hasCompactionPartInStorage: typeof hasCompactionPartInStorage
+  isCompactionMessage: typeof isCompactionMessage
+}
+
+const defaultSessionLastAgentDeps: SessionLastAgentDeps = {
+  getMessageDir,
+  isSqliteBackend,
+  normalizeSDKResponse,
+  hasCompactionPartInStorage,
+  isCompactionMessage,
+}
 
 type SessionMessagesClient = {
   session: {
@@ -9,26 +26,35 @@ type SessionMessagesClient = {
   }
 }
 
-function isCompactionAgent(agent: unknown): boolean {
-  return typeof agent === "string" && agent.toLowerCase() === "compaction"
-}
-
 function getLastAgentFromMessageDir(messageDir: string): string | null {
   try {
-    const files = readdirSync(messageDir)
+    const messages = readdirSync(messageDir)
       .filter((fileName) => fileName.endsWith(".json"))
-      .sort()
-
-    for (let i = files.length - 1; i >= 0; i--) {
-      const fileName = files[i]
-      try {
-        const content = readFileSync(join(messageDir, fileName), "utf-8")
-        const parsed = JSON.parse(content) as { agent?: unknown }
-        if (typeof parsed.agent === "string" && !isCompactionAgent(parsed.agent)) {
-          return parsed.agent.toLowerCase()
+      .map((fileName) => {
+        try {
+          const content = readFileSync(join(messageDir, fileName), "utf-8")
+          const parsed = JSON.parse(content) as { id?: string; agent?: unknown; time?: { created?: unknown } }
+          return {
+            fileName,
+            id: parsed.id,
+            agent: parsed.agent,
+            createdAt: typeof parsed.time?.created === "number" ? parsed.time.created : Number.NEGATIVE_INFINITY,
+          }
+        } catch {
+          return null
         }
-      } catch {
+      })
+      .filter((message): message is { fileName: string; id: string | undefined; agent: unknown; createdAt: number } => message !== null)
+      .sort((left, right) => (right?.createdAt ?? 0) - (left?.createdAt ?? 0) || (right?.fileName ?? "").localeCompare(left?.fileName ?? ""))
+
+    for (const message of messages) {
+      if (!message) continue
+      if (isCompactionMessage({ agent: message.agent }) || hasCompactionPartInStorage(message?.id)) {
         continue
+      }
+
+      if (typeof message.agent === "string") {
+        return message.agent.toLowerCase()
       }
     }
   } catch {
@@ -40,26 +66,88 @@ function getLastAgentFromMessageDir(messageDir: string): string | null {
 
 export async function getLastAgentFromSession(
   sessionID: string,
-  client?: SessionMessagesClient
+  client?: SessionMessagesClient,
+  deps: Partial<SessionLastAgentDeps> = {},
 ): Promise<string | null> {
-  if (isSqliteBackend() && client) {
-    const response = await client.session.messages({ path: { id: sessionID } })
-    const messages = normalizeSDKResponse(response, [] as Array<{ info?: { agent?: string } }>, {
-      preferResponseOnMissingData: true,
-    })
+  const resolvedDeps: SessionLastAgentDeps = {
+    ...defaultSessionLastAgentDeps,
+    ...deps,
+  }
 
-    for (let i = messages.length - 1; i >= 0; i--) {
-      const agent = messages[i].info?.agent
-      if (typeof agent === "string" && !isCompactionAgent(agent)) {
-        return agent.toLowerCase()
+  if (resolvedDeps.isSqliteBackend() && client) {
+    try {
+      const response = await client.session.messages({ path: { id: sessionID } })
+      const messages = resolvedDeps.normalizeSDKResponse(response, [] as Array<{
+        id?: string
+        info?: { agent?: string; time?: { created?: number } }
+        parts?: Array<{ type?: string }>
+      }>, {
+        preferResponseOnMissingData: true,
+      }).sort((left, right) => {
+        const leftTime = (left as { info?: { time?: { created?: number } } }).info?.time?.created ?? Number.NEGATIVE_INFINITY
+        const rightTime = (right as { info?: { time?: { created?: number } } }).info?.time?.created ?? Number.NEGATIVE_INFINITY
+        if (leftTime !== rightTime) {
+          return rightTime - leftTime
+        }
+
+        const leftId = typeof left.id === "string" ? left.id : ""
+        const rightId = typeof right.id === "string" ? right.id : ""
+        return rightId.localeCompare(leftId)
+      })
+
+      for (const message of messages) {
+        if (resolvedDeps.isCompactionMessage(message)) {
+          continue
+        }
+
+        const agent = message.info?.agent
+        if (typeof agent === "string") {
+          return agent.toLowerCase()
+        }
       }
+    } catch {
+      return null
     }
 
     return null
   }
 
-  const messageDir = getMessageDir(sessionID)
+  const messageDir = resolvedDeps.getMessageDir(sessionID)
   if (!messageDir) return null
 
-  return getLastAgentFromMessageDir(messageDir)
+  try {
+    const messages = readdirSync(messageDir)
+      .filter((fileName) => fileName.endsWith(".json"))
+      .map((fileName) => {
+        try {
+          const content = readFileSync(join(messageDir, fileName), "utf-8")
+          const parsed = JSON.parse(content) as { id?: string; agent?: unknown; time?: { created?: unknown } }
+          return {
+            fileName,
+            id: parsed.id,
+            agent: parsed.agent,
+            createdAt: typeof parsed.time?.created === "number" ? parsed.time.created : Number.NEGATIVE_INFINITY,
+          }
+        } catch {
+          return null
+        }
+      })
+      .filter((message): message is { fileName: string; id: string | undefined; agent: unknown; createdAt: number } => message !== null)
+      .sort((left, right) => (right?.createdAt ?? 0) - (left?.createdAt ?? 0) || (right?.fileName ?? "").localeCompare(left?.fileName ?? ""))
+
+    for (const message of messages) {
+      if (!message) continue
+      if (resolvedDeps.isCompactionMessage({ agent: message.agent }) || resolvedDeps.hasCompactionPartInStorage(message?.id)) {
+        continue
+      }
+
+      if (typeof message.agent === "string") {
+        return message.agent.toLowerCase()
+      }
+    }
+  } catch {
+    return null
+  }
+
+  return null
 }

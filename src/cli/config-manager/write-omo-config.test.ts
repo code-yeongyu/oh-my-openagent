@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { parseJsonc } from "../../shared/jsonc-parser"
+import { CONFIG_BASENAME, LEGACY_CONFIG_BASENAME } from "../../shared/plugin-identity"
 import type { InstallConfig } from "../types"
 import { resetConfigContext } from "./config-context"
 import { generateOmoConfig } from "./generate-omo-config"
@@ -18,6 +19,7 @@ const installConfig: InstallConfig = {
   hasOpencodeZen: false,
   hasZaiCodingPlan: false,
   hasKimiForCoding: false,
+  hasOpencodeGo: false,
 }
 
 function getRecord(value: unknown): Record<string, unknown> {
@@ -34,7 +36,7 @@ describe("writeOmoConfig", () => {
 
   beforeEach(() => {
     testConfigDir = join(tmpdir(), `omo-write-config-${Date.now()}-${Math.random().toString(36).slice(2)}`)
-    testConfigPath = join(testConfigDir, "oh-my-opencode.json")
+    testConfigPath = join(testConfigDir, `${CONFIG_BASENAME}.json`)
 
     mkdirSync(testConfigDir, { recursive: true })
     process.env.OPENCODE_CONFIG_DIR = testConfigDir
@@ -76,5 +78,22 @@ describe("writeOmoConfig", () => {
     for (const defaultKey of Object.keys(generatedDefaults)) {
       expect(savedConfig).toHaveProperty(defaultKey)
     }
+  })
+
+  it("migrates a legacy config file to the canonical basename before writing", () => {
+    // given
+    const legacyConfigPath = join(testConfigDir, `${LEGACY_CONFIG_BASENAME}.json`)
+    const canonicalConfigPath = join(testConfigDir, `${CONFIG_BASENAME}.json`)
+    writeFileSync(legacyConfigPath, JSON.stringify({ disabled_hooks: ["comment-checker"] }, null, 2) + "\n", "utf-8")
+
+    // when
+    const result = writeOmoConfig(installConfig)
+
+    // then
+    expect(result.success).toBe(true)
+    expect(result.configPath).toEndWith(canonicalConfigPath)
+
+    const savedConfig = parseJsonc<Record<string, unknown>>(readFileSync(canonicalConfigPath, "utf-8"))
+    expect(savedConfig.disabled_hooks).toEqual(["comment-checker"])
   })
 })

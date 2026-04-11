@@ -1,6 +1,6 @@
 # src/hooks/claude-code-hooks/ — Claude Code Compatibility
 
-**Generated:** 2026-03-06
+**Generated:** 2026-04-11
 
 ## OVERVIEW
 

@@ -2,7 +2,7 @@ import type { AgentOverrides } from "../../config"
 import type { BackgroundManager } from "../../features/background-agent"
 import type { TopLevelTaskRef } from "../../features/boulder-state"
 
-export type ModelInfo = { providerID: string; modelID: string }
+export type ModelInfo = { providerID: string; modelID: string; variant?: string }
 
 export interface AtlasHookOptions {
   directory: string
@@ -35,6 +35,7 @@ export type PendingTaskRef =
 export interface SessionState {
   lastEventWasAbortError?: boolean
   lastContinuationInjectedAt?: number
+  isInjectingContinuation?: boolean
   promptFailureCount: number
   lastFailureAt?: number
   pendingRetryTimer?: ReturnType<typeof setTimeout>

@@ -1,23 +1,25 @@
-# src/plugin/ — 8 OpenCode Hook Handlers + Hook Composition
+# src/plugin/ — 10 OpenCode Hook Handlers + Hook Composition
 
-**Generated:** 2026-03-06
+**Generated:** 2026-04-11
 
 ## OVERVIEW
 
-Core glue layer. 20 source files assembling the 8 OpenCode hook handlers and composing 48 hooks into the PluginInterface. Every handler file corresponds to one OpenCode hook type.
+Core glue layer. 20 source files assembling the 10 OpenCode hook handlers and composing 50 hooks into the PluginInterface. Every handler file corresponds to one OpenCode hook type.
 
 ## HANDLER FILES
 
 | File | OpenCode Hook | Purpose |
 |------|---------------|---------|
+| `config.ts` | `config` | 6-phase config loading pipeline |
+| `tool-registry.ts` | `tool` | 26 tools assembled from factories |
 | `chat-message.ts` | `chat.message` | First-message variant, session setup, keyword detection |
 | `chat-params.ts` | `chat.params` | Anthropic effort level, think mode |
+| `chat-headers.ts` | `chat.headers` | Copilot x-initiator header injection |
 | `event.ts` | `event` | Session lifecycle (created, deleted, idle, error) |
 | `tool-execute-before.ts` | `tool.execute.before` | Pre-tool guards (file guard, label truncator, rules injector) |
 | `tool-execute-after.ts` | `tool.execute.after` | Post-tool hooks (output truncation, comment checker, metadata) |
 | `messages-transform.ts` | `experimental.chat.messages.transform` | Context injection, thinking block validation |
-| `tool-registry.ts` | `tool` | 26 tools assembled from factories |
-| `chat-headers.ts` | `chat.headers` | Copilot x-initiator header injection |
+| `session-compacting.ts` | `experimental.session.compacting` | Context + todo preservation during compaction |
 | `skill-context.ts` | — | Skill/browser/category context for tool creation |
 
 ## HOOK COMPOSITION (hooks/ subdir)
@@ -25,9 +27,10 @@ Core glue layer. 20 source files assembling the 8 OpenCode hook handlers and com
 | File | Tier | Count |
 |------|------|-------|
 | `create-session-hooks.ts` | Session | 23 |
-| `create-tool-guard-hooks.ts` | Tool Guard | 12 |
+| `create-tool-guard-hooks.ts` | Tool Guard | 14 |
+| `create-transform-hooks.ts` | Transform | 5 |
 | `create-skill-hooks.ts` | Skill | 2 |
-| `create-core-hooks.ts` | Aggregator | Session + Guard + Transform = 39 |
+| `create-core-hooks.ts` | Aggregator | Session + Guard + Transform = 42 |
 
 ## SUPPORT FILES
 

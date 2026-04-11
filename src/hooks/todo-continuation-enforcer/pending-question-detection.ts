@@ -2,7 +2,7 @@ import { log } from "../../shared/logger"
 import { HOOK_NAME } from "./constants"
 
 interface MessagePart {
-  type: string
+  type?: string
   name?: string
   toolName?: string
 }

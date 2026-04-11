@@ -7,6 +7,7 @@ import { createHephaestusAgent } from "../hephaestus"
 import { applyEnvironmentContext } from "./environment-context"
 import { applyCategoryOverride, mergeAgentConfig } from "./agent-overrides"
 import { applyModelResolution, getFirstFallbackModel } from "./model-resolution"
+import { getGptApplyPatchPermission } from "../gpt-apply-patch-guard"
 
 export function maybeCreateHephaestusConfig(input: {
   disabledAgents: string[]
@@ -86,5 +87,12 @@ export function maybeCreateHephaestusConfig(input: {
   if (hephaestusOverride) {
     hephaestusConfig = mergeAgentConfig(hephaestusConfig, hephaestusOverride, directory)
   }
+
+  const resolvedModel = hephaestusConfig.model ?? ""
+  const gptDeny = getGptApplyPatchPermission(resolvedModel)
+  if (Object.keys(gptDeny).length > 0 && hephaestusConfig.permission) {
+    Object.assign(hephaestusConfig.permission, gptDeny)
+  }
+
   return hephaestusConfig
 }

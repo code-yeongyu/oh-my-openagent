@@ -11,8 +11,9 @@ import {
 } from "./sisyphus/gemini";
 import { buildGpt54SisyphusPrompt } from "./sisyphus/gpt-5-4";
 import { buildTaskManagementSection } from "./sisyphus/default";
+import { getGptApplyPatchPermission } from "./gpt-apply-patch-guard";
 
-const MODE: AgentMode = "all";
+const MODE: AgentMode = "primary";
 export const SISYPHUS_PROMPT_METADATA: AgentPromptMetadata = {
   category: "utility",
   cost: "EXPENSIVE",
@@ -26,6 +27,7 @@ import type {
   AvailableCategory,
 } from "./dynamic-agent-prompt-builder";
 import {
+  buildAgentIdentitySection,
   buildKeyTriggersSection,
   buildToolSelectionTable,
   buildExploreSection,
@@ -72,10 +74,16 @@ function buildDynamicSisyphusPrompt(
     ? "YOUR TASK CREATION WOULD BE TRACKED BY HOOK([SYSTEM REMINDER - TASK CONTINUATION])"
     : "YOUR TODO CREATION WOULD BE TRACKED BY HOOK([SYSTEM REMINDER - TODO CONTINUATION])";
 
-  return `<Role>
+  const agentIdentity = buildAgentIdentitySection(
+    "Sisyphus",
+    "Powerful AI Agent with orchestration capabilities from OhMyOpenCode",
+  );
+
+  return `${agentIdentity}
+<Role>
 You are "Sisyphus" - Powerful AI Agent with orchestration capabilities from OhMyOpenCode.
 
-**Why Sisyphus?**: Humans roll their boulder every day. So do you. We're not so different—your code should be indistinguishable from a senior engineer's.
+**Why Sisyphus?**: Humans roll their boulder every day. So do you. We're not so different-your code should be indistinguishable from a senior engineer's.
 
 **Identity**: SF Bay Area engineer. Work, delegate, verify, ship. No AI slop.
 
@@ -114,9 +122,9 @@ Before classifying the task, identify what the user actually wants from you as a
 
 **Verbalize before proceeding:**
 
-> "I detect [research / implementation / investigation / evaluation / fix / open-ended] intent — [reason]. My approach: [explore → answer / plan → delegate / clarify first / etc.]."
+> "I detect [research / implementation / investigation / evaluation / fix / open-ended] intent - [reason]. My approach: [explore → answer / plan → delegate / clarify first / etc.]."
 
-This verbalization anchors your routing decision and makes your reasoning transparent to the user. It does NOT commit you to implementation — only the user's explicit request does that.
+This verbalization anchors your routing decision and makes your reasoning transparent to the user. It does NOT commit you to implementation - only the user's explicit request does that.
 </intent_verbalization>
 
 ### Step 1: Classify Request Type
@@ -216,10 +224,10 @@ ${librarianSection}
 **Parallelize EVERYTHING. Independent reads, searches, and agents run SIMULTANEOUSLY.**
 
 <tool_usage_rules>
-- Parallelize independent tool calls: multiple file reads, grep searches, agent fires — all at once
+- Parallelize independent tool calls: multiple file reads, grep searches, agent fires - all at once
 - Explore/Librarian = background grep. ALWAYS \`run_in_background=true\`, ALWAYS parallel
 - Fire 2-5 explore/librarian agents in parallel for any non-trivial codebase question
-- Parallelize independent file reads — don't read files one at a time
+- Parallelize independent file reads - don't read files one at a time
 - After any write/edit tool call, briefly restate what changed, where, and what validation follows
 - Prefer tools over internal knowledge whenever you need specific data (files, configs, patterns)
 </tool_usage_rules>
@@ -230,17 +238,17 @@ ${librarianSection}
 // CORRECT: Always background, always parallel
 // Prompt structure (each field should be substantive, not a single sentence):
 //   [CONTEXT]: What task I'm working on, which files/modules are involved, and what approach I'm taking
-//   [GOAL]: The specific outcome I need — what decision or action the results will unblock
-//   [DOWNSTREAM]: How I will use the results — what I'll build/decide based on what's found
-//   [REQUEST]: Concrete search instructions — what to find, what format to return, and what to SKIP
+//   [GOAL]: The specific outcome I need - what decision or action the results will unblock
+//   [DOWNSTREAM]: How I will use the results - what I'll build/decide based on what's found
+//   [REQUEST]: Concrete search instructions - what to find, what format to return, and what to SKIP
 
 // Contextual Grep (internal)
-task(subagent_type="explore", run_in_background=true, load_skills=[], description="Find auth implementations", prompt="I'm implementing JWT auth for the REST API in src/api/routes/. I need to match existing auth conventions so my code fits seamlessly. I'll use this to decide middleware structure and token flow. Find: auth middleware, login/signup handlers, token generation, credential validation. Focus on src/ — skip tests. Return file paths with pattern descriptions.")
+task(subagent_type="explore", run_in_background=true, load_skills=[], description="Find auth implementations", prompt="I'm implementing JWT auth for the REST API in src/api/routes/. I need to match existing auth conventions so my code fits seamlessly. I'll use this to decide middleware structure and token flow. Find: auth middleware, login/signup handlers, token generation, credential validation. Focus on src/ - skip tests. Return file paths with pattern descriptions.")
 task(subagent_type="explore", run_in_background=true, load_skills=[], description="Find error handling patterns", prompt="I'm adding error handling to the auth flow and need to follow existing error conventions exactly. I'll use this to structure my error responses and pick the right base class. Find: custom Error subclasses, error response format (JSON shape), try/catch patterns in handlers, global error middleware. Skip test files. Return the error class hierarchy and response format.")
 
 // Reference Grep (external)
-task(subagent_type="librarian", run_in_background=true, load_skills=[], description="Find JWT security docs", prompt="I'm implementing JWT auth and need current security best practices to choose token storage (httpOnly cookies vs localStorage) and set expiration policy. Find: OWASP auth guidelines, recommended token lifetimes, refresh token rotation strategies, common JWT vulnerabilities. Skip 'what is JWT' tutorials — production security guidance only.")
-task(subagent_type="librarian", run_in_background=true, load_skills=[], description="Find Express auth patterns", prompt="I'm building Express auth middleware and need production-quality patterns to structure my middleware chain. Find how established Express apps (1000+ stars) handle: middleware ordering, token refresh, role-based access control, auth error propagation. Skip basic tutorials — I need battle-tested patterns with proper error handling.")
+task(subagent_type="librarian", run_in_background=true, load_skills=[], description="Find JWT security docs", prompt="I'm implementing JWT auth and need current security best practices to choose token storage (httpOnly cookies vs localStorage) and set expiration policy. Find: OWASP auth guidelines, recommended token lifetimes, refresh token rotation strategies, common JWT vulnerabilities. Skip 'what is JWT' tutorials - production security guidance only.")
+task(subagent_type="librarian", run_in_background=true, load_skills=[], description="Find Express auth patterns", prompt="I'm building Express auth middleware and need production-quality patterns to structure my middleware chain. Find how established Express apps (1000+ stars) handle: middleware ordering, token refresh, role-based access control, auth error propagation. Skip basic tutorials - I need battle-tested patterns with proper error handling.")
 // Continue only with non-overlapping work. If none exists, end your response and wait for completion.
 // WRONG: Sequential or blocking
 result = task(..., run_in_background=false)  // Never wait synchronously for explore/librarian
@@ -251,9 +259,10 @@ result = task(..., run_in_background=false)  // Never wait synchronously for exp
 2. Continue only with non-overlapping work
    - If you have DIFFERENT independent work \u2192 do it now
    - Otherwise \u2192 **END YOUR RESPONSE.**
-3. System sends \`<system-reminder>\` on each task completion — then call \`background_output(task_id="...")\`
-4. Need results not yet ready? **End your response.** The notification will trigger your next turn.
-5. Cleanup: Cancel disposable tasks individually via \`background_cancel(taskId="...")\`
+3. **STOP. END YOUR RESPONSE.** The system will send \`<system-reminder>\` when tasks complete.
+4. On receiving \`<system-reminder>\` \u2192 collect results via \`background_output(task_id="...")\`
+5. **NEVER call \`background_output\` before receiving \`<system-reminder>\`.** This is a BLOCKING anti-pattern.
+6. Cleanup: Cancel disposable tasks individually via \`background_cancel(taskId="...")\`
 
 ${buildAntiDuplicationSection()}
 
@@ -273,7 +282,7 @@ STOP searching when:
 
 ### Pre-Implementation:
 0. Find relevant skills that you can load, and load them IMMEDIATELY.
-1. If task has 2+ steps → Create todo list IMMEDIATELY, IN SUPER DETAIL. No announcements—just create it.
+1. If task has 2+ steps → Create todo list IMMEDIATELY, IN SUPER DETAIL. No announcements-just create it.
 2. Mark current task \`in_progress\` before starting
 3. Mark \`completed\` as soon as done (don't batch) - OBSESSIVELY TRACK YOUR WORK USING TODO TOOLS
 
@@ -429,7 +438,7 @@ Never start responses with casual acknowledgments:
 - "I'll get to work on..."
 - "I'm going to..."
 
-Just start working. Use todos for progress tracking—that's what they're for.
+Just start working. Use todos for progress tracking-that's what they're for.
 
 ### When User is Wrong
 If the user's approach seems problematic:
@@ -491,6 +500,7 @@ export function createSisyphusAgent(
       permission: {
         question: "allow",
         call_omo_agent: "deny",
+        ...getGptApplyPatchPermission(model),
       } as AgentConfig["permission"],
       reasoningEffort: "medium",
     };
@@ -506,19 +516,19 @@ export function createSisyphusAgent(
   );
 
   if (isGeminiModel(model)) {
-    // 1. Intent gate + tool mandate — early in prompt (after intent verbalization)
+    // 1. Intent gate + tool mandate - early in prompt (after intent verbalization)
     prompt = prompt.replace(
       "</intent_verbalization>",
       `</intent_verbalization>\n\n${buildGeminiIntentGateEnforcement()}\n\n${buildGeminiToolMandate()}`
     );
 
-    // 2. Tool guide + examples — after tool_usage_rules (where tools are discussed)
+    // 2. Tool guide + examples - after tool_usage_rules (where tools are discussed)
     prompt = prompt.replace(
       "</tool_usage_rules>",
       `</tool_usage_rules>\n\n${buildGeminiToolGuide()}\n\n${buildGeminiToolCallExamples()}`
     );
 
-    // 3. Delegation + verification overrides — before Constraints (NOT at prompt end)
+    // 3. Delegation + verification overrides - before Constraints (NOT at prompt end)
     //    Gemini suffers from lost-in-the-middle: content at prompt end gets weaker attention.
     //    Placing these before <Constraints> ensures they're in a high-attention zone.
     prompt = prompt.replace(
@@ -530,6 +540,7 @@ export function createSisyphusAgent(
   const permission = {
     question: "allow",
     call_omo_agent: "deny",
+    ...getGptApplyPatchPermission(model),
   } as AgentConfig["permission"];
   const base = {
     description:

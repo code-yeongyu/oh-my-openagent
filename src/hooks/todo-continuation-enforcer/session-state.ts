@@ -1,4 +1,4 @@
-import type { SessionState, Todo } from "./types"
+import type { ContinuationProgressOptions, SessionState, Todo } from "./types"
 
 type TimerHandle = number | { unref?: () => void }
 
@@ -16,6 +16,8 @@ interface TrackedSessionState {
   lastAccessedAt: number
   lastCompletedCount?: number
   lastTodoSnapshot?: string
+  activitySignalCount: number
+  lastObservedActivitySignalCount?: number
 }
 
 export interface ContinuationProgressUpdate {
@@ -23,13 +25,19 @@ export interface ContinuationProgressUpdate {
   previousStagnationCount: number
   stagnationCount: number
   hasProgressed: boolean
-  progressSource: "none" | "todo"
+  progressSource: "none" | "todo" | "activity"
 }
 
 export interface SessionStateStore {
   getState: (sessionID: string) => SessionState
   getExistingState: (sessionID: string) => SessionState | undefined
-  trackContinuationProgress: (sessionID: string, incompleteCount: number, todos?: Todo[]) => ContinuationProgressUpdate
+  recordActivity: (sessionID: string) => void
+  trackContinuationProgress: (
+    sessionID: string,
+    incompleteCount: number,
+    todos?: Todo[],
+    options?: ContinuationProgressOptions,
+  ) => ContinuationProgressUpdate
   resetContinuationProgress: (sessionID: string) => void
   cancelCountdown: (sessionID: string) => void
   cleanup: (sessionID: string) => void
@@ -96,6 +104,7 @@ export function createSessionStateStore(): SessionStateStore {
     const trackedSession: TrackedSessionState = {
       state: rawState,
       lastAccessedAt: Date.now(),
+      activitySignalCount: 0,
     }
     sessions.set(sessionID, trackedSession)
     return trackedSession
@@ -114,10 +123,16 @@ export function createSessionStateStore(): SessionStateStore {
     return undefined
   }
 
+  function recordActivity(sessionID: string): void {
+    const trackedSession = getTrackedSession(sessionID)
+    trackedSession.activitySignalCount += 1
+  }
+
   function trackContinuationProgress(
     sessionID: string,
     incompleteCount: number,
-    todos?: Todo[]
+    todos?: Todo[],
+    options: ContinuationProgressOptions = {},
   ): ContinuationProgressUpdate {
     const trackedSession = getTrackedSession(sessionID)
     const state = trackedSession.state
@@ -125,6 +140,7 @@ export function createSessionStateStore(): SessionStateStore {
     const previousStagnationCount = state.stagnationCount
     const currentCompletedCount = todos?.filter((todo) => todo.status === "completed").length
     const currentTodoSnapshot = todos ? getTodoSnapshot(todos) : undefined
+    const currentActivitySignalCount = trackedSession.activitySignalCount
     const hasCompletedMoreTodos =
       currentCompletedCount !== undefined
       && trackedSession.lastCompletedCount !== undefined
@@ -133,6 +149,10 @@ export function createSessionStateStore(): SessionStateStore {
       currentTodoSnapshot !== undefined
       && trackedSession.lastTodoSnapshot !== undefined
       && currentTodoSnapshot !== trackedSession.lastTodoSnapshot
+    const hasObservedExternalActivity =
+      options.allowActivityProgress === true
+      && trackedSession.lastObservedActivitySignalCount !== undefined
+      && currentActivitySignalCount > trackedSession.lastObservedActivitySignalCount
     const hadSuccessfulInjectionAwaitingProgressCheck = state.awaitingPostInjectionProgressCheck === true
 
     state.lastIncompleteCount = incompleteCount
@@ -142,6 +162,7 @@ export function createSessionStateStore(): SessionStateStore {
     if (currentTodoSnapshot !== undefined) {
       trackedSession.lastTodoSnapshot = currentTodoSnapshot
     }
+    trackedSession.lastObservedActivitySignalCount = currentActivitySignalCount
 
     if (previousIncompleteCount === undefined) {
       state.stagnationCount = 0
@@ -156,7 +177,9 @@ export function createSessionStateStore(): SessionStateStore {
 
     const progressSource = incompleteCount < previousIncompleteCount || hasCompletedMoreTodos || hasTodoSnapshotChanged
       ? "todo"
-      : "none"
+      : hasObservedExternalActivity
+        ? "activity"
+        : "none"
 
     if (progressSource !== "none") {
       state.stagnationCount = 0
@@ -204,6 +227,8 @@ export function createSessionStateStore(): SessionStateStore {
     state.awaitingPostInjectionProgressCheck = false
     trackedSession.lastCompletedCount = undefined
     trackedSession.lastTodoSnapshot = undefined
+    trackedSession.activitySignalCount = 0
+    trackedSession.lastObservedActivitySignalCount = undefined
   }
 
   function cancelCountdown(sessionID: string): void {
@@ -247,6 +272,7 @@ export function createSessionStateStore(): SessionStateStore {
   return {
     getState,
     getExistingState,
+    recordActivity,
     trackContinuationProgress,
     resetContinuationProgress,
     cancelCountdown,

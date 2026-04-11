@@ -2,6 +2,7 @@ import type { CategoryConfig } from "../config/schema";
 import { PROMETHEUS_PERMISSION, getPrometheusPrompt } from "../agents/prometheus";
 import { resolvePromptAppend } from "../agents/builtin-agents/resolve-file-uri";
 import { AGENT_MODEL_REQUIREMENTS } from "../shared/model-requirements";
+import type { FallbackEntry } from "../shared/model-requirements";
 import {
   fetchAvailableModels,
   readConnectedProvidersCache,
@@ -21,6 +22,20 @@ type PrometheusOverride = Record<string, unknown> & {
   maxTokens?: number;
   prompt_append?: string;
 };
+
+function isModelInFallbackChain(
+  model: string | undefined,
+  fallbackChain: FallbackEntry[] | undefined,
+): boolean {
+  if (!model || !fallbackChain || fallbackChain.length === 0) {
+    return false;
+  }
+
+  const modelParts = model.split("/");
+  const modelName = modelParts.length >= 2 ? modelParts.slice(1).join("/") : model;
+
+  return fallbackChain.some((entry) => entry.model === modelName);
+}
 
 export async function buildPrometheusAgentConfig(params: {
   configAgentPlan: Record<string, unknown> | undefined;
@@ -42,9 +57,18 @@ export async function buildPrometheusAgentConfig(params: {
   const configuredPrometheusModel =
     params.pluginPrometheusOverride?.model ?? categoryConfig?.model;
 
+  const shouldUseCurrentModel = isModelInFallbackChain(
+    params.currentModel,
+    requirement?.fallbackChain,
+  );
+
   const modelResolution = resolveModelPipeline({
     intent: {
-      uiSelectedModel: configuredPrometheusModel ? undefined : params.currentModel,
+      uiSelectedModel: configuredPrometheusModel
+        ? undefined
+        : shouldUseCurrentModel
+          ? params.currentModel
+          : undefined,
       userModel: params.pluginPrometheusOverride?.model,
       categoryDefaultModel: categoryConfig?.model,
     },

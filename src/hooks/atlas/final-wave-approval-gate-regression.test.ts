@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, mock, test, afterAll } from "bun:test"
 import { randomUUID } from "node:crypto"
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -28,6 +28,8 @@ mock.module("../../shared/opencode-message-dir", () => ({
 mock.module("../../shared/opencode-storage-detection", () => ({
   isSqliteBackend: () => false,
 }))
+
+afterAll(() => { mock.restore() })
 
 const { createAtlasHook } = await import("./index")
 const { MESSAGE_STORAGE } = await import("../../features/hook-message-injector")

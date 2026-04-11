@@ -274,16 +274,64 @@ bunDescribe("sendSyncPrompt", () => {
       modelID: "gpt-5.4",
     })
     bunExpect(promptArgs.body.variant).toBe("low")
-    bunExpect(promptArgs.body.options).toBeUndefined()
+    bunExpect(promptArgs.body.options).toEqual({
+      reasoningEffort: "high",
+      thinking: { type: "disabled" },
+    })
+    bunExpect(promptArgs.body.maxOutputTokens).toBe(4096)
     bunExpect(getSessionPromptParams("test-session")).toEqual({
       temperature: 0.4,
       topP: 0.7,
+      maxOutputTokens: 4096,
       options: {
         reasoningEffort: "high",
         thinking: { type: "disabled" },
-        maxTokens: 4096,
       },
     })
+  })
+
+  bunTest("forwards category temperature through the sync prompt body", async () => {
+    //#given
+    const { sendSyncPrompt } = require("./sync-prompt-sender")
+
+    let promptArgs: any
+    const promptWithModelSuggestionRetry = bunMock(async (_client: any, input: any) => {
+      promptArgs = input
+    })
+
+    const input = {
+      sessionID: "test-session",
+      agentToUse: "sisyphus-junior",
+      args: {
+        description: "test task",
+        prompt: "test prompt",
+        category: "quick",
+        run_in_background: false,
+        load_skills: [],
+      },
+      systemContent: undefined,
+      categoryModel: {
+        providerID: "openai",
+        modelID: "gpt-5.4",
+        temperature: 0.25,
+      },
+      toastManager: null,
+      taskId: undefined,
+    }
+
+    //#when
+    await sendSyncPrompt(
+      { session: { promptAsync: bunMock(async () => ({ data: {} })) } },
+      input,
+      {
+        promptWithModelSuggestionRetry,
+        promptSyncWithModelSuggestionRetry: bunMock(async () => {}),
+      },
+    )
+
+    //#then
+    bunExpect(promptWithModelSuggestionRetry).toHaveBeenCalledTimes(1)
+    bunExpect(promptArgs.body.temperature).toBe(0.25)
   })
   bunTest("retries with promptSync for oracle when promptAsync fails with unexpected EOF", async () => {
     //#given

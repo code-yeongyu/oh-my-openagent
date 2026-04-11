@@ -15,7 +15,6 @@ export async function waitForCompletion(
 ): Promise<void> {
   log(`[call_omo_agent] Polling for completion...`)
 
-  // Poll for session completion
   const POLL_INTERVAL_MS = 500
   const MAX_POLL_TIME_MS = 5 * 60 * 1000 // 5 minutes max
   const pollStart = Date.now()
@@ -24,7 +23,6 @@ export async function waitForCompletion(
   const STABILITY_REQUIRED = 3
 
   while (Date.now() - pollStart < MAX_POLL_TIME_MS) {
-    // Check if aborted
     if (toolContext.abort?.aborted) {
       log(`[call_omo_agent] Aborted by user`)
       throw new Error("Task aborted.")
@@ -32,19 +30,16 @@ export async function waitForCompletion(
 
     await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS))
 
-    // Check session status
     const statusResult = await ctx.client.session.status()
     const allStatuses = normalizeSDKResponse(statusResult, {} as Record<string, { type: string }>)
     const sessionStatus = allStatuses[sessionID]
 
-    // If session is actively running, reset stability counter
     if (sessionStatus && sessionStatus.type !== "idle") {
       stablePolls = 0
       lastMsgCount = 0
       continue
     }
 
-    // Session is idle - check message stability
     const messagesCheck = await ctx.client.session.messages({ path: { id: sessionID } })
     const msgs = normalizeSDKResponse(messagesCheck, [] as Array<unknown>, {
       preferResponseOnMissingData: true,

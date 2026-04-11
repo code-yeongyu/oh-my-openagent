@@ -1,4 +1,4 @@
-import { spawnWithWindowsHide } from "../../../shared/spawn-with-windows-hide"
+import { spawnWithTimeout } from "../spawn-with-timeout"
 
 export interface GhCliInfo {
   installed: boolean
@@ -21,13 +21,11 @@ async function checkBinaryExists(binary: string): Promise<{ exists: boolean; pat
 
 async function getGhVersion(): Promise<string | null> {
   try {
-    const processResult = spawnWithWindowsHide(["gh", "--version"], { stdout: "pipe", stderr: "pipe" })
-    const output = await new Response(processResult.stdout).text()
-    await processResult.exited
-    if (processResult.exitCode !== 0) return null
+    const result = await spawnWithTimeout(["gh", "--version"], { stdout: "pipe", stderr: "pipe" })
+    if (result.timedOut || result.exitCode !== 0) return null
 
-    const matchedVersion = output.match(/gh version (\S+)/)
-    return matchedVersion?.[1] ?? output.trim().split("\n")[0] ?? null
+    const matchedVersion = result.stdout.match(/gh version (\S+)/)
+    return matchedVersion?.[1] ?? result.stdout.trim().split("\n")[0] ?? null
   } catch {
     return null
   }
@@ -40,18 +38,17 @@ async function getGhAuthStatus(): Promise<{
   error: string | null
 }> {
   try {
-    const processResult = spawnWithWindowsHide(["gh", "auth", "status"], {
-      stdout: "pipe",
-      stderr: "pipe",
-      env: { ...process.env, GH_NO_UPDATE_NOTIFIER: "1" },
-    })
+    const result = await spawnWithTimeout(
+      ["gh", "auth", "status"],
+      { stdout: "pipe", stderr: "pipe", env: { ...process.env, GH_NO_UPDATE_NOTIFIER: "1" } }
+    )
 
-    const stdout = await new Response(processResult.stdout).text()
-    const stderr = await new Response(processResult.stderr).text()
-    await processResult.exited
+    if (result.timedOut) {
+      return { authenticated: false, username: null, scopes: [], error: "gh auth status timed out" }
+    }
 
-    const output = stderr || stdout
-    if (processResult.exitCode === 0) {
+    const output = result.stderr || result.stdout
+    if (result.exitCode === 0) {
       const usernameMatch = output.match(/Logged in to github\.com account (\S+)/)
       const scopesMatch = output.match(/Token scopes?:\s*(.+)/i)
 

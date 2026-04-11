@@ -24,6 +24,8 @@ npx oh-my-opencode install # alternative
 
 Follow the prompts to configure your Claude, ChatGPT, and Gemini subscriptions. After installation, authenticate your providers as instructed.
 
+Anonymous telemetry is enabled by default to help improve install and runtime reliability. It uses PostHog with a hashed installation identifier and can be disabled with `OMO_SEND_ANONYMOUS_TELEMETRY=0` or `OMO_DISABLE_POSTHOG=1`. See [Privacy Policy](../legal/privacy-policy.md) and [Terms of Service](../legal/terms-of-service.md).
+
 After you install it, you can read this [overview guide](./overview.md) to understand more.
 
 The published package and local binary are still `oh-my-opencode`. Inside `opencode.json`, the compatibility layer now prefers the plugin entry `oh-my-openagent`, while legacy `oh-my-opencode` entries still load with a warning. Plugin config loading recognizes both `oh-my-openagent.json[c]` and `oh-my-opencode.json[c]` during the transition. If you see a "Using legacy package name" warning from `bunx oh-my-opencode doctor`, update your `opencode.json` plugin entry from `"oh-my-opencode"` to `"oh-my-openagent"`.

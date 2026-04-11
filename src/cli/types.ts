@@ -34,6 +34,7 @@ export interface ConfigMergeResult {
 
 export interface DetectedConfig {
   isInstalled: boolean
+  installedVersion: string | null
   hasClaude: boolean
   isMax20: boolean
   hasOpenAI: boolean

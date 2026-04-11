@@ -299,7 +299,7 @@ task({ category: "quick", prompt: "..." }); // "Just get it done fast"
 | `ultrabrain`         | GPT-5.4 (xhigh)        | Deep logical reasoning, complex architecture decisions      |
 | `artistry`           | Gemini 3.1 Pro (high)  | Highly creative or artistic tasks, novel ideas              |
 | `quick`              | GPT-5.4 Mini           | Trivial tasks - single file changes, typo fixes             |
-| `deep`               | GPT-5.3 Codex (medium) | Goal-oriented autonomous problem-solving, thorough research |
+| `deep`               | GPT-5.4 (medium)       | Goal-oriented autonomous problem-solving, thorough research |
 | `unspecified-low`    | Claude Sonnet 4.6      | Tasks that don't fit other categories, low effort           |
 | `unspecified-high`   | Claude Opus 4.6 (max)  | Tasks that don't fit other categories, high effort          |
 | `writing`            | Gemini 3 Flash         | Documentation, prose, technical writing                     |

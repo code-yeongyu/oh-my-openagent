@@ -31,6 +31,19 @@ export function readBoulderState(directory: string): BoulderState | null {
     if (!Array.isArray(parsed.session_ids)) {
       parsed.session_ids = []
     }
+    if (!parsed.session_origins || typeof parsed.session_origins !== "object" || Array.isArray(parsed.session_origins)) {
+      parsed.session_origins = {}
+    }
+    if (parsed.session_ids.length === 1) {
+      const soleSessionId = parsed.session_ids[0]
+      if (
+        typeof soleSessionId === "string"
+        && parsed.session_origins[soleSessionId] !== "appended"
+        && parsed.session_origins[soleSessionId] !== "direct"
+      ) {
+        parsed.session_origins[soleSessionId] = "direct"
+      }
+    }
     if (!parsed.task_sessions || typeof parsed.task_sessions !== "object" || Array.isArray(parsed.task_sessions)) {
       parsed.task_sessions = {}
     }
@@ -56,21 +69,39 @@ export function writeBoulderState(directory: string, state: BoulderState): boole
   }
 }
 
-export function appendSessionId(directory: string, sessionId: string): BoulderState | null {
+export function appendSessionId(
+  directory: string,
+  sessionId: string,
+  origin: "direct" | "appended" = "direct",
+): BoulderState | null {
   const state = readBoulderState(directory)
   if (!state) return null
+
+  if (!state.session_origins || typeof state.session_origins !== "object" || Array.isArray(state.session_origins)) {
+    state.session_origins = {}
+  }
 
   if (!state.session_ids?.includes(sessionId)) {
     if (!Array.isArray(state.session_ids)) {
       state.session_ids = []
     }
     const originalSessionIds = [...state.session_ids]
+    const originalSessionOrigins = { ...state.session_origins }
     state.session_ids.push(sessionId)
+    state.session_origins[sessionId] = origin
     if (writeBoulderState(directory, state)) {
       return state
     }
     state.session_ids = originalSessionIds
+    state.session_origins = originalSessionOrigins
     return null
+  }
+
+  if (!state.session_origins[sessionId]) {
+    state.session_origins[sessionId] = origin
+    if (!writeBoulderState(directory, state)) {
+      return null
+    }
   }
 
   return state
@@ -165,8 +196,25 @@ export function findPrometheusPlans(directory: string): string[] {
   }
 }
 
+const TODO_HEADING_PATTERN = /^##\s+TODOs\b/i
+const FINAL_VERIFICATION_HEADING_PATTERN = /^##\s+Final Verification Wave\b/i
+const SECOND_LEVEL_HEADING_PATTERN = /^##\s+/
+const UNCHECKED_CHECKBOX_PATTERN = /^(\s*)[-*]\s*\[\s*\]\s*(.+)$/
+const CHECKED_CHECKBOX_PATTERN = /^(\s*)[-*]\s*\[[xX]\]\s*(.+)$/
+const TODO_TASK_PATTERN = /^\d+\.\s+/
+const FINAL_WAVE_TASK_PATTERN = /^F\d+\.\s+/i
+
+type ProgressSection = "todo" | "final-wave" | "other"
+
 /**
  * Parse a plan file and count checkbox progress.
+ *
+ * Only top-level (zero-indent) checkboxes under `## TODOs` and
+ * `## Final Verification Wave` sections are counted. The checkbox
+ * body must carry a valid task label (`N.` for TODOs, `FN.` for
+ * Final Verification Wave). Nested acceptance-criteria checkboxes
+ * and checkboxes in other sections are intentionally ignored so
+ * that progress tracking stays aligned with `readCurrentTopLevelTask`.
  */
 export function getPlanProgress(planPath: string): PlanProgress {
   if (!existsSync(planPath)) {
@@ -175,21 +223,86 @@ export function getPlanProgress(planPath: string): PlanProgress {
 
   try {
     const content = readFileSync(planPath, "utf-8")
-    
-    // Match markdown checkboxes: - [ ] or - [x] or - [X]
-    const uncheckedMatches = content.match(/^\s*[-*]\s*\[\s*\]/gm) || []
-    const checkedMatches = content.match(/^\s*[-*]\s*\[[xX]\]/gm) || []
+    const lines = content.split(/\r?\n/)
 
-    const total = uncheckedMatches.length + checkedMatches.length
-    const completed = checkedMatches.length
+    // Check if the plan has structured sections (## TODOs / ## Final Verification Wave)
+    const hasStructuredSections = lines.some(
+      (line) => TODO_HEADING_PATTERN.test(line) || FINAL_VERIFICATION_HEADING_PATTERN.test(line),
+    )
 
-    return {
-      total,
-      completed,
-      isComplete: total > 0 && completed === total,
+    if (hasStructuredSections) {
+      // Structured plan: only count top-level checkboxes with numbered labels
+      // under ## TODOs and ## Final Verification Wave sections
+      return getStructuredPlanProgress(lines)
     }
+
+    // Simple plan: count all top-level checkboxes anywhere
+    return getSimplePlanProgress(content)
   } catch {
     return { total: 0, completed: 0, isComplete: true }
+  }
+}
+
+function getStructuredPlanProgress(lines: string[]): PlanProgress {
+  let section: ProgressSection = "other"
+  let total = 0
+  let completed = 0
+
+  for (const line of lines) {
+    if (SECOND_LEVEL_HEADING_PATTERN.test(line)) {
+      section = TODO_HEADING_PATTERN.test(line)
+        ? "todo"
+        : FINAL_VERIFICATION_HEADING_PATTERN.test(line)
+          ? "final-wave"
+          : "other"
+      continue
+    }
+
+    if (section !== "todo" && section !== "final-wave") {
+      continue
+    }
+
+    const checkedMatch = line.match(CHECKED_CHECKBOX_PATTERN)
+    const uncheckedMatch = checkedMatch ? null : line.match(UNCHECKED_CHECKBOX_PATTERN)
+    const match = checkedMatch ?? uncheckedMatch
+    if (!match) {
+      continue
+    }
+
+    if (match[1].length > 0) {
+      continue
+    }
+
+    const taskBody = match[2].trim()
+    const labelPattern = section === "todo" ? TODO_TASK_PATTERN : FINAL_WAVE_TASK_PATTERN
+    if (!labelPattern.test(taskBody)) {
+      continue
+    }
+
+    total++
+    if (checkedMatch) {
+      completed++
+    }
+  }
+
+  return {
+    total,
+    completed,
+    isComplete: total > 0 && completed === total,
+  }
+}
+
+function getSimplePlanProgress(content: string): PlanProgress {
+  const uncheckedMatches = content.match(/^[-*]\s*\[\s*\]/gm) || []
+  const checkedMatches = content.match(/^[-*]\s*\[[xX]\]/gm) || []
+
+  const total = uncheckedMatches.length + checkedMatches.length
+  const completed = checkedMatches.length
+
+  return {
+    total,
+    completed,
+    isComplete: total > 0 && completed === total,
   }
 }
 
@@ -213,6 +326,9 @@ export function createBoulderState(
     active_plan: planPath,
     started_at: new Date().toISOString(),
     session_ids: [sessionId],
+    session_origins: {
+      [sessionId]: "direct",
+    },
     plan_name: getPlanName(planPath),
     ...(agent !== undefined ? { agent } : {}),
     ...(worktreePath !== undefined ? { worktree_path: worktreePath } : {}),

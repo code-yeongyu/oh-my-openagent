@@ -1,4 +1,4 @@
-import { describe, expect, it, mock } from "bun:test"
+import { afterAll, describe, expect, it, mock } from "bun:test"
 
 mock.module("../../shared/system-directive", () => ({
   createSystemDirective: (type: string) => `[DIRECTIVE:${type}]`,
@@ -13,6 +13,10 @@ mock.module("../../shared/system-directive", () => ({
     PROMETHEUS_READ_ONLY: "PROMETHEUS READ-ONLY",
   },
 }))
+
+afterAll(() => {
+  mock.restore()
+})
 
 import { createCompactionContextInjector } from "./index"
 import { TaskHistory } from "../../features/background-agent/task-history"

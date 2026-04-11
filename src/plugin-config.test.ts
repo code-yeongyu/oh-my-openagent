@@ -1,6 +1,28 @@
-import { describe, expect, it } from "bun:test";
+import { afterEach, describe, expect, it, mock, spyOn } from "bun:test";
+import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import * as shared from "./shared"
 import { mergeConfigs, parseConfigPartially } from "./plugin-config";
 import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig } from "./config";
+
+const tempDirs: string[] = []
+
+function createConfig(config: Partial<OhMyOpenCodeConfig>): OhMyOpenCodeConfig {
+  return OhMyOpenCodeConfigSchema.parse(config)
+}
+
+async function importFreshPluginConfigModule(): Promise<typeof import("./plugin-config")> {
+  return import(`./plugin-config?test=${Date.now()}-${Math.random()}`)
+}
+
+afterEach(() => {
+  mock.restore()
+
+  for (const dir of tempDirs.splice(0)) {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
 
 describe("mergeConfigs", () => {
   describe("categories merging", () => {
@@ -9,7 +31,7 @@ describe("mergeConfigs", () => {
     // then should deep merge categories, not override completely
 
     it("should deep merge categories from base and override", () => {
-      const base = {
+      const base = createConfig({
         categories: {
           general: {
             model: "openai/gpt-5.4",
@@ -19,9 +41,9 @@ describe("mergeConfigs", () => {
             model: "anthropic/claude-haiku-4-5",
           },
         },
-      } as OhMyOpenCodeConfig;
+      });
 
-      const override = {
+      const override = createConfig({
         categories: {
           general: {
             temperature: 0.3,
@@ -30,7 +52,7 @@ describe("mergeConfigs", () => {
             model: "google/gemini-3.1-pro",
           },
         },
-      } as unknown as OhMyOpenCodeConfig;
+      });
 
       const result = mergeConfigs(base, override);
 
@@ -45,15 +67,15 @@ describe("mergeConfigs", () => {
     });
 
     it("should preserve base categories when override has no categories", () => {
-      const base: OhMyOpenCodeConfig = {
+      const base = createConfig({
         categories: {
           general: {
             model: "openai/gpt-5.4",
           },
         },
-      };
+      });
 
-      const override: OhMyOpenCodeConfig = {};
+      const override = createConfig({});
 
       const result = mergeConfigs(base, override);
 
@@ -61,15 +83,15 @@ describe("mergeConfigs", () => {
     });
 
     it("should use override categories when base has no categories", () => {
-      const base: OhMyOpenCodeConfig = {};
+      const base = createConfig({});
 
-      const override: OhMyOpenCodeConfig = {
+      const override = createConfig({
         categories: {
           general: {
             model: "openai/gpt-5.4",
           },
         },
-      };
+      });
 
       const result = mergeConfigs(base, override);
 
@@ -79,18 +101,18 @@ describe("mergeConfigs", () => {
 
   describe("existing behavior preservation", () => {
     it("should deep merge agents", () => {
-      const base: OhMyOpenCodeConfig = {
+      const base = createConfig({
         agents: {
           oracle: { model: "openai/gpt-5.4" },
         },
-      };
+      });
 
-      const override: OhMyOpenCodeConfig = {
+      const override = createConfig({
         agents: {
           oracle: { temperature: 0.5 },
           explore: { model: "anthropic/claude-haiku-4-5" },
         },
-      };
+      });
 
       const result = mergeConfigs(base, override);
 
@@ -100,13 +122,13 @@ describe("mergeConfigs", () => {
     });
 
     it("should merge disabled arrays without duplicates", () => {
-      const base: OhMyOpenCodeConfig = {
+      const base = createConfig({
         disabled_hooks: ["comment-checker", "think-mode"],
-      };
+      });
 
-      const override: OhMyOpenCodeConfig = {
+      const override = createConfig({
         disabled_hooks: ["think-mode", "session-recovery"],
-      };
+      });
 
       const result = mergeConfigs(base, override);
 
@@ -117,13 +139,13 @@ describe("mergeConfigs", () => {
     });
 
     it("should union disabled_tools from base and override without duplicates", () => {
-      const base: OhMyOpenCodeConfig = {
+      const base = createConfig({
         disabled_tools: ["todowrite", "interactive_bash"],
-      };
+      });
 
-      const override: OhMyOpenCodeConfig = {
+      const override = createConfig({
         disabled_tools: ["interactive_bash", "look_at"],
-      };
+      });
 
       const result = mergeConfigs(base, override);
 
@@ -277,3 +299,128 @@ describe("parseConfigPartially", () => {
     });
   });
 });
+
+describe("loadPluginConfig", () => {
+  it("should only honor mcp_env_allowlist from user config", async () => {
+    // given
+    const rootDir = mkdtempSync(join(tmpdir(), "omo-plugin-config-"))
+    const userConfigDir = join(rootDir, "user-config")
+    const projectDir = join(rootDir, "project")
+    const projectConfigDir = join(projectDir, ".opencode")
+
+    tempDirs.push(rootDir)
+    mkdirSync(userConfigDir, { recursive: true })
+    mkdirSync(projectConfigDir, { recursive: true })
+
+    writeFileSync(
+      join(userConfigDir, "oh-my-openagent.jsonc"),
+      JSON.stringify({ mcp_env_allowlist: ["USER_ONLY_TOKEN"] })
+    )
+    writeFileSync(
+      join(projectConfigDir, "oh-my-openagent.jsonc"),
+      JSON.stringify({ mcp_env_allowlist: ["PROJECT_TOKEN"] })
+    )
+
+    process.env.OPENCODE_CONFIG_DIR = userConfigDir
+
+    // when
+    const { loadPluginConfig } = await importFreshPluginConfigModule()
+    const config = loadPluginConfig(projectDir, {})
+
+    // then
+    expect(config.mcp_env_allowlist).toEqual(["USER_ONLY_TOKEN"])
+  })
+
+  it("should ignore edits to the renamed legacy backup after migration", async () => {
+    // given
+    const rootDir = mkdtempSync(join(tmpdir(), "omo-plugin-config-legacy-"))
+    const userConfigDir = join(rootDir, "user-config")
+    const projectDir = join(rootDir, "project")
+    const projectConfigDir = join(projectDir, ".opencode")
+    const legacyConfigPath = join(projectConfigDir, "oh-my-opencode.jsonc")
+    const backupConfigPath = `${legacyConfigPath}.bak`
+    const canonicalConfigPath = join(projectConfigDir, "oh-my-openagent.jsonc")
+
+    tempDirs.push(rootDir)
+    mkdirSync(userConfigDir, { recursive: true })
+    mkdirSync(projectConfigDir, { recursive: true })
+    writeFileSync(legacyConfigPath, JSON.stringify({ agents: { oracle: { model: "openai/gpt-5.4" } } }))
+
+    process.env.OPENCODE_CONFIG_DIR = userConfigDir
+
+    // when
+    const { loadPluginConfig } = await importFreshPluginConfigModule()
+    loadPluginConfig(projectDir, {})
+    writeFileSync(backupConfigPath, JSON.stringify({ agents: { oracle: { model: "openai/gpt-5-nano" } } }))
+    const reloadedConfig = loadPluginConfig(projectDir, {})
+
+    // then
+    expect(existsSync(legacyConfigPath)).toBe(false)
+    expect(existsSync(backupConfigPath)).toBe(true)
+    expect(readFileSync(canonicalConfigPath, "utf-8")).toContain('"openai/gpt-5.4"')
+    expect(reloadedConfig.agents?.oracle?.model).toBe("openai/gpt-5.4")
+  })
+
+  it("should still load config from legacy path when migration fails", async () => {
+    // given - legacy config exists but canonical path is not writable
+    const rootDir = mkdtempSync(join(tmpdir(), "omo-plugin-config-fail-"))
+    const userConfigDir = join(rootDir, "user-config")
+    const projectDir = join(rootDir, "project")
+    const projectConfigDir = join(projectDir, ".opencode")
+    const legacyConfigPath = join(projectConfigDir, "oh-my-opencode.json")
+
+    tempDirs.push(rootDir)
+    mkdirSync(userConfigDir, { recursive: true })
+    mkdirSync(projectConfigDir, { recursive: true })
+    writeFileSync(legacyConfigPath, JSON.stringify({ agents: { oracle: { model: "openai/gpt-5.4" } } }))
+
+    // Make the directory read-only so migration write fails
+    // (simulates Windows file lock / permission issues)
+    if (process.platform !== "win32") {
+      chmodSync(projectConfigDir, 0o555)
+    }
+
+    process.env.OPENCODE_CONFIG_DIR = userConfigDir
+
+    // when
+    let config: OhMyOpenCodeConfig
+    try {
+      const fresh = await importFreshPluginConfigModule()
+      config = fresh.loadPluginConfig(projectDir, {})
+    } finally {
+      // Restore permissions for cleanup
+      if (process.platform !== "win32") {
+        chmodSync(projectConfigDir, 0o755)
+      }
+    }
+
+    // then - should still load the config from legacy path
+    expect(config.agents?.oracle?.model).toBe("openai/gpt-5.4")
+  })
+
+  it("should load migrated legacy project config on the first load", async () => {
+    // given
+    const rootDir = mkdtempSync(join(tmpdir(), "omo-plugin-config-first-load-"))
+    const userConfigDir = join(rootDir, "user-config")
+    const projectDir = join(rootDir, "project")
+    const projectConfigDir = join(projectDir, ".opencode")
+    const legacyConfigPath = join(projectConfigDir, "oh-my-opencode.jsonc")
+    const canonicalConfigPath = join(projectConfigDir, "oh-my-openagent.jsonc")
+
+    tempDirs.push(rootDir)
+    mkdirSync(userConfigDir, { recursive: true })
+    mkdirSync(projectConfigDir, { recursive: true })
+    writeFileSync(legacyConfigPath, JSON.stringify({ agents: { oracle: { model: "openai/gpt-5.4" } } }))
+
+    process.env.OPENCODE_CONFIG_DIR = userConfigDir
+
+    // when
+    const { loadPluginConfig } = await importFreshPluginConfigModule()
+    const config = loadPluginConfig(projectDir, {})
+
+    // then
+    expect(existsSync(legacyConfigPath)).toBe(false)
+    expect(existsSync(canonicalConfigPath)).toBe(true)
+    expect(config.agents?.oracle?.model).toBe("openai/gpt-5.4")
+  })
+})

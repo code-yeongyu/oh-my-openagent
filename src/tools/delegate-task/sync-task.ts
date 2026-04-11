@@ -3,6 +3,7 @@ import type { DelegateTaskArgs, ToolContextWithMetadata, DelegatedModelConfig } 
 import type { ExecutorContext, ParentContext } from "./executor-types"
 import { getTaskToastManager } from "../../features/task-toast-manager"
 import { storeToolMetadata } from "../../features/tool-metadata-store"
+import { resolveCallID } from "./resolve-call-id"
 import { subagentSessions, syncSubagentSessions, setSessionAgent } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
@@ -10,6 +11,7 @@ import { formatDuration } from "./time-formatter"
 import { formatDetailedError } from "./error-formatting"
 import { syncTaskDeps, type SyncTaskDeps } from "./sync-task-deps"
 import { setSessionFallbackChain, clearSessionFallbackChain } from "../../hooks/model-fallback/hook"
+import { retrySyncPromptWithFallbacks } from "./sync-task-fallback"
 
 export async function executeSyncTask(
   args: DelegateTaskArgs,
@@ -36,14 +38,29 @@ export async function executeSyncTask(
       spawnReservation = await manager.reserveSubagentSpawn(parentContext.sessionID)
     }
 
-    const spawnContext = spawnReservation?.spawnContext
-      ?? (typeof manager?.assertCanSpawn === "function"
-        ? await manager.assertCanSpawn(parentContext.sessionID)
-        : {
-            rootSessionID: parentContext.sessionID,
-            parentDepth: 0,
-            childDepth: 1,
-          })
+    // Depth/descendant guard. We must NOT silently fall back to childDepth: 1
+    // when the manager is unavailable or lacks the spawn methods, because that
+    // would let subagents recurse without bound. The only safe fallback is
+    // when the manager genuinely cannot enforce limits (legacy SDK), in which
+    // case we still record childDepth: 1 but log a warning so regressions are
+    // visible.
+    let spawnContext: { rootSessionID: string; parentDepth: number; childDepth: number }
+    if (spawnReservation?.spawnContext) {
+      spawnContext = spawnReservation.spawnContext
+    } else if (typeof manager?.assertCanSpawn === "function") {
+      spawnContext = await manager.assertCanSpawn(parentContext.sessionID)
+    } else {
+      log(
+        "[task] WARNING: BackgroundManager has no spawn enforcement methods (reserveSubagentSpawn / assertCanSpawn). " +
+        "Depth and descendant limits cannot be enforced for this task. This indicates an old SDK or a misconfiguration.",
+        { parentSessionID: parentContext.sessionID }
+      )
+      spawnContext = {
+        rootSessionID: parentContext.sessionID,
+        parentDepth: 0,
+        childDepth: 1,
+      }
+    }
 
     const createSessionResult = await deps.createSyncSession(client, {
       parentSessionID: parentContext.sessionID,
@@ -114,22 +131,48 @@ export async function executeSyncTask(
       },
     }
     await ctx.metadata?.(syncTaskMeta)
-    if (ctx.callID) {
-      storeToolMetadata(ctx.sessionID, ctx.callID, syncTaskMeta)
+    const callID = resolveCallID(ctx)
+    if (callID) {
+      storeToolMetadata(ctx.sessionID, callID, syncTaskMeta)
     }
 
-    const promptError = await deps.sendSyncPrompt(client, {
+    let effectiveCategoryModel = categoryModel
+    let promptError = await deps.sendSyncPrompt(client, {
       sessionID,
       agentToUse,
       args,
       systemContent,
-      categoryModel,
+      categoryModel: effectiveCategoryModel,
       toastManager,
       taskId,
       sisyphusAgentConfig: executorCtx.sisyphusAgentConfig,
     })
     if (promptError) {
-      return promptError
+      const promptResult = await retrySyncPromptWithFallbacks({
+        sessionID,
+        initialError: promptError,
+        categoryModel: effectiveCategoryModel,
+        fallbackChain,
+        sendPrompt: async (fallbackModel) => {
+          return deps.sendSyncPrompt(client, {
+            sessionID,
+            agentToUse,
+            args,
+            systemContent,
+            categoryModel: fallbackModel,
+            toastManager,
+            taskId,
+            sisyphusAgentConfig: executorCtx.sisyphusAgentConfig,
+          })
+        },
+      })
+
+      promptError = promptResult.promptError
+      effectiveCategoryModel = promptResult.categoryModel
+
+      if (promptError) {
+        return promptError
+      }
     }
 
     try {
@@ -151,8 +194,8 @@ export async function executeSyncTask(
       const duration = formatDuration(startTime)
 
       // 检测模型路由是否与父 session 不同，给用户可见的提示
-      const actualModelStr = categoryModel
-        ? `${categoryModel.providerID}/${categoryModel.modelID}`
+      const actualModelStr = effectiveCategoryModel
+        ? `${effectiveCategoryModel.providerID}/${effectiveCategoryModel.modelID}`
         : undefined
       const parentModelStr = parentContext.model
         ? `${parentContext.model.providerID}/${parentContext.model.modelID}`

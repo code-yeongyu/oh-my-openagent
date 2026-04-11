@@ -38,8 +38,8 @@ describe("no-sisyphus-gpt hook", () => {
 
     // then - toast is shown for every message
     expect(showToast).toHaveBeenCalledTimes(2)
-    expect(output1.message.agent).toBe(HEPHAESTUS_DISPLAY)
-    expect(output2.message.agent).toBe(HEPHAESTUS_DISPLAY)
+    expect(output1.message.agent).toBe("hephaestus")
+    expect(output2.message.agent).toBe("hephaestus")
     expect(showToast.mock.calls[0]?.[0]).toMatchObject({
       body: {
         title: "NEVER Use Sisyphus with GPT",
@@ -131,6 +131,6 @@ describe("no-sisyphus-gpt hook", () => {
 
     // then - toast shown via session-agent fallback
     expect(showToast).toHaveBeenCalledTimes(1)
-    expect(output.message.agent).toBe(HEPHAESTUS_DISPLAY)
+    expect(output.message.agent).toBe("hephaestus")
   })
 })

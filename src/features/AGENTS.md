@@ -1,6 +1,6 @@
 # src/features/ — 19 Feature Modules
 
-**Generated:** 2026-03-06
+**Generated:** 2026-04-11
 
 ## OVERVIEW
 
@@ -11,12 +11,12 @@ Standalone feature modules wired into plugin/ layer. Each is self-contained with
 | Module | Files | Complexity | Purpose |
 |--------|-------|------------|---------|
 | **opencode-skill-loader** | 33 | HIGH | YAML frontmatter skill loading from 4 scopes |
-| **background-agent** | 31 | HIGH | Task lifecycle, concurrency (5/model), polling, spawner pattern |
-| **tmux-subagent** | 30 | HIGH | Tmux pane management, grid planning, session orchestration |
+| **background-agent** | 47 | HIGH | Task lifecycle, concurrency (5/model), polling, spawner pattern, circuit breaker |
+| **tmux-subagent** | 34 | HIGH | Tmux pane management, grid planning, session orchestration |
 | **mcp-oauth** | 18 | HIGH | OAuth 2.0 + PKCE + DCR (RFC 7591) for MCP servers |
-| **builtin-skills** | 17 | LOW | 6 skills: git-master, playwright, playwright-cli, agent-browser, dev-browser, frontend-ui-ux |
-| **skill-mcp-manager** | 12 | MEDIUM | MCP client lifecycle per session (stdio + HTTP) |
-| **claude-code-plugin-loader** | 10 | MEDIUM | Unified plugin discovery from .opencode/plugins/ |
+| **builtin-skills** | 17 | LOW | 8 skills: git-master, playwright, playwright-cli, agent-browser, dev-browser, frontend-ui-ux, review-work, ai-slop-remover |
+| **skill-mcp-manager** | 18 | HIGH | Tier-3 MCP client lifecycle per session (stdio + HTTP + OAuth step-up) |
+| **claude-code-plugin-loader** | 15 | MEDIUM | Unified plugin discovery from .opencode/plugins/ |
 | **builtin-commands** | 11 | LOW | Command templates: refactor, init-deep, handoff, etc. |
 | **claude-tasks** | 7 | MEDIUM | Task schema + file storage + OpenCode todo sync |
 | **claude-code-mcp-loader** | 6 | MEDIUM | .mcp.json loading with ${VAR} env expansion |
@@ -32,12 +32,13 @@ Standalone feature modules wired into plugin/ layer. Each is self-contained with
 
 ## KEY MODULES
 
-### background-agent (31 files, ~10k LOC)
+### background-agent (47 files, ~10k LOC)
 
 Core orchestration engine. `BackgroundManager` manages task lifecycle:
 - States: pending → running → completed/error/cancelled/interrupt
 - Concurrency: per-model/provider limits via `ConcurrencyManager` (FIFO queue)
 - Polling: 3s interval, completion via idle events + stability detection (10s unchanged)
+- Circuit breaker: automatic failure detection and recovery
 - spawner/: 8 focused files composing via `SpawnerContext` interface
 
 ### opencode-skill-loader (33 files, ~3.2k LOC)
@@ -48,7 +49,7 @@ Core orchestration engine. `BackgroundManager` manages task lifecycle:
 - Template resolution with variable substitution
 - Provider gating for model-specific skills
 
-### tmux-subagent (30 files, ~3.6k LOC)
+### tmux-subagent (34 files, ~3.6k LOC)
 
 State-first tmux integration:
 - `TmuxSessionManager`: pane lifecycle, grid planning
@@ -56,7 +57,7 @@ State-first tmux integration:
 - Polling manager for session health
 - Event handlers for pane creation/destruction
 
-### builtin-skills (6 skill objects)
+### builtin-skills (8 skill objects)
 
 | Skill | Size | MCP | Tools |
 |-------|------|-----|-------|
@@ -66,5 +67,7 @@ State-first tmux integration:
 | playwright-cli | 268 LOC | — | Bash(playwright-cli:*) |
 | dev-browser | 221 LOC | — | Bash |
 | frontend-ui-ux | 79 LOC | — | — |
+| review-work | ~LOC | --- | --- |
+| ai-slop-remover | ~LOC | --- | --- |
 
 Browser variant selected by `browserProvider` config: playwright (default) | playwright-cli | agent-browser.

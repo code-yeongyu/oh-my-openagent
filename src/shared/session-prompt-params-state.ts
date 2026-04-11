@@ -1,6 +1,7 @@
 export type SessionPromptParams = {
   temperature?: number
   topP?: number
+  maxOutputTokens?: number
   options?: Record<string, unknown>
 }
 
@@ -10,6 +11,7 @@ export function setSessionPromptParams(sessionID: string, params: SessionPromptP
   sessionPromptParams.set(sessionID, {
     ...(params.temperature !== undefined ? { temperature: params.temperature } : {}),
     ...(params.topP !== undefined ? { topP: params.topP } : {}),
+    ...(params.maxOutputTokens !== undefined ? { maxOutputTokens: params.maxOutputTokens } : {}),
     ...(params.options !== undefined ? { options: { ...params.options } } : {}),
   })
 }
@@ -21,6 +23,7 @@ export function getSessionPromptParams(sessionID: string): SessionPromptParams |
   return {
     ...(params.temperature !== undefined ? { temperature: params.temperature } : {}),
     ...(params.topP !== undefined ? { topP: params.topP } : {}),
+    ...(params.maxOutputTokens !== undefined ? { maxOutputTokens: params.maxOutputTokens } : {}),
     ...(params.options !== undefined ? { options: { ...params.options } } : {}),
   }
 }

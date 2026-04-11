@@ -16,6 +16,7 @@ export function createTrackedSession(params: {
     lastSeenAt: now,
     closePending: false,
     closeRetryCount: 0,
+    activityVersion: 0,
   }
 }
 

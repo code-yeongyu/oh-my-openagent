@@ -1,3 +1,5 @@
+/// <reference types="bun-types" />
+
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test"
 import { mkdirSync, writeFileSync, rmSync } from "fs"
 import { join } from "path"
@@ -14,7 +16,7 @@ describe("getSystemMcpServerNames", () => {
       homedir: () => TEST_HOME,
       tmpdir,
     }))
-    mock.module("../../shared", () => ({
+    mock.module("../../shared/claude-config-dir", () => ({
       getClaudeConfigDir: () => join(TEST_HOME, ".claude"),
     }))
   })
@@ -136,6 +138,41 @@ describe("getSystemMcpServerNames", () => {
     }
   })
 
+  it("removes a server name when a higher-precedence config disables it", async () => {
+    // given
+    writeFileSync(join(TEST_HOME, ".claude.json"), JSON.stringify({
+      mcpServers: {
+        playwright: {
+          command: "npx",
+          args: ["@playwright/mcp@latest"],
+        },
+      },
+    }))
+    writeFileSync(join(TEST_DIR, ".mcp.json"), JSON.stringify({
+      mcpServers: {
+        playwright: {
+          command: "npx",
+          args: ["@playwright/mcp@latest"],
+          disabled: true,
+        },
+      },
+    }))
+
+    const originalCwd = process.cwd()
+    process.chdir(TEST_DIR)
+
+    try {
+      // when
+      const { getSystemMcpServerNames } = await import("./loader")
+      const names = getSystemMcpServerNames()
+
+      // then
+      expect(names.has("playwright")).toBe(false)
+    } finally {
+      process.chdir(originalCwd)
+    }
+  })
+
    it("merges server names from multiple .mcp.json files", async () => {
      // given
      mkdirSync(join(TEST_DIR, ".claude"), { recursive: true })
@@ -198,10 +235,10 @@ describe("getSystemMcpServerNames", () => {
       }
     })
 
-    it("reads both ~/.claude.json and ~/.claude/.mcp.json for user scope", async () => {
-      // given
-      const claudeDir = join(TEST_HOME, ".claude")
-      mkdirSync(claudeDir, { recursive: true })
+     it("reads both ~/.claude.json and ~/.claude/.mcp.json for user scope", async () => {
+       // given
+       const claudeDir = join(TEST_HOME, ".claude")
+       mkdirSync(claudeDir, { recursive: true })
 
       writeFileSync(join(TEST_HOME, ".claude.json"), JSON.stringify({
         mcpServers: {
@@ -226,10 +263,55 @@ describe("getSystemMcpServerNames", () => {
         // then
         expect(names.has("server-from-claude-json")).toBe(true)
         expect(names.has("server-from-mcp-json")).toBe(true)
+       } finally {
+         process.chdir(originalCwd)
+       }
+      })
+
+    it("ignores local-scope user MCP entries for other projects", async () => {
+      //#given
+      const otherProjectDir = join(TEST_DIR, "project-a")
+      const currentProjectDir = join(TEST_DIR, "project-b")
+      mkdirSync(otherProjectDir, { recursive: true })
+      mkdirSync(currentProjectDir, { recursive: true })
+
+      writeFileSync(join(TEST_HOME, ".claude.json"), JSON.stringify({
+        mcpServers: {
+          playwright: {
+            command: "npx",
+            args: ["@playwright/mcp@latest"],
+            scope: "local",
+            projectPath: otherProjectDir,
+          },
+          sqlite: {
+            command: "uvx",
+            args: ["mcp-server-sqlite"],
+            scope: "local",
+            projectPath: currentProjectDir,
+          },
+          memory: {
+            command: "npx",
+            args: ["memory-mcp"],
+          },
+        },
+      }))
+
+      const originalCwd = process.cwd()
+      process.chdir(currentProjectDir)
+
+      try {
+        //#when
+        const { getSystemMcpServerNames } = await import("./loader")
+        const names = getSystemMcpServerNames()
+
+        //#then
+        expect(names.has("playwright")).toBe(false)
+        expect(names.has("sqlite")).toBe(true)
+        expect(names.has("memory")).toBe(true)
       } finally {
         process.chdir(originalCwd)
       }
-     })
+    })
 })
 
 describe("loadMcpConfigs", () => {
@@ -240,7 +322,7 @@ describe("loadMcpConfigs", () => {
       homedir: () => TEST_HOME,
       tmpdir,
     }))
-    mock.module("../../shared", () => ({
+    mock.module("../../shared/claude-config-dir", () => ({
       getClaudeConfigDir: () => join(TEST_HOME, ".claude"),
     }))
     mock.module("../../shared/logger", () => ({
@@ -334,4 +416,3 @@ describe("loadMcpConfigs", () => {
     }
   })
 })
-

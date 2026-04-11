@@ -143,4 +143,56 @@ describe("createSessionStateStore", () => {
     expect(stagnatedAgainUpdate.hasProgressed).toBe(false)
     expect(stagnatedAgainUpdate.stagnationCount).toBe(1)
   })
+
+  test("given non-codex activity happens after a successful continuation, treats it as progress", () => {
+    // given
+    const sessionID = "ses-non-codex-activity-progress"
+    const state = sessionStateStore.getState(sessionID)
+    const todos = [
+      { id: "1", content: "Task 1", status: "pending", priority: "high" },
+    ]
+
+    sessionStateStore.trackContinuationProgress(sessionID, 1, todos)
+    state.awaitingPostInjectionProgressCheck = true
+    sessionStateStore.recordActivity(sessionID)
+
+    // when
+    const progressUpdate = sessionStateStore.trackContinuationProgress(
+      sessionID,
+      1,
+      todos,
+      { allowActivityProgress: true },
+    )
+
+    // then
+    expect(progressUpdate.hasProgressed).toBe(true)
+    expect(progressUpdate.progressSource).toBe("activity")
+    expect(progressUpdate.stagnationCount).toBe(0)
+  })
+
+  test("given codex activity happens after a successful continuation, keeps counting stagnation", () => {
+    // given
+    const sessionID = "ses-codex-activity-stagnation"
+    const state = sessionStateStore.getState(sessionID)
+    const todos = [
+      { id: "1", content: "Task 1", status: "pending", priority: "high" },
+    ]
+
+    sessionStateStore.trackContinuationProgress(sessionID, 1, todos)
+    state.awaitingPostInjectionProgressCheck = true
+    sessionStateStore.recordActivity(sessionID)
+
+    // when
+    const progressUpdate = sessionStateStore.trackContinuationProgress(
+      sessionID,
+      1,
+      todos,
+      { allowActivityProgress: false },
+    )
+
+    // then
+    expect(progressUpdate.hasProgressed).toBe(false)
+    expect(progressUpdate.progressSource).toBe("none")
+    expect(progressUpdate.stagnationCount).toBe(1)
+  })
 })

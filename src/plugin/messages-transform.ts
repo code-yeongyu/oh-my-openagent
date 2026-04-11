@@ -20,5 +20,9 @@ export function createMessagesTransformHandler(args: {
     await args.hooks.thinkingBlockValidator?.[
       "experimental.chat.messages.transform"
     ]?.(input, output)
+
+    await args.hooks.toolPairValidator?.[
+      "experimental.chat.messages.transform"
+    ]?.(input, output)
   }
 }

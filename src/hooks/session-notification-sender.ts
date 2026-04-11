@@ -40,7 +40,7 @@ export async function sendSessionNotification(
 ): Promise<void> {
   switch (platform) {
     case "darwin": {
-      // Try terminal-notifier first — deterministic click-to-focus
+      // Try terminal-notifier first - deterministic click-to-focus
       const terminalNotifierPath = await getTerminalNotifierPath()
       if (terminalNotifierPath) {
         const bundleId = process.env.__CFBundleIdentifier

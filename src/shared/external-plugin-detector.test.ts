@@ -1,18 +1,26 @@
-import { describe, expect, test, beforeEach, afterEach } from "bun:test"
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 import { detectExternalNotificationPlugin, getNotificationConflictWarning, detectExternalSkillPlugin, getSkillPluginConflictWarning } from "./external-plugin-detector"
 import * as fs from "node:fs"
 import * as path from "node:path"
 import * as os from "node:os"
 
+async function importFreshExternalPluginDetectorModule(): Promise<typeof import("./external-plugin-detector")> {
+  return import(`./external-plugin-detector?test=${Date.now()}-${Math.random()}`)
+}
+
 describe("external-plugin-detector", () => {
   let tempDir: string
+  let tempHomeDir: string
 
   beforeEach(() => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "omo-test-"))
+    tempHomeDir = fs.mkdtempSync(path.join(os.tmpdir(), "omo-home-"))
   })
 
   afterEach(() => {
+    mock.restore()
     fs.rmSync(tempDir, { recursive: true, force: true })
+    fs.rmSync(tempHomeDir, { recursive: true, force: true })
   })
 
   describe("detectExternalNotificationPlugin", () => {
@@ -92,6 +100,32 @@ describe("external-plugin-detector", () => {
       // then - returns the matched known plugin pattern, not the full entry
       expect(result.detected).toBe(true)
       expect(result.pluginName).toContain("opencode-notifier")
+    })
+
+    test("should safely handle tuple-format plugin entries without crashing (fixes #3122)", () => {
+      // given - opencode.json with array/tuple plugin entries
+      const opencodeDir = path.join(tempDir, ".opencode")
+      fs.mkdirSync(opencodeDir, { recursive: true })
+      fs.writeFileSync(
+        path.join(opencodeDir, "opencode.json"),
+        JSON.stringify({
+          plugin: [
+            "oh-my-opencode",
+            ["advanced-tuple-plugin", { debug: true }],
+            "opencode-notifier"
+          ]
+        })
+      )
+
+      // when
+      const result = detectExternalNotificationPlugin(tempDir)
+
+      // then - should detect opencode-notifier without crashing on the tuple entry
+      expect(result.detected).toBe(true)
+      expect(result.pluginName).toBe("opencode-notifier")
+      expect(result.allPlugins).toContain("oh-my-opencode")
+      expect(result.allPlugins).toContain("advanced-tuple-plugin")
+      expect(result.allPlugins).not.toContain(["advanced-tuple-plugin", { debug: true }])
     })
 
     test("should handle JSONC format with comments", () => {
@@ -397,6 +431,31 @@ describe("external-plugin-detector", () => {
       // then
       expect(result.detected).toBe(true)
       expect(result.pluginName).toBe("opencode-skills")
+    })
+
+    test("should detect user-level opencode-skills when project config exists without plugins", async () => {
+      // given
+      const projectConfigDir = path.join(tempDir, ".opencode")
+      const userConfigDir = path.join(tempHomeDir, ".config", "opencode")
+      fs.mkdirSync(projectConfigDir, { recursive: true })
+      fs.mkdirSync(userConfigDir, { recursive: true })
+      fs.writeFileSync(path.join(projectConfigDir, "opencode.json"), JSON.stringify({}))
+      fs.writeFileSync(path.join(userConfigDir, "opencode.json"), JSON.stringify({ plugin: ["opencode-skills"] }))
+
+      const nodeOs = await import("node:os")
+      mock.module("node:os", () => ({
+        ...nodeOs,
+        homedir: () => tempHomeDir,
+      }))
+      const { detectExternalSkillPlugin: detectExternalSkillPluginFresh } = await importFreshExternalPluginDetectorModule()
+
+      // when
+      const result = detectExternalSkillPluginFresh(tempDir)
+
+      // then
+      expect(result.detected).toBe(true)
+      expect(result.pluginName).toBe("opencode-skills")
+      expect(result.allPlugins).toEqual(["opencode-skills"])
     })
 
     test("should NOT match opencode-skills-extra (suffix variation)", () => {

@@ -1,6 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { HOOK_NAME, NON_INTERACTIVE_ENV, SHELL_COMMAND_PATTERNS } from "./constants"
 import { log, buildEnvPrefix } from "../../shared"
+import { detectShellType } from "../../shared/shell-env"
 
 export * from "./constants"
 export * from "./detector"
@@ -52,7 +53,8 @@ export function createNonInteractiveEnvHook(_ctx: PluginInput) {
       // The env vars (GIT_EDITOR=:, EDITOR=:, etc.) must ALWAYS be injected
       // for git commands to prevent interactive prompts.
 
-      const envPrefix = buildEnvPrefix(NON_INTERACTIVE_ENV, "unix")
+      const shellType = detectShellType()
+      const envPrefix = buildEnvPrefix(NON_INTERACTIVE_ENV, shellType)
       
       // Check if the command already starts with the prefix to avoid stacking.
       // This maintains the non-interactive behavior and makes the operation idempotent.

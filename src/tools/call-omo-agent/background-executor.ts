@@ -61,15 +61,18 @@ export async function executeBackground(
     const waitStart = Date.now()
     let sessionId = task.sessionID
     while (!sessionId && Date.now() - waitStart < WAIT_FOR_SESSION_TIMEOUT_MS) {
-      if (toolContext.abort?.aborted) {
-        return `Task aborted while waiting for session to start.\n\nTask ID: ${task.id}`
-      }
       const updated = manager.getTask(task.id)
       if (updated?.status === "error" || updated?.status === "cancelled" || updated?.status === "interrupt") {
         return `Task failed to start (status: ${updated.status}).\n\nTask ID: ${task.id}`
       }
+      sessionId = updated?.sessionID
+      if (sessionId) {
+        break
+      }
+      if (toolContext.abort?.aborted) {
+        break
+      }
       await new Promise(resolve => setTimeout(resolve, WAIT_FOR_SESSION_INTERVAL_MS))
-      sessionId = manager.getTask(task.id)?.sessionID
     }
 
     await toolContext.metadata?.({
@@ -85,10 +88,9 @@ Description: ${task.description}
 Agent: ${task.agent} (subagent)
 Status: ${task.status}
 
-The system will notify you when the task completes.
-Use \`background_output\` tool with task_id="${task.id}" to check progress:
-- block=false (default): Check status immediately - returns full status info
-- block=true: Wait for completion (rarely needed since system notifies)`
+System notifies on completion. Use \`background_output\` with task_id="${task.id}" to check.
+
+Do NOT call background_output now. Wait for <system-reminder> notification first.`
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     return `Failed to launch background agent task: ${message}`

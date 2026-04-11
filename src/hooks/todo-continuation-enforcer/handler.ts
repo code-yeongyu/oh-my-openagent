@@ -11,6 +11,7 @@ import { armCompactionGuard } from "./compaction-guard"
 import type { SessionStateStore } from "./session-state"
 import { handleSessionIdle } from "./idle-event"
 import { handleNonIdleEvent } from "./non-idle-events"
+import { isTokenLimitError } from "./token-limit-detection"
 
 export function createTodoContinuationHandler(args: {
   ctx: PluginInput
@@ -34,11 +35,21 @@ export function createTodoContinuationHandler(args: {
       const sessionID = props?.sessionID as string | undefined
       if (!sessionID) return
 
-      const error = props?.error as { name?: string } | undefined
+      const error = props?.error as { name?: string; message?: string } | undefined
       if (error?.name === "MessageAbortedError" || error?.name === "AbortError") {
         const state = sessionStateStore.getState(sessionID)
+        state.wasCancelled = true
         state.abortDetectedAt = Date.now()
+        state.lastIncompleteCount = undefined
+        state.lastInjectedAt = undefined
+        state.awaitingPostInjectionProgressCheck = false
+        state.stagnationCount = 0
+        state.consecutiveFailures = 0
         log(`[${HOOK_NAME}] Abort detected via session.error`, { sessionID, errorName: error.name })
+      } else if (isTokenLimitError(error)) {
+        const state = sessionStateStore.getState(sessionID)
+        state.tokenLimitDetected = true
+        log(`[${HOOK_NAME}] Token limit error detected via session.error`, { sessionID, errorName: error?.name, errorMessage: error?.message })
       }
 
       sessionStateStore.cancelCountdown(sessionID)

@@ -11,6 +11,7 @@ mock.module("./deduplication-recovery", () => ({
 
 afterAll(() => {
   mock.module("./deduplication-recovery", () => originalDeduplicationRecovery)
+  mock.restore()
 })
 
 function createImmediateTimeouts(): () => void {

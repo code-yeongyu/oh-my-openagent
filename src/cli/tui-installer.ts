@@ -10,6 +10,7 @@ import {
   writeOmoConfig,
 } from "./config-manager"
 import { detectedToInitialValues, formatConfigSummary, SYMBOLS } from "./install-validators"
+import { getUnsupportedOpenCodeVersionMessage } from "./minimum-opencode-version"
 import { promptInstallConfig } from "./tui-install-prompts"
 
 export async function runTuiInstaller(args: InstallArgs, version: string): Promise<number> {
@@ -39,6 +40,13 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
     p.note("Visit https://opencode.ai/docs for installation instructions", "Installation Guide")
   } else {
     spinner.stop(`OpenCode ${openCodeVersion ?? "installed"} ${color.green("[OK]")}`)
+
+    const unsupportedVersionMessage = getUnsupportedOpenCodeVersionMessage(openCodeVersion)
+    if (unsupportedVersionMessage) {
+      p.log.warn(unsupportedVersionMessage)
+      p.outro(color.red("Installation blocked."))
+      return 1
+    }
   }
 
   const config = await promptInstallConfig(detected)
@@ -63,17 +71,10 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
   spinner.stop(`Config written to ${color.cyan(omoResult.configPath)}`)
 
   if (!config.hasClaude) {
-    console.log()
-    console.log(color.bgRed(color.white(color.bold(" CRITICAL WARNING "))))
-    console.log()
-    console.log(color.red(color.bold("  Sisyphus agent is STRONGLY optimized for Claude Opus 4.5.")))
-    console.log(color.red("  Without Claude, you may experience significantly degraded performance:"))
-    console.log(color.dim("    • Reduced orchestration quality"))
-    console.log(color.dim("    • Weaker tool selection and delegation"))
-    console.log(color.dim("    • Less reliable task completion"))
-    console.log()
-    console.log(color.yellow("  Consider subscribing to Claude Pro/Max for the best experience."))
-    console.log()
+    p.log.info(
+      `${color.bold("Note:")} Sisyphus agent performs best with Claude Opus 4.5+.\n` +
+        `Other models work but may have reduced orchestration quality.`,
+    )
   }
 
   if (!config.hasClaude && !config.hasOpenAI && !config.hasGemini && !config.hasCopilot && !config.hasOpencodeZen) {
@@ -84,10 +85,12 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
 
   p.log.success(color.bold(isUpdate ? "Configuration updated!" : "Installation complete!"))
   p.log.message(`Run ${color.cyan("opencode")} to start!`)
+  p.log.info("Anonymous telemetry is enabled by default. Disable it with OMO_SEND_ANONYMOUS_TELEMETRY=0 or OMO_DISABLE_POSTHOG=1.")
+  p.log.info("Docs: docs/legal/privacy-policy.md and docs/legal/terms-of-service.md")
 
   p.note(
     `Include ${color.cyan("ultrawork")} (or ${color.cyan("ulw")}) in your prompt.\n` +
-      `All features work like magic—parallel agents, background tasks,\n` +
+      `All features work like magic-parallel agents, background tasks,\n` +
       `deep exploration, and relentless execution until completion.`,
     "The Magic Word",
   )

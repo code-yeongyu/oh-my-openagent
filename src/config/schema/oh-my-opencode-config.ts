@@ -36,6 +36,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   disabled_commands: z.array(BuiltinCommandNameSchema).optional(),
   /** Disable specific tools by name (e.g., ["todowrite", "todoread"]) */
   disabled_tools: z.array(z.string()).optional(),
+  mcp_env_allowlist: z.array(z.string()).optional(),
   /** Enable hashline_edit tool/hook integrations (default: false) */
   hashline_edit: z.boolean().optional(),
   /** Enable model fallback on API errors (default: false). Set to true to enable automatic model switching when model errors occur. */

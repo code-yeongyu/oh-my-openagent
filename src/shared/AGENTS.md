@@ -1,6 +1,6 @@
-# src/shared/ — 95+ Utility Files in 13 Categories
+# src/shared/ — 100+ Utility Files
 
-**Generated:** 2026-03-06
+**Generated:** 2026-04-11
 
 ## OVERVIEW
 
@@ -10,7 +10,7 @@ Cross-cutting utilities used throughout the plugin. Barrel-exported from `index.
 
 | Category | Files | Key Exports |
 |----------|-------|-------------|
-| **Model Resolution** | 17 | `resolveModel()`, `checkModelAvailability()`, `AGENT_MODEL_REQUIREMENTS` |
+| **Model Resolution** | ~22 | `resolveModel()`, `checkModelAvailability()`, `AGENT_MODEL_REQUIREMENTS` |
 | **Tmux Integration** | 11 | `createTmuxSession()`, `spawnPane()`, `closePane()`, server health |
 | **Configuration & Paths** | 10 | `resolveOpenCodeConfigDir()`, `getDataPath()`, `parseJSONC()` |
 | **Session Management** | 8 | `SessionCursor`, `trackInjectedPath()`, `SessionToolsStore` |

@@ -1,3 +1,5 @@
+/// <reference types="bun-types" />
+
 import { describe, expect, test } from "bun:test"
 
 import { generateModelConfig } from "./model-fallback"
@@ -378,7 +380,7 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then
-      expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-opus-4-6")
+      expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-opus-4.6")
     })
 
     test("Sisyphus is created when multiple fallback providers are available", () => {
@@ -395,7 +397,7 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then
-      expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-opus-4-6")
+      expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-opus-4.6")
     })
 
     test("Sisyphus resolves to gpt-5.4 medium when only OpenAI is available", () => {
@@ -546,6 +548,62 @@ describe("generateModelConfig", () => {
 
       // #then librarian should be omitted when its dedicated providers are unavailable
       expect(result.agents?.librarian).toBeUndefined()
+    })
+  })
+
+  describe("special-case agents include fallback_models", () => {
+    test("explore includes fallback_models when Copilot and Claude are both available", () => {
+      // #given both Copilot and Claude are available
+      const config = createConfig({ hasCopilot: true, hasClaude: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then explore should have fallback_models from the remaining chain entries
+      expect(result.agents?.explore?.model).toBe("anthropic/claude-haiku-4-5")
+      expect(result.agents?.explore?.fallback_models).toBeDefined()
+      expect(result.agents?.explore?.fallback_models?.length).toBeGreaterThan(0)
+    })
+
+    test("explore omits fallback_models when only one provider matches chain entries", () => {
+      // #given only Claude is available
+      const config = createConfig({ hasClaude: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then explore should not have fallback_models (only one chain entry matches)
+      expect(result.agents?.explore?.model).toBe("anthropic/claude-haiku-4-5")
+      expect(result.agents?.explore?.fallback_models).toEqual([
+        {
+          model: "anthropic/claude-haiku-4.5",
+        },
+      ])
+    })
+
+    test("librarian includes fallback_models when opencode-go and Claude are both available", () => {
+      // #given opencode-go and Claude are available
+      const config = createConfig({ hasOpencodeGo: true, hasClaude: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then librarian should have fallback_models
+      expect(result.agents?.librarian?.model).toBe("opencode-go/minimax-m2.7")
+      expect(result.agents?.librarian?.fallback_models).toBeDefined()
+      expect(result.agents?.librarian?.fallback_models?.length).toBeGreaterThan(0)
+    })
+
+    test("librarian omits fallback_models when only one provider matches", () => {
+      // #given only opencode-go is available
+      const config = createConfig({ hasOpencodeGo: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then librarian should not have fallback_models
+      expect(result.agents?.librarian?.model).toBe("opencode-go/minimax-m2.7")
+      expect(result.agents?.librarian?.fallback_models).toBeUndefined()
     })
   })
 

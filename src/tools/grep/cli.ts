@@ -1,6 +1,7 @@
 import { spawn } from "bun"
 import {
   resolveGrepCli,
+  type ResolvedCli,
   type GrepBackend,
   DEFAULT_MAX_DEPTH,
   DEFAULT_MAX_FILESIZE,
@@ -148,17 +149,17 @@ function parseCountOutput(output: string): CountResult[] {
   return results
 }
 
-export async function runRg(options: GrepOptions): Promise<GrepResult> {
+export async function runRg(options: GrepOptions, resolvedCli?: ResolvedCli): Promise<GrepResult> {
   await rgSemaphore.acquire()
   try {
-    return await runRgInternal(options)
+    return await runRgInternal(options, resolvedCli)
   } finally {
     rgSemaphore.release()
   }
 }
 
-async function runRgInternal(options: GrepOptions): Promise<GrepResult> {
-  const cli = resolveGrepCli()
+async function runRgInternal(options: GrepOptions, resolvedCli?: ResolvedCli): Promise<GrepResult> {
+  const cli = resolvedCli ?? resolveGrepCli()
   const args = buildArgs(options, cli.backend)
   const timeout = Math.min(options.timeout ?? DEFAULT_TIMEOUT_MS, DEFAULT_TIMEOUT_MS)
 
@@ -224,17 +225,23 @@ async function runRgInternal(options: GrepOptions): Promise<GrepResult> {
   }
 }
 
-export async function runRgCount(options: Omit<GrepOptions, "context">): Promise<CountResult[]> {
+export async function runRgCount(
+  options: Omit<GrepOptions, "context">,
+  resolvedCli?: ResolvedCli
+): Promise<CountResult[]> {
   await rgSemaphore.acquire()
   try {
-    return await runRgCountInternal(options)
+    return await runRgCountInternal(options, resolvedCli)
   } finally {
     rgSemaphore.release()
   }
 }
 
-async function runRgCountInternal(options: Omit<GrepOptions, "context">): Promise<CountResult[]> {
-  const cli = resolveGrepCli()
+async function runRgCountInternal(
+  options: Omit<GrepOptions, "context">,
+  resolvedCli?: ResolvedCli
+): Promise<CountResult[]> {
+  const cli = resolvedCli ?? resolveGrepCli()
   const args = buildArgs({ ...options, context: 0 }, cli.backend)
 
   if (cli.backend === "rg") {

@@ -1,9 +1,9 @@
 import { createBuiltinAgents } from "../agents";
 import { createSisyphusJuniorAgentWithOverrides } from "../agents/sisyphus-junior";
 import type { OhMyOpenCodeConfig } from "../config";
-import { log, migrateAgentConfig } from "../shared";
+import { isTaskSystemEnabled, log, migrateAgentConfig } from "../shared";
+import { getAgentRuntimeName } from "../shared/agent-display-names";
 import { AGENT_NAME_MAP } from "../shared/migration";
-import { getAgentDisplayName } from "../shared/agent-display-names";
 import { registerAgentName } from "../features/claude-code-session-state";
 import {
   discoverConfigSourceSkills,
@@ -90,7 +90,7 @@ export async function applyAgentConfig(params: {
     params.pluginConfig.browser_automation_engine?.provider ?? "playwright";
   const currentModel = params.config.model as string | undefined;
   const disabledSkills = new Set<string>(params.pluginConfig.disabled_skills ?? []);
-  const useTaskSystem = params.pluginConfig.experimental?.task_system ?? true;
+  const useTaskSystem = isTaskSystemEnabled(params.pluginConfig);
   const disableOmoEnv = params.pluginConfig.experimental?.disable_omo_env ?? false;
 
   const includeClaudeAgents = params.pluginConfig.claude_code?.agents ?? true;
@@ -99,10 +99,12 @@ export async function applyAgentConfig(params: {
   const rawPluginAgents = params.pluginComponents.agents;
 
   const pluginAgents = Object.fromEntries(
-    Object.entries(rawPluginAgents).map(([key, value]) => [
-      key,
-      value ? migrateAgentConfig(value as Record<string, unknown>) : value,
-    ]),
+    Object.entries(rawPluginAgents).map(([key, value]) => {
+      if (!value) return [key, value];
+      const migrated = migrateAgentConfig(value as Record<string, unknown>);
+      if (!migrated.mode) migrated.mode = "subagent";
+      return [key, migrated];
+    }),
   );
 
   const configAgent = params.config.agent as AgentConfigRecord | undefined;
@@ -157,15 +159,38 @@ export async function applyAgentConfig(params: {
   if (isSisyphusEnabled && builtinAgents.sisyphus) {
     if (configuredDefaultAgent) {
       (params.config as { default_agent?: string }).default_agent =
-        getAgentDisplayName(configuredDefaultAgent);
+        getAgentRuntimeName(configuredDefaultAgent);
     } else {
       (params.config as { default_agent?: string }).default_agent =
-        getAgentDisplayName("sisyphus");
+        getAgentRuntimeName("sisyphus");
     }
 
+    // Assembly order: Sisyphus -> Hephaestus -> Prometheus -> Atlas
     const agentConfig: Record<string, unknown> = {
       sisyphus: builtinAgents.sisyphus,
     };
+
+    if (builtinAgents.hephaestus) {
+      agentConfig["hephaestus"] = builtinAgents.hephaestus;
+    }
+
+    if (plannerEnabled) {
+      const prometheusOverride = params.pluginConfig.agents?.["prometheus"] as
+        | (Record<string, unknown> & { prompt_append?: string })
+        | undefined;
+
+      agentConfig["prometheus"] = await buildPrometheusAgentConfig({
+        configAgentPlan: configAgent?.plan,
+        pluginPrometheusOverride: prometheusOverride,
+        userCategories: params.pluginConfig.categories,
+        currentModel,
+        disabledTools: params.pluginConfig.disabled_tools,
+      });
+    }
+
+    if (builtinAgents.atlas) {
+      agentConfig["atlas"] = builtinAgents.atlas;
+    }
 
     agentConfig["sisyphus-junior"] = createSisyphusJuniorAgentWithOverrides(
       params.pluginConfig.agents?.["sisyphus-junior"],
@@ -187,20 +212,6 @@ export async function applyAgentConfig(params: {
       agentConfig["OpenCode-Builder"] = override ? { ...base, ...override } : base;
     }
 
-    if (plannerEnabled) {
-      const prometheusOverride = params.pluginConfig.agents?.["prometheus"] as
-        | (Record<string, unknown> & { prompt_append?: string })
-        | undefined;
-
-      agentConfig["prometheus"] = await buildPrometheusAgentConfig({
-        configAgentPlan: configAgent?.plan,
-        pluginPrometheusOverride: prometheusOverride,
-        userCategories: params.pluginConfig.categories,
-        currentModel,
-        disabledTools: params.pluginConfig.disabled_tools,
-      });
-    }
-
     const filteredConfigAgents = configAgent
       ? Object.fromEntries(
           Object.entries(configAgent)
@@ -210,10 +221,12 @@ export async function applyAgentConfig(params: {
               if (key in builtinAgents) return false;
               return true;
             })
-            .map(([key, value]) => [
-              key,
-              value ? migrateAgentConfig(value as Record<string, unknown>) : value,
-            ]),
+            .map(([key, value]) => {
+              if (!value) return [key, value];
+              const migrated = migrateAgentConfig(value as Record<string, unknown>);
+              if (!migrated.mode) migrated.mode = "subagent";
+              return [key, migrated];
+            }),
         )
       : {};
 
@@ -248,7 +261,9 @@ export async function applyAgentConfig(params: {
     params.config.agent = {
       ...agentConfig,
       ...Object.fromEntries(
-        Object.entries(builtinAgents).filter(([key]) => key !== "sisyphus"),
+        Object.entries(builtinAgents).filter(
+          ([key]) => key !== "sisyphus" && key !== "hephaestus" && key !== "atlas",
+        ),
       ),
       ...filterDisabledAgents(filteredUserAgents),
       ...filterDisabledAgents(filteredProjectAgents),
@@ -274,12 +289,23 @@ export async function applyAgentConfig(params: {
       protectedBuiltinAgentNames,
     );
 
+    const defaultedConfigAgents = configAgent
+      ? Object.fromEntries(
+          Object.entries(configAgent).map(([key, value]) => {
+            if (!value) return [key, value];
+            const migrated = migrateAgentConfig(value as Record<string, unknown>);
+            if (!migrated.mode) migrated.mode = "subagent";
+            return [key, migrated];
+          }),
+        )
+      : {};
+
     params.config.agent = {
       ...builtinAgents,
       ...filterDisabledAgents(filteredUserAgents),
       ...filterDisabledAgents(filteredProjectAgents),
       ...filterDisabledAgents(filteredPluginAgents),
-      ...configAgent,
+      ...defaultedConfigAgents,
     };
   }
 

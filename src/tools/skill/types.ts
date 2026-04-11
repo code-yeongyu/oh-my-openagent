@@ -29,7 +29,7 @@ export interface SkillLoadOptions {
   /** MCP manager for querying skill-embedded MCP servers */
   mcpManager?: SkillMcpManager
   /** Session ID getter for MCP client identification */
-  getSessionID?: () => string
+  getSessionID?: () => string | undefined
   /** Git master configuration for watermark/co-author settings */
   gitMasterConfig?: GitMasterConfig
   disabledSkills?: Set<string>

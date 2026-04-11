@@ -12113,7 +12113,7 @@
       "family": "gpt-nano",
       "reasoning": false,
       "temperature": true,
-      "toolCall": false,
+      "toolCall": true,
       "modalities": {
         "input": [
           "text",
@@ -12274,7 +12274,7 @@
       "family": "gpt-mini",
       "reasoning": false,
       "temperature": true,
-      "toolCall": false,
+      "toolCall": true,
       "modalities": {
         "input": [
           "text",

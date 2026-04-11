@@ -1,5 +1,8 @@
 import type { OhMyOpenCodeConfig } from "../config";
-import { getAgentDisplayName } from "../shared/agent-display-names";
+import {
+  getAgentConfigKey,
+  getAgentListDisplayName,
+} from "../shared/agent-display-names";
 import {
   loadUserCommands,
   loadProjectCommands,
@@ -30,13 +33,14 @@ export async function applyCommandConfig(params: {
   ctx: { directory: string };
   pluginComponents: PluginComponents;
 }): Promise<void> {
-  const builtinCommands = loadBuiltinCommands(params.pluginConfig.disabled_commands);
+  const builtinCommands = loadBuiltinCommands(params.pluginConfig.disabled_commands, {
+    useRegisteredAgents: true,
+  });
   const systemCommands = (params.config.command as Record<string, unknown>) ?? {};
 
   const includeClaudeCommands = params.pluginConfig.claude_code?.commands ?? true;
   const includeClaudeSkills = params.pluginConfig.claude_code?.skills ?? true;
 
-  // Detect conflicting skill plugins
   const externalSkillPlugin = detectExternalSkillPlugin(params.ctx.directory);
   if (includeClaudeSkills && externalSkillPlugin.detected) {
     log(getSkillPluginConflictWarning(externalSkillPlugin.pluginName!));
@@ -95,7 +99,7 @@ export async function applyCommandConfig(params: {
 function remapCommandAgentFields(commands: Record<string, Record<string, unknown>>): void {
   for (const cmd of Object.values(commands)) {
     if (cmd?.agent && typeof cmd.agent === "string") {
-      cmd.agent = getAgentDisplayName(cmd.agent);
+      cmd.agent = getAgentListDisplayName(getAgentConfigKey(cmd.agent));
     }
   }
 }

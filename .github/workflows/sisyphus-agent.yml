@@ -40,8 +40,10 @@ jobs:
 
       # gh CLI auth as sisyphus-dev-ai
       - name: Authenticate gh CLI as sisyphus-dev-ai
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
         run: |
-          echo "${{ secrets.GH_PAT }}" | gh auth login --with-token
+          echo "$GITHUB_TOKEN" | gh auth login --with-token
           gh auth status
 
       - name: Ensure tmux is available (Linux)
@@ -372,28 +374,33 @@ jobs:
         if: steps.context.outputs.comment_id != ''
         env:
           GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+          REPOSITORY: ${{ github.repository }}
+          COMMENT_ID: ${{ steps.context.outputs.comment_id }}
         run: |
-          gh api "/repos/${{ github.repository }}/issues/comments/${{ steps.context.outputs.comment_id }}/reactions" \
+          gh api "/repos/${REPOSITORY}/issues/comments/${COMMENT_ID}/reactions" \
             -X POST -f content="eyes" || true
 
       - name: Add working label
         if: steps.context.outputs.number != ''
         env:
           GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+          REPOSITORY: ${{ github.repository }}
+          CONTEXT_TYPE: ${{ steps.context.outputs.type }}
+          CONTEXT_NUMBER: ${{ steps.context.outputs.number }}
         run: |
           gh label create "sisyphus: working" \
-            --repo "${{ github.repository }}" \
+            --repo "$REPOSITORY" \
             --color "fcf2e1" \
             --description "Sisyphus is currently working on this" \
             --force || true
           
-          if [[ "${{ steps.context.outputs.type }}" == "pr" ]]; then
-            gh pr edit "${{ steps.context.outputs.number }}" \
-              --repo "${{ github.repository }}" \
+          if [[ "$CONTEXT_TYPE" == "pr" ]]; then
+            gh pr edit "$CONTEXT_NUMBER" \
+              --repo "$REPOSITORY" \
               --add-label "sisyphus: working" || true
           else
-            gh issue edit "${{ steps.context.outputs.number }}" \
-              --repo "${{ github.repository }}" \
+            gh issue edit "$CONTEXT_NUMBER" \
+              --repo "$REPOSITORY" \
               --add-label "sisyphus: working" || true
           fi
 
@@ -514,26 +521,30 @@ jobs:
         if: always()
         env:
           GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+          REPOSITORY: ${{ github.repository }}
+          COMMENT_ID: ${{ steps.context.outputs.comment_id }}
+          CONTEXT_NUMBER: ${{ steps.context.outputs.number }}
+          CONTEXT_TYPE: ${{ steps.context.outputs.type }}
         run: |
-          if [[ -n "${{ steps.context.outputs.comment_id }}" ]]; then
-            REACTION_ID=$(gh api "/repos/${{ github.repository }}/issues/comments/${{ steps.context.outputs.comment_id }}/reactions" \
+          if [[ -n "$COMMENT_ID" ]]; then
+            REACTION_ID=$(gh api "/repos/${REPOSITORY}/issues/comments/${COMMENT_ID}/reactions" \
               --jq '.[] | select(.content == "eyes" and .user.login == "sisyphus-dev-ai") | .id' | head -1)
             if [[ -n "$REACTION_ID" ]]; then
-              gh api -X DELETE "/repos/${{ github.repository }}/reactions/${REACTION_ID}" || true
+              gh api -X DELETE "/repos/${REPOSITORY}/reactions/${REACTION_ID}" || true
             fi
 
-            gh api "/repos/${{ github.repository }}/issues/comments/${{ steps.context.outputs.comment_id }}/reactions" \
+            gh api "/repos/${REPOSITORY}/issues/comments/${COMMENT_ID}/reactions" \
               -X POST -f content="+1" || true
           fi
 
-          if [[ -n "${{ steps.context.outputs.number }}" ]]; then
-            if [[ "${{ steps.context.outputs.type }}" == "pr" ]]; then
-              gh pr edit "${{ steps.context.outputs.number }}" \
-                --repo "${{ github.repository }}" \
+          if [[ -n "$CONTEXT_NUMBER" ]]; then
+            if [[ "$CONTEXT_TYPE" == "pr" ]]; then
+              gh pr edit "$CONTEXT_NUMBER" \
+                --repo "$REPOSITORY" \
                 --remove-label "sisyphus: working" || true
             else
-              gh issue edit "${{ steps.context.outputs.number }}" \
-                --repo "${{ github.repository }}" \
+              gh issue edit "$CONTEXT_NUMBER" \
+                --repo "$REPOSITORY" \
                 --remove-label "sisyphus: working" || true
             fi
           fi

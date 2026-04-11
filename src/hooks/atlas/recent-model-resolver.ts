@@ -18,20 +18,36 @@ export async function resolveRecentPromptContextForSession(
   try {
     const messagesResp = await ctx.client.session.messages({ path: { id: sessionID } })
     const messages = normalizeSDKResponse(messagesResp, [] as Array<{
+      id?: string
       info?: {
         model?: ModelInfo
         modelID?: string
         providerID?: string
         tools?: Record<string, boolean | "allow" | "deny" | "ask">
+        time?: { created?: number }
       }
-    }>)
+    }>).sort((left, right) => {
+      const leftTime = left.info?.time?.created ?? Number.NEGATIVE_INFINITY
+      const rightTime = right.info?.time?.created ?? Number.NEGATIVE_INFINITY
+      if (leftTime !== rightTime) return rightTime - leftTime
+      const leftId = typeof left.id === "string" ? left.id : ""
+      const rightId = typeof right.id === "string" ? right.id : ""
+      return rightId.localeCompare(leftId)
+    })
 
-    for (let i = messages.length - 1; i >= 0; i--) {
-      const info = messages[i].info
+    for (const message of messages) {
+      const info = message.info
       const model = info?.model
       const tools = normalizePromptTools(info?.tools)
       if (model?.providerID && model?.modelID) {
-        return { model: { providerID: model.providerID, modelID: model.modelID }, tools }
+        return {
+          model: {
+            providerID: model.providerID,
+            modelID: model.modelID,
+            ...(model.variant ? { variant: model.variant } : {}),
+          },
+          tools,
+        }
       }
 
       if (info?.providerID && info?.modelID) {
@@ -54,7 +70,14 @@ export async function resolveRecentPromptContextForSession(
   if (!model?.providerID || !model?.modelID) {
     return { tools }
   }
-  return { model: { providerID: model.providerID, modelID: model.modelID }, tools }
+  return {
+    model: {
+      providerID: model.providerID,
+      modelID: model.modelID,
+      ...(model.variant ? { variant: model.variant } : {}),
+    },
+    tools,
+  }
 }
 
 export async function resolveRecentModelForSession(

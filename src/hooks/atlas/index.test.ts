@@ -1,4 +1,4 @@
-import { describe, expect, test, beforeEach, afterEach, mock } from "bun:test"
+import { describe, expect, test, beforeEach, afterEach, mock, afterAll } from "bun:test"
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
@@ -32,6 +32,8 @@ mock.module("../../shared/opencode-message-dir", () => ({
 mock.module("../../shared/opencode-storage-detection", () => ({
   isSqliteBackend: () => false,
 }))
+
+afterAll(() => { mock.restore() })
 
 const { createAtlasHook } = await import("./index")
 const { createToolExecuteAfterHandler } = await import("./tool-execute-after")
@@ -246,6 +248,91 @@ describe("atlas hook", () => {
       cleanupMessageStorage(sessionID)
     })
 
+    test("should preserve metadata when transforming output for boulder orchestrator", async () => {
+      // given - Atlas caller with boulder state and metadata containing sessionId
+      const sessionID = "session-metadata-preserve-test"
+      setupMessageStorage(sessionID, "atlas")
+
+      const planPath = join(TEST_DIR, "metadata-plan.md")
+      writeFileSync(planPath, "# Plan\n- [ ] Task 1")
+
+      const state: BoulderState = {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: ["session-1"],
+        plan_name: "metadata-plan",
+      }
+      writeBoulderState(TEST_DIR, state)
+
+      const hook = createAtlasHook(createMockPluginInput())
+      const output = {
+        title: "Sisyphus Task",
+        output: `Task completed
+
+<task_metadata>
+session_id: ses_subagent_abc
+</task_metadata>`,
+        metadata: {
+          sessionId: "ses_subagent_abc",
+          agent: "sisyphus-junior",
+          category: "quick",
+          truncated: false,
+        } as Record<string, unknown>,
+      }
+
+      // when
+      await hook["tool.execute.after"](
+        { tool: "task", sessionID },
+        output
+      )
+
+      // then - output is transformed but metadata is preserved
+      expect(output.output).toContain("SUBAGENT WORK COMPLETED")
+      expect(output.metadata.sessionId).toBe("ses_subagent_abc")
+      expect(output.metadata.agent).toBe("sisyphus-junior")
+      expect(output.metadata.category).toBe("quick")
+      expect(output.metadata.truncated).toBe(false)
+
+      cleanupMessageStorage(sessionID)
+    })
+
+    test("should preserve metadata when appending standalone verification reminder", async () => {
+      // given - Atlas caller without boulder state, metadata containing sessionId
+      const sessionID = "session-standalone-metadata-test"
+      setupMessageStorage(sessionID, "atlas")
+
+      const hook = createAtlasHook(createMockPluginInput())
+      const output = {
+        title: "Sisyphus Task",
+        output: `Task completed
+
+<task_metadata>
+session_id: ses_standalone_def
+</task_metadata>`,
+        metadata: {
+          sessionId: "ses_standalone_def",
+          agent: "sisyphus-junior",
+          model: { providerID: "openai", modelID: "gpt-5.4" },
+          truncated: false,
+        } as Record<string, unknown>,
+      }
+
+      // when
+      await hook["tool.execute.after"](
+        { tool: "task", sessionID },
+        output
+      )
+
+      // then - standalone verification appended but metadata preserved
+      expect(output.output).toContain("LYING")
+      expect(output.metadata.sessionId).toBe("ses_standalone_def")
+      expect(output.metadata.agent).toBe("sisyphus-junior")
+      expect(output.metadata.model).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
+      expect(output.metadata.truncated).toBe(false)
+
+      cleanupMessageStorage(sessionID)
+    })
+
      test("should still transform when plan is complete (shows progress)", async () => {
        // given - boulder state with complete plan, Atlas caller
        const sessionID = "session-complete-plan-test"
@@ -283,7 +370,7 @@ describe("atlas hook", () => {
       cleanupMessageStorage(sessionID)
     })
 
-     test("should append session ID to boulder state if not present", async () => {
+     test("should not append unrelated current session to boulder state if not already tracked", async () => {
        // given - boulder state without session-append-test, Atlas caller
        const sessionID = "session-append-test"
        setupMessageStorage(sessionID, "atlas")
@@ -312,10 +399,50 @@ describe("atlas hook", () => {
         output
       )
 
-      // then - sessionID should be appended
+      // then - unrelated current session should not be absorbed into boulder
       const updatedState = readBoulderState(TEST_DIR)
-      expect(updatedState?.session_ids).toContain(sessionID)
+      expect(updatedState?.session_ids).not.toContain(sessionID)
       
+      cleanupMessageStorage(sessionID)
+    })
+
+     test("should not append current session when session lookup fails during append decision", async () => {
+       // given - boulder state without session-get-failure-test, Atlas caller, and session lookup failure
+       const sessionID = "session-get-failure-test"
+       setupMessageStorage(sessionID, "atlas")
+
+      const planPath = join(TEST_DIR, "test-plan.md")
+      writeFileSync(planPath, "# Plan\n- [ ] Task 1")
+
+      const state: BoulderState = {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: ["session-1"],
+        plan_name: "test-plan",
+      }
+      writeBoulderState(TEST_DIR, state)
+
+      const hook = createAtlasHook(createMockPluginInput({
+        sessionGetMock: mock(async () => {
+          throw new Error("session lookup failed")
+        }),
+      }))
+      const output = {
+        title: "Sisyphus Task",
+        output: "Task output",
+        metadata: {},
+      }
+
+      // when
+      await hook["tool.execute.after"](
+        { tool: "task", sessionID },
+        output,
+      )
+
+      // then
+      const updatedState = readBoulderState(TEST_DIR)
+      expect(updatedState?.session_ids).not.toContain(sessionID)
+
       cleanupMessageStorage(sessionID)
     })
 
@@ -1274,7 +1401,7 @@ session_id: ses_untrusted_999
       expect(mockInput._promptMock).not.toHaveBeenCalled()
     })
 
-    test("should append subagent session to boulder before injecting continuation", async () => {
+    test("should not append lineage-only subagent session during idle without explicit boulder tracking", async () => {
       // given - active boulder plan with another registered session and current session tracked as subagent
       const subagentSessionID = "subagent-session-456"
       const planPath = join(TEST_DIR, "test-plan.md")
@@ -1293,7 +1420,7 @@ session_id: ses_untrusted_999
       const mockInput = createMockPluginInput()
       const hook = createAtlasHook(mockInput)
 
-      // when - subagent session goes idle before parent task output appends it
+      // when - subagent session goes idle before explicit tracking appends it
       await hook.handler({
         event: {
           type: "session.idle",
@@ -1301,11 +1428,9 @@ session_id: ses_untrusted_999
         },
       })
 
-      // then - session is registered into boulder and continuation is injected
-      expect(readBoulderState(TEST_DIR)?.session_ids).toContain(subagentSessionID)
-      expect(mockInput._promptMock).toHaveBeenCalled()
-      const callArgs = mockInput._promptMock.mock.calls[0][0]
-      expect(callArgs.path.id).toBe(subagentSessionID)
+      // then - lineage alone is not enough to absorb the session into boulder
+      expect(readBoulderState(TEST_DIR)?.session_ids).not.toContain(subagentSessionID)
+      expect(mockInput._promptMock).not.toHaveBeenCalled()
     })
 
     test("should inject when registered boulder session has incomplete tasks even if last agent differs", async () => {
@@ -1679,7 +1804,7 @@ session_id: ses_untrusted_999
        // then - should call prompt for sisyphus
        expect(mockInput._promptMock).toHaveBeenCalled()
        const callArgs = mockInput._promptMock.mock.calls[0][0]
-       expect(callArgs.body.agent).toBe("Sisyphus (Ultraworker)")
+       expect(callArgs.body.agent).toBe("sisyphus")
      })
 
     test("should preserve display-name agent in continuation prompt when boulder agent uses display form", async () => {
@@ -1692,10 +1817,10 @@ session_id: ses_untrusted_999
         started_at: "2026-01-02T10:00:00Z",
         session_ids: [MAIN_SESSION_ID],
         plan_name: "test-plan",
-        agent: "Atlas (Plan Executor)",
+        agent: "Atlas - Plan Executor",
       }
       writeBoulderState(TEST_DIR, state)
-      registerAgentName("Atlas (Plan Executor)")
+      registerAgentName("Atlas - Plan Executor")
 
       const mockInput = createMockPluginInput()
       const hook = createAtlasHook(mockInput)
@@ -1711,7 +1836,7 @@ session_id: ses_untrusted_999
       // then
       expect(mockInput._promptMock).toHaveBeenCalled()
       const callArgs = mockInput._promptMock.mock.calls[0][0]
-      expect(callArgs.body.agent).toBe("Atlas (Plan Executor)")
+      expect(callArgs.body.agent).toBe("Atlas - Plan Executor")
       expect(callArgs.body.agent).not.toBe("atlas")
     })
 
@@ -2101,10 +2226,14 @@ session_id: ses_untrusted_999
       let nextFakeId = 99000
       const originalSetTimeout = globalThis.setTimeout
       const originalClearTimeout = globalThis.clearTimeout
+      const originalDateNow = Date.now
+      let fakeNow = 0
 
       beforeEach(() => {
         capturedTimers.clear()
         nextFakeId = 99000
+        fakeNow = 10000
+        Date.now = () => fakeNow
 
         globalThis.setTimeout = ((callback: Function, delay?: number, ...args: unknown[]) => {
           const normalized = typeof delay === "number" ? delay : 0
@@ -2129,12 +2258,14 @@ session_id: ses_untrusted_999
       afterEach(() => {
         globalThis.setTimeout = originalSetTimeout
         globalThis.clearTimeout = originalClearTimeout
+        Date.now = originalDateNow
       })
 
       async function firePendingTimers(): Promise<void> {
         for (const [id, entry] of capturedTimers) {
           if (!entry.cleared) {
             capturedTimers.delete(id)
+            fakeNow += 6000
             await entry.callback()
           }
         }

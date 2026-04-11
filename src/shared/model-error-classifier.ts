@@ -8,11 +8,14 @@ import { readConnectedProvidersCache } from "./connected-providers-cache"
 const RETRYABLE_ERROR_NAMES = new Set([
   "providermodelnotfounderror",
   "ratelimiterror",
-  "quotaexceedederror",
-  "insufficientcreditserror",
   "modelunavailableerror",
   "providerconnectionerror",
   "authenticationerror",
+])
+
+const STOP_ERROR_NAMES = new Set([
+  "quotaexceedederror",
+  "insufficientcreditserror",
   "freeusagelimiterror",
 ])
 
@@ -37,8 +40,6 @@ const RETRYABLE_MESSAGE_PATTERNS = [
   "rate_limit",
   "rate limit",
   "quota",
-  "quota will reset after",
-  "usage limit has been reached",
   "all credentials for model",
   "cooling down",
   "exhausted your capacity",
@@ -49,6 +50,7 @@ const RETRYABLE_MESSAGE_PATTERNS = [
   "over limit",
   "overloaded",
   "bad gateway",
+  "bad request",
   "unknown provider",
   "provider not found",
   "model_not_supported",
@@ -72,14 +74,35 @@ const RETRYABLE_MESSAGE_PATTERNS = [
   "529",
 ]
 
+/**
+ * Message patterns that indicate a non-retryable STOP error (quota/billing exhaustion).
+ * These take precedence over RETRYABLE_MESSAGE_PATTERNS.
+ */
+const STOP_MESSAGE_PATTERNS = [
+  "quota will reset after",
+  "quota exceeded",
+  "usage limit has been reached",
+  "free usage limit",
+  "billing limit",
+  "billing hard limit",
+  "monthly limit",
+  "plan limit",
+  "subscription quota",
+  "subscription limit",
+  "payment required",
+  "out of credits",
+  "credits exhausted",
+  "insufficient credits",
+  "insufficient balance",
+  "credit balance",
+  "usage limit for this month",
+  "exhausted your capacity",
+]
+
 const AUTO_RETRY_GATE_PATTERNS = [
   "rate limit",
-  "quota",
-  "usage limit",
-  "limit reached",
   "cooling down",
   "credentials for model",
-  "exhausted your capacity",
 ]
 
 function hasProviderAutoRetrySignal(message: string): boolean {
@@ -106,6 +129,9 @@ export function isRetryableModelError(error: ErrorInfo): boolean {
     if (NON_RETRYABLE_ERROR_NAMES.has(errorNameLower)) {
       return false
     }
+    if (STOP_ERROR_NAMES.has(errorNameLower)) {
+      return false
+    }
     // Check if it's a known retryable error
     if (RETRYABLE_ERROR_NAMES.has(errorNameLower)) {
       return true
@@ -114,6 +140,12 @@ export function isRetryableModelError(error: ErrorInfo): boolean {
 
   // Check message patterns for unknown errors
   const msg = error.message?.toLowerCase() ?? ""
+
+  // STOP patterns take precedence over retryable patterns
+  if (STOP_MESSAGE_PATTERNS.some((pattern) => msg.includes(pattern))) {
+    return false
+  }
+
   if (hasProviderAutoRetrySignal(msg)) {
     return true
   }

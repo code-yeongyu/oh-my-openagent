@@ -1,25 +1,24 @@
-# src/hooks/ — 48 Lifecycle Hooks
+# src/hooks/ — 52 Lifecycle Hooks
 
-**Generated:** 2026-03-06
+**Generated:** 2026-04-11
 
 ## OVERVIEW
 
-48 hooks across dedicated modules and standalone files. Three-tier composition: Core(39) + Continuation(7) + Skill(2). All hooks follow `createXXXHook(deps) → HookFunction` factory pattern.
+52 hooks across dedicated modules and standalone files. Three-tier composition: Core(43) + Continuation(7) + Skill(2). All hooks follow `createXXXHook(deps) → HookFunction` factory pattern.
 
 ## HOOK TIERS
 
-### Tier 1: Session Hooks (23) — `create-session-hooks.ts`
+### Tier 1: Session Hooks (24) — `create-session-hooks.ts`
 ## STRUCTURE
 ```
 hooks/
+├── agent-usage-reminder/         # Reminds about available agents
 ├── atlas/                      # Main orchestration (757 lines)
 ├── anthropic-context-window-limit-recovery/ # Auto-summarize
 ├── anthropic-effort/            # Reasoning effort level adjustment
-├── anthropic-image-context/     # Image context handling for Anthropic
 ├── auto-slash-command/         # Detects /command patterns
 ├── auto-update-checker/        # Plugin update check
 ├── background-notification/    # OS notification
-├── beast-mode-system/          # Beast mode system prompt injection
 ├── category-skill-reminder/    # Reminds of category skills
 ├── claude-code-hooks/          # settings.json compat layer
 ├── comment-checker/            # Prevents AI slop
@@ -34,6 +33,7 @@ hooks/
 ├── interactive-bash-session/   # Tmux session management
 ├── json-error-recovery/        # JSON parse error correction
 ├── keyword-detector/           # ultrawork/search/analyze modes
+├── legacy-plugin-toast/        # Legacy plugin name migration toast
 ├── model-fallback/             # Provider-level model fallback
 ├── no-hephaestus-non-gpt/      # Block Hephaestus from non-GPT
 ├── no-sisyphus-gpt/            # Block Sisyphus from GPT
@@ -54,7 +54,10 @@ hooks/
 ├── think-mode/                 # Dynamic thinking budget
 ├── thinking-block-validator/   # Ensures valid <thinking>
 ├── todo-continuation-enforcer/ # Force TODO completion
+├── todo-description-override/  # Override todo descriptions
+├── tool-pair-validator/        # Validate tool pair usage
 ├── unstable-agent-babysitter/  # Monitor unstable agent behavior
+├── webfetch-redirect-guard/    # Guard webfetch redirect behavior
 ├── write-existing-file-guard/  # Require Read before Write
 └── index.ts                    # Hook aggregation + registration
 ```
@@ -84,8 +87,9 @@ hooks/
 | noSisyphusGpt | chat.message | Block Sisyphus from using GPT models (toast warning) |
 | noHephaestusNonGpt | chat.message | Block Hephaestus from using non-GPT models |
 | runtimeFallback | event | Auto-switch models on API provider errors |
+| legacyPluginToast | chat.message | Show toast when legacy plugin name detected |
 
-### Tier 2: Tool Guard Hooks (12) — `create-tool-guard-hooks.ts`
+### Tier 2: Tool Guard Hooks (14) — `create-tool-guard-hooks.ts`
 
 | Hook | Event | Purpose |
 |------|-------|---------|
@@ -97,10 +101,14 @@ hooks/
 | rulesInjector | tool.execute.before | Conditional rules injection (AGENTS.md, config) |
 | tasksTodowriteDisabler | tool.execute.before | Disable TodoWrite when task system active |
 | writeExistingFileGuard | tool.execute.before | Require Read before Write on existing files |
+| bashFileReadGuard | tool.execute.before | Guard bash commands that read files |
+| readImageResizer | tool.execute.after | Resize large images for context efficiency |
+| todoDescriptionOverride | tool.execute.before | Override todo item descriptions |
+| webfetchRedirectGuard | tool.execute.before | Guard webfetch redirect behavior |
 | hashlineReadEnhancer | tool.execute.after | Enhance Read output with line hashes |
 | jsonErrorRecovery | tool.execute.after | Detect JSON parse errors, inject correction reminder |
 
-### Tier 3: Transform Hooks (4) — `create-transform-hooks.ts`
+### Tier 3: Transform Hooks (5) — `create-transform-hooks.ts`
 
 | Hook | Event | Purpose |
 |------|-------|---------|
@@ -108,6 +116,7 @@ hooks/
 | keywordDetector | messages.transform | Detect ultrawork/search/analyze modes |
 | contextInjectorMessagesTransform | messages.transform | Inject AGENTS.md/README.md into context |
 | thinkingBlockValidator | messages.transform | Validate thinking block structure |
+| toolPairValidator | messages.transform | Validate tool call/result pairs |
 
 ### Tier 4: Continuation Hooks (7) — `create-continuation-hooks.ts`
 

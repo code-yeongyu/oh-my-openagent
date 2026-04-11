@@ -124,7 +124,7 @@ describe("resolveCategoryExecution", () => {
 		})
 		const agentsSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
 		const args = {
-			category: "deep",
+			category: "quick",
 			prompt: "test prompt",
 			description: "Test task",
 			run_in_background: false,
@@ -134,7 +134,7 @@ describe("resolveCategoryExecution", () => {
 		}
 		const executorCtx = createMockExecutorContext()
 		executorCtx.userCategories = {
-			deep: {
+			quick: {
 				fallback_models: [
 					{
 						model: "openai/gpt-5.4 high",
@@ -169,16 +169,10 @@ describe("resolveCategoryExecution", () => {
 		agentsSpy.mockRestore()
 	})
 
-	test("does not apply object-style fallback settings when the configured primary model matches directly", async () => {
+	test("preserves inline variant from category model string when no explicit variant is configured", async () => {
 		//#given
-		const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
-			models: { openai: ["gpt-5.4-preview"] },
-			connected: ["openai"],
-			updatedAt: "2026-03-03T00:00:00.000Z",
-		})
-		const agentsSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
 		const args = {
-			category: "deep",
+			category: "quick",
 			prompt: "test prompt",
 			description: "Test task",
 			run_in_background: false,
@@ -188,7 +182,49 @@ describe("resolveCategoryExecution", () => {
 		}
 		const executorCtx = createMockExecutorContext()
 		executorCtx.userCategories = {
-			deep: {
+			quick: {
+				model: "openai/gpt-5.4 high",
+			},
+		}
+
+		//#when
+		const result = await resolveCategoryExecution(args, executorCtx, undefined, "anthropic/claude-sonnet-4-6")
+
+		//#then
+		expect(result.error).toBeUndefined()
+		expect(result.actualModel).toBeDefined()
+		expect(result.categoryModel).toBeDefined()
+		if (!result.actualModel || !result.categoryModel) {
+			throw new Error("Expected resolved model and category model")
+		}
+		expect(result.actualModel).toBe("openai/gpt-5.4")
+		expect(result.categoryModel).toEqual({
+			providerID: "openai",
+			modelID: "gpt-5.4",
+			variant: "high",
+		})
+	})
+
+	test("does not apply object-style fallback settings when the configured primary model matches directly", async () => {
+		//#given
+		const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+			models: { openai: ["gpt-5.4-preview"] },
+			connected: ["openai"],
+			updatedAt: "2026-03-03T00:00:00.000Z",
+		})
+		const agentsSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
+		const args = {
+			category: "quick",
+			prompt: "test prompt",
+			description: "Test task",
+			run_in_background: false,
+			load_skills: [],
+			blockedBy: undefined,
+			enableSkillTools: false,
+		}
+		const executorCtx = createMockExecutorContext()
+		executorCtx.userCategories = {
+			quick: {
 				model: "openai/gpt-5.4-preview",
 				fallback_models: [
 					{
@@ -209,7 +245,7 @@ describe("resolveCategoryExecution", () => {
 		expect(result.categoryModel).toEqual({
 			providerID: "openai",
 			modelID: "gpt-5.4-preview",
-			variant: "medium",
+			variant: undefined,
 		})
 		cacheSpy.mockRestore()
 		agentsSpy.mockRestore()
@@ -224,7 +260,7 @@ describe("resolveCategoryExecution", () => {
 		})
 		const agentsSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
 		const args = {
-			category: "deep",
+			category: "quick",
 			prompt: "test prompt",
 			description: "Test task",
 			run_in_background: false,
@@ -234,7 +270,7 @@ describe("resolveCategoryExecution", () => {
 		}
 		const executorCtx = createMockExecutorContext()
 		executorCtx.userCategories = {
-			deep: {
+			quick: {
 				fallback_models: [
 					{
 						model: "openai/gpt-5.4",
@@ -278,7 +314,7 @@ describe("resolveCategoryExecution", () => {
 		})
 		const agentsSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
 		const args = {
-			category: "deep",
+			category: "quick",
 			prompt: "test prompt",
 			description: "Test task",
 			run_in_background: false,
@@ -288,7 +324,7 @@ describe("resolveCategoryExecution", () => {
 		}
 		const executorCtx = createMockExecutorContext()
 		executorCtx.userCategories = {
-			deep: {
+			quick: {
 				fallback_models: [
 					{
 						model: "openai/gpt-5.4",
@@ -329,7 +365,7 @@ describe("resolveCategoryExecution", () => {
 		})
 		const agentsSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
 		const args = {
-			category: "deep",
+			category: "quick",
 			prompt: "test prompt",
 			description: "Test task",
 			run_in_background: false,
@@ -339,7 +375,7 @@ describe("resolveCategoryExecution", () => {
 		}
 		const executorCtx = createMockExecutorContext()
 		executorCtx.userCategories = {
-			deep: {
+			quick: {
 				fallback_models: [
 					{
 						model: "openai/gpt-5.4",
@@ -415,5 +451,65 @@ describe("resolveCategoryExecution", () => {
 		})
 		cacheSpy.mockRestore()
 		agentsSpy.mockRestore()
+	})
+
+	test("does not inherit hardcoded fallbackChain when user configures a category model [regression #3040]", async () => {
+		//#given
+		const args = {
+			category: "quick",
+			prompt: "test prompt",
+			description: "Test task",
+			run_in_background: false,
+			load_skills: [],
+			blockedBy: undefined,
+			enableSkillTools: false,
+		}
+		const executorCtx = createMockExecutorContext()
+		executorCtx.userCategories = {
+			quick: {
+				model: "animal-gateway-xai/grok-4-fast-non-reasoning",
+			},
+		}
+
+		//#when
+		const result = await resolveCategoryExecution(args, executorCtx, undefined, "anthropic/claude-sonnet-4-6")
+
+		//#then
+		expect(result.error).toBeUndefined()
+		expect(result.actualModel).toBe("animal-gateway-xai/grok-4-fast-non-reasoning")
+		expect(result.categoryModel).toEqual({
+			providerID: "animal-gateway-xai",
+			modelID: "grok-4-fast-non-reasoning",
+			variant: undefined,
+		})
+		expect(result.fallbackChain).toBeUndefined()
+	})
+
+	test("does not inherit hardcoded fallbackChain when sisyphus-junior model override is set [regression #2941]", async () => {
+		//#given
+		const args = {
+			category: "quick",
+			prompt: "test prompt",
+			description: "Test task",
+			run_in_background: false,
+			load_skills: [],
+			blockedBy: undefined,
+			enableSkillTools: false,
+		}
+		const executorCtx = createMockExecutorContext()
+		executorCtx.sisyphusJuniorModel = "anthropic/claude-sonnet-4-6"
+
+		//#when
+		const result = await resolveCategoryExecution(args, executorCtx, undefined, "anthropic/claude-sonnet-4-6")
+
+		//#then
+		expect(result.error).toBeUndefined()
+		expect(result.actualModel).toBe("anthropic/claude-sonnet-4-6")
+		expect(result.categoryModel).toEqual({
+			providerID: "anthropic",
+			modelID: "claude-sonnet-4-6",
+			variant: undefined,
+		})
+		expect(result.fallbackChain).toBeUndefined()
 	})
 })

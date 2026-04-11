@@ -1,10 +1,10 @@
 # src/cli/ — CLI: install, run, doctor, mcp-oauth
 
-**Generated:** 2026-03-06
+**Generated:** 2026-04-11
 
 ## OVERVIEW
 
-Commander.js CLI with 5 commands. Entry: `index.ts` → `runCli()` in `cli-program.ts`.
+Commander.js CLI with 6 commands. Entry: `index.ts` → `runCli()` in `cli-program.ts`.
 
 ## COMMANDS
 
@@ -15,6 +15,7 @@ Commander.js CLI with 5 commands. Entry: `index.ts` → `runCli()` in `cli-progr
 | `doctor` | 4-category health checks | System, Config, Tools, Models |
 | `get-local-version` | Version detection | Installed vs npm latest |
 | `mcp-oauth` | OAuth token management | login (PKCE), logout, status |
+| `refresh-model-capabilities` | Refresh models.dev cache | Model capabilities refresh |
 
 ## STRUCTURE
 

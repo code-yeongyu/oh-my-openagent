@@ -1,29 +1,28 @@
 import { checkForLegacyPluginEntry } from "./legacy-plugin-warning"
 import { log } from "./logger"
 import { migrateLegacyPluginEntry } from "./migrate-legacy-plugin-entry"
+import { toCanonicalEntry } from "./plugin-entry-migrator"
 import { LEGACY_PLUGIN_NAME, PLUGIN_NAME } from "./plugin-identity"
 
-function toCanonicalEntry(entry: string): string {
-  if (entry === LEGACY_PLUGIN_NAME) {
-    return PLUGIN_NAME
-  }
-
-  if (entry.startsWith(`${LEGACY_PLUGIN_NAME}@`)) {
-    return `${PLUGIN_NAME}${entry.slice(LEGACY_PLUGIN_NAME.length)}`
-  }
-
-  return entry
+type LogLegacyPluginStartupWarningDeps = {
+  checkForLegacyPluginEntry?: typeof checkForLegacyPluginEntry
+  log?: typeof log
+  migrateLegacyPluginEntry?: typeof migrateLegacyPluginEntry
 }
 
-export function logLegacyPluginStartupWarning(): void {
-  const result = checkForLegacyPluginEntry()
+export function logLegacyPluginStartupWarning(deps: LogLegacyPluginStartupWarningDeps = {}): void {
+  const checkForLegacyPluginEntryFn = deps.checkForLegacyPluginEntry ?? checkForLegacyPluginEntry
+  const logFn = deps.log ?? log
+  const migrateLegacyPluginEntryFn = deps.migrateLegacyPluginEntry ?? migrateLegacyPluginEntry
+
+  const result = checkForLegacyPluginEntryFn()
   if (!result.hasLegacyEntry) {
     return
   }
 
   const suggestedEntries = result.legacyEntries.map(toCanonicalEntry)
 
-  log("[OhMyOpenCodePlugin] Legacy plugin entry detected in OpenCode config", {
+  logFn("[OhMyOpenCodePlugin] Legacy plugin entry detected in OpenCode config", {
     legacyEntries: result.legacyEntries,
     suggestedEntries,
     hasCanonicalEntry: result.hasCanonicalEntry,
@@ -35,7 +34,7 @@ export function logLegacyPluginStartupWarning(): void {
     + ` Attempting auto-migration...`,
   )
 
-  const migrated = migrateLegacyPluginEntry(result.configPath!)
+  const migrated = migrateLegacyPluginEntryFn(result.configPath!)
   if (migrated) {
     console.warn(`[oh-my-openagent] Auto-migrated opencode.json: ${result.legacyEntries.join(", ")} -> ${suggestedEntries.join(", ")}`)
   } else {

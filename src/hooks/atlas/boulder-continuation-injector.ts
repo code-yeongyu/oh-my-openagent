@@ -1,13 +1,17 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { BackgroundManager } from "../../features/background-agent"
-import { isAgentRegistered } from "../../features/claude-code-session-state"
-import { normalizeAgentForPrompt } from "../../shared/agent-display-names"
+import {
+  isAgentRegistered,
+  resolveRegisteredAgentName,
+} from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
 import { createInternalAgentTextPart, resolveInheritedPromptTools } from "../../shared"
 import { HOOK_NAME } from "./hook-name"
 import { BOULDER_CONTINUATION_PROMPT } from "./system-reminder-templates"
 import { resolveRecentPromptContextForSession } from "./recent-model-resolver"
 import type { SessionState } from "./types"
+
+export type BoulderContinuationResult = "injected" | "skipped_background_tasks" | "skipped_agent_unavailable" | "failed"
 
 export async function injectBoulderContinuation(input: {
   ctx: PluginInput
@@ -21,7 +25,7 @@ export async function injectBoulderContinuation(input: {
   preferredTaskTitle?: string
   backgroundManager?: BackgroundManager
   sessionState: SessionState
-}): Promise<void> {
+}): Promise<BoulderContinuationResult> {
   const {
     ctx,
     sessionID,
@@ -42,7 +46,7 @@ export async function injectBoulderContinuation(input: {
 
   if (hasRunningBgTasks) {
     log(`[${HOOK_NAME}] Skipped injection: background tasks running`, { sessionID })
-    return
+    return "skipped_background_tasks"
   }
 
   const worktreeContext = worktreePath ? `\n\n[Worktree: ${worktreePath}]` : ""
@@ -54,14 +58,16 @@ export async function injectBoulderContinuation(input: {
 		`\n\n[Status: ${total - remaining}/${total} completed, ${remaining} remaining]` +
 		preferredSessionContext +
 		worktreeContext
-	const continuationAgent = agent ?? (isAgentRegistered("atlas") ? "atlas" : undefined)
+	const continuationAgent = resolveRegisteredAgentName(
+		agent ?? (isAgentRegistered("atlas") ? "atlas" : undefined),
+	)
 
 	if (!continuationAgent || !isAgentRegistered(continuationAgent)) {
 		log(`[${HOOK_NAME}] Skipped injection: continuation agent unavailable`, {
 			sessionID,
 			agent: continuationAgent ?? agent ?? "unknown",
 		})
-		return
+		return "skipped_agent_unavailable"
 	}
 
 	try {
@@ -70,12 +76,18 @@ export async function injectBoulderContinuation(input: {
     const promptContext = await resolveRecentPromptContextForSession(ctx, sessionID)
     const inheritedTools = resolveInheritedPromptTools(sessionID, promptContext.tools)
 
-		await ctx.client.session.promptAsync({
-			path: { id: sessionID },
-			body: {
-				agent: normalizeAgentForPrompt(continuationAgent) ?? continuationAgent,
-				...(promptContext.model !== undefined ? { model: promptContext.model } : {}),
-				...(inheritedTools ? { tools: inheritedTools } : {}),
+    const launchModel = promptContext.model
+      ? { providerID: promptContext.model.providerID, modelID: promptContext.model.modelID }
+      : undefined
+    const launchVariant = promptContext.model?.variant
+
+    await ctx.client.session.promptAsync({
+      path: { id: sessionID },
+      body: {
+        agent: continuationAgent,
+        ...(launchModel ? { model: launchModel } : {}),
+        ...(launchVariant ? { variant: launchVariant } : {}),
+        ...(inheritedTools ? { tools: inheritedTools } : {}),
         parts: [createInternalAgentTextPart(prompt)],
       },
       query: { directory: ctx.directory },
@@ -83,6 +95,7 @@ export async function injectBoulderContinuation(input: {
 
     sessionState.promptFailureCount = 0
     log(`[${HOOK_NAME}] Boulder continuation injected`, { sessionID })
+    return "injected"
   } catch (err) {
     sessionState.promptFailureCount += 1
     sessionState.lastFailureAt = Date.now()
@@ -91,5 +104,6 @@ export async function injectBoulderContinuation(input: {
       error: String(err),
       promptFailureCount: sessionState.promptFailureCount,
     })
+    return "failed"
   }
 }

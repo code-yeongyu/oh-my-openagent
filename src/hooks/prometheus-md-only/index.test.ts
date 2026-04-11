@@ -1,15 +1,19 @@
-import { describe, expect, test, beforeEach, afterEach, mock } from "bun:test"
+import { afterAll, describe, expect, test, beforeEach, afterEach, mock } from "bun:test"
 import { mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { randomUUID } from "node:crypto"
 import { SYSTEM_DIRECTIVE_PREFIX } from "../../shared/system-directive"
-import { clearSessionAgent } from "../../features/claude-code-session-state"
+import { clearSessionAgent, setSessionAgent } from "../../features/claude-code-session-state"
 // Force stable (JSON) mode for tests that rely on message file storage
 mock.module("../../shared/opencode-storage-detection", () => ({
   isSqliteBackend: () => false,
   resetSqliteBackendCache: () => {},
 }))
+
+afterAll(() => {
+  mock.restore()
+})
 
 const { createPrometheusMdOnlyHook } = await import("./index")
 const { MESSAGE_STORAGE } = await import("../../features/hook-message-injector")
@@ -25,17 +29,36 @@ describe("prometheus-md-only", () => {
     } as never
   }
 
-  function setupMessageStorage(sessionID: string, agent: string | undefined): void {
+  function setupMessageStorage(
+    sessionID: string,
+    agent: string | undefined,
+    options?: { useSessionAgent?: boolean },
+  ): void {
+    const useSessionAgent = options?.useSessionAgent ?? true
     testMessageDir = join(MESSAGE_STORAGE, sessionID)
-    mkdirSync(testMessageDir, { recursive: true })
-    const messageContent = {
-      ...(agent ? { agent } : {}),
-      model: { providerID: "test", modelID: "test-model" },
+    if (agent && useSessionAgent) {
+      setSessionAgent(sessionID, agent)
+      return
     }
-    writeFileSync(
-      join(testMessageDir, "msg_001.json"),
-      JSON.stringify(messageContent)
-    )
+
+    clearSessionAgent(sessionID)
+    rmSync(testMessageDir, { recursive: true, force: true })
+    mkdirSync(testMessageDir, { recursive: true })
+    if (!agent) {
+      return
+    }
+
+    try {
+      writeFileSync(
+        join(testMessageDir, "msg_001.json"),
+        JSON.stringify({
+          agent,
+          model: { providerID: "test", modelID: "test-model" },
+        }),
+      )
+    } catch {
+      clearSessionAgent(sessionID)
+    }
   }
 
   afterEach(() => {
@@ -71,7 +94,7 @@ describe("prometheus-md-only", () => {
 
     test("should enforce md-only restriction for Prometheus display name Plan Builder", async () => {
       //#given
-      setupMessageStorage(TEST_SESSION_ID, "Prometheus (Plan Builder)")
+      setupMessageStorage(TEST_SESSION_ID, "Prometheus - Plan Builder")
       const hook = createPrometheusMdOnlyHook(createMockPluginInput())
       const input = {
         tool: "Write",
@@ -90,7 +113,7 @@ describe("prometheus-md-only", () => {
 
     test("should enforce md-only restriction for Prometheus display name Planner", async () => {
       //#given
-      setupMessageStorage(TEST_SESSION_ID, "Prometheus (Planner)")
+      setupMessageStorage(TEST_SESSION_ID, "Prometheus - Plan Builder")
       const hook = createPrometheusMdOnlyHook(createMockPluginInput())
       const input = {
         tool: "Write",
@@ -478,8 +501,7 @@ describe("prometheus-md-only", () => {
     //#when user types "continue" after interruption (memory cleared, falls back to message files)
     //#then should use boulder state agent (atlas), not message file agent (prometheus)
     test("should prioritize boulder agent over message file agent", async () => {
-      // given - prometheus in message files (from /plan)
-      setupMessageStorage(TEST_SESSION_ID, "prometheus")
+      setupMessageStorage(TEST_SESSION_ID, undefined)
       
       // given - atlas in boulder state (from /start-work)
       writeFileSync(BOULDER_FILE, JSON.stringify({
@@ -512,7 +534,7 @@ describe("prometheus-md-only", () => {
 
     test("should use prometheus from boulder state when set", async () => {
       // given - atlas in message files (from some other agent)
-      setupMessageStorage(TEST_SESSION_ID, "atlas")
+      setupMessageStorage(TEST_SESSION_ID, "atlas", { useSessionAgent: false })
       
       // given - prometheus in boulder state (edge case, but should honor it)
       writeFileSync(BOULDER_FILE, JSON.stringify({

@@ -1,6 +1,6 @@
 import * as fs from "node:fs"
 import * as path from "node:path"
-import { CACHE_DIR, PACKAGE_NAME, USER_CONFIG_DIR } from "./constants"
+import { CACHE_DIR, PACKAGE_NAME, getUserConfigDir } from "./constants"
 import { log } from "../../shared/logger"
 
 interface BunLockfile {
@@ -61,8 +61,9 @@ function removeFromBunLock(packageName: string): boolean {
 
 export function invalidatePackage(packageName: string = PACKAGE_NAME): boolean {
   try {
+    const userConfigDir = getUserConfigDir()
     const pkgDirs = [
-      path.join(USER_CONFIG_DIR, "node_modules", packageName),
+      path.join(userConfigDir, "node_modules", packageName),
       path.join(CACHE_DIR, "node_modules", packageName),
     ]
 

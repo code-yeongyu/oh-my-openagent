@@ -1,7 +1,10 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 
 import type { BackgroundManager } from "../../features/background-agent"
-import { getSessionAgent } from "../../features/claude-code-session-state"
+import {
+  getSessionAgent,
+  resolveRegisteredAgentName,
+} from "../../features/claude-code-session-state"
 import {
   createInternalAgentTextPart,
   normalizeSDKResponse,
@@ -14,7 +17,10 @@ import {
 } from "../../features/hook-message-injector"
 import { log } from "../../shared/logger"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
-import { getAgentConfigKey } from "../../shared/agent-display-names"
+import {
+  getAgentConfigKey,
+  normalizeAgentForPromptKey,
+} from "../../shared/agent-display-names"
 
 import {
   CONTINUATION_PROMPT,
@@ -23,6 +29,7 @@ import {
 } from "./constants"
 import { isCompactionGuardActive } from "./compaction-guard"
 import { getMessageDir } from "./message-directory"
+import { isTokenLimitError } from "./token-limit-detection"
 import { getIncompleteCount } from "./todo"
 import type { ResolvedMessageInfo, Todo } from "./types"
 import type { SessionStateStore } from "./session-state"
@@ -58,6 +65,11 @@ export async function injectContinuation(args: {
   const state = sessionStateStore.getExistingState(sessionID)
   if (state?.isRecovering) {
     log(`[${HOOK_NAME}] Skipped injection: in recovery`, { sessionID })
+    return
+  }
+
+  if (state?.wasCancelled) {
+    log(`[${HOOK_NAME}] Skipped injection: session was cancelled`, { sessionID })
     return
   }
 
@@ -117,12 +129,15 @@ export async function injectContinuation(args: {
     tools = tools ?? previousMessage?.tools
   }
 
-  if (agentName && skipAgents.some(s => getAgentConfigKey(s) === getAgentConfigKey(agentName))) {
+  const promptAgent = normalizeAgentForPromptKey(agentName)
+  const launchAgent = resolveRegisteredAgentName(agentName)
+
+  if (promptAgent && skipAgents.some(s => getAgentConfigKey(s) === getAgentConfigKey(promptAgent))) {
     log(`[${HOOK_NAME}] Skipped: agent in skipAgents list`, { sessionID, agent: agentName })
     return
   }
 
-  if (!agentName) {
+  if (!promptAgent) {
     const compactionState = sessionStateStore.getExistingState(sessionID)
     if (compactionState && isCompactionGuardActive(compactionState, Date.now())) {
       log(`[${HOOK_NAME}] Skipped: agent unknown after compaction`, { sessionID })
@@ -145,6 +160,11 @@ Remaining tasks:
 ${todoList}`
 
   const injectionState = sessionStateStore.getExistingState(sessionID)
+  if (injectionState?.wasCancelled) {
+    log(`[${HOOK_NAME}] Skipped injection: session was cancelled before prompt`, { sessionID })
+    return
+  }
+
   if (injectionState) {
     injectionState.inFlight = true
   }
@@ -152,18 +172,24 @@ ${todoList}`
   try {
     log(`[${HOOK_NAME}] Injecting continuation`, {
       sessionID,
-      agent: agentName,
+      agent: launchAgent ?? promptAgent,
       model,
       incompleteCount: freshIncompleteCount,
     })
 
     const inheritedTools = resolveInheritedPromptTools(sessionID, tools)
 
+    const launchModel = model
+      ? { providerID: model.providerID, modelID: model.modelID }
+      : undefined
+    const launchVariant = model?.variant
+
     await ctx.client.session.promptAsync({
       path: { id: sessionID },
       body: {
-        agent: agentName,
-        ...(model !== undefined ? { model } : {}),
+        agent: launchAgent ?? promptAgent,
+        ...(launchModel ? { model: launchModel } : {}),
+        ...(launchVariant ? { variant: launchVariant } : {}),
         ...(inheritedTools ? { tools: inheritedTools } : {}),
         parts: [createInternalAgentTextPart(prompt)],
       },
@@ -183,6 +209,14 @@ ${todoList}`
       injectionState.inFlight = false
       injectionState.lastInjectedAt = Date.now()
       injectionState.consecutiveFailures = (injectionState.consecutiveFailures ?? 0) + 1
+
+      const errorObj = error instanceof Error
+        ? { name: error.name, message: error.message }
+        : { message: String(error) }
+      if (isTokenLimitError(errorObj)) {
+        injectionState.tokenLimitDetected = true
+        log(`[${HOOK_NAME}] Token limit error detected during injection, stopping continuation`, { sessionID })
+      }
     }
   }
 }

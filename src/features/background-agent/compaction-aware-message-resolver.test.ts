@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test"
-import { mkdtempSync, writeFileSync, rmSync } from "node:fs"
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import {
@@ -11,6 +11,7 @@ import {
   clearCompactionAgentConfigCheckpoint,
   setCompactionAgentConfigCheckpoint,
 } from "../../shared/compaction-agent-config-checkpoint"
+import { getCompactionPartStorageDir } from "../../shared/compaction-marker"
 
 describe("isCompactionAgent", () => {
   describe("#given agent name variations", () => {
@@ -73,6 +74,7 @@ describe("findNearestMessageExcludingCompaction", () => {
 
   afterEach(() => {
     rmSync(tempDir, { force: true, recursive: true })
+    rmSync(getCompactionPartStorageDir("msg_test_background_compaction_marker"), { force: true, recursive: true })
     clearCompactionAgentConfigCheckpoint("ses_checkpoint")
   })
 
@@ -113,6 +115,30 @@ describe("findNearestMessageExcludingCompaction", () => {
 
       // then
       expect(result).not.toBeNull()
+      expect(result?.agent).toBe("sisyphus")
+    })
+
+    test("skips JSON messages whose part storage contains a compaction marker", () => {
+      // given
+      const compactionMessageID = "msg_test_background_compaction_marker"
+      const partDir = getCompactionPartStorageDir(compactionMessageID)
+      writeFileSync(join(tempDir, "002.json"), JSON.stringify({
+        id: compactionMessageID,
+        agent: "atlas",
+        model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
+      }))
+      writeFileSync(join(tempDir, "001.json"), JSON.stringify({
+        id: "msg_001",
+        agent: "sisyphus",
+        model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
+      }))
+      mkdirSync(partDir, { recursive: true })
+      writeFileSync(join(partDir, "prt_0001.json"), JSON.stringify({ type: "compaction" }))
+
+      // when
+      const result = findNearestMessageExcludingCompaction(tempDir)
+
+      // then
       expect(result?.agent).toBe("sisyphus")
     })
 
@@ -252,6 +278,30 @@ describe("resolvePromptContextFromSessionMessages", () => {
     // then
     expect(result).toEqual({
       agent: "atlas",
+      model: { providerID: "anthropic", modelID: "claude-opus-4-1" },
+      tools: { bash: true },
+    })
+  })
+
+  test("skips SDK messages that only exist to mark compaction", () => {
+    // given
+    const messages = [
+      {
+        id: "msg_compaction",
+        info: { agent: "atlas", model: { providerID: "openai", modelID: "gpt-5" } },
+        parts: [{ type: "compaction" }],
+      },
+      { info: { agent: "sisyphus" } },
+      { info: { model: { providerID: "anthropic", modelID: "claude-opus-4-1" } } },
+      { info: { tools: { bash: true } } },
+    ]
+
+    // when
+    const result = resolvePromptContextFromSessionMessages(messages)
+
+    // then
+    expect(result).toEqual({
+      agent: "sisyphus",
       model: { providerID: "anthropic", modelID: "claude-opus-4-1" },
       tools: { bash: true },
     })

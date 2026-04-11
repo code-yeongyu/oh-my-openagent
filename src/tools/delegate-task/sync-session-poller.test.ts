@@ -1,5 +1,5 @@
+import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 declare const require: (name: string) => any
-const { describe, test, expect, beforeEach, afterEach } = require("bun:test")
 import { __setTimingConfig, __resetTimingConfig } from "./timing"
 
 function createMockCtx(aborted = false) {
@@ -33,7 +33,6 @@ describe("pollSyncSession", () => {
       //         and the assistant id > user id (native opencode condition)
       const { pollSyncSession } = require("./sync-session-poller")
 
-      let pollCount = 0
       const mockClient = {
         session: {
           messages: async () => ({
@@ -165,6 +164,58 @@ describe("pollSyncSession", () => {
       expect(callCount).toBeGreaterThan(1)
     })
 
+    test("keeps polling when finish is 'stop' but assistant still has tool-call parts", async () => {
+      //#given
+      const { pollSyncSession } = require("./sync-session-poller")
+
+      let callCount = 0
+      const mockClient = {
+        session: {
+          messages: async () => {
+            callCount++
+            if (callCount <= 1) {
+              return {
+                data: [
+                  { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+                  {
+                    info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "stop" },
+                    parts: [{ type: "tool-call", text: "calling tool" }],
+                  },
+                ],
+              }
+            }
+            return {
+              data: [
+                { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+                {
+                  info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "stop" },
+                  parts: [{ type: "tool-call", text: "calling tool" }],
+                },
+                { info: { id: "msg_003", role: "user", time: { created: 3000 } } },
+                {
+                  info: { id: "msg_004", role: "assistant", time: { created: 4000 }, finish: "stop" },
+                  parts: [{ type: "text", text: "Done" }],
+                },
+              ],
+            }
+          },
+          status: async () => ({ data: { "ses_test": { type: "idle" } } }),
+        },
+      }
+
+      //#when
+      const result = await pollSyncSession(createMockCtx(), mockClient, {
+        sessionID: "ses_test",
+        agentToUse: "test-agent",
+        toastManager: null,
+        taskId: undefined,
+      })
+
+      //#then
+      expect(result).toBeNull()
+      expect(callCount).toBeGreaterThan(1)
+    })
+
     test("does not complete when assistant id < user id (user sent after assistant)", async () => {
       //#given - assistant finished but user message came after it (agent still processing)
       const { pollSyncSession } = require("./sync-session-poller")
@@ -220,6 +271,55 @@ describe("pollSyncSession", () => {
   })
 
   describe("abort handling", () => {
+    test("#given session completed AND abort fires #then returns completion result not abort", async () => {
+      //#given
+      const { pollSyncSession } = require("./sync-session-poller")
+      const controller = new AbortController()
+      controller.abort()
+
+      let abortCount = 0
+      let messageCallCount = 0
+      const mockClient = {
+        session: {
+          abort: async () => {
+            abortCount++
+          },
+          messages: async () => {
+            messageCallCount++
+            return {
+              data: [
+                { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+                {
+                  info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "stop" },
+                  parts: [{ type: "text", text: "Done" }],
+                },
+              ],
+            }
+          },
+          status: async () => ({ data: {} }),
+        },
+      }
+
+      //#when
+      const result = await pollSyncSession({
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "test-agent",
+        abort: controller.signal,
+      }, mockClient, {
+        sessionID: "ses_abort_complete",
+        agentToUse: "test-agent",
+        toastManager: { removeTask: () => {} },
+        taskId: "task_123",
+        anchorMessageCount: 1,
+      })
+
+      //#then
+      expect(result).toBeNull()
+      expect(messageCallCount).toBe(1)
+      expect(abortCount).toBe(0)
+    })
+
     test("returns abort message when signal is aborted", async () => {
       //#given
       const { pollSyncSession } = require("./sync-session-poller")
@@ -295,7 +395,7 @@ describe("pollSyncSession", () => {
        //#given
        const { pollSyncSession } = require("./sync-session-poller")
 
-       let statusCallCount = 0
+        let statusCallCount = 0
        let messageCallCount = 0
        const mockClient = {
          session: {
@@ -421,6 +521,44 @@ describe("pollSyncSession", () => {
       expect(result).toBe(false)
     })
 
+    test("returns false when finish is stop but assistant has tool-call parts", () => {
+      const { isSessionComplete } = require("./sync-session-poller")
+
+      //#given - provider marks stop even though tool execution is still pending
+      const messages = [
+        { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+        {
+          info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "stop" },
+          parts: [{ type: "tool-call", text: "calling tool" }],
+        },
+      ]
+
+      //#when
+      const result = isSessionComplete(messages)
+
+      //#then - should return false because tool execution is still pending
+      expect(result).toBe(false)
+    })
+
+    test("returns false when finish is end_turn but assistant has tool-call parts", () => {
+      const { isSessionComplete } = require("./sync-session-poller")
+
+      //#given - assistant emitted a terminal finish but still contains pending tool calls
+      const messages = [
+        { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+        {
+          info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "end_turn" },
+          parts: [{ type: "tool-call", text: "calling tool" }],
+        },
+      ]
+
+      //#when
+      const result = isSessionComplete(messages)
+
+      //#then - should return false because tool execution is still pending
+      expect(result).toBe(false)
+    })
+
     test("returns false when user message has missing info.id field", () => {
       const { isSessionComplete } = require("./sync-session-poller")
 
@@ -438,7 +576,7 @@ describe("pollSyncSession", () => {
 
       //#then - should return false (missing user id)
       expect(result).toBe(false)
+    })
   })
-})
 
 })

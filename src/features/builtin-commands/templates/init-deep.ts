@@ -41,7 +41,7 @@ TodoWrite([
 
 ### Fire Background Explore Agents IMMEDIATELY
 
-Don't wait—these run async while main session works.
+Don't wait-these run async while main session works.
 
 \`\`\`
 // Fire all at once, collect results later

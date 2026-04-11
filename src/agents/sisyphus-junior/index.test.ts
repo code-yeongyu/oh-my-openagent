@@ -143,6 +143,44 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
     })
   })
 
+  describe("reasoning configuration", () => {
+    test("#given GPT model #when agent is created #then uses reasoningEffort", () => {
+      // given
+      const override = { model: "openai/gpt-5.4" }
+
+      // when
+      const result = createSisyphusJuniorAgentWithOverrides(override)
+
+      // then
+      expect(result.reasoningEffort).toBe("medium")
+      expect(result.thinking).toBeUndefined()
+    })
+
+    test("#given Claude model #when agent is created #then injects thinking", () => {
+      // given
+      const override = { model: "anthropic/claude-sonnet-4-6" }
+
+      // when
+      const result = createSisyphusJuniorAgentWithOverrides(override)
+
+      // then
+      expect(result.reasoningEffort).toBeUndefined()
+      expect(result.thinking).toEqual({ type: "enabled", budgetTokens: 32000 })
+    })
+
+    test("#given GLM reasoning model #when agent is created #then skips injected thinking", () => {
+      // given
+      const override = { model: "z-ai/glm-5" }
+
+      // when
+      const result = createSisyphusJuniorAgentWithOverrides(override)
+
+      // then
+      expect(result.reasoningEffort).toBeUndefined()
+      expect(result.thinking).toBeUndefined()
+    })
+  })
+
   describe("tool safety (task blocked, call_omo_agent allowed)", () => {
     test("task remains blocked, call_omo_agent is allowed via tools format", () => {
       // given
@@ -312,6 +350,8 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
       expect(result.prompt).toContain("Scope Discipline")
       expect(result.prompt).toContain("<tool_usage_rules>")
       expect(result.prompt).toContain("Progress Updates")
+      expect(result.prompt).toContain("Do not use `apply_patch`")
+      expect(result.prompt).toContain("`edit` and `write`")
     })
 
     test("GPT 5.4 model uses GPT-5.4 specific prompt", () => {
@@ -324,6 +364,9 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
       // then
       expect(result.prompt).toContain("expert coding agent")
       expect(result.prompt).toContain("<tool_usage_rules>")
+      expect(result.prompt).toContain("Do not use `apply_patch`")
+      expect(result.prompt).toContain("`edit` and `write`")
+      expect(result.prompt).not.toContain("Always use apply_patch")
     })
 
     test("GPT 5.3 Codex model uses GPT-5.3-codex specific prompt", () => {
@@ -336,6 +379,28 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
       // then
       expect(result.prompt).toContain("Senior Engineer")
       expect(result.prompt).toContain("<tool_usage_rules>")
+      expect(result.prompt).toContain("Do not use `apply_patch`")
+      expect(result.prompt).toContain("`edit` and `write`")
+    })
+
+    test("GPT variants deny apply_patch while Claude variants do not", () => {
+      // given
+      const gpt54Override = { model: "openai/gpt-5.4" }
+      const gpt53Override = { model: "openai/gpt-5.3-codex" }
+      const gptGenericOverride = { model: "openai/gpt-4o" }
+      const claudeOverride = { model: "anthropic/claude-sonnet-4-6" }
+
+      // when
+      const gpt54Result = createSisyphusJuniorAgentWithOverrides(gpt54Override)
+      const gpt53Result = createSisyphusJuniorAgentWithOverrides(gpt53Override)
+      const gptGenericResult = createSisyphusJuniorAgentWithOverrides(gptGenericOverride)
+      const claudeResult = createSisyphusJuniorAgentWithOverrides(claudeOverride)
+
+      // then
+      expect(gpt54Result.permission ?? {}).toHaveProperty("apply_patch", "deny")
+      expect(gpt53Result.permission ?? {}).toHaveProperty("apply_patch", "deny")
+      expect(gptGenericResult.permission ?? {}).toHaveProperty("apply_patch", "deny")
+      expect(claudeResult.permission ?? {}).not.toHaveProperty("apply_patch")
     })
 
     test("prompt_append is added after base prompt", () => {
@@ -456,6 +521,7 @@ describe("buildSisyphusJuniorPrompt", () => {
     expect(prompt).toContain("expert coding agent")
     expect(prompt).toContain("Scope Discipline")
     expect(prompt).toContain("<tool_usage_rules>")
+    expect(prompt).toContain("Do not use `apply_patch`")
   })
 
   test("GPT 5.3 Codex model uses GPT-5.3-codex prompt", () => {
@@ -469,6 +535,7 @@ describe("buildSisyphusJuniorPrompt", () => {
     expect(prompt).toContain("Senior Engineer")
     expect(prompt).toContain("Scope Discipline")
     expect(prompt).toContain("<tool_usage_rules>")
+    expect(prompt).toContain("Do not use `apply_patch`")
   })
 
   test("generic GPT model uses generic GPT prompt", () => {
@@ -483,6 +550,7 @@ describe("buildSisyphusJuniorPrompt", () => {
     expect(prompt).toContain("Scope Discipline")
     expect(prompt).toContain("<tool_usage_rules>")
     expect(prompt).toContain("Progress Updates")
+    expect(prompt).toContain("Do not use `apply_patch`")
   })
 
   test("Claude model prompt contains Claude-specific sections", () => {

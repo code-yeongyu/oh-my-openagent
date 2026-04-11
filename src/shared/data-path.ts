@@ -2,6 +2,8 @@ import * as path from "node:path"
 import * as os from "node:os"
 import { accessSync, constants, mkdirSync } from "node:fs"
 
+import { CACHE_DIR_NAME } from "./plugin-identity"
+
 function resolveWritableDirectory(preferredDir: string, fallbackSuffix: string): string {
   try {
     mkdirSync(preferredDir, { recursive: true })
@@ -50,7 +52,7 @@ export function getCacheDir(): string {
  * All platforms: ~/.cache/oh-my-opencode
  */
 export function getOmoOpenCodeCacheDir(): string {
-  return path.join(getCacheDir(), "oh-my-opencode")
+  return path.join(getCacheDir(), CACHE_DIR_NAME)
 }
 
 /**

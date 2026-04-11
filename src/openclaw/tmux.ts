@@ -4,8 +4,7 @@ export function getCurrentTmuxSession(): string | null {
   const env = process.env.TMUX
   if (!env) return null
   const match = env.match(/(\d+)$/)
-  return match ? `session-${match[1]}` : null // Wait, TMUX env is /tmp/tmux-501/default,1234,0
-  // Reference tmux.js gets session name via `tmux display-message -p '#S'`
+  return match ? `session-${match[1]}` : null
 }
 
 export async function getTmuxSessionName(): Promise<string | null> {
@@ -17,7 +16,6 @@ export async function getTmuxSessionName(): Promise<string | null> {
     const outputPromise = new Response(proc.stdout).text()
     await proc.exited
     const output = await outputPromise
-    // Await proc.exited ensures exitCode is set; avoid race condition
     if (proc.exitCode !== 0) return null
     return output.trim() || null
   } catch {

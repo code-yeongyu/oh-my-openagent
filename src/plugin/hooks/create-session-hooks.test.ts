@@ -53,4 +53,30 @@ describe("createSessionHooks", () => {
     // then
     expect(result.modelFallback).not.toBeNull()
   })
+
+  it("skips interactive bash session hook when tmux integration is disabled", () => {
+    // given
+    const pluginConfig = {
+      tmux: {
+        enabled: false,
+        layout: "main-vertical",
+        main_pane_size: 60,
+        main_pane_min_width: 120,
+        agent_pane_min_width: 40,
+        isolation: "inline",
+      },
+    } as OhMyOpenCodeConfig
+
+    // when
+    const result = createSessionHooks({
+      ctx: mockContext,
+      pluginConfig,
+      modelCacheState: mockModelCacheState,
+      isHookEnabled: (hookName) => hookName === "interactive-bash-session",
+      safeHookEnabled: true,
+    })
+
+    // then
+    expect(result.interactiveBashSession).toBeNull()
+  })
 })

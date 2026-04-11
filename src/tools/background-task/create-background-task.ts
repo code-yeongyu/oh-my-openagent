@@ -80,16 +80,18 @@ export function createBackgroundTask(
         const waitStart = Date.now()
         let sessionId = task.sessionID
         while (!sessionId && Date.now() - waitStart < WAIT_FOR_SESSION_TIMEOUT_MS) {
-          if (ctx.abort?.aborted) {
-            await manager.cancelTask(task.id)
-            return `Task aborted and cancelled while waiting for session to start.\n\nTask ID: ${task.id}`
-          }
-          await delay(WAIT_FOR_SESSION_INTERVAL_MS)
           const updated = manager.getTask(task.id)
-          if (!updated || updated.status === "error" || updated.status === "cancelled" || updated.status === "interrupt") {
-            return `Task ${!updated ? "was deleted" : `entered error state`}\.\n\nTask ID: ${task.id}`
+          if (updated?.status === "error" || updated?.status === "cancelled" || updated?.status === "interrupt") {
+            return `Task ${`entered error state`}\.\n\nTask ID: ${task.id}`
           }
           sessionId = updated?.sessionID
+          if (sessionId) {
+            break
+          }
+          if (ctx.abort?.aborted) {
+            break
+          }
+          await delay(WAIT_FOR_SESSION_INTERVAL_MS)
         }
 
         const bgMeta = {
@@ -112,10 +114,9 @@ Description: ${task.description}
 Agent: ${task.agent}
 Status: ${task.status}
 
-The system will notify you when the task completes.
-Use \`background_output\` tool with task_id="${task.id}" to check progress:
-- block=false (default): Check status immediately - returns full status info
-- block=true: Wait for completion (rarely needed since system notifies)`
+System notifies on completion. Use \`background_output\` with task_id="${task.id}" to check.
+
+Do NOT call background_output now. Wait for <system-reminder> notification first.`
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
         return `[ERROR] Failed to launch background task: ${message}`

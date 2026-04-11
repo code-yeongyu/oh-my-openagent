@@ -5,7 +5,9 @@ import type { HookName } from "./config"
 
 import { createHooks } from "./create-hooks"
 import { createManagers } from "./create-managers"
+import { createRuntimeTmuxConfig, isTmuxIntegrationEnabled } from "./create-runtime-tmux-config"
 import { createTools } from "./create-tools"
+import { initializeOpenClaw } from "./openclaw"
 import { createPluginInterface } from "./plugin-interface"
 import { createPluginDispose, type PluginDispose } from "./plugin-dispose"
 
@@ -14,29 +16,56 @@ import { createModelCacheState } from "./plugin-state"
 import { createFirstMessageVariantGate } from "./shared/first-message-variant"
 import { injectServerAuthIntoClient, log, logLegacyPluginStartupWarning } from "./shared"
 import { detectExternalSkillPlugin, getSkillPluginConflictWarning } from "./shared/external-plugin-detector"
-import { startTmuxCheck } from "./tools"
+import { startBackgroundCheck as startTmuxCheck } from "./tools/interactive-bash"
+import { lspManager } from "./tools/lsp/client"
+import { createPluginPostHog, getPostHogDistinctId } from "./shared/posthog"
 
 let activePluginDispose: PluginDispose | null = null
 
 const OhMyOpenCodePlugin: Plugin = async (ctx) => {
-  // Initialize config context for plugin runtime (prevents warnings from hooks)
   initConfigContext("opencode", null)
   log("[OhMyOpenCodePlugin] ENTRY - plugin loading", {
     directory: ctx.directory,
   })
   logLegacyPluginStartupWarning()
 
-  // Detect conflicting skill plugins (e.g., opencode-skills)
   const skillPluginCheck = detectExternalSkillPlugin(ctx.directory)
   if (skillPluginCheck.detected && skillPluginCheck.pluginName) {
     console.warn(getSkillPluginConflictWarning(skillPluginCheck.pluginName))
   }
 
   injectServerAuthIntoClient(ctx.client)
-  startTmuxCheck()
   await activePluginDispose?.()
 
   const pluginConfig = loadPluginConfig(ctx.directory, ctx)
+
+  const posthog = createPluginPostHog()
+  const distinctId = getPostHogDistinctId()
+  try {
+    posthog.trackActive(distinctId, "plugin_loaded")
+  } catch {
+    // telemetry failure is non-fatal, silently ignore
+  }
+  try {
+    posthog.capture({
+      distinctId,
+      event: "plugin_loaded",
+      properties: {
+        entry_point: "plugin",
+        has_openclaw: !!pluginConfig.openclaw,
+        tmux_enabled: isTmuxIntegrationEnabled(pluginConfig),
+      },
+    })
+  } catch {
+    // telemetry failure is non-fatal, silently ignore
+  }
+  if (pluginConfig.openclaw) {
+    await initializeOpenClaw(pluginConfig.openclaw)
+  }
+  const tmuxIntegrationEnabled = isTmuxIntegrationEnabled(pluginConfig)
+  if (tmuxIntegrationEnabled) {
+    startTmuxCheck()
+  }
   const disabledHooks = new Set(pluginConfig.disabled_hooks ?? [])
 
   const isHookEnabled = (hookName: HookName): boolean => !disabledHooks.has(hookName)
@@ -44,14 +73,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
   const firstMessageVariantGate = createFirstMessageVariantGate()
 
-  const tmuxConfig = {
-    enabled: pluginConfig.tmux?.enabled ?? false,
-    layout: pluginConfig.tmux?.layout ?? "main-vertical",
-    main_pane_size: pluginConfig.tmux?.main_pane_size ?? 60,
-    main_pane_min_width: pluginConfig.tmux?.main_pane_min_width ?? 120,
-    agent_pane_min_width: pluginConfig.tmux?.agent_pane_min_width ?? 40,
-    isolation: pluginConfig.tmux?.isolation ?? "session",
-  }
+  const tmuxConfig = createRuntimeTmuxConfig(pluginConfig)
 
   const modelCacheState = createModelCacheState()
 
@@ -83,6 +105,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const dispose = createPluginDispose({
     backgroundManager: managers.backgroundManager,
     skillMcpManager: managers.skillMcpManager,
+    lspManager,
     disposeHooks: hooks.disposeHooks,
   })
 
@@ -130,7 +153,4 @@ export type {
   BuiltinCommandName,
 } from "./config"
 
-// NOTE: Do NOT export functions from main index.ts!
-// OpenCode treats ALL exports as plugin instances and calls them.
-// Config error utilities are available via "./shared/config-errors" for internal use only.
 export type { ConfigLoadError } from "./shared/config-errors"

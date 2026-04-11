@@ -9,3 +9,9 @@ export function clearSessionHookState(sessionID: string): void {
 	sessionInterruptState.delete(sessionID)
 	sessionFirstMessageProcessed.delete(sessionID)
 }
+
+export function clearAllSessionHookState(): void {
+	sessionErrorState.clear()
+	sessionInterruptState.clear()
+	sessionFirstMessageProcessed.clear()
+}

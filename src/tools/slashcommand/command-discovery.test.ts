@@ -2,7 +2,18 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test"
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { discoverCommandsSync } from "./command-discovery"
+
+function requireFresh<T>(modulePath: string): T {
+  const resolvedPath = require.resolve(modulePath)
+  if (require.cache?.[resolvedPath]) {
+    delete require.cache[resolvedPath]
+  }
+  return require(modulePath) as T
+}
+
+function discoverCommandsSync(...args: Parameters<typeof import("./command-discovery").discoverCommandsSync>): ReturnType<typeof import("./command-discovery").discoverCommandsSync> {
+  return requireFresh<typeof import("./command-discovery")>("./command-discovery").discoverCommandsSync(...args)
+}
 
 const ENV_KEYS = [
   "CLAUDE_CONFIG_DIR",
@@ -254,5 +265,65 @@ Use nested command.
 
     expect(nestedCommand?.content).toContain("Use nested command.")
     expect(nestedCommand?.scope).toBe("opencode-project")
+  })
+
+  it("keeps builtin start-work routed to Atlas during static discovery", () => {
+    // given
+
+    // when
+    const commands = discoverCommandsSync(projectDir)
+    const startWorkCommand = commands.find((command) => command.name === "start-work")
+
+    // then
+    expect(startWorkCommand?.metadata.agent).toBe("atlas")
+  })
+})
+
+describe("non-directory commands path", () => {
+  let testDir: string
+  let savedEnv: Record<string, string | undefined>
+
+  beforeEach(() => {
+    testDir = mkdtempSync(join(tmpdir(), "omo-cmd-file-"))
+    savedEnv = {
+      CLAUDE_CONFIG_DIR: process.env.CLAUDE_CONFIG_DIR,
+      OPENCODE_CONFIG_DIR: process.env.OPENCODE_CONFIG_DIR,
+    }
+    process.env.CLAUDE_CONFIG_DIR = join(testDir, "claude-config")
+    process.env.OPENCODE_CONFIG_DIR = join(testDir, "opencode-config")
+    mkdirSync(join(testDir, "claude-config"), { recursive: true })
+    mkdirSync(join(testDir, "opencode-config"), { recursive: true })
+  })
+
+  afterEach(() => {
+    Object.entries(savedEnv).forEach(([k, v]) => {
+      if (v === undefined) delete process.env[k]
+      else process.env[k] = v
+    })
+    rmSync(testDir, { recursive: true, force: true })
+  })
+
+  it("#given .claude/commands is a file #when discoverCommandsSync runs #then returns without crashing", () => {
+    const projectDir = join(testDir, "project")
+    mkdirSync(join(projectDir, ".claude"), { recursive: true })
+    writeFileSync(join(projectDir, ".claude", "commands"), "")  // file, not directory
+
+    // Should not throw
+    const commands = discoverCommandsSync(projectDir)
+    expect(commands).toBeInstanceOf(Array)
+  })
+
+  it("#given .claude/commands is a directory #when discoverCommandsSync runs #then discovers commands normally", () => {
+    const projectDir = join(testDir, "project")
+    mkdirSync(join(projectDir, ".claude", "commands"), { recursive: true })
+    writeFileSync(
+      join(projectDir, ".claude", "commands", "test-cmd.md"),
+      "---\ndescription: Test\n---\nTest command content.\n",
+    )
+
+    const commands = discoverCommandsSync(projectDir)
+    const testCmd = commands.find((c) => c.name === "test-cmd")
+    expect(testCmd).toBeDefined()
+    expect(testCmd?.content).toContain("Test command content.")
   })
 })

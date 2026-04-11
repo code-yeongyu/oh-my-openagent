@@ -1,4 +1,5 @@
 import type { OhMyOpenCodeConfig } from "../config";
+import { setAdditionalAllowedMcpEnvVars } from "../features/claude-code-mcp-loader";
 import type { ModelCacheState } from "../plugin-state";
 import { log } from "../shared";
 import { applyAgentConfig } from "./agent-config-handler";
@@ -23,6 +24,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
   return async (config: Record<string, unknown>) => {
     const formatterConfig = config.formatter;
 
+    setAdditionalAllowedMcpEnvVars(pluginConfig.mcp_env_allowlist ?? [])
     applyProviderConfig({ config, modelCacheState });
     clearFormatterCache()
 

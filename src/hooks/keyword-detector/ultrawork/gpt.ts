@@ -93,8 +93,8 @@ Use these when they provide clear value based on the decision framework above:
 **ALWAYS run both tracks in parallel:**
 \`\`\`
 // Fire background agents for deep exploration
-task(subagent_type="explore", load_skills=[], prompt="I'm implementing [TASK] and need to understand [KNOWLEDGE GAP]. Find [X] patterns in the codebase — file paths, implementation approach, conventions used, and how modules connect. I'll use this to [DOWNSTREAM DECISION]. Focus on production code in src/. Return file paths with brief descriptions.", run_in_background=true)
-task(subagent_type="librarian", load_skills=[], prompt="I'm working with [TECHNOLOGY] and need [SPECIFIC INFO]. Find official docs and production examples for [Y] — API reference, configuration, recommended patterns, and pitfalls. Skip tutorials. I'll use this to [DECISION THIS INFORMS].", run_in_background=true)
+task(subagent_type="explore", load_skills=[], prompt="I'm implementing [TASK] and need to understand [KNOWLEDGE GAP]. Find [X] patterns in the codebase - file paths, implementation approach, conventions used, and how modules connect. I'll use this to [DOWNSTREAM DECISION]. Focus on production code in src/. Return file paths with brief descriptions.", run_in_background=true)
+task(subagent_type="librarian", load_skills=[], prompt="I'm working with [TECHNOLOGY] and need [SPECIFIC INFO]. Find official docs and production examples for [Y] - API reference, configuration, recommended patterns, and pitfalls. Skip tutorials. I'll use this to [DECISION THIS INFORMS].", run_in_background=true)
 
 // WHILE THEY RUN - use direct tools for immediate context
 grep(pattern="relevant_pattern", path="src/")
@@ -122,7 +122,7 @@ deep_context = background_output(task_id=...)
 
 **BEFORE implementation**, define what "done" means in concrete, binary terms:
 
-1. Write acceptance criteria as pass/fail conditions (not "should work" — specific observable outcomes)
+1. Write acceptance criteria as pass/fail conditions (not "should work" - specific observable outcomes)
 2. Record them in your TODO/Task items with a "QA: [how to verify]" field
 3. Work toward those criteria, not just "finishing code"
 
@@ -160,7 +160,7 @@ A task is complete when:
 2. lsp_diagnostics shows zero errors on modified files
 3. Tests pass (or pre-existing failures documented)
 4. Code matches existing codebase patterns
-5. **Manual QA executed — actual feature tested, output observed and reported**
+5. **Manual QA executed - actual feature tested, output observed and reported**
 
 **Deliver exactly what was asked. No more, no less.**
 

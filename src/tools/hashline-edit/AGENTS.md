@@ -1,6 +1,6 @@
 # src/tools/hashline-edit/ — Hash-Anchored File Edit Tool
 
-**Generated:** 2026-03-06
+**Generated:** 2026-04-11
 
 ## OVERVIEW
 

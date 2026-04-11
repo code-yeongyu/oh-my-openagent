@@ -86,7 +86,7 @@ function formatResizeAppendix(entries: ResizeEntry[]): string {
     }
 
     if (entry.status === "resize-skipped") {
-      lines.push(`- ${entry.filename}: ${originalText} (resize skipped, tokens: ${originalTokens})`)
+      lines.push(`- ${entry.filename}: ${originalText} (exceeds provider limits, image removed to prevent API error)`)
       continue
     }
 
@@ -138,6 +138,7 @@ export function createReadImageResizerHook(_ctx: PluginInput) {
       }
 
       const entries: ResizeEntry[] = []
+      const attachmentsToRemove: ImageAttachment[] = []
       for (const [index, attachment] of attachments.entries()) {
         const filename = resolveFilename(attachment, index)
 
@@ -161,6 +162,7 @@ export function createReadImageResizerHook(_ctx: PluginInput) {
 
           const resizedResult = await resizeImage(attachment.url, attachment.mime, targetDims)
           if (!resizedResult) {
+            attachmentsToRemove.push(attachment)
             entries.push({
               filename,
               originalDims,
@@ -184,6 +186,16 @@ export function createReadImageResizerHook(_ctx: PluginInput) {
             filename,
           })
           entries.push({ filename, originalDims: null, resizedDims: null, status: "unknown-dims" })
+        }
+      }
+
+      if (attachmentsToRemove.length > 0) {
+        const rawAttachments = outputRecord.attachments as unknown[]
+        for (const toRemove of attachmentsToRemove) {
+          const removeIndex = rawAttachments.indexOf(toRemove)
+          if (removeIndex !== -1) {
+            rawAttachments.splice(removeIndex, 1)
+          }
         }
       }
 

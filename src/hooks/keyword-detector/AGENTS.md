@@ -1,6 +1,6 @@
 # src/hooks/keyword-detector/ — Mode Keyword Injection
 
-**Generated:** 2026-03-06
+**Generated:** 2026-04-11
 
 ## OVERVIEW
 

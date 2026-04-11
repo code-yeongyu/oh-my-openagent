@@ -7,10 +7,11 @@ import type { DelegatedModelConfig } from "../../shared/model-resolution-types"
 import type { FallbackEntry } from "../../shared/model-requirements"
 import { AGENT_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
 import { getAgentConfigKey } from "../../shared/agent-display-names"
-import { normalizeModelFormat } from "../../shared/model-format-normalizer"
 import { normalizeFallbackModels } from "../../shared/model-resolver"
 import { buildFallbackChainFromModels } from "../../shared/fallback-chain-from-models"
 import { log } from "../../shared"
+import { CONFIG_BASENAME } from "../../shared/plugin-identity"
+import { parseModelString } from "../delegate-task/model-string-parser"
 import { executeBackground } from "./background-executor"
 import { executeSync } from "./sync-executor"
 
@@ -27,16 +28,34 @@ function resolveModelAndFallbackChain(args: {
     ?? (agentOverrides
       ? Object.entries(agentOverrides).find(([key]) => key.toLowerCase() === agentConfigKey)?.[1]
       : undefined)
+  const agentCategoryModel = agentOverride?.category
+    ? userCategories?.[agentOverride.category]?.model
+    : undefined
+  const agentCategoryVariant = agentOverride?.category
+    ? userCategories?.[agentOverride.category]?.variant
+    : undefined
 
   let model: DelegatedModelConfig | undefined
   if (agentOverride?.model) {
-    const normalized = normalizeModelFormat(agentOverride.model)
+    const normalized = parseModelString(agentOverride.model)
     if (normalized) {
       model = agentOverride.variant ? { ...normalized, variant: agentOverride.variant } : normalized
       log("[call_omo_agent] Resolved model override from agent config", {
         agent: subagentType,
         model: agentOverride.model,
         variant: agentOverride.variant,
+      })
+    }
+  } else if (agentCategoryModel) {
+    const normalized = parseModelString(agentCategoryModel)
+    if (normalized) {
+      const variantToUse = agentOverride?.variant ?? agentCategoryVariant
+      model = variantToUse ? { ...normalized, variant: variantToUse } : normalized
+      log("[call_omo_agent] Resolved model override from agent category", {
+        agent: subagentType,
+        category: agentOverride?.category,
+        model: agentCategoryModel,
+        variant: variantToUse,
       })
     }
   }
@@ -99,7 +118,7 @@ export function createCallOmoAgent(
 
       // Check if agent is disabled
       if (disabledAgents.some((disabled) => disabled.toLowerCase() === normalizedAgent)) {
-        return `Error: Agent "${normalizedAgent}" is disabled via disabled_agents configuration. Remove it from disabled_agents in your oh-my-opencode.json to use it.`
+        return `Error: Agent "${normalizedAgent}" is disabled via disabled_agents configuration. Remove it from disabled_agents in your ${CONFIG_BASENAME}.json to use it.`
       }
 
       const { model: resolvedModel, fallbackChain } = resolveModelAndFallbackChain({

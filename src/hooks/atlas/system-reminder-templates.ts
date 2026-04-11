@@ -51,8 +51,8 @@ Assume the work is broken until YOU prove otherwise.
 
 Do NOT run tests yet. Read the code FIRST so you know what you're testing.
 
-1. \`Bash("git diff --stat")\` — see exactly which files changed. Any file outside expected scope = scope creep.
-2. \`Read\` EVERY changed file — no exceptions, no skimming.
+1. \`Bash("git diff --stat -- ':!node_modules'")\` - see exactly which files changed. Any file outside expected scope = scope creep.
+2. \`Read\` EVERY changed file - no exceptions, no skimming.
 3. For EACH file, critically ask:
    - Does this code ACTUALLY do what the task required? (Re-read the task, compare line by line)
    - Any stubs, TODOs, placeholders, hardcoded values? (\`Grep\` for TODO, FIXME, HACK, xxx)
@@ -60,46 +60,46 @@ Do NOT run tests yet. Read the code FIRST so you know what you're testing.
    - Anti-patterns? (\`Grep\` for \`as any\`, \`@ts-ignore\`, empty catch, console.log in changed files)
    - Scope creep? Did the subagent touch things or add features NOT in the task spec?
 4. Cross-check every claim:
-   - Said "Updated X" — READ X. Actually updated, or just superficially touched?
-   - Said "Added tests" — READ the tests. Do they test REAL behavior or just \`expect(true).toBe(true)\`?
-   - Said "Follows patterns" — OPEN a reference file. Does it ACTUALLY match?
+   - Said "Updated X" - READ X. Actually updated, or just superficially touched?
+   - Said "Added tests" - READ the tests. Do they test REAL behavior or just \`expect(true).toBe(true)\`?
+   - Said "Follows patterns" - OPEN a reference file. Does it ACTUALLY match?
 
 **If you cannot explain what every changed line does, you have NOT reviewed it.**
 
 **PHASE 2: RUN AUTOMATED CHECKS (targeted, then broad)**
 
 Now that you understand the code, verify mechanically:
-1. \`lsp_diagnostics\` on EACH changed file — ZERO new errors
+1. \`lsp_diagnostics\` on EACH changed file - ZERO new errors
 2. Run tests for changed modules FIRST, then full suite
-3. Build/typecheck — exit 0
+3. Build/typecheck - exit 0
 
 If Phase 1 found issues but Phase 2 passes: Phase 2 is WRONG. The code has bugs that tests don't cover. Fix the code.
 
-**PHASE 3: HANDS-ON QA — ACTUALLY RUN IT (MANDATORY for user-facing changes)**
+**PHASE 3: HANDS-ON QA - ACTUALLY RUN IT (MANDATORY for user-facing changes)**
 
 Tests and linters CANNOT catch: visual bugs, wrong CLI output, broken user flows, API response shape issues.
 
 **If this task produced anything a user would SEE or INTERACT with, you MUST launch it and verify yourself.**
 
-- **Frontend/UI**: \`/playwright\` skill — load the page, click through the flow, check console. Verify: page loads, interactions work, console clean, responsive.
-- **TUI/CLI**: \`interactive_bash\` — run the command, try good input, try bad input, try --help. Verify: command runs, output correct, error messages helpful, edge inputs handled.
-- **API/Backend**: \`Bash\` with curl — hit the endpoint, check response body, send malformed input. Verify: returns 200, body correct, error cases return proper errors.
+- **Frontend/UI**: \`/playwright\` skill - load the page, click through the flow, check console. Verify: page loads, interactions work, console clean, responsive.
+- **TUI/CLI**: \`interactive_bash\` - run the command, try good input, try bad input, try --help. Verify: command runs, output correct, error messages helpful, edge inputs handled.
+- **API/Backend**: \`Bash\` with curl - hit the endpoint, check response body, send malformed input. Verify: returns 200, body correct, error cases return proper errors.
 - **Config/Build**: Actually start the service or import the config. Verify: loads without error, backward compatible.
 
 This is NOT optional "if applicable". If the deliverable is user-facing and you did not run it, you are shipping untested work.
 
-**PHASE 4: GATE DECISION — Should you proceed to the next task?**
+**PHASE 4: GATE DECISION - Should you proceed to the next task?**
 
 Answer honestly:
-1. Can I explain what EVERY changed line does? (If no — back to Phase 1)
-2. Did I SEE it work with my own eyes? (If user-facing and no — back to Phase 3)
-3. Am I confident nothing existing is broken? (If no — run broader tests)
+1. Can I explain what EVERY changed line does? (If no - back to Phase 1)
+2. Did I SEE it work with my own eyes? (If user-facing and no - back to Phase 3)
+3. Am I confident nothing existing is broken? (If no - run broader tests)
 
 ALL three must be YES. "Probably" = NO. "I think so" = NO. Investigate until CERTAIN.
 
-- **All 3 YES** — Proceed: mark task complete, move to next.
-- **Any NO** — Reject: resume session with \`session_id\`, fix the specific issue.
-- **Unsure** — Reject: "unsure" = "no". Investigate until you have a definitive answer.
+- **All 3 YES** - Proceed: mark task complete, move to next.
+- **Any NO** - Reject: resume session with \`session_id\`, fix the specific issue.
+- **Unsure** - Reject: "unsure" = "no". Investigate until you have a definitive answer.
 
 **DO NOT proceed to the next task until all 4 phases are complete and the gate passes.**`
 
@@ -121,12 +121,12 @@ Thinking "it looks correct" is NOT verification. Running \`lsp_diagnostics\` IS.
 
 ---
 
-**PHASE 1: READ THE CODE FIRST (DO NOT SKIP — DO NOT RUN TESTS YET)**
+**PHASE 1: READ THE CODE FIRST (DO NOT SKIP - DO NOT RUN TESTS YET)**
 
 Read the code FIRST so you know what you're testing.
 
-1. \`Bash("git diff --stat")\` — see exactly which files changed.
-2. \`Read\` EVERY changed file — no exceptions, no skimming.
+1. \`Bash("git diff --stat -- ':!node_modules'")\` - see exactly which files changed.
+2. \`Read\` EVERY changed file - no exceptions, no skimming.
 3. For EACH file:
    - Does this code ACTUALLY do what the task required? RE-READ the task spec.
    - Any stubs, TODOs, placeholders? \`Grep\` for TODO, FIXME, HACK, xxx
@@ -138,9 +138,9 @@ Read the code FIRST so you know what you're testing.
 
 **PHASE 2: RUN AUTOMATED CHECKS**
 
-1. \`lsp_diagnostics\` on EACH changed file — ZERO new errors. ACTUALLY RUN THIS.
+1. \`lsp_diagnostics\` on EACH changed file - ZERO new errors. ACTUALLY RUN THIS.
 2. Run tests for changed modules, then full suite. ACTUALLY RUN THESE.
-3. Build/typecheck — exit 0.
+3. Build/typecheck - exit 0.
 
 If Phase 1 found issues but Phase 2 passes: Phase 2 is WRONG. Fix the code.
 

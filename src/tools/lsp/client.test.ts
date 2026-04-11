@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 
-import { describe, it, expect, spyOn, mock, beforeEach, afterEach } from "bun:test"
+import { describe, it, expect, spyOn, mock, beforeEach, afterEach, afterAll } from "bun:test"
 
 mock.module("vscode-jsonrpc/node", () => ({
   createMessageConnection: () => {
@@ -11,6 +11,8 @@ mock.module("vscode-jsonrpc/node", () => ({
   StreamMessageReader: function StreamMessageReader() {},
   StreamMessageWriter: function StreamMessageWriter() {},
 }))
+
+afterAll(() => { mock.restore() })
 
 import { LSPClient, lspManager, validateCwd } from "./client"
 import type { ResolvedServer } from "./types"

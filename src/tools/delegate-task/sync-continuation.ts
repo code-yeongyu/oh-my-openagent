@@ -2,6 +2,7 @@ import type { DelegateTaskArgs, ToolContextWithMetadata } from "./types"
 import type { ExecutorContext, SessionMessage } from "./executor-types"
 import { isPlanFamily } from "./constants"
 import { storeToolMetadata } from "../../features/tool-metadata-store"
+import { resolveCallID } from "./resolve-call-id"
 import { getTaskToastManager } from "../../features/task-toast-manager"
 import { getAgentToolRestrictions } from "../../shared/agent-tool-restrictions"
 import { getMessageDir } from "../../shared"
@@ -78,8 +79,9 @@ export async function executeSyncContinuation(
       },
     }
     await ctx.metadata?.(syncContMeta)
-    if (ctx.callID) {
-      storeToolMetadata(ctx.sessionID, ctx.callID, syncContMeta)
+    const callID = resolveCallID(ctx)
+    if (callID) {
+      storeToolMetadata(ctx.sessionID, callID, syncContMeta)
     }
 
     const allowTask = isPlanFamily(resumeAgent)

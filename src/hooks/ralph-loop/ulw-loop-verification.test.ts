@@ -135,6 +135,36 @@ describe("ulw-loop verification", () => {
 		expect(toastCalls.some((toast) => toast.title === "ULTRAWORK LOOP COMPLETE!")).toBe(true)
 	})
 
+	test("#given ulw loop is awaiting verification #when oracle transcript stores VERIFIED inside tool_result #then loop completes", async () => {
+		const hook = createRalphLoopHook(createMockPluginInput(), {
+			getTranscriptPath: (sessionID) => sessionID === "ses-oracle" ? oracleTranscriptPath : parentTranscriptPath,
+		})
+		hook.startLoop("session-123", "Build API", { ultrawork: true })
+		writeFileSync(
+			parentTranscriptPath,
+			`${JSON.stringify({ type: "assistant", timestamp: new Date().toISOString(), content: "done <promise>DONE</promise>" })}\n`,
+		)
+
+		await hook.event({ event: { type: "session.idle", properties: { sessionID: "session-123" } } })
+		writeState(testDir, {
+			...hook.getState()!,
+			verification_session_id: "ses-oracle",
+		})
+		writeFileSync(
+			oracleTranscriptPath,
+			`${JSON.stringify({
+				type: "tool_result",
+				timestamp: new Date().toISOString(),
+				tool_output: `Task completed.\n\nAgent: oracle\n\n<promise>${ULTRAWORK_VERIFICATION_PROMISE}</promise>\n\n<task_metadata>\nsession_id: ses-oracle\n</task_metadata>`,
+			})}\n`,
+		)
+
+		await hook.event({ event: { type: "session.idle", properties: { sessionID: "ses-oracle" } } })
+
+		expect(hook.getState()).toBeNull()
+		expect(toastCalls.some((toast) => toast.title === "ULTRAWORK LOOP COMPLETE!")).toBe(true)
+	})
+
 	test("#given ulw loop is awaiting verification without oracle session #when parent idles again #then loop continues until oracle verifies", async () => {
 		const hook = createRalphLoopHook(createMockPluginInput(), {
 			getTranscriptPath: (sessionID) => sessionID === "ses-oracle" ? oracleTranscriptPath : parentTranscriptPath,
@@ -249,8 +279,8 @@ describe("ulw-loop verification", () => {
 		await hook.event({ event: { type: "session.idle", properties: { sessionID: "session-123" } } })
 
 		expect(hook.getState()?.iteration).toBe(2)
-		expect(hook.getState()?.max_iterations).toBeUndefined()
-		expect(promptCalls[0].text).toContain("2/unbounded")
+		expect(hook.getState()?.max_iterations).toBe(500)
+		expect(promptCalls[0].text).toContain("2/500")
 	})
 
 	test("#given prior transcript completion from older run #when new ulw loop starts #then old completion is ignored", async () => {

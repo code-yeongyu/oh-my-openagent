@@ -10,11 +10,19 @@ import { isLastAssistantMessageAborted } from "./abort-detection"
 import { hasUnansweredQuestion } from "./pending-question-detection"
 import { shouldStopForStagnation } from "./stagnation-detection"
 import { getIncompleteCount } from "./todo"
-import type { MessageInfo, ResolvedMessageInfo, Todo } from "./types"
+import type { MessageInfo, MessageWithInfo, ResolvedMessageInfo, Todo } from "./types"
 import { resolveLatestMessageInfo } from "./resolve-message-info"
 import { acknowledgeCompactionGuard, isCompactionGuardActive } from "./compaction-guard"
 import type { SessionStateStore } from "./session-state"
 import { startCountdown } from "./countdown"
+
+function shouldAllowActivityProgress(modelID: string | undefined): boolean {
+  if (!modelID) {
+    return false
+  }
+
+  return !modelID.toLowerCase().includes("codex")
+}
 
 export async function handleSessionIdle(args: {
   ctx: PluginInput
@@ -42,6 +50,16 @@ export async function handleSessionIdle(args: {
     return
   }
 
+  if (state.wasCancelled) {
+    log(`[${HOOK_NAME}] Skipped: session was cancelled`, { sessionID })
+    return
+  }
+
+  if (state.tokenLimitDetected) {
+    log(`[${HOOK_NAME}] Skipped: token limit error detected, retry would worsen context overflow`, { sessionID })
+    return
+  }
+
   if (state.abortDetectedAt) {
     const timeSinceAbort = Date.now() - state.abortDetectedAt
     if (timeSinceAbort < ABORT_WINDOW_MS) {
@@ -61,17 +79,18 @@ export async function handleSessionIdle(args: {
     return
   }
 
+  let prefetchedMessages: MessageWithInfo[] | undefined
   try {
     const messagesResp = await ctx.client.session.messages({
       path: { id: sessionID },
       query: { directory: ctx.directory },
     })
-    const messages = normalizeSDKResponse(messagesResp, [] as Array<{ info?: MessageInfo }>)
-    if (isLastAssistantMessageAborted(messages)) {
+    prefetchedMessages = normalizeSDKResponse(messagesResp, [] as MessageWithInfo[])
+    if (isLastAssistantMessageAborted(prefetchedMessages)) {
       log(`[${HOOK_NAME}] Skipped: last assistant message was aborted (API fallback)`, { sessionID })
       return
     }
-    if (hasUnansweredQuestion(messages)) {
+    if (hasUnansweredQuestion(prefetchedMessages)) {
       log(`[${HOOK_NAME}] Skipped: pending question awaiting user response`, { sessionID })
       return
     }
@@ -131,12 +150,19 @@ export async function handleSessionIdle(args: {
 
   let resolvedInfo: ResolvedMessageInfo | undefined
   let encounteredCompaction = false
+  let latestMessageWasCompaction = false
   try {
-    const messageInfoResult = await resolveLatestMessageInfo(ctx, sessionID)
+    const messageInfoResult = await resolveLatestMessageInfo(ctx, sessionID, prefetchedMessages)
     resolvedInfo = messageInfoResult.resolvedInfo
     encounteredCompaction = messageInfoResult.encounteredCompaction
+    latestMessageWasCompaction = messageInfoResult.latestMessageWasCompaction
   } catch (error) {
     log(`[${HOOK_NAME}] Failed to fetch messages for agent check`, { sessionID, error: String(error) })
+  }
+
+  if (latestMessageWasCompaction) {
+    log(`[${HOOK_NAME}] Skipped: latest message is a compaction marker`, { sessionID })
+    return
   }
 
   const sessionAgent = getSessionAgent(sessionID)
@@ -176,7 +202,12 @@ export async function handleSessionIdle(args: {
     return
   }
 
-  const progressUpdate = sessionStateStore.trackContinuationProgress(sessionID, incompleteCount, todos)
+  const progressUpdate = sessionStateStore.trackContinuationProgress(
+    sessionID,
+    incompleteCount,
+    todos,
+    { allowActivityProgress: shouldAllowActivityProgress(resolvedInfo?.model?.modelID) },
+  )
   if (shouldStopForStagnation({ sessionID, incompleteCount, progressUpdate })) {
     return
   }

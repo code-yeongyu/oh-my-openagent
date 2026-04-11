@@ -3,6 +3,7 @@ import {
   interpolateInstruction,
   resolveCommandTimeoutMs,
   shellEscapeArg,
+  terminateCommandProcess,
   wakeGateway,
   wakeCommandGateway,
 } from "../dispatcher"
@@ -41,9 +42,82 @@ describe("OpenClaw Dispatcher", () => {
       expect(result.success).toBe(true)
       expect(fetchSpy).toHaveBeenCalled()
       const call = fetchSpy.mock.calls.find(c => c[0] === "https://example.com")
+      expect(call).toBeDefined()
+      if (!call) {
+        throw new Error("Expected fetch call for https://example.com")
+      }
       expect(call[0]).toBe("https://example.com")
       expect(call[1]?.method).toBe("POST")
       expect(call[1]?.body).toBe('{"foo":"bar"}')
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  test("wakeGateway returns correlation metadata from JSON response", async () => {
+    const fetchSpy = spyOn(global, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: {
+            messageId: "msg-123",
+            platform: "discord",
+            channelId: "chan-1",
+            threadId: "thread-9",
+          },
+        }),
+        { status: 200 },
+      ),
+    )
+
+    try {
+      const result = await wakeGateway(
+        "test",
+        { url: "https://example.com", method: "POST", timeout: 1000, type: "http" },
+        { foo: "bar" },
+      )
+
+      expect(result).toMatchObject({
+        success: true,
+        messageId: "msg-123",
+        platform: "discord",
+        channelId: "chan-1",
+        threadId: "thread-9",
+      })
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  test("wakeGateway prefers nested message metadata over wrapper ids", async () => {
+    const fetchSpy = spyOn(global, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          id: "job-42",
+          data: {
+            messageId: "msg-123",
+            platform: "discord",
+            channelId: "chan-1",
+            threadId: "thread-9",
+          },
+        }),
+        { status: 200 },
+      ),
+    )
+
+    try {
+      const result = await wakeGateway(
+        "test",
+        { url: "https://example.com", method: "POST", timeout: 1000, type: "http" },
+        { foo: "bar" },
+      )
+
+      expect(result).toMatchObject({
+        success: true,
+        messageId: "msg-123",
+        platform: "discord",
+        channelId: "chan-1",
+        threadId: "thread-9",
+      })
     } finally {
       fetchSpy.mockRestore()
     }
@@ -66,5 +140,80 @@ describe("OpenClaw Dispatcher", () => {
       if (original === undefined) delete process.env.OMO_OPENCLAW_COMMAND_TIMEOUT_MS
       else process.env.OMO_OPENCLAW_COMMAND_TIMEOUT_MS = original
     }
+  })
+
+  test("terminateCommandProcess kills process group on unix when pid exists", () => {
+    const killSpy = spyOn(process, "kill").mockImplementation(() => true)
+    const proc = {
+      pid: 4321,
+      kill: mock(() => {}),
+    }
+
+    try {
+      terminateCommandProcess(proc, "SIGKILL")
+
+      expect(killSpy).toHaveBeenCalledWith(-4321, "SIGKILL")
+      expect(proc.kill).not.toHaveBeenCalled()
+    } finally {
+      killSpy.mockRestore()
+    }
+  })
+
+  test("terminateCommandProcess falls back to direct kill when process group kill fails", () => {
+    const killSpy = spyOn(process, "kill").mockImplementation(() => {
+      throw new Error("group kill failed")
+    })
+    const proc = {
+      pid: 9876,
+      kill: mock(() => {}),
+    }
+
+    try {
+      terminateCommandProcess(proc, "SIGKILL")
+
+      expect(killSpy).toHaveBeenCalledWith(-9876, "SIGKILL")
+      expect(proc.kill).toHaveBeenCalledWith("SIGKILL")
+    } finally {
+      killSpy.mockRestore()
+    }
+  })
+
+  test("wakeCommandGateway returns correlation metadata from stdout JSON", async () => {
+    const result = await wakeCommandGateway(
+      "command",
+      {
+        type: "command",
+        method: "POST",
+        command: "printf '%s' '{\"messageId\":\"55\",\"platform\":\"telegram\",\"threadId\":\"thr\"}'",
+        timeout: 1000,
+      },
+      {},
+    )
+
+    expect(result).toMatchObject({
+      success: true,
+      messageId: "55",
+      platform: "telegram",
+      threadId: "thr",
+    })
+  })
+
+  test("wakeCommandGateway returns correlation metadata from OpenClaw CLI stdout", async () => {
+    const result = await wakeCommandGateway(
+      "command",
+      {
+        type: "command",
+        method: "POST",
+        command: "printf '%s' '✅ Sent via Discord. Message ID: 55'",
+        timeout: 1000,
+      },
+      {},
+    )
+
+    expect(result).toMatchObject({
+      success: true,
+      messageId: "55",
+      platform: "discord",
+    })
   })
 })

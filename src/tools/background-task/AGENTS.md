@@ -1,6 +1,6 @@
 # src/tools/background-task/ — Background Task Tool Wrappers
 
-**Generated:** 2026-03-06
+**Generated:** 2026-04-11
 
 ## OVERVIEW
 

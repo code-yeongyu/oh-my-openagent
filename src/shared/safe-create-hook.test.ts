@@ -1,14 +1,29 @@
-import { describe, test, expect, spyOn, afterEach } from "bun:test"
+import { describe, test, expect, spyOn, beforeEach, afterEach } from "bun:test"
 import * as shared from "./logger"
-import { safeCreateHook } from "./safe-create-hook"
+
+let safeCreateHook: (typeof import("./safe-create-hook"))["safeCreateHook"]
+let logSpy: ReturnType<typeof spyOn> | undefined
+
+async function importFreshSafeCreateHookModule(): Promise<typeof import("./safe-create-hook")> {
+  return import(`./safe-create-hook?test=${Date.now()}-${Math.random()}`)
+}
+
+async function loadFreshSafeCreateHookModule(): Promise<void> {
+  ;({ safeCreateHook } = await importFreshSafeCreateHookModule())
+}
+
+beforeEach(() => {
+  logSpy = undefined
+})
 
 afterEach(() => {
-  ;(shared.log as any)?.mockRestore?.()
+  logSpy?.mockRestore()
 })
 
 describe("safeCreateHook", () => {
-  test("returns hook object when factory succeeds", () => {
+  test("returns hook object when factory succeeds", async () => {
     //#given
+    await loadFreshSafeCreateHookModule()
     const hook = { handler: () => {} }
     const factory = () => hook
 
@@ -19,9 +34,11 @@ describe("safeCreateHook", () => {
     expect(result).toBe(hook)
   })
 
-  test("returns null when factory throws", () => {
+  test("returns null when factory throws", async () => {
     //#given
-    spyOn(shared, "log").mockImplementation(() => {})
+    logSpy = spyOn(shared, "log")
+    logSpy.mockImplementation(() => {})
+    await loadFreshSafeCreateHookModule()
     const factory = () => {
       throw new Error("boom")
     }
@@ -33,9 +50,11 @@ describe("safeCreateHook", () => {
     expect(result).toBeNull()
   })
 
-  test("logs error when factory throws", () => {
+  test("logs error when factory throws", async () => {
     //#given
-    const logSpy = spyOn(shared, "log").mockImplementation(() => {})
+    logSpy = spyOn(shared, "log")
+    logSpy.mockImplementation(() => {})
+    await loadFreshSafeCreateHookModule()
     const factory = () => {
       throw new Error("boom")
     }
@@ -50,8 +69,9 @@ describe("safeCreateHook", () => {
     expect(callArgs[0]).toContain("Hook creation failed")
   })
 
-  test("propagates error when enabled is false", () => {
+  test("propagates error when enabled is false", async () => {
     //#given
+    await loadFreshSafeCreateHookModule()
     const factory = () => {
       throw new Error("boom")
     }
@@ -60,9 +80,10 @@ describe("safeCreateHook", () => {
     expect(() => safeCreateHook("test-hook", factory, { enabled: false })).toThrow("boom")
   })
 
-  test("returns null for factory returning undefined", () => {
+  test("returns null for factory returning undefined", async () => {
     //#given
-    const factory = () => undefined as any
+    await loadFreshSafeCreateHookModule()
+    const factory = (): undefined => undefined
 
     //#when
     const result = safeCreateHook("test-hook", factory)

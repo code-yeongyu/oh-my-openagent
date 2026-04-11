@@ -111,7 +111,7 @@ By combining these two concepts, you can generate optimal agents through `task`.
 | -------------------- | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | `visual-engineering` | `google/gemini-3.1-pro`         | Frontend, UI/UX, design, styling, animation                                                                                 |
 | `ultrabrain`         | `openai/gpt-5.4` (xhigh)        | Deep logical reasoning, complex architecture decisions requiring extensive analysis                                         |
-| `deep`               | `openai/gpt-5.3-codex` (medium) | Goal-oriented autonomous problem-solving. Thorough research before action. For hairy problems requiring deep understanding. |
+| `deep`               | `openai/gpt-5.4` (medium)       | Goal-oriented autonomous problem-solving. Thorough research before action. For hairy problems requiring deep understanding. |
 | `artistry`           | `google/gemini-3.1-pro` (high)  | Highly creative/artistic tasks, novel ideas                                                                                 |
 | `quick`              | `openai/gpt-5.4-mini`           | Trivial tasks - single file changes, typo fixes, simple modifications                                                       |
 | `unspecified-low`    | `anthropic/claude-sonnet-4-6`   | Tasks that don't fit other categories, low effort required                                                                  |

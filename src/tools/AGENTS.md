@@ -1,6 +1,6 @@
-# src/tools/ — 26 Tools Across 15 Directories
+# src/tools/ - 26 Tools Across 16 Directories
 
-**Generated:** 2026-03-06
+**Generated:** 2026-04-11
 
 ## OVERVIEW
 
@@ -38,7 +38,7 @@
 | `background_output` | `createBackgroundOutput` | task_id, block, timeout, full_session, include_thinking, message_limit, since_message_id, thinking_max_chars |
 | `background_cancel` | `createBackgroundCancel` | taskId, all |
 
-### LSP Refactoring (6) — Direct ToolDefinition
+### LSP Refactoring (6) - Direct ToolDefinition
 
 | Tool | Parameters |
 |------|------------|
@@ -81,7 +81,7 @@
 | `interactive_bash` | Direct | tmux_command |
 | `look_at` | `createLookAt` | file_path, image_data, goal |
 
-### Editing (1) — Conditional
+### Editing (1) - Conditional
 
 | Tool | Factory | Parameters |
 |------|---------|------------|
@@ -93,12 +93,12 @@
 |----------|-------|--------|
 | visual-engineering | gemini-3.1-pro high | Frontend, UI/UX |
 | ultrabrain | gpt-5.4 xhigh | Hard logic |
-| deep | gpt-5.3-codex medium | Autonomous problem-solving |
+| deep | gpt-5.4 medium | Autonomous problem-solving |
 | artistry | gemini-3.1-pro high | Creative approaches |
 | quick | gpt-5.4-mini | Trivial tasks |
 | unspecified-low | claude-sonnet-4-6 | Moderate effort |
 | unspecified-high | claude-opus-4-6 max | High effort |
-| writing | kimi-k2p5 | Documentation |
+| writing | gemini-3-flash | Documentation |
 
 ## HOW TO ADD A TOOL
 

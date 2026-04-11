@@ -1,10 +1,44 @@
 # src/plugin-handlers/ — 6-Phase Config Loading Pipeline
 
-**Generated:** 2026-03-06
+**Generated:** 2026-04-11
+
+## CRITICAL: AGENT ORDERING
+
+The canonical agent order is **sisyphus → hephaestus → prometheus → atlas**.
+
+This order is enforced via two mechanisms working together:
+1. `CANONICAL_CORE_AGENT_ORDER` in `agent-priority-order.ts` controls object key insertion order
+2. `agent-key-remapper.ts` injects ZWSP-prefixed runtime names into the `name` field for OpenCode's `localeCompare` sort
+
+### Why Two Mechanisms
+
+OpenCode's `Agent.list()` sorts agents by `name` field via `localeCompare`. Object key order alone is not enough. The `name` field carries ZWSP prefixes (1-4 chars) so core agents sort before alphabetically-named agents.
+
+ZWSP is intentionally used in the `name` field only. It MUST NOT appear in:
+- Object keys (used as HTTP header values, causes RFC 7230 violations)
+- Display names returned by `getAgentDisplayName()`
+- Config keys
+
+### History
+
+Agent ordering has caused 15+ commits, 8+ PRs, and multiple reverts due to:
+1. Early ZWSP attempts that leaked into HTTP headers via object keys
+2. Object.entries() iteration order depending on merge sequence
+3. Multiple code paths assembling agents differently
+
+### Forbidden Patterns
+
+DO NOT introduce:
+- ZWSP in object keys or display names (only allowed in `name` field via `getAgentRuntimeName()`)
+- Runtime sort shims or comparators
+- Alternative ordering constants
+- Object.entries() order dependencies
+
+PRs attempting these patterns will be rejected.
 
 ## OVERVIEW
 
-13 non-test files implementing the `ConfigHandler` — the `config` hook handler. Executes 6 sequential phases to register agents, tools, MCPs, and commands with OpenCode.
+14 non-test files implementing the `ConfigHandler` — the `config` hook handler. Executes 6 sequential phases to register agents, tools, MCPs, and commands with OpenCode.
 
 ## 6-PHASE PIPELINE
 

@@ -56,7 +56,7 @@ export function createSessionStatusHandler(
         await helpers.abortSessionRequest(sessionID, "session.status.retry-signal")
         sessionRetryInFlight.delete(sessionID)
       } else {
-        log(`[${HOOK_NAME}] session.status retry skipped — retry already in flight`, { sessionID })
+        log(`[${HOOK_NAME}] session.status retry skipped - retry already in flight`, { sessionID })
         return
       }
     }

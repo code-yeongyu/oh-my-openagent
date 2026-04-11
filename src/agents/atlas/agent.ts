@@ -14,7 +14,7 @@ import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode, AgentPromptMetadata } from "../types"
 import { isGptModel, isGeminiModel } from "../types"
 import type { AvailableAgent, AvailableSkill, AvailableCategory } from "../dynamic-agent-prompt-builder"
-import { buildCategorySkillsDelegationGuide } from "../dynamic-agent-prompt-builder"
+import { buildAgentIdentitySection, buildCategorySkillsDelegationGuide } from "../dynamic-agent-prompt-builder"
 import type { CategoryConfig } from "../../config/schema"
 import { mergeCategories } from "../../shared/merge-categories"
 
@@ -29,7 +29,7 @@ import {
   buildDecisionMatrix,
 } from "./prompt-section-builder"
 
-const MODE: AgentMode = "all"
+const MODE: AgentMode = "primary"
 
 export type AtlasPromptSource = "default" | "gpt" | "gemini"
 
@@ -88,9 +88,13 @@ function buildDynamicOrchestratorPrompt(ctx?: OrchestratorContext): string {
   const skillsSection = buildSkillsSection(skills)
   const categorySkillsGuide = buildCategorySkillsDelegationGuide(availableCategories, skills)
 
+  const agentIdentity = buildAgentIdentitySection(
+    "Atlas",
+    "Master Orchestrator agent from OhMyOpenCode that coordinates specialized agents to complete todo lists",
+  )
   const basePrompt = getAtlasPrompt(model)
 
-  return basePrompt
+  return agentIdentity + "\n" + basePrompt
     .replace("{CATEGORY_SECTION}", categorySection)
     .replace("{AGENT_SECTION}", agentSection)
     .replace("{DECISION_MATRIX}", decisionMatrix)

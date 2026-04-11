@@ -4,16 +4,16 @@ export const TODOWRITE_DESCRIPTION = `Use this tool to create and manage a struc
 
 Each todo title MUST encode four elements: WHERE, WHY, HOW, and EXPECTED RESULT.
 
-Format: "[WHERE] [HOW] to [WHY] — expect [RESULT]"
+Format: "[WHERE] [HOW] to [WHY] - expect [RESULT]"
 
 GOOD:
-- "src/utils/validation.ts: Add validateEmail() for input sanitization — returns boolean"
-- "UserService.create(): Call validateEmail() before DB insert — rejects invalid emails with 400"
-- "validation.test.ts: Add test for missing @ sign — expect validateEmail('foo') to return false"
+- "src/utils/validation.ts: Add validateEmail() for input sanitization - returns boolean"
+- "UserService.create(): Call validateEmail() before DB insert - rejects invalid emails with 400"
+- "validation.test.ts: Add test for missing @ sign - expect validateEmail('foo') to return false"
 
 BAD:
 - "Implement email validation" (where? how? what result?)
-- "Add dark mode" (this is a feature, not a todo)
+- "Add dark mode" (feature, not a todo)
 - "Fix auth" (what file? what changes? what's expected?)
 
 ## Granularity Rules

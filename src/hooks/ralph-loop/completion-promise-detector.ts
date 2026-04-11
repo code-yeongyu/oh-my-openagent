@@ -2,6 +2,8 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { existsSync, readFileSync } from "node:fs"
 import { log } from "../../shared/logger"
 import { HOOK_NAME } from "./constants"
+import { ULTRAWORK_VERIFICATION_PROMISE } from "./constants"
+import { isOracleVerified } from "./oracle-verification-detector"
 import { withTimeout } from "./with-timeout"
 
 interface OpenCodeSessionMessage {
@@ -31,18 +33,36 @@ function buildPromisePattern(promise: string): RegExp {
 	return new RegExp(`<promise>\\s*${escapeRegex(promise)}\\s*</promise>`, "is")
 }
 
-const SEMANTIC_COMPLETION_PATTERNS = [
-	/\b(?:task|work|implementation|all\s+tasks?)\s+(?:is|are)\s+(?:complete|completed|done|finished)\b/i,
-	/\ball\s+(?:items?|todos?|steps?)\s+(?:are\s+)?(?:complete|completed|done|finished|marked)\b/i,
-	/\b(?:everything|all\s+work)\s+(?:is\s+)?(?:complete|completed|done|finished)\b/i,
-	/\bsuccessfully\s+completed?\s+all\b/i,
-	/\bnothing\s+(?:left|more|remaining)\s+to\s+(?:do|implement|fix)\b/i,
-]
+function shouldInspectSessionMessagePart(
+	partType: string,
+	promise: string,
+	partText: string,
+): boolean {
+	if (partType === "text") {
+		return true
+	}
 
-const SEMANTIC_DONE_FALLBACK_ENABLED = false
+	if (partType !== "tool_result") {
+		return false
+	}
 
-export function detectSemanticCompletion(text: string): boolean {
-	return SEMANTIC_COMPLETION_PATTERNS.some((pattern) => pattern.test(text))
+	return promise === ULTRAWORK_VERIFICATION_PROMISE && isOracleVerified(partText)
+}
+
+function shouldInspectTranscriptEntry(
+	entry: TranscriptEntry,
+	promise: string,
+	entryText: string,
+): boolean {
+	if (entry.type === "assistant" || entry.type === "text") {
+		return true
+	}
+
+	if (entry.type !== "tool_result") {
+		return false
+	}
+
+	return promise === ULTRAWORK_VERIFICATION_PROMISE && isOracleVerified(entryText)
 }
 
 export function detectCompletionInTranscript(
@@ -57,22 +77,17 @@ export function detectCompletionInTranscript(
 
 		const content = readFileSync(transcriptPath, "utf-8")
 		const pattern = buildPromisePattern(promise)
-		const lines = content.split("\n").filter((line) => line.trim())
+		const lines = content.split("\n").filter((line: string) => line.trim())
 
 		for (const line of lines) {
 			try {
 				const entry = JSON.parse(line) as TranscriptEntry
 				if (entry.type === "user") continue
-				if (entry.type !== "assistant" && entry.type !== "text") continue
 				if (startedAt && entry.timestamp && entry.timestamp < startedAt) continue
 				const entryText = extractTranscriptEntryText(entry)
 				if (!entryText) continue
+				if (!shouldInspectTranscriptEntry(entry, promise, entryText)) continue
 				if (pattern.test(entryText)) return true
-				const isAssistantEntry = entry.type === "assistant" || entry.type === "text"
-				if (SEMANTIC_DONE_FALLBACK_ENABLED && promise === "DONE" && isAssistantEntry && detectSemanticCompletion(entryText)) {
-					log("[ralph-loop] WARNING: Semantic completion detected in transcript (agent used natural language instead of <promise>DONE</promise>)")
-					return true
-				}
 			} catch {
 				continue
 			}
@@ -127,21 +142,13 @@ export async function detectCompletionInSessionMessages(
 			const assistant = assistantMessages[index]
 			if (!assistant.parts) continue
 
-			let responseText = ""
 			for (const part of assistant.parts) {
-				if (part.type !== "text") continue
-				responseText += `${responseText ? "\n" : ""}${part.text ?? ""}`
-			}
-
-			if (pattern.test(responseText)) {
-				return true
-			}
-
-			if (SEMANTIC_DONE_FALLBACK_ENABLED && options.promise === "DONE" && detectSemanticCompletion(responseText)) {
-				log("[ralph-loop] WARNING: Semantic completion detected (agent used natural language instead of <promise>DONE</promise>)", {
-					sessionID: options.sessionID,
-				})
-				return true
+				const partText = part.text ?? ""
+				if (!partText) continue
+				if (!shouldInspectSessionMessagePart(part.type, options.promise, partText)) continue
+				if (pattern.test(partText)) {
+					return true
+				}
 			}
 		}
 

@@ -1,4 +1,4 @@
-const { describe, it, expect, mock, beforeEach } = require("bun:test")
+import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 
 import type { MessageData } from "./types"
 
@@ -9,15 +9,16 @@ mock.module("../../shared/opencode-storage-detection", () => ({
   isSqliteBackend: () => sqliteBackend,
 }))
 
-mock.module("../../shared", () => ({
-  normalizeSDKResponse: <TData>(response: { data?: TData }, fallback: TData): TData => response.data ?? fallback,
-}))
-
 mock.module("./storage", () => ({
   readParts: () => storedParts,
 }))
 
 const { recoverToolResultMissing } = await import("./recover-tool-result-missing")
+
+const failedAssistantMsg: MessageData = {
+  info: { id: "msg_failed", role: "assistant" },
+  parts: [],
+}
 
 function createMockClient(messages: MessageData[] = []) {
   const promptAsync = mock(() => Promise.resolve({}))
@@ -33,15 +34,14 @@ function createMockClient(messages: MessageData[] = []) {
   }
 }
 
-const failedAssistantMsg: MessageData = {
-  info: { id: "msg_failed", role: "assistant" },
-  parts: [],
-}
-
 describe("recoverToolResultMissing", () => {
   beforeEach(() => {
     sqliteBackend = false
     storedParts = []
+  })
+
+  afterEach(() => {
+    mock.restore()
   })
 
   it("returns false for sqlite fallback when tool part has no valid callID", async () => {

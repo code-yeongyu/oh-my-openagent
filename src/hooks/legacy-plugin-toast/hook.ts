@@ -2,11 +2,20 @@ import type { PluginInput } from "@opencode-ai/plugin"
 
 import { checkForLegacyPluginEntry } from "../../shared/legacy-plugin-warning"
 import { log } from "../../shared/logger"
-import { LEGACY_PLUGIN_NAME, PLUGIN_NAME } from "../../shared/plugin-identity"
-import { autoMigrateLegacyPluginEntry } from "./auto-migrate"
+import { LEGACY_PLUGIN_NAME, PLUGIN_NAME, PUBLISHED_PACKAGE_NAME } from "../../shared/plugin-identity"
+import { autoMigrateLegacyPluginEntry } from "./auto-migrate-runner"
 
-export function createLegacyPluginToastHook(ctx: PluginInput) {
+type LegacyPluginToastDeps = {
+  checkForLegacyPluginEntry?: typeof checkForLegacyPluginEntry
+  log?: typeof log
+  autoMigrateLegacyPluginEntry?: typeof autoMigrateLegacyPluginEntry
+}
+
+export function createLegacyPluginToastHook(ctx: PluginInput, deps: LegacyPluginToastDeps = {}) {
   let fired = false
+  const checkForLegacyPluginEntryFn = deps.checkForLegacyPluginEntry ?? checkForLegacyPluginEntry
+  const logFn = deps.log ?? log
+  const autoMigrateLegacyPluginEntryFn = deps.autoMigrateLegacyPluginEntry ?? autoMigrateLegacyPluginEntry
 
   return {
     event: async ({ event }: { event: { type: string; properties?: unknown } }) => {
@@ -17,13 +26,13 @@ export function createLegacyPluginToastHook(ctx: PluginInput) {
 
       fired = true
 
-      const result = checkForLegacyPluginEntry()
+      const result = checkForLegacyPluginEntryFn()
       if (!result.hasLegacyEntry) return
 
-      const migration = autoMigrateLegacyPluginEntry()
+      const migration = autoMigrateLegacyPluginEntryFn()
 
       if (migration.migrated) {
-        log("[legacy-plugin-toast] Auto-migrated opencode.json plugin entry", {
+        logFn("[legacy-plugin-toast] Auto-migrated opencode.json plugin entry", {
           from: migration.from,
           to: migration.to,
         })
@@ -39,7 +48,7 @@ export function createLegacyPluginToastHook(ctx: PluginInput) {
           })
           .catch(() => {})
       } else {
-        log("[legacy-plugin-toast] Legacy entry detected but migration failed", {
+        logFn("[legacy-plugin-toast] Legacy entry detected but migration failed", {
           legacyEntries: result.legacyEntries,
         })
 
@@ -47,7 +56,7 @@ export function createLegacyPluginToastHook(ctx: PluginInput) {
           .showToast({
             body: {
               title: "Legacy Plugin Name Detected",
-              message: `Update your opencode.json: "${LEGACY_PLUGIN_NAME}" has been renamed to "${PLUGIN_NAME}".\nRun: bunx ${PLUGIN_NAME} install`,
+               message: `Update your opencode.json: "${LEGACY_PLUGIN_NAME}" has been renamed to "${PLUGIN_NAME}".\nRun: bunx ${PUBLISHED_PACKAGE_NAME} install`,
               variant: "warning" as const,
               duration: 10000,
             },

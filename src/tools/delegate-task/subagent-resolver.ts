@@ -7,14 +7,79 @@ import { normalizeModelFormat } from "../../shared/model-format-normalizer"
 import { AGENT_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
 import { normalizeFallbackModels, flattenToFallbackModelStrings } from "../../shared/model-resolver"
 import { buildFallbackChainFromModels, findMostSpecificFallbackEntry } from "../../shared/fallback-chain-from-models"
-import { getAgentDisplayName, getAgentConfigKey } from "../../shared/agent-display-names"
+import { getAgentDisplayName, getAgentConfigKey, stripAgentListSortPrefix } from "../../shared/agent-display-names"
 import { normalizeSDKResponse } from "../../shared"
 import { log } from "../../shared/logger"
 import { getAvailableModelsForDelegateTask } from "./available-models"
 import type { FallbackEntry } from "../../shared/model-requirements"
 import { resolveModelForDelegateTask } from "./model-selection"
 import { fuzzyMatchModel } from "../../shared/model-availability"
+import type { CategoryConfig } from "../../config/schema"
 import { loadUserAgents, loadProjectAgents } from "../../features/claude-code-agent-loader"
+
+type AgentMode = "subagent" | "primary" | "all" | undefined
+
+type AgentInfo = {
+  name: string
+  mode?: "subagent" | "primary" | "all"
+  model?: string | { providerID: string; modelID: string }
+}
+
+function applyCategoryParams(
+  base: DelegatedModelConfig,
+  config: CategoryConfig | undefined,
+): DelegatedModelConfig {
+  if (!config) {
+    return base
+  }
+
+  return {
+    ...base,
+    ...(config.reasoningEffort !== undefined ? { reasoningEffort: config.reasoningEffort } : {}),
+    ...(config.temperature !== undefined ? { temperature: config.temperature } : {}),
+    ...(config.top_p !== undefined ? { top_p: config.top_p } : {}),
+    ...(config.maxTokens !== undefined ? { maxTokens: config.maxTokens } : {}),
+    ...(config.thinking !== undefined ? { thinking: config.thinking } : {}),
+  }
+}
+
+function mergeWithClaudeCodeAgents(
+  serverAgents: AgentInfo[],
+  directory: string | undefined,
+): AgentInfo[] {
+  const userAgentsRecord = loadUserAgents()
+  const projectAgentsRecord = loadProjectAgents(directory)
+
+  const toAgentInfoList = (record: Record<string, { mode?: string; model?: AgentInfo["model"] }>): AgentInfo[] =>
+    Object.entries(record).map(([name, config]) => ({
+      name,
+      mode: config.mode as AgentInfo["mode"],
+      model: config.model,
+    }))
+
+  const projectAgentsList = toAgentInfoList(projectAgentsRecord)
+  const userAgentsList = toAgentInfoList(userAgentsRecord)
+
+  const mergedAgentMap = new Map<string, AgentInfo>()
+  const addIfAbsent = (agent: AgentInfo): void => {
+    const key = agent.name.toLowerCase()
+    if (!mergedAgentMap.has(key)) {
+      mergedAgentMap.set(key, agent)
+    }
+  }
+
+  for (const agent of serverAgents) {
+    addIfAbsent(agent)
+  }
+  for (const agent of projectAgentsList) {
+    addIfAbsent(agent)
+  }
+  for (const agent of userAgentsList) {
+    addIfAbsent(agent)
+  }
+
+  return Array.from(mergedAgentMap.values())
+}
 
 export async function resolveSubagentExecution(
   args: DelegateTaskArgs,
@@ -28,7 +93,9 @@ export async function resolveSubagentExecution(
     return { agentToUse: "", categoryModel: undefined, error: `Agent name cannot be empty.` }
   }
 
-  const agentName = args.subagent_type.trim()
+  // Strip wrapping characters (backslashes, quotes) that LLMs sometimes add around agent names
+  // e.g. \hephaestus\ -> hephaestus, "oracle" -> oracle, 'explore' -> explore
+  const agentName = args.subagent_type.trim().replace(/^[\\\/"']+|[\\\/"']+$/g, "").trim()
 
   if (agentName.toLowerCase() === SISYPHUS_JUNIOR_AGENT.toLowerCase()) {
     return {
@@ -54,82 +121,27 @@ Create the work plan directly - that's your job as the planning agent.`,
   let categoryModel: DelegatedModelConfig | undefined
   let fallbackChain: FallbackEntry[] | undefined = undefined
 
-  type AgentInfo = {
-    name: string
-    mode?: "subagent" | "primary" | "all"
-    model?: string | { providerID: string; modelID: string }
-  }
-
   try {
     const agentsResult = await client.app.agents()
     const agents = normalizeSDKResponse(agentsResult, [] as AgentInfo[], {
       preferResponseOnMissingData: true,
     })
 
-    // Load user and project agents
-    const userAgentsRecord = loadUserAgents()
-    const projectAgentsRecord = loadProjectAgents(executorCtx.directory)
+    const mergedAgents = mergeWithClaudeCodeAgents(agents, executorCtx.directory)
+    const callableAgents = mergedAgents.filter((agent) => isTaskCallableAgentMode(agent.mode))
 
-    // Convert user/project agent configs to AgentInfo format
-    const userAgentsList: AgentInfo[] = Object.entries(userAgentsRecord).map(([name, config]) => ({
-      name,
-      mode: config.mode as "subagent" | "primary" | "all",
-      model: config.model,
-    }))
-
-    const projectAgentsList: AgentInfo[] = Object.entries(projectAgentsRecord).map(([name, config]) => ({
-      name,
-      mode: config.mode as "subagent" | "primary" | "all",
-      model: config.model,
-    }))
-
-    // Merge user and project agents into the server's agent list
-    // Server agents take precedence; project agents override user agents
-    const mergedAgentMap = new Map<string, AgentInfo>()
-
-    // First add server agents (they take precedence)
-    for (const agent of agents) {
-      mergedAgentMap.set(agent.name.toLowerCase(), agent)
-    }
-
-    // Then add project agents (overrides user agents, server wins on collision)
-    for (const agent of projectAgentsList) {
-      if (!mergedAgentMap.has(agent.name.toLowerCase())) {
-        mergedAgentMap.set(agent.name.toLowerCase(), agent)
-      }
-    }
-
-    // Then add user agents (only if not already added by server or project)
-    for (const agent of userAgentsList) {
-      if (!mergedAgentMap.has(agent.name.toLowerCase())) {
-        mergedAgentMap.set(agent.name.toLowerCase(), agent)
-      }
-    }
-
-    const mergedAgents = Array.from(mergedAgentMap.values())
-    const callableAgents = mergedAgents.filter((a) => a.mode !== "primary")
-
-    const resolvedDisplayName = getAgentDisplayName(agentToUse)
+    const resolvedDisplayName = stripAgentListSortPrefix(getAgentDisplayName(agentToUse))
+    const normalizedAgentToUse = stripAgentListSortPrefix(agentToUse)
     const matchedAgent = callableAgents.find(
-      (agent) => agent.name.toLowerCase() === agentToUse.toLowerCase()
-        || agent.name.toLowerCase() === resolvedDisplayName.toLowerCase()
+      (agent) => {
+        const normalizedListedAgentName = stripAgentListSortPrefix(agent.name)
+        return normalizedListedAgentName.toLowerCase() === normalizedAgentToUse.toLowerCase()
+          || normalizedListedAgentName.toLowerCase() === resolvedDisplayName.toLowerCase()
+      }
     )
     if (!matchedAgent) {
-      const isPrimaryAgent = agents
-        .filter((a) => a.mode === "primary")
-        .find((agent) => agent.name.toLowerCase() === agentToUse.toLowerCase()
-          || agent.name.toLowerCase() === resolvedDisplayName.toLowerCase())
-
-      if (isPrimaryAgent) {
-        return {
-          agentToUse: "",
-          categoryModel: undefined,
-    error: `Cannot call primary agent "${isPrimaryAgent.name}" via task. Primary agents are top-level orchestrators.`,
-        }
-      }
-
       const availableAgents = callableAgents
-        .map((a) => a.name)
+        .map((a) => stripAgentListSortPrefix(a.name))
         .sort()
         .join(", ")
       return {
@@ -139,18 +151,19 @@ Create the work plan directly - that's your job as the planning agent.`,
       }
     }
 
-    agentToUse = matchedAgent.name
+    agentToUse = stripAgentListSortPrefix(matchedAgent.name)
 
     const agentConfigKey = getAgentConfigKey(agentToUse)
     const agentOverride = agentOverrides?.[agentConfigKey as keyof typeof agentOverrides]
       ?? (agentOverrides ? Object.entries(agentOverrides).find(([key]) => key.toLowerCase() === agentConfigKey)?.[1] : undefined)
     const agentRequirement = AGENT_MODEL_REQUIREMENTS[agentConfigKey]
-    const agentCategoryModel = agentOverride?.category
-      ? userCategories?.[agentOverride.category]?.model
+    const agentCategoryConfig = agentOverride?.category
+      ? userCategories?.[agentOverride.category]
       : undefined
+    const agentCategoryModel = agentCategoryConfig?.model
     const normalizedAgentFallbackModels = normalizeFallbackModels(
       agentOverride?.fallback_models
-      ?? (agentOverride?.category ? userCategories?.[agentOverride.category]?.fallback_models : undefined)
+      ?? agentCategoryConfig?.fallback_models
     )
 
     const availableModels = await getAvailableModelsForDelegateTask(client)
@@ -178,19 +191,16 @@ Create the work plan directly - that's your job as the planning agent.`,
       if (resolution && !resolutionSkipped) {
         const normalized = normalizeModelFormat(resolution.model)
         if (normalized) {
-          const variantToUse = agentOverride?.variant ?? resolution.variant
-          categoryModel = variantToUse ? { ...normalized, variant: variantToUse } : normalized
+          const variantToUse = agentOverride?.variant ?? resolution.variant ?? agentCategoryConfig?.variant
+          const resolvedModel = variantToUse ? { ...normalized, variant: variantToUse } : normalized
+          categoryModel = applyCategoryParams(resolvedModel, agentCategoryConfig)
         }
       } else if (resolutionSkipped && (agentOverride?.model ?? agentCategoryModel)) {
-        // Cold cache: resolution was skipped but user explicitly configured a model.
-        // Honor the user override directly — don't fall through to hardcoded fallback chain.
         const normalized = normalizeModelFormat((agentOverride?.model ?? agentCategoryModel)!)
         if (normalized) {
-          const agentCategoryVariant = agentOverride?.category
-            ? userCategories?.[agentOverride.category]?.variant
-            : undefined
-          const variantToUse = agentOverride?.variant ?? agentCategoryVariant
-          categoryModel = variantToUse ? { ...normalized, variant: variantToUse } : normalized
+          const variantToUse = agentOverride?.variant ?? agentCategoryConfig?.variant
+          const resolvedModel = variantToUse ? { ...normalized, variant: variantToUse } : normalized
+          categoryModel = applyCategoryParams(resolvedModel, agentCategoryConfig)
           log("[delegate-task] Cold cache: using explicit user override for subagent", {
             agent: agentToUse,
             model: agentOverride?.model ?? agentCategoryModel,
@@ -205,8 +215,6 @@ Create the work plan directly - that's your job as the planning agent.`,
         normalizedAgentFallbackModels,
         defaultProviderID,
       )
-      // Don't assign hardcoded fallback chain when resolution was skipped (cold cache)
-      // — the chain may contain model IDs that don't exist in the provider yet.
       fallbackChain = configuredFallbackChain ?? (resolutionSkipped ? undefined : agentRequirement?.fallbackChain)
 
       // Only promote fallback-only settings when resolution actually selected a fallback model.
@@ -225,11 +233,11 @@ Create the work plan directly - that's your job as the planning agent.`,
         categoryModel = {
           ...categoryModel,
           variant: agentOverride?.variant ?? effectiveEntry.variant ?? categoryModel.variant,
-          reasoningEffort: effectiveEntry.reasoningEffort,
-          temperature: effectiveEntry.temperature,
-          top_p: effectiveEntry.top_p,
-          maxTokens: effectiveEntry.maxTokens,
-          thinking: effectiveEntry.thinking,
+          reasoningEffort: effectiveEntry.reasoningEffort ?? categoryModel.reasoningEffort,
+          temperature: effectiveEntry.temperature ?? categoryModel.temperature,
+          top_p: effectiveEntry.top_p ?? categoryModel.top_p,
+          maxTokens: effectiveEntry.maxTokens ?? categoryModel.maxTokens,
+          thinking: effectiveEntry.thinking ?? categoryModel.thinking,
         }
       }
     }
@@ -264,4 +272,8 @@ Create the work plan directly - that's your job as the planning agent.`,
   }
 
   return { agentToUse, categoryModel, fallbackChain }
+}
+
+function isTaskCallableAgentMode(mode: AgentMode): boolean {
+  return mode === "all" || mode === "subagent"
 }

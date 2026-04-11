@@ -4,11 +4,50 @@ import type { FallbackEntry } from "../../shared/model-requirements"
 import { getTimingConfig } from "./timing"
 import { buildTaskPrompt } from "./prompt-builder"
 import { storeToolMetadata } from "../../features/tool-metadata-store"
+import { resolveCallID } from "./resolve-call-id"
 import { formatDetailedError } from "./error-formatting"
 import { getSessionTools } from "../../shared/session-tools-store"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { QUESTION_DENIED_SESSION_PERMISSION } from "../../shared/question-denied-session-permission"
 import { setSessionFallbackChain } from "../../hooks/model-fallback/hook"
+import { stripAgentListSortPrefix } from "../../shared/agent-display-names"
+
+function continueSessionSetup(args: {
+  taskID: string
+  manager: ExecutorContext["manager"]
+  timing: ReturnType<typeof getTimingConfig>
+  fallbackChain?: FallbackEntry[]
+  category?: string
+}): void {
+  if (!args.fallbackChain && !args.category) {
+    return
+  }
+
+  void (async () => {
+    const waitStart = Date.now()
+    while (Date.now() - waitStart < args.timing.WAIT_FOR_SESSION_TIMEOUT_MS) {
+      await new Promise(resolve => setTimeout(resolve, args.timing.WAIT_FOR_SESSION_INTERVAL_MS))
+      const updated = args.manager.getTask(args.taskID)
+      if (!updated) {
+        return
+      }
+      if (updated.status === "error" || updated.status === "cancelled" || updated.status === "interrupt") {
+        return
+      }
+
+      const sessionId = updated.sessionID
+      if (!sessionId) {
+        continue
+      }
+
+      setSessionFallbackChain(sessionId, args.fallbackChain)
+      if (args.category) {
+        SessionCategoryRegistry.register(sessionId, args.category)
+      }
+      return
+    }
+  })()
+}
 
 export async function executeBackgroundTask(
   args: DelegateTaskArgs,
@@ -24,11 +63,12 @@ export async function executeBackgroundTask(
 
   try {
     const tddEnabled = executorCtx.sisyphusAgentConfig?.tdd
-    const effectivePrompt = buildTaskPrompt(args.prompt, agentToUse, tddEnabled)
+    const normalizedAgent = stripAgentListSortPrefix(agentToUse)
+    const effectivePrompt = buildTaskPrompt(args.prompt, normalizedAgent, tddEnabled)
     const task = await manager.launch({
       description: args.description,
       prompt: effectivePrompt,
-      agent: agentToUse,
+      agent: normalizedAgent,
       parentSessionID: parentContext.sessionID,
       parentMessageID: parentContext.messageID,
       parentModel: parentContext.model,
@@ -50,12 +90,25 @@ export async function executeBackgroundTask(
     const waitStart = Date.now()
     let sessionId = task.sessionID
     while (!sessionId && Date.now() - waitStart < timing.WAIT_FOR_SESSION_TIMEOUT_MS) {
+      const updated = manager.getTask(task.id)
+      if (updated?.status === "error" || updated?.status === "cancelled" || updated?.status === "interrupt") {
+        return `Task failed to start (status: ${updated.status}).\n\nTask ID: ${task.id}`
+      }
+      sessionId = updated?.sessionID
+      if (sessionId) {
+        break
+      }
       if (ctx.abort?.aborted) {
-        return `Task aborted while waiting for session to start.\n\nTask ID: ${task.id}`
+        continueSessionSetup({
+          taskID: task.id,
+          manager,
+          timing,
+          fallbackChain,
+          category: args.category,
+        })
+        break
       }
       await new Promise(resolve => setTimeout(resolve, timing.WAIT_FOR_SESSION_INTERVAL_MS))
-      const updated = manager.getTask(task.id)
-      sessionId = updated?.sessionID
     }
 
     if (sessionId) {
@@ -82,8 +135,9 @@ export async function executeBackgroundTask(
       metadata,
     }
     await ctx.metadata?.(unstableMeta)
-    if (ctx.callID) {
-      storeToolMetadata(ctx.sessionID, ctx.callID, unstableMeta)
+    const callID = resolveCallID(ctx)
+    if (callID) {
+      storeToolMetadata(ctx.sessionID, callID, unstableMeta)
     }
 
     const taskMetadataBlock = sessionId
@@ -97,12 +151,14 @@ Description: ${task.description}
 Agent: ${task.agent}${args.category ? ` (category: ${args.category})` : ""}
 Status: ${task.status}
 
-System notifies on completion. Use \`background_output\` with task_id="${task.id}" to check.${taskMetadataBlock}`
+System notifies on completion. Use \`background_output\` with task_id="${task.id}" to check.
+
+Do NOT call background_output now. Wait for <system-reminder> notification first.${taskMetadataBlock}`
   } catch (error) {
     return formatDetailedError(error, {
       operation: "Launch background task",
       args,
-      agent: agentToUse,
+      agent: stripAgentListSortPrefix(agentToUse),
       category: args.category,
     })
   }

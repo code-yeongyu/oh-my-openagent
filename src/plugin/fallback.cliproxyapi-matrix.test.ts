@@ -1,21 +1,61 @@
 declare const require: (name: string) => any
-const { afterEach, describe, expect, mock, test } = require("bun:test")
+const { afterEach, describe, expect, spyOn, test } = require("bun:test")
 
 const PROVIDER_ID = "cliproxyapi"
-
-mock.module("../shared/connected-providers-cache", () => ({
-  readConnectedProvidersCache: () => [PROVIDER_ID],
-  readProviderModelsCache: () => ({
-    connected: [PROVIDER_ID],
-  }),
-}))
 
 import { createEventHandler } from "./event"
 import { createChatMessageHandler } from "./chat-message"
 import { createModelFallbackHook } from "../hooks/model-fallback/hook"
 import { createRuntimeFallbackHook } from "../hooks/runtime-fallback"
+import type { RuntimeFallbackPluginInput } from "../hooks/runtime-fallback/types"
 import { _resetForTesting } from "../features/claude-code-session-state"
+import { _resetForTesting as _resetModelFallbackForTesting } from "../hooks/model-fallback/hook"
 import { SessionCategoryRegistry } from "../shared/session-category-registry"
+import * as connectedProvidersCache from "../shared/connected-providers-cache"
+
+type EventHandlerArgs = Parameters<typeof createEventHandler>[0]
+type ChatMessageHandlerArgs = Parameters<typeof createChatMessageHandler>[0]
+type HarnessContext = EventHandlerArgs["ctx"] & RuntimeFallbackPluginInput
+type HarnessEventInput = Parameters<ReturnType<typeof createHarness>["eventHandler"]>[0]
+
+function asHarnessEventInput(input: unknown): HarnessEventInput {
+  return input as unknown as HarnessEventInput
+}
+
+function asHarnessContext(ctx: unknown): HarnessContext {
+  return ctx as unknown as HarnessContext
+}
+
+function createEventHandlerManagers(
+  overrides: Record<string, unknown> = {},
+): EventHandlerArgs["managers"] {
+  return {
+    ...({} as EventHandlerArgs["managers"]),
+    tmuxSessionManager: {
+      onSessionCreated: async () => {},
+      onSessionDeleted: async () => {},
+    },
+    ...overrides,
+  } as unknown as EventHandlerArgs["managers"]
+}
+
+function createEventHandlerHooks(
+  overrides: Record<string, unknown>,
+): EventHandlerArgs["hooks"] {
+  return {
+    ...({} as EventHandlerArgs["hooks"]),
+    ...overrides,
+  } as unknown as EventHandlerArgs["hooks"]
+}
+
+function createChatMessageHandlerHooks(
+  overrides: Record<string, unknown>,
+): ChatMessageHandlerArgs["hooks"] {
+  return {
+    ...({} as ChatMessageHandlerArgs["hooks"]),
+    ...overrides,
+  } as unknown as ChatMessageHandlerArgs["hooks"]
+}
 
 const PRIMARY_MODEL = {
   providerID: PROVIDER_ID,
@@ -44,6 +84,9 @@ type PromptAsyncCall = {
   parts?: Array<{ type?: string; text?: string }>
 }
 
+let readConnectedProvidersCacheSpy: { mockRestore: () => void } | undefined
+let readProviderModelsCacheSpy: { mockRestore: () => void } | undefined
+
 function createPluginConfig(mode: HarnessMode) {
   return {
     agents: {
@@ -58,7 +101,7 @@ function createPluginConfig(mode: HarnessMode) {
           },
         }
       : {}),
-  }
+  } as unknown as EventHandlerArgs["pluginConfig"]
 }
 
 function createHarness(args: {
@@ -66,12 +109,13 @@ function createHarness(args: {
   promptAsyncImpl?: (call: PromptAsyncCall) => Promise<unknown>
   sessionTimeoutMs?: number
 }) {
+  setupConnectedProviderCacheMocks()
   const abortCalls: string[] = []
   const promptCalls: string[] = []
   const promptAsyncCalls: PromptAsyncCall[] = []
   const pluginConfig = createPluginConfig(args.mode)
 
-  const ctx = {
+  const ctx = asHarnessContext({
     directory: "/tmp",
     client: {
       session: {
@@ -118,7 +162,7 @@ function createHarness(args: {
         showToast: async () => ({}),
       },
     },
-  } as any
+  })
 
   const hooks: Record<string, unknown> = {
     stopContinuationGuard: null,
@@ -144,38 +188,34 @@ function createHarness(args: {
         timeout_seconds: args.sessionTimeoutMs ? 30 : 0,
         notify_on_fallback: false,
       },
-      pluginConfig,
+      pluginConfig: pluginConfig as unknown as EventHandlerArgs["pluginConfig"],
       ...(args.sessionTimeoutMs ? { session_timeout_ms: args.sessionTimeoutMs } : {}),
     })
   }
 
   const eventHandler = createEventHandler({
     ctx,
-    pluginConfig: pluginConfig as any,
+    pluginConfig: pluginConfig as unknown as EventHandlerArgs["pluginConfig"],
     firstMessageVariantGate: {
       markSessionCreated: () => {},
       clear: () => {},
     },
-    managers: {
-      tmuxSessionManager: {
-        onSessionCreated: async () => {},
-        onSessionDeleted: async () => {},
-      },
+    managers: createEventHandlerManagers({
       skillMcpManager: {
         disconnectSession: async () => {},
       },
-    } as any,
-    hooks: hooks as any,
+    }),
+    hooks: createEventHandlerHooks(hooks),
   })
 
   const chatMessageHandler = createChatMessageHandler({
     ctx,
-    pluginConfig: pluginConfig as any,
+    pluginConfig: pluginConfig as unknown as ChatMessageHandlerArgs["pluginConfig"],
     firstMessageVariantGate: {
       shouldOverride: () => false,
       markApplied: () => {},
     },
-    hooks: hooks as any,
+    hooks: createChatMessageHandlerHooks(hooks),
   })
 
   return {
@@ -191,7 +231,7 @@ async function primeMainSession(
   eventHandler: ReturnType<typeof createHarness>["eventHandler"],
   sessionID: string,
 ) {
-  await eventHandler({
+  await eventHandler(asHarnessEventInput({
     event: {
       type: "session.created",
       properties: {
@@ -201,9 +241,9 @@ async function primeMainSession(
         },
       },
     },
-  })
+  }))
 
-  await eventHandler({
+  await eventHandler(asHarnessEventInput({
     event: {
       type: "message.updated",
       properties: {
@@ -215,12 +255,12 @@ async function primeMainSession(
           content: [],
           modelID: PRIMARY_MODEL.modelID,
           providerID: PRIMARY_MODEL.providerID,
-          agent: "Sisyphus (Ultraworker)",
+          agent: "Sisyphus - Ultraworker",
           path: { cwd: "/tmp", root: "/tmp" },
         },
       },
     },
-  })
+  }))
 }
 
 async function sendNextMessage(
@@ -240,7 +280,7 @@ async function triggerSessionError(
   eventHandler: ReturnType<typeof createHarness>["eventHandler"],
   sessionID: string,
 ) {
-  await eventHandler({
+  await eventHandler(asHarnessEventInput({
     event: {
       type: "session.error",
       properties: {
@@ -255,14 +295,14 @@ async function triggerSessionError(
         },
       },
     },
-  })
+  }))
 }
 
 async function triggerSessionStatusRetry(
   eventHandler: ReturnType<typeof createHarness>["eventHandler"],
   sessionID: string,
 ) {
-  await eventHandler({
+  await eventHandler(asHarnessEventInput({
     event: {
       type: "session.status",
       properties: {
@@ -278,14 +318,14 @@ async function triggerSessionStatusRetry(
         },
       },
     },
-  })
+  }))
 }
 
 async function triggerAssistantMessageError(
   eventHandler: ReturnType<typeof createHarness>["eventHandler"],
   sessionID: string,
 ) {
-  await eventHandler({
+  await eventHandler(asHarnessEventInput({
     event: {
       type: "message.updated",
       properties: {
@@ -297,7 +337,7 @@ async function triggerAssistantMessageError(
           model: PRIMARY_MODEL_STRING,
           modelID: PRIMARY_MODEL.modelID,
           providerID: PRIMARY_MODEL.providerID,
-          agent: "Sisyphus (Ultraworker)",
+          agent: "Sisyphus - Ultraworker",
           path: { cwd: "/tmp", root: "/tmp" },
           error: {
             statusCode: 529,
@@ -306,11 +346,30 @@ async function triggerAssistantMessageError(
         },
       },
     },
+  }))
+}
+
+afterEach(() => {
+  readConnectedProvidersCacheSpy?.mockRestore()
+  readProviderModelsCacheSpy?.mockRestore()
+  readConnectedProvidersCacheSpy = undefined
+  readProviderModelsCacheSpy = undefined
+})
+
+function setupConnectedProviderCacheMocks(): void {
+  readConnectedProvidersCacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue([
+    PROVIDER_ID,
+  ])
+  readProviderModelsCacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+    connected: [PROVIDER_ID],
+    models: {},
+    updatedAt: new Date(0).toISOString(),
   })
 }
 
 afterEach(() => {
   _resetForTesting()
+  _resetModelFallbackForTesting()
   SessionCategoryRegistry.clear()
 })
 

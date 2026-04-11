@@ -5,7 +5,7 @@ export const THINKING_SUMMARY_MAX_CHARS = 500 as const
 type MessageInfo = {
   role?: string
   agent?: string
-  model?: { providerID: string; modelID: string }
+  model?: { providerID: string; modelID: string; variant?: string }
   providerID?: string
   modelID?: string
   tools?: Record<string, boolean | "allow" | "deny" | "ask">
@@ -33,7 +33,11 @@ export function getMessageInfo(value: unknown): MessageInfo | undefined {
     ? info.model
     : undefined
   const model = modelValue && typeof modelValue.providerID === "string" && typeof modelValue.modelID === "string"
-    ? { providerID: modelValue.providerID, modelID: modelValue.modelID }
+    ? {
+        providerID: modelValue.providerID,
+        modelID: modelValue.modelID,
+        ...(typeof modelValue.variant === "string" ? { variant: modelValue.variant } : {}),
+      }
     : undefined
   return {
     role: typeof info.role === "string" ? info.role : undefined,

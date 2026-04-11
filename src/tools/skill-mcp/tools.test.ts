@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, mock } from "bun:test"
+import { describe, it, expect, beforeEach, mock, spyOn } from "bun:test"
 import type { ToolContext } from "@opencode-ai/plugin/tool"
 import { createSkillMcpTool, applyGrepFilter } from "./tools"
 import { SkillMcpManager } from "../../features/skill-mcp-manager"
@@ -163,6 +163,34 @@ describe("skill_mcp tool", () => {
 
       // then
       expect(tool.description).toBeDefined()
+    })
+  })
+
+  describe("session resolution", () => {
+    it("uses the tool context sessionID when the fallback getter is empty", async () => {
+      // given
+      loadedSkills = [
+        createMockSkillWithMcp("test-skill", {
+          "test-server": { command: "echo", args: ["test"] },
+        }),
+      ]
+      const callToolSpy = spyOn(manager, "callTool").mockResolvedValue({ content: [] } as never)
+      const tool = createSkillMcpTool({
+        manager,
+        getLoadedSkills: () => loadedSkills,
+        getSessionID: () => "",
+      })
+
+      // when
+      await tool.execute({ mcp_name: "test-server", tool_name: "some-tool" }, mockContext)
+
+      // then
+      expect(callToolSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ sessionID: mockContext.sessionID }),
+        expect.any(Object),
+        "some-tool",
+        {},
+      )
     })
   })
 })

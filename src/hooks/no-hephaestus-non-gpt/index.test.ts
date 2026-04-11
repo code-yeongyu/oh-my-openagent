@@ -40,8 +40,8 @@ describe("no-hephaestus-non-gpt hook", () => {
 
     // then - toast is shown and agent is switched to sisyphus
     expect(showToast).toHaveBeenCalledTimes(2)
-    expect(output1.message.agent).toBe(SISYPHUS_DISPLAY)
-    expect(output2.message.agent).toBe(SISYPHUS_DISPLAY)
+    expect(output1.message.agent).toBe("sisyphus")
+    expect(output2.message.agent).toBe("sisyphus")
     expect(showToast.mock.calls[0]?.[0]).toMatchObject({
       body: {
         title: "NEVER Use Hephaestus with Non-GPT",
@@ -141,6 +141,6 @@ describe("no-hephaestus-non-gpt hook", () => {
 
     // then - toast shown via session-agent fallback, switched to sisyphus
     expect(showToast).toHaveBeenCalledTimes(1)
-    expect(output.message.agent).toBe(SISYPHUS_DISPLAY)
+    expect(output.message.agent).toBe("sisyphus")
   })
 })

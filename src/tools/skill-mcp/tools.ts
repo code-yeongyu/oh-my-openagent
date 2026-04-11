@@ -1,4 +1,5 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin"
+import type { ToolContext } from "@opencode-ai/plugin/tool"
 import { BUILTIN_MCP_TOOL_HINTS, SKILL_MCP_DESCRIPTION } from "./constants"
 import type { SkillMcpArgs } from "./types"
 import type { SkillMcpManager, SkillMcpClientInfo, SkillMcpServerContext } from "../../features/skill-mcp-manager"
@@ -7,7 +8,7 @@ import type { LoadedSkill } from "../../features/opencode-skill-loader/types"
 interface SkillMcpToolOptions {
   manager: SkillMcpManager
   getLoadedSkills: () => LoadedSkill[]
-  getSessionID: () => string
+  getSessionID?: () => string | undefined
 }
 
 type OperationType = { type: "tool" | "resource" | "prompt"; name: string }
@@ -136,7 +137,7 @@ export function createSkillMcpTool(options: SkillMcpToolOptions): ToolDefinition
         .optional()
         .describe("Regex pattern to filter output lines (only matching lines returned)"),
     },
-    async execute(args: SkillMcpArgs) {
+    async execute(args: SkillMcpArgs, toolContext: ToolContext) {
       const operation = validateOperationParams(args)
       const skills = getLoadedSkills()
       const found = findMcpServer(args.mcp_name, skills)
@@ -156,10 +157,16 @@ export function createSkillMcpTool(options: SkillMcpToolOptions): ToolDefinition
         )
       }
 
+      const sessionID = toolContext.sessionID || getSessionID?.()
+      if (!sessionID) {
+        throw new Error("No active session available for skill MCP call.")
+      }
+
       const info: SkillMcpClientInfo = {
         serverName: args.mcp_name,
         skillName: found.skill.name,
-        sessionID: getSessionID(),
+        sessionID,
+        scope: found.skill.scope,
       }
 
       const context: SkillMcpServerContext = {

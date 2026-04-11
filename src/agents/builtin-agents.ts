@@ -26,7 +26,6 @@ import { collectPendingBuiltinAgents } from "./builtin-agents/general-agents"
 import { maybeCreateSisyphusConfig } from "./builtin-agents/sisyphus-agent"
 import { maybeCreateHephaestusConfig } from "./builtin-agents/hephaestus-agent"
 import { maybeCreateAtlasConfig } from "./builtin-agents/atlas-agent"
-import { buildCustomAgentMetadata, parseRegisteredAgentSummaries } from "./custom-agent-summaries"
 
 type AgentSource = AgentFactory | AgentConfig
 
@@ -119,23 +118,6 @@ export async function createBuiltinAgents(
     disabledSkills,
     disableOmoEnv,
   })
-
-  const registeredAgents = parseRegisteredAgentSummaries(customAgentSummaries)
-  const builtinAgentNames = new Set(Object.keys(agentSources).map((name) => name.toLowerCase()))
-  const disabledAgentNames = new Set(disabledAgents.map((name) => name.toLowerCase()))
-
-  for (const agent of registeredAgents) {
-    const lowerName = agent.name.toLowerCase()
-    if (builtinAgentNames.has(lowerName)) continue
-    if (disabledAgentNames.has(lowerName)) continue
-    if (availableAgents.some((availableAgent) => availableAgent.name.toLowerCase() === lowerName)) continue
-
-    availableAgents.push({
-      name: agent.name,
-      description: agent.description,
-      metadata: buildCustomAgentMetadata(agent.name, agent.description),
-    })
-  }
 
   const sisyphusConfig = maybeCreateSisyphusConfig({
     disabledAgents,

@@ -6,7 +6,41 @@ import { applySessionPromptParams } from "../../shared/session-prompt-params-hel
 import { subagentSessions } from "../claude-code-session-state"
 import { getTaskToastManager } from "../task-toast-manager"
 import { isInsideTmux } from "../../shared/tmux"
+import { stripAgentListSortPrefix } from "../../shared/agent-display-names"
 import type { ConcurrencyManager } from "./concurrency"
+
+export const FALLBACK_AGENT = "general"
+
+export function isAgentNotFoundError(error: unknown): boolean {
+  const message =
+    typeof error === "string"
+      ? error
+      : error instanceof Error
+        ? error.message
+        : typeof error === "object" && error !== null && typeof (error as { message?: unknown }).message === "string"
+          ? (error as { message: string }).message
+          : String(error)
+  return (
+    message.includes("Agent not found") ||
+    message.includes("agent.name")
+  )
+}
+
+export function buildFallbackBody(
+  originalBody: Record<string, unknown>,
+  fallbackAgent: string,
+): Record<string, unknown> {
+  return {
+    ...originalBody,
+    agent: fallbackAgent,
+    tools: {
+      task: false,
+      call_omo_agent: true,
+      question: false,
+      ...getAgentToolRestrictions(fallbackAgent),
+    },
+  }
+}
 
 export interface SpawnerContext {
   client: OpencodeClient
@@ -52,6 +86,7 @@ export async function startTask(
 
   const parentSession = await client.session.get({
     path: { id: input.parentSessionID },
+    query: { directory },
   }).catch((err) => {
     log(`[background-agent] Failed to get parent session: ${err}`)
     return null
@@ -135,25 +170,47 @@ export async function startTask(
       }
     : undefined
   const launchVariant = input.model?.variant
+  const normalizedAgent = stripAgentListSortPrefix(input.agent)
 
   applySessionPromptParams(sessionID, input.model)
 
+  const promptBody = {
+    agent: normalizedAgent,
+    ...(launchModel ? { model: launchModel } : {}),
+    ...(launchVariant ? { variant: launchVariant } : {}),
+    system: input.skillContent,
+    tools: {
+      task: false,
+      call_omo_agent: true,
+      question: false,
+      ...getAgentToolRestrictions(normalizedAgent),
+    },
+    parts: [createInternalAgentTextPart(input.prompt)],
+  }
+
   promptWithModelSuggestionRetry(client, {
     path: { id: sessionID },
-    body: {
-      agent: input.agent,
-      ...(launchModel ? { model: launchModel } : {}),
-      ...(launchVariant ? { variant: launchVariant } : {}),
-      system: input.skillContent,
-      tools: {
-        task: false,
-        call_omo_agent: true,
-        question: false,
-        ...getAgentToolRestrictions(input.agent),
-      },
-      parts: [createInternalAgentTextPart(input.prompt)],
-    },
-  }).catch((error) => {
+    body: promptBody,
+  }).catch(async (error) => {
+    if (isAgentNotFoundError(error) && input.agent !== FALLBACK_AGENT) {
+      log("[background-agent] Agent not found, retrying with fallback agent", {
+        original: input.agent,
+        fallback: FALLBACK_AGENT,
+        taskId: task.id,
+      })
+      try {
+        await promptWithModelSuggestionRetry(client, {
+          path: { id: sessionID },
+          body: buildFallbackBody(promptBody, FALLBACK_AGENT),
+        })
+        task.agent = FALLBACK_AGENT
+        return
+      } catch (retryError) {
+        log("[background-agent] Fallback agent also failed:", retryError)
+        onTaskError(task, retryError instanceof Error ? retryError : new Error(String(retryError)))
+        return
+      }
+    }
     log("[background-agent] promptAsync error:", error)
     onTaskError(task, error instanceof Error ? error : new Error(String(error)))
   })
@@ -228,21 +285,42 @@ export async function resumeTask(
 
   applySessionPromptParams(task.sessionID, task.model)
 
+  const resumeBody = {
+    agent: task.agent,
+    ...(resumeModel ? { model: resumeModel } : {}),
+    ...(resumeVariant ? { variant: resumeVariant } : {}),
+    tools: {
+      task: false,
+      call_omo_agent: true,
+      question: false,
+      ...getAgentToolRestrictions(task.agent),
+    },
+    parts: [createInternalAgentTextPart(input.prompt)],
+  }
+
   client.session.promptAsync({
     path: { id: task.sessionID },
-    body: {
-      agent: task.agent,
-      ...(resumeModel ? { model: resumeModel } : {}),
-      ...(resumeVariant ? { variant: resumeVariant } : {}),
-      tools: {
-        task: false,
-        call_omo_agent: true,
-        question: false,
-        ...getAgentToolRestrictions(task.agent),
-      },
-      parts: [createInternalAgentTextPart(input.prompt)],
-    },
-  }).catch((error) => {
+    body: resumeBody,
+  }).catch(async (error) => {
+    if (isAgentNotFoundError(error) && task.agent !== FALLBACK_AGENT) {
+      log("[background-agent] Resume agent not found, retrying with fallback agent", {
+        original: task.agent,
+        fallback: FALLBACK_AGENT,
+        taskId: task.id,
+      })
+      try {
+        await promptWithModelSuggestionRetry(client, {
+          path: { id: task.sessionID! },
+          body: buildFallbackBody(resumeBody, FALLBACK_AGENT),
+        })
+        task.agent = FALLBACK_AGENT
+        return
+      } catch (retryError) {
+        log("[background-agent] Resume fallback agent also failed:", retryError)
+        onTaskError(task, retryError instanceof Error ? retryError : new Error(String(retryError)))
+        return
+      }
+    }
     log("[background-agent] resume prompt error:", error)
     onTaskError(task, error instanceof Error ? error : new Error(String(error)))
   })

@@ -1,8 +1,8 @@
 {
   "name": "oh-my-opencode",
-  "version": "3.14.0",
+  "version": "3.17.0",
   "description": "The Best AI Agent Harness - Batteries-Included OpenCode Plugin with Multi-Model Orchestration, Parallel Background Agents, and Crafted LSP/AST Tools",
-  "main": "dist/index.js",
+  "main": "./dist/index.js",
   "types": "dist/index.d.ts",
   "type": "module",
   "bin": {
@@ -59,8 +59,8 @@
     "@clack/prompts": "^0.11.0",
     "@code-yeongyu/comment-checker": "^0.7.0",
     "@modelcontextprotocol/sdk": "^1.25.2",
-    "@opencode-ai/plugin": "^1.2.24",
-    "@opencode-ai/sdk": "^1.2.24",
+    "@opencode-ai/plugin": "^1.4.0",
+    "@opencode-ai/sdk": "^1.4.0",
     "commander": "^14.0.2",
     "detect-libc": "^2.0.0",
     "diff": "^8.0.3",
@@ -68,31 +68,30 @@
     "jsonc-parser": "^3.3.1",
     "picocolors": "^1.1.1",
     "picomatch": "^4.0.2",
+    "posthog-node": "^5.29.2",
     "vscode-jsonrpc": "^8.2.0",
-    "zod": "^4.1.8"
+    "zod": "^4.3.0"
   },
   "devDependencies": {
     "@types/js-yaml": "^4.0.9",
     "@types/picomatch": "^3.0.2",
-    "bun-types": "1.3.10",
+    "bun-types": "1.3.11",
     "typescript": "^5.7.3"
   },
   "optionalDependencies": {
-    "oh-my-opencode-darwin-arm64": "3.14.0",
-    "oh-my-opencode-darwin-x64": "3.14.0",
-    "oh-my-opencode-darwin-x64-baseline": "3.14.0",
-    "oh-my-opencode-linux-arm64": "3.14.0",
-    "oh-my-opencode-linux-arm64-musl": "3.14.0",
-    "oh-my-opencode-linux-x64": "3.14.0",
-    "oh-my-opencode-linux-x64-baseline": "3.14.0",
-    "oh-my-opencode-linux-x64-musl": "3.14.0",
-    "oh-my-opencode-linux-x64-musl-baseline": "3.14.0",
-    "oh-my-opencode-windows-x64": "3.14.0",
-    "oh-my-opencode-windows-x64-baseline": "3.14.0"
+    "oh-my-opencode-darwin-arm64": "3.17.0",
+    "oh-my-opencode-darwin-x64": "3.17.0",
+    "oh-my-opencode-darwin-x64-baseline": "3.17.0",
+    "oh-my-opencode-linux-arm64": "3.17.0",
+    "oh-my-opencode-linux-arm64-musl": "3.17.0",
+    "oh-my-opencode-linux-x64": "3.17.0",
+    "oh-my-opencode-linux-x64-baseline": "3.17.0",
+    "oh-my-opencode-linux-x64-musl": "3.17.0",
+    "oh-my-opencode-linux-x64-musl-baseline": "3.17.0",
+    "oh-my-opencode-windows-x64": "3.17.0",
+    "oh-my-opencode-windows-x64-baseline": "3.17.0"
   },
-  "overrides": {
-    "@opencode-ai/sdk": "^1.2.24"
-  },
+  "overrides": {},
   "trustedDependencies": [
     "@ast-grep/cli",
     "@ast-grep/napi",

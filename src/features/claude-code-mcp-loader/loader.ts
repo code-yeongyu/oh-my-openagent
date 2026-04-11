@@ -48,6 +48,7 @@ async function loadMcpConfigFile(
 export function getSystemMcpServerNames(): Set<string> {
   const names = new Set<string>()
   const paths = getMcpConfigPaths()
+  const cwd = process.cwd()
 
   for (const { path } of paths) {
     if (!existsSync(path)) continue
@@ -58,7 +59,11 @@ export function getSystemMcpServerNames(): Set<string> {
       if (!config?.mcpServers) continue
 
       for (const [name, serverConfig] of Object.entries(config.mcpServers)) {
-        if (serverConfig.disabled) continue
+        if (serverConfig.disabled) {
+          names.delete(name)
+          continue
+        }
+        if (!shouldLoadMcpServer(serverConfig, cwd)) continue
         names.add(name)
       }
     } catch {

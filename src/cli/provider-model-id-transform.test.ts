@@ -163,6 +163,44 @@ describe("transformModelForProvider", () => {
 		})
 	})
 
+	describe("anthropic provider", () => {
+		test("transforms claude-opus-4-6 to claude-opus-4.6", () => {
+			// #given anthropic provider and claude-opus-4-6 model
+			const provider = "anthropic"
+			const model = "claude-opus-4-6"
+
+			// #when transformModelForProvider is called
+			const result = transformModelForProvider(provider, model)
+
+			// #then should transform to claude-opus-4.6
+			expect(result).toBe("claude-opus-4.6")
+		})
+
+		test("transforms claude-sonnet-4-6 to claude-sonnet-4.6", () => {
+			// #given anthropic provider and claude-sonnet-4-6 model
+			const provider = "anthropic"
+			const model = "claude-sonnet-4-6"
+
+			// #when transformModelForProvider is called
+			const result = transformModelForProvider(provider, model)
+
+			// #then should transform to claude-sonnet-4.6
+			expect(result).toBe("claude-sonnet-4.6")
+		})
+
+		test("transforms claude-haiku-4-5 to claude-haiku-4.5", () => {
+			// #given anthropic provider and claude-haiku-4-5 model
+			const provider = "anthropic"
+			const model = "claude-haiku-4-5"
+
+			// #when transformModelForProvider is called
+			const result = transformModelForProvider(provider, model)
+
+			// #then should transform to claude-haiku-4.5
+			expect(result).toBe("claude-haiku-4.5")
+		})
+	})
+
 	describe("unknown provider", () => {
 		test("passes model through unchanged for unknown provider", () => {
 			// #given unknown provider and any model

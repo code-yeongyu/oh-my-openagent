@@ -19,13 +19,15 @@ describe("runCliInstaller", () => {
   afterEach(() => {
     console.log = originalConsoleLog
     console.error = originalConsoleError
+    mock.restore()
   })
 
-  it("completes installation without auth plugin or provider config steps", async () => {
-    //#given
+  it("blocks installation when OpenCode is below the minimum version", async () => {
+    // given
     const restoreSpies = [
       spyOn(configManager, "detectCurrentConfig").mockReturnValue({
         isInstalled: false,
+        installedVersion: null,
         hasClaude: false,
         isMax20: false,
         hasOpenAI: false,
@@ -34,9 +36,56 @@ describe("runCliInstaller", () => {
         hasOpencodeZen: false,
         hasZaiCodingPlan: false,
         hasKimiForCoding: false,
+        hasOpencodeGo: false,
       }),
       spyOn(configManager, "isOpenCodeInstalled").mockResolvedValue(true),
-      spyOn(configManager, "getOpenCodeVersion").mockResolvedValue("1.0.200"),
+      spyOn(configManager, "getOpenCodeVersion").mockResolvedValue("1.3.9"),
+    ]
+    const addPluginSpy = spyOn(configManager, "addPluginToOpenCodeConfig")
+
+    const args: InstallArgs = {
+      tui: false,
+      claude: "no",
+      openai: "no",
+      gemini: "no",
+      copilot: "no",
+      opencodeZen: "no",
+      zaiCodingPlan: "no",
+      kimiForCoding: "no",
+      opencodeGo: "no",
+    }
+
+    // when
+    const result = await runCliInstaller(args, "3.16.0")
+
+    // then
+    expect(result).toBe(1)
+    expect(addPluginSpy).not.toHaveBeenCalled()
+
+    for (const spy of restoreSpies) {
+      spy.mockRestore()
+    }
+    addPluginSpy.mockRestore()
+  })
+
+  it("completes installation without auth plugin or provider config steps", async () => {
+    // given
+    const restoreSpies = [
+      spyOn(configManager, "detectCurrentConfig").mockReturnValue({
+        isInstalled: false,
+        installedVersion: null,
+        hasClaude: false,
+        isMax20: false,
+        hasOpenAI: false,
+        hasGemini: false,
+        hasCopilot: false,
+        hasOpencodeZen: false,
+        hasZaiCodingPlan: false,
+        hasKimiForCoding: false,
+        hasOpencodeGo: false,
+      }),
+      spyOn(configManager, "isOpenCodeInstalled").mockResolvedValue(true),
+      spyOn(configManager, "getOpenCodeVersion").mockResolvedValue("1.4.0"),
       spyOn(configManager, "addPluginToOpenCodeConfig").mockResolvedValue({
         success: true,
         configPath: "/tmp/opencode.jsonc",
@@ -56,12 +105,13 @@ describe("runCliInstaller", () => {
       opencodeZen: "no",
       zaiCodingPlan: "no",
       kimiForCoding: "no",
+      opencodeGo: "no",
     }
 
-    //#when
+    // when
     const result = await runCliInstaller(args, "3.4.0")
 
-    //#then
+    // then
     expect(result).toBe(0)
 
     for (const spy of restoreSpies) {

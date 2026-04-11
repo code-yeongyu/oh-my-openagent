@@ -4,57 +4,42 @@ import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
 
 import { DEFAULT_MAX_DIAGNOSTICS } from "./constants"
 import { aggregateDiagnosticsForDirectory } from "./directory-diagnostics"
+import { inferExtensionFromDirectory } from "./infer-extension"
 import { filterDiagnosticsBySeverity, formatDiagnostic } from "./lsp-formatters"
 import { isDirectoryPath, withLspClient } from "./lsp-client-wrapper"
 import type { Diagnostic } from "./types"
 
 export const lsp_diagnostics: ToolDefinition = tool({
   description:
-    'Get errors, warnings, hints from language server BEFORE running build. Use filePath for a single file, or filePath with extension for a directory. Do NOT pass both filePath and directory — use filePath for everything.',
+    'Get errors, warnings, hints from language server BEFORE running build. Works for both single files and directories - file extension is auto-detected for directories.',
   args: {
     filePath: tool.schema
       .string()
-      .optional()
       .describe("File or directory path to check diagnostics for"),
-    directory: tool.schema
-      .string()
-      .optional()
-      .describe("Alias for filePath when checking a directory. Do NOT provide both filePath and directory."),
     severity: tool.schema
       .enum(["error", "warning", "information", "hint", "all"])
       .optional()
       .describe("Filter by severity level"),
-    extension: tool.schema
-      .string()
-      .optional()
-      .describe("Required if target is a directory. E.g., '.ts', '.py', '.go', '.java'"),
   },
   execute: async (args, _context) => {
     try {
-      // Accept either filePath or directory (treat directory as alias for filePath)
-      const targetPath = args.filePath || args.directory
-      if (!targetPath) {
-        throw new Error("Provide either 'filePath' or 'directory' parameter.")
+      if (!args.filePath) {
+        throw new Error("'filePath' parameter is required.")
       }
-      if (args.filePath && args.directory) {
-        // Instead of erroring, just use filePath and ignore directory
-        // This prevents model confusion from causing hard failures
-      }
-      const absPath = resolve(targetPath)
+      const absPath = resolve(args.filePath)
 
       if (isDirectoryPath(absPath)) {
-        if (!args.extension) {
+        const extension = inferExtensionFromDirectory(absPath)
+        if (!extension) {
           throw new Error(
-            `Directory path requires 'extension' parameter.\n\n` +
-              `Example: lsp_diagnostics(filePath="src", extension=".ts")\n\n` +
-              `Supported extensions: .ts, .tsx, .js, .py, .go, etc.`
+            `No supported source files found in directory: ${absPath}`
           )
         }
-        return await aggregateDiagnosticsForDirectory(absPath, args.extension, args.severity)
+        return await aggregateDiagnosticsForDirectory(absPath, extension, args.severity)
       }
 
-      const result = await withLspClient(targetPath, async (client) => {
-        return (await client.diagnostics(targetPath)) as { items?: Diagnostic[] } | Diagnostic[] | null
+      const result = await withLspClient(args.filePath, async (client) => {
+        return (await client.diagnostics(args.filePath)) as { items?: Diagnostic[] } | Diagnostic[] | null
       })
 
       let diagnostics: Diagnostic[] = []

@@ -27,12 +27,18 @@ export function extractResumeConfig(userMessage: MessageData | undefined, sessio
 export async function resumeSession(client: Client, config: ResumeConfig): Promise<boolean> {
   try {
     const inheritedTools = resolveInheritedPromptTools(config.sessionID, config.tools)
+    const launchModel = config.model
+      ? { providerID: config.model.providerID, modelID: config.model.modelID }
+      : undefined
+    const launchVariant = config.model?.variant
+
     await client.session.promptAsync({
       path: { id: config.sessionID },
       body: {
         parts: [createInternalAgentTextPart(RECOVERY_RESUME_TEXT)],
         agent: config.agent,
-        model: config.model,
+        ...(launchModel ? { model: launchModel } : {}),
+        ...(launchVariant ? { variant: launchVariant } : {}),
         ...(inheritedTools ? { tools: inheritedTools } : {}),
       },
     })

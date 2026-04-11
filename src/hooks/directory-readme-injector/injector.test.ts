@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
+import { afterAll, afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 import { randomUUID } from "node:crypto"
 import { mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -14,6 +14,10 @@ mock.module("./storage", () => ({
     storageMaps.set(sessionID, paths)
   },
 }))
+
+afterAll(() => {
+  mock.restore()
+})
 
 function createPluginContext(directory: string): PluginInput {
   return { directory } as PluginInput

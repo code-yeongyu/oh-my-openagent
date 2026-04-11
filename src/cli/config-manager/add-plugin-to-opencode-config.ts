@@ -1,12 +1,14 @@
 import { readFileSync, writeFileSync } from "node:fs"
 import type { ConfigMergeResult } from "../types"
 import { PLUGIN_NAME, LEGACY_PLUGIN_NAME } from "../../shared"
+import { backupConfigFile } from "./backup-config"
 import { getConfigDir } from "./config-context"
 import { ensureConfigDirectoryExists } from "./ensure-config-directory-exists"
 import { formatErrorWithSuggestion } from "./format-error-with-suggestion"
 import { detectConfigFormat } from "./opencode-config-format"
 import { parseOpenCodeConfigFileWithError, type OpenCodeConfig } from "./parse-opencode-config-file"
 import { getPluginNameWithVersion } from "./plugin-name-with-version"
+import { checkVersionCompatibility, extractVersionFromPluginEntry } from "./version-compatibility"
 
 export async function addPluginToOpenCodeConfig(currentVersion: string): Promise<ConfigMergeResult> {
   try {
@@ -52,14 +54,33 @@ export async function addPluginToOpenCodeConfig(currentVersion: string): Promise
         && !(plugin === LEGACY_PLUGIN_NAME || plugin.startsWith(`${LEGACY_PLUGIN_NAME}@`))
     )
 
+    const existingEntry = canonicalEntries[0] ?? legacyEntries[0]
+    if (existingEntry) {
+      const installedVersion = extractVersionFromPluginEntry(existingEntry)
+      const compatibility = checkVersionCompatibility(installedVersion, currentVersion)
+
+      if (!compatibility.canUpgrade) {
+        return {
+          success: false,
+          configPath: path,
+          error: compatibility.reason ?? "Version compatibility check failed",
+        }
+      }
+
+      const backupResult = backupConfigFile(path)
+      if (!backupResult.success) {
+        return {
+          success: false,
+          configPath: path,
+          error: `Failed to create backup: ${backupResult.error}`,
+        }
+      }
+    }
+
     const normalizedPlugins = [...otherPlugins]
 
-    if (canonicalEntries.length > 0) {
-      normalizedPlugins.push(canonicalEntries[0])
-    } else if (legacyEntries.length > 0) {
-      const versionMatch = legacyEntries[0].match(/@(.+)$/)
-      const preservedVersion = versionMatch ? versionMatch[1] : null
-      normalizedPlugins.push(preservedVersion ? `${PLUGIN_NAME}@${preservedVersion}` : pluginEntry)
+    if (canonicalEntries.length > 0 || legacyEntries.length > 0) {
+      normalizedPlugins.push(pluginEntry)
     } else {
       normalizedPlugins.push(pluginEntry)
     }
