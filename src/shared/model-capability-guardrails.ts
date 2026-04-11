@@ -123,10 +123,11 @@ export function collectModelCapabilityGuardrailIssues(
     }
   }
 
-  for (const modelID of requirementModelIDs) {
-    const aliasResolution = resolveModelIDAlias(modelID)
-    if (aliasResolution.source !== "canonical") {
-      issues.push({
+	for (const modelID of requirementModelIDs) {
+		const aliasResolution = resolveModelIDAlias(modelID)
+		const providerID = aliasResolution.requestedModelID.split("/")[0] ?? "test-provider"
+		if (aliasResolution.source !== "canonical") {
+			issues.push({
         kind: "built-in-model-relies-on-alias",
         modelID: aliasResolution.requestedModelID,
         canonicalModelID: aliasResolution.canonicalModelID,
@@ -135,8 +136,8 @@ export function collectModelCapabilityGuardrailIssues(
       })
     }
 
-    if (!resolveSnapshotModelKey(snapshot, aliasResolution.canonicalModelID)) {
-      issues.push({
+		if (!resolveSnapshotModelKey(snapshot, providerID, aliasResolution.canonicalModelID)) {
+			issues.push({
         kind: "built-in-model-missing-from-snapshot",
         modelID: aliasResolution.requestedModelID,
         canonicalModelID: aliasResolution.canonicalModelID,
