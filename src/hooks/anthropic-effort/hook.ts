@@ -62,11 +62,11 @@ export function createAnthropicEffortHook() {
     ): Promise<void> => {
       const { agent, model, message } = input
       if (!model?.modelID || !model?.providerID) return
+      if (isEffortUnsupportedModel(model.modelID)) return
       if (message.variant !== "max") return
       if (!isClaudeProvider(model.providerID, model.modelID)) return
       if (shouldSkipForInternalAgent(agent?.name)) return
       if (output.options.effort !== undefined) return
-      if (isEffortUnsupportedModel(model.modelID)) return
 
       const opus = isOpusModel(model.modelID)
       const clamped = clampVariant(message.variant, opus)
