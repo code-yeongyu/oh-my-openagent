@@ -31,7 +31,7 @@ describe("generateOmoConfig - model fallback system", () => {
 
     //#then
     expect((result.agents as Record<string, { model: string }>).sisyphus.model).toBe(
-      `github-copilot/${transformModelForProvider("github-copilot", "claude-opus")}`,
+      `github-copilot/${transformModelForProvider("github-copilot", "claude-opus-4-6")}`,
     )
   })
 
