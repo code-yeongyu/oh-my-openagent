@@ -37,6 +37,13 @@ export function stripAgentListSortPrefix(agentName: string): string {
   return agentName.replace(/^\u200B+/, "")
 }
 
+export function getAgentRuntimeName(configKey: string): string {
+  const displayName = getAgentDisplayName(configKey)
+  const prefix = AGENT_LIST_SORT_PREFIXES[configKey.toLowerCase()]
+
+  return prefix ? `${prefix}${displayName}` : displayName
+}
+
 /**
  * Get display name for an agent config key.
  * Uses case-insensitive lookup for backward compatibility.
@@ -65,10 +72,7 @@ export function getAgentDisplayName(configKey: string): string {
  * See: https://github.com/code-yeongyu/oh-my-openagent/issues/3238
  */
 export function getAgentListDisplayName(configKey: string): string {
-  const displayName = getAgentDisplayName(configKey)
-  const prefix = AGENT_LIST_SORT_PREFIXES[configKey.toLowerCase()]
-
-  return prefix ? `${prefix}${displayName}` : displayName
+  return getAgentRuntimeName(configKey)
 }
 
 const REVERSE_DISPLAY_NAMES: Record<string, string> = Object.fromEntries(
