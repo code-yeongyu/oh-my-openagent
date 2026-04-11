@@ -222,10 +222,10 @@ describe("createEventHandler - model fallback", () => {
     expect(abortCalls).toEqual([sessionID])
     expect(promptCalls).toEqual([sessionID])
     expect(output.message["model"]).toMatchObject({
-      providerID: "opencode-go",
-      modelID: "kimi-k2.5",
+      providerID: "github-copilot",
+      modelID: "claude-opus-4.6",
     })
-    expect(output.message["variant"]).toBeUndefined()
+    expect(output.message["variant"]).toBe("high")
   })
 
   test("does not spam abort/prompt when session.status retry countdown updates", async () => {
@@ -549,20 +549,20 @@ describe("createEventHandler - model fallback", () => {
     //#when - first retry cycle
     const first = await triggerRetryCycle()
 
-    //#then - first fallback entry applied (no-op skip: claude-opus-4-6 matches current model after normalization)
+    //#then - first reachable fallback is the adjacent Copilot Opus split entry
     expect(first.message["model"]).toMatchObject({
-      providerID: "opencode-go",
-      modelID: "kimi-k2.5",
+      providerID: "github-copilot",
+      modelID: "claude-opus-4.6",
     })
-    expect(first.message["variant"]).toBeUndefined()
+    expect(first.message["variant"]).toBe("high")
 
     //#when - second retry cycle
     const second = await triggerRetryCycle()
 
-    //#then - second fallback entry applied (chain advanced past opencode-go/kimi-k2.5)
+    //#then - chain advances past the Copilot split entry
     expect(second.message["model"]).toMatchObject({
-      providerID: "kimi-for-coding",
-      modelID: "k2p5",
+      providerID: "opencode-go",
+      modelID: "kimi-k2.5",
     })
     expect(second.message["variant"]).toBeUndefined()
     expect(abortCalls).toEqual([sessionID, sessionID])

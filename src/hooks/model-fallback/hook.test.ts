@@ -167,10 +167,10 @@ describe("model fallback hook", () => {
 
     //#then - chain should progress to entry[1], not repeat entry[0]
     expect(secondOutput.message["model"]).toEqual({
-      providerID: "opencode-go",
-      modelID: "kimi-k2.5",
+      providerID: "github-copilot",
+      modelID: "claude-opus-4.6",
     })
-    expect(secondOutput.message["variant"]).toBeUndefined()
+    expect(secondOutput.message["variant"]).toBe("high")
   })
 
   test("does not re-arm fallback when one is already pending", () => {
