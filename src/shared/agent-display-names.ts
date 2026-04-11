@@ -94,18 +94,23 @@ const LEGACY_DISPLAY_NAMES: Record<string, string> = {
   "athena-junior (council)": "athena-junior",
 }
 
-/**
- * Resolve an agent name (display name or config key) to its lowercase config key.
- * "Atlas - Plan Executor" -> "atlas", "Atlas (Plan Executor)" -> "atlas", "atlas" -> "atlas"
- */
-export function getAgentConfigKey(agentName: string): string {
+function resolveKnownAgentConfigKey(agentName: string): string | undefined {
   const lower = stripAgentListSortPrefix(agentName).trim().toLowerCase()
   const reversed = REVERSE_DISPLAY_NAMES[lower]
   if (reversed !== undefined) return reversed
   const legacy = LEGACY_DISPLAY_NAMES[lower]
   if (legacy !== undefined) return legacy
   if (AGENT_DISPLAY_NAMES[lower] !== undefined) return lower
-  return lower
+  return undefined
+}
+
+/**
+ * Resolve an agent name (display name or config key) to its lowercase config key.
+ * "Atlas - Plan Executor" -> "atlas", "Atlas (Plan Executor)" -> "atlas", "atlas" -> "atlas"
+ */
+export function getAgentConfigKey(agentName: string): string {
+  const lower = stripAgentListSortPrefix(agentName).trim().toLowerCase()
+  return resolveKnownAgentConfigKey(agentName) ?? lower
 }
 
 /**
@@ -124,17 +129,9 @@ export function normalizeAgentForPrompt(agentName: string | undefined): string |
     return undefined
   }
 
-  const lower = trimmed.toLowerCase()
-  const reversed = REVERSE_DISPLAY_NAMES[lower]
-  if (reversed !== undefined) {
-    return AGENT_DISPLAY_NAMES[reversed] ?? trimmed
-  }
-  const legacy = LEGACY_DISPLAY_NAMES[lower]
-  if (legacy !== undefined) {
-    return AGENT_DISPLAY_NAMES[legacy] ?? trimmed
-  }
-  if (AGENT_DISPLAY_NAMES[lower] !== undefined) {
-    return AGENT_DISPLAY_NAMES[lower]
+  const configKey = resolveKnownAgentConfigKey(trimmed)
+  if (configKey !== undefined) {
+    return AGENT_DISPLAY_NAMES[configKey] ?? trimmed
   }
 
   return trimmed
@@ -150,18 +147,5 @@ export function normalizeAgentForPromptKey(agentName: string | undefined): strin
     return undefined
   }
 
-  const lower = trimmed.toLowerCase()
-  const reversed = REVERSE_DISPLAY_NAMES[lower]
-  if (reversed !== undefined) {
-    return reversed
-  }
-  const legacy = LEGACY_DISPLAY_NAMES[lower]
-  if (legacy !== undefined) {
-    return legacy
-  }
-  if (AGENT_DISPLAY_NAMES[lower] !== undefined) {
-    return lower
-  }
-
-  return trimmed
+  return resolveKnownAgentConfigKey(trimmed) ?? trimmed
 }

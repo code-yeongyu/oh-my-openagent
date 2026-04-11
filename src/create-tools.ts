@@ -9,7 +9,7 @@ import { createAvailableCategories } from "./plugin/available-categories"
 import { createSkillContext } from "./plugin/skill-context"
 import { createToolRegistry } from "./plugin/tool-registry"
 
-export type CreateToolsResult = {
+type CreateToolsResult = {
   filteredTools: ToolsRecord
   mergedSkills: LoadedSkill[]
   availableSkills: AvailableSkill[]
