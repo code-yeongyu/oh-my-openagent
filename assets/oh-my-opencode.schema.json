@@ -5301,6 +5301,9 @@
         "auto_resume": {
           "type": "boolean"
         },
+        "beads_runtime": {
+          "type": "boolean"
+        },
         "preemptive_compaction": {
           "type": "boolean"
         },

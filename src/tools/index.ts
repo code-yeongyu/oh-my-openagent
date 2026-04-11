@@ -35,6 +35,7 @@ import type { BackgroundManager } from "../features/background-agent"
 type OpencodeClient = PluginInput["client"]
 
 export { createCallOmoAgent } from "./call-omo-agent"
+export { createBeadsRuntimeTools } from "./beads-runtime"
 export { createLookAt } from "./look-at"
 export { createDelegateTask } from "./delegate-task"
 export {
