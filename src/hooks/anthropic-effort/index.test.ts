@@ -147,6 +147,30 @@ describe("createAnthropicEffortHook", () => {
 
       expect(output.options.effort).toBeUndefined()
     })
+
+    describe("#given haiku models (effort unsupported)", () => {
+      const haikuModels = [
+        "claude-haiku-4-5",
+        "claude-haiku-4.6",
+        "claude-haiku",
+        "claude-haiku-20240307",
+      ]
+
+      for (const modelID of haikuModels) {
+        it(`skips effort injection for ${modelID}`, async () => {
+          // given
+          const hook = createAnthropicEffortHook()
+          const { input, output } = createMockParams({ modelID })
+
+          // when
+          await hook["chat.params"](input, output)
+
+          // then
+          expect(output.options.effort).toBeUndefined()
+          expect(input.message.variant).toBe("max")
+        })
+      }
+    })
   })
 
   describe("existing options", () => {
