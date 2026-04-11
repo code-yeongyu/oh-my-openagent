@@ -1,5 +1,5 @@
 import { spawn } from "bun"
-import { validateGatewayUrl } from "./config"
+import { validateGatewayUrl } from "./gateway-url-validation"
 import type { OpenClawGateway, WakeResult } from "./types"
 
 const DEFAULT_HTTP_TIMEOUT_MS = 10_000
