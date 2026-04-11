@@ -51,4 +51,16 @@ describe("resolveConfiguredFallbackEntry", () => {
 
     expect(result).toBeUndefined()
   })
+
+  test("transforms cold-cache string fallback entries for connected provider compatibility", () => {
+    const result = resolveConfiguredFallbackEntry("github-copilot/claude-sonnet-4-5", {
+      availableModels: new Set<string>(),
+      connectedProviders: ["github-copilot"],
+    })
+
+    expect(result).toEqual({
+      model: "github-copilot/claude-sonnet-4.5",
+      original: "github-copilot/claude-sonnet-4-5",
+    })
+  })
 })

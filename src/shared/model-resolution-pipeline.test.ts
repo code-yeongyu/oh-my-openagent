@@ -54,7 +54,7 @@ describe("resolveModelPipeline", () => {
     })
   })
 
-  test("keeps explicit fallback_models stable on cold cache with connected providers", () => {
+  test("transforms explicit fallback_models on cold cache when a compatible provider is connected", () => {
     // given
     const readConnectedProvidersSpy = spyOn(
       connectedProvidersCache,
@@ -74,7 +74,7 @@ describe("resolveModelPipeline", () => {
 
     // then
     expect(result).toEqual({
-      model: "openai/gpt-5",
+      model: "openai/gpt-5.4",
       provenance: "provider-fallback",
       attempted: ["openai/gpt-5"],
     })

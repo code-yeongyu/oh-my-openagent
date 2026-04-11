@@ -3,6 +3,7 @@ import { normalizeModel } from "./model-normalization"
 import { resolveExplicitModel } from "./explicit-model-resolution"
 import { parseModelString, parseVariantFromModelID } from "./model-string-parser"
 import { fuzzyMatchModel } from "./model-availability"
+import { transformModelForProvider } from "./provider-model-id-transform"
 
 export function resolveExplicitFallbackModel(
   fallbackModel: string,
@@ -99,6 +100,16 @@ export function resolveConfiguredFallbackEntry(
       && !parsedFallback.providerHint.some((provider) => connectedProviders.includes(provider))
     ) {
       return undefined
+    }
+
+    if (parsedFallback.providerHint?.[0]) {
+      const provider = parsedFallback.providerHint[0]
+      const baseModelID = parsedFallback.baseModel.split("/").slice(1).join("/")
+      const transformedModel = `${provider}/${transformModelForProvider(provider, baseModelID)}`
+
+      return includeVariant && parsedFallback.variant
+        ? { model: transformedModel, original: parsedFallback.original, variant: parsedFallback.variant }
+        : { model: transformedModel, original: parsedFallback.original }
     }
 
     return includeVariant && parsedFallback.variant
