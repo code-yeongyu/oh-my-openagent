@@ -33,10 +33,10 @@ const AGENT_LIST_SORT_PREFIXES: Record<string, string> = {
   atlas: "\u200B\u200B\u200B\u200B",
 }
 
-const ZERO_WIDTH_AGENT_CHARACTERS_REGEX = /[\u200B\u200C\u200D\uFEFF]/g
+const INVISIBLE_AGENT_CHARACTERS_REGEX = /[\u200B\u200C\u200D\uFEFF]/g
 
 export function stripInvisibleAgentCharacters(agentName: string): string {
-  return agentName.replace(ZERO_WIDTH_AGENT_CHARACTERS_REGEX, "")
+  return agentName.replace(INVISIBLE_AGENT_CHARACTERS_REGEX, "")
 }
 
 export function stripAgentListSortPrefix(agentName: string): string {
@@ -71,11 +71,7 @@ export function getAgentDisplayName(configKey: string): string {
 }
 
 /**
- * @deprecated Do NOT use for config.agent keys or API-facing names.
- * ZWSP prefixes leak into the /agent API response and break prompt_async consumers.
- * Use getAgentDisplayName() instead. The `order` field injected by
- * reorderAgentsByPriority() handles sort ordering without invisible characters.
- * See: https://github.com/code-yeongyu/oh-my-openagent/issues/3238
+ * Runtime-facing agent name used for OpenCode list ordering.
  */
 export function getAgentListDisplayName(configKey: string): string {
   return getAgentRuntimeName(configKey)
