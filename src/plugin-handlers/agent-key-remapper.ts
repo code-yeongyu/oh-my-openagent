@@ -1,4 +1,4 @@
-import { getAgentDisplayName, getAgentRuntimeName } from "../shared/agent-display-names"
+import { getAgentListDisplayName, getAgentRuntimeName } from "../shared/agent-display-names"
 
 function rewriteAgentNameForListDisplay(
   key: string,
@@ -21,7 +21,7 @@ export function remapAgentKeysToDisplayNames(
   const result: Record<string, unknown> = {}
 
   for (const [key, value] of Object.entries(agents)) {
-    const displayName = getAgentDisplayName(key)
+    const displayName = getAgentListDisplayName(key)
     if (displayName && displayName !== key) {
       result[displayName] = rewriteAgentNameForListDisplay(key, value)
       // Regression guard: do not also assign result[key].
