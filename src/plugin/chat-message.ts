@@ -1,7 +1,7 @@
 import type { OhMyOpenCodeConfig } from "../config"
 import type { PluginContext } from "./types"
 
-import { isModelCacheAvailable } from "../shared"
+import { isModelCacheAvailable, log } from "../shared"
 import { getAgentConfigKey } from "../shared/agent-display-names"
 import { getSessionModel, setSessionModel } from "../shared/session-model-state"
 import { getMainSessionID, setSessionAgent, subagentSessions } from "../features/claude-code-session-state"
@@ -125,6 +125,20 @@ function parseRawLoopSlashCommand(promptText: string): RawLoopCommand | null {
   return null
 }
 
+function clearStoppedContinuationBeforeWorkStart(
+  hooks: CreatedHooks,
+  sessionID: string,
+  command: "start-work" | "ralph-loop" | "ulw-loop"
+): void {
+  if (hooks.stopContinuationGuard?.isStopped(sessionID)) {
+    hooks.stopContinuationGuard.clear(sessionID)
+    log("[stop-continuation] Stop state cleared by chat.message work-starting command", {
+      sessionID,
+      command,
+    })
+  }
+}
+
 export function createChatMessageHandler(args: {
   ctx: PluginContext
   pluginConfig: OhMyOpenCodeConfig
@@ -207,6 +221,7 @@ export function createChatMessageHandler(args: {
     await hooks.noSisyphusGpt?.["chat.message"]?.(input, output)
     await hooks.noHephaestusNonGpt?.["chat.message"]?.(input, output)
     if (hooks.startWork && isStartWorkHookOutput(output)) {
+      clearStoppedContinuationBeforeWorkStart(hooks, input.sessionID, "start-work")
       await hooks.startWork["chat.message"]?.(input, output)
     }
 
@@ -252,7 +267,9 @@ export function createChatMessageHandler(args: {
         const rawTask = taskMatch?.[1]?.trim() || rawLoopCommand?.args || ""
         const parsedArguments = parseRalphLoopArguments(rawTask)
         const ultrawork = isUlwLoopTemplate || rawLoopCommand?.command === "ulw-loop"
+        const command = ultrawork ? "ulw-loop" : "ralph-loop"
 
+        clearStoppedContinuationBeforeWorkStart(hooks, input.sessionID, command)
         hooks.ralphLoop.startLoop(input.sessionID, parsedArguments.prompt, {
           ultrawork,
           maxIterations: parsedArguments.maxIterations,
