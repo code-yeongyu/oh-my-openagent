@@ -53,10 +53,12 @@ export async function run(options: RunOptions): Promise<number> {
 
   const posthog = createCliPostHog()
   const distinctId = getPostHogDistinctId()
+  posthog.trackActive(distinctId, "run_started")
   posthog.capture({
     distinctId,
     event: "run_started",
     properties: {
+      command: "run",
       agent: resolvedAgent,
       has_model: !!options.model,
       has_session_id: !!options.sessionId,
@@ -159,6 +161,7 @@ export async function run(options: RunOptions): Promise<number> {
           distinctId,
           event: "run_completed",
           properties: {
+            command: "run",
             agent: resolvedAgent,
             duration_ms: durationMs,
             message_count: eventState.messageCount,
@@ -169,6 +172,7 @@ export async function run(options: RunOptions): Promise<number> {
           distinctId,
           event: "run_failed",
           properties: {
+            command: "run",
             agent: resolvedAgent,
             exit_code: exitCode,
             duration_ms: durationMs,
@@ -195,6 +199,7 @@ export async function run(options: RunOptions): Promise<number> {
       distinctId,
       event: "run_failed",
       properties: {
+        command: "run",
         agent: resolvedAgent,
         error: serializeError(err),
         duration_ms: Date.now() - startTime,
