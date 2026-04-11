@@ -41,10 +41,11 @@ function parseCanonicalModel(model: string): { providerID: string; modelID: stri
   if (!parsed?.providerID || !parsed.modelID) return undefined
 
   const canonicalModelID = canonicalizeModelID(parsed.modelID)
+  const variant = parsed.variant?.toLowerCase()
 
   return {
     providerID: canonicalizeProviderFamily(parsed.providerID, parsed.modelID),
-    modelID: canonicalModelID,
+    modelID: variant ? `${canonicalModelID}::${variant}` : canonicalModelID,
   }
 }
 
