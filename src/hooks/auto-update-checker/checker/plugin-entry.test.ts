@@ -17,10 +17,18 @@ function runFindPluginEntry(
   directory: string,
   envOverrides: Record<string, string | undefined> = {},
 ): { status: number | null; stdout: string; stderr: string } {
+  const isolatedConfigDir = path.join(directory, ".opencode-user")
   const command = [
-    `import { findPluginEntry } from ${JSON.stringify("./src/hooks/auto-update-checker/checker/plugin-entry")};`,
+    "(async () => {",
+    `process.env.OPENCODE_CONFIG_DIR = ${JSON.stringify(isolatedConfigDir)};`,
+    `Object.assign(process.env, ${JSON.stringify(envOverrides)});`,
+    `const { findPluginEntry } = await import(${JSON.stringify("./src/hooks/auto-update-checker/checker/plugin-entry")});`,
     `const result = findPluginEntry(${JSON.stringify(directory)});`,
     "console.log(JSON.stringify(result));",
+    "})().catch((error) => {",
+    "console.error(error);",
+    "process.exit(1);",
+    "});",
   ].join("")
 
   const execution = spawnSync(process.execPath, ["-e", command], {
