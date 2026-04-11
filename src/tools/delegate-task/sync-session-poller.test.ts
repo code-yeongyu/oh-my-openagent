@@ -1,5 +1,5 @@
+import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 declare const require: (name: string) => any
-const { describe, test, expect, beforeEach, afterEach } = require("bun:test")
 import { __setTimingConfig, __resetTimingConfig } from "./timing"
 
 function createMockCtx(aborted = false) {
@@ -33,7 +33,6 @@ describe("pollSyncSession", () => {
       //         and the assistant id > user id (native opencode condition)
       const { pollSyncSession } = require("./sync-session-poller")
 
-      let pollCount = 0
       const mockClient = {
         session: {
           messages: async () => ({
@@ -272,6 +271,55 @@ describe("pollSyncSession", () => {
   })
 
   describe("abort handling", () => {
+    test("#given session completed AND abort fires #then returns completion result not abort", async () => {
+      //#given
+      const { pollSyncSession } = require("./sync-session-poller")
+      const controller = new AbortController()
+      controller.abort()
+
+      let abortCount = 0
+      let messageCallCount = 0
+      const mockClient = {
+        session: {
+          abort: async () => {
+            abortCount++
+          },
+          messages: async () => {
+            messageCallCount++
+            return {
+              data: [
+                { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+                {
+                  info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "stop" },
+                  parts: [{ type: "text", text: "Done" }],
+                },
+              ],
+            }
+          },
+          status: async () => ({ data: {} }),
+        },
+      }
+
+      //#when
+      const result = await pollSyncSession({
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "test-agent",
+        abort: controller.signal,
+      }, mockClient, {
+        sessionID: "ses_abort_complete",
+        agentToUse: "test-agent",
+        toastManager: { removeTask: () => {} },
+        taskId: "task_123",
+        anchorMessageCount: 1,
+      })
+
+      //#then
+      expect(result).toBeNull()
+      expect(messageCallCount).toBe(1)
+      expect(abortCount).toBe(0)
+    })
+
     test("returns abort message when signal is aborted", async () => {
       //#given
       const { pollSyncSession } = require("./sync-session-poller")
@@ -347,7 +395,7 @@ describe("pollSyncSession", () => {
        //#given
        const { pollSyncSession } = require("./sync-session-poller")
 
-       let statusCallCount = 0
+        let statusCallCount = 0
        let messageCallCount = 0
        const mockClient = {
          session: {
