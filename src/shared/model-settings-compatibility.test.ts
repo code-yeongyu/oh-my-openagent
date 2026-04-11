@@ -58,6 +58,42 @@ describe("resolveCompatibleModelSettings", () => {
     ])
   })
 
+  test("downgrades github-copilot claude opus max variant to high when metadata variants are limited", () => {
+    const result = resolveCompatibleModelSettings({
+      providerID: "github-copilot",
+      modelID: "claude-opus-4-6",
+      desired: { variant: "max" },
+      capabilities: { variants: ["low", "medium", "high"] },
+    })
+
+    expect(result).toEqual({
+      variant: "high",
+      reasoningEffort: undefined,
+      changes: [
+        {
+          field: "variant",
+          from: "max",
+          to: "high",
+          reason: "unsupported-by-model-metadata",
+        },
+      ],
+    })
+  })
+
+  test("keeps github-copilot gemini unchanged when desired settings omit variant", () => {
+    const result = resolveCompatibleModelSettings({
+      providerID: "github-copilot",
+      modelID: "gemini-3.1-pro",
+      desired: {},
+    })
+
+    expect(result).toEqual({
+      variant: undefined,
+      reasoningEffort: undefined,
+      changes: [],
+    })
+  })
+
   test("downgrades unsupported Claude Sonnet max variant to high when metadata is absent", () => {
     const result = resolveCompatibleModelSettings({
       providerID: "anthropic",

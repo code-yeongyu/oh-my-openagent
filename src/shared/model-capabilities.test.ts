@@ -346,6 +346,53 @@ describe("getModelCapabilities", () => {
     })
   })
 
+  describe("Copilot runtime metadata edge cases", () => {
+    test("resolves claude-opus-4-6 object-form variants to exactly ['low','medium','high'] via Copilot provider", () => {
+      findProviderModelMetadataSpy = spyOn(connectedProvidersCache, "findProviderModelMetadata").mockReturnValue(undefined)
+      const result = getModelCapabilities({
+        providerID: "github-copilot",
+        modelID: "claude-opus-4-6",
+        runtimeModel: {
+          variants: {
+            low: {},
+            medium: {},
+            high: {},
+          },
+        },
+        bundledSnapshot,
+      })
+
+      expect(result.variants).toEqual(["low", "medium", "high"])
+      expect(result.diagnostics).toMatchObject({
+        variants: { source: "runtime" },
+      })
+    })
+
+    test("does not treat empty variants object as runtime variants for gemini-3.1-pro via Copilot provider", () => {
+      findProviderModelMetadataSpy = spyOn(connectedProvidersCache, "findProviderModelMetadata").mockReturnValue(undefined)
+      const result = getModelCapabilities({
+        providerID: "github-copilot",
+        modelID: "gemini-3.1-pro",
+        runtimeModel: {
+          variants: {},
+        },
+        bundledSnapshot,
+      })
+
+      // An empty variant object must not produce numeric keys or phantom runtime variants.
+      // The runtime reader returns undefined for {}, so no runtime-sourced variants exist.
+      expect(result.diagnostics.variants.source).not.toBe("runtime")
+      // Variants may still be populated by heuristic family rules, but never from the empty object.
+      if (result.variants !== undefined) {
+        expect(result.variants).toEqual(expect.arrayContaining([expect.any(String)]))
+        for (const v of result.variants) {
+          expect(typeof v).toBe("string")
+          expect(Number.isInteger(Number(v))).toBe(false)
+        }
+      }
+    })
+  })
+
   test("keeps every built-in OmO requirement model snapshot-backed", () => {
     const bundledSnapshot = getBundledModelCapabilitiesSnapshot()
     const requirementModels = new Set<string>()
