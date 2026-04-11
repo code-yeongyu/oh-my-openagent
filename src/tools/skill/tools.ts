@@ -104,7 +104,7 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
       return cachedDescription ?? TOOL_DESCRIPTION_PREFIX
     },
     args: {
-      name: tool.schema.string().describe("The skill or command name (e.g., 'code-review' or 'publish'). Use without leading slash for commands."),
+      name: tool.schema.string().describe("The skill or command name (e.g., 'review-work' or 'publish'). Use without leading slash for commands."),
       user_message: tool.schema
         .string()
         .optional()
@@ -119,6 +119,15 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
       const matchedSkill = matchSkillByName(skills, requestedName)
 
       if (matchedSkill) {
+        await ctx?.ask({
+          permission: "skill",
+          patterns: [matchedSkill.name],
+          always: [matchedSkill.name],
+          metadata: {
+            skill: matchedSkill.name,
+          },
+        })
+
         if (matchedSkill.definition.agent && (!ctx?.agent || matchedSkill.definition.agent !== ctx.agent)) {
           throw new Error(`Skill "${matchedSkill.name}" is restricted to agent "${matchedSkill.definition.agent}"`)
         }

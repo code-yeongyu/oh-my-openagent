@@ -6,10 +6,7 @@ import {
   findPrometheusPlans,
   getPlanName,
   getPlanProgress,
-  getTaskSessionState,
   readBoulderState,
-  readCurrentTopLevelTask,
-  upsertTaskSessionState,
   writeBoulderState,
 } from "../../features/boulder-state"
 import { log } from "../../shared/logger"
@@ -97,8 +94,8 @@ Ask the user which plan to work on.`
   return `
 ## Plan Not Found
 
-Could not find a plan matching "${explicitPlanName}".
-No incomplete plans available. Create a new plan with: /plan "your task"`
+ Could not find a plan matching "${explicitPlanName}".
+ No incomplete plans available. Create a new plan using the Prometheus agent.`
 }
 
 function buildExplicitPlanContext(params: {
@@ -125,8 +122,8 @@ function buildExplicitPlanContext(params: {
     return `
 ## Plan Already Complete
 
-The requested plan "${getPlanName(matchedPlan)}" has been completed.
-All ${progress.total} tasks are done. Create a new plan with: /plan "your task"`
+ The requested plan "${getPlanName(matchedPlan)}" has been completed.
+ All ${progress.total} tasks are done. Create a new plan using the Prometheus agent.`
   }
 
   if (existingState) {
@@ -224,8 +221,8 @@ function buildPlanDiscoveryContext(params: {
     return contextInfo + `
 ## No Plans Found
 
-No Prometheus plan files found at .sisyphus/plans/
-Use Prometheus to create a work plan first: /plan "your task"`
+ No Prometheus plan files found in the .sisyphus plans directory.
+ Use the Prometheus agent to create a work plan first.`
   }
 
   if (incompletePlans.length === 0) {
@@ -233,7 +230,7 @@ Use Prometheus to create a work plan first: /plan "your task"`
 
 ## All Plans Complete
 
-All ${plans.length} plan(s) are complete. Create a new plan with: /plan "your task"`
+ All ${plans.length} plan(s) are complete. Create a new plan using the Prometheus agent.`
   }
 
   if (incompletePlans.length === 1) {

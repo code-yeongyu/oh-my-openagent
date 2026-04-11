@@ -6,6 +6,7 @@ import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { randomUUID } from "node:crypto"
 import { createStartWorkHook } from "./index"
+import { buildStartWorkContextInfo } from "./context-info-builder"
 import { createAtlasHook } from "../atlas"
 import {
   writeBoulderState,
@@ -67,6 +68,27 @@ You are starting a Sisyphus work session.
   })
 
   describe("chat.message handler", () => {
+    test("should not include /plan literal in missing-plan guidance", () => {
+      // given
+      const contextInfo = buildStartWorkContextInfo({
+        ctx: createMockPluginInput(),
+        explicitPlanName: null,
+        existingState: null,
+        sessionId: "session-123",
+        timestamp: "2026-04-12T00:00:00.000Z",
+        activeAgent: "sisyphus",
+        worktreePath: undefined,
+        worktreeBlock: "",
+      })
+
+      // when
+      const containsLegacyPlanCommand = contextInfo.includes("/plan")
+
+      // then
+      expect(containsLegacyPlanCommand).toBe(false)
+      expect(contextInfo).toContain("Prometheus")
+    })
+
     test("should ignore non-start-work commands", async () => {
       // given - hook and non-start-work message
       const hook = createStartWorkHook(createMockPluginInput())
