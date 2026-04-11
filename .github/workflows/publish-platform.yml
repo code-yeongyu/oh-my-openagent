@@ -213,13 +213,13 @@ jobs:
             echo "Built binary:"
             ls -lh "$OUTPUT"
 
-      - name: Ad-hoc codesign darwin binary
+      - name: Verify darwin binary signature
         if: steps.check.outputs.skip != 'true' && startsWith(matrix.platform, 'darwin-')
         run: |
           BINARY="packages/${{ matrix.platform }}/bin/oh-my-opencode"
-          codesign --force --sign - --preserve-metadata=entitlements,requirements,flags,runtime "$BINARY"
-          echo "Verifying signature:"
+          echo "Signature info:"
           codesign -dvvv "$BINARY" 2>&1
+          codesign -dvvv "$BINARY" 2>&1 | grep -q "Signature=adhoc" || { echo "ERROR: binary is not ad-hoc signed"; exit 1; }
 
       - name: Compress binary
         if: steps.check.outputs.skip != 'true'
