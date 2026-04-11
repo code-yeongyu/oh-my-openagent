@@ -217,11 +217,19 @@ describe("normalizeAgentForPrompt", () => {
   it("removes zero-width characters before returning canonical names", () => {
     expect(normalizeAgentForPrompt("Sisyphus\u200B - Ultraworker")).toBe("Sisyphus - Ultraworker")
   })
+
+  it("converts legacy parenthesized names to canonical display names", () => {
+    expect(normalizeAgentForPrompt("Atlas (Plan Executor)")).toBe("Atlas - Plan Executor")
+  })
 })
 
 describe("normalizeAgentForPromptKey", () => {
   it("converts built-in display names to config keys", () => {
     expect(normalizeAgentForPromptKey("Sisyphus (Ultraworker)")).toBe("sisyphus")
+  })
+
+  it("strips UI ordering prefixes before returning config keys", () => {
+    expect(normalizeAgentForPromptKey(getAgentListDisplayName("atlas"))).toBe("atlas")
   })
 
   it("preserves custom agents", () => {
@@ -259,7 +267,7 @@ describe("AGENT_DISPLAY_NAMES", () => {
     const httpHeaderUnsafe = /[()]/
 
     // when checking each display name
-    for (const [key, displayName] of Object.entries(AGENT_DISPLAY_NAMES)) {
+    for (const [, displayName] of Object.entries(AGENT_DISPLAY_NAMES)) {
       // then none should contain parentheses
       expect(httpHeaderUnsafe.test(displayName)).toBe(false)
     }
