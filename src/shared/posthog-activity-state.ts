@@ -32,6 +32,10 @@ function getUtcHourString(date: Date): string {
   return date.toISOString().slice(0, 13)
 }
 
+function isPostHogActivityState(value: unknown): value is PostHogActivityState {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+}
+
 function readPostHogActivityState(): PostHogActivityState {
   const stateFilePath = getPostHogActivityStateFilePath()
   if (!existsSync(stateFilePath)) {
@@ -40,7 +44,10 @@ function readPostHogActivityState(): PostHogActivityState {
 
   try {
     const content = readFileSync(stateFilePath, "utf-8")
-    const parsed = JSON.parse(content) as PostHogActivityState
+    const parsed: unknown = JSON.parse(content)
+    if (!isPostHogActivityState(parsed)) {
+      return {}
+    }
     return parsed
   } catch (error) {
     log("[posthog-activity-state] Failed to read activity state", {
