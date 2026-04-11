@@ -350,6 +350,34 @@ describe("getModelCapabilities", () => {
     })
   })
 
+	 test("prefers provider-scoped snapshot keys over unscoped aliases when both exist", () => {
+		findProviderModelMetadataSpy = spyOn(connectedProvidersCache, "findProviderModelMetadata").mockReturnValue(undefined)
+		const result = getModelCapabilities({
+			providerID: "minimax",
+			modelID: "minimax-m2",
+			bundledSnapshot: {
+				generatedAt: "2026-03-25T00:00:00.000Z",
+				sourceUrl: "https://models.dev/api.json",
+				models: {
+					"minimax-m2": {
+						id: "minimax-m2",
+						family: "minimax",
+						limit: { context: 500_000, output: 32_000 },
+					},
+					"minimax/minimax-m2": {
+						id: "minimax/minimax-m2",
+						family: "minimax",
+						limit: { context: 250_000, output: 16_000 },
+					},
+				},
+			},
+		})
+
+		expect(result.contextWindowTokens).toBe(250_000)
+		expect(result.maxOutputTokens).toBe(16_000)
+		expect(result.diagnostics.snapshot).toMatchObject({ source: "bundled-snapshot" })
+	 })
+
   test("falls back to heuristic family rules when no snapshot entry exists", () => {
     const result = getModelCapabilities({
       providerID: "openai",

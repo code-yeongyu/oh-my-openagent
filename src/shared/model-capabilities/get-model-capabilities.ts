@@ -28,10 +28,22 @@ const MODEL_ID_OVERRIDES: Record<string, ModelCapabilityOverride> = {}
 
 export function resolveSnapshotModelKey(
 	snapshot: ModelCapabilitiesSnapshot,
+	providerID: string,
 	modelID: string,
 ): string | undefined {
+	const providerScopedModelID = `${providerID}/${modelID}`
+	if (snapshot.models[providerScopedModelID]) {
+		return providerScopedModelID
+	}
+
 	if (snapshot.models[modelID]) {
 		return modelID
+	}
+
+	const providerScopedCandidates = Object.keys(snapshot.models).filter((key) => key.startsWith(`${providerID}/`))
+	const providerScopedAliasMatch = resolveStableFamilyAlias(modelID, providerScopedCandidates)
+	if (providerScopedAliasMatch) {
+		return providerScopedAliasMatch
 	}
 
 	const stableFamilyAliasMatch = resolveStableFamilyAlias(modelID, Object.keys(snapshot.models))
@@ -55,9 +67,9 @@ export function getModelCapabilities(input: GetModelCapabilitiesInput): ModelCap
 	const runtimeSnapshot = input.runtimeSnapshot
 	const bundledSnapshot = input.bundledSnapshot ?? getBundledModelCapabilitiesSnapshot()
 	const runtimeSnapshotModelKey = runtimeSnapshot
-		? resolveSnapshotModelKey(runtimeSnapshot, canonicalization.canonicalModelID)
+		? resolveSnapshotModelKey(runtimeSnapshot, input.providerID, canonicalization.canonicalModelID)
 		: undefined
-	const bundledSnapshotModelKey = resolveSnapshotModelKey(bundledSnapshot, canonicalization.canonicalModelID)
+	const bundledSnapshotModelKey = resolveSnapshotModelKey(bundledSnapshot, input.providerID, canonicalization.canonicalModelID)
 	const snapshotEntry =
 		(runtimeSnapshotModelKey ? runtimeSnapshot?.models?.[runtimeSnapshotModelKey] : undefined)
 		?? (bundledSnapshotModelKey ? bundledSnapshot.models[bundledSnapshotModelKey] : undefined)
