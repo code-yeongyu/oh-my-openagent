@@ -69,6 +69,11 @@ export function resolveModelForDelegateTask(input: {
     if (input.availableModels.size === 0) {
       const categoryProvider = categoryDefault.includes("/") ? categoryDefault.split("/")[0] : undefined
       if (!connectedProviders || !categoryProvider || connectedProviders.includes(categoryProvider)) {
+        if (categoryProvider) {
+          const baseModelID = categoryDefault.split("/").slice(1).join("/")
+          return { model: `${categoryProvider}/${transformModelForProvider(categoryProvider, baseModelID)}` }
+        }
+
         return { model: categoryDefault }
       }
 

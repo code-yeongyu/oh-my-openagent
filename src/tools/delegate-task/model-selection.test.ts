@@ -77,7 +77,7 @@ describe("resolveModelForDelegateTask", () => {
 		})
 
 		describe("#when availableModels is empty (cache exists but empty)", () => {
-			test("#then keeps the category default when its provider is connected", () => {
+			test("#then transforms the category default to a provider-compatible id when its provider is connected", () => {
 				const readConnectedProvidersSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["anthropic"])
 
 				const result = resolveModelForDelegateTask({
