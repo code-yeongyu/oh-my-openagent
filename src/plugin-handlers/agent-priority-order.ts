@@ -1,4 +1,4 @@
-import { getAgentDisplayName } from "../shared/agent-display-names"
+import { getAgentListDisplayName } from "../shared/agent-display-names"
 
 /**
  * CRITICAL: This is the ONLY source of truth for core agent ordering.
@@ -25,7 +25,7 @@ const CORE_AGENT_ORDER: ReadonlyArray<{
   order: number
 }> = CANONICAL_CORE_AGENT_ORDER.map((configKey, index) => ({
   configKey,
-  displayName: getAgentDisplayName(configKey),
+  displayName: getAgentListDisplayName(configKey),
   order: index + 1,
 }))
 
