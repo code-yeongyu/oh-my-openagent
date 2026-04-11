@@ -17,6 +17,39 @@ import { clearSessionModel, getSessionModel, setSessionModel } from "../shared/s
 type ChatMessagePart = { type: string; text?: string; [key: string]: unknown }
 type ChatMessageHandlerOutput = { message: Record<string, unknown>; parts: ChatMessagePart[] }
 
+function createStartWorkTemplateOutput(): ChatMessageHandlerOutput {
+  return {
+    message: {},
+    parts: [
+      {
+        type: "text",
+        text: `<session-context>context</session-context>\nYou are starting a Sisyphus work session.`,
+      },
+    ],
+  }
+}
+
+function createStopContinuationGuardMock(isStopped: boolean) {
+  const clearCalls: string[] = []
+  const isStoppedCalls: string[] = []
+
+  return {
+    guard: {
+      "chat.message": async () => {},
+      stop: () => {},
+      isStopped: (sessionID: string) => {
+        isStoppedCalls.push(sessionID)
+        return isStopped
+      },
+      clear: (sessionID: string) => {
+        clearCalls.push(sessionID)
+      },
+    },
+    clearCalls,
+    isStoppedCalls,
+  }
+}
+
 function createMockHandlerArgs(overrides?: {
   pluginConfig?: Record<string, unknown>
   shouldOverride?: boolean
@@ -211,6 +244,169 @@ describe("createChatMessageHandler - /start-work integration", () => {
     expect(output.parts[0].text).toContain("Auto-Selected Plan")
     expect(output.parts[0].text).toContain("my-feature-plan")
     expect(readBoulderState(testDir)?.plan_name).toBe("my-feature-plan")
+  })
+})
+
+describe("createChatMessageHandler - stop continuation clearing for raw slash fallback", () => {
+  test("clears stop state before raw /start-work resumes work through chat.message", async () => {
+    // given
+    const stopContinuationGuard = createStopContinuationGuardMock(true)
+    const startWorkCalls: string[] = []
+    const args = createMockHandlerArgs()
+    args.hooks.stopContinuationGuard = stopContinuationGuard.guard
+    args.hooks.startWork = {
+      "chat.message": async (input: { sessionID: string }) => {
+        startWorkCalls.push(input.sessionID)
+      },
+    }
+    const handler = createChatMessageHandler(args)
+    const output = createStartWorkTemplateOutput()
+
+    // when
+    await handler(createMockInput("sisyphus"), output)
+
+    // then
+    expect(startWorkCalls).toEqual(["test-session"])
+    expect(stopContinuationGuard.isStoppedCalls).toEqual(["test-session"])
+    expect(stopContinuationGuard.clearCalls).toEqual(["test-session"])
+  })
+
+  test("clears stop state before raw /ulw-loop resumes work through chat.message", async () => {
+    // given
+    const stopContinuationGuard = createStopContinuationGuardMock(true)
+    const startLoopCalls: Array<{ sessionID: string; prompt: string; ultrawork: boolean }> = []
+    const args = createMockHandlerArgs()
+    args.hooks.stopContinuationGuard = stopContinuationGuard.guard
+    args.hooks.ralphLoop = {
+      startLoop: (sessionID: string, prompt: string, options?: { ultrawork?: boolean }) => {
+        startLoopCalls.push({ sessionID, prompt, ultrawork: options?.ultrawork === true })
+        return true
+      },
+      cancelLoop: () => true,
+    }
+    const handler = createChatMessageHandler(args)
+    const output: ChatMessageHandlerOutput = {
+      message: {},
+      parts: [{ type: "text", text: "/ulw-loop ship it" }],
+    }
+
+    // when
+    await handler(createMockInput("sisyphus"), output)
+
+    // then
+    expect(startLoopCalls).toEqual([
+      { sessionID: "test-session", prompt: "ship it", ultrawork: true },
+    ])
+    expect(stopContinuationGuard.isStoppedCalls).toEqual(["test-session"])
+    expect(stopContinuationGuard.clearCalls).toEqual(["test-session"])
+  })
+
+  test("clears stop state before raw /ralph-loop resumes work through chat.message", async () => {
+    // given
+    const stopContinuationGuard = createStopContinuationGuardMock(true)
+    const startLoopCalls: Array<{ sessionID: string; prompt: string; ultrawork: boolean }> = []
+    const args = createMockHandlerArgs()
+    args.hooks.stopContinuationGuard = stopContinuationGuard.guard
+    args.hooks.ralphLoop = {
+      startLoop: (sessionID: string, prompt: string, options?: { ultrawork?: boolean }) => {
+        startLoopCalls.push({ sessionID, prompt, ultrawork: options?.ultrawork === true })
+        return true
+      },
+      cancelLoop: () => true,
+    }
+    const handler = createChatMessageHandler(args)
+    const output: ChatMessageHandlerOutput = {
+      message: {},
+      parts: [{ type: "text", text: "/ralph-loop keep going" }],
+    }
+
+    // when
+    await handler(createMockInput("sisyphus"), output)
+
+    // then
+    expect(startLoopCalls).toEqual([
+      { sessionID: "test-session", prompt: "keep going", ultrawork: false },
+    ])
+    expect(stopContinuationGuard.isStoppedCalls).toEqual(["test-session"])
+    expect(stopContinuationGuard.clearCalls).toEqual(["test-session"])
+  })
+
+  test("does not clear stop state for ordinary stopped chat messages", async () => {
+    // given
+    const stopContinuationGuard = createStopContinuationGuardMock(true)
+    const startWorkCalls: string[] = []
+    const args = createMockHandlerArgs()
+    args.hooks.stopContinuationGuard = stopContinuationGuard.guard
+    args.hooks.startWork = {
+      "chat.message": async (input: { sessionID: string }) => {
+        startWorkCalls.push(input.sessionID)
+      },
+    }
+    const handler = createChatMessageHandler(args)
+
+    // when
+    await handler(createMockInput("sisyphus"), {
+      message: {},
+      parts: [{ type: "text", text: "continue helping with this bug" }],
+    })
+
+    // then
+    expect(startWorkCalls).toEqual(["test-session"])
+    expect(stopContinuationGuard.isStoppedCalls).toHaveLength(0)
+    expect(stopContinuationGuard.clearCalls).toHaveLength(0)
+  })
+
+  test("does not clear stop state when the session was not stopped", async () => {
+    // given
+    const stopContinuationGuard = createStopContinuationGuardMock(false)
+    const startWorkCalls: string[] = []
+    const startLoopCalls: Array<{ sessionID: string; prompt: string; ultrawork: boolean }> = []
+    const args = createMockHandlerArgs()
+    args.hooks.stopContinuationGuard = stopContinuationGuard.guard
+    args.hooks.startWork = {
+      "chat.message": async (input: { sessionID: string }) => {
+        startWorkCalls.push(input.sessionID)
+      },
+    }
+    args.hooks.ralphLoop = {
+      startLoop: (sessionID: string, prompt: string, options?: { ultrawork?: boolean }) => {
+        startLoopCalls.push({ sessionID, prompt, ultrawork: options?.ultrawork === true })
+        return true
+      },
+      cancelLoop: () => true,
+    }
+    const handler = createChatMessageHandler(args)
+
+    // when
+    await handler(createMockInput("sisyphus"), {
+      message: {},
+      parts: createStartWorkTemplateOutput().parts,
+    })
+    await handler(createMockInput("sisyphus"), {
+      message: {},
+      parts: [{ type: "text", text: "/ulw-loop continue" }],
+    })
+    await handler(createMockInput("sisyphus"), {
+      message: {},
+      parts: [{ type: "text", text: "/ralph-loop continue" }],
+    })
+
+    // then
+    expect(startWorkCalls).toEqual([
+      "test-session",
+      "test-session",
+      "test-session",
+    ])
+    expect(startLoopCalls).toEqual([
+      { sessionID: "test-session", prompt: "continue", ultrawork: true },
+      { sessionID: "test-session", prompt: "continue", ultrawork: false },
+    ])
+    expect(stopContinuationGuard.isStoppedCalls).toEqual([
+      "test-session",
+      "test-session",
+      "test-session",
+    ])
+    expect(stopContinuationGuard.clearCalls).toHaveLength(0)
   })
 })
 
