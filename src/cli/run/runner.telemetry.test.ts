@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, mock } from "bun:test"
 
+async function* createEmptyEventStream(): AsyncIterable<unknown> {}
+
 describe("run telemetry isolation", () => {
   afterEach(() => {
     mock.restore()
@@ -13,20 +15,11 @@ describe("run telemetry isolation", () => {
     mock.module("./agent-resolver", () => ({
       resolveRunAgent: mock(() => "Sisyphus - Ultraworker"),
     }))
-    mock.module("./events", () => ({
-      createEventState: mock(() => ({
-        messageCount: 0,
-        lastPartText: "Run completed",
-        agentColorsByName: {},
-      })),
-      processEvents: mock(async () => {}),
-      serializeError: (error: unknown) => (error instanceof Error ? error.message : String(error)),
-    }))
     mock.module("./server-connection", () => ({
       createServerConnection: mock(async () => ({
         client: {
           event: {
-            subscribe: mock(async () => ({ stream: {} })),
+            subscribe: mock(async () => ({ stream: createEmptyEventStream() })),
           },
           session: {
             promptAsync: mock(async () => undefined),

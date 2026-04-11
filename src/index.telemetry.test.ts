@@ -95,7 +95,14 @@ function installModuleMocks(): void {
     startBackgroundCheck: mock(() => {}),
   }))
   mock.module("./tools/lsp/client", () => ({
-    lspManager: {},
+    lspManager: {
+      getClient: mock(async () => ({
+        diagnostics: mock(async () => ({ items: [] })),
+      })),
+      stopAll: mock(async () => {}),
+      releaseClient: mock(() => {}),
+      cleanupTempDirectoryClients: mock(async () => {}),
+    },
   }))
   mock.module("./shared/posthog", () => ({
     createPluginPostHog: mockCreatePluginPostHog,
