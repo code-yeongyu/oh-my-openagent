@@ -149,4 +149,16 @@ describe("resolveSkillPathReferences", () => {
 		//#then
 		expect(result).toBe("Inspect @data/../../../secret/")
 	})
+
+	it("does not resolve npx --package=@scope/pkg as skill path", () => {
+		//#given
+		const content = "npx --package=@scope/pkg"
+		const basePath = "/skills/frontend"
+
+		//#when
+		const result = resolveSkillPathReferences(content, basePath)
+
+		//#then
+		expect(result).toBe("npx --package=@scope/pkg")
+	})
 })
