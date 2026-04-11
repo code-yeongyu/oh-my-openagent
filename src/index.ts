@@ -40,10 +40,13 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const pluginConfig = loadPluginConfig(ctx.directory, ctx)
 
   const posthog = createPluginPostHog()
+  const distinctId = getPostHogDistinctId()
+  posthog.trackActive(distinctId, "plugin_loaded")
   posthog.capture({
-    distinctId: getPostHogDistinctId(),
+    distinctId,
     event: "plugin_loaded",
     properties: {
+      entry_point: "plugin",
       has_openclaw: !!pluginConfig.openclaw,
       tmux_enabled: isTmuxIntegrationEnabled(pluginConfig),
     },
