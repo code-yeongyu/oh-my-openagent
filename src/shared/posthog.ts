@@ -77,6 +77,7 @@ function createPostHogClient(
   const configuredClient = new PostHog(getPostHogApiKey(), {
     ...options,
     host: getPostHogHost(),
+    disableGeoip: false,
   })
   const sharedProperties = getSharedProperties(source)
 
