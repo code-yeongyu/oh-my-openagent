@@ -26,6 +26,7 @@ export type ChatMessageInput = {
 type StartWorkHookOutput = { parts: Array<{ type: string; text?: string }> }
 
 type SessionModelOverride = { providerID: string; modelID: string }
+const START_WORK_TEMPLATE_MARKER = "You are starting a Sisyphus work session."
 
 type RawLoopCommand =
   | { command: "ralph-loop" | "ulw-loop"; args: string }
@@ -125,6 +126,23 @@ function parseRawLoopSlashCommand(promptText: string): RawLoopCommand | null {
   return null
 }
 
+function extractPromptText(parts: ChatMessagePart[]): string {
+  return (
+    parts
+      ?.filter((part) => part.type === "text" && part.text)
+      .map((part) => part.text)
+      .join("\n")
+      .trim() || ""
+  )
+}
+
+function isStartWorkFallbackTemplate(promptText: string): boolean {
+  return (
+    promptText.includes("<session-context>") &&
+    promptText.includes(START_WORK_TEMPLATE_MARKER)
+  )
+}
+
 function clearStoppedContinuationBeforeWorkStart(
   hooks: CreatedHooks,
   sessionID: string,
@@ -221,7 +239,10 @@ export function createChatMessageHandler(args: {
     await hooks.noSisyphusGpt?.["chat.message"]?.(input, output)
     await hooks.noHephaestusNonGpt?.["chat.message"]?.(input, output)
     if (hooks.startWork && isStartWorkHookOutput(output)) {
-      clearStoppedContinuationBeforeWorkStart(hooks, input.sessionID, "start-work")
+      const promptText = extractPromptText(output.parts)
+      if (isStartWorkFallbackTemplate(promptText)) {
+        clearStoppedContinuationBeforeWorkStart(hooks, input.sessionID, "start-work")
+      }
       await hooks.startWork["chat.message"]?.(input, output)
     }
 
@@ -241,12 +262,7 @@ export function createChatMessageHandler(args: {
 
     if (hooks.ralphLoop && output.message[NATIVE_LOOP_TRIGGERED_FLAG] !== true) {
       const parts = output.parts
-      const promptText =
-        parts
-          ?.filter((p) => p.type === "text" && p.text)
-          .map((p) => p.text)
-          .join("\n")
-          .trim() || ""
+      const promptText = extractPromptText(parts)
 
       const isRalphLoopTemplate =
         promptText.includes("You are starting a Ralph Loop") &&

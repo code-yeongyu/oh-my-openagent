@@ -17,6 +17,18 @@ import { clearSessionModel, getSessionModel, setSessionModel } from "../shared/s
 type ChatMessagePart = { type: string; text?: string; [key: string]: unknown }
 type ChatMessageHandlerOutput = { message: Record<string, unknown>; parts: ChatMessagePart[] }
 
+function createStartWorkTemplateOutput(): ChatMessageHandlerOutput {
+  return {
+    message: {},
+    parts: [
+      {
+        type: "text",
+        text: `<session-context>context</session-context>\nYou are starting a Sisyphus work session.`,
+      },
+    ],
+  }
+}
+
 function createStopContinuationGuardMock(isStopped: boolean) {
   const clearCalls: string[] = []
   const isStoppedCalls: string[] = []
@@ -248,10 +260,7 @@ describe("createChatMessageHandler - stop continuation clearing for raw slash fa
       },
     }
     const handler = createChatMessageHandler(args)
-    const output: ChatMessageHandlerOutput = {
-      message: {},
-      parts: [{ type: "text", text: "/start-work" }],
-    }
+    const output = createStartWorkTemplateOutput()
 
     // when
     await handler(createMockInput("sisyphus"), output)
@@ -322,6 +331,31 @@ describe("createChatMessageHandler - stop continuation clearing for raw slash fa
     expect(stopContinuationGuard.clearCalls).toEqual(["test-session"])
   })
 
+  test("does not clear stop state for ordinary stopped chat messages", async () => {
+    // given
+    const stopContinuationGuard = createStopContinuationGuardMock(true)
+    const startWorkCalls: string[] = []
+    const args = createMockHandlerArgs()
+    args.hooks.stopContinuationGuard = stopContinuationGuard.guard
+    args.hooks.startWork = {
+      "chat.message": async (input: { sessionID: string }) => {
+        startWorkCalls.push(input.sessionID)
+      },
+    }
+    const handler = createChatMessageHandler(args)
+
+    // when
+    await handler(createMockInput("sisyphus"), {
+      message: {},
+      parts: [{ type: "text", text: "continue helping with this bug" }],
+    })
+
+    // then
+    expect(startWorkCalls).toEqual(["test-session"])
+    expect(stopContinuationGuard.isStoppedCalls).toHaveLength(0)
+    expect(stopContinuationGuard.clearCalls).toHaveLength(0)
+  })
+
   test("does not clear stop state when the session was not stopped", async () => {
     // given
     const stopContinuationGuard = createStopContinuationGuardMock(false)
@@ -346,7 +380,7 @@ describe("createChatMessageHandler - stop continuation clearing for raw slash fa
     // when
     await handler(createMockInput("sisyphus"), {
       message: {},
-      parts: [{ type: "text", text: "/start-work" }],
+      parts: createStartWorkTemplateOutput().parts,
     })
     await handler(createMockInput("sisyphus"), {
       message: {},
@@ -368,8 +402,6 @@ describe("createChatMessageHandler - stop continuation clearing for raw slash fa
       { sessionID: "test-session", prompt: "continue", ultrawork: false },
     ])
     expect(stopContinuationGuard.isStoppedCalls).toEqual([
-      "test-session",
-      "test-session",
       "test-session",
       "test-session",
       "test-session",
