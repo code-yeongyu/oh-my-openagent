@@ -39,23 +39,10 @@ REMEMBER: Vague requirements lead to failed implementations. Take the time to un
 </system>
 
 <CRITICAL_REQUIREMENT_DEPENDENCY_PARALLEL_EXECUTION_CATEGORY_SKILLS>
-#####################################################################
-#                                                                   #
-#   ██████╗ ███████╗ ██████╗ ██╗   ██╗██╗██████╗ ███████╗██████╗    #
-#   ██╔══██╗██╔════╝██╔═══██╗██║   ██║██║██╔══██╗██╔════╝██╔══██╗   #
-#   ██████╔╝█████╗  ██║   ██║██║   ██║██║██████╔╝█████╗  ██║  ██║   #
-#   ██╔══██╗██╔══╝  ██║▄▄ ██║██║   ██║██║██╔══██╗██╔══╝  ██║  ██║   #
-#   ██��  ██║███████╗╚██████╔╝╚██████╔╝██║██║  ██║███████╗██████╔╝   #
-#   ╚═╝  ╚═╝╚══════╝ ╚══▀▀═╝  ╚═════╝ ╚═╝╚═╝  ╚═╝╚══════╝╚═════╝    #
-#                                                                   #
-#####################################################################
-
 YOU MUST INCLUDE THE FOLLOWING SECTIONS IN YOUR PLAN OUTPUT.
 THIS IS NON-NEGOTIABLE. FAILURE TO INCLUDE THESE SECTIONS = INCOMPLETE PLAN.
 
-═══════════════════════════════════════════════════════════════════
-█ SECTION 1: TASK DEPENDENCY GRAPH (MANDATORY)                    █
-═══════════════════════════════════════════════════════════════════
+SECTION 1: TASK DEPENDENCY GRAPH (MANDATORY)
 
 YOU MUST ANALYZE AND DOCUMENT TASK DEPENDENCIES.
 
@@ -82,9 +69,7 @@ WHY THIS MATTERS:
 - Identifies critical path for project timeline
 
 
-═══════════════════════════════════════════════════════════════════
-█ SECTION 2: PARALLEL EXECUTION GRAPH (MANDATORY)                 █
-═══════════════════════════════════════════════════════════════════
+SECTION 2: PARALLEL EXECUTION GRAPH (MANDATORY)
 
 YOU MUST IDENTIFY WHICH TASKS CAN RUN IN PARALLEL.
 
@@ -95,18 +80,18 @@ Example format:
 ## Parallel Execution Graph
 
 Wave 1 (Start immediately):
-├── Task 1: [description] (no dependencies)
-└── Task 5: [description] (no dependencies)
+- Task 1: [description] (no dependencies)
+- Task 5: [description] (no dependencies)
 
 Wave 2 (After Wave 1 completes):
-├── Task 2: [description] (depends: Task 1)
-├── Task 3: [description] (depends: Task 1)
-└── Task 6: [description] (depends: Task 5)
+- Task 2: [description] (depends: Task 1)
+- Task 3: [description] (depends: Task 1)
+- Task 6: [description] (depends: Task 5)
 
 Wave 3 (After Wave 2 completes):
-└── Task 4: [description] (depends: Task 2, Task 3)
+- Task 4: [description] (depends: Task 2, Task 3)
 
-Critical Path: Task 1 → Task 2 → Task 4
+Critical Path: Task 1 -> Task 2 -> Task 4
 Estimated Parallel Speedup: 40% faster than sequential
 \`\`\`
 
@@ -116,9 +101,7 @@ WHY THIS MATTERS:
 - Identifies bottlenecks in the execution plan
 
 
-═══════════════════════════════════════════════════════════════════
-█ SECTION 3: CATEGORY + SKILLS RECOMMENDATIONS (MANDATORY)        █
-═══════════════════════════════════════════════════════════════════
+SECTION 3: CATEGORY + SKILLS RECOMMENDATIONS (MANDATORY)
 
 FOR EVERY TASK, YOU MUST RECOMMEND:
 1. Which CATEGORY to use for delegation
@@ -148,9 +131,7 @@ WHY THIS MATTERS:
 - Wrong category = wrong model = poor results
 
 
-═══════════════════════════════════════════════════════════════════
-█ RESPONSE FORMAT SPECIFICATION (MANDATORY)                       █
-═══════════════════════════════════════════════════════════════════
+RESPONSE FORMAT SPECIFICATION (MANDATORY)
 
 YOUR PLAN OUTPUT MUST FOLLOW THIS EXACT STRUCTURE:
 
@@ -163,7 +144,7 @@ YOUR PLAN OUTPUT MUST FOLLOW THIS EXACT STRUCTURE:
 ## Task Dependency Graph
 [Dependency table - see Section 1]
 
-## Parallel Execution Graph  
+## Parallel Execution Graph
 [Wave structure - see Section 2]
 
 ## Tasks
@@ -173,7 +154,7 @@ YOUR PLAN OUTPUT MUST FOLLOW THIS EXACT STRUCTURE:
 **Delegation Recommendation**:
 - Category: \`[category]\` - [reason]
 - Skills: [\`skill-1\`] - [reason]
-**Skills Evaluation**: [✅ included / ❌ omitted with reasons]
+**Skills Evaluation**: [included / omitted with reasons]
 **Depends On**: [Task IDs or "None"]
 **Acceptance Criteria**: [Verifiable conditions]
 
@@ -187,18 +168,11 @@ YOUR PLAN OUTPUT MUST FOLLOW THIS EXACT STRUCTURE:
 [Final verification steps]
 \`\`\`
 
-#####################################################################
-#                                                                   #
-#   FAILURE TO INCLUDE THESE SECTIONS = PLAN WILL BE REJECTED      #
-#   BY MOMUS REVIEW. DO NOT SKIP. DO NOT ABBREVIATE.               #
-#                                                                   #
-#####################################################################
+FAILURE TO INCLUDE THESE SECTIONS = PLAN WILL BE REJECTED BY MOMUS REVIEW. DO NOT SKIP. DO NOT ABBREVIATE.
 </CRITICAL_REQUIREMENT_DEPENDENCY_PARALLEL_EXECUTION_CATEGORY_SKILLS>
 
 <FINAL_OUTPUT_FOR_CALLER>
-═══════════════════════════════════════════════════════════════════
-█ SECTION 4: ACTIONABLE TODO LIST FOR CALLER (MANDATORY)          █
-═══════════════════════════════════════════════════════════════════
+SECTION 4: ACTIONABLE TODO LIST FOR CALLER (MANDATORY)
 
 YOU MUST END YOUR RESPONSE WITH THIS SECTION.
 
