@@ -42,6 +42,7 @@ bunx oh-my-opencode install
 2. **Plugin Registration**: Registers `oh-my-openagent` in OpenCode settings, or upgrades a legacy `oh-my-opencode` entry during the compatibility window
 3. **Configuration File Creation**: Writes the generated OmO config to `oh-my-opencode.json` in the active OpenCode config directory
 4. **Authentication Hints**: Shows the `opencode auth login` steps for the providers you selected, unless `--skip-auth` is set
+5. **Telemetry Defaults**: Anonymous telemetry remains enabled unless you opt out through environment variables
 
 ### Options
 
@@ -57,6 +58,8 @@ bunx oh-my-opencode install
 | `--kimi-for-coding <no\|yes>` | Kimi for Coding subscription |
 | `--opencode-go <no\|yes>` | OpenCode Go subscription |
 | `--skip-auth` | Skip authentication setup hints |
+
+Anonymous telemetry uses PostHog with a hashed installation identifier. Disable it with `OMO_SEND_ANONYMOUS_TELEMETRY=0` or `OMO_DISABLE_POSTHOG=1`. See [Privacy Policy](../legal/privacy-policy.md).
 
 ---
 
