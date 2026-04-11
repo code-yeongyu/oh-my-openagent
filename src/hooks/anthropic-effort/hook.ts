@@ -1,6 +1,7 @@
 import { log, normalizeModelID } from "../../shared"
 
 const OPUS_PATTERN = /claude-.*opus/i
+const EFFORT_UNSUPPORTED_PATTERN = /claude-.*haiku/i
 const INTERNAL_SKIP_AGENTS = new Set(["title", "summary", "compaction"])
 
 function isClaudeProvider(providerID: string, modelID: string): boolean {
@@ -12,6 +13,11 @@ function isClaudeProvider(providerID: string, modelID: string): boolean {
 function isOpusModel(modelID: string): boolean {
   const normalized = normalizeModelID(modelID)
   return OPUS_PATTERN.test(normalized)
+}
+
+function isEffortUnsupportedModel(modelID: string): boolean {
+  const normalized = normalizeModelID(modelID)
+  return EFFORT_UNSUPPORTED_PATTERN.test(normalized)
 }
 
 function shouldSkipForInternalAgent(agentName: string | undefined): boolean {
@@ -60,6 +66,7 @@ export function createAnthropicEffortHook() {
       if (!isClaudeProvider(model.providerID, model.modelID)) return
       if (shouldSkipForInternalAgent(agent?.name)) return
       if (output.options.effort !== undefined) return
+      if (isEffortUnsupportedModel(model.modelID)) return
 
       const opus = isOpusModel(model.modelID)
       const clamped = clampVariant(message.variant, opus)
