@@ -86,8 +86,8 @@ describe("buildPrometheusAgentConfig", () => {
         expect(result).toBeDefined();
         expect(resolveModelPipelineSpy).toHaveBeenCalledWith(
           expect.objectContaining({
-            intent: expect.objectContaining({
-              uiSelectedModel: currentModel,
+            policy: expect.objectContaining({
+              fallbackChain: expect.any(Array),
             }),
           })
         );
