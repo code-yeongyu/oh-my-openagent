@@ -22,7 +22,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     fallbackChain: [
       {
         providers: ["anthropic", "github-copilot", "opencode"],
-        model: "claude-opus",
+        model: "claude-opus-4-6",
         variant: "max",
       },
       { providers: ["opencode-go"], model: "kimi-k2.5" },
@@ -68,7 +68,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       },
       {
         providers: ["anthropic", "github-copilot", "opencode"],
-        model: "claude-opus",
+        model: "claude-opus-4-6",
         variant: "max",
       },
       { providers: ["opencode-go"], model: "glm-5" },
@@ -103,7 +103,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     fallbackChain: [
       {
         providers: ["anthropic", "github-copilot", "opencode"],
-        model: "claude-opus",
+        model: "claude-opus-4-6",
         variant: "max",
       },
       {
@@ -122,7 +122,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     fallbackChain: [
       {
         providers: ["anthropic", "github-copilot", "opencode"],
-        model: "claude-opus",
+        model: "claude-opus-4-6",
         variant: "max",
       },
       {
@@ -156,7 +156,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   atlas: {
     fallbackChain: [
-      { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-sonnet" },
+      { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-sonnet-4-6" },
       { providers: ["opencode-go"], model: "kimi-k2.5" },
       {
         providers: ["openai", "github-copilot", "opencode"],
@@ -168,7 +168,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   "sisyphus-junior": {
     fallbackChain: [
-      { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-sonnet" },
+      { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-sonnet-4-6" },
       { providers: ["opencode-go"], model: "kimi-k2.5" },
       {
         providers: ["openai", "github-copilot", "opencode"],
@@ -192,7 +192,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["zai-coding-plan", "opencode"], model: "glm-5" },
       {
         providers: ["anthropic", "github-copilot", "opencode"],
-        model: "claude-opus",
+        model: "claude-opus-4-6",
         variant: "max",
       },
       { providers: ["opencode-go"], model: "glm-5" },
@@ -213,7 +213,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       },
       {
         providers: ["anthropic", "github-copilot", "opencode"],
-        model: "claude-opus",
+        model: "claude-opus-4-6",
         variant: "max",
       },
       { providers: ["opencode-go"], model: "glm-5" },
@@ -228,7 +228,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       },
       {
         providers: ["anthropic", "github-copilot", "opencode"],
-        model: "claude-opus",
+        model: "claude-opus-4-6",
         variant: "max",
       },
       {
@@ -276,7 +276,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     fallbackChain: [
       {
         providers: ["anthropic", "github-copilot", "opencode"],
-        model: "claude-sonnet",
+        model: "claude-sonnet-4-6",
       },
       {
         providers: ["openai", "opencode"],
@@ -295,7 +295,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     fallbackChain: [
       {
         providers: ["anthropic", "github-copilot", "opencode"],
-        model: "claude-opus",
+        model: "claude-opus-4-6",
         variant: "max",
       },
       {
@@ -329,7 +329,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["opencode-go"], model: "kimi-k2.5" },
       {
         providers: ["anthropic", "github-copilot", "opencode"],
-        model: "claude-sonnet",
+        model: "claude-sonnet-4-6",
       },
       { providers: ["opencode-go"], model: "minimax-m2.7" },
     ],

@@ -36,7 +36,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
 
     const primary = sisyphus.fallbackChain[0]
     expect(primary.providers).toEqual(["anthropic", "github-copilot", "opencode"])
-    expect(primary.model).toBe("claude-opus")
+    expect(primary.model).toBe("claude-opus-4-6")
     expect(primary.variant).toBe("max")
 
     const second = sisyphus.fallbackChain[1]
@@ -159,7 +159,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(prometheus.fallbackChain.length).toBeGreaterThan(1)
 
     const primary = prometheus.fallbackChain[0]
-    expect(primary.model).toBe("claude-opus")
+    expect(primary.model).toBe("claude-opus-4-6")
     expect(primary.providers).toEqual(["anthropic", "github-copilot", "opencode"])
     expect(primary.variant).toBe("max")
   })
@@ -175,7 +175,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(metis.fallbackChain.length).toBeGreaterThan(1)
 
     const primary = metis.fallbackChain[0]
-    expect(primary.model).toBe("claude-opus")
+    expect(primary.model).toBe("claude-opus-4-6")
     expect(primary.providers).toEqual(["anthropic", "github-copilot", "opencode"])
     expect(primary.variant).toBe("max")
 
@@ -214,7 +214,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(atlas.fallbackChain).toHaveLength(4)
 
     const primary = atlas.fallbackChain[0]
-    expect(primary.model).toBe("claude-sonnet")
+    expect(primary.model).toBe("claude-sonnet-4-6")
     expect(primary.providers[0]).toBe("anthropic")
 
     const secondary = atlas.fallbackChain[1]
@@ -356,7 +356,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(second.model).toBe("glm-5")
 
     const third = visualEngineering.fallbackChain[2]
-    expect(third.model).toBe("claude-opus")
+    expect(third.model).toBe("claude-opus-4-6")
     expect(third.variant).toBe("max")
 
     const fourth = visualEngineering.fallbackChain[3]
@@ -398,7 +398,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(unspecifiedLow.fallbackChain.length).toBeGreaterThan(0)
 
     const primary = unspecifiedLow.fallbackChain[0]
-    expect(primary.model).toBe("claude-sonnet")
+    expect(primary.model).toBe("claude-sonnet-4-6")
     expect(primary.providers[0]).toBe("anthropic")
   })
 
@@ -413,7 +413,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(unspecifiedHigh.fallbackChain.length).toBeGreaterThan(1)
 
     const primary = unspecifiedHigh.fallbackChain[0]
-    expect(primary.model).toBe("claude-opus")
+    expect(primary.model).toBe("claude-opus-4-6")
     expect(primary.variant).toBe("max")
     expect(primary.providers).toEqual(["anthropic", "github-copilot", "opencode"])
 
@@ -458,7 +458,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(second.providers[0]).toBe("opencode-go")
 
     const third = writing.fallbackChain[2]
-    expect(third.model).toBe("claude-sonnet")
+    expect(third.model).toBe("claude-sonnet-4-6")
     expect(third.providers[0]).toBe("anthropic")
 
     const fourth = writing.fallbackChain[3]
