@@ -3,6 +3,13 @@ import { log, normalizeModelID } from "../../shared"
 const OPUS_PATTERN = /claude-.*opus/i
 const INTERNAL_SKIP_AGENTS = new Set(["title", "summary", "compaction"])
 
+/**
+ * Models that do not support the effort parameter.
+ * Haiku is a "small" model used for title generation, summaries, etc.
+ * These models return API errors when effort is passed.
+ */
+const EFFORT_UNSUPPORTED_PATTERN = /claude-.*haiku/i
+
 function isClaudeProvider(providerID: string, modelID: string): boolean {
   if (["anthropic", "google-vertex-anthropic", "opencode"].includes(providerID)) return true
   if (providerID === "github-copilot" && modelID.toLowerCase().includes("claude")) return true
@@ -12,6 +19,15 @@ function isClaudeProvider(providerID: string, modelID: string): boolean {
 function isOpusModel(modelID: string): boolean {
   const normalized = normalizeModelID(modelID)
   return OPUS_PATTERN.test(normalized)
+}
+
+/**
+ * Check if the model does not support effort parameter.
+ * Haiku and other small/lite models don't support extended thinking.
+ */
+function isEffortUnsupportedModel(modelID: string): boolean {
+  const normalized = normalizeModelID(modelID)
+  return EFFORT_UNSUPPORTED_PATTERN.test(normalized)
 }
 
 function shouldSkipForInternalAgent(agentName: string | undefined): boolean {
@@ -59,6 +75,7 @@ export function createAnthropicEffortHook() {
       if (message.variant !== "max") return
       if (!isClaudeProvider(model.providerID, model.modelID)) return
       if (shouldSkipForInternalAgent(agent?.name)) return
+      if (isEffortUnsupportedModel(model.modelID)) return
       if (output.options.effort !== undefined) return
 
       const opus = isOpusModel(model.modelID)

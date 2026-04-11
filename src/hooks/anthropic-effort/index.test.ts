@@ -147,6 +147,32 @@ describe("createAnthropicEffortHook", () => {
 
       expect(output.options.effort).toBeUndefined()
     })
+
+    describe("#given models that do not support effort parameter", () => {
+      const unsupportedModels = [
+        "claude-haiku-4-5",
+        "claude-3-haiku",
+        "claude-3-5-haiku",
+        "claude-haiku-4.5",
+        "anthropic/claude-haiku-4-5",
+      ] as const
+
+      for (const modelID of unsupportedModels) {
+        it(`skips effort injection for ${modelID} (does not support effort)`, async () => {
+          // given - haiku model with variant max
+          const hook = createAnthropicEffortHook()
+          const { input, output } = createMockParams({ modelID })
+
+          // when
+          await hook["chat.params"](input, output)
+
+          // then - effort should NOT be injected
+          expect(output.options.effort).toBeUndefined()
+          // variant should remain unchanged (not mutated)
+          expect(input.message.variant).toBe("max")
+        })
+      }
+    })
   })
 
   describe("existing options", () => {
