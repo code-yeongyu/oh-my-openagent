@@ -15,8 +15,15 @@ import type { FallbackEntry } from "../../shared/model-requirements"
 import { resolveModelForDelegateTask } from "./model-selection"
 import { fuzzyMatchModel } from "../../shared/model-availability"
 import type { CategoryConfig } from "../../config/schema"
+import { loadUserAgents, loadProjectAgents } from "../../features/claude-code-agent-loader"
 
 type AgentMode = "subagent" | "primary" | "all" | undefined
+
+type AgentInfo = {
+  name: string
+  mode?: "subagent" | "primary" | "all"
+  model?: string | { providerID: string; modelID: string }
+}
 
 function applyCategoryParams(
   base: DelegatedModelConfig,
@@ -34,6 +41,44 @@ function applyCategoryParams(
     ...(config.maxTokens !== undefined ? { maxTokens: config.maxTokens } : {}),
     ...(config.thinking !== undefined ? { thinking: config.thinking } : {}),
   }
+}
+
+function mergeWithClaudeCodeAgents(
+  serverAgents: AgentInfo[],
+  directory: string | undefined,
+): AgentInfo[] {
+  const userAgentsRecord = loadUserAgents()
+  const projectAgentsRecord = loadProjectAgents(directory)
+
+  const toAgentInfoList = (record: Record<string, { mode?: string; model?: AgentInfo["model"] }>): AgentInfo[] =>
+    Object.entries(record).map(([name, config]) => ({
+      name,
+      mode: config.mode as AgentInfo["mode"],
+      model: config.model,
+    }))
+
+  const projectAgentsList = toAgentInfoList(projectAgentsRecord)
+  const userAgentsList = toAgentInfoList(userAgentsRecord)
+
+  const mergedAgentMap = new Map<string, AgentInfo>()
+  const addIfAbsent = (agent: AgentInfo): void => {
+    const key = agent.name.toLowerCase()
+    if (!mergedAgentMap.has(key)) {
+      mergedAgentMap.set(key, agent)
+    }
+  }
+
+  for (const agent of serverAgents) {
+    addIfAbsent(agent)
+  }
+  for (const agent of projectAgentsList) {
+    addIfAbsent(agent)
+  }
+  for (const agent of userAgentsList) {
+    addIfAbsent(agent)
+  }
+
+  return Array.from(mergedAgentMap.values())
 }
 
 export async function resolveSubagentExecution(
@@ -78,16 +123,12 @@ Create the work plan directly - that's your job as the planning agent.`,
 
   try {
     const agentsResult = await client.app.agents()
-    type AgentInfo = {
-      name: string
-      mode?: "subagent" | "primary" | "all"
-      model?: string | { providerID: string; modelID: string }
-    }
     const agents = normalizeSDKResponse(agentsResult, [] as AgentInfo[], {
       preferResponseOnMissingData: true,
     })
 
-    const callableAgents = agents.filter((agent) => isTaskCallableAgentMode(agent.mode))
+    const mergedAgents = mergeWithClaudeCodeAgents(agents, executorCtx.directory)
+    const callableAgents = mergedAgents.filter((agent) => isTaskCallableAgentMode(agent.mode))
 
     const resolvedDisplayName = stripAgentListSortPrefix(getAgentDisplayName(agentToUse))
     const normalizedAgentToUse = stripAgentListSortPrefix(agentToUse)
