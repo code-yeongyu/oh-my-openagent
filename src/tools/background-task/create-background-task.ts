@@ -94,7 +94,10 @@ export function createBackgroundTask(
 
         const bgMeta = {
           title: args.description,
-          metadata: { sessionId: sessionId ?? "pending" },
+          metadata: {
+            taskId: task.id,
+            sessionId: sessionId ?? "pending",
+          },
         }
         await ctx.metadata?.(bgMeta)
 

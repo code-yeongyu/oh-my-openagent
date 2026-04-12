@@ -1,8 +1,9 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 
 import type { BackgroundManager } from "../../features/background-agent"
+import { shouldAutoContinueParentSession } from "../../features/background-agent/parent-session-auto-continue"
 import {
-  createInternalAgentTextPart,
+  createHiddenSystemDirectiveTextPart,
   normalizeSDKResponse,
   resolveInheritedPromptTools,
 } from "../../shared"
@@ -24,6 +25,13 @@ import { getMessageDir } from "./message-directory"
 import { getIncompleteCount } from "./todo"
 import type { ResolvedMessageInfo, Todo } from "./types"
 import type { SessionStateStore } from "./session-state"
+
+const EMPTY_CONTINUATION_RECOVERY_PROMPT = `Your previous reply contained no user-visible task progress.
+
+Continue the original task now.
+- Do NOT repeat continuation reminders, internal markers, wrapper tags, or acknowledgement prefixes
+- Do NOT restate the continuation instructions
+- Perform the next tool call or provide substantive visible progress`
 
 function hasWritePermission(tools: Record<string, ToolPermission> | undefined): boolean {
   const editPermission = tools?.edit
@@ -134,7 +142,7 @@ export async function injectContinuation(args: {
 Remaining tasks:
 ${todoList}
 
-System directive: You MUST reply. DO NOT output an empty response. Proceed with your tasks.`
+Continue now with the next pending task.`
 
   const injectionState = sessionStateStore.getExistingState(sessionID)
   if (injectionState) {
@@ -157,10 +165,25 @@ System directive: You MUST reply. DO NOT output an empty response. Proceed with 
         agent: agentName,
         ...(model !== undefined ? { model } : {}),
         ...(inheritedTools ? { tools: inheritedTools } : {}),
-        parts: [createInternalAgentTextPart(prompt)],
+        parts: [createHiddenSystemDirectiveTextPart(prompt)],
       },
       query: { directory: ctx.directory },
     })
+
+    const messagesResp = await ctx.client.session.messages({ path: { id: sessionID } })
+    if (shouldAutoContinueParentSession(messagesResp)) {
+      log(`[${HOOK_NAME}] Continuation reply was service-only, retrying once`, { sessionID })
+      await ctx.client.session.promptAsync({
+        path: { id: sessionID },
+        body: {
+          agent: agentName,
+          ...(model !== undefined ? { model } : {}),
+          ...(inheritedTools ? { tools: inheritedTools } : {}),
+          parts: [createHiddenSystemDirectiveTextPart(EMPTY_CONTINUATION_RECOVERY_PROMPT)],
+        },
+        query: { directory: ctx.directory },
+      })
+    }
 
     log(`[${HOOK_NAME}] Injection successful`, { sessionID })
     if (injectionState) {

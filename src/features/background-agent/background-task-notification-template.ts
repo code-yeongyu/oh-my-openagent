@@ -19,30 +19,23 @@ export function buildBackgroundTaskNotificationText(input: {
       .map((t) => `- \`${t.id}\`: ${t.description}`)
       .join("\n")
 
-    return `---
-[ALL BACKGROUND TASKS COMPLETE]
+    return `Background tasks complete.
 
-**Completed:**
+Completed tasks:
 ${completedTasksText || `- \`${task.id}\`: ${task.description}`}
 
-Use \`background_output(task_id="<id>")\` to retrieve each result.
-
-System directive: You MUST now call the 'background_output' tool to read the results or continue your work. DO NOT output an empty response.
----`
+If you need a result now, call \`background_output(task_id="<id>")\`.
+Otherwise continue the existing task normally.`
   }
 
   const agentInfo = task.category ? `${task.agent} (${task.category})` : task.agent
 
-  return `---
-[BACKGROUND TASK ${statusText}]
-**ID:** \`${task.id}\`
-**Description:** ${task.description}
-**Agent:** ${agentInfo}
-**Duration:** ${duration}${errorInfo}
+  return `Background task ${statusText.toLowerCase()}.
+ID: \`${task.id}\`
+Description: ${task.description}
+Agent: ${agentInfo}
+Duration: ${duration}${errorInfo}
 
-**${remainingCount} task${remainingCount === 1 ? "" : "s"} still in progress.** You WILL be notified when ALL complete.
-Do NOT poll - continue productive work.
-
-Use \`background_output(task_id="${task.id}")\` to retrieve this result when ready.
----`
+${remainingCount} task${remainingCount === 1 ? "" : "s"} still in progress.
+Do not poll. Continue the current task and call \`background_output(task_id="${task.id}")\` only when you need this result.`
 }

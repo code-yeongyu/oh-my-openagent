@@ -1,6 +1,10 @@
 /// <reference types="bun-types" />
 
 import { describe, test, expect } from "bun:test"
+import { Database } from "bun:sqlite"
+import { mkdtempSync, mkdirSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { createBackgroundCancel, createBackgroundOutput } from "./tools"
 import type { BackgroundManager, BackgroundTask } from "../../features/background-agent"
 import type { ToolContext } from "@opencode-ai/plugin/tool"
@@ -50,6 +54,90 @@ function createTask(overrides: Partial<BackgroundTask> = {}): BackgroundTask {
     status: "running",
     ...overrides,
   }
+}
+
+async function withTempDataHome<T>(run: (dataHome: string) => Promise<T>): Promise<T> {
+  const previous = process.env.XDG_DATA_HOME
+  const dataHome = mkdtempSync(join(tmpdir(), "omo-bg-output-"))
+  mkdirSync(join(dataHome, "opencode"), { recursive: true })
+
+  process.env.XDG_DATA_HOME = dataHome
+
+  try {
+    return await run(dataHome)
+  } finally {
+    if (previous === undefined) {
+      delete process.env.XDG_DATA_HOME
+    } else {
+      process.env.XDG_DATA_HOME = previous
+    }
+    rmSync(dataHome, { recursive: true, force: true })
+  }
+}
+
+function createLaunchOnlyTaskDb(dataHome: string, options: {
+  taskID: string
+  sessionID: string
+  parentSessionID: string
+  parentMessageID: string
+  description: string
+  agent: string
+  category?: string
+  launchTime?: number
+  includeStructuredTaskID?: boolean
+}) {
+  const db = new Database(join(dataHome, "opencode", "opencode.db"))
+  db.exec(`
+    CREATE TABLE part (
+      id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL,
+      message_id TEXT NOT NULL,
+      time_created INTEGER NOT NULL,
+      data TEXT NOT NULL
+    );
+  `)
+
+  const launchTime = options.launchTime ?? Date.now()
+  const metadata = {
+    agent: options.agent,
+    category: options.category,
+    description: options.description,
+    run_in_background: true,
+    sessionId: options.sessionID,
+    ...(options.includeStructuredTaskID ? { taskId: options.taskID } : {}),
+  }
+  const data = {
+    type: "tool",
+    tool: "task",
+    state: {
+      status: "completed",
+      input: {
+        description: options.description,
+        subagent_type: options.agent,
+        run_in_background: true,
+        ...(options.category ? { category: options.category } : {}),
+      },
+      output: `Background task launched.\n\nBackground Task ID: ${options.taskID}\nDescription: ${options.description}\nAgent: ${options.agent}${options.category ? ` (category: ${options.category})` : ""}\nStatus: pending\n\nSystem notifies on completion. Use \`background_output\` with task_id=\"${options.taskID}\" to check.\n\n<task_metadata>\nsession_id: ${options.sessionID}\ntask_id: ${options.taskID}\nbackground_task_id: ${options.taskID}\n</task_metadata>`,
+      metadata,
+      time: {
+        start: launchTime,
+        end: launchTime + 1,
+      },
+    },
+  }
+
+  db.query(`
+    INSERT INTO part (id, session_id, message_id, time_created, data)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(
+    `part-${options.taskID}`,
+    options.parentSessionID,
+    options.parentMessageID,
+    launchTime,
+    JSON.stringify(data),
+  )
+
+  db.close()
 }
 
 describe("background_output full_session", () => {
@@ -275,6 +363,45 @@ describe("background_output full_session", () => {
     expect(output).toContain("Task ID")
   })
 
+  test("returns stable completed result even with a dangling empty assistant tail", async () => {
+    // #given
+    const task = createTask({
+      status: "completed",
+      startedAt: new Date("2026-01-01T00:00:00Z"),
+      completedAt: new Date("2026-01-01T00:00:05Z"),
+    })
+    const manager = createMockManager(task)
+    const client = createMockClient({
+      "ses-1": [
+        {
+          id: "m1",
+          info: {
+            role: "assistant",
+            time: { created: 1000, completed: 2000 },
+            finish: "tool-calls",
+          },
+          parts: [{ type: "tool_result", content: "Located philosophy section in the left column." }],
+        },
+        {
+          id: "m2",
+          info: { role: "assistant", time: { created: 3000 } },
+          parts: [{ type: "step-start" }],
+        },
+      ],
+    })
+    const tool = createBackgroundOutput(manager, client)
+
+    // #when
+    const first = await tool.execute({ task_id: "task-1", full_session: false }, mockContext)
+    const second = await tool.execute({ task_id: "task-1", full_session: false }, mockContext)
+
+    // #then
+    expect(first).toContain("Located philosophy section in the left column.")
+    expect(second).toContain("Located philosophy section in the left column.")
+    expect(first).not.toContain("No new output since last check")
+    expect(second).not.toContain("No new output since last check")
+  })
+
   test("truncates thinking content to thinking_max_chars", async () => {
     // #given
     const longThinking = "x".repeat(500)
@@ -336,6 +463,52 @@ describe("background_output full_session", () => {
     // #then
     expect(output).toContain("[thinking] " + "y".repeat(2000) + "...")
     expect(output).not.toContain("y".repeat(2100))
+  })
+
+  test("recovers cleaned-up completed tasks from persisted launch records", async () => {
+    await withTempDataHome(async (dataHome) => {
+      createLaunchOnlyTaskDb(dataHome, {
+        taskID: "bg-orphaned-output",
+        sessionID: "ses-recovered",
+        parentSessionID: "parent-recovered",
+        parentMessageID: "msg-recovered",
+        description: "Recovered task output",
+        agent: "Sisyphus-Junior",
+        category: "quick",
+        includeStructuredTaskID: true,
+      })
+
+      const manager: BackgroundOutputManager = {
+        getTask: () => undefined,
+      }
+      const client = createMockClient({
+        "ses-recovered": [
+          {
+            id: "m1",
+            info: {
+              role: "assistant",
+              time: { created: 1000, completed: 2000 },
+              finish: "tool-calls",
+            },
+            parts: [{ type: "tool_result", content: "Recovered output from child session." }],
+          },
+          {
+            id: "m2",
+            info: { role: "assistant", time: { created: 3000 } },
+            parts: [{ type: "step-start" }],
+          },
+        ],
+      })
+      const tool = createBackgroundOutput(manager, client)
+
+      const output = await tool.execute({
+        task_id: "bg-orphaned-output",
+        full_session: false,
+      }, mockContext)
+
+      expect(output).toContain("Recovered output from child session.")
+      expect(output).not.toContain("Task not found")
+    })
   })
 })
 

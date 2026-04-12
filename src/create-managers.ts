@@ -64,6 +64,12 @@ export function createManagers(args: {
 
   initTaskToastManager(ctx.client)
 
+  queueMicrotask(() => {
+    backgroundManager.recoverOrphanedTasks().catch((error) => {
+      log("[index] orphan background task recovery failed:", { error: String(error) })
+    })
+  })
+
   const skillMcpManager = new SkillMcpManager()
 
   const configHandler = createConfigHandler({

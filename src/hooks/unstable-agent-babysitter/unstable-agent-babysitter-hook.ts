@@ -1,7 +1,7 @@
 import type { BackgroundManager } from "../../features/background-agent"
 import { getMainSessionID, getSessionAgent } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
-import { createInternalAgentTextPart, resolveInheritedPromptTools } from "../../shared"
+import { createHiddenSystemReminderTextPart, resolveInheritedPromptTools } from "../../shared"
 import {
   buildReminder,
   extractMessages,
@@ -158,7 +158,7 @@ export function createUnstableAgentBabysitterHook(ctx: BabysitterContext, option
             ...(agent ? { agent } : {}),
             ...(model ? { model } : {}),
             ...(tools ? { tools } : {}),
-            parts: [createInternalAgentTextPart(reminder)],
+            parts: [createHiddenSystemReminderTextPart(reminder)],
           },
           query: { directory: ctx.directory },
         })

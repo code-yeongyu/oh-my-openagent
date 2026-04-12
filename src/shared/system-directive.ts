@@ -6,6 +6,16 @@
  */
 
 export const SYSTEM_DIRECTIVE_PREFIX = "[SYSTEM DIRECTIVE: OH-MY-OPENCODE"
+const LEGACY_MARKDOWN_REMINDER_PATTERN = /---[\s\S]*?---/gi
+const SYSTEM_REMINDER_TAG_PATTERN = /<system-reminder>[\s\S]*?<\/system-reminder>/gi
+const SYSTEM_DIRECTIVE_TAG_PATTERN = /<system-directive>[\s\S]*?<\/system-directive>/gi
+const INTERNAL_INITIATOR_COMMENT_PATTERN = /<!--\s*OMO_INTERNAL_INITIATOR\s*-->/gi
+const INTERNAL_INITIATOR_TEXT_PATTERN = /\[OMO_INTERNAL\]/g
+
+function matchesPattern(pattern: RegExp, text: string): boolean {
+  pattern.lastIndex = 0
+  return pattern.test(text)
+}
 
 /**
  * Creates a system directive header with the given type.
@@ -33,7 +43,13 @@ export function isSystemDirective(text: string): boolean {
  * @returns true if the message contains system-directive tags
  */
 export function hasSystemReminder(text: string): boolean {
-  return /---[\s\S]*?---/i.test(text)
+  return (
+    matchesPattern(LEGACY_MARKDOWN_REMINDER_PATTERN, text) ||
+    matchesPattern(SYSTEM_REMINDER_TAG_PATTERN, text) ||
+    matchesPattern(SYSTEM_DIRECTIVE_TAG_PATTERN, text) ||
+    matchesPattern(INTERNAL_INITIATOR_COMMENT_PATTERN, text) ||
+    matchesPattern(INTERNAL_INITIATOR_TEXT_PATTERN, text)
+  )
 }
 
 /**
@@ -43,7 +59,13 @@ export function hasSystemReminder(text: string): boolean {
  * @returns text with system-directive content removed
  */
 export function removeSystemReminders(text: string): string {
-  return text.replace(/---[\s\S]*?---/gi, "").trim()
+  return text
+    .replace(SYSTEM_REMINDER_TAG_PATTERN, "")
+    .replace(SYSTEM_DIRECTIVE_TAG_PATTERN, "")
+    .replace(LEGACY_MARKDOWN_REMINDER_PATTERN, "")
+    .replace(INTERNAL_INITIATOR_COMMENT_PATTERN, "")
+    .replace(INTERNAL_INITIATOR_TEXT_PATTERN, "")
+    .trim()
 }
 
 export const SystemDirectiveTypes = {

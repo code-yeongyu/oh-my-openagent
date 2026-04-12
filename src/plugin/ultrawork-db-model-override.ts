@@ -10,7 +10,7 @@ function getDbPath(): string {
 
 const MAX_MICROTASK_RETRIES = 10
 
-function executeWithBackoff<T>(fn: () => T, maxRetries = 10, baseDelayMs = 50): T {
+async function executeWithBackoff<T>(fn: () => T, maxRetries = 10, baseDelayMs = 50): Promise<T> {
   let attempt = 0;
   while (true) {
     try {
@@ -21,20 +21,18 @@ function executeWithBackoff<T>(fn: () => T, maxRetries = 10, baseDelayMs = 50): 
         throw error;
       }
       const delay = baseDelayMs * Math.pow(1.5, attempt) + Math.random() * 10;
-      const start = Date.now();
-      while (Date.now() - start < delay) {
-      }
+      await new Promise(resolve => setTimeout(resolve, delay));
       attempt++;
     }
   }
 }
 
-function tryUpdateMessageModel(
+async function tryUpdateMessageModel(
   db: InstanceType<typeof Database>,
   messageId: string,
   targetModel: { providerID: string; modelID: string },
   variant?: string,
-): boolean {
+): Promise<boolean> {
   return executeWithBackoff(() => {
     const stmt = db.prepare(
       `UPDATE message SET data = json_set(data, '$.model.providerID', ?, '$.model.modelID', ?) WHERE id = ?`,
@@ -62,9 +60,9 @@ function retryViaMicrotask(
       messageId,
       attempt,
     })
-    setTimeout(() => {
+    setTimeout(async () => {
       try {
-        if (tryUpdateMessageModel(db, messageId, targetModel, variant)) {
+        if (await tryUpdateMessageModel(db, messageId, targetModel, variant)) {
           log(`[ultrawork-db-override] setTimeout fallback succeeded: ${targetModel.providerID}/${targetModel.modelID}`, { messageId })
         } else {
           log("[ultrawork-db-override] setTimeout fallback failed - message not found", { messageId })
@@ -88,11 +86,11 @@ function retryViaMicrotask(
     return
   }
 
-  queueMicrotask(() => {
+  queueMicrotask(async () => {
     let shouldCloseDb = true
 
     try {
-      if (tryUpdateMessageModel(db, messageId, targetModel, variant)) {
+      if (await tryUpdateMessageModel(db, messageId, targetModel, variant)) {
         log(`[ultrawork-db-override] Deferred DB update (attempt ${attempt}): ${targetModel.providerID}/${targetModel.modelID}`, { messageId })
         return
       }

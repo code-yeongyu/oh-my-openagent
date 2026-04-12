@@ -66,7 +66,7 @@ export function handleSessionIdleBackgroundEvent(args: {
       }
 
       if (!hasValidOutput) {
-        log("[background-agent] Session.idle but no valid output yet, waiting:", task.id)
+        log("[background-agent] Session.idle but no completion signal yet, waiting:", task.id)
         return
       }
 

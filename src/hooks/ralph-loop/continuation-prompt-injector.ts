@@ -4,7 +4,7 @@ import { findNearestMessageWithFields } from "../../features/hook-message-inject
 import { getMessageDir } from "./message-storage-directory"
 import { withTimeout } from "./with-timeout"
 import {
-	createInternalAgentTextPart,
+	createHiddenSystemDirectiveTextPart,
 	normalizeSDKResponse,
 	resolveInheritedPromptTools,
 } from "../../shared"
@@ -75,7 +75,7 @@ export async function injectContinuationPrompt(
 			...(agent !== undefined ? { agent } : {}),
 			...(model !== undefined ? { model } : {}),
 			...(inheritedTools ? { tools: inheritedTools } : {}),
-			parts: [createInternalAgentTextPart(options.prompt)],
+			parts: [createHiddenSystemDirectiveTextPart(options.prompt)],
 		},
 		query: { directory: options.directory },
 	})

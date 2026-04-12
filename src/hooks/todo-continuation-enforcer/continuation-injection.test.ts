@@ -2,7 +2,7 @@ declare const require: (name: string) => any
 const { describe, expect, test } = require("bun:test")
 
 import { injectContinuation } from "./continuation-injection"
-import { OMO_INTERNAL_INITIATOR_MARKER } from "../../shared/internal-initiator-marker"
+import { OMO_INTERNAL_INITIATOR_COMMENT } from "../../shared/internal-initiator-marker"
 
 describe("injectContinuation", () => {
   test("inherits tools from resolved message info when reinjecting", async () => {
@@ -45,6 +45,7 @@ describe("injectContinuation", () => {
 
     // then
     expect(capturedTools).toEqual({ question: false, bash: true })
-    expect(capturedText).toContain(OMO_INTERNAL_INITIATOR_MARKER)
+    expect(capturedText).toContain("<system-directive>")
+    expect(capturedText).toContain(OMO_INTERNAL_INITIATOR_COMMENT)
   })
 })

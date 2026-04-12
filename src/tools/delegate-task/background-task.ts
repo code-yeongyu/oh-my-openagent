@@ -59,6 +59,7 @@ export async function executeBackgroundTask(
     const unstableMeta = {
       title: args.description,
       metadata: {
+        taskId: task.id,
         prompt: args.prompt,
         agent: task.agent,
         category: args.category,

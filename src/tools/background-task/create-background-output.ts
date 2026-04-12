@@ -8,8 +8,10 @@ import { delay } from "./delay"
 import { formatFullSession } from "./full-session-format"
 import { formatTaskResult } from "./task-result-format"
 import { formatTaskStatus } from "./task-status-format"
-
 import { getAgentDisplayName } from "../../shared/agent-display-names"
+import { loadPersistedBackgroundTask } from "../../features/background-agent/orphan-task-recovery"
+import { hasBackgroundSessionCompletionSignal } from "../../features/background-agent/session-output-analysis"
+import { extractMessages, getErrorMessage } from "./session-messages"
 
 const SISYPHUS_JUNIOR_AGENT = getAgentDisplayName("sisyphus-junior")
 
@@ -41,6 +43,58 @@ function appendTimeoutNote(output: string, timeoutMs: number): string {
   return `${output}\n\n> **Timed out waiting** after ${timeoutMs}ms. Task is still running; showing latest available output.`
 }
 
+async function inferRecoveredTaskStatus(task: BackgroundTask, client: BackgroundOutputClient): Promise<BackgroundTask> {
+  if (!task.sessionID) {
+    return task
+  }
+
+  try {
+    const messagesResult = await client.session.messages({
+      path: { id: task.sessionID },
+    })
+    const errorMessage = getErrorMessage(messagesResult)
+    if (errorMessage) {
+      return task
+    }
+
+    const messages = extractMessages(messagesResult)
+    if (Array.isArray(messages) && hasBackgroundSessionCompletionSignal(messages)) {
+      return {
+        ...task,
+        status: "completed",
+        completedAt: task.completedAt ?? task.startedAt ?? new Date(),
+      }
+    }
+  } catch {
+    return task
+  }
+
+  return task
+}
+
+async function recoverPersistedTask(taskID: string, client: BackgroundOutputClient): Promise<BackgroundTask | undefined> {
+  const snapshot = loadPersistedBackgroundTask(taskID)
+  if (!snapshot) {
+    return undefined
+  }
+
+  const recoveredTask: BackgroundTask = {
+    id: snapshot.taskID,
+    sessionID: snapshot.sessionID,
+    parentSessionID: snapshot.parentSessionID,
+    parentMessageID: snapshot.parentMessageID,
+    description: snapshot.description,
+    prompt: "",
+    agent: snapshot.agent,
+    status: snapshot.hasParentCompletionNotification ? "completed" : "running",
+    startedAt: snapshot.startedAt,
+    completedAt: snapshot.hasParentCompletionNotification ? snapshot.startedAt : undefined,
+    category: snapshot.category,
+  }
+
+  return inferRecoveredTaskStatus(recoveredTask, client)
+}
+
 export function createBackgroundOutput(manager: BackgroundOutputManager, client: BackgroundOutputClient): ToolDefinition {
   return tool({
     description: BACKGROUND_OUTPUT_DESCRIPTION,
@@ -63,7 +117,10 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
     async execute(args: BackgroundOutputArgs, toolContext) {
       try {
         const ctx = toolContext as ToolContextWithMetadata
-        const task = manager.getTask(args.task_id)
+        let task = manager.getTask(args.task_id)
+        if (!task) {
+          task = await recoverPersistedTask(args.task_id, client)
+        }
         if (!task) {
           return `Task not found: ${args.task_id}`
         }
@@ -100,7 +157,11 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
 
             const currentTask = manager.getTask(args.task_id)
             if (!currentTask) {
-              return `Task was deleted: ${args.task_id}`
+              resolvedTask = await inferRecoveredTaskStatus(resolvedTask, client)
+              if (!isTaskActiveStatus(resolvedTask.status)) {
+                break
+              }
+              continue
             }
 
             resolvedTask = currentTask

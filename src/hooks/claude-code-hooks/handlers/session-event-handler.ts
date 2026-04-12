@@ -3,7 +3,7 @@ import { loadClaudeHooksConfig } from "../config"
 import { loadPluginExtendedConfig } from "../config-loader"
 import { executeStopHooks, type StopContext } from "../stop"
 import type { PluginConfig } from "../types"
-import { createInternalAgentTextPart, isHookDisabled, log } from "../../../shared"
+import { createHiddenSystemDirectiveTextPart, isHookDisabled, log } from "../../../shared"
 import {
 	clearSessionHookState,
 	sessionErrorState,
@@ -94,7 +94,7 @@ export function createSessionEventHandler(ctx: PluginInput, config: PluginConfig
 					.prompt({
 						path: { id: sessionID },
 						body: {
-							parts: [createInternalAgentTextPart(stopResult.injectPrompt)],
+							parts: [createHiddenSystemDirectiveTextPart(stopResult.injectPrompt)],
 						},
 						query: { directory: ctx.directory },
 					})

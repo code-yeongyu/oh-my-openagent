@@ -7,6 +7,7 @@ import { MIN_IDLE_TIME_MS } from "./constants"
 import { BackgroundManager } from "./manager"
 import { ConcurrencyManager } from "./concurrency"
 import { initTaskToastManager, _resetTaskToastManagerForTesting } from "../task-toast-manager/manager"
+import { subagentSessions } from "../claude-code-session-state"
 
 
 const TASK_TTL_MS = 30 * 60 * 1000
@@ -974,10 +975,9 @@ describe("BackgroundManager.notifyParentSession - dynamic message lookup", () =>
     expect("model" in promptBody).toBe(false)
   })
 
-  test("should auto-continue when all-complete reply is marker-only", async () => {
+  test("should send all-complete notification as hidden no-reply reminder", async () => {
     // given
     const promptBodies: Array<Record<string, unknown>> = []
-    let messagesCallCount = 0
     const client = {
       session: {
         prompt: async () => ({}),
@@ -986,30 +986,7 @@ describe("BackgroundManager.notifyParentSession - dynamic message lookup", () =>
           return {}
         },
         abort: async () => ({}),
-        messages: async () => {
-          messagesCallCount += 1
-          if (messagesCallCount === 1) {
-            return { data: [] }
-          }
-          if (messagesCallCount === 2) {
-            return {
-              data: [
-                {
-                  info: { role: "assistant" },
-                  parts: [{ type: "text", text: "<!-- OMO_INTERNAL_INITIATOR -->" }],
-                },
-              ],
-            }
-          }
-          return {
-            data: [
-              {
-                info: { role: "assistant" },
-                parts: [{ type: "text", text: "I will read the result now." }],
-              },
-            ],
-          }
-        },
+        messages: async () => ({ data: [] }),
       },
     }
     const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
@@ -1034,12 +1011,13 @@ describe("BackgroundManager.notifyParentSession - dynamic message lookup", () =>
       .notifyParentSession(task)
 
     // then
-    expect(promptBodies).toHaveLength(2)
-    const retryBody = promptBodies[1]
-    expect(retryBody.noReply).toBe(false)
-    const retryText = ((retryBody.parts as Array<{ text?: string }>)[0]?.text) ?? ""
-    expect(retryText).toContain("previous reply contained no user-visible content")
-    expect(retryText).toContain("background_output")
+    expect(promptBodies).toHaveLength(1)
+    const reminderBody = promptBodies[0]
+    expect(reminderBody.noReply).toBe(true)
+    const reminderText = ((reminderBody.parts as Array<{ text?: string }>)[0]?.text) ?? ""
+    expect(reminderText).toContain("<system-reminder>")
+    expect(reminderText).toContain("Background tasks complete.")
+    expect(reminderText).toContain("background_output")
 
     manager.shutdown()
   })
@@ -1169,8 +1147,8 @@ describe("BackgroundManager.notifyParentSession - aborted parent", () => {
     //#then
     const queuedNotifications = getPendingNotifications(manager).get("session-parent") ?? []
     expect(queuedNotifications).toHaveLength(1)
-    expect(queuedNotifications[0]).toContain("---")
-    expect(queuedNotifications[0]).toContain("[ALL BACKGROUND TASKS COMPLETE]")
+    expect(queuedNotifications[0]).toContain("Background tasks complete.")
+    expect(queuedNotifications[0]).toContain("background_output")
 
     manager.shutdown()
   })
@@ -1223,7 +1201,7 @@ describe("BackgroundManager.notifyParentSession - notifications toggle", () => {
 })
 
 describe("BackgroundManager.injectPendingNotificationsIntoChatMessage", () => {
-  test("should prepend queued notifications to first text part and clear queue", () => {
+  test("should insert queued notifications as a separate hidden text part and clear queue", () => {
     // given
     const manager = createBackgroundManager()
     manager.queuePendingNotification("session-parent", "---queued-one---")
@@ -1238,7 +1216,8 @@ describe("BackgroundManager.injectPendingNotificationsIntoChatMessage", () => {
     // then
     expect(output.parts[0].text).toContain("---queued-one---")
     expect(output.parts[0].text).toContain("---queued-two---")
-    expect(output.parts[0].text).toContain("User prompt")
+    expect(output.parts[0].synthetic).toBe(true)
+    expect(output.parts[1].text).toBe("User prompt")
     expect(getPendingNotifications(manager).get("session-parent")).toBeUndefined()
 
     manager.shutdown()
@@ -1278,6 +1257,7 @@ describe("BackgroundManager.tryCompleteTask", () => {
   })
 
   afterEach(() => {
+    subagentSessions.clear()
     manager.shutdown()
   })
 
@@ -1339,7 +1319,7 @@ describe("BackgroundManager.tryCompleteTask", () => {
     expect(concurrencyManager.getCount(concurrencyKey)).toBe(0)
   })
 
-   test("should abort session on completion", async () => {
+  test("should not abort session on normal completion and should clean subagent session state", async () => {
      // #given
      const abortedSessionIDs: string[] = []
      const client = {
@@ -1368,12 +1348,14 @@ describe("BackgroundManager.tryCompleteTask", () => {
       status: "running",
       startedAt: new Date(),
     }
+    subagentSessions.add(task.sessionID)
 
     // #when
     await tryCompleteTaskForTest(manager, task)
 
     // #then
-    expect(abortedSessionIDs).toEqual(["session-1"])
+    expect(abortedSessionIDs).toEqual([])
+    expect(subagentSessions.has(task.sessionID)).toBe(false)
   })
 
   test("should clean pendingByParent even when notifyParentSession throws", async () => {
@@ -1494,7 +1476,7 @@ describe("BackgroundManager.tryCompleteTask", () => {
     // then
     expect(rejectedCount).toBe(0)
     expect(promptBodies.length).toBe(2)
-    expect(promptBodies.some((b) => b.noReply === false)).toBe(true)
+    expect(promptBodies.every((b) => b.noReply === true)).toBe(true)
   })
 })
 
@@ -3655,7 +3637,11 @@ describe("BackgroundManager.handleEvent - early session.idle deferral", () => {
            return {
              data: [
                {
-                 info: { role: "assistant" },
+                 info: {
+                   role: "assistant",
+                   finish: "stop",
+                   time: { created: 1000, completed: 2000 },
+                 },
                  parts: [{ type: "text", text: "ok" }],
                },
              ],
@@ -3713,7 +3699,11 @@ describe("BackgroundManager.handleEvent - early session.idle deferral", () => {
          messages: async () => ({
            data: [
              {
-               info: { role: "assistant" },
+               info: {
+                 role: "assistant",
+                 finish: "stop",
+                 time: { created: 1000, completed: 2000 },
+               },
                parts: [{ type: "text", text: "ok" }],
              },
            ],

@@ -14,6 +14,7 @@ import {
   promptWithModelSuggestionRetry,
   resolveInheritedPromptTools,
   createInternalAgentTextPart,
+  createHiddenSystemReminderTextPart,
 } from "../../shared"
 import { setSessionTools } from "../../shared/session-tools-store"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
@@ -43,16 +44,14 @@ import { tryFallbackRetry } from "./fallback-retry-handler"
 import { registerManagerForCleanup, unregisterManagerForCleanup } from "./process-cleanup"
 import { isCompactionAgent, findNearestMessageExcludingCompaction } from "./compaction-aware-message-resolver"
 import { handleSessionIdleBackgroundEvent } from "./session-idle-event-handler"
-import { buildAutoContinuePrompt, shouldAutoContinueParentSession } from "./parent-session-auto-continue"
+import { hasBackgroundSessionCompletionSignal } from "./session-output-analysis"
+import { loadRecoverableBackgroundLaunches } from "./orphan-task-recovery"
 import { MESSAGE_STORAGE } from "../hook-message-injector"
 import { join } from "node:path"
 import { pruneStaleTasksAndNotifications } from "./task-poller"
 import { checkAndInterruptStaleTasks } from "./task-poller"
 
 type OpencodeClient = PluginInput["client"]
-
-const PARENT_NOTIFICATION_AUTO_CONTINUE_MAX_RETRIES = 2
-
 
 interface MessagePartInfo {
   sessionID?: string
@@ -115,6 +114,7 @@ export class BackgroundManager {
   private idleDeferralTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
   private notificationQueueByParent: Map<string, Promise<void>> = new Map()
   private enableParentSessionNotifications: boolean
+  private orphanRecoveryStarted = false
   readonly taskHistory = new TaskHistory()
 
   constructor(
@@ -140,6 +140,75 @@ export class BackgroundManager {
     this.onShutdown = options?.onShutdown
     this.enableParentSessionNotifications = options?.enableParentSessionNotifications ?? true
     this.registerProcessCleanup()
+  }
+
+  async recoverOrphanedTasks(): Promise<void> {
+    if (this.orphanRecoveryStarted) {
+      return
+    }
+    this.orphanRecoveryStarted = true
+
+    const launches = loadRecoverableBackgroundLaunches()
+    if (launches.length === 0) {
+      return
+    }
+
+    log("[background-agent] Recovering orphaned background tasks:", {
+      count: launches.length,
+    })
+
+    const tracked: Array<{ task: BackgroundTask; sessionID: string }> = []
+    for (const launch of [...launches].reverse()) {
+      if (this.tasks.has(launch.taskID) || this.findBySession(launch.sessionID)) {
+        continue
+      }
+
+      try {
+        const task = await this.trackTask({
+          taskId: launch.taskID,
+          sessionID: launch.sessionID,
+          parentSessionID: launch.parentSessionID,
+          description: launch.description,
+          agent: launch.agent,
+        })
+        task.parentMessageID = launch.parentMessageID
+        task.startedAt = launch.startedAt
+        if (task.progress) {
+          task.progress.lastUpdate = launch.startedAt
+        }
+        if (launch.category) {
+          task.category = launch.category
+        }
+        tracked.push({ task, sessionID: launch.sessionID })
+      } catch (error) {
+        log("[background-agent] Failed to reattach orphaned background task:", {
+          taskId: launch.taskID,
+          sessionID: launch.sessionID,
+          error: String(error),
+        })
+      }
+    }
+
+    let completed = 0
+    for (const entry of tracked) {
+      const hasValidOutput = await this.validateSessionHasOutput(entry.sessionID)
+      if (!hasValidOutput) {
+        continue
+      }
+      const hasIncompleteTodos = await this.checkSessionTodos(entry.sessionID)
+      if (hasIncompleteTodos) {
+        continue
+      }
+      if (await this.tryCompleteTask(entry.task, "startup orphan recovery")) {
+        completed += 1
+      }
+    }
+
+    log("[background-agent] Orphan recovery finished:", {
+      discovered: launches.length,
+      tracked: tracked.length,
+      completed,
+    })
   }
 
   async launch(input: LaunchInput): Promise<BackgroundTask> {
@@ -947,19 +1016,19 @@ export class BackgroundManager {
     this.pendingNotifications.delete(sessionID)
     const notificationContent = pendingNotifications.join("\n\n")
     const firstTextPartIndex = output.parts.findIndex((part) => part.type === "text")
+    const hiddenNotificationPart = createHiddenSystemReminderTextPart(notificationContent)
 
     if (firstTextPartIndex === -1) {
-      output.parts.unshift(createInternalAgentTextPart(notificationContent))
+      output.parts.unshift(hiddenNotificationPart)
       return
     }
 
-    const originalText = output.parts[firstTextPartIndex].text ?? ""
-    output.parts[firstTextPartIndex].text = `${notificationContent}\n\n---\n\n${originalText}`
+    output.parts.splice(firstTextPartIndex, 0, hiddenNotificationPart)
   }
 
   /**
-   * Validates that a session has actual assistant/tool output before marking complete.
-   * Prevents premature completion when session.idle fires before agent responds.
+   * Validates that a session has emitted a real completion signal before marking complete.
+   * Prevents premature completion when session.idle fires while the assistant is between tool-calls.
    */
   private async validateSessionHasOutput(sessionID: string): Promise<boolean> {
     try {
@@ -968,52 +1037,32 @@ export class BackgroundManager {
       })
 
       const messages = normalizeSDKResponse(response, [] as Array<{ info?: { role?: string } }>, { preferResponseOnMissingData: true })
-      
-      // Check for at least one assistant or tool message
-      const hasAssistantOrToolMessage = messages.some(
-        (m: { info?: { role?: string } }) => 
-          m.info?.role === "assistant" || m.info?.role === "tool"
+
+      const hasCompletionSignal = hasBackgroundSessionCompletionSignal(
+        messages as Array<{
+          info?: {
+            role?: string
+            finish?: string
+            time?: { created?: number | string; completed?: number | string } | string
+          }
+          parts?: Array<{
+            type?: string
+            text?: string
+            content?: string | Array<{ type?: string; text?: string }>
+            output?: string
+          }>
+        }>
       )
 
-      if (!hasAssistantOrToolMessage) {
-        log("[background-agent] No assistant/tool messages found in session:", sessionID)
-        return false
-      }
-
-      // Additionally check that at least one message has content (not just empty)
-      // OpenCode API uses different part types than Anthropic's API:
-      // - "reasoning" with .text property (thinking/reasoning content)
-      // - "tool" with .state.output property (tool call results)
-      // - "text" with .text property (final text output)
-      // - "step-start"/"step-finish" (metadata, no content)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const hasContent = messages.some((m: any) => {
-        if (m.info?.role !== "assistant" && m.info?.role !== "tool") return false
-        const parts = m.parts ?? []
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return parts.some((p: any) => 
-        // Text content (final output)
-        (p.type === "text" && p.text && p.text.trim().length > 0) ||
-        // Reasoning content (thinking blocks)
-        (p.type === "reasoning" && p.text && p.text.trim().length > 0) ||
-        // Tool calls (indicates work was done)
-        p.type === "tool" ||
-        // Tool results (output from executed tools) - important for tool-only tasks
-        (p.type === "tool_result" && p.content && 
-          (typeof p.content === "string" ? p.content.trim().length > 0 : p.content.length > 0))
-      )
-      })
-
-      if (!hasContent) {
-        log("[background-agent] Messages exist but no content found in session:", sessionID)
+      if (!hasCompletionSignal) {
+        log("[background-agent] No completion signal found in session yet:", sessionID)
         return false
       }
 
       return true
     } catch (error) {
       log("[background-agent] Error validating session output:", error)
-      // On error, allow completion to proceed (don't block indefinitely)
-      return true
+      return false
     }
   }
 
@@ -1215,10 +1264,7 @@ export class BackgroundManager {
     }
 
     if (task.sessionID) {
-      this.client.session.abort({
-        path: { id: task.sessionID },
-      }).catch(() => {})
-
+      subagentSessions.delete(task.sessionID)
       SessionCategoryRegistry.remove(task.sessionID)
     }
 
@@ -1270,46 +1316,30 @@ export class BackgroundManager {
       ? Array.from(this.tasks.values())
         .filter(t => t.parentSessionID === task.parentSessionID && t.status !== "running" && t.status !== "pending")
       : []
-    const completedTaskSummaries = (completedTasks.length > 0 ? completedTasks : [task]).map((completedTask) => ({
-      id: completedTask.id,
-      description: completedTask.description,
-    }))
-
     const statusText = task.status === "completed" ? "COMPLETED" : task.status === "interrupt" ? "INTERRUPTED" : "CANCELLED"
     const errorInfo = task.error ? `\n**Error:** ${task.error}` : ""
 
     let notification: string
     if (allComplete) {
-        const completedTasksText = completedTasks
-          .map(t => `- \`${t.id}\`: ${t.description}`)
-          .join("\n")
+      const completedTasksText = completedTasks
+        .map(t => `- \`${t.id}\`: ${t.description}`)
+        .join("\n")
 
-        notification = `---
-[ALL BACKGROUND TASKS COMPLETE]
+      notification = `Background tasks complete.
 
-**Completed:**
+Completed tasks:
 ${completedTasksText || `- \`${task.id}\`: ${task.description}`}
 
-Use \`background_output(task_id="<id>")\` to retrieve each result.
-
-System directive: You MUST now call the 'background_output' tool to read the results or continue your work. DO NOT output an empty response.
-
-[SYSTEM DIRECTIVE: OH-MY-OPENCODE - CONTEXT PIN]
-Remember your original role and task. Do not adopt a new persona or abandon the plan.
----`
+If you need a result now, call \`background_output(task_id="<id>")\`.
+Otherwise continue the existing task normally.`
     } else {
-      // Individual completion - silent notification
-      notification = `---
-[BACKGROUND TASK ${statusText}]
-**ID:** \`${task.id}\`
-**Description:** ${task.description}
-**Duration:** ${duration}${errorInfo}
+      notification = `Background task ${statusText.toLowerCase()}.
+ID: \`${task.id}\`
+Description: ${task.description}
+Duration: ${duration}${errorInfo}
 
-**${remainingCount} task${remainingCount === 1 ? "" : "s"} still in progress.** You WILL be notified when ALL complete.
-Do NOT poll - continue productive work.
-
-Use \`background_output(task_id="${task.id}")\` to retrieve this result when ready.
----`
+${remainingCount} task${remainingCount === 1 ? "" : "s"} still in progress.
+Do not poll. Continue the current task and call \`background_output(task_id="${task.id}")\` only when you need this result.`
     }
 
       let agent: string | undefined = task.parentAgent
@@ -1368,62 +1398,21 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
         })
 
         try {
-          let promptText = notification
-          let attempt = 0
-
-          while (true) {
-            await this.client.session.promptAsync({
-              path: { id: task.parentSessionID },
-              body: {
-                noReply: !allComplete,
-                ...(agent !== undefined ? { agent } : {}),
-                ...(model !== undefined ? { model } : {}),
-                ...(resolvedTools ? { tools: resolvedTools } : {}),
-                parts: [createInternalAgentTextPart(promptText)],
-              },
-            })
-            log("[background-agent] Sent notification to parent session:", {
-              taskId: task.id,
-              allComplete,
-              noReply: !allComplete,
-              attempt,
-            })
-
-            if (!allComplete) {
-              break
-            }
-
-            const messagesResp = await this.client.session.messages({
-              path: { id: task.parentSessionID },
-            }).catch((error) => {
-              log("[background-agent] Failed to read parent session after notification:", {
-                taskId: task.id,
-                parentSessionID: task.parentSessionID,
-                error: String(error),
-              })
-              return null
-            })
-
-            if (!messagesResp || !shouldAutoContinueParentSession(messagesResp)) {
-              break
-            }
-
-            attempt += 1
-            if (attempt > PARENT_NOTIFICATION_AUTO_CONTINUE_MAX_RETRIES) {
-              log("[background-agent] Auto-continue retry budget exhausted for parent notification:", {
-                taskId: task.id,
-                parentSessionID: task.parentSessionID,
-              })
-              break
-            }
-
-            promptText = buildAutoContinuePrompt(completedTaskSummaries, attempt)
-            log("[background-agent] Auto-continuing parent session after empty/service-only reply:", {
-              taskId: task.id,
-              parentSessionID: task.parentSessionID,
-              attempt,
-            })
-          }
+          await this.client.session.promptAsync({
+            path: { id: task.parentSessionID },
+            body: {
+              noReply: true,
+              ...(agent !== undefined ? { agent } : {}),
+              ...(model !== undefined ? { model } : {}),
+              ...(resolvedTools ? { tools: resolvedTools } : {}),
+              parts: [createHiddenSystemReminderTextPart(notification)],
+            },
+          })
+          log("[background-agent] Sent hidden notification to parent session:", {
+            taskId: task.id,
+            allComplete,
+            noReply: true,
+          })
         } catch (error) {
           if (isAbortedSessionError(error)) {
             log("[background-agent] Parent session aborted while sending notification; continuing cleanup:", {
@@ -1559,7 +1548,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
           // Edge guard: Validate session has actual output before completing
           const hasValidOutput = await this.validateSessionHasOutput(sessionID)
           if (!hasValidOutput) {
-            log("[background-agent] Polling idle but no valid output yet, waiting:", task.id)
+            log("[background-agent] Polling idle but no completion signal yet, waiting:", task.id)
             continue
           }
 

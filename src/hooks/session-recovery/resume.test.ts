@@ -1,7 +1,7 @@
 declare const require: (name: string) => any
 const { describe, expect, test } = require("bun:test")
 import { extractResumeConfig, resumeSession } from "./resume"
-import { OMO_INTERNAL_INITIATOR_MARKER } from "../../shared/internal-initiator-marker"
+import { OMO_INTERNAL_INITIATOR_COMMENT } from "../../shared/internal-initiator-marker"
 import type { MessageData } from "./types"
 
 describe("session-recovery resume", () => {
@@ -47,6 +47,7 @@ describe("session-recovery resume", () => {
     expect(promptBody?.tools).toEqual({ question: false, bash: true })
     expect(Array.isArray(promptBody?.parts)).toBe(true)
     const firstPart = (promptBody?.parts as Array<{ text?: string }>)?.[0]
-    expect(firstPart?.text).toContain(OMO_INTERNAL_INITIATOR_MARKER)
+    expect(firstPart?.text).toContain("<system-directive>")
+    expect(firstPart?.text).toContain(OMO_INTERNAL_INITIATOR_COMMENT)
   })
 })
