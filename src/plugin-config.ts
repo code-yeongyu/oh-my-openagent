@@ -13,6 +13,26 @@ import {
 import { migrateLegacyConfigFile } from "./shared/migrate-legacy-config-file";
 import { CONFIG_BASENAME, LEGACY_CONFIG_BASENAME } from "./shared/plugin-identity";
 
+function loadExplicitGitMasterOverrides(configPath: string): Record<string, unknown> | undefined {
+  try {
+    if (!fs.existsSync(configPath)) {
+      return undefined
+    }
+
+    const content = fs.readFileSync(configPath, "utf-8")
+    const rawConfig = parseJsonc<Record<string, unknown>>(content)
+    const gitMaster = rawConfig.git_master
+
+    if (gitMaster && typeof gitMaster === "object" && !Array.isArray(gitMaster)) {
+      return gitMaster as Record<string, unknown>
+    }
+  } catch {
+    return undefined
+  }
+
+  return undefined
+}
+
 const PARTIAL_STRING_ARRAY_KEYS = new Set([
   "disabled_mcps",
   "disabled_agents",
@@ -229,13 +249,27 @@ export function loadPluginConfig(
 
   // Load user config first (base). Parse empty config through Zod to apply field defaults.
   const userConfig = loadConfigFromPath(userConfigPath, ctx)
+  const userGitMasterOverrides = loadExplicitGitMasterOverrides(userConfigPath)
   let config: OhMyOpenCodeConfig =
     userConfig ?? OhMyOpenCodeConfigSchema.parse({});
 
   // Override with project config
+  const defaultGitMaster = OhMyOpenCodeConfigSchema.parse({}).git_master
   const projectConfig = loadConfigFromPath(projectConfigPath, ctx);
+  const projectGitMasterOverrides = loadExplicitGitMasterOverrides(projectConfigPath)
   if (projectConfig) {
     config = mergeConfigs(config, projectConfig);
+  }
+
+  if (userGitMasterOverrides || projectGitMasterOverrides) {
+    config = {
+      ...config,
+      git_master: {
+        ...defaultGitMaster,
+        ...(userGitMasterOverrides ?? {}),
+        ...(projectGitMasterOverrides ?? {}),
+      },
+    }
   }
 
   config = {

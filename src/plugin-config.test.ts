@@ -423,4 +423,92 @@ describe("loadPluginConfig", () => {
     expect(existsSync(canonicalConfigPath)).toBe(true)
     expect(config.agents?.oracle?.model).toBe("openai/gpt-5.4")
   })
+
+  it("should preserve explicit user git_master settings when project config omits git_master", async () => {
+    // given
+    const rootDir = mkdtempSync(join(tmpdir(), "omo-plugin-config-git-master-user-"))
+    const userConfigDir = join(rootDir, "user-config")
+    const projectDir = join(rootDir, "project")
+    const projectConfigDir = join(projectDir, ".opencode")
+
+    tempDirs.push(rootDir)
+    mkdirSync(userConfigDir, { recursive: true })
+    mkdirSync(projectConfigDir, { recursive: true })
+
+    writeFileSync(
+      join(userConfigDir, "oh-my-openagent.jsonc"),
+      JSON.stringify({
+        git_master: {
+          commit_footer: false,
+          include_co_authored_by: false,
+        },
+      })
+    )
+
+    writeFileSync(
+      join(projectConfigDir, "oh-my-openagent.jsonc"),
+      JSON.stringify({
+        agents: {
+          hephaestus: { model: "openai/gpt-5.4" },
+        },
+      })
+    )
+
+    process.env.OPENCODE_CONFIG_DIR = userConfigDir
+
+    // when
+    const { loadPluginConfig } = await importFreshPluginConfigModule()
+    const config = loadPluginConfig(projectDir, {})
+
+    // then
+    expect(config.git_master).toEqual({
+      commit_footer: false,
+      include_co_authored_by: false,
+      git_env_prefix: "GIT_MASTER=1",
+    })
+  })
+
+  it("should merge explicit git_master keys from user and project configs", async () => {
+    // given
+    const rootDir = mkdtempSync(join(tmpdir(), "omo-plugin-config-git-master-merge-"))
+    const userConfigDir = join(rootDir, "user-config")
+    const projectDir = join(rootDir, "project")
+    const projectConfigDir = join(projectDir, ".opencode")
+
+    tempDirs.push(rootDir)
+    mkdirSync(userConfigDir, { recursive: true })
+    mkdirSync(projectConfigDir, { recursive: true })
+
+    writeFileSync(
+      join(userConfigDir, "oh-my-openagent.jsonc"),
+      JSON.stringify({
+        git_master: {
+          commit_footer: false,
+          include_co_authored_by: false,
+        },
+      })
+    )
+
+    writeFileSync(
+      join(projectConfigDir, "oh-my-openagent.jsonc"),
+      JSON.stringify({
+        git_master: {
+          commit_footer: true,
+        },
+      })
+    )
+
+    process.env.OPENCODE_CONFIG_DIR = userConfigDir
+
+    // when
+    const { loadPluginConfig } = await importFreshPluginConfigModule()
+    const config = loadPluginConfig(projectDir, {})
+
+    // then
+    expect(config.git_master).toEqual({
+      commit_footer: true,
+      include_co_authored_by: false,
+      git_env_prefix: "GIT_MASTER=1",
+    })
+  })
 })
