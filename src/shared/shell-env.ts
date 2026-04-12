@@ -5,12 +5,14 @@ export type ShellType = "unix" | "powershell" | "cmd" | "csh"
  * 
  * Detection priority:
  * 1. SHELL env var → Unix shell (explicit user choice takes precedence)
- * 2. PSModulePath → PowerShell
- * 3. Platform fallback → win32: cmd, others: unix
+ * 2. Unix shell indicators on Windows → Git Bash, WSL, MSYS2
+ * 3. PSModulePath → PowerShell
+ * 4. Platform fallback → win32: cmd, others: unix
  * 
- * Note: SHELL is checked before PSModulePath because on Windows, PSModulePath
- * is always set by the system even when the active shell is Git Bash or WSL.
- * An explicit SHELL variable indicates the user's chosen shell overrides that.
+ * Note: Step 2 is scoped to Windows only because PSModulePath is always set
+ * on Windows regardless of the active shell. Indicators are deliberately
+ * specific (BASH_VERSION, MSYSTEM, WSL_DISTRO_NAME) — TERM is excluded
+ * because some PowerShell users set it manually.
  */
 export function detectShellType(): ShellType {
   if (process.env.SHELL) {
@@ -18,6 +20,18 @@ export function detectShellType(): ShellType {
     if (shell.includes("csh") || shell.includes("tcsh")) {
       return "csh"
     }
+    return "unix"
+  }
+
+  // On Windows, detect Unix-compatible shells (Git Bash, WSL, MSYS2).
+  // PSModulePath is always set on Windows, so we must check these BEFORE it.
+  // Indicators are shell-specific — no broad signals like TERM.
+  if (
+    process.platform === "win32" &&
+    (process.env.BASH_VERSION ||
+     process.env.MSYSTEM ||
+     process.env.WSL_DISTRO_NAME)
+  ) {
     return "unix"
   }
 
