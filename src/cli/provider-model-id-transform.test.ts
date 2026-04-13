@@ -201,6 +201,116 @@ describe("transformModelForProvider", () => {
 		})
 	})
 
+	describe("vercel provider", () => {
+		test("prepends anthropic/ and applies anthropic transform for claude models", () => {
+			// #given vercel provider and claude-opus-4-6 model
+			// #when transformModelForProvider is called
+			const result = transformModelForProvider("vercel", "claude-opus-4-6")
+
+			// #then should produce anthropic/claude-opus-4.6
+			expect(result).toBe("anthropic/claude-opus-4.6")
+		})
+
+		test("prepends anthropic/ and applies anthropic transform for claude-sonnet", () => {
+			// #given vercel provider and claude-sonnet-4-6 model
+			// #when transformModelForProvider is called
+			const result = transformModelForProvider("vercel", "claude-sonnet-4-6")
+
+			// #then should produce anthropic/claude-sonnet-4.6
+			expect(result).toBe("anthropic/claude-sonnet-4.6")
+		})
+
+		test("prepends anthropic/ and applies anthropic transform for claude-haiku", () => {
+			// #given vercel provider and claude-haiku-4-5 model
+			// #when transformModelForProvider is called
+			const result = transformModelForProvider("vercel", "claude-haiku-4-5")
+
+			// #then should produce anthropic/claude-haiku-4.5
+			expect(result).toBe("anthropic/claude-haiku-4.5")
+		})
+
+		test("prepends openai/ for gpt models", () => {
+			// #given vercel provider and gpt-5.4 model
+			// #when transformModelForProvider is called
+			const result = transformModelForProvider("vercel", "gpt-5.4")
+
+			// #then should produce openai/gpt-5.4
+			expect(result).toBe("openai/gpt-5.4")
+		})
+
+		test("prepends google/ and applies google transform for gemini models", () => {
+			// #given vercel provider and gemini-3.1-pro model
+			// #when transformModelForProvider is called
+			const result = transformModelForProvider("vercel", "gemini-3.1-pro")
+
+			// #then should produce google/gemini-3.1-pro-preview
+			expect(result).toBe("google/gemini-3.1-pro-preview")
+		})
+
+		test("prepends google/ without -preview for gemini-3-flash", () => {
+			// #given vercel provider and gemini-3-flash model
+			// #when transformModelForProvider is called
+			const result = transformModelForProvider("vercel", "gemini-3-flash")
+
+			// #then should produce google/gemini-3-flash (gateway does not use -preview for this model)
+			expect(result).toBe("google/gemini-3-flash")
+		})
+
+		test("prepends xai/ for grok models", () => {
+			// #given vercel provider and grok-code-fast-1 model
+			// #when transformModelForProvider is called
+			const result = transformModelForProvider("vercel", "grok-code-fast-1")
+
+			// #then should produce xai/grok-code-fast-1
+			expect(result).toBe("xai/grok-code-fast-1")
+		})
+
+		test("delegates to sub-provider when model already has sub-provider prefix", () => {
+			// #given vercel provider and anthropic/claude-opus-4-6 (already prefixed)
+			// #when transformModelForProvider is called
+			const result = transformModelForProvider("vercel", "anthropic/claude-opus-4-6")
+
+			// #then should apply anthropic transform within the prefix
+			expect(result).toBe("anthropic/claude-opus-4.6")
+		})
+
+		test("prepends minimax/ for minimax models", () => {
+			// #given vercel provider and minimax-m2.7 model
+			// #when transformModelForProvider is called
+			const result = transformModelForProvider("vercel", "minimax-m2.7")
+
+			// #then should produce minimax/minimax-m2.7
+			expect(result).toBe("minimax/minimax-m2.7")
+		})
+
+		test("prepends moonshotai/ for kimi models", () => {
+			// #given vercel provider and kimi-k2.5 model
+			// #when transformModelForProvider is called
+			const result = transformModelForProvider("vercel", "kimi-k2.5")
+
+			// #then should produce moonshotai/kimi-k2.5
+			expect(result).toBe("moonshotai/kimi-k2.5")
+		})
+
+		test("prepends zai/ for glm models", () => {
+			// #given vercel provider and glm-5 model
+			// #when transformModelForProvider is called
+			const result = transformModelForProvider("vercel", "glm-5")
+
+			// #then should produce zai/glm-5
+			expect(result).toBe("zai/glm-5")
+		})
+
+		test("passes through unknown models without sub-provider prefix", () => {
+			// #given vercel provider and an unknown model name
+			// #when transformModelForProvider is called
+			const result = transformModelForProvider("vercel", "big-pickle")
+
+			// #then should pass through unchanged
+			expect(result).toBe("big-pickle")
+		})
+	})
+
 	describe("unknown provider", () => {
 		test("passes model through unchanged for unknown provider", () => {
 			// #given unknown provider and any model
