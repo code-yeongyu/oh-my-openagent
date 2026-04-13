@@ -27,10 +27,10 @@ export const AGENT_DISPLAY_NAMES: Record<string, string> = {
 }
 
 const AGENT_LIST_SORT_PREFIXES: Record<string, string> = {
-  sisyphus: "\u200B",
-  hephaestus: "\u200B\u200B",
-  prometheus: "\u200B\u200B\u200B",
-  atlas: "\u200B\u200B\u200B\u200B",
+  sisyphus: "",
+  hephaestus: "",
+  prometheus: "",
+  atlas: "",
 }
 
 const INVISIBLE_AGENT_CHARACTERS_REGEX = /[\u200B\u200C\u200D\uFEFF]/g
