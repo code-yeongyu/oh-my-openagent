@@ -10,11 +10,14 @@ This order is enforced via two mechanisms working together:
 1. `CANONICAL_CORE_AGENT_ORDER` in `agent-priority-order.ts` controls object key insertion order
 2. `agent-priority-order.ts` injects an explicit `order` field (1-4) into each core agent config
 
-### Why the `order` Field
+### How Ordering Works
 
-OpenCode's `Agent.list()` may sort agents by `name` field. Object key order alone is not enough.
-The explicit `order` field (integers 1-4 for sisyphus/hephaestus/prometheus/atlas) ensures deterministic
-ordering regardless of alphabetical sort order.
+`reorderAgentsByPriority` iterates over `CANONICAL_CORE_AGENT_ORDER`, matches each core agent by
+display name, and inserts it first into the result object. JavaScript preserves string-key insertion
+order (ES2015+), so core agents always appear before custom agents regardless of alphabetical order.
+
+The `order` field (integers 1-4) is stored as metadata this repo can provide — **this repo only
+stores it**; whether OpenCode consumes it for rendering is outside this codebase's control.
 
 ZWSP (U+200B) MUST NOT appear anywhere in the agent config — not in:
 - Object keys (used as HTTP header values, causes RFC 7230 violations)
