@@ -35,6 +35,30 @@ describe("getAgentDisplayName", () => {
     expect(result).toBe("custom-agent")
   })
 
+  it("strips ZWSP prefix before lookup (runtime name normalization)", () => {
+    // given a ZWSP-prefixed runtime name (e.g., from default_agent config)
+    const runtimeName = "\u200BSisyphus - Ultraworker"
+
+    // when getAgentDisplayName called
+    const result = getAgentDisplayName(runtimeName)
+
+    // then returns clean display name without ZWSP
+    expect(result).toBe("Sisyphus - Ultraworker")
+    expect(result).not.toContain("\u200B")
+  })
+
+  it("strips multiple ZWSP prefixes before lookup", () => {
+    // given a multi-ZWSP-prefixed runtime name (atlas has 4 ZWSPs)
+    const runtimeName = "\u200B\u200B\u200B\u200BAtlas - Plan Executor"
+
+    // when getAgentDisplayName called
+    const result = getAgentDisplayName(runtimeName)
+
+    // then returns clean display name without ZWSP
+    expect(result).toBe("Atlas - Plan Executor")
+    expect(result).not.toContain("\u200B")
+  })
+
   it("returns display name for atlas", () => {
     // given config key "atlas"
     const configKey = "atlas"

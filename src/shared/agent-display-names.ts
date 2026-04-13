@@ -58,18 +58,17 @@ export function getAgentRuntimeName(configKey: string): string {
  * Returns original key if not found.
  */
 export function getAgentDisplayName(configKey: string): string {
-  // Try exact match first
-  const exactMatch = AGENT_DISPLAY_NAMES[configKey]
+  const stripped = stripInvisibleAgentCharacters(configKey)
+  
+  const exactMatch = AGENT_DISPLAY_NAMES[stripped]
   if (exactMatch !== undefined) return exactMatch
   
-  // Fall back to case-insensitive search
-  const lowerKey = configKey.toLowerCase()
+  const lowerKey = stripped.toLowerCase()
   for (const [k, v] of Object.entries(AGENT_DISPLAY_NAMES)) {
     if (k.toLowerCase() === lowerKey) return v
   }
   
-  // Unknown agent: return original key
-  return configKey
+  return stripped
 }
 
 /**
