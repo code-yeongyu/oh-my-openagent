@@ -129,10 +129,10 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
       let agentConfig: AgentConfig | undefined
       if (avail.opencodeGo) {
         agentConfig = { model: "opencode-go/minimax-m2.7" }
+      } else if (avail.vercelAiGateway) {
+        agentConfig = { model: "vercel/minimax/minimax-m2.7" }
       } else if (avail.zai) {
         agentConfig = { model: ZAI_MODEL }
-      } else if (avail.vercelAiGateway) {
-        agentConfig = { model: "vercel/anthropic/claude-haiku-4.5" }
       }
       if (agentConfig) {
         agents[role] = attachAllFallbackModels(agentConfig, req.fallbackChain, avail)
@@ -149,7 +149,7 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
       } else if (avail.opencodeGo) {
         agentConfig = { model: "opencode-go/minimax-m2.7" }
       } else if (avail.vercelAiGateway) {
-        agentConfig = { model: "vercel/anthropic/claude-haiku-4.5" }
+        agentConfig = { model: "vercel/minimax/minimax-m2.7-highspeed" }
       } else if (avail.copilot) {
         agentConfig = { model: "github-copilot/gpt-5-mini" }
       } else {

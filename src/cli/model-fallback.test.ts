@@ -631,26 +631,26 @@ describe("generateModelConfig", () => {
       expect(result).toMatchSnapshot()
     })
 
-    test("explore uses vercel/anthropic/claude-haiku-4.5 when only gateway available", () => {
+    test("explore uses vercel/minimax/minimax-m2.7-highspeed when only gateway available", () => {
       // #given only Vercel AI Gateway is available
       const config = createConfig({ hasVercelAiGateway: true })
 
       // #when generateModelConfig is called
       const result = generateModelConfig(config)
 
-      // #then explore should use gateway-routed claude-haiku
-      expect(result.agents?.explore?.model).toBe("vercel/anthropic/claude-haiku-4.5")
+      // #then explore should use gateway-routed minimax (preferred over claude-haiku)
+      expect(result.agents?.explore?.model).toBe("vercel/minimax/minimax-m2.7-highspeed")
     })
 
-    test("librarian uses vercel/anthropic/claude-haiku-4.5 when only gateway available", () => {
+    test("librarian uses vercel/minimax/minimax-m2.7 when only gateway available", () => {
       // #given only Vercel AI Gateway is available
       const config = createConfig({ hasVercelAiGateway: true })
 
       // #when generateModelConfig is called
       const result = generateModelConfig(config)
 
-      // #then librarian should use gateway-routed claude-haiku
-      expect(result.agents?.librarian?.model).toBe("vercel/anthropic/claude-haiku-4.5")
+      // #then librarian should use gateway-routed minimax (preferred over claude-haiku)
+      expect(result.agents?.librarian?.model).toBe("vercel/minimax/minimax-m2.7")
     })
 
     test("Hephaestus is created when only Vercel AI Gateway is available", () => {

@@ -40,7 +40,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(primary.variant).toBe("max")
 
     const second = sisyphus.fallbackChain[1]
-    expect(second.providers).toEqual(["opencode-go"])
+    expect(second.providers).toEqual(["opencode-go", "vercel"])
     expect(second.model).toBe("kimi-k2.5")
 
     const third = sisyphus.fallbackChain[2]
@@ -137,7 +137,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(primary.variant).toBe("medium")
 
     const secondary = multimodalLooker.fallbackChain[1]
-    expect(secondary.providers).toEqual(["opencode-go"])
+    expect(secondary.providers).toEqual(["opencode-go", "vercel"])
     expect(secondary.model).toBe("kimi-k2.5")
 
     const tertiary = multimodalLooker.fallbackChain[2]

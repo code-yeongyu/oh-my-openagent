@@ -274,6 +274,33 @@ describe("transformModelForProvider", () => {
 			expect(result).toBe("anthropic/claude-opus-4.6")
 		})
 
+		test("prepends minimax/ for minimax models", () => {
+			// #given vercel provider and minimax-m2.7 model
+			// #when transformModelForProvider is called
+			const result = transformModelForProvider("vercel", "minimax-m2.7")
+
+			// #then should produce minimax/minimax-m2.7
+			expect(result).toBe("minimax/minimax-m2.7")
+		})
+
+		test("prepends moonshotai/ for kimi models", () => {
+			// #given vercel provider and kimi-k2.5 model
+			// #when transformModelForProvider is called
+			const result = transformModelForProvider("vercel", "kimi-k2.5")
+
+			// #then should produce moonshotai/kimi-k2.5
+			expect(result).toBe("moonshotai/kimi-k2.5")
+		})
+
+		test("prepends zai/ for glm models", () => {
+			// #given vercel provider and glm-5 model
+			// #when transformModelForProvider is called
+			const result = transformModelForProvider("vercel", "glm-5")
+
+			// #then should produce zai/glm-5
+			expect(result).toBe("zai/glm-5")
+		})
+
 		test("passes through unknown models without sub-provider prefix", () => {
 			// #given vercel provider and an unknown model name
 			// #when transformModelForProvider is called

@@ -3,6 +3,9 @@ function inferSubProvider(model: string): string | undefined {
 	if (model.startsWith("gpt-")) return "openai"
 	if (model.startsWith("gemini-")) return "google"
 	if (model.startsWith("grok-")) return "xai"
+	if (model.startsWith("minimax-")) return "minimax"
+	if (model.startsWith("kimi-")) return "moonshotai"
+	if (model.startsWith("glm-")) return "zai"
 	return undefined
 }
 

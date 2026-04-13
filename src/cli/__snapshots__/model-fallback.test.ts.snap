@@ -4145,27 +4145,61 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
     "atlas": {
       "fallback_models": [
         {
+          "model": "vercel/moonshotai/kimi-k2.5",
+        },
+        {
           "model": "vercel/openai/gpt-5.4",
           "variant": "medium",
+        },
+        {
+          "model": "vercel/minimax/minimax-m2.7",
         },
       ],
       "model": "vercel/anthropic/claude-sonnet-4.6",
     },
     "explore": {
-      "model": "vercel/anthropic/claude-haiku-4.5",
+      "fallback_models": [
+        {
+          "model": "vercel/xai/grok-code-fast-1",
+        },
+        {
+          "model": "vercel/minimax/minimax-m2.7",
+        },
+        {
+          "model": "vercel/anthropic/claude-haiku-4.5",
+        },
+        {
+          "model": "vercel/openai/gpt-5-nano",
+        },
+      ],
+      "model": "vercel/minimax/minimax-m2.7-highspeed",
     },
     "hephaestus": {
       "model": "vercel/openai/gpt-5.4",
       "variant": "medium",
     },
     "librarian": {
-      "model": "vercel/anthropic/claude-haiku-4.5",
+      "fallback_models": [
+        {
+          "model": "vercel/minimax/minimax-m2.7-highspeed",
+        },
+        {
+          "model": "vercel/anthropic/claude-haiku-4.5",
+        },
+        {
+          "model": "vercel/openai/gpt-5-nano",
+        },
+      ],
+      "model": "vercel/minimax/minimax-m2.7",
     },
     "metis": {
       "fallback_models": [
         {
           "model": "vercel/openai/gpt-5.4",
           "variant": "high",
+        },
+        {
+          "model": "vercel/zai/glm-5",
         },
       ],
       "model": "vercel/anthropic/claude-opus-4.6",
@@ -4181,12 +4215,21 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
           "model": "vercel/google/gemini-3.1-pro-preview",
           "variant": "high",
         },
+        {
+          "model": "vercel/zai/glm-5",
+        },
       ],
       "model": "vercel/openai/gpt-5.4",
       "variant": "xhigh",
     },
     "multimodal-looker": {
       "fallback_models": [
+        {
+          "model": "vercel/moonshotai/kimi-k2.5",
+        },
+        {
+          "model": "vercel/zai/glm-4.6v",
+        },
         {
           "model": "vercel/openai/gpt-5-nano",
         },
@@ -4204,6 +4247,9 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
           "model": "vercel/anthropic/claude-opus-4.6",
           "variant": "max",
         },
+        {
+          "model": "vercel/zai/glm-5",
+        },
       ],
       "model": "vercel/openai/gpt-5.4",
       "variant": "high",
@@ -4215,6 +4261,9 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
           "variant": "high",
         },
         {
+          "model": "vercel/zai/glm-5",
+        },
+        {
           "model": "vercel/google/gemini-3.1-pro-preview",
         },
       ],
@@ -4224,8 +4273,14 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
     "sisyphus": {
       "fallback_models": [
         {
+          "model": "vercel/moonshotai/kimi-k2.5",
+        },
+        {
           "model": "vercel/openai/gpt-5.4",
           "variant": "medium",
+        },
+        {
+          "model": "vercel/zai/glm-5",
         },
       ],
       "model": "vercel/anthropic/claude-opus-4.6",
@@ -4234,8 +4289,14 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
     "sisyphus-junior": {
       "fallback_models": [
         {
+          "model": "vercel/moonshotai/kimi-k2.5",
+        },
+        {
           "model": "vercel/openai/gpt-5.4",
           "variant": "medium",
+        },
+        {
+          "model": "vercel/minimax/minimax-m2.7",
         },
       ],
       "model": "vercel/anthropic/claude-sonnet-4.6",
@@ -4277,6 +4338,12 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
         {
           "model": "vercel/google/gemini-3-flash",
         },
+        {
+          "model": "vercel/minimax/minimax-m2.7",
+        },
+        {
+          "model": "vercel/openai/gpt-5-nano",
+        },
       ],
       "model": "vercel/openai/gpt-5.4-mini",
     },
@@ -4290,6 +4357,9 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
           "model": "vercel/anthropic/claude-opus-4.6",
           "variant": "max",
         },
+        {
+          "model": "vercel/zai/glm-5",
+        },
       ],
       "model": "vercel/openai/gpt-5.4",
       "variant": "xhigh",
@@ -4301,7 +4371,13 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
           "variant": "medium",
         },
         {
+          "model": "vercel/moonshotai/kimi-k2.5",
+        },
+        {
           "model": "vercel/google/gemini-3-flash",
+        },
+        {
+          "model": "vercel/minimax/minimax-m2.7",
         },
       ],
       "model": "vercel/anthropic/claude-sonnet-4.6",
@@ -4313,13 +4389,22 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
           "variant": "medium",
         },
         {
+          "model": "vercel/moonshotai/kimi-k2.5",
+        },
+        {
           "model": "vercel/google/gemini-3-flash",
+        },
+        {
+          "model": "vercel/minimax/minimax-m2.7",
         },
       ],
       "model": "vercel/anthropic/claude-sonnet-4.6",
     },
     "visual-engineering": {
       "fallback_models": [
+        {
+          "model": "vercel/zai/glm-5",
+        },
         {
           "model": "vercel/anthropic/claude-opus-4.6",
           "variant": "max",
@@ -4331,7 +4416,13 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
     "writing": {
       "fallback_models": [
         {
+          "model": "vercel/moonshotai/kimi-k2.5",
+        },
+        {
           "model": "vercel/anthropic/claude-sonnet-4.6",
+        },
+        {
+          "model": "vercel/minimax/minimax-m2.7",
         },
       ],
       "model": "vercel/google/gemini-3-flash",
@@ -4347,27 +4438,61 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
     "atlas": {
       "fallback_models": [
         {
+          "model": "vercel/moonshotai/kimi-k2.5",
+        },
+        {
           "model": "vercel/openai/gpt-5.4",
           "variant": "medium",
+        },
+        {
+          "model": "vercel/minimax/minimax-m2.7",
         },
       ],
       "model": "vercel/anthropic/claude-sonnet-4.6",
     },
     "explore": {
-      "model": "vercel/anthropic/claude-haiku-4.5",
+      "fallback_models": [
+        {
+          "model": "vercel/xai/grok-code-fast-1",
+        },
+        {
+          "model": "vercel/minimax/minimax-m2.7",
+        },
+        {
+          "model": "vercel/anthropic/claude-haiku-4.5",
+        },
+        {
+          "model": "vercel/openai/gpt-5-nano",
+        },
+      ],
+      "model": "vercel/minimax/minimax-m2.7-highspeed",
     },
     "hephaestus": {
       "model": "vercel/openai/gpt-5.4",
       "variant": "medium",
     },
     "librarian": {
-      "model": "vercel/anthropic/claude-haiku-4.5",
+      "fallback_models": [
+        {
+          "model": "vercel/minimax/minimax-m2.7-highspeed",
+        },
+        {
+          "model": "vercel/anthropic/claude-haiku-4.5",
+        },
+        {
+          "model": "vercel/openai/gpt-5-nano",
+        },
+      ],
+      "model": "vercel/minimax/minimax-m2.7",
     },
     "metis": {
       "fallback_models": [
         {
           "model": "vercel/openai/gpt-5.4",
           "variant": "high",
+        },
+        {
+          "model": "vercel/zai/glm-5",
         },
       ],
       "model": "vercel/anthropic/claude-opus-4.6",
@@ -4383,12 +4508,21 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
           "model": "vercel/google/gemini-3.1-pro-preview",
           "variant": "high",
         },
+        {
+          "model": "vercel/zai/glm-5",
+        },
       ],
       "model": "vercel/openai/gpt-5.4",
       "variant": "xhigh",
     },
     "multimodal-looker": {
       "fallback_models": [
+        {
+          "model": "vercel/moonshotai/kimi-k2.5",
+        },
+        {
+          "model": "vercel/zai/glm-4.6v",
+        },
         {
           "model": "vercel/openai/gpt-5-nano",
         },
@@ -4406,6 +4540,9 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
           "model": "vercel/anthropic/claude-opus-4.6",
           "variant": "max",
         },
+        {
+          "model": "vercel/zai/glm-5",
+        },
       ],
       "model": "vercel/openai/gpt-5.4",
       "variant": "high",
@@ -4417,6 +4554,9 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
           "variant": "high",
         },
         {
+          "model": "vercel/zai/glm-5",
+        },
+        {
           "model": "vercel/google/gemini-3.1-pro-preview",
         },
       ],
@@ -4426,8 +4566,14 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
     "sisyphus": {
       "fallback_models": [
         {
+          "model": "vercel/moonshotai/kimi-k2.5",
+        },
+        {
           "model": "vercel/openai/gpt-5.4",
           "variant": "medium",
+        },
+        {
+          "model": "vercel/zai/glm-5",
         },
       ],
       "model": "vercel/anthropic/claude-opus-4.6",
@@ -4436,8 +4582,14 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
     "sisyphus-junior": {
       "fallback_models": [
         {
+          "model": "vercel/moonshotai/kimi-k2.5",
+        },
+        {
           "model": "vercel/openai/gpt-5.4",
           "variant": "medium",
+        },
+        {
+          "model": "vercel/minimax/minimax-m2.7",
         },
       ],
       "model": "vercel/anthropic/claude-sonnet-4.6",
@@ -4479,6 +4631,12 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
         {
           "model": "vercel/google/gemini-3-flash",
         },
+        {
+          "model": "vercel/minimax/minimax-m2.7",
+        },
+        {
+          "model": "vercel/openai/gpt-5-nano",
+        },
       ],
       "model": "vercel/openai/gpt-5.4-mini",
     },
@@ -4492,6 +4650,9 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
           "model": "vercel/anthropic/claude-opus-4.6",
           "variant": "max",
         },
+        {
+          "model": "vercel/zai/glm-5",
+        },
       ],
       "model": "vercel/openai/gpt-5.4",
       "variant": "xhigh",
@@ -4501,6 +4662,12 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
         {
           "model": "vercel/openai/gpt-5.4",
           "variant": "high",
+        },
+        {
+          "model": "vercel/zai/glm-5",
+        },
+        {
+          "model": "vercel/moonshotai/kimi-k2.5",
         },
       ],
       "model": "vercel/anthropic/claude-opus-4.6",
@@ -4513,13 +4680,22 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
           "variant": "medium",
         },
         {
+          "model": "vercel/moonshotai/kimi-k2.5",
+        },
+        {
           "model": "vercel/google/gemini-3-flash",
+        },
+        {
+          "model": "vercel/minimax/minimax-m2.7",
         },
       ],
       "model": "vercel/anthropic/claude-sonnet-4.6",
     },
     "visual-engineering": {
       "fallback_models": [
+        {
+          "model": "vercel/zai/glm-5",
+        },
         {
           "model": "vercel/anthropic/claude-opus-4.6",
           "variant": "max",
@@ -4531,7 +4707,13 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
     "writing": {
       "fallback_models": [
         {
+          "model": "vercel/moonshotai/kimi-k2.5",
+        },
+        {
           "model": "vercel/anthropic/claude-sonnet-4.6",
+        },
+        {
+          "model": "vercel/minimax/minimax-m2.7",
         },
       ],
       "model": "vercel/google/gemini-3-flash",
