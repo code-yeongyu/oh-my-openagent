@@ -138,7 +138,8 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
     !config.hasOpenAI &&
     !config.hasGemini &&
     !config.hasCopilot &&
-    !config.hasOpencodeZen
+    !config.hasOpencodeZen &&
+    !config.hasVercelAiGateway
   ) {
     printWarning("No model providers configured. Using opencode/big-pickle as fallback.")
   }
