@@ -112,6 +112,20 @@ describe("loop-detector", () => {
       expect(result).toBe("read")
     })
 
+    test("#given nullish inputs #when signatures are created #then null and undefined behave the same", () => {
+      // given
+      const undefinedInput = undefined
+      const nullInput = null
+
+      // when
+      const undefinedResult = createToolCallSignature("read", undefinedInput)
+      const nullResult = createToolCallSignature("read", nullInput)
+
+      // then
+      expect(undefinedResult).toBe("read")
+      expect(nullResult).toBe(undefinedResult)
+    })
+
     test("#given tool with empty object input #when signature created #then returns bare tool name", () => {
       const result = createToolCallSignature("read", {})
 
@@ -257,6 +271,25 @@ describe("loop-detector", () => {
         const result = detectRepetitiveToolUse(window)
 
         expect(result).toEqual({ triggered: false })
+      })
+    })
+
+    describe("#given nullish tool inputs", () => {
+      test("#when recorded #then null and undefined produce the same unknown-input window", () => {
+        // given
+        const settings = resolveCircuitBreakerSettings()
+
+        // when
+        const undefinedWindow = recordToolCall(undefined, "read", settings, undefined)
+        const nullWindow = recordToolCall(undefined, "read", settings, null)
+
+        // then
+        expect(undefinedWindow).toEqual(nullWindow)
+        expect(undefinedWindow).toEqual({
+          lastSignature: "read::__unknown-input__",
+          consecutiveCount: 1,
+          threshold: settings.consecutiveThreshold,
+        })
       })
     })
   })

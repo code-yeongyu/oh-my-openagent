@@ -127,6 +127,32 @@ describe("skill tool - agent restriction", () => {
     expect(result).toContain("public-skill")
   })
 
+  it("requests host skill permission before loading the skill", async () => {
+    // given
+    const loadedSkills = [createMockSkill("review-work")]
+    const askCalls: Array<Parameters<ToolContext["ask"]>[0]> = []
+    const tool = createSkillTool({ skills: loadedSkills })
+    const context: ToolContext = {
+      ...mockContext,
+      ask: async (input) => {
+        askCalls.push(input)
+      },
+    }
+
+    // when
+    await tool.execute({ name: "review-work" }, context)
+
+    // then
+    expect(askCalls).toEqual([
+      {
+        permission: "skill",
+        patterns: ["review-work"],
+        always: ["review-work"],
+        metadata: { skill: "review-work" },
+      },
+    ])
+  })
+
   it("allows skill when agent matches restriction", async () => {
     // given
     const loadedSkills = [createMockSkill("restricted-skill", { agent: "sisyphus" })]
@@ -147,7 +173,7 @@ describe("skill tool - agent restriction", () => {
     const context = { ...mockContext, agent: "oracle" }
 
     // when / #then
-    await expect(tool.execute({ name: "sisyphus-only-skill" }, context)).rejects.toThrow(
+    return expect(tool.execute({ name: "sisyphus-only-skill" }, context)).rejects.toThrow(
       'Skill "sisyphus-only-skill" is restricted to agent "sisyphus"'
     )
   })
@@ -159,7 +185,7 @@ describe("skill tool - agent restriction", () => {
     const contextWithoutAgent = { ...mockContext, agent: undefined as unknown as string }
 
     // when / #then
-    await expect(tool.execute({ name: "sisyphus-only-skill" }, contextWithoutAgent)).rejects.toThrow(
+    return expect(tool.execute({ name: "sisyphus-only-skill" }, contextWithoutAgent)).rejects.toThrow(
       'Skill "sisyphus-only-skill" is restricted to agent "sisyphus"'
     )
   })
@@ -567,6 +593,7 @@ describe("skill tool - dynamic description cache invalidation", () => {
     
     // Get initial description - it will build from empty or disk skills
     const initialDescription = tool.description
+    expect(initialDescription).toBeString()
     
     // when: execute() is called, which clears cache AND gets fresh skills
     // Note: In real scenario, execute() would discover new skills from disk
@@ -739,7 +766,7 @@ describe("skill tool - short name resolution", () => {
     const tool = createSkillTool({ skills: loadedSkills })
 
     // when / then, should not resolve (ambiguous), should suggest both
-    await expect(tool.execute({ name: "debugging" }, mockContext)).rejects.toThrow(
+    return expect(tool.execute({ name: "debugging" }, mockContext)).rejects.toThrow(
       "not found"
     )
   })

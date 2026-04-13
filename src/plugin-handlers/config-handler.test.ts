@@ -447,7 +447,7 @@ describe("Plan agent demote behavior", () => {
     expect(agents.plan.prompt).toBe("original plan prompt")
   })
 
-  test("prometheus should have mode 'all' to be callable via task", async () => {
+  test("prometheus should have mode 'primary' like the other core agents", async () => {
     // given
     const pluginConfig = createPluginConfig({
       sisyphus_agent: {
@@ -474,7 +474,7 @@ describe("Plan agent demote behavior", () => {
     const agents = config.agent as Record<string, { mode?: string }>
     const prometheusKey = getAgentListDisplayName("prometheus")
     expect(agents[prometheusKey]).toBeDefined()
-    expect(agents[prometheusKey].mode).toBe("all")
+    expect(agents[prometheusKey].mode).toBe("primary")
   })
 })
 
@@ -1007,7 +1007,7 @@ describe("Plan agent model inheritance from prometheus", () => {
     spyOn(prometheusAgentConfigBuilder, "buildPrometheusAgentConfig").mockResolvedValue({
       model: "anthropic/claude-opus-4-6",
       variant: "max",
-      mode: "all",
+      mode: "primary",
       prompt: "prometheus prompt",
     })
     const pluginConfig = createPluginConfig({

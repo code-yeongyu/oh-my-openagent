@@ -11,6 +11,7 @@ export interface ProviderAvailability {
 	zai: boolean
 kimiForCoding: boolean
 	opencodeGo: boolean
+	vercelAiGateway: boolean
 	isMaxPlan: boolean
 }
 

@@ -103,6 +103,7 @@ export type SessionStatusMap = Record<string, { type: string }>
 export async function checkAndInterruptStaleTasks(args: {
   tasks: Iterable<BackgroundTask>
   client: OpencodeClient
+  directory?: string
   config: BackgroundTaskConfig | undefined
   concurrencyManager: ConcurrencyManager
   notifyParentSession: (task: BackgroundTask) => Promise<void>
@@ -112,6 +113,7 @@ export async function checkAndInterruptStaleTasks(args: {
   const {
     tasks,
     client,
+    directory,
     config,
     concurrencyManager,
     notifyParentSession,
@@ -151,7 +153,7 @@ export async function checkAndInterruptStaleTasks(args: {
       const effectiveTimeout = sessionGone ? sessionGoneTimeoutMs : messageStalenessMs
       if (runtime <= effectiveTimeout) continue
 
-      if (sessionGone && await verifySessionExists(client, sessionID)) {
+      if (sessionGone && await verifySessionExists(client, sessionID, directory)) {
         task.consecutiveMissedPolls = 0
         continue
       }
@@ -189,7 +191,7 @@ export async function checkAndInterruptStaleTasks(args: {
     if (timeSinceLastUpdate <= effectiveStaleTimeout) continue
     if (task.status !== "running") continue
 
-    if (sessionGone && await verifySessionExists(client, sessionID)) {
+    if (sessionGone && await verifySessionExists(client, sessionID, directory)) {
       task.consecutiveMissedPolls = 0
       continue
     }

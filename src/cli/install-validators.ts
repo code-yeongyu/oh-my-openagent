@@ -40,6 +40,7 @@ export function formatConfigSummary(config: InstallConfig): string {
   lines.push(formatProvider("OpenCode Zen", config.hasOpencodeZen, "opencode/ models"))
   lines.push(formatProvider("Z.ai Coding Plan", config.hasZaiCodingPlan, "Librarian/Multimodal"))
   lines.push(formatProvider("Kimi For Coding", config.hasKimiForCoding, "Sisyphus/Prometheus fallback"))
+  lines.push(formatProvider("Vercel AI Gateway", config.hasVercelAiGateway, "universal proxy"))
 
   lines.push("")
   lines.push(color.dim("─".repeat(40)))
@@ -153,6 +154,10 @@ export function validateNonTuiArgs(args: InstallArgs): { valid: boolean; errors:
     errors.push(`Invalid --kimi-for-coding value: ${args.kimiForCoding} (expected: no, yes)`)
   }
 
+  if (args.vercelAiGateway !== undefined && !["no", "yes"].includes(args.vercelAiGateway)) {
+    errors.push(`Invalid --vercel-ai-gateway value: ${args.vercelAiGateway} (expected: no, yes)`)
+  }
+
   return { valid: errors.length === 0, errors }
 }
 
@@ -167,6 +172,7 @@ export function argsToConfig(args: InstallArgs): InstallConfig {
     hasZaiCodingPlan: args.zaiCodingPlan === "yes",
 hasKimiForCoding: args.kimiForCoding === "yes",
     hasOpencodeGo: args.opencodeGo === "yes",
+    hasVercelAiGateway: args.vercelAiGateway === "yes",
   }
 }
 
@@ -179,6 +185,7 @@ export function detectedToInitialValues(detected: DetectedConfig): {
   zaiCodingPlan: BooleanArg
 kimiForCoding: BooleanArg
   opencodeGo: BooleanArg
+  vercelAiGateway: BooleanArg
 } {
   let claude: ClaudeSubscription = "no"
   if (detected.hasClaude) {
@@ -194,5 +201,6 @@ kimiForCoding: BooleanArg
     zaiCodingPlan: detected.hasZaiCodingPlan ? "yes" : "no",
 kimiForCoding: detected.hasKimiForCoding ? "yes" : "no",
     opencodeGo: detected.hasOpencodeGo ? "yes" : "no",
+    vercelAiGateway: detected.hasVercelAiGateway ? "yes" : "no",
   }
 }

@@ -20,6 +20,7 @@ const installConfig: InstallConfig = {
   hasZaiCodingPlan: false,
   hasKimiForCoding: false,
   hasOpencodeGo: false,
+  hasVercelAiGateway: false,
 }
 
 function getRecord(value: unknown): Record<string, unknown> {

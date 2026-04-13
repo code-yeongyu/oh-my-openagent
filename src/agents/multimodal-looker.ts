@@ -42,7 +42,7 @@ How you work:
 3. Return ONLY the relevant extracted information
 4. The main agent never processes the raw file - you save context tokens
 
-For PDFs: extract text, structure, tables, data from specific sections
+For PDFs and documents: Use the Read tool to load the file content first, then extract text, structure, tables, data from specific sections
 For images: describe layouts, UI elements, text, diagrams, charts
 For diagrams: explain relationships, flows, architecture depicted
 

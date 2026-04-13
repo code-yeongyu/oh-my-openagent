@@ -65,6 +65,7 @@ export function createAnthropicEffortHook() {
       if (isEffortUnsupportedModel(model.modelID)) return
       if (message.variant !== "max") return
       if (!isClaudeProvider(model.providerID, model.modelID)) return
+      if (model.providerID === "github-copilot") return
       if (shouldSkipForInternalAgent(agent?.name)) return
       if (output.options.effort !== undefined) return
 
