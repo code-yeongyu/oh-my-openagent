@@ -101,6 +101,10 @@ https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/heads/dev/do
 curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/heads/dev/docs/guide/installation.md
 ```
 
+**Примечание**: Используйте опубликованное имя пакета и бинарника `oh-my-opencode`. Внутри `opencode.json` слой совместимости теперь предпочитает точку входа плагина `oh-my-openagent`, в то время как устаревшие записи `oh-my-opencode` все еще загружаются с предупреждением. Файлы конфигурации плагина по-прежнему часто используют `oh-my-opencode.json` или `oh-my-opencode.jsonc`, и как устаревшие, так и переименованные базовые имена распознаются во время переходного периода.
+
+Анонимная телеметрия включена по умолчанию для улучшения надежности установки и работы. Она использует PostHog с хешированным идентификатором установки, никогда не используя исходное имя хоста, и может быть отключена с помощью `OMO_SEND_ANONYMOUS_TELEMETRY=0` или `OMO_DISABLE_POSTHOG=1`. См. [Политику конфиденциальности](docs/legal/privacy-policy.md) и [Условия обслуживания](docs/legal/terms-of-service.md).
+
 ------
 
 ## Пропустите этот README
