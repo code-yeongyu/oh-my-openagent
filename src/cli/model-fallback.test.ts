@@ -16,6 +16,7 @@ function createConfig(overrides: Partial<InstallConfig> = {}): InstallConfig {
     hasZaiCodingPlan: false,
     hasKimiForCoding: false,
     hasOpencodeGo: false,
+    hasVercelAiGateway: false,
     ...overrides,
   }
 }
@@ -604,6 +605,74 @@ describe("generateModelConfig", () => {
       // #then librarian should not have fallback_models
       expect(result.agents?.librarian?.model).toBe("opencode-go/minimax-m2.7")
       expect(result.agents?.librarian?.fallback_models).toBeUndefined()
+    })
+  })
+
+  describe("Vercel AI Gateway provider", () => {
+    test("uses vercel/ model strings when only Vercel AI Gateway is available", () => {
+      // #given only Vercel AI Gateway is available
+      const config = createConfig({ hasVercelAiGateway: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then should use vercel/<sub-provider>/<model> format
+      expect(result).toMatchSnapshot()
+    })
+
+    test("uses vercel/ model strings with isMax20 flag", () => {
+      // #given Vercel AI Gateway is available with Max 20 plan
+      const config = createConfig({ hasVercelAiGateway: true, isMax20: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then should use higher capability models via gateway
+      expect(result).toMatchSnapshot()
+    })
+
+    test("explore uses vercel/anthropic/claude-haiku-4.5 when only gateway available", () => {
+      // #given only Vercel AI Gateway is available
+      const config = createConfig({ hasVercelAiGateway: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then explore should use gateway-routed claude-haiku
+      expect(result.agents?.explore?.model).toBe("vercel/anthropic/claude-haiku-4.5")
+    })
+
+    test("librarian uses vercel/anthropic/claude-haiku-4.5 when only gateway available", () => {
+      // #given only Vercel AI Gateway is available
+      const config = createConfig({ hasVercelAiGateway: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then librarian should use gateway-routed claude-haiku
+      expect(result.agents?.librarian?.model).toBe("vercel/anthropic/claude-haiku-4.5")
+    })
+
+    test("Hephaestus is created when only Vercel AI Gateway is available", () => {
+      // #given only Vercel AI Gateway is available
+      const config = createConfig({ hasVercelAiGateway: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then hephaestus should be created with gateway-routed gpt-5.4
+      expect(result.agents?.hephaestus?.model).toBe("vercel/openai/gpt-5.4")
+    })
+
+    test("native providers take priority over gateway", () => {
+      // #given Claude and Vercel AI Gateway are both available
+      const config = createConfig({ hasClaude: true, hasVercelAiGateway: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then should prefer native anthropic over gateway
+      expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-opus-4.6")
     })
   })
 
