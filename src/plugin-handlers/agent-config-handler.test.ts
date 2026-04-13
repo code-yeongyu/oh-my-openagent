@@ -9,13 +9,13 @@ import type { OhMyOpenCodeConfig } from "../config"
 import * as agentLoader from "../features/claude-code-agent-loader"
 import * as skillLoader from "../features/opencode-skill-loader"
 import type { LoadedSkill } from "../features/opencode-skill-loader"
-import { getAgentListDisplayName, getAgentRuntimeName } from "../shared/agent-display-names"
+import { getAgentDisplayName, getAgentRuntimeName } from "../shared/agent-display-names"
 import { applyAgentConfig } from "./agent-config-handler"
 import type { PluginComponents } from "./plugin-components-loader"
 
-const BUILTIN_SISYPHUS_DISPLAY_NAME = getAgentListDisplayName("sisyphus")
-const BUILTIN_SISYPHUS_JUNIOR_DISPLAY_NAME = getAgentListDisplayName("sisyphus-junior")
-const BUILTIN_MULTIMODAL_LOOKER_DISPLAY_NAME = getAgentListDisplayName("multimodal-looker")
+const BUILTIN_SISYPHUS_DISPLAY_NAME = getAgentDisplayName("sisyphus")
+const BUILTIN_SISYPHUS_JUNIOR_DISPLAY_NAME = getAgentDisplayName("sisyphus-junior")
+const BUILTIN_MULTIMODAL_LOOKER_DISPLAY_NAME = getAgentDisplayName("multimodal-looker")
 
 function createPluginComponents(): PluginComponents {
   return {
@@ -175,8 +175,8 @@ describe("applyAgentConfig builtin override protection", () => {
     })
 
     // then every registered agent key must be HTTP-header-safe (no parentheses)
-    // Parentheses in agent names cause HTTP header validation errors in
-    // x-opencode-agent-name and prevent the agents from showing in the OpenCode UI.
+    // Agent keys can flow into HTTP header values in some plugin paths.
+    // Parentheses and ZWSP characters violate RFC 7230 header value rules.
     for (const key of Object.keys(result)) {
       expect(key).not.toMatch(/[()]/)
     }

@@ -4,10 +4,12 @@
  * Display names include suffixes for UI/logs (e.g., "Sisyphus - Ultraworker").
  *
  * IMPORTANT: Display names MUST NOT contain parentheses or other characters
- * that are invalid in HTTP header values per RFC 7230. OpenCode passes the
- * agent name in the `x-opencode-agent-name` header, and parentheses cause
- * header validation failures that prevent agents from appearing in the UI
- * type selector dropdown. Use ` - ` (space-dash-space) instead of `(...)`.
+ * that are invalid in HTTP header values per RFC 7230. Config object keys
+ * can flow into HTTP header values in some plugin paths. Use ` - `
+ * (space-dash-space) instead of `(...)` to avoid header validation failures.
+ *
+ * NOTE: ZWSP characters (\u200B) are used ONLY in the `name` field for
+ * UI sorting. ZWSP MUST NOT appear in object keys (see agent-key-remapper.ts).
  */
 export const AGENT_DISPLAY_NAMES: Record<string, string> = {
   sisyphus: "Sisyphus - Ultraworker",
