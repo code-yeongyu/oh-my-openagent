@@ -100,6 +100,34 @@ This is a simple skill.
       }
     })
 
+    it("coerces numeric frontmatter names to strings", async () => {
+      // given
+      const skillContent = `---
+name: 12306
+description: Numeric skill name
+---
+This skill name should still load.
+`
+      createTestSkill("12306", skillContent)
+
+      // when
+      const { discoverSkills } = await import("./loader")
+      const originalCwd = process.cwd()
+      process.chdir(TEST_DIR)
+
+      try {
+        const skills = await discoverSkills({ includeClaudeCodePaths: false })
+        const skill = skills.find(s => s.name === "12306")
+
+        // then
+        expect(skill).toBeDefined()
+        expect(typeof skill?.name).toBe("string")
+        expect(skill?.definition.name).toBe("12306")
+      } finally {
+        process.chdir(originalCwd)
+      }
+    })
+
     it("preserves env var placeholders without expansion", async () => {
       // given
       const skillContent = `---
