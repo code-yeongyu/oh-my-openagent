@@ -247,13 +247,13 @@ describe("transformModelForProvider", () => {
 			expect(result).toBe("google/gemini-3.1-pro-preview")
 		})
 
-		test("prepends google/ and applies google transform for gemini-3-flash", () => {
+		test("prepends google/ without -preview for gemini-3-flash", () => {
 			// #given vercel provider and gemini-3-flash model
 			// #when transformModelForProvider is called
 			const result = transformModelForProvider("vercel", "gemini-3-flash")
 
-			// #then should produce google/gemini-3-flash-preview
-			expect(result).toBe("google/gemini-3-flash-preview")
+			// #then should produce google/gemini-3-flash (gateway does not use -preview for this model)
+			expect(result).toBe("google/gemini-3-flash")
 		})
 
 		test("prepends xai/ for grok models", () => {

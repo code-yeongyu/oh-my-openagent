@@ -4275,7 +4275,7 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
           "model": "vercel/anthropic/claude-haiku-4.5",
         },
         {
-          "model": "vercel/google/gemini-3-flash-preview",
+          "model": "vercel/google/gemini-3-flash",
         },
       ],
       "model": "vercel/openai/gpt-5.4-mini",
@@ -4301,7 +4301,7 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
           "variant": "medium",
         },
         {
-          "model": "vercel/google/gemini-3-flash-preview",
+          "model": "vercel/google/gemini-3-flash",
         },
       ],
       "model": "vercel/anthropic/claude-sonnet-4.6",
@@ -4313,7 +4313,7 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
           "variant": "medium",
         },
         {
-          "model": "vercel/google/gemini-3-flash-preview",
+          "model": "vercel/google/gemini-3-flash",
         },
       ],
       "model": "vercel/anthropic/claude-sonnet-4.6",
@@ -4334,7 +4334,7 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
           "model": "vercel/anthropic/claude-sonnet-4.6",
         },
       ],
-      "model": "vercel/google/gemini-3-flash-preview",
+      "model": "vercel/google/gemini-3-flash",
     },
   },
 }
@@ -4477,7 +4477,7 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
           "model": "vercel/anthropic/claude-haiku-4.5",
         },
         {
-          "model": "vercel/google/gemini-3-flash-preview",
+          "model": "vercel/google/gemini-3-flash",
         },
       ],
       "model": "vercel/openai/gpt-5.4-mini",
@@ -4513,7 +4513,7 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
           "variant": "medium",
         },
         {
-          "model": "vercel/google/gemini-3-flash-preview",
+          "model": "vercel/google/gemini-3-flash",
         },
       ],
       "model": "vercel/anthropic/claude-sonnet-4.6",
@@ -4534,7 +4534,7 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
           "model": "vercel/anthropic/claude-sonnet-4.6",
         },
       ],
-      "model": "vercel/google/gemini-3-flash-preview",
+      "model": "vercel/google/gemini-3-flash",
     },
   },
 }
