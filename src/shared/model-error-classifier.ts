@@ -50,6 +50,7 @@ const RETRYABLE_MESSAGE_PATTERNS = [
   "over limit",
   "hit your limit",
   "hit the limit",
+  "spending cap",
   "overloaded",
   "bad gateway",
   "bad request",
