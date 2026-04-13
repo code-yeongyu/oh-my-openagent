@@ -37,6 +37,7 @@ export const RETRYABLE_ERROR_PATTERNS = [
   /temporarily.?unavailable/i,
   /hit.{0,10}(?:your|the)?.{0,5}limit/i,
   /spending.?cap/i,
+  /usage.?limit/i,
   /try.?again/i,
   /(?:^|\s)429(?:\s|$)/,
   /(?:^|\s)503(?:\s|$)/,

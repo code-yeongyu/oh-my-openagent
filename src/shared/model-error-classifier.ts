@@ -51,6 +51,7 @@ const RETRYABLE_MESSAGE_PATTERNS = [
   "hit your limit",
   "hit the limit",
   "spending cap",
+  "usage limit",
   "overloaded",
   "bad gateway",
   "bad request",
@@ -84,7 +85,6 @@ const RETRYABLE_MESSAGE_PATTERNS = [
 const STOP_MESSAGE_PATTERNS = [
   "quota will reset after",
   "quota exceeded",
-  "usage limit has been reached",
   "free usage limit",
   "billing limit",
   "billing hard limit",
