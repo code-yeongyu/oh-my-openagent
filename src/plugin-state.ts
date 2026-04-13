@@ -5,6 +5,7 @@ export type VisionCapableModel = {
 
 export interface ModelCacheState {
   modelContextLimitsCache: Map<string, number>;
+  providerContextLimitMinimumsCache?: Map<string, number>;
   visionCapableModelsCache?: Map<string, VisionCapableModel>;
   anthropicContext1MEnabled: boolean;
 }
@@ -12,6 +13,7 @@ export interface ModelCacheState {
 export function createModelCacheState(): ModelCacheState {
   return {
     modelContextLimitsCache: new Map<string, number>(),
+    providerContextLimitMinimumsCache: new Map<string, number>(),
     visionCapableModelsCache: new Map<string, VisionCapableModel>(),
     anthropicContext1MEnabled: false,
   };

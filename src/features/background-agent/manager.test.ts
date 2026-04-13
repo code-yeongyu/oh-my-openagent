@@ -4434,11 +4434,11 @@ describe("BackgroundManager.handleEvent - session.error", () => {
     //#then
     expect(task.status).toBe("pending")
     expect(task.attemptCount).toBe(1)
-    expect(task.model).toEqual({
-      providerID: "anthropic",
-      modelID: "claude-opus-4.6",
-      variant: "max",
-    })
+		expect(task.model).toEqual({
+			providerID: "anthropic",
+			modelID: "claude-opus-4-6",
+			variant: "max",
+		})
     expect(task.concurrencyKey).toBeUndefined()
     expect(concurrencyManager.getCount(concurrencyKey)).toBe(0)
 
@@ -4472,11 +4472,11 @@ describe("BackgroundManager.handleEvent - session.error", () => {
     //#then
     expect(task.status).toBe("pending")
     expect(task.attemptCount).toBe(1)
-    expect(task.model).toEqual({
-      providerID: "anthropic",
-      modelID: "claude-opus-4.6",
-      variant: "max",
-    })
+		expect(task.model).toEqual({
+			providerID: "anthropic",
+			modelID: "claude-opus-4-6",
+			variant: "max",
+		})
 
     manager.shutdown()
   })
@@ -4517,11 +4517,11 @@ describe("BackgroundManager.handleEvent - session.error", () => {
     //#then
     expect(task.status).toBe("pending")
     expect(task.attemptCount).toBe(1)
-    expect(task.model).toEqual({
-      providerID: "anthropic",
-      modelID: "claude-opus-4.6",
-      variant: "max",
-    })
+		expect(task.model).toEqual({
+			providerID: "anthropic",
+			modelID: "claude-opus-4-6",
+			variant: "max",
+		})
 
     manager.shutdown()
   })

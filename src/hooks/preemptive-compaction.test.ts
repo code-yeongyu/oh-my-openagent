@@ -66,6 +66,13 @@ function setupImmediateTimeouts(): () => void {
   }
 }
 
+function createModelLimitState(entries: Array<[string, number]>) {
+  return {
+    anthropicContext1MEnabled: false,
+    modelContextLimitsCache: new Map<string, number>(entries),
+  }
+}
+
 describe("preemptive-compaction", () => {
   let ctx: ReturnType<typeof createMockCtx>
 
@@ -137,10 +144,14 @@ describe("preemptive-compaction", () => {
   // #when tool.execute.after runs
   // #then should trigger summarize
   it("should trigger compaction when usage exceeds threshold", async () => {
-    const hook = createPreemptiveCompactionHook(ctx as never, {} as never)
+    const hook = createPreemptiveCompactionHook(
+      ctx as never,
+      {} as never,
+      createModelLimitState([["anthropic/claude-sonnet-4-6", 1_000_000]]),
+    )
     const sessionID = "ses_high"
 
-    // 170K input + 10K cache = 180K → 90% of 200K
+    // 800K input + 10K cache = 811K → above the 78% preemptive threshold of a 1M window
     await hook.event({
       event: {
         type: "message.updated",
@@ -152,7 +163,7 @@ describe("preemptive-compaction", () => {
             modelID: "claude-sonnet-4-6",
             finish: true,
             tokens: {
-              input: 170000,
+              input: 800000,
               output: 1000,
               reasoning: 0,
               cache: { read: 10000, write: 0 },
@@ -174,7 +185,11 @@ describe("preemptive-compaction", () => {
 
   it("should trigger compaction for google-vertex-anthropic provider", async () => {
     //#given google-vertex-anthropic usage above threshold
-    const hook = createPreemptiveCompactionHook(ctx as never, {} as never)
+    const hook = createPreemptiveCompactionHook(
+      ctx as never,
+      {} as never,
+      createModelLimitState([["google-vertex-anthropic/claude-sonnet-4-6", 1_000_000]]),
+    )
     const sessionID = "ses_vertex_anthropic_high"
 
     await hook.event({
@@ -188,7 +203,7 @@ describe("preemptive-compaction", () => {
             modelID: "claude-sonnet-4-6",
             finish: true,
             tokens: {
-              input: 170000,
+              input: 800000,
               output: 1000,
               reasoning: 0,
               cache: { read: 10000, write: 0 },
@@ -249,7 +264,11 @@ describe("preemptive-compaction", () => {
 
   it("should log summarize errors instead of swallowing them", async () => {
     //#given
-    const hook = createPreemptiveCompactionHook(ctx as never, {} as never)
+    const hook = createPreemptiveCompactionHook(
+      ctx as never,
+      {} as never,
+      createModelLimitState([["anthropic/claude-sonnet-4-6", 1_000_000]]),
+    )
     const sessionID = "ses_log_error"
     const summarizeError = new Error("summarize failed")
     ctx.client.session.summarize.mockRejectedValueOnce(summarizeError)
@@ -265,7 +284,7 @@ describe("preemptive-compaction", () => {
             modelID: "claude-sonnet-4-6",
             finish: true,
             tokens: {
-              input: 170000,
+              input: 800000,
               output: 0,
               reasoning: 0,
               cache: { read: 10000, write: 0 },
@@ -295,7 +314,11 @@ describe("preemptive-compaction", () => {
   // #then should show a warning toast explaining the failure to the user
   it("should show a warning toast when preemptive compaction fails", async () => {
     //#given
-    const hook = createPreemptiveCompactionHook(ctx as never, {} as never)
+    const hook = createPreemptiveCompactionHook(
+      ctx as never,
+      {} as never,
+      createModelLimitState([["anthropic/claude-sonnet-4-6", 200_000]]),
+    )
     const sessionID = "ses_toast_on_failure"
     const summarizeError = new Error("upstream rate limited")
     ctx.client.session.summarize.mockRejectedValueOnce(summarizeError)
@@ -340,7 +363,11 @@ describe("preemptive-compaction", () => {
   // #then should NOT retry due to cooldown
   it("should enforce cooldown even after failed compaction to prevent rapid retry loops", async () => {
     //#given
-    const hook = createPreemptiveCompactionHook(ctx as never, {} as never)
+    const hook = createPreemptiveCompactionHook(
+      ctx as never,
+      {} as never,
+      createModelLimitState([["anthropic/claude-sonnet-4-6", 1_000_000]]),
+    )
     const sessionID = "ses_fail_cooldown"
     ctx.client.session.summarize.mockRejectedValueOnce(new Error("rate limited"))
 
@@ -355,7 +382,7 @@ describe("preemptive-compaction", () => {
             modelID: "claude-sonnet-4-6",
             finish: true,
             tokens: {
-              input: 170000,
+              input: 800000,
               output: 0,
               reasoning: 0,
               cache: { read: 10000, write: 0 },
@@ -384,7 +411,7 @@ describe("preemptive-compaction", () => {
             modelID: "claude-sonnet-4-6",
             finish: true,
             tokens: {
-              input: 170000,
+              input: 800000,
               output: 0,
               reasoning: 0,
               cache: { read: 10000, write: 0 },
@@ -483,7 +510,11 @@ describe("preemptive-compaction", () => {
   it("should clear in-progress lock when summarize times out", async () => {
     //#given
     const restoreTimeouts = setupImmediateTimeouts()
-    const hook = createPreemptiveCompactionHook(ctx as never, {} as never)
+    const hook = createPreemptiveCompactionHook(
+      ctx as never,
+      {} as never,
+      createModelLimitState([["anthropic/claude-sonnet-4-6", 1_000_000]]),
+    )
     const sessionID = "ses_timeout"
 
     ctx.client.session.summarize
@@ -502,7 +533,7 @@ describe("preemptive-compaction", () => {
               modelID: "claude-sonnet-4-6",
               finish: true,
               tokens: {
-                input: 170000,
+                input: 800000,
                 output: 0,
                 reasoning: 0,
                 cache: { read: 10000, write: 0 },
@@ -542,7 +573,7 @@ describe("preemptive-compaction", () => {
                 modelID: "claude-sonnet-4-6",
                 finish: true,
                 tokens: {
-                  input: 170000,
+                  input: 800000,
                   output: 0,
                   reasoning: 0,
                   cache: { read: 10000, write: 0 },
@@ -571,7 +602,11 @@ describe("preemptive-compaction", () => {
   // #when tool.execute.after runs after new high-token message
   // #then should trigger compaction again (re-compaction)
   it("should allow re-compaction when context grows after successful compaction", async () => {
-    const hook = createPreemptiveCompactionHook(ctx as never, {} as never)
+    const hook = createPreemptiveCompactionHook(
+      ctx as never,
+      {} as never,
+      createModelLimitState([["anthropic/claude-sonnet-4-6", 1_000_000]]),
+    )
     const sessionID = "ses_recompact"
 
     // given - first compaction cycle
@@ -586,7 +621,7 @@ describe("preemptive-compaction", () => {
             modelID: "claude-sonnet-4-6",
             finish: true,
             tokens: {
-              input: 170000,
+              input: 800000,
               output: 0,
               reasoning: 0,
               cache: { read: 10000, write: 0 },
@@ -617,7 +652,7 @@ describe("preemptive-compaction", () => {
             modelID: "claude-sonnet-4-6",
             finish: true,
             tokens: {
-              input: 170000,
+              input: 800000,
               output: 0,
               reasoning: 0,
               cache: { read: 10000, write: 0 },
@@ -723,7 +758,7 @@ describe("preemptive-compaction", () => {
     expect(ctx.client.session.summarize).toHaveBeenCalled()
   })
 
-  it("should ignore stale cached Anthropic limits for older models", async () => {
+  it("should respect cached Anthropic limits for older models", async () => {
     const modelContextLimitsCache = new Map<string, number>()
     modelContextLimitsCache.set("anthropic/claude-sonnet-4-5", 500000)
 
@@ -759,6 +794,6 @@ describe("preemptive-compaction", () => {
       { title: "", output: "test", metadata: null }
     )
 
-    expect(ctx.client.session.summarize).toHaveBeenCalled()
+    expect(ctx.client.session.summarize).not.toHaveBeenCalled()
   })
 })

@@ -112,13 +112,13 @@ describe("sisyphus-task", () => {
       expect(category.variant).toBe("medium")
     })
 
-    test("unspecified-high category uses claude-opus-4-6 max as primary", () => {
+    test("unspecified-high category uses claude-opus max as primary", () => {
       // given
       const category = DEFAULT_CATEGORIES["unspecified-high"]
 
       // when / #then
       expect(category).toBeDefined()
-      expect(category.model).toBe("anthropic/claude-opus-4-6")
+      expect(category.model).toBe("anthropic/claude-opus")
       expect(category.variant).toBe("max")
     })
   })
@@ -3438,7 +3438,7 @@ describe("sisyphus-task", () => {
       
       // then - default model from DEFAULT_CATEGORIES is used
       expect(resolved).not.toBeNull()
-      expect(resolved!.config.model).toBe("anthropic/claude-sonnet-4-6")
+      expect(resolved!.config.model).toBe("anthropic/claude-sonnet")
     })
 
     test("category built-in model takes precedence over inheritedModel for builtin category", () => {

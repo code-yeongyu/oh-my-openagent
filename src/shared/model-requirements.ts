@@ -78,7 +78,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     fallbackChain: [
       { providers: ["opencode-go"], model: "minimax-m2.7" },
       { providers: ["opencode"], model: "minimax-m2.7-highspeed" },
-      { providers: ["anthropic", "opencode"], model: "claude-haiku-4-5" },
+      { providers: ["anthropic", "opencode"], model: "claude-haiku" },
       { providers: ["opencode"], model: "gpt-5-nano" },
     ],
   },
@@ -87,7 +87,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["github-copilot", "xai"], model: "grok-code-fast-1" },
       { providers: ["opencode-go"], model: "minimax-m2.7-highspeed" },
       { providers: ["opencode"], model: "minimax-m2.7" },
-      { providers: ["anthropic", "opencode"], model: "claude-haiku-4-5" },
+      { providers: ["anthropic", "opencode"], model: "claude-haiku" },
       { providers: ["opencode"], model: "gpt-5-nano" },
     ],
   },
@@ -143,7 +143,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       },
       {
         providers: ["anthropic", "github-copilot", "opencode"],
-        model: "claude-opus-4-6",
+        model: "claude-opus",
         variant: "max",
       },
       {
@@ -247,7 +247,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       },
       {
         providers: ["anthropic", "github-copilot", "opencode"],
-        model: "claude-opus-4-6",
+        model: "claude-opus",
         variant: "max",
       },
       { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.4" },
@@ -262,7 +262,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       },
       {
         providers: ["anthropic", "github-copilot", "opencode"],
-        model: "claude-haiku-4-5",
+        model: "claude-haiku",
       },
       {
         providers: ["google", "github-copilot", "opencode"],

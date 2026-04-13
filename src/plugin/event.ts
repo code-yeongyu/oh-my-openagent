@@ -515,8 +515,8 @@ export function createEventHandler(args: {
                   sessionID,
                   info?.providerID as string | undefined,
                 );
-                const rawModel = (info?.modelID as string | undefined) ?? "claude-opus-4-6";
-                const currentModel = normalizeFallbackModelID(rawModel);
+                const rawModel = info?.modelID as string | undefined;
+                const currentModel = rawModel ? normalizeFallbackModelID(rawModel) : undefined;
                 applyUserConfiguredFallbackChain(sessionID, agentName, currentProvider, args.pluginConfig);
 
                 const setFallback = setPendingModelFallback(sessionID, agentName, currentProvider, currentModel);
@@ -578,8 +578,8 @@ export function createEventHandler(args: {
               const parsed = extractProviderModelFromErrorMessage(retryMessage);
               const lastKnown = lastKnownModelBySession.get(sessionID);
               const currentProvider = resolveFallbackProviderID(sessionID, parsed.providerID);
-              let currentModel = parsed.modelID ?? lastKnown?.modelID ?? "claude-opus-4-6";
-              currentModel = normalizeFallbackModelID(currentModel);
+              const rawCurrentModel = parsed.modelID ?? lastKnown?.modelID;
+              const currentModel = rawCurrentModel ? normalizeFallbackModelID(rawCurrentModel) : undefined;
               applyUserConfiguredFallbackChain(sessionID, agentName, currentProvider, args.pluginConfig);
 
               const setFallback = setPendingModelFallback(sessionID, agentName, currentProvider, currentModel);
@@ -660,12 +660,13 @@ export function createEventHandler(args: {
 
           if (agentName) {
             const parsed = extractProviderModelFromErrorMessage(errorMessage);
+            const lastKnown = lastKnownModelBySession.get(sessionID);
             const currentProvider = resolveFallbackProviderID(
               sessionID,
               (props?.providerID as string | undefined) || parsed.providerID,
             );
-            let currentModel = (props?.modelID as string) || parsed.modelID || "claude-opus-4-6";
-            currentModel = normalizeFallbackModelID(currentModel);
+            const rawCurrentModel = (props?.modelID as string | undefined) || parsed.modelID || lastKnown?.modelID;
+            const currentModel = rawCurrentModel ? normalizeFallbackModelID(rawCurrentModel) : undefined;
             applyUserConfiguredFallbackChain(sessionID, agentName, currentProvider, args.pluginConfig);
 
             const setFallback = setPendingModelFallback(sessionID, agentName, currentProvider, currentModel);

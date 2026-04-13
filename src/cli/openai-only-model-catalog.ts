@@ -1,15 +1,47 @@
 import type { AgentConfig, CategoryConfig, GeneratedOmoConfig, ProviderAvailability } from "./model-fallback-types"
+import { transformModelForProvider } from "../shared/provider-model-id-transform"
 
-const OPENAI_ONLY_AGENT_OVERRIDES: Record<string, AgentConfig> = {
-  explore: { model: "openai/gpt-5.4", variant: "medium" },
-  librarian: { model: "openai/gpt-5.4", variant: "medium" },
+type OpenAiOnlyProfile = "general" | "quick"
+
+type OpenAiOnlyOverride = {
+  profile: OpenAiOnlyProfile
+  variant?: string
 }
 
-const OPENAI_ONLY_CATEGORY_OVERRIDES: Record<string, CategoryConfig> = {
-  artistry: { model: "openai/gpt-5.4", variant: "xhigh" },
-  quick: { model: "openai/gpt-5.4-mini" },
-  "visual-engineering": { model: "openai/gpt-5.4", variant: "high" },
-  writing: { model: "openai/gpt-5.4", variant: "medium" },
+const OPENAI_ONLY_PROFILE_MODELS: Record<OpenAiOnlyProfile, string> = {
+  general: "gpt-5",
+  quick: "gpt-5-mini",
+}
+
+const OPENAI_ONLY_AGENT_OVERRIDES: Record<string, OpenAiOnlyOverride> = {
+  explore: { profile: "general", variant: "medium" },
+  librarian: { profile: "general", variant: "medium" },
+}
+
+const OPENAI_ONLY_CATEGORY_OVERRIDES: Record<string, OpenAiOnlyOverride> = {
+  artistry: { profile: "general", variant: "xhigh" },
+  quick: { profile: "quick" },
+  "visual-engineering": { profile: "general", variant: "high" },
+  writing: { profile: "general", variant: "medium" },
+}
+
+function resolveOpenAiOnlyOverrideModel(profile: OpenAiOnlyProfile): string {
+  const model = transformModelForProvider("openai", OPENAI_ONLY_PROFILE_MODELS[profile])
+  return `openai/${model}`
+}
+
+function materializeOpenAiOnlyOverrides<T extends AgentConfig | CategoryConfig>(
+  overrides: Record<string, OpenAiOnlyOverride>,
+): Record<string, T> {
+  return Object.fromEntries(
+    Object.entries(overrides).map(([key, value]) => [
+      key,
+      {
+        model: resolveOpenAiOnlyOverrideModel(value.profile),
+        ...(value.variant ? { variant: value.variant } : {}),
+      },
+    ]),
+  ) as Record<string, T>
 }
 
 export function isOpenAiOnlyAvailability(availability: ProviderAvailability): boolean {
@@ -30,11 +62,11 @@ export function applyOpenAiOnlyModelCatalog(config: GeneratedOmoConfig): Generat
     ...config,
     agents: {
       ...config.agents,
-      ...OPENAI_ONLY_AGENT_OVERRIDES,
+      ...materializeOpenAiOnlyOverrides<AgentConfig>(OPENAI_ONLY_AGENT_OVERRIDES),
     },
     categories: {
       ...config.categories,
-      ...OPENAI_ONLY_CATEGORY_OVERRIDES,
+      ...materializeOpenAiOnlyOverrides<CategoryConfig>(OPENAI_ONLY_CATEGORY_OVERRIDES),
     },
   }
 }

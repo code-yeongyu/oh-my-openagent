@@ -1,13 +1,12 @@
-import { log, normalizeModelID } from "../../shared"
+import { getModelCapabilities, log, normalizeModelID } from "../../shared"
 
 const OPUS_PATTERN = /claude-.*opus/i
 const EFFORT_UNSUPPORTED_PATTERN = /claude-.*haiku/i
 const INTERNAL_SKIP_AGENTS = new Set(["title", "summary", "compaction"])
 
-function isClaudeProvider(providerID: string, modelID: string): boolean {
-  if (["anthropic", "google-vertex-anthropic", "opencode"].includes(providerID)) return true
-  if (providerID === "github-copilot" && modelID.toLowerCase().includes("claude")) return true
-  return false
+function isClaudeModel(providerID: string, modelID: string): boolean {
+  const capabilities = getModelCapabilities({ providerID, modelID })
+  return typeof capabilities.family === "string" && capabilities.family.startsWith("claude")
 }
 
 function isOpusModel(modelID: string): boolean {
@@ -64,7 +63,7 @@ export function createAnthropicEffortHook() {
       if (!model?.modelID || !model?.providerID) return
       if (isEffortUnsupportedModel(model.modelID)) return
       if (message.variant !== "max") return
-      if (!isClaudeProvider(model.providerID, model.modelID)) return
+      if (!isClaudeModel(model.providerID, model.modelID)) return
       if (model.providerID === "github-copilot") return
       if (shouldSkipForInternalAgent(agent?.name)) return
       if (output.options.effort !== undefined) return

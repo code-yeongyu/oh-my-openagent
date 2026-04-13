@@ -77,7 +77,7 @@ describe("resolveModelForDelegateTask", () => {
 		})
 
 		describe("#when availableModels is empty (cache exists but empty)", () => {
-			test("#then keeps the category default when its provider is connected", () => {
+			test("#then transforms the category default to a provider-compatible id when its provider is connected", () => {
 				const readConnectedProvidersSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["anthropic"])
 
 				const result = resolveModelForDelegateTask({
@@ -152,6 +152,15 @@ describe("resolveModelForDelegateTask", () => {
 		})
 
 		describe("#when user fallback models include variant syntax", () => {
+			test("#then keeps an explicit fallback family alias stable against concrete available models", () => {
+				const result = resolveModelForDelegateTask({
+					userFallbackModels: ["openai/gpt-5"],
+					availableModels: new Set(["openai/gpt-5.4"]),
+				})
+
+				expect(result).toEqual({ model: "openai/gpt-5", variant: undefined, matchedFallback: true })
+			})
+
 			test("#then resolves a parenthesized variant against the base available model", () => {
 				const result = resolveModelForDelegateTask({
 					userFallbackModels: ["openai/gpt-5.2(high)"],
@@ -168,6 +177,50 @@ describe("resolveModelForDelegateTask", () => {
 				})
 
 				expect(result).toEqual({ model: "openai/gpt-5.2", variant: "medium", matchedFallback: true })
+			})
+		})
+
+		describe("#when user fallback models are object entries with promoted settings", () => {
+			test("#then fuzzy-resolves the object entry to the available concrete model", () => {
+				const result = resolveModelForDelegateTask({
+					userFallbackModels: [{ model: "openai/gpt-5.4", reasoningEffort: "high" }],
+					availableModels: new Set(["openai/gpt-5.4-preview"]),
+				})
+
+				expect(result).toEqual({ model: "openai/gpt-5.4-preview", matchedFallback: true })
+			})
+
+			test("#then preserves object fallback variant on warm-cache resolution", () => {
+				const result = resolveModelForDelegateTask({
+					userFallbackModels: [{ model: "anthropic/claude-opus", variant: "max" }],
+					availableModels: new Set(["anthropic/claude-opus-4-6"]),
+				})
+
+				expect(result).toEqual({ model: "anthropic/claude-opus-4-6", variant: "max", matchedFallback: true })
+			})
+
+			test("#then preserves object fallback variant on cold-cache connected-provider resolution", () => {
+				const readConnectedProvidersSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["anthropic"])
+
+				const result = resolveModelForDelegateTask({
+					userFallbackModels: [{ model: "anthropic/claude-opus", variant: "max" }],
+					availableModels: new Set<string>(),
+				})
+
+				expect(result).toEqual({ model: "anthropic/claude-opus-4-6", variant: "max", matchedFallback: true })
+				readConnectedProvidersSpy.mockRestore()
+			})
+
+			test("#then prefers a later exact object entry over an earlier fuzzy prefix match", () => {
+				const result = resolveModelForDelegateTask({
+					userFallbackModels: [
+						{ model: "openai/gpt-5.4", reasoningEffort: "medium" },
+						{ model: "openai/gpt-5.4-preview", reasoningEffort: "high" },
+					],
+					availableModels: new Set(["openai/gpt-5.4-preview"]),
+				})
+
+				expect(result).toEqual({ model: "openai/gpt-5.4-preview", matchedFallback: true })
 			})
 		})
 	})
@@ -201,7 +254,7 @@ describe("resolveModelForDelegateTask", () => {
 				expect(result).toBeDefined()
 				expect(result).not.toHaveProperty("skipped")
 				const resolved = result as { model: string; variant?: string }
-				expect(resolved.model).toBe("anthropic/claude-haiku-4.5")
+				expect(resolved.model).toBe("anthropic/claude-haiku-4-5")
 			})
 
 			test("#then resolves first provider in entry that is connected", () => {

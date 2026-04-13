@@ -138,6 +138,139 @@ describe("createEventHandler - model fallback", () => {
     expect(promptCalls).toEqual([sessionID])
   })
 
+  test("does not skip the first fallback entry when session.error has provider but no model ID", async () => {
+    //#given
+    const sessionID = "ses_main_fallback_missing_model"
+    setMainSession(sessionID)
+    clearPendingModelFallback(sessionID)
+
+    const modelFallback = createModelFallbackHook()
+    const { handler, abortCalls, promptCalls } = createHandler({ hooks: { modelFallback } })
+
+    const chatMessageHandler = createChatMessageHandler({
+      ctx: {
+        client: {
+          tui: {
+            showToast: async () => ({}),
+          },
+        },
+      } as any,
+      pluginConfig: {} as any,
+      firstMessageVariantGate: {
+        shouldOverride: () => false,
+        markApplied: () => {},
+      },
+      hooks: {
+        modelFallback,
+        stopContinuationGuard: null,
+        keywordDetector: null,
+        claudeCodeHooks: null,
+        autoSlashCommand: null,
+        startWork: null,
+        ralphLoop: null,
+      } as any,
+    })
+
+    //#when
+    await handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          providerID: "anthropic",
+          error: {
+            name: "RateLimitError",
+            message: "All credentials are cooling down [retrying in 7m 56s attempt #1]",
+          },
+        },
+      },
+    })
+
+    const output = { message: {}, parts: [] as Array<{ type: string; text?: string }> }
+    await chatMessageHandler(
+      {
+        sessionID,
+        agent: "sisyphus",
+        model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
+      },
+      output,
+    )
+
+    //#then
+    expect(abortCalls).toEqual([sessionID])
+    expect(promptCalls).toEqual([sessionID])
+    expect(output.message["model"]).toEqual({
+      providerID: "anthropic",
+      modelID: "claude-opus-4-6",
+    })
+    expect(output.message["variant"]).toBe("max")
+  })
+
+  test("triggers retry prompt for session.error invalid authentication credentials message", async () => {
+    //#given
+    const sessionID = "ses_invalid_auth_credentials_fallback"
+    setMainSession(sessionID)
+    clearPendingModelFallback(sessionID)
+
+    const modelFallback = createModelFallbackHook()
+    const { handler, abortCalls, promptCalls } = createHandler({ hooks: { modelFallback } })
+
+    const chatMessageHandler = createChatMessageHandler({
+      ctx: {
+        client: {
+          tui: {
+            showToast: async () => ({}),
+          },
+        },
+      } as any,
+      pluginConfig: {} as any,
+      firstMessageVariantGate: {
+        shouldOverride: () => false,
+        markApplied: () => {},
+      },
+      hooks: {
+        modelFallback,
+        stopContinuationGuard: null,
+        keywordDetector: null,
+        claudeCodeHooks: null,
+        autoSlashCommand: null,
+        startWork: null,
+        ralphLoop: null,
+      } as any,
+    })
+
+    //#when
+    await handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          providerID: "anthropic",
+          modelID: "claude-opus-4-6-thinking",
+          error: {
+            name: "APIError",
+            message: "Invalid authentication credentials",
+          },
+        },
+      },
+    })
+
+    const output = { message: {}, parts: [] as Array<{ type: string; text?: string }> }
+    await chatMessageHandler(
+      {
+        sessionID,
+        agent: "sisyphus",
+        model: { providerID: "anthropic", modelID: "claude-opus-4-6-thinking" },
+      },
+      output,
+    )
+
+    //#then
+    expect(abortCalls).toEqual([sessionID])
+    expect(promptCalls).toEqual([sessionID])
+    expect(output.message["model"]).toBeDefined()
+  })
+
   test("triggers retry prompt on session.status retry events and applies fallback", async () => {
     //#given
     const sessionID = "ses_status_retry_fallback"
@@ -226,6 +359,90 @@ describe("createEventHandler - model fallback", () => {
       modelID: "kimi-k2.5",
     })
     expect(output.message["variant"]).toBeUndefined()
+  })
+
+  test("triggers fallback for session.status retry when unknown provider message uses claude-opus alias", async () => {
+    //#given
+    const sessionID = "ses_status_retry_claude_opus_alias"
+    setMainSession(sessionID)
+    clearPendingModelFallback(sessionID)
+    const modelFallback = createModelFallbackHook()
+    const { handler, abortCalls, promptCalls } = createHandler({ hooks: { modelFallback } })
+
+    const chatMessageHandler = createChatMessageHandler({
+      ctx: {
+        client: {
+          tui: {
+            showToast: async () => ({}),
+          },
+        },
+      } as any,
+      pluginConfig: {} as any,
+      firstMessageVariantGate: {
+        shouldOverride: () => false,
+        markApplied: () => {},
+      },
+      hooks: {
+        modelFallback,
+        stopContinuationGuard: null,
+        keywordDetector: null,
+        claudeCodeHooks: null,
+        autoSlashCommand: null,
+        startWork: null,
+        ralphLoop: null,
+      } as any,
+    })
+
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_user_status_alias_1",
+            sessionID,
+            role: "user",
+            time: { created: 1 },
+            content: [],
+            modelID: "claude-opus",
+            providerID: "anthropic",
+            agent: "Sisyphus - Ultraworker",
+            path: { cwd: "/tmp", root: "/tmp" },
+          },
+        },
+      },
+    })
+
+    //#when
+    await handler({
+      event: {
+        type: "session.status",
+        properties: {
+          sessionID,
+          status: {
+            type: "retry",
+            attempt: 12,
+            message:
+              'Bad Gateway: {"error":{"message":"unknown provider for model claude-opus","type":"bad_request"}} [retrying in 43m 40s attempt #12]',
+            next: 1234,
+          },
+        },
+      },
+    })
+
+    const output = { message: {}, parts: [] as Array<{ type: string; text?: string }> }
+    await chatMessageHandler(
+      {
+        sessionID,
+        agent: "sisyphus",
+        model: { providerID: "anthropic", modelID: "claude-opus" },
+      },
+      output,
+    )
+
+    //#then
+    expect(abortCalls).toEqual([sessionID])
+    expect(promptCalls).toEqual([sessionID])
+    expect(output.message["model"]).toBeDefined()
   })
 
   test("does not spam abort/prompt when session.status retry countdown updates", async () => {

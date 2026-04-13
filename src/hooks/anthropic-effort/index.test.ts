@@ -187,6 +187,26 @@ describe("createAnthropicEffortHook", () => {
         })
       }
     })
+
+    it("does nothing for non-claude opencode models", async () => {
+      const hook = createAnthropicEffortHook()
+      const { input, output } = createMockParams({ providerID: "opencode", modelID: "gpt-5.4" })
+
+      await hook["chat.params"](input, output)
+
+      expect(output.options.effort).toBeUndefined()
+      expect(input.message.variant).toBe("max")
+    })
+
+    it("still applies anthropic effort for claude models routed through opencode", async () => {
+      const hook = createAnthropicEffortHook()
+      const { input, output } = createMockParams({ providerID: "opencode", modelID: "claude-sonnet-4-6" })
+
+      await hook["chat.params"](input, output)
+
+      expect(output.options.effort).toBe("high")
+      expect(input.message.variant).toBe("high")
+    })
   })
 
   describe("existing options", () => {

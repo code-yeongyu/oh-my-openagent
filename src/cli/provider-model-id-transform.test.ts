@@ -1,229 +1,121 @@
-import { describe, expect, test } from "bun:test"
+declare const require: (name: string) => any
+const { beforeAll, beforeEach, describe, expect, mock, test } = require("bun:test")
 
-import { transformModelForProvider } from "./provider-model-id-transform"
+let providerModelsCache: { models: Record<string, Array<string | { id?: string }>> } | null = null
+
+mock.module("../shared/connected-providers-cache", () => ({
+	readProviderModelsCache: () => providerModelsCache,
+}))
+
+let transformModelForProvider: (provider: string, model: string) => string
+
+beforeAll(async () => {
+	;({ transformModelForProvider } = await import("./provider-model-id-transform"))
+})
 
 describe("transformModelForProvider", () => {
-	describe("github-copilot provider", () => {
-		test("transforms claude-opus-4-6 to claude-opus-4.6", () => {
-			// #given github-copilot provider and claude-opus-4-6 model
-			const provider = "github-copilot"
-			const model = "claude-opus-4-6"
+	beforeEach(() => {
+		providerModelsCache = null
+	})
 
-			// #when transformModelForProvider is called
-			const result = transformModelForProvider(provider, model)
+	describe("provider-model cache", () => {
+		test("resolves github-copilot claude dot-notation dynamically from cache", () => {
+			providerModelsCache = {
+				models: {
+					"github-copilot": [{ id: "claude-opus-4.6" }],
+				},
+			}
 
-			// #then should transform to claude-opus-4.6
+			const result = transformModelForProvider("github-copilot", "claude-opus-4-6")
+
 			expect(result).toBe("claude-opus-4.6")
 		})
 
-		test("transforms claude-sonnet-4-5 to claude-sonnet-4.5", () => {
-			// #given github-copilot provider and claude-sonnet-4-5 model
-			const provider = "github-copilot"
-			const model = "claude-sonnet-4-5"
+		test("resolves google preview variants dynamically from cache", () => {
+			providerModelsCache = {
+				models: {
+					google: [{ id: "gemini-3.1-pro-preview" }, { id: "gemini-3-flash-preview" }],
+				},
+			}
 
-			// #when transformModelForProvider is called
-			const result = transformModelForProvider(provider, model)
-
-			// #then should transform to claude-sonnet-4.5
-			expect(result).toBe("claude-sonnet-4.5")
+			expect(transformModelForProvider("google", "gemini-3.1-pro")).toBe("gemini-3.1-pro-preview")
+			expect(transformModelForProvider("google", "gemini-3-flash")).toBe("gemini-3-flash-preview")
 		})
 
-		test("transforms claude-haiku-4-5 to claude-haiku-4.5", () => {
-			// #given github-copilot provider and claude-haiku-4-5 model
-			const provider = "github-copilot"
-			const model = "claude-haiku-4-5"
+		test("passes through exact cached model ids unchanged", () => {
+			providerModelsCache = {
+				models: {
+					google: [{ id: "gemini-2.5-flash" }],
+				},
+			}
 
-			// #when transformModelForProvider is called
-			const result = transformModelForProvider(provider, model)
+			const result = transformModelForProvider("google", "gemini-2.5-flash")
 
-			// #then should transform to claude-haiku-4.5
-			expect(result).toBe("claude-haiku-4.5")
-		})
-
-		test("transforms gemini-3.1-pro to gemini-3.1-pro-preview", () => {
-			// #given github-copilot provider and gemini-3.1-pro model
-			const provider = "github-copilot"
-			const model = "gemini-3.1-pro"
-
-			// #when transformModelForProvider is called
-			const result = transformModelForProvider(provider, model)
-
-			// #then should transform to gemini-3.1-pro-preview
-			expect(result).toBe("gemini-3.1-pro-preview")
-		})
-
-		test("transforms gemini-3-flash to gemini-3-flash-preview", () => {
-			// #given github-copilot provider and gemini-3-flash model
-			const provider = "github-copilot"
-			const model = "gemini-3-flash"
-
-			// #when transformModelForProvider is called
-			const result = transformModelForProvider(provider, model)
-
-			// #then should transform to gemini-3-flash-preview
-			expect(result).toBe("gemini-3-flash-preview")
-		})
-
-		test("prevents double transformation of gemini-3.1-pro-preview", () => {
-			// #given github-copilot provider and gemini-3.1-pro-preview model (already transformed)
-			const provider = "github-copilot"
-			const model = "gemini-3.1-pro-preview"
-
-			// #when transformModelForProvider is called
-			const result = transformModelForProvider(provider, model)
-
-			// #then should NOT become gemini-3.1-pro-preview-preview
-			expect(result).toBe("gemini-3.1-pro-preview")
-		})
-
-		test("prevents double transformation of gemini-3-flash-preview", () => {
-			// #given github-copilot provider and gemini-3-flash-preview model (already transformed)
-			const provider = "github-copilot"
-			const model = "gemini-3-flash-preview"
-
-			// #when transformModelForProvider is called
-			const result = transformModelForProvider(provider, model)
-
-			// #then should NOT become gemini-3-flash-preview-preview
-			expect(result).toBe("gemini-3-flash-preview")
-		})
-	})
-
-	describe("google provider", () => {
-		test("transforms gemini-3-flash to gemini-3-flash-preview", () => {
-			// #given google provider and gemini-3-flash model
-			const provider = "google"
-			const model = "gemini-3-flash"
-
-			// #when transformModelForProvider is called
-			const result = transformModelForProvider(provider, model)
-
-			// #then should transform to gemini-3-flash-preview
-			expect(result).toBe("gemini-3-flash-preview")
-		})
-
-		test("transforms gemini-3.1-pro to gemini-3.1-pro-preview", () => {
-			// #given google provider and gemini-3.1-pro model
-			const provider = "google"
-			const model = "gemini-3.1-pro"
-
-			// #when transformModelForProvider is called
-			const result = transformModelForProvider(provider, model)
-
-			// #then should transform to gemini-3.1-pro-preview
-			expect(result).toBe("gemini-3.1-pro-preview")
-		})
-
-		test("passes through other gemini models unchanged", () => {
-			// #given google provider and gemini-2.5-flash model
-			const provider = "google"
-			const model = "gemini-2.5-flash"
-
-			// #when transformModelForProvider is called
-			const result = transformModelForProvider(provider, model)
-
-			// #then should pass through unchanged
 			expect(result).toBe("gemini-2.5-flash")
 		})
 
-		test("prevents double transformation of gemini-3-flash-preview", () => {
-			// #given google provider and gemini-3-flash-preview model (already transformed)
-			const provider = "google"
-			const model = "gemini-3-flash-preview"
+		test("resolves legacy claude version pins to newer provider models via family metadata", () => {
+			providerModelsCache = {
+				models: {
+					"github-copilot": [{ id: "claude-opus-4.7" }],
+				},
+			}
 
-			// #when transformModelForProvider is called
-			const result = transformModelForProvider(provider, model)
+			const result = transformModelForProvider("github-copilot", "claude-opus-4-6")
 
-			// #then should NOT become gemini-3-flash-preview-preview
-			expect(result).toBe("gemini-3-flash-preview")
-		})
-
-		test("prevents double transformation of gemini-3.1-pro-preview", () => {
-			// #given google provider and gemini-3.1-pro-preview model (already transformed)
-			const provider = "google"
-			const model = "gemini-3.1-pro-preview"
-
-			// #when transformModelForProvider is called
-			const result = transformModelForProvider(provider, model)
-
-			// #then should NOT become gemini-3.1-pro-preview-preview
-			expect(result).toBe("gemini-3.1-pro-preview")
-		})
-
-		test("does not transform claude models for google provider", () => {
-			// #given google provider and claude-opus-4-6 model
-			const provider = "google"
-			const model = "claude-opus-4-6"
-
-			// #when transformModelForProvider is called
-			const result = transformModelForProvider(provider, model)
-
-			// #then should pass through unchanged (google doesn't use claude)
-			expect(result).toBe("claude-opus-4-6")
+			expect(result).toBe("claude-opus-4.7")
 		})
 	})
 
 	describe("anthropic provider", () => {
-		test("transforms claude-opus-4-6 to claude-opus-4.6", () => {
-			// #given anthropic provider and claude-opus-4-6 model
-			const provider = "anthropic"
-			const model = "claude-opus-4-6"
-
-			// #when transformModelForProvider is called
-			const result = transformModelForProvider(provider, model)
-
-			// #then should transform to claude-opus-4.6
-			expect(result).toBe("claude-opus-4.6")
+		test("keeps claude-opus-4-6 unchanged for anthropic", () => {
+			const result = transformModelForProvider("anthropic", "claude-opus-4-6")
+			expect(result).toBe("claude-opus-4-6")
 		})
 
-		test("transforms claude-sonnet-4-6 to claude-sonnet-4.6", () => {
-			// #given anthropic provider and claude-sonnet-4-6 model
-			const provider = "anthropic"
-			const model = "claude-sonnet-4-6"
-
-			// #when transformModelForProvider is called
-			const result = transformModelForProvider(provider, model)
-
-			// #then should transform to claude-sonnet-4.6
-			expect(result).toBe("claude-sonnet-4.6")
+		test("keeps claude-sonnet-4-6 unchanged for anthropic", () => {
+			const result = transformModelForProvider("anthropic", "claude-sonnet-4-6")
+			expect(result).toBe("claude-sonnet-4-6")
 		})
 
-		test("transforms claude-haiku-4-5 to claude-haiku-4.5", () => {
-			// #given anthropic provider and claude-haiku-4-5 model
-			const provider = "anthropic"
-			const model = "claude-haiku-4-5"
-
-			// #when transformModelForProvider is called
-			const result = transformModelForProvider(provider, model)
-
-			// #then should transform to claude-haiku-4.5
-			expect(result).toBe("claude-haiku-4.5")
+		test("keeps claude-haiku-4-5 unchanged for anthropic", () => {
+			const result = transformModelForProvider("anthropic", "claude-haiku-4-5")
+			expect(result).toBe("claude-haiku-4-5")
 		})
 	})
 
-	describe("unknown provider", () => {
-		test("passes model through unchanged for unknown provider", () => {
-			// #given unknown provider and any model
-			const provider = "unknown-provider"
-			const model = "some-model"
+	describe("compatibility fallback", () => {
+		test("keeps github-copilot fallback when cache is unavailable", () => {
+			const result = transformModelForProvider("github-copilot", "claude-sonnet-4-5")
+			expect(result).toBe("claude-sonnet-4.5")
+		})
 
-			// #when transformModelForProvider is called
-			const result = transformModelForProvider(provider, model)
+		test("preserves casing for github-copilot custom model ids on cold cache", () => {
+			const result = transformModelForProvider("github-copilot", "CustomModelX")
 
-			// #then should pass through unchanged
+			expect(result).toBe("CustomModelX")
+		})
+
+		test("uses bundled metadata for google models when cache is unavailable", () => {
+			const result = transformModelForProvider("google", "gemini-3-flash")
+			expect(result).toBe("gemini-3-flash")
+		})
+
+		test("passes unknown providers through unchanged", () => {
+			const result = transformModelForProvider("unknown-provider", "some-model")
 			expect(result).toBe("some-model")
 		})
 
-		test("passes gemini-3-flash through unchanged for unknown provider", () => {
-			// #given unknown provider and gemini-3-flash model
-			const provider = "unknown-provider"
-			const model = "gemini-3-flash"
+		test("does not canonicalize unsupported model families across providers on cold cache", () => {
+			const result = transformModelForProvider("openai", "claude-opus-4-6")
 
-			// #when transformModelForProvider is called
-			const result = transformModelForProvider(provider, model)
+			expect(result).toBe("claude-opus-4-6")
+		})
 
-			// #then should pass through unchanged (no transformation for unknown provider)
-			expect(result).toBe("gemini-3-flash")
+		test("does not rewrite claude-style ids for unknown providers on cold cache", () => {
+			const result = transformModelForProvider("unknown-provider", "claude-opus-4-6")
+
+			expect(result).toBe("claude-opus-4-6")
 		})
 	})
 })

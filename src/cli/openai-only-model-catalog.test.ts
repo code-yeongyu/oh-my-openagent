@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test"
 import { generateModelConfig } from "./model-fallback"
 import type { InstallConfig } from "./types"
 
+
 function createConfig(overrides: Partial<InstallConfig> = {}): InstallConfig {
   return {
     hasClaude: false,
@@ -40,7 +41,7 @@ describe("generateModelConfig OpenAI-only model catalog", () => {
 
     // #then
     expect(result.categories?.artistry).toEqual({ model: "openai/gpt-5.4", variant: "xhigh" })
-    expect(result.categories?.quick).toEqual({ model: "openai/gpt-5.4-mini" })
+    expect(result.categories?.quick).toEqual({ model: "openai/gpt-5-mini" })
     expect(result.categories?.["visual-engineering"]).toEqual({ model: "openai/gpt-5.4", variant: "high" })
     expect(result.categories?.writing).toEqual({ model: "openai/gpt-5.4", variant: "medium" })
   })

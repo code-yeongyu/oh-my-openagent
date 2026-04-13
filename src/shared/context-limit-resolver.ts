@@ -1,9 +1,14 @@
 import process from "node:process"
+import { getModelCapabilities } from "./model-capabilities"
 
-const DEFAULT_ANTHROPIC_ACTUAL_LIMIT = 200_000
 export type ContextLimitModelCacheState = {
-  anthropicContext1MEnabled: boolean
+  anthropicContext1MEnabled?: boolean
   modelContextLimitsCache?: Map<string, number>
+  providerContextLimitMinimumsCache?: Map<string, number>
+}
+
+type ContextLimitResolverOptions = {
+  getModelCapabilities?: typeof getModelCapabilities
 }
 
 function isAnthropicProvider(providerID: string): boolean {
@@ -11,32 +16,104 @@ function isAnthropicProvider(providerID: string): boolean {
   return normalized === "anthropic" || normalized === "google-vertex-anthropic" || normalized === "aws-bedrock-anthropic"
 }
 
-function getAnthropicActualLimit(modelCacheState?: ContextLimitModelCacheState): number {
+function getContextLimitLookupProviderIDs(providerID: string): string[] {
+  if (!isAnthropicProvider(providerID)) {
+    return [providerID]
+  }
+
+  return providerID === "anthropic"
+    ? [providerID]
+    : [providerID, "anthropic"]
+}
+
+function getLegacyAnthropicProviderMinimum(
+  providerID: string,
+  modelCacheState?: ContextLimitModelCacheState,
+): number | null {
+  if (!isAnthropicProvider(providerID)) {
+    return null
+  }
+
   return (modelCacheState?.anthropicContext1MEnabled ?? false) ||
     process.env.ANTHROPIC_1M_CONTEXT === "true" ||
     process.env.VERTEX_ANTHROPIC_1M_CONTEXT === "true"
     ? 1_000_000
-    : DEFAULT_ANTHROPIC_ACTUAL_LIMIT
+    : null
 }
 
-function supportsCachedAnthropicLimit(modelID: string): boolean {
-  return /^claude-(opus|sonnet)-4(?:-|\.)6(?:-high)?$/.test(modelID)
+function getConfiguredContextLimit(
+  providerID: string,
+  modelID: string,
+  modelCacheState?: ContextLimitModelCacheState,
+): number | null {
+  const cache = modelCacheState?.modelContextLimitsCache
+  if (!cache) {
+    return null
+  }
+
+  for (const lookupProviderID of getContextLimitLookupProviderIDs(providerID)) {
+    const limit = cache.get(`${lookupProviderID}/${modelID}`)
+    if (limit !== undefined) {
+      return limit
+    }
+  }
+
+  return null
+}
+
+function getDiscoveredContextLimit(
+  providerID: string,
+  modelID: string,
+  options?: ContextLimitResolverOptions,
+): number | null {
+  const getCapabilities = options?.getModelCapabilities ?? getModelCapabilities
+
+  for (const lookupProviderID of getContextLimitLookupProviderIDs(providerID)) {
+    const limit = getCapabilities({ providerID: lookupProviderID, modelID }).contextWindowTokens
+    if (limit !== undefined) {
+      return limit
+    }
+  }
+
+  return null
+}
+
+function getConfiguredProviderMinimumContextLimit(
+  providerID: string,
+  modelCacheState?: ContextLimitModelCacheState,
+): number | null {
+  const cache = modelCacheState?.providerContextLimitMinimumsCache
+  if (!cache) {
+    return null
+  }
+
+  for (const lookupProviderID of getContextLimitLookupProviderIDs(providerID)) {
+    const limit = cache.get(lookupProviderID)
+    if (limit !== undefined) {
+      return limit
+    }
+  }
+
+  return null
 }
 
 export function resolveActualContextLimit(
   providerID: string,
   modelID: string,
   modelCacheState?: ContextLimitModelCacheState,
+  options?: ContextLimitResolverOptions,
 ): number | null {
-  if (isAnthropicProvider(providerID)) {
-    const explicit1M = getAnthropicActualLimit(modelCacheState)
-    if (explicit1M === 1_000_000) return explicit1M
+  const configuredLimit = getConfiguredContextLimit(providerID, modelID, modelCacheState)
+  const discoveredLimit = configuredLimit ?? getDiscoveredContextLimit(providerID, modelID, options)
+  const providerMinimum =
+    getConfiguredProviderMinimumContextLimit(providerID, modelCacheState)
+    ?? getLegacyAnthropicProviderMinimum(providerID, modelCacheState)
 
-    const cachedLimit = modelCacheState?.modelContextLimitsCache?.get(`${providerID}/${modelID}`)
-    if (cachedLimit && supportsCachedAnthropicLimit(modelID)) return cachedLimit
-
-    return DEFAULT_ANTHROPIC_ACTUAL_LIMIT
+  if (providerMinimum !== null) {
+    return discoveredLimit !== null
+      ? Math.max(discoveredLimit, providerMinimum)
+      : providerMinimum
   }
 
-  return modelCacheState?.modelContextLimitsCache?.get(`${providerID}/${modelID}`) ?? null
+  return discoveredLimit
 }

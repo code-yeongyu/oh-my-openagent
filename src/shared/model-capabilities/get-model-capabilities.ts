@@ -1,10 +1,12 @@
 import { findProviderModelMetadata } from "../connected-providers-cache"
+import { resolveStableFamilyAlias } from "../model-availability"
 import { resolveModelIDAlias } from "../model-capability-aliases"
 import { detectHeuristicModelFamily } from "../model-capability-heuristics"
 
 import { getBundledModelCapabilitiesSnapshot } from "./bundled-snapshot"
 import {
 	readRuntimeModel,
+	readRuntimeModelLimitContext,
 	readRuntimeModelLimitOutput,
 	readRuntimeModelModalities,
 	readRuntimeModelReasoningSupport,
@@ -19,9 +21,34 @@ import type {
 	ModelCapabilities,
 	ModelCapabilitiesDiagnostics,
 	ModelCapabilityOverride,
+	ModelCapabilitiesSnapshot,
 } from "./types"
 
 const MODEL_ID_OVERRIDES: Record<string, ModelCapabilityOverride> = {}
+
+export function resolveSnapshotModelKey(
+	snapshot: ModelCapabilitiesSnapshot,
+	providerID: string,
+	modelID: string,
+): string | undefined {
+	const providerScopedModelID = `${providerID}/${modelID}`
+	if (snapshot.models[providerScopedModelID]) {
+		return providerScopedModelID
+	}
+
+	if (snapshot.models[modelID]) {
+		return modelID
+	}
+
+	const providerScopedCandidates = Object.keys(snapshot.models).filter((key) => key.startsWith(`${providerID}/`))
+	const providerScopedAliasMatch = resolveStableFamilyAlias(modelID, providerScopedCandidates)
+	if (providerScopedAliasMatch) {
+		return providerScopedAliasMatch
+	}
+
+	const stableFamilyAliasMatch = resolveStableFamilyAlias(modelID, Object.keys(snapshot.models))
+	return stableFamilyAliasMatch ?? undefined
+}
 
 function normalizeLookupModelID(modelID: string): string {
 	return modelID.trim().toLowerCase()
@@ -39,8 +66,13 @@ export function getModelCapabilities(input: GetModelCapabilitiesInput): ModelCap
 	)
 	const runtimeSnapshot = input.runtimeSnapshot
 	const bundledSnapshot = input.bundledSnapshot ?? getBundledModelCapabilitiesSnapshot()
-	const snapshotEntry = runtimeSnapshot?.models?.[canonicalization.canonicalModelID]
-		?? bundledSnapshot.models[canonicalization.canonicalModelID]
+	const runtimeSnapshotModelKey = runtimeSnapshot
+		? resolveSnapshotModelKey(runtimeSnapshot, input.providerID, canonicalization.canonicalModelID)
+		: undefined
+	const bundledSnapshotModelKey = resolveSnapshotModelKey(bundledSnapshot, input.providerID, canonicalization.canonicalModelID)
+	const snapshotEntry =
+		(runtimeSnapshotModelKey ? runtimeSnapshot?.models?.[runtimeSnapshotModelKey] : undefined)
+		?? (bundledSnapshotModelKey ? bundledSnapshot.models[bundledSnapshotModelKey] : undefined)
 	const heuristicFamily = detectHeuristicModelFamily(canonicalization.canonicalModelID)
 
 	const runtimeVariants = readRuntimeModelVariants(runtimeModel)
@@ -48,14 +80,15 @@ export function getModelCapabilities(input: GetModelCapabilitiesInput): ModelCap
 	const runtimeThinking = readRuntimeModelThinkingSupport(runtimeModel)
 	const runtimeTemperature = readRuntimeModelTemperatureSupport(runtimeModel)
 	const runtimeTopP = readRuntimeModelTopPSupport(runtimeModel)
+	const runtimeContextWindowTokens = readRuntimeModelLimitContext(runtimeModel)
 	const runtimeMaxOutputTokens = readRuntimeModelLimitOutput(runtimeModel)
 	const runtimeToolCall = readRuntimeModelToolCallSupport(runtimeModel)
 	const runtimeModalities = readRuntimeModelModalities(runtimeModel)
 
 	const snapshotSource: ModelCapabilitiesDiagnostics["snapshot"]["source"] =
-		runtimeSnapshot?.models?.[canonicalization.canonicalModelID]
+		runtimeSnapshotModelKey
 			? "runtime-snapshot"
-			: bundledSnapshot.models[canonicalization.canonicalModelID]
+			: bundledSnapshotModelKey
 			? "bundled-snapshot"
 			: "none"
 	const familySource: ModelCapabilitiesDiagnostics["family"]["source"] =
@@ -86,6 +119,12 @@ export function getModelCapabilities(input: GetModelCapabilitiesInput): ModelCap
 			: "none"
 	const supportsTopPSource: ModelCapabilitiesDiagnostics["supportsTopP"]["source"] =
 		runtimeTopP !== undefined ? "runtime" : override?.supportsTopP !== undefined ? "override" : "none"
+	const contextWindowTokensSource: ModelCapabilitiesDiagnostics["contextWindowTokens"]["source"] =
+		runtimeContextWindowTokens !== undefined
+			? "runtime"
+			: snapshotEntry?.limit?.context !== undefined
+			? snapshotSource
+			: "none"
 	const maxOutputTokensSource: ModelCapabilitiesDiagnostics["maxOutputTokens"]["source"] =
 		runtimeMaxOutputTokens !== undefined
 			? "runtime"
@@ -115,6 +154,7 @@ export function getModelCapabilities(input: GetModelCapabilitiesInput): ModelCap
 		supportsThinking: override?.supportsThinking ?? heuristicFamily?.supportsThinking ?? runtimeThinking ?? snapshotEntry?.reasoning,
 		supportsTemperature: runtimeTemperature ?? override?.supportsTemperature ?? snapshotEntry?.temperature,
 		supportsTopP: runtimeTopP ?? override?.supportsTopP,
+		contextWindowTokens: runtimeContextWindowTokens ?? snapshotEntry?.limit?.context,
 		maxOutputTokens: runtimeMaxOutputTokens ?? snapshotEntry?.limit?.output,
 		toolCall: runtimeToolCall ?? snapshotEntry?.toolCall,
 		modalities: runtimeModalities ?? snapshotEntry?.modalities,
@@ -132,6 +172,7 @@ export function getModelCapabilities(input: GetModelCapabilitiesInput): ModelCap
 			supportsThinking: { source: supportsThinkingSource },
 			supportsTemperature: { source: supportsTemperatureSource },
 			supportsTopP: { source: supportsTopPSource },
+			contextWindowTokens: { source: contextWindowTokensSource },
 			maxOutputTokens: { source: maxOutputTokensSource },
 			toolCall: { source: toolCallSource },
 			modalities: { source: modalitiesSource },

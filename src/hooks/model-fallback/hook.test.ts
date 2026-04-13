@@ -37,6 +37,10 @@ const transformModelForProviderMock = mock((provider: string, model: string) => 
       .replace(/gemini-3\.1-pro(?!-)/g, "gemini-3.1-pro-preview")
       .replace(/gemini-3-flash(?!-)/g, "gemini-3-flash-preview")
   }
+  // Resolve stable family aliases for anthropic (mirrors real transformModelForProvider behavior)
+  if (model === "claude-opus") return "claude-opus-4-6"
+  if (model === "claude-sonnet") return "claude-sonnet-4-6"
+  if (model === "claude-haiku") return "claude-haiku-4-5"
   return model
 })
 
@@ -59,7 +63,6 @@ async function importFreshModelFallbackHookModule() {
   }))
 
   const module = await import(`./hook?test=${Date.now()}-${Math.random()}`)
-  mock.restore()
   return module
 }
 
@@ -285,6 +288,48 @@ describe("model fallback hook", () => {
       modelID: "gpt-5.2",
     })
     expect(output.message["variant"]).toBeUndefined()
+    clearPendingModelFallback(sessionID)
+  })
+
+  test("does not skip the first fallback entry when the current model is unknown", async () => {
+    //#given
+    const sessionID = "ses_model_fallback_unknown_current_model"
+    clearPendingModelFallback(sessionID)
+
+    const hook = createModelFallbackHook() as unknown as {
+      "chat.message"?: (
+        input: { sessionID: string },
+        output: { message: Record<string, unknown>; parts: Array<{ type: string; text?: string }> },
+      ) => Promise<void>
+    }
+
+    setSessionFallbackChain(sessionID, [
+      { providers: ["anthropic"], model: "claude-opus-4-6", variant: "max" },
+      { providers: ["opencode"], model: "kimi-k2.5" },
+    ])
+
+    expect(
+      setPendingModelFallback(
+        sessionID,
+        "Sisyphus (Ultraworker)",
+        "anthropic",
+      ),
+    ).toBe(true)
+
+    const output = {
+      message: {},
+      parts: [{ type: "text", text: "continue" }],
+    }
+
+    //#when
+    await hook["chat.message"]?.({ sessionID }, output)
+
+    //#then
+    expect(output.message["model"]).toEqual({
+      providerID: "anthropic",
+      modelID: "claude-opus-4-6",
+    })
+    expect(output.message["variant"]).toBe("max")
     clearPendingModelFallback(sessionID)
   })
 

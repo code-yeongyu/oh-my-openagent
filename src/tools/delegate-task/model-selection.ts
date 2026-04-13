@@ -1,10 +1,24 @@
 import type { FallbackEntry } from "../../shared/model-requirements"
+import type { FallbackModelObject } from "../../config/schema/fallback-models"
 import { normalizeModel } from "../../shared/model-normalization"
 import { fuzzyMatchModel } from "../../shared/model-availability"
 import { transformModelForProvider } from "../../shared/provider-model-id-transform"
 import { hasConnectedProvidersCache, hasProviderModelsCache, readConnectedProvidersCache } from "../../shared/connected-providers-cache"
 import { log } from "../../shared/logger"
-import { parseModelString, parseVariantFromModelID } from "./model-string-parser"
+import { resolveExplicitModel } from "../../shared/explicit-model-resolution"
+import { resolveConfiguredFallbackEntry } from "../../shared/explicit-fallback-model-resolution"
+import { parseModelString } from "./model-string-parser"
+
+function parseUserFallbackModel(modelString: string): { baseModel: string; variant?: string } | undefined {
+	const parsed = parseModelString(modelString)
+	if (!parsed) {
+		return undefined
+	}
+	return {
+		baseModel: `${parsed.providerID}/${parsed.modelID}`,
+		variant: parsed.variant,
+	}
+}
 
 function isExplicitHighModel(model: string): boolean {
   return /(?:^|\/)[^/]+-high$/.test(model)
@@ -14,40 +28,9 @@ function getExplicitHighBaseModel(model: string): string | null {
   return isExplicitHighModel(model) ? model.replace(/-high$/, "") : null
 }
 
-function parseUserFallbackModel(fallbackModel: string): {
-  baseModel: string
-  providerHint?: string[]
-  variant?: string
-} | undefined {
-  const normalizedFallback = normalizeModel(fallbackModel)
-  if (!normalizedFallback) {
-    return undefined
-  }
-
-  const parsedFullModel = parseModelString(normalizedFallback)
-  if (parsedFullModel) {
-    return {
-      baseModel: `${parsedFullModel.providerID}/${parsedFullModel.modelID}`,
-      providerHint: [parsedFullModel.providerID],
-      variant: parsedFullModel.variant,
-    }
-  }
-
-  const parsedModel = parseVariantFromModelID(normalizedFallback)
-  if (!parsedModel.modelID) {
-    return undefined
-  }
-
-  return {
-    baseModel: parsedModel.modelID,
-    variant: parsedModel.variant,
-  }
-}
-
-
 export function resolveModelForDelegateTask(input: {
   userModel?: string
-  userFallbackModels?: string[]
+  userFallbackModels?: (string | FallbackModelObject)[]
   categoryDefaultModel?: string
   isUserConfiguredCategoryModel?: boolean
   fallbackChain?: FallbackEntry[]
@@ -89,6 +72,11 @@ export function resolveModelForDelegateTask(input: {
     if (input.availableModels.size === 0) {
       const categoryProvider = categoryDefault.includes("/") ? categoryDefault.split("/")[0] : undefined
       if (!connectedProviders || !categoryProvider || connectedProviders.includes(categoryProvider)) {
+        if (categoryProvider) {
+          const baseModelID = categoryDefault.split("/").slice(1).join("/")
+          return { model: `${categoryProvider}/${transformModelForProvider(categoryProvider, baseModelID)}` }
+        }
+
         return { model: categoryDefault }
       }
 
@@ -114,28 +102,30 @@ export function resolveModelForDelegateTask(input: {
   if (userFallbackModels && userFallbackModels.length > 0) {
     if (input.availableModels.size === 0) {
       for (const fallbackModel of userFallbackModels) {
-        const parsedFallback = parseUserFallbackModel(fallbackModel)
-        if (!parsedFallback) continue
-
-        if (
-          connectedProviders &&
-          parsedFallback.providerHint &&
-          !parsedFallback.providerHint.some((provider) => connectedProviders.includes(provider))
-        ) {
+        const resolvedFallback = resolveConfiguredFallbackEntry(fallbackModel, {
+          availableModels: input.availableModels,
+          connectedProviders,
+        })
+        if (!resolvedFallback) {
           continue
         }
 
-        return { model: parsedFallback.baseModel, variant: parsedFallback.variant, matchedFallback: true }
+        return resolvedFallback.variant
+          ? { model: resolvedFallback.model, variant: resolvedFallback.variant, matchedFallback: true }
+          : { model: resolvedFallback.model, matchedFallback: true }
       }
     } else {
       for (const fallbackModel of userFallbackModels) {
-        const parsedFallback = parseUserFallbackModel(fallbackModel)
-        if (!parsedFallback) continue
-
-        const match = fuzzyMatchModel(parsedFallback.baseModel, input.availableModels, parsedFallback.providerHint)
-        if (match) {
-          return { model: match, variant: parsedFallback.variant, matchedFallback: true }
+        const resolvedFallback = resolveConfiguredFallbackEntry(fallbackModel, {
+          availableModels: input.availableModels,
+        })
+        if (!resolvedFallback) {
+          continue
         }
+
+        return resolvedFallback.variant
+          ? { model: resolvedFallback.model, variant: resolvedFallback.variant, matchedFallback: true }
+          : { model: resolvedFallback.model, matchedFallback: true }
       }
     }
   }

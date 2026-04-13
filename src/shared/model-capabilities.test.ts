@@ -68,6 +68,9 @@ describe("getModelCapabilities", () => {
       providerID: "anthropic",
       modelID: "claude-opus-4-6",
       runtimeModel: {
+        limit: {
+          context: 750_000,
+        },
         variants: {
           low: {},
           medium: {},
@@ -81,6 +84,7 @@ describe("getModelCapabilities", () => {
       canonicalModelID: "claude-opus-4-6",
       family: "claude-opus",
       variants: ["low", "medium", "high"],
+      contextWindowTokens: 750_000,
       supportsThinking: true,
       supportsTemperature: true,
       maxOutputTokens: 128_000,
@@ -90,6 +94,7 @@ describe("getModelCapabilities", () => {
       resolutionMode: "snapshot-backed",
       canonicalization: { source: "canonical" },
       snapshot: { source: "bundled-snapshot" },
+      contextWindowTokens: { source: "runtime" },
       variants: { source: "runtime" },
     })
   })
@@ -108,6 +113,9 @@ describe("getModelCapabilities", () => {
             text: true,
             image: true,
           },
+          limit: {
+            context: 900_000,
+          },
           output: {
             text: true,
           },
@@ -118,6 +126,7 @@ describe("getModelCapabilities", () => {
 
     expect(result).toMatchObject({
       canonicalModelID: "gpt-5.4",
+      contextWindowTokens: 900_000,
       reasoning: true,
       supportsThinking: true,
       supportsTemperature: false,
@@ -131,6 +140,7 @@ describe("getModelCapabilities", () => {
       resolutionMode: "snapshot-backed",
       reasoning: { source: "runtime" },
       supportsThinking: { source: "runtime" },
+      contextWindowTokens: { source: "runtime" },
       toolCall: { source: "runtime" },
     })
   })
@@ -269,6 +279,40 @@ describe("getModelCapabilities", () => {
     })
   })
 
+  test("resolves stable Claude family aliases through bundled snapshot metadata", () => {
+    const bundledSnapshot = getBundledModelCapabilitiesSnapshot()
+
+    const opus = getModelCapabilities({
+      providerID: "anthropic",
+      modelID: "claude-opus",
+      bundledSnapshot,
+    })
+    const sonnet = getModelCapabilities({
+      providerID: "anthropic",
+      modelID: "claude-sonnet",
+      bundledSnapshot,
+    })
+    const haiku = getModelCapabilities({
+      providerID: "anthropic",
+      modelID: "claude-haiku",
+      bundledSnapshot,
+    })
+
+    for (const result of [opus, sonnet, haiku]) {
+      expect(result.diagnostics).toMatchObject({
+        resolutionMode: "snapshot-backed",
+        canonicalization: { source: "canonical" },
+        snapshot: { source: "bundled-snapshot" },
+      })
+      expect(result.contextWindowTokens).toBeGreaterThan(0)
+      expect(result.maxOutputTokens).toBeGreaterThan(0)
+    }
+
+    expect(opus.family).toBe("claude-opus")
+    expect(sonnet.family).toBe("claude-sonnet")
+    expect(haiku.family).toBe("claude-haiku")
+  })
+
   test("prefers runtime models.dev cache over bundled snapshot", () => {
     findProviderModelMetadataSpy = spyOn(connectedProvidersCache, "findProviderModelMetadata").mockReturnValue(undefined)
     const runtimeSnapshot: ModelCapabilitiesSnapshot = {
@@ -278,7 +322,7 @@ describe("getModelCapabilities", () => {
         "gpt-5.4": {
           ...bundledSnapshot.models["gpt-5.4"],
           limit: {
-            context: 1_050_000,
+            context: 1_200_000,
             output: 64_000,
           },
         },
@@ -294,15 +338,45 @@ describe("getModelCapabilities", () => {
 
     expect(result).toMatchObject({
       canonicalModelID: "gpt-5.4",
+      contextWindowTokens: 1_200_000,
       maxOutputTokens: 64_000,
       supportsTemperature: false,
     })
     expect(result.diagnostics).toMatchObject({
       snapshot: { source: "runtime-snapshot" },
+      contextWindowTokens: { source: "runtime-snapshot" },
       maxOutputTokens: { source: "runtime-snapshot" },
       supportsTemperature: { source: "runtime-snapshot" },
     })
   })
+
+	 test("prefers provider-scoped snapshot keys over unscoped aliases when both exist", () => {
+		findProviderModelMetadataSpy = spyOn(connectedProvidersCache, "findProviderModelMetadata").mockReturnValue(undefined)
+		const result = getModelCapabilities({
+			providerID: "minimax",
+			modelID: "minimax-m2",
+			bundledSnapshot: {
+				generatedAt: "2026-03-25T00:00:00.000Z",
+				sourceUrl: "https://models.dev/api.json",
+				models: {
+					"minimax-m2": {
+						id: "minimax-m2",
+						family: "minimax",
+						limit: { context: 500_000, output: 32_000 },
+					},
+					"minimax/minimax-m2": {
+						id: "minimax/minimax-m2",
+						family: "minimax",
+						limit: { context: 250_000, output: 16_000 },
+					},
+				},
+			},
+		})
+
+		expect(result.contextWindowTokens).toBe(250_000)
+		expect(result.maxOutputTokens).toBe(16_000)
+		expect(result.diagnostics.snapshot).toMatchObject({ source: "bundled-snapshot" })
+	 })
 
   test("falls back to heuristic family rules when no snapshot entry exists", () => {
     const result = getModelCapabilities({

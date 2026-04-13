@@ -46,6 +46,34 @@ describe("applyProviderConfig", () => {
     ])
   })
 
+  test("caches provider-level minimum context limits for explicit Anthropic 1M mode", () => {
+    // given
+    const modelCacheState = createModelCacheState()
+
+    // when
+    applyProviderConfig({
+      config: {
+        provider: {
+          anthropic: {
+            options: {
+              headers: {
+                "anthropic-beta": "context-1m-2025-08-07",
+              },
+            },
+          },
+        },
+      },
+      modelCacheState,
+    })
+
+    // then
+    expect(Array.from(modelCacheState.providerContextLimitMinimumsCache?.entries() ?? [])).toEqual([
+      ["anthropic", 1_000_000],
+      ["google-vertex-anthropic", 1_000_000],
+      ["aws-bedrock-anthropic", 1_000_000],
+    ])
+  })
+
   test("caches vision-capable models from modalities and capabilities", () => {
     // given
     const modelCacheState = createModelCacheState()
@@ -94,6 +122,34 @@ describe("applyProviderConfig", () => {
     expect(readVisionCapableModelsCache()).toEqual([
       { providerID: "rundao", modelID: "public/qwen3.5-397b" },
       { providerID: "google", modelID: "gemini-3-flash" },
+    ])
+  })
+
+  test("stores provider-level context minimums from existing provider config signals", () => {
+    // given
+    const modelCacheState = createModelCacheState()
+
+    // when
+    applyProviderConfig({
+      config: {
+        provider: {
+          anthropic: {
+            options: {
+              headers: {
+                "anthropic-beta": "prompt-caching-2024-07-31,context-1m-2025-08-07",
+              },
+            },
+          },
+        },
+      },
+      modelCacheState,
+    })
+
+    // then
+    expect(Array.from(modelCacheState.providerContextLimitMinimumsCache?.entries() ?? [])).toEqual([
+      ["anthropic", 1000000],
+      ["google-vertex-anthropic", 1000000],
+      ["aws-bedrock-anthropic", 1000000],
     ])
   })
 

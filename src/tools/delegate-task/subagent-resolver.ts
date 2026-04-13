@@ -5,7 +5,7 @@ import { isPlanFamily } from "./constants"
 import { SISYPHUS_JUNIOR_AGENT } from "./sisyphus-junior-agent"
 import { normalizeModelFormat } from "../../shared/model-format-normalizer"
 import { AGENT_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
-import { normalizeFallbackModels, flattenToFallbackModelStrings } from "../../shared/model-resolver"
+import { normalizeFallbackModels } from "../../shared/model-resolver"
 import { buildFallbackChainFromModels, findMostSpecificFallbackEntry } from "../../shared/fallback-chain-from-models"
 import { getAgentDisplayName, getAgentConfigKey, stripAgentListSortPrefix } from "../../shared/agent-display-names"
 import { normalizeSDKResponse } from "../../shared"
@@ -179,7 +179,7 @@ Create the work plan directly - that's your job as the planning agent.`,
 
       const resolution = resolveModelForDelegateTask({
         userModel: agentOverride?.model ?? agentCategoryModel,
-        userFallbackModels: flattenToFallbackModelStrings(normalizedAgentFallbackModels),
+        userFallbackModels: normalizedAgentFallbackModels,
         categoryDefaultModel: matchedAgentModelStr,
         fallbackChain: agentRequirement?.fallbackChain,
         availableModels,

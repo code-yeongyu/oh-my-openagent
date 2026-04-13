@@ -41,6 +41,39 @@ describe("model-error-classifier", () => {
     expect(result).toBe(true)
   })
 
+  test("treats invalid authentication credentials message as retryable", () => {
+    //#given
+    const error = { message: "Invalid authentication credentials" }
+
+    //#when
+    const result = shouldRetryError(error)
+
+    //#then
+    expect(result).toBe(true)
+  })
+
+  test("treats authentication failed message as retryable", () => {
+    //#given
+    const error = { message: "Authentication failed for upstream provider" }
+
+    //#when
+    const result = shouldRetryError(error)
+
+    //#then
+    expect(result).toBe(true)
+  })
+
+  test("treats unauthorized provider message as retryable", () => {
+    //#given
+    const error = { message: "401 Unauthorized: invalid API key" }
+
+    //#when
+    const result = shouldRetryError(error)
+
+    //#then
+    expect(result).toBe(true)
+  })
+
   test("selectFallbackProvider prefers first connected provider in preference order", () => {
     //#given
     readConnectedProvidersCacheSpy?.mockReturnValue(["anthropic", "nvidia"])

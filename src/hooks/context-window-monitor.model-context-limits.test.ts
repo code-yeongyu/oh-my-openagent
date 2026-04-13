@@ -222,8 +222,8 @@ describe("context-window-monitor modelContextLimitsCache", () => {
   })
 
   describe("#given older Anthropic provider with cached context limit and 1M mode disabled", () => {
-    describe("#when cached usage would only exceed the incorrect cached limit", () => {
-      it("#then should ignore the cached limit and use the 200K default", async () => {
+    describe("#when cached usage stays below the cached threshold", () => {
+      it("#then should use the cached limit from the model cache", async () => {
         // given
         const modelContextLimitsCache = new Map<string, number>()
         modelContextLimitsCache.set("anthropic/claude-sonnet-4-5", 500000)
@@ -232,7 +232,7 @@ describe("context-window-monitor modelContextLimitsCache", () => {
           anthropicContext1MEnabled: false,
           modelContextLimitsCache,
         })
-        const sessionID = "ses_anthropic_older_model_ignores_cached_limit"
+        const sessionID = "ses_anthropic_older_model_uses_cached_limit"
 
         await hook.event({
           event: {
@@ -260,8 +260,7 @@ describe("context-window-monitor modelContextLimitsCache", () => {
         await hook["tool.execute.after"]({ tool: "bash", sessionID, callID: "call_1" }, output)
 
         // then
-        expect(output.output).toContain("context remaining")
-        expect(output.output).toContain("200,000-token context window")
+        expect(output.output).toBe("original")
       })
     })
   })

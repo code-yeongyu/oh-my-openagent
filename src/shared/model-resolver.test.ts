@@ -6,6 +6,7 @@ mock.module("./logger", () => ({ log: (..._args: unknown[]) => {} }))
 import { resolveModel, resolveModelWithFallback, type ModelResolutionInput, type ExtendedModelResolutionInput, type ModelResolutionResult, type ModelSource } from "./model-resolver"
 import * as logger from "./logger"
 import * as connectedProvidersCache from "./connected-providers-cache"
+import { transformModelForProvider } from "./provider-model-id-transform"
 
 describe("resolveModel", () => {
   describe("priority chain", () => {
@@ -108,13 +109,16 @@ describe("resolveModel", () => {
 
 describe("resolveModelWithFallback", () => {
   let logSpy: ReturnType<typeof spyOn>
+  let providerModelsCacheSpy: ReturnType<typeof spyOn>
 
   beforeEach(() => {
     logSpy = spyOn(logger, "log")
+    providerModelsCacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue(null)
   })
 
   afterEach(() => {
     logSpy.mockRestore()
+    providerModelsCacheSpy.mockRestore()
   })
 
   describe("Step 1: UI Selection (highest priority)", () => {
@@ -526,9 +530,9 @@ describe("resolveModelWithFallback", () => {
       // when
       const result = resolveModelWithFallback(input)
 
-      // then - should use connected provider (openai) from fallback chain
-      expect(result!.model).toBe("openai/claude-opus-4-6")
-      expect(result!.source).toBe("provider-fallback")
+		  // then - should use connected provider (openai) from fallback chain
+		  expect(result!.model).toBe(`openai/${transformModelForProvider("openai", "claude-opus-4-6")}`)
+		  expect(result!.source).toBe("provider-fallback")
       cacheSpy.mockRestore()
     })
 
@@ -546,10 +550,11 @@ describe("resolveModelWithFallback", () => {
       // when
       const result = resolveModelWithFallback(input)
 
-      // then - should use github-copilot (second provider) since google not connected
-      // model name is transformed to preview variant for github-copilot provider
-      expect(result!.model).toBe("github-copilot/gemini-3.1-pro-preview")
-      expect(result!.source).toBe("provider-fallback")
+		  // then - should use github-copilot (second provider) since google not connected
+		  expect(result!.model).toBe(
+		    `github-copilot/${transformModelForProvider("github-copilot", "gemini-3.1-pro")}`,
+		  )
+		  expect(result!.source).toBe("provider-fallback")
       cacheSpy.mockRestore()
     })
 
@@ -800,8 +805,8 @@ describe("resolveModelWithFallback", () => {
       // when
       const result = resolveModelWithFallback(input)
 
-      // then - should use transformed categoryDefaultModel since google is connected
-      expect(result!.model).toBe("google/gemini-3.1-pro-preview")
+      // then - should use the connected-provider canonical model since google is connected
+      expect(result!.model).toBe(`google/${transformModelForProvider("google", "gemini-3.1-pro")}`)
       expect(result!.source).toBe("category-default")
       cacheSpy.mockRestore()
     })
@@ -818,8 +823,8 @@ describe("resolveModelWithFallback", () => {
       // when
       const result = resolveModelWithFallback(input)
 
-      // then - gemini-3-flash should be transformed to gemini-3-flash-preview
-      expect(result!.model).toBe("google/gemini-3-flash-preview")
+      // then - gemini-3-flash should resolve through provider-aware canonicalization
+      expect(result!.model).toBe(`google/${transformModelForProvider("google", "gemini-3-flash")}`)
       expect(result!.source).toBe("category-default")
       cacheSpy.mockRestore()
     })
@@ -856,9 +861,9 @@ describe("resolveModelWithFallback", () => {
       // when
       const result = resolveModelWithFallback(input)
 
-      // then - should transform to preview variant for google provider
-      expect(result!.model).toBe("google/gemini-3.1-pro-preview")
-      expect(result!.source).toBe("provider-fallback")
+		  // then - should use the provider-aware canonical model for google
+		  expect(result!.model).toBe(`google/${transformModelForProvider("google", "gemini-3.1-pro")}`)
+		  expect(result!.source).toBe("provider-fallback")
       cacheSpy.mockRestore()
     })
 

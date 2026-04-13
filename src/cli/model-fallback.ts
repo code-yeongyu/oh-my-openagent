@@ -140,9 +140,9 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
     if (role === "explore") {
       let agentConfig: AgentConfig
       if (avail.native.claude) {
-        agentConfig = { model: "anthropic/claude-haiku-4-5" }
+        agentConfig = { model: `anthropic/${transformModelForProvider("anthropic", "claude-haiku")}` }
       } else if (avail.opencodeZen) {
-        agentConfig = { model: "opencode/claude-haiku-4-5" }
+        agentConfig = { model: `opencode/${transformModelForProvider("opencode", "claude-haiku")}` }
       } else if (avail.opencodeGo) {
         agentConfig = { model: "opencode-go/minimax-m2.7" }
       } else if (avail.copilot) {

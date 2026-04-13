@@ -1,5 +1,5 @@
 export { getBundledModelCapabilitiesSnapshot } from "./bundled-snapshot"
-export { getModelCapabilities } from "./get-model-capabilities"
+export { getModelCapabilities, resolveSnapshotModelKey } from "./get-model-capabilities"
 export type {
 	GetModelCapabilitiesInput,
 	ModelCapabilities,

@@ -6,13 +6,17 @@
  * Keys are full "provider/model" strings. Only openai and anthropic entries needed.
  */
 export const MODEL_VERSION_MAP: Record<string, string> = {
-  "anthropic/claude-opus-4-5": "anthropic/claude-opus-4-6",
-  "anthropic/claude-sonnet-4-5": "anthropic/claude-sonnet-4-6",
+  "anthropic/claude-opus-4-5": "anthropic/claude-opus",
+  "anthropic/claude-sonnet-4-5": "anthropic/claude-sonnet",
   "openai/gpt-5.3-codex": "openai/gpt-5.4",
 }
 
 function migrationKey(oldModel: string, newModel: string): string {
   return `model-version:${oldModel}->${newModel}`
+}
+
+function migrationPrefix(oldModel: string): string {
+  return `model-version:${oldModel}->`
 }
 
 export function migrateModelVersions(
@@ -31,8 +35,13 @@ export function migrateModelVersions(
         const newModel = MODEL_VERSION_MAP[oldModel]
         const mKey = migrationKey(oldModel, newModel)
 
-        // Skip if this migration was already applied (user may have reverted)
-        if (appliedMigrations?.has(mKey)) {
+        // Skip if this migration was already applied (user may have reverted).
+        // Also recognize legacy migration keys from older plugin versions that
+        // pointed to a different target version for the same source model.
+        const prefix = migrationPrefix(oldModel)
+        const alreadyApplied = appliedMigrations?.has(mKey)
+          || (appliedMigrations != null && Array.from(appliedMigrations).some((k) => k.startsWith(prefix)))
+        if (alreadyApplied) {
           migrated[key] = value
           continue
         }

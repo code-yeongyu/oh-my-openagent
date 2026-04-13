@@ -1,6 +1,13 @@
-import { describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, test } from "bun:test"
 import type { OhMyOpenCodeConfig } from "../config"
+import { AGENT_MODEL_REQUIREMENTS } from "./model-requirements"
 import { applyAgentVariant, resolveAgentVariant, resolveVariantForModel } from "./agent-variant"
+
+const AGENT_VARIANT_PRIORITY_TEST_KEY = "__variant-priority-test__"
+
+afterEach(() => {
+  delete AGENT_MODEL_REQUIREMENTS[AGENT_VARIANT_PRIORITY_TEST_KEY]
+})
 
 describe("resolveAgentVariant", () => {
   test("returns undefined when agent name missing", () => {
@@ -210,5 +217,21 @@ describe("resolveVariantForModel", () => {
 
     // then
     expect(variant).toBe("max")
+  })
+
+  test("prefers later exact provider match over earlier family match", () => {
+    AGENT_MODEL_REQUIREMENTS[AGENT_VARIANT_PRIORITY_TEST_KEY] = {
+      fallbackChain: [
+        { providers: ["anthropic"], model: "claude-opus", variant: "max" },
+        { providers: ["anthropic"], model: "claude-opus-4-6", variant: "high" },
+      ],
+    }
+
+    const config = {} as OhMyOpenCodeConfig
+    const model = { providerID: "anthropic", modelID: "claude-opus-4-6" }
+
+    const variant = resolveVariantForModel(config, AGENT_VARIANT_PRIORITY_TEST_KEY, model)
+
+    expect(variant).toBe("high")
   })
 })

@@ -57,7 +57,8 @@ export function getNextReachableFallback(
     const providerID = selectFallbackProvider(fallback.providers, state.providerID)
     const modelID = transformModelForProvider(providerID, fallback.model)
     const isNoOpFallback =
-      providerID.toLowerCase() === state.providerID.toLowerCase()
+      typeof state.modelID === "string"
+      && providerID.toLowerCase() === state.providerID.toLowerCase()
       && canonicalizeModelID(modelID) === canonicalizeModelID(state.modelID)
 
     if (isNoOpFallback) {

@@ -34,7 +34,7 @@ const BLOCKED_TOOLS = ["task"]
 const GPT_BLOCKED_TOOLS = ["task", "apply_patch"]
 
 export const SISYPHUS_JUNIOR_DEFAULTS = {
-  model: "anthropic/claude-sonnet-4-6",
+  model: "anthropic/claude-sonnet",
   temperature: 0.1,
 } as const
 

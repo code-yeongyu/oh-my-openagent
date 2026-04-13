@@ -175,16 +175,38 @@ export function readRuntimeModelToolCallSupport(
 	return readRuntimeModelBoolean(runtimeModel, ["toolCall", "tool_call", "toolcall"])
 }
 
-export function readRuntimeModelLimitOutput(
+function readRuntimeModelLimitValue(
 	runtimeModel: Record<string, unknown> | undefined,
+	key: "context" | "output",
 ): number | undefined {
-	const limit = isRecord(runtimeModel?.limit)
-		? runtimeModel.limit
-		: readRuntimeModelCapabilities(runtimeModel)?.limit
+	if (!runtimeModel) {
+		return undefined
+	}
 
+	const rootValue = readNumber(runtimeModel[key])
+	if (rootValue !== undefined) {
+		return rootValue
+	}
+
+	const runtimeCapabilities = readRuntimeModelCapabilities(runtimeModel)
+	const limit = isRecord(runtimeModel.limit)
+		? runtimeModel.limit
+		: runtimeCapabilities?.limit
 	if (!isRecord(limit)) {
 		return undefined
 	}
 
-	return readNumber(limit.output)
+	return readNumber(limit[key])
+}
+
+export function readRuntimeModelLimitContext(
+	runtimeModel: Record<string, unknown> | undefined,
+): number | undefined {
+	return readRuntimeModelLimitValue(runtimeModel, "context")
+}
+
+export function readRuntimeModelLimitOutput(
+	runtimeModel: Record<string, unknown> | undefined,
+): number | undefined {
+	return readRuntimeModelLimitValue(runtimeModel, "output")
 }

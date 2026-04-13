@@ -4,6 +4,8 @@ import { log } from "./logger"
 import { getOpenCodeCacheDir } from "./data-path"
 import * as connectedProvidersCache from "./connected-providers-cache"
 import { normalizeSDKResponse } from "./normalize-sdk-response"
+import { detectHeuristicModelFamily } from "./model-capability-heuristics"
+import { normalizeModelID } from "./model-normalization"
 
 /**
  * Fuzzy match a target model name against available models
@@ -29,6 +31,113 @@ function normalizeModelName(name: string): string {
 	return name
 		.toLowerCase()
 		.replace(/claude-(opus|sonnet|haiku)-(\d+)[.-](\d+)/g, "claude-$1-$2.$3")
+}
+
+function extractModelID(name: string): string {
+	const slashIndex = name.indexOf("/")
+	return slashIndex === -1 ? name : name.slice(slashIndex + 1)
+}
+
+function normalizeFamilyComparableModelID(name: string): string {
+	return normalizeModelID(extractModelID(name).trim().toLowerCase())
+}
+
+function compareVersionVectors(left: number[], right: number[]): number {
+	const maxLength = Math.max(left.length, right.length)
+	for (let index = 0; index < maxLength; index++) {
+		const leftValue = left[index] ?? 0
+		const rightValue = right[index] ?? 0
+		if (leftValue !== rightValue) {
+			return rightValue - leftValue
+		}
+	}
+	return 0
+}
+
+function getFamilyMatchVersionVector(candidate: string, family: string): number[] {
+	const normalizedModelID = normalizeFamilyComparableModelID(candidate)
+	const suffix = normalizedModelID.startsWith(family)
+		? normalizedModelID.slice(family.length)
+		: normalizedModelID
+	return suffix.match(/\d+/g)?.map((value) => Number(value)) ?? []
+}
+
+function compareFamilyCandidates(left: string, right: string, family: string): number {
+	const leftModelID = normalizeFamilyComparableModelID(left)
+	const rightModelID = normalizeFamilyComparableModelID(right)
+
+	const leftHasDefault = leftModelID.includes("@default") ? 1 : 0
+	const rightHasDefault = rightModelID.includes("@default") ? 1 : 0
+	if (leftHasDefault !== rightHasDefault) {
+		return rightHasDefault - leftHasDefault
+	}
+
+	const leftStartsWithFamily = leftModelID.startsWith(`${family}-`) ? 1 : 0
+	const rightStartsWithFamily = rightModelID.startsWith(`${family}-`) ? 1 : 0
+	if (leftStartsWithFamily !== rightStartsWithFamily) {
+		return rightStartsWithFamily - leftStartsWithFamily
+	}
+
+	const leftIsNonThinking = leftModelID.includes("think") ? 0 : 1
+	const rightIsNonThinking = rightModelID.includes("think") ? 0 : 1
+	if (leftIsNonThinking !== rightIsNonThinking) {
+		return rightIsNonThinking - leftIsNonThinking
+	}
+
+	const leftHasNoColon = leftModelID.includes(":") ? 0 : 1
+	const rightHasNoColon = rightModelID.includes(":") ? 0 : 1
+	if (leftHasNoColon !== rightHasNoColon) {
+		return rightHasNoColon - leftHasNoColon
+	}
+
+	const versionComparison = compareVersionVectors(
+		getFamilyMatchVersionVector(left, family),
+		getFamilyMatchVersionVector(right, family),
+	)
+	if (versionComparison !== 0) {
+		return versionComparison
+	}
+
+	const leftHasNoAtSign = leftModelID.includes("@") ? 0 : 1
+	const rightHasNoAtSign = rightModelID.includes("@") ? 0 : 1
+	if (leftHasNoAtSign !== rightHasNoAtSign) {
+		return rightHasNoAtSign - leftHasNoAtSign
+	}
+
+	// Prefer normalized (hyphen) form over dot form when version vectors are equal.
+	// e.g. "claude-opus-4-6" beats "claude-opus-4.6" because dots are normalizable noise.
+	// Must count dots on the raw candidate strings (not normalized ones, where dots are already converted).
+	const leftRawModelID = extractModelID(left).trim().toLowerCase()
+	const rightRawModelID = extractModelID(right).trim().toLowerCase()
+	const leftDotCount = (leftRawModelID.match(/\./g) ?? []).length
+	const rightDotCount = (rightRawModelID.match(/\./g) ?? []).length
+	if (leftDotCount !== rightDotCount) {
+		return leftDotCount - rightDotCount
+	}
+
+	return left.length - right.length
+}
+
+export function resolveStableFamilyAlias(target: string, candidates: Iterable<string>): string | null {
+	const normalizedTargetModelID = normalizeFamilyComparableModelID(target)
+	const targetFamily = detectHeuristicModelFamily(normalizedTargetModelID)?.family
+	if (!targetFamily || normalizedTargetModelID !== targetFamily) {
+		return null
+	}
+
+	const familyCandidates = Array.from(candidates).filter((candidate) => {
+		const candidateFamily = detectHeuristicModelFamily(
+			normalizeFamilyComparableModelID(candidate),
+		)?.family
+		return candidateFamily === targetFamily
+	})
+
+	if (familyCandidates.length === 0) {
+		return null
+	}
+
+	familyCandidates.sort((left, right) => compareFamilyCandidates(left, right, targetFamily))
+	return familyCandidates[0] ?? null
 }
 
 export function fuzzyMatchModel(
@@ -93,6 +202,15 @@ export function fuzzyMatchModel(
 		)
 		log("[fuzzyMatchModel] exact model ID match found", { result, candidateCount: exactModelIdMatches.length })
 		return result
+	}
+
+	const stableFamilyAliasMatch = resolveStableFamilyAlias(target, matches)
+	if (stableFamilyAliasMatch) {
+		log("[fuzzyMatchModel] stable family alias match found", {
+			target,
+			result: stableFamilyAliasMatch,
+		})
+		return stableFamilyAliasMatch
 	}
 
 	// Priority 3: Shorter model name (more specific, fallback for partial matches)
