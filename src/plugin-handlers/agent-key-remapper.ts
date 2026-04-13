@@ -1,4 +1,4 @@
-import { getAgentDisplayName, getAgentRuntimeName } from "../shared/agent-display-names"
+import { getAgentDisplayName } from "../shared/agent-display-names"
 
 function rewriteAgentNameForListDisplay(
   key: string,
@@ -11,7 +11,7 @@ function rewriteAgentNameForListDisplay(
   const agent = value as Record<string, unknown>
   return {
     ...agent,
-    name: getAgentRuntimeName(key),
+    name: getAgentDisplayName(key),
   }
 }
 
