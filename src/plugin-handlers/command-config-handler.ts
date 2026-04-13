@@ -12,6 +12,7 @@ import {
 import { loadBuiltinCommands } from "../features/builtin-commands";
 import {
   discoverConfigSourceSkills,
+  discoverOpencodeConfigSkillPaths,
   loadGlobalAgentsSkills,
   loadProjectAgentsSkills,
   loadUserSkills,
@@ -48,6 +49,7 @@ export async function applyCommandConfig(params: {
 
   const [
     configSourceSkills,
+    opencodeConfigPathSkills,
     userCommands,
     projectCommands,
     opencodeGlobalCommands,
@@ -63,6 +65,7 @@ export async function applyCommandConfig(params: {
       config: params.pluginConfig.skills,
       configDir: params.ctx.directory,
     }),
+    discoverOpencodeConfigSkillPaths(params.ctx.directory),
     includeClaudeCommands ? loadUserCommands() : Promise.resolve({}),
     includeClaudeCommands ? loadProjectCommands(params.ctx.directory) : Promise.resolve({}),
     loadOpencodeGlobalCommands(),
@@ -78,6 +81,7 @@ export async function applyCommandConfig(params: {
   params.config.command = {
     ...builtinCommands,
     ...skillsToCommandDefinitionRecord(configSourceSkills),
+    ...skillsToCommandDefinitionRecord(opencodeConfigPathSkills),
     ...userCommands,
     ...userSkills,
     ...globalAgentsSkills,

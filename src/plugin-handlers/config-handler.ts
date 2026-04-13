@@ -1,5 +1,6 @@
 import type { OhMyOpenCodeConfig } from "../config";
 import { setAdditionalAllowedMcpEnvVars } from "../features/claude-code-mcp-loader";
+import { setOpencodeConfigSkillPaths } from "../features/opencode-skill-loader/opencode-config-skill-paths";
 import type { ModelCacheState } from "../plugin-state";
 import { log } from "../shared";
 import { applyAgentConfig } from "./agent-config-handler";
@@ -23,6 +24,9 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
 
   return async (config: Record<string, unknown>) => {
     const formatterConfig = config.formatter;
+
+    const opencodeSkills = config.skills as { paths?: string[] } | undefined
+    setOpencodeConfigSkillPaths(opencodeSkills?.paths ?? [])
 
     setAdditionalAllowedMcpEnvVars(pluginConfig.mcp_env_allowlist ?? [])
     applyProviderConfig({ config, modelCacheState });
