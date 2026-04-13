@@ -1,6 +1,6 @@
 # oh-my-opencode — OpenCode Plugin
 
-**Generated:** 2026-04-11 | **Commit:** f5dc1c0e | **Branch:** dev
+**Generated:** 2026-04-13 | **Commit:** 1b36194b | **Branch:** dev
 
 ## OVERVIEW
 
@@ -61,19 +61,19 @@ OhMyOpenCodePlugin(ctx)
 | Task | Location | Notes |
 |------|----------|-------|
 | Add new agent | `src/agents/` + `src/agents/builtin-agents/` | Follow createXXXAgent factory pattern |
-| Add new hook | `src/hooks/{name}/` + register in `src/plugin/hooks/create-*-hooks.ts` | Match event type to tier |
-| Add new tool | `src/tools/{name}/` + register in `src/plugin/tool-registry.ts` | Follow createXXXTool factory |
+| Add new hook | `src/hooks/{name}/` + `src/plugin/hooks/create-*-hooks.ts` | Match event type to tier |
+| Add new tool | `src/tools/{name}/` + `src/tools/index.ts` + `src/plugin/tool-registry.ts` | Factory + export |
 | Add new feature module | `src/features/{name}/` | Standalone module, wire in plugin/ |
-| Add new MCP | `src/mcp/` + register in `createBuiltinMcps()` | Remote HTTP only (tier 1 of 3) |
+| Add new MCP | `src/mcp/` + register in `createBuiltinMcps()` | Tier 1: remote HTTP only |
 | Add new skill | `src/features/builtin-skills/skills/` | Implement BuiltinSkill interface |
 | Add new command | `src/features/builtin-commands/` | Template in templates/ |
 | Add new CLI command | `src/cli/cli-program.ts` | Commander.js subcommand |
 | Add new doctor check | `src/cli/doctor/checks/` | Register in checks/index.ts |
-| Modify config schema | `src/config/schema/` + update root schema | Zod v4, add to OhMyOpenCodeConfigSchema |
+| Modify config schema | `src/config/schema/` | Zod v4, update root schema |
 | Add new category | `src/tools/delegate-task/constants.ts` | DEFAULT_CATEGORIES + CATEGORY_MODEL_REQUIREMENTS |
-| Debug provider errors | `src/hooks/runtime-fallback/` | Reactive error recovery (distinct from model-fallback) |
-| External notifications | `src/openclaw/` | Bidirectional Discord/Telegram/webhook integration |
-| Skill-embedded MCP | `src/features/skill-mcp-manager/` | Tier 3 MCPs (stdio + HTTP, per-session) |
+| Debug provider errors | `src/hooks/runtime-fallback/` | Reactive error recovery |
+| External notifications | `src/openclaw/` | Discord/Telegram/webhook |
+| Skill-embedded MCP | `src/features/skill-mcp-manager/` | Tier 3: stdio + HTTP |
 
 ## MULTI-LEVEL CONFIG
 
@@ -81,6 +81,7 @@ OhMyOpenCodePlugin(ctx)
 Project (.opencode/oh-my-opencode.jsonc)  →  User (~/.config/opencode/oh-my-opencode.jsonc)  →  Defaults
 ```
 
+- Config file basename: supports both `oh-my-openagent.jsonc` and legacy `oh-my-opencode.jsonc` during transition
 - `agents`, `categories`, `claude_code`: deep merged recursively (prototype-pollution-safe)
 - `disabled_*` arrays: Set union (concatenated + deduplicated)
 - All other fields: override replaces base value
@@ -145,13 +146,13 @@ bunx oh-my-opencode run     # Non-interactive session
 
 | Workflow | Trigger | Purpose |
 |----------|---------|---------|
-| ci.yml | push/PR to master/dev | Tests (split: mock-heavy isolated + batch), typecheck, build, schema auto-commit |
-| publish.yml | manual dispatch | Version bump, dual npm publish (oh-my-opencode + oh-my-openagent), platform binaries, GitHub release |
-| publish-platform.yml | called by publish | 11 platform binaries via bun compile (darwin/linux/windows) |
+| ci.yml | push/PR to master, dev | Tests (split: mock-heavy isolated + batch), typecheck, build, schema auto-commit |
+| publish.yml | manual dispatch | Version bump, dual npm publish, platform binaries, GitHub release |
+| publish-platform.yml | called by publish | 11 platform binaries via bun compile |
 | sisyphus-agent.yml | @mention / dispatch | AI agent handles issues/PRs |
-| refresh-model-capabilities.yml | weekly schedule / dispatch | Auto-refresh model capabilities from models.dev API |
-| cla.yml | issue_comment/PR | CLA assistant for contributors |
-| lint-workflows.yml | push to .github/ | actionlint + shellcheck on workflow files |
+| refresh-model-capabilities.yml | weekly / dispatch | Auto-refresh model capabilities |
+| cla.yml | issue_comment/PR | CLA assistant |
+| lint-workflows.yml | push to .github/ | actionlint + shellcheck |
 
 ## NOTES
 

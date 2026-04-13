@@ -39,6 +39,7 @@ export const OverridableAgentNameSchema = z.enum([
   "explore",
   "multimodal-looker",
   "atlas",
+  "preview",
 ])
 
 export const AgentNameSchema = BuiltinAgentNameSchema
