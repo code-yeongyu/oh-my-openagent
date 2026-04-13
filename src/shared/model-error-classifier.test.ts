@@ -332,7 +332,7 @@ describe("model-error-classifier", () => {
       expect(result).toBe(true)
     })
 
-    test("returns false for spending cap message (retryable, not stop)", () => {
+    test("returns true for spending cap message", () => {
       //#given
       const error = { message: "exceeded its monthly spending cap" }
 
@@ -340,7 +340,7 @@ describe("model-error-classifier", () => {
       const result = isStopModelError(error)
 
       //#then
-      expect(result).toBe(false)
+      expect(result).toBe(true)
     })
 
     test("returns false for RateLimitError (retryable, not stop)", () => {

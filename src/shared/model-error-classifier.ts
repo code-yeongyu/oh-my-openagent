@@ -50,7 +50,6 @@ const RETRYABLE_MESSAGE_PATTERNS = [
   "over limit",
   "hit your limit",
   "hit the limit",
-  "spending cap",
   "overloaded",
   "bad gateway",
   "bad request",
@@ -100,6 +99,7 @@ const STOP_MESSAGE_PATTERNS = [
   "usage limit for this month",
   "usage limit has been reached",
   "exhausted your capacity",
+  "spending cap",
 ]
 
 const AUTO_RETRY_GATE_PATTERNS = [
