@@ -14,6 +14,7 @@ import {
   discoverOpencodeProjectSkills,
   discoverProjectAgentsSkills,
   discoverGlobalAgentsSkills,
+  discoverOpencodeConfigSkillPaths,
   mergeSkills,
 } from "../features/opencode-skill-loader"
 import { createBuiltinSkills } from "../features/builtin-skills"
@@ -72,7 +73,7 @@ export async function createSkillContext(args: {
   })
 
   const includeClaudeSkills = pluginConfig.claude_code?.skills !== false
-  const [configSourceSkills, userSkills, globalSkills, projectSkills, opencodeProjectSkills, agentsProjectSkills, agentsGlobalSkills] =
+  const [configSourceSkills, userSkills, globalSkills, projectSkills, opencodeProjectSkills, agentsProjectSkills, agentsGlobalSkills, opencodeConfigPathSkills] =
     await Promise.all([
       discoverConfigSourceSkills({
         config: pluginConfig.skills,
@@ -84,6 +85,7 @@ export async function createSkillContext(args: {
       discoverOpencodeProjectSkills(directory),
       discoverProjectAgentsSkills(directory),
       discoverGlobalAgentsSkills(),
+      discoverOpencodeConfigSkillPaths(directory),
     ])
 
   const filteredConfigSourceSkills = filterProviderGatedSkills(
@@ -105,11 +107,15 @@ export async function createSkillContext(args: {
     agentsGlobalSkills,
     browserProvider,
   )
+  const filteredOpencodeConfigPathSkills = filterProviderGatedSkills(
+    opencodeConfigPathSkills,
+    browserProvider,
+  )
 
   const mergedSkills = mergeSkills(
     builtinSkills,
     pluginConfig.skills,
-    filteredConfigSourceSkills,
+    [...filteredConfigSourceSkills, ...filteredOpencodeConfigPathSkills],
     [...filteredUserSkills, ...filteredAgentsGlobalSkills],
     filteredGlobalSkills,
     [...filteredProjectSkills, ...filteredAgentsProjectSkills],
