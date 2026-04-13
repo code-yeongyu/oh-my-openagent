@@ -48,6 +48,8 @@ const RETRYABLE_MESSAGE_PATTERNS = [
   "insufficient",
   "too many requests",
   "over limit",
+  "hit your limit",
+  "hit the limit",
   "overloaded",
   "bad gateway",
   "bad request",
