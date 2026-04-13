@@ -109,6 +109,10 @@ https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/heads/dev/do
 curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/heads/dev/docs/guide/installation.md
 ```
 
+**참고**: 배포된 패키지와 바이너리 이름은 `oh-my-opencode`를 사용하세요. `opencode.json` 내부에서는 호환성 레이어가 이제 플러그인 엔트리 `oh-my-openagent`를 우선시하며, 레거시 `oh-my-opencode` 엔트리는 경고와 함께 여전히 로드됩니다. 플러그인 설정 파일은 여전히 일반적으로 `oh-my-opencode.json` 또는 `oh-my-opencode.jsonc`를 사용하며, 전환 기간 동안 레거시와 변경된 basename 모두 인식됩니다.
+
+익명 텔레메트리는 설치 및 런타임 안정성 개선을 위해 기본적으로 활성화되어 있습니다. PostHog를 사용하며 해시된 설치 식별자를 사용하고 원시 호스트명은 절대 사용하지 않습니다. `OMO_SEND_ANONYMOUS_TELEMETRY=0` 또는 `OMO_DISABLE_POSTHOG=1`로 비활성화할 수 있습니다. [개인정보처리방침](docs/legal/privacy-policy.md)과 [서비스 이용약관](docs/legal/terms-of-service.md)을 참조하세요.
+
 ---
 
 ## 이 README 건너뛰기
