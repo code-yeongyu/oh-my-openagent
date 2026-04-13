@@ -14,8 +14,7 @@ https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/heads/dev/do
 Run the interactive installer:
 
 ```bash
-bunx oh-my-opencode install # recommended
-npx oh-my-opencode install # alternative
+bunx oh-my-opencode install
 ```
 
 > **Note**: The CLI ships with standalone binaries for all major platforms. No runtime (Bun/Node.js) is required for CLI execution after installation.
@@ -77,6 +76,14 @@ Ask the user these questions to determine CLI options:
    - If **yes** → `--opencode-go=yes`
    - If **no** → `--opencode-go=no` (default)
 
+8. **Do you have a Kimi for Coding subscription?**
+   - If **yes** → `--kimi-for-coding=yes`
+   - If **no** → `--kimi-for-coding=no` (default)
+
+9. **Do you use Vercel AI Gateway?**
+   - If **yes** → `--vercel-ai-gateway=yes`
+   - If **no** → `--vercel-ai-gateway=no` (default)
+
 **Provider selection is agent-specific.** The installer and runtime do not use one single global provider priority. Each agent resolves against its own fallback chain.
 
 MUST STRONGLY WARNING, WHEN USER SAID THEY DON'T HAVE CLAUDE SUBSCRIPTION, SISYPHUS AGENT MIGHT NOT WORK IDEALLY.
@@ -100,7 +107,7 @@ Spawn a subagent to handle installation and report back - to save context.
 Based on user's answers, run the CLI installer with appropriate flags:
 
 ```bash
-bunx oh-my-opencode install --no-tui --claude=<yes|no|max20> --gemini=<yes|no> --copilot=<yes|no> [--openai=<yes|no>] [--opencode-go=<yes|no>] [--opencode-zen=<yes|no>] [--zai-coding-plan=<yes|no>]
+bunx oh-my-opencode install --no-tui --claude=<yes|no|max20> --gemini=<yes|no> --copilot=<yes|no> [--openai=<yes|no>] [--opencode-go=<yes|no>] [--opencode-zen=<yes|no>] [--zai-coding-plan=<yes|no>] [--kimi-for-coding=<yes|no>] [--vercel-ai-gateway=<yes|no>] [--skip-auth]
 ```
 
 **Examples:**
