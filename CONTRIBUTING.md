@@ -56,8 +56,7 @@ If English isn't your first language, don't worry! We value your contributions r
 ### Prerequisites
 
 - **Bun** (latest version) - The only supported package manager
-- **TypeScript 5.7.3+** - For type checking and declarations
-- **OpenCode 1.0.150+** - For testing the plugin
+- **TypeScript** - Strict mode for type checking and declarations
 
 ### Development Setup
 
@@ -113,14 +112,14 @@ oh-my-opencode/
 │   ├── index.ts         # Plugin entry (OhMyOpenCodePlugin)
 │   ├── plugin-config.ts # JSONC multi-level config (Zod v4)
 │   ├── agents/          # 11 agents (Sisyphus, Hephaestus, Oracle, Librarian, Explore, Atlas, Prometheus, Metis, Momus, Multimodal-Looker, Sisyphus-Junior)
-│   ├── hooks/           # Lifecycle hooks for orchestration, recovery, UX, and context management
-│   ├── tools/           # 26 tools across 15 directories
+│   ├── hooks/           # 52 lifecycle hooks across 55 dedicated modules
+│   ├── tools/           # 26 tools across 16 directories
 │   ├── mcp/             # 3 built-in remote MCPs (websearch, context7, grep_app)
 │   ├── features/        # 19 feature modules (background-agent, skill-loader, tmux, MCP-OAuth, etc.)
 │   ├── config/          # Zod v4 schema system
 │   ├── shared/          # Cross-cutting utilities
 │   ├── cli/             # CLI: install, run, doctor, mcp-oauth (Commander.js)
-│   ├── plugin/          # 8 OpenCode hook handlers + hook composition
+│   ├── plugin/          # 10 OpenCode hook handlers + hook composition
 │   └── plugin-handlers/ # 6-phase config loading pipeline
 ├── packages/            # Monorepo: comment-checker, opencode-sdk
 └── dist/                # Build output (ESM + .d.ts)
