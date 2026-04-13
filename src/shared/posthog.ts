@@ -87,11 +87,17 @@ function createPostHogClient(
     return NO_OP_POSTHOG
   }
 
-  const configuredClient = new PostHog(getPostHogApiKey(), {
-    ...options,
-    host: getPostHogHost(),
-    disableGeoip: false,
-  })
+  let configuredClient: PostHog
+
+  try {
+    configuredClient = new PostHog(getPostHogApiKey(), {
+      ...options,
+      host: getPostHogHost(),
+      disableGeoip: false,
+    })
+  } catch {
+    return NO_OP_POSTHOG
+  }
   const sharedProperties = getSharedProperties(source)
 
   return {
