@@ -51,7 +51,6 @@ const RETRYABLE_MESSAGE_PATTERNS = [
   "hit your limit",
   "hit the limit",
   "spending cap",
-  "usage limit",
   "overloaded",
   "bad gateway",
   "bad request",
@@ -99,6 +98,7 @@ const STOP_MESSAGE_PATTERNS = [
   "insufficient balance",
   "credit balance",
   "usage limit for this month",
+  "usage limit has been reached",
   "exhausted your capacity",
 ]
 
@@ -156,11 +156,50 @@ export function isRetryableModelError(error: ErrorInfo): boolean {
 }
 
 /**
- * Determines if an error should trigger a fallback retry.
- * Returns true for deadstop errors that completely halt the action loop.
+ * Determines if an error indicates provider exhaustion (quota/billing/usage limits).
+ * These errors mean the current provider cannot serve requests, but a different provider might.
+ */
+export function isStopModelError(error: ErrorInfo): boolean {
+  if (error.name) {
+    const errorNameLower = error.name.toLowerCase()
+    if (STOP_ERROR_NAMES.has(errorNameLower)) {
+      return true
+    }
+  }
+
+  const msg = error.message?.toLowerCase() ?? ""
+  return STOP_MESSAGE_PATTERNS.some((pattern) => msg.includes(pattern))
+}
+
+/**
+ * Determines if an error should trigger cross-provider fallback.
+ * Returns true for both retryable errors AND stop errors (provider exhaustion),
+ * since a different provider may still be able to serve the request.
+ * Returns false only for non-retryable errors (user aborts, validation, syntax)
+ * where no provider switch would help.
  */
 export function shouldRetryError(error: ErrorInfo): boolean {
-  return isRetryableModelError(error)
+  if (error.name) {
+    const errorNameLower = error.name.toLowerCase()
+    if (NON_RETRYABLE_ERROR_NAMES.has(errorNameLower)) {
+      return false
+    }
+    if (RETRYABLE_ERROR_NAMES.has(errorNameLower) || STOP_ERROR_NAMES.has(errorNameLower)) {
+      return true
+    }
+  }
+
+  const msg = error.message?.toLowerCase() ?? ""
+
+  if (STOP_MESSAGE_PATTERNS.some((pattern) => msg.includes(pattern))) {
+    return true
+  }
+
+  if (hasProviderAutoRetrySignal(msg)) {
+    return true
+  }
+
+  return RETRYABLE_MESSAGE_PATTERNS.some((pattern) => msg.includes(pattern))
 }
 
 /**
