@@ -14,11 +14,8 @@ import type { ConcurrencyManager } from "./concurrency"
 import type { OpencodeClient, QueueItem } from "./constants"
 
 async function importFreshFallbackRetryHandlerModule() {
-  mock.module("../../shared/logger", () => ({
+  mock.module("../../shared", () => ({
     log: sharedLogMock,
-  }))
-
-  mock.module("../../shared/connected-providers-cache", () => ({
     readConnectedProvidersCache: readConnectedProvidersCacheMock,
     readProviderModelsCache: readProviderModelsCacheMock,
   }))
@@ -362,4 +359,5 @@ describe("tryFallbackRetry", () => {
       expect(args.task.model?.modelID).toBe("fallback-model-1")
     })
   })
+
 })

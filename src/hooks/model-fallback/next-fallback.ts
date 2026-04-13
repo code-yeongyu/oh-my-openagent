@@ -1,5 +1,6 @@
 import type { FallbackEntry } from "../../shared/model-requirements"
 import { readConnectedProvidersCache, readProviderModelsCache } from "../../shared/connected-providers-cache"
+import { resolveFirstAvailableFallback } from "../../shared/fallback-model-availability"
 import { selectFallbackProvider } from "../../shared/model-error-classifier"
 import { transformModelForProvider } from "../../shared/provider-model-id-transform"
 import { log } from "../../shared/logger"
@@ -29,6 +30,26 @@ function createReachabilityChecker(state: ModelFallbackState): (entry: FallbackE
   }
 }
 
+function buildAvailableModelsFromCache(): Set<string> {
+  const providerModelsCache = readProviderModelsCache()
+  if (!providerModelsCache?.models) return new Set<string>()
+
+  const connected = new Set(providerModelsCache.connected)
+  const out = new Set<string>()
+
+  for (const [providerID, models] of Object.entries(providerModelsCache.models)) {
+    if (!connected.has(providerID)) continue
+
+    for (const item of models) {
+      const modelID = typeof item === "string" ? item : item?.id
+      if (!modelID) continue
+      out.add(`${providerID}/${modelID}`)
+    }
+  }
+
+  return out
+}
+
 export function getNextReachableFallback(
   sessionID: string,
   state: ModelFallbackState,
@@ -43,6 +64,7 @@ export function getNextReachableFallback(
   thinking?: { type: "enabled" | "disabled"; budgetTokens?: number }
 } | null {
   const isReachable = createReachabilityChecker(state)
+  const availableModels = buildAvailableModelsFromCache()
 
   while (state.attemptCount < state.fallbackChain.length) {
     const attemptCount = state.attemptCount
@@ -54,8 +76,23 @@ export function getNextReachableFallback(
       continue
     }
 
-    const providerID = selectFallbackProvider(fallback.providers, state.providerID)
-    const modelID = transformModelForProvider(providerID, fallback.model)
+    let providerID: string
+    let modelID: string
+
+    if (availableModels.size > 0) {
+      const resolved = resolveFirstAvailableFallback([fallback], availableModels)
+      if (!resolved) {
+        log("[model-fallback] Skipping unavailable fallback for session: " + sessionID + ", attempt: " + attemptCount + ", model: " + fallback.model)
+        continue
+      }
+
+      providerID = resolved.provider
+      modelID = resolved.model.split("/").slice(1).join("/")
+    } else {
+      providerID = selectFallbackProvider(fallback.providers, state.providerID)
+      modelID = transformModelForProvider(providerID, fallback.model)
+    }
+
     const isNoOpFallback =
       providerID.toLowerCase() === state.providerID.toLowerCase()
       && canonicalizeModelID(modelID) === canonicalizeModelID(state.modelID)
