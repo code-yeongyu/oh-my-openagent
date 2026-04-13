@@ -3657,11 +3657,11 @@ describe("sisyphus-task", () => {
       expect(result).toContain("plan-family")
     })
 
-    test("plan cannot delegate to prometheus (cross-blocking)", async () => {
+    test("plan cannot delegate to prometheus even when it is exposed as a primary agent", async () => {
       //#given
       const { createDelegateTask } = require("./tools")
       const mockClient = {
-         app: { agents: async () => ({ data: [{ name: "prometheus", mode: "subagent" }] }) },
+         app: { agents: async () => ({ data: [{ name: "prometheus", mode: "primary" }] }) },
          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
          session: { get: async () => ({ data: { directory: "/project" } }), create: async () => ({ data: { id: "s" } }), prompt: async () => ({ data: {} }), promptAsync: async () => ({ data: {} }), messages: async () => ({ data: [] }), status: async () => ({ data: {} }) },
        }
@@ -4154,19 +4154,17 @@ describe("sisyphus-task", () => {
       expect(promptBody.tools.task).toBe(true)
     }, { timeout: 20000 })
 
-    test("prometheus subagent should have task permission as part of the plan family", async () => {
+    test("prometheus primary agent should not be callable via task", async () => {
       //#given
       const { createDelegateTask } = require("./tools")
-      let promptBody: any
-      const promptMock = async (input: any) => { promptBody = input.body; return { data: {} } }
        const mockClient = {
-         app: { agents: async () => ({ data: [{ name: "prometheus", mode: "subagent" }] }) },
+         app: { agents: async () => ({ data: [{ name: "prometheus", mode: "primary" }] }) },
          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
          session: {
            get: async () => ({ data: { directory: "/project" } }),
            create: async () => ({ data: { id: "ses_prometheus_task" } }),
-           prompt: promptMock,
-           promptAsync: promptMock,
+           prompt: async () => ({ data: {} }),
+           promptAsync: async () => ({ data: {} }),
            messages: async () => ({ data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Plan created" }] }] }),
            status: async () => ({ data: { "ses_prometheus_task": { type: "idle" } } }),
          },
@@ -4174,13 +4172,13 @@ describe("sisyphus-task", () => {
        const tool = createDelegateTask({ manager: { launch: async () => ({}) }, client: mockClient })
       
       //#when
-      await tool.execute(
+      const result = await tool.execute(
         { description: "Test prometheus task permission", prompt: "Create a plan", subagent_type: "prometheus", run_in_background: false, load_skills: [] },
         { sessionID: "p", messageID: "m", agent: "sisyphus", abort: new AbortController().signal }
       )
       
-      //#then - prometheus shares task permission with the plan family
-      expect(promptBody.tools.task).toBe(true)
+      //#then
+      expect(result).toContain('Unknown agent: "prometheus"')
     }, { timeout: 20000 })
 
     test("non-plan subagent should NOT have task permission", async () => {

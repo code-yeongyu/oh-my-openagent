@@ -20,7 +20,7 @@ describe("buildPlanDemoteConfig", () => {
       name: "prometheus",
       model: "anthropic/claude-opus-4-6",
       variant: "max",
-      mode: "all",
+      mode: "primary",
       prompt: "You are Prometheus...",
       permission: { edit: "allow" },
       description: "Plan agent (Prometheus)",

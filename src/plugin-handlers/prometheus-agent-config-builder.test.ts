@@ -267,4 +267,19 @@ describe("buildPrometheusAgentConfig", () => {
         expect(result.model).toBe("anthropic/claude-opus-4-6");
       });
   });
+
+  test("returns Prometheus as a primary agent", async () => {
+    // given
+
+    // when
+    const result = await buildPrometheusAgentConfig({
+      configAgentPlan: undefined,
+      pluginPrometheusOverride: undefined,
+      userCategories: undefined,
+      currentModel: undefined,
+    });
+
+    // then
+    expect(result.mode).toBe("primary");
+  });
 });
