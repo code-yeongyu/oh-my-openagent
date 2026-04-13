@@ -119,7 +119,7 @@ oh-my-opencode/
 │   ├── config/          # Zod v4 schema system
 │   ├── shared/          # Cross-cutting utilities
 │   ├── cli/             # CLI: install, run, doctor, mcp-oauth (Commander.js)
-│   ├── plugin/          # 10 OpenCode hook handlers + hook composition
+│   ├── plugin/          # 10 OpenCode hook handlers + 52 hook composition
 │   └── plugin-handlers/ # 6-phase config loading pipeline
 ├── packages/            # Monorepo: comment-checker, opencode-sdk
 └── dist/                # Build output (ESM + .d.ts)
