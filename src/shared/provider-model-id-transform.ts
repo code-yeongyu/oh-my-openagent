@@ -1,4 +1,25 @@
+function inferSubProvider(model: string): string | undefined {
+	if (model.startsWith("claude-")) return "anthropic"
+	if (model.startsWith("gpt-")) return "openai"
+	if (model.startsWith("gemini-")) return "google"
+	if (model.startsWith("grok-")) return "xai"
+	return undefined
+}
+
 export function transformModelForProvider(provider: string, model: string): string {
+	if (provider === "vercel") {
+		const slashIndex = model.indexOf("/")
+		if (slashIndex !== -1) {
+			const subProvider = model.substring(0, slashIndex)
+			const subModel = model.substring(slashIndex + 1)
+			return `${subProvider}/${transformModelForProvider(subProvider, subModel)}`
+		}
+		const subProvider = inferSubProvider(model)
+		if (subProvider) {
+			return `${subProvider}/${transformModelForProvider(subProvider, model)}`
+		}
+		return model
+	}
 	if (provider === "github-copilot") {
 		return model
 			.replace("claude-opus-4-6", "claude-opus-4.6")
