@@ -4203,6 +4203,7 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
         },
         {
           "model": "vercel/google/gemini-3.1-pro-preview",
+          "variant": "high",
         },
       ],
       "model": "vercel/anthropic/claude-opus-4.6",
@@ -4496,6 +4497,7 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
         },
         {
           "model": "vercel/google/gemini-3.1-pro-preview",
+          "variant": "high",
         },
       ],
       "model": "vercel/anthropic/claude-opus-4.6",
