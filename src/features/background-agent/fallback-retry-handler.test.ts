@@ -3,10 +3,6 @@ import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test"
 const sharedLogMock = mock(() => {})
 const readConnectedProvidersCacheMock = mock(() => null)
 const readProviderModelsCacheMock = mock(() => null)
-const shouldRetryErrorMock = mock(() => true)
-const getNextFallbackMock = mock((chain: Array<{ model: string }>, attempt: number) => chain[attempt])
-const hasMoreFallbacksMock = mock((chain: Array<{ model: string }>, attempt: number) => attempt < chain.length)
-const selectFallbackProviderMock = mock((providers: string[]) => providers[0])
 const transformModelForProviderMock = mock((_provider: string, model: string) => model)
 
 import type { BackgroundTask } from "./types"
@@ -20,11 +16,9 @@ async function importFreshFallbackRetryHandlerModule() {
     readProviderModelsCache: readProviderModelsCacheMock,
   }))
 
-  mock.module("../../shared/model-error-classifier", () => ({
-    shouldRetryError: shouldRetryErrorMock,
-    getNextFallback: getNextFallbackMock,
-    hasMoreFallbacks: hasMoreFallbacksMock,
-    selectFallbackProvider: selectFallbackProviderMock,
+  mock.module("../../shared/connected-providers-cache", () => ({
+    readConnectedProvidersCache: readConnectedProvidersCacheMock,
+    readProviderModelsCache: readProviderModelsCacheMock,
   }))
 
   mock.module("../../shared/provider-model-id-transform", () => ({
@@ -32,17 +26,14 @@ async function importFreshFallbackRetryHandlerModule() {
   }))
 
   const retryHandlerModule = await import(`./fallback-retry-handler?test=${Date.now()}-${Math.random()}`)
-  mock.restore()
 
   return {
     tryFallbackRetry: retryHandlerModule.tryFallbackRetry,
-    shouldRetryError: shouldRetryErrorMock,
-    selectFallbackProvider: selectFallbackProviderMock,
     readProviderModelsCache: readProviderModelsCacheMock,
   }
 }
 
-const { tryFallbackRetry, shouldRetryError, selectFallbackProvider, readProviderModelsCache } =
+const { tryFallbackRetry, readProviderModelsCache } =
   await importFreshFallbackRetryHandlerModule()
 
 function createDeferredPromise(): {
@@ -130,9 +121,8 @@ describe("tryFallbackRetry", () => {
   })
 
   beforeEach(() => {
-    ;(shouldRetryError as any).mockImplementation(() => true)
-    ;(selectFallbackProvider as any).mockImplementation((providers: string[]) => providers[0])
     ;(readProviderModelsCache as any).mockReturnValue(null)
+    readConnectedProvidersCacheMock.mockReturnValue(null)
   })
 
   describe("#given retryable error with fallback chain", () => {
@@ -259,9 +249,12 @@ describe("tryFallbackRetry", () => {
   })
 
   describe("#given non-retryable error", () => {
-    test("returns false when shouldRetryError returns false", async () => {
-      ;(shouldRetryError as any).mockImplementation(() => false)
-      const args = createDefaultArgs()
+    test("returns false for non-retryable error message", async () => {
+      const args = createDefaultArgs({})
+      args.errorInfo = {
+        name: "UnknownError",
+        message: "Subscription quota exceeded. You can continue using free models.",
+      }
 
       const result = await tryFallbackRetry(args)
 
@@ -342,10 +335,28 @@ describe("tryFallbackRetry", () => {
 
   describe("#given disconnected fallback providers with connected preferred provider", () => {
     test("keeps fallback entry and selects connected preferred provider", async () => {
-      ;(readProviderModelsCache as any).mockReturnValueOnce({ connected: ["provider-a"] })
-      ;(selectFallbackProvider as any).mockImplementationOnce(
-        (_providers: string[], preferredProviderID?: string) => preferredProviderID ?? "provider-b",
-      )
+      readConnectedProvidersCacheMock.mockReturnValue(["provider-a"])
+      ;(readProviderModelsCache as any).mockReturnValue({ connected: ["provider-a"] })
+
+      const args = createDefaultArgs({
+        fallbackChain: [{ model: "fallback-model-1", providers: ["provider-b"], variant: undefined }],
+        model: { providerID: "provider-a", modelID: "original-model" },
+      })
+
+      const result = await tryFallbackRetry(args)
+
+      expect(result).toBe(true)
+      expect(args.task.model?.providerID).toBe("provider-a")
+      expect(args.task.model?.modelID).toBe("fallback-model-1")
+    })
+
+    test("resolves via preferred provider when available model cache is present", async () => {
+      ;(readProviderModelsCache as any).mockReturnValue({
+        connected: ["provider-a"],
+        models: {
+          "provider-a": [{ id: "fallback-model-1" }],
+        },
+      })
 
       const args = createDefaultArgs({
         fallbackChain: [{ model: "fallback-model-1", providers: ["provider-b"], variant: undefined }],

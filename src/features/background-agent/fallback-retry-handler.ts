@@ -33,6 +33,15 @@ function buildAvailableModelsFromCache(): Set<string> {
   return out
 }
 
+function getProvidersForAvailabilityResolution(
+  providers: string[],
+  preferredProviderID?: string,
+): string[] {
+  if (!preferredProviderID) return providers
+  if (providers.some((provider) => provider.toLowerCase() === preferredProviderID.toLowerCase())) return providers
+  return [...providers, preferredProviderID]
+}
+
 export async function tryFallbackRetry(args: {
   task: BackgroundTask
   errorInfo: { name?: string; message?: string }
@@ -87,7 +96,12 @@ export async function tryFallbackRetry(args: {
     }
 
     if (availableModels.size > 0) {
-      const resolved = resolveFirstAvailableFallback([candidate], availableModels)
+      const resolved = resolveFirstAvailableFallback([
+        {
+          ...candidate,
+          providers: getProvidersForAvailabilityResolution(candidate.providers, task.model?.providerID),
+        },
+      ], availableModels)
       if (!resolved) {
         log("[background-agent] Skipping unavailable fallback:", {
           taskId: task.id,

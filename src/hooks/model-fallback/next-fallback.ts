@@ -50,6 +50,15 @@ function buildAvailableModelsFromCache(): Set<string> {
   return out
 }
 
+function getProvidersForAvailabilityResolution(
+  providers: string[],
+  preferredProviderID?: string,
+): string[] {
+  if (!preferredProviderID) return providers
+  if (providers.some((provider) => provider.toLowerCase() === preferredProviderID.toLowerCase())) return providers
+  return [...providers, preferredProviderID]
+}
+
 export function getNextReachableFallback(
   sessionID: string,
   state: ModelFallbackState,
@@ -80,7 +89,12 @@ export function getNextReachableFallback(
     let modelID: string
 
     if (availableModels.size > 0) {
-      const resolved = resolveFirstAvailableFallback([fallback], availableModels)
+      const resolved = resolveFirstAvailableFallback([
+        {
+          ...fallback,
+          providers: getProvidersForAvailabilityResolution(fallback.providers, state.providerID),
+        },
+      ], availableModels)
       if (!resolved) {
         log("[model-fallback] Skipping unavailable fallback for session: " + sessionID + ", attempt: " + attemptCount + ", model: " + fallback.model)
         continue

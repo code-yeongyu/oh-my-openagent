@@ -332,6 +332,56 @@ describe("model fallback hook", () => {
     clearPendingModelFallback(sessionID)
   })
 
+  test("uses connected preferred provider with available model cache present", async () => {
+    //#given
+    const sessionID = "ses_model_fallback_preferred_provider_with_cache"
+    clearPendingModelFallback(sessionID)
+    readConnectedProvidersCacheMock.mockReturnValue(["provider-x"])
+    readProviderModelsCacheMock.mockReturnValue({
+      connected: ["provider-x"],
+      models: {
+        "provider-x": [{ id: "fallback-model" }],
+      },
+    })
+
+    const hook = createModelFallbackHook() as unknown as {
+      "chat.message"?: (
+        input: { sessionID: string },
+        output: { message: Record<string, unknown>; parts: Array<{ type: string; text?: string }> },
+      ) => Promise<void>
+    }
+
+    setSessionFallbackChain(sessionID, [
+      { providers: ["provider-y"], model: "fallback-model" },
+    ])
+
+    expect(
+      setPendingModelFallback(
+        sessionID,
+        "Sisyphus - Ultraworker",
+        "provider-x",
+        "current-model",
+      ),
+    ).toBe(true)
+
+    const output = {
+      message: {
+        model: { providerID: "provider-x", modelID: "current-model" },
+      },
+      parts: [{ type: "text", text: "continue" }],
+    }
+
+    //#when
+    await hook["chat.message"]?.({ sessionID }, output)
+
+    //#then
+    expect(output.message["model"]).toEqual({
+      providerID: "provider-x",
+      modelID: "fallback-model",
+    })
+    clearPendingModelFallback(sessionID)
+  })
+
   test("does not fall back to hardcoded agent chain when session explicitly stores no fallback chain [regression #2941]", () => {
     //#given
     const sessionID = "ses_model_fallback_explicit_none"
