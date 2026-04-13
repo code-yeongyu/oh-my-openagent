@@ -148,7 +148,24 @@ describe("resolveSubagentExecution", () => {
     //#then
     expect(result.agentToUse).toBe("")
     expect(result.categoryModel).toBeUndefined()
-    expect(result.error).toBe('Unknown agent: "sisyphus". Available agents: metis, oracle')
+    expect(result.error).toBe('Cannot delegate to primary agent "sisyphus" via task. Select that agent directly instead.')
+  })
+
+  test("returns explicit error for primary display-name agents", async () => {
+    //#given
+    const args = createBaseArgs({ subagent_type: "Prometheus - Plan Builder" })
+    const executorCtx = createExecutorContext(async () => ([
+      { name: "Prometheus - Plan Builder", mode: "primary" },
+      { name: "oracle", mode: "subagent" },
+    ]))
+
+    //#when
+    const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep")
+
+    //#then
+    expect(result.agentToUse).toBe("")
+    expect(result.categoryModel).toBeUndefined()
+    expect(result.error).toBe('Cannot delegate to primary agent "Prometheus - Plan Builder" via task. Select that agent directly instead.')
   })
 
   test("requires explicit all or subagent mode for task-callable agents", async () => {
@@ -823,7 +840,7 @@ describe("resolveSubagentExecution", () => {
     const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep")
 
     //#then
-    expect(result.error).toContain("Unknown agent")
+    expect(result.error).toBe('Cannot delegate to primary agent "my-primary-agent" via task. Select that agent directly instead.')
     expect(result.agentToUse).toBe("")
   })
 })

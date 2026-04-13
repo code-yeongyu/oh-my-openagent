@@ -4178,7 +4178,7 @@ describe("sisyphus-task", () => {
       )
       
       //#then
-      expect(result).toContain('Unknown agent: "prometheus"')
+      expect(result).toContain('Cannot delegate to primary agent "prometheus" via task. Select that agent directly instead.')
     }, { timeout: 20000 })
 
     test("non-plan subagent should NOT have task permission", async () => {
