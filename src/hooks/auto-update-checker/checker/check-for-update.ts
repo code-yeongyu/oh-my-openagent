@@ -1,4 +1,5 @@
 import { log } from "../../../shared/logger"
+import { compareVersions } from "../../../shared/opencode-version"
 import type { UpdateCheckResult } from "../types"
 import { extractChannel } from "../version-channel"
 import { isLocalDevMode } from "./local-dev-path"
@@ -55,7 +56,7 @@ export async function checkForUpdate(directory: string): Promise<UpdateCheckResu
     }
   }
 
-  const needsUpdate = currentVersion !== latestVersion
+  const needsUpdate = compareVersions(currentVersion, latestVersion) !== 0
   log(
     `[auto-update-checker] Current: ${currentVersion}, Latest (${channel}): ${latestVersion}, NeedsUpdate: ${needsUpdate}`
   )
