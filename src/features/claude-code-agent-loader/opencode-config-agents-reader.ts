@@ -9,6 +9,7 @@ import type { ClaudeCodeAgentConfig } from "./types"
 
 interface OpencodeConfigWithAgents {
   agents?: Record<string, unknown>
+  agent?: Record<string, unknown>
   agent_definitions?: string | string[]
 }
 
@@ -103,8 +104,10 @@ export function readOpencodeConfigAgents(directory: string): Record<string, Clau
 
       const configDir = path.dirname(configPath)
 
-      if (parseResult.data.agents && typeof parseResult.data.agents === "object") {
-        for (const [agentName, agentData] of Object.entries(parseResult.data.agents)) {
+      const agentsToLoad = parseResult.data.agents || parseResult.data.agent
+
+      if (agentsToLoad && typeof agentsToLoad === "object") {
+        for (const [agentName, agentData] of Object.entries(agentsToLoad)) {
           const converted = convertInlineAgent(agentData)
           if (converted) {
             result[agentName] = converted

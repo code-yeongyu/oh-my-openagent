@@ -229,6 +229,34 @@ describe("readOpencodeConfigAgents", () => {
     fs.rmSync(tempDir, { recursive: true })
   })
 
+  it("supports agent key as fallback when agents key is not present", () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "opencode-test-"))
+    const opencodeDir = path.join(tempDir, ".opencode")
+    fs.mkdirSync(opencodeDir, { recursive: true })
+
+    const configPath = path.join(opencodeDir, "opencode.json")
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify({
+        agent: {
+          "fallback-agent": {
+            description: "Using agent key",
+            mode: "subagent",
+            prompt: "Fallback prompt",
+          },
+        },
+      })
+    )
+
+    const result = readOpencodeConfigAgents(tempDir)
+
+    expect(result).toHaveProperty("fallback-agent")
+    expect(result["fallback-agent"].description).toBe("(opencode-config) Using agent key")
+    expect(result["fallback-agent"].prompt).toBe("Fallback prompt")
+
+    fs.rmSync(tempDir, { recursive: true })
+  })
+
   it("prioritizes project-level opencode.json over user-level", () => {
     const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), "opencode-project-"))
     const projectOpencodeDir = path.join(projectDir, ".opencode")
