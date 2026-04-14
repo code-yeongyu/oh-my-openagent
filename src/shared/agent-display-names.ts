@@ -26,11 +26,16 @@ export const AGENT_DISPLAY_NAMES: Record<string, string> = {
   "council-member": "council-member",
 }
 
+// ZWSP sort prefixes removed — they caused agent name truncation in VS Code,
+// WezTerm, and other terminals that mishandle zero-width characters.
+// Sorting now relies exclusively on the `order` field injected by
+// CANONICAL_CORE_AGENT_ORDER in agent-priority-order.ts.
+// The map is kept (with empty values) so callers don't break.
 const AGENT_LIST_SORT_PREFIXES: Record<string, string> = {
-  sisyphus: "\u200B",
-  hephaestus: "\u200B\u200B",
-  prometheus: "\u200B\u200B\u200B",
-  atlas: "\u200B\u200B\u200B\u200B",
+  sisyphus: "",
+  hephaestus: "",
+  prometheus: "",
+  atlas: "",
 }
 
 const INVISIBLE_AGENT_CHARACTERS_REGEX = /[\u200B\u200C\u200D\uFEFF]/g
