@@ -297,5 +297,79 @@ describe("task_create tool", () => {
       expect(taskContent.subject).toBe("Test task")
       expect(taskContent.description).toBe("Test description")
     })
+
+    describe("near-duplicate detection", () => {
+      test("same subject + same session → warning", async () => {
+        //#given
+        const args1 = { subject: "Fix login bug" }
+        const args2 = { subject: "Fix login bug" }
+        const context1 = { ...TEST_CONTEXT, sessionID: "ses_test" }
+
+        //#when
+        const result1Str = await tool.execute(args1, context1)
+        const result1 = JSON.parse(result1Str)
+        const result2Str = await tool.execute(args2, context1)
+        const result2 = JSON.parse(result2Str)
+
+        //#then
+        expect(result1).not.toHaveProperty("warning")
+        expect(result2).toHaveProperty("warning")
+        expect(result2.warning).toContain(result1.task.id)
+        expect(result2.warning).toContain("pending")
+      })
+
+      test("same subject + different session → no warning", async () => {
+        //#given
+        const args = { subject: "Fix login bug" }
+        const contextA = { ...TEST_CONTEXT, sessionID: "ses_A" }
+        const contextB = { ...TEST_CONTEXT, sessionID: "ses_B" }
+
+        //#when
+        await tool.execute(args, contextA)
+        const result2Str = await tool.execute(args, contextB)
+        const result2 = JSON.parse(result2Str)
+
+        //#then
+        expect(result2).not.toHaveProperty("warning")
+      })
+
+      test("different subject → no warning", async () => {
+        //#given
+        const args1 = { subject: "Fix login bug" }
+        const args2 = { subject: "Fix signup bug" }
+        const context = { ...TEST_CONTEXT, sessionID: "ses_test" }
+
+        //#when
+        await tool.execute(args1, context)
+        const result2Str = await tool.execute(args2, context)
+        const result2 = JSON.parse(result2Str)
+
+        //#then
+        expect(result2).not.toHaveProperty("warning")
+      })
+
+      test("task still created even with warning", async () => {
+        //#given
+        const args = { subject: "Fix login bug" }
+        const context = { ...TEST_CONTEXT, sessionID: "ses_test" }
+
+        //#when
+        const result1Str = await tool.execute(args, context)
+        const result1 = JSON.parse(result1Str)
+        const result2Str = await tool.execute(args, context)
+        const result2 = JSON.parse(result2Str)
+
+        //#then
+        expect(result2).toHaveProperty("task")
+        expect(result2.task).toHaveProperty("id")
+        expect(result2.task.id).not.toBe(result1.task.id)
+
+        // Both files should exist
+        const task1File = join(TEST_DIR, `${result1.task.id}.json`)
+        const task2File = join(TEST_DIR, `${result2.task.id}.json`)
+        expect(existsSync(task1File)).toBe(true)
+        expect(existsSync(task2File)).toBe(true)
+      })
+    })
   })
 })

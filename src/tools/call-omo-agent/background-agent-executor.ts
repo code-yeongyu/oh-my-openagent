@@ -73,6 +73,10 @@ export async function executeBackgroundAgent(
 			metadata: { sessionId: sessionId ?? "pending" },
 		})
 
+		const taskMetadataBlock = sessionId
+			? `\n\n<task_metadata>\nsession_id: ${sessionId}\nbackground_task_id: ${task.id}\n</task_metadata>`
+			: ""
+
 		return `Background agent task launched successfully.
 
 Task ID: ${task.id}
@@ -83,7 +87,7 @@ Status: ${task.status}
 
 System notifies on completion. Use \`background_output\` with task_id="${task.id}" to check.
 
-Do NOT call background_output now. Wait for <system-reminder> notification first.`
+Do NOT call background_output now. Wait for <system-reminder> notification first.${taskMetadataBlock}`
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error)
 		return `Failed to launch background agent task: ${message}`

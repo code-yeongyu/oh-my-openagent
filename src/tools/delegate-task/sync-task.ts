@@ -215,8 +215,9 @@ Agent: ${agentToUse}${args.category ? ` (category: ${args.category})` : ""}${mod
 
 ${result.textContent || "(No text output)"}
 
-<task_metadata>
+ <task_metadata>
 session_id: ${sessionID}
+task_id: ${taskId}
 </task_metadata>`
     } finally {
       if (toastManager && taskId !== undefined) {

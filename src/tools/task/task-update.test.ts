@@ -427,6 +427,246 @@ describe("task_update tool", () => {
       expect(result.task.description).toBe("New description")
       expect(result.task.status).toBe("in_progress")
       expect(result.task.owner).toBe("alice")
+     })
+
+    describe("blockedBy completion guard", () => {
+      test("cannot complete with unresolved blocker", async () => {
+        //#given
+        const taskAId = "T-test-a";
+        const taskAPath = join(TEST_DIR, `${taskAId}.json`);
+        const taskA: TaskObject = {
+          id: taskAId,
+          subject: "Task A (blocker)",
+          description: "Blocker task",
+          status: "pending",
+          blocks: [],
+          blockedBy: [],
+          threadID: TEST_SESSION_ID,
+        };
+        await Bun.write(taskAPath, JSON.stringify(taskA));
+
+        const taskBId = "T-test-b";
+        const taskBPath = join(TEST_DIR, `${taskBId}.json`);
+        const taskB: TaskObject = {
+          id: taskBId,
+          subject: "Task B",
+          description: "Dependent task",
+          status: "pending",
+          blocks: [],
+          blockedBy: [taskAId],
+          threadID: TEST_SESSION_ID,
+        };
+        await Bun.write(taskBPath, JSON.stringify(taskB));
+
+        //#when
+        const args = {
+          id: taskBId,
+          status: "completed" as const,
+        };
+        const resultStr = await tool.execute(args, TEST_CONTEXT);
+        const result = JSON.parse(resultStr);
+
+        //#then
+        expect(result).toHaveProperty("error");
+        expect(result.error).toBe("blocked_by_unresolved");
+        expect(result.unresolved).toEqual([taskAId]);
+      });
+
+      test("can complete when all blockers are completed", async () => {
+        //#given
+        const taskAId = "T-test-a";
+        const taskAPath = join(TEST_DIR, `${taskAId}.json`);
+        const taskA: TaskObject = {
+          id: taskAId,
+          subject: "Task A (blocker)",
+          description: "Blocker task",
+          status: "pending",
+          blocks: [],
+          blockedBy: [],
+          threadID: TEST_SESSION_ID,
+        };
+        await Bun.write(taskAPath, JSON.stringify(taskA));
+
+        // Mark task A as completed first
+        const updateA = {
+          id: taskAId,
+          status: "completed" as const,
+        };
+        await tool.execute(updateA, TEST_CONTEXT);
+
+        const taskBId = "T-test-b";
+        const taskBPath = join(TEST_DIR, `${taskBId}.json`);
+        const taskB: TaskObject = {
+          id: taskBId,
+          subject: "Task B",
+          description: "Dependent task",
+          status: "pending",
+          blocks: [],
+          blockedBy: [taskAId],
+          threadID: TEST_SESSION_ID,
+        };
+        await Bun.write(taskBPath, JSON.stringify(taskB));
+
+        //#when
+        const args = {
+          id: taskBId,
+          status: "completed" as const,
+        };
+        const resultStr = await tool.execute(args, TEST_CONTEXT);
+        const result = JSON.parse(resultStr);
+
+        //#then
+        expect(result).toHaveProperty("task");
+        expect(result.task.status).toBe("completed");
+      });
+
+      test("deleted blocker counts as resolved", async () => {
+        //#given
+        const taskAId = "T-test-a";
+        const taskAPath = join(TEST_DIR, `${taskAId}.json`);
+        const taskA: TaskObject = {
+          id: taskAId,
+          subject: "Task A (blocker)",
+          description: "Blocker task",
+          status: "pending",
+          blocks: [],
+          blockedBy: [],
+          threadID: TEST_SESSION_ID,
+        };
+        await Bun.write(taskAPath, JSON.stringify(taskA));
+
+        // Mark task A as deleted
+        const updateA = {
+          id: taskAId,
+          status: "deleted" as const,
+        };
+        await tool.execute(updateA, TEST_CONTEXT);
+
+        const taskBId = "T-test-b";
+        const taskBPath = join(TEST_DIR, `${taskBId}.json`);
+        const taskB: TaskObject = {
+          id: taskBId,
+          subject: "Task B",
+          description: "Dependent task",
+          status: "pending",
+          blocks: [],
+          blockedBy: [taskAId],
+          threadID: TEST_SESSION_ID,
+        };
+        await Bun.write(taskBPath, JSON.stringify(taskB));
+
+        //#when
+        const args = {
+          id: taskBId,
+          status: "completed" as const,
+        };
+        const resultStr = await tool.execute(args, TEST_CONTEXT);
+        const result = JSON.parse(resultStr);
+
+        //#then
+        expect(result).toHaveProperty("task");
+        expect(result.task.status).toBe("completed");
+      });
+
+      test("can complete with empty blockedBy", async () => {
+        //#given
+        const taskCId = "T-test-c";
+        const taskCPath = join(TEST_DIR, `${taskCId}.json`);
+        const taskC: TaskObject = {
+          id: taskCId,
+          subject: "Task C",
+          description: "Task with no blockers",
+          status: "pending",
+          blocks: [],
+          blockedBy: [],
+          threadID: TEST_SESSION_ID,
+        };
+        await Bun.write(taskCPath, JSON.stringify(taskC));
+
+        //#when
+        const args = {
+          id: taskCId,
+          status: "completed" as const,
+        };
+        const resultStr = await tool.execute(args, TEST_CONTEXT);
+        const result = JSON.parse(resultStr);
+
+        //#then
+        expect(result).toHaveProperty("task");
+        expect(result.task.status).toBe("completed");
+      });
+
+      test("cannot bypass guard by combining status=completed with addBlockedBy in same request", async () => {
+        //#given
+        const taskAId = "T-test-a2";
+        const taskAPath = join(TEST_DIR, `${taskAId}.json`);
+        const taskA: TaskObject = {
+          id: taskAId,
+          subject: "Blocker",
+          description: "",
+          status: "pending",
+          blocks: [],
+          blockedBy: [],
+          threadID: TEST_SESSION_ID,
+        };
+        await Bun.write(taskAPath, JSON.stringify(taskA));
+
+        const taskBId = "T-test-b2";
+        const taskBPath = join(TEST_DIR, `${taskBId}.json`);
+        const taskB: TaskObject = {
+          id: taskBId,
+          subject: "Target",
+          description: "",
+          status: "pending",
+          blocks: [],
+          blockedBy: [],
+          threadID: TEST_SESSION_ID,
+        };
+        await Bun.write(taskBPath, JSON.stringify(taskB));
+
+        //#when
+        const args = {
+          id: taskBId,
+          status: "completed" as const,
+          addBlockedBy: [taskAId],
+        };
+        const resultStr = await tool.execute(args, TEST_CONTEXT);
+        const result = JSON.parse(resultStr);
+
+        //#then
+        expect(result).toHaveProperty("error");
+        expect(result.error).toBe("blocked_by_unresolved");
+        expect(result.unresolved).toEqual([taskAId]);
+      });
+
+      test("invalid blockedBy ID in guard is treated as unresolved", async () => {
+        //#given
+        const taskBId = "T-test-b3";
+        const taskBPath = join(TEST_DIR, `${taskBId}.json`);
+        const taskB: TaskObject = {
+          id: taskBId,
+          subject: "Target",
+          description: "",
+          status: "pending",
+          blocks: [],
+          blockedBy: ["../../etc/passwd"],
+          threadID: TEST_SESSION_ID,
+        };
+        await Bun.write(taskBPath, JSON.stringify(taskB));
+
+        //#when
+        const args = {
+          id: taskBId,
+          status: "completed" as const,
+        };
+        const resultStr = await tool.execute(args, TEST_CONTEXT);
+        const result = JSON.parse(resultStr);
+
+        //#then
+        expect(result).toHaveProperty("error");
+        expect(result.error).toBe("blocked_by_unresolved");
+        expect(result.unresolved).toEqual(["../../etc/passwd"]);
+      });
     })
-  })
+   })
 })

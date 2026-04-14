@@ -9,6 +9,8 @@ import {
   writeJsonAtomic,
   acquireLock,
   generateTaskId,
+  listTaskFiles,
+  readJsonSafe,
 } from "../../features/claude-tasks/storage";
 import { syncTaskTodoUpdate } from "./todo-sync";
 
@@ -71,6 +73,21 @@ async function handleCreate(
       return JSON.stringify({ error: "task_lock_unavailable" });
     }
 
+    // Near-duplicate detection (advisory warning, not blocking)
+    let duplicateWarning: string | undefined;
+    try {
+      const existingFiles = listTaskFiles(config);
+      for (const fileId of existingFiles) {
+        const existingTask = readJsonSafe(join(taskDir, `${fileId}.json`), TaskObjectSchema);
+        if (existingTask && existingTask.subject === validatedArgs.subject && existingTask.threadID === context.sessionID) {
+          duplicateWarning = `Similar task already exists: ${existingTask.id} (status: ${existingTask.status})`;
+          break;
+        }
+      }
+    } catch {
+      // Dedup check is advisory, never block creation on failure
+    }
+
     try {
       const taskId = generateTaskId();
       const task: TaskObject = {
@@ -92,12 +109,16 @@ async function handleCreate(
 
       await syncTaskTodoUpdate(ctx, validatedTask, context.sessionID);
 
-      return JSON.stringify({
+      const response: Record<string, unknown> = {
         task: {
           id: validatedTask.id,
           subject: validatedTask.subject,
         },
-      });
+      };
+      if (duplicateWarning) {
+        response.warning = duplicateWarning;
+      }
+      return JSON.stringify(response);
     } finally {
       lock.release();
     }
