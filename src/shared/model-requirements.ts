@@ -41,6 +41,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       },
       { providers: ["openai", "github-copilot", "opencode", "vercel"], model: "gpt-5.4", variant: "medium" },
       { providers: ["zai-coding-plan", "opencode", "vercel"], model: "glm-5" },
+      { providers: ["zai-coding-plan", "opencode", "vercel"], model: "glm-5.1" },
       { providers: ["opencode"], model: "big-pickle" },
     ],
     requiresAnyModel: true,
@@ -73,6 +74,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         variant: "max",
       },
       { providers: ["opencode-go", "vercel"], model: "glm-5" },
+      { providers: ["opencode-go", "vercel"], model: "glm-5.1" },
     ],
   },
   librarian: {
@@ -113,6 +115,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         variant: "high",
       },
       { providers: ["opencode-go", "vercel"], model: "glm-5" },
+      { providers: ["opencode-go", "vercel"], model: "glm-5.1" },
       {
         providers: ["google", "github-copilot", "opencode", "vercel"],
         model: "gemini-3.1-pro",
@@ -132,6 +135,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         variant: "high",
       },
       { providers: ["opencode-go", "vercel"], model: "glm-5" },
+      { providers: ["opencode-go", "vercel"], model: "glm-5.1" },
       { providers: ["kimi-for-coding"], model: "k2p5" },
     ],
   },
@@ -153,6 +157,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         variant: "high",
       },
       { providers: ["opencode-go", "vercel"], model: "glm-5" },
+      { providers: ["opencode-go", "vercel"], model: "glm-5.1" },
     ],
   },
   atlas: {
@@ -191,12 +196,14 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         variant: "high",
       },
       { providers: ["zai-coding-plan", "opencode", "vercel"], model: "glm-5" },
+      { providers: ["zai-coding-plan", "opencode", "vercel"], model: "glm-5.1" },
       {
         providers: ["anthropic", "github-copilot", "opencode", "vercel"],
         model: "claude-opus-4-6",
         variant: "max",
       },
       { providers: ["opencode-go", "vercel"], model: "glm-5" },
+      { providers: ["opencode-go", "vercel"], model: "glm-5.1" },
       { providers: ["kimi-for-coding"], model: "k2p5" },
     ],
   },
@@ -218,6 +225,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         variant: "max",
       },
       { providers: ["opencode-go", "vercel"], model: "glm-5" },
+      { providers: ["opencode-go", "vercel"], model: "glm-5.1" },
     ],
   },
   deep: {
@@ -305,8 +313,10 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         variant: "high",
       },
       { providers: ["zai-coding-plan", "opencode", "vercel"], model: "glm-5" },
+      { providers: ["zai-coding-plan", "opencode", "vercel"], model: "glm-5.1" },
       { providers: ["kimi-for-coding"], model: "k2p5" },
       { providers: ["opencode-go", "vercel"], model: "glm-5" },
+      { providers: ["opencode-go", "vercel"], model: "glm-5.1" },
       { providers: ["opencode", "vercel"], model: "kimi-k2.5" },
       {
         providers: [
