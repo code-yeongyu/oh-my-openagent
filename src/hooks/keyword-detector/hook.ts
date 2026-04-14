@@ -14,6 +14,23 @@ import {
 import type { ContextCollector } from "../../features/context-injector"
 import type { RalphLoopHook } from "../ralph-loop"
 
+const activeModes = new Map<string, Set<string>>()
+
+function getActiveModes(sessionID: string): Set<string> {
+  if (!activeModes.has(sessionID)) {
+    activeModes.set(sessionID, new Set())
+  }
+  return activeModes.get(sessionID)!
+}
+
+function isModeActive(sessionID: string, modeType: string): boolean {
+  return getActiveModes(sessionID).has(modeType)
+}
+
+function setModeActive(sessionID: string, modeType: string): void {
+  getActiveModes(sessionID).add(modeType)
+}
+
 export function createKeywordDetectorHook(
   ctx: PluginInput,
   _collector?: ContextCollector,
@@ -93,6 +110,22 @@ export function createKeywordDetectorHook(
         }
       }
 
+      const activeSessionModes = getActiveModes(input.sessionID)
+      const alreadyActiveTypes = detectedKeywords.filter((k) => activeSessionModes.has(k.type))
+      if (alreadyActiveTypes.length > 0) {
+        log(`[keyword-detector] Mode already active, skipping re-injection`, {
+          sessionID: input.sessionID,
+          types: alreadyActiveTypes.map((k) => k.type),
+        })
+        detectedKeywords = detectedKeywords.filter((k) => !activeSessionModes.has(k.type))
+        if (detectedKeywords.length === 0) {
+          return
+        }
+      }
+      for (const k of detectedKeywords) {
+        setModeActive(input.sessionID, k.type)
+      }
+
       const hasUltrawork = detectedKeywords.some((k) => k.type === "ultrawork")
       if (hasUltrawork) {
         const runtimeVariant = getRuntimeVariant(input, output.message)
@@ -120,24 +153,13 @@ export function createKeywordDetectorHook(
               sessionID: input.sessionID,
             })
           )
-
       }
 
-      const textPartIndex = output.parts.findIndex((p) => p.type === "text" && p.text !== undefined)
-      if (textPartIndex === -1) {
-        log(`[keyword-detector] No text part found, skipping injection`, { sessionID: input.sessionID })
-        return
-      }
-
-      const allMessages = detectedKeywords.map((k) => k.message).join("\n\n")
-      const originalText = output.parts[textPartIndex].text ?? ""
-
-      output.parts[textPartIndex].text = `${allMessages}\n\n---\n\n${originalText}`
-
-      log(`[keyword-detector] Detected ${detectedKeywords.length} keywords`, {
+      log(`[keyword-detector] Mode activated (no injection)`, {
         sessionID: input.sessionID,
         types: detectedKeywords.map((k) => k.type),
       })
+      return
     },
   }
 }
