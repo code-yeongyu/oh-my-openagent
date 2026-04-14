@@ -1,5 +1,6 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test"
-import { homedir } from "node:os"
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
+import { homedir, tmpdir } from "node:os"
 import { join, resolve, win32 } from "node:path"
 import {
   getOpenCodeConfigDir,
@@ -13,6 +14,7 @@ import {
 describe("opencode-config-dir", () => {
   let originalPlatform: NodeJS.Platform
   let originalEnv: Record<string, string | undefined>
+  const tempDirs: string[] = []
 
   beforeEach(() => {
     originalPlatform = process.platform
@@ -32,6 +34,10 @@ describe("opencode-config-dir", () => {
       } else {
         delete process.env[key]
       }
+    }
+
+    for (const dir of tempDirs.splice(0)) {
+      rmSync(dir, { recursive: true, force: true })
     }
   })
 
@@ -306,6 +312,38 @@ describe("opencode-config-dir", () => {
       expect(paths.configJsonc).toBe(join(expectedDir, "opencode.jsonc"))
       expect(paths.packageJson).toBe(join(expectedDir, "package.json"))
       expect(paths.omoConfig).toBe(join(expectedDir, "oh-my-openagent.json"))
+    })
+
+    test("returns the detected legacy plugin config when it is the only plugin config file", () => {
+      // given
+      const configDir = mkdtempSync(join(tmpdir(), "omo-config-paths-legacy-"))
+      tempDirs.push(configDir)
+      writeFileSync(join(configDir, "oh-my-opencode.jsonc"), "{}")
+      process.env.OPENCODE_CONFIG_DIR = configDir
+      Object.defineProperty(process, "platform", { value: "linux" })
+
+      // when
+      const paths = getOpenCodeConfigPaths({ binary: "opencode", version: "1.0.200" })
+
+      // then
+      expect(paths.omoConfig).toBe(join(configDir, "oh-my-opencode.jsonc"))
+    })
+
+    test("prefers the canonical basename when canonical and legacy plugin config files both exist", () => {
+      // given
+      const configDir = mkdtempSync(join(tmpdir(), "omo-config-paths-canonical-"))
+      tempDirs.push(configDir)
+      mkdirSync(configDir, { recursive: true })
+      writeFileSync(join(configDir, "oh-my-opencode.jsonc"), "{}")
+      writeFileSync(join(configDir, "oh-my-openagent.json"), "{}")
+      process.env.OPENCODE_CONFIG_DIR = configDir
+      Object.defineProperty(process, "platform", { value: "linux" })
+
+      // when
+      const paths = getOpenCodeConfigPaths({ binary: "opencode", version: "1.0.200" })
+
+      // then
+      expect(paths.omoConfig).toBe(join(configDir, "oh-my-openagent.json"))
     })
   })
 
