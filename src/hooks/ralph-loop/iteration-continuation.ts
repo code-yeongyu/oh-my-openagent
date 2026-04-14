@@ -20,7 +20,7 @@ export async function continueIteration(
   state: RalphLoopState,
   options: ContinuationOptions,
 ): Promise<void> {
-  const strategy = state.strategy ?? "continue"
+  const strategy = state.strategy ?? "reset"
   const continuationPrompt = buildContinuationPrompt(state)
 
   if (strategy === "reset") {

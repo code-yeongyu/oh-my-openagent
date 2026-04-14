@@ -48,7 +48,7 @@ export function createLoopStateController(options: {
 				verification_session_id: undefined,
 				ultrawork: loopOptions?.ultrawork,
 				verification_pending: undefined,
-				strategy: loopOptions?.strategy ?? config?.default_strategy ?? "continue",
+				strategy: loopOptions?.strategy ?? config?.default_strategy ?? "reset",
 				started_at: new Date().toISOString(),
 				prompt,
 				session_id: sessionID,
