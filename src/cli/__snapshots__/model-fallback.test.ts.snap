@@ -2228,11 +2228,11 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
     "multimodal-looker": {
       "fallback_models": [
         {
-          "model": "openai/gpt-5-nano",
-        },
-        {
           "model": "github-copilot/gpt-5.4",
           "variant": "medium",
+        },
+        {
+          "model": "openai/gpt-5-nano",
         },
       ],
       "model": "openai/gpt-5.4",
@@ -2740,17 +2740,17 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
     "multimodal-looker": {
       "fallback_models": [
         {
-          "model": "zai-coding-plan/glm-4.6v",
+          "model": "opencode/gpt-5.4",
+          "variant": "medium",
         },
         {
-          "model": "github-copilot/gpt-5.4",
-          "variant": "medium",
+          "model": "zai-coding-plan/glm-4.6v",
         },
         {
           "model": "opencode/gpt-5-nano",
         },
       ],
-      "model": "opencode/gpt-5.4",
+      "model": "github-copilot/gpt-5.4",
       "variant": "medium",
     },
     "oracle": {
@@ -3172,6 +3172,10 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
     "multimodal-looker": {
       "fallback_models": [
         {
+          "model": "github-copilot/gpt-5.4",
+          "variant": "medium",
+        },
+        {
           "model": "opencode/gpt-5.4",
           "variant": "medium",
         },
@@ -3180,10 +3184,6 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
         },
         {
           "model": "openai/gpt-5-nano",
-        },
-        {
-          "model": "github-copilot/gpt-5.4",
-          "variant": "medium",
         },
         {
           "model": "opencode/gpt-5-nano",
@@ -3727,6 +3727,10 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
     "multimodal-looker": {
       "fallback_models": [
         {
+          "model": "github-copilot/gpt-5.4",
+          "variant": "medium",
+        },
+        {
           "model": "opencode/gpt-5.4",
           "variant": "medium",
         },
@@ -3735,10 +3739,6 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
         },
         {
           "model": "openai/gpt-5-nano",
-        },
-        {
-          "model": "github-copilot/gpt-5.4",
-          "variant": "medium",
         },
         {
           "model": "opencode/gpt-5-nano",
