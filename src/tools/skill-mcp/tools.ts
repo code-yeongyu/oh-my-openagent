@@ -167,6 +167,7 @@ export function createSkillMcpTool(options: SkillMcpToolOptions): ToolDefinition
         skillName: found.skill.name,
         sessionID,
         scope: found.skill.scope,
+        directory: toolContext.directory,
       }
 
       const context: SkillMcpServerContext = {
