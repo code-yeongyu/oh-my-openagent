@@ -298,7 +298,7 @@ describe("createCallOmoAgent", () => {
       getTask: mock(() => undefined),
     }
     const toolDef = createCallOmoAgent(
-      mockCtx,
+      createMockCtx(DEFAULT_AGENTS),
       managerWithLaunch,
       [],
       {
@@ -347,7 +347,7 @@ describe("createCallOmoAgent", () => {
       getTask: mock(() => undefined),
     }
     const toolDef = createCallOmoAgent(
-      mockCtx,
+      createMockCtx(DEFAULT_AGENTS),
       managerWithLaunch,
       [],
       {
@@ -398,7 +398,7 @@ describe("createCallOmoAgent", () => {
       getTask: mock(() => undefined),
     }
     const toolDef = createCallOmoAgent(
-      mockCtx,
+      createMockCtx(DEFAULT_AGENTS),
       managerWithLaunch,
       [],
       {
@@ -448,7 +448,7 @@ describe("createCallOmoAgent", () => {
       getTask: mock(() => undefined),
     }
     const toolDef = createCallOmoAgent(
-      mockCtx,
+      createMockCtx(DEFAULT_AGENTS),
       managerWithLaunch,
       [],
       {
