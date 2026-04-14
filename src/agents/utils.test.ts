@@ -102,7 +102,7 @@ describe("createBuiltinAgents with model overrides", () => {
     }
   })
 
-  test("user config model takes priority over uiSelectedModel for sisyphus", async () => {
+  test("uiSelectedModel takes priority over sisyphus config model override", async () => {
     // #given
     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
       new Set(["openai/gpt-5.4", "anthropic/claude-sonnet-4-6"])
@@ -129,13 +129,47 @@ describe("createBuiltinAgents with model overrides", () => {
 
       // #then
       expect(agents.sisyphus).toBeDefined()
-      expect(agents.sisyphus.model).toBe("google/antigravity-claude-opus-4-5-thinking")
+      expect(agents.sisyphus.model).toBe("openai/gpt-5.4")
     } finally {
       fetchSpy.mockRestore()
     }
   })
 
-  test("user config model takes priority over uiSelectedModel for atlas", async () => {
+  test("uiSelectedModel takes priority over sisyphus category model override", async () => {
+    // #given
+    const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
+      new Set(["openai/gpt-5.4", "anthropic/claude-sonnet-4-6"])
+    )
+    const uiSelectedModel = "anthropic/claude-sonnet-4-6"
+    const overrides = {
+      sisyphus: { category: "ultrabrain" },
+    }
+
+    try {
+      // #when
+      const agents = await createBuiltinAgents(
+        [],
+        overrides,
+        undefined,
+        TEST_DEFAULT_MODEL,
+        undefined,
+        undefined,
+        [],
+        undefined,
+        undefined,
+        uiSelectedModel
+      )
+
+      // #then
+      expect(agents.sisyphus).toBeDefined()
+      expect(agents.sisyphus.model).toBe("anthropic/claude-sonnet-4-6")
+      expect(agents.sisyphus.variant).toBeUndefined()
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  test("uiSelectedModel takes priority over atlas config model override", async () => {
     // #given
     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
       new Set(["openai/gpt-5.4", "anthropic/claude-sonnet-4-6"])
@@ -162,7 +196,41 @@ describe("createBuiltinAgents with model overrides", () => {
 
       // #then
       expect(agents.atlas).toBeDefined()
-      expect(agents.atlas.model).toBe("google/antigravity-claude-opus-4-5-thinking")
+      expect(agents.atlas.model).toBe("openai/gpt-5.4")
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  test("uiSelectedModel takes priority over atlas category model override", async () => {
+    // #given
+    const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
+      new Set(["openai/gpt-5.4", "anthropic/claude-sonnet-4-6"])
+    )
+    const uiSelectedModel = "anthropic/claude-sonnet-4-6"
+    const overrides = {
+      atlas: { category: "ultrabrain" },
+    }
+
+    try {
+      // #when
+      const agents = await createBuiltinAgents(
+        [],
+        overrides,
+        undefined,
+        TEST_DEFAULT_MODEL,
+        undefined,
+        undefined,
+        [],
+        undefined,
+        undefined,
+        uiSelectedModel
+      )
+
+      // #then
+      expect(agents.atlas).toBeDefined()
+      expect(agents.atlas.model).toBe("anthropic/claude-sonnet-4-6")
+      expect(agents.atlas.variant).toBeUndefined()
     } finally {
       fetchSpy.mockRestore()
     }
