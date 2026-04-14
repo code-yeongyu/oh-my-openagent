@@ -6,6 +6,10 @@
 
 OpenCode plugin (npm: `oh-my-opencode`) that extends Claude Code (OpenCode fork) with multi-agent orchestration, 52 lifecycle hooks, 26 tools, skill/command/MCP systems, and Claude Code compatibility. ~1602 TypeScript source files, ~214k LOC.
 
+For the OCK/OMO integration story, direct OMO CLI and runtime entry points are internal/debug-oriented, not the main public UX. `ock` is the public command authority, `.beads` is the documented durable user-facing surface, and OMO remains the internal runtime and orchestration owner behind that surface.
+
+Within `.beads/artifacts/*`, OMO only writes the runtime-owned schema-1 namespaces for runtime attachments and runtime checkpoints; `ock` remains the owner of manifest/index files and published plan snapshots.
+
 ## STRUCTURE
 
 ```
@@ -40,34 +44,34 @@ OhMyOpenCodePlugin(ctx)
 
 ## 10 OPENCODE HOOK HANDLERS
 
-| Handler | Purpose |
-|---------|---------|
-| `config` | 6-phase: provider → plugin-components → agents → tools → MCPs → commands |
-| `tool` | 26 registered tools |
-| `chat.message` | First-message variant, session setup, keyword detection |
-| `chat.params` | Anthropic effort level adjustment |
-| `chat.headers` | Copilot x-initiator header injection |
-| `event` | Session lifecycle (created, deleted, idle, error) |
-| `tool.execute.before` | Pre-tool hooks (file guard, label truncator, rules injector) |
-| `tool.execute.after` | Post-tool hooks (output truncation, metadata store) |
-| `experimental.chat.messages.transform` | Context injection, thinking block validation |
-| `experimental.session.compacting` | Context + todo preservation during compaction |
+| Handler                                | Purpose                                                                  |
+| -------------------------------------- | ------------------------------------------------------------------------ |
+| `config`                               | 6-phase: provider → plugin-components → agents → tools → MCPs → commands |
+| `tool`                                 | 26 registered tools                                                      |
+| `chat.message`                         | First-message variant, session setup, keyword detection                  |
+| `chat.params`                          | Anthropic effort level adjustment                                        |
+| `chat.headers`                         | Copilot x-initiator header injection                                     |
+| `event`                                | Session lifecycle (created, deleted, idle, error)                        |
+| `tool.execute.before`                  | Pre-tool hooks (file guard, label truncator, rules injector)             |
+| `tool.execute.after`                   | Post-tool hooks (output truncation, metadata store)                      |
+| `experimental.chat.messages.transform` | Context injection, thinking block validation                             |
+| `experimental.session.compacting`      | Context + todo preservation during compaction                            |
 
 ## WHERE TO LOOK
 
-| Task | Location | Notes |
-|------|----------|-------|
-| Add new agent | `src/agents/` + `src/agents/builtin-agents/` | Follow createXXXAgent factory pattern |
-| Add new hook | `src/hooks/{name}/` + register in `src/plugin/hooks/create-*-hooks.ts` | Match event type to tier |
-| Add new tool | `src/tools/{name}/` + register in `src/plugin/tool-registry.ts` | Follow createXXXTool factory |
-| Add new feature module | `src/features/{name}/` | Standalone module, wire in plugin/ |
-| Add new MCP | `src/mcp/` + register in `createBuiltinMcps()` | Remote HTTP only |
-| Add new skill | `src/features/builtin-skills/skills/` | Implement BuiltinSkill interface |
-| Add new command | `src/features/builtin-commands/` | Template in templates/ |
-| Add new CLI command | `src/cli/cli-program.ts` | Commander.js subcommand |
-| Add new doctor check | `src/cli/doctor/checks/` | Register in checks/index.ts |
-| Modify config schema | `src/config/schema/` + update root schema | Zod v4, add to OhMyOpenCodeConfigSchema |
-| Add new category | `src/tools/delegate-task/constants.ts` | DEFAULT_CATEGORIES + CATEGORY_MODEL_REQUIREMENTS |
+| Task                   | Location                                                               | Notes                                            |
+| ---------------------- | ---------------------------------------------------------------------- | ------------------------------------------------ |
+| Add new agent          | `src/agents/` + `src/agents/builtin-agents/`                           | Follow createXXXAgent factory pattern            |
+| Add new hook           | `src/hooks/{name}/` + register in `src/plugin/hooks/create-*-hooks.ts` | Match event type to tier                         |
+| Add new tool           | `src/tools/{name}/` + register in `src/plugin/tool-registry.ts`        | Follow createXXXTool factory                     |
+| Add new feature module | `src/features/{name}/`                                                 | Standalone module, wire in plugin/               |
+| Add new MCP            | `src/mcp/` + register in `createBuiltinMcps()`                         | Remote HTTP only                                 |
+| Add new skill          | `src/features/builtin-skills/skills/`                                  | Implement BuiltinSkill interface                 |
+| Add new command        | `src/features/builtin-commands/`                                       | Template in templates/                           |
+| Add new CLI command    | `src/cli/cli-program.ts`                                               | Commander.js subcommand                          |
+| Add new doctor check   | `src/cli/doctor/checks/`                                               | Register in checks/index.ts                      |
+| Modify config schema   | `src/config/schema/` + update root schema                              | Zod v4, add to OhMyOpenCodeConfigSchema          |
+| Add new category       | `src/tools/delegate-task/constants.ts`                                 | DEFAULT_CATEGORIES + CATEGORY_MODEL_REQUIREMENTS |
 
 ## MULTI-LEVEL CONFIG
 
@@ -81,15 +85,15 @@ Project (.opencode/oh-my-opencode.jsonc)  →  User (~/.config/opencode/oh-my-op
 - Zod `safeParse()` fills defaults for omitted fields; partial parsing as fallback
 - `migrateConfigFile()` transforms legacy keys automatically (idempotent via `_migrations` tracking)
 
-Fields: agents (14 overridable, 21 fields each), categories (8 built-in + custom), disabled_* arrays (agents, hooks, mcps, skills, commands, tools), 19 feature-specific configs.
+Fields: agents (14 overridable, 21 fields each), categories (8 built-in + custom), disabled\_\* arrays (agents, hooks, mcps, skills, commands, tools), 19 feature-specific configs.
 
 ## THREE-TIER MCP SYSTEM
 
-| Tier | Source | Mechanism |
-|------|--------|-----------|
-| Built-in | `src/mcp/` | 3 remote HTTP: websearch (Exa/Tavily), context7, grep_app |
-| Claude Code | `.mcp.json` | `${VAR}` env expansion via claude-code-mcp-loader |
-| Skill-embedded | SKILL.md YAML | Managed by SkillMcpManager (stdio + HTTP) |
+| Tier           | Source        | Mechanism                                                 |
+| -------------- | ------------- | --------------------------------------------------------- |
+| Built-in       | `src/mcp/`    | 3 remote HTTP: websearch (Exa/Tavily), context7, grep_app |
+| Claude Code    | `.mcp.json`   | `${VAR}` env expansion via claude-code-mcp-loader         |
+| Skill-embedded | SKILL.md YAML | Managed by SkillMcpManager (stdio + HTTP)                 |
 
 ## CONVENTIONS
 
@@ -137,15 +141,15 @@ bunx oh-my-opencode run     # Non-interactive session
 
 ## CI/CD
 
-| Workflow | Trigger | Purpose |
-|----------|---------|---------|
-| ci.yml | push/PR to master/dev | Tests (split: mock-heavy isolated + batch), typecheck, build, schema auto-commit |
-| publish.yml | manual dispatch | Version bump, dual npm publish (oh-my-opencode + oh-my-openagent), platform binaries, GitHub release |
-| publish-platform.yml | called by publish | 11 platform binaries via bun compile (darwin/linux/windows) |
-| sisyphus-agent.yml | @mention / dispatch | AI agent handles issues/PRs |
-| refresh-model-capabilities.yml | weekly schedule / dispatch | Auto-refresh model capabilities from models.dev API |
-| cla.yml | issue_comment/PR | CLA assistant for contributors |
-| lint-workflows.yml | push to .github/ | actionlint + shellcheck on workflow files |
+| Workflow                       | Trigger                    | Purpose                                                                                              |
+| ------------------------------ | -------------------------- | ---------------------------------------------------------------------------------------------------- |
+| ci.yml                         | push/PR to master/dev      | Tests (split: mock-heavy isolated + batch), typecheck, build, schema auto-commit                     |
+| publish.yml                    | manual dispatch            | Version bump, dual npm publish (oh-my-opencode + oh-my-openagent), platform binaries, GitHub release |
+| publish-platform.yml           | called by publish          | 11 platform binaries via bun compile (darwin/linux/windows)                                          |
+| sisyphus-agent.yml             | @mention / dispatch        | AI agent handles issues/PRs                                                                          |
+| refresh-model-capabilities.yml | weekly schedule / dispatch | Auto-refresh model capabilities from models.dev API                                                  |
+| cla.yml                        | issue_comment/PR           | CLA assistant for contributors                                                                       |
+| lint-workflows.yml             | push to .github/           | actionlint + shellcheck on workflow files                                                            |
 
 ## NOTES
 
