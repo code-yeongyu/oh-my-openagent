@@ -101,7 +101,8 @@ describe("finalizeStopContinuation", () => {
 			testDirectory,
 			".beads",
 			"artifacts",
-			"checkpoint-ses-root.json",
+			"runtime-checkpoints",
+			"checkpoint-ses-root.schema-1.json",
 		);
 		const checkpoint = JSON.parse(
 			readFileSync(checkpointPath, "utf-8"),
@@ -111,6 +112,9 @@ describe("finalizeStopContinuation", () => {
 		expect(cancelledSessionID).toBe("ses-root");
 		expect(cancelledCountdowns).toBe(1);
 		expect(checkpoint).toMatchObject({
+			schemaVersion: 1,
+			producer: { name: "omo", version: "3.16.0" },
+			runtime: { name: "oh-my-openagent", version: "3.16.0" },
 			session_id: "ses-root",
 			bead_id: "bd-123",
 			bead_source_command: "/start bd-123",
