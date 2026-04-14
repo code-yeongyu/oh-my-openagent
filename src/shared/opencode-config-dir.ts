@@ -2,6 +2,7 @@ import { existsSync, realpathSync } from "node:fs"
 import { homedir } from "node:os"
 import { join, resolve, win32 } from "node:path"
 
+import { detectPluginConfigFile } from "./jsonc-parser"
 import { CONFIG_BASENAME } from "./plugin-identity"
 
 import type {
@@ -93,13 +94,17 @@ export function getOpenCodeConfigDir(options: OpenCodeConfigDirOptions): string 
 
 export function getOpenCodeConfigPaths(options: OpenCodeConfigDirOptions): OpenCodeConfigPaths {
   const configDir = getOpenCodeConfigDir(options)
+  const detectedPluginConfig = detectPluginConfigFile(configDir)
+  const omoConfig = detectedPluginConfig.format !== "none"
+    ? detectedPluginConfig.path
+    : join(configDir, `${CONFIG_BASENAME}.json`)
 
   return {
     configDir,
     configJson: join(configDir, "opencode.json"),
     configJsonc: join(configDir, "opencode.jsonc"),
     packageJson: join(configDir, "package.json"),
-    omoConfig: join(configDir, `${CONFIG_BASENAME}.json`),
+    omoConfig,
   }
 }
 
