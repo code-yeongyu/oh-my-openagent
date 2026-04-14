@@ -102,16 +102,9 @@ async function handleUpdate(
       if (validatedArgs.description !== undefined) {
         task.description = validatedArgs.description;
       }
-      if (validatedArgs.status !== undefined) {
-        task.status = validatedArgs.status;
-      }
-      if (validatedArgs.activeForm !== undefined) {
-        task.activeForm = validatedArgs.activeForm;
-      }
-      if (validatedArgs.owner !== undefined) {
-        task.owner = validatedArgs.owner;
-      }
 
+      // Merge addBlocks and addBlockedBy before the completion guard
+      // so the guard checks the final set of blockers (prevents bypass via same-request addBlockedBy)
       const addBlocks = args.addBlocks as string[] | undefined;
       if (addBlocks) {
         task.blocks = [...new Set([...task.blocks, ...addBlocks])];
@@ -120,6 +113,41 @@ async function handleUpdate(
       const addBlockedBy = args.addBlockedBy as string[] | undefined;
       if (addBlockedBy) {
         task.blockedBy = [...new Set([...task.blockedBy, ...addBlockedBy])];
+      }
+
+      // BlockedBy completion guard
+      if (validatedArgs.status === "completed" && task.blockedBy && task.blockedBy.length > 0) {
+        const taskDir = getTaskDir(config);
+        const unresolvedBlockers: string[] = [];
+        for (const blockerId of task.blockedBy) {
+          const normalizedBlockerId = parseTaskId(blockerId);
+          if (!normalizedBlockerId) {
+            unresolvedBlockers.push(blockerId);
+            continue;
+          }
+          const blockerPath = join(taskDir, `${normalizedBlockerId}.json`);
+          const blockerTask = readJsonSafe(blockerPath, TaskObjectSchema);
+          if (!blockerTask || (blockerTask.status !== "completed" && blockerTask.status !== "deleted")) {
+            unresolvedBlockers.push(blockerId);
+          }
+        }
+        if (unresolvedBlockers.length > 0) {
+          return JSON.stringify({
+            error: "blocked_by_unresolved",
+            unresolved: unresolvedBlockers,
+            message: `Cannot mark task as completed. The following blocking tasks are not resolved: ${unresolvedBlockers.join(", ")}`,
+          });
+        }
+      }
+
+      if (validatedArgs.status !== undefined) {
+        task.status = validatedArgs.status;
+      }
+      if (validatedArgs.activeForm !== undefined) {
+        task.activeForm = validatedArgs.activeForm;
+      }
+      if (validatedArgs.owner !== undefined) {
+        task.owner = validatedArgs.owner;
       }
 
       if (validatedArgs.metadata !== undefined) {

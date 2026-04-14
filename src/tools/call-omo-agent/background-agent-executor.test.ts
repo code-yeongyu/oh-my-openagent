@@ -152,4 +152,73 @@ describe("executeBackgroundAgent", () => {
     expect(secondResult).toContain("Task ID: task-2")
     expect(secondResult).not.toContain("interrupt")
   })
+
+  test("output contains task_metadata block when sessionId is resolved", async () => {
+    // Create fresh mocks for this test
+    const localLaunchMock = mock(async () => ({
+      id: "test-task-id",
+      sessionID: "resolved-session-id",
+      description: "Test task",
+      agent: "test-agent",
+      status: "pending",
+    }))
+    const localGetTaskMock = mock(() => ({
+      id: "test-task-id",
+      sessionID: "resolved-session-id",
+      description: "Test task",
+      agent: "test-agent",
+      status: "pending",
+    }))
+    const localMockManager = {
+      launch: localLaunchMock,
+      getTask: localGetTaskMock,
+    } as unknown as BackgroundManager
+
+    //#when
+    const result = await executeBackgroundAgent(testArgs, testContext, localMockManager, mockClient)
+
+    //#then
+    expect(result).toContain("Background agent task launched successfully")
+    expect(result).toContain("<task_metadata>")
+    expect(result).toContain("session_id: resolved-session-id")
+    expect(result).toContain("background_task_id: test-task-id")
+    expect(result).toContain("</task_metadata>")
+  })
+
+  test("output does not contain task_metadata block when sessionId is null", async () => {
+    // Create fresh mocks for this test
+    const localLaunchMock = mock(async () => ({
+      id: "test-task-id",
+      sessionID: null,
+      description: "Test task",
+      agent: "test-agent",
+      status: "pending",
+    }))
+    const localGetTaskMock = mock(() => ({
+      id: "test-task-id",
+      sessionID: null,
+      description: "Test task",
+      agent: "test-agent",
+      status: "pending",
+    }))
+    const localMockManager = {
+      launch: localLaunchMock,
+      getTask: localGetTaskMock,
+    } as unknown as BackgroundManager
+
+    // Abort after first iteration to avoid timeout
+    const abortController = new AbortController()
+    abortController.abort()
+
+    //#when
+    const result = await executeBackgroundAgent(testArgs, {
+      ...testContext,
+      abort: abortController.signal,
+    }, localMockManager, mockClient)
+
+    //#then
+    expect(result).toContain("Background agent task launched successfully")
+    expect(result).not.toContain("<task_metadata>")
+    expect(result).not.toContain("background_task_id")
+  })
 })

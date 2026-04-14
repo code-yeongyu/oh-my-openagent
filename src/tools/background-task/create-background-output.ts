@@ -11,6 +11,7 @@ import { formatTaskStatus } from "./task-status-format"
 
 import { getAgentDisplayName } from "../../shared/agent-display-names"
 import { recordBackgroundOutputConsumption } from "../../shared/background-output-consumption"
+import { formatIdTypeError } from "../../shared/id-types"
 
 const SISYPHUS_JUNIOR_AGENT = getAgentDisplayName("sisyphus-junior")
 
@@ -67,7 +68,7 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
         const ctx = toolContext as ToolContextWithMetadata
         const task = manager.getTask(args.task_id)
         if (!task) {
-          return `Task not found: ${args.task_id}`
+          return formatIdTypeError(args.task_id, "background_output")
         }
 
         const meta = {
