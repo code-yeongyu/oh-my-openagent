@@ -1,9 +1,17 @@
 import type { OpencodeClient } from "./types"
+import type { DelegatedModelConfig } from "../../shared/model-resolution-types"
 import { QUESTION_DENIED_SESSION_PERMISSION } from "../../shared/question-denied-session-permission"
+import { buildSubagentSessionCreateBody } from "../../shared/subagent-context-window"
 
 export async function createSyncSession(
   client: OpencodeClient,
-  input: { parentSessionID: string; agentToUse: string; description: string; defaultDirectory: string }
+  input: {
+    parentSessionID: string
+    agentToUse: string
+    description: string
+    defaultDirectory: string
+    model?: DelegatedModelConfig
+  }
 ): Promise<{ ok: true; sessionID: string; parentDirectory: string } | { ok: false; error: string }> {
   const parentSession = client.session.get
     ? await client.session.get({ path: { id: input.parentSessionID } }).catch(() => null)
@@ -11,11 +19,12 @@ export async function createSyncSession(
   const parentDirectory = parentSession?.data?.directory ?? input.defaultDirectory
 
   const createResult = await client.session.create({
-    body: {
-      parentID: input.parentSessionID,
+    body: buildSubagentSessionCreateBody({
+      parentSessionID: input.parentSessionID,
       title: `${input.description} (@${input.agentToUse} subagent)`,
       permission: QUESTION_DENIED_SESSION_PERMISSION,
-    } as Record<string, unknown>,
+      model: input.model,
+    }),
     query: {
       directory: parentDirectory,
     },

@@ -45,7 +45,71 @@ function reduceSegmentToFitBudget(content: string, overflowTokens: number): stri
 
   const currentTokens = estimateTokenCount(content)
   const nextBudget = Math.max(0, currentTokens - overflowTokens)
-  return truncateToTokenBudget(content, nextBudget)
+  return truncateLowPriorityBlocks(content, nextBudget)
+}
+
+function getBlockPriority(block: string): number {
+  const normalized = block.toLowerCase()
+
+  if (
+    normalized.includes("```")
+    || normalized.includes("example")
+    || normalized.includes("examples")
+    || normalized.includes("wrong:")
+    || normalized.includes("correct:")
+  ) {
+    return 0
+  }
+
+  if (normalized.includes("optional") || normalized.includes("note:")) {
+    return 1
+  }
+
+  return 2
+}
+
+function truncateLowPriorityBlocks(content: string, maxTokens: number): string {
+  if (!content || maxTokens <= 0) {
+    return ""
+  }
+
+  if (estimateTokenCount(content) <= maxTokens) {
+    return content
+  }
+
+  const blocks = content
+    .split(/\n\s*\n/)
+    .map((block) => block.trim())
+    .filter((block) => block.length > 0)
+
+  if (blocks.length <= 1) {
+    return truncateToTokenBudget(content, maxTokens)
+  }
+
+  const prioritizedBlocks = blocks.map((block, index) => ({
+    block,
+    index,
+    priority: getBlockPriority(block),
+  }))
+
+  const kept = [...prioritizedBlocks]
+  kept.sort((left, right) => left.priority - right.priority || right.index - left.index)
+
+  while (kept.length > 1) {
+    const current = kept
+      .slice()
+      .sort((left, right) => left.index - right.index)
+      .map((entry) => entry.block)
+      .join("\n\n")
+
+    if (estimateTokenCount(current) <= maxTokens) {
+      return current
+    }
+
+    kept.shift()
+  }
+
+  return truncateToTokenBudget(kept[0]?.block ?? content, maxTokens)
 }
 
 export function buildSystemContentWithTokenLimit(

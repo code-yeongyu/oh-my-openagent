@@ -5,6 +5,10 @@ import {
   clearSessionPromptParams,
   getSessionPromptParams,
 } from "../../shared/session-prompt-params-state"
+import {
+  _resetMemCacheForTesting,
+  writeProviderModelsCache,
+} from "../../shared/connected-providers-cache"
 
 describe("background-agent spawner agent-not-found fallback", () => {
   afterEach(() => {
@@ -324,6 +328,65 @@ describe("background-agent spawner agent-not-found fallback", () => {
 describe("background-agent spawner fallback model promotion", () => {
   afterEach(() => {
     clearSessionPromptParams("session-123")
+    _resetMemCacheForTesting()
+  })
+
+  test("detaches parent context for small-context models", async () => {
+    //#given
+    writeProviderModelsCache({
+      connected: ["ollama"],
+      models: {
+        ollama: [{ id: "qwen2.5:14b", context: 16_384 }],
+      },
+    })
+
+    const createCalls: Array<Record<string, unknown>> = []
+    const client = {
+      session: {
+        get: async () => ({ data: { directory: "/parent/dir" } }),
+        create: async (input: Record<string, unknown>) => {
+          createCalls.push(input)
+          return { data: { id: "ses_child_detached" } }
+        },
+        promptAsync: async () => ({}),
+      },
+    }
+
+    const task = createTask({
+      description: "Test task",
+      prompt: "Do work",
+      agent: "sisyphus-junior",
+      parentSessionID: "ses_parent",
+      parentMessageID: "msg_parent",
+      model: { providerID: "ollama", modelID: "qwen2.5:14b" },
+    })
+
+    //#when
+    await startTask({
+      task,
+      input: {
+        description: task.description,
+        prompt: task.prompt,
+        agent: task.agent,
+        parentSessionID: task.parentSessionID,
+        parentMessageID: task.parentMessageID,
+        parentModel: task.parentModel,
+        parentAgent: task.parentAgent,
+        model: task.model,
+      },
+    } as never, {
+      client: client as never,
+      directory: "/fallback",
+      concurrencyManager: { release: () => {} } as never,
+      tmuxEnabled: false,
+      onTaskError: () => {},
+    })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    //#then
+    expect(createCalls[0]?.body).toEqual({
+      title: "Test task",
+    })
   })
 
   test("passes promoted fallback model settings through supported prompt channels", async () => {

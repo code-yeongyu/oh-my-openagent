@@ -1,8 +1,52 @@
 import { describe, expect, test } from "bun:test"
 
 import { createSyncSession } from "./sync-session-creator"
+import {
+  _resetMemCacheForTesting,
+  writeProviderModelsCache,
+} from "../../shared/connected-providers-cache"
 
 describe("createSyncSession", () => {
+  test("creates detached session for small-context models", async () => {
+    // given
+    writeProviderModelsCache({
+      connected: ["ollama"],
+      models: {
+        ollama: [{ id: "qwen2.5:14b", context: 16_384 }],
+      },
+    })
+
+    const createCalls: Array<Record<string, unknown>> = []
+    const client = {
+      session: {
+        get: async () => ({ data: { directory: "/parent" } }),
+        create: async (input: Record<string, unknown>) => {
+          createCalls.push(input)
+          return { data: { id: "ses_child" } }
+        },
+      },
+    }
+
+    // when
+    await createSyncSession(client as never, {
+      parentSessionID: "ses_parent",
+      agentToUse: "explore",
+      description: "test task",
+      defaultDirectory: "/fallback",
+      model: { providerID: "ollama", modelID: "qwen2.5:14b" },
+    })
+
+    // then
+    expect(createCalls[0]?.body).toEqual({
+      title: "test task (@explore subagent)",
+      permission: [
+        { permission: "question", action: "deny", pattern: "*" },
+      ],
+    })
+
+    _resetMemCacheForTesting()
+  })
+
   test("creates child session with question permission denied", async () => {
     // given
     const createCalls: Array<Record<string, unknown>> = []
@@ -34,5 +78,7 @@ describe("createSyncSession", () => {
         { permission: "question", action: "deny", pattern: "*" },
       ],
     })
+
+    _resetMemCacheForTesting()
   })
 })

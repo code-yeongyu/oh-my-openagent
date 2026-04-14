@@ -2,6 +2,7 @@ import type { BuildSystemContentInput } from "./types"
 import type { AvailableSkill } from "../../agents/dynamic-agent-prompt-builder"
 import { buildPlanAgentSystemPrepend, isPlanAgent } from "./constants"
 import { buildSystemContentWithTokenLimit } from "./token-limiter"
+import { resolveSubagentPromptTokenBudget } from "../../shared/subagent-context-window"
 
 const FREE_OR_LOCAL_PROMPT_TOKEN_LIMIT = 24000
 const PLAN_AGENT_PROMPT_BASE = `
@@ -83,6 +84,7 @@ export function buildSystemContent(input: BuildSystemContentInput): string | und
     : baseAgentsContext
 
   const effectiveMaxPromptTokens = maxPromptTokens
+    ?? resolveSubagentPromptTokenBudget(model)
     ?? (usesFreeOrLocalModel(model) ? FREE_OR_LOCAL_PROMPT_TOKEN_LIMIT : undefined)
 
   return buildSystemContentWithTokenLimit(

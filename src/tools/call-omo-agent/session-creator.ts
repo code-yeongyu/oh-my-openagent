@@ -1,7 +1,9 @@
 import type { CallOmoAgentArgs } from "./types"
 import type { PluginInput } from "@opencode-ai/plugin"
+import type { DelegatedModelConfig } from "../../shared/model-resolution-types"
 import { subagentSessions, syncSubagentSessions } from "../../features/claude-code-session-state"
-import { log } from "../../shared"
+import { log } from "../../shared/logger"
+import { buildSubagentSessionCreateBody } from "../../shared/subagent-context-window"
 
 export async function createOrGetSession(
   args: CallOmoAgentArgs,
@@ -12,7 +14,8 @@ export async function createOrGetSession(
     abort: AbortSignal
     metadata?: (input: { title?: string; metadata?: Record<string, unknown> }) => void
   },
-  ctx: PluginInput
+  ctx: PluginInput,
+  model?: DelegatedModelConfig,
 ): Promise<{ sessionID: string; isNew: boolean }> {
   if (args.session_id) {
     log(`[call_omo_agent] Using existing session: ${args.session_id}`)
@@ -36,10 +39,11 @@ export async function createOrGetSession(
     const parentDirectory = parentSession?.data?.directory ?? ctx.directory
 
     const createResult = await ctx.client.session.create({
-      body: {
-        parentID: toolContext.sessionID,
+      body: buildSubagentSessionCreateBody({
+        parentSessionID: toolContext.sessionID,
         title: `${args.description} (@${args.subagent_type} subagent)`,
-      } as Record<string, unknown>,
+        model,
+      }),
       query: {
         directory: parentDirectory,
       },

@@ -1,7 +1,11 @@
 import type { BackgroundTask, LaunchInput, ResumeInput } from "./types"
 import type { OpencodeClient, OnSubagentSessionCreated, QueueItem } from "./constants"
 import { TMUX_CALLBACK_DELAY_MS } from "./constants"
-import { log, getAgentToolRestrictions, promptWithModelSuggestionRetry, createInternalAgentTextPart } from "../../shared"
+import { log } from "../../shared/logger"
+import { getAgentToolRestrictions } from "../../shared/agent-tool-restrictions"
+import { promptWithModelSuggestionRetry } from "../../shared/model-suggestion-retry"
+import { createInternalAgentTextPart } from "../../shared/internal-initiator-marker"
+import { buildSubagentSessionCreateBody } from "../../shared/subagent-context-window"
 import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
 import { subagentSessions } from "../claude-code-session-state"
 import { getTaskToastManager } from "../task-toast-manager"
@@ -95,10 +99,12 @@ export async function startTask(
   log(`[background-agent] Parent dir: ${parentSession?.data?.directory}, using: ${parentDirectory}`)
 
   const createResult = await client.session.create({
-    body: {
-      parentID: input.parentSessionID,
-      ...(input.sessionPermission ? { permission: input.sessionPermission } : {}),
-    } as Record<string, unknown>,
+    body: buildSubagentSessionCreateBody({
+      parentSessionID: input.parentSessionID,
+      title: input.description,
+      permission: input.sessionPermission,
+      model: input.model,
+    }),
     query: {
       directory: parentDirectory,
     },
