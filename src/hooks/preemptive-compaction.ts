@@ -28,6 +28,46 @@ interface CachedCompactionState {
   tokens: TokenInfo
 }
 
+function resolvePreemptiveCompactionConfig(pluginConfig: OhMyOpenCodeConfig): {
+  model?: string
+  threshold: number
+} {
+  const preemptiveCompactionConfig = pluginConfig.experimental?.preemptive_compaction
+  const threshold = typeof preemptiveCompactionConfig === "object" && preemptiveCompactionConfig !== null
+    ? preemptiveCompactionConfig.threshold ?? PREEMPTIVE_COMPACTION_THRESHOLD
+    : PREEMPTIVE_COMPACTION_THRESHOLD
+
+  return {
+    threshold,
+    model:
+      typeof preemptiveCompactionConfig === "object" && preemptiveCompactionConfig !== null
+        ? preemptiveCompactionConfig.model
+        : undefined,
+  }
+}
+
+function resolvePreemptiveCompactionModel(args: {
+  pluginConfig: OhMyOpenCodeConfig
+  sessionID: string
+  providerID: string
+  modelID: string
+  configuredModel?: string
+}): { providerID: string; modelID: string } {
+  const { configuredModel, modelID, pluginConfig, providerID, sessionID } = args
+
+  if (configuredModel) {
+    const modelParts = configuredModel.split("/")
+    if (modelParts.length >= 2) {
+      return {
+        providerID: modelParts[0],
+        modelID: modelParts.slice(1).join("/"),
+      }
+    }
+  }
+
+  return resolveCompactionModel(pluginConfig, sessionID, providerID, modelID)
+}
+
 async function withTimeout<TValue>(
   promise: Promise<TValue>,
   timeoutMs: number,
@@ -71,6 +111,7 @@ export function createPreemptiveCompactionHook(
   const compactedSessions = new Set<string>()
   const lastCompactionTime = new Map<string, number>()
   const tokenCache = new Map<string, CachedCompactionState>()
+  const preemptiveCompactionConfig = resolvePreemptiveCompactionConfig(pluginConfig)
 
   const postCompactionMonitor = createPostCompactionDegradationMonitor({
     client: ctx.client,
@@ -109,18 +150,19 @@ export function createPreemptiveCompactionHook(
 
     const totalInputTokens = (cached.tokens.input ?? 0) + (cached.tokens.cache?.read ?? 0)
     const usageRatio = totalInputTokens / actualLimit
-    if (usageRatio < PREEMPTIVE_COMPACTION_THRESHOLD || !cached.modelID) return
+    if (usageRatio < preemptiveCompactionConfig.threshold || !cached.modelID) return
 
     compactionInProgress.add(sessionID)
     lastCompactionTime.set(sessionID, Date.now())
 
     try {
-      const { providerID: targetProviderID, modelID: targetModelID } = resolveCompactionModel(
+      const { providerID: targetProviderID, modelID: targetModelID } = resolvePreemptiveCompactionModel({
         pluginConfig,
         sessionID,
-        cached.providerID,
-        cached.modelID,
-      )
+        providerID: cached.providerID,
+        modelID: cached.modelID,
+        configuredModel: preemptiveCompactionConfig.model,
+      })
 
       await withTimeout(
         ctx.client.session.summarize({
@@ -143,7 +185,7 @@ export function createPreemptiveCompactionHook(
       ctx.client.tui.showToast({
         body: {
           title: "Preemptive compaction failed",
-          message: `Context window is above ${Math.round(PREEMPTIVE_COMPACTION_THRESHOLD * 100)}% and auto-compaction could not run. The session may grow large. Error: ${String(error)}`,
+          message: `Context window is above ${Math.round(preemptiveCompactionConfig.threshold * 100)}% and auto-compaction could not run. The session may grow large. Error: ${String(error)}`,
           variant: "warning",
           duration: 10000,
         },

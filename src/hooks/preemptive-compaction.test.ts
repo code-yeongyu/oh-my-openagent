@@ -172,6 +172,88 @@ describe("preemptive-compaction", () => {
     expect(ctx.client.session.summarize).toHaveBeenCalled()
   })
 
+  it("should use configured compaction model override when set", async () => {
+    const hook = createPreemptiveCompactionHook(ctx as never, {
+      experimental: {
+        preemptive_compaction: {
+          model: "openrouter/openai/gpt-5-mini",
+        },
+      },
+    })
+    const sessionID = "ses_model_override"
+
+    await hook.event({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            role: "assistant",
+            sessionID,
+            providerID: "anthropic",
+            modelID: "claude-sonnet-4-6",
+            finish: true,
+            tokens: {
+              input: 170000,
+              output: 1000,
+              reasoning: 0,
+              cache: { read: 10000, write: 0 },
+            },
+          },
+        },
+      },
+    })
+
+    await hook["tool.execute.after"](
+      { tool: "bash", sessionID, callID: "call_model_override" },
+      { title: "", output: "test", metadata: null },
+    )
+
+    expect(ctx.client.session.summarize).toHaveBeenCalledWith({
+      path: { id: sessionID },
+      body: { providerID: "openrouter", modelID: "openai/gpt-5-mini", auto: true },
+      query: { directory: "/tmp/test" },
+    })
+  })
+
+  it("should respect object threshold config", async () => {
+    const hook = createPreemptiveCompactionHook(ctx as never, {
+      experimental: {
+        preemptive_compaction: {
+          threshold: 0.95,
+        },
+      },
+    })
+    const sessionID = "ses_threshold_override"
+
+    await hook.event({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            role: "assistant",
+            sessionID,
+            providerID: "anthropic",
+            modelID: "claude-sonnet-4-6",
+            finish: true,
+            tokens: {
+              input: 170000,
+              output: 1000,
+              reasoning: 0,
+              cache: { read: 10000, write: 0 },
+            },
+          },
+        },
+      },
+    })
+
+    await hook["tool.execute.after"](
+      { tool: "bash", sessionID, callID: "call_threshold_override" },
+      { title: "", output: "test", metadata: null },
+    )
+
+    expect(ctx.client.session.summarize).not.toHaveBeenCalled()
+  })
+
   it("should trigger compaction for google-vertex-anthropic provider", async () => {
     //#given google-vertex-anthropic usage above threshold
     const hook = createPreemptiveCompactionHook(ctx as never, {} as never)
