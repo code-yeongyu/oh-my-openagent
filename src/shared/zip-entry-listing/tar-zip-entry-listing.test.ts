@@ -1,7 +1,12 @@
 import { afterEach, describe, expect, it, mock, spyOn } from "bun:test"
 
 import * as logger from "../logger"
-import { parseTarListingOutput } from "./tar-zip-entry-listing"
+
+type TarZipEntryListingModule = typeof import("./tar-zip-entry-listing")
+
+async function importFreshTarZipEntryListingModule(): Promise<TarZipEntryListingModule> {
+  return await import(`./tar-zip-entry-listing?test=${Date.now()}-${Math.random()}`)
+}
 
 function createTarFileLine(fileName: string): string {
 	return `-rw-r--r-- 1 user group 123 Jan 01 12:34 ${fileName}`
@@ -40,10 +45,11 @@ describe("parseTarListingOutput", () => {
 		mock.restore()
 	})
 
-	describe("#given tar output with any unparsed lines", () => {
-		it("#when parsing the output #then throws immediately (fail-closed)", () => {
+		describe("#given tar output with any unparsed lines", () => {
+		it("#when parsing the output #then throws immediately (fail-closed)", async () => {
 			// given
 			const logSpy = spyOn(logger, "log").mockImplementation(() => {})
+			const { parseTarListingOutput } = await importFreshTarZipEntryListingModule()
 			const listedOutput = [
 				createTarFileLine("file-1.txt"),
 				createTarFileLine("file-2.txt"),
@@ -59,10 +65,11 @@ describe("parseTarListingOutput", () => {
 		})
 	})
 
-	describe("#given tar output with multiple unparsed lines", () => {
-		it("#when parsing the output #then throws with count details", () => {
+		describe("#given tar output with multiple unparsed lines", () => {
+		it("#when parsing the output #then throws with count details", async () => {
 			// given
 			const logSpy = spyOn(logger, "log").mockImplementation(() => {})
+			const { parseTarListingOutput } = await importFreshTarZipEntryListingModule()
 			const listedOutput = [
 				createTarFileLine("file-1.txt"),
 				createTarFileLine("file-2.txt"),
@@ -90,10 +97,11 @@ describe("parseTarListingOutput", () => {
 		})
 	})
 
-	describe("#given tar output where every non-empty line is unparsed", () => {
-		it("#when parsing the output #then rejects the listing", () => {
+		describe("#given tar output where every non-empty line is unparsed", () => {
+		it("#when parsing the output #then rejects the listing", async () => {
 			// given
 			const logSpy = spyOn(logger, "log").mockImplementation(() => {})
+			const { parseTarListingOutput } = await importFreshTarZipEntryListingModule()
 
 			// when
 			const thrownError = captureThrownError(() =>

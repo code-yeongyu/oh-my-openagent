@@ -18,6 +18,7 @@ describe("generateOmoConfig - model fallback system", () => {
       hasZaiCodingPlan: false,
       hasKimiForCoding: false,
       hasOpencodeGo: false,
+      hasVercelAiGateway: false,
     }
 
     //#when
@@ -42,6 +43,7 @@ describe("generateOmoConfig - model fallback system", () => {
       hasZaiCodingPlan: false,
       hasKimiForCoding: false,
       hasOpencodeGo: false,
+      hasVercelAiGateway: false,
     }
 
     //#when
@@ -64,6 +66,7 @@ describe("generateOmoConfig - model fallback system", () => {
       hasZaiCodingPlan: true,
       hasKimiForCoding: false,
       hasOpencodeGo: false,
+      hasVercelAiGateway: false,
     }
 
     //#when
@@ -71,7 +74,7 @@ describe("generateOmoConfig - model fallback system", () => {
 
     //#then
     expect((result.agents as Record<string, { model: string }>).librarian.model).toBe("zai-coding-plan/glm-4.7")
-    expect((result.agents as Record<string, { model: string }>).sisyphus.model).toBe("anthropic/claude-opus-4-6")
+    expect((result.agents as Record<string, { model: string }>).sisyphus.model).toBe("anthropic/claude-opus-4.6")
   })
 
   test("uses native OpenAI models when only ChatGPT available", () => {
@@ -86,6 +89,7 @@ describe("generateOmoConfig - model fallback system", () => {
       hasZaiCodingPlan: false,
       hasKimiForCoding: false,
       hasOpencodeGo: false,
+      hasVercelAiGateway: false,
     }
 
     //#when
@@ -110,6 +114,7 @@ describe("generateOmoConfig - model fallback system", () => {
       hasZaiCodingPlan: false,
       hasKimiForCoding: false,
       hasOpencodeGo: false,
+      hasVercelAiGateway: false,
     }
 
     //#when
@@ -126,7 +131,7 @@ describe("generateOmoConfig - model fallback system", () => {
     }>
 
     //#then
-    expect(agents.sisyphus.model).toBe("anthropic/claude-opus-4-6")
+    expect(agents.sisyphus.model).toBe("anthropic/claude-opus-4.6")
     expect(agents.sisyphus.fallback_models).toEqual([
       {
         model: "openai/gpt-5.4",
@@ -136,7 +141,7 @@ describe("generateOmoConfig - model fallback system", () => {
     expect(categories.deep.model).toBe("openai/gpt-5.4")
     expect(categories.deep.fallback_models).toEqual([
       {
-        model: "anthropic/claude-opus-4-6",
+        model: "anthropic/claude-opus-4.6",
         variant: "max",
       },
     ])
@@ -154,6 +159,7 @@ describe("generateOmoConfig - model fallback system", () => {
       hasZaiCodingPlan: false,
       hasKimiForCoding: false,
       hasOpencodeGo: false,
+      hasVercelAiGateway: false,
     }
 
     //#when
@@ -175,6 +181,7 @@ describe("generateOmoConfig - model fallback system", () => {
       hasZaiCodingPlan: false,
       hasKimiForCoding: false,
       hasOpencodeGo: false,
+      hasVercelAiGateway: false,
     }
 
     //#when

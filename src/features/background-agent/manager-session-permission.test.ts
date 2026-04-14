@@ -6,6 +6,48 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { BackgroundManager } from "./manager"
 
 describe("BackgroundManager session permission", () => {
+  test("passes query directory when loading the parent session", async () => {
+    // given
+    const getCalls: Array<Record<string, unknown>> = []
+    const client = {
+      session: {
+        get: async (input: Record<string, unknown>) => {
+          getCalls.push(input)
+          return { data: { directory: "/parent" } }
+        },
+        create: async () => ({ data: { id: "ses_child" } }),
+        promptAsync: async () => ({}),
+        abort: async () => ({}),
+      },
+    }
+    const directory = tmpdir()
+    const manager = new BackgroundManager({ client, directory } as unknown as PluginInput)
+
+    // when
+    await manager.launch({
+      description: "Test task",
+      prompt: "Do something",
+      agent: "explore",
+      parentSessionID: "ses_parent",
+      parentMessageID: "msg_parent",
+    })
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    manager.shutdown()
+
+    // then
+    expect(getCalls).toHaveLength(2)
+    expect(getCalls).toEqual([
+      {
+        path: { id: "ses_parent" },
+        query: { directory },
+      },
+      {
+        path: { id: "ses_parent" },
+        query: { directory },
+      },
+    ])
+  })
+
   test("passes explicit session permission rules to child session creation", async () => {
     // given
     const createCalls: Array<Record<string, unknown>> = []

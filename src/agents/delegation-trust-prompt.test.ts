@@ -114,6 +114,8 @@ describe("delegation trust prompt rules", () => {
     expect(prompt).toContain("do only non-overlapping work simultaneously")
     expect(prompt).toContain("Continue only with non-overlapping work")
     expect(prompt).toContain("DO NOT perform the same search yourself")
+    expect(prompt).toContain("Do not use `apply_patch`")
+    expect(prompt).toContain("`edit` and `write`")
   })
 
   test("Sisyphus-Junior GPT-5.4 prompt forbids duplicate delegated exploration", () => {

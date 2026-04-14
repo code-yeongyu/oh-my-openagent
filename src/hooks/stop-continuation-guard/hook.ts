@@ -100,10 +100,16 @@ export function createStopContinuationGuardHook(
   }: {
     sessionID?: string
   }): Promise<void> => {
-    if (sessionID && stoppedSessions.has(sessionID)) {
-      clear(sessionID)
-      log(`[${HOOK_NAME}] Cleared stop state on new user message`, { sessionID })
-    }
+    // Intentionally no-op: stop state should persist across user messages.
+    // Previously this cleared the stop on any new user message, but that caused
+    // /stop-continuation to be ineffective — the user's very next message
+    // (including normal chat) would re-enable continuation.
+    //
+    // Stop state is now only cleared by:
+    // 1. /start-work (or /ulw-loop, /ralph-loop) via explicit clear() call
+    // 2. session.deleted event
+    // 3. Future /resume-continuation command
+    void sessionID
   }
 
   return {

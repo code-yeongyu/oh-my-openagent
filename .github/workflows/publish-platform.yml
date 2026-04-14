@@ -35,7 +35,7 @@ jobs:
   # - Uploads compressed artifacts for the publish job
   # =============================================================================
   build:
-    runs-on: ${{ startsWith(matrix.platform, 'windows-') && 'windows-latest' || 'ubuntu-latest' }}
+    runs-on: ${{ startsWith(matrix.platform, 'windows-') && 'windows-latest' || startsWith(matrix.platform, 'darwin-') && 'macos-latest' || 'ubuntu-latest' }}
     defaults:
       run:
         shell: bash
@@ -212,6 +212,20 @@ jobs:
             
             echo "Built binary:"
             ls -lh "$OUTPUT"
+
+      - name: Ad-hoc sign darwin binary
+        if: steps.check.outputs.skip != 'true' && startsWith(matrix.platform, 'darwin-')
+        run: |
+          BINARY="packages/${{ matrix.platform }}/bin/oh-my-opencode"
+          echo "Initial state:"
+          codesign -dvvv "$BINARY" 2>&1 || true
+          echo "Removing any existing signature:"
+          codesign --remove-signature "$BINARY" 2>&1 || true
+          echo "Applying ad-hoc signature:"
+          codesign --sign - --force --timestamp=none "$BINARY"
+          echo "Final state:"
+          codesign -dvvv "$BINARY" 2>&1
+          codesign --verify --verbose "$BINARY"
 
       - name: Compress binary
         if: steps.check.outputs.skip != 'true'

@@ -1,12 +1,19 @@
-const { describe, it, expect, mock, beforeEach, afterEach, spyOn } = require("bun:test")
+import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 
 import type { MessageData } from "./types"
-import * as storageDetection from "../../shared/opencode-storage-detection"
-import * as storage from "./storage"
-import { recoverToolResultMissing } from "./recover-tool-result-missing"
 
 let sqliteBackend = false
 let storedParts: Array<{ type: string; id?: string; callID?: string; [key: string]: unknown }> = []
+
+mock.module("../../shared/opencode-storage-detection", () => ({
+  isSqliteBackend: () => sqliteBackend,
+}))
+
+mock.module("./storage", () => ({
+  readParts: () => storedParts,
+}))
+
+const { recoverToolResultMissing } = await import("./recover-tool-result-missing")
 
 const failedAssistantMsg: MessageData = {
   info: { id: "msg_failed", role: "assistant" },
@@ -31,9 +38,6 @@ describe("recoverToolResultMissing", () => {
   beforeEach(() => {
     sqliteBackend = false
     storedParts = []
-
-    spyOn(storageDetection, "isSqliteBackend").mockImplementation(() => sqliteBackend)
-    spyOn(storage, "readParts").mockImplementation(() => storedParts)
   })
 
   afterEach(() => {

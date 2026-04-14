@@ -30,12 +30,16 @@ export function isCompactionMessage(message: CompactionMessageLike): boolean {
   return isCompactionAgent(message.info?.agent ?? message.agent) || hasCompactionPart(message.parts)
 }
 
+export function getCompactionPartStorageDir(messageID: string): string {
+  return join(PART_STORAGE, messageID)
+}
+
 export function hasCompactionPartInStorage(messageID: string | undefined): boolean {
   if (!messageID) {
     return false
   }
 
-  const partDir = join(PART_STORAGE, messageID)
+  const partDir = getCompactionPartStorageDir(messageID)
   if (!existsSync(partDir)) {
     return false
   }

@@ -86,6 +86,7 @@ export async function startTask(
 
   const parentSession = await client.session.get({
     path: { id: input.parentSessionID },
+    query: { directory },
   }).catch((err) => {
     log(`[background-agent] Failed to get parent session: ${err}`)
     return null

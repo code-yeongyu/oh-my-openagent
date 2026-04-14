@@ -6,6 +6,7 @@ import { randomUUID } from "node:crypto"
 import { createPluginInterface } from "./plugin-interface"
 import { createAutoSlashCommandHook } from "./hooks/auto-slash-command"
 import { createStartWorkHook } from "./hooks/start-work"
+import { getAgentListDisplayName } from "./shared/agent-display-names"
 import { readBoulderState } from "./features/boulder-state"
 import {
   _resetForTesting,
@@ -13,6 +14,7 @@ import {
   registerAgentName,
   updateSessionAgent,
 } from "./features/claude-code-session-state"
+
 
 describe("createPluginInterface - command.execute.before", () => {
   let testDir = ""

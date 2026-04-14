@@ -1,4 +1,5 @@
 /** GPT-5.3 Codex optimized Hephaestus prompt */
+import { GPT_APPLY_PATCH_GUIDANCE } from "../gpt-apply-patch-guard";
 import type { AgentConfig } from "@opencode-ai/sdk";
 import type { AgentMode } from "../types";
 import type {
@@ -448,6 +449,7 @@ ${oracleSection}
 1. SEARCH existing codebase for similar patterns/styles
 2. Match naming, indentation, import styles, error handling conventions
 3. Default to ASCII. Add comments only for non-obvious blocks
+4. ${GPT_APPLY_PATCH_GUIDANCE}
 
 ### After Implementation (MANDATORY - DO NOT SKIP)
 

@@ -1,44 +1,84 @@
 import { describe, it, expect, beforeEach, afterEach, afterAll, mock, spyOn } from "bun:test"
+import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js"
 import type { SkillMcpClientInfo, SkillMcpServerContext } from "./types"
 import type { ClaudeCodeMcpServer } from "../claude-code-mcp-loader/types"
 import type { OAuthTokenData } from "../mcp-oauth/storage"
+import { setHttpClientDependenciesForTesting } from "./http-client"
+import { setStdioClientDependenciesForTesting } from "./stdio-client"
+import { SkillMcpManager } from "./manager"
 
-// Mock the MCP SDK transports to avoid network calls
 const mockHttpConnect = mock(() => Promise.reject(new Error("Mocked HTTP connection failure")))
 const mockHttpClose = mock(() => Promise.resolve())
 let lastTransportInstance: { url?: URL; options?: { requestInit?: RequestInit } } = {}
+
+class MockHttpClient {
+  readonly close = mock(() => Promise.resolve())
+  readonly listTools = mock(async () => ({ tools: [] }))
+  readonly listResources = mock(async () => ({ resources: [] }))
+  readonly listPrompts = mock(async () => ({ prompts: [] }))
+  readonly callTool = mock(async () => ({ content: [] }))
+  readonly readResource = mock(async () => ({ contents: [] }))
+  readonly getPrompt = mock(async () => ({ messages: [] }))
+
+  constructor(
+    _clientInfo: { name: string; version: string },
+    _options: { capabilities: Record<string, never> }
+  ) {}
+
+  async connect(transport: Transport): Promise<void> {
+    await transport.start()
+  }
+}
+
+class MockStreamableHTTPClientTransport {
+  constructor(public url: URL, public options?: { requestInit?: RequestInit }) {
+    lastTransportInstance = { url, options }
+  }
+
+  async start(): Promise<void> {
+    await mockHttpConnect()
+  }
+
+  async send(): Promise<void> {}
+
+  async close(): Promise<void> {
+    await mockHttpClose()
+  }
+}
+
+function getHeaderValue(headers: HeadersInit | undefined, name: string): string | undefined {
+  if (!headers) {
+    return undefined
+  }
+
+  if (headers instanceof Headers) {
+    return headers.get(name) ?? undefined
+  }
+
+  if (Array.isArray(headers)) {
+    const entry = headers.find(([headerName]) => headerName.toLowerCase() === name.toLowerCase())
+    return entry?.[1]
+  }
+
+  return headers[name]
+}
 
 const mockTokens = mock(() => null as OAuthTokenData | null)
 const mockLogin = mock(() => Promise.resolve({ accessToken: "test-token" } satisfies OAuthTokenData))
 const mockRefresh = mock((_: string) => Promise.resolve({ accessToken: "refreshed-token" } satisfies OAuthTokenData))
 
-async function importFreshManagerModule(): Promise<typeof import("./manager")> {
-  mock.module("@modelcontextprotocol/sdk/client/streamableHttp.js", () => ({
-    StreamableHTTPClientTransport: class MockStreamableHTTPClientTransport {
-      constructor(public url: URL, public options?: { requestInit?: RequestInit }) {
-        lastTransportInstance = { url, options }
-      }
-      async start() {
-        await mockHttpConnect()
-      }
-      async close() {
-        await mockHttpClose()
-      }
-    },
-  }))
-
-  const module = await import(`./manager?test=${Date.now()}-${Math.random()}`)
-  mock.restore()
-  return module
-}
-
 afterAll(() => { mock.restore() })
 
 describe("SkillMcpManager", () => {
-  let manager: any
+  let manager: SkillMcpManager
 
-  beforeEach(async () => {
-    const { SkillMcpManager } = await importFreshManagerModule()
+  beforeEach(() => {
+    setHttpClientDependenciesForTesting({
+      createClient: (clientInfo, options) => new MockHttpClient(clientInfo, options),
+      createTransport: (url, options) => new MockStreamableHTTPClientTransport(url, options),
+    })
+    setStdioClientDependenciesForTesting()
+
     manager = new SkillMcpManager({
       createOAuthProvider: () => ({
         tokens: () => mockTokens(),
@@ -51,10 +91,13 @@ describe("SkillMcpManager", () => {
     mockTokens.mockClear()
     mockLogin.mockClear()
     mockRefresh.mockClear()
+    lastTransportInstance = {}
   })
 
   afterEach(async () => {
     await manager.disconnectAll()
+    setHttpClientDependenciesForTesting()
+    setStdioClientDependenciesForTesting()
   })
 
   describe("getOrCreateClient", () => {
@@ -697,8 +740,8 @@ describe("SkillMcpManager", () => {
       } catch { /* connection fails in test */ }
 
       // then
-      const headers = lastTransportInstance.options?.requestInit?.headers as Record<string, string> | undefined
-      expect(headers?.Authorization).toBe("Bearer stored-access-token")
+      const headers = lastTransportInstance.options?.requestInit?.headers
+      expect(getHeaderValue(headers, "Authorization")).toBe("Bearer stored-access-token")
     })
 
     it("does not inject Authorization header when no stored tokens exist and login fails", async () => {
@@ -724,8 +767,8 @@ describe("SkillMcpManager", () => {
       } catch { /* connection fails in test */ }
 
       // then
-      const headers = lastTransportInstance.options?.requestInit?.headers as Record<string, string> | undefined
-      expect(headers?.Authorization).toBeUndefined()
+      const headers = lastTransportInstance.options?.requestInit?.headers
+      expect(getHeaderValue(headers, "Authorization")).toBeUndefined()
     })
 
     it("preserves existing static headers alongside OAuth token", async () => {
@@ -753,9 +796,9 @@ describe("SkillMcpManager", () => {
       } catch { /* connection fails in test */ }
 
       // then
-      const headers = lastTransportInstance.options?.requestInit?.headers as Record<string, string> | undefined
-      expect(headers?.["X-Custom"]).toBe("custom-value")
-      expect(headers?.Authorization).toBe("Bearer oauth-token")
+      const headers = lastTransportInstance.options?.requestInit?.headers
+      expect(getHeaderValue(headers, "X-Custom")).toBe("custom-value")
+      expect(getHeaderValue(headers, "Authorization")).toBe("Bearer oauth-token")
     })
 
     it("attempts silent refresh for expired stored tokens before login", async () => {
@@ -785,8 +828,8 @@ describe("SkillMcpManager", () => {
       } catch { /* connection fails in test */ }
 
       // then
-      const headers = lastTransportInstance.options?.requestInit?.headers as Record<string, string> | undefined
-      expect(headers?.Authorization).toBe("Bearer refreshed-token")
+      const headers = lastTransportInstance.options?.requestInit?.headers
+      expect(getHeaderValue(headers, "Authorization")).toBe("Bearer refreshed-token")
       expect(mockRefresh).toHaveBeenCalledWith("refresh-token")
       expect(mockLogin).not.toHaveBeenCalled()
     })
@@ -819,8 +862,8 @@ describe("SkillMcpManager", () => {
       } catch { /* connection fails in test */ }
 
       // then
-      const headers = lastTransportInstance.options?.requestInit?.headers as Record<string, string> | undefined
-      expect(headers?.Authorization).toBe("Bearer login-token")
+      const headers = lastTransportInstance.options?.requestInit?.headers
+      expect(getHeaderValue(headers, "Authorization")).toBe("Bearer login-token")
       expect(mockRefresh).toHaveBeenCalledWith("refresh-token")
       expect(mockLogin).toHaveBeenCalled()
     })
@@ -846,8 +889,8 @@ describe("SkillMcpManager", () => {
       } catch { /* connection fails in test */ }
 
       // then
-      const headers = lastTransportInstance.options?.requestInit?.headers as Record<string, string> | undefined
-      expect(headers?.Authorization).toBe("Bearer static-token")
+      const headers = lastTransportInstance.options?.requestInit?.headers
+      expect(getHeaderValue(headers, "Authorization")).toBe("Bearer static-token")
       expect(mockTokens).not.toHaveBeenCalled()
     })
 

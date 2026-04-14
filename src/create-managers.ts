@@ -7,6 +7,7 @@ import { BackgroundManager } from "./features/background-agent"
 import { SkillMcpManager } from "./features/skill-mcp-manager"
 import { initTaskToastManager } from "./features/task-toast-manager"
 import { TmuxSessionManager } from "./features/tmux-subagent"
+import * as openclawRuntimeDispatch from "./openclaw/runtime-dispatch"
 import { registerManagerForCleanup } from "./features/background-agent/process-cleanup"
 import { createConfigHandler } from "./plugin-handlers"
 import { log } from "./shared"
@@ -68,10 +69,10 @@ export function createManagers(args: {
     pluginConfig.background_task,
     {
       tmuxConfig,
-		onSubagentSessionCreated: async (event: SubagentSessionCreatedEvent) => {
-			log("[index] onSubagentSessionCreated callback received", {
-				sessionID: event.sessionID,
-				parentID: event.parentID,
+      onSubagentSessionCreated: async (event: SubagentSessionCreatedEvent) => {
+        log("[create-managers] onSubagentSessionCreated callback received", {
+          sessionID: event.sessionID,
+          parentID: event.parentID,
           title: event.title,
         })
 
@@ -86,11 +87,23 @@ export function createManagers(args: {
           },
         })
 
-        log("[index] onSubagentSessionCreated callback completed")
+        if (pluginConfig.openclaw) {
+          await openclawRuntimeDispatch.dispatchOpenClawEvent({
+            config: pluginConfig.openclaw,
+            rawEvent: "session.created",
+            context: {
+              sessionId: event.sessionID,
+              projectPath: ctx.directory,
+              tmuxPaneId: tmuxSessionManager.getTrackedPaneId?.(event.sessionID) ?? process.env.TMUX_PANE,
+            },
+          })
+        }
+
+        log("[create-managers] onSubagentSessionCreated callback completed")
       },
       onShutdown: async () => {
         await tmuxSessionManager.cleanup().catch((error) => {
-          log("[index] tmux cleanup error during shutdown:", error)
+          log("[create-managers] tmux cleanup error during shutdown:", error)
         })
       },
       enableParentSessionNotifications: backgroundNotificationHookEnabled,

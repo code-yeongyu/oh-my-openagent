@@ -79,11 +79,7 @@ export async function addPluginToOpenCodeConfig(currentVersion: string): Promise
 
     const normalizedPlugins = [...otherPlugins]
 
-    if (canonicalEntries.length > 0 || legacyEntries.length > 0) {
-      normalizedPlugins.push(pluginEntry)
-    } else {
-      normalizedPlugins.push(pluginEntry)
-    }
+    normalizedPlugins.push(pluginEntry)
 
     config.plugin = normalizedPlugins
 

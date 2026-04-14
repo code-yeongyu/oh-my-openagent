@@ -8,6 +8,7 @@ import type {
   AvailableCategory,
 } from "../dynamic-agent-prompt-builder";
 import { categorizeTools, buildAgentIdentitySection } from "../dynamic-agent-prompt-builder";
+import { getGptApplyPatchPermission } from "../gpt-apply-patch-guard";
 
 import { buildHephaestusPrompt as buildGptPrompt } from "./gpt";
 import { buildHephaestusPrompt as buildGpt53CodexPrompt } from "./gpt-5-3-codex";
@@ -125,6 +126,7 @@ export function createHephaestusAgent(
     permission: {
       question: "allow",
       call_omo_agent: "deny",
+      ...getGptApplyPatchPermission(model),
     } as AgentConfig["permission"],
     reasoningEffort: "medium",
   };

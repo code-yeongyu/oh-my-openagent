@@ -1,6 +1,7 @@
 import { log, normalizeModelID } from "../../shared"
 
 const OPUS_PATTERN = /claude-.*opus/i
+const EFFORT_UNSUPPORTED_PATTERN = /claude-.*haiku/i
 const INTERNAL_SKIP_AGENTS = new Set(["title", "summary", "compaction"])
 
 function isClaudeProvider(providerID: string, modelID: string): boolean {
@@ -12,6 +13,11 @@ function isClaudeProvider(providerID: string, modelID: string): boolean {
 function isOpusModel(modelID: string): boolean {
   const normalized = normalizeModelID(modelID)
   return OPUS_PATTERN.test(normalized)
+}
+
+function isEffortUnsupportedModel(modelID: string): boolean {
+  const normalized = normalizeModelID(modelID)
+  return EFFORT_UNSUPPORTED_PATTERN.test(normalized)
 }
 
 function shouldSkipForInternalAgent(agentName: string | undefined): boolean {
@@ -56,8 +62,10 @@ export function createAnthropicEffortHook() {
     ): Promise<void> => {
       const { agent, model, message } = input
       if (!model?.modelID || !model?.providerID) return
+      if (isEffortUnsupportedModel(model.modelID)) return
       if (message.variant !== "max") return
       if (!isClaudeProvider(model.providerID, model.modelID)) return
+      if (model.providerID === "github-copilot") return
       if (shouldSkipForInternalAgent(agent?.name)) return
       if (output.options.effort !== undefined) return
 

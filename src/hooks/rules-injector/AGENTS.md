@@ -1,6 +1,6 @@
 # src/hooks/rules-injector/ — Conditional Rules Injection
 
-**Generated:** 2026-04-05
+**Generated:** 2026-04-11
 
 ## OVERVIEW
 

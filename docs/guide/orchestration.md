@@ -15,6 +15,7 @@ Oh My OpenAgent's orchestration system transforms a simple AI agent into a coord
 **Decision Flow:**
 
 ```
+
 Is it a quick fix or simple task?
   └─ YES → Just prompt normally
   └─ NO  → Is explaining the full context tedious?
@@ -34,21 +35,21 @@ The orchestration system uses a three-layer architecture that solves context ove
 flowchart TB
     subgraph Planning["Planning Layer (Human + Prometheus)"]
         User[(" User")]
-        Prometheus[" Prometheus<br/>(Planner)<br/>Claude Opus 4.6"]
-        Metis[" Metis<br/>(Consultant)<br/>Claude Opus 4.6"]
-        Momus[" Momus<br/>(Reviewer)<br/>GPT-5.4"]
+        Prometheus[" Prometheus<br/>(Planner)<br/>claude-opus-4-6 / gpt-5.4 / glm-5"]
+        Metis[" Metis<br/>(Consultant)<br/>claude-opus-4-6 / gpt-5.4 / glm-5"]
+        Momus[" Momus<br/>(Reviewer)<br/>gpt-5.4 / claude-opus-4-6 / gemini-3.1-pro / glm-5"]
     end
 
     subgraph Execution["Execution Layer (Orchestrator)"]
-        Orchestrator[" Atlas<br/>(Conductor)<br/>Claude Sonnet 4.6"]
+        Orchestrator[" Atlas<br/>(Conductor)<br/>claude-sonnet-4-6 / kimi-k2.5 / gpt-5.4 / minimax-m2.7"]
     end
 
     subgraph Workers["Worker Layer (Specialized Agents)"]
-        Junior[" Sisyphus-Junior<br/>(Task Executor)<br/>Claude Sonnet 4.6"]
-        Oracle[" Oracle<br/>(Architecture)<br/>GPT-5.4"]
-        Explore[" Explore<br/>(Codebase Grep)<br/>Grok Code"]
-        Librarian[" Librarian<br/>(Docs/OSS)<br/>Gemini 3 Flash"]
-        Frontend[" Frontend<br/>(UI/UX)<br/>Gemini 3.1 Pro"]
+        Junior[" Sisyphus-Junior<br/>(Task Executor)<br/>claude-sonnet-4-6 / kimi-k2.5 / gpt-5.4 / minimax-m2.7"]
+        Oracle[" Oracle<br/>(Architecture)<br/>gpt-5.4 / gemini-3.1-pro / claude-opus-4-6 / glm-5"]
+        Explore[" Explore<br/>(Codebase Grep)<br/>grok-code-fast-1 / minimax-m2.7-highspeed / claude-haiku-4-5"]
+        Librarian[" Librarian<br/>(Docs/OSS)<br/>minimax-m2.7 / minimax-m2.7-highspeed / claude-haiku-4-5"]
+        Frontend[" visual-engineering<br/>(category + frontend-ui-ux)<br/>gemini-3.1-pro / glm-5 / claude-opus-4-6"]
     end
 
     User -->|"Describe work"| Prometheus
@@ -61,11 +62,11 @@ flowchart TB
     User -->|"/start-work"| Orchestrator
     Plan -->|"Read"| Orchestrator
 
-    Orchestrator -->|"task(category)"| Junior
-    Orchestrator -->|"task(agent)"| Oracle
-    Orchestrator -->|"task(agent)"| Explore
-    Orchestrator -->|"task(agent)"| Librarian
-    Orchestrator -->|"task(agent)"| Frontend
+    Orchestrator -->|"task(category=deep/quick/unspecified-*)"| Junior
+    Orchestrator -->|"call_omo_agent(subagent_type=oracle)"| Oracle
+    Orchestrator -->|"call_omo_agent(subagent_type=explore)"| Explore
+    Orchestrator -->|"call_omo_agent(subagent_type=librarian)"| Librarian
+    Orchestrator -->|"task(category=visual-engineering, load_skills=[frontend-ui-ux])"| Frontend
 
     Junior -->|"Results + Learnings"| Orchestrator
     Oracle -->|"Advice"| Orchestrator
@@ -73,6 +74,8 @@ flowchart TB
     Librarian -->|"Documentation"| Orchestrator
     Frontend -->|"UI code"| Orchestrator
 ```
+
+Model labels above show the current fallback stacks from `src/shared/model-requirements.ts`, not marketing names.
 
 ---
 
@@ -240,7 +243,7 @@ Junior is the workhorse that actually writes code. Key characteristics:
 - **Verified**: Must pass lsp_diagnostics before completion
 - **Constrained**: Cannot modify plan files (READ-ONLY)
 
-**Why Sonnet is Sufficient:**
+**Why the fallback chain is sufficient:**
 
 Junior doesn't need to be the smartest - it needs to be reliable. With:
 
@@ -249,7 +252,7 @@ Junior doesn't need to be the smartest - it needs to be reliable. With:
 3. Clear MUST DO / MUST NOT DO constraints
 4. Verification requirements
 
-Even a mid-tier model executes precisely. The intelligence is in the **system**, not individual agents.
+Even a mid-tier execution model works when the harness is strict. The current fallback order is `claude-sonnet-4-6` → `kimi-k2.5` → `gpt-5.4` → `minimax-m2.7` → `big-pickle`. The intelligence is in the **system**, not a single worker model.
 
 ### System Reminder Mechanism
 
@@ -279,7 +282,7 @@ This "boulder pushing" mechanism is why the system is named after Sisyphus.
 ```typescript
 // OLD: Model name creates distributional bias
 task({ agent: "gpt-5.4", prompt: "..." }); // Model knows its limitations
-task({ agent: "claude-opus-4.6", prompt: "..." }); // Different self-perception
+task({ agent: "claude-opus-4-6", prompt: "..." }); // Different self-perception
 ```
 
 **The Solution: Semantic Categories:**
@@ -293,16 +296,16 @@ task({ category: "quick", prompt: "..." }); // "Just get it done fast"
 
 ### Built-in Categories
 
-| Category             | Model                  | When to Use                                                 |
-| -------------------- | ---------------------- | ----------------------------------------------------------- |
-| `visual-engineering` | Gemini 3.1 Pro         | Frontend, UI/UX, design, styling, animation                 |
-| `ultrabrain`         | GPT-5.4 (xhigh)        | Deep logical reasoning, complex architecture decisions      |
-| `artistry`           | Gemini 3.1 Pro (high)  | Highly creative or artistic tasks, novel ideas              |
-| `quick`              | GPT-5.4 Mini           | Trivial tasks - single file changes, typo fixes             |
-| `deep`               | GPT-5.4 (medium)       | Goal-oriented autonomous problem-solving, thorough research |
-| `unspecified-low`    | Claude Sonnet 4.6      | Tasks that don't fit other categories, low effort           |
-| `unspecified-high`   | Claude Opus 4.6 (max)  | Tasks that don't fit other categories, high effort          |
-| `writing`            | Gemini 3 Flash         | Documentation, prose, technical writing                     |
+| Category             | Default config                  | Runtime fallback order                                                                 | When to Use                                                 |
+| -------------------- | ------------------------------- | -------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| `visual-engineering` | `google/gemini-3.1-pro high`   | `gemini-3.1-pro` → `glm-5` → `claude-opus-4-6` → `glm-5` → `k2p5`                     | Frontend, UI/UX, design, styling, animation                 |
+| `ultrabrain`         | `openai/gpt-5.4 xhigh`         | `gpt-5.4` → `gemini-3.1-pro` → `claude-opus-4-6` → `glm-5`                             | Deep logical reasoning, complex architecture decisions      |
+| `deep`               | `openai/gpt-5.4 medium`        | `gpt-5.4` → `claude-opus-4-6` → `gemini-3.1-pro`                                       | Goal-oriented autonomous problem-solving, thorough research |
+| `artistry`           | `google/gemini-3.1-pro high`   | `gemini-3.1-pro` → `claude-opus-4-6` → `gpt-5.4`                                       | Highly creative or artistic tasks, novel ideas              |
+| `quick`              | `openai/gpt-5.4-mini`          | `gpt-5.4-mini` → `claude-haiku-4-5` → `gemini-3-flash` → `minimax-m2.7` → `gpt-5-nano` | Trivial tasks, single file changes, typo fixes              |
+| `unspecified-low`    | `anthropic/claude-sonnet-4-6`  | `claude-sonnet-4-6` → `gpt-5.3-codex` → `kimi-k2.5` → `gemini-3-flash` → `minimax-m2.7` | Tasks that don't fit other categories, low effort           |
+| `unspecified-high`   | `anthropic/claude-opus-4-6 max` | `claude-opus-4-6` → `gpt-5.4` → `glm-5` → `k2p5` → `kimi-k2.5`                          | Tasks that don't fit other categories, high effort          |
+| `writing`            | `kimi-for-coding/k2p5`         | `gemini-3-flash` → `kimi-k2.5` → `claude-sonnet-4-6` → `minimax-m2.7`                  | Documentation, prose, technical writing                     |
 
 ### Skills: Domain-Specific Instructions
 
@@ -317,7 +320,7 @@ task(
 );
 
 task(
-  (category = "general"),
+  (category = "deep"),
   (load_skills = ["playwright"]), // Adds browser automation expertise
   (prompt = "..."),
 );
@@ -420,7 +423,7 @@ Atlas is automatically activated when you run `/start-work`. You don't need to m
 
 | Aspect          | Hephaestus                                 | Sisyphus + `ulw` / `ultrawork`                       |
 | --------------- | ------------------------------------------ | ---------------------------------------------------- |
-| **Model**       | GPT-5.4 (medium reasoning)                 | Claude Opus 4.6 / GPT-5.4 / GLM 5 depending on setup |
+| **Model**       | `gpt-5.4` (`medium`)                       | `claude-opus-4-6` / `kimi-k2.5` / `gpt-5.4` / `glm-5` depending on setup |
 | **Approach**    | Autonomous deep worker                     | Keyword-activated ultrawork mode                     |
 | **Best For**    | Complex architectural work, deep reasoning | General complex tasks, "just do it" scenarios        |
 | **Planning**    | Self-plans during execution                | Uses Prometheus plans if available                   |

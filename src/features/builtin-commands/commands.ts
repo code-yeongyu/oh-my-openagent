@@ -9,7 +9,7 @@ import { START_WORK_TEMPLATE } from "./templates/start-work"
 import { HANDOFF_TEMPLATE } from "./templates/handoff"
 import { REMOVE_AI_SLOPS_TEMPLATE } from "./templates/remove-ai-slops"
 
-export interface LoadBuiltinCommandsOptions {
+interface LoadBuiltinCommandsOptions {
   useRegisteredAgents?: boolean
 }
 

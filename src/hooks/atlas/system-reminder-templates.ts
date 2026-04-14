@@ -51,7 +51,7 @@ Assume the work is broken until YOU prove otherwise.
 
 Do NOT run tests yet. Read the code FIRST so you know what you're testing.
 
-1. \`Bash("git diff --stat")\` - see exactly which files changed. Any file outside expected scope = scope creep.
+1. \`Bash("git diff --stat -- ':!node_modules'")\` - see exactly which files changed. Any file outside expected scope = scope creep.
 2. \`Read\` EVERY changed file - no exceptions, no skimming.
 3. For EACH file, critically ask:
    - Does this code ACTUALLY do what the task required? (Re-read the task, compare line by line)
@@ -125,7 +125,7 @@ Thinking "it looks correct" is NOT verification. Running \`lsp_diagnostics\` IS.
 
 Read the code FIRST so you know what you're testing.
 
-1. \`Bash("git diff --stat")\` - see exactly which files changed.
+1. \`Bash("git diff --stat -- ':!node_modules'")\` - see exactly which files changed.
 2. \`Read\` EVERY changed file - no exceptions, no skimming.
 3. For EACH file:
    - Does this code ACTUALLY do what the task required? RE-READ the task spec.

@@ -3,13 +3,17 @@ import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, wr
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import * as shared from "./shared"
-import { loadPluginConfig, mergeConfigs, parseConfigPartially } from "./plugin-config";
+import { mergeConfigs, parseConfigPartially } from "./plugin-config";
 import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig } from "./config";
 
 const tempDirs: string[] = []
 
 function createConfig(config: Partial<OhMyOpenCodeConfig>): OhMyOpenCodeConfig {
   return OhMyOpenCodeConfigSchema.parse(config)
+}
+
+async function importFreshPluginConfigModule(): Promise<typeof import("./plugin-config")> {
+  return import(`./plugin-config?test=${Date.now()}-${Math.random()}`)
 }
 
 afterEach(() => {
@@ -297,7 +301,7 @@ describe("parseConfigPartially", () => {
 });
 
 describe("loadPluginConfig", () => {
-  it("should only honor mcp_env_allowlist from user config", () => {
+  it("should only honor mcp_env_allowlist from user config", async () => {
     // given
     const rootDir = mkdtempSync(join(tmpdir(), "omo-plugin-config-"))
     const userConfigDir = join(rootDir, "user-config")
@@ -317,16 +321,17 @@ describe("loadPluginConfig", () => {
       JSON.stringify({ mcp_env_allowlist: ["PROJECT_TOKEN"] })
     )
 
-    spyOn(shared, "getOpenCodeConfigDir").mockReturnValue(userConfigDir)
+    process.env.OPENCODE_CONFIG_DIR = userConfigDir
 
     // when
+    const { loadPluginConfig } = await importFreshPluginConfigModule()
     const config = loadPluginConfig(projectDir, {})
 
     // then
     expect(config.mcp_env_allowlist).toEqual(["USER_ONLY_TOKEN"])
   })
 
-  it("should ignore edits to the renamed legacy backup after migration", () => {
+  it("should ignore edits to the renamed legacy backup after migration", async () => {
     // given
     const rootDir = mkdtempSync(join(tmpdir(), "omo-plugin-config-legacy-"))
     const userConfigDir = join(rootDir, "user-config")
@@ -341,9 +346,10 @@ describe("loadPluginConfig", () => {
     mkdirSync(projectConfigDir, { recursive: true })
     writeFileSync(legacyConfigPath, JSON.stringify({ agents: { oracle: { model: "openai/gpt-5.4" } } }))
 
-    spyOn(shared, "getOpenCodeConfigDir").mockReturnValue(userConfigDir)
+    process.env.OPENCODE_CONFIG_DIR = userConfigDir
 
     // when
+    const { loadPluginConfig } = await importFreshPluginConfigModule()
     loadPluginConfig(projectDir, {})
     writeFileSync(backupConfigPath, JSON.stringify({ agents: { oracle: { model: "openai/gpt-5-nano" } } }))
     const reloadedConfig = loadPluginConfig(projectDir, {})
@@ -355,7 +361,7 @@ describe("loadPluginConfig", () => {
     expect(reloadedConfig.agents?.oracle?.model).toBe("openai/gpt-5.4")
   })
 
-  it("should still load config from legacy path when migration fails", () => {
+  it("should still load config from legacy path when migration fails", async () => {
     // given - legacy config exists but canonical path is not writable
     const rootDir = mkdtempSync(join(tmpdir(), "omo-plugin-config-fail-"))
     const userConfigDir = join(rootDir, "user-config")
@@ -374,12 +380,13 @@ describe("loadPluginConfig", () => {
       chmodSync(projectConfigDir, 0o555)
     }
 
-    spyOn(shared, "getOpenCodeConfigDir").mockReturnValue(userConfigDir)
+    process.env.OPENCODE_CONFIG_DIR = userConfigDir
 
     // when
     let config: OhMyOpenCodeConfig
     try {
-      config = loadPluginConfig(projectDir, {})
+      const fresh = await importFreshPluginConfigModule()
+      config = fresh.loadPluginConfig(projectDir, {})
     } finally {
       // Restore permissions for cleanup
       if (process.platform !== "win32") {
@@ -391,7 +398,7 @@ describe("loadPluginConfig", () => {
     expect(config.agents?.oracle?.model).toBe("openai/gpt-5.4")
   })
 
-  it("should load migrated legacy project config on the first load", () => {
+  it("should load migrated legacy project config on the first load", async () => {
     // given
     const rootDir = mkdtempSync(join(tmpdir(), "omo-plugin-config-first-load-"))
     const userConfigDir = join(rootDir, "user-config")
@@ -405,14 +412,103 @@ describe("loadPluginConfig", () => {
     mkdirSync(projectConfigDir, { recursive: true })
     writeFileSync(legacyConfigPath, JSON.stringify({ agents: { oracle: { model: "openai/gpt-5.4" } } }))
 
-    spyOn(shared, "getOpenCodeConfigDir").mockReturnValue(userConfigDir)
+    process.env.OPENCODE_CONFIG_DIR = userConfigDir
 
     // when
+    const { loadPluginConfig } = await importFreshPluginConfigModule()
     const config = loadPluginConfig(projectDir, {})
 
     // then
     expect(existsSync(legacyConfigPath)).toBe(false)
     expect(existsSync(canonicalConfigPath)).toBe(true)
     expect(config.agents?.oracle?.model).toBe("openai/gpt-5.4")
+  })
+
+  it("should preserve explicit user git_master settings when project config omits git_master", async () => {
+    // given
+    const rootDir = mkdtempSync(join(tmpdir(), "omo-plugin-config-git-master-user-"))
+    const userConfigDir = join(rootDir, "user-config")
+    const projectDir = join(rootDir, "project")
+    const projectConfigDir = join(projectDir, ".opencode")
+
+    tempDirs.push(rootDir)
+    mkdirSync(userConfigDir, { recursive: true })
+    mkdirSync(projectConfigDir, { recursive: true })
+
+    writeFileSync(
+      join(userConfigDir, "oh-my-openagent.jsonc"),
+      JSON.stringify({
+        git_master: {
+          commit_footer: false,
+          include_co_authored_by: false,
+        },
+      })
+    )
+
+    writeFileSync(
+      join(projectConfigDir, "oh-my-openagent.jsonc"),
+      JSON.stringify({
+        agents: {
+          hephaestus: { model: "openai/gpt-5.4" },
+        },
+      })
+    )
+
+    process.env.OPENCODE_CONFIG_DIR = userConfigDir
+
+    // when
+    const { loadPluginConfig } = await importFreshPluginConfigModule()
+    const config = loadPluginConfig(projectDir, {})
+
+    // then
+    expect(config.git_master).toEqual({
+      commit_footer: false,
+      include_co_authored_by: false,
+      git_env_prefix: "GIT_MASTER=1",
+    })
+  })
+
+  it("should merge explicit git_master keys from user and project configs", async () => {
+    // given
+    const rootDir = mkdtempSync(join(tmpdir(), "omo-plugin-config-git-master-merge-"))
+    const userConfigDir = join(rootDir, "user-config")
+    const projectDir = join(rootDir, "project")
+    const projectConfigDir = join(projectDir, ".opencode")
+
+    tempDirs.push(rootDir)
+    mkdirSync(userConfigDir, { recursive: true })
+    mkdirSync(projectConfigDir, { recursive: true })
+
+    writeFileSync(
+      join(userConfigDir, "oh-my-openagent.jsonc"),
+      JSON.stringify({
+        git_master: {
+          commit_footer: false,
+          include_co_authored_by: false,
+        },
+      })
+    )
+
+    writeFileSync(
+      join(projectConfigDir, "oh-my-openagent.jsonc"),
+      JSON.stringify({
+        git_master: {
+          commit_footer: true,
+        },
+      })
+    )
+
+    process.env.OPENCODE_CONFIG_DIR = userConfigDir
+
+    // when
+    const { loadPluginConfig } = await importFreshPluginConfigModule()
+    const config = loadPluginConfig(projectDir, {})
+
+    // then
+    expect(config.git_master).toEqual({
+      commit_footer: true,
+      include_co_authored_by: false,
+      git_env_prefix: "GIT_MASTER=1",
+    })
   })
 })

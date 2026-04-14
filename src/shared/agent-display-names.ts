@@ -26,25 +26,28 @@ export const AGENT_DISPLAY_NAMES: Record<string, string> = {
   "council-member": "council-member",
 }
 
-/**
- * Strip the legacy zero-width-space sort prefix from an agent name.
- *
- * v3.14.0 through v3.16.0 prefixed the four core agents (Sisyphus,
- * Hephaestus, Prometheus, Atlas) with U+200B Zero Width Space characters
- * so they would sort ahead of user agents in the Tab cycle. Some terminal
- * emulators (Ghostty, certain Windows Terminal builds) render ZWSP as a
- * visible box or extra space, breaking the status bar layout (#3259), and
- * the prefixes also leaked through the plugin API and broke prompt_async
- * consumers (#3238).
- *
- * The prefixes are no longer injected anywhere (#3242 removed all call
- * sites and #3259 removed the constant table). This helper remains so
- * existing user configs that still have the ZWSP baked into their
- * `config.agent` keys from an older install continue to resolve
- * correctly after upgrading.
- */
+const AGENT_LIST_SORT_PREFIXES: Record<string, string> = {
+  sisyphus: "\u200B",
+  hephaestus: "\u200B\u200B",
+  prometheus: "\u200B\u200B\u200B",
+  atlas: "\u200B\u200B\u200B\u200B",
+}
+
+const INVISIBLE_AGENT_CHARACTERS_REGEX = /[\u200B\u200C\u200D\uFEFF]/g
+
+export function stripInvisibleAgentCharacters(agentName: string): string {
+  return agentName.replace(INVISIBLE_AGENT_CHARACTERS_REGEX, "")
+}
+
 export function stripAgentListSortPrefix(agentName: string): string {
-  return agentName.replace(/^\u200B+/, "")
+  return stripInvisibleAgentCharacters(agentName)
+}
+
+export function getAgentRuntimeName(configKey: string): string {
+  const displayName = getAgentDisplayName(configKey)
+  const prefix = AGENT_LIST_SORT_PREFIXES[configKey.toLowerCase()]
+
+  return prefix ? `${prefix}${displayName}` : displayName
 }
 
 /**
@@ -68,20 +71,10 @@ export function getAgentDisplayName(configKey: string): string {
 }
 
 /**
- * @deprecated Use {@link getAgentDisplayName} directly.
- *
- * Historically this returned the display name with a ZWSP sort prefix
- * prepended so core agents would sort ahead of user agents in the Tab
- * cycle. The ZWSP prefixes caused visible rendering artifacts in some
- * terminals (#3259) and leaked into the plugin API surface (#3238), so
- * they were removed in #3242/#3259. This function is now a thin alias
- * over {@link getAgentDisplayName} that exists only for external
- * callers that may still import it. Sort ordering is now handled by
- * the `order` field injection in `reorderAgentsByPriority()` plus the
- * core-first insertion order in the same helper.
+ * Runtime-facing agent name used for OpenCode list ordering.
  */
 export function getAgentListDisplayName(configKey: string): string {
-  return getAgentDisplayName(configKey)
+  return getAgentRuntimeName(configKey)
 }
 
 const REVERSE_DISPLAY_NAMES: Record<string, string> = Object.fromEntries(
@@ -101,18 +94,23 @@ const LEGACY_DISPLAY_NAMES: Record<string, string> = {
   "athena-junior (council)": "athena-junior",
 }
 
-/**
- * Resolve an agent name (display name or config key) to its lowercase config key.
- * "Atlas - Plan Executor" -> "atlas", "Atlas (Plan Executor)" -> "atlas", "atlas" -> "atlas"
- */
-export function getAgentConfigKey(agentName: string): string {
-  const lower = stripAgentListSortPrefix(agentName).toLowerCase()
+function resolveKnownAgentConfigKey(agentName: string): string | undefined {
+  const lower = stripAgentListSortPrefix(agentName).trim().toLowerCase()
   const reversed = REVERSE_DISPLAY_NAMES[lower]
   if (reversed !== undefined) return reversed
   const legacy = LEGACY_DISPLAY_NAMES[lower]
   if (legacy !== undefined) return legacy
   if (AGENT_DISPLAY_NAMES[lower] !== undefined) return lower
-  return lower
+  return undefined
+}
+
+/**
+ * Resolve an agent name (display name or config key) to its lowercase config key.
+ * "Atlas - Plan Executor" -> "atlas", "Atlas (Plan Executor)" -> "atlas", "atlas" -> "atlas"
+ */
+export function getAgentConfigKey(agentName: string): string {
+  const lower = stripAgentListSortPrefix(agentName).trim().toLowerCase()
+  return resolveKnownAgentConfigKey(agentName) ?? lower
 }
 
 /**
@@ -126,22 +124,14 @@ export function normalizeAgentForPrompt(agentName: string | undefined): string |
     return undefined
   }
 
-  const trimmed = stripAgentListSortPrefix(agentName.trim())
+  const trimmed = stripAgentListSortPrefix(agentName).trim()
   if (!trimmed) {
     return undefined
   }
 
-  const lower = trimmed.toLowerCase()
-  const reversed = REVERSE_DISPLAY_NAMES[lower]
-  if (reversed !== undefined) {
-    return AGENT_DISPLAY_NAMES[reversed] ?? trimmed
-  }
-  const legacy = LEGACY_DISPLAY_NAMES[lower]
-  if (legacy !== undefined) {
-    return AGENT_DISPLAY_NAMES[legacy] ?? trimmed
-  }
-  if (AGENT_DISPLAY_NAMES[lower] !== undefined) {
-    return AGENT_DISPLAY_NAMES[lower]
+  const configKey = resolveKnownAgentConfigKey(trimmed)
+  if (configKey !== undefined) {
+    return AGENT_DISPLAY_NAMES[configKey] ?? trimmed
   }
 
   return trimmed
@@ -152,23 +142,10 @@ export function normalizeAgentForPromptKey(agentName: string | undefined): strin
     return undefined
   }
 
-  const trimmed = stripAgentListSortPrefix(agentName.trim())
+  const trimmed = stripAgentListSortPrefix(agentName).trim()
   if (!trimmed) {
     return undefined
   }
 
-  const lower = trimmed.toLowerCase()
-  const reversed = REVERSE_DISPLAY_NAMES[lower]
-  if (reversed !== undefined) {
-    return reversed
-  }
-  const legacy = LEGACY_DISPLAY_NAMES[lower]
-  if (legacy !== undefined) {
-    return legacy
-  }
-  if (AGENT_DISPLAY_NAMES[lower] !== undefined) {
-    return lower
-  }
-
-  return trimmed
+  return resolveKnownAgentConfigKey(trimmed) ?? trimmed
 }

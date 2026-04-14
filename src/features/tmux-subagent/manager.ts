@@ -182,6 +182,10 @@ export class TmuxSessionManager {
     }))
   }
 
+  getTrackedPaneId(sessionId: string): string | undefined {
+    return this.sessions.get(sessionId)?.paneId
+  }
+
   private removeTrackedSession(sessionId: string): void {
     this.sessions.delete(sessionId)
 

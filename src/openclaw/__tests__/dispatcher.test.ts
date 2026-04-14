@@ -54,6 +54,75 @@ describe("OpenClaw Dispatcher", () => {
     }
   })
 
+  test("wakeGateway returns correlation metadata from JSON response", async () => {
+    const fetchSpy = spyOn(global, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: {
+            messageId: "msg-123",
+            platform: "discord",
+            channelId: "chan-1",
+            threadId: "thread-9",
+          },
+        }),
+        { status: 200 },
+      ),
+    )
+
+    try {
+      const result = await wakeGateway(
+        "test",
+        { url: "https://example.com", method: "POST", timeout: 1000, type: "http" },
+        { foo: "bar" },
+      )
+
+      expect(result).toMatchObject({
+        success: true,
+        messageId: "msg-123",
+        platform: "discord",
+        channelId: "chan-1",
+        threadId: "thread-9",
+      })
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  test("wakeGateway prefers nested message metadata over wrapper ids", async () => {
+    const fetchSpy = spyOn(global, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          id: "job-42",
+          data: {
+            messageId: "msg-123",
+            platform: "discord",
+            channelId: "chan-1",
+            threadId: "thread-9",
+          },
+        }),
+        { status: 200 },
+      ),
+    )
+
+    try {
+      const result = await wakeGateway(
+        "test",
+        { url: "https://example.com", method: "POST", timeout: 1000, type: "http" },
+        { foo: "bar" },
+      )
+
+      expect(result).toMatchObject({
+        success: true,
+        messageId: "msg-123",
+        platform: "discord",
+        channelId: "chan-1",
+        threadId: "thread-9",
+      })
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
   test("wakeGateway fails on invalid URL", async () => {
     const result = await wakeGateway("test", { url: "http://example.com", method: "POST", timeout: 1000, type: "http" }, {})
     expect(result.success).toBe(false)
@@ -107,5 +176,44 @@ describe("OpenClaw Dispatcher", () => {
     } finally {
       killSpy.mockRestore()
     }
+  })
+
+  test("wakeCommandGateway returns correlation metadata from stdout JSON", async () => {
+    const result = await wakeCommandGateway(
+      "command",
+      {
+        type: "command",
+        method: "POST",
+        command: "printf '%s' '{\"messageId\":\"55\",\"platform\":\"telegram\",\"threadId\":\"thr\"}'",
+        timeout: 1000,
+      },
+      {},
+    )
+
+    expect(result).toMatchObject({
+      success: true,
+      messageId: "55",
+      platform: "telegram",
+      threadId: "thr",
+    })
+  })
+
+  test("wakeCommandGateway returns correlation metadata from OpenClaw CLI stdout", async () => {
+    const result = await wakeCommandGateway(
+      "command",
+      {
+        type: "command",
+        method: "POST",
+        command: "printf '%s' '✅ Sent via Discord. Message ID: 55'",
+        timeout: 1000,
+      },
+      {},
+    )
+
+    expect(result).toMatchObject({
+      success: true,
+      messageId: "55",
+      platform: "discord",
+    })
   })
 })

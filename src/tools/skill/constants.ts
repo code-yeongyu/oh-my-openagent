@@ -8,7 +8,7 @@ Skills and commands provide specialized knowledge and step-by-step guidance.
 Use this when a task matches an available skill's or command's description.
 
 **How to use:**
-- Call with a skill name: name='code-review'
+- Call with a skill name: name='review-work'
 - Call with a command name (without leading slash): name='publish'
 - The tool will return detailed instructions with your context applied.
 `

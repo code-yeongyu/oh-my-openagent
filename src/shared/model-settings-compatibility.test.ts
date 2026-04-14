@@ -486,6 +486,30 @@ describe("resolveCompatibleModelSettings", () => {
     ])
   })
 
+  test("#given capabilities.maxOutputTokens is 0 #then maxTokens preserved unchanged", () => {
+    const result = resolveCompatibleModelSettings({
+      providerID: "openai",
+      modelID: "gpt-5.4",
+      desired: { maxTokens: 200_000 },
+      capabilities: { maxOutputTokens: 0 },
+    })
+
+    expect(result.maxTokens).toBe(200_000)
+    expect(result.changes).toEqual([])
+  })
+
+  test("#given capabilities.maxOutputTokens is -1 #then maxTokens preserved unchanged", () => {
+    const result = resolveCompatibleModelSettings({
+      providerID: "openai",
+      modelID: "gpt-5.4",
+      desired: { maxTokens: 200_000 },
+      capabilities: { maxOutputTokens: -1 },
+    })
+
+    expect(result.maxTokens).toBe(200_000)
+    expect(result.changes).toEqual([])
+  })
+
   // Passthrough: undefined desired values produce no changes
   test("no-op when desired settings are empty", () => {
     const result = resolveCompatibleModelSettings({

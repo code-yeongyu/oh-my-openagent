@@ -11,7 +11,7 @@ import {
   clearCompactionAgentConfigCheckpoint,
   setCompactionAgentConfigCheckpoint,
 } from "../../shared/compaction-agent-config-checkpoint"
-import { PART_STORAGE } from "../../shared"
+import { getCompactionPartStorageDir } from "../../shared/compaction-marker"
 
 describe("isCompactionAgent", () => {
   describe("#given agent name variations", () => {
@@ -74,7 +74,7 @@ describe("findNearestMessageExcludingCompaction", () => {
 
   afterEach(() => {
     rmSync(tempDir, { force: true, recursive: true })
-    rmSync(join(PART_STORAGE, "msg_test_background_compaction_marker"), { force: true, recursive: true })
+    rmSync(getCompactionPartStorageDir("msg_test_background_compaction_marker"), { force: true, recursive: true })
     clearCompactionAgentConfigCheckpoint("ses_checkpoint")
   })
 
@@ -121,7 +121,7 @@ describe("findNearestMessageExcludingCompaction", () => {
     test("skips JSON messages whose part storage contains a compaction marker", () => {
       // given
       const compactionMessageID = "msg_test_background_compaction_marker"
-      const partDir = join(PART_STORAGE, compactionMessageID)
+      const partDir = getCompactionPartStorageDir(compactionMessageID)
       writeFileSync(join(tempDir, "002.json"), JSON.stringify({
         id: compactionMessageID,
         agent: "atlas",

@@ -207,7 +207,7 @@ export class BackgroundManager {
   }
 
   async assertCanSpawn(parentSessionID: string): Promise<SubagentSpawnContext> {
-    const spawnContext = await resolveSubagentSpawnContext(this.client, parentSessionID)
+    const spawnContext = await resolveSubagentSpawnContext(this.client, parentSessionID, this.directory)
     const maxDepth = getMaxSubagentDepth(this.config)
     if (spawnContext.childDepth > maxDepth) {
       throw createSubagentDepthLimitError({
@@ -453,6 +453,7 @@ export class BackgroundManager {
 
     const parentSession = await this.client.session.get({
       path: { id: input.parentSessionID },
+      query: { directory: this.directory },
     }).catch((err) => {
       log(`[background-agent] Failed to get parent session: ${err}`)
       return null
@@ -1060,7 +1061,8 @@ export class BackgroundManager {
 
         task.progress.toolCalls += 1
         task.progress.lastTool = partInfo.tool
-        const circuitBreaker = this.cachedCircuitBreakerSettings ?? (this.cachedCircuitBreakerSettings = resolveCircuitBreakerSettings(this.config))
+        const circuitBreaker = this.cachedCircuitBreakerSettings ?? resolveCircuitBreakerSettings(this.config)
+        this.cachedCircuitBreakerSettings = circuitBreaker
         if (partInfo.tool) {
          task.progress.toolCallWindow = recordToolCall(
              task.progress.toolCallWindow,
@@ -1947,6 +1949,7 @@ export class BackgroundManager {
     await checkAndInterruptStaleTasks({
       tasks: this.tasks.values(),
       client: this.client,
+      directory: this.directory,
       config: this.config,
       concurrencyManager: this.concurrencyManager,
       notifyParentSession: (task) => this.enqueueNotificationForParent(task.parentSessionID, () => this.notifyParentSession(task)),
@@ -1955,7 +1958,7 @@ export class BackgroundManager {
   }
 
   private async verifySessionExists(sessionID: string): Promise<boolean> {
-    return verifySessionStillExists(this.client, sessionID)
+    return verifySessionStillExists(this.client, sessionID, this.directory)
   }
 
   private async failCrashedTask(task: BackgroundTask, errorMessage: string): Promise<void> {

@@ -2,8 +2,22 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test"
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { executeSlashCommand } from "../../hooks/auto-slash-command/executor"
-import { discoverCommandsSync } from "./command-discovery"
+
+function requireFresh<T>(modulePath: string): T {
+  const resolvedPath = require.resolve(modulePath)
+  if (require.cache?.[resolvedPath]) {
+    delete require.cache[resolvedPath]
+  }
+  return require(modulePath) as T
+}
+
+function executeSlashCommand(...args: Parameters<typeof import("../../hooks/auto-slash-command/executor").executeSlashCommand>): ReturnType<typeof import("../../hooks/auto-slash-command/executor").executeSlashCommand> {
+  return requireFresh<typeof import("../../hooks/auto-slash-command/executor")>("../../hooks/auto-slash-command/executor").executeSlashCommand(...args)
+}
+
+function discoverCommandsSync(...args: Parameters<typeof import("./command-discovery").discoverCommandsSync>): ReturnType<typeof import("./command-discovery").discoverCommandsSync> {
+  return requireFresh<typeof import("./command-discovery")>("./command-discovery").discoverCommandsSync(...args)
+}
 
 describe("slashcommand discovery and execution compatibility", () => {
   let tempDir = ""

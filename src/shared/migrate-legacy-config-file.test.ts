@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test"
+import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -84,6 +84,28 @@ describe("migrateLegacyConfigFile", () => {
         const result = migrateLegacyConfigFile(nonLegacyPath)
 
         expect(result).toBe(false)
+      })
+    })
+  })
+
+  describe("#given canonical write succeeds but archive fails", () => {
+    describe("#when migrating the config file", () => {
+      it("#then returns true", () => {
+        const legacyPath = join(testDir, "oh-my-opencode.jsonc")
+        const backupPath = `${legacyPath}.bak`
+        const canonicalPath = join(testDir, "oh-my-openagent.jsonc")
+        writeFileSync(legacyPath, '{ "agents": {} }')
+
+        // given: create backup path as directory (blocks rename, causing archive to return false)
+        mkdirSync(backupPath)
+
+        // when: migrate the config file
+        const result = migrateLegacyConfigFile(legacyPath)
+
+        // then: migration should return true (canonical write succeeded, archive is optional)
+        expect(result).toBe(true)
+        // then: canonical file should exist
+        expect(existsSync(canonicalPath)).toBe(true)
       })
     })
   })
