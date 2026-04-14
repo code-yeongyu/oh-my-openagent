@@ -115,8 +115,9 @@ Register these as task/todo items so progress is tracked and visible throughout 
 
 When working in a worktree (\`worktree_path\` is set in boulder.json) and ALL plan tasks are complete:
 1. Commit all remaining changes in the worktree
-2. **Sync .sisyphus state back**: Copy \`.sisyphus/\` from the worktree to the main repo before removal.
-   This is CRITICAL when \`.sisyphus/\` is gitignored - state written during worktree execution would otherwise be lost.
+2. **Copy runtime continuity only**: Copy \`.sisyphus/\` from the worktree to the main repo before removal.
+   This is CRITICAL when \`.sisyphus/\` is gitignored - runtime continuity written during worktree execution would otherwise be lost.
+   The copied-back runtime state must not be treated as durable truth; \`.beads\` and published manifests remain authoritative.
    \`\`\`bash
    cp -r <worktree-path>/.sisyphus/* <main-repo>/.sisyphus/ 2>/dev/null || true
    \`\`\`
@@ -125,4 +126,4 @@ When working in a worktree (\`worktree_path\` is set in boulder.json) and ALL pl
 5. If merge succeeds, clean up: \`git worktree remove <worktree-path>\`
 6. Remove the boulder.json state
 
-This is the DEFAULT behavior when \`--worktree\` was used. Skip merge only if the user explicitly instructs otherwise (e.g., asks to create a PR instead).`
+This is the DEFAULT behavior when \`--worktree\` was used. Skip merge only if the user explicitly instructs otherwise (e.g., asks to create a PR instead).`;
