@@ -6,64 +6,91 @@
  */
 
 export interface BoulderState {
-  /** Absolute path to the active plan file */
-  active_plan: string
-  /** ISO timestamp when work started */
-  started_at: string
-  /** Session IDs that have worked on this plan */
-  session_ids: string[]
-  session_origins?: Record<string, "direct" | "appended">
-  /** Plan name derived from filename */
-  plan_name: string
-  /** Agent type to use when resuming (e.g., 'atlas') */
-  agent?: string
-  /** Absolute path to the git worktree root where work happens */
-  worktree_path?: string
-  /** Attached top-level bead identifier, when continuation work is bead-linked */
-  bead_id?: string
-  /** Command that attached the current continuation to a bead */
-  bead_source_command?: string
-  /** Absolute path to the bead worktree root inherited by continuation work */
-  bead_worktree_path?: string
-  /** ISO timestamp of the last successful bead reconciliation */
-  bead_last_reconciled_at?: string
-  /** Preferred reusable subagent sessions keyed by current top-level plan task */
-  task_sessions?: Record<string, TaskSessionState>
+	/** Absolute path to the active plan file */
+	active_plan: string;
+	/** ISO timestamp when work started */
+	started_at: string;
+	/** Session IDs that have worked on this plan */
+	session_ids: string[];
+	session_origins?: Record<string, "direct" | "appended">;
+	/** Plan name derived from filename */
+	plan_name: string;
+	/** Agent type to use when resuming (e.g., 'atlas') */
+	agent?: string;
+	/** Absolute path to the git worktree root where work happens */
+	worktree_path?: string;
+	/** Attached top-level bead identifier, when continuation work is bead-linked */
+	bead_id?: string;
+	/** Command that attached the current continuation to a bead */
+	bead_source_command?: string;
+	/** Absolute path to the bead worktree root inherited by continuation work */
+	bead_worktree_path?: string;
+	/** ISO timestamp of the last successful bead reconciliation */
+	bead_last_reconciled_at?: string;
+	/** Rebuildable runtime provenance for bead-linked continuation state */
+	bead_runtime_state?: BoulderRuntimeStateMetadata;
+	/** Preferred reusable subagent sessions keyed by current top-level plan task */
+	task_sessions?: Record<string, TaskSessionState>;
+}
+
+export interface BoulderRuntimeProducerInfo {
+	name: string;
+	version: string;
+}
+
+export interface BoulderRuntimeCompatibilityMetadata {
+	durable_truth: string;
+	runtime_state_conflict_policy: string;
+}
+
+export interface BoulderRuntimeStateMetadata {
+	schema_version: number;
+	runtime_role: "rebuildable-runtime-state";
+	authoritative_source: "durable-beads-artifacts";
+	producer: BoulderRuntimeProducerInfo;
+	runtime: BoulderRuntimeProducerInfo;
+	compatibility: BoulderRuntimeCompatibilityMetadata;
+	last_rebuild_source?: string;
+	last_durable_artifact_ref?: string;
+	last_durable_manifest_ref?: string;
+	last_synced_at?: string;
+	stale_reason?: string;
+	stale_checked_at?: string;
 }
 
 export interface PlanProgress {
-  /** Total number of checkboxes */
-  total: number
-  /** Number of completed checkboxes */
-  completed: number
-  /** Whether all tasks are done */
-  isComplete: boolean
+	/** Total number of checkboxes */
+	total: number;
+	/** Number of completed checkboxes */
+	completed: number;
+	/** Whether all tasks are done */
+	isComplete: boolean;
 }
 
 export interface TaskSessionState {
-  /** Stable identifier for the current top-level plan task (e.g. todo:1 / final-wave:F1) */
-  task_key: string
-  /** Original task label from the plan file */
-  task_label: string
-  /** Full task title from the plan file */
-  task_title: string
-  /** Preferred reusable subagent session */
-  session_id: string
-  /** Agent associated with the task session, when known */
-  agent?: string
-  /** Category associated with the task session, when known */
-  category?: string
-  /** Last update timestamp */
-  updated_at: string
+	/** Stable identifier for the current top-level plan task (e.g. todo:1 / final-wave:F1) */
+	task_key: string;
+	/** Original task label from the plan file */
+	task_label: string;
+	/** Full task title from the plan file */
+	task_title: string;
+	/** Preferred reusable subagent session */
+	session_id: string;
+	/** Agent associated with the task session, when known */
+	agent?: string;
+	/** Category associated with the task session, when known */
+	category?: string;
+	/** Last update timestamp */
+	updated_at: string;
 }
 
 export interface TopLevelTaskRef {
-  /** Stable identifier for the current top-level plan task */
-  key: string
-  /** Task section in the Prometheus plan */
-  section: "todo" | "final-wave"
-  /** Original label token (e.g. 1 / F1) */
-  label: string
-  /** Full task title extracted from the checkbox line */
-  title: string
+	/** Stable identifier for the current top-level plan task */
+	key: string;
+	/** Task section in the Prometheus plan */
+	section: "todo" | "final-wave";
+	/** Original label token (e.g. 1 / F1) */
+	label: string;
+	/** Full task title extracted from the checkbox line */
+	title: string;
 }

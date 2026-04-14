@@ -1,396 +1,451 @@
-import { describe, expect, test, beforeEach, afterEach } from "bun:test"
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
-import { join } from "node:path"
-import { tmpdir } from "node:os"
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
-  readBoulderState,
-  writeBoulderState,
-  appendSessionId,
-  clearBoulderState,
-  getPlanProgress,
-  getPlanName,
-  createBoulderState,
-  findPrometheusPlans,
-  getTaskSessionState,
-  upsertTaskSessionState,
-} from "./storage"
-import type { BoulderState } from "./types"
-import { readCurrentTopLevelTask } from "./top-level-task"
+	appendSessionId,
+	clearBoulderState,
+	createBoulderState,
+	findPrometheusPlans,
+	getPlanName,
+	getPlanProgress,
+	getTaskSessionState,
+	readBoulderState,
+	upsertTaskSessionState,
+	writeBoulderState,
+} from "./storage";
+import { readCurrentTopLevelTask } from "./top-level-task";
+import type { BoulderState } from "./types";
 
 describe("boulder-state", () => {
-  const TEST_DIR = join(tmpdir(), "boulder-state-test-" + Date.now())
-  const SISYPHUS_DIR = join(TEST_DIR, ".sisyphus")
+	const TEST_DIR = join(tmpdir(), "boulder-state-test-" + Date.now());
+	const SISYPHUS_DIR = join(TEST_DIR, ".sisyphus");
 
-  beforeEach(() => {
-    if (!existsSync(TEST_DIR)) {
-      mkdirSync(TEST_DIR, { recursive: true })
-    }
-    if (!existsSync(SISYPHUS_DIR)) {
-      mkdirSync(SISYPHUS_DIR, { recursive: true })
-    }
-    clearBoulderState(TEST_DIR)
-  })
+	beforeEach(() => {
+		if (!existsSync(TEST_DIR)) {
+			mkdirSync(TEST_DIR, { recursive: true });
+		}
+		if (!existsSync(SISYPHUS_DIR)) {
+			mkdirSync(SISYPHUS_DIR, { recursive: true });
+		}
+		clearBoulderState(TEST_DIR);
+	});
 
-  afterEach(() => {
-    if (existsSync(TEST_DIR)) {
-      rmSync(TEST_DIR, { recursive: true, force: true })
-    }
-  })
+	afterEach(() => {
+		if (existsSync(TEST_DIR)) {
+			rmSync(TEST_DIR, { recursive: true, force: true });
+		}
+	});
 
-  describe("readBoulderState", () => {
-    test("should return null when no boulder.json exists", () => {
-      // given - no boulder.json file
-      // when
-      const result = readBoulderState(TEST_DIR)
-      // then
-      expect(result).toBeNull()
-    })
+	describe("readBoulderState", () => {
+		test("should return null when no boulder.json exists", () => {
+			// given - no boulder.json file
+			// when
+			const result = readBoulderState(TEST_DIR);
+			// then
+			expect(result).toBeNull();
+		});
 
-    test("should return null for JSON null value", () => {
-      //#given - boulder.json containing null
-      const boulderFile = join(SISYPHUS_DIR, "boulder.json")
-      writeFileSync(boulderFile, "null")
+		test("should return null for JSON null value", () => {
+			//#given - boulder.json containing null
+			const boulderFile = join(SISYPHUS_DIR, "boulder.json");
+			writeFileSync(boulderFile, "null");
 
-      //#when
-      const result = readBoulderState(TEST_DIR)
+			//#when
+			const result = readBoulderState(TEST_DIR);
 
-      //#then
-      expect(result).toBeNull()
-    })
+			//#then
+			expect(result).toBeNull();
+		});
 
-    test("should return null for JSON primitive value", () => {
-      //#given - boulder.json containing a string
-      const boulderFile = join(SISYPHUS_DIR, "boulder.json")
-      writeFileSync(boulderFile, '"just a string"')
+		test("should return null for JSON primitive value", () => {
+			//#given - boulder.json containing a string
+			const boulderFile = join(SISYPHUS_DIR, "boulder.json");
+			writeFileSync(boulderFile, '"just a string"');
 
-      //#when
-      const result = readBoulderState(TEST_DIR)
+			//#when
+			const result = readBoulderState(TEST_DIR);
 
-      //#then
-      expect(result).toBeNull()
-    })
+			//#then
+			expect(result).toBeNull();
+		});
 
-    test("should default session_ids to [] when missing from JSON", () => {
-      //#given - boulder.json without session_ids field
-      const boulderFile = join(SISYPHUS_DIR, "boulder.json")
-      writeFileSync(boulderFile, JSON.stringify({
-        active_plan: "/path/to/plan.md",
-        started_at: "2026-01-01T00:00:00Z",
-        plan_name: "plan",
-      }))
+		test("should default session_ids to [] when missing from JSON", () => {
+			//#given - boulder.json without session_ids field
+			const boulderFile = join(SISYPHUS_DIR, "boulder.json");
+			writeFileSync(
+				boulderFile,
+				JSON.stringify({
+					active_plan: "/path/to/plan.md",
+					started_at: "2026-01-01T00:00:00Z",
+					plan_name: "plan",
+				}),
+			);
 
-      //#when
-      const result = readBoulderState(TEST_DIR)
+			//#when
+			const result = readBoulderState(TEST_DIR);
 
-      //#then
-      expect(result).not.toBeNull()
-      expect(result!.session_ids).toEqual([])
-    })
+			//#then
+			expect(result).not.toBeNull();
+			expect(result!.session_ids).toEqual([]);
+		});
 
-    test("should default session_ids to [] when not an array", () => {
-      //#given - boulder.json with session_ids as a string
-      const boulderFile = join(SISYPHUS_DIR, "boulder.json")
-      writeFileSync(boulderFile, JSON.stringify({
-        active_plan: "/path/to/plan.md",
-        started_at: "2026-01-01T00:00:00Z",
-        session_ids: "not-an-array",
-        plan_name: "plan",
-      }))
+		test("should default session_ids to [] when not an array", () => {
+			//#given - boulder.json with session_ids as a string
+			const boulderFile = join(SISYPHUS_DIR, "boulder.json");
+			writeFileSync(
+				boulderFile,
+				JSON.stringify({
+					active_plan: "/path/to/plan.md",
+					started_at: "2026-01-01T00:00:00Z",
+					session_ids: "not-an-array",
+					plan_name: "plan",
+				}),
+			);
 
-      //#when
-      const result = readBoulderState(TEST_DIR)
+			//#when
+			const result = readBoulderState(TEST_DIR);
 
-      //#then
-      expect(result).not.toBeNull()
-      expect(result!.session_ids).toEqual([])
-    })
+			//#then
+			expect(result).not.toBeNull();
+			expect(result!.session_ids).toEqual([]);
+		});
 
-    test("should default session_ids to [] for empty object", () => {
-      //#given - boulder.json with empty object
-      const boulderFile = join(SISYPHUS_DIR, "boulder.json")
-      writeFileSync(boulderFile, JSON.stringify({}))
+		test("should default session_ids to [] for empty object", () => {
+			//#given - boulder.json with empty object
+			const boulderFile = join(SISYPHUS_DIR, "boulder.json");
+			writeFileSync(boulderFile, JSON.stringify({}));
 
-      //#when
-      const result = readBoulderState(TEST_DIR)
+			//#when
+			const result = readBoulderState(TEST_DIR);
 
-      //#then
-      expect(result).not.toBeNull()
-      expect(result!.session_ids).toEqual([])
-    })
+			//#then
+			expect(result).not.toBeNull();
+			expect(result!.session_ids).toEqual([]);
+		});
 
-    test("should backfill missing origin as direct only for a single tracked session", () => {
-      // given
-      const boulderFile = join(SISYPHUS_DIR, "boulder.json")
-      writeFileSync(boulderFile, JSON.stringify({
-        active_plan: "/path/to/plan.md",
-        started_at: "2026-01-01T00:00:00Z",
-        session_ids: ["session-1"],
-        plan_name: "plan",
-      }))
+		test("should backfill missing origin as direct only for a single tracked session", () => {
+			// given
+			const boulderFile = join(SISYPHUS_DIR, "boulder.json");
+			writeFileSync(
+				boulderFile,
+				JSON.stringify({
+					active_plan: "/path/to/plan.md",
+					started_at: "2026-01-01T00:00:00Z",
+					session_ids: ["session-1"],
+					plan_name: "plan",
+				}),
+			);
 
-      // when
-      const result = readBoulderState(TEST_DIR)
+			// when
+			const result = readBoulderState(TEST_DIR);
 
-      // then
-      expect(result?.session_origins).toEqual({ "session-1": "direct" })
-    })
+			// then
+			expect(result?.session_origins).toEqual({ "session-1": "direct" });
+		});
 
-    test("should keep missing origins empty when multiple sessions are tracked", () => {
-      // given
-      const boulderFile = join(SISYPHUS_DIR, "boulder.json")
-      writeFileSync(boulderFile, JSON.stringify({
-        active_plan: "/path/to/plan.md",
-        started_at: "2026-01-01T00:00:00Z",
-        session_ids: ["session-1", "session-2"],
-        plan_name: "plan",
-      }))
+		test("should keep missing origins empty when multiple sessions are tracked", () => {
+			// given
+			const boulderFile = join(SISYPHUS_DIR, "boulder.json");
+			writeFileSync(
+				boulderFile,
+				JSON.stringify({
+					active_plan: "/path/to/plan.md",
+					started_at: "2026-01-01T00:00:00Z",
+					session_ids: ["session-1", "session-2"],
+					plan_name: "plan",
+				}),
+			);
 
-      // when
-      const result = readBoulderState(TEST_DIR)
+			// when
+			const result = readBoulderState(TEST_DIR);
 
-      // then
-      expect(result?.session_origins).toEqual({})
-    })
-    test("should read valid boulder state", () => {
-      // given - valid boulder.json
-      const state: BoulderState = {
-        active_plan: "/path/to/plan.md",
-        started_at: "2026-01-02T10:00:00Z",
-        session_ids: ["session-1", "session-2"],
-        plan_name: "my-plan",
-      }
-      writeBoulderState(TEST_DIR, state)
+			// then
+			expect(result?.session_origins).toEqual({});
+		});
+		test("should read valid boulder state", () => {
+			// given - valid boulder.json
+			const state: BoulderState = {
+				active_plan: "/path/to/plan.md",
+				started_at: "2026-01-02T10:00:00Z",
+				session_ids: ["session-1", "session-2"],
+				plan_name: "my-plan",
+			};
+			writeBoulderState(TEST_DIR, state);
 
-      // when
-      const result = readBoulderState(TEST_DIR)
+			// when
+			const result = readBoulderState(TEST_DIR);
 
-      // then
-      expect(result).not.toBeNull()
-      expect(result?.active_plan).toBe("/path/to/plan.md")
-      expect(result?.session_ids).toEqual(["session-1", "session-2"])
-      expect(result?.plan_name).toBe("my-plan")
-    })
+			// then
+			expect(result).not.toBeNull();
+			expect(result?.active_plan).toBe("/path/to/plan.md");
+			expect(result?.session_ids).toEqual(["session-1", "session-2"]);
+			expect(result?.plan_name).toBe("my-plan");
+		});
 
-    test("should default task_sessions to empty object when missing from JSON", () => {
-      // given - boulder.json without task_sessions field
-      const boulderFile = join(SISYPHUS_DIR, "boulder.json")
-      writeFileSync(boulderFile, JSON.stringify({
-        active_plan: "/path/to/plan.md",
-        started_at: "2026-01-01T00:00:00Z",
-        session_ids: ["session-1"],
-        plan_name: "plan",
-      }))
+		test("should preserve runtime provenance metadata when present", () => {
+			// given
+			const state: BoulderState = {
+				active_plan: "/path/to/plan.md",
+				started_at: "2026-01-02T10:00:00Z",
+				session_ids: ["session-1"],
+				plan_name: "my-plan",
+				bead_id: "bd-123",
+				bead_runtime_state: {
+					schema_version: 1,
+					runtime_role: "rebuildable-runtime-state",
+					authoritative_source: "durable-beads-artifacts",
+					producer: { name: "omo", version: "3.16.0" },
+					runtime: { name: "oh-my-openagent", version: "3.16.0" },
+					compatibility: {
+						durable_truth: "beads-manifest-and-runtime-artifacts",
+						runtime_state_conflict_policy: "durable-wins-mark-runtime-stale",
+					},
+					last_rebuild_source: "start-work",
+					last_durable_artifact_ref:
+						".beads/artifacts/runtime-attachments/registry.schema-1.json",
+					last_durable_manifest_ref:
+						".beads/artifacts/manifests/index.schema-1.json",
+					last_synced_at: "2026-01-02T10:05:00Z",
+				},
+			};
+			writeBoulderState(TEST_DIR, state);
 
-      // when
-      const result = readBoulderState(TEST_DIR)
+			// when
+			const result = readBoulderState(TEST_DIR);
 
-      // then
-      expect(result).not.toBeNull()
-      expect(result!.task_sessions).toEqual({})
-    })
-  })
+			// then
+			expect(result?.bead_runtime_state).toEqual(state.bead_runtime_state);
+		});
 
-  describe("writeBoulderState", () => {
-    test("should write state and create .sisyphus directory if needed", () => {
-      // given - state to write
-      const state: BoulderState = {
-        active_plan: "/test/plan.md",
-        started_at: "2026-01-02T12:00:00Z",
-        session_ids: ["ses-123"],
-        plan_name: "test-plan",
-      }
+		test("should default task_sessions to empty object when missing from JSON", () => {
+			// given - boulder.json without task_sessions field
+			const boulderFile = join(SISYPHUS_DIR, "boulder.json");
+			writeFileSync(
+				boulderFile,
+				JSON.stringify({
+					active_plan: "/path/to/plan.md",
+					started_at: "2026-01-01T00:00:00Z",
+					session_ids: ["session-1"],
+					plan_name: "plan",
+				}),
+			);
 
-      // when
-      const success = writeBoulderState(TEST_DIR, state)
-      const readBack = readBoulderState(TEST_DIR)
+			// when
+			const result = readBoulderState(TEST_DIR);
 
-      // then
-      expect(success).toBe(true)
-      expect(readBack).not.toBeNull()
-      expect(readBack?.active_plan).toBe("/test/plan.md")
-    })
-  })
+			// then
+			expect(result).not.toBeNull();
+			expect(result!.task_sessions).toEqual({});
+		});
+	});
 
-  describe("appendSessionId", () => {
-    test("should append new session id to existing state", () => {
-      // given - existing state with one session
-      const state: BoulderState = {
-        active_plan: "/plan.md",
-        started_at: "2026-01-02T10:00:00Z",
-        session_ids: ["session-1"],
-        plan_name: "plan",
-      }
-      writeBoulderState(TEST_DIR, state)
+	describe("writeBoulderState", () => {
+		test("should write state and create .sisyphus directory if needed", () => {
+			// given - state to write
+			const state: BoulderState = {
+				active_plan: "/test/plan.md",
+				started_at: "2026-01-02T12:00:00Z",
+				session_ids: ["ses-123"],
+				plan_name: "test-plan",
+			};
 
-      // when
-      const result = appendSessionId(TEST_DIR, "session-2")
+			// when
+			const success = writeBoulderState(TEST_DIR, state);
+			const readBack = readBoulderState(TEST_DIR);
 
-      // then
-      expect(result).not.toBeNull()
-      expect(result?.session_ids).toEqual(["session-1", "session-2"])
-    })
+			// then
+			expect(success).toBe(true);
+			expect(readBack).not.toBeNull();
+			expect(readBack?.active_plan).toBe("/test/plan.md");
+		});
+	});
 
-    test("should not duplicate existing session id", () => {
-      // given - state with session-1 already
-      const state: BoulderState = {
-        active_plan: "/plan.md",
-        started_at: "2026-01-02T10:00:00Z",
-        session_ids: ["session-1"],
-        plan_name: "plan",
-      }
-      writeBoulderState(TEST_DIR, state)
+	describe("appendSessionId", () => {
+		test("should append new session id to existing state", () => {
+			// given - existing state with one session
+			const state: BoulderState = {
+				active_plan: "/plan.md",
+				started_at: "2026-01-02T10:00:00Z",
+				session_ids: ["session-1"],
+				plan_name: "plan",
+			};
+			writeBoulderState(TEST_DIR, state);
 
-      // when
-      appendSessionId(TEST_DIR, "session-1")
-      const result = readBoulderState(TEST_DIR)
+			// when
+			const result = appendSessionId(TEST_DIR, "session-2");
 
-      // then
-      expect(result?.session_ids).toEqual(["session-1"])
-    })
+			// then
+			expect(result).not.toBeNull();
+			expect(result?.session_ids).toEqual(["session-1", "session-2"]);
+		});
 
-    test("should return null when no state exists", () => {
-      // given - no boulder.json
-      // when
-      const result = appendSessionId(TEST_DIR, "new-session")
-      // then
-      expect(result).toBeNull()
-    })
+		test("should not duplicate existing session id", () => {
+			// given - state with session-1 already
+			const state: BoulderState = {
+				active_plan: "/plan.md",
+				started_at: "2026-01-02T10:00:00Z",
+				session_ids: ["session-1"],
+				plan_name: "plan",
+			};
+			writeBoulderState(TEST_DIR, state);
 
-    test("should not crash when boulder.json has no session_ids field", () => {
-      //#given - boulder.json without session_ids
-      const boulderFile = join(SISYPHUS_DIR, "boulder.json")
-      writeFileSync(boulderFile, JSON.stringify({
-        active_plan: "/plan.md",
-        started_at: "2026-01-01T00:00:00Z",
-        plan_name: "plan",
-      }))
+			// when
+			appendSessionId(TEST_DIR, "session-1");
+			const result = readBoulderState(TEST_DIR);
 
-      //#when
-      const result = appendSessionId(TEST_DIR, "ses-new")
+			// then
+			expect(result?.session_ids).toEqual(["session-1"]);
+		});
 
-      //#then - should not crash and should contain the new session
-      expect(result).not.toBeNull()
-      expect(result!.session_ids).toContain("ses-new")
-    })
+		test("should return null when no state exists", () => {
+			// given - no boulder.json
+			// when
+			const result = appendSessionId(TEST_DIR, "new-session");
+			// then
+			expect(result).toBeNull();
+		});
 
-    test("should persist appended session origin when provided", () => {
-      // given
-      writeBoulderState(TEST_DIR, {
-        active_plan: "/path/to/plan.md",
-        started_at: "2026-01-02T10:00:00Z",
-        session_ids: ["session-1"],
-        session_origins: { "session-1": "direct" },
-        plan_name: "plan",
-      })
+		test("should not crash when boulder.json has no session_ids field", () => {
+			//#given - boulder.json without session_ids
+			const boulderFile = join(SISYPHUS_DIR, "boulder.json");
+			writeFileSync(
+				boulderFile,
+				JSON.stringify({
+					active_plan: "/plan.md",
+					started_at: "2026-01-01T00:00:00Z",
+					plan_name: "plan",
+				}),
+			);
 
-      // when
-      const result = appendSessionId(TEST_DIR, "session-2", "appended")
+			//#when
+			const result = appendSessionId(TEST_DIR, "ses-new");
 
-      // then
-      expect(result?.session_origins).toEqual({
-        "session-1": "direct",
-        "session-2": "appended",
-      })
-    })
-  })
+			//#then - should not crash and should contain the new session
+			expect(result).not.toBeNull();
+			expect(result!.session_ids).toContain("ses-new");
+		});
 
-  describe("clearBoulderState", () => {
-    test("should remove boulder.json", () => {
-      // given - existing state
-      const state: BoulderState = {
-        active_plan: "/plan.md",
-        started_at: "2026-01-02T10:00:00Z",
-        session_ids: ["session-1"],
-        plan_name: "plan",
-      }
-      writeBoulderState(TEST_DIR, state)
+		test("should persist appended session origin when provided", () => {
+			// given
+			writeBoulderState(TEST_DIR, {
+				active_plan: "/path/to/plan.md",
+				started_at: "2026-01-02T10:00:00Z",
+				session_ids: ["session-1"],
+				session_origins: { "session-1": "direct" },
+				plan_name: "plan",
+			});
 
-      // when
-      const success = clearBoulderState(TEST_DIR)
-      const result = readBoulderState(TEST_DIR)
+			// when
+			const result = appendSessionId(TEST_DIR, "session-2", "appended");
 
-      // then
-      expect(success).toBe(true)
-      expect(result).toBeNull()
-    })
+			// then
+			expect(result?.session_origins).toEqual({
+				"session-1": "direct",
+				"session-2": "appended",
+			});
+		});
+	});
 
-    test("should succeed even when no file exists", () => {
-      // given - no boulder.json
-      // when
-      const success = clearBoulderState(TEST_DIR)
-      // then
-      expect(success).toBe(true)
-    })
-  })
+	describe("clearBoulderState", () => {
+		test("should remove boulder.json", () => {
+			// given - existing state
+			const state: BoulderState = {
+				active_plan: "/plan.md",
+				started_at: "2026-01-02T10:00:00Z",
+				session_ids: ["session-1"],
+				plan_name: "plan",
+			};
+			writeBoulderState(TEST_DIR, state);
 
-  describe("task session state", () => {
-    test("should persist and read preferred session for a top-level plan task", () => {
-      // given - existing boulder state
-      const state: BoulderState = {
-        active_plan: "/plan.md",
-        started_at: "2026-01-02T10:00:00Z",
-        session_ids: ["session-1"],
-        plan_name: "plan",
-      }
-      writeBoulderState(TEST_DIR, state)
+			// when
+			const success = clearBoulderState(TEST_DIR);
+			const result = readBoulderState(TEST_DIR);
 
-      // when
-      upsertTaskSessionState(TEST_DIR, {
-        taskKey: "todo:1",
-        taskLabel: "1",
-        taskTitle: "Implement auth flow",
-        sessionId: "ses_task_123",
-        agent: "sisyphus-junior",
-        category: "deep",
-      })
-      const result = getTaskSessionState(TEST_DIR, "todo:1")
+			// then
+			expect(success).toBe(true);
+			expect(result).toBeNull();
+		});
 
-      // then
-      expect(result).not.toBeNull()
-      expect(result?.session_id).toBe("ses_task_123")
-      expect(result?.task_title).toBe("Implement auth flow")
-      expect(result?.agent).toBe("sisyphus-junior")
-      expect(result?.category).toBe("deep")
-    })
+		test("should succeed even when no file exists", () => {
+			// given - no boulder.json
+			// when
+			const success = clearBoulderState(TEST_DIR);
+			// then
+			expect(success).toBe(true);
+		});
+	});
 
-    test("should overwrite preferred session for the same top-level plan task", () => {
-      // given - existing boulder state with prior preferred session
-      const state: BoulderState = {
-        active_plan: "/plan.md",
-        started_at: "2026-01-02T10:00:00Z",
-        session_ids: ["session-1"],
-        plan_name: "plan",
-        task_sessions: {
-          "todo:1": {
-            task_key: "todo:1",
-            task_label: "1",
-            task_title: "Implement auth flow",
-            session_id: "ses_old",
-            updated_at: "2026-01-02T10:00:00Z",
-          },
-        },
-      }
-      writeBoulderState(TEST_DIR, state)
+	describe("task session state", () => {
+		test("should persist and read preferred session for a top-level plan task", () => {
+			// given - existing boulder state
+			const state: BoulderState = {
+				active_plan: "/plan.md",
+				started_at: "2026-01-02T10:00:00Z",
+				session_ids: ["session-1"],
+				plan_name: "plan",
+			};
+			writeBoulderState(TEST_DIR, state);
 
-      // when
-      upsertTaskSessionState(TEST_DIR, {
-        taskKey: "todo:1",
-        taskLabel: "1",
-        taskTitle: "Implement auth flow",
-        sessionId: "ses_new",
-      })
-      const result = getTaskSessionState(TEST_DIR, "todo:1")
+			// when
+			upsertTaskSessionState(TEST_DIR, {
+				taskKey: "todo:1",
+				taskLabel: "1",
+				taskTitle: "Implement auth flow",
+				sessionId: "ses_task_123",
+				agent: "sisyphus-junior",
+				category: "deep",
+			});
+			const result = getTaskSessionState(TEST_DIR, "todo:1");
 
-      // then
-      expect(result?.session_id).toBe("ses_new")
-    })
-  })
+			// then
+			expect(result).not.toBeNull();
+			expect(result?.session_id).toBe("ses_task_123");
+			expect(result?.task_title).toBe("Implement auth flow");
+			expect(result?.agent).toBe("sisyphus-junior");
+			expect(result?.category).toBe("deep");
+		});
 
-  describe("readCurrentTopLevelTask", () => {
-    test("should return the first unchecked top-level task in TODOs", () => {
-      // given - plan with nested and top-level unchecked tasks
-      const planPath = join(TEST_DIR, "current-task-plan.md")
-      writeFileSync(planPath, `# Plan
+		test("should overwrite preferred session for the same top-level plan task", () => {
+			// given - existing boulder state with prior preferred session
+			const state: BoulderState = {
+				active_plan: "/plan.md",
+				started_at: "2026-01-02T10:00:00Z",
+				session_ids: ["session-1"],
+				plan_name: "plan",
+				task_sessions: {
+					"todo:1": {
+						task_key: "todo:1",
+						task_label: "1",
+						task_title: "Implement auth flow",
+						session_id: "ses_old",
+						updated_at: "2026-01-02T10:00:00Z",
+					},
+				},
+			};
+			writeBoulderState(TEST_DIR, state);
+
+			// when
+			upsertTaskSessionState(TEST_DIR, {
+				taskKey: "todo:1",
+				taskLabel: "1",
+				taskTitle: "Implement auth flow",
+				sessionId: "ses_new",
+			});
+			const result = getTaskSessionState(TEST_DIR, "todo:1");
+
+			// then
+			expect(result?.session_id).toBe("ses_new");
+		});
+	});
+
+	describe("readCurrentTopLevelTask", () => {
+		test("should return the first unchecked top-level task in TODOs", () => {
+			// given - plan with nested and top-level unchecked tasks
+			const planPath = join(TEST_DIR, "current-task-plan.md");
+			writeFileSync(
+				planPath,
+				`# Plan
 
 ## TODOs
 - [x] 1. Finished task
@@ -399,44 +454,50 @@ describe("boulder-state", () => {
 
 ## Final Verification Wave
 - [ ] F1. Final review
-`)
+`,
+			);
 
-      // when
-      const result = readCurrentTopLevelTask(planPath)
+			// when
+			const result = readCurrentTopLevelTask(planPath);
 
-      // then
-      expect(result).not.toBeNull()
-      expect(result?.key).toBe("todo:2")
-      expect(result?.title).toBe("Current task")
-    })
+			// then
+			expect(result).not.toBeNull();
+			expect(result?.key).toBe("todo:2");
+			expect(result?.title).toBe("Current task");
+		});
 
-    test("should fall back to final-wave task when implementation tasks are complete", () => {
-      // given - plan with only final-wave work remaining
-      const planPath = join(TEST_DIR, "final-wave-current-task-plan.md")
-      writeFileSync(planPath, `# Plan
+		test("should fall back to final-wave task when implementation tasks are complete", () => {
+			// given - plan with only final-wave work remaining
+			const planPath = join(TEST_DIR, "final-wave-current-task-plan.md");
+			writeFileSync(
+				planPath,
+				`# Plan
 
 ## TODOs
 - [x] 1. Finished task
 
 ## Final Verification Wave
 - [ ] F1. Final review
-`)
+`,
+			);
 
-      // when
-      const result = readCurrentTopLevelTask(planPath)
+			// when
+			const result = readCurrentTopLevelTask(planPath);
 
-      // then
-      expect(result).not.toBeNull()
-      expect(result?.key).toBe("final-wave:f1")
-      expect(result?.title).toBe("Final review")
-    })
-  })
+			// then
+			expect(result).not.toBeNull();
+			expect(result?.key).toBe("final-wave:f1");
+			expect(result?.title).toBe("Final review");
+		});
+	});
 
-  describe("getPlanProgress", () => {
-    test("should count only top-level tasks under TODOs and Final Verification Wave sections", () => {
-      // given - plan with top-level tasks in tracked sections
-      const planPath = join(TEST_DIR, "test-plan.md")
-      writeFileSync(planPath, `# Plan
+	describe("getPlanProgress", () => {
+		test("should count only top-level tasks under TODOs and Final Verification Wave sections", () => {
+			// given - plan with top-level tasks in tracked sections
+			const planPath = join(TEST_DIR, "test-plan.md");
+			writeFileSync(
+				planPath,
+				`# Plan
 
 ## TODOs
 - [ ] 1. Task 1
@@ -446,21 +507,24 @@ describe("boulder-state", () => {
 
 ## Final Verification Wave
 - [ ] F1. Final review
-`)
+`,
+			);
 
-      // when
-      const progress = getPlanProgress(planPath)
+			// when
+			const progress = getPlanProgress(planPath);
 
-      // then
-      expect(progress.total).toBe(5)
-      expect(progress.completed).toBe(2)
-      expect(progress.isComplete).toBe(false)
-    })
+			// then
+			expect(progress.total).toBe(5);
+			expect(progress.completed).toBe(2);
+			expect(progress.isComplete).toBe(false);
+		});
 
-    test("should ignore nested Acceptance Criteria checkboxes under TODOs (issue #3066)", () => {
-      // given - plan with 9 completed top-level tasks and unchecked nested acceptance criteria
-      const planPath = join(TEST_DIR, "issue-3066-plan.md")
-      writeFileSync(planPath, `# Plan
+		test("should ignore nested Acceptance Criteria checkboxes under TODOs (issue #3066)", () => {
+			// given - plan with 9 completed top-level tasks and unchecked nested acceptance criteria
+			const planPath = join(TEST_DIR, "issue-3066-plan.md");
+			writeFileSync(
+				planPath,
+				`# Plan
 
 ## TODOs
 - [x] 1. Implement feature A
@@ -485,21 +549,24 @@ describe("boulder-state", () => {
 
 ## Final Verification Wave
 - [ ] F1. Final review
-`)
+`,
+			);
 
-      // when
-      const progress = getPlanProgress(planPath)
+			// when
+			const progress = getPlanProgress(planPath);
 
-      // then
-      expect(progress.total).toBe(10)
-      expect(progress.completed).toBe(9)
-      expect(progress.isComplete).toBe(false)
-    })
+			// then
+			expect(progress.total).toBe(10);
+			expect(progress.completed).toBe(9);
+			expect(progress.isComplete).toBe(false);
+		});
 
-    test("should ignore checkboxes outside TODOs and Final Verification Wave sections", () => {
-      // given - plan with checkboxes in Work Objectives, Success Criteria, and other sections
-      const planPath = join(TEST_DIR, "ignore-other-sections-plan.md")
-      writeFileSync(planPath, `# Plan
+		test("should ignore checkboxes outside TODOs and Final Verification Wave sections", () => {
+			// given - plan with checkboxes in Work Objectives, Success Criteria, and other sections
+			const planPath = join(TEST_DIR, "ignore-other-sections-plan.md");
+			writeFileSync(
+				planPath,
+				`# Plan
 
 ## Work Objectives
 
@@ -516,59 +583,68 @@ describe("boulder-state", () => {
 - [ ] All Must Have present
 - [ ] All Must NOT Have absent
 - [ ] All tests pass
-`)
+`,
+			);
 
-      // when
-      const progress = getPlanProgress(planPath)
+			// when
+			const progress = getPlanProgress(planPath);
 
-      // then
-      expect(progress.total).toBe(2)
-      expect(progress.completed).toBe(1)
-      expect(progress.isComplete).toBe(false)
-    })
+			// then
+			expect(progress.total).toBe(2);
+			expect(progress.completed).toBe(1);
+			expect(progress.isComplete).toBe(false);
+		});
 
-    test("should ignore indented checkboxes under top-level tasks", () => {
-      // given - plan with indented unchecked nested checkboxes
-      const planPath = join(TEST_DIR, "nested-indented-plan.md")
-      writeFileSync(planPath, `# Plan
+		test("should ignore indented checkboxes under top-level tasks", () => {
+			// given - plan with indented unchecked nested checkboxes
+			const planPath = join(TEST_DIR, "nested-indented-plan.md");
+			writeFileSync(
+				planPath,
+				`# Plan
 
 ## TODOs
 - [x] 1. top-level completed task
   - [ ] nested unchecked task
-`)
+`,
+			);
 
-      // when
-      const progress = getPlanProgress(planPath)
+			// when
+			const progress = getPlanProgress(planPath);
 
-      // then
-      expect(progress.total).toBe(1)
-      expect(progress.completed).toBe(1)
-      expect(progress.isComplete).toBe(true)
-    })
+			// then
+			expect(progress.total).toBe(1);
+			expect(progress.completed).toBe(1);
+			expect(progress.isComplete).toBe(true);
+		});
 
-    test("should require proper task label format in TODOs", () => {
-      // given - plan with malformed labels (no numeric prefix)
-      const planPath = join(TEST_DIR, "malformed-labels-plan.md")
-      writeFileSync(planPath, `# Plan
+		test("should require proper task label format in TODOs", () => {
+			// given - plan with malformed labels (no numeric prefix)
+			const planPath = join(TEST_DIR, "malformed-labels-plan.md");
+			writeFileSync(
+				planPath,
+				`# Plan
 
 ## TODOs
 - [ ] no number prefix
 - [x] 1. Valid numbered task
-`)
+`,
+			);
 
-      // when
-      const progress = getPlanProgress(planPath)
+			// when
+			const progress = getPlanProgress(planPath);
 
-      // then
-      expect(progress.total).toBe(1)
-      expect(progress.completed).toBe(1)
-      expect(progress.isComplete).toBe(true)
-    })
+			// then
+			expect(progress.total).toBe(1);
+			expect(progress.completed).toBe(1);
+			expect(progress.isComplete).toBe(true);
+		});
 
-    test("should require F-prefix label format in Final Verification Wave", () => {
-      // given - plan with malformed final-wave labels
-      const planPath = join(TEST_DIR, "malformed-final-plan.md")
-      writeFileSync(planPath, `# Plan
+		test("should require F-prefix label format in Final Verification Wave", () => {
+			// given - plan with malformed final-wave labels
+			const planPath = join(TEST_DIR, "malformed-final-plan.md");
+			writeFileSync(
+				planPath,
+				`# Plan
 
 ## TODOs
 - [x] 1. Implementation done
@@ -577,21 +653,24 @@ describe("boulder-state", () => {
 - [ ] missing F-prefix
 - [ ] F1. Proper final review
 - [x] F2. Another final review
-`)
+`,
+			);
 
-      // when
-      const progress = getPlanProgress(planPath)
+			// when
+			const progress = getPlanProgress(planPath);
 
-      // then
-      expect(progress.total).toBe(3)
-      expect(progress.completed).toBe(2)
-      expect(progress.isComplete).toBe(false)
-    })
+			// then
+			expect(progress.total).toBe(3);
+			expect(progress.completed).toBe(2);
+			expect(progress.isComplete).toBe(false);
+		});
 
-    test("should return isComplete true when all top-level tasks checked", () => {
-      // given - all top-level tasks completed
-      const planPath = join(TEST_DIR, "complete-plan.md")
-      writeFileSync(planPath, `# Plan
+		test("should return isComplete true when all top-level tasks checked", () => {
+			// given - all top-level tasks completed
+			const planPath = join(TEST_DIR, "complete-plan.md");
+			writeFileSync(
+				planPath,
+				`# Plan
 
 ## TODOs
 - [x] 1. Task 1
@@ -599,183 +678,231 @@ describe("boulder-state", () => {
 
 ## Final Verification Wave
 - [x] F1. Final review
-`)
+`,
+			);
 
-      // when
-      const progress = getPlanProgress(planPath)
+			// when
+			const progress = getPlanProgress(planPath);
 
-      // then
-      expect(progress.total).toBe(3)
-      expect(progress.completed).toBe(3)
-      expect(progress.isComplete).toBe(true)
-    })
+			// then
+			expect(progress.total).toBe(3);
+			expect(progress.completed).toBe(3);
+			expect(progress.isComplete).toBe(true);
+		});
 
-    test("should return isComplete false for empty plan", () => {
-      // given - plan with no checkboxes
-      const planPath = join(TEST_DIR, "empty-plan.md")
-      writeFileSync(planPath, "# Plan\nNo tasks here")
+		test("should return isComplete false for empty plan", () => {
+			// given - plan with no checkboxes
+			const planPath = join(TEST_DIR, "empty-plan.md");
+			writeFileSync(planPath, "# Plan\nNo tasks here");
 
-      // when
-      const progress = getPlanProgress(planPath)
+			// when
+			const progress = getPlanProgress(planPath);
 
-      // then
-      expect(progress.total).toBe(0)
-      expect(progress.isComplete).toBe(false)
-    })
+			// then
+			expect(progress.total).toBe(0);
+			expect(progress.isComplete).toBe(false);
+		});
 
-    test("should handle non-existent file", () => {
-      // given - non-existent file
-      // when
-      const progress = getPlanProgress("/non/existent/file.md")
-      // then
-      expect(progress.total).toBe(0)
-      expect(progress.isComplete).toBe(true)
-    })
+		test("should handle non-existent file", () => {
+			// given - non-existent file
+			// when
+			const progress = getPlanProgress("/non/existent/file.md");
+			// then
+			expect(progress.total).toBe(0);
+			expect(progress.isComplete).toBe(true);
+		});
 
-    test("should support asterisk bullet top-level tasks", () => {
-      // given - plan with asterisk bullet tasks
-      const planPath = join(TEST_DIR, "asterisk-bullet-plan.md")
-      writeFileSync(planPath, `# Plan
+		test("should support asterisk bullet top-level tasks", () => {
+			// given - plan with asterisk bullet tasks
+			const planPath = join(TEST_DIR, "asterisk-bullet-plan.md");
+			writeFileSync(
+				planPath,
+				`# Plan
 
 ## TODOs
 * [x] 1. Task using asterisk bullet
 * [ ] 2. Another asterisk task
-`)
+`,
+			);
 
-      // when
-      const progress = getPlanProgress(planPath)
+			// when
+			const progress = getPlanProgress(planPath);
 
-      // then
-      expect(progress.total).toBe(2)
-      expect(progress.completed).toBe(1)
-      expect(progress.isComplete).toBe(false)
-    })
+			// then
+			expect(progress.total).toBe(2);
+			expect(progress.completed).toBe(1);
+			expect(progress.isComplete).toBe(false);
+		});
 
-    test("should count only top-level checkboxes for simple plans with nested tasks", () => {
-      // given
-      const planPath = join(TEST_DIR, "simple-nested-plan.md")
-      writeFileSync(planPath, `# Plan
+		test("should count only top-level checkboxes for simple plans with nested tasks", () => {
+			// given
+			const planPath = join(TEST_DIR, "simple-nested-plan.md");
+			writeFileSync(
+				planPath,
+				`# Plan
 
 - [ ] Top-level task 1
   - [x] Nested task ignored
 - [x] Top-level task 2
     * [ ] Another nested task ignored
-`)
+`,
+			);
 
-      // when
-      const progress = getPlanProgress(planPath)
+			// when
+			const progress = getPlanProgress(planPath);
 
-      // then
-      expect(progress.total).toBe(2)
-      expect(progress.completed).toBe(1)
-      expect(progress.isComplete).toBe(false)
-    })
+			// then
+			expect(progress.total).toBe(2);
+			expect(progress.completed).toBe(1);
+			expect(progress.isComplete).toBe(false);
+		});
 
-    test("should treat final-wave-only plans as structured mode", () => {
-      // given
-      const planPath = join(TEST_DIR, "final-wave-only-plan.md")
-      writeFileSync(planPath, `# Plan
+		test("should treat final-wave-only plans as structured mode", () => {
+			// given
+			const planPath = join(TEST_DIR, "final-wave-only-plan.md");
+			writeFileSync(
+				planPath,
+				`# Plan
 
 ## Final Verification Wave
 - [ ] F1. Top-level final review
   - [x] Nested verification detail ignored
-`)
+`,
+			);
 
-      // when
-      const progress = getPlanProgress(planPath)
+			// when
+			const progress = getPlanProgress(planPath);
 
-      // then
-      expect(progress.total).toBe(1)
-      expect(progress.completed).toBe(0)
-      expect(progress.isComplete).toBe(false)
-    })
+			// then
+			expect(progress.total).toBe(1);
+			expect(progress.completed).toBe(0);
+			expect(progress.isComplete).toBe(false);
+		});
 
-    test("should ignore mixed indentation levels in simple plans", () => {
-      // given
-      const planPath = join(TEST_DIR, "simple-mixed-indentation-plan.md")
-      writeFileSync(planPath, `# Plan
+		test("should ignore mixed indentation levels in simple plans", () => {
+			// given
+			const planPath = join(TEST_DIR, "simple-mixed-indentation-plan.md");
+			writeFileSync(
+				planPath,
+				`# Plan
 
 * [x] Top-level star task
  - [ ] Indented task ignored
 	- [x] Tab-indented task ignored
 - [ ] Top-level dash task
-`)
+`,
+			);
 
-      // when
-      const progress = getPlanProgress(planPath)
+			// when
+			const progress = getPlanProgress(planPath);
 
-      // then
-      expect(progress.total).toBe(2)
-      expect(progress.completed).toBe(1)
-      expect(progress.isComplete).toBe(false)
-    })
-  })
+			// then
+			expect(progress.total).toBe(2);
+			expect(progress.completed).toBe(1);
+			expect(progress.isComplete).toBe(false);
+		});
+	});
 
-  describe("getPlanName", () => {
-    test("should extract plan name from path", () => {
-      // given
-      const path = "/home/user/.sisyphus/plans/project/my-feature.md"
-      // when
-      const name = getPlanName(path)
-      // then
-      expect(name).toBe("my-feature")
-    })
-  })
+	describe("getPlanName", () => {
+		test("should extract plan name from path", () => {
+			// given
+			const path = "/home/user/.sisyphus/plans/project/my-feature.md";
+			// when
+			const name = getPlanName(path);
+			// then
+			expect(name).toBe("my-feature");
+		});
+	});
 
-  describe("createBoulderState", () => {
-    test("should create state with correct fields", () => {
-      // given
-      const planPath = "/path/to/auth-refactor.md"
-      const sessionId = "ses-abc123"
+	describe("createBoulderState", () => {
+		test("should create state with correct fields", () => {
+			// given
+			const planPath = "/path/to/auth-refactor.md";
+			const sessionId = "ses-abc123";
 
-      // when
-      const state = createBoulderState(planPath, sessionId)
+			// when
+			const state = createBoulderState(planPath, sessionId);
 
-      // then
-      expect(state.active_plan).toBe(planPath)
-      expect(state.session_ids).toEqual([sessionId])
-      expect(state.plan_name).toBe("auth-refactor")
-      expect(state.started_at).toBeDefined()
-    })
+			// then
+			expect(state.active_plan).toBe(planPath);
+			expect(state.session_ids).toEqual([sessionId]);
+			expect(state.plan_name).toBe("auth-refactor");
+			expect(state.started_at).toBeDefined();
+		});
 
-    test("should include agent field when provided", () => {
-      //#given - plan path, session id, and agent type
-      const planPath = "/path/to/feature.md"
-      const sessionId = "ses-xyz789"
-      const agent = "atlas"
+		test("should include agent field when provided", () => {
+			//#given - plan path, session id, and agent type
+			const planPath = "/path/to/feature.md";
+			const sessionId = "ses-xyz789";
+			const agent = "atlas";
 
-      //#when - createBoulderState is called with agent
-      const state = createBoulderState(planPath, sessionId, agent)
+			//#when - createBoulderState is called with agent
+			const state = createBoulderState(planPath, sessionId, agent);
 
-      //#then - state should include the agent field
-      expect(state.agent).toBe("atlas")
-      expect(state.active_plan).toBe(planPath)
-      expect(state.session_ids).toEqual([sessionId])
-      expect(state.plan_name).toBe("feature")
-    })
+			//#then - state should include the agent field
+			expect(state.agent).toBe("atlas");
+			expect(state.active_plan).toBe(planPath);
+			expect(state.session_ids).toEqual([sessionId]);
+			expect(state.plan_name).toBe("feature");
+		});
 
-    test("should mark the initial session origin as direct", () => {
-      // given
-      const planPath = "/path/to/feature.md"
-      const sessionId = "ses-origin"
+		test("should mark the initial session origin as direct", () => {
+			// given
+			const planPath = "/path/to/feature.md";
+			const sessionId = "ses-origin";
 
-      // when
-      const state = createBoulderState(planPath, sessionId)
+			// when
+			const state = createBoulderState(planPath, sessionId);
 
-      // then
-      expect(state.session_origins).toEqual({ [sessionId]: "direct" })
-    })
+			// then
+			expect(state.session_origins).toEqual({ [sessionId]: "direct" });
+		});
 
-    test("should allow agent to be undefined", () => {
-      //#given - plan path and session id without agent
-      const planPath = "/path/to/legacy.md"
-      const sessionId = "ses-legacy"
+		test("should stamp rebuildable runtime provenance when bead metadata is included", () => {
+			// given
+			const planPath = "/path/to/feature.md";
+			const sessionId = "ses-runtime";
 
-      //#when - createBoulderState is called without agent
-      const state = createBoulderState(planPath, sessionId)
+			// when
+			const state = createBoulderState(
+				planPath,
+				sessionId,
+				undefined,
+				"/repo",
+				{
+					beadID: "bd-123",
+					sourceCommand: "start",
+					worktreePath: "/repo/worktree",
+				},
+			);
 
-      //#then - state should not have agent field (backward compatible)
-      expect(state.agent).toBeUndefined()
-    })
-  })
-})
+			// then
+			expect(state.bead_runtime_state).toMatchObject({
+				schema_version: 1,
+				runtime_role: "rebuildable-runtime-state",
+				authoritative_source: "durable-beads-artifacts",
+				producer: { name: "omo", version: "3.16.0" },
+				runtime: { name: "oh-my-openagent", version: "3.16.0" },
+				compatibility: {
+					durable_truth: "beads-manifest-and-runtime-artifacts",
+					runtime_state_conflict_policy: "durable-wins-mark-runtime-stale",
+				},
+				last_rebuild_source: "start",
+				last_durable_artifact_ref:
+					".beads/artifacts/runtime-attachments/registry.schema-1.json",
+			});
+		});
+
+		test("should allow agent to be undefined", () => {
+			//#given - plan path and session id without agent
+			const planPath = "/path/to/legacy.md";
+			const sessionId = "ses-legacy";
+
+			//#when - createBoulderState is called without agent
+			const state = createBoulderState(planPath, sessionId);
+
+			//#then - state should not have agent field (backward compatible)
+			expect(state.agent).toBeUndefined();
+		});
+	});
+});
