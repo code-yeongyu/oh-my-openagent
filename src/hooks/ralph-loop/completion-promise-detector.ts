@@ -134,15 +134,18 @@ export async function detectCompletionInSessionMessages(
 				? messageArray.slice(options.sinceMessageIndex)
 				: messageArray
 
-		const assistantMessages = (scopedMessages as OpenCodeSessionMessage[]).filter((msg) => msg.info?.role === "assistant")
-		if (assistantMessages.length === 0) return false
+		const isVerificationPromise = options.promise === ULTRAWORK_VERIFICATION_PROMISE
+		const relevantMessages = isVerificationPromise
+			? (scopedMessages as OpenCodeSessionMessage[]).filter((msg) => msg.info?.role !== "user")
+			: (scopedMessages as OpenCodeSessionMessage[]).filter((msg) => msg.info?.role === "assistant")
+		if (relevantMessages.length === 0) return false
 
 		const pattern = buildPromisePattern(options.promise)
-		for (let index = assistantMessages.length - 1; index >= 0; index -= 1) {
-			const assistant = assistantMessages[index]
-			if (!assistant.parts) continue
+		for (let index = relevantMessages.length - 1; index >= 0; index -= 1) {
+			const message = relevantMessages[index]
+			if (!message.parts) continue
 
-			for (const part of assistant.parts) {
+			for (const part of message.parts) {
 				const partText = part.text ?? ""
 				if (!partText) continue
 				if (!shouldInspectSessionMessagePart(part.type, options.promise, partText)) continue

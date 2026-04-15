@@ -77,9 +77,17 @@ export async function handleFailedVerification(
 		messageCountAtStart,
 	)
 	if (!resumedState) {
-		log(`[${HOOK_NAME}] Failed to restart loop after verification failure`, {
+		log(`[${HOOK_NAME}] Failed to restart loop after verification failure (circuit breaker may have tripped)`, {
 			parentSessionID,
 		})
+		await ctx.client.tui?.showToast?.({
+			body: {
+				title: "ULTRAWORK LOOP",
+				message: "Verification failed after maximum attempts. Loop ended.",
+				variant: "error",
+				duration: 10000,
+			},
+		}).catch(() => {})
 		return false
 	}
 

@@ -3,6 +3,7 @@ import {
 	DEFAULT_COMPLETION_PROMISE,
 	DEFAULT_MAX_ITERATIONS,
 	HOOK_NAME,
+	MAX_VERIFICATION_ATTEMPTS,
 	ULTRAWORK_MAX_ITERATIONS,
 	ULTRAWORK_VERIFICATION_PROMISE,
 } from "./constants"
@@ -125,6 +126,7 @@ export function createLoopStateController(options: {
 			}
 
 			state.verification_pending = true
+			state.verification_attempts = 0
 			state.completion_promise = ULTRAWORK_VERIFICATION_PROMISE
 			state.verification_attempt_id = undefined
 			state.verification_session_id = undefined
@@ -158,7 +160,18 @@ export function createLoopStateController(options: {
 				return null
 			}
 
+			const attempts = (state.verification_attempts ?? 0) + 1
+			if (attempts >= MAX_VERIFICATION_ATTEMPTS) {
+				log(`[${HOOK_NAME}] Verification circuit breaker tripped after ${attempts} attempts, ending loop`, {
+					sessionID,
+					iteration: state.iteration,
+				})
+				clearState(directory, stateDir)
+				return null
+			}
+
 			state.iteration += 1
+			state.verification_attempts = attempts
 			state.started_at = new Date().toISOString()
 			state.completion_promise = state.initial_completion_promise ?? DEFAULT_COMPLETION_PROMISE
 			state.verification_pending = undefined

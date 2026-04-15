@@ -53,18 +53,18 @@ async function detectOracleVerificationFromParentSession(
 				? responseData
 				: []
 
-		for (let index = messageArray.length - 1; index >= 0; index -= 1) {
-			const message = messageArray[index] as OpenCodeSessionMessage
-			if (message.info?.role !== "assistant") {
-				continue
-			}
+	for (let index = messageArray.length - 1; index >= 0; index -= 1) {
+		const message = messageArray[index] as OpenCodeSessionMessage
+		if (message.info?.role === "user") {
+			continue
+		}
 
-			const assistantText = collectAssistantText(message)
-			if (!isOracleVerified(assistantText)) {
-				continue
-			}
+		const messageText = collectAssistantText(message)
+		if (!isOracleVerified(messageText)) {
+			continue
+		}
 
-			const detectedOracleSessionID = extractOracleSessionID(assistantText)
+			const detectedOracleSessionID = extractOracleSessionID(messageText)
 			if (detectedOracleSessionID) {
 				return detectedOracleSessionID
 			}
