@@ -119,3 +119,52 @@ describe("migrateConfigFile sidecar write ordering", () => {
     expect(statSync(getSidecarPath(configPath)).isDirectory()).toBe(true)
   })
 })
+
+describe("migrateConfigFile backup skipping", () => {
+  test("skips backup when file content is identical after migration", () => {
+    // given - config with legacy key that migrates to same on-disk content
+    const workdir = createWorkdir()
+    const configPath = join(workdir, "oh-my-opencode.json")
+    const migratedContent = {
+      disabled_hooks: ["comment-checker"],
+    }
+
+    // Write the already-migrated content to disk
+    writeFileSync(configPath, JSON.stringify(migratedContent, null, 2) + "\n")
+
+    // rawConfig still has the legacy hook that will be removed
+    const rawConfig: Record<string, unknown> = {
+      disabled_hooks: ["gpt-permission-continuation", "comment-checker"],
+    }
+
+    // when
+    migrateConfigFile(configPath, rawConfig)
+
+    // then - no backup file should be created since file content is unchanged
+    const files = require("fs").readdirSync(workdir) as string[]
+    const backupFiles = files.filter((f: string) => f.includes(".bak."))
+    expect(backupFiles.length).toBe(0)
+  })
+
+  test("creates backup when file content actually changes", () => {
+    // given - config with model that needs migration
+    const workdir = createWorkdir()
+    const configPath = join(workdir, "oh-my-opencode.json")
+    const rawConfig = {
+      agents: {
+        prometheus: { model: "anthropic/claude-opus-4-5" },
+      },
+    }
+
+    writeFileSync(configPath, JSON.stringify(rawConfig, null, 2) + "\n")
+
+    // when
+    const needsWrite = migrateConfigFile(configPath, rawConfig as Record<string, unknown>)
+
+    // then - backup should be created since content changed
+    expect(needsWrite).toBe(true)
+    const files = require("fs").readdirSync(workdir) as string[]
+    const backupFiles = files.filter((f: string) => f.includes(".bak."))
+    expect(backupFiles.length).toBe(1)
+  })
+})
