@@ -278,7 +278,7 @@ export function loadPluginConfig(
   if (projectConfig?.agent_definitions) {
     projectConfig.agent_definitions = resolveAgentDefinitionPaths(
       projectConfig.agent_definitions,
-      directory,
+      projectBasePath,
       directory
     )
   }

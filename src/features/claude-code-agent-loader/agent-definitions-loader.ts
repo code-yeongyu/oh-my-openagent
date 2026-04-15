@@ -28,7 +28,8 @@ export function parseMarkdownAgentFile(filePath: string, scope: AgentScope): Loa
     const content = readFileSync(filePath, "utf-8")
     const { data, body } = parseFrontmatter<AgentFrontmatter>(content)
 
-    const agentName = basename(filePath, ".md")
+    const fileName = basename(filePath)
+    const agentName = fileName.replace(/\.md$/i, "")
     const name = data.name || agentName
     const originalDescription = data.description || ""
 

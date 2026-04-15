@@ -82,6 +82,22 @@ Prompt.`
       expect(result?.config.prompt).toBe("Prompt.")
     })
 
+    test("strips .MD extension case-insensitively for agent name", () => {
+      const filePath = join(tempDir, "UpperCase.MD")
+      const content = `---
+description: Mixed case extension
+---
+
+Prompt content.`
+
+      writeFileSync(filePath, content, "utf-8")
+
+      const result = parseMarkdownAgentFile(filePath, "definition-file")
+
+      expect(result).not.toBeNull()
+      expect(result?.name).toBe("UpperCase")
+    })
+
     test("defaults mode to subagent when not specified", () => {
       const filePath = join(tempDir, "no-mode.md")
       const content = `---

@@ -124,7 +124,7 @@ describe("readOpencodeConfigAgents", () => {
     const opencodeDir = path.join(tempDir, ".opencode")
     fs.mkdirSync(opencodeDir, { recursive: true })
 
-    const agentDefFile = path.join(tempDir, "agents.json")
+    const agentDefFile = path.join(opencodeDir, "agents.json")
     fs.writeFileSync(
       agentDefFile,
       JSON.stringify({
@@ -146,7 +146,7 @@ describe("readOpencodeConfigAgents", () => {
 
     if (Object.keys(result).length > 0) {
       expect(result).toHaveProperty("definition-agent")
-      expect(result["definition-agent"].description).toContain("definition-file")
+      expect(result["definition-agent"].description).toContain("From definition file")
     }
 
     fs.rmSync(tempDir, { recursive: true })
@@ -157,7 +157,7 @@ describe("readOpencodeConfigAgents", () => {
     const opencodeDir = path.join(tempDir, ".opencode")
     fs.mkdirSync(opencodeDir, { recursive: true })
 
-    const agentDefFile = path.join(tempDir, "agents.json")
+    const agentDefFile = path.join(opencodeDir, "agents.json")
     fs.writeFileSync(
       agentDefFile,
       JSON.stringify({
@@ -288,7 +288,7 @@ describe("readOpencodeConfigAgents", () => {
     const opencodeDir = path.join(tempDir, ".opencode")
     fs.mkdirSync(opencodeDir, { recursive: true })
 
-    const agentDef1 = path.join(tempDir, "agents1.json")
+    const agentDef1 = path.join(opencodeDir, "agents1.json")
     fs.writeFileSync(
       agentDef1,
       JSON.stringify({
@@ -298,7 +298,7 @@ describe("readOpencodeConfigAgents", () => {
       })
     )
 
-    const agentDef2 = path.join(tempDir, "agents2.json")
+    const agentDef2 = path.join(opencodeDir, "agents2.json")
     fs.writeFileSync(
       agentDef2,
       JSON.stringify({

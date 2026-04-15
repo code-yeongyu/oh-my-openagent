@@ -1,7 +1,7 @@
 import * as fs from "node:fs"
-import * as os from "node:os"
 import * as path from "node:path"
 
+import { getOpenCodeConfigDir } from "../../shared/opencode-config-dir"
 import { parseJsoncSafe } from "../../shared/jsonc-parser"
 import { loadAgentDefinitions } from "./agent-definitions-loader"
 import { mapClaudeModelToOpenCode } from "./claude-model-mapper"
@@ -13,26 +13,14 @@ interface OpencodeConfigWithAgents {
   agent_definitions?: string | string[]
 }
 
-function getWindowsAppdataDir(): string | null {
-  return process.env.APPDATA || null
-}
-
 function getConfigPaths(directory: string): string[] {
-  const crossPlatformDir = path.join(os.homedir(), ".config")
+  const globalConfigDir = getOpenCodeConfigDir({ binary: "opencode" })
   const paths = [
     path.join(directory, ".opencode", "opencode.json"),
     path.join(directory, ".opencode", "opencode.jsonc"),
-    path.join(crossPlatformDir, "opencode", "opencode.json"),
-    path.join(crossPlatformDir, "opencode", "opencode.jsonc"),
+    path.join(globalConfigDir, "opencode.json"),
+    path.join(globalConfigDir, "opencode.jsonc"),
   ]
-
-  if (process.platform === "win32") {
-    const appdataDir = getWindowsAppdataDir()
-    if (appdataDir) {
-      paths.push(path.join(appdataDir, "opencode", "opencode.json"))
-      paths.push(path.join(appdataDir, "opencode", "opencode.jsonc"))
-    }
-  }
 
   return paths
 }
@@ -108,6 +96,7 @@ export function readOpencodeConfigAgents(directory: string): Record<string, Clau
 
       if (agentsToLoad && typeof agentsToLoad === "object") {
         for (const [agentName, agentData] of Object.entries(agentsToLoad)) {
+          if (agentName in result) continue
           const converted = convertInlineAgent(agentData)
           if (converted) {
             result[agentName] = converted
