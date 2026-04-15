@@ -19,7 +19,7 @@ export class LSPClient extends LSPClientConnection {
 
     if (!this.openedFiles.has(absPath)) {
       const ext = extname(absPath)
-      const languageId = getLanguageId(ext)
+      const languageId = getLanguageId(absPath, ext)
       const version = 1
 
       this.sendNotification("textDocument/didOpen", {
