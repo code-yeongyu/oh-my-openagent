@@ -1,23 +1,22 @@
-import { describe, expect, it, beforeEach, afterEach } from "bun:test"
-import { mock } from "bun:test"
+import { describe, expect, it, beforeEach, afterEach, spyOn } from "bun:test"
 import * as fs from "node:fs"
 import * as os from "node:os"
 import * as path from "node:path"
 
-// Mock getOpenCodeConfigDir to prevent global config leakage
-let mockGlobalConfigDir: string
-mock.module("../../shared/opencode-config-dir", () => ({
-  getOpenCodeConfigDir: () => mockGlobalConfigDir,
-}))
-
-const { readOpencodeConfigAgents } = require("./opencode-config-agents-reader")
+import * as configDir from "../../shared/opencode-config-dir"
+import { readOpencodeConfigAgents } from "./opencode-config-agents-reader"
 
 describe("readOpencodeConfigAgents", () => {
+  let mockGlobalConfigDir = ""
+  let configDirSpy: ReturnType<typeof spyOn>
+
   beforeEach(() => {
     mockGlobalConfigDir = fs.mkdtempSync(path.join(os.tmpdir(), "opencode-mock-global-"))
+    configDirSpy = spyOn(configDir, "getOpenCodeConfigDir").mockReturnValue(mockGlobalConfigDir)
   })
 
   afterEach(() => {
+    configDirSpy.mockRestore()
     fs.rmSync(mockGlobalConfigDir, { recursive: true, force: true })
   })
 
