@@ -289,6 +289,27 @@ describe("sisyphus-task", () => {
       expect(result).toBe(false)
     })
 
+    test("returns false for 'Momus (Plan Critic)' - no substring false-positive", () => {
+      //#given / #when
+      const result = isPlanFamily("Momus (Plan Critic)")
+      //#then
+      expect(result).toBe(false)
+    })
+
+    test("returns false for 'Momus - Plan Critic' - no substring false-positive", () => {
+      //#given / #when
+      const result = isPlanFamily("Momus - Plan Critic")
+      //#then
+      expect(result).toBe(false)
+    })
+
+    test("returns false for 'Metis - Plan Consultant' - no substring false-positive", () => {
+      //#given / #when
+      const result = isPlanFamily("Metis - Plan Consultant")
+      //#then
+      expect(result).toBe(false)
+    })
+
     test("returns false for undefined", () => {
       //#given / #when
       const result = isPlanFamily(undefined)
