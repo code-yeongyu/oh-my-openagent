@@ -17,6 +17,7 @@ export * from "./claude-config-dir"
 export * from "./jsonc-parser"
 export * from "./migration"
 export * from "./opencode-config-dir"
+export * from "./resolve-agent-definition-paths"
 export type {
   OpenCodeBinaryType,
   OpenCodeConfigDirOptions,
@@ -75,3 +76,4 @@ export { SessionCategoryRegistry } from "./session-category-registry"
 export * from "./plugin-identity"
 export * from "./log-legacy-plugin-startup-warning"
 export * from "./task-system-enabled"
+export * from "./parse-tools-config"

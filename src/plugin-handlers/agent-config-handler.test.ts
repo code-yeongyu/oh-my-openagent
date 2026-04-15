@@ -61,6 +61,8 @@ describe("applyAgentConfig builtin override protection", () => {
   let discoverGlobalAgentsSkillsSpy: ReturnType<typeof spyOn>
   let loadUserAgentsSpy: ReturnType<typeof spyOn>
   let loadProjectAgentsSpy: ReturnType<typeof spyOn>
+  let loadAgentDefinitionsSpy: ReturnType<typeof spyOn>
+  let readOpencodeConfigAgentsSpy: ReturnType<typeof spyOn>
   let migrateAgentConfigSpy: ReturnType<typeof spyOn>
   let logSpy: ReturnType<typeof spyOn>
 
@@ -140,6 +142,11 @@ describe("applyAgentConfig builtin override protection", () => {
 
     loadUserAgentsSpy = spyOn(agentLoader, "loadUserAgents").mockReturnValue({})
     loadProjectAgentsSpy = spyOn(agentLoader, "loadProjectAgents").mockReturnValue({})
+    loadAgentDefinitionsSpy = spyOn(agentLoader, "loadAgentDefinitions").mockReturnValue({})
+    readOpencodeConfigAgentsSpy = spyOn(
+      agentLoader,
+      "readOpencodeConfigAgents",
+    ).mockReturnValue({})
 
     migrateAgentConfigSpy = spyOn(shared, "migrateAgentConfig").mockImplementation(
       (config: Record<string, unknown>) => config,
@@ -159,6 +166,8 @@ describe("applyAgentConfig builtin override protection", () => {
     discoverGlobalAgentsSkillsSpy.mockRestore()
     loadUserAgentsSpy.mockRestore()
     loadProjectAgentsSpy.mockRestore()
+    loadAgentDefinitionsSpy.mockRestore()
+    readOpencodeConfigAgentsSpy.mockRestore()
     migrateAgentConfigSpy.mockRestore()
     logSpy.mockRestore()
   })
@@ -440,5 +449,209 @@ describe("applyAgentConfig builtin override protection", () => {
         expect.objectContaining({ name: "global-agent-skill" }),
       ]),
     )
+  })
+
+  describe("agent_definitions and opencode.json integration", () => {
+    test("agent_definitions agents appear in output", async () => {
+      // given
+      loadAgentDefinitionsSpy.mockReturnValue({
+        "my-custom-agent": {
+          name: "my-custom-agent",
+          prompt: "test custom agent from agent_definitions",
+          mode: "subagent",
+        },
+      })
+      const pluginConfig = createPluginConfig()
+      pluginConfig.agent_definitions = ["/fake/path/agent.md"]
+
+      // when
+      const result = await applyAgentConfig({
+        config: createBaseConfig(),
+        pluginConfig,
+        ctx: { directory: "/tmp" },
+        pluginComponents: createPluginComponents(),
+      })
+
+      // then
+      expect(result["my-custom-agent"]).toBeDefined()
+      expect(result["my-custom-agent"]?.prompt).toBe("test custom agent from agent_definitions")
+    })
+
+    test("opencode.json agents appear in output", async () => {
+      // given
+      readOpencodeConfigAgentsSpy.mockReturnValue({
+        "opencode-agent": {
+          name: "opencode-agent",
+          prompt: "test opencode config agent",
+          mode: "subagent",
+          description: "(opencode-config) OC",
+        },
+      })
+
+      // when
+      const result = await applyAgentConfig({
+        config: createBaseConfig(),
+        pluginConfig: createPluginConfig(),
+        ctx: { directory: "/tmp" },
+        pluginComponents: createPluginComponents(),
+      })
+
+      // then
+      expect(result["opencode-agent"]).toBeDefined()
+      expect(result["opencode-agent"]?.prompt).toBe("test opencode config agent")
+      expect(result["opencode-agent"]?.description).toBe("(opencode-config) OC")
+    })
+
+    test("agent_definitions agents subject to disabled_agents filtering", async () => {
+      // given
+      loadAgentDefinitionsSpy.mockReturnValue({
+        "disabled-custom-agent": {
+          name: "disabled-custom-agent",
+          prompt: "this should be filtered",
+          mode: "subagent",
+        },
+      })
+      const pluginConfig = createPluginConfig()
+      pluginConfig.agent_definitions = ["/fake/path/agent.md"]
+      pluginConfig.disabled_agents = ["disabled-custom-agent"]
+
+      // when
+      const result = await applyAgentConfig({
+        config: createBaseConfig(),
+        pluginConfig,
+        ctx: { directory: "/tmp" },
+        pluginComponents: createPluginComponents(),
+      })
+
+      // then
+      expect(result["disabled-custom-agent"]).toBeUndefined()
+    })
+
+    test("agent_definitions cannot override builtin agents", async () => {
+      // given
+      loadAgentDefinitionsSpy.mockReturnValue({
+        oracle: {
+          name: "oracle",
+          prompt: "evil override prompt",
+          mode: "subagent",
+        },
+      })
+      const pluginConfig = createPluginConfig()
+      pluginConfig.agent_definitions = ["/fake/path/agent.md"]
+
+      // when
+      const result = await applyAgentConfig({
+        config: createBaseConfig(),
+        pluginConfig,
+        ctx: { directory: "/tmp" },
+        pluginComponents: createPluginComponents(),
+      })
+
+      // then
+      expect(result.oracle).toBeDefined()
+      expect(result.oracle?.prompt).not.toBe("evil override prompt")
+    })
+
+    test("precedence: configAgents override agent_definitions", async () => {
+      // given
+      loadAgentDefinitionsSpy.mockReturnValue({
+        "shared-name": {
+          name: "shared-name",
+          prompt: "from-definitions",
+          mode: "subagent",
+        },
+      })
+      const config = createBaseConfig()
+      ;(config as Record<string, unknown>).agent = {
+        "shared-name": {
+          name: "shared-name",
+          prompt: "from-config",
+          mode: "subagent",
+        },
+      }
+      const pluginConfig = createPluginConfig()
+      pluginConfig.agent_definitions = ["/fake/path/agent.md"]
+
+      // when
+      const result = await applyAgentConfig({
+        config,
+        pluginConfig,
+        ctx: { directory: "/tmp" },
+        pluginComponents: createPluginComponents(),
+      })
+
+      // then
+      expect(result["shared-name"]).toBeDefined()
+      expect(result["shared-name"]?.prompt).toBe("from-config")
+    })
+
+    test("precedence: agent_definitions overrides project agents", async () => {
+      // given
+      loadProjectAgentsSpy.mockReturnValue({
+        "shared-name": {
+          name: "shared-name",
+          prompt: "from-project",
+          mode: "subagent",
+        },
+      })
+      loadAgentDefinitionsSpy.mockReturnValue({
+        "shared-name": {
+          name: "shared-name",
+          prompt: "from-definitions",
+          mode: "subagent",
+        },
+      })
+      const pluginConfig = createPluginConfig()
+      pluginConfig.agent_definitions = ["/fake/path/agent.md"]
+
+      // when
+      const result = await applyAgentConfig({
+        config: createBaseConfig(),
+        pluginConfig,
+        ctx: { directory: "/tmp" },
+        pluginComponents: createPluginComponents(),
+      })
+
+      // then
+      expect(result["shared-name"]).toBeDefined()
+      expect(result["shared-name"]?.prompt).toBe("from-definitions")
+    })
+
+    test("both Sisyphus-enabled and disabled paths include new sources", async () => {
+      // given
+      loadAgentDefinitionsSpy.mockReturnValue({
+        "definitions-agent": {
+          name: "definitions-agent",
+          prompt: "from agent_definitions",
+          mode: "subagent",
+        },
+      })
+      readOpencodeConfigAgentsSpy.mockReturnValue({
+        "opencode-agent": {
+          name: "opencode-agent",
+          prompt: "from opencode.json",
+          mode: "subagent",
+        },
+      })
+      const pluginConfig = createPluginConfig()
+      pluginConfig.agent_definitions = ["/fake/path/agent.md"]
+      if (pluginConfig.sisyphus_agent) {
+        pluginConfig.sisyphus_agent.planner_enabled = false
+      }
+
+      // when
+      const result = await applyAgentConfig({
+        config: createBaseConfig(),
+        pluginConfig,
+        ctx: { directory: "/tmp" },
+        pluginComponents: createPluginComponents(),
+      })
+
+      // then
+      expect(result["definitions-agent"]).toBeDefined()
+      expect(result["definitions-agent"]?.prompt).toBe("from agent_definitions")
+      expect(result["opencode-agent"]).toBeDefined()
+      expect(result["opencode-agent"]?.prompt).toBe("from opencode.json")
+    })
   })
 })
