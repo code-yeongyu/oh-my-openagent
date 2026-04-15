@@ -39,7 +39,7 @@ export async function resolveOrCreateSessionId(
 
 	const body = {
 		parentID: toolContext.sessionID,
-		title: `${args.description} (@${args.subagent_type} subagent)`,
+		title: `${args.description} (@${args.subagent_type ?? "agent"} subagent)`,
 	}
 
 	const createResult = await ctx.client.session.create({

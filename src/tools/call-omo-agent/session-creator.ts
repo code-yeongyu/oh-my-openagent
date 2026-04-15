@@ -38,7 +38,7 @@ export async function createOrGetSession(
     const createResult = await ctx.client.session.create({
       body: {
         parentID: toolContext.sessionID,
-        title: `${args.description} (@${args.subagent_type} subagent)`,
+        title: `${args.description} (@${args.subagent_type ?? "agent"} subagent)`,
       } as Record<string, unknown>,
       query: {
         directory: parentDirectory,
