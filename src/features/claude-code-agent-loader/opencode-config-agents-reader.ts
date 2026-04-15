@@ -79,7 +79,7 @@ function convertInlineAgent(agentData: unknown): ClaudeCodeAgentConfig | null {
 }
 
 export function readOpencodeConfigAgents(directory: string): Record<string, ClaudeCodeAgentConfig> {
-  const result: Record<string, ClaudeCodeAgentConfig> = {}
+  const result: Record<string, ClaudeCodeAgentConfig> = Object.create(null)
 
   for (const configPath of getConfigPaths(directory)) {
     try {
