@@ -23,6 +23,16 @@ function supportsCachedAnthropicLimit(modelID: string): boolean {
   return /^claude-(opus|sonnet)-4(?:-|\.)6(?:-high)?$/.test(modelID)
 }
 
+const KNOWN_GA_CONTEXT_LIMITS: Record<string, number> = {
+  "claude-opus-4-6": 680_000,
+  "claude-sonnet-4-6": 680_000,
+}
+
+function getKnownGAContextLimit(modelID: string): number | undefined {
+  const normalized = modelID.replace(/-high$/, "")
+  return KNOWN_GA_CONTEXT_LIMITS[normalized]
+}
+
 export function resolveActualContextLimit(
   providerID: string,
   modelID: string,
@@ -35,7 +45,7 @@ export function resolveActualContextLimit(
     const cachedLimit = modelCacheState?.modelContextLimitsCache?.get(`${providerID}/${modelID}`)
     if (cachedLimit && supportsCachedAnthropicLimit(modelID)) return cachedLimit
 
-    return DEFAULT_ANTHROPIC_ACTUAL_LIMIT
+    return getKnownGAContextLimit(modelID) ?? DEFAULT_ANTHROPIC_ACTUAL_LIMIT
   }
 
   return modelCacheState?.modelContextLimitsCache?.get(`${providerID}/${modelID}`) ?? null
