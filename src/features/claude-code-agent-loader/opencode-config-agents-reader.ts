@@ -96,7 +96,7 @@ export function readOpencodeConfigAgents(directory: string): Record<string, Clau
 
       if (agentsToLoad && typeof agentsToLoad === "object") {
         for (const [agentName, agentData] of Object.entries(agentsToLoad)) {
-          if (agentName in result) continue
+          if (Object.hasOwn(result, agentName)) continue
           const converted = convertInlineAgent(agentData)
           if (converted) {
             result[agentName] = converted
@@ -113,7 +113,7 @@ export function readOpencodeConfigAgents(directory: string): Record<string, Clau
         const definitionAgents = loadAgentDefinitions(resolvedPaths, "opencode-config")
 
         for (const [name, config] of Object.entries(definitionAgents)) {
-          if (!(name in result)) {
+          if (!Object.hasOwn(result, name)) {
             result[name] = config
           }
         }
