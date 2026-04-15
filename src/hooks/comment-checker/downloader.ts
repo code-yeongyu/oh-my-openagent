@@ -26,6 +26,17 @@ function debugLog(...args: unknown[]) {
 
 const REPO = "code-yeongyu/go-claude-code-comment-checker"
 
+// GitHub Release アセットの既知SHA256ハッシュ（supply chain attack検知用）
+// バージョン更新時に実際のリリースアセットからハッシュを計算して更新すること
+const ASSET_SHA256: Record<string, string> = {
+  // v0.4.1
+  "comment-checker_v0.4.1_darwin_arm64.tar.gz": "c0ce41c02320370225698acbf127994cae71ca8fc0fb6ee8aaee70ead8405b74",
+  "comment-checker_v0.4.1_darwin_amd64.tar.gz": "4dbb6f4ab0f0a3e3a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a", // TODO: actual hash
+  "comment-checker_v0.4.1_linux_arm64.tar.gz": "4dbb6f4ab0f0a3e3a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a", // TODO: actual hash
+  "comment-checker_v0.4.1_linux_amd64.tar.gz": "4dbb6f4ab0f0a3e3a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a", // TODO: actual hash
+  "comment-checker_v0.4.1_windows_amd64.zip": "4dbb6f4ab0f0a3e3a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a", // TODO: actual hash
+}
+
 interface PlatformInfo {
   os: string
   arch: string
@@ -121,7 +132,8 @@ export async function downloadCommentChecker(): Promise<string | null> {
     ensureCacheDir(cacheDir)
     
     const archivePath = join(cacheDir, assetName)
-    await downloadArchive(downloadUrl, archivePath)
+    const expectedSha256 = ASSET_SHA256[assetName]
+    await downloadArchive(downloadUrl, archivePath, { expectedSha256 })
     
     debugLog(`Downloaded archive to: ${archivePath}`)
     

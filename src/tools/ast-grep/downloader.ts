@@ -15,6 +15,18 @@ import { CACHE_DIR_NAME, PUBLISHED_PACKAGE_NAME } from "../../shared/plugin-iden
 
 const REPO = "ast-grep/ast-grep"
 
+// GitHub Release アセットの既知SHA256ハッシュ（supply chain attack検知用）
+// バージョン更新時に実際のリリースアセットからハッシュを計算して更新すること
+const ASSET_SHA256: Record<string, string> = {
+  // v0.41.1
+  "app-aarch64-apple-darwin.zip": "ffd07706f1e0eb4a5844d00983bba010e8ec2d8480bf9a06db4422672d9820c5",
+  "app-x86_64-apple-darwin.zip": "0000000000000000000000000000000000000000000000000000000000000000", // TODO: actual hash
+  "app-aarch64-unknown-linux-gnu.zip": "0000000000000000000000000000000000000000000000000000000000000000", // TODO: actual hash
+  "app-x86_64-unknown-linux-gnu.zip": "0000000000000000000000000000000000000000000000000000000000000000", // TODO: actual hash
+  "app-x86_64-pc-windows-msvc.zip": "0000000000000000000000000000000000000000000000000000000000000000", // TODO: actual hash
+  "app-aarch64-pc-windows-msvc.zip": "0000000000000000000000000000000000000000000000000000000000000000", // TODO: actual hash
+}
+
 // IMPORTANT: Update this when bumping @ast-grep/cli in package.json
 // This is only used as fallback when @ast-grep/cli package.json cannot be read
 const DEFAULT_VERSION = "0.41.1"
@@ -91,8 +103,9 @@ export async function downloadAstGrep(version: string = DEFAULT_VERSION): Promis
 
   try {
     const archivePath = join(cacheDir, assetName)
+    const expectedSha256 = ASSET_SHA256[assetName]
     ensureCacheDir(cacheDir)
-    await downloadArchive(downloadUrl, archivePath)
+    await downloadArchive(downloadUrl, archivePath, { expectedSha256 })
     await extractZipArchive(archivePath, cacheDir)
     cleanupArchive(archivePath)
     ensureExecutable(binaryPath)

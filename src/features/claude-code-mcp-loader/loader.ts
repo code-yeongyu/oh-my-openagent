@@ -11,6 +11,7 @@ import type {
 import { transformMcpServer } from "./transformer"
 import { log } from "../../shared/logger"
 import { shouldLoadMcpServer } from "./scope-filter"
+import { shouldGateProject, TRUST_ENV_VAR } from "../../features/trust-gate"
 
 interface McpConfigPath {
   path: string
@@ -83,6 +84,9 @@ export async function loadMcpConfigs(
   const disabledSet = new Set(disabledMcps)
   const cwd = process.cwd()
 
+  // Trust Gate: projectスコープのMCPチェック
+  const projectNeedsGate = shouldGateProject(cwd)
+
   for (const { path, scope } of paths) {
     const config = await loadMcpConfigFile(path)
     if (!config?.mcpServers) continue
@@ -100,6 +104,15 @@ export async function loadMcpConfigs(
           cwd,
         })
         continue
+      }
+
+      // Trust Gate: project/localスコープでcommand+argsを持つMCPは承認が必要
+      const isProjectScope = scope === "project" || scope === "local"
+      if (isProjectScope && serverConfig.command && projectNeedsGate) {
+        if (process.env[TRUST_ENV_VAR] !== "1") {
+          log(`[trust-gate] MCP server "${name}" disabled - project not trusted`, { path })
+          continue
+        }
       }
 
       if (serverConfig.disabled) {

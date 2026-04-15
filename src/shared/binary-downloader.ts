@@ -1,8 +1,10 @@
 import { chmodSync, existsSync, mkdirSync, unlinkSync } from "node:fs";
 import * as path from "node:path";
+import { createHash } from "node:crypto";
 import { spawn } from "bun";
 import { validateArchiveEntries, type ArchiveEntry } from "./archive-entry-validator";
 import { extractZip } from "./zip-extractor";
+import { log } from "./logger";
 
 function isTarTraversalErrorOutput(output: string): boolean {
   return /path contains '\.\.'|member name contains '\.\.'|removing leading [`'\"]?\.\.\//i.test(output)
@@ -19,7 +21,22 @@ export function ensureCacheDir(cacheDir: string): void {
   }
 }
 
-export async function downloadArchive(downloadUrl: string, archivePath: string): Promise<void> {
+export class BinaryIntegrityError extends Error {
+  constructor(message: string, public readonly expectedHash: string, public readonly actualHash: string) {
+    super(message);
+    this.name = "BinaryIntegrityError";
+  }
+}
+
+export interface DownloadArchiveOptions {
+  expectedSha256?: string;
+}
+
+export async function downloadArchive(
+  downloadUrl: string,
+  archivePath: string,
+  options?: DownloadArchiveOptions
+): Promise<void> {
   const response = await fetch(downloadUrl, { redirect: "follow" });
   if (!response.ok) {
     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -27,6 +44,28 @@ export async function downloadArchive(downloadUrl: string, archivePath: string):
 
   const arrayBuffer = await response.arrayBuffer();
   await Bun.write(archivePath, arrayBuffer);
+
+  // SHA256検証（提供されている場合）
+  if (options?.expectedSha256) {
+    const actualSha256 = createHash("sha256")
+      .update(new Uint8Array(arrayBuffer))
+      .digest("hex");
+
+    if (actualSha256 !== options.expectedSha256.toLowerCase()) {
+      // 検証失敗時はファイルを削除してエラーをスロー
+      unlinkSync(archivePath);
+      log(`[binary-downloader] SHA256 mismatch for ${archivePath}: expected ${options.expectedSha256}, got ${actualSha256}`);
+      throw new BinaryIntegrityError(
+        `Binary integrity check failed: SHA256 mismatch for ${downloadUrl}`,
+        options.expectedSha256,
+        actualSha256
+      );
+    }
+    log(`[binary-downloader] SHA256 verified for ${archivePath}`);
+  } else {
+    // expectedSha256未指定時は警告ログを出して後方互換
+    log(`[binary-downloader] Warning: No SHA256 provided for ${downloadUrl} - skipping integrity check`);
+  }
 }
 
 export async function extractTarGz(

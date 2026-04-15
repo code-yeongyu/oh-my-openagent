@@ -5,6 +5,7 @@ import { getLocalVersion } from "./get-local-version"
 import { doctor } from "./doctor"
 import { refreshModelCapabilities } from "./refresh-model-capabilities"
 import { createMcpOAuthCommand } from "./mcp-oauth"
+import { setupTrustCommand } from "../features/trust-gate/cli"
 import type { InstallArgs } from "./types"
 import type { RunOptions } from "./run"
 import type { GetLocalVersionOptions } from "./get-local-version/types"
@@ -203,6 +204,9 @@ program
   })
 
 program.addCommand(createMcpOAuthCommand())
+
+// Trust Gateコマンド登録
+setupTrustCommand(program)
 
 export function runCli(): void {
   program.parse()

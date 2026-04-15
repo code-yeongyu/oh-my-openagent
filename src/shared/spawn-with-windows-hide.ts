@@ -77,7 +77,8 @@ export function spawnWithWindowsHide(command: string[], options: SpawnOptions): 
     env: options.env,
     stdio: [options.stdin ?? "pipe", options.stdout ?? "pipe", options.stderr ?? "pipe"],
     windowsHide: true,
-    shell: true,
+    // shell: true を削除 - CVE-2024-27980 (Node.js Windows cmd.exe 引数境界バグ) 対策
+    // args経由の引数越境実行を防ぐため、コマンドと引数を分離して渡す
   })
 
   return wrapNodeProcess(proc)

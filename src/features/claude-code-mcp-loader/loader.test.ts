@@ -8,6 +8,9 @@ import { tmpdir } from "os"
 const TEST_DIR = join(tmpdir(), "mcp-loader-test-" + Date.now())
 const TEST_HOME = join(TEST_DIR, "home")
 
+// Trust Gate bypass for tests
+process.env.OMO_TRUST_PROJECT = "1"
+
 describe("getSystemMcpServerNames", () => {
   beforeEach(() => {
     mkdirSync(TEST_DIR, { recursive: true })

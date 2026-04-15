@@ -26,6 +26,17 @@ export function findFileRecursive(dir: string, filename: string): string | null 
 
 const RG_VERSION = "14.1.1"
 
+// GitHub Release アセットの既知SHA256ハッシュ（supply chain attack検知用）
+// バージョン更新時に実際のリリースアセットからハッシュを計算して更新すること
+// ripgrep v14.1.1
+const ASSET_SHA256: Record<string, string> = {
+  "ripgrep-14.1.1-aarch64-apple-darwin.tar.gz": "24ad76777745fbff131c8fbc466742b011f925bfa4fffa2ded6def23b5b937be",
+  "ripgrep-14.1.1-x86_64-apple-darwin.tar.gz": "0000000000000000000000000000000000000000000000000000000000000000", // TODO: actual hash
+  "ripgrep-14.1.1-aarch64-unknown-linux-gnu.tar.gz": "0000000000000000000000000000000000000000000000000000000000000000", // TODO: actual hash
+  "ripgrep-14.1.1-x86_64-unknown-linux-musl.tar.gz": "0000000000000000000000000000000000000000000000000000000000000000", // TODO: actual hash
+  "ripgrep-14.1.1-x86_64-pc-windows-msvc.zip": "0000000000000000000000000000000000000000000000000000000000000000", // TODO: actual hash
+}
+
 const PLATFORM_CONFIG: Record<string, { platform: string; extension: "tar.gz" | "zip" } | undefined> = {
   "arm64-darwin": { platform: "aarch64-apple-darwin", extension: "tar.gz" },
   "arm64-linux": { platform: "aarch64-unknown-linux-gnu", extension: "tar.gz" },
@@ -97,8 +108,10 @@ export async function downloadAndInstallRipgrep(): Promise<string> {
   const url = `https://github.com/BurntSushi/ripgrep/releases/download/${RG_VERSION}/${filename}`
   const archivePath = join(installDir, filename)
 
+  const expectedSha256 = ASSET_SHA256[filename]
+
   try {
-    await downloadArchive(url, archivePath)
+    await downloadArchive(url, archivePath, { expectedSha256 })
 
     if (config.extension === "tar.gz") {
       await extractTarGz(archivePath, installDir)

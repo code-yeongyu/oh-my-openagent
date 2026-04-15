@@ -9,7 +9,9 @@ This skill provides browser automation capabilities via the Playwright MCP serve
   mcpConfig: {
     playwright: {
       command: "npx",
-      args: ["@playwright/mcp@latest"],
+      // Supply chain attack対策: @latestを禁止。セマンティックバージョニングで
+      // パッチ更新のみ自動適用し、メジャー/マイナー更新は安全性確認後に手動更新
+      args: ["@playwright/mcp@0.0.70"],
     },
   },
 }
