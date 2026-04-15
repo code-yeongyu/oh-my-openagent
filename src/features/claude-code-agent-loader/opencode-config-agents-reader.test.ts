@@ -1,11 +1,26 @@
-import { describe, expect, it } from "bun:test"
+import { describe, expect, it, beforeEach, afterEach } from "bun:test"
+import { mock } from "bun:test"
 import * as fs from "node:fs"
 import * as os from "node:os"
 import * as path from "node:path"
 
-import { readOpencodeConfigAgents } from "./opencode-config-agents-reader"
+// Mock getOpenCodeConfigDir to prevent global config leakage
+let mockGlobalConfigDir: string
+mock.module("../../shared/opencode-config-dir", () => ({
+  getOpenCodeConfigDir: () => mockGlobalConfigDir,
+}))
+
+const { readOpencodeConfigAgents } = require("./opencode-config-agents-reader")
 
 describe("readOpencodeConfigAgents", () => {
+  beforeEach(() => {
+    mockGlobalConfigDir = fs.mkdtempSync(path.join(os.tmpdir(), "opencode-mock-global-"))
+  })
+
+  afterEach(() => {
+    fs.rmSync(mockGlobalConfigDir, { recursive: true, force: true })
+  })
+
   it("returns empty record when no opencode.json exists", () => {
     const nonexistentDir = "/nonexistent/directory/path"
     const result = readOpencodeConfigAgents(nonexistentDir)

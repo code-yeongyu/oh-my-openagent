@@ -1,22 +1,8 @@
 import { existsSync, readFileSync } from "fs"
 import { parseJsoncSafe } from "../../shared/jsonc-parser"
+import { parseToolsConfig } from "../../shared/parse-tools-config"
 import { mapClaudeModelToOpenCode } from "./claude-model-mapper"
 import type { AgentScope, AgentJsonDefinition, ClaudeCodeAgentConfig, LoadedAgent } from "./types"
-
-function parseToolsConfig(tools?: string | string[]): Record<string, boolean> | undefined {
-  if (!tools) return undefined
-
-  const toolsArray = Array.isArray(tools) ? tools : tools.split(",").map((t) => t.trim())
-  const filtered = toolsArray.filter((t) => typeof t === "string" && t.length > 0)
-
-  if (filtered.length === 0) return undefined
-
-  const result: Record<string, boolean> = {}
-  for (const tool of filtered) {
-    result[tool.toLowerCase()] = true
-  }
-  return result
-}
 
 export function parseJsonAgentFile(filePath: string, scope: AgentScope): LoadedAgent | null {
   try {

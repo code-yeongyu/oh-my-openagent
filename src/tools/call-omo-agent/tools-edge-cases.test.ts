@@ -9,6 +9,7 @@
  */
 const { describe, test, expect, mock, beforeEach } = require("bun:test")
 const { createCallOmoAgent } = require("./tools")
+const { clearCallableAgentsCache } = require("./agent-resolver")
 
 type PluginInput = { client: any; directory: string }
 
@@ -50,6 +51,7 @@ const toolCtx = {
 }
 
 beforeEach(() => {
+  clearCallableAgentsCache()
   reserveSubagentSpawnMock.mockClear()
   reserveCommitMock.mockClear()
   reserveRollbackMock.mockClear()

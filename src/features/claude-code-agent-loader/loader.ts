@@ -32,7 +32,7 @@ export function loadUserAgents(): Record<string, ClaudeCodeAgentConfig> {
   const userAgentsDir = join(getClaudeConfigDir(), "agents")
   const agents = loadAgentsFromDir(userAgentsDir, "user")
 
-  const result: Record<string, ClaudeCodeAgentConfig> = {}
+  const result: Record<string, ClaudeCodeAgentConfig> = Object.create(null)
   for (const agent of agents) {
     result[agent.name] = agent.config
   }
@@ -43,7 +43,7 @@ export function loadProjectAgents(directory?: string): Record<string, ClaudeCode
   const projectAgentsDir = join(directory ?? process.cwd(), ".claude", "agents")
   const agents = loadAgentsFromDir(projectAgentsDir, "project")
 
-  const result: Record<string, ClaudeCodeAgentConfig> = {}
+  const result: Record<string, ClaudeCodeAgentConfig> = Object.create(null)
   for (const agent of agents) {
     result[agent.name] = agent.config
   }
@@ -55,7 +55,7 @@ export function loadOpencodeGlobalAgents(): Record<string, ClaudeCodeAgentConfig
   const opencodeAgentsDir = join(configDir, "agents")
   const agents = loadAgentsFromDir(opencodeAgentsDir, "opencode")
 
-  const result: Record<string, ClaudeCodeAgentConfig> = {}
+  const result: Record<string, ClaudeCodeAgentConfig> = Object.create(null)
   for (const agent of agents) {
     result[agent.name] = agent.config
   }
@@ -66,7 +66,7 @@ export function loadOpencodeProjectAgents(directory?: string): Record<string, Cl
   const opencodeProjectDir = join(directory ?? process.cwd(), ".opencode", "agents")
   const agents = loadAgentsFromDir(opencodeProjectDir, "opencode-project")
 
-  const result: Record<string, ClaudeCodeAgentConfig> = {}
+  const result: Record<string, ClaudeCodeAgentConfig> = Object.create(null)
   for (const agent of agents) {
     result[agent.name] = agent.config
   }

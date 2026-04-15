@@ -12,8 +12,8 @@
  * R6: No duplicate agent names in output
  * R7: Malformed agent entries (null, missing name, non-string name, whitespace-only) are skipped gracefully
  */
-const { describe, test, expect, mock } = require("bun:test")
-const { resolveCallableAgents } = require("./agent-resolver")
+const { describe, test, expect, mock, beforeEach } = require("bun:test")
+const { resolveCallableAgents, clearCallableAgentsCache } = require("./agent-resolver")
 const { ALLOWED_AGENTS } = require("./constants")
 
 function createMockClient(agents: Array<Record<string, unknown>>) {
@@ -33,6 +33,10 @@ function createFailingClient(error: Error = new Error("API unavailable")) {
 }
 
 describe("resolveCallableAgents", () => {
+  beforeEach(() => {
+    clearCallableAgentsCache()
+  })
+
   describe("#given the SDK returns agents successfully", () => {
     describe("#when only built-in agents exist", () => {
       test("#then every ALLOWED_AGENT appears in the result", async () => {

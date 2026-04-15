@@ -2,22 +2,10 @@ import { existsSync, readFileSync } from "fs"
 import { basename, extname } from "path"
 import { parseFrontmatter } from "../../shared/frontmatter"
 import { log } from "../../shared/logger"
+import { parseToolsConfig } from "../../shared/parse-tools-config"
 import { parseJsonAgentFile } from "./json-agent-loader"
 import { mapClaudeModelToOpenCode } from "./claude-model-mapper"
 import type { AgentScope, AgentFrontmatter, ClaudeCodeAgentConfig, LoadedAgent } from "./types"
-
-function parseToolsConfig(toolsStr?: string): Record<string, boolean> | undefined {
-  if (!toolsStr) return undefined
-
-  const tools = toolsStr.split(",").map((t) => t.trim()).filter(Boolean)
-  if (tools.length === 0) return undefined
-
-  const result: Record<string, boolean> = {}
-  for (const tool of tools) {
-    result[tool.toLowerCase()] = true
-  }
-  return result
-}
 
 export function parseMarkdownAgentFile(filePath: string, scope: AgentScope): LoadedAgent | null {
   try {
@@ -67,7 +55,7 @@ export function loadAgentDefinitions(
   paths: string[],
   scope: AgentScope
 ): Record<string, ClaudeCodeAgentConfig> {
-  const result: Record<string, ClaudeCodeAgentConfig> = {}
+  const result: Record<string, ClaudeCodeAgentConfig> = Object.create(null)
 
   for (const filePath of paths) {
     if (!existsSync(filePath)) {

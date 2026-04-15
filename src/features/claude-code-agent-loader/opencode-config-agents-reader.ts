@@ -3,6 +3,8 @@ import * as path from "node:path"
 
 import { getOpenCodeConfigDir } from "../../shared/opencode-config-dir"
 import { parseJsoncSafe } from "../../shared/jsonc-parser"
+import { parseToolsConfig } from "../../shared/parse-tools-config"
+import { resolveAgentDefinitionPaths } from "../../shared/resolve-agent-definition-paths"
 import { loadAgentDefinitions } from "./agent-definitions-loader"
 import { mapClaudeModelToOpenCode } from "./claude-model-mapper"
 import type { ClaudeCodeAgentConfig } from "./types"
@@ -25,28 +27,6 @@ function getConfigPaths(directory: string): string[] {
   return paths
 }
 
-function parseToolsConfig(toolsValue: unknown): Record<string, boolean> | undefined {
-  if (!toolsValue) return undefined
-
-  let toolsStr: string
-  if (typeof toolsValue === "string") {
-    toolsStr = toolsValue
-  } else if (Array.isArray(toolsValue)) {
-    toolsStr = toolsValue.filter((t) => typeof t === "string").join(",")
-  } else {
-    return undefined
-  }
-
-  const tools = toolsStr.split(",").map((t) => t.trim()).filter(Boolean)
-  if (tools.length === 0) return undefined
-
-  const result: Record<string, boolean> = {}
-  for (const tool of tools) {
-    result[tool.toLowerCase()] = true
-  }
-  return result
-}
-
 function convertInlineAgent(agentData: unknown): ClaudeCodeAgentConfig | null {
   if (!agentData || typeof agentData !== "object") {
     return null
@@ -63,9 +43,15 @@ function convertInlineAgent(agentData: unknown): ClaudeCodeAgentConfig | null {
     ? `${mappedModel.providerID}/${mappedModel.modelID}`
     : undefined
 
+  const VALID_MODES = ["subagent", "primary", "all"] as const
+  const rawMode = typeof agent.mode === "string" ? agent.mode : undefined
+  const mode = rawMode && (VALID_MODES as readonly string[]).includes(rawMode)
+    ? (rawMode as "subagent" | "primary" | "all")
+    : "subagent"
+
   const config: ClaudeCodeAgentConfig = {
     description,
-    mode: (agent.mode as "subagent" | "primary" | "all") || "subagent",
+    mode,
     prompt: agent.prompt ? String(agent.prompt) : "",
     ...(modelString ? { model: modelString } : {}),
   }
@@ -106,9 +92,7 @@ export function readOpencodeConfigAgents(directory: string): Record<string, Clau
 
       if (parseResult.data.agent_definitions) {
         const definitionPaths = extractDefinitionPaths(parseResult.data.agent_definitions)
-        const resolvedPaths = definitionPaths.map((p) =>
-          path.isAbsolute(p) ? p : path.resolve(configDir, p)
-        )
+        const resolvedPaths = resolveAgentDefinitionPaths(definitionPaths, configDir, directory)
 
         const definitionAgents = loadAgentDefinitions(resolvedPaths, "opencode-config")
 

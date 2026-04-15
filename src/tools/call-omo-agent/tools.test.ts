@@ -1,5 +1,6 @@
 const { beforeEach, describe, test, expect, mock } = require("bun:test")
 const { createCallOmoAgent } = require("./tools")
+const { clearCallableAgentsCache } = require("./agent-resolver")
 
 type PluginInput = { client: any; directory: string }
 type BackgroundManager = {
@@ -72,6 +73,7 @@ const toolCtx = {
 }
 
 beforeEach(() => {
+  clearCallableAgentsCache()
   assertCanSpawnMock.mockClear()
   reserveSubagentSpawnMock.mockClear()
   reserveCommitMock.mockClear()
