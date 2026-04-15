@@ -1,3 +1,4 @@
+import { stripInvisibleAgentCharacters } from "../../shared/agent-display-names"
 import { ULTRAWORK_VERIFICATION_PROMISE } from "./constants"
 
 export interface OracleVerificationEvidence {
@@ -54,7 +55,7 @@ export function isOracleVerified(text: string): boolean {
 		return false
 	}
 
-	const isOracleAgent = evidence.agent.toLowerCase() === "oracle"
+	const isOracleAgent = stripInvisibleAgentCharacters(evidence.agent).toLowerCase() === "oracle"
 	const isVerifiedPromise = evidence.promise === ULTRAWORK_VERIFICATION_PROMISE
 
 	return isOracleAgent && isVerifiedPromise
@@ -62,7 +63,7 @@ export function isOracleVerified(text: string): boolean {
 
 export function extractOracleSessionID(text: string): string | undefined {
 	const evidence = parseOracleVerificationEvidence(text)
-	if (!evidence || evidence.agent.toLowerCase() !== "oracle") {
+	if (!evidence || stripInvisibleAgentCharacters(evidence.agent).toLowerCase() !== "oracle") {
 		return undefined
 	}
 

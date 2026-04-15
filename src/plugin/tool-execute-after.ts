@@ -1,6 +1,7 @@
 import { consumeToolMetadata } from "../features/tool-metadata-store"
 import type { CreatedHooks } from "../create-hooks"
 import { log } from "../shared"
+import { stripInvisibleAgentCharacters } from "../shared/agent-display-names"
 import type { PluginContext } from "./types"
 import { readState, writeState } from "../hooks/ralph-loop/storage"
 
@@ -60,7 +61,7 @@ export function createToolExecuteAfterHandler(args: {
       const verificationAttemptId = prompt?.match(VERIFICATION_ATTEMPT_PATTERN)?.[1]?.trim()
       const loopState = directory ? readState(directory) : null
       const isVerificationContext =
-        agent === "oracle"
+        (agent ? stripInvisibleAgentCharacters(agent) : agent) === "oracle"
         && !!sessionId
         && !!directory
         && loopState?.active === true
