@@ -1704,8 +1704,11 @@ export class BackgroundManager {
       await this.enqueueNotificationForParent(task.parentSessionID, () => this.notifyParentSession(task))
       log(`[background-agent] Task completed via ${source}:`, task.id)
     } catch (err) {
-      log("[background-agent] Error in notifyParentSession:", { taskId: task.id, error: err })
-      // Concurrency already released, notification failed but task is complete
+      log("[background-agent] Error in notifyParentSession, queuing fallback:", { taskId: task.id, error: err })
+      this.queuePendingNotification(
+        task.parentSessionID,
+        `[Background task completed] "${task.description}" (agent: ${task.agent ?? "unknown"}) finished but notification delivery failed. Use background_output to retrieve the result.\n\nSession ID: ${task.sessionID}\nTask ID: ${task.id}`,
+      )
     }
 
     return true
