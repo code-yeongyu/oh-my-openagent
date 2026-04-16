@@ -26,13 +26,15 @@ function shouldSkipForInternalAgent(agentName: string | undefined): boolean {
 }
 
 /**
- * Claude Pro/Max subscriptions expose a constrained OAuth API that rejects
- * `output_config.effort: "max"` (supported values: low | medium | high) even on
- * Opus models. Detect OAuth auth by inspecting OpenCode's auth.json.
+ * Providers that expose constrained APIs rejecting `output_config.effort: "max"`
+ * (supported values: low | medium | high). Includes:
+ * - Anthropic OAuth (Claude Pro/Max via third-party clients)
+ * - GitHub Copilot (proxied Anthropic, doesn't support "max")
  */
-function isAnthropicOAuth(providerID: string): boolean {
-  if (providerID !== "anthropic") return false
-  return isProviderUsingOAuth(providerID)
+function isConstrainedProvider(providerID: string): boolean {
+  if (providerID === "github-copilot") return true
+  if (providerID === "anthropic") return isProviderUsingOAuth(providerID)
+  return false
 }
 
 interface ChatParamsInput {
@@ -59,9 +61,9 @@ const MAX_VARIANT_BY_TIER: Record<string, string> = {
   default: "high",
 }
 
-function clampVariant(variant: string, isOpus: boolean, isOAuth: boolean): string {
+function clampVariant(variant: string, isOpus: boolean, isConstrained: boolean): string {
   if (variant !== "max") return variant
-  if (isOAuth) return MAX_VARIANT_BY_TIER.default
+  if (isConstrained) return MAX_VARIANT_BY_TIER.default
   return isOpus ? MAX_VARIANT_BY_TIER.opus : MAX_VARIANT_BY_TIER.default
 }
 
@@ -76,16 +78,15 @@ export function createAnthropicEffortHook() {
       if (isEffortUnsupportedModel(model.modelID)) return
       if (message.variant !== "max") return
       if (!isClaudeProvider(model.providerID, model.modelID)) return
-      if (model.providerID === "github-copilot") return
       if (shouldSkipForInternalAgent(agent?.name)) return
       if (output.options.effort !== undefined) return
 
       const opus = isOpusModel(model.modelID)
-      const oauth = isAnthropicOAuth(model.providerID)
-      const clamped = clampVariant(message.variant, opus, oauth)
+      const constrained = isConstrainedProvider(model.providerID)
+      const clamped = clampVariant(message.variant, opus, constrained)
       output.options.effort = clamped
 
-      const shouldOverrideMessageVariant = !opus || oauth
+      const shouldOverrideMessageVariant = !opus || constrained
 
       if (shouldOverrideMessageVariant) {
         // Override the variant so OpenCode doesn't pass "max" to the API.
@@ -97,7 +98,7 @@ export function createAnthropicEffortHook() {
           sessionID: input.sessionID,
           provider: model.providerID,
           model: model.modelID,
-          reason: oauth ? "anthropic-oauth" : "non-opus",
+          reason: constrained ? "constrained-provider" : "non-opus",
         })
       } else {
         log("anthropic-effort: injected effort=max", {
