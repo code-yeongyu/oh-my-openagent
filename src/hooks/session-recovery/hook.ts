@@ -99,6 +99,7 @@ export function createSessionRecoveryHook(ctx: PluginInput, options?: SessionRec
         unavailable_tool: "Tool Recovery",
         thinking_block_order: "Thinking Block Recovery",
         thinking_disabled_violation: "Thinking Strip Recovery",
+        thinking_block_modified: "Thinking Block Recovery",
         "assistant_prefill_unsupported": "Prefill Unsupported",
       }
       const toastMessages: Record<RecoveryErrorType & string, string> = {
@@ -106,6 +107,7 @@ export function createSessionRecoveryHook(ctx: PluginInput, options?: SessionRec
         unavailable_tool: "Recovering from unavailable tool call...",
         thinking_block_order: "Fixing message structure...",
         thinking_disabled_violation: "Stripping thinking blocks...",
+        thinking_block_modified: "Stripping corrupted thinking blocks...",
         "assistant_prefill_unsupported": "Prefill not supported; continuing without recovery.",
       }
 
@@ -134,6 +136,13 @@ export function createSessionRecoveryHook(ctx: PluginInput, options?: SessionRec
           await resumeSession(ctx.client, resumeConfig)
         }
       } else if (errorType === "thinking_disabled_violation") {
+        success = await recoverThinkingDisabledViolation(ctx.client, sessionID, failedMsg)
+        if (success && experimental?.auto_resume) {
+          const lastUser = findLastUserMessage(msgs ?? [])
+          const resumeConfig = extractResumeConfig(lastUser, sessionID)
+          await resumeSession(ctx.client, resumeConfig)
+        }
+      } else if (errorType === "thinking_block_modified") {
         success = await recoverThinkingDisabledViolation(ctx.client, sessionID, failedMsg)
         if (success && experimental?.auto_resume) {
           const lastUser = findLastUserMessage(msgs ?? [])
