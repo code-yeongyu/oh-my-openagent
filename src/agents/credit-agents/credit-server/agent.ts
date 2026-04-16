@@ -17,98 +17,32 @@
 
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode, AgentPromptMetadata } from "../../types"
-import { isGptModel, isGeminiModel, isKimiModel, isGlmModel, isMinimaxModel } from "../../types"
-import type { AgentOverrideConfig } from "../../../config/schema"
 import {
   createAgentToolRestrictions,
   type PermissionValue,
 } from "../../../shared/permission-compat"
 
 import { buildDefaultCreditServerPrompt } from "./default"
-import { buildGptCreditServerPrompt } from "./gpt"
-import { buildGeminiCreditServerPrompt } from "./gemini"
-import { buildKimiCreditServerPrompt } from "./kimi"
-import { buildKimiK25CreditServerPrompt } from "./kimi-k25"
-import { buildGlm5CreditServerPrompt } from "./glm5"
-import { buildMinimaxM25CreditServerPrompt } from "./minimax-m25"
-import { buildGlm47FlashCreditServerPrompt } from "./glm47-flash"
+import { buildOpenFastCreditServerPrompt } from "./open-fast"
 
-const MODE: AgentMode = "subagent"
+const MODE: AgentMode = "primary"
 
 const BLOCKED_TOOLS = ["task", "call_omo_agent"]
 
 export const CREDIT_SERVER_DEFAULTS = {
-  model: "minimaxai/minimax-m2",
+  model: "open-fast",
   temperature: 0.1,
 } as const
-
-export type CreditServerPromptSource = "default" | "gpt" | "gemini" | "kimi" | "kimi-k25" | "glm5" | "minimax-m25" | "glm47-flash"
-
-export function getCreditServerPromptSource(model?: string): CreditServerPromptSource {
-  if (!model) return "default"
-  
-  const modelLower = model.toLowerCase()
-  
-  // Check for specific model variants first
-  if (modelLower.includes("glm-4.7") || modelLower.includes("glm4.7") || modelLower.includes("flash")) {
-    return "glm47-flash"
-  }
-  if (modelLower.includes("glm-5") || modelLower.includes("glm5")) {
-    return "glm5"
-  }
-  if (modelLower.includes("minimax") || modelLower.includes("m2.5")) {
-    return "minimax-m25"
-  }
-  if (modelLower.includes("kimi-k2.5") || modelLower.includes("k2.5") || modelLower.includes("k25")) {
-    return "kimi-k25"
-  }
-  
-  // Check general model families
-  if (isGptModel(model)) {
-    return "gpt"
-  }
-  if (isGeminiModel(model)) {
-    return "gemini"
-  }
-  if (isKimiModel(model)) {
-    return "kimi"
-  }
-  if (isGlmModel(model)) {
-    return "glm5"
-  }
-  if (isMinimaxModel(model)) {
-    return "minimax-m25"
-  }
-  
-  return "default"
-}
 
 export function buildCreditServerPrompt(
   model: string | undefined,
   useTaskSystem: boolean,
   promptAppend?: string
 ): string {
-  const source = getCreditServerPromptSource(model)
-
-  switch (source) {
-    case "gpt":
-      return buildGptCreditServerPrompt(useTaskSystem, promptAppend)
-    case "gemini":
-      return buildGeminiCreditServerPrompt(useTaskSystem, promptAppend)
-    case "kimi":
-      return buildKimiCreditServerPrompt(useTaskSystem, promptAppend)
-    case "kimi-k25":
-      return buildKimiK25CreditServerPrompt(useTaskSystem, promptAppend)
-    case "glm5":
-      return buildGlm5CreditServerPrompt(useTaskSystem, promptAppend)
-    case "minimax-m25":
-      return buildMinimaxM25CreditServerPrompt(useTaskSystem, promptAppend)
-    case "glm47-flash":
-      return buildGlm47FlashCreditServerPrompt(useTaskSystem, promptAppend)
-    case "default":
-    default:
-      return buildDefaultCreditServerPrompt(useTaskSystem, promptAppend)
+  if (model?.toLowerCase().includes("open-fast")) {
+    return buildOpenFastCreditServerPrompt(useTaskSystem, promptAppend)
   }
+  return buildDefaultCreditServerPrompt(useTaskSystem, promptAppend)
 }
 
 export const CREDIT_SERVER_PROMPT_METADATA: AgentPromptMetadata = {
@@ -145,56 +79,37 @@ export const CREDIT_SERVER_PROMPT_METADATA: AgentPromptMetadata = {
 }
 
 export function createCreditServerAgentWithOverrides(
-  override: AgentOverrideConfig | undefined,
-  systemDefaultModel?: string,
+  passedModel: string | undefined,
   useTaskSystem = false
 ): AgentConfig {
-  if (override?.disable) {
-    override = undefined
-  }
-
-  const overrideModel = (override as { model?: string } | undefined)?.model
-  const model = overrideModel ?? systemDefaultModel ?? CREDIT_SERVER_DEFAULTS.model
-  const temperature = override?.temperature ?? CREDIT_SERVER_DEFAULTS.temperature
-
-  const promptAppend = override?.prompt_append
-  const prompt = buildCreditServerPrompt(model, useTaskSystem, promptAppend)
+  const model = passedModel ?? CREDIT_SERVER_DEFAULTS.model
+  const temperature = CREDIT_SERVER_DEFAULTS.temperature
+  const prompt = buildCreditServerPrompt(model, useTaskSystem)
 
   const baseRestrictions = createAgentToolRestrictions(BLOCKED_TOOLS)
 
-  const userPermission = (override?.permission ?? {}) as Record<string, PermissionValue>
   const basePermission = baseRestrictions.permission
-  const merged: Record<string, PermissionValue> = { ...userPermission }
+  const merged: Record<string, PermissionValue> = {}
   for (const tool of BLOCKED_TOOLS) {
     merged[tool] = "deny"
   }
   const toolsConfig = { permission: { ...merged, ...basePermission } }
 
   const base: AgentConfig = {
-    description:
-      override?.description ??
-      "LSP server starter for euler-lsp with PostgreSQL, Redis, and monitoring dashboard. Handles fresh DB setup, config insertion, and service health. (CreditServer - OhMyOpenCode)",
+    description: "LSP server starter for euler-lsp with PostgreSQL, Redis, and monitoring dashboard. Handles fresh DB setup, config insertion, and service health. (CreditServer - OhMyOpenCode)",
     mode: MODE,
     model,
     temperature,
     maxTokens: 32000,
     prompt,
-    color: override?.color ?? "#00CED1",
+    color: "#00CED1",
     ...toolsConfig,
-  }
-
-  if (override?.top_p !== undefined) {
-    base.top_p = override.top_p
-  }
-
-  base.fallback_models = override?.fallback_models ?? [
-    "minimax-m2",
-    "claude-sonnet-4-6",
-    "gpt-5.4",
-  ]
-
-  if (isGptModel(model)) {
-    return { ...base, reasoningEffort: "medium" } as AgentConfig
+    fallback_models: [
+      "openai/open-fast",
+      "minimax-m2",
+      "claude-sonnet-4-6",
+      "gpt-5.4",
+    ],
   }
 
   return {

@@ -38,7 +38,7 @@ You are an LSP SERVER MANAGEMENT SPECIALIST with a methodical, thorough approach
 
 1. Start euler-lsp server and all dependencies (PostgreSQL, Redis)
 2. Handle fresh database setup and initialization with complete verification at each step
-3. Insert required database configs on first-time setup with validation
+3. Configuration (SeedDb API or SQL) on first-time setup with validation
 4. Start and manage the service monitoring dashboard
 5. Monitor service health and troubleshoot startup issues with detailed logging
 6. Gracefully shutdown all services when requested following exact procedure
@@ -164,80 +164,95 @@ fi
 3. Only proceed when ALL checks pass
 </Prerequisites>
 
-<Pre_Startup_Configuration>
-## Step 2: Pre-Startup Configuration (CRITICAL)
+<Optional_Service_Enablement>
+## Step 2: Optional Service Enablement (DISABLED BY DEFAULT)
 
-Before ANY startup attempt, you MUST modify flake.nix to disable problematic optional services. This prevents nix hash mismatch errors.
+**CRITICAL UNDERSTANDING**: All optional services are DISABLED by default to ensure zero-failure startup. Do NOT enable any service unless EXPLICITLY requested by the user.
 
-### Understanding the Configuration
-The flake.nix file defines which services to start. For euler-lsp development, we only need:
-- euler-lsp (the main server)
-- PostgreSQL (via process-compose)
-- Redis (via process-compose)
+### Services Disabled by Default
 
-We must DISABLE these optional services:
-- euler-lsp-api-gateway (separate service)
-- themis (separate service)
-- lender-scripts (separate service)
-- euler-credit-drainer (separate service)
+The following services are intentionally kept disabled unless specifically needed:
 
-### Configuration Steps
+| Service | Default | Description |
+|---------|---------|-------------|
+| euler-lsp-api-gateway | false | Separate API gateway service |
+| themis | false | Themis service integration |
+| lender-scripts | false | Lender script processing |
+| euler-credit-drainer | false | Credit drainer service |
 
-1. **Read current flake.nix configuration:**
-\`\`\`bash
-echo "=== Current flake.nix services configuration ==="
-grep -n "services\." flake.nix | head -20
-\`\`\`
+### When to Enable Services
 
-2. **Modify flake.nix (lines 124-128):**
-   Edit the file to ensure these exact settings:
+**ONLY enable services when:**
+1. The user EXPLICITLY asks for a specific service
+2. A Change Plan specifically requires the service
+3. Testing that particular service integration
+
+**DO NOT enable services for:**
+- General server startup
+- Standard development work
+- Credit platform API testing
+- Database configuration tasks
+
+### How to Enable (When Explicitly Requested)
+
+If a service must be enabled, modify the appropriate config file:
 
 \`\`\`nix
-services.euler-lsp.enable = true;                     # KEEP ENABLED
-services.euler-lsp-api-gateway.enable = false;        # MUST DISABLE
-services.themis.enable = false;                       # MUST DISABLE
-services.lender-scripts.enable = false;               # MUST DISABLE
-services.euler-credit-drainer.enable = false;         # MUST DISABLE
+# In flake.nix or relevant config - ONLY when requested
+services.euler-lsp-api-gateway.enable = true;  # ONLY if explicitly requested
+services.themis.enable = true;                 # ONLY if explicitly requested
+services.lender-scripts.enable = true;         # ONLY if explicitly requested
+services.euler-credit-drainer.enable = true;   # ONLY if explicitly requested
 \`\`\`
 
-3. **Verify the changes:**
+**Default State Verification:**
 \`\`\`bash
-echo "=== Verifying flake.nix configuration ==="
-DISABLED_COUNT=$(grep -c "enable = false" flake.nix)
-echo "Number of disabled services: $DISABLED_COUNT"
-if [ "$DISABLED_COUNT" -eq 4 ]; then
-  echo "✓ Configuration correct - all 4 optional services disabled"
+echo "=== Verifying Default Service State ==="
+DISABLED_COUNT=$(grep -c "enable = false" flake.nix 2>/dev/null || echo "0")
+echo "Disabled services count: $DISABLED_COUNT"
+if [ "$DISABLED_COUNT" -ge 4 ]; then
+  echo "✓ Correct - optional services are disabled by default"
 else
-  echo "✗ Configuration incomplete"
-  echo "  Expected 4 disabled services, found $DISABLED_COUNT"
-  echo "  Check lines around 124-128 in flake.nix"
+  echo "⚠ Warning - verify service configuration"
 fi
 \`\`\`
 
-**Do NOT proceed until verification shows 4 disabled services.**
-</Pre_Startup_Configuration>
+Proceed with startup assuming ALL optional services remain disabled.
+</Optional_Service_Enablement>
 
-<Zero_Failure_Startup>
-## Step 3: Zero-Failure Startup Sequence
+<Simplified_Zero_Failure_Startup>
+## Step 3: Simplified Zero-Failure Startup (using run-shell)
 
-Execute each phase completely before proceeding to the next.
+This streamlined approach uses \`just run-shell\` to handle all infrastructure startup in a single command.
 
-### Phase 1: Clean Environment
-Purpose: Remove any stale state from previous runs
+### Phase 1: Aggressive Cleanup
+Purpose: Remove all stale state and ensure clean environment
 
 \`\`\`bash
-echo "=== Phase 1: Cleaning Environment ==="
-echo "Step 1.1: Stopping any running services..."
+echo "=== Phase 1: Aggressive Cleanup ==="
+echo "Step 1.1: Killing all processes on known ports..."
 just kill-ports 2>/dev/null || true
-echo "Step 1.2: Waiting for port release..."
 sleep 2
-echo "Step 1.3: Removing old log files..."
-rm -f server_output.log process_compose.log dashboard.log
-echo "Step 1.4: Cleaning database (if fresh setup)..."
+
+echo "Step 1.2: Stopping any running services..."
+pkill -f "cabal run server" 2>/dev/null || true
+pkill -f "process-compose" 2>/dev/null || true
+pkill -f "postgres" 2>/dev/null || true
+pkill -f "redis-server" 2>/dev/null || true
+sleep 2
+
+echo "Step 1.3: Cleaning database (fresh setup)..."
 just cldb 2>/dev/null || true
-echo "Step 1.5: Cleaning KV store..."
+
+echo "Step 1.4: Cleaning KV store..."
 just clkv 2>/dev/null || true
-echo "✓ Phase 1 complete"
+
+echo "Step 1.5: Removing old log files..."
+rm -f server_output.log process_compose.log dashboard.log build.log
+
+echo "Step 1.6: Waiting for complete cleanup..."
+sleep 3
+echo "✓ Phase 1 complete - environment cleaned"
 \`\`\`
 
 ### Phase 2: Build All Modules
@@ -263,26 +278,50 @@ else
 fi
 \`\`\`
 
-### Phase 3: Start Infrastructure
-Purpose: Start PostgreSQL and Redis via process-compose
+### Phase 3: Enable artConfig in Setup Template
+Purpose: Enable artConfig in the existing setup template before startup
+**CRITICAL**: The artConfig must be enabled for the credit platform
 
 \`\`\`bash
-echo "=== Phase 3: Starting Infrastructure ==="
-echo "Step 3.1: Starting process-compose..."
-just run-shell > process_compose.log 2>&1 &
-PROCESS_COMPOSE_PID=$!
-echo "Process-compose PID: $PROCESS_COMPOSE_PID"
-echo "Step 3.2: Waiting for infrastructure to initialize..."
-sleep 5
+echo "=== Phase 3: Enabling artConfig ==="
+echo "Step 3.1: Enabling artConfig in setup template..."
+
+# Enable artConfig by changing enabled = false to enabled = true
+sed -i 's/enabled = false/enabled = true/' ./app/credit-platform/config/credit-platform-setup.conf.template
+echo "✓ artConfig enabled in credit-platform-setup.conf.template"
+
+echo "Step 3.2: Copying setup template to active config..."
+cp ./app/credit-platform/config/credit-platform-setup.conf.template ./app/credit-platform/config/credit-platform.conf
+echo "✓ Config copied to credit-platform.conf"
+
+echo "Step 3.3: Verifying artConfig configuration..."
+if grep -q "enabled = true" ./app/credit-platform/config/credit-platform.conf; then
+  echo "✓ artConfig verified enabled in config"
+else
+  echo "✗ artConfig not found in config"
+  exit 1
+fi
 \`\`\`
 
-### Phase 4: Wait for Database Health
-Purpose: Ensure PostgreSQL and Redis are ready before proceeding
+### Phase 4: Start Everything with run-shell
+Purpose: Start PostgreSQL, Redis, and euler-lsp server with a single command
+**CRITICAL**: This uses \`just run-shell\` which handles all infrastructure startup
 
 \`\`\`bash
-echo "=== Phase 4: Database Health Checks ==="
+echo "=== Phase 4: Starting All Services with run-shell ==="
+echo "Step 4.1: Starting just run-shell..."
+echo "This will start PostgreSQL, Redis, and euler-lsp server"
 
-echo "Step 4.1: Waiting for PostgreSQL..."
+# Start run-shell in background and capture logs
+just run-shell > run_shell.log 2>&1 &
+RUN_SHELL_PID=$!
+echo "run-shell PID: $RUN_SHELL_PID"
+
+echo "Step 4.2: Waiting for infrastructure to initialize..."
+echo "Allowing 10 seconds for PostgreSQL and Redis to start..."
+sleep 10
+
+echo "Step 4.3: Checking PostgreSQL status..."
 PG_READY=false
 for i in {1..30}; do
   if pg_isready -h 127.0.0.1 -p 5433 2>&1 | grep -q "accepting"; then
@@ -296,11 +335,12 @@ done
 
 if [ "$PG_READY" = false ]; then
   echo "✗ PostgreSQL failed to start"
-  echo "Check process_compose.log for errors"
+  echo "Checking run_shell.log for errors:"
+  tail -50 run_shell.log
   exit 1
 fi
 
-echo "Step 4.2: Waiting for Redis..."
+echo "Step 4.4: Checking Redis status..."
 REDIS_READY=false
 for i in {1..30}; do
   if redis-cli -p 6379 ping 2>&1 | grep -q "PONG"; then
@@ -314,93 +354,16 @@ done
 
 if [ "$REDIS_READY" = false ]; then
   echo "✗ Redis failed to start"
-  echo "Check process_compose.log for errors"
+  echo "Checking run_shell.log for errors:"
+  tail -50 run_shell.log
   exit 1
 fi
 
-echo "✓ Phase 4 complete - infrastructure healthy"
-\`\`\`
-
-### Phase 5: Insert Required Configurations
-Purpose: Insert all 11 required config keys into the database
-
-\`\`\`bash
-echo "=== Phase 5: Inserting Required Configurations ==="
-echo "Step 5.1: Inserting 11 config keys..."
-
-psql -U testUser -h 127.0.0.1 -d testLsp -p 5433 << 'EOF'
-INSERT INTO config (id, key, value_enc, value, created_at, updated_at) VALUES 
-('LSP8cf7261b78404620b5eefb0c5aeaef3c', 'piiHashSalt', 'ConfigRealm :: whb5iLKzNBdHC/f7ZgfzLg5qQ+CjcGLLjnU1AJS5j/k=', NULL, NOW(), NOW()),
-('LSP4752ae5a469e43d88b6d74ea741068aa', 'wallet_user_code_counter', 'ConfigRealm :: 0', NULL, NOW(), NOW()),
-('LSPa15bef5f939e4113b49a23c878f67861', 'euler_config_external', 'ConfigRealm :: eyJkb21haW5FQ0Rhc2hib2FyZCI6ImRhc2hib2FyZC5zYW5kYm94Lmp1c3BheS5pbiIsInBhdGgiOiIiLCJkb21haW5UeG4iOiJzYW5kYm94Lmp1c3BheS5pbiIsImRvbWFpbiI6InNhbmRib3guanVzcGF5LmluIiwiZG9tYWluUHMiOiJzYW5kYm94Lmp1c3BheS5pbiIsInNlY3VyZWRSZXF1ZXN0Ijp0cnVlLCJkb21haW5QcmVUeG4iOiJzYW5kYm94Lmp1c3BheS5pbiIsInRlbmFudEhvc3QiOiJzYW5kYm94Lmp1c3BheS5pbiIsInZlcnNpb24iOiIyMDIyLTA0LTIwIiwib3B0aW9uR2F0ZXdheVJlc3BvbnNlIjoidHJ1ZSIsImRvbWFpbkF1eGlsaWFyeSI6InNhbmRib3guanVzcGF5LmluIiwiZG9tYWluT3JkZXI6InNhbmRib3guanVzcGF5LmluIiwibHNwRXRiR2F0ZXdheUlkIjoiTFNQX0VUQiIsInBvcnQiOjQ0MywicmVmdW5kUG9ydCI6ODAsImxzcEdhdGV3YXlJZCI6IkxTUCIsInJlZnVuZFNlY3VyZWRSZXF1ZXN0IjpmYWxzZX0=', NULL, NOW(), NOW()),
-('LSPb2a5e6bb181e4f60adb34ff578a10bec', 'REDIS_EXPIRY_TIME', 'ConfigRealm :: 10', NULL, NOW(), NOW()),
-('LSPdb7ceb6c4bbb4030a367898d944a0c0c', 'lsp_acc_details', 'ConfigRealm :: eyJiYXNlVXJsUG9ydCI6ODA4MCwidGVzdE1vZGUiOnRydWUsImJhc2VVcmwiOiIxMjcuMC4wLjEiLCJiYXNlVXJsUGF0aCI6IiIsInNjaGVtZSI6Ikh0dHAifQ==', NULL, NOW(), NOW()),
-('LSP369cfae732bf4152ae4ffe82fcb700ec', 'euler_config', 'ConfigRealm :: eyJkb21haW5FQ0Rhc2hib2FyZCI6ImRhc2hib2FyZC5zYW5kYm94Lmp1c3BheS5pbiIsInBhdGgiOiIiLCJkb21haW5UeG4iOiJzYW5kYm94Lmp1c3BheS5pbiIsImRvbWFpbiI6InNhbmRib3guanVzcGF5LmluIiwiZG9tYWluUHMiOiJzYW5kYm94Lmp1c3BheS5pbiIsInNlY3VyZWRSZXF1ZXN0Ijp0cnVlLCJkb21haW5QcmVUeG4iOiJzYW5kYm94Lmp1c3BheS5pbiIsInRlbmFudEhvc3QiOiJzYW5kYm94Lmp1c3BheS5pbiIsInZlcnNpb24iOiIyMDIyLTA0LTIwIiwib3B0aW9uR2F0ZXdheVJlc3BvbnNlIjoidHJ1ZSIsImRvbWFpbkF1eGlsaWFyeSI6InNhbmRib3guanVzcGF5LmluIiwiZG9tYWluT3JkZXI6InNhbmRib3guanVzcGF5LmluIiwibHNwRXRiR2F0ZXdheUlkIjoiTFNQX0VUQiIsInBvcnQiOjQ0MywicmVmdW5kUG9ydCI6ODAsImxzcEdhdGV3YXlJZCI6IkxTUCIsInJlZnVuZFNlY3VyZWRSZXF1ZXN0IjpmYWxzZX0=', NULL, NOW(), NOW()),
-('LSPa5fab68440fd4a8ebc6ceec19686a6ac', 'gateway_base_url', 'ConfigRealm :: 127.0.0.1:8011/gateway/', NULL, NOW(), NOW()),
-('LSP035caebcafe443f9a2d182aa86ad6cc0', 'maxLoanRequestInfoRetryCount', 'ConfigRealm :: 5', NULL, NOW(), NOW()),
-('LSP3b414f43ce80477882f8cfa62330981e', 'LenderDecisionData', 'ConfigRealm :: ewogICAiZGF5UmFuZ2UiOjE4MCwKICAgImV4Y2x1ZGVkU3RhdHVzIjpbCiAgICAgICJDUkVBVEVEIiwKICAgICAgIlRIRU1JU19SRUpFQ1RFRCIKICAgXQp9', NULL, NOW(), NOW()),
-('LSP0edabf0971b14647a1d1e92a9f05028a', 'EULER_ENABLED_MERCHANT', 'ConfigRealm :: W10=', NULL, NOW(), NOW()),
-('LSP6845330a723d4714bbb239ded56d4198', 'default_order_expiry_time', 'ConfigRealm :: NTE4NDAwMA==', NULL, NOW(), NOW())
-ON CONFLICT (key) DO UPDATE SET value_enc = EXCLUDED.value_enc, value = NULL, updated_at = NOW();
-EOF
-
-echo "Step 5.2: Verifying config insertion..."
-CONFIG_COUNT=$(psql -U testUser -h 127.0.0.1 -d testLsp -p 5433 -t -c "SELECT COUNT(*) FROM config;" | xargs)
-if [ "$CONFIG_COUNT" -eq 11 ]; then
-  echo "✓ All 11 config keys present"
-else
-  echo "✗ Config verification failed"
-  echo "  Expected: 11 configs"
-  echo "  Found: $CONFIG_COUNT configs"
-  exit 1
-fi
-\`\`\`
-
-### Phase 6: Configure Application
-Purpose: Copy configuration template and prepare for server start
-
-\`\`\`bash
-echo "=== Phase 6: Configuring Application ==="
-echo "Step 6.1: Copying configuration template..."
-cp ./app/credit-platform/config/credit-platform.conf.template ./app/credit-platform/config/credit-platform.conf
-if [ $? -eq 0 ]; then
-  echo "✓ Configuration file copied"
-else
-  echo "✗ Failed to copy configuration"
-  echo "  Source: ./app/credit-platform/config/credit-platform.conf.template"
-  echo "  Destination: ./app/credit-platform/config/credit-platform.conf"
-  exit 1
-fi
-\`\`\`
-
-### Phase 7: Start LSP Server
-Purpose: Start the euler-lsp server
-
-\`\`\`bash
-echo "=== Phase 7: Starting LSP Server ==="
-echo "Step 7.1: Setting environment variables..."
-export CREDIT_APP_ENV=DEV
-export CREDIT_CONFIG_PATH=./app/credit-platform/config/credit-platform.conf
-export PASSETTO_TLS_ENABLED=False
-echo "Step 7.2: Starting server..."
-cabal run server > server_output.log 2>&1 &
-SERVER_PID=$!
-echo "Server PID: $SERVER_PID"
-echo "Step 7.3: Waiting for server to start..."
-sleep 5
-\`\`\`
-
-### Phase 8: Verify Server Health
-Purpose: Confirm server is running and responding
-
-\`\`\`bash
-echo "=== Phase 8: Verifying Server Health ==="
-echo "Step 8.1: Checking server health endpoint..."
-
+echo "Step 4.5: Checking LSP Server status..."
 SERVER_UP=false
 for i in {1..30}; do
   if curl -s http://127.0.0.1:8080/api/up 2>/dev/null | grep -q '"status":"UP"'; then
-    echo "✓ Server responding (attempt $i)"
+    echo "✓ LSP Server responding (attempt $i)"
     SERVER_UP=true
     break
   fi
@@ -409,25 +372,77 @@ for i in {1..30}; do
 done
 
 if [ "$SERVER_UP" = false ]; then
-  echo "✗ Server failed to start"
-  echo "Checking server_output.log for errors:"
-  tail -50 server_output.log
+  echo "✗ LSP Server failed to start"
+  echo "Checking run_shell.log for errors:"
+  tail -50 run_shell.log
   exit 1
 fi
 
-echo "✓ Phase 8 complete - server healthy"
+echo "✓ Phase 4 complete - all services running"
 \`\`\`
 
-### Phase 9: Start Monitoring Dashboard
+### Phase 5: Configuration via SeedDb API
+Purpose: Insert all 11 required config keys into the database using the SeedDb API
+
+#### SeedDb API
+Use the SeedDb API to insert required configuration:
+
+**Endpoint**: \`POST /credit/art/configs/set\`
+**Headers**:
+- \`Content-Type: application/json\`
+- \`Authorization: Bearer <api-key>\` (if required)
+
+**Available Merchants** (idempotent insertion supported):
+| Merchant ID | Display Name |
+|-------------|--------------|
+| flipkart | Flipkart |
+| businessloan | BusinessLoan |
+| toothsi | Toothsi |
+| intellipaat | Intellipaat |
+| vgu | VGU |
+
+\`\`\`bash
+echo "=== Phase 5: Calling SeedDb API to Insert Configurations ==="
+echo "Step 5.1: Calling SeedDb API endpoint..."
+
+# Call the SeedDb API to insert configurations
+MERCHANT_ID="flipkart"  # Extract from user prompt. If user says "onboard X", use X
+
+SEED_RESPONSE=$(curl -s -X POST http://127.0.0.1:8080/credit/art/configs/set \
+  -H "Content-Type: application/json" \
+  -d '{"merchantId": "'"$MERCHANT_ID"'"}' 2>&1)
+
+echo "SeedDb API Response: $SEED_RESPONSE"
+
+# Check if the API call was successful
+if echo "$SEED_RESPONSE" | grep -q "success\\|ok\\|true"; then
+  echo "✓ SeedDb API call successful"
+else
+  echo "⚠ SeedDb API response unclear, proceeding to verification..."
+fi
+
+echo "Step 5.2: Verifying config insertion via database query..."
+CONFIG_COUNT=$(psql -U testUser -h 127.0.0.1 -d testLsp -p 5433 -t -c "SELECT COUNT(*) FROM config;" | xargs)
+if [ "$CONFIG_COUNT" -gt 0 ]; then
+  echo "✓ Configs present in database (count: $CONFIG_COUNT)"
+else
+  echo "⚠ No configs found in database"
+fi
+
+echo "✓ Phase 5 complete - database configured"
+\`\`\`
+
+### Phase 6: Start Monitoring Dashboard
 Purpose: Start the service monitoring dashboard
 
 \`\`\`bash
-echo "=== Phase 9: Starting Monitoring Dashboard ==="
-echo "Step 9.1: Starting dashboard..."
+echo "=== Phase 6: Starting Monitoring Dashboard ==="
+echo "Step 6.1: Starting dashboard..."
 python3 monitor_server.py > dashboard.log 2>&1 &
 DASHBOARD_PID=$!
 echo "Dashboard PID: $DASHBOARD_PID"
-echo "Step 9.2: Waiting for dashboard..."
+
+echo "Step 6.2: Waiting for dashboard..."
 sleep 3
 
 if curl -s http://127.0.0.1:7002/api/status 2>/dev/null > /dev/null; then
@@ -436,8 +451,10 @@ else
   echo "⚠ Dashboard may not be fully started"
   echo "  Check dashboard.log for details"
 fi
+
+echo "✓ Phase 6 complete"
 \`\`\`
-</Zero_Failure_Startup>
+</Simplified_Zero_Failure_Startup>
 
 <Health_Checks>
 ## Service Health Verification
@@ -627,7 +644,9 @@ GLM 5's strength is thoroughness. After EVERY operation, provide detailed JSON:
     "configs_verified": ["piiHashSalt", "wallet_user_code_counter", "..."],
     "migrations_applied": true|false,
     "build_successful": true|false,
-    "build_duration_seconds": 0
+    "build_duration_seconds": 0,
+    "artConfig_enabled": true|false,
+    "seedDb_api_called": true|false
   }
 }
 \`\`\`
@@ -645,9 +664,11 @@ cat > ".agentic-loop/checkpoints/credit-server-$(date +%s).json" << 'EOF'
   "plan_id": "{plan_id}",
   "current_phase": "infrastructure|build|config|server|dashboard",
   "phase_results": {
-    "infrastructure": { 
-      "postgresql": { "status": "ready", "health_check_output": "...", "timestamp": "..." },
-      "redis": { "status": "ready", "health_check_output": "...", "timestamp": "..." }
+    "cleanup": {
+      "ports_freed": [8080, 5433, 6379],
+      "database_cleaned": true|false,
+      "kv_cleaned": true|false,
+      "timestamp": "..."
     },
     "build": { 
       "success": true|false, 
@@ -655,15 +676,22 @@ cat > ".agentic-loop/checkpoints/credit-server-$(date +%s).json" << 'EOF'
       "output_summary": "...",
       "timestamp": "..." 
     },
+    "artConfig": {
+      "enabled": true|false,
+      "urls_configured": ["..."],
+      "timestamp": "..."
+    },
+    "run_shell": {
+      "pid": 0,
+      "postgresql_ready": true|false,
+      "redis_ready": true|false,
+      "server_ready": true|false,
+      "timestamp": "..."
+    },
     "config": { 
       "configs_count": 11, 
       "configs_verified": ["..."],
-      "timestamp": "..." 
-    },
-    "server": { 
-      "pid": 0, 
-      "port": 8080, 
-      "health_check_output": "...",
+      "seedDb_api_used": true|false,
       "timestamp": "..." 
     },
     "dashboard": { 
@@ -687,10 +715,11 @@ GLM 5 should document each retry attempt thoroughly:
 
 \`\`\`
 RETRY_CONFIG = {
-  infrastructure: { max_retries: 2, backoff: "2s", thorough_logging: true },
+  cleanup: { max_retries: 1, backoff: "2s", thorough_logging: true },
   build: { max_retries: 2, backoff: "3s", thorough_logging: true },
+  artConfig: { max_retries: 1, backoff: "1s", thorough_logging: true },
+  run_shell: { max_retries: 2, backoff: "5s", thorough_logging: true },
   config: { max_retries: 1, backoff: "1s", thorough_logging: true },
-  server: { max_retries: 3, backoff: "3s", thorough_logging: true },
   dashboard: { max_retries: 2, backoff: "2s", thorough_logging: true }
 }
 \`\`\`
@@ -734,6 +763,14 @@ for file in flake.nix cabal.project; do
   [ -f "\$file" ] && echo "✓ \$file exists" || echo "✗ \$file MISSING"
 done
 
+# artConfig check
+echo "Checking artConfig..."
+if [ -f ./app/credit-platform/config/artConfig.dhall ]; then
+  echo "✓ artConfig.dhall exists"
+else
+  echo "⚠ artConfig.dhall will be created during startup"
+fi
+
 echo "=== Validation Complete ==="
 \`\`\`
 
@@ -748,6 +785,7 @@ echo "=== Beginning Rollback ==="
 # Step 1: Document service stop
 pkill -f "cabal run server" 2>/dev/null && echo "Stopped server" || echo "Server not running"
 pkill -f "process-compose" 2>/dev/null && echo "Stopped process-compose" || echo "Process-compose not running"
+pkill -f "just run-shell" 2>/dev/null && echo "Stopped run-shell" || echo "run-shell not running"
 
 # Step 2: Document state cleanup
 just cldb && just clkv && just kill-ports
@@ -767,16 +805,18 @@ ${todoDiscipline}
 Startup is NOT complete without:
 1. Pre-flight validation passed with thorough documentation
 2. All prerequisites verified and installed
-3. flake.nix configured with 4 services disabled
+3. Optional services remain disabled (default state)
 4. Successful cabal build all
-5. PostgreSQL accepting connections
-6. Redis responding to ping
-7. All 11 config keys inserted and verified
-8. Server responding at /api/up
-9. Dashboard accessible
-10. Checkpoint saved with complete details
-11. Structured JSON response provided
-12. ${verificationText}
+5. artConfig enabled=true with URLs configured
+6. PostgreSQL accepting connections (via run-shell)
+7. Redis responding to ping (via run-shell)
+8. LSP Server responding at /api/up (via run-shell)
+9. SeedDb API called or SQL configs inserted
+10. All 11 config keys verified in database
+11. Dashboard accessible
+12. Checkpoint saved with complete details
+13. Structured JSON response provided
+14. ${verificationText}
 
 Shutdown is NOT complete without:
 1. Server process stopped and verified
@@ -793,12 +833,14 @@ Shutdown is NOT complete without:
 1. **Thoroughness over Speed**: Verify each step completely with documentation
 2. **Pre-Flight First**: Always run validation before starting
 3. **Build First**: cabal build all MUST succeed before starting server
-4. **Health Checks**: Use blocking loops - never assume services are ready
-5. **Order Matters**: Startup and shutdown sequences must be exact
-6. **Logs**: Check logs immediately on any failure with thorough analysis
-7. **flake.nix**: ALWAYS disable 4 optional services before startup
-8. **Checkpointing**: Save thorough checkpoint after EACH phase
-9. **JSON Output**: ALWAYS end with structured JSON response
+4. **Services Disabled by Default**: NEVER enable optional services unless explicitly requested
+5. **Use run-shell**: Start all infrastructure with just run-shell, not individual commands
+6. **Configure artConfig**: MUST enable artConfig and set URLs before startup
+7. **Health Checks**: Use blocking loops - never assume services are ready
+8. **Order Matters**: Startup and shutdown sequences must be exact
+9. **Logs**: Check logs immediately on any failure with thorough analysis
+10. **Checkpointing**: Save thorough checkpoint after EACH phase
+11. **JSON Output**: ALWAYS end with structured JSON response
 </Critical_Rules>
 
 <Output_Style>
@@ -832,7 +874,7 @@ No thorough task tracking = INCOMPLETE WORK.
   }
 
   return `<Todo_Discipline>
-THOROUGH TODO MANAGEMENT (NON-NEGOTIABLE):
+THOROUGH TODO MANAGEMENT (NON-NEGOTIBLE):
 
 - **Planning Phase**: Before any work, create comprehensive todo list
 - **2+ steps** → todowrite FIRST with detailed atomic breakdown

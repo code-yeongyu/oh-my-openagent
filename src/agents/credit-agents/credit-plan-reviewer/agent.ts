@@ -5,7 +5,7 @@ import type { AgentOverrideConfig } from "../../../config/schema"
 import { createAgentToolRestrictions, type PermissionValue } from "../../../shared/permission-compat"
 import { buildDefaultCreditPlanReviewerPrompt } from "./default"
 
-const MODE: AgentMode = "subagent"
+const MODE: AgentMode = "primary"
 
 const BLOCKED_TOOLS = ["edit", "apply_patch", "bash", "task"]
 
@@ -66,7 +66,7 @@ export function createCreditPlanReviewerAgentWithOverrides(
   }
 
   const overrideModel = (override as { model?: string } | undefined)?.model
-  const model = overrideModel ?? systemDefaultModel ?? CREDIT_PLAN_REVIEWER_DEFAULTS.model
+  const model = overrideModel ?? CREDIT_PLAN_REVIEWER_DEFAULTS.model
   const temperature = override?.temperature ?? CREDIT_PLAN_REVIEWER_DEFAULTS.temperature
 
   const promptAppend = override?.prompt_append

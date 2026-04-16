@@ -74,81 +74,118 @@ just run              # With TUI
 just run-shell        # Logs in shell (recommended for debugging)
 \`\`\`
 
-**Start Only euler-lsp (CRITICAL - Disable Other Services First):**
+## Optional Service Enablement
 
-Before ANY startup, modify flake.nix to prevent nix hash mismatch errors:
+**Services are now disabled by default.** Only enable services when user EXPLICITLY requests them.
 
-1. Edit flake.nix (lines 124-128):
-   \`\`\`nix
-   services.euler-lsp.enable = true;
-   services.euler-lsp-api-gateway.enable = false;  # DISABLE
-   services.themis.enable = false;                  # DISABLE
-   services.lender-scripts.enable = false;          # DISABLE
-   services.euler-credit-drainer.enable = false;    # DISABLE
-   \`\`\`
+To enable additional services, modify flake.nix and set \`enable = true\` for the services you need:
 
-2. Verify: \`grep -c "enable = false" flake.nix\` should return 4
-3. Run: \`just run\` or \`just run-shell\`
+\`\`\`nix
+# Example: Enable only the services you explicitly need
+services.euler-lsp-api-gateway.enable = false;  # Keep disabled unless needed
+services.themis.enable = false;                  # Keep disabled unless needed
+services.lender-scripts.enable = false;          # Keep disabled unless needed
+services.euler-credit-drainer.enable = false;    # Keep disabled unless needed
+\`\`\`
 
-**Fresh Database Setup (9 Steps):**
-1. **Aggressive cleanup** (prevents stale processes on wrong ports):
+**Default State (Recommended):**
+- euler-lsp: enabled (required)
+- All other services: disabled
+
+**When to Enable:**
+- Only enable services when user EXPLICITLY asks for specific functionality
+- Never enable services "just in case" or speculatively
+- Enabling extra services increases startup time and resource usage
+
+## Simplified Startup Flow (Recommended)
+
+**Single-Command Startup:**
+
+1. **Aggressive cleanup** (prevents stale processes):
    \`\`\`bash
    pkill -KILL -f "postgres" 2>/dev/null || true
    pkill -KILL -f "redis-server" 2>/dev/null || true
    sleep 3
    just cldb && just clkv && just kill-ports
    \`\`\`
+
 2. **Build** (with retry for transient errors):
    \`\`\`bash
    cabal build all || cabal build all
    \`\`\`
-3. Start services: \`just run-shell > process_compose.log 2>&1 &\`
-4. Wait for DB (with timeout and error detection):
+
+3. **Enable artConfig in setup template**:
+   The file \`./app/credit-platform/config/credit-platform-setup.conf.template\` already exists with artConfig disabled.
+   Enable it by changing enabled = false to enabled = true:
    \`\`\`bash
-   # Check for existing PostgreSQL first
-   PG_PID=$(cat ./data/lsp-db/postmaster.pid 2>/dev/null | head -1)
-   if [ -n "$PG_PID" ] && kill -0 "$PG_PID" 2>/dev/null; then
-     echo "WARNING: PostgreSQL already running (PID: $PG_PID)"
-   fi
-   
-   # Wait with timeout
-   for i in {1..60}; do
-     if pg_isready -h 127.0.0.1 -p 5433 2>&1 | grep -q "accepting"; then
-       echo "✓ PostgreSQL ready"; break
-     fi
-     # Check for lock file error
-     if grep -q "FATAL:.*lock file.*already exists" process_compose.log 2>/dev/null; then
-       echo "✗ PostgreSQL lock file error - kill existing instance first"
-       exit 1
-     fi
-     sleep 1
-   done
+   sed -i 's/enabled = false/enabled = true/' ./app/credit-platform/config/credit-platform-setup.conf.template
+   echo "✓ artConfig enabled in credit-platform-setup.conf.template"
    \`\`\`
-5. Wait for Redis: \`redis-cli -p 6379 ping\`
-6. Insert configs: psql command with required configs
-7. Copy config: \`cp ./app/credit-platform/config/credit-platform.conf.template ./app/credit-platform/config/credit-platform.conf\`
-8. **Start server** (use direct binary to avoid rebuild):
+
+4. **Copy setup template to active config**:
    \`\`\`bash
-   SERVER_BIN=$(find dist-newstyle -name "server" -type f -executable 2>/dev/null | grep "server/noopt/build" | head -1)
-   nohup "$SERVER_BIN" > server_output.log 2>&1 &
+   cp ./app/credit-platform/config/credit-platform-setup.conf.template ./app/credit-platform/config/credit-platform.conf
+   echo "✓ Config copied to credit-platform.conf"
    \`\`\`
-9. Start dashboard: \`python3 monitor_server.py > dashboard.log 2>&1 &\`
-10. **Health check** (extended - 45 iterations):
-    \`\`\`bash
-    for i in {1..45}; do
-      if curl -sf http://127.0.0.1:8080/api/up 2>/dev/null | grep -q "UP"; then
-        echo "✓ Server UP"; break
-      fi
-      sleep 2
-    done
-    \`\`\`
+
+5. **Start everything with run-shell** (starts all services in foreground):
+   \`\`\`bash
+   just run-shell
+   \`\`\`
+   This will start PostgreSQL, Redis, and the euler-lsp server automatically.
+
+6. **Call SeedDb API** to insert configs (after server starts)
+
+### SeedDb API
+Use the SeedDb API to insert required configuration:
+
+**Endpoint**: \`POST /credit/art/configs/set\`
+**Headers**:
+- \`Content-Type: application/json\`
+- \`Authorization: Bearer <api-key>\` (if required)
+
+**Available Merchants** (idempotent insertion supported):
+| Merchant ID | Display Name |
+|-------------|--------------|
+| flipkart | Flipkart |
+| businessloan | BusinessLoan |
+| toothsi | Toothsi |
+| intellipaat | Intellipaat |
+| vgu | VGU |
+
+**Call API:**
+\`\`\`bash
+# Wait for server to be ready, then call SeedDb API
+for i in {1..45}; do
+  if curl -sf http://127.0.0.1:8080/api/up 2>/dev/null | grep -q "UP"; then
+    echo "✓ Server UP"; break
+  fi
+  sleep 2
+done
+
+# Call SeedDb API with merchantId
+curl -X POST http://127.0.0.1:8080/credit/art/configs/set \
+  -H "Content-Type: application/json" \
+  -d '{"merchantId": "flipkart"}'
+\`\`\`
 
 ## Service Health Checks
 
-- Main Server: \`curl http://127.0.0.1:8080/api/up\` (should return {"status":"UP"})
-- PostgreSQL: \`pg_isready -h 127.0.0.1 -p 5433\`
-- Redis: \`redis-cli -p 6379 ping\`
-- Dashboard: \`curl http://127.0.0.1:7002/api/status\`
+After startup, verify all services are healthy:
+
+\`\`\`bash
+# Main Server
+curl -sf http://127.0.0.1:8080/api/up && echo "✓ Server UP" || echo "✗ Server DOWN"
+
+# PostgreSQL
+pg_isready -h 127.0.0.1 -p 5433 && echo "✓ PostgreSQL ready" || echo "✗ PostgreSQL not ready"
+
+# Redis
+redis-cli -p 6379 ping | grep -q "PONG" && echo "✓ Redis ready" || echo "✗ Redis not ready"
+
+# Dashboard
+curl -sf http://127.0.0.1:7002/api/status && echo "✓ Dashboard UP" || echo "✗ Dashboard DOWN"
+\`\`\`
 
 ## Access Points
 
@@ -161,13 +198,16 @@ Before ANY startup, modify flake.nix to prevent nix hash mismatch errors:
 
 **Missing Config Error:**
 "Missing configuration DB keys: piiHashSalt"
-→ Insert required configs via psql
+→ Call SeedDb API: \`curl -X POST http://127.0.0.1:8080/credit/art/configs/set -H "Content-Type: application/json" -d '{"merchantId": "flipkart"}'\`
 
 **Migration Version Mismatch:**
 → Clean DB: \`just cldb && just kill-ports && just run-shell\`
 
 **Port Already in Use:**
 → \`just kill-ports\`
+
+**PostgreSQL Lock File Error:**
+→ Kill existing postgres: \`pkill -KILL -f "postgres" && sleep 3 && just run-shell\`
 
 ## Graceful Shutdown Sequence (Reverse Startup Order)
 
@@ -504,7 +544,7 @@ FREE_MEM=$(free -g | grep Mem | awk '{print $7}')
 **ALWAYS:**
 - Run pre-flight validation FIRST
 - Run \`cabal build all\` and verify successful compilation before starting server
-- Insert required DB configs on fresh setup
+- Insert required DB configs on fresh setup via SeedDb API
 - Start the monitoring dashboard
 - Verify with health checks after starting
 - Check logs: \`tail -f server_output.log process_compose.log\`
@@ -515,6 +555,7 @@ FREE_MEM=$(free -g | grep Mem | awk '{print $7}')
 - Edit .template files directly (copy to .conf first)
 - Use task() or call_omo_agent()
 - Stop process-compose if DB/Redis needed
+- Enable services unless user EXPLICITLY requests them
 
 ${taskDiscipline}
 

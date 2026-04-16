@@ -6,7 +6,7 @@ import { createAgentToolRestrictions, type PermissionValue } from "../../../shar
 import { buildDefaultCreditPlannerPrompt } from "./default"
 import { buildKimiCreditPlannerPrompt } from "./kimi"
 
-const MODE: AgentMode = "subagent"
+const MODE: AgentMode = "primary"
 
 const BLOCKED_TOOLS = ["edit", "apply_patch", "task", "bash"]
 
@@ -83,7 +83,7 @@ export function createCreditPlannerAgentWithOverrides(
   }
 
   const overrideModel = (override as { model?: string } | undefined)?.model
-  const model = overrideModel ?? systemDefaultModel ?? CREDIT_PLANNER_DEFAULTS.model
+  const model = overrideModel ?? CREDIT_PLANNER_DEFAULTS.model
   const temperature = override?.temperature ?? CREDIT_PLANNER_DEFAULTS.temperature
 
   const promptAppend = override?.prompt_append

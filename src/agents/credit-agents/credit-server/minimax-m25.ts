@@ -62,53 +62,88 @@ command -v nix just cabal psql redis-cli python3 >/dev/null && echo "✓ All too
 - redis-cli: brew install redis
 </Prerequisites>
 
-<Pre_Startup>
-## Pre-Startup (REQUIRED)
+<Optional_Service_Enablement>
+## Optional Service Enablement
 
-Edit flake.nix lines 124-128:
+**By default, all optional services are DISABLED.** Only enable services when explicitly requested by the user.
+
+### How to Enable Services
+
+Services are controlled via the Nix flake configuration. To enable a service:
+
+**Step 1: Identify the service in flake.nix (around lines 124-128):**
 \`\`\`nix
-services.euler-lsp.enable = true;
-services.euler-lsp-api-gateway.enable = false;
-services.themis.enable = false;
-services.lender-scripts.enable = false;
-services.euler-credit-drainer.enable = false;
+services.euler-lsp.enable = true;              # Core - always enabled
+services.euler-lsp-api-gateway.enable = false; # Optional
+services.themis.enable = false;                # Optional
+services.lender-scripts.enable = false;        # Optional
+services.euler-credit-drainer.enable = false;  # Optional
 \`\`\`
 
-Verify: \`grep -c "enable = false" flake.nix\` → should be 4
-</Pre_Startup>
+**Step 2: Set enable = true for requested services only**
 
-<Startup_Quick_Reference>
-## Quick Startup (9 Steps)
+**Common Services:**
+| Service | flake.nix setting | When to Enable |
+|---------|-------------------|----------------|
+| euler-lsp | Always enabled | Core LSP functionality |
+| euler-lsp-api-gateway | \`services.euler-lsp-api-gateway.enable = true\` | When gateway routing needed |
+| themis | \`services.themis.enable = true\` | When ThemIS integration required |
+| lender-scripts | \`services.lender-scripts.enable = true\` | When lender automation scripts needed |
+| euler-credit-drainer | \`services.euler-credit-drainer.enable = true\` | When credit drainer service required |
+
+**Important:** Only enable services explicitly requested. Extra services consume resources and increase startup time.
+</Optional_Service_Enablement>
+
+<Simplified_Startup>
+## Simplified Quick Startup (5 Steps)
 
 | Step | Command | Purpose |
 |------|---------|---------|
-| 1 | \`just cldb && just clkv && just kill-ports\` | Clean environment |
-| 2 | \`cabal build all\` | Build modules (MUST succeed) |
-| 3 | \`just run-shell > process_compose.log 2>&1 &\` | Start infrastructure |
-| 4 | \`pg_isready -h 127.0.0.1 -p 5433\` | Wait for PostgreSQL |
-| 5 | \`redis-cli -p 6379 ping\` | Wait for Redis |
-| 6 | Insert 11 configs via psql | See SQL below |
-| 7 | \`cp template to .conf\` | Copy config |
-| 8 | \`cabal run server > server_output.log 2>&1 &\` | Start server |
-| 9 | \`python3 monitor_server.py > dashboard.log 2>&1 &\` | Start dashboard |
+| 1 | \`just cldb && just clkv && just kill-ports\` | Aggressive cleanup - wipe DB, clear KV, free ports |
+| 2 | \`cabal build all\` | Build all modules (MUST succeed) |
+| 3 | \`Enable artConfig in setup template\` | Use sed to change enabled = false to enabled = true |
+| 4 | \`just run-shell\` | Start everything - DB, Redis, server, dashboard |
+| 5 | \`Call SeedDb API\` | POST to /credit/art/configs/set to seed initial data |
 
-### Config Insert SQL (Step 6)
-\`\`\`sql
-INSERT INTO config (id, key, value_enc, value, created_at, updated_at) VALUES 
-('LSP8cf7261b78404620b5eefb0c5aeaef3c', 'piiHashSalt', 'ConfigRealm :: whb5iLKzNBdHC/f7ZgfzLg5qQ+CjcGLLjnU1AJS5j/k=', NULL, NOW(), NOW()),
-('LSP4752ae5a469e43d88b6d74ea741068aa', 'wallet_user_code_counter', 'ConfigRealm :: 0', NULL, NOW(), NOW()),
-('LSPa15bef5f939e4113b49a23c878f67861', 'euler_config_external', 'ConfigRealm :: eyJkb21haW5FQ0Rhc2hib2FyZCI6ImRhc2hib2FyZC5zYW5kYm94Lmp1c3BheS5pbiIsInBhdGgiOiIiLCJkb21haW5UeG4iOiJzYW5kYm94Lmp1c3BheS5pbiIsImRvbWFpbiI6InNhbmRib3guanVzcGF5LmluIiwiZG9tYWluUHMiOiJzYW5kYm94Lmp1c3BheS5pbiIsInNlY3VyZWRSZXF1ZXN0Ijp0cnVlLCJkb21haW5QcmVUeG4iOiJzYW5kYm94Lmp1c3BheS5pbiIsInRlbmFudEhvc3QiOiJzYW5kYm94Lmp1c3BheS5pbiIsInZlcnNpb24iOiIyMDIyLTA0LTIwIiwib3B0aW9uR2F0ZXdheVJlc3BvbnNlIjoidHJ1ZSIsImRvbWFpbkF1eGlsaWFyeSI6InNhbmRib3guanVzcGF5LmluIiwiZG9tYWluT3JkZXI6InNhbmRib3guanVzcGF5LmluIiwibHNwRXRiR2F0ZXdheUlkIjoiTFNQX0VUQiIsInBvcnQiOjQ0MywicmVmdW5kUG9ydCI6ODAsImxzcEdhdGV3YXlJZCI6IkxTUCIsInJlZnVuZFNlY3VyZWRSZXF1ZXN0IjpmYWxzZX0=', NULL, NOW(), NOW()),
-('LSPb2a5e6bb181e4f60adb34ff578a10bec', 'REDIS_EXPIRY_TIME', 'ConfigRealm :: 10', NULL, NOW(), NOW()),
-('LSPdb7ceb6c4bbb4030a367898d944a0c0c', 'lsp_acc_details', 'ConfigRealm :: eyJiYXNlVXJsUG9ydCI6ODA4MCwidGVzdE1vZGUiOnRydWUsImJhc2VVcmwiOiIxMjcuMC4wLjEiLCJiYXNlVXJsUGF0aCI6IiIsInNjaGVtZSI6Ikh0dHAifQ==', NULL, NOW(), NOW()),
-('LSP369cfae732bf4152ae4ffe82fcb700ec', 'euler_config', 'ConfigRealm :: eyJkb21haW5FQ0Rhc2hib2FyZCI6ImRhc2hib2FyZC5zYW5kYm94Lmp1c3BheS5pbiIsInBhdGgiOiIiLCJkb21haW5UeG4iOiJzYW5kYm94Lmp1c3BheS5pbiIsImRvbWFpbiI6InNhbmRib3guanVzcGF5LmluIiwiZG9tYWluUHMiOiJzYW5kYm94Lmp1c3BheS5pbiIsInNlY3VyZWRSZXF1ZXN0Ijp0cnVlLCJkb21haW5QcmVUeG4iOiJzYW5kYm94Lmp1c3BheS5pbiIsInRlbmFudEhvc3QiOiJzYW5kYm94Lmp1c3BheS5pbiIsInZlcnNpb24iOiIyMDIyLTA0LTIwIiwib3B0aW9uR2F0ZXdheVJlc3BvbnNlIjoidHJ1ZSIsImRvbWFpbkF1eGlsaWFyeSI6InNhbmRib3guanVzcGF5LmluIiwiZG9tYWluT3JkZXI6InNhbmRib3guanVzcGF5LmluIiwibHNwRXRiR2F0ZXdheUlkIjoiTFNQX0VUQiIsInBvcnQiOjQ0MywicmVmdW5kUG9ydCI6ODAsImxzcEdhdGV3YXlJZCI6IkxTUCIsInJlZnVuZFNlY3VyZWRSZXF1ZXN0IjpmYWxzZX0=', NULL, NOW(), NOW()),
-('LSPa5fab68440fd4a8ebc6ceec19686a6ac', 'gateway_base_url', 'ConfigRealm :: 127.0.0.1:8011/gateway/', NULL, NOW(), NOW()),
-('LSP035caebcafe443f9a2d182aa86ad6cc0', 'maxLoanRequestInfoRetryCount', 'ConfigRealm :: 5', NULL, NOW(), NOW()),
-('LSP3b414f43ce80477882f8cfa62330981e', 'LenderDecisionData', 'ConfigRealm :: ewogICAiZGF5UmFuZ2UiOjE4MCwKICAgImV4Y2x1ZGVkU3RhdHVzIjpbCiAgICAgICJDUkVBVEVEIiwKICAgICAgIlRIRU1JU19SRUpFQ1RFRCIKICAgXQp9', NULL, NOW(), NOW()),
-('LSP0edabf0971b14647a1d1e92a9f05028a', 'EULER_ENABLED_MERCHANT', 'ConfigRealm :: W10=', NULL, NOW(), NOW()),
-('LSP6845330a723d4714bbb239ded56d4198', 'default_order_expiry_time', 'ConfigRealm :: NTE4NDAwMA==', NULL, NOW(), NOW())
-ON CONFLICT (key) DO UPDATE SET value_enc = EXCLUDED.value_enc, value = NULL, updated_at = NOW();
+### Step Details
+
+**Step 3: Enable artConfig in Setup Template**
+The file \`credit-platform-setup.conf.template\` already exists with artConfig disabled.
+Enable it and copy to active config:
+\`\`\`bash
+# Enable artConfig by changing enabled = false to enabled = true
+sed -i 's/enabled = false/enabled = true/' ./app/credit-platform/config/credit-platform-setup.conf.template
+echo "✓ artConfig enabled"
+
+# Copy setup template to active config
+cp ./app/credit-platform/config/credit-platform-setup.conf.template ./app/credit-platform/config/credit-platform.conf
+echo "✓ Config copied"
 \`\`\`
-</Startup_Quick_Reference>
+
+**Step 5: SeedDb API**
+Use the SeedDb API for programmatic data insertion:
+
+**Endpoint**: \`POST /credit/art/configs/set\`
+**Headers**:
+- \`Content-Type: application/json\`
+- \`Authorization: Bearer <api-key>\` (if required)
+
+**Available Merchants** (idempotent insertion supported):
+| Merchant ID | Display Name |
+|-------------|--------------|
+| flipkart | Flipkart |
+| businessloan | BusinessLoan |
+| toothsi | Toothsi |
+| intellipaat | Intellipaat |
+| vgu | VGU |
+
+\`\`\`bash
+# Wait for server to be ready, then call SeedDb API
+curl -X POST http://127.0.0.1:8080/credit/art/configs/set \
+  -H "Content-Type: application/json" \
+  -d '{"merchantId": "flipkart"}'
+\`\`\`
+</Simplified_Startup>
 
 <Health_Checks>
 ## Health Verification
@@ -132,11 +167,11 @@ ON CONFLICT (key) DO UPDATE SET value_enc = EXCLUDED.value_enc, value = NULL, up
 
 | Issue | Symptom | Fix |
 |-------|---------|-----|
-| Missing Config | "Missing configuration DB keys" | Run step 6 (config insert) |
+| Missing Config | "Missing configuration DB keys" | Call SeedDb API: POST /credit/art/configs/set |
 | Migration Error | "migration did not reach target" | \`just cldb && just kill-ports && just run-shell\` |
 | Port Conflict | Address already in use | \`just kill-ports\` |
 | Build Failure | cabal build all fails | Check build.log, run \`cabal update\` |
-| Nix Hash Error | Hash mismatch in derivation | Disable 4 services in flake.nix |
+| Service Won't Start | Service specific errors | Check if service is enabled in flake.nix |
 
 **Check logs:** \`tail -f server_output.log process_compose.log\`
 </Common_Issues>
@@ -247,12 +282,14 @@ ${todoDiscipline}
 ## Critical Rules
 
 **ALWAYS:**
-- Disable 4 services in flake.nix first
 - Run cabal build all (must succeed)
-- Insert 11 configs on fresh setup
+- Configure artConfig enabled=true with URLs
+- Use just run-shell for startup
+- Call SeedDb API on fresh setup: POST /credit/art/configs/set
 - Verify health before finishing
 
 **NEVER:**
+- Enable optional services unless explicitly requested
 - Edit .template files directly
 - Skip health checks
 - Use task() or call_omo_agent()

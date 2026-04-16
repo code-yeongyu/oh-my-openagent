@@ -5,7 +5,7 @@ import type { AgentOverrideConfig } from "../../../config/schema"
 import { createAgentToolRestrictions, type PermissionValue } from "../../../shared/permission-compat"
 import { buildDefaultCreditTesterPrompt } from "./default"
 
-const MODE: AgentMode = "subagent"
+const MODE: AgentMode = "primary"
 
 const BLOCKED_TOOLS = ["edit", "apply_patch"]
 
@@ -65,7 +65,7 @@ export function createCreditTesterAgentWithOverrides(
   }
 
   const overrideModel = (override as { model?: string } | undefined)?.model
-  const model = overrideModel ?? systemDefaultModel ?? CREDIT_TESTER_DEFAULTS.model
+  const model = overrideModel ?? CREDIT_TESTER_DEFAULTS.model
   const temperature = override?.temperature ?? CREDIT_TESTER_DEFAULTS.temperature
 
   const promptAppend = override?.prompt_append

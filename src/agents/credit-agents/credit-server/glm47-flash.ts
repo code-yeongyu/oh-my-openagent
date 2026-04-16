@@ -23,18 +23,28 @@ CRITICAL: Before starting ANY task, you MUST read the memory-bank to understand 
 Do NOT skip this step. The memory-bank contains essential configuration patterns and best practices.
 </Memory_Bank_Instruction>
 
-CreditServer - LSP Server Starter (GLM 4.7 Flash Mode)
+CreditServer - LSP Server Starter (Flash Mode)
+
+## Optional Service Enablement
+
+Services are DISABLED by default. Only enable when explicitly requested:
+- svcPostgres, svcRedis: Database infrastructure
+- svcEulerLsp: Main LSP server
+- svcDashboard: Monitoring dashboard
+
+Enable via: \`just run-shell <service1> <service2> ...\` or modify flake.nix
 
 ## Quick Actions
 
 **Start:**
 \`\`\`bash
-# 1. Check flake.nix has 4 services disabled
-grep -c "enable = false" flake.nix  # Should be 4
-
-# 2. Clean & Build
+# 1. Clean & Build
 just cldb && just clkv && just kill-ports
 cabal build all  # MUST succeed
+
+# 2. Enable artConfig in setup template and copy to active config
+sed -i 's/enabled = false/enabled = true/' ./app/credit-platform/config/credit-platform-setup.conf.template
+cp ./app/credit-platform/config/credit-platform-setup.conf.template ./app/credit-platform/config/credit-platform.conf
 
 # 3. Start infrastructure
 just run-shell > process_compose.log 2>&1 &
@@ -43,22 +53,10 @@ just run-shell > process_compose.log 2>&1 &
 pg_isready -h 127.0.0.1 -p 5433
 redis-cli -p 6379 ping
 
-# 5. Insert 11 configs
-psql -U testUser -h 127.0.0.1 -d testLsp -p 5433 << 'EOF'
-INSERT INTO config (id, key, value_enc, created_at, updated_at) VALUES 
-('LSP8cf7261b78404620b5eefb0c5aeaef3c', 'piiHashSalt', 'ConfigRealm :: whb5iLKzNBdHC/f7ZgfzLg5qQ+CjcGLLjnU1AJS5j/k=', NOW(), NOW()),
-('LSP4752ae5a469e43d88b6d74ea741068aa', 'wallet_user_code_counter', 'ConfigRealm :: 0', NOW(), NOW()),
-('LSPa15bef5f939e4113b49a23c878f67861', 'euler_config_external', 'ConfigRealm :: eyJkb21haW5FQ0Rhc2hib2FyZCI6ImRhc2hib2FyZC5zYW5kYm94Lmp1c3BheS5pbiIsInBhdGgiOiIiLCJkb21haW5UeG4iOiJzYW5kYm94Lmp1c3BheS5pbiIsImRvbWFpbiI6InNhbmRib3guanVzcGF5LmluIiwiZG9tYWluUHMiOiJzYW5kYm94Lmp1c3BheS5pbiIsInNlY3VyZWRSZXF1ZXN0Ijp0cnVlLCJkb21haW5QcmVUeG4iOiJzYW5kYm94Lmp1c3BheS5pbiIsInRlbmFudEhvc3QiOiJzYW5kYm94Lmp1c3BheS5pbiIsInZlcnNpb24iOiIyMDIyLTA0LTIwIiwib3B0aW9uR2F0ZXdheVJlc3BvbnNlIjoidHJ1ZSIsImRvbWFpbkF1eGlsaWFyeSI6InNhbmRib3guanVzcGF5LmluIiwiZG9tYWluT3JkZXI6InNhbmRib3guanVzcGF5LmluIiwibHNwRXRiR2F0ZXdheUlkIjoiTFNQX0VUQiIsInBvcnQiOjQ0MywicmVmdW5kUG9ydCI6ODAsImxzcEdhdGV3YXlJZCI6IkxTUCIsInJlZnVuZFNlY3VyZWRSZXF1ZXN0IjpmYWxzZX0=', NOW(), NOW()),
-('LSPb2a5e6bb181e4f60adb34ff578a10bec', 'REDIS_EXPIRY_TIME', 'ConfigRealm :: 10', NOW(), NOW()),
-('LSPdb7ceb6c4bbb4030a367898d944a0c0c', 'lsp_acc_details', 'ConfigRealm :: eyJiYXNlVXJsUG9ydCI6ODA4MCwidGVzdE1vZGUiOnRydWUsImJhc2VVcmwiOiIxMjcuMC4wLjEiLCJiYXNlVXJsUGF0aCI6IiIsInNjaGVtZSI6Ikh0dHAifQ==', NOW(), NOW()),
-('LSP369cfae732bf4152ae4ffe82fcb700ec', 'euler_config', 'ConfigRealm :: eyJkb21haW5FQ0Rhc2hib2FyZCI6ImRhc2hib2FyZC5zYW5kYm94Lmp1c3BheS5pbiIsInBhdGgiOiIiLCJkb21haW5UeG4iOiJzYW5kYm94Lmp1c3BheS5pbiIsImRvbWFpbiI6InNhbmRib3guanVzcGF5LmluIiwiZG9tYWluUHMiOiJzYW5kYm94Lmp1c3BheS5pbiIsInNlY3VyZWRSZXF1ZXN0Ijp0cnVlLCJkb21haW5QcmVUeG4iOiJzYW5kYm94Lmp1c3BheS5pbiIsInRlbmFudEhvc3QiOiJzYW5kYm94Lmp1c3BheS5pbiIsInZlcnNpb24iOiIyMDIyLTA0LTIwIiwib3B0aW9uR2F0ZXdheVJlc3BvbnNlIjoidHJ1ZSIsImRvbWFpbkF1eGlsaWFyeSI6InNhbmRib3guanVzcGF5LmluIiwiZG9tYWluT3JkZXI6InNhbmRib3guanVzcGF5LmluIiwibHNwRXRiR2F0ZXdheUlkIjoiTFNQX0VUQiIsInBvcnQiOjQ0MywicmVmdW5kUG9ydCI6ODAsImxzcEdhdGV3YXlJZCI6IkxTUCIsInJlZnVuZFNlY3VyZWRSZXF1ZXN0IjpmYWxzZX0=', NOW(), NOW()),
-('LSPa5fab68440fd4a8ebc6ceec19686a6ac', 'gateway_base_url', 'ConfigRealm :: 127.0.0.1:8011/gateway/', NOW(), NOW()),
-('LSP035caebcafe443f9a2d182aa86ad6cc0', 'maxLoanRequestInfoRetryCount', 'ConfigRealm :: 5', NOW(), NOW()),
-('LSP3b414f43ce80477882f8cfa62330981e', 'LenderDecisionData', 'ConfigRealm :: ewogICAiZGF5UmFuZ2UiOjE4MCwKICAgImV4Y2x1ZGVkU3RhdHVzIjpbCiAgICAgICJDUkVBVEVEIiwKICAgICAgIlRIRU1JU19SRUpFQ1RFRCIKICAgXQp9', NOW(), NOW()),
-('LSP0edabf0971b14647a1d1e92a9f05028a', 'EULER_ENABLED_MERCHANT', 'ConfigRealm :: W10=', NOW(), NOW()),
-('LSP6845330a723d4714bbb239ded56d4198', 'default_order_expiry_time', 'ConfigRealm :: NTE4NDAwMA==', NOW(), NOW())
-ON CONFLICT (key) DO UPDATE SET value_enc = EXCLUDED.value_enc, updated_at = NOW();
-EOF
+# 5. Call SeedDb API
+curl -X POST http://localhost:8080/credit/seed \
+  -H "Content-Type: application/json" \
+  -d '{"merchants": ["flipkart", "businessloan", "toothsi", "intellipaat", "vgu"]}'
 
 # 6. Copy config & Start
 cp template.conf .conf
@@ -82,7 +80,7 @@ pkill -KILL -f "postgres|redis-server" 2>/dev/null || true
 \`\`\`
 
 **Fix:**
-- Missing config → Insert 11 configs (step 5)
+- Missing config → Call SeedDb API (step 5)
 - Migration error → just cldb && just kill-ports && just run-shell
 - Port conflict → just kill-ports
 
@@ -140,7 +138,7 @@ GLM 4.7 Flash is optimized for speed. Keep structured output minimal but complet
 
 ${todoDiscipline}
 
-**Rules:** flake.nix first (disable 4), build must succeed, 11 configs, health checks, checkpoint saved, JSON output.`
+**Rules:** Services disabled by default, build must succeed, configure artConfig, call SeedDb API, health checks, checkpoint saved, JSON output.`
 
   if (!promptAppend) return prompt
   return prompt + "\n\n" + resolvePromptAppend(promptAppend)

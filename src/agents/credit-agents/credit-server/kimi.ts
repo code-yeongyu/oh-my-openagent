@@ -71,6 +71,41 @@ command -v python3 >/dev/null 2>&1 && echo "✓ python3" || echo "✗ python3 - 
 - Enter nix shell: Run 'nix develop'
 </Prerequisites>
 
+<Optional_Service_Enablement>
+## Optional Service Enablement
+
+**IMPORTANT:** Services are **DISABLED BY DEFAULT** in flake.nix. Only enable services when user **EXPLICITLY requests** them.
+
+### When to Enable Services
+- **User explicitly asks** for api-gateway, themis, lender-scripts, or drainer
+- **Integration testing** requires specific service
+- **Production deployment** with full stack
+
+### How to Enable (Only When Requested)
+If user explicitly requests a service:
+
+\`\`\`nix
+# Edit flake.nix - change ONLY the requested service
+services.euler-lsp.enable = true;                          # ALWAYS enabled
+services.euler-lsp-api-gateway.enable = true;              # ONLY if requested
+services.themis.enable = true;                             # ONLY if requested
+services.lender-scripts.enable = true;                     # ONLY if requested
+services.euler-credit-drainer.enable = true;               # ONLY if requested
+\`\`\`
+
+### Default State (No Action Needed)
+\`\`\`nix
+# These are already disabled by default - DO NOT MODIFY:
+services.euler-lsp.enable = true;
+services.euler-lsp-api-gateway.enable = false;
+services.themis.enable = false;
+services.lender-scripts.enable = false;
+services.euler-credit-drainer.enable = false;
+\`\`\`
+
+**NEVER modify flake.nix unless user explicitly asks for additional services.**
+</Optional_Service_Enablement>
+
 <Quick_Start>
 ## Primary Commands
 
@@ -80,104 +115,68 @@ just run              # With TUI
 just run-shell        # Logs in shell (recommended for debugging)
 \`\`\`
 
-**Pre-Startup Configuration (MANDATORY FIRST):**
-Before ANY startup, modify flake.nix to prevent nix hash mismatch errors:
+**Simplified Startup Flow (Execute in Order):**
 
-\`\`\`nix
-# Edit flake.nix lines 124-128:
-services.euler-lsp.enable = true;
-services.euler-lsp-api-gateway.enable = false;  # DISABLE
-services.themis.enable = false;                  # DISABLE
-services.lender-scripts.enable = false;          # DISABLE
-services.euler-credit-drainer.enable = false;    # DISABLE
-\`\`\`
-
-Verify: \`grep -c "enable = false" flake.nix\` should return 4
-
-**Fresh Database Setup (9 Steps - Execute in Order):**
-
-1. Clean everything (aggressive cleanup first):
+1. **Aggressive cleanup** (prevents port conflicts and stale locks):
    \`\`\`bash
-   # Kill all stale postgres/redis processes (prevents port conflicts)
+   # Kill all stale postgres/redis processes
    pkill -KILL -f "postgres" 2>/dev/null || true
    pkill -KILL -f "redis-server" 2>/dev/null || true
    sleep 3
+   # Clean database and kill ports
    just cldb && just clkv && just kill-ports
    \`\`\`
 
-2. Build all modules (CRITICAL - with retry for transient errors):
+2. **Build** (with retry for transient errors):
    \`\`\`bash
    cabal build all || cabal build all
    \`\`\`
 
-3. Start services in background:
+3. **Enable artConfig in setup template**:
    \`\`\`bash
-   just run-shell > process_compose.log 2>&1 &
-   \`\`\`
-
-4. Wait for PostgreSQL health (with lock file detection):
-   \`\`\`bash
-   # Check for existing PostgreSQL instance
-   PG_PID=$(cat ./data/lsp-db/postmaster.pid 2>/dev/null | head -1)
-   if [ -n "$PG_PID" ] && kill -0 "$PG_PID" 2>/dev/null; then
-     echo "WARNING: PostgreSQL already running (PID: $PG_PID)"
-   fi
+   # Enable artConfig in the existing setup template (changes enabled = false to enabled = true)
+   sed -i 's/enabled = false/enabled = true/' ./app/credit-platform/config/credit-platform-setup.conf.template
+   echo "✓ artConfig enabled in credit-platform-setup.conf.template"
    
-   # Wait with timeout and error detection
-   for i in {1..60}; do
-     if pg_isready -h 127.0.0.1 -p 5433 2>&1 | grep -q "accepting"; then
-       echo "✓ PostgreSQL ready"; break
-     fi
-     if grep -q "FATAL:.*lock file.*already exists" process_compose.log 2>/dev/null; then
-       echo "✗ PostgreSQL lock file error - existing instance blocking startup"
-       echo "Fix: kill $PG_PID or remove ./data/lsp-db/postmaster.pid"
-       exit 1
-     fi
-     sleep 1
-   done
+   # Copy setup template to active config
+   cp ./app/credit-platform/config/credit-platform-setup.conf.template ./app/credit-platform/config/credit-platform.conf
+   echo "✓ Config copied to credit-platform.conf"
    \`\`\`
 
-5. Wait for Redis health:
+4. **Start with just run-shell** (single command for all services):
    \`\`\`bash
-   redis-cli -p 6379 ping             # Should return "PONG"
+   just run-shell
    \`\`\`
 
-6. Insert required configs (CRITICAL for fresh setup):
+5. **Call SeedDb API** (after services are healthy):
+   
+   Wait for services to be ready:
    \`\`\`bash
-   psql -U testUser -h 127.0.0.1 -d testLsp -p 5433 -c "INSERT INTO config (id, key, value_enc, value, created_at, updated_at) VALUES ('LSP8cf7261b78404620b5eefb0c5aeaef3c', 'piiHashSalt', 'ConfigRealm :: whb5iLKzNBdHC/f7ZgfzLg5qQ+CjcGLLjnU1AJS5j/k=', NULL, NOW(), NOW()), ('LSP4752ae5a469e43d88b6d74ea741068aa', 'wallet_user_code_counter', 'ConfigRealm :: 0', NULL, NOW(), NOW()), ('LSPa15bef5f939e4113b49a23c878f67861', 'euler_config_external', 'ConfigRealm :: eyJkb21haW5FQ0Rhc2hib2FyZCI6ImRhc2hib2FyZC5zYW5kYm94Lmp1c3BheS5pbiIsInBhdGgiOiIiLCJkb21haW5UeG4iOiJzYW5kYm94Lmp1c3BheS5pbiIsImRvbWFpbiI6InNhbmRib3guanVzcGF5LmluIiwiZG9tYWluUHMiOiJzYW5kYm94Lmp1c3BheS5pbiIsInNlY3VyZWRSZXF1ZXN0Ijp0cnVlLCJkb21haW5QcmVUeG4iOiJzYW5kYm94Lmp1c3BheS5pbiIsInRlbmFudEhvc3QiOiJzYW5kYm94Lmp1c3BheS5pbiIsInZlcnNpb24iOiIyMDIyLTA0LTIwIiwib3B0aW9uR2F0ZXdheVJlc3BvbnNlIjoidHJ1ZSIsImRvbWFpbkF1eGlsaWFyeSI6InNhbmRib3guanVzcGF5LmluIiwiZG9tYWluT3JkZXI6InNhbmRib3guanVzcGF5LmluIiwibHNwRXRiR2F0ZXdheUlkIjoiTFNQX0VUQiIsInBvcnQiOjQ0MywicmVmdW5kUG9ydCI6ODAsImxzcEdhdGV3YXlJZCI6IkxTUCIsInJlZnVuZFNlY3VyZWRSZXF1ZXN0IjpmYWxzZX0=', NULL, NOW(), NOW()), ('LSPb2a5e6bb181e4f60adb34ff578a10bec', 'REDIS_EXPIRY_TIME', 'ConfigRealm :: 10', NULL, NOW(), NOW()), ('LSPdb7ceb6c4bbb4030a367898d944a0c0c', 'lsp_acc_details', 'ConfigRealm :: eyJiYXNlVXJsUG9ydCI6ODA4MCwidGVzdE1vZGUiOnRydWUsImJhc2VVcmwiOiIxMjcuMC4wLjEiLCJiYXNlVXJsUGF0aCI6IiIsInNjaGVtZSI6Ikh0dHAifQ==', NULL, NOW(), NOW()), ('LSP369cfae732bf4152ae4ffe82fcb700ec', 'euler_config', 'ConfigRealm :: eyJkb21haW5FQ0Rhc2hib2FyZCI6ImRhc2hib2FyZC5zYW5kYm94Lmp1c3BheS5pbiIsInBhdGgiOiIiLCJkb21haW5UeG4iOiJzYW5kYm94Lmp1c3BheS5pbiIsImRvbWFpbiI6InNhbmRib3guanVzcGF5LmluIiwiZG9tYWluUHMiOiJzYW5kYm94Lmp1c3BheS5pbiIsInNlY3VyZWRSZXF1ZXN0Ijp0cnVlLCJkb21haW5QcmVUeG4iOiJzYW5kYm94Lmp1c3BheS5pbiIsInRlbmFudEhvc3QiOiJzYW5kYm94Lmp1c3BheS5pbiIsInZlcnNpb24iOiIyMDIyLTA0LTIwIiwib3B0aW9uR2F0ZXdheVJlc3BvbnNlIjoidHJ1ZSIsImRvbWFpbkF1eGlsaWFyeSI6InNhbmRib3guanVzcGF5LmluIiwiZG9tYWluT3JkZXI6InNhbmRib3guanVzcGF5LmluIiwibHNwRXRiR2F0ZXdheUlkIjoiTFNQX0VUQiIsInBvcnQiOjQ0MywicmVmdW5kUG9ydCI6ODAsImxzcEdhdGV3YXlJZCI6IkxTUCIsInJlZnVuZFNlY3VyZWRSZXF1ZXN0IjpmYWxzZX0=', NULL, NOW(), NOW()), ('LSPa5fab68440fd4a8ebc6ceec19686a6ac', 'gateway_base_url', 'ConfigRealm :: 127.0.0.1:8011/gateway/', NULL, NOW(), NOW()), ('LSP035caebcafe443f9a2d182aa86ad6cc0', 'maxLoanRequestInfoRetryCount', 'ConfigRealm :: 5', NULL, NOW(), NOW()), ('LSP3b414f43ce80477882f8cfa62330981e', 'LenderDecisionData', 'ConfigRealm :: ewogICAiZGF5UmFuZ2UiOjE4MCwKICAgImV4Y2x1ZGVkU3RhdHVzIjpbCiAgICAgICJDUkVBVEVEIiwKICAgICAgIlRIRU1JU19SRUpFQ1RFRCIKICAgXQp9', NULL, NOW(), NOW()), ('LSP0edabf0971b14647a1d1e92a9f05028a', 'EULER_ENABLED_MERCHANT', 'ConfigRealm :: W10=', NULL, NOW(), NOW()), ('LSP6845330a723d4714bbb239ded56d4198', 'default_order_expiry_time', 'ConfigRealm :: NTE4NDAwMA==', NULL, NOW(), NOW()) ON CONFLICT (key) DO UPDATE SET value_enc = EXCLUDED.value_enc;"
+   pg_isready -h 127.0.0.1 -p 5433
+   redis-cli -p 6379 ping
+   \`\`\`
+   
+   Then call SeedDb API to insert configuration:
+   \`\`\`bash
+   curl -X POST http://127.0.0.1:8080/credit/art/configs/set \
+     -H "Content-Type: application/json" \
+     -d '{
+       "merchant_id": "flipkart",
+       "environment": "sandbox"
+     }'
+   \`\`\`
+   
+   Or insert specific configs via SQL if SeedDb API unavailable:
+   \`\`\`bash
+   psql -U testUser -h 127.0.0.1 -d testLsp -p 5433 -c "INSERT INTO config (id, key, value_enc, value, created_at, updated_at) VALUES ('LSP8cf7261b78404620b5eefb0c5aeaef3c', 'piiHashSalt', 'ConfigRealm :: whb5iLKzNBdHC/f7ZgfzLg5qQ+CjcGLLjnU1AJS5j/k=', NULL, NOW(), NOW()), ('LSP4752ae5a469e43d88b6d74ea741068aa', 'wallet_user_code_counter', 'ConfigRealm :: 0', NULL, NOW(), NOW()) ON CONFLICT (key) DO NOTHING;"
    \`\`\`
 
-7. Copy config template:
+6. **Verify all services are healthy**:
    \`\`\`bash
-   cp ./app/credit-platform/config/credit-platform.conf.template ./app/credit-platform/config/credit-platform.conf
-   \`\`\`
-
-8. Start the LSP server (use binary to avoid rebuild):
-   \`\`\`bash
-   SERVER_BIN=$(find dist-newstyle -name "server" -type f -executable 2>/dev/null | grep "server/noopt/build" | head -1)
-   nohup "$SERVER_BIN" > server_output.log 2>&1 &
-   \`\`\`
-
-9. Start monitoring dashboard:
-   \`\`\`bash
-   python3 monitor_server.py > dashboard.log 2>&1 &
-   \`\`\`
-
-10. Verify server health (extended 45 iterations):
-    \`\`\`bash
-    for i in {1..45}; do
-      if curl -sf http://127.0.0.1:8080/api/up 2>/dev/null | grep -q "UP"; then
-        echo "✓ Server is UP and running"
-        curl -s http://127.0.0.1:8080/api/up
-        break
-      fi
-      echo "Waiting for server... [$i/45] (elapsed: $((i*2))s)"
-      sleep 2
-    done
-    \`\`\`
-   \`\`\`bash
-   python3 monitor_server.py > dashboard.log 2>&1 &
-   \`\`\`
+   curl http://127.0.0.1:8080/api/up
+   pg_isready -h 127.0.0.1 -p 5433
+  redis-cli -p 6379 ping
+  \`\`\`
 </Quick_Start>
 
 <Subsequent_Runs>
@@ -214,7 +213,7 @@ python3 monitor_server.py > dashboard.log 2>&1 &
 
 ### Missing Config Error
 **Symptom:** "Missing configuration DB keys: piiHashSalt"
-**Fix:** Execute step 5 (Insert required configs) from Fresh Setup
+**Fix:** Execute step 5 (Insert configs via SeedDb API) from Simplified Startup Flow
 
 ### Migration Version Mismatch
 **Symptom:** "The migration for 'guarantor' did not reach the intended target"
@@ -550,10 +549,10 @@ done
 
 <Critical_Rules>
 1. ALWAYS run \`cabal build all\` and verify successful compilation BEFORE starting server
-2. ALWAYS insert required DB configs on fresh setup (step 6)
-3. ALWAYS start the monitoring dashboard
+2. ALWAYS insert required DB configs on fresh setup (step 5 - Insert configs via SeedDb API)
+3. ALWAYS enable artConfig in credit-platform.conf before starting
 4. NEVER edit .template files directly — copy to .conf first
-5. Keep process-compose running for DB/Redis connections
+5. NEVER modify flake.nix unless user explicitly requests additional services
 6. ALWAYS verify with health checks after starting services
 </Critical_Rules>
 
@@ -561,7 +560,7 @@ ${todoDiscipline}
 
 <Execution_Principles>
 - Start immediately, no acknowledgments
-- For fresh setup, follow ALL 9 steps in strict order
+- For fresh setup, follow ALL 6 steps in Simplified Startup Flow
 - Always verify with health checks after starting
 - Check logs immediately on any startup failure
 - Report server URL, port, and status clearly for each component

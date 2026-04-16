@@ -1,0 +1,161 @@
+{
+  "$schema": "./node_modules/oh-my-opencode/assets/oh-my-opencode.schema.json",
+  
+  // Model Configuration for Credit Agents
+  // Using available models: Kimi K2.5, GLM 5, Minimax M2.5
+  "agents": {
+    // Planning/Orchestration Agents - Kimi K2.5 (1.1T params, regular speed)
+    // credit-worker: Main orchestrator - delegates but doesn't directly edit files
+    "credit-worker": {
+      "model": "kimi/k2.5",
+      "temperature": 0.1,
+      "fallback_models": [
+        { "model": "kimi/k2.5", "variant": "latest" }
+      ],
+      "file_permissions": {
+        "deny": ["**/*.hs", "**/*.cabal", "**/*.yaml", "**/src/**", "**/test/**"]
+      }
+    },
+    // credit-planner: Only writes to .agentic-loop/plans/*.md
+    "credit-planner": {
+      "model": "kimi/k2.5",
+      "temperature": 0.1,
+      "fallback_models": [
+        { "model": "kimi/k2.5", "variant": "latest" }
+      ],
+      "file_permissions": {
+        "allow": [".agentic-loop/plans/**"],
+        "deny": ["**/*"]
+      }
+    },
+    // credit-plan-reviewer: Read-only - no file writes
+    "credit-plan-reviewer": {
+      "model": "kimi/k2.5",
+      "temperature": 0.1,
+      "fallback_models": [
+        { "model": "kimi/k2.5", "variant": "latest" }
+      ],
+      "file_permissions": {
+        "deny": ["**/*"]
+      }
+    },
+    
+    // Building Agent - GLM 5 (754B params, slow but thorough)
+    // credit-executor: Full access for implementation
+    "credit-executor": {
+      "model": "zhipu/glm-5",
+      "temperature": 0.1,
+      "fallback_models": [
+        { "model": "zhipu/glm-5", "variant": "latest" }
+      ],
+      "file_permissions": {
+        "allow": ["**/*"]
+      }
+    },
+    
+    // Fast Agents - Minimax M2.5 (229B params, fast speed)
+    // credit-tester: Read-only validation
+    "credit-tester": {
+      "model": "minimaxai/minimax-m2",
+      "temperature": 0.1,
+      "fallback_models": [
+        { "model": "minimaxai/minimax-m2", "variant": "5" }
+      ],
+      "file_permissions": {
+        "deny": ["**/*"]
+      }
+    },
+    // credit-server: Full access for infrastructure operations
+    "credit-server": {
+      "model": "minimaxai/minimax-m2",
+      "temperature": 0.1,
+      "fallback_models": [
+        { "model": "minimaxai/minimax-m2", "variant": "5" }
+      ],
+      "file_permissions": {
+        "allow": ["**/*"]
+      }
+    },
+    
+    // Built-in agents - use your available models
+    "explore": {
+      "model": "minimaxai/minimax-m2",
+      "fallback_models": [
+        { "model": "minimaxai/minimax-m2" }
+      ]
+    },
+    "librarian": {
+      "model": "minimaxai/minimax-m2",
+      "fallback_models": [
+        { "model": "minimaxai/minimax-m2" }
+      ]
+    },
+    "oracle": {
+      "model": "kimi/k2.5",
+      "fallback_models": [
+        { "model": "kimi/k2.5" }
+      ]
+    },
+    "hephaestus": {
+      "model": "zhipu/glm-5",
+      "fallback_models": [
+        { "model": "zhipu/glm-5" }
+      ]
+    },
+    "metis": {
+      "model": "kimi/k2.5",
+      "fallback_models": [
+        { "model": "kimi/k2.5" }
+      ]
+    },
+    "momus": {
+      "model": "kimi/k2.5",
+      "fallback_models": [
+        { "model": "kimi/k2.5" }
+      ]
+    },
+    "atlas": {
+      "model": "kimi/k2.5",
+      "fallback_models": [
+        { "model": "kimi/k2.5" }
+      ]
+    }
+  },
+  
+  // Categories using your available models
+  "categories": {
+    "deep": {
+      "fallback_models": [
+        { "model": "kimi/k2.5" },
+        { "model": "zhipu/glm-5" }
+      ]
+    },
+    "quick": {
+      "fallback_models": [
+        { "model": "minimaxai/minimax-m2" }
+      ]
+    },
+    "unspecified-low": {
+      "fallback_models": [
+        { "model": "minimaxai/minimax-m2" },
+        { "model": "zhipu/glm-4.7-flash" }
+      ]
+    },
+    "unspecified-high": {
+      "fallback_models": [
+        { "model": "kimi/k2.5" },
+        { "model": "zhipu/glm-5" }
+      ]
+    }
+  },
+  
+  // Default model for general use
+  "claude_code": {
+    "default_model": "kimi/k2.5"
+  },
+  
+  // Experimental features
+  "experimental": {
+    "preemptive_compaction": true
+  }
+}

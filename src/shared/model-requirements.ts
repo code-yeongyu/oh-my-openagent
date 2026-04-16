@@ -220,11 +220,21 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   "credit-server": {
     fallbackChain: [
       {
+        providers: ["openai", "anthropic", "opencode"],
+        model: "open-fast",
+      },
+      {
         providers: ["anthropic", "github-copilot", "opencode"],
         model: "claude-sonnet-4-6",
       },
       { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.4", variant: "medium" },
+      { providers: ["github-copilot"], model: "grok-code-fast-1" },
+      { providers: ["kimi-for-coding", "moonshotai", "opencode"], model: "kimi-k2.5" },
+      { providers: ["zai-coding-plan", "opencode"], model: "glm-5" },
+      { providers: ["opencode"], model: "minimax-m2" },
+      { providers: ["opencode"], model: "big-pickle" },
     ],
+    requiresAnyModel: true,
   },
 };
 

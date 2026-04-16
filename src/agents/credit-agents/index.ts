@@ -32,11 +32,9 @@ export type { CreditTesterPromptSource } from "./credit-tester"
 export {
   CREDIT_SERVER_DEFAULTS,
   CREDIT_SERVER_PROMPT_METADATA,
-  getCreditServerPromptSource,
   buildCreditServerPrompt,
   createCreditServerAgentWithOverrides,
 } from "./credit-server"
-export type { CreditServerPromptSource } from "./credit-server"
 
 export {
   CREDIT_PLAN_REVIEWER_DEFAULTS,

@@ -5,7 +5,7 @@ import type { AgentOverrideConfig } from "../../../config/schema"
 import { createAgentToolRestrictions, type PermissionValue } from "../../../shared/permission-compat"
 import { buildDefaultCreditExecutorPrompt } from "./default"
 
-const MODE: AgentMode = "subagent"
+const MODE: AgentMode = "primary"
 
 const BLOCKED_TOOLS: string[] = []
 
@@ -65,7 +65,7 @@ export function createCreditExecutorAgentWithOverrides(
   }
 
   const overrideModel = (override as { model?: string } | undefined)?.model
-  const model = overrideModel ?? systemDefaultModel ?? CREDIT_EXECUTOR_DEFAULTS.model
+  const model = overrideModel ?? CREDIT_EXECUTOR_DEFAULTS.model
   const temperature = override?.temperature ?? CREDIT_EXECUTOR_DEFAULTS.temperature
 
   const promptAppend = override?.prompt_append

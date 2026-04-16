@@ -1,0 +1,99 @@
+import { resolvePromptAppend } from "../../builtin-agents/resolve-file-uri"
+
+export function buildGlm47FlashCreditServerPrompt(
+  useTaskSystem: boolean,
+  promptAppend?: string
+): string {
+  const todoDiscipline = buildGlm47FlashTodoDisciplineSection(useTaskSystem)
+
+  const prompt = `<Memory_Bank_Instruction>
+CRITICAL: Before starting ANY task, you MUST read the memory-bank to understand project patterns.
+
+**Search for memory-bank in this order:**
+1. First, check ".opencode/memory-bank/" (most common location)
+2. If not found, check ".agentic-loop/memory-bank/" (alternate location)
+3. If not found, search for any \`memory-bank/\` directory in the project
+4. If still not found, use \`glob\` to find all \`.md\` files that might be memory-bank
+
+**Once found:**
+- Read index.md or INDEX.md if it exists (to understand structure)
+- Read ALL .md files in the memory-bank directory
+- Use the patterns and guidelines for server setup
+
+Do NOT skip this step. The memory-bank contains essential configuration patterns and best practices.
+</Memory_Bank_Instruction>
+
+CreditServer - LSP Server Starter (GLM 4.7 Flash Mode)
+
+## Quick Actions
+
+**Start:**
+\`\`\`bash
+# 1. Check flake.nix has 4 services disabled
+grep -c "enable = false" flake.nix  // Should be 4
+
+# 2. Clean & Build
+just cldb && just clkv && just kill-ports
+cabal build all  // MUST succeed
+\`\`\`
+
+# 3. Start infrastructure
+just run-shell > process_compose.log 2>&1 &
+
+# 4. Wait for health
+pg_isready -h 127.0.0.1 -p 5433
+redis-cli -p 6379 ping
+
+### Configuration (via SeedDb API)
+
+### SeedDb API
+Use the SeedDb API to insert required configuration:
+
+**Endpoint**: \`POST /credit/art/configs/set\`
+**Headers**: 
+- \`Content-Type: application/json\`
+- \`Authorization: Bearer <api-key>\` (if required)
+
+**Available Merchants** (idempotent insertion supported):
+| Merchant ID | Display Name |
+|-------------|--------------|
+| flipkart | Flipkart |
+| businessloan | BusinessLoan |
+| toothsi | Toothsi |
+| intellipaat | Intellipaat |
+| vgu | VGU |
+
+**Call SeedDb API:**
+\`\`\`bash
+# Wait for server to be ready
+curl -X POST http://127.0.0.1:8080/credit/art/configs/set \
+  -H "Content-Type: application/json" \
+  -d '{"merchantId": "flipkart"}'
+\`\`\`
+`
+
+  if (!promptAppend) return prompt
+  return prompt + "\n\n" + resolvePromptAppend(promptAppend)
+}
+
+function buildGlm47FlashTodoDisciplineSection(useTaskSystem: boolean): string {
+  if (useTaskSystem) {
+    return `<Task_Discipline>
+QUICK TASK TRACKING:
+
+- **2+ steps** → task_create with brief breakdown
+- **Starting** → task_update(status="in_progress")
+- **Completing** → task_update(status="completed")
+- Keep it fast and efficient
+</Task_Discipline>`
+  }
+
+  return `<Todo_Discipline>
+QUICK TODO TRACKING:
+
+- **2+ steps** → todowrite with brief breakdown
+- **Starting** → Mark in_progress
+- **Completing** → Mark completed
+- Keep it fast and efficient
+</Todo_Discipline>`
+}

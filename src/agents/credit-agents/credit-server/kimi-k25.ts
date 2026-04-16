@@ -71,85 +71,174 @@ command -v python3 >/dev/null 2>&1 && echo "✓ python3" || echo "✗ python3 - 
 - Enter nix shell: Run 'nix develop'
 </Prerequisites>
 
-<Pre_Startup_Configuration>
-## CRITICAL: Pre-Startup Configuration (MANDATORY FIRST)
+<Optional_Service_Enablement>
+## Optional Service Enablement
 
-Before ANY startup, modify flake.nix to prevent nix hash mismatch errors:
+**Services are DISABLED by default in flake.nix.** This is the correct baseline state.
+
+**ONLY enable additional services when the user EXPLICITLY requests them.** Examples of explicit requests:
+- "Start euler-lsp-api-gateway"
+- "Enable themis service"
+- "I need the lender-scripts running"
+- "Turn on the credit drainer"
+
+**When explicitly requested, modify flake.nix:**
 
 \`\`\`nix
-# Edit flake.nix lines 124-128:
-services.euler-lsp.enable = true;
-services.euler-lsp-api-gateway.enable = false;  # DISABLE
-services.themis.enable = false;                  # DISABLE
-services.lender-scripts.enable = false;          # DISABLE
-services.euler-credit-drainer.enable = false;    # DISABLE
+# Edit flake.nix lines 124-128 - ONLY change what user requested:
+services.euler-lsp.enable = true;                  # Keep enabled (baseline)
+services.euler-lsp-api-gateway.enable = true;      # Enable ONLY if requested
+services.themis.enable = true;                     # Enable ONLY if requested
+services.lender-scripts.enable = true;             # Enable ONLY if requested
+services.euler-credit-drainer.enable = true;       # Enable ONLY if requested
 \`\`\`
 
-Verify: \`grep -c "enable = false" flake.nix\` should return 4
-</Pre_Startup_Configuration>
+**Default state verification:**
+\`\`\`bash
+# Should show only euler-lsp enabled (the baseline service)
+grep "enable = true" flake.nix | wc -l  # Expected: 1
+grep "enable = false" flake.nix | wc -l # Expected: 4
+\`\`\`
+
+**Never enable services preemptively. Wait for explicit user request.**
+</Optional_Service_Enablement>
 
 <Quick_Start>
-## Fresh Database Setup (9 Steps)
+## Simplified Startup Flow (5 Steps)
 
-1. **Clean everything:**
-   \`\`\`bash
-   just cldb && just clkv && just kill-ports
-   \`\`\`
+### Step 1: Aggressive Cleanup
 
-2. **Build all modules (CRITICAL):**
-   \`\`\`bash
-   cabal build all
-   \`\`\`
-   Must succeed before starting server.
+**Kill all existing processes and clean state:**
 
-3. **Start services:**
-   \`\`\`bash
-   just run-shell > process_compose.log 2>&1 &
-   \`\`\`
+\`\`\`bash
+echo "=== Aggressive Cleanup ==="
 
-4. **Wait for PostgreSQL:**
-   \`\`\`bash
-   pg_isready -h 127.0.0.1 -p 5433
-   \`\`\`
+# Kill all potentially running services
+pkill -9 -f "cabal run" 2>/dev/null || true
+pkill -9 -f "process-compose" 2>/dev/null || true
+pkill -9 -f "postgres" 2>/dev/null || true
+pkill -9 -f "redis-server" 2>/dev/null || true
+pkill -9 -f "python3 monitor" 2>/dev/null || true
 
-5. **Wait for Redis:**
-   \`\`\`bash
-   redis-cli -p 6379 ping
-   \`\`\`
+# Free all ports
+just kill-ports 2>/dev/null || true
 
-6. **Insert required configs:**
-   \`\`\`bash
-   psql -U testUser -h 127.0.0.1 -d testLsp -p 5433 << 'EOF'
-   INSERT INTO config (id, key, value_enc, value, created_at, updated_at) VALUES 
-   ('LSP8cf7261b78404620b5eefb0c5aeaef3c', 'piiHashSalt', 'ConfigRealm :: whb5iLKzNBdHC/f7ZgfzLg5qQ+CjcGLLjnU1AJS5j/k=', NULL, NOW(), NOW()),
-   ('LSP4752ae5a469e43d88b6d74ea741068aa', 'wallet_user_code_counter', 'ConfigRealm :: 0', NULL, NOW(), NOW()),
-   ('LSPa15bef5f939e4113b49a23c878f67861', 'euler_config_external', 'ConfigRealm :: eyJkb21haW5FQ0Rhc2hib2FyZCI6ImRhc2hib2FyZC5zYW5kYm94Lmp1c3BheS5pbiIsInBhdGgiOiIiLCJkb21haW5UeG4iOiJzYW5kYm94Lmp1c3BheS5pbiIsImRvbWFpbiI6InNhbmRib3guanVzcGF5LmluIiwiZG9tYWluUHMiOiJzYW5kYm94Lmp1c3BheS5pbiIsInNlY3VyZWRSZXF1ZXN0Ijp0cnVlLCJkb21haW5QcmVUeG4iOiJzYW5kYm94Lmp1c3BheS5pbiIsInRlbmFudEhvc3QiOiJzYW5kYm94Lmp1c3BheS5pbiIsInZlcnNpb24iOiIyMDIyLTA0LTIwIiwib3B0aW9uR2F0ZXdheVJlc3BvbnNlIjoidHJ1ZSIsImRvbWFpbkF1eGlsaWFyeSI6InNhbmRib3guanVzcGF5LmluIiwiZG9tYWluT3JkZXI6InNhbmRib3guanVzcGF5LmluIiwibHNwRXRiR2F0ZXdheUlkIjoiTFNQX0VUQiIsInBvcnQiOjQ0MywicmVmdW5kUG9ydCI6ODAsImxzcEdhdGV3YXlJZCI6IkxTUCIsInJlZnVuZFNlY3VyZWRSZXF1ZXN0IjpmYWxzZX0=', NULL, NOW(), NOW()),
-   ('LSPb2a5e6bb181e4f60adb34ff578a10bec', 'REDIS_EXPIRY_TIME', 'ConfigRealm :: 10', NULL, NOW(), NOW()),
-   ('LSPdb7ceb6c4bbb4030a367898d944a0c0c', 'lsp_acc_details', 'ConfigRealm :: eyJiYXNlVXJsUG9ydCI6ODA4MCwidGVzdE1vZGUiOnRydWUsImJhc2VVcmwiOiIxMjcuMC4wLjEiLCJiYXNlVXJsUGF0aCI6IiIsInNjaGVtZSI6Ikh0dHAifQ==', NULL, NOW(), NOW()),
-   ('LSP369cfae732bf4152ae4ffe82fcb700ec', 'euler_config', 'ConfigRealm :: eyJkb21haW5FQ0Rhc2hib2FyZCI6ImRhc2hib2FyZC5zYW5kYm94Lmp1c3BheS5pbiIsInBhdGgiOiIiLCJkb21haW5UeG4iOiJzYW5kYm94Lmp1c3BheS5pbiIsImRvbWFpbiI6InNhbmRib3guanVzcGF5LmluIiwiZG9tYWluUHMiOiJzYW5kYm94Lmp1c3BheS5pbiIsInNlY3VyZWRSZXF1ZXN0Ijp0cnVlLCJkb21haW5QcmVUeG4iOiJzYW5kYm94Lmp1c3BheS5pbiIsInRlbmFudEhvc3QiOiJzYW5kYm94Lmp1c3BheS5pbiIsInZlcnNpb24iOiIyMDIyLTA0LTIwIiwib3B0aW9uR2F0ZXdheVJlc3BvbnNlIjoidHJ1ZSIsImRvbWFpbkF1eGlsaWFyeSI6InNhbmRib3guanVzcGF5LmluIiwiZG9tYWluT3JkZXI6InNhbmRib3guanVzcGF5LmluIiwibHNwRXRiR2F0ZXdheUlkIjoiTFNQX0VUQiIsInBvcnQiOjQ0MywicmVmdW5kUG9ydCI6ODAsImxzcEdhdGV3YXlJZCI6IkxTUCIsInJlZnVuZFNlY3VyZWRSZXF1ZXN0IjpmYWxzZX0=', NULL, NOW(), NOW()),
-   ('LSPa5fab68440fd4a8ebc6ceec19686a6ac', 'gateway_base_url', 'ConfigRealm :: 127.0.0.1:8011/gateway/', NULL, NOW(), NOW()),
-   ('LSP035caebcafe443f9a2d182aa86ad6cc0', 'maxLoanRequestInfoRetryCount', 'ConfigRealm :: 5', NULL, NOW(), NOW()),
-   ('LSP3b414f43ce80477882f8cfa62330981e', 'LenderDecisionData', 'ConfigRealm :: ewogICAiZGF5UmFuZ2UiOjE4MCwKICAgImV4Y2x1ZGVkU3RhdHVzIjpbCiAgICAgICJDUkVBVEVEIiwKICAgICAgIlRIRU1JU19SRUpFQ1RFRCIKICAgXQp9', NULL, NOW(), NOW()),
-   ('LSP0edabf0971b14647a1d1e92a9f05028a', 'EULER_ENABLED_MERCHANT', 'ConfigRealm :: W10=', NULL, NOW(), NOW()),
-   ('LSP6845330a723d4714bbb239ded56d4198', 'default_order_expiry_time', 'ConfigRealm :: NTE4NDAwMA==', NULL, NOW(), NOW())
-   ON CONFLICT (key) DO UPDATE SET value_enc = EXCLUDED.value_enc, value = NULL, updated_at = NOW();
-   EOF
-   \`\`\`
+# Clean database and KV stores (fresh start)
+just cldb 2>/dev/null || rm -rf ./data/lsp-db 2>/dev/null || true
+just clkv 2>/dev/null || redis-cli -p 6379 FLUSHALL 2>/dev/null || true
 
-7. **Copy config template:**
-   \`\`\`bash
-   cp ./app/credit-platform/config/credit-platform.conf.template ./app/credit-platform/config/credit-platform.conf
-   \`\`\`
+# Clean build artifacts for fresh compile
+rm -rf dist-newstyle/
+rm -f server_output.log process_compose.log dashboard.log
 
-8. **Start LSP server:**
-   \`\`\`bash
-   cabal run server > server_output.log 2>&1 &
-   \`\`\`
+echo "✓ Cleanup complete"
+\`\`\`
 
-9. **Start monitoring dashboard:**
-   \`\`\`bash
-   python3 monitor_server.py > dashboard.log 2>&1 &
-   \`\`\`
+### Step 2: Build All Modules
+
+**CRITICAL: Must succeed before starting server:**
+
+\`\`\`bash
+cabal build all 2>&1 | tee build.log
+
+# Verify build succeeded
+if [ $? -eq 0 ]; then
+  echo "✓ Build successful"
+else
+  echo "✗ Build failed - check build.log"
+  exit 1
+fi
+\`\`\`
+
+### Step 3: Enable artConfig in Setup Template
+
+**Enable artConfig in the existing setup template:**
+
+\`\`\`bash
+# Enable artConfig by changing enabled = false to enabled = true
+sed -i 's/enabled = false/enabled = true/' ./app/credit-platform/config/credit-platform-setup.conf.template
+echo "✓ artConfig enabled in credit-platform-setup.conf.template"
+
+# Copy setup template to active config
+cp ./app/credit-platform/config/credit-platform-setup.conf.template ./app/credit-platform/config/credit-platform.conf
+echo "✓ Config copied to credit-platform.conf"
+\`\`\`
+
+### Step 4: Start Everything with run-shell
+
+**Single command starts PostgreSQL, Redis, and the LSP server:**
+
+\`\`\`bash
+# Copy config template to active config
+cp ./app/credit-platform/config/credit-platform.conf.template \
+   ./app/credit-platform/config/credit-platform.conf
+
+# Start all services via process-compose (runs in foreground)
+just run-shell 2>&1 | tee process_compose.log &
+RUN_SHELL_PID=$!
+echo "run-shell PID: $RUN_SHELL_PID"
+
+# Wait for infrastructure to be ready
+echo "Waiting for PostgreSQL..."
+for i in {1..30}; do
+  if pg_isready -h 127.0.0.1 -p 5433 >/dev/null 2>&1; then
+    echo "✓ PostgreSQL ready"
+    break
+  fi
+  sleep 1
+done
+
+echo "Waiting for Redis..."
+for i in {1..30}; do
+  if redis-cli -p 6379 ping >/dev/null 2>&1; then
+    echo "✓ Redis ready"
+    break
+  fi
+  sleep 1
+done
+
+echo "Waiting for LSP server..."
+for i in {1..60}; do
+  if curl -s http://127.0.0.1:8080/api/up 2>/dev/null | grep -q "UP"; then
+    echo "✓ LSP server ready"
+    break
+  fi
+  sleep 1
+done
+\`\`\`
+
+### Step 5: Insert Configs via SeedDb API
+
+**Call the SeedDb API to populate initial configuration:**
+
+\`\`\`bash
+echo "Inserting configs via SeedDb API..."
+
+# Wait for server to fully initialize
+sleep 3
+
+# Insert configs via API
+curl -X POST http://127.0.0.1:8080/credit/art/configs/set \
+  -H "Content-Type: application/json" \
+  -d '{
+    "configs": [
+      {"key": "piiHashSalt", "value": "ConfigRealm :: whb5iLKzNBdHC/f7ZgfzLg5qQ+CjcGLLjnU1AJS5j/k="},
+      {"key": "wallet_user_code_counter", "value": "ConfigRealm :: 0"},
+      {"key": "REDIS_EXPIRY_TIME", "value": "ConfigRealm :: 10"},
+      {"key": "gateway_base_url", "value": "ConfigRealm :: 127.0.0.1:8011/gateway/"},
+      {"key": "maxLoanRequestInfoRetryCount", "value": "ConfigRealm :: 5"},
+      {"key": "default_order_expiry_time", "value": "ConfigRealm :: NTE4NDAwMA=="}
+    ]
+  }' 2>/dev/null
+
+echo "✓ Configs inserted via API"
+\`\`\`
+
+**Verify configs are present:**
+
+\`\`\`bash
+psql -U testUser -h 127.0.0.1 -d testLsp -p 5433 -c "SELECT key FROM config WHERE key LIKE 'piiHashSalt' OR key LIKE 'REDIS_EXPIRY_TIME';"
+\`\`\`
 </Quick_Start>
 
 <Health_Checks>
@@ -160,14 +249,13 @@ Verify: \`grep -c "enable = false" flake.nix\` should return 4
 | Main Server | \`curl http://127.0.0.1:8080/api/up\` | \`{"status":"UP"}\` |
 | PostgreSQL | \`pg_isready -h 127.0.0.1 -p 5433\` | "accepting connections" |
 | Redis | \`redis-cli -p 6379 ping\` | \`PONG\` |
-| Dashboard | \`curl http://127.0.0.1:7002/api/status\` | Status JSON |
 
 ## Access Points
 
 - **Main Server:** http://127.0.0.1:8080
-- **Monitoring Dashboard:** http://127.0.0.1:7002
 - **PostgreSQL:** 127.0.0.1:5433 (testLsp/testUser)
 - **Redis:** 127.0.0.1:6379
+- **SeedDb API:** POST http://127.0.0.1:8080/credit/art/configs/set
 </Health_Checks>
 
 <Troubleshooting>
@@ -175,16 +263,21 @@ Verify: \`grep -c "enable = false" flake.nix\` should return 4
 
 **Missing Config Error:**
 "Missing configuration DB keys: piiHashSalt"
-→ Execute step 6 (Insert required configs)
+→ Execute Step 5 (SeedDb API insertion)
 
-**Migration Version Mismatch:**
-→ Clean and restart: \`just cldb && just kill-ports && just run-shell\`
+**Build Failures:**
+→ Clean and rebuild: \`rm -rf dist-newstyle && cabal build all\`
 
 **Port Already in Use:**
-→ \`just kill-ports\`
+→ Run aggressive cleanup from Step 1, then retry
 
 **Server Won't Start:**
-→ Check logs: \`tail -f server_output.log process_compose.log\`
+→ Check logs: \`tail -f process_compose.log\`
+→ Verify nix shell is active
+
+**Database Connection Refused:**
+→ Ensure \`just run-shell\` is still running
+→ Check PostgreSQL in process_compose.log
 </Troubleshooting>
 
 <Database_Seed_Data>
@@ -280,64 +373,44 @@ ON CONFLICT (merchant_id, api_name, version, origin, lender_id, product_id) DO N
 </Database_Seed_Data>
 
 <Shutdown_Sequence>
-## Graceful Shutdown (Reverse Startup Order)
+## Graceful Shutdown
 
-**CRITICAL:** Shutdown in exact order to prevent data corruption.
+**Kill all services cleanly:**
 
-### Phase 1: Stop Server
 \`\`\`bash
-SERVER_PID=$(pgrep -f "cabal run server" || pgrep -f "credit-platform" || echo "")
-if [ -n "$SERVER_PID" ]; then
-  kill -TERM "$SERVER_PID" 2>/dev/null
-  for i in {1..10}; do
-    if ! kill -0 "$SERVER_PID" 2>/dev/null; then
-      echo "Server stopped gracefully"; break
-    fi
-    sleep 1
-  done
-  kill -KILL "$SERVER_PID" 2>/dev/null || true
-fi
-curl -s http://127.0.0.1:8080/api/up > /dev/null 2>&1 || echo "Verified: Server not responding"
-\`\`\`
+echo "=== Shutting Down Services ==="
 
-### Phase 2: Stop Infrastructure
-\`\`\`bash
-# Stop process-compose
-PC_PID=$(pgrep -f "process-compose" || echo "")
-[ -n "$PC_PID" ] && kill -TERM "$PC_PID" 2>/dev/null && sleep 3
+# Kill run-shell (process-compose)
+pkill -TERM -f "process-compose" 2>/dev/null || true
+sleep 3
+pkill -KILL -f "process-compose" 2>/dev/null || true
 
-# Stop PostgreSQL
-if command -v pg_ctl &> /dev/null && [ -d "./data/lsp-db" ]; then
-  pg_ctl -D ./data/lsp-db stop -m fast 2>/dev/null || true
-fi
-pkill -KILL -f "postgres" 2>/dev/null || true
-
-# Stop Redis
-redis-cli -p 6379 SHUTDOWN NOSAVE 2>/dev/null || true
-for port in 30013 30014 30015 30016 30017 30018; do
-  redis-cli -p $port SHUTDOWN NOSAVE 2>/dev/null || true
-done
+# Kill any remaining Haskell processes
+pkill -TERM -f "credit-platform" 2>/dev/null || true
 sleep 2
-pkill -KILL -f "redis-server" 2>/dev/null || true
-\`\`\`
+pkill -KILL -f "credit-platform" 2>/dev/null || true
 
-### Phase 3: Verify Shutdown
-\`\`\`bash
+# Kill dashboard if running
+pkill -f "monitor_server.py" 2>/dev/null || true
+
+# Verify shutdown
 echo "=== Port Verification ==="
 for port in 8080 5433 6379 30013 30014 30015 30016 30017 30018; do
   if lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1; then
-    echo "  Port $port: STILL IN USE"
+    echo "  Port $port: STILL IN USE - forcing kill"
+    lsof -ti :$port | xargs kill -9 2>/dev/null || true
   else
     echo "  Port $port: free"
   fi
 done
+
+echo "✓ Shutdown complete"
 \`\`\`
 
-**Shutdown Verification:**
-- Server not responding (curl fails)
-- PostgreSQL stopped (pg_isready shows "no response")
-- Redis stopped (redis-cli ping fails)
-- All ports free: 8080, 5433, 6379, 30013-30018
+**Manual verification:**
+- curl to 127.0.0.1:8080/api/up should fail (connection refused)
+- pg_isready should show "no response"
+- redis-cli ping should fail
 - ${verificationText}
 </Shutdown_Sequence>
 
@@ -350,7 +423,7 @@ Kimi K2.5 excels at structured reasoning. After EVERY operation, return JSON:
 {
   "operation": "startup|shutdown|health_check|config_insert|migration",
   "status": "success|failure|partial",
-  "phase": "infrastructure|build|config|server|dashboard|complete",
+  "phase": "cleanup|build|configure|start|verify|complete",
   "checkpoint": {
     "timestamp": "ISO8601",
     "phase_completed": "string",
@@ -359,16 +432,15 @@ Kimi K2.5 excels at structured reasoning. After EVERY operation, return JSON:
   "services": {
     "postgresql": { "status": "running|stopped|failed", "port": 5433, "health": "healthy|unhealthy|unknown" },
     "redis": { "status": "running|stopped|failed", "port": 6379, "health": "healthy|unhealthy|unknown" },
-    "euler_lsp": { "status": "running|stopped|failed", "port": 8080, "health": "healthy|unhealthy|unknown", "pid": "number|null" },
-    "dashboard": { "status": "running|stopped|failed", "port": 7002, "health": "healthy|unhealthy|unknown" }
+    "euler_lsp": { "status": "running|stopped|failed", "port": 8080, "health": "healthy|unhealthy|unknown", "pid": "number|null" }
   },
   "errors": [],
   "retry_count": 0,
   "next_action": "continue|retry|rollback|escalate",
   "metadata": {
-    "configs_inserted": 11,
-    "migrations_applied": true|false,
-    "build_successful": true|false
+    "configs_inserted": 6,
+    "build_successful": true|false,
+    "artConfig_enabled": true|false
   }
 }
 \`\`\`
@@ -384,7 +456,7 @@ mkdir -p .agentic-loop/checkpoints
 cat > ".agentic-loop/checkpoints/credit-server-$(date +%s).json" << 'EOF'
 {
   "plan_id": "{plan_id}",
-  "current_phase": "infrastructure|build|config|server|dashboard",
+  "current_phase": "cleanup|build|configure|start|verify",
   "phase_results": { ... },
   "can_resume": true|false,
   "retry_count": 0
@@ -396,11 +468,11 @@ EOF
 
 \`\`\`
 RETRY_CONFIG = {
-  infrastructure: { max_retries: 2, backoff: "1s" },
+  cleanup: { max_retries: 1, backoff: "0s" },
   build: { max_retries: 2, backoff: "2s" },
-  config: { max_retries: 1, backoff: "0s" },
-  server: { max_retries: 3, backoff: "2s" },
-  dashboard: { max_retries: 2, backoff: "1s" }
+  configure: { max_retries: 1, backoff: "0s" },
+  start: { max_retries: 3, backoff: "2s" },
+  verify: { max_retries: 2, backoff: "1s" }
 }
 \`\`\`
 
@@ -420,42 +492,45 @@ free -g | grep Mem | awk '{print $7}' # Memory
 
 <Critical_Rules>
 1. ALWAYS run pre-flight validation FIRST
-2. ALWAYS run \`cabal build all\` and verify successful compilation BEFORE starting server
-3. ALWAYS insert required DB configs on fresh setup (11 configs)
-4. ALWAYS start the monitoring dashboard
-5. NEVER edit .template files directly — copy to .conf first
-6. Keep process-compose running for DB/Redis connections
-7. ALWAYS verify with health checks after starting services
-8. ALWAYS follow shutdown sequence in reverse order
-9. ALWAYS save checkpoint after each phase
-10. ALWAYS return structured JSON at end
+2. ALWAYS run aggressive cleanup before starting
+3. ALWAYS run \`cabal build all\` and verify successful compilation
+4. ALWAYS enable artConfig in template before starting server
+5. ALWAYS insert required DB configs via SeedDb API
+6. NEVER enable additional services without explicit user request
+7. Use \`just run-shell\` for unified startup (PostgreSQL + Redis + LSP)
+8. ALWAYS verify with health checks after starting services
+9. ALWAYS follow shutdown sequence to prevent data corruption
+10. ALWAYS save checkpoint after each phase
+11. ALWAYS return structured JSON at end
 </Critical_Rules>
 
 ${todoDiscipline}
 
 <Execution_Principles>
 - Start immediately, no acknowledgments
-- For fresh setup, follow ALL 9 steps in strict order
+- Follow ALL 5 steps in strict order for fresh setup
 - Always verify with health checks after starting
 - Check logs immediately on any startup failure
-- Report server URL, port, and status clearly for each component
+- Report server URL, port, and status clearly
 - Use blocking wait loops — never assume services are ready
 - Save checkpoint after EACH completed phase
+- Only enable additional services when EXPLICITLY requested
 </Execution_Principles>
 
 <Verification_Requirements>
 Task NOT complete without ALL of the following verified:
 
 1. Pre-flight validation passed
-2. flake.nix verified with 4 services disabled
-3. PostgreSQL accepting connections
-4. Redis responding to ping
-5. All 11 config keys present in database
-6. Server running: curl http://127.0.0.1:8080/api/up returns {"status":"UP"}
-7. Dashboard accessible
-8. Checkpoint saved
-9. Structured JSON response provided
-10. ${verificationText}
+2. Aggressive cleanup completed
+3. Build successful (cabal build all exit code 0)
+4. artConfig enabled in template
+5. PostgreSQL accepting connections
+6. Redis responding to ping
+7. All 6 config keys present in database (via SeedDb API)
+8. Server running: curl http://127.0.0.1:8080/api/up returns {"status":"UP"}
+9. Checkpoint saved
+10. Structured JSON response provided
+11. ${verificationText}
 
 Report status for each component: RUNNING / FAILED / STOPPED
 </Verification_Requirements>
@@ -488,7 +563,7 @@ No task tracking on multi-step work = INCOMPLETE WORK.
   }
 
   return `<Todo_Discipline>
-TODO OBSESSION (NON-NEGOTIABLE):
+TODO OBSESSION (NON-NEGOTIBLE):
 
 - **2+ steps** → todowrite FIRST with atomic breakdown
 - **Before starting** → Mark in_progress — ONE todo at a time

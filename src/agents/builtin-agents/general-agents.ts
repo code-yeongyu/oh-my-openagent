@@ -3,7 +3,7 @@ import type { BuiltinAgentName, AgentOverrides, AgentPromptMetadata } from "../t
 import type { CategoryConfig, GitMasterConfig } from "../../config/schema"
 import type { BrowserAutomationProvider } from "../../config/schema"
 import type { AvailableAgent } from "../dynamic-agent-prompt-builder"
-import { AGENT_MODEL_REQUIREMENTS, isModelAvailable } from "../../shared"
+import { AGENT_MODEL_REQUIREMENTS, isModelAvailable, isAnyFallbackModelAvailable } from "../../shared"
 import { buildAgent, isFactory } from "../agent-builder"
 import { applyOverrides } from "./agent-overrides"
 import { applyEnvironmentContext } from "./environment-context"
@@ -63,6 +63,13 @@ export function collectPendingBuiltinAgents(input: {
       }
     }
 
+    // Check if agent requires any model from fallback chain to be available
+    if (requirement?.requiresAnyModel && availableModels.size > 0) {
+      if (!isAnyFallbackModelAvailable(requirement.fallbackChain ?? [], availableModels)) {
+        continue
+      }
+    }
+
     const isPrimaryAgent = isFactory(source) && source.mode === "primary"
 
     const resolution = applyModelResolution({
@@ -72,7 +79,9 @@ export function collectPendingBuiltinAgents(input: {
       availableModels,
       systemDefaultModel,
     })
-    if (!resolution) continue
+    if (!resolution) {
+      continue
+    }
     const { model, variant: resolvedVariant } = resolution
 
     let config = buildAgent(source, model, mergedCategories, gitMasterConfig, browserProvider, disabledSkills)
