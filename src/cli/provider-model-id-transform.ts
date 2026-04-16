@@ -54,7 +54,12 @@ export function transformModelForProvider(provider: string, model: string): stri
   }
 
   if (provider === "anthropic") {
-    return claudeVersionDot(model)
+    // Installer writes hyphenated IDs (claude-opus-4-6) to the config. The
+    // runtime provider-model-id-transform converts dash→dot when calling the
+    // Anthropic API. Keeping the dotted form in the config breaks fresh
+    // installs with ProviderModelNotFoundError because Anthropic's provider
+    // registers models under hyphenated IDs.
+    return model
   }
 
   return model

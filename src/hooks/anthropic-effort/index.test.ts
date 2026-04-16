@@ -1,4 +1,9 @@
-import { describe, expect, it } from "bun:test"
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "bun:test"
+import { mkdirSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import * as path from "node:path"
+
+import { _resetProviderAuthCacheForTesting } from "../../shared/opencode-provider-auth"
 import { createAnthropicEffortHook } from "./index"
 
 interface ChatParamsInput {
@@ -197,6 +202,94 @@ describe("createAnthropicEffortHook", () => {
       await hook["chat.params"](input, output)
 
       expect(output.options.effort).toBe("high")
+    })
+  })
+
+  describe("#given anthropic OAuth auth (Claude Pro/Max) — regression for #3429", () => {
+    let tempDataDir: string
+    const originalXdgDataHome = process.env.XDG_DATA_HOME
+
+    function writeAuthFile(providerEntries: Record<string, Record<string, unknown>>): void {
+      const opencodeDir = path.join(tempDataDir, "opencode")
+      mkdirSync(opencodeDir, { recursive: true })
+      writeFileSync(path.join(opencodeDir, "auth.json"), JSON.stringify(providerEntries), "utf-8")
+      _resetProviderAuthCacheForTesting()
+    }
+
+    beforeAll(() => {
+      tempDataDir = path.join(tmpdir(), `anthropic-effort-oauth-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+      mkdirSync(tempDataDir, { recursive: true })
+      process.env.XDG_DATA_HOME = tempDataDir
+    })
+
+    afterAll(() => {
+      if (originalXdgDataHome === undefined) {
+        delete process.env.XDG_DATA_HOME
+      } else {
+        process.env.XDG_DATA_HOME = originalXdgDataHome
+      }
+      rmSync(tempDataDir, { recursive: true, force: true })
+      _resetProviderAuthCacheForTesting()
+    })
+
+    afterEach(() => {
+      _resetProviderAuthCacheForTesting()
+    })
+
+    it("clamps opus-4-6 + max to high when anthropic provider uses oauth", async () => {
+      // given an Anthropic OAuth session and variant=max on an Opus model
+      writeAuthFile({ anthropic: { type: "oauth" } })
+      const hook = createAnthropicEffortHook()
+      const { input, output } = createMockParams({ modelID: "claude-opus-4-6" })
+
+      // when chat.params fires
+      await hook["chat.params"](input, output)
+
+      // then effort must be clamped to high so Anthropic's OAuth API accepts it
+      expect(output.options.effort).toBe("high")
+      expect(input.message.variant).toBe("high")
+    })
+
+    it("clamps dotted opus id + max to high under OAuth", async () => {
+      // given an Anthropic OAuth session and a dotted opus id
+      writeAuthFile({ anthropic: { type: "oauth" } })
+      const hook = createAnthropicEffortHook()
+      const { input, output } = createMockParams({ modelID: "claude-opus-4.6" })
+
+      // when chat.params fires
+      await hook["chat.params"](input, output)
+
+      // then effort must be clamped to high
+      expect(output.options.effort).toBe("high")
+      expect(input.message.variant).toBe("high")
+    })
+
+    it("still injects effort=max when anthropic auth is an API key", async () => {
+      // given an Anthropic API-key session (not OAuth)
+      writeAuthFile({ anthropic: { type: "api", key: "sk-ant-xxx" } })
+      const hook = createAnthropicEffortHook()
+      const { input, output } = createMockParams({ modelID: "claude-opus-4-6" })
+
+      // when chat.params fires
+      await hook["chat.params"](input, output)
+
+      // then API-key users keep the original max behaviour for Opus
+      expect(output.options.effort).toBe("max")
+      expect(input.message.variant).toBe("max")
+    })
+
+    it("does not clamp when OAuth belongs to a different provider", async () => {
+      // given OAuth entries for unrelated providers only
+      writeAuthFile({ "github-copilot": { type: "oauth" }, opencode: { type: "api", key: "sk-x" } })
+      const hook = createAnthropicEffortHook()
+      const { input, output } = createMockParams({ modelID: "claude-opus-4-6", providerID: "anthropic" })
+
+      // when chat.params fires for the anthropic provider
+      await hook["chat.params"](input, output)
+
+      // then max stays because anthropic itself is not OAuth
+      expect(output.options.effort).toBe("max")
+      expect(input.message.variant).toBe("max")
     })
   })
 })

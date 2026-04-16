@@ -165,7 +165,7 @@ describe("transformModelForProvider", () => {
   })
 
   describe("anthropic provider", () => {
-    test("transforms claude-opus-4-6 to claude-opus-4.6", () => {
+    test("preserves hyphenated claude-opus-4-6 for config output (regression: installer must not write dotted IDs)", () => {
       // #given anthropic provider and claude-opus-4-6 model
       const provider = "anthropic"
       const model = "claude-opus-4-6"
@@ -173,11 +173,11 @@ describe("transformModelForProvider", () => {
       // #when transformModelForProvider is called
       const result = transformModelForProvider(provider, model)
 
-      // #then should transform to claude-opus-4.6
-      expect(result).toBe("claude-opus-4.6")
+      // #then should keep hyphenated form so Anthropic provider resolution succeeds on fresh installs
+      expect(result).toBe("claude-opus-4-6")
     })
 
-    test("transforms claude-sonnet-4-6 to claude-sonnet-4.6", () => {
+    test("preserves hyphenated claude-sonnet-4-6 for config output", () => {
       // #given anthropic provider and claude-sonnet-4-6 model
       const provider = "anthropic"
       const model = "claude-sonnet-4-6"
@@ -185,11 +185,11 @@ describe("transformModelForProvider", () => {
       // #when transformModelForProvider is called
       const result = transformModelForProvider(provider, model)
 
-      // #then should transform to claude-sonnet-4.6
-      expect(result).toBe("claude-sonnet-4.6")
+      // #then should keep hyphenated form
+      expect(result).toBe("claude-sonnet-4-6")
     })
 
-    test("transforms claude-haiku-4-5 to claude-haiku-4.5", () => {
+    test("preserves hyphenated claude-haiku-4-5 for config output", () => {
       // #given anthropic provider and claude-haiku-4-5 model
       const provider = "anthropic"
       const model = "claude-haiku-4-5"
@@ -197,8 +197,8 @@ describe("transformModelForProvider", () => {
       // #when transformModelForProvider is called
       const result = transformModelForProvider(provider, model)
 
-      // #then should transform to claude-haiku-4.5
-      expect(result).toBe("claude-haiku-4.5")
+      // #then should keep hyphenated form
+      expect(result).toBe("claude-haiku-4-5")
     })
   })
 
@@ -338,14 +338,16 @@ describe("transformModelForProvider", () => {
     })
   })
 
-  test("uses a CLI-local transform implementation", () => {
-    // #given
+  test("uses a CLI-local transform implementation distinct from the shared runtime transform", () => {
+    // #given the CLI transform (used by the installer) and the shared runtime transform
     const cliResult = transformModelForProvider("anthropic", "claude-opus-4-6")
     const sharedResult = transformSharedModelForProvider("anthropic", "claude-opus-4-6")
 
-    // #when
+    // #when both are called with the same anthropic claude input
+    // #then the CLI preserves hyphenated form for config output,
+    //       the shared runtime transform converts dash→dot for API calls
     expect(transformModelForProvider).not.toBe(transformSharedModelForProvider)
-    expect(cliResult).toBe("claude-opus-4.6")
+    expect(cliResult).toBe("claude-opus-4-6")
     expect(sharedResult).toBe("claude-opus-4.6")
   })
 })

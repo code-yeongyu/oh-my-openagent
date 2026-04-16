@@ -1,4 +1,4 @@
-import { log, normalizeModelID } from "../../shared"
+import { isProviderUsingOAuth, log, normalizeModelID } from "../../shared"
 
 const OPUS_PATTERN = /claude-.*opus/i
 const EFFORT_UNSUPPORTED_PATTERN = /claude-.*haiku/i
@@ -25,6 +25,16 @@ function shouldSkipForInternalAgent(agentName: string | undefined): boolean {
   return INTERNAL_SKIP_AGENTS.has(agentName.trim().toLowerCase())
 }
 
+/**
+ * Claude Pro/Max subscriptions expose a constrained OAuth API that rejects
+ * `output_config.effort: "max"` (supported values: low | medium | high) even on
+ * Opus models. Detect OAuth auth by inspecting OpenCode's auth.json.
+ */
+function isAnthropicOAuth(providerID: string): boolean {
+  if (providerID !== "anthropic") return false
+  return isProviderUsingOAuth(providerID)
+}
+
 interface ChatParamsInput {
   sessionID: string
   agent: { name?: string }
@@ -49,8 +59,9 @@ const MAX_VARIANT_BY_TIER: Record<string, string> = {
   default: "high",
 }
 
-function clampVariant(variant: string, isOpus: boolean): string {
+function clampVariant(variant: string, isOpus: boolean, isOAuth: boolean): string {
   if (variant !== "max") return variant
+  if (isOAuth) return MAX_VARIANT_BY_TIER.default
   return isOpus ? MAX_VARIANT_BY_TIER.opus : MAX_VARIANT_BY_TIER.default
 }
 
@@ -70,16 +81,23 @@ export function createAnthropicEffortHook() {
       if (output.options.effort !== undefined) return
 
       const opus = isOpusModel(model.modelID)
-      const clamped = clampVariant(message.variant, opus)
+      const oauth = isAnthropicOAuth(model.providerID)
+      const clamped = clampVariant(message.variant, opus, oauth)
       output.options.effort = clamped
 
-      if (!opus) {
-        // Override the variant so OpenCode doesn't pass "max" to the API
+      const shouldOverrideMessageVariant = !opus || oauth
+
+      if (shouldOverrideMessageVariant) {
+        // Override the variant so OpenCode doesn't pass "max" to the API.
+        // Non-Opus models cap at high; Anthropic OAuth (Claude Pro/Max) also
+        // caps at high even on Opus because the OAuth API only accepts
+        // low | medium | high.
         ;(message as { variant?: string }).variant = clamped
-        log("anthropic-effort: clamped variant max→high for non-Opus model", {
+        log("anthropic-effort: clamped variant max→high", {
           sessionID: input.sessionID,
           provider: model.providerID,
           model: model.modelID,
+          reason: oauth ? "anthropic-oauth" : "non-opus",
         })
       } else {
         log("anthropic-effort: injected effort=max", {
