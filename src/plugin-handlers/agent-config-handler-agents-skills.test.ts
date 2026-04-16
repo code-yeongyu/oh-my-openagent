@@ -122,4 +122,35 @@ describe("applyAgentConfig .agents skills", () => {
     expect(discoveredSkills.map(skill => skill.name)).toContain("project-agent-skill")
     expect(discoveredSkills.map(skill => skill.name)).toContain("global-agent-skill")
   })
+
+  test("passes host config skills declared in opencode config.skills.paths to builtin agent creation", async () => {
+    // given
+    discoverConfigSourceSkillsSpy
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          name: "host-config-skill",
+          definition: { name: "host-config-skill", template: "host-template" },
+          scope: "config",
+        },
+      ])
+
+    // when
+    await applyAgentConfig({
+      config: {
+        model: "anthropic/claude-opus-4-6",
+        agent: {},
+        skills: {
+          paths: ["/host/skills"],
+        },
+      },
+      pluginConfig: createPluginConfig(),
+      ctx: { directory: "/tmp/project" },
+      pluginComponents: createPluginComponents(),
+    })
+
+    // then
+    const discoveredSkills = createBuiltinAgentsSpy.mock.calls[0]?.[6] as Array<{ name: string }>
+    expect(discoveredSkills.map(skill => skill.name)).toContain("host-config-skill")
+  })
 })

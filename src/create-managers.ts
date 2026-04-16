@@ -10,6 +10,7 @@ import { TmuxSessionManager } from "./features/tmux-subagent"
 import * as openclawRuntimeDispatch from "./openclaw/runtime-dispatch"
 import { registerManagerForCleanup } from "./features/background-agent/process-cleanup"
 import { createConfigHandler } from "./plugin-handlers"
+import { createHostSkillConfigStore } from "./shared/host-skill-config"
 import { log } from "./shared"
 import { markServerRunningInProcess } from "./shared/tmux/tmux-utils/server-health"
 
@@ -38,6 +39,7 @@ export type Managers = {
   backgroundManager: BackgroundManager
   skillMcpManager: SkillMcpManager
   configHandler: ReturnType<typeof createConfigHandler>
+  hostSkillConfigStore: ReturnType<typeof createHostSkillConfigStore>
 }
 
 export function createManagers(args: {
@@ -113,11 +115,13 @@ export function createManagers(args: {
   deps.initTaskToastManagerFn(ctx.client)
 
   const skillMcpManager = new deps.SkillMcpManagerClass()
+  const hostSkillConfigStore = createHostSkillConfigStore()
 
   const configHandler = deps.createConfigHandlerFn({
     ctx: { directory: ctx.directory, client: ctx.client },
     pluginConfig,
     modelCacheState,
+    hostSkillConfigStore,
   })
 
   return {
@@ -125,5 +129,6 @@ export function createManagers(args: {
     backgroundManager,
     skillMcpManager,
     configHandler,
+    hostSkillConfigStore,
   }
 }

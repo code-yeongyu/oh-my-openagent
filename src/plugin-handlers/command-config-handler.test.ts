@@ -157,4 +157,39 @@ describe("applyCommandConfig", () => {
     const commandConfig = config.command as Record<string, { agent?: string }>;
     expect(commandConfig["start-work"]?.agent).toBe(getAgentListDisplayName("atlas"));
   });
+
+  test("includes host config skills declared in opencode config.skills.paths", async () => {
+    // given
+    discoverConfigSourceSkillsSpy
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          name: "host-config-skill",
+          definition: {
+            name: "host-config-skill",
+            description: "Host config skill",
+            template: "template",
+          },
+          scope: "config",
+        },
+      ]);
+    const config: Record<string, unknown> = {
+      command: {},
+      skills: {
+        paths: ["/host/skills"],
+      },
+    };
+
+    // when
+    await applyCommandConfig({
+      config,
+      pluginConfig: createPluginConfig(),
+      ctx: { directory: "/tmp" },
+      pluginComponents: createPluginComponents(),
+    });
+
+    // then
+    const commandConfig = config.command as Record<string, { description?: string }>;
+    expect(commandConfig["host-config-skill"]?.description).toContain("Host config skill");
+  });
 });

@@ -2,6 +2,7 @@ import { afterAll, beforeEach, describe, expect, it, mock, spyOn } from "bun:tes
 import type { ToolContext } from "@opencode-ai/plugin/tool"
 import * as fs from "node:fs"
 import { SkillMcpManager } from "../../../features/skill-mcp-manager"
+import * as skillLoader from "../../../features/opencode-skill-loader"
 import type { LoadedSkill } from "../../../features/opencode-skill-loader/types"
 import type { CommandInfo } from "../../slashcommand/types"
 import type { Tool as McpTool } from "@modelcontextprotocol/sdk/types.js"
@@ -729,6 +730,46 @@ describe("skill tool - nativeSkills integration", () => {
     //#then
     expect(result).toContain("external-plugin-skill")
     expect(result).toContain("External plugin skill body")
+  })
+
+  it("merges host config skill sources exposed via config.skills.paths", async () => {
+    //#given
+    const discoverConfigSourceSkillsSpy = spyOn(
+      skillLoader,
+      "discoverConfigSourceSkills",
+    ).mockResolvedValue([
+      {
+        name: "host-config-skill",
+        path: "/host/skills/host-config-skill/SKILL.md",
+        resolvedPath: "/host/skills/host-config-skill",
+        definition: {
+          name: "host-config-skill",
+          description: "Host config skill",
+          template: "Host config skill body",
+        },
+        scope: "config",
+      },
+    ])
+
+    try {
+      const tool = createSkillTool({
+        skills: [],
+        directory: "/workspace/project",
+        hostConfigSkills: () => ({ sources: ["/host/skills"] }),
+      })
+
+      //#when
+      const result = await tool.execute({ name: "host-config-skill" }, mockContext)
+
+      //#then
+      expect(discoverConfigSourceSkillsSpy).toHaveBeenCalledWith({
+        config: { sources: ["/host/skills"] },
+        configDir: "/workspace/project",
+      })
+      expect(result).toContain("host-config-skill")
+    } finally {
+      discoverConfigSourceSkillsSpy.mockRestore()
+    }
   })
 })
 

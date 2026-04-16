@@ -9,6 +9,7 @@ import { applyProviderConfig } from "./provider-config-handler";
 import { loadPluginComponents } from "./plugin-components-loader";
 import { applyToolConfig } from "./tool-config-handler";
 import { clearFormatterCache } from "../tools/hashline-edit/formatter-trigger"
+import type { createHostSkillConfigStore } from "../shared/host-skill-config"
 
 export { resolveCategoryConfig } from "./category-config-resolver";
 
@@ -16,14 +17,16 @@ export interface ConfigHandlerDeps {
   ctx: { directory: string; client?: any };
   pluginConfig: OhMyOpenCodeConfig;
   modelCacheState: ModelCacheState;
+  hostSkillConfigStore: ReturnType<typeof createHostSkillConfigStore>;
 }
 
 export function createConfigHandler(deps: ConfigHandlerDeps) {
-  const { ctx, pluginConfig, modelCacheState } = deps;
+  const { ctx, pluginConfig, modelCacheState, hostSkillConfigStore } = deps;
 
   return async (config: Record<string, unknown>) => {
     const formatterConfig = config.formatter;
 
+    hostSkillConfigStore.set(config.skills)
     setAdditionalAllowedMcpEnvVars(pluginConfig.mcp_env_allowlist ?? [])
     applyProviderConfig({ config, modelCacheState });
     clearFormatterCache()

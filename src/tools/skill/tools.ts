@@ -6,6 +6,7 @@ import type { SkillArgs, SkillLoadOptions } from "./types"
 import type { LoadedSkill } from "../../features/opencode-skill-loader"
 import { getAllSkills, clearSkillCache } from "../../features/opencode-skill-loader/skill-content"
 import { injectGitMasterConfig } from "../../features/opencode-skill-loader/skill-content"
+import { discoverConfigSourceSkills } from "../../features/opencode-skill-loader"
 import { discoverCommandsSync } from "../slashcommand/command-discovery"
 import type { CommandInfo } from "../slashcommand/types"
 import { formatLoadedCommand } from "../slashcommand/command-output-formatter"
@@ -29,16 +30,29 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
 
   const getSkills = async (): Promise<LoadedSkill[]> => {
     clearSkillCache()
-    const discovered = await getAllSkills({
-      disabledSkills: options?.disabledSkills,
-      browserProvider: options?.browserProvider,
-    })
+    const [discovered, hostConfigSourceSkills] = await Promise.all([
+      getAllSkills({
+        disabledSkills: options?.disabledSkills,
+        browserProvider: options?.browserProvider,
+        directory: options?.directory,
+      }),
+      discoverConfigSourceSkills({
+        config: options.hostConfigSkills?.(),
+        configDir: options?.directory ?? process.cwd(),
+      }),
+    ])
+    const discoveredWithHostConfig = [
+      ...discovered,
+      ...hostConfigSourceSkills.filter(
+        (skill) => !new Set(discovered.map((discoveredSkill) => discoveredSkill.name)).has(skill.name),
+      ),
+    ]
     const allSkills = !options.skills
-      ? discovered
+      ? discoveredWithHostConfig
       : [
-          ...discovered,
+          ...discoveredWithHostConfig,
           ...options.skills.filter(
-            (skill) => !new Set(discovered.map((discoveredSkill) => discoveredSkill.name)).has(skill.name)
+            (skill) => !new Set(discoveredWithHostConfig.map((discoveredSkill) => discoveredSkill.name)).has(skill.name)
           ),
         ]
 
