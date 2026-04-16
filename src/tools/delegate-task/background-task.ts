@@ -3,8 +3,7 @@ import type { ExecutorContext, ParentContext } from "./executor-types"
 import type { FallbackEntry } from "../../shared/model-requirements"
 import { getTimingConfig } from "./timing"
 import { buildTaskPrompt } from "./prompt-builder"
-import { storeToolMetadata } from "../../features/tool-metadata-store"
-import { resolveCallID } from "./resolve-call-id"
+import { publishToolMetadata } from "../../features/tool-metadata-store"
 import { formatDetailedError } from "./error-formatting"
 import { getSessionTools } from "../../shared/session-tools-store"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
@@ -134,11 +133,7 @@ export async function executeBackgroundTask(
       title: args.description,
       metadata,
     }
-    await ctx.metadata?.(unstableMeta)
-    const callID = resolveCallID(ctx)
-    if (callID) {
-      storeToolMetadata(ctx.sessionID, callID, unstableMeta)
-    }
+    await publishToolMetadata(ctx, unstableMeta)
 
     const taskMetadataBlock = sessionId
       ? `\n\n<task_metadata>\nsession_id: ${sessionId}\ntask_id: ${task.id}\nbackground_task_id: ${task.id}\n</task_metadata>`

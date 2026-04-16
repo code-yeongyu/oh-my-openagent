@@ -1,6 +1,6 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin"
 import type { BackgroundTask } from "../../features/background-agent"
-import { storeToolMetadata } from "../../features/tool-metadata-store"
+import { publishToolMetadata } from "../../features/tool-metadata-store"
 import type { BackgroundOutputArgs } from "./types"
 import type { BackgroundOutputClient, BackgroundOutputManager } from "./clients"
 import { BACKGROUND_OUTPUT_DESCRIPTION } from "./constants"
@@ -21,13 +21,6 @@ type ToolContextWithMetadata = {
   callID?: string
   callId?: string
   call_id?: string
-}
-
-function resolveToolCallID(ctx: ToolContextWithMetadata): string | undefined {
-  if (typeof ctx.callID === "string" && ctx.callID.trim() !== "") return ctx.callID
-  if (typeof ctx.callId === "string" && ctx.callId.trim() !== "") return ctx.callId
-  if (typeof ctx.call_id === "string" && ctx.call_id.trim() !== "") return ctx.call_id
-  return undefined
 }
 
 function formatResolvedTitle(task: BackgroundTask): string {
@@ -80,12 +73,7 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
             ...(task.sessionID ? { sessionId: task.sessionID } : {}),
           } as Record<string, unknown>,
         }
-        ctx.metadata?.(meta)
-
-        const callID = resolveToolCallID(ctx)
-        if (callID) {
-          storeToolMetadata(ctx.sessionID, callID, meta)
-        }
+        await publishToolMetadata(ctx, meta)
 
         const shouldBlock = args.block === true
         const timeoutMs = Math.min(args.timeout ?? 60000, 600000)
