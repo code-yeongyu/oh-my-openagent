@@ -78,6 +78,24 @@ describe("createTaskResumeInfoHook", () => {
     })
   })
 
+  describe("#given target tool with session metadata object", () => {
+    describe("#when output text omits session ID but metadata includes it", () => {
+      it("#then should append resume info from metadata", async () => {
+        const input = createInput("task")
+        const output = {
+          title: "task",
+          output: "Task completed successfully",
+          metadata: { sessionID: "ses_meta_123" },
+        }
+
+        await afterHook(input, output)
+
+        expect(output.output).toContain("to continue:")
+        expect(output.output).toContain("ses_meta_123")
+      })
+    })
+  })
+
   describe("#given target tool with error output", () => {
     describe("#when output starts with Error:", () => {
       it("#then should not modify output", async () => {

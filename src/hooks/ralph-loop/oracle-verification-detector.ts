@@ -1,3 +1,4 @@
+import { extractTaskLink } from "../../features/tool-metadata-store"
 import { stripInvisibleAgentCharacters } from "../../shared/agent-display-names"
 import { ULTRAWORK_VERIFICATION_PROMISE } from "./constants"
 
@@ -9,8 +10,6 @@ export interface OracleVerificationEvidence {
 
 const AGENT_LINE_PATTERN = /^Agent:[ \t]*(\S+)$/im
 const PROMISE_TAG_PATTERN = /<promise>[ \t]*(\S+?)[ \t]*<\/promise>/is
-const TASK_METADATA_PATTERN = /<task_metadata>[ \t]*([\s\S]*?)[ \t]*<\/task_metadata>/is
-const SESSION_ID_LINE_PATTERN = /^session_id:[ \t]*(\S+)$/im
 
 export function parseOracleVerificationEvidence(text: string): OracleVerificationEvidence | undefined {
 	const trimmedText = text.trim()
@@ -36,17 +35,9 @@ export function parseOracleVerificationEvidence(text: string): OracleVerificatio
 		return undefined
 	}
 
-	const metadataMatch = trimmedText.match(TASK_METADATA_PATTERN)
-	let sessionID: string | undefined
-	if (metadataMatch) {
-		const metadataContent = metadataMatch[1]
-		const sessionIDMatch = metadataContent.match(SESSION_ID_LINE_PATTERN)
-		if (sessionIDMatch) {
-			sessionID = sessionIDMatch[1]?.trim()
-		}
-	}
+  const sessionID = extractTaskLink(undefined, trimmedText).sessionId
 
-	return { agent, promise, sessionID }
+  return { agent, promise, sessionID }
 }
 
 export function isOracleVerified(text: string): boolean {
