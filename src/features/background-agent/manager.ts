@@ -48,6 +48,7 @@ import {
 } from "./error-classifier"
 import { tryFallbackRetry } from "./fallback-retry-handler"
 import { registerManagerForCleanup, unregisterManagerForCleanup } from "./process-cleanup"
+import { setContinuationMarkerSource } from "../../features/run-continuation-state"
 import {
   findNearestMessageExcludingCompaction,
   resolvePromptContextFromSessionMessages,
@@ -370,6 +371,9 @@ export class BackgroundManager {
       spawnReservation.commit()
       this.markPreStartDescendantReservation(task)
 
+      // Signal CLI run mode that background tasks are active
+      this.updateBackgroundTaskMarker(input.parentSessionID)
+
       // Trigger processing (fire-and-forget)
       void this.processKey(key)
 
@@ -655,6 +659,21 @@ export class BackgroundManager {
       }
     }
     return result
+  }
+
+  private updateBackgroundTaskMarker(parentSessionID: string): void {
+    const tasks = this.getTasksByParentSession(parentSessionID)
+    const activeTasks = tasks.filter(t => t.status === "running" || t.status === "pending")
+    if (activeTasks.length > 0) {
+      setContinuationMarkerSource(
+        this.directory, parentSessionID, "background-task", "active",
+        `${activeTasks.length} background task(s) active`,
+      )
+    } else {
+      setContinuationMarkerSource(
+        this.directory, parentSessionID, "background-task", "idle",
+      )
+    }
   }
 
   getAllDescendantTasks(sessionID: string): BackgroundTask[] {
@@ -1585,6 +1604,11 @@ export class BackgroundManager {
 
     removeTaskToastTracking(task.id)
 
+    // Update continuation marker for CLI run mode
+    if (task.parentSessionID) {
+      this.updateBackgroundTaskMarker(task.parentSessionID)
+    }
+
     if (options?.skipNotification) {
       this.cleanupPendingByParent(task)
       this.scheduleTaskRemoval(task.id)
@@ -1698,6 +1722,11 @@ export class BackgroundManager {
       await this.abortSessionWithLogging(task.sessionID, `task completion (${source})`)
 
       SessionCategoryRegistry.remove(task.sessionID)
+    }
+
+    // Update continuation marker for CLI run mode
+    if (task.parentSessionID) {
+      this.updateBackgroundTaskMarker(task.parentSessionID)
     }
 
     try {
@@ -1991,6 +2020,11 @@ export class BackgroundManager {
     this.scheduleTaskRemoval(task.id)
     if (task.sessionID) {
       SessionCategoryRegistry.remove(task.sessionID)
+    }
+
+    // Update continuation marker for CLI run mode
+    if (task.parentSessionID) {
+      this.updateBackgroundTaskMarker(task.parentSessionID)
     }
 
     this.markForNotification(task)
