@@ -13,35 +13,35 @@ interface OpencodeSkillsConfig {
 
 interface ConfigSource {
 	configPath: string
-	baseDir: string
+	resolveBaseDir: string
 }
 
-function getConfigPath(baseDir: string): string | null {
+function getConfigPaths(baseDir: string): string[] {
+	const configPaths: string[] = []
+
 	const jsoncPath = join(baseDir, "opencode.jsonc")
-	if (existsSync(jsoncPath)) return jsoncPath
+	if (existsSync(jsoncPath)) configPaths.push(jsoncPath)
 
 	const jsonPath = join(baseDir, "opencode.json")
-	if (existsSync(jsonPath)) return jsonPath
+	if (existsSync(jsonPath)) configPaths.push(jsonPath)
 
-	return null
+	return configPaths
 }
 
 function getConfigSources(directory: string): ConfigSource[] {
 	const globalPaths = getOpenCodeConfigPaths({ binary: "opencode" })
-	const sourceDirs = [
-		directory,
-		join(directory, ".opencode"),
-		globalPaths.configDir,
+	const sourceConfigs = [
+		{ configDir: directory, resolveBaseDir: directory },
+		{ configDir: join(directory, ".opencode"), resolveBaseDir: directory },
+		{ configDir: globalPaths.configDir, resolveBaseDir: globalPaths.configDir },
 	]
 
-	return sourceDirs
-		.map((baseDir) => {
-			const configPath = getConfigPath(baseDir)
-			if (!configPath) return null
-
-			return { configPath, baseDir }
+	return sourceConfigs.flatMap((sourceConfig) => {
+		return getConfigPaths(sourceConfig.configDir).map((configPath) => ({
+			configPath,
+			resolveBaseDir: sourceConfig.resolveBaseDir,
+		}))
 		})
-		.filter((source): source is ConfigSource => source !== null)
 }
 
 export function readOpenCodeSkillsPaths(directory: string): string[] {
@@ -58,7 +58,7 @@ export function readOpenCodeSkillsPaths(directory: string): string[] {
 					? join(homedir(), item.slice(2))
 					: isAbsolute(item)
 						? item
-						: join(source.baseDir, item)
+						: join(source.resolveBaseDir, item)
 
 				if (!existsSync(resolved)) {
 					log(`[skill-loader] skills.paths entry not found: ${resolved}`)

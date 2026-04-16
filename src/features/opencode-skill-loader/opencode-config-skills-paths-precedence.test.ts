@@ -98,4 +98,50 @@ describe("opencode-config-skills-paths precedence", () => {
 			})
 		})
 	})
+
+	describe("#given .opencode config uses project-relative paths", () => {
+		describe("#when readOpenCodeSkillsPaths is called", () => {
+			it("#then resolves relative entries against project root", async () => {
+				const opencodeSkillsDir = join(TEST_DIR, "opencode-skills")
+				mkdirSync(opencodeSkillsDir, { recursive: true })
+
+				const opencodeDir = join(TEST_DIR, ".opencode")
+				mkdirSync(opencodeDir, { recursive: true })
+				writeFileSync(
+					join(opencodeDir, "opencode.json"),
+					JSON.stringify({ skills: { paths: ["./opencode-skills"] } })
+				)
+
+				const { readOpenCodeSkillsPaths } = await import("./opencode-config-skills-paths")
+				const paths = readOpenCodeSkillsPaths(TEST_DIR)
+
+				expect(paths).toEqual([opencodeSkillsDir])
+			})
+		})
+	})
+
+	describe("#given both opencode.jsonc and opencode.json exist in one source", () => {
+		describe("#when readOpenCodeSkillsPaths is called", () => {
+			it("#then uses paths from jsonc first and appends json fallback entries", async () => {
+				const jsoncSkillsDir = join(TEST_DIR, "jsonc-skills")
+				const jsonSkillsDir = join(TEST_DIR, "json-skills")
+				mkdirSync(jsoncSkillsDir, { recursive: true })
+				mkdirSync(jsonSkillsDir, { recursive: true })
+
+				writeFileSync(
+					join(TEST_DIR, "opencode.jsonc"),
+					JSON.stringify({ skills: { paths: ["./jsonc-skills"] } })
+				)
+				writeFileSync(
+					join(TEST_DIR, "opencode.json"),
+					JSON.stringify({ skills: { paths: ["./json-skills"] } })
+				)
+
+				const { readOpenCodeSkillsPaths } = await import("./opencode-config-skills-paths")
+				const paths = readOpenCodeSkillsPaths(TEST_DIR)
+
+				expect(paths).toEqual([jsoncSkillsDir, jsonSkillsDir])
+			})
+		})
+	})
 })
