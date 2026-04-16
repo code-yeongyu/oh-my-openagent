@@ -5635,6 +5635,12 @@
             },
             "notify_on_fallback": {
               "type": "boolean"
+            },
+            "error_patterns_to_fallback": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             }
           },
           "additionalProperties": false

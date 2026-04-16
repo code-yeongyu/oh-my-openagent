@@ -22,7 +22,10 @@ export function createRuntimeFallbackHook(
     cooldown_seconds: options?.config?.cooldown_seconds ?? DEFAULT_CONFIG.cooldown_seconds,
     timeout_seconds: options?.config?.timeout_seconds ?? DEFAULT_CONFIG.timeout_seconds,
     notify_on_fallback: options?.config?.notify_on_fallback ?? DEFAULT_CONFIG.notify_on_fallback,
+    error_patterns_to_fallback: options?.config?.error_patterns_to_fallback ?? DEFAULT_CONFIG.error_patterns_to_fallback,
   }
+
+  const patterns = config.error_patterns_to_fallback.map(s => new RegExp(s, "i"))
 
   let pluginConfig = options?.pluginConfig
   if (!pluginConfig) {
@@ -36,6 +39,7 @@ export function createRuntimeFallbackHook(
   const deps: HookDeps = {
     ctx,
     config,
+    patterns,
     options,
     pluginConfig,
     sessionStates: new Map(),

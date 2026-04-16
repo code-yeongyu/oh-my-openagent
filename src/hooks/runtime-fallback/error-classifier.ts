@@ -155,7 +155,7 @@ export function containsErrorContent(
   return { hasError: false }
 }
 
-export function isRetryableError(error: unknown, retryOnErrors: number[]): boolean {
+export function isRetryableError(error: unknown, retryOnErrors: number[], extraPatterns: RegExp[] = []): boolean {
   const statusCode = extractStatusCode(error, retryOnErrors)
   const message = getErrorMessage(error)
   const errorType = classifyErrorType(error)
@@ -179,5 +179,5 @@ export function isRetryableError(error: unknown, retryOnErrors: number[]): boole
     return true
   }
 
-  return RETRYABLE_ERROR_PATTERNS.some((pattern) => pattern.test(message))
+  return [...RETRYABLE_ERROR_PATTERNS, ...extraPatterns].some((p) => p.test(message))
 }

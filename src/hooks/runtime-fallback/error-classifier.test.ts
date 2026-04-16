@@ -198,4 +198,61 @@ describe("model support fallback", () => {
     expect(retryable2).toBe(true)
     expect(retryable3).toBe(true)
   })
+
+  describe("error_patterns_to_fallback", () => {
+    test("extra pattern matches message", () => {
+      //#given
+      const error = { message: "litellm.BadRequestError: invalid_request_error: effort: Extra inputs are not permitted" }
+
+      //#when
+      const retryable = isRetryableError(error, [], [/extra inputs are not permitted/i])
+
+      //#then
+      expect(retryable).toBe(true)
+    })
+
+    test("extra pattern does not match unrelated message", () => {
+      //#given
+      const error = { message: "prompt must be a string" }
+
+      //#when
+      const retryable = isRetryableError(error, [], [/extra inputs are not permitted/i])
+
+      //#then
+      expect(retryable).toBe(false)
+    })
+
+    test("built-in patterns still match when extra patterns are provided", () => {
+      //#given
+      const error = { message: "rate limit exceeded" }
+
+      //#when
+      const retryable = isRetryableError(error, [], [/extra inputs are not permitted/i])
+
+      //#then
+      expect(retryable).toBe(true)
+    })
+
+    test("built-in patterns still match when extra patterns array is empty", () => {
+      //#given
+      const error = { message: "rate limit exceeded" }
+
+      //#when
+      const retryable = isRetryableError(error, [], [])
+
+      //#then
+      expect(retryable).toBe(true)
+    })
+
+    test("no match when neither built-in nor extra patterns match", () => {
+      //#given
+      const error = { message: "prompt must be a string" }
+
+      //#when
+      const retryable = isRetryableError(error, [], [])
+
+      //#then
+      expect(retryable).toBe(false)
+    })
+  })
 })

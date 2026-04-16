@@ -149,7 +149,7 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
       errorType: classifyErrorType(error),
     })
 
-    if (!isRetryableError(error, config.retry_on_errors)) {
+    if (!isRetryableError(error, config.retry_on_errors, deps.patterns)) {
       log(`[${HOOK_NAME}] Error not retryable, skipping fallback`, {
         sessionID,
         retryable: false,
