@@ -85,7 +85,6 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
   - subagent_type: Use specific agent directly (explore, librarian, oracle, metis, momus)
   - run_in_background: REQUIRED. true=async (returns task_id), false=sync (waits). Use background=true ONLY for parallel exploration with 5+ independent queries.
   - task_id: Existing task to continue (from previous task output). Continues the same subagent session with FULL CONTEXT PRESERVED.
-  - session_id: Deprecated alias for task_id. Accepted for backward compatibility.
   - command: The command that triggered this task (optional, for slash command tracking).
   
   **WHEN TO USE task_id:**
@@ -105,14 +104,10 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
       category: tool.schema.string().optional().describe(`REQUIRED if subagent_type not provided. Do NOT provide both category and subagent_type.`),
       subagent_type: tool.schema.string().optional().describe("REQUIRED if category not provided. Do NOT provide both category and subagent_type."),
       task_id: tool.schema.string().optional().describe("Existing task to continue. Canonical resume identifier."),
-      session_id: tool.schema.string().optional().describe("Deprecated alias for task_id. Existing task to continue."),
       command: tool.schema.string().optional().describe("The command that triggered this task"),
     },
     async execute(args: DelegateTaskArgs, toolContext) {
       const ctx = toolContext as ToolContextWithMetadata
-      if (!args.task_id && args.session_id) {
-        args.task_id = args.session_id
-      }
 
       if (args.category) {
         if (args.subagent_type && args.subagent_type !== SISYPHUS_JUNIOR_AGENT) {
@@ -163,7 +158,7 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
 
       const parentContext = await resolveParentContext(ctx, options.client)
 
-      if (args.task_id || args.session_id) {
+      if (args.task_id) {
         if (runInBackground) {
           return executeBackgroundContinuation(args, ctx, options, parentContext)
         }

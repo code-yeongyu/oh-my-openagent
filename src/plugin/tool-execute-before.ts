@@ -100,16 +100,7 @@ export function createToolExecuteBeforeHandler(args: {
       const argsObject = output.args
       const category = typeof argsObject.category === "string" ? argsObject.category : undefined
       const subagentType = typeof argsObject.subagent_type === "string" ? argsObject.subagent_type : undefined
-      const taskId =
-        typeof argsObject.task_id === "string"
-          ? argsObject.task_id
-          : typeof argsObject.session_id === "string"
-            ? argsObject.session_id
-            : undefined
-
-      if (taskId && typeof argsObject.task_id !== "string") {
-        argsObject.task_id = taskId
-      }
+      const taskId = typeof argsObject.task_id === "string" ? argsObject.task_id : undefined
 
       if (category) {
         argsObject.subagent_type = "sisyphus-junior"

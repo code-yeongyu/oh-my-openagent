@@ -1359,7 +1359,7 @@ describe("sisyphus-task", () => {
       )).rejects.toThrow("Invalid arguments: 'run_in_background' parameter is REQUIRED")
     })
 
-    test("#given session_id without run_in_background #when executing #then throws required parameter error", async () => {
+    test("#given task_id without run_in_background #when executing #then throws required parameter error", async () => {
       // given
       const { createDelegateTask } = require("./tools")
       const mockManager = { resume: async () => ({ id: "task-1", sessionID: "ses_1", status: "running" }) }
@@ -1381,14 +1381,14 @@ describe("sisyphus-task", () => {
         {
           description: "Continue without run flag",
           prompt: "Continue",
-          session_id: "ses_existing",
+          task_id: "ses_existing",
           load_skills: [],
         },
         { sessionID: "parent-session", messageID: "parent-message", agent: "sisyphus", abort: new AbortController().signal }
       )).rejects.toThrow("Invalid arguments: 'run_in_background' parameter is REQUIRED")
     })
 
-    test("#given no category no subagent_type no session_id and no run_in_background #when executing #then throws required parameter error", async () => {
+    test("#given no category no subagent_type no task_id and no run_in_background #when executing #then throws required parameter error", async () => {
       // given
       const { createDelegateTask } = require("./tools")
       const mockManager = { launch: async () => ({}) }
@@ -1719,8 +1719,8 @@ describe("sisyphus-task", () => {
     }, { timeout: 10000 })
   })
 
-  describe("session_id with background parameter", () => {
-  test("session_id with background=false should wait for result and return content", async () => {
+  describe("task_id with background parameter", () => {
+  test("task_id with background=false should wait for result and return content", async () => {
     // Note: This test needs extended timeout because the implementation has MIN_STABILITY_TIME_MS = 5000
     // given
     const { createDelegateTask } = require("./tools")
@@ -1808,7 +1808,7 @@ describe("sisyphus-task", () => {
        {
          description: "Continue test",
          prompt: "Continue the task",
-         session_id: "ses_continue_test",
+         task_id: "ses_continue_test",
          run_in_background: false,
          load_skills: ["git-master"],
        },
@@ -1905,7 +1905,7 @@ describe("sisyphus-task", () => {
       {
         description: "Continue with variant",
         prompt: "Continue the task",
-        session_id: "ses_var_test",
+        task_id: "ses_var_test",
         run_in_background: false,
         load_skills: [],
       },
@@ -1920,7 +1920,7 @@ describe("sisyphus-task", () => {
     expect(callArgs.body.model).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-6" })
   }, { timeout: 10000 })
 
-  test("session_id with background=true should return immediately without waiting", async () => {
+  test("task_id with background=true should return immediately without waiting", async () => {
     // given
     const { createDelegateTask } = require("./tools")
     
@@ -1964,7 +1964,7 @@ describe("sisyphus-task", () => {
        {
          description: "Continue bg test",
          prompt: "Continue in background",
-         session_id: "ses_bg_continue",
+         task_id: "ses_bg_continue",
          run_in_background: true,
          load_skills: ["git-master"],
        },

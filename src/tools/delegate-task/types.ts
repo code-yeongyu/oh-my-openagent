@@ -15,8 +15,6 @@ export interface DelegateTaskArgs {
   subagent_type?: string
   run_in_background: boolean
   task_id?: string
-  /** @deprecated Use task_id instead. */
-  session_id?: string
   command?: string
   load_skills: string[]
   execute?: {

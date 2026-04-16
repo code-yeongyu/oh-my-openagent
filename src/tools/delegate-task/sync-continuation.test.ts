@@ -86,7 +86,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     }
 
     const args = {
-      session_id: "ses_test_12345678",
+      task_id: "ses_test_12345678",
       prompt: "test prompt",
       description: "test task",
       load_skills: [],
@@ -148,7 +148,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     }
 
     const args = {
-      session_id: "ses_test_12345678",
+      task_id: "ses_test_12345678",
       prompt: "test prompt",
       description: "test task",
       load_skills: [],
@@ -214,7 +214,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     }
 
     const args = {
-      session_id: "ses_test_12345678",
+      task_id: "ses_test_12345678",
       prompt: "test prompt",
       description: "test task",
       load_skills: [],
@@ -278,7 +278,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     }
 
     const args = {
-      session_id: "ses_test_12345678",
+      task_id: "ses_test_12345678",
       prompt: "test prompt",
       description: "test task",
       load_skills: [],
@@ -335,7 +335,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     }
 
     const args = {
-      session_id: "ses_test_12345678",
+      task_id: "ses_test_12345678",
       prompt: "test prompt",
       description: "test task",
       load_skills: [],
@@ -395,7 +395,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     }
 
     const args = {
-      session_id: "ses_test_12345678",
+      task_id: "ses_test_12345678",
       prompt: "continue working",
       description: "resume oracle task",
       load_skills: [],
@@ -449,7 +449,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     }
 
     const args = {
-      session_id: "ses_test_12345678",
+      task_id: "ses_test_12345678",
       prompt: "continue working",
       description: "resume task",
       load_skills: [],
@@ -514,7 +514,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     }
 
     const args = {
-      session_id: "ses_test_12345678",
+      task_id: "ses_test_12345678",
       prompt: "continue working",
       description: "resume explore task",
       load_skills: [],
@@ -584,7 +584,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     }
 
     const args = {
-      session_id: "ses_test_12345678",
+      task_id: "ses_test_12345678",
       prompt: "continue researching",
       description: "resume librarian task",
       load_skills: [],
@@ -654,7 +654,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     }
 
     const args = {
-      session_id: "ses_test_12345678",
+      task_id: "ses_test_12345678",
       prompt: "continue planning",
       description: "resume prometheus task",
       load_skills: [],

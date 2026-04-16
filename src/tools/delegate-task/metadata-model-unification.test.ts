@@ -122,7 +122,7 @@ describe("metadata model unification", () => {
         const ctx = makeMockCtx()
         const args: DelegateTaskArgs = {
           description: "continue", prompt: "keep going",
-          load_skills: [], run_in_background: true, session_id: "ses_resumed",
+          load_skills: [], run_in_background: true, task_id: "ses_resumed",
         }
 
         await executeBackgroundContinuation(args, ctx, {
@@ -144,7 +144,7 @@ describe("metadata model unification", () => {
         const ctx = makeMockCtx()
         const args: DelegateTaskArgs = {
           description: "continue", prompt: "keep going",
-          load_skills: [], run_in_background: false, session_id: "ses_cont",
+          load_skills: [], run_in_background: false, task_id: "ses_cont",
         }
 
         const deps = {
