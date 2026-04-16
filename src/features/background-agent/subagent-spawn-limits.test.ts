@@ -5,9 +5,6 @@ import {
   getMaxSubagentDepth,
   DEFAULT_MAX_SUBAGENT_DEPTH,
   createSubagentDepthLimitError,
-  createSubagentDescendantLimitError,
-  getMaxRootSessionSpawnBudget,
-  DEFAULT_MAX_ROOT_SESSION_SPAWN_BUDGET,
 } from "./subagent-spawn-limits"
 
 function createMockClient(sessionGet: OpencodeClient["session"]["get"]): OpencodeClient {
@@ -62,7 +59,7 @@ describe("resolveSubagentSpawnContext", () => {
       const result = resolveSubagentSpawnContext(client, "parent-session")
 
       // then
-      await expect(result).rejects.toThrow(/background_task\.maxDescendants cannot be enforced safely.*lookup failed/)
+      await expect(result).rejects.toThrow(/background_task\.maxDepth cannot be enforced safely.*lookup failed/)
     })
   })
 
@@ -77,7 +74,7 @@ describe("resolveSubagentSpawnContext", () => {
       const result = resolveSubagentSpawnContext(client, "parent-session")
 
       // then
-      await expect(result).rejects.toThrow(/background_task\.maxDescendants cannot be enforced safely.*No session data returned/)
+      await expect(result).rejects.toThrow(/background_task\.maxDepth cannot be enforced safely.*No session data returned/)
     })
   })
 
@@ -209,20 +206,6 @@ describe("getMaxSubagentDepth", () => {
   })
 })
 
-describe("getMaxRootSessionSpawnBudget", () => {
-  test("returns DEFAULT_MAX_ROOT_SESSION_SPAWN_BUDGET when no config", () => {
-    expect(getMaxRootSessionSpawnBudget()).toBe(DEFAULT_MAX_ROOT_SESSION_SPAWN_BUDGET)
-  })
-
-  test("returns config.maxDescendants when provided", () => {
-    expect(getMaxRootSessionSpawnBudget({ maxDescendants: 10 })).toBe(10)
-  })
-
-  test("default is 50", () => {
-    expect(DEFAULT_MAX_ROOT_SESSION_SPAWN_BUDGET).toBe(50)
-  })
-})
-
 describe("createSubagentDepthLimitError", () => {
   test("includes childDepth, maxDepth, and session IDs in message", () => {
     const error = createSubagentDepthLimitError({
@@ -236,21 +219,6 @@ describe("createSubagentDepthLimitError", () => {
     expect(error.message).toContain("maxDepth=3")
     expect(error.message).toContain("parent-123")
     expect(error.message).toContain("root-456")
-    expect(error.message).toContain("spawn blocked")
-  })
-})
-
-describe("createSubagentDescendantLimitError", () => {
-  test("includes descendant count, max, and root session ID", () => {
-    const error = createSubagentDescendantLimitError({
-      rootSessionID: "root-789",
-      descendantCount: 50,
-      maxDescendants: 50,
-    })
-
-    expect(error.message).toContain("root-789")
-    expect(error.message).toContain("50")
-    expect(error.message).toContain("maxDescendants=50")
     expect(error.message).toContain("spawn blocked")
   })
 })

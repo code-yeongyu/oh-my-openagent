@@ -2327,7 +2327,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       await expect(result).rejects.toThrow("background_task.maxDepth=3")
     })
 
-    test("should block launches when maxDescendants is reached", async () => {
+    test("should ignore legacy maxDescendants config when launching multiple descendants", async () => {
       // given
       manager.shutdown()
       manager = new BackgroundManager(
@@ -2354,10 +2354,10 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       const result = manager.launch(input)
 
       // then
-      await expect(result).rejects.toThrow("background_task.maxDescendants=1")
+      await expect(result).resolves.toBeDefined()
     })
 
-    test("should consume descendant quota for reserved sync spawns", async () => {
+    test("should allow spawn assertions after reserveSubagentSpawn even with legacy maxDescendants config", async () => {
       // given
       manager.shutdown()
       manager = new BackgroundManager(
@@ -2376,7 +2376,10 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       const result = manager.assertCanSpawn("session-root")
 
       // then
-      await expect(result).rejects.toThrow("background_task.maxDescendants=1")
+      await expect(result).resolves.toMatchObject({
+        rootSessionID: "session-root",
+        childDepth: 1,
+      })
     })
 
     test("should fail closed when session lineage lookup fails", async () => {
@@ -2407,7 +2410,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       const result = manager.launch(input)
 
       // then
-      await expect(result).rejects.toThrow("background_task.maxDescendants cannot be enforced safely")
+      await expect(result).rejects.toThrow("background_task.maxDepth cannot be enforced safely")
     })
 
     test("should release descendant quota when queued task is cancelled before session starts", async () => {

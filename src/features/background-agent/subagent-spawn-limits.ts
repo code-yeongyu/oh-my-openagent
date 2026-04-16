@@ -2,7 +2,6 @@ import type { BackgroundTaskConfig } from "../../config/schema"
 import type { OpencodeClient } from "./constants"
 
 export const DEFAULT_MAX_SUBAGENT_DEPTH = 3
-export const DEFAULT_MAX_ROOT_SESSION_SPAWN_BUDGET = 50
 
 export interface SubagentSpawnContext {
   rootSessionID: string
@@ -12,10 +11,6 @@ export interface SubagentSpawnContext {
 
 export function getMaxSubagentDepth(config?: BackgroundTaskConfig): number {
   return config?.maxDepth ?? DEFAULT_MAX_SUBAGENT_DEPTH
-}
-
-export function getMaxRootSessionSpawnBudget(config?: BackgroundTaskConfig): number {
-  return config?.maxDescendants ?? DEFAULT_MAX_ROOT_SESSION_SPAWN_BUDGET
 }
 
 export async function resolveSubagentSpawnContext(
@@ -53,7 +48,7 @@ export async function resolveSubagentSpawnContext(
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error)
       throw new Error(
-        `Subagent spawn blocked: failed to resolve session lineage for ${parentSessionID}, so background_task.maxDescendants cannot be enforced safely. ${reason}`
+        `Subagent spawn blocked: failed to resolve session lineage for ${parentSessionID}, so background_task.maxDepth cannot be enforced safely. ${reason}`
       )
     }
 
@@ -82,16 +77,5 @@ export function createSubagentDepthLimitError(input: {
   const { childDepth, maxDepth, parentSessionID, rootSessionID } = input
   return new Error(
     `Subagent spawn blocked: child depth ${childDepth} exceeds background_task.maxDepth=${maxDepth}. Parent session: ${parentSessionID}. Root session: ${rootSessionID}. Continue in an existing subagent session instead of spawning another.`
-  )
-}
-
-export function createSubagentDescendantLimitError(input: {
-  rootSessionID: string
-  descendantCount: number
-  maxDescendants: number
-}): Error {
-  const { rootSessionID, descendantCount, maxDescendants } = input
-  return new Error(
-    `Subagent spawn blocked: root session ${rootSessionID} already has ${descendantCount} descendants, which meets background_task.maxDescendants=${maxDescendants}. Reuse an existing session instead of spawning another.`
   )
 }
