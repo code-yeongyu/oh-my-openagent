@@ -598,7 +598,7 @@ export function createSisyphusAgent(
         ...getFrontierToolSchemaPermission(model),
         ...getGptApplyPatchPermission(model),
       } as AgentConfig["permission"],
-      thinking: { type: "enabled", budgetTokens: 32000 },
+      thinking: { type: "adaptive", display: "summarized" },
     };
   }
 
@@ -654,6 +654,6 @@ export function createSisyphusAgent(
     return { ...base, reasoningEffort: "medium" };
   }
 
-  return { ...base, thinking: { type: "enabled", budgetTokens: 32000 } };
+  return { ...base, thinking: { type: "adaptive", display: "summarized" } };
 }
 createSisyphusAgent.mode = MODE;

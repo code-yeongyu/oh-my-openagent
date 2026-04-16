@@ -126,8 +126,9 @@ const RuntimeStateMemberModelSchema = z.object({
   top_p: z.number().optional(),
   maxTokens: z.number().optional(),
   thinking: z.object({
-    type: z.enum(["enabled", "disabled"]),
+    type: z.enum(["enabled", "disabled", "adaptive"]),
     budgetTokens: z.number().int().positive().optional(),
+    display: z.enum(["summarized", "omitted"]).optional(),
   }).optional(),
 }).strict()
 

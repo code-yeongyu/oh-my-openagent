@@ -179,14 +179,14 @@ describe("parseFallbackModelObjectEntry", () => {
     const result = parseFallbackModelObjectEntry(
       {
         model: "anthropic/claude-sonnet-4-6",
-        thinking: { type: "enabled", budgetTokens: 10000 },
+        thinking: { type: "adaptive", display: "omitted" },
       },
       undefined,
     )
     expect(result).toEqual({
       providers: ["anthropic"],
       model: "claude-sonnet-4-6",
-      thinking: { type: "enabled", budgetTokens: 10000 },
+      thinking: { type: "adaptive", display: "omitted" },
     })
   })
 

@@ -32,8 +32,9 @@ export const AgentOverrideConfigSchema = z.object({
   /** Extended thinking configuration (Anthropic). Overrides category and default settings. */
   thinking: z
     .object({
-      type: z.enum(["enabled", "disabled"]),
+      type: z.enum(["enabled", "disabled", "adaptive"]),
       budgetTokens: z.number().optional(),
+      display: z.enum(["summarized", "omitted"]).optional(),
     })
     .optional(),
   /** Reasoning effort level (OpenAI). Overrides category and default settings. */

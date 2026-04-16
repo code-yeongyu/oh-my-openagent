@@ -12,8 +12,9 @@ export const CategoryConfigSchema = z.object({
   maxTokens: z.number().optional(),
   thinking: z
     .object({
-      type: z.enum(["enabled", "disabled"]),
+      type: z.enum(["enabled", "disabled", "adaptive"]),
       budgetTokens: z.number().optional(),
+      display: z.enum(["summarized", "omitted"]).optional(),
     })
     .optional(),
   reasoningEffort: z.enum(["none", "minimal", "low", "medium", "high", "xhigh", "max"]).optional(),

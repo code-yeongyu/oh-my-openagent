@@ -5,7 +5,7 @@ type PromptParamModel = {
   top_p?: number
   reasoningEffort?: string
   maxTokens?: number
-  thinking?: { type: "enabled" | "disabled"; budgetTokens?: number }
+  thinking?: { type: "enabled" | "disabled" | "adaptive"; budgetTokens?: number; display?: "summarized" | "omitted" }
 }
 
 export function applySessionPromptParams(

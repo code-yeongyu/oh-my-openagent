@@ -8,7 +8,7 @@ export interface DelegatedModelConfig {
   temperature?: number
   top_p?: number
   maxTokens?: number
-  thinking?: { type: "enabled" | "disabled"; budgetTokens?: number }
+  thinking?: { type: "enabled" | "disabled" | "adaptive"; budgetTokens?: number; display?: "summarized" | "omitted" }
 }
 
 export type ModelResolutionRequest = {

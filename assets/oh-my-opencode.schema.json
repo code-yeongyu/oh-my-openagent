@@ -168,11 +168,19 @@
                             "type": "string",
                             "enum": [
                               "enabled",
-                              "disabled"
+                              "disabled",
+                              "adaptive"
                             ]
                           },
                           "budgetTokens": {
                             "type": "number"
+                          },
+                          "display": {
+                            "type": "string",
+                            "enum": [
+                              "summarized",
+                              "omitted"
+                            ]
                           }
                         },
                         "required": [
@@ -235,11 +243,19 @@
                                 "type": "string",
                                 "enum": [
                                   "enabled",
-                                  "disabled"
+                                  "disabled",
+                                  "adaptive"
                                 ]
                               },
                               "budgetTokens": {
                                 "type": "number"
+                              },
+                              "display": {
+                                "type": "string",
+                                "enum": [
+                                  "summarized",
+                                  "omitted"
+                                ]
                               }
                             },
                             "required": [
@@ -398,11 +414,19 @@
                   "type": "string",
                   "enum": [
                     "enabled",
-                    "disabled"
+                    "disabled",
+                    "adaptive"
                   ]
                 },
                 "budgetTokens": {
                   "type": "number"
+                },
+                "display": {
+                  "type": "string",
+                  "enum": [
+                    "summarized",
+                    "omitted"
+                  ]
                 }
               },
               "required": [
@@ -524,11 +548,19 @@
                             "type": "string",
                             "enum": [
                               "enabled",
-                              "disabled"
+                              "disabled",
+                              "adaptive"
                             ]
                           },
                           "budgetTokens": {
                             "type": "number"
+                          },
+                          "display": {
+                            "type": "string",
+                            "enum": [
+                              "summarized",
+                              "omitted"
+                            ]
                           }
                         },
                         "required": [
@@ -591,11 +623,19 @@
                                 "type": "string",
                                 "enum": [
                                   "enabled",
-                                  "disabled"
+                                  "disabled",
+                                  "adaptive"
                                 ]
                               },
                               "budgetTokens": {
                                 "type": "number"
+                              },
+                              "display": {
+                                "type": "string",
+                                "enum": [
+                                  "summarized",
+                                  "omitted"
+                                ]
                               }
                             },
                             "required": [
@@ -754,11 +794,19 @@
                   "type": "string",
                   "enum": [
                     "enabled",
-                    "disabled"
+                    "disabled",
+                    "adaptive"
                   ]
                 },
                 "budgetTokens": {
                   "type": "number"
+                },
+                "display": {
+                  "type": "string",
+                  "enum": [
+                    "summarized",
+                    "omitted"
+                  ]
                 }
               },
               "required": [
@@ -880,11 +928,19 @@
                             "type": "string",
                             "enum": [
                               "enabled",
-                              "disabled"
+                              "disabled",
+                              "adaptive"
                             ]
                           },
                           "budgetTokens": {
                             "type": "number"
+                          },
+                          "display": {
+                            "type": "string",
+                            "enum": [
+                              "summarized",
+                              "omitted"
+                            ]
                           }
                         },
                         "required": [
@@ -947,11 +1003,19 @@
                                 "type": "string",
                                 "enum": [
                                   "enabled",
-                                  "disabled"
+                                  "disabled",
+                                  "adaptive"
                                 ]
                               },
                               "budgetTokens": {
                                 "type": "number"
+                              },
+                              "display": {
+                                "type": "string",
+                                "enum": [
+                                  "summarized",
+                                  "omitted"
+                                ]
                               }
                             },
                             "required": [
@@ -1110,11 +1174,19 @@
                   "type": "string",
                   "enum": [
                     "enabled",
-                    "disabled"
+                    "disabled",
+                    "adaptive"
                   ]
                 },
                 "budgetTokens": {
                   "type": "number"
+                },
+                "display": {
+                  "type": "string",
+                  "enum": [
+                    "summarized",
+                    "omitted"
+                  ]
                 }
               },
               "required": [
@@ -1236,11 +1308,19 @@
                             "type": "string",
                             "enum": [
                               "enabled",
-                              "disabled"
+                              "disabled",
+                              "adaptive"
                             ]
                           },
                           "budgetTokens": {
                             "type": "number"
+                          },
+                          "display": {
+                            "type": "string",
+                            "enum": [
+                              "summarized",
+                              "omitted"
+                            ]
                           }
                         },
                         "required": [
@@ -1303,11 +1383,19 @@
                                 "type": "string",
                                 "enum": [
                                   "enabled",
-                                  "disabled"
+                                  "disabled",
+                                  "adaptive"
                                 ]
                               },
                               "budgetTokens": {
                                 "type": "number"
+                              },
+                              "display": {
+                                "type": "string",
+                                "enum": [
+                                  "summarized",
+                                  "omitted"
+                                ]
                               }
                             },
                             "required": [
@@ -1466,11 +1554,19 @@
                   "type": "string",
                   "enum": [
                     "enabled",
-                    "disabled"
+                    "disabled",
+                    "adaptive"
                   ]
                 },
                 "budgetTokens": {
                   "type": "number"
+                },
+                "display": {
+                  "type": "string",
+                  "enum": [
+                    "summarized",
+                    "omitted"
+                  ]
                 }
               },
               "required": [
@@ -1595,11 +1691,19 @@
                             "type": "string",
                             "enum": [
                               "enabled",
-                              "disabled"
+                              "disabled",
+                              "adaptive"
                             ]
                           },
                           "budgetTokens": {
                             "type": "number"
+                          },
+                          "display": {
+                            "type": "string",
+                            "enum": [
+                              "summarized",
+                              "omitted"
+                            ]
                           }
                         },
                         "required": [
@@ -1662,11 +1766,19 @@
                                 "type": "string",
                                 "enum": [
                                   "enabled",
-                                  "disabled"
+                                  "disabled",
+                                  "adaptive"
                                 ]
                               },
                               "budgetTokens": {
                                 "type": "number"
+                              },
+                              "display": {
+                                "type": "string",
+                                "enum": [
+                                  "summarized",
+                                  "omitted"
+                                ]
                               }
                             },
                             "required": [
@@ -1825,11 +1937,19 @@
                   "type": "string",
                   "enum": [
                     "enabled",
-                    "disabled"
+                    "disabled",
+                    "adaptive"
                   ]
                 },
                 "budgetTokens": {
                   "type": "number"
+                },
+                "display": {
+                  "type": "string",
+                  "enum": [
+                    "summarized",
+                    "omitted"
+                  ]
                 }
               },
               "required": [
@@ -1951,11 +2071,19 @@
                             "type": "string",
                             "enum": [
                               "enabled",
-                              "disabled"
+                              "disabled",
+                              "adaptive"
                             ]
                           },
                           "budgetTokens": {
                             "type": "number"
+                          },
+                          "display": {
+                            "type": "string",
+                            "enum": [
+                              "summarized",
+                              "omitted"
+                            ]
                           }
                         },
                         "required": [
@@ -2018,11 +2146,19 @@
                                 "type": "string",
                                 "enum": [
                                   "enabled",
-                                  "disabled"
+                                  "disabled",
+                                  "adaptive"
                                 ]
                               },
                               "budgetTokens": {
                                 "type": "number"
+                              },
+                              "display": {
+                                "type": "string",
+                                "enum": [
+                                  "summarized",
+                                  "omitted"
+                                ]
                               }
                             },
                             "required": [
@@ -2181,11 +2317,19 @@
                   "type": "string",
                   "enum": [
                     "enabled",
-                    "disabled"
+                    "disabled",
+                    "adaptive"
                   ]
                 },
                 "budgetTokens": {
                   "type": "number"
+                },
+                "display": {
+                  "type": "string",
+                  "enum": [
+                    "summarized",
+                    "omitted"
+                  ]
                 }
               },
               "required": [
@@ -2307,11 +2451,19 @@
                             "type": "string",
                             "enum": [
                               "enabled",
-                              "disabled"
+                              "disabled",
+                              "adaptive"
                             ]
                           },
                           "budgetTokens": {
                             "type": "number"
+                          },
+                          "display": {
+                            "type": "string",
+                            "enum": [
+                              "summarized",
+                              "omitted"
+                            ]
                           }
                         },
                         "required": [
@@ -2374,11 +2526,19 @@
                                 "type": "string",
                                 "enum": [
                                   "enabled",
-                                  "disabled"
+                                  "disabled",
+                                  "adaptive"
                                 ]
                               },
                               "budgetTokens": {
                                 "type": "number"
+                              },
+                              "display": {
+                                "type": "string",
+                                "enum": [
+                                  "summarized",
+                                  "omitted"
+                                ]
                               }
                             },
                             "required": [
@@ -2537,11 +2697,19 @@
                   "type": "string",
                   "enum": [
                     "enabled",
-                    "disabled"
+                    "disabled",
+                    "adaptive"
                   ]
                 },
                 "budgetTokens": {
                   "type": "number"
+                },
+                "display": {
+                  "type": "string",
+                  "enum": [
+                    "summarized",
+                    "omitted"
+                  ]
                 }
               },
               "required": [
@@ -2663,11 +2831,19 @@
                             "type": "string",
                             "enum": [
                               "enabled",
-                              "disabled"
+                              "disabled",
+                              "adaptive"
                             ]
                           },
                           "budgetTokens": {
                             "type": "number"
+                          },
+                          "display": {
+                            "type": "string",
+                            "enum": [
+                              "summarized",
+                              "omitted"
+                            ]
                           }
                         },
                         "required": [
@@ -2730,11 +2906,19 @@
                                 "type": "string",
                                 "enum": [
                                   "enabled",
-                                  "disabled"
+                                  "disabled",
+                                  "adaptive"
                                 ]
                               },
                               "budgetTokens": {
                                 "type": "number"
+                              },
+                              "display": {
+                                "type": "string",
+                                "enum": [
+                                  "summarized",
+                                  "omitted"
+                                ]
                               }
                             },
                             "required": [
@@ -2893,11 +3077,19 @@
                   "type": "string",
                   "enum": [
                     "enabled",
-                    "disabled"
+                    "disabled",
+                    "adaptive"
                   ]
                 },
                 "budgetTokens": {
                   "type": "number"
+                },
+                "display": {
+                  "type": "string",
+                  "enum": [
+                    "summarized",
+                    "omitted"
+                  ]
                 }
               },
               "required": [
@@ -3019,11 +3211,19 @@
                             "type": "string",
                             "enum": [
                               "enabled",
-                              "disabled"
+                              "disabled",
+                              "adaptive"
                             ]
                           },
                           "budgetTokens": {
                             "type": "number"
+                          },
+                          "display": {
+                            "type": "string",
+                            "enum": [
+                              "summarized",
+                              "omitted"
+                            ]
                           }
                         },
                         "required": [
@@ -3086,11 +3286,19 @@
                                 "type": "string",
                                 "enum": [
                                   "enabled",
-                                  "disabled"
+                                  "disabled",
+                                  "adaptive"
                                 ]
                               },
                               "budgetTokens": {
                                 "type": "number"
+                              },
+                              "display": {
+                                "type": "string",
+                                "enum": [
+                                  "summarized",
+                                  "omitted"
+                                ]
                               }
                             },
                             "required": [
@@ -3249,11 +3457,19 @@
                   "type": "string",
                   "enum": [
                     "enabled",
-                    "disabled"
+                    "disabled",
+                    "adaptive"
                   ]
                 },
                 "budgetTokens": {
                   "type": "number"
+                },
+                "display": {
+                  "type": "string",
+                  "enum": [
+                    "summarized",
+                    "omitted"
+                  ]
                 }
               },
               "required": [
@@ -3375,11 +3591,19 @@
                             "type": "string",
                             "enum": [
                               "enabled",
-                              "disabled"
+                              "disabled",
+                              "adaptive"
                             ]
                           },
                           "budgetTokens": {
                             "type": "number"
+                          },
+                          "display": {
+                            "type": "string",
+                            "enum": [
+                              "summarized",
+                              "omitted"
+                            ]
                           }
                         },
                         "required": [
@@ -3442,11 +3666,19 @@
                                 "type": "string",
                                 "enum": [
                                   "enabled",
-                                  "disabled"
+                                  "disabled",
+                                  "adaptive"
                                 ]
                               },
                               "budgetTokens": {
                                 "type": "number"
+                              },
+                              "display": {
+                                "type": "string",
+                                "enum": [
+                                  "summarized",
+                                  "omitted"
+                                ]
                               }
                             },
                             "required": [
@@ -3605,11 +3837,19 @@
                   "type": "string",
                   "enum": [
                     "enabled",
-                    "disabled"
+                    "disabled",
+                    "adaptive"
                   ]
                 },
                 "budgetTokens": {
                   "type": "number"
+                },
+                "display": {
+                  "type": "string",
+                  "enum": [
+                    "summarized",
+                    "omitted"
+                  ]
                 }
               },
               "required": [
@@ -3731,11 +3971,19 @@
                             "type": "string",
                             "enum": [
                               "enabled",
-                              "disabled"
+                              "disabled",
+                              "adaptive"
                             ]
                           },
                           "budgetTokens": {
                             "type": "number"
+                          },
+                          "display": {
+                            "type": "string",
+                            "enum": [
+                              "summarized",
+                              "omitted"
+                            ]
                           }
                         },
                         "required": [
@@ -3798,11 +4046,19 @@
                                 "type": "string",
                                 "enum": [
                                   "enabled",
-                                  "disabled"
+                                  "disabled",
+                                  "adaptive"
                                 ]
                               },
                               "budgetTokens": {
                                 "type": "number"
+                              },
+                              "display": {
+                                "type": "string",
+                                "enum": [
+                                  "summarized",
+                                  "omitted"
+                                ]
                               }
                             },
                             "required": [
@@ -3961,11 +4217,19 @@
                   "type": "string",
                   "enum": [
                     "enabled",
-                    "disabled"
+                    "disabled",
+                    "adaptive"
                   ]
                 },
                 "budgetTokens": {
                   "type": "number"
+                },
+                "display": {
+                  "type": "string",
+                  "enum": [
+                    "summarized",
+                    "omitted"
+                  ]
                 }
               },
               "required": [
@@ -4087,11 +4351,19 @@
                             "type": "string",
                             "enum": [
                               "enabled",
-                              "disabled"
+                              "disabled",
+                              "adaptive"
                             ]
                           },
                           "budgetTokens": {
                             "type": "number"
+                          },
+                          "display": {
+                            "type": "string",
+                            "enum": [
+                              "summarized",
+                              "omitted"
+                            ]
                           }
                         },
                         "required": [
@@ -4154,11 +4426,19 @@
                                 "type": "string",
                                 "enum": [
                                   "enabled",
-                                  "disabled"
+                                  "disabled",
+                                  "adaptive"
                                 ]
                               },
                               "budgetTokens": {
                                 "type": "number"
+                              },
+                              "display": {
+                                "type": "string",
+                                "enum": [
+                                  "summarized",
+                                  "omitted"
+                                ]
                               }
                             },
                             "required": [
@@ -4317,11 +4597,19 @@
                   "type": "string",
                   "enum": [
                     "enabled",
-                    "disabled"
+                    "disabled",
+                    "adaptive"
                   ]
                 },
                 "budgetTokens": {
                   "type": "number"
+                },
+                "display": {
+                  "type": "string",
+                  "enum": [
+                    "summarized",
+                    "omitted"
+                  ]
                 }
               },
               "required": [
@@ -4443,11 +4731,19 @@
                             "type": "string",
                             "enum": [
                               "enabled",
-                              "disabled"
+                              "disabled",
+                              "adaptive"
                             ]
                           },
                           "budgetTokens": {
                             "type": "number"
+                          },
+                          "display": {
+                            "type": "string",
+                            "enum": [
+                              "summarized",
+                              "omitted"
+                            ]
                           }
                         },
                         "required": [
@@ -4510,11 +4806,19 @@
                                 "type": "string",
                                 "enum": [
                                   "enabled",
-                                  "disabled"
+                                  "disabled",
+                                  "adaptive"
                                 ]
                               },
                               "budgetTokens": {
                                 "type": "number"
+                              },
+                              "display": {
+                                "type": "string",
+                                "enum": [
+                                  "summarized",
+                                  "omitted"
+                                ]
                               }
                             },
                             "required": [
@@ -4673,11 +4977,19 @@
                   "type": "string",
                   "enum": [
                     "enabled",
-                    "disabled"
+                    "disabled",
+                    "adaptive"
                   ]
                 },
                 "budgetTokens": {
                   "type": "number"
+                },
+                "display": {
+                  "type": "string",
+                  "enum": [
+                    "summarized",
+                    "omitted"
+                  ]
                 }
               },
               "required": [
@@ -4799,11 +5111,19 @@
                             "type": "string",
                             "enum": [
                               "enabled",
-                              "disabled"
+                              "disabled",
+                              "adaptive"
                             ]
                           },
                           "budgetTokens": {
                             "type": "number"
+                          },
+                          "display": {
+                            "type": "string",
+                            "enum": [
+                              "summarized",
+                              "omitted"
+                            ]
                           }
                         },
                         "required": [
@@ -4866,11 +5186,19 @@
                                 "type": "string",
                                 "enum": [
                                   "enabled",
-                                  "disabled"
+                                  "disabled",
+                                  "adaptive"
                                 ]
                               },
                               "budgetTokens": {
                                 "type": "number"
+                              },
+                              "display": {
+                                "type": "string",
+                                "enum": [
+                                  "summarized",
+                                  "omitted"
+                                ]
                               }
                             },
                             "required": [
@@ -5029,11 +5357,19 @@
                   "type": "string",
                   "enum": [
                     "enabled",
-                    "disabled"
+                    "disabled",
+                    "adaptive"
                   ]
                 },
                 "budgetTokens": {
                   "type": "number"
+                },
+                "display": {
+                  "type": "string",
+                  "enum": [
+                    "summarized",
+                    "omitted"
+                  ]
                 }
               },
               "required": [
@@ -5156,11 +5492,19 @@
                           "type": "string",
                           "enum": [
                             "enabled",
-                            "disabled"
+                            "disabled",
+                            "adaptive"
                           ]
                         },
                         "budgetTokens": {
                           "type": "number"
+                        },
+                        "display": {
+                          "type": "string",
+                          "enum": [
+                            "summarized",
+                            "omitted"
+                          ]
                         }
                       },
                       "required": [
@@ -5223,11 +5567,19 @@
                               "type": "string",
                               "enum": [
                                 "enabled",
-                                "disabled"
+                                "disabled",
+                                "adaptive"
                               ]
                             },
                             "budgetTokens": {
                               "type": "number"
+                            },
+                            "display": {
+                              "type": "string",
+                              "enum": [
+                                "summarized",
+                                "omitted"
+                              ]
                             }
                           },
                           "required": [
@@ -5386,11 +5738,19 @@
                 "type": "string",
                 "enum": [
                   "enabled",
-                  "disabled"
+                  "disabled",
+                  "adaptive"
                 ]
               },
               "budgetTokens": {
                 "type": "number"
+              },
+              "display": {
+                "type": "string",
+                "enum": [
+                  "summarized",
+                  "omitted"
+                ]
               }
             },
             "required": [
@@ -5521,11 +5881,19 @@
                           "type": "string",
                           "enum": [
                             "enabled",
-                            "disabled"
+                            "disabled",
+                            "adaptive"
                           ]
                         },
                         "budgetTokens": {
                           "type": "number"
+                        },
+                        "display": {
+                          "type": "string",
+                          "enum": [
+                            "summarized",
+                            "omitted"
+                          ]
                         }
                       },
                       "required": [
@@ -5588,11 +5956,19 @@
                               "type": "string",
                               "enum": [
                                 "enabled",
-                                "disabled"
+                                "disabled",
+                                "adaptive"
                               ]
                             },
                             "budgetTokens": {
                               "type": "number"
+                            },
+                            "display": {
+                              "type": "string",
+                              "enum": [
+                                "summarized",
+                                "omitted"
+                              ]
                             }
                           },
                           "required": [
@@ -5634,11 +6010,19 @@
                 "type": "string",
                 "enum": [
                   "enabled",
-                  "disabled"
+                  "disabled",
+                  "adaptive"
                 ]
               },
               "budgetTokens": {
                 "type": "number"
+              },
+              "display": {
+                "type": "string",
+                "enum": [
+                  "summarized",
+                  "omitted"
+                ]
               }
             },
             "required": [

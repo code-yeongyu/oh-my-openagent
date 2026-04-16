@@ -16,7 +16,7 @@ type PrometheusOverride = Record<string, unknown> & {
   variant?: string;
   reasoningEffort?: string;
   textVerbosity?: string;
-  thinking?: { type: string; budgetTokens?: number };
+  thinking?: { type: string; budgetTokens?: number; display?: string };
   temperature?: number;
   top_p?: number;
   maxTokens?: number;
