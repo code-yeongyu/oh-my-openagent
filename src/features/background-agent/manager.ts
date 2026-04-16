@@ -433,6 +433,9 @@ export class BackgroundManager {
             await this.abortSessionWithLogging(item.task.sessionID, "startTask error cleanup")
           }
 
+          // Update continuation marker for CLI run mode
+          this.updateBackgroundTaskMarker(item.task.parentSessionID)
+
           this.markForNotification(item.task)
           this.enqueueNotificationForParent(item.task.parentSessionID, () => this.notifyParentSession(item.task)).catch(err => {
             log("[background-agent] Failed to notify on startTask error:", err)
@@ -1329,6 +1332,11 @@ export class BackgroundManager {
       SessionCategoryRegistry.remove(task.sessionID)
     }
 
+    // Update continuation marker for CLI run mode
+    if (task.parentSessionID) {
+      this.updateBackgroundTaskMarker(task.parentSessionID)
+    }
+
     this.markForNotification(task)
     this.enqueueNotificationForParent(task.parentSessionID, () => this.notifyParentSession(task)).catch(err => {
       log("[background-agent] Error in notifyParentSession for errored task:", { taskId: task.id, error: err })
@@ -1964,6 +1972,10 @@ export class BackgroundManager {
           }
         }
         this.cleanupPendingByParent(task)
+        // Update continuation marker for CLI run mode
+        if (task.parentSessionID) {
+          this.updateBackgroundTaskMarker(task.parentSessionID)
+        }
         this.markForNotification(task)
         this.enqueueNotificationForParent(task.parentSessionID, () => this.notifyParentSession(task)).catch(err => {
           log("[background-agent] Error in notifyParentSession for stale-pruned task:", { taskId: task.id, error: err })
