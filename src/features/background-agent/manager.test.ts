@@ -2327,7 +2327,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       await expect(result).rejects.toThrow("background_task.maxDepth=3")
     })
 
-    test("should ignore legacy maxDescendants config when launching multiple descendants", async () => {
+    test("allows multiple descendants without a root spawn cap", async () => {
       // given
       manager.shutdown()
       manager = new BackgroundManager(
@@ -2337,7 +2337,6 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
           }),
           directory: tmpdir(),
         } as unknown as PluginInput,
-        { maxDescendants: 1 },
       )
 
       const input = {
@@ -2357,7 +2356,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       await expect(result).resolves.toBeDefined()
     })
 
-    test("should allow spawn assertions after reserveSubagentSpawn even with legacy maxDescendants config", async () => {
+    test("allows spawn assertions after reserveSubagentSpawn without a root spawn cap", async () => {
       // given
       manager.shutdown()
       manager = new BackgroundManager(
@@ -2367,7 +2366,6 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
           }),
           directory: tmpdir(),
         } as unknown as PluginInput,
-        { maxDescendants: 1 },
       )
 
       await manager.reserveSubagentSpawn("session-root")
@@ -2395,7 +2393,6 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
           ),
           directory: tmpdir(),
         } as unknown as PluginInput,
-        { maxDescendants: 1 },
       )
 
       const input = {
@@ -2413,7 +2410,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       await expect(result).rejects.toThrow("background_task.maxDepth cannot be enforced safely")
     })
 
-    test("should release descendant quota when queued task is cancelled before session starts", async () => {
+    test("allows replacement launch when a queued task is cancelled before session starts", async () => {
       // given
       manager.shutdown()
       manager = new BackgroundManager(
@@ -2423,7 +2420,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
           }),
           directory: tmpdir(),
         } as unknown as PluginInput,
-        { defaultConcurrency: 1, maxDescendants: 2 },
+        { defaultConcurrency: 1 },
       )
 
       const input = {
@@ -2448,7 +2445,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       expect(replacementTask.status).toBe("pending")
     })
 
-    test("should release descendant quota when session creation fails before session starts", async () => {
+    test("allows retry after session creation fails before session starts", async () => {
       // given
       let createAttempts = 0
       manager.shutdown()
@@ -2475,7 +2472,6 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
           },
           directory: tmpdir(),
         } as unknown as PluginInput,
-        { maxDescendants: 1 },
       )
 
       const input = {
@@ -2890,7 +2886,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       }
     })
 
-    test("should release descendant quota when task completes", async () => {
+    test("allows relaunch after task completes", async () => {
       manager.shutdown()
       manager = new BackgroundManager(
         {
@@ -2899,7 +2895,6 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
           }),
           directory: tmpdir(),
         } as unknown as PluginInput,
-        { maxDescendants: 1 },
       )
       stubNotifyParentSession(manager)
 
@@ -2923,7 +2918,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       await expect(manager.launch(input)).resolves.toBeDefined()
     })
 
-    test("should release descendant quota when running task is cancelled", async () => {
+    test("allows relaunch after running task is cancelled", async () => {
       manager.shutdown()
       manager = new BackgroundManager(
         {
@@ -2932,7 +2927,6 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
           }),
           directory: tmpdir(),
         } as unknown as PluginInput,
-        { maxDescendants: 1 },
       )
 
       const input = {
@@ -2953,7 +2947,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       await expect(manager.launch(input)).resolves.toBeDefined()
     })
 
-    test("should release descendant quota when task errors", async () => {
+    test("allows relaunch after task errors", async () => {
       manager.shutdown()
       manager = new BackgroundManager(
         {
@@ -2962,7 +2956,6 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
           }),
           directory: tmpdir(),
         } as unknown as PluginInput,
-        { maxDescendants: 1 },
       )
 
       const input = {
@@ -2987,7 +2980,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       await expect(manager.launch(input)).resolves.toBeDefined()
     })
 
-    test("should not double-decrement quota when pending task is cancelled", async () => {
+    test("allows repeated relaunch after pending tasks are cancelled", async () => {
       manager.shutdown()
       manager = new BackgroundManager(
         {
@@ -2996,7 +2989,6 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
           }),
           directory: tmpdir(),
         } as unknown as PluginInput,
-        { maxDescendants: 2 },
       )
 
       const input = {

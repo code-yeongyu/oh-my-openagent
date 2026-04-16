@@ -5673,11 +5673,6 @@
           "minimum": 1,
           "maximum": 9007199254740991
         },
-        "maxDescendants": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 9007199254740991
-        },
         "staleTimeoutMs": {
           "type": "number",
           "minimum": 60000
