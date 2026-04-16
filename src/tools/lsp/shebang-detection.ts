@@ -1,4 +1,4 @@
-import { readFileSync } from "fs"
+import { readFileSync, statSync } from "fs"
 
 export const SHEBANG_TO_LANG: Record<string, string> = {
   node: "javascript",
@@ -35,7 +35,12 @@ export const SHEBANG_TO_LANG: Record<string, string> = {
   sed: "sed",
 }
 
-const shebangCache = new Map<string, string | null>()
+interface CacheEntry {
+  language: string | null
+  mtime: number
+}
+
+const shebangCache = new Map<string, CacheEntry>()
 const MAX_CACHE_SIZE = 1000
 
 export function parseShebang(shebangLine: string): string | null {
@@ -55,7 +60,10 @@ export function parseShebang(shebangLine: string): string | null {
   }
 
   const parts = command.split("/")
-  const interpreter = parts[parts.length - 1]
+  const interpreterWithArgs = parts[parts.length - 1]
+
+  // Handle interpreter arguments like "bash -e" -> "bash"
+  const interpreter = interpreterWithArgs.split(/\s+/)[0]
 
   const baseName = interpreter.replace(/\.\d+$/, "")
 
@@ -63,37 +71,42 @@ export function parseShebang(shebangLine: string): string | null {
 }
 
 export function detectShebangLanguage(filePath: string): string | null {
-  const cached = shebangCache.get(filePath)
-  if (cached !== undefined) {
-    return cached
-  }
-
   try {
+    const stats = statSync(filePath)
+    const cached = shebangCache.get(filePath)
+
+    // Check cache validity using mtime
+    if (cached !== undefined && cached.mtime === stats.mtimeMs) {
+      // Refresh recency: delete and re-set to mark as most recently used
+      shebangCache.delete(filePath)
+      shebangCache.set(filePath, cached)
+      return cached.language
+    }
+
     const buffer = readFileSync(filePath, { encoding: "utf-8", flag: "r" })
     const firstLine = buffer.split(/\r?\n/)[0]
 
     if (!firstLine || !firstLine.startsWith("#!")) {
-      setCache(filePath, null)
+      setCache(filePath, null, stats.mtimeMs)
       return null
     }
 
     const interpreter = parseShebang(firstLine)
     if (!interpreter) {
-      setCache(filePath, null)
+      setCache(filePath, null, stats.mtimeMs)
       return null
     }
 
     const lang = SHEBANG_TO_LANG[interpreter] || SHEBANG_TO_LANG[interpreter.toLowerCase()]
 
-    setCache(filePath, lang || null)
+    setCache(filePath, lang || null, stats.mtimeMs)
     return lang || null
   } catch {
-    setCache(filePath, null)
     return null
   }
 }
 
-function setCache(key: string, value: string | null): void {
+function setCache(key: string, value: string | null, mtime: number): void {
   if (shebangCache.size >= MAX_CACHE_SIZE) {
     const entries = Array.from(shebangCache.entries())
     const half = Math.floor(entries.length / 2)
@@ -103,7 +116,7 @@ function setCache(key: string, value: string | null): void {
     }
   }
 
-  shebangCache.set(key, value)
+  shebangCache.set(key, { language: value, mtime })
 }
 
 export function clearShebangCache(): void {
@@ -112,4 +125,8 @@ export function clearShebangCache(): void {
 
 export function getShebangCacheSize(): number {
   return shebangCache.size
+}
+
+export function getShebangCacheEntry(filePath: string): CacheEntry | undefined {
+  return shebangCache.get(filePath)
 }

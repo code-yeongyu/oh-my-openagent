@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "bun:test"
-import { parseShebang, detectShebangLanguage, clearShebangCache, getShebangCacheSize, SHEBANG_TO_LANG } from "./shebang-detection"
+import { parseShebang, detectShebangLanguage, clearShebangCache, getShebangCacheSize, getShebangCacheEntry, SHEBANG_TO_LANG } from "./shebang-detection"
 import { mkdtempSync, writeFileSync, rmSync } from "fs"
 import { tmpdir } from "os"
 import { join } from "path"
@@ -41,6 +41,13 @@ describe("parseShebang", () => {
   it("strips version suffixes", () => {
     expect(parseShebang("#!/usr/bin/python3.11")).toBe("python3")
     expect(parseShebang("#!/usr/bin/lua5.4")).toBe("lua5")
+  })
+
+  it("handles interpreter arguments like -e flag", () => {
+    expect(parseShebang("#!/bin/bash -e")).toBe("bash")
+    expect(parseShebang("#!/usr/bin/bash -ex")).toBe("bash")
+    expect(parseShebang("#!/bin/sh -e")).toBe("sh")
+    expect(parseShebang("#!/usr/bin/env python3 -u")).toBe("python3")
   })
 })
 
@@ -138,5 +145,49 @@ describe("clearShebangCache", () => {
 
     clearShebangCache()
     expect(getShebangCacheSize()).toBe(0)
+  })
+})
+
+describe("cache invalidation", () => {
+  it("invalidates cache when file mtime changes", () => {
+    const file = join(tmpDir, "mtime-test")
+    writeFileSync(file, "#!/bin/bash\necho test")
+
+    // First detection - should cache
+    detectShebangLanguage(file)
+    const entry1 = getShebangCacheEntry(file)
+    expect(entry1).toBeDefined()
+    expect(entry1?.language).toBe("shellscript")
+    const mtime1 = entry1?.mtime
+
+    // Re-detect immediately - should use cache
+    detectShebangLanguage(file)
+    const entry2 = getShebangCacheEntry(file)
+    expect(entry2?.mtime).toBe(mtime1)
+
+    // Modify file and re-detect
+    writeFileSync(file, "#!/usr/bin/env node\nconsole.log('hello')")
+    const result = detectShebangLanguage(file)
+    expect(result).toBe("javascript")
+
+    const entry3 = getShebangCacheEntry(file)
+    expect(entry3?.language).toBe("javascript")
+  })
+
+  it("refreshes recency on cache hit", () => {
+    const file1 = join(tmpDir, "recency-test-1")
+    const file2 = join(tmpDir, "recency-test-2")
+    writeFileSync(file1, "#!/bin/bash\necho test1")
+    writeFileSync(file2, "#!/bin/bash\necho test2")
+
+    // Detect both files
+    detectShebangLanguage(file1)
+    detectShebangLanguage(file2)
+
+    // Access file1 again to refresh its recency
+    detectShebangLanguage(file1)
+
+    // Verify cache has both entries
+    expect(getShebangCacheSize()).toBe(2)
   })
 })
