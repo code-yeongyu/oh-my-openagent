@@ -11,6 +11,7 @@ import { formatDetailedError } from "./error-formatting"
 import { syncTaskDeps, type SyncTaskDeps } from "./sync-task-deps"
 import { setSessionFallbackChain, clearSessionFallbackChain } from "../../hooks/model-fallback/hook"
 import { retrySyncPromptWithFallbacks } from "./sync-task-fallback"
+import { buildTaskMetadataBlock } from "../../features/tool-metadata-store/task-metadata-contract"
 
 export async function executeSyncTask(
   args: DelegateTaskArgs,
@@ -122,6 +123,7 @@ export async function executeSyncTask(
         load_skills: args.load_skills,
         description: args.description,
         run_in_background: args.run_in_background,
+        taskId: sessionID,
         sessionId: sessionID,
         sync: true,
         spawnDepth: spawnContext.childDepth,
@@ -210,9 +212,12 @@ Agent: ${agentToUse}${args.category ? ` (category: ${args.category})` : ""}${mod
 
 ${result.textContent || "(No text output)"}
 
-<task_metadata>
-session_id: ${sessionID}
-</task_metadata>`
+${buildTaskMetadataBlock({
+        sessionId: sessionID,
+        taskId: sessionID,
+        agent: agentToUse,
+        category: args.category,
+      })}`
     } finally {
       if (toastManager && taskId !== undefined) {
         toastManager.removeTask(taskId)

@@ -161,6 +161,23 @@ describe("createToolExecuteBeforeHandler", () => {
       expect(output.args.subagent_type).toBe("explore")
     })
 
+    test("normalizes task_id into the canonical resume argument", async () => {
+      //#given
+      const ctx = createCtxWithSessionMessages([
+        { info: { role: "assistant", agent: "oracle" } },
+      ])
+      const handler = createToolExecuteBeforeHandler({ ctx, hooks: emptyHooks })
+      const input = { tool: "task", sessionID: "ses_123", callID: "call_1" }
+      const output = { args: { task_id: "ses_resume_123", description: "Continue task", prompt: "fix it" } as Record<string, unknown> }
+
+      //#when
+      await handler(input, output)
+
+      //#then
+      expect(output.args.task_id).toBe("ses_resume_123")
+      expect(output.args.subagent_type).toBe("oracle")
+    })
+
     test("falls back to 'continue' when session has no agent info", async () => {
       //#given
       const ctx = createCtxWithSessionMessages([

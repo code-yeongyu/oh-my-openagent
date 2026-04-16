@@ -18,7 +18,7 @@ describe("buildTaskMetadataBlock", () => {
     // given
     const link = {
       sessionId: "ses_bg_123",
-      taskId: "bg_123",
+      taskId: "ses_bg_123",
       backgroundTaskId: "bg_123",
       agent: "explore",
       category: "quick",
@@ -29,7 +29,7 @@ describe("buildTaskMetadataBlock", () => {
 
     // then
     expect(block).toBe(
-      "<task_metadata>\nsession_id: ses_bg_123\ntask_id: bg_123\nbackground_task_id: bg_123\nsubagent: explore\ncategory: quick\n</task_metadata>"
+      "<task_metadata>\nsession_id: ses_bg_123\ntask_id: ses_bg_123\nbackground_task_id: bg_123\nsubagent: explore\ncategory: quick\n</task_metadata>"
     )
   })
 })

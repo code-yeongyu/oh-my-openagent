@@ -12,12 +12,13 @@ export function createTaskResumeInfoHook() {
     if (outputText.startsWith("Error:") || outputText.startsWith("Failed")) return
     if (outputText.includes("\nto continue:")) return
 
-    const sessionId = extractTaskLink(output.metadata, outputText).sessionId
-    if (!sessionId) return
+    const link = extractTaskLink(output.metadata, outputText)
+    const taskId = link.taskId ?? link.sessionId
+    if (!taskId) return
 
     output.output =
       outputText.trimEnd() +
-      `\n\nto continue: task(session_id="${sessionId}", load_skills=[], run_in_background=false, prompt="...")`
+      `\n\nto continue: task(task_id="${taskId}", load_skills=[], run_in_background=false, prompt="...")`
   }
 
   return {
