@@ -8,6 +8,11 @@ import {
   type Platform,
 } from "./session-notification-sender"
 import * as sessionNotificationSender from "./session-notification-sender"
+import {
+  getEventToolName,
+  getQuestionText,
+  getSessionID,
+} from "./session-notification-event-properties"
 import { hasIncompleteTodos } from "./session-todo-status"
 import { createIdleNotificationScheduler } from "./session-notification-scheduler"
 
@@ -85,23 +90,6 @@ export function createSessionNotification(
   const PERMISSION_EVENTS = new Set(["permission.ask", "permission.asked", "permission.updated", "permission.requested"])
   const PERMISSION_HINT_PATTERN = /\b(permission|approve|approval|allow|deny|consent)\b/i
 
-  const getSessionID = (properties: Record<string, unknown> | undefined): string | undefined => {
-    const sessionID = properties?.sessionID
-    if (typeof sessionID === "string" && sessionID.length > 0) return sessionID
-
-    const sessionId = properties?.sessionId
-    if (typeof sessionId === "string" && sessionId.length > 0) return sessionId
-
-    const info = properties?.info as Record<string, unknown> | undefined
-    const infoSessionID = info?.sessionID
-    if (typeof infoSessionID === "string" && infoSessionID.length > 0) return infoSessionID
-
-    const infoSessionId = info?.sessionId
-    if (typeof infoSessionId === "string" && infoSessionId.length > 0) return infoSessionId
-
-    return undefined
-  }
-
   const shouldNotifyForSession = (sessionID: string): boolean => {
     if (subagentSessions.has(sessionID)) return false
 
@@ -111,26 +99,6 @@ export function createSessionNotification(
     }
 
     return true
-  }
-
-  const getEventToolName = (properties: Record<string, unknown> | undefined): string | undefined => {
-    const tool = properties?.tool
-    if (typeof tool === "string" && tool.length > 0) return tool
-
-    const name = properties?.name
-    if (typeof name === "string" && name.length > 0) return name
-
-    return undefined
-  }
-
-  const getQuestionText = (properties: Record<string, unknown> | undefined): string => {
-    const args = properties?.args as Record<string, unknown> | undefined
-    const questions = args?.questions
-    if (!Array.isArray(questions) || questions.length === 0) return ""
-
-    const firstQuestion = questions[0] as Record<string, unknown> | undefined
-    const questionText = firstQuestion?.question
-    return typeof questionText === "string" ? questionText : ""
   }
 
   return async ({ event }: { event: { type: string; properties?: unknown } }) => {
