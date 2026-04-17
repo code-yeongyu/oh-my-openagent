@@ -283,6 +283,10 @@
             "description": {
               "type": "string"
             },
+            "display_name": {
+              "type": "string",
+              "minLength": 1
+            },
             "mode": {
               "type": "string",
               "enum": [
@@ -632,6 +636,10 @@
             },
             "description": {
               "type": "string"
+            },
+            "display_name": {
+              "type": "string",
+              "minLength": 1
             },
             "mode": {
               "type": "string",
@@ -983,6 +991,10 @@
             "description": {
               "type": "string"
             },
+            "display_name": {
+              "type": "string",
+              "minLength": 1
+            },
             "mode": {
               "type": "string",
               "enum": [
@@ -1332,6 +1344,10 @@
             },
             "description": {
               "type": "string"
+            },
+            "display_name": {
+              "type": "string",
+              "minLength": 1
             },
             "mode": {
               "type": "string",
@@ -1686,6 +1702,10 @@
             "description": {
               "type": "string"
             },
+            "display_name": {
+              "type": "string",
+              "minLength": 1
+            },
             "mode": {
               "type": "string",
               "enum": [
@@ -2035,6 +2055,10 @@
             },
             "description": {
               "type": "string"
+            },
+            "display_name": {
+              "type": "string",
+              "minLength": 1
             },
             "mode": {
               "type": "string",
@@ -2386,6 +2410,10 @@
             "description": {
               "type": "string"
             },
+            "display_name": {
+              "type": "string",
+              "minLength": 1
+            },
             "mode": {
               "type": "string",
               "enum": [
@@ -2735,6 +2763,10 @@
             },
             "description": {
               "type": "string"
+            },
+            "display_name": {
+              "type": "string",
+              "minLength": 1
             },
             "mode": {
               "type": "string",
@@ -3086,6 +3118,10 @@
             "description": {
               "type": "string"
             },
+            "display_name": {
+              "type": "string",
+              "minLength": 1
+            },
             "mode": {
               "type": "string",
               "enum": [
@@ -3435,6 +3471,10 @@
             },
             "description": {
               "type": "string"
+            },
+            "display_name": {
+              "type": "string",
+              "minLength": 1
             },
             "mode": {
               "type": "string",
@@ -3786,6 +3826,10 @@
             "description": {
               "type": "string"
             },
+            "display_name": {
+              "type": "string",
+              "minLength": 1
+            },
             "mode": {
               "type": "string",
               "enum": [
@@ -4135,6 +4179,10 @@
             },
             "description": {
               "type": "string"
+            },
+            "display_name": {
+              "type": "string",
+              "minLength": 1
             },
             "mode": {
               "type": "string",
@@ -4486,6 +4534,10 @@
             "description": {
               "type": "string"
             },
+            "display_name": {
+              "type": "string",
+              "minLength": 1
+            },
             "mode": {
               "type": "string",
               "enum": [
@@ -4836,6 +4888,10 @@
             "description": {
               "type": "string"
             },
+            "display_name": {
+              "type": "string",
+              "minLength": 1
+            },
             "mode": {
               "type": "string",
               "enum": [
@@ -5008,6 +5064,10 @@
         "properties": {
           "description": {
             "type": "string"
+          },
+          "display_name": {
+            "type": "string",
+            "minLength": 1
           },
           "model": {
             "type": "string"

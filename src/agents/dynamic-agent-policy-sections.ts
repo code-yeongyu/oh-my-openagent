@@ -3,6 +3,7 @@ import type {
   AvailableCategory,
   AvailableSkill,
 } from "./dynamic-agent-prompt-types"
+import { sanitizeDisplayNameForMarkdown } from "../shared/markdown-display-name"
 
 export function buildHardBlocksSection(): string {
   const blocks = [
@@ -63,8 +64,12 @@ export function buildUltraworkSection(
   if (categories.length > 0) {
     lines.push("**Categories** (for implementation tasks):")
     for (const category of categories) {
-      const shortDescription = category.description || category.name
-      lines.push(`- \`${category.name}\`: ${shortDescription}`)
+      const safeName = category.displayName ? sanitizeDisplayNameForMarkdown(category.displayName) : undefined
+      const shortDescription = category.description?.trim() || safeName || category.name
+      const categorySuffix = safeName && safeName !== category.name
+        ? ` (${safeName})`
+        : ""
+      lines.push(`- \`${category.name}\`${categorySuffix}: ${shortDescription}`)
     }
     lines.push("")
   }

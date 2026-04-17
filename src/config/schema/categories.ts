@@ -4,6 +4,8 @@ import { FallbackModelsSchema } from "./fallback-models"
 export const CategoryConfigSchema = z.object({
   /** Human-readable description of the category's purpose. Shown in task prompt. */
   description: z.string().optional(),
+  /** Custom display name shown in prompts and tool descriptions. Overrides the category key. */
+  display_name: z.string().trim().min(1).optional(),
   model: z.string().optional(),
   fallback_models: FallbackModelsSchema.optional(),
   variant: z.string().optional(),

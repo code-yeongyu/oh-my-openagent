@@ -3,6 +3,7 @@ import type { DelegateTaskArgs, DelegatedModelConfig, ToolContextWithMetadata, D
 import { CATEGORY_DESCRIPTIONS } from "./constants"
 import { SISYPHUS_JUNIOR_AGENT } from "./sisyphus-junior-agent"
 import { mergeCategories } from "../../shared/merge-categories"
+import { sanitizeDisplayNameForMarkdown } from "../../shared/markdown-display-name"
 import { log } from "../../shared/logger"
 import { buildSystemContent } from "./prompt-builder"
 import type {
@@ -37,20 +38,24 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
       const userDesc = userCategories?.[name]?.description
       const builtinDesc = CATEGORY_DESCRIPTIONS[name]
       const description = userDesc || builtinDesc || "General tasks"
+      const displayName = categoryConfig.display_name
       return {
         name,
         description,
         model: categoryConfig.model,
+        ...(displayName !== name && { displayName }),
       }
     })
 
   const availableSkills: AvailableSkill[] = options.availableSkills ?? []
 
-  const categoryList = categoryNames.map(name => {
-    const userDesc = userCategories?.[name]?.description
-    const builtinDesc = CATEGORY_DESCRIPTIONS[name]
-    const desc = userDesc || builtinDesc
-    return desc ? `  - ${name}: ${desc}` : `  - ${name}`
+  const categoryList = availableCategories.map(cat => {
+    const safeName = cat.displayName ? sanitizeDisplayNameForMarkdown(cat.displayName) : undefined
+    const suffix = safeName && safeName !== cat.name
+      ? ` (${safeName})`
+      : ""
+    const desc = cat.description
+    return desc ? `  - \`${cat.name}\`${suffix}: ${desc}` : `  - \`${cat.name}\`${suffix}`
   }).join("\n")
 
   const description = `Spawn agent task with category-based or direct agent selection.

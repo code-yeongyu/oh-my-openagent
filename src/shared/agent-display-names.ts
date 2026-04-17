@@ -9,6 +9,15 @@
  * header validation failures that prevent agents from appearing in the UI
  * type selector dropdown. Use ` - ` (space-dash-space) instead of `(...)`.
  */
+
+let agentDisplayNameOverrides: Record<string, string> = {}
+let cachedReverseMap: Record<string, string> | null = null
+
+export function setAgentDisplayNameOverrides(overrides: Record<string, string>): void {
+  agentDisplayNameOverrides = overrides
+  cachedReverseMap = null
+}
+
 export const AGENT_DISPLAY_NAMES: Record<string, string> = {
   sisyphus: "Sisyphus - Ultraworker",
   hephaestus: "Hephaestus - Deep Agent",
@@ -52,20 +61,28 @@ export function getAgentRuntimeName(configKey: string): string {
 
 /**
  * Get display name for an agent config key.
+ * Checks config overrides first, then hardcoded mappings.
  * Uses case-insensitive lookup for backward compatibility.
  * Returns original key if not found.
  */
 export function getAgentDisplayName(configKey: string): string {
-  // Try exact match first
+  const lowerKey = configKey.toLowerCase()
+
+  // Config overrides take highest priority
+  const overrideExact = agentDisplayNameOverrides[configKey]
+  if (overrideExact !== undefined) return overrideExact
+  const overrideLower = agentDisplayNameOverrides[lowerKey]
+  if (overrideLower !== undefined) return overrideLower
+
+  // Try exact match in hardcoded names
   const exactMatch = AGENT_DISPLAY_NAMES[configKey]
   if (exactMatch !== undefined) return exactMatch
-  
-  // Fall back to case-insensitive search
-  const lowerKey = configKey.toLowerCase()
+
+  // Fall back to case-insensitive search in hardcoded names
   for (const [k, v] of Object.entries(AGENT_DISPLAY_NAMES)) {
     if (k.toLowerCase() === lowerKey) return v
   }
-  
+
   // Unknown agent: return original key
   return configKey
 }
@@ -77,9 +94,17 @@ export function getAgentListDisplayName(configKey: string): string {
   return getAgentRuntimeName(configKey)
 }
 
-const REVERSE_DISPLAY_NAMES: Record<string, string> = Object.fromEntries(
-  Object.entries(AGENT_DISPLAY_NAMES).map(([key, displayName]) => [displayName.toLowerCase(), key]),
-)
+function buildReverseDisplayNames(): Record<string, string> {
+  if (cachedReverseMap) return cachedReverseMap
+  const base = Object.fromEntries(
+    Object.entries(AGENT_DISPLAY_NAMES).map(([key, displayName]) => [displayName.toLowerCase(), key]),
+  )
+  for (const [key, displayName] of Object.entries(agentDisplayNameOverrides)) {
+    base[displayName.toLowerCase()] = key.toLowerCase()
+  }
+  cachedReverseMap = base
+  return base
+}
 
 // Legacy parenthesized display names for backward compatibility.
 // Old configs/sessions may reference these names; resolve them to config keys.
@@ -96,7 +121,7 @@ const LEGACY_DISPLAY_NAMES: Record<string, string> = {
 
 function resolveKnownAgentConfigKey(agentName: string): string | undefined {
   const lower = stripAgentListSortPrefix(agentName).trim().toLowerCase()
-  const reversed = REVERSE_DISPLAY_NAMES[lower]
+  const reversed = buildReverseDisplayNames()[lower]
   if (reversed !== undefined) return reversed
   const legacy = LEGACY_DISPLAY_NAMES[lower]
   if (legacy !== undefined) return legacy
@@ -131,7 +156,7 @@ export function normalizeAgentForPrompt(agentName: string | undefined): string |
 
   const configKey = resolveKnownAgentConfigKey(trimmed)
   if (configKey !== undefined) {
-    return AGENT_DISPLAY_NAMES[configKey] ?? trimmed
+    return getAgentDisplayName(configKey)
   }
 
   return trimmed

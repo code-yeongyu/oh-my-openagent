@@ -1,5 +1,5 @@
-import { describe, it, expect } from "bun:test"
-import { AGENT_DISPLAY_NAMES, getAgentConfigKey, getAgentDisplayName, getAgentListDisplayName, normalizeAgentForPrompt, normalizeAgentForPromptKey } from "./agent-display-names"
+import { describe, it, expect, afterEach } from "bun:test"
+import { AGENT_DISPLAY_NAMES, getAgentConfigKey, getAgentDisplayName, getAgentListDisplayName, normalizeAgentForPrompt, normalizeAgentForPromptKey, setAgentDisplayNameOverrides } from "./agent-display-names"
 
 describe("getAgentDisplayName", () => {
   it("returns display name for lowercase config key (new format)", () => {
@@ -271,5 +271,44 @@ describe("AGENT_DISPLAY_NAMES", () => {
       // then none should contain parentheses
       expect(httpHeaderUnsafe.test(displayName)).toBe(false)
     }
+  })
+})
+
+describe("setAgentDisplayNameOverrides", () => {
+  afterEach(() => {
+    setAgentDisplayNameOverrides({})
+  })
+
+  it("#given config overrides set #when getAgentDisplayName called #then returns override value", () => {
+    // given override for sisyphus
+    setAgentDisplayNameOverrides({ sisyphus: "Ox (Ultraworker)" })
+
+    // when getAgentDisplayName called
+    const result = getAgentDisplayName("sisyphus")
+
+    // then returns override value
+    expect(result).toBe("Ox (Ultraworker)")
+  })
+
+  it("#given config overrides set #when getAgentConfigKey called with override name #then resolves to config key", () => {
+    // given override for oracle
+    setAgentDisplayNameOverrides({ oracle: "Owl" })
+
+    // when getAgentConfigKey called with override display name
+    const result = getAgentConfigKey("Owl")
+
+    // then resolves to config key
+    expect(result).toBe("oracle")
+  })
+
+  it("#given no overrides #when getAgentDisplayName called #then returns hardcoded default", () => {
+    // given no overrides (reset)
+    setAgentDisplayNameOverrides({})
+
+    // when getAgentDisplayName called
+    const result = getAgentDisplayName("sisyphus")
+
+    // then returns hardcoded default
+    expect(result).toBe("Sisyphus (Ultraworker)")
   })
 })
