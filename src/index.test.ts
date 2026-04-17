@@ -257,7 +257,7 @@ const mockCreatePluginInterface = mock(() => ({}))
 const mockInitializeOpenClaw = mock(async () => {})
 const mockStartTmuxCheck = mock(() => {})
 
-let OhMyOpenCodePlugin: (typeof import("./index"))["default"]
+let pluginModule: (typeof import("./index"))["default"]
 
 function installIndexModuleMocks(): void {
   mock.module("./cli/config-manager/config-context", () => ({
@@ -337,7 +337,7 @@ describe("OhMyOpenCodePlugin", () => {
   beforeEach(async () => {
     mock.restore()
     installIndexModuleMocks()
-    ;({ default: OhMyOpenCodePlugin } = await importFreshIndexModule())
+    ;({ default: pluginModule } = await importFreshIndexModule())
     mockInitConfigContext.mockClear()
     mockDetectExternalSkillPlugin.mockClear()
     mockGetSkillPluginConflictWarning.mockClear()
@@ -375,10 +375,10 @@ describe("OhMyOpenCodePlugin", () => {
     })
 
     // when
-    await OhMyOpenCodePlugin({
+    await pluginModule.server({
       directory: "/tmp/project",
       client: {},
-    } as Parameters<typeof OhMyOpenCodePlugin>[0])
+    } as Parameters<typeof pluginModule.server>[0])
 
     // then
     expect(mockInitializeOpenClaw).toHaveBeenCalledTimes(1)
@@ -390,12 +390,21 @@ describe("OhMyOpenCodePlugin", () => {
     mockLoadPluginConfig.mockReturnValue({})
 
     // when
-    await OhMyOpenCodePlugin({
+    await pluginModule.server({
       directory: "/tmp/project",
       client: {},
-    } as Parameters<typeof OhMyOpenCodePlugin>[0])
+    } as Parameters<typeof pluginModule.server>[0])
 
     // then
     expect(mockInitializeOpenClaw).not.toHaveBeenCalled()
+  })
+
+  it("exports a V1 PluginModule shape with id and server", () => {
+    // given the plugin module is loaded
+    // when inspecting the default export
+    // then it has the expected V1 shape
+    expect(typeof pluginModule).toBe("object")
+    expect(pluginModule.id).toBe("oh-my-openagent")
+    expect(typeof pluginModule.server).toBe("function")
   })
 })

@@ -125,12 +125,13 @@ describe("OhMyOpenCodePlugin telemetry isolation", () => {
     const { default: plugin } = await import(`./index?telemetry=${Date.now()}-${Math.random()}`)
 
     // when
-    const result = await plugin({
+    const result = await plugin.server({
       directory: "/tmp/project",
       client: {},
-    } as Parameters<typeof plugin>[0])
+    } as Parameters<typeof plugin.server>[0])
 
     // then
-    expect(result).toMatchObject({ name: "oh-my-openagent" })
+    expect(typeof result).toBe("object")
+    expect(result).not.toBeNull()
   })
 })
