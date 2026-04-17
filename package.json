@@ -6,7 +6,8 @@
   "types": "dist/index.d.ts",
   "type": "module",
   "bin": {
-    "oh-my-opencode": "bin/oh-my-opencode.js"
+    "oh-my-opencode": "bin/oh-my-opencode.js",
+    "oh-my-openagent": "bin/oh-my-opencode.js"
   },
   "files": [
     "dist",
