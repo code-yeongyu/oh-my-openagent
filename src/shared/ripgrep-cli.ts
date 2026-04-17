@@ -28,7 +28,7 @@ function findExecutable(name: string): string | null {
       return result.stdout.trim().split("\n")[0]
     }
   } catch {
-    // Command execution failed
+    return null
   }
   return null
 }
@@ -62,21 +62,9 @@ export function resolveGrepCli(): ResolvedCli {
     return cachedCli
   }
 
-  const bundledRg = getOpenCodeBundledRg()
-  if (bundledRg) {
-    cachedCli = { path: bundledRg, backend: "rg" }
-    return cachedCli
-  }
-
-  const systemRg = findExecutable("rg")
-  if (systemRg) {
-    cachedCli = { path: systemRg, backend: "rg" }
-    return cachedCli
-  }
-
-  const installedRg = getInstalledRipgrepPath()
-  if (installedRg) {
-    cachedCli = { path: installedRg, backend: "rg" }
+  const rgPath = getOpenCodeBundledRg() ?? findExecutable("rg") ?? getInstalledRipgrepPath()
+  if (rgPath) {
+    cachedCli = { path: rgPath, backend: "rg" }
     return cachedCli
   }
 
@@ -108,14 +96,16 @@ export async function resolveGrepCliWithAutoInstall(): Promise<ResolvedCli> {
     cachedCli = { path: rgPath, backend: "rg" }
     return cachedCli
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+
     if (current.backend === "grep") {
       log(`[${PUBLISHED_PACKAGE_NAME}] Failed to auto-install ripgrep. Falling back to GNU grep.`, {
-        error: error instanceof Error ? error.message : String(error),
+        error: message,
         grep_path: current.path,
       })
     } else {
       log(`[${PUBLISHED_PACKAGE_NAME}] Failed to auto-install ripgrep and GNU grep was not found.`, {
-        error: error instanceof Error ? error.message : String(error),
+        error: message,
       })
     }
 

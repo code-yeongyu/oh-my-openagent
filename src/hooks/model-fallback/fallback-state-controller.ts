@@ -53,9 +53,7 @@ export function createModelFallbackStateController(input: {
   ): boolean {
     const agentKey = getAgentConfigKey(agentName)
     const requirements = AGENT_MODEL_REQUIREMENTS[agentKey]
-    const fallbackChain = sessionFallbackChains.has(sessionID)
-      ? sessionFallbackChains.get(sessionID)
-      : requirements?.fallbackChain
+    const fallbackChain = sessionFallbackChains.get(sessionID) ?? requirements?.fallbackChain
 
     if (!fallbackChain?.length) {
       log("[model-fallback] No fallback chain for agent: " + agentName + " (key: " + agentKey + ")")
@@ -63,30 +61,31 @@ export function createModelFallbackStateController(input: {
     }
 
     const existing = pendingModelFallbacks.get(sessionID)
-    if (existing) {
-      if (existing.pending) {
-        log("[model-fallback] Pending fallback already armed for session: " + sessionID)
-        return false
-      }
-      existing.providerID = currentProviderID
-      existing.modelID = currentModelID
-      existing.pending = true
-      if (existing.attemptCount >= existing.fallbackChain.length) {
-        log("[model-fallback] Fallback chain exhausted for session: " + sessionID)
-        return false
-      }
-      log("[model-fallback] Re-armed pending fallback for session: " + sessionID)
+    if (!existing) {
+      pendingModelFallbacks.set(sessionID, {
+        providerID: currentProviderID,
+        modelID: currentModelID,
+        fallbackChain,
+        attemptCount: 0,
+        pending: true,
+      })
+      log("[model-fallback] Set pending fallback for session: " + sessionID + ", agent: " + agentName)
       return true
     }
 
-    pendingModelFallbacks.set(sessionID, {
-      providerID: currentProviderID,
-      modelID: currentModelID,
-      fallbackChain,
-      attemptCount: 0,
-      pending: true,
-    })
-    log("[model-fallback] Set pending fallback for session: " + sessionID + ", agent: " + agentName)
+    if (existing.pending) {
+      log("[model-fallback] Pending fallback already armed for session: " + sessionID)
+      return false
+    }
+
+    existing.providerID = currentProviderID
+    existing.modelID = currentModelID
+    existing.pending = true
+    if (existing.attemptCount >= existing.fallbackChain.length) {
+      log("[model-fallback] Fallback chain exhausted for session: " + sessionID)
+      return false
+    }
+    log("[model-fallback] Re-armed pending fallback for session: " + sessionID)
     return true
   }
 

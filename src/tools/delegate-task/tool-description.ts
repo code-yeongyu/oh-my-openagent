@@ -13,28 +13,26 @@ export interface DelegateTaskPresentation {
 export function createDelegateTaskPresentation(options: DelegateTaskToolOptions): DelegateTaskPresentation {
   const { userCategories } = options
   const allCategories = mergeCategories(userCategories)
-  const categoryNames = Object.keys(allCategories)
+  const categoryEntries = Object.entries(allCategories).map(([name, categoryConfig]) => ({
+    name,
+    categoryConfig,
+    description: userCategories?.[name]?.description || CATEGORY_DESCRIPTIONS[name],
+  }))
+  const categoryNames = categoryEntries.map(({ name }) => name)
   const categoryExamples = categoryNames.join(", ")
 
   const availableCategories: AvailableCategory[] = options.availableCategories
-    ?? Object.entries(allCategories).map(([name, categoryConfig]) => {
-      const userDescription = userCategories?.[name]?.description
-      const builtinDescription = CATEGORY_DESCRIPTIONS[name]
-      const description = userDescription || builtinDescription || "General tasks"
-
+    ?? categoryEntries.map(({ name, categoryConfig, description }) => {
       return {
         name,
-        description,
+        description: description || "General tasks",
         model: categoryConfig.model,
       }
     })
 
   const availableSkills: AvailableSkill[] = options.availableSkills ?? []
 
-  const categoryList = categoryNames.map(name => {
-    const userDescription = userCategories?.[name]?.description
-    const builtinDescription = CATEGORY_DESCRIPTIONS[name]
-    const description = userDescription || builtinDescription
+  const categoryList = categoryEntries.map(({ name, description }) => {
     return description ? `  - ${name}: ${description}` : `  - ${name}`
   }).join("\n")
 

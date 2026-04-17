@@ -101,17 +101,16 @@ export function prepareLookAtInput(args: LookAtArgs): PrepareLookAtInputResult {
   if (filePath) {
     let mimeType = inferMimeTypeFromFilePath(filePath)
     let actualFilePath = filePath
-    let tempFilePath: string | null = null
     let tempConversionPath: string | null = null
 
     if (needsConversion(mimeType)) {
       log(`[look_at] Detected unsupported format: ${mimeType}, converting to JPEG...`)
       try {
-        tempFilePath = convertImageToJpeg(filePath, mimeType)
-        tempConversionPath = tempFilePath
-        actualFilePath = tempFilePath
+        const convertedFilePath = convertImageToJpeg(filePath, mimeType)
+        tempConversionPath = convertedFilePath
+        actualFilePath = convertedFilePath
         mimeType = "image/jpeg"
-        log(`[look_at] Conversion successful: ${tempFilePath}`)
+        log(`[look_at] Conversion successful: ${convertedFilePath}`)
       } catch (conversionError) {
         const failedConversionPath = getTemporaryConversionPath(conversionError)
         if (failedConversionPath) {
@@ -139,8 +138,6 @@ export function prepareLookAtInput(args: LookAtArgs): PrepareLookAtInputResult {
         cleanup() {
           if (tempConversionPath) {
             cleanupConvertedImage(tempConversionPath)
-          } else if (tempFilePath) {
-            cleanupConvertedImage(tempFilePath)
           }
         },
       },
