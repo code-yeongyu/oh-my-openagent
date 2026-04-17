@@ -59,7 +59,7 @@ export function createBackgroundCancel(manager: BackgroundManager, _client: Back
 
 To continue a cancelled task, use:
 \`\`\`
-task(session_id="<session_id>", prompt="Continue: <your follow-up>")
+task(task_id="<task_id>", prompt="Continue: <your follow-up>")
 \`\`\`
 
 Continuable sessions:

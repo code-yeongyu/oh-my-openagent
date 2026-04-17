@@ -30,12 +30,12 @@ describe("no-hephaestus-non-gpt hook", () => {
     await hook["chat.message"]?.({
       sessionID: "ses_1",
       agent: HEPHAESTUS_DISPLAY,
-      model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
+      model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
     }, output1)
     await hook["chat.message"]?.({
       sessionID: "ses_1",
       agent: HEPHAESTUS_DISPLAY,
-      model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
+      model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
     }, output2)
 
     // then - toast is shown and agent is switched to sisyphus
@@ -66,7 +66,7 @@ describe("no-hephaestus-non-gpt hook", () => {
     await hook["chat.message"]?.({
       sessionID: "ses_opt_out",
       agent: HEPHAESTUS_DISPLAY,
-      model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
+      model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
     }, output)
 
     // then - warning toast is shown but agent is not switched
@@ -114,7 +114,7 @@ describe("no-hephaestus-non-gpt hook", () => {
     await hook["chat.message"]?.({
       sessionID: "ses_3",
       agent: SISYPHUS_DISPLAY,
-      model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
+      model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
     }, output)
 
     // then - no toast
@@ -136,7 +136,7 @@ describe("no-hephaestus-non-gpt hook", () => {
     // when - chat.message runs without input.agent
     await hook["chat.message"]?.({
       sessionID: "ses_4",
-      model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
+      model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
     }, output)
 
     // then - toast shown via session-agent fallback, switched to sisyphus

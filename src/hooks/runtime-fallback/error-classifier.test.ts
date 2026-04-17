@@ -7,7 +7,7 @@ describe("runtime-fallback error classifier", () => {
     //#given
     const info = {
       status:
-        "All credentials for model claude-opus-4-6-thinking are cooling down [retrying in ~5 days attempt #1]",
+        "All credentials for model claude-opus-4-7-thinking are cooling down [retrying in ~5 days attempt #1]",
     }
 
     //#when
@@ -21,7 +21,7 @@ describe("runtime-fallback error classifier", () => {
     //#given
     const info = {
       status:
-        "All credentials for model claude-opus-4-6 are cooldown [retrying in 7m 56s attempt #1]",
+        "All credentials for model claude-opus-4-7 are cooldown [retrying in 7m 56s attempt #1]",
     }
 
     //#when
@@ -49,7 +49,7 @@ describe("runtime-fallback error classifier", () => {
     //#given
     const error = {
       message:
-        "All credentials for model claude-opus-4-6-thinking are cooling down [retrying in ~5 days attempt #1]",
+        "All credentials for model claude-opus-4-7-thinking are cooling down [retrying in ~5 days attempt #1]",
     }
 
     //#when
@@ -65,8 +65,8 @@ describe("runtime-fallback error classifier", () => {
       name: "ProviderModelNotFoundError",
       data: {
         providerID: "anthropic",
-        modelID: "claude-opus-4-6",
-        message: "Model not found: anthropic/claude-opus-4-6.",
+        modelID: "claude-opus-4-7",
+        message: "Model not found: anthropic/claude-opus-4-7.",
       },
     }
 

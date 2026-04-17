@@ -57,7 +57,7 @@ describe("Sisyphus prompt identity", () => {
   describe("#given a Sisyphus agent created with default model", () => {
     describe("#when checking the prompt", () => {
       it("#then contains the agent identity section with override directive", () => {
-        const config = createSisyphusAgent("anthropic/claude-opus-4-6")
+        const config = createSisyphusAgent("anthropic/claude-opus-4-7")
 
         expect(config.prompt).toContain("<agent-identity>")
         expect(config.prompt).toContain("Sisyphus")
@@ -65,7 +65,7 @@ describe("Sisyphus prompt identity", () => {
       })
 
       it("#then identity section appears before the Role section", () => {
-        const config = createSisyphusAgent("anthropic/claude-opus-4-6")
+        const config = createSisyphusAgent("anthropic/claude-opus-4-7")
         const prompt = config.prompt ?? ""
         const identityIndex = prompt.indexOf("<agent-identity>")
         const roleIndex = prompt.indexOf("<Role>")
@@ -115,7 +115,7 @@ describe("Agent identity preservation through overrides", () => {
   describe("#given a Sisyphus agent with prompt_append override", () => {
     describe("#when merging the override", () => {
       it("#then identity section is preserved in the merged prompt", () => {
-        const baseConfig = createSisyphusAgent("anthropic/claude-opus-4-6")
+        const baseConfig = createSisyphusAgent("anthropic/claude-opus-4-7")
         const merged = mergeAgentConfig(baseConfig, { prompt_append: "Extra instructions here" })
 
         expect(merged.prompt).toContain("<agent-identity>")
@@ -129,7 +129,7 @@ describe("Agent identity preservation through overrides", () => {
   describe("#given a Sisyphus agent with model override only", () => {
     describe("#when merging the override", () => {
       it("#then identity section is preserved unchanged", () => {
-        const baseConfig = createSisyphusAgent("anthropic/claude-opus-4-6")
+        const baseConfig = createSisyphusAgent("anthropic/claude-opus-4-7")
         const merged = mergeAgentConfig(baseConfig, { model: "openai/gpt-5.4" })
 
         expect(merged.prompt).toContain("<agent-identity>")

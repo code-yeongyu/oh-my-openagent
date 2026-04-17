@@ -4,7 +4,7 @@ import type { BackgroundTaskArgs } from "./types"
 import { BACKGROUND_TASK_DESCRIPTION } from "./constants"
 import { resolveMessageContext } from "../../features/hook-message-injector"
 import { getSessionAgent } from "../../features/claude-code-session-state"
-import { storeToolMetadata } from "../../features/tool-metadata-store"
+import { publishToolMetadata } from "../../features/tool-metadata-store"
 import { log } from "../../shared/logger"
 import { delay } from "./delay"
 import { getMessageDir } from "./message-dir"
@@ -100,11 +100,7 @@ export function createBackgroundTask(
             ...(sessionId ? { sessionId } : {}),
           },
         }
-        ctx.metadata?.(bgMeta)
-
-        if (ctx.callID) {
-          storeToolMetadata(ctx.sessionID, ctx.callID, bgMeta)
-        }
+        await publishToolMetadata(ctx, bgMeta)
 
         return `Background task launched successfully.
 

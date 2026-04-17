@@ -91,7 +91,7 @@ describe("Atlas final-wave approval gate regressions", () => {
       join(messageDirectory, "msg_test001.json"),
       JSON.stringify({
         agent: "atlas",
-        model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
       }),
     )
   }

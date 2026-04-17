@@ -74,7 +74,7 @@ export async function promptInstallConfig(detected: DetectedConfig): Promise<Ins
     message: "Do you have access to OpenCode Zen (opencode/ models)?",
     options: [
       { value: "no", label: "No", hint: "Will use other configured providers" },
-      { value: "yes", label: "Yes", hint: "opencode/claude-opus-4-6, opencode/gpt-5.4, etc." },
+      { value: "yes", label: "Yes", hint: "opencode/claude-opus-4-7, opencode/gpt-5.4, etc." },
     ],
     initialValue: initial.opencodeZen,
   })

@@ -84,7 +84,7 @@ describe("executeCompact lock management", () => {
   let pluginConfig: ReturnType<typeof OhMyOpenCodeConfigSchema.parse>
   const sessionID = "test-session-123"
   const directory = "/test/dir"
-  const msg = { providerID: "anthropic", modelID: "claude-opus-4-6" }
+  const msg = { providerID: "anthropic", modelID: "claude-opus-4-7" }
 
   beforeEach(() => {
     // given: Fresh state for each test
@@ -132,7 +132,7 @@ describe("executeCompact lock management", () => {
     expect(mockClient.session.summarize).toHaveBeenCalledWith(
       expect.objectContaining({
         path: { id: sessionID },
-        body: { providerID: "anthropic", modelID: "claude-opus-4-6", auto: true },
+        body: { providerID: "anthropic", modelID: "claude-opus-4-7", auto: true },
       }),
     )
 
@@ -157,7 +157,7 @@ describe("executeCompact lock management", () => {
     expect(mockClient.session.summarize).toHaveBeenCalledWith(
       expect.objectContaining({
         path: { id: sessionID },
-        body: { providerID: "anthropic", modelID: "claude-opus-4-6", auto: true },
+        body: { providerID: "anthropic", modelID: "claude-opus-4-7", auto: true },
       }),
     )
 
@@ -352,7 +352,7 @@ describe("executeCompact lock management", () => {
     expect(mockClient.session.summarize).toHaveBeenCalledWith(
       expect.objectContaining({
         path: { id: sessionID },
-        body: { providerID: "anthropic", modelID: "claude-opus-4-6", auto: true },
+        body: { providerID: "anthropic", modelID: "claude-opus-4-7", auto: true },
       }),
     )
 

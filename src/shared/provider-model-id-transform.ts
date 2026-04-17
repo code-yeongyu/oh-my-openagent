@@ -23,9 +23,9 @@ function applyGatewayTransforms(model: string): string {
 }
 
 export function transformModelForProvider(provider: string, model: string): string {
-	// Vercel AI Gateway expects <sub-provider>/<model> (e.g. anthropic/claude-opus-4.6).
-	// Canonical names in model-requirements.ts may be bare (claude-opus-4-6) or
-	// already prefixed (anthropic/claude-opus-4-6). Both need gateway-specific transforms.
+	// Vercel AI Gateway expects <sub-provider>/<model> (e.g. anthropic/claude-opus-4.7).
+	// Canonical names in model-requirements.ts may be bare (claude-opus-4-7) or
+	// already prefixed (anthropic/claude-opus-4-7). Both need gateway-specific transforms.
 	if (provider === "vercel") {
 		// Already prefixed — transform only the model part
 		const slashIndex = model.indexOf("/")

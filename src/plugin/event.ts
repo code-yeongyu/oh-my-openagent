@@ -515,7 +515,7 @@ export function createEventHandler(args: {
                   sessionID,
                   info?.providerID as string | undefined,
                 );
-                const rawModel = (info?.modelID as string | undefined) ?? "claude-opus-4-6";
+                const rawModel = (info?.modelID as string | undefined) ?? "claude-opus-4-7";
                 const currentModel = normalizeFallbackModelID(rawModel);
                 applyUserConfiguredFallbackChain(sessionID, agentName, currentProvider, args.pluginConfig);
 
@@ -578,7 +578,7 @@ export function createEventHandler(args: {
               const parsed = extractProviderModelFromErrorMessage(retryMessage);
               const lastKnown = lastKnownModelBySession.get(sessionID);
               const currentProvider = resolveFallbackProviderID(sessionID, parsed.providerID);
-              let currentModel = parsed.modelID ?? lastKnown?.modelID ?? "claude-opus-4-6";
+              let currentModel = parsed.modelID ?? lastKnown?.modelID ?? "claude-opus-4-7";
               currentModel = normalizeFallbackModelID(currentModel);
               applyUserConfiguredFallbackChain(sessionID, agentName, currentProvider, args.pluginConfig);
 
@@ -664,7 +664,7 @@ export function createEventHandler(args: {
               sessionID,
               (props?.providerID as string | undefined) || parsed.providerID,
             );
-            let currentModel = (props?.modelID as string) || parsed.modelID || "claude-opus-4-6";
+            let currentModel = (props?.modelID as string) || parsed.modelID || "claude-opus-4-7";
             currentModel = normalizeFallbackModelID(currentModel);
             applyUserConfiguredFallbackChain(sessionID, agentName, currentProvider, args.pluginConfig);
 

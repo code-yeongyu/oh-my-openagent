@@ -27,30 +27,6 @@ describe("BackgroundTaskConfigSchema", () => {
     })
   })
 
-  describe("maxDescendants", () => {
-    describe("#given valid maxDescendants (50)", () => {
-      test("#when parsed #then returns correct value", () => {
-        const result = BackgroundTaskConfigSchema.parse({ maxDescendants: 50 })
-
-        expect(result.maxDescendants).toBe(50)
-      })
-    })
-
-    describe("#given maxDescendants below minimum (0)", () => {
-      test("#when parsed #then throws ZodError", () => {
-        let thrownError: unknown
-
-        try {
-          BackgroundTaskConfigSchema.parse({ maxDescendants: 0 })
-        } catch (error) {
-          thrownError = error
-        }
-
-        expect(thrownError).toBeInstanceOf(ZodError)
-      })
-    })
-  })
-
   describe("syncPollTimeoutMs", () => {
     describe("#given valid syncPollTimeoutMs (120000)", () => {
       test("#when parsed #then returns correct value", () => {

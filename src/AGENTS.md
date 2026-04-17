@@ -1,6 +1,6 @@
 # src/ — Plugin Source
 
-**Generated:** 2026-04-11
+**Generated:** 2026-04-18
 
 ## OVERVIEW
 

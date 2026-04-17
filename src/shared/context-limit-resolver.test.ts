@@ -28,15 +28,15 @@ describe("resolveActualContextLimit", () => {
     resetContextLimitEnv()
   })
 
-  it("returns cached limit for Anthropic 4.6 models when 1M mode is disabled (GA support)", () => {
+  it("returns cached limit for Anthropic 4.7 models when 1M mode is disabled (GA support)", () => {
     // given
     delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
     delete process.env[VERTEX_CONTEXT_ENV_KEY]
     const modelContextLimitsCache = new Map<string, number>()
-    modelContextLimitsCache.set("anthropic/claude-opus-4-6", 1_000_000)
+    modelContextLimitsCache.set("anthropic/claude-opus-4-7", 1_000_000)
 
     // when
-    const actualLimit = resolveActualContextLimit("anthropic", "claude-opus-4-6", {
+    const actualLimit = resolveActualContextLimit("anthropic", "claude-opus-4-7", {
       anthropicContext1MEnabled: false,
       modelContextLimitsCache,
     })
@@ -107,15 +107,15 @@ describe("resolveActualContextLimit", () => {
     expect(actualLimit).toBe(200000)
   })
 
-  it("supports Anthropic 4.6 dot-version model IDs without explicit 1M mode", () => {
+  it("supports Anthropic 4.7 dot-version model IDs without explicit 1M mode", () => {
     // given
     delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
     delete process.env[VERTEX_CONTEXT_ENV_KEY]
     const modelContextLimitsCache = new Map<string, number>()
-    modelContextLimitsCache.set("anthropic/claude-opus-4.6", 1_000_000)
+    modelContextLimitsCache.set("anthropic/claude-opus-4.7", 1_000_000)
 
     // when
-    const actualLimit = resolveActualContextLimit("anthropic", "claude-opus-4.6", {
+    const actualLimit = resolveActualContextLimit("anthropic", "claude-opus-4.7", {
       anthropicContext1MEnabled: false,
       modelContextLimitsCache,
     })
