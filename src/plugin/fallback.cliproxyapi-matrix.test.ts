@@ -59,7 +59,7 @@ function createChatMessageHandlerHooks(
 
 const PRIMARY_MODEL = {
   providerID: PROVIDER_ID,
-  modelID: "claude-opus-4-6",
+  modelID: "claude-opus-4-7",
 }
 
 const PRIMARY_MODEL_STRING = `${PRIMARY_MODEL.providerID}/${PRIMARY_MODEL.modelID}`
@@ -313,7 +313,7 @@ async function triggerSessionStatusRetry(
           type: "retry",
           attempt: 1,
           message:
-            "All credentials for model claude-opus-4-6 are cooling down [retrying in 7m 56s attempt #1]",
+            "All credentials for model claude-opus-4-7 are cooling down [retrying in 7m 56s attempt #1]",
           next: 476,
         },
       },

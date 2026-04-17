@@ -29,7 +29,7 @@ function createMockParams(overrides: {
   existingOptions?: Record<string, unknown>
 }): { input: ChatParamsInput; output: ChatParamsOutput } {
   const providerID = overrides.providerID ?? "anthropic"
-  const modelID = overrides.modelID ?? "claude-opus-4-6"
+  const modelID = overrides.modelID ?? "claude-opus-4-7"
   const variant = "variant" in overrides ? overrides.variant : "max"
   const agentName = overrides.agentName ?? "sisyphus"
   const existingOptions = overrides.existingOptions ?? {}
@@ -71,7 +71,7 @@ describe("createAnthropicEffortHook", () => {
 
     it("injects effort max for dotted opus ids", async () => {
       const hook = createAnthropicEffortHook()
-      const { input, output } = createMockParams({ modelID: "claude-opus-4.6" })
+      const { input, output } = createMockParams({ modelID: "claude-opus-4.7" })
 
       await hook["chat.params"](input, output)
 
@@ -158,7 +158,7 @@ describe("createAnthropicEffortHook", () => {
       const hook = createAnthropicEffortHook()
       const { input, output } = createMockParams({
         providerID: "github-copilot",
-        modelID: "claude-opus-4-6",
+        modelID: "claude-opus-4-7",
       })
 
       // when
@@ -256,7 +256,7 @@ describe("createAnthropicEffortHook", () => {
       // given an Anthropic OAuth session and variant=max on an Opus model
       writeAuthFile({ anthropic: { type: "oauth" } })
       const hook = createAnthropicEffortHook()
-      const { input, output } = createMockParams({ modelID: "claude-opus-4-6" })
+      const { input, output } = createMockParams({ modelID: "claude-opus-4-7" })
 
       // when chat.params fires
       await hook["chat.params"](input, output)
@@ -270,7 +270,7 @@ describe("createAnthropicEffortHook", () => {
       // given an Anthropic OAuth session and a dotted opus id
       writeAuthFile({ anthropic: { type: "oauth" } })
       const hook = createAnthropicEffortHook()
-      const { input, output } = createMockParams({ modelID: "claude-opus-4.6" })
+      const { input, output } = createMockParams({ modelID: "claude-opus-4.7" })
 
       // when chat.params fires
       await hook["chat.params"](input, output)
@@ -284,7 +284,7 @@ describe("createAnthropicEffortHook", () => {
       // given an Anthropic API-key session (not OAuth)
       writeAuthFile({ anthropic: { type: "api", key: "sk-ant-xxx" } })
       const hook = createAnthropicEffortHook()
-      const { input, output } = createMockParams({ modelID: "claude-opus-4-6" })
+      const { input, output } = createMockParams({ modelID: "claude-opus-4-7" })
 
       // when chat.params fires
       await hook["chat.params"](input, output)
@@ -298,7 +298,7 @@ describe("createAnthropicEffortHook", () => {
       // given OAuth entries for unrelated providers only
       writeAuthFile({ "github-copilot": { type: "oauth" }, opencode: { type: "api", key: "sk-x" } })
       const hook = createAnthropicEffortHook()
-      const { input, output } = createMockParams({ modelID: "claude-opus-4-6", providerID: "anthropic" })
+      const { input, output } = createMockParams({ modelID: "claude-opus-4-7", providerID: "anthropic" })
 
       // when chat.params fires for the anthropic provider
       await hook["chat.params"](input, output)

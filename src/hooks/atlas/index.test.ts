@@ -79,7 +79,7 @@ describe("atlas hook", () => {
     }
     const messageData = {
       agent,
-      model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
+      model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
     }
     writeFileSync(join(messageDir, "msg_test001.json"), JSON.stringify(messageData))
   }

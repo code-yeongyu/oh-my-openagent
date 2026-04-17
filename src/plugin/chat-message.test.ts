@@ -709,7 +709,7 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
       shouldOverride: false,
       pluginConfig: {
         agents: {
-          sisyphus: { model: "anthropic/claude-opus-4-6" },
+          sisyphus: { model: "anthropic/claude-opus-4-7" },
         },
       },
     })
@@ -733,7 +733,7 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
       shouldOverride: false,
       pluginConfig: {
         agents: {
-          prometheus: { model: "anthropic/claude-opus-4-6" },
+          prometheus: { model: "anthropic/claude-opus-4-7" },
         },
       },
     })
@@ -753,7 +753,7 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
   test("respects a mid-conversation model switch instead of reusing the previous stored model", async () => {
     //#given
     setMainSession("test-session")
-    setSessionModel("test-session", { providerID: "anthropic", modelID: "claude-opus-4-6" })
+    setSessionModel("test-session", { providerID: "anthropic", modelID: "claude-opus-4-7" })
     const args = createMockHandlerArgs({ shouldOverride: false })
     const handler = createChatMessageHandler(args)
     const nextModel = { providerID: "openai", modelID: "gpt-5.4" }

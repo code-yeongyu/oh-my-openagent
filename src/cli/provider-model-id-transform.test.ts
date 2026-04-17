@@ -5,16 +5,16 @@ import { transformModelForProvider as transformSharedModelForProvider } from "..
 
 describe("transformModelForProvider", () => {
   describe("github-copilot provider", () => {
-    test("transforms claude-opus-4-6 to claude-opus-4.6", () => {
-      // #given github-copilot provider and claude-opus-4-6 model
+    test("transforms claude-opus-4-7 to claude-opus-4.7", () => {
+      // #given github-copilot provider and claude-opus-4-7 model
       const provider = "github-copilot"
-      const model = "claude-opus-4-6"
+      const model = "claude-opus-4-7"
 
       // #when transformModelForProvider is called
       const result = transformModelForProvider(provider, model)
 
-      // #then should transform to claude-opus-4.6
-      expect(result).toBe("claude-opus-4.6")
+      // #then should transform to claude-opus-4.7
+      expect(result).toBe("claude-opus-4.7")
     })
 
     test("transforms claude-sonnet-4-5 to claude-sonnet-4.5", () => {
@@ -152,29 +152,29 @@ describe("transformModelForProvider", () => {
     })
 
     test("does not transform claude models for google provider", () => {
-      // #given google provider and claude-opus-4-6 model
+      // #given google provider and claude-opus-4-7 model
       const provider = "google"
-      const model = "claude-opus-4-6"
+      const model = "claude-opus-4-7"
 
       // #when transformModelForProvider is called
       const result = transformModelForProvider(provider, model)
 
       // #then should pass through unchanged (google doesn't use claude)
-      expect(result).toBe("claude-opus-4-6")
+      expect(result).toBe("claude-opus-4-7")
     })
   })
 
   describe("anthropic provider", () => {
-    test("preserves hyphenated claude-opus-4-6 for config output (regression: installer must not write dotted IDs)", () => {
-      // #given anthropic provider and claude-opus-4-6 model
+    test("preserves hyphenated claude-opus-4-7 for config output (regression: installer must not write dotted IDs)", () => {
+      // #given anthropic provider and claude-opus-4-7 model
       const provider = "anthropic"
-      const model = "claude-opus-4-6"
+      const model = "claude-opus-4-7"
 
       // #when transformModelForProvider is called
       const result = transformModelForProvider(provider, model)
 
       // #then should keep hyphenated form so Anthropic provider resolution succeeds on fresh installs
-      expect(result).toBe("claude-opus-4-6")
+      expect(result).toBe("claude-opus-4-7")
     })
 
     test("preserves hyphenated claude-sonnet-4-6 for config output", () => {
@@ -204,12 +204,12 @@ describe("transformModelForProvider", () => {
 
   describe("vercel provider", () => {
     test("prepends anthropic/ and applies anthropic transform for claude models", () => {
-      // #given vercel provider and claude-opus-4-6 model
+      // #given vercel provider and claude-opus-4-7 model
       // #when transformModelForProvider is called
-      const result = transformModelForProvider("vercel", "claude-opus-4-6")
+      const result = transformModelForProvider("vercel", "claude-opus-4-7")
 
-      // #then should produce anthropic/claude-opus-4.6
-      expect(result).toBe("anthropic/claude-opus-4.6")
+      // #then should produce anthropic/claude-opus-4.7
+      expect(result).toBe("anthropic/claude-opus-4.7")
     })
 
     test("prepends anthropic/ and applies anthropic transform for claude-sonnet", () => {
@@ -267,12 +267,12 @@ describe("transformModelForProvider", () => {
     })
 
     test("delegates to sub-provider when model already has sub-provider prefix", () => {
-      // #given vercel provider and anthropic/claude-opus-4-6 (already prefixed)
+      // #given vercel provider and anthropic/claude-opus-4-7 (already prefixed)
       // #when transformModelForProvider is called
-      const result = transformModelForProvider("vercel", "anthropic/claude-opus-4-6")
+      const result = transformModelForProvider("vercel", "anthropic/claude-opus-4-7")
 
       // #then should apply anthropic transform within the prefix
-      expect(result).toBe("anthropic/claude-opus-4.6")
+      expect(result).toBe("anthropic/claude-opus-4.7")
     })
 
     test("prepends minimax/ for minimax models", () => {
@@ -340,14 +340,14 @@ describe("transformModelForProvider", () => {
 
   test("uses a CLI-local transform implementation distinct from the shared runtime transform", () => {
     // #given the CLI transform (used by the installer) and the shared runtime transform
-    const cliResult = transformModelForProvider("anthropic", "claude-opus-4-6")
-    const sharedResult = transformSharedModelForProvider("anthropic", "claude-opus-4-6")
+    const cliResult = transformModelForProvider("anthropic", "claude-opus-4-7")
+    const sharedResult = transformSharedModelForProvider("anthropic", "claude-opus-4-7")
 
     // #when both are called with the same anthropic claude input
     // #then the CLI preserves hyphenated form for config output,
     //       the shared runtime transform converts dash→dot for API calls
     expect(transformModelForProvider).not.toBe(transformSharedModelForProvider)
-    expect(cliResult).toBe("claude-opus-4-6")
-    expect(sharedResult).toBe("claude-opus-4.6")
+    expect(cliResult).toBe("claude-opus-4-7")
+    expect(sharedResult).toBe("claude-opus-4.7")
   })
 })

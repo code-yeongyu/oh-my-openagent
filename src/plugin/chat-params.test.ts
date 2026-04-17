@@ -48,7 +48,7 @@ describe("createChatParamsHandler", () => {
     const input = {
       sessionID: "ses_chat_params",
       agent: { name: "sisyphus" },
-      model: { providerID: "opencode", modelID: "claude-opus-4-6" },
+      model: { providerID: "opencode", modelID: "claude-opus-4-7" },
       provider: { id: "opencode" },
       message: {},
     }
