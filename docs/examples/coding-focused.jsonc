@@ -8,7 +8,7 @@
     // Primary orchestrator: aggressive parallel delegation
     "sisyphus": {
       "model": "kimi-for-coding/k2p5",
-      "ultrawork": { "model": "anthropic/claude-opus-4-6", "variant": "max" },
+      "ultrawork": { "model": "anthropic/claude-opus-4-7", "variant": "max" },
       "prompt_append": "Delegate heavily to hephaestus for implementation. Parallelize exploration.",
     },
 

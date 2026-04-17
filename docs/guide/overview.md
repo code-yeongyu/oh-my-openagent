@@ -173,7 +173,7 @@ You can override specific agents or categories in your config:
     // Main orchestrator: Claude Opus or Kimi K2.5 work best
     "sisyphus": {
       "model": "kimi-for-coding/k2p5",
-      "ultrawork": { "model": "anthropic/claude-opus-4-6", "variant": "max" },
+      "ultrawork": { "model": "anthropic/claude-opus-4-7", "variant": "max" },
     },
 
     // Research agents: cheaper models are fine
@@ -207,10 +207,10 @@ You can override specific agents or categories in your config:
     "unspecified-low": { "model": "openai/gpt-5.4-mini" },
 
     // High-effort fallback: best available
-    "unspecified-high": { "model": "anthropic/claude-opus-4-6", "variant": "max" },
+    "unspecified-high": { "model": "anthropic/claude-opus-4-7", "variant": "max" },
 
     // Prose and documentation
-    "writing": { "model": "anthropic/claude-opus-4-6", "variant": "high" },
+    "writing": { "model": "anthropic/claude-opus-4-7", "variant": "high" },
   },
 }
 ```
