@@ -3,13 +3,15 @@ import {
   resolveGrepCli,
   type ResolvedCli,
   type GrepBackend,
+  DEFAULT_RG_THREADS,
+} from "../../shared/ripgrep-cli"
+import {
   DEFAULT_MAX_DEPTH,
   DEFAULT_MAX_FILESIZE,
   DEFAULT_MAX_COUNT,
   DEFAULT_MAX_COLUMNS,
   DEFAULT_TIMEOUT_MS,
   DEFAULT_MAX_OUTPUT_BYTES,
-  DEFAULT_RG_THREADS,
   RG_SAFETY_FLAGS,
   GREP_SAFETY_FLAGS,
 } from "./constants"
