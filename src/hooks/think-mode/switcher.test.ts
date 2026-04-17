@@ -38,7 +38,7 @@ describe("think-mode switcher", () => {
       })
 
       it("should handle claude-opus-4-7 high variant", () => {
-        // given a Claude Opus 4.6 model ID
+        // given a Claude Opus 4.7 model ID
         const variant = getHighVariant("claude-opus-4-7")
 
         // then should return high variant
