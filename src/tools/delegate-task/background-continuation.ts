@@ -4,6 +4,7 @@ import { publishToolMetadata } from "../../features/tool-metadata-store"
 import { formatDetailedError } from "./error-formatting"
 import { getSessionTools } from "../../shared/session-tools-store"
 import { buildTaskMetadataBlock } from "../../features/tool-metadata-store/task-metadata-contract"
+import { resolveMetadataModel } from "./resolve-metadata-model"
 import { getTaskID } from "./task-id"
 
 export async function executeBackgroundContinuation(
@@ -42,7 +43,7 @@ export async function executeBackgroundContinuation(
         backgroundTaskId: task.id,
         sessionId: task.sessionID,
         command: args.command,
-        model: task.model ? { providerID: task.model.providerID, modelID: task.model.modelID } : undefined,
+        model: resolveMetadataModel(task.model, parentContext.model),
       },
     }
     await publishToolMetadata(ctx, bgContMeta)

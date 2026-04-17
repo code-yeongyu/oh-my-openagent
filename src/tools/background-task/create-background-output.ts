@@ -66,11 +66,11 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
         const meta = {
           title: formatResolvedTitle(task),
           metadata: {
-            task_id: task.id,
+            backgroundTaskId: task.id,
             agent: task.agent,
             category: task.category,
             description: task.description,
-            ...(task.sessionID ? { sessionId: task.sessionID } : {}),
+            ...(task.sessionID ? { sessionId: task.sessionID, taskId: task.sessionID } : {}),
           } as Record<string, unknown>,
         }
         await publishToolMetadata(ctx, meta)

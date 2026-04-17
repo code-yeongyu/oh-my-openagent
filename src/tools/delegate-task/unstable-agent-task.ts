@@ -9,6 +9,8 @@ import { formatDetailedError } from "./error-formatting"
 import { getSessionTools } from "../../shared/session-tools-store"
 import { normalizeSDKResponse } from "../../shared"
 import { QUESTION_DENIED_SESSION_PERMISSION } from "../../shared/question-denied-session-permission"
+import { resolveMetadataModel } from "./resolve-metadata-model"
+import { buildTaskMetadataBlock } from "../../features/tool-metadata-store/task-metadata-contract"
 
 export async function executeUnstableAgentTask(
   args: DelegateTaskArgs,
@@ -75,9 +77,11 @@ export async function executeUnstableAgentTask(
         load_skills: args.load_skills,
         description: args.description,
         run_in_background: args.run_in_background,
+        taskId: sessionID,
+        backgroundTaskId: task.id,
         sessionId: sessionID,
         command: args.command,
-        model: categoryModel ? { providerID: categoryModel.providerID, modelID: categoryModel.modelID } : undefined,
+        model: resolveMetadataModel(categoryModel, parentContext.model),
       },
     }
     await publishToolMetadata(ctx, bgTaskMeta)
@@ -147,9 +151,13 @@ Model: ${actualModel}
 
 The task session may contain partial results.
 
-<task_metadata>
-session_id: ${sessionID}
-</task_metadata>`
+${buildTaskMetadataBlock({
+        sessionId: sessionID,
+        taskId: sessionID,
+        backgroundTaskId: task.id,
+        agent: agentToUse,
+        category: args.category,
+      })}`
     }
 
     if (!completedDuringMonitoring) {
@@ -167,9 +175,13 @@ Model: ${actualModel}
 
 The task session may still contain partial results.
 
-<task_metadata>
-session_id: ${sessionID}
-</task_metadata>`
+${buildTaskMetadataBlock({
+        sessionId: sessionID,
+        taskId: sessionID,
+        backgroundTaskId: task.id,
+        agent: agentToUse,
+        category: args.category,
+      })}`
     }
 
     const messagesResult = await client.session.messages({ path: { id: sessionID } })
@@ -217,9 +229,13 @@ RESULT:
 
 ${textContent || "(No text output)"}
 
-<task_metadata>
-session_id: ${sessionID}
-</task_metadata>`
+${buildTaskMetadataBlock({
+      sessionId: sessionID,
+      taskId: sessionID,
+      backgroundTaskId: task.id,
+      agent: agentToUse,
+      category: args.category,
+    })}`
   } catch (error) {
     if (!cleanupReason) {
       cleanupReason = "exception"

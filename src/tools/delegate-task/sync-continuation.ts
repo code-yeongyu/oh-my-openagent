@@ -1,5 +1,5 @@
 import type { DelegateTaskArgs, ToolContextWithMetadata } from "./types"
-import type { ExecutorContext, SessionMessage } from "./executor-types"
+import type { ExecutorContext, ParentContext, SessionMessage } from "./executor-types"
 import { isPlanFamily } from "./constants"
 import { publishToolMetadata } from "../../features/tool-metadata-store"
 import { getTaskToastManager } from "../../features/task-toast-manager"
@@ -14,11 +14,13 @@ import { normalizeSDKResponse } from "../../shared"
 import { buildTaskPrompt } from "./prompt-builder"
 import { buildTaskMetadataBlock } from "../../features/tool-metadata-store/task-metadata-contract"
 import { getTaskID } from "./task-id"
+import { resolveMetadataModel } from "./resolve-metadata-model"
 
 export async function executeSyncContinuation(
   args: DelegateTaskArgs,
   ctx: ToolContextWithMetadata,
   executorCtx: ExecutorContext,
+  parentContext: ParentContext,
   deps: SyncContinuationDeps = syncContinuationDeps
 ): Promise<string> {
   const { client, syncPollTimeoutMs, sisyphusAgentConfig } = executorCtx
@@ -81,7 +83,7 @@ export async function executeSyncContinuation(
         sessionId: continuationID,
         sync: true,
         command: args.command,
-        model: resumeModel,
+        model: resolveMetadataModel(resumeModel, parentContext.model),
       },
     }
     await publishToolMetadata(ctx, syncContMeta)

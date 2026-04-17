@@ -11,6 +11,7 @@ import { QUESTION_DENIED_SESSION_PERMISSION } from "../../shared/question-denied
 import { setSessionFallbackChain } from "../../hooks/model-fallback/hook"
 import { stripAgentListSortPrefix } from "../../shared/agent-display-names"
 import { buildTaskMetadataBlock } from "../../features/tool-metadata-store/task-metadata-contract"
+import { resolveMetadataModel } from "./resolve-metadata-model"
 
 function continueSessionSetup(args: {
   taskID: string
@@ -118,6 +119,7 @@ export async function executeBackgroundTask(
       SessionCategoryRegistry.register(sessionId, args.category)
     }
 
+    const resolvedModel = resolveMetadataModel(categoryModel, parentContext.model)
     const metadata = {
       prompt: args.prompt,
       agent: task.agent,
@@ -129,7 +131,7 @@ export async function executeBackgroundTask(
       ...(sessionId ? { taskId: sessionId } : {}),
       backgroundTaskId: task.id,
       ...(sessionId ? { sessionId } : {}),
-      ...(categoryModel ? { model: { providerID: categoryModel.providerID, modelID: categoryModel.modelID } } : {}),
+      ...(resolvedModel ? { model: resolvedModel } : {}),
     }
 
     const unstableMeta = {

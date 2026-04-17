@@ -12,6 +12,7 @@ import { syncTaskDeps, type SyncTaskDeps } from "./sync-task-deps"
 import { setSessionFallbackChain, clearSessionFallbackChain } from "../../hooks/model-fallback/hook"
 import { retrySyncPromptWithFallbacks } from "./sync-task-fallback"
 import { buildTaskMetadataBlock } from "../../features/tool-metadata-store/task-metadata-contract"
+import { resolveMetadataModel } from "./resolve-metadata-model"
 
 export async function executeSyncTask(
   args: DelegateTaskArgs,
@@ -128,7 +129,7 @@ export async function executeSyncTask(
         sync: true,
         spawnDepth: spawnContext.childDepth,
         command: args.command,
-        model: categoryModel ? { providerID: categoryModel.providerID, modelID: categoryModel.modelID } : undefined,
+        model: resolveMetadataModel(categoryModel, parentContext.model),
       },
     }
     await publishToolMetadata(ctx, syncTaskMeta)

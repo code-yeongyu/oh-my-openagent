@@ -97,7 +97,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     let error: any = null
     let result: string | null = null
     try {
-      result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, deps)
+      result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, { sessionID: "parent-session", messageID: "parent-message" }, deps)
     } catch (e) {
       error = e
     }
@@ -159,7 +159,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     let error: any = null
     let result: string | null = null
     try {
-      result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, deps)
+      result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, { sessionID: "parent-session", messageID: "parent-message" }, deps)
     } catch (e) {
       error = e
     }
@@ -222,7 +222,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     }
 
     //#when - executeSyncContinuation completes successfully
-    const result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, deps)
+    const result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, { sessionID: "parent-session", messageID: "parent-message" }, deps)
 
     //#then - toast should be removed exactly once
     expect(removeTaskCalls.length).toBe(1)
@@ -286,7 +286,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     }
 
     //#when - executeSyncContinuation with abort signal
-    const result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, deps)
+    const result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, { sessionID: "parent-session", messageID: "parent-message" }, deps)
 
     //#then - removeTask should be called at least once (poller and finally may both call it)
     expect(removeTaskCalls.length).toBeGreaterThanOrEqual(1)
@@ -346,7 +346,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     let error: any = null
     let result: string | null = null
     try {
-      result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, deps)
+      result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, { sessionID: "parent-session", messageID: "parent-message" }, deps)
     } catch (e) {
       error = e
     }
@@ -403,7 +403,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     }
 
     //#when - executeSyncContinuation completes with agent info in messages
-    const result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, deps)
+    const result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, { sessionID: "parent-session", messageID: "parent-message" }, deps)
 
     //#then - task_metadata should contain subagent field with the agent name
     expect(result).toContain("<task_metadata>")
@@ -457,7 +457,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     }
 
     //#when - executeSyncContinuation completes without agent info
-    const result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, deps)
+    const result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, { sessionID: "parent-session", messageID: "parent-message" }, deps)
 
     //#then - task_metadata should NOT contain subagent field
     expect(result).toContain("<task_metadata>")
@@ -522,7 +522,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     }
 
     //#when
-    await executeSyncContinuation(args, mockCtx, mockExecutorCtx, deps)
+    await executeSyncContinuation(args, mockCtx, mockExecutorCtx, { sessionID: "parent-session", messageID: "parent-message" }, deps)
 
     //#then
     expect(promptAsyncCalls).toHaveLength(1)
@@ -592,7 +592,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     }
 
     //#when
-    await executeSyncContinuation(args, mockCtx, mockExecutorCtx, deps)
+    await executeSyncContinuation(args, mockCtx, mockExecutorCtx, { sessionID: "parent-session", messageID: "parent-message" }, deps)
 
     //#then
     expect(promptAsyncCalls).toHaveLength(1)
@@ -662,7 +662,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     }
 
     //#when
-    await executeSyncContinuation(args, mockCtx, mockExecutorCtx, deps)
+    await executeSyncContinuation(args, mockCtx, mockExecutorCtx, { sessionID: "parent-session", messageID: "parent-message" }, deps)
 
     //#then
     expect(promptAsyncCalls).toHaveLength(1)

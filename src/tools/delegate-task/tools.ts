@@ -162,7 +162,7 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
         if (runInBackground) {
           return executeBackgroundContinuation(args, ctx, options, parentContext)
         }
-        return executeSyncContinuation(args, ctx, options)
+        return executeSyncContinuation(args, ctx, options, parentContext)
       }
 
       if (!args.category && !args.subagent_type) {
