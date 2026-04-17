@@ -244,7 +244,7 @@ describe("buildNonClaudePlannerSection", () => {
 
     //#then
     expect(result).toContain("Plan Agent")
-    expect(result).toContain("session_id")
+    expect(result).toContain("task_id")
     expect(result).toContain("Multi-step")
   })
 
