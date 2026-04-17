@@ -106,7 +106,7 @@ function installModuleMocks(): void {
   }))
 }
 
-describe("OhMyOpenCodePlugin telemetry isolation", () => {
+describe("oh-my-openagent telemetry isolation", () => {
   beforeEach(() => {
     mock.restore()
     installModuleMocks()

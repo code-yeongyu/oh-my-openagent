@@ -20,7 +20,7 @@ import { createPluginPostHog, getPostHogDistinctId } from "./shared/posthog"
 
 const serverPlugin: Plugin = async (input, _options): Promise<Hooks> => {
   initConfigContext("opencode", null)
-  log("[OhMyOpenCodePlugin] ENTRY - plugin loading", {
+  log("[oh-my-openagent] ENTRY - plugin loading", {
     directory: input.directory,
   })
   logLegacyPluginStartupWarning()

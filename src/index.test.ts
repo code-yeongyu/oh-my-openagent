@@ -110,7 +110,7 @@ async function importFreshIndexModule(): Promise<typeof import("./index")> {
   return import(`./index?test=${Date.now()}-${Math.random()}`)
 }
 
-describe("OhMyOpenCodePlugin", () => {
+describe("oh-my-openagent plugin module", () => {
   beforeEach(async () => {
     mock.restore()
     installIndexModuleMocks()
