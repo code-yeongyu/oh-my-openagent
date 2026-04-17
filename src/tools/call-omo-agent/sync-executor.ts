@@ -1,7 +1,6 @@
 import type { CallOmoAgentArgs } from "./types"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { subagentSessions, syncSubagentSessions } from "../../features/claude-code-session-state"
-import { clearSessionFallbackChain, setSessionFallbackChain } from "../../hooks/model-fallback/hook"
 import { getAgentToolRestrictions, log } from "../../shared"
 import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
 import type { DelegatedModelConfig } from "../../shared/model-resolution-types"
@@ -19,8 +18,8 @@ type ExecuteSyncDeps = {
   createOrGetSession: typeof createOrGetSession
   waitForCompletion: typeof waitForCompletion
   processMessages: typeof processMessages
-  setSessionFallbackChain: typeof setSessionFallbackChain
-  clearSessionFallbackChain: typeof clearSessionFallbackChain
+  setSessionFallbackChain: (sessionID: string, fallbackChain: FallbackEntry[] | undefined) => void
+  clearSessionFallbackChain: (sessionID: string) => void
 }
 
 type SpawnReservation = {
@@ -32,8 +31,8 @@ const defaultDeps: ExecuteSyncDeps = {
   createOrGetSession,
   waitForCompletion,
   processMessages,
-  setSessionFallbackChain,
-  clearSessionFallbackChain,
+  setSessionFallbackChain: () => {},
+  clearSessionFallbackChain: () => {},
 }
 
 function buildPromptGenerationParams(model: DelegatedModelConfig | undefined): Record<string, unknown> {

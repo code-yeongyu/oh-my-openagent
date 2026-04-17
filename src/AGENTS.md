@@ -10,7 +10,7 @@ Entry point `index.ts` orchestrates 5-step initialization: loadConfig → create
 
 | File | Purpose |
 |------|---------|
-| `index.ts` | Plugin entry, exports `OhMyOpenCodePlugin` |
+| `index.ts` | Plugin entry, default-exports `pluginModule: PluginModule` with `{ id, server }` |
 | `plugin-config.ts` | JSONC parse, multi-level merge, Zod v4 validation |
 | `create-managers.ts` | TmuxSessionManager, BackgroundManager, SkillMcpManager, ConfigHandler |
 | `create-tools.ts` | SkillContext + AvailableCategories + ToolRegistry (26 tools) |

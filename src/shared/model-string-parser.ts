@@ -41,13 +41,13 @@ export function parseModelString(
   const trimmedModel = model.trim()
   if (!trimmedModel) return undefined
 
-  const parts = trimmedModel.split("/")
-  if (parts.length < 2) {
+  const separatorIndex = trimmedModel.indexOf("/")
+  if (separatorIndex === -1) {
     return undefined
   }
 
-  const providerID = parts[0]?.trim()
-  const rawModelID = parts.slice(1).join("/").trim()
+  const providerID = trimmedModel.slice(0, separatorIndex).trim()
+  const rawModelID = trimmedModel.slice(separatorIndex + 1).trim()
   if (!providerID || !rawModelID) {
     return undefined
   }
