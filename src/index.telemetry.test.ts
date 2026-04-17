@@ -29,7 +29,6 @@ const mockCreateHooks = mock(() => ({
   compactionTodoPreserver: undefined,
   claudeCodeHooks: undefined,
 }))
-const mockCreatePluginDispose = mock(() => async () => {})
 const mockCreatePluginInterface = mock(() => ({}))
 const mockCreatePluginPostHog = mock(() => ({
   trackActive: () => {
@@ -69,9 +68,6 @@ function installModuleMocks(): void {
   }))
   mock.module("./create-hooks", () => ({
     createHooks: mockCreateHooks,
-  }))
-  mock.module("./plugin-dispose", () => ({
-    createPluginDispose: mockCreatePluginDispose,
   }))
   mock.module("./plugin-interface", () => ({
     createPluginInterface: mockCreatePluginInterface,
