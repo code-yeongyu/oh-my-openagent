@@ -13,12 +13,14 @@ export interface PermissionFormat {
  * Creates tool restrictions that deny specified tools.
  */
 export function createAgentToolRestrictions(
-  denyTools: string[]
+  denyTools: string[],
+  allowTools: string[] = [],
 ): PermissionFormat {
   return {
-    permission: Object.fromEntries(
-      denyTools.map((tool) => [tool, "deny" as const])
-    ),
+    permission: Object.fromEntries([
+      ...denyTools.map((tool) => [tool, "deny" as const]),
+      ...allowTools.map((tool) => [tool, "allow" as const]),
+    ]),
   }
 }
 
