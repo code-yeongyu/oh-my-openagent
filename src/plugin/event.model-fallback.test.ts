@@ -142,9 +142,8 @@ describe("createEventHandler - model fallback", () => {
     //#given
     const sessionID = "ses_status_retry_fallback"
     setMainSession(sessionID)
-    clearPendingModelFallback(sessionID)
-
     const modelFallback = createModelFallbackHook()
+    clearPendingModelFallback(modelFallback, sessionID)
 
     const { handler, abortCalls, promptCalls } = createHandler({ hooks: { modelFallback } })
 
@@ -232,8 +231,8 @@ describe("createEventHandler - model fallback", () => {
     //#given
     const sessionID = "ses_status_retry_dedup"
     setMainSession(sessionID)
-    clearPendingModelFallback(sessionID)
     const modelFallback = createModelFallbackHook()
+    clearPendingModelFallback(modelFallback, sessionID)
     const { handler, abortCalls, promptCalls } = createHandler({ hooks: { modelFallback } })
 
     await handler({
@@ -293,8 +292,8 @@ describe("createEventHandler - model fallback", () => {
     //#given
     const sessionID = "ses_status_retry_runtime_enabled"
     setMainSession(sessionID)
-    clearPendingModelFallback(sessionID)
     const modelFallback = createModelFallbackHook()
+    clearPendingModelFallback(modelFallback, sessionID)
     const runtimeFallback = {
       event: async () => {},
       "chat.message": async () => {},
@@ -346,9 +345,8 @@ describe("createEventHandler - model fallback", () => {
     //#given
     const sessionID = "ses_status_retry_user_fallback"
     setMainSession(sessionID)
-    clearPendingModelFallback(sessionID)
-
     const modelFallback = createModelFallbackHook()
+    clearPendingModelFallback(modelFallback, sessionID)
     const pluginConfig = {
       agents: {
         sisyphus: {
@@ -446,9 +444,8 @@ describe("createEventHandler - model fallback", () => {
     const toastCalls: string[] = []
     const sessionID = "ses_main_fallback_chain"
     setMainSession(sessionID)
-    clearPendingModelFallback(sessionID)
-
     const modelFallback = createModelFallbackHook()
+    clearPendingModelFallback(modelFallback, sessionID)
 
     setupConnectedProviderCacheMocks()
     const eventHandler = createEventHandler({

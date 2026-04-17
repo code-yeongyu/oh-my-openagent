@@ -5,6 +5,7 @@ import {
   createModelFallbackStateController,
   type ModelFallbackStateController,
 } from "./fallback-state-controller"
+import type { ModelFallbackControllerAccessor } from "./controller-accessor"
 
 type FallbackToast = (input: {
   title: string
@@ -28,26 +29,45 @@ export type ModelFallbackState = {
   pending: boolean
 }
 
-const modelFallbackControllerRef: { current?: ModelFallbackStateController } = {}
+type ModelFallbackControllerWithState = Pick<
+  ModelFallbackStateController,
+  | "lastToastKey"
+  | "setSessionFallbackChain"
+  | "clearSessionFallbackChain"
+  | "setPendingModelFallback"
+  | "getNextFallback"
+  | "clearPendingModelFallback"
+  | "hasPendingModelFallback"
+  | "getFallbackState"
+  | "reset"
+>
 
-function getOrCreateModelFallbackController(): ModelFallbackStateController {
-  if (!modelFallbackControllerRef.current) {
-    createModelFallbackHook()
-  }
-
-  const controller = modelFallbackControllerRef.current
-  if (!controller) {
-    throw new Error("Model fallback controller should be initialized")
-  }
-  return controller
+export type ModelFallbackHook = ModelFallbackControllerWithState & {
+  "chat.message": (
+    input: ChatMessageInput,
+    output: ChatMessageHandlerOutput,
+  ) => Promise<void>
 }
 
-export function setSessionFallbackChain(sessionID: string, fallbackChain: FallbackEntry[] | undefined): void {
-  getOrCreateModelFallbackController().setSessionFallbackChain(sessionID, fallbackChain)
+type ModelFallbackHookArgs = {
+  toast?: FallbackToast
+  onApplied?: FallbackCallback
+  controllerAccessor?: ModelFallbackControllerAccessor
 }
 
-export function clearSessionFallbackChain(sessionID: string): void {
-  getOrCreateModelFallbackController().clearSessionFallbackChain(sessionID)
+export function setSessionFallbackChain(
+  controller: Pick<ModelFallbackStateController, "setSessionFallbackChain">,
+  sessionID: string,
+  fallbackChain: FallbackEntry[] | undefined,
+): void {
+  controller.setSessionFallbackChain(sessionID, fallbackChain)
+}
+
+export function clearSessionFallbackChain(
+  controller: Pick<ModelFallbackStateController, "clearSessionFallbackChain">,
+  sessionID: string,
+): void {
+  controller.clearSessionFallbackChain(sessionID)
 }
 
 /**
@@ -55,12 +75,13 @@ export function clearSessionFallbackChain(sessionID: string): void {
  * Called when a model error is detected in session.error handler.
  */
 export function setPendingModelFallback(
+  controller: Pick<ModelFallbackStateController, "setPendingModelFallback">,
   sessionID: string,
   agentName: string,
   currentProviderID: string,
   currentModelID: string,
 ): boolean {
-  return getOrCreateModelFallbackController().setPendingModelFallback(
+  return controller.setPendingModelFallback(
     sessionID,
     agentName,
     currentProviderID,
@@ -73,54 +94,71 @@ export function setPendingModelFallback(
  * Increments attemptCount each time called.
  */
 export function getNextFallback(
+  controller: Pick<ModelFallbackStateController, "getNextFallback">,
   sessionID: string,
 ): { providerID: string; modelID: string; variant?: string } | null {
-  return getOrCreateModelFallbackController().getNextFallback(sessionID)
+  return controller.getNextFallback(sessionID)
 }
 
 /**
  * Clears the pending fallback for a session.
  * Called after fallback is successfully applied.
  */
-export function clearPendingModelFallback(sessionID: string): void {
-  getOrCreateModelFallbackController().clearPendingModelFallback(sessionID)
+export function clearPendingModelFallback(
+  controller: Pick<ModelFallbackStateController, "clearPendingModelFallback">,
+  sessionID: string,
+): void {
+  controller.clearPendingModelFallback(sessionID)
 }
 
 /**
  * Checks if there's a pending fallback for a session.
  */
-export function hasPendingModelFallback(sessionID: string): boolean {
-  return getOrCreateModelFallbackController().hasPendingModelFallback(sessionID)
+export function hasPendingModelFallback(
+  controller: Pick<ModelFallbackStateController, "hasPendingModelFallback">,
+  sessionID: string,
+): boolean {
+  return controller.hasPendingModelFallback(sessionID)
 }
 
 /**
  * Gets the current fallback state for a session (for debugging).
  */
-export function getFallbackState(sessionID: string): ModelFallbackState | undefined {
-  return getOrCreateModelFallbackController().getFallbackState(sessionID)
+export function getFallbackState(
+  controller: Pick<ModelFallbackStateController, "getFallbackState">,
+  sessionID: string,
+): ModelFallbackState | undefined {
+  return controller.getFallbackState(sessionID)
 }
 
 /**
  * Creates a chat.message hook that applies model fallbacks when pending.
  */
-export function createModelFallbackHook(args?: { toast?: FallbackToast; onApplied?: FallbackCallback }) {
-  if (!modelFallbackControllerRef.current) {
-    const pendingModelFallbacks = new Map<string, ModelFallbackState>()
-    const lastToastKey = new Map<string, string>()
-    const sessionFallbackChains = new Map<string, FallbackEntry[]>()
+export function createModelFallbackHook(args?: ModelFallbackHookArgs): ModelFallbackHook {
+  const pendingModelFallbacks = new Map<string, ModelFallbackState>()
+  const lastToastKey = new Map<string, string>()
+  const sessionFallbackChains = new Map<string, FallbackEntry[]>()
+  const controller = createModelFallbackStateController({
+    pendingModelFallbacks,
+    lastToastKey,
+    sessionFallbackChains,
+  })
 
-    modelFallbackControllerRef.current = createModelFallbackStateController({
-      pendingModelFallbacks,
-      lastToastKey,
-      sessionFallbackChains,
-    })
-  }
+  args?.controllerAccessor?.register(controller)
 
-  const controller = getOrCreateModelFallbackController()
   const toast = args?.toast
   const onApplied = args?.onApplied
 
   return {
+    lastToastKey: controller.lastToastKey,
+    setSessionFallbackChain: controller.setSessionFallbackChain,
+    clearSessionFallbackChain: controller.clearSessionFallbackChain,
+    setPendingModelFallback: controller.setPendingModelFallback,
+    getNextFallback: controller.getNextFallback,
+    clearPendingModelFallback: controller.clearPendingModelFallback,
+    hasPendingModelFallback: controller.hasPendingModelFallback,
+    getFallbackState: controller.getFallbackState,
+    reset: controller.reset,
     "chat.message": async (
       input: ChatMessageInput,
       output: ChatMessageHandlerOutput,
@@ -128,7 +166,7 @@ export function createModelFallbackHook(args?: { toast?: FallbackToast; onApplie
       const { sessionID } = input
       if (!sessionID) return
 
-      const fallback = getNextFallback(sessionID)
+      const fallback = getNextFallback(controller, sessionID)
       if (!fallback) return
 
       await applyFallbackToChatMessage({
@@ -144,9 +182,8 @@ export function createModelFallbackHook(args?: { toast?: FallbackToast; onApplie
 }
 
 /**
- * Resets all module-global state for testing.
- * Clears pending fallbacks, toast keys, and session chains.
+ * Resets hook-owned state for testing.
  */
-export function _resetForTesting(): void {
-  getOrCreateModelFallbackController().reset()
+export function _resetForTesting(controller?: Pick<ModelFallbackStateController, "reset">): void {
+  controller?.reset()
 }

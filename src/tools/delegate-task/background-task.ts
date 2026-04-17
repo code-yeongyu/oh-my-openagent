@@ -8,7 +8,6 @@ import { formatDetailedError } from "./error-formatting"
 import { getSessionTools } from "../../shared/session-tools-store"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { QUESTION_DENIED_SESSION_PERMISSION } from "../../shared/question-denied-session-permission"
-import { setSessionFallbackChain } from "../../hooks/model-fallback/hook"
 import { stripAgentListSortPrefix } from "../../shared/agent-display-names"
 import { buildTaskMetadataBlock } from "../../features/tool-metadata-store/task-metadata-contract"
 import { resolveMetadataModel } from "./resolve-metadata-model"
@@ -19,6 +18,7 @@ function continueSessionSetup(args: {
   timing: ReturnType<typeof getTimingConfig>
   fallbackChain?: FallbackEntry[]
   category?: string
+  modelFallbackControllerAccessor?: ExecutorContext["modelFallbackControllerAccessor"]
 }): void {
   if (!args.fallbackChain && !args.category) {
     return
@@ -41,7 +41,7 @@ function continueSessionSetup(args: {
         continue
       }
 
-      setSessionFallbackChain(sessionId, args.fallbackChain)
+      args.modelFallbackControllerAccessor?.setSessionFallbackChain(sessionId, args.fallbackChain)
       if (args.category) {
         SessionCategoryRegistry.register(sessionId, args.category)
       }
@@ -106,6 +106,7 @@ export async function executeBackgroundTask(
           timing,
           fallbackChain,
           category: args.category,
+          modelFallbackControllerAccessor: executorCtx.modelFallbackControllerAccessor,
         })
         break
       }
@@ -113,7 +114,7 @@ export async function executeBackgroundTask(
     }
 
     if (sessionId) {
-      setSessionFallbackChain(sessionId, fallbackChain)
+      executorCtx.modelFallbackControllerAccessor?.setSessionFallbackChain(sessionId, fallbackChain)
     }
     if (args.category && sessionId) {
       SessionCategoryRegistry.register(sessionId, args.category)

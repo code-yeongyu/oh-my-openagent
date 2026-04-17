@@ -761,11 +761,10 @@ describe("createEventHandler - retry dedupe lifecycle", () => {
 		//#given
 		const sessionID = "ses_retry_recovery_rearm"
 		setMainSession(sessionID)
-		clearPendingModelFallback(sessionID)
-
 		const abortCalls: string[] = []
 		const promptCalls: string[] = []
 		const modelFallback = createModelFallbackHook()
+		clearPendingModelFallback(modelFallback, sessionID)
 
 		const eventHandler = createEventHandler({
 			ctx: asEventHandlerContext({

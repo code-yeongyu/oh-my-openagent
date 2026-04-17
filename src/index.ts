@@ -91,6 +91,7 @@ const serverPlugin: Plugin = async (input, _options): Promise<Hooks> => {
     pluginConfig,
     modelCacheState,
     backgroundManager: managers.backgroundManager,
+    modelFallbackControllerAccessor: managers.modelFallbackControllerAccessor,
     isHookEnabled,
     safeHookEnabled,
     mergedSkills: toolsResult.mergedSkills,

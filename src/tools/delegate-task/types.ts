@@ -1,6 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { BackgroundManager } from "../../features/background-agent"
 import type { CategoriesConfig, GitMasterConfig, BrowserAutomationProvider, AgentOverrides, SisyphusAgentConfig } from "../../config/schema"
+import type { ModelFallbackControllerAccessor } from "../../hooks/model-fallback"
 import type {
   AvailableCategory,
   AvailableSkill,
@@ -68,6 +69,7 @@ export interface DelegateTaskToolOptions {
   availableSkills?: AvailableSkill[]
   agentOverrides?: AgentOverrides
   sisyphusAgentConfig?: SisyphusAgentConfig
+  modelFallbackControllerAccessor?: ModelFallbackControllerAccessor
   onSyncSessionCreated?: (event: SyncSessionCreatedEvent) => Promise<void>
   syncPollTimeoutMs?: number
 }
