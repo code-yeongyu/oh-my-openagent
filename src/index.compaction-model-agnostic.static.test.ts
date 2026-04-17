@@ -13,7 +13,7 @@ describe("experimental.session.compacting", () => {
 
     //#then
     expect(hookIndex).toBeGreaterThanOrEqual(0)
-    expect(content.includes('modelID: "claude-opus-4-6"')).toBe(false)
+    expect(content.includes('modelID: "claude-opus-4-7"')).toBe(false)
     expect(hookSlice.includes("output.context.push")).toBe(true)
     expect(hookSlice.includes("providerID:")).toBe(false)
     expect(hookSlice.includes("modelID:")).toBe(false)

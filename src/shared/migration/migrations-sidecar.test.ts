@@ -42,7 +42,7 @@ describe("migrations sidecar", () => {
         JSON.stringify({
           appliedMigrations: [
             "model-version:openai/gpt-5.3-codex->openai/gpt-5.4",
-            "model-version:anthropic/claude-opus-4-5->anthropic/claude-opus-4-6",
+            "model-version:anthropic/claude-opus-4-5->anthropic/claude-opus-4-7",
           ],
         }),
       )
@@ -51,7 +51,7 @@ describe("migrations sidecar", () => {
 
       expect(applied.size).toBe(2)
       expect(applied.has("model-version:openai/gpt-5.3-codex->openai/gpt-5.4")).toBe(true)
-      expect(applied.has("model-version:anthropic/claude-opus-4-5->anthropic/claude-opus-4-6")).toBe(true)
+      expect(applied.has("model-version:anthropic/claude-opus-4-5->anthropic/claude-opus-4-7")).toBe(true)
     })
 
     test("returns an empty set on malformed JSON instead of throwing", () => {
@@ -134,7 +134,7 @@ describe("migrations sidecar", () => {
       const configPath = join(workdir, "oh-my-openagent.jsonc")
       const original = new Set([
         "model-version:openai/gpt-5.3-codex->openai/gpt-5.4",
-        "model-version:anthropic/claude-opus-4-5->anthropic/claude-opus-4-6",
+        "model-version:anthropic/claude-opus-4-5->anthropic/claude-opus-4-7",
       ])
 
       writeAppliedMigrations(configPath, original)

@@ -24,7 +24,7 @@ const selectFallbackProviderMock = mock((providers: string[], preferredProviderI
 const transformModelForProviderMock = mock((provider: string, model: string) => {
   if (provider === "github-copilot") {
     return model
-      .replace("claude-opus-4-6", "claude-opus-4.6")
+      .replace("claude-opus-4-7", "claude-opus-4.7")
       .replace("claude-sonnet-4-6", "claude-sonnet-4.6")
       .replace("claude-sonnet-4-5", "claude-sonnet-4.5")
       .replace("claude-haiku-4-5", "claude-haiku-4.5")
@@ -96,13 +96,13 @@ describe("model fallback hook", () => {
       "ses_model_fallback_main",
       "Sisyphus - Ultraworker",
       "anthropic",
-      "claude-opus-4-6-thinking",
+      "claude-opus-4-7-thinking",
     )
     expect(set).toBe(true)
 
     const output = {
       message: {
-        model: { providerID: "anthropic", modelID: "claude-opus-4-6-thinking" },
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7-thinking" },
         variant: "max",
       },
       parts: [{ type: "text", text: "continue" }],
@@ -117,7 +117,7 @@ describe("model fallback hook", () => {
     //#then
     expect(output.message["model"]).toEqual({
       providerID: "anthropic",
-      modelID: "claude-opus-4-6",
+      modelID: "claude-opus-4-7",
     })
   })
 
@@ -132,12 +132,12 @@ describe("model fallback hook", () => {
     const sessionID = "ses_model_fallback_main"
 
     expect(
-      setPendingModelFallback(sessionID, "Sisyphus - Ultraworker", "anthropic", "claude-opus-4-6-thinking"),
+      setPendingModelFallback(sessionID, "Sisyphus - Ultraworker", "anthropic", "claude-opus-4-7-thinking"),
     ).toBe(true)
 
     const firstOutput = {
       message: {
-        model: { providerID: "anthropic", modelID: "claude-opus-4-6-thinking" },
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7-thinking" },
         variant: "max",
       },
       parts: [{ type: "text", text: "continue" }],
@@ -149,17 +149,17 @@ describe("model fallback hook", () => {
     //#then
     expect(firstOutput.message["model"]).toEqual({
       providerID: "anthropic",
-      modelID: "claude-opus-4-6",
+      modelID: "claude-opus-4-7",
     })
 
     //#when - second error re-arms fallback and should advance to next entry
     expect(
-      setPendingModelFallback(sessionID, "Sisyphus - Ultraworker", "anthropic", "claude-opus-4-6"),
+      setPendingModelFallback(sessionID, "Sisyphus - Ultraworker", "anthropic", "claude-opus-4-7"),
     ).toBe(true)
 
     const secondOutput = {
       message: {
-        model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
       },
       parts: [{ type: "text", text: "continue" }],
     }
@@ -183,13 +183,13 @@ describe("model fallback hook", () => {
       sessionID,
       "Sisyphus - Ultraworker",
       "anthropic",
-      "claude-opus-4-6-thinking",
+      "claude-opus-4-7-thinking",
     )
     const secondSet = setPendingModelFallback(
       sessionID,
       "Sisyphus - Ultraworker",
       "anthropic",
-      "claude-opus-4-6-thinking",
+      "claude-opus-4-7-thinking",
     )
 
     //#then
@@ -211,7 +211,7 @@ describe("model fallback hook", () => {
     }
 
     setSessionFallbackChain(sessionID, [
-      { providers: ["anthropic"], model: "claude-opus-4-6" },
+      { providers: ["anthropic"], model: "claude-opus-4-7" },
       { providers: ["opencode"], model: "kimi-k2.5-free" },
     ])
 
@@ -220,13 +220,13 @@ describe("model fallback hook", () => {
         sessionID,
         "Sisyphus - Ultraworker",
         "anthropic",
-        "claude-opus-4-6",
+        "claude-opus-4-7",
       ),
     ).toBe(true)
 
     const output = {
       message: {
-        model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
       },
       parts: [{ type: "text", text: "continue" }],
     }
@@ -255,7 +255,7 @@ describe("model fallback hook", () => {
     }
 
     setSessionFallbackChain(sessionID, [
-      { providers: ["quotio"], model: "claude-opus-4-6", variant: "max" },
+      { providers: ["quotio"], model: "claude-opus-4-7", variant: "max" },
       { providers: ["quotio"], model: "gpt-5.2" },
     ])
 
@@ -264,13 +264,13 @@ describe("model fallback hook", () => {
         sessionID,
         "Sisyphus - Ultraworker",
         "quotio",
-        "claude-opus-4-6",
+        "claude-opus-4-7",
       ),
     ).toBe(true)
 
     const output = {
       message: {
-        model: { providerID: "quotio", modelID: "claude-opus-4-6" },
+        model: { providerID: "quotio", modelID: "claude-opus-4-7" },
         variant: "max",
       },
       parts: [{ type: "text", text: "continue" }],
@@ -369,13 +369,13 @@ describe("model fallback hook", () => {
       "ses_model_fallback_toast",
       "Sisyphus - Ultraworker",
       "anthropic",
-      "claude-opus-4-6-thinking",
+      "claude-opus-4-7-thinking",
     )
     expect(set).toBe(true)
 
     const output = {
       message: {
-        model: { providerID: "anthropic", modelID: "claude-opus-4-6-thinking" },
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7-thinking" },
         variant: "max",
       },
       parts: [{ type: "text", text: "continue" }],
