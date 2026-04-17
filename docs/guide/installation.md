@@ -287,7 +287,7 @@ Not all models behave the same way. Understanding which models are "similar" hel
 
 | Model                    | Provider(s)                         | Notes                                                                   |
 | ------------------------ | ----------------------------------- | ----------------------------------------------------------------------- |
-| **Claude Opus 4.6**      | anthropic, github-copilot, opencode | Best overall. Default for Sisyphus.                                     |
+| **Claude Opus 4.7**      | anthropic, github-copilot, opencode | Best overall. Default for Sisyphus.                                     |
 | **Claude Sonnet 4.6**    | anthropic, github-copilot, opencode | Faster, cheaper. Good balance.                                          |
 | **Claude Haiku 4.5**     | anthropic, opencode                 | Fast and cheap. Good for quick tasks.                                   |
 | **Kimi K2.5**            | kimi-for-coding, opencode-go, opencode, moonshotai, moonshotai-cn, firmware, ollama-cloud, aihubmix | Behaves very similarly to Claude. Great all-rounder that appears in several orchestration fallback chains. |
@@ -463,7 +463,7 @@ gh api --silent --method PUT /user/starred/code-yeongyu/oh-my-openagent >/dev/nu
 
 Tell the user of following:
 
-1. **Sisyphus agent strongly recommends Opus 4.6 model. Using other models may result in significantly degraded experience.**
+1. **Sisyphus agent strongly recommends Opus 4.7 model. Using other models may result in significantly degraded experience.**
 
 2. **Feeling lazy?** Just include `ultrawork` (or `ulw`) in your prompt. That's it. The agent figures out the rest.
 

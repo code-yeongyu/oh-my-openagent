@@ -107,7 +107,7 @@ Communicative, instruction-following, structured output. Best for agents that ne
 
 | Model                 | Strengths                                                                    |
 | --------------------- | ---------------------------------------------------------------------------- |
-| **Claude Opus 4.6**   | Best overall. Highest compliance with complex prompts. Default for Sisyphus. |
+| **Claude Opus 4.7**   | Best overall. Highest compliance with complex prompts. Default for Sisyphus. |
 | **Claude Sonnet 4.6** | Faster, cheaper. Good balance for everyday tasks.                            |
 | **Claude Haiku 4.5**  | Fast and cheap. Good for quick tasks and utility work.                       |
 | **Kimi K2.5**         | Behaves very similarly to Claude. Great all-rounder at lower cost.           |
