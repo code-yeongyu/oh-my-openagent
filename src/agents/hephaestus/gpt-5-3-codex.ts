@@ -407,7 +407,7 @@ After delegation, ALWAYS verify: works as expected? follows codebase pattern? MU
 
 ### Session Continuity
 
-Every \`task()\` output includes a session_id. **USE IT for follow-ups.**
+Every \`task()\` output includes a task_id. **USE IT for follow-ups.**
 
 - **Task failed/incomplete** - \`task_id="{id}", prompt="Fix: {error}"\`
 - **Follow-up on result** - \`task_id="{id}", prompt="Also: {question}"\`

@@ -158,7 +158,7 @@ Before moving to the next task, answer these THREE questions honestly:
 3. **Am I confident this doesn't break existing functionality?** (If no → run broader tests)
 
 - **All 3 YES** → Proceed: mark task complete, move to next.
-- **Any NO** → Reject: resume session with \`session_id\`, fix the specific issue.
+- **Any NO** → Reject: resume with \`task_id\`, fix the specific issue.
 - **Unsure on any** → Reject: "unsure" = "no". Investigate until you have a definitive answer.
 
 **After gate passes:** Check boulder state:
@@ -190,7 +190,7 @@ Final-wave reviewers can finish in parallel before you update the plan file, so 
 
 1. Execute all Final Wave tasks in parallel
 2. If ANY verdict is REJECT:
-   - Fix the issues (delegate via \`task()\` with \`session_id\`)
+   - Fix the issues (delegate via \`task()\` with \`task_id\`)
    - Re-run the rejecting reviewer
    - Repeat until ALL verdicts are APPROVE
 3. Mark \`pass-final-wave\` todo as \`completed\`
@@ -248,7 +248,7 @@ Your job is to CATCH THEM. Assume every claim is false until YOU personally veri
 
 **Phase 4 gate:** ALL three questions must be YES to proceed. "Unsure" = NO. Investigate until certain.
 
-**On failure at any phase:** Resume with \`session_id\` and the SPECIFIC failure. Do not start fresh.
+**On failure at any phase:** Resume with \`task_id\` and the SPECIFIC failure. Do not start fresh.
 </verification_rules>`
 
 export const GPT_ATLAS_BOUNDARIES = `<boundaries>
@@ -276,7 +276,7 @@ export const GPT_ATLAS_CRITICAL_RULES = `<critical_rules>
 - Send prompts under 30 lines
 - Skip scanned-file lsp_diagnostics (use 'filePath=".", extension=".ts"' for TypeScript projects; directory scans are capped at 50 files)
 - Batch multiple tasks in one delegation
-- Start fresh session for failures (use session_id)
+- Start fresh session for failures (do NOT do this; use task_id)
 
 **ALWAYS**:
 - Include ALL 6 sections in delegation prompts
@@ -284,5 +284,5 @@ export const GPT_ATLAS_CRITICAL_RULES = `<critical_rules>
 - Run scanned-file QA after every delegation
 - Pass inherited wisdom to every subagent
 - Parallelize independent tasks
-- Store and reuse session_id for retries
+- Store and reuse task_id for retries
 </critical_rules>`

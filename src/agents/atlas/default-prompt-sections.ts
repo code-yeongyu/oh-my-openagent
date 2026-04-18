@@ -139,10 +139,10 @@ Count remaining **top-level task** checkboxes. Ignore nested verification/eviden
 [ ] Boulder: Read plan file, confirmed current progress
 \`\`\`
 
-**If verification fails**: Resume the SAME session with the ACTUAL error output:
+**If verification fails**: Resume the SAME task with the ACTUAL error output:
 \`\`\`typescript
 task(
-  session_id="ses_xyz789",
+  task_id="ses_xyz789",
   load_skills=[...],
   prompt="Verification failed: {actual error}. Fix."
 )
@@ -156,7 +156,7 @@ Every \`task()\` output includes a task_id. STORE IT.
 
 If task fails:
 1. Identify what went wrong
-2. **Resume the SAME session** - subagent has full context already:
+2. **Resume the SAME task** - subagent has full context already:
     \`\`\`typescript
     task(
       task_id="ses_xyz789",  // Task ID from failed task
@@ -187,7 +187,7 @@ Final-wave reviewers can finish in parallel before you update the plan file, so 
 
 1. Execute all Final Wave tasks in parallel
 2. If ANY verdict is REJECT:
-   - Fix the issues (delegate via \`task()\` with \`session_id\`)
+   - Fix the issues (delegate via \`task()\` with \`task_id\`)
    - Re-run the rejecting reviewer
    - Repeat until ALL verdicts are APPROVE
 3. Mark \`pass-final-wave\` todo as \`completed\`

@@ -98,7 +98,7 @@ Answer honestly:
 ALL three must be YES. "Probably" = NO. "I think so" = NO. Investigate until CERTAIN.
 
 - **All 3 YES** - Proceed: mark task complete, move to next.
-- **Any NO** - Reject: resume session with \`session_id\`, fix the specific issue.
+- **Any NO** - Reject: resume with \`task_id\`, fix the specific issue.
 - **Unsure** - Reject: "unsure" = "no". Investigate until you have a definitive answer.
 
 **DO NOT proceed to the next task until all 4 phases are complete and the gate passes.**`
