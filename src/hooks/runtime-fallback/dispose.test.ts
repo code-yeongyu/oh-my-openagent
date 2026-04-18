@@ -107,9 +107,10 @@ describe("createRuntimeFallbackHook dispose", () => {
     globalThis.clearTimeout = originalClearTimeout
   })
 
-  test("#given runtime-fallback hook created #when dispose() is called #then cleanup interval is cleared", () => {
+  test("#given runtime-fallback hook handles its first event #when dispose() is called #then cleanup interval is cleared", async () => {
     // given
     const hook = createRuntimeFallbackHook(createMockContext(), { pluginConfig: {} })
+    await hook.event({ event: { type: "session.created", properties: {} } })
 
     // when
     hook.dispose?.()
