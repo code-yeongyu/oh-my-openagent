@@ -3,6 +3,7 @@ import { createDynamicTruncator } from "../../shared/dynamic-truncator";
 import { getRuleInjectionFilePath } from "./output-path";
 import { createSessionCacheStore } from "./cache";
 import { createRuleInjectionProcessor } from "./injector";
+import { clearProjectRootCache } from "./project-root-finder";
 
 interface ToolExecuteInput {
   tool: string;
@@ -75,6 +76,7 @@ export function createRulesInjectorHook(
       if (sessionInfo?.id) {
         clearSessionCache(sessionInfo.id);
       }
+      clearProjectRootCache();
     }
 
     if (event.type === "session.compacted") {
@@ -83,6 +85,7 @@ export function createRulesInjectorHook(
       if (sessionID) {
         clearSessionCache(sessionID);
       }
+      clearProjectRootCache();
     }
   };
 
