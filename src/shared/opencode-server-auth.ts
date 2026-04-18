@@ -78,7 +78,7 @@ function tryInjectViaInterceptors(internal: UnknownRecord, auth: string): boolea
     return false
   }
 
-  use((request: Request): Request => {
+  requestInterceptors.use((request: Request): Request => {
     if (!request.headers.get("Authorization")) {
       request.headers.set("Authorization", auth)
     }
