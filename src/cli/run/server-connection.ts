@@ -5,6 +5,17 @@ import { injectServerAuthIntoClient } from "../../shared/opencode-server-auth"
 import { getAvailableServerPort, isPortAvailable, DEFAULT_SERVER_PORT } from "../../shared/port-utils"
 import { withWorkingOpencodePath } from "./opencode-binary-resolver"
 
+const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "::1", "[::1]", "0.0.0.0"])
+
+function isLoopbackAttachUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url)
+    return LOOPBACK_HOSTS.has(parsed.hostname)
+  } catch {
+    return false
+  }
+}
+
 function isPortStartFailure(error: unknown, port: number): boolean {
   if (!(error instanceof Error)) {
     return false
@@ -41,7 +52,9 @@ export async function createServerConnection(options: {
   if (attach !== undefined) {
     console.log(pc.dim("Attaching to existing server at"), pc.cyan(attach))
     const client = createOpencodeClient({ baseUrl: attach })
-    injectServerAuthIntoClient(client)
+    if (isLoopbackAttachUrl(attach)) {
+      injectServerAuthIntoClient(client)
+    }
     return { client, cleanup: () => {} }
   }
 
