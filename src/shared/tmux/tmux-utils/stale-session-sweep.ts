@@ -10,7 +10,7 @@ function isProcessAlive(pid: number): boolean {
 	}
 }
 
-async function listOmoAgentSessions(tmux: string): Promise<string[]> {
+async function listOmoAgentSessionsViaTmux(tmux: string): Promise<string[]> {
 	const { spawn } = await import("./spawn-process")
 	const proc = spawn([tmux, "list-sessions", "-F", "#{session_name}"], {
 		stdout: "pipe",
@@ -32,7 +32,17 @@ async function listOmoAgentSessions(tmux: string): Promise<string[]> {
 		.filter((name) => STALE_SESSION_PATTERN.test(name))
 }
 
-export async function sweepStaleOmoAgentSessions(): Promise<number> {
+export type SweepDeps = {
+	isInsideTmux: () => boolean
+	getTmuxPath: () => Promise<string | null | undefined>
+	listCandidateSessions: (tmux: string) => Promise<string[]>
+	killSession: (sessionName: string) => Promise<boolean>
+	processAlive: (pid: number) => boolean
+	currentPid: number
+	log: (message: string, payload?: unknown) => void
+}
+
+async function buildRuntimeDeps(): Promise<SweepDeps> {
 	const [{ log }, { isInsideTmux }, { getTmuxPath }, { killTmuxSessionIfExists }] = await Promise.all([
 		import("../../logger"),
 		import("./environment"),
@@ -40,16 +50,28 @@ export async function sweepStaleOmoAgentSessions(): Promise<number> {
 		import("./session-kill"),
 	])
 
-	if (!isInsideTmux()) {
+	return {
+		isInsideTmux,
+		getTmuxPath,
+		listCandidateSessions: listOmoAgentSessionsViaTmux,
+		killSession: killTmuxSessionIfExists,
+		processAlive: isProcessAlive,
+		currentPid: process.pid,
+		log,
+	}
+}
+
+export async function sweepStaleOmoAgentSessionsWith(deps: SweepDeps): Promise<number> {
+	if (!deps.isInsideTmux()) {
 		return 0
 	}
 
-	const tmux = await getTmuxPath()
+	const tmux = await deps.getTmuxPath()
 	if (!tmux) {
 		return 0
 	}
 
-	const candidateSessions = await listOmoAgentSessions(tmux)
+	const candidateSessions = await deps.listCandidateSessions(tmux)
 	let killedCount = 0
 
 	for (const sessionName of candidateSessions) {
@@ -58,15 +80,20 @@ export async function sweepStaleOmoAgentSessions(): Promise<number> {
 
 		const pid = Number.parseInt(pidMatch[1], 10)
 		if (!Number.isFinite(pid)) continue
-		if (pid === process.pid) continue
-		if (isProcessAlive(pid)) continue
+		if (pid === deps.currentPid) continue
+		if (deps.processAlive(pid)) continue
 
-		log("[sweepStaleOmoAgentSessions] killing stale session", { sessionName, deadPid: pid })
-		const killed = await killTmuxSessionIfExists(sessionName)
+		deps.log("[sweepStaleOmoAgentSessions] killing stale session", { sessionName, deadPid: pid })
+		const killed = await deps.killSession(sessionName)
 		if (killed) {
 			killedCount += 1
 		}
 	}
 
 	return killedCount
+}
+
+export async function sweepStaleOmoAgentSessions(): Promise<number> {
+	const deps = await buildRuntimeDeps()
+	return sweepStaleOmoAgentSessionsWith(deps)
 }

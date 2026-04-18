@@ -1,188 +1,154 @@
-import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
+import { beforeEach, describe, expect, it, mock } from "bun:test"
+import { sweepStaleOmoAgentSessionsWith, type SweepDeps } from "./stale-session-sweep"
 
-type SweepStaleOmoAgentSessions = typeof import("./stale-session-sweep").sweepStaleOmoAgentSessions
-
-type SpawnCall = { command: string[] }
-
-type FakeSubprocess = {
-	exited: Promise<number>
-	stdout: ReadableStream<Uint8Array>
-	stderr: ReadableStream<Uint8Array>
+type SweepFixture = {
+	deps: SweepDeps
+	candidates: string[]
+	killed: string[]
+	killSessionMock: ReturnType<typeof mock>
+	setCandidates: (sessions: string[]) => void
+	setAlive: (predicate: (pid: number) => boolean) => void
 }
 
-const spawnCalls: SpawnCall[] = []
-const queuedProcesses: FakeSubprocess[] = []
+function createFixture(): SweepFixture {
+	const candidates: string[] = []
+	const killed: string[] = []
+	let aliveCheck: (pid: number) => boolean = () => false
 
-function createClosedStream(): ReadableStream<Uint8Array> {
-	return new ReadableStream({ start(controller) { controller.close() } })
-}
-
-function createTextStream(text: string): ReadableStream<Uint8Array> {
-	return new ReadableStream({
-		start(controller) {
-			controller.enqueue(new TextEncoder().encode(text))
-			controller.close()
-		},
+	const killSessionMock = mock(async (sessionName: string): Promise<boolean> => {
+		killed.push(sessionName)
+		return true
 	})
-}
 
-function makeProcess(exitCode: number, stdoutText: string): FakeSubprocess {
+	const deps: SweepDeps = {
+		isInsideTmux: () => true,
+		getTmuxPath: async () => "tmux",
+		listCandidateSessions: async () => [...candidates],
+		killSession: killSessionMock,
+		processAlive: (pid) => aliveCheck(pid),
+		currentPid: 12345,
+		log: () => undefined,
+	}
+
 	return {
-		exited: Promise.resolve(exitCode),
-		stdout: createTextStream(stdoutText),
-		stderr: createClosedStream(),
+		deps,
+		candidates,
+		killed,
+		killSessionMock,
+		setCandidates: (sessions) => {
+			candidates.length = 0
+			candidates.push(...sessions)
+		},
+		setAlive: (predicate) => {
+			aliveCheck = predicate
+		},
 	}
 }
 
-const spawnMock = mock((command: string[]): FakeSubprocess => {
-	spawnCalls.push({ command })
-	const process = queuedProcesses.shift()
-	if (!process) {
-		throw new Error(`No fake subprocess configured for ${command.join(" ")}`)
-	}
-	return process
-})
+describe("sweepStaleOmoAgentSessionsWith", () => {
+	let fixture: SweepFixture
 
-const isInsideTmuxMock = mock((): boolean => true)
-const getTmuxPathMock = mock(async (): Promise<string | undefined> => "tmux")
-const logMock = mock(() => undefined)
-const killTmuxSessionMock = mock(async (_name: string): Promise<boolean> => true)
-const isProcessAliveMock = mock((_pid: number): boolean => false)
-
-const sweepSpecifier = import.meta.resolve("./stale-session-sweep")
-const spawnProcessSpecifier = import.meta.resolve("./spawn-process")
-const environmentSpecifier = import.meta.resolve("./environment")
-const loggerSpecifier = import.meta.resolve("../../logger")
-const tmuxPathResolverSpecifier = import.meta.resolve("../../../tools/interactive-bash/tmux-path-resolver")
-const sessionKillSpecifier = import.meta.resolve("./session-kill")
-
-function registerModuleMocks(): void {
-	mock.module(spawnProcessSpecifier, () => ({ spawn: spawnMock }))
-	mock.module(environmentSpecifier, () => ({ isInsideTmux: isInsideTmuxMock }))
-	mock.module(loggerSpecifier, () => ({ log: logMock }))
-	mock.module(tmuxPathResolverSpecifier, () => ({ getTmuxPath: getTmuxPathMock }))
-	mock.module(sessionKillSpecifier, () => ({ killTmuxSessionIfExists: killTmuxSessionMock }))
-}
-
-const originalProcessKill = process.kill
-
-async function loadSweeper(overrideProcessAlive?: (pid: number) => boolean): Promise<SweepStaleOmoAgentSessions> {
-	const processAlive = overrideProcessAlive ?? isProcessAliveMock
-	process.kill = ((pid: number, signal?: number | string): true => {
-		if (signal === 0) {
-			if (processAlive(pid)) {
-				return true
-			}
-			const err = new Error("ESRCH") as NodeJS.ErrnoException
-			err.code = "ESRCH"
-			throw err
-		}
-		return originalProcessKill.call(process, pid, signal)
-	}) as typeof process.kill
-	const module = await import(`${sweepSpecifier}?test=${crypto.randomUUID()}`)
-	return module.sweepStaleOmoAgentSessions
-}
-
-describe("sweepStaleOmoAgentSessions", () => {
 	beforeEach(() => {
-		registerModuleMocks()
-		spawnCalls.length = 0
-		queuedProcesses.length = 0
-		spawnMock.mockClear()
-		isInsideTmuxMock.mockClear()
-		getTmuxPathMock.mockClear()
-		logMock.mockClear()
-		killTmuxSessionMock.mockClear()
-		isProcessAliveMock.mockClear()
-
-		isInsideTmuxMock.mockImplementation((): boolean => true)
-		getTmuxPathMock.mockImplementation(async (): Promise<string | undefined> => "tmux")
-		killTmuxSessionMock.mockImplementation(async (_name: string): Promise<boolean> => true)
-		isProcessAliveMock.mockImplementation((_pid: number): boolean => false)
+		fixture = createFixture()
 	})
 
-	afterEach(() => {
-		process.kill = originalProcessKill
-	})
-
-	it("#given not inside tmux #when sweepStaleOmoAgentSessions called #then returns 0 without spawn", async () => {
+	it("#given not inside tmux #when sweep called #then returns 0 without listing", async () => {
 		// given
-		isInsideTmuxMock.mockImplementation((): boolean => false)
-		const sweep = await loadSweeper()
+		const deps: SweepDeps = { ...fixture.deps, isInsideTmux: () => false }
 
 		// when
-		const result = await sweep()
+		const result = await sweepStaleOmoAgentSessionsWith(deps)
 
 		// then
 		expect(result).toBe(0)
-		expect(spawnCalls).toHaveLength(0)
 	})
 
-	it("#given no omo-agents sessions exist #when sweepStaleOmoAgentSessions called #then returns 0", async () => {
+	it("#given tmux not found #when sweep called #then returns 0 without listing", async () => {
 		// given
-		queuedProcesses.push(makeProcess(0, "other-session\nmain\n"))
-		const sweep = await loadSweeper()
+		const deps: SweepDeps = { ...fixture.deps, getTmuxPath: async () => undefined }
 
 		// when
-		const result = await sweep()
+		const result = await sweepStaleOmoAgentSessionsWith(deps)
 
 		// then
 		expect(result).toBe(0)
-		expect(killTmuxSessionMock).toHaveBeenCalledTimes(0)
 	})
 
-	it("#given omo-agents sessions with dead PIDs #when sweepStaleOmoAgentSessions called #then each dead session is killed", async () => {
+	it("#given candidate list is empty #when sweep called #then returns 0 and does not kill anything", async () => {
 		// given
-		queuedProcesses.push(makeProcess(0, "omo-agents-99991\nomo-agents-99992\nunrelated\n"))
-		const sweep = await loadSweeper(() => false)
+		fixture.setCandidates([])
 
 		// when
-		const result = await sweep()
+		const result = await sweepStaleOmoAgentSessionsWith(fixture.deps)
+
+		// then
+		expect(result).toBe(0)
+		expect(fixture.killed).toEqual([])
+	})
+
+	it("#given sessions with dead PIDs #when sweep called #then each dead session is killed once", async () => {
+		// given
+		fixture.setCandidates(["omo-agents-99991", "omo-agents-99992"])
+		fixture.setAlive(() => false)
+
+		// when
+		const result = await sweepStaleOmoAgentSessionsWith(fixture.deps)
 
 		// then
 		expect(result).toBe(2)
-		expect(killTmuxSessionMock).toHaveBeenCalledTimes(2)
-		expect(killTmuxSessionMock.mock.calls[0]?.[0]).toBe("omo-agents-99991")
-		expect(killTmuxSessionMock.mock.calls[1]?.[0]).toBe("omo-agents-99992")
+		expect(fixture.killed).toEqual(["omo-agents-99991", "omo-agents-99992"])
 	})
 
-	it("#given session matches current PID #when sweepStaleOmoAgentSessions called #then it is not killed", async () => {
+	it("#given session matches current PID #when sweep called #then it is NOT killed", async () => {
 		// given
-		queuedProcesses.push(makeProcess(0, `omo-agents-${process.pid}\nomo-agents-99999\n`))
-		const sweep = await loadSweeper(() => false)
+		fixture.setCandidates([`omo-agents-${fixture.deps.currentPid}`, "omo-agents-99999"])
+		fixture.setAlive(() => false)
 
 		// when
-		const result = await sweep()
+		const result = await sweepStaleOmoAgentSessionsWith(fixture.deps)
 
 		// then
 		expect(result).toBe(1)
-		expect(killTmuxSessionMock).toHaveBeenCalledTimes(1)
-		expect(killTmuxSessionMock.mock.calls[0]?.[0]).toBe("omo-agents-99999")
+		expect(fixture.killed).toEqual(["omo-agents-99999"])
 	})
 
-	it("#given session PID is still alive #when sweepStaleOmoAgentSessions called #then it is not killed", async () => {
+	it("#given session PID is still alive #when sweep called #then it is NOT killed", async () => {
 		// given
-		queuedProcesses.push(makeProcess(0, "omo-agents-88888\n"))
-		const sweep = await loadSweeper((pid) => pid === 88888)
+		fixture.setCandidates(["omo-agents-88888"])
+		fixture.setAlive((pid) => pid === 88888)
 
 		// when
-		const result = await sweep()
+		const result = await sweepStaleOmoAgentSessionsWith(fixture.deps)
 
 		// then
 		expect(result).toBe(0)
-		expect(killTmuxSessionMock).toHaveBeenCalledTimes(0)
+		expect(fixture.killed).toEqual([])
 	})
 
-	it("#given list-sessions fails #when sweepStaleOmoAgentSessions called #then returns 0 without killing", async () => {
+	it("#given killSession returns false #when sweep called #then session is not counted toward killedCount", async () => {
 		// given
-		queuedProcesses.push(makeProcess(1, ""))
-		const sweep = await loadSweeper(() => false)
+		fixture.setCandidates(["omo-agents-55555"])
+		fixture.setAlive(() => false)
+		fixture.killSessionMock.mockImplementation(async () => false)
 
 		// when
-		const result = await sweep()
+		const result = await sweepStaleOmoAgentSessionsWith(fixture.deps)
 
 		// then
 		expect(result).toBe(0)
-		expect(killTmuxSessionMock).toHaveBeenCalledTimes(0)
+		expect(fixture.killSessionMock).toHaveBeenCalledTimes(1)
+	})
+
+	it("#given non-matching sessions mixed in #when sweep called #then only omo-agents-<pid> sessions are considered", async () => {
+		// given
+		fixture.setCandidates(["main", "omo-agents-99999", "other-session", "omo-agents-abc"])
+		fixture.setAlive(() => false)
+
+		// when
+		const result = await sweepStaleOmoAgentSessionsWith(fixture.deps)
+
+		// then
+		expect(result).toBe(1)
+		expect(fixture.killed).toEqual(["omo-agents-99999"])
 	})
 })
