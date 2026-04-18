@@ -1,4 +1,5 @@
 import type { HookDeps, RuntimeFallbackHook, RuntimeFallbackInterval, RuntimeFallbackOptions, RuntimeFallbackPluginInput, RuntimeFallbackTimeout } from "./types"
+import { clearAllRuntimeFallbackActiveSessions } from "./active-session-state"
 import { DEFAULT_CONFIG } from "./constants"
 import { createAutoRetryHelpers } from "./auto-retry"
 import { createEventHandler } from "./event-handler"
@@ -81,6 +82,7 @@ export function createRuntimeFallbackHook(
     deps.sessionAwaitingFallbackResult.clear()
     deps.sessionFallbackTimeouts.clear()
     deps.sessionStatusRetryKeys.clear()
+    clearAllRuntimeFallbackActiveSessions()
   }
 
   return {

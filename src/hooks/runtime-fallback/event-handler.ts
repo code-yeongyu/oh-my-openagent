@@ -1,5 +1,6 @@
 import type { HookDeps } from "./types"
 import type { AutoRetryHelpers } from "./auto-retry"
+import { clearRuntimeFallbackActive } from "./active-session-state"
 import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
 import { extractStatusCode, extractErrorName, classifyErrorType, isRetryableError } from "./error-classifier"
@@ -26,6 +27,7 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
     sessionAwaitingFallbackResult.delete(sessionID)
     sessionStatusRetryKeys.delete(sessionID)
     helpers.clearSessionFallbackTimeout(sessionID)
+    clearRuntimeFallbackActive(sessionID)
   }
 
   const handleSessionCreated = (props: Record<string, unknown> | undefined) => {
@@ -53,6 +55,7 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
       sessionAwaitingFallbackResult.delete(sessionID)
       helpers.clearSessionFallbackTimeout(sessionID)
       sessionStatusRetryKeys.delete(sessionID)
+      clearRuntimeFallbackActive(sessionID)
       SessionCategoryRegistry.remove(sessionID)
     }
   }
@@ -108,6 +111,8 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
     if (hadTimeout) {
       log(`[${HOOK_NAME}] Cleared fallback timeout after session completion`, { sessionID })
     }
+
+    clearRuntimeFallbackActive(sessionID)
   }
 
   const handleSessionError = async (props: Record<string, unknown> | undefined) => {

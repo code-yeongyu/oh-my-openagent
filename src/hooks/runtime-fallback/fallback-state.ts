@@ -1,4 +1,5 @@
 import type { FallbackState, FallbackResult } from "./types"
+import { markRuntimeFallbackActive } from "./active-session-state"
 import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
 import type { RuntimeFallbackConfig } from "../../config"
@@ -69,6 +70,7 @@ export function prepareFallback(
   state.attemptCount++
   state.currentModel = nextModel
   state.pendingFallbackModel = nextModel
+  markRuntimeFallbackActive(sessionID)
 
   return { success: true, newModel: nextModel }
 }
