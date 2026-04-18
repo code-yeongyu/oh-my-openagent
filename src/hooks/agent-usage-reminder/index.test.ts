@@ -77,4 +77,20 @@ describe("agent-usage-reminder hook", () => {
 
     clearSessionAgent(sessionID);
   });
+
+  test("does not re-arm after session.compacted when task delegation already happened", async () => {
+    const hook = createHook();
+    const sessionID = "agent-usage-delegated-session";
+    updateSessionAgent(sessionID, "Sisyphus");
+
+    const output = { title: "", output: "result", metadata: {} };
+
+    await hook["tool.execute.after"]({ tool: "task", sessionID, callID: "1" }, output);
+    await hook.event({ event: { type: "session.compacted", properties: { sessionID } } });
+    await hook["tool.execute.after"]({ tool: "grep", sessionID, callID: "2" }, output);
+
+    expect(output.output).not.toContain("[Agent Usage Reminder]");
+
+    clearSessionAgent(sessionID);
+  });
 });
