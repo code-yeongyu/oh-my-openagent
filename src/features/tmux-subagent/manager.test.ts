@@ -1056,6 +1056,27 @@ describe('TmuxSessionManager', () => {
         logSpy.mockRestore()
       })
     })
+
+    test('#given session.status never reports session ready #when onSessionCreated runs #then pane is tracked immediately without blocking', async () => {
+      // given
+      mockIsInsideTmux.mockReturnValue(true)
+      mockQueryWindowState.mockImplementation(async () => createWindowState())
+
+      const { TmuxSessionManager } = await import('./manager')
+      const ctx = createMockContext({ sessionStatusResult: { data: {} } })
+      const config = createTmuxConfig({ enabled: true })
+      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+      const event = createSessionCreatedEvent('ses_fast_track', 'ses_parent', 'Fast Track')
+
+      // when
+      const start = Date.now()
+      await manager.onSessionCreated(event)
+      const elapsed = Date.now() - start
+
+      // then
+      expect(elapsed < 500).toBe(true)
+      expect(getTrackedSessions(manager).has('ses_fast_track')).toBe(true)
+    })
   })
 
   describe('onSessionDeleted', () => {
