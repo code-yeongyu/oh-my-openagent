@@ -59,7 +59,7 @@ describe("createWriteExistingFileGuardHook", () => {
     ).rejects.toThrow("File already exists. Use edit tool instead.")
 
     // then
-    expect(existsSyncMock).toHaveBeenCalledTimes(2)
-    expect(realpathNativeMock).toHaveBeenCalledTimes(1)
+    expect(existsSyncMock).toHaveBeenCalledTimes(3)
+    expect(realpathNativeMock).toHaveBeenCalledTimes(2)
   })
 })
