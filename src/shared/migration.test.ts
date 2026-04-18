@@ -412,6 +412,17 @@ describe("migrateConfigFile", () => {
     expect(agents["sisyphus"]).toBeDefined()
   })
 
+  test("migrates default_agent from display name to config key", () => {
+    const rawConfig: Record<string, unknown> = {
+      default_agent: "Sisyphus - Ultraworker",
+    }
+
+    const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
+
+    expect(needsWrite).toBe(true)
+    expect(rawConfig.default_agent).toBe("sisyphus")
+  })
+
   test("migrates legacy hook names in disabled_hooks", () => {
     // given: Config with legacy hook names
     const rawConfig: Record<string, unknown> = {
@@ -555,6 +566,9 @@ describe("migration maps", () => {
     expect(AGENT_NAME_MAP["OmO-Plan"]).toBe("prometheus")
     expect(AGENT_NAME_MAP["omo-plan"]).toBe("prometheus")
     expect(AGENT_NAME_MAP["Planner-Sisyphus"]).toBe("prometheus")
+    expect(AGENT_NAME_MAP["Sisyphus - Ultraworker"]).toBe("sisyphus")
+    expect(AGENT_NAME_MAP["Hephaestus - Deep Agent"]).toBe("hephaestus")
+    expect(AGENT_NAME_MAP["Atlas - Plan Executor"]).toBe("atlas")
     expect(AGENT_NAME_MAP["plan-consultant"]).toBe("metis")
   })
 

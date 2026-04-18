@@ -197,6 +197,29 @@ describe("Sisyphus-Junior model inheritance", () => {
   })
 })
 
+describe("default_agent normalization", () => {
+  test("normalizes display-name default_agent to the runtime list entry", async () => {
+    const pluginConfig = createPluginConfig({})
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-7",
+      default_agent: "Sisyphus - Ultraworker",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    await handler(config)
+
+    expect(config.default_agent).toBe(getAgentListDisplayName("sisyphus"))
+  })
+})
+
 describe("MCP env allowlist initialization", () => {
   test("sets the configured MCP env allowlist before plugin loading", async () => {
     // given

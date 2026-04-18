@@ -2,7 +2,7 @@ import { createBuiltinAgents } from "../agents";
 import { createSisyphusJuniorAgentWithOverrides } from "../agents/sisyphus-junior";
 import type { OhMyOpenCodeConfig } from "../config";
 import { isTaskSystemEnabled, log, migrateAgentConfig } from "../shared";
-import { getAgentRuntimeName } from "../shared/agent-display-names";
+import { getAgentConfigKey, getAgentRuntimeName } from "../shared/agent-display-names";
 import { AGENT_NAME_MAP } from "../shared/migration";
 import { registerAgentName } from "../features/claude-code-session-state";
 import {
@@ -41,7 +41,9 @@ function getConfiguredDefaultAgent(config: Record<string, unknown>): string | un
   const defaultAgent = config.default_agent;
   if (typeof defaultAgent !== "string") return undefined;
   const trimmedDefaultAgent = defaultAgent.trim();
-  return trimmedDefaultAgent.length > 0 ? trimmedDefaultAgent : undefined;
+  if (trimmedDefaultAgent.length === 0) return undefined;
+
+  return getAgentConfigKey(trimmedDefaultAgent);
 }
 
 export async function applyAgentConfig(params: {

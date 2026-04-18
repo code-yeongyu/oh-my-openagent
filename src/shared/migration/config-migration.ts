@@ -1,4 +1,5 @@
 import * as fs from "node:fs"
+import { getAgentConfigKey } from "../agent-display-names"
 import { log } from "../logger"
 import { writeFileAtomically } from "../write-file-atomically"
 import { AGENT_NAME_MAP, migrateAgentNames } from "./agent-names"
@@ -125,6 +126,14 @@ export function migrateConfigFile(
     }
     if (changed) {
       copy.disabled_agents = migrated
+      needsWrite = true
+    }
+  }
+
+  if (typeof copy.default_agent === "string") {
+    const migratedDefaultAgent = getAgentConfigKey(copy.default_agent)
+    if (migratedDefaultAgent !== copy.default_agent) {
+      copy.default_agent = migratedDefaultAgent
       needsWrite = true
     }
   }
