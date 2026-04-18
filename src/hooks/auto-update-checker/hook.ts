@@ -3,7 +3,7 @@ import { log } from "../../shared/logger"
 import type { AutoUpdateCheckerOptions } from "./types"
 import { getCachedVersion, getLocalDevVersion } from "./checker"
 import { runBackgroundUpdateCheck } from "./hook/background-update-check"
-import { scheduleDeferredIdleCheck } from "./hook/deferred-idle-check"
+import { scheduleDeferredStartupCheck } from "./hook/deferred-startup-check"
 import { showConfigErrorsIfAny } from "./hook/config-errors-toast"
 import { updateAndShowConnectedProvidersCacheStatus } from "./hook/connected-providers-status"
 import { refreshModelCapabilitiesOnStartup } from "./hook/model-capabilities-status"
@@ -36,6 +36,20 @@ const defaultDeps: AutoUpdateCheckerDeps = {
   log,
 }
 
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+  return typeof value === "object" && value !== null
+}
+
+const getParentID = (properties: unknown): string | undefined => {
+  if (!isRecord(properties)) return undefined
+
+  const { info } = properties
+  if (!isRecord(info)) return undefined
+
+  const { parentID } = info
+  return typeof parentID === "string" && parentID.length > 0 ? parentID : undefined
+}
+
 export function createAutoUpdateCheckerHook(
   ctx: PluginInput,
   options: AutoUpdateCheckerOptions = {},
@@ -65,13 +79,14 @@ export function createAutoUpdateCheckerHook(
 
   return {
     event: ({ event }: { event: { type: string; properties?: unknown } }) => {
-      if (event.type !== "session.idle") return
+      if (event.type !== "session.created") return
       if (isCliRunMode) return
       if (hasChecked || hasScheduled) return
+      if (getParentID(event.properties)) return
 
       hasScheduled = true
 
-      scheduleDeferredIdleCheck(() => {
+      scheduleDeferredStartupCheck(() => {
         hasChecked = true
         void (async () => {
           const cachedVersion = deps.getCachedVersion()

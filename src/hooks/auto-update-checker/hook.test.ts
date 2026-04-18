@@ -6,7 +6,7 @@ type HookOptions = Parameters<CreateAutoUpdateCheckerHook>[1]
 type HookDeps = NonNullable<Parameters<CreateAutoUpdateCheckerHook>[2]>
 
 let latestVersionCallCount = 0
-let scheduleDeferredIdleCheckCallCount = 0
+let scheduleDeferredStartupCheckCallCount = 0
 
 const flushMicrotasks = async (count: number): Promise<void> => {
   for (let index = 0; index < count; index += 1) {
@@ -19,8 +19,8 @@ const latestVersionMock = async () => {
   return "3.0.1"
 }
 
-const scheduleDeferredIdleCheckMock = (runCheck: () => void) => {
-  scheduleDeferredIdleCheckCallCount += 1
+const scheduleDeferredStartupCheckMock = (runCheck: () => void) => {
+  scheduleDeferredStartupCheckCallCount += 1
   scheduledCheck = runCheck
 }
 
@@ -30,8 +30,8 @@ mock.module("./checker/latest-version", () => ({
   getLatestVersion: latestVersionMock,
 }))
 
-mock.module("./hook/deferred-idle-check", () => ({
-  scheduleDeferredIdleCheck: scheduleDeferredIdleCheckMock,
+mock.module("./hook/deferred-startup-check", () => ({
+  scheduleDeferredStartupCheck: scheduleDeferredStartupCheckMock,
 }))
 
 const createPluginInput = (): PluginInput => ({
@@ -105,7 +105,7 @@ const createHook = async (
 
 const resetDeferredState = (): void => {
   latestVersionCallCount = 0
-  scheduleDeferredIdleCheckCallCount = 0
+  scheduleDeferredStartupCheckCallCount = 0
   scheduledCheck = null
 }
 
@@ -135,7 +135,7 @@ describe("auto-update-checker hook", () => {
     triggerSessionCreated(hook)
 
     // then
-    expect(scheduleDeferredIdleCheckCallCount).toBe(1)
+    expect(scheduleDeferredStartupCheckCallCount).toBe(1)
     expect(mocks.showVersionToast).not.toHaveBeenCalled()
     expect(mocks.runBackgroundUpdateCheck).not.toHaveBeenCalled()
     expect(latestVersionCallCount).toBe(0)
@@ -158,7 +158,7 @@ describe("auto-update-checker hook", () => {
     triggerSessionCreated(hook, { info: { parentID: "parent-123" } })
 
     // then
-    expect(scheduleDeferredIdleCheckCallCount).toBe(0)
+    expect(scheduleDeferredStartupCheckCallCount).toBe(0)
     expect(mocks.showVersionToast).not.toHaveBeenCalled()
     expect(mocks.runBackgroundUpdateCheck).not.toHaveBeenCalled()
   })
@@ -172,7 +172,7 @@ describe("auto-update-checker hook", () => {
     triggerSessionIdle(hook)
 
     // then
-    expect(scheduleDeferredIdleCheckCallCount).toBe(0)
+    expect(scheduleDeferredStartupCheckCallCount).toBe(0)
     expect(mocks.showVersionToast).not.toHaveBeenCalled()
     expect(mocks.runBackgroundUpdateCheck).not.toHaveBeenCalled()
   })
@@ -205,14 +205,14 @@ describe("auto-update-checker hook", () => {
     triggerSessionCreated(hook)
 
     // then
-    expect(scheduleDeferredIdleCheckCallCount).toBe(1)
+    expect(scheduleDeferredStartupCheckCallCount).toBe(1)
 
     // when
     await runScheduledCheck()
     triggerSessionCreated(hook)
 
     // then
-    expect(scheduleDeferredIdleCheckCallCount).toBe(1)
+    expect(scheduleDeferredStartupCheckCallCount).toBe(1)
     expect(mocks.showConfigErrorsIfAny).toHaveBeenCalledTimes(1)
     expect(mocks.updateAndShowConnectedProvidersCacheStatus).toHaveBeenCalledTimes(1)
     expect(mocks.showModelCacheWarningIfNeeded).toHaveBeenCalledTimes(1)

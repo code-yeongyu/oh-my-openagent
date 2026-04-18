@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 
 let scheduledDeferredCheck: (() => void) | null = null
-mock.module("../auto-update-checker/hook/deferred-idle-check", () => ({
-  scheduleDeferredIdleCheck: (runCheck: () => void) => {
+mock.module("../auto-update-checker/hook/deferred-startup-check", () => ({
+  scheduleDeferredStartupCheck: (runCheck: () => void) => {
     scheduledDeferredCheck = runCheck
   },
 }))
