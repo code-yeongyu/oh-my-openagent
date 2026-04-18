@@ -4,7 +4,7 @@ import type { ToolContext } from "@opencode-ai/plugin/tool"
 import { TOOL_DESCRIPTION_PREFIX } from "./constants"
 import type { SkillArgs, SkillLoadOptions } from "./types"
 import type { LoadedSkill } from "../../features/opencode-skill-loader"
-import { getAllSkills, clearSkillCache } from "../../features/opencode-skill-loader/skill-content"
+import { getAllSkills } from "../../features/opencode-skill-loader/skill-content"
 import { injectGitMasterConfig } from "../../features/opencode-skill-loader/skill-content"
 import { discoverCommandsSync } from "../slashcommand/command-discovery"
 import type { CommandInfo } from "../slashcommand/types"
@@ -28,7 +28,6 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
   let cachedDescription: string | null = null
 
   const getSkills = async (): Promise<LoadedSkill[]> => {
-    clearSkillCache()
     const discovered = await getAllSkills({
       disabledSkills: options?.disabledSkills,
       browserProvider: options?.browserProvider,
@@ -92,8 +91,6 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
     }
   } else if (options.commands !== undefined) {
     cachedDescription = formatCombinedDescription([], options.commands)
-  } else {
-    void buildDescription()
   }
 
   return tool({
