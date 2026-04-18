@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, mock } from "bun:test"
+import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 
 type SweepStaleOmoAgentSessions = typeof import("./stale-session-sweep").sweepStaleOmoAgentSessions
 
@@ -64,8 +64,9 @@ function registerModuleMocks(): void {
 	mock.module(sessionKillSpecifier, () => ({ killTmuxSessionIfExists: killTmuxSessionMock }))
 }
 
+const originalProcessKill = process.kill
+
 async function loadSweeper(overrideProcessAlive?: (pid: number) => boolean): Promise<SweepStaleOmoAgentSessions> {
-	const originalKill = process.kill
 	const processAlive = overrideProcessAlive ?? isProcessAliveMock
 	process.kill = ((pid: number, signal?: number | string): true => {
 		if (signal === 0) {
@@ -76,7 +77,7 @@ async function loadSweeper(overrideProcessAlive?: (pid: number) => boolean): Pro
 			err.code = "ESRCH"
 			throw err
 		}
-		return originalKill.call(process, pid, signal)
+		return originalProcessKill.call(process, pid, signal)
 	}) as typeof process.kill
 	const module = await import(`${sweepSpecifier}?test=${crypto.randomUUID()}`)
 	return module.sweepStaleOmoAgentSessions
@@ -98,6 +99,10 @@ describe("sweepStaleOmoAgentSessions", () => {
 		getTmuxPathMock.mockImplementation(async (): Promise<string | undefined> => "tmux")
 		killTmuxSessionMock.mockImplementation(async (_name: string): Promise<boolean> => true)
 		isProcessAliveMock.mockImplementation((_pid: number): boolean => false)
+	})
+
+	afterEach(() => {
+		process.kill = originalProcessKill
 	})
 
 	it("#given not inside tmux #when sweepStaleOmoAgentSessions called #then returns 0 without spawn", async () => {
