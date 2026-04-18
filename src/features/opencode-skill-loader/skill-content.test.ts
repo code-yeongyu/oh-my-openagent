@@ -3,12 +3,19 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
-import { resolveSkillContent, resolveMultipleSkills, resolveSkillContentAsync, resolveMultipleSkillsAsync } from "./skill-content"
+import {
+	clearSkillCache,
+	resolveSkillContent,
+	resolveMultipleSkills,
+	resolveSkillContentAsync,
+	resolveMultipleSkillsAsync,
+} from "./skill-content"
 
 let originalEnv: Record<string, string | undefined>
 let testConfigDir: string
 
 beforeEach(() => {
+	clearSkillCache()
 	originalEnv = {
 		CLAUDE_CONFIG_DIR: process.env.CLAUDE_CONFIG_DIR,
 		OPENCODE_CONFIG_DIR: process.env.OPENCODE_CONFIG_DIR,
@@ -20,6 +27,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+	clearSkillCache()
 	for (const [key, value] of Object.entries(originalEnv)) {
 		if (value !== undefined) {
 			process.env[key] = value

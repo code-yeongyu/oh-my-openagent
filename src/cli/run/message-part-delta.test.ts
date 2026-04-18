@@ -98,7 +98,7 @@ describe("message.part.delta handling", () => {
           sessionID: "ses_main",
           role: "assistant",
           agent: "Sisyphus - Ultraworker",
-          modelID: "claude-opus-4-6",
+          modelID: "claude-opus-4-7",
           variant: "max",
         },
       },
@@ -113,7 +113,7 @@ describe("message.part.delta handling", () => {
     //#then
     const rendered = stdoutSpy.mock.calls.map((call) => String(call[0] ?? "")).join("")
     expect(rendered).toContain("\u001b[38;2;0;206;209m")
-    expect(rendered).toContain("claude-opus-4-6 (max)")
+    expect(rendered).toContain("claude-opus-4-7 (max)")
     expect(rendered).toContain("└─")
     expect(rendered).toContain("Sisyphus - Ultraworker")
     stdoutSpy.mockRestore()
@@ -128,7 +128,7 @@ describe("message.part.delta handling", () => {
       {
         type: "message.updated",
         properties: {
-          info: { sessionID: "ses_main", role: "assistant", agent: "Sisyphus - Ultraworker", modelID: "claude-opus-4-6" },
+          info: { sessionID: "ses_main", role: "assistant", agent: "Sisyphus - Ultraworker", modelID: "claude-opus-4-7" },
         },
       },
       {
@@ -187,7 +187,7 @@ describe("message.part.delta handling", () => {
       {
         type: "message.updated",
         properties: {
-          info: { sessionID: "ses_main", role: "assistant", agent: "Sisyphus - Ultraworker", modelID: "claude-opus-4-6" },
+          info: { sessionID: "ses_main", role: "assistant", agent: "Sisyphus - Ultraworker", modelID: "claude-opus-4-7" },
         },
       },
       {
@@ -242,7 +242,7 @@ describe("message.part.delta handling", () => {
       {
         type: "message.updated",
         properties: {
-          info: { id: "msg_assistant", sessionID: "ses_main", role: "assistant", agent: "Sisyphus - Ultraworker", modelID: "claude-opus-4-6" },
+          info: { id: "msg_assistant", sessionID: "ses_main", role: "assistant", agent: "Sisyphus - Ultraworker", modelID: "claude-opus-4-7" },
         },
       },
       {
@@ -309,7 +309,7 @@ describe("message.part.delta handling", () => {
       {
         type: "message.updated",
         properties: {
-          info: { id: "msg_assistant", sessionID: "ses_main", role: "assistant", agent: "Sisyphus - Ultraworker", modelID: "claude-opus-4-6" },
+          info: { id: "msg_assistant", sessionID: "ses_main", role: "assistant", agent: "Sisyphus - Ultraworker", modelID: "claude-opus-4-7" },
         },
       },
       {
@@ -353,7 +353,7 @@ describe("message.part.delta handling", () => {
       {
         type: "message.updated",
         properties: {
-          info: { id: "msg_assistant", sessionID: "ses_main", role: "assistant", agent: "Sisyphus - Ultraworker", modelID: "claude-opus-4-6", variant: "max" },
+          info: { id: "msg_assistant", sessionID: "ses_main", role: "assistant", agent: "Sisyphus - Ultraworker", modelID: "claude-opus-4-7", variant: "max" },
         },
       },
       {
@@ -388,7 +388,7 @@ describe("message.part.delta handling", () => {
       {
         type: "message.updated",
         properties: {
-          info: { id: "msg_user", sessionID: "ses_main", role: "user", agent: "Sisyphus - Ultraworker", modelID: "claude-opus-4-6" },
+          info: { id: "msg_user", sessionID: "ses_main", role: "user", agent: "Sisyphus - Ultraworker", modelID: "claude-opus-4-7" },
         },
       },
       {
@@ -410,7 +410,7 @@ describe("message.part.delta handling", () => {
       {
         type: "message.updated",
         properties: {
-          info: { id: "msg_assistant", sessionID: "ses_main", role: "assistant", agent: "Sisyphus - Ultraworker", modelID: "claude-opus-4-6" },
+          info: { id: "msg_assistant", sessionID: "ses_main", role: "assistant", agent: "Sisyphus - Ultraworker", modelID: "claude-opus-4-7" },
         },
       },
       {
@@ -619,7 +619,7 @@ describe("message.part.delta handling", () => {
       {
         type: "message.updated",
         properties: {
-          info: { id: "msg_1", sessionID: "ses_main", role: "assistant", agent: "Sisyphus", modelID: "claude-opus-4-6" },
+          info: { id: "msg_1", sessionID: "ses_main", role: "assistant", agent: "Sisyphus", modelID: "claude-opus-4-7" },
         },
       },
       {
@@ -634,7 +634,7 @@ describe("message.part.delta handling", () => {
       {
         type: "message.updated",
         properties: {
-          info: { id: "msg_1", sessionID: "ses_main", role: "assistant", agent: "Sisyphus", modelID: "claude-opus-4-6" },
+          info: { id: "msg_1", sessionID: "ses_main", role: "assistant", agent: "Sisyphus", modelID: "claude-opus-4-7" },
         },
       },
       {

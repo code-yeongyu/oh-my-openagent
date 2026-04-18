@@ -3,83 +3,28 @@ import type { ExecutorContext } from "./executor-types"
 import type { DelegatedModelConfig } from "./types"
 import { isPlanFamily } from "./constants"
 import { SISYPHUS_JUNIOR_AGENT } from "./sisyphus-junior-agent"
+import { applyCategoryParams } from "./delegated-model-config"
+import { resolveEffectiveFallbackEntry } from "./fallback-entry-resolution"
+import { applyFallbackEntrySettings } from "./fallback-entry-settings"
+import {
+  type AgentInfo,
+  sanitizeSubagentType,
+  mergeWithClaudeCodeAgents,
+  findPrimaryAgentMatch,
+  findCallableAgentMatch,
+  listCallableAgentNames,
+} from "./subagent-discovery"
 import { normalizeModelFormat } from "../../shared/model-format-normalizer"
 import { AGENT_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
 import { normalizeFallbackModels, flattenToFallbackModelStrings } from "../../shared/model-resolver"
-import { buildFallbackChainFromModels, findMostSpecificFallbackEntry } from "../../shared/fallback-chain-from-models"
-import { getAgentDisplayName, getAgentConfigKey, stripAgentListSortPrefix } from "../../shared/agent-display-names"
+import { buildFallbackChainFromModels } from "../../shared/fallback-chain-from-models"
+import { getAgentConfigKey, stripAgentListSortPrefix } from "../../shared/agent-display-names"
 import { normalizeSDKResponse } from "../../shared"
 import { log } from "../../shared/logger"
 import { getAvailableModelsForDelegateTask } from "./available-models"
 import type { FallbackEntry } from "../../shared/model-requirements"
 import { resolveModelForDelegateTask } from "./model-selection"
 import { fuzzyMatchModel } from "../../shared/model-availability"
-import type { CategoryConfig } from "../../config/schema"
-import { loadUserAgents, loadProjectAgents } from "../../features/claude-code-agent-loader"
-
-type AgentMode = "subagent" | "primary" | "all" | undefined
-
-type AgentInfo = {
-  name: string
-  mode?: "subagent" | "primary" | "all"
-  model?: string | { providerID: string; modelID: string }
-}
-
-function applyCategoryParams(
-  base: DelegatedModelConfig,
-  config: CategoryConfig | undefined,
-): DelegatedModelConfig {
-  if (!config) {
-    return base
-  }
-
-  return {
-    ...base,
-    ...(config.reasoningEffort !== undefined ? { reasoningEffort: config.reasoningEffort } : {}),
-    ...(config.temperature !== undefined ? { temperature: config.temperature } : {}),
-    ...(config.top_p !== undefined ? { top_p: config.top_p } : {}),
-    ...(config.maxTokens !== undefined ? { maxTokens: config.maxTokens } : {}),
-    ...(config.thinking !== undefined ? { thinking: config.thinking } : {}),
-  }
-}
-
-function mergeWithClaudeCodeAgents(
-  serverAgents: AgentInfo[],
-  directory: string | undefined,
-): AgentInfo[] {
-  const userAgentsRecord = loadUserAgents()
-  const projectAgentsRecord = loadProjectAgents(directory)
-
-  const toAgentInfoList = (record: Record<string, { mode?: string; model?: AgentInfo["model"] }>): AgentInfo[] =>
-    Object.entries(record).map(([name, config]) => ({
-      name,
-      mode: config.mode as AgentInfo["mode"],
-      model: config.model,
-    }))
-
-  const projectAgentsList = toAgentInfoList(projectAgentsRecord)
-  const userAgentsList = toAgentInfoList(userAgentsRecord)
-
-  const mergedAgentMap = new Map<string, AgentInfo>()
-  const addIfAbsent = (agent: AgentInfo): void => {
-    const key = agent.name.toLowerCase()
-    if (!mergedAgentMap.has(key)) {
-      mergedAgentMap.set(key, agent)
-    }
-  }
-
-  for (const agent of serverAgents) {
-    addIfAbsent(agent)
-  }
-  for (const agent of projectAgentsList) {
-    addIfAbsent(agent)
-  }
-  for (const agent of userAgentsList) {
-    addIfAbsent(agent)
-  }
-
-  return Array.from(mergedAgentMap.values())
-}
 
 export async function resolveSubagentExecution(
   args: DelegateTaskArgs,
@@ -93,9 +38,7 @@ export async function resolveSubagentExecution(
     return { agentToUse: "", categoryModel: undefined, error: `Agent name cannot be empty.` }
   }
 
-  // Strip wrapping characters (backslashes, quotes) that LLMs sometimes add around agent names
-  // e.g. \hephaestus\ -> hephaestus, "oracle" -> oracle, 'explore' -> explore
-  const agentName = args.subagent_type.trim().replace(/^[\\\/"']+|[\\\/"']+$/g, "").trim()
+  const agentName = sanitizeSubagentType(args.subagent_type)
 
   if (agentName.toLowerCase() === SISYPHUS_JUNIOR_AGENT.toLowerCase()) {
     return {
@@ -128,26 +71,22 @@ Create the work plan directly - that's your job as the planning agent.`,
     })
 
     const mergedAgents = mergeWithClaudeCodeAgents(agents, executorCtx.directory)
-    const callableAgents = mergedAgents.filter((agent) => isTaskCallableAgentMode(agent.mode))
+    const matchedPrimaryAgent = findPrimaryAgentMatch(mergedAgents, agentToUse)
 
-    const resolvedDisplayName = stripAgentListSortPrefix(getAgentDisplayName(agentToUse))
-    const normalizedAgentToUse = stripAgentListSortPrefix(agentToUse)
-    const matchedAgent = callableAgents.find(
-      (agent) => {
-        const normalizedListedAgentName = stripAgentListSortPrefix(agent.name)
-        return normalizedListedAgentName.toLowerCase() === normalizedAgentToUse.toLowerCase()
-          || normalizedListedAgentName.toLowerCase() === resolvedDisplayName.toLowerCase()
-      }
-    )
-    if (!matchedAgent) {
-      const availableAgents = callableAgents
-        .map((a) => stripAgentListSortPrefix(a.name))
-        .sort()
-        .join(", ")
+    if (matchedPrimaryAgent) {
       return {
         agentToUse: "",
         categoryModel: undefined,
-        error: `Unknown agent: "${agentToUse}". Available agents: ${availableAgents}`,
+        error: `Cannot delegate to primary agent "${stripAgentListSortPrefix(matchedPrimaryAgent.name)}" via task. Select that agent directly instead.`,
+      }
+    }
+
+    const matchedAgent = findCallableAgentMatch(mergedAgents, agentToUse)
+    if (!matchedAgent) {
+      return {
+        agentToUse: "",
+        categoryModel: undefined,
+        error: `Unknown agent: "${agentToUse}". Available agents: ${listCallableAgentNames(mergedAgents)}`,
       }
     }
 
@@ -216,29 +155,18 @@ Create the work plan directly - that's your job as the planning agent.`,
         defaultProviderID,
       )
       fallbackChain = configuredFallbackChain ?? (resolutionSkipped ? undefined : agentRequirement?.fallbackChain)
-
-      // Only promote fallback-only settings when resolution actually selected a fallback model.
-      const resolvedFallbackEntry = (resolution && !('skipped' in resolution)) ? resolution.fallbackEntry : undefined
-      const matchedFallback = (resolution && !('skipped' in resolution)) ? resolution.matchedFallback === true : false
-      const effectiveEntry = matchedFallback && categoryModel
-        ? (
-            resolvedFallbackEntry
-            ?? (configuredFallbackChain
-              ? findMostSpecificFallbackEntry(categoryModel.providerID, categoryModel.modelID, configuredFallbackChain)
-              : undefined)
-          )
-        : undefined
+      const effectiveEntry = resolveEffectiveFallbackEntry({
+        categoryModel,
+        configuredFallbackChain,
+        resolution,
+      })
 
       if (categoryModel && effectiveEntry) {
-        categoryModel = {
-          ...categoryModel,
-          variant: agentOverride?.variant ?? effectiveEntry.variant ?? categoryModel.variant,
-          reasoningEffort: effectiveEntry.reasoningEffort ?? categoryModel.reasoningEffort,
-          temperature: effectiveEntry.temperature ?? categoryModel.temperature,
-          top_p: effectiveEntry.top_p ?? categoryModel.top_p,
-          maxTokens: effectiveEntry.maxTokens ?? categoryModel.maxTokens,
-          thinking: effectiveEntry.thinking ?? categoryModel.thinking,
-        }
+        categoryModel = applyFallbackEntrySettings({
+          categoryModel,
+          effectiveEntry,
+          variantOverride: agentOverride?.variant,
+        })
       }
     }
 
@@ -272,8 +200,4 @@ Create the work plan directly - that's your job as the planning agent.`,
   }
 
   return { agentToUse, categoryModel, fallbackChain }
-}
-
-function isTaskCallableAgentMode(mode: AgentMode): boolean {
-  return mode === "all" || mode === "subagent"
 }

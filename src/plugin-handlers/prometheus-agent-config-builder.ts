@@ -97,7 +97,7 @@ export async function buildPrometheusAgentConfig(params: {
   const base: Record<string, unknown> = {
     ...(resolvedModel ? { model: resolvedModel } : {}),
     ...(variantToUse ? { variant: variantToUse } : {}),
-    mode: "all",
+    mode: "primary",
     prompt: getPrometheusPrompt(resolvedModel, params.disabledTools),
     permission: PROMETHEUS_PERMISSION,
     description: `${(params.configAgentPlan?.description as string) ?? "Plan agent"} (Prometheus - OhMyOpenCode)`,

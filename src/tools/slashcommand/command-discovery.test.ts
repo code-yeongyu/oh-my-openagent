@@ -326,4 +326,40 @@ describe("non-directory commands path", () => {
     expect(testCmd).toBeDefined()
     expect(testCmd?.content).toContain("Test command content.")
   })
+
+  it("#given excluded subdirectories under .claude/commands #when discoverCommandsSync runs #then prunes commands beneath them", () => {
+    // given
+    const projectDir = join(testDir, "project")
+    const commandsDir = join(projectDir, ".claude", "commands")
+
+    mkdirSync(join(commandsDir, "node_modules", "fake-pkg"), { recursive: true })
+    mkdirSync(join(commandsDir, ".git", "branches"), { recursive: true })
+    mkdirSync(join(commandsDir, "dist"), { recursive: true })
+    writeFileSync(
+      join(commandsDir, "real-cmd.md"),
+      "---\ndescription: Real command\n---\nRun real command.\n",
+    )
+    writeFileSync(
+      join(commandsDir, "node_modules", "fake-pkg", "cmd.md"),
+      "---\ndescription: Nested command\n---\nRun nested command.\n",
+    )
+    writeFileSync(
+      join(commandsDir, ".git", "branches", "cmd.md"),
+      "---\ndescription: Git command\n---\nRun git command.\n",
+    )
+    writeFileSync(
+      join(commandsDir, "dist", "bundled-cmd.md"),
+      "---\ndescription: Bundled command\n---\nRun bundled command.\n",
+    )
+
+    // when
+    const commands = discoverCommandsSync(projectDir)
+    const names = commands.map((command) => command.name)
+
+    // then
+    expect(names).toContain("real-cmd")
+    expect(names).not.toContain("node_modules/fake-pkg/cmd")
+    expect(names).not.toContain(".git/branches/cmd")
+    expect(names).not.toContain("dist/bundled-cmd")
+  })
 })

@@ -1,9 +1,11 @@
 import type { DelegateTaskArgs, ToolContextWithMetadata } from "./types"
 import type { ExecutorContext, ParentContext } from "./executor-types"
-import { storeToolMetadata } from "../../features/tool-metadata-store"
+import { publishToolMetadata } from "../../features/tool-metadata-store"
 import { formatDetailedError } from "./error-formatting"
 import { getSessionTools } from "../../shared/session-tools-store"
-import { resolveCallID } from "./resolve-call-id"
+import { buildTaskMetadataBlock } from "../../features/tool-metadata-store/task-metadata-contract"
+import { resolveMetadataModel } from "./resolve-metadata-model"
+import { getTaskID } from "./task-id"
 
 export async function executeBackgroundContinuation(
   args: DelegateTaskArgs,
@@ -14,8 +16,13 @@ export async function executeBackgroundContinuation(
   const { manager } = executorCtx
 
   try {
+    const taskID = getTaskID(args)
+    if (!taskID) {
+      throw new Error("task_id is required to continue a background task")
+    }
+
     const task = await manager.resume({
-      sessionId: args.session_id!,
+      sessionId: taskID,
       prompt: args.prompt,
       parentSessionID: parentContext.sessionID,
       parentMessageID: parentContext.messageID,
@@ -32,16 +39,14 @@ export async function executeBackgroundContinuation(
         load_skills: args.load_skills,
         description: args.description,
         run_in_background: args.run_in_background,
+        taskId: task.sessionID,
+        backgroundTaskId: task.id,
         sessionId: task.sessionID,
         command: args.command,
-        model: task.model ? { providerID: task.model.providerID, modelID: task.model.modelID } : undefined,
+        model: resolveMetadataModel(task.model, parentContext.model),
       },
     }
-    await ctx.metadata?.(bgContMeta)
-    const callID = resolveCallID(ctx)
-    if (callID) {
-      storeToolMetadata(ctx.sessionID, callID, bgContMeta)
-    }
+    await publishToolMetadata(ctx, bgContMeta)
 
     return `Background task continued.
 
@@ -55,14 +60,17 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
 
 Do NOT call background_output now. Wait for <system-reminder> notification first.
 
-<task_metadata>
-session_id: ${task.sessionID}
-${task.agent ? `subagent: ${task.agent}\n` : ""}</task_metadata>`
+${buildTaskMetadataBlock({
+      sessionId: task.sessionID,
+      taskId: task.sessionID,
+      backgroundTaskId: task.id,
+      agent: task.agent,
+    })}`
   } catch (error) {
     return formatDetailedError(error, {
       operation: "Continue background task",
       args,
-      sessionID: args.session_id,
+      sessionID: getTaskID(args),
     })
   }
 }

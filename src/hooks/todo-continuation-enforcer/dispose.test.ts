@@ -8,6 +8,7 @@ declare module "bun:test" {
 
 import { afterAll, afterEach, describe, expect, it, mock } from "bun:test"
 
+import type { BackgroundManager } from "../../features/background-agent"
 import * as actualSessionStateModule from "./session-state"
 import type { SessionStateStore } from "./session-state"
 
@@ -35,6 +36,12 @@ function createMockPluginInput(): PluginInput {
   return {
     directory: "/tmp/test",
   } as PluginInput
+}
+
+function createMockBackgroundManager(): BackgroundManager {
+  return {
+    getTasksByParentSession: () => [{ status: "running" }],
+  } as BackgroundManager
 }
 
 function getCreatedSessionStateStore(): SessionStateStore {
@@ -68,7 +75,7 @@ describe("todo-continuation-enforcer dispose", () => {
     enforcer.dispose()
   })
 
-  it("#given enforcer with active session states #when dispose is called #then internal session state store is shut down", () => {
+  it("#given enforcer with active session states #when dispose is called #then internal session state store is shut down", async () => {
     // given
     const originalClearInterval = globalThis.clearInterval
     const clearIntervalCalls: Array<Parameters<typeof clearInterval>[0]> = []
@@ -78,8 +85,12 @@ describe("todo-continuation-enforcer dispose", () => {
     }) as typeof clearInterval
 
     try {
-      const enforcer = createTodoContinuationEnforcer(createMockPluginInput())
+      const enforcer = createTodoContinuationEnforcer(createMockPluginInput(), {
+        backgroundManager: createMockBackgroundManager(),
+      })
       const sessionStateStore = getCreatedSessionStateStore()
+
+      await enforcer.handler({ event: { type: "session.idle", properties: { sessionID: "session-1" } } })
 
       enforcer.markRecovering("session-1")
       enforcer.markRecovering("session-2")

@@ -312,10 +312,10 @@ Every delegation prompt needs these 6 sections:
 After delegation, verify by reading every file the subagent touched. Check: works as expected? follows codebase pattern? Do not trust self-reports.
 
 <session_continuity>
-Every \`task()\` returns a session_id. Use it for all follow-ups:
-- Task failed/incomplete: \`session_id="{id}", prompt="Fix: {error}"\`
-- Follow-up on result: \`session_id="{id}", prompt="Also: {question}"\`
-- Verification failed: \`session_id="{id}", prompt="Failed: {error}. Fix."\`
+Every \`task()\` returns a task_id. Use it for all follow-ups:
+- Task failed/incomplete: \`task_id="{id}", prompt="Fix: {error}"\`
+- Follow-up on result: \`task_id="{id}", prompt="Also: {question}"\`
+- Verification failed: \`task_id="{id}", prompt="Failed: {error}. Fix."\`
 
 This preserves full context, avoids repeated exploration, saves 70%+ tokens.
 </session_continuity>

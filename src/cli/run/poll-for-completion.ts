@@ -193,6 +193,9 @@ async function getMainSessionStatus(
       statusesRes,
       {} as Record<string, { type?: string }>
     )
+    if (!(ctx.sessionID in statuses)) {
+      return "idle"
+    }
     const status = statuses[ctx.sessionID]?.type
     if (status === "idle" || status === "busy" || status === "retry") {
       return status

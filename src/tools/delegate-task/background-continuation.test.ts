@@ -30,7 +30,7 @@ describe("executeBackgroundContinuation - subagent metadata", () => {
     }
 
     const args = {
-      session_id: "ses_resumed_123",
+      task_id: "ses_resumed_123",
       prompt: "continue working",
       description: "resume oracle",
       load_skills: [],
@@ -76,7 +76,7 @@ describe("executeBackgroundContinuation - subagent metadata", () => {
     }
 
     const args = {
-      session_id: "ses_resumed_456",
+      task_id: "ses_resumed_456",
       prompt: "continue",
       description: "resume task",
       load_skills: [],

@@ -29,8 +29,8 @@ export function detectShellType(): ShellType {
   if (
     process.platform === "win32" &&
     (process.env.BASH_VERSION ||
-     process.env.MSYSTEM ||
-     process.env.WSL_DISTRO_NAME)
+      process.env.MSYSTEM ||
+      process.env.WSL_DISTRO_NAME)
   ) {
     return "unix"
   }

@@ -648,7 +648,7 @@ describe("checkAndInterruptStaleTasks", () => {
     const task = createRunningTask({
       startedAt: new Date(Date.now() - 15 * 60 * 1000),
       progress: undefined,
-      concurrencyKey: "anthropic/claude-opus-4-6",
+      concurrencyKey: "anthropic/claude-opus-4-7",
     })
 
     //#when
@@ -661,7 +661,7 @@ describe("checkAndInterruptStaleTasks", () => {
     })
 
     //#then
-    expect(releaseMock).toHaveBeenCalledWith("anthropic/claude-opus-4-6")
+    expect(releaseMock).toHaveBeenCalledWith("anthropic/claude-opus-4-7")
     expect(task.concurrencyKey).toBeUndefined()
   })
 

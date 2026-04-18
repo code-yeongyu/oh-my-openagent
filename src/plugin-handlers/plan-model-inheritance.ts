@@ -23,5 +23,5 @@ export function buildPlanDemoteConfig(
     }
   }
 
-  return { mode: "subagent" as const, ...modelSettings }
+  return { mode: "subagent" as const, hidden: true, ...modelSettings }
 }

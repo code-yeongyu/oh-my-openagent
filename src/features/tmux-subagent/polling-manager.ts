@@ -16,7 +16,8 @@ export class TmuxPollingManager {
   constructor(
     private client: OpencodeClient,
     private sessions: Map<string, TrackedSession>,
-    private closeSessionById: (sessionId: string) => Promise<void>
+    private closeSessionById: (sessionId: string) => Promise<void>,
+    private retryPendingCloses?: () => Promise<void>
   ) {}
 
   handleEvent(event: { type: string; properties?: Record<string, unknown> }): void {
@@ -133,6 +134,14 @@ export class TmuxPollingManager {
       for (const sessionId of sessionsToClose) {
         log("[tmux-session-manager] closing session due to poll", { sessionId })
         await this.closeSessionById(sessionId)
+      }
+
+      if (this.retryPendingCloses) {
+        try {
+          await this.retryPendingCloses()
+        } catch (err) {
+          log("[tmux-session-manager] retry pending closes failed", { error: String(err) })
+        }
       }
     } catch (err) {
       log("[tmux-session-manager] poll error", { error: String(err) })
