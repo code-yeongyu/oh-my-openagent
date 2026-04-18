@@ -15,12 +15,14 @@ import {
 } from "./session-notification-event-properties"
 import { hasIncompleteTodos } from "./session-todo-status"
 import { createIdleNotificationScheduler } from "./session-notification-scheduler"
+import { executeNotificationScript } from "./session-notification-script-executor"
 
 interface SessionNotificationConfig {
   title?: string
   message?: string
   questionMessage?: string
   permissionMessage?: string
+  script?: string
   playSound?: boolean
   soundPath?: string
   /** Delay in ms before sending notification to confirm session is still idle (default: 1500) */
@@ -56,6 +58,27 @@ export function createSessionNotification(
     ...config,
   }
 
+  const sendNotification = async (
+    hookCtx: PluginInput,
+    platform: Platform,
+    hookType: string,
+    sessionID: string | undefined,
+    title: string,
+    message: string
+  ) => {
+    if (mergedConfig.script) {
+      await executeNotificationScript(hookCtx, mergedConfig.script, {
+        hookType,
+        sessionID,
+        projectDir: hookCtx.directory,
+        title,
+        message,
+      })
+    } else {
+      await sessionNotificationSender.sendSessionNotification(hookCtx, platform, title, message)
+    }
+  }
+
   const scheduler = createIdleNotificationScheduler({
     ctx,
     platform: currentPlatform,
@@ -66,12 +89,7 @@ export function createSessionNotification(
         typeof hookCtx.client.session.get !== "function"
         && typeof hookCtx.client.session.messages !== "function"
       ) {
-        await sessionNotificationSender.sendSessionNotification(
-          hookCtx,
-          platform,
-          mergedConfig.title,
-          mergedConfig.message,
-        )
+        await sendNotification(hookCtx, platform, "idle", sessionID, mergedConfig.title, mergedConfig.message)
         return
       }
 
@@ -81,7 +99,7 @@ export function createSessionNotification(
         baseMessage: mergedConfig.message,
       })
 
-      await sessionNotificationSender.sendSessionNotification(hookCtx, platform, content.title, content.message)
+      await sendNotification(hookCtx, platform, "idle", sessionID, content.title, content.message)
     },
     playSound: sessionNotificationSender.playSessionNotificationSound,
   })
@@ -140,12 +158,9 @@ export function createSessionNotification(
       if (!shouldNotifyForSession(sessionID)) return
 
       scheduler.markSessionActivity(sessionID)
-      await sessionNotificationSender.sendSessionNotification(
-        ctx,
-        currentPlatform,
-        mergedConfig.title,
-        mergedConfig.permissionMessage,
-      )
+      
+      await sendNotification(ctx, currentPlatform, "permission", sessionID, mergedConfig.title, mergedConfig.permissionMessage)
+      
       if (mergedConfig.playSound && mergedConfig.soundPath) {
         await sessionNotificationSender.playSessionNotificationSound(ctx, currentPlatform, mergedConfig.soundPath)
       }
@@ -166,8 +181,10 @@ export function createSessionNotification(
             const message = PERMISSION_HINT_PATTERN.test(questionText)
               ? mergedConfig.permissionMessage
               : mergedConfig.questionMessage
+            const hookType = PERMISSION_HINT_PATTERN.test(questionText) ? "permission" : "question"
 
-            await sessionNotificationSender.sendSessionNotification(ctx, currentPlatform, mergedConfig.title, message)
+            await sendNotification(ctx, currentPlatform, hookType, sessionID, mergedConfig.title, message)
+            
             if (mergedConfig.playSound && mergedConfig.soundPath) {
               await sessionNotificationSender.playSessionNotificationSound(ctx, currentPlatform, mergedConfig.soundPath)
             }
