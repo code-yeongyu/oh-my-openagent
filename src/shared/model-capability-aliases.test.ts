@@ -107,4 +107,31 @@ describe("model-capability-aliases", () => {
       ruleID: "claude-thinking-legacy-alias",
     })
   })
+
+  test("strips :cloud tag from Ollama cloud models through pattern alias", () => {
+    const result = resolveModelIDAlias("kimi-k2.5:cloud")
+
+    expect(result.requestedModelID).toBe("kimi-k2.5:cloud")
+    expect(result.canonicalModelID).toBe("kimi-k2.5")
+    expect(result.source).toBe("pattern-alias")
+    expect(result.ruleID).toBe("ollama-cloud-tag-alias")
+  })
+
+  test("strips :cloud tag from provider-prefixed Ollama cloud models", () => {
+    const result = resolveModelIDAlias("ollama-cloud/glm-5.1:cloud")
+
+    expect(result.requestedModelID).toBe("ollama-cloud/glm-5.1:cloud")
+    expect(result.canonicalModelID).toBe("glm-5.1")
+    expect(result.source).toBe("pattern-alias")
+    expect(result.ruleID).toBe("ollama-cloud-tag-alias")
+  })
+
+  test("strips :thinking tag from Ollama models through pattern alias", () => {
+    const result = resolveModelIDAlias("glm-5.1:thinking")
+
+    expect(result.requestedModelID).toBe("glm-5.1:thinking")
+    expect(result.canonicalModelID).toBe("glm-5.1")
+    expect(result.source).toBe("pattern-alias")
+    expect(result.ruleID).toBe("ollama-thinking-tag-alias")
+  })
 })
