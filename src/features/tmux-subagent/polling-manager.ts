@@ -24,6 +24,7 @@ export class TmuxPollingManager {
     private retryPendingCloses?: () => Promise<void>,
     private getWindowState?: () => Promise<WindowState | null>,
     private activateSessionPane?: (tracked: TrackedSession) => Promise<boolean>,
+    private canActivatePane: (state: WindowState) => boolean = (state) => state.windowActive !== false && state.sessionAttached !== false,
   ) {}
 
   handleEvent(event: { type: string; properties?: Record<string, unknown> }): void {
@@ -220,6 +221,13 @@ export class TmuxPollingManager {
 
     const state = await this.getWindowState().catch(() => null)
     if (!state) return
+    if (this.canActivatePane && !this.canActivatePane(state)) {
+      log("[tmux-session-manager] activation gate blocked auto-attach", {
+        windowActive: state.windowActive,
+        sessionAttached: state.sessionAttached,
+      })
+      return
+    }
 
     const panes = [state.mainPane, ...state.agentPanes].filter((pane): pane is NonNullable<typeof pane> => Boolean(pane))
     const activePaneIds = new Set(panes.filter((pane) => pane.isActive).map((pane) => pane.paneId))

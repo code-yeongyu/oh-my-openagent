@@ -31,6 +31,8 @@ export interface TmuxPaneInfo {
 export interface WindowState {
   windowWidth: number
   windowHeight: number
+  windowActive?: boolean
+  sessionAttached?: boolean
   mainPane: TmuxPaneInfo | null
   agentPanes: TmuxPaneInfo[]
 }

@@ -137,6 +137,7 @@ export class TmuxSessionManager {
       this.retryPendingCloses.bind(this),
       this.queryWindowStateSafely.bind(this),
       this.activateTrackedSessionPane.bind(this),
+      this.canAutoActivatePane.bind(this),
     )
     this.deps.log("[tmux-session-manager] initialized", {
       configEnabled: this.tmuxConfig.enabled,
@@ -383,6 +384,11 @@ export class TmuxSessionManager {
       isolatedPaneAlreadyClosed: true,
     })
     return true
+  }
+
+  private canAutoActivatePane(state: WindowState): boolean {
+    if (!this.isIsolated()) return true
+    return state.windowActive && state.sessionAttached
   }
 
   private async closeTrackedSessionPane(args: {

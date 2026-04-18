@@ -269,6 +269,8 @@ describe("TmuxPollingManager overlap", () => {
     const windowState: WindowState = {
       windowWidth: 160,
       windowHeight: 48,
+      windowActive: true,
+      sessionAttached: true,
       mainPane: null,
       agentPanes: [
         { paneId: "%1", width: 80, height: 24, left: 0, top: 0, title: "agent", isActive: true },
