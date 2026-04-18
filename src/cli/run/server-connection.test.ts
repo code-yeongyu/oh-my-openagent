@@ -3,6 +3,7 @@ import { describe, it, expect, mock, beforeEach, afterEach, afterAll } from "bun
 import * as originalSdk from "@opencode-ai/sdk"
 import * as originalPortUtils from "../../shared/port-utils"
 import * as originalBinaryResolver from "./opencode-binary-resolver"
+import * as originalServerAuth from "../../shared/opencode-server-auth"
 
 const originalConsole = globalThis.console
 
@@ -13,11 +14,15 @@ const mockCreateOpencode = mock(() =>
     server: { url: "http://127.0.0.1:4096", close: mockServerClose },
   })
 )
-const mockCreateOpencodeClient = mock(() => ({ session: {} }))
+const mockCreateOpencodeClient = mock((options?: { baseUrl?: string }) => ({
+  session: {},
+  baseUrl: options?.baseUrl,
+}))
 const mockIsPortAvailable = mock(() => Promise.resolve(true))
 const mockGetAvailableServerPort = mock(() => Promise.resolve({ port: 4096, wasAutoSelected: false }))
 const mockConsoleLog = mock(() => {})
 const mockWithWorkingOpencodePath = mock((startServer: () => Promise<unknown>) => startServer())
+const mockInjectServerAuthIntoClient = mock(() => {})
 
 mock.module("@opencode-ai/sdk", () => ({
   createOpencode: mockCreateOpencode,
@@ -34,10 +39,15 @@ mock.module("./opencode-binary-resolver", () => ({
   withWorkingOpencodePath: mockWithWorkingOpencodePath,
 }))
 
+mock.module("../../shared/opencode-server-auth", () => ({
+  injectServerAuthIntoClient: mockInjectServerAuthIntoClient,
+}))
+
 afterAll(() => {
   mock.module("@opencode-ai/sdk", () => originalSdk)
   mock.module("../../shared/port-utils", () => originalPortUtils)
   mock.module("./opencode-binary-resolver", () => originalBinaryResolver)
+  mock.module("../../shared/opencode-server-auth", () => originalServerAuth)
   mock.restore()
 })
 
@@ -52,11 +62,55 @@ describe("createServerConnection", () => {
     mockServerClose.mockClear()
     mockConsoleLog.mockClear()
     mockWithWorkingOpencodePath.mockClear()
+    mockInjectServerAuthIntoClient.mockClear()
     globalThis.console = { ...console, log: mockConsoleLog } as typeof console
   })
 
   afterEach(() => {
     globalThis.console = originalConsole
+  })
+
+  it("attach mode injects auth only for loopback URLs", async () => {
+    // given
+    const signal = new AbortController().signal
+
+    // when
+    const localhostResult = await createServerConnection({ attach: "http://localhost:8080", signal })
+    const loopbackResult = await createServerConnection({ attach: "http://127.0.0.1:8080", signal })
+    const anyBindResult = await createServerConnection({ attach: "http://0.0.0.0:8080", signal })
+    const remoteResult = await createServerConnection({ attach: "https://example.com", signal })
+
+    // then
+    expect(mockCreateOpencodeClient).toHaveBeenCalledWith({ baseUrl: "http://localhost:8080" })
+    expect(mockCreateOpencodeClient).toHaveBeenCalledWith({ baseUrl: "http://127.0.0.1:8080" })
+    expect(mockCreateOpencodeClient).toHaveBeenCalledWith({ baseUrl: "http://0.0.0.0:8080" })
+    expect(mockCreateOpencodeClient).toHaveBeenCalledWith({ baseUrl: "https://example.com" })
+    expect(mockInjectServerAuthIntoClient).toHaveBeenCalledTimes(3)
+    expect(mockInjectServerAuthIntoClient).toHaveBeenNthCalledWith(1, localhostResult.client)
+    expect(mockInjectServerAuthIntoClient).toHaveBeenNthCalledWith(2, loopbackResult.client)
+    expect(mockInjectServerAuthIntoClient).toHaveBeenNthCalledWith(3, anyBindResult.client)
+    expect(mockInjectServerAuthIntoClient).not.toHaveBeenCalledWith(remoteResult.client)
+    expect(mockWithWorkingOpencodePath).not.toHaveBeenCalled()
+    localhostResult.cleanup()
+    loopbackResult.cleanup()
+    anyBindResult.cleanup()
+    remoteResult.cleanup()
+    expect(mockServerClose).not.toHaveBeenCalled()
+  })
+
+  it("attach mode skips auth injection for invalid attach URLs", async () => {
+    // given
+    const signal = new AbortController().signal
+    const attachUrl = "not-a-url"
+
+    // when
+    const result = await createServerConnection({ attach: attachUrl, signal })
+
+    // then
+    expect(mockCreateOpencodeClient).toHaveBeenCalledWith({ baseUrl: attachUrl })
+    expect(mockInjectServerAuthIntoClient).not.toHaveBeenCalled()
+    result.cleanup()
+    expect(mockServerClose).not.toHaveBeenCalled()
   })
 
   it("attach mode returns client with no-op cleanup", async () => {
@@ -68,8 +122,6 @@ describe("createServerConnection", () => {
     const result = await createServerConnection({ attach: attachUrl, signal })
 
     // then
-    expect(mockCreateOpencodeClient).toHaveBeenCalledWith({ baseUrl: attachUrl })
-    expect(mockWithWorkingOpencodePath).not.toHaveBeenCalled()
     expect(result.client).toBeDefined()
     expect(result.cleanup).toBeDefined()
     result.cleanup()
