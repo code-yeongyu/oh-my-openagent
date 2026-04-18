@@ -43,6 +43,13 @@ const mockContext: ToolContext = {
   ask: async () => {},
 }
 
+function createMockContext(sessionID: string): ToolContext {
+  return {
+    ...mockContext,
+    sessionID,
+  }
+}
+
 beforeEach(() => {
   spyOn(skillContent, "getAllSkills").mockImplementation(getAllSkills)
   spyOn(skillContent, "clearSkillCache").mockImplementation(clearSkillCache)
@@ -100,5 +107,25 @@ describe("createSkillTool", () => {
 
     // then
     expect(clearSkillCache.mock.calls.length).toBe(baselineClearSkillCacheCalls)
+  })
+
+  it("clears the skill discovery cache once per session", async () => {
+    // given
+    const baselineClearSkillCacheCalls = clearSkillCache.mock.calls.length
+    const baselineGetAllSkillsCalls = getAllSkills.mock.calls.length
+    const sessionAContext = createMockContext("session-a")
+    const sessionBContext = createMockContext("session-b")
+    const { createSkillTool } = await import("./tools")
+    const skillTool = createSkillTool({})
+
+    // when
+    await skillTool.execute({ name: "lazy-skill" }, sessionAContext)
+    await skillTool.execute({ name: "lazy-skill" }, sessionAContext)
+    await skillTool.execute({ name: "lazy-skill" }, sessionBContext)
+    await skillTool.execute({ name: "lazy-skill" }, sessionBContext)
+
+    // then
+    expect(clearSkillCache.mock.calls.length).toBe(baselineClearSkillCacheCalls + 2)
+    expect(getAllSkills.mock.calls.length).toBe(baselineGetAllSkillsCalls + 4)
   })
 })
