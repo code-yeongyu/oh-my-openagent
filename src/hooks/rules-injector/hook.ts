@@ -1,7 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin";
 import { createDynamicTruncator } from "../../shared/dynamic-truncator";
 import { getRuleInjectionFilePath } from "./output-path";
-import { createSessionCacheStore } from "./cache";
+import { createSessionCacheStore, createSessionRuleScanCacheStore } from "./cache";
 import { createRuleInjectionProcessor } from "./injector";
 
 interface ToolExecuteInput {
@@ -36,14 +36,22 @@ export function createRulesInjectorHook(
 ) {
   const truncator = createDynamicTruncator(ctx, modelCacheState);
   const { getSessionCache, clearSessionCache } = createSessionCacheStore();
+  const { getSessionRuleScanCache, clearSessionRuleScanCache } =
+    createSessionRuleScanCacheStore();
   const { processFilePathForInjection } = createRuleInjectionProcessor({
     workspaceDirectory: ctx.directory,
     truncator,
     getSessionCache,
+    getSessionRuleScanCache,
     ruleFinderOptions: options?.skipClaudeUserRules
       ? { skipClaudeUserRules: true }
       : undefined,
   });
+
+  function clearSessionState(sessionID: string): void {
+    clearSessionCache(sessionID);
+    clearSessionRuleScanCache(sessionID);
+  }
 
   const toolExecuteAfter = async (
     input: ToolExecuteInput,
@@ -73,7 +81,7 @@ export function createRulesInjectorHook(
     if (event.type === "session.deleted") {
       const sessionInfo = props?.info as { id?: string } | undefined;
       if (sessionInfo?.id) {
-        clearSessionCache(sessionInfo.id);
+        clearSessionState(sessionInfo.id);
       }
     }
 
@@ -81,7 +89,7 @@ export function createRulesInjectorHook(
       const sessionID = (props?.sessionID ??
         (props?.info as { id?: string } | undefined)?.id) as string | undefined;
       if (sessionID) {
-        clearSessionCache(sessionID);
+        clearSessionState(sessionID);
       }
     }
   };
