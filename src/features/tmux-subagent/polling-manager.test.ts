@@ -336,4 +336,125 @@ describe("TmuxPollingManager overlap", () => {
     expect(closedSessionIds).toEqual([])
     expect(sessions.has("ses-1")).toBe(true)
   })
+
+  test("does not close immediately when first status is delayed after focused activation", async () => {
+    //#given
+    const originalDateNow = Date.now
+    let now = 0
+    Date.now = () => now
+
+    try {
+      const sessions = new Map<string, TrackedSession>()
+      const tracked: TrackedSession = {
+        sessionId: "ses-1",
+        paneId: "%1",
+        description: "test",
+        attachActivated: false,
+        createdAt: new Date(0),
+        lastSeenAt: new Date(0),
+        closePending: false,
+        closeRetryCount: 0,
+      }
+      sessions.set("ses-1", tracked)
+
+      let activationCount = 0
+      let statusCalls = 0
+      const closedSessionIds: string[] = []
+      const getWindowState = async (): Promise<WindowState> => ({
+        windowWidth: 220,
+        windowHeight: 44,
+        mainPane: { paneId: "%0", width: 110, height: 44, left: 0, top: 0, title: "main", isActive: false },
+        agentPanes: [{ paneId: "%1", width: 110, height: 44, left: 110, top: 0, title: "agent", isActive: true }],
+      })
+
+      const client = {
+        session: {
+          status: async () => {
+            statusCalls += 1
+            now += 3_000
+            if (statusCalls <= 3) {
+              return { data: {} }
+            }
+            return { data: { "ses-1": { type: "running" } } }
+          },
+          messages: async () => ({ data: [] }),
+        },
+      }
+
+      const manager = new TmuxPollingManager(
+        client as unknown as import("../../tools/delegate-task/types").OpencodeClient,
+        sessions,
+        async (sessionId) => {
+          closedSessionIds.push(sessionId)
+        },
+        getWindowState,
+        async () => {
+          activationCount += 1
+          return true
+        },
+      )
+
+      //#when
+      const pollSessions = (manager as unknown as { pollSessions: () => Promise<void> }).pollSessions
+      await pollSessions.call(manager)
+      await pollSessions.call(manager)
+      await pollSessions.call(manager)
+      await pollSessions.call(manager)
+
+      //#then
+      expect(activationCount).toBe(1)
+      expect(tracked.attachActivated).toBe(true)
+      expect(closedSessionIds).toEqual([])
+      expect(sessions.has("ses-1")).toBe(true)
+    } finally {
+      Date.now = originalDateNow
+    }
+  })
+
+  test("can still close non-activated sessions once status is idle and stable", async () => {
+    //#given
+    const sessions = new Map<string, TrackedSession>()
+    sessions.set("ses-1", {
+      sessionId: "ses-1",
+      paneId: "%1",
+      description: "test",
+      attachActivated: false,
+      createdAt: new Date(Date.now() - 15_000),
+      lastSeenAt: new Date(),
+      closePending: false,
+      closeRetryCount: 0,
+      activityVersion: 0,
+    })
+
+    const closedSessionIds: string[] = []
+    const client = {
+      session: {
+        status: async () => ({ data: { "ses-1": { type: "idle" } } }),
+        messages: async () => ({ data: [] }),
+      },
+    }
+
+    const manager = new TmuxPollingManager(
+      client as unknown as import("../../tools/delegate-task/types").OpencodeClient,
+      sessions,
+      async (sessionId) => {
+        closedSessionIds.push(sessionId)
+      },
+    )
+
+    manager.handleEvent({
+      type: "message.part.delta",
+      properties: { sessionID: "ses-1", field: "text", delta: "done" },
+    })
+
+    //#when
+    const pollSessions = (manager as unknown as { pollSessions: () => Promise<void> }).pollSessions
+    await pollSessions.call(manager)
+    await pollSessions.call(manager)
+    await pollSessions.call(manager)
+    await pollSessions.call(manager)
+
+    //#then
+    expect(closedSessionIds).toEqual(["ses-1"])
+  })
 })

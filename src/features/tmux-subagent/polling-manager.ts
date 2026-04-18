@@ -2,6 +2,7 @@ import type { OpencodeClient } from "../../tools/delegate-task/types"
 import {
   POLL_INTERVAL_BACKGROUND_MS,
   SESSION_MISSING_GRACE_MS,
+  SESSION_READY_TIMEOUT_MS,
   SESSION_TIMEOUT_MS,
 } from "../../shared/tmux"
 import type { TrackedSession, WindowState } from "./types"
@@ -76,15 +77,30 @@ export class TmuxPollingManager {
       const sessionsToClose: string[] = []
 
       for (const [sessionId, tracked] of this.sessions.entries()) {
-        if (!tracked.attachActivated) {
-          log("[tmux-session-manager] skipping close checks for non-activated pane", {
+        const status = allStatuses[sessionId]
+        const elapsedMs = now - tracked.createdAt.getTime()
+        if (!tracked.attachActivated && !status) {
+          log("[tmux-session-manager] placeholder pane has not been activated yet; skipping close checks", {
             sessionId,
             paneId: tracked.paneId,
+            elapsedMs,
           })
           continue
         }
 
-        const status = allStatuses[sessionId]
+        const attachElapsedMs = tracked.attachActivatedAt
+          ? now - tracked.attachActivatedAt.getTime()
+          : undefined
+        if (tracked.attachActivated && !status && attachElapsedMs !== undefined && attachElapsedMs < SESSION_READY_TIMEOUT_MS) {
+          log("[tmux-session-manager] waiting for first post-activation session status", {
+            sessionId,
+            paneId: tracked.paneId,
+            attachElapsedMs,
+            graceMs: SESSION_READY_TIMEOUT_MS,
+          })
+          continue
+        }
+
         const isIdle = status?.type === "idle"
 
         if (status) {
@@ -93,8 +109,7 @@ export class TmuxPollingManager {
 
         const missingSince = !status ? now - tracked.lastSeenAt.getTime() : 0
         const missingTooLong = missingSince >= SESSION_MISSING_GRACE_MS
-        const isTimedOut = now - tracked.createdAt.getTime() > SESSION_TIMEOUT_MS
-        const elapsedMs = now - tracked.createdAt.getTime()
+        const isTimedOut = elapsedMs > SESSION_TIMEOUT_MS
 
         let shouldCloseViaStability = false
 
@@ -217,6 +232,7 @@ export class TmuxPollingManager {
       const activated = await this.activateSessionPane(tracked)
       if (activated) {
         tracked.attachActivated = true
+        tracked.attachActivatedAt = new Date()
         tracked.lastSeenAt = new Date()
         tracked.stableIdlePolls = 0
         tracked.observedIdleActivityVersion = tracked.activityVersion
