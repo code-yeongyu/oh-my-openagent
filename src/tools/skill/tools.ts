@@ -28,10 +28,10 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
   let cachedDescription: string | null = null
 
   const getSkills = async (): Promise<LoadedSkill[]> => {
-    const discovered = await getAllSkills({
+    const discovered = (await getAllSkills({
       disabledSkills: options?.disabledSkills,
       browserProvider: options?.browserProvider,
-    })
+    })) ?? []
     const allSkills = !options.skills
       ? discovered
       : [
@@ -56,7 +56,7 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
     return discoverCommandsSync(undefined, {
       pluginsEnabled: options.pluginsEnabled,
       enabledPluginsOverride: options.enabledPluginsOverride,
-    })
+    }) ?? []
   }
 
   const buildDescription = async (force = false): Promise<string> => {
