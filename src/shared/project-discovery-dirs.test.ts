@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 const TEST_DIR = join(tmpdir(), `project-discovery-dirs-${Date.now()}`)
+let worktreeSpawnCount = 0
 
 function canonicalPath(path: string): string {
   return realpathSync(path)
@@ -16,6 +17,34 @@ describe("project-discovery-dirs", () => {
 
   afterEach(() => {
     rmSync(TEST_DIR, { recursive: true, force: true })
+  })
+
+  it("#given repeated worktree detection #when detecting twice #then reuses the cached result", async () => {
+    // given
+    worktreeSpawnCount = 0
+
+    mock.module("node:child_process", () => ({
+      execFileSync: () => {
+        worktreeSpawnCount += 1
+        return TEST_DIR
+      },
+    }))
+
+    const { clearWorktreeCache, detectWorktreePath } = await import("./project-discovery-dirs")
+
+    clearWorktreeCache()
+
+    // when
+    const firstPath = detectWorktreePath("/some/dir")
+    const secondPath = detectWorktreePath("/some/dir")
+    clearWorktreeCache()
+    const thirdPath = detectWorktreePath("/some/dir")
+
+    // then
+    expect(firstPath).toBe(TEST_DIR)
+    expect(secondPath).toBe(TEST_DIR)
+    expect(thirdPath).toBe(TEST_DIR)
+    expect(worktreeSpawnCount).toBe(2)
   })
 
   it("#given nested .opencode skill directories #when finding project opencode skill dirs #then returns nearest-first with aliases", async () => {
@@ -92,48 +121,4 @@ describe("project-discovery-dirs", () => {
     expect(directories).toEqual([canonicalPath(join(projectDir, ".opencode", "skills"))])
   })
 
-  it("#given repeated worktree detection #when detecting twice #then reuses the cached result", async () => {
-    // given
-    let callCount = 0
-    mock.module("node:child_process", () => ({
-      execFileSync: () => {
-        callCount += 1
-        return TEST_DIR
-      },
-    }))
-
-    const { clearWorktreeCache, detectWorktreePath } = await import("./project-discovery-dirs")
-
-    clearWorktreeCache()
-
-    // when
-    const firstPath = detectWorktreePath("/some/dir")
-    const secondPath = detectWorktreePath("/some/dir")
-
-    // then
-    expect(firstPath).toBe(TEST_DIR)
-    expect(secondPath).toBe(TEST_DIR)
-    expect(callCount).toBe(1)
-  })
-
-  it("#given a cleared worktree cache #when detecting again #then spawns git again", async () => {
-    // given
-    let callCount = 0
-    mock.module("node:child_process", () => ({
-      execFileSync: () => {
-        callCount += 1
-        return TEST_DIR
-      },
-    }))
-
-    const { clearWorktreeCache, detectWorktreePath } = await import("./project-discovery-dirs")
-
-    // when
-    detectWorktreePath("/some/dir")
-    clearWorktreeCache()
-    detectWorktreePath("/some/dir")
-
-    // then
-    expect(execFileSync).toHaveBeenCalledTimes(2)
-  })
 })
