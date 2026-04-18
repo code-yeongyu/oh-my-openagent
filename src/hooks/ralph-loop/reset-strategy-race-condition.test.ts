@@ -21,9 +21,9 @@ function createDeferred(): {
   }
 }
 
-async function waitUntil(condition: () => boolean): Promise<void> {
+async function waitUntil(shouldTrigger: () => boolean): Promise<void> {
   for (let index = 0; index < 100; index++) {
-    if (condition()) {
+    if (shouldTrigger()) {
       return
     }
 

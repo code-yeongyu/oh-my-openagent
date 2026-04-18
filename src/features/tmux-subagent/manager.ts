@@ -10,6 +10,9 @@ import {
   SESSION_READY_TIMEOUT_MS,
   spawnTmuxWindow,
   spawnTmuxSession,
+  killTmuxSessionIfExists,
+  getIsolatedSessionName,
+  sweepStaleOmoAgentSessions,
 } from "../../shared/tmux"
 import { queryWindowState } from "./pane-state-querier"
 import { decideSpawnActions, decideCloseAction, type SessionMapping } from "./decision-engine"
@@ -63,6 +66,8 @@ export class TmuxSessionManager {
   private isolatedContainerPaneId: string | undefined
   private isolatedWindowPaneId: string | undefined
   private isolatedContainerNullStateCount = 0
+  private staleSweepCompleted = false
+  private staleSweepInProgress = false
   constructor(ctx: PluginInput, tmuxConfig: TmuxConfig, deps: TmuxUtilDeps = defaultTmuxDeps) {
     this.client = ctx.client
     this.tmuxConfig = tmuxConfig
@@ -89,7 +94,8 @@ export class TmuxSessionManager {
     this.pollingManager = new TmuxPollingManager(
       this.client,
       this.sessions,
-      this.closeSessionById.bind(this)
+      this.closeSessionById.bind(this),
+      this.retryPendingCloses.bind(this)
     )
     log("[tmux-session-manager] initialized", {
       configEnabled: this.tmuxConfig.enabled,
@@ -511,7 +517,6 @@ export class TmuxSessionManager {
     if (deferred.retryIsolatedContainer) {
       const isolatedPaneId = await this.spawnInIsolatedContainer(sessionId, deferred.title)
       if (isolatedPaneId) {
-        const sessionReady = await this.waitForSessionReady(sessionId)
         this.sessions.set(
           sessionId,
           createTrackedSession({
@@ -525,8 +530,8 @@ export class TmuxSessionManager {
         log("[tmux-session-manager] deferred session attached in isolated window", {
           sessionId,
           paneId: isolatedPaneId,
-          sessionReady,
         })
+        this.logSessionReadinessInBackground(sessionId)
         return
       }
     }
@@ -585,14 +590,6 @@ export class TmuxSessionManager {
       return
     }
 
-    const sessionReady = await this.waitForSessionReady(sessionId)
-    if (!sessionReady) {
-      log("[tmux-session-manager] deferred session not ready after timeout", {
-        sessionId,
-        paneId: result.spawnedPaneId,
-      })
-    }
-
     this.sessions.set(
       sessionId,
       createTrackedSession({
@@ -606,18 +603,27 @@ export class TmuxSessionManager {
     log("[tmux-session-manager] deferred session attached", {
       sessionId,
       paneId: result.spawnedPaneId,
-      sessionReady,
+    })
+    this.logSessionReadinessInBackground(sessionId)
+  }
+
+  private logSessionReadinessInBackground(sessionId: string): void {
+    void this.waitForSessionReady(sessionId).catch((error) => {
+      log("[tmux-session-manager] background readiness probe failed", {
+        sessionId,
+        error: String(error),
+      })
     })
   }
 
   private async waitForSessionReady(sessionId: string): Promise<boolean> {
     const startTime = Date.now()
-    
+
     while (Date.now() - startTime < SESSION_READY_TIMEOUT_MS) {
       try {
         const statusResult = await this.client.session.status({ path: undefined })
         const allStatuses = normalizeSDKResponse(statusResult, {} as Record<string, { type: string }>)
-        
+
         if (allStatuses[sessionId]) {
           log("[tmux-session-manager] session ready", {
             sessionId,
@@ -629,10 +635,10 @@ export class TmuxSessionManager {
       } catch (err) {
         log("[tmux-session-manager] session status check error", { error: String(err) })
       }
-      
+
       await new Promise((resolve) => setTimeout(resolve, SESSION_READY_POLL_INTERVAL_MS))
     }
-    
+
     log("[tmux-session-manager] session ready timeout", {
       sessionId,
       timeoutMs: SESSION_READY_TIMEOUT_MS,
@@ -665,6 +671,7 @@ export class TmuxSessionManager {
       return
     }
 
+    await this.sweepStaleIsolatedSessionsOnce()
     await this.retryPendingCloses()
 
     if (
@@ -682,7 +689,6 @@ export class TmuxSessionManager {
       try {
         const isolatedPaneId = await this.spawnInIsolatedContainer(sessionId, title)
         if (isolatedPaneId) {
-          const sessionReady = await this.waitForSessionReady(sessionId)
           this.sessions.set(
             sessionId,
             createTrackedSession({ sessionId, paneId: isolatedPaneId, description: title }),
@@ -691,8 +697,8 @@ export class TmuxSessionManager {
           log("[tmux-session-manager] first subagent spawned in isolated window", {
             sessionId,
             paneId: isolatedPaneId,
-            sessionReady,
           })
+          this.logSessionReadinessInBackground(sessionId)
           return
         }
 
@@ -773,15 +779,6 @@ export class TmuxSessionManager {
         }
 
         if (result.success && result.spawnedPaneId) {
-          const sessionReady = await this.waitForSessionReady(sessionId)
-
-          if (!sessionReady) {
-            log("[tmux-session-manager] session not ready after timeout, tracking anyway", {
-              sessionId,
-              paneId: result.spawnedPaneId,
-            })
-          }
-
           this.sessions.set(
             sessionId,
             createTrackedSession({
@@ -793,9 +790,9 @@ export class TmuxSessionManager {
           log("[tmux-session-manager] pane spawned and tracked", {
             sessionId,
             paneId: result.spawnedPaneId,
-            sessionReady,
           })
           this.pollingManager.startPolling()
+          this.logSessionReadinessInBackground(sessionId)
         } else {
           log("[tmux-session-manager] spawn failed", {
             success: result.success,
@@ -964,6 +961,49 @@ export class TmuxSessionManager {
     this.isolatedContainerPaneId = undefined
     this.isolatedWindowPaneId = undefined
 
+    if (this.tmuxConfig.isolation === "session") {
+      const isolatedSessionName = getIsolatedSessionName()
+      try {
+        const killed = await killTmuxSessionIfExists(isolatedSessionName)
+        log("[tmux-session-manager] isolated session teardown", {
+          session: isolatedSessionName,
+          killed,
+        })
+      } catch (error) {
+        log("[tmux-session-manager] isolated session teardown failed", {
+          session: isolatedSessionName,
+          error: String(error),
+        })
+      }
+    }
+
+    this.staleSweepCompleted = false
+    this.staleSweepInProgress = false
+
     log("[tmux-session-manager] cleanup complete")
+  }
+
+  private async sweepStaleIsolatedSessionsOnce(): Promise<void> {
+    if (this.staleSweepCompleted) return
+    if (this.staleSweepInProgress) return
+    if (this.tmuxConfig.isolation !== "session") {
+      this.staleSweepCompleted = true
+      return
+    }
+
+    this.staleSweepInProgress = true
+    try {
+      const killed = await sweepStaleOmoAgentSessions()
+      if (killed > 0) {
+        log("[tmux-session-manager] stale isolated sessions swept", { killed })
+      }
+      this.staleSweepCompleted = true
+    } catch (error) {
+      log("[tmux-session-manager] stale sweep failed", {
+        error: String(error),
+      })
+    } finally {
+      this.staleSweepInProgress = false
+    }
   }
 }

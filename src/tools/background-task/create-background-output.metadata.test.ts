@@ -59,7 +59,7 @@ describe("createBackgroundOutput metadata", () => {
         agent: "test-agent",
         category: undefined,
         description: "background task",
-        task_id: "task-1",
+        backgroundTaskId: "task-1",
       },
     })
 

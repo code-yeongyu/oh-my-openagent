@@ -57,6 +57,7 @@ bunx oh-my-opencode install
 | `--zai-coding-plan <no\|yes>` | Z.ai Coding Plan subscription |
 | `--kimi-for-coding <no\|yes>` | Kimi for Coding subscription |
 | `--opencode-go <no\|yes>` | OpenCode Go subscription |
+| `--vercel-ai-gateway <no\|yes>` | Vercel AI Gateway: no, yes (default: no) |
 | `--skip-auth` | Skip authentication setup hints |
 
 Anonymous telemetry uses PostHog with a hashed installation identifier. Disable it with `OMO_SEND_ANONYMOUS_TELEMETRY=0` or `OMO_DISABLE_POSTHOG=1`. See [Privacy Policy](../legal/privacy-policy.md).

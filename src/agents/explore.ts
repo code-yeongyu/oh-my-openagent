@@ -25,13 +25,10 @@ export const EXPLORE_PROMPT_METADATA: AgentPromptMetadata = {
 }
 
 export function createExploreAgent(model: string): AgentConfig {
-  const restrictions = createAgentToolRestrictions([
-    "write",
-    "edit",
-    "apply_patch",
-    "task",
-    "call_omo_agent",
-  ])
+  const restrictions = createAgentToolRestrictions(
+    ["write", "edit", "apply_patch", "task", "call_omo_agent"],
+    ["lsp_symbols", "lsp_goto_definition", "lsp_find_references", "lsp_diagnostics", "ast_grep_search"],
+  )
 
   return {
     description:

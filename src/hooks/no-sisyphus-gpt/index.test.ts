@@ -83,7 +83,7 @@ describe("no-sisyphus-gpt hook", () => {
     await hook["chat.message"]?.({
       sessionID: "ses_2",
       agent: SISYPHUS_DISPLAY,
-      model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
+      model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
     }, output)
 
     // then - no toast

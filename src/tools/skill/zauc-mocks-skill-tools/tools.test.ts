@@ -1,7 +1,14 @@
+/// <reference types="bun-types" />
+
+declare const require: NodeJS.Require
+
 import { afterAll, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
 import type { ToolContext } from "@opencode-ai/plugin/tool"
 import * as fs from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { SkillMcpManager } from "../../../features/skill-mcp-manager"
+import { clearSkillCache } from "../../../features/opencode-skill-loader/skill-content"
 import type { LoadedSkill } from "../../../features/opencode-skill-loader/types"
 import type { CommandInfo } from "../../slashcommand/types"
 import type { Tool as McpTool } from "@modelcontextprotocol/sdk/types.js"
@@ -10,7 +17,24 @@ const originalReadFileSync = fs.readFileSync.bind(fs)
 
 let createSkillTool: typeof import("../tools").createSkillTool
 
-beforeEach(async () => {
+function clearRequireCache(modulePath: string): void {
+  const resolvedPath = require.resolve(modulePath)
+  if (require.cache?.[resolvedPath]) {
+    delete require.cache[resolvedPath]
+  }
+}
+
+function requireFresh<TModule>(modulePath: string): TModule {
+  clearRequireCache(modulePath)
+  return require(modulePath) as TModule
+}
+
+beforeEach(() => {
+  mock.restore()
+  clearRequireCache("../tools")
+  clearRequireCache("../../../features/opencode-skill-loader/skill-content")
+  clearRequireCache("../../slashcommand/command-discovery")
+
   mock.module("node:fs", () => ({
     ...fs,
     readFileSync: (path: string, encoding?: string) => {
@@ -23,9 +47,8 @@ Test skill body content`
       return originalReadFileSync(path, encoding as BufferEncoding)
     },
   }))
-  
-  const module = await import("../tools")
-  createSkillTool = module.createSkillTool
+
+  createSkillTool = requireFresh<typeof import("../tools")>("../tools").createSkillTool
 })
 
 afterAll(() => {
@@ -548,16 +571,43 @@ describe("skill tool - ordering and priority", () => {
 })
 
 describe("skill tool - dynamic discovery", () => {
-  it("discovers skills from disk on every invocation instead of caching", async () => {
-    // given: tool created with initial skills
-    const initialSkills = [createMockSkill("initial-skill")]
-    const tool = createSkillTool({ skills: initialSkills })
+  it("caches discovered skills across tool instances until the shared cache resets", async () => {
+    // given
+    clearSkillCache()
+    const originalDirectory = process.cwd()
+    const temporaryDirectory = fs.mkdtempSync(join(tmpdir(), "skill-tool-cache-"))
+    const initialSkillDirectory = join(temporaryDirectory, ".opencode", "skills", "initial-skill")
+    const secondSkillDirectory = join(temporaryDirectory, ".opencode", "skills", "second-skill")
 
-    // when: executing with the initial skill name
-    const result = await tool.execute({ name: "initial-skill" }, mockContext)
+    fs.mkdirSync(initialSkillDirectory, { recursive: true })
+    fs.writeFileSync(join(initialSkillDirectory, "SKILL.md"), "---\ndescription: Initial skill\n---\nInitial skill body")
+    process.chdir(temporaryDirectory)
 
-    // then: initial skill found (merged from options.skills since not on disk)
-    expect(result).toContain("Skill: initial-skill")
+    try {
+      const firstTool = createSkillTool({})
+
+      // when
+      const initialResult = await firstTool.execute({ name: "initial-skill" }, mockContext)
+
+      fs.mkdirSync(secondSkillDirectory, { recursive: true })
+      fs.writeFileSync(join(secondSkillDirectory, "SKILL.md"), "---\ndescription: Second skill\n---\nSecond skill body")
+
+      const cachedTool = createSkillTool({})
+
+      // then
+      expect(initialResult).toContain("Skill: initial-skill")
+      let cachedError: Error | undefined
+      try {
+        await cachedTool.execute({ name: "second-skill" }, mockContext)
+      } catch (error) {
+        cachedError = error instanceof Error ? error : new Error(String(error))
+      }
+      expect(cachedError?.message).toContain('Skill or command "second-skill" not found.')
+    } finally {
+      process.chdir(originalDirectory)
+      clearSkillCache()
+      fs.rmSync(temporaryDirectory, { recursive: true, force: true })
+    }
   })
 
   it("merges pre-provided skills with dynamically discovered ones", async () => {
@@ -586,59 +636,66 @@ describe("skill tool - dynamic discovery", () => {
   })
 })
 describe("skill tool - dynamic description cache invalidation", () => {
-  it("rebuilds description after execute() discovers new skills", async () => {
-    // given: tool created with initial skills (no pre-provided skills)
-    // This triggers lazy description building
+  it("keeps description available after execute misses a skill", async () => {
+    // given
     const tool = createSkillTool({})
-    
-    // Get initial description - it will build from empty or disk skills
+
+    // when
     const initialDescription = tool.description
     expect(initialDescription).toBeString()
-    
-    // when: execute() is called, which clears cache AND gets fresh skills
-    // Note: In real scenario, execute() would discover new skills from disk
-    // For testing, we verify the mechanism: execute() should invalidate cachedDescription
-    
-    // Execute any skill to trigger the cache clear + getSkills flow
-    // Using a non-existent skill name to trigger the error path which still goes through getSkills()
+
     try {
       await tool.execute({ name: "nonexistent-skill-12345" }, mockContext)
-    } catch (e) {
-      // Expected to fail - skill doesn't exist
+    } catch {
     }
-    
-    // then: cachedDescription should be invalidated, so next description access should rebuild
-    // We verify by checking that the description getter triggers a rebuild
-    // Since we can't easily mock getAllSkills in this test, we verify the cache invalidation mechanism
-    
-    // The key assertion: after execute(), the description should be rebuildable
-    // If cachedDescription wasn't invalidated, it would still return old value
-    // We verify by checking that the tool still has valid description structure
+
+    // then
     expect(tool.description).toBeDefined()
     expect(typeof tool.description).toBe("string")
   })
 
-  it("description reflects fresh skills after execute() clears cache", async () => {
-    // given: tool created without pre-provided skills (will use disk discovery)
-    const tool = createSkillTool({})
-    
-    // when: execute() is called with a skill that exists on disk (via mock)
-    // This simulates the real scenario: execute() discovers skills, cache should be invalidated
-    
-    // Execute to trigger the cache invalidation path
+  it("picks up new disk skills only after the shared skill cache resets", async () => {
+    // given
+    clearSkillCache()
+    const originalDirectory = process.cwd()
+    const temporaryDirectory = fs.mkdtempSync(join(tmpdir(), "skill-tool-refresh-"))
+    const initialSkillDirectory = join(temporaryDirectory, ".opencode", "skills", "initial-skill")
+    const secondSkillDirectory = join(temporaryDirectory, ".opencode", "skills", "second-skill")
+
+    fs.mkdirSync(initialSkillDirectory, { recursive: true })
+    fs.writeFileSync(join(initialSkillDirectory, "SKILL.md"), "---\ndescription: Initial skill\n---\nInitial skill body")
+    process.chdir(temporaryDirectory)
+
     try {
-      // This will call getSkills() which clears cache
-      await tool.execute({ name: "nonexistent" }, mockContext)
-    } catch (e) {
-      // Expected
+      const initialTool = createSkillTool({})
+      await initialTool.execute({ name: "initial-skill" }, mockContext)
+
+      fs.mkdirSync(secondSkillDirectory, { recursive: true })
+      fs.writeFileSync(join(secondSkillDirectory, "SKILL.md"), "---\ndescription: Second skill\n---\nSecond skill body")
+
+      const cachedTool = createSkillTool({})
+      let cachedError: Error | undefined
+      try {
+        await cachedTool.execute({ name: "second-skill" }, mockContext)
+      } catch (error) {
+        cachedError = error instanceof Error ? error : new Error(String(error))
+      }
+      expect(cachedError?.message).toContain('Skill or command "second-skill" not found.')
+
+      clearSkillCache()
+      const refreshedTool = createSkillTool({})
+
+      // when
+      const refreshedResult = await refreshedTool.execute({ name: "second-skill" }, mockContext)
+
+      // then
+      expect(refreshedResult).toContain("Skill: second-skill")
+      expect(refreshedTool.description).toContain("second-skill")
+    } finally {
+      process.chdir(originalDirectory)
+      clearSkillCache()
+      fs.rmSync(temporaryDirectory, { recursive: true, force: true })
     }
-    
-    // then: description should still work and not be stale
-    // The bug would cause it to return old cached value forever
-    const desc = tool.description
-    
-    // Verify description is a valid string (not stale/old)
-    expect(desc).toContain("skill")
   })
 })
 

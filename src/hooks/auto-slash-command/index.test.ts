@@ -2,6 +2,7 @@ import { describe, expect, it, beforeEach, afterEach, spyOn, mock } from "bun:te
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { clearCommandLoaderCache } from "../../features/claude-code-command-loader"
 import type { LoadedSkill } from "../../features/opencode-skill-loader/types"
 import type {
   AutoSlashCommandHookInput,
@@ -43,6 +44,7 @@ describe("createAutoSlashCommandHook", () => {
   let createAutoSlashCommandHook: AutoSlashCommandModule["createAutoSlashCommandHook"]
 
   beforeEach(async () => {
+    clearCommandLoaderCache()
     mock.restore()
     logCalls = []
     spyOn(shared, "log").mockImplementation((message: string, data?: unknown) => {
@@ -56,6 +58,7 @@ describe("createAutoSlashCommandHook", () => {
   })
 
   afterEach(() => {
+    clearCommandLoaderCache()
     process.chdir(originalWorkingDirectory)
     rmSync(tempDir, { recursive: true, force: true })
     mock.restore()

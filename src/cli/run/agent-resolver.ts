@@ -1,7 +1,7 @@
 import pc from "picocolors"
 import type { RunOptions } from "./types"
 import type { OhMyOpenCodeConfig } from "../../config"
-import { getAgentConfigKey, getAgentDisplayName } from "../../shared/agent-display-names"
+import { getAgentConfigKey, getAgentDisplayName, getAgentRuntimeName } from "../../shared/agent-display-names"
 
 const CORE_AGENT_ORDER = ["sisyphus", "hephaestus", "prometheus", "atlas"] as const
 const DEFAULT_AGENT = "sisyphus"
@@ -21,11 +21,12 @@ const normalizeAgentName = (agent?: string): ResolvedAgent | undefined => {
 
   const configKey = getAgentConfigKey(trimmed)
   const displayName = getAgentDisplayName(configKey)
+  const runtimeName = getAgentRuntimeName(configKey)
   const isKnownAgent = displayName !== configKey
 
   return {
     configKey,
-    resolvedName: isKnownAgent ? displayName : trimmed,
+    resolvedName: isKnownAgent ? runtimeName : trimmed,
   }
 }
 
@@ -61,27 +62,28 @@ export const resolveRunAgent = (
     envAgent ??
     configAgent ?? {
       configKey: DEFAULT_AGENT,
-      resolvedName: getAgentDisplayName(DEFAULT_AGENT),
+      resolvedName: getAgentRuntimeName(DEFAULT_AGENT),
     }
 
   if (isAgentDisabled(resolved.configKey, pluginConfig)) {
     const fallback = pickFallbackAgent(pluginConfig)
-    const fallbackName = getAgentDisplayName(fallback)
+    const fallbackDisplayName = getAgentDisplayName(fallback)
+    const fallbackRuntimeName = getAgentRuntimeName(fallback)
     const fallbackDisabled = isAgentDisabled(fallback, pluginConfig)
     if (fallbackDisabled) {
       console.log(
         pc.yellow(
-          `Requested agent "${resolved.resolvedName}" is disabled and no enabled core agent was found. Proceeding with "${fallbackName}".`
+          `Requested agent "${resolved.resolvedName}" is disabled and no enabled core agent was found. Proceeding with "${fallbackDisplayName}".`
         )
       )
-      return fallbackName
+      return fallbackRuntimeName
     }
     console.log(
       pc.yellow(
-        `Requested agent "${resolved.resolvedName}" is disabled. Falling back to "${fallbackName}".`
+        `Requested agent "${resolved.resolvedName}" is disabled. Falling back to "${fallbackDisplayName}".`
       )
     )
-    return fallbackName
+    return fallbackRuntimeName
   }
 
   return resolved.resolvedName

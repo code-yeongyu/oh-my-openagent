@@ -56,7 +56,7 @@ describe("getHephaestusPromptSource", () => {
 
   test("returns 'gpt' for non-GPT models and undefined", () => {
     // given
-    const model1 = "anthropic/claude-opus-4-6";
+    const model1 = "anthropic/claude-opus-4-7";
     const model2 = undefined;
 
     // when
@@ -124,7 +124,7 @@ describe("getHephaestusPrompt", () => {
 
   test("Claude model returns generic GPT prompt (Hephaestus default)", () => {
     // given
-    const model = "anthropic/claude-opus-4-6";
+    const model = "anthropic/claude-opus-4-7";
 
     // when
     const prompt = getHephaestusPrompt(model);
@@ -149,7 +149,7 @@ describe("getHephaestusPrompt", () => {
 
   test("useTaskSystem=false includes Todo Discipline for Claude models", () => {
     // given
-    const model = "anthropic/claude-opus-4-6";
+    const model = "anthropic/claude-opus-4-7";
 
     // when
     const prompt = getHephaestusPrompt(model, false);
@@ -239,7 +239,7 @@ describe("createHephaestusAgent", () => {
     // given
     const gpt54Model = "openai/gpt-5.4";
     const gptGenericModel = "openai/gpt-4o";
-    const claudeModel = "anthropic/claude-opus-4-6";
+    const claudeModel = "anthropic/claude-opus-4-7";
 
     // when
     const gpt54Config = createHephaestusAgent(gpt54Model);
@@ -322,7 +322,7 @@ describe("maybeCreateHephaestusConfig GPT apply_patch guard", () => {
       // given
       const agentOverrides: AgentOverrides = {
         hephaestus: {
-          model: "anthropic/claude-opus-4-6",
+          model: "anthropic/claude-opus-4-7",
           permission: {
             apply_patch: "allow",
           },
@@ -334,8 +334,8 @@ describe("maybeCreateHephaestusConfig GPT apply_patch guard", () => {
       const config = maybeCreateHephaestusConfig({
         disabledAgents: [],
         agentOverrides,
-        availableModels: new Set(["anthropic/claude-opus-4-6"]),
-        systemDefaultModel: "anthropic/claude-opus-4-6",
+        availableModels: new Set(["anthropic/claude-opus-4-7"]),
+        systemDefaultModel: "anthropic/claude-opus-4-7",
         isFirstRunNoCache: false,
         availableAgents: [],
         availableSkills: [],
@@ -346,7 +346,7 @@ describe("maybeCreateHephaestusConfig GPT apply_patch guard", () => {
 
       // then
       expect(config).toBeDefined();
-      expect(config?.model).toBe("anthropic/claude-opus-4-6");
+      expect(config?.model).toBe("anthropic/claude-opus-4-7");
       expect(config?.permission).toHaveProperty("apply_patch", "allow");
     });
   });

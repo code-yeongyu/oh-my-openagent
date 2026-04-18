@@ -34,7 +34,7 @@ describe("loadAvailableModelsFromCache", () => {
       join(tempDir, "cache", "opencode", "models.json"),
       JSON.stringify({
         openai: { models: { "gpt-5.4": {} } },
-        anthropic: { models: { "claude-opus-4-6": {}, "claude-sonnet-4-6": {} } },
+        anthropic: { models: { "claude-opus-4-7": {}, "claude-sonnet-4-6": {} } },
       })
     )
 

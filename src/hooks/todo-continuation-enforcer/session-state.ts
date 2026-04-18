@@ -31,6 +31,7 @@ export interface ContinuationProgressUpdate {
 export interface SessionStateStore {
   getState: (sessionID: string) => SessionState
   getExistingState: (sessionID: string) => SessionState | undefined
+  startPruneInterval: () => void
   recordActivity: (sessionID: string) => void
   trackContinuationProgress: (
     sessionID: string,
@@ -76,18 +77,26 @@ export function createSessionStateStore(): SessionStateStore {
 
   // Periodic pruning of stale session states to prevent unbounded Map growth
   let pruneInterval: TimerHandle | undefined
-  pruneInterval = setInterval(() => {
-    const now = Date.now()
-    for (const [sessionID, tracked] of sessions.entries()) {
-      if (now - tracked.lastAccessedAt > SESSION_STATE_TTL_MS) {
-        cancelCountdown(sessionID)
-        sessions.delete(sessionID)
-      }
+  let pruneIntervalStarted = false
+
+  function startPruneInterval(): void {
+    if (pruneIntervalStarted) {
+      return
     }
-  }, SESSION_STATE_PRUNE_INTERVAL_MS)
-  // Allow process to exit naturally even if interval is running
-  if (typeof pruneInterval === "object" && typeof pruneInterval.unref === "function") {
-    pruneInterval.unref()
+
+    pruneIntervalStarted = true
+    pruneInterval = setInterval(() => {
+      const now = Date.now()
+      for (const [sessionID, tracked] of sessions.entries()) {
+        if (now - tracked.lastAccessedAt > SESSION_STATE_TTL_MS) {
+          cancelCountdown(sessionID)
+          sessions.delete(sessionID)
+        }
+      }
+    }, SESSION_STATE_PRUNE_INTERVAL_MS)
+    if (typeof pruneInterval === "object" && typeof pruneInterval.unref === "function") {
+      pruneInterval.unref()
+    }
   }
 
   function getTrackedSession(sessionID: string): TrackedSessionState {
@@ -272,6 +281,7 @@ export function createSessionStateStore(): SessionStateStore {
   return {
     getState,
     getExistingState,
+    startPruneInterval,
     recordActivity,
     trackContinuationProgress,
     resetContinuationProgress,

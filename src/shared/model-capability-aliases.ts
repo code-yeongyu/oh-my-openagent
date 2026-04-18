@@ -41,9 +41,9 @@ const EXACT_ALIAS_RULES_BY_MODEL: ReadonlyMap<string, ExactAliasRule> = new Map(
 const PATTERN_ALIAS_RULES: ReadonlyArray<PatternAliasRule> = [
   {
     ruleID: "claude-thinking-legacy-alias",
-    description: "Normalizes the legacy Claude Opus 4.6 thinking suffix to the canonical snapshot ID.",
-    match: (normalizedModelID) => /^claude-opus-4-6-thinking$/.test(normalizedModelID),
-    canonicalize: () => "claude-opus-4-6",
+    description: "Normalizes legacy Claude Opus thinking suffixes (4-6, 4-7) to the canonical snapshot ID.",
+    match: (normalizedModelID) => /^claude-opus-4-(?:6|7)-thinking$/.test(normalizedModelID),
+    canonicalize: () => "claude-opus-4-7",
   },
   {
     ruleID: "gemini-3.1-pro-tier-alias",

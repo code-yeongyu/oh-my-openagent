@@ -2,6 +2,8 @@ import { execFileSync } from "node:child_process"
 import { existsSync, realpathSync } from "node:fs"
 import { dirname, join, resolve } from "node:path"
 
+const worktreePathCache = new Map<string, string | undefined>()
+
 function normalizePath(path: string): string {
   const resolvedPath = resolve(path)
   if (!existsSync(resolvedPath)) {
@@ -49,15 +51,28 @@ function findAncestorDirectories(
   }
 }
 
-function detectWorktreePath(directory: string): string | undefined {
+export function clearWorktreeCache(): void {
+  worktreePathCache.clear()
+}
+
+export function detectWorktreePath(directory: string): string | undefined {
+  const resolvedDirectory = resolve(directory)
+  if (worktreePathCache.has(resolvedDirectory)) {
+    return worktreePathCache.get(resolvedDirectory)
+  }
+
   try {
-    return execFileSync("git", ["rev-parse", "--show-toplevel"], {
-      cwd: directory,
+    const worktreePath = execFileSync("git", ["rev-parse", "--show-toplevel"], {
+      cwd: resolvedDirectory,
       encoding: "utf-8",
       timeout: 5000,
       stdio: ["pipe", "pipe", "pipe"],
     }).trim()
+
+    worktreePathCache.set(resolvedDirectory, worktreePath)
+    return worktreePath
   } catch {
+    worktreePathCache.set(resolvedDirectory, undefined)
     return undefined
   }
 }

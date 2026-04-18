@@ -43,7 +43,7 @@ describe("maybeCreateSisyphusConfig", () => {
       // given
       const agentOverrides: AgentOverrides = {
         sisyphus: {
-          model: "anthropic/claude-opus-4-6",
+          model: "anthropic/claude-opus-4-7",
           permission: {
             apply_patch: "allow",
           },
@@ -55,8 +55,8 @@ describe("maybeCreateSisyphusConfig", () => {
       const config = maybeCreateSisyphusConfig({
         disabledAgents: [],
         agentOverrides,
-        availableModels: new Set(["anthropic/claude-opus-4-6"]),
-        systemDefaultModel: "anthropic/claude-opus-4-6",
+        availableModels: new Set(["anthropic/claude-opus-4-7"]),
+        systemDefaultModel: "anthropic/claude-opus-4-7",
         isFirstRunNoCache: false,
         availableAgents: [],
         availableSkills: [],
@@ -67,7 +67,7 @@ describe("maybeCreateSisyphusConfig", () => {
 
       // then
       expect(config).toBeDefined();
-      expect(config?.model).toBe("anthropic/claude-opus-4-6");
+      expect(config?.model).toBe("anthropic/claude-opus-4-7");
       // Claude models should allow the user override
       expect(config?.permission).toHaveProperty("apply_patch", "allow");
     });

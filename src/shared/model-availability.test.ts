@@ -65,7 +65,7 @@ describe("fetchAvailableModels", () => {
   it("#given cache file with models #when fetchAvailableModels called with connectedProviders #then returns Set of model IDs", async () => {
     writeModelsCache({
       openai: { id: "openai", models: { "gpt-5.4": { id: "gpt-5.4" } } },
-      anthropic: { id: "anthropic", models: { "claude-opus-4-6": { id: "claude-opus-4-6" } } },
+      anthropic: { id: "anthropic", models: { "claude-opus-4-7": { id: "claude-opus-4-7" } } },
       google: { id: "google", models: { "gemini-3.1-pro": { id: "gemini-3.1-pro" } } },
     })
 
@@ -76,7 +76,7 @@ describe("fetchAvailableModels", () => {
     expect(result).toBeInstanceOf(Set)
     expect(result.size).toBe(3)
     expect(result.has("openai/gpt-5.4")).toBe(true)
-    expect(result.has("anthropic/claude-opus-4-6")).toBe(true)
+    expect(result.has("anthropic/claude-opus-4-7")).toBe(true)
     expect(result.has("google/gemini-3.1-pro")).toBe(true)
   })
 
@@ -145,7 +145,7 @@ describe("fetchAvailableModels", () => {
   it("#given cache read twice #when second call made with same providers #then reads fresh each time", async () => {
     writeModelsCache({
       openai: { id: "openai", models: { "gpt-5.4": { id: "gpt-5.4" } } },
-      anthropic: { id: "anthropic", models: { "claude-opus-4-6": { id: "claude-opus-4-6" } } },
+      anthropic: { id: "anthropic", models: { "claude-opus-4-7": { id: "claude-opus-4-7" } } },
     })
 
     const result1 = await fetchAvailableModels(undefined, { connectedProviders: ["openai"] })
@@ -192,7 +192,7 @@ describe("fuzzyMatchModel", () => {
 		const available = new Set([
 			"openai/gpt-5.4",
 			"openai/gpt-5.3-codex",
-			"anthropic/claude-opus-4-6",
+			"anthropic/claude-opus-4-7",
 		])
 		const result = fuzzyMatchModel("gpt-5.4", available)
 		expect(result).toBe("openai/gpt-5.4")
@@ -239,25 +239,25 @@ describe("fuzzyMatchModel", () => {
 	// given available models with claude variants
 	// when searching for claude-opus
 	// then return matching claude-opus model
-	it("should match claude-opus to claude-opus-4-6", () => {
+	it("should match claude-opus to claude-opus-4-7", () => {
 		const available = new Set([
-			"anthropic/claude-opus-4-6",
+			"anthropic/claude-opus-4-7",
 			"anthropic/claude-sonnet-4-6",
 		])
 		const result = fuzzyMatchModel("claude-opus", available)
-		expect(result).toBe("anthropic/claude-opus-4-6")
+		expect(result).toBe("anthropic/claude-opus-4-7")
 	})
 
 	// given github-copilot serves claude versions with dot notation
 	// when fallback chain uses hyphen notation in requested model
 	// then normalize both forms and match github-copilot model
-	it("should match github-copilot claude-opus-4-6 to claude-opus-4.6", () => {
+	it("should match github-copilot claude-opus-4-7 to claude-opus-4.7", () => {
 		const available = new Set([
-			"github-copilot/claude-opus-4.6",
+			"github-copilot/claude-opus-4.7",
 			"opencode/big-pickle",
 		])
-		const result = fuzzyMatchModel("claude-opus-4-6", available, ["github-copilot"])
-		expect(result).toBe("github-copilot/claude-opus-4.6")
+		const result = fuzzyMatchModel("claude-opus-4-7", available, ["github-copilot"])
+		expect(result).toBe("github-copilot/claude-opus-4.7")
 	})
 
 	// given claude models can evolve to newer version numbers
@@ -275,7 +275,7 @@ describe("fuzzyMatchModel", () => {
 	it("should filter by provider when providers array is given", () => {
 		const available = new Set([
 			"openai/gpt-5.4",
-			"anthropic/claude-opus-4-6",
+			"anthropic/claude-opus-4-7",
 			"google/gemini-3",
 		])
 		const result = fuzzyMatchModel("gpt", available, ["openai"])
@@ -288,7 +288,7 @@ describe("fuzzyMatchModel", () => {
 	it("should return null when provider filter excludes all matches", () => {
 		const available = new Set([
 			"openai/gpt-5.4",
-			"anthropic/claude-opus-4-6",
+			"anthropic/claude-opus-4-7",
 		])
 		const result = fuzzyMatchModel("claude", available, ["openai"])
 		expect(result).toBeNull()
@@ -300,7 +300,7 @@ describe("fuzzyMatchModel", () => {
 	it("should return null when no match found", () => {
 		const available = new Set([
 			"openai/gpt-5.4",
-			"anthropic/claude-opus-4-6",
+			"anthropic/claude-opus-4-7",
 		])
 		const result = fuzzyMatchModel("gemini", available)
 		expect(result).toBeNull()
@@ -312,7 +312,7 @@ describe("fuzzyMatchModel", () => {
 	it("should match case-insensitively", () => {
 		const available = new Set([
 			"openai/gpt-5.4",
-			"anthropic/claude-opus-4-6",
+			"anthropic/claude-opus-4-7",
 		])
 		const result = fuzzyMatchModel("GPT-5.4", available)
 		expect(result).toBe("openai/gpt-5.4")
@@ -323,11 +323,11 @@ describe("fuzzyMatchModel", () => {
 	// then return exact match first
 	it("should prioritize exact match over longer variants", () => {
 		const available = new Set([
-			"anthropic/claude-opus-4-6",
-			"anthropic/claude-opus-4-6-extended",
+			"anthropic/claude-opus-4-7",
+			"anthropic/claude-opus-4-7-extended",
 		])
-		const result = fuzzyMatchModel("claude-opus-4-6", available)
-		expect(result).toBe("anthropic/claude-opus-4-6")
+		const result = fuzzyMatchModel("claude-opus-4-7", available)
+		expect(result).toBe("anthropic/claude-opus-4-7")
 	})
 
 	// given available models with similar model IDs (e.g., glm-5 and big-pickle)
@@ -372,7 +372,7 @@ describe("fuzzyMatchModel", () => {
 	it("should search all specified providers", () => {
 		const available = new Set([
 			"openai/gpt-5.4",
-			"anthropic/claude-opus-4-6",
+			"anthropic/claude-opus-4-7",
 			"google/gemini-3",
 		])
 		const result = fuzzyMatchModel("gpt", available, ["openai", "google"])
@@ -520,7 +520,7 @@ describe("fetchAvailableModels with connected providers filtering", () => {
 	it("should filter models by connected providers", async () => {
 		writeModelsCache({
 			openai: { models: { "gpt-5.4": { id: "gpt-5.4" } } },
-			anthropic: { models: { "claude-opus-4-6": { id: "claude-opus-4-6" } } },
+			anthropic: { models: { "claude-opus-4-7": { id: "claude-opus-4-7" } } },
 			google: { models: { "gemini-3.1-pro": { id: "gemini-3.1-pro" } } },
 		})
 
@@ -529,7 +529,7 @@ describe("fetchAvailableModels with connected providers filtering", () => {
 		})
 
 		expect(result.size).toBe(1)
-		expect(result.has("anthropic/claude-opus-4-6")).toBe(true)
+		expect(result.has("anthropic/claude-opus-4-7")).toBe(true)
 		expect(result.has("openai/gpt-5.4")).toBe(false)
 		expect(result.has("google/gemini-3.1-pro")).toBe(false)
 	})
@@ -540,7 +540,7 @@ describe("fetchAvailableModels with connected providers filtering", () => {
 	it("should filter models by multiple connected providers", async () => {
 		writeModelsCache({
 			openai: { models: { "gpt-5.4": { id: "gpt-5.4" } } },
-			anthropic: { models: { "claude-opus-4-6": { id: "claude-opus-4-6" } } },
+			anthropic: { models: { "claude-opus-4-7": { id: "claude-opus-4-7" } } },
 			google: { models: { "gemini-3.1-pro": { id: "gemini-3.1-pro" } } },
 		})
 
@@ -549,7 +549,7 @@ describe("fetchAvailableModels with connected providers filtering", () => {
 		})
 
 		expect(result.size).toBe(2)
-		expect(result.has("anthropic/claude-opus-4-6")).toBe(true)
+		expect(result.has("anthropic/claude-opus-4-7")).toBe(true)
 		expect(result.has("google/gemini-3.1-pro")).toBe(true)
 		expect(result.has("openai/gpt-5.4")).toBe(false)
 	})
@@ -560,7 +560,7 @@ describe("fetchAvailableModels with connected providers filtering", () => {
 	it("should return empty set when connectedProviders is empty", async () => {
 		writeModelsCache({
 			openai: { models: { "gpt-5.4": { id: "gpt-5.4" } } },
-			anthropic: { models: { "claude-opus-4-6": { id: "claude-opus-4-6" } } },
+			anthropic: { models: { "claude-opus-4-7": { id: "claude-opus-4-7" } } },
 		})
 
 		const result = await fetchAvailableModels(undefined, {
@@ -576,7 +576,7 @@ describe("fetchAvailableModels with connected providers filtering", () => {
 	it("should return empty set when connectedProviders not specified", async () => {
 		writeModelsCache({
 			openai: { models: { "gpt-5.4": { id: "gpt-5.4" } } },
-			anthropic: { models: { "claude-opus-4-6": { id: "claude-opus-4-6" } } },
+			anthropic: { models: { "claude-opus-4-7": { id: "claude-opus-4-7" } } },
 		})
 
 		const result = await fetchAvailableModels()
@@ -605,7 +605,7 @@ describe("fetchAvailableModels with connected providers filtering", () => {
 	it("should return models from providers that exist in both cache and connected list", async () => {
 		writeModelsCache({
 			openai: { models: { "gpt-5.4": { id: "gpt-5.4" } } },
-			anthropic: { models: { "claude-opus-4-6": { id: "claude-opus-4-6" } } },
+			anthropic: { models: { "claude-opus-4-7": { id: "claude-opus-4-7" } } },
 		})
 
 		const result = await fetchAvailableModels(undefined, {
@@ -613,7 +613,7 @@ describe("fetchAvailableModels with connected providers filtering", () => {
 		})
 
 		expect(result.size).toBe(1)
-		expect(result.has("anthropic/claude-opus-4-6")).toBe(true)
+		expect(result.has("anthropic/claude-opus-4-7")).toBe(true)
 	})
 
 	// given filtered fetch
@@ -622,7 +622,7 @@ describe("fetchAvailableModels with connected providers filtering", () => {
 	it("should not cache filtered results", async () => {
 		writeModelsCache({
 			openai: { models: { "gpt-5.4": { id: "gpt-5.4" } } },
-			anthropic: { models: { "claude-opus-4-6": { id: "claude-opus-4-6" } } },
+			anthropic: { models: { "claude-opus-4-7": { id: "claude-opus-4-7" } } },
 		})
 
 		// First call with anthropic
@@ -706,13 +706,13 @@ describe("fetchAvailableModels with provider-models cache (whitelist-filtered)",
 		writeProviderModelsCache({
 			models: {
 				opencode: ["big-pickle", "gpt-5-nano"],
-				anthropic: ["claude-opus-4-6"]
+				anthropic: ["claude-opus-4-7"]
 			},
 			connected: ["opencode", "anthropic"]
 		})
 		writeModelsCache({
 			opencode: { models: { "big-pickle": {}, "gpt-5-nano": {}, "gpt-5.4": {} } },
-			anthropic: { models: { "claude-opus-4-6": {}, "claude-sonnet-4-6": {} } }
+			anthropic: { models: { "claude-opus-4-7": {}, "claude-sonnet-4-6": {} } }
 		})
 
 		const result = await fetchAvailableModels(undefined, {
@@ -722,7 +722,7 @@ describe("fetchAvailableModels with provider-models cache (whitelist-filtered)",
 		expect(result.size).toBe(3)
 		expect(result.has("opencode/big-pickle")).toBe(true)
 		expect(result.has("opencode/gpt-5-nano")).toBe(true)
-		expect(result.has("anthropic/claude-opus-4-6")).toBe(true)
+		expect(result.has("anthropic/claude-opus-4-7")).toBe(true)
 		expect(result.has("opencode/gpt-5.4")).toBe(false)
 		expect(result.has("anthropic/claude-sonnet-4-6")).toBe(false)
 	})
@@ -773,7 +773,7 @@ describe("fetchAvailableModels with provider-models cache (whitelist-filtered)",
 		writeProviderModelsCache({
 			models: {
 				opencode: ["big-pickle"],
-				anthropic: ["claude-opus-4-6"],
+				anthropic: ["claude-opus-4-7"],
 				google: ["gemini-3.1-pro"]
 			},
 			connected: ["opencode", "anthropic", "google"]
@@ -785,7 +785,7 @@ describe("fetchAvailableModels with provider-models cache (whitelist-filtered)",
 
 		expect(result.size).toBe(1)
 		expect(result.has("opencode/big-pickle")).toBe(true)
-		expect(result.has("anthropic/claude-opus-4-6")).toBe(false)
+		expect(result.has("anthropic/claude-opus-4-7")).toBe(false)
 		expect(result.has("google/gemini-3.1-pro")).toBe(false)
 	})
 
@@ -812,7 +812,7 @@ describe("fetchAvailableModels with provider-models cache (whitelist-filtered)",
 	it("should handle mixed string[] and object[] formats across providers", async () => {
 		writeProviderModelsCache({
 			models: {
-				anthropic: ["claude-opus-4-6", "claude-sonnet-4-6"],
+				anthropic: ["claude-opus-4-7", "claude-sonnet-4-6"],
 				ollama: [
 					{ id: "ministral-3:14b-32k-agent", provider: "ollama" },
 					{ id: "qwen3-coder:32k-agent", provider: "ollama" }
@@ -826,7 +826,7 @@ describe("fetchAvailableModels with provider-models cache (whitelist-filtered)",
 		})
 
 		expect(result.size).toBe(4)
-		expect(result.has("anthropic/claude-opus-4-6")).toBe(true)
+		expect(result.has("anthropic/claude-opus-4-7")).toBe(true)
 		expect(result.has("anthropic/claude-sonnet-4-6")).toBe(true)
 		expect(result.has("ollama/ministral-3:14b-32k-agent")).toBe(true)
 		expect(result.has("ollama/qwen3-coder:32k-agent")).toBe(true)
@@ -859,7 +859,7 @@ describe("fetchAvailableModels with provider-models cache (whitelist-filtered)",
 describe("isModelAvailable", () => {
 	it("returns true when model exists via fuzzy match", () => {
 		// given
-		const available = new Set(["openai/gpt-5.3-codex", "anthropic/claude-opus-4-6"])
+		const available = new Set(["openai/gpt-5.3-codex", "anthropic/claude-opus-4-7"])
 
 		// when
 		const result = isModelAvailable("gpt-5.3-codex", available)
@@ -870,7 +870,7 @@ describe("isModelAvailable", () => {
 
 	it("returns false when model not found", () => {
 		// given
-		const available = new Set(["anthropic/claude-opus-4-6"])
+		const available = new Set(["anthropic/claude-opus-4-7"])
 
 		// when
 		const result = isModelAvailable("gpt-5.3-codex", available)
@@ -924,7 +924,7 @@ describe("fallback model availability", () => {
 
 	it("returns null for completely unknown model", () => {
 		// given
-		const available = new Set(["openai/gpt-5.4", "anthropic/claude-opus-4-6"])
+		const available = new Set(["openai/gpt-5.4", "anthropic/claude-opus-4-7"])
 
 		// when
 		const result = fuzzyMatchModel("non-existent-model-family", available)
@@ -936,7 +936,7 @@ describe("fallback model availability", () => {
 	it("returns true when models do not match but provider is connected", () => {
 		// given
 		const fallbackChain = [{ providers: ["openai"], model: "gpt-5.4" }]
-		const availableModels = new Set(["anthropic/claude-opus-4-6"])
+		const availableModels = new Set(["anthropic/claude-opus-4-7"])
 		writeConnectedProvidersCache(["openai"])
 
 		// when
@@ -950,10 +950,10 @@ describe("fallback model availability", () => {
 		// given
 		const fallbackChain = [
 			{ providers: ["openai"], model: "gpt-5.4" },
-			{ providers: ["anthropic"], model: "claude-opus-4-6" },
+			{ providers: ["anthropic"], model: "claude-opus-4-7" },
 		]
 		const availableModels = new Set([
-			"anthropic/claude-opus-4-6",
+			"anthropic/claude-opus-4-7",
 			"openai/gpt-5.4-preview",
 		])
 
@@ -968,7 +968,7 @@ describe("fallback model availability", () => {
 		// given
 		const fallbackChain = [
 			{ providers: ["openai"], model: "gpt-5.4" },
-			{ providers: ["anthropic"], model: "claude-opus-4-6" },
+			{ providers: ["anthropic"], model: "claude-opus-4-7" },
 		]
 		const availableModels = new Set(["google/gemini-3.1-pro"])
 
