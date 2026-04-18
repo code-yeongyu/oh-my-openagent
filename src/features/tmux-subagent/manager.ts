@@ -989,6 +989,8 @@ export class TmuxSessionManager {
     }
 
     this.staleSweepCompleted = false
+
+    log("[tmux-session-manager] cleanup complete")
   }
 
   private async sweepStaleIsolatedSessionsOnce(): Promise<void> {
@@ -1009,7 +1011,5 @@ export class TmuxSessionManager {
         error: String(error),
       })
     }
-
-    log("[tmux-session-manager] cleanup complete")
   }
 }
