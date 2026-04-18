@@ -127,12 +127,6 @@ export function createCategorySkillReminderHook(
       }
     }
 
-    if (event.type === "session.compacted") {
-      const sessionID = resolveSessionEventID(props)
-      if (sessionID) {
-        sessionStates.delete(sessionID)
-      }
-    }
   }
 
   return {
