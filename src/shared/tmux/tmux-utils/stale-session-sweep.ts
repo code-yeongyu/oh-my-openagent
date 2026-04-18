@@ -1,4 +1,4 @@
-const STALE_SESSION_PATTERN = /^omo-agents-(\d+)$/
+const STALE_SESSION_PATTERN = /^omo-agents-(\d+)(?:-([A-Za-z0-9]+))?$/
 
 function getErrorMessage(error: unknown): string {
 	if (error instanceof Error) {
