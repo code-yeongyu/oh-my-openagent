@@ -46,11 +46,19 @@ export async function closeTmuxPane(paneId: string): Promise<boolean> {
 		killPaneProc.exited,
 	])
 
-	if (exitCode !== 0) {
-		log("[closeTmuxPane] FAILED", { paneId, exitCode, stderr: stderr.trim() })
-	} else {
-		log("[closeTmuxPane] SUCCESS", { paneId })
+	const trimmedStderr = stderr.trim()
+	const paneAlreadyGone = exitCode !== 0 && /can't find pane/i.test(trimmedStderr)
+
+	if (paneAlreadyGone) {
+		log("[closeTmuxPane] SUCCESS (pane already closed by Ctrl+C)", { paneId })
+		return true
 	}
 
-	return exitCode === 0
+	if (exitCode !== 0) {
+		log("[closeTmuxPane] FAILED", { paneId, exitCode, stderr: trimmedStderr })
+		return false
+	}
+
+	log("[closeTmuxPane] SUCCESS", { paneId })
+	return true
 }

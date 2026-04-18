@@ -170,7 +170,7 @@ describe("closeTmuxPane", () => {
 		expect(spawnCalls).toHaveLength(0)
 	})
 
-	it("#given kill-pane fails #when closeTmuxPane called #then returns false", async () => {
+	it("#given kill-pane fails with unknown error #when closeTmuxPane called #then returns false", async () => {
 		// given
 		const closeTmuxPane = await loadCloseTmuxPane()
 		queuedProcesses.push(createProcess(0), createProcess(1))
@@ -180,6 +180,30 @@ describe("closeTmuxPane", () => {
 
 		// then
 		expect(result).toBe(false)
+	})
+
+	it("#given pane already closed by Ctrl+C (kill-pane reports 'can't find pane') #when closeTmuxPane called #then returns true", async () => {
+		// given
+		const closeTmuxPane = await loadCloseTmuxPane()
+		queuedProcesses.push(
+			createProcess(0),
+			{
+				exited: Promise.resolve(1),
+				stdout: createClosedStream(),
+				stderr: new ReadableStream<Uint8Array>({
+					start(controller) {
+						controller.enqueue(new TextEncoder().encode("can't find pane: %42\n"))
+						controller.close()
+					},
+				}),
+			},
+		)
+
+		// when
+		const result = await closeTmuxPane("%42")
+
+		// then
+		expect(result).toBe(true)
 	})
 
 	it("#given kill-pane stdout stream waits for drain #when closeTmuxPane called #then returns true once drainer consumes stdout", async () => {
