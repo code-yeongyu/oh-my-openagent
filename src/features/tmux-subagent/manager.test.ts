@@ -1932,6 +1932,47 @@ describe('TmuxSessionManager', () => {
       expect(mockKillTmuxSessionIfExists).toHaveBeenCalledTimes(0)
     })
 
+    test('#given sweepStaleOmoAgentSessions throws on first onSessionCreated #when second onSessionCreated fires #then sweep is retried instead of skipped forever', async () => {
+      // given
+      mockSweepStaleOmoAgentSessions.mockClear()
+      mockSweepStaleOmoAgentSessions.mockImplementationOnce(async () => {
+        throw new Error('simulated sweep failure')
+      })
+      mockIsInsideTmux.mockReturnValue(true)
+      const { TmuxSessionManager } = await import('./manager')
+      const manager = new TmuxSessionManager(createMockContext(), createTmuxConfig({
+        enabled: true,
+        isolation: 'session',
+      }), mockTmuxDeps)
+
+      // when
+      await manager.onSessionCreated(createSessionCreatedEvent('ses_first', 'ses_parent', 'First'))
+      await manager.onSessionCreated(createSessionCreatedEvent('ses_second', 'ses_parent', 'Second'))
+
+      // then
+      expect(mockSweepStaleOmoAgentSessions).toHaveBeenCalledTimes(2)
+    })
+
+    test('#given sweepStaleOmoAgentSessions succeeds #when additional onSessionCreated events fire in same process #then sweep runs exactly once', async () => {
+      // given
+      mockSweepStaleOmoAgentSessions.mockClear()
+      mockSweepStaleOmoAgentSessions.mockImplementation(async () => 0)
+      mockIsInsideTmux.mockReturnValue(true)
+      const { TmuxSessionManager } = await import('./manager')
+      const manager = new TmuxSessionManager(createMockContext(), createTmuxConfig({
+        enabled: true,
+        isolation: 'session',
+      }), mockTmuxDeps)
+
+      // when
+      await manager.onSessionCreated(createSessionCreatedEvent('ses_a', 'ses_parent', 'A'))
+      await manager.onSessionCreated(createSessionCreatedEvent('ses_b', 'ses_parent', 'B'))
+      await manager.onSessionCreated(createSessionCreatedEvent('ses_c', 'ses_parent', 'C'))
+
+      // then
+      expect(mockSweepStaleOmoAgentSessions).toHaveBeenCalledTimes(1)
+    })
+
     test('#given killTmuxSessionIfExists throws #when cleanup runs #then cleanup still completes without throwing', async () => {
       // given
       mockKillTmuxSessionIfExists.mockClear()

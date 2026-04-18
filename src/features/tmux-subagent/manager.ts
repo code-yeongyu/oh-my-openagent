@@ -67,6 +67,7 @@ export class TmuxSessionManager {
   private isolatedWindowPaneId: string | undefined
   private isolatedContainerNullStateCount = 0
   private staleSweepCompleted = false
+  private staleSweepInProgress = false
   constructor(ctx: PluginInput, tmuxConfig: TmuxConfig, deps: TmuxUtilDeps = defaultTmuxDeps) {
     this.client = ctx.client
     this.tmuxConfig = tmuxConfig
@@ -977,27 +978,32 @@ export class TmuxSessionManager {
     }
 
     this.staleSweepCompleted = false
+    this.staleSweepInProgress = false
 
     log("[tmux-session-manager] cleanup complete")
   }
 
   private async sweepStaleIsolatedSessionsOnce(): Promise<void> {
     if (this.staleSweepCompleted) return
+    if (this.staleSweepInProgress) return
     if (this.tmuxConfig.isolation !== "session") {
       this.staleSweepCompleted = true
       return
     }
 
-    this.staleSweepCompleted = true
+    this.staleSweepInProgress = true
     try {
       const killed = await sweepStaleOmoAgentSessions()
       if (killed > 0) {
         log("[tmux-session-manager] stale isolated sessions swept", { killed })
       }
+      this.staleSweepCompleted = true
     } catch (error) {
       log("[tmux-session-manager] stale sweep failed", {
         error: String(error),
       })
+    } finally {
+      this.staleSweepInProgress = false
     }
   }
 }
