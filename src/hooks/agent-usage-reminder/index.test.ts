@@ -64,16 +64,26 @@ describe("agent-usage-reminder hook", () => {
 
     const output1 = { title: "", output: "result-1", metadata: {} };
     const output2 = { title: "", output: "result-2", metadata: {} };
+    const output3 = { title: "", output: "result-3", metadata: {} };
+    const output4 = { title: "", output: "result-4", metadata: {} };
+    const output5 = { title: "", output: "result-5", metadata: {} };
 
     await hook["tool.execute.after"]({ tool: "grep", sessionID, callID: "1" }, output1);
+    await hook["tool.execute.after"]({ tool: "grep", sessionID, callID: "2" }, output2);
+    await hook["tool.execute.after"]({ tool: "grep", sessionID, callID: "3" }, output3);
+    await hook["tool.execute.after"]({ tool: "grep", sessionID, callID: "4" }, output4);
+
     expect(output1.output).toContain("[Agent Usage Reminder]");
+    expect(output2.output).toContain("[Agent Usage Reminder]");
+    expect(output3.output).toContain("[Agent Usage Reminder]");
+    expect(output4.output).not.toContain("[Agent Usage Reminder]");
 
     // when - the session is deleted and another target tool runs
     await hook.event({ event: { type: "session.deleted", properties: { info: { id: sessionID } } } });
-    await hook["tool.execute.after"]({ tool: "grep", sessionID, callID: "2" }, output2);
+    await hook["tool.execute.after"]({ tool: "grep", sessionID, callID: "5" }, output5);
 
     // then - deletion still resets the state
-    expect(output2.output).toContain("[Agent Usage Reminder]");
+    expect(output5.output).toContain("[Agent Usage Reminder]");
 
     clearSessionAgent(sessionID);
   });
