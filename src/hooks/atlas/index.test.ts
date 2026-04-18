@@ -549,10 +549,11 @@ session_id: ses_standalone_def
         output
       )
 
-      // then - should include verification instructions
+      // then - should include verification instructions and task_id guidance
       expect(output.output).toContain("LYING")
-     expect(output.output).toContain("PHASE 1")
-     expect(output.output).toContain("PHASE 2")
+      expect(output.output).toContain("PHASE 1")
+      expect(output.output).toContain("PHASE 2")
+      expect(output.output).toContain("task_id")
       
       cleanupMessageStorage(sessionID)
     })
