@@ -1,10 +1,23 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { describe, expect, mock, test } from "bun:test"
 
-const latestVersionMock = mock.fn(async () => "3.0.1")
-const scheduleDeferredIdleCheckMock = mock.fn((runCheck: () => void) => {
+let latestVersionCallCount = 0
+let scheduleDeferredIdleCheckCallCount = 0
+const flushMicrotasks = async (count: number): Promise<void> => {
+  for (let index = 0; index < count; index += 1) {
+    await Promise.resolve()
+  }
+}
+
+const latestVersionMock = async () => {
+  latestVersionCallCount += 1
+  return "3.0.1"
+}
+
+const scheduleDeferredIdleCheckMock = (runCheck: () => void) => {
+  scheduleDeferredIdleCheckCallCount += 1
   scheduledCheck = runCheck
-})
+}
 
 let scheduledCheck: (() => void) | null = null
 
@@ -51,8 +64,8 @@ const createHook = async () => {
 describe("auto-update-checker hook", () => {
   test("defers update check until first session idle", async () => {
     // given
-    latestVersionMock.mockClear()
-    scheduleDeferredIdleCheckMock.mockClear()
+    latestVersionCallCount = 0
+    scheduleDeferredIdleCheckCallCount = 0
     scheduledCheck = null
     const hook = await createHook()
 
@@ -60,28 +73,28 @@ describe("auto-update-checker hook", () => {
     hook.event({ event: { type: "session.created" } })
 
     // then
-    expect(scheduleDeferredIdleCheckMock).toHaveBeenCalledTimes(0)
-    expect(latestVersionMock).toHaveBeenCalledTimes(0)
+    expect(scheduleDeferredIdleCheckCallCount).toBe(0)
+    expect(latestVersionCallCount).toBe(0)
 
     // when
     hook.event({ event: { type: "session.idle" } })
 
     // then
-    expect(scheduleDeferredIdleCheckMock).toHaveBeenCalledTimes(1)
-    expect(latestVersionMock).toHaveBeenCalledTimes(0)
+    expect(scheduleDeferredIdleCheckCallCount).toBe(1)
+    expect(latestVersionCallCount).toBe(0)
 
     // when
-    scheduledCheck?.()
+    await scheduledCheck?.()
+    await flushMicrotasks(8)
 
     // then
-    expect(latestVersionMock).toHaveBeenCalledTimes(1)
+    expect(latestVersionCallCount).toBe(1)
 
     // when
     hook.event({ event: { type: "session.idle" } })
-    scheduledCheck?.()
 
     // then
-    expect(scheduleDeferredIdleCheckMock).toHaveBeenCalledTimes(1)
-    expect(latestVersionMock).toHaveBeenCalledTimes(1)
+    expect(scheduleDeferredIdleCheckCallCount).toBe(1)
+    expect(latestVersionCallCount).toBe(1)
   })
 })
