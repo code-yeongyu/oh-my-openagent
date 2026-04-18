@@ -4,6 +4,7 @@ import type { BackgroundManager } from "../../features/background-agent"
 import {
   clearContinuationMarker,
 } from "../../features/run-continuation-state"
+import { isRuntimeFallbackActive } from "../runtime-fallback/active-session-state"
 import { log } from "../../shared/logger"
 
 import { DEFAULT_SKIP_AGENTS, HOOK_NAME } from "./constants"
@@ -60,6 +61,11 @@ export function createTodoContinuationHandler(args: {
     if (event.type === "session.idle") {
       const sessionID = props?.sessionID as string | undefined
       if (!sessionID) return
+
+      if (isRuntimeFallbackActive(sessionID)) {
+        log(`[${HOOK_NAME}] Skipped: runtime fallback active`, { sessionID })
+        return
+      }
 
       sessionStateStore.startPruneInterval()
       await handleSessionIdle({

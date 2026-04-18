@@ -1,4 +1,5 @@
 import type { HookDeps, RuntimeFallbackTimeout } from "./types"
+import { clearRuntimeFallbackActive } from "./active-session-state"
 import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
 import { normalizeAgentName, resolveAgentForSession } from "./agent-resolver"
@@ -115,6 +116,7 @@ export function createAutoRetryHelpers(deps: HookDeps) {
       if (state?.pendingFallbackModel) {
         state.pendingFallbackModel = undefined
       }
+      clearRuntimeFallbackActive(sessionID)
       return
     }
 
@@ -161,6 +163,7 @@ export function createAutoRetryHelpers(deps: HookDeps) {
         if (state?.pendingFallbackModel) {
           state.pendingFallbackModel = undefined
         }
+        clearRuntimeFallbackActive(sessionID)
       }
     }
   }
@@ -205,6 +208,7 @@ export function createAutoRetryHelpers(deps: HookDeps) {
         sessionRetryInFlight.delete(sessionID)
         sessionAwaitingFallbackResult.delete(sessionID)
         clearSessionFallbackTimeout(sessionID)
+        clearRuntimeFallbackActive(sessionID)
         SessionCategoryRegistry.remove(sessionID)
         sessionStatusRetryKeys.delete(sessionID)
         cleanedCount++

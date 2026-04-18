@@ -1,5 +1,6 @@
 import type { HookDeps } from "./types"
 import type { AutoRetryHelpers } from "./auto-retry"
+import { clearRuntimeFallbackActive } from "./active-session-state"
 import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
 import { extractStatusCode, extractErrorName, classifyErrorType, isRetryableError, extractAutoRetrySignal, containsErrorContent } from "./error-classifier"
@@ -60,6 +61,7 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
       if (state?.pendingFallbackModel) {
         state.pendingFallbackModel = undefined
       }
+      clearRuntimeFallbackActive(sessionID)
       log(`[${HOOK_NAME}] Assistant response observed; cleared fallback timeout`, { sessionID, model })
       return
     }
@@ -97,6 +99,7 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
       })
 
       if (!isRetryableError(error, config.retry_on_errors)) {
+        clearRuntimeFallbackActive(sessionID)
         log(`[${HOOK_NAME}] message.updated error not retryable, skipping fallback`, {
           sessionID,
           statusCode: extractStatusCode(error, config.retry_on_errors),
@@ -112,6 +115,7 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
       const fallbackModels = getFallbackModelsForSession(sessionID, resolvedAgent, pluginConfig)
 
       if (fallbackModels.length === 0) {
+        clearRuntimeFallbackActive(sessionID)
         return
       }
 
@@ -125,6 +129,7 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
         })
 
         if (!initialModel) {
+          clearRuntimeFallbackActive(sessionID)
           log(`[${HOOK_NAME}] message.updated missing model info, cannot fallback`, {
             sessionID,
             errorName: extractErrorName(error),
