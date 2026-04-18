@@ -12,19 +12,12 @@ export function buildRetryModelPayload(
   const variant = parsedModel.variant ?? agentSettings?.variant
   const reasoningEffort = agentSettings?.reasoningEffort
 
-  const payload: { model: { providerID: string; modelID: string }; variant?: string; reasoningEffort?: string } = {
+  return {
     model: {
       providerID: parsedModel.providerID,
       modelID: parsedModel.modelID,
     },
+    ...(variant ? { variant } : {}),
+    ...(reasoningEffort ? { reasoningEffort } : {}),
   }
-
-  if (variant) {
-    payload.variant = variant
-  }
-  if (reasoningEffort) {
-    payload.reasoningEffort = reasoningEffort
-  }
-
-  return payload
 }

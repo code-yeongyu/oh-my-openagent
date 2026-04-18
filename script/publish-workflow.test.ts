@@ -14,7 +14,7 @@ describe("test workflows", () => {
       // #given
       const workflow = readFileSync(workflowPath, "utf8")
 
-      // #then - should use run-ci-tests.ts for mock isolation
+      // #then
       expect(workflow).toContain("- name: Run tests")
       expect(workflow).toContain("run-ci-tests.ts")
     }
