@@ -312,6 +312,40 @@ describe("transformModelForProvider", () => {
     })
   })
 
+  describe("ollama-cloud provider", () => {
+    test("appends :cloud tag to model ID without tag", () => {
+      // #given ollama-cloud provider and bare model name
+      const result = transformModelForProvider("ollama-cloud", "kimi-k2.5")
+
+      // #then should append :cloud tag for Ollama API
+      expect(result).toBe("kimi-k2.5:cloud")
+    })
+
+    test("appends :cloud tag to glm-5.1 model", () => {
+      // #given ollama-cloud provider and glm-5.1 model
+      const result = transformModelForProvider("ollama-cloud", "glm-5.1")
+
+      // #then should append :cloud tag
+      expect(result).toBe("glm-5.1:cloud")
+    })
+
+    test("preserves existing :cloud tag on model ID", () => {
+      // #given ollama-cloud provider and model that already has :cloud
+      const result = transformModelForProvider("ollama-cloud", "kimi-k2.5:cloud")
+
+      // #then should not double-append :cloud
+      expect(result).toBe("kimi-k2.5:cloud")
+    })
+
+    test("preserves :thinking tag on model ID", () => {
+      // #given ollama-cloud provider and model with :thinking tag
+      const result = transformModelForProvider("ollama-cloud", "glm-5.1:thinking")
+
+      // #then should preserve :thinking without appending :cloud
+      expect(result).toBe("glm-5.1:thinking")
+    })
+  })
+
   describe("unknown provider", () => {
     test("passes model through unchanged for unknown provider", () => {
       // #given unknown provider and any model
