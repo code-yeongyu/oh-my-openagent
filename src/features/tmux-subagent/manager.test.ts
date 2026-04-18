@@ -58,6 +58,7 @@ const mockSpawnTmuxSession = mock<(
   paneId: '%isolated-session',
 }))
 const mockKillTmuxSessionIfExists = mock<(sessionName: string) => Promise<boolean>>(async () => true)
+const mockSweepStaleOmoAgentSessions = mock<() => Promise<number>>(async () => 0)
 const mockIsInsideTmux = mock<() => boolean>(() => true)
 const mockGetCurrentPaneId = mock<() => string | undefined>(() => '%0')
 
@@ -102,6 +103,7 @@ mock.module('../../shared/tmux', () => {
     spawnTmuxSession: mockSpawnTmuxSession,
     killTmuxSessionIfExists: mockKillTmuxSessionIfExists,
     getIsolatedSessionName: (pid: number = 12345) => `omo-agents-${pid}`,
+    sweepStaleOmoAgentSessions: mockSweepStaleOmoAgentSessions,
   }
 })
 

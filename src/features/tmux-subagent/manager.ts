@@ -12,6 +12,7 @@ import {
   spawnTmuxSession,
   killTmuxSessionIfExists,
   getIsolatedSessionName,
+  sweepStaleOmoAgentSessions,
 } from "../../shared/tmux"
 import { queryWindowState } from "./pane-state-querier"
 import { decideSpawnActions, decideCloseAction, type SessionMapping } from "./decision-engine"
@@ -65,6 +66,7 @@ export class TmuxSessionManager {
   private isolatedContainerPaneId: string | undefined
   private isolatedWindowPaneId: string | undefined
   private isolatedContainerNullStateCount = 0
+  private staleSweepCompleted = false
   constructor(ctx: PluginInput, tmuxConfig: TmuxConfig, deps: TmuxUtilDeps = defaultTmuxDeps) {
     this.client = ctx.client
     this.tmuxConfig = tmuxConfig
@@ -668,6 +670,7 @@ export class TmuxSessionManager {
       return
     }
 
+    await this.sweepStaleIsolatedSessionsOnce()
     await this.retryPendingCloses()
 
     if (
@@ -983,6 +986,28 @@ export class TmuxSessionManager {
           error: String(error),
         })
       }
+    }
+
+    this.staleSweepCompleted = false
+  }
+
+  private async sweepStaleIsolatedSessionsOnce(): Promise<void> {
+    if (this.staleSweepCompleted) return
+    if (this.tmuxConfig.isolation !== "session") {
+      this.staleSweepCompleted = true
+      return
+    }
+
+    this.staleSweepCompleted = true
+    try {
+      const killed = await sweepStaleOmoAgentSessions()
+      if (killed > 0) {
+        log("[tmux-session-manager] stale isolated sessions swept", { killed })
+      }
+    } catch (error) {
+      log("[tmux-session-manager] stale sweep failed", {
+        error: String(error),
+      })
     }
 
     log("[tmux-session-manager] cleanup complete")
