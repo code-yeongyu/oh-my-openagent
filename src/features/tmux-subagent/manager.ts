@@ -11,7 +11,7 @@ import {
   spawnTmuxWindow,
   spawnTmuxSession,
   killTmuxSessionIfExists,
-  ISOLATED_SESSION_NAME,
+  getIsolatedSessionName,
 } from "../../shared/tmux"
 import { queryWindowState } from "./pane-state-querier"
 import { decideSpawnActions, decideCloseAction, type SessionMapping } from "./decision-engine"
@@ -970,15 +970,16 @@ export class TmuxSessionManager {
     this.isolatedWindowPaneId = undefined
 
     if (this.tmuxConfig.isolation === "session") {
+      const isolatedSessionName = getIsolatedSessionName()
       try {
-        const killed = await killTmuxSessionIfExists(ISOLATED_SESSION_NAME)
+        const killed = await killTmuxSessionIfExists(isolatedSessionName)
         log("[tmux-session-manager] isolated session teardown", {
-          session: ISOLATED_SESSION_NAME,
+          session: isolatedSessionName,
           killed,
         })
       } catch (error) {
         log("[tmux-session-manager] isolated session teardown failed", {
-          session: ISOLATED_SESSION_NAME,
+          session: isolatedSessionName,
           error: String(error),
         })
       }

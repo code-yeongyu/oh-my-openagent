@@ -101,7 +101,7 @@ mock.module('../../shared/tmux', () => {
     spawnTmuxWindow: mockSpawnTmuxWindow,
     spawnTmuxSession: mockSpawnTmuxSession,
     killTmuxSessionIfExists: mockKillTmuxSessionIfExists,
-    ISOLATED_SESSION_NAME: 'omo-agents',
+    getIsolatedSessionName: (pid: number = 12345) => `omo-agents-${pid}`,
   }
 })
 
@@ -1856,7 +1856,7 @@ describe('TmuxSessionManager', () => {
       expect(mockExecuteAction).toHaveBeenCalledTimes(2)
     })
 
-    test('#given tmux isolation is "session" #when cleanup runs #then killTmuxSessionIfExists is invoked for the isolated session', async () => {
+    test('#given tmux isolation is "session" #when cleanup runs #then killTmuxSessionIfExists is invoked for the per-pid isolated session', async () => {
       // given
       mockKillTmuxSessionIfExists.mockClear()
       const { TmuxSessionManager } = await import('./manager')
@@ -1870,7 +1870,32 @@ describe('TmuxSessionManager', () => {
 
       // then
       expect(mockKillTmuxSessionIfExists).toHaveBeenCalledTimes(1)
-      expect(mockKillTmuxSessionIfExists).toHaveBeenCalledWith('omo-agents')
+      expect(mockKillTmuxSessionIfExists.mock.calls[0]?.[0]).toMatch(/^omo-agents-\d+$/)
+    })
+
+    test('#given two manager instances #when both cleanup #then each kills its own isolated session name, not a shared one', async () => {
+      // given
+      mockKillTmuxSessionIfExists.mockClear()
+      const { TmuxSessionManager } = await import('./manager')
+      const managerA = new TmuxSessionManager(createMockContext(), createTmuxConfig({
+        enabled: true,
+        isolation: 'session',
+      }), mockTmuxDeps)
+      const managerB = new TmuxSessionManager(createMockContext(), createTmuxConfig({
+        enabled: true,
+        isolation: 'session',
+      }), mockTmuxDeps)
+
+      // when
+      await managerA.cleanup()
+      await managerB.cleanup()
+
+      // then
+      expect(mockKillTmuxSessionIfExists).toHaveBeenCalledTimes(2)
+      const firstTarget = mockKillTmuxSessionIfExists.mock.calls[0]?.[0]
+      const secondTarget = mockKillTmuxSessionIfExists.mock.calls[1]?.[0]
+      expect(firstTarget).toMatch(/^omo-agents-\d+$/)
+      expect(secondTarget).toMatch(/^omo-agents-\d+$/)
     })
 
     test('#given tmux isolation is "inline" #when cleanup runs #then killTmuxSessionIfExists is NOT invoked', async () => {

@@ -10,7 +10,7 @@ export { spawnTmuxPane } from "./tmux-utils/pane-spawn"
 export { closeTmuxPane } from "./tmux-utils/pane-close"
 export { replaceTmuxPane } from "./tmux-utils/pane-replace"
 export { spawnTmuxWindow } from "./tmux-utils/window-spawn"
-export { spawnTmuxSession, ISOLATED_SESSION_NAME } from "./tmux-utils/session-spawn"
+export { spawnTmuxSession, getIsolatedSessionName } from "./tmux-utils/session-spawn"
 export { killTmuxSessionIfExists } from "./tmux-utils/session-kill"
 
 export { applyLayout, enforceMainPaneWidth } from "./tmux-utils/layout"

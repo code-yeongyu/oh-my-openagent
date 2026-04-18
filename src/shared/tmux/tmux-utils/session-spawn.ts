@@ -6,7 +6,11 @@ import { isInsideTmux } from "./environment"
 import { isServerRunning } from "./server-health"
 import { shellEscapeForDoubleQuotedCommand } from "../../shell-env"
 
-export const ISOLATED_SESSION_NAME = "omo-agents"
+const ISOLATED_SESSION_NAME_PREFIX = "omo-agents"
+
+export function getIsolatedSessionName(pid: number = process.pid): string {
+	return `${ISOLATED_SESSION_NAME_PREFIX}-${pid}`
+}
 
 async function getWindowDimensions(
 	tmux: string,
@@ -87,12 +91,13 @@ export async function spawnTmuxSession(
 		}
 	}
 
-	const sessionAlreadyExists = await sessionExists(tmux, ISOLATED_SESSION_NAME)
+	const isolatedSessionName = getIsolatedSessionName()
+	const sessionAlreadyExists = await sessionExists(tmux, isolatedSessionName)
 
 	const args = sessionAlreadyExists
 		? [
 			"new-window",
-			"-t", ISOLATED_SESSION_NAME,
+			"-t", isolatedSessionName,
 			"-P",
 			"-F", "#{pane_id}",
 			opencodeCmd,
@@ -100,7 +105,7 @@ export async function spawnTmuxSession(
 		: [
 			"new-session",
 			"-d",
-			"-s", ISOLATED_SESSION_NAME,
+			"-s", isolatedSessionName,
 			...sizeArgs,
 			"-P",
 			"-F", "#{pane_id}",
@@ -109,7 +114,7 @@ export async function spawnTmuxSession(
 
 	log("[spawnTmuxSession] spawning", {
 		mode: sessionAlreadyExists ? "new-window" : "new-session",
-		sessionName: ISOLATED_SESSION_NAME,
+		sessionName: isolatedSessionName,
 	})
 
 	const proc = spawn([tmux, ...args], { stdout: "pipe", stderr: "pipe" })
@@ -140,6 +145,6 @@ export async function spawnTmuxSession(
 		})
 	}
 
-	log("[spawnTmuxSession] SUCCESS", { paneId, sessionName: ISOLATED_SESSION_NAME })
+	log("[spawnTmuxSession] SUCCESS", { paneId, sessionName: isolatedSessionName })
 	return { success: true, paneId }
 }
