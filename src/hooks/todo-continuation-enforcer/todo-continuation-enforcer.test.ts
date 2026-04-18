@@ -249,6 +249,33 @@ describe("todo-continuation-enforcer", () => {
     _resetForTesting()
   })
 
+  test("given the first idle event, starts the prune interval lazily", async () => {
+    // given
+    const originalSetInterval = globalThis.setInterval
+    let setIntervalCalls = 0
+    globalThis.setInterval = ((callback: TimerCallback, delay?: number, ...args: any[]) => {
+      setIntervalCalls += 1
+      return originalSetInterval(callback, delay, ...args)
+    }) as typeof setInterval
+
+    try {
+      const sessionID = "main-lazy-prune"
+      setMainSession(sessionID)
+      const hook = createTodoContinuationEnforcer(createMockPluginInput(), {
+        backgroundManager: createMockBackgroundManager(false),
+      })
+
+      // when
+      await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+      await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+
+      // then
+      expect(setIntervalCalls).toBe(1)
+    } finally {
+      globalThis.setInterval = originalSetInterval
+    }
+  })
+
   test("should inject continuation when idle with incomplete todos", async () => {
     fakeTimers.restore()
     // given - main session with incomplete todos
