@@ -12,6 +12,7 @@ import {
   spawnTmuxSession,
   killTmuxSessionIfExists,
   getIsolatedSessionName,
+  sweepStaleOmoAgentSessions,
 } from "../../shared/tmux"
 import { queryWindowState } from "./pane-state-querier"
 import { decideSpawnActions, decideCloseAction, type SessionMapping } from "./decision-engine"
@@ -65,6 +66,8 @@ export class TmuxSessionManager {
   private isolatedContainerPaneId: string | undefined
   private isolatedWindowPaneId: string | undefined
   private isolatedContainerNullStateCount = 0
+  private staleSweepCompleted = false
+  private staleSweepInProgress = false
   constructor(ctx: PluginInput, tmuxConfig: TmuxConfig, deps: TmuxUtilDeps = defaultTmuxDeps) {
     this.client = ctx.client
     this.tmuxConfig = tmuxConfig
@@ -668,6 +671,7 @@ export class TmuxSessionManager {
       return
     }
 
+    await this.sweepStaleIsolatedSessionsOnce()
     await this.retryPendingCloses()
 
     if (
@@ -835,18 +839,6 @@ export class TmuxSessionManager {
     await this.spawnQueue
   }
 
-  async onSessionError(event: { sessionID: string }): Promise<void> {
-    if (!this.isEnabled()) return
-    if (!this.getEffectiveSourcePaneId()) return
-    if (!this.sessions.has(event.sessionID)) return
-
-    log("[tmux-session-manager] onSessionError - routing to cleanup", {
-      sessionId: event.sessionID,
-    })
-
-    await this.onSessionDeleted(event)
-  }
-
   async onSessionDeleted(event: { sessionID: string }): Promise<void> {
     if (!this.isEnabled()) return
     if (!this.getEffectiveSourcePaneId()) return
@@ -985,6 +977,33 @@ export class TmuxSessionManager {
       }
     }
 
+    this.staleSweepCompleted = false
+    this.staleSweepInProgress = false
+
     log("[tmux-session-manager] cleanup complete")
+  }
+
+  private async sweepStaleIsolatedSessionsOnce(): Promise<void> {
+    if (this.staleSweepCompleted) return
+    if (this.staleSweepInProgress) return
+    if (this.tmuxConfig.isolation !== "session") {
+      this.staleSweepCompleted = true
+      return
+    }
+
+    this.staleSweepInProgress = true
+    try {
+      const killed = await sweepStaleOmoAgentSessions()
+      if (killed > 0) {
+        log("[tmux-session-manager] stale isolated sessions swept", { killed })
+      }
+      this.staleSweepCompleted = true
+    } catch (error) {
+      log("[tmux-session-manager] stale sweep failed", {
+        error: String(error),
+      })
+    } finally {
+      this.staleSweepInProgress = false
+    }
   }
 }
