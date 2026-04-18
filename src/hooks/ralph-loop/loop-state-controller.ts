@@ -125,9 +125,9 @@ export function createLoopStateController(options: {
 				return null
 			}
 
-			state.verification_pending = true
-			state.verification_attempts = 0
-			state.completion_promise = ULTRAWORK_VERIFICATION_PROMISE
+		state.verification_pending = true
+		state.verification_attempts = state.verification_attempts ?? 0
+		state.completion_promise = ULTRAWORK_VERIFICATION_PROMISE
 			state.verification_attempt_id = undefined
 			state.verification_session_id = undefined
 			state.initial_completion_promise ??= DEFAULT_COMPLETION_PROMISE
