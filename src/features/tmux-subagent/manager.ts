@@ -10,6 +10,8 @@ import {
   SESSION_READY_TIMEOUT_MS,
   spawnTmuxWindow,
   spawnTmuxSession,
+  killTmuxSessionIfExists,
+  ISOLATED_SESSION_NAME,
 } from "../../shared/tmux"
 import { queryWindowState } from "./pane-state-querier"
 import { decideSpawnActions, decideCloseAction, type SessionMapping } from "./decision-engine"
@@ -89,7 +91,8 @@ export class TmuxSessionManager {
     this.pollingManager = new TmuxPollingManager(
       this.client,
       this.sessions,
-      this.closeSessionById.bind(this)
+      this.closeSessionById.bind(this),
+      this.retryPendingCloses.bind(this)
     )
     log("[tmux-session-manager] initialized", {
       configEnabled: this.tmuxConfig.enabled,
@@ -832,6 +835,18 @@ export class TmuxSessionManager {
     await this.spawnQueue
   }
 
+  async onSessionError(event: { sessionID: string }): Promise<void> {
+    if (!this.isEnabled()) return
+    if (!this.getEffectiveSourcePaneId()) return
+    if (!this.sessions.has(event.sessionID)) return
+
+    log("[tmux-session-manager] onSessionError - routing to cleanup", {
+      sessionId: event.sessionID,
+    })
+
+    await this.onSessionDeleted(event)
+  }
+
   async onSessionDeleted(event: { sessionID: string }): Promise<void> {
     if (!this.isEnabled()) return
     if (!this.getEffectiveSourcePaneId()) return
@@ -953,6 +968,21 @@ export class TmuxSessionManager {
     this.isolatedContainerNullStateCount = 0
     this.isolatedContainerPaneId = undefined
     this.isolatedWindowPaneId = undefined
+
+    if (this.tmuxConfig.isolation === "session") {
+      try {
+        const killed = await killTmuxSessionIfExists(ISOLATED_SESSION_NAME)
+        log("[tmux-session-manager] isolated session teardown", {
+          session: ISOLATED_SESSION_NAME,
+          killed,
+        })
+      } catch (error) {
+        log("[tmux-session-manager] isolated session teardown failed", {
+          session: ISOLATED_SESSION_NAME,
+          error: String(error),
+        })
+      }
+    }
 
     log("[tmux-session-manager] cleanup complete")
   }
