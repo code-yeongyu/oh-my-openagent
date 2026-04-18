@@ -1,5 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
-import { createAutoUpdateCheckerHook } from "../auto-update-checker/hook"
+
+let scheduledDeferredCheck: (() => void) | null = null
+mock.module("../auto-update-checker/hook/deferred-idle-check", () => ({
+  scheduleDeferredIdleCheck: (runCheck: () => void) => {
+    scheduledDeferredCheck = runCheck
+  },
+}))
+
+const { createAutoUpdateCheckerHook } = await import("../auto-update-checker/hook")
 
 const mockShowConfigErrorsIfAny = mock(async () => {})
 const mockShowModelCacheWarningIfNeeded = mock(async () => {})
@@ -38,6 +46,20 @@ function runSessionCreatedEvent(
   })
 }
 
+function runSessionIdleEvent(hook: ReturnType<typeof createAutoUpdateCheckerHook>): void {
+  hook.event({
+    event: {
+      type: "session.idle",
+    },
+  })
+}
+
+function drainDeferredCheck(): void {
+  const run = scheduledDeferredCheck
+  scheduledDeferredCheck = null
+  run?.()
+}
+
 beforeEach(() => {
   mockShowConfigErrorsIfAny.mockClear()
   mockShowModelCacheWarningIfNeeded.mockClear()
@@ -51,6 +73,8 @@ beforeEach(() => {
 
   mockGetCachedVersion.mockReturnValue("3.6.0")
   mockGetLocalDevVersion.mockReturnValue(null)
+
+  scheduledDeferredCheck = null
 })
 
 afterEach(() => {
@@ -108,8 +132,10 @@ describe("createAutoUpdateCheckerHook", () => {
       log: () => {},
     })
 
-    //#when - session.created event arrives on primary session
+    //#when - session.created schedules work and session.idle drains it
     runSessionCreatedEvent(hook)
+    runSessionIdleEvent(hook)
+    drainDeferredCheck()
     await flushScheduledWork()
 
     //#then - startup checks, toast, and background check run
@@ -165,9 +191,12 @@ describe("createAutoUpdateCheckerHook", () => {
       log: () => {},
     })
 
-    //#when - session.created event is fired twice
+    //#when - session.created fires twice then session.idle fires twice
     runSessionCreatedEvent(hook)
     runSessionCreatedEvent(hook)
+    runSessionIdleEvent(hook)
+    runSessionIdleEvent(hook)
+    drainDeferredCheck()
     await flushScheduledWork()
 
     //#then - side effects execute only once
@@ -195,8 +224,10 @@ describe("createAutoUpdateCheckerHook", () => {
       log: () => {},
     })
 
-    //#when - session.created event arrives
+    //#when - session.created schedules and session.idle drains
     runSessionCreatedEvent(hook)
+    runSessionIdleEvent(hook)
+    drainDeferredCheck()
     await flushScheduledWork()
 
     //#then - local dev toast is shown and background check is skipped
@@ -259,8 +290,10 @@ describe("createAutoUpdateCheckerHook", () => {
       log: () => {},
     })
 
-    //#when - session.created event arrives
+    //#when - session.created schedules and session.idle drains
     runSessionCreatedEvent(hook)
+    runSessionIdleEvent(hook)
+    drainDeferredCheck()
     await flushScheduledWork()
 
     //#then - startup toast includes sisyphus wording
