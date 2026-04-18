@@ -615,10 +615,6 @@ export function createEventHandler(args: {
         const sessionID = props?.sessionID as string | undefined;
         const error = props?.error;
 
-        if (tmuxIntegrationEnabled && sessionID) {
-          await managers.tmuxSessionManager.onSessionError({ sessionID });
-        }
-
         const errorName = extractErrorName(error);
         const errorMessage = extractErrorMessage(error);
         const errorInfo = { name: errorName, message: errorMessage };

@@ -1932,43 +1932,6 @@ describe('TmuxSessionManager', () => {
       expect(mockKillTmuxSessionIfExists).toHaveBeenCalledTimes(0)
     })
 
-    test('#given a tracked session #when onSessionError is invoked #then the pane is closed like onSessionDeleted', async () => {
-      // given
-      mockIsInsideTmux.mockReturnValue(true)
-      mockExecuteAction.mockClear()
-      const { TmuxSessionManager } = await import('./manager')
-      const manager = new TmuxSessionManager(createMockContext(), createTmuxConfig({
-        enabled: true,
-        isolation: 'session',
-      }), mockTmuxDeps)
-      await manager.onSessionCreated(createSessionCreatedEvent('ses_err', 'ses_parent', 'Errored Task'))
-      mockExecuteAction.mockClear()
-
-      // when
-      await manager.onSessionError({ sessionID: 'ses_err' })
-
-      // then
-      expect(mockExecuteAction).toHaveBeenCalled()
-    })
-
-    test('#given an untracked session #when onSessionError is invoked #then it is a no-op and does not throw', async () => {
-      // given
-      mockIsInsideTmux.mockReturnValue(true)
-      mockExecuteAction.mockClear()
-      const { TmuxSessionManager } = await import('./manager')
-      const manager = new TmuxSessionManager(createMockContext(), createTmuxConfig({
-        enabled: true,
-        isolation: 'session',
-      }), mockTmuxDeps)
-
-      // when
-      const errorHandler = manager.onSessionError({ sessionID: 'ses_unknown' })
-
-      // then
-      await expect(errorHandler).resolves.toBeUndefined()
-      expect(mockExecuteAction).not.toHaveBeenCalled()
-    })
-
     test('#given killTmuxSessionIfExists throws #when cleanup runs #then cleanup still completes without throwing', async () => {
       // given
       mockKillTmuxSessionIfExists.mockClear()

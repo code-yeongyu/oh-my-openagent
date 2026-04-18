@@ -838,18 +838,6 @@ export class TmuxSessionManager {
     await this.spawnQueue
   }
 
-  async onSessionError(event: { sessionID: string }): Promise<void> {
-    if (!this.isEnabled()) return
-    if (!this.getEffectiveSourcePaneId()) return
-    if (!this.sessions.has(event.sessionID)) return
-
-    log("[tmux-session-manager] onSessionError - routing to cleanup", {
-      sessionId: event.sessionID,
-    })
-
-    await this.onSessionDeleted(event)
-  }
-
   async onSessionDeleted(event: { sessionID: string }): Promise<void> {
     if (!this.isEnabled()) return
     if (!this.getEffectiveSourcePaneId()) return
