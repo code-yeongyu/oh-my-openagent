@@ -1,5 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin";
-import { readFileSync } from "node:fs";
+import { promises as fsPromises } from "node:fs";
 import { dirname } from "node:path";
 
 import type { createDynamicTruncator } from "../../shared/dynamic-truncator";
@@ -31,7 +31,7 @@ export async function processFilePathForAgentsInjection(input: {
 
   const dir = dirname(resolved);
   const cache = getSessionCache(input.sessionCaches, input.sessionID);
-  const agentsPaths = findAgentsMdUp({ startDir: dir, rootDir: input.ctx.directory });
+  const agentsPaths = await findAgentsMdUp({ startDir: dir, rootDir: input.ctx.directory });
 
   let dirty = false;
   for (const agentsPath of agentsPaths) {
@@ -39,7 +39,8 @@ export async function processFilePathForAgentsInjection(input: {
     if (cache.has(agentsDir)) continue;
 
     try {
-      const content = readFileSync(agentsPath, "utf-8");
+      const content = await fsPromises.readFile(agentsPath, "utf-8");
+      cache.add(agentsDir);
       const { result, truncated } = await input.truncator.truncate(
         input.sessionID,
         content,
@@ -48,7 +49,6 @@ export async function processFilePathForAgentsInjection(input: {
         ? `\n\n[Note: Content was truncated to save context window space. For full context, please read the file directly: ${agentsPath}]`
         : "";
       input.output.output += `\n\n[Directory Context: ${agentsPath}]\n${result}${truncationNotice}`;
-      cache.add(agentsDir);
       dirty = true;
     } catch {}
   }
