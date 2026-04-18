@@ -46,14 +46,6 @@ function runSessionCreatedEvent(
   })
 }
 
-function runSessionIdleEvent(hook: ReturnType<typeof createAutoUpdateCheckerHook>): void {
-  hook.event({
-    event: {
-      type: "session.idle",
-    },
-  })
-}
-
 function drainDeferredCheck(): void {
   const run = scheduledDeferredCheck
   scheduledDeferredCheck = null
@@ -132,9 +124,8 @@ describe("createAutoUpdateCheckerHook", () => {
       log: () => {},
     })
 
-    //#when - session.created schedules work and session.idle drains it
+    //#when - session.created schedules work and deferred check drains it
     runSessionCreatedEvent(hook)
-    runSessionIdleEvent(hook)
     drainDeferredCheck()
     await flushScheduledWork()
 
@@ -191,11 +182,9 @@ describe("createAutoUpdateCheckerHook", () => {
       log: () => {},
     })
 
-    //#when - session.created fires twice then session.idle fires twice
+    //#when - session.created fires twice and deferred check drains once
     runSessionCreatedEvent(hook)
     runSessionCreatedEvent(hook)
-    runSessionIdleEvent(hook)
-    runSessionIdleEvent(hook)
     drainDeferredCheck()
     await flushScheduledWork()
 
@@ -224,9 +213,8 @@ describe("createAutoUpdateCheckerHook", () => {
       log: () => {},
     })
 
-    //#when - session.created schedules and session.idle drains
+    //#when - session.created schedules and deferred check drains
     runSessionCreatedEvent(hook)
-    runSessionIdleEvent(hook)
     drainDeferredCheck()
     await flushScheduledWork()
 
@@ -290,9 +278,8 @@ describe("createAutoUpdateCheckerHook", () => {
       log: () => {},
     })
 
-    //#when - session.created schedules and session.idle drains
+    //#when - session.created schedules and deferred check drains
     runSessionCreatedEvent(hook)
-    runSessionIdleEvent(hook)
     drainDeferredCheck()
     await flushScheduledWork()
 

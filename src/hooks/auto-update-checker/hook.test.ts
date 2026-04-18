@@ -109,53 +109,82 @@ const resetDeferredState = (): void => {
   scheduledCheck = null
 }
 
-const triggerDeferredIdleCheck = async (
-  hook: ReturnType<CreateAutoUpdateCheckerHook>,
-): Promise<void> => {
-  hook.event({ event: { type: "session.idle" } })
+const runScheduledCheck = async (): Promise<void> => {
   scheduledCheck?.()
   await flushMicrotasks(8)
 }
 
+const triggerSessionCreated = (
+  hook: ReturnType<CreateAutoUpdateCheckerHook>,
+  properties?: { info?: { parentID?: string } },
+): void => {
+  hook.event({ event: { type: "session.created", properties } })
+}
+
+const triggerSessionIdle = (hook: ReturnType<CreateAutoUpdateCheckerHook>): void => {
+  hook.event({ event: { type: "session.idle" } })
+}
+
 describe("auto-update-checker hook", () => {
-  test("defers update check until first session idle", async () => {
+  test("schedules deferred check on session.created without parentID", async () => {
     // given
     resetDeferredState()
     const { hook, mocks } = await createHook()
 
     // when
-    hook.event({ event: { type: "session.created" } })
+    triggerSessionCreated(hook)
 
     // then
-    expect(scheduleDeferredIdleCheckCallCount).toBe(0)
+    expect(scheduleDeferredIdleCheckCallCount).toBe(1)
     expect(mocks.showVersionToast).not.toHaveBeenCalled()
     expect(mocks.runBackgroundUpdateCheck).not.toHaveBeenCalled()
     expect(latestVersionCallCount).toBe(0)
 
     // when
-    await triggerDeferredIdleCheck(hook)
+    await runScheduledCheck()
 
     // then
-    expect(scheduleDeferredIdleCheckCallCount).toBe(1)
     expect(mocks.showVersionToast).toHaveBeenCalledTimes(1)
     expect(mocks.runBackgroundUpdateCheck).toHaveBeenCalledTimes(1)
     expect(latestVersionCallCount).toBe(1)
-
-    // when
-    hook.event({ event: { type: "session.idle" } })
-
-    // then
-    expect(scheduleDeferredIdleCheckCallCount).toBe(1)
-    expect(mocks.runBackgroundUpdateCheck).toHaveBeenCalledTimes(1)
   })
 
-  test("runs all startup checks on normal session.idle", async () => {
+  test("does not schedule deferred check on session.created with parentID", async () => {
     // given
     resetDeferredState()
     const { hook, mocks } = await createHook()
 
     // when
-    await triggerDeferredIdleCheck(hook)
+    triggerSessionCreated(hook, { info: { parentID: "parent-123" } })
+
+    // then
+    expect(scheduleDeferredIdleCheckCallCount).toBe(0)
+    expect(mocks.showVersionToast).not.toHaveBeenCalled()
+    expect(mocks.runBackgroundUpdateCheck).not.toHaveBeenCalled()
+  })
+
+  test("does not schedule deferred check on session.idle without session.created", async () => {
+    // given
+    resetDeferredState()
+    const { hook, mocks } = await createHook()
+
+    // when
+    triggerSessionIdle(hook)
+
+    // then
+    expect(scheduleDeferredIdleCheckCallCount).toBe(0)
+    expect(mocks.showVersionToast).not.toHaveBeenCalled()
+    expect(mocks.runBackgroundUpdateCheck).not.toHaveBeenCalled()
+  })
+
+  test("runs all startup checks after deferred session.created check executes", async () => {
+    // given
+    resetDeferredState()
+    const { hook, mocks } = await createHook()
+
+    // when
+    triggerSessionCreated(hook)
+    await runScheduledCheck()
 
     // then
     expect(mocks.showConfigErrorsIfAny).toHaveBeenCalledTimes(1)
@@ -166,16 +195,21 @@ describe("auto-update-checker hook", () => {
     expect(mocks.runBackgroundUpdateCheck).toHaveBeenCalledTimes(1)
   })
 
-  test("runs only once (hasChecked guard)", async () => {
+  test("guards double execution across repeated session.created events", async () => {
     // given
     resetDeferredState()
     const { hook, mocks } = await createHook()
 
     // when
-    hook.event({ event: { type: "session.idle" } })
-    hook.event({ event: { type: "session.idle" } })
-    scheduledCheck?.()
-    await flushMicrotasks(8)
+    triggerSessionCreated(hook)
+    triggerSessionCreated(hook)
+
+    // then
+    expect(scheduleDeferredIdleCheckCallCount).toBe(1)
+
+    // when
+    await runScheduledCheck()
+    triggerSessionCreated(hook)
 
     // then
     expect(scheduleDeferredIdleCheckCallCount).toBe(1)
@@ -194,7 +228,8 @@ describe("auto-update-checker hook", () => {
     })
 
     // when
-    await triggerDeferredIdleCheck(hook)
+    triggerSessionCreated(hook)
+    await runScheduledCheck()
 
     // then
     expect(mocks.showConfigErrorsIfAny).toHaveBeenCalledTimes(1)
@@ -212,7 +247,8 @@ describe("auto-update-checker hook", () => {
     const { hook, mocks } = await createHook({ isSisyphusEnabled: true })
 
     // when
-    await triggerDeferredIdleCheck(hook)
+    triggerSessionCreated(hook)
+    await runScheduledCheck()
 
     // then
     expect(mocks.showVersionToast).toHaveBeenCalledTimes(1)
