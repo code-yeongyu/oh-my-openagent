@@ -5,7 +5,12 @@ import type { ToolContext } from "@opencode-ai/plugin/tool"
 import type { LoadedSkill } from "../../features/opencode-skill-loader/types"
 import * as skillContent from "../../features/opencode-skill-loader/skill-content"
 import * as commandDiscovery from "../slashcommand/command-discovery"
-import { createSkillTool } from "./tools"
+
+const discoverCommandsSync = mock(() => [])
+
+mock.module("../slashcommand/command-discovery", () => ({
+  discoverCommandsSync,
+}))
 
 function createMockSkill(name: string): LoadedSkill {
   return {
@@ -25,7 +30,6 @@ async function flushMicrotasks(): Promise<void> {
 }
 
 const loadedSkill = createMockSkill("lazy-skill")
-const discoverCommandsSync = mock(() => [])
 const getAllSkills = mock(async () => [loadedSkill])
 const clearSkillCache = mock(() => {})
 const mockContext: ToolContext = {
@@ -40,8 +44,6 @@ const mockContext: ToolContext = {
 }
 
 beforeEach(() => {
-  mock.restore()
-  spyOn(commandDiscovery, "discoverCommandsSync").mockImplementation(discoverCommandsSync)
   spyOn(skillContent, "getAllSkills").mockImplementation(getAllSkills)
   spyOn(skillContent, "clearSkillCache").mockImplementation(clearSkillCache)
 })
@@ -57,6 +59,7 @@ describe("createSkillTool", () => {
     const baselineDiscoverCommandsSyncCalls = discoverCommandsSync.mock.calls.length
 
     // when
+    const { createSkillTool } = await import("./tools")
     const skillTool = createSkillTool({})
 
     // then
@@ -73,6 +76,7 @@ describe("createSkillTool", () => {
     const baselineGetAllSkillsCalls = getAllSkills.mock.calls.length
 
     // when
+    const { createSkillTool } = await import("./tools")
     const skillTool = createSkillTool({})
 
     // then
@@ -88,6 +92,7 @@ describe("createSkillTool", () => {
     const baselineClearSkillCacheCalls = clearSkillCache.mock.calls.length
 
     // when
+    const { createSkillTool } = await import("./tools")
     const skillTool = createSkillTool({})
     void skillTool.description
     await flushMicrotasks()
