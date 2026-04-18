@@ -15,10 +15,9 @@ type CleanupManager = {
 
 describe("#given process cleanup registration", () => {
   const registeredManagers: CleanupManager[] = []
-  const originalExitCode = process.exitCode
 
   beforeEach(() => {
-    process.exitCode = originalExitCode
+    process.exitCode = 0
     registeredManagers.length = 0
     _resetForTesting()
   })
@@ -28,7 +27,7 @@ describe("#given process cleanup registration", () => {
       unregisterManagerForCleanup(manager)
     }
 
-    process.exitCode = originalExitCode
+    process.exitCode = 0
     _resetForTesting()
   })
 
