@@ -2,6 +2,19 @@ import { describe, expect, it } from "bun:test"
 import { buildTmuxAttachCommand, buildTmuxPlaceholderCommand } from "./pane-command"
 
 describe("buildTmuxAttachCommand", () => {
+  it("uses /bin/sh instead of inheriting SHELL", () => {
+    const originalShell = process.env.SHELL
+    process.env.SHELL = "/bin/tcsh"
+
+    try {
+      const cmd = buildTmuxAttachCommand("http://localhost:3000", "ses_abc123")
+      expect(cmd.startsWith('/bin/sh -c "')).toBe(true)
+      expect(cmd).not.toContain("/bin/tcsh -c")
+    } finally {
+      process.env.SHELL = originalShell
+    }
+  })
+
   it("escapes serverUrl shell metacharacters", () => {
     const cmd = buildTmuxAttachCommand("http://localhost:3000$(whoami);rm -rf /", "ses_abc123")
     expect(cmd).toContain("\\$")
@@ -17,6 +30,19 @@ describe("buildTmuxAttachCommand", () => {
 })
 
 describe("buildTmuxPlaceholderCommand", () => {
+  it("uses /bin/sh instead of inheriting SHELL", () => {
+    const originalShell = process.env.SHELL
+    process.env.SHELL = "/bin/csh"
+
+    try {
+      const cmd = buildTmuxPlaceholderCommand("My Task")
+      expect(cmd.startsWith('/bin/sh -c "')).toBe(true)
+      expect(cmd).not.toContain("/bin/csh -c")
+    } finally {
+      process.env.SHELL = originalShell
+    }
+  })
+
   it("produces inert placeholder command instead of immediate attach", () => {
     const cmd = buildTmuxPlaceholderCommand("My Task")
     expect(cmd).toContain("Focus this pane to attach.")

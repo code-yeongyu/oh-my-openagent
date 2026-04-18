@@ -2,7 +2,7 @@ import { shellEscapeForDoubleQuotedCommand } from "../../shell-env"
 
 const TMUX_COMMAND_SHELL = "/bin/sh"
 
-export function buildTmuxAttachCommand(serverUrl: string, sessionId: string, directory: string): string {
+export function buildTmuxAttachCommand(serverUrl: string, sessionId: string, directory: string = process.cwd()): string {
   const escapedUrl = shellEscapeForDoubleQuotedCommand(serverUrl)
   const escapedSessionId = shellEscapeForDoubleQuotedCommand(sessionId)
   const escapedDirectory = shellEscapeForDoubleQuotedCommand(directory || process.cwd())
