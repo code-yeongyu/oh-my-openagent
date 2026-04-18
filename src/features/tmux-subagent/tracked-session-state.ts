@@ -12,6 +12,7 @@ export function createTrackedSession(params: {
     sessionId: params.sessionId,
     paneId: params.paneId,
     description: params.description,
+    attachActivated: false,
     createdAt: now,
     lastSeenAt: now,
     closePending: false,

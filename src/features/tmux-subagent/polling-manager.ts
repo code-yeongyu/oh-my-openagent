@@ -4,7 +4,7 @@ import {
   SESSION_MISSING_GRACE_MS,
   SESSION_TIMEOUT_MS,
 } from "../../shared/tmux"
-import type { TrackedSession } from "./types"
+import type { TrackedSession, WindowState } from "./types"
 import { log } from "../../shared"
 import { normalizeSDKResponse } from "../../shared"
 import { resolveMessageEventSessionID } from "../../shared/event-session-id"
@@ -20,7 +20,9 @@ export class TmuxPollingManager {
     private client: OpencodeClient,
     private sessions: Map<string, TrackedSession>,
     private closeSessionById: (sessionId: string) => Promise<void>,
-    private retryPendingCloses?: () => Promise<void>
+    private retryPendingCloses?: () => Promise<void>,
+    private getWindowState?: () => Promise<WindowState | null>,
+    private activateSessionPane?: (tracked: TrackedSession) => Promise<boolean>,
   ) {}
 
   handleEvent(event: { type: string; properties?: Record<string, unknown> }): void {
@@ -60,6 +62,8 @@ export class TmuxPollingManager {
         return
       }
 
+      await this.activateFocusedPanes()
+
       const statusResult = await this.client.session.status({ path: undefined })
       const allStatuses = normalizeSDKResponse(statusResult, {} as Record<string, { type: string }>)
 
@@ -72,6 +76,14 @@ export class TmuxPollingManager {
       const sessionsToClose: string[] = []
 
       for (const [sessionId, tracked] of this.sessions.entries()) {
+        if (!tracked.attachActivated) {
+          log("[tmux-session-manager] skipping close checks for non-activated pane", {
+            sessionId,
+            paneId: tracked.paneId,
+          })
+          continue
+        }
+
         const status = allStatuses[sessionId]
         const isIdle = status?.type === "idle"
 
@@ -184,5 +196,35 @@ export class TmuxPollingManager {
     }
 
     return undefined
+  }
+
+  private async activateFocusedPanes(): Promise<void> {
+    if (!this.getWindowState || !this.activateSessionPane || this.sessions.size === 0) {
+      return
+    }
+
+    const state = await this.getWindowState().catch(() => null)
+    if (!state) return
+
+    const panes = [state.mainPane, ...state.agentPanes].filter((pane): pane is NonNullable<typeof pane> => Boolean(pane))
+    const activePaneIds = new Set(panes.filter((pane) => pane.isActive).map((pane) => pane.paneId))
+    if (activePaneIds.size === 0) return
+
+    for (const tracked of this.sessions.values()) {
+      if (tracked.attachActivated) continue
+      if (!activePaneIds.has(tracked.paneId)) continue
+
+      const activated = await this.activateSessionPane(tracked)
+      if (activated) {
+        tracked.attachActivated = true
+        tracked.lastSeenAt = new Date()
+        tracked.stableIdlePolls = 0
+        tracked.observedIdleActivityVersion = tracked.activityVersion
+        log("[tmux-session-manager] activated focused pane", {
+          sessionId: tracked.sessionId,
+          paneId: tracked.paneId,
+        })
+      }
+    }
   }
 }

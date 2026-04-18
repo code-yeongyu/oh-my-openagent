@@ -12,6 +12,7 @@ import {
   killTmuxSessionIfExists,
   getIsolatedSessionName,
   sweepStaleOmoAgentSessions,
+  activateTmuxPane,
 } from "../../shared/tmux"
 import { queryWindowState as defaultQueryWindowState } from "./pane-state-querier"
 import { decideSpawnActions, decideCloseAction, type SessionMapping } from "./decision-engine"
@@ -133,7 +134,9 @@ export class TmuxSessionManager {
       this.client,
       this.sessions,
       this.closeSessionFromPolling.bind(this),
-      this.retryPendingCloses.bind(this)
+      this.retryPendingCloses.bind(this),
+      this.queryWindowStateSafely.bind(this),
+      this.activateTrackedSessionPane.bind(this),
     )
     this.deps.log("[tmux-session-manager] initialized", {
       configEnabled: this.tmuxConfig.enabled,
@@ -335,6 +338,10 @@ export class TmuxSessionManager {
       })
       return null
     }
+  }
+
+  private async activateTrackedSessionPane(tracked: TrackedSession): Promise<boolean> {
+    return activateTmuxPane(tracked.paneId, tracked.sessionId, this.serverUrl, this.projectDirectory)
   }
 
   private windowStateContainsPane(state: WindowState, paneId: string): boolean {
