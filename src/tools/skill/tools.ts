@@ -2,9 +2,10 @@ import { dirname } from "node:path"
 import { tool, type ToolDefinition } from "@opencode-ai/plugin"
 import type { ToolContext } from "@opencode-ai/plugin/tool"
 import { TOOL_DESCRIPTION_PREFIX } from "./constants"
+import { shouldInvalidateSkillCacheForSession } from "./session-skill-cache"
 import type { SkillArgs, SkillLoadOptions } from "./types"
 import type { LoadedSkill } from "../../features/opencode-skill-loader"
-import { getAllSkills } from "../../features/opencode-skill-loader/skill-content"
+import { clearSkillCache, getAllSkills } from "../../features/opencode-skill-loader/skill-content"
 import { injectGitMasterConfig } from "../../features/opencode-skill-loader/skill-content"
 import { discoverCommandsSync } from "../slashcommand/command-discovery"
 import type { CommandInfo } from "../slashcommand/types"
@@ -27,7 +28,11 @@ import {
 export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition {
   let cachedDescription: string | null = null
 
-  const getSkills = async (): Promise<LoadedSkill[]> => {
+  const getSkills = async (context?: ToolContext): Promise<LoadedSkill[]> => {
+    if (shouldInvalidateSkillCacheForSession(context?.sessionID)) {
+      clearSkillCache()
+    }
+
     const discovered = (await getAllSkills({
       disabledSkills: options?.disabledSkills,
       browserProvider: options?.browserProvider,
@@ -108,7 +113,7 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
         .describe("Optional arguments or context for command invocation. Example: name='publish', user_message='patch'"),
     },
     async execute(args: SkillArgs, ctx?: ToolContext) {
-      const skills = await getSkills()
+      const skills = await getSkills(ctx)
       const commands = getCommands()
       cachedDescription = formatCombinedDescription(skills.map(loadedSkillToInfo), commands)
 

@@ -4,7 +4,6 @@ import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:te
 import type { ToolContext } from "@opencode-ai/plugin/tool"
 import type { LoadedSkill } from "../../features/opencode-skill-loader/types"
 import * as skillContent from "../../features/opencode-skill-loader/skill-content"
-import * as commandDiscovery from "../slashcommand/command-discovery"
 
 const discoverCommandsSync = mock(() => [])
 
@@ -94,19 +93,21 @@ describe("createSkillTool", () => {
     expect(getAllSkills.mock.calls.length).toBe(baselineGetAllSkillsCalls + 1)
   })
 
-  it("does not clear the shared skill cache during description or execute refresh", async () => {
+  it("clears the shared skill cache once on first execute in a session", async () => {
     // given
     const baselineClearSkillCacheCalls = clearSkillCache.mock.calls.length
+    const sessionContext = createMockContext("session-clear-once")
 
     // when
     const { createSkillTool } = await import("./tools")
     const skillTool = createSkillTool({})
     void skillTool.description
     await flushMicrotasks()
-		await skillTool.execute({ name: "lazy-skill" }, mockContext)
+    await skillTool.execute({ name: "lazy-skill" }, sessionContext)
+    await skillTool.execute({ name: "lazy-skill" }, sessionContext)
 
     // then
-    expect(clearSkillCache.mock.calls.length).toBe(baselineClearSkillCacheCalls)
+    expect(clearSkillCache.mock.calls.length).toBe(baselineClearSkillCacheCalls + 1)
   })
 
   it("clears the skill discovery cache once per session", async () => {
