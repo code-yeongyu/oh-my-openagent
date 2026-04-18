@@ -1,6 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk";
 import type { AgentMode, AgentPromptMetadata } from "./types";
-import { isGptModel, isGeminiModel, isGpt5_4Model } from "./types";
+import { isGptModel, isGeminiModel, isGpt5_4Model, isGlmModel } from "./types";
 import {
   buildGeminiToolMandate,
   buildGeminiDelegationOverride,
@@ -9,6 +9,12 @@ import {
   buildGeminiToolGuide,
   buildGeminiToolCallExamples,
 } from "./sisyphus/gemini";
+import {
+  buildGlmToolContract,
+  buildGlmBrevityEnforcement,
+  buildGlmConstraintExtraction,
+  buildGlmLiteralismGuard,
+} from "./sisyphus/glm";
 import { buildGpt54SisyphusPrompt } from "./sisyphus/gpt-5-4";
 import { buildTaskManagementSection } from "./sisyphus/default";
 import { getGptApplyPatchPermission } from "./gpt-apply-patch-guard";
@@ -534,6 +540,23 @@ export function createSisyphusAgent(
     prompt = prompt.replace(
       "<Constraints>",
       `${buildGeminiDelegationOverride()}\n\n${buildGeminiVerificationOverride()}\n\n<Constraints>`
+    );
+  }
+
+  if (isGlmModel(model)) {
+    prompt = prompt.replace(
+      "</intent_verbalization>",
+      `</intent_verbalization>\n\n${buildGlmConstraintExtraction()}`
+    );
+
+    prompt = prompt.replace(
+      "</tool_usage_rules>",
+      `</tool_usage_rules>\n\n${buildGlmToolContract()}`
+    );
+
+    prompt = prompt.replace(
+      "<Constraints>",
+      `${buildGlmBrevityEnforcement()}\n\n${buildGlmLiteralismGuard()}\n\n<Constraints>`
     );
   }
 
