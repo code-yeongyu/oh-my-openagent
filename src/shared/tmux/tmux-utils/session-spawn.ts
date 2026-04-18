@@ -6,7 +6,7 @@ import { isInsideTmux } from "./environment"
 import { isServerRunning } from "./server-health"
 import { shellEscapeForDoubleQuotedCommand } from "../../shell-env"
 
-const ISOLATED_SESSION_NAME = "omo-agents"
+export const ISOLATED_SESSION_NAME = "omo-agents"
 
 async function getWindowDimensions(
 	tmux: string,
