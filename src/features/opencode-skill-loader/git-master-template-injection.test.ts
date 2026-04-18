@@ -219,16 +219,24 @@ describe("#given PowerShell env prefix conversion", () => {
 
 	describe("#when shell is Bash (SHELL env is unset)", () => {
 		it("#then keeps bash-format prefix unchanged", () => {
-			delete process.env.SHELL
-			const result = injectGitMasterConfig(SAMPLE_TEMPLATE, {
-				commit_footer: false,
-				include_co_authored_by: false,
-				git_env_prefix: "GIT_MASTER=1",
-			})
+			const originalPlatform = process.platform
+			Object.defineProperty(process, "platform", { value: "linux" })
+			try {
+				delete process.env.SHELL
+				delete process.env.Shell
+				delete process.env.ComSpec
+				const result = injectGitMasterConfig(SAMPLE_TEMPLATE, {
+					commit_footer: false,
+					include_co_authored_by: false,
+					git_env_prefix: "GIT_MASTER=1",
+				})
 
-			expect(result).toContain("GIT_MASTER=1 git status")
-			expect(result).toContain("GIT_MASTER=1 git commit")
-			expect(result).toContain("GIT_MASTER=1 git push")
+				expect(result).toContain("GIT_MASTER=1 git status")
+				expect(result).toContain("GIT_MASTER=1 git commit")
+				expect(result).toContain("GIT_MASTER=1 git push")
+			} finally {
+				Object.defineProperty(process, "platform", { value: originalPlatform })
+			}
 		})
 	})
 })
