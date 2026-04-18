@@ -1,9 +1,10 @@
 import { execFileSync } from "node:child_process"
-import { afterEach, beforeEach, describe, expect, it } from "bun:test"
+import { promises as fs } from "node:fs"
+import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test"
 import { mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { loadOpencodeGlobalCommands, loadOpencodeProjectCommands } from "./loader"
+import * as loader from "./loader"
 
 const TEST_DIR = join(tmpdir(), `claude-code-command-loader-${Date.now()}`)
 
@@ -16,19 +17,41 @@ function writeCommand(directory: string, name: string, description: string): voi
 }
 
 describe("claude-code command loader", () => {
+  let originalClaudeConfigDir: string | undefined
   let originalOpencodeConfigDir: string | undefined
 
   beforeEach(() => {
     mkdirSync(TEST_DIR, { recursive: true })
+    originalClaudeConfigDir = process.env.CLAUDE_CONFIG_DIR
     originalOpencodeConfigDir = process.env.OPENCODE_CONFIG_DIR
+
+    const claudeConfigDir = join(TEST_DIR, "claude-config")
+    const opencodeConfigDir = join(TEST_DIR, "opencode-config")
+    process.env.CLAUDE_CONFIG_DIR = claudeConfigDir
+    process.env.OPENCODE_CONFIG_DIR = opencodeConfigDir
+
+    if ("clearCommandLoaderCache" in loader && typeof loader.clearCommandLoaderCache === "function") {
+      loader.clearCommandLoaderCache()
+    }
   })
 
   afterEach(() => {
+    if (originalClaudeConfigDir === undefined) {
+      delete process.env.CLAUDE_CONFIG_DIR
+    } else {
+      process.env.CLAUDE_CONFIG_DIR = originalClaudeConfigDir
+    }
+
     if (originalOpencodeConfigDir === undefined) {
       delete process.env.OPENCODE_CONFIG_DIR
     } else {
       process.env.OPENCODE_CONFIG_DIR = originalOpencodeConfigDir
     }
+
+    if ("clearCommandLoaderCache" in loader && typeof loader.clearCommandLoaderCache === "function") {
+      loader.clearCommandLoaderCache()
+    }
+
     rmSync(TEST_DIR, { recursive: true, force: true })
   })
 
@@ -39,7 +62,7 @@ describe("claude-code command loader", () => {
     writeCommand(join(projectDir, ".opencode", "commands"), "ancestor", "Ancestor command")
 
     // when
-    const commands = await loadOpencodeProjectCommands(childDir)
+    const commands = await loader.loadOpencodeProjectCommands(childDir)
 
     // then
     expect(commands.ancestor?.description).toBe("(opencode-project) Ancestor command")
@@ -50,7 +73,7 @@ describe("claude-code command loader", () => {
     writeCommand(join(TEST_DIR, ".opencode", "command"), "singular", "Singular command")
 
     // when
-    const commands = await loadOpencodeProjectCommands(TEST_DIR)
+    const commands = await loader.loadOpencodeProjectCommands(TEST_DIR)
 
     // then
     expect(commands.singular?.description).toBe("(opencode-project) Singular command")
@@ -66,7 +89,7 @@ describe("claude-code command loader", () => {
     writeCommand(projectDir, "duplicate", "Nearest command")
 
     // when
-    const commands = await loadOpencodeProjectCommands(childDir)
+    const commands = await loader.loadOpencodeProjectCommands(childDir)
 
     // then
     expect(commands.duplicate?.description).toBe("(opencode-project) Nearest command")
@@ -79,7 +102,7 @@ describe("claude-code command loader", () => {
     writeCommand(join(opencodeConfigDir, "commands"), "global-plural", "Global plural command")
 
     // when
-    const commands = await loadOpencodeGlobalCommands()
+    const commands = await loader.loadOpencodeGlobalCommands()
 
     // then
     expect(commands["global-plural"]?.description).toBe("(opencode) Global plural command")
@@ -94,7 +117,7 @@ describe("claude-code command loader", () => {
     writeCommand(join(profileConfigDir, "commands"), "duplicate-global", "Profile global command")
 
     // when
-    const commands = await loadOpencodeGlobalCommands()
+    const commands = await loader.loadOpencodeGlobalCommands()
 
     // then
     expect(commands["duplicate-global"]?.description).toBe("(opencode) Profile global command")
@@ -114,12 +137,46 @@ describe("claude-code command loader", () => {
     writeCommand(join(TEST_DIR, ".opencode", "commands"), "outside", "Outside command")
 
     // when
-    const commands = await loadOpencodeProjectCommands(nestedDirectory)
+    const commands = await loader.loadOpencodeProjectCommands(nestedDirectory)
 
     // then
     expect(commands["deploy/staging"]?.description).toBe("(opencode-project) Deploy staging")
     expect(commands.release?.description).toBe("(opencode-project) Release command")
     expect(commands.outside).toBeUndefined()
     expect(commands["deploy:staging"]).toBeUndefined()
+  })
+
+  it("#given commands nested under an excluded basename #when loadProjectCommands is called #then it skips the excluded directory contents", async () => {
+    // given
+    writeCommand(join(TEST_DIR, ".claude", "commands"), "real", "Real command")
+    writeCommand(
+      join(TEST_DIR, ".claude", "commands", "node_modules"),
+      "fake",
+      "Fake command",
+    )
+
+    // when
+    const commands = await loader.loadProjectCommands(TEST_DIR)
+
+    // then
+    expect(commands.real?.description).toBe("(project) Real command")
+    expect(commands.fake).toBeUndefined()
+  })
+
+  it("#given a previously loaded directory #when loadAllCommands is called twice #then the second call reuses the cached result without readdir calls", async () => {
+    // given
+    writeCommand(join(TEST_DIR, ".claude", "commands"), "cached", "Cached command")
+    const readdirSpy = spyOn(fs, "readdir")
+
+    // when
+    const firstCommands = await loader.loadAllCommands(TEST_DIR)
+    const firstReaddirCount = readdirSpy.mock.calls.length
+    const secondCommands = await loader.loadAllCommands(TEST_DIR)
+
+    // then
+    expect(firstCommands.cached?.description).toBe("(project) Cached command")
+    expect(secondCommands).toEqual(firstCommands)
+    expect(firstReaddirCount).toBeGreaterThan(0)
+    expect(readdirSpy.mock.calls.length).toBe(firstReaddirCount)
   })
 })
