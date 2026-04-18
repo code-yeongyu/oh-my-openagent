@@ -14,6 +14,7 @@ oh-my-opencode/
 │   ├── index.ts              # Plugin entry: default export `pluginModule`, shape `{ id, server }`
 │   ├── plugin-config.ts      # JSONC multi-level config: user → project → defaults (Zod v4)
 │   ├── agents/               # 11 agents (Sisyphus, Hephaestus, Oracle, Librarian, Explore, Atlas, Prometheus, Metis, Momus, Multimodal-Looker, Sisyphus-Junior)
+│   │   └── sisyphus/         # Model-specific prompt overlays: default.ts, gemini.ts, glm.ts, gpt-5-4.ts
 │   ├── hooks/                # 52 lifecycle hooks across dedicated modules and standalone files
 │   ├── tools/                # 26 tools across 16 directories (includes Hashline edit with LINE#ID content hashing)
 │   ├── features/             # 19 feature modules (background-agent, skill-loader, tmux, MCP-OAuth, skill-mcp-manager, etc.)
@@ -61,6 +62,7 @@ pluginModule.server(input, options)
 | Task | Location | Notes |
 |------|----------|-------|
 | Add new agent | `src/agents/` + `src/agents/builtin-agents/` | Follow createXXXAgent factory pattern |
+| Add model-specific prompt overlay | `src/agents/sisyphus/` | Follow gemini.ts/glm.ts pattern: exported build functions, injected via `isXxxModel()` in sisyphus.ts |
 | Add new hook | `src/hooks/{name}/` + register in `src/plugin/hooks/create-*-hooks.ts` | Match event type to tier |
 | Add new tool | `src/tools/{name}/` + register in `src/plugin/tool-registry.ts` | Follow createXXXTool factory |
 | Add new feature module | `src/features/{name}/` | Standalone module, wire in plugin/ |
@@ -70,6 +72,9 @@ pluginModule.server(input, options)
 | Add new CLI command | `src/cli/cli-program.ts` | Commander.js subcommand |
 | Add new doctor check | `src/cli/doctor/checks/` | Register in checks/index.ts |
 | Modify config schema | `src/config/schema/` + update root schema | Zod v4, add to OhMyOpenCodeConfigSchema |
+| Add new model variant | `src/shared/model-string-parser.ts` KNOWN_VARIANTS | Also update `model-capability-aliases.ts` pattern rules + `provider-model-id-transform.ts` if API calls need tag |
+| Add provider model transform | `src/shared/provider-model-id-transform.ts` + `src/cli/provider-model-id-transform.ts` | Update BOTH: shared (runtime) + CLI (installer). Keep in sync. |
+| Debug "model not valid" warnings | `src/shared/model-string-parser.ts` → `model-availability.ts` → `model-resolution-pipeline.ts` | Check variant stripping, fuzzy matching, connected providers cache |
 | Add new category | `src/tools/delegate-task/constants.ts` | DEFAULT_CATEGORIES + CATEGORY_MODEL_REQUIREMENTS |
 | Debug provider errors | `src/hooks/runtime-fallback/` | Reactive error recovery (distinct from model-fallback) |
 | External notifications | `src/openclaw/` | Bidirectional Discord/Telegram/webhook integration |
@@ -107,6 +112,8 @@ Fields: agents (14 overridable, 21 fields each), categories (8 built-in + custom
 - **Hook tiers**: Session (24) → Tool-Guard (14) → Transform (5) → Continuation (7) → Skill (2)
 - **Agent modes**: `primary` (respects UI model) vs `subagent` (own fallback chain) vs `all`
 - **Model resolution**: 4-step: override → category-default → provider-fallback → system-default
+- **Model variant parsing**: `model-string-parser.ts` handles 3 formats: `model(variant)`, `model variant`, `model:tag` (Ollama syntax). Known variants: low, medium, high, xhigh, max, minimal, none, auto, thinking, cloud. Unknown `:tag` suffixes are preserved as part of the model ID.
+- **Provider transforms**: `provider-model-id-transform.ts` rewrites model IDs per provider (e.g., `ollama-cloud` appends `:cloud`, `vercel` prepends `sub-provider/`, `anthropic` converts dashes to dots in API calls)
 - **Config format**: JSONC with comments, Zod v4 validation, snake_case keys
 - **File naming**: kebab-case for all files/directories
 - **Module structure**: index.ts barrel exports, no catch-all files (utils.ts, helpers.ts banned), 200 LOC soft limit
@@ -160,6 +167,9 @@ bunx oh-my-opencode run     # Non-interactive session
 - Plugin load timeout: 10s for Claude Code plugins
 - Model fallback: per-agent chains in `shared/model-requirements.ts`, not a single global priority
 - Two fallback systems: `model-fallback` (proactive, chat.params) vs `runtime-fallback` (reactive, session.error)
+- Ollama-cloud models use `:cloud` tag — `model-string-parser.ts` strips it for matching, `provider-model-id-transform.ts` re-appends it for API calls
+- Model capability canonicalization: `model-capability-aliases.ts` strips `:cloud`/`:thinking` tags so `kimi-k2.5:cloud` matches `kimi-k2.5` in the bundled snapshot
+- Sisyphus prompt overlays: `sisyphus/gemini.ts` (tool mandate + delegation override), `sisyphus/glm.ts` (tool contract + brevity + literalism), `sisyphus/gpt-5-4.ts` (full 8-block XML). Thin overlays injected via `isXxxModel()` string replacement tags in `sisyphus.ts`.
 - Config migration: idempotent via `_migrations` tracking, creates timestamped backups before atomic writes
 - Build: bun build (ESM) + tsc --emitDeclarationOnly, externals: @ast-grep/napi
 - Test setup: `test-setup.ts` preloaded via bunfig.toml, resets session/cache state between tests
@@ -170,3 +180,4 @@ bunx oh-my-opencode run     # Non-interactive session
 - Platform binaries detect AVX2 + libc family at runtime, fallback to baseline if needed
 - Hashline edit: every Read output tagged with `LINE#ID` content hashes; edits reject on hash mismatch
 - IntentGate: classifies user intent (research/implementation/investigation/evaluation/fix) before routing
+- Dual provider-model-id-transform: `src/shared/` (runtime API calls) and `src/cli/` (installer/config output) are separate implementations that must stay in sync
