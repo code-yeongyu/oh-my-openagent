@@ -51,6 +51,18 @@ const PATTERN_ALIAS_RULES: ReadonlyArray<PatternAliasRule> = [
     match: (normalizedModelID) => /^gemini-3\.1-pro-(?:high|low)$/.test(normalizedModelID),
     canonicalize: () => "gemini-3.1-pro",
   },
+  {
+    ruleID: "ollama-cloud-tag-alias",
+    description: "Strips Ollama-style :cloud/:thinking tags so models like kimi-k2.5:cloud canonicalize to kimi-k2.5 for capability lookup.",
+    match: (normalizedModelID) => /^([\w.-]+):cloud$/.test(normalizedModelID),
+    canonicalize: (normalizedModelID) => normalizedModelID.replace(/:cloud$/, ""),
+  },
+  {
+    ruleID: "ollama-thinking-tag-alias",
+    description: "Strips Ollama-style :thinking tags so models like glm-5.1:thinking canonicalize to glm-5.1 for capability lookup.",
+    match: (normalizedModelID) => /^([\w.-]+):thinking$/.test(normalizedModelID),
+    canonicalize: (normalizedModelID) => normalizedModelID.replace(/:thinking$/, ""),
+  },
 ]
 
 function normalizeLookupModelID(modelID: string): string {

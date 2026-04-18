@@ -8,6 +8,7 @@ const KNOWN_VARIANTS = new Set([
   "none",
   "auto",
   "thinking",
+  "cloud",
 ])
 
 export function parseVariantFromModelID(rawModelID: string): { modelID: string; variant?: string } {
@@ -30,6 +31,20 @@ export function parseVariantFromModelID(rawModelID: string): { modelID: string; 
     if (variant && KNOWN_VARIANTS.has(variant)) {
       return { modelID, variant }
     }
+  }
+
+  // Handle Ollama-style colon-separated variants: "model:tag" (e.g., "glm-5.1:cloud", "kimi-k2.5:thinking")
+  // Only matches when what follows the last colon is a simple tag (letters, digits, dots, underscores, hyphens)
+  const colonVariant = trimmedModelID.match(/^(.+):([a-z][a-z0-9._-]*)$/i)
+  if (colonVariant) {
+    const modelID = colonVariant[1]?.trim() ?? ""
+    const variant = colonVariant[2]?.trim().toLowerCase()
+    if (variant && KNOWN_VARIANTS.has(variant)) {
+      return { modelID, variant }
+    }
+    // If the suffix after colon is not a recognized variant, keep it as part of the model ID
+    // (e.g., "kimi-k2.5:cloud" where ":cloud" IS now a known variant → strips to "kimi-k2.5")
+    // (e.g., "model:sometag" where ":sometag" is NOT known → stays as "model:sometag")
   }
 
   return { modelID: trimmedModelID }

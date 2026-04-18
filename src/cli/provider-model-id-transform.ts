@@ -62,5 +62,10 @@ export function transformModelForProvider(provider: string, model: string): stri
     return model
   }
 
+  if (provider === "ollama-cloud") {
+    if (model.includes(":")) return model
+    return `${model}:cloud`
+  }
+
   return model
 }

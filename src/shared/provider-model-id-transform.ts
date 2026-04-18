@@ -54,5 +54,11 @@ export function transformModelForProvider(provider: string, model: string): stri
 	if (provider === "anthropic") {
 		return claudeVersionDot(model)
 	}
+	// Ollama Cloud uses Ollama's :tag format (e.g. "kimi-k2.5:cloud", "glm-5.1:cloud")
+	// Models resolved without variant need the :cloud tag re-appended for API calls
+	if (provider === "ollama-cloud") {
+		if (model.includes(":")) return model
+		return `${model}:cloud`
+	}
 	return model
 }
