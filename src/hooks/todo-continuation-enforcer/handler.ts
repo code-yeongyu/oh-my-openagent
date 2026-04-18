@@ -61,6 +61,7 @@ export function createTodoContinuationHandler(args: {
       const sessionID = props?.sessionID as string | undefined
       if (!sessionID) return
 
+      sessionStateStore.startPruneInterval()
       await handleSessionIdle({
         ctx,
         sessionID,

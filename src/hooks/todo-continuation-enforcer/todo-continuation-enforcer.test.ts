@@ -262,7 +262,7 @@ describe("todo-continuation-enforcer", () => {
       const sessionID = "main-lazy-prune"
       setMainSession(sessionID)
       const hook = createTodoContinuationEnforcer(createMockPluginInput(), {
-        backgroundManager: createMockBackgroundManager(false),
+        backgroundManager: createMockBackgroundManager(true),
       })
 
       // when
