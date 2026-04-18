@@ -1,4 +1,4 @@
-import { spawn } from "bun"
+import { spawn } from "../../../shared/tmux/tmux-utils/spawn-process"
 import { log } from "../../../shared"
 import { getTmuxPath } from "../../../tools/interactive-bash/tmux-path-resolver"
 import type { TmuxSessionManager } from "../../tmux-subagent/manager"
