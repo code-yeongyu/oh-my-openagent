@@ -77,6 +77,13 @@ const FAILED_READINESS_SWEEP_INTERVAL_MS = 60 * 1000
 const MAX_DEFERRED_QUEUE_SIZE = 20
 const MAX_CLOSE_RETRY_COUNT = 3
 const MAX_ISOLATED_CONTAINER_NULL_STATE_COUNT = 2
+let nextIsolatedSessionManagerId = 1
+
+function createIsolatedSessionManagerId(): string {
+  const managerId = String(nextIsolatedSessionManagerId)
+  nextIsolatedSessionManagerId += 1
+  return managerId
+}
 
 export class TmuxSessionManager {
   private client: OpencodeClient
@@ -102,6 +109,7 @@ export class TmuxSessionManager {
   private isolatedContainerNullStateCount = 0
   private staleSweepCompleted = false
   private staleSweepInProgress = false
+  private isolatedSessionManagerId = createIsolatedSessionManagerId()
   constructor(ctx: PluginInput, tmuxConfig: TmuxConfig, deps: Partial<TmuxUtilDeps> = {}) {
     this.client = ctx.client
     this.tmuxConfig = tmuxConfig
@@ -197,7 +205,16 @@ export class TmuxSessionManager {
     this.deps.log("[tmux-session-manager] creating isolated tmux container", { isolation, sessionId, title })
 
     const result = isolation === "session"
-      ? await spawnTmuxSession(sessionId, title, this.tmuxConfig, this.serverUrl, this.projectDirectory, this.sourcePaneId)
+      ? await spawnTmuxSession(
+        sessionId,
+        title,
+        this.tmuxConfig,
+        this.serverUrl,
+        this.projectDirectory,
+        this.sourcePaneId,
+        undefined,
+        this.isolatedSessionManagerId,
+      )
       : await spawnTmuxWindow(sessionId, title, this.tmuxConfig, this.serverUrl, this.projectDirectory)
 
     if (result.success && result.paneId) {
@@ -1322,7 +1339,7 @@ export class TmuxSessionManager {
     this.isolatedWindowPaneId = undefined
 
     if (this.tmuxConfig.isolation === "session") {
-      const isolatedSessionName = getIsolatedSessionName()
+      const isolatedSessionName = getIsolatedSessionName(process.pid, this.isolatedSessionManagerId)
       try {
         const killed = await killTmuxSessionIfExists(isolatedSessionName)
         this.deps.log("[tmux-session-manager] isolated session teardown", {

@@ -32,8 +32,10 @@ async function resolveSpawnTmuxSessionDeps(deps?: Partial<SpawnTmuxSessionDeps>)
 	}
 }
 
-export function getIsolatedSessionName(pid: number = process.pid): string {
-	return `${ISOLATED_SESSION_NAME_PREFIX}-${pid}`
+export function getIsolatedSessionName(pid: number = process.pid, managerId?: string): string {
+	return managerId
+		? `${ISOLATED_SESSION_NAME_PREFIX}-${pid}-${managerId}`
+		: `${ISOLATED_SESSION_NAME_PREFIX}-${pid}`
 }
 
 async function getWindowDimensions(
@@ -64,6 +66,7 @@ export async function spawnTmuxSession(
 	_directory: string,
 	sourcePaneId?: string,
 	depsInput?: Partial<SpawnTmuxSessionDeps>,
+	managerId?: string,
 ): Promise<SpawnPaneResult> {
 	const deps = await resolveSpawnTmuxSessionDeps(depsInput)
 	const { log, runTmuxCommand } = deps
@@ -108,7 +111,7 @@ export async function spawnTmuxSession(
 		}
 	}
 
-	const isolatedSessionName = getIsolatedSessionName()
+	const isolatedSessionName = getIsolatedSessionName(process.pid, managerId)
 	const sessionAlreadyExists = await sessionExists(tmux, isolatedSessionName, runTmuxCommand)
 
 	const args = sessionAlreadyExists
