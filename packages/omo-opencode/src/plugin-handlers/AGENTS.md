@@ -97,3 +97,9 @@ Final Config
 
 - `agents`, `categories`, `claude_code`: deep merged
 - `disabled_*` arrays: Set union
+
+## Display layer sanitization (additive helper, 2026-04-19)
+
+Display-layer callers that render `name` to end-user surfaces MAY use `sanitizeAgentNameForDisplay(agentName)` from `src/shared/agent-display-names.ts`. The helper strips invisible codepoints (U+200B, U+200C, U+200D, U+FEFF) from the string it returns.
+
+It does NOT modify ordering behavior. Core agent ordering still relies on the sort shim described above. The new helper is opt in. No existing caller is migrated silently.
