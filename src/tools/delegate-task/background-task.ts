@@ -3,14 +3,14 @@ import type { ExecutorContext, ParentContext } from "./executor-types"
 import type { FallbackEntry } from "../../shared/model-requirements"
 import { getTimingConfig } from "./timing"
 import { buildTaskPrompt } from "./prompt-builder"
-import { storeToolMetadata } from "../../features/tool-metadata-store"
-import { resolveCallID } from "./resolve-call-id"
+import { publishToolMetadata } from "../../features/tool-metadata-store"
 import { formatDetailedError } from "./error-formatting"
 import { getSessionTools } from "../../shared/session-tools-store"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { QUESTION_DENIED_SESSION_PERMISSION } from "../../shared/question-denied-session-permission"
-import { setSessionFallbackChain } from "../../hooks/model-fallback/hook"
 import { stripAgentListSortPrefix } from "../../shared/agent-display-names"
+import { buildTaskMetadataBlock } from "../../features/tool-metadata-store/task-metadata-contract"
+import { resolveMetadataModel } from "./resolve-metadata-model"
 
 function continueSessionSetup(args: {
   taskID: string
@@ -18,6 +18,7 @@ function continueSessionSetup(args: {
   timing: ReturnType<typeof getTimingConfig>
   fallbackChain?: FallbackEntry[]
   category?: string
+  modelFallbackControllerAccessor?: ExecutorContext["modelFallbackControllerAccessor"]
 }): void {
   if (!args.fallbackChain && !args.category) {
     return
@@ -40,7 +41,7 @@ function continueSessionSetup(args: {
         continue
       }
 
-      setSessionFallbackChain(sessionId, args.fallbackChain)
+      args.modelFallbackControllerAccessor?.setSessionFallbackChain(sessionId, args.fallbackChain)
       if (args.category) {
         SessionCategoryRegistry.register(sessionId, args.category)
       }
@@ -105,6 +106,7 @@ export async function executeBackgroundTask(
           timing,
           fallbackChain,
           category: args.category,
+          modelFallbackControllerAccessor: executorCtx.modelFallbackControllerAccessor,
         })
         break
       }
@@ -112,12 +114,13 @@ export async function executeBackgroundTask(
     }
 
     if (sessionId) {
-      setSessionFallbackChain(sessionId, fallbackChain)
+      executorCtx.modelFallbackControllerAccessor?.setSessionFallbackChain(sessionId, fallbackChain)
     }
     if (args.category && sessionId) {
       SessionCategoryRegistry.register(sessionId, args.category)
     }
 
+    const resolvedModel = resolveMetadataModel(categoryModel, parentContext.model)
     const metadata = {
       prompt: args.prompt,
       agent: task.agent,
@@ -126,22 +129,26 @@ export async function executeBackgroundTask(
       description: args.description,
       run_in_background: args.run_in_background,
       command: args.command,
+      ...(sessionId ? { taskId: sessionId } : {}),
+      backgroundTaskId: task.id,
       ...(sessionId ? { sessionId } : {}),
-      ...(categoryModel ? { model: { providerID: categoryModel.providerID, modelID: categoryModel.modelID } } : {}),
+      ...(resolvedModel ? { model: resolvedModel } : {}),
     }
 
     const unstableMeta = {
       title: args.description,
       metadata,
     }
-    await ctx.metadata?.(unstableMeta)
-    const callID = resolveCallID(ctx)
-    if (callID) {
-      storeToolMetadata(ctx.sessionID, callID, unstableMeta)
-    }
+    await publishToolMetadata(ctx, unstableMeta)
 
     const taskMetadataBlock = sessionId
-      ? `\n\n<task_metadata>\nsession_id: ${sessionId}\ntask_id: ${task.id}\nbackground_task_id: ${task.id}\n</task_metadata>`
+      ? `\n\n${buildTaskMetadataBlock({
+        sessionId,
+        taskId: sessionId,
+        backgroundTaskId: task.id,
+        agent: task.agent,
+        category: args.category,
+      })}`
       : ""
 
     return `Background task launched.

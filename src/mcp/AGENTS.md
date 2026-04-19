@@ -1,6 +1,6 @@
 # src/mcp/ — 3 Built-in Remote MCPs
 
-**Generated:** 2026-04-11
+**Generated:** 2026-04-18
 
 ## OVERVIEW
 

@@ -1,8 +1,7 @@
 import type { DelegateTaskArgs, ToolContextWithMetadata } from "./types"
-import type { ExecutorContext, SessionMessage } from "./executor-types"
+import type { ExecutorContext, ParentContext, SessionMessage } from "./executor-types"
 import { isPlanFamily } from "./constants"
-import { storeToolMetadata } from "../../features/tool-metadata-store"
-import { resolveCallID } from "./resolve-call-id"
+import { publishToolMetadata } from "../../features/tool-metadata-store"
 import { getTaskToastManager } from "../../features/task-toast-manager"
 import { getAgentToolRestrictions } from "../../shared/agent-tool-restrictions"
 import { getMessageDir } from "../../shared"
@@ -13,16 +12,24 @@ import { syncContinuationDeps, type SyncContinuationDeps } from "./sync-continua
 import { setSessionTools } from "../../shared/session-tools-store"
 import { normalizeSDKResponse } from "../../shared"
 import { buildTaskPrompt } from "./prompt-builder"
+import { buildTaskMetadataBlock } from "../../features/tool-metadata-store/task-metadata-contract"
+import { getTaskID } from "./task-id"
+import { resolveMetadataModel } from "./resolve-metadata-model"
 
 export async function executeSyncContinuation(
   args: DelegateTaskArgs,
   ctx: ToolContextWithMetadata,
   executorCtx: ExecutorContext,
+  parentContext: ParentContext,
   deps: SyncContinuationDeps = syncContinuationDeps
 ): Promise<string> {
   const { client, syncPollTimeoutMs, sisyphusAgentConfig } = executorCtx
   const toastManager = getTaskToastManager()
-  const taskId = `resume_sync_${args.session_id!.slice(0, 8)}`
+  const continuationID = getTaskID(args)
+  if (!continuationID) {
+    throw new Error("task_id is required to continue a sync task")
+  }
+  const taskId = `resume_sync_${continuationID.slice(0, 8)}`
   const startTime = new Date()
 
   if (toastManager) {
@@ -43,7 +50,7 @@ export async function executeSyncContinuation(
 
   try {
     try {
-      const messagesResp = await client.session.messages({ path: { id: args.session_id! } })
+      const messagesResp = await client.session.messages({ path: { id: continuationID } })
       const messages = normalizeSDKResponse(messagesResp, [] as SessionMessage[])
       anchorMessageCount = messages.length
       for (let i = messages.length - 1; i >= 0; i--) {
@@ -56,7 +63,7 @@ export async function executeSyncContinuation(
         }
       }
     } catch {
-      const resumeMessageDir = getMessageDir(args.session_id!)
+      const resumeMessageDir = getMessageDir(continuationID)
       const resumeMessage = resumeMessageDir ? findNearestMessageWithFields(resumeMessageDir) : null
       resumeAgent = resumeMessage?.agent
       resumeModel = resumeMessage?.model?.providerID && resumeMessage?.model?.modelID
@@ -72,17 +79,14 @@ export async function executeSyncContinuation(
         load_skills: args.load_skills,
         description: args.description,
         run_in_background: args.run_in_background,
-        sessionId: args.session_id,
+        taskId: continuationID,
+        sessionId: continuationID,
         sync: true,
         command: args.command,
-        model: resumeModel,
+        model: resolveMetadataModel(resumeModel, parentContext.model),
       },
     }
-    await ctx.metadata?.(syncContMeta)
-    const callID = resolveCallID(ctx)
-    if (callID) {
-      storeToolMetadata(ctx.sessionID, callID, syncContMeta)
-    }
+    await publishToolMetadata(ctx, syncContMeta)
 
     const allowTask = isPlanFamily(resumeAgent)
     const tddEnabled = sisyphusAgentConfig?.tdd
@@ -93,10 +97,10 @@ export async function executeSyncContinuation(
       question: false,
       ...(resumeAgent ? getAgentToolRestrictions(resumeAgent) : {}),
     }
-    setSessionTools(args.session_id!, tools)
+    setSessionTools(continuationID, tools)
 
     await promptWithModelSuggestionRetry(client, {
-      path: { id: args.session_id! },
+      path: { id: continuationID },
       body: {
         ...(resumeAgent !== undefined ? { agent: resumeAgent } : {}),
         ...(resumeModel !== undefined ? { model: resumeModel } : {}),
@@ -110,12 +114,12 @@ export async function executeSyncContinuation(
        toastManager.removeTask(taskId)
      }
      const errorMessage = promptError instanceof Error ? promptError.message : String(promptError)
-     return `Failed to send continuation prompt: ${errorMessage}\n\nSession ID: ${args.session_id}`
+     return `Failed to send continuation prompt: ${errorMessage}\n\nTask ID: ${continuationID}`
    }
 
     try {
       const pollError = await deps.pollSyncSession(ctx, client, {
-        sessionID: args.session_id!,
+        sessionID: continuationID,
         agentToUse: resumeAgent ?? "continue",
         toastManager,
         taskId,
@@ -125,7 +129,7 @@ export async function executeSyncContinuation(
         return pollError
       }
 
-      const result = await deps.fetchSyncResult(client, args.session_id!, anchorMessageCount)
+      const result = await deps.fetchSyncResult(client, continuationID, anchorMessageCount)
       if (!result.ok) {
         return result.error
       }
@@ -138,9 +142,11 @@ export async function executeSyncContinuation(
 
 ${result.textContent || "(No text output)"}
 
-<task_metadata>
-session_id: ${args.session_id}
-${resumeAgent ? `subagent: ${resumeAgent}\n` : ""}</task_metadata>`
+${buildTaskMetadataBlock({
+        sessionId: continuationID,
+        taskId: continuationID,
+        agent: resumeAgent,
+      })}`
    } finally {
      if (toastManager) {
        toastManager.removeTask(taskId)

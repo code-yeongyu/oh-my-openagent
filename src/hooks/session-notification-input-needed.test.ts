@@ -93,6 +93,53 @@ describe("session-notification input-needed events", () => {
     expect(notificationCalls).toHaveLength(1)
     expect(notificationCalls[0]).toContain("Agent needs permission to continue")
   })
+
+  test("lazily detects platform and starts background checks on first idle event", async () => {
+    const sessionID = "main-idle"
+    setMainSession(sessionID)
+
+    const detectPlatformSpy = spyOn(sender, "detectPlatform")
+    detectPlatformSpy.mockReturnValue("darwin")
+
+    const getDefaultSoundPathSpy = spyOn(sender, "getDefaultSoundPath")
+    getDefaultSoundPathSpy.mockReturnValue("/System/Library/Sounds/Glass.aiff")
+
+    const startBackgroundCheckSpy = spyOn(utils, "startBackgroundCheck")
+    startBackgroundCheckSpy.mockImplementation(() => {})
+
+    // given
+    const hook = createSessionNotification(createMockPluginInput(), { enforceMainSessionFilter: false })
+
+    // when
+    await hook({
+      event: {
+        type: "session.idle",
+        properties: {
+          sessionID,
+        },
+      },
+    })
+
+    // then
+    expect(detectPlatformSpy).toHaveBeenCalledTimes(1)
+    expect(getDefaultSoundPathSpy).toHaveBeenCalledTimes(1)
+    expect(startBackgroundCheckSpy).toHaveBeenCalledTimes(1)
+
+    // when
+    await hook({
+      event: {
+        type: "session.idle",
+        properties: {
+          sessionID,
+        },
+      },
+    })
+
+    // then
+    expect(detectPlatformSpy).toHaveBeenCalledTimes(1)
+    expect(getDefaultSoundPathSpy).toHaveBeenCalledTimes(1)
+    expect(startBackgroundCheckSpy).toHaveBeenCalledTimes(1)
+  })
 })
 
 export {}

@@ -112,13 +112,13 @@ describe("scheduleDeferredModelOverride", () => {
     //#when
     scheduleDeferredModelOverride(
       "msg_001",
-      { providerID: "anthropic", modelID: "claude-opus-4-6" },
+      { providerID: "anthropic", modelID: "claude-opus-4-7" },
     )
     await flushMicrotasks(5)
 
     //#then
     const model = readMessageModel("msg_001")
-    expect(model).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-6" })
+    expect(model).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-7" })
   })
 
   test("should update variant and thinking fields when variant provided", async () => {
@@ -128,7 +128,7 @@ describe("scheduleDeferredModelOverride", () => {
     //#when
     scheduleDeferredModelOverride(
       "msg_002",
-      { providerID: "anthropic", modelID: "claude-opus-4-6" },
+      { providerID: "anthropic", modelID: "claude-opus-4-7" },
       "max",
     )
     await flushMicrotasks(5)
@@ -144,7 +144,7 @@ describe("scheduleDeferredModelOverride", () => {
     //#when
     scheduleDeferredModelOverride(
       "msg_nonexistent",
-      { providerID: "anthropic", modelID: "claude-opus-4-6" },
+      { providerID: "anthropic", modelID: "claude-opus-4-7" },
     )
     await flushWithTimeout()
 
@@ -162,13 +162,13 @@ describe("scheduleDeferredModelOverride", () => {
     //#when
     scheduleDeferredModelOverride(
       "msg_003",
-      { providerID: "anthropic", modelID: "claude-opus-4-6" },
+      { providerID: "anthropic", modelID: "claude-opus-4-7" },
     )
     await flushMicrotasks(5)
 
     //#then
     const model = readMessageModel("msg_003")
-    expect(model).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-6" })
+    expect(model).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-7" })
     expect(readMessageField("msg_003", "variant")).toBeNull()
     expect(readMessageField("msg_003", "thinking")).toBeNull()
   })
@@ -180,7 +180,7 @@ describe("scheduleDeferredModelOverride", () => {
     //#when
     scheduleDeferredModelOverride(
       "msg_004",
-      { providerID: "anthropic", modelID: "claude-opus-4-6" },
+      { providerID: "anthropic", modelID: "claude-opus-4-7" },
     )
     await flushMicrotasks(5)
 
@@ -200,7 +200,7 @@ describe("scheduleDeferredModelOverride", () => {
     //#when
     scheduleDeferredModelOverride(
       "msg_corrupt",
-      { providerID: "anthropic", modelID: "claude-opus-4-6" },
+      { providerID: "anthropic", modelID: "claude-opus-4-7" },
     )
     await flushMicrotasks(5)
 

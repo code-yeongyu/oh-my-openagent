@@ -235,6 +235,27 @@ describe("pollForCompletion", () => {
     expect(result).toBe(0)
   })
 
+  it("treats missing main session status as idle when status API omits idle sessions", async () => {
+    //#given - latest opencode omits idle sessions from the status map
+    const ctx = createMockContext({
+      statuses: {},
+    })
+    const eventState = createEventState()
+    eventState.mainSessionIdle = false
+    eventState.hasReceivedMeaningfulWork = true
+    const abortController = new AbortController()
+
+    //#when
+    const result = await pollForCompletion(ctx, eventState, abortController, {
+      pollIntervalMs: 10,
+      requiredConsecutive: 2,
+      minStabilizationMs: 10,
+    })
+
+    //#then - missing entry is treated as idle instead of hanging forever
+    expect(result).toBe(0)
+  })
+
   it("allows silent completion after stabilization when no meaningful work is received", async () => {
     //#given - session is idle and stable but no assistant message/tool event arrived
     const ctx = createMockContext()

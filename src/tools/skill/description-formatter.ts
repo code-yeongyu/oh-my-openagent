@@ -38,14 +38,17 @@ function formatSlashCommand(command: CommandInfo): string {
   return lines.join("\n")
 }
 
-export function formatCombinedDescription(skills: SkillInfo[], commands: CommandInfo[]): string {
-  if (skills.length === 0 && commands.length === 0) {
+export function formatCombinedDescription(skills?: SkillInfo[], commands?: CommandInfo[]): string {
+  const availableSkills = skills ?? []
+  const availableCommands = commands ?? []
+
+  if (availableSkills.length === 0 && availableCommands.length === 0) {
     return TOOL_DESCRIPTION_NO_SKILLS
   }
 
   const availableItems = [
-    ...sortByScopePriority(skills).map(formatSkillCommand),
-    ...sortByScopePriority(commands).map(formatSlashCommand),
+    ...sortByScopePriority(availableSkills).map(formatSkillCommand),
+    ...sortByScopePriority(availableCommands).map(formatSlashCommand),
   ]
 
   if (availableItems.length === 0) {

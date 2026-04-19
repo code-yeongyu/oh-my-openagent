@@ -12,6 +12,7 @@ describe("non-interactive-env hook", () => {
     originalEnv = {
       SHELL: process.env.SHELL,
       PSModulePath: process.env.PSModulePath,
+      MSYSTEM: process.env.MSYSTEM,
       CI: process.env.CI,
       OPENCODE_NON_INTERACTIVE: process.env.OPENCODE_NON_INTERACTIVE,
     }
@@ -252,6 +253,7 @@ describe("non-interactive-env hook", () => {
 
     test("#given Windows with PowerShell env #when bash tool git command executes #then uses powershell syntax", async () => {
       delete process.env.SHELL
+      delete process.env.MSYSTEM
       process.env.PSModulePath = "C:\\Program Files\\PowerShell\\Modules"
       Object.defineProperty(process, "platform", { value: "win32" })
 
@@ -276,6 +278,7 @@ describe("non-interactive-env hook", () => {
     test("#given Windows without SHELL env #when bash tool git command executes #then uses cmd syntax", async () => {
       delete process.env.PSModulePath
       delete process.env.SHELL
+      delete process.env.MSYSTEM
       Object.defineProperty(process, "platform", { value: "win32" })
 
       const hook = createNonInteractiveEnvHook(mockCtx)
@@ -296,8 +299,7 @@ describe("non-interactive-env hook", () => {
       expect(cmd).not.toContain("export ")
     })
 
-    test("#given Windows Git Bash environment #when git command executes #then uses detected shell syntax", async () => {
-      // Git Bash sets SHELL env var — detectShellType respects this
+    test("#given Windows Git Bash environment with SHELL #when git command executes #then uses unix syntax", async () => {
       delete process.env.PSModulePath
       process.env.SHELL = "/usr/bin/bash"
       Object.defineProperty(process, "platform", { value: "win32" })
@@ -313,14 +315,37 @@ describe("non-interactive-env hook", () => {
       )
 
       const cmd = output.args.command as string
-      // Verify env prefix is applied (exact syntax depends on detected shell)
-      expect(cmd).toContain("git status")
-      expect(cmd.length).toBeGreaterThan("git status".length)
+      expect(cmd).toStartWith("export ")
+      expect(cmd).toContain("; git status")
+      expect(cmd).not.toContain("$env:")
+    })
+
+    test("#given Windows Git Bash via MSYSTEM without SHELL #when git command executes #then uses unix syntax", async () => {
+      delete process.env.SHELL
+      process.env.MSYSTEM = "MINGW64"
+      process.env.PSModulePath = "C:\\Program Files\\PowerShell\\Modules"
+      Object.defineProperty(process, "platform", { value: "win32" })
+
+      const hook = createNonInteractiveEnvHook(mockCtx)
+      const output: { args: Record<string, unknown>; message?: string } = {
+        args: { command: "git status" },
+      }
+
+      await hook["tool.execute.before"](
+        { tool: "bash", sessionID: "test", callID: "1" },
+        output
+      )
+
+      const cmd = output.args.command as string
+      expect(cmd).toStartWith("export ")
+      expect(cmd).toContain("; git status")
+      expect(cmd).not.toContain("$env:")
     })
 
     test("#given Windows platform #when chained git commands via bash tool #then uses cmd syntax", async () => {
       delete process.env.PSModulePath
       delete process.env.SHELL
+      delete process.env.MSYSTEM
       Object.defineProperty(process, "platform", { value: "win32" })
 
       const hook = createNonInteractiveEnvHook(mockCtx)
@@ -366,6 +391,7 @@ describe("non-interactive-env hook", () => {
     test("#given PSModulePath set on non-Windows #when git command executes #then uses powershell syntax", async () => {
       // PowerShell detection via PSModulePath should work regardless of platform
       delete process.env.SHELL
+      delete process.env.MSYSTEM
       process.env.PSModulePath = "C:\\Program Files\\PowerShell\\Modules"
       Object.defineProperty(process, "platform", { value: "linux" })
 
@@ -389,6 +415,7 @@ describe("non-interactive-env hook", () => {
       // Platform fallback: win32 without env hints should use cmd
       delete process.env.SHELL
       delete process.env.PSModulePath
+      delete process.env.MSYSTEM
       Object.defineProperty(process, "platform", { value: "win32" })
 
       const hook = createNonInteractiveEnvHook(mockCtx)

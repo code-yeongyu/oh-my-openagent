@@ -72,8 +72,6 @@ import {
 } from "./loop-detector"
 import {
   createSubagentDepthLimitError,
-  createSubagentDescendantLimitError,
-  getMaxRootSessionSpawnBudget,
   getMaxSubagentDepth,
   resolveSubagentSpawnContext,
   type SubagentSpawnContext,
@@ -215,16 +213,6 @@ export class BackgroundManager {
         maxDepth,
         parentSessionID,
         rootSessionID: spawnContext.rootSessionID,
-      })
-    }
-
-    const maxRootSessionSpawnBudget = getMaxRootSessionSpawnBudget(this.config)
-    const descendantCount = this.rootDescendantCounts.get(spawnContext.rootSessionID) ?? 0
-    if (descendantCount >= maxRootSessionSpawnBudget) {
-      throw createSubagentDescendantLimitError({
-        rootSessionID: spawnContext.rootSessionID,
-        descendantCount,
-        maxDescendants: maxRootSessionSpawnBudget,
       })
     }
 

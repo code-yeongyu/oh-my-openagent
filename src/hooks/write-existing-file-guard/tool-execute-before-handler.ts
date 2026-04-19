@@ -90,10 +90,10 @@ export async function handleWriteExistingFileGuardToolExecuteBefore(params: {
   output: { args?: unknown }
   readPermissionsBySession: Map<string, Set<string>>
   sessionLastAccess: Map<string, number>
-  canonicalSessionRoot: string
+  getCanonicalSessionRoot: () => string
   maxTrackedSessions: number
 }): Promise<void> {
-  const { ctx, input, output, readPermissionsBySession, sessionLastAccess, canonicalSessionRoot, maxTrackedSessions } = params
+  const { ctx, input, output, readPermissionsBySession, sessionLastAccess, getCanonicalSessionRoot, maxTrackedSessions } = params
   const toolName = input.tool?.toLowerCase()
   if (toolName !== "write" && toolName !== "read") {
     return
@@ -107,6 +107,7 @@ export async function handleWriteExistingFileGuardToolExecuteBefore(params: {
   }
 
   const resolvedPath = resolveInputPath(ctx, filePath)
+  const canonicalSessionRoot = getCanonicalSessionRoot()
   const canonicalPath = toCanonicalPath(resolvedPath)
   if (!isPathInsideDirectory(canonicalPath, canonicalSessionRoot)) {
     return
