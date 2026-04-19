@@ -68,13 +68,13 @@ function wrapNodeProcess(proc: ChildProcess): SpawnedProcess {
 
 export function spawnWithWindowsHide(command: string[], options: SpawnOptions): SpawnedProcess {
   if (process.platform !== "win32") {
-    return bunSpawn(command, options)
+    return bunSpawn(command, { ...options, env: options.env ?? process.env })
   }
 
   const [cmd, ...args] = command
   const proc = nodeSpawn(cmd, args, {
     cwd: options.cwd,
-    env: options.env,
+    env: options.env ?? process.env,
     stdio: [options.stdin ?? "pipe", options.stdout ?? "pipe", options.stderr ?? "pipe"],
     windowsHide: true,
     shell: true,
