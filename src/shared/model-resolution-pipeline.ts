@@ -4,6 +4,22 @@ import { fuzzyMatchModel } from "./model-availability"
 import type { FallbackEntry } from "./model-requirements"
 import { transformModelForProvider } from "./provider-model-id-transform"
 import { normalizeModel } from "./model-normalization"
+import { parseVariantFromModelID } from "./model-string-parser"
+
+/**
+ * Strip :cloud tag from ollama-cloud model IDs so they match OpenCode's
+ * provider model map (keyed by bare IDs like "glm-5.1").
+ * transformModelForProvider re-appends :cloud at API call time.
+ */
+function sanitizeModelIdentity(model: string): string {
+  const slashIndex = model.indexOf("/")
+  if (slashIndex === -1) return model
+  const providerID = model.slice(0, slashIndex)
+  if (providerID !== "ollama-cloud") return model
+  const rawModelID = model.slice(slashIndex + 1)
+  if (!rawModelID.endsWith(":cloud")) return model
+  return `${providerID}/${rawModelID.slice(0, -6)}`
+}
 
 export type ModelResolutionRequest = {
   intent?: {
@@ -49,13 +65,13 @@ export function resolveModelPipeline(
   const normalizedUiModel = normalizeModel(intent?.uiSelectedModel)
   if (normalizedUiModel) {
     log("Model resolved via UI selection", { model: normalizedUiModel })
-    return { model: normalizedUiModel, provenance: "override" }
+    return { model: sanitizeModelIdentity(normalizedUiModel), provenance: "override" }
   }
 
   const normalizedUserModel = normalizeModel(intent?.userModel)
   if (normalizedUserModel) {
     log("Model resolved via config override", { model: normalizedUserModel })
-    return { model: normalizedUserModel, provenance: "override" }
+    return { model: sanitizeModelIdentity(normalizedUserModel), provenance: "override" }
   }
 
   const normalizedCategoryDefault = normalizeModel(intent?.categoryDefaultModel)
@@ -70,7 +86,7 @@ export function resolveModelPipeline(
           original: normalizedCategoryDefault,
           matched: match,
         })
-        return { model: match, provenance: "category-default", attempted }
+        return { model: sanitizeModelIdentity(match), provenance: "category-default", attempted }
       }
     } else {
       const connectedProviders = constraints.connectedProviders ?? connectedProvidersCache.readConnectedProvidersCache()
@@ -78,14 +94,14 @@ export function resolveModelPipeline(
         log("Model resolved via category default (no cache, first run)", {
           model: normalizedCategoryDefault,
         })
-        return { model: normalizedCategoryDefault, provenance: "category-default", attempted }
+        return { model: sanitizeModelIdentity(normalizedCategoryDefault), provenance: "category-default", attempted }
       }
       const parts = normalizedCategoryDefault.split("/")
       if (parts.length >= 2) {
         const provider = parts[0]
         if (connectedProviders.includes(provider)) {
           const modelName = parts.slice(1).join("/")
-          const transformedModel = `${provider}/${transformModelForProvider(provider, modelName)}`
+          const transformedModel = sanitizeModelIdentity(`${provider}/${transformModelForProvider(provider, modelName)}`)
           log("Model resolved via category default (connected provider)", {
             model: transformedModel,
             original: normalizedCategoryDefault,
@@ -99,7 +115,6 @@ export function resolveModelPipeline(
     })
   }
 
-  //#when - user configured fallback_models, try them before hardcoded fallback chain
   const userFallbackModels = intent?.userFallbackModels
   if (userFallbackModels && userFallbackModels.length > 0) {
     if (availableModels.size === 0) {
@@ -114,7 +129,7 @@ export function resolveModelPipeline(
             const provider = parts[0]
             if (connectedSet.has(provider)) {
               const modelName = parts.slice(1).join("/")
-              const transformedModel = `${provider}/${transformModelForProvider(provider, modelName)}`
+              const transformedModel = sanitizeModelIdentity(`${provider}/${transformModelForProvider(provider, modelName)}`)
               log("Model resolved via user fallback_models (connected provider)", { model: transformedModel, original: model })
               return { model: transformedModel, provenance: "provider-fallback", attempted }
             }
@@ -130,7 +145,7 @@ export function resolveModelPipeline(
         const match = fuzzyMatchModel(model, availableModels, providerHint)
         if (match) {
           log("Model resolved via user fallback_models (availability confirmed)", { model: model, match })
-          return { model: match, provenance: "provider-fallback", attempted }
+          return { model: sanitizeModelIdentity(match), provenance: "provider-fallback", attempted }
         }
       }
       log("No available model found in user fallback_models, falling through to hardcoded chain")
@@ -149,7 +164,7 @@ export function resolveModelPipeline(
           for (const provider of entry.providers) {
             if (connectedSet.has(provider)) {
               const transformedModelId = transformModelForProvider(provider, entry.model)
-              const model = `${provider}/${transformedModelId}`
+              const model = sanitizeModelIdentity(`${provider}/${transformedModelId}`)
               log("Model resolved via fallback chain (connected provider)", {
                 provider,
                 model: transformedModelId,
@@ -179,7 +194,7 @@ export function resolveModelPipeline(
               variant: entry.variant,
             })
             return {
-              model: match,
+              model: sanitizeModelIdentity(match),
               provenance: "provider-fallback",
               variant: entry.variant,
               attempted,
@@ -195,7 +210,7 @@ export function resolveModelPipeline(
             variant: entry.variant,
           })
           return {
-            model: crossProviderMatch,
+            model: sanitizeModelIdentity(crossProviderMatch),
             provenance: "provider-fallback",
             variant: entry.variant,
             attempted,
@@ -212,5 +227,5 @@ export function resolveModelPipeline(
   }
 
   log("Model resolved via system default", { model: systemDefaultModel })
-  return { model: systemDefaultModel, provenance: "system-default", attempted }
+  return { model: sanitizeModelIdentity(systemDefaultModel), provenance: "system-default", attempted }
 }
