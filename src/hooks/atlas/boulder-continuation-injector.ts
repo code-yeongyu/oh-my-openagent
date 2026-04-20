@@ -5,6 +5,7 @@ import {
   resolveRegisteredAgentName,
 } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
+import { stripAgentListSortPrefix } from "../../shared/agent-display-names"
 import { createInternalAgentTextPart, resolveInheritedPromptTools } from "../../shared"
 import { HOOK_NAME } from "./hook-name"
 import { BOULDER_CONTINUATION_PROMPT } from "./system-reminder-templates"
@@ -84,7 +85,7 @@ export async function injectBoulderContinuation(input: {
     await ctx.client.session.promptAsync({
       path: { id: sessionID },
       body: {
-        agent: continuationAgent,
+        agent: stripAgentListSortPrefix(continuationAgent),
         ...(launchModel ? { model: launchModel } : {}),
         ...(launchVariant ? { variant: launchVariant } : {}),
         ...(inheritedTools ? { tools: inheritedTools } : {}),

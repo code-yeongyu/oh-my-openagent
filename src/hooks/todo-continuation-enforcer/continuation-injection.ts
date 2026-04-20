@@ -20,6 +20,7 @@ import { isSqliteBackend } from "../../shared/opencode-storage-detection"
 import {
   getAgentConfigKey,
   normalizeAgentForPromptKey,
+  stripAgentListSortPrefix,
 } from "../../shared/agent-display-names"
 
 import {
@@ -184,10 +185,11 @@ ${todoList}`
       : undefined
     const launchVariant = model?.variant
 
+    const resolvedAgent = launchAgent ?? promptAgent
     await ctx.client.session.promptAsync({
       path: { id: sessionID },
       body: {
-        agent: launchAgent ?? promptAgent,
+        agent: resolvedAgent ? stripAgentListSortPrefix(resolvedAgent) : undefined,
         ...(launchModel ? { model: launchModel } : {}),
         ...(launchVariant ? { variant: launchVariant } : {}),
         ...(inheritedTools ? { tools: inheritedTools } : {}),
