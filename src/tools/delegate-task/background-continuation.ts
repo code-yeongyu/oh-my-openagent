@@ -11,7 +11,8 @@ export async function executeBackgroundContinuation(
   args: DelegateTaskArgs,
   ctx: ToolContextWithMetadata,
   executorCtx: ExecutorContext,
-  parentContext: ParentContext
+  parentContext: ParentContext,
+  systemContent?: string
 ): Promise<string> {
   const { manager } = executorCtx
   const taskID = getTaskID(args)
@@ -21,9 +22,13 @@ export async function executeBackgroundContinuation(
       throw new Error("task_id is required to continue a background task")
     }
 
+    const effectivePrompt = systemContent
+      ? `${systemContent}\n\n${args.prompt}`
+      : args.prompt
+
     const task = await manager.resume({
       sessionId: taskID,
-      prompt: args.prompt,
+      prompt: effectivePrompt,
       parentSessionID: parentContext.sessionID,
       parentMessageID: parentContext.messageID,
       parentModel: parentContext.model,
@@ -70,12 +75,12 @@ ${buildTaskMetadataBlock({
       taskId: sessionId,
       backgroundTaskId,
       agent: task.agent,
+      category: task.category,
     })}`
   } catch (error) {
     return formatDetailedError(error, {
       operation: "Continue background task",
       args,
-      category: task.category,
       sessionID: taskID,
     })
   }

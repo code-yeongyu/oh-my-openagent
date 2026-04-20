@@ -20,7 +20,8 @@ export async function executeSyncContinuation(
   ctx: ToolContextWithMetadata,
   executorCtx: ExecutorContext,
   parentContext: ParentContext,
-  deps: SyncContinuationDeps = syncContinuationDeps
+  deps: SyncContinuationDeps = syncContinuationDeps,
+  systemContent?: string
 ): Promise<string> {
   const { client, syncPollTimeoutMs, sisyphusAgentConfig } = executorCtx
   const toastManager = getTaskToastManager()
@@ -73,11 +74,11 @@ export async function executeSyncContinuation(
       resumeVariant = resumeMessageModel?.variant
     }
 
-    const syncContMeta = {
     const resumeModelForMetadata = resumeModel && resumeVariant !== undefined
       ? { ...resumeModel, variant: resumeVariant }
       : resumeModel
 
+    const syncContMeta = {
       title: `Continue: ${args.description}`,
       metadata: {
         prompt: args.prompt,
@@ -113,6 +114,7 @@ export async function executeSyncContinuation(
         ...(resumeAgent !== undefined ? { agent: resumeAgent } : {}),
         ...(resumeModel !== undefined ? { model: resumeModel } : {}),
         ...(resumeVariant !== undefined ? { variant: resumeVariant } : {}),
+        system: systemContent,
         tools,
         parts: [{ type: "text", text: effectivePrompt }],
       },
@@ -154,9 +156,9 @@ ${buildTaskMetadataBlock({
         sessionId: continuationID,
         taskId: continuationID,
         agent: resumeAgent,
+        category: args.category,
       })}`
    } finally {
-        category: args.category,
      if (toastManager) {
        toastManager.removeTask(taskId)
      }
