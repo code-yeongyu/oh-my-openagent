@@ -1008,6 +1008,34 @@ describe("OhMyOpenCodeConfigSchema - git_master defaults (#2040)", () => {
   })
 })
 
+describe("SisyphusAgent preserve_native_agents", () => {
+  test("accepts build and plan entries", () => {
+    const result = OhMyOpenCodeConfigSchema.safeParse({
+      sisyphus_agent: {
+        preserve_native_agents: ["build", "plan"],
+      },
+    })
+
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.sisyphus_agent?.preserve_native_agents).toEqual([
+        "build",
+        "plan",
+      ])
+    }
+  })
+
+  test("rejects unsupported preserve_native_agents values", () => {
+    const result = OhMyOpenCodeConfigSchema.safeParse({
+      sisyphus_agent: {
+        preserve_native_agents: ["oracle"],
+      },
+    })
+
+    expect(result.success).toBe(false)
+  })
+})
+
 describe("skills schema", () => {
   test("accepts skills.sources configuration", () => {
     //#given
