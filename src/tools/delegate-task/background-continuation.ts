@@ -35,7 +35,7 @@ export async function executeBackgroundContinuation(
     const resolvedModel = resolveMetadataModel(task.model, parentContext.model)
 
     const bgContMeta = {
-      title: `Continue: ${task.description}`,
+      title: `Continue: ${args.description}`,
       metadata: {
         prompt: args.prompt,
         agent: task.agent,
