@@ -74,6 +74,10 @@ export async function executeSyncContinuation(
     }
 
     const syncContMeta = {
+    const resumeModelForMetadata = resumeModel && resumeVariant !== undefined
+      ? { ...resumeModel, variant: resumeVariant }
+      : resumeModel
+
       title: `Continue: ${args.description}`,
       metadata: {
         prompt: args.prompt,
@@ -87,7 +91,7 @@ export async function executeSyncContinuation(
         sessionId: continuationID,
         sync: true,
         command: args.command,
-        model: resolveMetadataModel(resumeModel, parentContext.model),
+        model: resolveMetadataModel(resumeModelForMetadata, parentContext.model),
       },
     }
     await publishToolMetadata(ctx, syncContMeta)
