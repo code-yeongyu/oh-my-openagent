@@ -12,7 +12,6 @@ import {
 } from "../../features/boulder-state"
 import { log } from "../../shared/logger"
 import {
-  isAgentRegistered,
   resolveRegisteredAgentName,
   updateSessionAgent,
 } from "../../features/claude-code-session-state"
@@ -20,6 +19,7 @@ import { detectWorktreePath } from "./worktree-detector"
 import { parseUserRequest } from "./parse-user-request"
 import { buildStartWorkContextInfo } from "./context-info-builder"
 import { createWorktreeActiveBlock } from "./worktree-block"
+import { resolveStartWorkAgent } from "./resolve-start-work-agent"
 
 export const HOOK_NAME = "start-work" as const
 const START_WORK_TEMPLATE_MARKER = "You are starting a Sisyphus work session."
@@ -79,9 +79,7 @@ export function createStartWorkHook(ctx: PluginInput) {
     }
 
     log(`[${HOOK_NAME}] Processing start-work command`, { sessionID: input.sessionID })
-    const activeAgent = isAgentRegistered("atlas")
-      ? "atlas"
-      : "sisyphus"
+    const activeAgent = await resolveStartWorkAgent(ctx, input.sessionID)
     updateSessionAgent(input.sessionID, activeAgent)
     if (output.message) {
       output.message["agent"] = resolveRegisteredAgentName(activeAgent) ?? activeAgent
