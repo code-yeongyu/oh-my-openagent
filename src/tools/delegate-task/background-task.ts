@@ -12,6 +12,18 @@ import { stripAgentListSortPrefix } from "../../shared/agent-display-names"
 import { buildTaskMetadataBlock } from "../../features/tool-metadata-store/task-metadata-contract"
 import { resolveMetadataModel } from "./resolve-metadata-model"
 
+function registerBackgroundSessionContext(args: {
+  sessionId: string
+  fallbackChain?: FallbackEntry[]
+  category?: string
+  modelFallbackControllerAccessor?: ExecutorContext["modelFallbackControllerAccessor"]
+}): void {
+  args.modelFallbackControllerAccessor?.setSessionFallbackChain(args.sessionId, args.fallbackChain)
+  if (args.category) {
+    SessionCategoryRegistry.register(args.sessionId, args.category)
+  }
+}
+
 function continueSessionSetup(args: {
   taskID: string
   manager: ExecutorContext["manager"]
@@ -41,13 +53,48 @@ function continueSessionSetup(args: {
         continue
       }
 
-      args.modelFallbackControllerAccessor?.setSessionFallbackChain(sessionId, args.fallbackChain)
-      if (args.category) {
-        SessionCategoryRegistry.register(sessionId, args.category)
-      }
+      registerBackgroundSessionContext({
+        sessionId,
+        fallbackChain: args.fallbackChain,
+        category: args.category,
+        modelFallbackControllerAccessor: args.modelFallbackControllerAccessor,
+      })
       return
     }
   })()
+}
+
+async function waitForBackgroundSessionStart(args: {
+  taskId: string
+  initialSessionId?: string
+  manager: ExecutorContext["manager"]
+  timing: ReturnType<typeof getTimingConfig>
+  abortSignal?: AbortSignal
+  onAbort: () => void
+}): Promise<string | undefined> {
+  const waitStart = Date.now()
+  let sessionId = args.initialSessionId
+
+  while (!sessionId && Date.now() - waitStart < args.timing.WAIT_FOR_SESSION_TIMEOUT_MS) {
+    const updated = args.manager.getTask(args.taskId)
+    if (updated?.status === "error" || updated?.status === "cancelled" || updated?.status === "interrupt") {
+      return undefined
+    }
+
+    sessionId = updated?.sessionID
+    if (sessionId) {
+      return sessionId
+    }
+
+    if (args.abortSignal?.aborted) {
+      args.onAbort()
+      return undefined
+    }
+
+    await new Promise(resolve => setTimeout(resolve, args.timing.WAIT_FOR_SESSION_INTERVAL_MS))
+  }
+
+  return sessionId
 }
 
 export async function executeBackgroundTask(
@@ -88,18 +135,13 @@ export async function executeBackgroundTask(
     // BackgroundManager.launch() returns immediately (pending) before the session exists,
     // so we must wait briefly for the session to be created to set metadata correctly.
     const timing = getTimingConfig()
-    const waitStart = Date.now()
-    let sessionId = task.sessionID
-    while (!sessionId && Date.now() - waitStart < timing.WAIT_FOR_SESSION_TIMEOUT_MS) {
-      const updated = manager.getTask(task.id)
-      if (updated?.status === "error" || updated?.status === "cancelled" || updated?.status === "interrupt") {
-        return `Task failed to start (status: ${updated.status}).\n\nTask ID: ${task.id}`
-      }
-      sessionId = updated?.sessionID
-      if (sessionId) {
-        break
-      }
-      if (ctx.abort?.aborted) {
+    let sessionId = await waitForBackgroundSessionStart({
+      taskId: task.id,
+      initialSessionId: task.sessionID,
+      manager,
+      timing,
+      abortSignal: ctx.abort,
+      onAbort: () => {
         continueSessionSetup({
           taskID: task.id,
           manager,
@@ -108,16 +150,23 @@ export async function executeBackgroundTask(
           category: args.category,
           modelFallbackControllerAccessor: executorCtx.modelFallbackControllerAccessor,
         })
-        break
-      }
-      await new Promise(resolve => setTimeout(resolve, timing.WAIT_FOR_SESSION_INTERVAL_MS))
+      },
+    })
+
+    const updatedTask = typeof manager.getTask === "function"
+      ? manager.getTask(task.id)
+      : undefined
+    if (!sessionId && (updatedTask?.status === "error" || updatedTask?.status === "cancelled" || updatedTask?.status === "interrupt")) {
+      return `Task failed to start (status: ${updatedTask.status}).\n\nTask ID: ${task.id}`
     }
 
     if (sessionId) {
-      executorCtx.modelFallbackControllerAccessor?.setSessionFallbackChain(sessionId, fallbackChain)
-      if (args.category) {
-        SessionCategoryRegistry.register(sessionId, args.category)
-      }
+      registerBackgroundSessionContext({
+        sessionId,
+        fallbackChain,
+        category: args.category,
+        modelFallbackControllerAccessor: executorCtx.modelFallbackControllerAccessor,
+      })
     }
 
     const resolvedModel = resolveMetadataModel(categoryModel, parentContext.model)
