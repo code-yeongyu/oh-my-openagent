@@ -60,6 +60,7 @@ export async function prepareDelegateTaskArgs(args: Record<string, unknown>, ctx
 
   args.category = category
   args.subagent_type = subagentType
+  args.requested_subagent_type = originalSubagentType
   args.description = description
   args.prompt = prompt
   args.run_in_background = runInBackground
@@ -70,6 +71,7 @@ export async function prepareDelegateTaskArgs(args: Record<string, unknown>, ctx
   return {
     category,
     subagent_type: subagentType,
+    requested_subagent_type: originalSubagentType,
     description,
     prompt,
     run_in_background: runInBackground === true,
