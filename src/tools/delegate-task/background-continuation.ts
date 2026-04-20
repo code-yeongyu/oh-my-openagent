@@ -36,6 +36,7 @@ export async function executeBackgroundContinuation(
       metadata: {
         prompt: args.prompt,
         agent: task.agent,
+        ...(task.category !== undefined ? { category: task.category } : {}),
         load_skills: args.load_skills,
         description: args.description,
         run_in_background: args.run_in_background,
