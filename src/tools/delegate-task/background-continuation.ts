@@ -75,6 +75,7 @@ ${buildTaskMetadataBlock({
     return formatDetailedError(error, {
       operation: "Continue background task",
       args,
+      category: task.category,
       sessionID: taskID,
     })
   }

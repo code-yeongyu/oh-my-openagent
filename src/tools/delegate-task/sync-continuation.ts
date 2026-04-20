@@ -156,6 +156,7 @@ ${buildTaskMetadataBlock({
         agent: resumeAgent,
       })}`
    } finally {
+        category: args.category,
      if (toastManager) {
        toastManager.removeTask(taskId)
      }
