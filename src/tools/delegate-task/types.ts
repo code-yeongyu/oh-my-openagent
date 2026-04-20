@@ -19,10 +19,6 @@ export interface DelegateTaskArgs {
   task_id?: string
   command?: string
   load_skills: string[]
-  execute?: {
-    task_id: string
-    task_dir?: string
-  }
 }
 
 export interface ToolContextWithMetadata {
