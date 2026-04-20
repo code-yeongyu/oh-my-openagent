@@ -4,46 +4,16 @@ import { fuzzyMatchModel } from "../../shared/model-availability"
 import { transformModelForProvider } from "../../shared/provider-model-id-transform"
 import { hasConnectedProvidersCache, hasProviderModelsCache, readConnectedProvidersCache } from "../../shared/connected-providers-cache"
 import { log } from "../../shared/logger"
-import { parseModelString, parseVariantFromModelID } from "../../shared/model-string-parser"
-
-function isExplicitHighModel(model: string): boolean {
-  return /(?:^|\/)[^/]+-high$/.test(model)
-}
-
-function getExplicitHighBaseModel(model: string): string | null {
-  return isExplicitHighModel(model) ? model.replace(/-high$/, "") : null
-}
-
-function parseUserFallbackModel(fallbackModel: string): {
-  baseModel: string
-  providerHint?: string[]
-  variant?: string
-} | undefined {
-  const normalizedFallback = normalizeModel(fallbackModel)
-  if (!normalizedFallback) {
-    return undefined
-  }
-
-  const parsedFullModel = parseModelString(normalizedFallback)
-  if (parsedFullModel) {
-    return {
-      baseModel: `${parsedFullModel.providerID}/${parsedFullModel.modelID}`,
-      providerHint: [parsedFullModel.providerID],
-      variant: parsedFullModel.variant,
-    }
-  }
-
-  const parsedModel = parseVariantFromModelID(normalizedFallback)
-  if (!parsedModel.modelID) {
-    return undefined
-  }
-
-  return {
-    baseModel: parsedModel.modelID,
-    variant: parsedModel.variant,
-  }
-}
-
+import {
+  getFallbackChainForFreeOnlyProviders,
+  getFreeOnlyCategoryDefaultModel,
+  isFreeOnlyProviderConfiguration,
+} from "./free-model-fallback"
+import {
+  getExplicitHighBaseModel,
+  isExplicitHighModel,
+  parseUserFallbackModel,
+} from "./model-selection-input"
 
 export function resolveModelForDelegateTask(input: {
   userModel?: string
@@ -63,15 +33,18 @@ export function resolveModelForDelegateTask(input: {
     return { model: userModel }
   }
 
-  const connectedProviders = input.availableModels.size === 0 ? readConnectedProvidersCache() : null
+  const connectedProviders = readConnectedProvidersCache()
+  const freeOnlyProviderConfiguration = isFreeOnlyProviderConfiguration(connectedProviders)
 
-  // Before provider cache is created (first run), skip model resolution entirely.
-  // OpenCode will use its system default model when no model is specified in the prompt.
   if (input.availableModels.size === 0 && !hasProviderModelsCache() && !hasConnectedProvidersCache()) {
     return { skipped: true }
   }
 
-  const categoryDefault = normalizeModel(input.categoryDefaultModel)
+  const categoryDefault = normalizeModel(getFreeOnlyCategoryDefaultModel({
+    categoryDefaultModel: input.categoryDefaultModel,
+    isUserConfiguredCategoryModel: input.isUserConfiguredCategoryModel,
+    freeOnlyProviderConfiguration,
+  }))
   const explicitHighBaseModel = categoryDefault ? getExplicitHighBaseModel(categoryDefault) : null
   const explicitHighModel = explicitHighBaseModel ? categoryDefault : undefined
   if (categoryDefault) {
@@ -140,7 +113,10 @@ export function resolveModelForDelegateTask(input: {
     }
   }
 
-  const fallbackChain = input.fallbackChain
+  const fallbackChain = getFallbackChainForFreeOnlyProviders(
+    input.fallbackChain,
+    freeOnlyProviderConfiguration,
+  )
   if (fallbackChain && fallbackChain.length > 0) {
     if (input.availableModels.size === 0) {
       if (connectedProviders) {
