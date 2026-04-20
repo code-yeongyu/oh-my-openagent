@@ -13,6 +13,7 @@ import {
   builtinTools,
   createBackgroundTools,
   createCallOmoAgent,
+  createContextInfoTool,
   createLookAt,
   createSkillMcpTool,
   createSkillTool,
@@ -41,6 +42,7 @@ type ToolRegistryFactories = {
   builtinTools: typeof builtinTools
   createBackgroundTools: typeof createBackgroundTools
   createCallOmoAgent: typeof createCallOmoAgent
+  createContextInfoTool: typeof createContextInfoTool
   createLookAt: typeof createLookAt
   createSkillMcpTool: typeof createSkillMcpTool
   createSkillTool: typeof createSkillTool
@@ -62,6 +64,7 @@ const defaultToolRegistryFactories: ToolRegistryFactories = {
   builtinTools,
   createBackgroundTools,
   createCallOmoAgent,
+  createContextInfoTool,
   createLookAt,
   createSkillMcpTool,
   createSkillTool,
@@ -98,6 +101,7 @@ const LOW_PRIORITY_TOOL_ORDER = [
   "task_update",
   "background_output",
   "background_cancel",
+  "context_info",
   "edit",
   "ast_grep_replace",
   "ast_grep_search",
@@ -176,6 +180,7 @@ export function createToolRegistry(args: {
   const isMultimodalLookerEnabled = !(pluginConfig.disabled_agents ?? []).some(
     (agent) => agent.toLowerCase() === "multimodal-looker",
   )
+  const contextInfo = factories.createContextInfoTool(ctx)
   const lookAt = isMultimodalLookerEnabled ? factories.createLookAt(ctx) : null
 
   const delegateTask = factories.createDelegateTask({
@@ -269,6 +274,7 @@ export function createToolRegistry(args: {
     ...factories.createSessionManagerTools(ctx),
     ...backgroundTools,
     call_omo_agent: callOmoAgent,
+    context_info: contextInfo,
     ...(lookAt ? { look_at: lookAt } : {}),
     task: delegateTask,
     skill_mcp: skillMcpTool,

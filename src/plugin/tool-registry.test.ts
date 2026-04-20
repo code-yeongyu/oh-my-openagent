@@ -34,6 +34,7 @@ const toolFactories: NonNullable<Parameters<typeof createToolRegistry>[0]["toolF
   builtinTools: { bash: fakeTool, read: fakeTool },
   createBackgroundTools: mock(() => ({})),
   createCallOmoAgent: mock(() => fakeTool),
+  createContextInfoTool: mock(() => fakeTool),
   createLookAt: mock(() => fakeTool),
   createSkillMcpTool: mock(() => fakeTool),
   createSkillTool: mock(() => fakeTool),
@@ -109,6 +110,7 @@ describe("#given task_system configuration", () => {
     })
 
     expect(result.taskSystemEnabled).toBe(false)
+    expect(result.filteredTools).toHaveProperty("context_info")
     expect(result.filteredTools).not.toHaveProperty("task_create")
     expect(result.filteredTools).not.toHaveProperty("task_get")
     expect(result.filteredTools).not.toHaveProperty("task_list")
@@ -139,6 +141,7 @@ describe("#given task_system configuration", () => {
     })
 
     expect(result.taskSystemEnabled).toBe(true)
+    expect(result.filteredTools).toHaveProperty("context_info")
     expect(result.filteredTools).toHaveProperty("task_create")
     expect(result.filteredTools).toHaveProperty("task_get")
     expect(result.filteredTools).toHaveProperty("task_list")
