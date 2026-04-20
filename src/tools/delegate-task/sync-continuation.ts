@@ -76,6 +76,8 @@ export async function executeSyncContinuation(
       title: `Continue: ${args.description}`,
       metadata: {
         prompt: args.prompt,
+        ...(resumeAgent !== undefined ? { agent: resumeAgent } : {}),
+        ...(args.category !== undefined ? { category: args.category } : {}),
         load_skills: args.load_skills,
         description: args.description,
         run_in_background: args.run_in_background,
