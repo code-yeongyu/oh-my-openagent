@@ -228,10 +228,10 @@ describe("todo-continuation-enforcer", () => {
     } as any
   }
 
-  function createMockBackgroundManager(runningTasks: boolean = false): BackgroundManager {
+  function createMockBackgroundManager(taskStatus?: "pending" | "running"): BackgroundManager {
     return {
-      getTasksByParentSession: () => runningTasks
-        ? [{ status: "running" }]
+      getTasksByParentSession: () => taskStatus
+        ? [{ status: taskStatus }]
         : [],
     } as any
   }
@@ -262,7 +262,7 @@ describe("todo-continuation-enforcer", () => {
       const sessionID = "main-lazy-prune"
       setMainSession(sessionID)
       const hook = createTodoContinuationEnforcer(createMockPluginInput(), {
-        backgroundManager: createMockBackgroundManager(true),
+        backgroundManager: createMockBackgroundManager("running"),
       })
 
       // when
@@ -283,7 +283,7 @@ describe("todo-continuation-enforcer", () => {
     setMainSession(sessionID)
 
     const hook = createTodoContinuationEnforcer(createMockPluginInput(), {
-      backgroundManager: createMockBackgroundManager(false),
+      backgroundManager: createMockBackgroundManager(),
     })
 
     // when - session goes idle
@@ -350,24 +350,28 @@ describe("todo-continuation-enforcer", () => {
     expect(promptCalls).toHaveLength(0)
   })
 
-  test("should not inject when background tasks are running", async () => {
-    // given - session with running background tasks
+  test("should not inject when background tasks are active", async () => {
+    // given - session with active background tasks
     const sessionID = "main-789"
     setMainSession(sessionID)
 
-    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {
-      backgroundManager: createMockBackgroundManager(true),
-    })
+    for (const taskStatus of ["pending", "running"] as const) {
+      promptCalls.length = 0
 
-    // when - session goes idle
-    await hook.handler({
-      event: { type: "session.idle", properties: { sessionID } },
-    })
+      const hook = createTodoContinuationEnforcer(createMockPluginInput(), {
+        backgroundManager: createMockBackgroundManager(taskStatus),
+      })
 
-    await fakeTimers.advanceBy(3000)
+      // when - session goes idle
+      await hook.handler({
+        event: { type: "session.idle", properties: { sessionID } },
+      })
 
-    // then - no continuation injected
-    expect(promptCalls).toHaveLength(0)
+      await fakeTimers.advanceBy(3000)
+
+      // then - no continuation injected
+      expect(promptCalls).toHaveLength(0)
+    }
   })
 
   test("should inject for any session with incomplete todos", async () => {
@@ -1544,7 +1548,7 @@ describe("todo-continuation-enforcer", () => {
     setMainSession(sessionID)
 
     const hook = createTodoContinuationEnforcer(createMockPluginInput(), {
-      backgroundManager: createMockBackgroundManager(false),
+      backgroundManager: createMockBackgroundManager(),
     })
 
     // when - session goes idle and continuation is injected

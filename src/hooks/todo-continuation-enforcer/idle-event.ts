@@ -71,11 +71,13 @@ export async function handleSessionIdle(args: {
   }
 
   const hasRunningBgTasks = backgroundManager
-    ? backgroundManager.getTasksByParentSession(sessionID).some((task: { status: string }) => task.status === "running")
+    ? backgroundManager
+      .getTasksByParentSession(sessionID)
+      .some((task: { status: string }) => task.status === "pending" || task.status === "running")
     : false
 
   if (hasRunningBgTasks) {
-    log(`[${HOOK_NAME}] Skipped: background tasks running`, { sessionID })
+    log(`[${HOOK_NAME}] Skipped: background tasks active`, { sessionID })
     return
   }
 
