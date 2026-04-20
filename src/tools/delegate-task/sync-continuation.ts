@@ -15,6 +15,53 @@ import { buildTaskMetadataBlock } from "../../features/tool-metadata-store/task-
 import { getTaskID } from "./task-id"
 import { resolveMetadataModel } from "./resolve-metadata-model"
 
+type ResumeModel = { providerID: string; modelID: string }
+
+type ResumeContext = {
+  resumeAgent?: string
+  resumeModel?: ResumeModel
+  resumeVariant?: string
+  anchorMessageCount?: number
+}
+
+async function resolveResumeContext(
+  client: ExecutorContext["client"],
+  continuationID: string
+): Promise<ResumeContext> {
+  try {
+    const messagesResp = await client.session.messages({ path: { id: continuationID } })
+    const messages = normalizeSDKResponse(messagesResp, [] as SessionMessage[])
+
+    for (let index = messages.length - 1; index >= 0; index--) {
+      const info = messages[index].info
+      if (info?.agent || info?.model || (info?.modelID && info?.providerID)) {
+        return {
+          resumeAgent: info.agent,
+          resumeModel: info.model ?? (info.providerID && info.modelID
+            ? { providerID: info.providerID, modelID: info.modelID }
+            : undefined),
+          resumeVariant: info.variant,
+          anchorMessageCount: messages.length,
+        }
+      }
+    }
+
+    return { anchorMessageCount: messages.length }
+  } catch {
+    const resumeMessageDir = getMessageDir(continuationID)
+    const resumeMessage = resumeMessageDir ? findNearestMessageWithFields(resumeMessageDir) : null
+    const resumeMessageModel = resumeMessage?.model
+
+    return {
+      resumeAgent: resumeMessage?.agent,
+      resumeModel: resumeMessageModel?.providerID && resumeMessageModel.modelID
+        ? { providerID: resumeMessageModel.providerID, modelID: resumeMessageModel.modelID }
+        : undefined,
+      resumeVariant: resumeMessageModel?.variant,
+    }
+  }
+}
+
 export async function executeSyncContinuation(
   args: DelegateTaskArgs,
   ctx: ToolContextWithMetadata,
@@ -42,37 +89,16 @@ export async function executeSyncContinuation(
   }
 
   let resumeAgent: string | undefined
-  let resumeModel: { providerID: string; modelID: string } | undefined
+  let resumeModel: ResumeModel | undefined
   let resumeVariant: string | undefined
   let anchorMessageCount: number | undefined
 
   try {
-    try {
-      const messagesResp = await client.session.messages({ path: { id: continuationID } })
-      const messages = normalizeSDKResponse(messagesResp, [] as SessionMessage[])
-      anchorMessageCount = messages.length
-      for (let i = messages.length - 1; i >= 0; i--) {
-        const info = messages[i].info
-        if (info?.agent || info?.model || (info?.modelID && info?.providerID)) {
-          const fallbackResumeModel = info.providerID && info.modelID
-            ? { providerID: info.providerID, modelID: info.modelID }
-            : undefined
-          resumeAgent = info.agent
-          resumeModel = info.model ?? fallbackResumeModel
-          resumeVariant = info.variant
-          break
-        }
-      }
-    } catch {
-      const resumeMessageDir = getMessageDir(continuationID)
-      const resumeMessage = resumeMessageDir ? findNearestMessageWithFields(resumeMessageDir) : null
-      const resumeMessageModel = resumeMessage?.model
-      resumeAgent = resumeMessage?.agent
-      resumeModel = resumeMessageModel?.providerID && resumeMessageModel.modelID
-        ? { providerID: resumeMessageModel.providerID, modelID: resumeMessageModel.modelID }
-        : undefined
-      resumeVariant = resumeMessageModel?.variant
-    }
+    const resumeContext = await resolveResumeContext(client, continuationID)
+    resumeAgent = resumeContext.resumeAgent
+    resumeModel = resumeContext.resumeModel
+    resumeVariant = resumeContext.resumeVariant
+    anchorMessageCount = resumeContext.anchorMessageCount
 
     const resumeModelForMetadata = resumeModel && resumeVariant !== undefined
       ? { ...resumeModel, variant: resumeVariant }
