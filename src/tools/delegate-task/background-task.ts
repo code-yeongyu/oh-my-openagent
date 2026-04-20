@@ -115,9 +115,9 @@ export async function executeBackgroundTask(
 
     if (sessionId) {
       executorCtx.modelFallbackControllerAccessor?.setSessionFallbackChain(sessionId, fallbackChain)
-    }
-    if (args.category && sessionId) {
-      SessionCategoryRegistry.register(sessionId, args.category)
+      if (args.category) {
+        SessionCategoryRegistry.register(sessionId, args.category)
+      }
     }
 
     const resolvedModel = resolveMetadataModel(categoryModel, parentContext.model)
@@ -130,17 +130,15 @@ export async function executeBackgroundTask(
       description: args.description,
       run_in_background: args.run_in_background,
       command: args.command,
-      ...(sessionId ? { taskId: sessionId } : {}),
+      ...(sessionId ? { taskId: sessionId, sessionId } : {}),
       backgroundTaskId: task.id,
-      ...(sessionId ? { sessionId } : {}),
       ...(resolvedModel ? { model: resolvedModel } : {}),
     }
 
-    const unstableMeta = {
+    await publishToolMetadata(ctx, {
       title: args.description,
       metadata,
-    }
-    await publishToolMetadata(ctx, unstableMeta)
+    })
 
     const taskMetadataBlock = sessionId
       ? `\n\n${buildTaskMetadataBlock({

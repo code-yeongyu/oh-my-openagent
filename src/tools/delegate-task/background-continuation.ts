@@ -14,9 +14,9 @@ export async function executeBackgroundContinuation(
   parentContext: ParentContext
 ): Promise<string> {
   const { manager } = executorCtx
+  const taskID = getTaskID(args)
 
   try {
-    const taskID = getTaskID(args)
     if (!taskID) {
       throw new Error("task_id is required to continue a background task")
     }
@@ -30,6 +30,9 @@ export async function executeBackgroundContinuation(
       parentAgent: parentContext.agent,
       parentTools: getSessionTools(parentContext.sessionID),
     })
+    const sessionId = task.sessionID
+    const backgroundTaskId = task.id
+    const resolvedModel = resolveMetadataModel(task.model, parentContext.model)
 
     const bgContMeta = {
       title: `Continue: ${task.description}`,
@@ -41,38 +44,38 @@ export async function executeBackgroundContinuation(
         load_skills: args.load_skills,
         description: args.description,
         run_in_background: args.run_in_background,
-        taskId: task.sessionID,
-        backgroundTaskId: task.id,
-        sessionId: task.sessionID,
+        taskId: sessionId,
+        backgroundTaskId,
+        sessionId,
         command: args.command,
-        model: resolveMetadataModel(task.model, parentContext.model),
+        model: resolvedModel,
       },
     }
     await publishToolMetadata(ctx, bgContMeta)
 
     return `Background task continued.
 
-Task ID: ${task.id}
+Task ID: ${backgroundTaskId}
 Description: ${task.description}
 Agent: ${task.agent}
 Status: ${task.status}
 
 Agent continues with full previous context preserved.
-System notifies on completion. Use \`background_output\` with task_id="${task.id}" to check.
+System notifies on completion. Use \`background_output\` with task_id="${backgroundTaskId}" to check.
 
 Do NOT call background_output now. Wait for <system-reminder> notification first.
 
 ${buildTaskMetadataBlock({
-      sessionId: task.sessionID,
-      taskId: task.sessionID,
-      backgroundTaskId: task.id,
+      sessionId,
+      taskId: sessionId,
+      backgroundTaskId,
       agent: task.agent,
     })}`
   } catch (error) {
     return formatDetailedError(error, {
       operation: "Continue background task",
       args,
-      sessionID: getTaskID(args),
+      sessionID: taskID,
     })
   }
 }

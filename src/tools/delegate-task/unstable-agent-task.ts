@@ -87,6 +87,14 @@ export async function executeUnstableAgentTask(
     }
     await publishToolMetadata(ctx, bgTaskMeta)
 
+    const taskMetadataBlock = buildTaskMetadataBlock({
+      sessionId: sessionID,
+      taskId: sessionID,
+      backgroundTaskId: task.id,
+      agent: agentToUse,
+      category: args.category,
+    })
+
     const startTime = new Date()
     const timingCfg = getTimingConfig()
     const pollStart = Date.now()
@@ -152,13 +160,7 @@ Model: ${actualModel}
 
 The task session may contain partial results.
 
-${buildTaskMetadataBlock({
-        sessionId: sessionID,
-        taskId: sessionID,
-        backgroundTaskId: task.id,
-        agent: agentToUse,
-        category: args.category,
-      })}`
+${taskMetadataBlock}`
     }
 
     if (!completedDuringMonitoring) {
@@ -176,13 +178,7 @@ Model: ${actualModel}
 
 The task session may still contain partial results.
 
-${buildTaskMetadataBlock({
-        sessionId: sessionID,
-        taskId: sessionID,
-        backgroundTaskId: task.id,
-        agent: agentToUse,
-        category: args.category,
-      })}`
+${taskMetadataBlock}`
     }
 
     const messagesResult = await client.session.messages({ path: { id: sessionID } })
@@ -193,9 +189,8 @@ ${buildTaskMetadataBlock({
     const assistantMessages = messages
       .filter((m) => m.info?.role === "assistant")
       .sort((a, b) => (b.info?.time?.created ?? 0) - (a.info?.time?.created ?? 0))
-    const lastMessage = assistantMessages[0]
 
-    if (!lastMessage) {
+    if (assistantMessages.length === 0) {
       return `No assistant response found (task ran in background mode).\n\nSession ID: ${sessionID}`
     }
 
@@ -230,13 +225,7 @@ RESULT:
 
 ${textContent || "(No text output)"}
 
-${buildTaskMetadataBlock({
-      sessionId: sessionID,
-      taskId: sessionID,
-      backgroundTaskId: task.id,
-      agent: agentToUse,
-      category: args.category,
-    })}`
+${taskMetadataBlock}`
   } catch (error) {
     if (!cleanupReason) {
       cleanupReason = "exception"

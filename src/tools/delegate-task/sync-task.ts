@@ -88,13 +88,15 @@ export async function executeSyncTask(
 
     if (onSyncSessionCreated) {
       log("[task] Invoking onSyncSessionCreated callback", { sessionID, parentID: parentContext.sessionID })
-      await onSyncSessionCreated({
-        sessionID,
-        parentID: parentContext.sessionID,
-        title: args.description,
-      }).catch((err) => {
-      log("[task] onSyncSessionCreated callback failed", { error: String(err) })
-      })
+      try {
+        await onSyncSessionCreated({
+          sessionID,
+          parentID: parentContext.sessionID,
+          title: args.description,
+        })
+      } catch (error) {
+        log("[task] onSyncSessionCreated callback failed", { error: String(error) })
+      }
       await new Promise(r => setTimeout(r, 200))
     }
 
@@ -134,16 +136,20 @@ export async function executeSyncTask(
     }
     await publishToolMetadata(ctx, syncTaskMeta)
 
-    let effectiveCategoryModel = categoryModel
-    let promptError = await deps.sendSyncPrompt(client, {
+    const syncPromptInput = {
       sessionID,
       agentToUse,
       args,
       systemContent,
-      categoryModel: effectiveCategoryModel,
       toastManager,
       taskId,
       sisyphusAgentConfig: executorCtx.sisyphusAgentConfig,
+    }
+
+    let effectiveCategoryModel = categoryModel
+    let promptError = await deps.sendSyncPrompt(client, {
+      ...syncPromptInput,
+      categoryModel: effectiveCategoryModel,
     })
     if (promptError) {
       const promptResult = await retrySyncPromptWithFallbacks({
@@ -153,14 +159,8 @@ export async function executeSyncTask(
         fallbackChain,
         sendPrompt: async (fallbackModel) => {
           return deps.sendSyncPrompt(client, {
-            sessionID,
-            agentToUse,
-            args,
-            systemContent,
+            ...syncPromptInput,
             categoryModel: fallbackModel,
-            toastManager,
-            taskId,
-            sisyphusAgentConfig: executorCtx.sisyphusAgentConfig,
           })
         },
       })
@@ -198,12 +198,12 @@ export async function executeSyncTask(
       const parentModelStr = parentContext.model
         ? `${parentContext.model.providerID}/${parentContext.model.modelID}`
         : undefined
-      const modelRoutingNote =
-        actualModelStr && parentModelStr && actualModelStr !== parentModelStr
-          ? `\n⚠️  Model routing: parent used ${parentModelStr}, this subagent used ${actualModelStr} (via category: ${args.category ?? "unknown"})`
-          : actualModelStr
-            ? `\nModel: ${actualModelStr}${args.category ? ` (category: ${args.category})` : ""}`
-            : ""
+      let modelRoutingNote = ""
+      if (actualModelStr && parentModelStr && actualModelStr !== parentModelStr) {
+        modelRoutingNote = `\n⚠️  Model routing: parent used ${parentModelStr}, this subagent used ${actualModelStr} (via category: ${args.category ?? "unknown"})`
+      } else if (actualModelStr) {
+        modelRoutingNote = `\nModel: ${actualModelStr}${args.category ? ` (category: ${args.category})` : ""}`
+      }
 
       return `Task completed in ${duration}.
 

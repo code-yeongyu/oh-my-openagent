@@ -4,13 +4,12 @@ import { isPlanFamily } from "./constants"
 import { publishToolMetadata } from "../../features/tool-metadata-store"
 import { getTaskToastManager } from "../../features/task-toast-manager"
 import { getAgentToolRestrictions } from "../../shared/agent-tool-restrictions"
-import { getMessageDir } from "../../shared"
+import { getMessageDir, normalizeSDKResponse } from "../../shared"
 import { promptWithModelSuggestionRetry } from "../../shared/model-suggestion-retry"
 import { findNearestMessageWithFields } from "../../features/hook-message-injector"
 import { formatDuration } from "./time-formatter"
 import { syncContinuationDeps, type SyncContinuationDeps } from "./sync-continuation-deps"
 import { setSessionTools } from "../../shared/session-tools-store"
-import { normalizeSDKResponse } from "../../shared"
 import { buildTaskPrompt } from "./prompt-builder"
 import { buildTaskMetadataBlock } from "../../features/tool-metadata-store/task-metadata-contract"
 import { getTaskID } from "./task-id"
@@ -41,8 +40,6 @@ export async function executeSyncContinuation(
     })
   }
 
-  let syncContMeta: { title: string; metadata: Record<string, unknown> } | undefined
-
   let resumeAgent: string | undefined
   let resumeModel: { providerID: string; modelID: string } | undefined
   let resumeVariant: string | undefined
@@ -56,8 +53,11 @@ export async function executeSyncContinuation(
       for (let i = messages.length - 1; i >= 0; i--) {
         const info = messages[i].info
         if (info?.agent || info?.model || (info?.modelID && info?.providerID)) {
+          const fallbackResumeModel = info.providerID && info.modelID
+            ? { providerID: info.providerID, modelID: info.modelID }
+            : undefined
           resumeAgent = info.agent
-          resumeModel = info.model ?? (info.providerID && info.modelID ? { providerID: info.providerID, modelID: info.modelID } : undefined)
+          resumeModel = info.model ?? fallbackResumeModel
           resumeVariant = info.variant
           break
         }
@@ -65,14 +65,15 @@ export async function executeSyncContinuation(
     } catch {
       const resumeMessageDir = getMessageDir(continuationID)
       const resumeMessage = resumeMessageDir ? findNearestMessageWithFields(resumeMessageDir) : null
+      const resumeMessageModel = resumeMessage?.model
       resumeAgent = resumeMessage?.agent
-      resumeModel = resumeMessage?.model?.providerID && resumeMessage?.model?.modelID
-        ? { providerID: resumeMessage.model.providerID, modelID: resumeMessage.model.modelID }
+      resumeModel = resumeMessageModel?.providerID && resumeMessageModel.modelID
+        ? { providerID: resumeMessageModel.providerID, modelID: resumeMessageModel.modelID }
         : undefined
-      resumeVariant = resumeMessage?.model?.variant
+      resumeVariant = resumeMessageModel?.variant
     }
 
-    syncContMeta = {
+    const syncContMeta = {
       title: `Continue: ${args.description}`,
       metadata: {
         prompt: args.prompt,
