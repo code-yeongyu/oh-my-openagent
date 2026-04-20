@@ -1,6 +1,6 @@
 import type { DelegatedModelConfig } from "./types"
 
-export interface MetadataModel {
+interface MetadataModel {
   providerID: string
   modelID: string
   variant?: string
