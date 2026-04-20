@@ -451,6 +451,67 @@ describe("applyAgentConfig builtin override protection", () => {
     )
   })
 
+  test("keeps the native build agent visible when preserve_native_agents includes build", async () => {
+    const config = createBaseConfig()
+    ;(config as Record<string, unknown>).agent = {
+      build: {
+        name: "build",
+        prompt: "native build prompt",
+        mode: "primary",
+      },
+    }
+
+    const pluginConfig = createPluginConfig()
+    pluginConfig.sisyphus_agent = {
+      preserve_native_agents: ["build"],
+      planner_enabled: false,
+    }
+
+    const result = await applyAgentConfig({
+      config,
+      pluginConfig,
+      ctx: { directory: "/tmp" },
+      pluginComponents: createPluginComponents(),
+    })
+
+    expect(result.build).toEqual({
+      name: "build",
+      prompt: "native build prompt",
+      mode: "primary",
+    })
+    expect((result.build as Record<string, unknown>).hidden).toBeUndefined()
+  })
+
+  test("keeps the native plan agent when preserve_native_agents includes plan", async () => {
+    const config = createBaseConfig()
+    ;(config as Record<string, unknown>).agent = {
+      plan: {
+        name: "plan",
+        prompt: "native plan prompt",
+        mode: "primary",
+      },
+    }
+
+    const pluginConfig = createPluginConfig()
+    pluginConfig.sisyphus_agent = {
+      preserve_native_agents: ["plan"],
+      planner_enabled: false,
+    }
+
+    const result = await applyAgentConfig({
+      config,
+      pluginConfig,
+      ctx: { directory: "/tmp" },
+      pluginComponents: createPluginComponents(),
+    })
+
+    expect(result.plan).toEqual({
+      name: "plan",
+      prompt: "native plan prompt",
+      mode: "primary",
+    })
+  })
+
   describe("agent_definitions and opencode.json integration", () => {
     test("agent_definitions agents appear in output", async () => {
       // given
