@@ -6,7 +6,7 @@ import { getTaskToastManager } from "../../features/task-toast-manager"
 import { getAgentToolRestrictions } from "../../shared/agent-tool-restrictions"
 import { getMessageDir, normalizeSDKResponse } from "../../shared"
 import { promptWithModelSuggestionRetry } from "../../shared/model-suggestion-retry"
-import { findNearestMessageWithFields } from "../../features/hook-message-injector"
+import { resolveMessageContext } from "../../features/hook-message-injector"
 import { formatDuration } from "./time-formatter"
 import { syncContinuationDeps, type SyncContinuationDeps } from "./sync-continuation-deps"
 import { setSessionTools } from "../../shared/session-tools-store"
@@ -49,11 +49,11 @@ async function resolveResumeContext(
     return { anchorMessageCount: messages.length }
   } catch {
     const resumeMessageDir = getMessageDir(continuationID)
-    const resumeMessage = resumeMessageDir ? findNearestMessageWithFields(resumeMessageDir) : null
-    const resumeMessageModel = resumeMessage?.model
+    const { prevMessage } = await resolveMessageContext(continuationID, client, resumeMessageDir)
+    const resumeMessageModel = prevMessage?.model
 
     return {
-      resumeAgent: resumeMessage?.agent,
+      resumeAgent: prevMessage?.agent,
       resumeModel: resumeMessageModel?.providerID && resumeMessageModel.modelID
         ? { providerID: resumeMessageModel.providerID, modelID: resumeMessageModel.modelID }
         : undefined,
