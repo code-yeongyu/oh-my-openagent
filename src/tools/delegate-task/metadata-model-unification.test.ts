@@ -1,4 +1,4 @@
-const { describe, test, expect, mock } = require("bun:test")
+const { describe, test, expect } = require("bun:test")
 
 import type { DelegateTaskArgs, ToolContextWithMetadata } from "./types"
 import type { ParentContext } from "./executor-types"
@@ -90,7 +90,7 @@ describe("metadata model unification", () => {
           id: "bg_unstable", description: "test", agent: "explore",
           status: "completed", sessionID: "ses_unstable", model: MODEL,
         }
-        const result = await executeUnstableAgentTask(
+        await executeUnstableAgentTask(
           args, ctx,
           {
             manager: {

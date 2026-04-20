@@ -18,11 +18,16 @@ function isModelLike(value: unknown): value is ModelLike {
 }
 
 function toMetadataModel(model: ModelLike): MetadataModel {
-  return {
+  const metadataModel: MetadataModel = {
     providerID: model.providerID,
     modelID: model.modelID,
-    ...("variant" in model && model.variant ? { variant: model.variant } : {}),
   }
+
+  if ("variant" in model && model.variant) {
+    metadataModel.variant = model.variant
+  }
+
+  return metadataModel
 }
 
 export function resolveMetadataModel(

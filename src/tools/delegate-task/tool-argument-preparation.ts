@@ -8,13 +8,14 @@ export async function prepareDelegateTaskArgs(args: Record<string, unknown>, ctx
   const originalSubagentType = typeof args.subagent_type === "string" ? args.subagent_type : undefined
   let subagentType = originalSubagentType
 
+  if (category && subagentType && subagentType !== SISYPHUS_JUNIOR_AGENT) {
+    log("[task] category provided - overriding subagent_type to sisyphus-junior", {
+      category,
+      subagent_type: subagentType,
+    })
+  }
+
   if (category) {
-    if (subagentType && subagentType !== SISYPHUS_JUNIOR_AGENT) {
-      log("[task] category provided - overriding subagent_type to sisyphus-junior", {
-        category,
-        subagent_type: subagentType,
-      })
-    }
     subagentType = SISYPHUS_JUNIOR_AGENT
   }
 
