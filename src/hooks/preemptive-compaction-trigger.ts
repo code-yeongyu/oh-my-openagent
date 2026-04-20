@@ -71,6 +71,17 @@ export async function runPreemptiveCompactionIfNeeded(args: {
     modelCacheState,
   )
 
+  // Defensive logging: surface when we fallback to a default context limit
+  const DEFAULT_LIMIT = 200000
+  if (actualLimit === DEFAULT_LIMIT) {
+    log("[preemptive-compaction] context limit fallback to default (possible alias/mapping issue)", {
+      sessionID,
+      providerID: cached.providerID,
+      modelID: cached.modelID,
+      actualLimit,
+    })
+  }
+
   if (actualLimit === null) {
     log("[preemptive-compaction] Skipping preemptive compaction: unknown context limit for model", {
       providerID: cached.providerID,

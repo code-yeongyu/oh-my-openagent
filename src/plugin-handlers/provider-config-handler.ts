@@ -64,10 +64,25 @@ export function applyProviderConfig(params: {
       const contextLimit = modelConfig?.limit?.context;
       if (!contextLimit) continue;
 
-      modelContextLimitsCache.set(
-        `${providerID}/${modelID}`,
-        contextLimit,
-      );
+      // Write both dot and dash alias forms to improve cache hits for both 4.6/4-6 and 4.7/4-7 forms
+      const primaryKey = `${providerID}/${modelID}`
+      modelContextLimitsCache.set(primaryKey, contextLimit)
+
+      // Derive counterpart forms when possible
+      let dashForm = modelID
+      if (modelID.includes("4.6")) dashForm = modelID.replace("4.6", "4-6")
+      else if (modelID.includes("4-6")) dashForm = modelID.replace("4-6", "4.6")
+      if (dashForm !== modelID) {
+        modelContextLimitsCache.set(`${providerID}/${dashForm}`, contextLimit)
+      }
+
+      // Also attempt to preemptively cache the 4.7 forms if a 4.7 variant exists
+      let sevenForm = modelID
+      if (modelID.includes("4.7")) sevenForm = modelID.replace("4.7", "4-7")
+      else if (modelID.includes("4-7")) sevenForm = modelID.replace("4-7", "4.7")
+      if (sevenForm !== modelID) {
+        modelContextLimitsCache.set(`${providerID}/${sevenForm}`, contextLimit)
+      }
     }
   }
 }
