@@ -467,6 +467,53 @@ describe("BackgroundManager.getAllDescendantTasks", () => {
   })
 })
 
+describe("BackgroundManager notification fallback", () => {
+  test("queues a pending notification when promptAsync delivery fails", async () => {
+    //#given
+    const promptAsync = spyOn({
+      promptAsync: async () => {
+        throw new Error("network timeout")
+      },
+    }, "promptAsync")
+
+    const client = {
+      session: {
+        prompt: async () => ({}),
+        promptAsync,
+        abort: async () => ({}),
+        messages: async () => ({ data: [] }),
+        status: async () => ({ data: {} }),
+        todo: async () => ({ data: [] }),
+      },
+    }
+    const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
+    const task: BackgroundTask = {
+      id: "task-notification-fallback",
+      parentSessionID: "parent-session",
+      parentMessageID: "parent-message",
+      description: "collect READY result",
+      prompt: "return READY",
+      agent: "explore",
+      status: "running",
+      startedAt: new Date(),
+    }
+    getTaskMap(manager).set(task.id, task)
+
+    //#when
+    const completed = await tryCompleteTaskForTest(manager, task)
+    const pendingNotifications = getPendingNotifications(manager)
+
+    //#then
+    expect(completed).toBe(true)
+    expect(task.status).toBe("completed")
+    expect(promptAsync).toHaveBeenCalledTimes(1)
+    expect(pendingNotifications.get(task.parentSessionID)).toHaveLength(1)
+    expect(pendingNotifications.get(task.parentSessionID)?.[0]).toContain(task.description)
+
+    await manager.shutdown()
+  })
+})
+
 describe("BackgroundManager.notifyParentSession - release ordering", () => {
   test("should unblock queued task even when prompt hangs", async () => {
     // given - concurrency limit 1, task1 running, task2 waiting

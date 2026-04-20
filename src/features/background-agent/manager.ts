@@ -1849,14 +1849,18 @@ export class BackgroundManager {
           })
         } catch (error) {
           if (isAbortedSessionError(error)) {
-            log("[background-agent] Parent session aborted while sending notification; continuing cleanup:", {
+            log("[background-agent] Parent session aborted while sending notification; queued fallback notification:", {
               taskId: task.id,
               parentSessionID: task.parentSessionID,
             })
-            this.queuePendingNotification(task.parentSessionID, notification)
           } else {
-            log("[background-agent] Failed to send notification:", error)
+            log("[background-agent] Failed to send notification; queued fallback notification:", {
+              taskId: task.id,
+              parentSessionID: task.parentSessionID,
+              error,
+            })
           }
+          this.queuePendingNotification(task.parentSessionID, notification)
         }
       } else {
         log("[background-agent] Parent session notifications disabled, skipping prompt injection:", {
