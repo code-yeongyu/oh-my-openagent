@@ -54,8 +54,10 @@ describe("generateModelConfig OpenAI-only model catalog", () => {
     const result = generateModelConfig(config)
 
     // #then
-    expect(result.agents?.explore).toMatchObject({ model: "opencode-go/minimax-m2.7" })
-    expect(result.agents?.librarian).toMatchObject({ model: "opencode-go/minimax-m2.7" })
+    expect(result.agents?.explore).toMatchObject({ model: "openai/gpt-5.4-mini-fast" })
+    expect(result.agents?.librarian).toMatchObject({ model: "openai/gpt-5.4-mini-fast" })
+    expect(result.agents?.explore).not.toMatchObject({ variant: "medium" })
+    expect(result.agents?.librarian).not.toMatchObject({ variant: "medium" })
     expect(result.categories?.quick).toMatchObject({ model: "openai/gpt-5.4-mini" })
   })
 })
