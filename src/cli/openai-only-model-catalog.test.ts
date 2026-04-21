@@ -28,8 +28,8 @@ describe("generateModelConfig OpenAI-only model catalog", () => {
     const result = generateModelConfig(config)
 
     // #then
-    expect(result.agents?.explore).toEqual({ model: "openai/gpt-5.4", variant: "medium" })
-    expect(result.agents?.librarian).toEqual({ model: "openai/gpt-5.4", variant: "medium" })
+    expect(result.agents?.explore).toEqual({ model: "openai/gpt-5.4-mini-fast" })
+    expect(result.agents?.librarian).toEqual({ model: "openai/gpt-5.4-mini-fast" })
   })
 
   test("fills remaining OpenAI-only category gaps with OpenAI models", () => {

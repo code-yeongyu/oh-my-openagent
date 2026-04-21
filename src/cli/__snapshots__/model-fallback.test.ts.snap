@@ -206,16 +206,14 @@ exports[`generateModelConfig single native provider uses OpenAI models when only
       "variant": "medium",
     },
     "explore": {
-      "model": "openai/gpt-5.4",
-      "variant": "medium",
+      "model": "openai/gpt-5.4-mini-fast",
     },
     "hephaestus": {
       "model": "openai/gpt-5.4",
       "variant": "medium",
     },
     "librarian": {
-      "model": "openai/gpt-5.4",
-      "variant": "medium",
+      "model": "openai/gpt-5.4-mini-fast",
     },
     "metis": {
       "model": "openai/gpt-5.4",
@@ -296,16 +294,14 @@ exports[`generateModelConfig single native provider uses OpenAI models with isMa
       "variant": "medium",
     },
     "explore": {
-      "model": "openai/gpt-5.4",
-      "variant": "medium",
+      "model": "openai/gpt-5.4-mini-fast",
     },
     "hephaestus": {
       "model": "openai/gpt-5.4",
       "variant": "medium",
     },
     "librarian": {
-      "model": "openai/gpt-5.4",
-      "variant": "medium",
+      "model": "openai/gpt-5.4-mini-fast",
     },
     "metis": {
       "model": "openai/gpt-5.4",
