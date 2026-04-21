@@ -47,8 +47,8 @@ flowchart TB
     subgraph Workers["Worker Layer (Specialized Agents)"]
         Junior[" Sisyphus-Junior<br/>(Task Executor)<br/>claude-sonnet-4-6 / kimi-k2.5 / gpt-5.4 / minimax-m2.7"]
         Oracle[" Oracle<br/>(Architecture)<br/>gpt-5.4 / gemini-3.1-pro / claude-opus-4-7 / glm-5"]
-        Explore[" Explore<br/>(Codebase Grep)<br/>grok-code-fast-1 / minimax-m2.7-highspeed / claude-haiku-4-5"]
-        Librarian[" Librarian<br/>(Docs/OSS)<br/>minimax-m2.7 / minimax-m2.7-highspeed / claude-haiku-4-5"]
+Explore[" Explore<br/>(Codebase Grep)<br/>gpt-5.4-mini-fast / minimax-m2.7-highspeed / claude-haiku-4-5"]
+Librarian[" Librarian<br/>(Docs/OSS)<br/>gpt-5.4-mini-fast / minimax-m2.7-highspeed / claude-haiku-4-5"]
         Frontend[" visual-engineering<br/>(category + frontend-ui-ux)<br/>gemini-3.1-pro / glm-5 / claude-opus-4-7"]
     end
 
