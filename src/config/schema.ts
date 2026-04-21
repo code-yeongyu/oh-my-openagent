@@ -261,11 +261,11 @@ export const SkillEntrySchema = z.union([
 
 export const SkillsConfigSchema = z.union([
   z.array(z.string()),
-  z.record(z.string(), SkillEntrySchema).and(z.object({
+  z.object({
     sources: z.array(SkillSourceSchema).optional(),
     enable: z.array(z.string()).optional(),
     disable: z.array(z.string()).optional(),
-  }).partial()),
+  }).catchall(SkillEntrySchema),
 ])
 
 export const RalphLoopConfigSchema = z.object({

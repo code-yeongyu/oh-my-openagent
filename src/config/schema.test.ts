@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import * as z from "zod"
 import { AgentOverrideConfigSchema, BuiltinCategoryNameSchema, CategoryConfigSchema, OhMyOpenCodeConfigSchema } from "./schema"
 
 describe("disabled_mcps schema", () => {
@@ -506,5 +507,29 @@ describe("Sisyphus-Junior agent override", () => {
       expect(result.data.agents?.metis?.category).toBe("ultrabrain")
       expect(result.data.agents?.momus?.category).toBe("quick")
     }
+  })
+})
+
+describe("generated JSON schema", () => {
+  test("does not serialize skills config as an allOf intersection", () => {
+    // #when
+    const jsonSchema = z.toJSONSchema(OhMyOpenCodeConfigSchema, {
+      io: "input",
+      target: "draft-7",
+    }) as {
+      properties?: {
+        skills?: {
+          anyOf?: Array<Record<string, unknown>>
+        }
+      }
+    }
+
+    const skillsObjectBranch = jsonSchema.properties?.skills?.anyOf?.find(
+      branch => branch.type === "object"
+    )
+
+    // #then
+    expect(skillsObjectBranch).toBeDefined()
+    expect(skillsObjectBranch).not.toHaveProperty("allOf")
   })
 })
