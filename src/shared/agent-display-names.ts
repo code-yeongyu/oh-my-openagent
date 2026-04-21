@@ -26,11 +26,15 @@ export const AGENT_DISPLAY_NAMES: Record<string, string> = {
   "council-member": "council-member",
 }
 
+// Previously used ZWSP (\u200B) prefixes to force sort order in OpenCode's
+// localeCompare-based agent list. Removed because ZWSP renders as visible
+// garbled characters in many terminals (Windows Terminal, WezTerm, xterm-256color).
+// Sort order is now handled by the `order` field injected in agent-priority-order.ts.
 const AGENT_LIST_SORT_PREFIXES: Record<string, string> = {
-  sisyphus: "\u200B",
-  hephaestus: "\u200B\u200B",
-  prometheus: "\u200B\u200B\u200B",
-  atlas: "\u200B\u200B\u200B\u200B",
+  sisyphus: "",
+  hephaestus: "",
+  prometheus: "",
+  atlas: "",
 }
 
 const INVISIBLE_AGENT_CHARACTERS_REGEX = /[\u200B\u200C\u200D\uFEFF]/g

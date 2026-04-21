@@ -194,11 +194,14 @@ describe("getAgentConfigKey", () => {
 })
 
 describe("getAgentListDisplayName", () => {
-  it("applies invisible stable-sort prefixes to the core agent list", () => {
-    expect(getAgentListDisplayName("sisyphus")).toBe("\u200BSisyphus - Ultraworker")
-    expect(getAgentListDisplayName("hephaestus")).toBe("\u200B\u200BHephaestus - Deep Agent")
-    expect(getAgentListDisplayName("prometheus")).toBe("\u200B\u200B\u200BPrometheus - Plan Builder")
-    expect(getAgentListDisplayName("atlas")).toBe("\u200B\u200B\u200B\u200BAtlas - Plan Executor")
+  it("returns clean display names without ZWSP sort prefixes", () => {
+    // ZWSP prefixes were removed because they render as garbled characters
+    // in many terminals (Windows Terminal, WezTerm, xterm-256color).
+    // Sort order is now handled by the `order` field in agent-priority-order.ts.
+    expect(getAgentListDisplayName("sisyphus")).toBe("Sisyphus - Ultraworker")
+    expect(getAgentListDisplayName("hephaestus")).toBe("Hephaestus - Deep Agent")
+    expect(getAgentListDisplayName("prometheus")).toBe("Prometheus - Plan Builder")
+    expect(getAgentListDisplayName("atlas")).toBe("Atlas - Plan Executor")
   })
 
   it("keeps non-core agents unprefixed for list display", () => {
