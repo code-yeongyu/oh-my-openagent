@@ -77,19 +77,20 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   librarian: {
     fallbackChain: [
+      { providers: ["openai"], model: "gpt-5.4-mini-fast" },
+      { providers: ["opencode-go", "vercel"], model: "minimax-m2.7-highspeed" },
       { providers: ["opencode-go", "vercel"], model: "minimax-m2.7" },
-      { providers: ["opencode", "vercel"], model: "minimax-m2.7-highspeed" },
       { providers: ["anthropic", "opencode", "vercel"], model: "claude-haiku-4-5" },
-      { providers: ["opencode", "vercel"], model: "gpt-5-nano" },
+      { providers: ["openai", "opencode", "vercel"], model: "gpt-5.4-nano" },
     ],
   },
   explore: {
     fallbackChain: [
-      { providers: ["github-copilot", "xai", "vercel"], model: "grok-code-fast-1" },
+      { providers: ["openai"], model: "gpt-5.4-mini-fast" },
       { providers: ["opencode-go", "vercel"], model: "minimax-m2.7-highspeed" },
-      { providers: ["opencode", "vercel"], model: "minimax-m2.7" },
+      { providers: ["opencode-go", "vercel"], model: "minimax-m2.7" },
       { providers: ["anthropic", "opencode", "vercel"], model: "claude-haiku-4-5" },
-      { providers: ["opencode", "vercel"], model: "gpt-5-nano" },
+      { providers: ["openai", "opencode", "vercel"], model: "gpt-5.4-nano" },
     ],
   },
   "multimodal-looker": {

@@ -355,9 +355,9 @@ describe("generateModelConfig", () => {
       // #when generateModelConfig is called
       const result = generateModelConfig(config)
 
-      // #then explore should use native OpenAI model
-      expect(result.agents?.explore?.model).toBe("openai/gpt-5.4")
-      expect(result.agents?.explore?.variant).toBe("medium")
+      // #then explore should use native OpenAI mini-fast (primary model)
+      expect(result.agents?.explore?.model).toBe("openai/gpt-5.4-mini-fast")
+      expect(result.agents?.explore?.variant).toBeUndefined()
     })
 
     test("explore uses gpt-5-mini when only Copilot available", () => {
@@ -553,15 +553,15 @@ describe("generateModelConfig", () => {
   })
 
   describe("special-case agents include fallback_models", () => {
-    test("explore includes fallback_models when Copilot and Claude are both available", () => {
-      // #given both Copilot and Claude are available
-      const config = createConfig({ hasCopilot: true, hasClaude: true })
+    test("explore includes fallback_models when OpenAI and Claude are both available", () => {
+      // #given both OpenAI and Claude are available
+      const config = createConfig({ hasOpenAI: true, hasClaude: true })
 
       // #when generateModelConfig is called
       const result = generateModelConfig(config)
 
       // #then explore should have fallback_models from the remaining chain entries
-      expect(result.agents?.explore?.model).toBe("anthropic/claude-haiku-4-5")
+      expect(result.agents?.explore?.model).toBe("openai/gpt-5.4-mini-fast")
       expect(result.agents?.explore?.fallback_models).toBeDefined()
       expect(result.agents?.explore?.fallback_models?.length).toBeGreaterThan(0)
     })
@@ -578,28 +578,28 @@ describe("generateModelConfig", () => {
       expect(result.agents?.explore?.fallback_models).toBeUndefined()
     })
 
-    test("librarian includes fallback_models when opencode-go and Claude are both available", () => {
-      // #given opencode-go and Claude are available
-      const config = createConfig({ hasOpencodeGo: true, hasClaude: true })
+    test("librarian includes fallback_models when OpenAI and opencode-go are both available", () => {
+      // #given OpenAI and opencode-go are available
+      const config = createConfig({ hasOpenAI: true, hasOpencodeGo: true })
 
       // #when generateModelConfig is called
       const result = generateModelConfig(config)
 
       // #then librarian should have fallback_models
-      expect(result.agents?.librarian?.model).toBe("opencode-go/minimax-m2.7")
+      expect(result.agents?.librarian?.model).toBe("openai/gpt-5.4-mini-fast")
       expect(result.agents?.librarian?.fallback_models).toBeDefined()
       expect(result.agents?.librarian?.fallback_models?.length).toBeGreaterThan(0)
     })
 
-    test("librarian omits fallback_models when only one provider matches", () => {
-      // #given only opencode-go is available
-      const config = createConfig({ hasOpencodeGo: true })
+    test("librarian omits fallback_models when only ZAI is available", () => {
+      // #given only ZAI is available
+      const config = createConfig({ hasZaiCodingPlan: true })
 
       // #when generateModelConfig is called
       const result = generateModelConfig(config)
 
       // #then librarian should not have fallback_models
-      expect(result.agents?.librarian?.model).toBe("opencode-go/minimax-m2.7")
+      expect(result.agents?.librarian?.model).toBe("zai-coding-plan/glm-4.7")
       expect(result.agents?.librarian?.fallback_models).toBeUndefined()
     })
   })
