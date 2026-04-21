@@ -8,7 +8,7 @@ export const SUPPLEMENTAL_MODEL_CAPABILITIES: Record<string, ModelCapabilitiesSn
 		temperature: false,
 		toolCall: true,
 		modalities: {
-			input: ["text", "image", "pdf"],
+			input: ["text", "image"],
 			output: ["text"],
 		},
 		limit: {
