@@ -4,10 +4,16 @@
  * Display names include suffixes for UI/logs (e.g., "Sisyphus - Ultraworker").
  *
  * IMPORTANT: Display names MUST NOT contain parentheses or other characters
- * that are invalid in HTTP header values per RFC 7230. OpenCode passes the
- * agent name in the `x-opencode-agent-name` header, and parentheses cause
- * header validation failures that prevent agents from appearing in the UI
- * type selector dropdown. Use ` - ` (space-dash-space) instead of `(...)`.
+ * that are invalid in HTTP header values per RFC 7230. Config object keys
+ * can flow into HTTP header values in some plugin paths. Use ` - `
+ * (space-dash-space) instead of `(...)` to avoid header validation failures.
+ *
+ * NOTE: ZWSP sort prefixes were removed. Agent ordering is now handled by
+ * the `order` field injected by reorderAgentsByPriority() in
+ * agent-priority-order.ts. The AGENT_LIST_SORT_PREFIXES map is kept as empty
+ * strings for backward compatibility with existing session data that may
+ * contain ZWSP-prefixed agent names. stripInvisibleAgentCharacters() still
+ * strips any residual ZWSP from legacy sessions.
  */
 export const AGENT_DISPLAY_NAMES: Record<string, string> = {
   sisyphus: "Sisyphus - Ultraworker",
@@ -27,10 +33,10 @@ export const AGENT_DISPLAY_NAMES: Record<string, string> = {
 }
 
 const AGENT_LIST_SORT_PREFIXES: Record<string, string> = {
-  sisyphus: "\u200B",
-  hephaestus: "\u200B\u200B",
-  prometheus: "\u200B\u200B\u200B",
-  atlas: "\u200B\u200B\u200B\u200B",
+  sisyphus: "",
+  hephaestus: "",
+  prometheus: "",
+  atlas: "",
 }
 
 const INVISIBLE_AGENT_CHARACTERS_REGEX = /[\u200B\u200C\u200D\uFEFF]/g

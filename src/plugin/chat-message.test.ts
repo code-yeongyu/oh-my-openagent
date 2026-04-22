@@ -10,7 +10,7 @@ import { createKeywordDetectorHook } from "../hooks/keyword-detector"
 import { createStartWorkHook } from "../hooks/start-work"
 import { readBoulderState } from "../features/boulder-state"
 import { _resetForTesting, setMainSession, subagentSessions, registerAgentName, updateSessionAgent, getSessionAgent } from "../features/claude-code-session-state"
-import { getAgentListDisplayName } from "../shared/agent-display-names"
+import { getAgentDisplayName } from "../shared/agent-display-names"
 import { getOmoOpenCodeCacheDir, getOpenCodeCacheDir } from "../shared/data-path"
 import { clearSessionModel, getSessionModel, setSessionModel } from "../shared/session-model-state"
 
@@ -738,7 +738,7 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
       },
     })
     const handler = createChatMessageHandler(args)
-    const input = createMockInput(getAgentListDisplayName("prometheus"))
+    const input = createMockInput(getAgentDisplayName("prometheus"))
     const output = createMockOutput()
 
     //#when
