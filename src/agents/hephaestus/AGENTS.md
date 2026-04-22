@@ -1,3 +1,8 @@
+---
+name: hephaestus-agent
+description: Developer reference for the Hephaestus autonomous deep worker agent — model variants, key behaviors, and delegation patterns.
+---
+
 # src/agents/hephaestus/ -- Autonomous Deep Worker
 
 **Generated:** 2026-04-11

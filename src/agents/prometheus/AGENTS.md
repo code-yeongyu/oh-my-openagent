@@ -1,3 +1,8 @@
+---
+name: prometheus-agent
+description: Developer reference for the Prometheus strategic planner agent — interview flow, plan output format, and key constraints.
+---
+
 # src/agents/prometheus/ -- Strategic Planner
 
 **Generated:** 2026-04-11
