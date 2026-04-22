@@ -184,9 +184,12 @@ export function createSessionStateStore(): SessionStateStore {
       }
     }
 
+    // After a continuation injection, only actual todo changes count as progress.
+    // Activity signals (e.g. assistant text responses) must NOT reset stagnation
+    // after injection, otherwise blocked tasks cause infinite continuation loops.
     const progressSource = incompleteCount < previousIncompleteCount || hasCompletedMoreTodos || hasTodoSnapshotChanged
       ? "todo"
-      : hasObservedExternalActivity
+      : (hasObservedExternalActivity && !hadSuccessfulInjectionAwaitingProgressCheck)
         ? "activity"
         : "none"
 
