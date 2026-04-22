@@ -107,9 +107,10 @@ describe("createRuntimeFallbackHook dispose", () => {
     globalThis.clearTimeout = originalClearTimeout
   })
 
-  test("#given runtime-fallback hook created #when dispose() is called #then cleanup interval is cleared", () => {
+  test("#given runtime-fallback hook handles its first event #when dispose() is called #then cleanup interval is cleared", async () => {
     // given
     const hook = createRuntimeFallbackHook(createMockContext(), { pluginConfig: {} })
+    await hook.event({ event: { type: "session.created", properties: {} } })
 
     // when
     hook.dispose?.()
@@ -125,10 +126,10 @@ describe("createRuntimeFallbackHook dispose", () => {
     const fallbackTimeout = setTimeout(() => {}, 60_000)
 
     capturedDeps?.sessionStates.set("session-1", {
-      originalModel: "anthropic/claude-opus-4-6",
+      originalModel: "anthropic/claude-opus-4-7",
       currentModel: "openai/gpt-5.4",
       fallbackIndex: 1,
-      failedModels: new Map([["anthropic/claude-opus-4-6", 1]]),
+      failedModels: new Map([["anthropic/claude-opus-4-7", 1]]),
       attemptCount: 1,
     })
     capturedDeps?.sessionLastAccess.set("session-1", Date.now())

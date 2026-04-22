@@ -1,5 +1,5 @@
 import type { ToolContext } from "@opencode-ai/plugin/tool"
-import { storeToolMetadata } from "../../features/tool-metadata-store"
+import { publishToolMetadata } from "../../features/tool-metadata-store"
 import { applyHashlineEditsWithReport } from "./edit-operations"
 import { countLineDiffs, generateUnifiedDiff } from "./diff-utils"
 import { canonicalizeFileText, restoreFileText } from "./file-text-canonicalization"
@@ -24,13 +24,6 @@ type ToolContextWithCallID = ToolContext & {
 
 type ToolContextWithMetadata = ToolContextWithCallID & {
   metadata?: (value: unknown) => void
-}
-
-function resolveToolCallID(ctx: ToolContextWithCallID): string | undefined {
-  if (typeof ctx.callID === "string" && ctx.callID.trim() !== "") return ctx.callID
-  if (typeof ctx.callId === "string" && ctx.callId.trim() !== "") return ctx.callId
-  if (typeof ctx.call_id === "string" && ctx.call_id.trim() !== "") return ctx.call_id
-  return undefined
 }
 
 function canCreateFromMissingFile(edits: HashlineEdit[]): boolean {
@@ -143,13 +136,7 @@ export async function executeHashlineEditTool(args: HashlineEditArgs, context: T
           applyResult.noopEdits,
           applyResult.deduplicatedEdits
         )
-        if (typeof metadataContext.metadata === "function") {
-          metadataContext.metadata(formattedMeta)
-        }
-        const callID = resolveToolCallID(metadataContext)
-        if (callID) {
-          storeToolMetadata(context.sessionID, callID, formattedMeta)
-        }
+        await publishToolMetadata(metadataContext, formattedMeta)
         if (rename && rename !== filePath) {
           await Bun.write(rename, formattedContent)
           await Bun.file(filePath).delete()
@@ -173,14 +160,7 @@ export async function executeHashlineEditTool(args: HashlineEditArgs, context: T
       applyResult.deduplicatedEdits
     )
 
-    if (typeof metadataContext.metadata === "function") {
-      metadataContext.metadata(meta)
-    }
-
-    const callID = resolveToolCallID(metadataContext)
-    if (callID) {
-      storeToolMetadata(context.sessionID, callID, meta)
-    }
+    await publishToolMetadata(metadataContext, meta)
 
     if (rename && rename !== filePath) {
       return `Moved ${filePath} to ${rename}`

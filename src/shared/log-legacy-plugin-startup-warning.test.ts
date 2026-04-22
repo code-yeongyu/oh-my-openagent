@@ -63,7 +63,7 @@ describe("logLegacyPluginStartupWarning", () => {
       //#then
       expect(mockLog).toHaveBeenCalledTimes(1)
       expect(mockLog).toHaveBeenCalledWith(
-        "[OhMyOpenCodePlugin] Legacy plugin entry detected in OpenCode config",
+        "[legacy-migration] Legacy plugin entry detected in OpenCode config",
         {
           legacyEntries: ["oh-my-opencode", "oh-my-opencode@3.13.1"],
           suggestedEntries: ["oh-my-openagent", "oh-my-openagent@3.13.1"],

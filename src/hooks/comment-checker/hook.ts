@@ -28,6 +28,7 @@ import {
   stopPendingCallCleanup,
   takePendingCall,
 } from "./pending-calls"
+import { ensureCommentCheckerInitialization } from "./initialization-gate"
 
 import * as fs from "fs"
 import { tmpdir } from "os"
@@ -48,14 +49,16 @@ function debugLog(...args: unknown[]) {
 export function createCommentCheckerHooks(config?: CommentCheckerConfig) {
   debugLog("createCommentCheckerHooks called", { config })
 
-  startPendingCallCleanup()
-  initializeCommentCheckerCli(debugLog)
-
   return {
     "tool.execute.before": async (
       input: { tool: string; sessionID: string; callID: string },
       output: { args: Record<string, unknown> },
     ): Promise<void> => {
+      ensureCommentCheckerInitialization(() => {
+        startPendingCallCleanup()
+        initializeCommentCheckerCli(debugLog)
+      })
+
       debugLog("tool.execute.before:", {
         tool: input.tool,
         callID: input.callID,

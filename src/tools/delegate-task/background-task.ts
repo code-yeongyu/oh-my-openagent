@@ -3,14 +3,26 @@ import type { ExecutorContext, ParentContext } from "./executor-types"
 import type { FallbackEntry } from "../../shared/model-requirements"
 import { getTimingConfig } from "./timing"
 import { buildTaskPrompt } from "./prompt-builder"
-import { storeToolMetadata } from "../../features/tool-metadata-store"
-import { resolveCallID } from "./resolve-call-id"
+import { publishToolMetadata } from "../../features/tool-metadata-store"
 import { formatDetailedError } from "./error-formatting"
 import { getSessionTools } from "../../shared/session-tools-store"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { QUESTION_DENIED_SESSION_PERMISSION } from "../../shared/question-denied-session-permission"
-import { setSessionFallbackChain } from "../../hooks/model-fallback/hook"
 import { stripAgentListSortPrefix } from "../../shared/agent-display-names"
+import { buildTaskMetadataBlock } from "../../features/tool-metadata-store/task-metadata-contract"
+import { resolveMetadataModel } from "./resolve-metadata-model"
+
+function registerBackgroundSessionContext(args: {
+  sessionId: string
+  fallbackChain?: FallbackEntry[]
+  category?: string
+  modelFallbackControllerAccessor?: ExecutorContext["modelFallbackControllerAccessor"]
+}): void {
+  args.modelFallbackControllerAccessor?.setSessionFallbackChain(args.sessionId, args.fallbackChain)
+  if (args.category) {
+    SessionCategoryRegistry.register(args.sessionId, args.category)
+  }
+}
 
 function continueSessionSetup(args: {
   taskID: string
@@ -18,6 +30,7 @@ function continueSessionSetup(args: {
   timing: ReturnType<typeof getTimingConfig>
   fallbackChain?: FallbackEntry[]
   category?: string
+  modelFallbackControllerAccessor?: ExecutorContext["modelFallbackControllerAccessor"]
 }): void {
   if (!args.fallbackChain && !args.category) {
     return
@@ -40,13 +53,48 @@ function continueSessionSetup(args: {
         continue
       }
 
-      setSessionFallbackChain(sessionId, args.fallbackChain)
-      if (args.category) {
-        SessionCategoryRegistry.register(sessionId, args.category)
-      }
+      registerBackgroundSessionContext({
+        sessionId,
+        fallbackChain: args.fallbackChain,
+        category: args.category,
+        modelFallbackControllerAccessor: args.modelFallbackControllerAccessor,
+      })
       return
     }
   })()
+}
+
+async function waitForBackgroundSessionStart(args: {
+  taskId: string
+  initialSessionId?: string
+  manager: ExecutorContext["manager"]
+  timing: ReturnType<typeof getTimingConfig>
+  abortSignal?: AbortSignal
+  onAbort: () => void
+}): Promise<string | undefined> {
+  const waitStart = Date.now()
+  let sessionId = args.initialSessionId
+
+  while (!sessionId && Date.now() - waitStart < args.timing.WAIT_FOR_SESSION_TIMEOUT_MS) {
+    const updated = args.manager.getTask(args.taskId)
+    if (updated?.status === "error" || updated?.status === "cancelled" || updated?.status === "interrupt") {
+      return undefined
+    }
+
+    sessionId = updated?.sessionID
+    if (sessionId) {
+      return sessionId
+    }
+
+    if (args.abortSignal?.aborted) {
+      args.onAbort()
+      return undefined
+    }
+
+    await new Promise(resolve => setTimeout(resolve, args.timing.WAIT_FOR_SESSION_INTERVAL_MS))
+  }
+
+  return sessionId
 }
 
 export async function executeBackgroundTask(
@@ -87,61 +135,68 @@ export async function executeBackgroundTask(
     // BackgroundManager.launch() returns immediately (pending) before the session exists,
     // so we must wait briefly for the session to be created to set metadata correctly.
     const timing = getTimingConfig()
-    const waitStart = Date.now()
-    let sessionId = task.sessionID
-    while (!sessionId && Date.now() - waitStart < timing.WAIT_FOR_SESSION_TIMEOUT_MS) {
-      const updated = manager.getTask(task.id)
-      if (updated?.status === "error" || updated?.status === "cancelled" || updated?.status === "interrupt") {
-        return `Task failed to start (status: ${updated.status}).\n\nTask ID: ${task.id}`
-      }
-      sessionId = updated?.sessionID
-      if (sessionId) {
-        break
-      }
-      if (ctx.abort?.aborted) {
+    let sessionId = await waitForBackgroundSessionStart({
+      taskId: task.id,
+      initialSessionId: task.sessionID,
+      manager,
+      timing,
+      abortSignal: ctx.abort,
+      onAbort: () => {
         continueSessionSetup({
           taskID: task.id,
           manager,
           timing,
           fallbackChain,
           category: args.category,
+          modelFallbackControllerAccessor: executorCtx.modelFallbackControllerAccessor,
         })
-        break
-      }
-      await new Promise(resolve => setTimeout(resolve, timing.WAIT_FOR_SESSION_INTERVAL_MS))
+      },
+    })
+
+    const updatedTask = typeof manager.getTask === "function"
+      ? manager.getTask(task.id)
+      : undefined
+    if (!sessionId && (updatedTask?.status === "error" || updatedTask?.status === "cancelled" || updatedTask?.status === "interrupt")) {
+      return `Task failed to start (status: ${updatedTask.status}).\n\nTask ID: ${task.id}`
     }
 
     if (sessionId) {
-      setSessionFallbackChain(sessionId, fallbackChain)
-    }
-    if (args.category && sessionId) {
-      SessionCategoryRegistry.register(sessionId, args.category)
+      registerBackgroundSessionContext({
+        sessionId,
+        fallbackChain,
+        category: args.category,
+        modelFallbackControllerAccessor: executorCtx.modelFallbackControllerAccessor,
+      })
     }
 
+    const resolvedModel = resolveMetadataModel(categoryModel, parentContext.model)
     const metadata = {
       prompt: args.prompt,
       agent: task.agent,
       category: args.category,
+      ...(args.requested_subagent_type !== undefined ? { requested_subagent_type: args.requested_subagent_type } : {}),
       load_skills: args.load_skills,
       description: args.description,
       run_in_background: args.run_in_background,
       command: args.command,
-      ...(sessionId ? { sessionId } : {}),
-      ...(categoryModel ? { model: { providerID: categoryModel.providerID, modelID: categoryModel.modelID } } : {}),
+      ...(sessionId ? { taskId: sessionId, sessionId } : {}),
+      backgroundTaskId: task.id,
+      ...(resolvedModel ? { model: resolvedModel } : {}),
     }
 
-    const unstableMeta = {
+    await publishToolMetadata(ctx, {
       title: args.description,
       metadata,
-    }
-    await ctx.metadata?.(unstableMeta)
-    const callID = resolveCallID(ctx)
-    if (callID) {
-      storeToolMetadata(ctx.sessionID, callID, unstableMeta)
-    }
+    })
 
     const taskMetadataBlock = sessionId
-      ? `\n\n<task_metadata>\nsession_id: ${sessionId}\ntask_id: ${task.id}\nbackground_task_id: ${task.id}\n</task_metadata>`
+      ? `\n\n${buildTaskMetadataBlock({
+        sessionId,
+        taskId: sessionId,
+        backgroundTaskId: task.id,
+        agent: task.agent,
+        category: args.category,
+      })}`
       : ""
 
     return `Background task launched.

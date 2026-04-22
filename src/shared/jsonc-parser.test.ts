@@ -1,5 +1,5 @@
-import { describe, expect, test } from "bun:test"
-import { detectConfigFile, detectPluginConfigFile, parseJsonc, parseJsoncSafe, readJsoncFile } from "./jsonc-parser"
+import { afterEach, beforeEach, describe, expect, test } from "bun:test"
+import { clearPluginConfigFileDetectionCache, detectConfigFile, detectPluginConfigFile, parseJsonc, parseJsoncSafe, readJsoncFile } from "./jsonc-parser"
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
@@ -329,6 +329,14 @@ describe("detectConfigFile", () => {
 
 describe("detectPluginConfigFile", () => {
   const testDir = join(__dirname, ".test-detect-plugin")
+
+  beforeEach(() => {
+    clearPluginConfigFileDetectionCache()
+  })
+
+  afterEach(() => {
+    clearPluginConfigFileDetectionCache()
+  })
 
   test("prefers oh-my-openagent over oh-my-opencode when both jsonc files exist", () => {
     // given

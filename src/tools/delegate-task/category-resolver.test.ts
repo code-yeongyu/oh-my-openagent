@@ -99,7 +99,7 @@ describe("resolveCategoryExecution", () => {
 		const executorCtx = createMockExecutorContext()
 		executorCtx.userCategories = {
 			deep: {
-				model: "quotio/claude-opus-4-6",
+				model: "quotio/claude-opus-4-7",
 				fallback_models: ["quotio/kimi-k2.5", "openai/gpt-5.2(high)"],
 			},
 		}

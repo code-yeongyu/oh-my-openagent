@@ -3,6 +3,7 @@ import { log } from "../../shared/logger"
 import type { AutoUpdateCheckerOptions } from "./types"
 import { getCachedVersion, getLocalDevVersion } from "./checker"
 import { runBackgroundUpdateCheck } from "./hook/background-update-check"
+import { scheduleDeferredStartupCheck } from "./hook/deferred-startup-check"
 import { showConfigErrorsIfAny } from "./hook/config-errors-toast"
 import { updateAndShowConnectedProvidersCacheStatus } from "./hook/connected-providers-status"
 import { refreshModelCapabilitiesOnStartup } from "./hook/model-capabilities-status"
@@ -35,6 +36,20 @@ const defaultDeps: AutoUpdateCheckerDeps = {
   log,
 }
 
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+  return typeof value === "object" && value !== null
+}
+
+const getParentID = (properties: unknown): string | undefined => {
+  if (!isRecord(properties)) return undefined
+
+  const { info } = properties
+  if (!isRecord(info)) return undefined
+
+  const { parentID } = info
+  return typeof parentID === "string" && parentID.length > 0 ? parentID : undefined
+}
+
 export function createAutoUpdateCheckerHook(
   ctx: PluginInput,
   options: AutoUpdateCheckerOptions = {},
@@ -60,44 +75,46 @@ export function createAutoUpdateCheckerHook(
   }
 
   let hasChecked = false
+  let hasScheduled = false
 
   return {
     event: ({ event }: { event: { type: string; properties?: unknown } }) => {
       if (event.type !== "session.created") return
       if (isCliRunMode) return
-      if (hasChecked) return
+      if (hasChecked || hasScheduled) return
+      if (getParentID(event.properties)) return
 
-      const props = event.properties as { info?: { parentID?: string } } | undefined
-      if (props?.info?.parentID) return
+      hasScheduled = true
 
+      scheduleDeferredStartupCheck(() => {
         hasChecked = true
+        void (async () => {
+          const cachedVersion = deps.getCachedVersion()
+          const localDevVersion = deps.getLocalDevVersion(ctx.directory)
+          const displayVersion = localDevVersion ?? cachedVersion
 
-      setTimeout(async () => {
-        const cachedVersion = deps.getCachedVersion()
-        const localDevVersion = deps.getLocalDevVersion(ctx.directory)
-        const displayVersion = localDevVersion ?? cachedVersion
+          await deps.showConfigErrorsIfAny(ctx)
+          await deps.updateAndShowConnectedProvidersCacheStatus(ctx)
+          await deps.refreshModelCapabilitiesOnStartup(modelCapabilities)
+          await deps.showModelCacheWarningIfNeeded(ctx)
 
-        await deps.showConfigErrorsIfAny(ctx)
-        await deps.updateAndShowConnectedProvidersCacheStatus(ctx)
-        await deps.refreshModelCapabilitiesOnStartup(modelCapabilities)
-        await deps.showModelCacheWarningIfNeeded(ctx)
-
-        if (localDevVersion) {
-          if (showStartupToast) {
-            deps.showLocalDevToast(ctx, displayVersion, isSisyphusEnabled).catch(() => {})
+          if (localDevVersion) {
+            if (showStartupToast) {
+              deps.showLocalDevToast(ctx, displayVersion, isSisyphusEnabled).catch(() => {})
+            }
+            deps.log("[auto-update-checker] Local development mode")
+            return
           }
-          deps.log("[auto-update-checker] Local development mode")
-          return
-        }
 
-        if (showStartupToast) {
-          deps.showVersionToast(ctx, displayVersion, getToastMessage(false)).catch(() => {})
-        }
+          if (showStartupToast) {
+            deps.showVersionToast(ctx, displayVersion, getToastMessage(false)).catch(() => {})
+          }
 
-        deps.runBackgroundUpdateCheck(ctx, autoUpdate, getToastMessage).catch((err) => {
-          deps.log("[auto-update-checker] Background update check failed:", err)
-        })
-      }, 0)
+          deps.runBackgroundUpdateCheck(ctx, autoUpdate, getToastMessage).catch((err) => {
+            deps.log("[auto-update-checker] Background update check failed:", err)
+          })
+        })()
+      })
     },
   }
 }

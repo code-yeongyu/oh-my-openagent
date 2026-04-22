@@ -6,6 +6,7 @@ import {
   findProjectOpencodeCommandDirs,
   getOpenCodeCommandDirs,
   discoverPluginCommandDefinitions,
+  EXCLUDED_DIRS,
 } from "../../shared"
 import type { CommandFrontmatter } from "../../features/claude-code-command-loader/types"
 import { isMarkdownFile } from "../../shared/file-utils"
@@ -36,6 +37,7 @@ function discoverCommandsFromDir(
 
   for (const entry of entries) {
     if (entry.isDirectory()) {
+      if (EXCLUDED_DIRS.has(entry.name)) continue
       if (entry.name.startsWith(".")) continue
       const nestedPrefix = prefix
         ? `${prefix}${NESTED_COMMAND_SEPARATOR}${entry.name}`

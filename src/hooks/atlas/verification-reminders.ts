@@ -29,7 +29,7 @@ Your completion will NOT be recorded until you complete ALL of the following:
 
 If anything fails while closing this out, resume the same session immediately:
 \`\`\`typescript
-task(session_id="${sessionId}", load_skills=[], prompt="fix: checkbox not recorded correctly")
+task(task_id="${sessionId}", load_skills=[], prompt="fix: checkbox not recorded correctly")
 \`\`\`
 
 **Your completion is NOT tracked until the checkbox is marked in the plan file.**
@@ -47,7 +47,7 @@ ${VERIFICATION_REMINDER}
 
 **If ANY verification fails, use this immediately:**
 \`\`\`
-task(session_id="${sessionId}", load_skills=[], prompt="fix: [describe the specific failure]")
+task(task_id="${sessionId}", load_skills=[], prompt="fix: [describe the specific failure]")
 \`\`\`
 
 ${buildReuseHint(sessionId)}`

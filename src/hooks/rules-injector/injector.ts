@@ -12,6 +12,7 @@ import {
 import { parseRuleFrontmatter } from "./parser";
 import { saveInjectedRules } from "./storage";
 import type { SessionInjectedRulesCache } from "./cache";
+import type { RuleScanCache } from "./rule-scan-cache";
 import type { RuleMetadata } from "./types";
 
 type ToolExecuteOutput = {
@@ -56,6 +57,7 @@ export function createRuleInjectionProcessor(deps: {
   workspaceDirectory: string;
   truncator: DynamicTruncator;
   getSessionCache: (sessionID: string) => SessionInjectedRulesCache;
+  getSessionRuleScanCache?: (sessionID: string) => RuleScanCache;
   ruleFinderOptions?: FindRuleFilesOptions;
   readFileSync?: typeof readFileSync;
   statSync?: typeof statSync;
@@ -76,6 +78,7 @@ export function createRuleInjectionProcessor(deps: {
     workspaceDirectory,
     truncator,
     getSessionCache,
+    getSessionRuleScanCache,
     ruleFinderOptions,
     readFileSync: readRuleFileSync = readFileSync,
     statSync: statRuleSync = statSync,
@@ -121,9 +124,16 @@ export function createRuleInjectionProcessor(deps: {
 
     const projectRoot = findProjectRoot(resolved);
     const cache = getSessionCache(sessionID);
+    const ruleScanCache = getSessionRuleScanCache?.(sessionID);
     const home = getHomeDir();
 
-    const ruleFileCandidates = findRuleFiles(projectRoot, home, resolved, ruleFinderOptions);
+    const ruleFileCandidates = findRuleFiles(
+      projectRoot,
+      home,
+      resolved,
+      ruleFinderOptions,
+      ruleScanCache,
+    );
     const toInject: RuleToInject[] = [];
     let dirty = false;
 

@@ -4,7 +4,7 @@ import { fuzzyMatchModel } from "../../shared/model-availability"
 import { transformModelForProvider } from "../../shared/provider-model-id-transform"
 import { hasConnectedProvidersCache, hasProviderModelsCache, readConnectedProvidersCache } from "../../shared/connected-providers-cache"
 import { log } from "../../shared/logger"
-import { parseModelString, parseVariantFromModelID } from "./model-string-parser"
+import { parseModelString, parseVariantFromModelID } from "../../shared/model-string-parser"
 
 function isExplicitHighModel(model: string): boolean {
   return /(?:^|\/)[^/]+-high$/.test(model)

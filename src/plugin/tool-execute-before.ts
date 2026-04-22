@@ -100,12 +100,12 @@ export function createToolExecuteBeforeHandler(args: {
       const argsObject = output.args
       const category = typeof argsObject.category === "string" ? argsObject.category : undefined
       const subagentType = typeof argsObject.subagent_type === "string" ? argsObject.subagent_type : undefined
-      const sessionId = typeof argsObject.session_id === "string" ? argsObject.session_id : undefined
+      const taskId = typeof argsObject.task_id === "string" ? argsObject.task_id : undefined
 
       if (category) {
         argsObject.subagent_type = "sisyphus-junior"
-      } else if (!subagentType && sessionId) {
-        const resolvedAgent = await resolveSessionAgent(ctx.client, sessionId)
+      } else if (!subagentType && taskId) {
+        const resolvedAgent = await resolveSessionAgent(ctx.client, taskId)
         argsObject.subagent_type = resolvedAgent ?? "continue"
       }
 

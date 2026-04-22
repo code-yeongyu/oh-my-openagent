@@ -7,8 +7,8 @@
   "agents": {
     // Main orchestrator: handles delegation and drives tasks to completion
     "sisyphus": {
-      "model": "anthropic/claude-opus-4-6",
-      "ultrawork": { "model": "anthropic/claude-opus-4-6", "variant": "max" },
+      "model": "anthropic/claude-opus-4-7",
+      "ultrawork": { "model": "anthropic/claude-opus-4-7", "variant": "max" },
     },
 
     // Deep autonomous worker: end-to-end implementation
@@ -50,7 +50,7 @@
   "categories": {
     "quick": { "model": "opencode/gpt-5-nano" },
     "unspecified-low": { "model": "anthropic/claude-sonnet-4-6" },
-    "unspecified-high": { "model": "anthropic/claude-opus-4-6", "variant": "max" },
+    "unspecified-high": { "model": "anthropic/claude-opus-4-7", "variant": "max" },
     "writing": { "model": "google/gemini-3-flash" },
     "visual-engineering": { "model": "google/gemini-3.1-pro", "variant": "high" },
     "deep": { "model": "openai/gpt-5.4" },

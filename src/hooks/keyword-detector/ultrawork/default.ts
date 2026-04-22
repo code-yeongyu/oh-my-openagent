@@ -115,15 +115,15 @@ task(subagent_type="plan", load_skills=[], run_in_background=false, prompt="<gat
 
 ### SESSION CONTINUITY WITH PLAN AGENT (CRITICAL)
 
-**Plan agent returns a session_id. USE IT for follow-up interactions.**
+**Plan agent returns a task_id. USE IT for follow-up interactions.**
 
 | Scenario | Action |
 |----------|--------|
-| Plan agent asks clarifying questions | \`task(session_id="{returned_session_id}", load_skills=[], run_in_background=false, prompt="<your answer>")\` |
-| Need to refine the plan | \`task(session_id="{returned_session_id}", load_skills=[], run_in_background=false, prompt="Please adjust: <feedback>")\` |
-| Plan needs more detail | \`task(session_id="{returned_session_id}", load_skills=[], run_in_background=false, prompt="Add more detail to Task N")\` |
+| Plan agent asks clarifying questions | \`task(task_id="{returned_task_id}", load_skills=[], run_in_background=false, prompt="<your answer>")\` |
+| Need to refine the plan | \`task(task_id="{returned_task_id}", load_skills=[], run_in_background=false, prompt="Please adjust: <feedback>")\` |
+| Plan needs more detail | \`task(task_id="{returned_task_id}", load_skills=[], run_in_background=false, prompt="Add more detail to Task N")\` |
 
-**WHY SESSION_ID IS CRITICAL:**
+**WHY TASK_ID IS CRITICAL:**
 - Plan agent retains FULL conversation context
 - No repeated exploration or context gathering
 - Saves 70%+ tokens on follow-ups
@@ -134,7 +134,7 @@ task(subagent_type="plan", load_skills=[], run_in_background=false, prompt="<gat
 task(subagent_type="plan", load_skills=[], run_in_background=false, prompt="Here's more info...")
 
 // CORRECT: Resume preserves everything
-task(session_id="ses_abc123", load_skills=[], run_in_background=false, prompt="Here's my answer to your question: ...")
+task(task_id="ses_abc123", load_skills=[], run_in_background=false, prompt="Here's my answer to your question: ...")
 \`\`\`
 
 **FAILURE TO CALL PLAN AGENT = INCOMPLETE WORK.**

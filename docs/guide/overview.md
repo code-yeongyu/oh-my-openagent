@@ -82,11 +82,11 @@ Sisyphus is your main orchestrator. He plans, delegates to specialists, and driv
 
 **Recommended models:**
 
-- **Claude Opus 4.6** — Best overall experience. Sisyphus was built with Claude-optimized prompts.
+- **Claude Opus 4.7** — Best overall experience. Sisyphus was built with Claude-optimized prompts.
 - **Kimi K2.5** — Great Claude-like alternative. Many users run this combo exclusively.
 - **GLM 5** — Solid option, especially via Z.ai.
 
-Sisyphus works best on Claude Opus 4.6, Kimi K2.5, and GLM 5. GPT-5.4 now has a dedicated prompt path, but older GPT models are still a poor fit and should route to Hephaestus instead.
+Sisyphus works best on Claude Opus 4.7, Kimi K2.5, and GLM 5. GPT-5.4 now has a dedicated prompt path, but older GPT models are still a poor fit and should route to Hephaestus instead.
 
 ### Hephaestus: The Legitimate Craftsman
 
@@ -173,7 +173,7 @@ You can override specific agents or categories in your config:
     // Main orchestrator: Claude Opus or Kimi K2.5 work best
     "sisyphus": {
       "model": "kimi-for-coding/k2p5",
-      "ultrawork": { "model": "anthropic/claude-opus-4-6", "variant": "max" },
+      "ultrawork": { "model": "anthropic/claude-opus-4-7", "variant": "max" },
     },
 
     // Research agents: cheaper models are fine
@@ -207,10 +207,10 @@ You can override specific agents or categories in your config:
     "unspecified-low": { "model": "openai/gpt-5.4-mini" },
 
     // High-effort fallback: best available
-    "unspecified-high": { "model": "anthropic/claude-opus-4-6", "variant": "max" },
+    "unspecified-high": { "model": "anthropic/claude-opus-4-7", "variant": "max" },
 
     // Prose and documentation
-    "writing": { "model": "anthropic/claude-opus-4-6", "variant": "high" },
+    "writing": { "model": "anthropic/claude-opus-4-7", "variant": "high" },
   },
 }
 ```
@@ -219,7 +219,7 @@ You can override specific agents or categories in your config:
 
 **Claude-like models** (instruction-following, structured output):
 
-- Claude Opus 4.6, Claude Haiku 4.5
+- Claude Opus 4.7, Claude Haiku 4.5
 - Kimi K2.5 — behaves very similarly to Claude
 - GLM 5 — Claude-like behavior, good for broad tasks
 

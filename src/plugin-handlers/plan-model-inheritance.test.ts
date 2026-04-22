@@ -18,7 +18,7 @@ describe("buildPlanDemoteConfig", () => {
     //#given
     const prometheusConfig = {
       name: "prometheus",
-      model: "anthropic/claude-opus-4-6",
+      model: "anthropic/claude-opus-4-7",
       variant: "max",
       mode: "primary",
       prompt: "You are Prometheus...",
@@ -39,7 +39,7 @@ describe("buildPlanDemoteConfig", () => {
 
     //#then - picks model settings, NOT prompt/permission/description/color/name/mode
     expect(result.mode).toBe("subagent")
-    expect(result.model).toBe("anthropic/claude-opus-4-6")
+    expect(result.model).toBe("anthropic/claude-opus-4-7")
     expect(result.variant).toBe("max")
     expect(result.temperature).toBe(0.1)
     expect(result.top_p).toBe(0.95)
@@ -58,7 +58,7 @@ describe("buildPlanDemoteConfig", () => {
   test("plan override takes priority over prometheus for all model settings", () => {
     //#given
     const prometheusConfig = {
-      model: "anthropic/claude-opus-4-6",
+      model: "anthropic/claude-opus-4-7",
       variant: "max",
       temperature: 0.1,
       reasoningEffort: "high",
@@ -83,7 +83,7 @@ describe("buildPlanDemoteConfig", () => {
   test("falls back to prometheus when plan override has partial settings", () => {
     //#given
     const prometheusConfig = {
-      model: "anthropic/claude-opus-4-6",
+      model: "anthropic/claude-opus-4-7",
       variant: "max",
       temperature: 0.1,
       reasoningEffort: "high",
@@ -105,14 +105,14 @@ describe("buildPlanDemoteConfig", () => {
   test("skips undefined values from both sources", () => {
     //#given
     const prometheusConfig = {
-      model: "anthropic/claude-opus-4-6",
+      model: "anthropic/claude-opus-4-7",
     }
 
     //#when
     const result = buildPlanDemoteConfig(prometheusConfig, undefined)
 
     //#then
-    expect(result).toEqual({ mode: "subagent", hidden: true, model: "anthropic/claude-opus-4-6" })
+    expect(result).toEqual({ mode: "subagent", hidden: true, model: "anthropic/claude-opus-4-7" })
     expect(Object.keys(result)).toEqual(["mode", "hidden", "model"])
   })
 })

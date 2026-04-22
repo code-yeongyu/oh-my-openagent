@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test"
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { clearCommandLoaderCache } from "../../features/claude-code-command-loader"
 import { executeSlashCommand } from "./executor"
 
 const ENV_KEYS = [
@@ -95,6 +96,7 @@ describe("auto-slash command executor plugin dispatch", () => {
   let envSnapshot: EnvSnapshot
 
   beforeEach(() => {
+    clearCommandLoaderCache()
     tempDir = mkdtempSync(join(tmpdir(), "omo-executor-plugin-test-"))
     envSnapshot = {
       CLAUDE_CONFIG_DIR: process.env.CLAUDE_CONFIG_DIR,
@@ -106,6 +108,7 @@ describe("auto-slash command executor plugin dispatch", () => {
   })
 
   afterEach(() => {
+    clearCommandLoaderCache()
     for (const key of ENV_KEYS) {
       const previousValue = envSnapshot[key]
       if (previousValue === undefined) {

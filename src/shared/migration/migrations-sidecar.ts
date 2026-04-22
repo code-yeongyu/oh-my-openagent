@@ -22,7 +22,7 @@ import { writeFileAtomically } from "../write-file-atomically"
  *     {
  *       "appliedMigrations": [
  *         "model-version:openai/gpt-5.3-codex->openai/gpt-5.4",
- *         "model-version:anthropic/claude-opus-4-5->anthropic/claude-opus-4-6"
+ *         "model-version:anthropic/claude-opus-4-5->anthropic/claude-opus-4-7"
  *       ]
  *     }
  */

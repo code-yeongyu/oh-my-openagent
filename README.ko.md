@@ -164,11 +164,11 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 <td align="center"><img src=".github/assets/hephaestus.png" height="300" /></td>
 </tr></table>
 
-**Sisyphus** (`claude-opus-4-6` / **`kimi-k2.5`** / **`glm-5`**)는 당신의 메인 오케스트레이터입니다. 공격적인 병렬 실행으로 계획을 세우고, 전문가들에게 위임하며, 완료될 때까지 밀어붙입니다. 중간에 포기하는 법이 없습니다.
+**Sisyphus** (`claude-opus-4-7` / **`kimi-k2.5`** / **`glm-5`**)는 당신의 메인 오케스트레이터입니다. 공격적인 병렬 실행으로 계획을 세우고, 전문가들에게 위임하며, 완료될 때까지 밀어붙입니다. 중간에 포기하는 법이 없습니다.
 
 **Hephaestus** (`gpt-5.4`)는 당신의 자율 딥 워커입니다. 레시피가 아니라 목표를 주세요. 베이비시터 없이 알아서 코드베이스를 탐색하고, 패턴을 연구하며, 끝에서 끝까지 전부 해냅니다. *진정한 장인(The Legitimate Craftsman).*
 
-**Prometheus** (`claude-opus-4-6` / **`kimi-k2.5`** / **`glm-5`**)는 당신의 전략 플래너입니다. 인터뷰 모드로 작동합니다. 코드 한 줄 만지기 전에 질문을 던져 스코프를 파악하고 상세한 계획부터 세웁니다.
+**Prometheus** (`claude-opus-4-7` / **`kimi-k2.5`** / **`glm-5`**)는 당신의 전략 플래너입니다. 인터뷰 모드로 작동합니다. 코드 한 줄 만지기 전에 질문을 던져 스코프를 파악하고 상세한 계획부터 세웁니다.
 
 모든 에이전트는 해당 모델의 특장점에 맞춰 튜닝되어 있습니다. 수동으로 모델 바꿔가며 뻘짓하지 마세요. [더 알아보기 →](docs/guide/overview.md)
 

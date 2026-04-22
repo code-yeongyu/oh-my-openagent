@@ -65,13 +65,13 @@ function createChatMessageHandlerHooks(modelFallback: ReturnType<typeof createMo
 let readConnectedProvidersCacheSpy: { mockRestore: () => void } | undefined
 let readProviderModelsCacheSpy: { mockRestore: () => void } | undefined
 
-afterEach(() => {
-	readConnectedProvidersCacheSpy?.mockRestore()
-	readProviderModelsCacheSpy?.mockRestore()
-	readConnectedProvidersCacheSpy = undefined
-	readProviderModelsCacheSpy = undefined
-	_resetForTesting()
-})
+		afterEach(() => {
+			readConnectedProvidersCacheSpy?.mockRestore()
+			readProviderModelsCacheSpy?.mockRestore()
+			readConnectedProvidersCacheSpy = undefined
+			readProviderModelsCacheSpy = undefined
+			_resetForTesting()
+		})
 
 describe("createEventHandler - category runtime fallback suppression", () => {
 	test("does not arm retry fallback when category session explicitly stores no fallback chain [regression #2941]", async () => {
@@ -83,11 +83,10 @@ describe("createEventHandler - category runtime fallback suppression", () => {
 		readConnectedProvidersCacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(null)
 		readProviderModelsCacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue(null)
 
-		clearPendingModelFallback(sessionID)
-		setSessionAgent(sessionID, "sisyphus-junior")
-		setSessionFallbackChain(sessionID, undefined)
-
 		const modelFallback = createModelFallbackHook()
+		clearPendingModelFallback(modelFallback, sessionID)
+		setSessionAgent(sessionID, "sisyphus-junior")
+		setSessionFallbackChain(modelFallback, sessionID, undefined)
 		const eventHandler = createEventHandler({
 			ctx: asEventHandlerContext({
 				directory: "/tmp",

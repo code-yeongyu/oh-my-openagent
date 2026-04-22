@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, realpathSync } from "node:fs";
 import { join } from "node:path";
+import { EXCLUDED_DIRS } from "../../shared";
 import { GITHUB_INSTRUCTIONS_PATTERN, RULE_EXTENSIONS } from "./constants";
 
 function isGitHubInstructionsDir(dir: string): boolean {
@@ -28,6 +29,7 @@ export function findRuleFilesRecursive(dir: string, results: string[]): void {
       const fullPath = join(dir, entry.name);
 
       if (entry.isDirectory()) {
+        if (EXCLUDED_DIRS.has(entry.name)) continue;
         findRuleFilesRecursive(fullPath, results);
       } else if (entry.isFile()) {
         if (isValidRuleFile(entry.name, dir)) {

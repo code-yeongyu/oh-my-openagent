@@ -1,17 +1,17 @@
 # oh-my-opencode — OpenCode Plugin
 
-**Generated:** 2026-04-11 | **Commit:** f5dc1c0e | **Branch:** dev
+**Generated:** 2026-04-18 | **Commit:** 2892ca4a | **Branch:** dev
 
 ## OVERVIEW
 
-OpenCode plugin (npm: `oh-my-opencode`) extending Claude Code with multi-agent orchestration, 52 lifecycle hooks, 26 tools, skill/command/MCP systems, Hashline edit tool, IntentGate classifier, and Claude Code compatibility. ~1600 TypeScript source files. Dual-published as `oh-my-opencode` + `oh-my-openagent` during transition.
+OpenCode plugin (npm: `oh-my-opencode`, dual-published as `oh-my-openagent` during transition) extending Claude Code with 11 agents, 52 lifecycle hooks, 26 tools, 3-tier MCP system (built-in + .mcp.json + skill-embedded), Hashline LINE#ID edit tool, IntentGate classifier, and Claude Code compatibility. 1766 TypeScript source files, 377k LOC, 104 barrel index.ts files. Entry: `src/index.ts` → 5-step init (loadConfig → createManagers → createTools → createHooks → createPluginInterface).
 
 ## STRUCTURE
 
 ```
 oh-my-opencode/
 ├── src/
-│   ├── index.ts              # Plugin entry: loadConfig → createManagers → createTools → createHooks → createPluginInterface
+│   ├── index.ts              # Plugin entry: default export `pluginModule`, shape `{ id, server }`
 │   ├── plugin-config.ts      # JSONC multi-level config: user → project → defaults (Zod v4)
 │   ├── agents/               # 11 agents (Sisyphus, Hephaestus, Oracle, Librarian, Explore, Atlas, Prometheus, Metis, Momus, Multimodal-Looker, Sisyphus-Junior)
 │   ├── hooks/                # 52 lifecycle hooks across dedicated modules and standalone files
@@ -33,7 +33,7 @@ oh-my-opencode/
 ## INITIALIZATION FLOW
 
 ```
-OhMyOpenCodePlugin(ctx)
+pluginModule.server(input, options)
   ├─→ loadPluginConfig()         # JSONC parse → project/user merge → Zod validate → migrate
   ├─→ createManagers()           # TmuxSessionManager, BackgroundManager, SkillMcpManager, ConfigHandler
   ├─→ createTools()              # SkillContext + AvailableCategories + ToolRegistry (26 tools)

@@ -14,7 +14,7 @@ describe("model-resolution check", () => {
       // then: Should have agent entries
       const sisyphus = info.agents.find((a) => a.name === "sisyphus")
       expect(sisyphus).toBeDefined()
-      expect(sisyphus!.requirement.fallbackChain[0]?.model).toBe("claude-opus-4-6")
+      expect(sisyphus!.requirement.fallbackChain[0]?.model).toBe("claude-opus-4-7")
       expect(sisyphus!.requirement.fallbackChain[0]?.providers).toContain("anthropic")
     })
 
@@ -42,7 +42,7 @@ describe("model-resolution check", () => {
       // given: User has override for oracle agent
       const mockConfig = {
         agents: {
-          oracle: { model: "anthropic/claude-opus-4-6" },
+          oracle: { model: "anthropic/claude-opus-4-7" },
         },
       }
 
@@ -51,8 +51,8 @@ describe("model-resolution check", () => {
       // then: Oracle should show the override
       const oracle = info.agents.find((a) => a.name === "oracle")
       expect(oracle).toBeDefined()
-      expect(oracle!.userOverride).toBe("anthropic/claude-opus-4-6")
-      expect(oracle!.effectiveResolution).toBe("User override: anthropic/claude-opus-4-6")
+      expect(oracle!.userOverride).toBe("anthropic/claude-opus-4-7")
+      expect(oracle!.effectiveResolution).toBe("User override: anthropic/claude-opus-4-7")
     })
 
     it("shows user override for category when configured", async () => {
@@ -169,13 +169,13 @@ describe("model-resolution check", () => {
 
       const info = getModelResolutionInfoWithOverrides({
         agents: {
-          oracle: { model: "anthropic/claude-opus-4-6-thinking" },
+          oracle: { model: "anthropic/claude-opus-4-7-thinking" },
         },
       })
 
       const oracle = info.agents.find((agent) => agent.name === "oracle")
       expect(oracle).toBeDefined()
-      expect(oracle!.effectiveModel).toBe("anthropic/claude-opus-4-6-thinking")
+      expect(oracle!.effectiveModel).toBe("anthropic/claude-opus-4-7-thinking")
       expect(oracle!.capabilityDiagnostics).toMatchObject({
         resolutionMode: "alias-backed",
         canonicalization: {

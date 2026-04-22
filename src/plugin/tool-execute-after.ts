@@ -1,9 +1,8 @@
-import { consumeToolMetadata } from "../features/tool-metadata-store"
+import { recoverToolMetadata } from "../features/tool-metadata-store"
 import type { CreatedHooks } from "../create-hooks"
-import { log } from "../shared"
+import { log } from "../shared/logger"
 import { stripInvisibleAgentCharacters } from "../shared/agent-display-names"
 import type { PluginContext } from "./types"
-import { readState, writeState } from "../hooks/ralph-loop/storage"
 
 const VERIFICATION_ATTEMPT_PATTERN = /<ulw_verification_attempt_id>(.*?)<\/ulw_verification_attempt_id>/i
 
@@ -37,20 +36,45 @@ export function createToolExecuteAfterHandler(args: {
 ) => Promise<void> {
   const { ctx, hooks } = args
 
+  // OpenCode injects tool call ids into execute() context and after-hook input via undocumented runtime fields.
+  // We must treat their identity as a best-effort correlation key, not a guaranteed public contract.
+
   return async (
-    input: { tool: string; sessionID: string; callID: string },
+    input: { tool: string; sessionID: string; callID?: string; callId?: string; call_id?: string },
     output: { title: string; output: string; metadata: Record<string, unknown> } | undefined,
   ): Promise<void> => {
     if (!output) return
 
-    const stored = consumeToolMetadata(input.sessionID, input.callID)
+    const hookInput = {
+      tool: input.tool,
+      sessionID: input.sessionID,
+      callID: input.callID ?? input.callId ?? input.call_id ?? "",
+    }
+
+    const nativeSessionId = getMetadataString(output.metadata, ["sessionId", "sessionID", "session_id"])
+    const stored = recoverToolMetadata(input.sessionID, input)
     if (stored) {
       if (stored.title) {
         output.title = stored.title
       }
       if (stored.metadata) {
-        output.metadata = { ...output.metadata, ...stored.metadata }
+        if (nativeSessionId) {
+          log("[tool-execute-after] Native output metadata already includes session linkage; skipping stored metadata overwrite", {
+            tool: input.tool,
+            sessionID: input.sessionID,
+            callID: input.callID ?? input.callId ?? input.call_id,
+            nativeSessionId,
+          })
+        } else {
+          output.metadata = { ...output.metadata, ...stored.metadata }
+        }
       }
+    } else if (!nativeSessionId) {
+      log("[tool-execute-after] Unable to recover stored metadata and no native session linkage was present", {
+        tool: input.tool,
+        sessionID: input.sessionID,
+        callID: input.callID ?? input.callId ?? input.call_id,
+      })
     }
 
     if (input.tool === "task") {
@@ -59,7 +83,9 @@ export function createToolExecuteAfterHandler(args: {
       const agent = getMetadataString(output.metadata, ["agent"])
       const prompt = getMetadataString(output.metadata, ["prompt"])
       const verificationAttemptId = prompt?.match(VERIFICATION_ATTEMPT_PATTERN)?.[1]?.trim()
-      const loopState = directory ? readState(directory) : null
+      const loopState = directory
+        ? (await import("../hooks/ralph-loop/storage")).readState(directory)
+        : null
       const isVerificationContext =
         (agent ? stripInvisibleAgentCharacters(agent) : agent) === "oracle"
         && !!sessionId
@@ -83,7 +109,7 @@ export function createToolExecuteAfterHandler(args: {
         && verificationAttemptId
         && loopState.verification_attempt_id === verificationAttemptId
       ) {
-        writeState(directory, {
+        ;(await import("../hooks/ralph-loop/storage")).writeState(directory, {
           ...loopState,
           verification_session_id: sessionId,
         })
@@ -93,7 +119,7 @@ export function createToolExecuteAfterHandler(args: {
           verificationAttemptId,
         })
       } else if (isVerificationContext && !verificationAttemptId) {
-        writeState(directory, {
+        ;(await import("../hooks/ralph-loop/storage")).writeState(directory, {
           ...loopState,
           verification_session_id: sessionId,
         })
@@ -108,26 +134,26 @@ export function createToolExecuteAfterHandler(args: {
     }
 
     const runToolExecuteAfterHooks = async (): Promise<void> => {
-      await hooks.toolOutputTruncator?.["tool.execute.after"]?.(input, output)
-      await hooks.claudeCodeHooks?.["tool.execute.after"]?.(input, output)
-      await hooks.preemptiveCompaction?.["tool.execute.after"]?.(input, output)
-      await hooks.contextWindowMonitor?.["tool.execute.after"]?.(input, output)
-      await hooks.commentChecker?.["tool.execute.after"]?.(input, output)
-      await hooks.directoryAgentsInjector?.["tool.execute.after"]?.(input, output)
-      await hooks.directoryReadmeInjector?.["tool.execute.after"]?.(input, output)
-      await hooks.rulesInjector?.["tool.execute.after"]?.(input, output)
-      await hooks.emptyTaskResponseDetector?.["tool.execute.after"]?.(input, output)
-      await hooks.agentUsageReminder?.["tool.execute.after"]?.(input, output)
-      await hooks.categorySkillReminder?.["tool.execute.after"]?.(input, output)
-      await hooks.interactiveBashSession?.["tool.execute.after"]?.(input, output)
-      await hooks.editErrorRecovery?.["tool.execute.after"]?.(input, output)
-      await hooks.delegateTaskRetry?.["tool.execute.after"]?.(input, output)
-      await hooks.atlasHook?.["tool.execute.after"]?.(input, output)
-      await hooks.taskResumeInfo?.["tool.execute.after"]?.(input, output)
-      await hooks.readImageResizer?.["tool.execute.after"]?.(input, output)
-      await hooks.hashlineReadEnhancer?.["tool.execute.after"]?.(input, output)
-      await hooks.webfetchRedirectGuard?.["tool.execute.after"]?.(input, output)
-      await hooks.jsonErrorRecovery?.["tool.execute.after"]?.(input, output)
+      await hooks.toolOutputTruncator?.["tool.execute.after"]?.(hookInput, output)
+      await hooks.claudeCodeHooks?.["tool.execute.after"]?.(hookInput, output)
+      await hooks.preemptiveCompaction?.["tool.execute.after"]?.(hookInput, output)
+      await hooks.contextWindowMonitor?.["tool.execute.after"]?.(hookInput, output)
+      await hooks.commentChecker?.["tool.execute.after"]?.(hookInput, output)
+      await hooks.directoryAgentsInjector?.["tool.execute.after"]?.(hookInput, output)
+      await hooks.directoryReadmeInjector?.["tool.execute.after"]?.(hookInput, output)
+      await hooks.rulesInjector?.["tool.execute.after"]?.(hookInput, output)
+      await hooks.emptyTaskResponseDetector?.["tool.execute.after"]?.(hookInput, output)
+      await hooks.agentUsageReminder?.["tool.execute.after"]?.(hookInput, output)
+      await hooks.categorySkillReminder?.["tool.execute.after"]?.(hookInput, output)
+      await hooks.interactiveBashSession?.["tool.execute.after"]?.(hookInput, output)
+      await hooks.editErrorRecovery?.["tool.execute.after"]?.(hookInput, output)
+      await hooks.delegateTaskRetry?.["tool.execute.after"]?.(hookInput, output)
+      await hooks.atlasHook?.["tool.execute.after"]?.(hookInput, output)
+      await hooks.taskResumeInfo?.["tool.execute.after"]?.(hookInput, output)
+      await hooks.readImageResizer?.["tool.execute.after"]?.(hookInput, output)
+      await hooks.hashlineReadEnhancer?.["tool.execute.after"]?.(hookInput, output)
+      await hooks.webfetchRedirectGuard?.["tool.execute.after"]?.(hookInput, output)
+      await hooks.jsonErrorRecovery?.["tool.execute.after"]?.(hookInput, output)
     }
 
     if (input.tool === "extract" || input.tool === "discard") {
@@ -146,7 +172,7 @@ export function createToolExecuteAfterHandler(args: {
         log("[tool-execute-after] Failed to process extract/discard hooks", {
           tool: input.tool,
           sessionID: input.sessionID,
-          callID: input.callID,
+          callID: input.callID ?? input.callId ?? input.call_id,
           error,
         })
       }
