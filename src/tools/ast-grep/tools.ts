@@ -3,6 +3,7 @@ import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
 import { CLI_LANGUAGES } from "./constants"
 import { runSg } from "./cli"
 import { formatSearchResult, formatReplaceResult } from "./result-formatter"
+import { getPatternHint } from "./pattern-hints"
 import type { CliLanguage } from "./types"
 
 async function showOutputToUser(context: unknown, output: string): Promise<void> {
@@ -10,29 +11,6 @@ async function showOutputToUser(context: unknown, output: string): Promise<void>
     metadata?: (input: { metadata: { output: string } }) => void | Promise<void>
   }
   await ctx.metadata?.({ metadata: { output } })
-}
-
-function getEmptyResultHint(pattern: string, lang: CliLanguage): string | null {
-  const src = pattern.trim()
-
-  if (lang === "python") {
-    if (src.startsWith("class ") && src.endsWith(":")) {
-      const withoutColon = src.slice(0, -1)
-      return `Hint: Remove trailing colon. Try: "${withoutColon}"`
-    }
-    if ((src.startsWith("def ") || src.startsWith("async def ")) && src.endsWith(":")) {
-      const withoutColon = src.slice(0, -1)
-      return `Hint: Remove trailing colon. Try: "${withoutColon}"`
-    }
-  }
-
-  if (["javascript", "typescript", "tsx"].includes(lang)) {
-    if (/^(export\s+)?(async\s+)?function\s+\$[A-Z_]+\s*$/i.test(src)) {
-      return `Hint: Function patterns need params and body. Try "function $NAME($$$) { $$$ }"`
-    }
-  }
-
-  return null
 }
 
 export function createAstGrepTools(ctx: PluginInput): Record<string, ToolDefinition> {
@@ -63,7 +41,7 @@ export function createAstGrepTools(ctx: PluginInput): Record<string, ToolDefinit
         let output = formatSearchResult(result)
 
         if (result.matches.length === 0 && !result.error) {
-          const hint = getEmptyResultHint(args.pattern, args.lang as CliLanguage)
+          const hint = getPatternHint(args.pattern, args.lang as CliLanguage)
           if (hint) {
             output += `\n\n${hint}`
           }
