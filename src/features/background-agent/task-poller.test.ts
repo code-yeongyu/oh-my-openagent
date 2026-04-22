@@ -253,13 +253,13 @@ describe("checkAndInterruptStaleTasks", () => {
     expect(task.error).toContain("no activity")
   })
 
-  it("should NOT interrupt task when session is running, even if lastUpdate exceeds stale timeout", async () => {
-    //#given - lastUpdate is 5min old but session is actively running
+  it("should NOT interrupt busy session when progress is within the configured stale timeout", async () => {
+    //#given - session is busy and progress was observed recently
     const task = createRunningTask({
       startedAt: new Date(Date.now() - 300_000),
       progress: {
         toolCalls: 2,
-        lastUpdate: new Date(Date.now() - 300_000),
+        lastUpdate: new Date(Date.now() - 60_000),
       },
     })
 
@@ -273,12 +273,12 @@ describe("checkAndInterruptStaleTasks", () => {
       sessionStatuses: { "ses-1": { type: "busy" } },
     })
 
-    //#then - task should survive because session is actively busy
+    //#then
     expect(task.status).toBe("running")
   })
 
-  it("should NOT interrupt busy session task even with very old lastUpdate", async () => {
-    //#given - lastUpdate is 15min old, but session is still busy
+  it("should interrupt busy session task when lastUpdate exceeds stale timeout", async () => {
+    //#given - the session still reports busy, but no progress arrived within the configured timeout
     const task = createRunningTask({
       startedAt: new Date(Date.now() - 900_000),
       progress: {
@@ -297,14 +297,15 @@ describe("checkAndInterruptStaleTasks", () => {
       sessionStatuses: { "ses-1": { type: "busy" } },
     })
 
-    //#then - busy sessions are NEVER stale-killed (babysitter + TTL prune handle these)
-    expect(task.status).toBe("running")
+    //#then
+    expect(task.status).toBe("cancelled")
+    expect(task.error).toContain("Stale timeout")
   })
 
-  it("should NOT interrupt busy session even with no progress (undefined lastUpdate)", async () => {
-    //#given - task has no progress at all, but session is busy
+  it("should NOT interrupt busy session with no progress within message staleness timeout", async () => {
+    //#given - task has no progress yet, but it is still inside the configured first-progress window
     const task = createRunningTask({
-      startedAt: new Date(Date.now() - 15 * 60 * 1000),
+      startedAt: new Date(Date.now() - 5 * 60 * 1000),
       progress: undefined,
     })
 
@@ -318,8 +319,31 @@ describe("checkAndInterruptStaleTasks", () => {
       sessionStatuses: { "ses-1": { type: "busy" } },
     })
 
-    //#then - task should survive because session is actively running
+    //#then
     expect(task.status).toBe("running")
+  })
+
+  it("should interrupt busy session when it exceeds configured no-progress timeout", async () => {
+    //#given - the session reports busy, but no progress event arrived within the configured timeout
+    const task = createRunningTask({
+      startedAt: new Date(Date.now() - 15 * 60 * 1000),
+      progress: undefined,
+    })
+
+    //#when
+    await checkAndInterruptStaleTasks({
+      tasks: [task],
+      client: mockClient as never,
+      config: { messageStalenessTimeoutMs: 600_000 },
+      concurrencyManager: mockConcurrencyManager as never,
+      notifyParentSession: mockNotify,
+      sessionStatuses: { "ses-1": { type: "busy" } },
+    })
+
+    //#then
+    expect(task.status).toBe("cancelled")
+    expect(task.error).toContain("no activity")
+    expect(mockNotify).toHaveBeenCalledWith(task)
   })
 
   it("should interrupt task when session is idle and lastUpdate exceeds stale timeout", async () => {
@@ -347,8 +371,8 @@ describe("checkAndInterruptStaleTasks", () => {
     expect(task.error).toContain("Stale timeout")
   })
 
-  it("should NOT interrupt running session task even with very old lastUpdate", async () => {
-    //#given - lastUpdate is 15min old, but session is still running
+  it("should interrupt running session task when lastUpdate exceeds stale timeout", async () => {
+    //#given - the session reports running, but no progress arrived within the configured timeout
     const task = createRunningTask({
       startedAt: new Date(Date.now() - 900_000),
       progress: {
@@ -367,12 +391,13 @@ describe("checkAndInterruptStaleTasks", () => {
       sessionStatuses: { "ses-1": { type: "running" } },
     })
 
-    //#then - running sessions are NEVER stale-killed (babysitter + TTL prune handle these)
-    expect(task.status).toBe("running")
+    //#then
+    expect(task.status).toBe("cancelled")
+    expect(task.error).toContain("Stale timeout")
   })
 
-  it("should NOT interrupt running session even with no progress (undefined lastUpdate)", async () => {
-    //#given - task has no progress at all, but session is running
+  it("should interrupt running session with no progress after message staleness timeout", async () => {
+    //#given - the session reports running, but no progress ever arrived within the configured timeout
     const task = createRunningTask({
       startedAt: new Date(Date.now() - 15 * 60 * 1000),
       progress: undefined,
@@ -388,8 +413,9 @@ describe("checkAndInterruptStaleTasks", () => {
       sessionStatuses: { "ses-1": { type: "running" } },
     })
 
-    //#then — running sessions are NEVER killed, even without progress
-    expect(task.status).toBe("running")
+    //#then
+    expect(task.status).toBe("cancelled")
+    expect(task.error).toContain("no activity")
   })
 
   it("should NOT cancel healthy task on first missing status poll", async () => {
@@ -624,8 +650,8 @@ describe("checkAndInterruptStaleTasks", () => {
     expect(task.error).toContain("session gone from status registry")
   })
 
-  it("should NOT interrupt task when session is busy (OpenCode status), even if lastUpdate exceeds stale timeout", async () => {
-    //#given — lastUpdate is 5min old but session is "busy" (OpenCode's actual status for active sessions)
+  it("should interrupt task when busy session exceeds stale timeout", async () => {
+    //#given — lastUpdate is 5min old and session is still "busy"
     const task = createRunningTask({
       startedAt: new Date(Date.now() - 300_000),
       progress: {
@@ -644,11 +670,12 @@ describe("checkAndInterruptStaleTasks", () => {
       sessionStatuses: { "ses-1": { type: "busy" } },
     })
 
-    //#then — "busy" sessions must be protected from stale-kill
-    expect(task.status).toBe("running")
+    //#then
+    expect(task.status).toBe("cancelled")
+    expect(task.error).toContain("Stale timeout")
   })
 
-  it("should NOT interrupt task when session is in retry state", async () => {
+  it("should interrupt task when retry session exceeds stale timeout", async () => {
     //#given — lastUpdate is 5min old but session is retrying
     const task = createRunningTask({
       startedAt: new Date(Date.now() - 300_000),
@@ -668,12 +695,13 @@ describe("checkAndInterruptStaleTasks", () => {
       sessionStatuses: { "ses-1": { type: "retry" } },
     })
 
-    //#then — retry sessions must be protected from stale-kill
-    expect(task.status).toBe("running")
+    //#then
+    expect(task.status).toBe("cancelled")
+    expect(task.error).toContain("Stale timeout")
   })
 
-  it("should NOT interrupt busy session even with no progress (undefined lastUpdate)", async () => {
-    //#given — no progress at all, session is "busy" (thinking model with no streamed tokens yet)
+  it("should interrupt busy session with no progress after message staleness timeout", async () => {
+    //#given — no progress at all, session is still "busy"
     const task = createRunningTask({
       startedAt: new Date(Date.now() - 15 * 60 * 1000),
       progress: undefined,
@@ -689,8 +717,9 @@ describe("checkAndInterruptStaleTasks", () => {
       sessionStatuses: { "ses-1": { type: "busy" } },
     })
 
-    //#then — busy sessions with no progress must survive
-    expect(task.status).toBe("running")
+    //#then
+    expect(task.status).toBe("cancelled")
+    expect(task.error).toContain("no activity")
   })
 
   it("should release concurrency key when interrupting a never-updated task", async () => {

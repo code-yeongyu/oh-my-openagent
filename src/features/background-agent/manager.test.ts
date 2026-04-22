@@ -4354,7 +4354,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
     expect(task.status).toBe("cancelled")
   })
 
-  test("should NOT interrupt task when session is running, even with stale lastUpdate", async () => {
+  test("should interrupt running session when lastUpdate exceeds stale timeout", async () => {
     //#given
     const client = {
       session: {
@@ -4367,6 +4367,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
       },
     }
     const manager = new BackgroundManager({ pluginContext: createPluginInput(client), config: { staleTimeoutMs: 180_000 } })
+    stubNotifyParentSession(manager)
 
     const task: BackgroundTask = {
       id: "task-running-session",
@@ -4386,11 +4387,12 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
 
     getTaskMap(manager).set(task.id, task)
 
-    //#when - session is actively running
+    //#when - session still reports running, but progress is stale
     await manager["checkAndInterruptStaleTasks"]({ "session-running": { type: "running" } })
 
-    //#then - task survives because session is running
-    expect(task.status).toBe("running")
+    //#then
+    expect(task.status).toBe("cancelled")
+    expect(task.error).toContain("Stale timeout")
   })
 
   test("should interrupt task when session is idle and lastUpdate exceeds stale timeout", async () => {
@@ -4434,7 +4436,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
     expect(task.error).toContain("Stale timeout")
   })
 
-  test("should NOT interrupt running session even with very old lastUpdate (no safety net)", async () => {
+  test("should interrupt running session even with very old lastUpdate", async () => {
     //#given
     const client = {
       session: {
@@ -4444,6 +4446,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
       },
     }
     const manager = new BackgroundManager({ pluginContext: createPluginInput(client), config: { staleTimeoutMs: 180_000 } })
+    stubNotifyParentSession(manager)
 
     const task: BackgroundTask = {
       id: "task-long-running",
@@ -4466,11 +4469,12 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
     //#when - session is running, lastUpdate 15min old
     await manager["checkAndInterruptStaleTasks"]({ "session-long": { type: "running" } })
 
-    //#then - running sessions are NEVER stale-killed
-    expect(task.status).toBe("running")
+    //#then
+    expect(task.status).toBe("cancelled")
+    expect(task.error).toContain("Stale timeout")
   })
 
-  test("should NOT interrupt running session with no progress (undefined lastUpdate)", async () => {
+  test("should interrupt running session with no progress after message staleness timeout", async () => {
     //#given - no progress at all, but session is running
     const client = {
       session: {
@@ -4480,6 +4484,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
       },
     }
     const manager = new BackgroundManager({ pluginContext: createPluginInput(client), config: { messageStalenessTimeoutMs: 600_000 } })
+    stubNotifyParentSession(manager)
 
     const task: BackgroundTask = {
       id: "task-running-no-progress",
@@ -4500,8 +4505,9 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
     //#when - session is running despite no progress
     await manager["checkAndInterruptStaleTasks"]({ "session-rnp": { type: "running" } })
 
-    //#then - running sessions are NEVER killed
-    expect(task.status).toBe("running")
+    //#then
+    expect(task.status).toBe("cancelled")
+    expect(task.error).toContain("no activity")
   })
 
   test("should interrupt task with no lastUpdate after messageStalenessTimeout", async () => {
