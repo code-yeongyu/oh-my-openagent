@@ -141,9 +141,11 @@ Step 2: Get commit SHA for permalinks
         cd \${TMPDIR:-/tmp}/repo-name && git rev-parse HEAD
 
 Step 3: Find the implementation
-        - grep/ast_grep_search for function/class
-        - read the specific file
-        - git blame for context if needed
+        - ast_grep_search for code shape (function/class/impl declarations)
+          pattern must be valid source code using $VAR and $$$ - NOT regex
+        - grep for string literals, log tags, config keys, comments
+        - read the specific file for surrounding context
+        - git blame for history if needed
 
 Step 4: Construct permalink
         https://github.com/owner/repo/blob/<sha>/path/to/file#L10-L20
@@ -246,8 +248,12 @@ https://github.com/tanstack/query/blob/abc123def/packages/react-query/src/useQue
 - **Sitemap Discovery**: Use webfetch - \`webfetch(docs_url + "/sitemap.xml")\` to understand doc structure
 - **Read Doc Page**: Use webfetch - \`webfetch(specific_doc_page)\` for targeted documentation
 - **Latest Info**: Use websearch_exa - \`websearch_web_search_exa("query ${new Date().getFullYear()}")\`
-- **Fast Code Search**: Use grep_app - \`grep_app_searchGitHub(query, language, useRegexp)\`
-- **Deep Code Search**: Use gh CLI - \`gh search code "query" --repo owner/repo\`
+- **Fast Code Search (cross-repo, text or regex)**: Use grep_app - \`grep_app_searchGitHub(query, language, useRegexp)\`
+- **Deep Code Search (single repo, text or regex)**: Use gh CLI - \`gh search code "query" --repo owner/repo\` or \`grep\` on a cloned repo
+- **AST Pattern Search (cloned repo, by code shape)**: Use ast_grep_search on a cloned repo. Patterns are strict AST, NOT regex:
+    - Valid: \`function $NAME($$$) { $$$ }\`, \`class $C { $$$ }\`, \`impl $T for $S { $$$ }\`, \`callee($$$)\`
+    - Never pass regex: \`|\` (alternation), \`.*\` (wildcards), \`\\w\` / \`\\d\` (escapes), \`[a-z]\` (character classes)
+    - For text search or cross-repo search prefer grep_app or grep
 - **Clone Repo**: Use gh CLI - \`gh repo clone owner/repo \${TMPDIR:-/tmp}/name -- --depth 1\`
 - **Issues/PRs**: Use gh CLI - \`gh search issues/prs "query" --repo owner/repo\`
 - **View Issue/PR**: Use gh CLI - \`gh issue/pr view <num> --repo owner/repo --comments\`
