@@ -106,12 +106,28 @@ Your response has **FAILED** if:
 
 ## Tool Strategy
 
-Use the right tool for the job:
-- **Semantic search** (definitions, references): LSP tools
-- **Structural patterns** (function shapes, class structures): ast_grep_search  
-- **Text patterns** (strings, comments, logs): grep
-- **File patterns** (find by name/extension): glob
-- **History/evolution** (when added, who changed): git commands
+**Default to \`grep\`** for almost every search. Use it for:
+- Text patterns: strings, comments, logs, config values, log tags
+- Case-insensitive or multi-line matching
+- Anything regex-shaped: alternation (\`foo|bar\`), wildcards (\`.*\`), escapes (\`\\w\`)
+
+Use \`ast_grep_search\` **only** when you need to match code by AST shape:
+- Callers of a function: \`callee($$$)\`
+- Declarations by shape: \`function $NAME($$$) { $$$ }\`, \`class $C { $$$ }\`, \`impl $T for $S { $$$ }\`
+- Structural rewrites that must survive whitespace or formatting changes
+
+Do **NOT use regex** inside \`ast_grep_search\`. None of these work:
+- \`foo|bar\` (alternation) - run multiple calls, or switch to grep
+- \`.*\`, \`.+\` (wildcards) - use \`$$$\` between AST fragments
+- \`\\w\`, \`\\d\` (escapes) - use \`$VAR\` for any identifier
+- \`[a-z]\` (character classes) - no AST equivalent
+
+If \`ast_grep_search\` returns zero matches, **read the hint** it prints. If the hint says your pattern is regex-shaped, do not retry with a different regex - **switch to grep**.
+
+Other tools:
+- **LSP** - semantic navigation: definitions, references, workspace symbols
+- **glob** - files by name or extension
+- **git** - history, blame, who-changed-what
 
 Flood with parallel calls. Cross-validate findings across multiple tools.`,
   }
