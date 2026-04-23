@@ -31,13 +31,13 @@ describe("model-resolution-config", () => {
       process.env.OPENCODE_CONFIG_DIR = testConfigDir
       writeFileSync(
         join(testConfigDir, "oh-my-openagent.json"),
-        JSON.stringify({ agents: { atlas: { model: "opencode-go/kimi-k2.5" } } }, null, 2) + "\n",
+        JSON.stringify({ agents: { atlas: { model: "opencode-go/kimi-k2.6" } } }, null, 2) + "\n",
         "utf-8",
       )
 
       const config = loadOmoConfig()
 
-      expect(config?.agents?.atlas?.model).toBe("opencode-go/kimi-k2.5")
+      expect(config?.agents?.atlas?.model).toBe("opencode-go/kimi-k2.6")
     } finally {
       rmSync(testConfigDir, { recursive: true, force: true })
     }
