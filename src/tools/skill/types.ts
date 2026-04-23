@@ -26,6 +26,8 @@ export interface SkillLoadOptions {
   skills?: LoadedSkill[]
   /** Pre-discovered commands to use instead of discovering */
   commands?: CommandInfo[]
+  /** Include skills in the tool description. Disabled by default because OpenCode appends its own skill list. */
+  includeSkillsInDescription?: boolean
   /** MCP manager for querying skill-embedded MCP servers */
   mcpManager?: SkillMcpManager
   /** Session ID getter for MCP client identification */

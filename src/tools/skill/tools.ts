@@ -69,7 +69,9 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
     const skills = await getSkills()
     const commands = getCommands()
     const skillInfos = skills.map(loadedSkillToInfo)
-    cachedDescription = formatCombinedDescription(skillInfos, commands)
+    cachedDescription = formatCombinedDescription(skillInfos, commands, {
+      includeSkills: options.includeSkillsInDescription,
+    })
     return cachedDescription
   }
 
@@ -90,7 +92,9 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
       }
     }
 
-    cachedDescription = formatCombinedDescription(skillInfos, commandsForDescription)
+    cachedDescription = formatCombinedDescription(skillInfos, commandsForDescription, {
+      includeSkills: options.includeSkillsInDescription,
+    })
     if (needsAsyncRefresh) {
       void buildDescription(true)
     }

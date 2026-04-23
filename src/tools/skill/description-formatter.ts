@@ -38,16 +38,25 @@ function formatSlashCommand(command: CommandInfo): string {
   return lines.join("\n")
 }
 
-export function formatCombinedDescription(skills?: SkillInfo[], commands?: CommandInfo[]): string {
+interface FormatCombinedDescriptionOptions {
+  includeSkills?: boolean
+}
+
+export function formatCombinedDescription(
+  skills?: SkillInfo[],
+  commands?: CommandInfo[],
+  options: FormatCombinedDescriptionOptions = {}
+): string {
   const availableSkills = skills ?? []
   const availableCommands = commands ?? []
+  const includeSkills = options.includeSkills ?? false
 
   if (availableSkills.length === 0 && availableCommands.length === 0) {
     return TOOL_DESCRIPTION_NO_SKILLS
   }
 
   const availableItems = [
-    ...sortByScopePriority(availableSkills).map(formatSkillCommand),
+    ...(includeSkills ? sortByScopePriority(availableSkills).map(formatSkillCommand) : []),
     ...sortByScopePriority(availableCommands).map(formatSlashCommand),
   ]
 
@@ -57,7 +66,7 @@ export function formatCombinedDescription(skills?: SkillInfo[], commands?: Comma
 
   return `${TOOL_DESCRIPTION_PREFIX}
 <available_items>
-Priority: project > user > opencode > builtin/plugin | Skills listed before commands
+Priority: project > user > opencode > builtin/plugin | Commands listed here; skills are listed separately by OpenCode
 Invoke via: skill(name="item-name") - omit leading slash for commands.
 ${availableItems.join("\n")}
 </available_items>`

@@ -97,7 +97,7 @@ const mockContext: ToolContext = {
 }
 
 describe("skill tool - synchronous description", () => {
-  it("includes available_items immediately when skills are pre-provided", () => {
+  it("omits skills from available_items by default when skills are pre-provided", () => {
     // given
     const loadedSkills = [createMockSkill("test-skill")]
 
@@ -105,11 +105,11 @@ describe("skill tool - synchronous description", () => {
     const tool = createSkillTool({ skills: loadedSkills })
 
     // then
-    expect(tool.description).toContain("<available_items>")
-    expect(tool.description).toContain("test-skill")
+    expect(tool.description).not.toContain("<available_items>")
+    expect(tool.description).not.toContain("test-skill")
   })
 
-  it("includes all pre-provided skills in available_items immediately", () => {
+  it("can include pre-provided skills in available_items when explicitly requested", () => {
     // given
     const loadedSkills = [
       createMockSkill("playwright"),
@@ -118,7 +118,7 @@ describe("skill tool - synchronous description", () => {
     ]
 
     // when
-    const tool = createSkillTool({ skills: loadedSkills })
+    const tool = createSkillTool({ skills: loadedSkills, includeSkillsInDescription: true })
 
     // then
     expect(tool.description).toContain("<available_items>")
@@ -467,7 +467,7 @@ describe("skill tool - ordering and priority", () => {
     }
   }
 
-  it("shows skills as command items with slash prefix in available_items", () => {
+  it("omits skills from available_items when commands are also present", () => {
     //#given: mix of skills and commands
     const skills = [
       createMockSkillWithScope("builtin-skill", "builtin"),
@@ -481,17 +481,16 @@ describe("skill tool - ordering and priority", () => {
     //#when: creating tool with both
     const tool = createSkillTool({ skills, commands })
 
-    //#then: skills should appear as <command> items with / prefix, listed before regular commands
+    //#then: only commands should appear in available_items; OpenCode appends the skill list separately
     const desc = tool.description
-    expect(desc).toContain("<name>/builtin-skill</name>")
-    expect(desc).toContain("<name>/project-skill</name>")
+    expect(desc).not.toContain("<name>/builtin-skill</name>")
+    expect(desc).not.toContain("<name>/project-skill</name>")
+    expect(desc).toContain("<name>/project-cmd</name>")
+    expect(desc).toContain("<name>/builtin-cmd</name>")
     expect(desc).not.toContain("<skill>")
-    const skillCmdIndex = desc.indexOf("/project-skill")
-    const regularCmdIndex = desc.indexOf("/project-cmd")
-    expect(skillCmdIndex).toBeLessThan(regularCmdIndex)
   })
 
-  it("sorts skill-commands by priority: project > user > opencode > builtin", () => {
+  it("sorts skill-commands by priority when skills are explicitly included: project > user > opencode > builtin", () => {
     //#given: skills in random order
     const skills = [
       createMockSkillWithScope("builtin-skill", "builtin"),
@@ -501,7 +500,7 @@ describe("skill tool - ordering and priority", () => {
     ]
 
     //#when: creating tool
-    const tool = createSkillTool({ skills })
+    const tool = createSkillTool({ skills, includeSkillsInDescription: true })
 
     //#then: should be sorted by priority
     const desc = tool.description
@@ -549,7 +548,7 @@ describe("skill tool - ordering and priority", () => {
 
     //#then: should include priority info
     expect(tool.description).toContain("Priority: project > user > opencode > builtin/plugin")
-    expect(tool.description).toContain("Skills listed before commands")
+    expect(tool.description).toContain("Commands listed here; skills are listed separately by OpenCode")
   })
 
   it("uses <available_items> wrapper with unified command format", () => {
@@ -560,12 +559,12 @@ describe("skill tool - ordering and priority", () => {
     //#when: creating tool
     const tool = createSkillTool({ skills, commands })
 
-    //#then: should use unified wrapper with all items as commands
+    //#then: should use unified wrapper for commands without duplicating skills
     expect(tool.description).toContain("<available_items>")
     expect(tool.description).toContain("</available_items>")
     expect(tool.description).not.toContain("<skill>")
     expect(tool.description).toContain("<command>")
-    expect(tool.description).toContain("/test-skill")
+    expect(tool.description).not.toContain("/test-skill")
     expect(tool.description).toContain("/test-cmd")
   })
 })
@@ -690,7 +689,7 @@ describe("skill tool - dynamic description cache invalidation", () => {
 
       // then
       expect(refreshedResult).toContain("Skill: second-skill")
-      expect(refreshedTool.description).toContain("second-skill")
+      expect(refreshedTool.description).not.toContain("second-skill")
     } finally {
       process.chdir(originalDirectory)
       clearSkillCache()
@@ -718,7 +717,7 @@ describe("skill tool - browserProvider forwarding", () => {
     expect(result).toContain("Skill: agent-browser")
   })
 
-  it("description includes agent-browser when browserProvider is agent-browser", () => {
+  it("description omits agent-browser while execution still supports it", async () => {
     // given
     const agentBrowserSkill = createMockSkill("agent-browser")
 
@@ -729,12 +728,13 @@ describe("skill tool - browserProvider forwarding", () => {
     })
 
     // then
-    expect(tool.description).toContain("agent-browser")
+    expect(tool.description).not.toContain("agent-browser")
+    await expect(tool.execute({ name: "agent-browser" }, mockContext)).resolves.toContain("Skill: agent-browser")
   })
 })
 
 describe("skill tool - nativeSkills integration", () => {
-  it("includes native skills in the description even when skills are pre-seeded", async () => {
+  it("loads native skills even though descriptions omit skills by default", async () => {
     //#given
     const tool = createSkillTool({
       skills: [createMockSkill("seeded-skill")],
@@ -753,13 +753,12 @@ describe("skill tool - nativeSkills integration", () => {
     })
 
     //#when
-    expect(tool.description).toContain("seeded-skill")
-    expect(tool.description).toContain("native-visible-skill")
-    await tool.execute({ name: "native-visible-skill" }, mockContext)
+    const result = await tool.execute({ name: "native-visible-skill" }, mockContext)
 
     //#then
-    expect(tool.description).toContain("seeded-skill")
-    expect(tool.description).toContain("native-visible-skill")
+    expect(result).toContain("Skill: native-visible-skill")
+    expect(tool.description).not.toContain("seeded-skill")
+    expect(tool.description).not.toContain("native-visible-skill")
   })
 
   it("merges native skills exposed by PluginInput.skills.all()", async () => {

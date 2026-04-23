@@ -42,7 +42,7 @@ async function waitForRefresh(predicate: () => boolean): Promise<void> {
 }
 
 describe("skill tool - async native skill description refresh", () => {
-  it("updates description after async native skills resolve", async () => {
+  it("refreshes async native skills without duplicating them in the description", async () => {
     //#given
     let allCallCount = 0
     const tool = createSkillTool({
@@ -68,15 +68,15 @@ describe("skill tool - async native skill description refresh", () => {
       },
     })
 
-    expect(tool.description).toContain("seeded-skill")
+    expect(tool.description).not.toContain("seeded-skill")
     expect(tool.description).not.toContain("async-native-skill")
 
     //#when
-    await waitForRefresh(() => tool.description.includes("async-native-skill"))
+    await waitForRefresh(() => allCallCount > 0)
 
     //#then
     expect(allCallCount).toBeGreaterThanOrEqual(1)
-    expect(tool.description).toContain("seeded-skill")
-    expect(tool.description).toContain("async-native-skill")
+    expect(tool.description).not.toContain("seeded-skill")
+    expect(tool.description).not.toContain("async-native-skill")
   })
 })
