@@ -81,14 +81,18 @@ exports[`generateModelConfig single native provider uses Claude models when only
       "model": "anthropic/claude-sonnet-4-6",
     },
     "cipher": {
-      "model": "anthropic/claude-sonnet-4-6",
-    },
-    "construct": {
-      "model": "opencode/glm-4.7-free",
-    },
-    "merovingian": {
       "model": "anthropic/claude-opus-4-6",
       "variant": "max",
+    },
+    "construct": {
+      "model": "anthropic/claude-sonnet-4-6",
+    },
+    "keymaker": {
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
+    },
+    "merovingian": {
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "morpheus": {
       "model": "anthropic/claude-opus-4-6",
@@ -98,7 +102,7 @@ exports[`generateModelConfig single native provider uses Claude models when only
       "model": "anthropic/claude-sonnet-4-6",
     },
     "operator": {
-      "model": "anthropic/claude-sonnet-4-6",
+      "model": "anthropic/claude-haiku-4-5",
     },
     "oracle": {
       "model": "anthropic/claude-opus-4-6",
@@ -112,8 +116,7 @@ exports[`generateModelConfig single native provider uses Claude models when only
       "variant": "max",
     },
     "smith": {
-      "model": "anthropic/claude-opus-4-6",
-      "variant": "max",
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "trinity": {
       "model": "anthropic/claude-haiku-4-5",
@@ -133,8 +136,14 @@ exports[`generateModelConfig single native provider uses Claude models when only
       "model": "anthropic/claude-haiku-4-5",
     },
     "construct": {
+      "model": "anthropic/claude-sonnet-4-6",
+    },
+    "deep-jack": {
       "model": "anthropic/claude-opus-4-6",
       "variant": "max",
+    },
+    "matrix-bend": {
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "red-pill": {
       "model": "anthropic/claude-sonnet-4-6",
@@ -155,14 +164,18 @@ exports[`generateModelConfig single native provider uses Claude models with isMa
       "model": "anthropic/claude-sonnet-4-6",
     },
     "cipher": {
-      "model": "anthropic/claude-sonnet-4-6",
-    },
-    "construct": {
-      "model": "opencode/glm-4.7-free",
-    },
-    "merovingian": {
       "model": "anthropic/claude-opus-4-6",
       "variant": "max",
+    },
+    "construct": {
+      "model": "anthropic/claude-sonnet-4-6",
+    },
+    "keymaker": {
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
+    },
+    "merovingian": {
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "morpheus": {
       "model": "anthropic/claude-opus-4-6",
@@ -172,7 +185,7 @@ exports[`generateModelConfig single native provider uses Claude models with isMa
       "model": "anthropic/claude-sonnet-4-6",
     },
     "operator": {
-      "model": "anthropic/claude-sonnet-4-6",
+      "model": "anthropic/claude-haiku-4-5",
     },
     "oracle": {
       "model": "anthropic/claude-opus-4-6",
@@ -186,8 +199,7 @@ exports[`generateModelConfig single native provider uses Claude models with isMa
       "variant": "max",
     },
     "smith": {
-      "model": "anthropic/claude-opus-4-6",
-      "variant": "max",
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "trinity": {
       "model": "anthropic/claude-haiku-4-5",
@@ -207,8 +219,14 @@ exports[`generateModelConfig single native provider uses Claude models with isMa
       "model": "anthropic/claude-haiku-4-5",
     },
     "construct": {
+      "model": "anthropic/claude-sonnet-4-6",
+    },
+    "deep-jack": {
       "model": "anthropic/claude-opus-4-6",
       "variant": "max",
+    },
+    "matrix-bend": {
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "red-pill": {
       "model": "anthropic/claude-opus-4-6",
@@ -227,75 +245,69 @@ exports[`generateModelConfig single native provider uses OpenAI models when only
   "$schema": "https://raw.githubusercontent.com/klpanagi/matrixx/dev/assets/matrixx.schema.json",
   "agents": {
     "architect": {
-      "model": "openai/gpt-5.2",
+      "model": "opencode/glm-4.7-free",
     },
     "cipher": {
-      "model": "openai/gpt-5.2",
+      "model": "opencode/glm-4.7-free",
     },
     "construct": {
-      "model": "openai/gpt-5.2",
+      "model": "opencode/glm-4.7-free",
     },
     "keymaker": {
-      "model": "openai/gpt-5.3-codex",
-      "variant": "medium",
+      "model": "opencode/glm-4.7-free",
     },
     "merovingian": {
-      "model": "openai/gpt-5.2",
-      "variant": "high",
+      "model": "opencode/glm-4.7-free",
     },
     "niobe": {
-      "model": "openai/gpt-5.2",
+      "model": "opencode/glm-4.7-free",
     },
     "operator": {
       "model": "opencode/glm-4.7-free",
     },
     "oracle": {
-      "model": "openai/gpt-5.4",
-      "variant": "high",
+      "model": "opencode/glm-4.7-free",
     },
     "sentinel": {
-      "model": "openai/gpt-5.2",
+      "model": "opencode/glm-4.7-free",
     },
     "seraph": {
-      "model": "openai/gpt-5.2",
-      "variant": "high",
+      "model": "opencode/glm-4.7-free",
     },
     "smith": {
-      "model": "openai/gpt-5.2",
-      "variant": "medium",
+      "model": "opencode/glm-4.7-free",
     },
     "trinity": {
       "model": "opencode/gpt-5-nano",
     },
     "zion": {
-      "model": "openai/gpt-5.2",
+      "model": "opencode/glm-4.7-free",
     },
   },
   "categories": {
     "blue-pill": {
-      "model": "openai/gpt-5.3-codex",
-      "variant": "medium",
+      "model": "opencode/glm-4.7-free",
     },
     "broadcast": {
       "model": "opencode/glm-4.7-free",
     },
     "bullet-time": {
-      "model": "openai/gpt-5.4-mini",
+      "model": "opencode/glm-4.7-free",
     },
     "construct": {
       "model": "opencode/glm-4.7-free",
     },
     "deep-jack": {
-      "model": "openai/gpt-5.3-codex",
-      "variant": "medium",
+      "model": "opencode/glm-4.7-free",
+    },
+    "matrix-bend": {
+      "model": "opencode/glm-4.7-free",
     },
     "red-pill": {
-      "model": "openai/gpt-5.3-codex",
-      "variant": "medium",
+      "model": "opencode/glm-4.7-free",
     },
     "source": {
-      "model": "openai/gpt-5.3-codex",
-      "variant": "xhigh",
+      "model": "opencode/glm-4.7-free",
     },
   },
 }
@@ -306,75 +318,69 @@ exports[`generateModelConfig single native provider uses OpenAI models with isMa
   "$schema": "https://raw.githubusercontent.com/klpanagi/matrixx/dev/assets/matrixx.schema.json",
   "agents": {
     "architect": {
-      "model": "openai/gpt-5.2",
+      "model": "opencode/glm-4.7-free",
     },
     "cipher": {
-      "model": "openai/gpt-5.2",
+      "model": "opencode/glm-4.7-free",
     },
     "construct": {
-      "model": "openai/gpt-5.2",
+      "model": "opencode/glm-4.7-free",
     },
     "keymaker": {
-      "model": "openai/gpt-5.3-codex",
-      "variant": "medium",
+      "model": "opencode/glm-4.7-free",
     },
     "merovingian": {
-      "model": "openai/gpt-5.2",
-      "variant": "high",
+      "model": "opencode/glm-4.7-free",
     },
     "niobe": {
-      "model": "openai/gpt-5.2",
+      "model": "opencode/glm-4.7-free",
     },
     "operator": {
       "model": "opencode/glm-4.7-free",
     },
     "oracle": {
-      "model": "openai/gpt-5.4",
-      "variant": "high",
+      "model": "opencode/glm-4.7-free",
     },
     "sentinel": {
-      "model": "openai/gpt-5.2",
+      "model": "opencode/glm-4.7-free",
     },
     "seraph": {
-      "model": "openai/gpt-5.2",
-      "variant": "high",
+      "model": "opencode/glm-4.7-free",
     },
     "smith": {
-      "model": "openai/gpt-5.2",
-      "variant": "medium",
+      "model": "opencode/glm-4.7-free",
     },
     "trinity": {
       "model": "opencode/gpt-5-nano",
     },
     "zion": {
-      "model": "openai/gpt-5.2",
+      "model": "opencode/glm-4.7-free",
     },
   },
   "categories": {
     "blue-pill": {
-      "model": "openai/gpt-5.3-codex",
-      "variant": "medium",
+      "model": "opencode/glm-4.7-free",
     },
     "broadcast": {
       "model": "opencode/glm-4.7-free",
     },
     "bullet-time": {
-      "model": "openai/gpt-5.4-mini",
+      "model": "opencode/glm-4.7-free",
     },
     "construct": {
       "model": "opencode/glm-4.7-free",
     },
     "deep-jack": {
-      "model": "openai/gpt-5.3-codex",
-      "variant": "medium",
+      "model": "opencode/glm-4.7-free",
+    },
+    "matrix-bend": {
+      "model": "opencode/glm-4.7-free",
     },
     "red-pill": {
-      "model": "openai/gpt-5.2",
-      "variant": "high",
+      "model": "opencode/glm-4.7-free",
     },
     "source": {
-      "model": "openai/gpt-5.3-codex",
-      "variant": "xhigh",
+      "model": "opencode/glm-4.7-free",
     },
   },
 }
@@ -388,66 +394,66 @@ exports[`generateModelConfig single native provider uses Gemini models when only
       "model": "opencode/glm-4.7-free",
     },
     "cipher": {
-      "model": "google/gemini-3.1-pro",
+      "model": "opencode/glm-4.7-free",
     },
     "construct": {
-      "model": "google/gemini-3-flash",
+      "model": "opencode/glm-4.7-free",
+    },
+    "keymaker": {
+      "model": "opencode/glm-4.7-free",
     },
     "merovingian": {
-      "model": "google/gemini-3.1-pro",
-      "variant": "high",
+      "model": "opencode/glm-4.7-free",
     },
     "niobe": {
-      "model": "google/gemini-3.1-pro",
+      "model": "opencode/glm-4.7-free",
     },
     "operator": {
       "model": "opencode/glm-4.7-free",
     },
     "oracle": {
-      "model": "google/gemini-3.1-pro",
+      "model": "opencode/glm-4.7-free",
     },
     "sentinel": {
-      "model": "google/gemini-3.1-pro",
+      "model": "opencode/glm-4.7-free",
     },
     "seraph": {
-      "model": "google/gemini-3.1-pro",
-      "variant": "high",
+      "model": "opencode/glm-4.7-free",
     },
     "smith": {
-      "model": "google/gemini-3.1-pro",
-      "variant": "high",
+      "model": "opencode/glm-4.7-free",
     },
     "trinity": {
       "model": "opencode/gpt-5-nano",
     },
     "zion": {
-      "model": "google/gemini-3.1-pro",
+      "model": "opencode/glm-4.7-free",
     },
   },
   "categories": {
     "blue-pill": {
-      "model": "google/gemini-3-flash",
+      "model": "opencode/glm-4.7-free",
     },
     "broadcast": {
-      "model": "google/gemini-3-flash",
+      "model": "opencode/glm-4.7-free",
     },
     "bullet-time": {
-      "model": "google/gemini-3-flash",
+      "model": "opencode/glm-4.7-free",
     },
     "construct": {
-      "model": "google/gemini-3.1-pro",
-      "variant": "high",
+      "model": "opencode/glm-4.7-free",
+    },
+    "deep-jack": {
+      "model": "opencode/glm-4.7-free",
     },
     "matrix-bend": {
-      "model": "google/gemini-3.1-pro",
-      "variant": "high",
+      "model": "opencode/glm-4.7-free",
     },
     "red-pill": {
-      "model": "google/gemini-3-flash",
+      "model": "opencode/glm-4.7-free",
     },
     "source": {
-      "model": "google/gemini-3.1-pro",
-      "variant": "high",
+      "model": "opencode/glm-4.7-free",
     },
   },
 }
@@ -461,66 +467,66 @@ exports[`generateModelConfig single native provider uses Gemini models with isMa
       "model": "opencode/glm-4.7-free",
     },
     "cipher": {
-      "model": "google/gemini-3.1-pro",
+      "model": "opencode/glm-4.7-free",
     },
     "construct": {
-      "model": "google/gemini-3-flash",
+      "model": "opencode/glm-4.7-free",
+    },
+    "keymaker": {
+      "model": "opencode/glm-4.7-free",
     },
     "merovingian": {
-      "model": "google/gemini-3.1-pro",
-      "variant": "high",
+      "model": "opencode/glm-4.7-free",
     },
     "niobe": {
-      "model": "google/gemini-3.1-pro",
+      "model": "opencode/glm-4.7-free",
     },
     "operator": {
       "model": "opencode/glm-4.7-free",
     },
     "oracle": {
-      "model": "google/gemini-3.1-pro",
+      "model": "opencode/glm-4.7-free",
     },
     "sentinel": {
-      "model": "google/gemini-3.1-pro",
+      "model": "opencode/glm-4.7-free",
     },
     "seraph": {
-      "model": "google/gemini-3.1-pro",
-      "variant": "high",
+      "model": "opencode/glm-4.7-free",
     },
     "smith": {
-      "model": "google/gemini-3.1-pro",
-      "variant": "high",
+      "model": "opencode/glm-4.7-free",
     },
     "trinity": {
       "model": "opencode/gpt-5-nano",
     },
     "zion": {
-      "model": "google/gemini-3.1-pro",
+      "model": "opencode/glm-4.7-free",
     },
   },
   "categories": {
     "blue-pill": {
-      "model": "google/gemini-3-flash",
+      "model": "opencode/glm-4.7-free",
     },
     "broadcast": {
-      "model": "google/gemini-3-flash",
+      "model": "opencode/glm-4.7-free",
     },
     "bullet-time": {
-      "model": "google/gemini-3-flash",
+      "model": "opencode/glm-4.7-free",
     },
     "construct": {
-      "model": "google/gemini-3.1-pro",
-      "variant": "high",
+      "model": "opencode/glm-4.7-free",
+    },
+    "deep-jack": {
+      "model": "opencode/glm-4.7-free",
     },
     "matrix-bend": {
-      "model": "google/gemini-3.1-pro",
-      "variant": "high",
+      "model": "opencode/glm-4.7-free",
     },
     "red-pill": {
-      "model": "google/gemini-3.1-pro",
+      "model": "opencode/glm-4.7-free",
     },
     "source": {
-      "model": "google/gemini-3.1-pro",
-      "variant": "high",
+      "model": "opencode/glm-4.7-free",
     },
   },
 }
@@ -534,18 +540,18 @@ exports[`generateModelConfig all native providers uses preferred models from fal
       "model": "anthropic/claude-sonnet-4-6",
     },
     "cipher": {
-      "model": "anthropic/claude-sonnet-4-6",
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
     },
     "construct": {
-      "model": "google/gemini-3-flash",
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "keymaker": {
-      "model": "openai/gpt-5.3-codex",
-      "variant": "medium",
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
     },
     "merovingian": {
-      "model": "openai/gpt-5.2",
-      "variant": "high",
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "morpheus": {
       "model": "anthropic/claude-opus-4-6",
@@ -555,7 +561,7 @@ exports[`generateModelConfig all native providers uses preferred models from fal
       "model": "anthropic/claude-sonnet-4-6",
     },
     "operator": {
-      "model": "anthropic/claude-sonnet-4-6",
+      "model": "anthropic/claude-haiku-4-5",
     },
     "oracle": {
       "model": "anthropic/claude-opus-4-6",
@@ -569,8 +575,7 @@ exports[`generateModelConfig all native providers uses preferred models from fal
       "variant": "max",
     },
     "smith": {
-      "model": "openai/gpt-5.2",
-      "variant": "medium",
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "trinity": {
       "model": "anthropic/claude-haiku-4-5",
@@ -584,29 +589,27 @@ exports[`generateModelConfig all native providers uses preferred models from fal
       "model": "anthropic/claude-sonnet-4-6",
     },
     "broadcast": {
-      "model": "google/gemini-3-flash",
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "bullet-time": {
-      "model": "openai/gpt-5.4-mini",
+      "model": "anthropic/claude-haiku-4-5",
     },
     "construct": {
-      "model": "google/gemini-3.1-pro",
-      "variant": "high",
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "deep-jack": {
-      "model": "openai/gpt-5.3-codex",
-      "variant": "medium",
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
     },
     "matrix-bend": {
-      "model": "google/gemini-3.1-pro",
-      "variant": "high",
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "red-pill": {
       "model": "anthropic/claude-sonnet-4-6",
     },
     "source": {
-      "model": "openai/gpt-5.3-codex",
-      "variant": "xhigh",
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
     },
   },
 }
@@ -620,18 +623,18 @@ exports[`generateModelConfig all native providers uses preferred models with isM
       "model": "anthropic/claude-sonnet-4-6",
     },
     "cipher": {
-      "model": "anthropic/claude-sonnet-4-6",
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
     },
     "construct": {
-      "model": "google/gemini-3-flash",
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "keymaker": {
-      "model": "openai/gpt-5.3-codex",
-      "variant": "medium",
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
     },
     "merovingian": {
-      "model": "openai/gpt-5.2",
-      "variant": "high",
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "morpheus": {
       "model": "anthropic/claude-opus-4-6",
@@ -641,7 +644,7 @@ exports[`generateModelConfig all native providers uses preferred models with isM
       "model": "anthropic/claude-sonnet-4-6",
     },
     "operator": {
-      "model": "anthropic/claude-sonnet-4-6",
+      "model": "anthropic/claude-haiku-4-5",
     },
     "oracle": {
       "model": "anthropic/claude-opus-4-6",
@@ -655,8 +658,7 @@ exports[`generateModelConfig all native providers uses preferred models with isM
       "variant": "max",
     },
     "smith": {
-      "model": "openai/gpt-5.2",
-      "variant": "medium",
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "trinity": {
       "model": "anthropic/claude-haiku-4-5",
@@ -670,30 +672,28 @@ exports[`generateModelConfig all native providers uses preferred models with isM
       "model": "anthropic/claude-sonnet-4-6",
     },
     "broadcast": {
-      "model": "google/gemini-3-flash",
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "bullet-time": {
-      "model": "openai/gpt-5.4-mini",
+      "model": "anthropic/claude-haiku-4-5",
     },
     "construct": {
-      "model": "google/gemini-3.1-pro",
-      "variant": "high",
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "deep-jack": {
-      "model": "openai/gpt-5.3-codex",
-      "variant": "medium",
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
     },
     "matrix-bend": {
-      "model": "google/gemini-3.1-pro",
-      "variant": "high",
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "red-pill": {
       "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
     "source": {
-      "model": "openai/gpt-5.3-codex",
-      "variant": "xhigh",
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
     },
   },
 }
@@ -707,18 +707,18 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
       "model": "opencode/claude-sonnet-4-6",
     },
     "cipher": {
-      "model": "opencode/claude-sonnet-4-6",
+      "model": "opencode/claude-opus-4-6",
+      "variant": "max",
     },
     "construct": {
-      "model": "opencode/gemini-3-flash",
+      "model": "opencode/claude-sonnet-4-6",
     },
     "keymaker": {
-      "model": "opencode/gpt-5.3-codex",
-      "variant": "medium",
+      "model": "opencode/claude-opus-4-6",
+      "variant": "max",
     },
     "merovingian": {
-      "model": "opencode/gpt-5.2",
-      "variant": "high",
+      "model": "opencode/claude-sonnet-4-6",
     },
     "morpheus": {
       "model": "opencode/claude-opus-4-6",
@@ -728,7 +728,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
       "model": "opencode/claude-sonnet-4-6",
     },
     "operator": {
-      "model": "opencode/glm-4.7-free",
+      "model": "opencode/claude-haiku-4-5",
     },
     "oracle": {
       "model": "opencode/claude-opus-4-6",
@@ -742,8 +742,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
       "variant": "max",
     },
     "smith": {
-      "model": "opencode/gpt-5.2",
-      "variant": "medium",
+      "model": "opencode/claude-sonnet-4-6",
     },
     "trinity": {
       "model": "opencode/claude-haiku-4-5",
@@ -757,29 +756,27 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
       "model": "opencode/claude-sonnet-4-6",
     },
     "broadcast": {
-      "model": "opencode/gemini-3-flash",
+      "model": "opencode/claude-sonnet-4-6",
     },
     "bullet-time": {
-      "model": "opencode/gpt-5.4-mini",
+      "model": "opencode/claude-haiku-4-5",
     },
     "construct": {
-      "model": "opencode/gemini-3.1-pro",
-      "variant": "high",
+      "model": "opencode/claude-sonnet-4-6",
     },
     "deep-jack": {
-      "model": "opencode/gpt-5.3-codex",
-      "variant": "medium",
+      "model": "opencode/claude-opus-4-6",
+      "variant": "max",
     },
     "matrix-bend": {
-      "model": "opencode/gemini-3.1-pro",
-      "variant": "high",
+      "model": "opencode/claude-sonnet-4-6",
     },
     "red-pill": {
       "model": "opencode/claude-sonnet-4-6",
     },
     "source": {
-      "model": "opencode/gpt-5.3-codex",
-      "variant": "xhigh",
+      "model": "opencode/claude-opus-4-6",
+      "variant": "max",
     },
   },
 }
@@ -793,18 +790,18 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
       "model": "opencode/claude-sonnet-4-6",
     },
     "cipher": {
-      "model": "opencode/claude-sonnet-4-6",
+      "model": "opencode/claude-opus-4-6",
+      "variant": "max",
     },
     "construct": {
-      "model": "opencode/gemini-3-flash",
+      "model": "opencode/claude-sonnet-4-6",
     },
     "keymaker": {
-      "model": "opencode/gpt-5.3-codex",
-      "variant": "medium",
+      "model": "opencode/claude-opus-4-6",
+      "variant": "max",
     },
     "merovingian": {
-      "model": "opencode/gpt-5.2",
-      "variant": "high",
+      "model": "opencode/claude-sonnet-4-6",
     },
     "morpheus": {
       "model": "opencode/claude-opus-4-6",
@@ -814,7 +811,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
       "model": "opencode/claude-sonnet-4-6",
     },
     "operator": {
-      "model": "opencode/glm-4.7-free",
+      "model": "opencode/claude-haiku-4-5",
     },
     "oracle": {
       "model": "opencode/claude-opus-4-6",
@@ -828,8 +825,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
       "variant": "max",
     },
     "smith": {
-      "model": "opencode/gpt-5.2",
-      "variant": "medium",
+      "model": "opencode/claude-sonnet-4-6",
     },
     "trinity": {
       "model": "opencode/claude-haiku-4-5",
@@ -843,30 +839,28 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
       "model": "opencode/claude-sonnet-4-6",
     },
     "broadcast": {
-      "model": "opencode/gemini-3-flash",
+      "model": "opencode/claude-sonnet-4-6",
     },
     "bullet-time": {
-      "model": "opencode/gpt-5.4-mini",
+      "model": "opencode/claude-haiku-4-5",
     },
     "construct": {
-      "model": "opencode/gemini-3.1-pro",
-      "variant": "high",
+      "model": "opencode/claude-sonnet-4-6",
     },
     "deep-jack": {
-      "model": "opencode/gpt-5.3-codex",
-      "variant": "medium",
+      "model": "opencode/claude-opus-4-6",
+      "variant": "max",
     },
     "matrix-bend": {
-      "model": "opencode/gemini-3.1-pro",
-      "variant": "high",
+      "model": "opencode/claude-sonnet-4-6",
     },
     "red-pill": {
       "model": "opencode/claude-opus-4-6",
       "variant": "max",
     },
     "source": {
-      "model": "opencode/gpt-5.3-codex",
-      "variant": "xhigh",
+      "model": "opencode/claude-opus-4-6",
+      "variant": "max",
     },
   },
 }
@@ -880,18 +874,18 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models when 
       "model": "github-copilot/claude-sonnet-4-6",
     },
     "cipher": {
-      "model": "github-copilot/claude-sonnet-4-6",
+      "model": "github-copilot/claude-opus-4.6",
+      "variant": "max",
     },
     "construct": {
-      "model": "github-copilot/gemini-3-flash-preview",
+      "model": "github-copilot/claude-sonnet-4-6",
     },
     "keymaker": {
-      "model": "github-copilot/gpt-5.3-codex",
-      "variant": "medium",
+      "model": "github-copilot/claude-opus-4.6",
+      "variant": "max",
     },
     "merovingian": {
-      "model": "github-copilot/gpt-5.2",
-      "variant": "high",
+      "model": "github-copilot/claude-sonnet-4-6",
     },
     "morpheus": {
       "model": "github-copilot/claude-opus-4.6",
@@ -901,7 +895,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models when 
       "model": "github-copilot/claude-sonnet-4-6",
     },
     "operator": {
-      "model": "github-copilot/claude-sonnet-4-6",
+      "model": "github-copilot/claude-haiku-4.5",
     },
     "oracle": {
       "model": "github-copilot/claude-opus-4.6",
@@ -915,8 +909,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models when 
       "variant": "max",
     },
     "smith": {
-      "model": "github-copilot/gpt-5.2",
-      "variant": "medium",
+      "model": "github-copilot/claude-sonnet-4-6",
     },
     "trinity": {
       "model": "github-copilot/gpt-5-mini",
@@ -930,29 +923,27 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models when 
       "model": "github-copilot/claude-sonnet-4-6",
     },
     "broadcast": {
-      "model": "github-copilot/gemini-3-flash-preview",
+      "model": "github-copilot/claude-sonnet-4-6",
     },
     "bullet-time": {
-      "model": "github-copilot/gpt-5.4-mini",
+      "model": "github-copilot/claude-haiku-4.5",
     },
     "construct": {
-      "model": "github-copilot/gemini-3.1-pro",
-      "variant": "high",
+      "model": "github-copilot/claude-sonnet-4-6",
     },
     "deep-jack": {
-      "model": "github-copilot/gpt-5.3-codex",
-      "variant": "medium",
+      "model": "github-copilot/claude-opus-4.6",
+      "variant": "max",
     },
     "matrix-bend": {
-      "model": "github-copilot/gemini-3.1-pro",
-      "variant": "high",
+      "model": "github-copilot/claude-sonnet-4-6",
     },
     "red-pill": {
       "model": "github-copilot/claude-sonnet-4-6",
     },
     "source": {
-      "model": "github-copilot/gpt-5.3-codex",
-      "variant": "xhigh",
+      "model": "github-copilot/claude-opus-4.6",
+      "variant": "max",
     },
   },
 }
@@ -966,18 +957,18 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
       "model": "github-copilot/claude-sonnet-4-6",
     },
     "cipher": {
-      "model": "github-copilot/claude-sonnet-4-6",
+      "model": "github-copilot/claude-opus-4.6",
+      "variant": "max",
     },
     "construct": {
-      "model": "github-copilot/gemini-3-flash-preview",
+      "model": "github-copilot/claude-sonnet-4-6",
     },
     "keymaker": {
-      "model": "github-copilot/gpt-5.3-codex",
-      "variant": "medium",
+      "model": "github-copilot/claude-opus-4.6",
+      "variant": "max",
     },
     "merovingian": {
-      "model": "github-copilot/gpt-5.2",
-      "variant": "high",
+      "model": "github-copilot/claude-sonnet-4-6",
     },
     "morpheus": {
       "model": "github-copilot/claude-opus-4.6",
@@ -987,7 +978,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
       "model": "github-copilot/claude-sonnet-4-6",
     },
     "operator": {
-      "model": "github-copilot/claude-sonnet-4-6",
+      "model": "github-copilot/claude-haiku-4.5",
     },
     "oracle": {
       "model": "github-copilot/claude-opus-4.6",
@@ -1001,8 +992,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
       "variant": "max",
     },
     "smith": {
-      "model": "github-copilot/gpt-5.2",
-      "variant": "medium",
+      "model": "github-copilot/claude-sonnet-4-6",
     },
     "trinity": {
       "model": "github-copilot/gpt-5-mini",
@@ -1016,30 +1006,28 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
       "model": "github-copilot/claude-sonnet-4-6",
     },
     "broadcast": {
-      "model": "github-copilot/gemini-3-flash-preview",
+      "model": "github-copilot/claude-sonnet-4-6",
     },
     "bullet-time": {
-      "model": "github-copilot/gpt-5.4-mini",
+      "model": "github-copilot/claude-haiku-4.5",
     },
     "construct": {
-      "model": "github-copilot/gemini-3.1-pro",
-      "variant": "high",
+      "model": "github-copilot/claude-sonnet-4-6",
     },
     "deep-jack": {
-      "model": "github-copilot/gpt-5.3-codex",
-      "variant": "medium",
+      "model": "github-copilot/claude-opus-4.6",
+      "variant": "max",
     },
     "matrix-bend": {
-      "model": "github-copilot/gemini-3.1-pro",
-      "variant": "high",
+      "model": "github-copilot/claude-sonnet-4-6",
     },
     "red-pill": {
       "model": "github-copilot/claude-opus-4.6",
       "variant": "max",
     },
     "source": {
-      "model": "github-copilot/gpt-5.3-codex",
-      "variant": "xhigh",
+      "model": "github-copilot/claude-opus-4.6",
+      "variant": "max",
     },
   },
 }
@@ -1056,13 +1044,13 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian whe
       "model": "opencode/glm-4.7-free",
     },
     "construct": {
-      "model": "zai-coding-plan/glm-4.6v",
+      "model": "opencode/glm-4.7-free",
+    },
+    "keymaker": {
+      "model": "opencode/glm-4.7-free",
     },
     "merovingian": {
       "model": "opencode/glm-4.7-free",
-    },
-    "morpheus": {
-      "model": "zai-coding-plan/glm-5",
     },
     "niobe": {
       "model": "opencode/glm-4.7-free",
@@ -1100,7 +1088,13 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian whe
       "model": "opencode/glm-4.7-free",
     },
     "construct": {
-      "model": "zai-coding-plan/glm-5",
+      "model": "opencode/glm-4.7-free",
+    },
+    "deep-jack": {
+      "model": "opencode/glm-4.7-free",
+    },
+    "matrix-bend": {
+      "model": "opencode/glm-4.7-free",
     },
     "red-pill": {
       "model": "opencode/glm-4.7-free",
@@ -1123,13 +1117,13 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian wit
       "model": "opencode/glm-4.7-free",
     },
     "construct": {
-      "model": "zai-coding-plan/glm-4.6v",
+      "model": "opencode/glm-4.7-free",
+    },
+    "keymaker": {
+      "model": "opencode/glm-4.7-free",
     },
     "merovingian": {
       "model": "opencode/glm-4.7-free",
-    },
-    "morpheus": {
-      "model": "zai-coding-plan/glm-5",
     },
     "niobe": {
       "model": "opencode/glm-4.7-free",
@@ -1167,7 +1161,13 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian wit
       "model": "opencode/glm-4.7-free",
     },
     "construct": {
-      "model": "zai-coding-plan/glm-5",
+      "model": "opencode/glm-4.7-free",
+    },
+    "deep-jack": {
+      "model": "opencode/glm-4.7-free",
+    },
+    "matrix-bend": {
+      "model": "opencode/glm-4.7-free",
     },
     "red-pill": {
       "model": "opencode/glm-4.7-free",
@@ -1187,18 +1187,18 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
       "model": "anthropic/claude-sonnet-4-6",
     },
     "cipher": {
-      "model": "anthropic/claude-sonnet-4-6",
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
     },
     "construct": {
-      "model": "opencode/gemini-3-flash",
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "keymaker": {
-      "model": "opencode/gpt-5.3-codex",
-      "variant": "medium",
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
     },
     "merovingian": {
-      "model": "opencode/gpt-5.2",
-      "variant": "high",
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "morpheus": {
       "model": "anthropic/claude-opus-4-6",
@@ -1208,7 +1208,7 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
       "model": "anthropic/claude-sonnet-4-6",
     },
     "operator": {
-      "model": "opencode/glm-4.7-free",
+      "model": "anthropic/claude-haiku-4-5",
     },
     "oracle": {
       "model": "anthropic/claude-opus-4-6",
@@ -1222,8 +1222,7 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
       "variant": "max",
     },
     "smith": {
-      "model": "opencode/gpt-5.2",
-      "variant": "medium",
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "trinity": {
       "model": "anthropic/claude-haiku-4-5",
@@ -1237,29 +1236,27 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
       "model": "anthropic/claude-sonnet-4-6",
     },
     "broadcast": {
-      "model": "opencode/gemini-3-flash",
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "bullet-time": {
-      "model": "opencode/gpt-5.4-mini",
+      "model": "anthropic/claude-haiku-4-5",
     },
     "construct": {
-      "model": "opencode/gemini-3.1-pro",
-      "variant": "high",
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "deep-jack": {
-      "model": "opencode/gpt-5.3-codex",
-      "variant": "medium",
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
     },
     "matrix-bend": {
-      "model": "opencode/gemini-3.1-pro",
-      "variant": "high",
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "red-pill": {
       "model": "anthropic/claude-sonnet-4-6",
     },
     "source": {
-      "model": "opencode/gpt-5.3-codex",
-      "variant": "xhigh",
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
     },
   },
 }
@@ -1273,18 +1270,18 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
       "model": "github-copilot/claude-sonnet-4-6",
     },
     "cipher": {
-      "model": "github-copilot/claude-sonnet-4-6",
+      "model": "github-copilot/claude-opus-4.6",
+      "variant": "max",
     },
     "construct": {
-      "model": "github-copilot/gemini-3-flash-preview",
+      "model": "github-copilot/claude-sonnet-4-6",
     },
     "keymaker": {
-      "model": "openai/gpt-5.3-codex",
-      "variant": "medium",
+      "model": "github-copilot/claude-opus-4.6",
+      "variant": "max",
     },
     "merovingian": {
-      "model": "openai/gpt-5.2",
-      "variant": "high",
+      "model": "github-copilot/claude-sonnet-4-6",
     },
     "morpheus": {
       "model": "github-copilot/claude-opus-4.6",
@@ -1294,7 +1291,7 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
       "model": "github-copilot/claude-sonnet-4-6",
     },
     "operator": {
-      "model": "github-copilot/claude-sonnet-4-6",
+      "model": "github-copilot/claude-haiku-4.5",
     },
     "oracle": {
       "model": "github-copilot/claude-opus-4.6",
@@ -1308,8 +1305,7 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
       "variant": "max",
     },
     "smith": {
-      "model": "openai/gpt-5.2",
-      "variant": "medium",
+      "model": "github-copilot/claude-sonnet-4-6",
     },
     "trinity": {
       "model": "github-copilot/gpt-5-mini",
@@ -1323,29 +1319,27 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
       "model": "github-copilot/claude-sonnet-4-6",
     },
     "broadcast": {
-      "model": "github-copilot/gemini-3-flash-preview",
+      "model": "github-copilot/claude-sonnet-4-6",
     },
     "bullet-time": {
-      "model": "openai/gpt-5.4-mini",
+      "model": "github-copilot/claude-haiku-4.5",
     },
     "construct": {
-      "model": "github-copilot/gemini-3.1-pro",
-      "variant": "high",
+      "model": "github-copilot/claude-sonnet-4-6",
     },
     "deep-jack": {
-      "model": "openai/gpt-5.3-codex",
-      "variant": "medium",
+      "model": "github-copilot/claude-opus-4.6",
+      "variant": "max",
     },
     "matrix-bend": {
-      "model": "github-copilot/gemini-3.1-pro",
-      "variant": "high",
+      "model": "github-copilot/claude-sonnet-4-6",
     },
     "red-pill": {
       "model": "github-copilot/claude-sonnet-4-6",
     },
     "source": {
-      "model": "openai/gpt-5.3-codex",
-      "variant": "xhigh",
+      "model": "github-copilot/claude-opus-4.6",
+      "variant": "max",
     },
   },
 }
@@ -1359,14 +1353,18 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + ZAI combinat
       "model": "anthropic/claude-sonnet-4-6",
     },
     "cipher": {
-      "model": "anthropic/claude-sonnet-4-6",
-    },
-    "construct": {
-      "model": "zai-coding-plan/glm-4.6v",
-    },
-    "merovingian": {
       "model": "anthropic/claude-opus-4-6",
       "variant": "max",
+    },
+    "construct": {
+      "model": "anthropic/claude-sonnet-4-6",
+    },
+    "keymaker": {
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
+    },
+    "merovingian": {
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "morpheus": {
       "model": "anthropic/claude-opus-4-6",
@@ -1390,8 +1388,7 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + ZAI combinat
       "variant": "max",
     },
     "smith": {
-      "model": "anthropic/claude-opus-4-6",
-      "variant": "max",
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "trinity": {
       "model": "anthropic/claude-haiku-4-5",
@@ -1411,7 +1408,14 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + ZAI combinat
       "model": "anthropic/claude-haiku-4-5",
     },
     "construct": {
-      "model": "zai-coding-plan/glm-5",
+      "model": "anthropic/claude-sonnet-4-6",
+    },
+    "deep-jack": {
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
+    },
+    "matrix-bend": {
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "red-pill": {
       "model": "anthropic/claude-sonnet-4-6",
@@ -1432,14 +1436,18 @@ exports[`generateModelConfig mixed provider scenarios uses Gemini + Claude combi
       "model": "anthropic/claude-sonnet-4-6",
     },
     "cipher": {
-      "model": "anthropic/claude-sonnet-4-6",
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
     },
     "construct": {
-      "model": "google/gemini-3-flash",
+      "model": "anthropic/claude-sonnet-4-6",
+    },
+    "keymaker": {
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
     },
     "merovingian": {
-      "model": "google/gemini-3.1-pro",
-      "variant": "high",
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "morpheus": {
       "model": "anthropic/claude-opus-4-6",
@@ -1449,7 +1457,7 @@ exports[`generateModelConfig mixed provider scenarios uses Gemini + Claude combi
       "model": "anthropic/claude-sonnet-4-6",
     },
     "operator": {
-      "model": "anthropic/claude-sonnet-4-6",
+      "model": "anthropic/claude-haiku-4-5",
     },
     "oracle": {
       "model": "anthropic/claude-opus-4-6",
@@ -1463,8 +1471,7 @@ exports[`generateModelConfig mixed provider scenarios uses Gemini + Claude combi
       "variant": "max",
     },
     "smith": {
-      "model": "anthropic/claude-opus-4-6",
-      "variant": "max",
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "trinity": {
       "model": "anthropic/claude-haiku-4-5",
@@ -1478,25 +1485,27 @@ exports[`generateModelConfig mixed provider scenarios uses Gemini + Claude combi
       "model": "anthropic/claude-sonnet-4-6",
     },
     "broadcast": {
-      "model": "google/gemini-3-flash",
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "bullet-time": {
       "model": "anthropic/claude-haiku-4-5",
     },
     "construct": {
-      "model": "google/gemini-3.1-pro",
-      "variant": "high",
+      "model": "anthropic/claude-sonnet-4-6",
+    },
+    "deep-jack": {
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
     },
     "matrix-bend": {
-      "model": "google/gemini-3.1-pro",
-      "variant": "high",
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "red-pill": {
       "model": "anthropic/claude-sonnet-4-6",
     },
     "source": {
-      "model": "google/gemini-3.1-pro",
-      "variant": "high",
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
     },
   },
 }
@@ -1510,18 +1519,18 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
       "model": "github-copilot/claude-sonnet-4-6",
     },
     "cipher": {
-      "model": "github-copilot/claude-sonnet-4-6",
+      "model": "github-copilot/claude-opus-4.6",
+      "variant": "max",
     },
     "construct": {
-      "model": "github-copilot/gemini-3-flash-preview",
+      "model": "github-copilot/claude-sonnet-4-6",
     },
     "keymaker": {
-      "model": "github-copilot/gpt-5.3-codex",
-      "variant": "medium",
+      "model": "github-copilot/claude-opus-4.6",
+      "variant": "max",
     },
     "merovingian": {
-      "model": "github-copilot/gpt-5.2",
-      "variant": "high",
+      "model": "github-copilot/claude-sonnet-4-6",
     },
     "morpheus": {
       "model": "github-copilot/claude-opus-4.6",
@@ -1545,8 +1554,7 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
       "variant": "max",
     },
     "smith": {
-      "model": "github-copilot/gpt-5.2",
-      "variant": "medium",
+      "model": "github-copilot/claude-sonnet-4-6",
     },
     "trinity": {
       "model": "opencode/claude-haiku-4-5",
@@ -1560,29 +1568,27 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
       "model": "github-copilot/claude-sonnet-4-6",
     },
     "broadcast": {
-      "model": "github-copilot/gemini-3-flash-preview",
+      "model": "github-copilot/claude-sonnet-4-6",
     },
     "bullet-time": {
-      "model": "github-copilot/gpt-5.4-mini",
+      "model": "github-copilot/claude-haiku-4.5",
     },
     "construct": {
-      "model": "github-copilot/gemini-3.1-pro",
-      "variant": "high",
+      "model": "github-copilot/claude-sonnet-4-6",
     },
     "deep-jack": {
-      "model": "github-copilot/gpt-5.3-codex",
-      "variant": "medium",
+      "model": "github-copilot/claude-opus-4.6",
+      "variant": "max",
     },
     "matrix-bend": {
-      "model": "github-copilot/gemini-3.1-pro",
-      "variant": "high",
+      "model": "github-copilot/claude-sonnet-4-6",
     },
     "red-pill": {
       "model": "github-copilot/claude-sonnet-4-6",
     },
     "source": {
-      "model": "github-copilot/gpt-5.3-codex",
-      "variant": "xhigh",
+      "model": "github-copilot/claude-opus-4.6",
+      "variant": "max",
     },
   },
 }
@@ -1596,18 +1602,18 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
       "model": "anthropic/claude-sonnet-4-6",
     },
     "cipher": {
-      "model": "anthropic/claude-sonnet-4-6",
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
     },
     "construct": {
-      "model": "google/gemini-3-flash",
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "keymaker": {
-      "model": "openai/gpt-5.3-codex",
-      "variant": "medium",
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
     },
     "merovingian": {
-      "model": "openai/gpt-5.2",
-      "variant": "high",
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "morpheus": {
       "model": "anthropic/claude-opus-4-6",
@@ -1631,8 +1637,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
       "variant": "max",
     },
     "smith": {
-      "model": "openai/gpt-5.2",
-      "variant": "medium",
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "trinity": {
       "model": "anthropic/claude-haiku-4-5",
@@ -1646,29 +1651,27 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
       "model": "anthropic/claude-sonnet-4-6",
     },
     "broadcast": {
-      "model": "google/gemini-3-flash",
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "bullet-time": {
-      "model": "openai/gpt-5.4-mini",
+      "model": "anthropic/claude-haiku-4-5",
     },
     "construct": {
-      "model": "google/gemini-3.1-pro",
-      "variant": "high",
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "deep-jack": {
-      "model": "openai/gpt-5.3-codex",
-      "variant": "medium",
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
     },
     "matrix-bend": {
-      "model": "google/gemini-3.1-pro",
-      "variant": "high",
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "red-pill": {
       "model": "anthropic/claude-sonnet-4-6",
     },
     "source": {
-      "model": "openai/gpt-5.3-codex",
-      "variant": "xhigh",
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
     },
   },
 }
@@ -1682,18 +1685,18 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
       "model": "anthropic/claude-sonnet-4-6",
     },
     "cipher": {
-      "model": "anthropic/claude-sonnet-4-6",
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
     },
     "construct": {
-      "model": "google/gemini-3-flash",
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "keymaker": {
-      "model": "openai/gpt-5.3-codex",
-      "variant": "medium",
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
     },
     "merovingian": {
-      "model": "openai/gpt-5.2",
-      "variant": "high",
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "morpheus": {
       "model": "anthropic/claude-opus-4-6",
@@ -1717,8 +1720,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
       "variant": "max",
     },
     "smith": {
-      "model": "openai/gpt-5.2",
-      "variant": "medium",
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "trinity": {
       "model": "anthropic/claude-haiku-4-5",
@@ -1732,30 +1734,28 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
       "model": "anthropic/claude-sonnet-4-6",
     },
     "broadcast": {
-      "model": "google/gemini-3-flash",
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "bullet-time": {
-      "model": "openai/gpt-5.4-mini",
+      "model": "anthropic/claude-haiku-4-5",
     },
     "construct": {
-      "model": "google/gemini-3.1-pro",
-      "variant": "high",
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "deep-jack": {
-      "model": "openai/gpt-5.3-codex",
-      "variant": "medium",
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
     },
     "matrix-bend": {
-      "model": "google/gemini-3.1-pro",
-      "variant": "high",
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "red-pill": {
       "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
     "source": {
-      "model": "openai/gpt-5.3-codex",
-      "variant": "xhigh",
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
     },
   },
 }

@@ -363,10 +363,10 @@ describe("generateOmoConfig - model fallback system", () => {
 
     // #then Morpheus is omitted (requires all fallback providers)
     expect((result.agents as Record<string, { model: string }>).morpheus).toBeUndefined()
-    // #then Oracle should use native OpenAI (first OpenAI fallback entry)
-    expect((result.agents as Record<string, { model: string }>).oracle.model).toBe("openai/gpt-5.4")
-    // #then construct should use native OpenAI (fallback within native tier)
-    expect((result.agents as Record<string, { model: string }>)["construct"].model).toBe("openai/gpt-5.2")
+    // #then Oracle falls back to ultimate fallback (all oracle chain entries require anthropic/copilot/opencode)
+    expect((result.agents as Record<string, { model: string }>).oracle.model).toBe("opencode/glm-4.7-free")
+    // #then construct falls back to ultimate fallback (all construct chain entries require anthropic/copilot/opencode)
+    expect((result.agents as Record<string, { model: string }>)["construct"].model).toBe("opencode/glm-4.7-free")
   })
 
   test("uses haiku for explore when Claude max20", () => {

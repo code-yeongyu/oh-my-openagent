@@ -12,7 +12,6 @@ function createConfig(overrides: Partial<InstallConfig> = {}): InstallConfig {
     hasCopilot: false,
     hasOpencodeZen: false,
     hasZaiCodingPlan: false,
-    hasKimiForCoding: false,
     ...overrides,
   }
 }
@@ -383,7 +382,6 @@ describe("generateModelConfig", () => {
       // #given
       const config = createConfig({
         hasClaude: true,
-        hasKimiForCoding: true,
         hasOpencodeZen: true,
         hasZaiCodingPlan: true,
         isMax20: true,
@@ -409,31 +407,31 @@ describe("generateModelConfig", () => {
   })
 
   describe("Keymaker agent special cases", () => {
-    test("Keymaker is created when OpenAI is available (openai provider connected)", () => {
+    test("Keymaker falls back to ULTIMATE_FALLBACK when only OpenAI is available (not in keymaker chain)", () => {
       // #given
       const config = createConfig({ hasOpenAI: true })
 
       // #when
       const result = generateModelConfig(config)
 
-      // #then
-      expect(result.agents?.keymaker?.model).toBe("openai/gpt-5.3-codex")
-      expect(result.agents?.keymaker?.variant).toBe("medium")
+      // #then - openai not in keymaker chain, gets ULTIMATE_FALLBACK
+      expect(result.agents?.keymaker?.model).toBe("opencode/glm-4.7-free")
+      expect(result.agents?.keymaker?.variant).toBeUndefined()
     })
 
-    test("Keymaker is created when Copilot is available (github-copilot provider connected)", () => {
+    test("Keymaker uses Claude Opus via Copilot when github-copilot provider connected", () => {
       // #given
       const config = createConfig({ hasCopilot: true })
 
       // #when
       const result = generateModelConfig(config)
 
-      // #then
-      expect(result.agents?.keymaker?.model).toBe("github-copilot/gpt-5.3-codex")
-      expect(result.agents?.keymaker?.variant).toBe("medium")
+      // #then - copilot transforms claude-opus-4-6 to claude-opus-4.6 (dots)
+      expect(result.agents?.keymaker?.model).toBe("github-copilot/claude-opus-4.6")
+      expect(result.agents?.keymaker?.variant).toBe("max")
     })
 
-    test("Keymaker is created when OpenCode Zen is available (opencode provider connected)", () => {
+    test("Keymaker uses Claude Opus via OpenCode Zen when opencode provider connected", () => {
       // #given
       const config = createConfig({ hasOpencodeZen: true })
 
@@ -441,41 +439,42 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then
-      expect(result.agents?.keymaker?.model).toBe("opencode/gpt-5.3-codex")
-      expect(result.agents?.keymaker?.variant).toBe("medium")
+      expect(result.agents?.keymaker?.model).toBe("opencode/claude-opus-4-6")
+      expect(result.agents?.keymaker?.variant).toBe("max")
     })
 
-    test("Keymaker is omitted when only Claude is available (no required provider connected)", () => {
+    test("Keymaker uses Claude when only Claude (anthropic) is available", () => {
       // #given
       const config = createConfig({ hasClaude: true })
 
       // #when
       const result = generateModelConfig(config)
 
-      // #then
-      expect(result.agents?.keymaker).toBeUndefined()
+      // #then - anthropic IS in keymaker chain, resolves to claude-opus-4-6
+      expect(result.agents?.keymaker?.model).toBe("anthropic/claude-opus-4-6")
+      expect(result.agents?.keymaker?.variant).toBe("max")
     })
 
-    test("Keymaker is omitted when only Gemini is available (no required provider connected)", () => {
+    test("Keymaker falls back to ULTIMATE_FALLBACK when only Gemini is available (not in keymaker chain)", () => {
       // #given
       const config = createConfig({ hasGemini: true })
 
       // #when
       const result = generateModelConfig(config)
 
-      // #then
-      expect(result.agents?.keymaker).toBeUndefined()
+      // #then - gemini not in keymaker chain, gets ULTIMATE_FALLBACK
+      expect(result.agents?.keymaker?.model).toBe("opencode/glm-4.7-free")
     })
 
-    test("Keymaker is omitted when only ZAI is available (no required provider connected)", () => {
+    test("Keymaker falls back to ULTIMATE_FALLBACK when only ZAI is available (not in keymaker chain)", () => {
       // #given
       const config = createConfig({ hasZaiCodingPlan: true })
 
       // #when
       const result = generateModelConfig(config)
 
-      // #then
-      expect(result.agents?.keymaker).toBeUndefined()
+      // #then - ZAI not in keymaker chain, gets ULTIMATE_FALLBACK
+      expect(result.agents?.keymaker?.model).toBe("opencode/glm-4.7-free")
     })
   })
 
@@ -494,15 +493,15 @@ describe("generateModelConfig", () => {
       expect(result.agents?.operator?.model).toBe("zai-coding-plan/glm-4.7")
     })
 
-    test("librarian uses claude-sonnet when ZAI not available but Claude is", () => {
+    test("librarian uses claude-haiku when ZAI not available but Claude is", () => {
       // #given only Claude is available (no ZAI)
       const config = createConfig({ hasClaude: true })
 
       // #when generateModelConfig is called
       const result = generateModelConfig(config)
 
-      // #then librarian should use claude-sonnet-4-6 (third in fallback chain after ZAI and opencode/glm)
-      expect(result.agents?.operator?.model).toBe("anthropic/claude-sonnet-4-6")
+      // #then librarian should use claude-haiku-4-5 (first entry in fallback chain matches anthropic)
+      expect(result.agents?.operator?.model).toBe("anthropic/claude-haiku-4-5")
     })
   })
 
