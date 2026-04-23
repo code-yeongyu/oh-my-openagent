@@ -261,7 +261,7 @@ Skills aren't just prompts. Each brings:
 - Embedded MCP servers, on-demand
 - Scoped permissions. Agents stay in bounds
 
-Built-ins: `playwright` (browser automation), `git-master` (atomic commits, rebase surgery), `frontend-ui-ux` (design-first UI).
+Built-ins: `playwright` (browser automation), `git-master` (atomic commits, rebase surgery), `frontend-ui-ux` (design-first UI), `agent-audit` (structured runtime diagnostics).
 
 Add your own: `.opencode/skills/*/SKILL.md` or `~/.config/opencode/skills/*/SKILL.md`.
 
@@ -337,7 +337,7 @@ See [Configuration Documentation](docs/reference/configuration.md).
 - **Config Locations**: The compatibility layer recognizes both `oh-my-openagent.json[c]` and legacy `oh-my-opencode.json[c]` plugin config files. Existing installs still commonly use the legacy basename.
 - **JSONC Support**: Comments and trailing commas supported
 - **Agents**: Override models, temperatures, prompts, and permissions for any agent
-- **Built-in Skills**: `playwright` (browser automation), `git-master` (atomic commits)
+- **Built-in Skills**: `playwright` (browser automation), `git-master` (atomic commits), `agent-audit` (structured runtime diagnostics)
 - **Sisyphus Agent**: Main orchestrator with Prometheus (Planner) and Metis (Plan Consultant)
 - **Background Tasks**: Configure concurrency limits per provider/model
 - **Categories**: Domain-specific task delegation (`visual`, `business-logic`, custom)

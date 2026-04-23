@@ -463,7 +463,7 @@ Enable the Sisyphus Tasks system for cross-session task tracking.
 
 Skills bring domain-specific expertise and embedded MCPs.
 
-Built-in skills: `playwright`, `playwright-cli`, `agent-browser`, `dev-browser`, `git-master`, `frontend-ui-ux`
+Built-in skills: `playwright`, `playwright-cli`, `agent-browser`, `dev-browser`, `git-master`, `frontend-ui-ux`, `agent-audit`
 
 Disable built-in skills: `{ "disabled_skills": ["playwright"] }`
 

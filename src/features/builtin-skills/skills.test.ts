@@ -61,7 +61,7 @@ describe("createBuiltinSkills", () => {
 		expect(agentBrowserSkill!.template).toContain("agent-browser snapshot")
 	})
 
-	test("always includes frontend-ui-ux, git-master, review-work, and ai-slop-remover skills", () => {
+	test("always includes frontend-ui-ux, git-master, review-work, ai-slop-remover, and agent-audit skills", () => {
 		// given - both provider options
 
 		// when
@@ -74,10 +74,11 @@ describe("createBuiltinSkills", () => {
 			expect(skills.find((s) => s.name === "git-master")).toBeDefined()
 			expect(skills.find((s) => s.name === "review-work")).toBeDefined()
 			expect(skills.find((s) => s.name === "ai-slop-remover")).toBeDefined()
+			expect(skills.find((s) => s.name === "agent-audit")).toBeDefined()
 		}
 	})
 
-	test("returns exactly 6 skills regardless of provider", () => {
+	test("returns exactly 7 skills regardless of provider", () => {
 		// given
 
 		// when
@@ -85,8 +86,8 @@ describe("createBuiltinSkills", () => {
 		const agentBrowserSkills = createBuiltinSkills({ browserProvider: "agent-browser" })
 
 		// then
-		expect(defaultSkills).toHaveLength(6)
-		expect(agentBrowserSkills).toHaveLength(6)
+		expect(defaultSkills).toHaveLength(7)
+		expect(agentBrowserSkills).toHaveLength(7)
 	})
 
 	test("should exclude playwright when it is in disabledSkills", () => {
@@ -103,7 +104,8 @@ describe("createBuiltinSkills", () => {
 		expect(skills.map((s) => s.name)).toContain("dev-browser")
 		expect(skills.map((s) => s.name)).toContain("review-work")
 		expect(skills.map((s) => s.name)).toContain("ai-slop-remover")
-		expect(skills.length).toBe(5)
+		expect(skills.map((s) => s.name)).toContain("agent-audit")
+		expect(skills.length).toBe(6)
 	})
 
 	test("should exclude multiple skills when they are in disabledSkills", () => {
@@ -120,13 +122,14 @@ describe("createBuiltinSkills", () => {
 		expect(skills.map((s) => s.name)).toContain("dev-browser")
 		expect(skills.map((s) => s.name)).toContain("review-work")
 		expect(skills.map((s) => s.name)).toContain("ai-slop-remover")
-		expect(skills.length).toBe(4)
+		expect(skills.map((s) => s.name)).toContain("agent-audit")
+		expect(skills.length).toBe(5)
 	})
 
 	test("should return an empty array when all skills are disabled", () => {
 		// #given
 		const options = {
-			disabledSkills: new Set(["playwright", "frontend-ui-ux", "git-master", "dev-browser", "review-work", "ai-slop-remover"]),
+			disabledSkills: new Set(["playwright", "frontend-ui-ux", "git-master", "dev-browser", "review-work", "ai-slop-remover", "agent-audit"]),
 		}
 
 		// #when
@@ -144,7 +147,7 @@ describe("createBuiltinSkills", () => {
 		const skills = createBuiltinSkills(options)
 
 		// #then
-		expect(skills.length).toBe(6)
+		expect(skills.length).toBe(7)
 	})
 
 	test("review-work skill has correct structure", () => {
@@ -177,6 +180,23 @@ describe("createBuiltinSkills", () => {
 		expect(aiSlopRemover!.description).toContain("AI-generated code smells")
 		expect(aiSlopRemover!.template).toContain("DETECTION CRITERIA")
 		expect(aiSlopRemover!.template).toContain("SAFETY RULES")
+	})
+
+	test("agent-audit skill has correct structure", () => {
+		// #given - default options
+
+		// #when
+		const skills = createBuiltinSkills()
+		const agentAudit = skills.find((s) => s.name === "agent-audit")
+
+		// #then
+		expect(agentAudit).toBeDefined()
+		expect(agentAudit!.description).toContain("Audit agent runtimes")
+		expect(agentAudit!.template).toContain("agent_check_scope.json")
+		expect(agentAudit!.template).toContain("agent_check_report.json")
+		expect(agentAudit!.template).toContain("wrapper-regression")
+		expect(agentAudit!.template).toContain("contamination_paths")
+		expect(agentAudit!.template).toContain("schema_version")
 	})
 
 	test("returns playwright-cli skill when browserProvider is 'playwright-cli'", () => {
