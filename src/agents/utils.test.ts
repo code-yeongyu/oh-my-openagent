@@ -171,10 +171,10 @@ describe("createBuiltinAgents with model overrides", () => {
      // #when
      const agents = await createBuiltinAgents([], {}, undefined, TEST_DEFAULT_MODEL, undefined, undefined, [], undefined, undefined)
 
-     // #then - oracle resolves via connected cache fallback to openai/gpt-5.2 (not system default)
-     expect(agents.merovingian.model).toBe("openai/gpt-5.2")
-     expect(agents.merovingian.reasoningEffort).toBe("medium")
-     expect(agents.merovingian.thinking).toBeUndefined()
+     // #then - merovingian resolves via connected cache fallback to opencode/claude-sonnet-4-6 (not system default)
+     expect(agents.merovingian.model).toBe("opencode/claude-sonnet-4-6")
+     expect(agents.merovingian.reasoningEffort).toBeUndefined()
+     expect(agents.merovingian.thinking).toBeDefined()
      cacheSpy.mockRestore?.()
    })
 
@@ -475,7 +475,7 @@ describe("createBuiltinAgents without systemDefaultModel", () => {
 
      // #then - connected cache enables model resolution despite no systemDefaultModel
      expect(agents.merovingian).toBeDefined()
-     expect(agents.merovingian.model).toBe("openai/gpt-5.2")
+     expect(agents.merovingian.model).toBe("opencode/claude-sonnet-4-6")
      cacheSpy.mockRestore?.()
    })
 
@@ -488,7 +488,7 @@ describe("createBuiltinAgents without systemDefaultModel", () => {
 
       // #then - first fallback entry used as last resort
       expect(agents.merovingian).toBeDefined()
-      expect(agents.merovingian.model).toBe("openai/gpt-5.2")
+      expect(agents.merovingian.model).toBe("anthropic/claude-sonnet-4-6")
       cacheSpy.mockRestore?.()
     })
 
@@ -520,8 +520,8 @@ describe("createBuiltinAgents without systemDefaultModel", () => {
 })
 
 describe("createBuiltinAgents with requiresProvider gating (keymaker)", () => {
-  test("keymaker is not created when no required provider is connected", async () => {
-    // #given - only anthropic models available, not in keymaker requiresProvider
+  test("keymaker is created when anthropic provider is connected", async () => {
+    // #given - anthropic models available, keymaker uses anthropic provider
     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
       new Set(["anthropic/claude-opus-4-6"])
     )
@@ -532,7 +532,7 @@ describe("createBuiltinAgents with requiresProvider gating (keymaker)", () => {
       const agents = await createBuiltinAgents([], {}, undefined, TEST_DEFAULT_MODEL, undefined, undefined, [], {})
 
       // #then
-      expect(agents.keymaker).toBeUndefined()
+      expect(agents.keymaker).toBeDefined()
     } finally {
       fetchSpy.mockRestore()
       cacheSpy.mockRestore()
@@ -601,7 +601,7 @@ describe("createBuiltinAgents with requiresProvider gating (keymaker)", () => {
 
       // #then
       expect(agents.keymaker).toBeDefined()
-      expect(agents.keymaker.model).toBe("openai/gpt-5.3-codex")
+      expect(agents.keymaker.model).toBe("anthropic/claude-opus-4-6")
     } finally {
       cacheSpy.mockRestore()
       fetchSpy.mockRestore()
@@ -781,7 +781,7 @@ describe("buildAgent with category and skills", () => {
     const agent = buildAgent(source["test-agent"], TEST_MODEL)
 
     // #then - category's built-in model is applied
-    expect(agent.model).toBe("google/gemini-3-pro")
+    expect(agent.model).toBe("anthropic/claude-sonnet-4-6")
   })
 
   test("agent with category and existing model keeps existing model", () => {
@@ -903,8 +903,8 @@ describe("buildAgent with category and skills", () => {
     const agent = buildAgent(source["test-agent"], TEST_MODEL)
 
     // #then - category's built-in model and skills are applied
-    expect(agent.model).toBe("openai/gpt-5.3-codex")
-    expect(agent.variant).toBe("xhigh")
+    expect(agent.model).toBe("anthropic/claude-opus-4-6")
+    expect(agent.variant).toBe("max")
     expect(agent.prompt).toContain("Role: Designer-Turned-Developer")
     expect(agent.prompt).toContain("Task description")
   })
@@ -1016,10 +1016,10 @@ describe("override.category expansion in createBuiltinAgents", () => {
     // #when
     const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
 
-    // #then - source category: model=openai/gpt-5.3-codex, variant=xhigh
+    // #then - source category: model=anthropic/claude-opus-4-6, variant=max
     expect(agents.merovingian).toBeDefined()
-    expect(agents.merovingian.model).toBe("openai/gpt-5.3-codex")
-    expect(agents.merovingian.variant).toBe("xhigh")
+    expect(agents.merovingian.model).toBe("anthropic/claude-opus-4-6")
+    expect(agents.merovingian.variant).toBe("max")
   })
 
   test("standard agent override with category AND direct variant - direct wins", async () => {
@@ -1085,10 +1085,10 @@ describe("override.category expansion in createBuiltinAgents", () => {
     // #when
     const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
 
-    // #then - source category: model=openai/gpt-5.3-codex, variant=xhigh
+    // #then - source category: model=anthropic/claude-opus-4-6, variant=max
     expect(agents.morpheus).toBeDefined()
-    expect(agents.morpheus.model).toBe("openai/gpt-5.3-codex")
-    expect(agents.morpheus.variant).toBe("xhigh")
+    expect(agents.morpheus.model).toBe("anthropic/claude-opus-4-6")
+    expect(agents.morpheus.variant).toBe("max")
   })
 
   test("architect override with category expands category properties", async () => {
@@ -1100,10 +1100,10 @@ describe("override.category expansion in createBuiltinAgents", () => {
     // #when
     const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
 
-    // #then - source category: model=openai/gpt-5.3-codex, variant=xhigh
+    // #then - source category: model=anthropic/claude-opus-4-6, variant=max
     expect(agents.architect).toBeDefined()
-    expect(agents.architect.model).toBe("openai/gpt-5.3-codex")
-    expect(agents.architect.variant).toBe("xhigh")
+    expect(agents.architect.model).toBe("anthropic/claude-opus-4-6")
+    expect(agents.architect.variant).toBe("max")
   })
 
   test("override with non-existent category has no effect on config", async () => {
@@ -1225,9 +1225,9 @@ describe("Deadlock prevention - fetchAvailableModels must not receive client", (
      // #when
      const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
  
-     // #then - default "medium" variant is applied
+     // #then - default "max" variant is applied
      expect(agents.keymaker).toBeDefined()
-     expect(agents.keymaker.variant).toBe("medium")
+     expect(agents.keymaker.variant).toBe("max")
    })
 })
 
@@ -1258,19 +1258,19 @@ describe("createBuiltinAgents with fallbackChain override", () => {
   })
 
   test("agent without fallbackChain override uses default AGENT_MODEL_REQUIREMENTS chain", async () => {
-    // #given - no fallbackChain override, merovingian default chain starts with gpt-5.2
+    // #given - no fallbackChain override, merovingian default chain starts with claude-sonnet-4-6
     const overrides = {}
     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
-      new Set(["openai/gpt-5.2"])
+      new Set(["anthropic/claude-sonnet-4-6"])
     )
 
     try {
       // #when
       const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL, undefined, undefined, [], {})
 
-      // #then - should resolve to default chain's first entry (gpt-5.2)
+      // #then - should resolve to default chain's first entry (claude-sonnet-4-6)
       expect(agents.merovingian).toBeDefined()
-      expect(agents.merovingian.model).toBe("openai/gpt-5.2")
+      expect(agents.merovingian.model).toBe("anthropic/claude-sonnet-4-6")
     } finally {
       fetchSpy.mockRestore()
     }
