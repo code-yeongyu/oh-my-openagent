@@ -359,8 +359,8 @@ These agents do search, grep, and retrieval. They intentionally use fast, cheap 
 
 | Agent                 | Role               | Default Chain                                                          | Design Rationale                                               |
 | --------------------- | ------------------ | ---------------------------------------------------------------------- | -------------------------------------------------------------- |
-| **Explore**           | Fast codebase grep | github-copilot\|xai/grok-code-fast-1 → opencode-go/qwen3.5-plus → vercel/minimax-m2.7-highspeed → opencode/minimax-m2.7 → anthropic\|opencode/claude-haiku-4-5 → opencode/gpt-5-nano | Speed is everything. Exact runtime chain from `src/shared/model-requirements.ts`. |
-| **Librarian**         | Docs/code search   | opencode-go/minimax-m2.7 → opencode/minimax-m2.7-highspeed → anthropic\|opencode/claude-haiku-4-5 → opencode/gpt-5-nano | Doc retrieval doesn't need deep reasoning. Exact runtime chain from `src/shared/model-requirements.ts`. |
+| **Explore**           | Fast codebase grep | openai/gpt-5.4-mini-fast → opencode-go/qwen3.5-plus → vercel/minimax-m2.7-highspeed → opencode-go\|vercel/minimax-m2.7 → anthropic\|opencode\|vercel/claude-haiku-4-5 → openai\|opencode\|vercel/gpt-5.4-nano | Speed is everything. Exact runtime chain from `src/shared/model-requirements.ts`. |
+| **Librarian**         | Docs/code search   | openai/gpt-5.4-mini-fast → opencode-go/qwen3.5-plus → vercel/minimax-m2.7-highspeed → opencode-go\|vercel/minimax-m2.7 → anthropic\|opencode\|vercel/claude-haiku-4-5 → openai\|opencode\|vercel/gpt-5.4-nano | Doc retrieval doesn't need deep reasoning. Exact runtime chain from `src/shared/model-requirements.ts`. |
 | **Multimodal Looker** | Vision/screenshots | openai\|opencode/gpt-5.5 (medium) → opencode-go/kimi-k2.6 → zai-coding-plan/glm-4.6v → openai\|github-copilot\|opencode/gpt-5-nano | GPT-5.5 now leads the default vision path when available. |
 
 #### Why Different Models Need Different Prompts
