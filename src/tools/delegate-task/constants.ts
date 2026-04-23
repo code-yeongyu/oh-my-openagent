@@ -74,7 +74,7 @@ Approach:
 </Category_Context>
 
 <Caller_Warning>
-THIS CATEGORY USES A LESS CAPABLE MODEL (gpt-5.4-mini).
+THIS CATEGORY USES A LESS CAPABLE MODEL (claude-haiku-4-5).
 
 The model executing this task has LIMITED reasoning capacity. Your prompt MUST be:
 
@@ -125,7 +125,7 @@ This is NOT a default choice - it's for genuinely unclassifiable moderate-effort
 </Category_Context>
 
 <Caller_Warning>
-THIS CATEGORY USES A MID-TIER MODEL (claude-sonnet-4-5).
+THIS CATEGORY USES A MID-TIER MODEL (claude-sonnet-4-6).
 
 **PROVIDE CLEAR STRUCTURE:**
 1. MUST DO: Enumerate required actions explicitly
@@ -237,15 +237,15 @@ Approach:
 </Category_Context>`
 
 export const DEFAULT_CATEGORIES: Record<string, CategoryConfig> = {
-  "construct": { model: "google/gemini-3-pro", variant: "high" },
-  "source": { model: "openai/gpt-5.3-codex", variant: "xhigh" },
-  "deep-jack": { model: "openai/gpt-5.3-codex", variant: "medium" },
-  "matrix-bend": { model: "google/gemini-3-pro", variant: "high" },
-  "bullet-time": { model: "openai/gpt-5.4-mini" },
-  "blue-pill": { model: "anthropic/claude-sonnet-4-5" },
+  "construct": { model: "anthropic/claude-sonnet-4-6" },
+  "source": { model: "anthropic/claude-opus-4-6", variant: "max" },
+  "deep-jack": { model: "anthropic/claude-opus-4-6", variant: "max" },
+  "matrix-bend": { model: "anthropic/claude-sonnet-4-6" },
+  "bullet-time": { model: "anthropic/claude-haiku-4-5" },
+  "blue-pill": { model: "anthropic/claude-sonnet-4-6" },
   "red-pill": { model: "anthropic/claude-opus-4-6", variant: "max" },
   "broadcast": { model: "anthropic/claude-sonnet-4-6" },
-  "dsl-engineering": { model: "anthropic/claude-opus-4-6", variant: "high" },
+  "dsl-engineering": { model: "anthropic/claude-opus-4-6", variant: "max" },
 }
 
 export const CATEGORY_PROMPT_APPENDS: Record<string, string> = {

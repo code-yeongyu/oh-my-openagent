@@ -28,7 +28,7 @@ describe("resolveCategoryExecution", () => {
 	})
 
 	test("returns clear error when category exists but required model is not available", async () => {
-		//#given
+		//#given - deep-jack now uses Claude-only chain, so it resolves successfully
 		const args = {
 			category: "deep-jack",
 			prompt: "test prompt",
@@ -45,11 +45,10 @@ describe("resolveCategoryExecution", () => {
 		//#when
 		const result = await resolveCategoryExecution(args, executorCtx, inheritedModel, systemDefaultModel)
 
-		//#then
-		expect(result.error).toBeDefined()
-		expect(result.error).toContain("deep")
-		expect(result.error).toMatch(/model.*not.*available|requires.*model/i)
-		expect(result.error).not.toContain("Unknown category")
+		//#then - deep-jack resolves via system default (no requiresModel restriction)
+		expect(result.error).toBeUndefined()
+		expect(result.actualModel).toBeDefined()
+		expect(result.actualModel).toContain("anthropic")
 	})
 
 	test("returns 'unknown category' error for truly unknown categories", async () => {

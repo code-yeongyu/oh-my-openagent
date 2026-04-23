@@ -74,8 +74,8 @@ describe("morpheus-task", () => {
 
       // when / #then
       expect(category).toBeDefined()
-      expect(category.model).toBe("google/gemini-3-pro")
-      expect(category.variant).toBe("high")
+      expect(category.model).toBe("anthropic/claude-sonnet-4-6")
+      expect(category.variant).toBeUndefined()
     })
 
     test("source category has model and variant config", () => {
@@ -84,8 +84,8 @@ describe("morpheus-task", () => {
 
       // when / #then
       expect(category).toBeDefined()
-      expect(category.model).toBe("openai/gpt-5.3-codex")
-      expect(category.variant).toBe("xhigh")
+      expect(category.model).toBe("anthropic/claude-opus-4-6")
+      expect(category.variant).toBe("max")
     })
 
     test("deep-jack category has model and variant config", () => {
@@ -94,8 +94,8 @@ describe("morpheus-task", () => {
 
       // when / #then
       expect(category).toBeDefined()
-      expect(category.model).toBe("openai/gpt-5.3-codex")
-      expect(category.variant).toBe("medium")
+      expect(category.model).toBe("anthropic/claude-opus-4-6")
+      expect(category.variant).toBe("max")
     })
   })
 
@@ -703,8 +703,8 @@ describe("morpheus-task", () => {
       expect(result).toBeNull()
     })
 
-    test("blocks requiresModel when availability is known and missing the required model", () => {
-      // given
+    test("resolves deep-jack when availability includes anthropic (no requiresModel restriction)", () => {
+      // given - deep-jack now uses Claude-only chain, no requiresModel
       const categoryName = "deep-jack"
       const availableModels = new Set<string>(["anthropic/claude-opus-4-6"])
 
@@ -714,12 +714,13 @@ describe("morpheus-task", () => {
         availableModels,
       })
 
-      // then
-      expect(result).toBeNull()
+      // then - resolves successfully since anthropic is available
+      expect(result).not.toBeNull()
+      expect(result!.config.model).toBe("anthropic/claude-opus-4-6")
     })
 
-    test("blocks requiresModel when availability is empty", () => {
-      // given
+    test("resolves deep-jack with built-in model when availability is empty", () => {
+      // given - deep-jack has no requiresModel, uses its built-in model
       const categoryName = "deep-jack"
       const availableModels = new Set<string>()
 
@@ -729,8 +730,9 @@ describe("morpheus-task", () => {
         availableModels,
       })
 
-      // then
-      expect(result).toBeNull()
+      // then - resolves via deep-jack's built-in model (anthropic/claude-opus-4-6)
+      expect(result).not.toBeNull()
+      expect(result!.config.model).toBe("anthropic/claude-opus-4-6")
     })
 
     test("bypasses requiresModel when explicit user config provided", () => {
@@ -782,7 +784,7 @@ describe("morpheus-task", () => {
 
       // then
       expect(result).not.toBeNull()
-      expect(result!.config.model).toBe("google/gemini-3-pro")
+      expect(result!.config.model).toBe("anthropic/claude-sonnet-4-6")
       expect(result!.promptAppend).toContain("VISUAL/UI")
     })
 
@@ -869,7 +871,7 @@ describe("morpheus-task", () => {
 
       // then - category's built-in model wins over inheritedModel
       expect(result).not.toBeNull()
-      expect(result!.config.model).toBe("google/gemini-3-pro")
+      expect(result!.config.model).toBe("anthropic/claude-sonnet-4-6")
     })
 
     test("systemDefaultModel is used as fallback when custom category has no model", () => {
@@ -911,7 +913,7 @@ describe("morpheus-task", () => {
 
       // then
       expect(result).not.toBeNull()
-      expect(result!.config.model).toBe("google/gemini-3-pro")
+      expect(result!.config.model).toBe("anthropic/claude-sonnet-4-6")
     })
   })
 
@@ -943,15 +945,15 @@ describe("morpheus-task", () => {
     })
 
     test("inherits default variant when user does not override model", () => {
-      //#given - construct default has variant "high", user does not override
-      const categoryName = "construct"
+      //#given - source default has variant "max", user does not override
+      const categoryName = "source"
 
       //#when
       const result = resolveCategoryConfig(categoryName, { systemDefaultModel: SYSTEM_DEFAULT_MODEL })
 
       //#then - variant should be inherited from default
       expect(result).not.toBeNull()
-      expect(result!.config.variant).toBe("high")
+      expect(result!.config.variant).toBe("max")
     })
   })
 
@@ -1756,15 +1758,15 @@ describe("morpheus-task", () => {
   })
 
   describe("unstable agent forced background mode", () => {
-    test("gemini model with run_in_background=false should force background but wait for result", async () => {
-      // given - category using gemini model with run_in_background=false
+    test("is_unstable_agent category with run_in_background=false should force background but wait for result", async () => {
+      // given - custom category with is_unstable_agent=true and run_in_background=false
       const { createDelegateTask } = require("./tools")
       let launchCalled = false
       
       const launchedTask = {
         id: "task-unstable",
-        sessionID: "ses_unstable_gemini",
-        description: "Unstable gemini task",
+        sessionID: "ses_unstable_custom",
+        description: "Unstable custom task",
         agent: "sisyphus-junior",
         status: "running",
       }
@@ -1779,24 +1781,27 @@ describe("morpheus-task", () => {
        const mockClient = {
          app: { agents: async () => ({ data: [] }) },
          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         model: { list: async () => [{ provider: "google", id: "gemini-3-pro" }] },
+         model: { list: async () => [{ provider: "anthropic", id: "claude-sonnet-4-6" }] },
          session: {
            get: async () => ({ data: { directory: "/project" } }),
-           create: async () => ({ data: { id: "ses_unstable_gemini" } }),
+           create: async () => ({ data: { id: "ses_unstable_custom" } }),
            prompt: async () => ({ data: {} }),
            promptAsync: async () => ({ data: {} }),
            messages: async () => ({
              data: [
-               { info: { role: "assistant", time: { created: Date.now() } }, parts: [{ type: "text", text: "Gemini task completed successfully" }] }
+               { info: { role: "assistant", time: { created: Date.now() } }, parts: [{ type: "text", text: "Unstable task completed successfully" }] }
              ]
            }),
-           status: async () => ({ data: { "ses_unstable_gemini": { type: "idle" } } }),
+           status: async () => ({ data: { "ses_unstable_custom": { type: "idle" } } }),
          },
        }
        
        const tool = createDelegateTask({
          manager: mockManager,
          client: mockClient,
+         userCategories: {
+           "custom-unstable": { model: "anthropic/claude-sonnet-4-6", is_unstable_agent: true },
+         },
        })
       
       const toolContext = {
@@ -1806,12 +1811,12 @@ describe("morpheus-task", () => {
         abort: new AbortController().signal,
       }
       
-      // when - using construct (gemini model) with run_in_background=false
+      // when - using custom unstable category with run_in_background=false
       const result = await tool.execute(
         {
-          description: "Test gemini forced background",
-          prompt: "Do something visual",
-          category: "construct",
+          description: "Test unstable forced background",
+          prompt: "Do something",
+          category: "custom-unstable",
           run_in_background: false,
           load_skills: ["git-master"],
         },
@@ -1821,7 +1826,7 @@ describe("morpheus-task", () => {
       // then - should launch as background BUT wait for and return actual result
       expect(launchCalled).toBe(true)
       expect(result).toContain("SUPERVISED TASK COMPLETED")
-      expect(result).toContain("Gemini task completed successfully")
+      expect(result).toContain("Unstable task completed successfully")
     }, { timeout: 20000 })
 
     test("gemini model with run_in_background=true should not show unstable message (normal background)", async () => {
@@ -2019,15 +2024,15 @@ describe("morpheus-task", () => {
       expect(result).not.toContain("UNSTABLE AGENT MODE")
     }, { timeout: 20000 })
 
-    test("matrix-bend category (gemini) with run_in_background=false should force background but wait for result", async () => {
-      // given - matrix-bend also uses gemini model
+    test("custom-artistry category (is_unstable_agent) with run_in_background=false should force background but wait for result", async () => {
+      // given - custom category with is_unstable_agent=true and run_in_background=false
       const { createDelegateTask } = require("./tools")
       let launchCalled = false
       
       const launchedTask = {
         id: "task-artistry",
-        sessionID: "ses_artistry_gemini",
-        description: "Artistry gemini task",
+        sessionID: "ses_artistry_custom",
+        description: "Artistry custom task",
         agent: "sisyphus-junior",
         status: "running",
       }
@@ -2042,10 +2047,10 @@ describe("morpheus-task", () => {
        const mockClient = {
          app: { agents: async () => ({ data: [] }) },
          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         model: { list: async () => [{ provider: "google", id: "gemini-3-pro" }] },
+         model: { list: async () => [{ provider: "anthropic", id: "claude-sonnet-4-6" }] },
          session: {
            get: async () => ({ data: { directory: "/project" } }),
-           create: async () => ({ data: { id: "ses_matrix-bend_gemini" } }),
+           create: async () => ({ data: { id: "ses_artistry_custom" } }),
            prompt: async () => ({ data: {} }),
            promptAsync: async () => ({ data: {} }),
            messages: async () => ({
@@ -2053,13 +2058,16 @@ describe("morpheus-task", () => {
                { info: { role: "assistant", time: { created: Date.now() } }, parts: [{ type: "text", text: "Artistry result here" }] }
              ]
            }),
-           status: async () => ({ data: { "ses_matrix-bend_gemini": { type: "idle" } } }),
+           status: async () => ({ data: { "ses_artistry_custom": { type: "idle" } } }),
          },
        }
        
        const tool = createDelegateTask({
          manager: mockManager,
          client: mockClient,
+         userCategories: {
+           "custom-artistry": { model: "anthropic/claude-sonnet-4-6", is_unstable_agent: true },
+         },
        })
       
       const toolContext = {
@@ -2069,12 +2077,12 @@ describe("morpheus-task", () => {
         abort: new AbortController().signal,
       }
       
-      // when - matrix-bend category (gemini-3-pro with high variant)
+      // when - custom artistry category with is_unstable_agent=true
       const result = await tool.execute(
         {
-          description: "Test matrix-bend forced background",
+          description: "Test artistry forced background",
           prompt: "Do something artistic",
-          category: "matrix-bend",
+          category: "custom-artistry",
           run_in_background: false,
           load_skills: ["git-master"],
         },
@@ -2087,15 +2095,15 @@ describe("morpheus-task", () => {
       expect(result).toContain("Artistry result here")
     }, { timeout: 20000 })
 
-    test("broadcast category (gemini-flash) with run_in_background=false should force background but wait for result", async () => {
-      // given - writing uses gemini-3-flash
+    test("custom-broadcast category (is_unstable_agent=true) with run_in_background=false should force background but wait for result", async () => {
+      // given - custom broadcast category with is_unstable_agent=true (broadcast now uses claude-sonnet-4-6, not gemini)
       const { createDelegateTask } = require("./tools")
       let launchCalled = false
       
       const launchedTask = {
         id: "task-writing",
-        sessionID: "ses_writing_gemini",
-        description: "Writing gemini task",
+        sessionID: "ses_writing_custom",
+        description: "Writing custom task",
         agent: "sisyphus-junior",
         status: "running",
       }
@@ -2110,10 +2118,10 @@ describe("morpheus-task", () => {
        const mockClient = {
          app: { agents: async () => ({ data: [] }) },
          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         model: { list: async () => [{ provider: "google", id: "gemini-3-flash" }] },
+         model: { list: async () => [{ provider: "anthropic", id: "claude-sonnet-4-6" }] },
          session: {
            get: async () => ({ data: { directory: "/project" } }),
-           create: async () => ({ data: { id: "ses_writing_gemini" } }),
+           create: async () => ({ data: { id: "ses_writing_custom" } }),
            prompt: async () => ({ data: {} }),
            promptAsync: async () => ({ data: {} }),
            messages: async () => ({
@@ -2121,13 +2129,16 @@ describe("morpheus-task", () => {
                { info: { role: "assistant", time: { created: Date.now() } }, parts: [{ type: "text", text: "Writing result here" }] }
              ]
            }),
-           status: async () => ({ data: { "ses_writing_gemini": { type: "idle" } } }),
+           status: async () => ({ data: { "ses_writing_custom": { type: "idle" } } }),
          },
        }
        
        const tool = createDelegateTask({
          manager: mockManager,
          client: mockClient,
+         userCategories: {
+           "custom-broadcast": { model: "anthropic/claude-sonnet-4-6", is_unstable_agent: true },
+         },
        })
       
       const toolContext = {
@@ -2137,12 +2148,12 @@ describe("morpheus-task", () => {
         abort: new AbortController().signal,
       }
       
-      // when - writing category (gemini-3-flash)
+      // when - custom broadcast category with is_unstable_agent=true
       const result = await tool.execute(
         {
           description: "Test writing forced background",
           prompt: "Write something",
-          category: "broadcast",
+          category: "custom-broadcast",
           run_in_background: false,
           load_skills: ["git-master"],
         },
@@ -2418,8 +2429,8 @@ describe("morpheus-task", () => {
       )
 
       // then - category model should be used instead of override model
-      expect(launchInput.model.providerID).toBe("openai")
-      expect(launchInput.model.modelID).toBe("gpt-5.3-codex")
+      expect(launchInput.model.providerID).toBe("anthropic")
+      expect(launchInput.model.modelID).toBe("claude-opus-4-6")
     })
 
     test("explicit category model takes precedence over mouse model", async () => {
@@ -2914,8 +2925,8 @@ describe("morpheus-task", () => {
       
       // then - catalog model is used
       expect(resolved).not.toBeNull()
-      expect(resolved!.config.model).toBe("openai/gpt-5.3-codex")
-      expect(resolved!.config.variant).toBe("xhigh")
+      expect(resolved!.config.model).toBe("anthropic/claude-opus-4-6")
+      expect(resolved!.config.variant).toBe("max")
     })
 
     test("default model is used for category with default entry", () => {
@@ -2927,7 +2938,7 @@ describe("morpheus-task", () => {
       
       // then - default model from DEFAULT_CATEGORIES is used
       expect(resolved).not.toBeNull()
-      expect(resolved!.config.model).toBe("anthropic/claude-sonnet-4-5")
+      expect(resolved!.config.model).toBe("anthropic/claude-sonnet-4-6")
     })
 
     test("category built-in model takes precedence over inheritedModel for builtin category", () => {
@@ -2938,10 +2949,10 @@ describe("morpheus-task", () => {
       // when
       const resolved = resolveCategoryConfig(categoryName, { inheritedModel, systemDefaultModel: SYSTEM_DEFAULT_MODEL })
       
-      // then - category's built-in model wins (source uses gpt-5.3-codex)
+      // then - category's built-in model wins (source uses anthropic/claude-opus-4-6)
       expect(resolved).not.toBeNull()
       const actualModel = resolved!.config.model
-      expect(actualModel).toBe("openai/gpt-5.3-codex")
+      expect(actualModel).toBe("anthropic/claude-opus-4-6")
     })
 
     test("when user defines model - modelInfo should report user-defined regardless of inheritedModel", () => {
@@ -2993,14 +3004,14 @@ describe("morpheus-task", () => {
       // given a builtin category with its own model, and an inherited model from parent
       // The CORRECT chain: userConfig?.model ?? categoryBuiltIn ?? systemDefaultModel
       const categoryName = "source"
-      const inheritedModel = "anthropic/claude-opus-4-6"
+      const inheritedModel = "anthropic/claude-haiku-4-5"
       
-      // when category has a built-in model (gpt-5.3-codex for source)
+      // when category has a built-in model (anthropic/claude-opus-4-6 for source)
       const resolved = resolveCategoryConfig(categoryName, { inheritedModel, systemDefaultModel: SYSTEM_DEFAULT_MODEL })
       
       // then category's built-in model should be used, NOT inheritedModel
       expect(resolved).not.toBeNull()
-      expect(resolved!.model).toBe("openai/gpt-5.3-codex")
+      expect(resolved!.model).toBe("anthropic/claude-opus-4-6")
     })
 
     test("FIXED: systemDefaultModel is used when no userConfig.model and no inheritedModel", () => {
@@ -3058,14 +3069,14 @@ describe("morpheus-task", () => {
       const categoryName = "construct"
       // Using type assertion since we're testing fallback behavior for categories without model
       const userCategories = { "construct": { temperature: 0.2 } } as unknown as Record<string, CategoryConfig>
-      const inheritedModel = "anthropic/claude-opus-4-6"
+      const inheritedModel = "anthropic/claude-haiku-4-5"
       
       // when resolveCategoryConfig is called
       const resolved = resolveCategoryConfig(categoryName, { userCategories, inheritedModel, systemDefaultModel: SYSTEM_DEFAULT_MODEL })
       
-      // then should use category's built-in model (gemini-3-pro for construct)
+      // then should use category's built-in model (anthropic/claude-sonnet-4-6 for construct)
       expect(resolved).not.toBeNull()
-      expect(resolved!.model).toBe("google/gemini-3-pro")
+      expect(resolved!.model).toBe("anthropic/claude-sonnet-4-6")
     })
 
     test("systemDefaultModel is used when no other model is available", () => {
