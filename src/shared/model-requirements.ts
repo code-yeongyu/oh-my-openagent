@@ -78,7 +78,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   librarian: {
     fallbackChain: [
       { providers: ["openai"], model: "gpt-5.4-mini-fast" },
-      { providers: ["opencode-go", "vercel"], model: "minimax-m2.7-highspeed" },
+      { providers: ["vercel"], model: "minimax-m2.7-highspeed" },
       { providers: ["opencode-go", "vercel"], model: "minimax-m2.7" },
       { providers: ["anthropic", "opencode", "vercel"], model: "claude-haiku-4-5" },
       { providers: ["openai", "opencode", "vercel"], model: "gpt-5.4-nano" },
@@ -87,7 +87,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   explore: {
     fallbackChain: [
       { providers: ["openai"], model: "gpt-5.4-mini-fast" },
-      { providers: ["opencode-go", "vercel"], model: "minimax-m2.7-highspeed" },
+      { providers: ["vercel"], model: "minimax-m2.7-highspeed" },
       { providers: ["opencode-go", "vercel"], model: "minimax-m2.7" },
       { providers: ["anthropic", "opencode", "vercel"], model: "claude-haiku-4-5" },
       { providers: ["openai", "opencode", "vercel"], model: "gpt-5.4-nano" },

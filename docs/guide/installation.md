@@ -247,7 +247,7 @@ If Z.ai is your main provider, the most important fallbacks are:
 
 #### OpenCode Zen
 
-OpenCode Zen provides access to `opencode/` prefixed models including `opencode/claude-opus-4-7`, `opencode/gpt-5.4`, `opencode/gpt-5.3-codex`, `opencode/gpt-5-nano`, `opencode/glm-5`, `opencode/big-pickle`, `opencode/minimax-m2.7`, and `opencode/minimax-m2.7-highspeed`.
+OpenCode Zen provides access to `opencode/` prefixed models including `opencode/claude-opus-4-7`, `opencode/gpt-5.4`, `opencode/gpt-5.3-codex`, `opencode/gpt-5-nano`, `opencode/glm-5`, `opencode/big-pickle`, and `opencode/minimax-m2.7`.
 
 When OpenCode Zen is the best available provider, these are the most relevant source-backed examples:
 
@@ -310,7 +310,7 @@ Not all models behave the same way. Understanding which models are "similar" hel
 | --------------------- | -------------------------------- | ----------------------------------------------------------- |
 | **Gemini 3.1 Pro**    | google, github-copilot, opencode | Excels at visual/frontend tasks. Different reasoning style. |
 | **Gemini 3 Flash**    | google, github-copilot, opencode | Fast, good for doc search and light tasks.                  |
-| **MiniMax M2.7**      | opencode-go, opencode            | Fast and smart. Utility fallbacks use `minimax-m2.7` or `minimax-m2.7-highspeed` depending on the chain. |
+| **MiniMax M2.7**      | opencode-go, opencode            | Fast and smart. Utility fallbacks use `minimax-m2.7` depending on the chain. |
 | **MiniMax M2.7 Highspeed** | opencode-go, opencode       | Faster utility variant used in Explore and other retrieval-heavy fallback chains. |
 
 **Speed-Focused Models**:
@@ -358,8 +358,8 @@ These agents do search, grep, and retrieval. They intentionally use fast, cheap 
 
 | Agent                 | Role               | Default Chain                                                          | Design Rationale                                               |
 | --------------------- | ------------------ | ---------------------------------------------------------------------- | -------------------------------------------------------------- |
-| **Explore**           | Fast codebase grep | github-copilot\|xai/grok-code-fast-1 → opencode-go/minimax-m2.7-highspeed → opencode/minimax-m2.7 → anthropic\|opencode/claude-haiku-4-5 → opencode/gpt-5-nano | Speed is everything. Exact runtime chain from `src/shared/model-requirements.ts`. |
-| **Librarian**         | Docs/code search   | opencode-go/minimax-m2.7 → opencode/minimax-m2.7-highspeed → anthropic\|opencode/claude-haiku-4-5 → opencode/gpt-5-nano | Doc retrieval doesn't need deep reasoning. Exact runtime chain from `src/shared/model-requirements.ts`. |
+| **Explore**           | Fast codebase grep | github-copilot\|xai/grok-code-fast-1 → opencode-go/minimax-m2.7 → opencode/minimax-m2.7 → anthropic\|opencode/claude-haiku-4-5 → opencode/gpt-5-nano | Speed is everything. Exact runtime chain from `src/shared/model-requirements.ts`. |
+| **Librarian**         | Docs/code search   | opencode-go/minimax-m2.7 → opencode/minimax-m2.7 → anthropic\|opencode/claude-haiku-4-5 → opencode/gpt-5-nano | Doc retrieval doesn't need deep reasoning. Exact runtime chain from `src/shared/model-requirements.ts`. |
 | **Multimodal Looker** | Vision/screenshots | openai\|opencode/gpt-5.4 (medium) → opencode-go/kimi-k2.5 → zai-coding-plan/glm-4.6v → openai\|github-copilot\|opencode/gpt-5-nano | GPT-5.4 now leads the default vision path when available. |
 
 #### Why Different Models Need Different Prompts
