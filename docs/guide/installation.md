@@ -291,8 +291,10 @@ Not all models behave the same way. Understanding which models are "similar" hel
 | **Claude Opus 4.7**      | anthropic, github-copilot, opencode | Best overall. Default for Sisyphus.                                     |
 | **Claude Sonnet 4.6**    | anthropic, github-copilot, opencode | Faster, cheaper. Good balance.                                          |
 | **Claude Haiku 4.5**     | anthropic, opencode                 | Fast and cheap. Good for quick tasks.                                   |
-| **Kimi K2.5**            | kimi-for-coding, opencode-go, opencode, moonshotai, moonshotai-cn, firmware, ollama-cloud, aihubmix | Behaves very similarly to Claude. Great all-rounder that appears in several orchestration fallback chains. |
+| **Kimi K2.6**            | opencode-go, vercel                  | Behaves very similarly to Claude. Great all-rounder that appears in several orchestration fallback chains. |
+| **Kimi K2.5**            | kimi-for-coding, opencode, moonshotai, moonshotai-cn, firmware, ollama-cloud, aihubmix | Claude-like behavior. Available on multiple providers.                    |
 | **Kimi K2.5 Free**       | opencode                            | Free-tier Kimi. Rate-limited but functional.                            |
+| **GLM 5.1**              | opencode-go, vercel                 | Claude-like behavior. Upgraded from GLM-5 on opencode-go.              |
 | **GLM 5**                | zai-coding-plan, opencode           | Claude-like behavior. Good for broad tasks.                             |
 | **Big Pickle (GLM 4.6)** | opencode                            | Free-tier GLM. Decent fallback.                                         |
 
@@ -311,8 +313,9 @@ Not all models behave the same way. Understanding which models are "similar" hel
 | --------------------- | -------------------------------- | ----------------------------------------------------------- |
 | **Gemini 3.1 Pro**    | google, github-copilot, opencode | Excels at visual/frontend tasks. Different reasoning style. |
 | **Gemini 3 Flash**    | google, github-copilot, opencode | Fast, good for doc search and light tasks.                  |
-| **MiniMax M2.7**      | opencode-go, opencode            | Fast and smart. Utility fallbacks use `minimax-m2.7` or `minimax-m2.7-highspeed` depending on the chain. |
-| **MiniMax M2.7 Highspeed** | opencode-go, opencode       | Faster utility variant used in Explore and other retrieval-heavy fallback chains. |
+| **MiniMax M2.7**      | opencode-go, opencode, vercel       | Fast and smart. Utility fallbacks use `minimax-m2.7` or `minimax-m2.7-highspeed` depending on the chain. |
+| **MiniMax M2.7 Highspeed** | vercel, opencode             | Faster utility variant used in Explore and other retrieval-heavy fallback chains. |
+| **Qwen 3.5 Plus**     | opencode-go                       | 1M context, high-speed reasoning. Default for Explore and Librarian when GPT-5.4 Mini Fast is unavailable. |
 
 **Speed-Focused Models**:
 
@@ -320,7 +323,7 @@ Not all models behave the same way. Understanding which models are "similar" hel
 | ----------------------- | ---------------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Grok Code Fast 1**    | github-copilot, xai    | Very fast      | Optimized for code grep/search. Default for Explore.                                                                                          |
 | **Claude Haiku 4.5**    | anthropic, opencode    | Fast           | Good balance of speed and intelligence.                                                                                                       |
-| **MiniMax M2.7 Highspeed** | opencode-go, opencode | Very fast    | High-speed MiniMax utility fallback used by runtime chains such as Explore and, on the OpenCode catalog, Librarian.                          |
+| **MiniMax M2.7 Highspeed** | vercel, opencode | Very fast    | High-speed MiniMax utility fallback used by runtime chains such as Explore and, on the OpenCode catalog, Librarian.                          |
 | **GPT-5.3-codex-spark** | openai                 | Extremely fast | Blazing fast but compacts so aggressively that oh-my-openagent's context management doesn't work well with it. Not recommended for omo agents. |
 
 #### What Each Agent Does and Which Model It Got
