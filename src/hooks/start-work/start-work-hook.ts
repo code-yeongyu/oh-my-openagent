@@ -20,6 +20,7 @@ import { detectWorktreePath } from "./worktree-detector"
 import { parseUserRequest } from "./parse-user-request"
 import { buildStartWorkContextInfo } from "./context-info-builder"
 import { createWorktreeActiveBlock } from "./worktree-block"
+import { findRecentSessionPlanPath } from "./session-plan-affinity"
 
 export const HOOK_NAME = "start-work" as const
 const START_WORK_TEMPLATE_MARKER = "You are starting a Sisyphus work session."
@@ -93,6 +94,14 @@ export function createStartWorkHook(ctx: PluginInput) {
 
     const { planName: explicitPlanName, explicitWorktreePath } = parseUserRequest(promptText)
     const { worktreePath, block: worktreeBlock } = resolveWorktreeContext(explicitWorktreePath)
+    const preferredPlanPath = explicitPlanName
+      ? null
+      : await findRecentSessionPlanPath({
+          client: ctx.client,
+          directory: ctx.directory,
+          sessionID: sessionId,
+          availablePlans: findPrometheusPlans(ctx.directory),
+        })
 
     const contextInfo = buildStartWorkContextInfo({
       ctx,
@@ -103,6 +112,7 @@ export function createStartWorkHook(ctx: PluginInput) {
       activeAgent,
       worktreePath,
       worktreeBlock,
+      preferredPlanPath,
     })
 
     const idx = output.parts.findIndex((p) => p.type === "text" && p.text)
@@ -114,11 +124,12 @@ export function createStartWorkHook(ctx: PluginInput) {
       output.parts[idx].text += `\n\n---\n${contextInfo}`
     }
 
-    log(`[${HOOK_NAME}] Context injected`, {
-      sessionID: input.sessionID,
-      hasExistingState: !!existingState,
-      worktreePath,
-    })
+      log(`[${HOOK_NAME}] Context injected`, {
+        sessionID: input.sessionID,
+        hasExistingState: !!existingState,
+        preferredPlanPath,
+        worktreePath,
+      })
   }
 
   return {
