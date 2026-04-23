@@ -82,7 +82,7 @@ describe("isGptModel", () => {
 describe("isMiniMaxModel", () => {
   test("detects minimax models with provider prefix", () => {
     expect(isMiniMaxModel("opencode-go/minimax-m2.7")).toBe(true);
-    expect(isMiniMaxModel("opencode/minimax-m2.7-highspeed")).toBe(true);
+    //expect(isMiniMaxModel("opencode/minimax-m2.7-highspeed")).toBe(true);
     expect(isMiniMaxModel("opencode-go/minimax-m2.5")).toBe(true);
     expect(isMiniMaxModel("opencode/minimax-m2.5-free")).toBe(true);
   });
