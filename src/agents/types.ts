@@ -84,6 +84,20 @@ export function isGpt5_4Model(model: string): boolean {
   return modelName.includes("gpt-5.4") || modelName.includes("gpt-5-4");
 }
 
+export function isGpt5_5Model(model: string): boolean {
+  const modelName = extractModelName(model).toLowerCase();
+  return modelName.includes("gpt-5.5") || modelName.includes("gpt-5-5");
+}
+
+/**
+ * Returns true for GPT models that have a native Sisyphus prompt variant.
+ * Currently covers GPT-5.4 and GPT-5.5 (both use the block-structured XML prompt).
+ * Extend this as new major GPT releases receive dedicated Sisyphus prompts.
+ */
+export function isGptNativeSisyphusModel(model: string): boolean {
+  return isGpt5_4Model(model) || isGpt5_5Model(model);
+}
+
 export function isGpt5_3CodexModel(model: string): boolean {
   const modelName = extractModelName(model).toLowerCase();
   return modelName.includes("gpt-5.3-codex") || modelName.includes("gpt-5-3-codex");
