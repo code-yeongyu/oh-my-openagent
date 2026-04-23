@@ -72,7 +72,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     // then - fallbackChain exists with openai/gpt-5.4-mini-fast as first entry
     expect(librarian).toBeDefined()
     expect(librarian.fallbackChain).toBeArray()
-    expect(librarian.fallbackChain).toHaveLength(5)
+    expect(librarian.fallbackChain).toHaveLength(6)
 
     const primary = librarian.fallbackChain[0]
     expect(primary.providers).toEqual(["openai"])
@@ -80,19 +80,23 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
 
     const second = librarian.fallbackChain[1]
     expect(second.providers[0]).toBe("opencode-go")
-    expect(second.model).toBe("minimax-m2.7-highspeed")
+    expect(second.model).toBe("qwen3.5-plus")
 
-    const tertiary = librarian.fallbackChain[2]
-    expect(tertiary.providers[0]).toBe("opencode-go")
-    expect(tertiary.model).toBe("minimax-m2.7")
+    const third = librarian.fallbackChain[2]
+    expect(third.providers).toEqual(["vercel"])
+    expect(third.model).toBe("minimax-m2.7-highspeed")
 
     const quaternary = librarian.fallbackChain[3]
-    expect(quaternary.providers).toContain("anthropic")
-    expect(quaternary.model).toBe("claude-haiku-4-5")
+    expect(quaternary.providers[0]).toBe("opencode-go")
+    expect(quaternary.model).toBe("minimax-m2.7")
 
-    const fifth = librarian.fallbackChain[4]
-    expect(fifth.providers).toContain("openai")
-    expect(fifth.model).toBe("gpt-5.4-nano")
+    const quinary = librarian.fallbackChain[4]
+    expect(quinary.providers).toContain("anthropic")
+    expect(quinary.model).toBe("claude-haiku-4-5")
+
+    const sixth = librarian.fallbackChain[5]
+    expect(sixth.providers).toContain("openai")
+    expect(sixth.model).toBe("gpt-5.4-nano")
   })
 
   test("explore has valid fallbackChain with openai/gpt-5.4-mini-fast as primary", () => {
@@ -102,27 +106,31 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     // when - accessing explore requirement
     expect(explore).toBeDefined()
     expect(explore.fallbackChain).toBeArray()
-    expect(explore.fallbackChain).toHaveLength(5)
+    expect(explore.fallbackChain).toHaveLength(6)
 
     const primary = explore.fallbackChain[0]
     expect(primary.providers).toEqual(["openai"])
     expect(primary.model).toBe("gpt-5.4-mini-fast")
 
     const secondary = explore.fallbackChain[1]
-    expect(secondary.providers).toContain("opencode-go")
-    expect(secondary.model).toBe("minimax-m2.7-highspeed")
+    expect(secondary.providers[0]).toBe("opencode-go")
+    expect(secondary.model).toBe("qwen3.5-plus")
 
-    const tertiary = explore.fallbackChain[2]
-    expect(tertiary.providers).toContain("opencode-go")
-    expect(tertiary.model).toBe("minimax-m2.7")
+    const third = explore.fallbackChain[2]
+    expect(third.providers).toEqual(["vercel"])
+    expect(third.model).toBe("minimax-m2.7-highspeed")
 
     const quaternary = explore.fallbackChain[3]
-    expect(quaternary.providers).toContain("anthropic")
-    expect(quaternary.model).toBe("claude-haiku-4-5")
+    expect(quaternary.providers[0]).toBe("opencode-go")
+    expect(quaternary.model).toBe("minimax-m2.7")
 
-    const fifth = explore.fallbackChain[4]
-    expect(fifth.providers).toContain("openai")
-    expect(fifth.model).toBe("gpt-5.4-nano")
+    const quinary = explore.fallbackChain[4]
+    expect(quinary.providers).toContain("anthropic")
+    expect(quinary.model).toBe("claude-haiku-4-5")
+
+    const sixth = explore.fallbackChain[5]
+    expect(sixth.providers).toContain("openai")
+    expect(sixth.model).toBe("gpt-5.4-nano")
   })
 
   test("multimodal-looker has valid fallbackChain with gpt-5.5 as primary", () => {
