@@ -112,16 +112,16 @@ describe("resolveVariantForModel", () => {
     expect(variant).toBe("max")
   })
 
-  test("returns correct variant for openai provider (keymaker agent)", () => {
-    // #given keymaker has openai/gpt-5.3-codex with variant "medium" in its chain
+  test("returns correct variant for anthropic provider (keymaker agent)", () => {
+    // #given keymaker has anthropic/claude-opus-4-6 with variant "max" in its chain
     const config = {} as MatrixxConfig
-    const model = { providerID: "openai", modelID: "gpt-5.3-codex" }
+    const model = { providerID: "anthropic", modelID: "claude-opus-4-6" }
 
     // #when
     const variant = resolveVariantForModel(config, "keymaker", model)
 
     // then
-    expect(variant).toBe("medium")
+    expect(variant).toBe("max")
   })
 
   test("returns undefined for provider not in morpheus chain", () => {
@@ -179,17 +179,17 @@ describe("resolveVariantForModel", () => {
         "custom-agent": { category: "source" },
       },
     } as MatrixxConfig
-    const model = { providerID: "openai", modelID: "gpt-5.3-codex" }
+    const model = { providerID: "anthropic", modelID: "claude-opus-4-6" }
 
     // when
     const variant = resolveVariantForModel(config, "custom-agent", model)
 
     // then
-    expect(variant).toBe("xhigh")
+    expect(variant).toBe("max")
   })
 
-  test("returns correct variant for oracle agent with openai", () => {
-    // given
+  test("returns undefined for oracle agent with openai (not in chain)", () => {
+    // given - oracle no longer has openai in its chain
     const config = {} as MatrixxConfig
     const model = { providerID: "openai", modelID: "gpt-5.2" }
 
@@ -197,7 +197,7 @@ describe("resolveVariantForModel", () => {
     const variant = resolveVariantForModel(config, "oracle", model)
 
     // then
-    expect(variant).toBe("high")
+    expect(variant).toBeUndefined()
   })
 
   test("returns correct variant for oracle agent with anthropic", () => {
