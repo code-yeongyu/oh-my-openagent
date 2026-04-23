@@ -124,12 +124,12 @@ export function createStartWorkHook(ctx: PluginInput) {
       output.parts[idx].text += `\n\n---\n${contextInfo}`
     }
 
-      log(`[${HOOK_NAME}] Context injected`, {
-        sessionID: input.sessionID,
-        hasExistingState: !!existingState,
-        preferredPlanPath,
-        worktreePath,
-      })
+    log(`[${HOOK_NAME}] Context injected`, {
+      sessionID: input.sessionID,
+      hasExistingState: !!existingState,
+      preferredPlanPath,
+      worktreePath,
+    })
   }
 
   return {

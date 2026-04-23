@@ -25,7 +25,11 @@ describe("start-work hook", () => {
   function createMockPluginInput() {
     return {
       directory: testDir,
-      client: {},
+      client: {
+        session: {
+          messages: async () => ({ data: [] }),
+        },
+      },
     } as Parameters<typeof createStartWorkHook>[0]
   }
 
@@ -174,6 +178,107 @@ You are starting a Sisyphus work session.
       // then - should show resuming status
       expect(output.parts[0].text).toContain("RESUMING")
       expect(output.parts[0].text).toContain("test-plan")
+    })
+
+    test("should prefer the plan most recently referenced in the current session", async () => {
+      // given - two incomplete plans and current session recently referenced plan-b
+      const plansDir = join(testDir, ".sisyphus", "plans")
+      mkdirSync(plansDir, { recursive: true })
+
+      const planAPath = join(plansDir, "plan-a.md")
+      const planBPath = join(plansDir, "plan-b.md")
+      writeFileSync(planAPath, "# Plan A\n- [ ] Task 1")
+      writeFileSync(planBPath, "# Plan B\n- [ ] Task 2")
+
+      const hook = createStartWorkHook({
+        directory: testDir,
+        client: {
+          session: {
+            messages: async () => ({
+              data: [
+                {
+                  parts: [
+                    {
+                      text: `Plan saved to: ${planBPath}`,
+                    },
+                  ],
+                },
+              ],
+            }),
+          },
+        },
+      } as Parameters<typeof createStartWorkHook>[0])
+      const output = {
+        parts: [{ type: "text", text: createStartWorkPrompt() }],
+      }
+
+      // when
+      await hook["chat.message"](
+        { sessionID: "session-123" },
+        output,
+      )
+
+      // then - should auto-select plan-b instead of prompting for multiple plans
+      expect(output.parts[0].text).toContain("Auto-Selected Plan")
+      expect(output.parts[0].text).toContain("plan-b")
+      expect(output.parts[0].text).toContain("Most recently referenced plan in this session")
+      expect(output.parts[0].text).not.toContain("Multiple Plans Found")
+
+      const state = readBoulderState(testDir)
+      expect(state?.active_plan).toBe(planBPath)
+    })
+
+    test("should ignore unrelated active boulder state when current session references another plan", async () => {
+      // given - active boulder points to old plan, current session most recently referenced new plan
+      const plansDir = join(testDir, ".sisyphus", "plans")
+      mkdirSync(plansDir, { recursive: true })
+
+      const oldPlanPath = join(plansDir, "old-plan.md")
+      const newPlanPath = join(plansDir, "new-plan.md")
+      writeFileSync(oldPlanPath, "# Old Plan\n- [ ] Legacy task")
+      writeFileSync(newPlanPath, "# New Plan\n- [ ] Fresh task")
+
+      writeBoulderState(testDir, {
+        active_plan: oldPlanPath,
+        started_at: "2026-01-01T00:00:00Z",
+        session_ids: ["different-session"],
+        plan_name: "old-plan",
+      })
+
+      const hook = createStartWorkHook({
+        directory: testDir,
+        client: {
+          session: {
+            messages: async () => ({
+              data: [
+                {
+                  parts: [
+                    {
+                      output: `Plan saved to: ${newPlanPath}`,
+                    },
+                  ],
+                },
+              ],
+            }),
+          },
+        },
+      } as Parameters<typeof createStartWorkHook>[0])
+      const output = {
+        parts: [{ type: "text", text: createStartWorkPrompt() }],
+      }
+
+      // when
+      await hook["chat.message"](
+        { sessionID: "session-123" },
+        output,
+      )
+
+      // then - should select the session-preferred new plan, not resume the unrelated one
+      expect(output.parts[0].text).toContain("new-plan")
+      expect(output.parts[0].text).not.toContain("RESUMING existing work")
+
+      const state = readBoulderState(testDir)
+      expect(state?.active_plan).toBe(newPlanPath)
     })
 
     test("should replace $SESSION_ID placeholder", async () => {
