@@ -41,7 +41,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
 
     const second = sisyphus.fallbackChain[1]
     expect(second.providers).toEqual(["opencode-go", "vercel"])
-    expect(second.model).toBe("kimi-k2.5")
+    expect(second.model).toBe("kimi-k2.6")
 
     const third = sisyphus.fallbackChain[2]
     expect(third.providers).toEqual(["kimi-for-coding"])
@@ -138,7 +138,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     const multimodalLooker = AGENT_MODEL_REQUIREMENTS["multimodal-looker"]
 
     // when - accessing multimodal-looker requirement
-    // then - fallbackChain: gpt-5.5 -> opencode-go/kimi-k2.5 -> glm-4.6v -> gpt-5-nano
+    // then - fallbackChain: gpt-5.5 -> opencode-go/kimi-k2.6 -> glm-4.6v -> gpt-5-nano
     expect(multimodalLooker).toBeDefined()
     expect(multimodalLooker.fallbackChain).toBeArray()
     expect(multimodalLooker.fallbackChain).toHaveLength(4)
@@ -150,7 +150,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
 
     const secondary = multimodalLooker.fallbackChain[1]
     expect(secondary.providers).toEqual(["opencode-go", "vercel"])
-    expect(secondary.model).toBe("kimi-k2.5")
+    expect(secondary.model).toBe("kimi-k2.6")
 
     const tertiary = multimodalLooker.fallbackChain[2]
     expect(tertiary.model).toBe("glm-4.6v")
@@ -230,7 +230,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(primary.providers[0]).toBe("anthropic")
 
     const secondary = atlas.fallbackChain[1]
-    expect(secondary.model).toBe("kimi-k2.5")
+    expect(secondary.model).toBe("kimi-k2.6")
     expect(secondary.providers[0]).toBe("opencode-go")
 
     const tertiary = atlas.fallbackChain[2]
@@ -353,7 +353,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     const visualEngineering = CATEGORY_MODEL_REQUIREMENTS["visual-engineering"]
 
     // when - accessing visual-engineering requirement
-    // then - fallbackChain: gemini-3.1-pro(high) → glm-5 → opus-4-6(max) → opencode-go/glm-5 → k2p5
+    // then - fallbackChain: gemini-3.1-pro(high) → glm-5 → opus-4-6(max) → opencode-go/glm-5.1 → k2p5
     expect(visualEngineering).toBeDefined()
     expect(visualEngineering.fallbackChain).toBeArray()
     expect(visualEngineering.fallbackChain).toHaveLength(5)
@@ -373,7 +373,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
 
     const fourth = visualEngineering.fallbackChain[3]
     expect(fourth.providers[0]).toBe("opencode-go")
-    expect(fourth.model).toBe("glm-5")
+    expect(fourth.model).toBe("glm-5.1")
 
     const fifth = visualEngineering.fallbackChain[4]
     expect(fifth.providers[0]).toBe("kimi-for-coding")
@@ -466,7 +466,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(primary.providers[0]).toBe("google")
 
     const second = writing.fallbackChain[1]
-    expect(second.model).toBe("kimi-k2.5")
+    expect(second.model).toBe("kimi-k2.6")
     expect(second.providers[0]).toBe("opencode-go")
 
     const third = writing.fallbackChain[2]
