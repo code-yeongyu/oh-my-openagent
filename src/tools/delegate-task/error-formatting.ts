@@ -1,4 +1,5 @@
 import type { DelegateTaskArgs } from "./types"
+import { getTaskID } from "./task-id"
 
 /**
  * Context for error formatting.
@@ -35,8 +36,9 @@ export function formatDetailedError(error: unknown, ctx: ErrorContext): string {
     lines.push(`- subagent_type: ${ctx.args.subagent_type ?? "(none)"}`)
     lines.push(`- run_in_background: ${ctx.args.run_in_background}`)
     lines.push(`- load_skills: [${ctx.args.load_skills?.join(", ") ?? ""}]`)
-    if (ctx.args.session_id) {
-      lines.push(`- session_id: ${ctx.args.session_id}`)
+    const taskID = getTaskID(ctx.args)
+    if (taskID) {
+      lines.push(`- task_id: ${taskID}`)
     }
   }
 

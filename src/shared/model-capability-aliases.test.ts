@@ -67,22 +67,22 @@ describe("model-capability-aliases", () => {
   })
 
   test("normalizes provider-prefixed Claude thinking aliases through a pattern rule", () => {
-    const result = resolveModelIDAlias("anthropic/claude-opus-4-6-thinking")
+    const result = resolveModelIDAlias("anthropic/claude-opus-4-7-thinking")
 
     expect(result).toEqual({
-      requestedModelID: "anthropic/claude-opus-4-6-thinking",
-      canonicalModelID: "claude-opus-4-6",
+      requestedModelID: "anthropic/claude-opus-4-7-thinking",
+      canonicalModelID: "claude-opus-4-7",
       source: "pattern-alias",
       ruleID: "claude-thinking-legacy-alias",
     })
   })
 
   test("does not pattern-match nearby canonical Claude IDs incorrectly", () => {
-    const result = resolveModelIDAlias("claude-opus-4-6-think")
+    const result = resolveModelIDAlias("claude-opus-4-7-think")
 
     expect(result).toEqual({
-      requestedModelID: "claude-opus-4-6-think",
-      canonicalModelID: "claude-opus-4-6-think",
+      requestedModelID: "claude-opus-4-7-think",
+      canonicalModelID: "claude-opus-4-7-think",
       source: "canonical",
     })
   })
@@ -98,11 +98,11 @@ describe("model-capability-aliases", () => {
   })
 
   test("normalizes legacy Claude thinking aliases through a pattern rule", () => {
-    const result = resolveModelIDAlias("claude-opus-4-6-thinking")
+    const result = resolveModelIDAlias("claude-opus-4-7-thinking")
 
     expect(result).toEqual({
-      requestedModelID: "claude-opus-4-6-thinking",
-      canonicalModelID: "claude-opus-4-6",
+      requestedModelID: "claude-opus-4-7-thinking",
+      canonicalModelID: "claude-opus-4-7",
       source: "pattern-alias",
       ruleID: "claude-thinking-legacy-alias",
     })

@@ -1,14 +1,7 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin"
-import type { DelegateTaskArgs, DelegatedModelConfig, ToolContextWithMetadata, DelegateTaskToolOptions } from "./types"
-import { CATEGORY_DESCRIPTIONS } from "./constants"
-import { SISYPHUS_JUNIOR_AGENT } from "./sisyphus-junior-agent"
-import { mergeCategories } from "../../shared/merge-categories"
+import type { DelegatedModelConfig, ToolContextWithMetadata, DelegateTaskToolOptions } from "./types"
 import { log } from "../../shared/logger"
 import { buildSystemContent } from "./prompt-builder"
-import type {
-  AvailableCategory,
-  AvailableSkill,
-} from "../../agents/dynamic-agent-prompt-builder"
 import {
   resolveSkillContent,
   resolveParentContext,
@@ -20,133 +13,37 @@ import {
   executeBackgroundTask,
   executeSyncTask,
 } from "./executor"
+import { prepareDelegateTaskArgs } from "./tool-argument-preparation"
+import { createDelegateTaskPresentation } from "./tool-description"
 
 export { resolveCategoryConfig } from "./categories"
 export type { SyncSessionCreatedEvent, DelegateTaskToolOptions, BuildSystemContentInput } from "./types"
 export { buildSystemContent, buildTaskPrompt } from "./prompt-builder"
 
+const delegateTaskArgsSchema = {
+  load_skills: tool.schema.array(tool.schema.string()).describe("Skill names to inject. REQUIRED - pass [] if no skills needed."),
+  description: tool.schema.string().optional().describe("Short task description (3-5 words). Auto-generated from prompt if omitted."),
+  prompt: tool.schema.string().describe("Full detailed prompt for the agent"),
+  run_in_background: tool.schema.boolean().describe("REQUIRED. true=async (returns task_id), false=sync (waits). Use false for task delegation, true ONLY for parallel exploration."),
+  category: tool.schema.string().optional().describe("REQUIRED if subagent_type not provided. Do NOT provide both category and subagent_type."),
+  subagent_type: tool.schema.string().optional().describe("REQUIRED if category not provided. Do NOT provide both category and subagent_type."),
+  task_id: tool.schema.string().optional().describe("Existing task to continue. Canonical resume identifier."),
+  command: tool.schema.string().optional().describe("The command that triggered this task"),
+}
+
 export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefinition {
-  const { userCategories } = options
-
-  const allCategories = mergeCategories(userCategories)
-  const categoryNames = Object.keys(allCategories)
-  const categoryExamples = categoryNames.join(", ")
-
-  const availableCategories: AvailableCategory[] = options.availableCategories
-    ?? Object.entries(allCategories).map(([name, categoryConfig]) => {
-      const userDesc = userCategories?.[name]?.description
-      const builtinDesc = CATEGORY_DESCRIPTIONS[name]
-      const description = userDesc || builtinDesc || "General tasks"
-      return {
-        name,
-        description,
-        model: categoryConfig.model,
-      }
-    })
-
-  const availableSkills: AvailableSkill[] = options.availableSkills ?? []
-
-  const categoryList = categoryNames.map(name => {
-    const userDesc = userCategories?.[name]?.description
-    const builtinDesc = CATEGORY_DESCRIPTIONS[name]
-    const desc = userDesc || builtinDesc
-    return desc ? `  - ${name}: ${desc}` : `  - ${name}`
-  }).join("\n")
-
-  const description = `Spawn agent task with category-based or direct agent selection.
-  
-  ⚠️  CRITICAL: You MUST provide EITHER category OR subagent_type. Omitting BOTH will FAIL.
-  
-  **COMMON MISTAKE (DO NOT DO THIS):**
-  \`\`\`
-  task(description="...", prompt="...", run_in_background=false)  // ❌ FAILS - missing category AND subagent_type
-  \`\`\`
-  
-  **CORRECT - Using category:**
-  \`\`\`
-  task(category="quick", load_skills=[], description="Fix type error", prompt="...", run_in_background=false)
-  \`\`\`
-  
-  **CORRECT - Using subagent_type:**
-  \`\`\`
-  task(subagent_type="explore", load_skills=[], description="Find patterns", prompt="...", run_in_background=true)
-  \`\`\`
-  
-  REQUIRED: Provide ONE of:
-  - category: For task delegation (uses Sisyphus-Junior with category-optimized model)
-  - subagent_type: For direct agent invocation (explore, librarian, oracle, etc.)
-  
-  **DO NOT provide both.** If category is provided, subagent_type is ignored.
-  
-  - load_skills: ALWAYS REQUIRED. Pass [] if no skills needed, or ["skill-1", "skill-2"] for category tasks.
-  - category: Use predefined category → Spawns Sisyphus-Junior with category config
-    Available categories:
-  ${categoryList}
-  - subagent_type: Use specific agent directly (explore, librarian, oracle, metis, momus)
-  - run_in_background: REQUIRED. true=async (returns task_id), false=sync (waits). Use background=true ONLY for parallel exploration with 5+ independent queries.
-  - session_id: Existing Task session to continue (from previous task output). Continues agent with FULL CONTEXT PRESERVED - saves tokens, maintains continuity.
-  - command: The command that triggered this task (optional, for slash command tracking).
-  
-  **WHEN TO USE session_id:**
-  - Task failed/incomplete → session_id with "fix: [specific issue]"
-  - Need follow-up on previous result → session_id with additional question
-  - Multi-turn conversation with same agent → always session_id instead of new task
-  
-  Prompts MUST be in English.`
+  const { availableCategories, availableSkills, categoryExamples, description } = createDelegateTaskPresentation(options)
 
   return tool({
     description,
-    args: {
-      load_skills: tool.schema.array(tool.schema.string()).describe("Skill names to inject. REQUIRED - pass [] if no skills needed."),
-      description: tool.schema.string().optional().describe("Short task description (3-5 words). Auto-generated from prompt if omitted."),
-      prompt: tool.schema.string().describe("Full detailed prompt for the agent"),
-      run_in_background: tool.schema.boolean().describe("REQUIRED. true=async (returns task_id), false=sync (waits). Use false for task delegation, true ONLY for parallel exploration."),
-      category: tool.schema.string().optional().describe(`REQUIRED if subagent_type not provided. Do NOT provide both category and subagent_type.`),
-      subagent_type: tool.schema.string().optional().describe("REQUIRED if category not provided. Do NOT provide both category and subagent_type."),
-      session_id: tool.schema.string().optional().describe("Existing Task session to continue"),
-      command: tool.schema.string().optional().describe("The command that triggered this task"),
-    },
-    async execute(args: DelegateTaskArgs, toolContext) {
+    args: delegateTaskArgsSchema,
+    async execute(args, toolContext) {
       const ctx = toolContext as ToolContextWithMetadata
+      const delegateTaskArgs = await prepareDelegateTaskArgs(args, ctx)
 
-      if (args.category) {
-        if (args.subagent_type && args.subagent_type !== SISYPHUS_JUNIOR_AGENT) {
-          log("[task] category provided - overriding subagent_type to sisyphus-junior", {
-            category: args.category,
-            subagent_type: args.subagent_type,
-          })
-        }
-        args.subagent_type = SISYPHUS_JUNIOR_AGENT
-      }
-      // Auto-generate description from prompt when missing or empty
-      if (!args.description || typeof args.description !== "string" || args.description.trim() === "") {
-        const words = (args.prompt || "").trim().split(/\s+/)
-        args.description = words.slice(0, 4).join(" ") || "Delegated task"
-      }
-      await ctx.metadata?.({
-        title: args.description,
-      })
-      if (args.run_in_background === undefined) {
-        throw new Error(`Invalid arguments: 'run_in_background' parameter is REQUIRED. Specify run_in_background=false for task delegation, or run_in_background=true for parallel exploration.`)
-      }
-      if (typeof args.load_skills === "string") {
-        try {
-          const parsed = JSON.parse(args.load_skills)
-          args.load_skills = Array.isArray(parsed) ? parsed : []
-        } catch {
-          args.load_skills = []
-        }
-      }
-      if (args.load_skills === undefined) {
-        throw new Error(`Invalid arguments: 'load_skills' parameter is REQUIRED. Pass [] if no skills needed.`)
-      }
-      if (args.load_skills === null) {
-        throw new Error(`Invalid arguments: load_skills=null is not allowed. Pass [] if no skills needed.`)
-      }
+      const runInBackground = delegateTaskArgs.run_in_background === true
 
-      const runInBackground = args.run_in_background === true
-
-      const { content: skillContent, contents: skillContents, error: skillError } = await resolveSkillContent(args.load_skills, {
+      const { content: skillContent, contents: skillContents, error: skillError } = await resolveSkillContent(delegateTaskArgs.load_skills, {
         gitMasterConfig: options.gitMasterConfig,
         browserProvider: options.browserProvider,
         disabledSkills: options.disabledSkills,
@@ -156,16 +53,23 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
         return skillError
       }
 
+      const continuationSystemContent = buildSystemContent({
+        skillContent,
+        skillContents,
+        availableCategories,
+        availableSkills,
+      })
+
       const parentContext = await resolveParentContext(ctx, options.client)
 
-      if (args.session_id) {
+      if (delegateTaskArgs.task_id) {
         if (runInBackground) {
-          return executeBackgroundContinuation(args, ctx, options, parentContext)
+          return executeBackgroundContinuation(delegateTaskArgs, ctx, options, parentContext, continuationSystemContent)
         }
-        return executeSyncContinuation(args, ctx, options)
+        return executeSyncContinuation(delegateTaskArgs, ctx, options, parentContext, undefined, continuationSystemContent)
       }
 
-      if (!args.category && !args.subagent_type) {
+      if (!delegateTaskArgs.category && !delegateTaskArgs.subagent_type) {
         return `Invalid arguments: Must provide either category or subagent_type.`
       }
 
@@ -190,8 +94,8 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
       let fallbackChain: import("../../shared/model-requirements").FallbackEntry[] | undefined
       let maxPromptTokens: number | undefined
 
-      if (args.category) {
-        const resolution = await resolveCategoryExecution(args, options, inheritedModel, systemDefaultModel)
+      if (delegateTaskArgs.category) {
+        const resolution = await resolveCategoryExecution(delegateTaskArgs, options, inheritedModel, systemDefaultModel)
         if (resolution.error) {
           return resolution.error
         }
@@ -204,14 +108,14 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
         fallbackChain = resolution.fallbackChain
         maxPromptTokens = resolution.maxPromptTokens
 
-        const isRunInBackgroundExplicitlyFalse = args.run_in_background === false || args.run_in_background === "false" as unknown as boolean
+        const isRunInBackgroundExplicitlyFalse = isExplicitSyncRun(delegateTaskArgs.run_in_background)
 
         log("[task] unstable agent detection", {
-          category: args.category,
+          category: delegateTaskArgs.category,
           actualModel,
           isUnstableAgent,
-          run_in_background_value: args.run_in_background,
-          run_in_background_type: typeof args.run_in_background,
+          run_in_background_value: delegateTaskArgs.run_in_background,
+          run_in_background_type: typeof delegateTaskArgs.run_in_background,
           isRunInBackgroundExplicitlyFalse,
           willForceBackground: isUnstableAgent && isRunInBackgroundExplicitlyFalse,
         })
@@ -227,10 +131,10 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
             availableCategories,
             availableSkills,
           })
-          return executeUnstableAgentTask(args, ctx, options, parentContext, agentToUse, categoryModel, systemContent, actualModel)
+          return executeUnstableAgentTask(delegateTaskArgs, ctx, options, parentContext, agentToUse, categoryModel, systemContent, actualModel)
         }
       } else {
-        const resolution = await resolveSubagentExecution(args, options, parentContext.agent, categoryExamples)
+        const resolution = await resolveSubagentExecution(delegateTaskArgs, options, parentContext.agent, categoryExamples)
         if (resolution.error) {
           return resolution.error
         }
@@ -251,10 +155,14 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
       })
 
       if (runInBackground) {
-        return executeBackgroundTask(args, ctx, options, parentContext, agentToUse, categoryModel, systemContent, fallbackChain)
+        return executeBackgroundTask(delegateTaskArgs, ctx, options, parentContext, agentToUse, categoryModel, systemContent, fallbackChain)
       }
 
-      return executeSyncTask(args, ctx, options, parentContext, agentToUse, categoryModel, systemContent, modelInfo, fallbackChain)
+      return executeSyncTask(delegateTaskArgs, ctx, options, parentContext, agentToUse, categoryModel, systemContent, modelInfo, fallbackChain)
     },
   })
+}
+
+function isExplicitSyncRun(runInBackground: unknown): boolean {
+  return runInBackground === false || runInBackground === "false"
 }

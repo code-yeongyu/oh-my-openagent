@@ -79,7 +79,7 @@ describe("atlas hook", () => {
     }
     const messageData = {
       agent,
-      model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
+      model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
     }
     writeFileSync(join(messageDir, "msg_test001.json"), JSON.stringify(messageData))
   }
@@ -957,7 +957,8 @@ session_id: ses_untrusted_999
       const updatedState = readBoulderState(TEST_DIR)
       expect(updatedState?.task_sessions?.["todo:1"]).toBeUndefined()
       expect(output.output).not.toContain('task(session_id="ses_untrusted_999"')
-      expect(output.output).toContain('task(session_id="<session_id>"')
+      expect(output.output).not.toContain('task(task_id="ses_untrusted_999"')
+      expect(output.output).toContain('task(task_id="<session_id>"')
 
       cleanupMessageStorage(sessionID)
     })

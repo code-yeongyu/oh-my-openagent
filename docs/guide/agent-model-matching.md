@@ -64,8 +64,8 @@ These agents have Claude-optimized prompts — long, detailed, mechanics-driven.
 
 | Agent        | Role              | Fallback Chain                         | Notes                                                                                             |
 | ------------ | ----------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| **Sisyphus** | Main orchestrator | anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-6 (max) → opencode-go\|vercel/kimi-k2.5 → kimi-for-coding/k2p5 → opencode\|moonshotai\|moonshotai-cn\|firmware\|ollama-cloud\|aihubmix\|vercel/kimi-k2.5 → openai\|github-copilot\|opencode\|vercel/gpt-5.4 (medium) → zai-coding-plan\|opencode\|vercel/glm-5 → opencode/big-pickle | Exact runtime chain from `src/shared/model-requirements.ts`. |
-| **Metis**    | Plan gap analyzer | anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-6 (max) → openai\|github-copilot\|opencode\|vercel/gpt-5.4 (high) → opencode-go\|vercel/glm-5 → kimi-for-coding/k2p5 | Exact runtime chain from `src/shared/model-requirements.ts`. |
+| **Sisyphus** | Main orchestrator | anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7 (max) → opencode-go\|vercel/kimi-k2.5 → kimi-for-coding/k2p5 → opencode\|moonshotai\|moonshotai-cn\|firmware\|ollama-cloud\|aihubmix\|vercel/kimi-k2.5 → openai\|github-copilot\|opencode\|vercel/gpt-5.4 (medium) → zai-coding-plan\|opencode\|vercel/glm-5 → opencode/big-pickle | Exact runtime chain from `src/shared/model-requirements.ts`. |
+| **Metis**    | Plan gap analyzer | anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7 (max) → openai\|github-copilot\|opencode\|vercel/gpt-5.4 (high) → opencode-go\|vercel/glm-5 → kimi-for-coding/k2p5 | Exact runtime chain from `src/shared/model-requirements.ts`. |
 
 ### Dual-Prompt Agents → Claude preferred, GPT supported
 
@@ -73,7 +73,7 @@ These agents ship separate prompts for Claude and GPT families. They auto-detect
 
 | Agent          | Role              | Fallback Chain                         | Notes                                                                |
 | -------------- | ----------------- | -------------------------------------- | -------------------------------------------------------------------- |
-| **Prometheus** | Strategic planner | anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-6 (max) → openai\|github-copilot\|opencode\|vercel/gpt-5.4 (high) → opencode-go\|vercel/glm-5 → google\|github-copilot\|opencode\|vercel/gemini-3.1-pro | Exact runtime chain from `src/shared/model-requirements.ts`. |
+| **Prometheus** | Strategic planner | anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7 (max) → openai\|github-copilot\|opencode\|vercel/gpt-5.4 (high) → opencode-go\|vercel/glm-5 → google\|github-copilot\|opencode\|vercel/gemini-3.1-pro | Exact runtime chain from `src/shared/model-requirements.ts`. |
 | **Atlas**      | Todo orchestrator | anthropic\|github-copilot\|opencode\|vercel/claude-sonnet-4-6 → opencode-go\|vercel/kimi-k2.5 → openai\|github-copilot\|opencode\|vercel/gpt-5.4 (medium) → opencode-go\|vercel/minimax-m2.7 | Exact runtime chain from `src/shared/model-requirements.ts`. |
 
 ### Deep Specialists → GPT
@@ -83,8 +83,8 @@ These agents are built for GPT's principle-driven style. Their prompts assume au
 | Agent          | Role                    | Fallback Chain                         | Notes                                            |
 | -------------- | ----------------------- | -------------------------------------- | ------------------------------------------------ |
 | **Hephaestus** | Autonomous deep worker  | openai\|github-copilot\|venice\|opencode\|vercel/gpt-5.4 (medium) | Single-entry chain. Requires one of those providers. The craftsman. |
-| **Oracle**     | Architecture consultant | openai\|github-copilot\|opencode\|vercel/gpt-5.4 (high) → google\|github-copilot\|opencode\|vercel/gemini-3.1-pro (high) → anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-6 (max) → opencode-go\|vercel/glm-5 | Exact runtime chain from `src/shared/model-requirements.ts`. |
-| **Momus**      | Ruthless reviewer       | openai\|github-copilot\|opencode\|vercel/gpt-5.4 (xhigh) → anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-6 (max) → google\|github-copilot\|opencode\|vercel/gemini-3.1-pro (high) → opencode-go\|vercel/glm-5 | Exact runtime chain from `src/shared/model-requirements.ts`. |
+| **Oracle**     | Architecture consultant | openai\|github-copilot\|opencode\|vercel/gpt-5.4 (high) → google\|github-copilot\|opencode\|vercel/gemini-3.1-pro (high) → anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7 (max) → opencode-go\|vercel/glm-5 | Exact runtime chain from `src/shared/model-requirements.ts`. |
+| **Momus**      | Ruthless reviewer       | openai\|github-copilot\|opencode\|vercel/gpt-5.4 (xhigh) → anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7 (max) → google\|github-copilot\|opencode\|vercel/gemini-3.1-pro (high) → opencode-go\|vercel/glm-5 | Exact runtime chain from `src/shared/model-requirements.ts`. |
 
 ### Utility Runners → Speed over Intelligence
 
@@ -92,8 +92,8 @@ These agents do grep, search, and retrieval. They intentionally use the fastest,
 
 | Agent                 | Role               | Fallback Chain                                 | Notes                                                 |
 | --------------------- | ------------------ | ---------------------------------------------- | ----------------------------------------------------- |
-| **Explore**           | Fast codebase grep | github-copilot\|xai\|vercel/grok-code-fast-1 → opencode-go\|vercel/minimax-m2.7-highspeed → opencode\|vercel/minimax-m2.7 → anthropic\|opencode\|vercel/claude-haiku-4-5 → opencode\|vercel/gpt-5-nano | Exact runtime chain from `src/shared/model-requirements.ts`. |
-| **Librarian**         | Docs/code search   | opencode-go\|vercel/minimax-m2.7 → opencode\|vercel/minimax-m2.7-highspeed → anthropic\|opencode\|vercel/claude-haiku-4-5 → opencode\|vercel/gpt-5-nano | Exact runtime chain from `src/shared/model-requirements.ts`. |
+| **Explore**           | Fast codebase grep | openai/gpt-5.4-mini-fast → opencode-go\|vercel/minimax-m2.7-highspeed → opencode-go\|vercel/minimax-m2.7 → anthropic\|opencode\|vercel/claude-haiku-4-5 → openai\|opencode\|vercel/gpt-5.4-nano | Exact runtime chain from `src/shared/model-requirements.ts`. |
+| **Librarian**         | Docs/code search   | openai/gpt-5.4-mini-fast → opencode-go\|vercel/minimax-m2.7-highspeed → opencode-go\|vercel/minimax-m2.7 → anthropic\|opencode\|vercel/claude-haiku-4-5 → openai\|opencode\|vercel/gpt-5.4-nano | Exact runtime chain from `src/shared/model-requirements.ts`. |
 | **Multimodal Looker** | Vision/screenshots | openai\|opencode\|vercel/gpt-5.4 (medium) → opencode-go\|vercel/kimi-k2.5 → zai-coding-plan\|vercel/glm-4.6v → openai\|github-copilot\|opencode\|vercel/gpt-5-nano | Exact runtime chain from `src/shared/model-requirements.ts`. |
 | **Sisyphus-Junior**   | Category executor  | anthropic\|github-copilot\|opencode\|vercel/claude-sonnet-4-6 → opencode-go\|vercel/kimi-k2.5 → openai\|github-copilot\|opencode\|vercel/gpt-5.4 (medium) → opencode-go\|vercel/minimax-m2.7 → opencode/big-pickle | Exact runtime chain from `src/shared/model-requirements.ts`. |
 
@@ -107,7 +107,7 @@ Communicative, instruction-following, structured output. Best for agents that ne
 
 | Model                 | Strengths                                                                    |
 | --------------------- | ---------------------------------------------------------------------------- |
-| **Claude Opus 4.6**   | Best overall. Highest compliance with complex prompts. Default for Sisyphus. |
+| **Claude Opus 4.7**   | Best overall. Highest compliance with complex prompts. Default for Sisyphus. |
 | **Claude Sonnet 4.6** | Faster, cheaper. Good balance for everyday tasks.                            |
 | **Claude Haiku 4.5**  | Fast and cheap. Good for quick tasks and utility work.                       |
 | **Kimi K2.5**         | Behaves very similarly to Claude. Great all-rounder at lower cost.           |
@@ -130,7 +130,7 @@ Principle-driven, explicit reasoning, deep technical capability. Best for agents
 | -------------------- | ------------------------------------------------------------------------------------------------------------ |
 | **Gemini 3.1 Pro**   | Excels at visual/frontend tasks. Different reasoning style. Default for `visual-engineering` and `artistry`. |
 | **Gemini 3 Flash**   | Fast. Good for doc search and light tasks.                                                                   |
-| **Grok Code Fast 1** | Blazing fast code grep. Default for Explore agent.                                                           |
+| **GPT-5.4 Mini Fast** | Default for Explore and Librarian agents. Blazing-fast reasoning-capable mini model. |
 | **MiniMax M2.7**     | Fast and smart. Used in OpenCode Go and OpenCode Zen utility fallback chains. |
 | **MiniMax M2.7 Highspeed** | High-speed OpenCode catalog entry used in utility fallback chains that prefer the fastest available MiniMax path. |
 
@@ -144,8 +144,8 @@ A premium subscription tier ($10/month) that provides reliable access to Chinese
 | ------------------------ | --------------------------------------------------------------------- |
 | **opencode-go/kimi-k2.5** | Vision-capable, Claude-like reasoning. Used by Sisyphus, Atlas, Sisyphus-Junior, Multimodal Looker. |
 | **opencode-go/glm-5**     | Text-only orchestration model. Used by Oracle, Prometheus, Metis, Momus.                           |
-| **opencode-go/minimax-m2.7** | Ultra-cheap, fast responses. Used by Librarian, Atlas, and Sisyphus-Junior for utility work. |
-| **opencode-go/minimax-m2.7-highspeed** | Even faster OpenCode Go MiniMax entry used by Explore when the high-speed catalog entry is available. |
+| **opencode-go/minimax-m2.7** | Ultra-cheap, fast responses. Used by Atlas, Sisyphus-Junior, Explore and Librarian fallbacks for utility work. |
+| **opencode-go/minimax-m2.7-highspeed** | Even faster OpenCode Go MiniMax entry used as a secondary fallback for Explore and Librarian when GPT-5.4 Mini Fast is unavailable. |
 
 **When It Gets Used:**
 
@@ -169,12 +169,12 @@ When agents delegate work, they don't pick a model name — they pick a **catego
 
 | Category             | When Used                  | Fallback Chain                               |
 | -------------------- | -------------------------- | -------------------------------------------- |
-| `visual-engineering` | Frontend, UI, CSS, design  | google\|github-copilot\|opencode\|vercel/gemini-3.1-pro (high) → zai-coding-plan\|opencode\|vercel/glm-5 → anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-6 (max) → opencode-go\|vercel/glm-5 → kimi-for-coding/k2p5 |
-| `ultrabrain`         | Maximum reasoning needed   | openai\|opencode\|vercel/gpt-5.4 (xhigh) → google\|github-copilot\|opencode\|vercel/gemini-3.1-pro (high) → anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-6 (max) → opencode-go\|vercel/glm-5 |
-| `deep`               | Deep coding, complex logic | openai\|github-copilot\|venice\|opencode\|vercel/gpt-5.4 (medium) → anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-6 (max) → google\|github-copilot\|opencode\|vercel/gemini-3.1-pro (high) |
-| `artistry`           | Creative, novel approaches | google\|github-copilot\|opencode\|vercel/gemini-3.1-pro (high) → anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-6 (max) → openai\|github-copilot\|opencode\|vercel/gpt-5.4 |
+| `visual-engineering` | Frontend, UI, CSS, design  | google\|github-copilot\|opencode\|vercel/gemini-3.1-pro (high) → zai-coding-plan\|opencode\|vercel/glm-5 → anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7 (max) → opencode-go\|vercel/glm-5 → kimi-for-coding/k2p5 |
+| `ultrabrain`         | Maximum reasoning needed   | openai\|opencode\|vercel/gpt-5.4 (xhigh) → google\|github-copilot\|opencode\|vercel/gemini-3.1-pro (high) → anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7 (max) → opencode-go\|vercel/glm-5 |
+| `deep`               | Deep coding, complex logic | openai\|github-copilot\|venice\|opencode\|vercel/gpt-5.4 (medium) → anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7 (max) → google\|github-copilot\|opencode\|vercel/gemini-3.1-pro (high) |
+| `artistry`           | Creative, novel approaches | google\|github-copilot\|opencode\|vercel/gemini-3.1-pro (high) → anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7 (max) → openai\|github-copilot\|opencode\|vercel/gpt-5.4 |
 | `quick`              | Simple, fast tasks         | openai\|github-copilot\|opencode\|vercel/gpt-5.4-mini → anthropic\|github-copilot\|opencode\|vercel/claude-haiku-4-5 → google\|github-copilot\|opencode\|vercel/gemini-3-flash → opencode-go\|vercel/minimax-m2.7 → opencode\|vercel/gpt-5-nano |
-| `unspecified-high`   | General complex work       | anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-6 (max) → openai\|github-copilot\|opencode\|vercel/gpt-5.4 (high) → zai-coding-plan\|opencode\|vercel/glm-5 → kimi-for-coding/k2p5 → opencode-go\|vercel/glm-5 → opencode\|vercel/kimi-k2.5 → opencode\|moonshotai\|moonshotai-cn\|firmware\|ollama-cloud\|aihubmix\|vercel/kimi-k2.5 |
+| `unspecified-high`   | General complex work       | anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7 (max) → openai\|github-copilot\|opencode\|vercel/gpt-5.4 (high) → zai-coding-plan\|opencode\|vercel/glm-5 → kimi-for-coding/k2p5 → opencode-go\|vercel/glm-5 → opencode\|vercel/kimi-k2.5 → opencode\|moonshotai\|moonshotai-cn\|firmware\|ollama-cloud\|aihubmix\|vercel/kimi-k2.5 |
 | `unspecified-low`    | General standard work      | anthropic\|github-copilot\|opencode\|vercel/claude-sonnet-4-6 → openai\|opencode\|vercel/gpt-5.3-codex (medium) → opencode-go\|vercel/kimi-k2.5 → google\|github-copilot\|opencode\|vercel/gemini-3-flash → opencode-go\|vercel/minimax-m2.7 |
 | `writing`            | Text, docs, prose          | google\|github-copilot\|opencode\|vercel/gemini-3-flash → opencode-go\|vercel/kimi-k2.5 → anthropic\|github-copilot\|opencode\|vercel/claude-sonnet-4-6 → opencode-go\|vercel/minimax-m2.7 |
 
@@ -198,7 +198,7 @@ See the [Orchestration System Guide](./orchestration.md) for how agents dispatch
     // Main orchestrator: Claude Opus or Kimi K2.5 work best
     "sisyphus": {
       "model": "kimi-for-coding/k2p5",
-      "ultrawork": { "model": "anthropic/claude-opus-4-6", "variant": "max" },
+      "ultrawork": { "model": "anthropic/claude-opus-4-7", "variant": "max" },
     },
 
     // Research agents: cheaper models are fine
@@ -217,7 +217,7 @@ See the [Orchestration System Guide](./orchestration.md) for how agents dispatch
   "categories": {
     "quick": { "model": "opencode/gpt-5-nano" },
     "unspecified-low": { "model": "anthropic/claude-sonnet-4-6" },
-    "unspecified-high": { "model": "anthropic/claude-opus-4-6", "variant": "max" },
+    "unspecified-high": { "model": "anthropic/claude-opus-4-7", "variant": "max" },
     "visual-engineering": {
       "model": "google/gemini-3.1-pro",
       "variant": "high",
@@ -234,7 +234,7 @@ See the [Orchestration System Guide](./orchestration.md) for how agents dispatch
       "zai-coding-plan": 10,
     },
     "modelConcurrency": {
-      "anthropic/claude-opus-4-6": 2,
+      "anthropic/claude-opus-4-7": 2,
       "opencode/gpt-5-nano": 20,
     },
   },

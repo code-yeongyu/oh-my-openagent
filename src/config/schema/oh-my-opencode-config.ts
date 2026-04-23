@@ -1,6 +1,7 @@
 import { z } from "zod"
 import { AnyMcpNameSchema } from "../../mcp/types"
 import { BuiltinSkillNameSchema } from "./agent-names"
+import { AgentDefinitionsConfigSchema } from "./agent-definitions"
 import { AgentOverridesSchema } from "./agent-overrides"
 import { BabysittingConfigSchema } from "./babysitting"
 import { BackgroundTaskConfigSchema } from "./background-task"
@@ -29,6 +30,8 @@ export const OhMyOpenCodeConfigSchema = z.object({
   new_task_system_enabled: z.boolean().optional(),
   /** Default agent name for `oh-my-opencode run` (env: OPENCODE_DEFAULT_AGENT) */
   default_run_agent: z.string().optional(),
+  /** Paths to external agent definition files (.md or .json) */
+  agent_definitions: AgentDefinitionsConfigSchema,
   disabled_mcps: z.array(AnyMcpNameSchema).optional(),
   disabled_agents: z.array(z.string()).optional(),
   disabled_skills: z.array(BuiltinSkillNameSchema).optional(),

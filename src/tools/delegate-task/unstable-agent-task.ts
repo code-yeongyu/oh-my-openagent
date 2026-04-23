@@ -3,13 +3,14 @@ import type { ExecutorContext, ParentContext, SessionMessage } from "./executor-
 import { DEFAULT_SYNC_POLL_TIMEOUT_MS, getTimingConfig } from "./timing"
 import { buildTaskPrompt } from "./prompt-builder"
 import { cancelUnstableAgentTask } from "./cancel-unstable-agent-task"
-import { storeToolMetadata } from "../../features/tool-metadata-store"
-import { resolveCallID } from "./resolve-call-id"
+import { publishToolMetadata } from "../../features/tool-metadata-store"
 import { formatDuration } from "./time-formatter"
 import { formatDetailedError } from "./error-formatting"
 import { getSessionTools } from "../../shared/session-tools-store"
 import { normalizeSDKResponse } from "../../shared"
 import { QUESTION_DENIED_SESSION_PERMISSION } from "../../shared/question-denied-session-permission"
+import { resolveMetadataModel } from "./resolve-metadata-model"
+import { buildTaskMetadataBlock } from "../../features/tool-metadata-store/task-metadata-contract"
 
 export async function executeUnstableAgentTask(
   args: DelegateTaskArgs,
@@ -73,19 +74,26 @@ export async function executeUnstableAgentTask(
         prompt: args.prompt,
         agent: agentToUse,
         category: args.category,
+        ...(args.requested_subagent_type !== undefined ? { requested_subagent_type: args.requested_subagent_type } : {}),
         load_skills: args.load_skills,
         description: args.description,
         run_in_background: args.run_in_background,
+        taskId: sessionID,
+        backgroundTaskId: task.id,
         sessionId: sessionID,
         command: args.command,
-        model: categoryModel ? { providerID: categoryModel.providerID, modelID: categoryModel.modelID } : undefined,
+        model: resolveMetadataModel(categoryModel, parentContext.model),
       },
     }
-    await ctx.metadata?.(bgTaskMeta)
-    const callID = resolveCallID(ctx)
-    if (callID) {
-      storeToolMetadata(ctx.sessionID, callID, bgTaskMeta)
-    }
+    await publishToolMetadata(ctx, bgTaskMeta)
+
+    const taskMetadataBlock = buildTaskMetadataBlock({
+      sessionId: sessionID,
+      taskId: sessionID,
+      backgroundTaskId: task.id,
+      agent: agentToUse,
+      category: args.category,
+    })
 
     const startTime = new Date()
     const timingCfg = getTimingConfig()
@@ -152,9 +160,7 @@ Model: ${actualModel}
 
 The task session may contain partial results.
 
-<task_metadata>
-session_id: ${sessionID}
-</task_metadata>`
+${taskMetadataBlock}`
     }
 
     if (!completedDuringMonitoring) {
@@ -172,9 +178,7 @@ Model: ${actualModel}
 
 The task session may still contain partial results.
 
-<task_metadata>
-session_id: ${sessionID}
-</task_metadata>`
+${taskMetadataBlock}`
     }
 
     const messagesResult = await client.session.messages({ path: { id: sessionID } })
@@ -185,9 +189,8 @@ session_id: ${sessionID}
     const assistantMessages = messages
       .filter((m) => m.info?.role === "assistant")
       .sort((a, b) => (b.info?.time?.created ?? 0) - (a.info?.time?.created ?? 0))
-    const lastMessage = assistantMessages[0]
 
-    if (!lastMessage) {
+    if (assistantMessages.length === 0) {
       return `No assistant response found (task ran in background mode).\n\nSession ID: ${sessionID}`
     }
 
@@ -222,9 +225,7 @@ RESULT:
 
 ${textContent || "(No text output)"}
 
-<task_metadata>
-session_id: ${sessionID}
-</task_metadata>`
+${taskMetadataBlock}`
   } catch (error) {
     if (!cleanupReason) {
       cleanupReason = "exception"

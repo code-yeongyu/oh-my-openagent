@@ -31,7 +31,7 @@ describe("model-error-classifier", () => {
     //#given
     const error = {
       message:
-        "All credentials for model claude-opus-4-6-thinking are cooling down [retrying in ~5 days attempt #1]",
+        "All credentials for model claude-opus-4-7-thinking are cooling down [retrying in ~5 days attempt #1]",
     }
 
     //#when

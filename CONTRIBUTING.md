@@ -109,7 +109,7 @@ After making changes, you can test your local build in OpenCode:
 ```
 oh-my-opencode/
 ├── src/
-│   ├── index.ts         # Plugin entry (OhMyOpenCodePlugin)
+│   ├── index.ts         # Plugin entry (V1 PluginModule, default export)
 │   ├── plugin-config.ts # JSONC multi-level config (Zod v4)
 │   ├── agents/          # 11 agents (Sisyphus, Hephaestus, Oracle, Librarian, Explore, Atlas, Prometheus, Metis, Momus, Multimodal-Looker, Sisyphus-Junior)
 │   ├── hooks/           # 52 lifecycle hooks across 55 dedicated modules
@@ -183,7 +183,7 @@ import type { AgentConfig } from "./types";
 
 export const myAgent: AgentConfig = {
   name: "my-agent",
-  model: "anthropic/claude-opus-4-6",
+  model: "anthropic/claude-opus-4-7",
   description: "Description of what this agent does",
   prompt: `Your agent's system prompt here`,
   temperature: 0.1,

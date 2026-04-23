@@ -409,9 +409,9 @@ After delegation, ALWAYS verify: works as expected? follows codebase pattern? MU
 
 Every \`task()\` output includes a session_id. **USE IT for follow-ups.**
 
-- **Task failed/incomplete** - \`session_id="{id}", prompt="Fix: {error}"\`
-- **Follow-up on result** - \`session_id="{id}", prompt="Also: {question}"\`
-- **Verification failed** - \`session_id="{id}", prompt="Failed: {error}. Fix."\`
+- **Task failed/incomplete** - \`task_id="{id}", prompt="Fix: {error}"\`
+- **Follow-up on result** - \`task_id="{id}", prompt="Also: {question}"\`
+- **Verification failed** - \`task_id="{id}", prompt="Failed: {error}. Fix."\`
 
 ${
   oracleSection

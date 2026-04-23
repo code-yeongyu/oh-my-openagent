@@ -8,6 +8,7 @@ import {
 } from "../../shared/model-suggestion-retry"
 import { formatDetailedError } from "./error-formatting"
 import { getAgentToolRestrictions } from "../../shared/agent-tool-restrictions"
+import { stripInvisibleAgentCharacters } from "../../shared/agent-display-names"
 import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
 import { setSessionTools } from "../../shared/session-tools-store"
 import { createInternalAgentTextPart } from "../../shared/internal-initiator-marker"
@@ -41,7 +42,7 @@ function buildPromptGenerationParams(model: DelegatedModelConfig | undefined): R
 }
 
 function isOracleAgent(agentToUse: string): boolean {
-  return agentToUse.toLowerCase() === "oracle"
+  return stripInvisibleAgentCharacters(agentToUse).toLowerCase() === "oracle"
 }
 
 function isUnexpectedEofError(error: unknown): boolean {
@@ -80,7 +81,7 @@ export async function sendSyncPrompt(
   const promptArgs = {
     path: { id: input.sessionID },
     body: {
-      agent: input.agentToUse.replace(/^\u200B+/, ""),
+      agent: stripInvisibleAgentCharacters(input.agentToUse),
       system: input.systemContent,
       tools,
       parts: [createInternalAgentTextPart(effectivePrompt)],

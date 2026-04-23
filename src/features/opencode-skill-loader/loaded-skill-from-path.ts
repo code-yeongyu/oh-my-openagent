@@ -25,7 +25,7 @@ export async function loadSkillFromPath(options: {
     const mcpJsonMcp = await loadMcpJsonFromDir(options.resolvedPath)
     const mcpConfig = mcpJsonMcp || frontmatterMcp
 
-    const baseName = data.name || options.defaultName
+    const baseName = String(data.name || options.defaultName)
     const skillName = namePrefix ? `${namePrefix}/${baseName}` : baseName
     const originalDescription = data.description || ""
     const isOpencodeSource = options.scope === "opencode" || options.scope === "opencode-project"

@@ -164,10 +164,10 @@ Count remaining **top-level task** checkboxes. Ignore nested verification/eviden
 
 ### 3.5 Handle Failures
 
-**CRITICAL: Use \`session_id\` for retries.**
+**CRITICAL: Use \`task_id\` for retries.**
 
 \`\`\`typescript
-task(session_id="ses_xyz789", load_skills=[...], prompt="FAILED: {error}. Fix by: {instruction}")
+task(task_id="ses_xyz789", load_skills=[...], prompt="FAILED: {error}. Fix by: {instruction}")
 \`\`\`
 
 - Maximum 3 retries per task

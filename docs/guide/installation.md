@@ -225,7 +225,7 @@ When GitHub Copilot is the best available provider, install-time defaults are ag
 
 | Agent         | Model                              |
 | ------------- | ---------------------------------- |
-| **Sisyphus**  | `github-copilot/claude-opus-4.6`   |
+| **Sisyphus**  | `github-copilot/claude-opus-4.7`   |
 | **Oracle**    | `github-copilot/gpt-5.4`           |
 | **Explore**   | `github-copilot/grok-code-fast-1`  |
 | **Atlas**     | `github-copilot/claude-sonnet-4.6` |
@@ -247,13 +247,13 @@ If Z.ai is your main provider, the most important fallbacks are:
 
 #### OpenCode Zen
 
-OpenCode Zen provides access to `opencode/` prefixed models including `opencode/claude-opus-4-6`, `opencode/gpt-5.4`, `opencode/gpt-5.3-codex`, `opencode/gpt-5-nano`, `opencode/glm-5`, `opencode/big-pickle`, `opencode/minimax-m2.7`, and `opencode/minimax-m2.7-highspeed`.
+OpenCode Zen provides access to `opencode/` prefixed models including `opencode/claude-opus-4-7`, `opencode/gpt-5.4`, `opencode/gpt-5.3-codex`, `opencode/gpt-5-nano`, `opencode/glm-5`, `opencode/big-pickle`, `opencode/minimax-m2.7`, and `opencode/minimax-m2.7-highspeed`.
 
 When OpenCode Zen is the best available provider, these are the most relevant source-backed examples:
 
 | Agent         | Model                                                |
 | ------------- | ---------------------------------------------------- |
-| **Sisyphus**  | `opencode/claude-opus-4-6`                           |
+| **Sisyphus**  | `opencode/claude-opus-4-7`                           |
 | **Oracle**    | `opencode/gpt-5.4`                                   |
 | **Explore**   | `opencode/minimax-m2.7`                              |
 
@@ -287,7 +287,7 @@ Not all models behave the same way. Understanding which models are "similar" hel
 
 | Model                    | Provider(s)                         | Notes                                                                   |
 | ------------------------ | ----------------------------------- | ----------------------------------------------------------------------- |
-| **Claude Opus 4.6**      | anthropic, github-copilot, opencode | Best overall. Default for Sisyphus.                                     |
+| **Claude Opus 4.7**      | anthropic, github-copilot, opencode | Best overall. Default for Sisyphus.                                     |
 | **Claude Sonnet 4.6**    | anthropic, github-copilot, opencode | Faster, cheaper. Good balance.                                          |
 | **Claude Haiku 4.5**     | anthropic, opencode                 | Fast and cheap. Good for quick tasks.                                   |
 | **Kimi K2.5**            | kimi-for-coding, opencode-go, opencode, moonshotai, moonshotai-cn, firmware, ollama-cloud, aihubmix | Behaves very similarly to Claude. Great all-rounder that appears in several orchestration fallback chains. |
@@ -330,8 +330,8 @@ Based on your subscriptions, here's how the agents were configured:
 
 | Agent        | Role             | Default Chain                                   | What It Does                                                                             |
 | ------------ | ---------------- | ----------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| **Sisyphus** | Main ultraworker | anthropic\|github-copilot\|opencode/claude-opus-4-6 (max) → opencode-go/kimi-k2.5 → kimi-for-coding/k2p5 → opencode\|moonshotai\|moonshotai-cn\|firmware\|ollama-cloud\|aihubmix/kimi-k2.5 → openai\|github-copilot\|opencode/gpt-5.4 (medium) → zai-coding-plan\|opencode/glm-5 → opencode/big-pickle | Primary coding agent. Exact runtime chain from `src/shared/model-requirements.ts`. |
-| **Metis**    | Plan review      | anthropic\|github-copilot\|opencode/claude-opus-4-6 (max) → openai\|github-copilot\|opencode/gpt-5.4 (high) → opencode-go/glm-5 → kimi-for-coding/k2p5 | Reviews Prometheus plans for gaps. Exact runtime chain from `src/shared/model-requirements.ts`. |
+| **Sisyphus** | Main ultraworker | anthropic\|github-copilot\|opencode/claude-opus-4-7 (max) → opencode-go/kimi-k2.5 → kimi-for-coding/k2p5 → opencode\|moonshotai\|moonshotai-cn\|firmware\|ollama-cloud\|aihubmix/kimi-k2.5 → openai\|github-copilot\|opencode/gpt-5.4 (medium) → zai-coding-plan\|opencode/glm-5 → opencode/big-pickle | Primary coding agent. Exact runtime chain from `src/shared/model-requirements.ts`. |
+| **Metis**    | Plan review      | anthropic\|github-copilot\|opencode/claude-opus-4-7 (max) → openai\|github-copilot\|opencode/gpt-5.4 (high) → opencode-go/glm-5 → kimi-for-coding/k2p5 | Reviews Prometheus plans for gaps. Exact runtime chain from `src/shared/model-requirements.ts`. |
 
 **Dual-Prompt Agents** (auto-switch between Claude and GPT prompts):
 
@@ -341,7 +341,7 @@ Priority: **Claude > GPT > Claude-like models**
 
 | Agent          | Role              | Default Chain                                              | GPT Prompt?                                                      |
 | -------------- | ----------------- | ---------------------------------------------------------- | ---------------------------------------------------------------- |
-| **Prometheus** | Strategic planner | anthropic\|github-copilot\|opencode/claude-opus-4-6 (max) → openai\|github-copilot\|opencode/gpt-5.4 (high) → opencode-go/glm-5 → google\|github-copilot\|opencode/gemini-3.1-pro | Yes — XML-tagged, principle-driven (~300 lines vs ~1,100 Claude) |
+| **Prometheus** | Strategic planner | anthropic\|github-copilot\|opencode/claude-opus-4-7 (max) → openai\|github-copilot\|opencode/gpt-5.4 (high) → opencode-go/glm-5 → google\|github-copilot\|opencode/gemini-3.1-pro | Yes — XML-tagged, principle-driven (~300 lines vs ~1,100 Claude) |
 | **Atlas**      | Todo orchestrator | anthropic\|github-copilot\|opencode/claude-sonnet-4-6 → opencode-go/kimi-k2.5 → openai\|github-copilot\|opencode/gpt-5.4 (medium) → opencode-go/minimax-m2.7 | Yes - GPT-optimized todo management                              |
 
 **GPT-Native Agents** (built for GPT, don't override to Claude):
@@ -349,8 +349,8 @@ Priority: **Claude > GPT > Claude-like models**
 | Agent          | Role                   | Default Chain                          | Notes                                                  |
 | -------------- | ---------------------- | -------------------------------------- | ------------------------------------------------------ |
 | **Hephaestus** | Deep autonomous worker | GPT-5.4 (medium) only                  | "Codex on steroids." No fallback. Requires GPT access. |
-| **Oracle**     | Architecture/debugging | openai\|github-copilot\|opencode/gpt-5.4 (high) → google\|github-copilot\|opencode/gemini-3.1-pro (high) → anthropic\|github-copilot\|opencode/claude-opus-4-6 (max) → opencode-go/glm-5 | High-IQ strategic backup. GPT preferred.               |
-| **Momus**      | High-accuracy reviewer | openai\|github-copilot\|opencode/gpt-5.4 (xhigh) → anthropic\|github-copilot\|opencode/claude-opus-4-6 (max) → google\|github-copilot\|opencode/gemini-3.1-pro (high) → opencode-go/glm-5 | Verification agent. GPT preferred.                     |
+| **Oracle**     | Architecture/debugging | openai\|github-copilot\|opencode/gpt-5.4 (high) → google\|github-copilot\|opencode/gemini-3.1-pro (high) → anthropic\|github-copilot\|opencode/claude-opus-4-7 (max) → opencode-go/glm-5 | High-IQ strategic backup. GPT preferred.               |
+| **Momus**      | High-accuracy reviewer | openai\|github-copilot\|opencode/gpt-5.4 (xhigh) → anthropic\|github-copilot\|opencode/claude-opus-4-7 (max) → google\|github-copilot\|opencode/gemini-3.1-pro (high) → opencode-go/glm-5 | Verification agent. GPT preferred.                     |
 
 **Utility Agents** (speed over intelligence):
 
@@ -463,7 +463,7 @@ gh api --silent --method PUT /user/starred/code-yeongyu/oh-my-openagent >/dev/nu
 
 Tell the user of following:
 
-1. **Sisyphus agent strongly recommends Opus 4.6 model. Using other models may result in significantly degraded experience.**
+1. **Sisyphus agent strongly recommends Opus 4.7 model. Using other models may result in significantly degraded experience.**
 
 2. **Feeling lazy?** Just include `ultrawork` (or `ulw`) in your prompt. That's it. The agent figures out the rest.
 

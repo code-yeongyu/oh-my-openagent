@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test"
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { clearCommandLoaderCache } from "../../features/claude-code-command-loader"
 
 function requireFresh<T>(modulePath: string): T {
   const resolvedPath = require.resolve(modulePath)
@@ -25,12 +26,14 @@ describe("slashcommand discovery and execution compatibility", () => {
   let originalOpencodeConfigDir: string | undefined
 
   beforeEach(() => {
+    clearCommandLoaderCache()
     tempDir = mkdtempSync(join(tmpdir(), "omo-slashcommand-compat-test-"))
     originalWorkingDirectory = process.cwd()
     originalOpencodeConfigDir = process.env.OPENCODE_CONFIG_DIR
   })
 
   afterEach(() => {
+    clearCommandLoaderCache()
     process.chdir(originalWorkingDirectory)
 
     if (originalOpencodeConfigDir === undefined) {

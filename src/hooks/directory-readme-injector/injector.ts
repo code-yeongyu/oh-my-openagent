@@ -1,5 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin";
-import { readFileSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
 import type { createDynamicTruncator } from "../../shared/dynamic-truncator";
@@ -31,7 +31,7 @@ export async function processFilePathForReadmeInjection(input: {
 
   const dir = dirname(resolved);
   const cache = getSessionCache(input.sessionCaches, input.sessionID);
-  const readmePaths = findReadmeMdUp({ startDir: dir, rootDir: input.ctx.directory });
+   const readmePaths = await findReadmeMdUp({ startDir: dir, rootDir: input.ctx.directory });
 
   let dirty = false;
   for (const readmePath of readmePaths) {
@@ -39,7 +39,7 @@ export async function processFilePathForReadmeInjection(input: {
     if (cache.has(readmeDir)) continue;
 
     try {
-      const content = readFileSync(readmePath, "utf-8");
+      const content = await readFile(readmePath, "utf-8");
       const { result, truncated } = await input.truncator.truncate(
         input.sessionID,
         content,

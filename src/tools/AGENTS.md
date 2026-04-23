@@ -1,6 +1,6 @@
 # src/tools/ - 26 Tools Across 16 Directories
 
-**Generated:** 2026-04-11
+**Generated:** 2026-04-18
 
 ## OVERVIEW
 
@@ -97,7 +97,7 @@
 | artistry | gemini-3.1-pro high | Creative approaches |
 | quick | gpt-5.4-mini | Trivial tasks |
 | unspecified-low | claude-sonnet-4-6 | Moderate effort |
-| unspecified-high | claude-opus-4-6 max | High effort |
+| unspecified-high | claude-opus-4-7 max | High effort |
 | writing | gemini-3-flash | Documentation |
 
 ## HOW TO ADD A TOOL

@@ -1,7 +1,5 @@
 import type { HookDeps, RuntimeFallbackHook, RuntimeFallbackInterval, RuntimeFallbackOptions, RuntimeFallbackPluginInput, RuntimeFallbackTimeout } from "./types"
-import { DEFAULT_CONFIG, HOOK_NAME } from "./constants"
-import { log } from "../../shared/logger"
-import { loadPluginConfig } from "../../plugin-config"
+import { DEFAULT_CONFIG } from "./constants"
 import { createAutoRetryHelpers } from "./auto-retry"
 import { createEventHandler } from "./event-handler"
 import { createMessageUpdateHandler } from "./message-update-handler"
@@ -24,20 +22,11 @@ export function createRuntimeFallbackHook(
     notify_on_fallback: options?.config?.notify_on_fallback ?? DEFAULT_CONFIG.notify_on_fallback,
   }
 
-  let pluginConfig = options?.pluginConfig
-  if (!pluginConfig) {
-    try {
-      pluginConfig = loadPluginConfig(ctx.directory, ctx)
-    } catch {
-      log(`[${HOOK_NAME}] Plugin config not available`)
-    }
-  }
-
   const deps: HookDeps = {
     ctx,
     config,
     options,
-    pluginConfig,
+    pluginConfig: options?.pluginConfig,
     sessionStates: new Map(),
     sessionLastAccess: new Map(),
     sessionRetryInFlight: new Set(),
@@ -51,10 +40,23 @@ export function createRuntimeFallbackHook(
   const messageUpdateHandler = createMessageUpdateHandler(deps, helpers)
   const chatMessageHandler = createChatMessageHandler(deps)
 
-  const cleanupInterval = setInterval(helpers.cleanupStaleSessions, 5 * 60 * 1000)
-  cleanupInterval.unref()
+  let cleanupInterval: RuntimeFallbackInterval | null = null
+  let intervalStarted = false
+
+  const ensureInterval = (): void => {
+    if (intervalStarted) return
+
+    intervalStarted = true
+    cleanupInterval = setInterval(helpers.cleanupStaleSessions, 5 * 60 * 1000)
+
+    if (typeof cleanupInterval.unref === "function") {
+      cleanupInterval.unref()
+    }
+  }
 
   const eventHandler = async ({ event }: { event: { type: string; properties?: unknown } }) => {
+    ensureInterval()
+
     if (event.type === "message.updated") {
       if (!config.enabled) return
       const props = event.properties as Record<string, unknown> | undefined
@@ -65,7 +67,9 @@ export function createRuntimeFallbackHook(
   }
 
   const dispose = () => {
-    clearInterval(cleanupInterval)
+    if (cleanupInterval) {
+      clearInterval(cleanupInterval)
+    }
 
     for (const fallbackTimeout of deps.sessionFallbackTimeouts.values()) {
       clearTimeout(fallbackTimeout)

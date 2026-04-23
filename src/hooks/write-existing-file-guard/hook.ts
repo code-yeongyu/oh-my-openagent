@@ -76,7 +76,15 @@ export function isOverwriteEnabled(value: boolean | string | undefined): boolean
 export function createWriteExistingFileGuardHook(ctx: PluginInput): Hooks {
   const readPermissionsBySession = new Map<string, Set<string>>()
   const sessionLastAccess = new Map<string, number>()
-  const canonicalSessionRoot = toCanonicalPath(resolveInputPath(ctx, ctx.directory))
+  let canonicalSessionRoot: string | undefined
+
+  function getCanonicalSessionRoot(): string {
+    if (!canonicalSessionRoot) {
+      canonicalSessionRoot = toCanonicalPath(resolveInputPath(ctx, ctx.directory))
+    }
+
+    return canonicalSessionRoot
+  }
 
   return {
     "tool.execute.before": async (input, output) => {
@@ -86,7 +94,7 @@ export function createWriteExistingFileGuardHook(ctx: PluginInput): Hooks {
         output,
         readPermissionsBySession,
         sessionLastAccess,
-        canonicalSessionRoot,
+        getCanonicalSessionRoot,
         maxTrackedSessions: MAX_TRACKED_SESSIONS,
       })
     },

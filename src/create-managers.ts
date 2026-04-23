@@ -5,6 +5,7 @@ import type { PluginContext, TmuxConfig } from "./plugin/types"
 import type { SubagentSessionCreatedEvent } from "./features/background-agent"
 import { BackgroundManager } from "./features/background-agent"
 import { SkillMcpManager } from "./features/skill-mcp-manager"
+import { createModelFallbackControllerAccessor } from "./hooks/model-fallback"
 import { initTaskToastManager } from "./features/task-toast-manager"
 import { TmuxSessionManager } from "./features/tmux-subagent"
 import * as openclawRuntimeDispatch from "./openclaw/runtime-dispatch"
@@ -13,6 +14,7 @@ import { createConfigHandler } from "./plugin-handlers"
 import { createHostSkillConfigStore } from "./shared/host-skill-config"
 import { log } from "./shared"
 import { markServerRunningInProcess } from "./shared/tmux/tmux-utils/server-health"
+import type { ModelFallbackControllerAccessor } from "./hooks/model-fallback"
 
 type CreateManagersDeps = {
   BackgroundManagerClass: typeof BackgroundManager
@@ -40,6 +42,7 @@ export type Managers = {
   skillMcpManager: SkillMcpManager
   configHandler: ReturnType<typeof createConfigHandler>
   hostSkillConfigStore: ReturnType<typeof createHostSkillConfigStore>
+  modelFallbackControllerAccessor: ModelFallbackControllerAccessor
 }
 
 export function createManagers(args: {
@@ -123,6 +126,7 @@ export function createManagers(args: {
     modelCacheState,
     hostSkillConfigStore,
   })
+  const modelFallbackControllerAccessor = createModelFallbackControllerAccessor()
 
   return {
     tmuxSessionManager,
@@ -130,5 +134,6 @@ export function createManagers(args: {
     skillMcpManager,
     configHandler,
     hostSkillConfigStore,
+    modelFallbackControllerAccessor,
   }
 }
