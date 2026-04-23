@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, mock } from "bun:test"
+import { afterAll, beforeEach, describe, expect, it, mock } from "bun:test"
 
 const readFileSyncMock = mock((_: string, __: string) => "# README")
 const findReadmeMdUpMock = mock((_: { startDir: string; rootDir: string }) => [] as string[])
@@ -21,6 +21,10 @@ mock.module("./storage", () => ({
 }))
 
 const { processFilePathForReadmeInjection } = await import("./injector")
+
+afterAll(() => {
+  mock.restore()
+})
 
 describe("processFilePathForReadmeInjection", () => {
   beforeEach(() => {
