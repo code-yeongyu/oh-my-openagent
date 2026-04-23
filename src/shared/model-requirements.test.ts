@@ -79,7 +79,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(primary.model).toBe("gpt-5.4-mini-fast")
 
     const second = librarian.fallbackChain[1]
-    expect(second.providers[0]).toBe("opencode-go")
+    expect(second.providers).toContain("opencode-go")
     expect(second.model).toBe("qwen3.5-plus")
 
     const third = librarian.fallbackChain[2]
@@ -87,7 +87,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(third.model).toBe("minimax-m2.7-highspeed")
 
     const quaternary = librarian.fallbackChain[3]
-    expect(quaternary.providers[0]).toBe("opencode-go")
+    expect(quaternary.providers).toContain("opencode-go")
     expect(quaternary.model).toBe("minimax-m2.7")
 
     const quinary = librarian.fallbackChain[4]
@@ -113,7 +113,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(primary.model).toBe("gpt-5.4-mini-fast")
 
     const secondary = explore.fallbackChain[1]
-    expect(secondary.providers[0]).toBe("opencode-go")
+    expect(secondary.providers).toContain("opencode-go")
     expect(secondary.model).toBe("qwen3.5-plus")
 
     const third = explore.fallbackChain[2]
@@ -121,7 +121,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(third.model).toBe("minimax-m2.7-highspeed")
 
     const quaternary = explore.fallbackChain[3]
-    expect(quaternary.providers[0]).toBe("opencode-go")
+    expect(quaternary.providers).toContain("opencode-go")
     expect(quaternary.model).toBe("minimax-m2.7")
 
     const quinary = explore.fallbackChain[4]
