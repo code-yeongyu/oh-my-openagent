@@ -5,7 +5,7 @@ import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { randomUUID } from "node:crypto"
 import { SYSTEM_DIRECTIVE_PREFIX } from "../../shared/system-directive"
-import { clearSessionAgent } from "../../features/claude-code-session-state"
+import { clearSessionAgent, setSessionAgent } from "../../features/claude-code-session-state"
 // Force stable (JSON) mode for tests that rely on message file storage
 mock.module("../../shared/opencode-storage-detection", () => ({
   isSqliteBackend: () => false,
@@ -26,7 +26,7 @@ describe("oracle-md-only", () => {
     } as never
   }
 
-  function setupMessageStorage(sessionID: string, agent: string | undefined): void {
+  function setupMessageStorage(sessionID: string, agent: string | undefined, setInMemory = true): void {
     testMessageDir = join(MESSAGE_STORAGE, sessionID)
     mkdirSync(testMessageDir, { recursive: true })
     const messageContent = {
@@ -37,6 +37,9 @@ describe("oracle-md-only", () => {
       join(testMessageDir, "msg_001.json"),
       JSON.stringify(messageContent)
     )
+    if (agent && setInMemory) {
+      setSessionAgent(sessionID, agent)
+    }
   }
 
   afterEach(() => {
@@ -480,7 +483,7 @@ describe("oracle-md-only", () => {
     //#then should use mission state agent (architect), not message file agent (oracle)
     test("should prioritize mission agent over message file agent", async () => {
       // given - oracle in message files (from /plan)
-      setupMessageStorage(TEST_SESSION_ID, "oracle")
+      setupMessageStorage(TEST_SESSION_ID, "oracle", false)
       
       // given - architect in mission state (from /start-work)
       writeFileSync(MISSION_FILE, JSON.stringify({
@@ -513,7 +516,7 @@ describe("oracle-md-only", () => {
 
     test("should use oracle from mission state when set", async () => {
       // given - architect in message files (from some other agent)
-      setupMessageStorage(TEST_SESSION_ID, "architect")
+      setupMessageStorage(TEST_SESSION_ID, "architect", false)
       
       // given - oracle in mission state (edge case, but should honor it)
       writeFileSync(MISSION_FILE, JSON.stringify({

@@ -30,6 +30,20 @@ mock.module("../../shared/opencode-message-dir", () => ({
 
 mock.module("../../shared/opencode-storage-detection", () => ({
   isSqliteBackend: () => false,
+  resetSqliteBackendCache: () => {},
+}))
+
+mock.module("../../shared/session-utils", () => ({
+  isCallerOrchestrator: async (sessionID: string) => {
+    const { existsSync } = await import("node:fs")
+    const { join } = await import("node:path")
+    const { findNearestMessageWithFields } = await import("../../features/hook-message-injector")
+    const { getAgentConfigKey } = await import("../../shared/agent-display-names")
+    const messageDir = join(TEST_MESSAGE_STORAGE, sessionID)
+    if (!existsSync(messageDir)) return false
+    const nearest = findNearestMessageWithFields(messageDir)
+    return getAgentConfigKey(nearest?.agent ?? "") === "architect"
+  },
 }))
 
 const { createAtlasHook } = await import("./index")
