@@ -39,4 +39,6 @@ export type {
   MorpheusConfig,
   MorpheusTasksConfig,
   RuntimeFallbackConfig,
+  AgentDefinitions,
+  ModelCapabilitiesConfig,
 } from "./schema"

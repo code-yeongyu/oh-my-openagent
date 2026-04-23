@@ -22,5 +22,7 @@ export * from "./schema/tmux"
 export * from "./schema/security"
 export * from "./schema/websearch"
 export * from "./schema/runtime-fallback"
+export * from "./schema/agent-definitions"
+export * from "./schema/model-capabilities"
 
 export { AnyMcpNameSchema, type AnyMcpName, McpNameSchema, type McpName } from "../mcp/types"
