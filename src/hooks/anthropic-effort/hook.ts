@@ -76,13 +76,31 @@ export function createAnthropicEffortHook() {
       const { agent, model, message } = input
       if (!model?.modelID || !model?.providerID) return
       if (isEffortUnsupportedModel(model.modelID)) return
-      if (message.variant !== "max") return
       if (!isClaudeProvider(model.providerID, model.modelID)) return
       if (shouldSkipForInternalAgent(agent?.name)) return
-      if (output.options.effort !== undefined) return
+
+      const constrained = isConstrainedProvider(model.providerID)
+
+      // Clamp pre-existing effort for constrained providers (e.g. github-copilot)
+      // OpenCode may pre-populate effort="max" before hooks run; constrained APIs
+      // only accept low | medium | high.
+      if (output.options.effort !== undefined) {
+        if (constrained && output.options.effort === "max") {
+          output.options.effort = MAX_VARIANT_BY_TIER.default
+          ;(message as { variant?: string }).variant = MAX_VARIANT_BY_TIER.default
+          log("anthropic-effort: clamped pre-existing effort max→high", {
+            sessionID: input.sessionID,
+            provider: model.providerID,
+            model: model.modelID,
+            reason: "constrained-provider",
+          })
+        }
+        return
+      }
+
+      if (message.variant !== "max") return
 
       const opus = isOpusModel(model.modelID)
-      const constrained = isConstrainedProvider(model.providerID)
       const clamped = clampVariant(message.variant, opus, constrained)
       output.options.effort = clamped
 
