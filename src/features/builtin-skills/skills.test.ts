@@ -80,7 +80,7 @@ describe("createBuiltinSkills", () => {
 		}
 	})
 
-	test("returns exactly 41 skills regardless of provider", () => {
+	test("returns exactly 42 skills regardless of provider", () => {
 		// given
 
 		// when
@@ -88,8 +88,8 @@ describe("createBuiltinSkills", () => {
 		const agentBrowserSkills = createBuiltinSkills({ browserProvider: "agent-browser" })
 
 		// then
-		expect(defaultSkills).toHaveLength(41)
-		expect(agentBrowserSkills).toHaveLength(41)
+		expect(defaultSkills).toHaveLength(42)
+		expect(agentBrowserSkills).toHaveLength(42)
 	})
 
 	test("should exclude playwright when it is in disabledSkills", () => {
