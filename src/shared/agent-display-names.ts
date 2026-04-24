@@ -26,13 +26,6 @@ export const AGENT_DISPLAY_NAMES: Record<string, string> = {
   "council-member": "council-member",
 }
 
-const AGENT_LIST_SORT_PREFIXES: Record<string, string> = {
-  sisyphus: "\u200B",
-  hephaestus: "\u200B\u200B",
-  prometheus: "\u200B\u200B\u200B",
-  atlas: "\u200B\u200B\u200B\u200B",
-}
-
 const INVISIBLE_AGENT_CHARACTERS_REGEX = /[\u200B\u200C\u200D\uFEFF]/g
 
 export function stripInvisibleAgentCharacters(agentName: string): string {
@@ -44,10 +37,7 @@ export function stripAgentListSortPrefix(agentName: string): string {
 }
 
 export function getAgentRuntimeName(configKey: string): string {
-  const displayName = getAgentDisplayName(configKey)
-  const prefix = AGENT_LIST_SORT_PREFIXES[configKey.toLowerCase()]
-
-  return prefix ? `${prefix}${displayName}` : displayName
+  return getAgentDisplayName(configKey)
 }
 
 /**
@@ -71,10 +61,13 @@ export function getAgentDisplayName(configKey: string): string {
 }
 
 /**
- * Runtime-facing agent name used for OpenCode list ordering.
+ * Runtime-facing agent name used by OpenCode.
+ * Older versions injected zero-width prefixes for list ordering; we now keep
+ * runtime names clean and rely on explicit `order` fields while still stripping
+ * historical prefixes during lookups for backward compatibility.
  */
 export function getAgentListDisplayName(configKey: string): string {
-  return getAgentRuntimeName(configKey)
+  return getAgentDisplayName(configKey)
 }
 
 const REVERSE_DISPLAY_NAMES: Record<string, string> = Object.fromEntries(
