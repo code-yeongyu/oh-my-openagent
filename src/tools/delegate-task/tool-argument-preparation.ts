@@ -44,12 +44,8 @@ export async function prepareDelegateTaskArgs(args: Record<string, unknown>, ctx
     }
   }
 
-  if (loadSkills === undefined) {
+  if (!loadSkills) {
     loadSkills = []
-  }
-
-  if (loadSkills === null) {
-    throw new Error("Invalid arguments: load_skills=null is not allowed. Pass [] if no skills needed.")
   }
 
   const normalizedLoadSkills = Array.isArray(loadSkills)
