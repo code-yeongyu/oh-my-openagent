@@ -79,18 +79,11 @@ export function isGptModel(model: string): boolean {
   return modelName.includes("gpt");
 }
 
-export function isGpt5_4Model(model: string): boolean {
-  const modelName = extractModelName(model).toLowerCase();
-  return modelName.includes("gpt-5.4") || modelName.includes("gpt-5-4");
-}
-
-export function isGpt5_5Model(model: string): boolean {
-  const modelName = extractModelName(model).toLowerCase();
-  return modelName.includes("gpt-5.5") || modelName.includes("gpt-5-5");
-}
+const GPT_NATIVE_SISYPHUS_RE = /gpt-5[.-](?:[4-9]|\d{2,})/i;
 
 export function isGptNativeSisyphusModel(model: string): boolean {
-  return isGpt5_4Model(model) || isGpt5_5Model(model);
+  const modelName = extractModelName(model).toLowerCase();
+  return GPT_NATIVE_SISYPHUS_RE.test(modelName);
 }
 
 export function isGpt5_3CodexModel(model: string): boolean {
