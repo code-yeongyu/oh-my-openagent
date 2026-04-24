@@ -281,6 +281,55 @@ You are starting a Sisyphus work session.
       expect(state?.active_plan).toBe(newPlanPath)
     })
 
+    test("should still find nested plan references when direct input fields contain a different plan path", async () => {
+      // given - direct path points to plan-a but nested serialized input also references newer plan-b
+      const plansDir = join(testDir, ".sisyphus", "plans")
+      mkdirSync(plansDir, { recursive: true })
+
+      const planAPath = join(plansDir, "plan-a.md")
+      const planBPath = join(plansDir, "plan-b.md")
+      writeFileSync(planAPath, "# Plan A\n- [ ] Task A")
+      writeFileSync(planBPath, "# Plan B\n- [ ] Task B")
+
+      const hook = createStartWorkHook({
+        directory: testDir,
+        client: {
+          session: {
+            messages: async () => ({
+              data: [
+                {
+                  parts: [
+                    {
+                      input: {
+                        path: `Legacy reference ${planAPath}`,
+                        metadata: {
+                          selectedPlan: `Current reference ${planBPath}`,
+                        },
+                      },
+                    },
+                  ],
+                },
+              ],
+            }),
+          },
+        },
+      } as Parameters<typeof createStartWorkHook>[0])
+      const output = {
+        parts: [{ type: "text", text: createStartWorkPrompt() }],
+      }
+
+      // when
+      await hook["chat.message"](
+        { sessionID: "session-123" },
+        output,
+      )
+
+      // then - latest nested reference should still be discoverable and selected
+      const state = readBoulderState(testDir)
+      expect(state?.active_plan).toBe(planBPath)
+      expect(output.parts[0].text).toContain("plan-b")
+    })
+
     test("should replace $SESSION_ID placeholder", async () => {
       // given - hook and message with placeholder
       const hook = createStartWorkHook(createMockPluginInput())

@@ -29,20 +29,36 @@ function extractPlanPathsFromText(directory: string, text: string): string[] {
   return matches.map((match) => normalizePlanPath(directory, match))
 }
 
+function extractPlanPathsFromValue(directory: string, value: unknown): string[] {
+  if (typeof value === "string") {
+    return extractPlanPathsFromText(directory, value)
+  }
+
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => extractPlanPathsFromValue(directory, item))
+  }
+
+  if (value && typeof value === "object") {
+    return Object.values(value).flatMap((item) => extractPlanPathsFromValue(directory, item))
+  }
+
+  return []
+}
+
 function extractPlanPathsFromInput(directory: string, input: Record<string, unknown> | undefined): string[] {
   if (!input) {
     return []
   }
 
+  const nestedCandidates = Object.entries(input)
+    .filter(([key]) => key !== "filePath" && key !== "path" && key !== "file")
+    .flatMap(([, value]) => extractPlanPathsFromValue(directory, value))
+
   const directCandidates = [input.filePath, input.path, input.file]
     .filter((value): value is string => typeof value === "string")
     .flatMap((value) => extractPlanPathsFromText(directory, value))
 
-  if (directCandidates.length > 0) {
-    return directCandidates
-  }
-
-  return extractPlanPathsFromText(directory, JSON.stringify(input))
+  return [...new Set([...nestedCandidates, ...directCandidates])]
 }
 
 export async function findRecentSessionPlanPath(input: {
