@@ -12,12 +12,6 @@ export const DELEGATE_TASK_ERROR_PATTERNS: DelegateTaskErrorPattern[] = [
       "Add run_in_background=false (for delegation) or run_in_background=true (for parallel exploration)",
   },
   {
-    pattern: "load_skills",
-    errorType: "missing_load_skills",
-    fixHint:
-      "Add load_skills=[] parameter (empty array if no skills needed). Note: Calling Skill tool does NOT populate this.",
-  },
-  {
     pattern: "category OR subagent_type",
     errorType: "mutual_exclusion",
     fixHint:

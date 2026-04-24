@@ -61,7 +61,7 @@ export function createDelegateTaskPresentation(options: DelegateTaskToolOptions)
   
   **DO NOT provide both.** If category is provided, subagent_type is ignored.
   
-  - load_skills: ALWAYS REQUIRED. Pass [] if no skills needed, or ["skill-1", "skill-2"] for category tasks.
+  - load_skills: Defaults to [] if omitted, or pass skill names to inject
   - category: Use predefined category → Spawns Sisyphus-Junior with category config
     Available categories:
   ${categoryList}

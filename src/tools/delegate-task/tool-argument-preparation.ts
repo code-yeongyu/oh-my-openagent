@@ -45,7 +45,7 @@ export async function prepareDelegateTaskArgs(args: Record<string, unknown>, ctx
   }
 
   if (loadSkills === undefined) {
-    throw new Error("Invalid arguments: 'load_skills' parameter is REQUIRED. Pass [] if no skills needed.")
+    loadSkills = []
   }
 
   if (loadSkills === null) {

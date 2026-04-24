@@ -1190,7 +1190,7 @@ describe("sisyphus-task", () => {
       }
 
       // when - skills not provided (undefined)
-      // then - should throw error about missing skills
+      // then - should default to empty array
       await expect(tool.execute(
         {
           description: "Test task",
@@ -1199,7 +1199,7 @@ describe("sisyphus-task", () => {
           run_in_background: false,
         },
         toolContext
-      )).rejects.toThrow("Invalid arguments: 'load_skills' parameter is REQUIRED")
+      )).resolves.toBeDefined()
     })
 
      test("null skills throws error", async () => {

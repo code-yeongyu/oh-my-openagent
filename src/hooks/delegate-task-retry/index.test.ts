@@ -34,15 +34,6 @@ describe("sisyphus-task-retry", () => {
       expect(result?.errorType).toBe("missing_run_in_background")
     })
 
-    it("should detect load_skills missing error", () => {
-      const output = "[ERROR] Invalid arguments: 'load_skills' parameter is REQUIRED. Use load_skills=[] if no skills are needed."
-      
-      const result = detectDelegateTaskError(output)
-      
-      expect(result).not.toBeNull()
-      expect(result?.errorType).toBe("missing_load_skills")
-    })
-
     it("should detect category/subagent mutual exclusion error", () => {
       const output = "[ERROR] Invalid arguments: Provide EITHER category OR subagent_type, not both."
       
