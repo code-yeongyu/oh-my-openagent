@@ -25,8 +25,21 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         model: "claude-opus-4-7",
         variant: "max",
       },
+      { providers: ["opencode-go", "vercel"], model: "kimi-k2.6" },
       { providers: ["opencode-go", "vercel"], model: "kimi-k2.5" },
       { providers: ["kimi-for-coding"], model: "k2p5" },
+      {
+        providers: [
+          "opencode",
+          "moonshotai",
+          "moonshotai-cn",
+          "firmware",
+          "ollama-cloud",
+          "aihubmix",
+          "vercel",
+        ],
+        model: "kimi-k2.6",
+      },
       {
         providers: [
           "opencode",
@@ -40,6 +53,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         model: "kimi-k2.5",
       },
       { providers: ["openai", "github-copilot", "opencode", "vercel"], model: "gpt-5.4", variant: "medium" },
+      { providers: ["zai-coding-plan", "opencode", "vercel"], model: "glm-5.1" },
       { providers: ["zai-coding-plan", "opencode", "vercel"], model: "glm-5" },
       { providers: ["opencode"], model: "big-pickle" },
     ],
