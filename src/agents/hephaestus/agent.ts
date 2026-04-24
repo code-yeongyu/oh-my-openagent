@@ -1,6 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk";
 import type { AgentMode, AgentPromptMetadata } from "../types";
-import { isGpt5_4Model, isGpt5_3CodexModel } from "../types";
+import { isGpt5_3CodexModel, isGptNativeSisyphusModel } from "../types";
 import type {
   AvailableAgent,
   AvailableTool,
@@ -21,7 +21,7 @@ export type HephaestusPromptSource = "gpt-5-4" | "gpt-5-3-codex" | "gpt";
 export function getHephaestusPromptSource(
   model?: string,
 ): HephaestusPromptSource {
-  if (model && isGpt5_4Model(model)) {
+  if (model && isGptNativeSisyphusModel(model)) {
     return "gpt-5-4";
   }
   if (model && isGpt5_3CodexModel(model)) {

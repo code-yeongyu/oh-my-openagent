@@ -1,5 +1,13 @@
 import { describe, test, expect } from "bun:test";
-import { isGptModel, isGeminiModel, isGlmModel, isGpt5_4Model, isMiniMaxModel } from "./types";
+import {
+  isGptModel,
+  isGeminiModel,
+  isGlmModel,
+  isGpt5_4Model,
+  isGpt5_5Model,
+  isGptNativeSisyphusModel,
+  isMiniMaxModel,
+} from "./types";
 
 describe("isGpt5_4Model", () => {
   test("detects gpt-5.4 models", () => {
@@ -21,6 +29,42 @@ describe("isGpt5_4Model", () => {
     expect(isGpt5_4Model("anthropic/claude-opus-4-7")).toBe(false);
     expect(isGpt5_4Model("google/gemini-3.1-pro")).toBe(false);
     expect(isGpt5_4Model("openai/o1")).toBe(false);
+  });
+});
+
+describe("isGpt5_5Model", () => {
+  test("detects gpt-5.5 models", () => {
+    expect(isGpt5_5Model("gpt-5.5")).toBe(true);
+    expect(isGpt5_5Model("gpt-5-5")).toBe(true);
+    expect(isGpt5_5Model("openai/gpt-5.5")).toBe(true);
+    expect(isGpt5_5Model("openai/gpt-5-5")).toBe(true);
+    expect(isGpt5_5Model("github-copilot/gpt-5.5")).toBe(true);
+  });
+
+  test("does not match other GPT models", () => {
+    expect(isGpt5_5Model("openai/gpt-5.4")).toBe(false);
+    expect(isGpt5_5Model("openai/gpt-5.3-codex")).toBe(false);
+    expect(isGpt5_5Model("openai/gpt-4o")).toBe(false);
+  });
+
+  test("does not match non-GPT models", () => {
+    expect(isGpt5_5Model("anthropic/claude-opus-4-7")).toBe(false);
+    expect(isGpt5_5Model("google/gemini-3.1-pro")).toBe(false);
+  });
+});
+
+describe("isGptNativeSisyphusModel", () => {
+  test("allows GPT-5.4 and GPT-5.5 variants", () => {
+    expect(isGptNativeSisyphusModel("openai/gpt-5.4")).toBe(true);
+    expect(isGptNativeSisyphusModel("openai/gpt-5-4")).toBe(true);
+    expect(isGptNativeSisyphusModel("openai/gpt-5.5")).toBe(true);
+    expect(isGptNativeSisyphusModel("openai/gpt-5-5")).toBe(true);
+  });
+
+  test("rejects non-native Sisyphus GPT models and non-GPT models", () => {
+    expect(isGptNativeSisyphusModel("openai/gpt-5.3-codex")).toBe(false);
+    expect(isGptNativeSisyphusModel("openai/gpt-4o")).toBe(false);
+    expect(isGptNativeSisyphusModel("anthropic/claude-opus-4-7")).toBe(false);
   });
 });
 
