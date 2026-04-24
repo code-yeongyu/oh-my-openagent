@@ -1,6 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk";
 import type { AgentMode, AgentPromptMetadata } from "./types";
-import { isGptModel, isGeminiModel, isGpt5_4Model } from "./types";
+import { isGptModel, isGeminiModel, isGptNativeSisyphusModel } from "./types";
 import {
   buildGeminiToolMandate,
   buildGeminiDelegationOverride,
@@ -480,7 +480,7 @@ export function createSisyphusAgent(
   const categories = availableCategories ?? [];
   const agents = availableAgents ?? [];
 
-  if (isGpt5_4Model(model)) {
+  if (isGptNativeSisyphusModel(model)) {
     const prompt = buildGpt54SisyphusPrompt(
       model,
       agents,

@@ -79,9 +79,11 @@ export function isGptModel(model: string): boolean {
   return modelName.includes("gpt");
 }
 
-export function isGpt5_4Model(model: string): boolean {
+const GPT_NATIVE_SISYPHUS_RE = /gpt-5[.-](?:[4-9]|\d{2,})/i;
+
+export function isGptNativeSisyphusModel(model: string): boolean {
   const modelName = extractModelName(model).toLowerCase();
-  return modelName.includes("gpt-5.4") || modelName.includes("gpt-5-4");
+  return GPT_NATIVE_SISYPHUS_RE.test(modelName);
 }
 
 export function isGpt5_3CodexModel(model: string): boolean {
