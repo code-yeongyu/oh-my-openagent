@@ -244,6 +244,8 @@ export function createToolRegistry(args: {
     gitMasterConfig: pluginConfig.git_master,
     browserProvider: skillContext.browserProvider,
     nativeSkills: "skills" in ctx ? (ctx as { skills: SkillLoadOptions["nativeSkills"] }).skills : undefined,
+    pluginsEnabled: pluginConfig.claude_code?.plugins ?? true,
+    enabledPluginsOverride: pluginConfig.claude_code?.plugins_override,
   })
 
   const taskSystemEnabled = isTaskSystemEnabled(pluginConfig)
