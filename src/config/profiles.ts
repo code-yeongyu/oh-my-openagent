@@ -25,7 +25,6 @@ const PROFILES: Record<ProfileName, Partial<MatrixxConfig>> = {
     },
     categories: {
       source: { model: SONNET },
-      "dsl-engineering": { model: SONNET },
       "deep-jack": { model: HAIKU },
       "matrix-bend": { model: HAIKU },
       construct: { model: HAIKU },
@@ -53,7 +52,6 @@ const PROFILES: Record<ProfileName, Partial<MatrixxConfig>> = {
     },
     categories: {
       source: { model: SONNET },
-      "dsl-engineering": { model: SONNET },
       "deep-jack": { model: SONNET },
       "matrix-bend": { model: SONNET },
       construct: { model: SONNET },
@@ -81,7 +79,6 @@ const PROFILES: Record<ProfileName, Partial<MatrixxConfig>> = {
     },
     categories: {
       source: { model: OPUS },
-      "dsl-engineering": { model: OPUS },
       "deep-jack": { model: SONNET },
       "matrix-bend": { model: SONNET },
       construct: { model: SONNET },
@@ -109,7 +106,6 @@ const PROFILES: Record<ProfileName, Partial<MatrixxConfig>> = {
     },
     categories: {
       source: { model: OPUS },
-      "dsl-engineering": { model: OPUS },
       "deep-jack": { model: OPUS },
       "matrix-bend": { model: OPUS },
       construct: { model: OPUS },
