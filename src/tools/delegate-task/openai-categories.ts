@@ -103,7 +103,7 @@ export const OPENAI_CATEGORIES: BuiltinCategoryDefinition[] = [
   },
   {
     name: "deep",
-    config: { model: "openai/gpt-5.4", variant: "medium" },
+    config: { model: "openai/gpt-5.5", variant: "medium" },
     description: "Goal-oriented autonomous problem-solving. Thorough research before action. For hairy problems requiring deep understanding.",
     promptAppend: DEEP_CATEGORY_PROMPT_APPEND,
   },
