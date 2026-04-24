@@ -6,18 +6,7 @@ import { createExploreAgent } from "./explore"
 describe("explore agent tool strategy", () => {
   const model = "openai/gpt-5.4-mini-fast"
 
-  it("#given the prompt #when inspecting #then defaults to grep for most searches", () => {
-    // given
-    const agent = createExploreAgent(model)
-
-    // when
-    const prompt = agent.prompt ?? ""
-
-    // then
-    expect(prompt.toLowerCase()).toContain("default to `grep`")
-  })
-
-  it("#given the prompt #when inspecting #then warns against regex in ast_grep_search", () => {
+  it("#given the prompt #when inspecting #then includes ast_grep_search in tool strategy", () => {
     // given
     const agent = createExploreAgent(model)
 
@@ -26,13 +15,10 @@ describe("explore agent tool strategy", () => {
 
     // then
     expect(prompt).toContain("ast_grep_search")
-    expect(prompt.toLowerCase()).toContain("not use regex")
-    expect(prompt).toContain("|")
-    expect(prompt).toContain(".*")
-    expect(prompt).toContain("\\w")
+    expect(prompt.toLowerCase()).toContain("structural patterns")
   })
 
-  it("#given the prompt #when inspecting #then mandates falling back to grep on regex-shaped patterns", () => {
+  it("#given the prompt #when inspecting #then includes grep in tool strategy", () => {
     // given
     const agent = createExploreAgent(model)
 
@@ -40,10 +26,11 @@ describe("explore agent tool strategy", () => {
     const prompt = agent.prompt ?? ""
 
     // then
-    expect(prompt.toLowerCase()).toContain("switch to grep")
+    expect(prompt).toContain("grep")
+    expect(prompt.toLowerCase()).toContain("text patterns")
   })
 
-  it("#given the prompt #when inspecting #then gives concrete AST pattern examples", () => {
+  it("#given the prompt #when inspecting #then includes lsp tools in tool strategy", () => {
     // given
     const agent = createExploreAgent(model)
 
@@ -51,11 +38,11 @@ describe("explore agent tool strategy", () => {
     const prompt = agent.prompt ?? ""
 
     // then
-    expect(prompt).toContain("$$$")
-    expect(prompt).toContain("function $NAME")
+    expect(prompt).toContain("LSP tools")
+    expect(prompt.toLowerCase()).toContain("semantic search")
   })
 
-  it("#given the prompt #when inspecting #then tells LLM to read the returned hint before retrying", () => {
+  it("#given the prompt #when inspecting #then includes glob in tool strategy", () => {
     // given
     const agent = createExploreAgent(model)
 
@@ -63,7 +50,19 @@ describe("explore agent tool strategy", () => {
     const prompt = agent.prompt ?? ""
 
     // then
-    expect(prompt.toLowerCase()).toContain("read the hint")
+    expect(prompt).toContain("glob")
+    expect(prompt.toLowerCase()).toContain("file patterns")
+  })
+
+  it("#given the prompt #when inspecting #then requires parallel execution", () => {
+    // given
+    const agent = createExploreAgent(model)
+
+    // when
+    const prompt = agent.prompt ?? ""
+
+    // then
+    expect(prompt).toContain("3+ tools simultaneously")
   })
 
   it("#given the prompt #when inspecting #then preserves the absolute-path requirement", () => {
