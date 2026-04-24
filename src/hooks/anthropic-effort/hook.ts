@@ -79,10 +79,24 @@ export function createAnthropicEffortHook() {
       if (message.variant !== "max") return
       if (!isClaudeProvider(model.providerID, model.modelID)) return
       if (shouldSkipForInternalAgent(agent?.name)) return
-      if (output.options.effort !== undefined) return
-
       const opus = isOpusModel(model.modelID)
       const constrained = isConstrainedProvider(model.providerID)
+
+      // If effort was pre-set (e.g., via session prompt params), still clamp
+      // for constrained providers that reject "max".
+      if (output.options.effort !== undefined) {
+        if (constrained && output.options.effort === "max") {
+          output.options.effort = MAX_VARIANT_BY_TIER.default
+          ;(message as { variant?: string }).variant = MAX_VARIANT_BY_TIER.default
+          log("anthropic-effort: clamped pre-set effort max→high", {
+            sessionID: input.sessionID,
+            provider: model.providerID,
+            model: model.modelID,
+          })
+        }
+        return
+      }
+
       const clamped = clampVariant(message.variant, opus, constrained)
       output.options.effort = clamped
 
