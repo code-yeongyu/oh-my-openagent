@@ -7,19 +7,19 @@ import {
 } from "./model-requirements"
 
 describe("AGENT_MODEL_REQUIREMENTS", () => {
-  test("oracle has valid fallbackChain with gpt-5.4 as primary", () => {
+  test("oracle has valid fallbackChain with gpt-5.5 as primary", () => {
     // given - oracle agent requirement
     const oracle = AGENT_MODEL_REQUIREMENTS["oracle"]
 
     // when - accessing oracle requirement
-    // then - fallbackChain exists with gpt-5.4 as first entry
+    // then - fallbackChain exists with gpt-5.5 as first entry
     expect(oracle).toBeDefined()
     expect(oracle.fallbackChain).toBeArray()
     expect(oracle.fallbackChain.length).toBeGreaterThan(0)
 
     const primary = oracle.fallbackChain[0]
     expect(primary.providers).toContain("openai")
-    expect(primary.model).toBe("gpt-5.4")
+    expect(primary.model).toBe("gpt-5.5")
     expect(primary.variant).toBe("high")
   })
 
@@ -323,19 +323,19 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(primary.providers[0]).toBe("openai")
   })
 
-  test("deep has valid fallbackChain with gpt-5.4 as primary", () => {
+  test("deep has valid fallbackChain with gpt-5.5 as primary", () => {
     // given - deep category requirement
     const deep = CATEGORY_MODEL_REQUIREMENTS["deep"]
 
     // when - accessing deep requirement
-    // then - fallbackChain exists with gpt-5.4 as first entry, medium variant
+    // then - fallbackChain exists with gpt-5.5 as first entry, medium variant
     expect(deep).toBeDefined()
     expect(deep.fallbackChain).toBeArray()
     expect(deep.fallbackChain.length).toBeGreaterThan(0)
 
     const primary = deep.fallbackChain[0]
     expect(primary.variant).toBe("medium")
-    expect(primary.model).toBe("gpt-5.4")
+    expect(primary.model).toBe("gpt-5.5")
     expect(primary.providers).toContain("openai")
     expect(primary.providers).toContain("github-copilot")
   })
@@ -597,7 +597,7 @@ describe("ModelRequirement type", () => {
 })
 
 describe("requiresModel field in categories", () => {
-  test("deep category no longer has requiresModel (gpt-5.4 is widely available)", () => {
+  test("deep category no longer has requiresModel (gpt-5.5 is widely available)", () => {
     // given
     const deep = CATEGORY_MODEL_REQUIREMENTS["deep"]
 

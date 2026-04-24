@@ -196,8 +196,8 @@ describe("createBuiltinAgents with model overrides", () => {
      // #when
      const agents = await createBuiltinAgents([], {}, undefined, TEST_DEFAULT_MODEL, undefined, undefined, [], undefined, undefined)
 
-     // #then - oracle resolves via connected cache fallback to openai/gpt-5.4 (not system default)
-     expect(agents.oracle.model).toBe("openai/gpt-5.4")
+     // #then - oracle resolves via connected cache fallback to openai/gpt-5.5 (not system default)
+     expect(agents.oracle.model).toBe("openai/gpt-5.5")
      expect(agents.oracle.reasoningEffort).toBe("medium")
      expect(agents.oracle.thinking).toBeUndefined()
      cacheSpy.mockRestore?.()
@@ -223,14 +223,14 @@ describe("createBuiltinAgents with model overrides", () => {
     const providerModelsSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue(null)
     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(new Set())
     const overrides = {
-      oracle: { model: "openai/gpt-5.4" },
+      oracle: { model: "openai/gpt-5.5" },
     }
 
     // #when
     const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL, undefined, undefined, [], undefined, undefined)
 
     // #then
-    expect(agents.oracle.model).toBe("openai/gpt-5.4")
+    expect(agents.oracle.model).toBe("openai/gpt-5.5")
     expect(agents.oracle.reasoningEffort).toBe("medium")
     expect(agents.oracle.textVerbosity).toBe("high")
     expect(agents.oracle.thinking).toBeUndefined()
@@ -524,7 +524,7 @@ describe("createBuiltinAgents without systemDefaultModel", () => {
 
      // #then - connected cache enables model resolution despite no systemDefaultModel
      expect(agents.oracle).toBeDefined()
-     expect(agents.oracle.model).toBe("openai/gpt-5.4")
+     expect(agents.oracle.model).toBe("openai/gpt-5.5")
      cacheSpy.mockRestore?.()
      providerModelsSpy.mockRestore()
      fetchSpy.mockRestore()
@@ -541,7 +541,7 @@ describe("createBuiltinAgents without systemDefaultModel", () => {
 
       // #then
       expect(agents.oracle).toBeDefined()
-      expect(agents.oracle.model).toBe("openai/gpt-5.4")
+      expect(agents.oracle.model).toBe("openai/gpt-5.5")
     } finally {
       fetchSpy.mockRestore()
       cacheSpy.mockRestore()
@@ -689,7 +689,7 @@ describe("createBuiltinAgents with requiresProvider gating (hephaestus)", () => 
 
       // #then
       expect(agents.hephaestus).toBeDefined()
-      expect(agents.hephaestus.model).toBe("openai/gpt-5.4")
+      expect(agents.hephaestus.model).toBe("openai/gpt-5.5")
     } finally {
       cacheSpy.mockRestore()
       fetchSpy.mockRestore()

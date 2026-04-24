@@ -113,9 +113,9 @@ describe("resolveVariantForModel", () => {
   })
 
   test("returns correct variant for openai provider (hephaestus agent)", () => {
-    // #given hephaestus has openai/gpt-5.4 with variant "medium" in its chain
+    // #given hephaestus has openai/gpt-5.5 with variant "medium" in its chain
     const config = {} as OhMyOpenCodeConfig
-    const model = { providerID: "openai", modelID: "gpt-5.4" }
+    const model = { providerID: "openai", modelID: "gpt-5.5" }
 
     // #when
     const variant = resolveVariantForModel(config, "hephaestus", model)
@@ -191,7 +191,7 @@ describe("resolveVariantForModel", () => {
   test("returns correct variant for oracle agent with openai", () => {
     // given
     const config = {} as OhMyOpenCodeConfig
-    const model = { providerID: "openai", modelID: "gpt-5.4" }
+    const model = { providerID: "openai", modelID: "gpt-5.5" }
 
     // when
     const variant = resolveVariantForModel(config, "oracle", model)

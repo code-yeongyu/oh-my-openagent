@@ -209,7 +209,7 @@ exports[`generateModelConfig single native provider uses OpenAI models when only
       "model": "openai/gpt-5.4-mini-fast",
     },
     "hephaestus": {
-      "model": "openai/gpt-5.4",
+      "model": "openai/gpt-5.5",
       "variant": "medium",
     },
     "librarian": {
@@ -233,7 +233,7 @@ exports[`generateModelConfig single native provider uses OpenAI models when only
       "variant": "medium",
     },
     "oracle": {
-      "model": "openai/gpt-5.4",
+      "model": "openai/gpt-5.5",
       "variant": "high",
     },
     "prometheus": {
@@ -255,7 +255,7 @@ exports[`generateModelConfig single native provider uses OpenAI models when only
       "variant": "xhigh",
     },
     "deep": {
-      "model": "openai/gpt-5.4",
+      "model": "openai/gpt-5.5",
       "variant": "medium",
     },
     "quick": {
@@ -297,7 +297,7 @@ exports[`generateModelConfig single native provider uses OpenAI models with isMa
       "model": "openai/gpt-5.4-mini-fast",
     },
     "hephaestus": {
-      "model": "openai/gpt-5.4",
+      "model": "openai/gpt-5.5",
       "variant": "medium",
     },
     "librarian": {
@@ -321,7 +321,7 @@ exports[`generateModelConfig single native provider uses OpenAI models with isMa
       "variant": "medium",
     },
     "oracle": {
-      "model": "openai/gpt-5.4",
+      "model": "openai/gpt-5.5",
       "variant": "high",
     },
     "prometheus": {
@@ -343,7 +343,7 @@ exports[`generateModelConfig single native provider uses OpenAI models with isMa
       "variant": "xhigh",
     },
     "deep": {
-      "model": "openai/gpt-5.4",
+      "model": "openai/gpt-5.5",
       "variant": "medium",
     },
     "quick": {
@@ -526,7 +526,7 @@ exports[`generateModelConfig all native providers uses preferred models from fal
       "model": "openai/gpt-5.4-mini-fast",
     },
     "hephaestus": {
-      "model": "openai/gpt-5.4",
+      "model": "openai/gpt-5.5",
       "variant": "medium",
     },
     "librarian": {
@@ -584,7 +584,7 @@ exports[`generateModelConfig all native providers uses preferred models from fal
           "variant": "max",
         },
       ],
-      "model": "openai/gpt-5.4",
+      "model": "openai/gpt-5.5",
       "variant": "high",
     },
     "prometheus": {
@@ -645,7 +645,7 @@ exports[`generateModelConfig all native providers uses preferred models from fal
           "variant": "high",
         },
       ],
-      "model": "openai/gpt-5.4",
+      "model": "openai/gpt-5.5",
       "variant": "medium",
     },
     "quick": {
@@ -744,7 +744,7 @@ exports[`generateModelConfig all native providers uses preferred models with isM
       "model": "openai/gpt-5.4-mini-fast",
     },
     "hephaestus": {
-      "model": "openai/gpt-5.4",
+      "model": "openai/gpt-5.5",
       "variant": "medium",
     },
     "librarian": {
@@ -802,7 +802,7 @@ exports[`generateModelConfig all native providers uses preferred models with isM
           "variant": "max",
         },
       ],
-      "model": "openai/gpt-5.4",
+      "model": "openai/gpt-5.5",
       "variant": "high",
     },
     "prometheus": {
@@ -863,7 +863,7 @@ exports[`generateModelConfig all native providers uses preferred models with isM
           "variant": "high",
         },
       ],
-      "model": "openai/gpt-5.4",
+      "model": "openai/gpt-5.5",
       "variant": "medium",
     },
     "quick": {
@@ -957,7 +957,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
       "model": "opencode/claude-haiku-4-5",
     },
     "hephaestus": {
-      "model": "opencode/gpt-5.4",
+      "model": "opencode/gpt-5.5",
       "variant": "medium",
     },
     "metis": {
@@ -1004,7 +1004,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
           "variant": "max",
         },
       ],
-      "model": "opencode/gpt-5.4",
+      "model": "opencode/gpt-5.5",
       "variant": "high",
     },
     "prometheus": {
@@ -1077,7 +1077,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
           "variant": "high",
         },
       ],
-      "model": "opencode/gpt-5.4",
+      "model": "opencode/gpt-5.5",
       "variant": "medium",
     },
     "quick": {
@@ -1179,7 +1179,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
       "model": "opencode/claude-haiku-4-5",
     },
     "hephaestus": {
-      "model": "opencode/gpt-5.4",
+      "model": "opencode/gpt-5.5",
       "variant": "medium",
     },
     "metis": {
@@ -1226,7 +1226,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
           "variant": "max",
         },
       ],
-      "model": "opencode/gpt-5.4",
+      "model": "opencode/gpt-5.5",
       "variant": "high",
     },
     "prometheus": {
@@ -1299,7 +1299,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
           "variant": "high",
         },
       ],
-      "model": "opencode/gpt-5.4",
+      "model": "opencode/gpt-5.5",
       "variant": "medium",
     },
     "quick": {
@@ -1400,7 +1400,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models when 
       "model": "github-copilot/gpt-5-mini",
     },
     "hephaestus": {
-      "model": "github-copilot/gpt-5.4",
+      "model": "github-copilot/gpt-5.5",
       "variant": "medium",
     },
     "metis": {
@@ -1441,7 +1441,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models when 
           "variant": "max",
         },
       ],
-      "model": "github-copilot/gpt-5.4",
+      "model": "github-copilot/gpt-5.5",
       "variant": "high",
     },
     "prometheus": {
@@ -1502,7 +1502,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models when 
           "variant": "high",
         },
       ],
-      "model": "github-copilot/gpt-5.4",
+      "model": "github-copilot/gpt-5.5",
       "variant": "medium",
     },
     "quick": {
@@ -1581,7 +1581,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
       "model": "github-copilot/gpt-5-mini",
     },
     "hephaestus": {
-      "model": "github-copilot/gpt-5.4",
+      "model": "github-copilot/gpt-5.5",
       "variant": "medium",
     },
     "metis": {
@@ -1622,7 +1622,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
           "variant": "max",
         },
       ],
-      "model": "github-copilot/gpt-5.4",
+      "model": "github-copilot/gpt-5.5",
       "variant": "high",
     },
     "prometheus": {
@@ -1683,7 +1683,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
           "variant": "high",
         },
       ],
-      "model": "github-copilot/gpt-5.4",
+      "model": "github-copilot/gpt-5.5",
       "variant": "medium",
     },
     "quick": {
@@ -1897,7 +1897,7 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
       "model": "anthropic/claude-haiku-4-5",
     },
     "hephaestus": {
-      "model": "opencode/gpt-5.4",
+      "model": "opencode/gpt-5.5",
       "variant": "medium",
     },
     "metis": {
@@ -1956,7 +1956,7 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
           "variant": "max",
         },
       ],
-      "model": "opencode/gpt-5.4",
+      "model": "opencode/gpt-5.5",
       "variant": "high",
     },
     "prometheus": {
@@ -2048,7 +2048,7 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
           "variant": "high",
         },
       ],
-      "model": "opencode/gpt-5.4",
+      "model": "opencode/gpt-5.5",
       "variant": "medium",
     },
     "quick": {
@@ -2176,11 +2176,11 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
     "hephaestus": {
       "fallback_models": [
         {
-          "model": "github-copilot/gpt-5.4",
+          "model": "github-copilot/gpt-5.5",
           "variant": "medium",
         },
       ],
-      "model": "openai/gpt-5.4",
+      "model": "openai/gpt-5.5",
       "variant": "medium",
     },
     "librarian": {
@@ -2238,7 +2238,7 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
     "oracle": {
       "fallback_models": [
         {
-          "model": "github-copilot/gpt-5.4",
+          "model": "github-copilot/gpt-5.5",
           "variant": "high",
         },
         {
@@ -2250,7 +2250,7 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
           "variant": "max",
         },
       ],
-      "model": "openai/gpt-5.4",
+      "model": "openai/gpt-5.5",
       "variant": "high",
     },
     "prometheus": {
@@ -2318,7 +2318,7 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
     "deep": {
       "fallback_models": [
         {
-          "model": "github-copilot/gpt-5.4",
+          "model": "github-copilot/gpt-5.5",
           "variant": "medium",
         },
         {
@@ -2330,7 +2330,7 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
           "variant": "high",
         },
       ],
-      "model": "openai/gpt-5.4",
+      "model": "openai/gpt-5.5",
       "variant": "medium",
     },
     "quick": {
@@ -2653,11 +2653,11 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
     "hephaestus": {
       "fallback_models": [
         {
-          "model": "opencode/gpt-5.4",
+          "model": "opencode/gpt-5.5",
           "variant": "medium",
         },
       ],
-      "model": "github-copilot/gpt-5.4",
+      "model": "github-copilot/gpt-5.5",
       "variant": "medium",
     },
     "librarian": {
@@ -2733,7 +2733,7 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
     "oracle": {
       "fallback_models": [
         {
-          "model": "opencode/gpt-5.4",
+          "model": "opencode/gpt-5.5",
           "variant": "high",
         },
         {
@@ -2753,7 +2753,7 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
           "variant": "max",
         },
       ],
-      "model": "github-copilot/gpt-5.4",
+      "model": "github-copilot/gpt-5.5",
       "variant": "high",
     },
     "prometheus": {
@@ -2858,7 +2858,7 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
     "deep": {
       "fallback_models": [
         {
-          "model": "opencode/gpt-5.4",
+          "model": "opencode/gpt-5.5",
           "variant": "medium",
         },
         {
@@ -2878,7 +2878,7 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
           "variant": "high",
         },
       ],
-      "model": "github-copilot/gpt-5.4",
+      "model": "github-copilot/gpt-5.5",
       "variant": "medium",
     },
     "quick": {
@@ -3051,15 +3051,15 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
     "hephaestus": {
       "fallback_models": [
         {
-          "model": "github-copilot/gpt-5.4",
+          "model": "github-copilot/gpt-5.5",
           "variant": "medium",
         },
         {
-          "model": "opencode/gpt-5.4",
+          "model": "opencode/gpt-5.5",
           "variant": "medium",
         },
       ],
-      "model": "openai/gpt-5.4",
+      "model": "openai/gpt-5.5",
       "variant": "medium",
     },
     "librarian": {
@@ -3168,11 +3168,11 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
     "oracle": {
       "fallback_models": [
         {
-          "model": "github-copilot/gpt-5.4",
+          "model": "github-copilot/gpt-5.5",
           "variant": "high",
         },
         {
-          "model": "opencode/gpt-5.4",
+          "model": "opencode/gpt-5.5",
           "variant": "high",
         },
         {
@@ -3200,7 +3200,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
           "variant": "max",
         },
       ],
-      "model": "openai/gpt-5.4",
+      "model": "openai/gpt-5.5",
       "variant": "high",
     },
     "prometheus": {
@@ -3342,11 +3342,11 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
     "deep": {
       "fallback_models": [
         {
-          "model": "github-copilot/gpt-5.4",
+          "model": "github-copilot/gpt-5.5",
           "variant": "medium",
         },
         {
-          "model": "opencode/gpt-5.4",
+          "model": "opencode/gpt-5.5",
           "variant": "medium",
         },
         {
@@ -3374,7 +3374,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
           "variant": "high",
         },
       ],
-      "model": "openai/gpt-5.4",
+      "model": "openai/gpt-5.5",
       "variant": "medium",
     },
     "quick": {
@@ -3602,15 +3602,15 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
     "hephaestus": {
       "fallback_models": [
         {
-          "model": "github-copilot/gpt-5.4",
+          "model": "github-copilot/gpt-5.5",
           "variant": "medium",
         },
         {
-          "model": "opencode/gpt-5.4",
+          "model": "opencode/gpt-5.5",
           "variant": "medium",
         },
       ],
-      "model": "openai/gpt-5.4",
+      "model": "openai/gpt-5.5",
       "variant": "medium",
     },
     "librarian": {
@@ -3719,11 +3719,11 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
     "oracle": {
       "fallback_models": [
         {
-          "model": "github-copilot/gpt-5.4",
+          "model": "github-copilot/gpt-5.5",
           "variant": "high",
         },
         {
-          "model": "opencode/gpt-5.4",
+          "model": "opencode/gpt-5.5",
           "variant": "high",
         },
         {
@@ -3751,7 +3751,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
           "variant": "max",
         },
       ],
-      "model": "openai/gpt-5.4",
+      "model": "openai/gpt-5.5",
       "variant": "high",
     },
     "prometheus": {
@@ -3893,11 +3893,11 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
     "deep": {
       "fallback_models": [
         {
-          "model": "github-copilot/gpt-5.4",
+          "model": "github-copilot/gpt-5.5",
           "variant": "medium",
         },
         {
-          "model": "opencode/gpt-5.4",
+          "model": "opencode/gpt-5.5",
           "variant": "medium",
         },
         {
@@ -3925,7 +3925,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
           "variant": "high",
         },
       ],
-      "model": "openai/gpt-5.4",
+      "model": "openai/gpt-5.5",
       "variant": "medium",
     },
     "quick": {
@@ -4147,7 +4147,7 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
       "model": "vercel/minimax/minimax-m2.7-highspeed",
     },
     "hephaestus": {
-      "model": "vercel/openai/gpt-5.4",
+      "model": "vercel/openai/gpt-5.5",
       "variant": "medium",
     },
     "librarian": {
@@ -4223,7 +4223,7 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
           "model": "vercel/zai/glm-5",
         },
       ],
-      "model": "vercel/openai/gpt-5.4",
+      "model": "vercel/openai/gpt-5.5",
       "variant": "high",
     },
     "prometheus": {
@@ -4299,7 +4299,7 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
           "variant": "high",
         },
       ],
-      "model": "vercel/openai/gpt-5.4",
+      "model": "vercel/openai/gpt-5.5",
       "variant": "medium",
     },
     "quick": {
@@ -4437,7 +4437,7 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
       "model": "vercel/minimax/minimax-m2.7-highspeed",
     },
     "hephaestus": {
-      "model": "vercel/openai/gpt-5.4",
+      "model": "vercel/openai/gpt-5.5",
       "variant": "medium",
     },
     "librarian": {
@@ -4513,7 +4513,7 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
           "model": "vercel/zai/glm-5",
         },
       ],
-      "model": "vercel/openai/gpt-5.4",
+      "model": "vercel/openai/gpt-5.5",
       "variant": "high",
     },
     "prometheus": {
@@ -4589,7 +4589,7 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
           "variant": "high",
         },
       ],
-      "model": "vercel/openai/gpt-5.4",
+      "model": "vercel/openai/gpt-5.5",
       "variant": "medium",
     },
     "quick": {

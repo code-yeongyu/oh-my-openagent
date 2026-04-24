@@ -1557,9 +1557,7 @@ describe("disable_omo_env pass-through", () => {
     const lastCall =
       createBuiltinAgentsMock.mock.calls[createBuiltinAgentsMock.mock.calls.length - 1]
     expect(lastCall).toBeDefined()
-    const disableOmoEnv = Array.isArray(lastCall)
-      ? lastCall[lastCall.length - 1]
-      : undefined
+    const disableOmoEnv = Array.isArray(lastCall) ? lastCall[12] : undefined
     expect(disableOmoEnv).toBe(true)
   })
 
@@ -1594,9 +1592,7 @@ describe("disable_omo_env pass-through", () => {
     const lastCall =
       createBuiltinAgentsMock.mock.calls[createBuiltinAgentsMock.mock.calls.length - 1]
     expect(lastCall).toBeDefined()
-    const disableOmoEnv = Array.isArray(lastCall)
-      ? lastCall[lastCall.length - 1]
-      : undefined
+    const disableOmoEnv = Array.isArray(lastCall) ? lastCall[12] : undefined
     expect(disableOmoEnv).toBe(false)
   })
 })
