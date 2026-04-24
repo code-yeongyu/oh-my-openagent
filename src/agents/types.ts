@@ -86,6 +86,11 @@ export function isGptNativeSisyphusModel(model: string): boolean {
   return GPT_NATIVE_SISYPHUS_RE.test(modelName);
 }
 
+export function isGpt5_5Model(model: string): boolean {
+  const modelName = extractModelName(model).toLowerCase();
+  return modelName.includes("gpt-5.5") || modelName.includes("gpt-5-5");
+}
+
 export function isGpt5_3CodexModel(model: string): boolean {
   const modelName = extractModelName(model).toLowerCase();
   return modelName.includes("gpt-5.3-codex") || modelName.includes("gpt-5-3-codex");
