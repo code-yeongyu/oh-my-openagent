@@ -401,7 +401,7 @@ describe("generateModelConfig", () => {
       expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-opus-4-7")
     })
 
-    test("Sisyphus resolves to gpt-5.4 medium when only OpenAI is available", () => {
+    test("Sisyphus resolves to gpt-5.5 medium when only OpenAI is available", () => {
       // #given
       const config = createConfig({ hasOpenAI: true })
 
@@ -409,7 +409,7 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then
-      expect(result.agents?.sisyphus?.model).toBe("openai/gpt-5.4")
+      expect(result.agents?.sisyphus?.model).toBe("openai/gpt-5.5")
       expect(result.agents?.sisyphus?.variant).toBe("medium")
     })
   })
@@ -423,7 +423,7 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then
-      expect(result.agents?.atlas?.model).toBe("openai/gpt-5.4")
+      expect(result.agents?.atlas?.model).toBe("openai/gpt-5.5")
       expect(result.agents?.atlas?.variant).toBe("medium")
     })
 
@@ -435,7 +435,7 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then
-      expect(result.agents?.metis?.model).toBe("openai/gpt-5.4")
+      expect(result.agents?.metis?.model).toBe("openai/gpt-5.5")
       expect(result.agents?.metis?.variant).toBe("high")
     })
 
@@ -447,7 +447,7 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then
-      expect(result.agents?.["sisyphus-junior"]?.model).toBe("openai/gpt-5.4")
+      expect(result.agents?.["sisyphus-junior"]?.model).toBe("openai/gpt-5.5")
       expect(result.agents?.["sisyphus-junior"]?.variant).toBe("medium")
     })
   })

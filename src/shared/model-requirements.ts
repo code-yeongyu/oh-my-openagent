@@ -39,7 +39,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         ],
         model: "kimi-k2.5",
       },
-      { providers: ["openai", "github-copilot", "opencode", "vercel"], model: "gpt-5.4", variant: "medium" },
+      { providers: ["openai", "github-copilot", "opencode", "vercel"], model: "gpt-5.5", variant: "medium" },
       { providers: ["zai-coding-plan", "opencode", "vercel"], model: "glm-5" },
       { providers: ["opencode"], model: "big-pickle" },
     ],
@@ -95,7 +95,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   "multimodal-looker": {
     fallbackChain: [
-      { providers: ["openai", "opencode", "vercel"], model: "gpt-5.4", variant: "medium" },
+      { providers: ["openai", "opencode", "vercel"], model: "gpt-5.5", variant: "medium" },
       { providers: ["opencode-go", "vercel"], model: "kimi-k2.5" },
       { providers: ["zai-coding-plan", "vercel"], model: "glm-4.6v" },
       { providers: ["openai", "github-copilot", "opencode", "vercel"], model: "gpt-5-nano" },
@@ -110,7 +110,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       },
       {
         providers: ["openai", "github-copilot", "opencode", "vercel"],
-        model: "gpt-5.4",
+        model: "gpt-5.5",
         variant: "high",
       },
       { providers: ["opencode-go", "vercel"], model: "glm-5" },
@@ -129,7 +129,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       },
       {
         providers: ["openai", "github-copilot", "opencode", "vercel"],
-        model: "gpt-5.4",
+        model: "gpt-5.5",
         variant: "high",
       },
       { providers: ["opencode-go", "vercel"], model: "glm-5" },
@@ -140,7 +140,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     fallbackChain: [
       {
         providers: ["openai", "github-copilot", "opencode", "vercel"],
-        model: "gpt-5.4",
+        model: "gpt-5.5",
         variant: "xhigh",
       },
       {
@@ -162,7 +162,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["opencode-go", "vercel"], model: "kimi-k2.5" },
       {
         providers: ["openai", "github-copilot", "opencode", "vercel"],
-        model: "gpt-5.4",
+        model: "gpt-5.5",
         variant: "medium",
       },
       { providers: ["opencode-go", "vercel"], model: "minimax-m2.7" },
@@ -174,7 +174,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["opencode-go", "vercel"], model: "kimi-k2.5" },
       {
         providers: ["openai", "github-copilot", "opencode", "vercel"],
-        model: "gpt-5.4",
+        model: "gpt-5.5",
         variant: "medium",
       },
       { providers: ["opencode-go", "vercel"], model: "minimax-m2.7" },
@@ -205,7 +205,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     fallbackChain: [
       {
         providers: ["openai", "opencode", "vercel"],
-        model: "gpt-5.4",
+        model: "gpt-5.5",
         variant: "xhigh",
       },
       {
@@ -252,7 +252,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         model: "claude-opus-4-7",
         variant: "max",
       },
-      { providers: ["openai", "github-copilot", "opencode", "vercel"], model: "gpt-5.4" },
+      { providers: ["openai", "github-copilot", "opencode", "vercel"], model: "gpt-5.5" },
     ],
     requiresModel: "gemini-3.1-pro",
   },
@@ -302,7 +302,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       },
       {
         providers: ["openai", "github-copilot", "opencode", "vercel"],
-        model: "gpt-5.4",
+        model: "gpt-5.5",
         variant: "high",
       },
       { providers: ["zai-coding-plan", "opencode", "vercel"], model: "glm-5" },
