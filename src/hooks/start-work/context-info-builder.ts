@@ -495,7 +495,7 @@ export function buildStartWorkContextInfo(params: {
       worktreeBlock,
       directory: ctx.directory,
     })
-  } else if (shouldResumeExistingState({ existingState, preferredPlanPath })) {
+  } else if (existingState && shouldResumeExistingState({ existingState, preferredPlanPath })) {
     contextInfo = buildExistingSessionContext({
       existingState,
       sessionId,
