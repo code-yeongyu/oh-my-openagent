@@ -11,6 +11,11 @@ export type ShellType = "unix" | "powershell" | "cmd" | "csh"
  * Note: SHELL is checked before PSModulePath because on Windows, PSModulePath
  * is always set by the system even when the active shell is Git Bash or WSL.
  * An explicit SHELL variable indicates the user's chosen shell overrides that.
+ *
+ * MSYSTEM is intentionally NOT used for shell selection on Windows. Git for
+ * Windows commonly leaves it set in the environment even when OpenCode is
+ * executing commands via PowerShell or cmd.exe, so treating it as a Unix-shell
+ * signal produces invalid command prefixes like `export ...` in PowerShell.
  */
 export function detectShellType(): ShellType {
   if (process.env.SHELL) {
@@ -18,13 +23,6 @@ export function detectShellType(): ShellType {
     if (shell.includes("csh") || shell.includes("tcsh")) {
       return "csh"
     }
-    return "unix"
-  }
-
-  // Git Bash on Windows sets MSYSTEM (e.g. "MINGW64", "MINGW32", "MSYS")
-  // even when SHELL is not set. Detect this before PSModulePath which is
-  // always present on Windows regardless of the active shell.
-  if (process.env.MSYSTEM) {
     return "unix"
   }
 

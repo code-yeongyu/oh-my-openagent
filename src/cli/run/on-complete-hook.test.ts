@@ -47,6 +47,7 @@ describe("executeOnCompleteHook", () => {
     originalEnv = {
       SHELL: process.env.SHELL,
       PSModulePath: process.env.PSModulePath,
+      MSYSTEM: process.env.MSYSTEM,
       ComSpec: process.env.ComSpec,
     }
     logCalls = []
@@ -108,6 +109,36 @@ describe("executeOnCompleteHook", () => {
     // given
     Object.defineProperty(process, "platform", { value: "win32" })
     process.env.PSModulePath = "C:\\Program Files\\PowerShell\\Modules"
+    delete process.env.SHELL
+    const spawnCalls: Array<Parameters<typeof spawnWithWindowsHideModule.spawnWithWindowsHide>> = []
+    spyOn(spawnWithWindowsHideModule, "spawnWithWindowsHide").mockImplementation((
+      command,
+      options,
+    ) => {
+      spawnCalls.push([command, options])
+      return createProc(0)
+    })
+    const executeOnCompleteHook = await importFreshExecuteOnCompleteHook()
+
+    // when
+    await executeOnCompleteHook({
+      command: "Write-Host done",
+      sessionId: "session-123",
+      exitCode: 0,
+      durationMs: 5000,
+      messageCount: 10,
+    })
+
+    // then
+    const [args] = spawnCalls[0]
+    expect(args).toEqual(["powershell.exe", "-NoProfile", "-Command", "Write-Host done"])
+  })
+
+  it("keeps using powershell on Windows when MSYSTEM lingers without SHELL", async () => {
+    // given
+    Object.defineProperty(process, "platform", { value: "win32" })
+    process.env.PSModulePath = "C:\\Program Files\\PowerShell\\Modules"
+    process.env.MSYSTEM = "MINGW64"
     delete process.env.SHELL
     const spawnCalls: Array<Parameters<typeof spawnWithWindowsHideModule.spawnWithWindowsHide>> = []
     spyOn(spawnWithWindowsHideModule, "spawnWithWindowsHide").mockImplementation((

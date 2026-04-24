@@ -320,7 +320,7 @@ describe("non-interactive-env hook", () => {
       expect(cmd).not.toContain("$env:")
     })
 
-    test("#given Windows Git Bash via MSYSTEM without SHELL #when git command executes #then uses unix syntax", async () => {
+    test("#given Windows PowerShell env with lingering MSYSTEM and no SHELL #when git command executes #then uses powershell syntax", async () => {
       delete process.env.SHELL
       process.env.MSYSTEM = "MINGW64"
       process.env.PSModulePath = "C:\\Program Files\\PowerShell\\Modules"
@@ -337,9 +337,10 @@ describe("non-interactive-env hook", () => {
       )
 
       const cmd = output.args.command as string
-      expect(cmd).toStartWith("export ")
+      expect(cmd).toStartWith("$env:")
       expect(cmd).toContain("; git status")
-      expect(cmd).not.toContain("$env:")
+      expect(cmd).toContain("$env:GIT_EDITOR=':'")
+      expect(cmd).not.toContain("export ")
     })
 
     test("#given Windows platform #when chained git commands via bash tool #then uses cmd syntax", async () => {
