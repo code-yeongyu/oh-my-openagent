@@ -138,8 +138,8 @@ jobs:
         run: |
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/oh-my-opencode/${VERSION}")
           if [ "$STATUS" = "200" ]; then
-            echo "skip=true" >> $GITHUB_OUTPUT
-            echo "✓ oh-my-opencode@${VERSION} already published"
+            echo "::error::oh-my-opencode@${VERSION} is already published. Choose a new version so the GitHub tag cannot diverge from the immutable npm artifact."
+            exit 1
           else
             echo "skip=false" >> $GITHUB_OUTPUT
           fi
@@ -186,8 +186,8 @@ jobs:
         run: |
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/oh-my-openagent/${VERSION}")
           if [ "$STATUS" = "200" ]; then
-            echo "skip=true" >> $GITHUB_OUTPUT
-            echo "✓ oh-my-openagent@${VERSION} already published"
+            echo "::error::oh-my-openagent@${VERSION} is already published. Choose a new version so the GitHub tag cannot diverge from the immutable npm artifact."
+            exit 1
           else
             echo "skip=false" >> $GITHUB_OUTPUT
           fi
