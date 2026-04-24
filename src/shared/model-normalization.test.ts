@@ -54,6 +54,32 @@ describe("normalizeModel", () => {
 		})
 	})
 
+	describe("#given legacy gateway alias without sub-provider", () => {
+		test("#when normalizeModel is called with gateway/gpt-5.4 #then returns vercel/openai/gpt-5.4", () => {
+			// given
+			const input = "gateway/gpt-5.4"
+
+			// when
+			const result = normalizeModel(input)
+
+			// then
+			expect(result).toBe("vercel/openai/gpt-5.4")
+		})
+	})
+
+	describe("#given legacy gateway alias with explicit sub-provider", () => {
+		test("#when normalizeModel is called with gateway/anthropic/claude-opus-4-7 #then returns vercel/anthropic/claude-opus-4.7", () => {
+			// given
+			const input = "gateway/anthropic/claude-opus-4-7"
+
+			// when
+			const result = normalizeModel(input)
+
+			// then
+			expect(result).toBe("vercel/anthropic/claude-opus-4.7")
+		})
+	})
+
 	describe("#given string with leading and trailing spaces", () => {
 		test("#when normalizeModel is called with spaces #then returns trimmed string", () => {
 			// given

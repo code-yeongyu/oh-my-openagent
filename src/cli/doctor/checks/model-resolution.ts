@@ -1,5 +1,6 @@
 import { AGENT_MODEL_REQUIREMENTS, CATEGORY_MODEL_REQUIREMENTS } from "../../../shared/model-requirements"
 import { getModelCapabilities } from "../../../shared/model-capabilities"
+import { normalizeModel } from "../../../shared/model-normalization"
 import { CHECK_IDS, CHECK_NAMES } from "../constants"
 import type { CheckResult, DoctorIssue } from "../types"
 import { loadAvailableModelsFromCache } from "./model-resolution-cache"
@@ -61,28 +62,30 @@ export function getModelResolutionInfo(): ModelResolutionInfo {
 export function getModelResolutionInfoWithOverrides(config: OmoConfig): ModelResolutionInfo {
   const agents: AgentResolutionInfo[] = Object.entries(AGENT_MODEL_REQUIREMENTS).map(([name, requirement]) => {
     const userOverride = config.agents?.[name]?.model
+    const normalizedUserOverride = normalizeModel(userOverride)
     const userVariant = config.agents?.[name]?.variant
     return attachCapabilityDiagnostics({
       name,
       requirement,
       userOverride,
       userVariant,
-      effectiveModel: getEffectiveModel(requirement, userOverride),
-      effectiveResolution: buildEffectiveResolution(requirement, userOverride),
+      effectiveModel: getEffectiveModel(requirement, normalizedUserOverride),
+      effectiveResolution: buildEffectiveResolution(requirement, normalizedUserOverride),
     })
   })
 
   const categories: CategoryResolutionInfo[] = Object.entries(CATEGORY_MODEL_REQUIREMENTS).map(
     ([name, requirement]) => {
       const userOverride = config.categories?.[name]?.model
+      const normalizedUserOverride = normalizeModel(userOverride)
       const userVariant = config.categories?.[name]?.variant
       return attachCapabilityDiagnostics({
         name,
         requirement,
         userOverride,
         userVariant,
-        effectiveModel: getEffectiveModel(requirement, userOverride),
-        effectiveResolution: buildEffectiveResolution(requirement, userOverride),
+        effectiveModel: getEffectiveModel(requirement, normalizedUserOverride),
+        effectiveResolution: buildEffectiveResolution(requirement, normalizedUserOverride),
       })
     }
   )
@@ -99,19 +102,35 @@ export function collectCapabilityResolutionIssues(info: ModelResolutionInfo): Do
   })
 
   if (fallbackEntries.length === 0) {
-    return issues
+    // continue collecting alias warnings below
+  } else {
+    const summary = fallbackEntries
+      .map((entry) => `${entry.name}=${entry.effectiveModel} (${entry.capabilityDiagnostics?.resolutionMode ?? "unknown"})`)
+      .join(", ")
+
+    issues.push({
+      title: "Configured models rely on compatibility fallback",
+      description: summary,
+      severity: "warning",
+      affects: fallbackEntries.map((entry) => entry.name),
+    })
   }
 
-  const summary = fallbackEntries
-    .map((entry) => `${entry.name}=${entry.effectiveModel} (${entry.capabilityDiagnostics?.resolutionMode ?? "unknown"})`)
-    .join(", ")
+  const deprecatedGatewayEntries = allEntries.filter(
+    (entry) => entry.userOverride?.startsWith("gateway/") && entry.userOverride !== entry.effectiveModel
+  )
+  if (deprecatedGatewayEntries.length > 0) {
+    const summary = deprecatedGatewayEntries
+      .map((entry) => `${entry.name}=${entry.userOverride} -> ${entry.effectiveModel}`)
+      .join(", ")
 
-  issues.push({
-    title: "Configured models rely on compatibility fallback",
-    description: summary,
-    severity: "warning",
-    affects: fallbackEntries.map((entry) => entry.name),
-  })
+    issues.push({
+      title: "Deprecated gateway model alias configured",
+      description: `${summary}. Replace gateway/... with vercel/...`,
+      severity: "warning",
+      affects: deprecatedGatewayEntries.map((entry) => entry.name),
+    })
+  }
 
   return issues
 }

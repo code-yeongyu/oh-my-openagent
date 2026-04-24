@@ -42,6 +42,9 @@ export function buildModelResolutionDetails(options: {
       getEffectiveVariant(agent.name, agent.requirement, options.config)
     )
     details.push(`  ${marker} ${agent.name}: ${display} [capabilities: ${formatCapabilityResolutionLabel(agent.capabilityDiagnostics?.resolutionMode)}]`)
+    if (agent.userOverride?.startsWith("gateway/") && agent.userOverride !== agent.effectiveModel) {
+      details.push(`    ↳ deprecated alias: ${agent.userOverride} -> use ${agent.effectiveModel}`)
+    }
   }
   details.push("")
   details.push("Categories:")
@@ -52,6 +55,9 @@ export function buildModelResolutionDetails(options: {
       getCategoryEffectiveVariant(category.name, category.requirement, options.config)
     )
     details.push(`  ${marker} ${category.name}: ${display} [capabilities: ${formatCapabilityResolutionLabel(category.capabilityDiagnostics?.resolutionMode)}]`)
+    if (category.userOverride?.startsWith("gateway/") && category.userOverride !== category.effectiveModel) {
+      details.push(`    ↳ deprecated alias: ${category.userOverride} -> use ${category.effectiveModel}`)
+    }
   }
   details.push("")
   details.push("● = user override, ○ = provider fallback")

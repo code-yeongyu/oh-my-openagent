@@ -101,6 +101,8 @@ export function resolveModelPipeline(
 
   //#when - user configured fallback_models, try them before hardcoded fallback chain
   const userFallbackModels = intent?.userFallbackModels
+    ?.map((model) => normalizeModel(model))
+    .filter((model): model is string => model !== undefined)
   if (userFallbackModels && userFallbackModels.length > 0) {
     if (availableModels.size === 0) {
       const connectedProviders = constraints.connectedProviders ?? connectedProvidersCache.readConnectedProvidersCache()

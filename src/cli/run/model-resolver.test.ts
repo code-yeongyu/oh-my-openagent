@@ -48,6 +48,28 @@ describe("resolveRunModel", () => {
     expect(result).toEqual({ providerID: "openai", modelID: "gpt-5.3/preview" })
   })
 
+  it("given legacy gateway alias without sub-provider, when resolved, then returns canonical vercel/openai model", () => {
+    // given
+    const modelString = "gateway/gpt-5.4"
+
+    // when
+    const result = resolveRunModel(modelString)
+
+    // then
+    expect(result).toEqual({ providerID: "vercel", modelID: "openai/gpt-5.4" })
+  })
+
+  it("given legacy gateway alias with explicit sub-provider, when resolved, then returns canonical vercel transport model", () => {
+    // given
+    const modelString = "gateway/anthropic/claude-opus-4-7"
+
+    // when
+    const result = resolveRunModel(modelString)
+
+    // then
+    expect(result).toEqual({ providerID: "vercel", modelID: "anthropic/claude-opus-4.7" })
+  })
+
   it("given no slash 'claude-sonnet-4', when resolved, then throws Error", () => {
     // given
     const modelString = "claude-sonnet-4"

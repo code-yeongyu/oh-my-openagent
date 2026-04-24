@@ -29,4 +29,44 @@ describe("resolveModelPipeline", () => {
     expect(result).toEqual({ model: "openai/gpt-5.3-codex", provenance: "override" })
     expect(hasExplicitUserConfigField).toBe(false)
   })
+
+  test("normalizes legacy gateway aliases in category defaults before connected-provider resolution", () => {
+    // given
+    const result = resolveModelPipeline({
+      intent: {
+        categoryDefaultModel: "gateway/gpt-5.4",
+      },
+      constraints: {
+        availableModels: new Set<string>(),
+        connectedProviders: ["vercel"],
+      },
+    })
+
+    // then
+    expect(result).toEqual({
+      model: "vercel/openai/gpt-5.4",
+      provenance: "category-default",
+      attempted: ["vercel/openai/gpt-5.4"],
+    })
+  })
+
+  test("normalizes legacy gateway aliases in user fallback models before provider fallback resolution", () => {
+    // given
+    const result = resolveModelPipeline({
+      intent: {
+        userFallbackModels: ["gateway/gpt-5.4"],
+      },
+      constraints: {
+        availableModels: new Set<string>(),
+        connectedProviders: ["vercel"],
+      },
+    })
+
+    // then
+    expect(result).toEqual({
+      model: "vercel/openai/gpt-5.4",
+      provenance: "provider-fallback",
+      attempted: ["vercel/openai/gpt-5.4"],
+    })
+  })
 })

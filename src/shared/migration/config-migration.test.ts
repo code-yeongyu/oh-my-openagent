@@ -168,3 +168,55 @@ describe("migrateConfigFile backup skipping", () => {
     expect(backupFiles.length).toBe(1)
   })
 })
+
+describe("migrateConfigFile legacy gateway alias", () => {
+  test("rewrites gateway model aliases in persisted config and in-memory config", () => {
+    // given
+    const workdir = createWorkdir()
+    const configPath = join(workdir, "oh-my-opencode.json")
+    const rawConfig: Record<string, unknown> = {
+      agents: {
+        hephaestus: {
+          model: "gateway/gpt-5.4",
+          fallback_models: [
+            "gateway/gpt-5.4",
+            { model: "gateway/anthropic/claude-opus-4-7", variant: "high" },
+          ],
+        },
+      },
+      categories: {
+        deep: { model: "gateway/anthropic/claude-opus-4-7" },
+      },
+    }
+
+    writeFileSync(configPath, JSON.stringify(rawConfig, null, 2) + "\n")
+
+    // when
+    const needsWrite = migrateConfigFile(configPath, rawConfig)
+
+    // then
+    expect(needsWrite).toBe(true)
+    expect((rawConfig.agents as Record<string, Record<string, unknown>>).hephaestus.model).toBe(
+      "vercel/openai/gpt-5.4",
+    )
+    expect((rawConfig.agents as Record<string, Record<string, unknown>>).hephaestus.fallback_models).toEqual([
+      "vercel/openai/gpt-5.4",
+      { model: "vercel/anthropic/claude-opus-4.7", variant: "high" },
+    ])
+    expect((rawConfig.categories as Record<string, Record<string, unknown>>).deep.model).toBe(
+      "vercel/anthropic/claude-opus-4.7",
+    )
+
+    const persistedConfig = JSON.parse(readFileSync(configPath, "utf-8")) as Record<string, unknown>
+    expect((persistedConfig.agents as Record<string, Record<string, unknown>>).hephaestus.model).toBe(
+      "vercel/openai/gpt-5.4",
+    )
+    expect((persistedConfig.agents as Record<string, Record<string, unknown>>).hephaestus.fallback_models).toEqual([
+      "vercel/openai/gpt-5.4",
+      { model: "vercel/anthropic/claude-opus-4.7", variant: "high" },
+    ])
+    expect((persistedConfig.categories as Record<string, Record<string, unknown>>).deep.model).toBe(
+      "vercel/anthropic/claude-opus-4.7",
+    )
+  })
+})

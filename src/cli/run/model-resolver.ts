@@ -1,3 +1,5 @@
+import { normalizeModel } from "../../shared/model-normalization"
+
 export function resolveRunModel(
   modelString?: string
 ): { providerID: string; modelID: string } | undefined {
@@ -5,12 +7,12 @@ export function resolveRunModel(
     return undefined
   }
 
-  const trimmed = modelString.trim()
-  if (trimmed.length === 0) {
+  const normalized = normalizeModel(modelString)
+  if (normalized === undefined) {
     throw new Error("Model string cannot be empty")
   }
 
-  const parts = trimmed.split("/")
+  const parts = normalized.split("/")
   if (parts.length < 2) {
     throw new Error("Model string must be in 'provider/model' format")
   }

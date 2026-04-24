@@ -90,6 +90,22 @@ describe("model-resolution check", () => {
       expect(sisyphus!.effectiveResolution).toContain("anthropic")
     })
 
+    it("normalizes deprecated gateway aliases to canonical vercel models while preserving the raw override for diagnostics", async () => {
+      const { getModelResolutionInfoWithOverrides } = await import("./model-resolution")
+
+      const info = getModelResolutionInfoWithOverrides({
+        agents: {
+          oracle: { model: "gateway/gpt-5.4" },
+        },
+      })
+
+      const oracle = info.agents.find((a) => a.name === "oracle")
+      expect(oracle).toBeDefined()
+      expect(oracle!.userOverride).toBe("gateway/gpt-5.4")
+      expect(oracle!.effectiveModel).toBe("vercel/openai/gpt-5.4")
+      expect(oracle!.effectiveResolution).toBe("User override: vercel/openai/gpt-5.4")
+    })
+
     it("captures user variant for agent when configured", async () => {
       const { getModelResolutionInfoWithOverrides } = await import("./model-resolution")
 
@@ -234,6 +250,40 @@ describe("model-resolution check", () => {
       expect(issues).toHaveLength(1)
       expect(issues[0]?.title).toContain("compatibility fallback")
       expect(issues[0]?.description).toContain("oracle=custom/unknown-llm")
+    })
+
+    it("collects warnings when deprecated gateway aliases are configured", async () => {
+      const { collectCapabilityResolutionIssues, getModelResolutionInfoWithOverrides } = await import("./model-resolution")
+
+      const info = getModelResolutionInfoWithOverrides({
+        agents: {
+          oracle: { model: "gateway/gpt-5.4" },
+        },
+      })
+
+      const issues = collectCapabilityResolutionIssues(info)
+
+      expect(issues.some((issue) => issue.title.includes("Deprecated gateway model alias"))).toBe(true)
+      expect(issues.some((issue) => issue.description.includes("gateway/gpt-5.4 -> vercel/openai/gpt-5.4"))).toBe(true)
+    })
+
+    it("includes deprecated gateway alias guidance in verbose details", async () => {
+      const { checkModelResolution } = await import("./model-resolution")
+      const configModule = await import("./model-resolution-config")
+
+      const loadOmoConfigSpy = spyOn(configModule, "loadOmoConfig")
+      loadOmoConfigSpy.mockReturnValue({
+        agents: {
+          oracle: { model: "gateway/gpt-5.4" },
+        },
+      })
+
+      try {
+        const result = await checkModelResolution()
+        expect(result.details?.some((line) => line.includes("deprecated alias: gateway/gpt-5.4 -> use vercel/openai/gpt-5.4"))).toBe(true)
+      } finally {
+        loadOmoConfigSpy.mockRestore()
+      }
     })
   })
 
