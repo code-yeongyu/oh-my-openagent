@@ -4,7 +4,12 @@ import { isAbsolute, resolve } from "node:path"
 import { isWithinProject } from "../../shared/contains-path"
 import { log } from "../../shared/logger"
 
-export function resolvePromptAppend(promptAppend: string, configDir?: string): string {
+export function resolvePromptAppend(
+  promptAppend: string,
+  configDir?: string,
+  /** When true, skip isWithinProject check (for user-level global configs like ~/.hermes/) */
+  allowOutsideProject?: boolean
+): string {
   if (!promptAppend.startsWith("file://")) return promptAppend
 
   const encoded = promptAppend.slice(7)
@@ -20,14 +25,16 @@ export function resolvePromptAppend(promptAppend: string, configDir?: string): s
     return `[WARNING: Malformed file URI (invalid percent-encoding): ${promptAppend}]`
   }
 
-  const projectRoot = configDir ?? process.cwd()
-  if (!isWithinProject(filePath, projectRoot)) {
-    log("[resolve-file-uri] Rejected file URI outside project root", {
-      promptAppend,
-      filePath,
-      projectRoot,
-    })
-    return `[WARNING: Path rejected: ${promptAppend}]`
+  if (!allowOutsideProject) {
+    const projectRoot = configDir ?? process.cwd()
+    if (!isWithinProject(filePath, projectRoot)) {
+      log("[resolve-file-uri] Rejected file URI outside project root", {
+        promptAppend,
+        filePath,
+        projectRoot,
+      })
+      return `[WARNING: Path rejected: ${promptAppend}]`
+    }
   }
 
   if (!existsSync(filePath)) {

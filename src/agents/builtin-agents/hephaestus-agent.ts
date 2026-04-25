@@ -6,6 +6,7 @@ import { AGENT_MODEL_REQUIREMENTS, isAnyProviderConnected } from "../../shared"
 import { createHephaestusAgent } from "../hephaestus"
 import { applyEnvironmentContext } from "./environment-context"
 import { applyCategoryOverride, mergeAgentConfig } from "./agent-overrides"
+import { resolvePromptAppend } from "./resolve-file-uri"
 import { applyModelResolution, getFirstFallbackModel } from "./model-resolution"
 import { getGptApplyPatchPermission } from "../gpt-apply-patch-guard"
 
@@ -22,6 +23,7 @@ export function maybeCreateHephaestusConfig(input: {
   directory?: string
   useTaskSystem: boolean
   disableOmoEnv?: boolean
+  globalPromptAppend?: string
 }): AgentConfig | undefined {
   const {
     disabledAgents,
@@ -36,6 +38,7 @@ export function maybeCreateHephaestusConfig(input: {
     directory,
     useTaskSystem,
     disableOmoEnv = false,
+    globalPromptAppend,
   } = input
 
   if (disabledAgents.includes("hephaestus")) return undefined
@@ -83,6 +86,14 @@ export function maybeCreateHephaestusConfig(input: {
   }
 
   hephaestusConfig = applyEnvironmentContext(hephaestusConfig, directory, { disableOmoEnv })
+
+  // Apply global_prompt_append FIRST so it appears before agent-specific prompt_append
+  if (globalPromptAppend && typeof hephaestusConfig.prompt === "string") {
+    hephaestusConfig = {
+      ...hephaestusConfig,
+      prompt: hephaestusConfig.prompt + "\n" + resolvePromptAppend(globalPromptAppend, directory),
+    }
+  }
 
   if (hephaestusOverride) {
     hephaestusConfig = mergeAgentConfig(hephaestusConfig, hephaestusOverride, directory)
