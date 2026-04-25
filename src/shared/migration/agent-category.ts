@@ -14,7 +14,7 @@
 export const MODEL_TO_CATEGORY_MAP: Record<string, string> = {
   "google/gemini-3.1-pro": "visual-engineering",
   "google/gemini-3-flash": "writing",
-  "openai/gpt-5.4": "ultrabrain",
+  "openai/gpt-5.5": "ultrabrain",
   "anthropic/claude-haiku-4-5": "quick",
   "anthropic/claude-opus-4-6": "unspecified-high",
   "anthropic/claude-opus-4-7": "unspecified-high",

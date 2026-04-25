@@ -79,7 +79,7 @@ describe("resolveCompatibleModelSettings", () => {
   test("keeps supported GPT reasoningEffort unchanged", () => {
     const result = resolveCompatibleModelSettings({
       providerID: "openai",
-      modelID: "gpt-5.4",
+      modelID: "gpt-5.5",
       desired: { reasoningEffort: "high" },
     })
 
@@ -107,7 +107,7 @@ describe("resolveCompatibleModelSettings", () => {
   test("does not record case-only normalization as a compatibility downgrade", () => {
     const result = resolveCompatibleModelSettings({
       providerID: "openai",
-      modelID: "gpt-5.4",
+      modelID: "gpt-5.5",
       desired: { variant: "HIGH", reasoningEffort: "HIGH" },
     })
 
@@ -308,7 +308,7 @@ describe("resolveCompatibleModelSettings", () => {
   test("GPT-5 keeps xhigh variant and reasoningEffort", () => {
     const result = resolveCompatibleModelSettings({
       providerID: "openai",
-      modelID: "gpt-5.4",
+      modelID: "gpt-5.5",
       desired: { variant: "xhigh", reasoningEffort: "xhigh" },
     })
 
@@ -322,7 +322,7 @@ describe("resolveCompatibleModelSettings", () => {
   test("GPT-5 downgrades unsupported max variant to xhigh", () => {
     const result = resolveCompatibleModelSettings({
       providerID: "openai",
-      modelID: "gpt-5.4",
+      modelID: "gpt-5.5",
       desired: { variant: "max" },
     })
 
@@ -343,7 +343,7 @@ describe("resolveCompatibleModelSettings", () => {
   test("GPT-5 keeps none reasoningEffort", () => {
     const result = resolveCompatibleModelSettings({
       providerID: "openai",
-      modelID: "gpt-5.4",
+      modelID: "gpt-5.5",
       desired: { reasoningEffort: "none" },
     })
 
@@ -357,7 +357,7 @@ describe("resolveCompatibleModelSettings", () => {
   test("GPT-5 keeps minimal reasoningEffort", () => {
     const result = resolveCompatibleModelSettings({
       providerID: "openai",
-      modelID: "gpt-5.4",
+      modelID: "gpt-5.5",
       desired: { reasoningEffort: "minimal" },
     })
 
@@ -403,7 +403,7 @@ describe("resolveCompatibleModelSettings", () => {
   test("GPT-5 keeps xhigh but would downgrade a hypothetical beyond-max level", () => {
     const result = resolveCompatibleModelSettings({
       providerID: "openai",
-      modelID: "gpt-5.4",
+      modelID: "gpt-5.5",
       desired: { reasoningEffort: "xhigh" },
     })
 
@@ -432,7 +432,7 @@ describe("resolveCompatibleModelSettings", () => {
   test("drops unsupported temperature when capability metadata disables it", () => {
     const result = resolveCompatibleModelSettings({
       providerID: "openai",
-      modelID: "gpt-5.4",
+      modelID: "gpt-5.5",
       desired: { temperature: 0.7 },
       capabilities: { supportsTemperature: false },
     })
@@ -451,7 +451,7 @@ describe("resolveCompatibleModelSettings", () => {
   test("drops thinking when model capabilities say it is unsupported", () => {
     const result = resolveCompatibleModelSettings({
       providerID: "openai",
-      modelID: "gpt-5.4",
+      modelID: "gpt-5.5",
       desired: { thinking: { type: "enabled", budgetTokens: 4096 } },
       capabilities: { supportsThinking: false },
     })
@@ -470,7 +470,7 @@ describe("resolveCompatibleModelSettings", () => {
   test("clamps maxTokens to the model output limit", () => {
     const result = resolveCompatibleModelSettings({
       providerID: "openai",
-      modelID: "gpt-5.4",
+      modelID: "gpt-5.5",
       desired: { maxTokens: 200_000 },
       capabilities: { maxOutputTokens: 128_000 },
     })
@@ -489,7 +489,7 @@ describe("resolveCompatibleModelSettings", () => {
   test("#given capabilities.maxOutputTokens is 0 #then maxTokens preserved unchanged", () => {
     const result = resolveCompatibleModelSettings({
       providerID: "openai",
-      modelID: "gpt-5.4",
+      modelID: "gpt-5.5",
       desired: { maxTokens: 200_000 },
       capabilities: { maxOutputTokens: 0 },
     })
@@ -501,7 +501,7 @@ describe("resolveCompatibleModelSettings", () => {
   test("#given capabilities.maxOutputTokens is -1 #then maxTokens preserved unchanged", () => {
     const result = resolveCompatibleModelSettings({
       providerID: "openai",
-      modelID: "gpt-5.4",
+      modelID: "gpt-5.5",
       desired: { maxTokens: 200_000 },
       capabilities: { maxOutputTokens: -1 },
     })

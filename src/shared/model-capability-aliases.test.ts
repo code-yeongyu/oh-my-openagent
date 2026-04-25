@@ -4,11 +4,11 @@ import { resolveModelIDAlias } from "./model-capability-aliases"
 
 describe("model-capability-aliases", () => {
   test("keeps canonical model IDs unchanged", () => {
-    const result = resolveModelIDAlias("gpt-5.4")
+    const result = resolveModelIDAlias("gpt-5.5")
 
     expect(result).toEqual({
-      requestedModelID: "gpt-5.4",
-      canonicalModelID: "gpt-5.4",
+      requestedModelID: "gpt-5.5",
+      canonicalModelID: "gpt-5.5",
       source: "canonical",
     })
   })

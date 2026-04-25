@@ -45,8 +45,8 @@ describe("getModelCapabilities", () => {
           output: 65_000,
         },
       },
-      "gpt-5.4": {
-        id: "gpt-5.4",
+      "gpt-5.5": {
+        id: "gpt-5.5",
         family: "gpt",
         reasoning: true,
         temperature: false,
@@ -98,7 +98,7 @@ describe("getModelCapabilities", () => {
     findProviderModelMetadataSpy = spyOn(connectedProvidersCache, "findProviderModelMetadata").mockReturnValue(undefined)
     const result = getModelCapabilities({
       providerID: "openai",
-      modelID: "gpt-5.4",
+      modelID: "gpt-5.5",
       runtimeModel: {
         capabilities: {
           reasoning: true,
@@ -117,7 +117,7 @@ describe("getModelCapabilities", () => {
     })
 
     expect(result).toMatchObject({
-      canonicalModelID: "gpt-5.4",
+      canonicalModelID: "gpt-5.5",
       reasoning: true,
       supportsThinking: true,
       supportsTemperature: false,
@@ -139,7 +139,7 @@ describe("getModelCapabilities", () => {
     findProviderModelMetadataSpy = spyOn(connectedProvidersCache, "findProviderModelMetadata").mockReturnValue(undefined)
     const result = getModelCapabilities({
       providerID: "custom-proxy",
-      modelID: "gpt-5.4",
+      modelID: "gpt-5.5",
       runtimeModel: {
         supportsThinking: true,
       },
@@ -147,7 +147,7 @@ describe("getModelCapabilities", () => {
     })
 
     expect(result).toMatchObject({
-      canonicalModelID: "gpt-5.4",
+      canonicalModelID: "gpt-5.5",
       supportsThinking: true,
     })
     expect(result.diagnostics).toMatchObject({
@@ -159,7 +159,7 @@ describe("getModelCapabilities", () => {
     findProviderModelMetadataSpy = spyOn(connectedProvidersCache, "findProviderModelMetadata").mockReturnValue(undefined)
     const result = getModelCapabilities({
       providerID: "openai",
-      modelID: "gpt-5.4",
+      modelID: "gpt-5.5",
       runtimeModel: {
         variants: ["low", "medium", "high", "xhigh"],
       },
@@ -275,8 +275,8 @@ describe("getModelCapabilities", () => {
       ...bundledSnapshot,
       models: {
         ...bundledSnapshot.models,
-        "gpt-5.4": {
-          ...bundledSnapshot.models["gpt-5.4"],
+        "gpt-5.5": {
+          ...bundledSnapshot.models["gpt-5.5"],
           limit: {
             context: 1_050_000,
             output: 64_000,
@@ -287,13 +287,13 @@ describe("getModelCapabilities", () => {
 
     const result = getModelCapabilities({
       providerID: "openai",
-      modelID: "gpt-5.4",
+      modelID: "gpt-5.5",
       bundledSnapshot,
       runtimeSnapshot,
     })
 
     expect(result).toMatchObject({
-      canonicalModelID: "gpt-5.4",
+      canonicalModelID: "gpt-5.5",
       maxOutputTokens: 64_000,
       supportsTemperature: false,
     })

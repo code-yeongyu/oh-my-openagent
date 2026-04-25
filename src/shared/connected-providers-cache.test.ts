@@ -53,7 +53,7 @@ describe("updateConnectedProvidersCache", () => {
 									env: [],
 									models: {
 										"gpt-5.3-codex": { id: "gpt-5.3-codex", name: "GPT-5.3 Codex" },
-										"gpt-5.4": { id: "gpt-5.4", name: "GPT-5.4" },
+										"gpt-5.5": { id: "gpt-5.5", name: "GPT-5.5" },
 									},
 								},
 								{
@@ -81,7 +81,7 @@ describe("updateConnectedProvidersCache", () => {
 			expect(cache!.models).toEqual({
 				openai: [
 					{ id: "gpt-5.3-codex", name: "GPT-5.3 Codex" },
-					{ id: "gpt-5.4", name: "GPT-5.4" },
+					{ id: "gpt-5.5", name: "GPT-5.5" },
 				],
 				anthropic: [
 					{ id: "claude-opus-4-7", name: "Claude Opus 4.7" },
@@ -195,7 +195,7 @@ describe("updateConnectedProvidersCache", () => {
 							{
 								id: "openai",
 								models: {
-									"gpt-5.4": { id: "gpt-5.4" },
+									"gpt-5.5": { id: "gpt-5.5" },
 								},
 							},
 						],
@@ -238,9 +238,9 @@ describe("updateConnectedProvidersCache", () => {
 								{
 									id: "openai",
 									models: {
-										"gpt-5.4": {
-											id: "gpt-5.4",
-											name: "GPT-5.4",
+										"gpt-5.5": {
+											id: "gpt-5.5",
+											name: "GPT-5.5",
 											temperature: false,
 											variants: {
 												low: {},
@@ -260,12 +260,12 @@ describe("updateConnectedProvidersCache", () => {
 			const cache = testCacheStore.readProviderModelsCache()
 
 			//#when
-			const result = findProviderModelMetadata("openai", "gpt-5.4", cache)
+			const result = findProviderModelMetadata("openai", "gpt-5.5", cache)
 
 			//#then
 			expect(result).toEqual({
-				id: "gpt-5.4",
-				name: "GPT-5.4",
+				id: "gpt-5.5",
+				name: "GPT-5.5",
 				temperature: false,
 				variants: {
 					low: {},

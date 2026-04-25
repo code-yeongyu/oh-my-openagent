@@ -33,8 +33,8 @@ describe("model-capabilities-cache", () => {
     const raw = {
       openai: {
         models: {
-          "gpt-5.4": {
-            id: "gpt-5.4",
+          "gpt-5.5": {
+            id: "gpt-5.5",
             family: "gpt",
             reasoning: true,
             temperature: false,
@@ -70,8 +70,8 @@ describe("model-capabilities-cache", () => {
 
     //#then
     expect(snapshot.sourceUrl).toBe(MODELS_DEV_SOURCE_URL)
-    expect(snapshot.models["gpt-5.4"]).toEqual({
-      id: "gpt-5.4",
+    expect(snapshot.models["gpt-5.5"]).toEqual({
+      id: "gpt-5.5",
       family: "gpt",
       reasoning: true,
       temperature: false,
@@ -101,8 +101,8 @@ describe("model-capabilities-cache", () => {
     const raw = {
       openai: {
         models: {
-          "gpt-5.4": {
-            id: "gpt-5.4",
+          "gpt-5.5": {
+            id: "gpt-5.5",
             family: "gpt",
           },
         },
@@ -110,7 +110,7 @@ describe("model-capabilities-cache", () => {
       alias: {
         models: {
           "gpt-5.4-preview": {
-            id: "gpt-5.4",
+            id: "gpt-5.5",
             reasoning: true,
           },
         },
@@ -119,13 +119,13 @@ describe("model-capabilities-cache", () => {
 
     const snapshot = buildModelCapabilitiesSnapshotFromModelsDev(raw)
 
-    expect(snapshot.models["gpt-5.4"]).toEqual({
-      id: "gpt-5.4",
+    expect(snapshot.models["gpt-5.5"]).toEqual({
+      id: "gpt-5.5",
       family: "gpt",
       reasoning: true,
     })
-    expect(snapshot.models["gpt-5.4"]).not.toHaveProperty("modalities")
-    expect(snapshot.models["gpt-5.4"]).not.toHaveProperty("limit")
+    expect(snapshot.models["gpt-5.5"]).not.toHaveProperty("modalities")
+    expect(snapshot.models["gpt-5.5"]).not.toHaveProperty("limit")
   })
 
   test("refresh writes cache and preserves unrelated files in the cache directory", async () => {
@@ -139,8 +139,8 @@ describe("model-capabilities-cache", () => {
       new Response(JSON.stringify({
         openai: {
           models: {
-            "gpt-5.4": {
-              id: "gpt-5.4",
+            "gpt-5.5": {
+              id: "gpt-5.5",
               family: "gpt",
               reasoning: true,
               limit: { output: 128_000 },
@@ -157,7 +157,7 @@ describe("model-capabilities-cache", () => {
     const reloadedStore = createModelCapabilitiesCacheStore(() => testCacheDir)
 
     //#then
-    expect(snapshot.models["gpt-5.4"]?.limit?.output).toBe(128_000)
+    expect(snapshot.models["gpt-5.5"]?.limit?.output).toBe(128_000)
     expect(existsSync(sentinelPath)).toBe(true)
     expect(readFileSync(sentinelPath, "utf-8")).toBe(JSON.stringify({ keep: true }))
     expect(reloadedStore.readModelCapabilitiesCache()).toEqual(snapshot)

@@ -76,7 +76,7 @@ describe("migrateAgentNames with parenthesized aliases", () => {
     // given
     const legacyAgents = {
       "Sisyphus (Ultraworker)": { model: "claude-opus-4" },
-      "Hephaestus (Deep Agent)": { model: "gpt-5.4" },
+      "Hephaestus (Deep Agent)": { model: "gpt-5.5" },
       "Prometheus (Plan Builder)": { model: "claude-opus-4" },
       "Atlas (Plan Executor)": { model: "kimi-k2.5" },
       "Metis (Plan Consultant)": { model: "claude-opus-4" },
@@ -89,7 +89,7 @@ describe("migrateAgentNames with parenthesized aliases", () => {
     // then
     expect(changed).toBe(true)
     expect(migrated.sisyphus).toEqual({ model: "claude-opus-4" })
-    expect(migrated.hephaestus).toEqual({ model: "gpt-5.4" })
+    expect(migrated.hephaestus).toEqual({ model: "gpt-5.5" })
     expect(migrated.prometheus).toEqual({ model: "claude-opus-4" })
     expect(migrated.atlas).toEqual({ model: "kimi-k2.5" })
     expect(migrated.metis).toEqual({ model: "claude-opus-4" })

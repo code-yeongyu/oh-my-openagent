@@ -45,7 +45,7 @@ describe("Agent Config Integration", () => {
       // given - config with lowercase keys
       const config = {
         sisyphus: { model: "anthropic/claude-opus-4-7" },
-        oracle: { model: "openai/gpt-5.4" },
+        oracle: { model: "openai/gpt-5.5" },
         librarian: { model: "opencode/big-pickle" },
       }
 
@@ -63,7 +63,7 @@ describe("Agent Config Integration", () => {
       // given - config with mixed old and new format
       const mixedConfig = {
         Sisyphus: { model: "anthropic/claude-opus-4-7" },
-        oracle: { model: "openai/gpt-5.4" },
+        oracle: { model: "openai/gpt-5.5" },
         "Prometheus - Plan Builder": { model: "anthropic/claude-opus-4-7" },
         librarian: { model: "opencode/big-pickle" },
       }

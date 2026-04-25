@@ -41,7 +41,7 @@ describe("migrations sidecar", () => {
         getSidecarPath(configPath),
         JSON.stringify({
           appliedMigrations: [
-            "model-version:openai/gpt-5.3-codex->openai/gpt-5.4",
+            "model-version:openai/gpt-5.3-codex->openai/gpt-5.5",
             "model-version:anthropic/claude-opus-4-5->anthropic/claude-opus-4-7",
           ],
         }),
@@ -50,7 +50,7 @@ describe("migrations sidecar", () => {
       const applied = readAppliedMigrations(configPath)
 
       expect(applied.size).toBe(2)
-      expect(applied.has("model-version:openai/gpt-5.3-codex->openai/gpt-5.4")).toBe(true)
+      expect(applied.has("model-version:openai/gpt-5.3-codex->openai/gpt-5.5")).toBe(true)
       expect(applied.has("model-version:anthropic/claude-opus-4-5->anthropic/claude-opus-4-7")).toBe(true)
     })
 
@@ -89,7 +89,7 @@ describe("migrations sidecar", () => {
     test("creates the sidecar with the given migration keys", () => {
       const configPath = join(workdir, "oh-my-openagent.json")
       const migrations = new Set([
-        "model-version:openai/gpt-5.3-codex->openai/gpt-5.4",
+        "model-version:openai/gpt-5.3-codex->openai/gpt-5.5",
       ])
 
       const ok = writeAppliedMigrations(configPath, migrations)
@@ -98,7 +98,7 @@ describe("migrations sidecar", () => {
       expect(existsSync(getSidecarPath(configPath))).toBe(true)
 
       const body = JSON.parse(readFileSync(getSidecarPath(configPath), "utf-8"))
-      expect(body.appliedMigrations).toEqual(["model-version:openai/gpt-5.3-codex->openai/gpt-5.4"])
+      expect(body.appliedMigrations).toEqual(["model-version:openai/gpt-5.3-codex->openai/gpt-5.5"])
     })
 
     test("writes entries in sorted order for stable diffs", () => {
@@ -133,7 +133,7 @@ describe("migrations sidecar", () => {
     test("round-trips via readAppliedMigrations", () => {
       const configPath = join(workdir, "oh-my-openagent.jsonc")
       const original = new Set([
-        "model-version:openai/gpt-5.3-codex->openai/gpt-5.4",
+        "model-version:openai/gpt-5.3-codex->openai/gpt-5.5",
         "model-version:anthropic/claude-opus-4-5->anthropic/claude-opus-4-7",
       ])
 

@@ -75,7 +75,7 @@ export function parseFallbackModelObjectEntry(
  * Find the most specific FallbackEntry whose `provider/model` is a prefix of
  * the resolved `provider/modelID`.  Longest match wins so that e.g.
  * `openai/gpt-5.4-preview` picks the entry for `openai/gpt-5.4-preview` over
- * the shorter `openai/gpt-5.4`.
+ * the shorter `openai/gpt-5.5`.
  */
 export function findMostSpecificFallbackEntry(
   providerID: string,

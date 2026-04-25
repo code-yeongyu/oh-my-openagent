@@ -8,7 +8,7 @@ import { writeFileAtomically } from "../write-file-atomically"
  * config file.
  *
  * Why this exists (#3263): users who revert an auto-migrated value (e.g.
- * `gpt-5.4` → `gpt-5.3-codex`) and then delete the `_migrations` field from
+ * `gpt-5.5` → `gpt-5.3-codex`) and then delete the `_migrations` field from
  * their config would fall into an infinite migration loop — every startup
  * re-applied the migration because there was no memory of the previous
  * application. The sidecar remembers applied migrations even when the user
@@ -21,7 +21,7 @@ import { writeFileAtomically } from "../write-file-atomically"
  *
  *     {
  *       "appliedMigrations": [
- *         "model-version:openai/gpt-5.3-codex->openai/gpt-5.4",
+ *         "model-version:openai/gpt-5.3-codex->openai/gpt-5.5",
  *         "model-version:anthropic/claude-opus-4-5->anthropic/claude-opus-4-7"
  *       ]
  *     }

@@ -59,7 +59,7 @@ describe("migrateAgentNames", () => {
     const agents = {
       SISYPHUS: { model: "test" },
       "planner-sisyphus": { prompt: "test" },
-      "Orchestrator-Sisyphus": { model: "openai/gpt-5.4" },
+      "Orchestrator-Sisyphus": { model: "openai/gpt-5.5" },
     }
 
     // when: Migrate agent names
@@ -68,7 +68,7 @@ describe("migrateAgentNames", () => {
     // then: Case-insensitive lookup should migrate correctly
     expect(migrated["sisyphus"]).toEqual({ model: "test" })
     expect(migrated["prometheus"]).toEqual({ prompt: "test" })
-    expect(migrated["atlas"]).toEqual({ model: "openai/gpt-5.4" })
+    expect(migrated["atlas"]).toEqual({ model: "openai/gpt-5.5" })
   })
 
   test("passes through unknown agent names unchanged", () => {
@@ -578,10 +578,10 @@ describe("MODEL_VERSION_MAP", () => {
     expect(MODEL_VERSION_MAP["anthropic/claude-opus-4-5"]).toBe("anthropic/claude-opus-4-7")
   })
 
-  test("maps openai/gpt-5.3-codex to openai/gpt-5.4 for deep category migration", () => {
+  test("maps openai/gpt-5.3-codex to openai/gpt-5.5 for deep category migration", () => {
     // given/when: Check MODEL_VERSION_MAP
-    // then: gpt-5.3-codex should migrate to gpt-5.4
-    expect(MODEL_VERSION_MAP["openai/gpt-5.3-codex"]).toBe("openai/gpt-5.4")
+    // then: gpt-5.3-codex should migrate to gpt-5.5
+    expect(MODEL_VERSION_MAP["openai/gpt-5.3-codex"]).toBe("openai/gpt-5.5")
   })
 })
 
@@ -888,7 +888,7 @@ describe("migrateAgentConfigToCategory", () => {
     const configs = [
       { model: "google/gemini-3.1-pro" },
       { model: "google/gemini-3-flash" },
-      { model: "openai/gpt-5.4" },
+      { model: "openai/gpt-5.5" },
       { model: "anthropic/claude-haiku-4-5" },
       { model: "anthropic/claude-opus-4-7" },
       { model: "anthropic/claude-sonnet-4-6" },
@@ -910,7 +910,7 @@ describe("migrateAgentConfigToCategory", () => {
   test("preserves non-model fields during migration", () => {
     // given: Config with multiple fields
     const config = {
-      model: "openai/gpt-5.4",
+      model: "openai/gpt-5.5",
       temperature: 0.1,
       top_p: 0.95,
       maxTokens: 4096,
@@ -1345,14 +1345,14 @@ describe("migrateConfigFile with migration tracking via sidecar (#3263)", () => 
 
   test("skips re-applying a migration that is recorded in the sidecar even if the user edited _migrations away", () => {
     // This is the core #3263 regression: a user auto-migrated from
-    // gpt-5.3-codex to gpt-5.4, reverted to gpt-5.3-codex by hand, and
+    // gpt-5.3-codex to gpt-5.5, reverted to gpt-5.3-codex by hand, and
     // deleted _migrations in the process. Without the sidecar their
     // revert was clobbered on every startup.
     const testConfigPath = tempConfigPath("sidecar-revert")
     fs.writeFileSync(
       sidecarPath(testConfigPath),
       JSON.stringify({
-        appliedMigrations: ["model-version:openai/gpt-5.3-codex->openai/gpt-5.4"],
+        appliedMigrations: ["model-version:openai/gpt-5.3-codex->openai/gpt-5.5"],
       }),
     )
     const rawConfig: Record<string, unknown> = {
@@ -1380,7 +1380,7 @@ describe("migrateConfigFile with migration tracking via sidecar (#3263)", () => 
       agents: {
         oracle: { model: "openai/gpt-5.3-codex" },
       },
-      _migrations: ["model-version:openai/gpt-5.3-codex->openai/gpt-5.4"],
+      _migrations: ["model-version:openai/gpt-5.3-codex->openai/gpt-5.5"],
     }
     fs.writeFileSync(testConfigPath, JSON.stringify(rawConfig, null, 2))
 
@@ -1393,7 +1393,7 @@ describe("migrateConfigFile with migration tracking via sidecar (#3263)", () => 
 
     const sidecar = JSON.parse(fs.readFileSync(sidecarPath(testConfigPath), "utf-8"))
     expect(sidecar.appliedMigrations).toEqual([
-      "model-version:openai/gpt-5.3-codex->openai/gpt-5.4",
+      "model-version:openai/gpt-5.3-codex->openai/gpt-5.5",
     ])
   })
 
@@ -1407,7 +1407,7 @@ describe("migrateConfigFile with migration tracking via sidecar (#3263)", () => 
       sidecarPath(testConfigPath),
       JSON.stringify({
         appliedMigrations: [
-          "model-version:openai/gpt-5.3-codex->openai/gpt-5.4",
+          "model-version:openai/gpt-5.3-codex->openai/gpt-5.5",
           "model-version:anthropic/claude-opus-4-5->anthropic/claude-opus-4-7",
         ],
       }),
@@ -1431,7 +1431,7 @@ describe("migrateConfigFile with migration tracking via sidecar (#3263)", () => 
     const sidecar = JSON.parse(fs.readFileSync(sidecarPath(testConfigPath), "utf-8"))
     expect(sidecar.appliedMigrations).toEqual([
       "model-version:anthropic/claude-opus-4-5->anthropic/claude-opus-4-7",
-      "model-version:openai/gpt-5.3-codex->openai/gpt-5.4",
+      "model-version:openai/gpt-5.3-codex->openai/gpt-5.5",
     ])
   })
 
@@ -1443,7 +1443,7 @@ describe("migrateConfigFile with migration tracking via sidecar (#3263)", () => 
     fs.writeFileSync(
       sidecarPath(testConfigPath),
       JSON.stringify({
-        appliedMigrations: ["model-version:openai/gpt-5.3-codex->openai/gpt-5.4"],
+        appliedMigrations: ["model-version:openai/gpt-5.3-codex->openai/gpt-5.5"],
       }),
     )
     const rawConfig: Record<string, unknown> = {
@@ -1465,7 +1465,7 @@ describe("migrateConfigFile with migration tracking via sidecar (#3263)", () => 
 
     const sidecar = JSON.parse(fs.readFileSync(sidecarPath(testConfigPath), "utf-8"))
     expect(new Set(sidecar.appliedMigrations)).toEqual(new Set([
-      "model-version:openai/gpt-5.3-codex->openai/gpt-5.4",
+      "model-version:openai/gpt-5.3-codex->openai/gpt-5.5",
       "model-version:anthropic/claude-opus-4-5->anthropic/claude-opus-4-7",
     ]))
   })
@@ -1477,7 +1477,7 @@ describe("migrateConfigFile with migration tracking via sidecar (#3263)", () => 
       agents: {
         oracle: { model: "anthropic/claude-opus-4-5" },
       },
-      _migrations: ["model-version:openai/gpt-5.3-codex->openai/gpt-5.4"],
+      _migrations: ["model-version:openai/gpt-5.3-codex->openai/gpt-5.5"],
     }
     fs.writeFileSync(testConfigPath, JSON.stringify(rawConfig, null, 2))
 
@@ -1492,7 +1492,7 @@ describe("migrateConfigFile with migration tracking via sidecar (#3263)", () => 
     expect(needsWrite).toBe(true)
     const migrations = rawConfig._migrations as string[]
     expect(Array.isArray(migrations)).toBe(true)
-    expect(migrations).toContain("model-version:openai/gpt-5.3-codex->openai/gpt-5.4")
+    expect(migrations).toContain("model-version:openai/gpt-5.3-codex->openai/gpt-5.5")
     expect(migrations.length).toBeGreaterThanOrEqual(1)
     expect((rawConfig.agents as Record<string, Record<string, unknown>>).oracle.model).toBe("anthropic/claude-opus-4-7")
 

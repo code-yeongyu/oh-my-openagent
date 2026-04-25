@@ -89,19 +89,19 @@ describe("parseFallbackModelEntry (extended)", () => {
   })
 
   it("parses model with space variant", () => {
-    const result = parseFallbackModelEntry("openai/gpt-5.4 xhigh", undefined)
+    const result = parseFallbackModelEntry("openai/gpt-5.5 xhigh", undefined)
     expect(result).toEqual({
       providers: ["openai"],
-      model: "gpt-5.4",
+      model: "gpt-5.5",
       variant: "xhigh",
     })
   })
 
   it("parses model with minimal space variant", () => {
-    const result = parseFallbackModelEntry("openai/gpt-5.4 minimal", undefined)
+    const result = parseFallbackModelEntry("openai/gpt-5.5 minimal", undefined)
     expect(result).toEqual({
       providers: ["openai"],
-      model: "gpt-5.4",
+      model: "gpt-5.5",
       variant: "minimal",
     })
   })
@@ -159,7 +159,7 @@ describe("parseFallbackModelObjectEntry", () => {
   it("carries reasoningEffort and temperature", () => {
     const result = parseFallbackModelObjectEntry(
       {
-        model: "openai/gpt-5.4",
+        model: "openai/gpt-5.5",
         variant: "high",
         reasoningEffort: "high",
         temperature: 0.5,
@@ -168,7 +168,7 @@ describe("parseFallbackModelObjectEntry", () => {
     )
     expect(result).toEqual({
       providers: ["openai"],
-      model: "gpt-5.4",
+      model: "gpt-5.5",
       variant: "high",
       reasoningEffort: "high",
       temperature: 0.5,
@@ -193,7 +193,7 @@ describe("parseFallbackModelObjectEntry", () => {
   it("carries all optional fields", () => {
     const result = parseFallbackModelObjectEntry(
       {
-        model: "openai/gpt-5.4",
+        model: "openai/gpt-5.5",
         variant: "xhigh",
         reasoningEffort: "xhigh",
         temperature: 0.3,
@@ -205,7 +205,7 @@ describe("parseFallbackModelObjectEntry", () => {
     )
     expect(result).toEqual({
       providers: ["openai"],
-      model: "gpt-5.4",
+      model: "gpt-5.5",
       variant: "xhigh",
       reasoningEffort: "xhigh",
       temperature: 0.3,
@@ -226,12 +226,12 @@ describe("buildFallbackChainFromModels (mixed)", () => {
 
   it("handles string array", () => {
     const result = buildFallbackChainFromModels(
-      ["anthropic/claude-sonnet-4-6", "openai/gpt-5.4"],
+      ["anthropic/claude-sonnet-4-6", "openai/gpt-5.5"],
       undefined,
     )
     expect(result).toEqual([
       { providers: ["anthropic"], model: "claude-sonnet-4-6" },
-      { providers: ["openai"], model: "gpt-5.4" },
+      { providers: ["openai"], model: "gpt-5.5" },
     ])
   })
 
@@ -239,7 +239,7 @@ describe("buildFallbackChainFromModels (mixed)", () => {
     const result = buildFallbackChainFromModels(
       [
         { model: "anthropic/claude-sonnet-4-6", variant: "high", reasoningEffort: "high" },
-        { model: "openai/gpt-5.4", reasoningEffort: "xhigh" },
+        { model: "openai/gpt-5.5", reasoningEffort: "xhigh" },
         "chutes/kimi-k2.5",
         { model: "chutes/glm-5", temperature: 0.7 },
         "google/gemini-3-flash",
@@ -248,7 +248,7 @@ describe("buildFallbackChainFromModels (mixed)", () => {
     )
     expect(result).toEqual([
       { providers: ["anthropic"], model: "claude-sonnet-4-6", variant: "high", reasoningEffort: "high" },
-      { providers: ["openai"], model: "gpt-5.4", reasoningEffort: "xhigh" },
+      { providers: ["openai"], model: "gpt-5.5", reasoningEffort: "xhigh" },
       { providers: ["chutes"], model: "kimi-k2.5" },
       { providers: ["chutes"], model: "glm-5", temperature: 0.7 },
       { providers: ["google"], model: "gemini-3-flash" },
@@ -302,36 +302,36 @@ describe("flattenToFallbackModelStrings", () => {
 
   it("explicit variant overrides space-suffix variant", () => {
     expect(flattenToFallbackModelStrings([
-      { model: "openai/gpt-5.4 high", variant: "low" },
-    ])).toEqual(["openai/gpt-5.4(low)"])
+      { model: "openai/gpt-5.5 high", variant: "low" },
+    ])).toEqual(["openai/gpt-5.5(low)"])
   })
 
   it("explicit variant overrides minimal space-suffix variant", () => {
     expect(flattenToFallbackModelStrings([
-      { model: "openai/gpt-5.4 minimal", variant: "low" },
-    ])).toEqual(["openai/gpt-5.4(low)"])
+      { model: "openai/gpt-5.5 minimal", variant: "low" },
+    ])).toEqual(["openai/gpt-5.5(low)"])
   })
 
   it("preserves trailing non-variant suffixes when adding explicit variant", () => {
     expect(flattenToFallbackModelStrings([
-      { model: "openai/gpt-5.4 preview", variant: "low" },
-    ])).toEqual(["openai/gpt-5.4 preview(low)"])
+      { model: "openai/gpt-5.5 preview", variant: "low" },
+    ])).toEqual(["openai/gpt-5.5 preview(low)"])
   })
 
   it("flattens object without variant", () => {
     expect(flattenToFallbackModelStrings([
-      { model: "openai/gpt-5.4" },
-    ])).toEqual(["openai/gpt-5.4"])
+      { model: "openai/gpt-5.5" },
+    ])).toEqual(["openai/gpt-5.5"])
   })
 
   it("handles mixed array", () => {
     expect(flattenToFallbackModelStrings([
       "anthropic/claude-sonnet-4-6",
-      { model: "openai/gpt-5.4", variant: "high" },
+      { model: "openai/gpt-5.5", variant: "high" },
       { model: "google/gemini-3-flash(low)" },
     ])).toEqual([
       "anthropic/claude-sonnet-4-6",
-      "openai/gpt-5.4(high)",
+      "openai/gpt-5.5(high)",
       "google/gemini-3-flash(low)",
     ])
   })
@@ -359,7 +359,7 @@ describe("findMostSpecificFallbackEntry", () => {
     const chain = [
       { providers: ["anthropic"], model: "claude-sonnet-4-6" },
     ]
-    expect(findMostSpecificFallbackEntry("openai", "gpt-5.4", chain)).toBeUndefined()
+    expect(findMostSpecificFallbackEntry("openai", "gpt-5.5", chain)).toBeUndefined()
   })
 
   it("sorts by matched prefix length, not insertion order", () => {
@@ -383,7 +383,7 @@ describe("findMostSpecificFallbackEntry", () => {
 
   it("preserves variant and settings from matched entry", () => {
     const chain = [
-      { providers: ["openai"], model: "gpt-5.4", variant: "high", temperature: 0.7 },
+      { providers: ["openai"], model: "gpt-5.5", variant: "high", temperature: 0.7 },
       { providers: ["openai"], model: "gpt-5.4-preview", variant: "low", reasoningEffort: "medium" },
     ]
     const result = findMostSpecificFallbackEntry("openai", "gpt-5.4-preview", chain)
