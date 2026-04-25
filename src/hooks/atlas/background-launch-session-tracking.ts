@@ -1,5 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { appendSessionId, type BoulderState, upsertTaskSessionState } from "../../features/boulder-state"
+import { appendSessionId, type BoulderState, resolveBoulderPlanPath, upsertTaskSessionState } from "../../features/boulder-state"
 import { log } from "../../shared/logger"
 import { HOOK_NAME } from "./hook-name"
 import { extractSessionIdFromOutput, validateSubagentSessionId } from "./subagent-session-id"
@@ -40,7 +40,7 @@ export async function syncBackgroundLaunchSessionTracking(input: {
 
   const { currentTask, shouldSkipTaskSessionUpdate } = resolveTaskContext(
     pendingTaskRef,
-    boulderState.active_plan,
+    resolveBoulderPlanPath(ctx.directory, boulderState),
   )
 
   if (currentTask && !shouldSkipTaskSessionUpdate) {
