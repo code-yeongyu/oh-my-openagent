@@ -193,6 +193,7 @@ export function createToolRegistry(args: {
     sisyphusAgentConfig: pluginConfig.sisyphus_agent,
     syncPollTimeoutMs: pluginConfig.background_task?.syncPollTimeoutMs,
     modelFallbackControllerAccessor: managers.modelFallbackControllerAccessor,
+    globalPromptAppend: pluginConfig.global_prompt_append,
     onSyncSessionCreated: async (event) => {
       log("[index] onSyncSessionCreated callback", {
         sessionID: event.sessionID,

@@ -19,6 +19,7 @@ export function maybeCreateAtlasConfig(input: {
   directory?: string
   userCategories?: CategoriesConfig
   useTaskSystem?: boolean
+  globalPromptAppend?: string
 }): AgentConfig | undefined {
   const {
     disabledAgents,
@@ -31,6 +32,7 @@ export function maybeCreateAtlasConfig(input: {
     mergedCategories,
     directory,
     userCategories,
+    globalPromptAppend,
   } = input
 
   if (disabledAgents.includes("atlas")) return undefined
@@ -60,7 +62,7 @@ export function maybeCreateAtlasConfig(input: {
     orchestratorConfig = { ...orchestratorConfig, variant: atlasResolvedVariant }
   }
 
-  orchestratorConfig = applyOverrides(orchestratorConfig, orchestratorOverride, mergedCategories, directory)
+  orchestratorConfig = applyOverrides(orchestratorConfig, orchestratorOverride, mergedCategories, directory, globalPromptAppend)
 
   return orchestratorConfig
 }

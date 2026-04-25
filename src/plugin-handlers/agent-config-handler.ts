@@ -172,6 +172,7 @@ export async function applyAgentConfig(params: {
     disabledSkills,
     useTaskSystem,
     disableOmoEnv,
+    params.pluginConfig.global_prompt_append,
   );
 
   const disabledAgentNames = new Set(

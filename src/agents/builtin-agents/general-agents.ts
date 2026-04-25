@@ -5,7 +5,6 @@ import type { BrowserAutomationProvider } from "../../config/schema"
 import type { AvailableAgent } from "../dynamic-agent-prompt-builder"
 import { AGENT_MODEL_REQUIREMENTS, isModelAvailable } from "../../shared"
 import { buildAgent, isFactory } from "../agent-builder"
-import { resolveAgentSkills } from "../agent-skill-resolution"
 import { applyOverrides } from "./agent-overrides"
 import { applyEnvironmentContext } from "./environment-context"
 import { applyModelResolution, getFirstFallbackModel } from "./model-resolution"
@@ -27,6 +26,7 @@ export function collectPendingBuiltinAgents(input: {
   disabledSkills?: Set<string>
   useTaskSystem?: boolean
   disableOmoEnv?: boolean
+  globalPromptAppend?: string
 }): { pendingAgentConfigs: Map<string, AgentConfig>; availableAgents: AvailableAgent[] } {
   const {
     agentSources,
@@ -43,6 +43,7 @@ export function collectPendingBuiltinAgents(input: {
     isFirstRunNoCache,
     disabledSkills,
     disableOmoEnv = false,
+    globalPromptAppend,
   } = input
 
   const availableAgents: AvailableAgent[] = []
@@ -104,8 +105,7 @@ export function collectPendingBuiltinAgents(input: {
       config = applyEnvironmentContext(config, directory, { disableOmoEnv })
     }
 
-    config = applyOverrides(config, override, mergedCategories, directory)
-    config = resolveAgentSkills(config, { gitMasterConfig, browserProvider, disabledSkills })
+    config = applyOverrides(config, override, mergedCategories, directory, globalPromptAppend)
 
     // Store for later - will be added after sisyphus and hephaestus
     pendingAgentConfigs.set(name, config)

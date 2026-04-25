@@ -48,6 +48,7 @@ export function mergeAgentConfig(
     merged.prompt = resolvePromptAppend(merged.prompt, directory)
   }
 
+  // Agent-specific prompt_append is appended last (highest priority)
   if (prompt_append && merged.prompt) {
     merged.prompt = merged.prompt + "\n" + resolvePromptAppend(prompt_append, directory)
   }
@@ -59,9 +60,20 @@ export function applyOverrides(
   config: AgentConfig,
   override: AgentOverrideConfig | undefined,
   mergedCategories: Record<string, CategoryConfig>,
-  directory?: string
+  directory?: string,
+  globalPromptAppend?: string
 ): AgentConfig {
   let result = config
+
+  // Apply global_prompt_append FIRST so it appears before category and agent-specific appends
+  if (globalPromptAppend && typeof result.prompt === "string") {
+    const resolvedGlobal = resolvePromptAppend(globalPromptAppend, directory, true /* allowOutsideProject */)
+    result = {
+      ...result,
+      prompt: result.prompt + "\n" + resolvedGlobal,
+    }
+  }
+
   const overrideCategory = (override as Record<string, unknown> | undefined)?.category as string | undefined
   if (overrideCategory) {
     result = applyCategoryOverride(result, overrideCategory, mergedCategories)
