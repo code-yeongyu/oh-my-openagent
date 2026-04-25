@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs"
+import { existsSync, readFileSync, realpathSync } from "node:fs"
 import { homedir } from "node:os"
 import { isAbsolute, resolve } from "node:path"
 import { isWithinProject } from "../../shared/contains-path"
@@ -12,7 +12,12 @@ const ALLOWED_GLOBAL_PREFIXES = [
 ]
 
 function isAllowedGlobalPath(filePath: string): boolean {
-  return ALLOWED_GLOBAL_PREFIXES.some((prefix) => filePath.startsWith(prefix))
+  try {
+    const canonicalPath = realpathSync.native(filePath)
+    return ALLOWED_GLOBAL_PREFIXES.some((prefix) => canonicalPath.startsWith(prefix))
+  } catch {
+    return ALLOWED_GLOBAL_PREFIXES.some((prefix) => filePath.startsWith(prefix))
+  }
 }
 
 export function resolvePromptAppend(
