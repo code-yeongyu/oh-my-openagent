@@ -57,7 +57,7 @@ function writeJsonMessage(sessionID: string, fileName: string, agent: string): v
     join(messageDir, fileName),
       JSON.stringify({
         agent,
-        model: { providerID: "openai", modelID: "gpt-5.4" },
+        model: { providerID: "openai", modelID: "gpt-5.5" },
         time: { created: fileName.includes("002") ? 200 : 100 },
       }),
       "utf-8",
@@ -115,7 +115,7 @@ describe("getContinuationState JSON backend descendant coverage", () => {
       join(TEST_MESSAGE_STORAGE, sessionID, "msg_00000000_000999.json"),
       JSON.stringify({
         agent: "earliest-agent",
-        model: { providerID: "openai", modelID: "gpt-5.4" },
+        model: { providerID: "openai", modelID: "gpt-5.5" },
         time: { created: 10 },
       }),
       "utf-8",
@@ -151,17 +151,17 @@ describe("getContinuationState JSON backend descendant coverage", () => {
     mkdirSync(messageDir, { recursive: true })
     writeFileSync(join(messageDir, "msg_a91f00ab_000001.json"), JSON.stringify({
       agent: "atlas",
-      model: { providerID: "openai", modelID: "gpt-5.4" },
+      model: { providerID: "openai", modelID: "gpt-5.5" },
       time: { created: 100 },
     }), "utf-8")
     writeFileSync(join(messageDir, "msg_f0e1d2c3_000002.json"), JSON.stringify({
       agent: "compaction",
-      model: { providerID: "openai", modelID: "gpt-5.4" },
+      model: { providerID: "openai", modelID: "gpt-5.5" },
       time: { created: 200 },
     }), "utf-8")
     writeFileSync(join(messageDir, "msg_d4c3b2a1_000003.json"), JSON.stringify({
       agent: "sisyphus-junior",
-      model: { providerID: "openai", modelID: "gpt-5.4" },
+      model: { providerID: "openai", modelID: "gpt-5.5" },
       time: { created: 100 },
     }), "utf-8")
     sessionLastAgentBySessionID.set(sessionID, "sisyphus-junior")

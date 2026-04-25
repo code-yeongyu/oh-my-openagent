@@ -33,7 +33,7 @@ describe("loadAvailableModelsFromCache", () => {
     writeFileSync(
       join(tempDir, "cache", "opencode", "models.json"),
       JSON.stringify({
-        openai: { models: { "gpt-5.4": {} } },
+        openai: { models: { "gpt-5.5": {} } },
         anthropic: { models: { "claude-opus-4-7": {}, "claude-sonnet-4-6": {} } },
       })
     )
@@ -49,7 +49,7 @@ describe("loadAvailableModelsFromCache", () => {
     writeFileSync(
       join(tempDir, "cache", "opencode", "models.json"),
       JSON.stringify({
-        openai: { models: { "gpt-5.4": {} } },
+        openai: { models: { "gpt-5.5": {} } },
       })
     )
     writeFileSync(
@@ -58,7 +58,7 @@ describe("loadAvailableModelsFromCache", () => {
         provider: {
           "openai-custom": {
             npm: "@ai-sdk/openai-compatible",
-            models: { "gpt-5.4": {} },
+            models: { "gpt-5.5": {} },
           },
           "my-local-llm": {
             npm: "@ai-sdk/openai-compatible",
@@ -79,7 +79,7 @@ describe("loadAvailableModelsFromCache", () => {
     writeFileSync(
       join(tempDir, "cache", "opencode", "models.json"),
       JSON.stringify({
-        openai: { models: { "gpt-5.4": {} } },
+        openai: { models: { "gpt-5.5": {} } },
       })
     )
     writeFileSync(
@@ -104,7 +104,7 @@ describe("loadAvailableModelsFromCache", () => {
         provider: {
           "openai-custom": {
             npm: "@ai-sdk/openai-compatible",
-            models: { "gpt-5.4": {} },
+            models: { "gpt-5.5": {} },
           },
         },
       })
@@ -135,7 +135,7 @@ describe("loadAvailableModelsFromCache", () => {
   test("ignores malformed opencode.json gracefully", () => {
     writeFileSync(
       join(tempDir, "cache", "opencode", "models.json"),
-      JSON.stringify({ openai: { models: { "gpt-5.4": {} } } })
+      JSON.stringify({ openai: { models: { "gpt-5.5": {} } } })
     )
     writeFileSync(
       join(tempDir, "config", "opencode", "opencode.json"),

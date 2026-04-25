@@ -44,7 +44,7 @@ export async function promptInstallConfig(detected: DetectedConfig): Promise<Ins
     message: "Do you have an OpenAI/ChatGPT Plus subscription?",
     options: [
       { value: "no", label: "No", hint: "Oracle will use fallback models" },
-      { value: "yes", label: "Yes", hint: "GPT-5.4 for Oracle (high-IQ debugging)" },
+      { value: "yes", label: "Yes", hint: "GPT-5.5 for Oracle (high-IQ debugging)" },
     ],
     initialValue: initial.openai,
   })

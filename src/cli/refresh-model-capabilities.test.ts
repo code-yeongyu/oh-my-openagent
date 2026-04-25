@@ -13,7 +13,7 @@ describe("refreshModelCapabilities", () => {
       generatedAt: "2026-03-25T00:00:00.000Z",
       sourceUrl: "https://mirror.example/api.json",
       models: {
-        "gpt-5.4": { id: "gpt-5.4" },
+        "gpt-5.5": { id: "gpt-5.5" },
       },
     }))
     let stdout = ""
@@ -48,7 +48,7 @@ describe("refreshModelCapabilities", () => {
       generatedAt: "2026-03-25T00:00:00.000Z",
       sourceUrl: "https://override.example/api.json",
       models: {
-        "gpt-5.4": { id: "gpt-5.4" },
+        "gpt-5.5": { id: "gpt-5.5" },
         "claude-opus-4-7": { id: "claude-opus-4-7" },
       },
     }))

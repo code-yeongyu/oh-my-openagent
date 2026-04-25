@@ -231,12 +231,12 @@ describe("transformModelForProvider", () => {
     })
 
     test("prepends openai/ for gpt models", () => {
-      // #given vercel provider and gpt-5.4 model
+      // #given vercel provider and gpt-5.5 model
       // #when transformModelForProvider is called
-      const result = transformModelForProvider("vercel", "gpt-5.4")
+      const result = transformModelForProvider("vercel", "gpt-5.5")
 
-      // #then should produce openai/gpt-5.4
-      expect(result).toBe("openai/gpt-5.4")
+      // #then should produce openai/gpt-5.5
+      expect(result).toBe("openai/gpt-5.5")
     })
 
     test("prepends google/ and applies google transform for gemini models", () => {
