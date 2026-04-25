@@ -106,8 +106,8 @@ describe("createChatParamsHandler", () => {
       models: {
         openai: [
           {
-            id: "gpt-5.4",
-            name: "GPT-5.4",
+            id: "gpt-5.5",
+            name: "GPT-5.5",
             temperature: true,
             reasoning: true,
             variants: {
@@ -137,7 +137,7 @@ describe("createChatParamsHandler", () => {
     const input = {
       sessionID: "ses_chat_params_temperature",
       agent: { name: "oracle" },
-      model: { providerID: "openai", modelID: "gpt-5.4" },
+      model: { providerID: "openai", modelID: "gpt-5.5" },
       provider: { id: "openai" },
       message: {},
     }
@@ -175,7 +175,7 @@ describe("createChatParamsHandler", () => {
     })
   })
 
-  test("drops gpt-5.4 temperature and clamps maxOutputTokens from bundled model capabilities", async () => {
+  test("drops gpt-5.5 temperature and clamps maxOutputTokens from bundled model capabilities", async () => {
     //#given
     setSessionPromptParams("ses_chat_params_temperature", {
       temperature: 0.7,
@@ -189,7 +189,7 @@ describe("createChatParamsHandler", () => {
     const input = {
       sessionID: "ses_chat_params_temperature",
       agent: { name: "oracle" },
-      model: { providerID: "openai", modelID: "gpt-5.4" },
+      model: { providerID: "openai", modelID: "gpt-5.5" },
       provider: { id: "openai" },
       message: {},
     }

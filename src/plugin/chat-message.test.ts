@@ -111,7 +111,7 @@ describe("createChatMessageHandler - cache warning behavior", () => {
     mkdirSync(getOmoOpenCodeCacheDir(), { recursive: true })
     writeFileSync(providerModelsCachePath, JSON.stringify({
       models: {
-        openai: [{ id: "gpt-5.4" }],
+        openai: [{ id: "gpt-5.5" }],
       },
       connected: ["openai"],
       updatedAt: new Date().toISOString(),
@@ -145,7 +145,7 @@ describe("createChatMessageHandler - cache warning behavior", () => {
       openai: {
         id: "openai",
         models: {
-          "gpt-5.4": { id: "gpt-5.4" },
+          "gpt-5.5": { id: "gpt-5.5" },
         },
       },
     }))
@@ -650,7 +650,7 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
   test("reuses the stored model for subsequent messages in the main session when the UI sends none", async () => {
     //#given
     setMainSession("test-session")
-    setSessionModel("test-session", { providerID: "openai", modelID: "gpt-5.4" })
+    setSessionModel("test-session", { providerID: "openai", modelID: "gpt-5.5" })
     const args = createMockHandlerArgs({ shouldOverride: false })
     const handler = createChatMessageHandler(args)
     const input = createMockInput("sisyphus")
@@ -660,14 +660,14 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
     await handler(input, output)
 
     //#then
-    expect(output.message["model"]).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
-    expect(getSessionModel("test-session")).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
+    expect(output.message["model"]).toEqual({ providerID: "openai", modelID: "gpt-5.5" })
+    expect(getSessionModel("test-session")).toEqual({ providerID: "openai", modelID: "gpt-5.5" })
   })
 
   test("does not reuse a stored model for the first message of a session", async () => {
     //#given
     setMainSession("test-session")
-    setSessionModel("test-session", { providerID: "openai", modelID: "gpt-5.4" })
+    setSessionModel("test-session", { providerID: "openai", modelID: "gpt-5.5" })
     const args = createMockHandlerArgs({ shouldOverride: true })
     const handler = createChatMessageHandler(args)
     const input = createMockInput("sisyphus")
@@ -683,7 +683,7 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
   test("does not reuse the main-session model for subagent sessions", async () => {
     //#given
     setMainSession("main-session")
-    setSessionModel("main-session", { providerID: "openai", modelID: "gpt-5.4" })
+    setSessionModel("main-session", { providerID: "openai", modelID: "gpt-5.5" })
     subagentSessions.add("subagent-session")
     const args = createMockHandlerArgs({ shouldOverride: false })
     const handler = createChatMessageHandler(args)
@@ -704,7 +704,7 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
   test("does not override explicit agent model overrides with stored session model", async () => {
     //#given
     setMainSession("test-session")
-    setSessionModel("test-session", { providerID: "openai", modelID: "gpt-5.4" })
+    setSessionModel("test-session", { providerID: "openai", modelID: "gpt-5.5" })
     const args = createMockHandlerArgs({
       shouldOverride: false,
       pluginConfig: {
@@ -722,13 +722,13 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
 
     //#then
     expect(output.message["model"]).toBeUndefined()
-    expect(getSessionModel("test-session")).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
+    expect(getSessionModel("test-session")).toEqual({ providerID: "openai", modelID: "gpt-5.5" })
   })
 
   test("treats prefixed list-display agent names as explicit model overrides", async () => {
     //#given
     setMainSession("test-session")
-    setSessionModel("test-session", { providerID: "openai", modelID: "gpt-5.4" })
+    setSessionModel("test-session", { providerID: "openai", modelID: "gpt-5.5" })
     const args = createMockHandlerArgs({
       shouldOverride: false,
       pluginConfig: {
@@ -746,7 +746,7 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
 
     //#then
     expect(output.message["model"]).toBeUndefined()
-    expect(getSessionModel("test-session")).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
+    expect(getSessionModel("test-session")).toEqual({ providerID: "openai", modelID: "gpt-5.5" })
     expect(getSessionAgent("test-session")).toBe("Prometheus - Plan Builder")
   })
 
@@ -756,7 +756,7 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
     setSessionModel("test-session", { providerID: "anthropic", modelID: "claude-opus-4-7" })
     const args = createMockHandlerArgs({ shouldOverride: false })
     const handler = createChatMessageHandler(args)
-    const nextModel = { providerID: "openai", modelID: "gpt-5.4" }
+    const nextModel = { providerID: "openai", modelID: "gpt-5.5" }
     const input = createMockInput("sisyphus", nextModel)
     const output = createMockOutput()
 

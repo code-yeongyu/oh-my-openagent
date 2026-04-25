@@ -357,7 +357,7 @@ describe("background-agent spawner fallback model promotion", () => {
       parentMessageID: "message-1",
       model: {
         providerID: "openai",
-        modelID: "gpt-5.4",
+        modelID: "gpt-5.5",
         variant: "low",
         reasoningEffort: "high",
         temperature: 0.4,
@@ -393,7 +393,7 @@ describe("background-agent spawner fallback model promotion", () => {
     //#then
     expect(promptArgs.body.model).toEqual({
       providerID: "openai",
-      modelID: "gpt-5.4",
+      modelID: "gpt-5.5",
     })
     expect(promptArgs.body.variant).toBe("low")
     expect(promptArgs.body.options).toBeUndefined()
@@ -429,7 +429,7 @@ describe("background-agent spawner fallback model promotion", () => {
       agent: "sisyphus-junior",
       parentSessionID: "ses_parent",
       parentMessageID: "msg_parent",
-      model: { providerID: "openai", modelID: "gpt-5.4", variant: "medium" },
+      model: { providerID: "openai", modelID: "gpt-5.5", variant: "medium" },
     })
 
     const item = {
@@ -462,7 +462,7 @@ describe("background-agent spawner fallback model promotion", () => {
     expect(promptCalls[0]?.body?.agent).toBe("sisyphus-junior")
     expect(promptCalls[0]?.body?.model).toEqual({
       providerID: "openai",
-      modelID: "gpt-5.4",
+      modelID: "gpt-5.5",
     })
     expect(promptCalls[0]?.body?.variant).toBe("medium")
   })

@@ -750,7 +750,7 @@ describe("Prometheus category config resolution", () => {
 
     // then
     expect(config).toBeDefined()
-    expect(config?.model).toBe("openai/gpt-5.4")
+    expect(config?.model).toBe("openai/gpt-5.5")
     expect(config?.variant).toBe("xhigh")
   })
 
@@ -810,7 +810,7 @@ describe("Prometheus category config resolution", () => {
 
     // then - falls back to DEFAULT_CATEGORIES
     expect(config).toBeDefined()
-    expect(config?.model).toBe("openai/gpt-5.4")
+    expect(config?.model).toBe("openai/gpt-5.5")
     expect(config?.variant).toBe("xhigh")
   })
 
@@ -849,7 +849,7 @@ describe("Prometheus direct override priority over category", () => {
       },
       categories: {
         "test-planning": {
-          model: "openai/gpt-5.4",
+          model: "openai/gpt-5.5",
           reasoningEffort: "xhigh",
         },
       },
@@ -891,7 +891,7 @@ describe("Prometheus direct override priority over category", () => {
       },
       categories: {
         "reasoning-cat": {
-          model: "openai/gpt-5.4",
+          model: "openai/gpt-5.5",
           reasoningEffort: "high",
         },
       },
@@ -932,7 +932,7 @@ describe("Prometheus direct override priority over category", () => {
       },
       categories: {
         "temp-cat": {
-          model: "openai/gpt-5.4",
+          model: "openai/gpt-5.5",
           temperature: 0.8,
         },
       },
@@ -1055,7 +1055,7 @@ describe("Plan agent model inheritance from prometheus", () => {
   test("plan agent inherits temperature, reasoningEffort, and other model settings from prometheus", async () => {
     //#given - prometheus configured with category that has temperature and reasoningEffort
     spyOn(shared, "resolveModelPipeline" as any).mockReturnValue({
-      model: "openai/gpt-5.4",
+      model: "openai/gpt-5.5",
       provenance: "override",
       variant: "high",
     })
@@ -1066,7 +1066,7 @@ describe("Plan agent model inheritance from prometheus", () => {
       },
       agents: {
         prometheus: {
-          model: "openai/gpt-5.4",
+          model: "openai/gpt-5.5",
           variant: "high",
           temperature: 0.3,
           top_p: 0.9,
@@ -1097,7 +1097,7 @@ describe("Plan agent model inheritance from prometheus", () => {
     const agents = config.agent as Record<string, Record<string, unknown>>
     expect(agents.plan).toBeDefined()
     expect(agents.plan.mode).toBe("subagent")
-    expect(agents.plan.model).toBe("openai/gpt-5.4")
+    expect(agents.plan.model).toBe("openai/gpt-5.5")
     expect(agents.plan.variant).toBe("high")
     expect(agents.plan.temperature).toBe(0.3)
     expect(agents.plan.top_p).toBe(0.9)
@@ -1108,7 +1108,7 @@ describe("Plan agent model inheritance from prometheus", () => {
   })
 
   test("plan agent user override takes priority over prometheus inherited settings", async () => {
-    //#given - prometheus resolves to opus, but user has plan override for gpt-5.4
+    //#given - prometheus resolves to opus, but user has plan override for gpt-5.5
     spyOn(shared, "resolveModelPipeline" as any).mockReturnValue({
       model: "anthropic/claude-opus-4-7",
       provenance: "provider-fallback",
@@ -1121,7 +1121,7 @@ describe("Plan agent model inheritance from prometheus", () => {
       },
       agents: {
         plan: {
-          model: "openai/gpt-5.4",
+          model: "openai/gpt-5.5",
           variant: "high",
           temperature: 0.5,
         },
@@ -1145,7 +1145,7 @@ describe("Plan agent model inheritance from prometheus", () => {
 
     //#then - plan uses its own override, not prometheus settings
     const agents = config.agent as Record<string, Record<string, unknown>>
-    expect(agents.plan.model).toBe("openai/gpt-5.4")
+    expect(agents.plan.model).toBe("openai/gpt-5.5")
     expect(agents.plan.variant).toBe("high")
     expect(agents.plan.temperature).toBe(0.5)
   })

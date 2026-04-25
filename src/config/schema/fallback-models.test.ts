@@ -9,7 +9,7 @@ import { FallbackModelsSchema } from "./fallback-models"
 describe("FallbackModelsSchema", () => {
   test("accepts string array fallback_models", () => {
     // given
-    const fallbackModels = ["openai/gpt-5.4", "anthropic/claude-sonnet-4-6"]
+    const fallbackModels = ["openai/gpt-5.5", "anthropic/claude-sonnet-4-6"]
 
     // when
     const result = FallbackModelsSchema.safeParse(fallbackModels)
@@ -25,7 +25,7 @@ describe("FallbackModelsSchema", () => {
     // given
     const fallbackModels: FallbackModelObject[] = [
       {
-        model: "openai/gpt-5.4",
+        model: "openai/gpt-5.5",
         variant: "high",
         reasoningEffort: "high",
         temperature: 0.3,
@@ -48,7 +48,7 @@ describe("OhMyOpenCodeConfigSchema fallback_models", () => {
     // given
     const fallbackModels: FallbackModelObject[] = [
       {
-        model: "openai/gpt-5.4",
+        model: "openai/gpt-5.5",
         variant: "low",
         reasoningEffort: "medium",
       },
@@ -75,7 +75,7 @@ describe("OhMyOpenCodeConfigSchema fallback_models", () => {
     // given
     const fallbackModels: FallbackModelObject[] = [
       {
-        model: "openai/gpt-5.4",
+        model: "openai/gpt-5.5",
         maxTokens: 4096,
         thinking: { type: "disabled" },
       },

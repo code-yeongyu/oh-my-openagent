@@ -42,7 +42,7 @@ describe("buildPrometheusAgentConfig", () => {
     describe("#when currentModel is NOT in Prometheus fallback chain", () => {
       test("falls through to fallback chain instead of using currentModel as override", async () => {
         // given - currentModel is a model NOT in Prometheus fallback chain
-        // Prometheus chain: claude-opus-4-7, gpt-5.4, glm-5, gemini-3.1-pro
+        // Prometheus chain: claude-opus-4-7, gpt-5.5, glm-5, gemini-3.1-pro
         const currentModel = "some-provider/gpt-5.3-codex";
 
         // when
@@ -93,12 +93,12 @@ describe("buildPrometheusAgentConfig", () => {
         );
       });
 
-      test("accepts gpt-5.4 from fallback chain", async () => {
+      test("accepts gpt-5.5 from fallback chain", async () => {
         const result = await buildPrometheusAgentConfig({
           configAgentPlan: undefined,
           pluginPrometheusOverride: undefined,
           userCategories: undefined,
-          currentModel: "openai/gpt-5.4",
+          currentModel: "openai/gpt-5.5",
         });
         expect(result).toBeDefined();
       });

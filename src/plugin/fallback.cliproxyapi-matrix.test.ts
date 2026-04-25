@@ -70,7 +70,7 @@ const FIRST_FALLBACK_MODEL = {
 
 const CLIPROXYAPI_FALLBACKS = [
   `${PROVIDER_ID}/claude-sonnet-4-6`,
-  `${PROVIDER_ID}/gpt-5.4`,
+  `${PROVIDER_ID}/gpt-5.5`,
   `${PROVIDER_ID}/kimi-k2.5`,
 ]
 

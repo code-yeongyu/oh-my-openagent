@@ -34,7 +34,7 @@ describe("mergeConfigs", () => {
       const base = createConfig({
         categories: {
           general: {
-            model: "openai/gpt-5.4",
+            model: "openai/gpt-5.5",
             temperature: 0.5,
           },
           quick: {
@@ -57,7 +57,7 @@ describe("mergeConfigs", () => {
       const result = mergeConfigs(base, override);
 
       // then general.model should be preserved from base
-      expect(result.categories?.general?.model).toBe("openai/gpt-5.4");
+      expect(result.categories?.general?.model).toBe("openai/gpt-5.5");
       // then general.temperature should be overridden
       expect(result.categories?.general?.temperature).toBe(0.3);
       // then quick should be preserved from base
@@ -70,7 +70,7 @@ describe("mergeConfigs", () => {
       const base = createConfig({
         categories: {
           general: {
-            model: "openai/gpt-5.4",
+            model: "openai/gpt-5.5",
           },
         },
       });
@@ -79,7 +79,7 @@ describe("mergeConfigs", () => {
 
       const result = mergeConfigs(base, override);
 
-      expect(result.categories?.general?.model).toBe("openai/gpt-5.4");
+      expect(result.categories?.general?.model).toBe("openai/gpt-5.5");
     });
 
     it("should use override categories when base has no categories", () => {
@@ -88,14 +88,14 @@ describe("mergeConfigs", () => {
       const override = createConfig({
         categories: {
           general: {
-            model: "openai/gpt-5.4",
+            model: "openai/gpt-5.5",
           },
         },
       });
 
       const result = mergeConfigs(base, override);
 
-      expect(result.categories?.general?.model).toBe("openai/gpt-5.4");
+      expect(result.categories?.general?.model).toBe("openai/gpt-5.5");
     });
   });
 
@@ -184,7 +184,7 @@ describe("parseConfigPartially", () => {
       const rawConfig = {
         agents: {
           oracle: { model: "openai/gpt-5.5" },
-          momus: { model: "openai/gpt-5.4" },
+          momus: { model: "openai/gpt-5.5" },
         },
         disabled_hooks: ["comment-checker"],
       };
@@ -193,7 +193,7 @@ describe("parseConfigPartially", () => {
 
       expect(result).not.toBeNull();
       expect(result!.agents?.oracle).toMatchObject({ model: "openai/gpt-5.5" });
-      expect(result!.agents?.momus).toMatchObject({ model: "openai/gpt-5.4" });
+      expect(result!.agents?.momus).toMatchObject({ model: "openai/gpt-5.5" });
       expect(result!.disabled_hooks).toEqual(["comment-checker"]);
     });
   });
@@ -207,7 +207,7 @@ describe("parseConfigPartially", () => {
       const rawConfig = {
         agents: {
           oracle: { model: "openai/gpt-5.5" },
-          momus: { model: "openai/gpt-5.4" },
+          momus: { model: "openai/gpt-5.5" },
           prometheus: {
             permission: {
               edit: { "*": "ask", ".sisyphus/**": "allow" },

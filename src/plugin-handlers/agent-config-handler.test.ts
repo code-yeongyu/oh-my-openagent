@@ -89,7 +89,7 @@ describe("applyAgentConfig builtin override protection", () => {
     name: "atlas",
     prompt: "atlas prompt",
     mode: "all",
-    model: "openai/gpt-5.4",
+    model: "openai/gpt-5.5",
   }
 
   const sisyphusJuniorConfig: AgentConfig = {
@@ -332,7 +332,7 @@ describe("applyAgentConfig builtin override protection", () => {
     })
 
     // then
-    expect(createSisyphusJuniorAgentSpy).toHaveBeenCalledWith(undefined, "openai/gpt-5.4", false)
+    expect(createSisyphusJuniorAgentSpy).toHaveBeenCalledWith(undefined, "openai/gpt-5.5", false)
   })
 
   test("defaults mode to subagent for configAgent entries missing mode", async () => {
