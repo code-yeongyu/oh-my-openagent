@@ -36,7 +36,7 @@ describe("resolveAgentVariant", () => {
         sisyphus: { category: "ultrabrain" },
       },
       categories: {
-        ultrabrain: { model: "openai/gpt-5.4", variant: "xhigh" },
+        ultrabrain: { model: "openai/gpt-5.5", variant: "xhigh" },
       },
     } as OhMyOpenCodeConfig
 
@@ -124,10 +124,10 @@ describe("resolveVariantForModel", () => {
     expect(variant).toBe("medium")
   })
 
-  test("returns medium for openai/gpt-5.4 in sisyphus chain", () => {
-    // #given openai/gpt-5.4 is now in sisyphus fallback chain with variant medium
+  test("returns medium for openai/gpt-5.5 in sisyphus chain", () => {
+    // #given openai/gpt-5.5 is now in sisyphus fallback chain with variant medium
     const config = {} as OhMyOpenCodeConfig
-    const model = { providerID: "openai", modelID: "gpt-5.4" }
+    const model = { providerID: "openai", modelID: "gpt-5.5" }
 
     // when
     const variant = resolveVariantForModel(config, "sisyphus", model)
@@ -179,7 +179,7 @@ describe("resolveVariantForModel", () => {
         "custom-agent": { category: "ultrabrain" },
       },
     } as OhMyOpenCodeConfig
-    const model = { providerID: "openai", modelID: "gpt-5.4" }
+    const model = { providerID: "openai", modelID: "gpt-5.5" }
 
     // when
     const variant = resolveVariantForModel(config, "custom-agent", model)
