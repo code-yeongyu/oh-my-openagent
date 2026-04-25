@@ -181,7 +181,7 @@ describe("executeSync", () => {
     }
     const model = {
       providerID: "openai",
-      modelID: "gpt-5.4",
+      modelID: "gpt-5.5",
       variant: "high",
       temperature: 0.12,
       top_p: 0.34,
@@ -205,7 +205,7 @@ describe("executeSync", () => {
     const promptInput = recorder.getCapturedInput()
     expect(promptInput?.body.model).toEqual({
       providerID: "openai",
-      modelID: "gpt-5.4",
+      modelID: "gpt-5.5",
     })
     expect(promptInput?.body.variant).toBe("high")
     expect(promptInput?.body.temperature).toBe(0.12)

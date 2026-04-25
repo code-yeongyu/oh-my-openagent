@@ -291,7 +291,7 @@ describe("resolveSubagentExecution", () => {
   test("promotes object-style fallback model settings to categoryModel when subagent fallback becomes initial model", async () => {
     //#given
     readProviderModelsCacheMock.mockReturnValue({
-      models: { openai: ["gpt-5.4"] },
+      models: { openai: ["gpt-5.5"] },
       connected: ["openai"],
       updatedAt: "2026-03-03T00:00:00.000Z",
     })
@@ -306,7 +306,7 @@ describe("resolveSubagentExecution", () => {
           explore: {
             fallback_models: [
               {
-                model: "openai/gpt-5.4 high",
+                model: "openai/gpt-5.5 high",
                 variant: "low",
                 reasoningEffort: "high",
                 temperature: 0.2,
@@ -327,7 +327,7 @@ describe("resolveSubagentExecution", () => {
     expect(result.error).toBeUndefined()
     expect(result.categoryModel).toEqual({
       providerID: "openai",
-      modelID: "gpt-5.4",
+      modelID: "gpt-5.5",
       variant: "low",
       reasoningEffort: "high",
       temperature: 0.2,
@@ -607,7 +607,7 @@ describe("resolveSubagentExecution", () => {
   test("preserves category temperature when fallback entry leaves temperature undefined", async () => {
     //#given
     readProviderModelsCacheMock.mockReturnValue({
-      models: { openai: ["gpt-5.4"] },
+      models: { openai: ["gpt-5.5"] },
       connected: ["openai"],
       updatedAt: "2026-03-03T00:00:00.000Z",
     })
@@ -627,7 +627,7 @@ describe("resolveSubagentExecution", () => {
           research: {
             fallback_models: [
               {
-                model: "openai/gpt-5.4",
+                model: "openai/gpt-5.5",
                 variant: "max",
               },
             ],
@@ -645,7 +645,7 @@ describe("resolveSubagentExecution", () => {
     expect(result.error).toBeUndefined()
     expect(result.categoryModel).toEqual({
       providerID: "openai",
-      modelID: "gpt-5.4",
+      modelID: "gpt-5.5",
       variant: "max",
       temperature: 0.55,
       top_p: 0.45,
@@ -663,7 +663,7 @@ describe("resolveSubagentExecution", () => {
     const args = createBaseArgs({ subagent_type: "explore" })
     const executorCtx = createExecutorContext(
       async () => ([
-        { name: "explore", mode: "subagent", model: "openai/gpt-5.4" },
+        { name: "explore", mode: "subagent", model: "openai/gpt-5.5" },
       ]),
       {
         agentOverrides: {
@@ -673,7 +673,7 @@ describe("resolveSubagentExecution", () => {
         } as ExecutorContext["agentOverrides"],
         userCategories: {
           research: {
-            model: "openai/gpt-5.4",
+            model: "openai/gpt-5.5",
             variant: "high",
             temperature: 0.61,
             top_p: 0.62,
@@ -692,7 +692,7 @@ describe("resolveSubagentExecution", () => {
     expect(result.error).toBeUndefined()
     expect(result.categoryModel).toEqual({
       providerID: "openai",
-      modelID: "gpt-5.4",
+      modelID: "gpt-5.5",
       variant: "high",
       temperature: 0.61,
       top_p: 0.62,
@@ -705,7 +705,7 @@ describe("resolveSubagentExecution", () => {
   test("resolves user agent from loadUserAgents when calling task(subagent_type=...)", async () => {
     //#given
     readProviderModelsCacheMock.mockReturnValue({
-      models: { openai: ["gpt-5.4"] },
+      models: { openai: ["gpt-5.5"] },
       connected: ["openai"],
       updatedAt: "2026-03-03T00:00:00.000Z",
     })
@@ -715,7 +715,7 @@ describe("resolveSubagentExecution", () => {
         description: "A user agent",
         mode: "subagent",
         prompt: "Do something",
-        model: "openai/gpt-5.4",
+        model: "openai/gpt-5.5",
       },
     }))
     const args = createBaseArgs({ subagent_type: "my-user-agent" })
@@ -727,7 +727,7 @@ describe("resolveSubagentExecution", () => {
     //#then
     expect(result.error).toBeUndefined()
     expect(result.agentToUse).toBe("my-user-agent")
-    expect(result.categoryModel?.modelID).toBe("gpt-5.4")
+    expect(result.categoryModel?.modelID).toBe("gpt-5.5")
   })
 
   test("resolves project agent from loadProjectAgents when calling task(subagent_type=...)", async () => {
@@ -761,7 +761,7 @@ describe("resolveSubagentExecution", () => {
   test("server agent takes precedence over user agent with same name", async () => {
     //#given
     readProviderModelsCacheMock.mockReturnValue({
-      models: { openai: ["gpt-5.4", "gpt-3.5"] },
+      models: { openai: ["gpt-5.5", "gpt-3.5"] },
       connected: ["openai"],
       updatedAt: "2026-03-03T00:00:00.000Z",
     })
@@ -776,7 +776,7 @@ describe("resolveSubagentExecution", () => {
     }))
     const args = createBaseArgs({ subagent_type: "explore" })
     const executorCtx = createExecutorContext(async () => ([
-      { name: "explore", mode: "subagent", model: "openai/gpt-5.4" },
+      { name: "explore", mode: "subagent", model: "openai/gpt-5.5" },
     ]))
 
     //#when
@@ -785,7 +785,7 @@ describe("resolveSubagentExecution", () => {
     //#then
     expect(result.error).toBeUndefined()
     expect(result.agentToUse).toBe("explore")
-    expect(result.categoryModel?.modelID).toBe("gpt-5.4")
+    expect(result.categoryModel?.modelID).toBe("gpt-5.5")
   })
 
   test("project agent takes precedence over user agent with same name", async () => {

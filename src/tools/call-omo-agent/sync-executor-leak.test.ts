@@ -172,7 +172,7 @@ describe("executeSync session cleanup", () => {
         createOrGetSession: mock(async () => ({ sessionID, isNew: false })),
         clearSessionFallbackChain,
       })
-      const fallbackChain = [{ providers: ["openai"], model: "gpt-5.4" }]
+      const fallbackChain = [{ providers: ["openai"], model: "gpt-5.5" }]
 
       // when
       await executeSync(args, toolContext, createContext(promptAsync) as never, deps, fallbackChain)

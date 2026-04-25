@@ -7,7 +7,7 @@ import type { ParentContext } from "./executor-types"
 import * as executor from "./executor"
 
 const runtimeRequire = require as NodeJS.Require & { cache?: Record<string, unknown> }
-const MODEL = { providerID: "openai", modelID: "gpt-5.4" }
+const MODEL = { providerID: "openai", modelID: "gpt-5.5" }
 
 function clearRequireCache(modulePath: string): void {
   const resolvedPath = runtimeRequire.resolve(modulePath)

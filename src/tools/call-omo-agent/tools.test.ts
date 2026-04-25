@@ -354,7 +354,7 @@ describe("createCallOmoAgent", () => {
       [],
       {
         explore: {
-          model: "openai/gpt-5.4",
+          model: "openai/gpt-5.5",
           variant: "high",
         },
       },
@@ -381,7 +381,7 @@ describe("createCallOmoAgent", () => {
     const [launchArgs] = firstLaunchCall
     expect(launchArgs.model).toEqual({
       providerID: "openai",
-      modelID: "gpt-5.4",
+      modelID: "gpt-5.5",
       variant: "high",
     })
   })
@@ -405,7 +405,7 @@ describe("createCallOmoAgent", () => {
       [],
       {
         explore: {
-          model: "openai/gpt-5.4 high",
+          model: "openai/gpt-5.5 high",
         },
       },
     )
@@ -431,7 +431,7 @@ describe("createCallOmoAgent", () => {
     const [launchArgs] = firstLaunchCall
     expect(launchArgs.model).toEqual({
       providerID: "openai",
-      modelID: "gpt-5.4",
+      modelID: "gpt-5.5",
       variant: "high",
     })
   })
@@ -460,7 +460,7 @@ describe("createCallOmoAgent", () => {
       },
       {
         research: {
-          model: "openai/gpt-5.4",
+          model: "openai/gpt-5.5",
         },
       },
     )
@@ -486,7 +486,7 @@ describe("createCallOmoAgent", () => {
     const [launchArgs] = firstLaunchCall
     expect(launchArgs.model).toEqual({
       providerID: "openai",
-      modelID: "gpt-5.4",
+      modelID: "gpt-5.5",
     })
   })
 

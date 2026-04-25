@@ -69,18 +69,18 @@ describe("resolveMultimodalLookerAgentMetadata", () => {
     // given - registered model is in the vision-capable cache
     setVisionCapableModelsCache(new Map([
       [
-        "openai/gpt-5.4",
-        { providerID: "openai", modelID: "gpt-5.4" },
+        "openai/gpt-5.5",
+        { providerID: "openai", modelID: "gpt-5.5" },
       ],
     ]))
     spyOn(modelAvailability, "fetchAvailableModels").mockResolvedValue(
-      new Set(["openai/gpt-5.4"]),
+      new Set(["openai/gpt-5.5"]),
     )
     spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
     const ctx = createPluginInput([
       {
         name: "multimodal-looker",
-        model: { providerID: "openai", modelID: "gpt-5.4" },
+        model: { providerID: "openai", modelID: "gpt-5.5" },
       },
     ])
 
@@ -89,13 +89,13 @@ describe("resolveMultimodalLookerAgentMetadata", () => {
 
     // then - returns registered metadata directly, variant is undefined since none was set
     expect(result).toEqual({
-      agentModel: { providerID: "openai", modelID: "gpt-5.4" },
+      agentModel: { providerID: "openai", modelID: "gpt-5.5" },
       agentVariant: undefined,
     })
   })
 
   test("prefers registered model over dynamically resolved vision-capable model", async () => {
-    // given - registered model is openai/gpt-5.4, dynamic would resolve to rundao model
+    // given - registered model is openai/gpt-5.5, dynamic would resolve to rundao model
     setVisionCapableModelsCache(new Map([
       [
         "rundao/public/qwen3.5-397b",
@@ -103,13 +103,13 @@ describe("resolveMultimodalLookerAgentMetadata", () => {
       ],
     ]))
     spyOn(modelAvailability, "fetchAvailableModels").mockResolvedValue(
-      new Set(["openai/gpt-5.4", "rundao/public/qwen3.5-397b"]),
+      new Set(["openai/gpt-5.5", "rundao/public/qwen3.5-397b"]),
     )
     spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai", "rundao"])
     const ctx = createPluginInput([
       {
         name: "multimodal-looker",
-        model: { providerID: "openai", modelID: "gpt-5.4" },
+        model: { providerID: "openai", modelID: "gpt-5.5" },
         variant: "medium",
       },
     ])
@@ -119,7 +119,7 @@ describe("resolveMultimodalLookerAgentMetadata", () => {
 
     // then - registered model takes priority even when not in vision cache
     expect(result).toEqual({
-      agentModel: { providerID: "openai", modelID: "gpt-5.4" },
+      agentModel: { providerID: "openai", modelID: "gpt-5.5" },
       agentVariant: "medium",
     })
   })
@@ -151,13 +151,13 @@ describe("resolveMultimodalLookerAgentMetadata", () => {
   test("returns registered model even when not in vision-capable cache", async () => {
     // given - registered model exists but is NOT in the vision-capable cache
     spyOn(modelAvailability, "fetchAvailableModels").mockResolvedValue(
-      new Set(["openai/gpt-5.4"]),
+      new Set(["openai/gpt-5.5"]),
     )
     spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
     const ctx = createPluginInput([
       {
         name: "multimodal-looker",
-        model: { providerID: "openai", modelID: "gpt-5.4" },
+        model: { providerID: "openai", modelID: "gpt-5.5" },
       },
     ])
 
@@ -166,7 +166,7 @@ describe("resolveMultimodalLookerAgentMetadata", () => {
 
     // then - trusts user's configured model regardless of vision cache
     expect(result).toEqual({
-      agentModel: { providerID: "openai", modelID: "gpt-5.4" },
+      agentModel: { providerID: "openai", modelID: "gpt-5.5" },
       agentVariant: undefined,
     })
   })

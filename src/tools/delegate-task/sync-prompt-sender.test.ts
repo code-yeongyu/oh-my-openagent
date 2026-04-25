@@ -204,7 +204,7 @@ bunDescribe("sendSyncPrompt", () => {
       systemContent: undefined,
       categoryModel: {
         providerID: "openai",
-        modelID: "gpt-5.4",
+        modelID: "gpt-5.5",
         variant: "medium",
       },
       toastManager: null,
@@ -219,7 +219,7 @@ bunDescribe("sendSyncPrompt", () => {
     bunExpect(promptArgs.body.agent).toBe("sisyphus-junior")
     bunExpect(promptArgs.body.model).toEqual({
       providerID: "openai",
-      modelID: "gpt-5.4",
+      modelID: "gpt-5.5",
     })
     bunExpect(promptArgs.body.variant).toBe("medium")
   })
@@ -245,7 +245,7 @@ bunDescribe("sendSyncPrompt", () => {
       systemContent: undefined,
       categoryModel: {
         providerID: "openai",
-        modelID: "gpt-5.4",
+        modelID: "gpt-5.5",
         variant: "low",
         reasoningEffort: "high",
         temperature: 0.4,
@@ -271,7 +271,7 @@ bunDescribe("sendSyncPrompt", () => {
     bunExpect(promptWithModelSuggestionRetry).toHaveBeenCalledTimes(1)
     bunExpect(promptArgs.body.model).toEqual({
       providerID: "openai",
-      modelID: "gpt-5.4",
+      modelID: "gpt-5.5",
     })
     bunExpect(promptArgs.body.variant).toBe("low")
     bunExpect(promptArgs.body.options).toEqual({
@@ -312,7 +312,7 @@ bunDescribe("sendSyncPrompt", () => {
       systemContent: undefined,
       categoryModel: {
         providerID: "openai",
-        modelID: "gpt-5.4",
+        modelID: "gpt-5.5",
         temperature: 0.25,
       },
       toastManager: null,

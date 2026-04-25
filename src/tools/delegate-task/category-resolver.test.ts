@@ -118,7 +118,7 @@ describe("resolveCategoryExecution", () => {
 	test("promotes object-style fallback model settings to categoryModel when fallback becomes initial model", async () => {
 		//#given
 		const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
-			models: { openai: ["gpt-5.4"] },
+			models: { openai: ["gpt-5.5"] },
 			connected: ["openai"],
 			updatedAt: "2026-03-03T00:00:00.000Z",
 		})
@@ -137,7 +137,7 @@ describe("resolveCategoryExecution", () => {
 			quick: {
 				fallback_models: [
 					{
-						model: "openai/gpt-5.4 high",
+						model: "openai/gpt-5.5 high",
 						variant: "low",
 						reasoningEffort: "high",
 						temperature: 0.4,
@@ -154,10 +154,10 @@ describe("resolveCategoryExecution", () => {
 
 		//#then
 		expect(result.error).toBeUndefined()
-		expect(result.actualModel).toBe("openai/gpt-5.4")
+		expect(result.actualModel).toBe("openai/gpt-5.5")
 		expect(result.categoryModel).toEqual({
 			providerID: "openai",
-			modelID: "gpt-5.4",
+			modelID: "gpt-5.5",
 			variant: "low",
 			reasoningEffort: "high",
 			temperature: 0.4,
@@ -183,7 +183,7 @@ describe("resolveCategoryExecution", () => {
 		const executorCtx = createMockExecutorContext()
 		executorCtx.userCategories = {
 			quick: {
-				model: "openai/gpt-5.4 high",
+				model: "openai/gpt-5.5 high",
 			},
 		}
 
@@ -197,10 +197,10 @@ describe("resolveCategoryExecution", () => {
 		if (!result.actualModel || !result.categoryModel) {
 			throw new Error("Expected resolved model and category model")
 		}
-		expect(result.actualModel).toBe("openai/gpt-5.4")
+		expect(result.actualModel).toBe("openai/gpt-5.5")
 		expect(result.categoryModel).toEqual({
 			providerID: "openai",
-			modelID: "gpt-5.4",
+			modelID: "gpt-5.5",
 			variant: "high",
 		})
 	})

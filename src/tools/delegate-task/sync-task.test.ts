@@ -345,7 +345,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
     const fallbackChain = [
       { providers: ["anthropic"], model: "claude-opus-4-7", variant: "max" },
       { providers: ["opencode-go"], model: "kimi-k2.5" },
-      { providers: ["openai"], model: "gpt-5.4", variant: "medium" },
+      { providers: ["openai"], model: "gpt-5.5", variant: "medium" },
     ]
 
     //#when
@@ -358,7 +358,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
     expect(attemptedModels).toEqual([
       { providerID: "anthropic", modelID: "claude-opus-4-7", variant: "max" },
       { providerID: "opencode-go", modelID: "kimi-k2.5", variant: undefined },
-      { providerID: "openai", modelID: "gpt-5.4", variant: "medium" },
+      { providerID: "openai", modelID: "gpt-5.5", variant: "medium" },
     ])
   })
 

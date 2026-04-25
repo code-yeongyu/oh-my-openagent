@@ -2,7 +2,7 @@ const { describe, test, expect } = require("bun:test")
 
 import { resolveMetadataModel } from "./resolve-metadata-model"
 
-const PRIMARY = { providerID: "openai", modelID: "gpt-5.4" }
+const PRIMARY = { providerID: "openai", modelID: "gpt-5.5" }
 const FALLBACK = { providerID: "anthropic", modelID: "claude-sonnet-4-6" }
 
 describe("resolveMetadataModel", () => {
@@ -40,11 +40,11 @@ describe("resolveMetadataModel", () => {
 
   describe("#given primary has extra fields", () => {
     test("#when resolving #then preserves variant and strips unrelated fields", () => {
-      const extended = { providerID: "openai", modelID: "gpt-5.4", variant: "high", temperature: 0.7 } as const
+      const extended = { providerID: "openai", modelID: "gpt-5.5", variant: "high", temperature: 0.7 } as const
 
       const result = resolveMetadataModel(extended, undefined)
 
-      expect(result).toEqual({ providerID: "openai", modelID: "gpt-5.4", variant: "high" })
+      expect(result).toEqual({ providerID: "openai", modelID: "gpt-5.5", variant: "high" })
     })
   })
 
@@ -82,11 +82,11 @@ describe("resolveMetadataModel", () => {
 
   describe("#given both lack variant", () => {
     test("#when resolving metadata model #then variant is not on result", () => {
-      const primary = { providerID: "openai", modelID: "gpt-5.4" }
+      const primary = { providerID: "openai", modelID: "gpt-5.5" }
 
       const result = resolveMetadataModel(primary, undefined)
 
-      expect(result).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
+      expect(result).toEqual({ providerID: "openai", modelID: "gpt-5.5" })
       expect(result?.variant).toBeUndefined()
     })
   })

@@ -342,7 +342,7 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
       "explore",
       undefined,
       undefined,
-      [{ providers: ["openai"], model: "gpt-5.4" }],
+      [{ providers: ["openai"], model: "gpt-5.5" }],
     )
 
     await new Promise(resolve => setTimeout(resolve, 5))
