@@ -66,6 +66,7 @@ function createThrowingShellPromise(shouldThrow: (cmdStr: string) => boolean) {
 describe("session-notification-sender", () => {
 	beforeEach(() => {
 		jest.restoreAllMocks()
+		spyOn(utils, "getCmuxPath").mockResolvedValue(null)
 		spyOn(utils, "getTerminalNotifierPath").mockResolvedValue("/usr/local/bin/terminal-notifier")
 		spyOn(utils, "getOsascriptPath").mockResolvedValue("/usr/bin/osascript")
 		spyOn(utils, "getNotifySendPath").mockResolvedValue("/usr/bin/notify-send")
@@ -76,6 +77,105 @@ describe("session-notification-sender", () => {
 	})
 
 	describe("#given sendSessionNotification", () => {
+		describe("#when cmux is available", () => {
+			test("#then should use cmux notify", async () => {
+				spyOn(utils, "getCmuxPath").mockResolvedValue("/usr/local/bin/cmux")
+
+				const executedCmds: string[] = []
+				const mockCtx = {
+					$: createShellPromise((cmdStr) => executedCmds.push(cmdStr)),
+				} as unknown as PluginInput
+
+				await sender.sendSessionNotification(mockCtx, "darwin", "Test", "Message")
+
+				expect(executedCmds.length).toBe(1)
+				expect(executedCmds[0]).toContain("cmux")
+				expect(executedCmds[0]).toContain("notify")
+				expect(executedCmds[0]).not.toContain("terminal-notifier")
+				expect(executedCmds[0]).not.toContain("osascript")
+			})
+		})
+
+		describe("#when cmux fails", () => {
+			test("#then should fall back to terminal-notifier", async () => {
+				spyOn(utils, "getCmuxPath").mockResolvedValue("/usr/local/bin/cmux")
+
+				const allCmds: string[] = []
+				const mockCtx = {
+					$: (cmd: TemplateStringsArray, ...values: unknown[]) => {
+						const cmdStr = cmd.reduce((acc, part, i) => acc + part + (values[i] ?? ""), "")
+						allCmds.push(cmdStr)
+
+						if (cmdStr.includes("/usr/local/bin/cmux")) {
+							const err = Object.assign(new Error("command failed"), { stdout: Buffer.from(""), stderr: Buffer.from(""), exitCode: 1 })
+							const p = Promise.reject(err) as any
+							p.quiet = () => p
+							p.nothrow = () => { const q = Promise.resolve({}) as any; q.quiet = () => q; return q }
+							return p
+						}
+
+						const result = { stdout: Buffer.from(""), stderr: Buffer.from(""), exitCode: 0 }
+						const p = Promise.resolve(result) as any
+						p.quiet = () => p
+						p.nothrow = () => p
+						return p
+					},
+				} as unknown as PluginInput
+
+				await sender.sendSessionNotification(mockCtx, "darwin", "Test", "Message")
+
+				expect(allCmds.some((cmd) => cmd.includes("/usr/local/bin/cmux"))).toBe(true)
+				expect(allCmds.some((cmd) => cmd.includes("terminal-notifier"))).toBe(true)
+			})
+
+			test("#then should fall back to osascript when both cmux and terminal-notifier fail", async () => {
+				spyOn(utils, "getCmuxPath").mockResolvedValue("/usr/local/bin/cmux")
+
+				const allCmds: string[] = []
+				const mockCtx = {
+					$: (cmd: TemplateStringsArray, ...values: unknown[]) => {
+						const cmdStr = cmd.reduce((acc, part, i) => acc + part + (values[i] ?? ""), "")
+						allCmds.push(cmdStr)
+
+						if (cmdStr.includes("/usr/local/bin/cmux") || cmdStr.includes("terminal-notifier")) {
+							const err = Object.assign(new Error("command failed"), { stdout: Buffer.from(""), stderr: Buffer.from(""), exitCode: 1 })
+							const p = Promise.reject(err) as any
+							p.quiet = () => p
+							p.nothrow = () => { const q = Promise.resolve({}) as any; q.quiet = () => q; return q }
+							return p
+						}
+
+						const result = { stdout: Buffer.from(""), stderr: Buffer.from(""), exitCode: 0 }
+						const p = Promise.resolve(result) as any
+						p.quiet = () => p
+						p.nothrow = () => p
+						return p
+					},
+				} as unknown as PluginInput
+
+				await sender.sendSessionNotification(mockCtx, "darwin", "Test", "Message")
+
+				expect(allCmds.some((cmd) => cmd.includes("/usr/local/bin/cmux"))).toBe(true)
+				expect(allCmds.some((cmd) => cmd.includes("terminal-notifier"))).toBe(true)
+				expect(allCmds.some((cmd) => cmd.includes("osascript"))).toBe(true)
+			})
+		})
+
+		describe("#when cmux is not available", () => {
+			test("#then should skip to terminal-notifier", async () => {
+				const executedCmds: string[] = []
+				const mockCtx = {
+					$: createShellPromise((cmdStr) => executedCmds.push(cmdStr)),
+				} as unknown as PluginInput
+
+				await sender.sendSessionNotification(mockCtx, "darwin", "Test", "Message")
+
+				expect(executedCmds.length).toBe(1)
+				expect(executedCmds[0]).toContain("terminal-notifier")
+				expect(executedCmds[0]).not.toContain("/usr/local/bin/cmux")
+			})
+		})
+
 		describe("#when calling ctx.$ for notifications", () => {
 			test("#then should call .quiet() on all shell commands to suppress stdout/stderr", async () => {
 				const quietCalls: string[] = []
