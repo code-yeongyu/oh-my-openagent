@@ -224,7 +224,7 @@ describe("createEventHandler - model fallback", () => {
       providerID: "github-copilot",
       modelID: "claude-opus-4.7",
     })
-    expect(output.message["variant"]).toBe("high")
+    expect(output.message["variant"]).toBe("medium")
   })
 
   test("does not spam abort/prompt when session.status retry countdown updates", async () => {
@@ -551,7 +551,7 @@ describe("createEventHandler - model fallback", () => {
       providerID: "github-copilot",
       modelID: "claude-opus-4.7",
     })
-    expect(first.message["variant"]).toBe("high")
+    expect(first.message["variant"]).toBe("medium")
 
     //#when - second retry cycle
     const second = await triggerRetryCycle()

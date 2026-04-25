@@ -61,8 +61,13 @@ const MAX_VARIANT_BY_TIER: Record<string, string> = {
   default: "high",
 }
 
-function clampVariant(variant: string, isOpus: boolean, isConstrained: boolean): string {
+function isCopilotOpus47(providerID: string, modelID: string): boolean {
+  return providerID === "github-copilot" && isOpusModel(modelID) && /opus-4[-.]7/i.test(modelID)
+}
+
+function clampVariant(providerID: string, modelID: string, variant: string, isOpus: boolean, isConstrained: boolean): string {
   if (variant !== "max") return variant
+  if (isCopilotOpus47(providerID, modelID)) return "medium"
   if (isConstrained) return MAX_VARIANT_BY_TIER.default
   return isOpus ? MAX_VARIANT_BY_TIER.opus : MAX_VARIANT_BY_TIER.default
 }
@@ -83,7 +88,7 @@ export function createAnthropicEffortHook() {
 
       const opus = isOpusModel(model.modelID)
       const constrained = isConstrainedProvider(model.providerID)
-      const clamped = clampVariant(message.variant, opus, constrained)
+      const clamped = clampVariant(model.providerID, model.modelID, message.variant, opus, constrained)
       output.options.effort = clamped
 
       const shouldOverrideMessageVariant = !opus || constrained
@@ -94,10 +99,12 @@ export function createAnthropicEffortHook() {
         // caps at high even on Opus because the OAuth API only accepts
         // low | medium | high.
         ;(message as { variant?: string }).variant = clamped
-        log("anthropic-effort: clamped variant max→high", {
+        log("anthropic-effort: clamped variant", {
           sessionID: input.sessionID,
           provider: model.providerID,
           model: model.modelID,
+          from: "max",
+          to: clamped,
           reason: constrained ? "constrained-provider" : "non-opus",
         })
       } else {

@@ -42,7 +42,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     const second = sisyphus.fallbackChain[1]
     expect(second.providers).toEqual(["github-copilot"])
     expect(second.model).toBe("claude-opus-4-7")
-    expect(second.variant).toBe("high")
+    expect(second.variant).toBe("medium")
 
     const third = sisyphus.fallbackChain[2]
     expect(third.providers).toEqual(["opencode-go", "vercel"])
@@ -162,7 +162,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(last.model).toBe("gpt-5-nano")
   })
 
-  test("prometheus keeps split claude-opus-4-7 entries with Copilot high variant", () => {
+  test("prometheus keeps split claude-opus-4-7 entries with Copilot medium variant", () => {
     // #given - prometheus agent requirement
     const prometheus = AGENT_MODEL_REQUIREMENTS["prometheus"]
 
@@ -180,10 +180,10 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     const sibling = prometheus.fallbackChain[1]
     expect(sibling.providers).toEqual(["github-copilot"])
     expect(sibling.model).toBe("claude-opus-4-7")
-    expect(sibling.variant).toBe("high")
+    expect(sibling.variant).toBe("medium")
   })
 
-  test("metis keeps split claude-opus-4-7 entries with Copilot high variant", () => {
+  test("metis keeps split claude-opus-4-7 entries with Copilot medium variant", () => {
     // #given - metis agent requirement
     const metis = AGENT_MODEL_REQUIREMENTS["metis"]
 
@@ -201,7 +201,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     const sibling = metis.fallbackChain[1]
     expect(sibling.providers).toEqual(["github-copilot"])
     expect(sibling.model).toBe("claude-opus-4-7")
-    expect(sibling.variant).toBe("high")
+    expect(sibling.variant).toBe("medium")
 
     const openAiFallback = metis.fallbackChain.find((entry) => entry.providers.includes("openai"))
     expect(openAiFallback).toEqual({
@@ -392,7 +392,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     const fifth = visualEngineering.fallbackChain[4]
     expect(fifth.providers).toEqual(["github-copilot"])
     expect(fifth.model).toBe("claude-opus-4-7")
-    expect(fifth.variant).toBe("high")
+    expect(fifth.variant).toBe("medium")
 
     const sixth = visualEngineering.fallbackChain[5]
     expect(sixth.providers[0]).toBe("opencode-go")
@@ -455,7 +455,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     const sibling = unspecifiedHigh.fallbackChain[1]
     expect(sibling.providers).toEqual(["github-copilot"])
     expect(sibling.model).toBe("claude-opus-4-7")
-    expect(sibling.variant).toBe("high")
+    expect(sibling.variant).toBe("medium")
 
     const secondary = unspecifiedHigh.fallbackChain[2]
     expect(secondary.model).toBe("gpt-5.4")

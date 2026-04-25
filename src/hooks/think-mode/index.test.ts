@@ -43,7 +43,7 @@ describe("createThinkModeHook", () => {
     clearThinkModeState(sessionID)
   })
 
-  it("sets high variant when think keyword is present", async () => {
+  it("sets medium variant for github-copilot opus 4.7 when think keyword is present", async () => {
     // given
     const hook = createThinkModeHook()
     const input = createHookInput({
@@ -57,7 +57,7 @@ describe("createThinkModeHook", () => {
     await hook["chat.message"](input, output)
 
     // then
-    expect(output.message.variant).toBe("high")
+    expect(output.message.variant).toBe("medium")
     expect(output.message.model).toBeUndefined()
   })
 

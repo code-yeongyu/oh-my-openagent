@@ -172,7 +172,7 @@ describe("model fallback hook", () => {
       providerID: "github-copilot",
       modelID: "claude-opus-4.7",
     })
-    expect(secondOutput.message["variant"]).toBe("high")
+    expect(secondOutput.message["variant"]).toBe("medium")
   })
 
   test("does not re-arm fallback when one is already pending", () => {

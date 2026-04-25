@@ -5,6 +5,11 @@ import { log } from "../../shared"
 
 const thinkModeState = new Map<string, ThinkModeState>()
 
+function getThinkVariant(providerID: string, modelID: string): string {
+  if (providerID === "github-copilot" && /claude-opus-4[-.]7/i.test(modelID)) return "medium"
+  return "high"
+}
+
 export function clearThinkModeState(sessionID: string): void {
   thinkModeState.delete(sessionID)
 }
@@ -56,10 +61,11 @@ export function createThinkModeHook() {
         return
       }
 
-      output.message.variant = "high"
+      const variant = getThinkVariant(currentModel.providerID, currentModel.modelID)
+      output.message.variant = variant
       state.modelSwitched = false
       state.variantSet = true
-      log("Think mode: variant set to high", { sessionID })
+      log("Think mode: variant set", { sessionID, variant })
 
       thinkModeState.set(sessionID, state)
     },

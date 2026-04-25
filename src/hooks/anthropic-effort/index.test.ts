@@ -153,7 +153,7 @@ describe("createAnthropicEffortHook", () => {
       expect(output.options.effort).toBeUndefined()
     })
 
-    it("#given github-copilot + claude opus model #then effort clamped to high (constrained provider)", async () => {
+    it("#given github-copilot + claude opus 4.7 #then effort clamped to medium", async () => {
       // given
       const hook = createAnthropicEffortHook()
       const { input, output } = createMockParams({
@@ -164,9 +164,9 @@ describe("createAnthropicEffortHook", () => {
       // when
       await hook["chat.params"](input, output)
 
-      // then — github-copilot is a constrained provider, clamps max→high
-      expect(output.options.effort).toBe("high")
-      expect(input.message.variant).toBe("high")
+      // then
+      expect(output.options.effort).toBe("medium")
+      expect(input.message.variant).toBe("medium")
     })
 
     it("#given github-copilot + claude sonnet model #then effort clamped to high", async () => {

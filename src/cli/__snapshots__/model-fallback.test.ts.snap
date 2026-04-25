@@ -1394,13 +1394,13 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models when 
         },
       ],
       "model": "github-copilot/claude-opus-4.7",
-      "variant": "high",
+      "variant": "medium",
     },
     "momus": {
       "fallback_models": [
         {
           "model": "github-copilot/claude-opus-4.7",
-          "variant": "high",
+          "variant": "medium",
         },
         {
           "model": "github-copilot/gemini-3.1-pro-preview",
@@ -1419,7 +1419,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models when 
         },
         {
           "model": "github-copilot/claude-opus-4.7",
-          "variant": "high",
+          "variant": "medium",
         },
       ],
       "model": "github-copilot/gpt-5.4",
@@ -1436,7 +1436,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models when 
         },
       ],
       "model": "github-copilot/claude-opus-4.7",
-      "variant": "high",
+      "variant": "medium",
     },
     "sisyphus": {
       "fallback_models": [
@@ -1446,7 +1446,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models when 
         },
       ],
       "model": "github-copilot/claude-opus-4.7",
-      "variant": "high",
+      "variant": "medium",
     },
     "sisyphus-junior": {
       "fallback_models": [
@@ -1463,7 +1463,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models when 
       "fallback_models": [
         {
           "model": "github-copilot/claude-opus-4.7",
-          "variant": "high",
+          "variant": "medium",
         },
         {
           "model": "github-copilot/gemini-3.1-pro-preview",
@@ -1487,7 +1487,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models when 
       "fallback_models": [
         {
           "model": "github-copilot/claude-opus-4.7",
-          "variant": "high",
+          "variant": "medium",
         },
       ],
       "model": "github-copilot/gemini-3.1-pro-preview",
@@ -1512,7 +1512,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models when 
       "fallback_models": [
         {
           "model": "github-copilot/claude-opus-4.7",
-          "variant": "high",
+          "variant": "medium",
         },
       ],
       "model": "github-copilot/gemini-3.1-pro-preview",
@@ -1562,13 +1562,13 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
         },
       ],
       "model": "github-copilot/claude-opus-4.7",
-      "variant": "high",
+      "variant": "medium",
     },
     "momus": {
       "fallback_models": [
         {
           "model": "github-copilot/claude-opus-4.7",
-          "variant": "high",
+          "variant": "medium",
         },
         {
           "model": "github-copilot/gemini-3.1-pro-preview",
@@ -1587,7 +1587,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
         },
         {
           "model": "github-copilot/claude-opus-4.7",
-          "variant": "high",
+          "variant": "medium",
         },
       ],
       "model": "github-copilot/gpt-5.4",
@@ -1604,7 +1604,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
         },
       ],
       "model": "github-copilot/claude-opus-4.7",
-      "variant": "high",
+      "variant": "medium",
     },
     "sisyphus": {
       "fallback_models": [
@@ -1614,7 +1614,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
         },
       ],
       "model": "github-copilot/claude-opus-4.7",
-      "variant": "high",
+      "variant": "medium",
     },
     "sisyphus-junior": {
       "fallback_models": [
@@ -1631,7 +1631,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
       "fallback_models": [
         {
           "model": "github-copilot/claude-opus-4.7",
-          "variant": "high",
+          "variant": "medium",
         },
         {
           "model": "github-copilot/gemini-3.1-pro-preview",
@@ -1655,7 +1655,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
       "fallback_models": [
         {
           "model": "github-copilot/claude-opus-4.7",
-          "variant": "high",
+          "variant": "medium",
         },
       ],
       "model": "github-copilot/gemini-3.1-pro-preview",
@@ -1668,7 +1668,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
         },
       ],
       "model": "github-copilot/claude-opus-4.7",
-      "variant": "high",
+      "variant": "medium",
     },
     "unspecified-low": {
       "fallback_models": [
@@ -1682,7 +1682,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
       "fallback_models": [
         {
           "model": "github-copilot/claude-opus-4.7",
-          "variant": "high",
+          "variant": "medium",
         },
       ],
       "model": "github-copilot/gemini-3.1-pro-preview",
@@ -2151,7 +2151,7 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
         },
       ],
       "model": "github-copilot/claude-opus-4.7",
-      "variant": "high",
+      "variant": "medium",
     },
     "momus": {
       "fallback_models": [
@@ -2161,7 +2161,7 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
         },
         {
           "model": "github-copilot/claude-opus-4.7",
-          "variant": "high",
+          "variant": "medium",
         },
         {
           "model": "github-copilot/gemini-3.1-pro-preview",
@@ -2193,7 +2193,7 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
         },
         {
           "model": "github-copilot/claude-opus-4.7",
-          "variant": "high",
+          "variant": "medium",
         },
       ],
       "model": "openai/gpt-5.4",
@@ -2214,7 +2214,7 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
         },
       ],
       "model": "github-copilot/claude-opus-4.7",
-      "variant": "high",
+      "variant": "medium",
     },
     "sisyphus": {
       "fallback_models": [
@@ -2228,7 +2228,7 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
         },
       ],
       "model": "github-copilot/claude-opus-4.7",
-      "variant": "high",
+      "variant": "medium",
     },
     "sisyphus-junior": {
       "fallback_models": [
@@ -2253,7 +2253,7 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
         },
         {
           "model": "github-copilot/claude-opus-4.7",
-          "variant": "high",
+          "variant": "medium",
         },
         {
           "model": "github-copilot/gemini-3.1-pro-preview",
@@ -2283,7 +2283,7 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
         },
         {
           "model": "github-copilot/claude-opus-4.7",
-          "variant": "high",
+          "variant": "medium",
         },
       ],
       "model": "openai/gpt-5.4",
@@ -2317,7 +2317,7 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
       "fallback_models": [
         {
           "model": "github-copilot/claude-opus-4.7",
-          "variant": "high",
+          "variant": "medium",
         },
       ],
       "model": "github-copilot/gemini-3.1-pro-preview",
@@ -2612,7 +2612,7 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
       "fallback_models": [
         {
           "model": "github-copilot/claude-opus-4.7",
-          "variant": "high",
+          "variant": "medium",
         },
         {
           "model": "github-copilot/gpt-5.4",
@@ -2638,7 +2638,7 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
         },
         {
           "model": "github-copilot/claude-opus-4.7",
-          "variant": "high",
+          "variant": "medium",
         },
         {
           "model": "opencode/gemini-3.1-pro",
@@ -2685,7 +2685,7 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
         },
         {
           "model": "github-copilot/claude-opus-4.7",
-          "variant": "high",
+          "variant": "medium",
         },
       ],
       "model": "github-copilot/gpt-5.4",
@@ -2695,7 +2695,7 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
       "fallback_models": [
         {
           "model": "github-copilot/claude-opus-4.7",
-          "variant": "high",
+          "variant": "medium",
         },
         {
           "model": "github-copilot/gpt-5.4",
@@ -2720,7 +2720,7 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
       "fallback_models": [
         {
           "model": "github-copilot/claude-opus-4.7",
-          "variant": "high",
+          "variant": "medium",
         },
         {
           "model": "opencode/kimi-k2.5",
@@ -2778,7 +2778,7 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
         },
         {
           "model": "github-copilot/claude-opus-4.7",
-          "variant": "high",
+          "variant": "medium",
         },
         {
           "model": "github-copilot/gpt-5.4",
@@ -2802,7 +2802,7 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
         },
         {
           "model": "github-copilot/claude-opus-4.7",
-          "variant": "high",
+          "variant": "medium",
         },
         {
           "model": "opencode/gemini-3.1-pro",
@@ -2853,7 +2853,7 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
         },
         {
           "model": "github-copilot/claude-opus-4.7",
-          "variant": "high",
+          "variant": "medium",
         },
       ],
       "model": "opencode/gpt-5.4",
@@ -2912,7 +2912,7 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
         },
         {
           "model": "github-copilot/claude-opus-4.7",
-          "variant": "high",
+          "variant": "medium",
         },
       ],
       "model": "opencode/gemini-3.1-pro",
@@ -3019,7 +3019,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
         },
         {
           "model": "github-copilot/claude-opus-4.7",
-          "variant": "high",
+          "variant": "medium",
         },
         {
           "model": "openai/gpt-5.4",
@@ -3057,7 +3057,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
         },
         {
           "model": "github-copilot/claude-opus-4.7",
-          "variant": "high",
+          "variant": "medium",
         },
         {
           "model": "google/gemini-3.1-pro-preview",
@@ -3127,7 +3127,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
         },
         {
           "model": "github-copilot/claude-opus-4.7",
-          "variant": "high",
+          "variant": "medium",
         },
       ],
       "model": "openai/gpt-5.4",
@@ -3141,7 +3141,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
         },
         {
           "model": "github-copilot/claude-opus-4.7",
-          "variant": "high",
+          "variant": "medium",
         },
         {
           "model": "openai/gpt-5.4",
@@ -3178,7 +3178,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
         },
         {
           "model": "github-copilot/claude-opus-4.7",
-          "variant": "high",
+          "variant": "medium",
         },
         {
           "model": "opencode/kimi-k2.5",
@@ -3255,7 +3255,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
         },
         {
           "model": "github-copilot/claude-opus-4.7",
-          "variant": "high",
+          "variant": "medium",
         },
         {
           "model": "openai/gpt-5.4",
@@ -3290,7 +3290,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
         },
         {
           "model": "github-copilot/claude-opus-4.7",
-          "variant": "high",
+          "variant": "medium",
         },
         {
           "model": "google/gemini-3.1-pro-preview",
@@ -3366,7 +3366,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
         },
         {
           "model": "github-copilot/claude-opus-4.7",
-          "variant": "high",
+          "variant": "medium",
         },
       ],
       "model": "openai/gpt-5.4",
@@ -3453,7 +3453,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
         },
         {
           "model": "github-copilot/claude-opus-4.7",
-          "variant": "high",
+          "variant": "medium",
         },
       ],
       "model": "google/gemini-3.1-pro-preview",
@@ -3566,7 +3566,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
         },
         {
           "model": "github-copilot/claude-opus-4.7",
-          "variant": "high",
+          "variant": "medium",
         },
         {
           "model": "openai/gpt-5.4",
@@ -3604,7 +3604,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
         },
         {
           "model": "github-copilot/claude-opus-4.7",
-          "variant": "high",
+          "variant": "medium",
         },
         {
           "model": "google/gemini-3.1-pro-preview",
@@ -3674,7 +3674,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
         },
         {
           "model": "github-copilot/claude-opus-4.7",
-          "variant": "high",
+          "variant": "medium",
         },
       ],
       "model": "openai/gpt-5.4",
@@ -3688,7 +3688,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
         },
         {
           "model": "github-copilot/claude-opus-4.7",
-          "variant": "high",
+          "variant": "medium",
         },
         {
           "model": "openai/gpt-5.4",
@@ -3725,7 +3725,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
         },
         {
           "model": "github-copilot/claude-opus-4.7",
-          "variant": "high",
+          "variant": "medium",
         },
         {
           "model": "opencode/kimi-k2.5",
@@ -3802,7 +3802,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
         },
         {
           "model": "github-copilot/claude-opus-4.7",
-          "variant": "high",
+          "variant": "medium",
         },
         {
           "model": "openai/gpt-5.4",
@@ -3837,7 +3837,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
         },
         {
           "model": "github-copilot/claude-opus-4.7",
-          "variant": "high",
+          "variant": "medium",
         },
         {
           "model": "google/gemini-3.1-pro-preview",
@@ -3913,7 +3913,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
         },
         {
           "model": "github-copilot/claude-opus-4.7",
-          "variant": "high",
+          "variant": "medium",
         },
       ],
       "model": "openai/gpt-5.4",
@@ -3927,7 +3927,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
         },
         {
           "model": "github-copilot/claude-opus-4.7",
-          "variant": "high",
+          "variant": "medium",
         },
         {
           "model": "openai/gpt-5.4",
@@ -4007,7 +4007,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
         },
         {
           "model": "github-copilot/claude-opus-4.7",
-          "variant": "high",
+          "variant": "medium",
         },
       ],
       "model": "google/gemini-3.1-pro-preview",
