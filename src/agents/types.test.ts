@@ -9,8 +9,8 @@ import {
 
 describe("isGptNativeSisyphusModel", () => {
   test("allows GPT-5.x where x >= 4", () => {
-    expect(isGptNativeSisyphusModel("openai/gpt-5.4")).toBe(true);
-    expect(isGptNativeSisyphusModel("openai/gpt-5-4")).toBe(true);
+    expect(isGptNativeSisyphusModel("openai/gpt-5.5")).toBe(true);
+    expect(isGptNativeSisyphusModel("openai/gpt-5-5")).toBe(true);
     expect(isGptNativeSisyphusModel("openai/gpt-5.5")).toBe(true);
     expect(isGptNativeSisyphusModel("openai/gpt-5-5")).toBe(true);
     expect(isGptNativeSisyphusModel("openai/gpt-5.9")).toBe(true);
@@ -20,8 +20,8 @@ describe("isGptNativeSisyphusModel", () => {
   });
 
   test("allows with various providers and suffixes", () => {
-    expect(isGptNativeSisyphusModel("github-copilot/gpt-5.4")).toBe(true);
-    expect(isGptNativeSisyphusModel("venice/gpt-5-4")).toBe(true);
+    expect(isGptNativeSisyphusModel("github-copilot/gpt-5.5")).toBe(true);
+    expect(isGptNativeSisyphusModel("venice/gpt-5-5")).toBe(true);
     expect(isGptNativeSisyphusModel("openai/gpt-5.4-codex")).toBe(true);
     expect(isGptNativeSisyphusModel("openai/gpt-5.5-mini")).toBe(true);
   });
@@ -46,7 +46,7 @@ describe("isGptNativeSisyphusModel", () => {
 
 describe("isGptModel", () => {
   test("standard openai provider gpt models", () => {
-    expect(isGptModel("openai/gpt-5.4")).toBe(true);
+    expect(isGptModel("openai/gpt-5.5")).toBe(true);
     expect(isGptModel("openai/gpt-4o")).toBe(true);
   });
 
@@ -59,22 +59,22 @@ describe("isGptModel", () => {
   });
 
   test("github copilot gpt models", () => {
-    expect(isGptModel("github-copilot/gpt-5.4")).toBe(true);
+    expect(isGptModel("github-copilot/gpt-5.5")).toBe(true);
     expect(isGptModel("github-copilot/gpt-4o")).toBe(true);
   });
 
   test("litellm proxied gpt models", () => {
-    expect(isGptModel("litellm/gpt-5.4")).toBe(true);
+    expect(isGptModel("litellm/gpt-5.5")).toBe(true);
     expect(isGptModel("litellm/gpt-4o")).toBe(true);
   });
 
   test("other proxied gpt models", () => {
     expect(isGptModel("ollama/gpt-4o")).toBe(true);
-    expect(isGptModel("custom-provider/gpt-5.4")).toBe(true);
+    expect(isGptModel("custom-provider/gpt-5.5")).toBe(true);
   });
 
   test("venice provider gpt models", () => {
-    expect(isGptModel("venice/gpt-5.4")).toBe(true);
+    expect(isGptModel("venice/gpt-5.5")).toBe(true);
     expect(isGptModel("venice/gpt-4o")).toBe(true);
   });
 
@@ -114,7 +114,7 @@ describe("isMiniMaxModel", () => {
   });
 
   test("does not match non-minimax models", () => {
-    expect(isMiniMaxModel("openai/gpt-5.4")).toBe(false);
+    expect(isMiniMaxModel("openai/gpt-5.5")).toBe(false);
     expect(isMiniMaxModel("anthropic/claude-opus-4-7")).toBe(false);
     expect(isMiniMaxModel("google/gemini-3.1-pro")).toBe(false);
     expect(isMiniMaxModel("opencode-go/kimi-k2.5")).toBe(false);
@@ -135,7 +135,7 @@ describe("isGlmModel", () => {
   });
 
   test("#given non-GLM models #then returns false", () => {
-    expect(isGlmModel("openai/gpt-5.4")).toBe(false);
+    expect(isGlmModel("openai/gpt-5.5")).toBe(false);
     expect(isGlmModel("anthropic/claude-opus-4-7")).toBe(false);
     expect(isGlmModel("google/gemini-3.1-pro")).toBe(false);
   });
@@ -170,7 +170,7 @@ describe("isGeminiModel", () => {
   });
 
   test("#given gpt models #then returns false", () => {
-    expect(isGeminiModel("openai/gpt-5.4")).toBe(false);
+    expect(isGeminiModel("openai/gpt-5.5")).toBe(false);
     expect(isGeminiModel("openai/o3-mini")).toBe(false);
     expect(isGeminiModel("litellm/gpt-4o")).toBe(false);
   });

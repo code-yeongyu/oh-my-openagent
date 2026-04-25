@@ -68,17 +68,16 @@ describe("delegation trust prompt rules", () => {
     expect(prompt).toContain("DO NOT perform the same search yourself")
   })
 
-  test("Hephaestus GPT-5.4 prompt forbids duplicate delegated exploration", () => {
+  test("Hephaestus GPT-5.5 prompt forbids duplicate delegated exploration", () => {
     // given
-    const agent = createHephaestusAgent("openai/gpt-5.4", [exploreAgent])
+    const agent = createHephaestusAgent("openai/gpt-5.5", [exploreAgent])
 
     // when
     const prompt = agent.prompt
 
     // then
-    expect(prompt).toContain("continue only with non-overlapping work while they search")
-    expect(prompt).toContain("Continue only with non-overlapping work after launching background agents")
-    expect(prompt).toContain("DO NOT perform the same search yourself")
+    expect(prompt).toContain("do not manually perform the same search yourself")
+    expect(prompt).toContain("non-overlapping preparation")
   })
 
   test("Hephaestus GPT-5.3 Codex prompt forbids duplicate delegated exploration", () => {
@@ -103,28 +102,26 @@ describe("delegation trust prompt rules", () => {
     expect(prompt).toContain("DO NOT perform the same search yourself")
   })
 
-  test("Sisyphus GPT-5.4 prompt forbids duplicate delegated exploration", () => {
+  test("Sisyphus GPT-5.5 prompt forbids duplicate delegated exploration", () => {
     // given
-    const agent = createSisyphusAgent("openai/gpt-5.4", [exploreAgent])
+    const agent = createSisyphusAgent("openai/gpt-5.5", [exploreAgent])
 
     // when
     const prompt = agent.prompt
 
     // then
-    expect(prompt).toContain("do only non-overlapping work simultaneously")
-    expect(prompt).toContain("Continue only with non-overlapping work")
-    expect(prompt).toContain("DO NOT perform the same search yourself")
-    expect(prompt).toContain("Do not use `apply_patch`")
-    expect(prompt).toContain("`edit` and `write`")
+    expect(prompt).toContain("After firing exploration agents")
+    expect(prompt).toContain("do not manually perform the same search yourself")
+    expect(prompt).toContain("Always use `apply_patch`")
   })
 
-  test("Sisyphus-Junior GPT-5.4 prompt forbids duplicate delegated exploration", () => {
+  test("Sisyphus-Junior GPT-5.5 prompt forbids duplicate delegated exploration", () => {
     // given
-    const prompt = buildSisyphusJuniorPrompt("openai/gpt-5.4", false)
+    const prompt = buildSisyphusJuniorPrompt("openai/gpt-5.5", false)
 
     // when / then
-    expect(prompt).toContain("continue only with non-overlapping work while they search")
-    expect(prompt).toContain("DO NOT perform the same search yourself")
+    expect(prompt).toContain("do not manually perform the same search yourself")
+    expect(prompt).toContain("Continue only with non-overlapping preparation")
   })
 
   test("Sisyphus-Junior GPT-5.3 Codex prompt forbids duplicate delegated exploration", () => {

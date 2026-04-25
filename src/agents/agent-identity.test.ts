@@ -76,10 +76,10 @@ describe("Sisyphus prompt identity", () => {
     })
   })
 
-  describe("#given a Sisyphus agent created with GPT-5.4 model", () => {
+  describe("#given a Sisyphus agent created with GPT-5.5 model", () => {
     describe("#when checking the prompt", () => {
       it("#then contains the agent identity section", () => {
-        const config = createSisyphusAgent("openai/gpt-5.4")
+        const config = createSisyphusAgent("openai/gpt-5.5")
 
         expect(config.prompt).toContain("<agent-identity>")
         expect(config.prompt).toContain("Sisyphus")
@@ -93,7 +93,7 @@ describe("Hephaestus prompt identity", () => {
   describe("#given a Hephaestus agent created with GPT model", () => {
     describe("#when checking the prompt", () => {
       it("#then contains the agent identity section", () => {
-        const config = createHephaestusAgent("openai/gpt-5.4")
+        const config = createHephaestusAgent("openai/gpt-5.5")
 
         expect(config.prompt).toContain("<agent-identity>")
         expect(config.prompt).toContain("Hephaestus")
@@ -101,7 +101,7 @@ describe("Hephaestus prompt identity", () => {
       })
 
       it("#then identity section appears at the start of the prompt", () => {
-        const config = createHephaestusAgent("openai/gpt-5.4")
+        const config = createHephaestusAgent("openai/gpt-5.5")
         const prompt = config.prompt ?? ""
         const identityIndex = prompt.indexOf("<agent-identity>")
 
@@ -130,7 +130,7 @@ describe("Agent identity preservation through overrides", () => {
     describe("#when merging the override", () => {
       it("#then identity section is preserved unchanged", () => {
         const baseConfig = createSisyphusAgent("anthropic/claude-opus-4-7")
-        const merged = mergeAgentConfig(baseConfig, { model: "openai/gpt-5.4" })
+        const merged = mergeAgentConfig(baseConfig, { model: "openai/gpt-5.5" })
 
         expect(merged.prompt).toContain("<agent-identity>")
         expect(merged.prompt).toContain("Sisyphus")

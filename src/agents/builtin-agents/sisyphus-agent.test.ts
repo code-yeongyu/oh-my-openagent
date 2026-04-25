@@ -9,7 +9,7 @@ describe("maybeCreateSisyphusConfig", () => {
       // given
       const agentOverrides: AgentOverrides = {
         sisyphus: {
-          model: "openai/gpt-5.4",
+          model: "openai/gpt-5.5",
           permission: {
             apply_patch: "allow",
           },
@@ -21,8 +21,8 @@ describe("maybeCreateSisyphusConfig", () => {
       const config = maybeCreateSisyphusConfig({
         disabledAgents: [],
         agentOverrides,
-        availableModels: new Set(["openai/gpt-5.4"]),
-        systemDefaultModel: "openai/gpt-5.4",
+        availableModels: new Set(["openai/gpt-5.5"]),
+        systemDefaultModel: "openai/gpt-5.5",
         isFirstRunNoCache: false,
         availableAgents: [],
         availableSkills: [],
@@ -33,7 +33,7 @@ describe("maybeCreateSisyphusConfig", () => {
 
       // then
       expect(config).toBeDefined();
-      expect(config?.model).toBe("openai/gpt-5.4");
+      expect(config?.model).toBe("openai/gpt-5.5");
       expect(config?.permission).toHaveProperty("apply_patch", "deny");
     });
   });

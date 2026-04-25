@@ -116,7 +116,7 @@ describe("read-only agent tool restrictions", () => {
   describe("Sisyphus GPT variants", () => {
     test("deny apply_patch for GPT models but not Claude models", () => {
       // given
-      const gpt54Agent = createSisyphusAgent("openai/gpt-5.4")
+      const gpt54Agent = createSisyphusAgent("openai/gpt-5.5")
       const gptGenericAgent = createSisyphusAgent("openai/gpt-5.2")
       const claudeAgent = createSisyphusAgent(TEST_MODEL)
 
