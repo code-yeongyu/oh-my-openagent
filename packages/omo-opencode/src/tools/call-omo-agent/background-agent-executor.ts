@@ -9,6 +9,10 @@ import { getMessageDir } from "./message-storage-directory"
 import { getSessionTools } from "../../shared/session-tools-store"
 import { getAgentDisplayName, stripAgentListSortPrefix } from "../../shared/agent-display-names"
 
+function getTaskSessionId(task: { sessionId?: string | null; sessionID?: string | null } | undefined): string | undefined {
+	return task?.sessionId ?? task?.sessionID ?? undefined
+}
+
 export async function executeBackgroundAgent(
 	args: CallOmoAgentArgs,
 	toolContext: ToolContextWithMetadata,
@@ -51,13 +55,13 @@ export async function executeBackgroundAgent(
 		const waitTimeoutMs = 30_000
 		const waitIntervalMs = 50
 
-		let sessionId = task.sessionId
+		let sessionId = getTaskSessionId(task)
 		while (!sessionId && Date.now() - waitStart < waitTimeoutMs) {
 			const updated = manager.getTask(task.id)
 			if (updated?.status === "error" || updated?.status === "cancelled" || updated?.status === "interrupt") {
 				return `Task failed to start (status: ${updated.status}).\n\nTask ID: ${task.id}`
 			}
-			sessionId = updated?.sessionId
+			sessionId = getTaskSessionId(updated as { sessionId?: string | null; sessionID?: string | null } | undefined)
 			if (sessionId) {
 				break
 			}
