@@ -53,13 +53,20 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
         return skillError
       }
 
+      const continuationSystemContent = buildSystemContent({
+        skillContent,
+        skillContents,
+        availableCategories,
+        availableSkills,
+      })
+
       const parentContext = await resolveParentContext(ctx, options.client)
 
       if (delegateTaskArgs.task_id) {
         if (runInBackground) {
-          return executeBackgroundContinuation(delegateTaskArgs, ctx, options, parentContext)
+          return executeBackgroundContinuation(delegateTaskArgs, ctx, options, parentContext, continuationSystemContent)
         }
-        return executeSyncContinuation(delegateTaskArgs, ctx, options, parentContext)
+        return executeSyncContinuation(delegateTaskArgs, ctx, options, parentContext, undefined, continuationSystemContent)
       }
 
       if (!delegateTaskArgs.category && !delegateTaskArgs.subagent_type) {

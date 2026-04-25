@@ -10,6 +10,7 @@ export const MODEL_VERSION_MAP: Record<string, string> = {
   "anthropic/claude-opus-4-6": "anthropic/claude-opus-4-7",
   "anthropic/claude-sonnet-4-5": "anthropic/claude-sonnet-4-6",
   "openai/gpt-5.3-codex": "openai/gpt-5.4",
+  "openai/gpt-5.4": "openai/gpt-5.5",
 }
 
 function migrationKey(oldModel: string, newModel: string): string {

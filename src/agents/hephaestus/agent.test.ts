@@ -23,6 +23,23 @@ describe("getHephaestusPromptSource", () => {
     expect(source3).toBe("gpt-5-4");
   });
 
+  test("returns 'gpt-5-5' for gpt-5.5 models", () => {
+    // given
+    const model1 = "openai/gpt-5.5";
+    const model2 = "openai/gpt-5-5";
+    const model3 = "github-copilot/gpt-5.5";
+
+    // when
+    const source1 = getHephaestusPromptSource(model1);
+    const source2 = getHephaestusPromptSource(model2);
+    const source3 = getHephaestusPromptSource(model3);
+
+    // then
+    expect(source1).toBe("gpt-5-5");
+    expect(source2).toBe("gpt-5-5");
+    expect(source3).toBe("gpt-5-5");
+  });
+
   test("returns 'gpt-5-3-codex' for GPT 5.3 Codex models", () => {
     // given
     const model1 = "openai/gpt-5.3-codex";
@@ -94,6 +111,19 @@ describe("getHephaestusPrompt", () => {
     expect(prompt).toContain("You build context by examining");
     expect(prompt).toContain("Never chain together bash commands");
     expect(prompt).toContain("<tool_usage_rules>");
+  });
+
+  test("GPT 5.5 model returns GPT-5.5 optimized prompt", () => {
+    // given
+    const model = "openai/gpt-5.5";
+
+    // when
+    const prompt = getHephaestusPrompt(model);
+
+    // then
+    expect(prompt).toContain("You build context by examining");
+    expect(prompt).toContain("Forbidden stops");
+    expect(prompt).toContain("Three-attempt failure protocol");
   });
 
   test("GPT 5.3-codex model returns GPT-5.3 prompt", () => {

@@ -81,9 +81,9 @@ function getStoredMainSessionModel(
     return undefined
   }
 
-  if (output.message["model"] !== undefined) {
-    return undefined
-  }
+  // Removed: `output.message["model"] !== undefined` guard was unreachable.
+  // OpenCode always populates output.message.model before triggering chat.message,
+  // so the guard short-circuited every time, preventing session model recovery.
 
   if (hasExplicitAgentModelOverride(input.agent, pluginConfig)) {
     return undefined

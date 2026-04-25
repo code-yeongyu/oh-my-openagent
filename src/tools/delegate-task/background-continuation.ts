@@ -11,66 +11,77 @@ export async function executeBackgroundContinuation(
   args: DelegateTaskArgs,
   ctx: ToolContextWithMetadata,
   executorCtx: ExecutorContext,
-  parentContext: ParentContext
+  parentContext: ParentContext,
+  systemContent?: string
 ): Promise<string> {
   const { manager } = executorCtx
+  const taskID = getTaskID(args)
 
   try {
-    const taskID = getTaskID(args)
     if (!taskID) {
       throw new Error("task_id is required to continue a background task")
     }
 
+    const effectivePrompt = systemContent
+      ? `${systemContent}\n\n${args.prompt}`
+      : args.prompt
+
     const task = await manager.resume({
       sessionId: taskID,
-      prompt: args.prompt,
+      prompt: effectivePrompt,
       parentSessionID: parentContext.sessionID,
       parentMessageID: parentContext.messageID,
       parentModel: parentContext.model,
       parentAgent: parentContext.agent,
       parentTools: getSessionTools(parentContext.sessionID),
     })
+    const sessionId = task.sessionID
+    const backgroundTaskId = task.id
+    const resolvedModel = resolveMetadataModel(task.model, parentContext.model)
 
     const bgContMeta = {
-      title: `Continue: ${task.description}`,
+      title: `Continue: ${args.description}`,
       metadata: {
         prompt: args.prompt,
         agent: task.agent,
+        ...(task.category !== undefined ? { category: task.category } : {}),
+        ...(args.requested_subagent_type !== undefined ? { requested_subagent_type: args.requested_subagent_type } : {}),
         load_skills: args.load_skills,
         description: args.description,
         run_in_background: args.run_in_background,
-        taskId: task.sessionID,
-        backgroundTaskId: task.id,
-        sessionId: task.sessionID,
+        taskId: sessionId,
+        backgroundTaskId,
+        sessionId,
         command: args.command,
-        model: resolveMetadataModel(task.model, parentContext.model),
+        model: resolvedModel,
       },
     }
     await publishToolMetadata(ctx, bgContMeta)
 
     return `Background task continued.
 
-Task ID: ${task.id}
+Task ID: ${backgroundTaskId}
 Description: ${task.description}
 Agent: ${task.agent}
 Status: ${task.status}
 
 Agent continues with full previous context preserved.
-System notifies on completion. Use \`background_output\` with task_id="${task.id}" to check.
+System notifies on completion. Use \`background_output\` with task_id="${backgroundTaskId}" to check.
 
 Do NOT call background_output now. Wait for <system-reminder> notification first.
 
 ${buildTaskMetadataBlock({
-      sessionId: task.sessionID,
-      taskId: task.sessionID,
-      backgroundTaskId: task.id,
+      sessionId,
+      taskId: sessionId,
+      backgroundTaskId,
       agent: task.agent,
+      category: task.category,
     })}`
   } catch (error) {
     return formatDetailedError(error, {
       operation: "Continue background task",
       args,
-      sessionID: getTaskID(args),
+      sessionID: taskID,
     })
   }
 }

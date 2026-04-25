@@ -1,6 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk";
 import type { AgentMode, AgentPromptMetadata } from "./types";
-import { isGptModel, isGeminiModel, isGpt5_4Model } from "./types";
+import { isGptModel, isGeminiModel, isGpt5_5Model, isGptNativeSisyphusModel } from "./types";
 import {
   buildGeminiToolMandate,
   buildGeminiDelegationOverride,
@@ -10,6 +10,7 @@ import {
   buildGeminiToolCallExamples,
 } from "./sisyphus/gemini";
 import { buildGpt54SisyphusPrompt } from "./sisyphus/gpt-5-4";
+import { buildGpt55SisyphusPrompt } from "./sisyphus/gpt-5-5";
 import { buildTaskManagementSection } from "./sisyphus/default";
 import { getGptApplyPatchPermission } from "./gpt-apply-patch-guard";
 
@@ -480,7 +481,33 @@ export function createSisyphusAgent(
   const categories = availableCategories ?? [];
   const agents = availableAgents ?? [];
 
-  if (isGpt5_4Model(model)) {
+  if (isGpt5_5Model(model)) {
+    const prompt = buildGpt55SisyphusPrompt(
+      model,
+      agents,
+      tools,
+      skills,
+      categories,
+      useTaskSystem,
+    );
+    return {
+      description:
+        "Powerful AI orchestrator. Plans obsessively with todos, assesses search complexity before exploration, delegates strategically via category+skills combinations. Uses explore for internal code (parallel-friendly), librarian for external docs. (Sisyphus - OhMyOpenCode)",
+      mode: MODE,
+      model,
+      maxTokens: 64000,
+      prompt,
+      color: "#00CED1",
+      permission: {
+        question: "allow",
+        call_omo_agent: "deny",
+        ...getGptApplyPatchPermission(model),
+      } as AgentConfig["permission"],
+      reasoningEffort: "medium",
+    };
+  }
+
+  if (isGptNativeSisyphusModel(model)) {
     const prompt = buildGpt54SisyphusPrompt(
       model,
       agents,

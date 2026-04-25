@@ -1,26 +1,46 @@
 import { describe, test, expect } from "bun:test";
-import { isGptModel, isGeminiModel, isGlmModel, isGpt5_4Model, isMiniMaxModel } from "./types";
+import {
+  isGptModel,
+  isGeminiModel,
+  isGlmModel,
+  isGptNativeSisyphusModel,
+  isMiniMaxModel,
+} from "./types";
 
-describe("isGpt5_4Model", () => {
-  test("detects gpt-5.4 models", () => {
-    expect(isGpt5_4Model("openai/gpt-5.4")).toBe(true);
-    expect(isGpt5_4Model("openai/gpt-5-4")).toBe(true);
-    expect(isGpt5_4Model("openai/gpt-5.4-codex")).toBe(true);
-    expect(isGpt5_4Model("github-copilot/gpt-5.4")).toBe(true);
-    expect(isGpt5_4Model("venice/gpt-5-4")).toBe(true);
+describe("isGptNativeSisyphusModel", () => {
+  test("allows GPT-5.x where x >= 4", () => {
+    expect(isGptNativeSisyphusModel("openai/gpt-5.4")).toBe(true);
+    expect(isGptNativeSisyphusModel("openai/gpt-5-4")).toBe(true);
+    expect(isGptNativeSisyphusModel("openai/gpt-5.5")).toBe(true);
+    expect(isGptNativeSisyphusModel("openai/gpt-5-5")).toBe(true);
+    expect(isGptNativeSisyphusModel("openai/gpt-5.9")).toBe(true);
+    expect(isGptNativeSisyphusModel("openai/gpt-5-9")).toBe(true);
+    expect(isGptNativeSisyphusModel("openai/gpt-5.10")).toBe(true);
+    expect(isGptNativeSisyphusModel("openai/gpt-5-10")).toBe(true);
   });
 
-  test("does not match other GPT models", () => {
-    expect(isGpt5_4Model("openai/gpt-5.3-codex")).toBe(false);
-    expect(isGpt5_4Model("openai/gpt-5.1")).toBe(false);
-    expect(isGpt5_4Model("openai/gpt-4o")).toBe(false);
-    expect(isGpt5_4Model("github-copilot/gpt-4o")).toBe(false);
+  test("allows with various providers and suffixes", () => {
+    expect(isGptNativeSisyphusModel("github-copilot/gpt-5.4")).toBe(true);
+    expect(isGptNativeSisyphusModel("venice/gpt-5-4")).toBe(true);
+    expect(isGptNativeSisyphusModel("openai/gpt-5.4-codex")).toBe(true);
+    expect(isGptNativeSisyphusModel("openai/gpt-5.5-mini")).toBe(true);
   });
 
-  test("does not match non-GPT models", () => {
-    expect(isGpt5_4Model("anthropic/claude-opus-4-7")).toBe(false);
-    expect(isGpt5_4Model("google/gemini-3.1-pro")).toBe(false);
-    expect(isGpt5_4Model("openai/o1")).toBe(false);
+  test("rejects GPT-5.x where x < 4", () => {
+    expect(isGptNativeSisyphusModel("openai/gpt-5.3-codex")).toBe(false);
+    expect(isGptNativeSisyphusModel("openai/gpt-5.1")).toBe(false);
+    expect(isGptNativeSisyphusModel("openai/gpt-5-0")).toBe(false);
+  });
+
+  test("rejects other GPT models", () => {
+    expect(isGptNativeSisyphusModel("openai/gpt-4o")).toBe(false);
+    expect(isGptNativeSisyphusModel("github-copilot/gpt-4o")).toBe(false);
+  });
+
+  test("rejects non-GPT models", () => {
+    expect(isGptNativeSisyphusModel("anthropic/claude-opus-4-7")).toBe(false);
+    expect(isGptNativeSisyphusModel("google/gemini-3.1-pro")).toBe(false);
+    expect(isGptNativeSisyphusModel("openai/o1")).toBe(false);
   });
 });
 

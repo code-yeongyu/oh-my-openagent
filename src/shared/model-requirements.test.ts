@@ -7,19 +7,19 @@ import {
 } from "./model-requirements"
 
 describe("AGENT_MODEL_REQUIREMENTS", () => {
-  test("oracle has valid fallbackChain with gpt-5.4 as primary", () => {
+  test("oracle has valid fallbackChain with gpt-5.5 as primary", () => {
     // given - oracle agent requirement
     const oracle = AGENT_MODEL_REQUIREMENTS["oracle"]
 
     // when - accessing oracle requirement
-    // then - fallbackChain exists with gpt-5.4 as first entry
+    // then - fallbackChain exists with gpt-5.5 as first entry
     expect(oracle).toBeDefined()
     expect(oracle.fallbackChain).toBeArray()
     expect(oracle.fallbackChain.length).toBeGreaterThan(0)
 
     const primary = oracle.fallbackChain[0]
     expect(primary.providers).toContain("openai")
-    expect(primary.model).toBe("gpt-5.4")
+    expect(primary.model).toBe("gpt-5.5")
     expect(primary.variant).toBe("high")
   })
 
@@ -66,7 +66,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
 
     const sixth = sisyphus.fallbackChain[5]
     expect(sixth.providers).toEqual(["openai", "github-copilot", "opencode", "vercel"])
-    expect(sixth.model).toBe("gpt-5.4")
+    expect(sixth.model).toBe("gpt-5.5")
     expect(sixth.variant).toBe("medium")
 
     const seventh = sisyphus.fallbackChain[6]
@@ -78,33 +78,38 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(last.model).toBe("big-pickle")
   })
 
-  test("librarian has valid fallbackChain with opencode-go/minimax-m2.7 as primary", () => {
+  test("librarian has valid fallbackChain with openai/gpt-5.4-mini-fast as primary", () => {
     // given - librarian agent requirement
     const librarian = AGENT_MODEL_REQUIREMENTS["librarian"]
 
     // when - accessing librarian requirement
-    // then - fallbackChain exists with opencode-go/minimax-m2.7 as first entry
+    // then - fallbackChain exists with openai/gpt-5.4-mini-fast as first entry
     expect(librarian).toBeDefined()
     expect(librarian.fallbackChain).toBeArray()
-    expect(librarian.fallbackChain.length).toBeGreaterThan(0)
+    expect(librarian.fallbackChain).toHaveLength(5)
 
     const primary = librarian.fallbackChain[0]
-    expect(primary.providers[0]).toBe("opencode-go")
-    expect(primary.model).toBe("minimax-m2.7")
+    expect(primary.providers).toEqual(["openai"])
+    expect(primary.model).toBe("gpt-5.4-mini-fast")
 
     const second = librarian.fallbackChain[1]
-    expect(second.providers[0]).toBe("opencode")
+    expect(second.providers[0]).toBe("opencode-go")
     expect(second.model).toBe("minimax-m2.7-highspeed")
 
     const tertiary = librarian.fallbackChain[2]
-    expect(tertiary.providers).toContain("anthropic")
-    expect(tertiary.model).toBe("claude-haiku-4-5")
+    expect(tertiary.providers[0]).toBe("opencode-go")
+    expect(tertiary.model).toBe("minimax-m2.7")
 
     const quaternary = librarian.fallbackChain[3]
-    expect(quaternary.model).toBe("gpt-5-nano")
+    expect(quaternary.providers).toContain("anthropic")
+    expect(quaternary.model).toBe("claude-haiku-4-5")
+
+    const fifth = librarian.fallbackChain[4]
+    expect(fifth.providers).toContain("openai")
+    expect(fifth.model).toBe("gpt-5.4-nano")
   })
 
-  test("explore has valid fallbackChain with grok-code-fast-1 as primary", () => {
+  test("explore has valid fallbackChain with openai/gpt-5.4-mini-fast as primary", () => {
     // given - explore agent requirement
     const explore = AGENT_MODEL_REQUIREMENTS["explore"]
 
@@ -114,16 +119,15 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(explore.fallbackChain).toHaveLength(5)
 
     const primary = explore.fallbackChain[0]
-    expect(primary.providers).toContain("github-copilot")
-    expect(primary.providers).toContain("xai")
-    expect(primary.model).toBe("grok-code-fast-1")
+    expect(primary.providers).toEqual(["openai"])
+    expect(primary.model).toBe("gpt-5.4-mini-fast")
 
     const secondary = explore.fallbackChain[1]
     expect(secondary.providers).toContain("opencode-go")
     expect(secondary.model).toBe("minimax-m2.7-highspeed")
 
     const tertiary = explore.fallbackChain[2]
-    expect(tertiary.providers).toContain("opencode")
+    expect(tertiary.providers).toContain("opencode-go")
     expect(tertiary.model).toBe("minimax-m2.7")
 
     const quaternary = explore.fallbackChain[3]
@@ -131,23 +135,23 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(quaternary.model).toBe("claude-haiku-4-5")
 
     const fifth = explore.fallbackChain[4]
-    expect(fifth.providers).toContain("opencode")
-    expect(fifth.model).toBe("gpt-5-nano")
+    expect(fifth.providers).toContain("openai")
+    expect(fifth.model).toBe("gpt-5.4-nano")
   })
 
-  test("multimodal-looker has valid fallbackChain with gpt-5.4 as primary", () => {
+  test("multimodal-looker has valid fallbackChain with gpt-5.5 as primary", () => {
     // given - multimodal-looker agent requirement
     const multimodalLooker = AGENT_MODEL_REQUIREMENTS["multimodal-looker"]
 
     // when - accessing multimodal-looker requirement
-    // then - fallbackChain: gpt-5.4 -> opencode-go/kimi-k2.5 -> glm-4.6v -> gpt-5-nano
+    // then - fallbackChain: gpt-5.5 -> opencode-go/kimi-k2.5 -> glm-4.6v -> gpt-5-nano
     expect(multimodalLooker).toBeDefined()
     expect(multimodalLooker.fallbackChain).toBeArray()
     expect(multimodalLooker.fallbackChain).toHaveLength(4)
 
     const primary = multimodalLooker.fallbackChain[0]
     expect(primary.providers).toEqual(["openai", "opencode", "vercel"])
-    expect(primary.model).toBe("gpt-5.4")
+    expect(primary.model).toBe("gpt-5.5")
     expect(primary.variant).toBe("medium")
 
     const secondary = multimodalLooker.fallbackChain[1]
@@ -206,23 +210,23 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     const openAiFallback = metis.fallbackChain.find((entry) => entry.providers.includes("openai"))
     expect(openAiFallback).toEqual({
       providers: ["openai", "github-copilot", "opencode", "vercel"],
-      model: "gpt-5.4",
+      model: "gpt-5.5",
       variant: "high",
     })
   })
 
-  test("momus has valid fallbackChain with gpt-5.4 as primary", () => {
+  test("momus has valid fallbackChain with gpt-5.5 as primary", () => {
     // given - momus agent requirement
     const momus = AGENT_MODEL_REQUIREMENTS["momus"]
 
     // when - accessing Momus requirement
-    // then - fallbackChain exists with gpt-5.4 as first entry, variant xhigh
+    // then - fallbackChain exists with gpt-5.5 as first entry, variant xhigh
     expect(momus).toBeDefined()
     expect(momus.fallbackChain).toBeArray()
     expect(momus.fallbackChain.length).toBeGreaterThan(0)
 
     const primary = momus.fallbackChain[0]
-    expect(primary.model).toBe("gpt-5.4")
+    expect(primary.model).toBe("gpt-5.5")
     expect(primary.variant).toBe("xhigh")
     expect(primary.providers[0]).toBe("openai")
   })
@@ -248,7 +252,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     const tertiary = atlas.fallbackChain[2]
     expect(tertiary).toEqual({
       providers: ["openai", "github-copilot", "opencode", "vercel"],
-      model: "gpt-5.4",
+      model: "gpt-5.5",
       variant: "medium",
     })
 
@@ -270,7 +274,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     // then
     expect(openAiFallback).toEqual({
       providers: ["openai", "github-copilot", "opencode", "vercel"],
-      model: "gpt-5.4",
+      model: "gpt-5.5",
       variant: "medium",
     })
     expect(openAiFallbackIndex).toBeGreaterThan(-1)
@@ -327,35 +331,35 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
 })
 
 describe("CATEGORY_MODEL_REQUIREMENTS", () => {
-  test("ultrabrain has valid fallbackChain with gpt-5.4 as primary", () => {
+  test("ultrabrain has valid fallbackChain with gpt-5.5 as primary", () => {
     // given - ultrabrain category requirement
     const ultrabrain = CATEGORY_MODEL_REQUIREMENTS["ultrabrain"]
 
     // when - accessing ultrabrain requirement
-    // then - fallbackChain exists with gpt-5.4 as first entry
+    // then - fallbackChain exists with gpt-5.5 as first entry
     expect(ultrabrain).toBeDefined()
     expect(ultrabrain.fallbackChain).toBeArray()
     expect(ultrabrain.fallbackChain.length).toBeGreaterThan(0)
 
     const primary = ultrabrain.fallbackChain[0]
     expect(primary.variant).toBe("xhigh")
-    expect(primary.model).toBe("gpt-5.4")
+    expect(primary.model).toBe("gpt-5.5")
     expect(primary.providers[0]).toBe("openai")
   })
 
-  test("deep has valid fallbackChain with gpt-5.4 as primary", () => {
+  test("deep has valid fallbackChain with gpt-5.5 as primary", () => {
     // given - deep category requirement
     const deep = CATEGORY_MODEL_REQUIREMENTS["deep"]
 
     // when - accessing deep requirement
-    // then - fallbackChain exists with gpt-5.4 as first entry, medium variant
+    // then - fallbackChain exists with gpt-5.5 as first entry, medium variant
     expect(deep).toBeDefined()
     expect(deep.fallbackChain).toBeArray()
     expect(deep.fallbackChain.length).toBeGreaterThan(0)
 
     const primary = deep.fallbackChain[0]
     expect(primary.variant).toBe("medium")
-    expect(primary.model).toBe("gpt-5.4")
+    expect(primary.model).toBe("gpt-5.5")
     expect(primary.providers).toContain("openai")
     expect(primary.providers).toContain("github-copilot")
   })
@@ -437,12 +441,12 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(primary.providers[0]).toBe("anthropic")
   })
 
-  test("unspecified-high keeps split claude-opus-4-7 entries and preserves gpt-5.4", () => {
+  test("unspecified-high keeps split claude-opus-4-7 entries and preserves gpt-5.5", () => {
     // #given - unspecified-high category requirement
     const unspecifiedHigh = CATEGORY_MODEL_REQUIREMENTS["unspecified-high"]
 
     // #when - accessing unspecified-high requirement
-    // #then - claude-opus-4-7 is first and gpt-5.4 is second
+    // #then - claude-opus-4-7 is first and gpt-5.5 is second
     expect(unspecifiedHigh).toBeDefined()
     expect(unspecifiedHigh.fallbackChain).toBeArray()
     expect(unspecifiedHigh.fallbackChain.length).toBeGreaterThan(1)
@@ -458,7 +462,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(sibling.variant).toBe("medium")
 
     const secondary = unspecifiedHigh.fallbackChain[2]
-    expect(secondary.model).toBe("gpt-5.4")
+    expect(secondary.model).toBe("gpt-5.5")
     expect(secondary.variant).toBe("high")
     expect(secondary.providers).toEqual(["openai", "github-copilot", "opencode", "vercel"])
   })
@@ -575,7 +579,7 @@ describe("ModelRequirement type", () => {
     const requirement: ModelRequirement = {
       fallbackChain: [
         { providers: ["anthropic", "github-copilot"], model: "claude-opus-4-7", variant: "max" },
-        { providers: ["openai", "github-copilot"], model: "gpt-5.4", variant: "high" },
+        { providers: ["openai", "github-copilot"], model: "gpt-5.5", variant: "high" },
       ],
     }
 
@@ -584,7 +588,7 @@ describe("ModelRequirement type", () => {
     expect(requirement.fallbackChain).toBeArray()
     expect(requirement.fallbackChain).toHaveLength(2)
     expect(requirement.fallbackChain[0].model).toBe("claude-opus-4-7")
-    expect(requirement.fallbackChain[1].model).toBe("gpt-5.4")
+    expect(requirement.fallbackChain[1].model).toBe("gpt-5.5")
   })
 
   test("ModelRequirement variant is optional", () => {
@@ -633,7 +637,7 @@ describe("ModelRequirement type", () => {
 })
 
 describe("requiresModel field in categories", () => {
-  test("deep category no longer has requiresModel (gpt-5.4 is widely available)", () => {
+  test("deep category no longer has requiresModel (gpt-5.5 is widely available)", () => {
     // given
     const deep = CATEGORY_MODEL_REQUIREMENTS["deep"]
 
