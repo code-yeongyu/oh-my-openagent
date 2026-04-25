@@ -16,7 +16,23 @@ function isAllowedGlobalPath(filePath: string): boolean {
     const canonicalPath = realpathSync.native(filePath)
     return ALLOWED_GLOBAL_PREFIXES.some((prefix) => canonicalPath.startsWith(prefix))
   } catch {
-    return ALLOWED_GLOBAL_PREFIXES.some((prefix) => filePath.startsWith(prefix))
+    // File doesn't exist yet — canonicalize the deepest existing parent
+    let current = filePath
+    while (current.length > 1) {
+      current = current.substring(0, current.lastIndexOf('/'))
+      try {
+        const canonicalParent = realpathSync.native(current)
+        // Reconstruct canonical child path from canonical parent, then normalize
+        // to collapse any directory traversal segments (e.g., ../) left in remaining
+        const remaining = filePath.substring(current.length)
+        const reconstructed = resolve(canonicalParent + remaining)
+        return ALLOWED_GLOBAL_PREFIXES.some((prefix) => reconstructed.startsWith(prefix))
+      } catch {
+        // Parent also doesn't exist, keep going up
+      }
+    }
+    // No existing ancestor found — reject (secure by default)
+    return false
   }
 }
 
