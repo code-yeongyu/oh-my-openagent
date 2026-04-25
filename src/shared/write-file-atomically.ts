@@ -3,7 +3,7 @@ import { closeSync, fsyncSync, openSync, renameSync, unlinkSync, writeFileSync }
 export function writeFileAtomically(filePath: string, content: string): void {
 	const tempPath = `${filePath}.tmp`
 	writeFileSync(tempPath, content, "utf-8")
-  const tempFileDescriptor = openSync(tempPath, "r")
+  const tempFileDescriptor = openSync(tempPath, "r+")
   try {
     fsyncSync(tempFileDescriptor)
   } finally {
