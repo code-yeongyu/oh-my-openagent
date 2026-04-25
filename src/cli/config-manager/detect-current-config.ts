@@ -84,6 +84,7 @@ export function detectCurrentConfig(): DetectedConfig {
     hasKimiForCoding: false,
     hasOpencodeGo: false,
     hasVercelAiGateway: false,
+    enableCaveman: false,
   }
 
   const { format, path } = detectConfigFormat()

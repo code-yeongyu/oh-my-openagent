@@ -120,6 +120,16 @@ export async function promptInstallConfig(detected: DetectedConfig): Promise<Ins
   })
   if (!vercelAiGateway) return null
 
+  const enableCaveman = await selectOrCancel({
+    message: "Enable caveman output compression? (~65-75% token savings)",
+    options: [
+      { value: "yes", label: "Yes", hint: "Terse responses, fewer output tokens" },
+      { value: "no", label: "No", hint: "Standard response verbosity" },
+    ],
+    initialValue: initial.caveman ?? "no",
+  })
+  if (!enableCaveman) return null
+
   return {
     hasClaude: claude !== "no",
     isMax20: claude === "max20",
@@ -131,5 +141,6 @@ export async function promptInstallConfig(detected: DetectedConfig): Promise<Ins
     hasKimiForCoding: kimiForCoding === "yes",
     hasOpencodeGo: opencodeGo === "yes",
     hasVercelAiGateway: vercelAiGateway === "yes",
+    enableCaveman: enableCaveman === "yes",
   }
 }
