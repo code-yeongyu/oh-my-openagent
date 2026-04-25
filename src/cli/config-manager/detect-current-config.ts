@@ -121,5 +121,24 @@ export function detectCurrentConfig(): DetectedConfig {
   result.hasOpencodeGo = hasOpencodeGo
   result.hasVercelAiGateway = hasVercelAiGateway
 
+  // Detect caveman from global_prompt_append in OMO config
+  result.enableCaveman = detectCavemanFromOmoConfig()
+
   return result
+}
+
+function detectCavemanFromOmoConfig(): boolean {
+  const omoConfigPath = getOmoConfigPath()
+  if (!existsSync(omoConfigPath)) return false
+
+  try {
+    const content = readFileSync(omoConfigPath, "utf-8")
+    const omoConfig = parseJsonc<Record<string, unknown>>(content)
+    if (!omoConfig || typeof omoConfig !== "object") return false
+
+    const gpa = omoConfig.global_prompt_append
+    return typeof gpa === "string" && gpa.includes("CAVEMAN")
+  } catch {
+    return false
+  }
 }
