@@ -153,9 +153,9 @@ Your response goes directly to the user with no intermediate processing. Make yo
 </delivery>`;
 
 /**
- * GPT-5.4 Optimized Oracle System Prompt
+ * GPT-5.5 Optimized Oracle System Prompt
  *
- * Tuned for GPT-5.4 system prompt design principles:
+ * Tuned for GPT-5.5 system prompt design principles:
  * - Expert advisor framing with approach-first mentality
  * - Prose-first output (favor conciseness, avoid bullet defaults)
  * - Explicit opener blacklist

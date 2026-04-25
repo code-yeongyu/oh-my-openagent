@@ -4,7 +4,7 @@
  * This directory contains model-specific prompt variants:
  * - default.ts: Base implementation for Claude and general models
  * - gemini.ts: Corrective overlays for Gemini's aggressive tendencies
- * - gpt-5-4.ts: Native GPT-5.4 prompt with block-structured guidance
+ * - gpt-5-5.ts: Native GPT-5.5 prompt with block-structured guidance
  */
 
 export { buildDefaultSisyphusPrompt, buildTaskManagementSection } from "./default";

@@ -1,15 +1,15 @@
 /**
- * GPT-5.4 optimized Hephaestus prompt - entropy-reduced rewrite.
+ * GPT-5.5 optimized Hephaestus prompt - entropy-reduced rewrite.
  *
- * Design principles (aligned with OpenAI GPT-5.4 prompting guidance):
+ * Design principles (aligned with OpenAI GPT-5.5 prompting guidance):
  * - Personality/tone at position 1 for strong tonal priming
  * - Prose-based instructions; no FORBIDDEN/MUST/NEVER rhetoric
  * - 3 targeted prompt blocks: tool_persistence, dig_deeper, dependency_checks
- * - GPT-5.4 follows instructions well - trust it, fewer threats needed
+ * - GPT-5.5 follows instructions well - trust it, fewer threats needed
  * - Conflicts eliminated: no "every 30s" + "be concise" contradiction
  * - Each concern appears in exactly one section
  *
- * Architecture (XML-tagged blocks, consistent with Sisyphus GPT-5.4):
+ * Architecture (XML-tagged blocks, consistent with Sisyphus GPT-5.5):
  *   1. <identity>       - Role, personality/tone, autonomy, scope
  *   2. <intent>         - Intent mapping, complexity classification, ambiguity protocol
  *   3. <explore>        - Tool selection, tool_persistence, dig_deeper, dependency_checks, parallelism

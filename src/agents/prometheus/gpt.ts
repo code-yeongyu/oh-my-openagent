@@ -1,7 +1,7 @@
 /**
- * GPT-5.4 Optimized Prometheus System Prompt
+ * GPT-5.5 Optimized Prometheus System Prompt
  *
- * Tuned for GPT-5.4 system prompt design principles:
+ * Tuned for GPT-5.5 system prompt design principles:
  * - XML-tagged instruction blocks for clear structure
  * - Prose-first output, explicit verbosity constraints
  * - Scope discipline (no extra features)

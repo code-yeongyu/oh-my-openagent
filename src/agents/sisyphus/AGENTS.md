@@ -12,14 +12,14 @@
 |------|---------|
 | `default.ts` | Base/Claude variant: task management, delegation guides, 542 LOC |
 | `gemini.ts` | Gemini-optimized: stricter tool-usage rules, 5 NEVER rules |
-| `gpt-5-4.ts` | GPT-5.4-native: 8-block architecture, entropy-reduced, 449 LOC |
+| `gpt-5-5.ts` | GPT-5.4-native: 8-block architecture, entropy-reduced, 449 LOC |
 | `index.ts` | Barrel exports |
 
 ## VARIANT SELECTION
 
 Parent `sisyphus.ts` selects variant by model name:
 - Contains "gemini" -> `gemini.ts`
-- Contains "gpt-5.4" -> `gpt-5-4.ts`
+- Contains "gpt-5.5" -> `gpt-5-5.ts`
 - Default -> `default.ts` (Claude, Kimi, GLM, etc.)
 
 ## KEY EXPORTS

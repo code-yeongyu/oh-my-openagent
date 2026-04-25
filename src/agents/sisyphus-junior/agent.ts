@@ -5,7 +5,7 @@
  * Category-spawned executor with domain-specific configurations.
  *
  * Routing:
- * 1. GPT models (openai/*, github-copilot/gpt-*) -> gpt.ts (GPT-5.4 optimized)
+ * 1. GPT models (openai/*, github-copilot/gpt-*) -> gpt.ts (GPT-5.5 optimized)
  * 2. Gemini models (google/*, google-vertex/*) -> gemini.ts (Gemini-optimized)
  * 3. Default (Claude, etc.) -> default.ts (Claude-optimized)
  */
@@ -42,8 +42,8 @@ export const SISYPHUS_JUNIOR_DEFAULTS = {
 export type SisyphusJuniorPromptSource =
   | "default"
   | "gpt"
-  | "gpt-5-5"
   | "gpt-5-4"
+  | "gpt-5-5"
   | "gpt-5-3-codex"
   | "gemini"
 
@@ -51,6 +51,7 @@ export function getSisyphusJuniorPromptSource(model?: string): SisyphusJuniorPro
   if (model && isGptModel(model)) {
     if (isGpt5_5Model(model)) return "gpt-5-5"
     const lower = model.toLowerCase()
+    if (lower.includes("gpt-5.5") || lower.includes("gpt-5-5")) return "gpt-5-5"
     if (lower.includes("gpt-5.4") || lower.includes("gpt-5-4")) return "gpt-5-4"
     if (lower.includes("gpt-5.3-codex") || lower.includes("gpt-5-3-codex")) return "gpt-5-3-codex"
     return "gpt"
