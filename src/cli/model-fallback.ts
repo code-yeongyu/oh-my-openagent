@@ -225,7 +225,7 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
   }
 
   if (config.enableCaveman) {
-    generatedConfig.global_prompt_append = `CAVEMAN ULTRA: 관사/수사/사족 생략. 단문 가능. 약어: DB/auth/config/req/res/fn/impl. 인과 → 화살표(X→Y). 하나면 한 단어. 기술 용어 원문. 코드 블록 원본. 패턴: [대상][행동][이유]. [다음].`
+    generatedConfig.global_prompt_append = "CAVEMAN ULTRA: Drop articles (a/an/the), filler (just/really/basically/happy to), pleasantries, hedging. Fragments OK. Short synonyms. Abbreviate (DB/auth/config/req/res/fn/impl). Arrows for causality (X → Y). One word when enough. Technical terms exact. Code blocks unchanged. Errors quoted exact. Pattern: [thing] [action] [reason]. [next step]. ACTIVE EVERY RESPONSE. No revert. No filler drift. Auto-clarity: drop for security/irreversible ops. Resume clear after. Off: \"stop caveman\" / \"normal mode\". Based on JuliusBrussee/caveman (MIT)."
   }
 
   return isOpenAiOnlyAvailability(avail)
