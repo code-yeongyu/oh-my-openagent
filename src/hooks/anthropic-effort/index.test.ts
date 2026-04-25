@@ -146,7 +146,7 @@ describe("createAnthropicEffortHook", () => {
 
     it("does nothing for non-claude providers/models", async () => {
       const hook = createAnthropicEffortHook()
-      const { input, output } = createMockParams({ providerID: "openai", modelID: "gpt-5.4" })
+      const { input, output } = createMockParams({ providerID: "openai", modelID: "gpt-5.5" })
 
       await hook["chat.params"](input, output)
 

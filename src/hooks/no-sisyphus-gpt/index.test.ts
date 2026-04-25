@@ -49,8 +49,8 @@ describe("no-sisyphus-gpt hook", () => {
     })
   })
 
-  test("does not show toast for gpt-5.4 model (Sisyphus has specialized support)", async () => {
-    // given - sisyphus with gpt-5.4 model (should be allowed)
+  test("does not show toast for gpt-5.5 model (Sisyphus has specialized support)", async () => {
+    // given - sisyphus with gpt-5.5 model (should be allowed)
     const showToast = spyOn({ fn: async () => ({}) }, "fn")
     const hook = createNoSisyphusGptHook({
       client: { tui: { showToast } },
@@ -58,11 +58,11 @@ describe("no-sisyphus-gpt hook", () => {
 
     const output = createOutput()
 
-    // when - chat.message runs with gpt-5.4
+    // when - chat.message runs with gpt-5.5
     await hook["chat.message"]?.({
       sessionID: "ses_gpt54",
       agent: SISYPHUS_DISPLAY,
-      model: { providerID: "openai", modelID: "gpt-5.4" },
+      model: { providerID: "openai", modelID: "gpt-5.5" },
     }, output)
 
     // then - no toast, agent NOT switched to Hephaestus
@@ -125,7 +125,7 @@ describe("no-sisyphus-gpt hook", () => {
     await hook["chat.message"]?.({
       sessionID: "ses_3",
       agent: HEPHAESTUS_DISPLAY,
-      model: { providerID: "openai", modelID: "gpt-5.4" },
+      model: { providerID: "openai", modelID: "gpt-5.5" },
     }, output)
 
     // then - no toast

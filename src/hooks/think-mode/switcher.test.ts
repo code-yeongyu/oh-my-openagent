@@ -46,8 +46,8 @@ describe("think-mode switcher", () => {
       })
 
       it("should handle dots in GPT version numbers", () => {
-        // given a GPT model ID with dot format (gpt-5.4)
-        const variant = getHighVariant("gpt-5.4")
+        // given a GPT model ID with dot format (gpt-5.5)
+        const variant = getHighVariant("gpt-5.5")
 
         // then should return high variant
         expect(variant).toBe("gpt-5-4-high")
@@ -103,7 +103,7 @@ describe("think-mode switcher", () => {
       // given base model IDs without -high suffix
       expect(isAlreadyHighVariant("claude-opus-4-7")).toBe(false)
       expect(isAlreadyHighVariant("claude-opus-4.7")).toBe(false)
-      expect(isAlreadyHighVariant("gpt-5.4")).toBe(false)
+      expect(isAlreadyHighVariant("gpt-5.5")).toBe(false)
       expect(isAlreadyHighVariant("gemini-3.1-pro")).toBe(false)
     })
 
@@ -125,7 +125,7 @@ describe("think-mode switcher", () => {
 
       it("should preserve openai/ prefix when getting high variant", () => {
         // given a model ID with openai/ prefix
-        const variant = getHighVariant("openai/gpt-5-4")
+        const variant = getHighVariant("openai/gpt-5-5")
 
         // then should return high variant with prefix preserved
         expect(variant).toBe("openai/gpt-5-4-high")
@@ -183,12 +183,12 @@ describe("think-mode switcher", () => {
       it("should return false for prefixed base models", () => {
         // given prefixed base model IDs without -high suffix
         expect(isAlreadyHighVariant("vertex_ai/claude-opus-4-7")).toBe(false)
-        expect(isAlreadyHighVariant("openai/gpt-5-4")).toBe(false)
+        expect(isAlreadyHighVariant("openai/gpt-5-5")).toBe(false)
       })
 
       it("should handle prefixed models with dots", () => {
         // given prefixed model IDs with dots
-        expect(isAlreadyHighVariant("vertex_ai/gpt-5.4")).toBe(false)
+        expect(isAlreadyHighVariant("vertex_ai/gpt-5.5")).toBe(false)
         expect(isAlreadyHighVariant("vertex_ai/gpt-5.4-high")).toBe(true)
       })
     })

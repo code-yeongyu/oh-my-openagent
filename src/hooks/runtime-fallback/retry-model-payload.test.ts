@@ -83,7 +83,7 @@ describe("buildRetryModelPayload", () => {
 
   test("should include reasoningEffort from agent settings", () => {
     // given
-    const model = "openai/gpt-5.4"
+    const model = "openai/gpt-5.5"
     const agentSettings = { variant: "high", reasoningEffort: "xhigh" }
 
     // when
@@ -91,7 +91,7 @@ describe("buildRetryModelPayload", () => {
 
     // then
     expect(result).toEqual({
-      model: { providerID: "openai", modelID: "gpt-5.4" },
+      model: { providerID: "openai", modelID: "gpt-5.5" },
       variant: "high",
       reasoningEffort: "xhigh",
     })

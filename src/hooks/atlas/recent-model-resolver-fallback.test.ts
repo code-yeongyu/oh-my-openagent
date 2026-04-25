@@ -45,7 +45,7 @@ describe("resolveRecentPromptContextForSession fallback ordering", () => {
     }), "utf-8")
     writeFileSync(join(messageDir, "msg_00000000_000999.json"), JSON.stringify({
       agent: "atlas",
-      model: { providerID: "openai", modelID: "gpt-5.4" },
+      model: { providerID: "openai", modelID: "gpt-5.5" },
       tools: { edit: true },
       time: { created: 100 },
     }), "utf-8")
@@ -66,7 +66,7 @@ describe("resolveRecentPromptContextForSession fallback ordering", () => {
     const result = await resolveRecentPromptContextForSession(ctx as never, sessionID)
 
     // then
-    expect(result.model).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
+    expect(result.model).toEqual({ providerID: "openai", modelID: "gpt-5.5" })
     expect(result.tools).toEqual({ edit: true })
   })
 })

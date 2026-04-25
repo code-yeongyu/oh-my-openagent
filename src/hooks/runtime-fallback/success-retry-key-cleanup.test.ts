@@ -73,7 +73,7 @@ describe("createMessageUpdateHandler retry-key cleanup", () => {
       ],
     })
     const state = createFallbackState("google/gemini-2.5-pro")
-    state.pendingFallbackModel = "openai/gpt-5.4"
+    state.pendingFallbackModel = "openai/gpt-5.5"
     deps.sessionStates.set(sessionID, state)
     deps.sessionAwaitingFallbackResult.add(sessionID)
     deps.sessionStatusRetryKeys.set(sessionID, "retry:1")
@@ -84,7 +84,7 @@ describe("createMessageUpdateHandler retry-key cleanup", () => {
       info: {
         sessionID,
         role: "assistant",
-        model: "openai/gpt-5.4",
+        model: "openai/gpt-5.5",
       },
     })
 

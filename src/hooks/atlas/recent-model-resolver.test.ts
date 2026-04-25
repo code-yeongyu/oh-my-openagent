@@ -23,7 +23,7 @@ describe("resolveRecentPromptContextForSession", () => {
                 id: "msg_older_in_array",
                 info: {
                   providerID: "openai",
-                  modelID: "gpt-5.4",
+                  modelID: "gpt-5.5",
                   tools: { edit: true },
                   time: { created: 100 },
                 },
@@ -38,7 +38,7 @@ describe("resolveRecentPromptContextForSession", () => {
     const result = await resolveRecentPromptContextForSession(ctx, "ses_123")
 
     // then
-    expect(result.model).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
+    expect(result.model).toEqual({ providerID: "openai", modelID: "gpt-5.5" })
     expect(result.tools).toEqual({ edit: true })
   })
 })

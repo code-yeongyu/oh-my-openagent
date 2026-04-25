@@ -67,7 +67,7 @@ describe("createThinkModeHook", () => {
     const input = createHookInput({
       sessionID,
       providerID: "github-copilot",
-      modelID: "gpt-5.4",
+      modelID: "gpt-5.5",
     })
     const output = createHookOutput("ultrathink about this")
 

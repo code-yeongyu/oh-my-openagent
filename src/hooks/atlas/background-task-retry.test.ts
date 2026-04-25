@@ -379,7 +379,7 @@ describe("atlas background task retry", () => {
           promptAsync: promptAsyncMock,
           messages: async ({ path }: { path: { id: string } }) => ({
             data: path.id === descendantSessionID
-              ? [{ info: { agent: descendantAgent, providerID: "openai", modelID: "gpt-5.4" } }]
+              ? [{ info: { agent: descendantAgent, providerID: "openai", modelID: "gpt-5.5" } }]
               : [],
           }),
         },

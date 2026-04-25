@@ -312,7 +312,7 @@ session_id: ses_standalone_def
         metadata: {
           sessionId: "ses_standalone_def",
           agent: "sisyphus-junior",
-          model: { providerID: "openai", modelID: "gpt-5.4" },
+          model: { providerID: "openai", modelID: "gpt-5.5" },
           truncated: false,
         } as Record<string, unknown>,
       }
@@ -327,7 +327,7 @@ session_id: ses_standalone_def
       expect(output.output).toContain("LYING")
       expect(output.metadata.sessionId).toBe("ses_standalone_def")
       expect(output.metadata.agent).toBe("sisyphus-junior")
-      expect(output.metadata.model).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
+      expect(output.metadata.model).toEqual({ providerID: "openai", modelID: "gpt-5.5" })
       expect(output.metadata.truncated).toBe(false)
 
       cleanupMessageStorage(sessionID)

@@ -109,7 +109,7 @@ describe("atlas hook idle-event persisted lineage", () => {
       },
       {
         [descendantSessionID]: [
-          { info: { agent: "atlas", providerID: "openai", modelID: "gpt-5.4" } },
+          { info: { agent: "atlas", providerID: "openai", modelID: "gpt-5.5" } },
         ],
       },
     )
@@ -144,7 +144,7 @@ describe("atlas hook idle-event persisted lineage", () => {
       },
       {
         [descendantSessionID]: [
-          { info: { agent: "sisyphus-junior", providerID: "openai", modelID: "gpt-5.4" } },
+          { info: { agent: "sisyphus-junior", providerID: "openai", modelID: "gpt-5.5" } },
         ],
       },
     )
@@ -181,7 +181,7 @@ describe("atlas hook idle-event persisted lineage", () => {
             throw new Error("session lookup failed")
           },
           messages: async () => ({
-            data: [{ info: { agent: "atlas", providerID: "openai", modelID: "gpt-5.4" } }],
+            data: [{ info: { agent: "atlas", providerID: "openai", modelID: "gpt-5.5" } }],
           }),
           prompt: async (input: unknown) => {
             promptCalls.push(input)
@@ -225,7 +225,7 @@ describe("atlas hook idle-event persisted lineage", () => {
       },
       {
         [descendantSessionID]: [
-          { info: { agent: "sisyphus-junior", providerID: "openai", modelID: "gpt-5.4" } },
+          { info: { agent: "sisyphus-junior", providerID: "openai", modelID: "gpt-5.5" } },
         ],
       },
     )

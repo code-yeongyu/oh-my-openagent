@@ -36,7 +36,7 @@ function createDeps(): HookDeps {
     pluginConfig: {
       categories: {
         test: {
-          fallback_models: ["openai/gpt-5.4", "google/gemini-2.5-pro"],
+          fallback_models: ["openai/gpt-5.5", "google/gemini-2.5-pro"],
         },
       },
     },
@@ -75,10 +75,10 @@ describe("createSessionStatusHandler", () => {
     const abortCalls: string[] = []
     const retryCalls: Array<{ sessionID: string; model: string; source: string }> = []
     const state = createFallbackState("anthropic/claude-opus-4-7")
-    state.currentModel = "openai/gpt-5.4"
+    state.currentModel = "openai/gpt-5.5"
     state.fallbackIndex = 0
     state.attemptCount = 1
-    state.pendingFallbackModel = "openai/gpt-5.4"
+    state.pendingFallbackModel = "openai/gpt-5.5"
     state.failedModels.set("anthropic/claude-opus-4-7", Date.now())
     deps.sessionStates.set(sessionID, state)
 
@@ -87,11 +87,11 @@ describe("createSessionStatusHandler", () => {
     // when
     await handler({
       sessionID,
-      model: "openai/gpt-5.4",
+      model: "openai/gpt-5.5",
       status: {
         type: "retry",
         attempt: 2,
-        message: "All credentials for model gpt-5.4 are cooling down [retrying in 7m 56s attempt #2]",
+        message: "All credentials for model gpt-5.5 are cooling down [retrying in 7m 56s attempt #2]",
       },
     })
 

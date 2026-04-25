@@ -66,7 +66,7 @@ describe("createEventHandler", () => {
     const abortCalls: string[] = []
     const clearCalls: string[] = []
     const state = createFallbackState("google/gemini-2.5-pro")
-    state.pendingFallbackModel = "openai/gpt-5.4"
+    state.pendingFallbackModel = "openai/gpt-5.5"
     deps.sessionStates.set(sessionID, state)
     deps.sessionRetryInFlight.add(sessionID)
     deps.sessionStatusRetryKeys.set(sessionID, "retry:1")
@@ -88,7 +88,7 @@ describe("createEventHandler", () => {
     const abortCalls: string[] = []
     const clearCalls: string[] = []
     const state = createFallbackState("google/gemini-2.5-pro")
-    state.pendingFallbackModel = "openai/gpt-5.4"
+    state.pendingFallbackModel = "openai/gpt-5.5"
     deps.sessionStates.set(sessionID, state)
     deps.sessionRetryInFlight.add(sessionID)
     deps.sessionFallbackTimeouts.set(sessionID, 1)
@@ -111,10 +111,10 @@ describe("createEventHandler", () => {
     const abortCalls: string[] = []
     const clearCalls: string[] = []
     const state = createFallbackState("google/gemini-2.5-pro")
-    state.currentModel = "openai/gpt-5.4"
+    state.currentModel = "openai/gpt-5.5"
     state.fallbackIndex = 1
     state.attemptCount = 2
-    state.pendingFallbackModel = "openai/gpt-5.4"
+    state.pendingFallbackModel = "openai/gpt-5.5"
     state.failedModels.set("google/gemini-2.5-pro", Date.now())
     deps.sessionStates.set(sessionID, state)
     deps.sessionRetryInFlight.add(sessionID)
@@ -144,10 +144,10 @@ describe("createEventHandler", () => {
     const abortCalls: string[] = []
     const clearCalls: string[] = []
     const state = createFallbackState("google/gemini-2.5-pro")
-    state.currentModel = "openai/gpt-5.4"
+    state.currentModel = "openai/gpt-5.5"
     state.fallbackIndex = 1
     state.attemptCount = 2
-    state.pendingFallbackModel = "openai/gpt-5.4"
+    state.pendingFallbackModel = "openai/gpt-5.5"
     deps.sessionStates.set(sessionID, state)
     const handler = createEventHandler(deps, createHelpers(deps, abortCalls, clearCalls))
 
