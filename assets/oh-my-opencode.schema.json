@@ -8,6 +8,9 @@
     "$schema": {
       "type": "string"
     },
+    "global_prompt_append": {
+      "type": "string"
+    },
     "new_task_system_enabled": {
       "type": "boolean"
     },

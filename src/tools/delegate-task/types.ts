@@ -70,6 +70,8 @@ export interface DelegateTaskToolOptions {
   modelFallbackControllerAccessor?: ModelFallbackControllerAccessor
   onSyncSessionCreated?: (event: SyncSessionCreatedEvent) => Promise<void>
   syncPollTimeoutMs?: number
+  /** Global prompt append applied to all agents and categories. Supports file:// URIs. */
+  globalPromptAppend?: string
 }
 
 import type { DelegatedModelConfig } from "../../shared/model-resolution-types"

@@ -25,6 +25,7 @@ export function maybeCreateSisyphusConfig(input: {
   userCategories?: CategoriesConfig
   useTaskSystem: boolean
   disableOmoEnv?: boolean
+  globalPromptAppend?: string
 }): AgentConfig | undefined {
   const {
     disabledAgents,
@@ -40,6 +41,7 @@ export function maybeCreateSisyphusConfig(input: {
     directory,
     useTaskSystem,
     disableOmoEnv = false,
+    globalPromptAppend,
   } = input
 
   const sisyphusOverride = agentOverrides["sisyphus"]
@@ -81,7 +83,7 @@ export function maybeCreateSisyphusConfig(input: {
     sisyphusConfig = { ...sisyphusConfig, variant: sisyphusResolvedVariant }
   }
 
-  sisyphusConfig = applyOverrides(sisyphusConfig, sisyphusOverride, mergedCategories, directory)
+  sisyphusConfig = applyOverrides(sisyphusConfig, sisyphusOverride, mergedCategories, directory, globalPromptAppend)
 
   const resolvedModel = sisyphusConfig.model ?? ""
   sisyphusConfig.permission = applyFrontierToolSchemaPermission(

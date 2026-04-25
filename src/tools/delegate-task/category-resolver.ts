@@ -89,6 +89,7 @@ export async function resolveCategoryExecution(
     inheritedModel,
     systemDefaultModel,
     availableModels,
+    globalPromptAppend: executorCtx.globalPromptAppend,
   })
 
   if (!resolved) {

@@ -28,6 +28,7 @@ export function collectPendingBuiltinAgents(input: {
   teamModeEnabled?: boolean
   useTaskSystem?: boolean
   disableOmoEnv?: boolean
+  globalPromptAppend?: string
 }): { pendingAgentConfigs: Map<string, AgentConfig>; availableAgents: AvailableAgent[] } {
   const {
     agentSources,
@@ -45,6 +46,7 @@ export function collectPendingBuiltinAgents(input: {
     disabledSkills,
     teamModeEnabled,
     disableOmoEnv = false,
+    globalPromptAppend,
   } = input
 
   const availableAgents: AvailableAgent[] = []
@@ -106,7 +108,7 @@ export function collectPendingBuiltinAgents(input: {
       config = applyEnvironmentContext(config, directory, { disableOmoEnv })
     }
 
-    config = applyOverrides(config, override, mergedCategories, directory)
+    config = applyOverrides(config, override, mergedCategories, directory, globalPromptAppend)
     config = resolveAgentSkills(config, { gitMasterConfig, browserProvider, disabledSkills, teamModeEnabled })
 
     // Store for later - will be added after sisyphus and hephaestus

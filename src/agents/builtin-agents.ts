@@ -73,6 +73,7 @@ export async function createBuiltinAgents(
   useTaskSystem = false,
   disableOmoEnv = false,
   teamModeEnabled = false,
+  globalPromptAppend?: string
 ): Promise<Record<string, AgentConfig>> {
 
   const connectedProviders = readConnectedProvidersCache()
@@ -119,6 +120,7 @@ export async function createBuiltinAgents(
     disabledSkills,
     teamModeEnabled,
     disableOmoEnv,
+    globalPromptAppend,
   })
 
   const sisyphusConfig = maybeCreateSisyphusConfig({
@@ -136,6 +138,7 @@ export async function createBuiltinAgents(
     userCategories: categories,
     useTaskSystem,
     disableOmoEnv,
+    globalPromptAppend,
   })
   if (sisyphusConfig) {
     result["sisyphus"] = sisyphusConfig
@@ -154,6 +157,7 @@ export async function createBuiltinAgents(
     directory,
     useTaskSystem,
     disableOmoEnv,
+    globalPromptAppend,
   })
   if (hephaestusConfig) {
     result["hephaestus"] = hephaestusConfig
@@ -175,6 +179,7 @@ export async function createBuiltinAgents(
     mergedCategories,
     directory,
     userCategories: categories,
+    globalPromptAppend,
   })
   if (atlasConfig) {
     result["atlas"] = atlasConfig
