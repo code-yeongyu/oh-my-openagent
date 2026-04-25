@@ -60,7 +60,16 @@ export function resolvePromptAppend(
     return `[WARNING: Malformed file URI (invalid percent-encoding): ${promptAppend}]`
   }
 
-  if (!allowOutsideProject) {
+  if (allowOutsideProject) {
+    if (!isAllowedGlobalPath(filePath)) {
+      log("[resolve-file-uri] Rejected file URI outside allowed global paths", {
+        promptAppend,
+        filePath,
+        allowed: ALLOWED_GLOBAL_PREFIXES,
+      })
+      return `[WARNING: Path rejected (outside allowed global paths): ${promptAppend}]`
+    }
+  } else {
     const projectRoot = configDir ?? process.cwd()
     if (!isWithinProject(filePath, projectRoot)) {
       log("[resolve-file-uri] Rejected file URI outside project root", {
@@ -70,13 +79,6 @@ export function resolvePromptAppend(
       })
       return `[WARNING: Path rejected: ${promptAppend} (resolved outside project root ${projectRoot}; file:// prompts must reside within the project boundary)]`
     }
-  } else if (!isAllowedGlobalPath(filePath)) {
-    log("[resolve-file-uri] Rejected file URI outside allowed global paths", {
-      promptAppend,
-      filePath,
-      allowed: ALLOWED_GLOBAL_PREFIXES,
-    })
-    return `[WARNING: Path rejected (outside allowed global paths): ${promptAppend}]`
   }
 
   if (!existsSync(filePath)) {
