@@ -4,10 +4,21 @@ import { isAbsolute, resolve } from "node:path"
 import { isWithinProject } from "../../shared/contains-path"
 import { log } from "../../shared/logger"
 
+/** User directories allowed for global file:// URIs (security whitelist) */
+const ALLOWED_GLOBAL_PREFIXES = [
+  `${homedir()}/.config/`,
+  `${homedir()}/.hermes/`,
+  `${homedir()}/.local/share/`,
+]
+
+function isAllowedGlobalPath(filePath: string): boolean {
+  return ALLOWED_GLOBAL_PREFIXES.some((prefix) => filePath.startsWith(prefix))
+}
+
 export function resolvePromptAppend(
   promptAppend: string,
   configDir?: string,
-  /** When true, skip isWithinProject check (for user-level global configs like ~/.hermes/) */
+  /** When true, allow user-level paths outside project root (security whitelist enforced) */
   allowOutsideProject?: boolean
 ): string {
   if (!promptAppend.startsWith("file://")) return promptAppend
@@ -25,7 +36,16 @@ export function resolvePromptAppend(
     return `[WARNING: Malformed file URI (invalid percent-encoding): ${promptAppend}]`
   }
 
-  if (!allowOutsideProject) {
+  if (allowOutsideProject) {
+    if (!isAllowedGlobalPath(filePath)) {
+      log("[resolve-file-uri] Rejected file URI outside allowed global paths", {
+        promptAppend,
+        filePath,
+        allowed: ALLOWED_GLOBAL_PREFIXES,
+      })
+      return `[WARNING: Path rejected (outside allowed global paths): ${promptAppend}]`
+    }
+  } else {
     const projectRoot = configDir ?? process.cwd()
     if (!isWithinProject(filePath, projectRoot)) {
       log("[resolve-file-uri] Rejected file URI outside project root", {

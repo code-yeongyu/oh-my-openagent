@@ -80,20 +80,20 @@ export function maybeCreateHephaestusConfig(input: {
 
   hephaestusConfig = { ...hephaestusConfig, variant: hephaestusResolvedVariant ?? "medium" }
 
+  // Apply global_prompt_append BEFORE category override + merge
+  if (globalPromptAppend && typeof hephaestusConfig.prompt === "string") {
+    hephaestusConfig = {
+      ...hephaestusConfig,
+      prompt: hephaestusConfig.prompt + "\n" + resolvePromptAppend(globalPromptAppend, directory, true /* allowOutsideProject */),
+    }
+  }
+
   const hepOverrideCategory = (hephaestusOverride as Record<string, unknown> | undefined)?.category as string | undefined
   if (hepOverrideCategory) {
     hephaestusConfig = applyCategoryOverride(hephaestusConfig, hepOverrideCategory, mergedCategories)
   }
 
   hephaestusConfig = applyEnvironmentContext(hephaestusConfig, directory, { disableOmoEnv })
-
-  // Apply global_prompt_append FIRST so it appears before agent-specific prompt_append
-  if (globalPromptAppend && typeof hephaestusConfig.prompt === "string") {
-    hephaestusConfig = {
-      ...hephaestusConfig,
-      prompt: hephaestusConfig.prompt + "\n" + resolvePromptAppend(globalPromptAppend, directory),
-    }
-  }
 
   if (hephaestusOverride) {
     hephaestusConfig = mergeAgentConfig(hephaestusConfig, hephaestusOverride, directory)
