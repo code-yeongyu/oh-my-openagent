@@ -141,7 +141,7 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 
 以下のサブスクリプションだけでも、ultraworkは十分に機能します（このプロジェクトとは無関係であり、個人的な推奨にすぎません）：
 - [ChatGPT サブスクリプション ($20)](https://chatgpt.com/)
-- [Kimi Code サブスクリプション ($0.99) (*今月限定)](https://www.kimi.com/membership/pricing?track_id=5cdeca93-66f0-4d35-aabb-b6df8fcea328)
+- [Kimi Code サブスクリプション ($19)](https://www.kimi.com/code)
 - [GLM Coding プラン ($10)](https://z.ai/subscribe)
 - 従量課金（pay-per-token）の対象であれば、kimiやgeminiモデルを使っても費用はほとんどかかりません。
 
