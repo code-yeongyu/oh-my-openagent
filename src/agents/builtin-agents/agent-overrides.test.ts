@@ -15,4 +15,16 @@ describe("applyOverrides", () => {
       process.env.LANG = previousLang
     }
   })
+
+  test("skips automatic locale prompt when prompt_append is explicitly controlled", () => {
+    const previousLang = process.env.LANG
+    process.env.LANG = "zh-CN.UTF-8"
+    try {
+      const base = { prompt: "Base prompt" } as AgentConfig
+      const result = applyOverrides(base, { prompt_append: "" }, {})
+      expect(result.prompt).toBe("Base prompt")
+    } finally {
+      process.env.LANG = previousLang
+    }
+  })
 })
