@@ -32,9 +32,13 @@ When summarizing this session, include these sections:
 - Write "None" if no explicit constraints exist
 
 ## 7. Agent Verification State (Critical for Reviewers)
-- Current agent, verification progress, pending verifications
-- Previous rejections and reasons (if reviewer agent)
-- Acceptance status of review process
+- **Current Agent**: What agent is running (momus, oracle, etc.)
+- **Verification Progress**: Files already verified/validated
+- **Pending Verifications**: Files still needing verification
+- **Previous Rejections**: If reviewer agent, what was rejected and why
+- **Acceptance Status**: Current state of review process
+
+This section is CRITICAL for reviewer agents (momus, oracle) to maintain continuity.
 
 ## 8. Delegated Agent Sessions
 - List ALL background tasks: agent name, category, status, description, session_id
