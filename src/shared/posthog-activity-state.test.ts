@@ -37,9 +37,7 @@ describe("getPostHogActivityCaptureState", () => {
     // then
     expect(result).toEqual({
       dayUTC: "2026-04-11",
-      hourUTC: "2026-04-11T10",
       captureDaily: true,
-      captureHourly: true,
     })
 
     rmSync(dataHomePath, { recursive: true, force: true })
@@ -60,9 +58,7 @@ describe("getPostHogActivityCaptureState", () => {
     // then
     expect(result).toEqual({
       dayUTC: "2026-04-11",
-      hourUTC: "2026-04-11T10",
       captureDaily: true,
-      captureHourly: true,
     })
 
     rmSync(dataHomePath, { recursive: true, force: true })
@@ -83,9 +79,7 @@ describe("getPostHogActivityCaptureState", () => {
     // then
     expect(result).toEqual({
       dayUTC: "2026-04-11",
-      hourUTC: "2026-04-11T10",
       captureDaily: true,
-      captureHourly: true,
     })
 
     rmSync(dataHomePath, { recursive: true, force: true })
@@ -112,9 +106,33 @@ describe("getPostHogActivityCaptureState", () => {
     // then
     expect(result).toEqual({
       dayUTC: "2026-04-11",
-      hourUTC: "2026-04-11T10",
       captureDaily: false,
-      captureHourly: false,
+    })
+
+    rmSync(dataHomePath, { recursive: true, force: true })
+  })
+
+  it("reads legacy hourly state without crashing", async () => {
+    // given
+    const dataHomePath = createDataHomePath()
+    const cachePath = join(dataHomePath, "oh-my-opencode")
+    mkdirSync(cachePath, { recursive: true })
+    writeFileSync(
+      join(cachePath, "posthog-activity.json"),
+      `${JSON.stringify({
+        lastActiveHourUTC: "2026-04-11T10",
+      })}\n`,
+    )
+    process.env.XDG_DATA_HOME = dataHomePath
+    const { getPostHogActivityCaptureState } = await importPostHogActivityStateModule()
+
+    // when
+    const result = getPostHogActivityCaptureState(new Date("2026-04-11T10:15:00.000Z"))
+
+    // then
+    expect(result).toEqual({
+      dayUTC: "2026-04-11",
+      captureDaily: true,
     })
 
     rmSync(dataHomePath, { recursive: true, force: true })

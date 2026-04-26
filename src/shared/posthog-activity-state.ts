@@ -8,14 +8,11 @@ import { writeFileAtomically } from "./write-file-atomically"
 
 type PostHogActivityState = {
   lastActiveDayUTC?: string
-  lastActiveHourUTC?: string
 }
 
 type PostHogActivityCaptureState = {
   dayUTC: string
-  hourUTC: string
   captureDaily: boolean
-  captureHourly: boolean
 }
 
 const POSTHOG_ACTIVITY_STATE_FILE = "posthog-activity.json"
@@ -26,10 +23,6 @@ function getPostHogActivityStateFilePath(): string {
 
 function getUtcDayString(date: Date): string {
   return date.toISOString().slice(0, 10)
-}
-
-function getUtcHourString(date: Date): string {
-  return date.toISOString().slice(0, 13)
 }
 
 function isPostHogActivityState(value: unknown): value is PostHogActivityState {
@@ -75,22 +68,17 @@ function writePostHogActivityState(nextState: PostHogActivityState): void {
 export function getPostHogActivityCaptureState(now: Date = new Date()): PostHogActivityCaptureState {
   const state = readPostHogActivityState()
   const dayUTC = getUtcDayString(now)
-  const hourUTC = getUtcHourString(now)
 
   const captureDaily = state.lastActiveDayUTC !== dayUTC
-  const captureHourly = state.lastActiveHourUTC !== hourUTC
 
-  if (captureDaily || captureHourly) {
+  if (captureDaily) {
     writePostHogActivityState({
       lastActiveDayUTC: captureDaily ? dayUTC : state.lastActiveDayUTC,
-      lastActiveHourUTC: captureHourly ? hourUTC : state.lastActiveHourUTC,
     })
   }
 
   return {
     dayUTC,
-    hourUTC,
     captureDaily,
-    captureHourly,
   }
 }
