@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, realpathSync } from "node:fs"
 import { homedir } from "node:os"
-import { isAbsolute, resolve } from "node:path"
+import { dirname, isAbsolute, resolve } from "node:path"
 import { isWithinProject } from "../../shared/contains-path"
 import { log } from "../../shared/logger"
 
@@ -19,7 +19,7 @@ function isAllowedGlobalPath(filePath: string): boolean {
     // File doesn't exist yet — canonicalize the deepest existing parent
     let current = filePath
     while (current.length > 1) {
-      current = current.substring(0, current.lastIndexOf('/'))
+      current = dirname(current)
       try {
         const canonicalParent = realpathSync.native(current)
         // Reconstruct canonical child path from canonical parent, then normalize
