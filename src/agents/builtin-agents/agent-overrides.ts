@@ -2,6 +2,7 @@ import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentOverrideConfig } from "../types"
 import type { CategoryConfig } from "../../config/schema"
 import { deepMerge, migrateAgentConfig } from "../../shared"
+import { applyAutomaticLocalePromptPreference } from "./auto-locale-prompt-append"
 import { resolvePromptAppend } from "./resolve-file-uri"
 
 /**
@@ -71,5 +72,5 @@ export function applyOverrides(
     result = mergeAgentConfig(result, override, directory)
   }
 
-  return result
+  return applyAutomaticLocalePromptPreference(result)
 }
