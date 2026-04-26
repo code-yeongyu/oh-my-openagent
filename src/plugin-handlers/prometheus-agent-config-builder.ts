@@ -24,6 +24,10 @@ type PrometheusOverride = Record<string, unknown> & {
   prompt_append?: string;
 };
 
+function hasExplicitPromptAppend(value: unknown): boolean {
+  return typeof value === "object" && value !== null && Object.prototype.hasOwnProperty.call(value, "prompt_append");
+}
+
 function isModelInFallbackChain(
   model: string | undefined,
   fallbackChain: FallbackEntry[] | undefined,
@@ -117,12 +121,17 @@ export async function buildPrometheusAgentConfig(params: {
   };
 
   const override = params.pluginPrometheusOverride;
-  if (!override) return applyAutomaticLocalePromptPreference(base);
+  if (!override) {
+    return hasExplicitPromptAppend(categoryConfig) ? base : applyAutomaticLocalePromptPreference(base);
+  }
 
   const { prompt_append, ...restOverride } = override;
   const merged = { ...base, ...restOverride };
   if (prompt_append && typeof merged.prompt === "string") {
     merged.prompt = merged.prompt + "\n" + resolvePromptAppend(prompt_append);
+  }
+  if (hasExplicitPromptAppend(categoryConfig) || hasExplicitPromptAppend(override)) {
+    return merged;
   }
   return applyAutomaticLocalePromptPreference(merged);
 }
