@@ -128,7 +128,7 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 Даже при наличии только следующих подписок ultrawork будет работать отлично (проект не аффилирован с ними, это личная рекомендация):
 
 - [Подписка ChatGPT ($20)](https://chatgpt.com/)
-- [Подписка Kimi Code ($0.99) (*только в этом месяце)](https://www.kimi.com/membership/pricing?track_id=5cdeca93-66f0-4d35-aabb-b6df8fcea328)
+- [Подписка Kimi Code ($19)](https://www.kimi.com/code)
 - [Тариф GLM Coding ($10)](https://z.ai/subscribe)
 - При доступе к оплате за токены использование моделей Kimi и Gemini обойдётся недорого.
 
