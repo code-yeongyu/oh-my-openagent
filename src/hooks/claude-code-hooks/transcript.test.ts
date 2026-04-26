@@ -100,7 +100,7 @@ describe("transcript caching", () => {
     expect(client.session.messages).toHaveBeenCalledTimes(2)
   })
 
-  it("keeps intermediate tool calls across sequential transcript rebuilds", async () => {
+  it("should not grow cached base entries across sequential transcript rebuilds", async () => {
     // given
     const client = createMockClient([])
 
@@ -112,6 +112,12 @@ describe("transcript caching", () => {
       "bash",
       { command: "echo first" }
     )
+    if (firstPath) {
+      const firstLines = readFileSync(firstPath, "utf-8").trim().split("\n")
+      expect(firstLines).toHaveLength(1)
+      expect(firstLines[0]).toContain("Bash")
+    }
+
     const secondPath = await buildTranscriptFromSession(
       client,
       "ses_sequential",
@@ -119,6 +125,8 @@ describe("transcript caching", () => {
       "read",
       { filePath: "/tmp/second.txt" }
     )
+    const secondLines = secondPath ? readFileSync(secondPath, "utf-8").trim().split("\n") : []
+
     const thirdPath = await buildTranscriptFromSession(
       client,
       "ses_sequential",
@@ -132,12 +140,18 @@ describe("transcript caching", () => {
     expect(secondPath).not.toBeNull()
     expect(thirdPath).not.toBeNull()
 
-    if (thirdPath) {
-      const content = readFileSync(thirdPath, "utf-8")
+    if (secondPath && thirdPath) {
+      expect(secondLines).toHaveLength(1)
+      expect(secondLines[0]).toContain("Read")
 
-      expect(content).toContain("Bash")
-      expect(content).toContain("Read")
-      expect(content).toContain("Write")
+      const thirdLines = readFileSync(thirdPath, "utf-8").trim().split("\n")
+      expect(thirdLines).toHaveLength(1)
+      expect(thirdLines[0]).toContain("Write")
+    }
+
+    // Cached previous temp files should be replaced on rebuild
+    if (firstPath) {
+      expect(existsSync(firstPath)).toBe(false)
     }
 
     deleteTempTranscript(firstPath)

@@ -216,7 +216,6 @@ export async function buildTranscriptFromSession(
 
     const cacheEntry = transcriptCache.get(sessionId)
     if (cacheEntry) {
-      cacheEntry.baseEntries = allEntries
       cacheEntry.tempPath = tempPath
       cacheEntry.createdAt = Date.now()
     }
