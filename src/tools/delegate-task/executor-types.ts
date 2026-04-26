@@ -16,6 +16,8 @@ export interface ExecutorContext {
   modelFallbackControllerAccessor?: ModelFallbackControllerAccessor
   onSyncSessionCreated?: (event: { sessionID: string; parentID: string; title: string }) => Promise<void>
   syncPollTimeoutMs?: number
+  /** Global prompt append applied to all agents and categories. Supports file:// URIs. */
+  globalPromptAppend?: string
 }
 
 export interface ParentContext {

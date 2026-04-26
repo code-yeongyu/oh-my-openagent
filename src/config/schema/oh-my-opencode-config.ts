@@ -26,6 +26,8 @@ import { WebsearchConfigSchema } from "./websearch"
 
 export const OhMyOpenCodeConfigSchema = z.object({
   $schema: z.string().optional(),
+  /** Text appended to ALL agent and category prompts. Supports file:// URIs. Applies globally before agent-specific prompt_append. Use instead of repeating prompt_append across every agent. */
+  global_prompt_append: z.string().optional(),
   /** Enable new task system (default: false) */
   new_task_system_enabled: z.boolean().optional(),
   /** Default agent name for `oh-my-opencode run` (env: OPENCODE_DEFAULT_AGENT) */
