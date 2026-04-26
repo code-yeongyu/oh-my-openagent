@@ -10,6 +10,10 @@ import { applyCategoryOverride, mergeAgentConfig } from "./agent-overrides"
 import { applyModelResolution, getFirstFallbackModel } from "./model-resolution"
 import { getGptApplyPatchPermission } from "../gpt-apply-patch-guard"
 
+function hasExplicitPromptAppend(value: unknown): boolean {
+  return typeof value === "object" && value !== null && Object.prototype.hasOwnProperty.call(value, "prompt_append")
+}
+
 export function maybeCreateHephaestusConfig(input: {
   disabledAgents: string[]
   agentOverrides: AgentOverrides
@@ -93,6 +97,10 @@ export function maybeCreateHephaestusConfig(input: {
   const gptDeny = getGptApplyPatchPermission(resolvedModel)
   if (Object.keys(gptDeny).length > 0 && hephaestusConfig.permission) {
     Object.assign(hephaestusConfig.permission, gptDeny)
+  }
+
+  if (hasExplicitPromptAppend(hepOverrideCategory ? mergedCategories[hepOverrideCategory] : undefined) || hasExplicitPromptAppend(hephaestusOverride)) {
+    return hephaestusConfig
   }
 
   return applyAutomaticLocalePromptPreference(hephaestusConfig)
