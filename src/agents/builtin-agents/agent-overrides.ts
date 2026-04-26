@@ -5,6 +5,10 @@ import { deepMerge, migrateAgentConfig } from "../../shared"
 import { applyAutomaticLocalePromptPreference } from "./auto-locale-prompt-append"
 import { resolvePromptAppend } from "./resolve-file-uri"
 
+function hasExplicitPromptAppend(value: unknown): boolean {
+  return typeof value === "object" && value !== null && Object.prototype.hasOwnProperty.call(value, "prompt_append")
+}
+
 /**
  * Expands a category reference from an agent override into concrete config properties.
  * Category properties are applied unconditionally (overwriting factory defaults),
@@ -64,12 +68,17 @@ export function applyOverrides(
 ): AgentConfig {
   let result = config
   const overrideCategory = (override as Record<string, unknown> | undefined)?.category as string | undefined
+  const categoryConfig = overrideCategory ? mergedCategories[overrideCategory] : undefined
   if (overrideCategory) {
     result = applyCategoryOverride(result, overrideCategory, mergedCategories)
   }
 
   if (override) {
     result = mergeAgentConfig(result, override, directory)
+  }
+
+  if (hasExplicitPromptAppend(categoryConfig) || hasExplicitPromptAppend(override)) {
+    return result
   }
 
   return applyAutomaticLocalePromptPreference(result)
