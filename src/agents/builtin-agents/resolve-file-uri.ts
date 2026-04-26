@@ -1,14 +1,17 @@
 import { existsSync, readFileSync, realpathSync } from "node:fs"
 import { homedir } from "node:os"
-import { dirname, isAbsolute, resolve } from "node:path"
+import { dirname, isAbsolute, join, resolve, sep } from "node:path"
 import { isWithinProject } from "../../shared/contains-path"
 import { log } from "../../shared/logger"
 
-/** User directories allowed for global file:// URIs (security whitelist) */
+const homeDir = homedir()
+
+/** User directories allowed for global file:// URIs (security whitelist).
+ *  Built with path.join + trailing sep so startsWith works on all platforms. */
 const ALLOWED_GLOBAL_PREFIXES = [
-  `${homedir()}/.config/`,
-  `${homedir()}/.hermes/`,
-  `${homedir()}/.local/share/`,
+  join(homeDir, ".config") + sep,
+  join(homeDir, ".hermes") + sep,
+  join(homeDir, ".local", "share") + sep,
 ]
 
 function isAllowedGlobalPath(filePath: string): boolean {
@@ -18,14 +21,17 @@ function isAllowedGlobalPath(filePath: string): boolean {
   } catch {
     // File doesn't exist yet — canonicalize the deepest existing parent
     let current = filePath
-    while (current.length > 1) {
-      current = dirname(current)
+    // walk up until we hit the filesystem root (dirname stops changing)
+    for (;;) {
+      const parent = dirname(current)
+      if (parent === current) break // reached root (e.g. C:\ or /), no existing ancestor
+      current = parent
       try {
         const canonicalParent = realpathSync.native(current)
-        // Reconstruct canonical child path from canonical parent, then normalize
-        // to collapse any directory traversal segments (e.g., ../) left in remaining
-        const remaining = filePath.substring(current.length)
-        const reconstructed = resolve(canonicalParent + remaining)
+        // Reconstruct canonical child path, then resolve to collapse any
+        // directory-traversal segments (e.g. ../) that may be in the remaining suffix
+        const remaining = filePath.slice(current.length)
+        const reconstructed = resolve(canonicalParent, `.${remaining}`)
         return ALLOWED_GLOBAL_PREFIXES.some((prefix) => reconstructed.startsWith(prefix))
       } catch {
         // Parent also doesn't exist, keep going up
