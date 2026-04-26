@@ -1,4 +1,5 @@
 import type { CategoryConfig } from "../config/schema";
+import { applyAutomaticLocalePromptPreference } from "../agents/builtin-agents/auto-locale-prompt-append";
 import { PROMETHEUS_PERMISSION, getPrometheusPrompt } from "../agents/prometheus";
 import { resolvePromptAppend } from "../agents/builtin-agents/resolve-file-uri";
 import { AGENT_MODEL_REQUIREMENTS } from "../shared/model-requirements";
@@ -116,12 +117,12 @@ export async function buildPrometheusAgentConfig(params: {
   };
 
   const override = params.pluginPrometheusOverride;
-  if (!override) return base;
+  if (!override) return applyAutomaticLocalePromptPreference(base);
 
   const { prompt_append, ...restOverride } = override;
   const merged = { ...base, ...restOverride };
   if (prompt_append && typeof merged.prompt === "string") {
     merged.prompt = merged.prompt + "\n" + resolvePromptAppend(prompt_append);
   }
-  return merged;
+  return applyAutomaticLocalePromptPreference(merged);
 }
