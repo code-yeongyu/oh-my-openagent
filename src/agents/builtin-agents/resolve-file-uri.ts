@@ -21,8 +21,11 @@ function isAllowedGlobalPath(filePath: string): boolean {
   } catch {
     // File doesn't exist yet — canonicalize the deepest existing parent
     let current = filePath
-    // walk up until we hit the filesystem root (dirname stops changing)
-    for (;;) {
+    // walk up until we hit the filesystem root (dirname stops changing).
+    // Guarded by a max-depth counter as defense-in-depth against non-terminating
+    // edge cases (e.g. Windows drive-root where dirname may not converge).
+    const MAX_DEPTH = 64
+    for (let depth = 0; depth < MAX_DEPTH; depth++) {
       const parent = dirname(current)
       if (parent === current) break // reached root (e.g. C:\ or /), no existing ancestor
       current = parent
