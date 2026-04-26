@@ -4,6 +4,7 @@ import type { CategoryConfig } from "../../config/schema"
 import type { AvailableAgent, AvailableCategory, AvailableSkill } from "../dynamic-agent-prompt-builder"
 import { AGENT_MODEL_REQUIREMENTS, isAnyProviderConnected } from "../../shared"
 import { createHephaestusAgent } from "../hephaestus"
+import { applyAutomaticLocalePromptPreference } from "./auto-locale-prompt-append"
 import { applyEnvironmentContext } from "./environment-context"
 import { applyCategoryOverride, mergeAgentConfig } from "./agent-overrides"
 import { applyModelResolution, getFirstFallbackModel } from "./model-resolution"
@@ -94,5 +95,5 @@ export function maybeCreateHephaestusConfig(input: {
     Object.assign(hephaestusConfig.permission, gptDeny)
   }
 
-  return hephaestusConfig
+  return applyAutomaticLocalePromptPreference(hephaestusConfig)
 }
