@@ -53,7 +53,7 @@ describe("keyword-detector message transform", () => {
     expect(textPart).toBeDefined()
     expect(textPart!.text).toContain("---")
     expect(textPart!.text).toContain("do something")
-    expect(textPart!.text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
+    expect(textPart!.text).toContain("Maximum precision")
   })
 
   test("should prepend search message to text part", async () => {
@@ -576,7 +576,7 @@ describe("keyword-detector agent-specific ultrawork messages", () => {
     expect(textPart).toBeDefined()
     expect(textPart!.text).toBe("ultrawork plan this feature")
     expect(textPart!.text).not.toContain("YOU ARE A PLANNER, NOT AN IMPLEMENTER")
-    expect(textPart!.text).not.toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
+    expect(textPart!.text).not.toContain("Maximum precision")
   })
 
   test("should skip ultrawork injection when agent name contains 'planner'", async () => {
@@ -635,7 +635,7 @@ describe("keyword-detector agent-specific ultrawork messages", () => {
     // then - should use normal ultrawork message with agent utilization instructions
     const textPart = output.parts.find(p => p.type === "text")
     expect(textPart).toBeDefined()
-    expect(textPart!.text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
+    expect(textPart!.text).toContain("Maximum precision")
     expect(textPart!.text).not.toContain("YOU ARE A PLANNER, NOT AN IMPLEMENTER")
     expect(textPart!.text).toContain("---")
     expect(textPart!.text).toContain("implement this feature")
@@ -657,7 +657,7 @@ describe("keyword-detector agent-specific ultrawork messages", () => {
     // then - should use normal ultrawork message (default behavior)
     const textPart = output.parts.find(p => p.type === "text")
     expect(textPart).toBeDefined()
-    expect(textPart!.text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
+    expect(textPart!.text).toContain("Maximum precision")
     expect(textPart!.text).not.toContain("YOU ARE A PLANNER, NOT AN IMPLEMENTER")
     expect(textPart!.text).toContain("---")
     expect(textPart!.text).toContain("do something")
@@ -689,7 +689,7 @@ describe("keyword-detector agent-specific ultrawork messages", () => {
     expect(prometheusTextPart!.text).toBe("ultrawork plan")
 
     const sisyphusTextPart = sisyphusOutput.parts.find(p => p.type === "text")
-    expect(sisyphusTextPart!.text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
+    expect(sisyphusTextPart!.text).toContain("Maximum precision")
     expect(sisyphusTextPart!.text).toContain("---")
     expect(sisyphusTextPart!.text).toContain("implement")
   })
@@ -714,7 +714,7 @@ describe("keyword-detector agent-specific ultrawork messages", () => {
     // then - should use Sisyphus from session state, NOT prometheus from stale input
     const textPart = output.parts.find(p => p.type === "text")
     expect(textPart).toBeDefined()
-    expect(textPart!.text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
+    expect(textPart!.text).toContain("Maximum precision")
     expect(textPart!.text).not.toContain("YOU ARE A PLANNER, NOT AN IMPLEMENTER")
     expect(textPart!.text).toContain("---")
     expect(textPart!.text).toContain("implement this")
@@ -829,7 +829,7 @@ describe("keyword-detector non-OMO agent skipping", () => {
     // then - keywords should be injected normally
     const textPart = output.parts.find(p => p.type === "text")
     expect(textPart).toBeDefined()
-    expect(textPart!.text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
+    expect(textPart!.text).toContain("Maximum precision")
     expect(textPart!.text).toContain("implement this")
   })
 
