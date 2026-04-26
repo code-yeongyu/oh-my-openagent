@@ -60,7 +60,7 @@ describe("keyword-detector ultrawork routing", () => {
 
     // then
     expect(startLoopCalls).toHaveLength(0)
-    expect(output.parts[0]?.text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
+    expect(output.parts[0]?.text).toContain("Maximum precision")
     expect(output.parts[0]?.text).toContain("ulw build a multi-agent backend architecture")
   })
 
@@ -80,7 +80,7 @@ describe("keyword-detector ultrawork routing", () => {
 
     // then
     expect(startLoopCalls).toHaveLength(0)
-    expect(output.parts[0]?.text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
+    expect(output.parts[0]?.text).toContain("Maximum precision")
     expect(output.parts[0]?.text).toContain("ultrawork ship the dashboard")
   })
 
@@ -190,7 +190,7 @@ describe("keyword-detector ultrawork routing", () => {
 
     // then
     const textPart = output.parts.find((p) => p.type === "text")
-    expect(textPart!.text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
+    expect(textPart!.text).toContain("Maximum precision")
     expect(textPart!.text).toContain("do this")
   })
 
@@ -251,7 +251,7 @@ The system mentions ulw mode in passing.
 
     // then
     const textPart = output.parts.find((p) => p.type === "text")
-    expect(textPart!.text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
+    expect(textPart!.text).toContain("Maximum precision")
     expect(textPart!.text).toContain("refactor the codebase")
     expect(startLoopCalls).toHaveLength(0)
   })
