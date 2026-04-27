@@ -212,6 +212,41 @@ describe("maybeCreateSisyphusConfig", () => {
     });
   });
 
+  describe("#given non-frontier model with legacy user tools denying grep and glob", () => {
+    test("#when config is created #then explicit legacy denies are preserved", () => {
+      // given
+      const legacyOverride = {
+        model: "openai/gpt-5.4",
+        tools: {
+          grep: false,
+          glob: false,
+        },
+      };
+      const agentOverrides: AgentOverrides = {
+        sisyphus: legacyOverride,
+      };
+      const mergedCategories: Record<string, CategoryConfig> = {};
+
+      // when
+      const config = maybeCreateSisyphusConfig({
+        disabledAgents: [],
+        agentOverrides,
+        availableModels: new Set(["openai/gpt-5.4"]),
+        systemDefaultModel: "openai/gpt-5.4",
+        isFirstRunNoCache: false,
+        availableAgents: [],
+        availableSkills: [],
+        availableCategories: [],
+        mergedCategories,
+        useTaskSystem: false,
+      });
+
+      // then
+      expect(config?.permission).toHaveProperty("grep", "deny");
+      expect(config?.permission).toHaveProperty("glob", "deny");
+    });
+  });
+
   describe("#given generic GPT model with user override allowing apply_patch", () => {
     test("#when config is created #then apply_patch is still denied", () => {
       // given

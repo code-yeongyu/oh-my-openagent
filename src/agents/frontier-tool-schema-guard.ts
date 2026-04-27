@@ -19,7 +19,8 @@ export function getFrontierToolSchemaPermission(model: string): Record<string, "
 export function applyFrontierToolSchemaPermission(
   permission: AgentConfig["permission"] | undefined,
   model: string,
-  explicitPermission?: AgentConfig["permission"]
+  explicitPermission?: AgentConfig["permission"],
+  explicitTools?: Record<string, boolean>
 ): AgentConfig["permission"] | undefined {
   if (!permission) return permission
 
@@ -33,6 +34,7 @@ export function applyFrontierToolSchemaPermission(
 
   for (const toolName of FRONTIER_TOOL_SCHEMA_NAMES) {
     if (explicitPermissionMap?.[toolName] === "deny") continue
+    if (explicitTools?.[toolName] === false) continue
     delete nextPermission[toolName]
   }
   return nextPermission as AgentConfig["permission"]

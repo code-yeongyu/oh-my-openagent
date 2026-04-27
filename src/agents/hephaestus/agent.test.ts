@@ -553,4 +553,39 @@ describe("maybeCreateHephaestusConfig GPT apply_patch guard", () => {
       expect(config?.permission).toHaveProperty("glob", "deny");
     });
   });
+
+  describe("#given non-frontier model with legacy user tools denying grep and glob", () => {
+    test("#when config is created #then explicit legacy denies are preserved", () => {
+      // given
+      const legacyOverride = {
+        model: "openai/gpt-5.4",
+        tools: {
+          grep: false,
+          glob: false,
+        },
+      };
+      const agentOverrides: AgentOverrides = {
+        hephaestus: legacyOverride,
+      };
+      const mergedCategories: Record<string, CategoryConfig> = {};
+
+      // when
+      const config = maybeCreateHephaestusConfig({
+        disabledAgents: [],
+        agentOverrides,
+        availableModels: new Set(["openai/gpt-5.4"]),
+        systemDefaultModel: "openai/gpt-5.4",
+        isFirstRunNoCache: false,
+        availableAgents: [],
+        availableSkills: [],
+        availableCategories: [],
+        mergedCategories,
+        useTaskSystem: false,
+      });
+
+      // then
+      expect(config?.permission).toHaveProperty("grep", "deny");
+      expect(config?.permission).toHaveProperty("glob", "deny");
+    });
+  });
 });

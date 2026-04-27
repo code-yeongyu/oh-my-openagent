@@ -87,7 +87,8 @@ export function maybeCreateSisyphusConfig(input: {
   sisyphusConfig.permission = applyFrontierToolSchemaPermission(
     sisyphusConfig.permission,
     resolvedModel,
-    sisyphusOverride?.permission
+    sisyphusOverride?.permission,
+    (sisyphusOverride as { tools?: Record<string, boolean> } | undefined)?.tools
   )
 
   const gptDeny = getGptApplyPatchPermission(resolvedModel)

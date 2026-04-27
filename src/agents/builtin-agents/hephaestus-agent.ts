@@ -93,7 +93,8 @@ export function maybeCreateHephaestusConfig(input: {
   hephaestusConfig.permission = applyFrontierToolSchemaPermission(
     hephaestusConfig.permission,
     resolvedModel,
-    hephaestusOverride?.permission
+    hephaestusOverride?.permission,
+    (hephaestusOverride as { tools?: Record<string, boolean> } | undefined)?.tools
   )
 
   const gptDeny = getGptApplyPatchPermission(resolvedModel)
