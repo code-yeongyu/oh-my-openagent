@@ -5,8 +5,9 @@ import { normalizeSDKResponse } from "../../shared"
 import { log } from "../../shared/logger"
 import { getAgentConfigKey } from "../../shared/agent-display-names"
 
-import { ABORT_WINDOW_MS, CONTINUATION_COOLDOWN_MS, DEFAULT_SKIP_AGENTS, FAILURE_RESET_WINDOW_MS, HOOK_NAME, MAX_CONSECUTIVE_FAILURES } from "./constants"
+import { ABORT_WINDOW_MS, CONTINUATION_COOLDOWN_MS, CLARIFICATION_COOLDOWN_MS, CLARIFICATION_BLOCKED_PROMPT, CLARIFICATION_ESCALATION_PROMPT, DEFAULT_SKIP_AGENTS, FAILURE_RESET_WINDOW_MS, HOOK_NAME, IN_FLIGHT_TIMEOUT_MS, MAX_CONSECUTIVE_FAILURES, MAX_CLARIFICATION_CONSECUTIVE } from "./constants"
 import { isLastAssistantMessageAborted } from "./abort-detection"
+import { detectClarificationSeeking } from "./clarification-detection"
 import { hasUnansweredQuestion } from "./pending-question-detection"
 import { shouldStopForStagnation } from "./stagnation-detection"
 import { getIncompleteCount } from "./todo"
@@ -15,6 +16,8 @@ import { resolveLatestMessageInfo } from "./resolve-message-info"
 import { acknowledgeCompactionGuard, isCompactionGuardActive } from "./compaction-guard"
 import type { SessionStateStore } from "./session-state"
 import { startCountdown } from "./countdown"
+import { injectContinuation } from "./continuation-injection"
+import { persistLoopState } from "./loop-state-persistence"
 
 function shouldAllowActivityProgress(modelID: string | undefined): boolean {
   if (!modelID) {
@@ -94,6 +97,35 @@ export async function handleSessionIdle(args: {
       log(`[${HOOK_NAME}] Skipped: pending question awaiting user response`, { sessionID })
       return
     }
+
+    const clarificationResult = detectClarificationSeeking(prefetchedMessages)
+    if (clarificationResult.isAskingForClarification) {
+      const now = Date.now()
+      if (state.lastClarificationDetectedAt && now - state.lastClarificationDetectedAt < CLARIFICATION_COOLDOWN_MS) {
+        log(`[${HOOK_NAME}] Skipped: clarification cooldown active`, { sessionID })
+        return
+      }
+
+      state.consecutiveClarifications += 1
+      state.lastClarificationDetectedAt = now
+      persistLoopState(ctx.directory, sessionID, {
+        consecutiveClarifications: state.consecutiveClarifications,
+        consecutiveFailures: state.consecutiveFailures,
+        stagnationCount: state.stagnationCount,
+      })
+      log(`[${HOOK_NAME}] Clarification-seeking detected`, {
+        sessionID,
+        consecutiveClarifications: state.consecutiveClarifications,
+      })
+    } else {
+      state.consecutiveClarifications = 0
+      state.lastClarificationDetectedAt = undefined
+      persistLoopState(ctx.directory, sessionID, {
+        consecutiveClarifications: 0,
+        consecutiveFailures: state.consecutiveFailures,
+        stagnationCount: state.stagnationCount,
+      })
+    }
   } catch (error) {
     log(`[${HOOK_NAME}] Messages fetch failed, continuing`, { sessionID, error: String(error) })
   }
@@ -123,8 +155,14 @@ export async function handleSessionIdle(args: {
   }
 
   if (state.inFlight) {
-    log(`[${HOOK_NAME}] Skipped: injection in flight`, { sessionID })
-    return
+    if (state.inFlightSince && Date.now() - state.inFlightSince > IN_FLIGHT_TIMEOUT_MS) {
+      state.inFlight = false
+      state.inFlightSince = undefined
+      log(`[${HOOK_NAME}] Reset stuck inFlight flag (timeout after ${IN_FLIGHT_TIMEOUT_MS}ms)`, { sessionID })
+    } else {
+      log(`[${HOOK_NAME}] Skipped: injection in flight`, { sessionID })
+      return
+    }
   }
 
   if (
@@ -202,6 +240,26 @@ export async function handleSessionIdle(args: {
     return
   }
 
+  let promptOverride: string | undefined
+  if (state.consecutiveClarifications >= MAX_CLARIFICATION_CONSECUTIVE) {
+    log(`[${HOOK_NAME}] BLOCKED: injecting stop prompt (${state.consecutiveClarifications} consecutive clarifications)`, { sessionID })
+    void injectContinuation({
+      ctx,
+      sessionID,
+      backgroundManager,
+      skipAgents,
+      resolvedInfo,
+      sessionStateStore,
+      isContinuationStopped,
+      promptOverride: CLARIFICATION_BLOCKED_PROMPT,
+    })
+    return
+  }
+  if (state.consecutiveClarifications >= MAX_CLARIFICATION_CONSECUTIVE - 1) {
+    promptOverride = CLARIFICATION_ESCALATION_PROMPT
+    log(`[${HOOK_NAME}] Escalating: warning prompt for clarification tier 2`, { sessionID })
+  }
+
   const progressUpdate = sessionStateStore.trackContinuationProgress(
     sessionID,
     incompleteCount,
@@ -221,5 +279,6 @@ export async function handleSessionIdle(args: {
     skipAgents,
     sessionStateStore,
     isContinuationStopped,
+    promptOverride,
   })
 }
