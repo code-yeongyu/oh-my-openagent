@@ -134,6 +134,23 @@ Principle-driven, explicit reasoning, deep technical capability. Best for agents
 | **MiniMax M2.7**     | Fast and smart. Used in OpenCode Go and OpenCode Zen utility fallback chains. |
 | **MiniMax M2.7 Highspeed** | High-speed OpenCode catalog entry used in utility fallback chains that prefer the fastest available MiniMax path. |
 
+### DeepSeek
+
+If you're pinching pennies but don't want to sacrifice reasoning capability, DeepSeek is worth a look. The API is OpenAI-compatible—just point your existing integration at a different URL.
+
+V4 Pro punches well above its weight for agentic coding. The 1.6T MoE architecture holds its own against the big closed-source models, especially for complex multi-step tasks. V4 Flash strips things down for speed without throwing away the reasoning entirely—useful for exploration and utility work where you need outputs fast but can't afford to sound like a broken chatbot.
+
+| Model | When to reach for it | Pricing (input/output per 1M) |
+| ------ | ------------------ | ------------------------------ |
+| **deepseek-v4-pro** | Complex logic, `deep` category tasks, anywhere you'd normally reach for Opus but need to cut costs | $1.74 / $3.48 (75% off at launch: $0.435 / $0.87) |
+| **deepseek-v4-flash** | Quick lookups, Explore/Librarian fallbacks, anything where speed matters more than depth | $0.14 / $0.28 |
+
+> [!WARNING] Heads up: the old model names (`deepseek-chat` and `deepseek-reasoner`) go away July 24, 2026. They're currently routing to V4 Flash under the hood, but migrate before the deadline to avoid surprises.
+
+> [!NOTE] DeepSeek is OpenAI-compatible—add it to fallback chains via the `openai` provider with a `base_url` override, or configure a dedicated provider. V4-Flash makes a cheap fallback for Explore/Librarian; V4-Pro works well as a cost-effective option in `deep` chains.
+
+V4-Pro supports thinking mode with reasoning effort control. Use `variant: "high"` for standard reasoning or `variant: "max"` for complex agent tasks (the API auto-escalates for complex requests). Other variants like `low`/`medium` map to `high`, and `xhigh` maps to `max` for compatibility.
+
 ### OpenCode Go
 
 A premium subscription tier ($10/month) that provides reliable access to Chinese frontier models through OpenCode's infrastructure.
@@ -194,6 +211,18 @@ See the [Orchestration System Guide](./orchestration.md) for how agents dispatch
 {
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json",
 
+  // DeepSeek provider config (choose one approach)
+  "providers": {
+    // Approach 1: Override openai provider's base_url
+    // "openai": { "base_url": "https://api.deepseek.com/v1", "api_key": "${DEEPSEEK_API_KEY}" }
+    
+    // Approach 2: Dedicated deepseek provider (recommended for clarity)
+    "deepseek": {
+      "base_url": "https://api.deepseek.com/v1",
+      "api_key": "${DEEPSEEK_API_KEY}"
+    }
+  },
+
   "agents": {
     // Main orchestrator: Claude Opus or Kimi K2.5 work best
     "sisyphus": {
@@ -201,9 +230,9 @@ See the [Orchestration System Guide](./orchestration.md) for how agents dispatch
       "ultrawork": { "model": "anthropic/claude-opus-4-7", "variant": "max" },
     },
 
-    // Research agents: cheaper models are fine
-    "librarian": { "model": "google/gemini-3-flash" },
-    "explore": { "model": "github-copilot/grok-code-fast-1" },
+    // Research agents: cheaper models are fine (DeepSeek Flash example)
+    "librarian": { "model": "deepseek/deepseek-v4-flash" },
+    "explore": { "model": "deepseek/deepseek-v4-flash" },
 
     // Architecture consultation: GPT or Claude Opus
     "oracle": { "model": "openai/gpt-5.4", "variant": "high" },
@@ -223,6 +252,9 @@ See the [Orchestration System Guide](./orchestration.md) for how agents dispatch
       "variant": "high",
     },
     "writing": { "model": "google/gemini-3-flash" },
+
+    // DeepSeek — just add your API key and point base_url at their API
+    "deep": { "model": "deepseek/deepseek-v4-pro" },
   },
 
   // Limit expensive providers; let cheap ones run freely
