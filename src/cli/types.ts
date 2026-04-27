@@ -11,6 +11,7 @@ export interface InstallArgs {
   zaiCodingPlan?: BooleanArg
   kimiForCoding?: BooleanArg
   opencodeGo?: BooleanArg
+  openrouter?: BooleanArg
   vercelAiGateway?: BooleanArg
   enableCaveman?: BooleanArg
   skipAuth?: boolean
@@ -26,6 +27,7 @@ export interface InstallConfig {
   hasZaiCodingPlan: boolean
   hasKimiForCoding: boolean
   hasOpencodeGo: boolean
+  hasOpenRouter: boolean
   hasVercelAiGateway: boolean
   enableCaveman: boolean
 }
@@ -48,6 +50,7 @@ export interface DetectedConfig {
   hasZaiCodingPlan: boolean
   hasKimiForCoding: boolean
   hasOpencodeGo: boolean
+  hasOpenRouter: boolean
   hasVercelAiGateway: boolean
   enableCaveman: boolean
 }

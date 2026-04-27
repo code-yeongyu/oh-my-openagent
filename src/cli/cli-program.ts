@@ -33,6 +33,7 @@ program
   .option("--zai-coding-plan <value>", "Z.ai Coding Plan subscription: no, yes (default: no)")
   .option("--kimi-for-coding <value>", "Kimi For Coding subscription: no, yes (default: no)")
   .option("--opencode-go <value>", "OpenCode Go subscription: no, yes (default: no)")
+  .option("--openrouter <value>", "OpenRouter subscription: no, yes (default: no)")
   .option("--vercel-ai-gateway <value>", "Vercel AI Gateway: no, yes (default: no)")
   .option("--enable-caveman <value>", "Caveman output compression: no, yes (default: no)")
   .option("--skip-auth", "Skip authentication setup hints")
@@ -50,6 +51,7 @@ Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi > Verce
   OpenCode Zen  opencode/ models (opencode/claude-opus-4-7, etc.)
   Z.ai          zai-coding-plan/glm-5 (visual-engineering fallback)
   Kimi          kimi-for-coding/k2p5 (Sisyphus/Prometheus fallback)
+  OpenRouter    openrouter/ models (universal proxy, model variety)
   Vercel        vercel/ models (universal proxy, always last fallback)
 `)
   .action(async (options) => {
@@ -63,6 +65,7 @@ Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi > Verce
       zaiCodingPlan: options.zaiCodingPlan,
       kimiForCoding: options.kimiForCoding,
       opencodeGo: options.opencodeGo,
+      openrouter: options.openrouter,
       vercelAiGateway: options.vercelAiGateway,
       enableCaveman: options.enableCaveman,
       skipAuth: options.skipAuth ?? false,

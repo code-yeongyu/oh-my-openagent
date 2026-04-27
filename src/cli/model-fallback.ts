@@ -106,6 +106,7 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
     avail.zai ||
     avail.kimiForCoding ||
     avail.opencodeGo ||
+    avail.openrouter ||
     avail.vercelAiGateway
   if (!hasAnyProvider) {
     return {

@@ -40,6 +40,7 @@ export function formatConfigSummary(config: InstallConfig): string {
   lines.push(formatProvider("OpenCode Zen", config.hasOpencodeZen, "opencode/ models"))
   lines.push(formatProvider("Z.ai Coding Plan", config.hasZaiCodingPlan, "Librarian/Multimodal"))
   lines.push(formatProvider("Kimi For Coding", config.hasKimiForCoding, "Sisyphus/Prometheus fallback"))
+  lines.push(formatProvider("OpenRouter", config.hasOpenRouter, "model variety"))
   lines.push(formatProvider("Vercel AI Gateway", config.hasVercelAiGateway, "universal proxy"))
   lines.push(formatProvider("Caveman", config.enableCaveman, "~65-75% token savings"))
 
@@ -143,6 +144,10 @@ export function validateNonTuiArgs(args: InstallArgs): { valid: boolean; errors:
     errors.push(`Invalid --opencode-go value: ${args.opencodeGo} (expected: no, yes)`)
   }
 
+  if (args.openrouter !== undefined && !["no", "yes"].includes(args.openrouter)) {
+    errors.push(`Invalid --openrouter value: ${args.openrouter} (expected: no, yes)`)
+  }
+
   if (args.opencodeZen !== undefined && !["no", "yes"].includes(args.opencodeZen)) {
     errors.push(`Invalid --opencode-zen value: ${args.opencodeZen} (expected: no, yes)`)
   }
@@ -177,6 +182,7 @@ export function argsToConfig(args: InstallArgs): InstallConfig {
     hasZaiCodingPlan: args.zaiCodingPlan === "yes",
     hasKimiForCoding: args.kimiForCoding === "yes",
     hasOpencodeGo: args.opencodeGo === "yes",
+    hasOpenRouter: args.openrouter === "yes",
     hasVercelAiGateway: args.vercelAiGateway === "yes",
     enableCaveman: args.enableCaveman === "yes",
   }
@@ -191,6 +197,7 @@ export function detectedToInitialValues(detected: DetectedConfig): {
   zaiCodingPlan: BooleanArg
   kimiForCoding: BooleanArg
   opencodeGo: BooleanArg
+  openrouter: BooleanArg
   vercelAiGateway: BooleanArg
   caveman: BooleanArg
 } {
@@ -208,6 +215,7 @@ export function detectedToInitialValues(detected: DetectedConfig): {
     zaiCodingPlan: detected.hasZaiCodingPlan ? "yes" : "no",
     kimiForCoding: detected.hasKimiForCoding ? "yes" : "no",
     opencodeGo: detected.hasOpencodeGo ? "yes" : "no",
+    openrouter: detected.hasOpenRouter ? "yes" : "no",
     vercelAiGateway: detected.hasVercelAiGateway ? "yes" : "no",
     caveman: detected.enableCaveman ? "yes" : "no",
   }

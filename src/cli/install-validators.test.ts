@@ -14,6 +14,7 @@ function createArgs(overrides: Partial<InstallArgs> = {}): InstallArgs {
     zaiCodingPlan: "no",
     kimiForCoding: "no",
     opencodeGo: "no",
+    openrouter: "no",
     skipAuth: false,
     ...overrides,
   }
@@ -30,5 +31,17 @@ describe("validateNonTuiArgs", () => {
     // #then
     expect(result.valid).toBe(false)
     expect(result.errors).toContain("Invalid --opencode-go value: maybe (expected: no, yes)")
+  })
+
+  test("rejects invalid --openrouter values", () => {
+    // #given
+    const args = createArgs({ openrouter: "maybe" as InstallArgs["openrouter"] })
+
+    // #when
+    const result = validateNonTuiArgs(args)
+
+    // #then
+    expect(result.valid).toBe(false)
+    expect(result.errors).toContain("Invalid --openrouter value: maybe (expected: no, yes)")
   })
 })
