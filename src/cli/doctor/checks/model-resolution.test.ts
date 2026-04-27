@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, spyOn, mock } from "bun:test"
+import { describe, it, expect } from "bun:test"
 
 describe("model-resolution check", () => {
   describe("getModelResolutionInfo", () => {
@@ -234,6 +234,28 @@ describe("model-resolution check", () => {
       expect(issues).toHaveLength(1)
       expect(issues[0]?.title).toContain("compatibility fallback")
       expect(issues[0]?.description).toContain("oracle=custom/unknown-llm")
+    })
+
+    it("does not warn for known provider aliases used by current recommended models", async () => {
+      const { collectCapabilityResolutionIssues, getModelResolutionInfoWithOverrides } = await import("./model-resolution")
+
+      // #given current recommended provider aliases from user configuration
+      const info = getModelResolutionInfoWithOverrides({
+        agents: {
+          sisyphus: { model: "kimi-for-coding/k2pb" },
+          metis: { model: "github-copilot/claude-opus-4.7" },
+        },
+        categories: {
+          "visual-engineering": { model: "github-copilot/claude-opus-4.7" },
+          artistry: { model: "github-copilot/claude-opus-4.7" },
+        },
+      })
+
+      // #when collecting doctor capability issues
+      const issues = collectCapabilityResolutionIssues(info)
+
+      // #then these known aliases do not create compatibility fallback warnings
+      expect(issues).toHaveLength(0)
     })
   })
 

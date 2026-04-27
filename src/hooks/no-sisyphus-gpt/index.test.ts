@@ -62,6 +62,25 @@ describe("no-sisyphus-gpt hook", () => {
     })
   })
 
+  test("does not show toast for gpt-5.4 model (Sisyphus has specialized support)", async () => {
+    // given - sisyphus with gpt-5.4 model (should be allowed)
+    const showToast = spyOn({ fn: async () => ({}) }, "fn")
+    const hook = createNoSisyphusGptHook(createHookContext(showToast))
+
+    const output = createOutput()
+
+    // when - chat.message runs with gpt-5.4
+    await hook["chat.message"]?.({
+      sessionID: "ses_gpt54",
+      agent: SISYPHUS_DISPLAY,
+      model: { providerID: "openai", modelID: "gpt-5.4" },
+    }, output)
+
+    // then - no toast, agent NOT switched to Hephaestus
+    expect(showToast).toHaveBeenCalledTimes(0)
+    expect(output.message.agent).toBeUndefined()
+  })
+
   test("does not show toast for gpt-5.5 model (native Sisyphus support)", async () => {
     // given - sisyphus with gpt-5.5 model (should be allowed)
     const showToast = spyOn({ fn: async () => ({}) }, "fn")
