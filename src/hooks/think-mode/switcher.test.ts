@@ -168,7 +168,7 @@ describe("think-mode switcher", () => {
       it("should return null for already-high prefixed models", () => {
         // given prefixed model IDs that are already high
         expect(getHighVariant("vertex_ai/claude-opus-4-7-high")).toBeNull()
-        expect(getHighVariant("openai/gpt-5-4-high")).toBeNull()
+        expect(getHighVariant("openai/gpt-5-5-high")).toBeNull()
       })
     })
 

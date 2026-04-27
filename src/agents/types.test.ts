@@ -1,6 +1,7 @@
 import { describe, test, expect } from "bun:test";
 import {
   isGptModel,
+  isGpt5_5Model,
   isGeminiModel,
   isGlmModel,
   isGptNativeSisyphusModel,
@@ -41,6 +42,21 @@ describe("isGptNativeSisyphusModel", () => {
     expect(isGptNativeSisyphusModel("anthropic/claude-opus-4-7")).toBe(false);
     expect(isGptNativeSisyphusModel("google/gemini-3.1-pro")).toBe(false);
     expect(isGptNativeSisyphusModel("openai/o1")).toBe(false);
+  });
+});
+
+describe("isGpt5_5Model", () => {
+  test("detects dotted and dashed GPT-5.5 model IDs", () => {
+    expect(isGpt5_5Model("openai/gpt-5.5")).toBe(true);
+    expect(isGpt5_5Model("openai/gpt-5-5")).toBe(true);
+    expect(isGpt5_5Model("github-copilot/gpt-5.5-high")).toBe(true);
+    expect(isGpt5_5Model("venice/gpt-5-5-medium")).toBe(true);
+  });
+
+  test("rejects adjacent GPT model versions", () => {
+    expect(isGpt5_5Model("openai/gpt-5.4")).toBe(false);
+    expect(isGpt5_5Model("openai/gpt-5.6")).toBe(false);
+    expect(isGpt5_5Model("openai/gpt-4o")).toBe(false);
   });
 });
 
