@@ -7,11 +7,12 @@ import {
   getOpenCodeCommandDirs,
   discoverPluginCommandDefinitions,
   EXCLUDED_DIRS,
-} from "../../shared"
+} from "./command-discovery-deps"
 import type { CommandFrontmatter } from "../../features/claude-code-command-loader/types"
 import { isMarkdownFile } from "../../shared/file-utils"
-import { getClaudeConfigDir, log } from "../../shared"
-import { loadBuiltinCommands } from "../../features/builtin-commands"
+import { getClaudeConfigDir } from "../../shared/claude-config-dir"
+import { log } from "../../shared/logger"
+import { loadBuiltinCommands } from "../../features/builtin-commands/commands"
 import type { CommandInfo, CommandMetadata, CommandScope } from "./types"
 
 export interface CommandDiscoveryOptions {

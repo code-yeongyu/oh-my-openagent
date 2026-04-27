@@ -1,8 +1,9 @@
+/// <reference types="bun-types" />
+
 import { afterEach, describe, expect, it, spyOn } from "bun:test"
 import type { LoadedSkill } from "../../features/opencode-skill-loader"
 import * as shared from "../../shared"
-import * as slashcommand from "../../tools/slashcommand"
-import { executeSlashCommand } from "./executor"
+import * as slashcommand from "../../tools/slashcommand/command-discovery"
 
 let resolveCommandsInTextSpy: { mockRestore: () => void } | undefined
 let resolveFileReferencesInTextSpy: { mockRestore: () => void } | undefined
@@ -36,6 +37,11 @@ function restoreExecutorSpies(): void {
   resolveCommandsInTextSpy = undefined
   resolveFileReferencesInTextSpy = undefined
   discoverCommandsSyncSpy = undefined
+}
+
+async function executeSlashCommand(...args: Parameters<typeof import("./executor").executeSlashCommand>): ReturnType<typeof import("./executor").executeSlashCommand> {
+  const module = await import(`./executor?test=${Date.now()}-${Math.random()}`)
+  return module.executeSlashCommand(...args)
 }
 
 afterEach(restoreExecutorSpies)
