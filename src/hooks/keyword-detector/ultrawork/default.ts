@@ -34,6 +34,13 @@ task(subagent_type="oracle", run_in_background=false, prompt="Evaluate my approa
 
 **Only after**: sufficient context gathered, ambiguities resolved, precise step-by-step plan created, 100% confidence → THEN begin implementation.
 
+**Test Plan** (mandatory for non-trivial tasks):
+- Objective: [what we're verifying]
+- Prerequisites: [setup needed]
+- Cases: [input] → [expected] → [how to verify]
+- Execute: [commands/steps]
+- Success: ALL cases pass
+
 ---
 
 ## **NO EXCUSES. NO COMPROMISES. DELIVER WHAT WAS ASKED.**
@@ -75,6 +82,9 @@ task(subagent_type="plan", run_in_background=false, prompt="<gathered context + 
 \`\`\`
 
 **Session continuity**: Plan agent returns task_id — USE IT for follow-ups. task(task_id="{id}", prompt="<answer/refine/add>"). TASK_ID preserves full context, saves 70%+ tokens.
+
+WRONG: task(subagent_type="plan", ...) // loses context
+CORRECT: task(task_id="ses_abc123", ...) // preserves everything
 
 FAILURE TO CALL PLAN AGENT = INCOMPLETE WORK.
 
@@ -126,7 +136,13 @@ BEFORE writing ANY code, define: **Functional** (what specific behavior must wor
 
 Your failure mode: finishing code, running lsp_diagnostics, declaring "done" without actually TESTING. lsp_diagnostics catches type errors, NOT functional bugs.
 
-MANUAL QA means: run CLI commands with Bash and show output, run builds and verify output files, call API endpoints and show response, describe UI rendering, test new tools/features end-to-end.
+MANUAL QA — execute ALL that apply:
+- CLI change → run command with Bash, show output
+- Build change → run build, verify output files
+- API change → call endpoint, show response
+- UI change → describe what renders
+- New tool/feature → test end-to-end in real scenario
+- Config change → load config, verify parsing
 
 **UNACCEPTABLE claims**: "This should work", "The types check out", "lsp_diagnostics is clean", "Tests pass". All these miss functional bugs. RUN THE FEATURE. Manual QA is the FINAL gate. Skip it = INCOMPLETE.
 
