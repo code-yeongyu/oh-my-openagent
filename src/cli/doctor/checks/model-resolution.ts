@@ -95,7 +95,7 @@ export function collectCapabilityResolutionIssues(info: ModelResolutionInfo): Do
   const allEntries = [...info.agents, ...info.categories]
   const fallbackEntries = allEntries.filter((entry) => {
     const mode = entry.capabilityDiagnostics?.resolutionMode
-    return mode === "alias-backed" || mode === "heuristic-backed" || mode === "unknown"
+    return mode === "unknown"
   })
 
   if (fallbackEntries.length === 0) {
