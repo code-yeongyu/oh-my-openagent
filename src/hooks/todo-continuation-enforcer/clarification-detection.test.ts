@@ -322,4 +322,86 @@ describe("detectClarificationSeeking", () => {
     ]
     expect(detectClarificationSeeking(messages).isAskingForClarification).toBe(false)
   })
+
+  // ── Multilingual tests ──────────────────────────────────
+
+  test("given Portuguese (pt-BR) agent asking for details, returns true", () => {
+    const messages = [
+      { info: { role: "user" } },
+      { info: { role: "assistant" }, parts: [{ type: "text", text: "Preciso de mais informações sobre a API. Quais campos são obrigatórios?" }] },
+    ]
+    expect(detectClarificationSeeking(messages).isAskingForClarification).toBe(true)
+  })
+
+  test("given Spanish agent asking what to do, returns true", () => {
+    const messages = [
+      { info: { role: "user" } },
+      { info: { role: "assistant" }, parts: [{ type: "text", text: "No sé qué hacer, necesito más instrucciones para continuar." }] },
+    ]
+    expect(detectClarificationSeeking(messages).isAskingForClarification).toBe(true)
+  })
+
+  test("given French agent asking for clarification, returns true", () => {
+    const messages = [
+      { info: { role: "user" } },
+      { info: { role: "assistant" }, parts: [{ type: "text", text: "J'ai besoin de plus de détails avant de pouvoir continuer." }] },
+    ]
+    expect(detectClarificationSeeking(messages).isAskingForClarification).toBe(true)
+  })
+
+  test("given German agent asking for instructions, returns true", () => {
+    const messages = [
+      { info: { role: "user" } },
+      { info: { role: "assistant" }, parts: [{ type: "text", text: "Ich brauche mehr Anweisungen, bevor ich fortfahren kann." }] },
+    ]
+    expect(detectClarificationSeeking(messages).isAskingForClarification).toBe(true)
+  })
+
+  test("given Japanese agent asking what to do, returns true", () => {
+    const messages = [
+      { info: { role: "user" } },
+      { info: { role: "assistant" }, parts: [{ type: "text", text: "どうすればいいですか？もっと情報が必要です。" }] },
+    ]
+    expect(detectClarificationSeeking(messages).isAskingForClarification).toBe(true)
+  })
+
+  test("given Korean agent asking for guidance, returns true", () => {
+    const messages = [
+      { info: { role: "user" } },
+      { info: { role: "assistant" }, parts: [{ type: "text", text: "더 자세한 내용이 필요합니다. 어떻게 해야 할지 모르겠습니다." }] },
+    ]
+    expect(detectClarificationSeeking(messages).isAskingForClarification).toBe(true)
+  })
+
+  test("given Chinese agent asking what to do, returns true", () => {
+    const messages = [
+      { info: { role: "user" } },
+      { info: { role: "assistant" }, parts: [{ type: "text", text: "我不明白怎么做。请提供更多信息。" }] },
+    ]
+    expect(detectClarificationSeeking(messages).isAskingForClarification).toBe(true)
+  })
+
+  test("given Russian agent saying it's stuck, returns true", () => {
+    const messages = [
+      { info: { role: "user" } },
+      { info: { role: "assistant" }, parts: [{ type: "text", text: "Мне нужно больше информации. Я не знаю что делать." }] },
+    ]
+    expect(detectClarificationSeeking(messages).isAskingForClarification).toBe(true)
+  })
+
+  test("given Hindi agent asking for details, returns true", () => {
+    const messages = [
+      { info: { role: "user" } },
+      { info: { role: "assistant" }, parts: [{ type: "text", text: "मुझे और जानकारी चाहिए। मुझे नहीं पता क्या करना है।" }] },
+    ]
+    expect(detectClarificationSeeking(messages).isAskingForClarification).toBe(true)
+  })
+
+  test("given Arabic agent waiting for input, returns true", () => {
+    const messages = [
+      { info: { role: "user" } },
+      { info: { role: "assistant" }, parts: [{ type: "text", text: "في انتظار ردك. أحتاج إلى مزيد من المعلومات للمتابعة." }] },
+    ]
+    expect(detectClarificationSeeking(messages).isAskingForClarification).toBe(true)
+  })
 })
