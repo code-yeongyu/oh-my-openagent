@@ -370,6 +370,31 @@ describe("todo-continuation-enforcer", () => {
     expect(promptCalls).toHaveLength(0)
   })
 
+  test("should not inject when background tasks are pending", async () => {
+    // given - session with pending background tasks (regression test for issue #3362)
+    const sessionID = "main-pending-123"
+    setMainSession(sessionID)
+
+    // Mock background manager that returns pending tasks
+    const pendingBgManager = {
+      getTasksByParentSession: () => [{ id: "task-1", status: "pending" }],
+    }
+
+    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {
+      backgroundManager: pendingBgManager as BackgroundManager,
+    })
+
+    // when - session goes idle
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+
+    await fakeTimers.advanceBy(3000)
+
+    // then - no continuation injected (pending tasks should block just like running)
+    expect(promptCalls).toHaveLength(0)
+  })
+
   test("should inject for any session with incomplete todos", async () => {
     fakeTimers.restore()
     //#given — any session, not necessarily main session

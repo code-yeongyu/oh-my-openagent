@@ -78,12 +78,14 @@ export async function injectContinuation(args: {
     return
   }
 
-  const hasRunningBgTasks = backgroundManager
-    ? backgroundManager.getTasksByParentSession(sessionID).some((task: { status: string }) => task.status === "running")
+  const hasActiveBgTasks = backgroundManager
+    ? backgroundManager.getTasksByParentSession(sessionID).some(
+        (task: { status: string }) => task.status === "running" || task.status === "pending"
+      )
     : false
 
-  if (hasRunningBgTasks) {
-    log(`[${HOOK_NAME}] Skipped injection: background tasks running`, { sessionID })
+  if (hasActiveBgTasks) {
+    log(`[${HOOK_NAME}] Skipped injection: background tasks active (pending or running)`, { sessionID })
     return
   }
 
