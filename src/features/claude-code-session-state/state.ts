@@ -18,16 +18,12 @@ const registeredAgentAliases = new Map<string, string>()
 
 const ZERO_WIDTH_CHARACTERS_REGEX = /[\u200B\u200C\u200D\uFEFF]/g
 
-function stripSortPrefix(name: string): string {
-  return name.replace(ZERO_WIDTH_CHARACTERS_REGEX, "").replace(/^\s+/, "")
-}
-
 function normalizeRegisteredAgentName(name: string): string {
-  return stripSortPrefix(name).toLowerCase()
+  return name.replace(ZERO_WIDTH_CHARACTERS_REGEX, "").toLowerCase()
 }
 
 function normalizeStoredAgentName(name: string): string {
-  return stripSortPrefix(name)
+  return name.replace(ZERO_WIDTH_CHARACTERS_REGEX, "")
 }
 
 export function registerAgentName(name: string): void {
