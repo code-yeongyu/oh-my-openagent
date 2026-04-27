@@ -138,6 +138,18 @@ export async function handleWriteExistingFileGuardToolExecuteBefore(params: {
   }
 
   const isSisyphusPath = canonicalPath.includes("/.sisyphus/")
+  const isNotepadPath = canonicalPath.includes("/.sisyphus/notepads/")
+  if (isNotepadPath) {
+    log("[write-existing-file-guard] Blocking notepad overwrite", {
+      sessionID: input.sessionID,
+      filePath,
+    })
+    throw new Error(
+      "Notepad files (.sisyphus/notepads/*) are APPEND-ONLY. " +
+        "Use the Edit tool to append new content at the end. " +
+        "Never use Write tool on notepad files."
+    )
+  }
   if (isSisyphusPath) {
     log("[write-existing-file-guard] Allowing .sisyphus/** overwrite", {
       sessionID: input.sessionID,
