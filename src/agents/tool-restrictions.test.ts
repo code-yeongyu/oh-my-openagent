@@ -1,3 +1,5 @@
+/// <reference types="bun-types" />
+
 import { describe, test, expect } from "bun:test"
 import { createOracleAgent } from "./oracle"
 import { createLibrarianAgent } from "./librarian"
@@ -6,6 +8,7 @@ import { createMomusAgent } from "./momus"
 import { createMetisAgent } from "./metis"
 import { createAtlasAgent } from "./atlas"
 import { createSisyphusAgent } from "./sisyphus"
+import { createHephaestusAgent } from "./hephaestus"
 
 const TEST_MODEL = "anthropic/claude-sonnet-4-5"
 
@@ -129,6 +132,51 @@ describe("read-only agent tool restrictions", () => {
       expect(gpt54Permission["apply_patch"]).toBe("deny")
       expect(gptGenericPermission["apply_patch"]).toBe("deny")
       expect(claudePermission["apply_patch"]).toBeUndefined()
+    })
+  })
+
+  describe("Sisyphus and Hephaestus frontier tool schema restrictions", () => {
+    test("deny grep and glob for Opus 4.7 and GPT 5.5 models", () => {
+      // given
+      const frontierAgents = [
+        createSisyphusAgent("anthropic/claude-opus-4-7"),
+        createSisyphusAgent("anthropic/claude-opus-4.7"),
+        createSisyphusAgent("openai/gpt-5.5"),
+        createHephaestusAgent("anthropic/claude-opus-4-7"),
+        createHephaestusAgent("anthropic/claude-opus-4.7"),
+        createHephaestusAgent("openai/gpt-5.5"),
+      ]
+
+      // when
+      const permissions = frontierAgents.map(
+        (agent) => (agent.permission ?? {}) as Record<string, string>,
+      )
+
+      // then
+      for (const permission of permissions) {
+        expect(permission.grep).toBe("deny")
+        expect(permission.glob).toBe("deny")
+      }
+    })
+
+    test("keeps grep and glob available for other models", () => {
+      // given
+      const otherAgents = [
+        createSisyphusAgent("anthropic/claude-sonnet-4-5"),
+        createSisyphusAgent("openai/gpt-5.4"),
+        createHephaestusAgent("openai/gpt-5.4"),
+      ]
+
+      // when
+      const permissions = otherAgents.map(
+        (agent) => (agent.permission ?? {}) as Record<string, string>,
+      )
+
+      // then
+      for (const permission of permissions) {
+        expect(permission.grep).toBeUndefined()
+        expect(permission.glob).toBeUndefined()
+      }
     })
   })
 })
