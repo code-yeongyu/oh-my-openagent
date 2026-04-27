@@ -17,10 +17,6 @@ function throwOnNonFallbackableSdkError(response: unknown): void {
   throw error
 }
 
-/**
- * Fetch the main sessions (sessions without a parentID).
- * Optionally filter by directory.
- */
 export async function getSdkMainSessions(
   client: PluginInput["client"],
   directory?: string,
@@ -40,9 +36,6 @@ export async function getSdkMainSessions(
   return mainSessions.sort((a, b) => b.time.updated - a.time.updated)
 }
 
-/**
- * Fetch all session IDs from the SDK.
- */
 export async function getSdkAllSessions(client: PluginInput["client"]): Promise<string[]> {
   const response = await client.session.list()
   throwOnNonFallbackableSdkError(response)
@@ -50,9 +43,6 @@ export async function getSdkAllSessions(client: PluginInput["client"]): Promise<
   return sessions.map((session) => session.id)
 }
 
-/**
- * Check if a session exists by querying the SDK.
- */
 export async function sdkSessionExists(client: PluginInput["client"], sessionID: string): Promise<boolean> {
   const response = await client.session.list()
   throwOnNonFallbackableSdkError(response)
@@ -60,40 +50,6 @@ export async function sdkSessionExists(client: PluginInput["client"], sessionID:
   return sessions.some((session) => session.id === sessionID)
 }
 
-/**
- * Type guard for session messages with valid info.
- * Narrows the type so TypeScript knows info.id is definitely a string.
- */
-type RawMessage = {
-  info?: {
-    id?: string
-    role?: string
-    agent?: string
-    time?: { created?: number; updated?: number }
-  }
-  parts?: Array<{
-    id?: string
-    type?: string
-    text?: string
-    thinking?: string
-    tool?: string
-    callID?: string
-    input?: Record<string, unknown>
-    output?: string
-    error?: string
-  }>
-}
-
-function hasValidInfo(message: RawMessage): message is RawMessage & {
-  info: { id: string; role?: string; agent?: string; time?: { created?: number; updated?: number } }
-} {
-  return Boolean(message.info?.id)
-}
-
-/**
- * Fetch session messages from the SDK, filtering for valid entries.
- * Messages must have a valid info.id to be included.
- */
 export async function getSdkSessionMessages(
   client: PluginInput["client"],
   sessionID: string,
@@ -101,36 +57,51 @@ export async function getSdkSessionMessages(
   const response = await client.session.messages({ path: { id: sessionID } })
   throwOnNonFallbackableSdkError(response)
 
-  const rawMessages = normalizeSDKResponse(response, [] as RawMessage[])
+  const rawMessages = normalizeSDKResponse(response, [] as Array<{
+    info?: {
+      id?: string
+      role?: string
+      agent?: string
+      time?: { created?: number; updated?: number }
+    }
+    parts?: Array<{
+      id?: string
+      type?: string
+      text?: string
+      thinking?: string
+      tool?: string
+      callID?: string
+      input?: Record<string, unknown>
+      output?: string
+      error?: string
+    }>
+  }>)
 
   const messages: SessionMessage[] = rawMessages
-    .filter(hasValidInfo)
-    .map((message) => {
-      const info = message.info
-      return {
-        id: info.id,
-        role: (info.role as "user" | "assistant") || "user",
-        agent: info.agent,
-        time: info.time?.created
-          ? {
-              created: info.time.created,
-              updated: info.time.updated,
-            }
-          : undefined,
-        parts:
-          message.parts?.map((part) => ({
-            id: part.id || `generated-${crypto.randomUUID()}`,
-            type: part.type || "text",
-            text: part.text,
-            thinking: part.thinking,
-            tool: part.tool,
-            callID: part.callID,
-            input: part.input,
-            output: part.output,
-            error: part.error,
-          })) || [],
-      }
-    })
+    .filter((message) => message.info?.id)
+    .map((message) => ({
+      id: message.info!.id!,
+      role: (message.info!.role as "user" | "assistant") || "user",
+      agent: message.info!.agent,
+      time: message.info!.time?.created
+        ? {
+            created: message.info!.time.created,
+            updated: message.info!.time.updated,
+          }
+        : undefined,
+      parts:
+        message.parts?.map((part) => ({
+          id: part.id || "",
+          type: part.type || "text",
+          text: part.text,
+          thinking: part.thinking,
+          tool: part.tool,
+          callID: part.callID,
+          input: part.input,
+          output: part.output,
+          error: part.error,
+        })) || [],
+    }))
 
   return messages.sort((a, b) => {
     const aTime = a.time?.created ?? 0
