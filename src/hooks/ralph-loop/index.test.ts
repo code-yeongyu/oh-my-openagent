@@ -386,8 +386,8 @@ describe("ralph-loop", () => {
       expect(hook.getState()).not.toBeNull()
     })
 
-    test("should skip injection during recovery", async () => {
-      // given - active loop and session in recovery
+    test("should continue after non-abort session error", async () => {
+      // given - active loop and non-abort session error
       const hook = createRalphLoopHook(createMockPluginInput())
       hook.startLoop("session-123", "Test task")
 
@@ -398,7 +398,7 @@ describe("ralph-loop", () => {
         },
       })
 
-      // when - session goes idle immediately
+      // when - session goes idle immediately after the error
       await hook.event({
         event: {
           type: "session.idle",
@@ -406,8 +406,9 @@ describe("ralph-loop", () => {
         },
       })
 
-      // then - no continuation injected
-      expect(promptCalls.length).toBe(0)
+      // then - continuation is injected without a recovery skip
+      expect(promptCalls.length).toBe(1)
+      expect(hook.getState()?.iteration).toBe(2)
     })
 
     test("should clear state on session deletion", async () => {
