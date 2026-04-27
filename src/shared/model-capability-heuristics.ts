@@ -45,9 +45,17 @@ export const HEURISTIC_MODEL_FAMILY_REGISTRY: ReadonlyArray<HeuristicModelFamily
     variants: ["low", "medium", "high"],
   },
   {
+    family: "kimi-thinking",
+    includes: ["kimi-thinking", "k2-thinking", "k2-think"],
+    pattern: /(?:kimi|k2).*-(?:thinking|think)/,
+    variants: ["low", "medium", "high"],
+    supportsThinking: true,
+  },
+  {
     family: "kimi",
     includes: ["kimi", "k2"],
     variants: ["low", "medium", "high"],
+    supportsThinking: false,
   },
   {
     family: "glm",
@@ -58,6 +66,7 @@ export const HEURISTIC_MODEL_FAMILY_REGISTRY: ReadonlyArray<HeuristicModelFamily
     family: "minimax",
     includes: ["minimax"],
     variants: ["low", "medium", "high"],
+    supportsThinking: false,
   },
   {
     family: "deepseek",
