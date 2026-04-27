@@ -7,7 +7,7 @@ import type { SkillArgs, SkillLoadOptions } from "./types"
 import type { LoadedSkill } from "../../features/opencode-skill-loader"
 import { clearSkillCache, getAllSkills } from "../../features/opencode-skill-loader/skill-content"
 import { injectGitMasterConfig } from "../../features/opencode-skill-loader/skill-content"
-import { discoverCommandsSync } from "../slashcommand/command-discovery"
+import * as commandDiscovery from "../slashcommand/command-discovery"
 import type { CommandInfo } from "../slashcommand/types"
 import { formatLoadedCommand } from "../slashcommand/command-output-formatter"
 import { formatCombinedDescription } from "./description-formatter"
@@ -51,7 +51,7 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
   }
 
   const getCommands = (): CommandInfo[] => {
-    return discoverCommandsSync(undefined, {
+    return commandDiscovery.discoverCommandsSync(undefined, {
       pluginsEnabled: options.pluginsEnabled,
       enabledPluginsOverride: options.enabledPluginsOverride,
     }) ?? []
