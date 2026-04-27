@@ -3,20 +3,17 @@ import { describe, expect, test } from "bun:test"
 import { classifyErrorType, isRetryableError } from "./error-classifier"
 
 describe("runtime-fallback quota error regressions", () => {
-  test("classifies subscription quota errors as quota_exceeded and stops retry", () => {
-    //#given
+  test("classifies subscription quota errors as quota_exceeded and allows retry", () => {
     const error = {
       name: "AI_APICallError",
       message: "Subscription quota exceeded. You can continue using free models.",
     }
 
-    //#when
     const errorType = classifyErrorType(error)
     const retryable = isRetryableError(error, [429, 500, 502, 503, 504])
 
-    //#then
     expect(errorType).toBe("quota_exceeded")
-    expect(retryable).toBe(false)
+    expect(retryable).toBe(true)
   })
 
   test("treats HTTP 402 payment required as non-retryable", () => {
@@ -41,16 +38,13 @@ describe("runtime-fallback quota error regressions", () => {
     expect(retryable).toBe(true)
   })
 
-  test("classifies quota error names as quota_exceeded without retry", () => {
-    //#given
+  test("classifies quota error names as quota_exceeded and allows retry", () => {
     const error = { name: "QuotaExceededError", message: "Request failed." }
 
-    //#when
     const errorType = classifyErrorType(error)
     const retryable = isRetryableError(error, [429, 500, 502, 503, 504])
 
-    //#then
     expect(errorType).toBe("quota_exceeded")
-    expect(retryable).toBe(false)
+    expect(retryable).toBe(true)
   })
 })

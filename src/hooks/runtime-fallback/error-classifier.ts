@@ -169,10 +169,8 @@ export function isRetryableError(error: unknown, retryOnErrors: number[]): boole
   }
 
   if (errorType === "quota_exceeded") {
-    // When a provider signals an auto-retry (e.g. "retrying in ~2 weeks"),
-    // we should still trigger fallback to another model rather than STOP.
-    const hasAutoRetrySignal = /retrying\s+in/i.test(message)
-    return hasAutoRetrySignal
+    if (statusCode === 402) return false
+    return true
   }
 
   if (statusCode && retryOnErrors.includes(statusCode)) {
