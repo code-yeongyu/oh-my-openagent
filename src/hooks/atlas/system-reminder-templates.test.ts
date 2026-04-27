@@ -1,6 +1,7 @@
 import { describe, it, expect } from "bun:test"
 import {
   BOULDER_CONTINUATION_PROMPT,
+  SINGLE_TASK_DIRECTIVE,
   VERIFICATION_REMINDER,
   VERIFICATION_REMINDER_GEMINI,
 } from "./system-reminder-templates"
@@ -32,8 +33,8 @@ describe("BOULDER_CONTINUATION_PROMPT", () => {
       expect(checkboxMarkingMatch).not.toBeNull()
       expect(proceedMatch).not.toBeNull()
 
-      const checkboxPosition = checkboxMarkingMatch!.index
-      const proceedPosition = proceedMatch!.index
+      const checkboxPosition = checkboxMarkingMatch!.index ?? -1
+      const proceedPosition = proceedMatch!.index ?? -1
 
       expect(checkboxPosition).toBeLessThan(proceedPosition)
     })
@@ -49,5 +50,21 @@ describe("VERIFICATION_REMINDER", () => {
 describe("VERIFICATION_REMINDER_GEMINI", () => {
   it("contains node_modules exclusion pathspec in git diff command", () => {
     expect(VERIFICATION_REMINDER_GEMINI).toContain(":!node_modules")
+  })
+})
+
+describe("SINGLE_TASK_DIRECTIVE", () => {
+  it("does not contain refusal language", () => {
+    // given
+    const lowerCaseDirective = SINGLE_TASK_DIRECTIVE.toLowerCase()
+
+    // when / then
+    expect(lowerCaseDirective).not.toContain("refuse")
+    expect(SINGLE_TASK_DIRECTIVE).not.toContain("I refuse")
+  })
+
+  it("contains systematic execution guidance", () => {
+    expect(SINGLE_TASK_DIRECTIVE).toContain("EXECUTION PROTOCOL")
+    expect(SINGLE_TASK_DIRECTIVE).toContain("VERIFICATION IS MANDATORY")
   })
 })
