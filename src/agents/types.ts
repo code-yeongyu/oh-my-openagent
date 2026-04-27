@@ -138,7 +138,10 @@ export type OverridableAgentName = "build" | BuiltinAgentName;
 export type AgentName = BuiltinAgentName;
 
 export type AgentOverrideConfig = Partial<AgentConfig> & {
+  category?: string;
   prompt_append?: string;
+  skills?: string[];
+  tools?: Record<string, boolean>;
   variant?: string;
   fallback_models?: string | (string | import("../config/schema/fallback-models").FallbackModelObject)[];
 };

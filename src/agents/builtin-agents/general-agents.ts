@@ -5,6 +5,7 @@ import type { BrowserAutomationProvider } from "../../config/schema"
 import type { AvailableAgent } from "../dynamic-agent-prompt-builder"
 import { AGENT_MODEL_REQUIREMENTS, isModelAvailable } from "../../shared"
 import { buildAgent, isFactory } from "../agent-builder"
+import { resolveAgentSkills } from "../agent-skill-resolution"
 import { applyOverrides } from "./agent-overrides"
 import { applyEnvironmentContext } from "./environment-context"
 import { applyModelResolution, getFirstFallbackModel } from "./model-resolution"
@@ -92,7 +93,7 @@ export function collectPendingBuiltinAgents(input: {
     if (!resolution) continue
     const { model, variant: resolvedVariant } = resolution
 
-    let config = buildAgent(source, model, mergedCategories, gitMasterConfig, browserProvider, disabledSkills)
+    let config = buildAgent(source, model, mergedCategories)
 
     // Apply resolved variant from model fallback chain
     if (resolvedVariant) {
@@ -104,6 +105,7 @@ export function collectPendingBuiltinAgents(input: {
     }
 
     config = applyOverrides(config, override, mergedCategories, directory)
+    config = resolveAgentSkills(config, { gitMasterConfig, browserProvider, disabledSkills })
 
     // Store for later - will be added after sisyphus and hephaestus
     pendingAgentConfigs.set(name, config)
