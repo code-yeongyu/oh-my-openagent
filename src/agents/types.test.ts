@@ -10,8 +10,8 @@ import {
 
 describe("isGptNativeSisyphusModel", () => {
   test("allows GPT-5.x where x >= 4", () => {
-    expect(isGptNativeSisyphusModel("openai/gpt-5.5")).toBe(true);
-    expect(isGptNativeSisyphusModel("openai/gpt-5-5")).toBe(true);
+    expect(isGptNativeSisyphusModel("openai/gpt-5.4")).toBe(true);
+    expect(isGptNativeSisyphusModel("openai/gpt-5-4")).toBe(true);
     expect(isGptNativeSisyphusModel("openai/gpt-5.5")).toBe(true);
     expect(isGptNativeSisyphusModel("openai/gpt-5-5")).toBe(true);
     expect(isGptNativeSisyphusModel("openai/gpt-5.9")).toBe(true);
