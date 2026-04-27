@@ -110,6 +110,16 @@ export async function promptInstallConfig(detected: DetectedConfig): Promise<Ins
   })
   if (!opencodeGo) return null
 
+  const openrouter = await selectOrCancel({
+    message: "Do you have an OpenRouter subscription?",
+    options: [
+      { value: "no", label: "No", hint: "Will use other configured providers" },
+      { value: "yes", label: "Yes", hint: "OpenRouter for model variety and fallback" },
+    ],
+    initialValue: initial.openrouter,
+  })
+  if (!openrouter) return null
+
   const vercelAiGateway = await selectOrCancel({
     message: "Do you have a Vercel AI Gateway API key?",
     options: [
@@ -130,6 +140,7 @@ export async function promptInstallConfig(detected: DetectedConfig): Promise<Ins
     hasZaiCodingPlan: zaiCodingPlan === "yes",
     hasKimiForCoding: kimiForCoding === "yes",
     hasOpencodeGo: opencodeGo === "yes",
+    hasOpenRouter: openrouter === "yes",
     hasVercelAiGateway: vercelAiGateway === "yes",
   }
 }
