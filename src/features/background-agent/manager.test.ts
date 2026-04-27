@@ -3254,7 +3254,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
         description: "Task 2",
         prompt: "Do something else",
         agent: "test-agent",
-        model: { providerID: "openai", modelID: "gpt-5.5" },
+        model: { providerID: "openai", modelID: "gpt-5.4" },
         parentSessionID: "parent-session",
         parentMessageID: "parent-message",
       }
@@ -5432,7 +5432,7 @@ describe("BackgroundManager - tool permission spread order", () => {
       agent: "sisyphus-junior",
       parentSessionID: "parent-session",
       parentMessageID: "parent-message",
-      model: { providerID: "openai", modelID: "gpt-5.5", variant: "medium" },
+      model: { providerID: "openai", modelID: "gpt-5.4", variant: "medium" },
     }
     const input: import("./types").LaunchInput = {
       description: task.description,
@@ -5450,7 +5450,7 @@ describe("BackgroundManager - tool permission spread order", () => {
     //#then
     expect(promptCalls).toHaveLength(1)
     expect(promptCalls[0].body.agent).toBe("sisyphus-junior")
-    expect(promptCalls[0].body.model).toEqual({ providerID: "openai", modelID: "gpt-5.5" })
+    expect(promptCalls[0].body.model).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
     expect(promptCalls[0].body.variant).toBe("medium")
 
     manager.shutdown()
