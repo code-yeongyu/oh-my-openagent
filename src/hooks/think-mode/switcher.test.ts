@@ -50,7 +50,7 @@ describe("think-mode switcher", () => {
         const variant = getHighVariant("gpt-5.5")
 
         // then should return high variant
-        expect(variant).toBe("gpt-5-4-high")
+        expect(variant).toBe("gpt-5-5-high")
       })
 
       it("should handle dots in GPT-5.1 codex variants", () => {
@@ -74,7 +74,7 @@ describe("think-mode switcher", () => {
       it("should return null for already-high variants", () => {
         // given model IDs that are already high variants
         expect(getHighVariant("claude-opus-4-7-high")).toBeNull()
-        expect(getHighVariant("gpt-5-4-high")).toBeNull()
+        expect(getHighVariant("gpt-5-5-high")).toBeNull()
         expect(getHighVariant("gemini-3-1-pro-high")).toBeNull()
       })
 
@@ -90,13 +90,13 @@ describe("think-mode switcher", () => {
     it("should detect -high suffix", () => {
       // given model IDs with -high suffix
       expect(isAlreadyHighVariant("claude-opus-4-7-high")).toBe(true)
-      expect(isAlreadyHighVariant("gpt-5-4-high")).toBe(true)
+      expect(isAlreadyHighVariant("gpt-5-5-high")).toBe(true)
       expect(isAlreadyHighVariant("gemini-3.1-pro-high")).toBe(true)
     })
 
     it("should detect -high suffix after normalization", () => {
       // given model IDs with dots that end in -high
-      expect(isAlreadyHighVariant("gpt-5.4-high")).toBe(true)
+      expect(isAlreadyHighVariant("gpt-5.5-high")).toBe(true)
     })
 
     it("should return false for base models", () => {
@@ -128,7 +128,7 @@ describe("think-mode switcher", () => {
         const variant = getHighVariant("openai/gpt-5-5")
 
         // then should return high variant with prefix preserved
-        expect(variant).toBe("openai/gpt-5-4-high")
+        expect(variant).toBe("openai/gpt-5-5-high")
       })
 
       it("should handle prefixes with dots in version numbers", () => {
@@ -176,7 +176,7 @@ describe("think-mode switcher", () => {
       it("should detect -high suffix in prefixed models", () => {
         // given prefixed model IDs with -high suffix
         expect(isAlreadyHighVariant("vertex_ai/claude-opus-4-7-high")).toBe(true)
-        expect(isAlreadyHighVariant("openai/gpt-5-4-high")).toBe(true)
+        expect(isAlreadyHighVariant("openai/gpt-5-5-high")).toBe(true)
         expect(isAlreadyHighVariant("custom/gemini-3.1-pro-high")).toBe(true)
       })
 
@@ -189,7 +189,7 @@ describe("think-mode switcher", () => {
       it("should handle prefixed models with dots", () => {
         // given prefixed model IDs with dots
         expect(isAlreadyHighVariant("vertex_ai/gpt-5.5")).toBe(false)
-        expect(isAlreadyHighVariant("vertex_ai/gpt-5.4-high")).toBe(true)
+        expect(isAlreadyHighVariant("vertex_ai/gpt-5.5-high")).toBe(true)
       })
     })
 })
