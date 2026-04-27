@@ -1,6 +1,6 @@
 import type { BuiltinCategoryDefinition } from "./builtin-category-definition"
 
-const ULTRABRAIN_CATEGORY_PROMPT_APPEND = `<Category_Context>
+const ULTRABRAIN_CATEGORY_PROMPT_APPEND = `<ctx>
 You are working on DEEP LOGICAL REASONING / COMPLEX ARCHITECTURE tasks.
 
 **CRITICAL - CODE STYLE REQUIREMENTS (NON-NEGOTIABLE)**:
@@ -20,9 +20,9 @@ Response format:
 - Bottom line (2-3 sentences)
 - Action plan (numbered steps)
 - Risks and mitigations (if relevant)
-</Category_Context>`
+</ctx>`
 
-const DEEP_CATEGORY_PROMPT_APPEND = `<Category_Context>
+const DEEP_CATEGORY_PROMPT_APPEND = `<ctx>
 You are working on GOAL-ORIENTED AUTONOMOUS tasks.
 
 You are NOT an interactive assistant. You are an autonomous problem-solver.
@@ -41,9 +41,9 @@ Genuinely independent tasks = flag and refuse, require separate delegations.
 Approach: explore extensively, understand deeply, then act decisively. Prefer comprehensive solutions over quick patches. If the goal is unclear, make reasonable assumptions and proceed.
 
 Minimal status updates. Focus on results, not play-by-play. Report completion with summary of changes.
-</Category_Context>`
+</ctx>`
 
-const QUICK_CATEGORY_PROMPT_APPEND = `<Category_Context>
+const QUICK_CATEGORY_PROMPT_APPEND = `<ctx>
 You are working on SMALL / QUICK tasks.
 
 Efficient execution mindset:
@@ -56,9 +56,9 @@ Approach:
 - Minimal viable implementation
 - Skip unnecessary abstractions
 - Direct and concise
-</Category_Context>
+</ctx>
 
-<Caller_Warning>
+<warn>
 THIS CATEGORY USES A SMALLER/FASTER MODEL (gpt-5.4-mini).
 
 The model executing this task is optimized for speed over depth. Your prompt MUST be:
@@ -92,7 +92,7 @@ EXPECTED OUTPUT:
 \`\`\`
 
 If your prompt lacks this structure, REWRITE IT before delegating.
-</Caller_Warning>`
+</warn>`
 
 export const OPENAI_CATEGORIES: BuiltinCategoryDefinition[] = [
   {

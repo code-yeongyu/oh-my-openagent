@@ -1,6 +1,6 @@
 import type { BuiltinCategoryDefinition } from "./builtin-category-definition"
 
-const WRITING_CATEGORY_PROMPT_APPEND = `<Category_Context>
+const WRITING_CATEGORY_PROMPT_APPEND = `<ctx>
 You are working on WRITING / PROSE tasks.
 
 Wordsmith mindset:
@@ -24,7 +24,7 @@ ANTI-AI-SLOP RULES (NON-NEGOTIABLE):
 - NEVER start consecutive sentences with the same word.
 - No filler openings: skip "In today's world...", "As we all know...", "It goes without saying..."
 - Write like a human, not a corporate template.
-</Category_Context>`
+</ctx>`
 
 export const KIMI_CATEGORIES: BuiltinCategoryDefinition[] = [
   {
