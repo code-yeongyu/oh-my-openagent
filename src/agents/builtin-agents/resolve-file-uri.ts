@@ -27,7 +27,7 @@ export function resolvePromptAppend(promptAppend: string, configDir?: string): s
       filePath,
       projectRoot,
     })
-    return `[WARNING: Path rejected: ${promptAppend}]`
+    return `[WARNING: Path rejected: ${promptAppend} (resolved outside project root ${projectRoot}; file:// prompts must reside within the project boundary)]`
   }
 
   if (!existsSync(filePath)) {

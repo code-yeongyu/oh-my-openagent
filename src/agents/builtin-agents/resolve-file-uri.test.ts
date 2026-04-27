@@ -161,4 +161,16 @@ describe("resolvePromptAppend", () => {
     expect(resolved).toContain("[WARNING: Path rejected:")
     expect(resolved).not.toContain("absolute-content")
   })
+
+  test("rejection warning explains the project boundary restriction (issue #3554)", () => {
+    //#given
+    const input = `file://${absoluteFilePath}`
+
+    //#when
+    const resolved = resolvePromptAppend(input, configDir)
+
+    //#then
+    expect(resolved).toContain("[WARNING: Path rejected:")
+    expect(resolved).toMatch(/outside project root/i)
+  })
 })
