@@ -14,11 +14,13 @@ import { loadPluginConfig } from "./plugin-config"
 import { createModelCacheState } from "./plugin-state"
 import { createFirstMessageVariantGate } from "./shared/first-message-variant"
 import { injectServerAuthIntoClient, log, logLegacyPluginStartupWarning } from "./shared"
+import { installAgentSortShim } from "./shared/agent-sort-shim"
 import { detectExternalSkillPlugin, getSkillPluginConflictWarning } from "./shared/external-plugin-detector"
 import { startBackgroundCheck as startTmuxCheck } from "./tools/interactive-bash"
 import { createPluginPostHog, getPostHogDistinctId } from "./shared/posthog"
 
 const serverPlugin: Plugin = async (input, _options): Promise<Hooks> => {
+  installAgentSortShim()
   initConfigContext("opencode", null)
   log("[oh-my-openagent] ENTRY - plugin loading", {
     directory: input.directory,
