@@ -8,45 +8,28 @@ The canonical agent order is **sisyphus → hephaestus → prometheus → atlas*
 
 This order is enforced via two mechanisms working together:
 1. `CANONICAL_CORE_AGENT_ORDER` in `agent-priority-order.ts` controls object key insertion order
-2. `agent-key-remapper.ts` injects leading-space-prefixed runtime names into the `name` field for OpenCode's `localeCompare` sort
+2. `agent-key-remapper.ts` injects ZWSP-prefixed runtime names into the `name` field for OpenCode's `localeCompare` sort
 
 ### Why Two Mechanisms
 
-OpenCode's `Agent.list()` sorts agents by `name` field via `localeCompare`. Object key order alone is not enough. The `name` field carries leading ASCII spaces (4-3-2-1 descending) so core agents sort before alphabetically-named agents.
+OpenCode's `Agent.list()` sorts agents by `name` field via `localeCompare`. Object key order alone is not enough. The `name` field carries ZWSP prefixes (1-4 chars) so core agents sort before alphabetically-named agents.
 
-The prefix lengths are intentionally **descending** (sisyphus=4, hephaestus=3, prometheus=2, atlas=1) because `localeCompare` puts strings with more leading whitespace before strings with fewer. Reference: see `agent-runtime-name-sort.test.ts` for empirical verification.
-
-### Why ASCII Spaces, Not ZWSP
-
-Earlier versions used ZWSP (`\u200B`) prefixes hoping they would be invisible to users. They silently failed: Unicode collation algorithms treat zero-width characters as ignorable at the primary level, so ZWSP-prefixed names sorted as if the prefix did not exist. The result was alphabetical order interleaving core and non-core agents.
-
-ASCII space (`\u0020`) is the only character that:
-- Sorts before alphabetic characters reliably under all locales
-- Renders correctly in every terminal (no glyph substitution)
-- Is valid in HTTP header values (RFC 7230) when placed in the `name` field
-
-The leading-space prefix MUST NOT appear in:
+ZWSP is intentionally used in the `name` field only. It MUST NOT appear in:
 - Object keys (used as HTTP header values, causes RFC 7230 violations)
 - Display names returned by `getAgentDisplayName()`
 - Config keys
 
-### Backward Compatibility
-
-`stripAgentListSortPrefix()` strips both the new leading-space prefix AND legacy ZWSP/zero-width characters. Existing sessions and configs from the ZWSP era continue to resolve correctly.
-
 ### History
 
-Agent ordering caused 15+ commits, 8+ PRs, and multiple reverts due to:
+Agent ordering has caused 15+ commits, 8+ PRs, and multiple reverts due to:
 1. Early ZWSP attempts that leaked into HTTP headers via object keys
 2. Object.entries() iteration order depending on merge sequence
 3. Multiple code paths assembling agents differently
-4. The ZWSP prefix being silently broken in `localeCompare` sort (resolved in this commit by switching to leading ASCII spaces)
 
 ### Forbidden Patterns
 
 DO NOT introduce:
-- ZWSP in any field (broken in `localeCompare`, replaced by leading ASCII spaces)
-- Leading whitespace in object keys or display names (allowed only in `name` field via `getAgentRuntimeName()`)
+- ZWSP in object keys or display names (only allowed in `name` field via `getAgentRuntimeName()`)
 - Runtime sort shims or comparators
 - Alternative ordering constants
 - Object.entries() order dependencies
