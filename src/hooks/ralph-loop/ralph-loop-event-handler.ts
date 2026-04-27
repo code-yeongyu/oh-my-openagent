@@ -11,11 +11,6 @@ import { continueIteration } from "./iteration-continuation"
 import { handlePendingVerification } from "./pending-verification-handler"
 import { handleDeletedLoopSession, handleErroredLoopSession } from "./session-event-handler"
 
-type SessionRecovery = {
-	isRecovering: (sessionID: string) => boolean
-	markRecovering: (sessionID: string) => void
-	clear: (sessionID: string) => void
-}
 type LoopStateController = {
 	getState: () => RalphLoopState | null
 	clear: () => boolean
@@ -25,7 +20,7 @@ type LoopStateController = {
 	setVerificationSessionID: (sessionID: string, verificationSessionID: string) => RalphLoopState | null
 	restartAfterFailedVerification: (sessionID: string, messageCountAtStart?: number) => RalphLoopState | null
 }
-type RalphLoopEventHandlerOptions = { directory: string; apiTimeoutMs: number; getTranscriptPath: (sessionID: string) => string | undefined; checkSessionExists?: RalphLoopOptions["checkSessionExists"]; backgroundManager?: RalphLoopOptions["backgroundManager"]; sessionRecovery: SessionRecovery; loopState: LoopStateController }
+type RalphLoopEventHandlerOptions = { directory: string; apiTimeoutMs: number; getTranscriptPath: (sessionID: string) => string | undefined; checkSessionExists?: RalphLoopOptions["checkSessionExists"]; backgroundManager?: RalphLoopOptions["backgroundManager"]; loopState: LoopStateController }
 
 export function createRalphLoopEventHandler(
 	ctx: PluginInput,
@@ -48,12 +43,6 @@ export function createRalphLoopEventHandler(
 			inFlightSessions.add(sessionID)
 
 			try {
-
-				if (options.sessionRecovery.isRecovering(sessionID)) {
-					log(`[${HOOK_NAME}] Skipped: in recovery`, { sessionID })
-					return
-				}
-
 				const state = options.loopState.getState()
 				if (!state || !state.active) {
 					return
@@ -229,12 +218,12 @@ export function createRalphLoopEventHandler(
 		}
 
 		if (event.type === "session.deleted") {
-			if (!handleDeletedLoopSession(props, options.loopState, options.sessionRecovery)) return
+			if (!handleDeletedLoopSession(props, options.loopState)) return
 			return
 		}
 
 		if (event.type === "session.error") {
-			handleErroredLoopSession(props, options.loopState, options.sessionRecovery)
+			handleErroredLoopSession(props, options.loopState)
 		}
 	}
 }
