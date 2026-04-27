@@ -1,7 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { RalphLoopOptions, RalphLoopState } from "./types"
 import { getTranscriptPath as getDefaultTranscriptPath } from "../claude-code-hooks/transcript"
-import { createLoopSessionRecovery } from "./loop-session-recovery"
 import { createLoopStateController } from "./loop-state-controller"
 import { createRalphLoopEventHandler } from "./ralph-loop-event-handler"
 
@@ -53,7 +52,6 @@ export function createRalphLoopHook(
 		stateDir,
 		config,
 	})
-	const sessionRecovery = createLoopSessionRecovery()
 
 	const event = createRalphLoopEventHandler(ctx, {
 		directory: ctx.directory,
@@ -61,7 +59,6 @@ export function createRalphLoopHook(
 		getTranscriptPath,
 		checkSessionExists,
 		backgroundManager,
-		sessionRecovery,
 		loopState,
 	})
 
