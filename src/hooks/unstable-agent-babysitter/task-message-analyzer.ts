@@ -83,9 +83,7 @@ export function extractMessages(value: unknown): unknown[] {
 }
 
 export function isUnstableTask(task: BackgroundTask): boolean {
-  if (task.isUnstableAgent === true) return true
-  const modelId = task.model?.modelID?.toLowerCase()
-  return modelId ? modelId.includes("gemini") || modelId.includes("minimax") : false
+  return true
 }
 
 export function buildReminder(task: BackgroundTask, summary: string | null, idleMs: number): string {
