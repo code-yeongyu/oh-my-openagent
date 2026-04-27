@@ -10,26 +10,26 @@ Core-agent tab cycling is deterministic via injected runtime order field. The fi
 
 | Agent                 | Model              | Purpose                                                                                                                                                                                                                                                                                                                                                          |
 | --------------------- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Sisyphus**          | `claude-opus-4-7`  | The default orchestrator. Plans, delegates, and executes complex tasks using specialized subagents with aggressive parallel execution. Todo-driven workflow with extended thinking (32k budget). Fallback: `opencode-go/kimi-k2.5` → `kimi-for-coding/k2p5` → `opencode\|moonshotai\|moonshotai-cn\|firmware\|ollama-cloud\|aihubmix/kimi-k2.5` → `openai\|github-copilot\|opencode/gpt-5.4 (medium)` → `zai-coding-plan\|opencode/glm-5` → `opencode/big-pickle`. |
-| **Hephaestus**        | `gpt-5.4`          | The Legitimate Craftsman. Autonomous deep worker inspired by AmpCode's deep mode. Goal-oriented execution with thorough research before action. Explores codebase patterns, completes tasks end-to-end without premature stopping. Named after the Greek god of forge and craftsmanship. Requires a GPT-capable provider. |
-| **Oracle**            | `gpt-5.4`          | Architecture decisions, code review, debugging. Read-only consultation with stellar logical reasoning and deep analysis. Inspired by AmpCode. Fallback: `google\|github-copilot\|opencode/gemini-3.1-pro (high)` → `anthropic\|github-copilot\|opencode/claude-opus-4-7 (max)` → `opencode-go/glm-5`.                                                                                                                                 |
+| **Sisyphus**          | `claude-opus-4-7`  | The default orchestrator. Plans, delegates, and executes complex tasks using specialized subagents with aggressive parallel execution. Todo-driven workflow with extended thinking (32k budget). Fallback: `opencode-go/kimi-k2.5` → `kimi-for-coding/k2p5` → `opencode\|moonshotai\|moonshotai-cn\|firmware\|ollama-cloud\|aihubmix/kimi-k2.5` → `openai\|github-copilot\|opencode/gpt-5.5 (medium)` → `zai-coding-plan\|opencode/glm-5` → `opencode/big-pickle`. |
+| **Hephaestus**        | `gpt-5.5`          | The Legitimate Craftsman. Autonomous deep worker inspired by AmpCode's deep mode. Goal-oriented execution with thorough research before action. Explores codebase patterns, completes tasks end-to-end without premature stopping. Named after the Greek god of forge and craftsmanship. Requires a GPT-capable provider. |
+| **Oracle**            | `gpt-5.5`          | Architecture decisions, code review, debugging. Read-only consultation with stellar logical reasoning and deep analysis. Inspired by AmpCode. Fallback: `google\|github-copilot\|opencode/gemini-3.1-pro (high)` → `anthropic\|github-copilot\|opencode/claude-opus-4-7 (max)` → `opencode-go/glm-5`.                                                                                                                                 |
 | **Librarian**         | `gpt-5.4-mini-fast` | Multi-repo analysis, documentation lookup, OSS implementation examples. Deep codebase understanding with evidence-based answers. Fallback: `opencode-go/minimax-m2.7-highspeed` → `opencode-go/minimax-m2.7` → `anthropic\|opencode/claude-haiku-4-5` → `openai\|opencode/gpt-5.4-nano`. |
 | **Explore**           | `gpt-5.4-mini-fast` | Fast codebase exploration and contextual grep. Fallback: `opencode-go/minimax-m2.7-highspeed` → `opencode-go/minimax-m2.7` → `anthropic\|opencode/claude-haiku-4-5` → `openai\|opencode/gpt-5.4-nano`. |
-| **Multimodal-Looker** | `gpt-5.4`          | Visual content specialist. Analyzes PDFs, images, diagrams to extract information. Fallback: `opencode-go/kimi-k2.5` → `zai-coding-plan/glm-4.6v` → `openai\|github-copilot\|opencode/gpt-5-nano`.                                                                                                                                                                                                   |
+| **Multimodal-Looker** | `gpt-5.5`          | Visual content specialist. Analyzes PDFs, images, diagrams to extract information. Fallback: `opencode-go/kimi-k2.5` → `zai-coding-plan/glm-4.6v` → `openai\|github-copilot\|opencode/gpt-5-nano`.                                                                                                                                                                                                   |
 ### Planning Agents
 
 | Agent          | Model             | Purpose                                                                                                                                            |
 | -------------- | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Prometheus** | `claude-opus-4-7` | Strategic planner with interview mode. Creates detailed work plans through iterative questioning. Fallback: `openai\|github-copilot\|opencode/gpt-5.4 (high)` → `opencode-go/glm-5` → `google\|github-copilot\|opencode/gemini-3.1-pro`. |
-| **Metis**      | `claude-opus-4-7` | Plan consultant — pre-planning analysis. Identifies hidden intentions, ambiguities, and AI failure points. Fallback: `openai\|github-copilot\|opencode/gpt-5.4 (high)` → `opencode-go/glm-5` → `kimi-for-coding/k2p5`. |
-| **Momus**      | `gpt-5.4`         | Plan reviewer — validates plans against clarity, verifiability, and completeness standards. Fallback: `anthropic\|github-copilot\|opencode/claude-opus-4-7 (max)` → `google\|github-copilot\|opencode/gemini-3.1-pro (high)` → `opencode-go/glm-5`. |
+| **Prometheus** | `claude-opus-4-7` | Strategic planner with interview mode. Creates detailed work plans through iterative questioning. Fallback: `openai\|github-copilot\|opencode/gpt-5.5 (high)` → `opencode-go/glm-5` → `google\|github-copilot\|opencode/gemini-3.1-pro`. |
+| **Metis**      | `claude-opus-4-7` | Plan consultant — pre-planning analysis. Identifies hidden intentions, ambiguities, and AI failure points. Fallback: `openai\|github-copilot\|opencode/gpt-5.5 (high)` → `opencode-go/glm-5` → `kimi-for-coding/k2p5`. |
+| **Momus**      | `gpt-5.5`         | Plan reviewer — validates plans against clarity, verifiability, and completeness standards. Fallback: `anthropic\|github-copilot\|opencode/claude-opus-4-7 (max)` → `google\|github-copilot\|opencode/gemini-3.1-pro (high)` → `opencode-go/glm-5`. |
 
 ### Orchestration Agents
 
 | Agent               | Model                  | Purpose                                                                                                                                                                                     |
 | ------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Atlas**           | `claude-sonnet-4-6`    | Todo-list orchestrator. Executes planned tasks systematically, managing todo items and coordinating work. Fallback: `opencode-go/kimi-k2.5` → `openai\|github-copilot\|opencode/gpt-5.4 (medium)` → `opencode-go/minimax-m2.7`. |
-| **Sisyphus-Junior** | _(category-dependent)_ | Category-spawned executor. Model is selected automatically based on the task category (visual-engineering, quick, deep, etc.). Its built-in general fallback chain is `anthropic\|github-copilot\|opencode/claude-sonnet-4-6` → `opencode-go/kimi-k2.5` → `openai\|github-copilot\|opencode/gpt-5.4 (medium)` → `opencode-go/minimax-m2.7` → `opencode/big-pickle`. |
+| **Atlas**           | `claude-sonnet-4-6`    | Todo-list orchestrator. Executes planned tasks systematically, managing todo items and coordinating work. Fallback: `opencode-go/kimi-k2.5` → `openai\|github-copilot\|opencode/gpt-5.5 (medium)` → `opencode-go/minimax-m2.7`. |
+| **Sisyphus-Junior** | _(category-dependent)_ | Category-spawned executor. Model is selected automatically based on the task category (visual-engineering, quick, deep, etc.). Its built-in general fallback chain is `anthropic\|github-copilot\|opencode/claude-sonnet-4-6` → `opencode-go/kimi-k2.5` → `openai\|github-copilot\|opencode/gpt-5.5 (medium)` → `opencode-go/minimax-m2.7` → `opencode/big-pickle`. |
 
 ### Invoking Agents
 
@@ -116,8 +116,8 @@ By combining these two concepts, you can generate optimal agents through `task`.
 | Category             | Default Model                   | Use Cases                                                                                                                   |
 | -------------------- | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | `visual-engineering` | `google/gemini-3.1-pro`         | Frontend, UI/UX, design, styling, animation                                                                                 |
-| `ultrabrain`         | `openai/gpt-5.4` (xhigh)        | Deep logical reasoning, complex architecture decisions requiring extensive analysis                                         |
-| `deep`               | `openai/gpt-5.4` (medium)       | Goal-oriented autonomous problem-solving. Thorough research before action. For hairy problems requiring deep understanding. |
+| `ultrabrain`         | `openai/gpt-5.5` (xhigh)        | Deep logical reasoning, complex architecture decisions requiring extensive analysis                                         |
+| `deep`               | `openai/gpt-5.5` (medium)       | Goal-oriented autonomous problem-solving. Thorough research before action. For hairy problems requiring deep understanding. |
 | `artistry`           | `google/gemini-3.1-pro` (high)  | Highly creative/artistic tasks, novel ideas                                                                                 |
 | `quick`              | `openai/gpt-5.4-mini`           | Trivial tasks - single file changes, typo fixes, simple modifications                                                       |
 | `unspecified-low`    | `anthropic/claude-sonnet-4-6`   | Tasks that don't fit other categories, low effort required                                                                  |
@@ -170,7 +170,7 @@ You can define custom categories in your plugin config file. During the rename t
 
     // 2. Override existing category (change model)
     "visual-engineering": {
-      "model": "openai/gpt-5.4",
+      "model": "openai/gpt-5.5",
       "temperature": 0.8,
     },
 
@@ -212,7 +212,7 @@ Configure per-agent fallback chains with arrays that can mix plain model strings
     "sisyphus": {
       "fallback_models": [
         "opencode/glm-5",
-        { "model": "openai/gpt-5.4", "variant": "high" },
+        { "model": "openai/gpt-5.5", "variant": "high" },
         { "model": "anthropic/claude-sonnet-4-6", "thinking": { "type": "enabled", "budgetTokens": 64000 } }
       ]
     }
@@ -410,7 +410,7 @@ You can create powerful specialized agents by combining Categories and Skills.
 
 - **Category**: `ultrabrain`
 - **load_skills**: `[]` (pure reasoning)
-- **Effect**: Leverages GPT-5.4 xhigh reasoning for in-depth system architecture analysis.
+- **Effect**: Leverages GPT-5.5 xhigh reasoning for in-depth system architecture analysis.
 
 #### The Maintainer (Quick Fixes)
 
