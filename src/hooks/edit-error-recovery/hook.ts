@@ -23,6 +23,10 @@ You made an Edit mistake. STOP and do this NOW:
 3. APOLOGIZE briefly to the user for the error
 4. CONTINUE with corrected action based on the real file content
 
+CRITICAL RULES:
+- For NOTEPAD files (.sisyphus/notepads/*): NEVER use Write tool. Always use Edit to append.
+- If Edit fails again after reading, STOP and ask the user for guidance.
+- Do NOT use Write tool as fallback for notepad files.
 DO NOT attempt another edit until you've read and verified the file state.
 `
 
