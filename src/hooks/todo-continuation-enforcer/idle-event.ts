@@ -165,6 +165,23 @@ export async function handleSessionIdle(args: {
     }
   }
 
+  // BLOCKED escalation must fire before consecutiveFailures check.
+  // Even if regular continuation is failing (API errors, rate limits),
+  // the BLOCKED prompt is a one-way instruction that must be delivered.
+  if (state.consecutiveClarifications >= MAX_CLARIFICATION_CONSECUTIVE) {
+    log(`[${HOOK_NAME}] BLOCKED: injecting stop prompt (${state.consecutiveClarifications} consecutive clarifications)`, { sessionID })
+    void injectContinuation({
+      ctx,
+      sessionID,
+      backgroundManager,
+      skipAgents,
+      sessionStateStore,
+      isContinuationStopped,
+      promptOverride: CLARIFICATION_BLOCKED_PROMPT,
+    })
+    return
+  }
+
   if (
     state.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES
     && state.lastInjectedAt
@@ -241,20 +258,6 @@ export async function handleSessionIdle(args: {
   }
 
   let promptOverride: string | undefined
-  if (state.consecutiveClarifications >= MAX_CLARIFICATION_CONSECUTIVE) {
-    log(`[${HOOK_NAME}] BLOCKED: injecting stop prompt (${state.consecutiveClarifications} consecutive clarifications)`, { sessionID })
-    void injectContinuation({
-      ctx,
-      sessionID,
-      backgroundManager,
-      skipAgents,
-      resolvedInfo,
-      sessionStateStore,
-      isContinuationStopped,
-      promptOverride: CLARIFICATION_BLOCKED_PROMPT,
-    })
-    return
-  }
   if (state.consecutiveClarifications >= MAX_CLARIFICATION_CONSECUTIVE - 1) {
     promptOverride = CLARIFICATION_ESCALATION_PROMPT
     log(`[${HOOK_NAME}] Escalating: warning prompt for clarification tier 2`, { sessionID })

@@ -148,7 +148,7 @@ export async function injectContinuation(args: {
     }
   }
 
-  if (!hasWritePermission(tools)) {
+  if (!hasWritePermission(tools) && !promptOverride) {
     log(`[${HOOK_NAME}] Skipped: agent lacks write permission`, { sessionID, agent: agentName })
     return
   }
