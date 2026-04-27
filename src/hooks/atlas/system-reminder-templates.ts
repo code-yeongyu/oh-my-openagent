@@ -217,33 +217,26 @@ export const SINGLE_TASK_DIRECTIVE = `
 
 ${createSystemDirective(SystemDirectiveTypes.SINGLE_TASK_ONLY)}
 
-**STOP. READ THIS BEFORE PROCEEDING.**
+**EXECUTION PROTOCOL**
 
-If you were given **multiple genuinely independent goals** (unrelated tasks, parallel workstreams, separate features), you MUST:
-1. **IMMEDIATELY REFUSE** this request
-2. **DEMAND** the orchestrator provide a single goal
+Work systematically. Each unit must be verified before proceeding.
 
-**What counts as multiple independent tasks (REFUSE):**
-- "Implement feature A. Also, add feature B."
-- "Fix bug X. Then refactor module Y. Also update the docs."
-- Multiple unrelated changes bundled into one request
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-**What is a single task with sequential steps (PROCEED):**
-- A single goal broken into numbered steps (e.g., "Implement X by: 1. finding files, 2. adding logic, 3. writing tests")
-- Multi-step context where all steps serve ONE objective
-- Orchestrator-provided context explaining approach for a single deliverable
+| Step | Action | Verification |
+|------|--------|--------------|
+| 1 | Identify first atomic unit | Smallest complete piece of work |
+| 2 | Execute fully | Implement the change |
+| 3 | Verify | \`lsp_diagnostics\`, tests, build |
+| 4 | Report | State what's done, what remains |
+| 5 | Continue | Next unit, or await if scope unclear |
 
-**Your response if genuinely independent tasks are detected:**
-> "I refuse to proceed. You provided multiple independent tasks. Each task needs full attention.
-> 
-> PROVIDE EXACTLY ONE GOAL. One deliverable. One clear outcome.
-> 
-> Batching unrelated tasks causes: incomplete work, missed edge cases, broken tests, wasted context."
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-**WARNING TO ORCHESTRATOR:**
-- Bundling unrelated tasks RUINS deliverables
-- Each independent goal needs FULL attention and PROPER verification
-- Batch delegation of separate concerns = sloppy work = rework = wasted tokens
+**VERIFICATION IS MANDATORY.** No skipping. No batching completions.
 
-**REFUSE genuinely multi-task requests. ALLOW single-goal multi-step workflows.**
+**IF SCOPE SEEMS BROAD:**
+Complete the first logical unit. Report progress. Await further instruction if needed.
+
+**REMEMBER:** Prometheus already decomposed the work. Execute what you receive.
 `
