@@ -5,6 +5,10 @@ import {
   isGlmModel,
   isGptNativeSisyphusModel,
   isMiniMaxModel,
+  isDeepSeekV4Model,
+  isDeepSeekV4ProModel,
+  isDeepSeekV4FlashModel,
+  isDeepSeekR1Model,
 } from "./types";
 
 describe("isGptNativeSisyphusModel", () => {
@@ -182,5 +186,88 @@ describe("isGeminiModel", () => {
 
   test("#given opencode provider #then returns false", () => {
     expect(isGeminiModel("opencode/claude-opus-4-7")).toBe(false);
+  });
+});
+
+describe("isDeepSeekV4Model", () => {
+  test("#given DeepSeek-V4 models with provider prefix #then returns true", () => {
+    expect(isDeepSeekV4Model("llmgateway/deepseek-v4-pro")).toBe(true);
+    expect(isDeepSeekV4Model("llmgateway/deepseek-v4-flash")).toBe(true);
+    expect(isDeepSeekV4Model("deepseek/deepseek-v4-pro")).toBe(true);
+    expect(isDeepSeekV4Model("openrouter/deepseek-v4-pro")).toBe(true);
+    expect(isDeepSeekV4Model("opencode/deepseek-v4-flash")).toBe(true);
+  });
+
+  test("#given DeepSeek-V4 models without provider prefix #then returns true", () => {
+    expect(isDeepSeekV4Model("deepseek-v4-pro")).toBe(true);
+    expect(isDeepSeekV4Model("deepseek-v4-flash")).toBe(true);
+    expect(isDeepSeekV4Model("deepseek-v4")).toBe(true);
+  });
+
+  test("#given non-V4 DeepSeek models #then returns false", () => {
+    expect(isDeepSeekV4Model("deepseek/deepseek-v3")).toBe(false);
+    expect(isDeepSeekV4Model("deepseek/deepseek-chat")).toBe(false);
+    expect(isDeepSeekV4Model("deepseek/deepseek-r1")).toBe(false);
+  });
+
+  test("#given other models #then returns false", () => {
+    expect(isDeepSeekV4Model("openai/gpt-5.4")).toBe(false);
+    expect(isDeepSeekV4Model("anthropic/claude-opus-4-7")).toBe(false);
+    expect(isDeepSeekV4Model("google/gemini-3.1-pro")).toBe(false);
+  });
+});
+
+describe("isDeepSeekV4ProModel", () => {
+  test("#given DeepSeek-V4-Pro models #then returns true", () => {
+    expect(isDeepSeekV4ProModel("llmgateway/deepseek-v4-pro")).toBe(true);
+    expect(isDeepSeekV4ProModel("deepseek/deepseek-v4-pro")).toBe(true);
+    expect(isDeepSeekV4ProModel("deepseek-v4-pro")).toBe(true);
+  });
+
+  test("#given DeepSeek-V4-Flash models #then returns false", () => {
+    expect(isDeepSeekV4ProModel("llmgateway/deepseek-v4-flash")).toBe(false);
+    expect(isDeepSeekV4ProModel("deepseek-v4-flash")).toBe(false);
+  });
+
+  test("#given other models #then returns false", () => {
+    expect(isDeepSeekV4ProModel("openai/gpt-5.4")).toBe(false);
+    expect(isDeepSeekV4ProModel("deepseek/deepseek-r1")).toBe(false);
+  });
+});
+
+describe("isDeepSeekV4FlashModel", () => {
+  test("#given DeepSeek-V4-Flash models #then returns true", () => {
+    expect(isDeepSeekV4FlashModel("llmgateway/deepseek-v4-flash")).toBe(true);
+    expect(isDeepSeekV4FlashModel("deepseek/deepseek-v4-flash")).toBe(true);
+    expect(isDeepSeekV4FlashModel("deepseek-v4-flash")).toBe(true);
+  });
+
+  test("#given DeepSeek-V4-Pro models #then returns false", () => {
+    expect(isDeepSeekV4FlashModel("llmgateway/deepseek-v4-pro")).toBe(false);
+    expect(isDeepSeekV4FlashModel("deepseek-v4-pro")).toBe(false);
+  });
+
+  test("#given other models #then returns false", () => {
+    expect(isDeepSeekV4FlashModel("openai/gpt-5.4")).toBe(false);
+    expect(isDeepSeekV4FlashModel("deepseek/deepseek-r1")).toBe(false);
+  });
+});
+
+describe("isDeepSeekR1Model", () => {
+  test("#given DeepSeek-R1 models #then returns true", () => {
+    expect(isDeepSeekR1Model("deepseek/deepseek-r1")).toBe(true);
+    expect(isDeepSeekR1Model("deepseek-reasoner")).toBe(true);
+    expect(isDeepSeekR1Model("llmgateway/deepseek-r1")).toBe(true);
+    expect(isDeepSeekR1Model("openrouter/deepseek-r1")).toBe(true);
+  });
+
+  test("#given DeepSeek-V4 models #then returns false", () => {
+    expect(isDeepSeekR1Model("llmgateway/deepseek-v4-pro")).toBe(false);
+    expect(isDeepSeekR1Model("deepseek-v4-flash")).toBe(false);
+  });
+
+  test("#given other models #then returns false", () => {
+    expect(isDeepSeekR1Model("openai/gpt-5.4")).toBe(false);
+    expect(isDeepSeekR1Model("anthropic/claude-opus-4-7")).toBe(false);
   });
 });

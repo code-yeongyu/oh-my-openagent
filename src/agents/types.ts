@@ -108,6 +108,26 @@ export function isGlmModel(model: string): boolean {
   return modelName.includes("glm");
 }
 
+export function isDeepSeekV4Model(model: string): boolean {
+  const modelName = extractModelName(model).toLowerCase();
+  return modelName.includes("deepseek-v4");
+}
+
+export function isDeepSeekV4ProModel(model: string): boolean {
+  const modelName = extractModelName(model).toLowerCase();
+  return modelName.includes("deepseek-v4-pro");
+}
+
+export function isDeepSeekV4FlashModel(model: string): boolean {
+  const modelName = extractModelName(model).toLowerCase();
+  return modelName.includes("deepseek-v4-flash");
+}
+
+export function isDeepSeekR1Model(model: string): boolean {
+  const modelName = extractModelName(model).toLowerCase();
+  return modelName.includes("deepseek-r1") || modelName.includes("deepseek-reasoner");
+}
+
 export function isGeminiModel(model: string): boolean {
   if (GEMINI_PROVIDERS.some((prefix) => model.startsWith(prefix))) return true;
 
