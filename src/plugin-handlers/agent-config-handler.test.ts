@@ -191,6 +191,56 @@ describe("applyAgentConfig builtin override protection", () => {
     }
   })
 
+  test("normalizes display-name default_agent to runtime agent name", async () => {
+    // given
+    const config = createBaseConfig()
+    config.default_agent = "Sisyphus - Ultraworker"
+
+    // when
+    await applyAgentConfig({
+      config,
+      pluginConfig: createPluginConfig(),
+      ctx: { directory: "/tmp" },
+      pluginComponents: createPluginComponents(),
+    })
+
+    // then
+    expect(config.default_agent).toBe(getAgentRuntimeName("sisyphus"))
+  })
+
+  test("keeps config-key default_agent behavior unchanged", async () => {
+    // given
+    const config = createBaseConfig()
+    config.default_agent = "sisyphus"
+
+    // when
+    await applyAgentConfig({
+      config,
+      pluginConfig: createPluginConfig(),
+      ctx: { directory: "/tmp" },
+      pluginComponents: createPluginComponents(),
+    })
+
+    // then
+    expect(config.default_agent).toBe(getAgentRuntimeName("sisyphus"))
+  })
+
+  test("keeps fallback default_agent behavior unchanged", async () => {
+    // given
+    const config = createBaseConfig()
+
+    // when
+    await applyAgentConfig({
+      config,
+      pluginConfig: createPluginConfig(),
+      ctx: { directory: "/tmp" },
+      pluginComponents: createPluginComponents(),
+    })
+
+    // then
+    expect(config.default_agent).toBe(getAgentRuntimeName("sisyphus"))
+  })
+
   test("filters user agents whose key matches the builtin display-name alias", async () => {
     // given
     loadUserAgentsSpy.mockReturnValue({
