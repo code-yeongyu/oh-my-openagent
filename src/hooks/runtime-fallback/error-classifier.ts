@@ -169,7 +169,11 @@ export function isRetryableError(error: unknown, retryOnErrors: number[]): boole
   }
 
   if (errorType === "quota_exceeded") {
+    // Block HTTP 402 explicitly - this is a billing/payment issue, not a retryable quota issue
+    // Check explicit statusCode field
     if (statusCode === 402) return false
+    // Also check if message contains just "402" as status code (e.g., "error 402: payment required")
+    if (/^402\b/i.test(message) || /\b402[,:]\s*payment/i.test(message)) return false
     return true
   }
 

@@ -27,6 +27,17 @@ describe("runtime-fallback quota error regressions", () => {
     expect(retryable).toBe(false)
   })
 
+  test("treats message-only 402 as non-retryable (regression fix)", () => {
+    //#given - no explicit statusCode, but message contains "402 payment"
+    const error = { message: "402: Payment Required. Please upgrade your plan." }
+
+    //#when
+    const retryable = isRetryableError(error, [429, 500, 502, 503, 504])
+
+    //#then - should NOT retry billing issues
+    expect(retryable).toBe(false)
+  })
+
   test("keeps HTTP 429 rate limit retryable", () => {
     //#given
     const error = { statusCode: 429, message: "Too Many Requests: rate limit reached" }
