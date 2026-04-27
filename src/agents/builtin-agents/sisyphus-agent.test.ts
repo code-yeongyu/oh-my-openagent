@@ -1,3 +1,5 @@
+/// <reference types="bun-types" />
+
 import { describe, expect, test } from "bun:test";
 import { maybeCreateSisyphusConfig } from "./sisyphus-agent";
 import type { AgentOverrides } from "../types";
@@ -12,7 +14,7 @@ describe("maybeCreateSisyphusConfig", () => {
           model: "openai/gpt-5.4",
           permission: {
             apply_patch: "allow",
-          },
+          } as Record<string, "allow">,
         },
       };
       const mergedCategories: Record<string, CategoryConfig> = {};
@@ -46,7 +48,7 @@ describe("maybeCreateSisyphusConfig", () => {
           model: "anthropic/claude-opus-4-7",
           permission: {
             apply_patch: "allow",
-          },
+          } as Record<string, "allow">,
         },
       };
       const mergedCategories: Record<string, CategoryConfig> = {};
@@ -73,6 +75,74 @@ describe("maybeCreateSisyphusConfig", () => {
     });
   });
 
+  describe("#given Opus 4.7 model with user override allowing grep and glob", () => {
+    test("#when config is created #then grep and glob are still denied", () => {
+      // given
+      const agentOverrides: AgentOverrides = {
+        sisyphus: {
+          model: "anthropic/claude-opus-4-7",
+          permission: {
+            grep: "allow",
+            glob: "allow",
+          } as Record<string, "allow">,
+        },
+      };
+      const mergedCategories: Record<string, CategoryConfig> = {};
+
+      // when
+      const config = maybeCreateSisyphusConfig({
+        disabledAgents: [],
+        agentOverrides,
+        availableModels: new Set(["anthropic/claude-opus-4-7"]),
+        systemDefaultModel: "anthropic/claude-opus-4-7",
+        isFirstRunNoCache: false,
+        availableAgents: [],
+        availableSkills: [],
+        availableCategories: [],
+        mergedCategories,
+        useTaskSystem: false,
+      });
+
+      // then
+      expect(config?.permission).toHaveProperty("grep", "deny");
+      expect(config?.permission).toHaveProperty("glob", "deny");
+    });
+  });
+
+  describe("#given GPT 5.5 model with user override allowing grep and glob", () => {
+    test("#when config is created #then grep and glob are still denied", () => {
+      // given
+      const agentOverrides: AgentOverrides = {
+        sisyphus: {
+          model: "openai/gpt-5.5",
+          permission: {
+            grep: "allow",
+            glob: "allow",
+          } as Record<string, "allow">,
+        },
+      };
+      const mergedCategories: Record<string, CategoryConfig> = {};
+
+      // when
+      const config = maybeCreateSisyphusConfig({
+        disabledAgents: [],
+        agentOverrides,
+        availableModels: new Set(["openai/gpt-5.5"]),
+        systemDefaultModel: "openai/gpt-5.5",
+        isFirstRunNoCache: false,
+        availableAgents: [],
+        availableSkills: [],
+        availableCategories: [],
+        mergedCategories,
+        useTaskSystem: false,
+      });
+
+      // then
+      expect(config?.permission).toHaveProperty("grep", "deny");
+      expect(config?.permission).toHaveProperty("glob", "deny");
+    });
+  });
+
   describe("#given generic GPT model with user override allowing apply_patch", () => {
     test("#when config is created #then apply_patch is still denied", () => {
       // given
@@ -81,7 +151,7 @@ describe("maybeCreateSisyphusConfig", () => {
           model: "openai/gpt-4o",
           permission: {
             apply_patch: "allow",
-          },
+          } as Record<string, "allow">,
         },
       };
       const mergedCategories: Record<string, CategoryConfig> = {};

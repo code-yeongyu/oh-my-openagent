@@ -8,6 +8,7 @@ import { applyEnvironmentContext } from "./environment-context"
 import { applyCategoryOverride, mergeAgentConfig } from "./agent-overrides"
 import { applyModelResolution, getFirstFallbackModel } from "./model-resolution"
 import { getGptApplyPatchPermission } from "../gpt-apply-patch-guard"
+import { getFrontierToolSchemaPermission } from "../frontier-tool-schema-guard"
 
 export function maybeCreateHephaestusConfig(input: {
   disabledAgents: string[]
@@ -89,6 +90,11 @@ export function maybeCreateHephaestusConfig(input: {
   }
 
   const resolvedModel = hephaestusConfig.model ?? ""
+  const frontierDeny = getFrontierToolSchemaPermission(resolvedModel)
+  if (Object.keys(frontierDeny).length > 0 && hephaestusConfig.permission) {
+    Object.assign(hephaestusConfig.permission, frontierDeny)
+  }
+
   const gptDeny = getGptApplyPatchPermission(resolvedModel)
   if (Object.keys(gptDeny).length > 0 && hephaestusConfig.permission) {
     Object.assign(hephaestusConfig.permission, gptDeny)
