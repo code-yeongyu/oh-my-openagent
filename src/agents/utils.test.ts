@@ -2,6 +2,8 @@
 
 import { describe, test, expect, beforeEach, afterEach, spyOn, mock } from "bun:test"
 import type { AgentConfig } from "@opencode-ai/sdk"
+import type { AgentOverrides } from "./types"
+import { resolveAgentSkills } from "./agent-skill-resolution"
 import { clearSkillCache } from "../features/opencode-skill-loader/skill-content"
 import * as connectedProvidersCache from "../shared/connected-providers-cache"
 import * as modelAvailability from "../shared/model-availability"
@@ -1060,7 +1062,7 @@ describe("buildAgent with category and skills", () => {
     }
 
     // #when
-    const agent = buildAgent(source["test-agent"], TEST_MODEL)
+    const agent = resolveAgentSkills(buildAgent(source["test-agent"], TEST_MODEL))
 
     // #then - category's built-in model is applied
     expect(agent.model).toBe("google/gemini-3.1-pro")
@@ -1078,7 +1080,7 @@ describe("buildAgent with category and skills", () => {
     }
 
     // #when
-    const agent = buildAgent(source["test-agent"], TEST_MODEL)
+    const agent = resolveAgentSkills(buildAgent(source["test-agent"], TEST_MODEL))
 
     // #then - explicit model takes precedence over category
     expect(agent.model).toBe("custom/model")
@@ -1121,7 +1123,7 @@ describe("buildAgent with category and skills", () => {
     }
 
     // #when
-    const agent = buildAgent(source["test-agent"], TEST_MODEL)
+    const agent = resolveAgentSkills(buildAgent(source["test-agent"], TEST_MODEL))
 
     // #then
     expect(agent.prompt).toContain("Role: Designer-Turned-Developer")
@@ -1141,7 +1143,7 @@ describe("buildAgent with category and skills", () => {
     }
 
     // #when
-    const agent = buildAgent(source["test-agent"], TEST_MODEL)
+    const agent = resolveAgentSkills(buildAgent(source["test-agent"], TEST_MODEL))
 
     // #then
     expect(agent.prompt).toContain("Role: Designer-Turned-Developer")
@@ -1161,7 +1163,7 @@ describe("buildAgent with category and skills", () => {
     }
 
     // #when
-    const agent = buildAgent(source["test-agent"], TEST_MODEL)
+    const agent = resolveAgentSkills(buildAgent(source["test-agent"], TEST_MODEL))
 
     // #then
     expect(agent.model).toBe("custom/model")
@@ -1182,7 +1184,7 @@ describe("buildAgent with category and skills", () => {
     }
 
     // #when
-    const agent = buildAgent(source["test-agent"], TEST_MODEL)
+    const agent = resolveAgentSkills(buildAgent(source["test-agent"], TEST_MODEL))
 
     // #then - category's built-in model and skills are applied
     expect(agent.model).toBe("openai/gpt-5.5")
@@ -1203,7 +1205,7 @@ describe("buildAgent with category and skills", () => {
     }
 
     // #when
-    const agent = buildAgent(source["test-agent"], TEST_MODEL)
+    const agent = resolveAgentSkills(buildAgent(source["test-agent"], TEST_MODEL))
 
     // #then
     // Note: The factory receives model, but if category doesn't exist, it's not applied
@@ -1224,7 +1226,7 @@ describe("buildAgent with category and skills", () => {
     }
 
     // #when
-    const agent = buildAgent(source["test-agent"], TEST_MODEL)
+    const agent = resolveAgentSkills(buildAgent(source["test-agent"], TEST_MODEL))
 
     // #then
     expect(agent.prompt).toContain("Role: Designer-Turned-Developer")
@@ -1261,7 +1263,7 @@ describe("buildAgent with category and skills", () => {
     }
 
     // #when - browserProvider is "agent-browser"
-    const agent = buildAgent(source["test-agent"], TEST_MODEL, undefined, undefined, "agent-browser")
+    const agent = resolveAgentSkills(buildAgent(source["test-agent"], TEST_MODEL), { browserProvider: "agent-browser" })
 
     // #then - agent-browser skill content should be in prompt
     expect(agent.prompt).toContain("agent-browser")
@@ -1280,11 +1282,33 @@ describe("buildAgent with category and skills", () => {
     }
 
     // #when - no browserProvider (defaults to playwright)
-    const agent = buildAgent(source["test-agent"], TEST_MODEL)
+    const agent = resolveAgentSkills(buildAgent(source["test-agent"], TEST_MODEL))
 
     // #then - agent-browser skill not found, only base prompt remains
     expect(agent.prompt).toBe("Base prompt")
     expect(agent.prompt).not.toContain("agent-browser open")
+  })
+})
+
+describe("createBuiltinAgents with skill overrides", () => {
+  test("injects user configured skills into standard agent prompt", async () => {
+    // #given
+    const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(new Set())
+    const overrides = {
+      librarian: { skills: ["frontend-ui-ux"] },
+    } as AgentOverrides
+
+    try {
+      // #when
+      const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
+
+      // #then
+      expect(agents.librarian.prompt).toContain("Role: Designer-Turned-Developer")
+      expect(agents.librarian.prompt).toContain("THE LIBRARIAN")
+      expect("skills" in agents.librarian).toBe(false)
+    } finally {
+      fetchSpy.mockRestore()
+    }
   })
 })
 
@@ -1303,7 +1327,7 @@ describe("override.category expansion in createBuiltinAgents", () => {
   test("standard agent override with category expands category properties", async () => {
     // #given
     const overrides = {
-      oracle: { category: "ultrabrain" } as any,
+      oracle: { category: "ultrabrain" },
     }
 
     // #when
@@ -1318,7 +1342,7 @@ describe("override.category expansion in createBuiltinAgents", () => {
   test("standard agent override with category AND direct variant - direct wins", async () => {
     // #given - ultrabrain has variant=xhigh, but direct override says "max"
     const overrides = {
-      oracle: { category: "ultrabrain", variant: "max" } as any,
+      oracle: { category: "ultrabrain", variant: "max" },
     }
 
     // #when
@@ -1338,7 +1362,7 @@ describe("override.category expansion in createBuiltinAgents", () => {
       },
     }
     const overrides = {
-      oracle: { category: "test-cat", reasoningEffort: "low" } as any,
+      oracle: { category: "test-cat", reasoningEffort: "low" as const },
     }
 
     // #when
@@ -1358,7 +1382,7 @@ describe("override.category expansion in createBuiltinAgents", () => {
       },
     }
     const overrides = {
-      oracle: { category: "reasoning-cat" } as any,
+      oracle: { category: "reasoning-cat" },
     }
 
     // #when
@@ -1372,7 +1396,7 @@ describe("override.category expansion in createBuiltinAgents", () => {
   test("sisyphus override with category expands category properties", async () => {
     // #given
     const overrides = {
-      sisyphus: { category: "ultrabrain" } as any,
+      sisyphus: { category: "ultrabrain" },
     }
 
     // #when
@@ -1387,7 +1411,7 @@ describe("override.category expansion in createBuiltinAgents", () => {
   test("atlas override with category expands category properties", async () => {
     // #given
     const overrides = {
-      atlas: { category: "ultrabrain" } as any,
+      atlas: { category: "ultrabrain" },
     }
 
     // #when
@@ -1402,7 +1426,7 @@ describe("override.category expansion in createBuiltinAgents", () => {
   test("override with non-existent category has no effect on config", async () => {
     // #given
     const overrides = {
-      oracle: { category: "non-existent-category" } as any,
+      oracle: { category: "non-existent-category" },
     }
 
     // #when
@@ -1430,7 +1454,7 @@ describe("agent override tools migration", () => {
   test("tools: { x: false } is migrated to permission: { x: deny }", async () => {
     // #given
     const overrides = {
-      explore: { tools: { "jetbrains_*": false } } as any,
+      explore: { tools: { "jetbrains_*": false } },
     }
 
     // #when
@@ -1445,7 +1469,7 @@ describe("agent override tools migration", () => {
   test("tools: { x: true } is migrated to permission: { x: allow }", async () => {
     // #given
     const overrides = {
-      librarian: { tools: { "jetbrains_get_*": true } } as any,
+      librarian: { tools: { "jetbrains_get_*": true } },
     }
 
     // #when
@@ -1460,7 +1484,7 @@ describe("agent override tools migration", () => {
   test("tools config is removed after migration", async () => {
     // #given
     const overrides = {
-      explore: { tools: { "some_tool": false } } as any,
+      explore: { tools: { "some_tool": false } },
     }
 
     // #when
@@ -1468,7 +1492,7 @@ describe("agent override tools migration", () => {
 
     // #then
     expect(agents.explore).toBeDefined()
-    expect((agents.explore as any).tools).toBeUndefined()
+    expect("tools" in agents.explore).toBe(false)
   })
 })
 
