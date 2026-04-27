@@ -12,6 +12,7 @@ export interface ProviderAvailability {
 kimiForCoding: boolean
 	opencodeGo: boolean
 	vercelAiGateway: boolean
+	openrouter: boolean
 	isMaxPlan: boolean
 }
 
