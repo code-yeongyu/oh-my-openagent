@@ -46,6 +46,11 @@ function createMockContext(sessionID: string): ToolContext {
   }
 }
 
+async function createSkillTool(...args: Parameters<typeof import("./tools").createSkillTool>): ReturnType<typeof import("./tools").createSkillTool> {
+  const module = await import(`./tools?test=${Date.now()}-${Math.random()}`)
+  return module.createSkillTool(...args)
+}
+
 beforeEach(() => {
   spyOn(commandDiscovery, "discoverCommandsSync").mockImplementation(discoverCommandsSync)
   spyOn(skillContent, "getAllSkills").mockImplementation(getAllSkills)
@@ -63,8 +68,7 @@ describe("createSkillTool", () => {
     const baselineDiscoverCommandsSyncCalls = discoverCommandsSync.mock.calls.length
 
     // when
-    const { createSkillTool } = await import("./tools")
-    const skillTool = createSkillTool({})
+    const skillTool = await createSkillTool({})
 
     // then
     expect(discoverCommandsSync.mock.calls.length).toBe(baselineDiscoverCommandsSyncCalls)
@@ -80,8 +84,7 @@ describe("createSkillTool", () => {
     const baselineGetAllSkillsCalls = getAllSkills.mock.calls.length
 
     // when
-    const { createSkillTool } = await import("./tools")
-    const skillTool = createSkillTool({})
+    const skillTool = await createSkillTool({})
 
     // then
     expect(getAllSkills.mock.calls.length).toBe(baselineGetAllSkillsCalls)
@@ -97,8 +100,7 @@ describe("createSkillTool", () => {
     const sessionContext = createMockContext("session-clear-once")
 
     // when
-    const { createSkillTool } = await import("./tools")
-    const skillTool = createSkillTool({})
+    const skillTool = await createSkillTool({})
     void skillTool.description
     await flushMicrotasks()
     await skillTool.execute({ name: "lazy-skill" }, sessionContext)
@@ -114,8 +116,7 @@ describe("createSkillTool", () => {
     const baselineGetAllSkillsCalls = getAllSkills.mock.calls.length
     const sessionAContext = createMockContext("session-a")
     const sessionBContext = createMockContext("session-b")
-    const { createSkillTool } = await import("./tools")
-    const skillTool = createSkillTool({})
+    const skillTool = await createSkillTool({})
 
     // when
     await skillTool.execute({ name: "lazy-skill" }, sessionAContext)
