@@ -451,6 +451,40 @@ describe("maybeCreateHephaestusConfig GPT apply_patch guard", () => {
     });
   });
 
+  describe("#given dotted Opus 4.7 model with user override allowing grep and glob", () => {
+    test("#when config is created #then grep and glob are still denied", () => {
+      // given
+      const agentOverrides: AgentOverrides = {
+        hephaestus: {
+          model: "anthropic/claude-opus-4.7",
+          permission: {
+            grep: "allow",
+            glob: "allow",
+          } as Record<string, "allow">,
+        },
+      };
+      const mergedCategories: Record<string, CategoryConfig> = {};
+
+      // when
+      const config = maybeCreateHephaestusConfig({
+        disabledAgents: [],
+        agentOverrides,
+        availableModels: new Set(["anthropic/claude-opus-4.7"]),
+        systemDefaultModel: "anthropic/claude-opus-4.7",
+        isFirstRunNoCache: false,
+        availableAgents: [],
+        availableSkills: [],
+        availableCategories: [],
+        mergedCategories,
+        useTaskSystem: false,
+      });
+
+      // then
+      expect(config?.permission).toHaveProperty("grep", "deny");
+      expect(config?.permission).toHaveProperty("glob", "deny");
+    });
+  });
+
   describe("#given GPT 5.5 model with user override allowing grep and glob", () => {
     test("#when config is created #then grep and glob are still denied", () => {
       // given

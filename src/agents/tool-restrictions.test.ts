@@ -140,8 +140,10 @@ describe("read-only agent tool restrictions", () => {
       // given
       const frontierAgents = [
         createSisyphusAgent("anthropic/claude-opus-4-7"),
+        createSisyphusAgent("anthropic/claude-opus-4.7"),
         createSisyphusAgent("openai/gpt-5.5"),
         createHephaestusAgent("anthropic/claude-opus-4-7"),
+        createHephaestusAgent("anthropic/claude-opus-4.7"),
         createHephaestusAgent("openai/gpt-5.5"),
       ]
 
