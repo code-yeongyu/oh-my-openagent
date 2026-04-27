@@ -54,4 +54,49 @@ describe("posthog client creation", () => {
     expect(() => pluginPostHog.trackActive("plugin", "plugin_loaded")).not.toThrow()
     await expect(pluginPostHog.shutdown()).resolves.toBeUndefined()
   })
+
+  it("creates a plugin client when os.cpus throws", async () => {
+    // given
+    process.env.OMO_DISABLE_POSTHOG = "0"
+    process.env.OMO_SEND_ANONYMOUS_TELEMETRY = "1"
+    process.env.POSTHOG_API_KEY = "test-api-key"
+
+    mock.module("os", () => ({
+      default: {
+        arch: () => "x64",
+        cpus: () => {
+          throw new Error("Failed to get CPU information")
+        },
+        hostname: () => "test-host",
+        platform: () => "linux",
+        release: () => "6.8.0-arch1-1",
+        totalmem: () => 8 * 1024 * 1024 * 1024,
+        type: () => "Linux",
+      },
+    }))
+
+    mock.module("posthog-node", () => ({
+      PostHog: class {
+        capture() {}
+        captureException() {}
+        async shutdown() {}
+      },
+    }))
+
+    const { createPluginPostHog } = await importPostHogModule()
+
+    // when
+    const pluginPostHog = createPluginPostHog()
+
+    // then
+    expect(() =>
+      pluginPostHog.capture({
+        distinctId: "plugin",
+        event: "plugin_loaded",
+      }),
+    ).not.toThrow()
+    expect(() => pluginPostHog.captureException(new Error("plugin failure"), "plugin")).not.toThrow()
+    expect(() => pluginPostHog.trackActive("plugin", "plugin_loaded")).not.toThrow()
+    await expect(pluginPostHog.shutdown()).resolves.toBeUndefined()
+  })
 })

@@ -55,7 +55,18 @@ function getPostHogHost(): string {
   return process.env.POSTHOG_HOST?.trim() || DEFAULT_POSTHOG_HOST
 }
 
+function safeCpus(): { length: number; model: string | undefined } {
+  try {
+    const cpus = os.cpus()
+    return { length: cpus.length, model: cpus[0]?.model }
+  } catch {
+    return { length: 0, model: undefined }
+  }
+}
+
 function getSharedProperties(source: PostHogSource): NonNullable<PostHogCaptureEvent["properties"]> {
+  const cpus = safeCpus()
+
   return {
     platform: "oh-my-opencode",
     package_name: PUBLISHED_PACKAGE_NAME,
@@ -68,8 +79,8 @@ function getSharedProperties(source: PostHogSource): NonNullable<PostHogCaptureE
     $os_version: os.release(),
     os_arch: os.arch(),
     os_type: os.type(),
-    cpu_count: os.cpus().length,
-    cpu_model: os.cpus()[0]?.model,
+    cpu_count: cpus.length,
+    cpu_model: cpus.model,
     total_memory_gb: Math.round(os.totalmem() / 1024 / 1024 / 1024),
     locale: Intl.DateTimeFormat().resolvedOptions().locale,
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
