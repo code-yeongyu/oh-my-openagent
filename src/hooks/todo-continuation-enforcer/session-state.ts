@@ -250,6 +250,8 @@ export function createSessionStateStore(): SessionStateStore {
     state.lastIncompleteCount = undefined
     state.stagnationCount = 0
     state.awaitingPostInjectionProgressCheck = false
+    state.consecutiveClarifications = 0
+    state.lastClarificationDetectedAt = undefined
     trackedSession.lastCompletedCount = undefined
     trackedSession.lastTodoSnapshot = undefined
     trackedSession.activitySignalCount = 0

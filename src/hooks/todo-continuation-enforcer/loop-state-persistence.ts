@@ -3,6 +3,7 @@ import { join } from "node:path"
 import { log } from "../../shared/logger"
 
 const LOOP_STATE_DIR = ".sisyphus/loop-state"
+const MAX_LOOP_STATE_AGE_MS = 60 * 60 * 1000 // 1 hour
 
 interface PersistedLoopState {
   sessionID: string
@@ -56,6 +57,13 @@ export function loadLoopState(
     const raw = readFileSync(statePath, "utf-8")
     const parsed = JSON.parse(raw)
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null
+
+    const updatedAt = typeof parsed.updatedAt === "string" ? new Date(parsed.updatedAt).getTime() : NaN
+    if (Number.isFinite(updatedAt) && Date.now() - updatedAt > MAX_LOOP_STATE_AGE_MS) {
+      log(`[loop-state-persistence] Loop state expired, ignoring (age: ${Date.now() - updatedAt}ms, max: ${MAX_LOOP_STATE_AGE_MS}ms)`, { sessionID })
+      rmSync(statePath, { force: true })
+      return null
+    }
 
     return {
       sessionID: parsed.sessionID ?? sessionID,

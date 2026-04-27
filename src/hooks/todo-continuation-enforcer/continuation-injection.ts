@@ -155,7 +155,8 @@ export async function injectContinuation(args: {
 
   const incompleteTodos = todos.filter((todo) => todo.status !== "completed" && todo.status !== "cancelled")
   const todoList = incompleteTodos.map((todo) => `- [${todo.status}] ${todo.content}`).join("\n")
-  const prompt = promptOverride ?? `${CONTINUATION_PROMPT}
+  const baseline = promptOverride ?? CONTINUATION_PROMPT
+  const prompt = `${baseline}
 
 [Status: ${todos.length - freshIncompleteCount}/${todos.length} completed, ${freshIncompleteCount} remaining]
 
