@@ -25,8 +25,30 @@ describe("createBuiltinSkills", () => {
 		// then
 		const playwrightSkill = skills.find((s) => s.name === "playwright")
 		const agentBrowserSkill = skills.find((s) => s.name === "agent-browser")
+		const devBrowserSkill = skills.find((s) => s.name === "dev-browser")
 		expect(playwrightSkill).toBeDefined()
 		expect(agentBrowserSkill).toBeUndefined()
+		expect(devBrowserSkill).toBeUndefined()
+	})
+
+	test("returns dev-browser skill when browserProvider is 'dev-browser'", () => {
+		// given
+		const options = { browserProvider: "dev-browser" as const }
+
+		// when
+		const skills = createBuiltinSkills(options)
+
+		// then
+		const skillNames = skills.map((skill) => skill.name)
+		const devBrowserSkill = skills.find((skill) => skill.name === "dev-browser")
+		const playwrightSkill = skills.find((skill) => skill.name === "playwright")
+		const agentBrowserSkill = skills.find((skill) => skill.name === "agent-browser")
+		expect(devBrowserSkill).toBeDefined()
+		expect(devBrowserSkill!.description).toContain("Browser automation")
+		expect(playwrightSkill).toBeUndefined()
+		expect(agentBrowserSkill).toBeUndefined()
+		expect(skillNames).not.toContain("playwright-cli")
+		expect(skills.some((skill) => skill.allowedTools?.includes("Bash(playwright-cli:*)"))).toBe(false)
 	})
 
 	test("returns agent-browser skill when browserProvider is 'agent-browser'", () => {
@@ -67,9 +89,10 @@ describe("createBuiltinSkills", () => {
 		// when
 		const defaultSkills = createBuiltinSkills()
 		const agentBrowserSkills = createBuiltinSkills({ browserProvider: "agent-browser" })
+		const devBrowserSkills = createBuiltinSkills({ browserProvider: "dev-browser" })
 
 		// then
-		for (const skills of [defaultSkills, agentBrowserSkills]) {
+		for (const skills of [defaultSkills, agentBrowserSkills, devBrowserSkills]) {
 			expect(skills.find((s) => s.name === "frontend-ui-ux")).toBeDefined()
 			expect(skills.find((s) => s.name === "git-master")).toBeDefined()
 			expect(skills.find((s) => s.name === "review-work")).toBeDefined()
@@ -77,16 +100,18 @@ describe("createBuiltinSkills", () => {
 		}
 	})
 
-	test("returns exactly 6 skills regardless of provider", () => {
+	test("returns exactly 5 skills regardless of provider", () => {
 		// given
 
 		// when
 		const defaultSkills = createBuiltinSkills()
 		const agentBrowserSkills = createBuiltinSkills({ browserProvider: "agent-browser" })
+		const devBrowserSkills = createBuiltinSkills({ browserProvider: "dev-browser" })
 
 		// then
-		expect(defaultSkills).toHaveLength(6)
-		expect(agentBrowserSkills).toHaveLength(6)
+		expect(defaultSkills).toHaveLength(5)
+		expect(agentBrowserSkills).toHaveLength(5)
+		expect(devBrowserSkills).toHaveLength(5)
 	})
 
 	test("should exclude playwright when it is in disabledSkills", () => {
@@ -100,10 +125,10 @@ describe("createBuiltinSkills", () => {
 		expect(skills.map((s) => s.name)).not.toContain("playwright")
 		expect(skills.map((s) => s.name)).toContain("frontend-ui-ux")
 		expect(skills.map((s) => s.name)).toContain("git-master")
-		expect(skills.map((s) => s.name)).toContain("dev-browser")
+		expect(skills.map((s) => s.name)).not.toContain("dev-browser")
 		expect(skills.map((s) => s.name)).toContain("review-work")
 		expect(skills.map((s) => s.name)).toContain("ai-slop-remover")
-		expect(skills.length).toBe(5)
+		expect(skills.length).toBe(4)
 	})
 
 	test("should exclude multiple skills when they are in disabledSkills", () => {
@@ -117,17 +142,15 @@ describe("createBuiltinSkills", () => {
 		expect(skills.map((s) => s.name)).not.toContain("playwright")
 		expect(skills.map((s) => s.name)).not.toContain("git-master")
 		expect(skills.map((s) => s.name)).toContain("frontend-ui-ux")
-		expect(skills.map((s) => s.name)).toContain("dev-browser")
+		expect(skills.map((s) => s.name)).not.toContain("dev-browser")
 		expect(skills.map((s) => s.name)).toContain("review-work")
 		expect(skills.map((s) => s.name)).toContain("ai-slop-remover")
-		expect(skills.length).toBe(4)
+		expect(skills.length).toBe(3)
 	})
 
 	test("should return an empty array when all skills are disabled", () => {
 		// #given
-		const options = {
-			disabledSkills: new Set(["playwright", "frontend-ui-ux", "git-master", "dev-browser", "review-work", "ai-slop-remover"]),
-		}
+		const options = { disabledSkills: new Set(["playwright", "frontend-ui-ux", "git-master", "review-work", "ai-slop-remover"]) }
 
 		// #when
 		const skills = createBuiltinSkills(options)
@@ -144,7 +167,7 @@ describe("createBuiltinSkills", () => {
 		const skills = createBuiltinSkills(options)
 
 		// #then
-		expect(skills.length).toBe(6)
+		expect(skills.length).toBe(5)
 	})
 
 	test("review-work skill has correct structure", () => {
