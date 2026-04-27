@@ -9,7 +9,7 @@ import type { OhMyOpenCodeConfig } from "../config"
 import * as agentLoader from "../features/claude-code-agent-loader"
 import * as skillLoader from "../features/opencode-skill-loader"
 import type { LoadedSkill } from "../features/opencode-skill-loader"
-import { getAgentListDisplayName, getAgentRuntimeName } from "../shared/agent-display-names"
+import { getAgentDisplayName, getAgentListDisplayName } from "../shared/agent-display-names"
 import { applyAgentConfig } from "./agent-config-handler"
 import type { PluginComponents } from "./plugin-components-loader"
 
@@ -205,7 +205,7 @@ describe("applyAgentConfig builtin override protection", () => {
     })
 
     // then
-    expect(config.default_agent).toBe(getAgentRuntimeName("sisyphus"))
+    expect(config.default_agent).toBe(getAgentDisplayName("sisyphus"))
   })
 
   test("keeps config-key default_agent behavior unchanged", async () => {
@@ -222,7 +222,7 @@ describe("applyAgentConfig builtin override protection", () => {
     })
 
     // then
-    expect(config.default_agent).toBe(getAgentRuntimeName("sisyphus"))
+    expect(config.default_agent).toBe(getAgentDisplayName("sisyphus"))
   })
 
   test("keeps fallback default_agent behavior unchanged", async () => {
@@ -238,7 +238,25 @@ describe("applyAgentConfig builtin override protection", () => {
     })
 
     // then
-    expect(config.default_agent).toBe(getAgentRuntimeName("sisyphus"))
+    expect(config.default_agent).toBe(getAgentDisplayName("sisyphus"))
+  })
+
+  test("resolved default_agent contains no zero-width invisible characters", async () => {
+    // given canonical core ordering is now enforced by the agent sort shim, so
+    // default_agent must not carry the legacy ZWSP prefix that earlier biased
+    // OpenCode's localeCompare sort.
+    const config = createBaseConfig()
+
+    // when applyAgentConfig resolves the default agent
+    await applyAgentConfig({
+      config,
+      pluginConfig: createPluginConfig(),
+      ctx: { directory: "/tmp" },
+      pluginComponents: createPluginComponents(),
+    })
+
+    // then the persisted default_agent is the clean display name
+    expect(config.default_agent).not.toMatch(/[\u200B\u200C\u200D\uFEFF]/)
   })
 
   test("filters user agents whose key matches the builtin display-name alias", async () => {
@@ -262,7 +280,7 @@ describe("applyAgentConfig builtin override protection", () => {
     // then
     expect(result[BUILTIN_SISYPHUS_DISPLAY_NAME]).toEqual({
       ...builtinSisyphusConfig,
-      name: getAgentRuntimeName("sisyphus"),
+      name: getAgentDisplayName("sisyphus"),
     })
   })
 
@@ -287,7 +305,7 @@ describe("applyAgentConfig builtin override protection", () => {
     // then
     expect(result[BUILTIN_SISYPHUS_DISPLAY_NAME]).toEqual({
       ...builtinSisyphusConfig,
-      name: getAgentRuntimeName("sisyphus"),
+      name: getAgentDisplayName("sisyphus"),
     })
     expect(result.SiSyPhUs).toBeUndefined()
   })
@@ -314,7 +332,7 @@ describe("applyAgentConfig builtin override protection", () => {
     // then
     expect(result[BUILTIN_SISYPHUS_DISPLAY_NAME]).toEqual({
       ...builtinSisyphusConfig,
-      name: getAgentRuntimeName("sisyphus"),
+      name: getAgentDisplayName("sisyphus"),
     })
   })
 

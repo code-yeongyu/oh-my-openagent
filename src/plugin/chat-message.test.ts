@@ -767,4 +767,18 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
     expect(output.message["model"]).toBeUndefined()
     expect(getSessionModel("test-session")).toEqual(nextModel)
   })
+
+  test("strips legacy ZWSP-prefixed agent names from persisted prompt body session state (GH-3259)", async () => {
+    //#given - persisted prompt body from v3.14.0-v3.16.0 may contain ZWSP-prefixed agent
+    const args = createMockHandlerArgs()
+    const handler = createChatMessageHandler(args)
+    const input = createMockInput("\u200B\u200BHephaestus - Deep Agent")
+    const output = createMockOutput()
+
+    //#when
+    await handler(input, output)
+
+    //#then
+    expect(getSessionAgent("test-session")).toBe("Hephaestus - Deep Agent")
+  })
 })

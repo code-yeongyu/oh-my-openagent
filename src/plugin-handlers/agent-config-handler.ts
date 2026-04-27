@@ -4,7 +4,7 @@ import type { OhMyOpenCodeConfig } from "../config";
 import { isTaskSystemEnabled, log, migrateAgentConfig } from "../shared";
 import {
   getAgentConfigKey,
-  getAgentRuntimeName,
+  getAgentDisplayName,
   normalizeAgentForPromptKey,
 } from "../shared/agent-display-names";
 import { AGENT_NAME_MAP } from "../shared/migration";
@@ -196,10 +196,10 @@ export async function applyAgentConfig(params: {
       const configKey = getAgentConfigKey(configuredDefaultAgent);
       const runtimeConfigKey = normalizeAgentForPromptKey(configuredDefaultAgent) ?? configKey;
       (params.config as { default_agent?: string }).default_agent =
-        getAgentRuntimeName(runtimeConfigKey);
+        getAgentDisplayName(runtimeConfigKey);
     } else {
       (params.config as { default_agent?: string }).default_agent =
-        getAgentRuntimeName("sisyphus");
+        getAgentDisplayName("sisyphus");
     }
 
     // Assembly order: Sisyphus -> Hephaestus -> Prometheus -> Atlas

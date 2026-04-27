@@ -963,4 +963,24 @@ describe("resolveSubagentExecution - agent name sanitization", () => {
     expect(result.error).toBeUndefined()
     expect(result.agentToUse).toBe("Sisyphus - Ultraworker")
   })
+
+  test("strips legacy ZWSP-prefixed agent names from persisted subagent runtime state (GH-3259)", async () => {
+    //#given - persisted runtime agent metadata from v3.14.0-v3.16.0 with ZWSP prefix
+    readProviderModelsCacheMock.mockReturnValue({
+      models: {},
+      connected: [],
+      updatedAt: "2026-03-03T00:00:00.000Z",
+    })
+    const args = createBaseArgs({ subagent_type: "Hephaestus - Deep Agent" })
+    const executorCtx = createExecutorContext(async () => ([
+      { name: "\u200B\u200BHephaestus - Deep Agent", mode: "subagent", model: "openai/gpt-5.3-codex" },
+    ]))
+
+    //#when
+    const result = await resolveSubagentExecution(args, executorCtx, "oracle", "deep")
+
+    //#then
+    expect(result.error).toBeUndefined()
+    expect(result.agentToUse).toBe("Hephaestus - Deep Agent")
+  })
 })
