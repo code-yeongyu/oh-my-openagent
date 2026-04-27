@@ -348,6 +348,38 @@ describe('TmuxSessionManager', () => {
       // then
       expect((manager as any).serverUrl).toBe('http://localhost:5678')
     })
+
+    test('ignores invalid OPENCODE_PORT when serverUrl has port 0', async () => {
+      // given
+      const previousOpenCodePort = process.env.OPENCODE_PORT
+      process.env.OPENCODE_PORT = 'not-a-port'
+      let manager: TmuxSessionManagerType | undefined
+      try {
+        mockIsInsideTmux.mockReturnValue(true)
+        const { TmuxSessionManager } = await import('./manager')
+        const ctx = {
+          ...createMockContext(),
+          serverUrl: new URL('http://127.0.0.1:0/'),
+        }
+        const config = createTmuxConfig({ enabled: true,
+        layout: 'main-vertical',
+        main_pane_size: 60,
+        main_pane_min_width: 80,
+        agent_pane_min_width: 40, })
+
+        // when
+        manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+      } finally {
+        if (previousOpenCodePort === undefined) {
+          delete process.env.OPENCODE_PORT
+        } else {
+          process.env.OPENCODE_PORT = previousOpenCodePort
+        }
+      }
+
+      // then
+      expect((manager as any).serverUrl).toBe('http://localhost:4096')
+    })
   })
 
   describe('onSessionCreated', () => {

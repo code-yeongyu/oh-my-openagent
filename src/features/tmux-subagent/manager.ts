@@ -72,7 +72,11 @@ export class TmuxSessionManager {
     this.client = ctx.client
     this.tmuxConfig = tmuxConfig
     this.deps = deps
-    const defaultPort = process.env.OPENCODE_PORT ?? "4096"
+    const configuredPort = process.env.OPENCODE_PORT
+    const parsedPort = configuredPort ? Number(configuredPort) : 4096
+    const defaultPort = Number.isInteger(parsedPort) && parsedPort > 0 && parsedPort <= 65535
+      ? String(parsedPort)
+      : "4096"
     const fallbackUrl = `http://localhost:${defaultPort}`
     const rawServerUrl = ctx.serverUrl?.toString()
     try {
