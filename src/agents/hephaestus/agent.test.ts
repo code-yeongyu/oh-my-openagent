@@ -484,4 +484,73 @@ describe("maybeCreateHephaestusConfig GPT apply_patch guard", () => {
       expect(config?.permission).toHaveProperty("glob", "deny");
     });
   });
+
+  describe("#given frontier default model with category override to non-frontier model", () => {
+    test("#when config is created #then stale grep and glob denies are cleared", () => {
+      // given
+      const agentOverrides: AgentOverrides = {
+        hephaestus: {
+          category: "non-frontier",
+        },
+      };
+      const mergedCategories: Record<string, CategoryConfig> = {
+        "non-frontier": {
+          model: "openai/gpt-5.4",
+        },
+      };
+
+      // when
+      const config = maybeCreateHephaestusConfig({
+        disabledAgents: [],
+        agentOverrides,
+        availableModels: new Set(["openai/gpt-5.5", "openai/gpt-5.4"]),
+        systemDefaultModel: "openai/gpt-5.5",
+        isFirstRunNoCache: false,
+        availableAgents: [],
+        availableSkills: [],
+        availableCategories: [],
+        mergedCategories,
+        useTaskSystem: false,
+      });
+
+      // then
+      expect(config?.model).toBe("openai/gpt-5.4");
+      expect(config?.permission).not.toHaveProperty("grep");
+      expect(config?.permission).not.toHaveProperty("glob");
+    });
+  });
+
+  describe("#given non-frontier model with user override denying grep and glob", () => {
+    test("#when config is created #then explicit user denies are preserved", () => {
+      // given
+      const agentOverrides: AgentOverrides = {
+        hephaestus: {
+          model: "openai/gpt-5.4",
+          permission: {
+            grep: "deny",
+            glob: "deny",
+          } as Record<string, "deny">,
+        },
+      };
+      const mergedCategories: Record<string, CategoryConfig> = {};
+
+      // when
+      const config = maybeCreateHephaestusConfig({
+        disabledAgents: [],
+        agentOverrides,
+        availableModels: new Set(["openai/gpt-5.4"]),
+        systemDefaultModel: "openai/gpt-5.4",
+        isFirstRunNoCache: false,
+        availableAgents: [],
+        availableSkills: [],
+        availableCategories: [],
+        mergedCategories,
+        useTaskSystem: false,
+      });
+
+      // then
+      expect(config?.permission).toHaveProperty("grep", "deny");
+      expect(config?.permission).toHaveProperty("glob", "deny");
+    });
+  });
 });

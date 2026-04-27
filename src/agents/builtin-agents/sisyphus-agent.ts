@@ -8,7 +8,7 @@ import { applyOverrides } from "./agent-overrides"
 import { applyModelResolution, getFirstFallbackModel } from "./model-resolution"
 import { createSisyphusAgent } from "../sisyphus"
 import { getGptApplyPatchPermission } from "../gpt-apply-patch-guard"
-import { getFrontierToolSchemaPermission } from "../frontier-tool-schema-guard"
+import { applyFrontierToolSchemaPermission } from "../frontier-tool-schema-guard"
 
 export function maybeCreateSisyphusConfig(input: {
   disabledAgents: string[]
@@ -84,10 +84,11 @@ export function maybeCreateSisyphusConfig(input: {
   sisyphusConfig = applyOverrides(sisyphusConfig, sisyphusOverride, mergedCategories, directory)
 
   const resolvedModel = sisyphusConfig.model ?? ""
-  const frontierDeny = getFrontierToolSchemaPermission(resolvedModel)
-  if (Object.keys(frontierDeny).length > 0 && sisyphusConfig.permission) {
-    Object.assign(sisyphusConfig.permission, frontierDeny)
-  }
+  sisyphusConfig.permission = applyFrontierToolSchemaPermission(
+    sisyphusConfig.permission,
+    resolvedModel,
+    sisyphusOverride?.permission
+  )
 
   const gptDeny = getGptApplyPatchPermission(resolvedModel)
   if (Object.keys(gptDeny).length > 0 && sisyphusConfig.permission) {
