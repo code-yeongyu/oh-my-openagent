@@ -37,14 +37,7 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
       disabledSkills: options?.disabledSkills,
       browserProvider: options?.browserProvider,
     })) ?? []
-    const allSkills = !options.skills
-      ? discovered
-      : [
-          ...discovered,
-          ...options.skills.filter(
-            (skill) => !new Set(discovered.map((discoveredSkill) => discoveredSkill.name)).has(skill.name)
-          ),
-        ]
+    const allSkills = options.skills ? [...options.skills] : discovered
 
     if (options.nativeSkills) {
       try {

@@ -4,12 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:te
 import type { ToolContext } from "@opencode-ai/plugin/tool"
 import type { LoadedSkill } from "../../features/opencode-skill-loader/types"
 import * as skillContent from "../../features/opencode-skill-loader/skill-content"
+import * as commandDiscovery from "../slashcommand/command-discovery"
 
 const discoverCommandsSync = mock(() => [])
-
-mock.module("../slashcommand/command-discovery", () => ({
-  discoverCommandsSync,
-}))
 
 function createMockSkill(name: string): LoadedSkill {
   return {
@@ -50,6 +47,7 @@ function createMockContext(sessionID: string): ToolContext {
 }
 
 beforeEach(() => {
+  spyOn(commandDiscovery, "discoverCommandsSync").mockImplementation(discoverCommandsSync)
   spyOn(skillContent, "getAllSkills").mockImplementation(getAllSkills)
   spyOn(skillContent, "clearSkillCache").mockImplementation(clearSkillCache)
 })
