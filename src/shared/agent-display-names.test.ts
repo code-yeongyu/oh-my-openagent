@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test"
-import { AGENT_DISPLAY_NAMES, getAgentConfigKey, getAgentDisplayName, getAgentListDisplayName, normalizeAgentForPrompt, normalizeAgentForPromptKey } from "./agent-display-names"
+import { AGENT_DISPLAY_NAMES, getAgentConfigKey, getAgentDisplayName, getAgentListDisplayName, getAgentRuntimeName, normalizeAgentForPrompt, normalizeAgentForPromptKey } from "./agent-display-names"
 
 describe("getAgentDisplayName", () => {
   it("returns display name for lowercase config key (new format)", () => {
@@ -194,15 +194,28 @@ describe("getAgentConfigKey", () => {
 })
 
 describe("getAgentListDisplayName", () => {
-  it("applies leading-space stable-sort prefixes so OpenCode localeCompare yields canonical order", () => {
-    expect(getAgentListDisplayName("sisyphus")).toBe("    Sisyphus - Ultraworker")
-    expect(getAgentListDisplayName("hephaestus")).toBe("   Hephaestus - Deep Agent")
-    expect(getAgentListDisplayName("prometheus")).toBe("  Prometheus - Plan Builder")
-    expect(getAgentListDisplayName("atlas")).toBe(" Atlas - Plan Executor")
+  it("returns clean display names for object keys (no leading whitespace, RFC 7230 safe)", () => {
+    expect(getAgentListDisplayName("sisyphus")).toBe("Sisyphus - Ultraworker")
+    expect(getAgentListDisplayName("hephaestus")).toBe("Hephaestus - Deep Agent")
+    expect(getAgentListDisplayName("prometheus")).toBe("Prometheus - Plan Builder")
+    expect(getAgentListDisplayName("atlas")).toBe("Atlas - Plan Executor")
   })
 
   it("keeps non-core agents unprefixed for list display", () => {
     expect(getAgentListDisplayName("oracle")).toBe("oracle")
+  })
+})
+
+describe("getAgentRuntimeName", () => {
+  it("applies leading-space stable-sort prefixes so OpenCode localeCompare yields canonical order", () => {
+    expect(getAgentRuntimeName("sisyphus")).toBe("    Sisyphus - Ultraworker")
+    expect(getAgentRuntimeName("hephaestus")).toBe("   Hephaestus - Deep Agent")
+    expect(getAgentRuntimeName("prometheus")).toBe("  Prometheus - Plan Builder")
+    expect(getAgentRuntimeName("atlas")).toBe(" Atlas - Plan Executor")
+  })
+
+  it("keeps non-core agents unprefixed (no entry in AGENT_LIST_SORT_PREFIXES)", () => {
+    expect(getAgentRuntimeName("oracle")).toBe("oracle")
   })
 })
 
