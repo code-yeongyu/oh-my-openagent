@@ -1,42 +1,38 @@
 import type { BuiltinCategoryDefinition } from "./builtin-category-definition"
 
-const UNSPECIFIED_LOW_CATEGORY_PROMPT_APPEND = `<Category_Context>
-You are working on tasks that don't fit specific categories but require moderate effort.
+const UNSPECIFIED_LOW_CATEGORY_PROMPT_APPEND = `<ctx>
+Moderate-effort tasks that don't fit other categories.
 
-<Selection_Gate>
-BEFORE selecting this category, VERIFY ALL conditions:
-1. Task does NOT fit: quick (trivial), visual-engineering (UI), ultrabrain (deep logic), artistry (creative), writing (docs)
-2. Task requires more than trivial effort but is NOT system-wide
-3. Scope is contained within a few files/modules
+<gate>
+Select ONLY if ALL true:
+1. Does NOT fit: quick, visual-engineering, ultrabrain, artistry, writing
+2. Requires non-trivial effort
+3. Scope: few files/modules
 
-If task fits ANY other category, DO NOT select unspecified-low.
-This is NOT a default choice - it's for genuinely unclassifiable moderate-effort work.
-</Selection_Gate>
-</Category_Context>
+NOT a default. Genuinely unclassifiable only.
+</gate>
+</ctx>
 
-<Caller_Warning>
-THIS CATEGORY USES A MID-TIER MODEL (claude-sonnet-4-6).
+<warn>
+MID-TIER model (claude-sonnet-4-6). Provide clear structure:
+- MUST DO: enumerate required actions
+- MUST NOT DO: state forbidden actions
+- EXPECTED OUTPUT: concrete success criteria
+</warn>`
 
-**PROVIDE CLEAR STRUCTURE:**
-1. MUST DO: Enumerate required actions explicitly
-2. MUST NOT DO: State forbidden actions to prevent scope creep
-3. EXPECTED OUTPUT: Define concrete success criteria
-</Caller_Warning>`
+const UNSPECIFIED_HIGH_CATEGORY_PROMPT_APPEND = `<ctx>
+Substantial-effort tasks that don't fit other categories, with broad impact.
 
-const UNSPECIFIED_HIGH_CATEGORY_PROMPT_APPEND = `<Category_Context>
-You are working on tasks that don't fit specific categories but require substantial effort.
+<gate>
+Select ONLY if ALL true:
+1. Does NOT fit: quick, visual-engineering, ultrabrain, artistry, writing
+2. Substantial effort across multiple systems/modules
+3. Broad impact or requires careful coordination
+4. Genuinely unclassifiable AND high-effort (not just "complex")
 
-<Selection_Gate>
-BEFORE selecting this category, VERIFY ALL conditions:
-1. Task does NOT fit: quick (trivial), visual-engineering (UI), ultrabrain (deep logic), artistry (creative), writing (docs)
-2. Task requires substantial effort across multiple systems/modules
-3. Changes have broad impact or require careful coordination
-4. NOT just "complex" - must be genuinely unclassifiable AND high-effort
-
-If task fits ANY other category, DO NOT select unspecified-high.
-If task is unclassifiable but moderate-effort, use unspecified-low instead.
-</Selection_Gate>
-</Category_Context>`
+NOT a default. Use unspecified-low for moderate effort.
+</gate>
+</ctx>`
 
 export const ANTHROPIC_CATEGORIES: BuiltinCategoryDefinition[] = [
   {
