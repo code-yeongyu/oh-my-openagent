@@ -576,6 +576,60 @@ describe("background-agent spawner fallback model promotion", () => {
     expect(promptCalls).toHaveLength(1)
     expect(promptCalls[0]?.body?.agent).toBe("sisyphus-junior")
   })
+
+  test("strips legacy ZWSP-prefixed agent names from persisted background spawn prompt body (GH-3259)", async () => {
+    //#given - persisted spawn input from v3.14.0-v3.16.0 with ZWSP prefix on agent
+    const promptCalls: Array<{ body?: { agent?: string } }> = []
+
+    const client = {
+      session: {
+        get: async () => ({ data: { directory: "/parent/dir" } }),
+        create: async () => ({ data: { id: "ses_child_legacy_zwsp" } }),
+        promptAsync: async (args?: { body?: { agent?: string } }) => {
+          promptCalls.push(args ?? {})
+          return {}
+        },
+      },
+    }
+
+    const task = createTask({
+      description: "Legacy ZWSP",
+      prompt: "Do work",
+      agent: "\u200B\u200BHephaestus - Deep Agent",
+      parentSessionID: "ses_parent",
+      parentMessageID: "msg_parent",
+    })
+
+    const item = {
+      task,
+      input: {
+        description: task.description,
+        prompt: task.prompt,
+        agent: task.agent,
+        parentSessionID: task.parentSessionID,
+        parentMessageID: task.parentMessageID,
+        parentModel: task.parentModel,
+        parentAgent: task.parentAgent,
+        model: task.model,
+      },
+    }
+
+    const ctx = {
+      client,
+      directory: "/fallback",
+      concurrencyManager: { release: () => {} },
+      tmuxEnabled: false,
+      onTaskError: () => {},
+    }
+
+    //#when
+    await startTask(item as any, ctx as any)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    //#then
+    expect(promptCalls).toHaveLength(1)
+    expect(promptCalls[0]?.body?.agent).toBe("Hephaestus - Deep Agent")
+  })
 })
 
 describe("background-agent spawner tmux callback ordering", () => {
