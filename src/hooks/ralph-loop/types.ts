@@ -22,4 +22,5 @@ export interface RalphLoopOptions {
   getTranscriptPath?: (sessionId: string) => string
   apiTimeout?: number
   checkSessionExists?: (sessionId: string) => Promise<boolean>
+  backgroundManager?: { getTasksByParentSession: (sessionId: string) => Array<{ status: string }> }
 }

@@ -25,7 +25,7 @@ type LoopStateController = {
 	setVerificationSessionID: (sessionID: string, verificationSessionID: string) => RalphLoopState | null
 	restartAfterFailedVerification: (sessionID: string, messageCountAtStart?: number) => RalphLoopState | null
 }
-type RalphLoopEventHandlerOptions = { directory: string; apiTimeoutMs: number; getTranscriptPath: (sessionID: string) => string | undefined; checkSessionExists?: RalphLoopOptions["checkSessionExists"]; sessionRecovery: SessionRecovery; loopState: LoopStateController }
+type RalphLoopEventHandlerOptions = { directory: string; apiTimeoutMs: number; getTranscriptPath: (sessionID: string) => string | undefined; checkSessionExists?: RalphLoopOptions["checkSessionExists"]; backgroundManager?: RalphLoopOptions["backgroundManager"]; sessionRecovery: SessionRecovery; loopState: LoopStateController }
 
 export function createRalphLoopEventHandler(
 	ctx: PluginInput,
@@ -56,6 +56,15 @@ export function createRalphLoopEventHandler(
 
 				const state = options.loopState.getState()
 				if (!state || !state.active) {
+					return
+				}
+
+				const hasRunningBackgroundTasks = options.backgroundManager
+					? options.backgroundManager.getTasksByParentSession(sessionID).some((task: { status: string }) => task.status === "running")
+					: false
+
+				if (hasRunningBackgroundTasks) {
+					log(`[${HOOK_NAME}] Skipped: background tasks running`, { sessionID })
 					return
 				}
 
