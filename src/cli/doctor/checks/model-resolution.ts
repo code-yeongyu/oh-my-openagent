@@ -8,8 +8,8 @@ import { buildModelResolutionDetails } from "./model-resolution-details"
 import { buildEffectiveResolution, getEffectiveModel } from "./model-resolution-effective-model"
 import type { AgentResolutionInfo, CategoryResolutionInfo, ModelResolutionInfo, OmoConfig } from "./model-resolution-types"
 
-function parseProviderModel(value: string): { providerID: string; modelID: string } | null {
-  const slashIndex = value.lastIndexOf("/")
+export function parseProviderModel(value: string): { providerID: string; modelID: string } | null {
+  const slashIndex = value.indexOf("/")
   if (slashIndex <= 0 || slashIndex === value.length - 1) {
     return null
   }

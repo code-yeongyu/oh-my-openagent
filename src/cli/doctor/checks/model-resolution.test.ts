@@ -1,6 +1,47 @@
 import { describe, it, expect } from "bun:test"
 
 describe("model-resolution check", () => {
+  describe("parseProviderModel", () => {
+    it("splits chutes model IDs at the provider separator", async () => {
+      const { parseProviderModel } = await import("./model-resolution")
+
+      // #given a provider-prefixed model whose model ID contains a slash
+      const value = "chutes/deepseek-ai/DeepSeek-V3.2-TEE"
+
+      // #when parsing the provider and model IDs
+      const result = parseProviderModel(value)
+
+      // #then only the first slash separates the provider
+      expect(result).toEqual({ providerID: "chutes", modelID: "deepseek-ai/DeepSeek-V3.2-TEE" })
+    })
+
+    it("splits simple provider model IDs", async () => {
+      const { parseProviderModel } = await import("./model-resolution")
+
+      // #given a provider-prefixed model without extra slashes
+      const value = "openai/gpt-5"
+
+      // #when parsing the provider and model IDs
+      const result = parseProviderModel(value)
+
+      // #then provider and model are split normally
+      expect(result).toEqual({ providerID: "openai", modelID: "gpt-5" })
+    })
+
+    it("splits synthetic provider model IDs at the provider separator", async () => {
+      const { parseProviderModel } = await import("./model-resolution")
+
+      // #given a synthetic provider model whose model ID contains a slash
+      const value = "synthetic/hf:zai-org/GLM-5.1"
+
+      // #when parsing the provider and model IDs
+      const result = parseProviderModel(value)
+
+      // #then only the first slash separates the provider
+      expect(result).toEqual({ providerID: "synthetic", modelID: "hf:zai-org/GLM-5.1" })
+    })
+  })
+
   describe("getModelResolutionInfo", () => {
     // given: Model requirements are defined in model-requirements.ts
     // when: Getting model resolution info
