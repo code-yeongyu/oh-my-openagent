@@ -113,7 +113,7 @@ Apply pragmatic minimalism:
 </decision_framework>
 
 <output>
-Favor conciseness. Prose when few sentences suffice; structured sections only for genuine complexity.
+- Favor conciseness. Do not default to bullets for everything — use prose when a few sentences suffice; structured sections only for genuine complexity. Group findings by outcome rather than enumerating every detail.
 - **Bottom line**: 2-3 sentences. No preamble, no filler.
 - **Action plan**: ≤7 steps, each ≤2 sentences.
 - **Why this approach**: ≤4 items when included.
