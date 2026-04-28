@@ -9,9 +9,11 @@ import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { formatDuration } from "./time-formatter"
 import { formatDetailedError } from "./error-formatting"
 import { syncTaskDeps, type SyncTaskDeps } from "./sync-task-deps"
-import { retrySyncPromptWithFallbacks } from "./sync-task-fallback"
+import { getNextSyncFallbackModel, retrySyncPromptWithFallbacks } from "./sync-task-fallback"
 import { buildTaskMetadataBlock } from "../../features/tool-metadata-store/task-metadata-contract"
 import { resolveMetadataModel } from "./resolve-metadata-model"
+import { shouldRetryError } from "../../shared/model-error-classifier"
+import type { ModelFallbackState } from "../../hooks/model-fallback/hook"
 
 export async function executeSyncTask(
   args: DelegateTaskArgs,
@@ -147,44 +149,97 @@ export async function executeSyncTask(
     }
 
     let effectiveCategoryModel = categoryModel
-    let promptError = await deps.sendSyncPrompt(client, {
-      ...syncPromptInput,
-      categoryModel: effectiveCategoryModel,
-    })
-    if (promptError) {
-      const promptResult = await retrySyncPromptWithFallbacks({
-        sessionID,
-        initialError: promptError,
-        categoryModel: effectiveCategoryModel,
-        fallbackChain,
-        sendPrompt: async (fallbackModel) => {
-          return deps.sendSyncPrompt(client, {
-            ...syncPromptInput,
-            categoryModel: fallbackModel,
-          })
-        },
-      })
+    let fallbackState: ModelFallbackState | undefined = effectiveCategoryModel && fallbackChain?.length
+      ? {
+          providerID: effectiveCategoryModel.providerID,
+          modelID: effectiveCategoryModel.modelID,
+          fallbackChain,
+          attemptCount: 0,
+          pending: true,
+        }
+      : undefined
+    let activeSessionID = sessionID
 
-      promptError = promptResult.promptError
-      effectiveCategoryModel = promptResult.categoryModel
-
-      if (promptError) {
-        return promptError
-      }
+    const cleanupRetrySession = (currentSessionID: string): void => {
+      subagentSessions.delete(currentSessionID)
+      syncSubagentSessions.delete(currentSessionID)
+      executorCtx.modelFallbackControllerAccessor?.clearSessionFallbackChain(currentSessionID)
+      SessionCategoryRegistry.remove(currentSessionID)
     }
 
     try {
-      const pollError = await deps.pollSyncSession(ctx, client, {
-        sessionID,
-        agentToUse,
-        toastManager,
-        taskId,
-      }, syncPollTimeoutMs)
-      if (pollError) {
-        return pollError
-      }
+      while (true) {
+        let promptError = await deps.sendSyncPrompt(client, {
+          ...syncPromptInput,
+          sessionID: activeSessionID,
+          categoryModel: effectiveCategoryModel,
+        })
+        if (promptError) {
+          const promptResult = await retrySyncPromptWithFallbacks({
+            sessionID: activeSessionID,
+            initialError: promptError,
+            categoryModel: effectiveCategoryModel,
+            fallbackChain,
+            sendPrompt: async (fallbackModel) => {
+              return deps.sendSyncPrompt(client, {
+                ...syncPromptInput,
+                sessionID: activeSessionID,
+                categoryModel: fallbackModel,
+              })
+            },
+          })
 
-      const result = await deps.fetchSyncResult(client, sessionID)
+          promptError = promptResult.promptError
+          effectiveCategoryModel = promptResult.categoryModel
+          fallbackState = promptResult.fallbackState ?? fallbackState
+
+          if (promptError) {
+            return promptError
+          }
+        }
+
+        const pollError = await deps.pollSyncSession(ctx, client, {
+          sessionID: activeSessionID,
+          agentToUse,
+          toastManager,
+          taskId,
+        }, syncPollTimeoutMs)
+        if (pollError) {
+          const nextFallbackModel = shouldRetryError({ message: pollError })
+            ? getNextSyncFallbackModel(activeSessionID, fallbackState)
+            : null
+          if (!nextFallbackModel) {
+            return pollError
+          }
+
+          cleanupRetrySession(activeSessionID)
+
+          const retrySessionResult = await deps.createSyncSession(client, {
+            parentSessionID: parentContext.sessionID,
+            agentToUse,
+            description: args.description,
+            defaultDirectory: directory,
+          })
+          if (!retrySessionResult.ok) {
+            return retrySessionResult.error
+          }
+
+          activeSessionID = retrySessionResult.sessionID
+          syncSessionID = retrySessionResult.sessionID
+          subagentSessions.add(activeSessionID)
+          syncSubagentSessions.add(activeSessionID)
+          setSessionAgent(activeSessionID, agentToUse)
+          executorCtx.modelFallbackControllerAccessor?.setSessionFallbackChain(activeSessionID, fallbackChain)
+
+          if (args.category) {
+            SessionCategoryRegistry.register(activeSessionID, args.category)
+          }
+
+          effectiveCategoryModel = nextFallbackModel
+          continue
+        }
+
+        const result = await deps.fetchSyncResult(client, activeSessionID)
       if (!result.ok) {
         return result.error
       }
@@ -205,6 +260,25 @@ export async function executeSyncTask(
         modelRoutingNote = `\nModel: ${actualModelStr}${args.category ? ` (category: ${args.category})` : ""}`
       }
 
+      await publishToolMetadata(ctx, {
+        title: args.description,
+        metadata: {
+          prompt: args.prompt,
+          agent: agentToUse,
+          category: args.category,
+          ...(args.requested_subagent_type !== undefined ? { requested_subagent_type: args.requested_subagent_type } : {}),
+          load_skills: args.load_skills,
+          description: args.description,
+          run_in_background: args.run_in_background,
+          taskId: activeSessionID,
+          sessionId: activeSessionID,
+          sync: true,
+          spawnDepth: spawnContext.childDepth,
+          command: args.command,
+          model: resolveMetadataModel(effectiveCategoryModel, parentContext.model),
+        },
+      })
+
       return `Task completed in ${duration}.
 
 Agent: ${agentToUse}${args.category ? ` (category: ${args.category})` : ""}${modelRoutingNote}
@@ -214,11 +288,12 @@ Agent: ${agentToUse}${args.category ? ` (category: ${args.category})` : ""}${mod
 ${result.textContent || "(No text output)"}
 
 ${buildTaskMetadataBlock({
-        sessionId: sessionID,
-        taskId: sessionID,
+        sessionId: activeSessionID,
+        taskId: activeSessionID,
         agent: agentToUse,
         category: args.category,
       })}`
+      }
     } finally {
       if (toastManager && taskId !== undefined) {
         toastManager.removeTask(taskId)

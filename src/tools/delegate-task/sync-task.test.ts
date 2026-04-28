@@ -426,6 +426,96 @@ describe("executeSyncTask - cleanup on error paths", () => {
     expect(deleteCalls[0]).toBe("ses_test_12345678")
   })
 
+  test("retries sync session on retryable runtime session error using next fallback model", async () => {
+    const mockClient = {
+      session: {
+        create: async () => ({ data: { id: "ignored" } }),
+      },
+    }
+
+    const { executeSyncTask } = require("./sync-task")
+    const createdSessions: string[] = []
+    const attemptedModels: Array<{ providerID: string; modelID: string; variant?: string } | undefined> = []
+    const polledSessions: string[] = []
+
+    const deps = {
+      createSyncSession: async () => {
+        const sessionID = createdSessions.length === 0 ? "ses_first" : "ses_second"
+        createdSessions.push(sessionID)
+        return { ok: true as const, sessionID }
+      },
+      sendSyncPrompt: async (_client: unknown, input: { categoryModel?: { providerID: string; modelID: string; variant?: string } }) => {
+        attemptedModels.push(input.categoryModel)
+        return null
+      },
+      pollSyncSession: async (_ctx: unknown, _client: unknown, input: { sessionID: string }) => {
+        polledSessions.push(input.sessionID)
+        return input.sessionID === "ses_first"
+          ? "Forbidden: Selected provider is forbidden"
+          : null
+      },
+      fetchSyncResult: async (_client: unknown, sessionID: string) => ({ ok: true as const, textContent: `Result from ${sessionID}` }),
+    }
+
+    const metadataCalls: any[] = []
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-123",
+      metadata: (input: any) => { metadataCalls.push(input) },
+    }
+
+    const mockExecutorCtx = {
+      client: mockClient,
+      directory: "/tmp",
+      onSyncSessionCreated: null,
+      modelFallbackControllerAccessor: {
+        setSessionFallbackChain: () => {},
+        clearSessionFallbackChain: () => {},
+      },
+    }
+
+    const args = {
+      prompt: "test prompt",
+      description: "test task",
+      category: "quick",
+      load_skills: [],
+      run_in_background: false,
+      command: null,
+    }
+
+    const initialModel = {
+      providerID: "genai-proxy-openai",
+      modelID: "gpt-5.4-mini",
+      variant: undefined,
+    }
+    const fallbackChain = [
+      { providers: ["genai-proxy-openai"], model: "gpt-5.4-mini" },
+      { providers: ["genai-proxy-aws"], model: "us.anthropic.claude-haiku-4-5-20251001-v1:0" },
+    ]
+
+    const result = await executeSyncTask(args, mockCtx, mockExecutorCtx, {
+      sessionID: "parent-session",
+    }, "sisyphus-junior", initialModel, undefined, undefined, fallbackChain, deps)
+
+    expect(createdSessions).toEqual(["ses_first", "ses_second"])
+    expect(polledSessions).toEqual(["ses_first", "ses_second"])
+    expect(attemptedModels).toEqual([
+      { providerID: "genai-proxy-openai", modelID: "gpt-5.4-mini", variant: undefined },
+      { providerID: "genai-proxy-aws", modelID: "us.anthropic.claude-haiku-4-5-20251001-v1:0", variant: undefined },
+    ])
+    expect(result).toContain("Result from ses_second")
+    expect(deleteCalls).toContain("ses_first")
+
+    const finalMetadata = metadataCalls.at(-1)
+    expect(finalMetadata.metadata.sessionId).toBe("ses_second")
+    expect(finalMetadata.metadata.taskId).toBe("ses_second")
+    expect(finalMetadata.metadata.model).toEqual({
+      providerID: "genai-proxy-aws",
+      modelID: "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+      variant: undefined,
+    })
+  })
+
   test("depth regression: blocks spawn when reserveSubagentSpawn throws depth limit error", async () => {
     // This is a smoke test guarding against regressions where the depth limit
     // would be silently bypassed (e.g. via a fallback path that hardcodes

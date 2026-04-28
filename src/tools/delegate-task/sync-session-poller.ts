@@ -3,6 +3,7 @@ import type { SessionMessage } from "./executor-types"
 import { getDefaultSyncPollTimeoutMs, getTimingConfig } from "./timing"
 import { log } from "../../shared/logger"
 import { normalizeSDKResponse } from "../../shared"
+import { extractErrorMessage } from "../../features/background-agent/error-classifier"
 
 const NON_TERMINAL_FINISH_REASONS = new Set(["tool-calls", "unknown"])
 const PENDING_TOOL_PART_TYPES = new Set(["tool", "tool_use", "tool-call"])
@@ -30,6 +31,16 @@ async function fetchSessionMessages(
   const messagesResult = await client.session.messages({ path: { id: sessionID } })
   const rawData = (messagesResult as { data?: unknown })?.data ?? messagesResult
   return Array.isArray(rawData) ? (rawData as SessionMessage[]) : []
+}
+
+function getTerminalSessionError(messages: SessionMessage[]): string | null {
+  const lastAssistant = [...messages].reverse().find((msg) => msg.info?.role === "assistant")
+  if (!lastAssistant?.info || !("error" in lastAssistant.info)) {
+    return null
+  }
+
+  const errorMessage = extractErrorMessage((lastAssistant.info as { error?: unknown }).error)
+  return errorMessage && errorMessage.length > 0 ? errorMessage : "Session error"
 }
 
 export function isSessionComplete(messages: SessionMessage[]): boolean {
@@ -135,6 +146,12 @@ export async function pollSyncSession(
 
     if (input.anchorMessageCount !== undefined && messages.length <= input.anchorMessageCount) {
       continue
+    }
+
+    const sessionError = getTerminalSessionError(messages)
+    if (sessionError) {
+      log("[task] Poll detected terminal session error", { sessionID: input.sessionID, sessionError })
+      return sessionError
     }
 
     if (isSessionComplete(messages)) {

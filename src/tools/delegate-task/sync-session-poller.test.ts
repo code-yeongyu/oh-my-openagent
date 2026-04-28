@@ -28,6 +28,42 @@ describe("pollSyncSession", () => {
   })
 
   describe("native finish-based completion", () => {
+    test("returns terminal session error when assistant message contains info.error", async () => {
+      //#given
+      const { pollSyncSession } = require("./sync-session-poller")
+
+      const mockClient = {
+        session: {
+          messages: async () => ({
+            data: [
+              { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+              {
+                info: {
+                  id: "msg_002",
+                  role: "assistant",
+                  time: { created: 2000 },
+                  error: { data: { message: "Forbidden: Selected provider is forbidden" } },
+                },
+                parts: [],
+              },
+            ],
+          }),
+          status: async () => ({ data: { "ses_test": { type: "idle" } } }),
+        },
+      }
+
+      //#when
+      const result = await pollSyncSession(createMockCtx(), mockClient, {
+        sessionID: "ses_test",
+        agentToUse: "test-agent",
+        toastManager: null,
+        taskId: undefined,
+      })
+
+      //#then
+      expect(result).toBe("Forbidden: Selected provider is forbidden")
+    })
+
     test("detects completion when assistant message has terminal finish reason", async () => {
       //#given - session messages with a terminal assistant finish ("end_turn")
       //         and the assistant id > user id (native opencode condition)
