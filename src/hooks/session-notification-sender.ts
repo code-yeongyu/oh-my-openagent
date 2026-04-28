@@ -1,6 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { platform } from "os"
 import {
+  getCmuxPath,
   getOsascriptPath,
   getNotifySendPath,
   getPowershellPath,
@@ -40,7 +41,17 @@ export async function sendSessionNotification(
 ): Promise<void> {
   switch (platform) {
     case "darwin": {
-      // Try terminal-notifier first - deterministic click-to-focus
+      // Try cmux first - native UNUserNotificationCenter, properly attributed
+      const cmuxPath = await getCmuxPath()
+      if (cmuxPath) {
+        try {
+          await ctx.$`${cmuxPath} notify --title ${title} --body ${message}`.quiet()
+          break
+        } catch {
+        }
+      }
+
+      // Try terminal-notifier - deterministic click-to-focus
       const terminalNotifierPath = await getTerminalNotifierPath()
       if (terminalNotifierPath) {
         const bundleId = process.env.__CFBundleIdentifier
