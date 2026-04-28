@@ -12,55 +12,56 @@ type EventHandlerArgs = Parameters<typeof createEventHandler>[0]
 type EventHandlerInput = Parameters<ReturnType<typeof createEventHandler>>[0]
 type ChatMessageHandlerArgs = Parameters<typeof createChatMessageHandler>[0]
 
+function cast<T>(value: unknown): T {
+	return value as T
+}
+
 function asEventHandlerInput(input: EventInput): EventHandlerInput {
-	return input as unknown as EventHandlerInput
+	return cast<EventHandlerInput>(input)
 }
 
 function asEventHandlerContext(ctx: unknown): EventHandlerArgs["ctx"] {
-	return ctx as unknown as EventHandlerArgs["ctx"]
+	return cast<EventHandlerArgs["ctx"]>(ctx)
 }
 
 function asChatMessageHandlerContext(ctx: unknown): ChatMessageHandlerArgs["ctx"] {
-	return ctx as unknown as ChatMessageHandlerArgs["ctx"]
+	return cast<ChatMessageHandlerArgs["ctx"]>(ctx)
 }
 
 function asPluginConfig(config: unknown): EventHandlerArgs["pluginConfig"] {
-	return config as unknown as EventHandlerArgs["pluginConfig"]
+	return cast<EventHandlerArgs["pluginConfig"]>(config)
 }
 
 function asChatPluginConfig(config: unknown): ChatMessageHandlerArgs["pluginConfig"] {
-	return config as unknown as ChatMessageHandlerArgs["pluginConfig"]
+	return cast<ChatMessageHandlerArgs["pluginConfig"]>(config)
 }
 
 function createEventHandlerManagers(
 	overrides: Record<string, unknown> = {},
 ): EventHandlerArgs["managers"] {
-	return {
-		...({} as EventHandlerArgs["managers"]),
+	return cast<EventHandlerArgs["managers"]>({
 		tmuxSessionManager: {
 			onSessionCreated: async () => {},
 			onSessionDeleted: async () => {},
 		},
 		...overrides,
-	} as unknown as EventHandlerArgs["managers"]
+	})
 }
 
 function createEventHandlerHooks(
-	overrides: Record<string, unknown>,
+	overrides: Record<string, unknown> = {},
 ): EventHandlerArgs["hooks"] {
-	return {
-		...({} as EventHandlerArgs["hooks"]),
-		...overrides,
-	} as unknown as EventHandlerArgs["hooks"]
+	return cast<EventHandlerArgs["hooks"]>(overrides)
 }
 
 function createChatMessageHandlerHooks(
-	overrides: Record<string, unknown>,
+	overrides: Record<string, unknown> = {},
 ): ChatMessageHandlerArgs["hooks"] {
-	return {
-		...({} as ChatMessageHandlerArgs["hooks"]),
-		...overrides,
-	} as unknown as ChatMessageHandlerArgs["hooks"]
+	return cast<ChatMessageHandlerArgs["hooks"]>(overrides)
+}
+
+async function wait(ms: number): Promise<void> {
+	await new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 function createIdleTrackingEventHandler(dispatchCalls: EventInput[]): ReturnType<typeof createEventHandler> {
@@ -95,29 +96,21 @@ afterEach(() => {
 
 describe("event error extraction", () => {
 	it("prefers nested APIError message over generic top-level message", async () => {
-		//#given
 		const error = {
 			name: "APIError",
 			message: "Error",
 			data: { message: "Forbidden: Selected provider is forbidden" },
 		}
-
-		//#when
 		const result = extractErrorMessage(error)
-
-		//#then
 		expect(result).toBe("Forbidden: Selected provider is forbidden")
 	})
 })
 
-	describe("createEventHandler - idle deduplication", () => {
-	it("#given synthetic idle fires first #when real idle arrives within 500ms #then real idle dispatched", async () => {
-		//#given
+describe("createEventHandler - idle deduplication", () => {
+	it("dispatches both idle events when the real idle arrives within 500ms", async () => {
 		const dispatchCalls: EventInput[] = []
 		const eventHandler = createIdleTrackingEventHandler(dispatchCalls)
 		const sessionId = "ses_test123"
-
-		//#when
 		await eventHandler(asEventHandlerInput({
 			event: {
 				type: "session.status",
@@ -135,8 +128,6 @@ describe("event error extraction", () => {
 				},
 			},
 		}))
-
-		//#then
 		expect(dispatchCalls).toHaveLength(2)
 		expect(dispatchCalls[0]?.event.type).toBe("session.idle")
 		expect(dispatchCalls[1]?.event.type).toBe("session.idle")
@@ -144,13 +135,10 @@ describe("event error extraction", () => {
 		expect((dispatchCalls[1]?.event.properties as { sessionID?: string } | undefined)?.sessionID).toBe(sessionId)
 	})
 
-	it("#given real idle fires first #when synthetic arrives within 500ms #then synthetic dropped", async () => {
-		//#given
+	it("drops the synthetic idle when a real idle already arrived within 500ms", async () => {
 		const dispatchCalls: EventInput[] = []
 		const eventHandler = createIdleTrackingEventHandler(dispatchCalls)
 		const sessionId = "ses_test456"
-
-		//#when
 		await eventHandler(asEventHandlerInput({
 			event: {
 				type: "session.idle",
@@ -168,15 +156,12 @@ describe("event error extraction", () => {
 				},
 			},
 		}))
-
-		//#then
 		expect(dispatchCalls).toHaveLength(1)
 		expect(dispatchCalls[0]?.event.type).toBe("session.idle")
 		expect((dispatchCalls[0]?.event.properties as { sessionID?: string } | undefined)?.sessionID).toBe(sessionId)
 	})
 
-	it("both maps pruned on every event", async () => {
-		//#given
+	it("prunes both maps on every event", async () => {
 		const eventHandler = createEventHandler({
 			ctx: {} as any,
 			pluginConfig: {} as any,
@@ -213,7 +198,6 @@ describe("event error extraction", () => {
 			} as any,
 		})
 
-		// Trigger some synthetic idles
 		await eventHandler({
 			event: {
 				type: "session.status",
@@ -234,7 +218,6 @@ describe("event error extraction", () => {
 			},
 		})
 
-		// Trigger some real idles
 		await eventHandler({
 			event: {
 				type: "session.idle",
@@ -252,19 +235,13 @@ describe("event error extraction", () => {
 				},
 			},
 		})
+		await wait(600)
 
-		//#when - wait for dedup window to expire (600ms > 500ms)
-		await new Promise((resolve) => setTimeout(resolve, 600))
-
-		// Trigger any event to trigger pruning
 		await eventHandler({
 			event: {
 				type: "message.updated",
 			},
 		} as any)
-
-		//#then - both maps should be pruned (no dedup should occur for new events)
-		// We verify by checking that a new idle event for same session is dispatched
 		const dispatchCalls: EventInput[] = []
 		const eventHandlerWithMock = createEventHandler({
 			ctx: {} as any,
@@ -319,8 +296,7 @@ describe("event error extraction", () => {
 		expect(dispatchCalls[0].event.type).toBe("session.idle")
 	})
 
-	it("dedup only applies within window - outside window both dispatch", async () => {
-		//#given
+	it("dispatches both idle events once the dedup window expires", async () => {
 		const dispatchCalls: EventInput[] = []
 		const eventHandler = createEventHandler({
 			ctx: {} as any,
@@ -365,8 +341,6 @@ describe("event error extraction", () => {
 		})
 
 		const sessionId = "ses_outside_window"
-
-		//#when - synthetic idle first
 		await eventHandler({
 			event: {
 				type: "session.status",
@@ -376,14 +350,8 @@ describe("event error extraction", () => {
 				},
 			},
 		})
-
-		//#then - synthetic dispatched
 		expect(dispatchCalls.length).toBe(1)
-
-		//#when - wait for dedup window to expire (600ms > 500ms)
-		await new Promise((resolve) => setTimeout(resolve, 600))
-
-		//#when - real idle arrives outside window
+		await wait(600)
 		await eventHandler({
 			event: {
 				type: "session.idle",
@@ -392,8 +360,6 @@ describe("event error extraction", () => {
 				},
 			},
 		})
-
-		//#then - real idle dispatched (outside dedup window)
 		expect(dispatchCalls.length).toBe(2)
 		expect(dispatchCalls[0].event.type).toBe("session.idle")
 		expect(dispatchCalls[1].event.type).toBe("session.idle")
@@ -402,7 +368,6 @@ describe("event error extraction", () => {
 
 describe("createEventHandler - event forwarding", () => {
 	it("forwards message activity events to tmux session manager", async () => {
-		//#given
 		const forwardedEvents: EventInput[] = []
 		const eventHandler = createEventHandler({
 			ctx: asEventHandlerContext({}),
@@ -434,22 +399,17 @@ describe("createEventHandler - event forwarding", () => {
 			}),
 			hooks: createEventHandlerHooks({}),
 		})
-
-		//#when
 		await eventHandler(asEventHandlerInput({
 			event: {
 				type: "message.part.delta",
 				properties: { sessionID: "ses_tmux_activity", field: "text", delta: "x" },
 			},
 		}))
-
-		//#then
 		expect(forwardedEvents.length).toBe(1)
 		expect(forwardedEvents[0]?.event.type).toBe("message.part.delta")
 	})
 
 	it("does not forward tmux activity events when tmux integration is disabled", async () => {
-		//#given
 		const forwardedEvents: EventInput[] = []
 		const eventHandler = createEventHandler({
 			ctx: asEventHandlerContext({}),
@@ -481,21 +441,16 @@ describe("createEventHandler - event forwarding", () => {
 			}),
 			hooks: createEventHandlerHooks({}),
 		})
-
-		//#when
 		await eventHandler(asEventHandlerInput({
 			event: {
 				type: "message.part.delta",
 				properties: { sessionID: "ses_tmux_disabled", field: "text", delta: "x" },
 			},
 		}))
-
-		//#then
 		expect(forwardedEvents).toHaveLength(0)
 	})
 
 	it("does not forward session.created to tmux session manager when tmux integration is disabled", async () => {
-		//#given
 		const createdSessions: string[] = []
 		const eventHandler = createEventHandler({
 			ctx: asEventHandlerContext({}),
@@ -529,21 +484,16 @@ describe("createEventHandler - event forwarding", () => {
 			}),
 			hooks: createEventHandlerHooks({}),
 		})
-
-		//#when
 		await eventHandler(asEventHandlerInput({
 			event: {
 				type: "session.created",
 				properties: { info: { id: "ses_tmux_disabled", parentID: "ses_parent" } },
 			},
 		}))
-
-		//#then
 		expect(createdSessions).toHaveLength(0)
 	})
 
 	it("dispatches OpenClaw after session.created for main sessions (no parentID)", async () => {
-		//#given
 		const openClawSpy = spyOn(openclawRuntimeDispatch, "dispatchOpenClawEvent").mockResolvedValue(null)
 		const eventHandler = createEventHandler({
 			ctx: asEventHandlerContext({ directory: "/tmp/project-created" }),
@@ -572,16 +522,12 @@ describe("createEventHandler - event forwarding", () => {
 			}),
 			hooks: createEventHandlerHooks({}),
 		})
-
-		//#when - main session created (no parentID)
 		await eventHandler(asEventHandlerInput({
 			event: {
 				type: "session.created",
 				properties: { info: { id: "ses_openclaw_created" } },
 			},
 		}))
-
-		//#then - OpenClaw dispatch called for main session
 		const [call] = openClawSpy.mock.calls[0] ?? []
 		expect(call).toMatchObject({
 			rawEvent: "session.created",
@@ -593,8 +539,7 @@ describe("createEventHandler - event forwarding", () => {
 		})
 	})
 
-	it("does NOT dispatch OpenClaw for subagent sessions (with parentID)", async () => {
-		//#given
+	it("does not dispatch OpenClaw for subagent sessions with a parentID", async () => {
 		const openClawSpy = spyOn(openclawRuntimeDispatch, "dispatchOpenClawEvent").mockResolvedValue(null)
 		const eventHandler = createEventHandler({
 			ctx: asEventHandlerContext({ directory: "/tmp/project-created" }),
@@ -623,21 +568,16 @@ describe("createEventHandler - event forwarding", () => {
 			}),
 			hooks: createEventHandlerHooks({}),
 		})
-
-		//#when - subagent session created (with parentID)
 		await eventHandler(asEventHandlerInput({
 			event: {
 				type: "session.created",
 				properties: { info: { id: "ses_subagent", parentID: "ses_parent" } },
 			},
 		}))
-
-		//#then - OpenClaw dispatch NOT called for subagent session (handled by specialized callbacks)
 		expect(openClawSpy.mock.calls.length).toBe(0)
 	})
 
 	it("forwards session.deleted to write-existing-file-guard hook", async () => {
-		//#given
 		const forwardedEvents: EventInput[] = []
 		const disconnectedSessions: string[] = []
 		const deletedSessions: string[] = []
@@ -679,16 +619,12 @@ describe("createEventHandler - event forwarding", () => {
 			} as never,
 		})
 		const sessionID = "ses_forward_delete_event"
-
-		//#when
 		await eventHandler(asEventHandlerInput({
 			event: {
 				type: "session.deleted",
 				properties: { info: { id: sessionID } },
 			},
 		}))
-
-		//#then
 		expect(forwardedEvents.length).toBe(1)
 		expect(forwardedEvents[0]?.event.type).toBe("session.deleted")
 		expect(disconnectedSessions).toEqual([sessionID])
@@ -734,7 +670,6 @@ describe("createEventHandler - event forwarding", () => {
 	})
 
 	it("clears stored prompt params on session.deleted", async () => {
-		//#given
 		const eventHandler = createEventHandler({
 			ctx: {} as never,
 			pluginConfig: {} as never,
@@ -759,23 +694,18 @@ describe("createEventHandler - event forwarding", () => {
 			topP: 0.7,
 			options: { reasoningEffort: "high" },
 		})
-
-		//#when
 		await eventHandler(asEventHandlerInput({
 			event: {
 				type: "session.deleted",
 				properties: { info: { id: sessionID } },
 			},
 		}))
-
-		//#then
 		expect(getSessionPromptParams(sessionID)).toBeUndefined()
 	})
 })
 
 describe("createEventHandler - retry dedupe lifecycle", () => {
 	it("re-handles same retry key after session recovers to idle status", async () => {
-		//#given
 		const sessionID = "ses_retry_recovery_rearm"
 		setMainSession(sessionID)
 		const abortCalls: string[] = []
@@ -861,8 +791,6 @@ describe("createEventHandler - retry dedupe lifecycle", () => {
 				},
 			},
 		}))
-
-		//#when - first retry key is handled
 		await eventHandler(asEventHandlerInput({
 			event: {
 				type: "session.status",
@@ -882,8 +810,6 @@ describe("createEventHandler - retry dedupe lifecycle", () => {
 			},
 			firstOutput,
 		)
-
-		//#when - session recovers to non-retry idle state
 		await eventHandler(asEventHandlerInput({
 			event: {
 				type: "session.status",
@@ -893,8 +819,6 @@ describe("createEventHandler - retry dedupe lifecycle", () => {
 				},
 			},
 		}))
-
-		//#when - same retry key appears again after recovery
 		await eventHandler(asEventHandlerInput({
 			event: {
 				type: "session.status",
@@ -904,8 +828,6 @@ describe("createEventHandler - retry dedupe lifecycle", () => {
 				},
 			},
 		}))
-
-		//#then
 		expect(abortCalls).toEqual([sessionID, sessionID])
 		expect(promptCalls).toEqual([sessionID, sessionID])
 	})
@@ -913,7 +835,6 @@ describe("createEventHandler - retry dedupe lifecycle", () => {
 
 describe("createEventHandler - session recovery compaction", () => {
 	it("triggers compaction before sending continue after session error recovery", async () => {
-		//#given
 		const sessionID = "ses_recovery_compaction"
 		setMainSession(sessionID)
 		const callOrder: string[] = []
@@ -949,8 +870,6 @@ describe("createEventHandler - session recovery compaction", () => {
 				stopContinuationGuard: { isStopped: () => false },
 			}),
 		})
-
-		//#when
 		await eventHandler(asEventHandlerInput({
 			event: {
 				type: "session.error",
@@ -961,13 +880,10 @@ describe("createEventHandler - session recovery compaction", () => {
 				},
 			},
 		}))
-
-		//#then - summarize (compaction) must be called before prompt (continue)
 		expect(callOrder).toEqual(["summarize", "prompt"])
 	})
 
 	it("sends continue even if compaction fails", async () => {
-		//#given
 		const sessionID = "ses_recovery_compaction_fail"
 		setMainSession(sessionID)
 		const callOrder: string[] = []
@@ -1003,8 +919,6 @@ describe("createEventHandler - session recovery compaction", () => {
 				stopContinuationGuard: { isStopped: () => false },
 			}),
 		})
-
-		//#when
 		await eventHandler(asEventHandlerInput({
 			event: {
 				type: "session.error",
@@ -1015,13 +929,10 @@ describe("createEventHandler - session recovery compaction", () => {
 				},
 			},
 		}))
-
-		//#then - continue is still sent even when compaction fails
 		expect(callOrder).toEqual(["summarize", "prompt"])
 	})
 
 	it("continues dispatching later event hooks when an earlier hook throws", async () => {
-		//#given
 		const runtimeFallbackCalls: EventInput[] = []
 
 		const eventHandler = createEventHandler({
@@ -1054,8 +965,6 @@ describe("createEventHandler - session recovery compaction", () => {
 				stopContinuationGuard: { isStopped: () => false },
 			}),
 		})
-
-		//#when
 		let thrownError: unknown
 		try {
 			await eventHandler(asEventHandlerInput({
@@ -1070,8 +979,6 @@ describe("createEventHandler - session recovery compaction", () => {
 		} catch (error) {
 			thrownError = error
 		}
-
-		//#then
 		expect(thrownError).toBeUndefined()
 		expect(runtimeFallbackCalls).toHaveLength(1)
 		expect(runtimeFallbackCalls[0]?.event.type).toBe("session.error")
