@@ -59,7 +59,7 @@ export interface BackgroundTask {
   result?: string
   error?: string
   progress?: TaskProgress
-  parentModel?: { providerId: string; modelId: string }
+  parentModel?: { providerID: string; modelID: string }
   model?: DelegatedModelConfig
   /** Fallback chain for runtime retry on model errors */
   fallbackChain?: FallbackEntry[]
@@ -79,7 +79,7 @@ export interface BackgroundTask {
   category?: string
   /** Pending retry notification details for the next spawned retry session */
   retryNotification?: {
-    previousSessionId?: string
+    previousSessionID?: string
     failedModel?: string
     failedError?: string
     nextModel: string
@@ -88,7 +88,7 @@ export interface BackgroundTask {
   /** Structured attempt history for retry observability */
   attempts?: BackgroundTaskAttempt[]
   /** ID of the currently active attempt */
-  currentAttemptId?: string
+  currentAttemptID?: string
 
   /** Last message count for stability detection */
   lastMsgCount?: number
@@ -106,7 +106,7 @@ export interface LaunchInput {
   parentMessageId: string
   teamRunId?: string
   suppressTmuxSpawn?: boolean
-  parentModel?: { providerId: string; modelId: string }
+  parentModel?: { providerID: string; modelID: string }
   parentAgent?: string
   parentTools?: Record<string, boolean>
   model?: DelegatedModelConfig
@@ -124,7 +124,7 @@ export interface ResumeInput {
   prompt: string
   parentSessionId: string
   parentMessageId: string
-  parentModel?: { providerId: string; modelId: string }
+  parentModel?: { providerID: string; modelID: string }
   parentAgent?: string
   parentTools?: Record<string, boolean>
 }
