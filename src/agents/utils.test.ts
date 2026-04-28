@@ -181,8 +181,11 @@ describe("createBuiltinAgents with model overrides", () => {
       const agents = await createBuiltinAgents([], {}, undefined, systemDefaultModel, undefined, undefined, [], {})
 
       // #then
+      // Anthropic's canonical model IDs are hyphenated; the runtime transform
+      // preserves them so strict Anthropic-compatible proxies (issue #3562)
+      // and the real Anthropic API both resolve the model.
       expect(agents.sisyphus).toBeDefined()
-      expect(agents.sisyphus.model).toBe("anthropic/claude-opus-4.7")
+      expect(agents.sisyphus.model).toBe("anthropic/claude-opus-4-7")
     } finally {
       cacheSpy.mockRestore()
       fetchSpy.mockRestore()
@@ -919,8 +922,11 @@ describe("createBuiltinAgents with requiresAnyModel gating (sisyphus)", () => {
       const agents = await createBuiltinAgents([], {}, undefined, TEST_DEFAULT_MODEL, undefined, undefined, [], {})
 
       // #then
+      // Anthropic's canonical model IDs are hyphenated; the runtime transform
+      // preserves them so strict Anthropic-compatible proxies (issue #3562)
+      // and the real Anthropic API both resolve the model.
       expect(agents.sisyphus).toBeDefined()
-      expect(agents.sisyphus.model).toBe("anthropic/claude-opus-4.7")
+      expect(agents.sisyphus.model).toBe("anthropic/claude-opus-4-7")
     } finally {
       cacheSpy.mockRestore()
       fetchSpy.mockRestore()

@@ -52,7 +52,14 @@ export function transformModelForProvider(provider: string, model: string): stri
 			.replace(GEMINI_3_FLASH_PREVIEW, "gemini-3-flash-preview")
 	}
 	if (provider === "anthropic") {
-		return claudeVersionDot(model)
+		// Anthropic's canonical model IDs are hyphenated (e.g.
+		// claude-opus-4-1-20250805). Real Anthropic accepts both forms, but
+		// strict Anthropic-compatible proxies (Meridian / opencode-with-claude)
+		// reject the dotted form for claude-haiku-4-5 because they only
+		// register the canonical hyphenated ID. Keeping the hyphenated form
+		// matches the CLI installer's behavior and works on both real Anthropic
+		// and strict proxies (issue #3562).
+		return model
 	}
 	return model
 }

@@ -202,6 +202,38 @@ describe("transformModelForProvider", () => {
     })
   })
 
+  describe("anthropic provider on shared runtime transform (regression #3562)", () => {
+    test("preserves hyphenated claude-haiku-4-5 so Meridian-style strict proxies accept it", () => {
+      // #given a Meridian-style anthropic-compatible proxy that requires the
+      //        canonical hyphenated form for claude-haiku-4-5
+      const provider = "anthropic"
+      const model = "claude-haiku-4-5"
+
+      // #when the runtime (shared) transform is called
+      const result = transformSharedModelForProvider(provider, model)
+
+      // #then it must NOT convert to the dotted form (claude-haiku-4.5),
+      //       which proxies like opencode-with-claude / Meridian reject as
+      //       "Model not found" for haiku (issue #3562)
+      expect(result).toBe("claude-haiku-4-5")
+    })
+
+    test("preserves hyphenated claude-opus-4-7 (canonical Anthropic API form)", () => {
+      // #given anthropic provider on the shared runtime transform
+      const provider = "anthropic"
+      const model = "claude-opus-4-7"
+
+      // #when the runtime transform is called
+      const result = transformSharedModelForProvider(provider, model)
+
+      // #then it preserves the hyphenated form. Anthropic's official model IDs
+      //       are hyphenated (e.g. claude-opus-4-1-20250805), so this matches
+      //       the canonical API contract and works on both real Anthropic and
+      //       strict proxies.
+      expect(result).toBe("claude-opus-4-7")
+    })
+  })
+
   describe("vercel provider", () => {
     test("prepends anthropic/ and applies anthropic transform for claude models", () => {
       // #given vercel provider and claude-opus-4-7 model
@@ -338,16 +370,20 @@ describe("transformModelForProvider", () => {
     })
   })
 
-  test("uses a CLI-local transform implementation distinct from the shared runtime transform", () => {
-    // #given the CLI transform (used by the installer) and the shared runtime transform
+  test("CLI and shared runtime transforms are separate functions but agree on anthropic provider model IDs", () => {
+    // #given the CLI transform (used by the installer) and the shared runtime
+    //        transform (used by hooks/agents/tools at runtime)
     const cliResult = transformModelForProvider("anthropic", "claude-opus-4-7")
     const sharedResult = transformSharedModelForProvider("anthropic", "claude-opus-4-7")
 
     // #when both are called with the same anthropic claude input
-    // #then the CLI preserves hyphenated form for config output,
-    //       the shared runtime transform converts dash→dot for API calls
+    // #then they remain separate function references (different files), but
+    //       both preserve the canonical hyphenated form. Anthropic's official
+    //       model IDs are hyphenated and strict proxies reject the dotted form
+    //       for some models (issue #3562). github-copilot/vercel transforms
+    //       still convert to dotted form where required by those gateways.
     expect(transformModelForProvider).not.toBe(transformSharedModelForProvider)
     expect(cliResult).toBe("claude-opus-4-7")
-    expect(sharedResult).toBe("claude-opus-4.7")
+    expect(sharedResult).toBe("claude-opus-4-7")
   })
 })
