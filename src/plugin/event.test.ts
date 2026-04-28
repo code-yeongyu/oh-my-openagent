@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, mock, spyOn } from "bun:test"
 
-import { createEventHandler } from "./event"
+import { createEventHandler, extractErrorMessage } from "./event"
 import { createChatMessageHandler } from "./chat-message"
 import * as openclawRuntimeDispatch from "../openclaw/runtime-dispatch"
 import { _resetForTesting, setMainSession } from "../features/claude-code-session-state"
@@ -91,6 +91,23 @@ function createIdleTrackingEventHandler(dispatchCalls: EventInput[]): ReturnType
 afterEach(() => {
 	mock.restore()
 	_resetForTesting()
+})
+
+describe("event error extraction", () => {
+	it("prefers nested APIError message over generic top-level message", async () => {
+		//#given
+		const error = {
+			name: "APIError",
+			message: "Error",
+			data: { message: "Forbidden: Selected provider is forbidden" },
+		}
+
+		//#when
+		const result = extractErrorMessage(error)
+
+		//#then
+		expect(result).toBe("Forbidden: Selected provider is forbidden")
+	})
 })
 
 	describe("createEventHandler - idle deduplication", () => {

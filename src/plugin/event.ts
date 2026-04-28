@@ -63,18 +63,17 @@ function extractErrorName(error: unknown): string | undefined {
   return undefined;
 }
 
-function extractErrorMessage(error: unknown): string {
+export function extractErrorMessage(error: unknown): string {
   if (!error) return "";
   if (typeof error === "string") return error;
-  if (error instanceof Error) return error.message;
 
   if (isRecord(error)) {
     const candidates: unknown[] = [
-      error,
       error.data,
-      error.error,
       isRecord(error.data) ? error.data.error : undefined,
+      error.error,
       error.cause,
+      error,
     ];
 
     for (const candidate of candidates) {
@@ -83,6 +82,8 @@ function extractErrorMessage(error: unknown): string {
       }
     }
   }
+
+  if (error instanceof Error) return error.message;
 
   try {
     return JSON.stringify(error);
