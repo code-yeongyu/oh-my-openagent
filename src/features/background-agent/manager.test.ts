@@ -523,7 +523,7 @@ describe("BackgroundManager retry observability", () => {
     expect(notification).toContain("[BACKGROUND TASK RETRYING]")
     expect(notification).toContain("ses_retry_visibility")
     expect(notification).toContain("genai-proxy-openai/gpt-5.4-mini")
-    expect(notification).toContain("anthropic/claude-haiku-4.5")
+    expect(notification).toContain("anthropic/claude-haiku-4-5")
   })
 
   test("queues a second parent-visible notification once the retry session ID is created", async () => {
@@ -4991,9 +4991,12 @@ describe("BackgroundManager.handleEvent - session.error", () => {
     //#then
     expect(task.status).toBe("pending")
     expect(task.attemptCount).toBe(1)
+    // Anthropic's canonical model IDs are hyphenated; the runtime transform
+    // preserves them so strict Anthropic-compatible proxies (issue #3562)
+    // and the real Anthropic API both resolve the model.
     expect(task.model).toEqual({
       providerID: "anthropic",
-      modelID: "claude-opus-4.7",
+      modelID: "claude-opus-4-7",
       variant: "max",
     })
     expect(task.concurrencyKey).toBeUndefined()
@@ -5029,9 +5032,12 @@ describe("BackgroundManager.handleEvent - session.error", () => {
     //#then
     expect(task.status).toBe("pending")
     expect(task.attemptCount).toBe(1)
+    // Anthropic's canonical model IDs are hyphenated; the runtime transform
+    // preserves them so strict Anthropic-compatible proxies (issue #3562)
+    // and the real Anthropic API both resolve the model.
     expect(task.model).toEqual({
       providerID: "anthropic",
-      modelID: "claude-opus-4.7",
+      modelID: "claude-opus-4-7",
       variant: "max",
     })
 
@@ -5074,9 +5080,12 @@ describe("BackgroundManager.handleEvent - session.error", () => {
     //#then
     expect(task.status).toBe("pending")
     expect(task.attemptCount).toBe(1)
+    // Anthropic's canonical model IDs are hyphenated; the runtime transform
+    // preserves them so strict Anthropic-compatible proxies (issue #3562)
+    // and the real Anthropic API both resolve the model.
     expect(task.model).toEqual({
       providerID: "anthropic",
-      modelID: "claude-opus-4.7",
+      modelID: "claude-opus-4-7",
       variant: "max",
     })
 
