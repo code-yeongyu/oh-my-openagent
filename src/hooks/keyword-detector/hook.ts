@@ -66,9 +66,9 @@ export function createKeywordDetectorHook(
 
       if (isPlannerAgent(currentAgent)) {
         const preFilterCount = detectedKeywords.length
-        detectedKeywords = detectedKeywords.filter((k) => k.type !== "ultrawork")
+        detectedKeywords = detectedKeywords.filter((k) => k.type !== "ultrawork" && k.type !== "hyperplan")
         if (preFilterCount > detectedKeywords.length) {
-          log(`[keyword-detector] Filtered ultrawork keywords for planner agent`, { sessionID: input.sessionID, agent: currentAgent })
+          log(`[keyword-detector] Filtered ultrawork/hyperplan keywords for planner agent`, { sessionID: input.sessionID, agent: currentAgent })
         }
       }
 
@@ -124,6 +124,29 @@ export function createKeywordDetectorHook(
             })
           )
 
+      }
+
+      const hasHyperplan = detectedKeywords.some((k) => k.type === "hyperplan")
+      if (hasHyperplan) {
+        log(`[keyword-detector] Hyperplan mode activated`, {
+          sessionID: input.sessionID,
+        })
+
+        ctx.client.tui
+          .showToast({
+            body: {
+              title: "Hyperplan Mode Activated",
+              message: "Adversarial planning engaged. 5 hostile members will cross-critique.",
+              variant: "success" as const,
+              duration: 3000,
+            },
+          })
+          .catch((err) =>
+            log(`[keyword-detector] Failed to show toast`, {
+              error: err,
+              sessionID: input.sessionID,
+            })
+          )
       }
 
       const textPartIndex = output.parts.findIndex((p) => p.type === "text" && p.text !== undefined)
