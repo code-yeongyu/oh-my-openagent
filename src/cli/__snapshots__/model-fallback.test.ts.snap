@@ -945,11 +945,17 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
           "model": "opencode/gpt-5.5",
           "variant": "medium",
         },
+        {
+          "model": "opencode/minimax-m2.7",
+        },
       ],
       "model": "opencode/claude-sonnet-4-6",
     },
     "explore": {
       "fallback_models": [
+        {
+          "model": "opencode/minimax-m2.7",
+        },
         {
           "model": "opencode/gpt-5.4-nano",
         },
@@ -1046,6 +1052,9 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
           "variant": "medium",
         },
         {
+          "model": "opencode/minimax-m2.7",
+        },
+        {
           "model": "opencode/big-pickle",
         },
       ],
@@ -1089,6 +1098,9 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
           "model": "opencode/gemini-3-flash",
         },
         {
+          "model": "opencode/minimax-m2.7",
+        },
+        {
           "model": "opencode/gpt-5-nano",
         },
       ],
@@ -1117,6 +1129,9 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
         {
           "model": "opencode/gemini-3-flash",
         },
+        {
+          "model": "opencode/minimax-m2.7",
+        },
       ],
       "model": "opencode/claude-sonnet-4-6",
     },
@@ -1128,6 +1143,9 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
         },
         {
           "model": "opencode/gemini-3-flash",
+        },
+        {
+          "model": "opencode/minimax-m2.7",
         },
       ],
       "model": "opencode/claude-sonnet-4-6",
@@ -1149,6 +1167,9 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
       "fallback_models": [
         {
           "model": "opencode/claude-sonnet-4-6",
+        },
+        {
+          "model": "opencode/minimax-m2.7",
         },
       ],
       "model": "opencode/gemini-3-flash",
@@ -1167,11 +1188,17 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
           "model": "opencode/gpt-5.5",
           "variant": "medium",
         },
+        {
+          "model": "opencode/minimax-m2.7",
+        },
       ],
       "model": "opencode/claude-sonnet-4-6",
     },
     "explore": {
       "fallback_models": [
+        {
+          "model": "opencode/minimax-m2.7",
+        },
         {
           "model": "opencode/gpt-5.4-nano",
         },
@@ -1268,6 +1295,9 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
           "variant": "medium",
         },
         {
+          "model": "opencode/minimax-m2.7",
+        },
+        {
           "model": "opencode/big-pickle",
         },
       ],
@@ -1309,6 +1339,9 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
         },
         {
           "model": "opencode/gemini-3-flash",
+        },
+        {
+          "model": "opencode/minimax-m2.7",
         },
         {
           "model": "opencode/gpt-5-nano",
@@ -1355,6 +1388,9 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
         {
           "model": "opencode/gemini-3-flash",
         },
+        {
+          "model": "opencode/minimax-m2.7",
+        },
       ],
       "model": "opencode/claude-sonnet-4-6",
     },
@@ -1375,6 +1411,9 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
       "fallback_models": [
         {
           "model": "opencode/claude-sonnet-4-6",
+        },
+        {
+          "model": "opencode/minimax-m2.7",
         },
       ],
       "model": "opencode/gemini-3-flash",
@@ -1882,11 +1921,17 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
           "model": "opencode/gpt-5.5",
           "variant": "medium",
         },
+        {
+          "model": "opencode/minimax-m2.7",
+        },
       ],
       "model": "anthropic/claude-sonnet-4-6",
     },
     "explore": {
       "fallback_models": [
+        {
+          "model": "opencode/minimax-m2.7",
+        },
         {
           "model": "opencode/claude-haiku-4-5",
         },
@@ -2009,6 +2054,9 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
           "variant": "medium",
         },
         {
+          "model": "opencode/minimax-m2.7",
+        },
+        {
           "model": "opencode/big-pickle",
         },
       ],
@@ -2063,6 +2111,9 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
           "model": "opencode/gemini-3-flash",
         },
         {
+          "model": "opencode/minimax-m2.7",
+        },
+        {
           "model": "opencode/gpt-5-nano",
         },
       ],
@@ -2098,6 +2149,9 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
         {
           "model": "opencode/gemini-3-flash",
         },
+        {
+          "model": "opencode/minimax-m2.7",
+        },
       ],
       "model": "anthropic/claude-sonnet-4-6",
     },
@@ -2112,6 +2166,9 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
         },
         {
           "model": "opencode/gemini-3-flash",
+        },
+        {
+          "model": "opencode/minimax-m2.7",
         },
       ],
       "model": "anthropic/claude-sonnet-4-6",
@@ -2140,6 +2197,9 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
         },
         {
           "model": "opencode/claude-sonnet-4-6",
+        },
+        {
+          "model": "opencode/minimax-m2.7",
         },
       ],
       "model": "opencode/gemini-3-flash",
@@ -2639,11 +2699,17 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
           "model": "opencode/gpt-5.5",
           "variant": "medium",
         },
+        {
+          "model": "opencode/minimax-m2.7",
+        },
       ],
       "model": "github-copilot/claude-sonnet-4.6",
     },
     "explore": {
       "fallback_models": [
+        {
+          "model": "opencode/minimax-m2.7",
+        },
         {
           "model": "opencode/gpt-5.4-nano",
         },
@@ -2662,6 +2728,9 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
     },
     "librarian": {
       "fallback_models": [
+        {
+          "model": "opencode/minimax-m2.7",
+        },
         {
           "model": "opencode/claude-haiku-4-5",
         },
@@ -2824,6 +2893,9 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
           "variant": "medium",
         },
         {
+          "model": "opencode/minimax-m2.7",
+        },
+        {
           "model": "opencode/big-pickle",
         },
       ],
@@ -2899,6 +2971,9 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
           "model": "opencode/gemini-3-flash",
         },
         {
+          "model": "opencode/minimax-m2.7",
+        },
+        {
           "model": "opencode/gpt-5-nano",
         },
       ],
@@ -2941,6 +3016,9 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
         {
           "model": "opencode/gemini-3-flash",
         },
+        {
+          "model": "opencode/minimax-m2.7",
+        },
       ],
       "model": "github-copilot/claude-sonnet-4.6",
     },
@@ -2958,6 +3036,9 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
         },
         {
           "model": "opencode/gemini-3-flash",
+        },
+        {
+          "model": "opencode/minimax-m2.7",
         },
       ],
       "model": "github-copilot/claude-sonnet-4.6",
@@ -2997,6 +3078,9 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
         {
           "model": "opencode/claude-sonnet-4-6",
         },
+        {
+          "model": "opencode/minimax-m2.7",
+        },
       ],
       "model": "github-copilot/gemini-3-flash-preview",
     },
@@ -3028,11 +3112,17 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
           "model": "opencode/gpt-5.5",
           "variant": "medium",
         },
+        {
+          "model": "opencode/minimax-m2.7",
+        },
       ],
       "model": "anthropic/claude-sonnet-4-6",
     },
     "explore": {
       "fallback_models": [
+        {
+          "model": "opencode/minimax-m2.7",
+        },
         {
           "model": "anthropic/claude-haiku-4-5",
         },
@@ -3064,6 +3154,9 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
     },
     "librarian": {
       "fallback_models": [
+        {
+          "model": "opencode/minimax-m2.7",
+        },
         {
           "model": "anthropic/claude-haiku-4-5",
         },
@@ -3297,6 +3390,9 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
           "variant": "medium",
         },
         {
+          "model": "opencode/minimax-m2.7",
+        },
+        {
           "model": "opencode/big-pickle",
         },
       ],
@@ -3404,6 +3500,9 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
           "model": "opencode/gemini-3-flash",
         },
         {
+          "model": "opencode/minimax-m2.7",
+        },
+        {
           "model": "opencode/gpt-5-nano",
         },
       ],
@@ -3468,6 +3567,9 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
         {
           "model": "opencode/gemini-3-flash",
         },
+        {
+          "model": "opencode/minimax-m2.7",
+        },
       ],
       "model": "anthropic/claude-sonnet-4-6",
     },
@@ -3495,6 +3597,9 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
         },
         {
           "model": "opencode/gemini-3-flash",
+        },
+        {
+          "model": "opencode/minimax-m2.7",
         },
       ],
       "model": "anthropic/claude-sonnet-4-6",
@@ -3547,6 +3652,9 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
         },
         {
           "model": "opencode/claude-sonnet-4-6",
+        },
+        {
+          "model": "opencode/minimax-m2.7",
         },
       ],
       "model": "google/gemini-3-flash-preview",
@@ -3579,11 +3687,17 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
           "model": "opencode/gpt-5.5",
           "variant": "medium",
         },
+        {
+          "model": "opencode/minimax-m2.7",
+        },
       ],
       "model": "anthropic/claude-sonnet-4-6",
     },
     "explore": {
       "fallback_models": [
+        {
+          "model": "opencode/minimax-m2.7",
+        },
         {
           "model": "anthropic/claude-haiku-4-5",
         },
@@ -3615,6 +3729,9 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
     },
     "librarian": {
       "fallback_models": [
+        {
+          "model": "opencode/minimax-m2.7",
+        },
         {
           "model": "anthropic/claude-haiku-4-5",
         },
@@ -3848,6 +3965,9 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
           "variant": "medium",
         },
         {
+          "model": "opencode/minimax-m2.7",
+        },
+        {
           "model": "opencode/big-pickle",
         },
       ],
@@ -3955,6 +4075,9 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
           "model": "opencode/gemini-3-flash",
         },
         {
+          "model": "opencode/minimax-m2.7",
+        },
+        {
           "model": "opencode/gpt-5-nano",
         },
       ],
@@ -4054,6 +4177,9 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
         {
           "model": "opencode/gemini-3-flash",
         },
+        {
+          "model": "opencode/minimax-m2.7",
+        },
       ],
       "model": "anthropic/claude-sonnet-4-6",
     },
@@ -4105,6 +4231,9 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
         },
         {
           "model": "opencode/claude-sonnet-4-6",
+        },
+        {
+          "model": "opencode/minimax-m2.7",
         },
       ],
       "model": "google/gemini-3-flash-preview",
