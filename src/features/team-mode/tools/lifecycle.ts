@@ -22,7 +22,7 @@ const TEAM_CREATE_USAGE = "team_create requires exactly one of teamName or inlin
 const TeamCreateArgsSchema = z.object({
   teamName: z.string().min(1).optional(),
   inline_spec: z.unknown().optional(),
-  leadSessionId: z.string().min(1).optional(),
+  leadSessionId: z.string().optional(),
 }).superRefine((value, ctx) => {
   const optionCount = Number(value.teamName !== undefined) + Number(value.inline_spec !== undefined)
   if (optionCount !== 1) {
