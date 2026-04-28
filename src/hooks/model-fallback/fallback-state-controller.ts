@@ -15,6 +15,7 @@ type ModelFallbackStateLike = {
 export type ModelFallbackStateController = {
   lastToastKey: Map<string, string>
   setSessionFallbackChain: (sessionID: string, fallbackChain: FallbackEntry[] | undefined) => void
+  getSessionFallbackChain: (sessionID: string) => FallbackEntry[] | undefined
   clearSessionFallbackChain: (sessionID: string) => void
   setPendingModelFallback: (
     sessionID: string,
@@ -43,6 +44,10 @@ export function createModelFallbackStateController(input: {
 
   function clearSessionFallbackChain(sessionID: string): void {
     sessionFallbackChains.delete(sessionID)
+  }
+
+  function getSessionFallbackChain(sessionID: string): FallbackEntry[] | undefined {
+    return sessionFallbackChains.get(sessionID)
   }
 
   function setPendingModelFallback(
@@ -123,6 +128,7 @@ export function createModelFallbackStateController(input: {
   return {
     lastToastKey,
     setSessionFallbackChain,
+    getSessionFallbackChain,
     clearSessionFallbackChain,
     setPendingModelFallback,
     getNextFallback,
