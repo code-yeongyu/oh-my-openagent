@@ -12,7 +12,7 @@
 
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode } from "../types"
-import { isGlmModel, isGpt5_5Model, isGptModel, isGeminiModel } from "../types"
+import { isGlmModel, isGpt5_5Model, isGptModel, isGeminiModel, isKimiK2Model } from "../types"
 import type { AgentOverrideConfig } from "../../config/schema"
 import {
   createAgentToolRestrictions,
@@ -21,6 +21,7 @@ import {
 import { getGptApplyPatchPermission } from "../gpt-apply-patch-guard"
 
 import { buildDefaultSisyphusJuniorPrompt } from "./default"
+import { buildKimiK26SisyphusJuniorPrompt } from "./kimi-k2-6"
 import { buildGptSisyphusJuniorPrompt } from "./gpt"
 import { buildGpt54SisyphusJuniorPrompt } from "./gpt-5-4"
 import { buildGpt55SisyphusJuniorPrompt } from "./gpt-5-5"
@@ -41,6 +42,7 @@ export const SISYPHUS_JUNIOR_DEFAULTS = {
 
 export type SisyphusJuniorPromptSource =
   | "default"
+  | "kimi-k2"
   | "gpt"
   | "gpt-5-5"
   | "gpt-5-4"
@@ -48,6 +50,7 @@ export type SisyphusJuniorPromptSource =
   | "gemini"
 
 export function getSisyphusJuniorPromptSource(model?: string): SisyphusJuniorPromptSource {
+  if (model && isKimiK2Model(model)) return "kimi-k2"
   if (model && isGptModel(model)) {
     if (isGpt5_5Model(model)) return "gpt-5-5"
     const lower = model.toLowerCase()
@@ -72,6 +75,8 @@ export function buildSisyphusJuniorPrompt(
   const source = getSisyphusJuniorPromptSource(model)
 
   switch (source) {
+    case "kimi-k2":
+      return buildKimiK26SisyphusJuniorPrompt(useTaskSystem, promptAppend)
     case "gpt-5-5":
       return buildGpt55SisyphusJuniorPrompt(useTaskSystem, promptAppend)
     case "gpt-5-4":
