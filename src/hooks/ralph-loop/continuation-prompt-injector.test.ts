@@ -2,6 +2,65 @@ import { describe, expect, test } from "bun:test"
 import { injectContinuationPrompt } from "./continuation-prompt-injector"
 
 describe("ralph-loop continuation prompt injector", () => {
+  test("#given inherited message agent has ZWSP prefix #when injecting continuation prompt #then promptAsync receives normalized agent", async () => {
+    // given
+    let promptBody: { agent?: string } | undefined
+    const ctx = {
+      client: {
+        session: {
+          messages: async () => ({
+            data: [{ info: { agent: "\u200bSisyphus - Ultraworker" } }],
+          }),
+          promptAsync: async (input: { body: { agent?: string } }) => {
+            promptBody = input.body
+            return {}
+          },
+        },
+      },
+    }
+
+    // when
+    await injectContinuationPrompt(ctx as never, {
+      sessionID: "ses_ralph_zwsp_agent",
+      prompt: "continue",
+      directory: "/tmp/test",
+      apiTimeoutMs: 50,
+    })
+
+    // then
+    expect(promptBody?.agent).toBe("sisyphus")
+    expect(promptBody?.agent).not.toContain("\u200b")
+  })
+
+  test("#given inherited message agent has no ZWSP prefix #when injecting continuation prompt #then promptAsync receives normalized agent", async () => {
+    // given
+    let promptBody: { agent?: string } | undefined
+    const ctx = {
+      client: {
+        session: {
+          messages: async () => ({
+            data: [{ info: { agent: "Sisyphus - Ultraworker" } }],
+          }),
+          promptAsync: async (input: { body: { agent?: string } }) => {
+            promptBody = input.body
+            return {}
+          },
+        },
+      },
+    }
+
+    // when
+    await injectContinuationPrompt(ctx as never, {
+      sessionID: "ses_ralph_clean_agent",
+      prompt: "continue",
+      directory: "/tmp/test",
+      apiTimeoutMs: 50,
+    })
+
+    // then
+    expect(promptBody?.agent).toBe("sisyphus")
+  })
+
   test("#given inherited message model includes variant #when injecting continuation prompt #then promptAsync receives variant as a top-level field", async () => {
     // given
     let promptBody:

@@ -17,7 +17,7 @@ describe("ralph-loop", () => {
   let mockSessionMessages: Array<{ info?: { role?: string }; parts?: Array<{ type: string; text?: string }> }>
   let mockMessagesApiResponseShape: "data" | "array"
 
-  function createMockPluginInput() {
+  function createMockPluginInput(): Parameters<typeof createRalphLoopHook>[0] {
     return {
       client: {
         session: {
@@ -63,7 +63,7 @@ describe("ralph-loop", () => {
         },
       },
       directory: TEST_DIR,
-    } as unknown as Parameters<typeof createRalphLoopHook>[0]
+    } as Parameters<typeof createRalphLoopHook>[0]
   }
 
   beforeEach(() => {
@@ -304,6 +304,33 @@ describe("ralph-loop", () => {
       expect(state?.iteration).toBe(2)
     })
 
+    test("should skip continuation when background task is running", async () => {
+      // given - active loop state with a running background task
+      const hook = createRalphLoopHook(createMockPluginInput(), {
+        backgroundManager: {
+          getTasksByParentSession: (sessionID: string) => sessionID === "session-123"
+            ? [{ status: "running" }]
+            : [],
+        },
+      })
+      hook.startLoop("session-123", "Build a feature", { maxIterations: 10 })
+
+      // when - session goes idle
+      await hook.event({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: "session-123" },
+        },
+      })
+
+      // then - no continuation should be injected
+      expect(promptCalls.length).toBe(0)
+
+      // then - iteration should not be incremented
+      const state = hook.getState()
+      expect(state?.iteration).toBe(1)
+    })
+
     test("should stop loop when max iterations reached", async () => {
       // given - loop at max iteration
       const hook = createRalphLoopHook(createMockPluginInput())
@@ -359,8 +386,8 @@ describe("ralph-loop", () => {
       expect(hook.getState()).not.toBeNull()
     })
 
-    test("should skip injection during recovery", async () => {
-      // given - active loop and session in recovery
+    test("should continue after non-abort session error", async () => {
+      // given - active loop and non-abort session error
       const hook = createRalphLoopHook(createMockPluginInput())
       hook.startLoop("session-123", "Test task")
 
@@ -371,7 +398,7 @@ describe("ralph-loop", () => {
         },
       })
 
-      // when - session goes idle immediately
+      // when - session goes idle immediately after the error
       await hook.event({
         event: {
           type: "session.idle",
@@ -379,8 +406,9 @@ describe("ralph-loop", () => {
         },
       })
 
-      // then - no continuation injected
-      expect(promptCalls.length).toBe(0)
+      // then - continuation is injected without a recovery skip
+      expect(promptCalls.length).toBe(1)
+      expect(hook.getState()?.iteration).toBe(2)
     })
 
     test("should clear state on session deletion", async () => {
@@ -1144,20 +1172,14 @@ Original task: Build something`
     test("should not hang when session.messages() throws", async () => {
       // given - API that throws (simulates timeout error)
       let apiCallCount = 0
-      const errorMock = {
-        ...createMockPluginInput(),
-        client: {
-          ...createMockPluginInput().client,
-          session: {
-            ...createMockPluginInput().client.session,
-            messages: async () => {
-              apiCallCount++
-              throw new Error("API timeout")
-            },
-          },
+      const errorMock = createMockPluginInput()
+      Object.defineProperty(errorMock.client.session, "messages", {
+        value: async () => {
+          apiCallCount++
+          throw new Error("API timeout")
         },
-      }
-      const hook = createRalphLoopHook(errorMock as any, {
+      })
+      const hook = createRalphLoopHook(errorMock, {
         getTranscriptPath: () => join(TEST_DIR, "nonexistent.jsonl"),
         apiTimeout: 100,
       })

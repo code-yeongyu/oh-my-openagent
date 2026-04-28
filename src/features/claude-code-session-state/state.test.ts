@@ -247,4 +247,18 @@ describe("claude-code-session-state", () => {
       expect(getSessionAgent(sessionID)).toBe(newAgent)
     })
   })
+
+  describe("backward compatibility", () => {
+    test("strips legacy ZWSP-prefixed agent names from persisted session state (GH-3259)", () => {
+      // given - persisted session payload from v3.14.0-v3.16.0 with ZWSP prefix
+      const sessionID = "test-session-legacy-zwsp"
+      const legacyAgent = "\u200B\u200BHephaestus - Deep Agent"
+
+      // when
+      setSessionAgent(sessionID, legacyAgent)
+
+      // then
+      expect(getSessionAgent(sessionID)).toBe("Hephaestus - Deep Agent")
+    })
+  })
 })

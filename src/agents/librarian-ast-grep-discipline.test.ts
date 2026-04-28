@@ -6,7 +6,7 @@ import { createLibrarianAgent } from "./librarian"
 describe("librarian agent ast-grep discipline", () => {
   const model = "openai/gpt-5.4-mini-fast"
 
-  it("#given the prompt #when inspecting TOOL REFERENCE #then documents ast_grep_search", () => {
+  it("#given the prompt #when inspecting TYPE B phase #then mentions ast_grep_search for implementation", () => {
     // given
     const agent = createLibrarianAgent(model)
 
@@ -15,11 +15,10 @@ describe("librarian agent ast-grep discipline", () => {
 
     // then
     expect(prompt).toContain("ast_grep_search")
-    expect(prompt).toContain("$$$")
-    expect(prompt).toContain("function $NAME($$$) { $$$ }")
+    expect(prompt).toContain("grep/ast_grep_search for function/class")
   })
 
-  it("#given the prompt #when inspecting #then warns against regex inside ast_grep_search", () => {
+  it("#given the prompt #when inspecting TOOL REFERENCE #then documents grep_app for code search", () => {
     // given
     const agent = createLibrarianAgent(model)
 
@@ -27,25 +26,11 @@ describe("librarian agent ast-grep discipline", () => {
     const prompt = agent.prompt ?? ""
 
     // then
-    expect(prompt.toLowerCase()).toContain("not regex")
-    expect(prompt).toContain("|")
-    expect(prompt).toContain(".*")
-    expect(prompt).toContain("\\w")
-  })
-
-  it("#given the prompt #when inspecting #then directs LLM to grep/grep_app for text search", () => {
-    // given
-    const agent = createLibrarianAgent(model)
-
-    // when
-    const prompt = agent.prompt ?? ""
-
-    // then
-    expect(prompt.toLowerCase()).toContain("for text")
     expect(prompt).toContain("grep_app")
+    expect(prompt).toContain("Fast Code Search")
   })
 
-  it("#given the prompt #when inspecting Implementation phase #then recommends ast_grep_search for code shape", () => {
+  it("#given the prompt #when inspecting #then directs LLM to use gh CLI for repo operations", () => {
     // given
     const agent = createLibrarianAgent(model)
 
@@ -53,7 +38,20 @@ describe("librarian agent ast-grep discipline", () => {
     const prompt = agent.prompt ?? ""
 
     // then
-    expect(prompt).toContain("ast_grep_search for code shape")
+    expect(prompt).toContain("gh repo clone")
+    expect(prompt).toContain("gh search issues")
+  })
+
+  it("#given the prompt #when inspecting #then requires parallel execution for comprehensive research", () => {
+    // given
+    const agent = createLibrarianAgent(model)
+
+    // when
+    const prompt = agent.prompt ?? ""
+
+    // then
+    expect(prompt).toContain("6+ calls")
+    expect(prompt).toContain("Parallel acceleration")
   })
 
   it("#given the prompt #when inspecting #then preserves the evidence + permalink contract", () => {

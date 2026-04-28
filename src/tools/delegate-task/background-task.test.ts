@@ -522,4 +522,48 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
     expectFn(secondResult).toContain("session_id: ses_second")
     expectFn(secondResult).not.toContain("interrupt")
   })
+
+  testFn("strips legacy ZWSP-prefixed agent names from persisted background task launch input (GH-3259)", async () => {
+    //#given - persisted launch input from v3.14.0-v3.16.0 with ZWSP prefix on agent
+    const launchCalls: Array<{ agent: string }> = []
+    const manager = {
+      launch: async (input: { agent: string }) => {
+        launchCalls.push(input)
+        return {
+          id: "bg_legacy_zwsp",
+          sessionID: "ses_legacy_zwsp",
+          description: "Legacy ZWSP",
+          agent: "Hephaestus - Deep Agent",
+          status: "running",
+        }
+      },
+      getTask: () => ({ sessionID: "ses_legacy_zwsp" }),
+    }
+
+    //#when
+    await executeBackgroundTask(
+      {
+        description: "Legacy ZWSP",
+        prompt: "check",
+        run_in_background: true,
+        load_skills: [],
+      },
+      {
+        sessionID: "ses_parent",
+        callID: "call_legacy_zwsp",
+        metadata: async () => {},
+        abort: new AbortController().signal,
+      },
+      { manager },
+      { sessionID: "ses_parent", messageID: "msg_legacy_zwsp" },
+      "\u200B\u200BHephaestus - Deep Agent",
+      undefined,
+      undefined,
+      undefined,
+    )
+
+    //#then
+    expectFn(launchCalls).toHaveLength(1)
+    expectFn(launchCalls[0].agent).toBe("Hephaestus - Deep Agent")
+  })
 })

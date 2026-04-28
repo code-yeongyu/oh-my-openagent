@@ -3,7 +3,7 @@
 import { describe, test, expect, spyOn, beforeEach, afterEach, mock } from "bun:test"
 import type { CategoryConfig } from "../config/schema"
 import type { OhMyOpenCodeConfig } from "../config"
-import { getAgentDisplayName, getAgentListDisplayName, getAgentRuntimeName } from "../shared/agent-display-names"
+import { getAgentDisplayName, getAgentListDisplayName } from "../shared/agent-display-names"
 import { resolveCategoryConfig } from "./category-config-resolver"
 
 import * as agents from "../agents"
@@ -359,19 +359,19 @@ describe("Plan agent demote behavior", () => {
     expect(emittedCoreEntries).toEqual([
       [
         getAgentListDisplayName("sisyphus"),
-        expect.objectContaining({ name: getAgentRuntimeName("sisyphus") }),
+        expect.objectContaining({ name: getAgentListDisplayName("sisyphus") }),
       ],
       [
         getAgentListDisplayName("hephaestus"),
-        expect.objectContaining({ name: getAgentRuntimeName("hephaestus") }),
+        expect.objectContaining({ name: getAgentListDisplayName("hephaestus") }),
       ],
       [
         getAgentListDisplayName("prometheus"),
-        expect.objectContaining({ name: getAgentRuntimeName("prometheus") }),
+        expect.objectContaining({ name: getAgentListDisplayName("prometheus") }),
       ],
       [
         getAgentListDisplayName("atlas"),
-        expect.objectContaining({ name: getAgentRuntimeName("atlas") }),
+        expect.objectContaining({ name: getAgentListDisplayName("atlas") }),
       ],
     ])
   })
@@ -540,7 +540,7 @@ describe("default_agent behavior with Sisyphus orchestration", () => {
     await handler(config)
 
     // then
-    expect(config.default_agent).toBe(getAgentRuntimeName("hephaestus"))
+    expect(config.default_agent).toBe(getAgentDisplayName("hephaestus"))
   })
 
   test("canonicalizes configured default_agent when key uses mixed case", async () => {
@@ -564,7 +564,7 @@ describe("default_agent behavior with Sisyphus orchestration", () => {
     await handler(config)
 
     // then
-    expect(config.default_agent).toBe(getAgentRuntimeName("hephaestus"))
+    expect(config.default_agent).toBe(getAgentDisplayName("hephaestus"))
   })
 
   test("canonicalizes configured default_agent key to display name", async () => {
@@ -588,7 +588,7 @@ describe("default_agent behavior with Sisyphus orchestration", () => {
     await handler(config)
 
     // #then
-    expect(config.default_agent).toBe(getAgentRuntimeName("hephaestus"))
+    expect(config.default_agent).toBe(getAgentDisplayName("hephaestus"))
   })
 
   test("preserves existing display-name default_agent", async () => {
@@ -613,7 +613,7 @@ describe("default_agent behavior with Sisyphus orchestration", () => {
     await handler(config)
 
     // #then
-    expect(config.default_agent).toBe(getAgentRuntimeName("hephaestus"))
+    expect(config.default_agent).toBe(getAgentDisplayName("hephaestus"))
   })
 
   test("sets default_agent to sisyphus when missing", async () => {
@@ -636,7 +636,7 @@ describe("default_agent behavior with Sisyphus orchestration", () => {
     await handler(config)
 
     // #then
-    expect(config.default_agent).toBe(getAgentRuntimeName("sisyphus"))
+    expect(config.default_agent).toBe(getAgentDisplayName("sisyphus"))
   })
 
   test("uses canonical default_agent display name so OpenCode lookups match emitted agent keys", async () => {
@@ -660,7 +660,7 @@ describe("default_agent behavior with Sisyphus orchestration", () => {
     await handler(config)
 
     // then
-    expect(config.default_agent).toBe(getAgentRuntimeName("hephaestus"))
+    expect(config.default_agent).toBe(getAgentDisplayName("hephaestus"))
   })
 
   test("sets default_agent to sisyphus when configured default_agent is empty after trim", async () => {
@@ -684,7 +684,7 @@ describe("default_agent behavior with Sisyphus orchestration", () => {
     await handler(config)
 
     // then
-    expect(config.default_agent).toBe(getAgentRuntimeName("sisyphus"))
+    expect(config.default_agent).toBe(getAgentDisplayName("sisyphus"))
   })
 
   test("preserves custom default_agent names while trimming whitespace", async () => {
@@ -750,7 +750,7 @@ describe("Prometheus category config resolution", () => {
 
     // then
     expect(config).toBeDefined()
-    expect(config?.model).toBe("openai/gpt-5.4")
+    expect(config?.model).toBe("openai/gpt-5.5")
     expect(config?.variant).toBe("xhigh")
   })
 
@@ -810,7 +810,7 @@ describe("Prometheus category config resolution", () => {
 
     // then - falls back to DEFAULT_CATEGORIES
     expect(config).toBeDefined()
-    expect(config?.model).toBe("openai/gpt-5.4")
+    expect(config?.model).toBe("openai/gpt-5.5")
     expect(config?.variant).toBe("xhigh")
   })
 
@@ -1557,9 +1557,7 @@ describe("disable_omo_env pass-through", () => {
     const lastCall =
       createBuiltinAgentsMock.mock.calls[createBuiltinAgentsMock.mock.calls.length - 1]
     expect(lastCall).toBeDefined()
-    const disableOmoEnv = Array.isArray(lastCall)
-      ? lastCall[lastCall.length - 1]
-      : undefined
+    const disableOmoEnv = Array.isArray(lastCall) ? lastCall[12] : undefined
     expect(disableOmoEnv).toBe(true)
   })
 
@@ -1594,9 +1592,7 @@ describe("disable_omo_env pass-through", () => {
     const lastCall =
       createBuiltinAgentsMock.mock.calls[createBuiltinAgentsMock.mock.calls.length - 1]
     expect(lastCall).toBeDefined()
-    const disableOmoEnv = Array.isArray(lastCall)
-      ? lastCall[lastCall.length - 1]
-      : undefined
+    const disableOmoEnv = Array.isArray(lastCall) ? lastCall[12] : undefined
     expect(disableOmoEnv).toBe(false)
   })
 })

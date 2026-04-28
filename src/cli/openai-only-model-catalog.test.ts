@@ -40,10 +40,10 @@ describe("generateModelConfig OpenAI-only model catalog", () => {
     const result = generateModelConfig(config)
 
     // #then
-    expect(result.categories?.artistry).toEqual({ model: "openai/gpt-5.4", variant: "xhigh" })
+    expect(result.categories?.artistry).toEqual({ model: "openai/gpt-5.5", variant: "xhigh" })
     expect(result.categories?.quick).toEqual({ model: "openai/gpt-5.4-mini" })
-    expect(result.categories?.["visual-engineering"]).toEqual({ model: "openai/gpt-5.4", variant: "high" })
-    expect(result.categories?.writing).toEqual({ model: "openai/gpt-5.4", variant: "medium" })
+    expect(result.categories?.["visual-engineering"]).toEqual({ model: "openai/gpt-5.5", variant: "high" })
+    expect(result.categories?.writing).toEqual({ model: "openai/gpt-5.5", variant: "medium" })
   })
 
   test("does not apply OpenAI-only overrides when OpenCode Go is also available", () => {

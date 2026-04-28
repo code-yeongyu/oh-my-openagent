@@ -1,3 +1,5 @@
+/// <reference types="bun-types" />
+
 import { describe, expect, test } from "bun:test";
 import {
   getHephaestusPromptSource,
@@ -21,6 +23,23 @@ describe("getHephaestusPromptSource", () => {
     expect(source1).toBe("gpt-5-4");
     expect(source2).toBe("gpt-5-4");
     expect(source3).toBe("gpt-5-4");
+  });
+
+  test("returns 'gpt-5-5' for gpt-5.5 models", () => {
+    // given
+    const model1 = "openai/gpt-5.5";
+    const model2 = "openai/gpt-5-5";
+    const model3 = "github-copilot/gpt-5.5";
+
+    // when
+    const source1 = getHephaestusPromptSource(model1);
+    const source2 = getHephaestusPromptSource(model2);
+    const source3 = getHephaestusPromptSource(model3);
+
+    // then
+    expect(source1).toBe("gpt-5-5");
+    expect(source2).toBe("gpt-5-5");
+    expect(source3).toBe("gpt-5-5");
   });
 
   test("returns 'gpt-5-3-codex' for GPT 5.3 Codex models", () => {
@@ -94,6 +113,19 @@ describe("getHephaestusPrompt", () => {
     expect(prompt).toContain("You build context by examining");
     expect(prompt).toContain("Never chain together bash commands");
     expect(prompt).toContain("<tool_usage_rules>");
+  });
+
+  test("GPT 5.5 model returns GPT-5.5 optimized prompt", () => {
+    // given
+    const model = "openai/gpt-5.5";
+
+    // when
+    const prompt = getHephaestusPrompt(model);
+
+    // then
+    expect(prompt).toContain("You build context by examining");
+    expect(prompt).toContain("Forbidden stops");
+    expect(prompt).toContain("Three-attempt failure protocol");
   });
 
   test("GPT 5.3-codex model returns GPT-5.3 prompt", () => {
@@ -291,7 +323,7 @@ describe("maybeCreateHephaestusConfig GPT apply_patch guard", () => {
           model: "openai/gpt-5.4",
           permission: {
             apply_patch: "allow",
-          },
+          } as Record<string, "allow">,
         },
       };
       const mergedCategories: Record<string, CategoryConfig> = {};
@@ -325,7 +357,7 @@ describe("maybeCreateHephaestusConfig GPT apply_patch guard", () => {
           model: "anthropic/claude-opus-4-7",
           permission: {
             apply_patch: "allow",
-          },
+          } as Record<string, "allow">,
         },
       };
       const mergedCategories: Record<string, CategoryConfig> = {};
@@ -359,7 +391,7 @@ describe("maybeCreateHephaestusConfig GPT apply_patch guard", () => {
           model: "openai/gpt-4o",
           permission: {
             apply_patch: "allow",
-          },
+          } as Record<string, "allow">,
         },
       };
       const mergedCategories: Record<string, CategoryConfig> = {};
@@ -382,6 +414,212 @@ describe("maybeCreateHephaestusConfig GPT apply_patch guard", () => {
       expect(config).toBeDefined();
       expect(config?.model).toBe("openai/gpt-4o");
       expect(config?.permission).toHaveProperty("apply_patch", "deny");
+    });
+  });
+
+  describe("#given Opus 4.7 model with user override allowing grep and glob", () => {
+    test("#when config is created #then grep and glob are still denied", () => {
+      // given
+      const agentOverrides: AgentOverrides = {
+        hephaestus: {
+          model: "anthropic/claude-opus-4-7",
+          permission: {
+            grep: "allow",
+            glob: "allow",
+          } as Record<string, "allow">,
+        },
+      };
+      const mergedCategories: Record<string, CategoryConfig> = {};
+
+      // when
+      const config = maybeCreateHephaestusConfig({
+        disabledAgents: [],
+        agentOverrides,
+        availableModels: new Set(["anthropic/claude-opus-4-7"]),
+        systemDefaultModel: "anthropic/claude-opus-4-7",
+        isFirstRunNoCache: false,
+        availableAgents: [],
+        availableSkills: [],
+        availableCategories: [],
+        mergedCategories,
+        useTaskSystem: false,
+      });
+
+      // then
+      expect(config?.permission).toHaveProperty("grep", "deny");
+      expect(config?.permission).toHaveProperty("glob", "deny");
+    });
+  });
+
+  describe("#given dotted Opus 4.7 model with user override allowing grep and glob", () => {
+    test("#when config is created #then grep and glob are still denied", () => {
+      // given
+      const agentOverrides: AgentOverrides = {
+        hephaestus: {
+          model: "anthropic/claude-opus-4.7",
+          permission: {
+            grep: "allow",
+            glob: "allow",
+          } as Record<string, "allow">,
+        },
+      };
+      const mergedCategories: Record<string, CategoryConfig> = {};
+
+      // when
+      const config = maybeCreateHephaestusConfig({
+        disabledAgents: [],
+        agentOverrides,
+        availableModels: new Set(["anthropic/claude-opus-4.7"]),
+        systemDefaultModel: "anthropic/claude-opus-4.7",
+        isFirstRunNoCache: false,
+        availableAgents: [],
+        availableSkills: [],
+        availableCategories: [],
+        mergedCategories,
+        useTaskSystem: false,
+      });
+
+      // then
+      expect(config?.permission).toHaveProperty("grep", "deny");
+      expect(config?.permission).toHaveProperty("glob", "deny");
+    });
+  });
+
+  describe("#given GPT 5.5 model with user override allowing grep and glob", () => {
+    test("#when config is created #then grep and glob are still denied", () => {
+      // given
+      const agentOverrides: AgentOverrides = {
+        hephaestus: {
+          model: "openai/gpt-5.5",
+          permission: {
+            grep: "allow",
+            glob: "allow",
+          } as Record<string, "allow">,
+        },
+      };
+      const mergedCategories: Record<string, CategoryConfig> = {};
+
+      // when
+      const config = maybeCreateHephaestusConfig({
+        disabledAgents: [],
+        agentOverrides,
+        availableModels: new Set(["openai/gpt-5.5"]),
+        systemDefaultModel: "openai/gpt-5.5",
+        isFirstRunNoCache: false,
+        availableAgents: [],
+        availableSkills: [],
+        availableCategories: [],
+        mergedCategories,
+        useTaskSystem: false,
+      });
+
+      // then
+      expect(config?.permission).toHaveProperty("grep", "deny");
+      expect(config?.permission).toHaveProperty("glob", "deny");
+    });
+  });
+
+  describe("#given frontier default model with category override to non-frontier model", () => {
+    test("#when config is created #then stale grep and glob denies are cleared", () => {
+      // given
+      const agentOverrides: AgentOverrides = {
+        hephaestus: {
+          category: "non-frontier",
+        },
+      };
+      const mergedCategories: Record<string, CategoryConfig> = {
+        "non-frontier": {
+          model: "openai/gpt-5.4",
+        },
+      };
+
+      // when
+      const config = maybeCreateHephaestusConfig({
+        disabledAgents: [],
+        agentOverrides,
+        availableModels: new Set(["openai/gpt-5.5", "openai/gpt-5.4"]),
+        systemDefaultModel: "openai/gpt-5.5",
+        isFirstRunNoCache: false,
+        availableAgents: [],
+        availableSkills: [],
+        availableCategories: [],
+        mergedCategories,
+        useTaskSystem: false,
+      });
+
+      // then
+      expect(config?.model).toBe("openai/gpt-5.4");
+      expect(config?.permission).not.toHaveProperty("grep");
+      expect(config?.permission).not.toHaveProperty("glob");
+    });
+  });
+
+  describe("#given non-frontier model with user override denying grep and glob", () => {
+    test("#when config is created #then explicit user denies are preserved", () => {
+      // given
+      const agentOverrides: AgentOverrides = {
+        hephaestus: {
+          model: "openai/gpt-5.4",
+          permission: {
+            grep: "deny",
+            glob: "deny",
+          } as Record<string, "deny">,
+        },
+      };
+      const mergedCategories: Record<string, CategoryConfig> = {};
+
+      // when
+      const config = maybeCreateHephaestusConfig({
+        disabledAgents: [],
+        agentOverrides,
+        availableModels: new Set(["openai/gpt-5.4"]),
+        systemDefaultModel: "openai/gpt-5.4",
+        isFirstRunNoCache: false,
+        availableAgents: [],
+        availableSkills: [],
+        availableCategories: [],
+        mergedCategories,
+        useTaskSystem: false,
+      });
+
+      // then
+      expect(config?.permission).toHaveProperty("grep", "deny");
+      expect(config?.permission).toHaveProperty("glob", "deny");
+    });
+  });
+
+  describe("#given non-frontier model with legacy user tools denying grep and glob", () => {
+    test("#when config is created #then explicit legacy denies are preserved", () => {
+      // given
+      const legacyOverride = {
+        model: "openai/gpt-5.4",
+        tools: {
+          grep: false,
+          glob: false,
+        },
+      };
+      const agentOverrides: AgentOverrides = {
+        hephaestus: legacyOverride,
+      };
+      const mergedCategories: Record<string, CategoryConfig> = {};
+
+      // when
+      const config = maybeCreateHephaestusConfig({
+        disabledAgents: [],
+        agentOverrides,
+        availableModels: new Set(["openai/gpt-5.4"]),
+        systemDefaultModel: "openai/gpt-5.4",
+        isFirstRunNoCache: false,
+        availableAgents: [],
+        availableSkills: [],
+        availableCategories: [],
+        mergedCategories,
+        useTaskSystem: false,
+      });
+
+      // then
+      expect(config?.permission).toHaveProperty("grep", "deny");
+      expect(config?.permission).toHaveProperty("glob", "deny");
     });
   });
 });

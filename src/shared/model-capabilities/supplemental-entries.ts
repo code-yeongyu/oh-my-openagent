@@ -17,4 +17,20 @@ export const SUPPLEMENTAL_MODEL_CAPABILITIES: Record<string, ModelCapabilitiesSn
 			output: 128000,
 		},
 	},
+	"gpt-5.5": {
+		id: "gpt-5.5",
+		family: "gpt",
+		reasoning: true,
+		temperature: false,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image", "pdf"],
+			output: ["text"],
+		},
+		limit: {
+			context: 400000,
+			input: 272000,
+			output: 128000,
+		},
+	},
 }

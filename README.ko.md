@@ -135,7 +135,7 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 
 다음 구독만 있어도 ultrawork는 충분히 잘 돌아갑니다 (본 프로젝트와 무관하며, 개인적인 추천일 뿐입니다):
 - [ChatGPT 구독 ($20)](https://chatgpt.com/)
-- [Kimi Code 구독 ($0.99) (*이번 달 한정)](https://www.kimi.com/membership/pricing?track_id=5cdeca93-66f0-4d35-aabb-b6df8fcea328)
+- [Kimi Code 구독 ($19)](https://www.kimi.com/code)
 - [GLM Coding 요금제 ($10)](https://z.ai/subscribe)
 - 종량제(pay-per-token) 대상자라면 kimi와 gemini 모델을 써도 비용이 별로 안 나옵니다.
 

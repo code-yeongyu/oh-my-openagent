@@ -5,6 +5,25 @@ import packageJson from "../../package.json" with { type: "json" }
 import { PLUGIN_NAME, PUBLISHED_PACKAGE_NAME } from "./plugin-identity"
 import { getPostHogActivityCaptureState } from "./posthog-activity-state"
 
+/** @internal test-only seam: keep null in production to use the real implementation. */
+let activityStateProviderOverride: typeof getPostHogActivityCaptureState | null = null
+
+function resolveActivityState(): ReturnType<typeof getPostHogActivityCaptureState> {
+  return (activityStateProviderOverride ?? getPostHogActivityCaptureState)()
+}
+
+/** @internal test-only */
+export function __setActivityStateProviderForTesting(
+  provider: typeof getPostHogActivityCaptureState,
+): void {
+  activityStateProviderOverride = provider
+}
+
+/** @internal test-only */
+export function __resetActivityStateProviderForTesting(): void {
+  activityStateProviderOverride = null
+}
+
 const DEFAULT_POSTHOG_HOST = "https://us.i.posthog.com"
 const DEFAULT_POSTHOG_API_KEY = "phc_CFJhj5HyvA62QPhvyaUCtaq23aUfznnijg5VaaGkNk74"
 
@@ -55,7 +74,18 @@ function getPostHogHost(): string {
   return process.env.POSTHOG_HOST?.trim() || DEFAULT_POSTHOG_HOST
 }
 
+function safeCpus(): { length: number; model: string | undefined } {
+  try {
+    const cpus = os.cpus()
+    return { length: cpus.length, model: cpus[0]?.model }
+  } catch {
+    return { length: 0, model: undefined }
+  }
+}
+
 function getSharedProperties(source: PostHogSource): NonNullable<PostHogCaptureEvent["properties"]> {
+  const cpus = safeCpus()
+
   return {
     platform: "oh-my-opencode",
     package_name: PUBLISHED_PACKAGE_NAME,
@@ -68,8 +98,8 @@ function getSharedProperties(source: PostHogSource): NonNullable<PostHogCaptureE
     $os_version: os.release(),
     os_arch: os.arch(),
     os_type: os.type(),
-    cpu_count: os.cpus().length,
-    cpu_model: os.cpus()[0]?.model,
+    cpu_count: cpus.length,
+    cpu_model: cpus.model,
     total_memory_gb: Math.round(os.totalmem() / 1024 / 1024 / 1024),
     locale: Intl.DateTimeFormat().resolvedOptions().locale,
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -117,7 +147,7 @@ function createPostHogClient(
       })
     },
     trackActive: (distinctId, reason) => {
-      const activityState = getPostHogActivityCaptureState()
+      const activityState = resolveActivityState()
 
       if (activityState.captureDaily) {
         configuredClient.capture({
@@ -126,18 +156,6 @@ function createPostHogClient(
           properties: {
             ...sharedProperties,
             day_utc: activityState.dayUTC,
-            reason,
-          },
-        })
-      }
-
-      if (activityState.captureHourly) {
-        configuredClient.capture({
-          distinctId,
-          event: "omo_hourly_active",
-          properties: {
-            ...sharedProperties,
-            hour_utc: activityState.hourUTC,
             reason,
           },
         })

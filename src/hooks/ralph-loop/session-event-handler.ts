@@ -7,15 +7,9 @@ type LoopStateController = {
 	clear: () => boolean
 }
 
-type SessionRecovery = {
-	clear: (sessionID: string) => void
-	markRecovering: (sessionID: string) => void
-}
-
 export function handleDeletedLoopSession(
 	props: Record<string, unknown> | undefined,
 	loopState: LoopStateController,
-	sessionRecovery: SessionRecovery,
 ): boolean {
 	const sessionInfo = props?.info as { id?: string } | undefined
 	if (!sessionInfo?.id) return false
@@ -25,14 +19,12 @@ export function handleDeletedLoopSession(
 		loopState.clear()
 		log(`[${HOOK_NAME}] Session deleted, loop cleared`, { sessionID: sessionInfo.id })
 	}
-	sessionRecovery.clear(sessionInfo.id)
 	return true
 }
 
 export function handleErroredLoopSession(
 	props: Record<string, unknown> | undefined,
 	loopState: LoopStateController,
-	sessionRecovery: SessionRecovery,
 ): boolean {
 	const sessionID = props?.sessionID as string | undefined
 	const error = props?.error as { name?: string } | undefined
@@ -44,13 +36,12 @@ export function handleErroredLoopSession(
 				loopState.clear()
 				log(`[${HOOK_NAME}] User aborted, loop cleared`, { sessionID })
 			}
-			sessionRecovery.clear(sessionID)
 		}
 		return true
 	}
 
 	if (sessionID) {
-		sessionRecovery.markRecovering(sessionID)
+		log(`[${HOOK_NAME}] Session error ignored, loop remains active`, { sessionID })
 	}
 	return true
 }
