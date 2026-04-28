@@ -40,7 +40,7 @@ export function detectKeywordsWithType(
   disabledKeywords?: ReadonlyArray<KeywordType>,
 ): DetectedKeyword[] {
   const textWithoutCode = removeCodeBlocks(text)
-  const types: Array<KeywordType> = ["ultrawork", "search", "analyze", "team"]
+  const types: Array<KeywordType> = ["ultrawork", "search", "analyze", "team", "hyperplan"]
   const disabled = new Set<KeywordType>(disabledKeywords ?? [])
   return KEYWORD_DETECTORS.map(({ pattern, message }, index) => ({
     matches: pattern.test(textWithoutCode),
