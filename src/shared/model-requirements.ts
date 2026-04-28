@@ -20,11 +20,32 @@ export type ModelRequirement = {
 export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   sisyphus: {
     fallbackChain: [
+      { providers: ["openrouter"], model: "deepseek/deepseek-v4-pro", variant: "max" },
       {
         providers: ["anthropic", "github-copilot", "opencode", "vercel"],
         model: "claude-opus-4-7",
         variant: "max",
       },
+      { providers: ["opencode-go", "vercel"], model: "kimi-k2.5" },
+      { providers: ["kimi-for-coding"], model: "k2p5" },
+      {
+        providers: [
+          "opencode",
+          "moonshotai",
+          "moonshotai-cn",
+          "firmware",
+          "ollama-cloud",
+          "aihubmix",
+          "vercel",
+        ],
+        model: "kimi-k2.5",
+      },
+      { providers: ["openai", "github-copilot", "opencode", "vercel"], model: "gpt-5.5", variant: "medium" },
+      { providers: ["zai-coding-plan", "opencode", "vercel"], model: "glm-5" },
+      { providers: ["opencode"], model: "big-pickle" },
+    ],
+    requiresAnyModel: true,
+  },
       { providers: ["opencode-go", "vercel"], model: "kimi-k2.5" },
       { providers: ["kimi-for-coding"], model: "k2p5" },
       {
@@ -57,6 +78,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   oracle: {
     fallbackChain: [
+      { providers: ["openrouter"], model: "moonshotai/kimi-k2.6" },
       {
         providers: ["openai", "github-copilot", "opencode", "vercel"],
         model: "gpt-5.5",
@@ -75,8 +97,22 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["opencode-go", "vercel"], model: "glm-5" },
     ],
   },
+      {
+        providers: ["google", "github-copilot", "opencode", "vercel"],
+        model: "gemini-3.1-pro",
+        variant: "high",
+      },
+      {
+        providers: ["anthropic", "github-copilot", "opencode", "vercel"],
+        model: "claude-opus-4-7",
+        variant: "max",
+      },
+      { providers: ["opencode-go", "vercel"], model: "glm-5" },
+    ],
+  },
   librarian: {
     fallbackChain: [
+      { providers: ["openrouter"], model: "qwen/qwen3.6-flash" },
       { providers: ["openai"], model: "gpt-5.4-mini-fast" },
       { providers: ["opencode-go", "vercel"], model: "minimax-m2.7-highspeed" },
       { providers: ["opencode-go", "vercel"], model: "minimax-m2.7" },
@@ -86,6 +122,17 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   explore: {
     fallbackChain: [
+      { providers: ["openrouter"], model: "qwen/qwen3.6-flash" },
+      { providers: ["openai"], model: "gpt-5.4-mini-fast" },
+      { providers: ["opencode-go", "vercel"], model: "minimax-m2.7-highspeed" },
+      { providers: ["opencode-go", "vercel"], model: "minimax-m2.7" },
+      { providers: ["anthropic", "opencode", "vercel"], model: "claude-haiku-4-5" },
+      { providers: ["openai", "opencode", "vercel"], model: "gpt-5.4-nano" },
+    ],
+  },
+  explore: {
+    fallbackChain: [
+      { providers: ["openrouter"], model: "qwen/qwen3.6-flash" },
       { providers: ["openai"], model: "gpt-5.4-mini-fast" },
       { providers: ["opencode-go", "vercel"], model: "minimax-m2.7-highspeed" },
       { providers: ["opencode-go", "vercel"], model: "minimax-m2.7" },
@@ -95,6 +142,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   "multimodal-looker": {
     fallbackChain: [
+      { providers: ["openrouter"], model: "~google/gemini-flash-latest" },
       { providers: ["openai", "opencode", "vercel"], model: "gpt-5.5", variant: "medium" },
       { providers: ["opencode-go", "vercel"], model: "kimi-k2.5" },
       { providers: ["zai-coding-plan", "vercel"], model: "glm-4.6v" },
@@ -103,6 +151,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   prometheus: {
     fallbackChain: [
+      { providers: ["openrouter"], model: "deepseek/deepseek-v4-pro", variant: "max" },
       {
         providers: ["anthropic", "github-copilot", "opencode", "vercel"],
         model: "claude-opus-4-7",
@@ -122,6 +171,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   metis: {
     fallbackChain: [
+      { providers: ["openrouter"], model: "deepseek/deepseek-v4-pro", variant: "max" },
       {
         providers: ["anthropic", "github-copilot", "opencode", "vercel"],
         model: "claude-opus-4-7",
@@ -138,6 +188,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   momus: {
     fallbackChain: [
+      { providers: ["openrouter"], model: "deepseek/deepseek-v4-pro", reasoningEffort: "xhigh" },
       {
         providers: ["openai", "github-copilot", "opencode", "vercel"],
         model: "gpt-5.5",
@@ -158,6 +209,70 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   atlas: {
     fallbackChain: [
+      { providers: ["openrouter"], model: "xiaomi/mimo-v2.5-pro" },
+      { providers: ["anthropic", "github-copilot", "opencode", "vercel"], model: "claude-sonnet-4-6" },
+      { providers: ["opencode-go", "vercel"], model: "kimi-k2.5" },
+      {
+        providers: ["openai", "github-copilot", "opencode", "vercel"],
+        model: "gpt-5.5",
+        variant: "medium",
+      },
+      { providers: ["opencode-go", "vercel"], model: "minimax-m2.7" },
+    ],
+  },
+      {
+        providers: ["openai", "github-copilot", "opencode", "vercel"],
+        model: "gpt-5.5",
+        variant: "high",
+      },
+      { providers: ["opencode-go", "vercel"], model: "glm-5" },
+      {
+        providers: ["google", "github-copilot", "opencode", "vercel"],
+        model: "gemini-3.1-pro",
+      },
+    ],
+  },
+  metis: {
+    fallbackChain: [
+      { providers: ["openrouter"], model: "deepseek/deepseek-v4-pro", variant: "max" },
+      {
+        providers: ["anthropic", "github-copilot", "opencode", "vercel"],
+        model: "claude-opus-4-7",
+        variant: "max",
+      },
+      {
+        providers: ["openai", "github-copilot", "opencode", "vercel"],
+        model: "gpt-5.5",
+        variant: "high",
+      },
+      { providers: ["opencode-go", "vercel"], model: "glm-5" },
+      { providers: ["kimi-for-coding"], model: "k2p5" },
+    ],
+  },
+  momus: {
+    fallbackChain: [
+      { providers: ["openrouter"], model: "deepseek/deepseek-v4-pro", reasoningEffort: "xhigh" },
+      {
+        providers: ["openai", "github-copilot", "opencode", "vercel"],
+        model: "gpt-5.5",
+        variant: "xhigh",
+      },
+      {
+        providers: ["anthropic", "github-copilot", "opencode", "vercel"],
+        model: "claude-opus-4-7",
+        variant: "max",
+      },
+      {
+        providers: ["google", "github-copilot", "opencode", "vercel"],
+        model: "gemini-3.1-pro",
+        variant: "high",
+      },
+      { providers: ["opencode-go", "vercel"], model: "glm-5" },
+    ],
+  },
+  atlas: {
+    fallbackChain: [
+      { providers: ["openrouter"], model: "xiaomi/mimo-v2.5-pro" },
       { providers: ["anthropic", "github-copilot", "opencode", "vercel"], model: "claude-sonnet-4-6" },
       { providers: ["opencode-go", "vercel"], model: "kimi-k2.5" },
       {
@@ -186,6 +301,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
 export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   "visual-engineering": {
     fallbackChain: [
+      { providers: ["openrouter"], model: "~google/gemini-pro-latest" },
       {
         providers: ["google", "github-copilot", "opencode", "vercel"],
         model: "gemini-3.1-pro",
@@ -203,6 +319,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   ultrabrain: {
     fallbackChain: [
+      { providers: ["openrouter"], model: "openai/gpt-5.5", reasoningEffort: "xhigh" },
       {
         providers: ["openai", "opencode", "vercel"],
         model: "gpt-5.5",
@@ -242,6 +359,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   artistry: {
     fallbackChain: [
+      { providers: ["openrouter"], model: "google/gemini-3.1-pro-preview" },
       {
         providers: ["google", "github-copilot", "opencode", "vercel"],
         model: "gemini-3.1-pro",
@@ -258,6 +376,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   quick: {
     fallbackChain: [
+      { providers: ["openrouter"], model: "qwen/qwen3.6-27b" },
       {
         providers: ["openai", "github-copilot", "opencode", "vercel"],
         model: "gpt-5.4-mini",
@@ -276,6 +395,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   "unspecified-low": {
     fallbackChain: [
+      { providers: ["openrouter"], model: "qwen/qwen3.6-27b" },
       {
         providers: ["anthropic", "github-copilot", "opencode", "vercel"],
         model: "claude-sonnet-4-6",
@@ -295,6 +415,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   "unspecified-high": {
     fallbackChain: [
+      { providers: ["openrouter"], model: "qwen/qwen3.6-plus" },
       {
         providers: ["anthropic", "github-copilot", "opencode", "vercel"],
         model: "claude-opus-4-7",
@@ -325,6 +446,101 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   writing: {
     fallbackChain: [
+      { providers: ["openrouter"], model: "~google/gemini-pro-latest" },
+      {
+        providers: ["google", "github-copilot", "opencode", "vercel"],
+        model: "gemini-3-flash",
+      },
+      { providers: ["opencode-go", "vercel"], model: "kimi-k2.5" },
+      {
+        providers: ["anthropic", "github-copilot", "opencode", "vercel"],
+        model: "claude-sonnet-4-6",
+      },
+      { providers: ["opencode-go", "vercel"], model: "minimax-m2.7" },
+    ],
+  },
+      {
+        providers: ["anthropic", "github-copilot", "opencode", "vercel"],
+        model: "claude-opus-4-7",
+        variant: "max",
+      },
+      { providers: ["openai", "github-copilot", "opencode", "vercel"], model: "gpt-5.5" },
+    ],
+    requiresModel: "gemini-3.1-pro",
+  },
+  quick: {
+    fallbackChain: [
+      { providers: ["openrouter"], model: "qwen/qwen3.6-27b" },
+      {
+        providers: ["openai", "github-copilot", "opencode", "vercel"],
+        model: "gpt-5.4-mini",
+      },
+      {
+        providers: ["anthropic", "github-copilot", "opencode", "vercel"],
+        model: "claude-haiku-4-5",
+      },
+      {
+        providers: ["google", "github-copilot", "opencode", "vercel"],
+        model: "gemini-3-flash",
+      },
+      { providers: ["opencode-go", "vercel"], model: "minimax-m2.7" },
+      { providers: ["opencode", "vercel"], model: "gpt-5-nano" },
+    ],
+  },
+  "unspecified-low": {
+    fallbackChain: [
+      { providers: ["openrouter"], model: "qwen/qwen3.6-27b" },
+      {
+        providers: ["anthropic", "github-copilot", "opencode", "vercel"],
+        model: "claude-sonnet-4-6",
+      },
+      {
+        providers: ["openai", "opencode", "vercel"],
+        model: "gpt-5.3-codex",
+        variant: "medium",
+      },
+      { providers: ["opencode-go", "vercel"], model: "kimi-k2.5" },
+      {
+        providers: ["google", "github-copilot", "opencode", "vercel"],
+        model: "gemini-3-flash",
+      },
+      { providers: ["opencode-go", "vercel"], model: "minimax-m2.7" },
+    ],
+  },
+  "unspecified-high": {
+    fallbackChain: [
+      { providers: ["openrouter"], model: "qwen/qwen3.6-plus" },
+      {
+        providers: ["anthropic", "github-copilot", "opencode", "vercel"],
+        model: "claude-opus-4-7",
+        variant: "max",
+      },
+      {
+        providers: ["openai", "github-copilot", "opencode", "vercel"],
+        model: "gpt-5.5",
+        variant: "high",
+      },
+      { providers: ["zai-coding-plan", "opencode", "vercel"], model: "glm-5" },
+      { providers: ["kimi-for-coding"], model: "k2p5" },
+      { providers: ["opencode-go", "vercel"], model: "glm-5" },
+      { providers: ["opencode", "vercel"], model: "kimi-k2.5" },
+      {
+        providers: [
+          "opencode",
+          "moonshotai",
+          "moonshotai-cn",
+          "firmware",
+          "ollama-cloud",
+          "aihubmix",
+          "vercel",
+        ],
+        model: "kimi-k2.5",
+      },
+    ],
+  },
+  writing: {
+    fallbackChain: [
+      { providers: ["openrouter"], model: "~google/gemini-pro-latest" },
       {
         providers: ["google", "github-copilot", "opencode", "vercel"],
         model: "gemini-3-flash",
