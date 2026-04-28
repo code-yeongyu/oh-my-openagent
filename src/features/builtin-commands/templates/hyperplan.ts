@@ -6,7 +6,7 @@ LOAD THE HYPERPLAN SKILL IMMEDIATELY:
 skill(name="hyperplan")
 \`\`\`
 
-After loading the skill, follow its 6-phase workflow EXACTLY using this user request:
+After loading the skill, follow its 7-phase workflow EXACTLY using this user request:
 
 <user-request>
 $ARGUMENTS

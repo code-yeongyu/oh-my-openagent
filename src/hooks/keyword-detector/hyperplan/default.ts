@@ -23,15 +23,17 @@ LOAD THE HYPERPLAN SKILL IMMEDIATELY:
 skill(name="hyperplan")
 \`\`\`
 
-After loading, follow the skill's 6-phase workflow EXACTLY:
+After loading, follow the skill's full workflow EXACTLY:
 1. Acknowledge and capture the planning request
-2. Spawn the 5-member adversarial team via team_create
+2. Spawn the 5-member adversarial team via \`team_create\`
 3. Round 1 — Independent analysis (each member produces findings)
 4. Round 2 — Cross-attack (each member ruthlessly attacks the other 4's findings)
 5. Round 3 — Defend, refine, or concede
-6. Synthesize defensible insights into a work plan + clean up the team
+6. Distill defensible insights into a structured bundle (Lead does NOT write the plan)
+7. MANDATORY: hand the bundle to the \`plan\` agent via \`task(subagent_type="plan", ...)\` — the plan agent owns sequencing, parallelization, and verification gates
+8. Present the plan agent's output verbatim with provenance line, then clean up the team
 
-Do NOT improvise. Do NOT skip rounds. Be the lead orchestrator and let the adversarial members do the cross-critique.
+Do NOT improvise. Do NOT skip rounds. Do NOT write the plan yourself in step 6 — the handoff to the plan agent in step 7 is non-negotiable. Be the lead orchestrator and let the adversarial members do the cross-critique.
 
 If team-mode is unavailable (\`team_*\` tools missing), instruct the user to set \`team_mode.enabled: true\` in \`~/.config/opencode/oh-my-opencode.jsonc\` and restart opencode.
 </hyperplan-mode>`
