@@ -4,13 +4,14 @@ import type { BuiltinCommandName, BuiltinCommands } from "./types"
 import { INIT_DEEP_TEMPLATE } from "./templates/init-deep"
 import { RALPH_LOOP_TEMPLATE, ULW_LOOP_TEMPLATE, CANCEL_RALPH_TEMPLATE } from "./templates/ralph-loop"
 import { STOP_CONTINUATION_TEMPLATE } from "./templates/stop-continuation"
-import { REFACTOR_TEMPLATE } from "./templates/refactor"
+import { REFACTOR_TEMPLATE, REFACTOR_TEAM_MODE_ADDENDUM } from "./templates/refactor"
 import { START_WORK_TEMPLATE } from "./templates/start-work"
 import { HANDOFF_TEMPLATE } from "./templates/handoff"
-import { REMOVE_AI_SLOPS_TEMPLATE } from "./templates/remove-ai-slops"
+import { REMOVE_AI_SLOPS_TEMPLATE, REMOVE_AI_SLOPS_TEAM_MODE_ADDENDUM } from "./templates/remove-ai-slops"
 
 interface LoadBuiltinCommandsOptions {
   useRegisteredAgents?: boolean
+  teamModeEnabled?: boolean
 }
 
 function resolveStartWorkAgent(options?: LoadBuiltinCommandsOptions): "atlas" | "sisyphus" {
@@ -21,9 +22,21 @@ function resolveStartWorkAgent(options?: LoadBuiltinCommandsOptions): "atlas" | 
   return "atlas"
 }
 
+function withTeamModeAddendum(baseTemplate: string, addendum: string, teamModeEnabled: boolean): string {
+  return teamModeEnabled ? `${baseTemplate}\n${addendum}` : baseTemplate
+}
+
 function createBuiltinCommandDefinitions(
   options?: LoadBuiltinCommandsOptions,
 ): Record<BuiltinCommandName, Omit<CommandDefinition, "name">> {
+  const teamModeEnabled = options?.teamModeEnabled ?? false
+  const refactorContent = withTeamModeAddendum(REFACTOR_TEMPLATE, REFACTOR_TEAM_MODE_ADDENDUM, teamModeEnabled)
+  const removeAiSlopsContent = withTeamModeAddendum(
+    REMOVE_AI_SLOPS_TEMPLATE,
+    REMOVE_AI_SLOPS_TEAM_MODE_ADDENDUM,
+    teamModeEnabled,
+  )
+
   return {
     "init-deep": {
       description: "(builtin) Initialize hierarchical AGENTS.md knowledge base",
@@ -68,7 +81,7 @@ ${CANCEL_RALPH_TEMPLATE}
       description:
         "(builtin) Intelligent refactoring command with LSP, AST-grep, architecture analysis, codemap, and TDD verification.",
       template: `<command-instruction>
-${REFACTOR_TEMPLATE}
+${refactorContent}
 </command-instruction>`,
       argumentHint: "<refactoring-target> [--scope=<file|module|project>] [--strategy=<safe|aggressive>]",
     },
@@ -98,7 +111,7 @@ ${STOP_CONTINUATION_TEMPLATE}
     "remove-ai-slops": {
       description: "(builtin) Remove AI-generated code smells from branch changes and critically review the results",
       template: `<command-instruction>
-${REMOVE_AI_SLOPS_TEMPLATE}
+${removeAiSlopsContent}
 </command-instruction>
 
 <user-request>
