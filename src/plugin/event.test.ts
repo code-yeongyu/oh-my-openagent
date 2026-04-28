@@ -1,9 +1,11 @@
+/// <reference path="../../bun-test.d.ts" />
 import { describe, it, expect, afterEach, mock, spyOn } from "bun:test"
+import type { PluginInput } from "@opencode-ai/plugin"
 
 import { createEventHandler, extractErrorMessage } from "./event"
 import { createChatMessageHandler } from "./chat-message"
 import * as openclawRuntimeDispatch from "../openclaw/runtime-dispatch"
-import { _resetForTesting, setMainSession } from "../features/claude-code-session-state"
+import { _resetForTesting, setMainSession, subagentSessions } from "../features/claude-code-session-state"
 import { clearPendingModelFallback, createModelFallbackHook } from "../hooks/model-fallback/hook"
 import { getSessionPromptParams, setSessionPromptParams } from "../shared/session-prompt-params-state"
 
@@ -36,11 +38,16 @@ function asChatPluginConfig(config: unknown): ChatMessageHandlerArgs["pluginConf
 	return cast<ChatMessageHandlerArgs["pluginConfig"]>(config)
 }
 
+function asPluginInput(input: unknown): PluginInput {
+	return input as PluginInput
+}
+
 function createEventHandlerManagers(
 	overrides: Record<string, unknown> = {},
 ): EventHandlerArgs["managers"] {
 	return cast<EventHandlerArgs["managers"]>({
 		tmuxSessionManager: {
+			onEvent: () => {},
 			onSessionCreated: async () => {},
 			onSessionDeleted: async () => {},
 		},
@@ -89,6 +96,43 @@ function createIdleTrackingEventHandler(dispatchCalls: EventInput[]): ReturnType
 	})
 }
 
+function createIdleDedupSpyEventHandler(args: {
+	onEvent: (event: EventInput["event"]) => void
+	sessionNotification: (input: EventInput) => Promise<void>
+}): ReturnType<typeof createEventHandler> {
+	return createEventHandler({
+		ctx: asEventHandlerContext({
+			directory: "/tmp",
+			client: {
+				session: {},
+			},
+		}),
+		pluginConfig: asPluginConfig({
+			tmux: { enabled: true },
+		}),
+		firstMessageVariantGate: {
+			markSessionCreated: () => {},
+			clear: () => {},
+		},
+		managers: createEventHandlerManagers({
+			tmuxSessionManager: {
+				onEvent: args.onEvent,
+				onSessionCreated: async () => {},
+				onSessionDeleted: async () => {},
+			},
+		}),
+		hooks: createEventHandlerHooks({
+			sessionNotification: args.sessionNotification,
+		}),
+	})
+}
+
+async function flushMicrotasks(turns: number = 5): Promise<void> {
+	for (let index = 0; index < turns; index += 1) {
+		await Promise.resolve()
+	}
+}
+
 afterEach(() => {
 	mock.restore()
 	_resetForTesting()
@@ -107,7 +151,192 @@ describe("event error extraction", () => {
 })
 
 describe("createEventHandler - idle deduplication", () => {
-	it("dispatches both idle events when the real idle arrives within 500ms", async () => {
+	it("#given tmux integration enabled #when session.idle arrives #then it forwards the event to tmuxSessionManager.onEvent", async () => {
+		//#given
+		const onEvent = mock<(event: EventInput["event"]) => void>(() => {})
+		const idleEvent = {
+			event: {
+				type: "session.idle",
+				properties: {
+					sessionID: "ses_tmux_idle",
+				},
+			},
+		}
+		const eventHandler = createEventHandler({
+			ctx: asEventHandlerContext({
+				directory: "/tmp",
+				client: {
+					session: {},
+				},
+			}),
+			pluginConfig: asPluginConfig({
+				tmux: { enabled: true },
+			}),
+			firstMessageVariantGate: {
+				markSessionCreated: () => {},
+				clear: () => {},
+			},
+			managers: createEventHandlerManagers({
+				tmuxSessionManager: {
+					onEvent,
+					onSessionCreated: async () => {},
+					onSessionDeleted: async () => {},
+				},
+			}),
+			hooks: createEventHandlerHooks({}),
+		})
+
+		//#when
+		await eventHandler(asEventHandlerInput(idleEvent))
+
+		//#then
+		expect(onEvent).toHaveBeenCalledTimes(1)
+		expect(onEvent.mock.calls[0]?.[0]).toEqual(idleEvent.event)
+	})
+
+	it("#given a readiness retry is pending #when session.idle arrives through the plugin handler #then tmux retry spawns the pane", async () => {
+		//#given
+		const sessionStatusData: Record<string, { type: string }> = {}
+		const sessionStatusResult = {
+			data: sessionStatusData,
+		}
+		const spawnTmuxPane = mock(async (_sessionId: string) => ({
+			success: true,
+			paneId: "%mock",
+		}))
+		let waitForSessionReadyCallCount = 0
+
+		mock.module("../features/tmux-subagent/pane-state-querier", () => ({
+			queryWindowState: async () => ({
+				windowWidth: 220,
+				windowHeight: 44,
+				mainPane: {
+					paneId: "%0",
+					width: 110,
+					height: 44,
+					left: 0,
+					top: 0,
+					title: "main",
+					isActive: true,
+				},
+				agentPanes: [],
+			}),
+		}))
+		mock.module("../features/tmux-subagent/action-executor", () => ({
+			executeActions: async (actions: Array<{ type: string; sessionId: string }>) => {
+				for (const action of actions) {
+					if (action.type === "spawn") {
+						await spawnTmuxPane(action.sessionId)
+					}
+				}
+
+				return {
+					success: true,
+					spawnedPaneId: "%mock",
+					results: [],
+				}
+			},
+			executeAction: async () => ({ success: true }),
+		}))
+		mock.module("../features/tmux-subagent/session-ready-waiter", () => ({
+			waitForSessionReady: async () => {
+				waitForSessionReadyCallCount += 1
+				if (waitForSessionReadyCallCount === 1) {
+					throw new Error("session readiness timed out")
+				}
+
+				return true
+			},
+		}))
+		mock.module("../shared/tmux", () => ({
+			isInsideTmux: () => true,
+			getCurrentPaneId: () => "%0",
+			POLL_INTERVAL_BACKGROUND_MS: 100,
+			spawnTmuxWindow: async () => ({ success: true, paneId: "%isolated-window" }),
+			spawnTmuxSession: async () => ({ success: true, paneId: "%isolated-session" }),
+			killTmuxSessionIfExists: async () => true,
+			getIsolatedSessionName: (pid: number = 12345) => `omo-agents-${pid}`,
+			sweepStaleOmoAgentSessions: async () => 0,
+		}))
+
+		const { TmuxSessionManager } = await import("../features/tmux-subagent/manager")
+		const managerContext = asPluginInput({
+			serverUrl: new URL("http://localhost:4096"),
+			directory: "/tmp",
+			project: "/tmp",
+			worktree: "/tmp",
+			$: {},
+			client: {
+				session: {
+					status: async () => sessionStatusResult,
+					messages: async () => ({ data: [] }),
+				},
+			},
+		})
+		const manager = new TmuxSessionManager(managerContext, {
+			enabled: true,
+			isolation: "inline",
+			layout: "main-vertical",
+			main_pane_size: 60,
+			main_pane_min_width: 80,
+			agent_pane_min_width: 40,
+		})
+		const eventHandler = createEventHandler({
+			ctx: asEventHandlerContext({
+				directory: "/tmp",
+				client: {
+					session: {},
+				},
+			}),
+			pluginConfig: asPluginConfig({
+				tmux: { enabled: true },
+			}),
+			firstMessageVariantGate: {
+				markSessionCreated: () => {},
+				clear: () => {},
+			},
+			managers: createEventHandlerManagers({
+				tmuxSessionManager: manager,
+				skillMcpManager: {
+					disconnectSession: async () => {},
+				},
+			}),
+			hooks: createEventHandlerHooks({}),
+		})
+
+		//#when
+		await manager.onSessionCreated({
+			type: "session.created",
+			properties: {
+				info: {
+					id: "ses_retry_via_plugin",
+					parentID: "ses_parent",
+					title: "Retry Via Plugin Event",
+				},
+			},
+		})
+
+		//#then
+		expect(spawnTmuxPane).toHaveBeenCalledTimes(0)
+
+		//#when
+		sessionStatusData.ses_retry_via_plugin = { type: "idle" }
+		await eventHandler(asEventHandlerInput({
+			event: {
+				type: "session.idle",
+				properties: {
+					sessionID: "ses_retry_via_plugin",
+				},
+			},
+		}))
+		await flushMicrotasks(20)
+
+		//#then
+		expect(spawnTmuxPane).toHaveBeenCalledTimes(1)
+	})
+
+	it("dedups real-idle-after-synthetic-idle within 500ms", async () => {
+		//#given
 		const dispatchCalls: EventInput[] = []
 		const eventHandler = createIdleTrackingEventHandler(dispatchCalls)
 		const sessionId = "ses_test123"
@@ -128,14 +357,70 @@ describe("createEventHandler - idle deduplication", () => {
 				},
 			},
 		}))
-		expect(dispatchCalls).toHaveLength(2)
+
+		//#then
+		expect(dispatchCalls).toHaveLength(1)
 		expect(dispatchCalls[0]?.event.type).toBe("session.idle")
-		expect(dispatchCalls[1]?.event.type).toBe("session.idle")
 		expect((dispatchCalls[0]?.event.properties as { sessionID?: string } | undefined)?.sessionID).toBe(sessionId)
-		expect((dispatchCalls[1]?.event.properties as { sessionID?: string } | undefined)?.sessionID).toBe(sessionId)
 	})
 
-	it("drops the synthetic idle when a real idle already arrived within 500ms", async () => {
+	it("dedups back-to-back real session.idle events for the same sessionID within 500ms", async () => {
+		//#given
+		const originalDateNow = Date.now
+		let currentNow = 10_000
+		Date.now = () => currentNow
+		const onEvent = mock<(event: EventInput["event"]) => void>(() => {})
+		const sessionNotification = mock(async (_input: EventInput) => {})
+		const eventHandler = createIdleDedupSpyEventHandler({
+			onEvent,
+			sessionNotification,
+		})
+		const sessionId = "ses_same_idle"
+
+		try {
+			//#when
+			await eventHandler(asEventHandlerInput({
+				event: {
+					type: "session.idle",
+					properties: {
+						sessionID: sessionId,
+					},
+				},
+			}))
+			await eventHandler(asEventHandlerInput({
+				event: {
+					type: "session.idle",
+					properties: {
+						sessionID: sessionId,
+					},
+				},
+			}))
+
+			//#then
+			expect(onEvent).toHaveBeenCalledTimes(1)
+			expect(sessionNotification).toHaveBeenCalledTimes(1)
+
+			//#when
+			currentNow += 501
+			await eventHandler(asEventHandlerInput({
+				event: {
+					type: "session.idle",
+					properties: {
+						sessionID: sessionId,
+					},
+				},
+			}))
+
+			//#then
+			expect(onEvent).toHaveBeenCalledTimes(2)
+			expect(sessionNotification).toHaveBeenCalledTimes(2)
+		} finally {
+			Date.now = originalDateNow
+		}
+	})
+
+	it("still dedups synthetic-idle-after-real-idle as before", async () => {
+		//#given
 		const dispatchCalls: EventInput[] = []
 		const eventHandler = createIdleTrackingEventHandler(dispatchCalls)
 		const sessionId = "ses_test456"
@@ -161,7 +446,47 @@ describe("createEventHandler - idle deduplication", () => {
 		expect((dispatchCalls[0]?.event.properties as { sessionID?: string } | undefined)?.sessionID).toBe(sessionId)
 	})
 
-	it("prunes both maps on every event", async () => {
+	it("does NOT dedup session.idle events for DIFFERENT sessionIDs", async () => {
+		//#given
+		const originalDateNow = Date.now
+		let currentNow = 20_000
+		Date.now = () => currentNow
+		const onEvent = mock<(event: EventInput["event"]) => void>(() => {})
+		const sessionNotification = mock(async (_input: EventInput) => {})
+		const eventHandler = createIdleDedupSpyEventHandler({
+			onEvent,
+			sessionNotification,
+		})
+
+		try {
+			//#when
+			await eventHandler(asEventHandlerInput({
+				event: {
+					type: "session.idle",
+					properties: {
+						sessionID: "ses_first_idle",
+					},
+				},
+			}))
+			await eventHandler(asEventHandlerInput({
+				event: {
+					type: "session.idle",
+					properties: {
+						sessionID: "ses_second_idle",
+					},
+				},
+			}))
+
+			//#then
+			expect(onEvent).toHaveBeenCalledTimes(2)
+			expect(sessionNotification).toHaveBeenCalledTimes(2)
+		} finally {
+			Date.now = originalDateNow
+		}
+	})
+
+	it("both maps pruned on every event", async () => {
+		//#given
 		const eventHandler = createEventHandler({
 			ctx: {} as any,
 			pluginConfig: {} as any,
@@ -493,8 +818,186 @@ describe("createEventHandler - event forwarding", () => {
 		expect(createdSessions).toHaveLength(0)
 	})
 
+	it("skips tmux dispatch for subagent sessions marked only via subagentSessions (no parentID)", async () => {
+		//#given
+		type SessionCreatedEvent = {
+			type?: string
+			properties?: {
+				info?: {
+					id?: string
+					parentID?: string
+					title?: string
+				}
+			}
+		}
+		const onSessionCreated = mock(async (event: SessionCreatedEvent) => event)
+		subagentSessions.add("ses_marked_subagent")
+		const eventHandler = createEventHandler({
+			ctx: asEventHandlerContext({}),
+			pluginConfig: asPluginConfig({
+				tmux: {
+					enabled: true,
+					layout: "main-vertical",
+					main_pane_size: 60,
+					main_pane_min_width: 120,
+					agent_pane_min_width: 40,
+					isolation: "inline",
+				},
+			}),
+			firstMessageVariantGate: {
+				markSessionCreated: () => {},
+				clear: () => {},
+			},
+			managers: createEventHandlerManagers({
+				skillMcpManager: {
+					disconnectSession: async () => {},
+				},
+				tmuxSessionManager: {
+					onSessionCreated,
+					onSessionDeleted: async () => {},
+				},
+			}),
+			hooks: createEventHandlerHooks({}),
+		})
+
+		//#when
+		await eventHandler(asEventHandlerInput({
+			event: {
+				type: "session.created",
+				properties: { info: { id: "ses_marked_subagent", title: "Child" } },
+			},
+		}))
+
+		//#then
+		expect(onSessionCreated).not.toHaveBeenCalled()
+	})
+
+	it("still dispatches for a primary session not in subagentSessions", async () => {
+		//#given
+		type SessionCreatedEvent = {
+			type?: string
+			properties?: {
+				info?: {
+					id?: string
+					parentID?: string
+					title?: string
+				}
+			}
+		}
+		const onSessionCreated = mock(async (event: SessionCreatedEvent) => event)
+		const eventHandler = createEventHandler({
+			ctx: asEventHandlerContext({}),
+			pluginConfig: asPluginConfig({
+				tmux: {
+					enabled: true,
+					layout: "main-vertical",
+					main_pane_size: 60,
+					main_pane_min_width: 120,
+					agent_pane_min_width: 40,
+					isolation: "inline",
+				},
+			}),
+			firstMessageVariantGate: {
+				markSessionCreated: () => {},
+				clear: () => {},
+			},
+			managers: createEventHandlerManagers({
+				skillMcpManager: {
+					disconnectSession: async () => {},
+				},
+				tmuxSessionManager: {
+					onSessionCreated,
+					onSessionDeleted: async () => {},
+				},
+			}),
+			hooks: createEventHandlerHooks({}),
+		})
+
+		//#when
+		await eventHandler(asEventHandlerInput({
+			event: {
+				type: "session.created",
+				properties: { info: { id: "ses_primary", title: "Primary" } },
+			},
+		}))
+
+		//#then
+		expect(onSessionCreated).toHaveBeenCalledTimes(1)
+		expect(onSessionCreated).toHaveBeenCalledWith({
+			type: "session.created",
+			properties: { info: { id: "ses_primary", title: "Primary" } },
+		})
+	})
+
+	it("Path A skips dispatch even when subagentSessions Set is populated only AFTER the event arrives (parentID covers it)", async () => {
+		//#given
+		type SessionCreatedEvent = {
+			type?: string
+			properties?: {
+				info?: {
+					id?: string
+					parentID?: string
+					title?: string
+				}
+			}
+		}
+		const onSessionCreated = mock(async (event: SessionCreatedEvent) => event)
+		const eventHandler = createEventHandler({
+			ctx: asEventHandlerContext({}),
+			pluginConfig: asPluginConfig({
+				tmux: {
+					enabled: true,
+					layout: "main-vertical",
+					main_pane_size: 60,
+					main_pane_min_width: 120,
+					agent_pane_min_width: 40,
+					isolation: "inline",
+				},
+			}),
+			firstMessageVariantGate: {
+				markSessionCreated: () => {},
+				clear: () => {},
+			},
+			managers: createEventHandlerManagers({
+				skillMcpManager: {
+					disconnectSession: async () => {},
+				},
+				tmuxSessionManager: {
+					onSessionCreated,
+					onSessionDeleted: async () => {},
+				},
+			}),
+			hooks: createEventHandlerHooks({}),
+		})
+
+		//#when
+		await eventHandler(asEventHandlerInput({
+			event: {
+				type: "session.created",
+				properties: { info: { id: "ses_parent_marked", parentID: "ses_parent", title: "Child" } },
+			},
+		}))
+
+		//#then
+		expect(onSessionCreated).not.toHaveBeenCalled()
+
+		//#when
+		subagentSessions.add("ses_parent_marked")
+		await eventHandler(asEventHandlerInput({
+			event: {
+				type: "session.created",
+				properties: { info: { id: "ses_parent_marked", title: "Child" } },
+			},
+		}))
+
+		//#then
+		expect(onSessionCreated).not.toHaveBeenCalled()
+	})
+
 	it("dispatches OpenClaw after session.created for main sessions (no parentID)", async () => {
-		const openClawSpy = spyOn(openclawRuntimeDispatch, "dispatchOpenClawEvent").mockResolvedValue(null)
+		//#given
+		const openClawSpy = spyOn(openclawRuntimeDispatch, "dispatchOpenClawEvent")
+		openClawSpy.mockResolvedValue(null)
 		const eventHandler = createEventHandler({
 			ctx: asEventHandlerContext({ directory: "/tmp/project-created" }),
 			pluginConfig: asPluginConfig({
@@ -528,19 +1031,26 @@ describe("createEventHandler - event forwarding", () => {
 				properties: { info: { id: "ses_openclaw_created" } },
 			},
 		}))
-		const [call] = openClawSpy.mock.calls[0] ?? []
-		expect(call).toMatchObject({
-			rawEvent: "session.created",
-			context: {
-				sessionId: "ses_openclaw_created",
-				projectPath: "/tmp/project-created",
-				tmuxPaneId: "%9",
-			},
+
+		//#then - OpenClaw dispatch called for main session
+		const call = openClawSpy.mock.calls[0]?.[0] as
+			| {
+				rawEvent?: string
+				context?: { sessionId?: string; projectPath?: string; tmuxPaneId?: string }
+			  }
+			| undefined
+		expect(call?.rawEvent).toBe("session.created")
+		expect(call?.context).toEqual({
+			sessionId: "ses_openclaw_created",
+			projectPath: "/tmp/project-created",
+			tmuxPaneId: "%9",
 		})
 	})
 
-	it("does not dispatch OpenClaw for subagent sessions with a parentID", async () => {
-		const openClawSpy = spyOn(openclawRuntimeDispatch, "dispatchOpenClawEvent").mockResolvedValue(null)
+	it("does NOT dispatch OpenClaw for subagent sessions (with parentID)", async () => {
+		//#given
+		const openClawSpy = spyOn(openclawRuntimeDispatch, "dispatchOpenClawEvent")
+		openClawSpy.mockResolvedValue(null)
 		const eventHandler = createEventHandler({
 			ctx: asEventHandlerContext({ directory: "/tmp/project-created" }),
 			pluginConfig: asPluginConfig({
@@ -632,7 +1142,8 @@ describe("createEventHandler - event forwarding", () => {
 	})
 
 	it("dispatches OpenClaw for synthetic session.idle events", async () => {
-		const openClawSpy = spyOn(openclawRuntimeDispatch, "dispatchOpenClawEvent").mockResolvedValue(null)
+		const openClawSpy = spyOn(openclawRuntimeDispatch, "dispatchOpenClawEvent")
+		openClawSpy.mockResolvedValue(null)
 		const eventHandler = createEventHandler({
 			ctx: asEventHandlerContext({ directory: "/tmp/project-idle" }),
 			pluginConfig: asPluginConfig({ openclaw: { enabled: true, gateways: {}, hooks: {} } }),
@@ -658,14 +1169,17 @@ describe("createEventHandler - event forwarding", () => {
 			},
 		}))
 
-		const [call] = openClawSpy.mock.calls[0] ?? []
-		expect(call).toMatchObject({
-			rawEvent: "session.idle",
-			context: {
-				sessionId: "ses_openclaw_idle",
-				projectPath: "/tmp/project-idle",
-				tmuxPaneId: "%3",
-			},
+		const call = openClawSpy.mock.calls[0]?.[0] as
+			| {
+				rawEvent?: string
+				context?: { sessionId?: string; projectPath?: string; tmuxPaneId?: string }
+			  }
+			| undefined
+		expect(call?.rawEvent).toBe("session.idle")
+		expect(call?.context).toEqual({
+			sessionId: "ses_openclaw_idle",
+			projectPath: "/tmp/project-idle",
+			tmuxPaneId: "%3",
 		})
 	})
 

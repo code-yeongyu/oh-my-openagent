@@ -6,6 +6,7 @@ import {
   clearSessionAgent,
   getMainSessionID,
   getSessionAgent,
+  resolveRegisteredAgentName,
   setMainSession,
   subagentSessions,
   syncSubagentSessions,
@@ -37,6 +38,10 @@ import { clearSessionPromptParams } from "../shared/session-prompt-params-state"
 import { deleteSessionTools } from "../shared/session-tools-store";
 import { lspManager } from "../tools";
 import { dispatchOpenClawEvent } from "../openclaw/runtime-dispatch";
+import { createTeamIdleWakeHint } from "../hooks/team-session-events/team-idle-wake-hint";
+import { createTeamLeadOrphanHandler } from "../hooks/team-session-events/team-lead-orphan-handler";
+import { createTeamMemberErrorHandler } from "../hooks/team-session-events/team-member-error-handler";
+import { createTeamMemberStatusHandler } from "../hooks/team-session-events/team-member-status-handler";
 
 import type { CreatedHooks } from "../create-hooks";
 import type { Managers } from "../create-managers";
@@ -155,12 +160,22 @@ export function createEventHandler(args: {
         abort: (input: { path: { id: string } }) => Promise<unknown>;
         promptAsync?: (input: {
           path: { id: string };
-          body: { parts: Array<{ type: "text"; text: string }> };
+          body: {
+            parts: Array<{ type: "text"; text: string }>;
+            agent?: string;
+            model?: { providerID: string; modelID: string };
+            variant?: string;
+          };
           query: { directory: string };
         }) => Promise<unknown>;
         prompt: (input: {
           path: { id: string };
-          body: { parts: Array<{ type: "text"; text: string }> };
+          body: {
+            parts: Array<{ type: "text"; text: string }>;
+            agent?: string;
+            model?: { providerID: string; modelID: string };
+            variant?: string;
+          };
           query: { directory: string };
         }) => Promise<unknown>;
         summarize: (...args: unknown[]) => Promise<unknown>;
@@ -273,7 +288,28 @@ export function createEventHandler(args: {
 
   const recentSyntheticIdles = new Map<string, number>();
   const recentRealIdles = new Map<string, number>();
+  const recentAnyIdles = new Map<string, number>();
   const DEDUP_WINDOW_MS = 500;
+  const teamModeConfig = pluginConfig.team_mode?.enabled ? pluginConfig.team_mode : undefined;
+  const teamLeadOrphanHandler = teamModeConfig
+    ? createTeamLeadOrphanHandler(teamModeConfig, managers.tmuxSessionManager, managers.backgroundManager)
+    : undefined;
+  const teamMemberErrorHandler = teamModeConfig
+    ? createTeamMemberErrorHandler(teamModeConfig)
+    : undefined;
+  const teamMemberStatusHandler = teamModeConfig
+    ? createTeamMemberStatusHandler(teamModeConfig)
+    : undefined;
+  const teamIdleWakeHint = teamModeConfig && pluginContext.client.session?.promptAsync
+    ? createTeamIdleWakeHint({
+        directory: pluginContext.directory,
+        client: {
+          session: {
+            promptAsync: pluginContext.client.session.promptAsync,
+          },
+        },
+      }, teamModeConfig)
+    : undefined;
   const TMUX_ACTIVITY_EVENT_TYPES = new Set([
     "message.updated",
     "message.part.updated",
@@ -291,14 +327,52 @@ export function createEventHandler(args: {
     return !subagentSessions.has(sessionID);
   };
 
-  const autoContinueAfterFallback = async (sessionID: string, source: string): Promise<void> => {
+  const shouldDispatchIdleEvent = (sessionID: string, now: number): boolean => {
+    const lastDispatchedAt = recentAnyIdles.get(sessionID);
+    if (lastDispatchedAt !== undefined && now - lastDispatchedAt < DEDUP_WINDOW_MS) {
+      return false;
+    }
+
+    recentAnyIdles.set(sessionID, now);
+    return true;
+  };
+
+  const autoContinueAfterFallback = async (
+    sessionID: string,
+    source: string,
+    fallbackContext?: {
+      agentName?: string;
+      providerID?: string;
+      modelID?: string;
+    },
+  ): Promise<void> => {
     await pluginContext.client.session.abort({ path: { id: sessionID } }).catch((error) => {
       log("[event] model-fallback abort failed", { sessionID, source, error });
     });
 
+    const launchAgent = fallbackContext?.agentName
+      ? resolveRegisteredAgentName(fallbackContext.agentName)
+      : undefined;
+    const launchModel = fallbackContext?.providerID && fallbackContext?.modelID
+      ? { providerID: fallbackContext.providerID, modelID: fallbackContext.modelID }
+      : undefined;
+
+    const agentConfigKey = fallbackContext?.agentName
+      ? getAgentConfigKey(fallbackContext.agentName)
+      : undefined;
+    const agentSettings = agentConfigKey
+      ? pluginConfig.agents?.[agentConfigKey as keyof NonNullable<typeof pluginConfig.agents>]
+      : undefined;
+    const launchVariant = (agentSettings as { variant?: string } | undefined)?.variant;
+
     const promptBody = {
       path: { id: sessionID },
-      body: { parts: [{ type: "text" as const, text: "continue" }] },
+      body: {
+        ...(launchAgent ? { agent: launchAgent } : {}),
+        ...(launchModel ? { model: launchModel } : {}),
+        ...(launchVariant ? { variant: launchVariant } : {}),
+        parts: [{ type: "text" as const, text: "continue" }],
+      },
       query: { directory: pluginContext.directory },
     };
 
@@ -318,20 +392,23 @@ export function createEventHandler(args: {
     pruneRecentSyntheticIdles({
       recentSyntheticIdles,
       recentRealIdles,
+      recentAnyIdles,
       now: Date.now(),
       dedupWindowMs: DEDUP_WINDOW_MS,
     });
 
     if (input.event.type === "session.idle") {
-      const sessionID = (input.event.properties as Record<string, unknown> | undefined)?.sessionID as
-        | string
-        | undefined;
+      const sessionID = getEventSessionID(input);
       if (sessionID) {
+        const now = Date.now();
         const emittedAt = recentSyntheticIdles.get(sessionID);
-        if (emittedAt && Date.now() - emittedAt < DEDUP_WINDOW_MS) {
+        if (emittedAt !== undefined && now - emittedAt < DEDUP_WINDOW_MS) {
           recentSyntheticIdles.delete(sessionID);
         }
-        recentRealIdles.set(sessionID, Date.now());
+        recentRealIdles.set(sessionID, now);
+        if (!shouldDispatchIdleEvent(sessionID, now)) {
+          return;
+        }
       }
     }
 
@@ -340,12 +417,16 @@ export function createEventHandler(args: {
     const syntheticIdle = normalizeSessionStatusToIdle(input);
     if (syntheticIdle) {
       const sessionID = (syntheticIdle.event.properties as Record<string, unknown>)?.sessionID as string;
+      const now = Date.now();
       const emittedAt = recentRealIdles.get(sessionID);
-      if (emittedAt && Date.now() - emittedAt < DEDUP_WINDOW_MS) {
+      if (emittedAt !== undefined && now - emittedAt < DEDUP_WINDOW_MS) {
         recentRealIdles.delete(sessionID);
         return;
       }
-      recentSyntheticIdles.set(sessionID, Date.now());
+      recentSyntheticIdles.set(sessionID, now);
+      if (!shouldDispatchIdleEvent(sessionID, now)) {
+        return;
+      }
       await dispatchToHooks(syntheticIdle as EventInput);
       if (pluginConfig.openclaw) {
         await dispatchOpenClawEvent({
@@ -369,14 +450,16 @@ export function createEventHandler(args: {
 
     if (event.type === "session.created") {
       const sessionInfo = props?.info as { id?: string; title?: string; parentID?: string } | undefined;
+      const isSubagentSession = !!sessionInfo?.parentID || !!sessionInfo?.id && subagentSessions.has(sessionInfo.id);
 
-      if (!sessionInfo?.parentID) {
+      if (!isSubagentSession) {
         setMainSession(sessionInfo?.id);
       }
 
       firstMessageVariantGate.markSessionCreated(sessionInfo);
 
-      if (tmuxIntegrationEnabled) {
+      // Subagent sessions are registered by the specialized background/delegate callbacks.
+      if (tmuxIntegrationEnabled && !isSubagentSession) {
         await managers.tmuxSessionManager.onSessionCreated(
           event as {
             type: string;
@@ -389,7 +472,6 @@ export function createEventHandler(args: {
 
       // Skip subagent sessions — they are dispatched by specialized callbacks
       // in create-managers.ts (async) and tool-registry.ts (sync)
-      const isSubagentSession = !!sessionInfo?.parentID;
       if (pluginConfig.openclaw && sessionInfo?.id && !isSubagentSession) {
         await dispatchOpenClawEvent({
           config: pluginConfig.openclaw,
@@ -449,6 +531,9 @@ export function createEventHandler(args: {
           });
         }
       }
+
+      await runEventHookSafely("teamLeadOrphanHandler", teamLeadOrphanHandler, input);
+      await runEventHookSafely("teamMemberStatusHandler", teamMemberStatusHandler, input);
     }
 
     if (event.type === "message.removed") {
@@ -470,6 +555,12 @@ export function createEventHandler(args: {
           },
         });
       }
+    }
+
+    if (event.type === "session.idle") {
+      managers.tmuxSessionManager?.onEvent?.(event);
+      await runEventHookSafely("teamIdleWakeHint", teamIdleWakeHint, input);
+      await runEventHookSafely("teamMemberStatusHandler", teamMemberStatusHandler, input);
     }
 
     if (event.type === "message.updated") {
@@ -541,7 +632,11 @@ export function createEventHandler(args: {
                   !hooks.stopContinuationGuard?.isStopped(sessionID)
                 ) {
                   lastHandledModelErrorMessageID.set(sessionID, assistantMessageID);
-                  await autoContinueAfterFallback(sessionID, "message.updated");
+                  await autoContinueAfterFallback(sessionID, "message.updated", {
+                    agentName,
+                    providerID: currentProvider,
+                    modelID: currentModel,
+                  });
                 }
               }
             }
@@ -605,7 +700,11 @@ export function createEventHandler(args: {
                 shouldAutoRetrySession(sessionID) &&
                 !hooks.stopContinuationGuard?.isStopped(sessionID)
               ) {
-                await autoContinueAfterFallback(sessionID, "session.status");
+                await autoContinueAfterFallback(sessionID, "session.status", {
+                  agentName,
+                  providerID: currentProvider,
+                  modelID: currentModel,
+                });
               }
             }
           }
@@ -693,7 +792,11 @@ export function createEventHandler(args: {
               shouldAutoRetrySession(sessionID) &&
               !hooks.stopContinuationGuard?.isStopped(sessionID)
             ) {
-              await autoContinueAfterFallback(sessionID, "session.error");
+              await autoContinueAfterFallback(sessionID, "session.error", {
+                agentName,
+                providerID: currentProvider,
+                modelID: currentModel,
+              });
             }
           }
         }
@@ -701,6 +804,8 @@ export function createEventHandler(args: {
         const sessionID = props?.sessionID as string | undefined;
         log("[event] model-fallback error in session.error:", { sessionID, error: err });
       }
+
+      await runEventHookSafely("teamMemberErrorHandler", teamMemberErrorHandler, input);
     }
   };
 }
