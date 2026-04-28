@@ -25,7 +25,7 @@ mock.module("../../shared/connected-providers-cache", () => ({
 mock.restore()
 
 
-const TASK_TTL_MS = 30 * 60 * 1000
+const TASK_TTL_MS = 100 * 60 * 60 * 1000
 
 class MockBackgroundManager {
   private tasks: Map<string, BackgroundTask> = new Map()
@@ -561,9 +561,9 @@ describe("BackgroundManager.pruneStaleTasksAndNotifications", () => {
     expect(manager.getTaskCount()).toBe(1)
   })
 
-  test("should prune tasks older than 30 minutes", () => {
+  test("should prune tasks older than TTL", () => {
     // given
-    const staleDate = new Date(Date.now() - 31 * 60 * 1000)
+    const staleDate = new Date(Date.now() - 101 * 60 * 60 * 1000)
     const task = createMockTask({
       id: "task-stale",
       sessionID: "session-stale",
@@ -582,7 +582,7 @@ describe("BackgroundManager.pruneStaleTasksAndNotifications", () => {
 
   test("should prune stale notifications", () => {
     // given
-    const staleDate = new Date(Date.now() - 31 * 60 * 1000)
+    const staleDate = new Date(Date.now() - 101 * 60 * 60 * 1000)
     const task = createMockTask({
       id: "task-stale",
       sessionID: "session-stale",
@@ -601,7 +601,7 @@ describe("BackgroundManager.pruneStaleTasksAndNotifications", () => {
 
   test("should clean up notifications when task is pruned", () => {
     // given
-    const staleDate = new Date(Date.now() - 31 * 60 * 1000)
+    const staleDate = new Date(Date.now() - 101 * 60 * 60 * 1000)
     const task = createMockTask({
       id: "task-stale",
       sessionID: "session-stale",
@@ -621,7 +621,7 @@ describe("BackgroundManager.pruneStaleTasksAndNotifications", () => {
 
   test("should keep fresh tasks while pruning stale ones", () => {
     // given
-    const staleDate = new Date(Date.now() - 31 * 60 * 1000)
+    const staleDate = new Date(Date.now() - 101 * 60 * 60 * 1000)
     const staleTask = createMockTask({
       id: "task-stale",
       sessionID: "session-stale",
@@ -3688,10 +3688,10 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
       prompt: "Test",
       agent: "test-agent",
       status: "running",
-      startedAt: new Date(Date.now() - 50 * 60 * 1000),
+      startedAt: new Date(Date.now() - 101 * 60 * 60 * 1000),
       progress: {
         toolCalls: 1,
-        lastUpdate: new Date(Date.now() - 46 * 60 * 1000),
+        lastUpdate: new Date(Date.now() - 101 * 60 * 60 * 1000),
       },
     }
 
@@ -4580,7 +4580,7 @@ describe("BackgroundManager.pruneStaleTasksAndNotifications - removes pruned tas
   test("removes stale pending task from queue", () => {
     //#given
     const manager = createBackgroundManager()
-    const queuedAt = new Date(Date.now() - 31 * 60 * 1000)
+    const queuedAt = new Date(Date.now() - 101 * 60 * 60 * 1000)
     const task: BackgroundTask = {
       id: "task-stale-pending",
       parentSessionID: "parent-session",
@@ -4622,7 +4622,7 @@ describe("BackgroundManager.pruneStaleTasksAndNotifications - removes pruned tas
       sessionID: "session-stale-toast",
       parentSessionID: "parent-session",
       status: "running",
-      startedAt: new Date(Date.now() - 31 * 60 * 1000),
+      startedAt: new Date(Date.now() - 101 * 60 * 60 * 1000),
     })
     getTaskMap(manager).set(staleTask.id, staleTask)
 
@@ -4661,7 +4661,7 @@ describe("BackgroundManager.pruneStaleTasksAndNotifications - removes pruned tas
       sessionID: "session-stale-notify-cleanup",
       parentSessionID: "parent-stale-notify-cleanup",
       status: "running",
-      startedAt: new Date(Date.now() - 31 * 60 * 1000),
+      startedAt: new Date(Date.now() - 101 * 60 * 60 * 1000),
     })
     getTaskMap(manager).set(staleTask.id, staleTask)
     getPendingByParent(manager).set(staleTask.parentSessionID, new Set([staleTask.id]))

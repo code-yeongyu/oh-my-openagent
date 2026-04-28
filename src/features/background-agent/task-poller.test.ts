@@ -184,11 +184,11 @@ describe("checkAndInterruptStaleTasks", () => {
   it("should use DEFAULT_MESSAGE_STALENESS_TIMEOUT_MS when messageStalenessTimeoutMs is not configured", async () => {
     //#given - task started 65 minutes ago, no config for messageStalenessTimeoutMs
     const task = createRunningTask({
-      startedAt: new Date(Date.now() - 65 * 60 * 1000),
+      startedAt: new Date(Date.now() - 101 * 60 * 60 * 1000),
       progress: undefined,
     })
 
-    //#when - default is 60 minutes (3_600_000ms)
+    //#when - default is 100 hours (360_000_000ms)
     await checkAndInterruptStaleTasks({
       tasks: [task],
       client: mockClient as never,
@@ -751,8 +751,8 @@ describe("pruneStaleTasksAndNotifications", () => {
       prompt: "terminal",
       agent: "explore",
       status: "completed",
-      startedAt: new Date(Date.now() - 40 * 60 * 1000),
-      completedAt: new Date(Date.now() - 31 * 60 * 1000),
+      startedAt: new Date(Date.now() - 101 * 60 * 60 * 1000),
+      completedAt: new Date(Date.now() - 101 * 60 * 60 * 1000),
       ...overrides,
     }
   }
@@ -768,7 +768,7 @@ describe("pruneStaleTasksAndNotifications", () => {
       prompt: "old",
       agent: "explore",
       status: "running",
-      startedAt: new Date(Date.now() - 31 * 60 * 1000),
+      startedAt: new Date(Date.now() - 101 * 60 * 60 * 1000),
     }
     tasks.set("old-task", oldTask)
 
@@ -797,7 +797,7 @@ describe("pruneStaleTasksAndNotifications", () => {
       prompt: "active",
       agent: "oracle",
       status: "running",
-      startedAt: new Date(Date.now() - 45 * 60 * 1000),
+      startedAt: new Date(Date.now() - 101 * 60 * 60 * 1000),
       progress: {
         toolCalls: 10,
         lastUpdate: new Date(Date.now() - 5 * 60 * 1000),
@@ -830,10 +830,10 @@ describe("pruneStaleTasksAndNotifications", () => {
       prompt: "stale",
       agent: "oracle",
       status: "running",
-      startedAt: new Date(Date.now() - 60 * 60 * 1000),
+      startedAt: new Date(Date.now() - 101 * 60 * 60 * 1000),
       progress: {
         toolCalls: 10,
-        lastUpdate: new Date(Date.now() - 35 * 60 * 1000),
+        lastUpdate: new Date(Date.now() - 101 * 60 * 60 * 1000),
       },
     }
     tasks.set("stale-task", staleTask)

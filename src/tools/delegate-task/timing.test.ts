@@ -3,7 +3,7 @@ const { describe, expect, test } = require("bun:test")
 import { __resetTimingConfig, __setTimingConfig, getDefaultSyncPollTimeoutMs, getTimingConfig } from "./timing"
 
 describe("timing sync poll timeout defaults", () => {
-  test("default sync timeout is 30 minutes", () => {
+  test("default sync timeout is 100 hours", () => {
     // #given
     __resetTimingConfig()
 
@@ -11,7 +11,7 @@ describe("timing sync poll timeout defaults", () => {
     const timeout = getDefaultSyncPollTimeoutMs()
 
     // #then
-    expect(timeout).toBe(30 * 60 * 1000)
+    expect(timeout).toBe(100 * 60 * 60 * 1000)
   })
 
   test("default sync timeout accessor follows MAX_POLL_TIME_MS config", () => {

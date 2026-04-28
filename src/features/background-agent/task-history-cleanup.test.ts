@@ -119,7 +119,7 @@ describe("task history cleanup", () => {
     const staleTask = createTask({
       id: "task-stale",
       parentSessionID: "parent-1",
-      startedAt: new Date(Date.now() - 31 * 60 * 1000),
+      startedAt: new Date(Date.now() - 101 * 60 * 60 * 1000),
     })
     const liveTask = createTask({
       id: "task-live",

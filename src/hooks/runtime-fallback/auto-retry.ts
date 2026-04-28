@@ -11,7 +11,7 @@ import { getLastUserRetryParts } from "./last-user-retry-parts"
 import { extractSessionMessages } from "./session-messages"
 import { resolveRegisteredAgentName } from "../../features/claude-code-session-state"
 
-const SESSION_TTL_MS = 30 * 60 * 1000
+const SESSION_TTL_MS = 100 * 60 * 60 * 1000
 
 declare function setTimeout(callback: () => void | Promise<void>, delay?: number): RuntimeFallbackTimeout
 declare function clearTimeout(timeout: RuntimeFallbackTimeout): void

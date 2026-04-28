@@ -43,7 +43,7 @@ const defaultTmuxDeps: TmuxUtilDeps = {
   getCurrentPaneId: defaultGetCurrentPaneId,
 }
 
-const DEFERRED_SESSION_TTL_MS = 5 * 60 * 1000
+const DEFERRED_SESSION_TTL_MS = 60 * 60 * 1000
 const MAX_DEFERRED_QUEUE_SIZE = 20
 const MAX_CLOSE_RETRY_COUNT = 3
 const MAX_ISOLATED_CONTAINER_NULL_STATE_COUNT = 2
