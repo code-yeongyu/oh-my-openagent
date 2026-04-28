@@ -9,6 +9,7 @@ export function resolveSkillContent(skillName: string, options?: SkillResolution
 	const skills = createBuiltinSkills({
 		browserProvider: options?.browserProvider,
 		disabledSkills: options?.disabledSkills,
+		teamModeEnabled: options?.teamModeEnabled,
 	})
 	const skill = skills.find((builtinSkill) => builtinSkill.name === skillName)
 	if (!skill) return null
@@ -27,6 +28,7 @@ export function resolveMultipleSkills(
 	const skills = createBuiltinSkills({
 		browserProvider: options?.browserProvider,
 		disabledSkills: options?.disabledSkills,
+		teamModeEnabled: options?.teamModeEnabled,
 	})
 	const skillMap = new Map(skills.map((skill) => [skill.name, skill.template]))
 
