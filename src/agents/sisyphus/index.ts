@@ -21,3 +21,4 @@ export {
 } from "./gemini";
 export { buildGpt54SisyphusPrompt } from "./gpt-5-4";
 export { buildGpt55SisyphusPrompt } from "./gpt-5-5";
+export { buildKimiK26SisyphusPrompt } from "./kimi-k2-6";
