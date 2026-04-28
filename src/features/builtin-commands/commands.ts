@@ -8,6 +8,7 @@ import { REFACTOR_TEMPLATE, REFACTOR_TEAM_MODE_ADDENDUM } from "./templates/refa
 import { START_WORK_TEMPLATE } from "./templates/start-work"
 import { HANDOFF_TEMPLATE } from "./templates/handoff"
 import { REMOVE_AI_SLOPS_TEMPLATE, REMOVE_AI_SLOPS_TEAM_MODE_ADDENDUM } from "./templates/remove-ai-slops"
+import { HYPERPLAN_TEMPLATE } from "./templates/hyperplan"
 
 interface LoadBuiltinCommandsOptions {
   useRegisteredAgents?: boolean
@@ -133,6 +134,13 @@ Timestamp: $TIMESTAMP
 $ARGUMENTS
 </user-request>`,
       argumentHint: "[goal]",
+    },
+    hyperplan: {
+      description: "(builtin) Adversarial multi-agent planning via team-mode (5 hostile category members cross-critique, lead synthesizes)",
+      template: `<command-instruction>
+${HYPERPLAN_TEMPLATE}
+</command-instruction>`,
+      argumentHint: "[planning-request]",
     },
   }
 }
