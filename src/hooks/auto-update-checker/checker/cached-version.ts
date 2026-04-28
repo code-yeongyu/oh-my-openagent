@@ -3,7 +3,12 @@ import * as path from "node:path"
 import { fileURLToPath } from "node:url"
 import { log } from "../../../shared/logger"
 import type { PackageJson } from "../types"
-import { INSTALLED_PACKAGE_JSON_CANDIDATES } from "../constants"
+import {
+  ACCEPTED_PACKAGE_NAMES,
+  CACHE_DIR,
+  CONFIG_DIR_PACKAGE_JSON_CANDIDATES,
+  INSTALLED_PACKAGE_JSON_CANDIDATES,
+} from "../constants"
 import { findPackageJsonUp } from "./package-json-locator"
 
 function readPackageVersion(packageJsonPath: string): string | null {
@@ -12,8 +17,34 @@ function readPackageVersion(packageJsonPath: string): string | null {
   return pkg.version ?? null
 }
 
+function getResolvedPackageJsonCandidates(): string[] {
+  const resolved = [
+    ...INSTALLED_PACKAGE_JSON_CANDIDATES,
+    ...CONFIG_DIR_PACKAGE_JSON_CANDIDATES,
+  ]
+
+  try {
+    const entries = fs.readdirSync(CACHE_DIR, { withFileTypes: true })
+
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue
+
+      for (const packageName of ACCEPTED_PACKAGE_NAMES) {
+        if (entry.name !== packageName && !entry.name.startsWith(`${packageName}@`)) continue
+
+        resolved.push(path.join(CACHE_DIR, entry.name, "node_modules", packageName, "package.json"))
+        resolved.push(path.join(CACHE_DIR, entry.name, "package.json"))
+      }
+    }
+  } catch {
+    // ignore cache dir enumeration failures and fall back to static candidates
+  }
+
+  return resolved
+}
+
 export function getCachedVersion(): string | null {
-  for (const candidate of INSTALLED_PACKAGE_JSON_CANDIDATES) {
+  for (const candidate of getResolvedPackageJsonCandidates()) {
     try {
       if (fs.existsSync(candidate)) {
         return readPackageVersion(candidate)
