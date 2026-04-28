@@ -1,3 +1,4 @@
+import type { KeywordType } from "../../config/schema/keyword-detector"
 import {
   KEYWORD_DETECTORS,
   CODE_BLOCK_PATTERN,
@@ -5,7 +6,7 @@ import {
 } from "./constants"
 
 export interface DetectedKeyword {
-  type: "ultrawork" | "search" | "analyze" | "team"
+  type: KeywordType
   message: string
 }
 
@@ -13,9 +14,6 @@ export function removeCodeBlocks(text: string): string {
   return text.replace(CODE_BLOCK_PATTERN, "").replace(INLINE_CODE_PATTERN, "")
 }
 
-/**
- * Resolves message to string, handling both static strings and dynamic functions.
- */
 function resolveMessage(
   message: string | ((agentName?: string, modelID?: string) => string),
   agentName?: string,
@@ -24,22 +22,32 @@ function resolveMessage(
   return typeof message === "function" ? message(agentName, modelID) : message
 }
 
-export function detectKeywords(text: string, agentName?: string, modelID?: string): string[] {
-  const textWithoutCode = removeCodeBlocks(text)
-  return KEYWORD_DETECTORS.filter(({ pattern }) =>
-    pattern.test(textWithoutCode)
-  ).map(({ message }) => resolveMessage(message, agentName, modelID))
+export function detectKeywords(
+  text: string,
+  agentName?: string,
+  modelID?: string,
+  disabledKeywords?: ReadonlyArray<KeywordType>,
+): string[] {
+  return detectKeywordsWithType(text, agentName, modelID, disabledKeywords).map(
+    ({ message }) => message,
+  )
 }
 
-export function detectKeywordsWithType(text: string, agentName?: string, modelID?: string): DetectedKeyword[] {
+export function detectKeywordsWithType(
+  text: string,
+  agentName?: string,
+  modelID?: string,
+  disabledKeywords?: ReadonlyArray<KeywordType>,
+): DetectedKeyword[] {
   const textWithoutCode = removeCodeBlocks(text)
-  const types: Array<DetectedKeyword["type"]> = ["ultrawork", "search", "analyze", "team"]
+  const types: Array<KeywordType> = ["ultrawork", "search", "analyze", "team"]
+  const disabled = new Set<KeywordType>(disabledKeywords ?? [])
   return KEYWORD_DETECTORS.map(({ pattern, message }, index) => ({
     matches: pattern.test(textWithoutCode),
     type: types[index],
     message: resolveMessage(message, agentName, modelID),
   }))
-    .filter((result) => result.matches)
+    .filter((result) => result.matches && !disabled.has(result.type))
     .map(({ type, message }) => ({ type, message }))
 }
 

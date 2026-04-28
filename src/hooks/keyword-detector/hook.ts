@@ -1,4 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
+import type { KeywordDetectorConfig } from "../../config/schema/keyword-detector"
 import { detectKeywordsWithType, extractPromptText } from "./detector"
 import { isPlannerAgent, isNonOmoAgent } from "./constants"
 import { log } from "../../shared"
@@ -17,8 +18,10 @@ import type { RalphLoopHook } from "../ralph-loop"
 export function createKeywordDetectorHook(
   ctx: PluginInput,
   _collector?: ContextCollector,
-  _ralphLoop?: Pick<RalphLoopHook, "startLoop">
+  _ralphLoop?: Pick<RalphLoopHook, "startLoop">,
+  config?: KeywordDetectorConfig,
 ) {
+  const disabledKeywords = config?.disabled_keywords
   function getRuntimeVariant(input: { variant?: string }, message: Record<string, unknown>): string | undefined {
     if (typeof message["variant"] === "string") {
       return message["variant"]
@@ -59,7 +62,7 @@ export function createKeywordDetectorHook(
       // Remove system-reminder content to prevent automated system messages from triggering mode keywords
       const cleanText = removeSystemReminders(promptText)
       const modelID = input.model?.modelID
-      let detectedKeywords = detectKeywordsWithType(cleanText, currentAgent, modelID)
+      let detectedKeywords = detectKeywordsWithType(cleanText, currentAgent, modelID, disabledKeywords)
 
       if (isPlannerAgent(currentAgent)) {
         const preFilterCount = detectedKeywords.length

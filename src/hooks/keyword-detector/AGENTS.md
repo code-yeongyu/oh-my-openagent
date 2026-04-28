@@ -47,10 +47,23 @@ chat.message (user input)
   → extractPromptText(parts)
   → isSystemDirective? → skip
   → removeSystemReminders(text)  # strip <SYSTEM_REMINDER> blocks
-  → detectKeywordsWithType(cleanText, agentName, modelID)
+  → detectKeywordsWithType(cleanText, agentName, modelID, disabledKeywords)
   → isPlannerAgent(agentName)? → filter out ultrawork
   → for each detected keyword: inject mode message into output
 ```
+
+## CONFIG
+
+```jsonc
+{
+  "keyword_detector": {
+    // Skip injection for any keyword in this list. Allowed: "ultrawork", "search", "analyze", "team".
+    "disabled_keywords": ["search", "analyze"]
+  }
+}
+```
+
+Default: empty/missing → all four detectors active. Schema lives at [src/config/schema/keyword-detector.ts](../../config/schema/keyword-detector.ts).
 
 ## GUARDS
 
