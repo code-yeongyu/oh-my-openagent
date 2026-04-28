@@ -104,6 +104,12 @@ function installModuleMocks(): void {
     createPluginPostHog: mockCreatePluginPostHog,
     getPostHogDistinctId: mockGetPostHogDistinctId,
   }))
+  mock.module("./shared/posthog-activity-state", () => ({
+    getPluginLoadedCaptureState: () => ({
+      dayUTC: "2026-04-18",
+      capturePluginLoaded: true,
+    }),
+  }))
 }
 
 describe("oh-my-openagent telemetry isolation", () => {
