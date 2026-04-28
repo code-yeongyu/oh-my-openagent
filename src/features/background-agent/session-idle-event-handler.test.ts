@@ -247,6 +247,27 @@ describe("handleSessionIdleBackgroundEvent", () => {
       expect(tryCompleteTask).toHaveBeenCalledWith(task, "session.idle event")
     })
 
+    it("#when task belongs to a team run #then should not auto-complete on idle", async () => {
+      //#given
+      const task = createRunningTask({ teamRunId: "team-run-1" })
+      const tryCompleteTask = mock(() => Promise.resolve(true))
+
+      //#when
+      handleSessionIdleBackgroundEvent({
+        properties: { sessionID: task.sessionID! },
+        findBySession: () => task,
+        idleDeferralTimers: new Map(),
+        validateSessionHasOutput: () => Promise.resolve(true),
+        checkSessionTodos: () => Promise.resolve(false),
+        tryCompleteTask,
+        emitIdleEvent: () => {},
+      })
+
+      //#then
+      await new Promise((resolve) => setTimeout(resolve, 10))
+      expect(tryCompleteTask).not.toHaveBeenCalled()
+    })
+
     it("#when session has no valid output #then should not complete task", async () => {
       //#given
       const task = createRunningTask()
