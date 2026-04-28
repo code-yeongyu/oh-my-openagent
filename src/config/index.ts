@@ -21,4 +21,5 @@ export type {
   RuntimeFallbackConfig,
   ModelCapabilitiesConfig,
   FallbackModels,
+  TeamModeConfig,
 } from "./schema"
