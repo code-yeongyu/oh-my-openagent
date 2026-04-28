@@ -47,6 +47,7 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
         gitMasterConfig: options.gitMasterConfig,
         browserProvider: options.browserProvider,
         disabledSkills: options.disabledSkills,
+        teamModeEnabled: options.teamModeEnabled,
         directory: options.directory,
       })
       if (skillError) {

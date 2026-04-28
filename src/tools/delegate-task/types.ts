@@ -62,6 +62,7 @@ export interface DelegateTaskToolOptions {
   sisyphusJuniorModel?: string
   browserProvider?: BrowserAutomationProvider
   disabledSkills?: Set<string>
+  teamModeEnabled?: boolean
   availableCategories?: AvailableCategory[]
   availableSkills?: AvailableSkill[]
   agentOverrides?: AgentOverrides
