@@ -2,7 +2,7 @@
 
 import { describe, expect, it, afterEach } from "bun:test"
 
-import { getContextWindowUsage } from "./dynamic-truncator"
+import { getContextWindowUsage, invalidateContextWindowUsageCache } from "./dynamic-truncator"
 
 const ANTHROPIC_CONTEXT_ENV_KEY = "ANTHROPIC_1M_CONTEXT"
 const VERTEX_CONTEXT_ENV_KEY = "VERTEX_ANTHROPIC_1M_CONTEXT"
@@ -50,6 +50,39 @@ function createContextUsageMockContext(
         }),
       },
     },
+  }
+}
+
+function createCountingContextUsageMockContext(inputTokens: number) {
+  let messagesCalls = 0
+  return {
+    ctx: {
+      client: {
+        session: {
+          messages: async () => {
+            messagesCalls += 1
+            return {
+              data: [
+                {
+                  info: {
+                    role: "assistant",
+                    providerID: "anthropic",
+                    modelID: "claude-sonnet-4-5",
+                    tokens: {
+                      input: inputTokens,
+                      output: 0,
+                      reasoning: 0,
+                      cache: { read: 0, write: 0 },
+                    },
+                  },
+                },
+              ],
+            }
+          },
+        },
+      },
+    },
+    getMessagesCalls: () => messagesCalls,
   }
 }
 
@@ -123,6 +156,39 @@ describe("getContextWindowUsage", () => {
     // then
     expect(usage?.usagePercentage).toBeCloseTo(180000 / 262144)
     expect(usage?.remainingTokens).toBe(82144)
+  })
+
+  it("reuses context usage for repeated calls in the same session", async () => {
+    // given
+    delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+    delete process.env[VERTEX_CONTEXT_ENV_KEY]
+    const { ctx, getMessagesCalls } = createCountingContextUsageMockContext(100000)
+    const modelCacheState = { anthropicContext1MEnabled: false }
+
+    // when
+    const firstUsage = await getContextWindowUsage(ctx as never, "ses_cached_usage", modelCacheState)
+    const secondUsage = await getContextWindowUsage(ctx as never, "ses_cached_usage", modelCacheState)
+
+    // then
+    expect(firstUsage?.remainingTokens).toBe(100000)
+    expect(secondUsage?.remainingTokens).toBe(100000)
+    expect(getMessagesCalls()).toBe(1)
+  })
+
+  it("refetches context usage after cache invalidation", async () => {
+    // given
+    delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+    delete process.env[VERTEX_CONTEXT_ENV_KEY]
+    const { ctx, getMessagesCalls } = createCountingContextUsageMockContext(100000)
+    const modelCacheState = { anthropicContext1MEnabled: false }
+
+    // when
+    await getContextWindowUsage(ctx as never, "ses_invalidated_usage", modelCacheState)
+    invalidateContextWindowUsageCache(ctx as never, "ses_invalidated_usage")
+    await getContextWindowUsage(ctx as never, "ses_invalidated_usage", modelCacheState)
+
+    // then
+    expect(getMessagesCalls()).toBe(2)
   })
 
   it("returns null for non-anthropic providers without a cached limit", async () => {
