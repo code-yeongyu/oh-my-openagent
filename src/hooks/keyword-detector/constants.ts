@@ -13,7 +13,6 @@ import { SEARCH_PATTERN, SEARCH_MESSAGE } from "./search"
 import { ANALYZE_PATTERN, ANALYZE_MESSAGE } from "./analyze"
 import { TEAM_PATTERN, TEAM_MESSAGE } from "./team"
 import { HYPERPLAN_PATTERN, HYPERPLAN_MESSAGE } from "./hyperplan"
-import { ANALYZE_MESSAGE, ANALYZE_PATTERN } from "./analyze"
 
 // Hyperplan-ultrawork combo: strict adjacency, both word orders
 export const HYPERPLAN_ULTRAWORK_PATTERN =
