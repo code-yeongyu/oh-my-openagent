@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/code-yeongyu-oh-my-openagent-badge.png)](https://mseep.ai/app/code-yeongyu-oh-my-openagent)
+
 > [!TIP]
 > **Building in Public**
 >
