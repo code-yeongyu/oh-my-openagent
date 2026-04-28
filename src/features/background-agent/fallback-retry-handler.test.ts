@@ -259,6 +259,57 @@ describe("tryFallbackRetry", () => {
       expect(queue![0].task).toBe(args.task)
       expect(args.processKey).toHaveBeenCalledWith(key)
     })
+
+    test("finalizes the failed attempt, creates a new pending attempt, and enqueues its explicit attemptID", async () => {
+      const args = createDefaultArgs({
+        status: "running",
+        sessionID: "session-attempt-1",
+        startedAt: new Date("2026-04-27T00:00:00.000Z"),
+        attempts: [
+          {
+            attemptID: "attempt-1",
+            attemptNumber: 1,
+            sessionID: "session-attempt-1",
+            providerID: "provider-a",
+            modelID: "original-model",
+            status: "running",
+            startedAt: new Date("2026-04-27T00:00:00.000Z"),
+          },
+        ],
+        currentAttemptID: "attempt-1",
+      })
+
+      await tryFallbackRetry(args)
+
+      expect(args.task.attempts).toHaveLength(2)
+      expect(args.task.attempts?.[0]).toMatchObject({
+        attemptID: "attempt-1",
+        sessionID: "session-attempt-1",
+        status: "error",
+        error: "model overloaded",
+      })
+      expect(args.task.attempts?.[0]?.completedAt).toBeInstanceOf(Date)
+
+      const nextAttempt = args.task.attempts?.[1]
+      expect(nextAttempt).toBeDefined()
+      expect(nextAttempt?.attemptNumber).toBe(2)
+      expect(nextAttempt?.providerID).toBe("provider-a")
+      expect(nextAttempt?.modelID).toBe("fallback-model-1")
+      expect(nextAttempt?.status).toBe("pending")
+
+      expect(args.task.currentAttemptID).toBe(nextAttempt?.attemptID)
+      expect(args.task.status).toBe("pending")
+      expect(args.task.model).toEqual({
+        providerID: "provider-a",
+        modelID: "fallback-model-1",
+        variant: undefined,
+      })
+
+      const key = `${args.task.model!.providerID}/${args.task.model!.modelID}`
+      const queue = args.queuesByKey.get(key)
+      expect(queue).toBeDefined()
+      expect((queue?.[0] as QueueItem & { attemptID?: string })?.attemptID).toBe(nextAttempt?.attemptID)
+    })
   })
 
   describe("#given non-retryable error", () => {
@@ -338,6 +389,25 @@ describe("tryFallbackRetry", () => {
 
       await tryFallbackRetry(args)
 
+      expect(args.task.model?.modelID).toBe("fallback-model-2")
+      expect(args.task.attemptCount).toBe(2)
+    })
+  })
+
+  describe("#given first fallback is a no-op for the current model", () => {
+    test("skips the no-op fallback and advances to the next distinct model", async () => {
+      const args = createDefaultArgs({
+        model: { providerID: "provider-a", modelID: "fallback-model-1" },
+        fallbackChain: [
+          { model: "fallback-model-1", providers: ["provider-a"], variant: undefined },
+          { model: "fallback-model-2", providers: ["provider-b"], variant: undefined },
+        ],
+      })
+
+      const result = await tryFallbackRetry(args)
+
+      expect(result).toBe(true)
+      expect(args.task.model?.providerID).toBe("provider-b")
       expect(args.task.model?.modelID).toBe("fallback-model-2")
       expect(args.task.attemptCount).toBe(2)
     })

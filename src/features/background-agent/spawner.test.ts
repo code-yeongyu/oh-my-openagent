@@ -378,7 +378,7 @@ describe("background-agent spawner fallback model promotion", () => {
 
     //#when
     await startTask(
-      { task, input },
+      { task, input, attemptID: "att_test123" },
       {
         client,
         directory: "/tmp/test",
