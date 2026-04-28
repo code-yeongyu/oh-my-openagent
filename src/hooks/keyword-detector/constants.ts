@@ -5,10 +5,12 @@ export { isPlannerAgent, isNonOmoAgent, getUltraworkMessage } from "./ultrawork"
 export { SEARCH_PATTERN, SEARCH_MESSAGE } from "./search"
 export { ANALYZE_PATTERN, ANALYZE_MESSAGE } from "./analyze"
 export { TEAM_PATTERN, TEAM_MESSAGE } from "./team"
+export { HYPERPLAN_PATTERN, HYPERPLAN_MESSAGE } from "./hyperplan"
 
 import { getUltraworkMessage } from "./ultrawork"
 import { SEARCH_PATTERN, SEARCH_MESSAGE } from "./search"
 import { TEAM_PATTERN, TEAM_MESSAGE } from "./team"
+import { HYPERPLAN_PATTERN, HYPERPLAN_MESSAGE } from "./hyperplan"
 
 export type KeywordDetector = {
   pattern: RegExp
@@ -46,5 +48,9 @@ Example: delegate_task(subagent_type="explore", prompt="...", run_in_background=
   {
     pattern: TEAM_PATTERN,
     message: TEAM_MESSAGE,
+  },
+  {
+    pattern: HYPERPLAN_PATTERN,
+    message: HYPERPLAN_MESSAGE,
   },
 ]
