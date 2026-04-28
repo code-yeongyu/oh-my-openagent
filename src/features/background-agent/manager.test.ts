@@ -603,6 +603,80 @@ describe("BackgroundManager retry observability", () => {
     expect(retryReadyNotification).toContain("genai-proxy-openai/gpt-5.4-mini")
     expect(retryReadyNotification).toContain("Forbidden: Selected provider is forbidden")
   })
+
+  test("builds retry-ready links from the parent session directory when it differs from the manager directory", async () => {
+    //#given
+    const queuePendingNotification = mock(() => {})
+    const managerDirectory = "/manager/dir"
+    const parentDirectory = "/parent/dir"
+    const client = {
+      session: {
+        get: async () => ({ data: { directory: parentDirectory } }),
+        create: async () => ({ data: { id: "ses_retry_created_parent_dir" } }),
+        promptAsync: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager({ client, directory: managerDirectory } as unknown as PluginInput)
+    ;(manager as unknown as {
+      queuePendingNotification: (sessionID: string | undefined, notification: string) => void
+    }).queuePendingNotification = queuePendingNotification
+    const task = createMockTask({
+      id: "bg_retry_ready_parent_dir",
+      parentSessionID: "parent-session",
+      status: "pending",
+      attemptCount: 1,
+      queuedAt: new Date(),
+      model: { providerID: "anthropic", modelID: "claude-haiku-4.5" },
+      retryNotification: {
+        nextModel: "anthropic/claude-haiku-4.5",
+      },
+      attempts: [
+        {
+          attemptID: "att_retry_failed_parent_dir",
+          attemptNumber: 1,
+          sessionID: "ses_retry_failed_parent_dir",
+          providerID: "genai-proxy-openai",
+          modelID: "gpt-5.4-mini",
+          status: "error",
+          error: "Forbidden: Selected provider is forbidden",
+        },
+        {
+          attemptID: "att_retry_ready_parent_dir",
+          attemptNumber: 2,
+          providerID: "anthropic",
+          modelID: "claude-haiku-4.5",
+          status: "pending",
+        },
+      ],
+      currentAttemptID: "att_retry_ready_parent_dir",
+    })
+    getTaskMap(manager).set(task.id, task)
+    const taskInput = {
+      description: task.description,
+      prompt: task.prompt,
+      agent: task.agent,
+      parentSessionID: task.parentSessionID,
+      parentMessageID: task.parentMessageID,
+      model: task.model,
+      fallbackChain: task.fallbackChain,
+      category: task.category,
+    }
+
+    //#when
+    await (manager as unknown as {
+      startTask: (queueItem: { task: BackgroundTask; input: typeof taskInput; attemptID: string }) => Promise<void>
+    }).startTask({ task, input: taskInput, attemptID: "att_retry_ready_parent_dir" })
+
+    //#then
+    const retryReadyNotification = queuePendingNotification.mock.calls
+      .map((call) => call[1])
+      .find((notification) => notification.includes("[BACKGROUND TASK RETRY SESSION READY]"))
+    const expectedRetryLink = `http://127.0.0.1:4096/${Buffer.from(parentDirectory).toString("base64url")}/session/ses_retry_created_parent_dir`
+    expect(retryReadyNotification).toBeDefined()
+    expect(retryReadyNotification).toContain(expectedRetryLink)
+
+    manager.shutdown()
+  })
 })
 
 function getCleanupSignals(): Array<NodeJS.Signals | "beforeExit" | "exit"> {
@@ -627,8 +701,6 @@ describe("BackgroundManager.getAllDescendantTasks", () => {
   })
 
   test("should return empty array when no tasks exist", () => {
-    // given - empty manager
-
     // when
     const result = manager.getAllDescendantTasks("session-a")
 
@@ -838,7 +910,7 @@ describe("BackgroundManager.notifyParentSession - release ordering", () => {
   })
 
   test("should keep queue blocked if release is after prompt (demonstrates the bug)", async () => {
-    // given - same setup
+    // given
     const { ConcurrencyManager } = await import("./concurrency")
     const concurrencyManager = new ConcurrencyManager({ defaultConcurrency: 1 })
 
@@ -991,9 +1063,7 @@ describe("BackgroundManager.resume", () => {
   })
 
   test("should throw error when task not found", () => {
-    // given - empty manager
-
-    // when / #then
+    // when / then
     expect(() => manager.resume({
       sessionId: "non-existent",
       prompt: "continue",
@@ -1147,7 +1217,7 @@ describe("LaunchInput.skillContent", () => {
       parentMessageID: "parent-msg",
     }
 
-    // when / #then - should compile without skillContent
+    // when / then
     expect(input.skillContent).toBeUndefined()
   })
 
@@ -1230,7 +1300,7 @@ describe("BackgroundManager.notifyParentSession - dynamic message lookup", () =>
   })
 
   test("should use currentMessage model/agent when available", async () => {
-    // given - currentMessage has model and agent
+    // given
     const task: BackgroundTask = {
       id: "task-1",
       sessionID: "session-child",
@@ -1253,7 +1323,7 @@ describe("BackgroundManager.notifyParentSession - dynamic message lookup", () =>
     // when
     const promptBody = buildNotificationPromptBody(task, currentMessage)
 
-    // then - uses currentMessage values, not task.parentModel/parentAgent
+    // then
     expect(promptBody.agent).toBe("sisyphus")
     expect(promptBody.model).toEqual({ providerID: "anthropic", modelID: "claude-opus-4.7" })
   })
@@ -1279,7 +1349,7 @@ describe("BackgroundManager.notifyParentSession - dynamic message lookup", () =>
     // when
     const promptBody = buildNotificationPromptBody(task, currentMessage)
 
-    // then - falls back to task.parentAgent
+    // then
     expect(promptBody.agent).toBe("FallbackAgent")
     expect("model" in promptBody).toBe(false)
   })
@@ -1308,7 +1378,7 @@ describe("BackgroundManager.notifyParentSession - dynamic message lookup", () =>
     // when
     const promptBody = buildNotificationPromptBody(task, currentMessage)
 
-    // then - model not passed due to incomplete data
+    // then
     expect(promptBody.agent).toBe("sisyphus")
     expect("model" in promptBody).toBe(false)
   })
@@ -1333,7 +1403,7 @@ describe("BackgroundManager.notifyParentSession - dynamic message lookup", () =>
     // when
     const promptBody = buildNotificationPromptBody(task, null)
 
-    // then - falls back to task.parentAgent, no model
+    // then
     expect(promptBody.agent).toBe("sisyphus")
     expect("model" in promptBody).toBe(false)
   })
@@ -2173,7 +2243,7 @@ describe("BackgroundManager.resume model persistence", () => {
       parentMessageID: "msg-2",
     })
 
-    // then - model should be passed in prompt body
+    // then
     expect(promptCalls).toHaveLength(1)
     expect(promptCalls[0].body.model).toEqual({ providerID: "anthropic", modelID: "claude-sonnet-4-20250514" })
     expect(promptCalls[0].body.agent).toBe("explore")
@@ -2258,7 +2328,7 @@ describe("BackgroundManager.resume model persistence", () => {
       parentMessageID: "msg-2",
     })
 
-    // then - model should NOT be in prompt body
+    // then
     expect(promptCalls).toHaveLength(1)
     expect("model" in promptCalls[0].body).toBe(false)
     expect(promptCalls[0].body.agent).toBe("explore")
@@ -2411,8 +2481,8 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
   test("should return immediately even with concurrency limit", async () => {
     // given
     const config = { defaultConcurrency: 1 }
-      manager.shutdown()
-      manager = new BackgroundManager({ client: mockClient, directory: tmpdir() } as unknown as PluginInput, config)
+    manager.shutdown()
+    manager = new BackgroundManager({ client: mockClient, directory: tmpdir() } as unknown as PluginInput, config)
 
       const input = {
         description: "Test task",
@@ -2429,7 +2499,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       const endTime = Date.now()
 
       // then
-      expect(endTime - startTime).toBeLessThan(100) // Should be instant
+      expect(endTime - startTime).toBeLessThan(100)
     expect(task1.status).toBe("pending")
     expect(task2.status).toBe("pending")
   })
@@ -2595,8 +2665,6 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
 
       // when
       const task = await manager.launch(input)
-
-      // Give processKey time to run
       await new Promise(resolve => setTimeout(resolve, 50))
 
       // then
@@ -2625,7 +2693,6 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       const task = await manager.launch(input)
       const queuedAt = task.queuedAt
 
-      // Wait for transition
       await new Promise(resolve => setTimeout(resolve, 50))
 
       // then
@@ -3398,8 +3465,6 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
 
       const task1 = await manager.launch(input)
       const task2 = await manager.launch(input)
-
-      // Wait for first task to start
       await new Promise(resolve => setTimeout(resolve, 50))
 
       // when
@@ -3427,8 +3492,6 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       }
 
       const task = await manager.launch(input)
-
-      // Wait for task to start
       await new Promise(resolve => setTimeout(resolve, 50))
 
       // when
@@ -3457,8 +3520,6 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       const task1 = await manager.launch(input)
       const task2 = await manager.launch(input)
       const task3 = await manager.launch(input)
-
-      // Wait for first task to start
       await new Promise(resolve => setTimeout(resolve, 100))
 
       // when - cancel middle task
@@ -3565,8 +3626,6 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       // when
       const task1 = await manager.launch(input1)
       const task2 = await manager.launch(input2)
-
-      // Wait for both to start
       await new Promise(resolve => setTimeout(resolve, 50))
 
       // then - both should be running despite limit of 1 (different keys)
@@ -3594,8 +3653,6 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       // when
       const task1 = await manager.launch(input)
       const task2 = await manager.launch(input)
-
-      // Wait for processing
       await new Promise(resolve => setTimeout(resolve, 50))
 
       // then - same key should respect limit
@@ -3633,8 +3690,6 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       // when
       const task1 = await manager.launch(input1)
       const task2 = await manager.launch(input2)
-
-      // Wait for both to start
       await new Promise(resolve => setTimeout(resolve, 50))
 
       // then - different models should run in parallel
@@ -3661,11 +3716,8 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
         parentMessageID: "parent-message",
       }
 
-      // Launch two tasks (second will be pending)
       await manager.launch(input)
       const task2 = await manager.launch(input)
-
-      // Wait for first to start
       await new Promise(resolve => setTimeout(resolve, 50))
 
       // when
@@ -3676,7 +3728,6 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       expect(pendingTask?.queuedAt).toBeInstanceOf(Date)
       expect(pendingTask?.startedAt).toBeUndefined()
 
-      // Verify TTL would use queuedAt (implementation detail check)
       const now = Date.now()
       const age = now - pendingTask!.queuedAt!.getTime()
       expect(age).toBeGreaterThanOrEqual(0)
@@ -3698,8 +3749,6 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
 
       // when
       const task = await manager.launch(input)
-
-      // Wait for task to start
       await new Promise(resolve => setTimeout(resolve, 50))
 
       // then
@@ -3707,7 +3756,6 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       expect(runningTask?.status).toBe("running")
       expect(runningTask?.startedAt).toBeInstanceOf(Date)
 
-      // Verify TTL would use startedAt (implementation detail check)
       const now = Date.now()
       const age = now - runningTask!.startedAt!.getTime()
       expect(age).toBeGreaterThanOrEqual(0)
@@ -3727,16 +3775,13 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
         parentMessageID: "parent-message",
       }
 
-      // Launch task that will queue
       await manager.launch(input)
       const task2 = await manager.launch(input)
 
       const queuedAt = task2.queuedAt!
 
-      // Wait for first task to complete and second to start
       await new Promise(resolve => setTimeout(resolve, 50))
 
-      // Simulate first task completion
       const tasks = Array.from(getTaskMap(manager).values())
       const runningTask = tasks.find(t => t.status === "running" && t.id !== task2.id)
       if (runningTask?.concurrencyKey) {
@@ -3744,7 +3789,6 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
         getConcurrencyManager(manager).release(runningTask.concurrencyKey)
       }
 
-      // Wait for second task to start
       await new Promise(resolve => setTimeout(resolve, 100))
 
       // then
@@ -3779,17 +3823,15 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       const endTime = Date.now()
 
       // then
-      expect(endTime - startTime).toBeLessThan(200) // Should be very fast
+      expect(endTime - startTime).toBeLessThan(200)
       expect(tasks).toHaveLength(10)
       tasks.forEach(task => {
         expect(task.status).toBe("pending")
         expect(task.id).toMatch(/^bg_/)
       })
 
-      // Wait for processing
       await new Promise(resolve => setTimeout(resolve, 100))
 
-      // Verify 5 running, 5 pending
       const updatedTasks = tasks.map(t => manager.getTask(t.id))
       const runningCount = updatedTasks.filter(t => t?.status === "running").length
       const pendingCount = updatedTasks.filter(t => t?.status === "pending").length
@@ -6115,6 +6157,114 @@ describe("BackgroundManager attempt lifecycle bindings", () => {
       sessionID: "session-attempt-2",
       status: "running",
     })
+
+    manager.shutdown()
+  })
+
+  test("late launch prompt errors from a historical attempt do not interrupt the current retry attempt", async () => {
+    //#given
+    let rejectPrompt: ((error: unknown) => void) | undefined
+    const abortCalls: string[] = []
+    const client = {
+      session: {
+        get: async () => ({ data: { directory: "/test/dir" } }),
+        create: async () => ({ data: { id: "session-attempt-1" } }),
+        promptAsync: async () => new Promise((_, reject) => {
+          rejectPrompt = reject
+        }),
+        abort: async ({ path }: { path: { id: string } }) => {
+          abortCalls.push(path.id)
+          return {}
+        },
+      },
+    }
+    const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
+    stubNotifyParentSession(manager)
+    ;(manager as unknown as {
+      tryFallbackRetry: (task: BackgroundTask, errorInfo: { name?: string; message?: string }, source: string) => Promise<boolean>
+    }).tryFallbackRetry = async () => false
+    const task: BackgroundTask = {
+      id: "task-stale-prompt-error",
+      status: "pending",
+      queuedAt: new Date("2026-04-27T00:00:00.000Z"),
+      description: "ignore stale prompt errors",
+      prompt: "continue",
+      agent: "sisyphus-junior",
+      parentSessionID: "parent-session",
+      parentMessageID: "parent-message",
+      model: { providerID: "openai", modelID: "gpt-5.4-mini" },
+      attempts: [
+        {
+          attemptID: "attempt-1",
+          attemptNumber: 1,
+          providerID: "openai",
+          modelID: "gpt-5.4-mini",
+          status: "pending",
+        },
+      ],
+      currentAttemptID: "attempt-1",
+    }
+    getTaskMap(manager).set(task.id, task)
+    const input: import("./types").LaunchInput = {
+      description: task.description,
+      prompt: task.prompt,
+      agent: task.agent,
+      parentSessionID: task.parentSessionID,
+      parentMessageID: task.parentMessageID,
+      model: task.model,
+    }
+
+    await (manager as unknown as {
+      startTask: (item: { task: BackgroundTask; input: import("./types").LaunchInput; attemptID: string }) => Promise<void>
+    }).startTask({ task, input, attemptID: "attempt-1" })
+
+    task.attempts = [
+      {
+        attemptID: "attempt-1",
+        attemptNumber: 1,
+        sessionID: "session-attempt-1",
+        providerID: "openai",
+        modelID: "gpt-5.4-mini",
+        status: "error",
+        error: "first attempt failed",
+        startedAt: new Date("2026-04-27T00:00:00.000Z"),
+        completedAt: new Date("2026-04-27T00:00:05.000Z"),
+      },
+      {
+        attemptID: "attempt-2",
+        attemptNumber: 2,
+        sessionID: "session-attempt-2",
+        providerID: "anthropic",
+        modelID: "claude-haiku-4.5",
+        status: "running",
+        startedAt: new Date("2026-04-27T00:00:10.000Z"),
+      },
+    ]
+    task.currentAttemptID = "attempt-2"
+    task.sessionID = "session-attempt-2"
+    task.status = "running"
+    task.error = undefined
+
+    //#when
+    rejectPrompt?.({ name: "APIError", data: { message: "Forbidden: Selected provider is forbidden" } })
+    await flushBackgroundNotifications()
+
+    //#then
+    expect(task.currentAttemptID).toBe("attempt-2")
+    expect(task.sessionID).toBe("session-attempt-2")
+    expect(task.status).toBe("running")
+    expect(task.error).toBeUndefined()
+    expect(task.attempts?.[0]).toMatchObject({
+      attemptID: "attempt-1",
+      status: "error",
+      error: "first attempt failed",
+    })
+    expect(task.attempts?.[1]).toMatchObject({
+      attemptID: "attempt-2",
+      status: "running",
+      sessionID: "session-attempt-2",
+    })
+    expect(abortCalls).toEqual([])
 
     manager.shutdown()
   })

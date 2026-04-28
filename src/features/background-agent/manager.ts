@@ -90,7 +90,6 @@ import {
 
 type OpencodeClient = PluginInput["client"]
 
-
 interface MessagePartInfo {
   id?: string
   sessionID?: string
@@ -581,7 +580,7 @@ export class BackgroundManager {
 
     if (task.retryNotification) {
       const attemptNumber = boundAttempt.attemptNumber
-      const retrySessionUrl = buildLocalSessionUrl(this.directory, sessionID)
+      const retrySessionUrl = buildLocalSessionUrl(parentDirectory, sessionID)
       const previousAttempt = getPreviousAttempt(task, boundAttempt.attemptID)
       const failedSessionID = previousAttempt?.sessionID ?? task.retryNotification.previousSessionID
       const failedSessionLine = failedSessionID
@@ -689,7 +688,16 @@ The fallback retry session is now created and can be inspected directly.
       }
 
       log("[background-agent] promptAsync error:", error)
-      const existingTask = this.findBySession(sessionID)
+      const resolvedTask = this.resolveTaskAttemptBySession(sessionID)
+      const existingTask = resolvedTask?.task
+      if (resolvedTask && !resolvedTask.isCurrent) {
+        log("[background-agent] Ignoring prompt error from stale attempt session", {
+          sessionID,
+          currentAttemptID: resolvedTask.task.currentAttemptID,
+          attemptID: resolvedTask.attemptID,
+        })
+        return
+      }
       if (existingTask) {
         const errorInfo = {
           name: extractErrorName(error),
@@ -1188,10 +1196,10 @@ The fallback retry session is now created and can be inspected directly.
 
         task.progress.toolCalls += 1
         task.progress.lastTool = partInfo.tool
-        const circuitBreaker = this.cachedCircuitBreakerSettings ?? resolveCircuitBreakerSettings(this.config)
-        this.cachedCircuitBreakerSettings = circuitBreaker
-        if (partInfo.tool) {
-         task.progress.toolCallWindow = recordToolCall(
+         const circuitBreaker = this.cachedCircuitBreakerSettings ?? resolveCircuitBreakerSettings(this.config)
+         this.cachedCircuitBreakerSettings = circuitBreaker
+         if (partInfo.tool) {
+           task.progress.toolCallWindow = recordToolCall(
              task.progress.toolCallWindow,
              partInfo.tool,
              circuitBreaker,
@@ -1813,7 +1821,6 @@ The task was re-queued on a fallback model after a retryable failure.
     unregisterManagerForCleanup(this)
   }
 
-
   /**
    * Get all running tasks (for compaction hook)
    */
@@ -2183,98 +2190,98 @@ The task was re-queued on a fallback model after a retryable failure.
     if (this.pollingInFlight) return
     this.pollingInFlight = true
     try {
-    this.pruneStaleTasksAndNotifications()
+      this.pruneStaleTasksAndNotifications()
 
-    const statusResult = await this.client.session.status()
-    const allStatuses = normalizeSDKResponse(statusResult, {} as Record<string, { type: string }>)
+      const statusResult = await this.client.session.status()
+      const allStatuses = normalizeSDKResponse(statusResult, {} as Record<string, { type: string }>)
 
-    await this.checkAndInterruptStaleTasks(allStatuses)
+      await this.checkAndInterruptStaleTasks(allStatuses)
 
-    for (const task of this.tasks.values()) {
-      if (task.status !== "running") continue
-      
-      const sessionID = task.sessionID
-      if (!sessionID) continue
+      for (const task of this.tasks.values()) {
+        if (task.status !== "running") continue
+        
+        const sessionID = task.sessionID
+        if (!sessionID) continue
 
-      try {
-        const sessionStatus = allStatuses[sessionID]
-        // Handle retry before checking running state
-        if (sessionStatus?.type === "retry") {
-          const retryMessage = typeof (sessionStatus as { message?: string }).message === "string"
-            ? (sessionStatus as { message?: string }).message
-            : undefined
-          const errorInfo = { name: "SessionRetry", message: retryMessage }
-          if (await this.tryFallbackRetry(task, errorInfo, "polling:session.status")) {
-            continue
-          }
-        }
-
-        // Only skip completion when session status is actively running.
-        // Unknown or terminal statuses (like "interrupted") fall through to completion.
-        if (sessionStatus && isActiveSessionStatus(sessionStatus.type)) {
-          log("[background-agent] Session still running, relying on event-based progress:", {
-            taskId: task.id,
-            sessionID,
-            sessionStatus: sessionStatus.type,
-            toolCalls: task.progress?.toolCalls ?? 0,
-          })
-          continue
-        }
-
-        if (sessionStatus && isTerminalSessionStatus(sessionStatus.type)) {
-          await this.tryCompleteTask(task, `polling (terminal session status: ${sessionStatus.type})`)
-          continue
-        }
-
-        if (sessionStatus && sessionStatus.type !== "idle") {
-          log("[background-agent] Unknown session status, treating as potentially idle:", {
-            taskId: task.id,
-            sessionID,
-            sessionStatus: sessionStatus.type,
-          })
-        }
-
-        // Session is idle or no longer in status response (completed/disappeared)
-        const sessionGoneFromStatus = !sessionStatus
-        const sessionGoneThresholdReached = sessionGoneFromStatus
-          && (task.consecutiveMissedPolls ?? 0) >= MIN_SESSION_GONE_POLLS
-        const completionSource = sessionStatus?.type === "idle"
-          ? "polling (idle status)"
-          : "polling (session gone from status)"
-        const hasValidOutput = await this.validateSessionHasOutput(sessionID)
-        if (!hasValidOutput) {
-          if (sessionGoneThresholdReached) {
-            const sessionExists = await this.verifySessionExists(sessionID)
-            if (!sessionExists) {
-              log("[background-agent] Session no longer exists (crashed), marking task as error:", task.id)
-              await this.failCrashedTask(task, "Subagent session no longer exists (process likely crashed). The session disappeared without producing any output.")
+        try {
+          const sessionStatus = allStatuses[sessionID]
+          // Handle retry before checking running state
+          if (sessionStatus?.type === "retry") {
+            const retryMessage = typeof (sessionStatus as { message?: string }).message === "string"
+              ? (sessionStatus as { message?: string }).message
+              : undefined
+            const errorInfo = { name: "SessionRetry", message: retryMessage }
+            if (await this.tryFallbackRetry(task, errorInfo, "polling:session.status")) {
               continue
             }
-
-            task.consecutiveMissedPolls = 0
           }
-          log("[background-agent] Polling idle/gone but no valid output yet, waiting:", task.id)
-          continue
+
+          // Only skip completion when session status is actively running.
+          // Unknown or terminal statuses (like "interrupted") fall through to completion.
+          if (sessionStatus && isActiveSessionStatus(sessionStatus.type)) {
+            log("[background-agent] Session still running, relying on event-based progress:", {
+              taskId: task.id,
+              sessionID,
+              sessionStatus: sessionStatus.type,
+              toolCalls: task.progress?.toolCalls ?? 0,
+            })
+            continue
+          }
+
+          if (sessionStatus && isTerminalSessionStatus(sessionStatus.type)) {
+            await this.tryCompleteTask(task, `polling (terminal session status: ${sessionStatus.type})`)
+            continue
+          }
+
+          if (sessionStatus && sessionStatus.type !== "idle") {
+            log("[background-agent] Unknown session status, treating as potentially idle:", {
+              taskId: task.id,
+              sessionID,
+              sessionStatus: sessionStatus.type,
+            })
+          }
+
+          // Session is idle or no longer in status response (completed/disappeared)
+          const sessionGoneFromStatus = !sessionStatus
+          const sessionGoneThresholdReached = sessionGoneFromStatus
+            && (task.consecutiveMissedPolls ?? 0) >= MIN_SESSION_GONE_POLLS
+          const completionSource = sessionStatus?.type === "idle"
+            ? "polling (idle status)"
+            : "polling (session gone from status)"
+          const hasValidOutput = await this.validateSessionHasOutput(sessionID)
+          if (!hasValidOutput) {
+            if (sessionGoneThresholdReached) {
+              const sessionExists = await this.verifySessionExists(sessionID)
+              if (!sessionExists) {
+                log("[background-agent] Session no longer exists (crashed), marking task as error:", task.id)
+                await this.failCrashedTask(task, "Subagent session no longer exists (process likely crashed). The session disappeared without producing any output.")
+                continue
+              }
+
+              task.consecutiveMissedPolls = 0
+            }
+            log("[background-agent] Polling idle/gone but no valid output yet, waiting:", task.id)
+            continue
+          }
+
+          // Re-check status after async operation
+          if (task.status !== "running") continue
+
+          const hasIncompleteTodos = await this.checkSessionTodos(sessionID)
+          if (hasIncompleteTodos) {
+            log("[background-agent] Task has incomplete todos via polling, waiting:", task.id)
+            continue
+          }
+
+          await this.tryCompleteTask(task, completionSource)
+        } catch (error) {
+          log("[background-agent] Poll error for task:", { taskId: task.id, error })
         }
-
-        // Re-check status after async operation
-        if (task.status !== "running") continue
-
-        const hasIncompleteTodos = await this.checkSessionTodos(sessionID)
-        if (hasIncompleteTodos) {
-          log("[background-agent] Task has incomplete todos via polling, waiting:", task.id)
-          continue
-        }
-
-        await this.tryCompleteTask(task, completionSource)
-      } catch (error) {
-        log("[background-agent] Poll error for task:", { taskId: task.id, error })
       }
-    }
 
-    if (!this.hasRunningTasks()) {
-      this.stopPolling()
-    }
+      if (!this.hasRunningTasks()) {
+        this.stopPolling()
+      }
     } finally {
       this.pollingInFlight = false
     }
