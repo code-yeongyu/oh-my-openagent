@@ -40,12 +40,7 @@ export async function executeSyncTask(
       spawnReservation = await manager.reserveSubagentSpawn(parentContext.sessionID)
     }
 
-    // Depth guard. We must NOT silently fall back to childDepth: 1
-    // when the manager is unavailable or lacks the spawn methods, because that
-    // would let subagents recurse without bound. The only safe fallback is
-    // when the manager genuinely cannot enforce limits (legacy SDK), in which
-    // case we still record childDepth: 1 but log a warning so regressions are
-    // visible.
+    // Only default to childDepth: 1 for legacy managers that cannot enforce spawn depth.
     let spawnContext: { rootSessionID: string; parentDepth: number; childDepth: number }
     if (spawnReservation?.spawnContext) {
       spawnContext = spawnReservation.spawnContext
@@ -79,28 +74,60 @@ export async function executeSyncTask(
     const sessionID = createSessionResult.sessionID
     spawnReservation?.commit()
     syncSessionID = sessionID
-    subagentSessions.add(sessionID)
-    syncSubagentSessions.add(sessionID)
-    setSessionAgent(sessionID, agentToUse)
-    executorCtx.modelFallbackControllerAccessor?.setSessionFallbackChain(sessionID, fallbackChain)
 
-    if (args.category) {
-      SessionCategoryRegistry.register(sessionID, args.category)
-    }
+    const registerSyncSession = async (newSessionID: string): Promise<void> => {
+      syncSessionID = newSessionID
+      subagentSessions.add(newSessionID)
+      syncSubagentSessions.add(newSessionID)
+      setSessionAgent(newSessionID, agentToUse)
+      executorCtx.modelFallbackControllerAccessor?.setSessionFallbackChain(newSessionID, fallbackChain)
 
-    if (onSyncSessionCreated) {
-      log("[task] Invoking onSyncSessionCreated callback", { sessionID, parentID: parentContext.sessionID })
-      try {
-        await onSyncSessionCreated({
-          sessionID,
-          parentID: parentContext.sessionID,
-          title: args.description,
-        })
-      } catch (error) {
-        log("[task] onSyncSessionCreated callback failed", { error: String(error) })
+      if (args.category) {
+        SessionCategoryRegistry.register(newSessionID, args.category)
       }
-      await new Promise(r => setTimeout(r, 200))
+
+      if (onSyncSessionCreated) {
+        log("[task] Invoking onSyncSessionCreated callback", { sessionID: newSessionID, parentID: parentContext.sessionID })
+        try {
+          await onSyncSessionCreated({
+            sessionID: newSessionID,
+            parentID: parentContext.sessionID,
+            title: args.description,
+          })
+        } catch (error) {
+          log("[task] onSyncSessionCreated callback failed", { error: String(error) })
+        }
+        await new Promise(r => setTimeout(r, 200))
+      }
     }
+
+    const publishSyncMetadata = async (
+      currentSessionID: string,
+      currentModel: DelegatedModelConfig | undefined,
+      currentTaskId: string,
+      spawnDepth: number,
+    ): Promise<void> => {
+      await publishToolMetadata(ctx, {
+        title: args.description,
+        metadata: {
+          prompt: args.prompt,
+          agent: agentToUse,
+          category: args.category,
+          ...(args.requested_subagent_type !== undefined ? { requested_subagent_type: args.requested_subagent_type } : {}),
+          load_skills: args.load_skills,
+          description: args.description,
+          run_in_background: args.run_in_background,
+          taskId: currentSessionID,
+          sessionId: currentSessionID,
+          sync: true,
+          spawnDepth,
+          command: args.command,
+          model: resolveMetadataModel(currentModel, parentContext.model),
+        },
+      })
+    }
+
+    await registerSyncSession(sessionID)
 
     taskId = `sync_${sessionID.slice(0, 8)}`
     const startTime = new Date()
@@ -117,26 +144,7 @@ export async function executeSyncTask(
         modelInfo,
       })
     }
-
-    const syncTaskMeta = {
-      title: args.description,
-      metadata: {
-        prompt: args.prompt,
-        agent: agentToUse,
-        category: args.category,
-        ...(args.requested_subagent_type !== undefined ? { requested_subagent_type: args.requested_subagent_type } : {}),
-        load_skills: args.load_skills,
-        description: args.description,
-        run_in_background: args.run_in_background,
-        taskId: sessionID,
-        sessionId: sessionID,
-        sync: true,
-        spawnDepth: spawnContext.childDepth,
-        command: args.command,
-        model: resolveMetadataModel(categoryModel, parentContext.model),
-      },
-    }
-    await publishToolMetadata(ctx, syncTaskMeta)
+    await publishSyncMetadata(sessionID, categoryModel, taskId, spawnContext.childDepth)
 
     const syncPromptInput = {
       sessionID,
@@ -225,17 +233,23 @@ export async function executeSyncTask(
           }
 
           activeSessionID = retrySessionResult.sessionID
-          syncSessionID = retrySessionResult.sessionID
-          subagentSessions.add(activeSessionID)
-          syncSubagentSessions.add(activeSessionID)
-          setSessionAgent(activeSessionID, agentToUse)
-          executorCtx.modelFallbackControllerAccessor?.setSessionFallbackChain(activeSessionID, fallbackChain)
-
-          if (args.category) {
-            SessionCategoryRegistry.register(activeSessionID, args.category)
-          }
-
           effectiveCategoryModel = nextFallbackModel
+          await registerSyncSession(activeSessionID)
+          if (toastManager && taskId) {
+            toastManager.addTask({
+              id: taskId,
+              sessionID: activeSessionID,
+              description: args.description,
+              agent: agentToUse,
+              isBackground: false,
+              category: args.category,
+              skills: args.load_skills,
+              modelInfo,
+            })
+          }
+          if (taskId) {
+            await publishSyncMetadata(activeSessionID, effectiveCategoryModel, taskId, spawnContext.childDepth)
+          }
           continue
         }
 
@@ -246,7 +260,6 @@ export async function executeSyncTask(
 
       const duration = formatDuration(startTime)
 
-      // 检测模型路由是否与父 session 不同，给用户可见的提示
       const actualModelStr = effectiveCategoryModel
         ? `${effectiveCategoryModel.providerID}/${effectiveCategoryModel.modelID}`
         : undefined
@@ -260,24 +273,7 @@ export async function executeSyncTask(
         modelRoutingNote = `\nModel: ${actualModelStr}${args.category ? ` (category: ${args.category})` : ""}`
       }
 
-      await publishToolMetadata(ctx, {
-        title: args.description,
-        metadata: {
-          prompt: args.prompt,
-          agent: agentToUse,
-          category: args.category,
-          ...(args.requested_subagent_type !== undefined ? { requested_subagent_type: args.requested_subagent_type } : {}),
-          load_skills: args.load_skills,
-          description: args.description,
-          run_in_background: args.run_in_background,
-          taskId: activeSessionID,
-          sessionId: activeSessionID,
-          sync: true,
-          spawnDepth: spawnContext.childDepth,
-          command: args.command,
-          model: resolveMetadataModel(effectiveCategoryModel, parentContext.model),
-        },
-      })
+      await publishSyncMetadata(activeSessionID, effectiveCategoryModel, taskId!, spawnContext.childDepth)
 
       return `Task completed in ${duration}.
 

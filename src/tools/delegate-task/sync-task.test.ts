@@ -15,7 +15,6 @@ describe("executeSyncTask - cleanup on error paths", () => {
   let resetToastManager: (() => void) | null = null
 
   beforeEach(() => {
-    //#given - configure fast timing for all tests
     const { __setTimingConfig } = require("./timing")
     __setTimingConfig({
       POLL_INTERVAL_MS: 10,
@@ -24,7 +23,6 @@ describe("executeSyncTask - cleanup on error paths", () => {
       MAX_POLL_TIME_MS: 100,
     })
 
-    //#given - reset call tracking
     removeTaskCalls = []
     addTaskCalls = []
     deleteCalls = []
@@ -32,7 +30,6 @@ describe("executeSyncTask - cleanup on error paths", () => {
 
     clearRequireCache("./sync-task")
 
-    //#given - initialize real task toast manager (avoid global module mocks)
     const { initTaskToastManager, _resetTaskToastManagerForTesting } = require("../../features/task-toast-manager/manager")
     _resetTaskToastManagerForTesting()
     resetToastManager = _resetTaskToastManagerForTesting
@@ -48,7 +45,6 @@ describe("executeSyncTask - cleanup on error paths", () => {
       removeTaskCalls.push(id)
     })
 
-    //#given - mock subagentSessions
     const { subagentSessions } = require("../../features/claude-code-session-state")
     spyOn(subagentSessions, "add").mockImplementation((id: string) => {
       addCalls.push(id)
@@ -60,7 +56,6 @@ describe("executeSyncTask - cleanup on error paths", () => {
   })
 
   afterEach(() => {
-    //#given - reset timing after each test
     const { __resetTimingConfig } = require("./timing")
     __resetTimingConfig()
 
@@ -516,11 +511,158 @@ describe("executeSyncTask - cleanup on error paths", () => {
     })
   })
 
-  test("depth regression: blocks spawn when reserveSubagentSpawn throws depth limit error", async () => {
-    // This is a smoke test guarding against regressions where the depth limit
-    // would be silently bypassed (e.g. via a fallback path that hardcodes
-    // childDepth: 1).
+  test("replays sync session side effects for retry-created sessions", async () => {
+    const mockClient = {
+      session: {
+        create: async () => ({ data: { id: "ignored" } }),
+      },
+    }
 
+    const { executeSyncTask } = require("./sync-task")
+    const createdSessions: string[] = []
+    const onSyncSessionCreated = mock(async (_event: unknown) => {})
+
+    const deps = {
+      createSyncSession: async () => {
+        const sessionID = createdSessions.length === 0 ? "ses_first" : "ses_second"
+        createdSessions.push(sessionID)
+        return { ok: true as const, sessionID }
+      },
+      sendSyncPrompt: async () => null,
+      pollSyncSession: async (_ctx: unknown, _client: unknown, input: { sessionID: string }) => {
+        return input.sessionID === "ses_first"
+          ? "Forbidden: Selected provider is forbidden"
+          : null
+      },
+      fetchSyncResult: async (_client: unknown, sessionID: string) => ({ ok: true as const, textContent: `Result from ${sessionID}` }),
+    }
+
+    const metadataCalls: any[] = []
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-123",
+      metadata: (input: any) => { metadataCalls.push(input) },
+    }
+
+    const mockExecutorCtx = {
+      client: mockClient,
+      directory: "/tmp",
+      onSyncSessionCreated,
+      modelFallbackControllerAccessor: {
+        setSessionFallbackChain: () => {},
+        clearSessionFallbackChain: () => {},
+      },
+    }
+
+    const args = {
+      prompt: "test prompt",
+      description: "test task",
+      category: "quick",
+      load_skills: [],
+      run_in_background: false,
+      command: null,
+    }
+
+    const initialModel = {
+      providerID: "genai-proxy-openai",
+      modelID: "gpt-5.4-mini",
+      variant: undefined,
+    }
+    const fallbackChain = [
+      { providers: ["genai-proxy-openai"], model: "gpt-5.4-mini" },
+      { providers: ["genai-proxy-aws"], model: "us.anthropic.claude-haiku-4-5-20251001-v1:0" },
+    ]
+
+    const result = await executeSyncTask(args, mockCtx, mockExecutorCtx, {
+      sessionID: "parent-session",
+    }, "sisyphus-junior", initialModel, undefined, undefined, fallbackChain, deps)
+
+    expect(result).toContain("Result from ses_second")
+    expect(onSyncSessionCreated.mock.calls.map((call: any[]) => call[0])).toEqual([
+      { sessionID: "ses_first", parentID: "parent-session", title: "test task" },
+      { sessionID: "ses_second", parentID: "parent-session", title: "test task" },
+    ])
+    expect(addTaskCalls.map((task) => task.sessionID)).toEqual(["ses_first", "ses_second"])
+    expect(addTaskCalls.map((task) => task.id)).toEqual(["sync_ses_firs", "sync_ses_firs"])
+  })
+
+  test("publishes latest retry session metadata when final retry still fails", async () => {
+    const mockClient = {
+      session: {
+        create: async () => ({ data: { id: "ignored" } }),
+      },
+    }
+
+    const { executeSyncTask } = require("./sync-task")
+    const createdSessions: string[] = []
+
+    const deps = {
+      createSyncSession: async () => {
+        const sessionID = createdSessions.length === 0 ? "ses_first" : "ses_second"
+        createdSessions.push(sessionID)
+        return { ok: true as const, sessionID }
+      },
+      sendSyncPrompt: async () => null,
+      pollSyncSession: async (_ctx: unknown, _client: unknown, input: { sessionID: string }) => {
+        return input.sessionID === "ses_first"
+          ? "Forbidden: Selected provider is forbidden"
+          : "Final retry failed"
+      },
+      fetchSyncResult: async () => ({ ok: true as const, textContent: "unused" }),
+    }
+
+    const metadataCalls: any[] = []
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-123",
+      metadata: (input: any) => { metadataCalls.push(input) },
+    }
+
+    const mockExecutorCtx = {
+      client: mockClient,
+      directory: "/tmp",
+      onSyncSessionCreated: null,
+      modelFallbackControllerAccessor: {
+        setSessionFallbackChain: () => {},
+        clearSessionFallbackChain: () => {},
+      },
+    }
+
+    const args = {
+      prompt: "test prompt",
+      description: "test task",
+      category: "quick",
+      load_skills: [],
+      run_in_background: false,
+      command: null,
+    }
+
+    const initialModel = {
+      providerID: "genai-proxy-openai",
+      modelID: "gpt-5.4-mini",
+      variant: undefined,
+    }
+    const fallbackChain = [
+      { providers: ["genai-proxy-openai"], model: "gpt-5.4-mini" },
+      { providers: ["genai-proxy-aws"], model: "us.anthropic.claude-haiku-4-5-20251001-v1:0" },
+    ]
+
+    const result = await executeSyncTask(args, mockCtx, mockExecutorCtx, {
+      sessionID: "parent-session",
+    }, "sisyphus-junior", initialModel, undefined, undefined, fallbackChain, deps)
+
+    expect(result).toBe("Final retry failed")
+    const finalMetadata = metadataCalls.at(-1)
+    expect(finalMetadata.metadata.sessionId).toBe("ses_second")
+    expect(finalMetadata.metadata.taskId).toBe("ses_second")
+    expect(finalMetadata.metadata.model).toEqual({
+      providerID: "genai-proxy-aws",
+      modelID: "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+      variant: undefined,
+    })
+  })
+
+  test("depth regression: blocks spawn when reserveSubagentSpawn throws depth limit error", async () => {
     const mockClient = {
       session: {
         create: async () => ({ data: { id: "ses_test_12345678" } }),
@@ -574,17 +716,10 @@ describe("executeSyncTask - cleanup on error paths", () => {
     expect(result).toContain("child depth 4")
     expect(result).toContain("maxDepth=3")
     expect(reserveSubagentSpawn).toHaveBeenCalledWith("parent-session")
-    // critical: createSyncSession must NOT have been called -- if it was,
-    // the depth guard was bypassed.
     expect(addCalls.length).toBe(0)
   })
 
   test("depth regression: does not silently fall back to childDepth: 1 when manager methods are present", async () => {
-    // Guards against the dangerous fallback path in sync-task.ts that
-    // hardcodes childDepth: 1 if reserveSubagentSpawn / assertCanSpawn are
-    // not functions. With a real manager present, the fallback must NOT be
-    // taken.
-
     const mockClient = {
       session: {
         create: async () => ({ data: { id: "ses_test_12345678" } }),
