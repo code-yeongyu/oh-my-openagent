@@ -68,7 +68,8 @@
           "refactor",
           "start-work",
           "stop-continuation",
-          "remove-ai-slops"
+          "remove-ai-slops",
+          "hyperplan"
         ]
       }
     },
@@ -5967,6 +5968,25 @@
         "recipient_unread_max_bytes",
         "mailbox_poll_interval_ms"
       ],
+      "additionalProperties": false
+    },
+    "keyword_detector": {
+      "type": "object",
+      "properties": {
+        "disabled_keywords": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "ultrawork",
+              "search",
+              "analyze",
+              "team",
+              "hyperplan"
+            ]
+          }
+        }
+      },
       "additionalProperties": false
     },
     "babysitting": {
