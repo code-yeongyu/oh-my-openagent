@@ -38,23 +38,10 @@ REMEMBER: Vague requirements lead to failed implementations. Take the time to un
 </system>
 
 <CRITICAL_REQUIREMENT_DEPENDENCY_PARALLEL_EXECUTION_CATEGORY_SKILLS>
-#####################################################################
-#                                                                   #
-#   ██████╗ ███████╗ ██████╗ ██╗   ██╗██╗██████╗ ███████╗██████╗    #
-#   ██╔══██╗██╔════╝██╔═══██╗██║   ██║██║██╔══██╗██╔════╝██╔══██╗   #
-#   ██████╔╝█████╗  ██║   ██║██║   ██║██║██████╔╝█████╗  ██║  ██║   #
-#   ██╔══██╗██╔══╝  ██║▄▄ ██║██║   ██║██║██╔══██╗██╔══╝  ██║  ██║   #
-#   ██��  ██║███████╗╚██████╔╝╚██████╔╝██║██║  ██║███████╗██████╔╝   #
-#   ╚═╝  ╚═╝╚══════╝ ╚══▀▀═╝  ╚═════╝ ╚═╝╚═╝  ╚═╝╚══════╝╚═════╝    #
-#                                                                   #
-#####################################################################
-
 YOU MUST INCLUDE THE FOLLOWING SECTIONS IN YOUR PLAN OUTPUT.
 THIS IS NON-NEGOTIABLE. FAILURE TO INCLUDE THESE SECTIONS = INCOMPLETE PLAN.
 
-═══════════════════════════════════════════════════════════════════
-█ SECTION 1: TASK DEPENDENCY GRAPH (MANDATORY)                    █
-═══════════════════════════════════════════════════════════════════
+### Section 1: Task Dependency Graph (MANDATORY)
 
 YOU MUST ANALYZE AND DOCUMENT TASK DEPENDENCIES.
 
@@ -81,9 +68,7 @@ WHY THIS MATTERS:
 - Identifies critical path for project timeline
 
 
-═══════════════════════════════════════════════════════════════════
-█ SECTION 2: PARALLEL EXECUTION GRAPH (MANDATORY)                 █
-═══════════════════════════════════════════════════════════════════
+### Section 2: Parallel Execution Graph (MANDATORY)
 
 YOU MUST IDENTIFY WHICH TASKS CAN RUN IN PARALLEL.
 
@@ -115,9 +100,7 @@ WHY THIS MATTERS:
 - Identifies bottlenecks in the execution plan
 
 
-═══════════════════════════════════════════════════════════════════
-█ SECTION 3: CATEGORY + SKILLS RECOMMENDATIONS (MANDATORY)        █
-═══════════════════════════════════════════════════════════════════
+### Section 3: Category + Skills Recommendations (MANDATORY)
 
 FOR EVERY TASK, YOU MUST RECOMMEND:
 1. Which CATEGORY to use for delegation
@@ -147,9 +130,7 @@ WHY THIS MATTERS:
 - Wrong category = wrong model = poor results
 
 
-═══════════════════════════════════════════════════════════════════
-█ RESPONSE FORMAT SPECIFICATION (MANDATORY)                       █
-═══════════════════════════════════════════════════════════════════
+### Response Format Specification (MANDATORY)
 
 YOUR PLAN OUTPUT MUST FOLLOW THIS EXACT STRUCTURE:
 
@@ -186,18 +167,11 @@ YOUR PLAN OUTPUT MUST FOLLOW THIS EXACT STRUCTURE:
 [Final verification steps]
 \`\`\`
 
-#####################################################################
-#                                                                   #
-#   FAILURE TO INCLUDE THESE SECTIONS = PLAN WILL BE REJECTED      #
-#   BY MOMUS REVIEW. DO NOT SKIP. DO NOT ABBREVIATE.               #
-#                                                                   #
-#####################################################################
+**FAILURE TO INCLUDE THESE SECTIONS = PLAN WILL BE REJECTED BY MOMUS REVIEW. DO NOT SKIP. DO NOT ABBREVIATE.**
 </CRITICAL_REQUIREMENT_DEPENDENCY_PARALLEL_EXECUTION_CATEGORY_SKILLS>
 
 <FINAL_OUTPUT_FOR_CALLER>
-═══════════════════════════════════════════════════════════════════
-█ SECTION 4: ACTIONABLE TODO LIST FOR CALLER (MANDATORY)          █
-═══════════════════════════════════════════════════════════════════
+### Section 4: Actionable TODO List for Caller (MANDATORY)
 
 YOU MUST END YOUR RESPONSE WITH THIS SECTION.
 
