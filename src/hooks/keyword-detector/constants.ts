@@ -4,9 +4,11 @@ export const INLINE_CODE_PATTERN = /`[^`]+`/g
 export { isPlannerAgent, isNonOmoAgent, getUltraworkMessage } from "./ultrawork"
 export { SEARCH_PATTERN, SEARCH_MESSAGE } from "./search"
 export { ANALYZE_PATTERN, ANALYZE_MESSAGE } from "./analyze"
+export { TEAM_PATTERN, TEAM_MESSAGE } from "./team"
 
 import { getUltraworkMessage } from "./ultrawork"
 import { SEARCH_PATTERN, SEARCH_MESSAGE } from "./search"
+import { TEAM_PATTERN, TEAM_MESSAGE } from "./team"
 
 export type KeywordDetector = {
   pattern: RegExp
@@ -40,5 +42,9 @@ SYNTHESIZE findings before proceeding.
 ---
 MANDATORY delegate_task params: ALWAYS include load_skills and run_in_background when calling delegate_task. Evaluate available skills before dispatch - pass task-appropriate skills when relevant, pass [] ONLY when no skill matches the task domain.
 Example: delegate_task(subagent_type="explore", prompt="...", run_in_background=true, load_skills=[])`,
+  },
+  {
+    pattern: TEAM_PATTERN,
+    message: TEAM_MESSAGE,
   },
 ]

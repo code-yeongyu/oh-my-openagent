@@ -860,3 +860,184 @@ describe("keyword-detector non-OMO agent skipping", () => {
     expect(textPart!.text).not.toContain("[search-mode]")
   })
 })
+
+describe("keyword-detector team mode", () => {
+  let logCalls: Array<{ msg: string; data?: unknown }>
+  let logSpy: ReturnType<typeof spyOn>
+  let getMainSessionSpy: ReturnType<typeof spyOn>
+
+  beforeEach(() => {
+    _resetForTesting()
+    logCalls = []
+    logSpy = spyOn(sharedModule, "log").mockImplementation((msg: string, data?: unknown) => {
+      logCalls.push({ msg, data })
+    })
+  })
+
+  afterEach(() => {
+    logSpy?.mockRestore()
+    getMainSessionSpy?.mockRestore()
+    _resetForTesting()
+  })
+
+  function createMockPluginInput() {
+    return {
+      client: {
+        tui: {
+          showToast: async () => {},
+        },
+      },
+    } as unknown as PluginInput
+  }
+
+  test("should inject team-mode message when user types 'team mode'", async () => {
+    // given - main session typing English 'team mode'
+    const collector = new ContextCollector()
+    const sessionID = "team-en-session"
+    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
+    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "let's use team mode for this task" }],
+    }
+
+    // when - keyword detection runs
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then - team-mode message should be prepended with team_* tool guidance
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).toContain("[team-mode]")
+    expect(textPart!.text).toContain("team_create")
+    expect(textPart!.text).toContain("team_task_create")
+    expect(textPart!.text).toContain("team_send_message")
+    expect(textPart!.text).toContain("NEVER substitute with delegate_task")
+    expect(textPart!.text).toContain("for this task")
+  })
+
+  test("should inject team-mode message when user types '팀 모드' (Korean with space)", async () => {
+    // given - main session typing Korean '팀 모드'
+    const collector = new ContextCollector()
+    const sessionID = "team-ko-spaced-session"
+    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
+    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "이거 팀 모드로 해줘" }],
+    }
+
+    // when - keyword detection runs
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then - team-mode message should be prepended
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).toContain("[team-mode]")
+    expect(textPart!.text).toContain("팀 모드로 해줘")
+  })
+
+  test("should inject team-mode message when user types '팀으로'", async () => {
+    // given - main session typing Korean '팀으로'
+    const collector = new ContextCollector()
+    const sessionID = "team-ko-eulo-session"
+    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
+    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "팀으로 일하자" }],
+    }
+
+    // when - keyword detection runs
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then - team-mode message should be prepended
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).toContain("[team-mode]")
+    expect(textPart!.text).toContain("팀으로 일하자")
+  })
+
+  test("should NOT trigger team-mode on '스팀으로' (false-positive guard)", async () => {
+    // given - text contains '팀으로' as substring of another Korean word ('스팀으로')
+    const collector = new ContextCollector()
+    const sessionID = "false-positive-eulo-session"
+    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
+    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "스팀으로 게임 켜줘" }],
+    }
+
+    // when - keyword detection runs
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then - team-mode should NOT be triggered, text unchanged
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).toBe("스팀으로 게임 켜줘")
+    expect(textPart!.text).not.toContain("[team-mode]")
+  })
+
+  test("should NOT trigger team-mode on '스팀모드' (Hangul-prefix false-positive guard)", async () => {
+    // given - text contains '팀모드' as substring of another Korean word ('스팀모드')
+    const collector = new ContextCollector()
+    const sessionID = "false-positive-mode-session"
+    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
+    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "스팀모드 활성화" }],
+    }
+
+    // when - keyword detection runs
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then - team-mode should NOT be triggered
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).toBe("스팀모드 활성화")
+    expect(textPart!.text).not.toContain("[team-mode]")
+  })
+
+  test("should NOT trigger team-mode on bare 'team' without 'mode'", async () => {
+    // given - text contains 'team' but not 'team mode'
+    const collector = new ContextCollector()
+    const sessionID = "bare-team-session"
+    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
+    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "join the team and start working" }],
+    }
+
+    // when - keyword detection runs
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then - team-mode should NOT be triggered
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).not.toContain("[team-mode]")
+  })
+
+  test("should filter team-mode keyword in non-main session (only ultrawork allowed there)", async () => {
+    // given - main session set, different (subagent) session triggers team mode
+    const mainSessionID = "main-team-mode"
+    const subagentSessionID = "subagent-team-mode"
+    setMainSession(mainSessionID)
+
+    const hook = createKeywordDetectorHook(createMockPluginInput())
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "team mode please" }],
+    }
+
+    // when - subagent session triggers team mode keyword
+    await hook["chat.message"]({ sessionID: subagentSessionID }, output)
+
+    // then - team-mode message should NOT be injected in subagent session
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).toBe("team mode please")
+    expect(textPart!.text).not.toContain("[team-mode]")
+  })
+})
