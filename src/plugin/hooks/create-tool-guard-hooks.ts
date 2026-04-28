@@ -17,6 +17,7 @@ import {
   createJsonErrorRecoveryHook,
   createTodoDescriptionOverrideHook,
   createWebFetchRedirectGuardHook,
+  createTeamToolGating,
 } from "../../hooks"
 import {
   getOpenCodeVersion,
@@ -41,6 +42,7 @@ export type ToolGuardHooks = {
   readImageResizer: ReturnType<typeof createReadImageResizerHook> | null
   todoDescriptionOverride: ReturnType<typeof createTodoDescriptionOverrideHook> | null
   webfetchRedirectGuard: ReturnType<typeof createWebFetchRedirectGuardHook> | null
+  teamToolGating: ReturnType<typeof createTeamToolGating> | null
 }
 
 export function createToolGuardHooks(args: {
@@ -133,6 +135,10 @@ export function createToolGuardHooks(args: {
     ? safeHook("webfetch-redirect-guard", () => createWebFetchRedirectGuardHook(ctx))
     : null
 
+  const teamToolGating = isHookEnabled("team-tool-gating")
+    ? safeHook("team-tool-gating", () => createTeamToolGating(ctx, pluginConfig.team_mode))
+    : null
+
   return {
     commentChecker,
     toolOutputTruncator,
@@ -148,5 +154,6 @@ export function createToolGuardHooks(args: {
     readImageResizer,
     todoDescriptionOverride,
     webfetchRedirectGuard,
+    teamToolGating,
   }
 }
