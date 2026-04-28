@@ -153,7 +153,7 @@ export function createEventHandler(args: {
 }): (input: EventInput) => Promise<void> {
   const { ctx, pluginConfig, firstMessageVariantGate, managers, hooks } = args;
   const tmuxIntegrationEnabled = pluginConfig.tmux?.enabled ?? false;
-  const pluginContext = ctx as {
+  const pluginContext = ctx as PluginContext & {
     directory: string;
     client: {
       session: {
@@ -178,7 +178,18 @@ export function createEventHandler(args: {
           };
           query: { directory: string };
         }) => Promise<unknown>;
-        summarize: (...args: unknown[]) => Promise<unknown>;
+        summarize: {
+          (input: {
+            path: { id: string };
+            body: { providerID: string; modelID: string; auto?: boolean };
+            query: { directory: string };
+          }): Promise<unknown>;
+          (input: {
+            path: { id: string };
+            body: { auto: boolean };
+            query: { directory: string };
+          }): Promise<unknown>;
+        };
       };
     };
   };
