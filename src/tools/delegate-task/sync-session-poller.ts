@@ -35,6 +35,10 @@ async function fetchSessionMessages(
 
 function getTerminalSessionError(messages: SessionMessage[]): string | null {
   const lastAssistant = [...messages].reverse().find((msg) => msg.info?.role === "assistant")
+  const lastUser = [...messages].reverse().find((msg) => msg.info?.role === "user")
+  if (lastUser?.info?.id && lastAssistant?.info?.id && lastAssistant.info.id <= lastUser.info.id) {
+    return null
+  }
   if (!lastAssistant?.info || !("error" in lastAssistant.info)) {
     return null
   }
@@ -159,7 +163,7 @@ export async function pollSyncSession(
       break
     }
 
-    // 计数新出现的 assistant 轮次，用于熔断无限循环
+    // Count new assistant turns to circuit-break infinite loops
     const lastAssistant = [...messages].reverse().find((m) => m.info?.role === "assistant")
     if (lastAssistant?.info?.id && lastAssistant.info.id !== lastSeenAssistantId) {
       lastSeenAssistantId = lastAssistant.info.id
