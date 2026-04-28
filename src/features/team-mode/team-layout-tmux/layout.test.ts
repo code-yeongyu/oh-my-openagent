@@ -1,94 +1,378 @@
-import { beforeEach, describe, expect, mock, test } from "bun:test"
+/// <reference types="bun-types" />
 
-type LayoutModule = typeof import("./layout")
+import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test"
 
-const spawnMock = mock(() => ({
-  exited: Promise.resolve(0),
-  stdout: new ReadableStream({ start(controller) { controller.enqueue(new TextEncoder().encode("%1\n")); controller.close() } }),
-  stderr: new ReadableStream({ start(controller) { controller.close() } }),
-}))
+import * as sharedModule from "../../../shared"
+import * as sharedTmuxModule from "../../../shared/tmux"
+import * as tmuxPathResolverModule from "../../../tools/interactive-bash/tmux-path-resolver"
+import * as resolveCallerTmuxSessionModule from "./resolve-caller-tmux-session"
+import { canVisualize, createTeamLayout, removeTeamLayout } from "./layout"
 
-const layoutSpecifier = import.meta.resolve("./layout")
-const spawnProcessSpecifier = import.meta.resolve("../../../shared/tmux/tmux-utils/spawn-process")
-const tmuxPathResolverSpecifier = import.meta.resolve("../../../tools/interactive-bash/tmux-path-resolver")
-const sharedSpecifier = import.meta.resolve("../../../shared")
+let nextWindowNumber = 1
+let nextPaneNumber = 1
+let displaySessionId = "$7"
+let displaySuccess = true
 
-function registerModuleMocks(): void {
-  mock.module(spawnProcessSpecifier, () => ({ spawn: spawnMock }))
-  mock.module(tmuxPathResolverSpecifier, () => ({ getTmuxPath: mock(() => Promise.resolve("tmux")) }))
-  mock.module(sharedSpecifier, () => ({ log: mock(() => undefined) }))
+function createTmuxCommandResult(output: string, success = true) {
+  return {
+    success,
+    output,
+    stdout: output,
+    stderr: success ? "" : "error",
+    exitCode: success ? 0 : 1,
+  }
 }
 
-async function loadLayoutModule(): Promise<LayoutModule> {
-  const module = await import(`${layoutSpecifier}?test=${crypto.randomUUID()}`)
-  return module as LayoutModule
+const runTmuxCommandMock = mock((_tmuxPath: string, args: Array<string>, _options?: unknown) => {
+  const command = args[0]
+
+  if (command === "display" && args.includes("#{session_name}:#{window_index}")) {
+    return Promise.resolve(createTmuxCommandResult("test-session:0"))
+  }
+
+  if (command === "display" && args.includes("#{window_id}")) {
+    return Promise.resolve(createTmuxCommandResult("@1"))
+  }
+
+  if (command === "display" && args.includes("#{pane_current_command}")) {
+    return Promise.resolve(createTmuxCommandResult("fish"))
+  }
+
+  if (command === "display") {
+    return Promise.resolve(createTmuxCommandResult(displaySessionId, displaySuccess))
+  }
+
+  if (command === "list-panes") {
+    const allPanes = [process.env.TMUX_PANE ?? "%0"]
+    for (let i = 1; i < nextPaneNumber; i++) allPanes.push(`%${i}`)
+    return Promise.resolve(createTmuxCommandResult(allPanes.join("\n")))
+  }
+
+  if (command === "new-session") {
+    return Promise.resolve(createTmuxCommandResult(`@${nextWindowNumber++}`))
+  }
+
+  if (command === "split-window") {
+    return Promise.resolve(createTmuxCommandResult(`%${nextPaneNumber++}`))
+  }
+
+  return Promise.resolve(createTmuxCommandResult(""))
+})
+
+const isServerRunningMock = mock(async (_serverUrl: string) => true)
+
+async function loadLayoutModule() {
+  return { canVisualize, createTeamLayout, removeTeamLayout }
+}
+
+type TmuxMgrLike = { getServerUrl: () => string }
+
+const tmuxMgr: TmuxMgrLike = { getServerUrl: () => "http://127.0.0.1:12345" }
+
+function getCommands(): Array<Array<string>> {
+  return Array.from(runTmuxCommandMock.mock.calls, (call) => call[1])
 }
 
 describe("team-layout-tmux", () => {
+  afterEach(() => {
+    mock.restore()
+  })
+
   beforeEach(() => {
-    registerModuleMocks()
-    spawnMock.mockClear()
+    runTmuxCommandMock.mockClear()
+    isServerRunningMock.mockClear()
+    isServerRunningMock.mockImplementation(async () => true)
+    nextWindowNumber = 1
+    nextPaneNumber = 1
+    displaySessionId = "$7"
+    displaySuccess = true
     process.env.TMUX = "/tmp/tmux-1"
+    process.env.TMUX_PANE = "%42"
+    spyOn(tmuxPathResolverModule, "getTmuxPath").mockResolvedValue("tmux")
+    spyOn(sharedModule, "log").mockImplementation(() => undefined)
+    spyOn(sharedTmuxModule, "isServerRunning").mockImplementation(isServerRunningMock)
+    spyOn(sharedTmuxModule, "runTmuxCommand").mockImplementation(runTmuxCommandMock)
+    spyOn(resolveCallerTmuxSessionModule, "resolveCallerTmuxSession").mockImplementation(async () => {
+      if (!process.env.TMUX_PANE || !displaySuccess || !/^\$[0-9]+$/.test(displaySessionId)) {
+        return null
+      }
+
+      return { sessionId: displaySessionId }
+    })
   })
 
   test("returns null and makes no tmux calls when visualization unavailable", async () => {
     // given
     delete process.env.TMUX
-    const { createTeamLayout, canVisualize } = await loadLayoutModule()
+    const { canVisualize, createTeamLayout } = await loadLayoutModule()
 
     // when
-    const result = await createTeamLayout("run-1", [], {} as never)
+    const result = await createTeamLayout("run-1", [], tmuxMgr as never)
 
     // then
     expect(canVisualize()).toBe(false)
     expect(result).toBeNull()
-    expect(spawnMock).toHaveBeenCalledTimes(0)
+    expect(runTmuxCommandMock).toHaveBeenCalledTimes(0)
   })
 
-  test("creates focus and grid windows", async () => {
+  test("returns null when server health check fails", async () => {
     // given
+    isServerRunningMock.mockImplementation(async () => false)
     const { createTeamLayout } = await loadLayoutModule()
-    const members = [
-      { name: "lead", sessionId: "s1", color: "red" },
-      { name: "m2", sessionId: "s2" },
-      { name: "m3", sessionId: "s3" },
-    ]
 
     // when
-    await createTeamLayout("run-2", members, {} as never)
-
-    // then
-    expect(spawnMock.mock.calls.flatMap((call) => call[0] as Array<string>)).toContain("new-session")
-    expect(spawnMock.mock.calls.flatMap((call) => call[0] as Array<string>)).toContain("new-window")
-    expect(spawnMock.mock.calls.flatMap((call) => call[0] as Array<string>)).toContain("split-window")
-    expect(spawnMock.mock.calls.flatMap((call) => call[0] as Array<string>)).toContain("select-layout")
-    expect(spawnMock.mock.calls.flatMap((call) => call[0] as Array<string>)).toContain("select-pane")
-  })
-
-  test("returns null when tmux command fails", async () => {
-    // given
-    const { createTeamLayout } = await loadLayoutModule()
-    spawnMock.mockImplementationOnce(() => ({
-      exited: Promise.resolve(1),
-      stdout: new ReadableStream({ start(controller) { controller.close() } }),
-      stderr: new ReadableStream({ start(controller) { controller.close() } }),
-    }))
-
-    // when
-    const result = await createTeamLayout("run-3", [{ name: "lead", sessionId: "s1" }], {} as never)
+    const result = await createTeamLayout(
+      "run-health",
+      [{ name: "lead", sessionId: "s1", worktreePath: "/tmp/lead" }],
+      tmuxMgr as never,
+    )
 
     // then
     expect(result).toBeNull()
+    expect(runTmuxCommandMock).toHaveBeenCalledTimes(0)
   })
 
-  test("cleans up the tmux session", async () => {
+  test("splits current window for each member and sends attach via send-keys", async () => {
+    // given
+    const { createTeamLayout } = await loadLayoutModule()
+    const members = [
+      { name: "m1", sessionId: "s-m1", worktreePath: "/tmp/m1" },
+      { name: "m2", sessionId: "s-m2", worktreePath: "/tmp/m2" },
+    ]
+
+    // when
+    await createTeamLayout("run-attach", members, tmuxMgr as never)
+
+    // then
+    const commands = getCommands()
+    const splitCalls = commands.filter((args) => args[0] === "split-window")
+    expect(splitCalls.length).toBe(2)
+    expect(commands.some((args) => args[0] === "new-window")).toBe(false)
+
+    const sendKeysCalls = commands.filter((args) => args[0] === "send-keys")
+    const literals = sendKeysCalls.map((args) => args.join(" "))
+    expect(literals.some((s) => s.includes("--session 's-m1'"))).toBe(true)
+    expect(literals.some((s) => s.includes("--session 's-m2'"))).toBe(true)
+  })
+
+  test("uses main-vertical layout with leader at 30%", async () => {
+    // given
+    const { createTeamLayout } = await loadLayoutModule()
+    const members = [
+      { name: "m1", sessionId: "s-m1", worktreePath: "/tmp/m1" },
+      { name: "m2", sessionId: "s-m2", worktreePath: "/tmp/m2" },
+      { name: "m3", sessionId: "s-m3", worktreePath: "/tmp/m3" },
+    ]
+
+    // when
+    const result = await createTeamLayout("run-layout", members, tmuxMgr as never)
+
+    // then
+    const commands = getCommands()
+    const selectLayoutArgs = commands.filter((args) => args[0] === "select-layout").map((args) => args[args.length - 1])
+    expect(selectLayoutArgs.every((l) => l === "main-vertical")).toBe(true)
+    const resizeCalls = commands.filter((args) => args[0] === "resize-pane" && args.includes("30%"))
+    expect(resizeCalls.length).toBeGreaterThan(0)
+    expect(result).not.toBeNull()
+    expect(Object.keys(result?.focusPanesByMember ?? {}).sort()).toEqual(["m1", "m2", "m3"])
+  })
+
+  test("sets pane title for each member", async () => {
+    // given
+    const { createTeamLayout } = await loadLayoutModule()
+    const members = [
+      { name: "lead", sessionId: "s-lead", worktreePath: "/tmp/lead" },
+      { name: "m2", sessionId: "s-m2", worktreePath: "/tmp/m2" },
+    ]
+
+    // when
+    await createTeamLayout("run-title", members, tmuxMgr as never)
+
+    // then
+    const commands = getCommands()
+    const titleSetters = commands
+      .filter((args) => args[0] === "select-pane" && args.includes("-T"))
+      .map((args) => args[args.length - 1])
+    expect(titleSetters).toContain("lead")
+    expect(titleSetters).toContain("m2")
+  })
+
+  test("#given ownedSession=false, focusWindowId=@10, gridWindowId=@11 #when removeTeamLayout runs #then tmux kill-window is called twice with -t @10 and -t @11 and kill-session is NEVER called", async () => {
     // given
     const { removeTeamLayout } = await loadLayoutModule()
 
     // when
-    await removeTeamLayout("run-4", {} as never)
+    await removeTeamLayout("run-cleanup", {
+      ownedSession: false,
+      targetSessionId: "$caller",
+      focusWindowId: "@10",
+      gridWindowId: "@11",
+    }, tmuxMgr as never)
 
     // then
-    expect(spawnMock.mock.calls.some((call) => (call[0] as Array<string>).includes("kill-session"))).toBe(true)
+    const commands = getCommands()
+    expect(commands).toContainEqual(["kill-window", "-t", "@10"])
+    expect(commands).toContainEqual(["kill-window", "-t", "@11"])
+    expect(commands.some((args) => args[0] === "kill-session")).toBe(false)
+  })
+
+  test("#given ownedSession=true, targetSessionId='omo-team-xyz' #when removeTeamLayout runs #then kill-session is called with -t omo-team-xyz (legacy behavior preserved)", async () => {
+    // given
+    const { removeTeamLayout } = await loadLayoutModule()
+
+    // when
+    await removeTeamLayout("run-cleanup", {
+      ownedSession: true,
+      targetSessionId: "omo-team-xyz",
+      focusWindowId: "@10",
+      gridWindowId: "@11",
+    }, tmuxMgr as never)
+
+    // then
+    const commands = getCommands()
+    expect(commands).toContainEqual(["kill-session", "-t", "omo-team-xyz"])
+  })
+
+  test("#given ownedSession=false and the first kill-window fails #when removeTeamLayout runs #then the second kill-window still fires", async () => {
+    // given
+    const { removeTeamLayout } = await loadLayoutModule()
+    let killWindowCallCount = 0
+    runTmuxCommandMock.mockImplementation((_tmuxPath: string, args: Array<string>, _options?: unknown) => {
+      if (args[0] === "kill-window") {
+        killWindowCallCount += 1
+        return Promise.resolve(createTmuxCommandResult("", killWindowCallCount > 1))
+      }
+
+      const command = args[0]
+      if (command === "display") {
+        return Promise.resolve(createTmuxCommandResult(displaySessionId, displaySuccess))
+      }
+      if (command === "new-session") {
+        return Promise.resolve(createTmuxCommandResult(`@${nextWindowNumber++}`))
+      }
+      if (command === "new-window") {
+        return Promise.resolve(createTmuxCommandResult(`@${nextWindowNumber++} %${nextPaneNumber++}`))
+      }
+      if (command === "split-window") {
+        return Promise.resolve(createTmuxCommandResult(`%${nextPaneNumber++}`))
+      }
+
+      return Promise.resolve(createTmuxCommandResult(""))
+    })
+
+    // when
+    await removeTeamLayout("run-cleanup", {
+      ownedSession: false,
+      targetSessionId: "$caller",
+      focusWindowId: "@10",
+      gridWindowId: "@11",
+    }, tmuxMgr as never)
+
+    // then
+    const commands = getCommands().filter((args) => args[0] === "kill-window")
+    expect(commands).toEqual([
+      ["kill-window", "-t", "@10"],
+      ["kill-window", "-t", "@11"],
+    ])
+  })
+
+  test("skips all panes when lead member missing", async () => {
+    // given
+    const { createTeamLayout } = await loadLayoutModule()
+    const members: Array<{ name: string; sessionId: string }> = []
+
+    // when
+    const result = await createTeamLayout("run-empty", members, tmuxMgr as never)
+
+    // then
+    expect(result).toBeNull()
+    const commands = getCommands()
+    expect(commands.some((args) => args[0] === "new-window")).toBe(false)
+  })
+
+  describe("createTeamLayout - split-pane topology", () => {
+    test("#given caller inside tmux #when createTeamLayout runs #then splits current window and never creates new windows or sessions", async () => {
+      // given
+      const { createTeamLayout } = await loadLayoutModule()
+      const members = [
+        { name: "m1", sessionId: "s-m1", worktreePath: "/tmp/m1" },
+        { name: "m2", sessionId: "s-m2", worktreePath: "/tmp/m2" },
+      ]
+
+      // when
+      await createTeamLayout("run-split", members, tmuxMgr as never)
+
+      // then
+      const commands = getCommands()
+      expect(commands.some((args) => args[0] === "new-session")).toBe(false)
+      expect(commands.some((args) => args[0] === "new-window")).toBe(false)
+      expect(commands.filter((args) => args[0] === "split-window").length).toBe(2)
+    })
+
+    test("#given caller session resolved #when createTeamLayout runs #then ownedSession is false", async () => {
+      // given
+      const { createTeamLayout } = await loadLayoutModule()
+      const members = [{ name: "m1", sessionId: "s-m1", worktreePath: "/tmp/m1" }]
+
+      // when
+      const result = await createTeamLayout("run-owned", members, tmuxMgr as never)
+
+      // then
+      expect(result).not.toBeNull()
+      expect(result?.ownedSession).toBe(false)
+    })
+
+    test("#given first teammate #when split-window runs #then it creates a single teammate pane from the current window", async () => {
+      // given
+      const { createTeamLayout } = await loadLayoutModule()
+      const members = [{ name: "m1", sessionId: "s-m1", worktreePath: "/tmp/m1" }]
+
+      // when
+      await createTeamLayout("run-first", members, tmuxMgr as never)
+
+      // then
+      const commands = getCommands()
+      const splitCalls = commands.filter((args) => args[0] === "split-window")
+      expect(splitCalls.length).toBe(1)
+      expect(splitCalls[0]!.includes("-d")).toBe(true)
+      expect(splitCalls[0]!.includes("-P")).toBe(true)
+    })
+
+    test("#given 3 members #when createTeamLayout runs #then focusPanesByMember contains 3 distinct pane ids", async () => {
+      // given
+      const { createTeamLayout } = await loadLayoutModule()
+      const members = [
+        { name: "m1", sessionId: "s-m1", worktreePath: "/tmp/m1" },
+        { name: "m2", sessionId: "s-m2", worktreePath: "/tmp/m2" },
+        { name: "m3", sessionId: "s-m3", worktreePath: "/tmp/m3" },
+      ]
+
+      // when
+      const result = await createTeamLayout("run-3-members", members, tmuxMgr as never)
+
+      // then
+      expect(result).not.toBeNull()
+      expect(Object.keys(result?.focusPanesByMember ?? {}).sort()).toEqual(["m1", "m2", "m3"])
+      expect(new Set(Object.values(result?.focusPanesByMember ?? {})).size).toBe(3)
+    })
+
+    test("#given layout created #when createTeamLayout runs #then it keeps a single current-window split result", async () => {
+      // given
+      const { createTeamLayout } = await loadLayoutModule()
+      const members = [
+        { name: "m1", sessionId: "s-m1", worktreePath: "/tmp/m1" },
+        { name: "m2", sessionId: "s-m2", worktreePath: "/tmp/m2" },
+      ]
+
+      // when
+      const result = await createTeamLayout("run-layout", members, tmuxMgr as never)
+
+      // then
+      const commands = getCommands()
+      expect(result).not.toBeNull()
+      expect(Object.keys(result?.focusPanesByMember ?? {}).sort()).toEqual(["m1", "m2"])
+      expect(commands.filter((args) => args[0] === "split-window").length).toBe(2)
+      expect(commands.some((args) => args[0] === "send-keys" && args.includes("Enter"))).toBe(true)
+    })
   })
 })

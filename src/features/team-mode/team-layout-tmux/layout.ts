@@ -1,104 +1,189 @@
-import { spawn } from "../../../shared/tmux/tmux-utils/spawn-process"
 import { log } from "../../../shared"
+import { shellSingleQuote } from "../../../shared/shell-env"
+import { isServerRunning, runTmuxCommand } from "../../../shared/tmux"
 import { getTmuxPath } from "../../../tools/interactive-bash/tmux-path-resolver"
 import type { TmuxSessionManager } from "../../tmux-subagent/manager"
+import { resolveCallerTmuxSession } from "./resolve-caller-tmux-session"
 
-type TeamLayoutMember = { name: string; sessionId: string; color?: string }
+type TeamLayoutMember = { name: string; sessionId: string; worktreePath?: string }
 
-type TeamLayoutResult = {
+export type TeamLayoutResult = {
   focusWindowId: string
   gridWindowId: string
-  panesByMember: Record<string, string>
+  focusPanesByMember: Record<string, string>
+  gridPanesByMember: Record<string, string>
+  targetSessionId: string
+  ownedSession: boolean
 }
 
-export function canVisualize(): boolean {
-  return process.env.TMUX !== undefined
+export type TeamLayoutCleanupTarget = {
+  ownedSession: boolean
+  targetSessionId: string
+  focusWindowId?: string
+  gridWindowId?: string
+  paneIds?: Array<string>
 }
 
-async function runTmux(tmuxPath: string, args: Array<string>): Promise<{ success: boolean; output: string }> {
-  const proc = spawn([tmuxPath, ...args], { stdout: "pipe", stderr: "pipe" })
-  const outputPromise = new Response(proc.stdout).text()
-  const exitCode = await proc.exited
-  const output = await outputPromise
+export function canVisualize(): boolean { return process.env.TMUX !== undefined }
 
-  if (exitCode !== 0) {
-    return { success: false, output: output.trim() }
-  }
-
-  return { success: true, output: output.trim() }
+function getPaneWorkingDirectory(member: TeamLayoutMember): string {
+  return member.worktreePath ?? process.cwd()
 }
 
-async function createWindow(
+function buildAttachCommand(member: TeamLayoutMember, serverUrl: string): string {
+  return `opencode attach ${shellSingleQuote(serverUrl)} --session ${shellSingleQuote(member.sessionId)} --dir ${shellSingleQuote(getPaneWorkingDirectory(member))}`
+}
+
+const PANE_SHELL_INIT_DELAY_MS = 200
+
+let paneCreationLock: Promise<void> = Promise.resolve()
+
+function acquirePaneCreationLock(): Promise<() => void> {
+  let release: () => void
+  const newLock = new Promise<void>((resolve) => { release = resolve })
+  const previousLock = paneCreationLock
+  paneCreationLock = newLock
+  return previousLock.then(() => release!)
+}
+
+async function resolveCurrentWindowTarget(tmuxPath: string, leaderPaneId: string): Promise<string | null> {
+  const result = await runTmuxCommand(tmuxPath, ["display", "-p", "-t", leaderPaneId, "#{session_name}:#{window_index}"])
+  if (!result.success || !result.output) return null
+  return result.output.trim()
+}
+
+async function resolveCurrentWindowId(tmuxPath: string, leaderPaneId: string): Promise<string | null> {
+  const result = await runTmuxCommand(tmuxPath, ["display", "-p", "-t", leaderPaneId, "#{window_id}"])
+  if (!result.success || !result.output) return null
+  return result.output.trim()
+}
+
+async function listPanesInWindow(tmuxPath: string, windowTarget: string): Promise<Array<string>> {
+  const result = await runTmuxCommand(tmuxPath, ["list-panes", "-t", windowTarget, "-F", "#{pane_id}"])
+  if (!result.success || !result.output) return []
+  return result.output.trim().split("\n").filter(Boolean)
+}
+
+async function rebalanceWithLeader(tmuxPath: string, windowTarget: string, leaderPaneId: string): Promise<void> {
+  const panes = await listPanesInWindow(tmuxPath, windowTarget)
+  if (panes.length <= 1) return
+  await runTmuxCommand(tmuxPath, ["select-layout", "-t", windowTarget, "main-vertical"])
+  await runTmuxCommand(tmuxPath, ["resize-pane", "-t", leaderPaneId, "-x", "30%"])
+}
+
+async function createTeammatePaneInCurrentWindow(
   tmuxPath: string,
-  sessionName: string,
-  windowName: string,
-  layout: "main-vertical" | "tiled",
-  members: Array<TeamLayoutMember>,
-): Promise<{ windowId: string; panesByMember: Record<string, string> } | null> {
-  const base = await runTmux(tmuxPath, ["new-window", "-d", "-P", "-F", "#{window_id}", "-t", sessionName, "-n", windowName])
-  if (!base.success || !base.output) return null
+  leaderPaneId: string,
+  windowTarget: string,
+  member: TeamLayoutMember,
+): Promise<string | null> {
+  const releaseLock = await acquirePaneCreationLock()
+  try {
+    const panes = await listPanesInWindow(tmuxPath, windowTarget)
+    const isFirstTeammate = panes.length === 1
 
-  const panesByMember: Record<string, string> = {}
-  const [lead, ...rest] = members
-  if (!lead) return null
+    let splitResult
+    if (isFirstTeammate) {
+      splitResult = await runTmuxCommand(tmuxPath, [
+        "split-window", "-t", leaderPaneId, "-h", "-l", "70%", "-d",
+        "-P", "-F", "#{pane_id}", "-c", getPaneWorkingDirectory(member),
+      ])
+    } else {
+      const teammatePanes = panes.filter((p) => p !== leaderPaneId)
+      const teammateCount = teammatePanes.length
+      const splitVertically = teammateCount % 2 === 1
+      const targetIndex = Math.floor((teammateCount - 1) / 2)
+      const targetPane = teammatePanes[targetIndex] ?? teammatePanes[teammatePanes.length - 1]
 
-  const leadPane = await runTmux(tmuxPath, ["list-panes", "-t", `${sessionName}:${base.output}`, "-F", "#{pane_id}"])
-  if (!leadPane.success || !leadPane.output) return null
-  panesByMember[lead.name] = leadPane.output.split("\n")[0] ?? ""
+      splitResult = await runTmuxCommand(tmuxPath, [
+        "split-window", "-t", targetPane!, splitVertically ? "-v" : "-h", "-d",
+        "-P", "-F", "#{pane_id}", "-c", getPaneWorkingDirectory(member),
+      ])
+    }
 
-  for (const member of rest) {
-    const split = await runTmux(tmuxPath, ["split-window", "-d", "-P", "-F", "#{pane_id}", "-t", panesByMember[lead.name] ?? base.output, "sh", "-c", "cat >/dev/null"])
-    if (!split.success || !split.output) return null
-    panesByMember[member.name] = split.output
+    if (!splitResult.success || !splitResult.output) return null
+    const paneId = splitResult.output.trim()
+
+    await runTmuxCommand(tmuxPath, ["select-pane", "-t", paneId, "-T", member.name])
+    await runTmuxCommand(tmuxPath, ["set-option", "-p", "-t", paneId, "pane-border-style", "fg=cyan"])
+    await runTmuxCommand(tmuxPath, ["set-option", "-p", "-t", paneId, "pane-active-border-style", "fg=cyan"])
+    await runTmuxCommand(tmuxPath, ["set-option", "-p", "-t", paneId, "pane-border-format", "#[fg=cyan,bold] #{pane_title} #[default]"])
+
+    await rebalanceWithLeader(tmuxPath, windowTarget, leaderPaneId)
+    await new Promise((resolve) => setTimeout(resolve, PANE_SHELL_INIT_DELAY_MS))
+
+    return paneId
+  } finally {
+    releaseLock()
   }
-
-  const layoutResult = await runTmux(tmuxPath, ["select-layout", "-t", `${sessionName}:${base.output}`, layout])
-  if (!layoutResult.success) return null
-
-  for (const member of members) {
-    const paneId = panesByMember[member.name]
-    if (!paneId) return null
-    const label = member.color ? `${member.name} ${member.color}` : member.name
-    const titleResult = await runTmux(tmuxPath, ["select-pane", "-t", paneId, "-T", label])
-    if (!titleResult.success) return null
-    await runTmux(tmuxPath, ["set-option", "-t", paneId, "pane-border-status", "top"])
-    await runTmux(tmuxPath, ["set-option", "-t", paneId, "pane-border-format", `#{pane_title} ${label}`])
-    await runTmux(tmuxPath, ["pipe-pane", "-I", "-t", paneId, "cat >/dev/null"])
-  }
-
-  return { windowId: base.output, panesByMember }
 }
 
-export async function createTeamLayout(
-  teamRunId: string,
-  members: Array<TeamLayoutMember>,
-  tmuxMgr: TmuxSessionManager,
-): Promise<TeamLayoutResult | null> {
+export async function createTeamLayout(teamRunId: string, members: Array<TeamLayoutMember>, tmuxMgr: TmuxSessionManager): Promise<TeamLayoutResult | null> {
   if (!canVisualize()) {
     log("tmux visualization unavailable, skipping")
     return null
   }
+  if (members.length === 0) return null
 
   try {
-    void tmuxMgr
+    const serverUrl = tmuxMgr.getServerUrl()
+    if (!(await isServerRunning(serverUrl))) {
+      log("opencode server not reachable, skipping team layout", { serverUrl })
+      return null
+    }
+
     const tmuxPath = await getTmuxPath()
     if (!tmuxPath) {
       log("tmux visualization unavailable, skipping")
       return null
     }
 
-    const sessionName = `omo-team-${teamRunId}`
-    const created = await runTmux(tmuxPath, ["new-session", "-d", "-s", sessionName, "-P", "-F", "#{window_id}"])
-    if (!created.success || !created.output) return null
+    const callerSession = await resolveCallerTmuxSession(tmuxPath)
+    const leaderPaneId = process.env.TMUX_PANE
+    const fallbackSessionName = `omo-team-${teamRunId}`
+    const ownedSession = callerSession === null || !leaderPaneId
+    const targetSessionId = callerSession?.sessionId ?? fallbackSessionName
 
-    const focus = await createWindow(tmuxPath, sessionName, "focus", "main-vertical", members)
-    const grid = await createWindow(tmuxPath, sessionName, "grid", "tiled", members)
-    if (!focus || !grid) return null
+    if (ownedSession) {
+      log("falling back to detached team session because caller tmux session could not be resolved", { teamRunId })
+      const created = await runTmuxCommand(tmuxPath, ["new-session", "-d", "-s", fallbackSessionName, "-P", "-F", "#{window_id}"])
+      if (!created.success || !created.output) return null
+    }
+
+    if (!leaderPaneId || ownedSession) {
+      log("no leader pane for split layout, skipping visualization", { teamRunId })
+      return null
+    }
+
+    const windowTarget = await resolveCurrentWindowTarget(tmuxPath, leaderPaneId)
+    const windowId = await resolveCurrentWindowId(tmuxPath, leaderPaneId)
+    if (!windowTarget || !windowId) return null
+
+    await runTmuxCommand(tmuxPath, ["set-option", "-w", "-t", windowTarget, "pane-border-status", "top"])
+
+    const panesByMember: Record<string, string> = {}
+
+    for (const member of members) {
+      const paneId = await createTeammatePaneInCurrentWindow(tmuxPath, leaderPaneId, windowTarget, member)
+      if (paneId) panesByMember[member.name] = paneId
+    }
+
+    if (Object.keys(panesByMember).length === 0) return null
+
+    for (const member of members) {
+      const paneId = panesByMember[member.name]
+      if (!paneId) continue
+      const cmd = buildAttachCommand(member, serverUrl)
+      await runTmuxCommand(tmuxPath, ["send-keys", "-t", paneId, cmd, "Enter"])
+    }
 
     return {
-      focusWindowId: focus.windowId,
-      gridWindowId: grid.windowId,
-      panesByMember: focus.panesByMember,
+      focusWindowId: windowId,
+      gridWindowId: windowId,
+      focusPanesByMember: panesByMember,
+      gridPanesByMember: panesByMember,
+      targetSessionId,
+      ownedSession,
     }
   } catch (error) {
     log("tmux visualization unavailable, skipping", { error: String(error) })
@@ -106,15 +191,70 @@ export async function createTeamLayout(
   }
 }
 
-export async function removeTeamLayout(teamRunId: string, tmuxMgr: TmuxSessionManager): Promise<void> {
-  void tmuxMgr
+export async function removeTeamLayout(teamRunId: string, _tmuxMgr: TmuxSessionManager): Promise<void>
+export async function removeTeamLayout(
+  teamRunId: string,
+  _cleanupTarget: TeamLayoutCleanupTarget | undefined,
+  _tmuxMgr: TmuxSessionManager,
+): Promise<void>
+export async function removeTeamLayout(
+  teamRunId: string,
+  tmuxMgrOrCleanupTarget: TmuxSessionManager | TeamLayoutCleanupTarget | undefined,
+  _tmuxMgr?: TmuxSessionManager,
+): Promise<void> {
   if (!canVisualize()) return
-
   try {
     const tmuxPath = await getTmuxPath()
     if (!tmuxPath) return
-    await runTmux(tmuxPath, ["kill-session", "-t", `omo-team-${teamRunId}`])
-  } catch {
-    return
+
+    const cleanupTarget = isTeamLayoutCleanupTarget(tmuxMgrOrCleanupTarget)
+      ? tmuxMgrOrCleanupTarget
+      : undefined
+
+    if (cleanupTarget?.ownedSession !== false) {
+      await runTmuxCommand(tmuxPath, ["kill-session", "-t", cleanupTarget?.targetSessionId ?? `omo-team-${teamRunId}`])
+      return
+    }
+
+    if (cleanupTarget.paneIds && cleanupTarget.paneIds.length > 0) {
+      for (const paneId of cleanupTarget.paneIds) {
+        try {
+          await runTmuxCommand(tmuxPath, ["kill-pane", "-t", paneId])
+        } catch {
+          log("tmux team pane cleanup failed", { teamRunId, paneId })
+        }
+      }
+
+      const leaderPaneId = process.env.TMUX_PANE
+      if (leaderPaneId) {
+        const windowTarget = await resolveCurrentWindowTarget(tmuxPath, leaderPaneId)
+        if (windowTarget) await rebalanceWithLeader(tmuxPath, windowTarget, leaderPaneId)
+      }
+      return
+    }
+
+    const leaderPaneId = process.env.TMUX_PANE
+    const leaderWindowId = leaderPaneId
+      ? await resolveCurrentWindowId(tmuxPath, leaderPaneId)
+      : null
+
+    for (const windowId of [cleanupTarget.focusWindowId, cleanupTarget.gridWindowId]) {
+      if (!windowId) continue
+      if (leaderWindowId && windowId === leaderWindowId) {
+        log("tmux team layout skipping kill-window on leader window", { teamRunId, windowId })
+        continue
+      }
+      try {
+        await runTmuxCommand(tmuxPath, ["kill-window", "-t", windowId])
+      } catch (windowError) {
+        log("tmux team layout window cleanup failed", { teamRunId, windowId, error: String(windowError) })
+      }
+    }
+  } catch (error) {
+    log("tmux team layout cleanup failed", { teamRunId, error: String(error) })
   }
+}
+
+function isTeamLayoutCleanupTarget(value: TmuxSessionManager | TeamLayoutCleanupTarget | undefined): value is TeamLayoutCleanupTarget {
+  return value !== undefined && "ownedSession" in value && "targetSessionId" in value
 }
