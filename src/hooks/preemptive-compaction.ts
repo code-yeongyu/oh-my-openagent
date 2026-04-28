@@ -76,6 +76,7 @@ export function createPreemptiveCompactionHook(
         modelID?: string
         finish?: boolean
         tokens?: TokenInfo
+        parts?: unknown
       } | undefined
 
       if (!info || info.role !== "assistant" || !info.finish || !info.sessionID) return
@@ -92,6 +93,7 @@ export function createPreemptiveCompactionHook(
       await postCompactionMonitor.onAssistantMessageUpdated({
         sessionID: info.sessionID,
         id: info.id,
+        parts: info.parts,
       })
     }
   }
