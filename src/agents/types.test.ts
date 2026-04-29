@@ -23,6 +23,9 @@ describe("isGptNativeSisyphusModel", () => {
     expect(isGptNativeSisyphusModel("github-copilot/gpt-5.4")).toBe(true);
     expect(isGptNativeSisyphusModel("venice/gpt-5-4")).toBe(true);
     expect(isGptNativeSisyphusModel("openai/gpt-5.4-codex")).toBe(true);
+    expect(isGptNativeSisyphusModel("openai/gpt-5.4-fast")).toBe(true);
+    expect(isGptNativeSisyphusModel("openai/gpt-5.5-fast")).toBe(true);
+    expect(isGptNativeSisyphusModel("openai/GPT-5.5-Pro")).toBe(true);
     expect(isGptNativeSisyphusModel("openai/gpt-5.5-mini")).toBe(true);
   });
 
@@ -35,6 +38,7 @@ describe("isGptNativeSisyphusModel", () => {
   test("rejects other GPT models", () => {
     expect(isGptNativeSisyphusModel("openai/gpt-4o")).toBe(false);
     expect(isGptNativeSisyphusModel("github-copilot/gpt-4o")).toBe(false);
+    expect(isGptNativeSisyphusModel("openai/my-gpt-5.5-wrapper")).toBe(false);
   });
 
   test("rejects non-GPT models", () => {
