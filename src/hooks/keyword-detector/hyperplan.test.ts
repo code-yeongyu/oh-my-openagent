@@ -220,25 +220,4 @@ describe("keyword-detector hyperplan keyword", () => {
     expect(textPart!.text).not.toContain('skill(name="hyperplan")')
     expect(textPart!.text).toContain("hpp build the feature")
   })
-
-  test("should inject hyperplan AND ultrawork together when both keywords present", async () => {
-    // given - main session typing both keywords in the same message
-    const sessionID = "hyperplan-combo-session"
-    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
-    const hook = createKeywordDetectorHook(createMockPluginInput())
-    const output = {
-      message: {} as Record<string, unknown>,
-      parts: [{ type: "text", text: "ultrawork hyperplan ship this feature" }],
-    }
-
-    // when - both keywords trigger
-    await hook["chat.message"]({ sessionID }, output)
-
-    // then - both messages should be present
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toContain("<hyperplan-mode>")
-    expect(textPart!.text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
-    expect(textPart!.text).toContain("ship this feature")
-  })
 })

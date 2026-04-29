@@ -40,11 +40,14 @@ export function detectKeywordsWithType(
   disabledKeywords?: ReadonlyArray<KeywordType>,
 ): DetectedKeyword[] {
   const textWithoutCode = removeCodeBlocks(text)
-  const types: Array<KeywordType> = ["ultrawork", "search", "analyze", "team", "hyperplan"]
   const disabled = new Set<KeywordType>(disabledKeywords ?? [])
-  return KEYWORD_DETECTORS.map(({ pattern, message }, index) => ({
+  // Intersection rule: combo requires BOTH base keywords enabled
+  if (disabled.has("ultrawork") || disabled.has("hyperplan")) {
+    disabled.add("hyperplan-ultrawork")
+  }
+  return KEYWORD_DETECTORS.map(({ type, pattern, message }) => ({
     matches: pattern.test(textWithoutCode),
-    type: types[index],
+    type,
     message: resolveMessage(message, agentName, modelID),
   }))
     .filter((result) => result.matches && !disabled.has(result.type))

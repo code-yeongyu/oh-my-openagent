@@ -1,5 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { KeywordDetectorConfig } from "../../config/schema/keyword-detector"
+import type { DetectedKeyword } from "./detector"
 import { detectKeywordsWithType, extractPromptText } from "./detector"
 import { isPlannerAgent, isNonOmoAgent } from "./constants"
 import { log } from "../../shared"
@@ -14,6 +15,12 @@ import {
 } from "../../features/claude-code-session-state"
 import type { ContextCollector } from "../../features/context-injector"
 import type { RalphLoopHook } from "../ralph-loop"
+
+function suppressComboStandalones(detected: DetectedKeyword[]): DetectedKeyword[] {
+  const hasCombo = detected.some((k) => k.type === "hyperplan-ultrawork")
+  if (!hasCombo) return detected
+  return detected.filter((k) => k.type !== "ultrawork" && k.type !== "hyperplan")
+}
 
 export function createKeywordDetectorHook(
   ctx: PluginInput,
@@ -63,10 +70,13 @@ export function createKeywordDetectorHook(
       const cleanText = removeSystemReminders(promptText)
       const modelID = input.model?.modelID
       let detectedKeywords = detectKeywordsWithType(cleanText, currentAgent, modelID, disabledKeywords)
+      detectedKeywords = suppressComboStandalones(detectedKeywords)
 
       if (isPlannerAgent(currentAgent)) {
         const preFilterCount = detectedKeywords.length
-        detectedKeywords = detectedKeywords.filter((k) => k.type !== "ultrawork" && k.type !== "hyperplan")
+        detectedKeywords = detectedKeywords.filter(
+          (k) => k.type !== "ultrawork" && k.type !== "hyperplan" && k.type !== "hyperplan-ultrawork"
+        )
         if (preFilterCount > detectedKeywords.length) {
           log(`[keyword-detector] Filtered ultrawork/hyperplan keywords for planner agent`, { sessionID: input.sessionID, agent: currentAgent })
         }
@@ -86,7 +96,9 @@ export function createKeywordDetectorHook(
       const isNonMainSession = mainSessionID && input.sessionID !== mainSessionID
 
       if (isNonMainSession) {
-        detectedKeywords = detectedKeywords.filter((k) => k.type === "ultrawork")
+        detectedKeywords = detectedKeywords.filter(
+          (k) => k.type === "ultrawork" || k.type === "hyperplan-ultrawork"
+        )
         if (detectedKeywords.length === 0) {
           log(`[keyword-detector] Skipping non-ultrawork keywords in non-main session`, {
             sessionID: input.sessionID,
@@ -147,6 +159,21 @@ export function createKeywordDetectorHook(
               sessionID: input.sessionID,
             })
           )
+      }
+
+      const hasHyperplanUltrawork = detectedKeywords.some((k) => k.type === "hyperplan-ultrawork")
+      if (hasHyperplanUltrawork) {
+        log(`[keyword-detector] Hyperplan Ultrawork mode activated`, { sessionID: input.sessionID })
+        ctx.client.tui
+          .showToast({
+            body: {
+              title: "Hyperplan Ultrawork Mode Activated",
+              message: "Ultrawork execution with adversarial hyperplan workflow.",
+              variant: "success" as const,
+              duration: 3000,
+            },
+          })
+          .catch((err) => log(`[keyword-detector] Failed to show toast`, { error: err, sessionID: input.sessionID }))
       }
 
       const textPartIndex = output.parts.findIndex((p) => p.type === "text" && p.text !== undefined)
