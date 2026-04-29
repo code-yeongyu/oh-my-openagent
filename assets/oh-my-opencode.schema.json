@@ -5982,7 +5982,8 @@
               "search",
               "analyze",
               "team",
-              "hyperplan"
+              "hyperplan",
+              "hyperplan-ultrawork"
             ]
           }
         }
