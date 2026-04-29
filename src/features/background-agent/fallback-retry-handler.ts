@@ -106,7 +106,7 @@ export async function tryFallbackRetry(args: {
   task.queuedAt = new Date()
   task.error = undefined
 
-  const key = task.model ? `${task.model.providerID}/${task.model.modelID}` : task.agent
+  const key = task.model ? `${task.model.providerID}/${task.model.modelID}/${task.id}` : `${task.agent}/${task.id}`
   const queue = queuesByKey.get(key) ?? []
   const retryInput: LaunchInput = {
     description: task.description,
