@@ -29,6 +29,25 @@ import {
   createTaskUpdateTool,
   createHashlineEditTool,
 } from "../tools"
+import {
+  loadUserAgents,
+  loadProjectAgents,
+  loadOpencodeGlobalAgents,
+  loadOpencodeProjectAgents,
+  readOpencodeConfigAgents,
+  loadAgentDefinitions,
+} from "../features/claude-code-agent-loader"
+// Mirror of runtime-registered built-in subagents. Sync with the agent registry.
+const BUILTIN_SUBAGENT_NAMES = [
+  "explore",
+  "librarian",
+  "oracle",
+  "hephaestus",
+  "multimodal-looker",
+  "metis",
+  "momus",
+  "sisyphus-junior",
+] as const
 import { getMainSessionID } from "../features/claude-code-session-state"
 import { filterDisabledTools } from "../shared/disabled-tools"
 import { isTaskSystemEnabled, log } from "../shared"
@@ -178,10 +197,39 @@ export function createToolRegistry(args: {
   )
   const lookAt = isMultimodalLookerEnabled ? factories.createLookAt(ctx) : null
 
+  const disabledAgents = new Set((pluginConfig.disabled_agents ?? []).map((a) => a.toLowerCase()))
+  const includeClaudeAgents = pluginConfig.claude_code?.agents ?? true
+  const agentDicts = [
+    includeClaudeAgents ? loadUserAgents() : {},
+    includeClaudeAgents ? loadProjectAgents(ctx.directory) : {},
+    loadOpencodeGlobalAgents(),
+    loadOpencodeProjectAgents(ctx.directory),
+    readOpencodeConfigAgents(ctx.directory),
+    pluginConfig.agent_definitions
+      ? loadAgentDefinitions(pluginConfig.agent_definitions, "definition-file")
+      : {},
+  ]
+  const discoveredNames = new Set<string>()
+  for (const dict of agentDicts) {
+    for (const [name, cfg] of Object.entries(dict)) {
+      const mode = (cfg as { mode?: string } | null | undefined)?.mode
+      if (mode === "subagent" || mode === "all" || mode === undefined) {
+        discoveredNames.add(name)
+      }
+    }
+  }
+  const builtinNames = [...BUILTIN_SUBAGENT_NAMES]
+  const availableSubagentNames = Array.from(
+    new Set([...builtinNames, ...discoveredNames]),
+  )
+    .filter((name) => !disabledAgents.has(name.toLowerCase()))
+    .sort((a, b) => a.localeCompare(b))
+
   const delegateTask = factories.createDelegateTask({
     manager: managers.backgroundManager,
     client: ctx.client,
     directory: ctx.directory,
+    availableSubagentNames,
     userCategories: pluginConfig.categories,
     agentOverrides: pluginConfig.agents,
     gitMasterConfig: pluginConfig.git_master,

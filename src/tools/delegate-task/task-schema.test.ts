@@ -46,6 +46,72 @@ function createDelegateTask(...args: Parameters<typeof import("./tools").createD
 		expect(description).not.toContain("hephaestus")
 		expect(description).not.toContain("prometheus")
 	})
+
+	test("#given no availableSubagentNames #when tool is created #then subagent_type is plain string (back-compat)", () => {
+		//#given
+		const toolDefinition = createDelegateTask({ manager: {} as never, client: {} as never, directory: "/tmp/test" })
+
+		//#when
+		const subagentSchema = toolDefinition.args.subagent_type as unknown as {
+			def: { type: string; innerType: { def: { type: string } } }
+		}
+
+		//#then
+		expect(subagentSchema.def.type).toBe("optional")
+		expect(subagentSchema.def.innerType.def.type).toBe("string")
+	})
+
+	test("#given availableSubagentNames option #when tool is created #then subagent_type emits enum with those names", () => {
+		//#given
+		const toolDefinition = createDelegateTask({
+			manager: {} as never,
+			client: {} as never,
+			directory: "/tmp/test",
+			availableSubagentNames: ["oracle", "librarian", "dev"],
+		})
+
+		//#when
+		const subagentSchema = toolDefinition.args.subagent_type as unknown as {
+			def: {
+				type: string
+				innerType: {
+					def: {
+						type: string
+						entries?: Record<string, string>
+						values?: string[]
+					}
+				}
+			}
+		}
+
+		//#then
+		expect(subagentSchema.def.type).toBe("optional")
+		expect(subagentSchema.def.innerType.def.type).toBe("enum")
+		const inner = subagentSchema.def.innerType.def
+		const values = inner.entries ? Object.values(inner.entries) : (inner.values ?? [])
+		expect(values).toContain("oracle")
+		expect(values).toContain("librarian")
+		expect(values).toContain("dev")
+	})
+
+	test("#given empty availableSubagentNames #when tool is created #then subagent_type stays plain string", () => {
+		//#given
+		const toolDefinition = createDelegateTask({
+			manager: {} as never,
+			client: {} as never,
+			directory: "/tmp/test",
+			availableSubagentNames: [],
+		})
+
+		//#when
+		const subagentSchema = toolDefinition.args.subagent_type as unknown as {
+			def: { type: string; innerType: { def: { type: string } } }
+		}
+
+		//#then
+		expect(subagentSchema.def.type).toBe("optional")
+		expect(subagentSchema.def.innerType.def.type).toBe("string")
+	})
 })
 
 export {}

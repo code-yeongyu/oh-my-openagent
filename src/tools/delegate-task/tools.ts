@@ -20,19 +20,33 @@ export { resolveCategoryConfig } from "./categories"
 export type { SyncSessionCreatedEvent, DelegateTaskToolOptions, BuildSystemContentInput } from "./types"
 export { buildSystemContent, buildTaskPrompt } from "./prompt-builder"
 
-const delegateTaskArgsSchema = {
-  load_skills: tool.schema.array(tool.schema.string()).describe("Skill names to inject. REQUIRED - pass [] if no skills needed."),
-  description: tool.schema.string().optional().describe("Short task description (3-5 words). Auto-generated from prompt if omitted."),
-  prompt: tool.schema.string().describe("Full detailed prompt for the agent"),
-  run_in_background: tool.schema.boolean().describe("REQUIRED. true=async (returns task_id), false=sync (waits). Use false for task delegation, true ONLY for parallel exploration."),
-  category: tool.schema.string().optional().describe("REQUIRED if subagent_type not provided. Do NOT provide both category and subagent_type."),
-  subagent_type: tool.schema.string().optional().describe("REQUIRED if category not provided. Do NOT provide both category and subagent_type."),
-  task_id: tool.schema.string().optional().describe("Existing task to continue. Canonical resume identifier."),
-  command: tool.schema.string().optional().describe("The command that triggered this task"),
+function buildSubagentTypeSchema(availableSubagentNames?: readonly string[]) {
+  const describe = "REQUIRED if category not provided. Do NOT provide both category and subagent_type."
+  if (availableSubagentNames && availableSubagentNames.length > 0) {
+    return tool.schema
+      .enum(availableSubagentNames as unknown as [string, ...string[]])
+      .optional()
+      .describe(describe)
+  }
+  return tool.schema.string().optional().describe(describe)
+}
+
+function buildDelegateTaskArgsSchema(availableSubagentNames?: readonly string[]) {
+  return {
+    load_skills: tool.schema.array(tool.schema.string()).describe("Skill names to inject. REQUIRED - pass [] if no skills needed."),
+    description: tool.schema.string().optional().describe("Short task description (3-5 words). Auto-generated from prompt if omitted."),
+    prompt: tool.schema.string().describe("Full detailed prompt for the agent"),
+    run_in_background: tool.schema.boolean().describe("REQUIRED. true=async (returns task_id), false=sync (waits). Use false for task delegation, true ONLY for parallel exploration."),
+    category: tool.schema.string().optional().describe("REQUIRED if subagent_type not provided. Do NOT provide both category and subagent_type."),
+    subagent_type: buildSubagentTypeSchema(availableSubagentNames),
+    task_id: tool.schema.string().optional().describe("Existing task to continue. Canonical resume identifier."),
+    command: tool.schema.string().optional().describe("The command that triggered this task"),
+  }
 }
 
 export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefinition {
   const { availableCategories, availableSkills, categoryExamples, description } = createDelegateTaskPresentation(options)
+  const delegateTaskArgsSchema = buildDelegateTaskArgsSchema(options.availableSubagentNames)
 
   return tool({
     description,
