@@ -8,5 +8,6 @@ export const DEFAULT_MAX_OUTPUT_BYTES = 10 * 1024 * 1024
 export const RG_FILES_FLAGS = [
   "--files",
   "--color=never",
+  "--no-messages",
   "--glob=!.git/*",
 ] as const

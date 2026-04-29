@@ -197,7 +197,7 @@ async function runRgInternal(options: GrepOptions, resolvedCli?: ResolvedCli): P
     const truncated = stdout.length >= DEFAULT_MAX_OUTPUT_BYTES
     const outputToProcess = truncated ? stdout.substring(0, DEFAULT_MAX_OUTPUT_BYTES) : stdout
 
-    if (exitCode > 1 && stderr.trim()) {
+    if (exitCode > 2 && stderr.trim()) {
       return {
         matches: [],
         totalMatches: 0,

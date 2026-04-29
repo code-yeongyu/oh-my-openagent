@@ -47,6 +47,14 @@ describe("buildRgArgs", () => {
     expect(args).toContain("--follow")
   })
 
+  // given any options
+  // when building ripgrep args
+  // then should include --no-messages to suppress broken symlink warnings
+  it("includes --no-messages to suppress I/O warnings", () => {
+    const args = buildRgArgs({ pattern: "*.ts" })
+    expect(args).toContain("--no-messages")
+  })
+
   // given pattern with special characters
   // when building ripgrep args
   // then should include glob pattern correctly

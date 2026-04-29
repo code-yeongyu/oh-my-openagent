@@ -152,7 +152,7 @@ async function runRgFilesInternal(
     const stderr = await new Response(proc.stderr).text()
     const exitCode = await proc.exited
 
-    if (exitCode > 1 && stderr.trim()) {
+    if (exitCode > 2 && stderr.trim()) {
       return {
         files: [],
         totalFiles: 0,

@@ -10,6 +10,7 @@ export const RG_SAFETY_FLAGS = [
   "--no-follow",
   "--color=never",
   "--no-heading",
+  "--no-messages",
   "--line-number",
   "--with-filename",
 ] as const
