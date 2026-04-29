@@ -293,7 +293,7 @@ describe("runtime-fallback", () => {
       expect(errorLog).toBeDefined()
     })
 
-    test("should NOT trigger fallback for quota exhaustion without auto-retry signal (STOP classification)", async () => {
+    test("should trigger fallback for quota exhaustion to try next configured model", async () => {
       const hook = createRuntimeFallbackHook(createMockPluginInput(), {
         config: createMockConfig({ notify_on_fallback: false }),
         pluginConfig: createMockPluginConfigWithCategoryFallback(["zai-coding-plan/glm-5.1"]),
@@ -318,11 +318,9 @@ describe("runtime-fallback", () => {
         },
       })
 
+      // quota exhaustion now triggers fallback to the next model
       const fallbackLog = logCalls.find((c) => c.msg.includes("Preparing fallback"))
-      expect(fallbackLog).toBeUndefined()
-
-      const skipLog = logCalls.find((c) => c.msg.includes("Error not retryable"))
-      expect(skipLog).toBeDefined()
+      expect(fallbackLog).toBeDefined()
     })
 
     test("should continue fallback chain when fallback model is not found", async () => {
@@ -2071,7 +2069,7 @@ describe("runtime-fallback", () => {
       expect(retriedModels).toContain("openai/gpt-5.3-codex")
     })
 
-    test("does NOT trigger fallback for quota exhaustion in error parts without auto-retry signal (STOP classification)", async () => {
+    test("triggers fallback for quota exhaustion in error parts to try next model", async () => {
       const retriedModels: string[] = []
 
       const hook = createRuntimeFallbackHook(
@@ -2119,10 +2117,8 @@ describe("runtime-fallback", () => {
         },
       })
 
-      expect(retriedModels).toHaveLength(0)
-
-      const skipLog = logCalls.find((c) => c.msg.includes("message.updated error not retryable"))
-      expect(skipLog).toBeDefined()
+      // quota exhaustion now triggers fallback to next configured model
+      expect(retriedModels.length).toBeGreaterThanOrEqual(1)
     })
 
     test("triggers fallback when message has mixed text and error parts", async () => {
