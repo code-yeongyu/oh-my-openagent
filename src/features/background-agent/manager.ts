@@ -177,6 +177,7 @@ export class BackgroundManager {
 
 
   private tasks: Map<string, BackgroundTask>
+  private tasksByParentSession: Map<string, Set<string>>
   private notifications: Map<string, BackgroundTask[]>
   private pendingNotifications: Map<string, string[]>
   private pendingByParent: Map<string, Set<string>>  // Track pending tasks per parent for batching
@@ -218,6 +219,7 @@ export class BackgroundManager {
     }
   ) {
     this.tasks = new Map()
+    this.tasksByParentSession = new Map()
     this.notifications = new Map()
     this.pendingNotifications = new Map()
     this.pendingByParent = new Map()
@@ -322,6 +324,50 @@ export class BackgroundManager {
     this.unregisterRootDescendant(task.rootSessionID)
   }
 
+  private addTask(task: BackgroundTask): void {
+    this.tasks.set(task.id, task)
+    if (!task.parentSessionID) {
+      return
+    }
+
+    const taskIDs = this.tasksByParentSession.get(task.parentSessionID) ?? new Set<string>()
+    taskIDs.add(task.id)
+    this.tasksByParentSession.set(task.parentSessionID, taskIDs)
+  }
+
+  private removeTask(task: BackgroundTask): void {
+    this.tasks.delete(task.id)
+    this.removeTaskFromParentIndex(task.id, task.parentSessionID)
+  }
+
+  private updateTaskParent(task: BackgroundTask, parentSessionID: string): void {
+    if (task.parentSessionID === parentSessionID) {
+      return
+    }
+
+    this.removeTaskFromParentIndex(task.id, task.parentSessionID)
+    task.parentSessionID = parentSessionID
+    const taskIDs = this.tasksByParentSession.get(parentSessionID) ?? new Set<string>()
+    taskIDs.add(task.id)
+    this.tasksByParentSession.set(parentSessionID, taskIDs)
+  }
+
+  private removeTaskFromParentIndex(taskID: string, parentSessionID: string | undefined): void {
+    if (!parentSessionID) {
+      return
+    }
+
+    const taskIDs = this.tasksByParentSession.get(parentSessionID)
+    if (!taskIDs) {
+      return
+    }
+
+    taskIDs.delete(taskID)
+    if (taskIDs.size === 0) {
+      this.tasksByParentSession.delete(parentSessionID)
+    }
+  }
+
   async launch(input: LaunchInput): Promise<BackgroundTask> {
     log("[background-agent] launch() called with:", {
       agent: input.agent,
@@ -368,7 +414,7 @@ export class BackgroundManager {
       }
       const firstAttempt = startAttempt(task, input.model)
 
-      this.tasks.set(task.id, task)
+      this.addTask(task)
       this.taskHistory.record(input.parentSessionID, { id: task.id, agent: input.agent, description: input.description, status: "pending", category: input.category })
 
       // Track for batched notifications immediately (pending state)
@@ -745,13 +791,25 @@ The fallback retry session is now created and can be inspected directly.
   }
 
   getTasksByParentSession(sessionID: string): BackgroundTask[] {
-    const result: BackgroundTask[] = []
-    for (const task of this.tasks.values()) {
-      if (task.parentSessionID === sessionID) {
-        result.push(task)
+    const taskIDs = this.tasksByParentSession.get(sessionID)
+    if (!taskIDs) {
+      const result: BackgroundTask[] = []
+      for (const task of this.tasks.values()) {
+        if (task.parentSessionID === sessionID) {
+          result.push(task)
+        }
+      }
+      return result
+    }
+
+    const tasks: BackgroundTask[] = []
+    for (const taskID of taskIDs) {
+      const task = this.tasks.get(taskID)
+      if (task) {
+        tasks.push(task)
       }
     }
-    return result
+    return tasks
   }
 
   getAllDescendantTasks(sessionID: string): BackgroundTask[] {
@@ -830,7 +888,7 @@ The fallback retry session is now created and can be inspected directly.
       const parentChanged = input.parentSessionID !== existingTask.parentSessionID
       if (parentChanged) {
         this.cleanupPendingByParent(existingTask)  // Clean from OLD parent
-        existingTask.parentSessionID = input.parentSessionID
+        this.updateTaskParent(existingTask, input.parentSessionID)
       }
       if (input.parentAgent !== undefined) {
         existingTask.parentAgent = input.parentAgent
@@ -885,7 +943,7 @@ The fallback retry session is now created and can be inspected directly.
       concurrencyGroup,
     }
 
-    this.tasks.set(task.id, task)
+    this.addTask(task)
     subagentSessions.add(input.sessionID)
     this.startPolling()
     this.taskHistory.record(input.parentSessionID, { id: task.id, sessionID: input.sessionID, agent: input.agent || "task", description: input.description, status: "running", startedAt: task.startedAt })
@@ -935,7 +993,7 @@ The fallback retry session is now created and can be inspected directly.
     existingTask.status = "running"
     existingTask.completedAt = undefined
     existingTask.error = undefined
-    existingTask.parentSessionID = input.parentSessionID
+    this.updateTaskParent(existingTask, input.parentSessionID)
     existingTask.parentMessageID = input.parentMessageID
     existingTask.parentModel = input.parentModel
     existingTask.parentAgent = input.parentAgent
@@ -1680,7 +1738,7 @@ The task was re-queued on a fallback model after a retryable failure.
       }
 
       this.clearNotificationsForTask(taskId)
-      this.tasks.delete(taskId)
+      this.removeTask(task)
       this.clearTaskHistoryWhenParentTasksGone(task.parentSessionID)
       if (task.sessionID) {
         subagentSessions.delete(task.sessionID)
@@ -2360,6 +2418,7 @@ The task was re-queued on a fallback model after a retryable failure.
 
     this.concurrencyManager.clear()
     this.tasks.clear()
+    this.tasksByParentSession.clear()
     this.notifications.clear()
     this.pendingNotifications.clear()
     this.pendingByParent.clear()
