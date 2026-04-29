@@ -59,6 +59,7 @@ export function createHooks(args: {
     ctx,
     pluginConfig,
     modelCacheState,
+    backgroundManager,
     modelFallbackControllerAccessor,
     isHookEnabled,
     safeHookEnabled,

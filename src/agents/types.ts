@@ -79,14 +79,43 @@ export function isGptModel(model: string): boolean {
   return modelName.includes("gpt");
 }
 
-export function isGpt5_4Model(model: string): boolean {
+const GPT_NATIVE_SISYPHUS_RE = /gpt-5[.-](?:[4-9]|\d{2,})/i;
+
+export function isGptNativeSisyphusModel(model: string): boolean {
   const modelName = extractModelName(model).toLowerCase();
-  return modelName.includes("gpt-5.4") || modelName.includes("gpt-5-4");
+  return GPT_NATIVE_SISYPHUS_RE.test(modelName);
+}
+
+export function isGpt5_5Model(model: string): boolean {
+  const modelName = extractModelName(model).toLowerCase();
+  return modelName.includes("gpt-5.5") || modelName.includes("gpt-5-5");
 }
 
 export function isGpt5_3CodexModel(model: string): boolean {
   const modelName = extractModelName(model).toLowerCase();
   return modelName.includes("gpt-5.3-codex") || modelName.includes("gpt-5-3-codex");
+}
+
+export function isClaudeOpus47Model(model: string): boolean {
+  const modelName = extractModelName(model).toLowerCase().replaceAll(".", "-");
+  return modelName.includes("claude-opus-4-7");
+}
+
+/**
+ * Kimi K2.x model detection (K2.5 / K2.6 family).
+ *
+ * Matches model IDs containing any of:
+ *   - "kimi" (provider/family signal — kimi-k2.6, moonshotai/Kimi-K2.6, etc.)
+ *   - "k2p5" / "k2-p5" / "k2.p5"
+ *   - "k2p6" / "k2-p6" / "k2.p6"
+ *
+ * Match is case-insensitive on the model name (last path segment).
+ */
+export function isKimiK2Model(model: string): boolean {
+  const modelName = extractModelName(model).toLowerCase();
+  if (modelName.includes("kimi")) return true;
+  if (/k2[-.]?p[56]/.test(modelName)) return true;
+  return false;
 }
 
 const GEMINI_PROVIDERS = ["google/", "google-vertex/"];
@@ -131,7 +160,10 @@ export type OverridableAgentName = "build" | BuiltinAgentName;
 export type AgentName = BuiltinAgentName;
 
 export type AgentOverrideConfig = Partial<AgentConfig> & {
+  category?: string;
   prompt_append?: string;
+  skills?: string[];
+  tools?: Record<string, boolean>;
   variant?: string;
   fallback_models?: string | (string | import("../config/schema/fallback-models").FallbackModelObject)[];
 };

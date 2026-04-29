@@ -1053,7 +1053,6 @@ describe("todo-continuation-enforcer", () => {
   })
 
   test("should show countdown toast updates", async () => {
-    fakeTimers.restore()
     // given - session with incomplete todos
     const sessionID = "main-toast"
     setMainSession(sessionID)
@@ -1066,7 +1065,7 @@ describe("todo-continuation-enforcer", () => {
     })
 
     // then - multiple toast updates during countdown (2s countdown = 2 toasts: "2s" and "1s")
-    await wait(2500)
+    await fakeTimers.advanceBy(1500)
     expect(toastCalls.length).toBeGreaterThanOrEqual(2)
     expect(toastCalls[0].message).toContain("2s")
   }, { timeout: 15000 })

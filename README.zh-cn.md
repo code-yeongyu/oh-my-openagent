@@ -142,7 +142,7 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 
 只需以下订阅之一，ultrawork 就能顺畅工作（本项目与它们没有任何关联，纯属个人推荐）：
 - [ChatGPT 订阅 ($20)](https://chatgpt.com/)
-- [Kimi Code 订阅 ($0.99) (*仅限本月*)](https://www.kimi.com/membership/pricing?track_id=5cdeca93-66f0-4d35-aabb-b6df8fcea328)
+- [Kimi Code 订阅 ($19)](https://www.kimi.com/code)
 - [GLM Coding 套餐 ($10)](https://z.ai/subscribe)
 - 如果你能使用按 token 计费的方式，用 kimi 和 gemini 模型花不了多少钱。
 

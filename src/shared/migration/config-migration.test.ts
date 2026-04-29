@@ -118,6 +118,37 @@ describe("migrateConfigFile sidecar write ordering", () => {
     )
     expect(statSync(getSidecarPath(configPath)).isDirectory()).toBe(true)
   })
+
+  test("treats top-level appliedMigrations as migration history and does not reapply the model update", () => {
+    // given
+    const workdir = createWorkdir()
+    const configPath = join(workdir, "oh-my-openagent.json")
+    const rawConfig: Record<string, unknown> = {
+      agents: {
+        oracle: { model: "anthropic/claude-opus-4-6" },
+      },
+      appliedMigrations: ["model-version:anthropic/claude-opus-4-6->anthropic/claude-opus-4-7"],
+    }
+
+    writeFileSync(configPath, JSON.stringify(rawConfig, null, 2) + "\n")
+
+    // when
+    const needsWrite = migrateConfigFile(configPath, rawConfig)
+
+    // then
+    expect(needsWrite).toBe(true)
+    expect(rawConfig.appliedMigrations).toBeUndefined()
+    expect((rawConfig.agents as Record<string, Record<string, unknown>>).oracle.model).toBe(
+      "anthropic/claude-opus-4-6",
+    )
+
+    const sidecar = JSON.parse(readFileSync(getSidecarPath(configPath), "utf-8")) as {
+      appliedMigrations: string[]
+    }
+    expect(sidecar.appliedMigrations).toEqual([
+      "model-version:anthropic/claude-opus-4-6->anthropic/claude-opus-4-7",
+    ])
+  })
 })
 
 describe("migrateConfigFile backup skipping", () => {

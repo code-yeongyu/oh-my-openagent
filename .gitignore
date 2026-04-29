@@ -37,3 +37,4 @@ notepad.md
 oauth-success.html
 *.bun-build
 .omx/
+.dori-sync/

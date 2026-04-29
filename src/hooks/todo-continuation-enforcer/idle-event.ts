@@ -109,14 +109,12 @@ export async function handleSessionIdle(args: {
 
   if (!todos || todos.length === 0) {
     sessionStateStore.resetContinuationProgress(sessionID)
-    sessionStateStore.resetContinuationProgress(sessionID)
     log(`[${HOOK_NAME}] No todos`, { sessionID })
     return
   }
 
   const incompleteCount = getIncompleteCount(todos)
   if (incompleteCount === 0) {
-    sessionStateStore.resetContinuationProgress(sessionID)
     sessionStateStore.resetContinuationProgress(sessionID)
     log(`[${HOOK_NAME}] All todos complete`, { sessionID, total: todos.length })
     return

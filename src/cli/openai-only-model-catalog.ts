@@ -6,10 +6,10 @@ const OPENAI_ONLY_AGENT_OVERRIDES: Record<string, AgentConfig> = {
 }
 
 const OPENAI_ONLY_CATEGORY_OVERRIDES: Record<string, CategoryConfig> = {
-  artistry: { model: "openai/gpt-5.4", variant: "xhigh" },
+  artistry: { model: "openai/gpt-5.5", variant: "xhigh" },
   quick: { model: "openai/gpt-5.4-mini" },
-  "visual-engineering": { model: "openai/gpt-5.4", variant: "high" },
-  writing: { model: "openai/gpt-5.4", variant: "medium" },
+  "visual-engineering": { model: "openai/gpt-5.5", variant: "high" },
+  writing: { model: "openai/gpt-5.5", variant: "medium" },
 }
 
 export function isOpenAiOnlyAvailability(availability: ProviderAvailability): boolean {

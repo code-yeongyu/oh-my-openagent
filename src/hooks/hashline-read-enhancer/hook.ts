@@ -141,6 +141,22 @@ function extractFilePath(metadata: unknown): string | undefined {
   return undefined
 }
 
+function extractLineCount(metadata: unknown): number | undefined {
+  if (!metadata || typeof metadata !== "object") {
+    return undefined
+  }
+
+  const objectMeta = metadata as Record<string, unknown>
+  const candidates = [objectMeta.lineCount, objectMeta.linesWritten, objectMeta.lines]
+  for (const candidate of candidates) {
+    if (typeof candidate === "number" && Number.isInteger(candidate) && candidate >= 0) {
+      return candidate
+    }
+  }
+
+  return undefined
+}
+
 async function appendWriteHashlineOutput(output: { output: string; metadata: unknown }): Promise<void> {
   if (output.output.startsWith(WRITE_SUCCESS_MARKER)) {
     return
@@ -148,6 +164,12 @@ async function appendWriteHashlineOutput(output: { output: string; metadata: unk
 
   const outputLower = output.output.toLowerCase()
   if (outputLower.startsWith("error") || outputLower.includes("failed")) {
+    return
+  }
+
+  const metadataLineCount = extractLineCount(output.metadata)
+  if (metadataLineCount !== undefined) {
+    output.output = `${WRITE_SUCCESS_MARKER} ${metadataLineCount} lines written.`
     return
   }
 
