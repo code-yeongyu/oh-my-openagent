@@ -33,6 +33,7 @@ type ModelFallbackControllerWithState = Pick<
   ModelFallbackStateController,
   | "lastToastKey"
   | "setSessionFallbackChain"
+  | "getSessionFallbackChain"
   | "clearSessionFallbackChain"
   | "setPendingModelFallback"
   | "getNextFallback"
@@ -68,6 +69,13 @@ export function clearSessionFallbackChain(
   sessionID: string,
 ): void {
   controller.clearSessionFallbackChain(sessionID)
+}
+
+export function getSessionFallbackChain(
+  controller: Pick<ModelFallbackStateController, "getSessionFallbackChain">,
+  sessionID: string,
+): FallbackEntry[] | undefined {
+  return controller.getSessionFallbackChain(sessionID)
 }
 
 /**
@@ -152,6 +160,7 @@ export function createModelFallbackHook(args?: ModelFallbackHookArgs): ModelFall
   return {
     lastToastKey: controller.lastToastKey,
     setSessionFallbackChain: controller.setSessionFallbackChain,
+    getSessionFallbackChain: controller.getSessionFallbackChain,
     clearSessionFallbackChain: controller.clearSessionFallbackChain,
     setPendingModelFallback: controller.setPendingModelFallback,
     getNextFallback: controller.getNextFallback,

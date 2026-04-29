@@ -237,6 +237,17 @@ describe("model-error-classifier", () => {
     //#then
     expect(result).toBe(true)
   })
+
+  test("treats forbidden provider message as retryable", () => {
+    //#given
+    const error = { message: "Forbidden: Selected provider is forbidden" }
+
+    //#when
+    const result = shouldRetryError(error)
+
+    //#then
+    expect(result).toBe(true)
+  })
 })
 
 export {}

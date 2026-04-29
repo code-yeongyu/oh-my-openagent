@@ -26,6 +26,21 @@ export interface TaskProgress {
   lastMessageAt?: Date
 }
 
+export type BackgroundTaskAttemptStatus = BackgroundTaskStatus
+
+export interface BackgroundTaskAttempt {
+  attemptID: string
+  attemptNumber: number
+  sessionID?: string
+  providerID?: string
+  modelID?: string
+  variant?: string
+  status: BackgroundTaskAttemptStatus
+  error?: string
+  startedAt?: Date
+  completedAt?: Date
+}
+
 export interface BackgroundTask {
   id: string
   sessionID?: string
@@ -61,6 +76,18 @@ export interface BackgroundTask {
   isUnstableAgent?: boolean
   /** Category used for this task (e.g., 'quick', 'visual-engineering') */
   category?: string
+  /** Pending retry notification details for the next spawned retry session */
+  retryNotification?: {
+    previousSessionID?: string
+    failedModel?: string
+    failedError?: string
+    nextModel: string
+  }
+
+  /** Structured attempt history for retry observability */
+  attempts?: BackgroundTaskAttempt[]
+  /** ID of the currently active attempt */
+  currentAttemptID?: string
 
   /** Last message count for stability detection */
   lastMsgCount?: number

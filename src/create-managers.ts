@@ -58,6 +58,7 @@ export function createManagers(args: {
     deps.markServerRunningInProcessFn()
   }
   const tmuxSessionManager = new deps.TmuxSessionManagerClass(ctx, tmuxConfig)
+  const modelFallbackControllerAccessor = createModelFallbackControllerAccessor()
 
   deps.registerManagerForCleanupFn({
     shutdown: async () => {
@@ -110,6 +111,7 @@ export function createManagers(args: {
         })
       },
       enableParentSessionNotifications: backgroundNotificationHookEnabled,
+      modelFallbackControllerAccessor,
     },
   )
 
@@ -122,8 +124,6 @@ export function createManagers(args: {
     pluginConfig,
     modelCacheState,
   })
-  const modelFallbackControllerAccessor = createModelFallbackControllerAccessor()
-
   return {
     tmuxSessionManager,
     backgroundManager,
