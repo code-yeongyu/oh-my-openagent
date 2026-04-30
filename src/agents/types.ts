@@ -130,6 +130,14 @@ export function isGlmModel(model: string): boolean {
   return modelName.includes("glm");
 }
 
+const GLM_SISYPHUS_HARNESS_RE =
+  /^(?:glm-5|glm-5[.-]1(?::thinking)?|glm5[.-]1(?::thinking)?|glm-5-turbo|glm5-turbo|glm-5v-turbo|glm5v-turbo)$/;
+
+export function isGlmSisyphusHarnessModel(model: string): boolean {
+  const modelName = extractModelName(model).toLowerCase();
+  return GLM_SISYPHUS_HARNESS_RE.test(modelName);
+}
+
 export function isGeminiModel(model: string): boolean {
   if (GEMINI_PROVIDERS.some((prefix) => model.startsWith(prefix))) return true;
 

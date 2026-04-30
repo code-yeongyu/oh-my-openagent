@@ -1,4 +1,5 @@
 export { buildDefaultSisyphusJuniorPrompt } from "./default"
+export { buildGlmSisyphusJuniorPrompt } from "./glm"
 export { buildKimiK26SisyphusJuniorPrompt } from "./kimi-k2-6"
 export { buildGptSisyphusJuniorPrompt } from "./gpt"
 export { buildGpt54SisyphusJuniorPrompt } from "./gpt-5-4"

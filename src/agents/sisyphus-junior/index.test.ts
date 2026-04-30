@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 import {
   createSisyphusJuniorAgentWithOverrides,
   SISYPHUS_JUNIOR_DEFAULTS,
+  buildGlmSisyphusJuniorPrompt,
   getSisyphusJuniorPromptSource,
   buildSisyphusJuniorPrompt,
 } from "./index"
@@ -178,6 +179,19 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
       // then
       expect(result.reasoningEffort).toBeUndefined()
       expect(result.thinking).toBeUndefined()
+    })
+  })
+
+  describe("barrel exports", () => {
+    test("exposes buildGlmSisyphusJuniorPrompt", () => {
+      // given
+      const model = false
+
+      // when
+      const prompt = buildGlmSisyphusJuniorPrompt(model)
+
+      // then
+      expect(prompt).toContain("GLM context priorities")
     })
   })
 
@@ -464,6 +478,116 @@ describe("getSisyphusJuniorPromptSource", () => {
     expect(source).toBe("gpt-5-4")
   })
 
+  test("returns 'glm' for z-ai/glm-5", () => {
+    // given
+    const model = "z-ai/glm-5"
+
+    // when
+    const source = getSisyphusJuniorPromptSource(model)
+
+    // then
+    expect(source).toBe("glm")
+  })
+
+  test("returns 'glm' for z-ai/glm-5.1", () => {
+    // given
+    const model = "z-ai/glm-5.1"
+
+    // when
+    const source = getSisyphusJuniorPromptSource(model)
+
+    // then
+    expect(source).toBe("glm")
+  })
+
+  test("returns 'glm' for zai-org/glm-5.1:thinking", () => {
+    // given
+    const model = "zai-org/glm-5.1:thinking"
+
+    // when
+    const source = getSisyphusJuniorPromptSource(model)
+
+    // then
+    expect(source).toBe("glm")
+  })
+
+  test("returns 'glm' for opencode-go/glm-5-turbo", () => {
+    // given
+    const model = "opencode-go/glm-5-turbo"
+
+    // when
+    const source = getSisyphusJuniorPromptSource(model)
+
+    // then
+    expect(source).toBe("glm")
+  })
+
+  test("returns 'glm' for opencode-go/glm5-turbo", () => {
+    // given
+    const model = "opencode-go/glm5-turbo"
+
+    // when
+    const source = getSisyphusJuniorPromptSource(model)
+
+    // then
+    expect(source).toBe("glm")
+  })
+
+  test("returns 'glm' for z-ai/glm-5v-turbo", () => {
+    // given
+    const model = "z-ai/glm-5v-turbo"
+
+    // when
+    const source = getSisyphusJuniorPromptSource(model)
+
+    // then
+    expect(source).toBe("glm")
+  })
+
+  test("returns 'glm' for z-ai/glm5v-turbo", () => {
+    // given
+    const model = "z-ai/glm5v-turbo"
+
+    // when
+    const source = getSisyphusJuniorPromptSource(model)
+
+    // then
+    expect(source).toBe("glm")
+  })
+
+  test("returns 'default' for z-ai/glm-4.6v", () => {
+    // given
+    const model = "z-ai/glm-4.6v"
+
+    // when
+    const source = getSisyphusJuniorPromptSource(model)
+
+    // then
+    expect(source).toBe("default")
+  })
+
+  test("returns 'default' for z-ai/glm-5.1-preview", () => {
+    // given
+    const model = "z-ai/glm-5.1-preview"
+
+    // when
+    const source = getSisyphusJuniorPromptSource(model)
+
+    // then
+    expect(source).toBe("default")
+  })
+
+  test("returns 'default' for big-pickle/glm", () => {
+    // given
+    const model = "big-pickle/glm"
+
+    // when
+    const source = getSisyphusJuniorPromptSource(model)
+
+    // then
+    expect(source).toBe("default")
+  })
+
   test("returns 'gpt-5-4' for GitHub Copilot GPT 5.4", () => {
     // given
     const model = "github-copilot/gpt-5.4"
@@ -555,6 +679,18 @@ describe("buildSisyphusJuniorPrompt", () => {
     expect(prompt).toContain("Scope Discipline")
     expect(prompt).toContain("<tool_usage_rules>")
     expect(prompt).toContain("Do not use `apply_patch`")
+  })
+
+  test("GLM harness model uses GLM prompt", () => {
+    // given
+    const model = "z-ai/glm-5"
+
+    // when
+    const prompt = buildSisyphusJuniorPrompt(model, false)
+
+    // then
+    expect(prompt).toContain("GLM context priorities")
+    expect(prompt).toContain("<Small_Context_Working_Memory>")
   })
 
   test("GPT 5.3 Codex model uses GPT-5.3-codex prompt", () => {

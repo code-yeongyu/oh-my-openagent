@@ -5,14 +5,22 @@
  * Category-spawned executor with domain-specific configurations.
  *
  * Routing:
- * 1. GPT models (openai/*, github-copilot/gpt-*) -> gpt.ts (GPT-5.4 optimized)
- * 2. Gemini models (google/*, google-vertex/*) -> gemini.ts (Gemini-optimized)
- * 3. Default (Claude, etc.) -> default.ts (Claude-optimized)
+ * 1. Kimi models -> kimi-k2-6.ts (Kimi-optimized)
+ * 2. GLM harness models -> glm.ts (GLM-optimized)
+ * 3. GPT models (openai/*, github-copilot/gpt-*) -> gpt.ts (GPT-5.4 optimized)
+ * 4. Gemini models (google/*, google-vertex/*) -> gemini.ts (Gemini-optimized)
+ * 5. Default (Claude, etc.) -> default.ts (Claude-optimized)
  */
 
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode } from "../types"
-import { isGlmModel, isGpt5_5Model, isGptModel, isGeminiModel, isKimiK2Model } from "../types"
+import {
+  isGlmSisyphusHarnessModel,
+  isGpt5_5Model,
+  isGptModel,
+  isGeminiModel,
+  isKimiK2Model,
+} from "../types"
 import type { AgentOverrideConfig } from "../../config/schema"
 import {
   createAgentToolRestrictions,
@@ -21,6 +29,7 @@ import {
 import { getGptApplyPatchPermission } from "../gpt-apply-patch-guard"
 
 import { buildDefaultSisyphusJuniorPrompt } from "./default"
+import { buildGlmSisyphusJuniorPrompt } from "./glm"
 import { buildKimiK26SisyphusJuniorPrompt } from "./kimi-k2-6"
 import { buildGptSisyphusJuniorPrompt } from "./gpt"
 import { buildGpt54SisyphusJuniorPrompt } from "./gpt-5-4"
@@ -43,6 +52,7 @@ export const SISYPHUS_JUNIOR_DEFAULTS = {
 export type SisyphusJuniorPromptSource =
   | "default"
   | "kimi-k2"
+  | "glm"
   | "gpt"
   | "gpt-5-5"
   | "gpt-5-4"
@@ -51,6 +61,7 @@ export type SisyphusJuniorPromptSource =
 
 export function getSisyphusJuniorPromptSource(model?: string): SisyphusJuniorPromptSource {
   if (model && isKimiK2Model(model)) return "kimi-k2"
+  if (model && isGlmSisyphusHarnessModel(model)) return "glm"
   if (model && isGptModel(model)) {
     if (isGpt5_5Model(model)) return "gpt-5-5"
     const lower = model.toLowerCase()
@@ -77,6 +88,8 @@ export function buildSisyphusJuniorPrompt(
   switch (source) {
     case "kimi-k2":
       return buildKimiK26SisyphusJuniorPrompt(useTaskSystem, promptAppend)
+    case "glm":
+      return buildGlmSisyphusJuniorPrompt(useTaskSystem, promptAppend)
     case "gpt-5-5":
       return buildGpt55SisyphusJuniorPrompt(useTaskSystem, promptAppend)
     case "gpt-5-4":
@@ -145,7 +158,7 @@ export function createSisyphusJuniorAgentWithOverrides(
     return { ...base, reasoningEffort: "medium" } as AgentConfig
   }
 
-  if (isGlmModel(model)) {
+  if (isGlmSisyphusHarnessModel(model)) {
     return base as AgentConfig
   }
 

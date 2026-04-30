@@ -3,6 +3,7 @@ import {
   isGptModel,
   isGeminiModel,
   isGlmModel,
+  isGlmSisyphusHarnessModel,
   isGptNativeSisyphusModel,
   isMiniMaxModel,
 } from "./types";
@@ -138,6 +139,43 @@ describe("isGlmModel", () => {
     expect(isGlmModel("openai/gpt-5.4")).toBe(false);
     expect(isGlmModel("anthropic/claude-opus-4-7")).toBe(false);
     expect(isGlmModel("google/gemini-3.1-pro")).toBe(false);
+  });
+});
+
+describe("isGlmSisyphusHarnessModel", () => {
+  test("#given exact GLM Sisyphus harness families #then returns true", () => {
+    expect(isGlmSisyphusHarnessModel("z-ai/glm-5")).toBe(true);
+    expect(isGlmSisyphusHarnessModel("vercel/zai/glm-5")).toBe(true);
+    expect(isGlmSisyphusHarnessModel("zai-coding-plan/glm-5")).toBe(true);
+    expect(isGlmSisyphusHarnessModel("z-ai/glm-5.1")).toBe(true);
+    expect(isGlmSisyphusHarnessModel("zai-org/glm-5.1:thinking")).toBe(true);
+    expect(isGlmSisyphusHarnessModel("opencode-go/glm-5-1")).toBe(true);
+    expect(isGlmSisyphusHarnessModel("opencode-go/glm5.1")).toBe(true);
+    expect(isGlmSisyphusHarnessModel("opencode/glm-5-turbo")).toBe(true);
+    expect(isGlmSisyphusHarnessModel("opencode-go/glm5-turbo")).toBe(true);
+    expect(isGlmSisyphusHarnessModel("opencode/glm-5v-turbo")).toBe(true);
+    expect(isGlmSisyphusHarnessModel("opencode-go/glm5v-turbo")).toBe(true);
+  });
+
+  test("#given compact plain glm5 #then returns false", () => {
+    expect(isGlmSisyphusHarnessModel("z-ai/glm5")).toBe(false);
+    expect(isGlmSisyphusHarnessModel("glm5")).toBe(false);
+    expect(isGlmSisyphusHarnessModel("z-ai/glm5:thinking")).toBe(false);
+  });
+
+  test("#given non-target GLM variants #then returns false", () => {
+    expect(isGlmSisyphusHarnessModel("opencode/glm-4.6v")).toBe(false);
+    expect(isGlmSisyphusHarnessModel("opencode/go/glm-4-6v")).toBe(false);
+    expect(isGlmSisyphusHarnessModel("z-ai/glm-5.1-preview")).toBe(false);
+    expect(isGlmSisyphusHarnessModel("accounts/fireworks/models/glm-5p1")).toBe(false);
+    expect(isGlmSisyphusHarnessModel("opencode/big-pickle")).toBe(false);
+  });
+
+  test("#given other providers and families #then returns false", () => {
+    expect(isGlmSisyphusHarnessModel("openai/gpt-5.4")).toBe(false);
+    expect(isGlmSisyphusHarnessModel("anthropic/claude-opus-4-7")).toBe(false);
+    expect(isGlmSisyphusHarnessModel("google/gemini-3.1-pro")).toBe(false);
+    expect(isGlmSisyphusHarnessModel("moonshotai/kimi-k2.5")).toBe(false);
   });
 });
 

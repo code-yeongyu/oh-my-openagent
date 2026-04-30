@@ -7,6 +7,7 @@ import {
   isGptNativeSisyphusModel,
   isClaudeOpus47Model,
   isKimiK2Model,
+  isGlmSisyphusHarnessModel,
 } from "./types";
 import {
   buildGeminiToolMandate,
@@ -17,6 +18,7 @@ import {
   buildGeminiToolCallExamples,
 } from "./sisyphus/gemini";
 import { buildClaudeOpus47SisyphusPrompt } from "./sisyphus/claude-opus-4-7";
+import { buildGlmSisyphusPrompt } from "./sisyphus/glm";
 import { buildGpt54SisyphusPrompt } from "./sisyphus/gpt-5-4";
 import { buildGpt55SisyphusPrompt } from "./sisyphus/gpt-5-5";
 import { buildKimiK26SisyphusPrompt } from "./sisyphus/kimi-k2-6";
@@ -515,6 +517,32 @@ export function createSisyphusAgent(
         ...getGptApplyPatchPermission(model),
       } as AgentConfig["permission"],
       reasoningEffort: "medium",
+    };
+  }
+
+  if (isGlmSisyphusHarnessModel(model)) {
+    const prompt = buildGlmSisyphusPrompt(
+      model,
+      agents,
+      tools,
+      skills,
+      categories,
+      useTaskSystem,
+    );
+    return {
+      description:
+        "Powerful AI orchestrator. Plans obsessively with todos, assesses search complexity before exploration, delegates strategically via category+skills combinations. Uses explore for internal code (parallel-friendly), librarian for external docs. (Sisyphus - OhMyOpenCode)",
+      mode: MODE,
+      model,
+      maxTokens: 64000,
+      prompt,
+      color: "#00CED1",
+      permission: {
+        question: "allow",
+        call_omo_agent: "deny",
+        ...getFrontierToolSchemaPermission(model),
+        ...getGptApplyPatchPermission(model),
+      } as AgentConfig["permission"],
     };
   }
 
