@@ -518,6 +518,9 @@ export class TmuxSessionManager {
       return
     }
 
+    const ready = await this.waitForSessionReady(sessionId)
+    if (!ready) return
+
     if (deferred.retryIsolatedContainer) {
       const isolatedPaneId = await this.spawnInIsolatedContainer(sessionId, deferred.title)
       if (isolatedPaneId) {
@@ -650,6 +653,17 @@ export class TmuxSessionManager {
     return false
   }
 
+  private async waitForSessionBeforeAttach(sessionId: string, title: string, retryIsolatedContainer = false): Promise<boolean> {
+    const ready = await this.waitForSessionReady(sessionId)
+    if (ready) return true
+
+    log("[tmux-session-manager] deferring attach until session is ready", {
+      sessionId,
+    })
+    this.enqueueDeferredSession(sessionId, title, retryIsolatedContainer)
+    return false
+  }
+
   async onSessionCreated(event: SessionCreatedEvent): Promise<void> {
     const enabled = this.isEnabled()
     log("[tmux-session-manager] onSessionCreated called", {
@@ -691,6 +705,9 @@ export class TmuxSessionManager {
 
     await this.enqueueSpawn(async () => {
       try {
+        const ready = await this.waitForSessionBeforeAttach(sessionId, title, this.isIsolated())
+        if (!ready) return
+
         const isolatedPaneId = await this.spawnInIsolatedContainer(sessionId, title)
         if (isolatedPaneId) {
           this.sessions.set(

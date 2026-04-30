@@ -108,6 +108,7 @@ mock.module('../../shared/tmux', () => {
 })
 
 const trackedSessions = new Set<string>()
+const readySessions = new Set<string>()
 
 function createMockContext(overrides?: {
   sessionStatusResult?: { data?: Record<string, { type: string }> }
@@ -122,7 +123,7 @@ function createMockContext(overrides?: {
             return overrides.sessionStatusResult
           }
           const data: Record<string, { type: string }> = {}
-          for (const sessionId of trackedSessions) {
+          for (const sessionId of readySessions) {
             data[sessionId] = { type: 'running' }
           }
           return { data }
@@ -143,6 +144,7 @@ function createSessionCreatedEvent(
   parentID: string | undefined,
   title: string
 ) {
+  readySessions.add(id)
   return {
     type: 'session.created',
     properties: {
@@ -188,6 +190,7 @@ describe('TmuxSessionManager', () => {
     mockIsInsideTmux.mockClear()
     mockGetCurrentPaneId.mockClear()
     trackedSessions.clear()
+    readySessions.clear()
 
     mockQueryWindowState.mockImplementation(async () => createWindowState())
     mockExecuteActions.mockImplementation(async (actions: PaneAction[]) => { for (const action of actions) {
@@ -1137,7 +1140,7 @@ describe('TmuxSessionManager', () => {
       })
     })
 
-    test('#given session.status never reports session ready #when onSessionCreated runs #then pane is tracked immediately without blocking', async () => {
+    test('#given session.status never reports session ready #when onSessionCreated runs #then pane attach is deferred', async () => {
       // given
       mockIsInsideTmux.mockReturnValue(true)
       mockQueryWindowState.mockImplementation(async () => createWindowState())
@@ -1146,16 +1149,15 @@ describe('TmuxSessionManager', () => {
       const ctx = createMockContext({ sessionStatusResult: { data: {} } })
       const config = createTmuxConfig({ enabled: true })
       const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
-      const event = createSessionCreatedEvent('ses_fast_track', 'ses_parent', 'Fast Track')
+      const event = createSessionCreatedEvent('ses_wait_for_ready', 'ses_parent', 'Wait For Ready')
 
       // when
-      const start = Date.now()
       await manager.onSessionCreated(event)
-      const elapsed = Date.now() - start
 
       // then
-      expect(elapsed < 500).toBe(true)
-      expect(getTrackedSessions(manager).has('ses_fast_track')).toBe(true)
+      expect(mockExecuteActions).toHaveBeenCalledTimes(0)
+      expect(getTrackedSessions(manager).has('ses_wait_for_ready')).toBe(false)
+      expect((manager as any).deferredQueue).toEqual(['ses_wait_for_ready'])
     })
   })
 
@@ -1202,7 +1204,9 @@ describe('TmuxSessionManager', () => {
       await manager.onSessionDeleted({ sessionID: 'ses_timeout' })
 
       // then
-      expect(mockExecuteAction).toHaveBeenCalledTimes(1)
+      expect(mockExecuteAction).toHaveBeenCalledTimes(0)
+      expect(getTrackedSessions(manager).has('ses_timeout')).toBe(false)
+      expect((manager as any).deferredQueue).toEqual([])
     })
 
     test('closes pane when tracked session is deleted', async () => {
