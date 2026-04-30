@@ -5,10 +5,8 @@ import { buildGlmWorkingMemory, buildGlmVisionConstraint } from "./glm";
 
 describe("buildGlmWorkingMemory", () => {
   test("#given call #then contains exactly one Small_Context_Working_Memory block", () => {
-    // given
     const block = buildGlmWorkingMemory();
 
-    // then
     const openCount = block.split("<Small_Context_Working_Memory>").length - 1;
     const closeCount =
       block.split("</Small_Context_Working_Memory>").length - 1;
@@ -71,10 +69,8 @@ describe("buildGlmWorkingMemory", () => {
 
 describe("buildGlmVisionConstraint", () => {
   test("#given call #then contains GLM_VISION_CONSTRAINT tag", () => {
-    // given
     const block = buildGlmVisionConstraint();
 
-    // then
     expect(block).toContain("<GLM_VISION_CONSTRAINT>");
     expect(block).toContain("</GLM_VISION_CONSTRAINT>");
   });
