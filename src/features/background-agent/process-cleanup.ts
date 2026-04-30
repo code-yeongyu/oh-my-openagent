@@ -31,6 +31,12 @@ function registerErrorEvent(
   handler: (error: unknown) => void | Promise<void>
 ): (error: unknown) => void {
   const listener = (error: unknown) => {
+    // Detach before running the body so a re-emit from inside log()/handler()
+    // (e.g. EPIPE while closing a broken pipe during shutdown) cannot recurse.
+    // Prior behavior: the listener re-entered itself, re-logged, re-ran cleanup,
+    // and threw EPIPE again — an unbounded loop that filled disks with 100+ GB
+    // of log lines in minutes before the 6 s forced-exit timer could fire.
+    process.off(signal, listener)
     log(`[background-agent] ${signal} received during shutdown cleanup:`, error)
     scheduleForcedExit(handler(error), 1)
   }
