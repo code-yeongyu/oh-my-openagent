@@ -14,9 +14,12 @@
 
     // Heavy lifter: maximum autonomy for coding tasks
     "hephaestus": {
-      "model": "openai/gpt-5.4",
+      "model": "openai/gpt-5.5",
       "prompt_append": "You are the primary implementation agent. Own the codebase. Explore, decide, execute. Use LSP and AST-grep aggressively.",
-      "permission": { "edit": "allow", "bash": { "git": "allow", "test": "allow" } },
+      "permission": {
+        "edit": "allow",
+        "bash": { "git": "allow", "test": "allow" },
+      },
     },
 
     // Lightweight planner: quick planning for coding tasks
@@ -26,7 +29,7 @@
     },
 
     // Debugging and architecture
-    "oracle": { "model": "openai/gpt-5.4", "variant": "high" },
+    "oracle": { "model": "openai/gpt-5.5", "variant": "high" },
 
     // Fast docs lookup
     "librarian": { "model": "github-copilot/grok-code-fast-1" },
@@ -41,7 +44,9 @@
     "metis": { "model": "opencode/gpt-5-nano" },
 
     // Code review focus
-    "momus": { "prompt_append": "Focus on code quality, edge cases, and test coverage." },
+    "momus": {
+      "prompt_append": "Focus on code quality, edge cases, and test coverage.",
+    },
 
     // Long-running coding sessions
     "atlas": {},
@@ -61,13 +66,16 @@
     "unspecified-high": { "model": "openai/gpt-5.3-codex" },
 
     // Visual work
-    "visual-engineering": { "model": "google/gemini-3.1-pro", "variant": "high" },
+    "visual-engineering": {
+      "model": "google/gemini-3.1-pro",
+      "variant": "high",
+    },
 
     // Deep autonomous work
-    "deep": { "model": "openai/gpt-5.4" },
+    "deep": { "model": "openai/gpt-5.5" },
 
     // Architecture decisions
-    "ultrabrain": { "model": "openai/gpt-5.4", "variant": "xhigh" },
+    "ultrabrain": { "model": "openai/gpt-5.5", "variant": "xhigh" },
   },
 
   // High concurrency for parallel agent work
