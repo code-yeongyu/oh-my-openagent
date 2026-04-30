@@ -8,6 +8,8 @@ export interface UpdateModelsOptions {
 }
 
 export interface UpdateModelsResult {
+  success: boolean
+  message: string
   updated: string[]
   preserved: string[]
   added: string[]

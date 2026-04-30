@@ -2,15 +2,17 @@ import { loadPluginConfig } from "../../plugin-config.js"
 import { detectCurrentConfig } from "../config-manager/detect-current-config.js"
 import { generateModelConfig } from "../model-fallback.js"
 import { backupConfigFile } from "../config-manager/backup-config.js"
-import { compareMappings, ModelMappingEntry } from "./compare-mappings.js"
-import type { UpdateModelsOptions, UpdateModelsResult } from "./types.js"
+import { compareMappings } from "./compare-mappings.js"
+import type { UpdateModelsOptions, UpdateModelsResult, ModelMappingEntry } from "./types.js"
+import type { InstallConfig } from "../types.js"
+import type { GeneratedOmoConfig } from "../model-fallback-types.js"
 import { readFileSync, writeFileSync, renameSync, existsSync } from "fs"
 import { join } from "path"
 
 export interface UpdateModelsDeps {
   loadConfig?: (directory: string) => Record<string, unknown> | null
-  detectCurrentConfig?: () => { providers: string[] }
-  generateModelConfig?: (config: { providers: string[] }) => { agents: Record<string, ModelMappingEntry>; categories: Record<string, ModelMappingEntry> }
+  detectCurrentConfig?: () => InstallConfig
+  generateModelConfig?: (config: InstallConfig) => GeneratedOmoConfig
   compareMappings?: typeof compareMappings
   backupConfigFile?: (configPath: string) => { success: boolean; backupPath?: string }
   writeFile?: (path: string, content: string) => void
@@ -50,17 +52,20 @@ export async function updateModels(
 
   // Detect providers from existing config
   const providerConfig = detect()
-  
+
   // Generate new defaults based on detected providers
-  const generatedConfig = generate({ providers: providerConfig.providers })
+  const generatedConfig = generate(providerConfig)
 
   // Extract current mappings from existing config
   const currentAgents = (existingConfig.agents as Record<string, ModelMappingEntry>) || {}
   const currentCategories = (existingConfig.categories as Record<string, ModelMappingEntry>) || {}
 
+  const generatedAgents = generatedConfig.agents || {}
+  const generatedCategories = generatedConfig.categories || {}
+
   // Compare and determine what to update
-  const agentsComparison = compare(currentAgents, generatedConfig.agents)
-  const categoriesComparison = compare(currentCategories, generatedConfig.categories)
+  const agentsComparison = compare(currentAgents, generatedAgents as Record<string, ModelMappingEntry>)
+  const categoriesComparison = compare(currentCategories, generatedCategories as Record<string, ModelMappingEntry>)
 
   const updated: string[] = []
   const preserved: string[] = []
@@ -71,10 +76,9 @@ export async function updateModels(
   let newCategories: Record<string, ModelMappingEntry>
 
   if (options.mode === "full-replacement") {
-    // Full replacement: use all generated mappings
-    newAgents = generatedConfig.agents
-    newCategories = generatedConfig.categories
-    updated.push(...Object.keys(generatedConfig.agents), ...Object.keys(generatedConfig.categories))
+    newAgents = generatedAgents as Record<string, ModelMappingEntry>
+    newCategories = generatedCategories as Record<string, ModelMappingEntry>
+    updated.push(...Object.keys(generatedAgents), ...Object.keys(generatedCategories))
   } else {
     // Preserve-custom mode: merge carefully
     newAgents = { ...currentAgents }
