@@ -1,27 +1,3 @@
-/**
- * GLM-specific overlay sections for Sisyphus prompt.
- *
- * GLM harness models (GLM-5, GLM-5.1, GLM-5-turbo) are text-only and
- * suffer from premature context compaction during long sessions.
- *
- * These overlays inject corrective sections at strategic points
- * in the dynamic Sisyphus prompt to counter these tendencies:
- *
- * 1. Working Memory block — lightweight `.sisyphus/state/` slices that
- *    preserve continuity across turns without re-reading full plans.
- * 2. Vision constraint — GLM text-only models cannot handle images/PDFs.
- *
- * Follows the same overlay pattern as `gemini.ts`: small functions
- * injected via string replacement in `sisyphus.ts`.
- */
-
-/**
- * Small Context Working Memory block for GLM.
- *
- * Prevents premature compaction by giving GLM a lightweight state
- * convention it can read/write on demand instead of re-reading
- * full plan files or scrolling old messages each turn.
- */
 export function buildGlmWorkingMemory(): string {
   return `<Small_Context_Working_Memory>
 ## Working Memory via Small Context Slices
@@ -52,12 +28,6 @@ GLM keeps a lightweight working memory under \`.sisyphus/state/{plan-or-session}
 </Small_Context_Working_Memory>`;
 }
 
-/**
- * Vision constraint for GLM text-only models.
- *
- * GLM-5, GLM-5.1, GLM-5-turbo cannot render or analyze images.
- * All visual tasks must be delegated to multimodal-looker.
- */
 export function buildGlmVisionConstraint(): string {
   return `<GLM_VISION_CONSTRAINT>
 **Vision/Image Constraint (GLM text-only models):**
