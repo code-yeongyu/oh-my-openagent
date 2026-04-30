@@ -65,9 +65,74 @@ jobs:
       - name: Type check
         run: bun run typecheck
 
+  preflight-trust:
+    runs-on: ubuntu-latest
+    if: github.repository == 'code-yeongyu/oh-my-openagent'
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Verify trusted publisher for all 24 packages
+        env:
+          REPO: code-yeongyu/oh-my-openagent
+          WORKFLOW_FILE: publish.yml
+        run: |
+          OIDC_TOKEN=$(curl -sH "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=npm:registry.npmjs.org" \
+            | jq -r '.value // empty')
+
+          if [ -z "${OIDC_TOKEN}" ]; then
+            echo "::error::Failed to acquire GitHub OIDC token"
+            exit 1
+          fi
+
+          PLATFORMS=(darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline)
+          ALL_PACKAGES=(oh-my-opencode oh-my-openagent)
+          for plat in "${PLATFORMS[@]}"; do
+            ALL_PACKAGES+=("oh-my-opencode-${plat}")
+            ALL_PACKAGES+=("oh-my-openagent-${plat}")
+          done
+
+          FAILED=()
+          for pkg in "${ALL_PACKAGES[@]}"; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+              -X POST \
+              "https://registry.npmjs.org/-/npm/v1/oidc/token/exchange/package/${pkg}" \
+              -H "Authorization: Bearer ${OIDC_TOKEN}" \
+              -H "Content-Type: application/json" \
+              -d '{}')
+
+            if [ "${STATUS}" = "200" ]; then
+              echo "OK   ${pkg}"
+            else
+              echo "FAIL ${pkg} (HTTP ${STATUS})"
+              FAILED+=("${pkg}")
+            fi
+          done
+
+          if [ ${#FAILED[@]} -gt 0 ]; then
+            {
+              echo
+              echo "::error::Trusted publisher not configured for ${#FAILED[@]} package(s)."
+              echo "::error::Configure each below at the URL with these values:"
+              echo "::error::  Provider: GitHub Actions"
+              echo "::error::  Organization: code-yeongyu"
+              echo "::error::  Repository: ${REPO}"
+              echo "::error::  Workflow filename: ${WORKFLOW_FILE}"
+              echo
+              for pkg in "${FAILED[@]}"; do
+                echo "::error::  https://www.npmjs.com/package/${pkg}/access"
+              done
+            } >&2
+            exit 1
+          fi
+
+          echo
+          echo "All ${#ALL_PACKAGES[@]} packages have trusted publisher configured."
+
   publish-main:
     runs-on: ubuntu-latest
-    needs: [test, typecheck]
+    needs: [test, typecheck, preflight-trust]
     if: github.repository == 'code-yeongyu/oh-my-openagent'
     outputs:
       version: ${{ steps.version.outputs.version }}
