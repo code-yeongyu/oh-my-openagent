@@ -26,7 +26,7 @@ export function buildModelResolutionDetails(options: {
     details.push(`  Total models: ${options.available.modelCount}`)
     details.push(`  Cache: ${cacheFile}`)
     details.push(`  ℹ Runtime: only connected providers used`)
-    details.push(`  Refresh: opencode models --refresh`)
+    details.push(`  Refresh: opencode models`)
   } else {
     details.push("  ⚠ Cache not found. Run 'opencode' to populate.")
   }

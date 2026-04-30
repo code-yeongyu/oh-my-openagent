@@ -10,7 +10,7 @@ export async function showModelCacheWarningIfNeeded(ctx: PluginInput): Promise<v
       body: {
         title: "Model Cache Not Found",
         message:
-          "Run 'opencode models --refresh' or restart OpenCode to populate the models cache for optimal agent model selection.",
+          "Run 'opencode models' or restart OpenCode to populate the models cache for optimal agent model selection.",
         variant: "warning" as const,
         duration: 10000,
       },

@@ -126,7 +126,7 @@ export async function checkModels(): Promise<CheckResult> {
     issues.push({
       title: "Model cache not found",
       description: "OpenCode model cache is missing, so model availability cannot be validated.",
-      fix: "Run: opencode models --refresh",
+      fix: "Run: opencode models",
       severity: "warning",
       affects: ["model resolution"],
     })
