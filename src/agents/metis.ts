@@ -1,5 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode, AgentPromptMetadata } from "./types"
+import { isGlmThinkingModel } from "./types"
 import { buildAntiDuplicationSection } from "./dynamic-agent-prompt-builder"
 import { createAgentToolRestrictions } from "../shared/permission-compat"
 
@@ -300,7 +301,7 @@ const metisRestrictions = createAgentToolRestrictions([
 ])
 
 export function createMetisAgent(model: string): AgentConfig {
-  return {
+  const base = {
     description:
       "Pre-planning consultant that analyzes requests to identify hidden intentions, ambiguities, and AI failure points. (Metis - OhMyOpenCode)",
     mode: MODE,
@@ -308,8 +309,13 @@ export function createMetisAgent(model: string): AgentConfig {
     temperature: 0.3,
     ...metisRestrictions,
     prompt: METIS_SYSTEM_PROMPT,
-    thinking: { type: "enabled", budgetTokens: 32000 },
   } as AgentConfig
+
+  if (isGlmThinkingModel(model)) {
+    return { ...base, thinking: { type: "enabled" } } as AgentConfig
+  }
+
+  return { ...base, thinking: { type: "enabled", budgetTokens: 32000 } } as AgentConfig
 }
 createMetisAgent.mode = MODE
 

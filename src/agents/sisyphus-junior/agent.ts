@@ -159,7 +159,7 @@ export function createSisyphusJuniorAgentWithOverrides(
   }
 
   if (isGlmSisyphusHarnessModel(model)) {
-    return base as AgentConfig
+    return { ...base, thinking: { type: "enabled" } } as AgentConfig
   }
 
   return {

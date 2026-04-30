@@ -53,4 +53,11 @@ describe("createSisyphusAgent - GLM routing", () => {
     expect(prompt).not.toContain("goal.md");
     expect(prompt).not.toContain("verification.md");
   });
+
+  test("#given GLM harness model #then returns config with thinking enabled (no budgetTokens)", () => {
+    const agent = createSisyphusAgent("zai/glm-5.1");
+
+    expect(agent.thinking).toEqual({ type: "enabled" });
+    expect((agent as Record<string, unknown>).reasoningEffort).toBeUndefined();
+  });
 });

@@ -18,7 +18,7 @@ import {
   buildGeminiToolCallExamples,
 } from "./sisyphus/gemini";
 import { buildClaudeOpus47SisyphusPrompt } from "./sisyphus/claude-opus-4-7";
-import { buildGlmSisyphusPrompt } from "./sisyphus/glm";
+import { buildGlmWorkingMemory, buildGlmVisionConstraint } from "./sisyphus/glm";
 import { buildGpt54SisyphusPrompt } from "./sisyphus/gpt-5-4";
 import { buildGpt55SisyphusPrompt } from "./sisyphus/gpt-5-5";
 import { buildKimiK26SisyphusPrompt } from "./sisyphus/kimi-k2-6";
@@ -520,31 +520,6 @@ export function createSisyphusAgent(
     };
   }
 
-  if (isGlmSisyphusHarnessModel(model)) {
-    const prompt = buildGlmSisyphusPrompt(
-      model,
-      agents,
-      tools,
-      skills,
-      categories,
-      useTaskSystem,
-    );
-    return {
-      description:
-        "Powerful AI orchestrator. Plans obsessively with todos, assesses search complexity before exploration, delegates strategically via category+skills combinations. Uses explore for internal code (parallel-friendly), librarian for external docs. (Sisyphus - OhMyOpenCode)",
-      mode: MODE,
-      model,
-      maxTokens: 64000,
-      prompt,
-      color: "#00CED1",
-      permission: {
-        question: "allow",
-        call_omo_agent: "deny",
-        ...getFrontierToolSchemaPermission(model),
-        ...getGptApplyPatchPermission(model),
-      } as AgentConfig["permission"],
-    };
-  }
 
   if (isGpt5_5Model(model)) {
     const prompt = buildGpt55SisyphusPrompt(
@@ -658,6 +633,21 @@ export function createSisyphusAgent(
     );
   }
 
+  if (isGlmSisyphusHarnessModel(model)) {
+    // 1. Working Memory - after Role to provide lightweight state convention
+    //    prevents premature compaction by giving GLM on-demand context slices
+    prompt = prompt.replace(
+      "</Role>",
+      `</Role>\n\n${buildGlmWorkingMemory()}`
+    );
+
+    // 2. Vision constraint - in Phase 0 Step 3 (delegation check area)
+    prompt = prompt.replace(
+      "**Default Bias: DELEGATE. WORK YOURSELF ONLY WHEN IT IS SUPER SIMPLE.**",
+      `**Default Bias: DELEGATE. WORK YOURSELF ONLY WHEN IT IS SUPER SIMPLE.**\n\n${buildGlmVisionConstraint()}`
+    );
+  }
+
   const permission = {
     question: "allow",
     call_omo_agent: "deny",
@@ -677,6 +667,12 @@ export function createSisyphusAgent(
 
   if (isGptModel(model)) {
     return { ...base, reasoningEffort: "medium" };
+  }
+
+  if (isGlmSisyphusHarnessModel(model)) {
+    // GLM-5.x supports thinking: { type: "enabled" } natively (Z.AI docs).
+    // GLM does not support budgetTokens. Set explicitly for cross-provider consistency.
+    return { ...base, thinking: { type: "enabled" } };
   }
 
   return { ...base, thinking: { type: "enabled", budgetTokens: 32000 } };

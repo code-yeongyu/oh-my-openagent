@@ -169,7 +169,7 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
       expect(result.thinking).toEqual({ type: "enabled", budgetTokens: 32000 })
     })
 
-    test("#given GLM reasoning model #when agent is created #then skips injected thinking", () => {
+    test("#given GLM reasoning model #when agent is created #then uses GLM-native thinking", () => {
       // given
       const override = { model: "z-ai/glm-5" }
 
@@ -178,7 +178,7 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
 
       // then
       expect(result.reasoningEffort).toBeUndefined()
-      expect(result.thinking).toBeUndefined()
+      expect(result.thinking).toEqual({ type: "enabled" })
     })
   })
 

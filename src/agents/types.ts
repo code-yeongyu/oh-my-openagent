@@ -130,6 +130,21 @@ export function isGlmModel(model: string): boolean {
   return modelName.includes("glm");
 }
 
+/** Matches GLM VLM variants (e.g., glm-4.6v, glm-5v, glm-5v-turbo). */
+const GLM_VISION_MODEL_RE = /glm[\d.-]+v/
+export function isGlmVisionModel(model: string): boolean {
+  const modelName = extractModelName(model).toLowerCase();
+  return modelName.includes("glm") && GLM_VISION_MODEL_RE.test(modelName);
+}
+
+/** Matches GLM-5+ text-only models that support extended thinking.
+ *  Excludes VLM variants (glm-5v-turbo, glm-4.6v) which may not support thinking.
+ */
+export function isGlmThinkingModel(model: string): boolean {
+  const modelName = extractModelName(model).toLowerCase();
+  return isGlmModel(model) && !isGlmVisionModel(model) && /^glm[-]?5/.test(modelName);
+}
+
 const GLM_SISYPHUS_HARNESS_RE =
   /^(?:glm-5|glm-5[.-]1(?::thinking)?|glm5[.-]1(?::thinking)?|glm-5-turbo|glm5-turbo|glm-5v-turbo|glm5v-turbo)$/;
 
