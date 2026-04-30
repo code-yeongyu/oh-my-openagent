@@ -1,12 +1,12 @@
 name: Bug Report
-description: Report a bug or unexpected behavior in oh-my-opencode
+description: Report a bug or unexpected behavior in oh-my-openagent
 title: "[Bug]: "
 labels: ["bug", "needs-triage"]
 body:
   - type: markdown
     attributes:
       value: |
-        **Please write your issue in English.** See our [Language Policy](https://github.com/code-yeongyu/oh-my-opencode/blob/dev/CONTRIBUTING.md#language-policy) for details.
+        **Please write your issue in English.** See our [Language Policy](https://github.com/code-yeongyu/oh-my-openagent/blob/dev/CONTRIBUTING.md#language-policy) for details.
 
   - type: checkboxes
     id: prerequisites
@@ -14,13 +14,13 @@ body:
       label: Prerequisites
       description: Please confirm the following before submitting
       options:
-        - label: I will write this issue in English (see our [Language Policy](https://github.com/code-yeongyu/oh-my-opencode/blob/dev/CONTRIBUTING.md#language-policy))
+        - label: I will write this issue in English (see our [Language Policy](https://github.com/code-yeongyu/oh-my-openagent/blob/dev/CONTRIBUTING.md#language-policy))
           required: true
         - label: I have searched existing issues to avoid duplicates
           required: true
-        - label: I am using the latest version of oh-my-opencode
-          required: true
-        - label: I have read the [documentation](https://github.com/code-yeongyu/oh-my-opencode#readme) or asked an AI coding agent with this project's GitHub URL loaded and couldn't find the answer
+        - label: I am using the latest version of oh-my-openagent
+          required: false
+        - label: I have read the [documentation](https://github.com/code-yeongyu/oh-my-openagent#readme) or asked an AI coding agent with this project's GitHub URL loaded and couldn't find the answer
           required: true
 
   - type: textarea
@@ -38,7 +38,7 @@ body:
       label: Steps to Reproduce
       description: Steps to reproduce the behavior
       placeholder: |
-        1. Configure oh-my-opencode with...
+        1. Configure oh-my-openagent with...
         2. Run command '...'
         3. See error...
     validations:
@@ -67,14 +67,14 @@ body:
     attributes:
       label: Doctor Output
       description: |
-        **Required:** Run `bunx oh-my-opencode doctor` and paste the full output below.
+        **Required:** Run `bunx oh-my-openagent doctor` and paste the full output below.
         This helps us diagnose your environment and configuration.
       placeholder: |
-        Paste the output of: bunx oh-my-opencode doctor
+        Paste the output of: bunx oh-my-openagent doctor
         
         Example:
         ✓ OpenCode version: 1.0.150
-        ✓ oh-my-opencode version: 1.2.3
+        ✓ oh-my-openagent version: 1.2.3
         ✓ Plugin loaded successfully
         ...
       render: shell
@@ -93,7 +93,7 @@ body:
     id: config
     attributes:
       label: Configuration
-      description: If relevant, share your oh-my-opencode configuration (remove sensitive data)
+      description: If relevant, share your oh-my-openagent configuration (remove sensitive data)
       placeholder: |
         {
           "agents": { ... },
