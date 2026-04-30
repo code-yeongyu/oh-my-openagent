@@ -17,8 +17,6 @@ import { createMomusAgent } from "./momus"
 import { createSisyphusAgent } from "./sisyphus"
 import { createSisyphusJuniorAgentWithOverrides as createSisyphusJuniorAgent } from "./sisyphus-junior/agent"
 
-// --- Model IDs to test (with provider prefixes as they appear at runtime) ---
-
 const GLM_TEXT_MODELS = [
   "z-ai/glm-5",
   "opencode/glm-5",
@@ -46,20 +44,16 @@ const GPT_MODELS = [
   "openai/gpt-5.5",
 ] as const
 
-// --- Helper ---
-
 function hasBudgetTokens(thinking: unknown): boolean {
   return typeof thinking === "object"
     && thinking !== null
     && "budgetTokens" in (thinking as Record<string, unknown>)
 }
 
-// === Benchmark: Sisyphus ===
-
 describe("GLM Thinking Benchmark: Sisyphus", () => {
   for (const model of GLM_TEXT_MODELS) {
     test(`#given ${model} #then thinking enabled without budgetTokens`, () => {
-      const config = createSisyphusAgent(model as string)
+      const config = createSisyphusAgent(model)
       expect(config.thinking).toEqual({ type: "enabled" })
       expect(hasBudgetTokens(config.thinking)).toBe(false)
     })
@@ -67,22 +61,20 @@ describe("GLM Thinking Benchmark: Sisyphus", () => {
 
   for (const model of CLAUDE_MODELS) {
     test(`#given ${model} #then thinking enabled with budgetTokens`, () => {
-      const config = createSisyphusAgent(model as string)
+      const config = createSisyphusAgent(model)
       expect(config.thinking).toBeDefined()
-      expect((config.thinking as Record<string, unknown>)?.type).toBe("enabled")
+      expect((config.thinking as Record<string, unknown>).type).toBe("enabled")
       expect(hasBudgetTokens(config.thinking)).toBe(true)
     })
   }
 
   for (const model of GPT_MODELS) {
     test(`#given ${model} #then uses reasoningEffort not thinking`, () => {
-      const config = createSisyphusAgent(model as string)
+      const config = createSisyphusAgent(model)
       expect(config.reasoningEffort).toBeDefined()
     })
   }
 })
-
-// === Benchmark: Sisyphus-Junior ===
 
 describe("GLM Thinking Benchmark: Sisyphus-Junior", () => {
   for (const model of GLM_TEXT_MODELS) {
@@ -108,8 +100,6 @@ describe("GLM Thinking Benchmark: Sisyphus-Junior", () => {
     })
   }
 })
-
-// === Benchmark: Oracle ===
 
 describe("GLM Thinking Benchmark: Oracle", () => {
   for (const model of GLM_TEXT_MODELS) {
@@ -145,8 +135,6 @@ describe("GLM Thinking Benchmark: Oracle", () => {
   }
 })
 
-// === Benchmark: Metis ===
-
 describe("GLM Thinking Benchmark: Metis", () => {
   for (const model of GLM_TEXT_MODELS) {
     test(`#given ${model} #then thinking enabled without budgetTokens`, () => {
@@ -172,8 +160,6 @@ describe("GLM Thinking Benchmark: Metis", () => {
     })
   }
 })
-
-// === Benchmark: Momus ===
 
 describe("GLM Thinking Benchmark: Momus", () => {
   for (const model of GLM_TEXT_MODELS) {
@@ -207,8 +193,6 @@ describe("GLM Thinking Benchmark: Momus", () => {
     })
   }
 })
-
-// === Summary: No GLM text model should ever receive budgetTokens ===
 
 describe("GLM Thinking Benchmark: Cross-agent budgetTokens guard", () => {
   const agentFactories = [
