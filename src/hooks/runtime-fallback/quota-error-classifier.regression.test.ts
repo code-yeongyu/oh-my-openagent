@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test"
 import { classifyErrorType, isRetryableError } from "./error-classifier"
 
 describe("runtime-fallback quota error regressions", () => {
-  test("classifies subscription quota errors as quota_exceeded and stops retry", () => {
+  test("classifies subscription quota errors as quota_exceeded and triggers fallback", () => {
     //#given
     const error = {
       name: "AI_APICallError",
@@ -16,10 +16,11 @@ describe("runtime-fallback quota error regressions", () => {
 
     //#then
     expect(errorType).toBe("quota_exceeded")
-    expect(retryable).toBe(false)
+    // quota exhaustion should trigger fallback to the next model
+    expect(retryable).toBe(true)
   })
 
-  test("treats HTTP 402 payment required as non-retryable", () => {
+  test("treats HTTP 402 payment required as fallback-eligible", () => {
     //#given
     const error = { statusCode: 402, message: "Payment Required" }
 
@@ -27,7 +28,8 @@ describe("runtime-fallback quota error regressions", () => {
     const retryable = isRetryableError(error, [429, 500, 502, 503, 504])
 
     //#then
-    expect(retryable).toBe(false)
+    // payment failure triggers fallback to a different provider/model
+    expect(retryable).toBe(true)
   })
 
   test("keeps HTTP 429 rate limit retryable", () => {
@@ -41,7 +43,7 @@ describe("runtime-fallback quota error regressions", () => {
     expect(retryable).toBe(true)
   })
 
-  test("classifies quota error names as quota_exceeded without retry", () => {
+  test("classifies quota error names as quota_exceeded and triggers fallback", () => {
     //#given
     const error = { name: "QuotaExceededError", message: "Request failed." }
 
@@ -51,6 +53,7 @@ describe("runtime-fallback quota error regressions", () => {
 
     //#then
     expect(errorType).toBe("quota_exceeded")
-    expect(retryable).toBe(false)
+    // quota errors trigger fallback to next configured model
+    expect(retryable).toBe(true)
   })
 })

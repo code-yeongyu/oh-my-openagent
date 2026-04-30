@@ -1,4 +1,5 @@
 import type { OhMyOpenCodeConfig } from "../config";
+import type { PluginInput } from "@opencode-ai/plugin";
 import type { PluginContext } from "./types";
 
 import {
@@ -26,6 +27,7 @@ import {
 import { resetMessageCursor } from "../shared";
 import { getAgentConfigKey } from "../shared/agent-display-names";
 import { readConnectedProvidersCache } from "../shared/connected-providers-cache";
+import { invalidateContextWindowUsageCache } from "../shared/dynamic-truncator";
 import { log } from "../shared/logger";
 import { shouldRetryError } from "../shared/model-error-classifier";
 import { buildFallbackChainFromModels } from "../shared/fallback-chain-from-models";
@@ -63,18 +65,17 @@ function extractErrorName(error: unknown): string | undefined {
   return undefined;
 }
 
-function extractErrorMessage(error: unknown): string {
+export function extractErrorMessage(error: unknown): string {
   if (!error) return "";
   if (typeof error === "string") return error;
-  if (error instanceof Error) return error.message;
 
   if (isRecord(error)) {
     const candidates: unknown[] = [
-      error,
       error.data,
-      error.error,
       isRecord(error.data) ? error.data.error : undefined,
+      error.error,
       error.cause,
+      error,
     ];
 
     for (const candidate of candidates) {
@@ -83,6 +84,8 @@ function extractErrorMessage(error: unknown): string {
       }
     }
   }
+
+  if (error instanceof Error) return error.message;
 
   try {
     return JSON.stringify(error);
@@ -160,8 +163,7 @@ export function createEventHandler(args: {
           body: { parts: Array<{ type: "text"; text: string }> };
           query: { directory: string };
         }) => Promise<unknown>;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        summarize: (...args: any[]) => Promise<unknown>;
+        summarize: (...args: unknown[]) => Promise<unknown>;
       };
     };
   };
@@ -475,6 +477,9 @@ export function createEventHandler(args: {
       const sessionID = info?.sessionID as string | undefined;
       const agent = info?.agent as string | undefined;
       const role = info?.role as string | undefined;
+      if (sessionID && info?.finish === true) {
+        invalidateContextWindowUsageCache(pluginContext as PluginInput, sessionID);
+      }
       if (sessionID && role === "user") {
         const isCompactionMessage = agent ? isCompactionAgent(agent) : false;
         if (agent && !isCompactionMessage) {

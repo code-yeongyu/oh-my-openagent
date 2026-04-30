@@ -1,4 +1,5 @@
 import type { BackgroundTask } from "../../features/background-agent"
+import { extractErrorMessage } from "../../features/background-agent/error-classifier"
 import { consumeNewMessages } from "../../shared/session-cursor"
 import type { BackgroundOutputClient, BackgroundOutputMessagesResult } from "./clients"
 import { extractMessages, getErrorMessage } from "./session-messages"
@@ -55,6 +56,23 @@ Session ID: ${task.sessionID}
     const timeB = getTimeString(b.info?.time)
     return timeA.localeCompare(timeB)
   })
+
+  const sessionError = sortedMessages
+    .filter((message) => message.info?.role === "assistant" && message.info?.error)
+    .map((message) => extractErrorMessage(message.info?.error))
+    .find((message): message is string => typeof message === "string" && message.length > 0)
+  if (sessionError) {
+    return `Task Result
+
+Task ID: ${task.id}
+Description: ${task.description}
+Duration: ${formatDuration(task.startedAt ?? new Date(), task.completedAt)}
+Session ID: ${task.sessionID}
+
+---
+
+Session error: ${sessionError}`
+  }
 
   const newMessages = consumeNewMessages(task.sessionID, sortedMessages)
   if (newMessages.length === 0) {

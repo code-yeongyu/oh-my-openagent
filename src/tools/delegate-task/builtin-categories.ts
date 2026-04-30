@@ -31,3 +31,9 @@ export const CATEGORY_PROMPT_APPENDS: Record<string, string> = buildCategoryReco
 export const CATEGORY_DESCRIPTIONS: Record<string, string> = buildCategoryRecord(
   (definition) => definition.description
 )
+
+export const CATEGORY_PROMPT_APPEND_RESOLVERS: Record<string, (model: string | undefined) => string> = Object.fromEntries(
+  BUILTIN_CATEGORIES
+    .filter((definition) => definition.resolvePromptAppend !== undefined)
+    .map((definition) => [definition.name, definition.resolvePromptAppend!]),
+)

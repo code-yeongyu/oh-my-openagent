@@ -16,7 +16,7 @@ We collect limited non-personal information needed to operate and improve the Se
 
 When anonymous telemetry is enabled, the Application may collect:
 
-- Anonymous usage events, including `run_started`, `run_completed`, `run_failed`, `install_completed`, `install_failed`, `plugin_loaded`, `omo_daily_active`, and `omo_hourly_active`
+- Anonymous usage events, including `run_started`, `run_completed`, `run_failed`, `install_completed`, `install_failed`, `plugin_loaded`, and `omo_daily_active`
 - Application metadata such as package version, plugin name, runtime, and command or entry-point context
 - Error diagnostics captured during failed CLI runs
 - A pseudonymous installation identifier derived from a one-way hash of the local hostname
@@ -25,7 +25,7 @@ We do not intentionally collect prompt contents, source files, repository conten
 
 ### Configuration and local state
 
-The Application stores local configuration and telemetry deduplication state on your machine to support installation, configuration, and anonymous daily or hourly active tracking.
+The Application stores local configuration and telemetry deduplication state on your machine to support installation, configuration, and anonymous daily active tracking.
 
 ## 2. How Telemetry Works
 

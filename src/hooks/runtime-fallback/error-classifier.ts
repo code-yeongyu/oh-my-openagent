@@ -127,7 +127,7 @@ export function classifyErrorType(error: unknown): string | undefined {
     errorName?.includes("billingerror") ||
     /quota.?exceeded/i.test(message) ||
     /subscription.*quota/i.test(message) ||
-    /insufficient.?quota/i.test(message) ||
+    /insufficient.?(?:quota|balance|funds?)/i.test(message) ||
     /billing.?(?:hard.?)?limit/i.test(message) ||
     /exhausted\s+your\s+capacity/i.test(message) ||
     /out\s+of\s+credits?/i.test(message) ||
@@ -169,10 +169,9 @@ export function isRetryableError(error: unknown, retryOnErrors: number[]): boole
   }
 
   if (errorType === "quota_exceeded") {
-    // When a provider signals an auto-retry (e.g. "retrying in ~2 weeks"),
-    // we should still trigger fallback to another model rather than STOP.
-    const hasAutoRetrySignal = /retrying\s+in/i.test(message)
-    return hasAutoRetrySignal
+    // Quota exhaustion means the current model/provider cannot serve requests.
+    // Trigger fallback to the next configured model instead of stopping entirely.
+    return true
   }
 
   if (statusCode && retryOnErrors.includes(statusCode)) {

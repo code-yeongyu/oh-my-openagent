@@ -65,9 +65,76 @@ jobs:
       - name: Type check
         run: bun run typecheck
 
+  preflight-trust:
+    runs-on: ubuntu-latest
+    if: github.repository == 'code-yeongyu/oh-my-openagent'
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Verify trusted publisher for all 24 packages
+        env:
+          REPO: code-yeongyu/oh-my-openagent
+          WORKFLOW_FILE: publish.yml
+        run: |
+          OIDC_TOKEN=$(curl -sH "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=npm:registry.npmjs.org" \
+            | jq -r '.value // empty')
+
+          if [ -z "${OIDC_TOKEN}" ]; then
+            echo "::error::Failed to acquire GitHub OIDC token"
+            exit 1
+          fi
+
+          PLATFORMS=(darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline)
+          ALL_PACKAGES=(oh-my-opencode oh-my-openagent)
+          for plat in "${PLATFORMS[@]}"; do
+            ALL_PACKAGES+=("oh-my-opencode-${plat}")
+            ALL_PACKAGES+=("oh-my-openagent-${plat}")
+          done
+
+          FAILED=()
+          for pkg in "${ALL_PACKAGES[@]}"; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+              -X POST \
+              "https://registry.npmjs.org/-/npm/v1/oidc/token/exchange/package/${pkg}" \
+              -H "Authorization: Bearer ${OIDC_TOKEN}" \
+              -H "Content-Type: application/json" \
+              -d '{}')
+
+            # npm returns 200 or 201 when trusted publisher is configured (token issued).
+            # 404 means the package has no trusted publisher mapping for this workflow.
+            if [ "${STATUS}" -ge 200 ] && [ "${STATUS}" -lt 300 ]; then
+              echo "OK   ${pkg}"
+            else
+              echo "FAIL ${pkg} (HTTP ${STATUS})"
+              FAILED+=("${pkg}")
+            fi
+          done
+
+          if [ ${#FAILED[@]} -gt 0 ]; then
+            {
+              echo
+              echo "::error::Trusted publisher not configured for ${#FAILED[@]} package(s)."
+              echo "::error::Configure each below at the URL with these values:"
+              echo "::error::  Provider: GitHub Actions"
+              echo "::error::  Organization: code-yeongyu"
+              echo "::error::  Repository: ${REPO}"
+              echo "::error::  Workflow filename: ${WORKFLOW_FILE}"
+              echo
+              for pkg in "${FAILED[@]}"; do
+                echo "::error::  https://www.npmjs.com/package/${pkg}/access"
+              done
+            } >&2
+            exit 1
+          fi
+
+          echo
+          echo "All ${#ALL_PACKAGES[@]} packages have trusted publisher configured."
+
   publish-main:
     runs-on: ubuntu-latest
-    needs: [test, typecheck]
+    needs: [test, typecheck, preflight-trust]
     if: github.repository == 'code-yeongyu/oh-my-openagent'
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -83,10 +150,13 @@ jobs:
         with:
           bun-version: "1.3.11"
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
+
+      - name: Upgrade npm for trusted publishing (>=11.5.1)
+        run: npm install -g npm@latest
 
       - name: Install dependencies
         run: bun install
@@ -166,17 +236,27 @@ jobs:
           bunx tsc --emitDeclarationOnly
           bun run build:schema
 
+      - name: Strip token auth from .npmrc to force OIDC
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          for f in .npmrc "$HOME/.npmrc"; do
+            if [ -f "$f" ]; then
+              sed -i.bak '/_authToken/d' "$f"
+              rm -f "$f.bak"
+              echo "Cleaned $f"
+            fi
+          done
+
       - name: Publish oh-my-opencode
         if: steps.check.outputs.skip != 'true'
         env:
           DIST_TAG: ${{ steps.version.outputs.dist_tag }}
-          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
         run: |
           if [ -n "$DIST_TAG" ]; then
-            npm publish --access public --provenance --tag "$DIST_TAG"
+            npm publish --access public --provenance --tag "$DIST_TAG" --loglevel verbose
           else
-            npm publish --access public --provenance
+            npm publish --access public --provenance --loglevel verbose
           fi
 
       - name: Check if oh-my-openagent already published
@@ -197,7 +277,6 @@ jobs:
         env:
           VERSION: ${{ steps.version.outputs.version }}
           DIST_TAG: ${{ steps.version.outputs.dist_tag }}
-          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
         run: |
           # Update package name, version, and optionalDependencies for oh-my-openagent
@@ -212,9 +291,9 @@ jobs:
           ' package.json > tmp.json && mv tmp.json package.json
 
           if [ -n "$DIST_TAG" ]; then
-            npm publish --access public --provenance --tag "$DIST_TAG"
+            npm publish --access public --provenance --tag "$DIST_TAG" --loglevel verbose
           else
-            npm publish --access public --provenance
+            npm publish --access public --provenance --loglevel verbose
           fi
 
       - name: Restore package.json

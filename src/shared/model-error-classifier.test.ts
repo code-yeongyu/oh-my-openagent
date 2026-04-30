@@ -237,6 +237,39 @@ describe("model-error-classifier", () => {
     //#then
     expect(result).toBe(true)
   })
+
+  test("treats forbidden provider message as retryable", () => {
+    //#given
+    const error = { message: "Forbidden: Selected provider is forbidden" }
+
+    //#when
+    const result = shouldRetryError(error)
+
+    //#then
+    expect(result).toBe(true)
+  })
+
+  test("does not treat unrelated forbidden messages as retryable", () => {
+    //#given
+    const error = { message: "EACCES: forbidden write to /etc/hosts" }
+
+    //#when
+    const result = shouldRetryError(error)
+
+    //#then
+    expect(result).toBe(false)
+  })
+
+  test("does not treat unrelated 403 messages as retryable", () => {
+    //#given
+    const error = { message: "Tool returned HTTP 403 for the requested URL" }
+
+    //#when
+    const result = shouldRetryError(error)
+
+    //#then
+    expect(result).toBe(false)
+  })
 })
 
 export {}
