@@ -488,19 +488,19 @@ describe("createEventHandler - idle deduplication", () => {
 	it("both maps pruned on every event", async () => {
 		//#given
 		const eventHandler = createEventHandler({
-			ctx: {} as any,
-			pluginConfig: {} as any,
+			ctx: asEventHandlerContext({}),
+			pluginConfig: asPluginConfig({}),
 			firstMessageVariantGate: {
 				markSessionCreated: () => {},
 				clear: () => {},
 			},
-			managers: {
+			managers: createEventHandlerManagers({
 				tmuxSessionManager: {
 					onSessionCreated: async () => {},
 					onSessionDeleted: async () => {},
 				},
-			} as any,
-			hooks: {
+			}),
+			hooks: createEventHandlerHooks({
 				autoUpdateChecker: { event: async () => {} },
 				claudeCodeHooks: { event: async () => {} },
 				backgroundNotificationHook: { event: async () => {} },
@@ -520,7 +520,7 @@ describe("createEventHandler - idle deduplication", () => {
 				stopContinuationGuard: { event: async () => {} },
 				compactionTodoPreserver: { event: async () => {} },
 				atlasHook: { handler: async () => {} },
-			} as any,
+			}),
 		})
 
 		await eventHandler({
@@ -562,26 +562,26 @@ describe("createEventHandler - idle deduplication", () => {
 		})
 		await wait(600)
 
-		await eventHandler({
+		await eventHandler(asEventHandlerInput({
 			event: {
 				type: "message.updated",
 			},
-		} as any)
+		}))
 		const dispatchCalls: EventInput[] = []
 		const eventHandlerWithMock = createEventHandler({
-			ctx: {} as any,
-			pluginConfig: {} as any,
+			ctx: asEventHandlerContext({}),
+			pluginConfig: asPluginConfig({}),
 			firstMessageVariantGate: {
 				markSessionCreated: () => {},
 				clear: () => {},
 			},
-			managers: {
+			managers: createEventHandlerManagers({
 				tmuxSessionManager: {
 					onSessionCreated: async () => {},
 					onSessionDeleted: async () => {},
 				},
-			} as any,
-			hooks: {
+			}),
+			hooks: createEventHandlerHooks({
 				autoUpdateChecker: {
 					event: async (input: EventInput) => {
 						dispatchCalls.push(input)
@@ -605,7 +605,7 @@ describe("createEventHandler - idle deduplication", () => {
 				stopContinuationGuard: { event: async () => {} },
 				compactionTodoPreserver: { event: async () => {} },
 				atlasHook: { handler: async () => {} },
-			} as any,
+			}),
 		})
 
 		await eventHandlerWithMock({
@@ -624,19 +624,19 @@ describe("createEventHandler - idle deduplication", () => {
 	it("dispatches both idle events once the dedup window expires", async () => {
 		const dispatchCalls: EventInput[] = []
 		const eventHandler = createEventHandler({
-			ctx: {} as any,
-			pluginConfig: {} as any,
+			ctx: asEventHandlerContext({}),
+			pluginConfig: asPluginConfig({}),
 			firstMessageVariantGate: {
 				markSessionCreated: () => {},
 				clear: () => {},
 			},
-			managers: {
+			managers: createEventHandlerManagers({
 				tmuxSessionManager: {
 					onSessionCreated: async () => {},
 					onSessionDeleted: async () => {},
 				},
-			} as any,
-			hooks: {
+			}),
+			hooks: createEventHandlerHooks({
 				autoUpdateChecker: {
 					event: async (input: EventInput) => {
 						if (input.event.type === "session.idle") {
@@ -662,7 +662,7 @@ describe("createEventHandler - idle deduplication", () => {
 				stopContinuationGuard: { event: async () => {} },
 				compactionTodoPreserver: { event: async () => {} },
 				atlasHook: { handler: async () => {} },
-			} as any,
+			}),
 		})
 
 		const sessionId = "ses_outside_window"
