@@ -51,6 +51,14 @@ function resolveSystemContent(input: {
   }) ?? ""
 }
 
+// Strip global `agents.sisyphus-junior.model` override at the team-mode boundary —
+// `resolveCategoryExecution` ranks it above category defaults (correct for plain
+// `task(category=…)`, wrong here) and would collapse every team member to the same model.
+function withoutSisyphusJuniorOverride(ctx: ExecutorContext): ExecutorContext {
+  if (ctx.sisyphusJuniorModel === undefined) return ctx
+  return { ...ctx, sisyphusJuniorModel: undefined }
+}
+
 export async function resolveMember(
   member: Member,
   ctx: ExecutorContext,
@@ -65,7 +73,7 @@ export async function resolveMember(
           category: member.category,
           subagent_type: "sisyphus-junior",
         },
-        ctx,
+        withoutSisyphusJuniorOverride(ctx),
         undefined,
         undefined,
       )

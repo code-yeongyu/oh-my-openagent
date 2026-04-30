@@ -75,6 +75,36 @@ describe("resolveMember", () => {
     expect(result.systemContent).toBe("resolved-system-content")
   })
 
+  test("strips sisyphusJuniorModel before resolving category members so each declared category keeps its own model", async () => {
+    // given
+    const member = {
+      backendType: "in-process",
+      isActive: true,
+      kind: "category",
+      name: "architect",
+      category: "ultrabrain",
+      prompt: "design X",
+    } satisfies Member
+    const ctxWithJuniorOverride: ExecutorContext = {
+      ...createExecutorContext(),
+      sisyphusJuniorModel: "anthropic/claude-sonnet-4-6",
+    }
+    resolveCategoryExecutionMock.mockResolvedValue({
+      agentToUse: "sisyphus-junior",
+      categoryModel: { providerID: "openai", modelID: "gpt-5.5", variant: "xhigh" },
+      categoryPromptAppend: "appendix",
+      maxPromptTokens: 256,
+      fallbackChain: [],
+    })
+
+    // when
+    await resolveMember(member, ctxWithJuniorOverride, "ultrabrain, deep")
+
+    // then
+    const [, executorCtxArg] = resolveCategoryExecutionMock.mock.calls[0]
+    expect(executorCtxArg.sisyphusJuniorModel).toBeUndefined()
+  })
+
   test("routes subagent members through resolveSubagentExecution", async () => {
     // given
     const member = {
