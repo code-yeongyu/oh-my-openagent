@@ -102,7 +102,9 @@ jobs:
               -H "Content-Type: application/json" \
               -d '{}')
 
-            if [ "${STATUS}" = "200" ]; then
+            # npm returns 200 or 201 when trusted publisher is configured (token issued).
+            # 404 means the package has no trusted publisher mapping for this workflow.
+            if [ "${STATUS}" -ge 200 ] && [ "${STATUS}" -lt 300 ]; then
               echo "OK   ${pkg}"
             else
               echo "FAIL ${pkg} (HTTP ${STATUS})"
