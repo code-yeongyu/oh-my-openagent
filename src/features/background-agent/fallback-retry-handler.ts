@@ -11,6 +11,11 @@ import {
 } from "../../shared/model-error-classifier"
 import { transformModelForProvider } from "../../shared/provider-model-id-transform"
 import { abortWithTimeout } from "./abort-with-timeout"
+import { ensureCurrentAttempt, scheduleRetryAttempt } from "./attempt-lifecycle"
+
+function canonicalizeModelID(modelID: string): string {
+  return modelID.toLowerCase().replace(/\./g, "-")
+}
 
 export async function tryFallbackRetry(args: {
   task: BackgroundTask
@@ -21,8 +26,16 @@ export async function tryFallbackRetry(args: {
   idleDeferralTimers: Map<string, ReturnType<typeof setTimeout>>
   queuesByKey: Map<string, QueueItem[]>
   processKey: (key: string) => void
+  onRetrying?: (details: {
+    task: BackgroundTask
+    source: string
+    previousSessionID?: string
+    failedModel?: string
+    failedError?: string
+    nextModel: string
+  }) => void
 }): Promise<boolean> {
-  const { task, errorInfo, source, concurrencyManager, client, idleDeferralTimers, queuesByKey, processKey } = args
+  const { task, errorInfo, source, concurrencyManager, client, idleDeferralTimers, queuesByKey, processKey, onRetrying } = args
   const fallbackChain = task.fallbackChain
   const canRetry =
     shouldRetryError(errorInfo) &&
@@ -48,6 +61,7 @@ export async function tryFallbackRetry(args: {
 
   let selectedAttemptCount = attemptCount
   let nextFallback: FallbackEntry | undefined
+  let nextProviderID: string | undefined
   while (fallbackChain && selectedAttemptCount < fallbackChain.length) {
     const candidate = getNextFallback(fallbackChain, selectedAttemptCount)
     if (!candidate) break
@@ -61,12 +75,31 @@ export async function tryFallbackRetry(args: {
       })
       continue
     }
+    const candidateProviderID = selectFallbackProvider(
+      candidate.providers,
+      task.model?.providerID,
+    )
+    const candidateModelID = transformModelForProvider(candidateProviderID, candidate.model)
+    const isNoOpFallback =
+      !!task.model &&
+      candidateProviderID.toLowerCase() === task.model.providerID.toLowerCase() &&
+      canonicalizeModelID(candidateModelID) === canonicalizeModelID(task.model.modelID)
+    if (isNoOpFallback) {
+      log("[background-agent] Skipping no-op fallback:", {
+        taskId: task.id,
+        source,
+        model: candidate.model,
+        providers: candidate.providers,
+      })
+      continue
+    }
     nextFallback = candidate
+    nextProviderID = candidateProviderID
     break
   }
   if (!nextFallback) return false
 
-  const providerID = selectFallbackProvider(
+  const providerID = nextProviderID ?? selectFallbackProvider(
     nextFallback.providers,
     task.model?.providerID,
   )
@@ -92,19 +125,39 @@ export async function tryFallbackRetry(args: {
   }
 
   const previousSessionID = task.sessionID
+  const previousModel = task.model
 
-  task.attemptCount = selectedAttemptCount
   const transformedModelId = transformModelForProvider(providerID, nextFallback.model)
-  task.model = {
+  const nextModel = {
     providerID,
     modelID: transformedModelId,
     variant: nextFallback.variant,
   }
-  task.status = "pending"
-  task.sessionID = undefined
-  task.startedAt = undefined
+  task.attemptCount = selectedAttemptCount
+  const failedAttemptID = ensureCurrentAttempt(task, previousModel).attemptID
+  const nextAttempt = failedAttemptID
+    ? scheduleRetryAttempt(task, failedAttemptID, nextModel, errorInfo.message)
+    : undefined
+  if (!nextAttempt) {
+    return false
+  }
+
   task.queuedAt = new Date()
-  task.error = undefined
+  task.retryNotification = {
+    previousSessionID,
+    failedModel: previousModel ? `${previousModel.providerID}/${previousModel.modelID}` : undefined,
+    failedError: errorInfo.message,
+    nextModel: `${providerID}/${transformedModelId}`,
+  }
+
+  onRetrying?.({
+    task,
+    source,
+    previousSessionID,
+    failedModel: task.retryNotification.failedModel,
+    failedError: errorInfo.message,
+    nextModel: `${providerID}/${transformedModelId}`,
+  })
 
   const key = task.model ? `${task.model.providerID}/${task.model.modelID}` : task.agent
   const queue = queuesByKey.get(key) ?? []
@@ -117,7 +170,7 @@ export async function tryFallbackRetry(args: {
     parentModel: task.parentModel,
     parentAgent: task.parentAgent,
     parentTools: task.parentTools,
-    model: task.model,
+    model: nextModel,
     fallbackChain: task.fallbackChain,
     category: task.category,
     isUnstableAgent: task.isUnstableAgent,
@@ -127,7 +180,7 @@ export async function tryFallbackRetry(args: {
     await abortWithTimeout(client, previousSessionID).catch(() => {})
   }
 
-  queue.push({ task, input: retryInput })
+  queue.push({ task, input: retryInput, attemptID: nextAttempt.attemptID })
   queuesByKey.set(key, queue)
   processKey(key)
   return true

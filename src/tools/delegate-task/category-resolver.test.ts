@@ -512,4 +512,114 @@ describe("resolveCategoryExecution", () => {
 		})
 		expect(result.fallbackChain).toBeUndefined()
 	})
+
+	test("uses GPT-5.5 deep prompt append when category model resolves to gpt-5.5", async () => {
+		//#given
+		const args = {
+			category: "deep",
+			prompt: "test prompt",
+			description: "Test task",
+			run_in_background: false,
+			load_skills: [],
+			blockedBy: undefined,
+			enableSkillTools: false,
+		}
+		const executorCtx = createMockExecutorContext()
+		executorCtx.userCategories = {
+			deep: { model: "openai/gpt-5.5", variant: "medium" },
+		}
+
+		//#when
+		const result = await resolveCategoryExecution(args, executorCtx, undefined, "anthropic/claude-sonnet-4-6")
+
+		//#then
+		expect(result.error).toBeUndefined()
+		expect(result.actualModel).toBe("openai/gpt-5.5")
+		expect(result.categoryPromptAppend).toBeDefined()
+		expect(result.categoryPromptAppend).toContain("operating in DEEP mode")
+		expect(result.categoryPromptAppend).toContain("five to fifteen minutes")
+	})
+
+	test("uses legacy deep prompt append when category model resolves to gpt-5.4", async () => {
+		//#given
+		const args = {
+			category: "deep",
+			prompt: "test prompt",
+			description: "Test task",
+			run_in_background: false,
+			load_skills: [],
+			blockedBy: undefined,
+			enableSkillTools: false,
+		}
+		const executorCtx = createMockExecutorContext()
+		executorCtx.userCategories = {
+			deep: { model: "openai/gpt-5.4" },
+		}
+
+		//#when
+		const result = await resolveCategoryExecution(args, executorCtx, undefined, "anthropic/claude-sonnet-4-6")
+
+		//#then
+		expect(result.error).toBeUndefined()
+		expect(result.actualModel).toBe("openai/gpt-5.4")
+		expect(result.categoryPromptAppend).toBeDefined()
+		expect(result.categoryPromptAppend).toContain("GOAL-ORIENTED AUTONOMOUS")
+		expect(result.categoryPromptAppend).not.toContain("operating in DEEP mode")
+	})
+
+	test("appends user prompt_append to GPT-5.5 deep base prompt", async () => {
+		//#given
+		const args = {
+			category: "deep",
+			prompt: "test prompt",
+			description: "Test task",
+			run_in_background: false,
+			load_skills: [],
+			blockedBy: undefined,
+			enableSkillTools: false,
+		}
+		const executorCtx = createMockExecutorContext()
+		executorCtx.userCategories = {
+			deep: {
+				model: "openai/gpt-5.5",
+				prompt_append: "USER_CUSTOM_INSTRUCTION_XYZ",
+			},
+		}
+
+		//#when
+		const result = await resolveCategoryExecution(args, executorCtx, undefined, "anthropic/claude-sonnet-4-6")
+
+		//#then
+		expect(result.error).toBeUndefined()
+		expect(result.categoryPromptAppend).toContain("operating in DEEP mode")
+		expect(result.categoryPromptAppend).toContain("USER_CUSTOM_INSTRUCTION_XYZ")
+	})
+
+	test("appends user prompt_append to legacy deep base prompt for non-gpt-5.5 models", async () => {
+		//#given
+		const args = {
+			category: "deep",
+			prompt: "test prompt",
+			description: "Test task",
+			run_in_background: false,
+			load_skills: [],
+			blockedBy: undefined,
+			enableSkillTools: false,
+		}
+		const executorCtx = createMockExecutorContext()
+		executorCtx.userCategories = {
+			deep: {
+				model: "openai/gpt-5.4",
+				prompt_append: "USER_CUSTOM_INSTRUCTION_LEGACY",
+			},
+		}
+
+		//#when
+		const result = await resolveCategoryExecution(args, executorCtx, undefined, "anthropic/claude-sonnet-4-6")
+
+		//#then
+		expect(result.error).toBeUndefined()
+		expect(result.categoryPromptAppend).toContain("GOAL-ORIENTED AUTONOMOUS")
+		expect(result.categoryPromptAppend).toContain("USER_CUSTOM_INSTRUCTION_LEGACY")
+	})
 })

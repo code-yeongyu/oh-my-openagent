@@ -2,8 +2,8 @@ import type { FallbackEntry } from "./model-requirements"
 import { readConnectedProvidersCache } from "./connected-providers-cache"
 
 /**
- * Error names that indicate a retryable model error (deadstop).
- * These errors completely halt the action loop and should trigger fallback retry.
+ * Error names that indicate a retryable model error.
+ * These errors halt execution and should trigger fallback retry.
  */
 const RETRYABLE_ERROR_NAMES = new Set([
   "providermodelnotfounderror",
@@ -72,6 +72,8 @@ const RETRYABLE_MESSAGE_PATTERNS = [
   "504",
   "429",
   "529",
+  "403",
+  "forbidden",
 ]
 
 /**
@@ -119,7 +121,7 @@ export interface ErrorInfo {
 
 /**
  * Determines if an error is a retryable model error.
- * Returns true if the error is a known retryable type OR matches retryable message patterns.
+ * Returns true if it's a known retryable type OR matches retryable message patterns.
  */
 export function isRetryableModelError(error: ErrorInfo): boolean {
   // If we have an error name, check against known lists
@@ -154,7 +156,7 @@ export function isRetryableModelError(error: ErrorInfo): boolean {
 
 /**
  * Determines if an error should trigger a fallback retry.
- * Returns true for deadstop errors that completely halt the action loop.
+ * Returns true for errors that halt execution.
  */
 export function shouldRetryError(error: ErrorInfo): boolean {
   return isRetryableModelError(error)

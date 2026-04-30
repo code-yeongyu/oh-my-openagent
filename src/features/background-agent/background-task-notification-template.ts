@@ -1,4 +1,4 @@
-import type { BackgroundTaskStatus } from "./types"
+import type { BackgroundTaskAttempt, BackgroundTaskStatus } from "./types"
 
 export type BackgroundTaskNotificationStatus = "COMPLETED" | "CANCELLED" | "INTERRUPTED" | "ERROR"
 
@@ -7,6 +7,55 @@ export interface BackgroundTaskNotificationTask {
   description: string
   status: BackgroundTaskStatus
   error?: string
+  attempts?: BackgroundTaskAttempt[]
+}
+
+function formatAttemptModel(attempt: BackgroundTaskAttempt): string {
+  if (attempt.providerID && attempt.modelID) {
+    return `${attempt.providerID}/${attempt.modelID}`
+  }
+
+  if (attempt.modelID) {
+    return attempt.modelID
+  }
+
+  if (attempt.providerID) {
+    return attempt.providerID
+  }
+
+  return "unknown-model"
+}
+
+function formatAttemptTimeline(task: BackgroundTaskNotificationTask): string {
+  if (!task.attempts || task.attempts.length <= 1) {
+    return ""
+  }
+
+  const lines = task.attempts
+    .map((attempt) => {
+      const attemptLines = [
+        `  - Attempt ${attempt.attemptNumber} — ${attempt.status.toUpperCase()} — ${formatAttemptModel(attempt)} — ${attempt.sessionID ?? "unknown"}`,
+      ]
+
+      if (attempt.status !== "completed" && attempt.error) {
+        attemptLines.push(`    Error: ${attempt.error}`)
+      }
+
+      return attemptLines.join("\n")
+    })
+    .join("\n")
+
+  return `Background task attempts:\n${lines}`
+}
+
+function formatTaskSummaryLine(task: BackgroundTaskNotificationTask): string {
+  const baseLine = `- \`${task.id}\`: ${task.description || task.id}`
+  const statusSuffix = task.status === "completed"
+    ? ""
+    : ` [${task.status.toUpperCase()}]${task.error ? ` - ${task.error}` : ""}`
+  const timeline = formatAttemptTimeline(task)
+
+  return `${baseLine}${statusSuffix}${timeline ? `\n${timeline}` : ""}`
 }
 
 export function buildBackgroundTaskNotificationText(input: {
@@ -27,10 +76,10 @@ export function buildBackgroundTaskNotificationText(input: {
     const failedTasks = completedTasks.filter((t) => t.status !== "completed")
 
     const succeededText = succeededTasks.length > 0
-      ? succeededTasks.map((t) => `- \`${t.id}\`: ${safeDescription(t)}`).join("\n")
+      ? succeededTasks.map((t) => formatTaskSummaryLine(t)).join("\n")
       : ""
     const failedText = failedTasks.length > 0
-      ? failedTasks.map((t) => `- \`${t.id}\`: ${safeDescription(t)} [${t.status.toUpperCase()}]${t.error ? ` - ${t.error}` : ""}`).join("\n")
+      ? failedTasks.map((t) => formatTaskSummaryLine(t)).join("\n")
       : ""
 
     const hasFailures = failedTasks.length > 0
@@ -46,7 +95,7 @@ export function buildBackgroundTaskNotificationText(input: {
       body += `\n**Failed:**\n${failedText}\n`
     }
     if (!body) {
-      body = `- \`${task.id}\`: ${safeDescription(task)} [${task.status.toUpperCase()}]${task.error ? ` - ${task.error}` : ""}\n`
+      body = `${formatTaskSummaryLine(task)}\n`
     }
 
     return `<system-reminder>

@@ -7,6 +7,7 @@ import { truncateDescription } from "../../shared/truncate-description"
 export {
   CATEGORY_DESCRIPTIONS,
   CATEGORY_PROMPT_APPENDS,
+  CATEGORY_PROMPT_APPEND_RESOLVERS,
   DEFAULT_CATEGORIES,
 } from "./builtin-categories"
 

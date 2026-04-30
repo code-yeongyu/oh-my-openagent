@@ -2,7 +2,7 @@ import type { BackgroundManager } from "../../features/background-agent"
 
 export type BackgroundOutputMessage = {
   id?: string
-  info?: { role?: string; time?: string | { created?: number }; agent?: string }
+  info?: { role?: string; time?: string | { created?: number }; agent?: string; error?: unknown }
   parts?: Array<{
     type?: string
     text?: string
