@@ -1,16 +1,4 @@
 #!/usr/bin/env bun
-/**
- * GLM Thinking Runtime Benchmark
- *
- * Measures GLM-5.1 API performance with thinking ON vs OFF.
- * Run via: bun run scripts/benchmark-glm-thinking.ts [--model z-ai/glm-5.1] [--iterations 3]
- *
- * Prerequisites: OpenCode must be configured with a GLM provider.
- * This script uses the agent factory functions to generate configs,
- * then calls the model directly through the configured provider.
- *
- * Output: JSON with timing metrics to stdout, human-readable summary to stderr.
- */
 
 const DEFAULT_MODEL = "z-ai/glm-5.1"
 const DEFAULT_ITERATIONS = 3
@@ -107,23 +95,12 @@ async function runFactoryBenchmark(): Promise<{ totalTests: number; passed: numb
       return { passed: parseInt(match[1], 10), failed: parseInt(match[2], 10), totalTests: parseInt(match[1], 10) + parseInt(match[2], 10) }
     }
     return { totalTests: 0, passed: 0, failed: 0 }
-  } catch (error) {
+  } catch {
     return { totalTests: 0, passed: 0, failed: -1 }
   }
 }
 
 async function callModelDirect(_model: string, _prompt: string, _thinking: boolean): Promise<BenchmarkResult> {
-  // NOTE: Direct API calls require provider credentials configured in OpenCode.
-  // This is a placeholder that measures agent factory overhead only.
-  //
-  // For actual runtime benchmarks, run through OpenCode:
-  //   opencode --model z-ai/glm-5.1 --prompt "your task here"
-  //
-  // Or use curl with Z.AI API:
-  //   curl -X POST https://open.bigmodel.cn/api/paas/v4/chat/completions \
-  //     -H "Authorization: Bearer $ZAI_API_KEY" \
-  //     -d '{"model": "glm-5.1", "messages": [...], "thinking": {"type": "enabled"}}'
-
   return {
     model: _model,
     thinkingEnabled: _thinking,
@@ -146,12 +123,10 @@ async function main() {
   console.error(`Branch: ${git.branch} (${git.commit})`)
   console.error()
 
-  // Phase 1: Factory-level benchmark (no API calls needed)
   console.error("Phase 1: Factory config correctness benchmark...")
   const factoryResults = await runFactoryBenchmark()
   console.error(`  Factory tests: ${factoryResults.passed}/${factoryResults.totalTests} passed`)
 
-  // Phase 2: Runtime benchmark placeholder
   console.error("\nPhase 2: Runtime benchmark (requires OpenCode runtime)...")
   const thinkingOnResults: BenchmarkResult[] = []
   const thinkingOffResults: BenchmarkResult[] = []
@@ -166,7 +141,6 @@ async function main() {
     thinkingOffResults.push(offResult)
   }
 
-  // Summary
   const summary: BenchmarkSummary = {
     model,
     timestamp: new Date().toISOString(),
@@ -183,13 +157,11 @@ async function main() {
       avgTTFTMs: null,
       results: thinkingOffResults,
     },
-    factoryResults,
+    factoryTestResults: factoryResults,
   }
 
-  // Output JSON to stdout
   console.log(JSON.stringify(summary, null, 2))
 
-  // Human-readable summary to stderr
   console.error("\n=== Summary ===")
   console.error(`Factory benchmark: ${factoryResults.passed}/${factoryResults.totalTests} tests passed`)
   console.error(`  - GLM-5+ text models: thinking enabled, NO budgetTokens`)
