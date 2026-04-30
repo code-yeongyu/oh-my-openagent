@@ -201,6 +201,67 @@ describe("keyword-detector hyperplan keyword", () => {
     expect(textPart!.text).toContain("hyperplan refactor stuff")
   })
 
+  test("should NOT inject hyperplan when user invokes /hyperplan slash command", async () => {
+    // given - main session typing the slash command form
+    const sessionID = "hyperplan-slash-session"
+    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
+    const toastCalls: string[] = []
+    const hook = createKeywordDetectorHook(createMockPluginInput({ toastCalls }))
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "/hyperplan refactor the auth module" }],
+    }
+
+    // when - keyword detection runs on slash-command-prefixed text
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then - the slash command path owns the message; keyword detector must not double-inject
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).toBe("/hyperplan refactor the auth module")
+    expect(textPart!.text).not.toContain("<hyperplan-mode>")
+    expect(toastCalls).not.toContain("Hyperplan Mode Activated")
+  })
+
+  test("should NOT inject hyperplan when user invokes /hpp shorthand slash command", async () => {
+    // given - main session and shorthand slash command
+    const sessionID = "hyperplan-slash-shorthand-session"
+    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
+    const hook = createKeywordDetectorHook(createMockPluginInput())
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "/hpp investigate the build pipeline" }],
+    }
+
+    // when - keyword detection runs
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then - keyword detector should yield to the slash command system
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).toBe("/hpp investigate the build pipeline")
+    expect(textPart!.text).not.toContain("<hyperplan-mode>")
+  })
+
+  test("should still inject hyperplan when slash appears mid-message (not a slash command)", async () => {
+    // given - text contains a slash later but does not start with one
+    const sessionID = "hyperplan-mid-slash-session"
+    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
+    const hook = createKeywordDetectorHook(createMockPluginInput())
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "hyperplan: refactor src/auth/handler.ts" }],
+    }
+
+    // when - keyword detection runs on free-form text that mentions hyperplan first
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then - hyperplan should still fire (this is a real keyword invocation, not a slash command)
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).toContain("<hyperplan-mode>")
+  })
+
   test("should skip hyperplan injection when agent name contains 'planner' token", async () => {
     // given - hook running with planner-named agent and a prompt that only triggers hpp
     const sessionID = "hyperplan-planner-session"

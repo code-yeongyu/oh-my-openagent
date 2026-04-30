@@ -14,6 +14,12 @@ export function removeCodeBlocks(text: string): string {
   return text.replace(CODE_BLOCK_PATTERN, "").replace(INLINE_CODE_PATTERN, "")
 }
 
+const SLASH_COMMAND_LEAD_PATTERN = /^\s*\/[a-zA-Z][\w-]*(?:\s|$)/
+
+export function looksLikeSlashCommand(text: string): boolean {
+  return SLASH_COMMAND_LEAD_PATTERN.test(text)
+}
+
 function resolveMessage(
   message: string | ((agentName?: string, modelID?: string) => string),
   agentName?: string,

@@ -1,7 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { KeywordDetectorConfig } from "../../config/schema/keyword-detector"
 import type { DetectedKeyword } from "./detector"
-import { detectKeywordsWithType, extractPromptText } from "./detector"
+import { detectKeywordsWithType, extractPromptText, looksLikeSlashCommand } from "./detector"
 import { isPlannerAgent, isNonOmoAgent } from "./constants"
 import { log } from "../../shared"
 import {
@@ -55,6 +55,11 @@ export function createKeywordDetectorHook(
 
       if (isSystemDirective(promptText)) {
         log(`[keyword-detector] Skipping system directive message`, { sessionID: input.sessionID })
+        return
+      }
+
+      if (looksLikeSlashCommand(promptText)) {
+        log(`[keyword-detector] Skipping slash command invocation`, { sessionID: input.sessionID })
         return
       }
 
