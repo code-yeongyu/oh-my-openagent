@@ -59,6 +59,7 @@ describe("updateModels", () => {
       writeFile: mock(() => {}),
       readFile: mock(() => ""),
       existsFile: mock(() => true),
+      renameFile: mock(() => {}),
       ...overrides,
     }
   }
