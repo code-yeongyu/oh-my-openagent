@@ -4,11 +4,13 @@ import { run } from "./run"
 import { getLocalVersion } from "./get-local-version"
 import { doctor } from "./doctor"
 import { refreshModelCapabilities } from "./refresh-model-capabilities"
+import { updateModels } from "./update-models/update-models"
 import { createMcpOAuthCommand } from "./mcp-oauth"
 import type { InstallArgs } from "./types"
 import type { RunOptions } from "./run"
 import type { GetLocalVersionOptions } from "./get-local-version/types"
 import type { DoctorOptions } from "./doctor"
+import type { UpdateModelsOptions } from "./update-models/types"
 import packageJson from "../../package.json" with { type: "json" }
 
 const VERSION = packageJson.version
@@ -193,6 +195,35 @@ program
       json: options.json ?? false,
     })
     process.exit(exitCode)
+  })
+
+program
+  .command("update-models")
+  .description("Update model mappings in oh-my-opencode config")
+  .option("-d, --directory <path>", "Working directory to read config from")
+  .option("--full", "Replace all model mappings with latest recommendations")
+  .option("--dry-run", "Preview changes without modifying config")
+  .option("--json", "Output as JSON")
+  .addHelpText("after", `
+Examples:
+  $ bunx oh-my-opencode update-models           # Preserve custom mappings
+  $ bunx oh-my-opencode update-models --dry-run # Preview changes
+  $ bunx oh-my-opencode update-models --full   # Replace all mappings
+  $ bunx oh-my-opencode update-models --json   # JSON output
+
+Modes:
+  preserve-custom (default): Update only non-customized entries
+  full-replacement (--full): Replace all entries with latest defaults
+`)
+  .action(async (options) => {
+    const updateModelsOptions: UpdateModelsOptions = {
+      directory: options.directory,
+      mode: options.full ? "full-replacement" : "preserve-custom",
+      dryRun: options.dryRun ?? false,
+      json: options.json ?? false,
+    }
+    const result = await updateModels(updateModelsOptions)
+    process.exit(result.success ? 0 : 1)
   })
 
 program
