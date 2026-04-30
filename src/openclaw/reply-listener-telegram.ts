@@ -31,8 +31,9 @@ export async function pollTelegramReplies(
   if (!replyListener?.telegramBotToken || !replyListener.telegramChatId) return
 
   try {
+    const telegramBaseUrl = "https://api.telegram.org/bot" + replyListener.telegramBotToken
     const offset = state.telegramLastUpdateId ? state.telegramLastUpdateId + 1 : 0
-    const url = `https://api.telegram.org/bot${replyListener.telegramBotToken}/getUpdates?offset=${offset}&timeout=0`
+    const url = telegramBaseUrl + "/getUpdates?offset=" + offset + "&timeout=0"
 
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 10000)
@@ -67,7 +68,7 @@ export async function pollTelegramReplies(
       if (success) {
         state.messagesInjected += 1
         try {
-          await fetch(`https://api.telegram.org/bot${replyListener.telegramBotToken}/sendMessage`, {
+          await fetch(`${telegramBaseUrl}/sendMessage`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
