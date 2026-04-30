@@ -150,12 +150,15 @@ describe("createTeamRun", () => {
     const firstPrompt = (launchMock.mock.calls as Array<[LaunchInput]>)[0]?.[0].prompt ?? ""
 
     // then
-    expect(firstPrompt).toContain("Do not call lead-only lifecycle tools")
+    expect(firstPrompt).toContain("Lead-only tools you must NOT call")
     expect(firstPrompt).not.toContain("3. Request shutdown via `team_shutdown_request`")
     expect(firstPrompt).toContain("Include `summary` and `references`")
     expect(firstPrompt).toContain("Move to `status: \"in_progress\"` when you start working")
-    expect(firstPrompt).toContain("delegate-task: Do not call this")
+    expect(firstPrompt).toContain("Do NOT call this from inside team members")
     expect(firstPrompt).toContain("lead can decide whether to request shutdown")
+    expect(firstPrompt).toContain("user interacts primarily with the team lead")
+    expect(firstPrompt).toContain("Idle is normal")
+    expect(firstPrompt).toContain("structured JSON status messages")
   })
 
   test("rolls back launched members in reverse order when a later spawn fails", async () => {
