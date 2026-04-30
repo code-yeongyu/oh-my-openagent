@@ -342,17 +342,20 @@ jobs:
           ls -la packages/${PLATFORM}/
           ls -la packages/${PLATFORM}/bin/
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         if: steps.check.outputs.skip_all != 'true' && steps.download.outcome == 'success'
         with:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
 
+      - name: Upgrade npm for trusted publishing (>=11.5.1)
+        if: steps.check.outputs.skip_all != 'true' && steps.download.outcome == 'success'
+        run: npm install -g npm@latest
+
       - name: Publish oh-my-opencode-${{ matrix.platform }}
         if: steps.check.outputs.skip_opencode != 'true' && steps.download.outcome == 'success'
         env:
           DIST_TAG: ${{ steps.validate.outputs.dist_tag }}
-          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
         run: |
           cd packages/${{ matrix.platform }}
@@ -368,7 +371,6 @@ jobs:
         if: steps.check.outputs.skip_openagent != 'true' && steps.download.outcome == 'success'
         env:
           DIST_TAG: ${{ steps.validate.outputs.dist_tag }}
-          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
         run: |
           cd packages/${{ matrix.platform }}

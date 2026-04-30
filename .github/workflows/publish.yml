@@ -83,10 +83,13 @@ jobs:
         with:
           bun-version: "1.3.11"
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
+
+      - name: Upgrade npm for trusted publishing (>=11.5.1)
+        run: npm install -g npm@latest
 
       - name: Install dependencies
         run: bun install
@@ -170,7 +173,6 @@ jobs:
         if: steps.check.outputs.skip != 'true'
         env:
           DIST_TAG: ${{ steps.version.outputs.dist_tag }}
-          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
         run: |
           if [ -n "$DIST_TAG" ]; then
@@ -197,7 +199,6 @@ jobs:
         env:
           VERSION: ${{ steps.version.outputs.version }}
           DIST_TAG: ${{ steps.version.outputs.dist_tag }}
-          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
         run: |
           # Update package name, version, and optionalDependencies for oh-my-openagent
