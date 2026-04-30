@@ -22,7 +22,7 @@ describe("resolveModelForDelegateTask free-only fallback", () => {
       availableModels: new Set([
         "opencode/gpt-5.4",
         "opencode/big-pickle",
-        "opencode/kimi-k2.5-free",
+        "opencode/minimax-m2.5-free",
       ]),
     })
 

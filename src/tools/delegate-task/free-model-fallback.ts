@@ -4,14 +4,16 @@ const FREE_ONLY_PROVIDER_IDS = new Set(["opencode"])
 const KNOWN_FREE_MODEL_IDS = new Set([
   "big-pickle",
   "gpt-5-nano",
-  "kimi-k2.5-free",
+  "hy3-preview-free",
   "minimax-m2.5-free",
+  "nemotron-3-super-free",
 ])
 
 export const FREE_ONLY_FALLBACK_CHAIN: FallbackEntry[] = [
   { providers: ["opencode"], model: "big-pickle" },
-  { providers: ["opencode"], model: "kimi-k2.5-free" },
   { providers: ["opencode"], model: "minimax-m2.5-free" },
+  { providers: ["opencode"], model: "hy3-preview-free" },
+  { providers: ["opencode"], model: "nemotron-3-super-free" },
   { providers: ["opencode"], model: "gpt-5-nano" },
 ]
 
