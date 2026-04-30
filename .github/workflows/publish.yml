@@ -169,6 +169,17 @@ jobs:
           bunx tsc --emitDeclarationOnly
           bun run build:schema
 
+      - name: Strip token auth from .npmrc to force OIDC
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          for f in .npmrc "$HOME/.npmrc"; do
+            if [ -f "$f" ]; then
+              sed -i.bak '/_authToken/d' "$f"
+              rm -f "$f.bak"
+              echo "Cleaned $f"
+            fi
+          done
+
       - name: Publish oh-my-opencode
         if: steps.check.outputs.skip != 'true'
         env:
@@ -176,9 +187,9 @@ jobs:
           NPM_CONFIG_PROVENANCE: true
         run: |
           if [ -n "$DIST_TAG" ]; then
-            npm publish --access public --provenance --tag "$DIST_TAG"
+            npm publish --access public --provenance --tag "$DIST_TAG" --loglevel verbose
           else
-            npm publish --access public --provenance
+            npm publish --access public --provenance --loglevel verbose
           fi
 
       - name: Check if oh-my-openagent already published
@@ -213,9 +224,9 @@ jobs:
           ' package.json > tmp.json && mv tmp.json package.json
 
           if [ -n "$DIST_TAG" ]; then
-            npm publish --access public --provenance --tag "$DIST_TAG"
+            npm publish --access public --provenance --tag "$DIST_TAG" --loglevel verbose
           else
-            npm publish --access public --provenance
+            npm publish --access public --provenance --loglevel verbose
           fi
 
       - name: Restore package.json
