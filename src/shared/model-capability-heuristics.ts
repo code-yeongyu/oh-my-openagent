@@ -32,7 +32,7 @@ export const HEURISTIC_MODEL_FAMILY_REGISTRY: ReadonlyArray<HeuristicModelFamily
     family: "gpt-5",
     includes: ["gpt-5"],
     variants: ["low", "medium", "high", "xhigh"],
-    reasoningEfforts: ["none", "minimal", "low", "medium", "high", "xhigh"],
+    reasoningEfforts: ["none", "minimal", "low", "medium", "high", "xhigh", "max"],
   },
   {
     family: "gpt-legacy",
