@@ -62,7 +62,7 @@ We do not sell personal information collected through this telemetry path.
 
 ## 5. Data Retention
 
-Anonymous analytics and diagnostics are retained only as long as reasonably necessary for product, security, and operational analysis. Local telemetry state stored on your machine remains there until removed by you.
+Anonymous analytics are retained only as long as reasonably necessary for understanding adoption. Local telemetry state stored on your machine remains there until removed by you.
 
 ## 6. Your Choices
 
