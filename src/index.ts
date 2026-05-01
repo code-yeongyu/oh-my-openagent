@@ -18,7 +18,6 @@ import { installAgentSortShim } from "./shared/agent-sort-shim"
 import { detectExternalSkillPlugin, getSkillPluginConflictWarning } from "./shared/external-plugin-detector"
 import { startBackgroundCheck as startTmuxCheck } from "./tools/interactive-bash"
 import { createPluginPostHog, getPostHogDistinctId } from "./shared/posthog"
-import { getPluginLoadedCaptureState } from "./shared/posthog-activity-state"
 
 const serverPlugin: Plugin = async (input, _options): Promise<Hooks> => {
   installAgentSortShim()
@@ -43,27 +42,6 @@ const serverPlugin: Plugin = async (input, _options): Promise<Hooks> => {
     posthog.trackActive(distinctId, "plugin_loaded")
   } catch {
     // telemetry failure is non-fatal, silently ignore
-  }
-  let pluginLoadedCaptureState: ReturnType<typeof getPluginLoadedCaptureState> | null = null
-  try {
-    pluginLoadedCaptureState = getPluginLoadedCaptureState()
-  } catch {
-    // telemetry failure is non-fatal, silently ignore
-  }
-  if (pluginLoadedCaptureState?.capturePluginLoaded) {
-    try {
-      posthog.capture({
-        distinctId,
-        event: "plugin_loaded",
-        properties: {
-          entry_point: "plugin",
-          has_openclaw: !!pluginConfig.openclaw,
-          tmux_enabled: isTmuxIntegrationEnabled(pluginConfig),
-        },
-      })
-    } catch {
-      // telemetry failure is non-fatal, silently ignore
-    }
   }
   if (pluginConfig.openclaw) {
     await initializeOpenClaw(pluginConfig.openclaw)
