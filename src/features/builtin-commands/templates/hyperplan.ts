@@ -6,7 +6,9 @@ LOAD THE HYPERPLAN SKILL IMMEDIATELY:
 skill(name="hyperplan")
 \`\`\`
 
-After loading the skill, follow its 7-phase workflow EXACTLY using this user request:
+After loading the skill, follow its 7-phase workflow EXACTLY using this user request.
+
+Roster contract: call \`team_create\` with category members \`unspecified-low\`, \`unspecified-high\`, \`ultrabrain\`, and \`artistry\`. Include \`deep\` only if the category is enabled; if \`deep\` is disabled or unavailable, retry without only that member and state the degraded roster.
 
 <user-request>
 $ARGUMENTS
