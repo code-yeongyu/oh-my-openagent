@@ -286,7 +286,6 @@ export function createMomusAgent(model: string): AgentConfig {
     "write",
     "edit",
     "apply_patch",
-    "task",
   ]);
 
   const base = {

@@ -9,6 +9,7 @@ import { createMetisAgent } from "./metis"
 import { createAtlasAgent } from "./atlas"
 import { createSisyphusAgent } from "./sisyphus"
 import { createHephaestusAgent } from "./hephaestus"
+import { getAgentToolRestrictions } from "../shared/agent-tool-restrictions"
 
 const TEST_MODEL = "anthropic/claude-sonnet-4-5"
 
@@ -85,6 +86,19 @@ describe("read-only agent tool restrictions", () => {
         expect(permission[tool]).toBe("deny")
       }
     })
+
+    test("allows task delegation while remaining ineligible for team membership", () => {
+      // given
+      const agent = createMomusAgent(TEST_MODEL)
+
+      // when
+      const permission = agent.permission as Record<string, string>
+      const sessionRestrictions = getAgentToolRestrictions("momus")
+
+      // then
+      expect(permission["task"]).toBeUndefined()
+      expect(sessionRestrictions["task"]).toBeUndefined()
+    })
   })
 
   describe("Metis", () => {
@@ -99,6 +113,19 @@ describe("read-only agent tool restrictions", () => {
       for (const tool of FILE_WRITE_TOOLS) {
         expect(permission[tool]).toBe("deny")
       }
+    })
+
+    test("allows task delegation while remaining ineligible for team membership", () => {
+      // given
+      const agent = createMetisAgent(TEST_MODEL)
+
+      // when
+      const permission = agent.permission as Record<string, string>
+      const sessionRestrictions = getAgentToolRestrictions("metis")
+
+      // then
+      expect(permission["task"]).toBeUndefined()
+      expect(sessionRestrictions["task"]).toBeUndefined()
     })
   })
 
