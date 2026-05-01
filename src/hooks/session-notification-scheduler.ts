@@ -1,5 +1,4 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import type { Platform } from "./session-notification-sender"
 
 type SessionNotificationConfig = {
   playSound: boolean
@@ -13,11 +12,10 @@ type SessionNotificationConfig = {
 
 export function createIdleNotificationScheduler(options: {
   ctx: PluginInput
-  platform: Platform
   config: SessionNotificationConfig
   hasIncompleteTodos: (ctx: PluginInput, sessionID: string) => Promise<boolean>
-  send: (ctx: PluginInput, platform: Platform, sessionID: string) => Promise<void>
-  playSound: (ctx: PluginInput, platform: Platform, soundPath: string) => Promise<void>
+  send: (ctx: PluginInput, sessionID: string) => Promise<void>
+  playSound: (ctx: PluginInput, soundPath: string) => Promise<void>
 }) {
   const notifiedSessions = new Set<string>()
   const pendingTimers = new Map<string, ReturnType<typeof setTimeout>>()
@@ -136,10 +134,10 @@ export function createIdleNotificationScheduler(options: {
 
       notifiedSessions.add(sessionID)
 
-      await options.send(options.ctx, options.platform, sessionID)
+      await options.send(options.ctx, sessionID)
 
       if (options.config.playSound && options.config.soundPath) {
-        await options.playSound(options.ctx, options.platform, options.config.soundPath)
+        await options.playSound(options.ctx, options.config.soundPath)
       }
     } finally {
       executingNotifications.delete(sessionID)

@@ -47,10 +47,10 @@ export function createSessionNotification(ctx: PluginInput, config: SessionNotif
 
   const scheduler = createIdleNotificationScheduler({
     ctx,
-    platform: "unsupported",
     config: mergedConfig,
     hasIncompleteTodos,
-    send: async (hookCtx, platform, sessionID) => {
+    send: async (hookCtx, sessionID) => {
+      const platform = ensureNotificationPlatform()
       if (typeof hookCtx.client.session.get !== "function" && typeof hookCtx.client.session.messages !== "function") {
         await sessionNotificationSender.sendSessionNotification(hookCtx, platform, mergedConfig.title, mergedConfig.message)
         return
@@ -64,7 +64,10 @@ export function createSessionNotification(ctx: PluginInput, config: SessionNotif
 
       await sessionNotificationSender.sendSessionNotification(hookCtx, platform, content.title, content.message)
     },
-    playSound: sessionNotificationSender.playSessionNotificationSound,
+    playSound: async (hookCtx, soundPath) => {
+      const platform = ensureNotificationPlatform()
+      await sessionNotificationSender.playSessionNotificationSound(hookCtx, platform, soundPath)
+    },
   })
 
   const QUESTION_TOOLS = new Set(["question", "ask_user_question", "askuserquestion"])
