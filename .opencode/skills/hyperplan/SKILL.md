@@ -26,6 +26,8 @@ Before starting, verify:
 
 Each member is a `kind: "category"` team member. They route through `sisyphus-junior` with the category's model and prompt-append shaping their behavior. The `prompt` field below is the **system prompt** that establishes their adversarial identity.
 
+Required categories are `unspecified-low`, `unspecified-high`, `ultrabrain`, and `artistry`. Include `deep` only when that category is enabled; if `deep` is disabled or unavailable, retry without only the researcher member and state the degraded roster.
+
 ### CATEGORY CHARACTERISTICS REFERENCE
 
 | Category | Model | Native Mindset | Why This Adversarial Role Fits |
@@ -204,7 +206,7 @@ Call `team_create` ONCE with this exact inline_spec shape (substitute the prompt
 team_create({
   inline_spec: {
     name: "hyperplan",
-    description: "Adversarial 5-member planning team for cross-critique debate.",
+    description: "Adversarial planning team for cross-critique debate.",
     members: [
       { name: "skeptic",    kind: "category", category: "unspecified-low",  prompt: "<full Skeptic system prompt>" },
       { name: "validator",  kind: "category", category: "unspecified-high", prompt: "<full Validator system prompt>" },
@@ -218,7 +220,7 @@ team_create({
 
 Capture the returned `teamRunId`. You will use it for every subsequent call.
 
-If `team_create` errors with "artistry requires gemini-3.1-pro and it is unavailable", swap `creative`'s category to `unspecified-high` and add a note to the user that the creative member is degraded.
+If `team_create` errors because `deep` is disabled or unavailable, retry once without the `researcher` member. Do not drop `unspecified-low`, `unspecified-high`, `ultrabrain`, or `artistry`.
 
 ### Phase 2: Round 1 — Independent analysis
 
