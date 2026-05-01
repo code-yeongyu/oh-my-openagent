@@ -1,8 +1,6 @@
 import { existsSync, readFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { isAbsolute, resolve } from "node:path"
-import { isWithinProject } from "../../shared/contains-path"
-import { log } from "../../shared/logger"
 
 export function resolvePromptAppend(promptAppend: string, configDir?: string): string {
   if (!promptAppend.startsWith("file://")) return promptAppend
@@ -18,16 +16,6 @@ export function resolvePromptAppend(promptAppend: string, configDir?: string): s
       : resolve(configDir ?? process.cwd(), expanded)
   } catch {
     return `[WARNING: Malformed file URI (invalid percent-encoding): ${promptAppend}]`
-  }
-
-  const projectRoot = configDir ?? process.cwd()
-  if (!isWithinProject(filePath, projectRoot)) {
-    log("[resolve-file-uri] Rejected file URI outside project root", {
-      promptAppend,
-      filePath,
-      projectRoot,
-    })
-    return `[WARNING: Path rejected: ${promptAppend} (resolved outside project root ${projectRoot}; file:// prompts must reside within the project boundary)]`
   }
 
   if (!existsSync(filePath)) {
