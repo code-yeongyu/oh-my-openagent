@@ -20,7 +20,7 @@ import {
   buildNonClaudePlannerSection,
   categorizeTools,
 } from "../dynamic-agent-prompt-builder"
-import { buildGlmVisionConstraint, buildGlmWorkingMemory } from "./glm"
+import { buildGlmVisionConstraint, buildGlmVisionHardBlock, buildGlmWorkingMemory } from "./glm"
 
 function buildGlmTasksSection(useTaskSystem: boolean): string {
   if (useTaskSystem) {
@@ -120,6 +120,8 @@ GLM hard constraints:
 - Do not use Claude-style budgetTokens assumptions. Keep thinking concise.
 
 ${buildGlmVisionConstraint()}
+
+${buildGlmVisionHardBlock()}
 </constraints>`
 
   const intentBlock = `<intent>

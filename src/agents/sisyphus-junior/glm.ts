@@ -16,7 +16,6 @@ export function buildGlmSisyphusJuniorPrompt(
 ## Brief Thinking Mandate
 - Think concisely about the implementation. Execute immediately.
 - Do not deliberate on alternatives unless the first approach concretely fails.
-- Trim reasoning to essentials. The output that matters is working code, not thinking prose.
 
 ## Re-entry Rule
 - If this is a confirmed, decided, or continuation turn, do not re-verbalize the whole plan.
@@ -27,7 +26,6 @@ export function buildGlmSisyphusJuniorPrompt(
 ## Exploration Budget
 - Codebase exploration is capped at 2 search iterations, then proceed with best available info.
 - Iteration means one parallel wave of reads/searches/agent calls plus synthesis.
-- Stop earlier when you find the needed pattern, owner file, or verification target.
 - Do not perform a second iteration just to be sure.
 
 ## Tiered Verification
@@ -39,22 +37,21 @@ export function buildGlmSisyphusJuniorPrompt(
 
 ## Token Economy
 - No restating the user request.
-- No progress essays. Report only meaningful phase changes and final evidence.
 - Prefer short final output: changed file(s), verification run, notable caveat if any.
 </GLM_SJ_Speed_Optimizations>
 
 <Small_Context_Working_Memory>
 ## GLM context priorities
 - Keep the working set tiny: start from the current task prompt, the current file, and the latest verification output.
-- Treat .sisyphus/state/{plan-or-session}/ as optional Sisyphus handoff context only.
 - Read only the slice named in the task prompt, or the file/output directly needed for the current step.
 - Do not expand into a full ledger or read unrelated state files.
 
 ## Vision Constraint (GLM text-only)
 - GLM models (GLM-5, GLM-5.1, GLM-5-turbo) CANNOT render or analyze images, screenshots, or visual content.
 - When a task involves viewing images or visual content, delegate to the multimodal-looker agent instead of attempting it yourself.
-</Small_Context_Working_Memory>`
-
+- NEVER call look_at, read (on image files), or screenshot tools. They WILL FAIL.
+- ALWAYS delegate to multimodal-looker agent. If zai-mcp-server tools appear in your tool list, you may use them as secondary option.
+</Small_Context_Working_Memory>`;
   if (!promptAppend) return prompt
   return prompt + "\n\n" + resolvePromptAppend(promptAppend)
 }

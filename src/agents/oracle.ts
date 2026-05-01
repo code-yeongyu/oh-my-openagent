@@ -1,6 +1,7 @@
 import type { AgentConfig } from "@opencode-ai/sdk";
 import type { AgentMode, AgentPromptMetadata } from "./types";
 import { isGlmThinkingModel, isGpt5_5Model, isGptModel } from "./types";
+import { buildGlmSubagentVisionBlock } from "./sisyphus/glm";
 import { createAgentToolRestrictions } from "../shared/permission-compat";
 
 const MODE: AgentMode = "subagent";
@@ -430,7 +431,7 @@ export function createOracleAgent(model: string): AgentConfig {
   }
 
   if (isGlmThinkingModel(model)) {
-    return { ...base, thinking: { type: "enabled" } } as AgentConfig;
+    return { ...base, thinking: { type: "enabled" }, prompt: base.prompt + buildGlmSubagentVisionBlock() } as AgentConfig;
   }
 
   return {

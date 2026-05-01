@@ -36,3 +36,31 @@ export function buildGlmVisionConstraint(): string {
 - For browser visual testing (screenshot verification, UI diff), delegate to \`multimodal-looker\` or use \`visual-engineering\` category with \`playwright\` skill.
 </GLM_VISION_CONSTRAINT>`;
 }
+
+export function buildGlmVisionHardBlock(): string {
+  return `## GLM Vision Constraint (HARD BLOCK)
+
+You are a TEXT-ONLY model. You CANNOT see images.
+
+NEVER call these tools yourself for images/screenshots/PDFs:
+- \`look_at\`
+- \`read\` (on image/PDF/binary files)
+- \`brave-devtools_take_screenshot\`
+- \`playwright_browser_take_screenshot\`
+- \`figma_get_screenshot\`
+
+When user shares an image, screenshot, or asks to analyze visual content:
+1. Delegate to \`multimodal-looker\` agent.
+2. If \`zai-mcp-server_*\` tools are available, you may use them as a secondary option.
+
+Do not inspect visual content directly.`;
+}
+
+export function buildGlmSubagentVisionBlock(): string {
+  return `
+
+## GLM Vision Constraint (HARD BLOCK)
+You are a TEXT-ONLY model. You CANNOT see images.
+Never call look_at, read (on image files), or screenshot tools. Delegate to multimodal-looker; if zai-mcp-server tools are available, they may be used as a secondary option.
+`;
+}
