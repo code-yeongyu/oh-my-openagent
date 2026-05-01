@@ -8,17 +8,11 @@ import { writeFileAtomically } from "./write-file-atomically"
 
 type PostHogActivityState = {
   lastActiveDayUTC?: string
-  lastPluginLoadedDayUTC?: string
 }
 
 type PostHogActivityCaptureState = {
   dayUTC: string
   captureDaily: boolean
-}
-
-type PluginLoadedCaptureState = {
-  dayUTC: string
-  capturePluginLoaded: boolean
 }
 
 const POSTHOG_ACTIVITY_STATE_FILE = "posthog-activity.json"
@@ -87,24 +81,5 @@ export function getPostHogActivityCaptureState(now: Date = new Date()): PostHogA
   return {
     dayUTC,
     captureDaily,
-  }
-}
-
-export function getPluginLoadedCaptureState(now: Date = new Date()): PluginLoadedCaptureState {
-  const state = readPostHogActivityState()
-  const dayUTC = getUtcDayString(now)
-
-  const capturePluginLoaded = state.lastPluginLoadedDayUTC !== dayUTC
-
-  if (capturePluginLoaded) {
-    writePostHogActivityState({
-      ...state,
-      lastPluginLoadedDayUTC: dayUTC,
-    })
-  }
-
-  return {
-    dayUTC,
-    capturePluginLoaded,
   }
 }

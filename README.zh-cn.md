@@ -118,7 +118,7 @@ curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/head
 
 **注意**：请使用已发布的包名和二进制名 `oh-my-opencode`。在 `opencode.json` 中，兼容性层现在优先使用插件入口 `oh-my-openagent`，而旧的 `oh-my-opencode` 条目仍会加载并显示警告。插件配置文件通常仍使用 `oh-my-opencode.json` 或 `oh-my-opencode.jsonc`，在过渡期间新旧两种文件名都会被识别。
 
-匿名遥测默认开启，用于帮助提升安装和运行时的可靠性。它使用 PostHog，并采用哈希化的安装标识符，绝不会使用原始主机名，可通过 `OMO_SEND_ANONYMOUS_TELEMETRY=0` 或 `OMO_DISABLE_POSTHOG=1` 禁用。详见 [隐私政策](docs/legal/privacy-policy.md) 和 [服务条款](docs/legal/terms-of-service.md)。
+匿名遥测默认开启，用于统计活跃安装数(DAU/WAU/MAU)。每台机器每个 UTC 日最多发送一次事件,使用哈希化的安装标识符,绝不会使用原始主机名,且不会创建 PostHog person profile。可通过 `OMO_SEND_ANONYMOUS_TELEMETRY=0` 或 `OMO_DISABLE_POSTHOG=1` 禁用。详见 [隐私政策](docs/legal/privacy-policy.md) 和 [服务条款](docs/legal/terms-of-service.md)。
 
 ---
 

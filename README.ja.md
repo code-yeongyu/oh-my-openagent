@@ -117,7 +117,7 @@ curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/head
 
 **注記**: 公開されているパッケージおよびバイナリ名は `oh-my-opencode` を使用してください。`opencode.json` 内では、互換性レイヤーがプラグインエントリ `oh-my-openagent` を優先しますが、従来の `oh-my-opencode` エントリも警告付きで読み込まれます。プラグイン設定ファイルは依然として `oh-my-opencode.json` または `oh-my-opencode.jsonc` を使用するのが一般的で、移行期間中は従来のファイル名と改名後のファイル名の両方が認識されます。
 
-匿名のテレメトリは、インストールとランタイムの信頼性向上のためにデフォルトで有効になっています。これは PostHog を使用し、生のホスト名ではなくハッシュ化されたインストール識別子を使用します。無効化するには `OMO_SEND_ANONYMOUS_TELEMETRY=0` または `OMO_DISABLE_POSTHOG=1` を設定してください。[プライバシーポリシー](docs/legal/privacy-policy.md)と[利用規約](docs/legal/terms-of-service.md)をご覧ください。
+匿名のテレメトリは、アクティブなインストール数(DAU/WAU/MAU)の集計のためにデフォルトで有効になっています。マシン1台につきUTC日あたり最大1回イベントが送信され、ハッシュ化されたインストール識別子を使用し、生のホスト名は使用せず、PostHog person profile も作成されません。無効化するには `OMO_SEND_ANONYMOUS_TELEMETRY=0` または `OMO_DISABLE_POSTHOG=1` を設定してください。[プライバシーポリシー](docs/legal/privacy-policy.md)と[利用規約](docs/legal/terms-of-service.md)をご覧ください。
 
 ---
 

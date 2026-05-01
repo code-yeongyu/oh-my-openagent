@@ -28,24 +28,15 @@ const DEFAULT_POSTHOG_HOST = "https://us.i.posthog.com"
 const DEFAULT_POSTHOG_API_KEY = "phc_CFJhj5HyvA62QPhvyaUCtaq23aUfznnijg5VaaGkNk74"
 
 type PostHogCaptureEvent = Parameters<PostHog["capture"]>[0]
-type PostHogExceptionProperties = Parameters<PostHog["captureException"]>[2]
 type PostHogSource = "cli" | "plugin"
 type PostHogActivityReason = "run_started" | "plugin_loaded"
 
 type PostHogClient = {
-  capture: (message: PostHogCaptureEvent) => void
-  captureException: (
-    error: unknown,
-    distinctId?: string,
-    additionalProperties?: PostHogExceptionProperties,
-  ) => void
   trackActive: (distinctId: string, reason: PostHogActivityReason) => void
   shutdown: () => Promise<void>
 }
 
 const NO_OP_POSTHOG: PostHogClient = {
-  capture: () => undefined,
-  captureException: () => undefined,
   trackActive: () => undefined,
   shutdown: async () => undefined,
 }
@@ -131,21 +122,6 @@ function createPostHogClient(
   const sharedProperties = getSharedProperties(source)
 
   return {
-    capture: (message) => {
-      configuredClient.capture({
-        ...message,
-        properties: {
-          ...sharedProperties,
-          ...message.properties,
-        },
-      })
-    },
-    captureException: (error, distinctId, additionalProperties) => {
-      configuredClient.captureException(error, distinctId, {
-        ...sharedProperties,
-        ...additionalProperties,
-      })
-    },
     trackActive: (distinctId, reason) => {
       const activityState = resolveActivityState()
 
@@ -155,6 +131,7 @@ function createPostHogClient(
           event: "omo_daily_active",
           properties: {
             ...sharedProperties,
+            $process_person_profile: false,
             day_utc: activityState.dayUTC,
             reason,
           },

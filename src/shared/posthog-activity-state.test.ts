@@ -138,7 +138,7 @@ describe("getPostHogActivityCaptureState", () => {
     rmSync(dataHomePath, { recursive: true, force: true })
   })
 
-  it("preserves lastPluginLoadedDayUTC when writing lastActiveDayUTC", async () => {
+  it("preserves unrelated state fields when writing lastActiveDayUTC", async () => {
     // given
     const dataHomePath = createDataHomePath()
     const cachePath = join(dataHomePath, "oh-my-opencode")
@@ -164,131 +164,6 @@ describe("getPostHogActivityCaptureState", () => {
       lastActiveDayUTC: "2026-04-11",
       lastPluginLoadedDayUTC: "2026-04-11",
     })
-
-    rmSync(dataHomePath, { recursive: true, force: true })
-  })
-})
-
-describe("getPluginLoadedCaptureState", () => {
-  it("returns capturePluginLoaded=true when activity file does not exist", async () => {
-    // given
-    const dataHomePath = createDataHomePath()
-    process.env.XDG_DATA_HOME = dataHomePath
-    const { getPluginLoadedCaptureState } = await importPostHogActivityStateModule()
-
-    // when
-    const result = getPluginLoadedCaptureState(new Date("2026-04-11T10:15:00.000Z"))
-
-    // then
-    expect(result).toEqual({
-      dayUTC: "2026-04-11",
-      capturePluginLoaded: true,
-    })
-
-    rmSync(dataHomePath, { recursive: true, force: true })
-  })
-
-  it("returns capturePluginLoaded=false when lastPluginLoadedDayUTC matches today", async () => {
-    // given
-    const dataHomePath = createDataHomePath()
-    const cachePath = join(dataHomePath, "oh-my-opencode")
-    mkdirSync(cachePath, { recursive: true })
-    writeFileSync(
-      join(cachePath, "posthog-activity.json"),
-      `${JSON.stringify({
-        lastPluginLoadedDayUTC: "2026-04-11",
-      })}\n`,
-    )
-    process.env.XDG_DATA_HOME = dataHomePath
-    const { getPluginLoadedCaptureState } = await importPostHogActivityStateModule()
-
-    // when
-    const result = getPluginLoadedCaptureState(new Date("2026-04-11T10:15:00.000Z"))
-
-    // then
-    expect(result).toEqual({
-      dayUTC: "2026-04-11",
-      capturePluginLoaded: false,
-    })
-
-    rmSync(dataHomePath, { recursive: true, force: true })
-  })
-
-  it("returns capturePluginLoaded=true when lastPluginLoadedDayUTC is from a previous day", async () => {
-    // given
-    const dataHomePath = createDataHomePath()
-    const cachePath = join(dataHomePath, "oh-my-opencode")
-    mkdirSync(cachePath, { recursive: true })
-    writeFileSync(
-      join(cachePath, "posthog-activity.json"),
-      `${JSON.stringify({
-        lastPluginLoadedDayUTC: "2026-04-10",
-      })}\n`,
-    )
-    process.env.XDG_DATA_HOME = dataHomePath
-    const { getPluginLoadedCaptureState } = await importPostHogActivityStateModule()
-
-    // when
-    const result = getPluginLoadedCaptureState(new Date("2026-04-11T10:15:00.000Z"))
-
-    // then
-    expect(result).toEqual({
-      dayUTC: "2026-04-11",
-      capturePluginLoaded: true,
-    })
-
-    rmSync(dataHomePath, { recursive: true, force: true })
-  })
-
-  it("preserves lastActiveDayUTC when writing lastPluginLoadedDayUTC", async () => {
-    // given
-    const dataHomePath = createDataHomePath()
-    const cachePath = join(dataHomePath, "oh-my-opencode")
-    mkdirSync(cachePath, { recursive: true })
-    writeFileSync(
-      join(cachePath, "posthog-activity.json"),
-      `${JSON.stringify({
-        lastActiveDayUTC: "2026-04-11",
-        lastPluginLoadedDayUTC: "2026-04-10",
-      })}\n`,
-    )
-    process.env.XDG_DATA_HOME = dataHomePath
-    const { getPluginLoadedCaptureState } = await importPostHogActivityStateModule()
-
-    // when
-    getPluginLoadedCaptureState(new Date("2026-04-11T10:15:00.000Z"))
-
-    // then
-    const persistedState = JSON.parse(
-      readFileSync(join(cachePath, "posthog-activity.json"), "utf-8"),
-    )
-    expect(persistedState).toEqual({
-      lastActiveDayUTC: "2026-04-11",
-      lastPluginLoadedDayUTC: "2026-04-11",
-    })
-
-    rmSync(dataHomePath, { recursive: true, force: true })
-  })
-
-  it("does not rewrite state when lastPluginLoadedDayUTC matches today", async () => {
-    // given
-    const dataHomePath = createDataHomePath()
-    const cachePath = join(dataHomePath, "oh-my-opencode")
-    mkdirSync(cachePath, { recursive: true })
-    const initialPayload = `${JSON.stringify({
-      lastActiveDayUTC: "2026-04-10",
-      lastPluginLoadedDayUTC: "2026-04-11",
-    })}\n`
-    writeFileSync(join(cachePath, "posthog-activity.json"), initialPayload)
-    process.env.XDG_DATA_HOME = dataHomePath
-    const { getPluginLoadedCaptureState } = await importPostHogActivityStateModule()
-
-    // when
-    getPluginLoadedCaptureState(new Date("2026-04-11T10:15:00.000Z"))
-
-    // then
-    const persistedPayload = readFileSync(join(cachePath, "posthog-activity.json"), "utf-8")
-    expect(persistedPayload).toBe(initialPayload)
 
     rmSync(dataHomePath, { recursive: true, force: true })
   })

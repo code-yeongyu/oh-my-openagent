@@ -1,6 +1,6 @@
 # Privacy Policy
 
-Last updated: April 11, 2026
+Last updated: May 2, 2026
 
 This Privacy Policy explains how oh-my-opencode and oh-my-openagent collect, use, and protect information related to the published CLI package, the OpenCode plugin, and the project website or repository materials where they apply.
 
@@ -14,14 +14,13 @@ We collect limited non-personal information needed to operate and improve the Se
 
 ### Automatically collected information
 
-When anonymous telemetry is enabled, the Application may collect:
+When anonymous telemetry is enabled, the Application may collect a single anonymous usage event:
 
-- Anonymous usage events, including `run_started`, `run_completed`, `run_failed`, `install_completed`, `install_failed`, `plugin_loaded`, and `omo_daily_active`
-- Application metadata such as package version, plugin name, runtime, and command or entry-point context
-- Error diagnostics captured during failed CLI runs
+- `omo_daily_active`, sent at most once per UTC day per machine when the plugin loads or when the `run` CLI is invoked, used to estimate daily, weekly, and monthly active installations
+- Anonymous machine metadata bundled with that event, such as package version, plugin name, runtime, OS family, locale, and timezone
 - A pseudonymous installation identifier derived from a one-way hash of the local hostname
 
-We do not intentionally collect prompt contents, source files, repository contents, access tokens, API keys, or raw hostnames through this telemetry path.
+The Application does not create or update PostHog person profiles, and does not collect prompt contents, source files, repository contents, access tokens, API keys, raw hostnames, or runtime error diagnostics through this telemetry path.
 
 ### Configuration and local state
 
@@ -29,7 +28,7 @@ The Application stores local configuration and telemetry deduplication state on 
 
 ## 2. How Telemetry Works
 
-The Application uses PostHog for anonymous product analytics. Telemetry is enabled by default, following the same opt-out posture used in cmux, and is intended to help us understand installation success, runtime reliability, and broad usage patterns.
+The Application uses PostHog for anonymous product analytics. Telemetry is enabled by default, following the same opt-out posture used in cmux, and is intended only to estimate active installations (daily, weekly, and monthly) so we can understand broad adoption.
 
 Telemetry can be disabled at any time by setting one of these environment variables before running the CLI or plugin host:
 
@@ -55,16 +54,15 @@ Each third-party service has its own terms and privacy practices.
 
 We use collected information to:
 
-- Measure installation and runtime health
-- Understand aggregate feature usage
-- Diagnose failures and improve reliability
+- Estimate daily, weekly, and monthly active installations
+- Understand aggregate adoption across operating systems and package versions
 - Maintain and evolve the Service
 
 We do not sell personal information collected through this telemetry path.
 
 ## 5. Data Retention
 
-Anonymous analytics and diagnostics are retained only as long as reasonably necessary for product, security, and operational analysis. Local telemetry state stored on your machine remains there until removed by you.
+Anonymous analytics are retained only as long as reasonably necessary for understanding adoption. Local telemetry state stored on your machine remains there until removed by you.
 
 ## 6. Your Choices
 
