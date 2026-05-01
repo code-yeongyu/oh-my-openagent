@@ -155,7 +155,7 @@ describe("team-layout-tmux", () => {
     expect(literals.some((s) => s.includes("--session 's-m2'"))).toBe(true)
   })
 
-  test("uses main-vertical layout with leader at 30%", async () => {
+  test("uses main-vertical layout with leader at 30% for up to 3 teammates", async () => {
     // given
     const { createTeamLayout } = await loadLayoutModule()
     const members = [
@@ -177,39 +177,48 @@ describe("team-layout-tmux", () => {
     expect(Object.keys(result?.focusPanesByMember ?? {}).sort()).toEqual(["m1", "m2", "m3"])
   })
 
-  test("sets pane title for each member", async () => {
+  test("#given 4 or more teammates #when createTeamLayout runs #then it switches to tiled layout and stops resizing the leader pane", async () => {
     // given
     const { createTeamLayout } = await loadLayoutModule()
-    const members = [
-      { name: "lead", sessionId: "s-lead", worktreePath: "/tmp/lead" },
-      { name: "m2", sessionId: "s-m2", worktreePath: "/tmp/m2" },
-    ]
+    const members = Array.from({ length: 5 }, (_, index) => ({
+      name: `m${index + 1}`,
+      sessionId: `s-m${index + 1}`,
+      worktreePath: `/tmp/m${index + 1}`,
+    }))
 
     // when
-    await createTeamLayout("run-title", members, tmuxMgr as never)
+    await createTeamLayout("run-tiled", members, tmuxMgr as never)
 
     // then
     const commands = getCommands()
-    const titleSetters = commands
-      .filter((args) => args[0] === "select-pane" && args.includes("-T"))
-      .map((args) => args[args.length - 1])
-    expect(titleSetters).toContain("lead")
-    expect(titleSetters).toContain("m2")
+    const selectLayoutArgs = commands.filter((args) => args[0] === "select-layout").map((args) => args[args.length - 1])
+    expect(selectLayoutArgs).toContain("tiled")
+    const tiledIndex = selectLayoutArgs.indexOf("tiled")
+    const layoutsAfterTiled = selectLayoutArgs.slice(tiledIndex)
+    expect(layoutsAfterTiled.every((layout) => layout === "tiled")).toBe(true)
+    const indexOfFirstTiled = commands.findIndex((args) => args[0] === "select-layout" && args[args.length - 1] === "tiled")
+    const resizesAfterTiled = commands
+      .slice(indexOfFirstTiled)
+      .filter((args) => args[0] === "resize-pane" && args.includes("30%"))
+    expect(resizesAfterTiled).toEqual([])
   })
 
-  test("#given caller inside tmux #when createTeamLayout runs #then it restores keyboard focus and avoids border status mutation", async () => {
+  test("#given caller inside tmux #when createTeamLayout runs #then it never steals focus or mutates window border options", async () => {
     // given
     const { createTeamLayout } = await loadLayoutModule()
-    const members = [{ name: "m1", sessionId: "s-m1", worktreePath: "/tmp/m1" }]
+    const members = Array.from({ length: 5 }, (_, index) => ({
+      name: `m${index + 1}`,
+      sessionId: `s-m${index + 1}`,
+      worktreePath: `/tmp/m${index + 1}`,
+    }))
 
     // when
-    await createTeamLayout("run-options", members, tmuxMgr as never)
+    await createTeamLayout("run-no-focus", members, tmuxMgr as never)
 
     // then
     const commands = getCommands()
-    const focusRestores = commands.filter((args) => args[0] === "select-pane" && args[1] === "-t" && args[2] === "%42")
-    expect(focusRestores.length).toBe(1)
-    expect(commands.some((args) => args[0] === "set-option" && args.includes("pane-border-status"))).toBe(false)
+    expect(commands.some((args) => args[0] === "select-pane")).toBe(false)
+    expect(commands.some((args) => args[0] === "set-option")).toBe(false)
   })
 
   test("#given ownedSession=false, focusWindowId=@10, gridWindowId=@11 #when removeTeamLayout runs #then tmux kill-window is called twice with -t @10 and -t @11 and kill-session is NEVER called", async () => {

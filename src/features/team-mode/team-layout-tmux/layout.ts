@@ -68,8 +68,14 @@ async function listPanesInWindow(tmuxPath: string, windowTarget: string): Promis
 async function rebalanceWithLeader(tmuxPath: string, windowTarget: string, leaderPaneId: string): Promise<void> {
   const panes = await listPanesInWindow(tmuxPath, windowTarget)
   if (panes.length <= 1) return
-  await runTmuxCommand(tmuxPath, ["select-layout", "-t", windowTarget, "main-vertical"])
-  await runTmuxCommand(tmuxPath, ["resize-pane", "-t", leaderPaneId, "-x", "30%"])
+  // main-vertical with many teammates collapses each pane to ~10 rows, which the
+  // opencode TUI cannot render. Switch to tiled once the column gets too tall.
+  const teammateCount = panes.length - 1
+  const layout = teammateCount >= 4 ? "tiled" : "main-vertical"
+  await runTmuxCommand(tmuxPath, ["select-layout", "-t", windowTarget, layout])
+  if (layout === "main-vertical") {
+    await runTmuxCommand(tmuxPath, ["resize-pane", "-t", leaderPaneId, "-x", "30%"])
+  }
 }
 
 async function createTeammatePaneInCurrentWindow(
@@ -104,12 +110,6 @@ async function createTeammatePaneInCurrentWindow(
 
     if (!splitResult.success || !splitResult.output) return null
     const paneId = splitResult.output.trim()
-
-    await runTmuxCommand(tmuxPath, ["select-pane", "-t", paneId, "-T", member.name])
-    await runTmuxCommand(tmuxPath, ["select-pane", "-t", leaderPaneId])
-    await runTmuxCommand(tmuxPath, ["set-option", "-p", "-t", paneId, "pane-border-style", "fg=cyan"])
-    await runTmuxCommand(tmuxPath, ["set-option", "-p", "-t", paneId, "pane-active-border-style", "fg=cyan"])
-    await runTmuxCommand(tmuxPath, ["set-option", "-p", "-t", paneId, "pane-border-format", "#[fg=cyan,bold] #{pane_title} #[default]"])
 
     await rebalanceWithLeader(tmuxPath, windowTarget, leaderPaneId)
     await new Promise((resolve) => setTimeout(resolve, PANE_SHELL_INIT_DELAY_MS))
