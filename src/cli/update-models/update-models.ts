@@ -134,6 +134,8 @@ export async function updateModels(
 
     if (options.json) {
       console.log(JSON.stringify(result, null, 2))
+    } else {
+      console.log(result.message)
     }
 
     return result
