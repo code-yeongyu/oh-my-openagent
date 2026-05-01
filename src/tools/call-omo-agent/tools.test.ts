@@ -136,6 +136,19 @@ describe("createCallOmoAgent", () => {
   })
 
   describe("dynamic custom agent resolution", () => {
+    test("should reject missing subagent_type without throwing", async () => {
+      const mockCtx = createMockCtx(DEFAULT_AGENTS)
+      const toolDef = createCallOmoAgent(mockCtx, mockBackgroundManager, [])
+      const executeFunc = toolDef.execute as Function
+
+      const result = await executeFunc(
+        { description: "Test", prompt: "Fix bug", run_in_background: true },
+        toolCtx
+      )
+
+      expect(result).toContain("subagent_type is required")
+    })
+
     test("should accept a custom agent returned by client.app.agents()", async () => {
       const agents = [...DEFAULT_AGENTS, { name: "bug-fixer", mode: "subagent" }]
       const mockCtx = createMockCtx(agents)
