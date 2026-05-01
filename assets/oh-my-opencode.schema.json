@@ -128,7 +128,8 @@
                           "low",
                           "medium",
                           "high",
-                          "xhigh"
+                          "xhigh",
+                          "max"
                         ]
                       },
                       "temperature": {
@@ -194,7 +195,8 @@
                               "low",
                               "medium",
                               "high",
-                              "xhigh"
+                              "xhigh",
+                              "max"
                             ]
                           },
                           "temperature": {
@@ -397,7 +399,8 @@
                 "low",
                 "medium",
                 "high",
-                "xhigh"
+                "xhigh",
+                "max"
               ]
             },
             "textVerbosity": {
@@ -478,7 +481,8 @@
                           "low",
                           "medium",
                           "high",
-                          "xhigh"
+                          "xhigh",
+                          "max"
                         ]
                       },
                       "temperature": {
@@ -544,7 +548,8 @@
                               "low",
                               "medium",
                               "high",
-                              "xhigh"
+                              "xhigh",
+                              "max"
                             ]
                           },
                           "temperature": {
@@ -747,7 +752,8 @@
                 "low",
                 "medium",
                 "high",
-                "xhigh"
+                "xhigh",
+                "max"
               ]
             },
             "textVerbosity": {
@@ -828,7 +834,8 @@
                           "low",
                           "medium",
                           "high",
-                          "xhigh"
+                          "xhigh",
+                          "max"
                         ]
                       },
                       "temperature": {
@@ -894,7 +901,8 @@
                               "low",
                               "medium",
                               "high",
-                              "xhigh"
+                              "xhigh",
+                              "max"
                             ]
                           },
                           "temperature": {
@@ -1097,7 +1105,8 @@
                 "low",
                 "medium",
                 "high",
-                "xhigh"
+                "xhigh",
+                "max"
               ]
             },
             "textVerbosity": {
@@ -1178,7 +1187,8 @@
                           "low",
                           "medium",
                           "high",
-                          "xhigh"
+                          "xhigh",
+                          "max"
                         ]
                       },
                       "temperature": {
@@ -1244,7 +1254,8 @@
                               "low",
                               "medium",
                               "high",
-                              "xhigh"
+                              "xhigh",
+                              "max"
                             ]
                           },
                           "temperature": {
@@ -1447,7 +1458,8 @@
                 "low",
                 "medium",
                 "high",
-                "xhigh"
+                "xhigh",
+                "max"
               ]
             },
             "textVerbosity": {
@@ -1531,7 +1543,8 @@
                           "low",
                           "medium",
                           "high",
-                          "xhigh"
+                          "xhigh",
+                          "max"
                         ]
                       },
                       "temperature": {
@@ -1597,7 +1610,8 @@
                               "low",
                               "medium",
                               "high",
-                              "xhigh"
+                              "xhigh",
+                              "max"
                             ]
                           },
                           "temperature": {
@@ -1800,7 +1814,8 @@
                 "low",
                 "medium",
                 "high",
-                "xhigh"
+                "xhigh",
+                "max"
               ]
             },
             "textVerbosity": {
@@ -1881,7 +1896,8 @@
                           "low",
                           "medium",
                           "high",
-                          "xhigh"
+                          "xhigh",
+                          "max"
                         ]
                       },
                       "temperature": {
@@ -1947,7 +1963,8 @@
                               "low",
                               "medium",
                               "high",
-                              "xhigh"
+                              "xhigh",
+                              "max"
                             ]
                           },
                           "temperature": {
@@ -2150,7 +2167,8 @@
                 "low",
                 "medium",
                 "high",
-                "xhigh"
+                "xhigh",
+                "max"
               ]
             },
             "textVerbosity": {
@@ -2231,7 +2249,8 @@
                           "low",
                           "medium",
                           "high",
-                          "xhigh"
+                          "xhigh",
+                          "max"
                         ]
                       },
                       "temperature": {
@@ -2297,7 +2316,8 @@
                               "low",
                               "medium",
                               "high",
-                              "xhigh"
+                              "xhigh",
+                              "max"
                             ]
                           },
                           "temperature": {
@@ -2500,7 +2520,8 @@
                 "low",
                 "medium",
                 "high",
-                "xhigh"
+                "xhigh",
+                "max"
               ]
             },
             "textVerbosity": {
@@ -2581,7 +2602,8 @@
                           "low",
                           "medium",
                           "high",
-                          "xhigh"
+                          "xhigh",
+                          "max"
                         ]
                       },
                       "temperature": {
@@ -2647,7 +2669,8 @@
                               "low",
                               "medium",
                               "high",
-                              "xhigh"
+                              "xhigh",
+                              "max"
                             ]
                           },
                           "temperature": {
@@ -2850,7 +2873,8 @@
                 "low",
                 "medium",
                 "high",
-                "xhigh"
+                "xhigh",
+                "max"
               ]
             },
             "textVerbosity": {
@@ -2931,7 +2955,8 @@
                           "low",
                           "medium",
                           "high",
-                          "xhigh"
+                          "xhigh",
+                          "max"
                         ]
                       },
                       "temperature": {
@@ -2997,7 +3022,8 @@
                               "low",
                               "medium",
                               "high",
-                              "xhigh"
+                              "xhigh",
+                              "max"
                             ]
                           },
                           "temperature": {
@@ -3200,7 +3226,8 @@
                 "low",
                 "medium",
                 "high",
-                "xhigh"
+                "xhigh",
+                "max"
               ]
             },
             "textVerbosity": {
@@ -3281,7 +3308,8 @@
                           "low",
                           "medium",
                           "high",
-                          "xhigh"
+                          "xhigh",
+                          "max"
                         ]
                       },
                       "temperature": {
@@ -3347,7 +3375,8 @@
                               "low",
                               "medium",
                               "high",
-                              "xhigh"
+                              "xhigh",
+                              "max"
                             ]
                           },
                           "temperature": {
@@ -3550,7 +3579,8 @@
                 "low",
                 "medium",
                 "high",
-                "xhigh"
+                "xhigh",
+                "max"
               ]
             },
             "textVerbosity": {
@@ -3631,7 +3661,8 @@
                           "low",
                           "medium",
                           "high",
-                          "xhigh"
+                          "xhigh",
+                          "max"
                         ]
                       },
                       "temperature": {
@@ -3697,7 +3728,8 @@
                               "low",
                               "medium",
                               "high",
-                              "xhigh"
+                              "xhigh",
+                              "max"
                             ]
                           },
                           "temperature": {
@@ -3900,7 +3932,8 @@
                 "low",
                 "medium",
                 "high",
-                "xhigh"
+                "xhigh",
+                "max"
               ]
             },
             "textVerbosity": {
@@ -3981,7 +4014,8 @@
                           "low",
                           "medium",
                           "high",
-                          "xhigh"
+                          "xhigh",
+                          "max"
                         ]
                       },
                       "temperature": {
@@ -4047,7 +4081,8 @@
                               "low",
                               "medium",
                               "high",
-                              "xhigh"
+                              "xhigh",
+                              "max"
                             ]
                           },
                           "temperature": {
@@ -4250,7 +4285,8 @@
                 "low",
                 "medium",
                 "high",
-                "xhigh"
+                "xhigh",
+                "max"
               ]
             },
             "textVerbosity": {
@@ -4331,7 +4367,8 @@
                           "low",
                           "medium",
                           "high",
-                          "xhigh"
+                          "xhigh",
+                          "max"
                         ]
                       },
                       "temperature": {
@@ -4397,7 +4434,8 @@
                               "low",
                               "medium",
                               "high",
-                              "xhigh"
+                              "xhigh",
+                              "max"
                             ]
                           },
                           "temperature": {
@@ -4600,7 +4638,8 @@
                 "low",
                 "medium",
                 "high",
-                "xhigh"
+                "xhigh",
+                "max"
               ]
             },
             "textVerbosity": {
@@ -4681,7 +4720,8 @@
                           "low",
                           "medium",
                           "high",
-                          "xhigh"
+                          "xhigh",
+                          "max"
                         ]
                       },
                       "temperature": {
@@ -4747,7 +4787,8 @@
                               "low",
                               "medium",
                               "high",
-                              "xhigh"
+                              "xhigh",
+                              "max"
                             ]
                           },
                           "temperature": {
@@ -4950,7 +4991,8 @@
                 "low",
                 "medium",
                 "high",
-                "xhigh"
+                "xhigh",
+                "max"
               ]
             },
             "textVerbosity": {
@@ -5042,7 +5084,8 @@
                         "low",
                         "medium",
                         "high",
-                        "xhigh"
+                        "xhigh",
+                        "max"
                       ]
                     },
                     "temperature": {
@@ -5108,7 +5151,8 @@
                             "low",
                             "medium",
                             "high",
-                            "xhigh"
+                            "xhigh",
+                            "max"
                           ]
                         },
                         "temperature": {
@@ -5197,7 +5241,8 @@
               "low",
               "medium",
               "high",
-              "xhigh"
+              "xhigh",
+              "max"
             ]
           },
           "textVerbosity": {
