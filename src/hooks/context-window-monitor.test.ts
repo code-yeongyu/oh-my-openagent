@@ -143,6 +143,62 @@ describe("context-window-monitor", () => {
     expect(ctx.client.session.messages).not.toHaveBeenCalled()
   })
 
+  // #given total input tokens exceed the resolved actualLimit (e.g. 1M-context
+  //        Anthropic model where resolveActualContextLimit falls back to the
+  //        200K default for the model family)
+  // #when tool.execute.after appends the context status block
+  // #then the displayed used% must be clamped to 100 and remaining% must not go
+  //       negative. Safety-tuned models flag the >100% / negative-remaining
+  //       block as prompt injection (issue #3655).
+  it("should clamp displayed percentages when input exceeds actualLimit (regression #3655)", async () => {
+    const hook = createContextWindowMonitorHook(ctx as never)
+    const sessionID = "ses_overflow"
+
+    // 289,370 input + 0 cache against a 200K resolved limit -> 144.7% raw,
+    // -44.7% remaining if not clamped.
+    await hook.event({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            role: "assistant",
+            sessionID,
+            providerID: "anthropic",
+            finish: true,
+            tokens: {
+              input: 289370,
+              output: 0,
+              reasoning: 0,
+              cache: { read: 0, write: 0 },
+            },
+          },
+        },
+      },
+    })
+
+    const output = { title: "", output: "original", metadata: null }
+    await hook["tool.execute.after"](
+      { tool: "bash", sessionID, callID: "call_1" },
+      output
+    )
+
+    // The block must still be emitted (we are above the 70% threshold).
+    expect(output.output).toContain("[Context Status:")
+
+    // Extract the displayed percentages and assert clamping.
+    const match = output.output.match(
+      /\[Context Status: ([\d.-]+)% used \([\d,]+\/[\d,]+ tokens\), ([\d.-]+)% remaining\]/,
+    )
+    expect(match).not.toBeNull()
+    const usedPct = Number(match![1])
+    const remainingPct = Number(match![2])
+
+    expect(usedPct).toBeLessThanOrEqual(100)
+    expect(usedPct).toBeGreaterThanOrEqual(0)
+    expect(remainingPct).toBeGreaterThanOrEqual(0)
+    expect(remainingPct).toBeLessThanOrEqual(100)
+  })
+
   it("should append context reminder for google-vertex-anthropic provider", async () => {
     //#given cached usage for google-vertex-anthropic above threshold
     const hook = createContextWindowMonitorHook(ctx as never)
