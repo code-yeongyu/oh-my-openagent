@@ -26,6 +26,17 @@ function createCategoryMember(name: string): Member {
   }
 }
 
+function createHyperplanMember(name: string, category: string): Member {
+  return {
+    kind: "category",
+    name,
+    category,
+    prompt: `perform the ${name} adversarial role`,
+    backendType: "in-process",
+    isActive: true,
+  }
+}
+
 function createBaseTeamSpec(): TeamSpec {
   return {
     version: 1,
@@ -144,6 +155,48 @@ describe("team-registry validator", () => {
 
     // then
     expect(act).toThrow("Team 'validator-team' exceeds max 8 members.")
+  })
+
+  test("rejects hyperplan teams that omit required adversarial categories", () => {
+    // given
+    const teamSpec: TeamSpec = {
+      version: 1,
+      name: "hyperplan",
+      createdAt: 1,
+      leadAgentId: "architect",
+      members: [
+        createHyperplanMember("researcher", "deep"),
+        createHyperplanMember("architect", "ultrabrain"),
+      ],
+    }
+
+    // when
+    const act = () => validateSpec(teamSpec)
+
+    // then
+    expect(act).toThrow("Hyperplan team must include category 'unspecified-low'.")
+  })
+
+  test("accepts hyperplan teams with required adversarial categories and optional deep", () => {
+    // given
+    const teamSpec: TeamSpec = {
+      version: 1,
+      name: "hyperplan",
+      createdAt: 1,
+      leadAgentId: "architect",
+      members: [
+        createHyperplanMember("skeptic", "unspecified-low"),
+        createHyperplanMember("validator", "unspecified-high"),
+        createHyperplanMember("architect", "ultrabrain"),
+        createHyperplanMember("creative", "artistry"),
+      ],
+    }
+
+    // when
+    const act = () => validateSpec(teamSpec)
+
+    // then
+    expect(act).not.toThrow()
   })
 
   test("rejects category prompts that collapse to empty text", () => {

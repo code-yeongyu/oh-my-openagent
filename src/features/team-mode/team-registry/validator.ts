@@ -3,6 +3,12 @@ import { AGENT_ELIGIBILITY_REGISTRY } from "../types"
 import type { Member, TeamSpec } from "../types"
 
 const MAX_TEAM_MEMBERS = 8
+const HYPERPLAN_REQUIRED_CATEGORIES = [
+  "unspecified-low",
+  "unspecified-high",
+  "ultrabrain",
+  "artistry",
+] as const
 const UNKNOWN_SUBAGENT_MESSAGE =
   "Unknown subagent_type '<name>'. Available ELIGIBLE agents: sisyphus, atlas, sisyphus-junior, hephaestus (if D-36 applied). Use delegate-task for read-only agents like oracle, librarian, explore, metis, momus, multimodal-looker."
 
@@ -55,6 +61,30 @@ export function validateSpec(spec: TeamSpec): void {
       "INVALID_LEAD_AGENT_ID",
       "leadAgentId",
     )
+  }
+
+  validateHyperplanComposition(spec)
+}
+
+function validateHyperplanComposition(spec: TeamSpec): void {
+  if (spec.name !== "hyperplan") {
+    return
+  }
+
+  const categories = new Set(
+    spec.members
+      .filter((member) => member.kind === "category")
+      .map((member) => member.category),
+  )
+
+  for (const category of HYPERPLAN_REQUIRED_CATEGORIES) {
+    if (!categories.has(category)) {
+      throw new TeamSpecValidationError(
+        `Hyperplan team must include category '${category}'.`,
+        "HYPERPLAN_REQUIRED_CATEGORY_MISSING",
+        "members",
+      )
+    }
   }
 }
 
