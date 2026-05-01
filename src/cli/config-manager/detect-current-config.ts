@@ -6,7 +6,7 @@ import { detectConfigFormat } from "./opencode-config-format"
 import { parseOpenCodeConfigFileWithError } from "./parse-opencode-config-file"
 import { extractVersionFromPluginEntry } from "./version-compatibility"
 
-function detectProvidersFromOmoConfig(): {
+function detectProvidersFromOmoConfig(projectDir?: string): {
   hasOpenAI: boolean
   hasOpencodeZen: boolean
   hasZaiCodingPlan: boolean
@@ -14,7 +14,9 @@ function detectProvidersFromOmoConfig(): {
   hasOpencodeGo: boolean
   hasVercelAiGateway: boolean
 } {
-  const omoConfigPath = getOmoConfigPath()
+  const omoConfigPath = projectDir
+    ? `${projectDir}/.opencode/oh-my-openagent.json`
+    : getOmoConfigPath()
   if (!existsSync(omoConfigPath)) {
     return {
       hasOpenAI: true,
@@ -70,7 +72,7 @@ function findOurPluginEntry(plugins: string[]): string | null {
   return plugins.find(isOurPlugin) ?? null
 }
 
-export function detectCurrentConfig(): DetectedConfig {
+export function detectCurrentConfig(directory?: string): DetectedConfig {
   const result: DetectedConfig = {
     isInstalled: false,
     installedVersion: null,
@@ -86,7 +88,9 @@ export function detectCurrentConfig(): DetectedConfig {
     hasVercelAiGateway: false,
   }
 
-  const { format, path } = detectConfigFormat()
+  const { format, path } = directory
+    ? detectConfigFormat(directory)
+    : detectConfigFormat()
   if (format === "none") {
     return result
   }
@@ -112,7 +116,7 @@ export function detectCurrentConfig(): DetectedConfig {
   const providers = openCodeConfig.provider as Record<string, unknown> | undefined
   result.hasGemini = providers ? "google" in providers : false
 
-  const { hasOpenAI, hasOpencodeZen, hasZaiCodingPlan, hasKimiForCoding, hasOpencodeGo, hasVercelAiGateway } = detectProvidersFromOmoConfig()
+  const { hasOpenAI, hasOpencodeZen, hasZaiCodingPlan, hasKimiForCoding, hasOpencodeGo, hasVercelAiGateway } = detectProvidersFromOmoConfig(directory)
   result.hasOpenAI = hasOpenAI
   result.hasOpencodeZen = hasOpencodeZen
   result.hasZaiCodingPlan = hasZaiCodingPlan

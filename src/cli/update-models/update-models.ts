@@ -53,7 +53,7 @@ export async function updateModels(
   }
 
   // Detect providers from existing config
-  const providerConfig = detect()
+  const providerConfig = detect(directory)
 
   // Generate new defaults based on detected providers
   const generatedConfig = generate(providerConfig)
