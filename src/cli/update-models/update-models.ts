@@ -18,6 +18,7 @@ export interface UpdateModelsDeps {
   writeFile?: (path: string, content: string) => void
   readFile?: (path: string) => string
   existsFile?: (path: string) => boolean
+  renameFile?: (oldPath: string, newPath: string) => void
 }
 
 export async function updateModels(
@@ -33,6 +34,7 @@ export async function updateModels(
     writeFile = writeFileSync,
     readFile = readFileSync,
     existsFile = existsSync,
+    renameFile = renameSync,
   } = deps
 
   const directory = options.directory ?? process.cwd()
@@ -80,39 +82,30 @@ export async function updateModels(
     newCategories = generatedCategories as Record<string, ModelMappingEntry>
     updated.push(...Object.keys(generatedAgents), ...Object.keys(generatedCategories))
   } else {
-    // Preserve-custom mode: merge carefully
     newAgents = { ...currentAgents }
     newCategories = { ...currentCategories }
 
-    // Update agents that match defaults (not customized)
-    for (const [key, value] of Object.entries(agentsComparison.toUpdate)) {
-      newAgents[key] = value
-      updated.push(`agents.${key}`)
+    for (const key of Object.keys(agentsComparison.toUpdate)) {
+      preserved.push(`agents.${key}`)
     }
 
-    // Preserve agents that are customized
     for (const key of agentsComparison.toPreserve) {
       preserved.push(`agents.${key}`)
     }
 
-    // Add new agents
     for (const [key, value] of Object.entries(agentsComparison.toAdd)) {
       newAgents[key] = value
       added.push(`agents.${key}`)
     }
 
-    // Update categories that match defaults
-    for (const [key, value] of Object.entries(categoriesComparison.toUpdate)) {
-      newCategories[key] = value
-      updated.push(`categories.${key}`)
+    for (const key of Object.keys(categoriesComparison.toUpdate)) {
+      preserved.push(`categories.${key}`)
     }
 
-    // Preserve customized categories
     for (const key of categoriesComparison.toPreserve) {
       preserved.push(`categories.${key}`)
     }
 
-    // Add new categories
     for (const [key, value] of Object.entries(categoriesComparison.toAdd)) {
       newCategories[key] = value
       added.push(`categories.${key}`)
@@ -155,7 +148,7 @@ export async function updateModels(
   // Atomic write: write to temp file then rename
   const tempPath = `${configPath}.tmp`
   writeFile(tempPath, JSON.stringify(newConfig, null, 2) + "\n")
-  renameSync(tempPath, configPath)
+  renameFile(tempPath, configPath)
 
   const result: UpdateModelsResult = {
     success: true,
