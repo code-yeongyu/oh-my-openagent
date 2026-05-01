@@ -135,9 +135,7 @@ describe("#given process cleanup registration", () => {
     })
 
     test("#given two managers registered #when uncaughtException fires #then both shutdowns called", async () => {
-      const exitSpy = spyOn(process, "exit").mockImplementation((code?: number): never => {
-        throw new Error(`Unexpected process.exit(${String(code)})`)
-      })
+      const exitSpy = spyOn(process, "exit").mockImplementation((() => undefined) as never)
       const shutdownOne = mock(() => {})
       const shutdownTwo = mock(() => {})
       const managerOne = { shutdown: shutdownOne }
@@ -154,7 +152,7 @@ describe("#given process cleanup registration", () => {
         expect(shutdownOne).toHaveBeenCalledTimes(1)
         expect(shutdownTwo).toHaveBeenCalledTimes(1)
         expect(process.exitCode).toBe(1)
-        expect(exitSpy).not.toHaveBeenCalled()
+        expect(exitSpy).toHaveBeenCalledWith(1)
       } finally {
         exitSpy.mockRestore()
       }
@@ -219,10 +217,8 @@ describe("#given process cleanup registration", () => {
   })
 
   describe("#given uncaught exception and rejection cleanup", () => {
-    test("#given manager registered AND process emits uncaughtException #when event fires #then manager.shutdown() called AND process.exitCode set to 1", async () => {
-      const exitSpy = spyOn(process, "exit").mockImplementation((code?: number): never => {
-        throw new Error(`Unexpected process.exit(${String(code)})`)
-      })
+    test("#given manager registered AND process emits uncaughtException #when event fires #then manager shuts down before process exits", async () => {
+      const exitSpy = spyOn(process, "exit").mockImplementation((() => undefined) as never)
       const shutdown = mock(() => {})
       const manager = { shutdown }
       registeredManagers.push(manager)
@@ -235,16 +231,14 @@ describe("#given process cleanup registration", () => {
 
         expect(shutdown).toHaveBeenCalledTimes(1)
         expect(process.exitCode).toBe(1)
-        expect(exitSpy).not.toHaveBeenCalled()
+        expect(exitSpy).toHaveBeenCalledWith(1)
       } finally {
         exitSpy.mockRestore()
       }
     })
 
-    test("#given manager registered AND process emits unhandledRejection #when event fires #then manager.shutdown() called AND process.exitCode set to 1", async () => {
-      const exitSpy = spyOn(process, "exit").mockImplementation((code?: number): never => {
-        throw new Error(`Unexpected process.exit(${String(code)})`)
-      })
+    test("#given manager registered AND process emits unhandledRejection #when event fires #then manager shuts down before process exits", async () => {
+      const exitSpy = spyOn(process, "exit").mockImplementation((() => undefined) as never)
       const shutdown = mock(() => {})
       const manager = { shutdown }
       registeredManagers.push(manager)
@@ -257,7 +251,7 @@ describe("#given process cleanup registration", () => {
 
         expect(shutdown).toHaveBeenCalledTimes(1)
         expect(process.exitCode).toBe(1)
-        expect(exitSpy).not.toHaveBeenCalled()
+        expect(exitSpy).toHaveBeenCalledWith(1)
       } finally {
         exitSpy.mockRestore()
       }

@@ -3,11 +3,18 @@ import { log } from "../../shared"
 type ProcessCleanupSignal = NodeJS.Signals | "beforeExit" | "exit"
 type ProcessCleanupErrorEvent = "uncaughtException" | "unhandledRejection"
 
-function scheduleForcedExit(cleanupResult: void | Promise<void>, exitCode: number): void {
+function scheduleForcedExit(
+  cleanupResult: void | Promise<void>,
+  exitCode: number,
+  exitAfterCleanup = false,
+): void {
   process.exitCode = exitCode
   const exitTimeout = setTimeout(() => process.exit(), 6000)
   void Promise.resolve(cleanupResult).finally(() => {
     clearTimeout(exitTimeout)
+    if (exitAfterCleanup) {
+      process.exit(exitCode)
+    }
   })
 }
 
@@ -32,7 +39,7 @@ function registerErrorEvent(
 ): (error: unknown) => void {
   const listener = (error: unknown) => {
     log(`[background-agent] ${signal} received during shutdown cleanup:`, error)
-    scheduleForcedExit(handler(error), 1)
+    scheduleForcedExit(handler(error), 1, true)
   }
   process.on(signal, listener)
   return listener
