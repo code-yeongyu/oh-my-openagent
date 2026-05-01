@@ -78,9 +78,19 @@ export async function updateModels(
   let newCategories: Record<string, ModelMappingEntry>
 
   if (options.mode === "full-replacement") {
-    newAgents = generatedAgents as Record<string, ModelMappingEntry>
-    newCategories = generatedCategories as Record<string, ModelMappingEntry>
-    updated.push(...Object.keys(generatedAgents), ...Object.keys(generatedCategories))
+    // Merge generated model properties INTO existing entries to preserve non-model properties
+    newAgents = { ...currentAgents }
+    newCategories = { ...currentCategories }
+
+    for (const [key, value] of Object.entries(generatedAgents)) {
+      newAgents[key] = { ...currentAgents[key], ...value }
+      updated.push(`agents.${key}`)
+    }
+
+    for (const [key, value] of Object.entries(generatedCategories)) {
+      newCategories[key] = { ...currentCategories[key], ...value }
+      updated.push(`categories.${key}`)
+    }
   } else {
     newAgents = { ...currentAgents }
     newCategories = { ...currentCategories }

@@ -223,6 +223,9 @@ Modes:
       json: options.json ?? false,
     }
     const result = await updateModels(updateModelsOptions)
+    if (!result.success) {
+      console.error(result.message)
+    }
     process.exit(result.success ? 0 : 1)
   })
 
