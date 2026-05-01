@@ -18,7 +18,7 @@ import {
   buildGeminiToolCallExamples,
 } from "./sisyphus/gemini";
 import { buildClaudeOpus47SisyphusPrompt } from "./sisyphus/claude-opus-4-7";
-import { buildGlmWorkingMemory, buildGlmVisionConstraint } from "./sisyphus/glm";
+import { buildGlmSisyphusPrompt } from "./sisyphus/glm-prompt";
 import { buildGpt54SisyphusPrompt } from "./sisyphus/gpt-5-4";
 import { buildGpt55SisyphusPrompt } from "./sisyphus/gpt-5-5";
 import { buildKimiK26SisyphusPrompt } from "./sisyphus/kimi-k2-6";
@@ -629,14 +629,13 @@ export function createSisyphusAgent(
   }
 
   if (isGlmSisyphusHarnessModel(model)) {
-    prompt = prompt.replace(
-      "</Role>",
-      `</Role>\n\n${buildGlmWorkingMemory()}`
-    );
-
-    prompt = prompt.replace(
-      "**Default Bias: DELEGATE. WORK YOURSELF ONLY WHEN IT IS SUPER SIMPLE.**",
-      `**Default Bias: DELEGATE. WORK YOURSELF ONLY WHEN IT IS SUPER SIMPLE.**\n\n${buildGlmVisionConstraint()}`
+    prompt = buildGlmSisyphusPrompt(
+      model,
+      agents,
+      tools,
+      skills,
+      categories,
+      useTaskSystem,
     );
   }
 
