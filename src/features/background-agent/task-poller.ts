@@ -131,7 +131,7 @@ export async function checkAndInterruptStaleTasks(args: {
     if (task.status !== "running") continue
 
     const startedAt = task.startedAt
-    const sessionID = task.sessionID
+    const sessionID = task.sessionId
     if (!startedAt || !sessionID) continue
 
     const sessionStatus = sessionStatuses?.[sessionID]?.type

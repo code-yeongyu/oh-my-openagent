@@ -41,12 +41,12 @@ export async function formatFullSession(
     thinkingMaxChars?: number
   }
 ): Promise<string> {
-  if (!task.sessionID) {
+  if (!task.sessionId) {
     return formatTaskStatus(task)
   }
 
   const messagesResult: BackgroundOutputMessagesResult = await client.session.messages({
-    path: { id: task.sessionID },
+    path: { id: task.sessionId },
   })
 
   const errorMessage = getErrorMessage(messagesResult)
@@ -107,7 +107,7 @@ export async function formatFullSession(
   lines.push(`Task ID: ${task.id}`)
   lines.push(`Description: ${task.description}`)
   lines.push(`Status: ${task.status}`)
-  lines.push(`Session ID: ${task.sessionID}`)
+  lines.push(`Session ID: ${task.sessionId}`)
   lines.push(`Total messages: ${normalizedMessages.length}`)
   lines.push(`Returned: ${visibleMessages.length}`)
   lines.push(`Has more: ${hasMore ? "true" : "false"}`)

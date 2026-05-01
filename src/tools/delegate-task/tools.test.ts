@@ -578,7 +578,7 @@ describe("sisyphus-task", () => {
       // given a mock client with no model in config
       const { createDelegateTask } = require("./tools")
       
-       const mockManager = { launch: async () => ({ id: "task-123", status: "pending", description: "Test task", agent: "sisyphus-junior", sessionID: "test-session" }) }
+       const mockManager = { launch: async () => ({ id: "task-123", status: "pending", description: "Test task", agent: "sisyphus-junior", sessionId: "test-session" }) }
        const mockClient = {
          app: { agents: async () => ({ data: [] }) },
          config: { get: async () => ({}) }, // No model configured
@@ -687,7 +687,7 @@ describe("sisyphus-task", () => {
           const task = { id: "bg_1", status: "pending", description: "Test task", agent: "explore" }
           tasks.set(task.id, task)
           setTimeout(() => {
-            tasks.set(task.id, { ...task, status: "running", sessionID: "ses_child" })
+            tasks.set(task.id, { ...task, status: "running", sessionId: "ses_child" })
           }, 20)
           return task
         },
@@ -1363,7 +1363,7 @@ describe("sisyphus-task", () => {
     test("#given task_id without run_in_background #when executing #then throws required parameter error", async () => {
       // given
       const { createDelegateTask } = require("./tools")
-      const mockManager = { resume: async () => ({ id: "task-1", sessionID: "ses_1", status: "running" }) }
+      const mockManager = { resume: async () => ({ id: "task-1", sessionId: "ses_1", status: "running" }) }
       const mockClient = {
         app: { agents: async () => ({ data: [] }) },
         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
@@ -1596,7 +1596,7 @@ describe("sisyphus-task", () => {
           launchCalled = true
           return {
             id: "bg_explicit_true",
-            sessionID: "ses_bg_explicit_true",
+            sessionId: "ses_bg_explicit_true",
             description: "Explicit true",
             agent: "Sisyphus-Junior",
             status: "running",
@@ -1639,8 +1639,8 @@ describe("sisyphus-task", () => {
       const firstAbortController = new AbortController()
       const secondAbortController = new AbortController()
       const taskStates = new Map([
-        ["bg_tool_first", { reads: 0, abortOnFirstRead: true, sessionID: "ses_tool_first" }],
-        ["bg_tool_second", { reads: 0, abortOnFirstRead: false, sessionID: "ses_tool_second" }],
+        ["bg_tool_first", { reads: 0, abortOnFirstRead: true, sessionId: "ses_tool_first" }],
+        ["bg_tool_second", { reads: 0, abortOnFirstRead: false, sessionId: "ses_tool_second" }],
       ])
       let launchCount = 0
       const mockManager = {
@@ -1649,14 +1649,14 @@ describe("sisyphus-task", () => {
           return launchCount === 1
             ? {
                 id: "bg_tool_first",
-                sessionID: undefined,
+                sessionId: undefined,
                 description: "Tool first",
                 agent: "Sisyphus-Junior",
                 status: "running",
               }
             : {
                 id: "bg_tool_second",
-                sessionID: undefined,
+                sessionId: undefined,
                 description: "Tool second",
                 agent: "Sisyphus-Junior",
                 status: "running",
@@ -1670,8 +1670,8 @@ describe("sisyphus-task", () => {
             firstAbortController.abort()
           }
           return state.reads >= 2
-            ? { sessionID: state.sessionID, status: "running" }
-            : { sessionID: undefined, status: "pending" }
+            ? { sessionId: state.sessionId, status: "running" }
+            : { sessionId: undefined, status: "pending" }
         },
       }
       const mockClient = {
@@ -1728,7 +1728,7 @@ describe("sisyphus-task", () => {
     
     const mockTask = {
       id: "task-123",
-      sessionID: "ses_continue_test",
+      sessionId: "ses_continue_test",
       description: "Continued task",
       agent: "explore",
       status: "running",
@@ -1890,7 +1890,7 @@ describe("sisyphus-task", () => {
     }
 
     const tool = createDelegateTask({
-      manager: { resume: async () => ({ id: "task-var", sessionID: "ses_var_test", description: "Variant test", agent: "sisyphus-junior", status: "running" }) },
+      manager: { resume: async () => ({ id: "task-var", sessionId: "ses_var_test", description: "Variant test", agent: "sisyphus-junior", status: "running" }) },
       client: mockClient,
     })
 
@@ -1927,7 +1927,7 @@ describe("sisyphus-task", () => {
     
     const mockTask = {
       id: "task-456",
-      sessionID: "ses_bg_continue",
+      sessionId: "ses_bg_continue",
       description: "Background continued task",
       agent: "explore",
       status: "running",
@@ -2223,7 +2223,7 @@ describe("sisyphus-task", () => {
       
       const launchedTask = {
         id: "task-unstable",
-        sessionID: "ses_unstable_gemini",
+        sessionId: "ses_unstable_gemini",
         description: "Unstable gemini task",
         agent: "sisyphus-junior",
         status: "running",
@@ -2294,7 +2294,7 @@ describe("sisyphus-task", () => {
           launchCalled = true
           return {
             id: "task-normal-bg",
-            sessionID: "ses_normal_bg",
+            sessionId: "ses_normal_bg",
             description: "Normal background task",
             agent: "sisyphus-junior",
             status: "running",
@@ -2350,7 +2350,7 @@ describe("sisyphus-task", () => {
 
       const launchedTask = {
         id: "task-unstable-minimax",
-        sessionID: "ses_unstable_minimax",
+        sessionId: "ses_unstable_minimax",
         description: "Unstable minimax task",
         agent: "sisyphus-junior",
         status: "running",
@@ -2424,7 +2424,7 @@ describe("sisyphus-task", () => {
       const mockManager = {
         launch: async () => {
           launchCalled = true
-          return { id: "should-not-be-called", sessionID: "x", description: "x", agent: "x", status: "running" }
+          return { id: "should-not-be-called", sessionId: "x", description: "x", agent: "x", status: "running" }
         },
       }
       
@@ -2486,7 +2486,7 @@ describe("sisyphus-task", () => {
       
       const launchedTask = {
         id: "task-artistry",
-        sessionID: "ses_artistry_gemini",
+        sessionId: "ses_artistry_gemini",
         description: "Artistry gemini task",
         agent: "sisyphus-junior",
         status: "running",
@@ -2569,7 +2569,7 @@ describe("sisyphus-task", () => {
       const mockManager = {
         launch: async () => {
           launchCalled = true
-          return { id: "should-not-be-called", sessionID: "x", description: "x", agent: "x", status: "running" }
+          return { id: "should-not-be-called", sessionId: "x", description: "x", agent: "x", status: "running" }
         },
       }
 
@@ -2630,7 +2630,7 @@ describe("sisyphus-task", () => {
       
       const launchedTask = {
         id: "task-custom-unstable",
-        sessionID: "ses_custom_unstable",
+        sessionId: "ses_custom_unstable",
         description: "Custom unstable task",
         agent: "sisyphus-junior",
         status: "running",
@@ -2711,7 +2711,7 @@ describe("sisyphus-task", () => {
           launchInput = input
           return {
             id: "task-fallback",
-            sessionID: "ses_fallback_test",
+            sessionId: "ses_fallback_test",
             description: "Fallback test task",
             agent: "sisyphus-junior",
             status: "running",
@@ -2775,7 +2775,7 @@ describe("sisyphus-task", () => {
           launchInput = input
           return {
             id: "task-ui-model",
-            sessionID: "ses_ui_model_test",
+            sessionId: "ses_ui_model_test",
             description: "UI model inheritance test",
             agent: "sisyphus-junior",
             status: "running",
@@ -2839,7 +2839,7 @@ describe("sisyphus-task", () => {
           launchInput = input
           return {
             id: "task-override",
-            sessionID: "ses_override_test",
+            sessionId: "ses_override_test",
             description: "Override precedence test",
             agent: "sisyphus-junior",
             status: "running",
@@ -2900,7 +2900,7 @@ describe("sisyphus-task", () => {
           launchInput = input
           return {
             id: "task-category-precedence",
-            sessionID: "ses_category_precedence_test",
+            sessionId: "ses_category_precedence_test",
             description: "Category precedence test",
             agent: "sisyphus-junior",
             status: "running",
@@ -2965,7 +2965,7 @@ describe("sisyphus-task", () => {
           launchInput = input
           return {
             id: "task-1295-quick",
-            sessionID: "ses_1295_quick",
+            sessionId: "ses_1295_quick",
             description: "Issue 1295 regression",
             agent: "sisyphus-junior",
             status: "running",
@@ -3027,7 +3027,7 @@ describe("sisyphus-task", () => {
           launchInput = input
           return {
             id: "task-1295-custom",
-            sessionID: "ses_1295_custom",
+            sessionId: "ses_1295_custom",
             description: "Issue 1295 custom category",
             agent: "sisyphus-junior",
             status: "running",
@@ -3737,7 +3737,7 @@ describe("sisyphus-task", () => {
           launchInput = input
           return {
             id: "task-explore",
-            sessionID: "ses_explore_model",
+            sessionId: "ses_explore_model",
             description: "Explore task",
             agent: "explore",
             status: "running",
@@ -4369,7 +4369,7 @@ describe("sisyphus-task", () => {
       const mockManager = {
         launch: async () => ({
           id: "bg_meta_test",
-          sessionID: "ses_bg_metadata",
+          sessionId: "ses_bg_metadata",
           description: "Background metadata test",
           agent: "sisyphus-junior",
           status: "running",

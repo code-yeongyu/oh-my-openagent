@@ -18,7 +18,7 @@ function createManagerWithStatus(statusImpl: () => Promise<{ data: Record<string
     },
   }
 
-  return new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
+  return new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput })
 }
 
 describe("BackgroundManager polling overlap", () => {
@@ -56,12 +56,12 @@ describe("BackgroundManager polling overlap", () => {
 })
 
 
-function createRunningTask(sessionID: string): BackgroundTask {
+function createRunningTask(sessionId: string): BackgroundTask {
   return {
-    id: `bg_test_${sessionID}`,
-    sessionID,
-    parentSessionID: "parent-session",
-    parentMessageID: "parent-msg",
+    id: `bg_test_${sessionId}`,
+    sessionId,
+    parentSessionId: "parent-session",
+    parentMessageId: "parent-msg",
     description: "test task",
     prompt: "test",
     agent: "explore",
@@ -98,9 +98,7 @@ function createManagerWithClient(clientOverrides: Record<string, unknown> = {}):
     },
   }
   return new BackgroundManager(
-    { client, directory: tmpdir() } as unknown as PluginInput,
-    undefined,
-    { enableParentSessionNotifications: false },
+    { pluginContext: { client, directory: tmpdir() } as unknown as PluginInput, config: undefined, enableParentSessionNotifications: false },
   )
 }
 

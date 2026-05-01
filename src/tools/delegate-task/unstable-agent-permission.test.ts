@@ -11,7 +11,7 @@ describe("executeUnstableAgentTask session permission", () => {
         launchCalls.push(input)
         return {
           id: "bg_unstable_permission",
-          sessionID: "ses_unstable_permission",
+          sessionId: "ses_unstable_permission",
           description: "test task",
           agent: "sisyphus-junior",
           status: "running",
@@ -19,7 +19,7 @@ describe("executeUnstableAgentTask session permission", () => {
       },
       getTask: () => ({
         id: "bg_unstable_permission",
-        sessionID: "ses_unstable_permission",
+        sessionId: "ses_unstable_permission",
         status: "interrupt",
         description: "test task",
         agent: "sisyphus-junior",

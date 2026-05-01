@@ -29,20 +29,20 @@ function createManager(): BackgroundManager {
     $: {} as PluginInput["$"],
   }
 
-  const manager = new BackgroundManager(ctx)
+  const manager = new BackgroundManager({ pluginContext: ctx })
   Reflect.set(manager, "client", client)
 
   return manager
 }
 
-function createTask(overrides: Partial<BackgroundTask> & { id: string; parentSessionID: string }): BackgroundTask {
+function createTask(overrides: Partial<BackgroundTask> & { id: string; parentSessionId: string }): BackgroundTask {
   const { id, parentSessionID, ...rest } = overrides
 
   return {
     ...rest,
     id,
     parentSessionID,
-    parentMessageID: rest.parentMessageID ?? "parent-message-id",
+    parentMessageId: rest.parentMessageId ?? "parent-message-id",
     description: rest.description ?? id,
     prompt: rest.prompt ?? `Prompt for ${id}`,
     agent: rest.agent ?? "test-agent",
@@ -118,12 +118,12 @@ describe("task history cleanup", () => {
     managerUnderTest = manager
     const staleTask = createTask({
       id: "task-stale",
-      parentSessionID: "parent-1",
+      parentSessionId: "parent-1",
       startedAt: new Date(Date.now() - 31 * 60 * 1000),
     })
     const liveTask = createTask({
       id: "task-live",
-      parentSessionID: "parent-2",
+      parentSessionId: "parent-2",
       startedAt: new Date(),
     })
 

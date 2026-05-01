@@ -3,28 +3,28 @@ import type { BackgroundTask, BackgroundTaskAttempt, BackgroundTaskStatus } from
 
 type TerminalAttemptStatus = Extract<BackgroundTaskStatus, "completed" | "error" | "cancelled" | "interrupt">
 
-function toAttemptModel(model: DelegatedModelConfig | undefined): Pick<BackgroundTaskAttempt, "providerID" | "modelID" | "variant"> {
+function toAttemptModel(model: DelegatedModelConfig | undefined): Pick<BackgroundTaskAttempt, "providerId" | "modelId" | "variant"> {
   return {
-    providerID: model?.providerID,
-    modelID: model?.modelID,
+    providerId: model?.providerID,
+    modelId: model?.modelID,
     variant: model?.variant,
   }
 }
 
 function toTaskModel(attempt: BackgroundTaskAttempt): DelegatedModelConfig | undefined {
-  if (!attempt.providerID || !attempt.modelID) {
+  if (!attempt.providerId || !attempt.modelId) {
     return undefined
   }
 
   return {
-    providerID: attempt.providerID,
-    modelID: attempt.modelID,
+    providerID: attempt.providerId,
+    modelID: attempt.modelId,
     ...(attempt.variant ? { variant: attempt.variant } : {}),
   }
 }
 
 function getAttemptIndex(task: BackgroundTask, attemptID: string): number {
-  return task.attempts?.findIndex((attempt) => attempt.attemptID === attemptID) ?? -1
+  return task.attempts?.findIndex((attempt) => attempt.attemptId === attemptID) ?? -1
 }
 
 function getAttempt(task: BackgroundTask, attemptID: string): BackgroundTaskAttempt | undefined {
@@ -54,9 +54,9 @@ export function ensureCurrentAttempt(
   }
 
   const attempt: BackgroundTaskAttempt = {
-    attemptID: `att_${crypto.randomUUID().slice(0, 8)}`,
+    attemptId: `att_${crypto.randomUUID().slice(0, 8)}`,
     attemptNumber: (task.attempts?.length ?? 0) + 1,
-    sessionID: task.sessionID,
+    sessionId: task.sessionId,
     ...toAttemptModel(model),
     status: task.status,
     error: task.error,
@@ -65,7 +65,7 @@ export function ensureCurrentAttempt(
   }
 
   task.attempts = [...(task.attempts ?? []), attempt]
-  task.currentAttemptID = attempt.attemptID
+  task.currentAttemptID = attempt.attemptId
   return attempt
 }
 
@@ -76,7 +76,7 @@ export function projectTaskFromCurrentAttempt(task: BackgroundTask): BackgroundT
   }
 
   task.status = currentAttempt.status
-  task.sessionID = currentAttempt.sessionID
+  task.sessionId = currentAttempt.sessionId
   task.startedAt = currentAttempt.startedAt
   task.completedAt = currentAttempt.completedAt
   task.error = currentAttempt.error
@@ -87,16 +87,16 @@ export function projectTaskFromCurrentAttempt(task: BackgroundTask): BackgroundT
 
 export function startAttempt(task: BackgroundTask, model: DelegatedModelConfig | undefined): BackgroundTaskAttempt {
   const attempt: BackgroundTaskAttempt = {
-    attemptID: `att_${crypto.randomUUID().slice(0, 8)}`,
+    attemptId: `att_${crypto.randomUUID().slice(0, 8)}`,
     attemptNumber: (task.attempts?.length ?? 0) + 1,
     ...toAttemptModel(model),
     status: "pending",
   }
 
   task.attempts = [...(task.attempts ?? []), attempt]
-  task.currentAttemptID = attempt.attemptID
+  task.currentAttemptID = attempt.attemptId
   task.status = "pending"
-  task.sessionID = undefined
+  task.sessionId = undefined
   task.startedAt = undefined
   task.completedAt = undefined
   task.error = undefined
@@ -121,13 +121,13 @@ export function bindAttemptSession(
     return undefined
   }
 
-  attempt.sessionID = sessionID
+  attempt.sessionId = sessionID
   attempt.status = "running"
   attempt.startedAt = new Date()
   attempt.completedAt = undefined
   attempt.error = undefined
-  attempt.providerID = model?.providerID ?? attempt.providerID
-  attempt.modelID = model?.modelID ?? attempt.modelID
+  attempt.providerId = model?.providerID ?? attempt.providerId
+  attempt.modelId = model?.modelID ?? attempt.modelId
   attempt.variant = model?.variant ?? attempt.variant
 
   return getCurrentAttempt(projectTaskFromCurrentAttempt(task))
@@ -170,5 +170,5 @@ export function scheduleRetryAttempt(
 }
 
 export function findAttemptBySession(task: BackgroundTask, sessionID: string): BackgroundTaskAttempt | undefined {
-  return task.attempts?.find((attempt) => attempt.sessionID === sessionID)
+  return task.attempts?.find((attempt) => attempt.sessionId === sessionID)
 }
