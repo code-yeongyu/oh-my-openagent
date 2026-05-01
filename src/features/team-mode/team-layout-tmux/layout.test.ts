@@ -197,6 +197,21 @@ describe("team-layout-tmux", () => {
     expect(titleSetters).toContain("m2")
   })
 
+  test("#given caller inside tmux #when createTeamLayout runs #then it restores keyboard focus and avoids border status mutation", async () => {
+    // given
+    const { createTeamLayout } = await loadLayoutModule()
+    const members = [{ name: "m1", sessionId: "s-m1", worktreePath: "/tmp/m1" }]
+
+    // when
+    await createTeamLayout("run-options", members, tmuxMgr as never)
+
+    // then
+    const commands = getCommands()
+    const focusRestores = commands.filter((args) => args[0] === "select-pane" && args[1] === "-t" && args[2] === "%42")
+    expect(focusRestores.length).toBe(1)
+    expect(commands.some((args) => args[0] === "set-option" && args.includes("pane-border-status"))).toBe(false)
+  })
+
   test("#given ownedSession=false, focusWindowId=@10, gridWindowId=@11 #when removeTeamLayout runs #then tmux kill-window is called twice with -t @10 and -t @11 and kill-session is NEVER called", async () => {
     // given
     const { removeTeamLayout } = await loadLayoutModule()

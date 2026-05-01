@@ -38,12 +38,13 @@ const PANE_SHELL_INIT_DELAY_MS = 200
 
 let paneCreationLock: Promise<void> = Promise.resolve()
 
-function acquirePaneCreationLock(): Promise<() => void> {
+async function acquirePaneCreationLock(): Promise<() => void> {
   let release: () => void
   const newLock = new Promise<void>((resolve) => { release = resolve })
   const previousLock = paneCreationLock
   paneCreationLock = newLock
-  return previousLock.then(() => release!)
+  await previousLock
+  return release!
 }
 
 async function resolveCurrentWindowTarget(tmuxPath: string, leaderPaneId: string): Promise<string | null> {
@@ -105,6 +106,7 @@ async function createTeammatePaneInCurrentWindow(
     const paneId = splitResult.output.trim()
 
     await runTmuxCommand(tmuxPath, ["select-pane", "-t", paneId, "-T", member.name])
+    await runTmuxCommand(tmuxPath, ["select-pane", "-t", leaderPaneId])
     await runTmuxCommand(tmuxPath, ["set-option", "-p", "-t", paneId, "pane-border-style", "fg=cyan"])
     await runTmuxCommand(tmuxPath, ["set-option", "-p", "-t", paneId, "pane-active-border-style", "fg=cyan"])
     await runTmuxCommand(tmuxPath, ["set-option", "-p", "-t", paneId, "pane-border-format", "#[fg=cyan,bold] #{pane_title} #[default]"])
@@ -158,8 +160,6 @@ export async function createTeamLayout(teamRunId: string, members: Array<TeamLay
     const windowTarget = await resolveCurrentWindowTarget(tmuxPath, leaderPaneId)
     const windowId = await resolveCurrentWindowId(tmuxPath, leaderPaneId)
     if (!windowTarget || !windowId) return null
-
-    await runTmuxCommand(tmuxPath, ["set-option", "-w", "-t", windowTarget, "pane-border-status", "top"])
 
     const panesByMember: Record<string, string> = {}
 
