@@ -70,9 +70,37 @@ describe("runBunInstallWithDetails", () => {
         expect(getOpenCodeCacheDirSpy).toHaveBeenCalledTimes(1)
         expect(spawnWithWindowsHideSpy).toHaveBeenCalledWith(["bun", "install"], {
           cwd: "/tmp/opencode-cache/packages",
+          env: process.env,
           stdout: "pipe",
           stderr: "pipe",
         })
+      })
+    })
+
+    describe("#when bun install runs with proxy environment variables set", () => {
+      it("#then forwards process.env so child bun install inherits proxy settings (issue #3528)", async () => {
+        // given
+        const originalHttpsProxy = process.env.https_proxy
+        const originalHttpProxy = process.env.http_proxy
+        process.env.https_proxy = "http://proxy.example.com:3128"
+        process.env.http_proxy = "http://proxy.example.com:3128"
+
+        try {
+          // when
+          await runBunInstallWithDetails()
+
+          // then
+          const callArgs = spawnWithWindowsHideSpy.mock.calls[0]
+          const spawnOptions = callArgs?.[1] as { env?: Record<string, string | undefined> } | undefined
+          expect(spawnOptions?.env).toBeDefined()
+          expect(spawnOptions?.env?.https_proxy).toBe("http://proxy.example.com:3128")
+          expect(spawnOptions?.env?.http_proxy).toBe("http://proxy.example.com:3128")
+        } finally {
+          if (originalHttpsProxy === undefined) delete process.env.https_proxy
+          else process.env.https_proxy = originalHttpsProxy
+          if (originalHttpProxy === undefined) delete process.env.http_proxy
+          else process.env.http_proxy = originalHttpProxy
+        }
       })
     })
 
@@ -87,6 +115,7 @@ describe("runBunInstallWithDetails", () => {
         expect(result).toEqual({ success: true })
         expect(spawnWithWindowsHideSpy).toHaveBeenCalledWith(["bun", "install"], {
           cwd: "/tmp/opencode-cache/packages",
+          env: process.env,
           stdout: "pipe",
           stderr: "pipe",
         })
@@ -104,6 +133,7 @@ describe("runBunInstallWithDetails", () => {
         expect(result).toEqual({ success: true })
         expect(spawnWithWindowsHideSpy).toHaveBeenCalledWith(["bun", "install"], {
           cwd: "/tmp/opencode-cache/packages",
+          env: process.env,
           stdout: "inherit",
           stderr: "inherit",
         })
