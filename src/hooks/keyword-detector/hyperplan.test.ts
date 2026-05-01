@@ -30,7 +30,7 @@ describe("keyword-detector hyperplan keyword", () => {
           },
         },
       },
-    } as unknown as PluginInput
+    } as PluginInput
   }
 
   test("should inject hyperplan message when user types 'hyperplan'", async () => {
@@ -52,6 +52,13 @@ describe("keyword-detector hyperplan keyword", () => {
     expect(textPart!.text).toContain("<hyperplan-mode>")
     expect(textPart!.text).toContain('skill(name="hyperplan")')
     expect(textPart!.text).toContain("HYPERPLAN MODE ENABLED")
+    expect(textPart!.text).toContain("unspecified-low")
+    expect(textPart!.text).toContain("unspecified-high")
+    expect(textPart!.text).toContain("artistry")
+    expect(textPart!.text).toContain("ultrabrain")
+    expect(textPart!.text).toContain("deep")
+    expect(textPart!.text).toContain("only if")
+    expect(textPart!.text).toContain("enabled")
     expect(textPart!.text).toContain("refactor the auth module")
     expect(textPart!.text).toContain("---")
   })
