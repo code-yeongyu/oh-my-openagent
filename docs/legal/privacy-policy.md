@@ -28,7 +28,7 @@ The Application stores local configuration and telemetry deduplication state on 
 
 ## 2. How Telemetry Works
 
-The Application uses PostHog for anonymous product analytics. Telemetry is enabled by default, following the same opt-out posture used in cmux, and is intended to help us understand installation success, runtime reliability, and broad usage patterns.
+The Application uses PostHog for anonymous product analytics. Telemetry is enabled by default, following the same opt-out posture used in cmux, and is intended only to estimate active installations (daily, weekly, and monthly) so we can understand broad adoption.
 
 Telemetry can be disabled at any time by setting one of these environment variables before running the CLI or plugin host:
 
@@ -54,9 +54,8 @@ Each third-party service has its own terms and privacy practices.
 
 We use collected information to:
 
-- Measure installation and runtime health
-- Understand aggregate feature usage
-- Diagnose failures and improve reliability
+- Estimate daily, weekly, and monthly active installations
+- Understand aggregate adoption across operating systems and package versions
 - Maintain and evolve the Service
 
 We do not sell personal information collected through this telemetry path.
