@@ -72,8 +72,8 @@ const RETRYABLE_MESSAGE_PATTERNS = [
   "504",
   "429",
   "529",
-  "403",
-  "forbidden",
+  "selected provider is forbidden",
+  "provider is forbidden",
 ]
 
 /**
