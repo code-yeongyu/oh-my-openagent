@@ -15,7 +15,7 @@ function detectProvidersFromOmoConfig(projectDir?: string): {
   hasVercelAiGateway: boolean
 } {
   const omoConfigPath = projectDir
-    ? `${projectDir}/.opencode/oh-my-openagent.json`
+    ? `${projectDir}/oh-my-openagent.json`
     : getOmoConfigPath()
   if (!existsSync(omoConfigPath)) {
     return {
