@@ -21,15 +21,15 @@ describe("BackgroundManager session permission", () => {
       },
     }
     const directory = tmpdir()
-    const manager = new BackgroundManager({ client, directory } as unknown as PluginInput)
+    const manager = new BackgroundManager({ pluginContext: { client, directory } as unknown as PluginInput })
 
     // when
     await manager.launch({
       description: "Test task",
       prompt: "Do something",
       agent: "explore",
-      parentSessionID: "ses_parent",
-      parentMessageID: "msg_parent",
+      parentSessionId: "ses_parent",
+      parentMessageId: "msg_parent",
     })
     await new Promise((resolve) => setTimeout(resolve, 50))
     manager.shutdown()
@@ -62,15 +62,15 @@ describe("BackgroundManager session permission", () => {
         abort: async () => ({}),
       },
     }
-    const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
+    const manager = new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput })
 
     // when
     await manager.launch({
       description: "Test task",
       prompt: "Do something",
       agent: "explore",
-      parentSessionID: "ses_parent",
-      parentMessageID: "msg_parent",
+      parentSessionId: "ses_parent",
+      parentMessageId: "msg_parent",
       sessionPermission: [
         { permission: "question", action: "deny", pattern: "*" },
       ],

@@ -8,13 +8,13 @@ import { createBackgroundTask } from "./create-background-task"
 describe("createBackgroundTask", () => {
   const launchMock = mock(async (): Promise<{
     id: string
-    sessionID: string | null
+    sessionId: string | null
     description: string
     agent: string
     status: string
   }> => ({
     id: "test-task-id",
-    sessionID: null,
+    sessionId: null,
     description: "Test task",
     agent: "test-agent",
     status: "pending",
@@ -55,14 +55,14 @@ describe("createBackgroundTask", () => {
     //#given
     launchMock.mockResolvedValueOnce({
       id: "test-task-id",
-      sessionID: null,
+      sessionId: null,
       description: "Test task",
       agent: "test-agent",
       status: "pending",
     })
     getTaskMock.mockReturnValueOnce({
       id: "test-task-id",
-      sessionID: null,
+      sessionId: null,
       description: "Test task",
       agent: "test-agent",
       status: "interrupt",
@@ -81,7 +81,7 @@ describe("createBackgroundTask", () => {
     const abortController = new AbortController()
     launchMock.mockResolvedValueOnce({
       id: "test-task-id",
-      sessionID: null,
+      sessionId: null,
       description: "Test task",
       agent: "test-agent",
       status: "pending",
@@ -90,7 +90,7 @@ describe("createBackgroundTask", () => {
       abortController.abort()
       return {
         id: "test-task-id",
-        sessionID: null,
+        sessionId: null,
         description: "Test task",
         agent: "test-agent",
         status: "pending",
@@ -114,15 +114,15 @@ describe("createBackgroundTask", () => {
     const firstAbortController = new AbortController()
     const secondAbortController = new AbortController()
     const states = new Map([
-      ["task-1", { reads: 0, abortOnFirstRead: true, sessionID: "ses-1" }],
-      ["task-2", { reads: 0, abortOnFirstRead: false, sessionID: "ses-2" }],
+      ["task-1", { reads: 0, abortOnFirstRead: true, sessionId: "ses-1" }],
+      ["task-2", { reads: 0, abortOnFirstRead: false, sessionId: "ses-2" }],
     ])
     let launchCount = 0
     launchMock.mockImplementation(async () => {
       launchCount += 1
       return launchCount === 1
-        ? { id: "task-1", sessionID: null, description: "Task 1", agent: "test-agent", status: "pending" }
-        : { id: "task-2", sessionID: null, description: "Task 2", agent: "test-agent", status: "pending" }
+        ? { id: "task-1", sessionId: null, description: "Task 1", agent: "test-agent", status: "pending" }
+        : { id: "task-2", sessionId: null, description: "Task 2", agent: "test-agent", status: "pending" }
     })
     getTaskMock.mockImplementation((taskID: string) => {
       const state = states.get(taskID)
@@ -132,8 +132,8 @@ describe("createBackgroundTask", () => {
         firstAbortController.abort()
       }
       return state.reads >= 2
-        ? { id: taskID, sessionID: state.sessionID, description: "Task", agent: "test-agent", status: "pending" }
-        : { id: taskID, sessionID: null, description: "Task", agent: "test-agent", status: "pending" }
+        ? { id: taskID, sessionId: state.sessionId, description: "Task", agent: "test-agent", status: "pending" }
+        : { id: taskID, sessionId: null, description: "Task", agent: "test-agent", status: "pending" }
     })
 
     //#when

@@ -69,8 +69,8 @@ export function createBackgroundTask(
           description: args.description,
           prompt: args.prompt,
           agent: args.agent.trim(),
-          parentSessionID: ctx.sessionID,
-          parentMessageID: ctx.messageID,
+          parentSessionId: ctx.sessionID,
+          parentMessageId: ctx.messageID,
           parentModel,
           parentAgent,
         })
@@ -78,13 +78,13 @@ export function createBackgroundTask(
         const WAIT_FOR_SESSION_INTERVAL_MS = 50
         const WAIT_FOR_SESSION_TIMEOUT_MS = 30000
         const waitStart = Date.now()
-        let sessionId = task.sessionID
+        let sessionId = task.sessionId
         while (!sessionId && Date.now() - waitStart < WAIT_FOR_SESSION_TIMEOUT_MS) {
           const updated = manager.getTask(task.id)
           if (updated?.status === "error" || updated?.status === "cancelled" || updated?.status === "interrupt") {
             return `Task ${`entered error state`}\.\n\nTask ID: ${task.id}`
           }
-          sessionId = updated?.sessionID
+          sessionId = updated?.sessionId
           if (sessionId) {
             break
           }

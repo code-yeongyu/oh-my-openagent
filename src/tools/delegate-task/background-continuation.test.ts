@@ -9,7 +9,7 @@ describe("executeBackgroundContinuation - subagent metadata", () => {
         description: "oracle consultation",
         agent: "oracle",
         status: "running",
-        sessionID: "ses_resumed_123",
+        sessionId: "ses_resumed_123",
       }),
     }
 
@@ -55,7 +55,7 @@ describe("executeBackgroundContinuation - subagent metadata", () => {
         description: "unknown task",
         agent: undefined,
         status: "running",
-        sessionID: "ses_resumed_456",
+        sessionId: "ses_resumed_456",
       }),
     }
 

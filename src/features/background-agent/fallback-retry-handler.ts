@@ -124,7 +124,7 @@ export async function tryFallbackRetry(args: {
     idleDeferralTimers.delete(task.id)
   }
 
-  const previousSessionID = task.sessionID
+  const previousSessionID = task.sessionId
   const previousModel = task.model
 
   const transformedModelId = transformModelForProvider(providerID, nextFallback.model)
@@ -134,7 +134,7 @@ export async function tryFallbackRetry(args: {
     variant: nextFallback.variant,
   }
   task.attemptCount = selectedAttemptCount
-  const failedAttemptID = ensureCurrentAttempt(task, previousModel).attemptID
+  const failedAttemptID = ensureCurrentAttempt(task, previousModel).attemptId
   const nextAttempt = failedAttemptID
     ? scheduleRetryAttempt(task, failedAttemptID, nextModel, errorInfo.message)
     : undefined
@@ -165,8 +165,8 @@ export async function tryFallbackRetry(args: {
     description: task.description,
     prompt: task.prompt,
     agent: task.agent,
-    parentSessionID: task.parentSessionID,
-    parentMessageID: task.parentMessageID,
+    parentSessionId: task.parentSessionId,
+    parentMessageId: task.parentMessageId,
     parentModel: task.parentModel,
     parentAgent: task.parentAgent,
     parentTools: task.parentTools,
@@ -180,7 +180,7 @@ export async function tryFallbackRetry(args: {
     await abortWithTimeout(client, previousSessionID).catch(() => {})
   }
 
-  queue.push({ task, input: retryInput, attemptID: nextAttempt.attemptID })
+  queue.push({ task, input: retryInput, attemptID: nextAttempt.attemptId })
   queuesByKey.set(key, queue)
   processKey(key)
   return true

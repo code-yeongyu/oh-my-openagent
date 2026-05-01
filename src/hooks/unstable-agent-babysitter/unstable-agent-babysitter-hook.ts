@@ -203,7 +203,7 @@ export function createUnstableAgentBabysitterHook(ctx: BabysitterContext, option
       const lastReminderAt = reminderCooldowns.get(task.id)
       if (lastReminderAt && now - lastReminderAt < COOLDOWN_MS) continue
 
-      const summary = task.sessionID ? await getThinkingSummary(ctx, task.sessionID) : null
+      const summary = task.sessionId ? await getThinkingSummary(ctx, task.sessionId) : null
       const reminder = buildReminder(task, summary, idleMs)
       const { agent, model, tools } = await resolveMainSessionTarget(ctx, mainSessionID)
 

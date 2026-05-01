@@ -41,9 +41,9 @@ function createMockClient(messagesBySession: Record<string, BackgroundOutputMess
 function createTask(overrides: Partial<BackgroundTask> = {}): BackgroundTask {
   return {
     id: "task-1",
-    sessionID: "ses-1",
-    parentSessionID: "main-1",
-    parentMessageID: "msg-1",
+    sessionId: "ses-1",
+    parentSessionId: "main-1",
+    parentMessageId: "msg-1",
     description: "background task",
     prompt: "do work",
     agent: "test-agent",
@@ -345,7 +345,7 @@ describe("background_output blocking", () => {
   test("block=true keeps legacy task result output when full_session is not provided", async () => {
     // #given a task that transitions running → completed after 2 polls
     let pollCount = 0
-    const task = createTask({ status: "running", sessionID: "ses-blocking-default" })
+    const task = createTask({ status: "running", sessionId: "ses-blocking-default" })
     const manager: BackgroundOutputManager = {
       getTask: (id: string) => {
         if (id !== task.id) return undefined
@@ -435,8 +435,8 @@ describe("background_cancel", () => {
 
   test("preserves original status in cancellation table", async () => {
     // #given
-    const taskA = createTask({ id: "task-a", status: "running", sessionID: "ses-a", description: "running task" })
-    const taskB = createTask({ id: "task-b", status: "pending", sessionID: undefined, description: "pending task" })
+    const taskA = createTask({ id: "task-a", status: "running", sessionId: "ses-a", description: "running task" })
+    const taskB = createTask({ id: "task-b", status: "pending", sessionId: undefined, description: "pending task" })
     const manager = {
       getTask: () => undefined,
       getAllDescendantTasks: () => [taskA, taskB],

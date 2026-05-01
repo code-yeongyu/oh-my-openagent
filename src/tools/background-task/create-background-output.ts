@@ -70,7 +70,7 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
             agent: task.agent,
             category: task.category,
             description: task.description,
-            ...(task.sessionID ? { sessionId: task.sessionID, taskId: task.sessionID } : {}),
+            ...(task.sessionId ? { sessionId: task.sessionId, taskId: task.sessionId } : {}),
           } as Record<string, unknown>,
         }
         await publishToolMetadata(ctx, meta)
@@ -129,7 +129,7 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
         }
 
         if (resolvedTask.status === "completed") {
-          recordBackgroundOutputConsumption(ctx.sessionID, ctx.messageID, resolvedTask.sessionID)
+          recordBackgroundOutputConsumption(ctx.sessionID, ctx.messageID, resolvedTask.sessionId)
           return await formatTaskResult(resolvedTask, client)
         }
 

@@ -33,9 +33,9 @@ describe("checkAndInterruptStaleTasks", () => {
   function createRunningTask(overrides: Partial<BackgroundTask> = {}): BackgroundTask {
     return {
       id: "task-1",
-      sessionID: "ses-1",
-      parentSessionID: "parent-ses-1",
-      parentMessageID: "msg-1",
+      sessionId: "ses-1",
+      parentSessionId: "parent-ses-1",
+      parentMessageId: "msg-1",
       description: "test",
       prompt: "test",
       agent: "explore",
@@ -745,8 +745,8 @@ describe("pruneStaleTasksAndNotifications", () => {
   function createTerminalTask(overrides: Partial<BackgroundTask> = {}): BackgroundTask {
     return {
       id: "terminal-task",
-      parentSessionID: "parent",
-      parentMessageID: "msg",
+      parentSessionId: "parent",
+      parentMessageId: "msg",
       description: "terminal",
       prompt: "terminal",
       agent: "explore",
@@ -762,8 +762,8 @@ describe("pruneStaleTasksAndNotifications", () => {
     const tasks = new Map<string, BackgroundTask>()
     const oldTask: BackgroundTask = {
       id: "old-task",
-      parentSessionID: "parent",
-      parentMessageID: "msg",
+      parentSessionId: "parent",
+      parentMessageId: "msg",
       description: "old",
       prompt: "old",
       agent: "explore",
@@ -791,8 +791,8 @@ describe("pruneStaleTasksAndNotifications", () => {
     const tasks = new Map<string, BackgroundTask>()
     const activeTask: BackgroundTask = {
       id: "active-task",
-      parentSessionID: "parent",
-      parentMessageID: "msg",
+      parentSessionId: "parent",
+      parentMessageId: "msg",
       description: "active",
       prompt: "active",
       agent: "oracle",
@@ -824,8 +824,8 @@ describe("pruneStaleTasksAndNotifications", () => {
     const tasks = new Map<string, BackgroundTask>()
     const staleTask: BackgroundTask = {
       id: "stale-task",
-      parentSessionID: "parent",
-      parentMessageID: "msg",
+      parentSessionId: "parent",
+      parentMessageId: "msg",
       description: "stale",
       prompt: "stale",
       agent: "oracle",
@@ -857,8 +857,8 @@ describe("pruneStaleTasksAndNotifications", () => {
     const tasks = new Map<string, BackgroundTask>()
     const task: BackgroundTask = {
       id: "custom-ttl-task",
-      parentSessionID: "parent",
-      parentMessageID: "msg",
+      parentSessionId: "parent",
+      parentMessageId: "msg",
       description: "custom",
       prompt: "custom",
       agent: "explore",
@@ -887,8 +887,8 @@ describe("pruneStaleTasksAndNotifications", () => {
     const tasks = new Map<string, BackgroundTask>()
     const task: BackgroundTask = {
       id: "within-ttl-task",
-      parentSessionID: "parent",
-      parentMessageID: "msg",
+      parentSessionId: "parent",
+      parentMessageId: "msg",
       description: "within",
       prompt: "within",
       agent: "explore",
@@ -944,7 +944,7 @@ describe("pruneStaleTasksAndNotifications", () => {
     //#given
     const task = createTerminalTask()
     const tasks = new Map<string, BackgroundTask>([[task.id, task]])
-    const notifications = new Map<string, BackgroundTask[]>([[task.parentSessionID, [task]]])
+    const notifications = new Map<string, BackgroundTask[]>([[task.parentSessionId, [task]]])
     const pruned: string[] = []
 
     //#when
@@ -957,6 +957,6 @@ describe("pruneStaleTasksAndNotifications", () => {
     //#then
     expect(pruned).toEqual([])
     expect(tasks.has(task.id)).toBe(true)
-    expect(notifications.has(task.parentSessionID)).toBe(false)
+    expect(notifications.has(task.parentSessionId)).toBe(false)
   })
 })

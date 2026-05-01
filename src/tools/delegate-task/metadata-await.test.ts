@@ -36,7 +36,7 @@ describe("task tool metadata awaiting", () => {
           prompt: "Do something",
           agent: "explore",
           status: "pending",
-          sessionID: "ses_child",
+          sessionId: "ses_child",
         }),
         getTask: () => undefined,
       },

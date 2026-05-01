@@ -161,8 +161,8 @@ describe("syncPollTimeoutMs threading", () => {
         }
 
         const mockManager = {
-          launch: async () => ({ id: "task_001", sessionID: "ses_unstable", status: "running" }),
-          getTask: () => ({ id: "task_001", sessionID: "ses_unstable", status: "running" }),
+          launch: async () => ({ id: "task_001", sessionId: "ses_unstable", status: "running" }),
+          getTask: () => ({ id: "task_001", sessionId: "ses_unstable", status: "running" }),
         }
 
         const result = await executeUnstableAgentTask(

@@ -7,9 +7,9 @@ import { formatTaskResult } from "./task-result-format"
 function createTask(overrides: Partial<BackgroundTask> = {}): BackgroundTask {
   return {
     id: "task-1",
-    sessionID: "ses-1",
-    parentSessionID: "main-1",
-    parentMessageID: "msg-1",
+    sessionId: "ses-1",
+    parentSessionId: "main-1",
+    parentMessageId: "msg-1",
     description: "background task",
     prompt: "do work",
     agent: "test-agent",
