@@ -1905,6 +1905,9 @@ describe('TmuxSessionManager', () => {
 
       // then
       expect(mockExecuteAction).toHaveBeenCalledTimes(0)
+      // Container close MUST NOT happen yet — it should be deferred until the last
+      // tracked session exits. An early close here would silently pass without this check.
+      expect(mockCloseTmuxPane).not.toHaveBeenCalled()
       expect(Reflect.get(manager, 'isolatedContainerPaneId')).toBe('%isolated-session-ses_first')
       expect(Reflect.get(manager, 'isolatedWindowPaneId')).toBe('%mock')
 
@@ -2005,6 +2008,9 @@ describe('TmuxSessionManager', () => {
 
       // then
       expect(mockExecuteAction).toHaveBeenCalledTimes(0)
+      // Container close MUST NOT happen yet — it should be deferred until the last
+      // tracked session exits. An early close here would silently pass without this check.
+      expect(mockCloseTmuxPane).not.toHaveBeenCalled()
       expect(Reflect.get(manager, 'isolatedContainerPaneId')).toBe('%isolated-window-ses_first')
       expect(Reflect.get(manager, 'isolatedWindowPaneId')).toBe('%mock')
 
