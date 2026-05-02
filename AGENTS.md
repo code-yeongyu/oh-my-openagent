@@ -170,3 +170,11 @@ bunx oh-my-opencode run     # Non-interactive session
 - Platform binaries detect AVX2 + libc family at runtime, fallback to baseline if needed
 - Hashline edit: every Read output tagged with `LINE#ID` content hashes; edits reject on hash mismatch
 - IntentGate: classifies user intent (research/implementation/investigation/evaluation/fix) before routing
+
+### OpenRouter Integration Gap
+
+OpenRouter is recognized in `model-capabilities.generated.json` but **missing from CLI provider availability**: `src/cli/provider-availability.ts` has no `openrouter` mapping, `src/cli/types.ts` lacks `hasOpenRouter`, and fallback chains in `src/shared/model-requirements.ts` do not include `openrouter` as a provider. When adding OpenRouter support, update:
+1. `provider-availability.ts` + `types.ts` + `model-fallback-types.ts`
+2. `tui-install-prompts.ts` + `cli-program.ts` + `install-validators.ts`
+3. `config-manager/detect-current-config.ts`
+4. Fallback chains in `model-requirements.ts` (use `openrouter/provider/model` format)
