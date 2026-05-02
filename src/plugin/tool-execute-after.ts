@@ -149,6 +149,7 @@ export function createToolExecuteAfterHandler(args: {
       await hooks.editErrorRecovery?.["tool.execute.after"]?.(hookInput, output)
       await hooks.delegateTaskRetry?.["tool.execute.after"]?.(hookInput, output)
       await hooks.atlasHook?.["tool.execute.after"]?.(hookInput, output)
+      await hooks.nativeGit?.["tool.execute.after"]?.(hookInput, output)
       await hooks.taskResumeInfo?.["tool.execute.after"]?.(hookInput, output)
       await hooks.readImageResizer?.["tool.execute.after"]?.(hookInput, output)
       await hooks.hashlineReadEnhancer?.["tool.execute.after"]?.(hookInput, output)

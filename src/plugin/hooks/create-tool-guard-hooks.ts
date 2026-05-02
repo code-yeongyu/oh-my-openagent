@@ -10,6 +10,7 @@ import {
   createEmptyTaskResponseDetectorHook,
   createRulesInjectorHook,
   createTasksTodowriteDisablerHook,
+  createNativeGitHook,
   createWriteExistingFileGuardHook,
   createBashFileReadGuardHook,
   createHashlineReadEnhancerHook,
@@ -34,6 +35,7 @@ export type ToolGuardHooks = {
   emptyTaskResponseDetector: ReturnType<typeof createEmptyTaskResponseDetectorHook> | null
   rulesInjector: ReturnType<typeof createRulesInjectorHook> | null
   tasksTodowriteDisabler: ReturnType<typeof createTasksTodowriteDisablerHook> | null
+  nativeGit: ReturnType<typeof createNativeGitHook> | null
   writeExistingFileGuard: ReturnType<typeof createWriteExistingFileGuardHook> | null
   bashFileReadGuard: ReturnType<typeof createBashFileReadGuardHook> | null
   hashlineReadEnhancer: ReturnType<typeof createHashlineReadEnhancerHook> | null
@@ -105,6 +107,10 @@ export function createToolGuardHooks(args: {
         createTasksTodowriteDisablerHook({ experimental: pluginConfig.experimental }))
     : null
 
+  const nativeGit = isHookEnabled("native-git")
+    ? safeHook("native-git", () => createNativeGitHook(ctx, pluginConfig.git))
+    : null
+
   const writeExistingFileGuard = isHookEnabled("write-existing-file-guard")
     ? safeHook("write-existing-file-guard", () => createWriteExistingFileGuardHook(ctx))
     : null
@@ -141,6 +147,7 @@ export function createToolGuardHooks(args: {
     emptyTaskResponseDetector,
     rulesInjector,
     tasksTodowriteDisabler,
+    nativeGit,
     writeExistingFileGuard,
     bashFileReadGuard,
     hashlineReadEnhancer,
