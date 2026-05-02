@@ -11,6 +11,7 @@ import {
   killTmuxSessionIfExists,
   getIsolatedSessionName,
   sweepStaleOmoAgentSessions,
+  closeTmuxPane,
 } from "../../shared/tmux"
 import { queryWindowState as defaultQueryWindowState } from "./pane-state-querier"
 import { decideSpawnActions, decideCloseAction, type SessionMapping } from "./decision-engine"
@@ -276,18 +277,14 @@ export class TmuxSessionManager {
     }
 
     try {
-      const result = await executeAction(
-        { type: "close", paneId: isolatedContainerPaneId, sessionId: tracked.sessionId },
-        {
-          config: this.tmuxConfig,
-          directory: this.projectDirectory,
-          serverUrl: this.serverUrl,
-          windowState: state,
-          sourcePaneId: this.sourcePaneId ?? tracked.paneId,
-        },
-      )
+      // Skip enforceLayoutAndMainPane: in isolation mode, the isolated container
+      // lives in the user's main window. Going through executeAction would call
+      // applyLayout against this.sourcePaneId (the user's main pane), forcing the
+      // user's window into our configured layout (e.g. main-vertical) and
+      // scrambling their custom pane arrangement. Direct close is sufficient.
+      const success = await closeTmuxPane(isolatedContainerPaneId)
 
-      if (!result.success) {
+      if (!success) {
         log("[tmux-session-manager] failed to close isolated container pane after anchor session deletion", {
           sessionId: tracked.sessionId,
           paneId: isolatedContainerPaneId,

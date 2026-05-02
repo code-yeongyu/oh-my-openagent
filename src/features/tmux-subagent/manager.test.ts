@@ -71,6 +71,7 @@ const mockSpawnTmuxSession = mock<(
 }))
 const mockKillTmuxSessionIfExists = mock<(sessionName: string) => Promise<boolean>>(async () => true)
 const mockSweepStaleOmoAgentSessions = mock<() => Promise<number>>(async () => 0)
+const mockCloseTmuxPane = mock<(paneId: string) => Promise<boolean>>(async () => true)
 const mockIsInsideTmux = mock<() => boolean>(() => true)
 const mockGetCurrentPaneId = mock<() => string | undefined>(() => '%0')
 
@@ -107,6 +108,7 @@ function registerModuleMocks(): void {
       killTmuxSessionIfExists: mockKillTmuxSessionIfExists,
       getIsolatedSessionName: (pid: number = 12345) => `omo-agents-${pid}`,
       sweepStaleOmoAgentSessions: mockSweepStaleOmoAgentSessions,
+      closeTmuxPane: mockCloseTmuxPane,
     }
   })
 }
@@ -227,6 +229,7 @@ describe('TmuxSessionManager', () => {
     mockSpawnTmuxSession.mockClear()
     mockIsInsideTmux.mockClear()
     mockGetCurrentPaneId.mockClear()
+    mockCloseTmuxPane.mockClear()
     trackedSessions.clear()
     readySessions.clear()
 
@@ -1751,12 +1754,10 @@ describe('TmuxSessionManager', () => {
       await manager.onSessionDeleted({ sessionID: 'ses_first' })
 
       // then
-      expect(mockExecuteAction).toHaveBeenCalledTimes(1)
-      expect(mockExecuteAction.mock.calls[0]?.[0]).toEqual({
-        type: 'close',
-        paneId: '%isolated-session-ses_first',
-        sessionId: 'ses_first',
-      })
+      // The isolated container pane is closed via closeTmuxPane (not executeAction) so
+      // applyLayout is never run against the user's main pane.
+      expect(mockExecuteAction).toHaveBeenCalledTimes(0)
+      expect(mockCloseTmuxPane).toHaveBeenCalledWith('%isolated-session-ses_first')
       expect(Reflect.get(manager, 'isolatedContainerPaneId')).toBeUndefined()
       expect(Reflect.get(manager, 'isolatedWindowPaneId')).toBeUndefined()
     })
@@ -1817,12 +1818,10 @@ describe('TmuxSessionManager', () => {
       await manager.onSessionDeleted({ sessionID: 'ses_first' })
 
       // then
-      expect(mockExecuteAction).toHaveBeenCalledTimes(1)
-      expect(mockExecuteAction.mock.calls[0]?.[0]).toEqual({
-        type: 'close',
-        paneId: '%isolated-window-ses_first',
-        sessionId: 'ses_first',
-      })
+      // The isolated container pane is closed via closeTmuxPane (not executeAction) so
+      // applyLayout is never run against the user's main pane.
+      expect(mockExecuteAction).toHaveBeenCalledTimes(0)
+      expect(mockCloseTmuxPane).toHaveBeenCalledWith('%isolated-window-ses_first')
       expect(Reflect.get(manager, 'isolatedContainerPaneId')).toBeUndefined()
       expect(Reflect.get(manager, 'isolatedWindowPaneId')).toBeUndefined()
     })
@@ -1913,17 +1912,16 @@ describe('TmuxSessionManager', () => {
       await manager.onSessionDeleted({ sessionID: 'ses_second' })
 
       // then
-      expect(mockExecuteAction).toHaveBeenCalledTimes(2)
+      // Subagent pane closed via executeAction (so layout is enforced inside the isolated window).
+      // Container pane in the user's window closed via closeTmuxPane directly to avoid
+      // applyLayout being run against the user's main pane.
+      expect(mockExecuteAction).toHaveBeenCalledTimes(1)
       expect(mockExecuteAction.mock.calls[0]?.[0]).toEqual({
         type: 'close',
         paneId: '%mock',
         sessionId: 'ses_second',
       })
-      expect(mockExecuteAction.mock.calls[1]?.[0]).toEqual({
-        type: 'close',
-        paneId: '%isolated-session-ses_first',
-        sessionId: 'ses_second',
-      })
+      expect(mockCloseTmuxPane).toHaveBeenCalledWith('%isolated-session-ses_first')
       expect(Reflect.get(manager, 'isolatedContainerPaneId')).toBeUndefined()
       expect(Reflect.get(manager, 'isolatedWindowPaneId')).toBeUndefined()
     })
@@ -2014,17 +2012,16 @@ describe('TmuxSessionManager', () => {
       await manager.onSessionDeleted({ sessionID: 'ses_second' })
 
       // then
-      expect(mockExecuteAction).toHaveBeenCalledTimes(2)
+      // Subagent pane closed via executeAction (so layout is enforced inside the isolated window).
+      // Container pane in the user's window closed via closeTmuxPane directly to avoid
+      // applyLayout being run against the user's main pane.
+      expect(mockExecuteAction).toHaveBeenCalledTimes(1)
       expect(mockExecuteAction.mock.calls[0]?.[0]).toEqual({
         type: 'close',
         paneId: '%mock',
         sessionId: 'ses_second',
       })
-      expect(mockExecuteAction.mock.calls[1]?.[0]).toEqual({
-        type: 'close',
-        paneId: '%isolated-window-ses_first',
-        sessionId: 'ses_second',
-      })
+      expect(mockCloseTmuxPane).toHaveBeenCalledWith('%isolated-window-ses_first')
       expect(Reflect.get(manager, 'isolatedContainerPaneId')).toBeUndefined()
       expect(Reflect.get(manager, 'isolatedWindowPaneId')).toBeUndefined()
     })
@@ -2135,17 +2132,16 @@ describe('TmuxSessionManager', () => {
       await closeSessionById.call(manager, 'ses_second')
 
       // then
-      expect(mockExecuteAction).toHaveBeenCalledTimes(3)
+      // After my fix: only 2 executeAction calls (one per subagent close).
+      // The container close goes through closeTmuxPane to avoid running applyLayout
+      // against the user's main pane.
+      expect(mockExecuteAction).toHaveBeenCalledTimes(2)
       expect(mockExecuteAction.mock.calls[1]?.[0]).toEqual({
         type: 'close',
         paneId: '%mock',
         sessionId: 'ses_second',
       })
-      expect(mockExecuteAction.mock.calls[2]?.[0]).toEqual({
-        type: 'close',
-        paneId: '%isolated-session-ses_first',
-        sessionId: 'ses_second',
-      })
+      expect(mockCloseTmuxPane).toHaveBeenCalledWith('%isolated-session-ses_first')
       expect(Reflect.get(manager, 'isolatedContainerPaneId')).toBeUndefined()
       expect(Reflect.get(manager, 'isolatedWindowPaneId')).toBeUndefined()
     })
@@ -2221,7 +2217,10 @@ describe('TmuxSessionManager', () => {
       await manager.cleanup()
 
       // then
-      expect(mockExecuteAction).toHaveBeenCalledTimes(3)
+      // After my fix: only 2 executeAction calls (one per subagent close).
+      // The container close goes through closeTmuxPane to avoid running applyLayout
+      // against the user's main pane.
+      expect(mockExecuteAction).toHaveBeenCalledTimes(2)
       expect(mockExecuteAction.mock.calls[0]?.[0]).toEqual({
         type: 'close',
         paneId: '%isolated-session-ses_first',
@@ -2232,11 +2231,7 @@ describe('TmuxSessionManager', () => {
         paneId: '%mock',
         sessionId: 'ses_second',
       })
-      expect(mockExecuteAction.mock.calls[2]?.[0]).toEqual({
-        type: 'close',
-        paneId: '%isolated-session-ses_first',
-        sessionId: 'ses_second',
-      })
+      expect(mockCloseTmuxPane).toHaveBeenCalledWith('%isolated-session-ses_first')
       expect(Reflect.get(manager, 'isolatedContainerPaneId')).toBeUndefined()
       expect(Reflect.get(manager, 'isolatedWindowPaneId')).toBeUndefined()
     })
