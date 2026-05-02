@@ -130,6 +130,8 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
       let agentConfig: AgentConfig | undefined
       if (avail.native.openai) {
         agentConfig = { model: "openai/gpt-5.4-mini-fast" }
+      } else if (avail.openrouter) {
+        agentConfig = { model: "openrouter/openai/gpt-5.4-mini-fast" }
       } else if (avail.opencodeGo) {
         agentConfig = { model: "opencode-go/minimax-m2.7" }
       } else if (avail.zai) {
@@ -151,6 +153,8 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
         agentConfig = { model: "anthropic/claude-haiku-4-5" }
       } else if (avail.opencodeZen) {
         agentConfig = { model: "opencode/claude-haiku-4-5" }
+      } else if (avail.openrouter) {
+        agentConfig = { model: "openrouter/openai/gpt-5.4-mini-fast" }
       } else if (avail.opencodeGo) {
         agentConfig = { model: "opencode-go/minimax-m2.7" }
       } else if (avail.copilot) {
