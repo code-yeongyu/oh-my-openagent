@@ -172,10 +172,10 @@ bunx oh-my-opencode run     # Non-interactive session
 - Hashline edit: every Read output tagged with `LINE#ID` content hashes; edits reject on hash mismatch
 - IntentGate: classifies user intent (research/implementation/investigation/evaluation/fix) before routing
 
-### OpenRouter Integration Gap
+### OpenRouter Integration
 
-OpenRouter is recognized in `model-capabilities.generated.json` but **missing from CLI provider availability**: `src/cli/provider-availability.ts` has no `openrouter` mapping, `src/cli/types.ts` lacks `hasOpenRouter`, and fallback chains in `src/shared/model-requirements.ts` do not include `openrouter` as a provider. When adding OpenRouter support, update:
-1. `provider-availability.ts` + `types.ts` + `model-fallback-types.ts`
-2. `tui-install-prompts.ts` + `cli-program.ts` + `install-validators.ts`
-3. `config-manager/detect-current-config.ts`
-4. Fallback chains in `model-requirements.ts` (use `openrouter/provider/model` format)
+OpenRouter is supported by the CLI installer and fallback generation path:
+1. Provider flags/types: `provider-availability.ts`, `types.ts`, `model-fallback-types.ts`
+2. User input: `tui-install-prompts.ts`, `cli-program.ts`, `install-validators.ts`
+3. Existing config detection: `config-manager/detect-current-config.ts`
+4. Fallback chains: `model-requirements.ts`, emitted as `openrouter/provider/model`

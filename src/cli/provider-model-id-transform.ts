@@ -25,6 +25,20 @@ function applyGatewayTransforms(model: string): string {
 }
 
 export function transformModelForProvider(provider: string, model: string): string {
+  if (provider === "openrouter") {
+    const slashIndex = model.indexOf("/")
+    if (slashIndex !== -1) {
+      return model
+    }
+
+    const subProvider = inferSubProvider(model)
+    if (subProvider) {
+      return `${subProvider}/${model}`
+    }
+
+    return model
+  }
+
   if (provider === "vercel") {
     const slashIndex = model.indexOf("/")
     if (slashIndex !== -1) {

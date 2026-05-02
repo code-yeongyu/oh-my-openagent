@@ -9,7 +9,7 @@ export interface ProviderAvailability {
 	opencodeZen: boolean
 	copilot: boolean
 	zai: boolean
-kimiForCoding: boolean
+	kimiForCoding: boolean
 	opencodeGo: boolean
 	vercelAiGateway: boolean
 	openrouter: boolean

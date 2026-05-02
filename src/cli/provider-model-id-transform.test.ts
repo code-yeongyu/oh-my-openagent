@@ -312,6 +312,20 @@ describe("transformModelForProvider", () => {
     })
   })
 
+  describe("openrouter provider", () => {
+    test("uses openrouter sub-provider/model format for inferred providers", () => {
+      expect(transformModelForProvider("openrouter", "gpt-5.5")).toBe("openai/gpt-5.5")
+      expect(transformModelForProvider("openrouter", "claude-opus-4-7")).toBe("anthropic/claude-opus-4-7")
+      expect(transformModelForProvider("openrouter", "gemini-3.1-pro")).toBe("google/gemini-3.1-pro")
+    })
+
+    test("preserves explicit OpenRouter sub-provider prefixes", () => {
+      const result = transformModelForProvider("openrouter", "openai/gpt-5.5")
+
+      expect(result).toBe("openai/gpt-5.5")
+    })
+  })
+
   describe("unknown provider", () => {
     test("passes model through unchanged for unknown provider", () => {
       // #given unknown provider and any model
