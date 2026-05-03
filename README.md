@@ -224,6 +224,35 @@ curl -s https://raw.githubusercontent.com/klpanagi/matrixx/refs/heads/dev/docs/g
 
 We strongly recommend letting an agent handle installation. [Manual guide &rarr;](docs/guide/installation.md) &nbsp;&middot;&nbsp; [Uninstall &rarr;](docs/guide/uninstallation.md)
 
+### OpenCode Compatibility
+
+> **Recommended:** Matrixx works on **OpenCode 1.14.33 or newer**. Earlier 1.14.x releases also work, with one specific exception: **OpenCode 1.14.32** ships a regression that breaks plugin agent and MCP registration. Upgrade to **1.14.33+** to restore full functionality.
+
+To install a recommended version:
+
+```bash
+curl -fsSL https://opencode.ai/install | bash
+# or pin explicitly
+curl -fsSL https://opencode.ai/install | bash -s -- --version 1.14.33
+# or via npm
+npm install -g opencode-ai@1.14.33
+```
+
+<details>
+<summary><strong>Compatibility Matrix</strong></summary>
+
+| OpenCode Version | Matrixx Status | Notes |
+|-----------------|----------------|-------|
+| 1.1.1 &ndash; 1.4.17 | **Supported** | Full agent registration, all hooks functional |
+| 1.14.17 &ndash; 1.14.31 | **Supported** | Full agent registration, all hooks functional |
+| **1.14.32** | **Broken** | Upstream regression: ALS context lost during `InstanceStore.boot` refactor; plugin async callbacks lose `Instance.current`, so agents and MCP servers fail to register. See [anomalyco/opencode#25457](https://github.com/anomalyco/opencode/issues/25457). |
+| **1.14.33+** | **Recommended** | Upstream fix shipped via [anomalyco/opencode#25449](https://github.com/anomalyco/opencode/pull/25449); restored `InstanceBootstrap` init parameter for non-Effect contexts. |
+
+**Minimum OpenCode version:** 1.1.1 (permission system required)
+**Avoid:** 1.14.32 only.
+
+</details>
+
 ---
 
 ## Documentation
