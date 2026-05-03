@@ -180,7 +180,7 @@ describe("native git hook", () => {
     expect(audit).toContain("part-event.txt")
   })
 
-  test("tool execute after still appends summary when completed events already audited the call", async () => {
+  test("tool execute after still appends summary when completed event uses event-level call id", async () => {
     const hook = createNativeGitHook({ directory } as never, { mode: "tracked", audit_log: true })
     await captureToolBaseline(hook, { tool: "write", sessionID: "ses_shared", callID: "call_shared" })
     writeFileSync(join(directory, "shared-state.txt"), "created by tool part\n", "utf-8")
@@ -189,10 +189,10 @@ describe("native git hook", () => {
       event: {
         type: "message.part.updated",
         properties: {
+          callID: "call_shared",
           part: {
             type: "tool",
             tool: "write",
-            callID: "call_shared",
             sessionID: "ses_shared",
             state: { status: "completed" },
           },

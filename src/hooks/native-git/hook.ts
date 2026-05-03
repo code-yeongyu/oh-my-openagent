@@ -138,7 +138,9 @@ function getNativeGitToolInputFromEvent(input: NativeGitEventInput): NativeGitTo
     sessionID:
       getStringProperty(part, ["sessionID", "sessionId"]) ??
       getStringProperty(input.event.properties, ["sessionID", "sessionId"]),
-    callID: getStringProperty(part, ["callID", "callId", "call_id"]),
+    callID:
+      getStringProperty(part, ["callID", "callId", "call_id"]) ??
+      getStringProperty(input.event.properties, ["callID", "callId", "call_id"]),
   }
 }
 
