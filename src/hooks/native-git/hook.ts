@@ -32,6 +32,11 @@ type NativeGitDirtyState = {
   fileCount: number
 }
 
+type NativeGitCallBaseline = {
+  repositoryRoot: string
+  statusKey: string
+}
+
 export const NATIVE_GIT_TASK_REMINDER = `
 <system-reminder>
 Native Git tracking detected uncommitted changes. Before final completion, use git-master to create atomic commits, for example:
@@ -41,10 +46,6 @@ task(category="quick", load_skills=["git-master"], prompt="Commit the current ch
 const NATIVE_GIT_TOAST_TITLE = "Native Git changes tracked"
 const NATIVE_GIT_TOAST_MESSAGE =
   "Uncommitted changes are being audited. Before final completion, use git-master to create atomic commits."
-
-function getStatusKey(files: string[]): string {
-  return files.slice().sort().join("\0")
-}
 
 function appendOutput(output: { output?: string }, text: string): void {
   output.output = `${output.output ?? ""}${text}`
@@ -71,6 +72,27 @@ function getStringProperty(record: Record<string, unknown>, keys: string[]): str
     }
   }
   return undefined
+}
+
+function getCallKey(input: NativeGitToolInput): string | null {
+  if (!input.callID) {
+    return null
+  }
+
+  return `${input.sessionID ?? "unknown"}:${input.callID}`
+}
+
+function getStateKey(sessionID: string, repoRoot: string): string {
+  return `${sessionID}:${repoRoot}`
+}
+
+function deleteSessionMapEntries<T>(map: Map<string, T>, sessionID: string): void {
+  const prefix = `${sessionID}:`
+  for (const key of map.keys()) {
+    if (key.startsWith(prefix)) {
+      map.delete(key)
+    }
+  }
 }
 
 function getNativeGitToolInputFromEvent(input: NativeGitEventInput): NativeGitToolInput | null {
@@ -126,6 +148,27 @@ export function createNativeGitHook(ctx: PluginInput, config: NativeGitConfig | 
   const lastStatusBySessionRepo = new Map<string, string>()
   const dirtyStateBySession = new Map<string, NativeGitDirtyState>()
   const lastToastStatusBySession = new Map<string, string>()
+  const baselineByCall = new Map<string, NativeGitCallBaseline>()
+  const changedResultByCall = new Map<string, NativeGitTrackResult>()
+  const auditedCallKeys = new Set<string>()
+  const outputReminderCallKeys = new Set<string>()
+  const taskReminderCallKeys = new Set<string>()
+
+  function clearSessionState(sessionID: string): void {
+    dirtyStateBySession.delete(sessionID)
+    lastToastStatusBySession.delete(sessionID)
+    deleteSessionMapEntries(lastStatusBySessionRepo, sessionID)
+    deleteSessionMapEntries(baselineByCall, sessionID)
+    deleteSessionMapEntries(changedResultByCall, sessionID)
+
+    for (const set of [auditedCallKeys, outputReminderCallKeys, taskReminderCallKeys]) {
+      for (const key of set) {
+        if (key.startsWith(`${sessionID}:`)) {
+          set.delete(key)
+        }
+      }
+    }
+  }
 
   async function showNativeGitReminder(sessionID: string): Promise<void> {
     const dirtyState = dirtyStateBySession.get(sessionID)
@@ -140,7 +183,7 @@ export function createNativeGitHook(ctx: PluginInput, config: NativeGitConfig | 
       return
     }
 
-    const statusKey = `${status.repository.repoRoot}:${getStatusKey(status.files)}`
+    const statusKey = `${status.repository.repoRoot}:${status.statusKey}`
     if (lastToastStatusBySession.get(sessionID) === statusKey) {
       return
     }
@@ -163,6 +206,30 @@ export function createNativeGitHook(ctx: PluginInput, config: NativeGitConfig | 
       })
   }
 
+  function captureNativeGitBaseline(input: NativeGitToolInput): void {
+    const tool = input.tool.toLowerCase()
+    if (mode === "manual" || !TRACKED_TOOLS.has(tool)) {
+      return
+    }
+
+    const status = getNativeGitStatus(ctx.directory)
+    if (!status) {
+      return
+    }
+
+    const sessionID = input.sessionID ?? "unknown"
+    const statusKey = status.dirty ? status.statusKey : ""
+    lastStatusBySessionRepo.set(getStateKey(sessionID, status.repository.repoRoot), statusKey)
+
+    const callKey = getCallKey(input)
+    if (callKey) {
+      baselineByCall.set(callKey, {
+        repositoryRoot: status.repository.repoRoot,
+        statusKey,
+      })
+    }
+  }
+
   function trackNativeGitChanges(input: NativeGitToolInput): NativeGitTrackResult {
     const tool = input.tool.toLowerCase()
     if (mode === "manual" || !TRACKED_TOOLS.has(tool)) {
@@ -175,16 +242,34 @@ export function createNativeGitHook(ctx: PluginInput, config: NativeGitConfig | 
     }
 
     const sessionID = input.sessionID ?? "unknown"
-    const stateKey = `${sessionID}:${status.repository.repoRoot}`
+    const stateKey = getStateKey(sessionID, status.repository.repoRoot)
+    const callKey = getCallKey(input)
+    const cachedResult = callKey ? changedResultByCall.get(callKey) : undefined
+    if (cachedResult) {
+      return cachedResult
+    }
+
     if (!status.dirty) {
       lastStatusBySessionRepo.set(stateKey, "")
       dirtyStateBySession.delete(sessionID)
+      if (callKey) {
+        baselineByCall.delete(callKey)
+        changedResultByCall.delete(callKey)
+      }
       return { dirty: false, changedSinceLastCheck: false }
     }
 
-    const statusKey = getStatusKey(status.files)
-    const changedSinceLastCheck = lastStatusBySessionRepo.get(stateKey) !== statusKey
-    lastStatusBySessionRepo.set(stateKey, statusKey)
+    const baseline = callKey ? baselineByCall.get(callKey) : undefined
+    const previousStatusKey =
+      baseline?.repositoryRoot === status.repository.repoRoot
+        ? baseline.statusKey
+        : lastStatusBySessionRepo.get(stateKey)
+    const changedSinceLastCheck = previousStatusKey !== undefined && previousStatusKey !== status.statusKey
+    lastStatusBySessionRepo.set(stateKey, status.statusKey)
+
+    if (callKey) {
+      baselineByCall.delete(callKey)
+    }
 
     const summary = getNativeGitChangeSummary(ctx.directory)
     dirtyStateBySession.set(sessionID, {
@@ -192,7 +277,7 @@ export function createNativeGitHook(ctx: PluginInput, config: NativeGitConfig | 
     })
 
     if (changedSinceLastCheck) {
-      if (auditLog) {
+      if (auditLog && (!callKey || !auditedCallKeys.has(callKey))) {
         appendNativeGitAuditRecord(status.repository, {
           tool,
           sessionID: input.sessionID,
@@ -200,6 +285,10 @@ export function createNativeGitHook(ctx: PluginInput, config: NativeGitConfig | 
           files: status.files,
           summary,
         })
+
+        if (callKey) {
+          auditedCallKeys.add(callKey)
+        }
       }
 
       log("[native-git] tracked uncommitted changes", {
@@ -209,12 +298,28 @@ export function createNativeGitHook(ctx: PluginInput, config: NativeGitConfig | 
       })
     }
 
-    return { dirty: true, changedSinceLastCheck, summary }
+    const result = { dirty: true, changedSinceLastCheck, summary }
+    if (callKey && changedSinceLastCheck) {
+      changedResultByCall.set(callKey, result)
+    }
+
+    return result
   }
 
   return {
     event: async (input: NativeGitEventInput): Promise<void> => {
       if (mode === "manual") {
+        return
+      }
+
+      if (input.event.type === "session.deleted" && isRecord(input.event.properties)) {
+        const info = isRecord(input.event.properties.info) ? input.event.properties.info : undefined
+        const sessionID =
+          getStringProperty(input.event.properties, ["sessionID", "sessionId"]) ??
+          (info ? getStringProperty(info, ["id"]) : undefined)
+        if (sessionID) {
+          clearSessionState(sessionID)
+        }
         return
       }
 
@@ -228,6 +333,11 @@ export function createNativeGitHook(ctx: PluginInput, config: NativeGitConfig | 
 
       const toolInput = getNativeGitToolInputFromEvent(input)
       if (!toolInput) {
+        return
+      }
+
+      if (input.event.type === "tool.execute") {
+        captureNativeGitBaseline(toolInput)
         return
       }
 
@@ -247,14 +357,21 @@ export function createNativeGitHook(ctx: PluginInput, config: NativeGitConfig | 
       }
 
       const result = trackNativeGitChanges(input)
-      if (result.changedSinceLastCheck && result.summary) {
+      const callKey = getCallKey(input)
+      if (result.changedSinceLastCheck && result.summary && (!callKey || !outputReminderCallKeys.has(callKey))) {
         if (tool !== "task") {
           appendOutput(output, buildTrackingMessage(result.summary))
         }
+        if (callKey) {
+          outputReminderCallKeys.add(callKey)
+        }
       }
 
-      if (tool === "task" && result.dirty) {
+      if (tool === "task" && result.dirty && (!callKey || !taskReminderCallKeys.has(callKey))) {
         appendOutput(output, NATIVE_GIT_TASK_REMINDER)
+        if (callKey) {
+          taskReminderCallKeys.add(callKey)
+        }
       }
     },
   }

@@ -100,6 +100,27 @@ describe("native git service", () => {
     expect(files).toEqual(["new-name.ts", "added.ts"])
   })
 
+  test("parses porcelain z rename entries that include similarity scores", () => {
+    const files = parseNativeGitStatusPorcelainZ("R100 new-name.ts\0old-name.ts\0C075 copied.ts\0source.ts\0")
+
+    expect(files).toEqual(["new-name.ts", "copied.ts"])
+  })
+
+  test("status key changes when dirty file contents change without changing paths", () => {
+    git(directory, ["init"])
+    writeFileSync(join(directory, "README.md"), "hello\n", "utf-8")
+    commitAll(directory, "init")
+
+    writeFileSync(join(directory, "README.md"), "first\n", "utf-8")
+    const firstStatus = getNativeGitStatus(directory)
+    writeFileSync(join(directory, "README.md"), "second\n", "utf-8")
+    const secondStatus = getNativeGitStatus(directory)
+
+    expect(firstStatus?.files).toEqual(["README.md"])
+    expect(secondStatus?.files).toEqual(["README.md"])
+    expect(firstStatus?.statusKey).not.toBe(secondStatus?.statusKey)
+  })
+
   test("writes audit under git common dir without dirtying the worktree", () => {
     git(directory, ["init"])
     writeFileSync(join(directory, "README.md"), "hello\n", "utf-8")

@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process"
-import { appendFileSync, mkdirSync } from "node:fs"
+import { createHash } from "node:crypto"
+import { appendFileSync, mkdirSync, readFileSync, statSync } from "node:fs"
 import { dirname, isAbsolute, join, resolve } from "node:path"
 import { collectGitDiffStats } from "./collect-git-diff-stats"
 import { formatFileChanges } from "./format-file-changes"
@@ -15,6 +16,7 @@ export interface NativeGitStatus {
   repository: NativeGitRepository
   files: string[]
   dirty: boolean
+  statusKey: string
 }
 
 export interface NativeGitAuditRecord {
@@ -63,8 +65,9 @@ export function parseNativeGitStatusPorcelainZ(output: string): string[] {
     const entry = entries[index]
     if (!entry || entry.length < 4) continue
 
-    const status = entry.slice(0, 2)
-    const filePath = entry.slice(3)
+    const scoredStatus = entry.match(/^([RC]\d{1,3}) (.+)$/)
+    const status = scoredStatus ? scoredStatus[1] : entry.slice(0, 2)
+    const filePath = scoredStatus ? scoredStatus[2] : entry.slice(3)
     if (filePath) {
       files.push(filePath)
     }
@@ -75,6 +78,39 @@ export function parseNativeGitStatusPorcelainZ(output: string): string[] {
   }
 
   return files
+}
+
+function createNativeGitStatusKey(repository: NativeGitRepository, statusOutput: string, files: string[]): string {
+  const hash = createHash("sha256")
+  hash.update(statusOutput)
+
+  try {
+    hash.update(runGit(repository.repoRoot, ["diff", "--binary", "HEAD"]))
+  } catch {
+    // Status output and file fingerprints still give us a stable dirty-state key.
+  }
+
+  for (const filePath of files.slice().sort()) {
+    hash.update("\0file:")
+    hash.update(filePath)
+
+    try {
+      const absolutePath = join(repository.repoRoot, filePath)
+      const stat = statSync(absolutePath)
+      hash.update(`\0size:${stat.size}`)
+
+      if (stat.isFile()) {
+        hash.update("\0content:")
+        hash.update(readFileSync(absolutePath))
+      } else {
+        hash.update("\0non-file")
+      }
+    } catch {
+      hash.update("\0missing")
+    }
+  }
+
+  return hash.digest("hex")
 }
 
 export function getNativeGitStatus(directory: string): NativeGitStatus | null {
@@ -88,6 +124,7 @@ export function getNativeGitStatus(directory: string): NativeGitStatus | null {
       repository,
       files,
       dirty: files.length > 0,
+      statusKey: createNativeGitStatusKey(repository, output, files),
     }
   } catch {
     return null
