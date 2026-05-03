@@ -322,6 +322,7 @@ See full [Features Documentation](docs/reference/features.md).
 - **Session Tools**: List, read, search, and analyze session history
 - **Productivity Features**: Ralph Loop, Todo Enforcer, Comment Checker, Think Mode, and more
 - **Doctor Command**: Built-in diagnostics (`bunx oh-my-opencode doctor`) verify plugin registration, config, models, and environment
+- **Native Git Tracking**: Tracks agent-caused dirty Git changes in `.git/omo/native-git/audit.jsonl` and reminds you to use `git-master` for atomic commits
 - **Model Fallbacks**: `fallback_models` can mix plain model strings with per-fallback object settings in the same array
 - **File Prompts**: Load prompts from files with `file://` support in agent configurations
 - **Session Recovery**: Automatic recovery from session errors, context window limits, and API failures
