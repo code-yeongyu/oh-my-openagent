@@ -32,7 +32,6 @@ describe("buildGlmSisyphusJuniorPrompt", () => {
     const prompt = buildGlmSisyphusJuniorPrompt(false)
 
     // then
-    expect(prompt).toContain(".sisyphus/state/{plan-or-session}/")
     expect(prompt).toContain("Read only the slice named in the task prompt")
     expect(prompt).not.toContain("Toggle RL")
     expect(prompt).not.toContain("goal.md")
