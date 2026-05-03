@@ -29,7 +29,7 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
     const manager = {
       launch: async () => ({
         id: "bg_unresolved",
-        sessionID: undefined,
+        sessionId: undefined,
         description: "Unresolved session",
         agent: "explore",
         status: "running",
@@ -72,12 +72,12 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
     const manager = {
       launch: async () => ({
         id: "bg_resolved",
-        sessionID: "ses_sub_123",
+        sessionId: "ses_sub_123",
         description: "Resolved session",
         agent: "explore",
         status: "running",
       }),
-      getTask: () => ({ sessionID: "ses_sub_123" }),
+      getTask: () => ({ sessionId: "ses_sub_123" }),
     }
 
     const result = await executeBackgroundTask(
@@ -121,14 +121,14 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
     const manager = {
       launch: async () => ({
         id: "bg_late",
-        sessionID: undefined,
+        sessionId: undefined,
         description: "Late session",
         agent: "explore",
         status: "running",
       }),
       getTask: () => {
         reads += 1
-        return reads >= 2 ? { sessionID: "ses_late_123" } : undefined
+        return reads >= 2 ? { sessionId: "ses_late_123" } : undefined
       },
     }
 
@@ -171,13 +171,13 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
         launchCalls.push(input)
         return {
           id: "bg_permission",
-          sessionID: "ses_permission_123",
+          sessionId: "ses_permission_123",
           description: "Permission session",
           agent: "explore",
           status: "running",
         }
       },
-      getTask: () => ({ sessionID: "ses_permission_123" }),
+      getTask: () => ({ sessionId: "ses_permission_123" }),
     }
 
     //#when
@@ -217,13 +217,13 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
         launchCalls.push(input)
         return {
           id: "bg_clean_agent",
-          sessionID: "ses_clean_agent",
+          sessionId: "ses_clean_agent",
           description: "Clean agent",
           agent: "sisyphus-junior",
           status: "running",
         }
       },
-      getTask: () => ({ sessionID: "ses_clean_agent" }),
+      getTask: () => ({ sessionId: "ses_clean_agent" }),
     }
 
     //#when
@@ -260,14 +260,14 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
     const manager = {
       launch: async () => ({
         id: "bg_abort_after_launch",
-        sessionID: undefined,
+        sessionId: undefined,
         description: "Abort after launch",
         agent: "explore",
         status: "pending",
       }),
       getTask: () => {
         abortController.abort()
-        return { sessionID: undefined, status: "pending" }
+        return { sessionId: undefined, status: "pending" }
       },
     }
 
@@ -309,7 +309,7 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
     const manager = {
       launch: async () => ({
         id: "bg_abort_category",
-        sessionID: undefined,
+        sessionId: undefined,
         description: "Abort category",
         agent: "explore",
         status: "pending",
@@ -317,8 +317,8 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
       getTask: () => {
         reads += 1
         return reads >= 2
-          ? { sessionID: "ses_abort_category", status: "running" }
-          : { sessionID: undefined, status: "pending" }
+          ? { sessionId: "ses_abort_category", status: "running" }
+          : { sessionId: undefined, status: "pending" }
       },
     }
 
@@ -359,12 +359,12 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
     const manager = {
       launch: async () => ({
         id: "bg_abort_terminal",
-        sessionID: undefined,
+        sessionId: undefined,
         description: "Abort terminal",
         agent: "explore",
         status: "pending",
       }),
-      getTask: () => ({ sessionID: undefined, status: "interrupt" }),
+      getTask: () => ({ sessionId: undefined, status: "interrupt" }),
     }
 
     //#when
@@ -401,7 +401,7 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
     const manager = {
       launch: async () => ({
         id: "bg_crash_before_prompt",
-        sessionID: undefined,
+        sessionId: undefined,
         description: "Crash before prompt",
         agent: "explore",
         status: "pending",
@@ -409,9 +409,9 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
       getTask: () => {
         reads += 1
         if (reads >= 2) {
-          return { sessionID: "ses_orphan", status: "error", error: "crash between session creation and prompt send" }
+          return { sessionId: "ses_orphan", status: "error", error: "crash between session creation and prompt send" }
         }
-        return { sessionID: undefined, status: "pending" }
+        return { sessionId: undefined, status: "pending" }
       },
     }
 
@@ -447,16 +447,16 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
     const firstAbortController = new AbortController()
     const secondAbortController = new AbortController()
     const states = new Map([
-      ["bg_first", { reads: 0, abortOnFirstRead: true, sessionID: "ses_first" }],
-      ["bg_second", { reads: 0, abortOnFirstRead: false, sessionID: "ses_second" }],
+      ["bg_first", { reads: 0, abortOnFirstRead: true, sessionId: "ses_first" }],
+      ["bg_second", { reads: 0, abortOnFirstRead: false, sessionId: "ses_second" }],
     ])
     let launchCount = 0
     const manager = {
       launch: async () => {
         launchCount += 1
         return launchCount === 1
-          ? { id: "bg_first", sessionID: undefined, description: "First", agent: "explore", status: "pending" }
-          : { id: "bg_second", sessionID: undefined, description: "Second", agent: "explore", status: "pending" }
+          ? { id: "bg_first", sessionId: undefined, description: "First", agent: "explore", status: "pending" }
+          : { id: "bg_second", sessionId: undefined, description: "Second", agent: "explore", status: "pending" }
       },
       getTask: (taskID: string) => {
         const state = states.get(taskID)
@@ -466,8 +466,8 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
           firstAbortController.abort()
         }
         return state.reads >= 2
-          ? { sessionID: state.sessionID, status: "running" }
-          : { sessionID: undefined, status: "pending" }
+          ? { sessionId: state.sessionId, status: "running" }
+          : { sessionId: undefined, status: "pending" }
       },
     }
 
@@ -531,13 +531,13 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
         launchCalls.push(input)
         return {
           id: "bg_legacy_zwsp",
-          sessionID: "ses_legacy_zwsp",
+          sessionId: "ses_legacy_zwsp",
           description: "Legacy ZWSP",
           agent: "Hephaestus - Deep Agent",
           status: "running",
         }
       },
-      getTask: () => ({ sessionID: "ses_legacy_zwsp" }),
+      getTask: () => ({ sessionId: "ses_legacy_zwsp" }),
     }
 
     //#when

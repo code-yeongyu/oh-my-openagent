@@ -7,9 +7,9 @@ import { MIN_IDLE_TIME_MS } from "./constants"
 function createRunningTask(overrides: Partial<BackgroundTask> = {}): BackgroundTask {
   return {
     id: "task-1",
-    sessionID: "ses-idle-1",
-    parentSessionID: "parent-ses-1",
-    parentMessageID: "msg-1",
+    sessionId: "ses-idle-1",
+    parentSessionId: "parent-ses-1",
+    parentMessageId: "msg-1",
     description: "test idle handler",
     prompt: "test",
     agent: "explore",
@@ -91,7 +91,7 @@ describe("handleSessionIdleBackgroundEvent", () => {
 
       //#when
       handleSessionIdleBackgroundEvent({
-        properties: { sessionID: task.sessionID! },
+        properties: { sessionID: task.sessionId! },
         findBySession: () => task,
         idleDeferralTimers: new Map(),
         validateSessionHasOutput: () => Promise.resolve(true),
@@ -113,7 +113,7 @@ describe("handleSessionIdleBackgroundEvent", () => {
 
       //#when
       handleSessionIdleBackgroundEvent({
-        properties: { sessionID: task.sessionID! },
+        properties: { sessionID: task.sessionId! },
         findBySession: () => task,
         idleDeferralTimers: new Map(),
         validateSessionHasOutput: () => Promise.resolve(true),
@@ -141,7 +141,7 @@ describe("handleSessionIdleBackgroundEvent", () => {
 
         //#when
         handleSessionIdleBackgroundEvent({
-          properties: { sessionID: task.sessionID! },
+          properties: { sessionID: task.sessionId! },
           findBySession: () => task,
           idleDeferralTimers,
           validateSessionHasOutput: () => Promise.resolve(true),
@@ -175,7 +175,7 @@ describe("handleSessionIdleBackgroundEvent", () => {
 
         //#when
         handleSessionIdleBackgroundEvent({
-          properties: { sessionID: task.sessionID! },
+          properties: { sessionID: task.sessionId! },
           findBySession: () => task,
           idleDeferralTimers,
           validateSessionHasOutput: () => Promise.resolve(true),
@@ -206,7 +206,7 @@ describe("handleSessionIdleBackgroundEvent", () => {
 
         //#when
         handleSessionIdleBackgroundEvent({
-          properties: { sessionID: task.sessionID! },
+          properties: { sessionID: task.sessionId! },
           findBySession: () => task,
           idleDeferralTimers,
           validateSessionHasOutput: () => Promise.resolve(true),
@@ -217,7 +217,7 @@ describe("handleSessionIdleBackgroundEvent", () => {
 
         //#then - wait for deferred timer
         await new Promise((resolve) => setTimeout(resolve, remainingMs + 50))
-        expect(emitIdleEvent).toHaveBeenCalledWith(task.sessionID)
+        expect(emitIdleEvent).toHaveBeenCalledWith(task.sessionId)
         expect(idleDeferralTimers.has(task.id)).toBe(false)
       } finally {
         Date.now = realDateNow
@@ -233,7 +233,7 @@ describe("handleSessionIdleBackgroundEvent", () => {
 
       //#when
       handleSessionIdleBackgroundEvent({
-        properties: { sessionID: task.sessionID! },
+        properties: { sessionID: task.sessionId! },
         findBySession: () => task,
         idleDeferralTimers: new Map(),
         validateSessionHasOutput: () => Promise.resolve(true),
@@ -254,7 +254,7 @@ describe("handleSessionIdleBackgroundEvent", () => {
 
       //#when
       handleSessionIdleBackgroundEvent({
-        properties: { sessionID: task.sessionID! },
+        properties: { sessionID: task.sessionId! },
         findBySession: () => task,
         idleDeferralTimers: new Map(),
         validateSessionHasOutput: () => Promise.resolve(false),
@@ -275,7 +275,7 @@ describe("handleSessionIdleBackgroundEvent", () => {
 
       //#when
       handleSessionIdleBackgroundEvent({
-        properties: { sessionID: task.sessionID! },
+        properties: { sessionID: task.sessionId! },
         findBySession: () => task,
         idleDeferralTimers: new Map(),
         validateSessionHasOutput: () => Promise.resolve(true),
@@ -296,7 +296,7 @@ describe("handleSessionIdleBackgroundEvent", () => {
 
       //#when
       handleSessionIdleBackgroundEvent({
-        properties: { sessionID: task.sessionID! },
+        properties: { sessionID: task.sessionId! },
         findBySession: () => task,
         idleDeferralTimers: new Map(),
         validateSessionHasOutput: async () => {
@@ -320,7 +320,7 @@ describe("handleSessionIdleBackgroundEvent", () => {
 
       //#when
       handleSessionIdleBackgroundEvent({
-        properties: { sessionID: task.sessionID! },
+        properties: { sessionID: task.sessionId! },
         findBySession: () => task,
         idleDeferralTimers: new Map(),
         validateSessionHasOutput: () => Promise.resolve(true),

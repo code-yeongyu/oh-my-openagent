@@ -29,11 +29,11 @@ export interface TaskProgress {
 export type BackgroundTaskAttemptStatus = BackgroundTaskStatus
 
 export interface BackgroundTaskAttempt {
-  attemptID: string
+  attemptId: string
   attemptNumber: number
-  sessionID?: string
-  providerID?: string
-  modelID?: string
+  sessionId?: string
+  providerId?: string
+  modelId?: string
   variant?: string
   status: BackgroundTaskAttemptStatus
   error?: string
@@ -43,10 +43,10 @@ export interface BackgroundTaskAttempt {
 
 export interface BackgroundTask {
   id: string
-  sessionID?: string
-  rootSessionID?: string
-  parentSessionID: string
-  parentMessageID: string
+  sessionId?: string
+  rootSessionId?: string
+  parentSessionId: string
+  parentMessageId: string
   description: string
   prompt: string
   agent: string
@@ -101,8 +101,8 @@ export interface LaunchInput {
   description: string
   prompt: string
   agent: string
-  parentSessionID: string
-  parentMessageID: string
+  parentSessionId: string
+  parentMessageId: string
   parentModel?: { providerID: string; modelID: string }
   parentAgent?: string
   parentTools?: Record<string, boolean>
@@ -119,8 +119,8 @@ export interface LaunchInput {
 export interface ResumeInput {
   sessionId: string
   prompt: string
-  parentSessionID: string
-  parentMessageID: string
+  parentSessionId: string
+  parentMessageId: string
   parentModel?: { providerID: string; modelID: string }
   parentAgent?: string
   parentTools?: Record<string, boolean>

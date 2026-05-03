@@ -50,9 +50,13 @@ export const getAfplayPath = createCommandFinder("afplay")
 export const getPaplayPath = createCommandFinder("paplay")
 export const getAplayPath = createCommandFinder("aplay")
 export const getTerminalNotifierPath = createCommandFinder("terminal-notifier")
+export const getCmuxPath = createCommandFinder("cmux")
 
 export function startBackgroundCheck(platform: Platform): void {
   if (platform === "darwin") {
+    getCmuxPath().catch((error) => {
+      logBackgroundCheckError("cmux", error)
+    })
     getOsascriptPath().catch((error) => {
       logBackgroundCheckError("osascript", error)
     })

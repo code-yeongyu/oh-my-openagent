@@ -67,7 +67,7 @@ describe("metadata model unification", () => {
           manager: {
             launch: async () => ({
               id: "bg_1", description: "test", agent: "explore",
-              status: "pending", sessionID: "ses_bg", model: MODEL,
+              status: "pending", sessionId: "ses_bg", model: MODEL,
             }),
             getTask: () => undefined,
           },
@@ -88,7 +88,7 @@ describe("metadata model unification", () => {
 
         const launchedTask = {
           id: "bg_unstable", description: "test", agent: "explore",
-          status: "completed", sessionID: "ses_unstable", model: MODEL,
+          status: "completed", sessionId: "ses_unstable", model: MODEL,
         }
         await executeUnstableAgentTask(
           args, ctx,
@@ -130,7 +130,7 @@ describe("metadata model unification", () => {
           manager: {
             resume: async () => ({
               id: "bg_2", description: "continue", agent: "explore",
-              status: "running", sessionID: "ses_resumed", model: MODEL,
+              status: "running", sessionId: "ses_resumed", model: MODEL,
             }),
           },
         } as any, parentContext)
@@ -210,7 +210,7 @@ describe("metadata model unification", () => {
           manager: {
             launch: async () => ({
               id: "bg_1", description: "test", agent: "explore",
-              status: "pending", sessionID: "ses_bg",
+              status: "pending", sessionId: "ses_bg",
             }),
             getTask: () => undefined,
           },
@@ -231,7 +231,7 @@ describe("metadata model unification", () => {
 
         const launchedTask = {
           id: "bg_unstable", description: "test", agent: "explore",
-          status: "completed", sessionID: "ses_unstable",
+          status: "completed", sessionId: "ses_unstable",
         }
 
         await executeUnstableAgentTask(
@@ -274,7 +274,7 @@ describe("metadata model unification", () => {
           manager: {
             resume: async () => ({
               id: "bg_2", description: "continue", agent: "explore",
-              status: "running", sessionID: "ses_resumed",
+              status: "running", sessionId: "ses_resumed",
             }),
           },
         } as any, parentContext)
@@ -385,7 +385,7 @@ describe("metadata model unification", () => {
           manager: {
             launch: async () => ({
               id: "bg_variant", description: "test", agent: "explore",
-              status: "pending", sessionID: "ses_bg_variant", model: MODEL_WITH_VARIANT,
+              status: "pending", sessionId: "ses_bg_variant", model: MODEL_WITH_VARIANT,
             }),
             getTask: () => undefined,
           },
@@ -406,7 +406,7 @@ describe("metadata model unification", () => {
 
         const launchedTask = {
           id: "bg_unstable_variant", description: "test", agent: "explore",
-          status: "completed", sessionID: "ses_unstable_variant", model: MODEL_WITH_VARIANT,
+          status: "completed", sessionId: "ses_unstable_variant", model: MODEL_WITH_VARIANT,
         }
 
         await executeUnstableAgentTask(
@@ -449,7 +449,7 @@ describe("metadata model unification", () => {
           manager: {
             resume: async () => ({
               id: "bg_resume_variant", description: "continue", agent: "explore",
-              status: "running", sessionID: "ses_resumed_variant", model: MODEL_WITH_VARIANT,
+              status: "running", sessionId: "ses_resumed_variant", model: MODEL_WITH_VARIANT,
             }),
           },
         } as any, parentContext)

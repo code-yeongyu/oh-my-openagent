@@ -37,8 +37,8 @@ describe("background-agent spawner agent-not-found fallback", () => {
       description: "Implement feature",
       prompt: "Please implement the break-even analysis",
       agent: "Sisyphus-Junior",
-      parentSessionID: "ses_parent",
-      parentMessageID: "msg_parent",
+      parentSessionId: "ses_parent",
+      parentMessageId: "msg_parent",
     })
 
     const item = {
@@ -47,8 +47,8 @@ describe("background-agent spawner agent-not-found fallback", () => {
         description: task.description,
         prompt: task.prompt,
         agent: task.agent,
-        parentSessionID: task.parentSessionID,
-        parentMessageID: task.parentMessageID,
+        parentSessionId: task.parentSessionId,
+        parentMessageId: task.parentMessageId,
         parentModel: task.parentModel,
         parentAgent: task.parentAgent,
         model: task.model,
@@ -109,8 +109,8 @@ describe("background-agent spawner agent-not-found fallback", () => {
       description: "Implement feature",
       prompt: "Do work",
       agent: "Sisyphus-Junior",
-      parentSessionID: "ses_parent",
-      parentMessageID: "msg_parent",
+      parentSessionId: "ses_parent",
+      parentMessageId: "msg_parent",
     })
 
     const item = {
@@ -119,8 +119,8 @@ describe("background-agent spawner agent-not-found fallback", () => {
         description: task.description,
         prompt: task.prompt,
         agent: task.agent,
-        parentSessionID: task.parentSessionID,
-        parentMessageID: task.parentMessageID,
+        parentSessionId: task.parentSessionId,
+        parentMessageId: task.parentMessageId,
       },
     }
 
@@ -162,8 +162,8 @@ describe("background-agent spawner agent-not-found fallback", () => {
       description: "Implement feature",
       prompt: "Do work",
       agent: "Sisyphus-Junior",
-      parentSessionID: "ses_parent",
-      parentMessageID: "msg_parent",
+      parentSessionId: "ses_parent",
+      parentMessageId: "msg_parent",
     })
 
     const item = {
@@ -172,8 +172,8 @@ describe("background-agent spawner agent-not-found fallback", () => {
         description: task.description,
         prompt: task.prompt,
         agent: task.agent,
-        parentSessionID: task.parentSessionID,
-        parentMessageID: task.parentMessageID,
+        parentSessionId: task.parentSessionId,
+        parentMessageId: task.parentMessageId,
       },
     }
 
@@ -221,8 +221,8 @@ describe("background-agent spawner agent-not-found fallback", () => {
       description: "Test task",
       prompt: "Do work",
       agent: "Sisyphus-Junior",
-      parentSessionID: "ses_parent",
-      parentMessageID: "msg_parent",
+      parentSessionId: "ses_parent",
+      parentMessageId: "msg_parent",
     })
 
     const item = {
@@ -231,8 +231,8 @@ describe("background-agent spawner agent-not-found fallback", () => {
         description: task.description,
         prompt: task.prompt,
         agent: task.agent,
-        parentSessionID: task.parentSessionID,
-        parentMessageID: task.parentMessageID,
+        parentSessionId: task.parentSessionId,
+        parentMessageId: task.parentMessageId,
         parentModel: task.parentModel,
         parentAgent: task.parentAgent,
         model: task.model,
@@ -284,8 +284,8 @@ describe("background-agent spawner agent-not-found fallback", () => {
       description: "Test task",
       prompt: "Do work",
       agent: "Custom-Agent",
-      parentSessionID: "ses_parent",
-      parentMessageID: "msg_parent",
+      parentSessionId: "ses_parent",
+      parentMessageId: "msg_parent",
     })
 
     const item = {
@@ -294,8 +294,8 @@ describe("background-agent spawner agent-not-found fallback", () => {
         description: task.description,
         prompt: task.prompt,
         agent: task.agent,
-        parentSessionID: task.parentSessionID,
-        parentMessageID: task.parentMessageID,
+        parentSessionId: task.parentSessionId,
+        parentMessageId: task.parentMessageId,
         parentModel: task.parentModel,
         parentAgent: task.parentAgent,
         model: task.model,
@@ -353,8 +353,8 @@ describe("background-agent spawner fallback model promotion", () => {
       description: "Test task",
       prompt: "Do the thing",
       agent: "oracle",
-      parentSessionID: "parent-1",
-      parentMessageID: "message-1",
+      parentSessionId: "parent-1",
+      parentMessageId: "message-1",
       model: {
         providerID: "openai",
         modelID: "gpt-5.4",
@@ -371,8 +371,8 @@ describe("background-agent spawner fallback model promotion", () => {
       description: "Test task",
       prompt: "Do the thing",
       agent: "oracle",
-      parentSessionID: "parent-1",
-      parentMessageID: "message-1",
+      parentSessionId: "parent-1",
+      parentMessageId: "message-1",
       model: task.model,
     }
 
@@ -427,8 +427,8 @@ describe("background-agent spawner fallback model promotion", () => {
       description: "Test task",
       prompt: "Do work",
       agent: "sisyphus-junior",
-      parentSessionID: "ses_parent",
-      parentMessageID: "msg_parent",
+      parentSessionId: "ses_parent",
+      parentMessageId: "msg_parent",
       model: { providerID: "openai", modelID: "gpt-5.4", variant: "medium" },
     })
 
@@ -438,8 +438,8 @@ describe("background-agent spawner fallback model promotion", () => {
         description: task.description,
         prompt: task.prompt,
         agent: task.agent,
-        parentSessionID: task.parentSessionID,
-        parentMessageID: task.parentMessageID,
+        parentSessionId: task.parentSessionId,
+        parentMessageId: task.parentMessageId,
         parentModel: task.parentModel,
         parentAgent: task.parentAgent,
         model: task.model,
@@ -486,8 +486,8 @@ describe("background-agent spawner fallback model promotion", () => {
       description: "Test task",
       prompt: "Do work",
       agent: "sisyphus-junior",
-      parentSessionID: "ses_parent",
-      parentMessageID: "msg_parent",
+      parentSessionId: "ses_parent",
+      parentMessageId: "msg_parent",
     })
 
     const item = {
@@ -496,8 +496,8 @@ describe("background-agent spawner fallback model promotion", () => {
         description: task.description,
         prompt: task.prompt,
         agent: task.agent,
-        parentSessionID: task.parentSessionID,
-        parentMessageID: task.parentMessageID,
+        parentSessionId: task.parentSessionId,
+        parentMessageId: task.parentMessageId,
         parentModel: task.parentModel,
         parentAgent: task.parentAgent,
         model: task.model,
@@ -542,8 +542,8 @@ describe("background-agent spawner fallback model promotion", () => {
       description: "Test task",
       prompt: "Do work",
       agent: "\u200Bsisyphus-junior",
-      parentSessionID: "ses_parent",
-      parentMessageID: "msg_parent",
+      parentSessionId: "ses_parent",
+      parentMessageId: "msg_parent",
     })
 
     const item = {
@@ -552,8 +552,8 @@ describe("background-agent spawner fallback model promotion", () => {
         description: task.description,
         prompt: task.prompt,
         agent: task.agent,
-        parentSessionID: task.parentSessionID,
-        parentMessageID: task.parentMessageID,
+        parentSessionId: task.parentSessionId,
+        parentMessageId: task.parentMessageId,
         parentModel: task.parentModel,
         parentAgent: task.parentAgent,
         model: task.model,
@@ -596,8 +596,8 @@ describe("background-agent spawner fallback model promotion", () => {
       description: "Legacy ZWSP",
       prompt: "Do work",
       agent: "\u200B\u200BHephaestus - Deep Agent",
-      parentSessionID: "ses_parent",
-      parentMessageID: "msg_parent",
+      parentSessionId: "ses_parent",
+      parentMessageId: "msg_parent",
     })
 
     const item = {
@@ -606,8 +606,8 @@ describe("background-agent spawner fallback model promotion", () => {
         description: task.description,
         prompt: task.prompt,
         agent: task.agent,
-        parentSessionID: task.parentSessionID,
-        parentMessageID: task.parentMessageID,
+        parentSessionId: task.parentSessionId,
+        parentMessageId: task.parentMessageId,
         parentModel: task.parentModel,
         parentAgent: task.parentAgent,
         model: task.model,
@@ -665,8 +665,8 @@ describe("background-agent spawner tmux callback ordering", () => {
       description: "Blocking tmux test",
       prompt: "Do work",
       agent: "general",
-      parentSessionID: "ses_parent",
-      parentMessageID: "msg_parent",
+      parentSessionId: "ses_parent",
+      parentMessageId: "msg_parent",
     })
 
     const item = {
@@ -675,8 +675,8 @@ describe("background-agent spawner tmux callback ordering", () => {
         description: task.description,
         prompt: task.prompt,
         agent: task.agent,
-        parentSessionID: task.parentSessionID,
-        parentMessageID: task.parentMessageID,
+        parentSessionId: task.parentSessionId,
+        parentMessageId: task.parentMessageId,
       },
     }
 

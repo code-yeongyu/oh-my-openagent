@@ -68,7 +68,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
         manager: {
           launch: async () => ({
             id: "bg_abc123", description: "test", agent: "explore",
-            status: "pending", sessionID: "ses_xyz789",
+            status: "pending", sessionId: "ses_xyz789",
           }),
           getTask: () => undefined,
         },
@@ -93,7 +93,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
 
       const launchedTask = {
         id: "bg_unstable_abc", description: "test", agent: "explore",
-        status: "completed", sessionID: "ses_unstable_xyz",
+        status: "completed", sessionId: "ses_unstable_xyz",
       }
 
       await executeUnstableAgentTask(
@@ -140,7 +140,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
         manager: {
           resume: async () => ({
             id: "bg_resumed_y", description: "continue", agent: "explore",
-            status: "running", sessionID: "ses_resumed_x", model: MODEL,
+            status: "running", sessionId: "ses_resumed_x", model: MODEL,
           }),
         },
       } as any, parentContext)
@@ -164,7 +164,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
         manager: {
           resume: async () => ({
             id: "bg_resumed_y", description: "continue", agent: "explore",
-            status: "running", sessionID: "ses_resumed_x", model: MODEL, category: "deep",
+            status: "running", sessionId: "ses_resumed_x", model: MODEL, category: "deep",
           }),
         },
       } as any, parentContext)
@@ -191,7 +191,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
         manager: {
           resume: async () => ({
             id: "bg_resumed_y", description: "continue", agent: "explore",
-            status: "running", sessionID: "ses_resumed_x", model: MODEL,
+            status: "running", sessionId: "ses_resumed_x", model: MODEL,
           }),
         },
       } as any, parentContext)
@@ -372,7 +372,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
         manager: {
           launch: async () => ({
             id: "bg_abc123", description: "test", agent: "Sisyphus-Junior",
-            status: "pending", sessionID: "ses_xyz789",
+            status: "pending", sessionId: "ses_xyz789",
           }),
           getTask: () => undefined,
         },
@@ -397,7 +397,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
 
       const launchedTask = {
         id: "bg_unstable_abc", description: "test", agent: "Sisyphus-Junior",
-        status: "completed", sessionID: "ses_unstable_xyz",
+        status: "completed", sessionId: "ses_unstable_xyz",
       }
 
       await executeUnstableAgentTask(
@@ -436,7 +436,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
       const manager = {
         getTask: (id: string) => ({
           id,
-          sessionID: "ses_bg_session",
+          sessionId: "ses_bg_session",
           agent: "explore",
           category: "deep",
           description: "test",

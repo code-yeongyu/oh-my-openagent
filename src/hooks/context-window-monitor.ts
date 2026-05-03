@@ -65,8 +65,15 @@ export function createContextWindowMonitorHook(
 
     remindedSessions.add(sessionID)
 
-    const usedPct = (actualUsagePercentage * 100).toFixed(1)
-    const remainingPct = ((1 - actualUsagePercentage) * 100).toFixed(1)
+    // Clamp the displayed percentages so the block stays trustworthy when the
+    // resolved actualLimit underestimates the model's real context window
+    // (e.g. a 1M-context Anthropic model that falls back to the 200K default).
+    // Without clamping, the block would advertise >100% used and a negative
+    // "remaining" - safety-tuned models flag exactly that pattern as a prompt
+    // injection and refuse to follow the directive (issue #3655).
+    const clampedPercentage = Math.min(Math.max(actualUsagePercentage, 0), 1)
+    const usedPct = (clampedPercentage * 100).toFixed(1)
+    const remainingPct = ((1 - clampedPercentage) * 100).toFixed(1)
     const usedTokens = totalInputTokens.toLocaleString()
     const limitTokens = actualLimit.toLocaleString()
 

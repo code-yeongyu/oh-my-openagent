@@ -23,11 +23,8 @@ import {
   validateNonTuiArgs,
 } from "./install-validators"
 import { getUnsupportedOpenCodeVersionMessage } from "./minimum-opencode-version"
-import { createCliPostHog, getPostHogDistinctId } from "../shared/posthog"
 
 export async function runCliInstaller(args: InstallArgs, version: string): Promise<number> {
-  const posthog = createCliPostHog()
-  const distinctId = getPostHogDistinctId()
   const validation = validateNonTuiArgs(args)
   if (!validation.valid) {
     printHeader(false)
@@ -65,16 +62,6 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
     const unsupportedVersionMessage = getUnsupportedOpenCodeVersionMessage(openCodeVersion)
     if (unsupportedVersionMessage) {
       printWarning(unsupportedVersionMessage)
-      try {
-        posthog.capture({ distinctId, event: "install_failed", properties: { command: "install", reason: "unsupported_opencode_version", is_update: isUpdate } })
-      } catch {
-        // telemetry failure is non-fatal, silently ignore
-      }
-      try {
-        await posthog.shutdown()
-      } catch {
-        // telemetry failure is non-fatal, silently ignore
-      }
       return 1
     }
   }
@@ -90,16 +77,6 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
   const pluginResult = await addPluginToOpenCodeConfig(version)
   if (!pluginResult.success) {
     printError(`Failed: ${pluginResult.error}`)
-    try {
-      posthog.capture({ distinctId, event: "install_failed", properties: { command: "install", reason: "plugin_config_write_failed", is_update: isUpdate } })
-    } catch {
-      // telemetry failure is non-fatal, silently ignore
-    }
-    try {
-      await posthog.shutdown()
-    } catch {
-      // telemetry failure is non-fatal, silently ignore
-    }
     return 1
   }
   printSuccess(
@@ -110,16 +87,6 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
   const omoResult = writeOmoConfig(config)
   if (!omoResult.success) {
     printError(`Failed: ${omoResult.error}`)
-    try {
-      posthog.capture({ distinctId, event: "install_failed", properties: { command: "install", reason: "omo_config_write_failed", is_update: isUpdate } })
-    } catch {
-      // telemetry failure is non-fatal, silently ignore
-    }
-    try {
-      await posthog.shutdown()
-    } catch {
-      // telemetry failure is non-fatal, silently ignore
-    }
     return 1
   }
   printSuccess(`Config written ${SYMBOLS.arrow} ${color.dim(omoResult.configPath)}`)
@@ -168,29 +135,6 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
   console.log()
   console.log(color.dim("oMoMoMoMo... Enjoy!"))
   console.log()
-
-  try {
-    posthog.capture({
-      distinctId,
-      event: "install_completed",
-      properties: {
-        command: "install",
-        is_update: isUpdate,
-        has_claude: config.hasClaude,
-        has_openai: config.hasOpenAI,
-        has_gemini: config.hasGemini,
-        has_copilot: config.hasCopilot,
-        has_opencode_zen: config.hasOpencodeZen,
-      },
-    })
-  } catch {
-    // telemetry failure is non-fatal, silently ignore
-  }
-  try {
-    await posthog.shutdown()
-  } catch {
-    // telemetry failure is non-fatal, silently ignore
-  }
 
   if ((config.hasClaude || config.hasGemini || config.hasCopilot) && !args.skipAuth) {
     printBox(

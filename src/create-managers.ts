@@ -68,12 +68,11 @@ export function createManagers(args: {
     },
   })
 
-  const backgroundManager = new deps.BackgroundManagerClass(
-    ctx,
-    pluginConfig.background_task,
-    {
-      tmuxConfig,
-      onSubagentSessionCreated: async (event: SubagentSessionCreatedEvent) => {
+  const backgroundManager = new deps.BackgroundManagerClass({
+    pluginContext: ctx,
+    config: pluginConfig.background_task,
+    tmuxConfig,
+    onSubagentSessionCreated: async (event: SubagentSessionCreatedEvent) => {
         log("[create-managers] onSubagentSessionCreated callback received", {
           sessionID: event.sessionID,
           parentID: event.parentID,
@@ -104,16 +103,15 @@ export function createManagers(args: {
         }
 
         log("[create-managers] onSubagentSessionCreated callback completed")
-      },
-      onShutdown: async () => {
-        await tmuxSessionManager.cleanup().catch((error) => {
-          log("[create-managers] tmux cleanup error during shutdown:", error)
-        })
-      },
-      enableParentSessionNotifications: backgroundNotificationHookEnabled,
-      modelFallbackControllerAccessor,
     },
-  )
+    onShutdown: async () => {
+      await tmuxSessionManager.cleanup().catch((error) => {
+        log("[create-managers] tmux cleanup error during shutdown:", error)
+      })
+    },
+    enableParentSessionNotifications: backgroundNotificationHookEnabled,
+    modelFallbackControllerAccessor,
+  })
 
   deps.initTaskToastManagerFn(ctx.client)
 

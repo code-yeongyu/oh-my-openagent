@@ -29,7 +29,6 @@ function mockPostHogNode(capturedMessages: CapturedPostHogMessage[]): void {
       capture(message: CapturedPostHogMessage): void {
         capturedMessages.push(message)
       }
-      captureException(): void {}
       async shutdown(): Promise<void> {}
     },
   }))
@@ -65,23 +64,9 @@ describe("posthog client creation", () => {
     const pluginPostHog = createPluginPostHog()
 
     // then
-    expect(() =>
-      cliPostHog.capture({
-        distinctId: "cli",
-        event: "run_started",
-      }),
-    ).not.toThrow()
-    expect(() => cliPostHog.captureException(new Error("cli failure"), "cli")).not.toThrow()
     expect(() => cliPostHog.trackActive("cli", "run_started")).not.toThrow()
     await expect(cliPostHog.shutdown()).resolves.toBeUndefined()
 
-    expect(() =>
-      pluginPostHog.capture({
-        distinctId: "plugin",
-        event: "plugin_loaded",
-      }),
-    ).not.toThrow()
-    expect(() => pluginPostHog.captureException(new Error("plugin failure"), "plugin")).not.toThrow()
     expect(() => pluginPostHog.trackActive("plugin", "plugin_loaded")).not.toThrow()
     await expect(pluginPostHog.shutdown()).resolves.toBeUndefined()
   })
@@ -109,7 +94,6 @@ describe("posthog client creation", () => {
     mock.module("posthog-node", () => ({
       PostHog: class {
         capture() {}
-        captureException() {}
         async shutdown() {}
       },
     }))
@@ -120,13 +104,6 @@ describe("posthog client creation", () => {
     const pluginPostHog = createPluginPostHog()
 
     // then
-    expect(() =>
-      pluginPostHog.capture({
-        distinctId: "plugin",
-        event: "plugin_loaded",
-      }),
-    ).not.toThrow()
-    expect(() => pluginPostHog.captureException(new Error("plugin failure"), "plugin")).not.toThrow()
     expect(() => pluginPostHog.trackActive("plugin", "plugin_loaded")).not.toThrow()
     await expect(pluginPostHog.shutdown()).resolves.toBeUndefined()
   })
@@ -174,6 +151,7 @@ describe("posthog trackActive emission contract", () => {
       day_utc: "2026-04-18",
       reason: "run_started",
       source: "cli",
+      $process_person_profile: false,
     })
     expect(dailyEvent?.properties).not.toHaveProperty("hour_utc")
   })

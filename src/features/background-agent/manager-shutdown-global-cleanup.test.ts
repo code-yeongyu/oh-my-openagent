@@ -20,10 +20,10 @@ function createDeferredPromise(): {
   }
 }
 
-function createTask(overrides: Partial<BackgroundTask> & { id: string; sessionID: string }): BackgroundTask {
+function createTask(overrides: Partial<BackgroundTask> & { id: string; sessionId: string }): BackgroundTask {
   return {
-    parentSessionID: "parent-session",
-    parentMessageID: "parent-message",
+    parentSessionId: "parent-session",
+    parentMessageId: "parent-message",
     description: "test task",
     prompt: "test prompt",
     agent: "explore",
@@ -34,7 +34,7 @@ function createTask(overrides: Partial<BackgroundTask> & { id: string; sessionID
 }
 
 function createBackgroundManager(): BackgroundManager {
-  return new BackgroundManager({
+  return new BackgroundManager({ pluginContext: {
     client: {
       session: {
         abort: async () => ({}),
@@ -47,7 +47,7 @@ function createBackgroundManager(): BackgroundManager {
     worktree: tmpdir(),
     serverUrl: new URL("https://example.com"),
     $: {} as never,
-  } as never)
+  } as never })
 }
 
 describe("BackgroundManager shutdown global cleanup", () => {
@@ -74,14 +74,14 @@ describe("BackgroundManager shutdown global cleanup", () => {
         "task-running-shutdown-cleanup",
         createTask({
           id: "task-running-shutdown-cleanup",
-          sessionID: runningSessionID,
+          sessionId: runningSessionID,
         }),
       ],
       [
         "task-completed-shutdown-cleanup",
         createTask({
           id: "task-completed-shutdown-cleanup",
-          sessionID: completedSessionID,
+          sessionId: completedSessionID,
           status: "completed",
           completedAt: new Date(),
         }),
@@ -119,7 +119,7 @@ describe("BackgroundManager shutdown global cleanup", () => {
         "task-running-await-shutdown",
         createTask({
           id: "task-running-await-shutdown",
-          sessionID: runningSessionID,
+          sessionId: runningSessionID,
         }),
       ],
     ])

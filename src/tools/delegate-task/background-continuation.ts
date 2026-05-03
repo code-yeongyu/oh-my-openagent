@@ -29,13 +29,13 @@ export async function executeBackgroundContinuation(
     const task = await manager.resume({
       sessionId: taskID,
       prompt: effectivePrompt,
-      parentSessionID: parentContext.sessionID,
-      parentMessageID: parentContext.messageID,
+      parentSessionId: parentContext.sessionID,
+      parentMessageId: parentContext.messageID,
       parentModel: parentContext.model,
       parentAgent: parentContext.agent,
       parentTools: getSessionTools(parentContext.sessionID),
     })
-    const sessionId = task.sessionID
+    const sessionId = task.sessionId
     const backgroundTaskId = task.id
     const resolvedModel = resolveMetadataModel(task.model, parentContext.model)
 

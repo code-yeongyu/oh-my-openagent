@@ -48,7 +48,7 @@ function continueSessionSetup(args: {
         return
       }
 
-      const sessionId = updated.sessionID
+      const sessionId = updated.sessionId
       if (!sessionId) {
         continue
       }
@@ -81,7 +81,7 @@ async function waitForBackgroundSessionStart(args: {
       return undefined
     }
 
-    sessionId = updated?.sessionID
+    sessionId = updated?.sessionId
     if (sessionId) {
       return sessionId
     }
@@ -117,8 +117,8 @@ export async function executeBackgroundTask(
       description: args.description,
       prompt: effectivePrompt,
       agent: normalizedAgent,
-      parentSessionID: parentContext.sessionID,
-      parentMessageID: parentContext.messageID,
+      parentSessionId: parentContext.sessionID,
+      parentMessageId: parentContext.messageID,
       parentModel: parentContext.model,
       parentAgent: parentContext.agent,
       parentTools: getSessionTools(parentContext.sessionID),
@@ -137,7 +137,7 @@ export async function executeBackgroundTask(
     const timing = getTimingConfig()
     let sessionId = await waitForBackgroundSessionStart({
       taskId: task.id,
-      initialSessionId: task.sessionID,
+      initialSessionId: task.sessionId,
       manager,
       timing,
       abortSignal: ctx.abort,

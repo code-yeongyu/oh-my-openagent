@@ -11,16 +11,16 @@ export interface BackgroundTaskNotificationTask {
 }
 
 function formatAttemptModel(attempt: BackgroundTaskAttempt): string {
-  if (attempt.providerID && attempt.modelID) {
-    return `${attempt.providerID}/${attempt.modelID}`
+  if (attempt.providerId && attempt.modelId) {
+    return `${attempt.providerId}/${attempt.modelId}`
   }
 
-  if (attempt.modelID) {
-    return attempt.modelID
+  if (attempt.modelId) {
+    return attempt.modelId
   }
 
-  if (attempt.providerID) {
-    return attempt.providerID
+  if (attempt.providerId) {
+    return attempt.providerId
   }
 
   return "unknown-model"
@@ -34,7 +34,7 @@ function formatAttemptTimeline(task: BackgroundTaskNotificationTask): string {
   const lines = task.attempts
     .map((attempt) => {
       const attemptLines = [
-        `  - Attempt ${attempt.attemptNumber} — ${attempt.status.toUpperCase()} — ${formatAttemptModel(attempt)} — ${attempt.sessionID ?? "unknown"}`,
+        `  - Attempt ${attempt.attemptNumber} — ${attempt.status.toUpperCase()} — ${formatAttemptModel(attempt)} — ${attempt.sessionId ?? "unknown"}`,
       ]
 
       if (attempt.status !== "completed" && attempt.error) {

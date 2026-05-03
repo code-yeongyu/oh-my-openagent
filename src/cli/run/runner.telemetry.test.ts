@@ -64,8 +64,6 @@ describe("run telemetry isolation", () => {
         trackActive: () => {
           throw new Error("telemetry failed")
         },
-        capture: mock(() => {}),
-        captureException: mock(() => {}),
         shutdown: mock(async () => {
           throw new Error("shutdown failed")
         }),

@@ -85,6 +85,7 @@ export async function runBunInstallWithDetails(options?: RunBunInstallOptions): 
   try {
     const proc = spawnWithWindowsHide(["bun", "install"], {
       cwd: cacheDir,
+      env: process.env,
       stdout: outputMode,
       stderr: outputMode,
     })

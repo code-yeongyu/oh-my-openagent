@@ -1,3 +1,5 @@
+/// <reference types="bun-types" />
+
 import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { createKeywordDetectorHook } from "./index"
@@ -5,6 +7,26 @@ import { setMainSession, updateSessionAgent, clearSessionAgent, _resetForTesting
 import { ContextCollector } from "../../features/context-injector"
 import * as sharedModule from "../../shared"
 import * as sessionState from "../../features/claude-code-session-state"
+
+type ToastOptions = { body: { title: string } }
+
+function createPluginInputWithToast(showToast: (options: ToastOptions) => Promise<void>): PluginInput {
+  const client = {} as PluginInput["client"]
+  Object.assign(client, { tui: { showToast } })
+
+  return {
+    client,
+    project: {
+      id: "keyword-detector-test-project",
+      worktree: "/tmp/keyword-detector-test",
+      time: { created: 0 },
+    },
+    directory: "/tmp/keyword-detector-test",
+    worktree: "/tmp/keyword-detector-test",
+    serverUrl: new URL("http://localhost"),
+    $: {} as PluginInput["$"],
+  }
+}
 
 describe("keyword-detector message transform", () => {
   let logCalls: Array<{ msg: string; data?: unknown }>
@@ -26,13 +48,7 @@ describe("keyword-detector message transform", () => {
   })
 
   function createMockPluginInput() {
-    return {
-      client: {
-        tui: {
-          showToast: async () => {},
-        },
-      },
-    } as unknown as PluginInput
+    return createPluginInputWithToast(async () => {})
   }
 
   test("should prepend ultrawork message to text part", async () => {
@@ -78,6 +94,27 @@ describe("keyword-detector message transform", () => {
     expect(textPart!.text).toContain("[search-mode]")
   })
 
+  test("should tell analyze-mode agents to evaluate skills before delegating", async () => {
+    // given - analyze mode keyword detection runs on a user investigation request
+    const collector = new ContextCollector()
+    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
+    const sessionID = "analyze-skill-guidance-session"
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "investigate why subagents miss recovery skills" }],
+    }
+
+    // when - analyze mode is injected
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then - guidance should require evaluating skills, not hard-code an empty skill list
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).toContain("Evaluate available skills before dispatch")
+    expect(textPart!.text).toContain("pass [] ONLY when no skill matches")
+    expect(textPart!.text).not.toContain("ALWAYS include load_skills=[]")
+  })
+
   test("should NOT transform when no keywords detected", async () => {
     // given - no keywords in message
     const collector = new ContextCollector()
@@ -117,15 +154,9 @@ describe("keyword-detector session filtering", () => {
 
   function createMockPluginInput(options: { toastCalls?: string[] } = {}) {
     const toastCalls = options.toastCalls ?? []
-    return {
-      client: {
-        tui: {
-          showToast: async (opts: { body: { title: string } }) => {
-            toastCalls.push(opts.body.title)
-          },
-        },
-      },
-    } as unknown as PluginInput
+    return createPluginInputWithToast(async (options) => {
+      toastCalls.push(options.body.title)
+    })
   }
 
   test("should skip non-ultrawork keywords in non-main session (using mainSessionID check)", async () => {
@@ -262,15 +293,9 @@ describe("keyword-detector word boundary", () => {
 
   function createMockPluginInput(options: { toastCalls?: string[] } = {}) {
     const toastCalls = options.toastCalls ?? []
-    return {
-      client: {
-        tui: {
-          showToast: async (opts: { body: { title: string } }) => {
-            toastCalls.push(opts.body.title)
-          },
-        },
-      },
-    } as unknown as PluginInput
+    return createPluginInputWithToast(async (options) => {
+      toastCalls.push(options.body.title)
+    })
   }
 
   test("should NOT trigger ultrawork on partial matches like 'StatefulWidget' containing 'ulw'", async () => {
@@ -358,13 +383,7 @@ describe("keyword-detector system-reminder filtering", () => {
   })
 
   function createMockPluginInput() {
-    return {
-      client: {
-        tui: {
-          showToast: async () => {},
-        },
-      },
-    } as unknown as PluginInput
+    return createPluginInputWithToast(async () => {})
   }
 
   test("should NOT trigger search mode from keywords inside <system-reminder> tags", async () => {
@@ -549,13 +568,7 @@ describe("keyword-detector agent-specific ultrawork messages", () => {
   })
 
   function createMockPluginInput() {
-    return {
-      client: {
-        tui: {
-          showToast: async () => {},
-        },
-      },
-    } as unknown as PluginInput
+    return createPluginInputWithToast(async () => {})
   }
 
   test("should skip ultrawork injection when agent is prometheus", async () => {
@@ -766,13 +779,7 @@ describe("keyword-detector non-OMO agent skipping", () => {
   })
 
   function createMockPluginInput() {
-    return {
-      client: {
-        tui: {
-          showToast: async () => {},
-        },
-      },
-    } as unknown as PluginInput
+    return createPluginInputWithToast(async () => {})
   }
 
   test("should skip all keyword injection for OpenCode-Builder agent", async () => {

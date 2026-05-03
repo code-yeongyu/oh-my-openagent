@@ -28,13 +28,11 @@ const AGENT_RESTRICTIONS: Record<string, Record<string, boolean>> = {
   metis: {
     write: false,
     edit: false,
-    task: false,
   },
 
   momus: {
     write: false,
     edit: false,
-    task: false,
   },
 
   "multimodal-looker": {

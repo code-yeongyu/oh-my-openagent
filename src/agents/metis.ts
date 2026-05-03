@@ -284,7 +284,6 @@ const metisRestrictions = createAgentToolRestrictions([
   "write",
   "edit",
   "apply_patch",
-  "task",
 ])
 
 export function createMetisAgent(model: string): AgentConfig {

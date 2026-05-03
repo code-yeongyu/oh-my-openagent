@@ -33,8 +33,8 @@ export async function executeUnstableAgentTask(
       description: args.description,
       prompt: effectivePrompt,
       agent: agentToUse,
-      parentSessionID: parentContext.sessionID,
-      parentMessageID: parentContext.messageID,
+      parentSessionId: parentContext.sessionID,
+      parentMessageId: parentContext.messageID,
       parentModel: parentContext.model,
       parentAgent: parentContext.agent,
       parentTools: getSessionTools(parentContext.sessionID),
@@ -48,7 +48,7 @@ export async function executeUnstableAgentTask(
 
     const timing = getTimingConfig()
     const waitStart = Date.now()
-    let sessionID = task.sessionID
+    let sessionID = task.sessionId
     while (!sessionID && Date.now() - waitStart < timing.WAIT_FOR_SESSION_TIMEOUT_MS) {
       if (ctx.abort?.aborted) {
         cleanupReason = "Parent aborted while waiting for unstable task session start"
@@ -56,7 +56,7 @@ export async function executeUnstableAgentTask(
       }
       await new Promise(resolve => setTimeout(resolve, timing.WAIT_FOR_SESSION_INTERVAL_MS))
       const updated = manager.getTask(task.id)
-      sessionID = updated?.sessionID
+      sessionID = updated?.sessionId
     }
     if (!sessionID) {
       cleanupReason = "Unstable task session start timed out before session became available"

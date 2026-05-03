@@ -48,8 +48,8 @@ export async function executeBackground(
       description: args.description,
       prompt: args.prompt,
       agent: args.subagent_type,
-      parentSessionID: toolContext.sessionID,
-      parentMessageID: toolContext.messageID,
+      parentSessionId: toolContext.sessionID,
+      parentMessageId: toolContext.messageID,
       parentAgent,
       parentTools: getSessionTools(toolContext.sessionID),
       model,
@@ -59,13 +59,13 @@ export async function executeBackground(
     const WAIT_FOR_SESSION_INTERVAL_MS = 50
     const WAIT_FOR_SESSION_TIMEOUT_MS = 30000
     const waitStart = Date.now()
-    let sessionId = task.sessionID
+    let sessionId = task.sessionId
     while (!sessionId && Date.now() - waitStart < WAIT_FOR_SESSION_TIMEOUT_MS) {
       const updated = manager.getTask(task.id)
       if (updated?.status === "error" || updated?.status === "cancelled" || updated?.status === "interrupt") {
         return `Task failed to start (status: ${updated.status}).\n\nTask ID: ${task.id}`
       }
-      sessionId = updated?.sessionID
+      sessionId = updated?.sessionId
       if (sessionId) {
         break
       }

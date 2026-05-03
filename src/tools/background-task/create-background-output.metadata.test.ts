@@ -20,9 +20,9 @@ describe("createBackgroundOutput metadata", () => {
 
     const task: BackgroundTask = {
       id: "task-1",
-      sessionID: undefined,
-      parentSessionID: "main-1",
-      parentMessageID: "msg-1",
+      sessionId: undefined,
+      parentSessionId: "main-1",
+      parentMessageId: "msg-1",
       description: "background task",
       prompt: "do work",
       agent: "test-agent",
