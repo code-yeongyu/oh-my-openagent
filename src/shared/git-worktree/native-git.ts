@@ -82,7 +82,7 @@ export function getNativeGitStatus(directory: string): NativeGitStatus | null {
   if (!repository) return null
 
   try {
-    const output = runGit(directory, ["status", "--porcelain=v1", "-z"])
+    const output = runGit(directory, ["status", "--porcelain=v1", "-z", "--untracked-files=all"])
     const files = parseNativeGitStatusPorcelainZ(output)
     return {
       repository,

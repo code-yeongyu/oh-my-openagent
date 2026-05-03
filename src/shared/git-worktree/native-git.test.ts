@@ -2,7 +2,7 @@
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { execFileSync } from "node:child_process"
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import {
@@ -75,6 +75,23 @@ describe("native git service", () => {
     expect(status?.dirty).toBe(true)
     expect(status?.files).toContain("RENAMED.md")
     expect(status?.files).toContain("new file.txt")
+  })
+
+  test("lists untracked files inside directories individually", () => {
+    git(directory, ["init"])
+    writeFileSync(join(directory, "README.md"), "hello\n", "utf-8")
+    commitAll(directory, "init")
+
+    mkdirSync(join(directory, "nested"))
+    writeFileSync(join(directory, "nested", "first.txt"), "first\n", "utf-8")
+    writeFileSync(join(directory, "nested", "second.txt"), "second\n", "utf-8")
+
+    const status = getNativeGitStatus(directory)
+
+    expect(status?.dirty).toBe(true)
+    expect(status?.files).toContain("nested/first.txt")
+    expect(status?.files).toContain("nested/second.txt")
+    expect(status?.files).not.toContain("nested/")
   })
 
   test("parses porcelain z rename entries by keeping the new path", () => {

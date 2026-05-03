@@ -2,7 +2,7 @@
 
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 import { execFileSync } from "node:child_process"
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { getNativeGitAuditPath, getNativeGitRepository } from "../../shared/git-worktree"
@@ -117,6 +117,58 @@ describe("native git hook", () => {
     expect(audit).toContain('"sessionID":"ses_part"')
     expect(audit).toContain('"callID":"call_part"')
     expect(audit).toContain("part-event.txt")
+  })
+
+  test("tracked mode records additional files created inside the same untracked directory", async () => {
+    const hook = createNativeGitHook({ directory } as never, { mode: "tracked", audit_log: true })
+    mkdirSync(join(directory, "nested"))
+    writeFileSync(join(directory, "nested", "first.txt"), "first\n", "utf-8")
+
+    await hook.event({
+      event: {
+        type: "message.part.updated",
+        properties: {
+          part: {
+            type: "tool",
+            tool: "write",
+            callID: "call_first",
+            sessionID: "ses_nested",
+            state: { status: "completed" },
+          },
+        },
+      },
+    })
+
+    writeFileSync(join(directory, "nested", "second.txt"), "second\n", "utf-8")
+
+    await hook.event({
+      event: {
+        type: "message.part.updated",
+        properties: {
+          part: {
+            type: "tool",
+            tool: "write",
+            callID: "call_second",
+            sessionID: "ses_nested",
+            state: { status: "completed" },
+          },
+        },
+      },
+    })
+
+    const repository = getNativeGitRepository(directory)
+    const auditPath = getNativeGitAuditPath(repository!)
+    const records = readFileSync(auditPath, "utf-8")
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line) as { callID: string; files: string[]; summary: string })
+
+    expect(records).toHaveLength(2)
+    expect(records[0]?.callID).toBe("call_first")
+    expect(records[0]?.files).toContain("nested/first.txt")
+    expect(records[1]?.callID).toBe("call_second")
+    expect(records[1]?.files).toContain("nested/second.txt")
+    expect(records[1]?.summary).toContain("nested/second.txt")
   })
 
   test("tracked mode shows one git-master reminder toast on session idle", async () => {
