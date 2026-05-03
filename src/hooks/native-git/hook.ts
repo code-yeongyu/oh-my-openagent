@@ -65,6 +65,53 @@ function getStringProperty(record: Record<string, unknown>, keys: string[]): str
   return undefined
 }
 
+function getNativeGitToolInputFromEvent(input: NativeGitEventInput): NativeGitToolInput | null {
+  if (!isRecord(input.event.properties)) {
+    return null
+  }
+
+  if (input.event.type === "tool.execute" || input.event.type === "tool.result") {
+    const tool = getStringProperty(input.event.properties, ["name", "tool"])
+    if (!tool) {
+      return null
+    }
+
+    return {
+      tool,
+      sessionID: getStringProperty(input.event.properties, ["sessionID", "sessionId"]),
+      callID: getStringProperty(input.event.properties, ["callID", "callId", "call_id"]),
+    }
+  }
+
+  if (input.event.type !== "message.part.updated") {
+    return null
+  }
+
+  const part = input.event.properties.part
+  if (!isRecord(part) || getStringProperty(part, ["type"]) !== "tool") {
+    return null
+  }
+
+  const state = isRecord(part.state) ? part.state : undefined
+  const status = state ? getStringProperty(state, ["status"]) : undefined
+  if (status !== "completed") {
+    return null
+  }
+
+  const tool = getStringProperty(part, ["tool", "name"])
+  if (!tool) {
+    return null
+  }
+
+  return {
+    tool,
+    sessionID:
+      getStringProperty(part, ["sessionID", "sessionId"]) ??
+      getStringProperty(input.event.properties, ["sessionID", "sessionId"]),
+    callID: getStringProperty(part, ["callID", "callId", "call_id"]),
+  }
+}
+
 export function createNativeGitHook(ctx: PluginInput, config: NativeGitConfig | undefined) {
   const mode = config?.mode ?? "tracked"
   const auditLog = config?.audit_log ?? true
@@ -116,24 +163,16 @@ export function createNativeGitHook(ctx: PluginInput, config: NativeGitConfig | 
 
   return {
     event: async (input: NativeGitEventInput): Promise<void> => {
-      if (mode === "manual" || (input.event.type !== "tool.execute" && input.event.type !== "tool.result")) {
+      if (mode === "manual") {
         return
       }
 
-      if (!isRecord(input.event.properties)) {
+      const toolInput = getNativeGitToolInputFromEvent(input)
+      if (!toolInput) {
         return
       }
 
-      const tool = getStringProperty(input.event.properties, ["name", "tool"])
-      if (!tool) {
-        return
-      }
-
-      trackNativeGitChanges({
-        tool,
-        sessionID: getStringProperty(input.event.properties, ["sessionID", "sessionId"]),
-        callID: getStringProperty(input.event.properties, ["callID", "callId", "call_id"]),
-      })
+      trackNativeGitChanges(toolInput)
     },
     "tool.execute.after": async (
       input: { tool: string; sessionID: string; callID: string },

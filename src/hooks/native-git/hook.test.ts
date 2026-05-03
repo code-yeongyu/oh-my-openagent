@@ -91,6 +91,34 @@ describe("native git hook", () => {
     expect(audit).toContain("event.txt")
   })
 
+  test("tracked mode records audit from completed tool part events", async () => {
+    const hook = createNativeGitHook({ directory } as never, { mode: "tracked", audit_log: true })
+    writeFileSync(join(directory, "part-event.txt"), "created by tool part\n", "utf-8")
+
+    await hook.event({
+      event: {
+        type: "message.part.updated",
+        properties: {
+          part: {
+            type: "tool",
+            tool: "write",
+            callID: "call_part",
+            sessionID: "ses_part",
+            state: { status: "completed" },
+          },
+        },
+      },
+    })
+
+    const repository = getNativeGitRepository(directory)
+    const auditPath = getNativeGitAuditPath(repository!)
+    const audit = readFileSync(auditPath, "utf-8")
+    expect(audit).toContain('"tool":"write"')
+    expect(audit).toContain('"sessionID":"ses_part"')
+    expect(audit).toContain('"callID":"call_part"')
+    expect(audit).toContain("part-event.txt")
+  })
+
   test("task output receives git-master commit reminder when changes remain", async () => {
     const hook = createNativeGitHook({ directory } as never, { mode: "tracked", audit_log: false })
     writeFileSync(join(directory, "README.md"), "changed\n", "utf-8")
