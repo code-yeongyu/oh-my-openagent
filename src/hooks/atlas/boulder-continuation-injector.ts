@@ -13,6 +13,8 @@ import type { SessionState } from "./types"
 
 export type BoulderContinuationResult = "injected" | "skipped_background_tasks" | "skipped_agent_unavailable" | "failed"
 
+const ACTIVE_BACKGROUND_TASK_STATUSES = new Set(["pending", "running"])
+
 export async function injectBoulderContinuation(input: {
   ctx: PluginInput
   sessionID: string
@@ -41,7 +43,7 @@ export async function injectBoulderContinuation(input: {
   } = input
 
   const hasRunningBgTasks = backgroundManager
-    ? backgroundManager.getTasksByParentSession(sessionID).some((t: { status: string }) => t.status === "running")
+    ? backgroundManager.getTasksByParentSession(sessionID).some((t: { status: string }) => ACTIVE_BACKGROUND_TASK_STATUSES.has(t.status))
     : false
 
   if (hasRunningBgTasks) {

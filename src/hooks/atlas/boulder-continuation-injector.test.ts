@@ -91,6 +91,44 @@ describe("injectBoulderContinuation", () => {
     expect(sessionState.lastContinuationInjectedAt).toBe(123)
   })
 
+  test("#given a background task is still pending session creation #when injector checks again #then it still skips continuation", async () => {
+    // given
+    registerAgentName("atlas")
+    const promptAsyncMock = mock(async (_request: unknown) => undefined)
+    const messagesMock = mock(async () => ({ data: [] }))
+    const sessionState = { promptFailureCount: 1, lastContinuationInjectedAt: 456 }
+
+    const ctx = {
+      directory: "/tmp",
+      client: {
+        session: {
+          messages: messagesMock,
+          promptAsync: promptAsyncMock,
+        },
+      },
+    } as unknown as PluginInput
+
+    // when
+    const result = await injectBoulderContinuation({
+      ctx,
+      sessionID: "ses_test_pending",
+      planName: "test-plan",
+      remaining: 1,
+      total: 2,
+      agent: "atlas",
+      backgroundManager: {
+        getTasksByParentSession: () => [{ status: "pending" }],
+      } as unknown as Parameters<typeof injectBoulderContinuation>[0]["backgroundManager"],
+      sessionState,
+    })
+
+    // then
+    expect(result).toBe("skipped_background_tasks")
+    expect(promptAsyncMock).not.toHaveBeenCalled()
+    expect(sessionState.promptFailureCount).toBe(1)
+    expect(sessionState.lastContinuationInjectedAt).toBe(456)
+  })
+
   test("#given the continuation agent is unavailable #when injector runs #then it reports skipped agent unavailable without prompting", async () => {
     // given
     const promptAsyncMock = mock(async (_request: unknown) => undefined)
