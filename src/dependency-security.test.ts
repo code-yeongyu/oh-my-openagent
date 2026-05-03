@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test"
 import { readFileSync } from "node:fs"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
+import { fileURLToPath } from "node:url"
 import { parse } from "jsonc-parser"
 
 type BunLock = {
@@ -13,6 +14,7 @@ type BunLock = {
 }
 
 const MINIMUM_SAFE_PICOMATCH_VERSION = "4.0.4"
+const REPOSITORY_ROOT = dirname(fileURLToPath(import.meta.url))
 
 function parseVersion(version: string): [number, number, number] {
   const [major = "0", minor = "0", patch = "0"] = version.split(".")
@@ -47,10 +49,10 @@ function extractLockedVersion(packageReference: string): string {
 
 describe("dependency security", () => {
   it("#given picomatch is a runtime dependency #when dependencies are locked #then it uses the patched ReDoS-safe release", () => {
-    const packageJson = JSON.parse(readFileSync(join(import.meta.dir, "..", "package.json"), "utf-8")) as {
+    const packageJson = JSON.parse(readFileSync(join(REPOSITORY_ROOT, "..", "package.json"), "utf-8")) as {
       dependencies?: Record<string, string>
     }
-    const bunLock = parse(readFileSync(join(import.meta.dir, "..", "bun.lock"), "utf-8")) as BunLock
+    const bunLock = parse(readFileSync(join(REPOSITORY_ROOT, "..", "bun.lock"), "utf-8")) as BunLock
     const dependencyRange = packageJson.dependencies?.picomatch
     const lockedReference = bunLock.packages?.picomatch?.[0]
 
