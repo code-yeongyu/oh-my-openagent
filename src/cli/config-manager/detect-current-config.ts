@@ -75,6 +75,10 @@ function findOurPluginEntry(plugins: string[]): string | null {
   return plugins.find(isOurPlugin) ?? null
 }
 
+function hasProviderConfig(providers: Record<string, unknown> | undefined, providerName: string): boolean {
+  return providers ? providerName in providers : false
+}
+
 export function detectCurrentConfig(): DetectedConfig {
   const result: DetectedConfig = {
     isInstalled: false,
@@ -117,7 +121,7 @@ export function detectCurrentConfig(): DetectedConfig {
   }
 
   const providers = openCodeConfig.provider as Record<string, unknown> | undefined
-  result.hasGemini = providers ? "google" in providers : false
+  result.hasGemini = hasProviderConfig(providers, "google")
 
   const { hasOpenAI, hasOpencodeZen, hasZaiCodingPlan, hasKimiForCoding, hasOpencodeGo, hasOpenRouter, hasVercelAiGateway } = detectProvidersFromOmoConfig()
   result.hasOpenAI = hasOpenAI
@@ -125,7 +129,7 @@ export function detectCurrentConfig(): DetectedConfig {
   result.hasZaiCodingPlan = hasZaiCodingPlan
   result.hasKimiForCoding = hasKimiForCoding
   result.hasOpencodeGo = hasOpencodeGo
-  result.hasOpenRouter = hasOpenRouter
+  result.hasOpenRouter = hasOpenRouter || hasProviderConfig(providers, "openrouter")
   result.hasVercelAiGateway = hasVercelAiGateway
 
   // Detect caveman from global_prompt_append in OMO config
