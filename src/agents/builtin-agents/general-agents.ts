@@ -54,6 +54,7 @@ export function collectPendingBuiltinAgents(input: {
     if (agentName === "sisyphus") continue
     if (agentName === "hephaestus") continue
     if (agentName === "atlas") continue
+    if (agentName === "cerberus") continue
     if (agentName === "sisyphus-junior") continue
     if (disabledAgents.some((name) => name.toLowerCase() === agentName.toLowerCase())) continue
 

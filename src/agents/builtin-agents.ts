@@ -26,6 +26,9 @@ import { collectPendingBuiltinAgents } from "./builtin-agents/general-agents"
 import { maybeCreateSisyphusConfig } from "./builtin-agents/sisyphus-agent"
 import { maybeCreateHephaestusConfig } from "./builtin-agents/hephaestus-agent"
 import { maybeCreateAtlasConfig } from "./builtin-agents/atlas-agent"
+import { createCerberusAgent, CERBERUS_PROMPT_METADATA } from "./cerberus"
+import { maybeCreateCerberusConfig } from "./builtin-agents/cerberus-agent"
+import { buildCustomAgentMetadata, parseRegisteredAgentSummaries } from "./custom-agent-summaries"
 
 type AgentSource = AgentFactory | AgentConfig
 
@@ -41,6 +44,7 @@ const agentSources: Record<BuiltinAgentName, AgentSource> = {
   // Note: Atlas is handled specially in createBuiltinAgents()
   // because it needs OrchestratorContext, not just a model string
   atlas: createAtlasAgent as AgentFactory,
+  cerberus: createCerberusAgent as AgentFactory,
   "sisyphus-junior": createSisyphusJuniorAgentWithOverrides as unknown as AgentFactory,
 }
 
@@ -56,6 +60,7 @@ const agentMetadata: Partial<Record<BuiltinAgentName, AgentPromptMetadata>> = {
   metis: metisPromptMetadata,
   momus: momusPromptMetadata,
   atlas: atlasPromptMetadata,
+  cerberus: CERBERUS_PROMPT_METADATA,
 }
 
 export async function createBuiltinAgents(
@@ -155,6 +160,24 @@ export async function createBuiltinAgents(
   })
   if (hephaestusConfig) {
     result["hephaestus"] = hephaestusConfig
+  }
+
+  const cerberusConfig = maybeCreateCerberusConfig({
+    disabledAgents,
+    agentOverrides,
+    availableModels,
+    systemDefaultModel,
+    isFirstRunNoCache,
+    availableAgents,
+    availableSkills,
+    availableCategories,
+    mergedCategories,
+    directory,
+    useTaskSystem,
+    disableOmoEnv,
+  })
+  if (cerberusConfig) {
+    result["cerberus"] = cerberusConfig
   }
 
   // Add pending agents after sisyphus and hephaestus to maintain order

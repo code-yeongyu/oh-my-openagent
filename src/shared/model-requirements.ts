@@ -168,6 +168,14 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["opencode-go", "vercel"], model: "minimax-m2.7" },
     ],
   },
+  cerberus: {
+    fallbackChain: [
+      { providers: ["openai", "venice", "opencode"], model: "gpt-5.3-codex", variant: "medium" },
+      { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-opus-4-6", variant: "max" },
+      { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.2", variant: "high" },
+      { providers: ["google", "github-copilot", "opencode"], model: "gemini-3.1-pro", variant: "high" },
+    ],
+  },
   "sisyphus-junior": {
     fallbackChain: [
       { providers: ["anthropic", "github-copilot", "opencode", "vercel"], model: "claude-sonnet-4-6" },

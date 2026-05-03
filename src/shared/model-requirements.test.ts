@@ -282,6 +282,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
       "metis",
       "momus",
       "atlas",
+      "cerberus",
       "sisyphus-junior",
     ]
 

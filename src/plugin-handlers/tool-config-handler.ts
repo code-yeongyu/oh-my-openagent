@@ -100,6 +100,16 @@ export function applyToolConfig(params: {
       ...denyTodoTools,
     };
   }
+  const cerberus = agentByKey(params.agentResult, "cerberus");
+  if (cerberus) {
+    cerberus.permission = {
+      ...cerberus.permission,
+      call_omo_agent: "deny",
+      task: "allow",
+      question: questionPermission,
+      ...denyTodoTools,
+    };
+  }
   const prometheus = agentByKey(params.agentResult, "prometheus");
   if (prometheus) {
     prometheus.permission = {
