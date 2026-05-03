@@ -9,6 +9,25 @@ import { log } from "../../shared/logger"
 
 const TRACKED_TOOLS = new Set(["write", "edit", "multiedit", "apply_patch", "hashline_edit", "bash", "task"])
 
+type NativeGitToolInput = {
+  tool: string
+  sessionID?: string
+  callID?: string
+}
+
+type NativeGitEventInput = {
+  event: {
+    type: string
+    properties?: unknown
+  }
+}
+
+type NativeGitTrackResult = {
+  dirty: boolean
+  changedSinceLastCheck: boolean
+  summary?: string
+}
+
 export const NATIVE_GIT_TASK_REMINDER = `
 <system-reminder>
 Native Git tracking detected uncommitted changes. Before final completion, use git-master to create atomic commits, for example:
@@ -32,12 +51,90 @@ ${summary.trim()}
 </system-reminder>`
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null
+}
+
+function getStringProperty(record: Record<string, unknown>, keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = record[key]
+    if (typeof value === "string" && value.length > 0) {
+      return value
+    }
+  }
+  return undefined
+}
+
 export function createNativeGitHook(ctx: PluginInput, config: NativeGitConfig | undefined) {
   const mode = config?.mode ?? "tracked"
   const auditLog = config?.audit_log ?? true
   const lastStatusBySessionRepo = new Map<string, string>()
 
+  function trackNativeGitChanges(input: NativeGitToolInput): NativeGitTrackResult {
+    const tool = input.tool.toLowerCase()
+    if (mode === "manual" || !TRACKED_TOOLS.has(tool)) {
+      return { dirty: false, changedSinceLastCheck: false }
+    }
+
+    const status = getNativeGitStatus(ctx.directory)
+    if (!status) {
+      return { dirty: false, changedSinceLastCheck: false }
+    }
+
+    const sessionID = input.sessionID ?? "unknown"
+    const stateKey = `${sessionID}:${status.repository.repoRoot}`
+    if (!status.dirty) {
+      lastStatusBySessionRepo.set(stateKey, "")
+      return { dirty: false, changedSinceLastCheck: false }
+    }
+
+    const statusKey = getStatusKey(status.files)
+    const changedSinceLastCheck = lastStatusBySessionRepo.get(stateKey) !== statusKey
+    lastStatusBySessionRepo.set(stateKey, statusKey)
+
+    const summary = getNativeGitChangeSummary(ctx.directory)
+    if (changedSinceLastCheck) {
+      if (auditLog) {
+        appendNativeGitAuditRecord(status.repository, {
+          tool,
+          sessionID: input.sessionID,
+          callID: input.callID,
+          files: status.files,
+          summary,
+        })
+      }
+
+      log("[native-git] tracked uncommitted changes", {
+        tool,
+        sessionID: input.sessionID,
+        fileCount: status.files.length,
+      })
+    }
+
+    return { dirty: true, changedSinceLastCheck, summary }
+  }
+
   return {
+    event: async (input: NativeGitEventInput): Promise<void> => {
+      if (mode === "manual" || (input.event.type !== "tool.execute" && input.event.type !== "tool.result")) {
+        return
+      }
+
+      if (!isRecord(input.event.properties)) {
+        return
+      }
+
+      const tool = getStringProperty(input.event.properties, ["name", "tool"])
+      if (!tool) {
+        return
+      }
+
+      trackNativeGitChanges({
+        tool,
+        sessionID: getStringProperty(input.event.properties, ["sessionID", "sessionId"]),
+        callID: getStringProperty(input.event.properties, ["callID", "callId", "call_id"]),
+      })
+    },
     "tool.execute.after": async (
       input: { tool: string; sessionID: string; callID: string },
       output: { output?: string; metadata?: Record<string, unknown> } | undefined,
@@ -51,45 +148,14 @@ export function createNativeGitHook(ctx: PluginInput, config: NativeGitConfig | 
         return
       }
 
-      const status = getNativeGitStatus(ctx.directory)
-      if (!status) {
-        return
-      }
-
-      const stateKey = `${input.sessionID}:${status.repository.repoRoot}`
-      if (!status.dirty) {
-        lastStatusBySessionRepo.set(stateKey, "")
-        return
-      }
-
-      const statusKey = getStatusKey(status.files)
-      const changedSinceLastCheck = lastStatusBySessionRepo.get(stateKey) !== statusKey
-      lastStatusBySessionRepo.set(stateKey, statusKey)
-
-      const summary = getNativeGitChangeSummary(ctx.directory)
-      if (changedSinceLastCheck) {
-        if (auditLog) {
-          appendNativeGitAuditRecord(status.repository, {
-            tool,
-            sessionID: input.sessionID,
-            callID: input.callID,
-            files: status.files,
-            summary,
-          })
-        }
-
+      const result = trackNativeGitChanges(input)
+      if (result.changedSinceLastCheck && result.summary) {
         if (tool !== "task") {
-          appendOutput(output, buildTrackingMessage(summary))
+          appendOutput(output, buildTrackingMessage(result.summary))
         }
-
-        log("[native-git] tracked uncommitted changes", {
-          tool,
-          sessionID: input.sessionID,
-          fileCount: status.files.length,
-        })
       }
 
-      if (tool === "task") {
+      if (tool === "task" && result.dirty) {
         appendOutput(output, NATIVE_GIT_TASK_REMINDER)
       }
     },

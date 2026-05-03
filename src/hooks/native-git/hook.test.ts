@@ -72,6 +72,25 @@ describe("native git hook", () => {
     expect(git(directory, ["status", "--porcelain"])).toContain("README.md")
   })
 
+  test("tracked mode records audit from tool result events", async () => {
+    const hook = createNativeGitHook({ directory } as never, { mode: "tracked", audit_log: true })
+    writeFileSync(join(directory, "event.txt"), "created by event\n", "utf-8")
+
+    await hook.event({
+      event: {
+        type: "tool.result",
+        properties: { name: "write", sessionID: "ses_event" },
+      },
+    })
+
+    const repository = getNativeGitRepository(directory)
+    const auditPath = getNativeGitAuditPath(repository!)
+    const audit = readFileSync(auditPath, "utf-8")
+    expect(audit).toContain('"tool":"write"')
+    expect(audit).toContain('"sessionID":"ses_event"')
+    expect(audit).toContain("event.txt")
+  })
+
   test("task output receives git-master commit reminder when changes remain", async () => {
     const hook = createNativeGitHook({ directory } as never, { mode: "tracked", audit_log: false })
     writeFileSync(join(directory, "README.md"), "changed\n", "utf-8")

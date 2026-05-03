@@ -266,6 +266,7 @@ export function createEventHandler(args: {
     await runEventHookSafely("stopContinuationGuard", hooks.stopContinuationGuard?.event, input);
     await runEventHookSafely("compactionContextInjector", hooks.compactionContextInjector?.event, input);
     await runEventHookSafely("compactionTodoPreserver", hooks.compactionTodoPreserver?.event, input);
+    await runEventHookSafely("nativeGit", hooks.nativeGit?.event, input);
     await runEventHookSafely("writeExistingFileGuard", hooks.writeExistingFileGuard?.event, input);
     await runEventHookSafely("atlasHook", hooks.atlasHook?.handler, input);
     await runEventHookSafely("autoSlashCommand", hooks.autoSlashCommand?.event, input);
