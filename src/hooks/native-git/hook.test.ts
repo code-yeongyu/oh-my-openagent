@@ -103,6 +103,34 @@ describe("native git hook", () => {
     expect(existsSync(getNativeGitAuditPath(repository!))).toBe(false)
   })
 
+  test("tracked mode uses initial clean state when tool execute baseline is missing", async () => {
+    const hook = createNativeGitHook({ directory } as never, { mode: "tracked", audit_log: true })
+    writeFileSync(join(directory, "missing-baseline.txt"), "created without execute event\n", "utf-8")
+    const output = { output: "write complete", metadata: {} }
+
+    await hook["tool.execute.after"]({ tool: "write", sessionID: "ses_missing", callID: "call_missing" }, output)
+
+    const repository = getNativeGitRepository(directory)
+    const audit = readFileSync(getNativeGitAuditPath(repository!), "utf-8")
+    expect(output.output).toContain("Native Git tracking detected uncommitted changes")
+    expect(output.output).toContain("missing-baseline.txt")
+    expect(audit).toContain('"callID":"call_missing"')
+    expect(audit).toContain("missing-baseline.txt")
+  })
+
+  test("tracked mode keeps initial dirty state as fallback when execute baseline is missing", async () => {
+    writeFileSync(join(directory, "README.md"), "dirty before hook creation\n", "utf-8")
+    const hook = createNativeGitHook({ directory } as never, { mode: "tracked", audit_log: true })
+    const output = { output: "listed files", metadata: {} }
+
+    await hook["tool.execute.after"]({ tool: "bash", sessionID: "ses_initial_dirty", callID: "call_read" }, output)
+
+    const repository = getNativeGitRepository(directory)
+    expect(output.output).toBe("listed files")
+    expect(repository).not.toBeNull()
+    expect(existsSync(getNativeGitAuditPath(repository!))).toBe(false)
+  })
+
   test("tracked mode records audit from tool result events", async () => {
     const hook = createNativeGitHook({ directory } as never, { mode: "tracked", audit_log: true })
     await captureToolBaseline(hook, { tool: "write", sessionID: "ses_event", callID: "call_event" })

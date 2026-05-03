@@ -153,6 +153,12 @@ export function createNativeGitHook(ctx: PluginInput, config: NativeGitConfig | 
   const auditedCallKeys = new Set<string>()
   const outputReminderCallKeys = new Set<string>()
   const taskReminderCallKeys = new Set<string>()
+  const initialStatusByRepo = new Map<string, string>()
+
+  const initialStatus = mode === "manual" ? null : getNativeGitStatus(ctx.directory)
+  if (initialStatus) {
+    initialStatusByRepo.set(initialStatus.repository.repoRoot, initialStatus.dirty ? initialStatus.statusKey : "")
+  }
 
   function clearSessionState(sessionID: string): void {
     dirtyStateBySession.delete(sessionID)
@@ -220,6 +226,9 @@ export function createNativeGitHook(ctx: PluginInput, config: NativeGitConfig | 
     const sessionID = input.sessionID ?? "unknown"
     const statusKey = status.dirty ? status.statusKey : ""
     lastStatusBySessionRepo.set(getStateKey(sessionID, status.repository.repoRoot), statusKey)
+    if (!initialStatusByRepo.has(status.repository.repoRoot)) {
+      initialStatusByRepo.set(status.repository.repoRoot, statusKey)
+    }
 
     const callKey = getCallKey(input)
     if (callKey) {
@@ -263,8 +272,8 @@ export function createNativeGitHook(ctx: PluginInput, config: NativeGitConfig | 
     const previousStatusKey =
       baseline?.repositoryRoot === status.repository.repoRoot
         ? baseline.statusKey
-        : lastStatusBySessionRepo.get(stateKey)
-    const changedSinceLastCheck = previousStatusKey !== undefined && previousStatusKey !== status.statusKey
+        : (lastStatusBySessionRepo.get(stateKey) ?? initialStatusByRepo.get(status.repository.repoRoot) ?? "")
+    const changedSinceLastCheck = previousStatusKey !== status.statusKey
     lastStatusBySessionRepo.set(stateKey, status.statusKey)
 
     if (callKey) {
