@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 
-import { afterEach, beforeEach, describe, expect, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 import { execFileSync } from "node:child_process"
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -117,6 +117,38 @@ describe("native git hook", () => {
     expect(audit).toContain('"sessionID":"ses_part"')
     expect(audit).toContain('"callID":"call_part"')
     expect(audit).toContain("part-event.txt")
+  })
+
+  test("tracked mode shows one git-master reminder toast on session idle", async () => {
+    const showToast = mock(() => Promise.resolve({}))
+    const hook = createNativeGitHook(
+      { directory, client: { tui: { showToast } } } as never,
+      { mode: "tracked", audit_log: true },
+    )
+    writeFileSync(join(directory, "toast.txt"), "created for toast\n", "utf-8")
+
+    await hook.event({
+      event: {
+        type: "message.part.updated",
+        properties: {
+          part: {
+            type: "tool",
+            tool: "write",
+            callID: "call_toast",
+            sessionID: "ses_toast",
+            state: { status: "completed" },
+          },
+        },
+      },
+    })
+    await hook.event({ event: { type: "session.idle", properties: { sessionID: "ses_toast" } } })
+    await hook.event({ event: { type: "session.idle", properties: { sessionID: "ses_toast" } } })
+
+    expect(showToast).toHaveBeenCalledTimes(1)
+    const toast = showToast.mock.calls[0]?.[0]
+    expect(toast?.body?.title).toBe("Native Git changes tracked")
+    expect(toast?.body?.message).toContain("git-master")
+    expect(toast?.body?.variant).toBe("warning")
   })
 
   test("task output receives git-master commit reminder when changes remain", async () => {

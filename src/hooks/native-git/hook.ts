@@ -28,11 +28,19 @@ type NativeGitTrackResult = {
   summary?: string
 }
 
+type NativeGitDirtyState = {
+  fileCount: number
+}
+
 export const NATIVE_GIT_TASK_REMINDER = `
 <system-reminder>
 Native Git tracking detected uncommitted changes. Before final completion, use git-master to create atomic commits, for example:
 task(category="quick", load_skills=["git-master"], prompt="Commit the current changes atomically following git-master conventions.")
 </system-reminder>`
+
+const NATIVE_GIT_TOAST_TITLE = "Native Git changes tracked"
+const NATIVE_GIT_TOAST_MESSAGE =
+  "Uncommitted changes are being audited. Before final completion, use git-master to create atomic commits."
 
 function getStatusKey(files: string[]): string {
   return files.slice().sort().join("\0")
@@ -116,6 +124,44 @@ export function createNativeGitHook(ctx: PluginInput, config: NativeGitConfig | 
   const mode = config?.mode ?? "tracked"
   const auditLog = config?.audit_log ?? true
   const lastStatusBySessionRepo = new Map<string, string>()
+  const dirtyStateBySession = new Map<string, NativeGitDirtyState>()
+  const lastToastStatusBySession = new Map<string, string>()
+
+  async function showNativeGitReminder(sessionID: string): Promise<void> {
+    const dirtyState = dirtyStateBySession.get(sessionID)
+    if (!dirtyState) {
+      return
+    }
+
+    const status = getNativeGitStatus(ctx.directory)
+    if (!status?.dirty) {
+      dirtyStateBySession.delete(sessionID)
+      lastToastStatusBySession.delete(sessionID)
+      return
+    }
+
+    const statusKey = `${status.repository.repoRoot}:${getStatusKey(status.files)}`
+    if (lastToastStatusBySession.get(sessionID) === statusKey) {
+      return
+    }
+
+    lastToastStatusBySession.set(sessionID, statusKey)
+    await ctx.client.tui
+      .showToast({
+        body: {
+          title: NATIVE_GIT_TOAST_TITLE,
+          message: `${NATIVE_GIT_TOAST_MESSAGE} (${dirtyState.fileCount} file${dirtyState.fileCount === 1 ? "" : "s"} dirty.)`,
+          variant: "warning" as const,
+          duration: 8000,
+        },
+      })
+      .catch((error: unknown) => {
+        log("[native-git] failed to show git-master reminder toast", {
+          sessionID,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      })
+  }
 
   function trackNativeGitChanges(input: NativeGitToolInput): NativeGitTrackResult {
     const tool = input.tool.toLowerCase()
@@ -132,6 +178,7 @@ export function createNativeGitHook(ctx: PluginInput, config: NativeGitConfig | 
     const stateKey = `${sessionID}:${status.repository.repoRoot}`
     if (!status.dirty) {
       lastStatusBySessionRepo.set(stateKey, "")
+      dirtyStateBySession.delete(sessionID)
       return { dirty: false, changedSinceLastCheck: false }
     }
 
@@ -140,6 +187,10 @@ export function createNativeGitHook(ctx: PluginInput, config: NativeGitConfig | 
     lastStatusBySessionRepo.set(stateKey, statusKey)
 
     const summary = getNativeGitChangeSummary(ctx.directory)
+    dirtyStateBySession.set(sessionID, {
+      fileCount: status.files.length,
+    })
+
     if (changedSinceLastCheck) {
       if (auditLog) {
         appendNativeGitAuditRecord(status.repository, {
@@ -164,6 +215,14 @@ export function createNativeGitHook(ctx: PluginInput, config: NativeGitConfig | 
   return {
     event: async (input: NativeGitEventInput): Promise<void> => {
       if (mode === "manual") {
+        return
+      }
+
+      if (input.event.type === "session.idle" && isRecord(input.event.properties)) {
+        const sessionID = getStringProperty(input.event.properties, ["sessionID", "sessionId"])
+        if (sessionID) {
+          await showNativeGitReminder(sessionID)
+        }
         return
       }
 
