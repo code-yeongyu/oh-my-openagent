@@ -8,29 +8,85 @@ const originalSetTimeout = globalThis.setTimeout
 const originalClearTimeout = globalThis.clearTimeout
 const originalDateNow = Date.now
 
+type MockPluginInput = Parameters<typeof createSessionNotification>[0]
+
+type MockShellResult = {
+  stdout: Buffer
+  stderr: Buffer
+  exitCode: number
+}
+
+type MockShellChain = Promise<MockShellResult> & {
+  nothrow: () => MockShellChain
+  quiet: () => MockShellChain
+  text: () => Promise<string>
+}
+
+function formatShellCommand(cmd: TemplateStringsArray | string, values: readonly unknown[]): string {
+  if (typeof cmd === "string") return cmd
+  return cmd.reduce((acc, part, index) => `${acc}${part}${String(values[index] ?? "")}`, "")
+}
+
+function createShellChain(result: MockShellResult, shouldReject = false): MockShellChain {
+  const promise = (shouldReject ? Promise.reject(Object.assign(new Error("command failed"), result)) : Promise.resolve(result)) as MockShellChain
+  const resolvedNothrow = Promise.resolve(result) as MockShellChain
+
+  promise.quiet = () => promise
+  promise.text = async () => ""
+  promise.nothrow = () => resolvedNothrow
+
+  resolvedNothrow.quiet = () => resolvedNothrow
+  resolvedNothrow.text = async () => ""
+  resolvedNothrow.nothrow = () => resolvedNothrow
+
+  return promise
+}
+
+function createShellMock(options: {
+  capture?: (commandString: string) => void
+  reject?: (commandString: string, values: readonly unknown[]) => boolean
+} = {}) {
+  return (cmd: TemplateStringsArray | string, ...values: unknown[]): MockShellChain => {
+    const commandString = formatShellCommand(cmd, values)
+    options.capture?.(commandString)
+
+    return createShellChain(
+      { stdout: Buffer.alloc(0), stderr: Buffer.alloc(0), exitCode: options.reject?.(commandString, values) ? 1 : 0 },
+      options.reject?.(commandString, values) ?? false
+    )
+  }
+}
+
+function createMockInput(shell: ReturnType<typeof createShellMock>): MockPluginInput {
+  const input = {} as MockPluginInput
+  return Object.assign(input, {
+    $: shell,
+    client: {
+      session: {
+        todo: async () => ({ data: [] }),
+      },
+    },
+    directory: "/tmp/test",
+    project: "/tmp/test",
+    worktree: "/tmp/test",
+    serverUrl: "http://localhost",
+  })
+}
+
 describe("session-notification", () => {
   let notificationCalls: string[]
 
-  function createMockPluginInput() {
-    return {
-      $: async (cmd: TemplateStringsArray | string, ...values: any[]) => {
+  function createMockPluginInput(): MockPluginInput {
+    return createMockInput(
+      createShellMock({
+        capture: (cmdStr) => {
         // given - track notification commands (osascript, notify-send, powershell)
-        const cmdStr = typeof cmd === "string" 
-          ? cmd 
-          : cmd.reduce((acc, part, i) => acc + part + (values[i] ?? ""), "")
-        
-        if (cmdStr.includes("osascript") || cmdStr.includes("notify-send") || cmdStr.includes("powershell")) {
-          notificationCalls.push(cmdStr)
+          if (cmdStr.includes("osascript") || cmdStr.includes("notify-send") || cmdStr.includes("powershell")) {
+            notificationCalls.push(cmdStr)
+          }
         }
-        return { stdout: "", stderr: "", exitCode: 0 }
-      },
-      client: {
-        session: {
-          todo: async () => ({ data: [] }),
-        },
-      },
-      directory: "/tmp/test",
-    } as any
+      })
+    )
   }
 
   beforeEach(() => {
@@ -44,6 +100,7 @@ describe("session-notification", () => {
     spyOn(utils, "getOsascriptPath").mockResolvedValue("/usr/bin/osascript")
     spyOn(utils, "getNotifySendPath").mockResolvedValue("/usr/bin/notify-send")
     spyOn(utils, "getPowershellPath").mockResolvedValue("powershell")
+    spyOn(utils, "getCmuxPath").mockResolvedValue(null)
     spyOn(utils, "getAfplayPath").mockResolvedValue("/usr/bin/afplay")
     spyOn(utils, "getPaplayPath").mockResolvedValue("/usr/bin/paplay")
     spyOn(utils, "getAplayPath").mockResolvedValue("/usr/bin/aplay")
@@ -389,19 +446,7 @@ describe("session-notification", () => {
 
   function createSenderMockCtx() {
     const notifyCalls: string[] = []
-    const mockCtx = {
-      $: (cmd: TemplateStringsArray | string, ...values: any[]) => {
-        const cmdStr = typeof cmd === "string"
-          ? cmd
-          : cmd.reduce((acc, part, i) => acc + part + (values[i] ?? ""), "")
-        notifyCalls.push(cmdStr)
-        const result = { stdout: "", stderr: "", exitCode: 0 }
-        const promise = Promise.resolve(result) as any
-        promise.quiet = () => promise
-        promise.nothrow = () => { const p = Promise.resolve(result) as any; p.quiet = () => p; p.nothrow = () => p; return p }
-        return promise
-      },
-    } as any
+    const mockCtx = createMockInput(createShellMock({ capture: (commandString) => notifyCalls.push(commandString) }))
     return { mockCtx, notifyCalls }
   }
 
@@ -454,28 +499,12 @@ describe("session-notification", () => {
     // given - terminal-notifier exists but invocation fails
     spyOn(sender, "sendSessionNotification").mockRestore()
     const notifyCalls: string[] = []
-    const mockCtx = {
-      $: (cmd: TemplateStringsArray | string, ...values: unknown[]) => {
-        const cmdStr = typeof cmd === "string"
-          ? cmd
-          : cmd.reduce((acc, part, index) => `${acc}${part}${String(values[index] ?? "")}`, "")
-        notifyCalls.push(cmdStr)
-
-        if (cmdStr.includes("terminal-notifier")) {
-          const err = Object.assign(new Error("terminal-notifier failed"), { stdout: "", stderr: "", exitCode: 1 })
-          const rejected = Promise.reject(err) as any
-          rejected.quiet = () => rejected
-          rejected.nothrow = () => { const p = Promise.resolve({ stdout: "", stderr: "", exitCode: 1 }) as any; p.quiet = () => p; p.nothrow = () => p; return p }
-          return rejected
-        }
-
-        const result = { stdout: "", stderr: "", exitCode: 0 }
-        const promise = Promise.resolve(result) as any
-        promise.quiet = () => promise
-        promise.nothrow = () => { const p = Promise.resolve(result) as any; p.quiet = () => p; p.nothrow = () => p; return p }
-        return promise
-      },
-    } as any
+    const mockCtx = createMockInput(
+      createShellMock({
+        capture: (commandString) => notifyCalls.push(commandString),
+        reject: (commandString) => commandString.includes("terminal-notifier"),
+      })
+    )
     spyOn(utils, "getTerminalNotifierPath").mockResolvedValue("/usr/local/bin/terminal-notifier")
     spyOn(utils, "getOsascriptPath").mockResolvedValue("/usr/bin/osascript")
 
@@ -493,27 +522,12 @@ describe("session-notification", () => {
     // given - shell interpolation rejects array values
     spyOn(sender, "sendSessionNotification").mockRestore()
     const notifyCalls: string[] = []
-    const mockCtx = {
-      $: (cmd: TemplateStringsArray | string, ...values: unknown[]) => {
-        if (values.some(Array.isArray)) {
-          const err = Object.assign(new Error("array interpolation unsupported"), { stdout: "", stderr: "", exitCode: 1 })
-          const rejected = Promise.reject(err) as any
-          rejected.quiet = () => rejected
-          rejected.nothrow = () => { const p = Promise.resolve({ stdout: "", stderr: "", exitCode: 1 }) as any; p.quiet = () => p; p.nothrow = () => p; return p }
-          return rejected
-        }
-
-        const commandString = typeof cmd === "string"
-          ? cmd
-          : cmd.reduce((acc, part, index) => `${acc}${part}${String(values[index] ?? "")}`, "")
-        notifyCalls.push(commandString)
-        const result = { stdout: "", stderr: "", exitCode: 0 }
-        const promise = Promise.resolve(result) as any
-        promise.quiet = () => promise
-        promise.nothrow = () => { const p = Promise.resolve(result) as any; p.quiet = () => p; p.nothrow = () => p; return p }
-        return promise
-      },
-    } as any
+    const mockCtx = createMockInput(
+      createShellMock({
+        capture: (commandString) => notifyCalls.push(commandString),
+        reject: (_commandString, values) => values.some(Array.isArray),
+      })
+    )
     spyOn(utils, "getTerminalNotifierPath").mockResolvedValue("/usr/local/bin/terminal-notifier")
     spyOn(utils, "getOsascriptPath").mockResolvedValue("/usr/bin/osascript")
 
