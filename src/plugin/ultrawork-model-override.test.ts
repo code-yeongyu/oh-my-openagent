@@ -1,4 +1,5 @@
 import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test"
+import type { FallbackModelObject } from "../config/schema/fallback-models"
 import * as sharedModule from "../shared"
 import * as dbOverrideModule from "./ultrawork-db-model-override"
 import * as sessionStateModule from "../features/claude-code-session-state"
@@ -69,7 +70,10 @@ describe("resolveUltraworkOverride", () => {
     }
   }
 
-  function createConfig(agentName: string, ultrawork: { model?: string; variant?: string }) {
+  function createConfig(
+    agentName: string,
+    ultrawork: { model?: string; variant?: string; fallback_models?: string | Array<string | FallbackModelObject> },
+  ) {
     return {
       agents: {
         [agentName]: { ultrawork },
@@ -87,6 +91,42 @@ describe("resolveUltraworkOverride", () => {
 
     //#then
     expect(result).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-7", variant: "max" })
+  })
+
+  test("should resolve scoped ultrawork fallback_models", () => {
+    //#given
+    const fallbackModels: Array<string | FallbackModelObject> = [
+      "openai/gpt-5.4",
+      { model: "anthropic/claude-opus-4-7", variant: "max" },
+    ]
+    const config = createConfig("sisyphus", {
+      model: "anthropic/claude-sonnet-4-6",
+      fallback_models: fallbackModels,
+    })
+    const output = createOutput("ultrawork do something")
+
+    //#when
+    const result = resolveUltraworkOverride(config, "sisyphus", output)
+
+    //#then
+    expect(result).toEqual({
+      providerID: "anthropic",
+      modelID: "claude-sonnet-4-6",
+      variant: undefined,
+      fallback_models: fallbackModels,
+    })
+  })
+
+  test("should preserve omitted ultrawork fallback_models", () => {
+    //#given
+    const config = createConfig("sisyphus", { model: "anthropic/claude-opus-4-7" })
+    const output = createOutput("ultrawork do something")
+
+    //#when
+    const result = resolveUltraworkOverride(config, "sisyphus", output)
+
+    //#then
+    expect(result).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-7", variant: undefined })
   })
 
   test("should return null when no keyword detected", () => {
@@ -277,7 +317,10 @@ describe("applyUltraworkModelOverrideOnMessage", () => {
     }
   }
 
-  function createConfig(agentName: string, ultrawork: { model?: string; variant?: string }) {
+  function createConfig(
+    agentName: string,
+    ultrawork: { model?: string; variant?: string; fallback_models?: string | Array<string | FallbackModelObject> },
+  ) {
     return {
       agents: {
         [agentName]: { ultrawork },
@@ -300,6 +343,23 @@ describe("applyUltraworkModelOverrideOnMessage", () => {
       { providerID: "anthropic", modelID: "claude-opus-4-7" },
       undefined,
     )
+  })
+
+  test("should surface scoped fallback_models on ultrawork message output", () => {
+    //#given
+    const fallbackModels = ["openai/gpt-5.4", { model: "anthropic/claude-opus-4-7", variant: "max" }]
+    const config = createConfig("sisyphus", {
+      model: "anthropic/claude-sonnet-4-6",
+      fallback_models: fallbackModels,
+    })
+    const output = createOutput("ultrawork do something")
+    const tui = createMockTui()
+
+    //#when
+    applyUltraworkModelOverrideOnMessage(config, "sisyphus", output, tui)
+
+    //#then
+    expect(output.message["fallback_models"]).toEqual(fallbackModels)
   })
 
   test("should NOT override variant when SDK unavailable even if config specifies variant", () => {
