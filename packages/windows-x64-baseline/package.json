@@ -1,6 +1,6 @@
 {
   "name": "oh-my-opencode-windows-x64-baseline",
-  "version": "3.17.12",
+  "version": "3.17.13",
   "description": "Platform-specific binary for oh-my-opencode (windows-x64-baseline, no AVX2)",
   "license": "MIT",
   "repository": {
