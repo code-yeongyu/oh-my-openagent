@@ -43,15 +43,17 @@ Complete reference for Oh My OpenCode plugin configuration. During the rename tr
 
 ### File Locations
 
-User config is loaded first, then project config overrides it. In each directory, the compatibility layer recognizes both the renamed and legacy basenames.
+User config loads first. Project configs are discovered by walking from the working directory up to `$HOME`; closer configs win. If the working directory is outside `$HOME`, only that directory is checked.
 
-1. Project config: `.opencode/oh-my-openagent.json[c]` or `.opencode/oh-my-opencode.json[c]`
+1. Walked configs: `.opencode/oh-my-openagent.json[c]` or legacy `.opencode/oh-my-opencode.json[c]`
 2. User config (`.jsonc` preferred over `.json`):
 
 | Platform    | Path candidates |
 | ----------- | --------------- |
 | macOS/Linux | `~/.config/opencode/oh-my-openagent.json[c]`, `~/.config/opencode/oh-my-opencode.json[c]` |
 | Windows     | `%APPDATA%\opencode\oh-my-openagent.json[c]`, `%APPDATA%\opencode\oh-my-opencode.json[c]` |
+
+**Security note:** `mcp_env_allowlist` is user-only. Walked configs cannot extend it.
 
 **Rename compatibility:** The published package and CLI binary remain `oh-my-opencode`. OpenCode plugin registration prefers `oh-my-openagent`, while legacy `oh-my-opencode` entries and config basenames still load during the transition. Config detection checks `oh-my-opencode` before `oh-my-openagent`, so if both plugin config basenames exist in the same directory, the legacy `oh-my-opencode.*` file currently wins.
 JSONC supports `// line comments`, `/* block comments */`, and trailing commas.

@@ -336,7 +336,7 @@ Opinionated defaults, adjustable if you insist.
 See [Configuration Documentation](docs/reference/configuration.md).
 
 **Quick Overview:**
-- **Config Locations**: The compatibility layer recognizes both `oh-my-openagent.json[c]` and legacy `oh-my-opencode.json[c]` plugin config files. Existing installs still commonly use the legacy basename.
+- **Config Locations**: User config plus walked `.opencode/oh-my-openagent.json[c]` configs up to `$HOME`; closest wins. Legacy `oh-my-opencode.json[c]` still works.
 - **JSONC Support**: Comments and trailing commas supported
 - **Agents**: Override models, temperatures, prompts, and permissions for any agent
 - **Built-in Skills**: `playwright` (browser automation), `git-master` (atomic commits)
