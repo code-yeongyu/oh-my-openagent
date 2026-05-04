@@ -5,11 +5,14 @@ import { access, mkdtemp, readdir, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 
+import type { PluginInput } from "@opencode-ai/plugin"
+
 import { TeamModeConfigSchema } from "../../../config/schema/team-mode"
 import type { ExecutorContext } from "../../../tools/delegate-task/executor-types"
 import type { BackgroundTask, LaunchInput } from "../../background-agent/types"
 import { BackgroundManager } from "../../background-agent/manager"
 import { loadRuntimeState } from "../team-state-store/store"
+import { clearTeamSessionRegistry, lookupTeamSession } from "../team-session-registry"
 import type { TeamSpec } from "../types"
 
 const resolveMemberMock = mock(async (member: TeamSpec["members"][number]) => ({
@@ -59,7 +62,7 @@ function createManager(
   launchImpl: (input: LaunchInput) => Promise<BackgroundTask>,
   getTaskImpl: (taskId: string) => BackgroundTask | undefined = () => undefined,
 ): { manager: BackgroundManager; launchMock: ReturnType<typeof mock>; cancelTaskMock: ReturnType<typeof mock> } {
-  const manager = new BackgroundManager({ client: {} as ExecutorContext["client"], directory: baseDir } as ConstructorParameters<typeof BackgroundManager>[0])
+  const manager = new BackgroundManager({ pluginContext: { client: {} as ExecutorContext["client"], directory: baseDir } as PluginInput })
   const launchMock = mock((input: LaunchInput) => launchImpl(input))
   const getTaskMock = mock((taskId: string) => getTaskImpl(taskId))
   const cancelTaskMock = mock(async () => true)
@@ -88,6 +91,7 @@ describe("createTeamRun", () => {
 
   beforeEach(() => {
     resolveMemberMock.mockClear()
+    clearTeamSessionRegistry()
   })
 
   afterAll(async () => {
@@ -99,7 +103,7 @@ describe("createTeamRun", () => {
     const baseDir = await mkdtemp(path.join(tmpdir(), "team-runtime-create-"))
     temporaryDirectories.push(baseDir)
     let launchCount = 0
-    const { manager, launchMock } = createManager(baseDir, async () => ({ id: `task-${++launchCount}`, sessionID: `session-${launchCount}`, status: "running" } as BackgroundTask))
+    const { manager, launchMock } = createManager(baseDir, async () => ({ id: `task-${++launchCount}`, sessionId: `session-${launchCount}`, status: "running" } as BackgroundTask))
     const context = createContext(baseDir, manager)
 
     // when
@@ -113,12 +117,54 @@ describe("createTeamRun", () => {
     expect((launchMock.mock.calls as Array<[LaunchInput]>).every(([input]) => input.suppressTmuxSpawn === true)).toBe(true)
   })
 
+  test("registers a member session as soon as launch reports the real sessionId", async () => {
+    // given
+    const baseDir = await mkdtemp(path.join(tmpdir(), "team-runtime-session-lineage-"))
+    temporaryDirectories.push(baseDir)
+    const tasks = new Map<string, BackgroundTask>()
+    const { manager } = createManager(
+      baseDir,
+      async (input) => {
+        const task = {
+          id: "task-lineage",
+          status: "pending",
+          parentSessionId: input.parentSessionId,
+          parentMessageId: input.parentMessageId,
+          description: input.description,
+          prompt: input.prompt,
+          agent: input.agent,
+        } satisfies BackgroundTask
+        tasks.set(task.id, task)
+        input.onSessionCreated?.("session-lineage")
+        tasks.set(task.id, { ...task, sessionId: "session-lineage", status: "running" })
+        expect(lookupTeamSession("session-lineage")).toEqual({
+          teamRunId: expect.any(String),
+          memberName: "member-1",
+          role: "lead",
+        })
+        return task
+      },
+      (taskId) => tasks.get(taskId),
+    )
+
+    // when
+    const runtimeState = await createTeamRun(createSpec(1), "lead-session", createContext(baseDir, manager), createConfig(baseDir), manager)
+
+    // then
+    expect(runtimeState.members[0]?.sessionId).toBe("session-lineage")
+    expect(lookupTeamSession("session-lineage")).toEqual({
+      teamRunId: runtimeState.teamRunId,
+      memberName: "member-1",
+      role: "lead",
+    })
+  })
+
   test("persists the resolved subagent_type and model on each spawned runtime member", async () => {
     // given
     const baseDir = await mkdtemp(path.join(tmpdir(), "team-runtime-subagent-type-"))
     temporaryDirectories.push(baseDir)
     let launchCount = 0
-    const { manager } = createManager(baseDir, async () => ({ id: `task-${++launchCount}`, sessionID: `session-${launchCount}`, status: "running" } as BackgroundTask))
+    const { manager } = createManager(baseDir, async () => ({ id: `task-${++launchCount}`, sessionId: `session-${launchCount}`, status: "running" } as BackgroundTask))
 
     // when
     const runtimeState = await createTeamRun(createSpec(3), "lead-session", createContext(baseDir, manager), createConfig(baseDir), manager)
@@ -141,7 +187,7 @@ describe("createTeamRun", () => {
     temporaryDirectories.push(baseDir)
     const { manager, launchMock } = createManager(baseDir, async () => ({
       id: "task-1",
-      sessionID: "session-1",
+      sessionId: "session-1",
       status: "running",
     } as BackgroundTask))
 
@@ -169,7 +215,7 @@ describe("createTeamRun", () => {
     const { manager, cancelTaskMock } = createManager(baseDir, async () => {
       launchCount += 1
       if (launchCount === 4) throw new Error("launch-4 failed")
-      return { id: `task-${launchCount}`, sessionID: `session-${launchCount}`, status: "running" } as BackgroundTask
+      return { id: `task-${launchCount}`, sessionId: `session-${launchCount}`, status: "running" } as BackgroundTask
     })
 
     // when
@@ -194,7 +240,7 @@ describe("createTeamRun", () => {
     const { manager } = createManager(baseDir, async () => {
       launchCount += 1
       if (launchCount === 2) throw new Error("launch-2 failed")
-      return { id: `task-${launchCount}`, sessionID: `session-${launchCount}`, status: "running" } as BackgroundTask
+      return { id: `task-${launchCount}`, sessionId: `session-${launchCount}`, status: "running" } as BackgroundTask
     })
     const spec = createSpec(2, true)
 
@@ -216,7 +262,7 @@ describe("createTeamRun", () => {
     const baseDir = await mkdtemp(path.join(tmpdir(), "team-runtime-idempotent-"))
     temporaryDirectories.push(baseDir)
     let launchCount = 0
-    const { manager, launchMock } = createManager(baseDir, async () => ({ id: `task-${++launchCount}`, sessionID: `session-${launchCount}`, status: "running" } as BackgroundTask))
+    const { manager, launchMock } = createManager(baseDir, async () => ({ id: `task-${++launchCount}`, sessionId: `session-${launchCount}`, status: "running" } as BackgroundTask))
     const spec = createSpec(2)
     const context = createContext(baseDir, manager)
 
@@ -242,7 +288,7 @@ describe("createTeamRun", () => {
       maxInFlight = Math.max(maxInFlight, inFlight)
       await new Promise((resolve) => setTimeout(resolve, 10))
       inFlight -= 1
-      return { id: `task-${launchCount}`, sessionID: `session-${launchCount}`, status: "running" } as BackgroundTask
+      return { id: `task-${launchCount}`, sessionId: `session-${launchCount}`, status: "running" } as BackgroundTask
     })
 
     // when
@@ -259,7 +305,7 @@ describe("createTeamRun", () => {
     let launchCount = 0
     const { manager, launchMock } = createManager(baseDir, async (input) => ({
       id: `task-${++launchCount}`,
-      sessionID: `${input.agent}-session-${launchCount}`,
+      sessionId: `${input.agent}-session-${launchCount}`,
       status: "running",
     } as BackgroundTask))
     const spec: TeamSpec = {
@@ -301,7 +347,7 @@ describe("createTeamRun", () => {
     temporaryDirectories.push(baseDir)
     const { manager } = createManager(baseDir, async (input) => ({
       id: `task-${input.agent}`,
-      sessionID: `${input.agent}-session`,
+      sessionId: `${input.agent}-session`,
       status: "running",
     } as BackgroundTask))
     const spec: TeamSpec = {
@@ -340,7 +386,7 @@ describe("createTeamRun", () => {
     let launchCount = 0
     const { manager, launchMock } = createManager(baseDir, async (input) => ({
       id: `task-${++launchCount}`,
-      sessionID: `${input.agent}-session-${launchCount}`,
+      sessionId: `${input.agent}-session-${launchCount}`,
       status: "running",
     } as BackgroundTask))
     const spec: TeamSpec = {

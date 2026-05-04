@@ -580,6 +580,7 @@ export class BackgroundManager {
       return
     }
 
+    await input.onSessionCreated?.(sessionID)
     this.settlePreStartDescendantReservation(task)
     subagentSessions.add(sessionID)
 

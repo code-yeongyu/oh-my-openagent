@@ -117,6 +117,7 @@ export interface LaunchInput {
   skillContent?: string
   category?: string
   sessionPermission?: SessionPermissionRule[]
+  onSessionCreated?: (sessionId: string) => void | Promise<void>
 }
 
 export interface ResumeInput {

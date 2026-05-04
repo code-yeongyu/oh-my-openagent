@@ -82,14 +82,14 @@ async function createMemberWorktree(memberWorktreePath: string, projectRoot: str
 }
 
 async function waitForTaskSessionId(bgMgr: BackgroundManager, task: BackgroundTask, deadlineAt: number): Promise<string> {
-  let sessionId = task.sessionID
+  let sessionId = task.sessionId
   while (!sessionId) {
     if (Date.now() > deadlineAt) throw new Error(`timed out waiting for child session for task ${task.id}`)
     const updatedTask = bgMgr.getTask(task.id)
     if (updatedTask?.status === "error" || updatedTask?.status === "cancelled" || updatedTask?.status === "interrupt") {
       throw new Error(updatedTask.error ?? `task ${task.id} failed before session creation`)
     }
-    sessionId = updatedTask?.sessionID
+    sessionId = updatedTask?.sessionId
     if (!sessionId) await new Promise((resolve) => setTimeout(resolve, SESSION_ID_POLL_MS))
   }
   return sessionId
@@ -190,8 +190,8 @@ export async function createTeamRun(
             description: `Create team member ${spec.name}/${member.name}`,
             prompt: buildMemberPrompt(spec, member, runtimeState.teamRunId, config, resource.worktreePath),
             agent: resolvedMember.agentToUse,
-            parentSessionID: leadSessionId,
-            parentMessageID: options?.parentMessageID ?? `team-create:${runtimeState.teamRunId}:${member.name}`,
+            parentSessionId: leadSessionId,
+            parentMessageId: options?.parentMessageID ?? `team-create:${runtimeState.teamRunId}:${member.name}`,
             teamRunId: runtimeState.teamRunId,
             suppressTmuxSpawn: true,
             model: resolvedMember.model,
@@ -199,6 +199,13 @@ export async function createTeamRun(
             skillContent: resolvedMember.systemContent,
             category: member.kind === "category" ? member.category : undefined,
             sessionPermission: QUESTION_DENIED_SESSION_PERMISSION,
+            onSessionCreated: (sessionId) => {
+              registerTeamSession(sessionId, {
+                teamRunId: runtimeState.teamRunId,
+                memberName: member.name,
+                role: member.name === spec.leadAgentId ? "lead" : "member",
+              })
+            },
           })
           resource.taskId = task.id
           const sessionId = await waitForTaskSessionId(bgMgr, task, deadlineAt)

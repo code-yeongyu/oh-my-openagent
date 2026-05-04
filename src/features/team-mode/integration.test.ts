@@ -77,7 +77,7 @@ function createManager(launchImpl?: (input: LaunchInput) => Promise<BackgroundTa
   let launchCount = 0
   manager.launch = mock((input: LaunchInput) => launchImpl?.(input) ?? Promise.resolve({
     id: `task-${++launchCount}`,
-    sessionID: `ses_mock_${randomUUID()}`,
+    sessionId: `ses_mock_${randomUUID()}`,
     status: "running",
   } as BackgroundTask))
   manager.getTask = mock(() => undefined)
@@ -301,7 +301,7 @@ describe("team-mode integration", () => {
       maxInFlight = Math.max(maxInFlight, inFlight)
       await new Promise((resolve) => setTimeout(resolve, 10))
       inFlight -= 1
-      return { id: `task-${randomUUID()}`, sessionID: `ses_mock_${randomUUID()}`, status: "running" } as BackgroundTask
+      return { id: `task-${randomUUID()}`, sessionId: `ses_mock_${randomUUID()}`, status: "running" } as BackgroundTask
     })
 
     // when
