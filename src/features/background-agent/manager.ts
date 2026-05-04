@@ -59,6 +59,7 @@ import {
   startAttempt,
 } from "./attempt-lifecycle"
 import { registerManagerForCleanup, unregisterManagerForCleanup } from "./process-cleanup"
+import { setContinuationMarkerSource } from "../../features/run-continuation-state"
 import {
   findNearestMessageExcludingCompaction,
   resolvePromptContextFromSessionMessages,
@@ -449,6 +450,9 @@ export class BackgroundManager {
       spawnReservation.commit()
       this.markPreStartDescendantReservation(task)
 
+      // Signal CLI run mode that background tasks are active
+      this.updateBackgroundTaskMarker(input.parentSessionID)
+
       // Trigger processing (fire-and-forget)
       void this.processKey(key)
 
@@ -511,6 +515,9 @@ export class BackgroundManager {
           if (item.task.sessionId) {
             await this.abortSessionWithLogging(item.task.sessionId, "startTask error cleanup")
           }
+
+          // Update continuation marker for CLI run mode
+          this.updateBackgroundTaskMarker(item.task.parentSessionID)
 
           this.markForNotification(item.task)
           this.enqueueNotificationForParent(item.task.parentSessionId, () => this.notifyParentSession(item.task)).catch(err => {
@@ -812,6 +819,21 @@ The fallback retry session is now created and can be inspected directly.
       }
     }
     return tasks
+  }
+
+  private updateBackgroundTaskMarker(parentSessionID: string): void {
+    const tasks = this.getTasksByParentSession(parentSessionID)
+    const activeTasks = tasks.filter(t => t.status === "running" || t.status === "pending")
+    if (activeTasks.length > 0) {
+      setContinuationMarkerSource(
+        this.directory, parentSessionID, "background-task", "active",
+        `${activeTasks.length} background task(s) active`,
+      )
+    } else {
+      setContinuationMarkerSource(
+        this.directory, parentSessionID, "background-task", "idle",
+      )
+    }
   }
 
   getAllDescendantTasks(sessionID: string): BackgroundTask[] {
@@ -1525,6 +1547,11 @@ The fallback retry session is now created and can be inspected directly.
       SessionCategoryRegistry.remove(task.sessionId)
     }
 
+    // Update continuation marker for CLI run mode
+    if (task.parentSessionID) {
+      this.updateBackgroundTaskMarker(task.parentSessionID)
+    }
+
     this.markForNotification(task)
     this.enqueueNotificationForParent(task.parentSessionId, () => this.notifyParentSession(task)).catch(err => {
       log("[background-agent] Error in notifyParentSession for errored task:", { taskId: task.id, error: err })
@@ -1824,6 +1851,11 @@ The task was re-queued on a fallback model after a retryable failure.
 
     removeTaskToastTracking(task.id)
 
+    // Update continuation marker for CLI run mode
+    if (task.parentSessionID) {
+      this.updateBackgroundTaskMarker(task.parentSessionID)
+    }
+
     if (options?.skipNotification) {
       this.cleanupPendingByParent(task)
       this.scheduleTaskRemoval(task.id)
@@ -1940,6 +1972,11 @@ The task was re-queued on a fallback model after a retryable failure.
       await this.abortSessionWithLogging(task.sessionId, `task completion (${source})`)
 
       SessionCategoryRegistry.remove(task.sessionId)
+    }
+
+    // Update continuation marker for CLI run mode
+    if (task.parentSessionID) {
+      this.updateBackgroundTaskMarker(task.parentSessionID)
     }
 
     try {
@@ -2178,6 +2215,10 @@ The task was re-queued on a fallback model after a retryable failure.
           }
         }
         this.cleanupPendingByParent(task)
+        // Update continuation marker for CLI run mode
+        if (task.parentSessionID) {
+          this.updateBackgroundTaskMarker(task.parentSessionID)
+        }
         this.markForNotification(task)
         this.enqueueNotificationForParent(task.parentSessionId, () => this.notifyParentSession(task)).catch(err => {
           log("[background-agent] Error in notifyParentSession for stale-pruned task:", { taskId: task.id, error: err })
@@ -2238,6 +2279,11 @@ The task was re-queued on a fallback model after a retryable failure.
     this.scheduleTaskRemoval(task.id)
     if (task.sessionId) {
       SessionCategoryRegistry.remove(task.sessionId)
+    }
+
+    // Update continuation marker for CLI run mode
+    if (task.parentSessionID) {
+      this.updateBackgroundTaskMarker(task.parentSessionID)
     }
 
     this.markForNotification(task)
