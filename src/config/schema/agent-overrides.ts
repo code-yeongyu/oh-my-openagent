@@ -44,12 +44,14 @@ export const AgentOverrideConfigSchema = z.object({
   ultrawork: z
     .object({
       model: z.string().optional(),
+      fallback_models: FallbackModelsSchema.optional(),
       variant: z.string().optional(),
     })
     .optional(),
   compaction: z
     .object({
       model: z.string().optional(),
+      fallback_models: FallbackModelsSchema.optional(),
       variant: z.string().optional(),
     })
     .optional(),

@@ -97,4 +97,56 @@ describe("OhMyOpenCodeConfigSchema fallback_models", () => {
       expect(result.data.categories?.deep?.fallback_models).toEqual(config.categories.deep.fallback_models)
     }
   })
+
+  test("accepts string fallback_models under agent ultrawork override", () => {
+    // given
+    const config = {
+      agents: {
+        sisyphus: {
+          ultrawork: {
+            model: "openai/gpt-5.4",
+            fallback_models: "anthropic/claude-opus-4-7",
+          },
+        },
+      },
+    }
+
+    // when
+    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+
+    // then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.agents?.sisyphus?.ultrawork?.fallback_models).toBe(
+        config.agents.sisyphus.ultrawork.fallback_models,
+      )
+    }
+  })
+
+  test("accepts mixed fallback_models under agent compaction override", () => {
+    // given
+    const fallbackModels: Array<string | FallbackModelObject> = [
+      "openai/gpt-5.4",
+      { model: "anthropic/claude-opus-4-7", variant: "max", reasoningEffort: "high" },
+    ]
+    const config = {
+      agents: {
+        sisyphus: {
+          compaction: {
+            model: "google/gemini-2.5-pro",
+            fallback_models: fallbackModels,
+          },
+        },
+      },
+    }
+
+    // when
+    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+
+    // then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.agents?.sisyphus?.compaction?.fallback_models).toEqual(fallbackModels)
+    }
+  })
 })
