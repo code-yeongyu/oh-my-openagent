@@ -19,6 +19,7 @@ import {
   type ModelFallbackHook,
 } from "../hooks/model-fallback/hook";
 import { getRawFallbackModels } from "../hooks/runtime-fallback/fallback-models";
+import { resolveCompactionModel } from "../hooks/shared/compaction-model-resolver";
 import {
   clearBackgroundOutputConsumptionsForParentSession,
   clearBackgroundOutputConsumptionsForTaskSession,
@@ -641,10 +642,24 @@ export function createEventHandler(args: {
             !hooks.stopContinuationGuard?.isStopped(sessionID)
           ) {
             // Trigger compaction before sending "continue" to avoid double-sending continuation
+            const sessionModel = getSessionModel(sessionID);
+            const compactionModel = resolveCompactionModel(
+              pluginConfig,
+              sessionID,
+              sessionModel?.providerID ?? "",
+              sessionModel?.modelID ?? "",
+            );
+            const summarizeBody = {
+              ...(compactionModel.providerID && compactionModel.modelID
+                ? { providerID: compactionModel.providerID, modelID: compactionModel.modelID }
+                : {}),
+              ...(compactionModel.fallback_models ? { fallback_models: compactionModel.fallback_models } : {}),
+              auto: true,
+            };
             await pluginContext.client.session
               .summarize({
                 path: { id: sessionID },
-                body: { auto: true },
+                body: summarizeBody,
                 query: { directory: pluginContext.directory },
               })
               .catch((err: unknown) => {

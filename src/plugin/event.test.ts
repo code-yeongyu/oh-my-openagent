@@ -3,7 +3,7 @@ import { describe, it, expect, afterEach, mock, spyOn } from "bun:test"
 import { createEventHandler, extractErrorMessage } from "./event"
 import { createChatMessageHandler } from "./chat-message"
 import * as openclawRuntimeDispatch from "../openclaw/runtime-dispatch"
-import { _resetForTesting, setMainSession } from "../features/claude-code-session-state"
+import { _resetForTesting, setMainSession, updateSessionAgent } from "../features/claude-code-session-state"
 import { clearPendingModelFallback, createModelFallbackHook } from "../hooks/model-fallback/hook"
 import { getSessionPromptParams, setSessionPromptParams } from "../shared/session-prompt-params-state"
 
@@ -838,6 +838,7 @@ describe("createEventHandler - session recovery compaction", () => {
 		const sessionID = "ses_recovery_compaction"
 		setMainSession(sessionID)
 		const callOrder: string[] = []
+		const summarizeBodies: unknown[] = []
 
 		const eventHandler = createEventHandler({
 			ctx: asEventHandlerContext({
@@ -845,8 +846,9 @@ describe("createEventHandler - session recovery compaction", () => {
 				client: {
 					session: {
 						abort: async () => ({}),
-						summarize: async () => {
+						summarize: async (input: { body: unknown }) => {
 							callOrder.push("summarize")
+							summarizeBodies.push(input.body)
 							return {}
 						},
 						prompt: async () => {
@@ -881,6 +883,70 @@ describe("createEventHandler - session recovery compaction", () => {
 			},
 		}))
 		expect(callOrder).toEqual(["summarize", "prompt"])
+		expect(summarizeBodies).toEqual([{ auto: true }])
+	})
+
+	it("passes scoped compaction fallback_models before recovery continue", async () => {
+		const sessionID = "ses_recovery_compaction_fallback"
+		setMainSession(sessionID)
+		updateSessionAgent(sessionID, "sisyphus")
+		const fallbackModels = ["openai/gpt-5.4", { model: "anthropic/claude-opus-4-7", variant: "max" }]
+		const summarizeBodies: unknown[] = []
+
+		const eventHandler = createEventHandler({
+			ctx: asEventHandlerContext({
+				directory: "/tmp",
+				client: {
+					session: {
+						abort: async () => ({}),
+						summarize: async (input: { body: unknown }) => {
+							summarizeBodies.push(input.body)
+							return {}
+						},
+						prompt: async () => ({}),
+					},
+				},
+			}),
+			pluginConfig: asPluginConfig({
+				agents: {
+					sisyphus: {
+						compaction: {
+							model: "google/gemini-2.5-pro",
+							fallback_models: fallbackModels,
+						},
+					},
+				},
+			}),
+			firstMessageVariantGate: {
+				markSessionCreated: () => {},
+				clear: () => {},
+			},
+			managers: createEventHandlerManagers(),
+			hooks: createEventHandlerHooks({
+				sessionRecovery: {
+					isRecoverableError: () => true,
+					handleSessionRecovery: async () => true,
+				},
+				stopContinuationGuard: { isStopped: () => false },
+			}),
+		})
+		await eventHandler(asEventHandlerInput({
+			event: {
+				type: "session.error",
+				properties: {
+					sessionID,
+					messageID: "msg_789",
+					error: { name: "Error", message: "tool_result block(s) that are not immediately" },
+				},
+			},
+		}))
+
+		expect(summarizeBodies).toEqual([{
+			providerID: "google",
+			modelID: "gemini-2.5-pro",
+			fallback_models: fallbackModels,
+			auto: true,
+		}])
 	})
 
 	it("sends continue even if compaction fails", async () => {
