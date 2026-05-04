@@ -4,6 +4,7 @@ import * as path from "path";
 import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig } from "./config";
 import {
   log,
+  containsPath,
   deepMerge,
   getOpenCodeConfigDir,
   addConfigLoadError,
@@ -24,7 +25,7 @@ function resolveHomeDirectory(): string {
   return process.env.HOME ?? process.env.USERPROFILE ?? homedir()
 }
 
-function migrateLegacyAndResolveCanonicalPath(detectedPath: string): string {
+function resolveConfigPathAfterLegacyMigration(detectedPath: string): string {
   if (!path.basename(detectedPath).startsWith(LEGACY_CONFIG_BASENAME)) {
     return detectedPath
   }
@@ -245,34 +246,38 @@ export function loadPluginConfig(
 
   // Auto-copy legacy config file to canonical name if needed
   if (userDetected.format !== "none") {
-    userConfigPath = migrateLegacyAndResolveCanonicalPath(userConfigPath)
+    userConfigPath = resolveConfigPathAfterLegacyMigration(userConfigPath)
   }
 
-  // Walk up from directory to $HOME for ancestor configs (closest first)
-  // This subsumes the previous single project-config load: the closest hit is
-  // the project's own .opencode/oh-my-openagent.json[c], and walking continues
-  // up so configs in ~/work/ (etc.) apply to all subprojects.
-  const ancestorConfigPaths = findProjectOpencodePluginConfigFiles(
+  // Pin the walk to $HOME only when the start directory is inside it. Outside
+  // $HOME the walker would otherwise reach FS root and surface unrelated configs
+  // in /tmp, /opt, etc.
+  const homeDirectory = resolveHomeDirectory()
+  const stopDirectory = containsPath(homeDirectory, directory) ? homeDirectory : directory
+  const ancestorConfigPathsNearestFirst = findProjectOpencodePluginConfigFiles(
     directory,
-    resolveHomeDirectory(),
+    stopDirectory,
   )
   log("Walked ancestor plugin configs", {
-    paths: ancestorConfigPaths,
-    count: ancestorConfigPaths.length,
+    paths: ancestorConfigPathsNearestFirst,
+    count: ancestorConfigPathsNearestFirst.length,
+    stopDirectory,
   })
 
   // Migrate any legacy basenames among ancestors and warn on dual-config presence
-  const canonicalAncestorPaths = ancestorConfigPaths.map((ancestorPath) => {
-    const opencodeDir = path.dirname(ancestorPath)
-    const ancestorDetected = detectPluginConfigFile(opencodeDir)
-    if (ancestorDetected.legacyPath) {
-      log("Canonical plugin config detected alongside legacy config. Remove the legacy file to avoid confusion.", {
-        canonicalPath: ancestorDetected.path,
-        legacyPath: ancestorDetected.legacyPath,
-      })
-    }
-    return migrateLegacyAndResolveCanonicalPath(ancestorPath)
-  })
+  const canonicalAncestorPathsNearestFirst = ancestorConfigPathsNearestFirst.map(
+    (ancestorPath) => {
+      const opencodeDir = path.dirname(ancestorPath)
+      const ancestorDetected = detectPluginConfigFile(opencodeDir)
+      if (ancestorDetected.legacyPath) {
+        log("Canonical plugin config detected alongside legacy config. Remove the legacy file to avoid confusion.", {
+          canonicalPath: ancestorDetected.path,
+          legacyPath: ancestorDetected.legacyPath,
+        })
+      }
+      return resolveConfigPathAfterLegacyMigration(ancestorPath)
+    },
+  )
 
   // Load user config first (base). Parse empty config through Zod to apply field defaults.
   const userConfig = loadConfigFromPath(userConfigPath, ctx)
@@ -289,12 +294,11 @@ export function loadPluginConfig(
   let config: OhMyOpenCodeConfig =
     userConfig ?? OhMyOpenCodeConfigSchema.parse({});
 
-  // Merge ancestor configs from farthest to nearest, so closer overrides farther.
-  // Walker returns nearest-first; reverse for merge order.
+  const canonicalAncestorPathsFarthestFirst = [...canonicalAncestorPathsNearestFirst].reverse()
   const defaultGitMaster = OhMyOpenCodeConfigSchema.parse({}).git_master
-  const ancestorGitMasterOverrides: Array<Record<string, unknown>> = []
+  const ancestorGitMasterOverridesFarthestFirst: Array<Record<string, unknown>> = []
 
-  for (const ancestorPath of canonicalAncestorPaths.slice().reverse()) {
+  for (const ancestorPath of canonicalAncestorPathsFarthestFirst) {
     const ancestorConfig = loadConfigFromPath(ancestorPath, ctx)
     const ancestorOverrides = loadExplicitGitMasterOverrides(ancestorPath)
 
@@ -314,19 +318,21 @@ export function loadPluginConfig(
     }
 
     if (ancestorOverrides) {
-      ancestorGitMasterOverrides.push(ancestorOverrides)
+      ancestorGitMasterOverridesFarthestFirst.push(ancestorOverrides)
     }
   }
 
-  if (userGitMasterOverrides || ancestorGitMasterOverrides.length > 0) {
+  if (userGitMasterOverrides || ancestorGitMasterOverridesFarthestFirst.length > 0) {
+    const mergedAncestorGitMaster: Record<string, unknown> = {}
+    for (const override of ancestorGitMasterOverridesFarthestFirst) {
+      Object.assign(mergedAncestorGitMaster, override)
+    }
     config = {
       ...config,
       git_master: {
         ...defaultGitMaster,
         ...(userGitMasterOverrides ?? {}),
-        // Ancestors are pushed far-to-near; Object.assign with an empty seed
-        // applies each in order so the nearest (last) wins.
-        ...Object.assign({}, ...ancestorGitMasterOverrides),
+        ...mergedAncestorGitMaster,
       },
     }
   }
