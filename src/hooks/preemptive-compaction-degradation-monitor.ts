@@ -128,12 +128,19 @@ export function createPostCompactionDegradationMonitor(args: {
     suppressRecoveryCompactionUntil.set(sessionID, Date.now() + RECOVERY_COMPACTION_SUPPRESSION_MS)
 
     try {
-      const { providerID: targetProviderID, modelID: targetModelID } = resolveCompactionModel(
+      const {
+        providerID: targetProviderID,
+        modelID: targetModelID,
+        fallback_models: targetFallbackModels,
+      } = resolveCompactionModel(
         pluginConfig,
         sessionID,
         cached.providerID,
         cached.modelID,
       )
+      const summarizeBody = targetFallbackModels
+        ? { providerID: targetProviderID, modelID: targetModelID, fallback_models: targetFallbackModels }
+        : { providerID: targetProviderID, modelID: targetModelID }
 
       await client.tui
         .showToast({
@@ -149,7 +156,7 @@ export function createPostCompactionDegradationMonitor(args: {
       await withTimeout(
         client.session.summarize({
           path: { id: sessionID },
-          body: { providerID: targetProviderID, modelID: targetModelID },
+          body: summarizeBody,
           query: { directory },
         }),
         PREEMPTIVE_COMPACTION_TIMEOUT_MS,

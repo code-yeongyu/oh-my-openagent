@@ -140,14 +140,20 @@ export async function runSummarizeRetryStrategy(params: {
           "summarize retry attempt",
         )
 
-        const { providerID: targetProviderID, modelID: targetModelID } = resolveCompactionModel(
+        const {
+          providerID: targetProviderID,
+          modelID: targetModelID,
+          fallback_models: targetFallbackModels,
+        } = resolveCompactionModel(
           params.pluginConfig,
           params.sessionID,
           providerID,
           modelID
         )
 
-        const summarizeBody = { providerID: targetProviderID, modelID: targetModelID, auto: true }
+        const summarizeBody = targetFallbackModels
+          ? { providerID: targetProviderID, modelID: targetModelID, fallback_models: targetFallbackModels, auto: true }
+          : { providerID: targetProviderID, modelID: targetModelID, auto: true }
         await params.client.session.summarize({
           path: { id: params.sessionID },
           body: summarizeBody as never,

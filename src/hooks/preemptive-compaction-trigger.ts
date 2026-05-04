@@ -87,17 +87,24 @@ export async function runPreemptiveCompactionIfNeeded(args: {
   lastCompactionTime.set(sessionID, Date.now())
 
   try {
-    const { providerID: targetProviderID, modelID: targetModelID } = resolveCompactionModel(
+    const {
+      providerID: targetProviderID,
+      modelID: targetModelID,
+      fallback_models: targetFallbackModels,
+    } = resolveCompactionModel(
       pluginConfig,
       sessionID,
       cached.providerID,
       cached.modelID,
     )
+    const summarizeBody = targetFallbackModels
+      ? { providerID: targetProviderID, modelID: targetModelID, fallback_models: targetFallbackModels, auto: true }
+      : { providerID: targetProviderID, modelID: targetModelID, auto: true }
 
     await withTimeout(
       ctx.client.session.summarize({
         path: { id: sessionID },
-        body: { providerID: targetProviderID, modelID: targetModelID, auto: true },
+        body: summarizeBody,
         query: { directory: ctx.directory },
       }),
       PREEMPTIVE_COMPACTION_TIMEOUT_MS,
