@@ -451,7 +451,7 @@ export class BackgroundManager {
       this.markPreStartDescendantReservation(task)
 
       // Signal CLI run mode that background tasks are active
-      this.updateBackgroundTaskMarker(input.parentSessionID)
+      this.updateBackgroundTaskMarker(input.parentSessionId)
 
       // Trigger processing (fire-and-forget)
       void this.processKey(key)
@@ -517,7 +517,7 @@ export class BackgroundManager {
           }
 
           // Update continuation marker for CLI run mode
-          this.updateBackgroundTaskMarker(item.task.parentSessionID)
+          this.updateBackgroundTaskMarker(item.task.parentSessionId)
 
           this.markForNotification(item.task)
           this.enqueueNotificationForParent(item.task.parentSessionId, () => this.notifyParentSession(item.task)).catch(err => {
@@ -1548,8 +1548,8 @@ The fallback retry session is now created and can be inspected directly.
     }
 
     // Update continuation marker for CLI run mode
-    if (task.parentSessionID) {
-      this.updateBackgroundTaskMarker(task.parentSessionID)
+    if (task.parentSessionId) {
+      this.updateBackgroundTaskMarker(task.parentSessionId)
     }
 
     this.markForNotification(task)
@@ -1852,8 +1852,8 @@ The task was re-queued on a fallback model after a retryable failure.
     removeTaskToastTracking(task.id)
 
     // Update continuation marker for CLI run mode
-    if (task.parentSessionID) {
-      this.updateBackgroundTaskMarker(task.parentSessionID)
+    if (task.parentSessionId) {
+      this.updateBackgroundTaskMarker(task.parentSessionId)
     }
 
     if (options?.skipNotification) {
@@ -1975,8 +1975,8 @@ The task was re-queued on a fallback model after a retryable failure.
     }
 
     // Update continuation marker for CLI run mode
-    if (task.parentSessionID) {
-      this.updateBackgroundTaskMarker(task.parentSessionID)
+    if (task.parentSessionId) {
+      this.updateBackgroundTaskMarker(task.parentSessionId)
     }
 
     try {
@@ -2216,8 +2216,8 @@ The task was re-queued on a fallback model after a retryable failure.
         }
         this.cleanupPendingByParent(task)
         // Update continuation marker for CLI run mode
-        if (task.parentSessionID) {
-          this.updateBackgroundTaskMarker(task.parentSessionID)
+        if (task.parentSessionId) {
+          this.updateBackgroundTaskMarker(task.parentSessionId)
         }
         this.markForNotification(task)
         this.enqueueNotificationForParent(task.parentSessionId, () => this.notifyParentSession(task)).catch(err => {
@@ -2282,8 +2282,8 @@ The task was re-queued on a fallback model after a retryable failure.
     }
 
     // Update continuation marker for CLI run mode
-    if (task.parentSessionID) {
-      this.updateBackgroundTaskMarker(task.parentSessionID)
+    if (task.parentSessionId) {
+      this.updateBackgroundTaskMarker(task.parentSessionId)
     }
 
     this.markForNotification(task)
