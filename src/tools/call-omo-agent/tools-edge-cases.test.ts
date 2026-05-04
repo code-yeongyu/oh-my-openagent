@@ -21,7 +21,7 @@ function createMockCtx(agents: Array<{ name: string; mode?: string }> = []): Plu
       },
     },
     directory: "/test",
-  } as unknown as PluginInput
+    }
 }
 
 const DEFAULT_AGENTS = [
@@ -103,12 +103,12 @@ describe("createCallOmoAgent edge cases", () => {
         reserveSubagentSpawn: reserveSubagentSpawnMock,
         launch: mock(() => Promise.resolve({
           id: "task-id",
-          sessionID: "ses-1",
+          sessionId: "ses-1",
           description: "Test",
           agent: "bug-fixer",
           status: "pending",
         })),
-        getTask: mock(() => ({ status: "pending", sessionID: "ses-1" })),
+        getTask: mock(() => ({ status: "pending", sessionId: "ses-1" })),
       }
       const toolDef = createCallOmoAgent(mockCtx, mockManager, [])
       const executeFunc = toolDef.execute as Function
@@ -139,12 +139,12 @@ describe("createCallOmoAgent edge cases", () => {
         reserveSubagentSpawn: reserveSubagentSpawnMock,
         launch: mock(() => Promise.resolve({
           id: "task-id",
-          sessionID: "ses-1",
+          sessionId: "ses-1",
           description: "Test",
           agent: "explore",
           status: "pending",
         })),
-        getTask: mock(() => ({ status: "pending", sessionID: "ses-1" })),
+        getTask: mock(() => ({ status: "pending", sessionId: "ses-1" })),
       }
       const toolDef = createCallOmoAgent(mockCtx, mockManager, [])
       const executeFunc = toolDef.execute as Function
