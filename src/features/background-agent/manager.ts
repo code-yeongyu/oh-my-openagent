@@ -66,7 +66,7 @@ import {
 import { handleSessionIdleBackgroundEvent } from "./session-idle-event-handler"
 import { MESSAGE_STORAGE } from "../hook-message-injector"
 import { join } from "node:path"
-import { pruneStaleTasksAndNotifications } from "./task-poller"
+import { pruneStaleTasksAndNotifications, type SessionStatusMap } from "./task-poller"
 import { checkAndInterruptStaleTasks } from "./task-poller"
 import { removeTaskToastTracking } from "./remove-task-toast-tracking"
 import { abortWithTimeout } from "./abort-with-timeout"
@@ -214,6 +214,7 @@ export class BackgroundManager {
   private preStartDescendantReservations: Set<string>
   private enableParentSessionNotifications: boolean
   private modelFallbackControllerAccessor?: ModelFallbackControllerAccessor
+  private loggedSessionStatusUnavailable = false
   readonly taskHistory = new TaskHistory()
   private cachedCircuitBreakerSettings?: CircuitBreakerSettings
 
@@ -2186,7 +2187,7 @@ The task was re-queued on a fallback model after a retryable failure.
   }
 
   private async checkAndInterruptStaleTasks(
-    allStatuses: Record<string, { type: string }> = {},
+    allStatuses: SessionStatusMap | undefined,
   ): Promise<void> {
     await checkAndInterruptStaleTasks({
       tasks: this.tasks.values(),
@@ -2251,8 +2252,26 @@ The task was re-queued on a fallback model after a retryable failure.
     try {
       this.pruneStaleTasksAndNotifications()
 
-      const statusResult = await this.client.session.status()
-      const allStatuses = normalizeSDKResponse(statusResult, {} as Record<string, { type: string }>)
+      let allStatuses: SessionStatusMap | undefined
+      const sessionStatusMethod = this.client?.session?.status
+      if (typeof sessionStatusMethod !== "function") {
+        if (!this.loggedSessionStatusUnavailable) {
+          log("[background-agent] Unable to poll session statuses:", {
+            reason: "session.status unavailable",
+          })
+          this.loggedSessionStatusUnavailable = true
+        }
+      } else {
+        try {
+          const statusResult = await this.client.session.status()
+          allStatuses = normalizeSDKResponse(statusResult, {})
+        } catch (error) {
+          if (!this.loggedSessionStatusUnavailable) {
+            log("[background-agent] Error polling session statuses:", { error })
+            this.loggedSessionStatusUnavailable = true
+          }
+        }
+      }
 
       await this.checkAndInterruptStaleTasks(allStatuses)
 
@@ -2263,7 +2282,7 @@ The task was re-queued on a fallback model after a retryable failure.
         if (!sessionID) continue
 
         try {
-          const sessionStatus = allStatuses[sessionID]
+          const sessionStatus = allStatuses?.[sessionID]
           // Handle retry before checking running state
           if (sessionStatus?.type === "retry") {
             const retryMessage = typeof (sessionStatus as { message?: string }).message === "string"
@@ -2300,8 +2319,12 @@ The task was re-queued on a fallback model after a retryable failure.
             })
           }
 
+          if (allStatuses === undefined) {
+            continue
+          }
+
           // Session is idle or no longer in status response (completed/disappeared)
-          const sessionGoneFromStatus = !sessionStatus
+          const sessionGoneFromStatus = allStatuses !== undefined && !sessionStatus
           const sessionGoneThresholdReached = sessionGoneFromStatus
             && (task.consecutiveMissedPolls ?? 0) >= MIN_SESSION_GONE_POLLS
           const completionSource = sessionStatus?.type === "idle"
