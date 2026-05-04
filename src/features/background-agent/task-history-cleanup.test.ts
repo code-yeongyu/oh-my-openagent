@@ -36,12 +36,12 @@ function createManager(): BackgroundManager {
 }
 
 function createTask(overrides: Partial<BackgroundTask> & { id: string; parentSessionId: string }): BackgroundTask {
-  const { id, parentSessionID, ...rest } = overrides
+  const { id, parentSessionId, ...rest } = overrides
 
   return {
     ...rest,
     id,
-    parentSessionID,
+    parentSessionId,
     parentMessageId: rest.parentMessageId ?? "parent-message-id",
     description: rest.description ?? id,
     prompt: rest.prompt ?? `Prompt for ${id}`,
