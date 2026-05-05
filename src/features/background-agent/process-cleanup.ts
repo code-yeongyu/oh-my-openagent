@@ -3,11 +3,25 @@ import { log } from "../../shared"
 type ProcessCleanupSignal = NodeJS.Signals | "beforeExit" | "exit"
 type ProcessCleanupErrorEvent = "uncaughtException" | "unhandledRejection"
 
+/** @internal test-only seam: prevents process.exitCode from contaminating bun test runner */
+let _scheduleForcedExitEnabled = true
+
+/** @internal test-only */
+export function __disableScheduledForcedExitForTesting(): void {
+  _scheduleForcedExitEnabled = false
+}
+
+/** @internal test-only */
+export function __enableScheduledForcedExitForTesting(): void {
+  _scheduleForcedExitEnabled = true
+}
+
 function scheduleForcedExit(
   cleanupResult: void | Promise<void>,
   exitCode: number,
   exitAfterCleanup = false,
 ): void {
+  if (!_scheduleForcedExitEnabled) return
   process.exitCode = exitCode
   const exitTimeout = setTimeout(() => process.exit(), 6000)
   void Promise.resolve(cleanupResult).finally(() => {
