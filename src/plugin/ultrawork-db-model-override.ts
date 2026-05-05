@@ -1,8 +1,26 @@
-import { Database } from "bun:sqlite"
 import { join } from "node:path"
 import { existsSync } from "node:fs"
 import { getDataDir } from "../shared/data-path"
 import { log } from "../shared"
+
+type BunDatabase = import("bun:sqlite").Database
+type SqliteModule = { Database: new (path: string) => BunDatabase }
+
+/** @internal test-only seam: override to simulate non-Bun runtime */
+let _bunSqliteImporter: () => Promise<SqliteModule | null> = () =>
+  import("bun:sqlite").catch(() => null) as Promise<SqliteModule | null>
+
+/** @internal test-only */
+export function __setBunSqliteImporterForTesting(
+  impl: () => Promise<SqliteModule | null>,
+): void {
+  _bunSqliteImporter = impl
+}
+
+/** @internal test-only */
+export function __resetBunSqliteImporterForTesting(): void {
+  _bunSqliteImporter = () => import("bun:sqlite").catch(() => null) as Promise<SqliteModule | null>
+}
 
 function getDbPath(): string {
   return join(getDataDir(), "opencode", "opencode.db")
@@ -11,7 +29,7 @@ function getDbPath(): string {
 const MAX_MICROTASK_RETRIES = 10
 
 function tryUpdateMessageModel(
-  db: InstanceType<typeof Database>,
+  db: BunDatabase,
   messageId: string,
   targetModel: { providerID: string; modelID: string },
   variant?: string,
@@ -30,7 +48,7 @@ function tryUpdateMessageModel(
 }
 
 function retryViaMicrotask(
-  db: InstanceType<typeof Database>,
+  db: BunDatabase,
   messageId: string,
   targetModel: { providerID: string; modelID: string },
   variant: string | undefined,
@@ -106,20 +124,31 @@ function retryViaMicrotask(
  * Session.updateMessage() to save the message first, then overwrites the model.
  *
  * Falls back to setTimeout(fn, 0) after 10 microtask attempts.
+ *
  */
 export function scheduleDeferredModelOverride(
   messageId: string,
   targetModel: { providerID: string; modelID: string },
   variant?: string,
 ): void {
-  queueMicrotask(() => {
+  queueMicrotask(async () => {
+    // Lazy-load bun:sqlite so this module can be imported under Node/Electron
+    // without crashing the ESM loader (bun: protocol is Bun-only).
+    const sqliteModule = await _bunSqliteImporter()
+    if (sqliteModule === null) {
+      log("[ultrawork-db-override] bun:sqlite unavailable (non-Bun runtime), skipping deferred override")
+      return
+    }
+
+    const { Database } = sqliteModule
+
     const dbPath = getDbPath()
     if (!existsSync(dbPath)) {
       log("[ultrawork-db-override] DB not found, skipping deferred override")
       return
     }
 
-    let db: InstanceType<typeof Database>
+    let db: BunDatabase
     try {
       db = new Database(dbPath)
     } catch (error) {
