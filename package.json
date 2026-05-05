@@ -22,7 +22,8 @@
     "./schema.json": "./dist/oh-my-opencode.schema.json"
   },
   "scripts": {
-    "build": "bun build src/index.ts --outdir dist --target bun --format esm --external @ast-grep/napi --external zod && tsc --emitDeclarationOnly && bun build src/cli/index.ts --outdir dist/cli --target bun --format esm --external @ast-grep/napi && bun run build:schema",
+    "build": "bun build src/index.ts --outdir dist --target bun --format esm --external @ast-grep/napi --external zod && bun run build:prepend-shim && tsc --emitDeclarationOnly && bun build src/cli/index.ts --outdir dist/cli --target bun --format esm --external @ast-grep/napi && bun run build:schema",
+    "build:prepend-shim": "bun run script/prepend-electron-shim.ts",
     "build:all": "bun run build && bun run build:binaries",
     "build:binaries": "bun run script/build-binaries.ts",
     "build:schema": "bun run script/build-schema.ts",

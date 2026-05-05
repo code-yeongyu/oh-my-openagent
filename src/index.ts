@@ -1,3 +1,4 @@
+import "./electron-compat"
 import { initConfigContext } from "./cli/config-manager/config-context"
 import type { Hooks, Plugin, PluginModule } from "@opencode-ai/plugin"
 
