@@ -1,68 +1,166 @@
-/**
- * Node/Electron-compatible spawn shim.
- *
- * Replaces direct `import { spawn } from "bun"` throughout the codebase so
- * that `bun build --target bun` no longer emits top-level
- *   var { spawn } = globalThis.Bun;
- * destructures that crash on Node/Electron (where globalThis.Bun is undefined).
- *
- * On real Bun runtime:  delegates straight to Bun.spawn / Bun.spawnSync.
- * On Node/Electron:     backed by node:child_process (via static ESM imports
- *                       which are safe in both runtimes).
- */
-
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 import { spawn as nodeSpawn, spawnSync as nodeSpawnSync } from "node:child_process"
-import { Readable } from "node:stream"
+import { Readable, Writable } from "node:stream"
 
-const IS_BUN = typeof globalThis.Bun !== "undefined"
+type AnyRecord = Record<string, unknown>
+type StdioMode = "pipe" | "inherit" | "ignore"
+type StdioTuple = [StdioMode, StdioMode, StdioMode]
 
-function _resolveCmd(cmdOrOpts: any, optsArg?: any): { cmd: string[]; opts: any } {
-  const isObj = !Array.isArray(cmdOrOpts)
-  return {
-    cmd: isObj ? (cmdOrOpts as any).cmd : (cmdOrOpts as string[]),
-    opts: isObj ? cmdOrOpts : (optsArg ?? {}),
-  }
+export interface SpawnOptions {
+  cmd?: string[]
+  cwd?: string
+  env?: NodeJS.ProcessEnv
+  stdin?: StdioMode
+  stdout?: StdioMode
+  stderr?: StdioMode
+  stdio?: StdioTuple
+  detached?: boolean
 }
 
-function _wrapNodeProc(proc: ReturnType<typeof nodeSpawn>): any {
-  let code: number | null = null
-  const exited = new Promise<number>((resolve) => {
-    proc.on("exit", (c) => { code = c ?? 1; resolve(code) })
-    proc.on("error", () => { if (code === null) { code = 1; resolve(1) } })
+export interface SpawnedProcess {
+  readonly exitCode: number | null
+  readonly exited: Promise<number>
+  readonly stdout: ReadableStream<Uint8Array>
+  readonly stderr: ReadableStream<Uint8Array>
+  readonly stdin: NodeJS.WritableStream
+  readonly pid: number | undefined
+  kill(signal?: NodeJS.Signals): void
+  ref(): void
+  unref(): void
+}
+
+export interface SpawnSyncResult {
+  readonly exitCode: number
+  readonly stdout: Buffer
+  readonly stderr: Buffer
+  readonly success: boolean
+  readonly pid: number
+}
+
+type BunSpawnRuntime = {
+  spawn(command: string[], options?: SpawnOptions): SpawnedProcess
+  spawn(options: SpawnOptions & { cmd: string[] }): SpawnedProcess
+  spawnSync(command: string[], options?: SpawnOptions): SpawnSyncResult
+  spawnSync(options: SpawnOptions & { cmd: string[] }): SpawnSyncResult
+}
+
+const runtime = globalThis as typeof globalThis & { Bun?: BunSpawnRuntime }
+const IS_BUN = typeof runtime.Bun !== "undefined"
+
+function emptyReadableStream(): ReadableStream<Uint8Array> {
+  return new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.close()
+    },
   })
+}
+
+function toReadableStream(stream: NodeJS.ReadableStream | null): ReadableStream<Uint8Array> {
+  if (!stream) return emptyReadableStream()
+
+  return Readable.toWeb(stream as Readable) as ReadableStream<Uint8Array>
+}
+
+function emptyWritableStream(): Writable {
+  return new Writable({
+    write(_chunk, _encoding, callback) {
+      callback()
+    },
+  })
+}
+
+function resolveCommand(cmdOrOpts: unknown, optsArg?: unknown): { cmd: string[]; opts: SpawnOptions } {
+  const isObj = !Array.isArray(cmdOrOpts)
+  const opts = isObj ? (cmdOrOpts as SpawnOptions) : ((optsArg ?? {}) as SpawnOptions)
+
   return {
-    get exitCode() { return code },
-    exited,
-    stdout: proc.stdout ? Readable.toWeb(proc.stdout) as ReadableStream<Uint8Array> : undefined,
-    stderr: proc.stderr ? Readable.toWeb(proc.stderr) as ReadableStream<Uint8Array> : undefined,
-    stdin: proc.stdin,
-    kill(s?: NodeJS.Signals) { try { proc.kill(s) } catch {} },
-    pid: proc.pid,
+    cmd: isObj ? ((cmdOrOpts as AnyRecord).cmd as string[]) : (cmdOrOpts as string[]),
+    opts,
   }
 }
 
-export function spawn(cmdOrOpts: any, opts?: any): any {
-  if (IS_BUN) return (globalThis.Bun as any).spawn(cmdOrOpts, opts)
-  const { cmd, opts: o } = _resolveCmd(cmdOrOpts, opts)
+function resolveStdio(options: SpawnOptions): StdioTuple {
+  if (options.stdio) return options.stdio
+
+  return [options.stdin ?? "pipe", options.stdout ?? "pipe", options.stderr ?? "pipe"]
+}
+
+function wrapNodeProcess(proc: ReturnType<typeof nodeSpawn>): SpawnedProcess {
+  let exitCode: number | null = null
+  const exited = new Promise<number>((resolve) => {
+    proc.on("exit", (code) => {
+      exitCode = code ?? 1
+      resolve(exitCode)
+    })
+    proc.on("error", () => {
+      if (exitCode === null) {
+        exitCode = 1
+        resolve(1)
+      }
+    })
+  })
+
+  return {
+    get exitCode() {
+      return exitCode
+    },
+    exited,
+    stdout: toReadableStream(proc.stdout),
+    stderr: toReadableStream(proc.stderr),
+    stdin: proc.stdin ?? emptyWritableStream(),
+    kill(signal?: NodeJS.Signals) {
+      if (proc.killed || exitCode !== null) return
+
+      try {
+        proc.kill(signal)
+      } catch (error) {
+        if (!String(error).includes("kill")) throw error
+      }
+    },
+    pid: proc.pid,
+    ref() {
+      proc.ref()
+    },
+    unref() {
+      proc.unref()
+    },
+  }
+}
+
+export function spawn(command: string[], options?: SpawnOptions): SpawnedProcess
+export function spawn(options: SpawnOptions & { cmd: string[] }): SpawnedProcess
+export function spawn(cmdOrOpts: unknown, opts?: unknown): SpawnedProcess {
+  if (IS_BUN) return runtime.Bun!.spawn(cmdOrOpts as string[] & SpawnOptions & { cmd: string[] }, opts as SpawnOptions)
+
+  const { cmd, opts: options } = resolveCommand(cmdOrOpts, opts)
   const [bin, ...args] = cmd
   const proc = nodeSpawn(bin, args, {
-    cwd: o.cwd as string | undefined,
-    env: o.env as NodeJS.ProcessEnv | undefined,
-    stdio: [(o.stdin ?? "pipe") as any, (o.stdout ?? "pipe") as any, (o.stderr ?? "pipe") as any],
+    cwd: options.cwd,
+    env: options.env,
+    stdio: resolveStdio(options),
+    detached: options.detached,
   })
-  return _wrapNodeProc(proc)
+
+  return wrapNodeProcess(proc)
 }
 
-export function spawnSync(cmdOrOpts: any, _opts?: any): any {
-  if (IS_BUN) return (globalThis.Bun as any).spawnSync(cmdOrOpts)
-  const { cmd, opts: o } = _resolveCmd(cmdOrOpts)
+export function spawnSync(command: string[], options?: SpawnOptions): SpawnSyncResult
+export function spawnSync(options: SpawnOptions & { cmd: string[] }): SpawnSyncResult
+export function spawnSync(cmdOrOpts: unknown, opts?: unknown): SpawnSyncResult {
+  if (IS_BUN) return runtime.Bun!.spawnSync(cmdOrOpts as string[] & SpawnOptions & { cmd: string[] }, opts as SpawnOptions)
+
+  const { cmd, opts: options } = resolveCommand(cmdOrOpts, opts)
   const [bin, ...args] = cmd
-  const r = nodeSpawnSync(bin, args, {
-    cwd: o.cwd as string | undefined,
-    env: o.env as NodeJS.ProcessEnv | undefined,
-    stdio: ["pipe", "pipe", "pipe"],
+  const result = nodeSpawnSync(bin, args, {
+    cwd: options.cwd,
+    env: options.env,
+    stdio: resolveStdio(options),
   })
-  return { exitCode: r.status ?? 1, stdout: r.stdout, stderr: r.stderr, success: (r.status ?? 1) === 0, pid: -1 }
+
+  return {
+    exitCode: result.status ?? 1,
+    stdout: result.stdout,
+    stderr: result.stderr,
+    success: (result.status ?? 1) === 0,
+    pid: -1,
+  }
 }
