@@ -26,6 +26,10 @@ export async function processFilePathForAgentsInjection(input: {
   sessionID: string;
   output: { title: string; output: string; metadata: unknown };
 }): Promise<void> {
+  // Guard: output.output may be non-string at runtime (e.g. MCP bridge format changes).
+  // Consistent with the pattern used in tool-output-truncator and other hooks.
+  if (typeof input.output.output !== "string") return;
+
   const resolved = resolveFilePath(input.ctx.directory, input.filePath);
   if (!resolved) return;
 
