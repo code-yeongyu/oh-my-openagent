@@ -1,8 +1,9 @@
-import { Database } from "bun:sqlite"
 import { join } from "node:path"
 import { existsSync } from "node:fs"
 import { getDataDir } from "../shared/data-path"
 import { log } from "../shared"
+
+type BunDatabase = import("bun:sqlite").Database
 
 function getDbPath(): string {
   return join(getDataDir(), "opencode", "opencode.db")
@@ -11,7 +12,7 @@ function getDbPath(): string {
 const MAX_MICROTASK_RETRIES = 10
 
 function tryUpdateMessageModel(
-  db: InstanceType<typeof Database>,
+  db: BunDatabase,
   messageId: string,
   targetModel: { providerID: string; modelID: string },
   variant?: string,
@@ -30,7 +31,7 @@ function tryUpdateMessageModel(
 }
 
 function retryViaMicrotask(
-  db: InstanceType<typeof Database>,
+  db: BunDatabase,
   messageId: string,
   targetModel: { providerID: string; modelID: string },
   variant: string | undefined,
@@ -112,14 +113,21 @@ export function scheduleDeferredModelOverride(
   targetModel: { providerID: string; modelID: string },
   variant?: string,
 ): void {
-  queueMicrotask(() => {
+  queueMicrotask(async () => {
+    const sqliteModule = await import("bun:sqlite").catch(() => null)
+    const Database = sqliteModule?.Database
+    if (typeof Database !== "function") {
+      log("[ultrawork-db-override] bun:sqlite unavailable, skipping deferred override", { messageId })
+      return
+    }
+
     const dbPath = getDbPath()
     if (!existsSync(dbPath)) {
       log("[ultrawork-db-override] DB not found, skipping deferred override")
       return
     }
 
-    let db: InstanceType<typeof Database>
+    let db: BunDatabase
     try {
       db = new Database(dbPath)
     } catch (error) {

@@ -15,17 +15,10 @@ let backgroundManagerOptions: {
 const trackedPaneBySession = new Map<string, string>()
 
 class MockBackgroundManager {
-  constructor(
-    _ctx: PluginInput,
-    _config?: unknown,
-    options?: {
-      tmuxConfig?: unknown
-      onSubagentSessionCreated?: (event: { sessionID: string; parentID: string; title: string }) => Promise<void>
-      onShutdown?: () => void | Promise<void>
-      enableParentSessionNotifications?: boolean
-    },
-  ) {
-    backgroundManagerOptions = options ?? null
+  constructor(config: {
+    onSubagentSessionCreated?: (event: { sessionID: string; parentID: string; title: string }) => Promise<void>
+  }) {
+    backgroundManagerOptions = config
   }
 }
 

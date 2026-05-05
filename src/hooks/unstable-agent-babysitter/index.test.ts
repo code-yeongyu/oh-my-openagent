@@ -40,9 +40,9 @@ function createBackgroundManager(tasks: BackgroundTask[]) {
 function createTask(overrides: Partial<BackgroundTask> = {}): BackgroundTask {
   return {
     id: "task-1",
-    sessionID: "bg-1",
-    parentSessionID: "main-1",
-    parentMessageID: "msg-1",
+    sessionId: "bg-1",
+    parentSessionId: "main-1",
+    parentMessageId: "msg-1",
     description: "unstable task",
     prompt: "run work",
     agent: "test-agent",

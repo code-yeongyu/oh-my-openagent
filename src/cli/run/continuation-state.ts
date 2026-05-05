@@ -16,6 +16,7 @@ export interface ContinuationState {
   hasActiveRalphLoop: boolean
   hasHookMarker: boolean
   hasTodoHookMarker: boolean
+  hasActiveBackgroundTaskMarker: boolean
   hasActiveHookMarker: boolean
   activeHookMarkerReason: string | null
 }
@@ -32,6 +33,7 @@ export async function getContinuationState(
     hasActiveRalphLoop: hasActiveRalphLoopContinuation(directory, sessionID),
     hasHookMarker: marker !== null,
     hasTodoHookMarker: marker?.sources.todo !== undefined,
+    hasActiveBackgroundTaskMarker: marker?.sources["background-task"]?.state === "active",
     hasActiveHookMarker: isContinuationMarkerActive(marker),
     activeHookMarkerReason: getActiveContinuationMarkerReason(marker),
   }

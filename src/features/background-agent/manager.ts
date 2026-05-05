@@ -59,6 +59,7 @@ import {
   startAttempt,
 } from "./attempt-lifecycle"
 import { registerManagerForCleanup, unregisterManagerForCleanup } from "./process-cleanup"
+import { setContinuationMarkerSource } from "../../features/run-continuation-state"
 import {
   findNearestMessageExcludingCompaction,
   resolvePromptContextFromSessionMessages,
@@ -66,7 +67,7 @@ import {
 import { handleSessionIdleBackgroundEvent } from "./session-idle-event-handler"
 import { MESSAGE_STORAGE } from "../hook-message-injector"
 import { join } from "node:path"
-import { pruneStaleTasksAndNotifications } from "./task-poller"
+import { pruneStaleTasksAndNotifications, type SessionStatusMap } from "./task-poller"
 import { checkAndInterruptStaleTasks } from "./task-poller"
 import { removeTaskToastTracking } from "./remove-task-toast-tracking"
 import { abortWithTimeout } from "./abort-with-timeout"
@@ -214,6 +215,7 @@ export class BackgroundManager {
   private preStartDescendantReservations: Set<string>
   private enableParentSessionNotifications: boolean
   private modelFallbackControllerAccessor?: ModelFallbackControllerAccessor
+  private loggedSessionStatusUnavailable = false
   readonly taskHistory = new TaskHistory()
   private cachedCircuitBreakerSettings?: CircuitBreakerSettings
 
@@ -448,6 +450,9 @@ export class BackgroundManager {
       spawnReservation.commit()
       this.markPreStartDescendantReservation(task)
 
+      // Signal CLI run mode that background tasks are active
+      this.updateBackgroundTaskMarker(input.parentSessionId)
+
       // Trigger processing (fire-and-forget)
       void this.processKey(key)
 
@@ -510,6 +515,9 @@ export class BackgroundManager {
           if (item.task.sessionId) {
             await this.abortSessionWithLogging(item.task.sessionId, "startTask error cleanup")
           }
+
+          // Update continuation marker for CLI run mode
+          this.updateBackgroundTaskMarker(item.task.parentSessionId)
 
           this.markForNotification(item.task)
           this.enqueueNotificationForParent(item.task.parentSessionId, () => this.notifyParentSession(item.task)).catch(err => {
@@ -811,6 +819,21 @@ The fallback retry session is now created and can be inspected directly.
       }
     }
     return tasks
+  }
+
+  private updateBackgroundTaskMarker(parentSessionID: string): void {
+    const tasks = this.getTasksByParentSession(parentSessionID)
+    const activeTasks = tasks.filter(t => t.status === "running" || t.status === "pending")
+    if (activeTasks.length > 0) {
+      setContinuationMarkerSource(
+        this.directory, parentSessionID, "background-task", "active",
+        `${activeTasks.length} background task(s) active`,
+      )
+    } else {
+      setContinuationMarkerSource(
+        this.directory, parentSessionID, "background-task", "idle",
+      )
+    }
   }
 
   getAllDescendantTasks(sessionID: string): BackgroundTask[] {
@@ -1524,6 +1547,11 @@ The fallback retry session is now created and can be inspected directly.
       SessionCategoryRegistry.remove(task.sessionId)
     }
 
+    // Update continuation marker for CLI run mode
+    if (task.parentSessionId) {
+      this.updateBackgroundTaskMarker(task.parentSessionId)
+    }
+
     this.markForNotification(task)
     this.enqueueNotificationForParent(task.parentSessionId, () => this.notifyParentSession(task)).catch(err => {
       log("[background-agent] Error in notifyParentSession for errored task:", { taskId: task.id, error: err })
@@ -1823,6 +1851,11 @@ The task was re-queued on a fallback model after a retryable failure.
 
     removeTaskToastTracking(task.id)
 
+    // Update continuation marker for CLI run mode
+    if (task.parentSessionId) {
+      this.updateBackgroundTaskMarker(task.parentSessionId)
+    }
+
     if (options?.skipNotification) {
       this.cleanupPendingByParent(task)
       this.scheduleTaskRemoval(task.id)
@@ -1939,6 +1972,11 @@ The task was re-queued on a fallback model after a retryable failure.
       await this.abortSessionWithLogging(task.sessionId, `task completion (${source})`)
 
       SessionCategoryRegistry.remove(task.sessionId)
+    }
+
+    // Update continuation marker for CLI run mode
+    if (task.parentSessionId) {
+      this.updateBackgroundTaskMarker(task.parentSessionId)
     }
 
     try {
@@ -2177,6 +2215,10 @@ The task was re-queued on a fallback model after a retryable failure.
           }
         }
         this.cleanupPendingByParent(task)
+        // Update continuation marker for CLI run mode
+        if (task.parentSessionId) {
+          this.updateBackgroundTaskMarker(task.parentSessionId)
+        }
         this.markForNotification(task)
         this.enqueueNotificationForParent(task.parentSessionId, () => this.notifyParentSession(task)).catch(err => {
           log("[background-agent] Error in notifyParentSession for stale-pruned task:", { taskId: task.id, error: err })
@@ -2186,7 +2228,7 @@ The task was re-queued on a fallback model after a retryable failure.
   }
 
   private async checkAndInterruptStaleTasks(
-    allStatuses: Record<string, { type: string }> = {},
+    allStatuses: SessionStatusMap | undefined,
   ): Promise<void> {
     await checkAndInterruptStaleTasks({
       tasks: this.tasks.values(),
@@ -2239,6 +2281,11 @@ The task was re-queued on a fallback model after a retryable failure.
       SessionCategoryRegistry.remove(task.sessionId)
     }
 
+    // Update continuation marker for CLI run mode
+    if (task.parentSessionId) {
+      this.updateBackgroundTaskMarker(task.parentSessionId)
+    }
+
     this.markForNotification(task)
     this.enqueueNotificationForParent(task.parentSessionId, () => this.notifyParentSession(task)).catch(err => {
       log("[background-agent] Error in notifyParentSession for crashed task:", { taskId: task.id, error: err })
@@ -2251,8 +2298,26 @@ The task was re-queued on a fallback model after a retryable failure.
     try {
       this.pruneStaleTasksAndNotifications()
 
-      const statusResult = await this.client.session.status()
-      const allStatuses = normalizeSDKResponse(statusResult, {} as Record<string, { type: string }>)
+      let allStatuses: SessionStatusMap | undefined
+      const sessionStatusMethod = this.client?.session?.status
+      if (typeof sessionStatusMethod !== "function") {
+        if (!this.loggedSessionStatusUnavailable) {
+          log("[background-agent] Unable to poll session statuses:", {
+            reason: "session.status unavailable",
+          })
+          this.loggedSessionStatusUnavailable = true
+        }
+      } else {
+        try {
+          const statusResult = await this.client.session.status()
+          allStatuses = normalizeSDKResponse(statusResult, {})
+        } catch (error) {
+          if (!this.loggedSessionStatusUnavailable) {
+            log("[background-agent] Error polling session statuses:", { error })
+            this.loggedSessionStatusUnavailable = true
+          }
+        }
+      }
 
       await this.checkAndInterruptStaleTasks(allStatuses)
 
@@ -2263,7 +2328,7 @@ The task was re-queued on a fallback model after a retryable failure.
         if (!sessionID) continue
 
         try {
-          const sessionStatus = allStatuses[sessionID]
+          const sessionStatus = allStatuses?.[sessionID]
           // Handle retry before checking running state
           if (sessionStatus?.type === "retry") {
             const retryMessage = typeof (sessionStatus as { message?: string }).message === "string"
@@ -2300,8 +2365,12 @@ The task was re-queued on a fallback model after a retryable failure.
             })
           }
 
+          if (allStatuses === undefined) {
+            continue
+          }
+
           // Session is idle or no longer in status response (completed/disappeared)
-          const sessionGoneFromStatus = !sessionStatus
+          const sessionGoneFromStatus = allStatuses !== undefined && !sessionStatus
           const sessionGoneThresholdReached = sessionGoneFromStatus
             && (task.consecutiveMissedPolls ?? 0) >= MIN_SESSION_GONE_POLLS
           const completionSource = sessionStatus?.type === "idle"

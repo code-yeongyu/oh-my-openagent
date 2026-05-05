@@ -204,7 +204,7 @@ function createBackgroundManagerWithOptions(options: unknown): BackgroundManager
     },
   }
   return new BackgroundManager(
-    { pluginContext: { client, directory: tmpdir() } as unknown as PluginInput, config: undefined, ...options as ConstructorParameters<typeof BackgroundManager>[2] },
+    { pluginContext: { client, directory: tmpdir() } as unknown as PluginInput, config: undefined, ...(options as Partial<import("./manager").BackgroundManagerConfig>) },
   )
 }
 
@@ -576,7 +576,7 @@ describe("BackgroundManager retry observability", () => {
     type RetryReadyQueueItem = {
       task: BackgroundTask
       input: typeof taskInput
-      attemptID: string
+      attemptId: string
     }
     const item: RetryReadyQueueItem = {
       task,
@@ -3869,7 +3869,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
 
     getTaskMap(manager).set(task.id, task)
 
-    await manager["checkAndInterruptStaleTasks"]()
+    await manager["checkAndInterruptStaleTasks"](undefined)
 
     expect(task.status).toBe("running")
   })
@@ -3902,7 +3902,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
 
     getTaskMap(manager).set(task.id, task)
 
-    await manager["checkAndInterruptStaleTasks"]()
+    await manager["checkAndInterruptStaleTasks"](undefined)
 
     expect(task.status).toBe("running")
   })
@@ -3936,7 +3936,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
 
     getTaskMap(manager).set(task.id, task)
 
-    await manager["checkAndInterruptStaleTasks"]()
+    await manager["checkAndInterruptStaleTasks"](undefined)
 
     expect(task.status).toBe("cancelled")
     expect(task.error).toContain("Stale timeout")
@@ -3973,7 +3973,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
 
     getTaskMap(manager).set(task.id, task)
 
-    await manager["checkAndInterruptStaleTasks"]()
+    await manager["checkAndInterruptStaleTasks"](undefined)
 
     expect(task.status).toBe("cancelled")
     expect(task.error).toContain("Stale timeout")
@@ -4009,7 +4009,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
 
     getTaskMap(manager).set(task.id, task)
 
-    await manager["checkAndInterruptStaleTasks"]()
+    await manager["checkAndInterruptStaleTasks"](undefined)
 
     expect(task.concurrencyKey).toBeUndefined()
     expect(task.status).toBe("cancelled")
@@ -4061,7 +4061,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
     getTaskMap(manager).set(task1.id, task1)
     getTaskMap(manager).set(task2.id, task2)
 
-    await manager["checkAndInterruptStaleTasks"]()
+    await manager["checkAndInterruptStaleTasks"](undefined)
 
     expect(task1.status).toBe("cancelled")
     expect(task2.status).toBe("cancelled")
@@ -4096,7 +4096,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
 
     getTaskMap(manager).set(task.id, task)
 
-     await manager["checkAndInterruptStaleTasks"]()
+      await manager["checkAndInterruptStaleTasks"](undefined)
 
     expect(task.status).toBe("cancelled")
   })
@@ -5555,7 +5555,7 @@ describe("BackgroundManager.handleEvent - non-tool event lastUpdate", () => {
       type: "message.part.updated",
       properties: { sessionID: "session-alive-1", type: "text" },
     })
-    await manager["checkAndInterruptStaleTasks"]()
+    await manager["checkAndInterruptStaleTasks"](undefined)
 
     //#then - task should still be running (text event refreshed lastUpdate)
     expect(task.status).toBe("running")
@@ -5595,7 +5595,7 @@ describe("BackgroundManager.handleEvent - non-tool event lastUpdate", () => {
       type: "message.part.delta",
       properties: { sessionID: "session-delta-1", field: "text", delta: "thinking..." },
     })
-    await manager["checkAndInterruptStaleTasks"]()
+    await manager["checkAndInterruptStaleTasks"](undefined)
 
     //#then - task should still be running (delta event refreshed lastUpdate)
     expect(task.status).toBe("running")
@@ -6200,8 +6200,8 @@ describe("BackgroundManager attempt lifecycle bindings", () => {
         attemptId: "attempt-1",
         attemptNumber: 1,
         sessionId: "session-attempt-1",
-        providerID: "openai",
-        modelID: "gpt-5.4-mini",
+        providerId: "openai",
+        modelId: "gpt-5.4-mini",
         status: "error",
         error: "first attempt failed",
         startedAt: new Date("2026-04-27T00:00:00.000Z"),
@@ -6211,8 +6211,8 @@ describe("BackgroundManager attempt lifecycle bindings", () => {
         attemptId: "attempt-2",
         attemptNumber: 2,
         sessionId: "session-attempt-2",
-        providerID: "anthropic",
-        modelID: "claude-haiku-4.5",
+        providerId: "anthropic",
+        modelId: "claude-haiku-4.5",
         status: "running",
         startedAt: new Date("2026-04-27T00:00:10.000Z"),
       },
