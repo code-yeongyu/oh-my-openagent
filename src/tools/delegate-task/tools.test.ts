@@ -1231,7 +1231,7 @@ describe("sisyphus-task", () => {
        }
        
        // when - null passed
-       // then - should throw error about null
+       // then - should default to empty array
        await expect(tool.execute(
          {
            description: "Test task",
@@ -1241,7 +1241,7 @@ describe("sisyphus-task", () => {
            load_skills: null,
          },
          toolContext
-        )).rejects.toThrow("Invalid arguments: load_skills=null is not allowed")
+        )).resolves.toBeDefined()
     })
 
      test("empty array [] is allowed and proceeds without skill content", async () => {

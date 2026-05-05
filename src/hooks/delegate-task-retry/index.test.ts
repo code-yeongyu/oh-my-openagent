@@ -10,11 +10,10 @@ describe("sisyphus-task-retry", () => {
     // given error patterns are defined
     // then should include all known task error types
     it("should contain all known error patterns", () => {
-      expect(DELEGATE_TASK_ERROR_PATTERNS.length).toBeGreaterThan(5)
+      expect(DELEGATE_TASK_ERROR_PATTERNS.length).toBeGreaterThan(4)
       
       const patternTexts = DELEGATE_TASK_ERROR_PATTERNS.map(p => p.pattern)
       expect(patternTexts).toContain("run_in_background")
-      expect(patternTexts).toContain("load_skills")
       expect(patternTexts).toContain("category OR subagent_type")
       expect(patternTexts).toContain("Unknown category")
       expect(patternTexts).toContain("Unknown agent")
