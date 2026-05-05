@@ -6,20 +6,16 @@ import { log } from "../shared"
 type BunDatabase = import("bun:sqlite").Database
 type SqliteModule = { Database: new (path: string) => BunDatabase }
 
-/** @internal test-only seam: override to simulate non-Bun runtime */
-let _bunSqliteImporter: () => Promise<SqliteModule | null> = () =>
-  import("bun:sqlite").catch(() => null) as Promise<SqliteModule | null>
+let bunSqliteImporter: () => Promise<SqliteModule> = () => import("bun:sqlite")
 
-/** @internal test-only */
 export function __setBunSqliteImporterForTesting(
-  impl: () => Promise<SqliteModule | null>,
+  importer: () => Promise<SqliteModule>,
 ): void {
-  _bunSqliteImporter = impl
+  bunSqliteImporter = importer
 }
 
-/** @internal test-only */
 export function __resetBunSqliteImporterForTesting(): void {
-  _bunSqliteImporter = () => import("bun:sqlite").catch(() => null) as Promise<SqliteModule | null>
+  bunSqliteImporter = () => import("bun:sqlite")
 }
 
 function getDbPath(): string {
@@ -124,7 +120,6 @@ function retryViaMicrotask(
  * Session.updateMessage() to save the message first, then overwrites the model.
  *
  * Falls back to setTimeout(fn, 0) after 10 microtask attempts.
- *
  */
 export function scheduleDeferredModelOverride(
   messageId: string,
@@ -132,15 +127,13 @@ export function scheduleDeferredModelOverride(
   variant?: string,
 ): void {
   queueMicrotask(async () => {
-    // Lazy-load bun:sqlite so this module can be imported under Node/Electron
-    // without crashing the ESM loader (bun: protocol is Bun-only).
-    const sqliteModule = await _bunSqliteImporter()
-    if (sqliteModule === null) {
-      log("[ultrawork-db-override] bun:sqlite unavailable (non-Bun runtime), skipping deferred override")
+    let DatabaseCtor: (new (path: string) => import("bun:sqlite").Database) | undefined
+    try {
+      DatabaseCtor = (await bunSqliteImporter()).Database
+    } catch {
+      log("[ultrawork-db-override] bun:sqlite unavailable (non-Bun runtime), skipping")
       return
     }
-
-    const { Database } = sqliteModule
 
     const dbPath = getDbPath()
     if (!existsSync(dbPath)) {
@@ -150,7 +143,7 @@ export function scheduleDeferredModelOverride(
 
     let db: BunDatabase
     try {
-      db = new Database(dbPath)
+      db = new DatabaseCtor(dbPath)
     } catch (error) {
       log("[ultrawork-db-override] Failed to open DB, skipping deferred override", {
         messageId,
