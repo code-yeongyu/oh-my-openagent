@@ -23,6 +23,7 @@ Complete reference for Oh My OpenCode plugin configuration. During the rename tr
   - [Commands](#commands)
   - [Browser Automation](#browser-automation)
   - [Tmux Integration](#tmux-integration)
+  - [Native Git Tracking](#native-git-tracking)
   - [Git Master](#git-master)
   - [Comment Checker](#comment-checker)
   - [Notification](#notification)
@@ -509,7 +510,7 @@ Disable built-in hooks via `disabled_hooks`:
 { "disabled_hooks": ["comment-checker"] }
 ```
 
-Available hooks: `todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `tool-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-context-window-limit-recovery`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `compaction-context-injector`, `thinking-block-validator`, `claude-code-hooks`, `ralph-loop`, `preemptive-compaction`, `auto-slash-command`, `sisyphus-junior-notepad`, `no-sisyphus-gpt`, `start-work`, `runtime-fallback`
+Available hooks: `todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `tool-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-context-window-limit-recovery`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `compaction-context-injector`, `thinking-block-validator`, `claude-code-hooks`, `ralph-loop`, `preemptive-compaction`, `auto-slash-command`, `sisyphus-junior-notepad`, `no-sisyphus-gpt`, `start-work`, `runtime-fallback`, `native-git`
 
 **Notes:**
 
@@ -564,6 +565,26 @@ Run background subagents in separate tmux panes. Requires running inside tmux wi
 | `main_pane_size`       | `60`            | Main pane % (20–80)                                                                 |
 | `main_pane_min_width`  | `120`           | Min main pane columns                                                               |
 | `agent_pane_min_width` | `40`            | Min agent pane columns                                                              |
+
+### Native Git Tracking
+
+Track agent-caused Git changes without automatically committing, stashing, or creating worktrees:
+
+```json
+{
+  "git": {
+    "mode": "tracked",
+    "audit_log": true
+  }
+}
+```
+
+| Option      | Default     | Description                                                                 |
+| ----------- | ----------- | --------------------------------------------------------------------------- |
+| `mode`      | `"tracked"` | `"manual"` disables tracking. `"tracked"` records dirty Git state. `"strict"` is reserved for future enforcement. |
+| `audit_log` | `true`      | Write JSONL audit records under the Git common dir at `.git/omo/native-git/audit.jsonl`. |
+
+In `tracked` mode, write/edit/bash-style tool activity is audited when it leaves the repository dirty. When the session goes idle, OpenCode shows a reminder to use `git-master` for atomic commits. Audit files live under `.git`, so they do not dirty the worktree.
 
 ### Git Master
 

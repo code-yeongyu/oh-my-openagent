@@ -764,6 +764,7 @@ Hooks intercept and modify behavior at key points in the agent lifecycle across 
 | **thinking-block-validator**    | Transform                | Validates thinking blocks to prevent API errors.                                          |
 | **edit-error-recovery**         | PostToolUse + Event      | Recovers from edit tool failures.                                                         |
 | **write-existing-file-guard**   | PreToolUse               | Prevents accidental overwrites of existing files without reading them first.              |
+| **native-git**                  | PostToolUse + Event      | Tracks dirty Git changes caused by write/edit/bash-style tools, writes audit JSONL under `.git`, and reminds users to commit with `git-master`. |
 | **hashline-read-enhancer**      | PostToolUse              | Enhances read output with hash-anchored line markers for the hashline edit tool.          |
 | **hashline-edit-diff-enhancer** | PreToolUse + PostToolUse | Enhances edit operations with diff markers for the hashline edit tool.                    |
 

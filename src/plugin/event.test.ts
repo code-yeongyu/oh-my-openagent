@@ -631,6 +631,40 @@ describe("createEventHandler - event forwarding", () => {
 		expect(deletedSessions).toEqual([sessionID])
 	})
 
+	it("forwards tool result events to native-git hook", async () => {
+		const forwardedEvents: EventInput[] = []
+		const eventHandler = createEventHandler({
+			ctx: {} as never,
+			pluginConfig: asPluginConfig({}),
+			firstMessageVariantGate: {
+				markSessionCreated: () => {},
+				clear: () => {},
+			},
+			managers: createEventHandlerManagers({
+				skillMcpManager: {
+					disconnectSession: async () => {},
+				},
+			}),
+			hooks: {
+				nativeGit: {
+					event: async (input: EventInput) => {
+						forwardedEvents.push(input)
+					},
+				},
+			} as never,
+		})
+
+		await eventHandler(asEventHandlerInput({
+			event: {
+				type: "tool.result",
+				properties: { name: "write", sessionID: "ses_native_git" },
+			},
+		}))
+
+		expect(forwardedEvents).toHaveLength(1)
+		expect(forwardedEvents[0]?.event.type).toBe("tool.result")
+	})
+
 	it("dispatches OpenClaw for synthetic session.idle events", async () => {
 		const openClawSpy = spyOn(openclawRuntimeDispatch, "dispatchOpenClawEvent").mockResolvedValue(null)
 		const eventHandler = createEventHandler({

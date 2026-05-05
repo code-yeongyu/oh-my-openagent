@@ -8,6 +8,7 @@ import {
   BuiltinCategoryNameSchema,
   CategoryConfigSchema,
   ExperimentalConfigSchema,
+  NativeGitConfigSchema,
   GitMasterConfigSchema,
   HookNameSchema,
   OhMyOpenCodeConfigSchema,
@@ -1004,6 +1005,75 @@ describe("OhMyOpenCodeConfigSchema - git_master defaults (#2040)", () => {
     if (result.success) {
       expect(result.data.git_master.commit_footer).toBe(false)
       expect(result.data.git_master.include_co_authored_by).toBe(false)
+    }
+  })
+})
+
+describe("NativeGitConfigSchema", () => {
+  test("defaults to tracked mode with audit logging enabled", () => {
+    //#when
+    const result = NativeGitConfigSchema.safeParse({})
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.mode).toBe("tracked")
+      expect(result.data.audit_log).toBe(true)
+    }
+  })
+
+  test("accepts manual, tracked, and strict modes", () => {
+    for (const mode of ["manual", "tracked", "strict"] as const) {
+      //#when
+      const result = NativeGitConfigSchema.safeParse({ mode })
+
+      //#then
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.mode).toBe(mode)
+      }
+    }
+  })
+
+  test("rejects unsupported modes", () => {
+    //#when
+    const result = NativeGitConfigSchema.safeParse({ mode: "always" })
+
+    //#then
+    expect(result.success).toBe(false)
+  })
+})
+
+describe("OhMyOpenCodeConfigSchema - native git defaults", () => {
+  test("git defaults are applied when section is missing from config", () => {
+    //#when
+    const result = OhMyOpenCodeConfigSchema.safeParse({})
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.git.mode).toBe("tracked")
+      expect(result.data.git.audit_log).toBe(true)
+    }
+  })
+
+  test("git respects manual mode and audit override", () => {
+    //#given
+    const config = {
+      git: {
+        mode: "manual",
+        audit_log: false,
+      },
+    }
+
+    //#when
+    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.git.mode).toBe("manual")
+      expect(result.data.git.audit_log).toBe(false)
     }
   })
 })
