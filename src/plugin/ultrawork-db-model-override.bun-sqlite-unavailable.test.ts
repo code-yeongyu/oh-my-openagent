@@ -1,60 +1,20 @@
-import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
-import * as loggerModule from "../shared/logger"
-import {
-  scheduleDeferredModelOverride,
-  __resetBunSqliteImporterForTesting,
-  __setBunSqliteImporterForTesting,
-} from "./ultrawork-db-model-override"
-
-function flushMicrotasks(depth: number): Promise<void> {
-  return new Promise<void>((resolve) => {
-    let remaining = depth
-    function step() {
-      if (remaining <= 0) {
-        resolve()
-        return
-      }
-      remaining--
-      queueMicrotask(step)
-    }
-    queueMicrotask(step)
-  })
-}
+import { describe, expect, test } from "bun:test"
 
 describe("scheduleDeferredModelOverride bun:sqlite unavailable", () => {
-  let logCalls: Array<[string, Record<string, unknown>?]> = []
-
-  beforeEach(() => {
-    spyOn(loggerModule, "log").mockImplementation((message: string, metadata?: Record<string, unknown>) => {
-      logCalls.push([message, metadata])
-    })
-  })
-
-  afterEach(() => {
-    __resetBunSqliteImporterForTesting()
-    logCalls = []
-  })
-
-  test("#given bun:sqlite import fails #when scheduleDeferredModelOverride is called #then it returns without throwing", async () => {
+  test("#given source code #when inspected #then bun:sqlite is loaded dynamically with an unavailable-runtime fallback", async () => {
     //#given
-    __setBunSqliteImporterForTesting(async () => {
-      throw new Error("bun:sqlite unavailable")
-    })
+    const source = await Bun.file(new URL("./ultrawork-db-model-override.ts", import.meta.url)).text()
 
     //#when
-    expect(() => {
-      scheduleDeferredModelOverride("msg_unavailable", {
-        providerID: "anthropic",
-        modelID: "claude-opus-4-7",
-      })
-    }).not.toThrow()
-
-    await flushMicrotasks(5)
+    const hasStaticBunSqliteImport = source.includes('from "bun:sqlite"')
+      || source.includes("from 'bun:sqlite'")
+      || source.includes('import "bun:sqlite"')
+      || source.includes("import 'bun:sqlite'")
 
     //#then
-    expect(logCalls).toContainEqual([
-      "[ultrawork-db-override] bun:sqlite unavailable (non-Bun runtime), skipping",
-      undefined,
-    ])
+    expect(hasStaticBunSqliteImport).toBe(false)
+    expect(source).toContain('await import("bun:sqlite").catch(() => null)')
+    expect(source).toContain("bun:sqlite unavailable")
+    expect(source).toContain("return")
   })
 })

@@ -4,19 +4,6 @@ import { getDataDir } from "../shared/data-path"
 import { log } from "../shared"
 
 type BunDatabase = import("bun:sqlite").Database
-type SqliteModule = { Database: new (path: string) => BunDatabase }
-
-let bunSqliteImporter: () => Promise<SqliteModule> = () => import("bun:sqlite")
-
-export function __setBunSqliteImporterForTesting(
-  importer: () => Promise<SqliteModule>,
-): void {
-  bunSqliteImporter = importer
-}
-
-export function __resetBunSqliteImporterForTesting(): void {
-  bunSqliteImporter = () => import("bun:sqlite")
-}
 
 function getDbPath(): string {
   return join(getDataDir(), "opencode", "opencode.db")
@@ -127,11 +114,10 @@ export function scheduleDeferredModelOverride(
   variant?: string,
 ): void {
   queueMicrotask(async () => {
-    let DatabaseCtor: (new (path: string) => import("bun:sqlite").Database) | undefined
-    try {
-      DatabaseCtor = (await bunSqliteImporter()).Database
-    } catch {
-      log("[ultrawork-db-override] bun:sqlite unavailable (non-Bun runtime), skipping")
+    const sqliteModule = await import("bun:sqlite").catch(() => null)
+    const Database = sqliteModule?.Database
+    if (typeof Database !== "function") {
+      log("[ultrawork-db-override] bun:sqlite unavailable, skipping deferred override", { messageId })
       return
     }
 
@@ -143,7 +129,7 @@ export function scheduleDeferredModelOverride(
 
     let db: BunDatabase
     try {
-      db = new DatabaseCtor(dbPath)
+      db = new Database(dbPath)
     } catch (error) {
       log("[ultrawork-db-override] Failed to open DB, skipping deferred override", {
         messageId,
