@@ -1,4 +1,4 @@
-import { spawn as bunSpawn } from "bun"
+import { spawn as bunSpawn } from "./bun-spawn-shim"
 import { spawn as nodeSpawn, type ChildProcess } from "node:child_process"
 import { Readable } from "node:stream"
 
