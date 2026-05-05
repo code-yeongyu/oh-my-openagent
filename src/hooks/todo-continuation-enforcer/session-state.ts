@@ -1,4 +1,5 @@
 import type { ContinuationProgressOptions, SessionState, Todo } from "./types"
+import { clearLoopState, loadLoopState, persistLoopState } from "./loop-state-persistence"
 
 type TimerHandle = number | { unref?: () => void }
 
@@ -29,6 +30,7 @@ export interface ContinuationProgressUpdate {
 }
 
 export interface SessionStateStore {
+  setDirectory: (directory: string) => void
   getState: (sessionID: string) => SessionState
   getExistingState: (sessionID: string) => SessionState | undefined
   startPruneInterval: () => void
@@ -74,6 +76,7 @@ function getTodoSnapshot(todos: Todo[]): string {
 
 export function createSessionStateStore(): SessionStateStore {
   const sessions = new Map<string, TrackedSessionState>()
+  let directory: string | undefined
 
   // Periodic pruning of stale session states to prevent unbounded Map growth
   let pruneInterval: TimerHandle | undefined
@@ -106,9 +109,11 @@ export function createSessionStateStore(): SessionStateStore {
       return existing
     }
 
+    const persisted = directory ? loadLoopState(directory, sessionID) : null
     const rawState: SessionState = {
-      stagnationCount: 0,
-      consecutiveFailures: 0,
+      stagnationCount: persisted?.stagnationCount ?? 0,
+      consecutiveFailures: persisted?.consecutiveFailures ?? 0,
+      consecutiveClarifications: persisted?.consecutiveClarifications ?? 0,
     }
     const trackedSession: TrackedSessionState = {
       state: rawState,
@@ -214,6 +219,13 @@ export function createSessionStateStore(): SessionStateStore {
 
     state.awaitingPostInjectionProgressCheck = false
     state.stagnationCount += 1
+    if (directory) {
+      persistLoopState(directory, sessionID, {
+        consecutiveClarifications: state.consecutiveClarifications,
+        consecutiveFailures: state.consecutiveFailures,
+        stagnationCount: state.stagnationCount,
+      })
+    }
     return {
       previousIncompleteCount,
       previousStagnationCount,
@@ -227,6 +239,10 @@ export function createSessionStateStore(): SessionStateStore {
     const trackedSession = sessions.get(sessionID)
     if (!trackedSession) return
 
+    if (directory) {
+      clearLoopState(directory, sessionID)
+    }
+
     trackedSession.lastAccessedAt = Date.now()
 
     const { state } = trackedSession
@@ -234,6 +250,8 @@ export function createSessionStateStore(): SessionStateStore {
     state.lastIncompleteCount = undefined
     state.stagnationCount = 0
     state.awaitingPostInjectionProgressCheck = false
+    state.consecutiveClarifications = 0
+    state.lastClarificationDetectedAt = undefined
     trackedSession.lastCompletedCount = undefined
     trackedSession.lastTodoSnapshot = undefined
     trackedSession.activitySignalCount = 0
@@ -256,11 +274,15 @@ export function createSessionStateStore(): SessionStateStore {
     }
 
     state.inFlight = false
+    state.inFlightSince = undefined
     state.countdownStartedAt = undefined
   }
 
   function cleanup(sessionID: string): void {
     cancelCountdown(sessionID)
+    if (directory) {
+      clearLoopState(directory, sessionID)
+    }
     sessions.delete(sessionID)
   }
 
@@ -279,6 +301,9 @@ export function createSessionStateStore(): SessionStateStore {
   }
 
   return {
+    setDirectory: (dir: string) => {
+      directory = dir
+    },
     getState,
     getExistingState,
     startPruneInterval,

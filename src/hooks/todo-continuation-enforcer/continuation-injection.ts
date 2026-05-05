@@ -16,6 +16,7 @@ import {
   type ToolPermission,
 } from "../../features/hook-message-injector"
 import { log } from "../../shared/logger"
+import { persistLoopState } from "./loop-state-persistence"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
 import {
   getAgentConfigKey,
@@ -51,6 +52,7 @@ export async function injectContinuation(args: {
   resolvedInfo?: ResolvedMessageInfo
   sessionStateStore: SessionStateStore
   isContinuationStopped?: (sessionID: string) => boolean
+  promptOverride?: string
 }): Promise<void> {
   const {
     ctx,
@@ -60,6 +62,7 @@ export async function injectContinuation(args: {
     resolvedInfo,
     sessionStateStore,
     isContinuationStopped,
+    promptOverride,
   } = args
 
   const state = sessionStateStore.getExistingState(sessionID)
@@ -145,14 +148,15 @@ export async function injectContinuation(args: {
     }
   }
 
-  if (!hasWritePermission(tools)) {
+  if (!hasWritePermission(tools) && !promptOverride) {
     log(`[${HOOK_NAME}] Skipped: agent lacks write permission`, { sessionID, agent: agentName })
     return
   }
 
   const incompleteTodos = todos.filter((todo) => todo.status !== "completed" && todo.status !== "cancelled")
   const todoList = incompleteTodos.map((todo) => `- [${todo.status}] ${todo.content}`).join("\n")
-  const prompt = `${CONTINUATION_PROMPT}
+  const baseline = promptOverride ?? CONTINUATION_PROMPT
+  const prompt = `${baseline}
 
 [Status: ${todos.length - freshIncompleteCount}/${todos.length} completed, ${freshIncompleteCount} remaining]
 
@@ -167,6 +171,7 @@ ${todoList}`
 
   if (injectionState) {
     injectionState.inFlight = true
+    injectionState.inFlightSince = Date.now()
   }
 
   try {
@@ -199,16 +204,28 @@ ${todoList}`
     log(`[${HOOK_NAME}] Injection successful`, { sessionID })
     if (injectionState) {
       injectionState.inFlight = false
+      injectionState.inFlightSince = undefined
       injectionState.lastInjectedAt = Date.now()
       injectionState.awaitingPostInjectionProgressCheck = true
       injectionState.consecutiveFailures = 0
+      persistLoopState(ctx.directory, sessionID, {
+        consecutiveClarifications: injectionState.consecutiveClarifications ?? 0,
+        consecutiveFailures: 0,
+        stagnationCount: injectionState.stagnationCount ?? 0,
+      })
     }
   } catch (error) {
     log(`[${HOOK_NAME}] Injection failed`, { sessionID, error: String(error) })
     if (injectionState) {
       injectionState.inFlight = false
+      injectionState.inFlightSince = undefined
       injectionState.lastInjectedAt = Date.now()
       injectionState.consecutiveFailures = (injectionState.consecutiveFailures ?? 0) + 1
+      persistLoopState(ctx.directory, sessionID, {
+        consecutiveClarifications: injectionState.consecutiveClarifications ?? 0,
+        consecutiveFailures: injectionState.consecutiveFailures,
+        stagnationCount: injectionState.stagnationCount ?? 0,
+      })
 
       const errorObj = error instanceof Error
         ? { name: error.name, message: error.message }

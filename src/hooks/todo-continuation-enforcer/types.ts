@@ -34,8 +34,11 @@ export interface SessionState {
   lastInjectedAt?: number
   awaitingPostInjectionProgressCheck?: boolean
   inFlight?: boolean
+  inFlightSince?: number
   stagnationCount: number
   consecutiveFailures: number
+  consecutiveClarifications: number
+  lastClarificationDetectedAt?: number
   recentCompactionAt?: number
   recentCompactionEpoch?: number
   acknowledgedCompactionEpoch?: number

@@ -39,6 +39,7 @@ export function startCountdown(args: {
   skipAgents: string[]
   sessionStateStore: SessionStateStore
   isContinuationStopped?: (sessionID: string) => boolean
+  promptOverride?: string
 }): void {
   const {
     ctx,
@@ -49,6 +50,7 @@ export function startCountdown(args: {
     skipAgents,
     sessionStateStore,
     isContinuationStopped,
+    promptOverride,
   } = args
 
   const state = sessionStateStore.getState(sessionID)
@@ -75,6 +77,7 @@ export function startCountdown(args: {
       resolvedInfo,
       sessionStateStore,
       isContinuationStopped,
+      promptOverride,
     })
   }, COUNTDOWN_SECONDS * 1000)
 
