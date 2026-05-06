@@ -119,13 +119,18 @@ export async function getOpenCodeVersion(
   }
 }
 
+const SEMVER_PATTERN = /\b(\d+\.\d+\.\d+)\b/
+
+export function extractSemverFromOutput(output: string): string | null {
+  const match = output.match(SEMVER_PATTERN)
+  return match ? match[1] : null
+}
+
 export function compareVersions(current: string, minimum: string): boolean {
-  const parseVersion = (version: string): number[] =>
-    version
-      .replace(/^v/, "")
-      .split("-")[0]
-      .split(".")
-      .map((part) => Number.parseInt(part, 10) || 0)
+  const parseVersion = (version: string): number[] => {
+    const semver = extractSemverFromOutput(version) ?? version.replace(/^v/, "").split("-")[0]
+    return semver.split(".").map((part) => Number.parseInt(part, 10) || 0)
+  }
 
   const currentParts = parseVersion(current)
   const minimumParts = parseVersion(minimum)
