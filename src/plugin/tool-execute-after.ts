@@ -181,5 +181,14 @@ export function createToolExecuteAfterHandler(args: {
     }
 
     await runToolExecuteAfterHooks()
+
+    // Cap excessively long error outputs that would flood the TUI with raw
+    // stack traces or framework internals. Normal outputs are handled by the
+    // tool-output-truncator hook for specific tools; this catch-all only fires
+    // for outputs that still exceed a safe display length after all hooks.
+    const MAX_ERROR_OUTPUT_CHARS = 3000
+    if (typeof output.output === "string" && output.output.length > MAX_ERROR_OUTPUT_CHARS) {
+      output.output = output.output.slice(0, MAX_ERROR_OUTPUT_CHARS) + "\n\n...(output truncated for display)"
+    }
   }
 }
