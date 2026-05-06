@@ -9,7 +9,7 @@ type TeamLayoutMember = { name: string; sessionId: string; worktreePath?: string
 
 export type TeamLayoutResult = {
   focusWindowId: string
-  gridWindowId: string
+  gridWindowId?: string
   focusPanesByMember: Record<string, string>
   gridPanesByMember: Record<string, string>
   targetSessionId: string
@@ -34,60 +34,63 @@ function buildAttachCommand(member: TeamLayoutMember, serverUrl: string): string
   return `opencode attach ${shellSingleQuote(serverUrl)} --session ${shellSingleQuote(member.sessionId)} --dir ${shellSingleQuote(getPaneWorkingDirectory(member))}`
 }
 
-async function listPanesInWindow(tmuxPath: string, windowId: string): Promise<Array<string>> {
-  const result = await runTmuxCommand(tmuxPath, ["list-panes", "-t", windowId, "-F", "#{pane_id}"])
+async function listPanesInWindow(tmuxPath: string, windowTarget: string): Promise<Array<string>> {
+  const result = await runTmuxCommand(tmuxPath, ["list-panes", "-t", windowTarget, "-F", "#{pane_id}"])
   if (!result.success || !result.output) return []
   return result.output.trim().split("\n").filter(Boolean)
 }
 
-async function createTeamWindow(
+function selectExistingTeammatePane(teammatePanes: Array<string>, callerPaneId: string): string {
+  return teammatePanes[Math.floor(teammatePanes.length / 2)] ?? teammatePanes[teammatePanes.length - 1] ?? callerPaneId
+}
+
+function buildSplitArgs(callerPaneId: string, teammatePanes: Array<string>, member: TeamLayoutMember): Array<string> {
+  if (teammatePanes.length === 0) {
+    return ["split-window", "-t", callerPaneId, "-h", "-l", "70%", "-P", "-F", "#{pane_id}", "-c", getPaneWorkingDirectory(member)]
+  }
+
+  return [
+    "split-window",
+    "-t",
+    selectExistingTeammatePane(teammatePanes, callerPaneId),
+    teammatePanes.length % 2 === 1 ? "-v" : "-h",
+    "-P",
+    "-F",
+    "#{pane_id}",
+    "-c",
+    getPaneWorkingDirectory(member),
+  ]
+}
+
+async function createTeamLayoutInCallerWindow(
   tmuxPath: string,
-  targetSessionId: string,
-  windowName: string,
-  layout: "main-vertical" | "tiled",
+  callerPaneId: string,
+  windowTarget: string,
   members: Array<TeamLayoutMember>,
   serverUrl: string,
-): Promise<{ windowId: string; panesByMember: Record<string, string> } | null> {
-  const [firstMember, ...restMembers] = members
-  if (!firstMember) return null
-
-  const created = await runTmuxCommand(tmuxPath, [
-    "new-window", "-d", "-P", "-F", "#{window_id}", "-t", targetSessionId, "-n", windowName,
-    "-c", getPaneWorkingDirectory(firstMember),
-  ])
-  if (!created.success || !created.output) return null
-
-  const windowId = created.output.trim()
-  const initialPanes = await listPanesInWindow(tmuxPath, windowId)
-  const firstPaneId = initialPanes[0]
-  if (!firstPaneId) return null
-
-  const panesByMember: Record<string, string> = { [firstMember.name]: firstPaneId }
-  for (const member of restMembers) {
-    const split = await runTmuxCommand(tmuxPath, [
-      "split-window", "-d", "-P", "-F", "#{pane_id}", "-t", firstPaneId,
-      "-c", getPaneWorkingDirectory(member),
-    ])
-    if (!split.success || !split.output) return null
-    panesByMember[member.name] = split.output.trim()
-  }
-
-  const layoutResult = await runTmuxCommand(tmuxPath, ["select-layout", "-t", windowId, layout])
-  if (!layoutResult.success) return null
-
-  if (layout === "main-vertical") {
-    await runTmuxCommand(tmuxPath, ["set-window-option", "-t", windowId, "main-pane-width", "60%"])
-    await runTmuxCommand(tmuxPath, ["select-layout", "-t", windowId, layout])
-  }
+): Promise<{ focusWindowId: string; focusPanesByMember: Record<string, string> } | null> {
+  const panesByMember: Record<string, string> = {}
+  const existingPanes = await listPanesInWindow(tmuxPath, windowTarget)
+  let teammatePanes = existingPanes.filter((paneId) => paneId !== callerPaneId)
 
   for (const member of members) {
-    const paneId = panesByMember[member.name]
-    if (!paneId) return null
+    const split = await runTmuxCommand(tmuxPath, buildSplitArgs(callerPaneId, teammatePanes, member))
+    if (!split.success || !split.output) return null
+
+    const paneId = split.output.trim()
+    teammatePanes = [...teammatePanes, paneId]
+    panesByMember[member.name] = paneId
     await runTmuxCommand(tmuxPath, ["select-pane", "-t", paneId, "-T", member.name])
     await runTmuxCommand(tmuxPath, ["send-keys", "-t", paneId, buildAttachCommand(member, serverUrl), "Enter"])
   }
 
-  return { windowId, panesByMember }
+  const layoutResult = await runTmuxCommand(tmuxPath, ["select-layout", "-t", windowTarget, "main-vertical"])
+  if (!layoutResult.success) return null
+
+  const resizeResult = await runTmuxCommand(tmuxPath, ["resize-pane", "-t", callerPaneId, "-x", "30%"])
+  if (!resizeResult.success) return null
+
+  return { focusWindowId: windowTarget, focusPanesByMember: panesByMember }
 }
 
 export async function createTeamLayout(teamRunId: string, members: Array<TeamLayoutMember>, tmuxMgr: TmuxSessionManager): Promise<TeamLayoutResult | null> {
@@ -111,27 +114,21 @@ export async function createTeamLayout(teamRunId: string, members: Array<TeamLay
     }
 
     const callerSession = await resolveCallerTmuxSession(tmuxPath)
-    const fallbackSessionName = `omo-team-${teamRunId}`
-    const ownedSession = callerSession === null
-    const targetSessionId = callerSession?.sessionId ?? fallbackSessionName
-
-    if (ownedSession) {
-      log("falling back to detached team session because caller tmux session could not be resolved", { teamRunId })
-      const created = await runTmuxCommand(tmuxPath, ["new-session", "-d", "-s", fallbackSessionName, "-P", "-F", "#{window_id}"])
-      if (!created.success || !created.output) return null
+    if (!callerSession) {
+      log("tmux visualization requires a resolvable caller tmux pane, skipping", { teamRunId })
+      return null
     }
 
-    const focus = await createTeamWindow(tmuxPath, targetSessionId, `team-${teamRunId}-focus`, "main-vertical", members, serverUrl)
-    const grid = await createTeamWindow(tmuxPath, targetSessionId, `team-${teamRunId}-grid`, "tiled", members, serverUrl)
-    if (!focus || !grid) return null
+    const focus = await createTeamLayoutInCallerWindow(tmuxPath, callerSession.paneId, callerSession.windowTarget, members, serverUrl)
+    if (!focus) return null
 
     return {
-      focusWindowId: focus.windowId,
-      gridWindowId: grid.windowId,
-      focusPanesByMember: focus.panesByMember,
-      gridPanesByMember: grid.panesByMember,
-      targetSessionId,
-      ownedSession,
+      focusWindowId: focus.focusWindowId,
+      gridWindowId: undefined,
+      focusPanesByMember: focus.focusPanesByMember,
+      gridPanesByMember: {},
+      targetSessionId: callerSession.sessionId,
+      ownedSession: false,
     }
   } catch (error) {
     log("tmux visualization unavailable, skipping", { error: String(error) })

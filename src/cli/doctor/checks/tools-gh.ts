@@ -80,6 +80,20 @@ async function getGhAuthStatus(): Promise<{
 export async function getGhCliInfo(): Promise<GhCliInfo> {
   const binaryStatus = await checkBinaryExists("gh")
   if (!binaryStatus.exists) {
+    const version = await getGhVersion()
+    if (version) {
+      const authStatus = await getGhAuthStatus()
+      return {
+        installed: true,
+        version,
+        path: null,
+        authenticated: authStatus.authenticated,
+        username: authStatus.username,
+        scopes: authStatus.scopes,
+        error: authStatus.error,
+      }
+    }
+
     return {
       installed: false,
       version: null,

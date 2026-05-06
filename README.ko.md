@@ -168,17 +168,17 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 <td align="center"><img src=".github/assets/hephaestus.png" height="300" /></td>
 </tr></table>
 
-**Sisyphus** (`claude-opus-4-7` / **`kimi-k2.5`** / **`glm-5`**)는 메인 오케스트레이터입니다. 계획을 세우고, 전문가에게 위임하고, 공격적인 병렬 실행으로 작업을 끝까지 밀어붙입니다. 중간에 멈추지 않습니다.
+**Sisyphus** (`claude-opus-4-7` / **`kimi-k2.6`** / **`glm-5.1`**)는 메인 오케스트레이터입니다. 계획을 세우고, 전문가에게 위임하고, 공격적인 병렬 실행으로 작업을 끝까지 밀어붙입니다. 중간에 멈추지 않습니다.
 
 **Hephaestus** (`gpt-5.4`)는 자율적으로 깊게 파는 작업자입니다. 레시피가 아니라 목표를 주세요. 코드베이스를 탐색하고, 패턴을 조사하고, 손을 잡아주지 않아도 엔드투엔드로 실행합니다. *The Legitimate Craftsman.*
 
-**Prometheus** (`claude-opus-4-7` / **`kimi-k2.5`** / **`glm-5`**)는 전략 플래너입니다. 인터뷰 모드: 질문으로 스코프를 파악하고, 코드에 손대기 전에 상세한 계획을 만듭니다.
+**Prometheus** (`claude-opus-4-7` / **`kimi-k2.6`** / **`glm-5.1`**)는 전략 플래너입니다. 인터뷰 모드: 질문으로 스코프를 파악하고, 코드에 손대기 전에 상세한 계획을 만듭니다.
 
 모든 에이전트는 자기 모델의 강점에 맞춰 튜닝되어 있습니다. 수동으로 모델을 돌려가며 쓸 필요가 없습니다. [더 알아보기 →](docs/guide/overview.md)
 
 > Anthropic은 [우리 때문에 OpenCode를 차단했습니다.](https://x.com/thdxr/status/2010149530486911014) 그래서 Hephaestus에게 "The Legitimate Craftsman"이라는 별명이 붙었습니다. 의도된 아이러니입니다.
 >
-> Opus에서 가장 잘 돌지만, Kimi K2.5 + GPT-5.4 조합만으로도 이미 바닐라 Claude Code를 이깁니다. 별도 설정 없이요.
+> Opus에서 가장 잘 돌지만, Kimi K2.6 + GPT-5.4 조합만으로도 이미 바닐라 Claude Code를 이깁니다. 별도 설정 없이요.
 
 ### Agent Orchestration
 

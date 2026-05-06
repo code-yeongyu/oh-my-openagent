@@ -1,6 +1,6 @@
 import { describe, expect, test, beforeEach, afterEach } from "bun:test"
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 import { tmpdir } from "node:os"
 import {
   readBoulderState,
@@ -12,6 +12,7 @@ import {
   createBoulderState,
   findPrometheusPlans,
   getTaskSessionState,
+  resolveBoulderPlanPath,
   upsertTaskSessionState,
 } from "./storage"
 import type { BoulderState } from "./types"
@@ -776,6 +777,48 @@ describe("boulder-state", () => {
 
       //#then - state should not have agent field (backward compatible)
       expect(state.agent).toBeUndefined()
+    })
+  })
+
+  describe("resolveBoulderPlanPath", () => {
+    test("should prefer the mirrored worktree plan when it exists", () => {
+      // given
+      const planPath = join(TEST_DIR, ".sisyphus", "plans", "worktree-plan.md")
+      const worktreeDir = join(tmpdir(), `boulder-state-worktree-${Date.now()}`)
+      const worktreePlanPath = join(worktreeDir, ".sisyphus", "plans", "worktree-plan.md")
+      mkdirSync(dirname(planPath), { recursive: true })
+      mkdirSync(dirname(worktreePlanPath), { recursive: true })
+      writeFileSync(planPath, "# Plan\n- [ ] Main repo task\n")
+      writeFileSync(worktreePlanPath, "# Plan\n- [x] Worktree task\n")
+
+      try {
+        // when
+        const resolvedPath = resolveBoulderPlanPath(TEST_DIR, {
+          active_plan: planPath,
+          worktree_path: worktreeDir,
+        })
+
+        // then
+        expect(resolvedPath).toBe(worktreePlanPath)
+      } finally {
+        rmSync(worktreeDir, { recursive: true, force: true })
+      }
+    })
+
+    test("should fall back to the tracked plan when the mirrored worktree plan is missing", () => {
+      // given
+      const planPath = join(TEST_DIR, ".sisyphus", "plans", "fallback-plan.md")
+      mkdirSync(dirname(planPath), { recursive: true })
+      writeFileSync(planPath, "# Plan\n- [ ] Main repo task\n")
+
+      // when
+      const resolvedPath = resolveBoulderPlanPath(TEST_DIR, {
+        active_plan: planPath,
+        worktree_path: join(tmpdir(), `missing-worktree-${Date.now()}`),
+      })
+
+      // then
+      expect(resolvedPath).toBe(planPath)
     })
   })
 })

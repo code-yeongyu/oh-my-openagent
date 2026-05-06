@@ -305,7 +305,7 @@ describe("team-runtime shutdown", () => {
     // when
     const result = await deleteTeam(
       fixture.teamRunId,
-      fixture.config,
+      { ...fixture.config, tmux_visualization: true },
       { getServerUrl: () => "http://localhost" } as never,
       undefined,
       { force: true },
@@ -323,6 +323,29 @@ describe("team-runtime shutdown", () => {
       () => { throw new Error(`expected ${runtimeStateDirectory} to be removed`) },
       () => undefined,
     )
+  })
+
+  test("#given tmux manager but visualization disabled #when deleteTeam runs #then layout cleanup is skipped", async () => {
+    // given
+    const fixture = await createFixture()
+    temporaryDirectories.push(fixture.baseDir)
+    spyOn(layoutModule, "canVisualize").mockReturnValue(true)
+    const removeLayoutSpy = spyOn(layoutModule, "removeTeamLayout").mockResolvedValue(undefined)
+    await updateMemberStatuses(fixture.teamRunId, fixture.config, {
+      "member-a": "shutdown_approved",
+      "member-b": "completed",
+    })
+
+    // when
+    const result = await deleteTeam(
+      fixture.teamRunId,
+      { ...fixture.config, tmux_visualization: false },
+      { getServerUrl: () => "http://localhost" } as never,
+    )
+
+    // then
+    expect(result.removedLayout).toBe(false)
+    expect(removeLayoutSpy).not.toHaveBeenCalled()
   })
 
   test("cancels team background tasks before deleting when force=true", async () => {

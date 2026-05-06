@@ -214,6 +214,10 @@ describe("stripAgentListSortPrefix", () => {
   it("strips legacy zero-width sort prefixes baked into v3.14.0–v3.16.0 sessions", () => {
     expect(stripAgentListSortPrefix("\u200B\u200BHephaestus - Deep Agent")).toBe("Hephaestus - Deep Agent")
   })
+
+  it("strips leading and trailing wrapper characters after sort prefix removal", () => {
+    expect(stripAgentListSortPrefix("\\Hephaestus - Deep Agent\\")).toBe("Hephaestus - Deep Agent")
+  })
 })
 
 describe("normalizeAgentForPrompt", () => {

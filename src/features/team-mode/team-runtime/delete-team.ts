@@ -86,7 +86,7 @@ export async function deleteTeam(
     }
   }
 
-  const removedLayout = tmuxMgr !== undefined && canVisualize()
+  const removedLayout = config.tmux_visualization && tmuxMgr !== undefined && canVisualize()
   if (removedLayout) {
     const memberPaneIds = runtimeState.members
       .filter((member) => member.agentType !== "leader" && member.tmuxPaneId)

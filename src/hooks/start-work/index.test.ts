@@ -2,7 +2,7 @@
 
 import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test"
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 import { tmpdir } from "node:os"
 import { randomUUID } from "node:crypto"
 import { createStartWorkHook } from "./index"
@@ -1012,6 +1012,40 @@ You are starting a Sisyphus work session.
       expect(output.parts[0].text).toContain("/existing/wt")
       expect(output.parts[0].text).toContain("subagent")
       expect(output.parts[0].text).not.toContain("Worktree Setup Required")
+    })
+
+    test("should show worktree plan progress and path when the mirrored plan exists", async () => {
+      // given
+      const mainPlanPath = join(testDir, ".sisyphus", "plans", "resume-worktree-plan.md")
+      const worktreeDir = join(testDir, "..", `resume-worktree-${randomUUID()}`)
+      const worktreePlanPath = join(worktreeDir, ".sisyphus", "plans", "resume-worktree-plan.md")
+      mkdirSync(dirname(mainPlanPath), { recursive: true })
+      mkdirSync(dirname(worktreePlanPath), { recursive: true })
+      writeFileSync(mainPlanPath, "# Plan\n- [ ] Main repo task\n")
+      writeFileSync(worktreePlanPath, "# Plan\n- [x] Worktree task 1\n- [ ] Worktree task 2\n")
+      writeBoulderState(testDir, {
+        active_plan: mainPlanPath,
+        started_at: "2026-01-01T00:00:00Z",
+        session_ids: ["old-session"],
+        plan_name: "resume-worktree-plan",
+        worktree_path: worktreeDir,
+      })
+
+      const hook = createStartWorkHook(createMockPluginInput())
+      const output = {
+        parts: [{ type: "text", text: createStartWorkPrompt() }],
+      }
+
+      try {
+        // when
+        await hook["chat.message"]({ sessionID: "session-worktree-progress" }, output)
+
+        // then
+        expect(output.parts[0].text).toContain(worktreePlanPath)
+        expect(output.parts[0].text).toContain("1/2 tasks completed")
+      } finally {
+        rmSync(worktreeDir, { recursive: true, force: true })
+      }
     })
   })
 })
