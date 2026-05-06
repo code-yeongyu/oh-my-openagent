@@ -36,7 +36,7 @@ describe("resolveAgentVariant", () => {
         sisyphus: { category: "ultrabrain" },
       },
       categories: {
-        ultrabrain: { model: "openai/gpt-5.4", variant: "xhigh" },
+        ultrabrain: { model: "openai/gpt-5.5", variant: "xhigh" },
       },
     } as OhMyOpenCodeConfig
 
