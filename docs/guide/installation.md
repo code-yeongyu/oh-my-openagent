@@ -5,7 +5,7 @@
 Paste this into your llm agent session:
 
 ```
-Install and configure oh-my-opencode by following the instructions here:
+Install and configure oh-my-openagent by following the instructions here:
 https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/heads/dev/docs/guide/installation.md
 ```
 
@@ -14,7 +14,8 @@ https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/heads/dev/do
 Run the interactive installer:
 
 ```bash
-bunx oh-my-opencode install
+bunx oh-my-openagent install # recommended
+npx oh-my-openagent install # alternative
 ```
 
 > **Note**: The CLI ships with standalone binaries for all major platforms. No runtime (Bun/Node.js) is required for CLI execution after installation.
@@ -27,7 +28,7 @@ Anonymous telemetry is enabled by default to track active installations (DAU/WAU
 
 After you install it, you can read this [overview guide](./overview.md) to understand more.
 
-The published package and local binary are still `oh-my-opencode`. Inside `opencode.json`, the compatibility layer now prefers the plugin entry `oh-my-openagent`, while legacy `oh-my-opencode` entries still load with a warning. Plugin config loading recognizes both `oh-my-openagent.json[c]` and `oh-my-opencode.json[c]` during the transition. If you see a "Using legacy package name" warning from `bunx oh-my-opencode doctor`, update your `opencode.json` plugin entry from `"oh-my-opencode"` to `"oh-my-openagent"`.
+The published package and local binary are still `oh-my-opencode`. Inside `opencode.json`, the compatibility layer now prefers the plugin entry `oh-my-openagent`, while legacy `oh-my-opencode` entries still load with a warning. Plugin config loading recognizes both `oh-my-openagent.json[c]` and `oh-my-opencode.json[c]` during the transition. If you see a "Using legacy package name" warning from `bunx oh-my-openagent doctor`, update your `opencode.json` plugin entry from `"oh-my-opencode"` to `"oh-my-openagent"`.
 
 ## For LLM Agents
 
@@ -37,7 +38,7 @@ The published package and local binary are still `oh-my-opencode`. Inside `openc
 > curl -fsSL https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/heads/dev/docs/guide/installation.md
 > ```
 
-If you're an LLM Agent helping set up oh-my-opencode, welcome. You'll help your user install the harness and verify the rename-compat setup cleanly. Tell user this with greetings, with text 'oMoMoMoMo...'
+If you're an LLM Agent helping set up oh-my-openagent, welcome. You'll help your user install the harness and verify the rename-compat setup cleanly. Tell user this with greetings, with text 'oMoMoMoMo...'
 
 follow these steps:
 
@@ -107,19 +108,19 @@ Spawn a subagent to handle installation and report back - to save context.
 Based on user's answers, run the CLI installer with appropriate flags:
 
 ```bash
-bunx oh-my-opencode install --no-tui --claude=<yes|no|max20> --gemini=<yes|no> --copilot=<yes|no> [--openai=<yes|no>] [--opencode-go=<yes|no>] [--opencode-zen=<yes|no>] [--zai-coding-plan=<yes|no>] [--kimi-for-coding=<yes|no>] [--vercel-ai-gateway=<yes|no>] [--skip-auth]
+bunx oh-my-openagent install --no-tui --claude=<yes|no|max20> --gemini=<yes|no> --copilot=<yes|no> [--openai=<yes|no>] [--opencode-go=<yes|no>] [--opencode-zen=<yes|no>] [--zai-coding-plan=<yes|no>] [--kimi-for-coding=<yes|no>] [--vercel-ai-gateway=<yes|no>] [--skip-auth]
 ```
 
 **Examples:**
 
-- User has all native subscriptions: `bunx oh-my-opencode install --no-tui --claude=max20 --openai=yes --gemini=yes --copilot=no`
-- User has only Claude: `bunx oh-my-opencode install --no-tui --claude=yes --gemini=no --copilot=no`
-- User has Claude + OpenAI: `bunx oh-my-opencode install --no-tui --claude=yes --openai=yes --gemini=no --copilot=no`
-- User has only GitHub Copilot: `bunx oh-my-opencode install --no-tui --claude=no --gemini=no --copilot=yes`
-- User has Z.ai for Librarian: `bunx oh-my-opencode install --no-tui --claude=yes --gemini=no --copilot=no --zai-coding-plan=yes`
-- User has only OpenCode Zen: `bunx oh-my-opencode install --no-tui --claude=no --gemini=no --copilot=no --opencode-zen=yes`
-- User has OpenCode Go only: `bunx oh-my-opencode install --no-tui --claude=no --openai=no --gemini=no --copilot=no --opencode-go=yes`
-- User has no subscriptions: `bunx oh-my-opencode install --no-tui --claude=no --gemini=no --copilot=no`
+- User has all native subscriptions: `bunx oh-my-openagent install --no-tui --claude=max20 --openai=yes --gemini=yes --copilot=no`
+- User has only Claude: `bunx oh-my-openagent install --no-tui --claude=yes --gemini=no --copilot=no`
+- User has Claude + OpenAI: `bunx oh-my-openagent install --no-tui --claude=yes --openai=yes --gemini=no --copilot=no`
+- User has only GitHub Copilot: `bunx oh-my-openagent install --no-tui --claude=no --gemini=no --copilot=yes`
+- User has Z.ai for Librarian: `bunx oh-my-openagent install --no-tui --claude=yes --gemini=no --copilot=no --zai-coding-plan=yes`
+- User has only OpenCode Zen: `bunx oh-my-openagent install --no-tui --claude=no --gemini=no --copilot=no --opencode-zen=yes`
+- User has OpenCode Go only: `bunx oh-my-openagent install --no-tui --claude=no --openai=no --gemini=no --copilot=no --opencode-go=yes`
+- User has no subscriptions: `bunx oh-my-openagent install --no-tui --claude=no --gemini=no --copilot=no`
 
 The CLI will:
 
@@ -138,7 +139,7 @@ cat ~/.config/opencode/opencode.json  # Should contain "oh-my-openagent" in plug
 After installation, verify everything is working correctly:
 
 ```bash
-bunx oh-my-opencode doctor
+bunx oh-my-openagent doctor
 ```
 
 This checks system, config, tools, and model resolution, including legacy package name warnings and compatibility-fallback diagnostics.
@@ -262,7 +263,7 @@ When OpenCode Zen is the best available provider, these are the most relevant so
 Run the installer and select "Yes" for OpenCode Zen:
 
 ```bash
-bunx oh-my-opencode install
+bunx oh-my-openagent install
 # Select your subscriptions (Claude, ChatGPT, Gemini, OpenCode Zen, etc.)
 # When prompted: "Do you have access to OpenCode Zen (opencode/ models)?" → Select "Yes"
 ```
@@ -270,14 +271,14 @@ bunx oh-my-opencode install
 Or use non-interactive mode:
 
 ```bash
-bunx oh-my-opencode install --no-tui --claude=no --openai=no --gemini=no --opencode-zen=yes
+bunx oh-my-openagent install --no-tui --claude=no --openai=no --gemini=no --opencode-zen=yes
 ```
 
 This provider uses the `opencode/` model catalog. If your OpenCode environment prompts for provider authentication, follow the OpenCode provider flow for `opencode/` models instead of reusing the fallback-provider auth steps above.
 
 ### Step 5: Understand Your Model Setup
 
-You've just configured oh-my-opencode. Here's what got set up and why.
+You've just configured oh-my-openagent. Here's what got set up and why.
 
 #### Model Families: What You're Working With
 
