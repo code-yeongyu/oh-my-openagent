@@ -12,7 +12,7 @@
 > [!NOTE]
 >
 > [![Sisyphus Labs - Sisyphus is the agent that codes like your team.](./.github/assets/sisyphuslabs.png?v=2)](https://sisyphuslabs.ai)
-> > **私たちは、フロンティアエージェントの未来を定義するために、Sisyphus の完全なプロダクト版を構築しています。 <br />[こちら](https://sisyphuslabs.ai) からウェイトリストにご登録ください。**
+> > **OmO は上記の Jobdori によってメンテナンスされています。あなた専用の Jobdori、Dori に会いましょう。 <br />[こちら](https://sisyphuslabs.ai) からウェイトリストにご登録ください。**
 
 > [!TIP]
 > 私たちと一緒に！

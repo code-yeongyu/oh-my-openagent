@@ -12,7 +12,7 @@
 > [!NOTE]
 >
 > [![Sisyphus Labs - Sisyphus is the agent that codes like your team.](./.github/assets/sisyphuslabs.png?v=2)](https://sisyphuslabs.ai)
-> > **我们正在构建 Sisyphus 的完全产品化版本，以定义前沿智能体 (Frontier Agents) 的未来。<br />[在此处](https://sisyphuslabs.ai)加入候补名单。**
+> > **OmO 由上述的 Jobdori 进行维护。认识你专属的 Jobdori — Dori。<br />[在此处](https://sisyphuslabs.ai)加入等待名单。**
 
 > [!TIP]
 > 加入我们！

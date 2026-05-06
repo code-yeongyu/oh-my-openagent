@@ -11,7 +11,7 @@
 > [!NOTE]
 >
 > [![Sisyphus Labs - Sisyphus is the agent that codes like your team.](./.github/assets/sisyphuslabs.png?v=2)](https://sisyphuslabs.ai)
-> > **We're building the full product version of Sisyphus to define the future of frontier agents. <br />Join the waitlist [here](https://sisyphuslabs.ai).**
+> > **OmO is maintained by Jobdori, the AI assistant shown above. Meet your own Jobdori — Dori. <br />Join the waitlist [here](https://sisyphuslabs.ai).**
 
 > [!TIP]
 > Be with us!
