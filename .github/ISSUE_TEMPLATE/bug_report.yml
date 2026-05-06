@@ -19,7 +19,7 @@ body:
         - label: I have searched existing issues to avoid duplicates
           required: true
         - label: I am using the latest version of oh-my-openagent
-          required: false
+          required: true
         - label: I have read the [documentation](https://github.com/code-yeongyu/oh-my-openagent#readme) or asked an AI coding agent with this project's GitHub URL loaded and couldn't find the answer
           required: true
 
