@@ -1,0 +1,14 @@
+{
+  "generatedAt": "2026-05-06T12:37:59.222Z",
+  "sourceUrl": "https://models.dev/api.json",
+  "providers": [
+    "opencode"
+  ],
+  "models": [
+    "big-pickle",
+    "gpt-5-nano",
+    "hy3-preview-free",
+    "minimax-m2.5-free",
+    "nemotron-3-super-free"
+  ]
+}

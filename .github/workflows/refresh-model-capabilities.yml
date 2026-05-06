@@ -28,18 +28,21 @@ jobs:
       - name: Refresh bundled model capabilities snapshot
         run: bun run build:model-capabilities
 
+      - name: Refresh free opencode models snapshot
+        run: bun run build:free-models
+
       - name: Validate capability guardrails
         run: bun run test:model-capabilities
 
       - name: Create refresh pull request
         uses: peter-evans/create-pull-request@v7
         with:
-          commit-message: "chore: refresh model capabilities snapshot"
-          title: "chore: refresh model capabilities snapshot"
+          commit-message: "chore: refresh model snapshots"
+          title: "chore: refresh model snapshots"
           body: |
-            Automated refresh of `src/generated/model-capabilities.generated.json` from `https://models.dev/api.json`.
-
-            This keeps the bundled capability snapshot aligned with upstream model metadata without relying on manual refreshes.
+            Automated refresh of model snapshots from `https://models.dev/api.json`:
+            - `src/generated/model-capabilities.generated.json` — full model capabilities
+            - `src/generated/free-opencode-models.generated.json` — free opencode model list
           branch: automation/refresh-model-capabilities
           delete-branch: true
           labels: |
