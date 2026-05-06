@@ -1,4 +1,4 @@
-import { spawn } from "bun"
+import { spawn } from "../shared/bun-spawn-shim"
 
 export function getCurrentTmuxSession(): string | null {
   const env = process.env.TMUX

@@ -1,4 +1,4 @@
-import { spawn } from "bun"
+import { spawn } from "../shared/bun-spawn-shim"
 import { validateGatewayUrl } from "./gateway-url-validation"
 import type { OpenClawGateway, WakeResult } from "./types"
 

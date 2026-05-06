@@ -1,4 +1,4 @@
-import { spawn } from "bun"
+import { spawn } from "../../bun-spawn-shim"
 import type { TmuxConfig } from "../../../config/schema"
 import { getTmuxPath } from "../../../tools/interactive-bash/tmux-path-resolver"
 import type { SpawnPaneResult } from "../types"
