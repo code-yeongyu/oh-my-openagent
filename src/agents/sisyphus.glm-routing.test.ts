@@ -3,8 +3,8 @@
 import { describe, expect, test } from "bun:test";
 import { createSisyphusAgent } from "./sisyphus";
 
-function getPrompt(model: string): string {
-  const agent = createSisyphusAgent(model);
+function getPrompt(model: string, availableCategories?: Parameters<typeof createSisyphusAgent>[4]): string {
+  const agent = createSisyphusAgent(model, undefined, undefined, undefined, availableCategories);
   return agent.prompt ?? "";
 }
 
@@ -48,6 +48,8 @@ describe("createSisyphusAgent - GLM routing", () => {
 
     expect(prompt).toContain("Toggle RL");
     expect(prompt).toContain("K2.x post-training context");
+    expect(prompt).not.toContain("DIRECT HEPHAESTUS DELEGATION");
+    expect(prompt).not.toContain("DECOMPOSE AND DELEGATE - YOU ARE NOT AN IMPLEMENTER");
     expect(prompt).not.toContain(".sisyphus/state/");
     expect(prompt).not.toContain("<Small_Context_Working_Memory>");
     expect(prompt).not.toContain("goal.md");
@@ -69,5 +71,33 @@ describe("createSisyphusAgent - GLM routing", () => {
     expect(prompt).toContain("DIRECT HEPHAESTUS DELEGATION - YOUR IMPLEMENTATION PATH");
     expect(prompt).toContain('call_omo_agent(subagent_type="hephaestus"');
     expect(prompt).toContain("delegate to Hephaestus");
+  });
+
+  test("#given GLM harness model #when building prompt #then preserves direct delegation markers", () => {
+    const prompt = getPrompt("zai/glm-5.1");
+
+    expect(prompt).toContain("DECOMPOSE AND DELEGATE - YOU ARE NOT AN IMPLEMENTER");
+    expect(prompt).toContain("DIRECT HEPHAESTUS DELEGATION");
+  });
+
+  test("#given GLM harness model #when building prompt #then places delegation before verification and style sections", () => {
+    const prompt = getPrompt("zai/glm-5.1");
+    const delegationIndex = prompt.indexOf("DIRECT HEPHAESTUS DELEGATION");
+    const verificationIndex = prompt.indexOf("<verification>");
+    const styleIndex = prompt.indexOf("<style>");
+
+    expect(delegationIndex).toBeGreaterThanOrEqual(0);
+    expect(styleIndex).toBeGreaterThanOrEqual(0);
+    if (verificationIndex >= 0) {
+      expect(delegationIndex).toBeLessThan(verificationIndex);
+    }
+    expect(delegationIndex).toBeLessThan(styleIndex);
+  });
+
+  test("#given GLM harness model with empty categories #when building prompt #then includes fallback delegation section", () => {
+    const prompt = getPrompt("zai/glm-5.1", []);
+
+    expect(prompt).toContain("DECOMPOSE AND DELEGATE - YOU ARE NOT AN IMPLEMENTER");
+    expect(prompt).toContain("NEVER implement directly");
   });
 });

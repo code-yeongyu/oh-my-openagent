@@ -229,6 +229,28 @@ describe("applyToolConfig", () => {
       expect(agent.permission.call_omo_agent).toBe("allow")
     })
 
+    it("#then should keep call_omo_agent denied for Atlas", () => {
+      const params = createParams({ agents: ["atlas"] })
+
+      applyToolConfig(params)
+
+      const agent = params.agentResult.atlas as {
+        permission: Record<string, unknown>
+      }
+      expect(agent.permission.call_omo_agent).toBe("deny")
+    })
+
+    it("#then should keep call_omo_agent denied for Prometheus", () => {
+      const params = createParams({ agents: ["prometheus"] })
+
+      applyToolConfig(params)
+
+      const agent = params.agentResult.prometheus as {
+        permission: Record<string, unknown>
+      }
+      expect(agent.permission.call_omo_agent).toBe("deny")
+    })
+
     it("#then should keep call_omo_agent denied for Hephaestus", () => {
       const params = createParams({ agents: ["hephaestus"] })
 
