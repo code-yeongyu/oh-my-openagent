@@ -25,7 +25,7 @@ describe("ralph-loop non-abort error continuation", () => {
 		}
 	})
 
-	test("continues on next idle after non-abort session error", async () => {
+	test("continues immediately after non-abort session error", async () => {
 		// given - an active Ralph Loop receives a recoverable command error
 		const hook = createRalphLoopHook({
 			directory: testDirectory,
@@ -81,16 +81,75 @@ describe("ralph-loop non-abort error continuation", () => {
 			},
 		})
 
-		// when - OpenCode emits the idle event caused by that failed command
-		await hook.event({
-			event: { type: "session.idle", properties: { sessionID: "session-123" } },
-		})
-
-		// then - the loop should continue instead of skipping idle as recovery
+		// then - the loop should continue without waiting for a later idle event
 		expect(promptCalls).toHaveLength(1)
 		expect(promptCalls[0]?.sessionID).toBe("session-123")
 		expect(promptCalls[0]?.text).toContain("Keep working")
 		expect(messagesCalls.length).toBeGreaterThan(0)
 		expect(hook.getState()?.iteration).toBe(2)
+	})
+
+	test("stops retrying runtime errors after max iterations", async () => {
+		// given - an active Ralph Loop has one retry remaining
+		const hook = createRalphLoopHook({
+			directory: testDirectory,
+			project: testDirectory,
+			worktree: testDirectory,
+			serverUrl: "http://localhost:4096",
+			$: async () => ({}),
+			client: {
+				session: {
+					messages: async (options: { path: { id: string } }) => {
+						messagesCalls.push({ sessionID: options.path.id })
+						return { data: [] }
+					},
+					promptAsync: async (options: {
+						path: { id: string }
+						body: { parts: Array<{ type: string; text: string }> }
+					}) => {
+						promptCalls.push({
+							sessionID: options.path.id,
+							text: options.body.parts[0]?.text ?? "",
+						})
+						return {}
+					},
+					prompt: async () => ({}),
+				},
+				tui: {
+					showToast: async () => ({}),
+				},
+			},
+		} as never)
+
+		hook.startLoop("session-123", "Keep working", {
+			messageCountAtStart: 0,
+			maxIterations: 2,
+		})
+
+		// when - the first runtime error consumes the final allowed attempt
+		await hook.event({
+			event: {
+				type: "session.error",
+				properties: {
+					sessionID: "session-123",
+					error: { name: "RuntimeError" },
+				},
+			},
+		})
+
+		// when - another runtime error arrives after the retry budget is exhausted
+		await hook.event({
+			event: {
+				type: "session.error",
+				properties: {
+					sessionID: "session-123",
+					error: { name: "RuntimeError" },
+				},
+			},
+		})
+
+		// then - the loop does not exceed the configured retry count
+		expect(promptCalls).toHaveLength(1)
+		expect(hook.getState()).toBeNull()
 	})
 })

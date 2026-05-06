@@ -13,9 +13,9 @@ Analyze the user's request to determine operation mode:
 
 | User Request Pattern | Mode | Jump To |
 |---------------------|------|---------|
-| "commit", "커밋", changes to commit | \`COMMIT\` | Phase 0-6 (existing) |
-| "rebase", "리베이스", "squash", "cleanup history" | \`REBASE\` | Phase R1-R4 |
-| "find when", "who changed", "언제 바뀌었", "git blame", "bisect" | \`HISTORY_SEARCH\` | Phase H1-H3 |
+| Commit intent in any language (e.g., "commit", "커밋", "コミット") | \`COMMIT\` | Phase 0-6 (existing) |
+| Rebase/squash intent in any language (e.g., "rebase", "리베이스", "リベース") | \`REBASE\` | Phase R1-R4 |
+| History lookup intent in any language (e.g., "find when", "언제 바뀌었", "いつ追加") | \`HISTORY_SEARCH\` | Phase H1-H3 |
 | "smart rebase", "rebase onto" | \`REBASE\` | Phase R1-R4 |
 
 **CRITICAL**: Don't default to COMMIT mode. Parse the actual request.

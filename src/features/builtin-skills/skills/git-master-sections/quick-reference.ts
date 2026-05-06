@@ -5,7 +5,7 @@ export const GIT_MASTER_QUICK_REFERENCE_SECTION = `## Quick Reference
 | If git log shows... | Use this style |
 |---------------------|----------------|
 | \`feat: xxx\`, \`fix: yyy\` | SEMANTIC |
-| \`Add xxx\`, \`Fix yyy\`, \`xxx 추가\` | PLAIN |
+| \`Add xxx\`, \`Fix yyy\`, \`xxx 추가\`, \`xxxを追加\` | PLAIN |
 | \`format\`, \`lint\`, \`typo\` | SHORT |
 | Full sentences | SENTENCE |
 | Mix of above | Use MAJORITY (not semantic by default) |

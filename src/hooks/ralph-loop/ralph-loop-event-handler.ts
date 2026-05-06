@@ -22,11 +22,42 @@ type LoopStateController = {
 }
 type RalphLoopEventHandlerOptions = { directory: string; apiTimeoutMs: number; getTranscriptPath: (sessionID: string) => string | undefined; checkSessionExists?: RalphLoopOptions["checkSessionExists"]; backgroundManager?: RalphLoopOptions["backgroundManager"]; loopState: LoopStateController }
 
+function isAbortError(error: unknown): boolean {
+	return typeof error === "object"
+		&& error !== null
+		&& "name" in error
+		&& (error as { name?: unknown }).name === "MessageAbortedError"
+}
+
+async function showMaxIterationsToast(
+	ctx: PluginInput,
+	state: RalphLoopState,
+): Promise<void> {
+	await ctx.client.tui?.showToast?.({
+		body: { title: "Ralph Loop Stopped", message: `Max iterations (${state.max_iterations}) reached without completion`, variant: "warning", duration: 5000 },
+	}).catch(() => {})
+}
+
+async function showIterationToast(
+	ctx: PluginInput,
+	state: RalphLoopState,
+): Promise<void> {
+	await ctx.client.tui?.showToast?.({
+		body: {
+			title: "Ralph Loop",
+			message: `Iteration ${state.iteration}/${typeof state.max_iterations === "number" ? state.max_iterations : "unbounded"}`,
+			variant: "info",
+			duration: 2000,
+		},
+	}).catch(() => {})
+}
+
 export function createRalphLoopEventHandler(
 	ctx: PluginInput,
 	options: RalphLoopEventHandlerOptions,
 ) {
 	const inFlightSessions = new Set<string>()
+	const runtimeErrorRetriedSessions = new Map<string, number>()
 
 	return async ({ event }: { event: { type: string; properties?: unknown } }): Promise<void> => {
 		const props = event.properties as Record<string, unknown> | undefined
@@ -121,6 +152,7 @@ export function createRalphLoopEventHandler(
 					})
 
 				if (completionViaTranscript || completionViaApi) {
+					runtimeErrorRetriedSessions.delete(sessionID)
 					log(`[${HOOK_NAME}] Completion detected!`, {
 						sessionID,
 						iteration: state.iteration,
@@ -160,6 +192,15 @@ export function createRalphLoopEventHandler(
 					return
 				}
 
+				if (runtimeErrorRetriedSessions.get(sessionID) === state.iteration) {
+					runtimeErrorRetriedSessions.delete(sessionID)
+					log(`[${HOOK_NAME}] Skipped stale idle after runtime error retry`, {
+						sessionID,
+						iteration: state.iteration,
+					})
+					return
+				}
+
 				if (
 					typeof state.max_iterations === "number"
 					&& state.iteration >= state.max_iterations
@@ -171,9 +212,7 @@ export function createRalphLoopEventHandler(
 					})
 					options.loopState.clear()
 
-					await ctx.client.tui?.showToast?.({
-						body: { title: "Ralph Loop Stopped", message: `Max iterations (${state.max_iterations}) reached without completion`, variant: "warning", duration: 5000 },
-						}).catch(() => {})
+					await showMaxIterationsToast(ctx, state)
 					return
 				}
 
@@ -189,14 +228,7 @@ export function createRalphLoopEventHandler(
 					max: newState.max_iterations,
 				})
 
-				await ctx.client.tui?.showToast?.({
-					body: {
-						title: "Ralph Loop",
-						message: `Iteration ${newState.iteration}/${typeof newState.max_iterations === "number" ? newState.max_iterations : "unbounded"}`,
-						variant: "info",
-						duration: 2000,
-					},
-					}).catch(() => {})
+				await showIterationToast(ctx, newState)
 
 				try {
 					await continueIteration(ctx, newState, {
@@ -223,7 +255,94 @@ export function createRalphLoopEventHandler(
 		}
 
 		if (event.type === "session.error") {
-			handleErroredLoopSession(props, options.loopState)
+			const sessionID = props?.sessionID as string | undefined
+			const error = props?.error
+			if (!sessionID || isAbortError(error)) {
+				handleErroredLoopSession(props, options.loopState)
+				return
+			}
+
+			if (inFlightSessions.has(sessionID)) {
+				log(`[${HOOK_NAME}] Skipped runtime error retry: handler in flight`, { sessionID })
+				return
+			}
+
+			inFlightSessions.add(sessionID)
+			try {
+				const state = options.loopState.getState()
+				if (!state || !state.active) {
+					handleErroredLoopSession(props, options.loopState)
+					return
+				}
+
+				const verificationSessionID = state.verification_pending
+					? state.verification_session_id
+					: undefined
+				const matchesParentSession = state.session_id === undefined || state.session_id === sessionID
+				const matchesVerificationSession = verificationSessionID === sessionID
+				if (!matchesParentSession && !matchesVerificationSession) {
+					handleErroredLoopSession(props, options.loopState)
+					return
+				}
+
+				log(`[${HOOK_NAME}] Retrying after runtime session error`, {
+					sessionID,
+					iteration: state.iteration,
+					error: String(error),
+				})
+
+				if (state.verification_pending) {
+					await handlePendingVerification(ctx, {
+						sessionID,
+						state,
+						verificationSessionID,
+						matchesParentSession,
+						matchesVerificationSession,
+						loopState: options.loopState,
+						directory: options.directory,
+						apiTimeoutMs: options.apiTimeoutMs,
+					})
+					return
+				}
+
+				if (
+					typeof state.max_iterations === "number"
+					&& state.iteration >= state.max_iterations
+				) {
+					log(`[${HOOK_NAME}] Runtime error retry budget exhausted`, {
+						sessionID,
+						iteration: state.iteration,
+						max: state.max_iterations,
+					})
+					options.loopState.clear()
+					await showMaxIterationsToast(ctx, state)
+					return
+				}
+
+				const newState = options.loopState.incrementIteration()
+				if (!newState) {
+					log(`[${HOOK_NAME}] Failed to increment iteration after runtime error`, { sessionID })
+					return
+				}
+
+				await showIterationToast(ctx, newState)
+				try {
+					await continueIteration(ctx, newState, {
+						previousSessionID: sessionID,
+						directory: options.directory,
+						apiTimeoutMs: options.apiTimeoutMs,
+						loopState: options.loopState,
+					})
+					runtimeErrorRetriedSessions.set(sessionID, newState.iteration)
+				} catch (err) {
+					log(`[${HOOK_NAME}] Failed to retry after runtime error`, {
+						sessionID,
+						error: String(err),
+					})
+				}
+			} finally {
+				inFlightSessions.delete(sessionID)
+			}
 		}
 	}
 }
