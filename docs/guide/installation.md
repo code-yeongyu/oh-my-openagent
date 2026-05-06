@@ -28,7 +28,7 @@ Anonymous telemetry is enabled by default to track active installations (DAU/WAU
 
 After you install it, you can read this [overview guide](./overview.md) to understand more.
 
-The published package and local binary are still `oh-my-opencode`. Inside `opencode.json`, the compatibility layer now prefers the plugin entry `oh-my-openagent`, while legacy `oh-my-opencode` entries still load with a warning. Plugin config loading recognizes both `oh-my-openagent.json[c]` and `oh-my-opencode.json[c]` during the transition. If you see a "Using legacy package name" warning from `bunx oh-my-opencode doctor`, update your `opencode.json` plugin entry from `"oh-my-opencode"` to `"oh-my-openagent"`.
+The published package and local binary are still `oh-my-opencode`. Inside `opencode.json`, the compatibility layer now prefers the plugin entry `oh-my-openagent`, while legacy `oh-my-opencode` entries still load with a warning. Plugin config loading recognizes both `oh-my-openagent.json[c]` and `oh-my-opencode.json[c]` during the transition. If you see a "Using legacy package name" warning from `bunx oh-my-openagent doctor`, update your `opencode.json` plugin entry from `"oh-my-opencode"` to `"oh-my-openagent"`.
 
 ## For LLM Agents
 
