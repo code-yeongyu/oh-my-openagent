@@ -605,12 +605,12 @@ describe("requiresModel field in categories", () => {
     expect(deep.requiresModel).toBeUndefined()
   })
 
-  test("artistry category has requiresModel set to gemini-3.1-pro", () => {
+  test("artistry category no longer hard-requires gemini-3.1-pro", () => {
     // given
     const artistry = CATEGORY_MODEL_REQUIREMENTS["artistry"]
 
     // when / #then
-    expect(artistry.requiresModel).toBe("gemini-3.1-pro")
+    expect(artistry.requiresModel).toBeUndefined()
   })
 })
 

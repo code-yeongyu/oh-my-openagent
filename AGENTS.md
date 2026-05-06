@@ -16,7 +16,7 @@ oh-my-opencode/
 │   ├── agents/               # 11 agents (Sisyphus, Hephaestus, Oracle, Librarian, Explore, Atlas, Prometheus, Metis, Momus, Multimodal-Looker, Sisyphus-Junior)
 │   ├── hooks/                # 52 lifecycle hooks across dedicated modules and standalone files
 │   ├── tools/                # 26 tools across 16 directories (includes Hashline edit with LINE#ID content hashing)
-│   ├── features/             # 19 feature modules (background-agent, skill-loader, tmux, MCP-OAuth, skill-mcp-manager, etc.)
+│   ├── features/             # 20 feature modules (background-agent, skill-loader, tmux, MCP-OAuth, skill-mcp-manager, team-mode, etc.)
 │   ├── shared/               # 170+ utility files (barrel-exported, logger → /tmp/oh-my-opencode.log)
 │   ├── config/               # Zod v4 schema system (32 files)
 │   ├── cli/                  # CLI: install, run, doctor, mcp-oauth (Commander.js)
@@ -74,6 +74,7 @@ pluginModule.server(input, options)
 | Debug provider errors | `src/hooks/runtime-fallback/` | Reactive error recovery (distinct from model-fallback) |
 | External notifications | `src/openclaw/` | Bidirectional Discord/Telegram/webhook integration |
 | Skill-embedded MCP | `src/features/skill-mcp-manager/` | Tier 3 MCPs (stdio + HTTP, per-session) |
+| Team mode | `src/features/team-mode/` | Parallel multi-agent coordination (OFF by default) |
 
 ## MULTI-LEVEL CONFIG
 

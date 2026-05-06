@@ -58,6 +58,10 @@ export function pruneStaleTasksAndNotifications(args: {
       continue
     }
 
+    if (task.teamRunId) {
+      continue
+    }
+
     const lastActivity = task.status === "running" && task.progress?.lastUpdate
       ? task.progress.lastUpdate.getTime()
       : undefined
@@ -146,8 +150,10 @@ export async function checkAndInterruptStaleTasks(args: {
     }
 
     const sessionGone = sessionMissing && (task.consecutiveMissedPolls ?? 0) >= MIN_SESSION_GONE_POLLS
+    const shouldSkipInactivityTimeout = task.teamRunId !== undefined && !sessionGone
 
     if (!task.progress?.lastUpdate) {
+      if (shouldSkipInactivityTimeout) continue
       if (sessionIsRunning) continue
       if (sessionMissing && !sessionGone) continue
       const effectiveTimeout = sessionGone ? sessionGoneTimeoutMs : messageStalenessMs
@@ -183,6 +189,7 @@ export async function checkAndInterruptStaleTasks(args: {
     }
 
     if (sessionIsRunning) continue
+    if (shouldSkipInactivityTimeout) continue
 
     if (runtime < MIN_RUNTIME_BEFORE_STALE_MS) continue
 

@@ -139,6 +139,16 @@ describe("session-notification input-needed events", () => {
     expect(detectPlatformSpy).toHaveBeenCalledTimes(1)
     expect(getDefaultSoundPathSpy).toHaveBeenCalledTimes(1)
     expect(startBackgroundCheckSpy).toHaveBeenCalledTimes(1)
+
+    // when
+    await hook({
+      event: {
+        type: "session.deleted",
+        properties: {
+          info: { id: sessionID },
+        },
+      },
+    })
   })
 })
 

@@ -173,3 +173,7 @@ export function shellEscapeForDoubleQuotedCommand(value: string): string {
     .replace(/\(/g, "\\(") // escape parentheses
     .replace(/\)/g, "\\)") // escape parentheses
 }
+
+export function shellSingleQuote(value: string): string {
+  return `'${value.replace(/'/g, "'\\''")}'`
+}

@@ -381,7 +381,7 @@ describe("sisyphus-task", () => {
       }
 
       //#when
-      await tool.execute(args as DelegateTaskArgs, toolContext)
+      await tool.execute(args, toolContext)
 
       //#then
       expect(args.load_skills).toEqual(["playwright", "git-master"])
@@ -444,7 +444,7 @@ describe("sisyphus-task", () => {
       }
 
       //#when
-      await tool.execute(args as DelegateTaskArgs, toolContext)
+      await tool.execute(args, toolContext)
 
       //#then
       expect(args.load_skills).toEqual([])
@@ -755,8 +755,8 @@ describe("sisyphus-task", () => {
       expect(result).toBeNull()
     })
 
-    test("blocks requiresModel when availability is known and missing the required model", () => {
-      // given - artistry has requiresModel: gemini-3.1-pro
+    test("allows artistry to use its fallback chain when gemini is missing", () => {
+      // given - artistry can fall back from gemini to another capable model
       const categoryName = "artistry"
       const availableModels = new Set<string>(["anthropic/claude-opus-4-7"])
 
@@ -767,11 +767,12 @@ describe("sisyphus-task", () => {
       })
 
       // then
-      expect(result).toBeNull()
+      expect(result).not.toBeNull()
+      expect(result?.model).toBe("google/gemini-3.1-pro")
     })
 
-    test("blocks requiresModel when availability is empty", () => {
-      // given - artistry has requiresModel: gemini-3.1-pro
+    test("allows artistry when availability is empty", () => {
+      // given - empty availability should not disable fallback-capable categories
       const categoryName = "artistry"
       const availableModels = new Set<string>()
 
@@ -782,7 +783,8 @@ describe("sisyphus-task", () => {
       })
 
       // then
-      expect(result).toBeNull()
+      expect(result).not.toBeNull()
+      expect(result?.model).toBe("google/gemini-3.1-pro")
     })
 
     test("bypasses requiresModel when explicit user config provided", () => {
@@ -1825,7 +1827,7 @@ describe("sisyphus-task", () => {
     //#given a session with a previous message that has variant "max"
     const { createDelegateTask } = require("./tools")
 
-    const promptMock = mock(async (input: any) => {
+    const promptMock = mock(async () => {
       return { data: {} }
     })
 
@@ -3144,8 +3146,6 @@ describe("sisyphus-task", () => {
     test("should resolve agent-browser skill even when browserProvider is not set", async () => {
       // given - delegate_task without browserProvider
       const { createDelegateTask } = require("./tools")
-      let promptBody: any
-
       const mockManager = { launch: async () => ({}) }
       const mockClient = {
         app: { agents: async () => ({ data: [] }) },
@@ -3153,8 +3153,7 @@ describe("sisyphus-task", () => {
         session: {
           get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "ses_no_browser_provider" } }),
-          prompt: async (input: any) => {
-            promptBody = input.body
+          prompt: async () => {
             return { data: {} }
           },
           messages: async () => ({

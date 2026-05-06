@@ -36,6 +36,7 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
     const discovered = (await getAllSkills({
       disabledSkills: options?.disabledSkills,
       browserProvider: options?.browserProvider,
+      teamModeEnabled: options?.teamModeEnabled,
     })) ?? []
     const allSkills = options.skills ? [...options.skills] : discovered
 

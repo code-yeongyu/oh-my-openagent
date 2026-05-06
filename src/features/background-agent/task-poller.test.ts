@@ -107,6 +107,57 @@ describe("checkAndInterruptStaleTasks", () => {
     expect(task.status).toBe("running")
   })
 
+  it("should NOT interrupt idle team-member tasks just because lastUpdate is old", async () => {
+    //#given
+    const task = createRunningTask({
+      teamRunId: "team-run-1",
+      progress: {
+        toolCalls: 1,
+        lastUpdate: new Date(Date.now() - 200_000),
+      },
+    })
+
+    //#when
+    await checkAndInterruptStaleTasks({
+      tasks: [task],
+      client: mockClient as never,
+      config: { staleTimeoutMs: 180_000 },
+      concurrencyManager: mockConcurrencyManager as never,
+      notifyParentSession: mockNotify,
+      sessionStatuses: { "ses-1": { type: "idle" } },
+    })
+
+    //#then
+    expect(task.status).toBe("running")
+  })
+
+  it("should still interrupt team-member tasks when the session is gone", async () => {
+    //#given
+    const task = createRunningTask({
+      teamRunId: "team-run-1",
+      progress: {
+        toolCalls: 1,
+        lastUpdate: new Date(Date.now() - 200_000),
+      },
+      consecutiveMissedPolls: 2,
+    })
+    mockClient.session.get.mockRejectedValueOnce(new Error("missing"))
+
+    //#when
+    await checkAndInterruptStaleTasks({
+      tasks: [task],
+      client: mockClient as never,
+      config: { staleTimeoutMs: 180_000, sessionGoneTimeoutMs: 180_000 },
+      concurrencyManager: mockConcurrencyManager as never,
+      notifyParentSession: mockNotify,
+      sessionStatuses: {},
+    })
+
+    //#then
+    expect(task.status).toBe("cancelled")
+    expect(task.error).toContain("session gone from status registry")
+  })
+
   it("should interrupt tasks with NO progress.lastUpdate that exceeded messageStalenessTimeoutMs since startedAt", async () => {
     //#given - task started 15 minutes ago, never received any progress update
     const task = createRunningTask({
@@ -910,6 +961,41 @@ describe("pruneStaleTasksAndNotifications", () => {
 
     //#then
     expect(pruned).toEqual([])
+  })
+
+  it("#given active team-member task with stale progress #when prune runs #then should NOT prune", () => {
+    //#given
+    const tasks = new Map<string, BackgroundTask>()
+    const task: BackgroundTask = {
+      id: "team-task",
+      sessionID: "ses-team-1",
+      parentSessionID: "parent",
+      parentMessageID: "msg",
+      teamRunId: "team-run-1",
+      description: "team member",
+      prompt: "team member",
+      agent: "sisyphus-junior",
+      status: "running",
+      startedAt: new Date(Date.now() - 60 * 60 * 1000),
+      progress: {
+        toolCalls: 1,
+        lastUpdate: new Date(Date.now() - 35 * 60 * 1000),
+      },
+    }
+    tasks.set(task.id, task)
+
+    const pruned: string[] = []
+
+    //#when
+    pruneStaleTasksAndNotifications({
+      tasks,
+      notifications: new Map<string, BackgroundTask[]>(),
+      onTaskPruned: (taskId) => pruned.push(taskId),
+    })
+
+    //#then
+    expect(pruned).toEqual([])
+    expect(tasks.has(task.id)).toBe(true)
   })
 
   it("should prune terminal tasks when completion time exceeds terminal TTL", () => {

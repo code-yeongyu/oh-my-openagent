@@ -168,6 +168,69 @@ describe("resolveSubagentExecution", () => {
     expect(result.error).toBe('Cannot delegate to primary agent "Prometheus - Plan Builder" via task. Select that agent directly instead.')
   })
 
+  test("allows delegating to a primary agent when allowPrimaryAgentDelegation is enabled (team-mode path)", async () => {
+    //#given
+    readProviderModelsCacheMock.mockReturnValue({
+      models: { anthropic: ["claude-opus-4-7"] },
+      connected: ["anthropic"],
+      updatedAt: "2026-03-03T00:00:00.000Z",
+    })
+    const args = createBaseArgs({ subagent_type: "sisyphus" })
+    const executorCtx = createExecutorContext(async () => ([
+      { name: "\u200BSisyphus - Ultraworker", mode: "primary", model: "anthropic/claude-opus-4-7" },
+      { name: "oracle", mode: "subagent" },
+    ]))
+
+    //#when
+    const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep", {
+      allowPrimaryAgentDelegation: true,
+    })
+
+    //#then
+    expect(result.error).toBeUndefined()
+    expect(result.agentToUse).toBe("\u200BSisyphus - Ultraworker")
+  })
+
+  test("allows delegating to Sisyphus-Junior when allowSisyphusJuniorDirect is enabled (team-mode path)", async () => {
+    //#given
+    readProviderModelsCacheMock.mockReturnValue({
+      models: { anthropic: ["claude-sonnet-4-6"] },
+      connected: ["anthropic"],
+      updatedAt: "2026-03-03T00:00:00.000Z",
+    })
+    const args = createBaseArgs({ subagent_type: "sisyphus-junior" })
+    const executorCtx = createExecutorContext(async () => ([
+      { name: "Sisyphus-Junior", mode: "subagent", model: "anthropic/claude-sonnet-4-6" },
+      { name: "oracle", mode: "subagent" },
+    ]))
+
+    //#when
+    const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep", {
+      allowSisyphusJuniorDirect: true,
+    })
+
+    //#then
+    expect(result.error).toBeUndefined()
+    expect(result.agentToUse).toBe("Sisyphus-Junior")
+  })
+
+  test("renders a usable fallback hint when categoryExamples is empty for the default Sisyphus-Junior block", async () => {
+    //#given
+    const args = createBaseArgs({ subagent_type: "sisyphus-junior" })
+    const executorCtx = createExecutorContext(async () => ([
+      { name: "Sisyphus-Junior", mode: "subagent" },
+    ]))
+
+    //#when
+    const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "")
+
+    //#then
+    expect(result.agentToUse).toBe("")
+    expect(result.error).toBeDefined()
+    expect(result.error).not.toContain("(e.g., )")
+    expect(result.error).toContain("pick one of: quick, deep, ultrabrain")
+  })
+
   test("requires explicit all or subagent mode for task-callable agents", async () => {
     //#given
     const args = createBaseArgs({ subagent_type: "custom-worker" })

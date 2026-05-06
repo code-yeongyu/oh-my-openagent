@@ -1,11 +1,27 @@
 import type { AgentConfig } from "@opencode-ai/sdk";
 import type { AgentMode, AgentPromptMetadata } from "./types";
-import { isGlmThinkingModel, isGptModel } from "./types";
-import { buildGlmSubagentVisionBlock } from "./sisyphus/glm";
+import { isGptModel } from "./types";
 import { createAgentToolRestrictions } from "../shared/permission-compat";
 
 const MODE: AgentMode = "subagent";
 
+/**
+ * Momus - Plan Reviewer Agent
+ *
+ * Named after Momus, the Greek god of satire and mockery, who was known for
+ * finding fault in everything - even the works of the gods themselves.
+ * He criticized Aphrodite (found her sandals squeaky), Hephaestus (said man
+ * should have windows in his chest to see thoughts), and Athena (her house
+ * should be on wheels to move from bad neighbors).
+ *
+ * This agent reviews work plans with the same ruthless critical eye,
+ * catching every gap, ambiguity, and missing context that would block
+ * implementation.
+ */
+
+/**
+ * Default Momus prompt - used for Claude and other non-GPT models.
+ */
 const MOMUS_DEFAULT_PROMPT = `You are a **practical** work plan reviewer. Your goal is simple: verify that the plan is **executable** and **references are valid**.
 
 **CRITICAL FIRST RULE**:
@@ -182,6 +198,15 @@ If REJECT:
 **Response Language**: Match the language of the plan content.
 `;
 
+/**
+ * GPT-5.5 Optimized Momus System Prompt
+ *
+ * Tuned for GPT-5.5 system prompt design principles:
+ * - XML-tagged instruction blocks for clear structure
+ * - Prose-first output, explicit opener blacklist
+ * - Blocker-finder philosophy preserved
+ * - Deterministic decision criteria
+ */
 const MOMUS_GPT_PROMPT = `<identity>
 You are a practical work plan reviewer. You verify that plans are executable and references are valid. You are a blocker-finder, not a perfectionist.
 </identity>
@@ -280,10 +305,6 @@ export function createMomusAgent(model: string): AgentConfig {
       reasoningEffort: "medium",
       textVerbosity: "high",
     } as AgentConfig;
-  }
-
-  if (isGlmThinkingModel(model)) {
-    return { ...base, thinking: { type: "enabled" }, prompt: base.prompt + buildGlmSubagentVisionBlock() } as AgentConfig;
   }
 
   return {

@@ -3,6 +3,12 @@
 import { beforeAll, describe, expect, test } from "bun:test"
 
 import { installAgentSortShim } from "./agent-sort-shim"
+import { AGENT_DISPLAY_NAMES } from "./agent-display-names"
+
+type AgentListItem = {
+  name: string
+  default_agent?: boolean
+}
 
 describe("agent-sort-shim", () => {
   beforeAll(() => {
@@ -45,6 +51,32 @@ describe("agent-sort-shim", () => {
 
         // then
         expect(result).toEqual([sisyphus, hephaestus, prometheus, atlas, build, plan])
+      })
+    })
+  })
+
+  describe("#given OpenCode Agent.list style sort with default agent priority", () => {
+    describe("#when toSorted compares default_agent first and then name", () => {
+      test("#then core agents stay in canonical order before non-core agents", () => {
+        // given
+        const sisyphus = { name: AGENT_DISPLAY_NAMES.sisyphus, default_agent: true }
+        const hephaestus = { name: AGENT_DISPLAY_NAMES.hephaestus }
+        const prometheus = { name: AGENT_DISPLAY_NAMES.prometheus }
+        const atlas = { name: AGENT_DISPLAY_NAMES.atlas }
+        const oracle = { name: AGENT_DISPLAY_NAMES.oracle }
+        const explore = { name: AGENT_DISPLAY_NAMES.explore }
+        const input: AgentListItem[] = [oracle, atlas, explore, prometheus, hephaestus, sisyphus]
+
+        // when
+        const result = input.toSorted((left, right) => {
+          const leftDefault = left.default_agent ? 1 : 0
+          const rightDefault = right.default_agent ? 1 : 0
+          if (leftDefault !== rightDefault) return rightDefault - leftDefault
+          return left.name.localeCompare(right.name)
+        })
+
+        // then
+        expect(result).toEqual([sisyphus, hephaestus, prometheus, atlas, explore, oracle])
       })
     })
   })

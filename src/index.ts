@@ -46,6 +46,22 @@ const serverPlugin: Plugin = async (input, _options): Promise<Hooks> => {
   if (pluginConfig.openclaw) {
     await initializeOpenClaw(pluginConfig.openclaw)
   }
+  if (pluginConfig.team_mode?.enabled) {
+    const teamModeConfig = pluginConfig.team_mode
+    try {
+      const { ensureBaseDirs, resolveBaseDir } = await import("./features/team-mode/team-registry/paths")
+      const { checkTeamModeDependencies } = await import("./features/team-mode/deps")
+      await checkTeamModeDependencies(teamModeConfig)
+      await ensureBaseDirs(resolveBaseDir(teamModeConfig))
+      if (pluginConfig.disabled_skills?.includes("team-mode")) {
+        console.warn(
+          "[team-mode] enabled=true but team-mode skill is disabled; skill docs hidden but tools still registered (D-29)",
+        )
+      }
+    } catch (err) {
+      console.warn("[team-mode] init failed:", err)
+    }
+  }
   const tmuxIntegrationEnabled = isTmuxIntegrationEnabled(pluginConfig)
   if (tmuxIntegrationEnabled) {
     startTmuxCheck()
