@@ -67,7 +67,8 @@
           "refactor",
           "start-work",
           "stop-continuation",
-          "remove-ai-slops"
+          "remove-ai-slops",
+          "btw"
         ]
       }
     },

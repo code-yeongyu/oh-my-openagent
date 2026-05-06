@@ -8,6 +8,7 @@ import { REFACTOR_TEMPLATE } from "./templates/refactor"
 import { START_WORK_TEMPLATE } from "./templates/start-work"
 import { HANDOFF_TEMPLATE } from "./templates/handoff"
 import { REMOVE_AI_SLOPS_TEMPLATE } from "./templates/remove-ai-slops"
+import { BTW_TEMPLATE } from "./templates/btw"
 
 interface LoadBuiltinCommandsOptions {
   useRegisteredAgents?: boolean
@@ -120,6 +121,17 @@ Timestamp: $TIMESTAMP
 $ARGUMENTS
 </user-request>`,
       argumentHint: "[goal]",
+    },
+    btw: {
+      description: "(builtin) Ask a side question that does not pollute the main conversation or todo list",
+      template: `<command-instruction>
+${BTW_TEMPLATE}
+</command-instruction>
+
+<side-question>
+$ARGUMENTS
+</side-question>`,
+      argumentHint: "<question>",
     },
   }
 }

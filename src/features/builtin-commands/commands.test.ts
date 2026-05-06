@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, test, expect } from "bun:test"
 import { loadBuiltinCommands } from "./commands"
 import { HANDOFF_TEMPLATE } from "./templates/handoff"
 import { REMOVE_AI_SLOPS_TEMPLATE } from "./templates/remove-ai-slops"
+import { BTW_TEMPLATE } from "./templates/btw"
 import type { BuiltinCommandName } from "./types"
 import { _resetForTesting, registerAgentName } from "../claude-code-session-state"
 
@@ -257,5 +258,62 @@ describe("HANDOFF_TEMPLATE", () => {
     //#when / #then
     const emojiRegex = /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2702}-\u{27B0}\u{24C2}-\u{1F251}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/u
     expect(emojiRegex.test(HANDOFF_TEMPLATE)).toBe(false)
+  })
+})
+
+describe("loadBuiltinCommands - btw", () => {
+  test("should include btw command in loaded commands", () => {
+    //#given
+    const disabledCommands: BuiltinCommandName[] = []
+
+    //#when
+    const commands = loadBuiltinCommands(disabledCommands)
+
+    //#then
+    expect(commands.btw).toBeDefined()
+    expect(commands.btw.name).toBe("btw")
+  })
+
+  test("should exclude btw when disabled", () => {
+    //#given
+    const disabledCommands: BuiltinCommandName[] = ["btw"]
+
+    //#when
+    const commands = loadBuiltinCommands(disabledCommands)
+
+    //#then
+    expect(commands.btw).toBeUndefined()
+  })
+
+  test("should embed BTW_TEMPLATE inside btw command template", () => {
+    //#given - no disabled commands
+
+    //#when
+    const commands = loadBuiltinCommands()
+
+    //#then
+    expect(commands.btw.template).toContain(BTW_TEMPLATE)
+  })
+
+  test("should pass user arguments through a side-question slot", () => {
+    //#given - no disabled commands
+
+    //#when
+    const commands = loadBuiltinCommands()
+
+    //#then
+    expect(commands.btw.template).toContain("<side-question>")
+    expect(commands.btw.template).toContain("$ARGUMENTS")
+  })
+
+  test("should describe btw as a side-question command that does not pollute main flow", () => {
+    //#given - no disabled commands
+
+    //#when
+    const commands = loadBuiltinCommands()
+
+    //#then
+    expect(commands.btw.description).toContain("side question")
+    expect(commands.btw.description).toContain("does not pollute")
   })
 })
