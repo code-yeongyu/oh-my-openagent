@@ -11,7 +11,7 @@
 
 > [!NOTE]
 >
-> [![Sisyphus Labs - Sisyphus is the agent that codes like your team.](./.github/assets/sisyphuslabs.png?v=2)](https://sisyphuslabs.ai)
+> [![Sisyphus Labs - Meet Dori, the AI agent maintainer of a 56k-star repo.](./.github/assets/sisyphuslabs.png?v=3)](https://sisyphuslabs.ai)
 > > **OmO は上記の Jobdori によってメンテナンスされています。あなた専用の Jobdori、Dori に会いましょう。 <br />[こちら](https://sisyphuslabs.ai) からウェイトリストにご登録ください。**
 
 > [!TIP]
