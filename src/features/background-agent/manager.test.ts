@@ -23,6 +23,12 @@ mock.module("../../shared/connected-providers-cache", () => ({
   writeProviderModelsCache: () => {},
   updateConnectedProvidersCache: () => {},
 }))
+mock.module("../../shared/frontmatter", () => ({
+  parseFrontmatter: () => ({ frontmatter: {}, content: "" }),
+}))
+mock.module("js-yaml", () => ({
+  load: () => ({}),
+}))
 mock.restore()
 
 
@@ -2445,6 +2451,63 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       expect(task.queuedAt).toBeInstanceOf(Date)
       expect(task.startedAt).toBeUndefined()
       expect(task.sessionId).toBeUndefined()
+    })
+
+    test("should sanitize wrapped agent names before task creation and queueing", async () => {
+      // given
+      const input = {
+        description: "Test task",
+        prompt: "Do something",
+        agent: "\\hephaestus\\",
+        parentSessionId: "parent-session",
+        parentMessageId: "parent-message",
+      }
+
+      // when
+      const task = await manager.launch(input)
+      const queueItem = getQueuesByKey(manager).values().next().value?.[0]
+
+      // then
+      expect(task.agent).toBe("hephaestus")
+      expect(getTaskMap(manager).get(task.id)?.agent).toBe("hephaestus")
+      expect(queueItem?.input.agent).toBe("hephaestus")
+    })
+
+    test("should sanitize slash and quote wrapped agent names before task creation and queueing", async () => {
+      // given
+      const input = {
+        description: "Test task",
+        prompt: "Do something",
+        agent: "\"/hephaestus/\"",
+        parentSessionId: "parent-session",
+        parentMessageId: "parent-message",
+      }
+
+      // when
+      const task = await manager.launch(input)
+      const queueItem = getQueuesByKey(manager).values().next().value?.[0]
+
+      // then
+      expect(task.agent).toBe("hephaestus")
+      expect(getTaskMap(manager).get(task.id)?.agent).toBe("hephaestus")
+      expect(queueItem?.input.agent).toBe("hephaestus")
+    })
+
+    test("should reject wrapper-only agent names after sanitization", async () => {
+      // given
+      const input = {
+        description: "Test task",
+        prompt: "Do something",
+        agent: "\\\"/'\\\"/",
+        parentSessionId: "parent-session",
+        parentMessageId: "parent-message",
+      }
+
+      // when
+      const result = manager.launch(input)
+
+      // then
+      await expect(result).rejects.toThrow("Agent parameter is required after sanitization")
     })
 
     test("should initialize attempt state for a newly launched task", async () => {
