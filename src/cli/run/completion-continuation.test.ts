@@ -105,6 +105,41 @@ describe("checkCompletionConditions continuation coverage", () => {
     expect(result).toBe(true)
   })
 
+  it("returns true when the mirrored worktree plan is complete even if the main repo plan is stale", async () => {
+    // given
+    spyOn(console, "log").mockImplementation(() => {})
+    const directory = createTempDir()
+    const mainPlanPath = join(directory, ".sisyphus", "plans", "done-in-worktree-plan.md")
+    const worktreeDirectory = createTempDir()
+    const worktreePlanPath = join(worktreeDirectory, ".sisyphus", "plans", "done-in-worktree-plan.md")
+    mkdirSync(join(directory, ".sisyphus", "plans"), { recursive: true })
+    mkdirSync(join(worktreeDirectory, ".sisyphus", "plans"), { recursive: true })
+    writeFileSync(mainPlanPath, "- [ ] stale main repo task\n", "utf-8")
+    writeFileSync(worktreePlanPath, "- [x] completed worktree task\n", "utf-8")
+    const sisyphusDir = join(directory, ".sisyphus")
+    mkdirSync(sisyphusDir, { recursive: true })
+    writeFileSync(
+      join(sisyphusDir, "boulder.json"),
+      JSON.stringify({
+        active_plan: mainPlanPath,
+        started_at: new Date().toISOString(),
+        session_ids: ["test-session"],
+        plan_name: "done-in-worktree-plan",
+        agent: "atlas",
+        worktree_path: worktreeDirectory,
+      }),
+      "utf-8",
+    )
+    const ctx = createMockContext(directory)
+    const { checkCompletionConditions } = await import("./completion")
+
+    // when
+    const result = await checkCompletionConditions(ctx)
+
+    // then
+    expect(result).toBe(true)
+  })
+
   it("returns false when current session is an appended descendant of an active boulder session with unchecked plan items", async () => {
     // given
     spyOn(console, "log").mockImplementation(() => {})

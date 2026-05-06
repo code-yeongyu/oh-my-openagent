@@ -7,6 +7,7 @@ import {
   getPlanName,
   getPlanProgress,
   readBoulderState,
+  resolveBoulderPlanPath,
   writeBoulderState,
 } from "../../features/boulder-state"
 import { log } from "../../shared/logger"
@@ -150,7 +151,8 @@ function buildExistingSessionContext(params: {
   directory: string
 }): string {
   const { existingState, sessionId, activeAgent, worktreePath, worktreeBlock, directory } = params
-  const progress = getPlanProgress(existingState.active_plan)
+  const planPath = resolveBoulderPlanPath(directory, existingState)
+  const progress = getPlanProgress(planPath)
   if (progress.isComplete) {
     return `
 ## Previous Work Complete
@@ -186,7 +188,7 @@ Looking for new plans...`
 
 **Status**: RESUMING existing work
 **Plan**: ${existingState.plan_name}
-**Path**: ${existingState.active_plan}
+**Path**: ${planPath}
 **Progress**: ${progress.completed}/${progress.total} tasks completed
 **Sessions**: ${existingState.session_ids.length + 1} (current session appended)
 **Started**: ${existingState.started_at}
@@ -197,11 +199,16 @@ Read the plan file and continue from the first unchecked task.`
 }
 
 function shouldDiscoverPlans(
+  directory: string,
   existingState: ReturnType<typeof readBoulderState>,
   explicitPlanName: string | null,
 ): boolean {
   return (!existingState && !explicitPlanName)
-    || (existingState !== null && !explicitPlanName && getPlanProgress(existingState.active_plan).isComplete)
+    || (
+      existingState !== null
+      && !explicitPlanName
+      && getPlanProgress(resolveBoulderPlanPath(directory, existingState)).isComplete
+    )
 }
 
 function buildPlanDiscoveryContext(params: {
@@ -303,7 +310,7 @@ export function buildStartWorkContextInfo(params: {
     })
   }
 
-  if (shouldDiscoverPlans(existingState, explicitPlanName)) {
+  if (shouldDiscoverPlans(ctx.directory, existingState, explicitPlanName)) {
     return buildPlanDiscoveryContext({
       contextInfo,
       sessionId,

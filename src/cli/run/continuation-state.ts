@@ -1,4 +1,4 @@
-import { getPlanProgress, readBoulderState } from "../../features/boulder-state"
+import { getPlanProgress, readBoulderState, resolveBoulderPlanPath } from "../../features/boulder-state"
 import { getSessionAgent } from "../../features/claude-code-session-state"
 import {
   getActiveContinuationMarkerReason,
@@ -47,7 +47,7 @@ async function hasActiveBoulderContinuation(
   const boulder = readBoulderState(directory)
   if (!boulder) return false
 
-  const progress = getPlanProgress(boulder.active_plan)
+  const progress = getPlanProgress(resolveBoulderPlanPath(directory, boulder))
   if (progress.isComplete) return false
   if (!client) return false
 
