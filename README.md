@@ -10,7 +10,7 @@
 
 > [!NOTE]
 >
-> [![Sisyphus Labs - Meet Dori, the AI agent maintainer of a 56k-star repo.](./.github/assets/sisyphuslabs.png?v=3)](https://sisyphuslabs.ai)
+> [![Sisyphus Labs - Meet Dori. Not a demo. Subscribes to everything.](./.github/assets/sisyphuslabs.png?v=4)](https://sisyphuslabs.ai)
 > > **OmO is maintained by Jobdori, the AI assistant shown above. Meet your own Jobdori — Dori. <br />Join the waitlist [here](https://sisyphuslabs.ai).**
 
 > [!TIP]

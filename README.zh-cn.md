@@ -11,7 +11,7 @@
 
 > [!NOTE]
 >
-> [![Sisyphus Labs - Meet Dori, the AI agent maintainer of a 56k-star repo.](./.github/assets/sisyphuslabs.png?v=3)](https://sisyphuslabs.ai)
+> [![Sisyphus Labs - Meet Dori. Not a demo. Subscribes to everything.](./.github/assets/sisyphuslabs.png?v=4)](https://sisyphuslabs.ai)
 > > **OmO 由上述的 Jobdori 进行维护。认识你专属的 Jobdori — Dori。<br />[在此处](https://sisyphuslabs.ai)加入等待名单。**
 
 > [!TIP]
