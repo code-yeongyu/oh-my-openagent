@@ -1,3 +1,8 @@
+---
+name: sisyphus-variants
+description: Developer reference for Sisyphus orchestrator model-specific prompt variants — selection logic and key exports.
+---
+
 # src/agents/sisyphus/ -- Orchestrator Variants
 
 **Generated:** 2026-04-11
