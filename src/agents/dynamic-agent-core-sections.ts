@@ -170,6 +170,21 @@ Briefly announce "Consulting Oracle for [reason]" before invocation.
 </Oracle_Usage>`
 }
 
+export function buildFrontendGuidanceSection(
+  categories: AvailableCategory[],
+): string {
+  const hasVisualEngineeringCategory = categories.some(
+    (category) => category.name === "visual-engineering",
+  )
+  if (hasVisualEngineeringCategory) {
+    return ""
+  }
+
+  return `# Frontend Tasks
+
+When you must touch frontend code yourself: avoid generic AI-SaaS aesthetics. Choose a clear visual direction with CSS variables (no purple-on-white default, no dark-mode default). Use expressive, purposeful typography rather than default stacks (Inter, Roboto, Arial, system). Build atmosphere through gradients, shapes, or subtle patterns rather than flat single-color backgrounds. Use a few meaningful animations (page-load, staggered reveals) over generic micro-motion. Verify both desktop and mobile rendering. If working within an existing design system, preserve its patterns instead.`
+}
+
 export function buildNonClaudePlannerSection(model: string): string {
   const isNonClaude = !model.toLowerCase().includes("claude")
   if (!isNonClaude) {
