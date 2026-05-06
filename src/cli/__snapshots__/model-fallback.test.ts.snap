@@ -102,6 +102,10 @@ exports[`generateModelConfig single native provider uses Claude models when only
     },
   },
   "categories": {
+    "artistry": {
+      "model": "anthropic/claude-opus-4-7",
+      "variant": "max",
+    },
     "deep": {
       "model": "anthropic/claude-opus-4-7",
       "variant": "max",
@@ -168,6 +172,10 @@ exports[`generateModelConfig single native provider uses Claude models with isMa
     },
   },
   "categories": {
+    "artistry": {
+      "model": "anthropic/claude-opus-4-7",
+      "variant": "max",
+    },
     "deep": {
       "model": "anthropic/claude-opus-4-7",
       "variant": "max",
@@ -1783,6 +1791,9 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian whe
     },
   },
   "categories": {
+    "artistry": {
+      "model": "opencode/gpt-5-nano",
+    },
     "deep": {
       "model": "opencode/gpt-5-nano",
     },
@@ -1844,6 +1855,9 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian wit
     },
   },
   "categories": {
+    "artistry": {
+      "model": "opencode/gpt-5-nano",
+    },
     "deep": {
       "model": "opencode/gpt-5-nano",
     },
@@ -2458,6 +2472,10 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + ZAI combinat
     },
   },
   "categories": {
+    "artistry": {
+      "model": "anthropic/claude-opus-4-7",
+      "variant": "max",
+    },
     "deep": {
       "model": "anthropic/claude-opus-4-7",
       "variant": "max",
