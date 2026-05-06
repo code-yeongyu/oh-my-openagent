@@ -391,6 +391,7 @@ No affiliation with any project or model mentioned. Just personal experimentatio
   - Makers of Spray (influencer marketing solution), vovushop (cross-border commerce platform), and vreview (AI commerce review marketing solution).
 - [Google](https://google.com)
 - [Microsoft](https://microsoft.com)
+- [Vercel](https://vercel.com)
 - [ELESTYLE](https://elestyle.jp)
   - Makers of elepay (multi-mobile payment gateway) and OneQR (mobile application SaaS for cashless solutions).
 

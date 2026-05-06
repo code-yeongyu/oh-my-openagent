@@ -391,6 +391,7 @@ OpenCode가 Debian/Arch라면, oh-my-openagent는 Ubuntu/[Omarchy](https://omarc
   - Spray(인플루언서 마케팅 솔루션), vovushop(크로스보더 커머스 플랫폼), vreview(AI 커머스 리뷰 마케팅 솔루션) 개발사.
 - [Google](https://google.com)
 - [Microsoft](https://microsoft.com)
+- [Vercel](https://vercel.com)
 - [ELESTYLE](https://elestyle.jp)
   - elepay(멀티 모바일 결제 게이트웨이), OneQR(캐시리스 솔루션용 모바일 앱 SaaS) 개발사.
 
