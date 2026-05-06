@@ -58,6 +58,8 @@ export function createRalphLoopEventHandler(
 ) {
 	const inFlightSessions = new Set<string>()
 	const runtimeErrorRetriedSessions = new Map<string, number>()
+	const MAX_RUNTIME_ERROR_RETRIES = 3
+	let runtimeErrorRetryCount = 0
 
 	return async ({ event }: { event: { type: string; properties?: unknown } }): Promise<void> => {
 		const props = event.properties as Record<string, unknown> | undefined
@@ -153,6 +155,7 @@ export function createRalphLoopEventHandler(
 
 				if (completionViaTranscript || completionViaApi) {
 					runtimeErrorRetriedSessions.delete(sessionID)
+					runtimeErrorRetryCount = 0
 					log(`[${HOOK_NAME}] Completion detected!`, {
 						sessionID,
 						iteration: state.iteration,
@@ -221,6 +224,7 @@ export function createRalphLoopEventHandler(
 					log(`[${HOOK_NAME}] Failed to increment iteration`, { sessionID })
 					return
 				}
+				runtimeErrorRetryCount = 0
 
 				log(`[${HOOK_NAME}] Continuing loop`, {
 					sessionID,
@@ -305,6 +309,18 @@ export function createRalphLoopEventHandler(
 					return
 				}
 
+				if (runtimeErrorRetryCount >= MAX_RUNTIME_ERROR_RETRIES) {
+					log(`[${HOOK_NAME}] Runtime error retry cap reached`, {
+						sessionID,
+						iteration: state.iteration,
+						retries: runtimeErrorRetryCount,
+						cap: MAX_RUNTIME_ERROR_RETRIES,
+					})
+					options.loopState.clear()
+					await showMaxIterationsToast(ctx, state)
+					return
+				}
+
 				if (
 					typeof state.max_iterations === "number"
 					&& state.iteration >= state.max_iterations
@@ -334,6 +350,7 @@ export function createRalphLoopEventHandler(
 						loopState: options.loopState,
 					})
 					runtimeErrorRetriedSessions.set(sessionID, newState.iteration)
+					runtimeErrorRetryCount++
 				} catch (err) {
 					log(`[${HOOK_NAME}] Failed to retry after runtime error`, {
 						sessionID,
