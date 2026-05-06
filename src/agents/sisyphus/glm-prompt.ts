@@ -17,6 +17,7 @@ import {
   buildHardBlocksSection,
   buildAntiPatternsSection,
   buildAntiDuplicationSection,
+  buildParallelDelegationSection,
   buildNonClaudePlannerSection,
   categorizeTools,
 } from "../dynamic-agent-prompt-builder"
@@ -77,6 +78,24 @@ export function buildGlmSisyphusPrompt(
   const hardBlocks = buildHardBlocksSection()
   const antiPatterns = buildAntiPatternsSection()
   const nonClaudePlannerSection = buildNonClaudePlannerSection(model)
+  const parallelDelegationSection = `### DIRECT HEPHAESTUS DELEGATION - YOUR IMPLEMENTATION PATH
+
+For long or complex implementation, call Hephaestus directly with \`call_omo_agent(subagent_type="hephaestus", run_in_background=true, ...)\` when that tool is available. Hephaestus is the autonomous implementation worker; GLM is the orchestrator.
+
+Use category delegation only when direct Hephaestus invocation is unavailable or when a domain category is more precise.
+
+${buildParallelDelegationSection(model, availableCategories) ||
+    `### DECOMPOSE AND DELEGATE - YOU ARE NOT AN IMPLEMENTER
+
+**YOUR FAILURE MODE: You attempt to do work yourself instead of decomposing and delegating.** When an implementation task is not V1 trivial, specialized subagents are faster and more reliable than GLM solo execution.
+
+**MANDATORY - for ANY non-trivial implementation task:**
+
+1. **ALWAYS decompose** the task into independent work units.
+2. **ALWAYS delegate** each unit to available category workers, preferably \`deep\` or \`unspecified-high\`, in parallel.
+3. **NEVER implement directly** when delegation is possible. You write prompts, collect results, verify, and synthesize.
+
+**Your value is orchestration, decomposition, and quality control. Delegating with crystal-clear prompts IS your work.**`}`
   const tasksSection = buildGlmTasksSection(useTaskSystem)
   const todoHookNote = useTaskSystem
     ? "YOUR TASK CREATION WOULD BE TRACKED BY HOOK([SYSTEM REMINDER - TASK CONTINUATION])"
@@ -283,6 +302,8 @@ ${categorySkillsGuide}
 
 ${nonClaudePlannerSection}
 
+${parallelDelegationSection}
+
 ${delegationTable}
 
 Delegation prompt structure:
@@ -297,15 +318,16 @@ Delegation prompt structure:
 
 GLM delegation defaults:
 - Research: explore/librarian in background, parallel.
-- Implementation: task category with load_skills.
+- Implementation: direct Hephaestus via \`call_omo_agent\` for complex work; category task with load_skills for domain-specific work.
 - Architecture/debug uncertainty: Oracle before editing.
 - Visual/media: multimodal-looker or visual-engineering, never GLM self-analysis of images.
 
 Heavy work routing:
-- Long or complex implementation (multi-file, multi-step, research-heavy) → delegate to Hephaestus via \`task(category=\"deep\", load_skills=[...])\`. Hephaestus is the deep-thinking autonomous worker. Let him handle it.
+- Long or complex implementation (multi-file, multi-step, research-heavy) → delegate to Hephaestus via \`call_omo_agent(subagent_type="hephaestus", run_in_background=true, prompt=...)\`. Do not self-implement.
+- Domain-specific implementation where a category is clearly better → delegate via \`task(category=..., load_skills=[...], run_in_background=true)\`.
 - Quick targeted edits, single-file fixes, trivial config changes → self-implement or use Sisyphus-Junior with quick category.
 - Frontend/visual → visual-engineering category with appropriate skills.
-- The key speed insight: if a task needs more than 3 sequential self-edits, delegate it to Hephaestus instead. Your time is better spent dispatching and synthesizing.
+- The key speed insight: if a task needs more than 3 sequential self-edits, decompose and delegate it instead. Your time is better spent dispatching and synthesizing.
 Session continuity:
 - Use returned task/session ids for follow-ups and verification fixes.
 - Do not start fresh when a delegated agent already has context.

@@ -217,6 +217,30 @@ describe("applyToolConfig", () => {
     })
   })
 
+  describe("#given Sisyphus needs direct specialist delegation", () => {
+    it("#then should allow call_omo_agent for Sisyphus", () => {
+      const params = createParams({ agents: ["sisyphus"] })
+
+      applyToolConfig(params)
+
+      const agent = params.agentResult.sisyphus as {
+        permission: Record<string, unknown>
+      }
+      expect(agent.permission.call_omo_agent).toBe("allow")
+    })
+
+    it("#then should keep call_omo_agent denied for Hephaestus", () => {
+      const params = createParams({ agents: ["hephaestus"] })
+
+      applyToolConfig(params)
+
+      const agent = params.agentResult.hephaestus as {
+        permission: Record<string, unknown>
+      }
+      expect(agent.permission.call_omo_agent).toBe("deny")
+    })
+  })
+
   describe("#given task_system is undefined", () => {
     describe("#when applying tool config", () => {
       it("#then should not disable todo tools globally by default", () => {

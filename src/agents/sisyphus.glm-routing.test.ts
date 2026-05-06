@@ -60,4 +60,14 @@ describe("createSisyphusAgent - GLM routing", () => {
     expect(agent.thinking).toEqual({ type: "enabled" });
     expect((agent as Record<string, unknown>).reasoningEffort).toBeUndefined();
   });
+
+  test("#given GLM harness model #then strongly biases implementation toward category delegation", () => {
+    const prompt = getPrompt("zai/glm-5.1");
+
+    expect(prompt).toContain("DECOMPOSE AND DELEGATE - YOU ARE NOT AN IMPLEMENTER");
+    expect(prompt).toContain("NEVER implement directly");
+    expect(prompt).toContain("DIRECT HEPHAESTUS DELEGATION - YOUR IMPLEMENTATION PATH");
+    expect(prompt).toContain('call_omo_agent(subagent_type="hephaestus"');
+    expect(prompt).toContain("delegate to Hephaestus");
+  });
 });
