@@ -201,7 +201,7 @@ describe("resolveModelForDelegateTask", () => {
 				expect(result).toBeDefined()
 				expect(result).not.toHaveProperty("skipped")
 				const resolved = result as { model: string; variant?: string }
-				expect(resolved.model).toBe("anthropic/claude-haiku-4.5")
+				expect(resolved.model).toBe("anthropic/claude-haiku-4-5")
 			})
 
 			test("#then resolves first provider in entry that is connected", () => {
