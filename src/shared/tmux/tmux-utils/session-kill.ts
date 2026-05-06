@@ -1,13 +1,9 @@
-async function readStream(stream: ReadableStream<Uint8Array> | null | undefined): Promise<string> {
-	return stream ? new Response(stream).text() : ""
-}
-
 export async function killTmuxSessionIfExists(sessionName: string): Promise<boolean> {
-	const [{ log }, { isInsideTmux }, { getTmuxPath }, { spawn }] = await Promise.all([
+	const [{ log }, { isInsideTmux }, { getTmuxPath }, { runTmuxCommand }] = await Promise.all([
 		import("../../logger"),
 		import("./environment"),
 		import("../../../tools/interactive-bash/tmux-path-resolver"),
-		import("./spawn-process"),
+		import("../runner"),
 	])
 
 	if (!isInsideTmux()) {
@@ -21,28 +17,21 @@ export async function killTmuxSessionIfExists(sessionName: string): Promise<bool
 		return false
 	}
 
-	const hasSessionProcess = spawn([tmux, "has-session", "-t", sessionName], {
-		stdout: "ignore",
-		stderr: "ignore",
-	})
+ 	const hasSessionResult = await runTmuxCommand(tmux, ["has-session", "-t", sessionName])
 
-	if ((await hasSessionProcess.exited) !== 0) {
+	if (hasSessionResult.exitCode !== 0) {
 		log("[killTmuxSessionIfExists] SKIP: session not found", { sessionName })
 		return false
 	}
 
-	const killSessionProcess = spawn([tmux, "kill-session", "-t", sessionName], {
-		stdout: "pipe",
-		stderr: "pipe",
-	})
-	const [, stderr, exitCode] = await Promise.all([
-		readStream(killSessionProcess.stdout),
-		readStream(killSessionProcess.stderr),
-		killSessionProcess.exited,
-	])
+ 	const killSessionResult = await runTmuxCommand(tmux, ["kill-session", "-t", sessionName])
 
-	if (exitCode !== 0) {
-		log("[killTmuxSessionIfExists] FAILED", { sessionName, exitCode, stderr: stderr.trim() })
+	if (killSessionResult.exitCode !== 0) {
+		log("[killTmuxSessionIfExists] FAILED", {
+			sessionName,
+			exitCode: killSessionResult.exitCode,
+			stderr: killSessionResult.stderr.trim(),
+		})
 		return false
 	}
 

@@ -1,14 +1,16 @@
-import { afterEach, describe, expect, it, mock, spyOn } from "bun:test";
+import { afterEach, describe, expect, it, mock } from "bun:test";
 import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import * as shared from "./shared"
 import { mergeConfigs, parseConfigPartially } from "./plugin-config";
-import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig } from "./config";
+import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig, type TeamModeConfig } from "./config";
 
 const tempDirs: string[] = []
+type ConfigInput = Omit<Partial<OhMyOpenCodeConfig>, "team_mode"> & {
+  team_mode?: Partial<TeamModeConfig>
+}
 
-function createConfig(config: Partial<OhMyOpenCodeConfig>): OhMyOpenCodeConfig {
+function createConfig(config: ConfigInput): OhMyOpenCodeConfig {
   return OhMyOpenCodeConfigSchema.parse(config)
 }
 
@@ -18,11 +20,34 @@ async function importFreshPluginConfigModule(): Promise<typeof import("./plugin-
 
 afterEach(() => {
   mock.restore()
+  delete process.env.OPENCODE_CONFIG_DIR
 
   for (const dir of tempDirs.splice(0)) {
     rmSync(dir, { recursive: true, force: true })
   }
 })
+
+function createLoadPluginConfigTestContext(prefix: string): {
+  rootDir: string
+  userConfigDir: string
+  projectDir: string
+  projectConfigDir: string
+} {
+  const rootDir = mkdtempSync(join(tmpdir(), prefix))
+  const userConfigDir = join(rootDir, "user-config")
+  const projectDir = join(rootDir, "project")
+  const projectConfigDir = join(projectDir, ".opencode")
+
+  tempDirs.push(rootDir)
+  mkdirSync(userConfigDir, { recursive: true })
+  mkdirSync(projectConfigDir, { recursive: true })
+
+  return { rootDir, userConfigDir, projectDir, projectConfigDir }
+}
+
+function writeJsonFile(filePath: string, value: Record<string, unknown>): void {
+  writeFileSync(filePath, JSON.stringify(value))
+}
 
 describe("mergeConfigs", () => {
   describe("categories merging", () => {
@@ -121,6 +146,29 @@ describe("mergeConfigs", () => {
       expect(result.agents?.explore).toMatchObject({ model: "anthropic/claude-haiku-4-5" });
     });
 
+    it("should deep merge team_mode", () => {
+      const base = createConfig({
+        team_mode: {
+          enabled: false,
+          tmux_visualization: false,
+          max_parallel_members: 2,
+        },
+      });
+
+      const override = {
+        team_mode: {
+          enabled: true,
+        },
+      } as OhMyOpenCodeConfig;
+
+      const result = mergeConfigs(base, override);
+
+      expect(result.team_mode).toMatchObject({
+        enabled: true,
+        max_parallel_members: 2,
+      });
+    });
+
     it("should merge disabled arrays without duplicates", () => {
       const base = createConfig({
         disabled_hooks: ["comment-checker", "think-mode"],
@@ -156,6 +204,7 @@ describe("mergeConfigs", () => {
     });
   });
 });
+
 
 describe("parseConfigPartially", () => {
   describe("disabled_hooks compatibility", () => {
@@ -509,6 +558,85 @@ describe("loadPluginConfig", () => {
       commit_footer: true,
       include_co_authored_by: false,
       git_env_prefix: "GIT_MASTER=1",
+    })
+  })
+
+  describe("team_mode.tmux_visualization", () => {
+    it("#given canonical user config enables team_mode and legacy config also exists #when loadPluginConfig runs #then tmux_visualization remains false", async () => {
+      // given
+      const { userConfigDir, projectDir } = createLoadPluginConfigTestContext("omo-plugin-config-team-mode-user-")
+
+      writeJsonFile(join(userConfigDir, "oh-my-openagent.json"), {
+        team_mode: {
+          enabled: true,
+        },
+      })
+      writeJsonFile(join(userConfigDir, "oh-my-opencode.json"), {
+        agents: {
+          oracle: {
+            model: "openai/gpt-5.4",
+          },
+        },
+      })
+
+      process.env.OPENCODE_CONFIG_DIR = userConfigDir
+
+      // when
+      const { loadPluginConfig } = await importFreshPluginConfigModule()
+      const config = loadPluginConfig(projectDir, {})
+
+      // then
+      expect(config.team_mode?.enabled).toBe(true)
+      expect(config.team_mode?.tmux_visualization).toBe(false)
+    })
+
+    it("#given canonical user config lacks team_mode and legacy config only enables team_mode #when loadPluginConfig runs #then canonical config wins and tmux_visualization stays effectively false", async () => {
+      // given
+      const { userConfigDir, projectDir } = createLoadPluginConfigTestContext("omo-plugin-config-team-mode-legacy-")
+
+      writeJsonFile(join(userConfigDir, "oh-my-openagent.json"), {
+        hashline_edit: true,
+      })
+      writeJsonFile(join(userConfigDir, "oh-my-opencode.json"), {
+        team_mode: {
+          enabled: true,
+        },
+      })
+
+      process.env.OPENCODE_CONFIG_DIR = userConfigDir
+
+      // when
+      const { loadPluginConfig } = await importFreshPluginConfigModule()
+      const config = loadPluginConfig(projectDir, {})
+
+      // then
+      expect(config.team_mode).toBeUndefined()
+      expect(config.team_mode?.tmux_visualization ?? false).toBe(false)
+    })
+
+    it("#given canonical user config lacks team_mode and legacy config sets tmux_visualization=true #when loadPluginConfig runs #then legacy team_mode is not promoted into the loaded config", async () => {
+      // given
+      const { userConfigDir, projectDir } = createLoadPluginConfigTestContext("omo-plugin-config-team-mode-visualization-")
+
+      writeJsonFile(join(userConfigDir, "oh-my-openagent.json"), {
+        hashline_edit: true,
+      })
+      writeJsonFile(join(userConfigDir, "oh-my-opencode.json"), {
+        team_mode: {
+          enabled: true,
+          tmux_visualization: true,
+        },
+      })
+
+      process.env.OPENCODE_CONFIG_DIR = userConfigDir
+
+      // when
+      const { loadPluginConfig } = await importFreshPluginConfigModule()
+      const config = loadPluginConfig(projectDir, {})
+
+      // then
+      // This proves a concurrent canonical file suppresses the legacy team_mode subtree entirely.
+      expect(config.team_mode).toBeUndefined()
     })
   })
 })

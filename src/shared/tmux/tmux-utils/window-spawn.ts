@@ -1,10 +1,9 @@
-import { spawn } from "../../bun-spawn-shim"
 import type { TmuxConfig } from "../../../config/schema"
 import { getTmuxPath } from "../../../tools/interactive-bash/tmux-path-resolver"
 import type { SpawnPaneResult } from "../types"
 import { isInsideTmux } from "./environment"
 import { isServerRunning } from "./server-health"
-import { shellEscapeForDoubleQuotedCommand } from "../../shell-env"
+import { shellSingleQuote } from "../../shell-env"
 
 const ISOLATED_WINDOW_NAME = "omo-agents"
 
@@ -13,8 +12,12 @@ export async function spawnTmuxWindow(
 	description: string,
 	config: TmuxConfig,
 	serverUrl: string,
+	directory: string,
 ): Promise<SpawnPaneResult> {
-	const { log } = await import("../../logger")
+	const [{ log }, { runTmuxCommand }] = await Promise.all([
+		import("../../logger"),
+		import("../runner"),
+	])
 
 	log("[spawnTmuxWindow] called", {
 		sessionId,
@@ -46,10 +49,8 @@ export async function spawnTmuxWindow(
 
 	log("[spawnTmuxWindow] all checks passed, creating isolated window...")
 
-	const shell = process.env.SHELL || "/bin/sh"
-	const escapedUrl = shellEscapeForDoubleQuotedCommand(serverUrl)
-	const escapedSessionId = shellEscapeForDoubleQuotedCommand(sessionId)
-	const opencodeCmd = `${shell} -c "opencode attach ${escapedUrl} --session ${escapedSessionId}"`
+	const effectiveDirectory = directory || process.cwd()
+	const opencodeCmd = `opencode attach ${shellSingleQuote(serverUrl)} --session ${shellSingleQuote(sessionId)} --dir ${shellSingleQuote(effectiveDirectory)}`
 
 	const args = [
 		"new-window",
@@ -60,31 +61,22 @@ export async function spawnTmuxWindow(
 		opencodeCmd,
 	]
 
-	const proc = spawn([tmux, ...args], { stdout: "pipe", stderr: "pipe" })
-	const exitCode = await proc.exited
-	const stdout = await new Response(proc.stdout).text()
-	const paneId = stdout.trim()
+	const result = await runTmuxCommand(tmux, args)
+	const paneId = result.output
 
-	if (exitCode !== 0 || !paneId) {
-		const stderr = await new Response(proc.stderr).text()
-		log("[spawnTmuxWindow] FAILED", { exitCode, stderr: stderr.trim() })
+	if (result.exitCode !== 0 || !paneId) {
+		log("[spawnTmuxWindow] FAILED", { exitCode: result.exitCode, stderr: result.stderr.trim() })
 		return { success: false }
 	}
 
 	const title = `omo-subagent-${description.slice(0, 20)}`
-	const titleProc = spawn([tmux, "select-pane", "-t", paneId, "-T", title], {
-		stdout: "ignore",
-		stderr: "pipe",
-	})
-	const stderrPromise = new Response(titleProc.stderr).text().catch(() => "")
-	const titleExitCode = await titleProc.exited
-	if (titleExitCode !== 0) {
-		const titleStderr = await stderrPromise
+	const titleResult = await runTmuxCommand(tmux, ["select-pane", "-t", paneId, "-T", title])
+	if (titleResult.exitCode !== 0) {
 		log("[spawnTmuxWindow] WARNING: failed to set pane title", {
 			paneId,
 			title,
-			exitCode: titleExitCode,
-			stderr: titleStderr.trim(),
+			exitCode: titleResult.exitCode,
+			stderr: titleResult.stderr.trim(),
 		})
 	}
 

@@ -14,6 +14,7 @@ export interface SpawnOptions {
   stderr?: StdioMode
   stdio?: StdioTuple
   detached?: boolean
+  signal?: AbortSignal
 }
 
 export interface SpawnedProcess {
@@ -138,6 +139,7 @@ export function spawn(cmdOrOpts: unknown, opts?: unknown): SpawnedProcess {
     env: options.env,
     stdio: resolveStdio(options),
     detached: options.detached,
+    signal: options.signal,
   })
 
   return wrapNodeProcess(proc)

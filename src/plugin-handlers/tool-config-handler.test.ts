@@ -265,6 +265,20 @@ describe("applyToolConfig", () => {
       expect(agent.permission["task_*"]).toBe("allow")
       expect(agent.permission.teammate).toBe("allow")
     })
+
+    it("#then should allow teammate for hephaestus", () => {
+      // given
+      const params = createParams({ agents: ["hephaestus"] })
+
+      // when
+      applyToolConfig(params)
+
+      // then
+      const agent = params.agentResult.hephaestus as {
+        permission: Record<string, unknown>
+      }
+      expect(agent.permission.teammate).toBe("allow")
+    })
   })
 
   describe("#given disabled_tools includes 'question'", () => {

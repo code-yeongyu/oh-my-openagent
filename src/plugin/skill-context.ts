@@ -62,6 +62,7 @@ export async function createSkillContext(args: {
   const builtinSkills = createBuiltinSkills({
     browserProvider,
     disabledSkills,
+    teamModeEnabled: pluginConfig.team_mode?.enabled ?? false,
   }).filter((skill) => {
     if (skill.mcpConfig) {
       for (const mcpName of Object.keys(skill.mcpConfig)) {

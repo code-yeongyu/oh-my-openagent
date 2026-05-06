@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-28 files. State-first tmux integration managing panes for background agent sessions. Handles split decisions, grid planning, polling, and lifecycle events.
+32 files. State-first tmux integration managing panes for background agent sessions. Handles split decisions, grid planning, polling, and lifecycle events.
 
 ## CORE ARCHITECTURE
 
@@ -15,6 +15,8 @@ TmuxSessionManager (manager.ts)
   ├─→ PollingManager: Monitor pane health
   └─→ EventHandlers: React to session create/delete
 ```
+
+All tmux command execution is centralized through `src/shared/tmux/runner.ts` (`runTmuxCommand`). Do NOT add direct `Bun.spawn([tmux,...])` calls in this module. They will drift from the retry/timeout/terminal-error discipline.
 
 ## KEY FILES
 

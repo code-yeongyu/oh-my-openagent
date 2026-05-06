@@ -1,4 +1,3 @@
-import { spawn } from "../../shared/bun-spawn-shim"
 import type { WindowState, TmuxPaneInfo } from "./types"
 import { parsePaneStateOutput } from "./pane-state-parser"
 import { getTmuxPath } from "../../tools/interactive-bash/tmux-path-resolver"
@@ -7,28 +6,22 @@ import { log } from "../../shared"
 export async function queryWindowState(sourcePaneId: string): Promise<WindowState | null> {
   const tmux = await getTmuxPath()
   if (!tmux) return null
+  const { runTmuxCommand } = await import("../../shared/tmux")
 
-  const proc = spawn(
-    [
-      tmux,
-      "list-panes",
-      "-t",
-      sourcePaneId,
-      "-F",
-			"#{pane_id}\t#{pane_width}\t#{pane_height}\t#{pane_left}\t#{pane_top}\t#{pane_active}\t#{window_width}\t#{window_height}\t#{pane_title}",
-    ],
-    { stdout: "pipe", stderr: "pipe" }
-  )
+  const result = await runTmuxCommand(tmux, [
+    "list-panes",
+    "-t",
+    sourcePaneId,
+    "-F",
+		"#{pane_id}\t#{pane_width}\t#{pane_height}\t#{pane_left}\t#{pane_top}\t#{pane_active}\t#{window_width}\t#{window_height}\t#{pane_title}",
+  ])
 
-  const exitCode = await proc.exited
-  const stdout = await new Response(proc.stdout).text()
+	if (result.exitCode !== 0) {
+		log("[pane-state-querier] list-panes failed", { exitCode: result.exitCode })
+		return null
+	}
 
-  if (exitCode !== 0) {
-    log("[pane-state-querier] list-panes failed", { exitCode })
-    return null
-  }
-
-  const parsedPaneState = parsePaneStateOutput(stdout)
+	const parsedPaneState = parsePaneStateOutput(result.output)
   if (!parsedPaneState) {
     log("[pane-state-querier] failed to parse pane state output", {
       sourcePaneId,

@@ -129,6 +129,63 @@ describe("recoverToolResultMissing", () => {
       },
     })
   })
+
+  it("pins agent, model, and variant on promptAsync body when resumeConfig provides them", async () => {
+    // given
+    storedParts = [{
+      type: "tool",
+      id: "prt_stored_pin_call",
+      callID: "toolu_pin",
+      tool: "bash",
+      state: { input: {} },
+    }]
+    const { client, promptAsync } = createMockClient()
+    const resumeConfig = {
+      sessionID: "ses_pin",
+      agent: "Hephaestus",
+      model: { providerID: "openai", modelID: "gpt-5.3-codex", variant: "max" },
+    }
+
+    // when
+    const result = await recoverToolResultMissing(client, "ses_pin", failedAssistantMsg, resumeConfig)
+
+    // then
+    expect(result).toBe(true)
+    expect(promptAsync).toHaveBeenCalledTimes(1)
+    const call = promptAsync.mock.calls[0]?.[0] as {
+      body: {
+        agent?: string
+        model?: { providerID: string; modelID: string }
+        variant?: string
+        parts: unknown[]
+      }
+    }
+    expect(call.body.agent).toBe("Hephaestus")
+    expect(call.body.model).toEqual({ providerID: "openai", modelID: "gpt-5.3-codex" })
+    expect(call.body.variant).toBe("max")
+  })
+
+  it("leaves body unchanged when no resumeConfig is provided", async () => {
+    // given
+    storedParts = [{
+      type: "tool",
+      id: "prt_stored_nopin_call",
+      callID: "toolu_nopin",
+      tool: "bash",
+      state: { input: {} },
+    }]
+    const { client, promptAsync } = createMockClient()
+
+    // when
+    const result = await recoverToolResultMissing(client, "ses_nopin", failedAssistantMsg)
+
+    // then
+    expect(result).toBe(true)
+    const call = promptAsync.mock.calls[0]?.[0] as { body: Record<string, unknown> }
+    expect(call.body).not.toHaveProperty("agent")
+    expect(call.body).not.toHaveProperty("model")
+    expect(call.body).not.toHaveProperty("variant")
+  })
 })
 
 export {}

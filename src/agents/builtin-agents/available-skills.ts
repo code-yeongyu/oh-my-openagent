@@ -12,9 +12,10 @@ function mapScopeToLocation(scope: SkillScope): AvailableSkill["location"] {
 export function buildAvailableSkills(
   discoveredSkills: LoadedSkill[],
   browserProvider?: BrowserAutomationProvider,
-  disabledSkills?: Set<string>
+  disabledSkills?: Set<string>,
+  teamModeEnabled?: boolean,
 ): AvailableSkill[] {
-  const builtinSkills = createBuiltinSkills({ browserProvider, disabledSkills })
+  const builtinSkills = createBuiltinSkills({ browserProvider, disabledSkills, teamModeEnabled })
   const builtinSkillNames = new Set(builtinSkills.map(s => s.name))
 
   const builtinAvailable: AvailableSkill[] = builtinSkills.map((skill) => ({

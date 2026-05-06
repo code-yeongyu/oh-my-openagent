@@ -525,9 +525,9 @@ describe("createBuiltinAgents without systemDefaultModel", () => {
      const agents = await createBuiltinAgents([], {}, undefined, undefined)
 
      // #then - connected cache enables model resolution despite no systemDefaultModel
-     expect(agents.oracle).toBeDefined()
-     expect(agents.oracle.model).toBe("openai/gpt-5.5")
-     cacheSpy.mockRestore?.()
+      expect(agents.oracle).toBeDefined()
+      expect(agents.oracle.model).toBe("openai/gpt-5.5")
+      cacheSpy.mockRestore?.()
      providerModelsSpy.mockRestore()
      fetchSpy.mockRestore()
    })

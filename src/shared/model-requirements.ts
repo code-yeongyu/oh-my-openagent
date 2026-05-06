@@ -254,7 +254,6 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       },
       { providers: ["openai", "github-copilot", "opencode", "vercel"], model: "gpt-5.5" },
     ],
-    requiresModel: "gemini-3.1-pro",
   },
   quick: {
     fallbackChain: [

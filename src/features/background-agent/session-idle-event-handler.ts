@@ -85,6 +85,14 @@ export function handleSessionIdleBackgroundEvent(args: {
         return
       }
 
+      if (task.teamRunId) {
+        log("[background-agent] Team member session went idle; skipping background auto-complete:", {
+          taskId: task.id,
+          teamRunId: task.teamRunId,
+        })
+        return
+      }
+
       await tryCompleteTask(task, "session.idle event")
     })
     .catch((err) => {

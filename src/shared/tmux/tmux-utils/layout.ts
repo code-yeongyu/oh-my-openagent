@@ -1,4 +1,3 @@
-import { spawn } from "../../bun-spawn-shim"
 import type { TmuxLayout } from "../../../config/schema"
 import { getTmuxPath } from "../../../tools/interactive-bash/tmux-path-resolver"
 
@@ -46,7 +45,12 @@ export async function applyLayout(
 	mainPaneSize: number,
 	deps?: LayoutDeps,
 ): Promise<void> {
-	const spawnCommand: TmuxSpawnCommand = deps?.spawnCommand ?? spawn
+	const spawnCommand: TmuxSpawnCommand = deps?.spawnCommand ?? ((args) => ({
+		exited: (async () => {
+			const { runTmuxCommand } = await import("../runner")
+			return (await runTmuxCommand(args[0] ?? "", args.slice(1))).exitCode
+		})(),
+	}))
 	const layoutProc = spawnCommand([tmux, "select-layout", layout], {
 		stdout: "ignore",
 		stderr: "ignore",
@@ -78,12 +82,9 @@ export async function enforceMainPaneWidth(
 			? { mainPaneSize: mainPaneSizeOrOptions }
 			: mainPaneSizeOrOptions ?? {}
 	const mainWidth = calculateMainPaneWidth(windowWidth, options)
+	const { runTmuxCommand } = await import("../runner")
 
-	const proc = spawn([tmux, "resize-pane", "-t", mainPaneId, "-x", String(mainWidth)], {
-		stdout: "ignore",
-		stderr: "ignore",
-	})
-	await proc.exited
+	await runTmuxCommand(tmux, ["resize-pane", "-t", mainPaneId, "-x", String(mainWidth)])
 
 	log("[enforceMainPaneWidth] main pane resized", {
 		mainPaneId,

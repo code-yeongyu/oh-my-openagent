@@ -1,6 +1,5 @@
 # Dependencies
-.sisyphus/*
-!.sisyphus/rules/
+.sisyphus/
 node_modules/
 
 # Build output

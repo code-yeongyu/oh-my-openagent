@@ -30,6 +30,7 @@ export interface SessionPollingController {
 export function createSessionPollingController(params: {
   client: OpencodeClient
   tmuxConfig: TmuxConfig
+  directory: string
   serverUrl: string
   sourcePaneId: string | undefined
   sessions: Map<string, TrackedSession>
@@ -49,7 +50,12 @@ export function createSessionPollingController(params: {
     if (state) {
       await executeAction(
         { type: "close", paneId: tracked.paneId, sessionId },
-        { config: params.tmuxConfig, serverUrl: params.serverUrl, windowState: state },
+        {
+          config: params.tmuxConfig,
+          directory: params.directory,
+          serverUrl: params.serverUrl,
+          windowState: state,
+        },
       )
     }
 

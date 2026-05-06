@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-8 files + 3 mode subdirs (~1665 LOC). Transform Tier hook on `messages.transform`. Scans first user message for mode keywords (ultrawork, search, analyze) and injects mode-specific system prompts.
+Transform Tier hook on `messages.transform`. Scans first user message for mode keywords (ultrawork, search, analyze, team) and injects mode-specific system prompts.
 
 ## KEYWORDS
 
@@ -13,6 +13,7 @@
 | `ultrawork` / `ulw` | `/\b(ultrawork|ulw)\b/i` | Full orchestration mode — parallel agents, deep exploration, relentless execution |
 | Search mode | `SEARCH_PATTERN` (from `search/`) | Web/doc search focus prompt injection |
 | Analyze mode | `ANALYZE_PATTERN` (from `analyze/`) | Deep analysis mode prompt injection |
+| Team mode | `TEAM_PATTERN` (from `team/`) | Forces orchestration via `team_*` tools when user invokes `team mode` / `팀 모드` / `팀으로`; instructs user to enable `team_mode.enabled` if tools are absent |
 
 ## STRUCTURE
 
@@ -31,10 +32,12 @@ keyword-detector/
 │   ├── index.ts
 │   ├── pattern.ts     # SEARCH_PATTERN regex
 │   └── message.ts     # SEARCH_MESSAGE
-└── analyze/
+├── analyze/
+│   ├── index.ts
+│   └── default.ts     # ANALYZE_PATTERN + ANALYZE_MESSAGE
+└── team/
     ├── index.ts
-    ├── pattern.ts     # ANALYZE_PATTERN regex
-    └── message.ts     # ANALYZE_MESSAGE
+    └── default.ts     # TEAM_PATTERN + TEAM_MESSAGE
 ```
 
 ## DETECTION LOGIC
@@ -44,10 +47,23 @@ chat.message (user input)
   → extractPromptText(parts)
   → isSystemDirective? → skip
   → removeSystemReminders(text)  # strip <SYSTEM_REMINDER> blocks
-  → detectKeywordsWithType(cleanText, agentName, modelID)
+  → detectKeywordsWithType(cleanText, agentName, modelID, disabledKeywords)
   → isPlannerAgent(agentName)? → filter out ultrawork
   → for each detected keyword: inject mode message into output
 ```
+
+## CONFIG
+
+```jsonc
+{
+  "keyword_detector": {
+    // Skip injection for any keyword in this list. Allowed: "ultrawork", "search", "analyze", "team".
+    "disabled_keywords": ["search", "analyze"]
+  }
+}
+```
+
+Default: empty/missing → all four detectors active. Schema lives at [src/config/schema/keyword-detector.ts](../../config/schema/keyword-detector.ts).
 
 ## GUARDS
 

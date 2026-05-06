@@ -112,6 +112,7 @@ export async function startTask(
   }
 
   const sessionID = createResult.data.id
+  await input.onSessionCreated?.(sessionID)
   subagentSessions.add(sessionID)
 
   task.status = "running"

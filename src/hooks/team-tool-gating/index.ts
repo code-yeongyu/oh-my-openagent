@@ -1,0 +1,1 @@
+export { createTeamToolGating } from "./hook"

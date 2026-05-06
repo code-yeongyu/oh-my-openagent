@@ -4,7 +4,9 @@ import { executeActionWithDeps } from "./action-executor-core"
 import type { ActionExecutorDeps, ExecuteContext } from "./action-executor-core"
 import type { WindowState } from "./types"
 
-const mockSpawnTmuxPane = mock(async () => ({ success: true, paneId: "%7" }))
+type SpawnPaneResult = Awaited<ReturnType<ActionExecutorDeps["spawnTmuxPane"]>>
+
+const mockSpawnTmuxPane = mock(async (): Promise<SpawnPaneResult> => ({ success: true, paneId: "%7" }))
 const mockCloseTmuxPane = mock(async () => true)
 const mockEnforceMainPaneWidth = mock(async () => undefined)
 const mockReplaceTmuxPane = mock(async () => ({ success: true, paneId: "%7" }))
@@ -21,6 +23,7 @@ const mockDeps: ActionExecutorDeps = {
 function createConfig(overrides?: Partial<TmuxConfig>): TmuxConfig {
 	return {
 		enabled: true,
+		isolation: "inline",
 		layout: "main-horizontal",
 		main_pane_size: 55,
 		main_pane_min_width: 120,
@@ -50,6 +53,7 @@ function createWindowState(overrides?: Partial<WindowState>): WindowState {
 function createContext(overrides?: Partial<ExecuteContext>): ExecuteContext {
 	return {
 		config: createConfig(),
+		directory: "/tmp/omo-project",
 		serverUrl: "http://localhost:4096",
 		windowState: createWindowState(),
 		...overrides,
@@ -90,7 +94,7 @@ describe("executeAction", () => {
 
 	test("does not apply layout when spawn fails", async () => {
 		// given
-		mockSpawnTmuxPane.mockImplementationOnce(async () => ({ success: false }))
+		mockSpawnTmuxPane.mockImplementation(async (): Promise<SpawnPaneResult> => ({ success: false }))
 
 		// when
 		const result = await executeActionWithDeps(
@@ -109,5 +113,6 @@ describe("executeAction", () => {
 		expect(result).toEqual({ success: false, paneId: undefined })
 		expect(mockApplyLayout).not.toHaveBeenCalled()
 		expect(mockEnforceMainPaneWidth).not.toHaveBeenCalled()
+		mockSpawnTmuxPane.mockImplementation(async (): Promise<SpawnPaneResult> => ({ success: true, paneId: "%7" }))
 	})
 })

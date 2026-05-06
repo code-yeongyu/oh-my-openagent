@@ -87,6 +87,23 @@ describe("migrateLegacyConfigFile", () => {
         expect(result).toBe(false)
         expect(readFileSync(canonicalPath, "utf-8")).toBe('{ "new": true }')
       })
+
+      it("#then does not copy legacy team_mode.tmux_visualization into the canonical file", () => {
+        const legacyPath = join(testDir, "oh-my-opencode.json")
+        const canonicalPath = join(testDir, "oh-my-openagent.json")
+        writeFileSync(legacyPath, JSON.stringify({
+          team_mode: {
+            enabled: true,
+            tmux_visualization: true,
+          },
+        }))
+        writeFileSync(canonicalPath, JSON.stringify({ hashline_edit: true }))
+
+        const result = migrateLegacyConfigFile(legacyPath)
+
+        expect(result).toBe(false)
+        expect(readFileSync(canonicalPath, "utf-8")).toBe(JSON.stringify({ hashline_edit: true }))
+      })
     })
   })
 

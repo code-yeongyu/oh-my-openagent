@@ -1,4 +1,14 @@
-import { spawn } from "../shared/bun-spawn-shim"
+import { runTmuxCommand } from "../shared/tmux/runner"
+import { getTmuxPath } from "../tools/interactive-bash/tmux-path-resolver"
+
+async function runOpenClawTmuxCommand(args: string[]) {
+  const tmuxPath = await getTmuxPath()
+  if (!tmuxPath) {
+    return null
+  }
+
+  return runTmuxCommand(tmuxPath, args)
+}
 
 export function getCurrentTmuxSession(): string | null {
   const env = process.env.TMUX
@@ -9,15 +19,9 @@ export function getCurrentTmuxSession(): string | null {
 
 export async function getTmuxSessionName(): Promise<string | null> {
   try {
-    const proc = spawn(["tmux", "display-message", "-p", "#S"], {
-      stdout: "pipe",
-      stderr: "ignore",
-    })
-    const outputPromise = new Response(proc.stdout).text()
-    await proc.exited
-    const output = await outputPromise
-    if (proc.exitCode !== 0) return null
-    return output.trim() || null
+    const result = await runOpenClawTmuxCommand(["display-message", "-p", "#S"])
+    if (!result?.success) return null
+    return result.output.trim() || null
   } catch {
     return null
   }
@@ -25,18 +29,9 @@ export async function getTmuxSessionName(): Promise<string | null> {
 
 export async function captureTmuxPane(paneId: string, lines = 15): Promise<string | null> {
   try {
-    const proc = spawn(
-      ["tmux", "capture-pane", "-p", "-t", paneId, "-S", `-${lines}`],
-      {
-        stdout: "pipe",
-        stderr: "ignore",
-      },
-    )
-    const outputPromise = new Response(proc.stdout).text()
-    await proc.exited
-    const output = await outputPromise
-    if (proc.exitCode !== 0) return null
-    return output.trim() || null
+    const result = await runOpenClawTmuxCommand(["capture-pane", "-p", "-t", paneId, "-S", `-${lines}`])
+    if (!result?.success) return null
+    return result.output.trim() || null
   } catch {
     return null
   }
@@ -44,21 +39,13 @@ export async function captureTmuxPane(paneId: string, lines = 15): Promise<strin
 
 export async function sendToPane(paneId: string, text: string, confirm = true): Promise<boolean> {
   try {
-    const literalProc = spawn(["tmux", "send-keys", "-t", paneId, "-l", "--", text], {
-      stdout: "ignore",
-      stderr: "ignore",
-    })
-    await literalProc.exited
-    if (literalProc.exitCode !== 0) return false
+    const literalResult = await runOpenClawTmuxCommand(["send-keys", "-t", paneId, "-l", "--", text])
+    if (!literalResult?.success) return false
 
     if (!confirm) return true
 
-    const enterProc = spawn(["tmux", "send-keys", "-t", paneId, "Enter"], {
-      stdout: "ignore",
-      stderr: "ignore",
-    })
-    await enterProc.exited
-    return enterProc.exitCode === 0
+    const enterResult = await runOpenClawTmuxCommand(["send-keys", "-t", paneId, "Enter"])
+    return enterResult?.success ?? false
   } catch {
     return false
   }
@@ -66,12 +53,8 @@ export async function sendToPane(paneId: string, text: string, confirm = true): 
 
 export async function isTmuxAvailable(): Promise<boolean> {
   try {
-    const proc = spawn(["tmux", "-V"], {
-      stdout: "ignore",
-      stderr: "ignore",
-    })
-    await proc.exited
-    return proc.exitCode === 0
+    const result = await runOpenClawTmuxCommand(["-V"])
+    return result?.success ?? false
   } catch {
     return false
   }
