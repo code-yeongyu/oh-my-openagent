@@ -1,4 +1,4 @@
-import { spawn } from "bun"
+import { spawn } from "../bun-spawn-shim"
 
 type RunTmuxOptions = {
 	retry?: number
