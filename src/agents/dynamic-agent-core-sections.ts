@@ -196,7 +196,7 @@ export function buildNonClaudePlannerSection(model: string): string {
 Multi-step task? **ALWAYS consult Plan Agent first.** Do NOT start implementation without a plan.
 
 - Single-file fix or trivial change → proceed directly
-- Anything else (2+ steps, unclear scope, architecture) → \`task(subagent_type="plan", ...)\` FIRST
+- Anything else (2+ steps, unclear scope, architecture) → \`task(subagent_type="prometheus", ...)\` FIRST
 - Use \`task_id\` to resume the same Plan Agent - ask follow-up questions aggressively
 - If ANY part of the task is ambiguous, ask Plan Agent before guessing
 
