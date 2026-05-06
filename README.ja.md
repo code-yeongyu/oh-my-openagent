@@ -167,17 +167,17 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 <td align="center"><img src=".github/assets/hephaestus.png" height="300" /></td>
 </tr></table>
 
-**Sisyphus** (`claude-opus-4-7` / **`kimi-k2.5`** / **`glm-5`**) はあなたのメインオーケストレーターです。計画を立て、専門家に委任し、攻撃的な並列実行でタスクを完了まで推進します。途中で投げ出すことはありません。
+**Sisyphus** (`claude-opus-4-7` / **`kimi-k2.6`** / **`glm-5.1`**) はあなたのメインオーケストレーターです。計画を立て、専門家に委任し、攻撃的な並列実行でタスクを完了まで推進します。途中で投げ出すことはありません。
 
 **Hephaestus** (`gpt-5.4`) はあなたの自律的なディープワーカーです。レシピではなく、目標を与えてください。手取り足取り教えなくても、コードベースを探索し、パターンを調査し、エンドツーエンドで実行します。*正当なる職人 (The Legitimate Craftsman).*
 
-**Prometheus** (`claude-opus-4-7` / **`kimi-k2.5`** / **`glm-5`**) はあなたの戦略プランナーです。インタビューモードで質問を投げ、スコープを特定し、コードに一行触れる前に詳細な計画を構築します。
+**Prometheus** (`claude-opus-4-7` / **`kimi-k2.6`** / **`glm-5.1`**) はあなたの戦略プランナーです。インタビューモードで質問を投げ、スコープを特定し、コードに一行触れる前に詳細な計画を構築します。
 
 すべてのエージェントは、それぞれのモデルの強みに合わせてチューニングされています。手動でモデルを切り替える必要はありません。[詳しくはこちら →](docs/guide/overview.md)
 
 > Anthropic が [私たちのせいで OpenCode をブロックしました。](https://x.com/thdxr/status/2010149530486911014) だからこそ Hephaestus は「正当なる職人 (The Legitimate Craftsman)」と呼ばれているのです。皮肉を込めています。
 >
-> Opus で最もよく動きますが、Kimi K2.5 + GPT-5.4 の組み合わせだけでも、バニラの Claude Code を軽く凌駕します。設定は一切不要です。
+> Opus で最もよく動きますが、Kimi K2.6 + GPT-5.4 の組み合わせだけでも、バニラの Claude Code を軽く凌駕します。設定は一切不要です。
 
 ### エージェントのオーケストレーション
 

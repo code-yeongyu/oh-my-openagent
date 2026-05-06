@@ -272,7 +272,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
     }
     const fallbackChain = [
       { providers: ["anthropic"], model: "claude-opus-4-7", variant: "max" },
-      { providers: ["opencode-go"], model: "kimi-k2.5" },
+      { providers: ["opencode-go"], model: "kimi-k2.6" },
     ]
 
     //#when
@@ -282,10 +282,10 @@ describe("executeSyncTask - cleanup on error paths", () => {
 
     //#then
     expect(result).toContain("Task completed")
-    expect(result).toContain("Model: opencode-go/kimi-k2.5")
+    expect(result).toContain("Model: opencode-go/kimi-k2.6")
     expect(attemptedModels).toEqual([
       { providerID: "anthropic", modelID: "claude-opus-4-7", variant: "max" },
-      { providerID: "opencode-go", modelID: "kimi-k2.5", variant: undefined },
+      { providerID: "opencode-go", modelID: "kimi-k2.6", variant: undefined },
     ])
   })
 
@@ -339,7 +339,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
     }
     const fallbackChain = [
       { providers: ["anthropic"], model: "claude-opus-4-7", variant: "max" },
-      { providers: ["opencode-go"], model: "kimi-k2.5" },
+      { providers: ["opencode-go"], model: "kimi-k2.6" },
       { providers: ["openai"], model: "gpt-5.4", variant: "medium" },
     ]
 
@@ -352,7 +352,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
     expect(result).toBe("Final failure")
     expect(attemptedModels).toEqual([
       { providerID: "anthropic", modelID: "claude-opus-4-7", variant: "max" },
-      { providerID: "opencode-go", modelID: "kimi-k2.5", variant: undefined },
+      { providerID: "opencode-go", modelID: "kimi-k2.6", variant: undefined },
       { providerID: "openai", modelID: "gpt-5.4", variant: "medium" },
     ])
   })
