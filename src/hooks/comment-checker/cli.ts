@@ -1,4 +1,4 @@
-import { spawn } from "bun"
+import { spawn } from "../../shared/bun-spawn-shim"
 import { createRequire } from "module"
 import { dirname, join } from "path"
 import { existsSync } from "fs"
@@ -206,8 +206,12 @@ export async function runCommentChecker(input: HookInput, cliPath?: string, cust
 
     try {
       // Write JSON to stdin
-      proc.stdin.write(jsonInput)
-      proc.stdin.end()
+      const stdin = proc.stdin as
+        | { write?: (chunk: string) => unknown; end?: () => unknown }
+        | null
+        | undefined
+      stdin?.write?.(jsonInput)
+      stdin?.end?.()
 
       const stdoutPromise = new Response(proc.stdout).text()
       const stderrPromise = new Response(proc.stderr).text()

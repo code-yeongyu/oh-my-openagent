@@ -1,6 +1,6 @@
 import { chmodSync, existsSync, mkdirSync, unlinkSync } from "node:fs";
 import * as path from "node:path";
-import { spawn } from "bun";
+import { spawn } from "./bun-spawn-shim";
 import { extractZip } from "./zip-extractor";
 
 export function getCachedBinaryPath(cacheDir: string, binaryName: string): string | null {

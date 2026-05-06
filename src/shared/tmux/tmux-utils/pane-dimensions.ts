@@ -1,4 +1,4 @@
-import { spawn } from "bun"
+import { spawn } from "../../bun-spawn-shim"
 import { getTmuxPath } from "../../../tools/interactive-bash/tmux-path-resolver"
 
 export interface PaneDimensions {

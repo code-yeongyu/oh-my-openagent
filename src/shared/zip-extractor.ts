@@ -1,4 +1,4 @@
-import { spawn, spawnSync } from "bun"
+import { spawn, spawnSync } from "./bun-spawn-shim"
 import { release } from "os"
 
 const WINDOWS_BUILD_WITH_TAR = 17134

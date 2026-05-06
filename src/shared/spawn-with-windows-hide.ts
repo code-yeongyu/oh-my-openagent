@@ -1,4 +1,4 @@
-import { spawn as bunSpawn } from "bun"
+import { spawn as bunSpawn } from "./bun-spawn-shim"
 import { spawn as nodeSpawn, type ChildProcess } from "node:child_process"
 import { Readable } from "node:stream"
 
@@ -68,7 +68,14 @@ function wrapNodeProcess(proc: ChildProcess): SpawnedProcess {
 
 export function spawnWithWindowsHide(command: string[], options: SpawnOptions): SpawnedProcess {
   if (process.platform !== "win32") {
-    return bunSpawn(command, options)
+    const processResult = bunSpawn(command, options)
+    return {
+      exitCode: processResult.exitCode,
+      exited: processResult.exited,
+      stdout: processResult.stdout ?? undefined,
+      stderr: processResult.stderr ?? undefined,
+      kill: (signal?: NodeJS.Signals) => processResult.kill(signal),
+    }
   }
 
   const [cmd, ...args] = command

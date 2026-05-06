@@ -1,5 +1,5 @@
 import { resolve } from "node:path"
-import { spawn } from "bun"
+import { spawn } from "../../shared/bun-spawn-shim"
 import {
   resolveGrepCli,
   type GrepBackend,

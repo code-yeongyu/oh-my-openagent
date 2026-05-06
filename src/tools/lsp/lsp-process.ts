@@ -1,4 +1,4 @@
-import { spawn as bunSpawn } from "bun"
+import { spawn as bunSpawn } from "../../shared/bun-spawn-shim"
 import { spawn as nodeSpawn, type ChildProcess } from "node:child_process"
 import { existsSync, statSync } from "fs"
 import { log } from "../../shared/logger"

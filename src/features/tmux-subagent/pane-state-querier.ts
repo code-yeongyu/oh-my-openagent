@@ -1,4 +1,4 @@
-import { spawn } from "bun"
+import { spawn } from "../../shared/bun-spawn-shim"
 import type { WindowState, TmuxPaneInfo } from "./types"
 import { parsePaneStateOutput } from "./pane-state-parser"
 import { getTmuxPath } from "../../tools/interactive-bash/tmux-path-resolver"
