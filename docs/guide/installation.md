@@ -469,7 +469,7 @@ Tell the user of following:
 
 3. **Need precision?** Press **Tab** to enter Prometheus (Planner) mode, create a work plan through an interview process, then run `/start-work` to execute it with full orchestration.
 
-4. You wanna have your own agent- catalog setup? I can read the [docs](docs/guide/agent-model-matching.md) and set up for you after interviewing!
+4. You wanna have your own agent- catalog setup? I can read the [docs](./agent-model-matching.md) and set up for you after interviewing!
 
 That's it. The agent will figure out the rest and handle everything automatically.
 
