@@ -393,6 +393,7 @@ project/
   - Создатели Spray (решение для influencer-маркетинга), vovushop (платформа трансграничной торговли) и vreview (AI-решение для маркетинга отзывов в commerce).
 - [Google](https://google.com)
 - [Microsoft](https://microsoft.com)
+- [Vercel](https://vercel.com)
 - [ELESTYLE](https://elestyle.jp)
   - Создатели elepay (мультимобильный платёжный шлюз) и OneQR (мобильное SaaS-приложение для безналичных расчётов).
 

@@ -390,6 +390,7 @@ Agent 会自动顺藤摸瓜加载对应的 Context，免去了你所有的手动
   - 开发了 Spray（意见领袖营销系统）、vovushop（跨境电商独立站）、vreview（AI 赋能的电商买家秀营销解决方案）。
 - [Google](https://google.com)
 - [Microsoft](https://microsoft.com)
+- [Vercel](https://vercel.com)
 - [ELESTYLE](https://elestyle.jp)
   - 开发了 elepay（全渠道移动支付网关）、OneQR（专为无现金社会打造的移动 SaaS 生态系统）。
 

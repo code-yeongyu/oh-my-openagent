@@ -390,6 +390,7 @@ OpenCode が Debian/Arch だとすれば、oh-my-openagent は Ubuntu/[Omarchy](
   - インフルエンサーマーケティングソリューション Spray、クロスボーダーコマースプラットフォーム vovushop、AI コマースレビューマーケティングソリューション vreview の開発元。
 - [Google](https://google.com)
 - [Microsoft](https://microsoft.com)
+- [Vercel](https://vercel.com)
 - [ELESTYLE](https://elestyle.jp)
   - マルチモバイル決済ゲートウェイ elepay、キャッシュレスソリューション向けモバイルアプリケーション SaaS OneQR の開発元。
 
