@@ -59,6 +59,33 @@ describe("bun-spawn-shim", () => {
 
     expect(result.exitCode).toBe(0)
     expect(result.success).toBe(true)
-    expect(Buffer.from(result.stdout).toString().trim()).toBe("sync-ok")
+    expect(result.stdout).toBeDefined()
+    expect(Buffer.from(result.stdout!).toString().trim()).toBe("sync-ok")
+  })
+
+  test("#given spawnSync command #when it completes #then result.pid is a positive number", () => {
+    const result = spawnSync(["bun", "--version"], { stdout: "pipe", stderr: "pipe" })
+
+    expect(result.pid).toBeGreaterThan(0)
+  })
+
+  test("#given default stdio #when child reads stdin #then it does not hang waiting for input", async () => {
+    const proc = spawn(["cat"], { stdout: "pipe", stderr: "pipe" })
+
+    const exitCode = await proc.exited
+
+    expect(exitCode).toBe(0)
+  })
+
+  test("#given missing executable #when spawn invoked #then the error is surfaced to the caller", async () => {
+    let observedError: unknown
+    try {
+      const proc = spawn(["__omo-shim-missing-binary__"], { stdout: "pipe", stderr: "pipe" })
+      await proc.exited
+    } catch (error) {
+      observedError = error
+    }
+
+    expect(observedError).toBeDefined()
   })
 })

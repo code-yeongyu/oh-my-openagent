@@ -75,7 +75,7 @@ export function spawnWithWindowsHide(command: string[], options: SpawnOptions): 
   const proc = nodeSpawn(cmd, args, {
     cwd: options.cwd,
     env: options.env,
-    stdio: [options.stdin ?? "pipe", options.stdout ?? "pipe", options.stderr ?? "pipe"],
+    stdio: [options.stdin ?? "ignore", options.stdout ?? "pipe", options.stderr ?? "inherit"],
     windowsHide: true,
     shell: true,
   })

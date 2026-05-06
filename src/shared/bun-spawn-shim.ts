@@ -30,8 +30,8 @@ export interface SpawnedProcess {
 
 export interface SpawnSyncResult {
   readonly exitCode: number
-  readonly stdout: Buffer
-  readonly stderr: Buffer
+  readonly stdout: Buffer | undefined
+  readonly stderr: Buffer | undefined
   readonly success: boolean
   readonly pid: number
 }
@@ -81,20 +81,20 @@ function resolveCommand(cmdOrOpts: unknown, optsArg?: unknown): { cmd: string[];
 function resolveStdio(options: SpawnOptions): StdioTuple {
   if (options.stdio) return options.stdio
 
-  return [options.stdin ?? "pipe", options.stdout ?? "pipe", options.stderr ?? "pipe"]
+  return [options.stdin ?? "ignore", options.stdout ?? "pipe", options.stderr ?? "inherit"]
 }
 
 function wrapNodeProcess(proc: ReturnType<typeof nodeSpawn>): SpawnedProcess {
   let exitCode: number | null = null
-  const exited = new Promise<number>((resolve) => {
+  const exited = new Promise<number>((resolve, reject) => {
     proc.on("exit", (code) => {
       exitCode = code ?? 1
       resolve(exitCode)
     })
-    proc.on("error", () => {
+    proc.on("error", (error) => {
       if (exitCode === null) {
         exitCode = 1
-        resolve(1)
+        reject(error)
       }
     })
   })
@@ -158,9 +158,9 @@ export function spawnSync(cmdOrOpts: unknown, opts?: unknown): SpawnSyncResult {
 
   return {
     exitCode: result.status ?? 1,
-    stdout: result.stdout,
-    stderr: result.stderr,
+    stdout: result.stdout ?? undefined,
+    stderr: result.stderr ?? undefined,
     success: (result.status ?? 1) === 0,
-    pid: -1,
+    pid: result.pid ?? -1,
   }
 }
