@@ -8,8 +8,8 @@ describe("extractFreeOpenCodeModelIds", () => {
     const raw = {
       opencode: {
         models: {
-          "z-model": { status: "active", cost: { input: 0 } },
-          "a-model": { status: "active", cost: { input: 0 } },
+          "z-model": { status: "active", cost: { input: 0, output: 0 } },
+          "a-model": { status: "active", cost: { input: 0, output: 0 } },
         },
       },
     }
@@ -20,20 +20,32 @@ describe("extractFreeOpenCodeModelIds", () => {
     const raw = {
       opencode: {
         models: {
-          "live-model": { cost: { input: 0 } },
-          "dead-model": { status: "deprecated", cost: { input: 0 } },
+          "live-model": { cost: { input: 0, output: 0 } },
+          "dead-model": { status: "deprecated", cost: { input: 0, output: 0 } },
         },
       },
     }
     expect(extractFreeOpenCodeModelIds(raw)).toEqual(["live-model"])
   })
 
-  test("excludes paid models", () => {
+  test("excludes models with paid input cost", () => {
     const raw = {
       opencode: {
         models: {
-          "free-model": { cost: { input: 0 } },
-          "paid-model": { cost: { input: 5 } },
+          "free-model": { cost: { input: 0, output: 0 } },
+          "paid-input": { cost: { input: 5, output: 0 } },
+        },
+      },
+    }
+    expect(extractFreeOpenCodeModelIds(raw)).toEqual(["free-model"])
+  })
+
+  test("excludes models with paid output cost", () => {
+    const raw = {
+      opencode: {
+        models: {
+          "free-model": { cost: { input: 0, output: 0 } },
+          "paid-output": { cost: { input: 0, output: 3 } },
         },
       },
     }
@@ -56,7 +68,7 @@ describe("extractFreeOpenCodeModelIds", () => {
     const raw = {
       opencode: {
         models: {
-          m1: { status: "deprecated", cost: { input: 0 } },
+          m1: { status: "deprecated", cost: { input: 0, output: 0 } },
         },
       },
     }
@@ -68,7 +80,7 @@ describe("extractFreeOpenCodeModelIds", () => {
       opencode: {
         models: {
           "no-cost": { status: "active" },
-          "has-cost": { cost: { input: 0 } },
+          "has-cost": { cost: { input: 0, output: 0 } },
         },
       },
     }

@@ -15,7 +15,7 @@ export function extractFreeOpenCodeModelIds(raw: unknown): string[] {
     if (entry.status === "deprecated") continue
     const cost = entry.cost
     if (!isRecord(cost)) continue
-    if (cost.input !== 0) continue
+    if (cost.input !== 0 || cost.output !== 0) continue
     ids.push(id)
   }
   return ids.sort()
