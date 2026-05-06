@@ -105,12 +105,25 @@ export function isGlmThinkingModel(model: string): boolean {
   return isGlmModel(model) && !isGlmVisionModel(model) && /^glm[-]?5/.test(modelName);
 }
 
-const GLM_SISYPHUS_HARNESS_RE =
-  /^(?:glm-5|glm-5[.-]1(?::thinking)?|glm5[.-]1(?::thinking)?|glm-5-turbo|glm5-turbo|glm-5v-turbo|glm5v-turbo)$/;
+const GLM_SISYPHUS_HARNESS_MODELS: ReadonlySet<string> = new Set([
+	"glm-5",
+	"glm-5.1",
+	"glm-5-1",
+	"glm-5.1:thinking",
+	"glm-5-1:thinking",
+	"glm5.1",
+	"glm5-1",
+	"glm5.1:thinking",
+	"glm5-1:thinking",
+	"glm-5-turbo",
+	"glm5-turbo",
+	"glm-5v-turbo",
+	"glm5v-turbo",
+])
 
 export function isGlmSisyphusHarnessModel(model: string): boolean {
-  const modelName = extractModelName(model).toLowerCase();
-  return GLM_SISYPHUS_HARNESS_RE.test(modelName);
+	const modelName = extractModelName(model).toLowerCase();
+	return GLM_SISYPHUS_HARNESS_MODELS.has(modelName);
 }
 
 export function isGeminiModel(model: string): boolean {
