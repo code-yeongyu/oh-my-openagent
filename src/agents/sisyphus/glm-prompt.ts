@@ -53,60 +53,14 @@ Clarification: ask one precise question only when the answer changes implementat
 </tasks>`
 }
 
-export function buildGlmSisyphusPrompt(
-  model: string,
-  availableAgents: AvailableAgent[],
-  availableTools: AvailableTool[] = [],
-  availableSkills: AvailableSkill[] = [],
-  availableCategories: AvailableCategory[] = [],
-  useTaskSystem = false,
-): string {
-  const keyTriggers = buildKeyTriggersSection(availableAgents, availableSkills)
-  const toolSelection = buildToolSelectionTable(
-    availableAgents,
-    availableTools,
-    availableSkills,
-  )
-  const exploreSection = buildExploreSection(availableAgents)
-  const librarianSection = buildLibrarianSection(availableAgents)
-  const categorySkillsGuide = buildCategorySkillsDelegationGuide(
-    availableCategories,
-    availableSkills,
-  )
-  const delegationTable = buildDelegationTable(availableAgents)
-  const oracleSection = buildOracleSection(availableAgents)
-  const hardBlocks = buildHardBlocksSection()
-  const antiPatterns = buildAntiPatternsSection()
-  const nonClaudePlannerSection = buildNonClaudePlannerSection(model)
-  const parallelDelegationSection = `### DIRECT HEPHAESTUS DELEGATION - YOUR IMPLEMENTATION PATH
-
-For long or complex implementation, call Hephaestus directly with \`call_omo_agent(subagent_type="hephaestus", run_in_background=true, ...)\` when that tool is available. Hephaestus is the autonomous implementation worker; GLM is the orchestrator.
-
-Use category delegation only when direct Hephaestus invocation is unavailable or when a domain category is more precise.
-
-${buildParallelDelegationSection(model, availableCategories) ||
-    `### DECOMPOSE AND DELEGATE - YOU ARE NOT AN IMPLEMENTER
-
-**YOUR FAILURE MODE: You attempt to do work yourself instead of decomposing and delegating.** When an implementation task is not V1 trivial, specialized subagents are faster and more reliable than GLM solo execution.
-
-**MANDATORY - for ANY non-trivial implementation task:**
-
-1. **ALWAYS decompose** the task into independent work units.
-2. **ALWAYS delegate** each unit to available category workers, preferably \`deep\` or \`unspecified-high\`, in parallel.
-3. **NEVER implement directly** when delegation is possible. You write prompts, collect results, verify, and synthesize.
-
-**Your value is orchestration, decomposition, and quality control. Delegating with crystal-clear prompts IS your work.**`}`
-  const tasksSection = buildGlmTasksSection(useTaskSystem)
-  const todoHookNote = useTaskSystem
-    ? "YOUR TASK CREATION WOULD BE TRACKED BY HOOK([SYSTEM REMINDER - TASK CONTINUATION])"
-    : "YOUR TODO CREATION WOULD BE TRACKED BY HOOK([SYSTEM REMINDER - TODO CONTINUATION])"
-
+function buildIdentityBlock(todoHookNote: string): string {
   const agentIdentity = buildAgentIdentitySection(
     "Sisyphus",
     "Powerful AI Agent with orchestration capabilities from OhMyOpenCode",
   )
 
-  const identityBlock = `<identity>
+  return `${agentIdentity}
+<identity>
 You are Sisyphus, the speed-first orchestrator from OhMyOpenCode.
 
 Your role is dispatch and synthesize. Think briefly about routing, delegate early, and synthesize agent results.
@@ -125,8 +79,10 @@ ${todoHookNote}
 
 ${buildGlmWorkingMemory()}
 </identity>`
+}
 
-  const constraintsBlock = `<constraints>
+function buildConstraintsBlock(hardBlocks: string, antiPatterns: string): string {
+  return `<constraints>
 ${hardBlocks}
 
 ${antiPatterns}
@@ -142,8 +98,10 @@ ${buildGlmVisionConstraint()}
 
 ${buildGlmVisionHardBlock()}
 </constraints>`
+}
 
-  const intentBlock = `<intent>
+function buildIntentBlock(keyTriggers: string): string {
+  return `<intent>
 Start with routing, not analysis.
 
 Concise thinking mandate: think briefly about routing, delegate before deep-diving, synthesize results from agents.
@@ -181,8 +139,14 @@ The gate always runs, but verbalization is suppressed when it would repeat decid
 
 Ask only when missing information would materially change the outcome or action has irreversible/external side effects.
 </intent>`
+}
 
-  const exploreBlock = `<explore>
+function buildExploreBlock(
+  toolSelection: string,
+  exploreSection: string,
+  librarianSection: string,
+): string {
+  return `<explore>
 ## Exploration & Research
 
 GLM exploration principle: dispatch first, synthesize second. Do not linger in silent inspection before launching agents.
@@ -235,8 +199,10 @@ Background result collection:
 
 ${buildAntiDuplicationSection()}
 </explore>`
+}
 
-  const executionLoopBlock = `<execution_loop>
+function buildExecutionLoopBlock(): string {
+  return `<execution_loop>
 ## GLM Execution Loop: DISPATCH→DELEGATE→COLLECT→SYNTHESIZE→DONE
 
 1. DISPATCH
@@ -291,8 +257,16 @@ Failure recovery:
 - One retry for V1, up to two for V2/V3, then consult Oracle or ask.
 - Never leave known broken changes unreported.
 </execution_loop>`
+}
 
-  const delegationBlock = `<delegation>
+function buildDelegationBlock(
+  categorySkillsGuide: string,
+  nonClaudePlannerSection: string,
+  parallelDelegationSection: string,
+  delegationTable: string,
+  oracleSection: string,
+): string {
+  return `<delegation>
 ## Delegation System
 
 Pre-delegation:
@@ -336,8 +310,10 @@ ${oracleSection ? `### Oracle
 
 ${oracleSection}` : ""}
 </delegation>`
+}
 
-  const styleBlock = `<style>
+function buildStyleBlock(): string {
+  return `<style>
 ## Tone
 
 Start immediately. No acknowledgments, flattery, or restating the request.
@@ -360,9 +336,72 @@ GLM reasoning tokens are unconstrained because budgetTokens is unsupported. Rest
 Exception: verification evidence must be concrete. "Diagnostics clean" is valid only after tool output proves it.
 </token_economy>
 </style>`
+}
 
-  return `${agentIdentity}
-${identityBlock}
+export function buildGlmSisyphusPrompt(
+  model: string,
+  availableAgents: AvailableAgent[],
+  availableTools: AvailableTool[] = [],
+  availableSkills: AvailableSkill[] = [],
+  availableCategories: AvailableCategory[] = [],
+  useTaskSystem = false,
+): string {
+  const keyTriggers = buildKeyTriggersSection(availableAgents, availableSkills)
+  const toolSelection = buildToolSelectionTable(
+    availableAgents,
+    availableTools,
+    availableSkills,
+  )
+  const exploreSection = buildExploreSection(availableAgents)
+  const librarianSection = buildLibrarianSection(availableAgents)
+  const categorySkillsGuide = buildCategorySkillsDelegationGuide(
+    availableCategories,
+    availableSkills,
+  )
+  const delegationTable = buildDelegationTable(availableAgents)
+  const oracleSection = buildOracleSection(availableAgents)
+  const hardBlocks = buildHardBlocksSection()
+  const antiPatterns = buildAntiPatternsSection()
+  const nonClaudePlannerSection = buildNonClaudePlannerSection(model)
+  const parallelDelegationSection = `### DIRECT HEPHAESTUS DELEGATION - YOUR IMPLEMENTATION PATH
+
+For long or complex implementation, call Hephaestus directly with \`call_omo_agent(subagent_type="hephaestus", run_in_background=true, ...)\` when that tool is available. Hephaestus is the autonomous implementation worker; GLM is the orchestrator.
+
+Use category delegation only when direct Hephaestus invocation is unavailable or when a domain category is more precise.
+
+${buildParallelDelegationSection(model, availableCategories) ||
+    `### DECOMPOSE AND DELEGATE - YOU ARE NOT AN IMPLEMENTER
+
+**YOUR FAILURE MODE: You attempt to do work yourself instead of decomposing and delegating.** When an implementation task is not V1 trivial, specialized subagents are faster and more reliable than GLM solo execution.
+
+**MANDATORY - for ANY non-trivial implementation task:**
+
+1. **ALWAYS decompose** the task into independent work units.
+2. **ALWAYS delegate** each unit to available category workers, preferably \`deep\` or \`unspecified-high\`, in parallel.
+3. **NEVER implement directly** when delegation is possible. You write prompts, collect results, verify, and synthesize.
+
+**Your value is orchestration, decomposition, and quality control. Delegating with crystal-clear prompts IS your work.**`}`
+
+  const todoHookNote = useTaskSystem
+    ? "YOUR TASK CREATION WOULD BE TRACKED BY HOOK([SYSTEM REMINDER - TASK CONTINUATION])"
+    : "YOUR TODO CREATION WOULD BE TRACKED BY HOOK([SYSTEM REMINDER - TODO CONTINUATION])"
+
+  const identityBlock = buildIdentityBlock(todoHookNote)
+  const constraintsBlock = buildConstraintsBlock(hardBlocks, antiPatterns)
+  const intentBlock = buildIntentBlock(keyTriggers)
+  const exploreBlock = buildExploreBlock(toolSelection, exploreSection, librarianSection)
+  const executionLoopBlock = buildExecutionLoopBlock()
+  const delegationBlock = buildDelegationBlock(
+    categorySkillsGuide,
+    nonClaudePlannerSection,
+    parallelDelegationSection,
+    delegationTable,
+    oracleSection,
+  )
+  const styleBlock = buildStyleBlock()
+  const tasksSection = buildGlmTasksSection(useTaskSystem)
+
+  return `${identityBlock}
 
 ${constraintsBlock}
 
