@@ -114,7 +114,7 @@ describe("team-layout-tmux", () => {
         return null
       }
 
-      return { sessionId: displaySessionId }
+      return { sessionId: displaySessionId, paneId: process.env.TMUX_PANE, windowTarget: "test-session:0" }
     })
   })
 
@@ -149,7 +149,7 @@ describe("team-layout-tmux", () => {
     expect(runTmuxCommandMock).toHaveBeenCalledTimes(0)
   })
 
-  test("creates detached focus and grid windows and sends attach via send-keys", async () => {
+  test("creates teammate panes in the caller window and sends attach via send-keys", async () => {
     // given
     const { createTeamLayout } = await loadLayoutModule()
     const members = [
@@ -162,12 +162,8 @@ describe("team-layout-tmux", () => {
 
     // then
     const commands = getCommands()
-    const newWindowCalls = commands.filter((args) => args[0] === "new-window")
-    expect(newWindowCalls.length).toBe(2)
-    expect(newWindowCalls.map((args) => args[args.indexOf("-n") + 1])).toEqual([
-      "team-run-attach-focus",
-      "team-run-attach-grid",
-    ])
+    expect(commands.some((args) => args[0] === "new-window")).toBe(false)
+    expect(commands.filter((args) => args[0] === "split-window")).toHaveLength(2)
 
     const sendKeysCalls = commands.filter((args) => args[0] === "send-keys")
     const literals = sendKeysCalls.map((args) => args.join(" "))
@@ -175,7 +171,7 @@ describe("team-layout-tmux", () => {
     expect(literals.some((s) => s.includes("--session 's-m2'"))).toBe(true)
   })
 
-  test("uses focus main-vertical and grid tiled windows", async () => {
+  test("uses caller window main-vertical layout with caller pane as primary", async () => {
     // given
     const { createTeamLayout } = await loadLayoutModule()
     const members = [
@@ -191,14 +187,14 @@ describe("team-layout-tmux", () => {
     const commands = getCommands()
     const selectLayoutArgs = commands.filter((args) => args[0] === "select-layout").map((args) => args[args.length - 1])
     expect(selectLayoutArgs).toContain("main-vertical")
-    expect(selectLayoutArgs).toContain("tiled")
-    expect(commands).toContainEqual(["set-window-option", "-t", "@1", "main-pane-width", "60%"])
+    expect(selectLayoutArgs).not.toContain("tiled")
+    expect(commands).toContainEqual(["resize-pane", "-t", process.env.TMUX_PANE ?? "", "-x", "30%"])
     expect(result).not.toBeNull()
     expect(Object.keys(result?.focusPanesByMember ?? {}).sort()).toEqual(["m1", "m2", "m3"])
-    expect(Object.keys(result?.gridPanesByMember ?? {}).sort()).toEqual(["m1", "m2", "m3"])
+    expect(Object.keys(result?.gridPanesByMember ?? {})).toEqual([])
   })
 
-  test("#given 4 or more teammates #when createTeamLayout runs #then it still keeps separate focus and grid windows", async () => {
+  test("#given 4 or more teammates #when createTeamLayout runs #then it keeps every teammate in the caller window", async () => {
     // given
     const { createTeamLayout } = await loadLayoutModule()
     const members = Array.from({ length: 5 }, (_, index) => ({
@@ -212,13 +208,11 @@ describe("team-layout-tmux", () => {
 
     // then
     const commands = getCommands()
-    const newWindowNames = commands
-      .filter((args) => args[0] === "new-window")
-      .map((args) => args[args.indexOf("-n") + 1])
-    expect(newWindowNames).toEqual(["team-run-tiled-focus", "team-run-tiled-grid"])
+    expect(commands.some((args) => args[0] === "new-window")).toBe(false)
+    expect(commands.filter((args) => args[0] === "split-window")).toHaveLength(5)
     const selectLayoutArgs = commands.filter((args) => args[0] === "select-layout").map((args) => args[args.length - 1])
     expect(selectLayoutArgs).toContain("main-vertical")
-    expect(selectLayoutArgs).toContain("tiled")
+    expect(selectLayoutArgs).not.toContain("tiled")
   })
 
   test("#given caller inside tmux #when createTeamLayout runs #then it never steals focus or mutates window border options", async () => {
@@ -333,7 +327,7 @@ describe("team-layout-tmux", () => {
   })
 
   describe("createTeamLayout - focus/grid window topology", () => {
-    test("#given caller inside tmux #when createTeamLayout runs #then creates focus and grid windows without a new session", async () => {
+    test("#given caller inside tmux #when createTeamLayout runs #then uses the caller window without a new session", async () => {
       // given
       const { createTeamLayout } = await loadLayoutModule()
       const members = [
@@ -347,8 +341,8 @@ describe("team-layout-tmux", () => {
       // then
       const commands = getCommands()
       expect(commands.some((args) => args[0] === "new-session")).toBe(false)
-      expect(commands.filter((args) => args[0] === "new-window").length).toBe(2)
-      expect(commands.some((args) => args[0] === "split-window" && args.includes(process.env.TMUX_PANE ?? ""))).toBe(false)
+      expect(commands.filter((args) => args[0] === "new-window").length).toBe(0)
+      expect(commands.some((args) => args[0] === "split-window" && args.includes(process.env.TMUX_PANE ?? ""))).toBe(true)
     })
 
     test("#given caller session resolved #when createTeamLayout runs #then ownedSession is false", async () => {
@@ -364,7 +358,7 @@ describe("team-layout-tmux", () => {
       expect(result?.ownedSession).toBe(false)
     })
 
-    test("#given first teammate #when layout runs #then it creates focus and grid windows without splitting the leader pane", async () => {
+    test("#given first teammate #when layout runs #then it splits the caller pane horizontally for teammate area", async () => {
       // given
       const { createTeamLayout } = await loadLayoutModule()
       const members = [{ name: "m1", sessionId: "s-m1", worktreePath: "/tmp/m1" }]
@@ -375,8 +369,10 @@ describe("team-layout-tmux", () => {
       // then
       const commands = getCommands()
       const splitCalls = commands.filter((args) => args[0] === "split-window")
-      expect(splitCalls).toEqual([])
-      expect(commands.filter((args) => args[0] === "new-window").length).toBe(2)
+      expect(splitCalls).toEqual([
+        ["split-window", "-t", process.env.TMUX_PANE ?? "", "-h", "-l", "70%", "-P", "-F", "#{pane_id}", "-c", "/tmp/m1"],
+      ])
+      expect(commands.filter((args) => args[0] === "new-window").length).toBe(0)
     })
 
     test("#given 3 members #when createTeamLayout runs #then focusPanesByMember contains 3 distinct pane ids", async () => {
@@ -397,7 +393,7 @@ describe("team-layout-tmux", () => {
       expect(new Set(Object.values(result?.focusPanesByMember ?? {})).size).toBe(3)
     })
 
-    test("#given layout created #when createTeamLayout runs #then it keeps separate focus and grid pane maps", async () => {
+    test("#given layout created #when createTeamLayout runs #then it records focus panes only", async () => {
       // given
       const { createTeamLayout } = await loadLayoutModule()
       const members = [
@@ -412,9 +408,10 @@ describe("team-layout-tmux", () => {
       const commands = getCommands()
       expect(result).not.toBeNull()
       expect(Object.keys(result?.focusPanesByMember ?? {}).sort()).toEqual(["m1", "m2"])
-      expect(Object.keys(result?.gridPanesByMember ?? {}).sort()).toEqual(["m1", "m2"])
-      expect(result?.focusWindowId).not.toBe(result?.gridWindowId)
-      expect(commands.filter((args) => args[0] === "new-window").length).toBe(2)
+      expect(Object.keys(result?.gridPanesByMember ?? {})).toEqual([])
+      expect(result?.focusWindowId).toBe("test-session:0")
+      expect(result?.gridWindowId).toBeUndefined()
+      expect(commands.filter((args) => args[0] === "new-window").length).toBe(0)
       expect(commands.some((args) => args[0] === "send-keys" && args.includes("Enter"))).toBe(true)
     })
   })
