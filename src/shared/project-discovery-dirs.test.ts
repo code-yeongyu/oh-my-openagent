@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
-import { mkdirSync, realpathSync, rmSync } from "node:fs"
+import { mkdirSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -119,6 +119,96 @@ describe("project-discovery-dirs", () => {
 
     // then
     expect(directories).toEqual([canonicalPath(join(projectDir, ".opencode", "skills"))])
+  })
+
+  it("#given nested .opencode plugin config files #when finding plugin config files #then returns nearest-first canonical paths", async () => {
+    // given
+    const grandparentDir = join(TEST_DIR, "grandparent")
+    const parentDir = join(grandparentDir, "parent")
+    const projectDir = join(parentDir, "project")
+    mkdirSync(join(grandparentDir, ".opencode"), { recursive: true })
+    mkdirSync(join(parentDir, ".opencode"), { recursive: true })
+    mkdirSync(join(projectDir, ".opencode"), { recursive: true })
+    writeFileSync(join(grandparentDir, ".opencode", "oh-my-openagent.jsonc"), "{}")
+    writeFileSync(join(parentDir, ".opencode", "oh-my-openagent.jsonc"), "{}")
+    writeFileSync(join(projectDir, ".opencode", "oh-my-openagent.jsonc"), "{}")
+
+    const { clearPluginConfigFileDetectionCache } = await import("./jsonc-parser")
+    clearPluginConfigFileDetectionCache()
+    const { findProjectOpencodePluginConfigFiles } = await import("./project-discovery-dirs")
+
+    // when
+    const paths = findProjectOpencodePluginConfigFiles(projectDir, TEST_DIR)
+
+    // then
+    expect(paths).toEqual([
+      canonicalPath(join(projectDir, ".opencode", "oh-my-openagent.jsonc")),
+      canonicalPath(join(parentDir, ".opencode", "oh-my-openagent.jsonc")),
+      canonicalPath(join(grandparentDir, ".opencode", "oh-my-openagent.jsonc")),
+    ])
+  })
+
+  it("#given a stop directory #when finding plugin config files #then walking halts at the stop boundary inclusive", async () => {
+    // given
+    const stopDir = join(TEST_DIR, "stop")
+    const childDir = join(stopDir, "child")
+    mkdirSync(join(TEST_DIR, ".opencode"), { recursive: true })
+    mkdirSync(join(stopDir, ".opencode"), { recursive: true })
+    mkdirSync(join(childDir, ".opencode"), { recursive: true })
+    writeFileSync(join(TEST_DIR, ".opencode", "oh-my-openagent.jsonc"), "{}")
+    writeFileSync(join(stopDir, ".opencode", "oh-my-openagent.jsonc"), "{}")
+    writeFileSync(join(childDir, ".opencode", "oh-my-openagent.jsonc"), "{}")
+
+    const { clearPluginConfigFileDetectionCache } = await import("./jsonc-parser")
+    clearPluginConfigFileDetectionCache()
+    const { findProjectOpencodePluginConfigFiles } = await import("./project-discovery-dirs")
+
+    // when
+    const paths = findProjectOpencodePluginConfigFiles(childDir, stopDir)
+
+    // then
+    expect(paths).toEqual([
+      canonicalPath(join(childDir, ".opencode", "oh-my-openagent.jsonc")),
+      canonicalPath(join(stopDir, ".opencode", "oh-my-openagent.jsonc")),
+    ])
+  })
+
+  it("#given a legacy basename in an ancestor #when finding plugin config files #then detection picks up the legacy path", async () => {
+    // given
+    const projectDir = join(TEST_DIR, "project")
+    mkdirSync(join(TEST_DIR, ".opencode"), { recursive: true })
+    mkdirSync(join(projectDir, ".opencode"), { recursive: true })
+    writeFileSync(join(TEST_DIR, ".opencode", "oh-my-opencode.jsonc"), "{}")
+    writeFileSync(join(projectDir, ".opencode", "oh-my-openagent.jsonc"), "{}")
+
+    const { clearPluginConfigFileDetectionCache } = await import("./jsonc-parser")
+    clearPluginConfigFileDetectionCache()
+    const { findProjectOpencodePluginConfigFiles } = await import("./project-discovery-dirs")
+
+    // when
+    const paths = findProjectOpencodePluginConfigFiles(projectDir, TEST_DIR)
+
+    // then
+    expect(paths).toEqual([
+      canonicalPath(join(projectDir, ".opencode", "oh-my-openagent.jsonc")),
+      canonicalPath(join(TEST_DIR, ".opencode", "oh-my-opencode.jsonc")),
+    ])
+  })
+
+  it("#given no .opencode directories along the walk #when finding plugin config files #then returns an empty list", async () => {
+    // given
+    const projectDir = join(TEST_DIR, "project", "deep")
+    mkdirSync(projectDir, { recursive: true })
+
+    const { clearPluginConfigFileDetectionCache } = await import("./jsonc-parser")
+    clearPluginConfigFileDetectionCache()
+    const { findProjectOpencodePluginConfigFiles } = await import("./project-discovery-dirs")
+
+    // when
+    const paths = findProjectOpencodePluginConfigFiles(projectDir, TEST_DIR)
+
+    // then
+    expect(paths).toEqual([])
   })
 
 })

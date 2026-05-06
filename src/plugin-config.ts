@@ -1,18 +1,49 @@
 import * as fs from "fs";
+import { homedir } from "node:os";
 import * as path from "path";
 import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig } from "./config";
 import {
   log,
+  containsPath,
   deepMerge,
   getOpenCodeConfigDir,
   addConfigLoadError,
   parseJsonc,
   detectPluginConfigFile,
+  findProjectOpencodePluginConfigFiles,
   migrateConfigFile,
   resolveAgentDefinitionPaths,
 } from "./shared";
 import { migrateLegacyConfigFile } from "./shared/migrate-legacy-config-file";
 import { CONFIG_BASENAME, LEGACY_CONFIG_BASENAME } from "./shared/plugin-identity";
+
+function resolveHomeDirectory(): string {
+  // Read env vars directly to bypass os.homedir() caching. Bun caches the
+  // first os.homedir() result, which means tests that set process.env.HOME
+  // after import never see the new value. Production behaviour is preserved
+  // because HOME (or USERPROFILE on Windows) is set by the OS at startup.
+  return process.env.HOME ?? process.env.USERPROFILE ?? homedir()
+}
+
+function resolveConfigPathAfterLegacyMigration(detectedPath: string): string {
+  if (!path.basename(detectedPath).startsWith(LEGACY_CONFIG_BASENAME)) {
+    return detectedPath
+  }
+
+  const migrated = migrateLegacyConfigFile(detectedPath)
+  const canonicalPath = path.join(
+    path.dirname(detectedPath),
+    `${CONFIG_BASENAME}${path.extname(detectedPath)}`,
+  )
+
+  // Only switch to canonical path if migration succeeded OR canonical file already exists
+  if (migrated || fs.existsSync(canonicalPath)) {
+    return canonicalPath
+  }
+
+  // Otherwise keep loading from the legacy path that was detected
+  return detectedPath
+}
 
 function loadExplicitGitMasterOverrides(configPath: string): Record<string, unknown> | undefined {
   try {
@@ -214,47 +245,39 @@ export function loadPluginConfig(
   }
 
   // Auto-copy legacy config file to canonical name if needed
-  if (userDetected.format !== "none" && path.basename(userDetected.path).startsWith(LEGACY_CONFIG_BASENAME)) {
-    const migrated = migrateLegacyConfigFile(userDetected.path);
-    const canonicalPath = path.join(
-      path.dirname(userDetected.path),
-      `${CONFIG_BASENAME}${path.extname(userDetected.path)}`
-    );
-    // Only switch to canonical path if migration succeeded OR canonical file already exists
-    if (migrated || fs.existsSync(canonicalPath)) {
-      userConfigPath = canonicalPath;
-    }
-    // Otherwise keep loading from the legacy path that was detected
+  if (userDetected.format !== "none") {
+    userConfigPath = resolveConfigPathAfterLegacyMigration(userConfigPath)
   }
 
-  // Project-level config path - prefer .jsonc over .json
-  const projectBasePath = path.join(directory, ".opencode");
-  const projectDetected = detectPluginConfigFile(projectBasePath);
-  let projectConfigPath =
-    projectDetected.format !== "none"
-      ? projectDetected.path
-      : path.join(projectBasePath, `${CONFIG_BASENAME}.json`);
+  // Pin the walk to $HOME only when the start directory is inside it. Outside
+  // $HOME the walker would otherwise reach FS root and surface unrelated configs
+  // in /tmp, /opt, etc.
+  const homeDirectory = resolveHomeDirectory()
+  const stopDirectory = containsPath(homeDirectory, directory) ? homeDirectory : directory
+  const ancestorConfigPathsNearestFirst = findProjectOpencodePluginConfigFiles(
+    directory,
+    stopDirectory,
+  )
+  log("Walked ancestor plugin configs", {
+    paths: ancestorConfigPathsNearestFirst,
+    count: ancestorConfigPathsNearestFirst.length,
+    stopDirectory,
+  })
 
-  if (projectDetected.legacyPath) {
-    log("Canonical plugin config detected alongside legacy config. Remove the legacy file to avoid confusion.", {
-      canonicalPath: projectDetected.path,
-      legacyPath: projectDetected.legacyPath,
-    });
-  }
-
-  // Auto-copy legacy project config file to canonical name if needed
-  if (projectDetected.format !== "none" && path.basename(projectDetected.path).startsWith(LEGACY_CONFIG_BASENAME)) {
-    const projectMigrated = migrateLegacyConfigFile(projectDetected.path);
-    const canonicalProjectPath = path.join(
-      path.dirname(projectDetected.path),
-      `${CONFIG_BASENAME}${path.extname(projectDetected.path)}`
-    );
-    // Only switch to canonical path if migration succeeded OR canonical file already exists
-    if (projectMigrated || fs.existsSync(canonicalProjectPath)) {
-      projectConfigPath = canonicalProjectPath;
-    }
-    // Otherwise keep loading from the legacy path that was detected
-  }
+  // Migrate any legacy basenames among ancestors and warn on dual-config presence
+  const canonicalAncestorPathsNearestFirst = ancestorConfigPathsNearestFirst.map(
+    (ancestorPath) => {
+      const opencodeDir = path.dirname(ancestorPath)
+      const ancestorDetected = detectPluginConfigFile(opencodeDir)
+      if (ancestorDetected.legacyPath) {
+        log("Canonical plugin config detected alongside legacy config. Remove the legacy file to avoid confusion.", {
+          canonicalPath: ancestorDetected.path,
+          legacyPath: ancestorDetected.legacyPath,
+        })
+      }
+      return resolveConfigPathAfterLegacyMigration(ancestorPath)
+    },
+  )
 
   // Load user config first (base). Parse empty config through Zod to apply field defaults.
   const userConfig = loadConfigFromPath(userConfigPath, ctx)
@@ -271,34 +294,53 @@ export function loadPluginConfig(
   let config: OhMyOpenCodeConfig =
     userConfig ?? OhMyOpenCodeConfigSchema.parse({});
 
-  // Override with project config
+  const canonicalAncestorPathsFarthestFirst = [...canonicalAncestorPathsNearestFirst].reverse()
   const defaultGitMaster = OhMyOpenCodeConfigSchema.parse({}).git_master
-  const projectConfig = loadConfigFromPath(projectConfigPath, ctx);
-  const projectGitMasterOverrides = loadExplicitGitMasterOverrides(projectConfigPath)
+  const ancestorGitMasterOverridesFarthestFirst: Array<Record<string, unknown>> = []
 
-  if (projectConfig?.agent_definitions) {
-    projectConfig.agent_definitions = resolveAgentDefinitionPaths(
-      projectConfig.agent_definitions,
-      projectBasePath,
-      directory
-    )
+  for (const ancestorPath of canonicalAncestorPathsFarthestFirst) {
+    const ancestorConfig = loadConfigFromPath(ancestorPath, ctx)
+    const ancestorOverrides = loadExplicitGitMasterOverrides(ancestorPath)
+
+    if (ancestorConfig?.agent_definitions) {
+      // Resolve relative paths against this ancestor's own .opencode/ base.
+      const ancestorBasePath = path.dirname(ancestorPath)
+      const ancestorDir = path.dirname(ancestorBasePath)
+      ancestorConfig.agent_definitions = resolveAgentDefinitionPaths(
+        ancestorConfig.agent_definitions,
+        ancestorBasePath,
+        ancestorDir,
+      )
+    }
+
+    if (ancestorConfig) {
+      config = mergeConfigs(config, ancestorConfig)
+    }
+
+    if (ancestorOverrides) {
+      ancestorGitMasterOverridesFarthestFirst.push(ancestorOverrides)
+    }
   }
 
-  if (projectConfig) {
-    config = mergeConfigs(config, projectConfig);
-  }
-
-  if (userGitMasterOverrides || projectGitMasterOverrides) {
+  if (userGitMasterOverrides || ancestorGitMasterOverridesFarthestFirst.length > 0) {
+    const mergedAncestorGitMaster: Record<string, unknown> = {}
+    for (const override of ancestorGitMasterOverridesFarthestFirst) {
+      Object.assign(mergedAncestorGitMaster, override)
+    }
     config = {
       ...config,
       git_master: {
         ...defaultGitMaster,
         ...(userGitMasterOverrides ?? {}),
-        ...(projectGitMasterOverrides ?? {}),
+        ...mergedAncestorGitMaster,
       },
     }
   }
 
+  // Security: mcp_env_allowlist remains user-only across the entire walk.
+  // This prevents clone-and-load attacks where a malicious project (or any
+  // walked ancestor) could extend the env var allowlist used during ${VAR}
+  // expansion in .mcp.json files. See commit 316d2504 for context.
   config = {
     ...config,
     mcp_env_allowlist: userConfig?.mcp_env_allowlist ?? [],
