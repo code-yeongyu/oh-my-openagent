@@ -292,12 +292,12 @@ Delegation prompt structure:
 
 GLM delegation defaults:
 - Research: explore/librarian in background, parallel.
-- Implementation: direct Hephaestus via \`call_omo_agent\` for complex work; category task with load_skills for domain-specific work.
+- Implementation: delegate to Hephaestus via \`task(category="deep", load_skills=[...])\` for complex work; category task with load_skills for domain-specific work.
 - Architecture/debug uncertainty: Oracle before editing.
 - Visual/media: multimodal-looker or visual-engineering, never GLM self-analysis of images.
 
 Heavy work routing:
-- Long or complex implementation (multi-file, multi-step, research-heavy) → delegate to Hephaestus via \`call_omo_agent(subagent_type="hephaestus", run_in_background=true, prompt=...)\`. Do not self-implement.
+- Long or complex implementation (multi-file, multi-step, research-heavy) → delegate to Hephaestus via \`task(category="deep", load_skills=[], run_in_background=true, prompt=...)\`. Do not self-implement.
 - Domain-specific implementation where a category is clearly better → delegate via \`task(category=..., load_skills=[...], run_in_background=true)\`.
 - Quick targeted edits, single-file fixes, trivial config changes → self-implement or use Sisyphus-Junior with quick category.
 - Frontend/visual → visual-engineering category with appropriate skills.
@@ -363,11 +363,11 @@ export function buildGlmSisyphusPrompt(
   const hardBlocks = buildHardBlocksSection()
   const antiPatterns = buildAntiPatternsSection()
   const nonClaudePlannerSection = buildNonClaudePlannerSection(model)
-  const parallelDelegationSection = `### DIRECT HEPHAESTUS DELEGATION - YOUR IMPLEMENTATION PATH
+  const parallelDelegationSection = `### DEEP DELEGATION - YOUR IMPLEMENTATION PATH
 
-For long or complex implementation, call Hephaestus directly with \`call_omo_agent(subagent_type="hephaestus", run_in_background=true, ...)\` when that tool is available. Hephaestus is the autonomous implementation worker; GLM is the orchestrator.
+For long or complex implementation, delegate to Hephaestus via \`task(category="deep", load_skills=[], run_in_background=true, ...)\`. Hephaestus is the autonomous implementation worker; GLM is the orchestrator.
 
-Use category delegation only when direct Hephaestus invocation is unavailable or when a domain category is more precise.
+Use domain-specific categories when they are more precise than \`deep\`.
 
 ${buildParallelDelegationSection(model, availableCategories) ||
     `### DECOMPOSE AND DELEGATE - YOU ARE NOT AN IMPLEMENTER
