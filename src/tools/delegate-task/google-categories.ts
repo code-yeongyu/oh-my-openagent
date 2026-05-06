@@ -1,9 +1,9 @@
 import type { BuiltinCategoryDefinition } from "./builtin-category-definition"
 
-const VISUAL_CATEGORY_PROMPT_APPEND = `<Category_Context>
+const VISUAL_CATEGORY_PROMPT_APPEND = `<ctx>
 You are working on VISUAL/UI tasks.
 
-<DESIGN_SYSTEM_WORKFLOW_MANDATE>
+<design>
 ## YOU ARE A VISUAL ENGINEER. FOLLOW THIS WORKFLOW OR YOUR OUTPUT IS REJECTED.
 
 **YOUR FAILURE MODE**: You skip design system analysis and jump straight to writing components with hardcoded colors, arbitrary spacing, and ad-hoc font sizes. The result is INCONSISTENT GARBAGE that looks like 5 different people built it. THIS STOPS NOW.
@@ -74,9 +74,9 @@ BEFORE reporting visual work as complete, answer these:
 
 **If ANY answer is NO - FIX IT. You are NOT done.**
 
-</DESIGN_SYSTEM_WORKFLOW_MANDATE>
+</design>
 
-<DESIGN_QUALITY>
+<quality>
 Design-first mindset (AFTER design system is established):
 - Bold aesthetic choices over safe defaults
 - Unexpected layouts, asymmetry, grid-breaking elements
@@ -86,10 +86,10 @@ Design-first mindset (AFTER design system is established):
 - Atmosphere: gradient meshes, noise textures, layered transparencies
 
 AVOID: Generic fonts, purple gradients on white, predictable layouts, cookie-cutter patterns.
-</DESIGN_QUALITY>
-</Category_Context>`
+</quality>
+</ctx>`
 
-const ARTISTRY_CATEGORY_PROMPT_APPEND = `<Category_Context>
+const ARTISTRY_CATEGORY_PROMPT_APPEND = `<ctx>
 You are working on HIGHLY CREATIVE / ARTISTIC tasks.
 
 Artistic genius mindset:
@@ -104,7 +104,7 @@ Approach:
 - Embrace ambiguity and wild experimentation
 - Balance novelty with coherence
 - This is for tasks requiring exceptional creativity
-</Category_Context>`
+</ctx>`
 
 export const GOOGLE_CATEGORIES: BuiltinCategoryDefinition[] = [
   {

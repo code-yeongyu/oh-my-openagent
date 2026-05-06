@@ -106,6 +106,7 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
     avail.zai ||
     avail.kimiForCoding ||
     avail.opencodeGo ||
+    avail.openrouter ||
     avail.vercelAiGateway
   if (!hasAnyProvider) {
     return {
@@ -129,6 +130,8 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
       let agentConfig: AgentConfig | undefined
       if (avail.native.openai) {
         agentConfig = { model: "openai/gpt-5.4-mini-fast" }
+      } else if (avail.openrouter) {
+        agentConfig = { model: "openrouter/openai/gpt-5.4-mini-fast" }
       } else if (avail.opencodeGo) {
         agentConfig = { model: "opencode-go/minimax-m2.7" }
       } else if (avail.zai) {
@@ -150,6 +153,8 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
         agentConfig = { model: "anthropic/claude-haiku-4-5" }
       } else if (avail.opencodeZen) {
         agentConfig = { model: "opencode/claude-haiku-4-5" }
+      } else if (avail.openrouter) {
+        agentConfig = { model: "openrouter/openai/gpt-5.4-mini-fast" }
       } else if (avail.opencodeGo) {
         agentConfig = { model: "opencode-go/minimax-m2.7" }
       } else if (avail.copilot) {
@@ -222,6 +227,10 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
     $schema: SCHEMA_URL,
     agents,
     categories,
+  }
+
+  if (config.enableCaveman) {
+    generatedConfig.global_prompt_append = "CAVEMAN ULTRA: Drop articles (a/an/the), filler (just/really/basically/happy to), pleasantries, hedging. Fragments OK. Short synonyms. Abbreviate (DB/auth/config/req/res/fn/impl). Arrows for causality (X → Y). One word when enough. Technical terms exact. Code blocks unchanged. Errors quoted exact. Pattern: [thing] [action] [reason]. [next step]. ACTIVE EVERY RESPONSE. No revert. No filler drift. Auto-clarity: drop for security/irreversible ops. Resume clear after. Off: \"stop caveman\" / \"normal mode\". Based on JuliusBrussee/caveman (MIT)."
   }
 
   return isOpenAiOnlyAvailability(avail)

@@ -4,6 +4,7 @@ import { resolveModel } from "../../shared/model-resolver"
 import { isModelAvailable } from "../../shared/model-availability"
 import { normalizeModel } from "../../shared/model-normalization"
 import { CATEGORY_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
+import { resolvePromptAppend } from "../../agents/builtin-agents/resolve-file-uri"
 import { log } from "../../shared/logger"
 
 export interface ResolveCategoryConfigOptions {
@@ -11,6 +12,8 @@ export interface ResolveCategoryConfigOptions {
   inheritedModel?: string
   systemDefaultModel?: string
   availableModels?: Set<string>
+  /** Global prompt append applied before category-specific prompt_append. Supports file:// URIs. */
+  globalPromptAppend?: string
 }
 
 export interface ResolveCategoryConfigResult {
@@ -28,7 +31,7 @@ export function resolveCategoryConfig(
   categoryName: string,
   options: ResolveCategoryConfigOptions
 ): ResolveCategoryConfigResult | null {
-  const { userCategories, inheritedModel: _inheritedModel, systemDefaultModel, availableModels } = options
+  const { userCategories, inheritedModel: _inheritedModel, systemDefaultModel, availableModels, globalPromptAppend } = options
 
   const defaultConfig = DEFAULT_CATEGORIES[categoryName]
   const userConfig = userCategories?.[categoryName]
@@ -66,11 +69,21 @@ export function resolveCategoryConfig(
     variant: userConfig?.variant ?? defaultConfig?.variant,
   }
 
-  let promptAppend = defaultPromptAppend
+  // Build promptAppend chain: global → category-default → user-specific
+  const resolvedGlobal = globalPromptAppend
+    ? resolvePromptAppend(globalPromptAppend, undefined, true /* allowOutsideProject */)
+    : ""
+  let promptAppend = resolvedGlobal
+
+  const appendLayer = (existing: string, next: string): string => {
+    return existing && next ? existing + "\n\n" + next : existing || next
+  }
+
+  if (defaultPromptAppend) {
+    promptAppend = appendLayer(promptAppend, defaultPromptAppend)
+  }
   if (userConfig?.prompt_append) {
-    promptAppend = defaultPromptAppend
-      ? defaultPromptAppend + "\n\n" + userConfig.prompt_append
-      : userConfig.prompt_append
+    promptAppend = appendLayer(promptAppend, userConfig.prompt_append)
   }
 
   return { config, promptAppend, model, isUserConfiguredModel }

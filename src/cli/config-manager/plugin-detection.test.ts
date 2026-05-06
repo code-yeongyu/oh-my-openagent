@@ -63,6 +63,22 @@ describe("detectCurrentConfig - single package detection", () => {
     expect(result.isInstalled).toBe(true)
     expect(result.hasOpencodeGo).toBe(true)
   })
+
+  it("detects OpenRouter from the OpenCode provider config", () => {
+    // given
+    writeFileSync(
+      testConfigPath,
+      JSON.stringify({ plugin: ["oh-my-opencode"], provider: { openrouter: {} } }, null, 2) + "\n",
+      "utf-8",
+    )
+
+    // when
+    const result = detectCurrentConfig()
+
+    // then
+    expect(result.isInstalled).toBe(true)
+    expect(result.hasOpenRouter).toBe(true)
+  })
 })
 
 describe("addPluginToOpenCodeConfig - single package writes", () => {

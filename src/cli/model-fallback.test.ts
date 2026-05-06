@@ -17,6 +17,7 @@ function createConfig(overrides: Partial<InstallConfig> = {}): InstallConfig {
     hasKimiForCoding: false,
     hasOpencodeGo: false,
     hasVercelAiGateway: false,
+    hasOpenRouter: false,
     ...overrides,
   }
 }
@@ -668,6 +669,33 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then should prefer native anthropic over gateway
+      expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-opus-4-7")
+    })
+  })
+
+  describe("OpenRouter provider", () => {
+    test("generates complete openrouter-routed config when only OpenRouter is available", () => {
+      // #given only OpenRouter is available
+      const config = createConfig({ hasOpenRouter: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then key agents and categories should not fall back to sparse ultimate defaults
+      expect(result.agents?.librarian?.model).toBe("openrouter/openai/gpt-5.4-mini-fast")
+      expect(result.agents?.explore?.model).toBe("openrouter/openai/gpt-5.4-mini-fast")
+      expect(result.agents?.hephaestus?.model).toBe("openrouter/openai/gpt-5.5")
+      expect(result.categories?.quick?.model).toBe("openrouter/openai/gpt-5.4-mini")
+    })
+
+    test("native providers take priority over OpenRouter", () => {
+      // #given Claude and OpenRouter are both available
+      const config = createConfig({ hasClaude: true, hasOpenRouter: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then should prefer native anthropic over OpenRouter
       expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-opus-4-7")
     })
   })
