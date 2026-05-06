@@ -11,7 +11,7 @@
 > [!NOTE]
 >
 > [![Sisyphus Labs - Sisyphus is the agent that codes like your team.](./.github/assets/sisyphuslabs.png?v=2)](https://sisyphuslabs.ai)
-> > **Sisyphus를 완성형 프로덕트로 만들어 프론티어 에이전트의 미래를 정의하고 있습니다. <br />대기 명단은 [여기](https://sisyphuslabs.ai)에서 받습니다.**
+> > **OmO는 위의 Jobdori에 의해 메인테이닝되고 있습니다. 당신의 Jobdori, Dori를 만나세요. <br />대기 명단은 [여기](https://sisyphuslabs.ai)에서 받습니다.**
 
 > [!TIP]
 > 함께해요!
