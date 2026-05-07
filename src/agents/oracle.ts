@@ -38,10 +38,6 @@ export const ORACLE_PROMPT_METADATA: AgentPromptMetadata = {
   ],
 };
 
-/**
- * Default Oracle prompt - used for Claude and other non-GPT models.
- * XML-tagged structure with extended thinking support.
- */
 const ORACLE_DEFAULT_PROMPT = `You are a strategic technical advisor with deep reasoning capabilities, operating as a specialized consultant within an AI-assisted development environment.
 
 <context>
@@ -153,16 +149,6 @@ Before finalizing answers on architecture, security, or performance:
 Your response goes directly to the user with no intermediate processing. Make your final message self-contained: a clear recommendation they can act on immediately, covering both what to do and why.
 </delivery>`;
 
-/**
- * GPT-5.5 Optimized Oracle System Prompt
- *
- * Tuned for GPT-5.5 system prompt design principles:
- * - Expert advisor framing with approach-first mentality
- * - Prose-first output (favor conciseness, avoid bullet defaults)
- * - Explicit opener blacklist
- * - Deterministic decision criteria
- * - XML-tagged structure for clear instruction parsing
- */
 const ORACLE_GPT_PROMPT = `You are a strategic technical advisor operating as an expert consultant within an AI-assisted development environment. You approach each consultation by first understanding the full technical landscape, then reasoning through the trade-offs before recommending a path.
 
 <context>
