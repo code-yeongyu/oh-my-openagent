@@ -29,7 +29,7 @@ const DEFAULT_POSTHOG_API_KEY = "phc_CFJhj5HyvA62QPhvyaUCtaq23aUfznnijg5VaaGkNk7
 
 type PostHogCaptureEvent = Parameters<PostHog["capture"]>[0]
 type PostHogSource = "cli" | "plugin"
-type PostHogActivityReason = "run_started" | "plugin_loaded"
+type PostHogActivityReason = "run_started"
 
 type PostHogClient = {
   trackActive: (distinctId: string, reason: PostHogActivityReason) => void
@@ -151,6 +151,9 @@ export function getPostHogDistinctId(): string {
 export function createCliPostHog(): PostHogClient {
   return createPostHogClient("cli", {
     enableExceptionAutocapture: false,
+    enableLocalEvaluation: false,
+    strictLocalEvaluation: true,
+    disableRemoteConfig: true,
     flushAt: 1,
     flushInterval: 0,
   })
@@ -159,6 +162,9 @@ export function createCliPostHog(): PostHogClient {
 export function createPluginPostHog(): PostHogClient {
   return createPostHogClient("plugin", {
     enableExceptionAutocapture: false,
+    enableLocalEvaluation: false,
+    strictLocalEvaluation: true,
+    disableRemoteConfig: true,
     flushAt: 1,
     flushInterval: 0,
   })

@@ -39,8 +39,6 @@ describe("runCliInstaller telemetry isolation", () => {
     mock.module("../shared/posthog", () => ({
       createCliPostHog: mock(() => ({
         trackActive: mock(() => {}),
-        capture: mock(() => {}),
-        captureException: mock(() => {}),
         shutdown: mock(async () => {
           throw new Error("shutdown failed")
         }),

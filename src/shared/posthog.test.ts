@@ -67,7 +67,7 @@ describe("posthog client creation", () => {
     expect(() => cliPostHog.trackActive("cli", "run_started")).not.toThrow()
     await expect(cliPostHog.shutdown()).resolves.toBeUndefined()
 
-    expect(() => pluginPostHog.trackActive("plugin", "plugin_loaded")).not.toThrow()
+    expect(() => pluginPostHog.trackActive("plugin", "run_started")).not.toThrow()
     await expect(pluginPostHog.shutdown()).resolves.toBeUndefined()
   })
 
@@ -104,8 +104,43 @@ describe("posthog client creation", () => {
     const pluginPostHog = createPluginPostHog()
 
     // then
-    expect(() => pluginPostHog.trackActive("plugin", "plugin_loaded")).not.toThrow()
+    expect(() => pluginPostHog.trackActive("plugin", "run_started")).not.toThrow()
     await expect(pluginPostHog.shutdown()).resolves.toBeUndefined()
+  })
+
+  it("passes the strict PostHog constructor options for both clients", async () => {
+    // given
+    enableTelemetryEnv()
+    const capturedOptions: Array<Record<string, unknown>> = []
+
+    mock.module("posthog-node", () => ({
+      PostHog: class {
+        constructor(_apiKey: string, options: Record<string, unknown>) {
+          capturedOptions.push(options)
+        }
+        capture() {}
+        async shutdown() {}
+      },
+    }))
+
+    const { createCliPostHog, createPluginPostHog } = await importPostHogModule()
+
+    // when
+    createCliPostHog()
+    createPluginPostHog()
+
+    // then
+    expect(capturedOptions).toHaveLength(2)
+    for (const options of capturedOptions) {
+      expect(options).toMatchObject({
+        enableExceptionAutocapture: false,
+        enableLocalEvaluation: false,
+        strictLocalEvaluation: true,
+        disableRemoteConfig: true,
+        flushAt: 1,
+        flushInterval: 0,
+      })
+    }
   })
 })
 
@@ -170,7 +205,7 @@ describe("posthog trackActive emission contract", () => {
     const client = posthogModule.createPluginPostHog()
 
     // when
-    client.trackActive("distinct-plugin", "plugin_loaded")
+    client.trackActive("distinct-plugin", "run_started")
 
     // then
     expect(captured).toHaveLength(0)
