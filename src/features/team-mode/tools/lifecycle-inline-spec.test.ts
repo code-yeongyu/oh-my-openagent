@@ -13,9 +13,6 @@ import type { RuntimeState, TeamSpec } from "../types"
 const runtimes = new Map<string, RuntimeState>()
 let nextTeamRunNumber = 1
 
-const lifecycleSpecifier = import.meta.resolve("./lifecycle")
-const teamRuntimeCreateSpecifier = import.meta.resolve("../team-runtime/create")
-
 function clone<TValue>(value: TValue): TValue {
   return structuredClone(value)
 }
@@ -65,12 +62,8 @@ const createTeamRunMock = mock(async (spec: TeamSpec, leadSessionId: string) => 
   return clone(runtimeState)
 })
 
-function registerModuleMocks(): void {
-  mock.module(teamRuntimeCreateSpecifier, () => ({ createTeamRun: createTeamRunMock }))
-}
-
 async function loadCreateTeamCreateTool(): Promise<typeof import("./lifecycle").createTeamCreateTool> {
-  const module = await import(`${lifecycleSpecifier}?test=${randomUUID()}`)
+  const module = await import(`./lifecycle?test=${randomUUID()}`)
   return module.createTeamCreateTool
 }
 
@@ -81,6 +74,23 @@ function createConfig() {
   })
 }
 
+function createTeamCreateToolForTest(
+  factory: typeof import("./lifecycle").createTeamCreateTool,
+  config: ReturnType<typeof createConfig>,
+  executorConfig?: Parameters<typeof factory>[4],
+) {
+  return factory(config, {} as never, {} as never, undefined, executorConfig, {
+    createTeamRun: createTeamRunMock,
+    loadTeamSpec: async () => {
+      throw new Error("loadTeamSpec should not be called for inline_spec tests")
+    },
+    listActiveTeams: async () => [],
+    loadRuntimeState: async () => {
+      throw new Error("loadRuntimeState should not be called when no active teams exist")
+    },
+  })
+}
+
 describe("createTeamCreateTool inline_spec normalization", () => {
   afterEach(() => {
     mock.restore()
@@ -88,7 +98,6 @@ describe("createTeamCreateTool inline_spec normalization", () => {
 
   beforeEach(() => {
     mock.restore()
-    registerModuleMocks()
     runtimes.clear()
     nextTeamRunNumber = 1
     createTeamRunMock.mockClear()
@@ -98,7 +107,7 @@ describe("createTeamCreateTool inline_spec normalization", () => {
     // given
     const createTeamCreateTool = await loadCreateTeamCreateTool()
     const config = createConfig()
-    const teamCreateTool = createTeamCreateTool(config, {} as never)
+    const teamCreateTool = createTeamCreateToolForTest(createTeamCreateTool, config)
     const inlineSpec = {
       name: "alpha-team",
       lead: { kind: "subagent_type", subagent_type: "sisyphus" },
@@ -129,7 +138,7 @@ describe("createTeamCreateTool inline_spec normalization", () => {
     // given
     const createTeamCreateTool = await loadCreateTeamCreateTool()
     const config = createConfig()
-    const teamCreateTool = createTeamCreateTool(config, {} as never)
+    const teamCreateTool = createTeamCreateToolForTest(createTeamCreateTool, config)
     const inlineSpec = JSON.stringify({
       name: "ccapi-explorers-v2",
       lead: { kind: "subagent_type", subagent_type: "sisyphus" },
@@ -152,7 +161,7 @@ describe("createTeamCreateTool inline_spec normalization", () => {
     // given
     const createTeamCreateTool = await loadCreateTeamCreateTool()
     const config = createConfig()
-    const teamCreateTool = createTeamCreateTool(config, {} as never)
+    const teamCreateTool = createTeamCreateToolForTest(createTeamCreateTool, config)
     const inlineSpec = {
       name: "project-analysis-team",
       description: "Analyze the codebase from structure, core logic, and quality angles.",
@@ -198,35 +207,45 @@ describe("createTeamCreateTool inline_spec normalization", () => {
     // given
     const createTeamCreateTool = await loadCreateTeamCreateTool()
     const config = createConfig()
-    const teamCreateTool = createTeamCreateTool(config, {} as never)
+    const teamCreateTool = createTeamCreateToolForTest(createTeamCreateTool, config)
 
     // when
-    const result = teamCreateTool.execute({}, createToolContext("lead-session", "Sisyphus"))
+    let errorMessage = ""
+    try {
+      await teamCreateTool.execute({}, createToolContext("lead-session", "Sisyphus"))
+    } catch (error) {
+      errorMessage = error instanceof Error ? error.message : String(error)
+    }
 
     // then
-    await expect(result).rejects.toThrow("team_create requires exactly one of teamName or inline_spec")
-    await expect(result).rejects.toThrow("team_create({ inline_spec: { name:")
+    expect(errorMessage).toContain("team_create requires exactly one of teamName or inline_spec")
+    expect(errorMessage).toContain("team_create({ inline_spec: { name:")
   })
 
   test("explains how to shape inline_spec when members are missing", async () => {
     // given
     const createTeamCreateTool = await loadCreateTeamCreateTool()
     const config = createConfig()
-    const teamCreateTool = createTeamCreateTool(config, {} as never)
+    const teamCreateTool = createTeamCreateToolForTest(createTeamCreateTool, config)
 
     // when
-    const result = teamCreateTool.execute({ inline_spec: { name: "project-analysis-team" } }, createToolContext("lead-session", "Sisyphus"))
+    let errorMessage = ""
+    try {
+      await teamCreateTool.execute({ inline_spec: { name: "project-analysis-team" } }, createToolContext("lead-session", "Sisyphus"))
+    } catch (error) {
+      errorMessage = error instanceof Error ? error.message : String(error)
+    }
 
     // then
-    await expect(result).rejects.toThrow("Invalid inline_spec for team_create")
-    await expect(result).rejects.toThrow("members array")
+    expect(errorMessage).toContain("Invalid inline_spec for team_create")
+    expect(errorMessage).toContain("members array")
   })
 
   test("accepts natural team and member names in inline_spec", async () => {
     // given
     const createTeamCreateTool = await loadCreateTeamCreateTool()
     const config = createConfig()
-    const teamCreateTool = createTeamCreateTool(config, {} as never)
+    const teamCreateTool = createTeamCreateToolForTest(createTeamCreateTool, config)
     const inlineSpec = {
       name: "Project Analysis Team",
       members: [
@@ -256,7 +275,7 @@ describe("createTeamCreateTool inline_spec normalization", () => {
     // given
     const createTeamCreateTool = await loadCreateTeamCreateTool()
     const config = createConfig()
-    const teamCreateTool = createTeamCreateTool(config, {} as never, undefined as never, undefined, {
+    const teamCreateTool = createTeamCreateToolForTest(createTeamCreateTool, config, {
       userCategories: {
         analysis: {},
       },

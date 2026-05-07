@@ -182,6 +182,7 @@ export interface BackgroundManagerConfig {
   onShutdown?: () => void | Promise<void>
   enableParentSessionNotifications?: boolean
   modelFallbackControllerAccessor?: ModelFallbackControllerAccessor
+  log?: typeof log
 }
 
 export class BackgroundManager {
@@ -215,6 +216,7 @@ export class BackgroundManager {
   private preStartDescendantReservations: Set<string>
   private enableParentSessionNotifications: boolean
   private modelFallbackControllerAccessor?: ModelFallbackControllerAccessor
+  private logger: typeof log
   private loggedSessionStatusUnavailable = false
   readonly taskHistory = new TaskHistory()
   private cachedCircuitBreakerSettings?: CircuitBreakerSettings
@@ -237,6 +239,7 @@ export class BackgroundManager {
     this.preStartDescendantReservations = new Set()
     this.enableParentSessionNotifications = options?.enableParentSessionNotifications ?? true
     this.modelFallbackControllerAccessor = options?.modelFallbackControllerAccessor
+    this.logger = options?.log ?? log
     this.registerProcessCleanup()
   }
 
@@ -1521,7 +1524,7 @@ The fallback retry session is now created and can be inspected directly.
     if (sessionId) {
       const sessionStillAlive = await this.verifySessionExists(sessionId)
       if (sessionStillAlive) {
-        log("[background-agent] session.error received but session still alive, treating as transient:", {
+        this.logger("[background-agent] session.error received but session still alive, treating as transient:", {
           taskId: task.id,
           sessionId,
           errorMessage: errorMsg?.slice(0, 200),

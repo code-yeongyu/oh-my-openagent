@@ -13,18 +13,20 @@ export function createToolExecuteBeforeHandler(input: {
   ctx: PluginInput
   pendingFilePaths: Map<string, string>
   pendingTaskRefs: Map<string, PendingTaskRef>
+  isCallerOrchestrator?: (sessionID: string | undefined) => Promise<boolean>
 }): (
   toolInput: { tool: string; sessionID?: string; callID?: string },
   toolOutput: { args: Record<string, unknown>; message?: string }
 ) => Promise<void> {
   const { ctx, pendingFilePaths, pendingTaskRefs } = input
+  const resolveIsCallerOrchestrator = input.isCallerOrchestrator ?? ((sessionID) => isCallerOrchestrator(sessionID, ctx.client))
 
   function trackTask(callID: string, task: TrackedTopLevelTaskRef): void {
     pendingTaskRefs.set(callID, { kind: "track", task })
   }
 
   return async (toolInput, toolOutput): Promise<void> => {
-    if (!(await isCallerOrchestrator(toolInput.sessionID, ctx.client))) {
+    if (!(await resolveIsCallerOrchestrator(toolInput.sessionID))) {
       return
     }
 

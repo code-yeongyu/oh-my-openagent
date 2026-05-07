@@ -10,6 +10,18 @@ import { listActiveTeams, loadRuntimeState, saveRuntimeState, transitionRuntimeS
 import type { RuntimeState } from "../types"
 import { DELETABLE_MEMBER_STATUSES, removeWorktrees } from "./shutdown-helpers"
 
+export type DeleteTeamDeps = {
+  canVisualize: typeof canVisualize
+  removeTeamLayout: typeof removeTeamLayout
+  log: typeof log
+}
+
+const defaultDeleteTeamDeps: DeleteTeamDeps = {
+  canVisualize,
+  removeTeamLayout,
+  log,
+}
+
 const DELETABLE_TEAM_STATUSES = new Set<RuntimeState["status"]>([
   "active",
   "shutdown_requested",
@@ -37,6 +49,7 @@ export async function deleteTeam(
   tmuxMgr?: TmuxSessionManager,
   bgMgr?: BackgroundManager,
   options?: { force?: boolean },
+  deps: DeleteTeamDeps = defaultDeleteTeamDeps,
 ): Promise<{ removedWorktrees: string[]; removedLayout: boolean }> {
   const runtimeState = await loadRuntimeState(teamRunId, config)
   const nonLeadMembers = runtimeState.members.filter((member) => member.agentType !== "leader")
@@ -86,7 +99,7 @@ export async function deleteTeam(
     }
   }
 
-  const removedLayout = config.tmux_visualization && tmuxMgr !== undefined && canVisualize()
+  const removedLayout = config.tmux_visualization && tmuxMgr !== undefined && deps.canVisualize()
   if (removedLayout) {
     const memberPaneIds = runtimeState.members
       .filter((member) => member.agentType !== "leader" && member.tmuxPaneId)
@@ -101,15 +114,15 @@ export async function deleteTeam(
 
     if (options?.force === true) {
       try {
-        await removeTeamLayout(teamRunId, cleanupTarget, tmuxMgr)
+        await deps.removeTeamLayout(teamRunId, cleanupTarget, tmuxMgr)
       } catch (error) {
-        log("team delete layout cleanup failed", {
+        deps.log("team delete layout cleanup failed", {
           teamRunId,
           error: error instanceof Error ? error.message : String(error),
         })
       }
     } else {
-      await removeTeamLayout(teamRunId, cleanupTarget, tmuxMgr)
+      await deps.removeTeamLayout(teamRunId, cleanupTarget, tmuxMgr)
     }
   }
 

@@ -6,7 +6,7 @@ import * as sharedModule from "../../../shared"
 import * as sharedTmuxModule from "../../../shared/tmux"
 import * as tmuxPathResolverModule from "../../../tools/interactive-bash/tmux-path-resolver"
 import * as resolveCallerTmuxSessionModule from "./resolve-caller-tmux-session"
-import { canVisualize, createTeamLayout, removeTeamLayout } from "./layout"
+import { canVisualize, createTeamLayout, removeTeamLayout, type TeamLayoutCleanupTarget, type TeamLayoutDeps } from "./layout"
 
 let nextWindowNumber = 1
 let nextPaneNumber = 1
@@ -77,7 +77,29 @@ const runTmuxCommandMock = mock(defaultRunTmuxCommand)
 const isServerRunningMock = mock(async (_serverUrl: string) => true)
 
 async function loadLayoutModule() {
-  return { canVisualize, createTeamLayout, removeTeamLayout }
+  const deps: TeamLayoutDeps = {
+    runTmuxCommand: runTmuxCommandMock,
+    isServerRunning: isServerRunningMock,
+    getTmuxPath: async () => "tmux",
+    resolveCallerTmuxSession: async () => {
+      if (!process.env.TMUX_PANE || !displaySuccess || !/^\$[0-9]+$/.test(displaySessionId)) {
+        return null
+      }
+
+      return { sessionId: displaySessionId, paneId: process.env.TMUX_PANE, windowTarget: "test-session:0" }
+    },
+  }
+  return {
+    canVisualize,
+    createTeamLayout: (teamRunId: string, members: Parameters<typeof createTeamLayout>[1], tmuxMgr: Parameters<typeof createTeamLayout>[2]) => {
+      return createTeamLayout(teamRunId, members, tmuxMgr, deps)
+    },
+    removeTeamLayout: (
+      teamRunId: string,
+      cleanupTarget: TeamLayoutCleanupTarget | undefined,
+      tmuxMgr: Parameters<typeof removeTeamLayout>[2],
+    ) => removeTeamLayout(teamRunId, cleanupTarget, tmuxMgr, deps),
+  }
 }
 
 type TmuxMgrLike = { getServerUrl: () => string }

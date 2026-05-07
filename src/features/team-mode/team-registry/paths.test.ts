@@ -69,6 +69,7 @@ describe("paths", () => {
 
     await writeFile(path.join(projectTeamDir, "config.json"), "{}")
     await writeFile(path.join(userTeamDir, "config.json"), "{}")
+    logCalls.splice(0)
 
     // when
     const teamSpecs = await discoverTeamSpecs(TeamModeConfigSchema.parse({ base_dir: userBaseDir }), projectRoot)

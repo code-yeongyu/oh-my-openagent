@@ -6,10 +6,9 @@ import path from "node:path"
 
 import { sendMessage } from "../team-mailbox/send"
 import { getRuntimeStateDir, resolveBaseDir } from "../team-registry/paths"
-import * as logger from "../../../shared/logger"
-import * as layoutModule from "../team-layout-tmux/layout"
 import * as runtimeStateStore from "../team-state-store/store"
 import { loadRuntimeState, transitionRuntimeState } from "../team-state-store/store"
+import type { DeleteTeamDeps } from "./delete-team"
 import {
   createFixture,
   createTestMessage,
@@ -291,9 +290,12 @@ describe("team-runtime shutdown", () => {
       transitionedStatuses.push(transition(currentRuntimeState).status)
       return await originalTransitionRuntimeState(teamRunId, transition, config)
     })
-    spyOn(layoutModule, "canVisualize").mockReturnValue(true)
-    spyOn(layoutModule, "removeTeamLayout").mockRejectedValue(new Error("layout failed"))
-    const logSpy = spyOn(logger, "log").mockImplementation(() => {})
+    const logMock = mock(() => {})
+    const deps = {
+      canVisualize: () => true,
+      removeTeamLayout: async () => { throw new Error("layout failed") },
+      log: logMock,
+    } satisfies DeleteTeamDeps
     await updateMemberStatuses(fixture.teamRunId, fixture.config, {
       "member-a": "running",
       "member-b": "idle",
@@ -309,12 +311,13 @@ describe("team-runtime shutdown", () => {
       { getServerUrl: () => "http://localhost" } as never,
       undefined,
       { force: true },
+      deps,
     )
 
     // then
     expect(result.removedLayout).toBe(true)
     expect(transitionedStatuses).toContain("deleted")
-    expect(logSpy).toHaveBeenCalledWith("team delete layout cleanup failed", {
+    expect(logMock).toHaveBeenCalledWith("team delete layout cleanup failed", {
       teamRunId: fixture.teamRunId,
       error: "layout failed",
     })
@@ -329,8 +332,12 @@ describe("team-runtime shutdown", () => {
     // given
     const fixture = await createFixture()
     temporaryDirectories.push(fixture.baseDir)
-    spyOn(layoutModule, "canVisualize").mockReturnValue(true)
-    const removeLayoutSpy = spyOn(layoutModule, "removeTeamLayout").mockResolvedValue(undefined)
+    const removeLayoutMock = mock(async () => {})
+    const deps = {
+      canVisualize: () => true,
+      removeTeamLayout: removeLayoutMock,
+      log: () => {},
+    } satisfies DeleteTeamDeps
     await updateMemberStatuses(fixture.teamRunId, fixture.config, {
       "member-a": "shutdown_approved",
       "member-b": "completed",
@@ -341,11 +348,14 @@ describe("team-runtime shutdown", () => {
       fixture.teamRunId,
       { ...fixture.config, tmux_visualization: false },
       { getServerUrl: () => "http://localhost" } as never,
+      undefined,
+      undefined,
+      deps,
     )
 
     // then
     expect(result.removedLayout).toBe(false)
-    expect(removeLayoutSpy).not.toHaveBeenCalled()
+    expect(removeLayoutMock).not.toHaveBeenCalled()
   })
 
   test("cancels team background tasks before deleting when force=true", async () => {

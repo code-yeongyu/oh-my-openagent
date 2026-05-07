@@ -43,6 +43,14 @@ type TeamRuntimeDetails = {
   activeMembers: string[]
 }
 
+export type TeamSendMessageToolDeps = {
+  loadRuntimeState: typeof loadRuntimeState
+}
+
+const defaultTeamSendMessageToolDeps: TeamSendMessageToolDeps = {
+  loadRuntimeState,
+}
+
 const TeamReferenceArgsSchema = z.object({
   path: z.string().min(1),
   description: z.string().optional(),
@@ -53,17 +61,22 @@ const TeamSendMessageArgsSchema = z.object({
   to: z.string().min(1),
   body: z.string(),
   kind: z.enum(MESSAGE_TOOL_KINDS).optional(),
-  correlationId: z.string().uuid().optional(),
+  correlationId: z.uuid().optional(),
   summary: z.string().optional(),
   references: z.array(TeamReferenceArgsSchema).optional(),
 })
 
 type DeliveryReservation = Awaited<ReturnType<typeof reserveMessageForDelivery>>
 
-async function resolveTeamRuntimeDetails(teamRunId: string, sessionID: string, config: TeamModeConfig): Promise<TeamRuntimeDetails> {
+async function resolveTeamRuntimeDetails(
+  teamRunId: string,
+  sessionID: string,
+  config: TeamModeConfig,
+  deps: TeamSendMessageToolDeps,
+): Promise<TeamRuntimeDetails> {
   const registryEntry = lookupTeamSession(sessionID)
   if (registryEntry?.teamRunId === teamRunId) {
-    const runtimeState = await loadRuntimeState(teamRunId, config)
+    const runtimeState = await deps.loadRuntimeState(teamRunId, config)
 
     return {
       teamRunId: runtimeState.teamRunId,
@@ -76,7 +89,7 @@ async function resolveTeamRuntimeDetails(teamRunId: string, sessionID: string, c
   }
 
   try {
-    const runtimeState = await loadRuntimeState(teamRunId, config)
+    const runtimeState = await deps.loadRuntimeState(teamRunId, config)
     const isLead = runtimeState.leadSessionId === sessionID
     const leadMember = isLead
       ? runtimeState.members.find((member) => member.agentType === "leader")
@@ -127,8 +140,9 @@ async function deliverLive(
   deliveredTo: readonly string[],
   config: TeamModeConfig,
   directory: string,
+  deps: TeamSendMessageToolDeps,
 ): Promise<void> {
-  const runtimeState = await loadRuntimeState(teamRunId, config)
+  const runtimeState = await deps.loadRuntimeState(teamRunId, config)
   const envelope = buildEnvelope(message)
 
   for (const recipientName of deliveredTo) {
@@ -194,7 +208,11 @@ async function deliverLive(
   }
 }
 
-export function createTeamSendMessageTool(config: TeamModeConfig, client: LiveDeliveryClient): ToolDefinition {
+export function createTeamSendMessageTool(
+  config: TeamModeConfig,
+  client: LiveDeliveryClient,
+  deps: TeamSendMessageToolDeps = defaultTeamSendMessageToolDeps,
+): ToolDefinition {
   return tool({
     description: "Send a message to a team member or broadcast to the team.",
     args: {
@@ -220,7 +238,7 @@ export function createTeamSendMessageTool(config: TeamModeConfig, client: LiveDe
 
       const targetDirectory = typeof runtimeContext.directory === "string" ? runtimeContext.directory : process.cwd()
 
-      const teamRuntime = await resolveTeamRuntimeDetails(args.teamRunId, sessionID, config)
+      const teamRuntime = await resolveTeamRuntimeDetails(args.teamRunId, sessionID, config, deps)
       const message = MessageSchema.parse({
         version: 1,
         messageId: randomUUID(),
@@ -242,7 +260,7 @@ export function createTeamSendMessageTool(config: TeamModeConfig, client: LiveDe
         throw new BroadcastNotPermittedError()
       }
 
-      const runtimeState = await loadRuntimeState(teamRuntime.teamRunId, config)
+      const runtimeState = await deps.loadRuntimeState(teamRuntime.teamRunId, config)
       const reservedRecipients = new Set<string>(
         runtimeState.members
           .filter((member) => member.sessionId !== undefined && member.name !== teamRuntime.senderName)
@@ -256,7 +274,7 @@ export function createTeamSendMessageTool(config: TeamModeConfig, client: LiveDe
       })
 
       try {
-        await deliverLive(client, message, teamRuntime.teamRunId, result.deliveredTo, config, targetDirectory)
+        await deliverLive(client, message, teamRuntime.teamRunId, result.deliveredTo, config, targetDirectory, deps)
       } catch (liveError) {
         log("[team-mailbox] deliverLive top-level error (message already in inbox, safe to ignore)", {
           error: liveError instanceof Error ? liveError.message : String(liveError),

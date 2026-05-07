@@ -37,11 +37,6 @@ const resolveMemberMock = mock(async (member: TeamSpec["members"][number]) => ({
 }))
 
 mock.module("./team-runtime/resolve-member", () => ({ resolveMember: resolveMemberMock }))
-mock.module("./team-layout-tmux/layout", () => ({
-  canVisualize: () => false,
-  createTeamLayout: mock(async () => undefined),
-  removeTeamLayout: mock(async () => undefined),
-}))
 
 const { sendMessage } = await import("./team-mailbox/send")
 const { createTeamRun } = await import("./team-runtime/create")

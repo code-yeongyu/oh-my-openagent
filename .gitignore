@@ -37,3 +37,9 @@ oauth-success.html
 *.bun-build
 .omx/
 .dori-sync/
+.dori/
+.playwright-mcp/
+
+# Debugging / session artifacts (skill workspace residue)
+.debug-journal*.md
+session-ses_*.md

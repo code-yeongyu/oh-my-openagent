@@ -24,21 +24,12 @@ let listActiveTeamsImplementation: typeof import("../team-state-store/store").li
   throw new Error("listActiveTeamsImplementation not set")
 }
 
-mock.module("../team-runtime/status", () => ({
+const deps = {
   aggregateStatus: (...args: Parameters<typeof aggregateStatusImplementation>) => aggregateStatusImplementation(...args),
-}))
-
-mock.module("../team-registry/paths", () => ({
   discoverTeamSpecs: (...args: Parameters<typeof discoverTeamSpecsImplementation>) => discoverTeamSpecsImplementation(...args),
-}))
-
-mock.module("../team-registry/loader", () => ({
   loadTeamSpec: (...args: Parameters<typeof loadTeamSpecImplementation>) => loadTeamSpecImplementation(...args),
-}))
-
-mock.module("../team-state-store/store", () => ({
   listActiveTeams: (...args: Parameters<typeof listActiveTeamsImplementation>) => listActiveTeamsImplementation(...args),
-}))
+}
 
 import { createTeamListTool, createTeamStatusTool } from "./query"
 
@@ -64,7 +55,7 @@ describe("query tools", () => {
       teamName: "team-alpha",
       status: "active",
       createdAt: 1,
-      members: [{ name: "worker", unreadMessages: 0 }],
+      members: [{ name: "worker", status: "running", unreadMessages: 0 }],
       tasks: { pending: 0, claimed: 0, in_progress: 0, completed: 0, deleted: 0, total: 0 },
       shutdownRequests: [],
       concurrency: { runningOnSameModel: 0, queuedOnSameModel: 0 },
@@ -76,7 +67,7 @@ describe("query tools", () => {
       expect(passedConfig).toBe(config)
       return expectedStatus
     }
-    const tool = createTeamStatusTool(config, mockClient)
+    const tool = createTeamStatusTool(config, mockClient, undefined, deps)
 
     // when
     const result = JSON.parse(await tool.execute({ teamRunId: "team-run-1" }, createMockContext()))
@@ -104,7 +95,7 @@ describe("query tools", () => {
     listActiveTeamsImplementation = async () => [
       { teamRunId: "run-1", teamName: "bar", status: "active", memberCount: 3, scope: "user" },
     ]
-    const tool = createTeamListTool(config, mockClient)
+    const tool = createTeamListTool(config, mockClient, deps)
 
     // when
     const result = JSON.parse(await tool.execute({}, createMockContext()))

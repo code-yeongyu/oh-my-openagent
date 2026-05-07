@@ -13,7 +13,9 @@ describe("scheduleDeferredModelOverride bun:sqlite unavailable", () => {
 
     //#then
     expect(hasStaticBunSqliteImport).toBe(false)
-    expect(source).toContain('await import("bun:sqlite").catch(() => null)')
+    // new Function() hides the bun: import from Node.js/Electron static ESM loader
+    expect(source).toContain("new Function(\"return import('bun:sqlite')\")")
+    expect(source).toContain("typeof globalThis.Bun === \"undefined\"")
     expect(source).toContain("bun:sqlite unavailable")
     expect(source).toContain("return")
   })

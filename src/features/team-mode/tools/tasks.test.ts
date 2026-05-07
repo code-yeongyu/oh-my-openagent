@@ -39,14 +39,14 @@ const loadRuntimeStateMock = mock(async (): Promise<RuntimeState> => ({
   },
 }))
 
-mock.module("../team-state-store", () => ({ loadRuntimeState: loadRuntimeStateMock }))
-mock.module("../team-tasklist", () => ({
+const deps = {
+  loadRuntimeState: loadRuntimeStateMock,
   createTask: createTaskMock,
   listTasks: listTasksMock,
   claimTask: claimTaskMock,
   updateTaskStatus: updateTaskStatusMock,
   getTask: getTaskMock,
-}))
+}
 
 const {
   createTeamTaskCreateTool,
@@ -96,10 +96,10 @@ describe("team task tools", () => {
   test("create -> list -> claim -> complete flow", async () => {
     // given
     const config = createConfig()
-    const createTool = createTeamTaskCreateTool(config, mockClient)
-    const listTool = createTeamTaskListTool(config, mockClient)
-    const updateTool = createTeamTaskUpdateTool(config, mockClient)
-    const getTool = createTeamTaskGetTool(config, mockClient)
+    const createTool = createTeamTaskCreateTool(config, mockClient, deps)
+    const listTool = createTeamTaskListTool(config, mockClient, deps)
+    const updateTool = createTeamTaskUpdateTool(config, mockClient, deps)
+    const getTool = createTeamTaskGetTool(config, mockClient, deps)
 
     // when
     const created = JSON.parse(await createTool.execute({ teamRunId: "team-run-1", subject: "task one", description: "desc" }, createContext("member-session-a")))
@@ -129,7 +129,7 @@ describe("team task tools", () => {
     // given
     const config = createConfig()
     updateTaskStatusMock.mockImplementationOnce(async () => { throw new Error("CrossOwnerUpdateError") })
-    const updateTool = createTeamTaskUpdateTool(config, mockClient)
+    const updateTool = createTeamTaskUpdateTool(config, mockClient, deps)
 
     // when
     const result = updateTool.execute({ teamRunId: "team-run-1", taskId: "1", status: "in_progress", owner: "member-b" }, createContext("member-session-a"))
@@ -142,7 +142,7 @@ describe("team task tools", () => {
     // given
     const config = createConfig()
     claimTaskMock.mockImplementationOnce(async () => { throw new Error("blocked by 2") })
-    const updateTool = createTeamTaskUpdateTool(config, mockClient)
+    const updateTool = createTeamTaskUpdateTool(config, mockClient, deps)
 
     // when
     const result = updateTool.execute({ teamRunId: "team-run-1", taskId: "1", status: "claimed" }, createContext("member-session-a"))

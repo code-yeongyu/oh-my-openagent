@@ -17,7 +17,6 @@ import { injectServerAuthIntoClient, log, logLegacyPluginStartupWarning } from "
 import { installAgentSortShim } from "./shared/agent-sort-shim"
 import { detectExternalSkillPlugin, getSkillPluginConflictWarning } from "./shared/external-plugin-detector"
 import { startBackgroundCheck as startTmuxCheck } from "./tools/interactive-bash"
-import { createPluginPostHog, getPostHogDistinctId } from "./shared/posthog"
 
 const serverPlugin: Plugin = async (input, _options): Promise<Hooks> => {
   installAgentSortShim()
@@ -36,13 +35,6 @@ const serverPlugin: Plugin = async (input, _options): Promise<Hooks> => {
 
   const pluginConfig = loadPluginConfig(input.directory, input)
 
-  const posthog = createPluginPostHog()
-  const distinctId = getPostHogDistinctId()
-  try {
-    posthog.trackActive(distinctId, "plugin_loaded")
-  } catch {
-    // telemetry failure is non-fatal, silently ignore
-  }
   if (pluginConfig.openclaw) {
     await initializeOpenClaw(pluginConfig.openclaw)
   }

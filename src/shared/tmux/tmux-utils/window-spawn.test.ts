@@ -4,11 +4,6 @@ import type { TmuxConfig } from "../../../config/schema"
 import type { TmuxCommandResult } from "../runner"
 
 const windowSpawnSpecifier = import.meta.resolve("./window-spawn")
-const environmentSpecifier = import.meta.resolve("./environment")
-const loggerSpecifier = import.meta.resolve("../../logger")
-const runnerSpecifier = import.meta.resolve("../runner")
-const serverHealthSpecifier = import.meta.resolve("./server-health")
-const tmuxPathResolverSpecifier = import.meta.resolve("../../../tools/interactive-bash/tmux-path-resolver")
 
 const enabledTmuxConfig = {
 	enabled: true,
@@ -28,7 +23,7 @@ const runTmuxCommandMock = mock(async (): Promise<TmuxCommandResult> => ({
 }))
 const isInsideTmuxMock = mock((): boolean => true)
 const isServerRunningMock = mock(async (): Promise<boolean> => true)
-const getTmuxPathMock = mock(async (): Promise<string | undefined> => "sh")
+const getTmuxPathMock = mock(async (): Promise<string | null> => "sh")
 const logMock = mock(() => undefined)
 
 function toStringArray(value: unknown): string[] {
@@ -64,23 +59,24 @@ function getNewWindowCommand(): string {
 	return newWindowCommand
 }
 
+function createDeps(): NonNullable<Parameters<typeof import("./window-spawn").spawnTmuxWindow>[5]> {
+	return {
+		log: logMock,
+		runTmuxCommand: runTmuxCommandMock,
+		isInsideTmux: isInsideTmuxMock,
+		isServerRunning: isServerRunningMock,
+		getTmuxPath: getTmuxPathMock,
+	}
+}
+
 async function loadSpawnTmuxWindow(): Promise<typeof import("./window-spawn").spawnTmuxWindow> {
 	const module = await import(`${windowSpawnSpecifier}?test=${crypto.randomUUID()}`)
 	return module.spawnTmuxWindow
 }
 
-function registerModuleMocks(): void {
-	mock.module(environmentSpecifier, () => ({ isInsideTmux: isInsideTmuxMock }))
-	mock.module(loggerSpecifier, () => ({ log: logMock }))
-	mock.module(runnerSpecifier, () => ({ runTmuxCommand: runTmuxCommandMock }))
-	mock.module(serverHealthSpecifier, () => ({ isServerRunning: isServerRunningMock }))
-	mock.module(tmuxPathResolverSpecifier, () => ({ getTmuxPath: getTmuxPathMock }))
-}
-
 describe("spawnTmuxWindow runner integration", () => {
 	beforeEach(() => {
 		mock.restore()
-		registerModuleMocks()
 		runTmuxCommandMock.mockClear()
 		isInsideTmuxMock.mockClear()
 		isServerRunningMock.mockClear()
@@ -109,7 +105,7 @@ describe("spawnTmuxWindow runner integration", () => {
 		const directory = "/tmp/omo-project/(window)"
 
 		// when
-		const result = await spawnTmuxWindow("session-1", "worker", enabledTmuxConfig, "http://127.0.0.1:1234", directory)
+		const result = await spawnTmuxWindow("session-1", "worker", enabledTmuxConfig, "http://127.0.0.1:1234", directory, createDeps())
 
 		// then
 		const firstCall = getRunTmuxCommandCall(0)
@@ -125,7 +121,7 @@ describe("spawnTmuxWindow runner integration", () => {
 		const spawnTmuxWindow = await loadSpawnTmuxWindow()
 
 		// when
-		await spawnTmuxWindow("session-1", "worker", enabledTmuxConfig, "http://127.0.0.1:1234", "/path with spaces/here")
+		await spawnTmuxWindow("session-1", "worker", enabledTmuxConfig, "http://127.0.0.1:1234", "/path with spaces/here", createDeps())
 
 		// then
 		expect(getNewWindowCommand()).toContain("--dir '/path with spaces/here'")
@@ -136,7 +132,7 @@ describe("spawnTmuxWindow runner integration", () => {
 		const spawnTmuxWindow = await loadSpawnTmuxWindow()
 
 		// when
-		await spawnTmuxWindow("session-1", "worker", enabledTmuxConfig, "http://127.0.0.1:1234", "")
+		await spawnTmuxWindow("session-1", "worker", enabledTmuxConfig, "http://127.0.0.1:1234", "", createDeps())
 
 		// then
 		expect(getNewWindowCommand()).toContain(`--dir '${process.cwd()}'`)
@@ -147,7 +143,7 @@ describe("spawnTmuxWindow runner integration", () => {
 		const spawnTmuxWindow = await loadSpawnTmuxWindow()
 
 		// when
-		await spawnTmuxWindow("session-1", "worker", enabledTmuxConfig, "http://127.0.0.1:1234", "/path/with'quote")
+		await spawnTmuxWindow("session-1", "worker", enabledTmuxConfig, "http://127.0.0.1:1234", "/path/with'quote", createDeps())
 
 		// then
 		expect(getNewWindowCommand()).toContain("--dir '/path/with'\\''quote'")

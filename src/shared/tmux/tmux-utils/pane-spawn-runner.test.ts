@@ -1,14 +1,11 @@
+/// <reference types="bun-types" />
+
 import { beforeEach, describe, expect, it, mock } from "bun:test"
 
 import type { TmuxConfig } from "../../../config/schema"
 import type { TmuxCommandResult } from "../runner"
 
 const paneSpawnSpecifier = import.meta.resolve("./pane-spawn")
-const environmentSpecifier = import.meta.resolve("./environment")
-const loggerSpecifier = import.meta.resolve("../../logger")
-const runnerSpecifier = import.meta.resolve("../runner")
-const serverHealthSpecifier = import.meta.resolve("./server-health")
-const tmuxPathResolverSpecifier = import.meta.resolve("../../../tools/interactive-bash/tmux-path-resolver")
 
 const enabledTmuxConfig = {
 	enabled: true,
@@ -28,7 +25,7 @@ const runTmuxCommandMock = mock(async (): Promise<TmuxCommandResult> => ({
 }))
 const isInsideTmuxMock = mock((): boolean => true)
 const isServerRunningMock = mock(async (): Promise<boolean> => true)
-const getTmuxPathMock = mock(async (): Promise<string | undefined> => "sh")
+const getTmuxPathMock = mock(async (): Promise<string | null> => "sh")
 const logMock = mock(() => undefined)
 
 function toStringArray(value: unknown): string[] {
@@ -64,23 +61,24 @@ function getSplitWindowCommand(): string {
 	return splitCommand
 }
 
+function createDeps(): NonNullable<Parameters<typeof import("./pane-spawn").spawnTmuxPane>[7]> {
+	return {
+		log: logMock,
+		runTmuxCommand: runTmuxCommandMock,
+		isInsideTmux: isInsideTmuxMock,
+		isServerRunning: isServerRunningMock,
+		getTmuxPath: getTmuxPathMock,
+	}
+}
+
 async function loadSpawnTmuxPane(): Promise<typeof import("./pane-spawn").spawnTmuxPane> {
 	const module = await import(`${paneSpawnSpecifier}?test=${crypto.randomUUID()}`)
 	return module.spawnTmuxPane
 }
 
-function registerModuleMocks(): void {
-	mock.module(environmentSpecifier, () => ({ isInsideTmux: isInsideTmuxMock }))
-	mock.module(loggerSpecifier, () => ({ log: logMock }))
-	mock.module(runnerSpecifier, () => ({ runTmuxCommand: runTmuxCommandMock }))
-	mock.module(serverHealthSpecifier, () => ({ isServerRunning: isServerRunningMock }))
-	mock.module(tmuxPathResolverSpecifier, () => ({ getTmuxPath: getTmuxPathMock }))
-}
-
 describe("spawnTmuxPane runner integration", () => {
 	beforeEach(() => {
 		mock.restore()
-		registerModuleMocks()
 		runTmuxCommandMock.mockClear()
 		isInsideTmuxMock.mockClear()
 		isServerRunningMock.mockClear()
@@ -109,7 +107,7 @@ describe("spawnTmuxPane runner integration", () => {
 		const directory = "/tmp/omo-project/(pane)"
 
 		// when
-		const result = await spawnTmuxPane("session-1", "worker", enabledTmuxConfig, "http://127.0.0.1:1234", directory, "%0")
+		const result = await spawnTmuxPane("session-1", "worker", enabledTmuxConfig, "http://127.0.0.1:1234", directory, "%0", "-h", createDeps())
 
 		// then
 		const firstCall = getRunTmuxCommandCall(0)
@@ -125,7 +123,7 @@ describe("spawnTmuxPane runner integration", () => {
 		const spawnTmuxPane = await loadSpawnTmuxPane()
 
 		// when
-		await spawnTmuxPane("session-1", "worker", enabledTmuxConfig, "http://127.0.0.1:1234", "/path with spaces/here", "%0")
+		await spawnTmuxPane("session-1", "worker", enabledTmuxConfig, "http://127.0.0.1:1234", "/path with spaces/here", "%0", "-h", createDeps())
 
 		// then
 		expect(getSplitWindowCommand()).toContain("--dir '/path with spaces/here'")
@@ -136,7 +134,7 @@ describe("spawnTmuxPane runner integration", () => {
 		const spawnTmuxPane = await loadSpawnTmuxPane()
 
 		// when
-		await spawnTmuxPane("session-1", "worker", enabledTmuxConfig, "http://127.0.0.1:1234", "", "%0")
+		await spawnTmuxPane("session-1", "worker", enabledTmuxConfig, "http://127.0.0.1:1234", "", "%0", "-h", createDeps())
 
 		// then
 		expect(getSplitWindowCommand()).toContain(`--dir '${process.cwd()}'`)
@@ -147,7 +145,7 @@ describe("spawnTmuxPane runner integration", () => {
 		const spawnTmuxPane = await loadSpawnTmuxPane()
 
 		// when
-		await spawnTmuxPane("session-1", "worker", enabledTmuxConfig, "http://127.0.0.1:1234", "/path/with'quote", "%0")
+		await spawnTmuxPane("session-1", "worker", enabledTmuxConfig, "http://127.0.0.1:1234", "/path/with'quote", "%0", "-h", createDeps())
 
 		// then
 		expect(getSplitWindowCommand()).toContain("--dir '/path/with'\\''quote'")

@@ -35,19 +35,7 @@ mock.module("../../features/hook-message-injector", () => ({
   findNearestMessageWithFields: findNearestMessageWithFieldsMock,
 }))
 
-const sessionAgentMap = new Map<string, string>()
-const resolveRegisteredAgentNameMock = mock((name: string | undefined) => name)
-
-mock.module("../../features/claude-code-session-state/state", () => ({
-  _resetForTesting: () => { sessionAgentMap.clear() },
-  setSessionAgent: (sessionID: string, agent: string) => { sessionAgentMap.set(sessionID, agent) },
-  getSessionAgent: (sessionID: string) => sessionAgentMap.get(sessionID),
-  resolveRegisteredAgentName: resolveRegisteredAgentNameMock,
-  registerAgentName: () => {},
-  isAgentRegistered: () => false,
-  resolveInheritedPromptTools: () => undefined,
-}))
-
+import { _resetForTesting as resetSessionState, updateSessionAgent } from "../../features/claude-code-session-state/state"
 import { runAggressiveTruncationStrategy } from "./aggressive-truncation-strategy"
 
 type FakeClient = {
@@ -89,25 +77,23 @@ async function flushDeferredPrompt(): Promise<void> {
 
 describe("runAggressiveTruncationStrategy - pins agent/model/variant on recovered promptAsync", () => {
   beforeEach(() => {
-    sessionAgentMap.clear()
+    resetSessionState()
     truncateUntilTargetTokensMock.mockClear()
     findNearestMessageWithFieldsFromSDKMock.mockClear()
     findNearestMessageWithFieldsMock.mockClear()
-    resolveRegisteredAgentNameMock.mockClear()
     findNearestMessageWithFieldsFromSDKMock.mockResolvedValue(null)
     findNearestMessageWithFieldsMock.mockReturnValue(null)
-    resolveRegisteredAgentNameMock.mockImplementation((name: string | undefined) => name)
   })
 
   afterEach(() => {
-    sessionAgentMap.clear()
+    resetSessionState()
   })
 
   test("includes the session's resolved agent on promptAsync when agent is known", async () => {
     // given
     const { client, calls } = createRecordingClient()
     const sessionID = "session-truncation-agent"
-    sessionAgentMap.set(sessionID, "sisyphus-junior")
+    updateSessionAgent(sessionID, "sisyphus-junior")
 
     // when
     await runAggressiveTruncationStrategy({

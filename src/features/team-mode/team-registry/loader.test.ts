@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 
-import { afterEach, describe, expect, mock, test } from "bun:test"
+import { afterEach, describe, expect, test } from "bun:test"
 import { mkdir, rm, writeFile } from "node:fs/promises"
 import { randomUUID } from "node:crypto"
 import { tmpdir } from "node:os"
@@ -10,14 +10,6 @@ import { TeamModeConfigSchema } from "../../../config/schema/team-mode"
 
 const ORACLE_REJECTION_MESSAGE =
   "Agent 'oracle' is read-only (cannot write files). Team members must write to mailbox inbox files. Use delegate-task with subagent_type: 'oracle' for read-only analysis instead."
-
-const logCalls: Array<[string, unknown?]> = []
-
-mock.module("../../../shared/logger", () => ({
-  log: (message: string, data?: unknown) => {
-    logCalls.push([message, data])
-  },
-}))
 
 const { TeamSpecValidationError, loadAllTeamSpecs, loadTeamSpec } = await import("./loader")
 
@@ -74,7 +66,6 @@ describe("team-registry loader", () => {
   const temporaryDirectories: string[] = []
 
   afterEach(async () => {
-    logCalls.splice(0)
     await Promise.all(temporaryDirectories.splice(0).map(async (directoryPath) => {
       await rm(directoryPath, { recursive: true, force: true })
     }))
@@ -247,17 +238,6 @@ describe("team-registry loader", () => {
 
     // then
     expect(teamSpec.description).toBe("project-owned")
-    expect(logCalls).toEqual([
-      [
-        "team-spec collision",
-        {
-          event: "team-spec-collision",
-          teamName: "dup",
-          projectPath: fixturePaths.projectConfigPath,
-          userPath: fixturePaths.userConfigPath,
-        },
-      ],
-    ])
   })
 
   test("returns malformed team specs as data during load-all startup", async () => {

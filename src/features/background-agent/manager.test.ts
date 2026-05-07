@@ -23,12 +23,6 @@ mock.module("../../shared/connected-providers-cache", () => ({
   writeProviderModelsCache: () => {},
   updateConnectedProvidersCache: () => {},
 }))
-mock.module("../../shared/frontmatter", () => ({
-  parseFrontmatter: () => ({ frontmatter: {}, content: "" }),
-}))
-mock.module("js-yaml", () => ({
-  load: () => ({}),
-}))
 mock.restore()
 
 
@@ -195,6 +189,10 @@ function cast<T>(value: unknown): T {
   return value as T
 }
 
+function createPluginInput(client: unknown, directory = tmpdir()): PluginInput {
+  return cast<PluginInput>({ client, directory })
+}
+
 function createBackgroundManager(): BackgroundManager {
   const client = {
     session: {
@@ -203,7 +201,7 @@ function createBackgroundManager(): BackgroundManager {
       abort: async () => ({}),
     },
   }
-  return new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput })
+  return new BackgroundManager({ pluginContext: createPluginInput(client) })
 }
 
 function createBackgroundManagerWithOptions(options: Partial<ConstructorParameters<typeof BackgroundManager>[0]>): BackgroundManager {
@@ -215,7 +213,7 @@ function createBackgroundManagerWithOptions(options: Partial<ConstructorParamete
     },
   }
   return new BackgroundManager({
-    pluginContext: { client, directory: tmpdir() } as unknown as PluginInput,
+    pluginContext: createPluginInput(client),
     config: undefined,
     ...options,
   })
@@ -370,7 +368,7 @@ describe("BackgroundManager prompt rejection fallback routing", () => {
         abort: async () => ({}),
       },
     }
-    const manager = new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput })
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
     stubNotifyParentSession(manager)
     ;(cast<{
       reserveSubagentSpawn: () => Promise<{
@@ -432,7 +430,7 @@ describe("BackgroundManager prompt rejection fallback routing", () => {
         abort: async () => ({}),
       },
     }
-    const manager = new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput })
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
     stubNotifyParentSession(manager)
     const task: BackgroundTask = {
       id: "bg_resume_retry",
@@ -489,7 +487,7 @@ describe("BackgroundManager retry observability", () => {
         abort: async () => ({}),
       },
     }
-    const manager = new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput })
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
     const task = createMockTask({
       id: "bg_retry_observable",
       parentSessionId: "parent-session",
@@ -510,9 +508,9 @@ describe("BackgroundManager retry observability", () => {
     })
     getTaskMap(manager).set(task.id, task)
     const queuePendingNotification = mock(() => {})
-    ;(manager as unknown as {
+    ;(cast<{
       queuePendingNotification: (sessionId: string | undefined, notification: string) => void
-    }).queuePendingNotification = queuePendingNotification
+    }>(manager)).queuePendingNotification = queuePendingNotification
 
     //#when
     await (cast<{
@@ -542,10 +540,10 @@ describe("BackgroundManager retry observability", () => {
         promptAsync: async () => ({}),
       },
     }
-    const manager = new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput })
-    ;(manager as unknown as {
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    ;(cast<{
       queuePendingNotification: (sessionId: string | undefined, notification: string) => void
-    }).queuePendingNotification = queuePendingNotification
+    }>(manager)).queuePendingNotification = queuePendingNotification
     const task = createMockTask({
       id: "bg_retry_ready",
       parentSessionId: "parent-session",
@@ -630,10 +628,10 @@ describe("BackgroundManager retry observability", () => {
         promptAsync: async () => ({}),
       },
     }
-    const manager = new BackgroundManager({ pluginContext: { client, directory: managerDirectory } as unknown as PluginInput })
-    ;(manager as unknown as {
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client, managerDirectory) })
+    ;(cast<{
       queuePendingNotification: (sessionId: string | undefined, notification: string) => void
-    }).queuePendingNotification = queuePendingNotification
+    }>(manager)).queuePendingNotification = queuePendingNotification
     const task = createMockTask({
       id: "bg_retry_ready_parent_dir",
       parentSessionId: "parent-session",
@@ -1286,7 +1284,7 @@ describe("BackgroundManager.notifyParentSession - dynamic message lookup", () =>
         }),
       },
     }
-    const manager = new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput })
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
     const task: BackgroundTask = {
       id: "task-skip-compaction",
       sessionId: "session-child",
@@ -1443,7 +1441,7 @@ describe("BackgroundManager.notifyParentSession - aborted parent", () => {
         },
       },
     }
-    const manager = new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput })
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
     const task: BackgroundTask = {
       id: "task-aborted-parent",
       sessionId: "session-child",
@@ -1485,7 +1483,7 @@ describe("BackgroundManager.notifyParentSession - aborted parent", () => {
         messages: async () => ({ data: [] }),
       },
     }
-    const manager = new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput })
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
     const task: BackgroundTask = {
       id: "task-aborted-prompt",
       sessionId: "session-child",
@@ -1525,7 +1523,7 @@ describe("BackgroundManager.notifyParentSession - aborted parent", () => {
         messages: async () => ({ data: [] }),
       },
     }
-    const manager = new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput })
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
     const task: BackgroundTask = {
       id: "task-aborted-idle-queue",
       sessionId: "session-child",
@@ -1582,7 +1580,7 @@ describe("BackgroundManager.notifyParentSession - notifications toggle", () => {
       },
     }
     const manager = new BackgroundManager(
-      { pluginContext: { client, directory: tmpdir() } as unknown as PluginInput, config: undefined, enableParentSessionNotifications: false },
+      { pluginContext: createPluginInput(client), config: undefined, enableParentSessionNotifications: false },
     )
     const task: BackgroundTask = {
       id: "task-no-parent-notification",
@@ -1635,7 +1633,7 @@ describe("BackgroundManager.notifyParentSession - variant propagation", () => {
         }),
       },
     }
-    const manager = new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput })
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
     const task: BackgroundTask = {
       id: "task-parent-variant-wins",
       sessionId: "session-child",
@@ -1676,7 +1674,7 @@ describe("BackgroundManager.notifyParentSession - variant propagation", () => {
         messages: async () => ({ data: [] }),
       },
     }
-    const manager = new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput })
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
     const task: BackgroundTask = {
       id: "task-no-variant",
       sessionId: "session-child",
@@ -1836,7 +1834,7 @@ describe("BackgroundManager.tryCompleteTask", () => {
        },
      }
     manager.shutdown()
-    manager = new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput })
+    manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
     stubNotifyParentSession(manager)
 
     const task: BackgroundTask = {
@@ -1871,7 +1869,7 @@ describe("BackgroundManager.tryCompleteTask", () => {
       },
     }
     manager.shutdown()
-    manager = new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput })
+    manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
 
     const task: BackgroundTask = {
       id: "task-pending-cleanup",
@@ -2081,7 +2079,7 @@ describe("BackgroundManager.tryCompleteTask", () => {
     }
 
     manager.shutdown()
-    manager = new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput })
+    manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
 
     const parentSessionID = "parent-session"
     const taskA = createMockTask({
@@ -2218,7 +2216,7 @@ describe("BackgroundManager.resume model persistence", () => {
          abort: async () => ({}),
        },
      }
-     manager = new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput })
+     manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
      stubNotifyParentSession(manager)
    })
 
@@ -2422,7 +2420,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
   beforeEach(() => {
     // given
     mockClient = createMockClient()
-    manager = new BackgroundManager({ pluginContext: { client: mockClient, directory: tmpdir() } as unknown as PluginInput })
+    manager = new BackgroundManager({ pluginContext: createPluginInput(mockClient) })
   })
 
   afterEach(() => {
@@ -2557,7 +2555,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
     // given
     const config = { defaultConcurrency: 1 }
     manager.shutdown()
-    manager = new BackgroundManager({ pluginContext: { client: mockClient, directory: tmpdir() } as unknown as PluginInput, config: config })
+    manager = new BackgroundManager({ pluginContext: createPluginInput(mockClient), config: config })
 
       const input = {
         description: "Test task",
@@ -2612,7 +2610,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       },
     }
     manager.shutdown()
-    manager = new BackgroundManager({ pluginContext: { client: customClient, directory: tmpdir() } as unknown as PluginInput })
+    manager = new BackgroundManager({ pluginContext: createPluginInput(customClient) })
 
     const launchInputWithModel = {
       description: "Test task with model",
@@ -2650,7 +2648,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       // given
       const config = { defaultConcurrency: 2 }
       manager.shutdown()
-      manager = new BackgroundManager({ pluginContext: { client: mockClient, directory: tmpdir() } as unknown as PluginInput, config: config })
+      manager = new BackgroundManager({ pluginContext: createPluginInput(mockClient), config: config })
 
       const input = {
         description: "Test task",
@@ -2703,7 +2701,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
         },
       }
       manager.shutdown()
-      manager = new BackgroundManager({ pluginContext: { client: customClient, directory: tmpdir() } as unknown as PluginInput, config: {
+      manager = new BackgroundManager({ pluginContext: createPluginInput(customClient), config: {
         defaultConcurrency: 5,
       } })
 
@@ -2728,7 +2726,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       // given
       const config = { defaultConcurrency: 5 }
       manager.shutdown()
-      manager = new BackgroundManager({ pluginContext: { client: mockClient, directory: tmpdir() } as unknown as PluginInput, config: config })
+      manager = new BackgroundManager({ pluginContext: createPluginInput(mockClient), config: config })
 
       const input = {
         description: "Test task",
@@ -2754,7 +2752,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       // given
       const config = { defaultConcurrency: 5 }
       manager.shutdown()
-      manager = new BackgroundManager({ pluginContext: { client: mockClient, directory: tmpdir() } as unknown as PluginInput, config: config })
+      manager = new BackgroundManager({ pluginContext: createPluginInput(mockClient), config: config })
 
       const input = {
         description: "Test task",
@@ -2782,14 +2780,14 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       // given
       manager.shutdown()
       manager = new BackgroundManager(
-        { pluginContext: {
+        { pluginContext: cast<PluginInput>({
           client: createMockClientWithSessionChain({
             "session-depth-2": { directory: "/test/dir", parentID: "session-depth-1" },
             "session-depth-1": { directory: "/test/dir", parentID: "session-root" },
             "session-root": { directory: "/test/dir" },
           }),
           directory: tmpdir(),
-        } as unknown as PluginInput, config: { maxDepth: 3 } },
+        }), config: { maxDepth: 3 } },
       )
 
       const input = {
@@ -2812,7 +2810,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       // given
       manager.shutdown()
       manager = new BackgroundManager(
-        { pluginContext: {
+        { pluginContext: cast<PluginInput>({
           client: createMockClientWithSessionChain({
             "session-depth-3": { directory: "/test/dir", parentID: "session-depth-2" },
             "session-depth-2": { directory: "/test/dir", parentID: "session-depth-1" },
@@ -2820,7 +2818,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
             "session-root": { directory: "/test/dir" },
           }),
           directory: tmpdir(),
-        } as unknown as PluginInput, config: { maxDepth: 3 } },
+        }), config: { maxDepth: 3 } },
       )
 
       const input = {
@@ -2842,12 +2840,12 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       // given
       manager.shutdown()
       manager = new BackgroundManager(
-        { pluginContext: {
+        { pluginContext: cast<PluginInput>({
           client: createMockClientWithSessionChain({
             "session-root": { directory: "/test/dir" },
           }),
           directory: tmpdir(),
-        } as unknown as PluginInput },
+        }) },
       )
 
       const input = {
@@ -2871,12 +2869,12 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       // given
       manager.shutdown()
       manager = new BackgroundManager(
-        { pluginContext: {
+        { pluginContext: cast<PluginInput>({
           client: createMockClientWithSessionChain({
             "session-root": { directory: "/test/dir" },
           }),
           directory: tmpdir(),
-        } as unknown as PluginInput },
+        }) },
       )
 
       await manager.reserveSubagentSpawn("session-root")
@@ -2895,7 +2893,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       // given
       manager.shutdown()
       manager = new BackgroundManager(
-        { pluginContext: {
+        { pluginContext: cast<PluginInput>({
           client: createMockClientWithSessionChain(
             {
               "session-root": { directory: "/test/dir" },
@@ -2903,7 +2901,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
             { sessionLookupError: new Error("session lookup failed") }
           ),
           directory: tmpdir(),
-        } as unknown as PluginInput },
+        }) },
       )
 
       const input = {
@@ -2925,12 +2923,12 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       // given
       manager.shutdown()
       manager = new BackgroundManager(
-        { pluginContext: {
+        { pluginContext: cast<PluginInput>({
           client: createMockClientWithSessionChain({
             "session-root": { directory: "/test/dir" },
           }),
           directory: tmpdir(),
-        } as unknown as PluginInput, config: { defaultConcurrency: 1 } },
+        }), config: { defaultConcurrency: 1 } },
       )
 
       const input = {
@@ -2960,7 +2958,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       let createAttempts = 0
       manager.shutdown()
       manager = new BackgroundManager(
-        { pluginContext: {
+        { pluginContext: cast<PluginInput>({
           client: {
             session: {
               create: async () => {
@@ -2981,7 +2979,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
             },
           },
           directory: tmpdir(),
-        } as unknown as PluginInput },
+        }) },
       )
 
       const input = {
@@ -3060,7 +3058,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
 
       manager.shutdown()
       manager = new BackgroundManager(
-        { pluginContext: {
+        { pluginContext: cast<PluginInput>({
           client: {
             session: {
               create: async () => {
@@ -3090,7 +3088,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
             },
           },
           directory: tmpdir(),
-        } as unknown as PluginInput, config: { defaultConcurrency: 1 } }
+        }), config: { defaultConcurrency: 1 } }
       )
 
       const input = {
@@ -3142,7 +3140,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
 
       manager.shutdown()
       manager = new BackgroundManager(
-        { pluginContext: {
+        { pluginContext: cast<PluginInput>({
           client: {
             session: {
               create: async () => {
@@ -3172,7 +3170,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
             },
           },
           directory: tmpdir(),
-        } as unknown as PluginInput, config: { defaultConcurrency: 1 } }
+        }), config: { defaultConcurrency: 1 } }
       )
 
       const input = {
@@ -3226,7 +3224,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
 
       manager.shutdown()
       manager = new BackgroundManager(
-        { pluginContext: {
+        { pluginContext: cast<PluginInput>({
           client: {
             session: {
               create: async () => {
@@ -3252,7 +3250,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
             },
           },
           directory: tmpdir(),
-        } as unknown as PluginInput, config: { defaultConcurrency: 1 } }
+        }), config: { defaultConcurrency: 1 } }
       )
 
       const input = {
@@ -3307,7 +3305,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
 
         manager.shutdown()
         manager = new BackgroundManager(
-          { pluginContext: {
+          { pluginContext: cast<PluginInput>({
             client: {
               session: {
                 create: async () => ({ data: { id: createdSessionID } }),
@@ -3328,7 +3326,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
               },
             },
             directory: tmpdir(),
-          } as unknown as PluginInput, config: {
+          }), config: {
             defaultConcurrency: 1,
           }, tmuxConfig: {
               enabled: true,
@@ -3392,12 +3390,12 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
     test("allows relaunch after task completes", async () => {
       manager.shutdown()
       manager = new BackgroundManager(
-        { pluginContext: {
+        { pluginContext: cast<PluginInput>({
           client: createMockClientWithSessionChain({
             "session-root": { directory: "/test/dir" },
           }),
           directory: tmpdir(),
-        } as unknown as PluginInput },
+        }) },
       )
       stubNotifyParentSession(manager)
 
@@ -3424,12 +3422,12 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
     test("allows relaunch after running task is cancelled", async () => {
       manager.shutdown()
       manager = new BackgroundManager(
-        { pluginContext: {
+        { pluginContext: cast<PluginInput>({
           client: createMockClientWithSessionChain({
             "session-root": { directory: "/test/dir" },
           }),
           directory: tmpdir(),
-        } as unknown as PluginInput },
+        }) },
       )
 
       const input = {
@@ -3453,12 +3451,12 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
     test("allows relaunch after task errors", async () => {
       manager.shutdown()
       manager = new BackgroundManager(
-        { pluginContext: {
+        { pluginContext: cast<PluginInput>({
           client: createMockClientWithSessionChain({
             "session-root": { directory: "/test/dir" },
           }),
           directory: tmpdir(),
-        } as unknown as PluginInput },
+        }) },
       )
 
       const input = {
@@ -3486,12 +3484,12 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
     test("allows repeated relaunch after pending tasks are cancelled", async () => {
       manager.shutdown()
       manager = new BackgroundManager(
-        { pluginContext: {
+        { pluginContext: cast<PluginInput>({
           client: createMockClientWithSessionChain({
             "session-root": { directory: "/test/dir" },
           }),
           directory: tmpdir(),
-        } as unknown as PluginInput },
+        }) },
       )
 
       const input = {
@@ -3518,7 +3516,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       // given
       const config = { defaultConcurrency: 1 }
       manager.shutdown()
-      manager = new BackgroundManager({ pluginContext: { client: mockClient, directory: tmpdir() } as unknown as PluginInput, config: config })
+      manager = new BackgroundManager({ pluginContext: createPluginInput(mockClient), config: config })
 
       const input = {
         description: "Test task",
@@ -3546,7 +3544,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       // given
       const config = { defaultConcurrency: 5 }
       manager.shutdown()
-      manager = new BackgroundManager({ pluginContext: { client: mockClient, directory: tmpdir() } as unknown as PluginInput, config: config })
+      manager = new BackgroundManager({ pluginContext: createPluginInput(mockClient), config: config })
 
       const input = {
         description: "Test task",
@@ -3572,7 +3570,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       // given
       const config = { defaultConcurrency: 1 }
       manager.shutdown()
-      manager = new BackgroundManager({ pluginContext: { client: mockClient, directory: tmpdir() } as unknown as PluginInput, config: config })
+      manager = new BackgroundManager({ pluginContext: createPluginInput(mockClient), config: config })
 
       const input = {
         description: "Test task",
@@ -3670,7 +3668,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       // given
       const config = { defaultConcurrency: 1 }
       manager.shutdown()
-      manager = new BackgroundManager({ pluginContext: { client: mockClient, directory: tmpdir() } as unknown as PluginInput, config: config })
+      manager = new BackgroundManager({ pluginContext: createPluginInput(mockClient), config: config })
 
       const input1 = {
         description: "Task 1",
@@ -3705,7 +3703,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       // given
       const config = { defaultConcurrency: 1 }
       manager.shutdown()
-      manager = new BackgroundManager({ pluginContext: { client: mockClient, directory: tmpdir() } as unknown as PluginInput, config: config })
+      manager = new BackgroundManager({ pluginContext: createPluginInput(mockClient), config: config })
 
       const input = {
         description: "Test task",
@@ -3732,7 +3730,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       // given
       const config = { defaultConcurrency: 1 }
       manager.shutdown()
-      manager = new BackgroundManager({ pluginContext: { client: mockClient, directory: tmpdir() } as unknown as PluginInput, config: config })
+      manager = new BackgroundManager({ pluginContext: createPluginInput(mockClient), config: config })
 
       const input1 = {
         description: "Task 1",
@@ -3771,7 +3769,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       // given
       const config = { defaultConcurrency: 1 }
       manager.shutdown()
-      manager = new BackgroundManager({ pluginContext: { client: mockClient, directory: tmpdir() } as unknown as PluginInput, config: config })
+      manager = new BackgroundManager({ pluginContext: createPluginInput(mockClient), config: config })
 
       const input = {
         description: "Test task",
@@ -3802,7 +3800,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       // given
       const config = { defaultConcurrency: 5 }
       manager.shutdown()
-      manager = new BackgroundManager({ pluginContext: { client: mockClient, directory: tmpdir() } as unknown as PluginInput, config: config })
+      manager = new BackgroundManager({ pluginContext: createPluginInput(mockClient), config: config })
 
       const input = {
         description: "Test task",
@@ -3830,7 +3828,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       // given
       const config = { defaultConcurrency: 1 }
       manager.shutdown()
-      manager = new BackgroundManager({ pluginContext: { client: mockClient, directory: tmpdir() } as unknown as PluginInput, config: config })
+      manager = new BackgroundManager({ pluginContext: createPluginInput(mockClient), config: config })
 
       const input = {
         description: "Test task",
@@ -3870,7 +3868,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       // given
       const config = { defaultConcurrency: 5 }
       manager.shutdown()
-      manager = new BackgroundManager({ pluginContext: { client: mockClient, directory: tmpdir() } as unknown as PluginInput, config: config })
+      manager = new BackgroundManager({ pluginContext: createPluginInput(mockClient), config: config })
 
       const input = {
         description: "Test task",
@@ -3928,7 +3926,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
          abort: async () => ({}),
        },
      }
-    const manager = new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput, config: { staleTimeoutMs: 180_000 } })
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client), config: { staleTimeoutMs: 180_000 } })
 
     const task: BackgroundTask = {
       id: "task-1",
@@ -3961,7 +3959,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
          abort: async () => ({}),
        },
     }
-    const manager = new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput, config: { staleTimeoutMs: 180_000 } })
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client), config: { staleTimeoutMs: 180_000 } })
 
     const task: BackgroundTask = {
       id: "task-2",
@@ -3994,7 +3992,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
          abort: async () => ({}),
       },
     }
-    const manager = new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput, config: { staleTimeoutMs: 180_000 } })
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client), config: { staleTimeoutMs: 180_000 } })
     stubNotifyParentSession(manager)
 
     const task: BackgroundTask = {
@@ -4031,7 +4029,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
         abort: async () => ({}),
       },
     }
-    const manager = new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput, config: { staleTimeoutMs: 60_000 } })
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client), config: { staleTimeoutMs: 60_000 } })
     stubNotifyParentSession(manager)
 
     const task: BackgroundTask = {
@@ -4066,7 +4064,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
          abort: async () => ({}),
        },
      }
-    const manager = new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput, config: { staleTimeoutMs: 180_000 } })
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client), config: { staleTimeoutMs: 180_000 } })
     stubNotifyParentSession(manager)
 
     const task: BackgroundTask = {
@@ -4102,7 +4100,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
          abort: async () => ({}),
        },
      }
-    const manager = new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput, config: { staleTimeoutMs: 180_000 } })
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client), config: { staleTimeoutMs: 180_000 } })
     stubNotifyParentSession(manager)
 
     const task1: BackgroundTask = {
@@ -4154,7 +4152,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
          abort: async () => ({}),
        },
      }
-    const manager = new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput })
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
     stubNotifyParentSession(manager)
 
     const task: BackgroundTask = {
@@ -4192,7 +4190,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
         },
       },
     }
-    const manager = new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput, config: { staleTimeoutMs: 180_000 } })
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client), config: { staleTimeoutMs: 180_000 } })
 
     const task: BackgroundTask = {
       id: "task-running-session",
@@ -4231,7 +4229,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
         },
       },
     }
-    const manager = new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput, config: { staleTimeoutMs: 180_000 } })
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client), config: { staleTimeoutMs: 180_000 } })
     stubNotifyParentSession(manager)
 
     const task: BackgroundTask = {
@@ -4269,7 +4267,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
         abort: async () => ({}),
       },
     }
-    const manager = new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput, config: { staleTimeoutMs: 180_000 } })
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client), config: { staleTimeoutMs: 180_000 } })
 
     const task: BackgroundTask = {
       id: "task-long-running",
@@ -4305,7 +4303,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
         abort: async () => ({}),
       },
     }
-    const manager = new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput, config: { messageStalenessTimeoutMs: 600_000 } })
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client), config: { messageStalenessTimeoutMs: 600_000 } })
 
     const task: BackgroundTask = {
       id: "task-running-no-progress",
@@ -4343,7 +4341,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
         abort: async () => ({}),
       },
     }
-    const manager = new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput, config: { messageStalenessTimeoutMs: 600_000 } })
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client), config: { messageStalenessTimeoutMs: 600_000 } })
     stubNotifyParentSession(manager)
 
     const task: BackgroundTask = {
@@ -4379,7 +4377,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
         abort: async () => ({}),
       },
     }
-    const manager = new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput, config: { messageStalenessTimeoutMs: 600_000, sessionGoneTimeoutMs: 600_000 } })
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client), config: { messageStalenessTimeoutMs: 600_000, sessionGoneTimeoutMs: 600_000 } })
 
     const task: BackgroundTask = {
       id: "task-fresh-no-update",
@@ -4418,7 +4416,7 @@ describe("BackgroundManager.shutdown session abort", () => {
          },
        },
      }
-    const manager = new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput })
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
 
     const task1: BackgroundTask = {
       id: "task-1",
@@ -4468,7 +4466,7 @@ describe("BackgroundManager.shutdown session abort", () => {
          },
        },
      }
-    const manager = new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput })
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
 
     const completedTask: BackgroundTask = {
       id: "task-completed",
@@ -4527,7 +4525,7 @@ describe("BackgroundManager.shutdown session abort", () => {
        },
      }
     const manager = new BackgroundManager(
-      { pluginContext: { client, directory: tmpdir() } as unknown as PluginInput, config: undefined, onShutdown: () => {
+      { pluginContext: createPluginInput(client), config: undefined, onShutdown: () => {
           shutdownCalled = true
         }, }
     )
@@ -4549,7 +4547,7 @@ describe("BackgroundManager.shutdown session abort", () => {
        },
      }
     const manager = new BackgroundManager(
-      { pluginContext: { client, directory: tmpdir() } as unknown as PluginInput, config: undefined, onShutdown: () => {
+      { pluginContext: createPluginInput(client), config: undefined, onShutdown: () => {
           throw new Error("cleanup failed")
         }, }
     )
@@ -4888,7 +4886,11 @@ describe("BackgroundManager.handleEvent - session.error", () => {
 
   test("does not terminate task on session.error when session is still alive", async () => {
     //#given
-    const manager = createBackgroundManager()
+    const manager = createBackgroundManagerWithOptions({
+      log: (message: string, data?: unknown) => {
+        logCalls.push({ message, data })
+      },
+    })
     mockVerifySessionExists(manager, true)
 
     const task = createMockTask({
@@ -4983,7 +4985,7 @@ describe("BackgroundManager.handleEvent - session.error", () => {
       },
     }
 
-    const manager = new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput })
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
     stubNotifyParentSession(manager)
     mockVerifySessionExists(manager, true)
 
@@ -5164,7 +5166,7 @@ describe("BackgroundManager queue processing - error tasks are skipped", () => {
       },
     }
     const manager = new BackgroundManager(
-      { pluginContext: { client, directory: tmpdir() } as unknown as PluginInput, config: { defaultConcurrency: 1 } }
+      { pluginContext: createPluginInput(client), config: { defaultConcurrency: 1 } }
     )
 
     const key = "test-key"
@@ -5285,7 +5287,7 @@ describe("BackgroundManager.pruneStaleTasksAndNotifications - removes pruned tas
         messages: async () => ({ data: [] }),
       },
     }
-    const manager = new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput })
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
     const staleTask = createMockTask({
       id: "task-stale-notify-cleanup",
       sessionId: "session-stale-notify-cleanup",
@@ -5348,7 +5350,7 @@ describe("BackgroundManager.completionTimers - Memory Leak Fix", () => {
         messages: async () => ({ data: [] }),
       },
     }
-    const manager = new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput })
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
     const taskA: BackgroundTask = {
       id: "task-timer-a",
       sessionId: "session-timer-a",
@@ -5493,7 +5495,7 @@ describe("BackgroundManager.handleEvent - early session.idle deferral", () => {
       },
     }
 
-    const manager = new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput })
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
     stubNotifyParentSession(manager)
 
     const task: BackgroundTask = {
@@ -5549,7 +5551,7 @@ describe("BackgroundManager.handleEvent - early session.idle deferral", () => {
        },
      }
 
-    const manager = new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput })
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
     stubNotifyParentSession(manager)
 
     const task: BackgroundTask = {
@@ -5603,7 +5605,7 @@ describe("BackgroundManager.handleEvent - early session.idle deferral", () => {
       },
     }
 
-    const manager = new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput })
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
     stubNotifyParentSession(manager)
 
     const remainingMs = 120
@@ -5653,7 +5655,7 @@ describe("BackgroundManager.handleEvent - non-tool event lastUpdate", () => {
         abort: async () => ({}),
       },
     }
-    const manager = new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput })
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
 
     const oldUpdate = new Date(Date.now() - 300_000)
     const task: BackgroundTask = {
@@ -5693,7 +5695,7 @@ describe("BackgroundManager.handleEvent - non-tool event lastUpdate", () => {
         abort: async () => ({}),
       },
     }
-    const manager = new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput })
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
 
     const oldUpdate = new Date(Date.now() - 300_000)
     const task: BackgroundTask = {
@@ -5733,7 +5735,7 @@ describe("BackgroundManager.handleEvent - non-tool event lastUpdate", () => {
         abort: async () => ({}),
       },
     }
-    const manager = new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput })
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
 
     const task: BackgroundTask = {
       id: "task-init-1",
@@ -5769,7 +5771,7 @@ describe("BackgroundManager.handleEvent - non-tool event lastUpdate", () => {
         abort: async () => ({}),
       },
     }
-    const manager = new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput, config: { staleTimeoutMs: 180_000 } })
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client), config: { staleTimeoutMs: 180_000 } })
     stubNotifyParentSession(manager)
 
     const task: BackgroundTask = {
@@ -5809,7 +5811,7 @@ describe("BackgroundManager.handleEvent - non-tool event lastUpdate", () => {
         abort: async () => ({}),
       },
     }
-    const manager = new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput, config: { staleTimeoutMs: 180_000 } })
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client), config: { staleTimeoutMs: 180_000 } })
     stubNotifyParentSession(manager)
 
     const task: BackgroundTask = {
@@ -5867,7 +5869,7 @@ describe("BackgroundManager.handleEvent - non-tool event lastUpdate", () => {
         },
       },
     }
-    const manager = new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput })
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
     stubNotifyParentSession(manager)
 
     const task: BackgroundTask = {
@@ -5911,7 +5913,7 @@ describe("BackgroundManager regression fixes - resume and aborted notification",
         abort: async () => ({}),
       },
     }
-    const manager = new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput })
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
 
     const task: BackgroundTask = {
       id: "task-resume-timer-regression",
@@ -5965,7 +5967,7 @@ describe("BackgroundManager regression fixes - resume and aborted notification",
         messages: async () => ({ data: [] }),
       },
     }
-    const manager = new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput })
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
     const task: BackgroundTask = {
       id: "task-aborted-cleanup-regression",
       sessionId: "session-aborted-cleanup-regression",
@@ -6005,7 +6007,7 @@ describe("BackgroundManager - tool permission spread order", () => {
         },
       },
     }
-    const manager = new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput })
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
     const task: BackgroundTask = {
       id: "task-1",
       status: "pending",
@@ -6051,7 +6053,7 @@ describe("BackgroundManager - tool permission spread order", () => {
         },
       },
     }
-    const manager = new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput })
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
     const task: BackgroundTask = {
       id: "task-explicit-model",
       status: "pending",
@@ -6097,7 +6099,7 @@ describe("BackgroundManager - tool permission spread order", () => {
         abort: async () => ({}),
       },
     }
-    const manager = new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput })
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
     const task: BackgroundTask = {
       id: "task-2",
       sessionId: "session-2",
@@ -6142,7 +6144,7 @@ describe("BackgroundManager - tool permission spread order", () => {
         abort: async () => ({}),
       },
     }
-    const manager = new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput })
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
     const task: BackgroundTask = {
       id: "task-explicit-model-resume",
       sessionId: "session-3",
@@ -6237,7 +6239,7 @@ describe("BackgroundManager attempt lifecycle bindings", () => {
         abort: async () => ({}),
       },
     }
-    const manager = new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput })
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
     const task: BackgroundTask = {
       id: "task-attempt-binding",
       status: "pending",
@@ -6394,7 +6396,7 @@ describe("BackgroundManager attempt lifecycle bindings", () => {
         },
       },
     }
-    const manager = new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput })
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
     stubNotifyParentSession(manager)
     ;(cast<{
       tryFallbackRetry: (task: BackgroundTask, errorInfo: { name?: string; message?: string }, source: string) => Promise<boolean>

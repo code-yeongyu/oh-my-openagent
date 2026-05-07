@@ -1,5 +1,4 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import type { BackgroundManager } from "../../features/background-agent"
 import {
   isAgentRegistered,
   resolveRegisteredAgentName,
@@ -9,7 +8,7 @@ import { createInternalAgentTextPart, resolveInheritedPromptTools } from "../../
 import { HOOK_NAME } from "./hook-name"
 import { BOULDER_CONTINUATION_PROMPT } from "./system-reminder-templates"
 import { resolveRecentPromptContextForSession } from "./recent-model-resolver"
-import type { SessionState } from "./types"
+import type { BackgroundTaskStatusProvider, SessionState } from "./types"
 
 export type BoulderContinuationResult = "injected" | "skipped_background_tasks" | "skipped_agent_unavailable" | "failed"
 
@@ -25,7 +24,7 @@ export async function injectBoulderContinuation(input: {
   worktreePath?: string
   preferredTaskSessionId?: string
   preferredTaskTitle?: string
-  backgroundManager?: BackgroundManager
+  backgroundManager?: BackgroundTaskStatusProvider
   sessionState: SessionState
 }): Promise<BoulderContinuationResult> {
   const {

@@ -1,11 +1,7 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test"
 
 import type { TmuxCommandResult } from "../../shared/tmux"
-
-const paneStateQuerierSpecifier = import.meta.resolve("./pane-state-querier")
-const loggerSpecifier = import.meta.resolve("../../shared")
-const runnerSpecifier = import.meta.resolve("../../shared/tmux")
-const tmuxPathResolverSpecifier = import.meta.resolve("../../tools/interactive-bash/tmux-path-resolver")
+import { queryWindowStateWithDeps } from "./pane-state-querier"
 
 const runTmuxCommandMock = mock(async (): Promise<TmuxCommandResult> => ({
 	success: true,
@@ -14,25 +10,12 @@ const runTmuxCommandMock = mock(async (): Promise<TmuxCommandResult> => ({
 	stderr: "",
 	exitCode: 0,
 }))
-const getTmuxPathMock = mock(async (): Promise<string | undefined> => "sh")
+const getTmuxPathMock = mock(async (): Promise<string | null> => "sh")
 const logMock = mock(() => undefined)
 
-async function loadQueryWindowState(): Promise<typeof import("./pane-state-querier").queryWindowState> {
-	const module = await import(`${paneStateQuerierSpecifier}?test=${crypto.randomUUID()}`)
-	return module.queryWindowState
-}
-
-function registerModuleMocks(): void {
-	mock.module(loggerSpecifier, () => ({ log: logMock }))
-	mock.module(runnerSpecifier, () => ({ runTmuxCommand: runTmuxCommandMock }))
-	mock.module(tmuxPathResolverSpecifier, () => ({ getTmuxPath: getTmuxPathMock }))
-}
-
 describe("queryWindowState runner integration", () => {
-	beforeEach(() => {
-		mock.restore()
-		registerModuleMocks()
-		runTmuxCommandMock.mockClear()
+  beforeEach(() => {
+    runTmuxCommandMock.mockClear()
 		getTmuxPathMock.mockClear()
 		logMock.mockClear()
 
@@ -43,15 +26,16 @@ describe("queryWindowState runner integration", () => {
 			stderr: "",
 			exitCode: 0,
 		})
-		getTmuxPathMock.mockResolvedValue("sh")
-	})
+    getTmuxPathMock.mockResolvedValue("sh")
+  })
 
 	it("#given source pane id #when queryWindowState called #then delegates list-panes to shared runner", async () => {
 		// given
-		const queryWindowState = await loadQueryWindowState()
-
-		// when
-		const result = await queryWindowState("%0")
+    const result = await queryWindowStateWithDeps("%0", {
+      getTmuxPath: getTmuxPathMock,
+      runTmuxCommand: runTmuxCommandMock,
+      log: logMock,
+    })
 
 		// then
 		expect(result).not.toBeNull()

@@ -4,6 +4,7 @@ import type { TeamModeConfig } from "../../../config/schema/team-mode"
 import type { OpencodeClient } from "../../../tools/delegate-task/types"
 import { loadRuntimeState } from "../team-state-store"
 import { createTask, getTask, listTasks, updateTaskStatus, claimTask } from "../team-tasklist"
+import type { RuntimeState, Task } from "../types"
 
 type TeamTaskToolContext = ToolContext & {
   sessionID?: string
@@ -39,8 +40,26 @@ type TeamTaskGetArgs = {
   taskId: string
 }
 
-async function resolveSenderName(teamRunId: string, config: TeamModeConfig, sessionID: string | undefined): Promise<string> {
-  const runtimeState = await loadRuntimeState(teamRunId, config)
+type TeamTaskToolDeps = {
+  loadRuntimeState: typeof loadRuntimeState
+  createTask: typeof createTask
+  listTasks: typeof listTasks
+  claimTask: typeof claimTask
+  updateTaskStatus: typeof updateTaskStatus
+  getTask: typeof getTask
+}
+
+const defaultDeps: TeamTaskToolDeps = {
+  loadRuntimeState,
+  createTask,
+  listTasks,
+  claimTask,
+  updateTaskStatus,
+  getTask,
+}
+
+async function resolveSenderName(teamRunId: string, config: TeamModeConfig, sessionID: string | undefined, deps: TeamTaskToolDeps): Promise<string> {
+  const runtimeState: RuntimeState = await deps.loadRuntimeState(teamRunId, config)
   const matchedMember = runtimeState.members.find((member) => member.sessionId === sessionID)
   if (matchedMember) return matchedMember.name
 
@@ -50,7 +69,7 @@ async function resolveSenderName(teamRunId: string, config: TeamModeConfig, sess
   throw new Error(`team member not found for session ${sessionID ?? "unknown"}`)
 }
 
-export function createTeamTaskCreateTool(config: TeamModeConfig, client: OpencodeClient): ToolDefinition {
+export function createTeamTaskCreateTool(config: TeamModeConfig, client: OpencodeClient, deps: TeamTaskToolDeps = defaultDeps): ToolDefinition {
   void client
 
   return tool({
@@ -62,7 +81,7 @@ export function createTeamTaskCreateTool(config: TeamModeConfig, client: Opencod
       blockedBy: tool.schema.array(tool.schema.string()).optional().describe("Blocking task IDs"),
     },
     execute: async (args: TeamTaskCreateArgs): Promise<string> => {
-      const createdTask = await createTask(args.teamRunId, {
+      const createdTask: Task = await deps.createTask(args.teamRunId, {
         subject: args.subject,
         description: args.description,
         blocks: [],
@@ -75,7 +94,7 @@ export function createTeamTaskCreateTool(config: TeamModeConfig, client: Opencod
   })
 }
 
-export function createTeamTaskListTool(config: TeamModeConfig, client: OpencodeClient): ToolDefinition {
+export function createTeamTaskListTool(config: TeamModeConfig, client: OpencodeClient, deps: TeamTaskToolDeps = defaultDeps): ToolDefinition {
   void client
 
   return tool({
@@ -86,13 +105,13 @@ export function createTeamTaskListTool(config: TeamModeConfig, client: OpencodeC
       owner: tool.schema.string().optional(),
     },
     execute: async (args: TeamTaskListArgs): Promise<string> => {
-      const tasks = await listTasks(args.teamRunId, config, { status: args.status, owner: args.owner })
+      const tasks = await deps.listTasks(args.teamRunId, config, { status: args.status, owner: args.owner })
       return JSON.stringify({ tasks })
     },
   })
 }
 
-export function createTeamTaskUpdateTool(config: TeamModeConfig, client: OpencodeClient): ToolDefinition {
+export function createTeamTaskUpdateTool(config: TeamModeConfig, client: OpencodeClient, deps: TeamTaskToolDeps = defaultDeps): ToolDefinition {
   void client
 
   return tool({
@@ -104,18 +123,18 @@ export function createTeamTaskUpdateTool(config: TeamModeConfig, client: Opencod
       owner: tool.schema.string().optional().describe("Task owner"),
     },
     execute: async (args: TeamTaskUpdateArgs, ctx?: TeamTaskToolContext): Promise<string> => {
-      const senderName = await resolveSenderName(args.teamRunId, config, ctx?.sessionID)
+      const senderName = await resolveSenderName(args.teamRunId, config, ctx?.sessionID, deps)
 
       const updatedTask = args.status === "claimed"
-        ? await claimTask(args.teamRunId, args.taskId, senderName, config)
-        : await updateTaskStatus(args.teamRunId, args.taskId, args.status, args.owner ?? senderName, config)
+        ? await deps.claimTask(args.teamRunId, args.taskId, senderName, config)
+        : await deps.updateTaskStatus(args.teamRunId, args.taskId, args.status, args.owner ?? senderName, config)
 
       return JSON.stringify({ task: updatedTask })
     },
   })
 }
 
-export function createTeamTaskGetTool(config: TeamModeConfig, client: OpencodeClient): ToolDefinition {
+export function createTeamTaskGetTool(config: TeamModeConfig, client: OpencodeClient, deps: TeamTaskToolDeps = defaultDeps): ToolDefinition {
   void client
 
   return tool({
@@ -125,7 +144,7 @@ export function createTeamTaskGetTool(config: TeamModeConfig, client: OpencodeCl
       taskId: tool.schema.string().describe("Task ID"),
     },
     execute: async (args: TeamTaskGetArgs): Promise<string> => {
-      const task = await getTask(args.teamRunId, args.taskId, config)
+      const task = await deps.getTask(args.teamRunId, args.taskId, config)
       return JSON.stringify({ task })
     },
   })

@@ -1,4 +1,4 @@
-import { promises as fs } from "fs"
+import * as fs from "node:fs/promises"
 import { join } from "path"
 import { resolveSymlinkAsync, isMarkdownFile } from "../../shared/file-utils"
 import type { LoadedSkill, SkillScope } from "./types"

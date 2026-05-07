@@ -108,6 +108,7 @@ export async function reapStaleLock(lockPath: string): Promise<void> {
 export async function atomicWrite(
   filePath: string,
   content: string | Buffer,
+  deps: { rename: typeof rename } = { rename },
 ): Promise<void> {
   const tmpPath = `${filePath}.tmp.${randomUUID()}`
 
@@ -119,7 +120,7 @@ export async function atomicWrite(
     } finally {
       await fileHandle.close()
     }
-    await rename(tmpPath, filePath)
+    await deps.rename(tmpPath, filePath)
   } catch (error) {
     await rm(tmpPath, { force: true })
     throw error

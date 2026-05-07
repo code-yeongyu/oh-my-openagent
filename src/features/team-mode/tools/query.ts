@@ -7,6 +7,20 @@ import { aggregateStatus } from "../team-runtime/status"
 import { discoverTeamSpecs } from "../team-registry/paths"
 import { listActiveTeams } from "../team-state-store/store"
 
+type QueryToolDeps = {
+  aggregateStatus: typeof aggregateStatus
+  discoverTeamSpecs: typeof discoverTeamSpecs
+  loadTeamSpec: typeof loadTeamSpec
+  listActiveTeams: typeof listActiveTeams
+}
+
+const defaultDeps: QueryToolDeps = {
+  aggregateStatus,
+  discoverTeamSpecs,
+  loadTeamSpec,
+  listActiveTeams,
+}
+
 type TeamListScope = "user" | "project" | "all"
 
 type TeamListEntry = {
@@ -21,6 +35,7 @@ export function createTeamStatusTool(
   config: TeamModeConfig,
   client: OpencodeClient,
   backgroundManager?: Parameters<typeof aggregateStatus>[2],
+  deps: QueryToolDeps = defaultDeps,
 ): ToolDefinition {
   void client
 
@@ -29,11 +44,11 @@ export function createTeamStatusTool(
     args: {
       teamRunId: tool.schema.string().describe("Team run ID"),
     },
-    execute: async (args: { teamRunId: string }) => JSON.stringify(await aggregateStatus(args.teamRunId, config, backgroundManager)),
+    execute: async (args: { teamRunId: string }) => JSON.stringify(await deps.aggregateStatus(args.teamRunId, config, backgroundManager)),
   })
 }
 
-export function createTeamListTool(config: TeamModeConfig, client: OpencodeClient): ToolDefinition {
+export function createTeamListTool(config: TeamModeConfig, client: OpencodeClient, deps: QueryToolDeps = defaultDeps): ToolDefinition {
   void client
 
   return tool({
@@ -48,8 +63,8 @@ export function createTeamListTool(config: TeamModeConfig, client: OpencodeClien
     execute: async (args: { scope?: TeamListScope }) => {
       const scope = args.scope ?? "all"
       const projectRoot = process.cwd()
-      const declaredTeamSpecs = await discoverTeamSpecs(config, projectRoot)
-      const activeTeams = await listActiveTeams(config)
+      const declaredTeamSpecs = await deps.discoverTeamSpecs(config, projectRoot)
+      const activeTeams = await deps.listActiveTeams(config)
 
       const filteredDeclaredTeamSpecs = scope === "all"
         ? declaredTeamSpecs
@@ -57,7 +72,7 @@ export function createTeamListTool(config: TeamModeConfig, client: OpencodeClien
 
       const declaredTeamSpecsByName = new Map(
         await Promise.all(filteredDeclaredTeamSpecs.map(async (teamSpec) => {
-          const loadedTeamSpec = await loadTeamSpec(teamSpec.name, config, projectRoot)
+          const loadedTeamSpec = await deps.loadTeamSpec(teamSpec.name, config, projectRoot)
           return [teamSpec.name, loadedTeamSpec.members.length] as const
         })),
       )

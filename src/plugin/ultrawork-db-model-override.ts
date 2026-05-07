@@ -5,6 +5,24 @@ import { log } from "../shared"
 
 type BunDatabase = import("bun:sqlite").Database
 
+/**
+ * Safely import bun:sqlite only when running in Bun runtime.
+ * Uses new Function() to hide the import from Node.js/Electron's static parser,
+ * which would fail on bun: protocol resolution before .catch() could run.
+ */
+async function importBunSqlite(): Promise<typeof import("bun:sqlite") | null> {
+  if (typeof globalThis.Bun === "undefined") {
+    return null
+  }
+  try {
+    // new Function() prevents Node.js ESM loader from seeing the bun: import at parse time
+    const dynamicImport = new Function("return import('bun:sqlite')") as () => Promise<typeof import("bun:sqlite")>
+    return await dynamicImport()
+  } catch {
+    return null
+  }
+}
+
 function getDbPath(): string {
   return join(getDataDir(), "opencode", "opencode.db")
 }
@@ -114,7 +132,7 @@ export function scheduleDeferredModelOverride(
   variant?: string,
 ): void {
   queueMicrotask(async () => {
-    const sqliteModule = await import("bun:sqlite").catch(() => null)
+    const sqliteModule = await importBunSqlite()
     const Database = sqliteModule?.Database
     if (typeof Database !== "function") {
       log("[ultrawork-db-override] bun:sqlite unavailable, skipping deferred override", { messageId })
