@@ -2,6 +2,10 @@ import { describe, expect, test, beforeEach, afterEach, mock } from "bun:test"
 import type { RuntimeFallbackConfig, OhMyOpenCodeConfig } from "../../config"
 import * as loggerModule from "../../shared/logger"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
+import {
+  clearAllDelegatedChildSessionBootstrap,
+  registerDelegatedChildSessionBootstrap,
+} from "../../shared/delegated-child-session-bootstrap"
 
 type RuntimeFallbackModule = typeof import("./hook")
 
@@ -15,6 +19,7 @@ describe("runtime-fallback", () => {
     logCalls = []
     toastCalls = []
     SessionCategoryRegistry.clear()
+    clearAllDelegatedChildSessionBootstrap()
 
     const cacheBuster = `${Date.now()}-${Math.random()}`
 
@@ -31,6 +36,7 @@ describe("runtime-fallback", () => {
 
   afterEach(() => {
     SessionCategoryRegistry.clear()
+    clearAllDelegatedChildSessionBootstrap()
     mock.restore()
   })
 
@@ -2720,9 +2726,18 @@ describe("runtime-fallback", () => {
       expect(abortCalls.some((call) => call.path?.id === sessionID)).toBe(true)
     })
 
-    test("pendingFallbackModel advances chain on subsequent error even when persisted", async () => {
+    test("delegated child-session empty-history fallback retries with captured bootstrap prompt", async () => {
       //#given
-      const hook = createRuntimeFallbackHook(createMockPluginInput(), {
+      const promptCalls: Array<Record<string, unknown>> = []
+      const hook = createRuntimeFallbackHook(createMockPluginInput({
+        session: {
+          messages: async () => ({ data: [] }),
+          promptAsync: async (args) => {
+            promptCalls.push(args as Record<string, unknown>)
+            return {}
+          },
+        },
+      }), {
         config: createMockConfig({ notify_on_fallback: false }),
         pluginConfig: {
           git_master: {
@@ -2737,8 +2752,12 @@ describe("runtime-fallback", () => {
           },
         },
       })
-      const sessionID = "test-race-pending-persists"
-      SessionCategoryRegistry.register(sessionID, "test")
+      const sessionID = "test-delegated-empty-history-pending-persists"
+      registerDelegatedChildSessionBootstrap({
+        sessionID,
+        promptText: "delegated retry payload",
+        category: "test",
+      })
 
       await hook.event({
         event: {
@@ -2754,8 +2773,13 @@ describe("runtime-fallback", () => {
         },
       })
 
+      expect(promptCalls).toHaveLength(1)
+      expect(promptCalls[0]?.body).toMatchObject({
+        model: { providerID: "provider-a", modelID: "model-a" },
+        parts: [{ type: "text", text: expect.stringContaining("delegated retry payload") }],
+      })
       const autoRetryLog = logCalls.find((call) => call.msg.includes("No user message found for auto-retry"))
-      expect(autoRetryLog).toBeDefined()
+      expect(autoRetryLog).toBeUndefined()
 
       //#when - second error fires after retry completed (retryInFlight cleared)
       await hook.event({
@@ -2768,6 +2792,55 @@ describe("runtime-fallback", () => {
       //#then - chain advances normally (not skipped), consistent with consecutive errors test
       const fallbackLogs = logCalls.filter((call) => call.msg.includes("Preparing fallback"))
       expect(fallbackLogs.length).toBeGreaterThanOrEqual(2)
+    })
+
+    test("empty-history fallback without delegated bootstrap still does not invent retry payloads", async () => {
+      //#given
+      const promptCalls: Array<Record<string, unknown>> = []
+      const hook = createRuntimeFallbackHook(createMockPluginInput({
+        session: {
+          messages: async () => ({ data: [] }),
+          promptAsync: async (args) => {
+            promptCalls.push(args as Record<string, unknown>)
+            return {}
+          },
+        },
+      }), {
+        config: createMockConfig({ notify_on_fallback: false }),
+        pluginConfig: {
+          git_master: {
+            commit_footer: true,
+            include_co_authored_by: true,
+            git_env_prefix: "GIT_MASTER=1",
+          },
+          categories: {
+            test: {
+              fallback_models: ["provider-a/model-a", "provider-b/model-b"],
+            },
+          },
+        },
+      })
+      const sessionID = "test-empty-history-without-bootstrap"
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      //#when
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "google/gemini-2.5-pro" } },
+        },
+      })
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: { sessionID, error: { statusCode: 429, message: "Rate limit" } },
+        },
+      })
+
+      //#then
+      const autoRetryLog = logCalls.find((call) => call.msg.includes("No user message found for auto-retry"))
+      expect(autoRetryLog).toBeDefined()
+      expect(promptCalls).toHaveLength(0)
     })
   })
 })

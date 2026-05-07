@@ -1,7 +1,10 @@
 declare const require: (name: string) => any
 const { describe, test, expect, beforeEach, afterEach, afterAll, spyOn, mock } = require("bun:test")
 
-afterAll(() => { mock.restore() })
+afterAll(() => {
+  mock.restore()
+  clearAllDelegatedChildSessionBootstrap()
+})
 
 import { getSessionPromptParams, clearSessionPromptParams } from "../../shared/session-prompt-params-state"
 import { tmpdir } from "node:os"
@@ -13,6 +16,12 @@ import { BackgroundManager } from "./manager"
 import { ConcurrencyManager } from "./concurrency"
 import { initTaskToastManager, _resetTaskToastManagerForTesting } from "../task-toast-manager/manager"
 import { _resetForTesting as resetProcessCleanupState } from "./process-cleanup"
+import {
+  clearAllDelegatedChildSessionBootstrap,
+  getDelegatedChildSessionBootstrap,
+  registerDelegatedChildSessionBootstrap,
+} from "../../shared/delegated-child-session-bootstrap"
+import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 
 mock.module("../../shared/connected-providers-cache", () => ({
   readConnectedProvidersCache: () => null,
@@ -338,23 +347,37 @@ describe("BackgroundManager session.error fallback hydration", () => {
 })
 
 describe("BackgroundManager prompt rejection fallback routing", () => {
-  test("routes launch-time prompt rejections into tryFallbackRetry before marking interrupt", async () => {
+  test("routes delegated child-session launch-time prompt rejections into tryFallbackRetry before history exists", async () => {
     //#given
     const promptError = {
       name: "APIError",
       data: { message: "Forbidden: Selected provider is forbidden" },
     }
+    const fallbackChain = [{ model: "claude-haiku-4-5", providers: ["anthropic"] }]
+    const messages = mock(async () => ({ data: [] }))
+    const bootstrapSnapshots: Array<ReturnType<typeof getDelegatedChildSessionBootstrap>> = []
     const client = {
       session: {
         get: async () => ({ data: { directory: tmpdir() } }),
         create: async () => ({ data: { id: "ses_launch_retry" } }),
+        messages,
         promptAsync: async () => {
+          bootstrapSnapshots.push(getDelegatedChildSessionBootstrap("ses_launch_retry"))
           throw promptError
         },
         abort: async () => ({}),
       },
     }
-    const manager = new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput })
+    const setSessionFallbackChain = mock(() => {})
+    const manager = new BackgroundManager({
+      pluginContext: { client, directory: tmpdir() } as unknown as PluginInput,
+      modelFallbackControllerAccessor: {
+        register: () => {},
+        setSessionFallbackChain,
+        getSessionFallbackChain: () => undefined,
+        clearSessionFallbackChain: () => {},
+      },
+    })
     stubNotifyParentSession(manager)
     ;(manager as unknown as {
       reserveSubagentSpawn: () => Promise<{
@@ -386,8 +409,9 @@ describe("BackgroundManager prompt rejection fallback routing", () => {
       agent: "sisyphus-junior",
       parentSessionId: "parent-session",
       parentMessageId: "parent-message",
+      category: "deep",
       model: { providerID: "genai-proxy-openai", modelID: "gpt-5.4-mini" },
-      fallbackChain: [{ model: "claude-haiku-4-5", providers: ["anthropic"] }],
+      fallbackChain,
     })
     await flushBackgroundNotifications()
 
@@ -400,6 +424,72 @@ describe("BackgroundManager prompt rejection fallback routing", () => {
       message: "Forbidden: Selected provider is forbidden",
     })
     expect(storedTask?.status).toBe("pending")
+    expect(messages).not.toHaveBeenCalled()
+    expect(setSessionFallbackChain).toHaveBeenCalledWith("ses_launch_retry", fallbackChain)
+    expect(bootstrapSnapshots[0]?.retryParts[0]?.text).toContain("say hi")
+  })
+
+  test("clears delegated bootstrap and fallback context when launch-time prompt failure is terminal", async () => {
+    //#given
+    const promptError = new Error("Connection timeout")
+    const fallbackChain = [{ model: "claude-haiku-4-5", providers: ["anthropic"] }]
+    const clearSessionFallbackChain = mock(() => {})
+    const client = {
+      session: {
+        get: async () => ({ data: { directory: tmpdir() } }),
+        create: async () => ({ data: { id: "ses_launch_terminal" } }),
+        promptAsync: async () => {
+          throw promptError
+        },
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager({
+      pluginContext: { client, directory: tmpdir() } as unknown as PluginInput,
+      modelFallbackControllerAccessor: {
+        register: () => {},
+        setSessionFallbackChain: () => {},
+        getSessionFallbackChain: () => undefined,
+        clearSessionFallbackChain,
+      },
+    })
+    stubNotifyParentSession(manager)
+    ;(manager as unknown as {
+      reserveSubagentSpawn: () => Promise<{
+        spawnContext: { rootSessionID: string; parentDepth: number; childDepth: number }
+        descendantCount: number
+        commit: () => number
+        rollback: () => void
+      }>
+    }).reserveSubagentSpawn = async () => ({
+      spawnContext: { rootSessionID: "parent-session", parentDepth: 0, childDepth: 1 },
+      descendantCount: 1,
+      commit: () => 1,
+      rollback: () => {},
+    })
+    ;(manager as unknown as {
+      tryFallbackRetry: (task: BackgroundTask, errorInfo: { name?: string; message?: string }, source: string) => Promise<boolean>
+    }).tryFallbackRetry = async () => false
+
+    //#when
+    const launchedTask = await manager.launch({
+      description: "background terminal retry test",
+      prompt: "say bye",
+      agent: "sisyphus-junior",
+      parentSessionId: "parent-session",
+      parentMessageId: "parent-message",
+      category: "deep",
+      model: { providerID: "genai-proxy-openai", modelID: "gpt-5.4-mini" },
+      fallbackChain,
+    })
+    await flushBackgroundNotifications()
+
+    //#then
+    const storedTask = getTaskMap(manager).get(launchedTask.id)
+    expect(storedTask?.status).toBe("interrupt")
+    expect(getDelegatedChildSessionBootstrap("ses_launch_terminal")).toBeUndefined()
+    expect(clearSessionFallbackChain).toHaveBeenCalledWith("ses_launch_terminal")
+    expect(SessionCategoryRegistry.has("ses_launch_terminal")).toBe(false)
   })
 
   test("routes resume-time prompt rejections into tryFallbackRetry before marking interrupt", async () => {
@@ -600,6 +690,60 @@ describe("BackgroundManager retry observability", () => {
     expect(retryReadyNotification).toContain("ses_retry_visibility")
     expect(retryReadyNotification).toContain("genai-proxy-openai/gpt-5.4-mini")
     expect(retryReadyNotification).toContain("Forbidden: Selected provider is forbidden")
+  })
+
+  test("clears delegated bootstrap and fallback context for the failed session when a fallback retry is scheduled", async () => {
+    //#given
+    const clearSessionFallbackChain = mock(() => {})
+    const manager = createBackgroundManagerWithOptions({
+      modelFallbackControllerAccessor: {
+        register: () => {},
+        setSessionFallbackChain: () => {},
+        getSessionFallbackChain: () => undefined,
+        clearSessionFallbackChain,
+      },
+    })
+    registerDelegatedChildSessionBootstrap({
+      sessionID: "ses_retry_cleanup",
+      promptText: "retry me",
+      fallbackChain: [{ model: "claude-haiku-4-5", providers: ["anthropic"] }],
+      category: "deep",
+    })
+    const task = createMockTask({
+      id: "bg_retry_cleanup",
+      sessionId: "ses_retry_cleanup",
+      parentSessionId: "parent-session",
+      status: "running",
+      attemptCount: 0,
+      fallbackChain: [{ model: "claude-haiku-4-5", providers: ["anthropic"] }],
+      model: { providerID: "genai-proxy-openai", modelID: "gpt-5.4-mini" },
+      concurrencyKey: "genai-proxy-openai/gpt-5.4-mini",
+      attempts: [
+        {
+          attemptId: "att_retry_cleanup",
+          attemptNumber: 1,
+          sessionId: "ses_retry_cleanup",
+          providerId: "genai-proxy-openai",
+          modelId: "gpt-5.4-mini",
+          status: "running",
+        },
+      ],
+      currentAttemptID: "att_retry_cleanup",
+    })
+
+    //#when
+    const retried = await (manager as unknown as {
+      tryFallbackRetry: (task: BackgroundTask, errorInfo: { name?: string; message?: string }, source: string) => Promise<boolean>
+    }).tryFallbackRetry(task, {
+      name: "APIError",
+      message: "Forbidden: Selected provider is forbidden",
+    }, "promptAsync.launch")
+
+    //#then
+    expect(retried).toBe(true)
+    expect(getDelegatedChildSessionBootstrap("ses_retry_cleanup")).toBeUndefined()
+    expect(clearSessionFallbackChain).toHaveBeenCalledWith("ses_retry_cleanup")
+    expect(SessionCategoryRegistry.has("ses_retry_cleanup")).toBe(false)
   })
 
   test("builds retry-ready links from the parent session directory when it differs from the manager directory", async () => {
@@ -1805,7 +1949,7 @@ describe("BackgroundManager.tryCompleteTask", () => {
     expect(concurrencyManager.getCount(concurrencyKey)).toBe(0)
   })
 
-   test("should abort session on completion", async () => {
+  test("should abort session on completion", async () => {
      // #given
      const abortedSessionIDs: string[] = []
      const client = {
@@ -1840,6 +1984,47 @@ describe("BackgroundManager.tryCompleteTask", () => {
 
     // #then
     expect(abortedSessionIDs).toEqual(["session-1"])
+  })
+
+  test("should clear delegated bootstrap and fallback context on completion", async () => {
+    //#given
+    const clearSessionFallbackChain = mock(() => {})
+    manager.shutdown()
+    manager = createBackgroundManagerWithOptions({
+      modelFallbackControllerAccessor: {
+        register: () => {},
+        setSessionFallbackChain: () => {},
+        getSessionFallbackChain: () => undefined,
+        clearSessionFallbackChain,
+      },
+    })
+    stubNotifyParentSession(manager)
+    registerDelegatedChildSessionBootstrap({
+      sessionID: "session-bootstrap-complete",
+      promptText: "complete me",
+      fallbackChain: [{ model: "fallback-1", providers: ["provider-a"] }],
+      category: "deep",
+    })
+
+    const task: BackgroundTask = {
+      id: "task-bootstrap-complete",
+      sessionId: "session-bootstrap-complete",
+      parentSessionId: "parent-bootstrap-complete",
+      parentMessageId: "msg-1",
+      description: "bootstrap completion task",
+      prompt: "test",
+      agent: "explore",
+      status: "running",
+      startedAt: new Date(),
+    }
+
+    //#when
+    await tryCompleteTaskForTest(manager, task)
+
+    //#then
+    expect(getDelegatedChildSessionBootstrap("session-bootstrap-complete")).toBeUndefined()
+    expect(clearSessionFallbackChain).toHaveBeenCalledWith("session-bootstrap-complete")
+    expect(SessionCategoryRegistry.has("session-bootstrap-complete")).toBe(false)
   })
 
   test("should clean pendingByParent even when promptAsync notification fails", async () => {
@@ -3583,6 +3768,46 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
 
       manager.shutdown()
       resetToastManager()
+    })
+
+    test("should clear delegated bootstrap and fallback context when cancelling a running task", async () => {
+      //#given
+      const clearSessionFallbackChain = mock(() => {})
+      const manager = createBackgroundManagerWithOptions({
+        modelFallbackControllerAccessor: {
+          register: () => {},
+          setSessionFallbackChain: () => {},
+          getSessionFallbackChain: () => undefined,
+          clearSessionFallbackChain,
+        },
+      })
+      registerDelegatedChildSessionBootstrap({
+        sessionID: "session-cancel-bootstrap",
+        promptText: "cancel me",
+        fallbackChain: [{ model: "fallback-1", providers: ["provider-a"] }],
+        category: "deep",
+      })
+      const task = createMockTask({
+        id: "task-cancel-bootstrap",
+        sessionId: "session-cancel-bootstrap",
+        parentSessionId: "parent-cancel-bootstrap",
+        status: "running",
+      })
+      getTaskMap(manager).set(task.id, task)
+
+      //#when
+      const cancelled = await manager.cancelTask(task.id, {
+        source: "test",
+        skipNotification: true,
+      })
+
+      //#then
+      expect(cancelled).toBe(true)
+      expect(getDelegatedChildSessionBootstrap("session-cancel-bootstrap")).toBeUndefined()
+      expect(clearSessionFallbackChain).toHaveBeenCalledWith("session-cancel-bootstrap")
+      expect(SessionCategoryRegistry.has("session-cancel-bootstrap")).toBe(false)
+
+      manager.shutdown()
     })
   })
 
