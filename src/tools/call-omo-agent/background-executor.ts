@@ -8,6 +8,7 @@ import { resolveMessageContext } from "../../features/hook-message-injector"
 import { getSessionAgent } from "../../features/claude-code-session-state"
 import { getMessageDir } from "./message-dir"
 import { getSessionTools } from "../../shared/session-tools-store"
+import { sanitizeSubagentType } from "../delegate-task/subagent-discovery"
 
 export async function executeBackground(
   args: CallOmoAgentArgs,
@@ -47,7 +48,7 @@ export async function executeBackground(
     const task = await manager.launch({
       description: args.description,
       prompt: args.prompt,
-      agent: args.subagent_type,
+      agent: sanitizeSubagentType(args.subagent_type),
       parentSessionId: toolContext.sessionID,
       parentMessageId: toolContext.messageID,
       parentAgent,

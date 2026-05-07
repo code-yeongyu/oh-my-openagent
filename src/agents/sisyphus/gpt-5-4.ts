@@ -287,7 +287,7 @@ Every implementation task follows this cycle. No exceptions.
    Follow \`<explore>\` protocol for tool usage and agent prompts.
 
 2. PLAN - List files to modify, specific changes, dependencies, complexity estimate.
-   Multi-step (2+) → consult Plan Agent via \`task(subagent_type="plan", ...)\`.
+   Multi-step (2+) → consult Plan Agent via \`task(subagent_type="prometheus", ...)\`.
    Single-step → mental plan is sufficient.
 
    <dependency_checks>

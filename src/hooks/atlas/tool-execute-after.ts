@@ -4,6 +4,7 @@ import {
   getPlanProgress,
   getTaskSessionState,
   readBoulderState,
+  resolveBoulderPlanPath,
   upsertTaskSessionState,
 } from "../../features/boulder-state"
 import { log } from "../../shared/logger"
@@ -98,12 +99,13 @@ export function createToolExecuteAfterHandler(input: {
       const extractedSessionId = metadataSessionId ?? extractSessionIdFromOutput(toolOutput.output)
 
       if (boulderState) {
-        const progress = getPlanProgress(boulderState.active_plan)
+        const planPath = resolveBoulderPlanPath(ctx.directory, boulderState)
+        const progress = getPlanProgress(planPath)
         const {
           currentTask,
           shouldSkipTaskSessionUpdate,
           shouldIgnoreCurrentSessionId,
-        } = resolveTaskContext(pendingTaskRef, boulderState.active_plan)
+        } = resolveTaskContext(pendingTaskRef, planPath)
         const trackedTaskSession = currentTask
           ? getTaskSessionState(ctx.directory, currentTask.key)
           : null
@@ -136,7 +138,7 @@ export function createToolExecuteAfterHandler(input: {
         const originalResponse = toolOutput.output
         const shouldPauseForApproval = sessionState
           ? shouldPauseForFinalWaveApproval({
-              planPath: boulderState.active_plan,
+              planPath,
               taskOutput: originalResponse,
               sessionState,
             })

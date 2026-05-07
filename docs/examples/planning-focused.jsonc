@@ -14,7 +14,7 @@
 
     // Implementation: uses planning outputs
     "hephaestus": {
-      "model": "openai/gpt-5.4",
+      "model": "openai/gpt-5.5",
       "prompt_append": "Follow established plans precisely. Ask for clarification when plans are ambiguous.",
     },
 
@@ -27,7 +27,7 @@
 
     // Architecture consultant
     "oracle": {
-      "model": "openai/gpt-5.4",
+      "model": "openai/gpt-5.5",
       "variant": "xhigh",
       "thinking": { "type": "enabled", "budgetTokens": 120000 },
     },
@@ -49,7 +49,7 @@
 
     // Critic: challenges assumptions
     "momus": {
-      "model": "openai/gpt-5.4",
+      "model": "openai/gpt-5.5",
       "prompt_append": "Challenge all assumptions in plans. Look for edge cases, failure modes, and overlooked requirements.",
     },
 
@@ -69,7 +69,7 @@
 
     // High-effort planning tasks: maximum reasoning
     "unspecified-high": {
-      "model": "openai/gpt-5.4",
+      "model": "openai/gpt-5.5",
       "variant": "xhigh",
     },
 
@@ -80,10 +80,10 @@
     "visual-engineering": { "model": "google/gemini-3.1-pro", "variant": "high" },
 
     // Deep research and analysis
-    "deep": { "model": "openai/gpt-5.4" },
+    "deep": { "model": "openai/gpt-5.5" },
 
     // Strategic reasoning
-    "ultrabrain": { "model": "openai/gpt-5.4", "variant": "xhigh" },
+    "ultrabrain": { "model": "openai/gpt-5.5", "variant": "xhigh" },
 
     // Creative approaches to problems
     "artistry": { "model": "google/gemini-3.1-pro", "variant": "high" },
@@ -99,7 +99,7 @@
     },
     "modelConcurrency": {
       "anthropic/claude-opus-4-7": 2,
-      "openai/gpt-5.4": 2,
+      "openai/gpt-5.5": 2,
     },
   },
 

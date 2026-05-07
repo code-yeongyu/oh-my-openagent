@@ -18,7 +18,7 @@ function shellSingleQuote(value: string): string {
 	return `'${value.split("'").join(`'"'"'`)}'`
 }
 
-async function createTmuxStub(options: { stdout: string; exitCode: number }): Promise<TmuxStub> {
+async function createTmuxStub(options: { stdout: string; windowStdout?: string; exitCode: number }): Promise<TmuxStub> {
 	const directory = await mkdtemp(path.join(tmpdir(), "resolve-caller-tmux-session-"))
 	temporaryDirectories.push(directory)
 
@@ -27,7 +27,7 @@ async function createTmuxStub(options: { stdout: string; exitCode: number }): Pr
 	const script = [
 		"#!/bin/sh",
 		`printf '%s\\n' \"$@\" >> ${shellSingleQuote(logPath)}`,
-		`printf '%s' ${shellSingleQuote(options.stdout)}`,
+		`case "$*" in *'#{session_name}:#{window_index}'*) printf '%s' ${shellSingleQuote(options.windowStdout ?? options.stdout)} ;; *) printf '%s' ${shellSingleQuote(options.stdout)} ;; esac`,
 		`exit ${options.exitCode}`,
 	].join("\n")
 
@@ -67,17 +67,20 @@ describe("resolveCallerTmuxSession", () => {
 		expect(await readLogLines(stub.logPath)).toHaveLength(0)
 	})
 
-	test("#given TMUX_PANE=%42 and display returns '$7' #when resolve runs #then returns { sessionId: '$7' }", async () => {
+	test("#given TMUX_PANE=%42 and display returns session and window #when resolve runs #then returns caller tmux target", async () => {
 		// given
 		process.env.TMUX_PANE = "%42"
-		const stub = await createTmuxStub({ stdout: "$7", exitCode: 0 })
+		const stub = await createTmuxStub({ stdout: "$7", windowStdout: "test-session:0", exitCode: 0 })
 
 		// when
 		const result = await resolveCallerTmuxSession(stub.tmuxPath)
 
 		// then
-		expect(result).toEqual({ sessionId: "$7" })
-		expect(await readLogLines(stub.logPath)).toEqual(["display", "-p", "-F", "#{session_id}", "-t", "%42"])
+		expect(result).toEqual({ sessionId: "$7", paneId: "%42", windowTarget: "test-session:0" })
+		expect(await readLogLines(stub.logPath)).toEqual([
+			"display", "-p", "-F", "#{session_id}", "-t", "%42",
+			"display", "-p", "-F", "#{session_name}:#{window_index}", "-t", "%42",
+		])
 	})
 
 	test("#given TMUX_PANE=%42 and display returns 'garbage' #when resolve runs #then returns null", async () => {

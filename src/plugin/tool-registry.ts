@@ -287,6 +287,8 @@ export function createToolRegistry(args: {
     browserProvider: skillContext.browserProvider,
     teamModeEnabled: pluginConfig.team_mode?.enabled ?? false,
     nativeSkills: "skills" in ctx ? (ctx as { skills: SkillLoadOptions["nativeSkills"] }).skills : undefined,
+    pluginsEnabled: pluginConfig.claude_code?.plugins ?? true,
+    enabledPluginsOverride: pluginConfig.claude_code?.plugins_override,
   })
 
   const taskSystemEnabled = isTaskSystemEnabled(pluginConfig)

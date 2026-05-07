@@ -88,7 +88,6 @@ describe("ralph-loop non-abort error continuation", () => {
 		expect(messagesCalls.length).toBeGreaterThan(0)
 		expect(hook.getState()?.iteration).toBe(2)
 	})
-
 	test("continues ultrawork loop immediately after non-abort session error", async () => {
 		// given - an active ULW Loop receives a recoverable runtime error
 		const hook = createRalphLoopHook({

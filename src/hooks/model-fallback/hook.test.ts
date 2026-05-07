@@ -163,7 +163,7 @@ describe("model fallback hook", () => {
 
     expect(secondOutput.message["model"]).toEqual({
       providerID: "opencode-go",
-      modelID: "kimi-k2.5",
+      modelID: "kimi-k2.6",
     })
     expect(secondOutput.message["variant"]).toBeUndefined()
   })

@@ -23,7 +23,7 @@ type TmuxManagerLike = {
 
 type TeamLayoutResultLike = {
 	focusWindowId: string
-	gridWindowId: string
+	gridWindowId?: string
 	focusPanesByMember: Record<string, string>
 	gridPanesByMember: Record<string, string>
 	targetSessionId: string
@@ -79,7 +79,7 @@ function isTeamLayoutResultLike(value: unknown): value is TeamLayoutResultLike {
 	}
 
 	return typeof value.focusWindowId === "string"
-		&& typeof value.gridWindowId === "string"
+		&& (value.gridWindowId === undefined || typeof value.gridWindowId === "string")
 		&& isRecord(value.focusPanesByMember)
 		&& isRecord(value.gridPanesByMember)
 		&& typeof value.targetSessionId === "string"
@@ -210,6 +210,7 @@ async function invokeRemoveTeamLayout(
 			targetSessionId,
 			focusWindowId: layoutResult.focusWindowId,
 			gridWindowId: layoutResult.gridWindowId,
+			paneIds: Object.values(layoutResult.focusPanesByMember),
 		},
 		tmuxManager,
 	]))
@@ -272,13 +273,11 @@ describe("team-mode live tmux smoke", () => {
 		await rm(state.tempRoot, { recursive: true, force: true })
 	})
 
-	test.skipIf(!LIVE)("#given a real caller tmux session and two mock members #when createTeamLayout runs #then two new windows appear in the caller session AND removeTeamLayout deletes exactly those two windows leaving the caller session intact", async () => {
+	test.skipIf(!LIVE)("#given a real caller tmux session and two mock members #when createTeamLayout runs #then teammate panes appear in the caller window and cleanup leaves the session intact", async () => {
 		// given
 		const state = requireLiveTestState()
 		const layoutModule = await loadLayoutModule()
 		const teamRunId = randomUUID()
-		const shortTeamRunId = teamRunId.slice(0, 8)
-		const expectedWindowNames = [`focus-${shortTeamRunId}`, `grid-${shortTeamRunId}`]
 		const initialWindows = await listWindows(state.callerSessionId)
 		const members: TeamLayoutMemberLike[] = [
 			{
@@ -295,25 +294,33 @@ describe("team-mode live tmux smoke", () => {
 
 		// when
 		const layoutResult = await invokeCreateTeamLayout(layoutModule, teamRunId, members, state.tmuxManager)
-		const windowsAppeared = await waitForCondition(async () => {
+		const panesAppeared = await waitForCondition(async () => {
+			const panes = await runTmuxCommand(["list-panes", "-t", state.callerSessionId, "-F", "#{pane_id}"])
+			return panes.success && Object.values(layoutResult.focusPanesByMember).every((paneId) => panes.stdout.split("\n").includes(paneId))
+		})
+		const windowsUnchangedBeforeCleanup = await waitForCondition(async () => {
 			const windows = await listWindows(state.callerSessionId)
-			return expectedWindowNames.every((windowName) => windows.some((window) => window.name === windowName))
+			return windows.map((window) => window.id).join(",") === initialWindows.map((window) => window.id).join(",")
 		})
 
 		await invokeRemoveTeamLayout(layoutModule, teamRunId, state.tmuxManager, layoutResult, state.callerSessionId)
-		const windowsRemoved = await waitForCondition(async () => {
+		const panesRemoved = await waitForCondition(async () => {
+			const panes = await runTmuxCommand(["list-panes", "-t", state.callerSessionId, "-F", "#{pane_id}"])
+			return panes.success && Object.values(layoutResult.focusPanesByMember).every((paneId) => !panes.stdout.split("\n").includes(paneId))
+		})
+		const windowsUnchangedAfterCleanup = await waitForCondition(async () => {
 			const windows = await listWindows(state.callerSessionId)
-			const noExpectedWindowsRemain = expectedWindowNames.every((windowName) => windows.every((window) => window.name !== windowName))
-			const sameWindowIds = windows.map((window) => window.id).join(",") === initialWindows.map((window) => window.id).join(",")
-			return noExpectedWindowsRemain && sameWindowIds
+			return windows.map((window) => window.id).join(",") === initialWindows.map((window) => window.id).join(",")
 		})
 		const callerSessionStillAlive = await runTmuxCommand(["has-session", "-t", state.callerSessionId])
 
 		// then
 		expect(layoutResult.focusWindowId.length).toBeGreaterThan(0)
-		expect(layoutResult.gridWindowId.length).toBeGreaterThan(0)
-		expect(windowsAppeared).toBe(true)
-		expect(windowsRemoved).toBe(true)
+		expect(layoutResult.gridWindowId).toBeUndefined()
+		expect(panesAppeared).toBe(true)
+		expect(windowsUnchangedBeforeCleanup).toBe(true)
+		expect(panesRemoved).toBe(true)
+		expect(windowsUnchangedAfterCleanup).toBe(true)
 		expect(callerSessionStillAlive.success).toBe(true)
 		expect(process.env.TMUX_PANE).toBe(state.callerPaneId)
 	})

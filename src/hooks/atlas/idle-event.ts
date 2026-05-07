@@ -4,6 +4,7 @@ import {
   getTaskSessionState,
   readBoulderState,
   readCurrentTopLevelTask,
+  resolveBoulderPlanPath,
 } from "../../features/boulder-state"
 import { getSessionAgent } from "../../features/claude-code-session-state"
 import { getLastAgentFromSession } from "./session-last-agent"
@@ -52,8 +53,12 @@ async function injectContinuation(input: {
 
   try {
     const currentBoulder = readBoulderState(input.ctx.directory)
+    const currentPlanPath = currentBoulder
+      ? resolveBoulderPlanPath(input.ctx.directory, currentBoulder)
+      : null
     const currentTask = currentBoulder
-      ? readCurrentTopLevelTask(currentBoulder.active_plan)
+      && currentPlanPath
+      ? readCurrentTopLevelTask(currentPlanPath)
       : null
     const preferredTaskSession = currentTask
       ? getTaskSessionState(input.ctx.directory, currentTask.key)
@@ -163,7 +168,7 @@ function scheduleRetry(input: {
     if (!currentBoulder) return
     if (!currentBoulder.session_ids?.includes(sessionID)) return
 
-    const currentProgress = getPlanProgress(currentBoulder.active_plan)
+    const currentProgress = getPlanProgress(resolveBoulderPlanPath(ctx.directory, currentBoulder))
     if (currentProgress.isComplete) return
     if (options?.isContinuationStopped?.(sessionID)) return
     const canContinueSession = await canContinueTrackedBoulderSession({

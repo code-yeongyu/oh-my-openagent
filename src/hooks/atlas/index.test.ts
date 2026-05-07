@@ -1494,6 +1494,43 @@ session_id: ses_untrusted_999
       expect(mockInput._promptMock).not.toHaveBeenCalled()
     })
 
+    test("should not inject when the mirrored worktree plan is complete even if the main repo plan is stale", async () => {
+      // given
+      const mainPlanPath = join(TEST_DIR, ".sisyphus", "plans", "worktree-complete-plan.md")
+      const worktreeDir = join(tmpdir(), `atlas-worktree-${randomUUID()}`)
+      const worktreePlanPath = join(worktreeDir, ".sisyphus", "plans", "worktree-complete-plan.md")
+      mkdirSync(join(TEST_DIR, ".sisyphus", "plans"), { recursive: true })
+      mkdirSync(join(worktreeDir, ".sisyphus", "plans"), { recursive: true })
+      writeFileSync(mainPlanPath, "# Plan\n- [ ] Main repo task\n")
+      writeFileSync(worktreePlanPath, "# Plan\n- [x] Worktree task\n")
+
+      writeBoulderState(TEST_DIR, {
+        active_plan: mainPlanPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: [MAIN_SESSION_ID],
+        plan_name: "worktree-complete-plan",
+        worktree_path: worktreeDir,
+      })
+
+      const mockInput = createMockPluginInput()
+      const hook = createAtlasHook(mockInput)
+
+      try {
+        // when
+        await hook.handler({
+          event: {
+            type: "session.idle",
+            properties: { sessionID: MAIN_SESSION_ID },
+          },
+        })
+
+        // then
+        expect(mockInput._promptMock).not.toHaveBeenCalled()
+      } finally {
+        rmSync(worktreeDir, { recursive: true, force: true })
+      }
+    })
+
     test("should skip when abort error occurred before idle", async () => {
       // given - boulder state with incomplete plan
       const planPath = join(TEST_DIR, "test-plan.md")

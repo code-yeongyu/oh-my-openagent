@@ -383,6 +383,12 @@ export class BackgroundManager {
       throw new Error("Agent parameter is required")
     }
 
+    input = { ...input, agent: input.agent.trim().replace(/^[\\/"']+|[\\/"']+$/g, "").trim() }
+
+    if (!input.agent) {
+      throw new Error("Agent parameter is required after sanitization")
+    }
+
     const spawnReservation = await this.reserveSubagentSpawn(input.parentSessionId)
 
     try {

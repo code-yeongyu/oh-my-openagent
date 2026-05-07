@@ -1,5 +1,11 @@
 /// <reference types="bun-types" />
 import { describe, test, expect, mock } from "bun:test"
+mock.module("../../shared/frontmatter", () => ({
+  parseFrontmatter: () => ({ frontmatter: {}, content: "" }),
+}))
+mock.module("js-yaml", () => ({
+  load: () => ({}),
+}))
 import type { BackgroundManager } from "../../features/background-agent"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { executeBackground } from "./background-executor"
@@ -98,6 +104,35 @@ describe("executeBackground", () => {
       throw new Error("Expected launch arguments")
     }
     expect(launchArgs.fallbackChain).toEqual(fallbackChain)
+  })
+
+  test("sanitizes subagent_type before passing to background manager launch", async () => {
+    //#given
+    const wrappedArgs = {
+      ...testArgs,
+      subagent_type: "\\hephaestus\\",
+    }
+    launchMock.mockResolvedValueOnce({
+      id: "test-task-id",
+      sessionId: "sub-session",
+      description: "Test task",
+      agent: "hephaestus",
+      status: "pending",
+    })
+
+    //#when
+    await executeBackground(wrappedArgs, testContext, mockManager, mockClient)
+
+    //#then
+    const latestCall = [...launchMock.mock.calls].pop()
+    if (!latestCall) {
+      throw new Error("Expected background manager launch to be called")
+    }
+    const launchArgs = latestCall[0]
+    if (!launchArgs) {
+      throw new Error("Expected launch arguments")
+    }
+    expect(launchArgs.agent).toBe("hephaestus")
   })
 
   test("keeps launched background task alive when parent aborts before session id resolves", async () => {
