@@ -139,7 +139,13 @@ export const rejectShutdownMock = mock(async (teamRunId: string, memberName: str
   }
 })
 export const loadTeamSpecMock = mock(async () => createSpec())
-export const listActiveTeamsMock = mock(async () => Array.from(runtimes.values()).map((runtimeState) => ({ teamRunId: runtimeState.teamRunId, teamName: runtimeState.teamName, status: runtimeState.status })))
+export const listActiveTeamsMock = mock(async () => Array.from(runtimes.values()).map((runtimeState) => ({
+  teamRunId: runtimeState.teamRunId,
+  teamName: runtimeState.teamName,
+  status: runtimeState.status,
+  memberCount: runtimeState.members.length,
+  scope: runtimeState.specSource,
+})))
 export const loadRuntimeStateMock = mock(async (teamRunId: string) => clone(requireRuntime(teamRunId)))
 
 export const config = TeamModeConfigSchema.parse({ enabled: true })

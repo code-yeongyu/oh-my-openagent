@@ -1,11 +1,5 @@
 /// <reference types="bun-types" />
 import { describe, test, expect, mock } from "bun:test"
-mock.module("../../shared/frontmatter", () => ({
-  parseFrontmatter: () => ({ frontmatter: {}, content: "" }),
-}))
-mock.module("js-yaml", () => ({
-  load: () => ({}),
-}))
 import type { BackgroundManager } from "../../features/background-agent"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { executeBackground } from "./background-executor"

@@ -51,6 +51,7 @@ describe("listUnreadMessages", () => {
     await writeFile(path.join(inboxDir, "bad.json"), "{not-json")
     await writeFile(path.join(inboxDir, ".hidden.json"), "{}")
     await writeFile(path.join(inboxDir, "processed", "done.json"), "{}")
+    logCalls.splice(0)
 
     // when
     const unreadMessages = await listUnreadMessages(teamRunId, "m1", config)

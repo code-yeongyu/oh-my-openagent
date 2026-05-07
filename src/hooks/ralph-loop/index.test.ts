@@ -304,6 +304,32 @@ describe("ralph-loop", () => {
       expect(state?.iteration).toBe(2)
     })
 
+    test("#given hanging toast #when session idles #then continuation still injects", async () => {
+      // given - TUI toast never settles
+      const ctx = createMockPluginInput()
+      ctx.client.tui = {
+        showToast: () => new Promise(() => {}),
+      } as never
+      const hook = createRalphLoopHook(ctx)
+      hook.startLoop("session-123", "Build a feature", { maxIterations: 10 })
+
+      // when - session goes idle
+      const result = await Promise.race([
+        hook.event({
+          event: {
+            type: "session.idle",
+            properties: { sessionID: "session-123" },
+          },
+        }).then(() => "resolved" as const),
+        new Promise<"timed-out">((resolvePromise) => setTimeout(() => resolvePromise("timed-out"), 50)),
+      ])
+
+      // then - continuation is not blocked by toast delivery
+      expect(result).toBe("resolved")
+      expect(promptCalls.length).toBe(1)
+      expect(promptCalls[0].sessionID).toBe("session-123")
+    })
+
     test("should skip continuation when background task is running", async () => {
       // given - active loop state with a running background task
       const hook = createRalphLoopHook(createMockPluginInput(), {

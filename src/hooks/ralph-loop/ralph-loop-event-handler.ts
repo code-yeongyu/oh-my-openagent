@@ -70,27 +70,38 @@ function isAbortError(error: unknown): boolean {
 		&& (error as { name?: unknown }).name === "MessageAbortedError"
 }
 
-async function showMaxIterationsToast(
+function showToastBestEffort(
 	ctx: PluginInput,
-	state: RalphLoopState,
-): Promise<void> {
-	await ctx.client.tui?.showToast?.({
-		body: { title: "Ralph Loop Stopped", message: `Max iterations (${state.max_iterations}) reached without completion`, variant: "warning", duration: 5000 },
-	}).catch(() => {})
+	body: { title: string; message: string; variant: "warning" | "info"; duration: number },
+): void {
+	try {
+		void Promise.resolve(ctx.client.tui?.showToast?.({ body })).catch(() => {})
+	} catch {
+	}
 }
 
-async function showIterationToast(
+function showMaxIterationsToast(
 	ctx: PluginInput,
 	state: RalphLoopState,
-): Promise<void> {
-	await ctx.client.tui?.showToast?.({
-		body: {
-			title: "Ralph Loop",
-			message: `Iteration ${state.iteration}/${typeof state.max_iterations === "number" ? state.max_iterations : "unbounded"}`,
-			variant: "info",
-			duration: 2000,
-		},
-	}).catch(() => {})
+): void {
+	showToastBestEffort(ctx, {
+		title: "Ralph Loop Stopped",
+		message: `Max iterations (${state.max_iterations}) reached without completion`,
+		variant: "warning",
+		duration: 5000,
+	})
+}
+
+function showIterationToast(
+	ctx: PluginInput,
+	state: RalphLoopState,
+): void {
+	showToastBestEffort(ctx, {
+		title: "Ralph Loop",
+		message: `Iteration ${state.iteration}/${typeof state.max_iterations === "number" ? state.max_iterations : "unbounded"}`,
+		variant: "info",
+		duration: 2000,
+	})
 }
 
 export function createRalphLoopEventHandler(
@@ -253,7 +264,7 @@ export function createRalphLoopEventHandler(
 					})
 					options.loopState.clear()
 
-					await showMaxIterationsToast(ctx, state)
+					showMaxIterationsToast(ctx, state)
 					return
 				}
 
@@ -269,7 +280,7 @@ export function createRalphLoopEventHandler(
 					max: newState.max_iterations,
 				})
 
-				await showIterationToast(ctx, newState)
+				showIterationToast(ctx, newState)
 
 				try {
 					await continueIteration(ctx, newState, {
@@ -361,7 +372,7 @@ export function createRalphLoopEventHandler(
 						max: state.max_iterations,
 					})
 					options.loopState.clear()
-					await showMaxIterationsToast(ctx, state)
+					showMaxIterationsToast(ctx, state)
 					return
 				}
 
@@ -371,7 +382,7 @@ export function createRalphLoopEventHandler(
 					return
 				}
 
-				await showIterationToast(ctx, newState)
+				showIterationToast(ctx, newState)
 				try {
 					await continueIteration(ctx, newState, {
 						previousSessionID: sessionID,

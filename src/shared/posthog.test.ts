@@ -65,10 +65,10 @@ describe("posthog client creation", () => {
 
     // then
     expect(() => cliPostHog.trackActive("cli", "run_started")).not.toThrow()
-    await expect(cliPostHog.shutdown()).resolves.toBeUndefined()
+    expect(await cliPostHog.shutdown()).toBeUndefined()
 
     expect(() => pluginPostHog.trackActive("plugin", "run_started")).not.toThrow()
-    await expect(pluginPostHog.shutdown()).resolves.toBeUndefined()
+    expect(await pluginPostHog.shutdown()).toBeUndefined()
   })
 
   it("creates a plugin client when os.cpus throws", async () => {
@@ -77,20 +77,6 @@ describe("posthog client creation", () => {
     process.env.OMO_SEND_ANONYMOUS_TELEMETRY = "1"
     process.env.POSTHOG_API_KEY = "test-api-key"
 
-    mock.module("os", () => ({
-      default: {
-        arch: () => "x64",
-        cpus: () => {
-          throw new Error("Failed to get CPU information")
-        },
-        hostname: () => "test-host",
-        platform: () => "linux",
-        release: () => "6.8.0-arch1-1",
-        totalmem: () => 8 * 1024 * 1024 * 1024,
-        type: () => "Linux",
-      },
-    }))
-
     mock.module("posthog-node", () => ({
       PostHog: class {
         capture() {}
@@ -98,14 +84,26 @@ describe("posthog client creation", () => {
       },
     }))
 
-    const { createPluginPostHog } = await importPostHogModule()
+    const posthogModule = await importPostHogModule()
+    posthogModule.__setOsProviderForTesting({
+      arch: () => "x64",
+      cpus: () => {
+        throw new Error("Failed to get CPU information")
+      },
+      hostname: () => "test-host",
+      platform: () => "linux",
+      release: () => "6.8.0-arch1-1",
+      totalmem: () => 8 * 1024 * 1024 * 1024,
+      type: () => "Linux",
+    })
 
     // when
-    const pluginPostHog = createPluginPostHog()
+    const pluginPostHog = posthogModule.createPluginPostHog()
 
     // then
     expect(() => pluginPostHog.trackActive("plugin", "run_started")).not.toThrow()
-    await expect(pluginPostHog.shutdown()).resolves.toBeUndefined()
+    expect(await pluginPostHog.shutdown()).toBeUndefined()
+    posthogModule.__resetOsProviderForTesting()
   })
 
   it("passes the strict PostHog constructor options for both clients", async () => {
@@ -180,15 +178,16 @@ describe("posthog trackActive emission contract", () => {
     const emittedEvents = captured.map((message) => message.event)
     expect(emittedEvents).not.toContain("omo_hourly_active")
     const [dailyEvent] = captured
+    if (!dailyEvent) {
+      throw new Error("Expected daily event")
+    }
     expect(dailyEvent?.event).toBe("omo_daily_active")
     expect(dailyEvent?.distinctId).toBe("distinct-cli")
-    expect(dailyEvent?.properties).toMatchObject({
-      day_utc: "2026-04-18",
-      reason: "run_started",
-      source: "cli",
-      $process_person_profile: false,
-    })
-    expect(dailyEvent?.properties).not.toHaveProperty("hour_utc")
+    expect(dailyEvent.properties?.day_utc).toBe("2026-04-18")
+    expect(dailyEvent.properties?.reason).toBe("run_started")
+    expect(dailyEvent.properties?.source).toBe("cli")
+    expect(dailyEvent.properties?.$process_person_profile).toBe(false)
+    expect(Object.prototype.hasOwnProperty.call(dailyEvent.properties ?? {}, "hour_utc")).toBe(false)
   })
 
   it("emits nothing and never omo_hourly_active when captureDaily is false", async () => {

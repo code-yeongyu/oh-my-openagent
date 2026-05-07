@@ -259,7 +259,7 @@ describe("createEventHandler - idle deduplication", () => {
 			sweepStaleOmoAgentSessions: async () => 0,
 		}))
 
-		const { TmuxSessionManager } = await import("../features/tmux-subagent/manager")
+    const { TmuxSessionManager } = await import(`../features/tmux-subagent/manager?test=${crypto.randomUUID()}`)
 		const managerContext = asPluginInput({
 			serverUrl: new URL("http://localhost:4096"),
 			directory: "/tmp",

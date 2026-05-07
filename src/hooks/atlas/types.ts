@@ -11,6 +11,7 @@ export interface AtlasHookOptions {
   directory: string
   backgroundManager?: BackgroundTaskStatusProvider
   isContinuationStopped?: (sessionID: string) => boolean
+  isCallerOrchestrator?: (sessionID: string | undefined) => Promise<boolean>
   agentOverrides?: AgentOverrides
   /** Enable auto-commit after each atomic task completion (default: true) */
   autoCommit?: boolean

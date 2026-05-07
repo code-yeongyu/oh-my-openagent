@@ -1,4 +1,5 @@
-import { afterEach, expect, mock, test } from "bun:test"
+import { expect, test } from "bun:test"
+import type { PathLike } from "node:fs"
 import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -6,10 +7,6 @@ import { join } from "node:path"
 async function createTempDirectory(prefix: string): Promise<string> {
   return await mkdtemp(join(tmpdir(), prefix))
 }
-
-afterEach(() => {
-  mock.restore()
-})
 
 test("withLock serializes concurrent work", async () => {
   // given
@@ -50,24 +47,20 @@ test("withLock serializes concurrent work", async () => {
 
 test("atomicWrite leaves no partial file when rename fails", async () => {
   // given
-  const fsPromises = await import("node:fs/promises")
   const rootDirectory = await createTempDirectory("locks-atomic-")
   const targetPath = join(rootDirectory, "target.txt")
   await writeFile(targetPath, "old content")
   const renameCalls: string[] = []
 
-  mock.module("node:fs/promises", () => ({
-    ...fsPromises,
-    rename: async (from: string, to: string) => {
-      renameCalls.push(`${from}->${to}`)
-      throw new Error("rename failed")
-    },
-  }))
-
   const { atomicWrite } = await import("./locks")
 
   // when
-  const result = atomicWrite(targetPath, "new content")
+  const result = atomicWrite(targetPath, "new content", {
+    rename: async (from: PathLike, to: PathLike) => {
+      renameCalls.push(`${from}->${to}`)
+      throw new Error("rename failed")
+    },
+  })
 
   // then
   expect(result).rejects.toThrow("rename failed")
@@ -76,7 +69,6 @@ test("atomicWrite leaves no partial file when rename fails", async () => {
 
   const directoryEntries = await readdir(rootDirectory)
   expect(directoryEntries.some((entry) => entry.startsWith("target.txt.tmp."))).toBe(false)
-  mock.restore()
   await rm(rootDirectory, { recursive: true, force: true })
 })
 

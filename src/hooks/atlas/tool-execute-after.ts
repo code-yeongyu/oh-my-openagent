@@ -1,6 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import {
-  appendSessionId,
   getPlanProgress,
   getTaskSessionState,
   readBoulderState,
@@ -33,15 +32,17 @@ export function createToolExecuteAfterHandler(input: {
   pendingTaskRefs: Map<string, PendingTaskRef>
   autoCommit: boolean
   getState: (sessionID: string) => SessionState
+  isCallerOrchestrator?: (sessionID: string | undefined) => Promise<boolean>
 }): (toolInput: ToolExecuteAfterInput, toolOutput: ToolExecuteAfterOutput | undefined) => Promise<void> {
   const { ctx, pendingFilePaths, pendingTaskRefs, autoCommit, getState } = input
+  const resolveIsCallerOrchestrator = input.isCallerOrchestrator ?? ((sessionID) => isCallerOrchestrator(sessionID, ctx.client))
   return async (toolInput, toolOutput): Promise<void> => {
     // Guard against undefined output (e.g., from /review command - see issue #1035)
     if (!toolOutput) {
       return
     }
 
-    if (!(await isCallerOrchestrator(toolInput.sessionID, ctx.client))) {
+    if (!(await resolveIsCallerOrchestrator(toolInput.sessionID))) {
       return
     }
 

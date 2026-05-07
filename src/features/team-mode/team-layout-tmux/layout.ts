@@ -1,11 +1,26 @@
 import { log } from "../../../shared"
 import { shellSingleQuote } from "../../../shared/shell-env"
-import { isServerRunning, runTmuxCommand } from "../../../shared/tmux"
-import { getTmuxPath } from "../../../tools/interactive-bash/tmux-path-resolver"
+import * as sharedTmuxModule from "../../../shared/tmux"
+import * as tmuxPathResolverModule from "../../../tools/interactive-bash/tmux-path-resolver"
 import type { TmuxSessionManager } from "../../tmux-subagent/manager"
 import { resolveCallerTmuxSession } from "./resolve-caller-tmux-session"
 
 type TeamLayoutMember = { name: string; sessionId: string; worktreePath?: string }
+type TmuxCommandResult = Awaited<ReturnType<typeof sharedTmuxModule.runTmuxCommand>>
+
+export type TeamLayoutDeps = {
+  runTmuxCommand: (tmuxPath: string, args: Array<string>, options?: Parameters<typeof sharedTmuxModule.runTmuxCommand>[2]) => Promise<TmuxCommandResult>
+  isServerRunning: typeof sharedTmuxModule.isServerRunning
+  getTmuxPath: typeof tmuxPathResolverModule.getTmuxPath
+  resolveCallerTmuxSession: typeof resolveCallerTmuxSession
+}
+
+const defaultDeps: TeamLayoutDeps = {
+  runTmuxCommand: sharedTmuxModule.runTmuxCommand,
+  isServerRunning: sharedTmuxModule.isServerRunning,
+  getTmuxPath: tmuxPathResolverModule.getTmuxPath,
+  resolveCallerTmuxSession,
+}
 
 export type TeamLayoutResult = {
   focusWindowId: string
@@ -34,8 +49,8 @@ function buildAttachCommand(member: TeamLayoutMember, serverUrl: string): string
   return `opencode attach ${shellSingleQuote(serverUrl)} --session ${shellSingleQuote(member.sessionId)} --dir ${shellSingleQuote(getPaneWorkingDirectory(member))}`
 }
 
-async function listPanesInWindow(tmuxPath: string, windowTarget: string): Promise<Array<string>> {
-  const result = await runTmuxCommand(tmuxPath, ["list-panes", "-t", windowTarget, "-F", "#{pane_id}"])
+async function listPanesInWindow(tmuxPath: string, windowTarget: string, deps: TeamLayoutDeps): Promise<Array<string>> {
+  const result = await deps.runTmuxCommand(tmuxPath, ["list-panes", "-t", windowTarget, "-F", "#{pane_id}"])
   if (!result.success || !result.output) return []
   return result.output.trim().split("\n").filter(Boolean)
 }
@@ -68,58 +83,61 @@ async function createTeamLayoutInCallerWindow(
   windowTarget: string,
   members: Array<TeamLayoutMember>,
   serverUrl: string,
+  deps: TeamLayoutDeps,
 ): Promise<{ focusWindowId: string; focusPanesByMember: Record<string, string> } | null> {
   const panesByMember: Record<string, string> = {}
-  const existingPanes = await listPanesInWindow(tmuxPath, windowTarget)
+  const existingPanes = await listPanesInWindow(tmuxPath, windowTarget, deps)
   let teammatePanes = existingPanes.filter((paneId) => paneId !== callerPaneId)
 
   for (const member of members) {
-    const split = await runTmuxCommand(tmuxPath, buildSplitArgs(callerPaneId, teammatePanes, member))
+    const split = await deps.runTmuxCommand(tmuxPath, buildSplitArgs(callerPaneId, teammatePanes, member))
     if (!split.success || !split.output) return null
 
     const paneId = split.output.trim()
     teammatePanes = [...teammatePanes, paneId]
     panesByMember[member.name] = paneId
-    await runTmuxCommand(tmuxPath, ["select-pane", "-t", paneId, "-T", member.name])
-    await runTmuxCommand(tmuxPath, ["send-keys", "-t", paneId, buildAttachCommand(member, serverUrl), "Enter"])
+    await deps.runTmuxCommand(tmuxPath, ["select-pane", "-t", paneId, "-T", member.name])
+    await deps.runTmuxCommand(tmuxPath, ["send-keys", "-t", paneId, buildAttachCommand(member, serverUrl), "Enter"])
   }
 
-  const layoutResult = await runTmuxCommand(tmuxPath, ["select-layout", "-t", windowTarget, "main-vertical"])
+  const layoutResult = await deps.runTmuxCommand(tmuxPath, ["select-layout", "-t", windowTarget, "main-vertical"])
   if (!layoutResult.success) return null
 
-  const resizeResult = await runTmuxCommand(tmuxPath, ["resize-pane", "-t", callerPaneId, "-x", "30%"])
+  const resizeResult = await deps.runTmuxCommand(tmuxPath, ["resize-pane", "-t", callerPaneId, "-x", "30%"])
   if (!resizeResult.success) return null
 
   return { focusWindowId: windowTarget, focusPanesByMember: panesByMember }
 }
 
-export async function createTeamLayout(teamRunId: string, members: Array<TeamLayoutMember>, tmuxMgr: TmuxSessionManager): Promise<TeamLayoutResult | null> {
+export async function createTeamLayout(teamRunId: string, members: Array<TeamLayoutMember>, tmuxMgr: TmuxSessionManager, deps: TeamLayoutDeps = defaultDeps): Promise<TeamLayoutResult | null> {
   if (!canVisualize()) {
     log("tmux visualization unavailable, skipping")
     return null
   }
-  if (members.length === 0) return null
+  if (members.length === 0) {
+    return null
+  }
 
   try {
     const serverUrl = tmuxMgr.getServerUrl()
-    if (!(await isServerRunning(serverUrl))) {
+    if (!(await deps.isServerRunning(serverUrl))) {
       log("opencode server not reachable, skipping team layout", { serverUrl })
       return null
     }
 
-    const tmuxPath = await getTmuxPath()
+    const tmuxPath = await deps.getTmuxPath()
     if (!tmuxPath) {
       log("tmux visualization unavailable, skipping")
       return null
     }
 
-    const callerSession = await resolveCallerTmuxSession(tmuxPath)
+    const callerSession = await deps.resolveCallerTmuxSession(tmuxPath)
     if (!callerSession) {
       log("tmux visualization requires a resolvable caller tmux pane, skipping", { teamRunId })
       return null
     }
 
-    const focus = await createTeamLayoutInCallerWindow(tmuxPath, callerSession.paneId, callerSession.windowTarget, members, serverUrl)
+    const focus = await createTeamLayoutInCallerWindow(tmuxPath, callerSession.paneId, callerSession.windowTarget, members, serverUrl, deps)
     if (!focus) return null
 
     return {
@@ -136,20 +154,16 @@ export async function createTeamLayout(teamRunId: string, members: Array<TeamLay
   }
 }
 
-export async function removeTeamLayout(teamRunId: string, _tmuxMgr: TmuxSessionManager): Promise<void>
-export async function removeTeamLayout(
-  teamRunId: string,
-  _cleanupTarget: TeamLayoutCleanupTarget | undefined,
-  _tmuxMgr: TmuxSessionManager,
-): Promise<void>
 export async function removeTeamLayout(
   teamRunId: string,
   tmuxMgrOrCleanupTarget: TmuxSessionManager | TeamLayoutCleanupTarget | undefined,
-  _tmuxMgr?: TmuxSessionManager,
+  tmuxMgrOrDeps?: TmuxSessionManager | TeamLayoutDeps,
+  deps: TeamLayoutDeps = defaultDeps,
 ): Promise<void> {
   if (!canVisualize()) return
   try {
-    const tmuxPath = await getTmuxPath()
+    const resolvedDeps = isTeamLayoutDeps(tmuxMgrOrDeps) ? tmuxMgrOrDeps : deps
+    const tmuxPath = await resolvedDeps.getTmuxPath()
     if (!tmuxPath) return
 
     const cleanupTarget = isTeamLayoutCleanupTarget(tmuxMgrOrCleanupTarget)
@@ -157,14 +171,14 @@ export async function removeTeamLayout(
       : undefined
 
     if (cleanupTarget?.ownedSession !== false) {
-      await runTmuxCommand(tmuxPath, ["kill-session", "-t", cleanupTarget?.targetSessionId ?? `omo-team-${teamRunId}`])
+      await resolvedDeps.runTmuxCommand(tmuxPath, ["kill-session", "-t", cleanupTarget?.targetSessionId ?? `omo-team-${teamRunId}`])
       return
     }
 
     if (cleanupTarget?.paneIds && cleanupTarget.paneIds.length > 0) {
       for (const paneId of cleanupTarget.paneIds) {
         try {
-          await runTmuxCommand(tmuxPath, ["kill-pane", "-t", paneId])
+          await resolvedDeps.runTmuxCommand(tmuxPath, ["kill-pane", "-t", paneId])
         } catch {
           log("tmux team pane cleanup failed", { teamRunId, paneId })
         }
@@ -175,7 +189,7 @@ export async function removeTeamLayout(
     for (const windowId of [cleanupTarget.focusWindowId, cleanupTarget.gridWindowId]) {
       if (!windowId) continue
       try {
-        await runTmuxCommand(tmuxPath, ["kill-window", "-t", windowId])
+        await resolvedDeps.runTmuxCommand(tmuxPath, ["kill-window", "-t", windowId])
       } catch (windowError) {
         log("tmux team layout window cleanup failed", { teamRunId, windowId, error: String(windowError) })
       }
@@ -183,6 +197,10 @@ export async function removeTeamLayout(
   } catch (error) {
     log("tmux team layout cleanup failed", { teamRunId, error: String(error) })
   }
+}
+
+function isTeamLayoutDeps(value: TmuxSessionManager | TeamLayoutDeps | undefined): value is TeamLayoutDeps {
+  return value !== undefined && "runTmuxCommand" in value && "getTmuxPath" in value
 }
 
 function isTeamLayoutCleanupTarget(value: TmuxSessionManager | TeamLayoutCleanupTarget | undefined): value is TeamLayoutCleanupTarget {

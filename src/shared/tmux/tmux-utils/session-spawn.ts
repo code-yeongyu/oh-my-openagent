@@ -8,6 +8,30 @@ import { shellSingleQuote } from "../../shell-env"
 
 const ISOLATED_SESSION_NAME_PREFIX = "omo-agents"
 
+type SpawnTmuxSessionDeps = {
+	log: (message: string, data?: unknown) => void
+	runTmuxCommand: typeof RunTmuxCommand
+	isInsideTmux: typeof isInsideTmux
+	isServerRunning: typeof isServerRunning
+	getTmuxPath: typeof getTmuxPath
+}
+
+async function resolveSpawnTmuxSessionDeps(deps?: Partial<SpawnTmuxSessionDeps>): Promise<SpawnTmuxSessionDeps> {
+	const [{ log }, { runTmuxCommand }] = await Promise.all([
+		import("../../logger"),
+		import("../runner"),
+	])
+
+	return {
+		log,
+		runTmuxCommand,
+		isInsideTmux,
+		isServerRunning,
+		getTmuxPath,
+		...deps,
+	}
+}
+
 export function getIsolatedSessionName(pid: number = process.pid): string {
 	return `${ISOLATED_SESSION_NAME_PREFIX}-${pid}`
 }
@@ -39,11 +63,10 @@ export async function spawnTmuxSession(
 	serverUrl: string,
 	directory: string,
 	sourcePaneId?: string,
+	depsInput?: Partial<SpawnTmuxSessionDeps>,
 ): Promise<SpawnPaneResult> {
-	const [{ log }, { runTmuxCommand }] = await Promise.all([
-		import("../../logger"),
-		import("../runner"),
-	])
+	const deps = await resolveSpawnTmuxSessionDeps(depsInput)
+	const { log, runTmuxCommand } = deps
 
 	log("[spawnTmuxSession] called", {
 		sessionId,
@@ -56,18 +79,18 @@ export async function spawnTmuxSession(
 		log("[spawnTmuxSession] SKIP: config.enabled is false")
 		return { success: false }
 	}
-	if (!isInsideTmux()) {
+	if (!deps.isInsideTmux()) {
 		log("[spawnTmuxSession] SKIP: not inside tmux", { TMUX: process.env.TMUX })
 		return { success: false }
 	}
 
-	const serverRunning = await isServerRunning(serverUrl)
+	const serverRunning = await deps.isServerRunning(serverUrl)
 	if (!serverRunning) {
 		log("[spawnTmuxSession] SKIP: server not running", { serverUrl })
 		return { success: false }
 	}
 
-	const tmux = await getTmuxPath()
+	const tmux = await deps.getTmuxPath()
 	if (!tmux) {
 		log("[spawnTmuxSession] SKIP: tmux not found")
 		return { success: false }

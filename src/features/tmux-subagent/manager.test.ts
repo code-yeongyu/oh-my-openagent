@@ -22,6 +22,22 @@ type SessionReadyWaitParams = {
   sessionId: string
 }
 
+type TmuxSessionManagerContext = ConstructorParameters<typeof import('./manager').TmuxSessionManager>[0]
+
+type TmuxSessionManagerInternals = {
+  serverUrl: string
+  deferredQueue: string[]
+  tryAttachDeferredSession: () => Promise<void>
+}
+
+function cast<TValue>(value: unknown): TValue {
+  return value as TValue
+}
+
+function getManagerInternals(manager: TmuxSessionManagerType): TmuxSessionManagerInternals {
+  return cast<TmuxSessionManagerInternals>(manager)
+}
+
 const mockQueryWindowState = mock<(paneId: string) => Promise<WindowState | null>>(
   async () => ({
     windowWidth: 212,
@@ -78,6 +94,8 @@ const mockTmuxDeps: TmuxUtilDeps = {
   isInsideTmux: mockIsInsideTmux,
   getCurrentPaneId: mockGetCurrentPaneId,
   queryWindowState: mockQueryWindowState,
+  waitForSessionReady: mockWaitForSessionReady,
+  log: (...args) => sharedModule.log(...args),
 }
 
 function registerModuleMocks(): void {
@@ -119,8 +137,8 @@ const readySessions = new Set<string>()
 function createMockContext(overrides?: {
   sessionStatusResult?: { data?: Record<string, { type: string }> }
   sessionMessagesResult?: { data?: unknown[] }
-}) {
-  return {
+}): TmuxSessionManagerContext {
+  return cast<TmuxSessionManagerContext>({
     serverUrl: new URL('http://localhost:4096'),
     client: {
       session: {
@@ -145,7 +163,7 @@ function createMockContext(overrides?: {
         }),
       },
     },
-  } as any
+  })
 }
 
 function createSessionCreatedEvent(
@@ -374,7 +392,7 @@ describe('TmuxSessionManager', () => {
       }
 
       // then
-      expect((manager as any).serverUrl).toBe('http://localhost:4096')
+      expect(getManagerInternals(manager).serverUrl).toBe('http://localhost:4096')
     })
 
     test('falls back to configured OPENCODE_PORT when serverUrl has port 0', async () => {
@@ -406,7 +424,7 @@ describe('TmuxSessionManager', () => {
       }
 
       // then
-      expect((manager as any).serverUrl).toBe('http://localhost:5678')
+      expect(getManagerInternals(manager).serverUrl).toBe('http://localhost:5678')
     })
 
     test('ignores invalid OPENCODE_PORT when serverUrl has port 0', async () => {
@@ -438,7 +456,7 @@ describe('TmuxSessionManager', () => {
       }
 
       // then
-      expect((manager as any).serverUrl).toBe('http://localhost:4096')
+      expect(getManagerInternals(manager).serverUrl).toBe('http://localhost:4096')
     })
   })
 
@@ -808,7 +826,7 @@ describe('TmuxSessionManager', () => {
 
       // then - with small window, manager defers instead of replacing
       expect(mockExecuteActions).toHaveBeenCalledTimes(0)
-      expect((manager as any).deferredQueue).toEqual(['ses_new'])
+      expect(getManagerInternals(manager).deferredQueue).toEqual(['ses_new'])
     })
 
     test('keeps deferred queue idempotent for duplicate session.created events', async () => {
@@ -850,7 +868,7 @@ describe('TmuxSessionManager', () => {
       )
 
       // then
-      expect((manager as any).deferredQueue).toEqual(['ses_dup'])
+      expect(getManagerInternals(manager).deferredQueue).toEqual(['ses_dup'])
     })
 
     test('auto-attaches deferred sessions in FIFO order', async () => {
@@ -900,17 +918,17 @@ describe('TmuxSessionManager', () => {
       await manager.onSessionCreated(createSessionCreatedEvent('ses_1', 'ses_parent', 'Task 1'))
       await manager.onSessionCreated(createSessionCreatedEvent('ses_2', 'ses_parent', 'Task 2'))
       await manager.onSessionCreated(createSessionCreatedEvent('ses_3', 'ses_parent', 'Task 3'))
-      expect((manager as any).deferredQueue).toEqual(['ses_1', 'ses_2', 'ses_3'])
+      expect(getManagerInternals(manager).deferredQueue).toEqual(['ses_1', 'ses_2', 'ses_3'])
 
       // when
       mockQueryWindowState.mockImplementation(async () => createWindowState())
-      await (manager as any).tryAttachDeferredSession()
-      await (manager as any).tryAttachDeferredSession()
-      await (manager as any).tryAttachDeferredSession()
+      await getManagerInternals(manager).tryAttachDeferredSession()
+      await getManagerInternals(manager).tryAttachDeferredSession()
+      await getManagerInternals(manager).tryAttachDeferredSession()
 
       // then
       expect(attachOrder).toEqual(['ses_1', 'ses_2', 'ses_3'])
-      expect((manager as any).deferredQueue).toEqual([])
+      expect(getManagerInternals(manager).deferredQueue).toEqual([])
     })
 
     test('does not attach deferred session more than once across repeated retries', async () => {
@@ -963,12 +981,12 @@ describe('TmuxSessionManager', () => {
 
       // when
       mockQueryWindowState.mockImplementation(async () => createWindowState())
-      await (manager as any).tryAttachDeferredSession()
-      await (manager as any).tryAttachDeferredSession()
+      await getManagerInternals(manager).tryAttachDeferredSession()
+      await getManagerInternals(manager).tryAttachDeferredSession()
 
       // then
       expect(attachCount).toBe(1)
-      expect((manager as any).deferredQueue).toEqual([])
+      expect(getManagerInternals(manager).deferredQueue).toEqual([])
     })
 
     test('skips deferred attach when the session is already pending through another spawn path', async () => {
@@ -998,7 +1016,7 @@ describe('TmuxSessionManager', () => {
       await manager.onSessionCreated(
         createSessionCreatedEvent('ses_pending_race', 'ses_parent', 'Pending Race Task')
       )
-      expect((manager as any).deferredQueue).toEqual(['ses_pending_race'])
+      expect(getManagerInternals(manager).deferredQueue).toEqual(['ses_pending_race'])
 
       mockQueryWindowState.mockImplementation(async () => createWindowState())
       Reflect.get(manager, 'pendingSessions').add('ses_pending_race')
@@ -1008,7 +1026,7 @@ describe('TmuxSessionManager', () => {
 
       // then
       expect(mockSpawnTmuxPane).toHaveBeenCalledTimes(0)
-      expect((manager as any).deferredQueue).toEqual(['ses_pending_race'])
+      expect(getManagerInternals(manager).deferredQueue).toEqual(['ses_pending_race'])
     })
 
     test('drops deferred sessions that were already closed by polling', async () => {
@@ -1038,7 +1056,7 @@ describe('TmuxSessionManager', () => {
       await manager.onSessionCreated(
         createSessionCreatedEvent('ses_bounce', 'ses_parent', 'Bounce Task')
       )
-      expect((manager as any).deferredQueue).toEqual(['ses_bounce'])
+      expect(getManagerInternals(manager).deferredQueue).toEqual(['ses_bounce'])
 
       mockQueryWindowState.mockImplementation(async () => createWindowState())
       Reflect.set(manager, 'closedByPolling', new Set(['ses_bounce']))
@@ -1048,7 +1066,7 @@ describe('TmuxSessionManager', () => {
 
       // then
       expect(mockSpawnTmuxPane).toHaveBeenCalledTimes(0)
-      expect((manager as any).deferredQueue).toEqual([])
+      expect(getManagerInternals(manager).deferredQueue).toEqual([])
     })
 
     test('removes deferred session when session is deleted before attach', async () => {
@@ -1084,13 +1102,13 @@ describe('TmuxSessionManager', () => {
       await manager.onSessionCreated(
         createSessionCreatedEvent('ses_pending', 'ses_parent', 'Pending Task')
       )
-      expect((manager as any).deferredQueue).toEqual(['ses_pending'])
+      expect(getManagerInternals(manager).deferredQueue).toEqual(['ses_pending'])
 
       // when
       await manager.onSessionDeleted({ sessionID: 'ses_pending' })
 
       // then
-      expect((manager as any).deferredQueue).toEqual([])
+      expect(getManagerInternals(manager).deferredQueue).toEqual([])
       expect(mockExecuteAction).toHaveBeenCalledTimes(0)
     })
 
@@ -1179,7 +1197,7 @@ describe('TmuxSessionManager', () => {
         )
 
         // then
-        expect((manager as any).deferredQueue).toEqual(['ses_null_state'])
+        expect(getManagerInternals(manager).deferredQueue).toEqual(['ses_null_state'])
 
         logSpy.mockRestore()
       })
@@ -1269,7 +1287,7 @@ describe('TmuxSessionManager', () => {
         )
 
         // then
-        expect((manager as any).deferredQueue).toEqual(['ses_fail_no_close'])
+        expect(getManagerInternals(manager).deferredQueue).toEqual(['ses_fail_no_close'])
 
         logSpy.mockRestore()
       })
@@ -1315,7 +1333,7 @@ describe('TmuxSessionManager', () => {
         )
 
         // then
-        expect((manager as any).deferredQueue).toEqual(['ses_fail_with_close'])
+        expect(getManagerInternals(manager).deferredQueue).toEqual(['ses_fail_with_close'])
 
         logSpy.mockRestore()
       })

@@ -1,10 +1,35 @@
 import type { TmuxConfig } from "../../../config/schema"
 import { getTmuxPath } from "../../../tools/interactive-bash/tmux-path-resolver"
 import type { SpawnPaneResult } from "../types"
+import type { runTmuxCommand as RunTmuxCommand } from "../runner"
 import type { SplitDirection } from "./environment"
 import { isInsideTmux } from "./environment"
 import { isServerRunning } from "./server-health"
 import { shellSingleQuote } from "../../shell-env"
+
+type SpawnTmuxPaneDeps = {
+	log: (message: string, data?: unknown) => void
+	runTmuxCommand: typeof RunTmuxCommand
+	isInsideTmux: typeof isInsideTmux
+	isServerRunning: typeof isServerRunning
+	getTmuxPath: typeof getTmuxPath
+}
+
+async function resolveSpawnTmuxPaneDeps(deps?: Partial<SpawnTmuxPaneDeps>): Promise<SpawnTmuxPaneDeps> {
+	const [{ log }, { runTmuxCommand }] = await Promise.all([
+		import("../../logger"),
+		import("../runner"),
+	])
+
+	return {
+		log,
+		runTmuxCommand,
+		isInsideTmux,
+		isServerRunning,
+		getTmuxPath,
+		...deps,
+	}
+}
 
 export async function spawnTmuxPane(
 	sessionId: string,
@@ -14,11 +39,10 @@ export async function spawnTmuxPane(
 	directory: string,
 	targetPaneId?: string,
 	splitDirection: SplitDirection = "-h",
+	depsInput?: Partial<SpawnTmuxPaneDeps>,
 ): Promise<SpawnPaneResult> {
-	const [{ log }, { runTmuxCommand }] = await Promise.all([
-		import("../../logger"),
-		import("../runner"),
-	])
+	const deps = await resolveSpawnTmuxPaneDeps(depsInput)
+	const { log, runTmuxCommand } = deps
 
 	log("[spawnTmuxPane] called", {
 		sessionId,
@@ -33,18 +57,18 @@ export async function spawnTmuxPane(
 		log("[spawnTmuxPane] SKIP: config.enabled is false")
 		return { success: false }
 	}
-	if (!isInsideTmux()) {
+	if (!deps.isInsideTmux()) {
 		log("[spawnTmuxPane] SKIP: not inside tmux", { TMUX: process.env.TMUX })
 		return { success: false }
 	}
 
-	const serverRunning = await isServerRunning(serverUrl)
+	const serverRunning = await deps.isServerRunning(serverUrl)
 	if (!serverRunning) {
 		log("[spawnTmuxPane] SKIP: server not running", { serverUrl })
 		return { success: false }
 	}
 
-	const tmux = await getTmuxPath()
+	const tmux = await deps.getTmuxPath()
 	if (!tmux) {
 		log("[spawnTmuxPane] SKIP: tmux not found")
 		return { success: false }

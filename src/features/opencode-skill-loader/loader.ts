@@ -56,8 +56,8 @@ export async function loadProjectAgentsSkills(directory?: string): Promise<Recor
   return skillsToCommandDefinitionRecord(deduplicateSkillsByName(allSkills.flat()))
 }
 
-export async function loadGlobalAgentsSkills(): Promise<Record<string, CommandDefinition>> {
-  const agentsGlobalDir = join(homedir(), ".agents", "skills")
+export async function loadGlobalAgentsSkills(homeDirectory: string = homedir()): Promise<Record<string, CommandDefinition>> {
+  const agentsGlobalDir = join(homeDirectory, ".agents", "skills")
   const skills = await loadSkillsFromDir({ skillsDir: agentsGlobalDir, scope: "user" })
   return skillsToCommandDefinitionRecord(skills)
 }
@@ -166,7 +166,7 @@ export async function discoverProjectAgentsSkills(directory?: string): Promise<L
   return deduplicateSkillsByName(allSkills.flat())
 }
 
-export async function discoverGlobalAgentsSkills(): Promise<LoadedSkill[]> {
-  const agentsGlobalDir = join(homedir(), ".agents", "skills")
+export async function discoverGlobalAgentsSkills(homeDirectory: string = homedir()): Promise<LoadedSkill[]> {
+  const agentsGlobalDir = join(homeDirectory, ".agents", "skills")
   return loadSkillsFromDir({ skillsDir: agentsGlobalDir, scope: "user" })
 }

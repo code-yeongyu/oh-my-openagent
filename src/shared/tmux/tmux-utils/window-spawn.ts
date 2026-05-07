@@ -4,8 +4,33 @@ import type { SpawnPaneResult } from "../types"
 import { isInsideTmux } from "./environment"
 import { isServerRunning } from "./server-health"
 import { shellSingleQuote } from "../../shell-env"
+import type { runTmuxCommand as RunTmuxCommand } from "../runner"
 
 const ISOLATED_WINDOW_NAME = "omo-agents"
+
+type SpawnTmuxWindowDeps = {
+	log: (message: string, data?: unknown) => void
+	runTmuxCommand: typeof RunTmuxCommand
+	isInsideTmux: typeof isInsideTmux
+	isServerRunning: typeof isServerRunning
+	getTmuxPath: typeof getTmuxPath
+}
+
+async function resolveSpawnTmuxWindowDeps(deps?: Partial<SpawnTmuxWindowDeps>): Promise<SpawnTmuxWindowDeps> {
+	const [{ log }, { runTmuxCommand }] = await Promise.all([
+		import("../../logger"),
+		import("../runner"),
+	])
+
+	return {
+		log,
+		runTmuxCommand,
+		isInsideTmux,
+		isServerRunning,
+		getTmuxPath,
+		...deps,
+	}
+}
 
 export async function spawnTmuxWindow(
 	sessionId: string,
@@ -13,11 +38,10 @@ export async function spawnTmuxWindow(
 	config: TmuxConfig,
 	serverUrl: string,
 	directory: string,
+	depsInput?: Partial<SpawnTmuxWindowDeps>,
 ): Promise<SpawnPaneResult> {
-	const [{ log }, { runTmuxCommand }] = await Promise.all([
-		import("../../logger"),
-		import("../runner"),
-	])
+	const deps = await resolveSpawnTmuxWindowDeps(depsInput)
+	const { log, runTmuxCommand } = deps
 
 	log("[spawnTmuxWindow] called", {
 		sessionId,
@@ -30,18 +54,18 @@ export async function spawnTmuxWindow(
 		log("[spawnTmuxWindow] SKIP: config.enabled is false")
 		return { success: false }
 	}
-	if (!isInsideTmux()) {
+	if (!deps.isInsideTmux()) {
 		log("[spawnTmuxWindow] SKIP: not inside tmux", { TMUX: process.env.TMUX })
 		return { success: false }
 	}
 
-	const serverRunning = await isServerRunning(serverUrl)
+	const serverRunning = await deps.isServerRunning(serverUrl)
 	if (!serverRunning) {
 		log("[spawnTmuxWindow] SKIP: server not running", { serverUrl })
 		return { success: false }
 	}
 
-	const tmux = await getTmuxPath()
+	const tmux = await deps.getTmuxPath()
 	if (!tmux) {
 		log("[spawnTmuxWindow] SKIP: tmux not found")
 		return { success: false }

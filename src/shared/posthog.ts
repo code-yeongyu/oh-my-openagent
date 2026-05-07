@@ -7,9 +7,15 @@ import { getPostHogActivityCaptureState } from "./posthog-activity-state"
 
 /** @internal test-only seam: keep null in production to use the real implementation. */
 let activityStateProviderOverride: typeof getPostHogActivityCaptureState | null = null
+type OsProvider = Pick<typeof os, "arch" | "cpus" | "hostname" | "platform" | "release" | "totalmem" | "type">
+let osProviderOverride: OsProvider | null = null
 
 function resolveActivityState(): ReturnType<typeof getPostHogActivityCaptureState> {
   return (activityStateProviderOverride ?? getPostHogActivityCaptureState)()
+}
+
+function resolveOsProvider(): OsProvider {
+  return osProviderOverride ?? os
 }
 
 /** @internal test-only */
@@ -22,6 +28,16 @@ export function __setActivityStateProviderForTesting(
 /** @internal test-only */
 export function __resetActivityStateProviderForTesting(): void {
   activityStateProviderOverride = null
+}
+
+/** @internal test-only */
+export function __setOsProviderForTesting(provider: OsProvider): void {
+  osProviderOverride = provider
+}
+
+/** @internal test-only */
+export function __resetOsProviderForTesting(): void {
+  osProviderOverride = null
 }
 
 const DEFAULT_POSTHOG_HOST = "https://us.i.posthog.com"
@@ -67,7 +83,7 @@ function getPostHogHost(): string {
 
 function safeCpus(): { length: number; model: string | undefined } {
   try {
-    const cpus = os.cpus()
+    const cpus = resolveOsProvider().cpus()
     return { length: cpus.length, model: cpus[0]?.model }
   } catch {
     return { length: 0, model: undefined }
@@ -76,6 +92,7 @@ function safeCpus(): { length: number; model: string | undefined } {
 
 function getSharedProperties(source: PostHogSource): NonNullable<PostHogCaptureEvent["properties"]> {
   const cpus = safeCpus()
+  const osProvider = resolveOsProvider()
 
   return {
     platform: "oh-my-opencode",
@@ -85,13 +102,13 @@ function getSharedProperties(source: PostHogSource): NonNullable<PostHogCaptureE
     runtime: "bun",
     runtime_version: process.versions.bun ?? process.version,
     source,
-    $os: os.platform(),
-    $os_version: os.release(),
-    os_arch: os.arch(),
-    os_type: os.type(),
+    $os: osProvider.platform(),
+    $os_version: osProvider.release(),
+    os_arch: osProvider.arch(),
+    os_type: osProvider.type(),
     cpu_count: cpus.length,
     cpu_model: cpus.model,
-    total_memory_gb: Math.round(os.totalmem() / 1024 / 1024 / 1024),
+    total_memory_gb: Math.round(osProvider.totalmem() / 1024 / 1024 / 1024),
     locale: Intl.DateTimeFormat().resolvedOptions().locale,
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     shell: process.env.SHELL,
@@ -144,7 +161,7 @@ function createPostHogClient(
 
 export function getPostHogDistinctId(): string {
   return createHash("sha256")
-    .update(`${PUBLISHED_PACKAGE_NAME}:${os.hostname()}`)
+    .update(`${PUBLISHED_PACKAGE_NAME}:${resolveOsProvider().hostname()}`)
     .digest("hex")
 }
 

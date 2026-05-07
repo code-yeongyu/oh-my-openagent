@@ -4,11 +4,6 @@ import type { TmuxConfig } from "../../../config/schema"
 import type { TmuxCommandResult } from "../runner"
 
 const sessionSpawnSpecifier = import.meta.resolve("./session-spawn")
-const environmentSpecifier = import.meta.resolve("./environment")
-const loggerSpecifier = import.meta.resolve("../../logger")
-const runnerSpecifier = import.meta.resolve("../runner")
-const serverHealthSpecifier = import.meta.resolve("./server-health")
-const tmuxPathResolverSpecifier = import.meta.resolve("../../../tools/interactive-bash/tmux-path-resolver")
 
 const enabledTmuxConfig = {
 	enabled: true,
@@ -28,7 +23,7 @@ const runTmuxCommandMock = mock(async (): Promise<TmuxCommandResult> => ({
 }))
 const isInsideTmuxMock = mock((): boolean => true)
 const isServerRunningMock = mock(async (): Promise<boolean> => true)
-const getTmuxPathMock = mock(async (): Promise<string | undefined> => "sh")
+const getTmuxPathMock = mock(async (): Promise<string | null> => "sh")
 const logMock = mock(() => undefined)
 
 function toStringArray(value: unknown): string[] {
@@ -64,23 +59,24 @@ function getSpawnCommand(): string {
 	return newSessionCommand
 }
 
+function createDeps(): NonNullable<Parameters<typeof import("./session-spawn").spawnTmuxSession>[6]> {
+	return {
+		log: logMock,
+		runTmuxCommand: runTmuxCommandMock,
+		isInsideTmux: isInsideTmuxMock,
+		isServerRunning: isServerRunningMock,
+		getTmuxPath: getTmuxPathMock,
+	}
+}
+
 async function loadSpawnTmuxSession(): Promise<typeof import("./session-spawn").spawnTmuxSession> {
 	const module = await import(`${sessionSpawnSpecifier}?test=${crypto.randomUUID()}`)
 	return module.spawnTmuxSession
 }
 
-function registerModuleMocks(): void {
-	mock.module(environmentSpecifier, () => ({ isInsideTmux: isInsideTmuxMock }))
-	mock.module(loggerSpecifier, () => ({ log: logMock }))
-	mock.module(runnerSpecifier, () => ({ runTmuxCommand: runTmuxCommandMock }))
-	mock.module(serverHealthSpecifier, () => ({ isServerRunning: isServerRunningMock }))
-	mock.module(tmuxPathResolverSpecifier, () => ({ getTmuxPath: getTmuxPathMock }))
-}
-
 describe("spawnTmuxSession runner integration", () => {
 	beforeEach(() => {
 		mock.restore()
-		registerModuleMocks()
 		runTmuxCommandMock.mockClear()
 		isInsideTmuxMock.mockClear()
 		isServerRunningMock.mockClear()
@@ -111,7 +107,7 @@ describe("spawnTmuxSession runner integration", () => {
 		const directory = "/tmp/omo-project/(session)"
 
 		// when
-		const result = await spawnTmuxSession("session-1", "worker", enabledTmuxConfig, "http://127.0.0.1:1234", directory, "%0")
+		const result = await spawnTmuxSession("session-1", "worker", enabledTmuxConfig, "http://127.0.0.1:1234", directory, "%0", createDeps())
 
 		// then
 		const displayCall = getRunTmuxCommandCall(0)
@@ -134,7 +130,7 @@ describe("spawnTmuxSession runner integration", () => {
 		const spawnTmuxSession = await loadSpawnTmuxSession()
 
 		// when
-		await spawnTmuxSession("session-1", "worker", enabledTmuxConfig, "http://127.0.0.1:1234", "/path with spaces/here", "%0")
+		await spawnTmuxSession("session-1", "worker", enabledTmuxConfig, "http://127.0.0.1:1234", "/path with spaces/here", "%0", createDeps())
 
 		// then
 		expect(getSpawnCommand()).toContain("--dir '/path with spaces/here'")
@@ -145,7 +141,7 @@ describe("spawnTmuxSession runner integration", () => {
 		const spawnTmuxSession = await loadSpawnTmuxSession()
 
 		// when
-		await spawnTmuxSession("session-1", "worker", enabledTmuxConfig, "http://127.0.0.1:1234", "", "%0")
+		await spawnTmuxSession("session-1", "worker", enabledTmuxConfig, "http://127.0.0.1:1234", "", "%0", createDeps())
 
 		// then
 		expect(getSpawnCommand()).toContain(`--dir '${process.cwd()}'`)
@@ -156,7 +152,7 @@ describe("spawnTmuxSession runner integration", () => {
 		const spawnTmuxSession = await loadSpawnTmuxSession()
 
 		// when
-		await spawnTmuxSession("session-1", "worker", enabledTmuxConfig, "http://127.0.0.1:1234", "/path/with'quote", "%0")
+		await spawnTmuxSession("session-1", "worker", enabledTmuxConfig, "http://127.0.0.1:1234", "/path/with'quote", "%0", createDeps())
 
 		// then
 		expect(getSpawnCommand()).toContain("--dir '/path/with'\\''quote'")

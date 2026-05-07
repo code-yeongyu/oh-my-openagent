@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 
-import { describe, expect, mock, test } from "bun:test"
+import { describe, expect, test } from "bun:test"
 import { mkdtemp, readdir } from "node:fs/promises"
 import { randomUUID } from "node:crypto"
 import { tmpdir } from "node:os"
@@ -10,6 +10,8 @@ import type { ToolContext } from "@opencode-ai/plugin/tool"
 
 import { TeamModeConfigSchema } from "../../../config/schema/team-mode"
 import { getInboxDir, resolveBaseDir } from "../team-registry/paths"
+import type { RuntimeState } from "../types"
+import { createTeamSendMessageTool, type LiveDeliveryClient } from "./messaging"
 
 function createToolContext(sessionID: string, directory: string): ToolContext {
   return {
@@ -34,17 +36,29 @@ describe("createTeamSendMessageTool missing recipient session fallback", () => {
     const memberOneSessionId = randomUUID()
     const memberTwoSessionId = randomUUID()
 
-    const runtimeStateWithRecipientSession = {
+    const runtimeStateWithRecipientSession: RuntimeState = {
+      version: 1,
       teamRunId,
+      teamName: "team-alpha",
+      specSource: "project",
+      createdAt: Date.now(),
       leadSessionId,
       status: "active",
+      shutdownRequests: [],
+      bounds: {
+        maxMembers: 8,
+        maxParallelMembers: 4,
+        maxMessagesPerRun: 10000,
+        maxWallClockMinutes: 120,
+        maxMemberTurns: 500,
+      },
       members: [
-        { name: "team-lead", agentType: "leader", sessionId: leadSessionId },
-        { name: "m1", agentType: "member", sessionId: memberOneSessionId },
-        { name: "m2", agentType: "member", sessionId: memberTwoSessionId },
+        { name: "team-lead", agentType: "leader", status: "idle", sessionId: leadSessionId, pendingInjectedMessageIds: [] },
+        { name: "m1", agentType: "general-purpose", status: "idle", sessionId: memberOneSessionId, pendingInjectedMessageIds: [] },
+        { name: "m2", agentType: "general-purpose", status: "idle", sessionId: memberTwoSessionId, pendingInjectedMessageIds: [] },
       ],
     }
-    const runtimeStateWithoutRecipientSession = {
+    const runtimeStateWithoutRecipientSession: RuntimeState = {
       ...runtimeStateWithRecipientSession,
       members: runtimeStateWithRecipientSession.members.map((member) => (
         member.name === "m2"
@@ -54,18 +68,15 @@ describe("createTeamSendMessageTool missing recipient session fallback", () => {
     }
 
     let loadRuntimeStateCalls = 0
-    mock.module("../team-state-store/store", () => ({
-      listActiveTeams: async () => [{ teamRunId }],
+    const deps = {
       loadRuntimeState: async () => {
         loadRuntimeStateCalls += 1
         return loadRuntimeStateCalls >= 3
           ? runtimeStateWithoutRecipientSession
           : runtimeStateWithRecipientSession
       },
-    }))
+    } satisfies NonNullable<Parameters<typeof createTeamSendMessageTool>[2]>
 
-    const { createTeamSendMessageTool } = await import("./messaging")
-    type LiveDeliveryClient = Parameters<typeof createTeamSendMessageTool>[1]
     const client = {
       session: {
         promptAsync: async () => {
@@ -73,7 +84,7 @@ describe("createTeamSendMessageTool missing recipient session fallback", () => {
         },
       },
     } satisfies LiveDeliveryClient
-    const tool = createTeamSendMessageTool(config, client)
+    const tool = createTeamSendMessageTool(config, client, deps)
 
     // when
     const result = await tool.execute({

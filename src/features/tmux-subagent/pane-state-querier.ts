@@ -2,13 +2,19 @@ import type { WindowState, TmuxPaneInfo } from "./types"
 import { parsePaneStateOutput } from "./pane-state-parser"
 import { getTmuxPath } from "../../tools/interactive-bash/tmux-path-resolver"
 import { log } from "../../shared"
+import type { TmuxCommandResult } from "../../shared/tmux"
 
-export async function queryWindowState(sourcePaneId: string): Promise<WindowState | null> {
-  const tmux = await getTmuxPath()
+type QueryWindowStateDeps = {
+  getTmuxPath: typeof getTmuxPath
+  runTmuxCommand: (tmuxPath: string, args: string[]) => Promise<TmuxCommandResult>
+  log: typeof log
+}
+
+export async function queryWindowStateWithDeps(sourcePaneId: string, deps: QueryWindowStateDeps): Promise<WindowState | null> {
+  const tmux = await deps.getTmuxPath()
   if (!tmux) return null
-  const { runTmuxCommand } = await import("../../shared/tmux")
 
-  const result = await runTmuxCommand(tmux, [
+  const result = await deps.runTmuxCommand(tmux, [
     "list-panes",
     "-t",
     sourcePaneId,
@@ -17,13 +23,13 @@ export async function queryWindowState(sourcePaneId: string): Promise<WindowStat
   ])
 
 	if (result.exitCode !== 0) {
-		log("[pane-state-querier] list-panes failed", { exitCode: result.exitCode })
+		deps.log("[pane-state-querier] list-panes failed", { exitCode: result.exitCode })
 		return null
 	}
 
 	const parsedPaneState = parsePaneStateOutput(result.output)
   if (!parsedPaneState) {
-    log("[pane-state-querier] failed to parse pane state output", {
+    deps.log("[pane-state-querier] failed to parse pane state output", {
       sourcePaneId,
     })
     return null
@@ -49,7 +55,7 @@ export async function queryWindowState(sourcePaneId: string): Promise<WindowStat
     return pane.paneId === sourcePaneId ? pane : selected
   }, null)
   if (!mainPane) {
-    log("[pane-state-querier] CRITICAL: failed to determine main pane", {
+    deps.log("[pane-state-querier] CRITICAL: failed to determine main pane", {
       sourcePaneId,
       availablePanes: panes.map((p) => p.paneId),
     })
@@ -58,7 +64,7 @@ export async function queryWindowState(sourcePaneId: string): Promise<WindowStat
 
   const agentPanes = panes.filter((p) => p.paneId !== mainPane.paneId)
 
-  log("[pane-state-querier] window state", {
+  deps.log("[pane-state-querier] window state", {
     windowWidth,
     windowHeight,
     mainPane: mainPane.paneId,
@@ -66,4 +72,9 @@ export async function queryWindowState(sourcePaneId: string): Promise<WindowStat
   })
 
   return { windowWidth, windowHeight, mainPane, agentPanes }
+}
+
+export async function queryWindowState(sourcePaneId: string): Promise<WindowState | null> {
+  const { runTmuxCommand } = await import("../../shared/tmux")
+  return queryWindowStateWithDeps(sourcePaneId, { getTmuxPath, runTmuxCommand, log })
 }
