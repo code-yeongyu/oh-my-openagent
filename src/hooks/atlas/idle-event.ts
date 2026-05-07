@@ -254,6 +254,12 @@ export async function handleAtlasSessionIdle(input: {
     return
   }
 
+  if (sessionState.skipNextIdleAfterRuntimeErrorRetry) {
+    sessionState.skipNextIdleAfterRuntimeErrorRetry = false
+    log(`[${HOOK_NAME}] Skipped: stale idle after runtime error retry`, { sessionID })
+    return
+  }
+
   if (sessionState.promptFailureCount >= MAX_CONSECUTIVE_PROMPT_FAILURES) {
     const timeSinceLastFailure =
       sessionState.lastFailureAt !== undefined ? now - sessionState.lastFailureAt : Number.POSITIVE_INFINITY

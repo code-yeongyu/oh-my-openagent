@@ -1,12 +1,15 @@
 import type { AgentOverrides } from "../../config"
-import type { BackgroundManager } from "../../features/background-agent"
 import type { TopLevelTaskRef } from "../../features/boulder-state"
 
 export type ModelInfo = { providerID: string; modelID: string; variant?: string }
 
+export interface BackgroundTaskStatusProvider {
+  getTasksByParentSession: (sessionID: string) => Array<{ status: string }>
+}
+
 export interface AtlasHookOptions {
   directory: string
-  backgroundManager?: BackgroundManager
+  backgroundManager?: BackgroundTaskStatusProvider
   isContinuationStopped?: (sessionID: string) => boolean
   agentOverrides?: AgentOverrides
   /** Enable auto-commit after each atomic task completion (default: true) */
@@ -34,6 +37,7 @@ export type PendingTaskRef =
 
 export interface SessionState {
   lastEventWasAbortError?: boolean
+  skipNextIdleAfterRuntimeErrorRetry?: boolean
   lastContinuationInjectedAt?: number
   isInjectingContinuation?: boolean
   promptFailureCount: number
