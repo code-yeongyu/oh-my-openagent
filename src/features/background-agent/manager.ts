@@ -761,33 +761,8 @@ export class BackgroundManager {
     this.settlePreStartDescendantReservation(task)
     subagentSessions.add(sessionID)
 
-    log("[background-agent] tmux callback check", {
-      hasCallback: !!this.onSubagentSessionCreated,
-      tmuxEnabled: this.tmuxEnabled,
-      isInsideTmux: isInsideTmux(),
-      sessionID,
-      parentID: input.parentSessionId,
-    })
-
-    if (!input.suppressTmuxSpawn && this.onSubagentSessionCreated && this.tmuxEnabled && isInsideTmux()) {
-      log("[background-agent] Invoking tmux callback NOW", { sessionID })
-      await this.onSubagentSessionCreated({
-        sessionID,
-        parentID: input.parentSessionId,
-        title: input.description,
-      }).catch((err) => {
-        log("[background-agent] Failed to spawn tmux pane:", err)
-      })
-      log("[background-agent] tmux callback completed, waiting 200ms")
-      await new Promise(r => setTimeout(r, 200))
-    } else {
-      log("[background-agent] SKIP tmux callback - conditions not met", {
-        suppressTmuxSpawn: !!input.suppressTmuxSpawn,
-      })
-    }
-
     if (this.tasks.get(task.id)?.status === "cancelled") {
-      await this.abortSessionWithLogging(sessionID, "cancelled during tmux setup")
+      await this.abortSessionWithLogging(sessionID, "cancelled during launch setup")
       subagentSessions.delete(sessionID)
       if (task.rootSessionId) {
         this.unregisterRootDescendant(task.rootSessionId)
@@ -982,6 +957,29 @@ The fallback retry session is now created and can be inspected directly.
         })
       }
     })
+
+    log("[background-agent] tmux callback check", {
+      hasCallback: !!this.onSubagentSessionCreated,
+      tmuxEnabled: this.tmuxEnabled,
+      isInsideTmux: isInsideTmux(),
+      sessionID,
+      parentID: input.parentSessionId,
+    })
+
+    if (!input.suppressTmuxSpawn && this.onSubagentSessionCreated && this.tmuxEnabled && isInsideTmux()) {
+      log("[background-agent] Invoking tmux callback (fire-and-forget)", { sessionID })
+      void this.onSubagentSessionCreated({
+        sessionID,
+        parentID: input.parentSessionId,
+        title: input.description,
+      }).catch((err) => {
+        log("[background-agent] Failed to spawn tmux pane:", err)
+      })
+    } else {
+      log("[background-agent] SKIP tmux callback - conditions not met", {
+        suppressTmuxSpawn: !!input.suppressTmuxSpawn,
+      })
+    }
   }
 
   getTask(id: string): BackgroundTask | undefined {
