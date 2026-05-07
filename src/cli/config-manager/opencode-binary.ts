@@ -3,10 +3,16 @@ import { spawnWithWindowsHide } from "../../shared/spawn-with-windows-hide"
 import { initConfigContext } from "./config-context"
 
 const OPENCODE_BINARIES = ["opencode", "opencode-desktop"] as const
+const SEMVER_PATTERN = /\b\d+\.\d+\.\d+\b/
 
 interface OpenCodeBinaryResult {
   binary: OpenCodeBinaryType
   version: string
+}
+
+function extractSemver(output: string): string | null {
+  const match = output.match(SEMVER_PATTERN)
+  return match ? match[0] : null
 }
 
 async function findOpenCodeBinaryWithVersion(): Promise<OpenCodeBinaryResult | null> {
@@ -18,11 +24,11 @@ async function findOpenCodeBinaryWithVersion(): Promise<OpenCodeBinaryResult | n
       })
       const output = await new Response(proc.stdout).text()
       await proc.exited
-      if (proc.exitCode === 0) {
-        const version = output.trim()
-        initConfigContext(binary, version)
-        return { binary, version }
-      }
+      if (proc.exitCode !== 0) continue
+      const version = extractSemver(output)
+      if (!version) continue
+      initConfigContext(binary, version)
+      return { binary, version }
     } catch {
       continue
     }
