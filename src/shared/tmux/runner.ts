@@ -36,13 +36,19 @@ function isTerminalTmuxError(stderr: string): boolean {
  * `cmux __tmux-compat` so they become native cmux splits instead of
  * failing because there is no real tmux server running.
  */
-function resolveTmuxExecutable(tmuxPath: string): string[] {
-	const inCmux = Boolean(process.env.CMUX_SOCKET_PATH) ||
+function isCmuxCompatEnvironment(): boolean {
+	return Boolean(process.env.CMUX_SOCKET_PATH) ||
 		process.env.TMUX?.includes("cmuxterm") === true
-	if (inCmux) {
-		return ["cmux", "__tmux-compat"]
+}
+
+function resolveTmuxExecutable(tmuxPath: string): string[] {
+	if (!isCmuxCompatEnvironment()) {
+		return [tmuxPath]
 	}
-	return [tmuxPath]
+
+	const executableName = tmuxPath.split(/[\\/]/).pop()
+	const cmuxExecutable = executableName === "cmux" ? tmuxPath : "cmux"
+	return [cmuxExecutable, "__tmux-compat"]
 }
 
 async function runTmuxCommandOnce(tmuxPath: string, args: Array<string>, timeoutMs?: number): Promise<TmuxCommandResult> {
