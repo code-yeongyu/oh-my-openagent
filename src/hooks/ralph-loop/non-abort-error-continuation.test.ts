@@ -88,6 +88,189 @@ describe("ralph-loop non-abort error continuation", () => {
 		expect(messagesCalls.length).toBeGreaterThan(0)
 		expect(hook.getState()?.iteration).toBe(2)
 	})
+	test("continues ultrawork loop immediately after non-abort session error", async () => {
+		// given - an active ULW Loop receives a recoverable runtime error
+		const hook = createRalphLoopHook({
+			directory: testDirectory,
+			project: testDirectory,
+			worktree: testDirectory,
+			serverUrl: "http://localhost:4096",
+			$: async () => ({}),
+			client: {
+				session: {
+					messages: async (options: { path: { id: string } }) => {
+						messagesCalls.push({ sessionID: options.path.id })
+						return { data: [] }
+					},
+					promptAsync: async (options: {
+						path: { id: string }
+						body: { parts: Array<{ type: string; text: string }> }
+					}) => {
+						promptCalls.push({
+							sessionID: options.path.id,
+							text: options.body.parts[0]?.text ?? "",
+						})
+						return {}
+					},
+					prompt: async () => ({}),
+				},
+				tui: {
+					showToast: async () => ({}),
+				},
+			},
+		} as never)
+
+		hook.startLoop("session-123", "Keep ultraworking", {
+			messageCountAtStart: 0,
+			maxIterations: 5,
+			ultrawork: true,
+		})
+
+		await hook.event({
+			event: {
+				type: "session.error",
+				properties: {
+					sessionID: "session-123",
+					error: { name: "RuntimeError" },
+				},
+			},
+		})
+
+		// then - the ULW continuation keeps the ultrawork directive
+		expect(promptCalls).toHaveLength(1)
+		expect(promptCalls[0]?.sessionID).toBe("session-123")
+		expect(promptCalls[0]?.text).toMatch(/^ultrawork /)
+		expect(promptCalls[0]?.text).toContain("Keep ultraworking")
+		expect(hook.getState()?.iteration).toBe(2)
+	})
+
+	test("continues after retry run activity when no stale idle arrived", async () => {
+		// given - an active loop retries a recoverable runtime error
+		const hook = createRalphLoopHook({
+			directory: testDirectory,
+			project: testDirectory,
+			worktree: testDirectory,
+			serverUrl: "http://localhost:4096",
+			$: async () => ({}),
+			client: {
+				session: {
+					messages: async (options: { path: { id: string } }) => {
+						messagesCalls.push({ sessionID: options.path.id })
+						return { data: [] }
+					},
+					promptAsync: async (options: {
+						path: { id: string }
+						body: { parts: Array<{ type: string; text: string }> }
+					}) => {
+						promptCalls.push({
+							sessionID: options.path.id,
+							text: options.body.parts[0]?.text ?? "",
+						})
+						return {}
+					},
+					prompt: async () => ({}),
+				},
+				tui: {
+					showToast: async () => ({}),
+				},
+			},
+		} as never)
+
+		hook.startLoop("session-123", "Keep working", {
+			messageCountAtStart: 0,
+			maxIterations: 5,
+		})
+
+		await hook.event({
+			event: {
+				type: "session.error",
+				properties: {
+					sessionID: "session-123",
+					error: { name: "RuntimeError" },
+				},
+			},
+		})
+
+		// when - the retried run emits real assistant activity before any stale idle
+		await hook.event({
+			event: {
+				type: "message.part.delta",
+				properties: {
+					sessionID: "session-123",
+					messageID: "msg-1",
+					partID: "part-1",
+					field: "text",
+					delta: "working",
+				},
+			},
+		})
+		await hook.event({
+			event: { type: "session.idle", properties: { sessionID: "session-123" } },
+		})
+
+		// then - the real idle is allowed to continue the loop
+		expect(promptCalls).toHaveLength(2)
+		expect(hook.getState()?.iteration).toBe(3)
+	})
+
+	test("skips immediate runtime retry while background tasks are running", async () => {
+		// given - an active loop owns running background work
+		const hook = createRalphLoopHook({
+			directory: testDirectory,
+			project: testDirectory,
+			worktree: testDirectory,
+			serverUrl: "http://localhost:4096",
+			$: async () => ({}),
+			client: {
+				session: {
+					messages: async (options: { path: { id: string } }) => {
+						messagesCalls.push({ sessionID: options.path.id })
+						return { data: [] }
+					},
+					promptAsync: async (options: {
+						path: { id: string }
+						body: { parts: Array<{ type: string; text: string }> }
+					}) => {
+						promptCalls.push({
+							sessionID: options.path.id,
+							text: options.body.parts[0]?.text ?? "",
+						})
+						return {}
+					},
+					prompt: async () => ({}),
+				},
+				tui: {
+					showToast: async () => ({}),
+				},
+			},
+		} as never, {
+			backgroundManager: {
+				getTasksByParentSession: (sessionID: string) => sessionID === "session-123"
+					? [{ status: "running" }]
+					: [],
+			},
+		})
+
+		hook.startLoop("session-123", "Keep working", {
+			messageCountAtStart: 0,
+			maxIterations: 5,
+		})
+
+		// when - the same session reports a recoverable runtime error
+		await hook.event({
+			event: {
+				type: "session.error",
+				properties: {
+					sessionID: "session-123",
+					error: { name: "RuntimeError" },
+				},
+			},
+		})
+
+		// then - Ralph waits for background work instead of starting overlapping continuation
+		expect(promptCalls).toHaveLength(0)
+		expect(hook.getState()?.iteration).toBe(1)
+	})
 
 	test("stops retrying runtime errors after max iterations", async () => {
 		// given - an active Ralph Loop has one retry remaining

@@ -66,7 +66,7 @@ describe("atlas hook", () => {
       },
       _promptMock: promptMock,
       _sessionGetMock: sessionGetMock,
-    } as unknown as Parameters<typeof createAtlasHook>[0] & {
+    } as Parameters<typeof createAtlasHook>[0] & {
       _promptMock: ReturnType<typeof mock>
       _sessionGetMock: ReturnType<typeof mock>
     }
@@ -122,7 +122,7 @@ describe("atlas hook", () => {
       // when - calling with undefined output
       const result = await hook["tool.execute.after"](
         { tool: "task", sessionID: "session-123" },
-        undefined as unknown as { title: string; output: string; metadata: Record<string, unknown> }
+        undefined
       )
 
       // then - returns undefined without throwing
@@ -1568,6 +1568,142 @@ session_id: ses_untrusted_999
       expect(mockInput._promptMock).not.toHaveBeenCalled()
     })
 
+    test("#given boulder has incomplete tasks #when non-abort session error fires #then continuation injects immediately", async () => {
+      // given - boulder state with incomplete plan
+      const planPath = join(TEST_DIR, "test-plan.md")
+      writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
+
+      const state: BoulderState = {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: [MAIN_SESSION_ID],
+        plan_name: "test-plan",
+      }
+      writeBoulderState(TEST_DIR, state)
+
+      const mockInput = createMockPluginInput()
+      const hook = createAtlasHook(mockInput)
+
+      // when - a recoverable runtime error fires without waiting for idle
+      await hook.handler({
+        event: {
+          type: "session.error",
+          properties: {
+            sessionID: MAIN_SESSION_ID,
+            error: { name: "RuntimeError", message: "provider overloaded" },
+          },
+        },
+      })
+
+      // then - boulder resumes work immediately
+      expect(mockInput._promptMock).toHaveBeenCalledTimes(1)
+      const callArgs = mockInput._promptMock.mock.calls[0][0]
+      expect(callArgs.path.id).toBe(MAIN_SESSION_ID)
+      expect(callArgs.body.parts[0].text).toContain("incomplete tasks")
+      expect(callArgs.body.parts[0].text).toContain("2 remaining")
+    })
+
+    test("#given boulder retried a runtime error #when stale idle follows #then no delayed duplicate retry is scheduled", async () => {
+      // given - boulder state with incomplete plan
+      const planPath = join(TEST_DIR, "test-plan.md")
+      writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
+
+      const state: BoulderState = {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: [MAIN_SESSION_ID],
+        plan_name: "test-plan",
+      }
+      writeBoulderState(TEST_DIR, state)
+
+      const originalSetTimeout = globalThis.setTimeout
+      const scheduledDelays: number[] = []
+      globalThis.setTimeout = ((_handler: TimerHandler, timeout?: number, ..._args: unknown[]) => {
+        scheduledDelays.push(timeout ?? 0)
+        return originalSetTimeout(() => undefined, 0)
+      }) as typeof setTimeout
+
+      try {
+        const mockInput = createMockPluginInput()
+        const hook = createAtlasHook(mockInput)
+
+        // when - runtime error resumes immediately and OpenCode later emits stale idle
+        await hook.handler({
+          event: {
+            type: "session.error",
+            properties: {
+              sessionID: MAIN_SESSION_ID,
+              error: { name: "RuntimeError", message: "provider overloaded" },
+            },
+          },
+        })
+        await hook.handler({
+          event: {
+            type: "session.idle",
+            properties: { sessionID: MAIN_SESSION_ID },
+          },
+        })
+
+        // then - stale idle is consumed, not converted into another scheduled continuation
+        expect(mockInput._promptMock).toHaveBeenCalledTimes(1)
+        expect(scheduledDelays).toHaveLength(0)
+      } finally {
+        globalThis.setTimeout = originalSetTimeout
+      }
+    })
+
+    test("#given boulder retried a runtime error #when assistant activity arrives #then next idle can continue", async () => {
+      // given - boulder state with incomplete plan
+      const planPath = join(TEST_DIR, "test-plan.md")
+      writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
+
+      const state: BoulderState = {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: [MAIN_SESSION_ID],
+        plan_name: "test-plan",
+      }
+      writeBoulderState(TEST_DIR, state)
+
+      const originalDateNow = Date.now
+      let now = 1000
+      Date.now = () => now
+
+      try {
+        const mockInput = createMockPluginInput()
+        const hook = createAtlasHook(mockInput)
+
+        // when - runtime error resumes immediately and then the retry run emits assistant activity
+        await hook.handler({
+          event: {
+            type: "session.error",
+            properties: {
+              sessionID: MAIN_SESSION_ID,
+              error: { name: "RuntimeError", message: "provider overloaded" },
+            },
+          },
+        })
+        await hook.handler({
+          event: {
+            type: "message.updated",
+            properties: { info: { sessionID: MAIN_SESSION_ID, role: "assistant" } },
+          },
+        })
+        now = 7000
+        await hook.handler({
+          event: {
+            type: "session.idle",
+            properties: { sessionID: MAIN_SESSION_ID },
+          },
+        })
+
+        // then - assistant activity marks the following idle as real work completion
+        expect(mockInput._promptMock).toHaveBeenCalledTimes(2)
+      } finally {
+        Date.now = originalDateNow
+      }
+    })
+
      test("should skip when background tasks are running", async () => {
        // given - boulder state with incomplete plan
        const planPath = join(TEST_DIR, "test-plan.md")
@@ -1588,7 +1724,7 @@ session_id: ses_untrusted_999
        const mockInput = createMockPluginInput()
        const hook = createAtlasHook(mockInput, {
          directory: TEST_DIR,
-         backgroundManager: mockBackgroundManager as any,
+         backgroundManager: mockBackgroundManager,
        })
 
        // when
@@ -2260,8 +2396,7 @@ session_id: ses_untrusted_999
     })
 
     describe("delayed retry timer (abort-stuck fix)", () => {
-      const capturedTimers = new Map<number, { callback: Function; cleared: boolean }>()
-      let nextFakeId = 99000
+      const capturedTimers = new Map<ReturnType<typeof setTimeout>, { callback: () => void | Promise<void>; cleared: boolean }>()
       const originalSetTimeout = globalThis.setTimeout
       const originalClearTimeout = globalThis.clearTimeout
       const originalDateNow = Date.now
@@ -2269,28 +2404,32 @@ session_id: ses_untrusted_999
 
       beforeEach(() => {
         capturedTimers.clear()
-        nextFakeId = 99000
         fakeNow = 10000
         Date.now = () => fakeNow
 
-        globalThis.setTimeout = ((callback: Function, delay?: number, ...args: unknown[]) => {
+        globalThis.setTimeout = ((callback: TimerHandler, delay?: number, ...args: unknown[]) => {
           const normalized = typeof delay === "number" ? delay : 0
           if (normalized >= 5000) {
-            const id = nextFakeId++
-            capturedTimers.set(id, { callback: () => callback(...args), cleared: false })
-            return id as unknown as ReturnType<typeof setTimeout>
+            const timerID = originalSetTimeout(() => undefined, 0)
+            const capturedCallback = typeof callback === "function"
+              ? () => callback(...args)
+              : () => undefined
+            capturedTimers.set(timerID, { callback: capturedCallback, cleared: false })
+            return timerID
           }
-          return originalSetTimeout(callback as Parameters<typeof originalSetTimeout>[0], delay)
-        }) as unknown as typeof setTimeout
+          return typeof callback === "function"
+            ? originalSetTimeout(callback, delay, ...args)
+            : originalSetTimeout(() => undefined, delay)
+        }) as typeof setTimeout
 
-        globalThis.clearTimeout = ((id?: number | ReturnType<typeof setTimeout>) => {
-          if (typeof id === "number" && capturedTimers.has(id)) {
+        globalThis.clearTimeout = ((id?: ReturnType<typeof setTimeout>) => {
+          if (id && capturedTimers.has(id)) {
             capturedTimers.get(id)!.cleared = true
             capturedTimers.delete(id)
             return
           }
-          originalClearTimeout(id as Parameters<typeof originalClearTimeout>[0])
-        }) as unknown as typeof clearTimeout
+          originalClearTimeout(id)
+        }) as typeof clearTimeout
       })
 
       afterEach(() => {

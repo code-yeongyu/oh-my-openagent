@@ -33,7 +33,7 @@ export function createToolExecuteAfterHandler(input: {
   pendingTaskRefs: Map<string, PendingTaskRef>
   autoCommit: boolean
   getState: (sessionID: string) => SessionState
-}): (toolInput: ToolExecuteAfterInput, toolOutput: ToolExecuteAfterOutput) => Promise<void> {
+}): (toolInput: ToolExecuteAfterInput, toolOutput: ToolExecuteAfterOutput | undefined) => Promise<void> {
   const { ctx, pendingFilePaths, pendingTaskRefs, autoCommit, getState } = input
   return async (toolInput, toolOutput): Promise<void> => {
     // Guard against undefined output (e.g., from /review command - see issue #1035)
