@@ -18,7 +18,7 @@ import {
   buildGeminiToolCallExamples,
 } from "./sisyphus/gemini";
 import { buildClaudeOpus47SisyphusPrompt } from "./sisyphus/claude-opus-4-7";
-import { buildGlmSisyphusPrompt } from "./sisyphus/glm-prompt";
+import { buildGlmSisyphusPrompt } from "./sisyphus/glm";
 import { buildGpt54SisyphusPrompt } from "./sisyphus/gpt-5-4";
 import { buildGpt55SisyphusPrompt } from "./sisyphus/gpt-5-5";
 import { buildKimiK26SisyphusPrompt } from "./sisyphus/kimi-k2-6";
