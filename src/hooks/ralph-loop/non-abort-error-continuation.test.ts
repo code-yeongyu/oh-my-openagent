@@ -89,6 +89,62 @@ describe("ralph-loop non-abort error continuation", () => {
 		expect(hook.getState()?.iteration).toBe(2)
 	})
 
+	test("continues ultrawork loop immediately after non-abort session error", async () => {
+		// given - an active ULW Loop receives a recoverable runtime error
+		const hook = createRalphLoopHook({
+			directory: testDirectory,
+			project: testDirectory,
+			worktree: testDirectory,
+			serverUrl: "http://localhost:4096",
+			$: async () => ({}),
+			client: {
+				session: {
+					messages: async (options: { path: { id: string } }) => {
+						messagesCalls.push({ sessionID: options.path.id })
+						return { data: [] }
+					},
+					promptAsync: async (options: {
+						path: { id: string }
+						body: { parts: Array<{ type: string; text: string }> }
+					}) => {
+						promptCalls.push({
+							sessionID: options.path.id,
+							text: options.body.parts[0]?.text ?? "",
+						})
+						return {}
+					},
+					prompt: async () => ({}),
+				},
+				tui: {
+					showToast: async () => ({}),
+				},
+			},
+		} as never)
+
+		hook.startLoop("session-123", "Keep ultraworking", {
+			messageCountAtStart: 0,
+			maxIterations: 5,
+			ultrawork: true,
+		})
+
+		await hook.event({
+			event: {
+				type: "session.error",
+				properties: {
+					sessionID: "session-123",
+					error: { name: "RuntimeError" },
+				},
+			},
+		})
+
+		// then - the ULW continuation keeps the ultrawork directive
+		expect(promptCalls).toHaveLength(1)
+		expect(promptCalls[0]?.sessionID).toBe("session-123")
+		expect(promptCalls[0]?.text).toMatch(/^ultrawork /)
+		expect(promptCalls[0]?.text).toContain("Keep ultraworking")
+		expect(hook.getState()?.iteration).toBe(2)
+	})
+
 	test("stops retrying runtime errors after max iterations", async () => {
 		// given - an active Ralph Loop has one retry remaining
 		const hook = createRalphLoopHook({
