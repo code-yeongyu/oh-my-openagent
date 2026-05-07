@@ -6,6 +6,7 @@
  * failing because there is no real tmux server running.
  */
 export function isCmuxCompatEnvironment(): boolean {
-	return Boolean(process.env.CMUX_SOCKET_PATH) ||
-		process.env.TMUX?.includes("cmuxterm") === true
+	const tmuxEnvironment = process.env.TMUX
+	return tmuxEnvironment?.includes("cmuxterm") === true ||
+		(Boolean(process.env.CMUX_SOCKET_PATH) && !tmuxEnvironment)
 }
