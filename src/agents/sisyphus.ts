@@ -610,16 +610,21 @@ export function createSisyphusAgent(
   );
 
   if (isGeminiModel(model)) {
+    // 1. Intent gate + tool mandate - early in prompt (after intent verbalization)
     prompt = prompt.replace(
       "</intent_verbalization>",
       `</intent_verbalization>\n\n${buildGeminiIntentGateEnforcement()}\n\n${buildGeminiToolMandate()}`
     );
 
+    // 2. Tool guide + examples - after tool_usage_rules (where tools are discussed)
     prompt = prompt.replace(
       "</tool_usage_rules>",
       `</tool_usage_rules>\n\n${buildGeminiToolGuide()}\n\n${buildGeminiToolCallExamples()}`
     );
 
+    // 3. Delegation + verification overrides - before Constraints (NOT at prompt end)
+    //    Gemini suffers from lost-in-the-middle: content at prompt end gets weaker attention.
+    //    Placing these before <Constraints> ensures they're in a high-attention zone.
     prompt = prompt.replace(
       "<Constraints>",
       `${buildGeminiDelegationOverride()}\n\n${buildGeminiVerificationOverride()}\n\n<Constraints>`
@@ -658,6 +663,8 @@ export function createSisyphusAgent(
   }
 
   if (isGlmSisyphusHarnessModel(model)) {
+    // GLM-5.x supports thinking: { type: "enabled" } natively (Z.AI docs).
+    // GLM does not support budgetTokens. Set explicitly for cross-provider consistency.
     return { ...base, thinking: { type: "enabled" } };
   }
 
