@@ -3,6 +3,7 @@ const { describe, test, expect } = require("bun:test")
 
 import {
   DEEP_CATEGORY_PROMPT_APPEND,
+  DEEP_CATEGORY_PROMPT_APPEND_GPT_5_3_CODEX,
   DEEP_CATEGORY_PROMPT_APPEND_GPT_5_5,
   OPENAI_CATEGORIES,
   resolveDeepCategoryPromptAppend,
@@ -52,6 +53,59 @@ describe("DEEP_CATEGORY_PROMPT_APPEND_GPT_5_5", () => {
   })
 })
 
+describe("DEEP_CATEGORY_PROMPT_APPEND_GPT_5_3_CODEX", () => {
+  test("uses Category_Context wrapper with name=\"deep\"", () => {
+    //#given
+    const prompt = DEEP_CATEGORY_PROMPT_APPEND_GPT_5_3_CODEX
+
+    //#then
+    expect(prompt).toContain('<Category_Context name="deep">')
+    expect(prompt).toContain("</Category_Context>")
+  })
+
+  test("contains GPT-5.3-Codex-specific style markers", () => {
+    //#given
+    const prompt = DEEP_CATEGORY_PROMPT_APPEND_GPT_5_3_CODEX
+
+    //#then
+    expect(prompt).toContain("GPT-5.3-Codex")
+    expect(prompt).toContain("Autonomy and persistence")
+    expect(prompt).toContain("Goal, not plan")
+    expect(prompt).toContain("Code implementation")
+    expect(prompt).toContain("Worktree safety")
+    expect(prompt).toContain("Completion bar")
+    expect(prompt).toContain("Final message")
+  })
+
+  test("preserves legacy DEEP knowledge from both default and 5.5 variants", () => {
+    //#given
+    const prompt = DEEP_CATEGORY_PROMPT_APPEND_GPT_5_3_CODEX
+
+    //#then
+    expect(prompt).toContain("atomic task")
+    expect(prompt).toContain("root cause")
+    expect(prompt).toContain("Bias to action")
+    expect(prompt).toContain("complete mental model")
+    expect(prompt).toContain("Ambition scaled")
+  })
+
+  test("uses parallel-batch exploration framing instead of legacy silent-exploration", () => {
+    //#given
+    const prompt = DEEP_CATEGORY_PROMPT_APPEND_GPT_5_3_CODEX
+
+    //#then
+    expect(prompt).toContain("Batch everything")
+    expect(prompt).toContain("maximize parallelism")
+    expect(prompt).not.toContain("five to fifteen minutes")
+  })
+
+  test("is materially different from both DEEP_CATEGORY_PROMPT_APPEND and DEEP_CATEGORY_PROMPT_APPEND_GPT_5_5", () => {
+    //#then
+    expect(DEEP_CATEGORY_PROMPT_APPEND_GPT_5_3_CODEX).not.toBe(DEEP_CATEGORY_PROMPT_APPEND)
+    expect(DEEP_CATEGORY_PROMPT_APPEND_GPT_5_3_CODEX).not.toBe(DEEP_CATEGORY_PROMPT_APPEND_GPT_5_5)
+  })
+})
+
 describe("resolveDeepCategoryPromptAppend", () => {
   test("returns GPT-5.5 prompt for openai/gpt-5.5", () => {
     //#when
@@ -85,12 +139,20 @@ describe("resolveDeepCategoryPromptAppend", () => {
     expect(result).toBe(DEEP_CATEGORY_PROMPT_APPEND)
   })
 
-  test("returns legacy prompt for openai/gpt-5.3-codex", () => {
+  test("returns GPT-5.3-codex prompt for openai/gpt-5.3-codex", () => {
     //#when
     const result = resolveDeepCategoryPromptAppend("openai/gpt-5.3-codex")
 
     //#then
-    expect(result).toBe(DEEP_CATEGORY_PROMPT_APPEND)
+    expect(result).toBe(DEEP_CATEGORY_PROMPT_APPEND_GPT_5_3_CODEX)
+  })
+
+  test("returns GPT-5.3-codex prompt for the gpt-5-3-codex hyphenated form", () => {
+    //#when
+    const result = resolveDeepCategoryPromptAppend("openai/gpt-5-3-codex")
+
+    //#then
+    expect(result).toBe(DEEP_CATEGORY_PROMPT_APPEND_GPT_5_3_CODEX)
   })
 
   test("returns legacy prompt for undefined model", () => {
