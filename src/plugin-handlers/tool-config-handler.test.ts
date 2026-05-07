@@ -217,8 +217,8 @@ describe("applyToolConfig", () => {
     })
   })
 
-  describe("#given Sisyphus needs direct specialist delegation", () => {
-    it("#then should allow call_omo_agent for Sisyphus", () => {
+  describe("#given Sisyphus uses task delegation instead of call_omo_agent", () => {
+    it("#then should deny call_omo_agent for Sisyphus", () => {
       const params = createParams({ agents: ["sisyphus"] })
 
       applyToolConfig(params)
@@ -226,7 +226,8 @@ describe("applyToolConfig", () => {
       const agent = params.agentResult.sisyphus as {
         permission: Record<string, unknown>
       }
-      expect(agent.permission.call_omo_agent).toBe("allow")
+      expect(agent.permission.call_omo_agent).toBe("deny")
+      expect(agent.permission.task).toBe("allow")
     })
 
     it("#then should keep call_omo_agent denied for Atlas", () => {

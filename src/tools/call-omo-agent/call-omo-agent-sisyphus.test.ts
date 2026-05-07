@@ -19,13 +19,13 @@ describe("call_omo_agent Sisyphus delegation access", () => {
     expect(ALLOWED_AGENTS).toContain("hephaestus")
   })
 
-  test("#given Sisyphus permissions and allowed agents #when applying tool config #then Sisyphus can reach Hephaestus", () => {
+  test("#given Sisyphus permissions #when applying tool config #then Sisyphus uses task delegation instead of call_omo_agent", () => {
     const params = createParams()
 
     applyToolConfig(params)
 
-    expect(ALLOWED_AGENTS).toContain("hephaestus")
-    expect(params.agentResult.sisyphus.permission.call_omo_agent).toBe("allow")
+    expect(params.agentResult.sisyphus.permission.call_omo_agent).toBe("deny")
+    expect(params.agentResult.sisyphus.permission.task).toBe("allow")
     expect(params.agentResult.hephaestus.permission.call_omo_agent).toBe("deny")
   })
 })

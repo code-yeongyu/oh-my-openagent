@@ -68,8 +68,8 @@ describe("createSisyphusAgent - GLM routing", () => {
 
     expect(prompt).toContain("DECOMPOSE AND DELEGATE - YOU ARE NOT AN IMPLEMENTER");
     expect(prompt).toContain("NEVER implement directly");
-    expect(prompt).toContain("DIRECT HEPHAESTUS DELEGATION - YOUR IMPLEMENTATION PATH");
-    expect(prompt).toContain('call_omo_agent(subagent_type="hephaestus"');
+    expect(prompt).toContain("DEEP DELEGATION - YOUR IMPLEMENTATION PATH");
+    expect(prompt).toContain('task(category="deep"');
     expect(prompt).toContain("delegate to Hephaestus");
   });
 
@@ -77,12 +77,12 @@ describe("createSisyphusAgent - GLM routing", () => {
     const prompt = getPrompt("zai/glm-5.1");
 
     expect(prompt).toContain("DECOMPOSE AND DELEGATE - YOU ARE NOT AN IMPLEMENTER");
-    expect(prompt).toContain("DIRECT HEPHAESTUS DELEGATION");
+    expect(prompt).toContain("DEEP DELEGATION");
   });
 
   test("#given GLM harness model #when building prompt #then places delegation before verification and style sections", () => {
     const prompt = getPrompt("zai/glm-5.1");
-    const delegationIndex = prompt.indexOf("DIRECT HEPHAESTUS DELEGATION");
+    const delegationIndex = prompt.indexOf("DEEP DELEGATION");
     const verificationIndex = prompt.indexOf("<verification>");
     const styleIndex = prompt.indexOf("<style>");
 
