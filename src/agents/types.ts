@@ -96,6 +96,11 @@ export function isGpt5_3CodexModel(model: string): boolean {
   return modelName.includes("gpt-5.3-codex") || modelName.includes("gpt-5-3-codex");
 }
 
+export function isGpt5_2Model(model: string): boolean {
+  const modelName = extractModelName(model).toLowerCase();
+  return modelName.includes("gpt-5.2") || modelName.includes("gpt-5-2");
+}
+
 export function isClaudeOpus47Model(model: string): boolean {
   const modelName = extractModelName(model).toLowerCase().replaceAll(".", "-");
   return modelName.includes("claude-opus-4-7");
