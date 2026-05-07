@@ -22,6 +22,47 @@ type LoopStateController = {
 }
 type RalphLoopEventHandlerOptions = { directory: string; apiTimeoutMs: number; getTranscriptPath: (sessionID: string) => string | undefined; checkSessionExists?: RalphLoopOptions["checkSessionExists"]; backgroundManager?: RalphLoopOptions["backgroundManager"]; loopState: LoopStateController }
 
+function hasRunningBackgroundTasks(
+	backgroundManager: RalphLoopOptions["backgroundManager"],
+	sessionID: string,
+): boolean {
+	return backgroundManager
+		? backgroundManager.getTasksByParentSession(sessionID).some((task: { status: string }) => task.status === "running")
+		: false
+}
+
+function getInfoSessionID(props: Record<string, unknown> | undefined): string | undefined {
+	const info = props?.info as Record<string, unknown> | undefined
+	const sessionID = info?.sessionID
+	return typeof sessionID === "string" ? sessionID : undefined
+}
+
+function getRuntimeRetryActivitySessionID(
+	eventType: string,
+	props: Record<string, unknown> | undefined,
+): string | undefined {
+	if (eventType === "message.updated") {
+		const info = props?.info as Record<string, unknown> | undefined
+		const role = info?.role
+		return role === "assistant" ? getInfoSessionID(props) : undefined
+	}
+
+	if (eventType === "message.part.updated") {
+		if (typeof props?.sessionID === "string") return props.sessionID
+		return getInfoSessionID(props)
+	}
+
+	if (eventType === "message.part.delta") {
+		return typeof props?.sessionID === "string" ? props.sessionID : undefined
+	}
+
+	if (eventType === "tool.execute.before" || eventType === "tool.execute.after") {
+		return typeof props?.sessionID === "string" ? props.sessionID : undefined
+	}
+
+	return undefined
+}
+
 function isAbortError(error: unknown): boolean {
 	return typeof error === "object"
 		&& error !== null
@@ -61,6 +102,10 @@ export function createRalphLoopEventHandler(
 
 	return async ({ event }: { event: { type: string; properties?: unknown } }): Promise<void> => {
 		const props = event.properties as Record<string, unknown> | undefined
+		const runtimeRetryActivitySessionID = getRuntimeRetryActivitySessionID(event.type, props)
+		if (runtimeRetryActivitySessionID) {
+			runtimeErrorRetriedSessions.delete(runtimeRetryActivitySessionID)
+		}
 
 		if (event.type === "session.idle") {
 			const sessionID = props?.sessionID as string | undefined
@@ -75,18 +120,14 @@ export function createRalphLoopEventHandler(
 
 			try {
 				const state = options.loopState.getState()
-				if (!state || !state.active) {
-					return
-				}
+					if (!state || !state.active) {
+						return
+					}
 
-				const hasRunningBackgroundTasks = options.backgroundManager
-					? options.backgroundManager.getTasksByParentSession(sessionID).some((task: { status: string }) => task.status === "running")
-					: false
-
-				if (hasRunningBackgroundTasks) {
-					log(`[${HOOK_NAME}] Skipped: background tasks running`, { sessionID })
-					return
-				}
+					if (hasRunningBackgroundTasks(options.backgroundManager, sessionID)) {
+						log(`[${HOOK_NAME}] Skipped: background tasks running`, { sessionID })
+						return
+					}
 
 				const verificationSessionID = state.verification_pending
 					? state.verification_session_id
@@ -278,18 +319,23 @@ export function createRalphLoopEventHandler(
 				const verificationSessionID = state.verification_pending
 					? state.verification_session_id
 					: undefined
-				const matchesParentSession = state.session_id === undefined || state.session_id === sessionID
-				const matchesVerificationSession = verificationSessionID === sessionID
-				if (!matchesParentSession && !matchesVerificationSession) {
-					handleErroredLoopSession(props, options.loopState)
-					return
-				}
+					const matchesParentSession = state.session_id === undefined || state.session_id === sessionID
+					const matchesVerificationSession = verificationSessionID === sessionID
+					if (!matchesParentSession && !matchesVerificationSession) {
+						handleErroredLoopSession(props, options.loopState)
+						return
+					}
 
-				log(`[${HOOK_NAME}] Retrying after runtime session error`, {
-					sessionID,
-					iteration: state.iteration,
-					error: String(error),
-				})
+					if (hasRunningBackgroundTasks(options.backgroundManager, sessionID)) {
+						log(`[${HOOK_NAME}] Skipped runtime error retry: background tasks running`, { sessionID })
+						return
+					}
+
+					log(`[${HOOK_NAME}] Retrying after runtime session error`, {
+						sessionID,
+						iteration: state.iteration,
+						error: String(error),
+					})
 
 				if (state.verification_pending) {
 					await handlePendingVerification(ctx, {
