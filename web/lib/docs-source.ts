@@ -1,9 +1,9 @@
-import { readFile } from "node:fs/promises"
-import path from "node:path"
+import { DOC_SOURCES } from "./docs-content.generated"
 
-const DOCS_ROOT = path.resolve(process.cwd(), "..", "docs")
-
-export async function loadDocSource(file: string): Promise<string> {
-  const fullPath = path.join(DOCS_ROOT, file)
-  return readFile(fullPath, "utf8")
+export function loadDocSource(file: string): string {
+  const source = DOC_SOURCES[file]
+  if (source === undefined) {
+    throw new Error(`Unknown doc file: ${file}`)
+  }
+  return source
 }
