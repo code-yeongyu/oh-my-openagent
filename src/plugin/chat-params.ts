@@ -96,7 +96,7 @@ export function createChatParamsHandler(args: {
       if (storedPromptParams.topP !== undefined) {
         output.topP = storedPromptParams.topP
       }
-      if (storedPromptParams.maxOutputTokens !== undefined) {
+      if (storedPromptParams.maxOutputTokens !== undefined && storedPromptParams.maxOutputTokens > 0) {
         (output as Record<string, unknown>).maxOutputTokens = storedPromptParams.maxOutputTokens
       }
       if (storedPromptParams.options) {
@@ -162,9 +162,12 @@ export function createChatParamsHandler(args: {
     }
 
     if ("maxTokens" in compatibility) {
-      if (compatibility.maxTokens !== undefined) {
+      if (compatibility.maxTokens !== undefined && compatibility.maxTokens > 0) {
         output.maxOutputTokens = compatibility.maxTokens
       } else {
+        // Remove invalid maxOutputTokens (0 or undefined) so the provider
+        // uses its own default. Custom OpenAI-compatible providers may report
+        // limit.output as 0 for models with unknown output caps.
         delete output.maxOutputTokens
       }
     }
