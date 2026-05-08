@@ -75,8 +75,13 @@ exports[`generateModelConfig single native provider uses Claude models when only
       "model": "anthropic/claude-haiku-4-5",
     },
     "metis": {
-      "model": "anthropic/claude-opus-4-7",
-      "variant": "max",
+      "fallback_models": [
+        {
+          "model": "anthropic/claude-opus-4-7",
+          "variant": "max",
+        },
+      ],
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "momus": {
       "model": "anthropic/claude-opus-4-7",
@@ -145,8 +150,13 @@ exports[`generateModelConfig single native provider uses Claude models with isMa
       "model": "anthropic/claude-haiku-4-5",
     },
     "metis": {
-      "model": "anthropic/claude-opus-4-7",
-      "variant": "max",
+      "fallback_models": [
+        {
+          "model": "anthropic/claude-opus-4-7",
+          "variant": "max",
+        },
+      ],
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "momus": {
       "model": "anthropic/claude-opus-4-7",
@@ -551,12 +561,15 @@ exports[`generateModelConfig all native providers uses preferred models from fal
     "metis": {
       "fallback_models": [
         {
+          "model": "anthropic/claude-opus-4-7",
+          "variant": "max",
+        },
+        {
           "model": "openai/gpt-5.5",
           "variant": "high",
         },
       ],
-      "model": "anthropic/claude-opus-4-7",
-      "variant": "max",
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "momus": {
       "fallback_models": [
@@ -769,12 +782,15 @@ exports[`generateModelConfig all native providers uses preferred models with isM
     "metis": {
       "fallback_models": [
         {
+          "model": "anthropic/claude-opus-4-7",
+          "variant": "max",
+        },
+        {
           "model": "openai/gpt-5.5",
           "variant": "high",
         },
       ],
-      "model": "anthropic/claude-opus-4-7",
-      "variant": "max",
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "momus": {
       "fallback_models": [
@@ -971,12 +987,15 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
     "metis": {
       "fallback_models": [
         {
+          "model": "opencode/claude-opus-4-7",
+          "variant": "max",
+        },
+        {
           "model": "opencode/gpt-5.5",
           "variant": "high",
         },
       ],
-      "model": "opencode/claude-opus-4-7",
-      "variant": "max",
+      "model": "opencode/claude-sonnet-4-6",
     },
     "momus": {
       "fallback_models": [
@@ -1193,12 +1212,15 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
     "metis": {
       "fallback_models": [
         {
+          "model": "opencode/claude-opus-4-7",
+          "variant": "max",
+        },
+        {
           "model": "opencode/gpt-5.5",
           "variant": "high",
         },
       ],
-      "model": "opencode/claude-opus-4-7",
-      "variant": "max",
+      "model": "opencode/claude-sonnet-4-6",
     },
     "momus": {
       "fallback_models": [
@@ -1414,12 +1436,15 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models when 
     "metis": {
       "fallback_models": [
         {
+          "model": "github-copilot/claude-opus-4.7",
+          "variant": "max",
+        },
+        {
           "model": "github-copilot/gpt-5.5",
           "variant": "high",
         },
       ],
-      "model": "github-copilot/claude-opus-4.7",
-      "variant": "max",
+      "model": "github-copilot/claude-sonnet-4.6",
     },
     "momus": {
       "fallback_models": [
@@ -1595,12 +1620,15 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
     "metis": {
       "fallback_models": [
         {
+          "model": "github-copilot/claude-opus-4.7",
+          "variant": "max",
+        },
+        {
           "model": "github-copilot/gpt-5.5",
           "variant": "high",
         },
       ],
-      "model": "github-copilot/claude-opus-4.7",
-      "variant": "max",
+      "model": "github-copilot/claude-sonnet-4.6",
     },
     "momus": {
       "fallback_models": [
@@ -1917,6 +1945,13 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
     "metis": {
       "fallback_models": [
         {
+          "model": "opencode/claude-sonnet-4-6",
+        },
+        {
+          "model": "anthropic/claude-opus-4-7",
+          "variant": "max",
+        },
+        {
           "model": "opencode/claude-opus-4-7",
           "variant": "max",
         },
@@ -1925,8 +1960,7 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
           "variant": "high",
         },
       ],
-      "model": "anthropic/claude-opus-4-7",
-      "variant": "max",
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "momus": {
       "fallback_models": [
@@ -2208,6 +2242,10 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
     "metis": {
       "fallback_models": [
         {
+          "model": "github-copilot/claude-opus-4.7",
+          "variant": "max",
+        },
+        {
           "model": "openai/gpt-5.5",
           "variant": "high",
         },
@@ -2216,8 +2254,7 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
           "variant": "high",
         },
       ],
-      "model": "github-copilot/claude-opus-4.7",
-      "variant": "max",
+      "model": "github-copilot/claude-sonnet-4.6",
     },
     "momus": {
       "fallback_models": [
@@ -2440,8 +2477,13 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + ZAI combinat
       "model": "zai-coding-plan/glm-4.7",
     },
     "metis": {
-      "model": "anthropic/claude-opus-4-7",
-      "variant": "max",
+      "fallback_models": [
+        {
+          "model": "anthropic/claude-opus-4-7",
+          "variant": "max",
+        },
+      ],
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "momus": {
       "model": "anthropic/claude-opus-4-7",
@@ -2520,8 +2562,13 @@ exports[`generateModelConfig mixed provider scenarios uses Gemini + Claude combi
       "model": "anthropic/claude-haiku-4-5",
     },
     "metis": {
-      "model": "anthropic/claude-opus-4-7",
-      "variant": "max",
+      "fallback_models": [
+        {
+          "model": "anthropic/claude-opus-4-7",
+          "variant": "max",
+        },
+      ],
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "momus": {
       "fallback_models": [
@@ -2692,6 +2739,13 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
     "metis": {
       "fallback_models": [
         {
+          "model": "opencode/claude-sonnet-4-6",
+        },
+        {
+          "model": "github-copilot/claude-opus-4.7",
+          "variant": "max",
+        },
+        {
           "model": "opencode/claude-opus-4-7",
           "variant": "max",
         },
@@ -2704,8 +2758,7 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
           "variant": "high",
         },
       ],
-      "model": "github-copilot/claude-opus-4.7",
-      "variant": "max",
+      "model": "github-copilot/claude-sonnet-4.6",
     },
     "momus": {
       "fallback_models": [
@@ -3100,6 +3153,16 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
     "metis": {
       "fallback_models": [
         {
+          "model": "github-copilot/claude-sonnet-4.6",
+        },
+        {
+          "model": "opencode/claude-sonnet-4-6",
+        },
+        {
+          "model": "anthropic/claude-opus-4-7",
+          "variant": "max",
+        },
+        {
           "model": "github-copilot/claude-opus-4.7",
           "variant": "max",
         },
@@ -3120,8 +3183,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
           "variant": "high",
         },
       ],
-      "model": "anthropic/claude-opus-4-7",
-      "variant": "max",
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "momus": {
       "fallback_models": [
@@ -3651,6 +3713,16 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
     "metis": {
       "fallback_models": [
         {
+          "model": "github-copilot/claude-sonnet-4.6",
+        },
+        {
+          "model": "opencode/claude-sonnet-4-6",
+        },
+        {
+          "model": "anthropic/claude-opus-4-7",
+          "variant": "max",
+        },
+        {
           "model": "github-copilot/claude-opus-4.7",
           "variant": "max",
         },
@@ -3671,8 +3743,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
           "variant": "high",
         },
       ],
-      "model": "anthropic/claude-opus-4-7",
-      "variant": "max",
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "momus": {
       "fallback_models": [
@@ -4185,6 +4256,10 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
     "metis": {
       "fallback_models": [
         {
+          "model": "vercel/anthropic/claude-opus-4.7",
+          "variant": "max",
+        },
+        {
           "model": "vercel/openai/gpt-5.5",
           "variant": "high",
         },
@@ -4192,8 +4267,7 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
           "model": "vercel/zai/glm-5.1",
         },
       ],
-      "model": "vercel/anthropic/claude-opus-4.7",
-      "variant": "max",
+      "model": "vercel/anthropic/claude-sonnet-4.6",
     },
     "momus": {
       "fallback_models": [
@@ -4481,6 +4555,10 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
     "metis": {
       "fallback_models": [
         {
+          "model": "vercel/anthropic/claude-opus-4.7",
+          "variant": "max",
+        },
+        {
           "model": "vercel/openai/gpt-5.5",
           "variant": "high",
         },
@@ -4488,8 +4566,7 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
           "model": "vercel/zai/glm-5.1",
         },
       ],
-      "model": "vercel/anthropic/claude-opus-4.7",
-      "variant": "max",
+      "model": "vercel/anthropic/claude-sonnet-4.6",
     },
     "momus": {
       "fallback_models": [
