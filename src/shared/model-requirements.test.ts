@@ -176,20 +176,24 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(primary.variant).toBe("max")
   })
 
-  test("metis has claude-opus-4-7 as primary", () => {
+  test("metis has claude-sonnet-4-6 as primary", () => {
     // #given - metis agent requirement
     const metis = AGENT_MODEL_REQUIREMENTS["metis"]
 
     // #when - accessing Metis requirement
-    // #then - claude-opus-4-7 is first
+    // #then - claude-sonnet-4-6 is first, claude-opus-4-7 max is the immediate fallback
     expect(metis).toBeDefined()
     expect(metis.fallbackChain).toBeArray()
     expect(metis.fallbackChain.length).toBeGreaterThan(1)
 
     const primary = metis.fallbackChain[0]
-    expect(primary.model).toBe("claude-opus-4-7")
+    expect(primary.model).toBe("claude-sonnet-4-6")
     expect(primary.providers).toEqual(["anthropic", "github-copilot", "opencode", "vercel"])
-    expect(primary.variant).toBe("max")
+    expect(primary.variant).toBeUndefined()
+
+    const opusFallback = metis.fallbackChain[1]
+    expect(opusFallback.model).toBe("claude-opus-4-7")
+    expect(opusFallback.variant).toBe("max")
 
     const openAiFallback = metis.fallbackChain.find((entry) => entry.providers.includes("openai"))
     expect(openAiFallback).toEqual({

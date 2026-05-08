@@ -65,6 +65,48 @@ describe("agent-priority-order", () => {
         expect(keys[3]).toBe(atlas)
       })
 
+      test("#when custom agent order is provided #then follows configured core ordering", () => {
+        // given
+        const agents: Record<string, unknown> = {
+          [atlas]: { name: "atlas" },
+          [prometheus]: { name: "prometheus" },
+          [hephaestus]: { name: "hephaestus" },
+          [sisyphus]: { name: "sisyphus" },
+        }
+
+        // when
+        const result = reorderAgentsByPriority(agents, [
+          "hephaestus",
+          "sisyphus",
+          "prometheus",
+          "atlas",
+        ])
+
+        // then
+        expect(Object.keys(result)).toEqual([hephaestus, sisyphus, prometheus, atlas])
+      })
+
+      test("#when custom agent order contains invalid entries #then ignores them and keeps valid/default ordering", () => {
+        // given
+        const agents: Record<string, unknown> = {
+          [atlas]: { name: "atlas" },
+          [prometheus]: { name: "prometheus" },
+          [hephaestus]: { name: "hephaestus" },
+          [sisyphus]: { name: "sisyphus" },
+        }
+
+        // when
+        const result = reorderAgentsByPriority(agents, [
+          "not-real",
+          "atlas",
+          "hephaestus",
+          "atlas",
+        ])
+
+        // then
+        expect(Object.keys(result)).toEqual([atlas, hephaestus, sisyphus, prometheus])
+      })
+
       test("#when core agents mixed with non-core #then core agents come first in canonical order", () => {
         // given: mixed order with non-core agents interleaved
         const agents: Record<string, unknown> = {
@@ -197,6 +239,21 @@ describe("agent-priority-order", () => {
         expect(result[hephaestus]).toEqual({ name: "hephaestus", mode: "primary", order: 2 })
         expect(result[prometheus]).toEqual({ name: "prometheus", mode: "primary", order: 3 })
         expect(result[atlas]).toEqual({ name: "atlas", mode: "primary", order: 4 })
+      })
+
+      test("#when custom agent order is provided #then injects matching order fields", () => {
+        // given
+        const agents: Record<string, unknown> = {
+          [sisyphus]: { name: "sisyphus", mode: "primary" },
+          [hephaestus]: { name: "hephaestus", mode: "primary" },
+        }
+
+        // when
+        const result = reorderAgentsByPriority(agents, ["hephaestus", "sisyphus"])
+
+        // then
+        expect(result[hephaestus]).toEqual({ name: "hephaestus", mode: "primary", order: 1 })
+        expect(result[sisyphus]).toEqual({ name: "sisyphus", mode: "primary", order: 2 })
       })
 
       test("#when core agent is non-object #then leaves value unchanged", () => {

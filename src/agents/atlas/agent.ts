@@ -2,18 +2,19 @@
  * Atlas - Master Orchestrator Agent
  *
  * Orchestrates work via task() to complete ALL tasks in a todo list until fully done.
- * You are the conductor of a symphony of specialized agents.
  *
  * Routing:
  * 1. GLM models → glm.ts (default + vision hard block)
- * 2. GPT models (openai/*, github-copilot/gpt-*) → gpt.ts (GPT-5.4 optimized)
+ * 2. GPT models (openai/*, github-copilot/gpt-*) → gpt.ts (GPT-5.5 optimized)
  * 3. Gemini models (google/*, google-vertex/*) → gemini.ts (Gemini-optimized)
- * 4. Default (Claude, etc.) → default.ts (Claude-optimized)
+ * 4. Kimi K2.x family → kimi.ts (Claude-family base + K2.6 thinking-mode calibration)
+ * 5. Claude Opus 4.7 → opus-4-7.ts (literal-following + explicit fan-out push)
+ * 6. Default (Claude 4.6 family: opus-4-6, sonnet-4-6, haiku-4-5, etc.) → default.ts
  */
 
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode, AgentPromptMetadata } from "../types"
-import { isGptModel, isGeminiModel, isGlmThinkingModel } from "../types"
+import { isClaudeOpus47Model, isGeminiModel, isGlmThinkingModel, isGptModel, isKimiK2Model } from "../types"
 import type { AvailableAgent, AvailableSkill, AvailableCategory } from "../dynamic-agent-prompt-builder"
 import { buildAgentIdentitySection, buildCategorySkillsDelegationGuide } from "../dynamic-agent-prompt-builder"
 import type { CategoryConfig } from "../../config/schema"
@@ -23,6 +24,8 @@ import { getDefaultAtlasPrompt } from "./default"
 import { getGptAtlasPrompt } from "./gpt"
 import { getGeminiAtlasPrompt } from "./gemini"
 import { getGlmAtlasPrompt } from "./glm"
+import { getKimiAtlasPrompt } from "./kimi"
+import { getOpus47AtlasPrompt } from "./opus-4-7"
 import {
   getCategoryDescription,
   buildAgentSelectionSection,
@@ -33,11 +36,8 @@ import {
 
 const MODE: AgentMode = "primary"
 
-export type AtlasPromptSource = "default" | "gpt" | "gemini" | "glm"
+export type AtlasPromptSource = "default" | "gpt" | "gemini" | "glm" | "kimi" | "opus-4-7"
 
-/**
- * Determines which Atlas prompt to use based on model.
- */
 export function getAtlasPromptSource(model?: string): AtlasPromptSource {
   if (model && isGlmThinkingModel(model)) {
     return "glm"
@@ -47,6 +47,12 @@ export function getAtlasPromptSource(model?: string): AtlasPromptSource {
   }
   if (model && isGeminiModel(model)) {
     return "gemini"
+  }
+  if (model && isKimiK2Model(model)) {
+    return "kimi"
+  }
+  if (model && isClaudeOpus47Model(model)) {
+    return "opus-4-7"
   }
   return "default"
 }
@@ -58,9 +64,6 @@ export interface OrchestratorContext {
   userCategories?: Record<string, CategoryConfig>
 }
 
-/**
- * Gets the appropriate Atlas prompt based on model.
- */
 export function getAtlasPrompt(model?: string): string {
   const source = getAtlasPromptSource(model)
 
@@ -71,6 +74,10 @@ export function getAtlasPrompt(model?: string): string {
       return getGptAtlasPrompt()
     case "gemini":
       return getGeminiAtlasPrompt()
+    case "kimi":
+      return getKimiAtlasPrompt()
+    case "opus-4-7":
+      return getOpus47AtlasPrompt()
     case "default":
     default:
       return getDefaultAtlasPrompt()

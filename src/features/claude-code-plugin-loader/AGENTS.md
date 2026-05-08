@@ -1,6 +1,6 @@
 # src/features/claude-code-plugin-loader/ — Unified Claude Code Plugin Loader
 
-**Generated:** 2026-04-18
+**Generated:** 2026-05-08
 
 ## OVERVIEW
 

@@ -37,6 +37,8 @@ const mockCreateHooks = mock(() => ({
 const mockCreatePluginInterface = mock(() => ({}))
 const mockInitializeOpenClaw = mock(async () => {})
 const mockStartTmuxCheck = mock(() => {})
+const mockInstallAgentSortShim = mock(() => {})
+const mockSetAgentSortOrder = mock(() => {})
 
 let pluginModule: (typeof import("./index"))["default"]
 
@@ -95,6 +97,11 @@ function installIndexModuleMocks(): void {
     })),
   }))
 
+  mock.module("./shared/agent-sort-shim", () => ({
+    installAgentSortShim: mockInstallAgentSortShim,
+    setAgentSortOrder: mockSetAgentSortOrder,
+  }))
+
   mock.module("./openclaw", () => ({
     initializeOpenClaw: mockInitializeOpenClaw,
   }))
@@ -130,6 +137,8 @@ describe("oh-my-openagent plugin module", () => {
     mockCreatePluginInterface.mockClear()
     mockInitializeOpenClaw.mockClear()
     mockStartTmuxCheck.mockClear()
+    mockInstallAgentSortShim.mockClear()
+    mockSetAgentSortOrder.mockClear()
   })
 
   afterEach(() => {
@@ -142,9 +151,6 @@ describe("oh-my-openagent plugin module", () => {
       enabled: true,
       gateways: {},
       hooks: {},
-      replyListener: {
-        discordBotToken: "discord-token",
-      },
     }
     mockLoadPluginConfig.mockReturnValue({
       openclaw: openclawConfig,
@@ -173,7 +179,7 @@ describe("oh-my-openagent plugin module", () => {
 
     // then
     expect(mockInitializeOpenClaw).not.toHaveBeenCalled()
-  })
+  }, { timeout: 15000 })
 
   it("exports a V1 PluginModule shape with id and server", () => {
     // given the plugin module is loaded

@@ -1096,7 +1096,7 @@ session_id: ses_untrusted_999
         )
 
         // then
-        expect(output.output).toContain("ORCHESTRATOR, not an IMPLEMENTER")
+        expect(output.output).toContain("DELEGATION REQUIRED")
         expect(output.output).toContain("task")
         expect(output.output).toContain("task")
       })
@@ -1117,7 +1117,7 @@ session_id: ses_untrusted_999
         )
 
         // then
-        expect(output.output).toContain("ORCHESTRATOR, not an IMPLEMENTER")
+        expect(output.output).toContain("DELEGATION REQUIRED")
       })
 
       test("should NOT append reminder when orchestrator writes inside .sisyphus/", async () => {
@@ -1138,7 +1138,7 @@ session_id: ses_untrusted_999
 
         // then
         expect(output.output).toBe(originalOutput)
-        expect(output.output).not.toContain("ORCHESTRATOR, not an IMPLEMENTER")
+        expect(output.output).not.toContain("DELEGATION REQUIRED")
       })
 
       test("should NOT append reminder when non-orchestrator writes outside .sisyphus/", async () => {
@@ -1162,7 +1162,7 @@ session_id: ses_untrusted_999
 
         // then
         expect(output.output).toBe(originalOutput)
-        expect(output.output).not.toContain("ORCHESTRATOR, not an IMPLEMENTER")
+        expect(output.output).not.toContain("DELEGATION REQUIRED")
         
         cleanupMessageStorage(nonOrchestratorSession)
       })
@@ -1226,7 +1226,7 @@ session_id: ses_untrusted_999
 
           // then
           expect(output.output).toBe(originalOutput)
-          expect(output.output).not.toContain("ORCHESTRATOR, not an IMPLEMENTER")
+          expect(output.output).not.toContain("DELEGATION REQUIRED")
         })
 
         test("should NOT append reminder when orchestrator writes inside .sisyphus with mixed separators", async () => {
@@ -1247,7 +1247,7 @@ session_id: ses_untrusted_999
 
           // then
           expect(output.output).toBe(originalOutput)
-          expect(output.output).not.toContain("ORCHESTRATOR, not an IMPLEMENTER")
+          expect(output.output).not.toContain("DELEGATION REQUIRED")
         })
 
         test("should NOT append reminder for absolute Windows path inside .sisyphus\\", async () => {
@@ -1268,7 +1268,7 @@ session_id: ses_untrusted_999
 
           // then
           expect(output.output).toBe(originalOutput)
-          expect(output.output).not.toContain("ORCHESTRATOR, not an IMPLEMENTER")
+          expect(output.output).not.toContain("DELEGATION REQUIRED")
         })
 
         test("should append reminder for Windows path outside .sisyphus\\", async () => {
@@ -1287,7 +1287,7 @@ session_id: ses_untrusted_999
           )
 
           // then
-          expect(output.output).toContain("ORCHESTRATOR, not an IMPLEMENTER")
+          expect(output.output).toContain("DELEGATION REQUIRED")
         })
       })
     })

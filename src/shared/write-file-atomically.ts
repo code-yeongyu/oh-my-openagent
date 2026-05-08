@@ -1,11 +1,24 @@
-import { closeSync, fsyncSync, openSync, renameSync, unlinkSync, writeFileSync } from "node:fs"
+import {
+  closeSync,
+  type fsyncSync as FsyncSync,
+  openSync,
+  renameSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs"
 
-export function writeFileAtomically(filePath: string, content: string): void {
-	const tempPath = `${filePath}.tmp`
-	writeFileSync(tempPath, content, "utf-8")
+import { tolerantFsyncSync } from "./tolerant-fsync"
+
+export function writeFileAtomically(
+  filePath: string,
+  content: string,
+  deps: { fsyncSync?: typeof FsyncSync } = {},
+): void {
+  const tempPath = `${filePath}.tmp`
+  writeFileSync(tempPath, content, "utf-8")
   const tempFileDescriptor = openSync(tempPath, "r")
   try {
-    fsyncSync(tempFileDescriptor)
+    tolerantFsyncSync(tempFileDescriptor, `writeFileAtomically:${filePath}`, deps.fsyncSync)
   } finally {
     closeSync(tempFileDescriptor)
   }

@@ -153,6 +153,7 @@ export function createToolExecuteAfterHandler(args: {
       await hooks.readImageResizer?.["tool.execute.after"]?.(hookInput, output)
       await hooks.hashlineReadEnhancer?.["tool.execute.after"]?.(hookInput, output)
       await hooks.webfetchRedirectGuard?.["tool.execute.after"]?.(hookInput, output)
+      await hooks.fsyncSkipWarning?.["tool.execute.after"]?.(hookInput, output)
       await hooks.jsonErrorRecovery?.["tool.execute.after"]?.(hookInput, output)
     }
 
