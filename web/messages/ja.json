@@ -79,7 +79,7 @@
       },
       "boulderTitle": "Session Continuity",
       "boulderDescription": "アクティブな作業はboulder.jsonに追跡されます。停電？システムクラッシュ？関係ありません。止まったそのままの場所から再開できます。",
-      "model": "Claude Opus 4.6 Max"
+      "model": "Claude Opus 4.7 Max"
     },
     "prometheusAtlas": {
       "badge": "オーケストレーションワークフロー",
@@ -88,7 +88,7 @@
       "prometheus": {
         "name": "Prometheus",
         "role": "Strategic Planner",
-        "model": "Claude Opus 4.6 Max",
+        "model": "Claude Opus 4.7 Max",
         "description": "設計者。あなたとインタビューし、コードベースを探索し、詳細な実行計画を作成します。コードは絶対に書きません。MetisとMomusを品質ゲートとして使用します。",
         "features": [
           "知的なインタビューモード",
@@ -139,7 +139,44 @@
         "verify": "VERIFY — 動作を証明する"
       },
       "tagline": "良いだけではない時に。",
-      "model": "GPT 5.3 Codex Medium"
+      "model": "GPT 5.5 Medium"
+    },
+    "teamMode": {
+      "badge": "NEW · v4.0",
+      "title": "Team Mode",
+      "headline": "複数のエージェント。横並び。並列で。",
+      "description": "リードエージェントがカテゴリ特化のメンバーチームを統括します。全員が並列で動き、専用ツールでリアルタイムに通信。tmuxで全メンバーの作業を同時に観察できます。オプトイン — team_mode.enabledを切り替えて再起動。",
+      "features": {
+        "lead": {
+          "title": "リードオーケストレーション",
+          "description": "コーディネーター1人、スペシャリスト複数。team_send_messageとteam_task_createによるリアルタイムメッセージング。"
+        },
+        "parallel": {
+          "title": "真の並列性",
+          "description": "最大8メンバーが同時に作業。待機なし、キューなし — あらゆる角度を一度にカバー。"
+        },
+        "tmux": {
+          "title": "Tmuxビジュアライゼーション",
+          "description": "Focusとgridウィンドウで一人のチームメンバーに集中しつつ、全体像も見逃しません。"
+        },
+        "tools": {
+          "title": "team_* ツールファミリー",
+          "description": "12の専用ツール(team_create、team_status、team_send_message、…)。team_mode.enabledの裏でゲーティング。"
+        }
+      },
+      "poweredBy": "Team Modeで動作",
+      "skills": {
+        "hyperplan": {
+          "name": "hyperplan",
+          "description": "5つの敵対的エージェントが、コード一行が書かれる前に直交する角度から計画を引き裂きます。"
+        },
+        "securityResearch": {
+          "name": "security-research",
+          "description": "3人の脆弱性ハンター + 2人のPoCエンジニアがコードベースを監査。実際の悪用可能性で重大度を調整。"
+        }
+      },
+      "optIn": "team_mode.enabled = true → opencode再起動",
+      "tagline": "デフォルトはOFF。ONにすると圧倒的。"
     },
     "agents": {
       "title": "Specialized Agents",
@@ -147,31 +184,31 @@
       "oracle": {
         "name": "Oracle",
         "role": "Architecture Consultant",
-        "model": "GPT 5.4 High",
+        "model": "GPT 5.5 High",
         "description": "複雑なデバッグとアーキテクチャ決定。前進の道が明らかでない時。"
       },
       "librarian": {
         "name": "Librarian",
         "role": "Docs & Code Search",
-        "model": "MiniMax M2.5",
+        "model": "GPT 5.4 Mini Fast",
         "description": "実際のGitHub例と公式ドキュメントを見つける。証拠ベース、パーマリンク付き。"
       },
       "explore": {
         "name": "Explore",
         "role": "Codebase Grep",
-        "model": "MiniMax M2.5",
+        "model": "GPT 5.4 Mini Fast",
         "description": "超高速コードベース検索。安価で、並列で、常にバックグラウンドで。"
       },
       "metis": {
         "name": "Metis",
         "role": "Plan Consultant",
-        "model": "Claude Opus 4.6",
+        "model": "Claude Sonnet 4.6",
         "description": "プランの曖昧さをプロダクションバグになる前に捕捉する。"
       },
       "momus": {
         "name": "Momus",
         "role": "Plan Reviewer",
-        "model": "GPT 5.4",
+        "model": "GPT 5.5 xHigh",
         "description": "容赦ない検証。プランが弾丸不可能な時だけ承認する。"
       },
       "dynamicSystem": {
