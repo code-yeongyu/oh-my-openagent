@@ -32,9 +32,16 @@ export async function activateTeamLayout(
         }]
       : []),
     tmuxMgr,
+    undefined,
+    { allowInsecureLocalTls: process.env.OMO_TEAM_ALLOW_INSECURE_LOCAL_TLS === "1" },
   )
   if (!layout) return false
   const normalizedLayout = normalizeTeamLayout(runtimeState.teamRunId, layout)
+
+  const paneIds = [
+    ...Object.values(normalizedLayout.focusPanesByMember),
+    ...Object.values(normalizedLayout.gridPanesByMember),
+  ].filter(Boolean)
 
   await transitionRuntimeState(runtimeState.teamRunId, (currentState) => ({
     ...currentState,
@@ -43,6 +50,7 @@ export async function activateTeamLayout(
       targetSessionId: normalizedLayout.targetSessionId,
       focusWindowId: normalizedLayout.focusWindowId,
       gridWindowId: normalizedLayout.gridWindowId,
+      paneIds: paneIds.length > 0 ? paneIds : undefined,
     },
     members: currentState.members.map((member) => ({
       ...member,

@@ -4,6 +4,7 @@ import { afterEach, describe, expect, mock, test } from "bun:test"
 import { rm } from "node:fs/promises"
 
 import type { BackgroundManager } from "../../background-agent/manager"
+import { transitionRuntimeState } from "../team-state-store/store"
 import { createFixture, updateMemberStatuses } from "./shutdown-test-fixtures"
 
 const { deleteTeam } = await import("./delete-team")
@@ -80,5 +81,101 @@ describe("deleteTeam cancels only this team's background tasks", () => {
     expect(cancelTaskMock).toHaveBeenCalledTimes(1)
     const cancelledTaskId = cancelTaskMock.mock.calls[0]?.[0]
     expect(cancelledTaskId).toBe("team-task-a")
+  })
+
+  test("passes both focus/grid pane ids to removeTeamLayout", async () => {
+    // given
+    const fixture = await createFixture()
+    temporaryDirectories.push(fixture.baseDir)
+    await updateMemberStatuses(fixture.teamRunId, fixture.config, {
+      "member-a": "shutdown_approved",
+      "member-b": "shutdown_approved",
+    })
+    await transitionRuntimeState(fixture.teamRunId, (runtimeState) => ({
+      ...runtimeState,
+      members: runtimeState.members.map((member) => {
+        if (member.name === "member-a") return { ...member, tmuxPaneId: "%10", tmuxGridPaneId: "%20" }
+        if (member.name === "member-b") return { ...member, tmuxPaneId: undefined, tmuxGridPaneId: undefined }
+        return member
+      }),
+      tmuxLayout: {
+        ownedSession: false,
+        targetSessionId: "$caller",
+        focusWindowId: "@10",
+        paneIds: ["%legacy-1", "%legacy-2"],
+      },
+    }), fixture.config)
+
+    fixture.config.tmux_visualization = true
+
+    const removeTeamLayoutMock = mock(async () => undefined)
+    const deps = {
+      canVisualize: () => true,
+      removeTeamLayout: removeTeamLayoutMock,
+      log: () => undefined,
+    }
+
+    // when
+    await deleteTeam(
+      fixture.teamRunId,
+      fixture.config,
+      { getServerUrl: () => "http://127.0.0.1:12345" } as never,
+      undefined,
+      undefined,
+      deps,
+    )
+
+    // then
+    expect(removeTeamLayoutMock).toHaveBeenCalledTimes(1)
+    const cleanupTarget = removeTeamLayoutMock.mock.calls[0]?.[1] as { paneIds?: string[] }
+    expect(cleanupTarget?.paneIds).toEqual(["%10", "%20"])
+  })
+
+  test("falls back to persisted paneIds when member pane ids are absent", async () => {
+    // given
+    const fixture = await createFixture()
+    temporaryDirectories.push(fixture.baseDir)
+    await updateMemberStatuses(fixture.teamRunId, fixture.config, {
+      "member-a": "shutdown_approved",
+      "member-b": "shutdown_approved",
+    })
+    await transitionRuntimeState(fixture.teamRunId, (runtimeState) => ({
+      ...runtimeState,
+      members: runtimeState.members.map((member) => (
+        member.agentType === "leader"
+          ? member
+          : { ...member, status: "shutdown_approved", tmuxPaneId: undefined, tmuxGridPaneId: undefined }
+      )),
+      tmuxLayout: {
+        ownedSession: false,
+        targetSessionId: "$caller",
+        focusWindowId: "@10",
+        paneIds: ["%legacy-1", "%legacy-2"],
+      },
+    }), fixture.config)
+
+    fixture.config.tmux_visualization = true
+
+    const removeTeamLayoutMock = mock(async () => undefined)
+    const deps = {
+      canVisualize: () => true,
+      removeTeamLayout: removeTeamLayoutMock,
+      log: () => undefined,
+    }
+
+    // when
+    await deleteTeam(
+      fixture.teamRunId,
+      fixture.config,
+      { getServerUrl: () => "http://127.0.0.1:12345" } as never,
+      undefined,
+      undefined,
+      deps,
+    )
+
+    // then
+    expect(removeTeamLayoutMock).toHaveBeenCalledTimes(1)
+    const cleanupTarget = removeTeamLayoutMock.mock.calls[0]?.[1] as { paneIds?: string[] }
+    expect(cleanupTarget?.paneIds).toEqual(["%legacy-1", "%legacy-2"])
   })
 })

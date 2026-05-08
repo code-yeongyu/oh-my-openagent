@@ -1,7 +1,7 @@
 import type { Hooks, PluginInput } from "@opencode-ai/plugin"
 
 import type { TeamModeConfig } from "../../config/schema/team-mode"
-import { lookupTeamSession } from "../../features/team-mode/team-session-registry"
+import { lookupTeamSession, registerTeamSession } from "../../features/team-mode/team-session-registry"
 import type { RuntimeState } from "../../features/team-mode/types"
 import {
   listActiveTeams,
@@ -52,11 +52,14 @@ async function resolveParticipant(sessionID: string, config: TeamModeConfig): Pr
     }
 
     if (runtimeState.leadSessionId === sessionID) {
+      const leadMemberName = runtimeState.members.find((member) => member.agentType === "leader")?.name ?? "lead"
+      registerTeamSession(sessionID, { teamRunId: runtimeState.teamRunId, memberName: leadMemberName, role: "lead" })
       return { role: "lead", teamRunId: runtimeState.teamRunId }
     }
 
     const matchedMember = runtimeState.members.find((member) => member.sessionId === sessionID)
     if (matchedMember) {
+      registerTeamSession(sessionID, { teamRunId: runtimeState.teamRunId, memberName: matchedMember.name, role: "member" })
       return {
         role: "member",
         teamRunId: runtimeState.teamRunId,

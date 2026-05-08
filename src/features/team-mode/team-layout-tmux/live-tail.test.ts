@@ -23,6 +23,13 @@ describe("buildLiveTailCommand", () => {
     expect(cmd.split("'").length).toBeGreaterThan(4)
   })
 
+  test("appends --insecure only when explicitly enabled", () => {
+    const strictCmd = buildLiveTailCommand("https://127.0.0.1:4096", "ses_strict")
+    const insecureCmd = buildLiveTailCommand("https://127.0.0.1:4096", "ses_insecure", { allowInsecureTls: true })
+    expect(strictCmd).not.toContain(" --insecure")
+    expect(insecureCmd).toContain(" --insecure")
+  })
+
   test("references a file that materialize wrote with python content", () => {
     const cmd = buildLiveTailCommand("http://127.0.0.1:4096", "ses_abc123")
     const match = cmd.match(/python3 -u '([^']+)'/)

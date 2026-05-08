@@ -105,6 +105,12 @@ class SessionStateUrlNormalizationTests(unittest.TestCase):
         s = mod.SessionState("http://127.0.0.1:4096", "ses_x")
         self.assertEqual(s.url, "http://127.0.0.1:4096")
 
+    def test_uses_unverified_context_only_when_insecure_enabled(self) -> None:
+        strict = mod.SessionState("https://127.0.0.1:4096", "ses_strict")
+        insecure = mod.SessionState("https://127.0.0.1:4096", "ses_insecure", insecure=True)
+        self.assertEqual(strict.ssl_context.verify_mode, mod.ssl.CERT_REQUIRED)
+        self.assertEqual(insecure.ssl_context.verify_mode, mod.ssl.CERT_NONE)
+
 
 class SessionStateFetchTests(unittest.TestCase):
     def _mock_session_response(self, payload: dict) -> patch:

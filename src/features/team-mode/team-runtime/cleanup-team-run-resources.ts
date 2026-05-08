@@ -59,7 +59,17 @@ export async function cleanupTeamRunResources(args: {
   if (args.createdLayout && args.tmuxMgr) {
     try {
       const runtimeState = await loadRuntimeState(args.teamRunId, args.config)
-      await removeTeamLayout(args.teamRunId, runtimeState.tmuxLayout, args.tmuxMgr)
+      const memberPaneIds = runtimeState.members
+        .filter((member) => member.agentType !== "leader")
+        .flatMap((member) => [member.tmuxPaneId, member.tmuxGridPaneId])
+        .filter((paneId): paneId is string => Boolean(paneId))
+      const cleanupTarget = runtimeState.tmuxLayout
+        ? {
+            ...runtimeState.tmuxLayout,
+            paneIds: memberPaneIds.length > 0 ? memberPaneIds : runtimeState.tmuxLayout.paneIds,
+          }
+        : undefined
+      await removeTeamLayout(args.teamRunId, cleanupTarget, args.tmuxMgr)
       cleanupReport.removedLayout = true
     } catch (layoutError) {
       cleanupReport.errors.push(`layout ${args.teamRunId}: ${normalizeError(layoutError).message}`)

@@ -2,11 +2,9 @@
 //
 // OpenCode TUI's `attach --session <child>` enters a static subagent-detail
 // view (see binary string "session.child.promptDisabled") for any session
-// that has a parentID. Team workers always carry parentID=lead — so the
-// usual `opencode attach` lands in that read-only view and never streams
-// live updates. This builder substitutes a small Python tailer that talks
-// directly to the OpenCode HTTP API and renders message updates in plain
-// text, side-stepping the TUI mode entirely.
+// that has a parentID. Team workers always carry parentID=lead, so team mode
+// now keeps the attach view in the main window and runs this Python tailer in
+// a companion window for the streaming feed.
 
 import { mkdirSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -29,9 +27,14 @@ export function materializeLiveTailScript(): string {
   return path
 }
 
-export function buildLiveTailCommand(serverUrl: string, sessionId: string): string {
+type LiveTailCommandOptions = {
+  allowInsecureTls?: boolean
+}
+
+export function buildLiveTailCommand(serverUrl: string, sessionId: string, options?: LiveTailCommandOptions): string {
   const scriptPath = materializeLiveTailScript()
-  return `python3 -u ${shellSingleQuote(scriptPath)} ${shellSingleQuote(serverUrl)} ${shellSingleQuote(sessionId)}`
+  const insecureFlag = options?.allowInsecureTls ? " --insecure" : ""
+  return `python3 -u ${shellSingleQuote(scriptPath)} ${shellSingleQuote(serverUrl)} ${shellSingleQuote(sessionId)}${insecureFlag}`
 }
 
 export function _resetCacheForTests(): void {

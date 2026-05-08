@@ -5,16 +5,17 @@ OpenCode TUI's `attach --session <child>` enters a static subagent-detail
 view (the `session.child.promptDisabled` mode) for any session with a
 parentID. That view shows only the kickoff prompt and never streams.
 
-This tailer subscribes to /event SSE and renders updates as plain text,
-giving worker panes a live feed without depending on the TUI mode.
+This tailer subscribes to /event SSE and renders updates as plain text in
+the companion live-tail tmux window while the main team window keeps attach.
 
-Usage: team-pane-live-tail.py <server-url> <session-id> [--no-clear] [--history N]
+Usage: team-pane-live-tail.py <server-url> <session-id> [--no-clear] [--history N] [--insecure]
 """
 from __future__ import annotations
 
 import argparse
 import json
 import re
+import ssl
 import sys
 import time
 import urllib.error
@@ -64,7 +65,7 @@ class SessionState:
     """Holds session metadata + role lookup so SSE part-updates render with
     the correct USER/ASSISTANT label without re-fetching per event."""
 
-    def __init__(self, url: str, session_id: str) -> None:
+    def __init__(self, url: str, session_id: str, insecure: bool = False) -> None:
         # OmO's tmuxMgr.getServerUrl() emits the URL with a trailing slash,
         # so naive `f"{url}/session/..."` concatenation produces `//session`
         # which OpenCode rejects with an empty body. Normalise once.
@@ -76,10 +77,20 @@ class SessionState:
         self.agent = ""
         self.model = ""
         self.role_by_message: dict[str, str] = {}
+        self.ssl_context = ssl._create_unverified_context() if insecure else ssl.create_default_context()
+
+    def open_url(
+        self,
+        url: str,
+        timeout: float | None = 5,
+        headers: dict[str, str] | None = None,
+    ):
+        request = urllib.request.Request(url, headers=headers) if headers is not None else url
+        return urllib.request.urlopen(request, timeout=timeout, context=self.ssl_context)
 
     def fetch(self) -> None:
         try:
-            with urllib.request.urlopen(f"{self.url}/session/{self.session_id}", timeout=5) as r:
+            with self.open_url(f"{self.url}/session/{self.session_id}", timeout=5) as r:
                 info = json.load(r)
         except (urllib.error.URLError, json.JSONDecodeError):
             return
@@ -155,7 +166,7 @@ def extract_task_line(kickoff_text: str) -> str:
 
 def fetch_history(state: SessionState, n: int) -> int:
     try:
-        with urllib.request.urlopen(f"{state.url}/session/{state.session_id}/message", timeout=5) as r:
+        with state.open_url(f"{state.url}/session/{state.session_id}/message", timeout=5) as r:
             msgs = json.load(r)
     except (urllib.error.URLError, json.JSONDecodeError) as e:
         print(f"{RED}history fetch failed: {e}{RST}")
@@ -193,8 +204,7 @@ def stream_events(state: SessionState) -> None:
     seen_parts: dict[str, int] = {}
     while True:
         try:
-            req = urllib.request.Request(f"{state.url}/event", headers={"Accept": "text/event-stream"})
-            with urllib.request.urlopen(req, timeout=None) as r:
+            with state.open_url(f"{state.url}/event", timeout=None, headers={"Accept": "text/event-stream"}) as r:
                 for raw in r:
                     line = raw.decode("utf-8", errors="replace").rstrip()
                     if not line.startswith("data: "):
@@ -274,13 +284,16 @@ def main() -> int:
     p.add_argument("session_id")
     p.add_argument("--no-clear", action="store_true")
     p.add_argument("--history", type=int, default=4)
+    p.add_argument("--insecure", action="store_true", help="Disable TLS certificate verification (local/dev only).")
     args = p.parse_args()
 
     if not args.no_clear:
         print("\033[2J\033[H", end="")
-    state = SessionState(args.url, args.session_id)
+    state = SessionState(args.url, args.session_id, insecure=args.insecure)
     state.fetch()
     render_banner(state)
+    if args.insecure:
+        print(f"{YEL}{DIM}TLS verify disabled (--insecure). Local/dev use only.{RST}")
     fetch_history(state, args.history)
     stream_events(state)
     return 0

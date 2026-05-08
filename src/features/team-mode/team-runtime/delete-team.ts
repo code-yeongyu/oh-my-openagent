@@ -102,13 +102,14 @@ export async function deleteTeam(
   const removedLayout = config.tmux_visualization && tmuxMgr !== undefined && deps.canVisualize()
   if (removedLayout) {
     const memberPaneIds = runtimeState.members
-      .filter((member) => member.agentType !== "leader" && member.tmuxPaneId)
-      .map((member) => member.tmuxPaneId!)
+      .filter((member) => member.agentType !== "leader")
+      .flatMap((member) => [member.tmuxPaneId, member.tmuxGridPaneId])
+      .filter((paneId): paneId is string => Boolean(paneId))
 
     const cleanupTarget = runtimeState.tmuxLayout
       ? {
           ...runtimeState.tmuxLayout,
-          paneIds: memberPaneIds.length > 0 ? memberPaneIds : undefined,
+          paneIds: memberPaneIds.length > 0 ? memberPaneIds : runtimeState.tmuxLayout.paneIds,
         }
       : undefined
 

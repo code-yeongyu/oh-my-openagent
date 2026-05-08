@@ -55,8 +55,9 @@ function defaultRunTmuxCommand(_tmuxPath: string, args: Array<string>, _options?
 
   if (command === "new-window") {
     const windowId = `@${nextWindowNumber++}`
-    panesByWindow.set(windowId, [`%${nextPaneNumber++}`])
-    return Promise.resolve(createTmuxCommandResult(windowId))
+    const paneId = `%${nextPaneNumber++}`
+    panesByWindow.set(windowId, [paneId])
+    return Promise.resolve(createTmuxCommandResult(`${windowId} ${paneId}`))
   }
 
   if (command === "split-window") {
@@ -184,17 +185,40 @@ describe("team-layout-tmux", () => {
 
     // then
     const commands = getCommands()
-    expect(commands.some((args) => args[0] === "new-window")).toBe(false)
-    expect(commands.filter((args) => args[0] === "split-window")).toHaveLength(2)
+    expect(commands.filter((args) => args[0] === "new-window")).toHaveLength(1)
+    expect(commands.filter((args) => args[0] === "split-window")).toHaveLength(3)
 
     const sendKeysCalls = commands.filter((args) => args[0] === "send-keys")
     const literals = sendKeysCalls.map((args) => args.join(" "))
-    // Live-tail replaces `opencode attach --session <id>`: the sessionId is
-    // now a positional arg of the python3 tailer, not behind --session.
-    expect(literals.every((s) => s.includes("python3 -u "))).toBe(true)
-    expect(literals.every((s) => !s.includes("opencode attach"))).toBe(true)
-    expect(literals.some((s) => s.includes("'s-m1'"))).toBe(true)
-    expect(literals.some((s) => s.includes("'s-m2'"))).toBe(true)
+    expect(literals.filter((s) => s.includes("opencode attach --session"))).toHaveLength(2)
+    expect(literals.filter((s) => s.includes("python3 -u "))).toHaveLength(2)
+    expect(literals.some((s) => s.includes("opencode attach --session 's-m1'"))).toBe(true)
+    expect(literals.some((s) => s.includes("opencode attach --session 's-m2'"))).toBe(true)
+    expect(literals.some((s) => s.includes("python3 -u ") && s.includes("'s-m1'"))).toBe(true)
+    expect(literals.some((s) => s.includes("python3 -u ") && s.includes("'s-m2'"))).toBe(true)
+  })
+
+  test("passes --insecure to live-tail only when tmux option is enabled", async () => {
+    // given
+    const deps: TeamLayoutDeps = {
+      runTmuxCommand: runTmuxCommandMock,
+      isServerRunning: isServerRunningMock,
+      getTmuxPath: async () => "tmux",
+      resolveCallerTmuxSession: async () => ({ sessionId: "$7", paneId: process.env.TMUX_PANE ?? "%42", windowTarget: "test-session:0" }),
+    }
+    const members = [{ name: "m1", sessionId: "s-m1", worktreePath: "/tmp/m1" }]
+
+    // when
+    await createTeamLayout("run-strict", members, tmuxMgr as never, deps, { allowInsecureLocalTls: false })
+    await createTeamLayout("run-insecure", members, tmuxMgr as never, deps, { allowInsecureLocalTls: true })
+
+    // then
+    const sendKeysCalls = getCommands().filter((args) => args[0] === "send-keys")
+    const liveTailLiterals = sendKeysCalls.map((args) => args.join(" ")).filter((literal) => literal.includes("python3 -u "))
+    const strictLiteral = liveTailLiterals[0] ?? ""
+    const insecureLiteral = liveTailLiterals[1] ?? ""
+    expect(strictLiteral).not.toContain(" --insecure")
+    expect(insecureLiteral).toContain(" --insecure")
   })
 
   test("uses caller window main-vertical layout with caller pane as primary", async () => {
@@ -213,11 +237,19 @@ describe("team-layout-tmux", () => {
     const commands = getCommands()
     const selectLayoutArgs = commands.filter((args) => args[0] === "select-layout").map((args) => args[args.length - 1])
     expect(selectLayoutArgs).toContain("main-vertical")
-    expect(selectLayoutArgs).not.toContain("tiled")
+    expect(selectLayoutArgs).toContain("tiled")
     expect(commands).toContainEqual(["resize-pane", "-t", process.env.TMUX_PANE ?? "", "-x", "30%"])
     expect(result).not.toBeNull()
     expect(Object.keys(result?.focusPanesByMember ?? {}).sort()).toEqual(["m1", "m2", "m3"])
-    expect(Object.keys(result?.gridPanesByMember ?? {})).toEqual([])
+    expect(Object.keys(result?.gridPanesByMember ?? {}).sort()).toEqual(["m1", "m2", "m3"])
+    // Without refresh-client, attached tmux clients can leave the freshly-
+    // split panes blank-rendered until the user types or focuses a pane —
+    // which makes the live-tail look frozen even though it's streaming.
+    const refreshIdx = commands.findIndex((args) => args[0] === "refresh-client")
+    const lastResizeIdx = commands.map((c) => c[0]).lastIndexOf("resize-pane")
+    const mainSelectLayoutIdx = commands.findIndex((args) => args[0] === "select-layout" && args[args.length - 1] === "main-vertical")
+    expect(refreshIdx).toBeGreaterThan(mainSelectLayoutIdx)
+    expect(refreshIdx).toBeGreaterThan(lastResizeIdx)
   })
 
   test("#given 4 or more teammates #when createTeamLayout runs #then it keeps every teammate in the caller window", async () => {
@@ -234,11 +266,11 @@ describe("team-layout-tmux", () => {
 
     // then
     const commands = getCommands()
-    expect(commands.some((args) => args[0] === "new-window")).toBe(false)
-    expect(commands.filter((args) => args[0] === "split-window")).toHaveLength(5)
+    expect(commands.filter((args) => args[0] === "new-window")).toHaveLength(1)
+    expect(commands.filter((args) => args[0] === "split-window")).toHaveLength(9)
     const selectLayoutArgs = commands.filter((args) => args[0] === "select-layout").map((args) => args[args.length - 1])
     expect(selectLayoutArgs).toContain("main-vertical")
-    expect(selectLayoutArgs).not.toContain("tiled")
+    expect(selectLayoutArgs).toContain("tiled")
   })
 
   test("#given caller inside tmux #when createTeamLayout runs #then it never steals focus or mutates window border options", async () => {
@@ -259,7 +291,30 @@ describe("team-layout-tmux", () => {
     expect(commands.some((args) => args[0] === "set-option")).toBe(false)
   })
 
-  test("#given ownedSession=false, focusWindowId=@10, gridWindowId=@11 #when removeTeamLayout runs #then tmux kill-window is called twice with -t @10 and -t @11 and kill-session is NEVER called", async () => {
+  test("#given ownedSession=false and paneIds are provided #when removeTeamLayout runs #then tmux kills panes and reaps only the live-tail window", async () => {
+    // given
+    const { removeTeamLayout } = await loadLayoutModule()
+
+    // when
+    await removeTeamLayout("run-cleanup", {
+      ownedSession: false,
+      targetSessionId: "$caller",
+      focusWindowId: "@10",
+      gridWindowId: "@11",
+      paneIds: ["%1", "%2", "%3"],
+    }, tmuxMgr as never)
+
+    // then
+    const commands = getCommands()
+    expect(commands).toContainEqual(["kill-pane", "-t", "%1"])
+    expect(commands).toContainEqual(["kill-pane", "-t", "%2"])
+    expect(commands).toContainEqual(["kill-pane", "-t", "%3"])
+    expect(commands).toContainEqual(["kill-window", "-t", "@11"])
+    expect(commands).not.toContainEqual(["kill-window", "-t", "@10"])
+    expect(commands.some((args) => args[0] === "kill-session")).toBe(false)
+  })
+
+  test("#given ownedSession=false, no paneIds, focusWindowId=@10, gridWindowId=@11 #when removeTeamLayout runs #then ONLY gridWindowId is killed (focusWindowId is the caller's window) and kill-session is NEVER called", async () => {
     // given
     const { removeTeamLayout } = await loadLayoutModule()
 
@@ -273,8 +328,27 @@ describe("team-layout-tmux", () => {
 
     // then
     const commands = getCommands()
-    expect(commands).toContainEqual(["kill-window", "-t", "@10"])
+    // The caller's window (@10) MUST NOT be killed when ownedSession=false —
+    // doing so destroys the lead's pane and any sibling user panes.
+    expect(commands).not.toContainEqual(["kill-window", "-t", "@10"])
     expect(commands).toContainEqual(["kill-window", "-t", "@11"])
+    expect(commands.some((args) => args[0] === "kill-session")).toBe(false)
+  })
+
+  test("#given ownedSession=false, no paneIds, only focusWindowId set #when removeTeamLayout runs #then no windows are killed (no-op cleanup is safer than destroying the caller's window)", async () => {
+    // given
+    const { removeTeamLayout } = await loadLayoutModule()
+
+    // when
+    await removeTeamLayout("run-cleanup", {
+      ownedSession: false,
+      targetSessionId: "$caller",
+      focusWindowId: "@10",
+    }, tmuxMgr as never)
+
+    // then
+    const commands = getCommands()
+    expect(commands.some((args) => args[0] === "kill-window")).toBe(false)
     expect(commands.some((args) => args[0] === "kill-session")).toBe(false)
   })
 
@@ -295,14 +369,12 @@ describe("team-layout-tmux", () => {
     expect(commands).toContainEqual(["kill-session", "-t", "omo-team-xyz"])
   })
 
-  test("#given ownedSession=false and the first kill-window fails #when removeTeamLayout runs #then the second kill-window still fires", async () => {
+  test("#given ownedSession=false and kill-window on the grid window fails #when removeTeamLayout runs #then the failure is swallowed without ever attempting to kill the caller's focusWindowId", async () => {
     // given
     const { removeTeamLayout } = await loadLayoutModule()
-    let killWindowCallCount = 0
     runTmuxCommandMock.mockImplementation((_tmuxPath: string, args: Array<string>, _options?: unknown) => {
       if (args[0] === "kill-window") {
-        killWindowCallCount += 1
-        return Promise.resolve(createTmuxCommandResult("", killWindowCallCount > 1))
+        return Promise.resolve(createTmuxCommandResult("", false))
       }
 
       const command = args[0]
@@ -332,10 +404,9 @@ describe("team-layout-tmux", () => {
 
     // then
     const commands = getCommands().filter((args) => args[0] === "kill-window")
-    expect(commands).toEqual([
-      ["kill-window", "-t", "@10"],
-      ["kill-window", "-t", "@11"],
-    ])
+    // Only the grid window (@11) is attempted; the caller's window (@10) is
+    // never touched even when the grid kill fails.
+    expect(commands).toEqual([["kill-window", "-t", "@11"]])
   })
 
   test("skips all panes when lead member missing", async () => {
@@ -367,7 +438,7 @@ describe("team-layout-tmux", () => {
       // then
       const commands = getCommands()
       expect(commands.some((args) => args[0] === "new-session")).toBe(false)
-      expect(commands.filter((args) => args[0] === "new-window").length).toBe(0)
+      expect(commands.filter((args) => args[0] === "new-window").length).toBe(1)
       expect(commands.some((args) => args[0] === "split-window" && args.includes(process.env.TMUX_PANE ?? ""))).toBe(true)
     })
 
@@ -398,7 +469,7 @@ describe("team-layout-tmux", () => {
       expect(splitCalls).toEqual([
         ["split-window", "-t", process.env.TMUX_PANE ?? "", "-h", "-l", "70%", "-P", "-F", "#{pane_id}", "-c", "/tmp/m1"],
       ])
-      expect(commands.filter((args) => args[0] === "new-window").length).toBe(0)
+      expect(commands.filter((args) => args[0] === "new-window").length).toBe(1)
     })
 
     test("#given 3 members #when createTeamLayout runs #then focusPanesByMember contains 3 distinct pane ids", async () => {
@@ -419,7 +490,7 @@ describe("team-layout-tmux", () => {
       expect(new Set(Object.values(result?.focusPanesByMember ?? {})).size).toBe(3)
     })
 
-    test("#given layout created #when createTeamLayout runs #then it records focus panes only", async () => {
+    test("#given layout created #when createTeamLayout runs #then it records focus and live-tail panes", async () => {
       // given
       const { createTeamLayout } = await loadLayoutModule()
       const members = [
@@ -434,10 +505,10 @@ describe("team-layout-tmux", () => {
       const commands = getCommands()
       expect(result).not.toBeNull()
       expect(Object.keys(result?.focusPanesByMember ?? {}).sort()).toEqual(["m1", "m2"])
-      expect(Object.keys(result?.gridPanesByMember ?? {})).toEqual([])
+      expect(Object.keys(result?.gridPanesByMember ?? {}).sort()).toEqual(["m1", "m2"])
       expect(result?.focusWindowId).toBe("test-session:0")
-      expect(result?.gridWindowId).toBeUndefined()
-      expect(commands.filter((args) => args[0] === "new-window").length).toBe(0)
+      expect(result?.gridWindowId).toBe("@1")
+      expect(commands.filter((args) => args[0] === "new-window").length).toBe(1)
       expect(commands.some((args) => args[0] === "send-keys" && args.includes("Enter"))).toBe(true)
     })
   })

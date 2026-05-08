@@ -1,4 +1,5 @@
 import { log } from "../../../shared"
+import { shellSingleQuote } from "../../../shared/shell-env"
 import * as sharedTmuxModule from "../../../shared/tmux"
 import * as tmuxPathResolverModule from "../../../tools/interactive-bash/tmux-path-resolver"
 import type { TmuxSessionManager } from "../../tmux-subagent/manager"
@@ -7,6 +8,7 @@ import { resolveCallerTmuxSession } from "./resolve-caller-tmux-session"
 
 type TeamLayoutMember = { name: string; sessionId: string; worktreePath?: string }
 type TmuxCommandResult = Awaited<ReturnType<typeof sharedTmuxModule.runTmuxCommand>>
+type TeamLayoutOptions = { allowInsecureLocalTls?: boolean }
 
 export type TeamLayoutDeps = {
   runTmuxCommand: (tmuxPath: string, args: Array<string>, options?: Parameters<typeof sharedTmuxModule.runTmuxCommand>[2]) => Promise<TmuxCommandResult>
@@ -45,12 +47,12 @@ function getPaneWorkingDirectory(member: TeamLayoutMember): string {
   return member.worktreePath ?? process.cwd()
 }
 
-function buildAttachCommand(member: TeamLayoutMember, serverUrl: string): string {
-  // Team workers carry parentID=lead, which puts OpenCode TUI's `attach
-  // --session <child>` into the static subagent-detail mode (no streaming,
-  // no prompt). The live-tail renders message updates from /event SSE so
-  // the worker pane actually shows live activity.
-  return buildLiveTailCommand(serverUrl, member.sessionId)
+function buildAttachCommand(member: TeamLayoutMember): string {
+  return `opencode attach --session ${shellSingleQuote(member.sessionId)}`
+}
+
+function buildMemberLiveTailCommand(member: TeamLayoutMember, serverUrl: string, options?: TeamLayoutOptions): string {
+  return buildLiveTailCommand(serverUrl, member.sessionId, { allowInsecureTls: options?.allowInsecureLocalTls })
 }
 
 async function listPanesInWindow(tmuxPath: string, windowTarget: string, deps: TeamLayoutDeps): Promise<Array<string>> {
@@ -86,7 +88,6 @@ async function createTeamLayoutInCallerWindow(
   callerPaneId: string,
   windowTarget: string,
   members: Array<TeamLayoutMember>,
-  serverUrl: string,
   deps: TeamLayoutDeps,
 ): Promise<{ focusWindowId: string; focusPanesByMember: Record<string, string> } | null> {
   const panesByMember: Record<string, string> = {}
@@ -101,7 +102,7 @@ async function createTeamLayoutInCallerWindow(
     teammatePanes = [...teammatePanes, paneId]
     panesByMember[member.name] = paneId
     await deps.runTmuxCommand(tmuxPath, ["select-pane", "-t", paneId, "-T", member.name])
-    await deps.runTmuxCommand(tmuxPath, ["send-keys", "-t", paneId, buildAttachCommand(member, serverUrl), "Enter"])
+    await deps.runTmuxCommand(tmuxPath, ["send-keys", "-t", paneId, buildAttachCommand(member), "Enter"])
   }
 
   const layoutResult = await deps.runTmuxCommand(tmuxPath, ["select-layout", "-t", windowTarget, "main-vertical"])
@@ -110,10 +111,77 @@ async function createTeamLayoutInCallerWindow(
   const resizeResult = await deps.runTmuxCommand(tmuxPath, ["resize-pane", "-t", callerPaneId, "-x", "30%"])
   if (!resizeResult.success) return null
 
+  await deps.runTmuxCommand(tmuxPath, ["refresh-client"])
+
   return { focusWindowId: windowTarget, focusPanesByMember: panesByMember }
 }
 
-export async function createTeamLayout(teamRunId: string, members: Array<TeamLayoutMember>, tmuxMgr: TmuxSessionManager, deps: TeamLayoutDeps = defaultDeps): Promise<TeamLayoutResult | null> {
+function parseNewWindowOutput(output: string): { windowId: string; paneId: string } | null {
+  const [windowId, paneId] = output.trim().split(/\s+/, 2)
+  if (!windowId || !paneId) return null
+  return { windowId, paneId }
+}
+
+async function createLiveTailWindow(
+  tmuxPath: string,
+  targetSessionId: string,
+  members: Array<TeamLayoutMember>,
+  serverUrl: string,
+  deps: TeamLayoutDeps,
+  options?: TeamLayoutOptions,
+): Promise<{ gridWindowId: string; gridPanesByMember: Record<string, string> } | null> {
+  const [firstMember, ...remainingMembers] = members
+  if (!firstMember) return null
+
+  const liveWindowName = `team-live-${Date.now().toString(36)}`
+  const created = await deps.runTmuxCommand(tmuxPath, [
+    "new-window",
+    "-t",
+    targetSessionId,
+    "-n",
+    liveWindowName,
+    "-P",
+    "-F",
+    "#{window_id} #{pane_id}",
+    "-c",
+    getPaneWorkingDirectory(firstMember),
+  ])
+  if (!created.success || !created.output) return null
+
+  const parsed = parseNewWindowOutput(created.output)
+  if (!parsed) return null
+
+  const panesByMember: Record<string, string> = { [firstMember.name]: parsed.paneId }
+  let livePanes = [parsed.paneId]
+
+  await deps.runTmuxCommand(tmuxPath, ["select-pane", "-t", parsed.paneId, "-T", `${firstMember.name} live`])
+  await deps.runTmuxCommand(tmuxPath, ["send-keys", "-t", parsed.paneId, buildMemberLiveTailCommand(firstMember, serverUrl, options), "Enter"])
+
+  for (const member of remainingMembers) {
+    const split = await deps.runTmuxCommand(tmuxPath, buildSplitArgs(parsed.paneId, livePanes, member))
+    if (!split.success || !split.output) return null
+
+    const paneId = split.output.trim()
+    livePanes = [...livePanes, paneId]
+    panesByMember[member.name] = paneId
+    await deps.runTmuxCommand(tmuxPath, ["select-pane", "-t", paneId, "-T", `${member.name} live`])
+    await deps.runTmuxCommand(tmuxPath, ["send-keys", "-t", paneId, buildMemberLiveTailCommand(member, serverUrl, options), "Enter"])
+  }
+
+  const layoutResult = await deps.runTmuxCommand(tmuxPath, ["select-layout", "-t", parsed.windowId, "tiled"])
+  if (!layoutResult.success) return null
+  await deps.runTmuxCommand(tmuxPath, ["refresh-client"])
+
+  return { gridWindowId: parsed.windowId, gridPanesByMember: panesByMember }
+}
+
+export async function createTeamLayout(
+  teamRunId: string,
+  members: Array<TeamLayoutMember>,
+  tmuxMgr: TmuxSessionManager,
+  deps: TeamLayoutDeps = defaultDeps,
+  options?: TeamLayoutOptions,
+): Promise<TeamLayoutResult | null> {
   if (!canVisualize()) {
     log("tmux visualization unavailable, skipping")
     return null
@@ -141,14 +209,30 @@ export async function createTeamLayout(teamRunId: string, members: Array<TeamLay
       return null
     }
 
-    const focus = await createTeamLayoutInCallerWindow(tmuxPath, callerSession.paneId, callerSession.windowTarget, members, serverUrl, deps)
+    const focus = await createTeamLayoutInCallerWindow(
+      tmuxPath,
+      callerSession.paneId,
+      callerSession.windowTarget,
+      members,
+      deps,
+    )
     if (!focus) return null
+
+    const liveTail = await createLiveTailWindow(
+      tmuxPath,
+      callerSession.sessionId,
+      members,
+      serverUrl,
+      deps,
+      options,
+    )
+    if (!liveTail) return null
 
     return {
       focusWindowId: focus.focusWindowId,
-      gridWindowId: undefined,
+      gridWindowId: liveTail.gridWindowId,
       focusPanesByMember: focus.focusPanesByMember,
-      gridPanesByMember: {},
+      gridPanesByMember: liveTail.gridPanesByMember,
       targetSessionId: callerSession.sessionId,
       ownedSession: false,
     }
@@ -187,10 +271,18 @@ export async function removeTeamLayout(
           log("tmux team pane cleanup failed", { teamRunId, paneId })
         }
       }
-      return
     }
 
-    for (const windowId of [cleanupTarget.focusWindowId, cleanupTarget.gridWindowId]) {
+    // When `ownedSession=false`, `focusWindowId` is the CALLER'S window
+    // (createTeamLayoutInCallerWindow reuses it); killing it would destroy
+    // the lead's pane and any sibling user panes. Only `gridWindowId` is
+    // ours to reap in that case. Even after pane cleanup, explicitly reaping
+    // the grid window prevents an empty live-tail window from being left
+    // behind on tmux versions that do not close it after the last pane kill.
+    const windowsToKill = cleanupTarget.ownedSession === false
+      ? [cleanupTarget.gridWindowId]
+      : [cleanupTarget.focusWindowId, cleanupTarget.gridWindowId]
+    for (const windowId of windowsToKill) {
       if (!windowId) continue
       try {
         await resolvedDeps.runTmuxCommand(tmuxPath, ["kill-window", "-t", windowId])
