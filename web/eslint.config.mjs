@@ -18,7 +18,7 @@ export default [
       },
     },
   },
-  nextPlugin.configs["core-web-vitals"],
+  nextPlugin.flatConfig.coreWebVitals,
   ...tseslint.configs.recommended,
   prettier,
   {
