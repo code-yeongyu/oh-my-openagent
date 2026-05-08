@@ -1,7 +1,8 @@
-import { describe, expect, it } from "bun:test"
+import { beforeEach, describe, expect, it } from "bun:test"
 import { fsyncSync } from "node:fs"
 import type { FileHandle } from "node:fs/promises"
 
+import { clearAllSkips, drainSkipsAfter } from "./fsync-skip-tracker"
 import { isToleratedFsyncError, tolerantFsync, tolerantFsyncSync } from "./tolerant-fsync"
 
 function makeFsError(code: string, message?: string): NodeJS.ErrnoException {
@@ -60,6 +61,10 @@ describe("isToleratedFsyncError", () => {
 })
 
 describe("tolerantFsync (async)", () => {
+  beforeEach(() => {
+    clearAllSkips()
+  })
+
   it("#given fsync throws EPERM #when called #then resolves without throwing", async () => {
     const handle = fakeHandleWithSyncError(makeFsError("EPERM", "operation not permitted, fsync"))
     await expect(tolerantFsync(handle, "test:async-eperm")).resolves.toBeUndefined()
@@ -99,6 +104,24 @@ describe("tolerantFsync (async)", () => {
     } as FileHandle
     await tolerantFsync(handle, "test:async-success")
     expect(syncCalled).toBe(true)
+  })
+
+  it("#given fsync throws EPERM #when called #then tracker records one skip", async () => {
+    const handle = fakeHandleWithSyncError(makeFsError("EPERM", "operation not permitted, fsync"))
+
+    await tolerantFsync(handle, "atomicWrite:/Users/x/Library/Mobile Documents/com~apple~CloudDocs/file.txt")
+
+    const entries = drainSkipsAfter(0)
+    expect(entries).toHaveLength(1)
+    expect(entries[0]?.errorCode).toBe("EPERM")
+  })
+
+  it("#given fsync throws EIO #when called #then tracker remains empty", async () => {
+    const handle = fakeHandleWithSyncError(makeFsError("EIO"))
+
+    await expect(tolerantFsync(handle, "atomicWrite:/tmp/file.txt")).rejects.toThrow("EIO: simulated")
+
+    expect(drainSkipsAfter(0)).toHaveLength(0)
   })
 })
 
