@@ -1,7 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 
 import { isCallerOrchestrator } from "../../shared/session-utils"
-import { SYSTEM_DIRECTIVE_PREFIX } from "../../shared/system-directive"
+import { containsSystemDirective } from "../../shared/system-directive"
 import { log } from "../../shared/logger"
 import { HOOK_NAME, NOTEPAD_DIRECTIVE } from "./constants"
 
@@ -27,8 +27,8 @@ export function createSisyphusJuniorNotepadHook(ctx: PluginInput) {
         return
       }
 
-      // 4. Check for double injection
-      if (prompt.includes(SYSTEM_DIRECTIVE_PREFIX)) {
+      // 4. Check for double injection (recognizes both current and legacy prefix)
+      if (containsSystemDirective(prompt)) {
         return
       }
 

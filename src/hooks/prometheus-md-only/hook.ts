@@ -1,7 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { HOOK_NAME, BLOCKED_TOOLS, PLANNING_CONSULT_WARNING, PROMETHEUS_WORKFLOW_REMINDER } from "./constants"
 import { log } from "../../shared/logger"
-import { SYSTEM_DIRECTIVE_PREFIX } from "../../shared/system-directive"
+import { containsSystemDirective } from "../../shared/system-directive"
 import { getAgentDisplayName } from "../../shared/agent-display-names"
 import { getAgentFromSession } from "./agent-resolution"
 import { isPrometheusAgent } from "./agent-matcher"
@@ -26,7 +26,7 @@ export function createPrometheusMdOnlyHook(ctx: PluginInput) {
       // Inject planning-only warning for task tools called by Prometheus
        if (TASK_TOOLS.includes(toolName)) {
          const prompt = output.args.prompt as string | undefined
-         if (prompt && !prompt.includes(SYSTEM_DIRECTIVE_PREFIX)) {
+         if (prompt && !containsSystemDirective(prompt)) {
            output.args.prompt = PLANNING_CONSULT_WARNING + prompt
           log(`[${HOOK_NAME}] Injected planning warning to ${toolName}`, {
             sessionID: input.sessionID,

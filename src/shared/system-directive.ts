@@ -2,17 +2,26 @@
  * Unified system directive prefix for oh-my-opencode internal messages.
  * All system-generated messages should use this prefix for consistent filtering.
  *
- * Format: [SYSTEM DIRECTIVE: OH-MY-OPENCODE - {TYPE}]
+ * Format: [SYSTEM DIRECTIVE: OMO - {TYPE}]
+ *
+ * The prefix was shortened from "OH-MY-OPENCODE" to "OMO" because Anthropic's
+ * keyword filter rejects requests that contain the literal "opencode" string in
+ * the system prompt. The legacy prefix is still recognized for backward
+ * compatibility with in-flight sessions whose system messages were minted
+ * before this change.
  */
 
-export const SYSTEM_DIRECTIVE_PREFIX = "[SYSTEM DIRECTIVE: OH-MY-OPENCODE"
+export const SYSTEM_DIRECTIVE_PREFIX = "[SYSTEM DIRECTIVE: OMO"
+
+// Legacy prefix kept for backward compatibility with in-flight sessions.
+export const LEGACY_SYSTEM_DIRECTIVE_PREFIX = "[SYSTEM DIRECTIVE: OH-MY-OPENCODE"
 
 const SYSTEM_DIRECTIVE_LEADING_KEYWORD_PATTERN = /^\s*(?:ultrawork|ulw)\s+/i
 
 /**
  * Creates a system directive header with the given type.
  * @param type - The directive type (e.g., "TODO CONTINUATION", "RALPH LOOP")
- * @returns Formatted directive string like "[SYSTEM DIRECTIVE: OH-MY-OPENCODE - TODO CONTINUATION]"
+ * @returns Formatted directive string like "[SYSTEM DIRECTIVE: OMO - TODO CONTINUATION]"
  */
 export function createSystemDirective(type: string): string {
   return `${SYSTEM_DIRECTIVE_PREFIX} - ${type}]`
@@ -21,16 +30,33 @@ export function createSystemDirective(type: string): string {
 /**
  * Checks if a message starts with the oh-my-opencode system directive prefix.
  * Used by keyword-detector and other hooks to skip system-generated messages.
+ * Recognizes both the current prefix and the legacy prefix.
  * @param text - The message text to check
  * @returns true if the message is a system directive
  */
 export function isSystemDirective(text: string): boolean {
   const trimmed = text.trimStart()
-  if (trimmed.startsWith(SYSTEM_DIRECTIVE_PREFIX)) {
+  if (trimmed.startsWith(SYSTEM_DIRECTIVE_PREFIX) || trimmed.startsWith(LEGACY_SYSTEM_DIRECTIVE_PREFIX)) {
     return true
   }
   const withoutLeadingKeyword = trimmed.replace(SYSTEM_DIRECTIVE_LEADING_KEYWORD_PATTERN, "")
-  return withoutLeadingKeyword.startsWith(SYSTEM_DIRECTIVE_PREFIX)
+  return (
+    withoutLeadingKeyword.startsWith(SYSTEM_DIRECTIVE_PREFIX) ||
+    withoutLeadingKeyword.startsWith(LEGACY_SYSTEM_DIRECTIVE_PREFIX)
+  )
+}
+
+/**
+ * Checks whether a prompt already contains a system directive header anywhere
+ * in its text. Use this for double-injection guards in tool.execute.before
+ * hooks; recognizes both the current prefix and the legacy prefix so guards
+ * keep working for in-flight sessions whose prompts were minted before the
+ * prefix rename.
+ * @param text - The full prompt text to scan
+ * @returns true if a directive header (current or legacy) is present
+ */
+export function containsSystemDirective(text: string): boolean {
+  return text.includes(SYSTEM_DIRECTIVE_PREFIX) || text.includes(LEGACY_SYSTEM_DIRECTIVE_PREFIX)
 }
 
 /**

@@ -4,6 +4,9 @@ import {
   removeSystemReminders,
   isSystemDirective,
   createSystemDirective,
+  containsSystemDirective,
+  LEGACY_SYSTEM_DIRECTIVE_PREFIX,
+  SYSTEM_DIRECTIVE_PREFIX,
 } from "./system-directive"
 
 describe("system-directive utilities", () => {
@@ -184,6 +187,64 @@ const x = 1;
 
       // when
       const result = isSystemDirective(text)
+
+      // then
+      expect(result).toBe(false)
+    })
+
+    test("#given a directive minted with the legacy OH-MY-OPENCODE prefix #when checking #then returns true (issue #3435)", () => {
+      // given: in-flight session whose directive was minted before the prefix rename
+      const directive = `${LEGACY_SYSTEM_DIRECTIVE_PREFIX} - SINGLE TASK ONLY]\n\nbody`
+
+      // when
+      const result = isSystemDirective(directive)
+
+      // then
+      expect(result).toBe(true)
+    })
+
+    test("#given a directive minted with the new OMO prefix #when checking #then returns true (issue #3435)", () => {
+      // given: directive created after the rename
+      const directive = createSystemDirective("SINGLE TASK ONLY")
+      expect(directive.startsWith(SYSTEM_DIRECTIVE_PREFIX)).toBe(true)
+
+      // when
+      const result = isSystemDirective(directive)
+
+      // then
+      expect(result).toBe(true)
+    })
+  })
+
+  describe("containsSystemDirective", () => {
+    test("#given prompt that already includes the new prefix anywhere #when checking #then returns true (issue #3435)", () => {
+      // given: another guard previously appended a directive somewhere in the body
+      const prompt = `Some preamble\n${createSystemDirective("NOTEPAD INJECTION")}\nrest of prompt`
+
+      // when
+      const result = containsSystemDirective(prompt)
+
+      // then
+      expect(result).toBe(true)
+    })
+
+    test("#given prompt that includes the legacy prefix anywhere #when checking #then returns true (issue #3435)", () => {
+      // given: in-flight session whose prompt still carries the OH-MY-OPENCODE marker
+      const prompt = `User prompt\n[SYSTEM DIRECTIVE: OH-MY-OPENCODE - SINGLE TASK ONLY]\nrest`
+
+      // when
+      const result = containsSystemDirective(prompt)
+
+      // then: legacy detection MUST still trip, otherwise hooks would double-inject
+      expect(result).toBe(true)
+    })
+
+    test("#given prompt with no system directive markers #when checking #then returns false", () => {
+      // given
+      const prompt = "Plain user prompt with no oh-my-opencode directives"
+
+      // when
+      const result = containsSystemDirective(prompt)
 
       // then
       expect(result).toBe(false)
