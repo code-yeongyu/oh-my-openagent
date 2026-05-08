@@ -17,8 +17,15 @@ import { buildTeammateCommunicationAddendum } from "../member-guidance"
 import { resolveMember } from "./resolve-member"
 import { shouldReuseCallerLeadSession } from "../resolve-caller-team-lead"
 import { sweepStaleTeamSessions } from "../team-layout-tmux/sweep-stale-team-sessions"
+import { resolveSandboxedWorktreePath } from "../team-worktree/manager"
 
 const SESSION_ID_POLL_MS = 25
+const EXISTING_RUNTIME_STATUSES = new Set<RuntimeState["status"]>([
+  "creating",
+  "active",
+  "shutdown_requested",
+  "orphaned",
+])
 
 type SpawnedMemberResource = {
   taskId?: string
@@ -69,14 +76,20 @@ async function resolveSpecSource(spec: TeamSpec, ctx: ExecutorContext, config: T
 
 async function findExistingRuntime(spec: TeamSpec, leadSessionId: string, config: TeamModeConfig): Promise<RuntimeState | undefined> {
   for (const candidate of await listActiveTeams(config)) {
-    if (candidate.teamName !== spec.name || (candidate.status !== "creating" && candidate.status !== "active")) continue
+    if (candidate.teamName !== spec.name || !EXISTING_RUNTIME_STATUSES.has(candidate.status as RuntimeState["status"])) continue
     const runtimeState = await loadRuntimeState(candidate.teamRunId, config).catch(() => undefined)
     if (runtimeState?.leadSessionId === leadSessionId) return runtimeState
   }
 }
 
-async function createMemberWorktree(memberWorktreePath: string, projectRoot: string): Promise<string> {
-  const absolutePath = path.isAbsolute(memberWorktreePath) ? memberWorktreePath : path.resolve(projectRoot, memberWorktreePath)
+async function createMemberWorktree(
+  memberWorktreePath: string,
+  projectRoot: string,
+  config: TeamModeConfig,
+): Promise<string> {
+  const absolutePath = resolveSandboxedWorktreePath(projectRoot, memberWorktreePath, {
+    worktreeBaseDir: path.join(resolveBaseDir(config), "worktrees"),
+  })
   await mkdir(absolutePath, { recursive: true })
   return absolutePath
 }
@@ -173,7 +186,7 @@ export async function createTeamRun(
         if (!resource) return
 
         try {
-          if (member.worktreePath) resource.worktreePath = await createMemberWorktree(member.worktreePath, ctx.directory)
+          if (member.worktreePath) resource.worktreePath = await createMemberWorktree(member.worktreePath, ctx.directory, config)
           if (reusesCallerLeadSession && member.name === spec.leadAgentId) {
             if (resource.worktreePath) {
               await transitionRuntimeState(runtimeState.teamRunId, (currentState) => ({

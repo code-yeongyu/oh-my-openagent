@@ -151,18 +151,6 @@ function normalizeInlineMember(member: JsonRecord, options?: NormalizeTeamSpecIn
       normalizedMember.kind = "category"
       normalizedMember.category = options.defaultCategoryName
     }
-  } else if (normalizedMember.kind !== "category" && normalizedMember.kind !== "subagent_type") {
-    if (typeof normalizedMember.category === "string") {
-      normalizedMember.kind = "category"
-    } else if (typeof normalizedMember.subagent_type === "string") {
-      normalizedMember.kind = "subagent_type"
-    } else if (typeof rawKind === "string" && rawKind !== "agent" && rawKind !== "member" && rawKind !== "worker" && rawKind !== "analyst") {
-      normalizedMember.kind = "category"
-      normalizedMember.category = rawKind
-    } else if (options?.defaultCategoryName !== undefined) {
-      normalizedMember.kind = "category"
-      normalizedMember.category = options.defaultCategoryName
-    }
   }
 
   if (normalizedMember.kind === "category" && normalizedMember.prompt === undefined) {

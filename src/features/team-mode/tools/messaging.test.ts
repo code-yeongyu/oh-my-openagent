@@ -175,6 +175,21 @@ describe("createTeamSendMessageTool", () => {
     expect(message.from).toBe("m1")
   })
 
+  test("rejects direct messages to non-existent recipients", async () => {
+    // given
+    const fixture = await createTeamFixture()
+
+    // when
+    const result = fixture.tool.execute({
+      teamRunId: fixture.teamRunId,
+      to: "ghost-member",
+      body: "hello",
+    }, fixture.toolContext(fixture.memberOneSessionId))
+
+    // then
+    await expect(result).rejects.toThrow("team recipient 'ghost-member' does not exist")
+  })
+
   test("gates broadcast to the lead and fans out to active members", async () => {
     // given
     const fixture = await createTeamFixture()
@@ -435,6 +450,21 @@ describe("createTeamSendMessageTool", () => {
     const [messageFile] = (await readdir(inboxDir)).filter((entry) => entry.endsWith(".json"))
     const message = MessageSchema.parse(JSON.parse(await readFile(path.join(inboxDir, messageFile), "utf8")))
     expect(message.from).toBe("m1")
+  })
+
+  test("rejects send_message from a non-participant session instead of falling back to unknown sender", async () => {
+    // given
+    const fixture = await createTeamFixture()
+
+    // when
+    const result = fixture.tool.execute({
+      teamRunId: fixture.teamRunId,
+      to: "m2",
+      body: "hello",
+    }, fixture.toolContext(randomUUID()))
+
+    // then
+    await expect(result).rejects.toThrow("team participant not found for session")
   })
 
   test("acks the message after live delivery so the transform hook does not redeliver", async () => {

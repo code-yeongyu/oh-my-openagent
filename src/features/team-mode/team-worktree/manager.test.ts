@@ -23,6 +23,12 @@ async function initGitRepo(): Promise<string> {
   return repositoryRoot
 }
 
+async function createSafeWorktreeBaseDir(): Promise<string> {
+  const worktreeBaseDir = await fs.mkdtemp(path.join(tmpdir(), "team-worktree-safe-"))
+  temporaryDirectories.push(worktreeBaseDir)
+  return worktreeBaseDir
+}
+
 beforeAll(() => {
   mock.restore()
 })
@@ -38,11 +44,11 @@ describe("team-worktree manager", () => {
   test("given tmp git repo when createWorktree then registers detached worktree", async () => {
     // given
     const repositoryRoot = await initGitRepo()
-    const worktreePath = `../worktree-${randomUUID()}`
-    const worktreeDirectory = path.resolve(repositoryRoot, worktreePath)
+    const worktreeBaseDir = await createSafeWorktreeBaseDir()
+    const worktreeDirectory = path.join(worktreeBaseDir, `worktree-${randomUUID()}`)
 
     // when
-    const resultPath = await createWorktree(repositoryRoot, "t1", "m1", worktreePath, {})
+    const resultPath = await createWorktree(repositoryRoot, "t1", "m1", worktreeDirectory, { worktreeBaseDir })
 
     // then
     expect(resultPath).toBe(worktreeDirectory)
@@ -68,6 +74,7 @@ describe("team-worktree manager", () => {
   test("given git unavailable when createWorktree then throws unavailable error", async () => {
     // given
     const repositoryRoot = await initGitRepo()
+    const worktreeBaseDir = await createSafeWorktreeBaseDir()
     setGitCommandRunnerForTests(async (args) => {
       if (args[0] === "--version") {
         return { code: 1, stderr: "git missing" }
@@ -77,7 +84,13 @@ describe("team-worktree manager", () => {
     })
 
     // when
-    const create = createWorktree(repositoryRoot, "t1", "m1", `../worktree-${randomUUID()}`, {})
+    const create = createWorktree(
+      repositoryRoot,
+      "t1",
+      "m1",
+      path.join(worktreeBaseDir, `worktree-${randomUUID()}`),
+      { worktreeBaseDir },
+    )
 
     // then
     await expect(create).rejects.toBeInstanceOf(GitUnavailableError)
@@ -90,15 +103,42 @@ describe("team-worktree manager", () => {
     })
   })
 
-  test("given created worktree when removeWorktree then directory disappears", async () => {
+  test("given created worktree when removeWorktree then directory disappears and git metadata is cleaned up", async () => {
     // given
     const repositoryRoot = await initGitRepo()
-    const worktreePath = await createWorktree(repositoryRoot, "t1", "m1", `../worktree-${randomUUID()}`, {})
+    const worktreeBaseDir = await createSafeWorktreeBaseDir()
+    const worktreePath = await createWorktree(
+      repositoryRoot,
+      "t1",
+      "m1",
+      path.join(worktreeBaseDir, `worktree-${randomUUID()}`),
+      { worktreeBaseDir },
+    )
 
     // when
     await removeWorktree(worktreePath)
 
     // then
     await expect(fs.stat(worktreePath)).rejects.toThrow()
+    const listResult = Bun.spawnSync(["git", "worktree", "list"], { cwd: repositoryRoot, stdout: "pipe", stderr: "pipe" })
+    expect(new TextDecoder().decode(listResult.stdout)).not.toContain(worktreePath)
+  })
+
+  test("rejects worktree paths outside the repository and configured sandbox", async () => {
+    // given
+    const repositoryRoot = await initGitRepo()
+    const worktreeBaseDir = await createSafeWorktreeBaseDir()
+
+    // when
+    const create = createWorktree(
+      repositoryRoot,
+      "t1",
+      "m1",
+      path.join(tmpdir(), `outside-sandbox-${randomUUID()}`),
+      { worktreeBaseDir },
+    )
+
+    // then
+    await expect(create).rejects.toThrow("worktreePath must stay inside the repository root or configured worktree base directory")
   })
 })

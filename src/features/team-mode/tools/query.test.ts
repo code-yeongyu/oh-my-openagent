@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 
-import { describe, expect, mock, test } from "bun:test"
+import { beforeEach, describe, expect, mock, test } from "bun:test"
 
 import type { ToolContext } from "@opencode-ai/plugin/tool"
 import { TeamModeConfigSchema } from "../../../config/schema/team-mode"
@@ -24,11 +24,27 @@ let listActiveTeamsImplementation: typeof import("../team-state-store/store").li
   throw new Error("listActiveTeamsImplementation not set")
 }
 
+let loadRuntimeStateImplementation: typeof import("../team-state-store/store").loadRuntimeState = async () => ({
+  version: 1,
+  teamRunId: "team-run-1",
+  teamName: "team-alpha",
+  specSource: "project",
+  createdAt: 1,
+  status: "active",
+  leadSessionId: "session",
+  members: [
+    { name: "lead", sessionId: "session", agentType: "leader", status: "running", pendingInjectedMessageIds: [] },
+  ],
+  shutdownRequests: [],
+  bounds: { maxMembers: 8, maxParallelMembers: 4, maxMessagesPerRun: 10000, maxWallClockMinutes: 120, maxMemberTurns: 500 },
+})
+
 const deps = {
   aggregateStatus: (...args: Parameters<typeof aggregateStatusImplementation>) => aggregateStatusImplementation(...args),
   discoverTeamSpecs: (...args: Parameters<typeof discoverTeamSpecsImplementation>) => discoverTeamSpecsImplementation(...args),
   loadTeamSpec: (...args: Parameters<typeof loadTeamSpecImplementation>) => loadTeamSpecImplementation(...args),
   listActiveTeams: (...args: Parameters<typeof listActiveTeamsImplementation>) => listActiveTeamsImplementation(...args),
+  loadRuntimeState: (...args: Parameters<typeof loadRuntimeStateImplementation>) => loadRuntimeStateImplementation(...args),
 }
 
 import { createTeamListTool, createTeamStatusTool } from "./query"
@@ -47,6 +63,35 @@ function createMockContext(): ToolContext {
 }
 
 describe("query tools", () => {
+  beforeEach(() => {
+    aggregateStatusImplementation = async () => {
+      throw new Error("aggregateStatusImplementation not set")
+    }
+    discoverTeamSpecsImplementation = async () => {
+      throw new Error("discoverTeamSpecsImplementation not set")
+    }
+    loadTeamSpecImplementation = async () => {
+      throw new Error("loadTeamSpecImplementation not set")
+    }
+    listActiveTeamsImplementation = async () => {
+      throw new Error("listActiveTeamsImplementation not set")
+    }
+    loadRuntimeStateImplementation = async () => ({
+      version: 1,
+      teamRunId: "team-run-1",
+      teamName: "team-alpha",
+      specSource: "project",
+      createdAt: 1,
+      status: "active",
+      leadSessionId: "session",
+      members: [
+        { name: "lead", sessionId: "session", agentType: "leader", status: "running", pendingInjectedMessageIds: [] },
+      ],
+      shutdownRequests: [],
+      bounds: { maxMembers: 8, maxParallelMembers: 4, maxMessagesPerRun: 10000, maxWallClockMinutes: 120, maxMemberTurns: 500 },
+    })
+  })
+
   test("team_status returns aggregated team status", async () => {
     // given
     const config = TeamModeConfigSchema.parse({ base_dir: "/tmp/team-mode" })
@@ -105,5 +150,34 @@ describe("query tools", () => {
       { name: "foo", scope: "project", status: "not-started", teamRunId: undefined, memberCount: 1 },
       { name: "bar", scope: "user", status: "active", teamRunId: "run-1", memberCount: 3 },
     ])
+  })
+
+  test("team_status rejects a non-participant session", async () => {
+    // given
+    const config = TeamModeConfigSchema.parse({ base_dir: "/tmp/team-mode" })
+    const tool = createTeamStatusTool(config, mockClient, undefined, deps)
+    loadRuntimeStateImplementation = async () => ({
+      version: 1,
+      teamRunId: "team-run-1",
+      teamName: "team-alpha",
+      specSource: "project",
+      createdAt: 1,
+      status: "active",
+      leadSessionId: "lead-session",
+      members: [
+        { name: "lead", sessionId: "lead-session", agentType: "leader", status: "running", pendingInjectedMessageIds: [] },
+      ],
+      shutdownRequests: [],
+      bounds: { maxMembers: 8, maxParallelMembers: 4, maxMessagesPerRun: 10000, maxWallClockMinutes: 120, maxMemberTurns: 500 },
+    })
+
+    // when
+    const result = tool.execute({ teamRunId: "team-run-1" }, {
+      ...createMockContext(),
+      sessionID: "outsider-session",
+    })
+
+    // then
+    await expect(result).rejects.toThrow("team participant not found for session outsider-session")
   })
 })

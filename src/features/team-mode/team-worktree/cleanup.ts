@@ -3,6 +3,7 @@ import path from "node:path"
 
 import type { TeamModeConfig } from "./manager"
 import { spawn as bunSpawn } from "../../../shared/bun-spawn-shim"
+import { RuntimeStateSchema } from "../types"
 
 async function runGit(args: string[]): Promise<{ code: number; stderr: string }> {
   const process = bunSpawn({ cmd: ["git", ...args], stdout: "pipe", stderr: "pipe" })
@@ -10,23 +11,33 @@ async function runGit(args: string[]): Promise<{ code: number; stderr: string }>
   return { code: exitCode, stderr: stderrText }
 }
 
-export async function removeWorktree(worktreePath: string): Promise<void> {
-  await fs.rm(worktreePath, { recursive: true, force: true })
-
+async function resolveWorktreeOwnerRoot(worktreePath: string): Promise<string | undefined> {
   const rootLookup = bunSpawn({
-    cmd: ["git", "-C", worktreePath, "rev-parse", "--show-superproject-working-tree"],
+    cmd: ["git", "-C", worktreePath, "rev-parse", "--git-common-dir"],
     stdout: "pipe",
     stderr: "pipe",
   })
   const [rootExitCode, rootStdout] = await Promise.all([
     rootLookup.exited,
     new Response(rootLookup.stdout).text(),
-    new Response(rootLookup.stderr).text(),
   ])
-  const result =
-    rootExitCode === 0 && rootStdout.trim().length > 0
-      ? await runGit(["-C", rootStdout.trim(), "worktree", "remove", "--force", worktreePath])
-      : await runGit(["worktree", "remove", "--force", worktreePath])
+  if (rootExitCode !== 0 || rootStdout.trim().length === 0) return undefined
+
+  const commonDir = rootStdout.trim()
+  const resolvedCommonDir = path.isAbsolute(commonDir)
+    ? commonDir
+    : path.resolve(worktreePath, commonDir)
+
+  return path.basename(resolvedCommonDir) === ".git"
+    ? path.dirname(resolvedCommonDir)
+    : resolvedCommonDir
+}
+
+export async function removeWorktree(worktreePath: string): Promise<void> {
+  const ownerRoot = await resolveWorktreeOwnerRoot(worktreePath)
+  const result = ownerRoot
+    ? await runGit(["-C", ownerRoot, "worktree", "remove", "--force", worktreePath])
+    : await runGit(["worktree", "remove", "--force", worktreePath])
 
   if (
     result.code !== 0 &&
@@ -37,8 +48,10 @@ export async function removeWorktree(worktreePath: string): Promise<void> {
     throw new Error(result.stderr.trim() || "git worktree remove failed")
   }
 
-  if (rootExitCode === 0 && rootStdout.trim().length > 0) {
-    await runGit(["-C", rootStdout.trim(), "worktree", "prune"])
+  await fs.rm(worktreePath, { recursive: true, force: true })
+
+  if (ownerRoot) {
+    await runGit(["-C", ownerRoot, "worktree", "prune"])
   }
 }
 
@@ -63,9 +76,13 @@ export async function findOrphanWorktrees(baseDir: string, _config: TeamModeConf
 
       try {
         const stateContents = await fs.readFile(statePath, "utf8")
-        const state = JSON.parse(stateContents) as { status?: string }
+        const parsedState = RuntimeStateSchema.safeParse(JSON.parse(stateContents))
+        if (!parsedState.success) {
+          orphanWorktrees.push(worktreePath)
+          continue
+        }
 
-        if (state.status !== "active" && state.status !== "shutdown_requested") {
+        if (parsedState.data.status !== "active" && parsedState.data.status !== "shutdown_requested") {
           orphanWorktrees.push(worktreePath)
         }
       } catch {

@@ -47,7 +47,7 @@ function translateMemberError(
     const subagentType = typeof input.subagent_type === "string" ? input.subagent_type : String(input.subagent_type)
     if (typeof input.subagent_type !== "string" || !agentEligibilityRegistry[input.subagent_type]) {
       return new MemberValidationError(
-        `Unknown subagent_type '${subagentType}'. Available ELIGIBLE agents: sisyphus, atlas, sisyphus-junior, hephaestus (if D-36 applied). Use delegate-task for read-only agents like oracle, librarian, explore, metis, momus, multimodal-looker.`,
+        `Unknown subagent_type '${subagentType}'. Available ELIGIBLE agents: sisyphus, atlas, sisyphus-junior, hephaestus. Use delegate-task for read-only agents like oracle, librarian, explore, metis, momus, multimodal-looker.`,
         name,
         "unknown-subagent",
       )

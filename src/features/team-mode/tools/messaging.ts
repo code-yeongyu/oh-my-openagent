@@ -88,31 +88,31 @@ async function resolveTeamRuntimeDetails(
     }
   }
 
-  try {
-    const runtimeState = await deps.loadRuntimeState(teamRunId, config)
-    const isLead = runtimeState.leadSessionId === sessionID
-    const leadMember = isLead
-      ? runtimeState.members.find((member) => member.agentType === "leader")
-      : undefined
-    const member = runtimeState.members.find((entry) => entry.sessionId === sessionID)
-    const senderName = leadMember?.name ?? member?.name ?? "unknown"
-
-    return {
-      teamRunId: runtimeState.teamRunId,
-      isLead,
-      senderName,
-      activeMembers: runtimeState.members
-        .map((entry) => entry.name)
-        .filter((name) => name !== senderName),
-    }
-  } catch {
-    return {
-      teamRunId,
-      isLead: false,
-      senderName: "unknown",
-      activeMembers: [],
-    }
+  const runtimeState = await deps.loadRuntimeState(teamRunId, config)
+  const isLead = runtimeState.leadSessionId === sessionID
+  const leadMember = isLead
+    ? runtimeState.members.find((member) => member.agentType === "leader")
+    : undefined
+  const member = runtimeState.members.find((entry) => entry.sessionId === sessionID)
+  const senderName = leadMember?.name ?? member?.name
+  if (!senderName) {
+    throw new Error(`team participant not found for session ${sessionID}`)
   }
+
+  return {
+    teamRunId: runtimeState.teamRunId,
+    isLead,
+    senderName,
+    activeMembers: runtimeState.members
+      .map((entry) => entry.name)
+      .filter((name) => name !== senderName),
+  }
+}
+
+function assertRecipientExists(message: Message, memberNames: Set<string>): void {
+  if (message.to === "*") return
+  if (memberNames.has(message.to)) return
+  throw new Error(`team recipient '${message.to}' does not exist`)
 }
 
 async function releaseReservationSafely(
@@ -261,6 +261,8 @@ export function createTeamSendMessageTool(
       }
 
       const runtimeState = await deps.loadRuntimeState(teamRuntime.teamRunId, config)
+      const memberNames = new Set(runtimeState.members.map((member) => member.name))
+      assertRecipientExists(message, memberNames)
       const reservedRecipients = new Set<string>(
         runtimeState.members
           .filter((member) => member.sessionId !== undefined && member.name !== teamRuntime.senderName)

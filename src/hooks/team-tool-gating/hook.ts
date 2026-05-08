@@ -8,7 +8,13 @@ import {
   loadRuntimeState,
 } from "../../features/team-mode/team-state-store"
 
-const ACTIVE_RUNTIME_STATUSES = new Set<RuntimeState["status"]>(["creating", "active", "shutdown_requested"])
+const ACTIVE_RUNTIME_STATUSES = new Set<RuntimeState["status"]>([
+  "creating",
+  "active",
+  "shutdown_requested",
+  "orphaned",
+  "deleting",
+])
 const UNIVERSAL_TOOL_NAMES = new Set([
   "team_send_message",
   "team_task_create",
@@ -53,17 +59,37 @@ async function resolveParticipant(sessionID: string, config: TeamModeConfig): Pr
 
     if (runtimeState.leadSessionId === sessionID) {
       const leadMemberName = runtimeState.members.find((member) => member.agentType === "leader")?.name ?? "lead"
-      registerTeamSession(sessionID, { teamRunId: runtimeState.teamRunId, memberName: leadMemberName, role: "lead" })
-      return { role: "lead", teamRunId: runtimeState.teamRunId }
+      const registeredEntry = registerTeamSession(sessionID, {
+        teamRunId: runtimeState.teamRunId,
+        memberName: leadMemberName,
+        role: "lead",
+      }, { overwrite: false })
+      if (registeredEntry.role === "lead") {
+        return { role: "lead", teamRunId: registeredEntry.teamRunId }
+      }
+
+      return {
+        role: "member",
+        teamRunId: registeredEntry.teamRunId,
+        memberName: registeredEntry.memberName,
+      }
     }
 
     const matchedMember = runtimeState.members.find((member) => member.sessionId === sessionID)
     if (matchedMember) {
-      registerTeamSession(sessionID, { teamRunId: runtimeState.teamRunId, memberName: matchedMember.name, role: "member" })
-      return {
-        role: "member",
+      const registeredEntry = registerTeamSession(sessionID, {
         teamRunId: runtimeState.teamRunId,
         memberName: matchedMember.name,
+        role: "member",
+      }, { overwrite: false })
+      if (registeredEntry.role === "lead") {
+        return { role: "lead", teamRunId: registeredEntry.teamRunId }
+      }
+
+      return {
+        role: "member",
+        teamRunId: registeredEntry.teamRunId,
+        memberName: registeredEntry.memberName,
       }
     }
   }

@@ -1,6 +1,7 @@
 /// <reference types="bun-types" />
 
 import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test"
+import { randomUUID } from "node:crypto"
 import { access, mkdtemp, readdir, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
@@ -273,6 +274,43 @@ describe("createTeamRun", () => {
     // then
     expect(firstRuntime.teamRunId).toBe(secondRuntime.teamRunId)
     expect(launchMock).toHaveBeenCalledTimes(2)
+  })
+
+  test("reuses a shutdown_requested runtime for the same spec and lead session", async () => {
+    // given
+    const baseDir = await mkdtemp(path.join(tmpdir(), "team-runtime-shutdown-requested-"))
+    temporaryDirectories.push(baseDir)
+    let launchCount = 0
+    const { manager, launchMock } = createManager(baseDir, async () => ({ id: `task-${++launchCount}`, sessionId: `session-${launchCount}`, status: "running" } as BackgroundTask))
+    const spec = createSpec(2)
+    const context = createContext(baseDir, manager)
+    const firstRuntime = await createTeamRun(spec, "lead-session", context, createConfig(baseDir), manager)
+    await (await import("../team-state-store/store")).saveRuntimeState({ ...firstRuntime, status: "shutdown_requested" }, createConfig(baseDir))
+
+    // when
+    const secondRuntime = await createTeamRun(spec, "lead-session", context, createConfig(baseDir), manager)
+
+    // then
+    expect(secondRuntime.teamRunId).toBe(firstRuntime.teamRunId)
+    expect(launchMock).toHaveBeenCalledTimes(2)
+  })
+
+  test("rejects member worktree paths outside the repo or configured worktree base", async () => {
+    // given
+    const baseDir = await mkdtemp(path.join(tmpdir(), "team-runtime-worktree-sandbox-"))
+    temporaryDirectories.push(baseDir)
+    const { manager } = createManager(baseDir, async () => ({ id: "task-1", sessionId: "session-1", status: "running" } as BackgroundTask))
+    const spec = createSpec(1, true)
+    spec.members[0] = {
+      ...spec.members[0],
+      worktreePath: path.join(tmpdir(), `outside-team-worktree-${randomUUID()}`),
+    }
+
+    // when
+    const result = createTeamRun(spec, "lead-session", createContext(baseDir, manager), createConfig(baseDir), manager)
+
+    // then
+    await expect(result).rejects.toThrow("worktreePath must stay inside the repository root or configured worktree base directory")
   })
 
   test("never exceeds max_parallel_members while spawning", async () => {

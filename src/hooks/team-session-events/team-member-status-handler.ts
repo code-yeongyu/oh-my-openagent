@@ -30,27 +30,44 @@ async function transitionMemberStatus(
   sessionID: string,
   eventLabel: string,
 ): Promise<void> {
-  const runtimeState = await loadRuntimeState(runtimeMember.teamRunId, config)
-  const currentEntry = runtimeState.members.find((member) => member.name === runtimeMember.memberName)
-  if (currentEntry === undefined) return
-  if (!allowedSources.has(currentEntry.status)) return
+  let previousStatus: MemberStatus | undefined
+  let teamName: string | undefined
+  let transitioned = false
 
-  await transitionRuntimeState(runtimeState.teamRunId, (currentRuntimeState) => ({
-    ...currentRuntimeState,
-    members: currentRuntimeState.members.map((member) => (
-      member.name === runtimeMember.memberName
-        ? { ...member, status: nextStatus }
-        : member
-    )),
-  }), config)
+  await transitionRuntimeState(runtimeMember.teamRunId, (currentRuntimeState) => {
+    teamName = currentRuntimeState.teamName
+    const currentEntry = currentRuntimeState.members.find((member) => member.name === runtimeMember.memberName)
+    if (currentEntry === undefined) {
+      return currentRuntimeState
+    }
+
+    previousStatus = currentEntry.status
+    if (!allowedSources.has(currentEntry.status)) {
+      return currentRuntimeState
+    }
+
+    transitioned = true
+    return {
+      ...currentRuntimeState,
+      members: currentRuntimeState.members.map((member) => (
+        member.name === runtimeMember.memberName
+          ? { ...member, status: nextStatus }
+          : member
+      )),
+    }
+  }, config)
+
+  if (!transitioned || previousStatus === undefined || teamName === undefined) {
+    return
+  }
 
   log(`team member ${eventLabel}`, {
     event: `team-mode-member-${eventLabel}`,
-    teamRunId: runtimeState.teamRunId,
-    teamName: runtimeState.teamName,
+    teamRunId: runtimeMember.teamRunId,
+    teamName,
     memberName: runtimeMember.memberName,
     sessionID,
-    previousStatus: currentEntry.status,
+    previousStatus,
     nextStatus,
   })
 }

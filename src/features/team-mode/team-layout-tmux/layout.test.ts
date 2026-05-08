@@ -190,10 +190,10 @@ describe("team-layout-tmux", () => {
 
     const sendKeysCalls = commands.filter((args) => args[0] === "send-keys")
     const literals = sendKeysCalls.map((args) => args.join(" "))
-    expect(literals.filter((s) => s.includes("opencode attach --session"))).toHaveLength(2)
+    expect(literals.filter((s) => s.includes("opencode attach "))).toHaveLength(2)
     expect(literals.filter((s) => s.includes("python3 -u "))).toHaveLength(2)
-    expect(literals.some((s) => s.includes("opencode attach --session 's-m1'"))).toBe(true)
-    expect(literals.some((s) => s.includes("opencode attach --session 's-m2'"))).toBe(true)
+    expect(literals.some((s) => s.includes("opencode attach 'http://127.0.0.1:12345' --session 's-m1' --dir '/tmp/m1'"))).toBe(true)
+    expect(literals.some((s) => s.includes("opencode attach 'http://127.0.0.1:12345' --session 's-m2' --dir '/tmp/m2'"))).toBe(true)
     expect(literals.some((s) => s.includes("python3 -u ") && s.includes("'s-m1'"))).toBe(true)
     expect(literals.some((s) => s.includes("python3 -u ") && s.includes("'s-m2'"))).toBe(true)
   })

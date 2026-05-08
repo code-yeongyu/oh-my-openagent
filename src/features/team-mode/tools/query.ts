@@ -5,13 +5,14 @@ import type { OpencodeClient } from "../../../tools/delegate-task/types"
 import { loadTeamSpec } from "../team-registry/loader"
 import { aggregateStatus } from "../team-runtime/status"
 import { discoverTeamSpecs } from "../team-registry/paths"
-import { listActiveTeams } from "../team-state-store/store"
+import { listActiveTeams, loadRuntimeState } from "../team-state-store/store"
 
 type QueryToolDeps = {
   aggregateStatus: typeof aggregateStatus
   discoverTeamSpecs: typeof discoverTeamSpecs
   loadTeamSpec: typeof loadTeamSpec
   listActiveTeams: typeof listActiveTeams
+  loadRuntimeState: typeof loadRuntimeState
 }
 
 const defaultDeps: QueryToolDeps = {
@@ -19,6 +20,7 @@ const defaultDeps: QueryToolDeps = {
   discoverTeamSpecs,
   loadTeamSpec,
   listActiveTeams,
+  loadRuntimeState,
 }
 
 type TeamListScope = "user" | "project" | "all"
@@ -29,6 +31,18 @@ type TeamListEntry = {
   status: string
   teamRunId?: string
   memberCount: number
+}
+
+type TeamQueryToolContext = {
+  sessionID?: string
+}
+
+async function assertTeamParticipant(teamRunId: string, config: TeamModeConfig, sessionID: string | undefined, deps: QueryToolDeps): Promise<void> {
+  const runtimeState = await deps.loadRuntimeState(teamRunId, config)
+  const isParticipant = runtimeState.members.some((member) => member.sessionId === sessionID)
+  if (!isParticipant) {
+    throw new Error(`team participant not found for session ${sessionID ?? "unknown"}`)
+  }
 }
 
 export function createTeamStatusTool(
@@ -44,7 +58,10 @@ export function createTeamStatusTool(
     args: {
       teamRunId: tool.schema.string().describe("Team run ID"),
     },
-    execute: async (args: { teamRunId: string }) => JSON.stringify(await deps.aggregateStatus(args.teamRunId, config, backgroundManager)),
+    execute: async (args: { teamRunId: string }, ctx?: TeamQueryToolContext) => {
+      await assertTeamParticipant(args.teamRunId, config, ctx?.sessionID, deps)
+      return JSON.stringify(await deps.aggregateStatus(args.teamRunId, config, backgroundManager))
+    },
   })
 }
 

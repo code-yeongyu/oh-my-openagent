@@ -6,6 +6,7 @@ import type { ExecutorContext } from "../../../tools/delegate-task/executor-type
 import { reclaimStaleReservations } from "../team-mailbox/reservation"
 import { getRuntimeStateDir, resolveBaseDir } from "../team-registry/paths"
 import type { RuntimeState } from "../types"
+import { removeWorktree } from "../team-worktree/cleanup"
 import { listActiveTeams, loadRuntimeState, transitionRuntimeState } from "./store"
 
 const CREATING_TIMEOUT_MS = 30 * 60 * 1000
@@ -62,7 +63,7 @@ async function removeRuntimeDirectory(teamRunId: string, config: TeamModeConfig)
 async function cleanupMemberWorktrees(runtimeState: RuntimeState): Promise<void> {
   await Promise.all(runtimeState.members.map(async (member) => {
     if (!member.worktreePath) return
-    await rm(member.worktreePath, { recursive: true, force: true })
+    await removeWorktree(member.worktreePath)
   }))
 }
 

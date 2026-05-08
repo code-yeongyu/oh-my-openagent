@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, test } from "bun:test"
-import { mkdtemp, readdir } from "node:fs/promises"
+import { mkdir, mkdtemp, readdir } from "node:fs/promises"
 import { randomUUID } from "node:crypto"
 import { tmpdir } from "node:os"
 import path from "node:path"
@@ -10,6 +10,7 @@ import type { ToolContext } from "@opencode-ai/plugin/tool"
 
 import { TeamModeConfigSchema } from "../../../config/schema/team-mode"
 import { getInboxDir, resolveBaseDir } from "../team-registry/paths"
+import { saveRuntimeState } from "../team-state-store/store"
 import type { RuntimeState } from "../types"
 import { createTeamSendMessageTool, type LiveDeliveryClient } from "./messaging"
 
@@ -66,6 +67,8 @@ describe("createTeamSendMessageTool missing recipient session fallback", () => {
           : member
       )),
     }
+    await mkdir(path.join(baseDir, "runtime", teamRunId), { recursive: true })
+    await saveRuntimeState(runtimeStateWithRecipientSession, config)
 
     let loadRuntimeStateCalls = 0
     const deps = {

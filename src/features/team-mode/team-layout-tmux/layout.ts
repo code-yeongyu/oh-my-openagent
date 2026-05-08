@@ -47,8 +47,8 @@ function getPaneWorkingDirectory(member: TeamLayoutMember): string {
   return member.worktreePath ?? process.cwd()
 }
 
-function buildAttachCommand(member: TeamLayoutMember): string {
-  return `opencode attach --session ${shellSingleQuote(member.sessionId)}`
+function buildAttachCommand(member: TeamLayoutMember, serverUrl: string): string {
+  return `opencode attach ${shellSingleQuote(serverUrl)} --session ${shellSingleQuote(member.sessionId)} --dir ${shellSingleQuote(getPaneWorkingDirectory(member))}`
 }
 
 function buildMemberLiveTailCommand(member: TeamLayoutMember, serverUrl: string, options?: TeamLayoutOptions): string {
@@ -88,6 +88,7 @@ async function createTeamLayoutInCallerWindow(
   callerPaneId: string,
   windowTarget: string,
   members: Array<TeamLayoutMember>,
+  serverUrl: string,
   deps: TeamLayoutDeps,
 ): Promise<{ focusWindowId: string; focusPanesByMember: Record<string, string> } | null> {
   const panesByMember: Record<string, string> = {}
@@ -102,7 +103,7 @@ async function createTeamLayoutInCallerWindow(
     teammatePanes = [...teammatePanes, paneId]
     panesByMember[member.name] = paneId
     await deps.runTmuxCommand(tmuxPath, ["select-pane", "-t", paneId, "-T", member.name])
-    await deps.runTmuxCommand(tmuxPath, ["send-keys", "-t", paneId, buildAttachCommand(member), "Enter"])
+    await deps.runTmuxCommand(tmuxPath, ["send-keys", "-t", paneId, buildAttachCommand(member, serverUrl), "Enter"])
   }
 
   const layoutResult = await deps.runTmuxCommand(tmuxPath, ["select-layout", "-t", windowTarget, "main-vertical"])
@@ -214,6 +215,7 @@ export async function createTeamLayout(
       callerSession.paneId,
       callerSession.windowTarget,
       members,
+      serverUrl,
       deps,
     )
     if (!focus) return null

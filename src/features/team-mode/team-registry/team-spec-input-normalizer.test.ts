@@ -3,6 +3,7 @@
 import { describe, expect, test } from "bun:test"
 
 import { resolveCallerTeamLead } from "../resolve-caller-team-lead"
+import { TeamSpecSchema } from "../types"
 import { normalizeTeamSpecInput } from "./team-spec-input-normalizer"
 
 describe("normalizeTeamSpecInput", () => {
@@ -140,5 +141,53 @@ describe("normalizeTeamSpecInput", () => {
         { name: "structure-analyst", kind: "category", category: "analysis", prompt: "Role: Structure Analyst\nstructure, modules" },
       ],
     })
+  })
+
+  test("keeps unknown member kinds invalid so schema parsing rejects them", () => {
+    // given
+    const rawSpec = {
+      name: "analysis-team",
+      leadAgentId: "lead",
+      members: [
+        { name: "lead", kind: "subagent_type", subagent_type: "sisyphus" },
+        { name: "reviewer", kind: "reviewer", prompt: "Review the results" },
+      ],
+    }
+
+    // when
+    const normalizedSpec = normalizeTeamSpecInput(rawSpec)
+
+    // then
+    expect(normalizedSpec).toMatchObject({
+      members: [
+        { name: "lead", kind: "subagent_type" },
+        { name: "reviewer", kind: "reviewer" },
+      ],
+    })
+    expect(() => TeamSpecSchema.parse(normalizedSpec)).toThrow()
+  })
+
+  test("does not repair an explicit invalid kind even when category-like fields are present", () => {
+    // given
+    const rawSpec = {
+      name: "analysis-team",
+      leadAgentId: "lead",
+      members: [
+        { name: "lead", kind: "subagent_type", subagent_type: "sisyphus" },
+        { name: "worker", kind: "quick", category: "quick", prompt: "Inspect the workspace" },
+      ],
+    }
+
+    // when
+    const normalizedSpec = normalizeTeamSpecInput(rawSpec)
+
+    // then
+    expect(normalizedSpec).toMatchObject({
+      members: [
+        { name: "lead", kind: "subagent_type" },
+        { name: "worker", kind: "quick", category: "quick" },
+      ],
+    })
+    expect(() => TeamSpecSchema.parse(normalizedSpec)).toThrow()
   })
 })
