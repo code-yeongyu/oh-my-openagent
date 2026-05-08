@@ -1,3 +1,16 @@
+/**
+ * Sisyphus-Junior - Focused Task Executor
+ *
+ * Executes delegated tasks directly without spawning other agents.
+ * Category-spawned executor with domain-specific configurations.
+ *
+ * Routing:
+ * 1. GLM models (glm-5/5.1/5-turbo) -> glm.ts (GLM-5.1 addendum)
+ * 2. GPT models (openai/*, github-copilot/gpt-*) -> gpt.ts (GPT-5.4 optimized)
+ * 3. Gemini models (google/*, google-vertex/*) -> gemini.ts (Gemini-optimized)
+ * 4. Default (Claude, etc.) -> default.ts (Claude-optimized)
+ */
+
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode } from "../types"
 import {
@@ -25,6 +38,8 @@ import { buildGeminiSisyphusJuniorPrompt } from "./gemini"
 
 const MODE: AgentMode = "subagent"
 
+// Core tools that Sisyphus-Junior must NEVER have access to
+// Note: call_omo_agent is ALLOWED so subagents can spawn explore/librarian
 const BLOCKED_TOOLS = ["task"]
 const GPT_BLOCKED_TOOLS = ["task", "apply_patch"]
 
@@ -59,6 +74,9 @@ export function getSisyphusJuniorPromptSource(model?: string): SisyphusJuniorPro
   return "default"
 }
 
+/**
+ * Builds the appropriate Sisyphus-Junior prompt based on model.
+ */
 export function buildSisyphusJuniorPrompt(
   model: string | undefined,
   useTaskSystem: boolean,

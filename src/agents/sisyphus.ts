@@ -33,8 +33,6 @@ export const SISYPHUS_PROMPT_METADATA: AgentPromptMetadata = {
   promptAlias: "Sisyphus",
   triggers: [],
 };
-
-const SISYPHUS_DESCRIPTION = "Orchestration agent for OhMyOpenCode.";
 import type {
   AvailableAgent,
   AvailableTool,
@@ -91,16 +89,16 @@ function buildDynamicSisyphusPrompt(
 
   const agentIdentity = buildAgentIdentitySection(
     "Sisyphus",
-    SISYPHUS_DESCRIPTION,
+    "Powerful AI Agent with orchestration capabilities from OhMyOpenCode",
   );
 
   return `${agentIdentity}
 <Role>
-You are "Sisyphus", the orchestration agent for OhMyOpenCode.
+You are "Sisyphus" - Powerful AI Agent with orchestration capabilities from OhMyOpenCode.
 
-**Why Sisyphus?**: Work steadily. Delegate, verify, ship.
+**Why Sisyphus?**: Humans roll their boulder every day. So do you. We're not so different-your code should be indistinguishable from a senior engineer's.
 
-**Identity**: Delegate, verify, ship.
+**Identity**: SF Bay Area engineer. Work, delegate, verify, ship. No AI slop.
 
 **Core Competencies**:
 - Parsing implicit requirements from explicit requests
@@ -505,7 +503,8 @@ export function createSisyphusAgent(
       useTaskSystem,
     );
     return {
-      description: SISYPHUS_DESCRIPTION,
+      description:
+        "Powerful AI orchestrator. Plans obsessively with todos, assesses search complexity before exploration, delegates strategically via category+skills combinations. Uses explore for internal code (parallel-friendly), librarian for external docs. (Sisyphus - OhMyOpenCode)",
       mode: MODE,
       model,
       maxTokens: 64000,
@@ -521,7 +520,6 @@ export function createSisyphusAgent(
     };
   }
 
-
   if (isGpt5_5Model(model)) {
     const prompt = buildGpt55SisyphusPrompt(
       model,
@@ -532,7 +530,8 @@ export function createSisyphusAgent(
       useTaskSystem,
     );
     return {
-      description: SISYPHUS_DESCRIPTION,
+      description:
+        "Powerful AI orchestrator. Plans obsessively with todos, assesses search complexity before exploration, delegates strategically via category+skills combinations. Uses explore for internal code (parallel-friendly), librarian for external docs. (Sisyphus - OhMyOpenCode)",
       mode: MODE,
       model,
       maxTokens: 64000,
@@ -558,7 +557,8 @@ export function createSisyphusAgent(
       useTaskSystem,
     );
     return {
-      description: SISYPHUS_DESCRIPTION,
+      description:
+        "Powerful AI orchestrator. Plans obsessively with todos, assesses search complexity before exploration, delegates strategically via category+skills combinations. Uses explore for internal code (parallel-friendly), librarian for external docs. (Sisyphus - OhMyOpenCode)",
       mode: MODE,
       model,
       maxTokens: 64000,
@@ -584,7 +584,8 @@ export function createSisyphusAgent(
       useTaskSystem,
     );
     return {
-      description: SISYPHUS_DESCRIPTION,
+      description:
+        "Powerful AI orchestrator. Plans obsessively with todos, assesses search complexity before exploration, delegates strategically via category+skills combinations. Uses explore for internal code (parallel-friendly), librarian for external docs. (Sisyphus - OhMyOpenCode)",
       mode: MODE,
       model,
       maxTokens: 64000,
@@ -610,16 +611,21 @@ export function createSisyphusAgent(
   );
 
   if (isGeminiModel(model)) {
+    // 1. Intent gate + tool mandate - early in prompt (after intent verbalization)
     prompt = prompt.replace(
       "</intent_verbalization>",
       `</intent_verbalization>\n\n${buildGeminiIntentGateEnforcement()}\n\n${buildGeminiToolMandate()}`
     );
 
+    // 2. Tool guide + examples - after tool_usage_rules (where tools are discussed)
     prompt = prompt.replace(
       "</tool_usage_rules>",
       `</tool_usage_rules>\n\n${buildGeminiToolGuide()}\n\n${buildGeminiToolCallExamples()}`
     );
 
+    // 3. Delegation + verification overrides - before Constraints (NOT at prompt end)
+    //    Gemini suffers from lost-in-the-middle: content at prompt end gets weaker attention.
+    //    Placing these before <Constraints> ensures they're in a high-attention zone.
     prompt = prompt.replace(
       "<Constraints>",
       `${buildGeminiDelegationOverride()}\n\n${buildGeminiVerificationOverride()}\n\n<Constraints>`
@@ -644,7 +650,8 @@ export function createSisyphusAgent(
     ...getGptApplyPatchPermission(model),
   } as AgentConfig["permission"];
   const base = {
-    description: SISYPHUS_DESCRIPTION,
+    description:
+      "Powerful AI orchestrator. Plans obsessively with todos, assesses search complexity before exploration, delegates strategically via category+skills combinations. Uses explore for internal code (parallel-friendly), librarian for external docs. (Sisyphus - OhMyOpenCode)",
     mode: MODE,
     model,
     maxTokens: 64000,
