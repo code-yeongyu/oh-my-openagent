@@ -55,6 +55,7 @@ export const HookNameSchema = z.enum([
   "read-image-resizer",
   "todo-description-override",
   "webfetch-redirect-guard",
+  "fsync-skip-warning",
   "legacy-plugin-toast",
 ])
 
