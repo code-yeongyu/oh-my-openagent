@@ -1,4 +1,5 @@
 import pc from "picocolors"
+import { displayChars } from "./display-chars"
 
 export function renderAgentHeader(
   agent: string | null,
@@ -24,7 +25,7 @@ export function renderAgentHeader(
   }
 
   if (agentLabel) {
-    process.stdout.write(`  ${pc.dim("└─")} ${agentLabel}  \n`)
+    process.stdout.write(`  ${pc.dim(displayChars.treeEnd)} ${agentLabel}  \n`)
   }
 
   process.stdout.write("\n")
@@ -71,6 +72,9 @@ export function writePaddedText(
 
 function colorizeWithProfileColor(text: string, hexColor?: string): string {
   if (!hexColor) return pc.magenta(text)
+  if (process.env.NO_COLOR || process.env.GITHUB_ACTIONS === "true" || process.env.CI || process.env.TERM === "dumb") {
+    return text
+  }
 
   const rgb = parseHexColor(hexColor)
   if (!rgb) return pc.magenta(text)
