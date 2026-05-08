@@ -1,0 +1,31 @@
+# Dependencies
+node_modules
+.pnp
+.pnp.*
+
+# Build output
+.next
+out
+build
+dist
+
+# Testing
+coverage
+test-results
+playwright-report
+.playwright
+
+# Misc
+.DS_Store
+*.pem
+
+# Logs
+*.log
+
+# Lock files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# TypeScript
+*.tsbuildinfo

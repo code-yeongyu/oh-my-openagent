@@ -1,0 +1,234 @@
+@import "tailwindcss";
+
+@plugin "tailwindcss-animate";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
+  --font-manrope: var(--font-manrope), sans-serif;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+
+  @keyframes accordion-down {
+    from {
+      height: 0;
+    }
+    to {
+      height: var(--radix-accordion-content-height);
+    }
+  }
+  @keyframes accordion-up {
+    from {
+      height: var(--radix-accordion-content-height);
+    }
+    to {
+      height: 0;
+    }
+  }
+}
+
+/*
+  The default border color has changed to `currentColor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentColor);
+  }
+}
+
+@layer base {
+  :root {
+    /* Dark Theme Only - Terminal/Hacker Aesthetic */
+
+    /* Colors */
+    --background: #0a0a0a;
+    --foreground: #ededed;
+
+    --card: #111111;
+    --card-foreground: #ededed;
+
+    --popover: #111111;
+    --popover-foreground: #ededed;
+
+    --primary: #00d4ff;
+    --primary-foreground: #000000;
+
+    --secondary: #7c3aed;
+    --secondary-foreground: #ffffff;
+
+    --muted: #1a1a1a;
+    --muted-foreground: #a1a1a1;
+
+    --accent: #1a1a1a;
+    --accent-foreground: #ededed;
+
+    --destructive: #ef4444;
+    --destructive-foreground: #ffffff;
+
+    --border: #262626;
+    --input: #262626;
+    --ring: #00d4ff;
+
+    /* Charts */
+    --chart-1: #00d4ff;
+    --chart-2: #7c3aed;
+    --chart-3: #10b981;
+    --chart-4: #f59e0b;
+    --chart-5: #ef4444;
+
+    /* Code */
+    --code-bg: #1e1e2e;
+    --code-text: #cdd6f4;
+
+    /* Spacing */
+    --radius: 0.5rem;
+
+    /* Typography */
+    --font-geist-sans: var(--font-geist-sans);
+    --font-geist-mono: var(--font-geist-mono);
+    --font-manrope: var(--font-manrope);
+    --font-inter: var(--font-inter);
+
+    /* Semantic Fonts */
+    --font-heading: var(--font-manrope);
+    --font-body: var(--font-geist-sans);
+    --font-code: var(--font-geist-mono);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings:
+      "rlig" 1,
+      "calt" 1;
+  }
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-manrope);
+  }
+
+  [lang|="ko"] h1,
+  [lang|="ko"] h2,
+  [lang|="ko"] h3,
+  [lang|="ko"] h4,
+  [lang|="ko"] h5,
+  [lang|="ko"] h6,
+  [lang|="ja"] h1,
+  [lang|="ja"] h2,
+  [lang|="ja"] h3,
+  [lang|="ja"] h4,
+  [lang|="ja"] h5,
+  [lang|="ja"] h6,
+  [lang|="zh"] h1,
+  [lang|="zh"] h2,
+  [lang|="zh"] h3,
+  [lang|="zh"] h4,
+  [lang|="zh"] h5,
+  [lang|="zh"] h6 {
+    letter-spacing: normal !important;
+    text-wrap: pretty;
+  }
+
+  :where([lang|="ko"], [lang|="ja"], [lang|="zh"])
+    :where(p, li, blockquote, figcaption, td, th, a, button, span) {
+    overflow-wrap: break-word;
+  }
+
+  [lang|="ko"]
+    :where(h1, h2, h3, h4, h5, h6, p, li, blockquote, figcaption, td, th, a, button, span) {
+    word-break: keep-all;
+  }
+
+  :where([lang|="ja"], [lang|="zh"])
+    :where(h1, h2, h3, h4, h5, h6, p, li, blockquote, figcaption, td, th, a, button, span) {
+    word-break: normal;
+    line-break: strict;
+  }
+
+  html {
+    scroll-behavior: auto;
+  }
+
+  ::selection {
+    @apply bg-primary/20 text-primary;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-muted;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-border hover:bg-muted-foreground/50 rounded-full transition-colors;
+  }
+}
+
+@layer utilities {
+  .glow-cyan {
+    box-shadow: 0 0 15px -5px rgba(0, 212, 255, 0.3);
+  }
+  .glow-purple {
+    box-shadow: 0 0 15px -5px rgba(124, 58, 237, 0.3);
+  }
+
+  .text-glow-cyan {
+    text-shadow: 0 0 8px rgba(0, 212, 255, 0.3);
+  }
+}

@@ -1,0 +1,561 @@
+{
+  "metadata": {
+    "title": "Oh My OpenAgent",
+    "description": "最佳 Agent harness。遇见 Sisyphus：开箱即用的 Agent，像你一样编程。"
+  },
+  "nav": {
+    "brand": "Oh My OpenAgent",
+    "features": "功能特性",
+    "agents": "Agents",
+    "docs": "文档",
+    "manifesto": "宣言",
+    "starOnGitHub": "在 GitHub 上标星"
+  },
+  "footer": {
+    "brand": "Oh My OpenAgent",
+    "copyright": "© {year} Oh My OpenAgent。基于 SUL-1.0 开源许可。",
+    "github": "GitHub",
+    "discord": "Discord",
+    "documentation": "文档",
+    "manifesto": "宣言"
+  },
+  "landing": {
+    "hero": {
+      "title": "最强 ",
+      "titleHighlight": "Agent Harness",
+      "subtitle": "{stars} Stars、{downloads} 下载。实战验证，生产级品质。",
+      "githubStars": "{count} GitHub Stars",
+      "specializedAgents": "{count} 个专业 Agent",
+      "totalDownloads": "累计 {count}+ 下载",
+      "monthlyDownloads": "月度 {count}+ 下载",
+      "lifecycleHooks": "{count}+ 生命周期 Hooks",
+      "installCommand": "bunx oh-my-openagent install",
+      "getStarted": "开始使用",
+      "viewOnGitHub": "在 GitHub 上查看"
+    },
+    "ulw": {
+      "badge": "魔法咒语",
+      "title": "ulw",
+      "headline": "敲三个字母。走人。",
+      "description": "Ultra Work 模式触发最大精度：自动规划、深度研究、并行 Agent、自我纠正循环。系统直到完成才会停止。你不需要盯梢。",
+      "autoPlanning": "自动规划",
+      "deepResearch": "深度研究",
+      "selfCorrection": "自我纠错",
+      "parallelAgents": "并行 Agent",
+      "terminalTitle": "sisyphus — -zsh — 80x24",
+      "terminalInput": "ulw add authentication to the API",
+      "steps": {
+        "scanning": "正在扫描代码库...",
+        "context": "正在启动 3 个 explore agent...",
+        "planning": "正在构建执行计划...",
+        "delegating": "正在部署 4 个并行 agent...",
+        "verifying": "正在运行验证测试...",
+        "complete": "完成。847 行更改，0 个问题。"
+      },
+      "tagline": "零干预。完全自主。只看结果。"
+    },
+    "sisyphus": {
+      "badge": "主编排器",
+      "title": "Sisyphus",
+      "headline": "永不眠的 CTO",
+      "description": "以神话人物命名——永远推着巨石上山。Sisyphus 解析隐含需求，适应代码库成熟度，并委派给专家。被中断了？boulder 系统会从你停下的地方精确恢复。",
+      "phases": {
+        "intent": {
+          "title": "Intent Gate",
+          "description": "解析你真正的意图，而不只是你输入的内容"
+        },
+        "explore": {
+          "title": "Codebase Assessment",
+          "description": "在碰任何一行代码之前先映射架构"
+        },
+        "delegate": {
+          "title": "Smart Delegation",
+          "description": "路由到正确的专家 agent"
+        },
+        "verify": {
+          "title": "Independent Verification",
+          "description": "不相信任何东西。验证一切。"
+        }
+      },
+      "boulderTitle": "Session Continuity",
+      "boulderDescription": "活跃工作被记录在 boulder.json 中。停电？系统崩溃？没关系。从你停下的地方精确恢复。",
+      "model": "Claude Opus 4.6 Max"
+    },
+    "prometheusAtlas": {
+      "badge": "编排工作流",
+      "title": "先想，再动",
+      "headline": "规划和执行是不同的工作",
+      "prometheus": {
+        "name": "Prometheus",
+        "role": "Strategic Planner",
+        "model": "Claude Opus 4.6 Max",
+        "description": "架构师。与你访谈，探索代码库，并创建详细的执行计划。从不写代码。使用 Metis 和 Momus 作为质量关卡。",
+        "features": [
+          "智能访谈模式",
+          "多 agent 代码库探索",
+          "与 Metis 进行差距分析",
+          "与 Momus 进行严苛审查"
+        ]
+      },
+      "atlas": {
+        "name": "Atlas",
+        "role": "Master Executor",
+        "model": "Claude Sonnet 4.6",
+        "description": "构建者。阅读已验证的计划，通过 category+skills 系统委派给专业 agent。跨任务追踪学习。独立验证 — 从不相信子 agent 的说法。",
+        "features": [
+          "基于意图的任务路由",
+          "跨任务的智慧积累",
+          "Boulder 会话连续性",
+          "独立的结果验证"
+        ]
+      },
+      "metis": {
+        "name": "Metis",
+        "description": "在歧义变成 Bug 之前捕获它们。"
+      },
+      "momus": {
+        "name": "Momus",
+        "description": "只有当计划真正完美时才说 OKAY。"
+      },
+      "workflow": {
+        "step1": "向 Prometheus 描述你的工作",
+        "step2": "Metis 分析差距",
+        "step3": "Momus 严苛验证",
+        "step4": "Atlas 委派给专家",
+        "step5": "对一切进行独立验证"
+      },
+      "whyItWorks": "规划者不编码。执行者遵循已验证的计划。智能存在于系统中，而非单个 agent。"
+    },
+    "hephaestus": {
+      "badge": "深度工作者",
+      "title": "Hephaestus",
+      "headline": "给他目标，不是菜谱",
+      "description": "以希腊锻造之神命名。有条不紊、彻底、执着。在写任何代码前启动 2-5 个并行 explore agent。专为深度架构推理、复杂调试和跨领域综合而设计。",
+      "loop": {
+        "explore": "EXPLORE — 绘制地形",
+        "plan": "PLAN — 规划路线",
+        "decide": "DECIDE — 确定路径",
+        "execute": "EXECUTE — 精确构建",
+        "verify": "VERIFY — 证明有效"
+      },
+      "tagline": "当足够好还不够时。",
+      "model": "GPT 5.3 Codex Medium"
+    },
+    "agents": {
+      "title": "Specialized Agents",
+      "subtitle": "五个专用 Agent 覆盖常见任务，外加按需动态构建的 Agent 系统。",
+      "oracle": {
+        "name": "Oracle",
+        "role": "Architecture Consultant",
+        "model": "GPT 5.4 High",
+        "description": "复杂调试和架构决策。当前路不明时。"
+      },
+      "librarian": {
+        "name": "Librarian",
+        "role": "Docs & Code Search",
+        "model": "MiniMax M2.5",
+        "description": "寻找真正的 GitHub 示例和官方文档。基于证据，附带永久链接。"
+      },
+      "explore": {
+        "name": "Explore",
+        "role": "Codebase Grep",
+        "model": "MiniMax M2.5",
+        "description": "超高速代码库搜索。便宜、并行、始终在后台运行。"
+      },
+      "metis": {
+        "name": "Metis",
+        "role": "Plan Consultant",
+        "model": "Claude Opus 4.6 Max",
+        "description": "在计划中的歧义变成生产 Bug 之前捕获它们。"
+      },
+      "momus": {
+        "name": "Momus",
+        "role": "Plan Reviewer",
+        "model": "GPT 5.4 Extra High",
+        "description": "严苛验证。只有当计划无懈可击时才批准。"
+      },
+      "dynamicSystem": {
+        "name": "Dynamic Agent",
+        "role": "随需而造",
+        "description": "根据请求自动匹配最佳模型、注入所需技能，并实时构建专属 Agent。"
+      }
+    },
+    "architecture": {
+      "title": "与众不同的设计",
+      "subtitle": "真正重要的设计决策。",
+      "principles": {
+        "specialization": {
+          "title": "Specialization",
+          "description": "每个 agent 把一件事做到极致。没有万事通。"
+        },
+        "trustVerify": {
+          "title": "Trust But Verify",
+          "description": "编排器对一切进行独立验证。子 agent 没有免费通行证。"
+        },
+        "wisdom": {
+          "title": "Wisdom Accumulation",
+          "description": "每个任务的学习传递给后续所有任务。系统在工作时变得更聪明。"
+        },
+        "modelOptimization": {
+          "title": "Model Optimization",
+          "description": "昂贵的模型用于规划和复杂决策。便宜的模型用于日常工作。每美元最大产出。"
+        },
+        "categories": {
+          "title": "Category System",
+          "description": "基于意图的路由。说出你需要什么 — ultrabrain、visual-engineering、quick — 正确的模型来处理。"
+        },
+        "continuity": {
+          "title": "Session Continuity",
+          "description": "Boulder 系统：中断的工作从你停下的地方精确恢复。零上下文丢失。"
+        }
+      }
+    },
+    "reviews": {
+      "title": "开发者们怎么说",
+      "review1": {
+        "text": "It made me cancel my Cursor subscription. Unbelievable things are happening in the open source community.",
+        "author": "Arthur Guiot"
+      },
+      "review2": {
+        "text": "If Claude Code does in 7 days what a human does in 3 months, Sisyphus does it in 1 hour.",
+        "author": "B, Quant Researcher"
+      },
+      "review3": {
+        "text": "Knocked out 8000 eslint warnings with Oh My Opencode, just in a day.",
+        "author": "Jacob Ferrari"
+      },
+      "review4": {
+        "text": "use oh-my-openagent, you will never go back",
+        "author": "d0t3ch"
+      },
+      "review5": {
+        "text": "You guys should pull this into core and recruit him. Seriously. It's really, really, really good.",
+        "author": "Henning Kilset"
+      },
+      "review6": {
+        "text": "Oh My OpenCode Is Actually Insane",
+        "author": "Darren Builds AI (YouTube)"
+      }
+    },
+    "cta": {
+      "title": "别写样板代码了",
+      "subtitle": "安装 Oh My OpenAgent，让 agent 来处理。距离你的第一个 ulw 命令只需 30 秒。",
+      "installCommand": "bunx oh-my-openagent install",
+      "installNow": "立即安装",
+      "readTheDocs": "阅读文档"
+    }
+  },
+  "docs": {
+    "mobileHeader": "Oh My OpenAgent 文档",
+    "searchPlaceholder": "搜索文档...",
+    "sections": {
+      "overview": "概览",
+      "quickStart": "快速开始",
+      "configLocations": "配置文件位置",
+      "agents": "Agents",
+      "categories": "分类",
+      "skills": "Skills",
+      "backgroundTasks": "后台任务",
+      "hooks": "钩子",
+      "mcps": "MCPs",
+      "browserAutomation": "浏览器自动化",
+      "tmux": "Tmux 集成",
+      "gitMaster": "Git Master",
+      "commentChecker": "注释检查器",
+      "experimental": "实验性功能",
+      "lsp": "LSP 配置",
+      "envVars": "环境变量"
+    },
+    "overview": {
+      "title": "配置参考",
+      "description": "Oh My OpenAgent 高度自有主张，但可根据个人喜好调整。大多数用户无需配置——运行 {command} 即可开始。"
+    },
+    "quickStart": {
+      "title": "快速开始"
+    },
+    "configLocations": {
+      "title": "配置文件位置",
+      "projectLevel": "（项目级）",
+      "userLevel": "（用户级）",
+      "jsonc": "支持 JSONC 格式，允许注释和尾随逗号。"
+    },
+    "agentsSection": {
+      "title": "Agents",
+      "description": "为内置 Agent 配置特定行为：Sisyphus、Hephaestus、Oracle、Librarian、Explore、Multimodal Looker、Prometheus、Metis、Momus、Atlas 和 Sisyphus Junior。",
+      "overrideOptions": "覆盖选项",
+      "permissions": "权限",
+      "options": {
+        "model": "模型标识符（例如 openai/gpt-4o）",
+        "variant": "模型变体（max、high、medium、low）",
+        "category": "从分类继承配置",
+        "temperature": "采样温度（0-2）",
+        "topP": "Top-p 采样（0-1）",
+        "prompt": "完全覆盖系统提示词",
+        "promptAppend": "在系统提示词后追加文本",
+        "tools": "启用或禁用特定工具",
+        "disable": "禁用此 Agent",
+        "maxTokens": "响应的最大 token 数",
+        "thinking": "扩展思考配置",
+        "reasoningEffort": "推理强度：low、medium、high、xhigh"
+      },
+      "permissionValues": "ask / allow / deny",
+      "permissionDescriptions": {
+        "edit": "文件编辑能力",
+        "bash": "Bash 命令执行",
+        "webfetch": "网络请求能力",
+        "doomLoop": "无限循环覆盖",
+        "externalDirectory": "访问项目外部文件"
+      }
+    },
+    "categoriesSection": {
+      "title": "分类",
+      "description": "分类允许你定义 Agent 可以继承的共享配置。",
+      "availableOptions": "分类可用选项：{options}。",
+      "categories": {
+        "visualEngineering": "前端、UI/UX、设计任务",
+        "ultrabrain": "深度逻辑推理",
+        "deep": "自主解决问题与深入研究",
+        "artistry": "创意任务",
+        "quick": "简单、快速任务",
+        "unspecifiedLow": "低投入一般任务",
+        "unspecifiedHigh": "高投入一般任务",
+        "writing": "文档和写作"
+      }
+    },
+    "skillsSection": {
+      "title": "Skills",
+      "description": "内置技能包括 {playwright}、{agentBrowser} 和 {gitMaster}。你也可以定义自定义技能。"
+    },
+    "backgroundTasksSection": {
+      "title": "后台任务",
+      "priority": "优先级：",
+      "options": {
+        "defaultConcurrency": "默认最大并发任务数",
+        "staleTimeoutMs": "过时任务超时时间（毫秒）",
+        "providerConcurrency": "每个提供商的并发限制",
+        "modelConcurrency": "每个模型的并发限制"
+      }
+    },
+    "hooksSection": {
+      "title": "钩子",
+      "description": "钩子允许你在各个生命周期点扩展功能。"
+    },
+    "mcpsSection": {
+      "title": "MCPs",
+      "websearch": {
+        "title": "websearch",
+        "description": "由 Exa 驱动，提供高质量搜索结果。"
+      },
+      "context7": {
+        "title": "context7",
+        "description": "文档检索和上下文管理。"
+      },
+      "grepApp": {
+        "title": "grep_app",
+        "description": "GitHub 代码搜索集成。"
+      }
+    },
+    "browserAutomationSection": {
+      "title": "浏览器自动化",
+      "playwright": {
+        "tool": "playwright",
+        "description": "完整的浏览器自动化（默认）",
+        "useCase": "测试、复杂交互"
+      },
+      "agentBrowser": {
+        "tool": "agent-browser",
+        "description": "轻量级浏览器 Agent",
+        "useCase": "快速查询、简单抓取"
+      }
+    },
+    "tmuxSection": {
+      "title": "Tmux 集成",
+      "options": {
+        "enabled": "启用 Tmux 集成",
+        "layout": "Tmux 窗口布局",
+        "mainPaneSize": "主面板大小"
+      }
+    },
+    "gitMasterSection": {
+      "title": "Git Master",
+      "options": {
+        "commitFooter": "追加到提交消息的文本",
+        "includeCoAuthoredBy": "添加 Co-authored-by 标记"
+      }
+    },
+    "commentCheckerSection": {
+      "title": "注释检查器",
+      "description": "验证代码中的注释。在自定义提示词中使用 {placeholder} 占位符。"
+    },
+    "experimentalSection": {
+      "title": "实验性功能",
+      "options": {
+        "aggressiveTruncation": "积极截断输出",
+        "autoResume": "自动恢复中断的任务",
+        "preemptiveCompaction": "在达到限制前压缩上下文",
+        "truncateAllToolOutputs": "截断所有工具输出"
+      },
+      "dynamicPruning": {
+        "trigger": "dynamic_context_pruning",
+        "description": "配置动态剪枝规则，高效管理上下文窗口使用。"
+      }
+    },
+    "lspSection": {
+      "title": "LSP 配置",
+      "options": {
+        "command": "LSP 服务器命令",
+        "extensions": "匹配的文件扩展名",
+        "priority": "服务器优先级",
+        "env": "环境变量",
+        "initialization": "初始化选项",
+        "disabled": "禁用此 LSP"
+      }
+    },
+    "envVarsSection": {
+      "title": "环境变量",
+      "opencodeConfigDir": {
+        "name": "OPENCODE_CONFIG_DIR",
+        "description": "覆盖默认配置目录路径。"
+      }
+    },
+    "footer": "Oh My OpenAgent 文档 © {year}"
+  },
+  "manifesto": {
+    "badge": "宣言",
+    "hero": {
+      "title": "Ultrawork 宣言",
+      "subtitle": "高产出工程的哲学"
+    },
+    "bottleneck": "> 人类介入 = 瓶颈",
+    "autonomousCar": "想象一辆自动驾驶汽车，每 30 秒就需要你握住方向盘。你会称它为'自动驾驶'吗？不会。你会说它是个比定速巡航好不了多少的驾驶辅助功能。",
+    "whyDifferent": "编程又有什么不同？",
+    "micromanagement": "我们已经接受了一种范式，'AI 编程'意味着一个聊天机器人写 20 行代码，然后等你修复。这不是自动化——这是微观管理。",
+    "painPoints": {
+      "fixing": "修复 AI 的半成品代码",
+      "syntax": "手动纠正语法错误",
+      "copyPasting": "来回复制粘贴上下文",
+      "reviewing": "逐行检查幻觉"
+    },
+    "notCollaboration": "那不是'人机协作'——那是 AI 没有完成它的工作。",
+    "premise": "{linkText} 建立在一个人类应该是架构师，而非拼写检查员的前提上。",
+    "premiseLinkText": "Oh My OpenAgent",
+    "indistinguishable": {
+      "title": "无法区分的代码",
+      "subtitle": "Agent 写的代码应该与资深工程师写的代码无法区分。",
+      "items": {
+        "patterns": "遵循现有代码库的模式和架构",
+        "errorHandling": "实现正确的错误处理和边界情况",
+        "tests": "编写真正测试行为的测试，而不仅是覆盖率",
+        "noSlop": "没有'AI 垃圾代码'——干净、简洁、可维护的代码",
+        "comments": "只在增加价值时注释，不陈述显而易见的内容"
+      },
+      "quote": "\"如果你能分辨出提交是由人类还是 Agent 完成的，那么 Agent 就失败了。\""
+    },
+    "tokenCost": {
+      "title": "Token 成本 vs 生产力",
+      "description": "我们不在乎 token 使用量。我们在乎产出。如果花 5 美元在 token 上能节省一小时的工程时间，那就是 20 倍的投资回报。",
+      "parallelAgents": "并行 Agent 探索多种解决方案",
+      "completeWork": "无需人工干预即可完成工作",
+      "selfVerification": "彻底的自我验证循环",
+      "however": "然而...",
+      "optimizeDescription": "我们在关键之处优化效率。不是通过削弱模型，而是：",
+      "cheaperModels": "对常规任务使用更便宜的模型",
+      "avoidingRedundant": "避免冗余探索",
+      "intelligentCaching": "智能缓存上下文",
+      "stoppingExactly": "恰到好处地停止"
+    },
+    "cognitiveLoad": {
+      "title": "最小化人类认知负荷",
+      "subtitle": "人类只需要说出他们想要什么。其余都是 Agent 的工作。",
+      "ultrawork": {
+        "badge": "方法 1",
+        "title": "Ultrawork",
+        "subtitle": "只需说 'ulw' 然后离开。",
+        "steps": {
+          "analyze": "分析代码库上下文",
+          "breakdown": "将任务分解为原子步骤",
+          "execute": "执行实现",
+          "verify": "针对需求验证",
+          "commit": "提交更改"
+        },
+        "footer": "零干预。完全自主。只看结果。"
+      },
+      "prometheus": {
+        "badge": "方法 2",
+        "title": "Prometheus + Atlas",
+        "subtitle": "当你需要战略性控制时。",
+        "prometheusTitle": "Prometheus",
+        "prometheusDescription": "进行访谈、研究上下文并生成详细的 YAML 计划。",
+        "atlasTitle": "Atlas",
+        "atlasDescription": "执行计划，委派给子 Agent，管理波次并跟踪进度。",
+        "footer": "你设计架构。Agent 执行。完全透明。"
+      }
+    },
+    "principles": {
+      "predictable": {
+        "title": "可预测",
+        "description": "相同输入 = 一致输出。除非要求，否则没有随机偏差或创意发挥。"
+      },
+      "continuous": {
+        "title": "持续",
+        "description": "经得起中断。实时跟踪进度。跨会话保留上下文。"
+      },
+      "delegatable": {
+        "title": "可委派",
+        "description": "明确的验收标准。自我纠错机制。仅在绝对必要时升级。"
+      }
+    },
+    "coreLoop": {
+      "title": "核心循环",
+      "features": {
+        "prometheus": {
+          "feature": "Prometheus",
+          "purpose": "通过智能访谈提取意图"
+        },
+        "metis": {
+          "feature": "Metis",
+          "purpose": "在歧义变成 Bug 之前捕获它们"
+        },
+        "momus": {
+          "feature": "Momus",
+          "purpose": "在执行前验证计划完整性"
+        },
+        "orchestrator": {
+          "feature": "Orchestrator",
+          "purpose": "无需人工微观管理协调工作"
+        },
+        "todoContinuation": {
+          "feature": "Todo Continuation",
+          "purpose": "强制完成，防止'我完成了'的谎言"
+        },
+        "categorySystem": {
+          "feature": "Category System",
+          "purpose": "无需人工决策路由到最优模型"
+        },
+        "backgroundAgents": {
+          "feature": "Background Agents",
+          "purpose": "并行研究而不阻塞用户"
+        },
+        "wisdomAccumulation": {
+          "feature": "Wisdom Accumulation",
+          "purpose": "从工作中学习，不重复错误"
+        }
+      }
+    },
+    "future": {
+      "title": "我们正在构建的未来",
+      "items": {
+        "focus": "人类开发者专注于构建什么，而非如何让 AI 构建它",
+        "quality": "代码质量与谁编写的无关",
+        "complexity": "复杂项目与简单项目一样容易",
+        "promptEngineering": "'提示工程'变得过时"
+      },
+      "quote1": "\"Agent 应该是无形的。就像电，就像自来水。\"",
+      "quote2": "\"你按下开关。灯亮了。你不会去想电网。\""
+    },
+    "finalCta": {
+      "title": "只需 ulw ulw",
+      "button": "获取 Oh My OpenAgent"
+    }
+  }
+}
