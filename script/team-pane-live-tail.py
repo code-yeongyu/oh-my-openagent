@@ -65,7 +65,10 @@ class SessionState:
     the correct USER/ASSISTANT label without re-fetching per event."""
 
     def __init__(self, url: str, session_id: str) -> None:
-        self.url = url
+        # OmO's tmuxMgr.getServerUrl() emits the URL with a trailing slash,
+        # so naive `f"{url}/session/..."` concatenation produces `//session`
+        # which OpenCode rejects with an empty body. Normalise once.
+        self.url = url.rstrip("/")
         self.session_id = session_id
         self.member_name = "unknown"
         self.team_name = ""

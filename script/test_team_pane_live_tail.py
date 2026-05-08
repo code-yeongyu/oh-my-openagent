@@ -88,6 +88,24 @@ class AccentForTests(unittest.TestCase):
         self.assertNotEqual(first, second)
 
 
+class SessionStateUrlNormalizationTests(unittest.TestCase):
+    """OmO's tmuxMgr.getServerUrl() emits trailing-slash URLs; without
+    normalisation the script issues `http://.../4096//session/...` which
+    OpenCode rejects with an empty body. Regression test for that bug."""
+
+    def test_strips_single_trailing_slash(self) -> None:
+        s = mod.SessionState("http://127.0.0.1:4096/", "ses_x")
+        self.assertEqual(s.url, "http://127.0.0.1:4096")
+
+    def test_strips_multiple_trailing_slashes(self) -> None:
+        s = mod.SessionState("http://127.0.0.1:4096///", "ses_x")
+        self.assertEqual(s.url, "http://127.0.0.1:4096")
+
+    def test_leaves_url_without_trailing_slash_alone(self) -> None:
+        s = mod.SessionState("http://127.0.0.1:4096", "ses_x")
+        self.assertEqual(s.url, "http://127.0.0.1:4096")
+
+
 class SessionStateFetchTests(unittest.TestCase):
     def _mock_session_response(self, payload: dict) -> patch:
         body = json.dumps(payload).encode("utf-8")
