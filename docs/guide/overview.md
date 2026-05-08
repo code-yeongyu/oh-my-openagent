@@ -54,7 +54,7 @@ Instead of one agent doing everything, Oh My OpenAgent uses **specialized agents
 ```
 User Request
     ↓
-[Intent Gate] — Classifies what you actually want
+[IntentGate] — Classifies what you actually want
     ↓
 [Sisyphus] — Main orchestrator, plans and delegates
     ↓
@@ -248,7 +248,7 @@ Oh My OpenAgent turns that into a coordinated team:
 
 **Hash-anchored edits.** Claude Code's edit tool fails when the model can't reproduce lines exactly. OmO's `LINE#ID` content hashing validates every edit before applying. Grok Code Fast 1 went from 6.7% to 68.3% success rate just from this change.
 
-**Intent Gate.** Claude Code takes your prompt and runs. OmO classifies your true intent first — research, implementation, investigation, fix — then routes accordingly. Fewer misinterpretations, better results.
+**IntentGate.** Claude Code takes your prompt and runs. OmO classifies your true intent first — research, implementation, investigation, fix — then routes accordingly. Fewer misinterpretations, better results.
 
 **LSP + AST tools.** Workspace-level rename, go-to-definition, find-references, pre-build diagnostics, AST-aware code rewrites. IDE precision that vanilla Claude Code doesn't have.
 
@@ -260,7 +260,7 @@ Oh My OpenAgent turns that into a coordinated team:
 
 ---
 
-## The Intent Gate
+## IntentGate
 
 Before acting on any request, Sisyphus classifies your true intent.
 

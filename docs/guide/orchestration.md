@@ -41,11 +41,11 @@ flowchart TB
     end
 
     subgraph Execution["Execution Layer (Orchestrator)"]
-        Orchestrator[" Atlas<br/>(Conductor)<br/>claude-sonnet-4-6 / kimi-k2.5 / gpt-5.5 / minimax-m2.7"]
+        Orchestrator[" Atlas<br/>(Conductor)<br/>claude-sonnet-4-6 / kimi-k2.6 / gpt-5.5 / minimax-m2.7"]
     end
 
     subgraph Workers["Worker Layer (Specialized Agents)"]
-        Junior[" Sisyphus-Junior<br/>(Task Executor)<br/>claude-sonnet-4-6 / kimi-k2.5 / gpt-5.5 / minimax-m2.7"]
+        Junior[" Sisyphus-Junior<br/>(Task Executor)<br/>claude-sonnet-4-6 / kimi-k2.6 / gpt-5.5 / minimax-m2.7"]
         Oracle[" Oracle<br/>(Architecture)<br/>gpt-5.5 / gemini-3.1-pro / claude-opus-4-7 / glm-5"]
         Explore[" Explore<br/>(Codebase Grep)<br/>gpt-5.4-mini-fast / minimax-m2.7-highspeed / claude-haiku-4-5"]
         Librarian[" Librarian<br/>(Docs/OSS)<br/>gpt-5.4-mini-fast / minimax-m2.7-highspeed / claude-haiku-4-5"]
@@ -76,6 +76,28 @@ flowchart TB
 ```
 
 Model labels above show the current fallback stacks from `src/shared/model-requirements.ts`, not marketing names.
+
+### Agent Inventory and Modes (Current)
+
+The system has **11 built-in agents**:
+
+- Primary: `sisyphus`, `hephaestus`, `prometheus`, `atlas`
+- Subagent: `oracle`, `librarian`, `explore`, `multimodal-looker`, `metis`, `momus`, `sisyphus-junior`
+
+Canonical assembly order for primary agents is:
+
+`Sisyphus → Hephaestus → Prometheus → Atlas`
+
+Mode distinction:
+
+- `mode: "primary"`: top-level session agents selected directly in UI/CLI
+- `mode: "subagent"`: worker/consultant agents invoked via `task(..., subagent_type="...")` or `call_omo_agent(...)`
+
+### Delegation Semantics (Important)
+
+- `task(category="...")` routes to **Sisyphus-Junior** with category-optimized model routing
+- `task(subagent_type="...")` invokes that specific agent directly (for example `oracle`, `explore`, `librarian`)
+- Category and `subagent_type` are mutually exclusive inputs in one call
 
 ---
 
@@ -294,18 +316,17 @@ task({ category: "visual-engineering", prompt: "..." }); // "Design beautifully"
 task({ category: "quick", prompt: "..." }); // "Just get it done fast"
 ```
 
-### Built-in Categories
+### Delegate-Task Categories
 
-| Category             | Default config                  | Runtime fallback order                                                                 | When to Use                                                 |
-| -------------------- | ------------------------------- | -------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| `visual-engineering` | `google/gemini-3.1-pro high`   | `gemini-3.1-pro` → `glm-5` → `claude-opus-4-7` → `glm-5` → `k2p5`                     | Frontend, UI/UX, design, styling, animation                 |
-| `ultrabrain`         | `openai/gpt-5.5 xhigh`         | `gpt-5.5` → `gemini-3.1-pro` → `claude-opus-4-7` → `glm-5`                             | Deep logical reasoning, complex architecture decisions      |
-| `deep`               | `openai/gpt-5.5 medium`        | `gpt-5.5` → `claude-opus-4-7` → `gemini-3.1-pro`                                       | Goal-oriented autonomous problem-solving, thorough research |
-| `artistry`           | `google/gemini-3.1-pro high`   | `gemini-3.1-pro` → `claude-opus-4-7` → `gpt-5.5`                                       | Highly creative or artistic tasks, novel ideas              |
-| `quick`              | `openai/gpt-5.4-mini`          | `gpt-5.4-mini` → `claude-haiku-4-5` → `gemini-3-flash` → `minimax-m2.7` → `gpt-5-nano` | Trivial tasks, single file changes, typo fixes              |
-| `unspecified-low`    | `anthropic/claude-sonnet-4-6`  | `claude-sonnet-4-6` → `gpt-5.3-codex` → `kimi-k2.5` → `gemini-3-flash` → `minimax-m2.7` | Tasks that don't fit other categories, low effort           |
-| `unspecified-high`   | `anthropic/claude-opus-4-7 max` | `claude-opus-4-7` → `gpt-5.5` → `glm-5` → `k2p5` → `kimi-k2.5`                          | Tasks that don't fit other categories, high effort          |
-| `writing`            | `kimi-for-coding/k2p5`         | `gemini-3-flash` → `kimi-k2.5` → `claude-sonnet-4-6` → `minimax-m2.7`                  | Documentation, prose, technical writing                     |
+`task(category="...")` supports these category names in user-facing orchestration:
+
+`visual-engineering`, `artistry`, `ultrabrain`, `deep`, `quick`, `unspecified-low`, `unspecified-high`, `writing`, `quick-rust`, `quick-zig`, `git`
+
+Notes:
+
+- Built-in defaults are defined in `src/tools/delegate-task/*-categories.ts` and `src/shared/model-requirements.ts`
+- Projects/users can extend categories via config; additional category names may appear in your session prompt
+- Regardless of category name, category dispatch goes through Sisyphus-Junior
 
 ### Skills: Domain-Specific Instructions
 
@@ -325,6 +346,40 @@ task(
   (prompt = "..."),
 );
 ```
+
+Skill loading priority is:
+
+`project > opencode > user > builtin`
+
+### Skill MCP (Tier 3)
+
+Skill-embedded MCP servers are isolated per session using a composite key pattern:
+
+`${sessionID}:${skillName}:${serverName}`
+
+This prevents state bleed across sessions when the same skill/MCP is used concurrently.
+
+### Background Task Concurrency
+
+Background task concurrency defaults to **5** when no overrides are configured.
+
+- Keyed by model/provider routing key
+- Configurable via `background_task.defaultConcurrency`, `background_task.providerConcurrency`, and `background_task.modelConcurrency`
+
+### Team Mode
+
+Team mode is parallel multi-agent orchestration and is **OFF by default**.
+
+For `subagent_type` team members, current eligibility is:
+
+- Eligible: `sisyphus`, `atlas`, `sisyphus-junior`
+- Conditional: `hephaestus` (requires teammate permission enablement)
+- Hard-reject: `oracle`, `librarian`, `explore`, `multimodal-looker`, `metis`, `momus`, `prometheus`
+
+Why `oracle`/`prometheus` are rejected in team members:
+
+- Oracle is read-only (cannot write/edit/patch/delegate)
+- Prometheus is constrained to `.sisyphus/*.md` writes by the `prometheus-md-only` hook
 
 ---
 

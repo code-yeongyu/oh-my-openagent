@@ -15,12 +15,13 @@ Run the interactive installer:
 
 ```bash
 bunx oh-my-openagent install # recommended
-npx oh-my-openagent install # alternative
 ```
+
+Use Bun only for installation. Do not use npm, yarn, or pnpm.
 
 > **Note**: The CLI ships with standalone binaries for all major platforms. No runtime (Bun/Node.js) is required for CLI execution after installation.
 >
-> **Supported platforms**: macOS (ARM64, x64), Linux (x64, ARM64, Alpine/musl), Windows (x64)
+> **Supported platforms**: 11 platform binaries across macOS (ARM64, x64, x64-baseline), Linux (x64, x64-baseline, x64-musl, x64-musl-baseline, ARM64, ARM64-musl), and Windows (x64, x64-baseline)
 
 Follow the prompts to configure your Claude, ChatGPT, and Gemini subscriptions. After installation, authenticate your providers as instructed.
 
@@ -28,7 +29,23 @@ Anonymous telemetry is enabled by default to track active installations (DAU/WAU
 
 After you install it, you can read this [overview guide](./overview.md) to understand more.
 
-The published package and local binary are still `oh-my-opencode`. Inside `opencode.json`, the compatibility layer now prefers the plugin entry `oh-my-openagent`, while legacy `oh-my-opencode` entries still load with a warning. Plugin config loading recognizes both `oh-my-openagent.json[c]` and `oh-my-opencode.json[c]` during the transition. If you see a "Using legacy package name" warning from `bunx oh-my-openagent doctor`, update your `opencode.json` plugin entry from `"oh-my-opencode"` to `"oh-my-openagent"`.
+The project is dual-published during the rename transition: `oh-my-openagent` and `oh-my-opencode` are both published package names. Inside `opencode.json`, the compatibility layer now prefers the plugin entry `oh-my-openagent`, while legacy `oh-my-opencode` entries still load with a warning. Plugin config loading recognizes both `oh-my-openagent.json[c]` and `oh-my-opencode.json[c]` during the transition. If you see a "Using legacy package name" warning from `bunx oh-my-openagent doctor`, update your `opencode.json` plugin entry from `"oh-my-opencode"` to `"oh-my-openagent"`.
+
+Postinstall validates both platform binary resolution and OpenCode version compatibility.
+
+Core CLI subcommands are: `install`, `run`, `doctor`, `mcp-oauth`, `refresh-model-capabilities`, and `get-local-version`.
+
+Config schema URL:
+
+```json
+"$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-openagent.schema.json"
+```
+
+Operational notes:
+
+- Claude Code compatibility is supported.
+- Claude Code plugin discovery load timeout is 10 seconds.
+- Runtime logger path: `/tmp/oh-my-opencode.log`
 
 ## For LLM Agents
 
