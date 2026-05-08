@@ -1,7 +1,6 @@
 import type { Metadata } from "next"
 import type { JSX, SVGProps } from "react"
 import { getTranslations } from "next-intl/server"
-import Image from "next/image"
 import {
   Layers,
   Star,
@@ -115,18 +114,13 @@ export async function LandingPage(): Promise<JSX.Element> {
 
   return (
     <div className="flex min-h-screen flex-col overflow-x-hidden">
+      <link rel="preload" as="image" href="/images/hero.webp" fetchPriority="low" />
       <section className="relative flex min-h-[90vh] items-center justify-center overflow-hidden pt-16">
-        <div className="absolute inset-0 z-0 opacity-30">
-          <Image
-            src="/images/hero.webp"
-            alt=""
-            fill
-            priority
-            fetchPriority="high"
-            className="object-cover object-center"
-            sizes="100vw"
-          />
-        </div>
+        <div
+          aria-hidden="true"
+          className="hero-bg absolute inset-0 z-0 bg-cover bg-center"
+          style={{ backgroundImage: "url(/images/hero.webp)" }}
+        />
         <div className="absolute inset-0 z-0 bg-gradient-to-b from-black/80 via-black/90 to-[#0a0a0a]" />
 
         <div className="relative z-10 container mx-auto flex flex-col items-center gap-8 px-4 text-center md:px-6">

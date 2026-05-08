@@ -7,7 +7,6 @@
 @theme {
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
-  --font-manrope: var(--font-manrope), sans-serif;
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -133,11 +132,9 @@
     /* Typography */
     --font-geist-sans: var(--font-geist-sans);
     --font-geist-mono: var(--font-geist-mono);
-    --font-manrope: var(--font-manrope);
-    --font-inter: var(--font-inter);
 
     /* Semantic Fonts */
-    --font-heading: var(--font-manrope);
+    --font-heading: var(--font-geist-sans);
     --font-body: var(--font-geist-sans);
     --font-code: var(--font-geist-mono);
   }
@@ -153,13 +150,34 @@
       "rlig" 1,
       "calt" 1;
   }
+
+  /*
+   * Hero background image fades in after first paint so the headline text is
+   * the LCP candidate. The image is decorative (opacity 30%) and is preloaded
+   * with low priority so it doesn't compete with critical resources.
+   */
+  .hero-bg {
+    opacity: 0;
+    animation: hero-bg-fade-in 600ms ease-out 200ms forwards;
+  }
+  @keyframes hero-bg-fade-in {
+    to {
+      opacity: 0.3;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .hero-bg {
+      animation: none;
+      opacity: 0.3;
+    }
+  }
   h1,
   h2,
   h3,
   h4,
   h5,
   h6 {
-    font-family: var(--font-manrope);
+    font-family: var(--font-geist-sans);
   }
 
   [lang|="ko"] h1,
