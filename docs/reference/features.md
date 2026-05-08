@@ -90,7 +90,7 @@ When running inside tmux:
 - Watch multiple agents work in real-time
 - Each pane shows agent output live
 - Auto-cleanup when agents complete
-- **Stable agent ordering**: core-agent tab cycling is deterministic via injected runtime order field (Sisyphus: 1, Hephaestus: 2, Prometheus: 3, Atlas: 4)
+- **Stable agent ordering**: core-agent tab cycling defaults to Sisyphus, Hephaestus, Prometheus, Atlas, and can be customized with `agent_order`
 
 Customize agent models, prompts, and permissions in `oh-my-opencode.jsonc`.
 

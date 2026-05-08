@@ -161,7 +161,13 @@ Override built-in agent settings. Available agents: `sisyphus`, `hephaestus`, `p
 
 Disable agents entirely: `{ "disabled_agents": ["oracle", "multimodal-looker"] }`
 
-Core agents receive an injected runtime `order` field for deterministic Tab cycling in the UI: Sisyphus = 1, Hephaestus = 2, Prometheus = 3, Atlas = 4. This is not a user-configurable config key.
+Agent tab cycling defaults to Sisyphus, Hephaestus, Prometheus, Atlas. Override known agent ordering with `agent_order`; omitted core agents keep their default relative order. Unknown or duplicate names are ignored and reported with a config toast.
+
+```json
+{
+  "agent_order": ["hephaestus", "sisyphus", "prometheus", "atlas"]
+}
+```
 
 #### Agent Options
 
