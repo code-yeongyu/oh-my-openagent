@@ -5,7 +5,7 @@ description: Developer reference for the Hephaestus autonomous deep worker agent
 
 # src/agents/hephaestus/ -- Autonomous Deep Worker
 
-**Generated:** 2026-04-11
+**Generated:** 2026-05-08
 
 ## OVERVIEW
 

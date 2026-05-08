@@ -1,57 +1,78 @@
 # src/config/ — Zod v4 Schema System
 
-**Generated:** 2026-04-18
+**Generated:** 2026-05-08
 
 ## OVERVIEW
 
-32 schema files composing `OhMyOpenCodeConfigSchema`. Zod v4 validation with `safeParse()`. All fields optional — omitted fields use plugin defaults.
+30 non-test schema files composing `OhMyOpenCodeConfigSchema`. Zod v4 validation with `safeParse()`. All fields optional — omitted fields use defaults from the schema. Auto-emitted to `assets/oh-my-opencode.schema.json` via `bun run build:schema`.
 
 ## SCHEMA TREE
 
 ```
 config/schema/
-├── oh-my-opencode-config.ts    # ROOT: OhMyOpenCodeConfigSchema (composes all below)
-├── agent-names.ts              # BuiltinAgentNameSchema (11), OverridableAgentNameSchema (14)
+├── oh-my-opencode-config.ts    # ROOT: composes all sub-schemas
+├── agent-names.ts              # BuiltinAgentNameSchema (10) + sisyphus-junior
 ├── agent-overrides.ts          # AgentOverrideConfigSchema (21 fields per agent)
+├── agent-definitions.ts        # custom agent definition schema
 ├── categories.ts               # 8 built-in + custom categories
-├── hooks.ts                    # HookNameSchema (48 hooks)
+├── hooks.ts                    # HookNameSchema (50+ hooks)
 ├── skills.ts                   # SkillsConfigSchema (sources, paths, recursive)
 ├── commands.ts                 # BuiltinCommandNameSchema
-├── experimental.ts             # Feature flags (plugin_load_timeout_ms min 1000)
+├── experimental.ts             # Feature flags incl plugin_load_timeout_ms (min 1000), task_system, max_tools
 ├── sisyphus.ts                 # SisyphusConfigSchema (task system)
 ├── sisyphus-agent.ts           # SisyphusAgentConfigSchema
 ├── ralph-loop.ts               # RalphLoopConfigSchema
 ├── tmux.ts                     # TmuxConfigSchema + TmuxLayoutSchema
 ├── websearch.ts                # provider: "exa" | "tavily"
-├── claude-code.ts              # CC compatibility settings
+├── claude-code.ts              # CC compatibility settings (plugins, plugins_override)
 ├── comment-checker.ts          # AI comment detection config
 ├── notification.ts             # OS notification settings
 ├── git-master.ts               # commit_footer: boolean | string
-├── browser-automation.ts       # provider: playwright | agent-browser | playwright-cli
-├── background-task.ts          # Concurrency limits per model/provider
+├── git-env-prefix.ts           # Git environment prefix config
+├── browser-automation.ts       # provider: playwright | playwright-cli | agent-browser
+├── background-task.ts          # Concurrency limits per model/provider, syncPollTimeoutMs
 ├── fallback-models.ts          # FallbackModelsConfigSchema
-├── runtime-fallback.ts         # RuntimeFallbackConfigSchema
+├── runtime-fallback.ts         # RuntimeFallbackConfigSchema (reactive provider fallback)
 ├── babysitting.ts              # Unstable agent monitoring
 ├── dynamic-context-pruning.ts  # Context pruning settings
-├── start-work.ts              # StartWorkConfigSchema (auto_commit)
-├── openclaw.ts                # OpenClaw integration settings
-├── git-env-prefix.ts          # Git environment prefix config
-├── model-capabilities.ts      # Model capabilities config
-└── internal/permission.ts      # AgentPermissionSchema
-
+├── start-work.ts               # StartWorkConfigSchema (auto_commit)
+├── openclaw.ts                 # OpenClaw integration settings
+├── model-capabilities.ts       # Model capabilities config
+├── keyword-detector.ts         # disabled_keywords (ultrawork|search|analyze|team)
+└── team-mode.ts                # TeamModeConfigSchema (enabled, max_parallel_members, max_members, tmux_visualization)
 ```
 
-## ROOT SCHEMA FIELDS (32)
+## ROOT SCHEMA FIELDS
 
-`$schema`, `new_task_system_enabled`, `default_run_agent`, `disabled_mcps`, `disabled_agents`, `disabled_skills`, `disabled_hooks`, `disabled_commands`, `disabled_tools`, `hashline_edit`, `agents`, `categories`, `claude_code`, `sisyphus_agent`, `comment_checker`, `experimental`, `auto_update`, `skills`, `ralph_loop`, `background_task`, `notification`, `babysitting`, `git_master`, `browser_automation_engine`, `websearch`, `tmux`, `sisyphus`, `start_work`, `_migrations`, `model_fallback`, `model_capabilities`, `openclaw`, `mcp_env_allowlist`
+`$schema`, `new_task_system_enabled`, `default_run_agent`, `disabled_mcps`, `disabled_agents`, `disabled_skills`, `disabled_hooks`, `disabled_commands`, `disabled_tools`, `hashline_edit`, `agents`, `categories`, `claude_code`, `sisyphus_agent`, `comment_checker`, `experimental`, `auto_update`, `skills`, `ralph_loop`, `background_task`, `notification`, `babysitting`, `git_master`, `browser_automation_engine`, `websearch`, `tmux`, `sisyphus`, `start_work`, `_migrations`, `model_fallback`, `model_capabilities`, `openclaw`, `mcp_env_allowlist`, `keyword_detector`, **`team_mode`**, `runtime_fallback`, `dynamic_context_pruning`.
 
-## AGENT OVERRIDE FIELDS (21)
+## TEAM_MODE SCHEMA
 
-`model`, `variant`, `category`, `skills`, `temperature`, `top_p`, `prompt`, `prompt_append`, `tools`, `disable`, `description`, `mode`, `color`, `permission`, `maxTokens`, `thinking`, `reasoningEffort`, `textVerbosity`, `providerOptions`
+```jsonc
+{
+  "team_mode": {
+    "enabled": false,                  // gate for 12 team_* tools and conditional hooks
+    "max_parallel_members": 4,         // concurrent active members
+    "max_members": 8,                  // hard cap on team size
+    "tmux_visualization": false        // render tmux pane layout for the team
+  }
+}
+```
 
-## HOW TO ADD CONFIG
+When `enabled: true`:
+- 12 `team_*` tools register
+- 4 team-mode hooks activate (status injector, mailbox injector, session events, tool gating)
+- `team-mode` built-in skill loads
+- Doctor check `cli/doctor/checks/team-mode.ts` runs
+
+## AGENT OVERRIDE FIELDS (per-agent)
+
+`model`, `variant`, `category`, `skills`, `temperature`, `top_p`, `prompt`, `prompt_append`, `tools`, `disable`, `description`, `mode`, `color`, `permission`, `maxTokens`, `thinking`, `reasoningEffort`, `textVerbosity`, `providerOptions`, `fallback_models`, `ultrawork`.
+
+## HOW TO ADD A CONFIG FIELD
 
 1. Create `src/config/schema/{name}.ts` with Zod schema
 2. Add field to `oh-my-opencode-config.ts` root schema
-3. Reference via `z.infer<typeof YourSchema>` for TypeScript types
-4. Access in handlers via `pluginConfig.{name}`
+3. Reference via `z.infer<typeof YourSchema>` for the TypeScript type
+4. Access in handlers via `pluginConfig.{field_name}` (snake_case JSON, snake_case TS field)
+5. Run `bun run build:schema` to regenerate `assets/oh-my-opencode.schema.json`

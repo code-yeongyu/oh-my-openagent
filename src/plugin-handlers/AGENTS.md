@@ -1,6 +1,6 @@
 # src/plugin-handlers/ — 6-Phase Config Loading Pipeline
 
-**Generated:** 2026-04-18
+**Generated:** 2026-05-08
 
 ## CRITICAL: AGENT ORDERING
 
