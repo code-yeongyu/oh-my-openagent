@@ -140,7 +140,7 @@ export function createSisyphusJuniorAgentWithOverrides(
   }
 
   if (isGlmSisyphusHarnessModel(model)) {
-    return { ...base, thinking: { type: "enabled" } } as AgentConfig
+    return { ...base, maxTokens: 128000, thinking: { type: "enabled" } } as AgentConfig
   }
 
   return {

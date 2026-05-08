@@ -658,7 +658,7 @@ export function createSisyphusAgent(
   }
 
   if (isGlmSisyphusHarnessModel(model)) {
-    return { ...base, thinking: { type: "enabled" } };
+    return { ...base, maxTokens: 128000, thinking: { type: "enabled" } };
   }
 
   return { ...base, thinking: { type: "enabled", budgetTokens: 32000 } };

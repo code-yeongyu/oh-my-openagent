@@ -1,7 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode, AgentPromptMetadata } from "./types"
 import { isGlmThinkingModel } from "./types"
-import { buildGlmSubagentVisionBlock } from "./sisyphus/glm"
 import { buildAntiDuplicationSection } from "./dynamic-agent-prompt-builder"
 import { createAgentToolRestrictions } from "../shared/permission-compat"
 
@@ -298,7 +297,7 @@ export function createMetisAgent(model: string): AgentConfig {
   } as AgentConfig
 
   if (isGlmThinkingModel(model)) {
-    return { ...base, thinking: { type: "enabled" }, prompt: base.prompt + buildGlmSubagentVisionBlock() } as AgentConfig
+    return { ...base, thinking: { type: "enabled" } } as AgentConfig
   }
 
   return { ...base, thinking: { type: "enabled", budgetTokens: 32000 } } as AgentConfig

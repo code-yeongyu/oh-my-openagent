@@ -46,26 +46,27 @@ describe("GLM Prompt Quality: Instruction Compliance", () => {
   test("#given GLM Sisyphus prompt #then mandates delegation before self-implementation", () => {
     const prompt = getGlmPrompt(GLM_MODEL)
 
-    expect(prompt).toMatch(/delegate.*before|dispatch.*first|delegation.*default/i)
-    expect(prompt).toMatch(/self.?implement.*only.*trivial|trivially simple/i)
+    expect(prompt).toMatch(/DECOMPOSE AND DELEGATE|delegate.*parallel/i)
+    expect(prompt).toMatch(/NEVER implement directly|delegate.*when delegation is possible/i)
   })
 
-  test("#given GLM Sisyphus prompt #then includes re-entry rule to avoid re-verbalization", () => {
+  test("#given GLM Sisyphus prompt #then includes intent-routing re-entry guidance", () => {
     const prompt = getGlmPrompt(GLM_MODEL)
 
-    expect(prompt).toContain("re_entry_rule")
-    expect(prompt).toMatch(/confirmation turn.*do not.*preamble|skip the preamble/i)
-    expect(prompt).toMatch(/already.*context.*return it|already.*context.*do not.*search/i)
+    expect(prompt).toMatch(/Do not re-verbalize confirmed decisions|Do not mechanically re-derive prior conclusions/i)
+    expect(prompt).toMatch(/delegate early|synthesize agent results/i)
   })
 
   test("#given GLM Sisyphus prompt #then includes working memory slice system", () => {
     const prompt = getGlmPrompt(GLM_MODEL)
 
     expect(prompt).toContain("Small_Context_Working_Memory")
-    expect(prompt).toContain(".sisyphus/state/")
-    expect(prompt).toContain("goal.md")
-    expect(prompt).toContain("decisions.md")
-    expect(prompt).toContain("verification.md")
+    expect(prompt).toContain(".sisyphus/state/context-memory.json")
+    expect(prompt).toContain("`goal`")
+    expect(prompt).toContain("`decisions`")
+    expect(prompt).toContain("`active_files`")
+    expect(prompt).toContain("`blockers`")
+    expect(prompt).toContain("`verification`")
   })
 
   test("#given GLM Sisyphus prompt #then includes vision constraint for text-only models", () => {
@@ -88,8 +89,8 @@ describe("GLM Prompt Quality: Instruction Compliance", () => {
     const prompt = getGlmPrompt(GLM_MODEL)
 
     expect(prompt).toMatch(/Hephaestus/i)
-    expect(prompt).toMatch(/deep.?thinking.*worker|autonomous.*worker/i)
-    expect(prompt).toMatch(/more than 3 sequential self-edits.*delegate|delegate.*Hephaestus instead/i)
+    expect(prompt).toMatch(/autonomous implementation worker|GLM is the orchestrator/i)
+    expect(prompt).toMatch(/3\+ sequential self-edits.*decompose and delegate|delegate to Hephaestus\/deep in background/i)
   })
 
   for (const model of GLM_MODELS) {
@@ -130,8 +131,8 @@ describe("GLM Prompt Quality: Speed", () => {
     const prompt = getGlmPrompt(GLM_MODEL)
 
     expect(prompt).toContain("token_economy")
-    expect(prompt).toMatch(/budgetTokens.*unsupported|unconstrained/i)
-    expect(prompt).toMatch(/restraint.*behavior|prompt.*level.*restraint/i)
+    expect(prompt).toContain("Restraint guidelines:")
+    expect(prompt).toMatch(/delegate before deep-diving|Do not pad final answers/i)
   })
 
   test("#given GLM Sisyphus prompt #then intent classification is one-line, not full analysis", () => {
@@ -141,26 +142,27 @@ describe("GLM Prompt Quality: Speed", () => {
     expect(prompt).toContain("Intent routes:")
   })
 
-  test("#given GLM SJ prompt #then contains brief thinking mandate", () => {
+  test("#given GLM SJ prompt #then contains GLM execution guidance", () => {
     const prompt = getSjPrompt(GLM_MODEL)
 
-    expect(prompt).toMatch(/Think concisely|Brief Thinking/i)
-    expect(prompt).toMatch(/Execute immediately|No deliberation/i)
+    expect(prompt).toContain("GLM-5.1 Execution Mode")
+    expect(prompt).toMatch(/Execute tasks directly/i)
+    expect(prompt).toMatch(/Stay an executor/i)
   })
 
-  test("#given GLM SJ prompt #then exploration is capped at 2 iterations", () => {
+  test("#given GLM SJ prompt #then contains bounded termination guidance", () => {
     const prompt = getSjPrompt(GLM_MODEL)
 
-    expect(prompt).toMatch(/2 search iteration|capped at 2/i)
+    expect(prompt).toMatch(/Maximum status checks: 2/i)
   })
 
-  test("#given GLM SJ prompt #then contains tiered verification for speed", () => {
+  test("#given GLM SJ prompt #then contains focused verification for speed", () => {
     const prompt = getSjPrompt(GLM_MODEL)
 
-    expect(prompt).toMatch(/V1.*trivial|V1.*lsp_diagnostics/i)
-    expect(prompt).toMatch(/V2.*moderate/i)
-    expect(prompt).toMatch(/V3.*broad/i)
-    expect(prompt).toMatch(/Stop after the first successful verification/i)
+    expect(prompt).toContain("<Verification>")
+    expect(prompt).toMatch(/lsp_diagnostics clean on changed files/i)
+    expect(prompt).toMatch(/Build passes \(if applicable\)/i)
+    expect(prompt).toMatch(/STOP after first successful verification/i)
   })
 
   test("#given GLM prompt #then prompt length is within reasonable bounds", () => {
@@ -197,7 +199,7 @@ describe("GLM Prompt Quality: Accuracy", () => {
   test("#given GLM Sisyphus prompt #then scope discipline prevents over-implementation", () => {
     const prompt = getGlmPrompt(GLM_MODEL)
 
-    expect(prompt).toMatch(/Self-implement only trivial|trivial local work/i)
+    expect(prompt).toContain("You never start implementing unless the current user message explicitly asks for implementation.")
   })
 
   test("#given GLM Sisyphus prompt #then includes hard blocks and anti-patterns", () => {
@@ -213,17 +215,18 @@ describe("GLM Prompt Quality: Accuracy", () => {
     expect(prompt).toMatch(/ask.*only when missing.*materially|materially change.*outcome/i)
   })
 
-  test("#given GLM SJ prompt #then contains scope discipline", () => {
+  test("#given GLM SJ prompt #then contains focused executor scope", () => {
     const prompt = getSjPrompt(GLM_MODEL)
 
-    expect(prompt).toMatch(/EXACTLY.*ONLY.*delegated|No extra features.*no scope creep/i)
+    expect(prompt).toMatch(/Focused executor/i)
+    expect(prompt).toMatch(/Execute tasks directly/i)
   })
 
-  test("#given GLM SJ prompt #then contains re-entry rule for context reuse", () => {
+  test("#given GLM SJ prompt #then contains token discipline", () => {
     const prompt = getSjPrompt(GLM_MODEL)
 
-    expect(prompt).toMatch(/re.?entry.*rule|Re-entry Rule/i)
-    expect(prompt).toMatch(/already.*context.*use it|Do not re.?search.*re.?derive/i)
+    expect(prompt).toContain("Token Discipline")
+    expect(prompt).toMatch(/large output capacity.*not verbosity/i)
   })
 })
 
@@ -236,12 +239,12 @@ describe("GLM Prompt Quality: Cross-Agent Consistency", () => {
     expect(sjPrompt).toMatch(/text.?only|GLM.*CANNOT.*images/i)
   })
 
-  test("#given GLM Sisyphus + SJ #then both have working memory reference", () => {
+  test("#given GLM Sisyphus + SJ #then both have vision routing", () => {
     const sisyphusPrompt = getGlmPrompt(GLM_MODEL)
     const sjPrompt = getSjPrompt(GLM_MODEL)
 
-    expect(sisyphusPrompt).toContain("Small_Context_Working_Memory")
-    expect(sjPrompt).toContain("Small_Context_Working_Memory")
+    expect(sisyphusPrompt).toContain("zai-mcp-server")
+    expect(sjPrompt).toContain("zai-mcp-server")
   })
 
   test("#given GLM Sisyphus + SJ #then both have tiered verification", () => {
@@ -251,9 +254,9 @@ describe("GLM Prompt Quality: Cross-Agent Consistency", () => {
     expect(sisyphusPrompt).toMatch(/V1.*trivial|V1.*trivial.*local/i)
     expect(sisyphusPrompt).toMatch(/V2.*moderate/i)
     expect(sisyphusPrompt).toMatch(/V3.*full.*rigor|V3.*broad/i)
-    expect(sjPrompt).toMatch(/V1 trivial change|V1.*lsp_diagnostics.*changed file/i)
-    expect(sjPrompt).toMatch(/V2 moderate change/i)
-    expect(sjPrompt).toMatch(/V3 broad.*risky change/i)
+    expect(sjPrompt).toMatch(/lsp_diagnostics clean on changed files/i)
+    expect(sjPrompt).toMatch(/Build passes \(if applicable\)/i)
+    expect(sjPrompt).toMatch(/STOP after first successful verification/i)
   })
 
   test("#given GLM factory config #then thinking is enabled without budgetTokens for all models", () => {

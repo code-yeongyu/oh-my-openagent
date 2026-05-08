@@ -26,7 +26,7 @@ describe("createSisyphusAgent - GLM routing", () => {
 
       expect(prompt).toContain(".sisyphus/state/");
       expect(prompt).toContain("<Small_Context_Working_Memory>");
-      expect(prompt).toContain("goal.md");
+      expect(prompt).toContain("context-memory.json");
     }
   });
 
@@ -38,8 +38,7 @@ describe("createSisyphusAgent - GLM routing", () => {
 
       expect(prompt).not.toContain(".sisyphus/state/");
       expect(prompt).not.toContain("<Small_Context_Working_Memory>");
-      expect(prompt).not.toContain("goal.md");
-      expect(prompt).not.toContain("verification.md");
+      expect(prompt).not.toContain("context-memory.json");
     }
   });
 

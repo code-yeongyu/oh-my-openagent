@@ -5,14 +5,15 @@
  * You are the conductor of a symphony of specialized agents.
  *
  * Routing:
- * 1. GPT models (openai/*, github-copilot/gpt-*) → gpt.ts (GPT-5.4 optimized)
- * 2. Gemini models (google/*, google-vertex/*) → gemini.ts (Gemini-optimized)
- * 3. Default (Claude, etc.) → default.ts (Claude-optimized)
+ * 1. GLM models → glm.ts (default + vision hard block)
+ * 2. GPT models (openai/*, github-copilot/gpt-*) → gpt.ts (GPT-5.4 optimized)
+ * 3. Gemini models (google/*, google-vertex/*) → gemini.ts (Gemini-optimized)
+ * 4. Default (Claude, etc.) → default.ts (Claude-optimized)
  */
 
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode, AgentPromptMetadata } from "../types"
-import { isGptModel, isGeminiModel } from "../types"
+import { isGptModel, isGeminiModel, isGlmThinkingModel } from "../types"
 import type { AvailableAgent, AvailableSkill, AvailableCategory } from "../dynamic-agent-prompt-builder"
 import { buildAgentIdentitySection, buildCategorySkillsDelegationGuide } from "../dynamic-agent-prompt-builder"
 import type { CategoryConfig } from "../../config/schema"
@@ -21,6 +22,7 @@ import { mergeCategories } from "../../shared/merge-categories"
 import { getDefaultAtlasPrompt } from "./default"
 import { getGptAtlasPrompt } from "./gpt"
 import { getGeminiAtlasPrompt } from "./gemini"
+import { getGlmAtlasPrompt } from "./glm"
 import {
   getCategoryDescription,
   buildAgentSelectionSection,
@@ -31,12 +33,15 @@ import {
 
 const MODE: AgentMode = "primary"
 
-export type AtlasPromptSource = "default" | "gpt" | "gemini"
+export type AtlasPromptSource = "default" | "gpt" | "gemini" | "glm"
 
 /**
  * Determines which Atlas prompt to use based on model.
  */
 export function getAtlasPromptSource(model?: string): AtlasPromptSource {
+  if (model && isGlmThinkingModel(model)) {
+    return "glm"
+  }
   if (model && isGptModel(model)) {
     return "gpt"
   }
@@ -60,6 +65,8 @@ export function getAtlasPrompt(model?: string): string {
   const source = getAtlasPromptSource(model)
 
   switch (source) {
+    case "glm":
+      return getGlmAtlasPrompt()
     case "gpt":
       return getGptAtlasPrompt()
     case "gemini":

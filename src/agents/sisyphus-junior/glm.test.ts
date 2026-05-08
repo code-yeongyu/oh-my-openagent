@@ -18,27 +18,24 @@ describe("buildGlmSisyphusJuniorPrompt", () => {
     expect(prompt.startsWith(basePrompt)).toBe(true)
   })
 
-  test("#given no append #then adds exactly one GLM context block", () => {
+  test("#given no append #then includes GLM execution mode block", () => {
     // given / when
     const prompt = buildGlmSisyphusJuniorPrompt(false)
 
     // then
-    expect(countOccurrences(prompt, "<Small_Context_Working_Memory>")).toBe(1)
-    expect(countOccurrences(prompt, "</Small_Context_Working_Memory>")).toBe(1)
+    expect(prompt).toContain("GLM-5.1 Execution Mode")
+    expect(prompt).toContain("Stay an executor")
   })
 
-  test("#given no append #then stays lightweight and avoids full ledger instructions", () => {
+  test("#given no append #then includes vision tool routing and token discipline", () => {
     // given / when
     const prompt = buildGlmSisyphusJuniorPrompt(false)
 
     // then
-    expect(prompt).toContain("Read only the slice named in the task prompt")
-    expect(prompt).not.toContain("Toggle RL")
+    expect(prompt).toContain("zai-mcp-server")
+    expect(prompt).toContain("Token Discipline")
     expect(prompt).not.toContain("goal.md")
     expect(prompt).not.toContain("decisions.md")
-    expect(prompt).not.toContain("files.md")
-    expect(prompt).not.toContain("blockers.md")
-    expect(prompt).not.toContain("verification.md")
   })
 
   test("#given promptAppend #then appends it exactly once", () => {

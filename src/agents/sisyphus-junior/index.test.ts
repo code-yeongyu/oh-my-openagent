@@ -190,7 +190,7 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
       const prompt = buildGlmSisyphusJuniorPrompt(model)
 
       // then
-      expect(prompt).toContain("GLM context priorities")
+      expect(prompt).toContain("GLM-5.1 Execution Mode")
     })
   })
 
@@ -685,8 +685,8 @@ describe("buildSisyphusJuniorPrompt", () => {
     const prompt = buildSisyphusJuniorPrompt(model, false)
 
     // then
-    expect(prompt).toContain("GLM context priorities")
-    expect(prompt).toContain("<Small_Context_Working_Memory>")
+    expect(prompt).toContain("GLM-5.1 Execution Mode")
+    expect(prompt).toContain("zai-mcp-server")
   })
 
   test("GPT 5.3 Codex model uses GPT-5.3-codex prompt", () => {
