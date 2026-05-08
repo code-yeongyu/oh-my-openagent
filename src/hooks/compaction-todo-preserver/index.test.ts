@@ -84,4 +84,55 @@ describe("compaction-todo-preserver", () => {
     //#then
     expect(updateMock).not.toHaveBeenCalled()
   })
+
+  // #given a richer pre-compact snapshot
+  // #when post-compaction todos are only the Atlas bootstrap pair
+  // #then the snapshot should be restored, not the bootstrap stub (issue #3833)
+  it("restores richer snapshot when post-compaction todos are only Atlas bootstrap items (issue #3833)", async () => {
+    //#given
+    updateMock.mockClear()
+    const sessionID = "session-compaction-atlas-bootstrap"
+    const richSnapshot: Todo[] = [
+      { id: "task-1", content: "Implement feature A", status: "in_progress", priority: "high" },
+      { id: "task-2", content: "Write tests for feature A", status: "pending", priority: "high" },
+      { id: "task-3", content: "Update documentation", status: "pending", priority: "medium" },
+    ]
+    const atlasBootstrap: Todo[] = [
+      { id: "orchestrate-plan", content: "Complete ALL implementation tasks", status: "in_progress", priority: "high" },
+      { id: "pass-final-wave", content: "Pass Final Verification Wave - ALL reviewers APPROVE", status: "pending", priority: "high" },
+    ]
+    // First todo() call returns the rich snapshot during capture; second returns the Atlas bootstrap during restore
+    const ctx = createMockContext([richSnapshot, atlasBootstrap])
+    const hook = createCompactionTodoPreserverHook(ctx)
+
+    //#when
+    await hook.capture(sessionID)
+    await hook.event({ event: { type: "session.compacted", properties: { sessionID } } })
+
+    //#then: rich snapshot wins, the bootstrap pair does not
+    expect(updateMock).toHaveBeenCalledTimes(1)
+    expect(updateMock).toHaveBeenCalledWith({ sessionID, todos: richSnapshot })
+  })
+
+  // #given a captured snapshot that itself is the Atlas bootstrap
+  // #when post-compaction shows the same Atlas bootstrap
+  // #then restore must NOT thrash the list (no Todo.update call) (issue #3833)
+  it("does not overwrite when both snapshot and current todos are the Atlas bootstrap pair (issue #3833)", async () => {
+    //#given
+    updateMock.mockClear()
+    const sessionID = "session-compaction-atlas-bootstrap-only"
+    const atlasBootstrap: Todo[] = [
+      { id: "orchestrate-plan", content: "Complete ALL implementation tasks", status: "in_progress", priority: "high" },
+      { id: "pass-final-wave", content: "Pass Final Verification Wave - ALL reviewers APPROVE", status: "pending", priority: "high" },
+    ]
+    const ctx = createMockContext([atlasBootstrap, atlasBootstrap])
+    const hook = createCompactionTodoPreserverHook(ctx)
+
+    //#when
+    await hook.capture(sessionID)
+    await hook.event({ event: { type: "session.compacted", properties: { sessionID } } })
+
+    //#then: nothing to restore beyond what is already present
+    expect(updateMock).not.toHaveBeenCalled()
+  })
 })

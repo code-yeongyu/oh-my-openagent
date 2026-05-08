@@ -12,6 +12,20 @@ type TodoWriter = (input: { sessionID: string; todos: TodoSnapshot[] }) => Promi
 
 const HOOK_NAME = "compaction-todo-preserver"
 
+// Atlas's hard-coded bootstrap todo list (mirrors the templates in
+// src/agents/atlas/{default,gpt,gemini}-prompt-sections.ts). When Atlas runs
+// after compaction it writes these two todos before the preserver gets a
+// chance to restore the captured snapshot — so the previous "current todos
+// non-empty -> skip restore" guard discarded the richer pre-compaction state.
+// (issue #3833)
+const ATLAS_BOOTSTRAP_TODO_IDS: readonly string[] = ["orchestrate-plan", "pass-final-wave"] as const
+
+function isAtlasBootstrapTodoList(todos: readonly TodoSnapshot[]): boolean {
+  if (todos.length !== ATLAS_BOOTSTRAP_TODO_IDS.length) return false
+  const ids = new Set(todos.map((todo) => todo.id))
+  return ATLAS_BOOTSTRAP_TODO_IDS.every((expectedId) => ids.has(expectedId))
+}
+
 function extractTodos(response: unknown): TodoSnapshot[] {
   const payload = response as { data?: unknown }
   if (Array.isArray(payload?.data)) {
@@ -81,7 +95,15 @@ export function createCompactionTodoPreserverHook(
       log(`[${HOOK_NAME}] Failed to fetch todos post-compaction`, { sessionID, error: String(err) })
     }
 
-    if (hasCurrent && currentTodos.length > 0) {
+    // Atlas writes its 2-item bootstrap todo list at the start of every post-
+    // compaction run. Treating that list as authoritative drops the richer
+    // pre-compaction snapshot. Restore the snapshot instead, but only when the
+    // captured snapshot is itself richer than the bootstrap list (issue #3833).
+    const currentIsAtlasBootstrap =
+      hasCurrent && currentTodos.length > 0 && isAtlasBootstrapTodoList(currentTodos)
+    const snapshotIsAtlasBootstrap = isAtlasBootstrapTodoList(snapshot)
+
+    if (hasCurrent && currentTodos.length > 0 && !(currentIsAtlasBootstrap && !snapshotIsAtlasBootstrap)) {
       snapshots.delete(sessionID)
       log(`[${HOOK_NAME}] Skipped restore (todos already present)`, { sessionID, count: currentTodos.length })
       return
