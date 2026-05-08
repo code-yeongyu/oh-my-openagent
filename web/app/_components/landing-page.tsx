@@ -652,10 +652,10 @@ export async function LandingPage(): Promise<JSX.Element> {
                       <div className="space-y-2">
                         {[
                           { cat: "visual-engineering", model: "Gemini 3.1 Pro" },
-                          { cat: "ultrabrain", model: "GPT 5.4" },
+                          { cat: "ultrabrain", model: "GPT 5.5 xHigh" },
                           { cat: "artistry", model: "Gemini 3.1 Pro" },
-                          { cat: "quick", model: "Claude Haiku 4.5" },
-                          { cat: "deep", model: "GPT 5.3 Codex" },
+                          { cat: "quick", model: "GPT 5.4 Mini" },
+                          { cat: "deep", model: "GPT 5.5 Medium" },
                           { cat: "writing", model: "Kimi K2.5" },
                           { cat: "git", model: "Claude Haiku 4.5" },
                         ].map((item) => (
@@ -676,7 +676,7 @@ export async function LandingPage(): Promise<JSX.Element> {
                         Skill Injection
                       </h3>
                       <div className="grid grid-cols-2 gap-3">
-                        {["playwright", "git-master", "frontend-ui-ux", "dev-browser"].map(
+                        {["playwright", "git-master", "frontend-ui-ux", "team-mode"].map(
                           (skill) => (
                             <div
                               key={skill}

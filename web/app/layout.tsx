@@ -40,7 +40,7 @@ export const metadata: Metadata = {
     title: "Oh My OpenAgent — The Best Agent Harness",
     description:
       "Meet Sisyphus: The batteries-included agent that codes like you. Multi-model orchestration, Team Mode, background agents, 50+ lifecycle hooks.",
-    images: [{ url: "/images/hero.webp", width: 1536, height: 1024, alt: "Oh My OpenAgent" }],
+    images: [{ url: "/images/hero.webp", width: 1024, height: 683, alt: "Oh My OpenAgent" }],
   },
   twitter: {
     card: "summary_large_image",

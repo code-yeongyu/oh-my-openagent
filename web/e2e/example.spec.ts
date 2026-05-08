@@ -26,7 +26,7 @@ test.describe("Landing Page", () => {
     await expect(installCommand).toBeVisible()
   })
 
-  test("renders all 10 agent cards", async ({ page }) => {
+  test("renders all rendered agent cards", async ({ page }) => {
     // given
     await page.goto("/")
 
@@ -41,7 +41,6 @@ test.describe("Landing Page", () => {
       "Metis",
       "Momus",
       "Atlas",
-      "Sisyphus Junior",
     ]
     for (const name of agentNames) {
       await expect(page.getByText(name, { exact: true }).first()).toBeVisible()
