@@ -1,0 +1,28 @@
+{
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json",
+  "model_fallback": true,
+  "runtime_fallback": {
+    "enabled": true,
+    "max_fallback_attempts": 5
+  },
+  "agents": {
+    "sisyphus": {
+      "model": "anthropic/claude-opus-4-7",
+      "variant": "max",
+      "fallback_models": [
+        { "model": "opencode-go/kimi-k2.6" },
+        { "model": "opencode-go/glm-5.1" },
+        { "model": "github-copilot/gpt-5.5", "variant": "medium" }
+      ]
+    },
+    "hephaestus": {
+      "model": "github-copilot/gpt-5.5",
+      "variant": "medium",
+      "fallback_models": [
+        { "model": "openai/gpt-5.5", "variant": "medium" },
+        { "model": "opencode/gpt-5.5", "variant": "medium" },
+        { "model": "vercel/openai/gpt-5.5", "variant": "medium" }
+      ]
+    }
+  }
+}

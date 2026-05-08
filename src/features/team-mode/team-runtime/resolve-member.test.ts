@@ -148,6 +148,117 @@ describe("resolveMember", () => {
     expect(result.systemContent).toBe("resolved-system-content")
   })
 
+  test("switches hephaestus team members to sisyphus when the resolved model is non-gpt", async () => {
+    // given
+    const member = {
+      backendType: "in-process",
+      isActive: true,
+      kind: "subagent_type",
+      name: "integration-tester",
+      subagent_type: "hephaestus",
+      prompt: "run integration checks",
+    } satisfies Member
+
+    resolveSubagentExecutionMock.mockResolvedValue({
+      agentToUse: "hephaestus",
+      categoryModel: { providerID: "opencode-go", modelID: "glm-5.1" },
+      fallbackChain: [{ providers: ["github-copilot"], model: "gpt-5.5" }],
+    })
+
+    // when
+    const result = await resolveMember(member, createExecutorContext(), "deep, quick", "sisyphus")
+
+    // then
+    expect(result.agentToUse).toBe("sisyphus")
+    expect(result.model).toEqual({ providerID: "opencode-go", modelID: "glm-5.1" })
+    expect(buildSystemContentMock).toHaveBeenCalledWith({
+      agentName: "sisyphus",
+      categoryPromptAppend: undefined,
+      maxPromptTokens: undefined,
+      model: { providerID: "opencode-go", modelID: "glm-5.1" },
+    })
+  })
+
+  test("keeps hephaestus on non-gpt only when explicitly allowed", async () => {
+    // given
+    const member = {
+      backendType: "in-process",
+      isActive: true,
+      kind: "subagent_type",
+      name: "integration-tester",
+      subagent_type: "hephaestus",
+      prompt: "run integration checks",
+    } satisfies Member
+    const ctx = {
+      ...createExecutorContext(),
+      agentOverrides: {
+        hephaestus: {
+          allow_non_gpt_model: true,
+        },
+      },
+    } satisfies ExecutorContext
+
+    resolveSubagentExecutionMock.mockResolvedValue({
+      agentToUse: "hephaestus",
+      categoryModel: { providerID: "opencode-go", modelID: "glm-5.1" },
+      fallbackChain: [],
+    })
+
+    // when
+    const result = await resolveMember(member, ctx, "deep, quick", "sisyphus")
+
+    // then
+    expect(result.agentToUse).toBe("hephaestus")
+  })
+
+  test("switches sisyphus team members to hephaestus for non-native gpt models", async () => {
+    // given
+    const member = {
+      backendType: "in-process",
+      isActive: true,
+      kind: "subagent_type",
+      name: "planner",
+      subagent_type: "sisyphus",
+      prompt: "plan rollout",
+    } satisfies Member
+
+    resolveSubagentExecutionMock.mockResolvedValue({
+      agentToUse: "sisyphus",
+      categoryModel: { providerID: "openai", modelID: "gpt-4.1" },
+      fallbackChain: [],
+    })
+
+    // when
+    const result = await resolveMember(member, createExecutorContext(), "deep, quick", "sisyphus")
+
+    // then
+    expect(result.agentToUse).toBe("hephaestus")
+  })
+
+  test("keeps sisyphus when using native gpt support models", async () => {
+    // given
+    const member = {
+      backendType: "in-process",
+      isActive: true,
+      kind: "subagent_type",
+      name: "planner",
+      subagent_type: "sisyphus",
+      prompt: "plan rollout",
+    } satisfies Member
+
+    resolveSubagentExecutionMock.mockResolvedValue({
+      agentToUse: "sisyphus",
+      categoryModel: { providerID: "openai", modelID: "gpt-5.5" },
+      fallbackChain: [],
+    })
+
+    // when
+    const result = await resolveMember(member, createExecutorContext(), "deep, quick", "sisyphus")
+
+    // then
+    expect(result.agentToUse).toBe("sisyphus")
+  })
+
   test("throws TeamMemberResolutionError without category fallback when subagent resolution fails", async () => {
     // given
     const member = {

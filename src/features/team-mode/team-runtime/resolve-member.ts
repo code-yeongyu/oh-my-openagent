@@ -2,6 +2,8 @@ import type { FallbackEntry } from "../../../shared/model-requirements"
 import type { DelegatedModelConfig } from "../../../shared/model-resolution-types"
 import type { ExecutorContext } from "../../../tools/delegate-task/executor-types"
 import type { DelegateTaskArgs } from "../../../tools/delegate-task/types"
+import { isGptModel, isGptNativeSisyphusModel } from "../../../agents/types"
+import { getAgentConfigKey } from "../../../shared/agent-display-names"
 import type { Member } from "../types"
 import {
   buildSystemContent,
@@ -49,6 +51,22 @@ function resolveSystemContent(input: {
     maxPromptTokens: input.maxPromptTokens,
     model: input.model,
   }) ?? ""
+}
+
+function resolveTeamSafeAgent(agentToUse: string, model: DelegatedModelConfig | undefined, ctx: ExecutorContext): string {
+  const agentKey = getAgentConfigKey(agentToUse)
+  if (!model) return agentToUse
+
+  if (agentKey === "hephaestus" && !isGptModel(model.modelID)) {
+    if (ctx.agentOverrides?.hephaestus?.allow_non_gpt_model === true) return agentToUse
+    return "sisyphus"
+  }
+
+  if (agentKey === "sisyphus" && isGptModel(model.modelID) && !isGptNativeSisyphusModel(model.modelID)) {
+    return "hephaestus"
+  }
+
+  return agentToUse
 }
 
 // Strip global `agents.sisyphus-junior.model` override at the team-mode boundary —
@@ -114,13 +132,15 @@ export async function resolveMember(
       throw new Error(execution.error)
     }
 
+    const agentToUse = resolveTeamSafeAgent(execution.agentToUse, execution.categoryModel, ctx)
+
     return {
       memberName: member.name,
-      agentToUse: execution.agentToUse,
+      agentToUse,
       model: execution.categoryModel,
       fallbackChain: execution.fallbackChain,
       systemContent: resolveSystemContent({
-        agentToUse: execution.agentToUse,
+        agentToUse,
         model: execution.categoryModel,
       }),
     }
