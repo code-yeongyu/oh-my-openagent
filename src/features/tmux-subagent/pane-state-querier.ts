@@ -55,19 +55,22 @@ export async function queryWindowState(sourcePaneId: string): Promise<WindowStat
 
   panes.sort((a, b) => a.left - b.left || a.top - b.top)
 
-  const mainPane = panes.reduce<TmuxPaneInfo | null>((selected, pane) => {
-    if (!selected) return pane
-    if (pane.left !== selected.left) {
-      return pane.left < selected.left ? pane : selected
-    }
-    if (pane.width !== selected.width) {
-      return pane.width > selected.width ? pane : selected
-    }
-    if (pane.top !== selected.top) {
-      return pane.top < selected.top ? pane : selected
-    }
-    return pane.paneId === sourcePaneId ? pane : selected
-  }, null)
+  let mainPane = panes.find((p) => p.paneId === sourcePaneId) || null
+  if (!mainPane) {
+    mainPane = panes.reduce<TmuxPaneInfo | null>((selected, pane) => {
+      if (!selected) return pane
+      if (pane.left !== selected.left) {
+        return pane.left < selected.left ? pane : selected
+      }
+      if (pane.width !== selected.width) {
+        return pane.width > selected.width ? pane : selected
+      }
+      if (pane.top !== selected.top) {
+        return pane.top < selected.top ? pane : selected
+      }
+      return pane.paneId === sourcePaneId ? pane : selected
+    }, null)
+  }
   if (!mainPane) {
     log("[pane-state-querier] CRITICAL: failed to determine main pane", {
       sourcePaneId,
