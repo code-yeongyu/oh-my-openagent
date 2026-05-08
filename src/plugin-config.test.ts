@@ -1,9 +1,10 @@
-import { afterEach, describe, expect, it, mock, spyOn } from "bun:test";
+import { afterEach, describe, expect, it, mock } from "bun:test";
 import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { mergeConfigs, parseConfigPartially } from "./plugin-config";
+import { loadConfigFromPath, mergeConfigs, parseConfigPartially } from "./plugin-config";
 import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig, type TeamModeConfig } from "./config";
+import { clearConfigLoadErrors, getConfigLoadErrors } from "./shared/config-errors";
 
 const tempDirs: string[] = []
 type ConfigInput = Omit<Partial<OhMyOpenCodeConfig>, "team_mode"> & {
@@ -20,6 +21,7 @@ async function importFreshPluginConfigModule(): Promise<typeof import("./plugin-
 
 afterEach(() => {
   mock.restore()
+  clearConfigLoadErrors()
   delete process.env.OPENCODE_CONFIG_DIR
 
   for (const dir of tempDirs.splice(0)) {
@@ -273,6 +275,35 @@ describe("parseConfigPartially", () => {
       expect(result!.agents).toBeUndefined();
     });
 
+    it("should preserve valid agent_order when another section is invalid", () => {
+      const rawConfig = {
+        agent_order: ["hephaestus", "sisyphus", "prometheus", "atlas"],
+        disabled_skills: [42],
+      };
+
+      const result = parseConfigPartially(rawConfig);
+
+      expect(result?.agent_order).toEqual([
+        "hephaestus",
+        "sisyphus",
+        "prometheus",
+        "atlas",
+      ]);
+      expect(result?.disabled_skills).toBeUndefined();
+    });
+
+    it("should skip abusive agent_order when another section is valid", () => {
+      const rawConfig = {
+        agent_order: ["x".repeat(129)],
+        disabled_hooks: ["comment-checker"],
+      };
+
+      const result = parseConfigPartially(rawConfig);
+
+      expect(result?.agent_order).toBeUndefined();
+      expect(result?.disabled_hooks).toEqual(["comment-checker"]);
+    });
+
     it("should preserve valid agents when a non-agent section is invalid", () => {
       const rawConfig = {
         agents: {
@@ -348,6 +379,51 @@ describe("parseConfigPartially", () => {
     });
   });
 });
+
+describe("loadConfigFromPath agent_order warnings", () => {
+  it("loads config and records warning for invalid agent_order entries", () => {
+    // given
+    const rootDir = mkdtempSync(join(tmpdir(), "agent-order-warning-"))
+    tempDirs.push(rootDir)
+    const configPath = join(rootDir, "oh-my-openagent.json")
+    writeJsonFile(configPath, {
+      agent_order: ["hephaestus", "not-real", "sisyphus", "hephaestus"],
+    })
+
+    // when
+    const result = loadConfigFromPath(configPath, {})
+
+    // then
+    expect(result?.agent_order).toEqual(["hephaestus", "not-real", "sisyphus", "hephaestus"])
+    expect(getConfigLoadErrors()).toEqual([
+      {
+        path: configPath,
+        error: 'agent_order warning - unknown agent names ignored: "not-real"; duplicate agent names ignored: "hephaestus"',
+      },
+    ])
+  })
+
+  it("sanitizes and caps invalid agent_order values before recording warnings", () => {
+    // given
+    const rootDir = mkdtempSync(join(tmpdir(), "agent-order-sanitize-"))
+    tempDirs.push(rootDir)
+    const configPath = join(rootDir, "oh-my-openagent.json")
+    writeJsonFile(configPath, {
+      agent_order: [
+        "\u001B[31mbad\u001B[0m",
+        ...Array.from({ length: 11 }, (_, index) => `missing-${index}`),
+      ],
+    })
+
+    // when
+    loadConfigFromPath(configPath, {})
+
+    // then
+    expect(getConfigLoadErrors()[0]?.error).toBe(
+      'agent_order warning - unknown agent names ignored: "[31mbad[0m", "missing-0", "missing-1", "missing-2", "missing-3", "missing-4", "missing-5", "missing-6", "missing-7", "missing-8", (+2 more)',
+    )
+  })
+})
 
 describe("loadPluginConfig", () => {
   it("should only honor mcp_env_allowlist from user config", async () => {
