@@ -1,0 +1,561 @@
+{
+  "metadata": {
+    "title": "Oh My OpenAgent",
+    "description": "究極のエージェントハーネス。Sisyphusと出会おう：あなたのようなコーディングをする、バッテリー内蔵型エージェントです。"
+  },
+  "nav": {
+    "brand": "Oh My OpenAgent",
+    "features": "機能",
+    "agents": "エージェント",
+    "docs": "ドキュメント",
+    "manifesto": "マニフェスト",
+    "starOnGitHub": "GitHubでスターをつける"
+  },
+  "footer": {
+    "brand": "Oh My OpenAgent",
+    "copyright": "© {year} Oh My OpenAgent. SUL-1.0ライセンスでオープンソースです。",
+    "github": "GitHub",
+    "discord": "Discord",
+    "documentation": "ドキュメント",
+    "manifesto": "マニフェスト"
+  },
+  "landing": {
+    "hero": {
+      "title": "最高の ",
+      "titleHighlight": "Agent Harness",
+      "subtitle": "{stars}スター。{downloads}ダウンロード。実戦で証明済み。",
+      "githubStars": "{count} GitHub Stars",
+      "specializedAgents": "{count}個の専門Agent",
+      "totalDownloads": "累計{count}+ダウンロード",
+      "monthlyDownloads": "月間{count}+ダウンロード",
+      "lifecycleHooks": "{count}+ライフサイクルHooks",
+      "installCommand": "bunx oh-my-openagent install",
+      "getStarted": "始める",
+      "viewOnGitHub": "GitHubで見る"
+    },
+    "ulw": {
+      "badge": "魔法の言葉",
+      "title": "ulw",
+      "headline": "3文字タイプ。離れる。",
+      "description": "Ultra Workモードは最大精度を発揮：自動計画、深い調査、並列エージェント、自己修正ループ。システムは完了するまで止まりません。あなたは監視しません。",
+      "autoPlanning": "自動計画",
+      "deepResearch": "深い調査",
+      "selfCorrection": "自己修正",
+      "parallelAgents": "並列エージェント",
+      "terminalTitle": "sisyphus — -zsh — 80x24",
+      "terminalInput": "ulw add authentication to the API",
+      "steps": {
+        "scanning": "コードベースをスキャン中...",
+        "context": "3個のexploreエージェントを起動中...",
+        "planning": "実行計画を構築中...",
+        "delegating": "4個の並列エージェントを展開中...",
+        "verifying": "検証テストを実行中...",
+        "complete": "完了。847行変更、0個の問題。"
+      },
+      "tagline": "ゼロ介入。完全な自律性。ただ結果。"
+    },
+    "sisyphus": {
+      "badge": "メインオーケストレーター",
+      "title": "Sisyphus",
+      "headline": "眠らないCTO",
+      "description": "神話の人物にちなんで名付けられた、永遠に巨石を転がし続けるオーケストレーター。暗黙的な要件を解析し、コードベースの成熟度に適応し、スペシャリストに委譲します。中断されても、boulderシステムが正確にその場所から再開します。",
+      "phases": {
+        "intent": {
+          "title": "Intent Gate",
+          "description": "入力した通りではなく、本当に望んだことを解析します"
+        },
+        "explore": {
+          "title": "Codebase Assessment",
+          "description": "一行も触れる前にアーキテクチャをマッピングします"
+        },
+        "delegate": {
+          "title": "Smart Delegation",
+          "description": "適切なスペシャリストエージェントにルーティングします"
+        },
+        "verify": {
+          "title": "Independent Verification",
+          "description": "何も信じません。すべてを検証します。"
+        }
+      },
+      "boulderTitle": "Session Continuity",
+      "boulderDescription": "アクティブな作業はboulder.jsonに追跡されます。停電？システムクラッシュ？関係ありません。止まったそのままの場所から再開できます。",
+      "model": "Claude Opus 4.6 Max"
+    },
+    "prometheusAtlas": {
+      "badge": "オーケストレーションワークフロー",
+      "title": "考えて、動け",
+      "headline": "計画と実行は別の仕事だ",
+      "prometheus": {
+        "name": "Prometheus",
+        "role": "Strategic Planner",
+        "model": "Claude Opus 4.6 Max",
+        "description": "設計者。あなたとインタビューし、コードベースを探索し、詳細な実行計画を作成します。コードは絶対に書きません。MetisとMomusを品質ゲートとして使用します。",
+        "features": [
+          "知的なインタビューモード",
+          "マルチエージェントコードベース探索",
+          "Metisによるギャップ分析",
+          "Momusとの容赦ないレビュー"
+        ]
+      },
+      "atlas": {
+        "name": "Atlas",
+        "role": "Master Executor",
+        "model": "Claude Sonnet 4.6",
+        "description": "建設者。検証済みの計画を読み、category+skillsシステムを通じて専門エージェントに委譲します。タスク間の学習を追跡します。独立して検証 — サブエージェントの主張を信じません。",
+        "features": [
+          "意図ベースのタスクルーティング",
+          "タスク間の叡智蓄積",
+          "Boulderセッション継続性",
+          "独立した結果検証"
+        ]
+      },
+      "metis": {
+        "name": "Metis",
+        "description": "バグになる前に曖昧さを捕捉します。"
+      },
+      "momus": {
+        "name": "Momus",
+        "description": "プランが実際に完璧な時だけOKAYと言います。"
+      },
+      "workflow": {
+        "step1": "Prometheusに作業を説明する",
+        "step2": "Metisがギャップを分析する",
+        "step3": "Momusが容赦なく検証する",
+        "step4": "Atlasがスペシャリストに委譲する",
+        "step5": "すべてに対して独立した検証が行われる"
+      },
+      "whyItWorks": "プランナーはコードを書かない。実行者は検証済みの計画に従う。知能は個々のエージェントではなくシステムにある。"
+    },
+    "hephaestus": {
+      "badge": "ディープワーカー",
+      "title": "Hephaestus",
+      "headline": "目標をくれ、レシピじゃなくて",
+      "description": "ギリシャの鍛冶の神にちなんで名付けられた、方法的、徹底的、執念的。コードを書く前に2-5個の並列exploreエージェントを起動。深いアーキテクチャ推論、複雑なデバッグ、クロスドメイン統成に最適。",
+      "loop": {
+        "explore": "EXPLORE — 地形をマッピングする",
+        "plan": "PLAN — コースを計画する",
+        "decide": "DECIDE — 道を確定する",
+        "execute": "EXECUTE — 精密に構築する",
+        "verify": "VERIFY — 動作を証明する"
+      },
+      "tagline": "良いだけではない時に。",
+      "model": "GPT 5.3 Codex Medium"
+    },
+    "agents": {
+      "title": "Specialized Agents",
+      "subtitle": "5つの専用エージェントに加え、必要に応じて生成されるダイナミックエージェント。",
+      "oracle": {
+        "name": "Oracle",
+        "role": "Architecture Consultant",
+        "model": "GPT 5.4 High",
+        "description": "複雑なデバッグとアーキテクチャ決定。前進の道が明らかでない時。"
+      },
+      "librarian": {
+        "name": "Librarian",
+        "role": "Docs & Code Search",
+        "model": "MiniMax M2.5",
+        "description": "実際のGitHub例と公式ドキュメントを見つける。証拠ベース、パーマリンク付き。"
+      },
+      "explore": {
+        "name": "Explore",
+        "role": "Codebase Grep",
+        "model": "MiniMax M2.5",
+        "description": "超高速コードベース検索。安価で、並列で、常にバックグラウンドで。"
+      },
+      "metis": {
+        "name": "Metis",
+        "role": "Plan Consultant",
+        "model": "Claude Opus 4.6",
+        "description": "プランの曖昧さをプロダクションバグになる前に捕捉する。"
+      },
+      "momus": {
+        "name": "Momus",
+        "role": "Plan Reviewer",
+        "model": "GPT 5.4",
+        "description": "容赦ない検証。プランが弾丸不可能な時だけ承認する。"
+      },
+      "dynamicSystem": {
+        "name": "Dynamic Agent",
+        "role": "必要な瞬間に生成される",
+        "description": "リクエストを解析し、最適なモデルとスキルを組み合わせてエージェントをリアルタイムに構築します。"
+      }
+    },
+    "architecture": {
+      "title": "異なる設計",
+      "subtitle": "実際に重要な設計決定。",
+      "principles": {
+        "specialization": {
+          "title": "Specialization",
+          "description": "各エージェントは一つのことを例外的に上手にやる。何でも屋はいない。"
+        },
+        "trustVerify": {
+          "title": "Trust But Verify",
+          "description": "オーケストレーターはすべてを独立して検証する。サブエージェントにタダパスはない。"
+        },
+        "wisdom": {
+          "title": "Wisdom Accumulation",
+          "description": "各タスクからの学習がその後のすべてのタスクに渡される。システムは作業しながら賢くなる。"
+        },
+        "modelOptimization": {
+          "title": "Model Optimization",
+          "description": "計画と複雑な決定には高価なモデル。日常的な作業には安価なモデル。ドルあたりの最大出力。"
+        },
+        "categories": {
+          "title": "Category System",
+          "description": "意図ベースのルーティング。必要なものを言って — ultrabrain、visual-engineering、quick — 正しいモデルが処理する。"
+        },
+        "continuity": {
+          "title": "Session Continuity",
+          "description": "Boulderシステム：中断された作業は正確に止まった場所から再開される。ゼロコンテキストロス。"
+        }
+      }
+    },
+    "reviews": {
+      "title": "開発者たちの声",
+      "review1": {
+        "text": "It made me cancel my Cursor subscription. Unbelievable things are happening in the open source community.",
+        "author": "Arthur Guiot"
+      },
+      "review2": {
+        "text": "If Claude Code does in 7 days what a human does in 3 months, Sisyphus does it in 1 hour.",
+        "author": "B, Quant Researcher"
+      },
+      "review3": {
+        "text": "Knocked out 8000 eslint warnings with Oh My Opencode, just in a day.",
+        "author": "Jacob Ferrari"
+      },
+      "review4": {
+        "text": "use oh-my-openagent, you will never go back",
+        "author": "d0t3ch"
+      },
+      "review5": {
+        "text": "You guys should pull this into core and recruit him. Seriously. It's really, really, really good.",
+        "author": "Henning Kilset"
+      },
+      "review6": {
+        "text": "Oh My OpenCode Is Actually Insane",
+        "author": "Darren Builds AI (YouTube)"
+      }
+    },
+    "cta": {
+      "title": "ボイラープレートを書くのをやめろ",
+      "subtitle": "Oh My OpenAgentをインストールしてエージェントに任せよう。最初のulwコマンドまであと30秒。",
+      "installCommand": "bunx oh-my-openagent install",
+      "installNow": "今すぐインストール",
+      "readTheDocs": "ドキュメントを読む"
+    }
+  },
+  "docs": {
+    "mobileHeader": "Oh My OpenAgentドキュメント",
+    "searchPlaceholder": "ドキュメントを検索...",
+    "sections": {
+      "overview": "概要",
+      "quickStart": "クイックスタート",
+      "configLocations": "設定ファイルの場所",
+      "agents": "エージェント",
+      "categories": "カテゴリ",
+      "skills": "スキル",
+      "backgroundTasks": "バックグラウンドタスク",
+      "hooks": "フック",
+      "mcps": "MCP",
+      "browserAutomation": "ブラウザ自動化",
+      "tmux": "Tmux統合",
+      "gitMaster": "Git Master",
+      "commentChecker": "コメントチェッカー",
+      "experimental": "実験的機能",
+      "lsp": "LSP設定",
+      "envVars": "環境変数"
+    },
+    "overview": {
+      "title": "設定リファレンス",
+      "description": "Oh My OpenAgentは意見を持っていますが、好みに応じて調整可能です。ほとんどのユーザーは何も設定する必要はありません — {command}を実行して始めてください。"
+    },
+    "quickStart": {
+      "title": "クイックスタート"
+    },
+    "configLocations": {
+      "title": "設定ファイルの場所",
+      "projectLevel": "（プロジェクトレベル）",
+      "userLevel": "（ユーザーレベル）",
+      "jsonc": "JSONCがサポートされており、コメントと末尾のカンマを使用できます。"
+    },
+    "agentsSection": {
+      "title": "エージェント",
+      "description": "Sisyphus、Hephaestus、Oracle、Librarian、Explore、Multimodal Looker、Prometheus、Metis、Momus、Atlas、Sisyphus Juniorなど、組み込みエージェントの動作を設定します。",
+      "overrideOptions": "オーバーライドオプション",
+      "permissions": "権限",
+      "options": {
+        "model": "モデル識別子（例：openai/gpt-4o）",
+        "variant": "モデルバリアント（max, high, medium, low）",
+        "category": "カテゴリから設定を継承",
+        "temperature": "サンプリング温度（0-2）",
+        "topP": "Top-pサンプリング（0-1）",
+        "prompt": "システムプロンプトを完全にオーバーライド",
+        "promptAppend": "システムプロンプトにテキストを追加",
+        "tools": "特定のツールを有効または無効にする",
+        "disable": "このエージェントを無効にする",
+        "maxTokens": "レスポンスの最大トークン数",
+        "thinking": "拡張思考設定",
+        "reasoningEffort": "推論努力：low, medium, high, xhigh"
+      },
+      "permissionValues": "ask / allow / deny",
+      "permissionDescriptions": {
+        "edit": "ファイル編集機能",
+        "bash": "Bashコマンド実行",
+        "webfetch": "Webリクエスト機能",
+        "doomLoop": "無限ループオーバーライド",
+        "externalDirectory": "プロジェクト外のファイルへのアクセス"
+      }
+    },
+    "categoriesSection": {
+      "title": "カテゴリ",
+      "description": "カテゴリを使用すると、エージェントが継承できる共有設定を定義できます。",
+      "availableOptions": "カテゴリで利用可能なオプション：{options}。",
+      "categories": {
+        "visualEngineering": "フロントエンド、UI/UX、デザインタスク",
+        "ultrabrain": "深い論理的推論",
+        "deep": "自律的な問題解決と徹底したリサーチ",
+        "artistry": "クリエイティブタスク",
+        "quick": "些細で高速なタスク",
+        "unspecifiedLow": "低労力の一般的タスク",
+        "unspecifiedHigh": "高労力の一般的タスク",
+        "writing": "ドキュメントと散文"
+      }
+    },
+    "skillsSection": {
+      "title": "スキル",
+      "description": "組み込みスキルには{playwright}、{agentBrowser}、{gitMaster}が含まれます。カスタムスキルを定義することもできます。"
+    },
+    "backgroundTasksSection": {
+      "title": "バックグラウンドタスク",
+      "priority": "優先度：",
+      "options": {
+        "defaultConcurrency": "デフォルトの最大並列タスク数",
+        "staleTimeoutMs": "古いタスクのタイムアウト（ミリ秒）",
+        "providerConcurrency": "プロバイダーごとの並列制限",
+        "modelConcurrency": "モデルごとの並列制限"
+      }
+    },
+    "hooksSection": {
+      "title": "フック",
+      "description": "フックを使用すると、さまざまなライフサイクルポイントで機能を拡張できます。"
+    },
+    "mcpsSection": {
+      "title": "MCP",
+      "websearch": {
+        "title": "websearch",
+        "description": "Exa提供の高品質検索結果。"
+      },
+      "context7": {
+        "title": "context7",
+        "description": "ドキュメント取得とコンテキスト管理。"
+      },
+      "grepApp": {
+        "title": "grep_app",
+        "description": "GitHubコード検索統合。"
+      }
+    },
+    "browserAutomationSection": {
+      "title": "ブラウザ自動化",
+      "playwright": {
+        "tool": "playwright",
+        "description": "フルブラウザ自動化（デフォルト）",
+        "useCase": "テスト、複雑なインタラクション"
+      },
+      "agentBrowser": {
+        "tool": "agent-browser",
+        "description": "軽量ブラウザエージェント",
+        "useCase": "クイックルックアップ、簡単なスクレイピング"
+      }
+    },
+    "tmuxSection": {
+      "title": "Tmux統合",
+      "options": {
+        "enabled": "Tmux統合を有効にする",
+        "layout": "Tmuxウィンドウレイアウト",
+        "mainPaneSize": "メインペインのサイズ"
+      }
+    },
+    "gitMasterSection": {
+      "title": "Git Master",
+      "options": {
+        "commitFooter": "コミットメッセージに追加するテキスト",
+        "includeCoAuthoredBy": "Co-authored-byトレーラーを追加"
+      }
+    },
+    "commentCheckerSection": {
+      "title": "コメントチェッカー",
+      "description": "コード内のコメントを検証します。カスタムプロンプトには{placeholder}プレースホルダーを使用してください。"
+    },
+    "experimentalSection": {
+      "title": "実験的機能",
+      "options": {
+        "aggressiveTruncation": "出力を積極的に切り詰める",
+        "autoResume": "中断されたタスクを自動的に再開",
+        "preemptiveCompaction": "制限前にコンテキストを圧縮",
+        "truncateAllToolOutputs": "すべてのツール出力を切り詰める"
+      },
+      "dynamicPruning": {
+        "trigger": "dynamic_context_pruning",
+        "description": "コンテキストウィンドウの使用量を効率的に管理するための動的プルーニングルールを設定します。"
+      }
+    },
+    "lspSection": {
+      "title": "LSP設定",
+      "options": {
+        "command": "LSPサーバーコマンド",
+        "extensions": "一致させるファイル拡張子",
+        "priority": "サーバーの優先度",
+        "env": "環境変数",
+        "initialization": "初期化オプション",
+        "disabled": "このLSPを無効にする"
+      }
+    },
+    "envVarsSection": {
+      "title": "環境変数",
+      "opencodeConfigDir": {
+        "name": "OPENCODE_CONFIG_DIR",
+        "description": "デフォルトの設定ディレクトリパスを上書きします。"
+      }
+    },
+    "footer": "Oh My OpenAgentドキュメント © {year}"
+  },
+  "manifesto": {
+    "badge": "マニフェスト",
+    "hero": {
+      "title": "Ultraworkマニフェスト",
+      "subtitle": "高生産性エンジニアリングの哲学"
+    },
+    "bottleneck": "> 人間がループに入る = ボトルネック",
+    "autonomousCar": "30秒ごとにハンドルを握る必要がある自動運転車を想像してください。それを「自律的」と呼びますか？いいえ。クルーズコントロールよりほんの少しマシなドライバー支援機能と呼ぶでしょう。",
+    "whyDifferent": "なぜコーディングは違うのでしょうか？",
+    "micromanagement": "「AIコーディング」が20行のコードを書いて、あなたが修正するのを待つチャットボットを意味するというパラダイムを私たちは受け入れてきました。それは自動化ではありません。それはマイクロマネジメントです。",
+    "painPoints": {
+      "fixing": "AIの中途半端なコードを修正する",
+      "syntax": "構文エラーを手動で修正する",
+      "copyPasting": "コンテキストを行ったり来たりコピー貼り付けする",
+      "reviewing": "すべての行を幻覚のためにレビューする"
+    },
+    "notCollaboration": "それは「人間-AIコラボレーション」ではありません。それはAIが仕事を果たせていないということです。",
+    "premise": "{linkText}は、人間がスペルチェッカーではなくアーキテクトであるべきという前提に基づいて構築されています。",
+    "premiseLinkText": "Oh My OpenAgent",
+    "indistinguishable": {
+      "title": "区別できないコード",
+      "subtitle": "エージェントが書いたコードは、シニアエンジニアが書いたコードと区別がつかないべきです。",
+      "items": {
+        "patterns": "既存のコードベースのパターンとアーキテクチャに従う",
+        "errorHandling": "適切なエラーハンドリングとエッジケースを実装する",
+        "tests": "カバレッジだけでなく実際の動作をテストするテストを書く",
+        "noSlop": "「AIスロップ」なし—クリーンで簡潔で保守しやすいコード",
+        "comments": "価値を追加する場合にのみコメントし、自明なことを述べない"
+      },
+      "quote": "「コミットが人間によるものかエージェントによるものかわかるなら、エージェントは失敗している。」"
+    },
+    "tokenCost": {
+      "title": "トークンコスト対生産性",
+      "description": "私たちはトークン使用量を気にしません。私たちが気にするのはアウトプットです。トークンに5ドル費やしてエンジニアリング時間を1時間節約できれば、それは20倍のROIです。",
+      "parallelAgents": "複数の解決策を並列で探索するエージェント",
+      "completeWork": "人間の介入なしに作業を完了させる",
+      "selfVerification": "徹底的な自己検証ループ",
+      "however": "しかし...",
+      "optimizeDescription": "重要な場所で効率性を最適化します。モデルを弱体化させるのではなく、以下によって：",
+      "cheaperModels": "定型タスクに安価なモデルを使用する",
+      "avoidingRedundant": "冗長な探索を避ける",
+      "intelligentCaching": "コンテキストのインテリジェントなキャッシング",
+      "stoppingExactly": "十分である時点で正確に停止する"
+    },
+    "cognitiveLoad": {
+      "title": "人間の認知負荷を最小化",
+      "subtitle": "人間は望みを伝えるだけで十分です。それ以外はすべてエージェントの仕事です。",
+      "ultrawork": {
+        "badge": "アプローチ1",
+        "title": "Ultrawork",
+        "subtitle": "「ulw」と言って離れればよい。",
+        "steps": {
+          "analyze": "コードベースのコンテキストを分析",
+          "breakdown": "タスクをアトミックなステップに分解",
+          "execute": "実装を実行",
+          "verify": "要件に対して検証",
+          "commit": "変更をコミット"
+        },
+        "footer": "ゼロ介入。完全な自律性。ただ結果。"
+      },
+      "prometheus": {
+        "badge": "アプローチ2",
+        "title": "Prometheus + Atlas",
+        "subtitle": "戦略的なコントロールが欲しい時。",
+        "prometheusTitle": "Prometheus",
+        "prometheusDescription": "インタビューを実施し、コンテキストを調査し、詳細なYAMLプランを生成します。",
+        "atlasTitle": "Atlas",
+        "atlasDescription": "プランを実行し、サブエージェントに委譲し、ウェーブを管理し、進捗を追跡します。",
+        "footer": "あなたがアーキテクト。エージェントが実行。完全な透明性。"
+      }
+    },
+    "principles": {
+      "predictable": {
+        "title": "予測可能",
+        "description": "同じ入力 = 一貫した出力。要求されない限り、ランダムな逸脱や創造的な自由はありません。"
+      },
+      "continuous": {
+        "title": "継続的",
+        "description": "中断を耐え抜きます。リアルタイムで進捗を追跡します。セッション間でコンテキストを保持します。"
+      },
+      "delegatable": {
+        "title": "委譲可能",
+        "description": "明確な受け入れ基準。自己修正メカニズム。絶対に必要な時のみエスカレーション。"
+      }
+    },
+    "coreLoop": {
+      "title": "コアループ",
+      "features": {
+        "prometheus": {
+          "feature": "Prometheus",
+          "purpose": "知的なインタビューを通じて意図を抽出"
+        },
+        "metis": {
+          "feature": "Metis",
+          "purpose": "バグになる前に曖昧さを捕捉"
+        },
+        "momus": {
+          "feature": "Momus",
+          "purpose": "実行前にプランが完全であることを検証"
+        },
+        "orchestrator": {
+          "feature": "Orchestrator",
+          "purpose": "人間のマイクロマネジメントなしに作業を調整"
+        },
+        "todoContinuation": {
+          "feature": "Todo Continuation",
+          "purpose": "完了を強制、「終わりました」の嘘を防止"
+        },
+        "categorySystem": {
+          "feature": "Category System",
+          "purpose": "人間の決定なしに最適なモデルにルーティング"
+        },
+        "backgroundAgents": {
+          "feature": "Background Agents",
+          "purpose": "ユーザーをブロックせずに並列調査"
+        },
+        "wisdomAccumulation": {
+          "feature": "Wisdom Accumulation",
+          "purpose": "仕事から学び、間違いを繰り返さない"
+        }
+      }
+    },
+    "future": {
+      "title": "私たちが構築する未来",
+      "items": {
+        "focus": "人間の開発者は何を作るかに集中し、AIにどう作らせるかには集中しない",
+        "quality": "誰が書いたかに関係なくコードの品質",
+        "complexity": "複雑なプロジェクトも簡単なプロジェクトと同じくらい簡単",
+        "promptEngineering": "「プロンプトエンジニアリング」が時代遅れになる"
+      },
+      "quote1": "「エージェントは目に見えないべきだ。電気のように、水道のように。」",
+      "quote2": "「スイッチを入れる。電灯がつく。配電網のことなど考えない。」"
+    },
+    "finalCta": {
+      "title": "just ulw ulw",
+      "button": "Oh My OpenAgentを入手"
+    }
+  }
+}

@@ -1,0 +1,561 @@
+{
+  "metadata": {
+    "title": "Oh My OpenAgent",
+    "description": "The Best Agent Harness. Meet Sisyphus: The Batteries-Included Agent that codes like you."
+  },
+  "nav": {
+    "brand": "Oh My OpenAgent",
+    "features": "Features",
+    "agents": "Agents",
+    "docs": "Docs",
+    "manifesto": "Manifesto",
+    "starOnGitHub": "Star on GitHub"
+  },
+  "footer": {
+    "brand": "Oh My OpenAgent",
+    "copyright": "© {year} Oh My OpenAgent. Open source under SUL-1.0.",
+    "github": "GitHub",
+    "discord": "Discord",
+    "documentation": "Documentation",
+    "manifesto": "Manifesto"
+  },
+  "landing": {
+    "hero": {
+      "title": "The Best ",
+      "titleHighlight": "Agent Harness",
+      "subtitle": "{stars} stars. {downloads} downloads. Battle-tested and production-proven.",
+      "githubStars": "{count} GitHub Stars",
+      "specializedAgents": "{count} Specialized Agents",
+      "totalDownloads": "{count} Total Downloads",
+      "monthlyDownloads": "{count} Monthly Downloads",
+      "lifecycleHooks": "{count} Lifecycle Hooks",
+      "installCommand": "bunx oh-my-openagent install",
+      "getStarted": "Get Started",
+      "viewOnGitHub": "View on GitHub"
+    },
+    "ulw": {
+      "badge": "The Magic Word",
+      "title": "ulw",
+      "headline": "Type Three Letters. Walk Away.",
+      "description": "Ultra Work mode triggers maximum precision: auto-planning, deep research, parallel agents, and self-correction loops. The system doesn't stop until it's done. You don't babysit.",
+      "autoPlanning": "Auto-Planning",
+      "deepResearch": "Deep Research",
+      "selfCorrection": "Self-Correction",
+      "parallelAgents": "Parallel Agents",
+      "terminalTitle": "sisyphus — -zsh — 80x24",
+      "terminalInput": "ulw add authentication to the API",
+      "steps": {
+        "scanning": "Scanning codebase...",
+        "context": "Launching 3 explore agents...",
+        "planning": "Building execution plan...",
+        "delegating": "Deploying 4 parallel agents...",
+        "verifying": "Running verification suite...",
+        "complete": "Done. 847 lines changed, 0 issues."
+      },
+      "tagline": "Zero intervention. Full autonomy. Just results."
+    },
+    "sisyphus": {
+      "badge": "Primary Orchestrator",
+      "title": "Sisyphus",
+      "headline": "The CTO Who Never Sleeps",
+      "description": "Named after the mythological figure rolling his boulder uphill forever. Sisyphus parses implicit requirements, adapts to your codebase's maturity, and delegates to specialists. Interrupted? The boulder system resumes exactly where you left off.",
+      "phases": {
+        "intent": {
+          "title": "Intent Gate",
+          "description": "Parses what you meant, not just what you typed"
+        },
+        "explore": {
+          "title": "Codebase Assessment",
+          "description": "Maps your architecture before touching a line"
+        },
+        "delegate": {
+          "title": "Smart Delegation",
+          "description": "Routes to the right specialist agent"
+        },
+        "verify": {
+          "title": "Independent Verification",
+          "description": "Trusts nothing. Verifies everything."
+        }
+      },
+      "boulderTitle": "Session Continuity",
+      "boulderDescription": "Active work tracked in boulder.json. Power outage? System crash? Doesn't matter. Pick up exactly where you stopped.",
+      "model": "Claude Opus 4.6 Max"
+    },
+    "prometheusAtlas": {
+      "badge": "Orchestration Workflow",
+      "title": "Think, Then Act",
+      "headline": "Planning and Execution Are Different Jobs",
+      "prometheus": {
+        "name": "Prometheus",
+        "role": "Strategic Planner",
+        "model": "Claude Opus 4.6 Max",
+        "description": "The architect. Interviews you, explores your codebase, and creates detailed battle plans. Never writes code. Uses Metis and Momus as quality gates.",
+        "features": [
+          "Intelligent interview mode",
+          "Multi-agent codebase exploration",
+          "Gap analysis with Metis",
+          "Ruthless review with Momus"
+        ]
+      },
+      "atlas": {
+        "name": "Atlas",
+        "role": "Master Executor",
+        "model": "Claude Sonnet 4.6",
+        "description": "The builder. Reads verified plans, delegates to specialized agents via category+skills system. Tracks learnings across tasks. Verifies independently — never trusts subagent claims.",
+        "features": [
+          "Intent-based task routing",
+          "Wisdom accumulation across tasks",
+          "Boulder session continuity",
+          "Independent result verification"
+        ]
+      },
+      "metis": {
+        "name": "Metis",
+        "description": "Catches ambiguities before they become bugs."
+      },
+      "momus": {
+        "name": "Momus",
+        "description": "Only says OKAY when the plan is actually perfect."
+      },
+      "workflow": {
+        "step1": "Describe your work to Prometheus",
+        "step2": "Metis analyzes for gaps",
+        "step3": "Momus validates ruthlessly",
+        "step4": "Atlas delegates to specialists",
+        "step5": "Independent verification on everything"
+      },
+      "whyItWorks": "The planner doesn't code. The executor follows verified plans. Intelligence lives in the system, not individual agents."
+    },
+    "hephaestus": {
+      "badge": "Deep Worker",
+      "title": "Hephaestus",
+      "headline": "Give Him a Goal, Not a Recipe",
+      "description": "Named after the Greek god of the forge. Methodical, thorough, obsessive. Fires 2-5 parallel explore agents before writing any code. Built for deep architectural reasoning, complex debugging, and cross-domain synthesis.",
+      "loop": {
+        "explore": "EXPLORE — Map the terrain",
+        "plan": "PLAN — Chart the course",
+        "decide": "DECIDE — Commit to the path",
+        "execute": "EXECUTE — Build with precision",
+        "verify": "VERIFY — Prove it works"
+      },
+      "tagline": "For when good enough isn't.",
+      "model": "GPT 5.3 Codex Medium"
+    },
+    "agents": {
+      "title": "Specialized Agents",
+      "subtitle": "Five built-in agents for common workflows. Plus a dynamic system that assembles custom agents on demand.",
+      "oracle": {
+        "name": "Oracle",
+        "role": "Architecture Consultant",
+        "model": "GPT 5.4 High",
+        "description": "Complex debugging and architectural decisions. When the path forward isn't obvious."
+      },
+      "librarian": {
+        "name": "Librarian",
+        "role": "Docs & Code Search",
+        "model": "MiniMax M2.5",
+        "description": "Finds real GitHub examples and official docs. Evidence-based, with permalinks."
+      },
+      "explore": {
+        "name": "Explore",
+        "role": "Codebase Grep",
+        "model": "MiniMax M2.5",
+        "description": "Blazing fast codebase search. Cheap, parallel, always background."
+      },
+      "metis": {
+        "name": "Metis",
+        "role": "Plan Consultant",
+        "model": "Claude Opus 4.6",
+        "description": "Catches ambiguities in plans before they become production bugs."
+      },
+      "momus": {
+        "name": "Momus",
+        "role": "Plan Reviewer",
+        "model": "GPT 5.4",
+        "description": "Ruthless validation. Only approves when the plan is bulletproof."
+      },
+      "dynamicSystem": {
+        "name": "Dynamic Agent",
+        "role": "Assembled for the task at hand",
+        "description": "Matches your request to the right model, loads the necessary skills, and builds an agent in real-time."
+      }
+    },
+    "architecture": {
+      "title": "Built Different",
+      "subtitle": "Design decisions that actually matter.",
+      "principles": {
+        "specialization": {
+          "title": "Specialization",
+          "description": "Each agent does one thing exceptionally well. No jacks of all trades."
+        },
+        "trustVerify": {
+          "title": "Trust But Verify",
+          "description": "Orchestrator runs independent verification on everything. Subagents don't get a free pass."
+        },
+        "wisdom": {
+          "title": "Wisdom Accumulation",
+          "description": "Learnings from each task passed to all subsequent tasks. The system gets smarter as it works."
+        },
+        "modelOptimization": {
+          "title": "Model Optimization",
+          "description": "Expensive models for planning and complex decisions. Cheap models for routine work. Maximum output per dollar."
+        },
+        "categories": {
+          "title": "Category System",
+          "description": "Intent-based routing. Say what you need — ultrabrain, visual-engineering, quick — and the right model handles it."
+        },
+        "continuity": {
+          "title": "Session Continuity",
+          "description": "Boulder system: interrupted work resumes exactly where it stopped. Zero context loss."
+        }
+      }
+    },
+    "reviews": {
+      "title": "What Devs Actually Say",
+      "review1": {
+        "text": "It made me cancel my Cursor subscription. Unbelievable things are happening in the open source community.",
+        "author": "Arthur Guiot"
+      },
+      "review2": {
+        "text": "If Claude Code does in 7 days what a human does in 3 months, Sisyphus does it in 1 hour.",
+        "author": "B, Quant Researcher"
+      },
+      "review3": {
+        "text": "Knocked out 8000 eslint warnings with Oh My Opencode, just in a day.",
+        "author": "Jacob Ferrari"
+      },
+      "review4": {
+        "text": "use oh-my-openagent, you will never go back",
+        "author": "d0t3ch"
+      },
+      "review5": {
+        "text": "You guys should pull this into core and recruit him. Seriously. It's really, really, really good.",
+        "author": "Henning Kilset"
+      },
+      "review6": {
+        "text": "Oh My OpenCode Is Actually Insane",
+        "author": "Darren Builds AI (YouTube)"
+      }
+    },
+    "cta": {
+      "title": "Stop Writing Boilerplate",
+      "subtitle": "Install Oh My OpenAgent and let the agents handle it. Your first ulw command is 30 seconds away.",
+      "installCommand": "bunx oh-my-openagent install",
+      "installNow": "Install Now",
+      "readTheDocs": "Read the Docs"
+    }
+  },
+  "docs": {
+    "mobileHeader": "Oh My OpenAgent Docs",
+    "searchPlaceholder": "Search docs...",
+    "sections": {
+      "overview": "Overview",
+      "quickStart": "Quick Start",
+      "configLocations": "Config File Locations",
+      "agents": "Agents",
+      "categories": "Categories",
+      "skills": "Skills",
+      "backgroundTasks": "Background Tasks",
+      "hooks": "Hooks",
+      "mcps": "MCPs",
+      "browserAutomation": "Browser Automation",
+      "tmux": "Tmux Integration",
+      "gitMaster": "Git Master",
+      "commentChecker": "Comment Checker",
+      "experimental": "Experimental Features",
+      "lsp": "LSP Configuration",
+      "envVars": "Environment Variables"
+    },
+    "overview": {
+      "title": "Configuration Reference",
+      "description": "Oh My OpenAgent is highly opinionated but adjustable to taste. Most users don't need to configure anything — run {command} and go."
+    },
+    "quickStart": {
+      "title": "Quick Start"
+    },
+    "configLocations": {
+      "title": "Config File Locations",
+      "projectLevel": "(Project level)",
+      "userLevel": "(User level)",
+      "jsonc": "JSONC is supported, allowing comments and trailing commas."
+    },
+    "agentsSection": {
+      "title": "Agents",
+      "description": "Configure specific behaviors for the built-in agents: Sisyphus, Hephaestus, Oracle, Librarian, Explore, Multimodal Looker, Prometheus, Metis, Momus, Atlas, and Sisyphus Junior.",
+      "overrideOptions": "Override Options",
+      "permissions": "Permissions",
+      "options": {
+        "model": "Model identifier (e.g., openai/gpt-4o)",
+        "variant": "Model variant (max, high, medium, low)",
+        "category": "Inherit configuration from a category",
+        "temperature": "Sampling temperature (0-2)",
+        "topP": "Top-p sampling (0-1)",
+        "prompt": "Override the system prompt completely",
+        "promptAppend": "Append text to the system prompt",
+        "tools": "Enable or disable specific tools",
+        "disable": "Disable this agent",
+        "maxTokens": "Maximum tokens for response",
+        "thinking": "Extended thinking configuration",
+        "reasoningEffort": "Reasoning effort: low, medium, high, xhigh"
+      },
+      "permissionValues": "ask / allow / deny",
+      "permissionDescriptions": {
+        "edit": "File editing capabilities",
+        "bash": "Bash command execution",
+        "webfetch": "Web request capabilities",
+        "doomLoop": "Infinite loop override",
+        "externalDirectory": "Access files outside project"
+      }
+    },
+    "categoriesSection": {
+      "title": "Categories",
+      "description": "Categories allow you to define shared configurations that agents can inherit from.",
+      "availableOptions": "Available options for categories: {options}.",
+      "categories": {
+        "visualEngineering": "Frontend, UI/UX, design tasks",
+        "ultrabrain": "Deep logical reasoning",
+        "deep": "Autonomous problem-solving, thorough research",
+        "artistry": "Creative tasks",
+        "quick": "Trivial, fast tasks",
+        "unspecifiedLow": "Low effort general tasks",
+        "unspecifiedHigh": "High effort general tasks",
+        "writing": "Documentation and prose"
+      }
+    },
+    "skillsSection": {
+      "title": "Skills",
+      "description": "Built-in skills include {playwright}, {agentBrowser}, and {gitMaster}. You can also define custom skills."
+    },
+    "backgroundTasksSection": {
+      "title": "Background Tasks",
+      "priority": "Priority:",
+      "options": {
+        "defaultConcurrency": "Default max concurrent tasks",
+        "staleTimeoutMs": "Timeout for stale tasks in ms",
+        "providerConcurrency": "Concurrency limit per provider",
+        "modelConcurrency": "Concurrency limit per model"
+      }
+    },
+    "hooksSection": {
+      "title": "Hooks",
+      "description": "Hooks allow you to extend functionality at various lifecycle points."
+    },
+    "mcpsSection": {
+      "title": "MCPs",
+      "websearch": {
+        "title": "websearch",
+        "description": "Powered by Exa for high-quality search results."
+      },
+      "context7": {
+        "title": "context7",
+        "description": "Documentation retrieval and context management."
+      },
+      "grepApp": {
+        "title": "grep_app",
+        "description": "GitHub code search integration."
+      }
+    },
+    "browserAutomationSection": {
+      "title": "Browser Automation",
+      "playwright": {
+        "tool": "playwright",
+        "description": "Full browser automation (default)",
+        "useCase": "Testing, complex interactions"
+      },
+      "agentBrowser": {
+        "tool": "agent-browser",
+        "description": "Lightweight browser agent",
+        "useCase": "Quick lookups, simple scraping"
+      }
+    },
+    "tmuxSection": {
+      "title": "Tmux Integration",
+      "options": {
+        "enabled": "Enable Tmux integration",
+        "layout": "Tmux window layout",
+        "mainPaneSize": "Size of the main pane"
+      }
+    },
+    "gitMasterSection": {
+      "title": "Git Master",
+      "options": {
+        "commitFooter": "Text to append to commit messages",
+        "includeCoAuthoredBy": "Add Co-authored-by trailer"
+      }
+    },
+    "commentCheckerSection": {
+      "title": "Comment Checker",
+      "description": "Validates comments in your code. Use the {placeholder} placeholder in your custom prompt."
+    },
+    "experimentalSection": {
+      "title": "Experimental Features",
+      "options": {
+        "aggressiveTruncation": "Aggressively truncate outputs",
+        "autoResume": "Automatically resume interrupted tasks",
+        "preemptiveCompaction": "Compact context before limits",
+        "truncateAllToolOutputs": "Truncate all tool outputs"
+      },
+      "dynamicPruning": {
+        "trigger": "dynamic_context_pruning",
+        "description": "Configure dynamic pruning rules to manage context window usage efficiently."
+      }
+    },
+    "lspSection": {
+      "title": "LSP Configuration",
+      "options": {
+        "command": "LSP server command",
+        "extensions": "File extensions to match",
+        "priority": "Server priority",
+        "env": "Environment variables",
+        "initialization": "Initialization options",
+        "disabled": "Disable this LSP"
+      }
+    },
+    "envVarsSection": {
+      "title": "Environment Variables",
+      "opencodeConfigDir": {
+        "name": "OPENCODE_CONFIG_DIR",
+        "description": "Override the default configuration directory path."
+      }
+    },
+    "footer": "Oh My OpenAgent Documentation © {year}"
+  },
+  "manifesto": {
+    "badge": "Manifesto",
+    "hero": {
+      "title": "Ultrawork Manifesto",
+      "subtitle": "The Philosophy of High-Output Engineering"
+    },
+    "bottleneck": "> HUMAN IN THE LOOP = BOTTLENECK",
+    "autonomousCar": "Imagine an autonomous car that requires you to grab the steering wheel every 30 seconds. Would you call that \"autonomous\"? No. You'd call it driver assist — barely better than cruise control.",
+    "whyDifferent": "Why is coding any different?",
+    "micromanagement": "We've accepted a paradigm where \"AI coding\" means a chatbot that writes 20 lines, then waits for you to fix it. That's not automation — that's micromanagement.",
+    "painPoints": {
+      "fixing": "Fixing AI's half-finished code",
+      "syntax": "Manually correcting syntax errors",
+      "copyPasting": "Copy-pasting context back and forth",
+      "reviewing": "Reviewing every single line for hallucinations"
+    },
+    "notCollaboration": "That's not \"human-AI collaboration\" — that's the AI failing to do its job.",
+    "premise": "{linkText} is built on the premise that the human should be the architect, not the spell-checker.",
+    "premiseLinkText": "Oh My OpenAgent",
+    "indistinguishable": {
+      "title": "Indistinguishable Code",
+      "subtitle": "Agent-written code should be indistinguishable from code written by a senior engineer.",
+      "items": {
+        "patterns": "Follows existing codebase patterns and architecture",
+        "errorHandling": "Implements proper error handling and edge cases",
+        "tests": "Writes tests that actually test behavior, not just coverage",
+        "noSlop": "No 'AI slop' — clean, concise, maintainable code",
+        "comments": "Comments only when they add value — never stating the obvious"
+      },
+      "quote": "\"If you can tell whether a commit was made by a human or an agent, the agent has failed.\""
+    },
+    "tokenCost": {
+      "title": "Token Cost vs. Productivity",
+      "description": "We don't care about token usage. We care about output. If spending $5 on tokens saves an hour of engineering time, that's a 20x ROI.",
+      "parallelAgents": "Parallel agents exploring multiple solutions",
+      "completeWork": "Complete work without human intervention",
+      "selfVerification": "Thorough self-verification loops",
+      "however": "However...",
+      "optimizeDescription": "We optimize for efficiency where it counts. Not by crippling the model, but by:",
+      "cheaperModels": "Using cheaper models for routine tasks",
+      "avoidingRedundant": "Avoiding redundant exploration",
+      "intelligentCaching": "Intelligent caching of context",
+      "stoppingExactly": "Stopping exactly when sufficient"
+    },
+    "cognitiveLoad": {
+      "title": "Minimize Human Cognitive Load",
+      "subtitle": "The human should only need to say what they want. Everything else is the agent's job.",
+      "ultrawork": {
+        "badge": "Approach 1",
+        "title": "Ultrawork",
+        "subtitle": "Just say \"ulw\" and walk away.",
+        "steps": {
+          "analyze": "Analyzes codebase context",
+          "breakdown": "Breaks down task into atomic steps",
+          "execute": "Executes implementation",
+          "verify": "Verifies against requirements",
+          "commit": "Commits changes"
+        },
+        "footer": "Zero intervention. Full autonomy. Just results."
+      },
+      "prometheus": {
+        "badge": "Approach 2",
+        "title": "Prometheus + Atlas",
+        "subtitle": "When you want strategic control.",
+        "prometheusTitle": "Prometheus",
+        "prometheusDescription": "Conducts interview, researches context, and generates a detailed YAML plan.",
+        "atlasTitle": "Atlas",
+        "atlasDescription": "Executes the plan, delegates to sub-agents, manages waves, and tracks progress.",
+        "footer": "You architect. Agents execute. Full transparency."
+      }
+    },
+    "principles": {
+      "predictable": {
+        "title": "Predictable",
+        "description": "Same inputs = consistent output. No random deviations or creative liberties unless requested."
+      },
+      "continuous": {
+        "title": "Continuous",
+        "description": "Survives interruptions. Tracks progress in real-time. Preserves context across sessions."
+      },
+      "delegatable": {
+        "title": "Delegatable",
+        "description": "Clear acceptance criteria. Self-correcting mechanisms. Escalation only when absolutely needed."
+      }
+    },
+    "coreLoop": {
+      "title": "The Core Loop",
+      "features": {
+        "prometheus": {
+          "feature": "Prometheus",
+          "purpose": "Extract intent through intelligent interview"
+        },
+        "metis": {
+          "feature": "Metis",
+          "purpose": "Catch ambiguities before they become bugs"
+        },
+        "momus": {
+          "feature": "Momus",
+          "purpose": "Verify plans are complete before execution"
+        },
+        "orchestrator": {
+          "feature": "Orchestrator",
+          "purpose": "Coordinate work without human micromanagement"
+        },
+        "todoContinuation": {
+          "feature": "Todo Continuation",
+          "purpose": "Force completion, prevent \"I'm done\" lies"
+        },
+        "categorySystem": {
+          "feature": "Category System",
+          "purpose": "Route to optimal model without human decision"
+        },
+        "backgroundAgents": {
+          "feature": "Background Agents",
+          "purpose": "Parallel research without blocking user"
+        },
+        "wisdomAccumulation": {
+          "feature": "Wisdom Accumulation",
+          "purpose": "Learn from work, don't repeat mistakes"
+        }
+      }
+    },
+    "future": {
+      "title": "The Future We're Building",
+      "items": {
+        "focus": "Human developers focus on WHAT to build, not HOW to get AI to build it",
+        "quality": "Code quality independent of who wrote it",
+        "complexity": "Complex projects as easy as simple ones",
+        "promptEngineering": "\"Prompt engineering\" becomes obsolete"
+      },
+      "quote1": "\"The agent should be invisible. Like electricity, like running water.\"",
+      "quote2": "\"You flip the switch. The light turns on. You don't think about the power grid.\""
+    },
+    "finalCta": {
+      "title": "just ulw ulw",
+      "button": "Get Oh My OpenAgent"
+    }
+  }
+}
