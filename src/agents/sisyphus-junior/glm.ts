@@ -1,15 +1,11 @@
 import { resolvePromptAppend } from "../builtin-agents/resolve-file-uri"
+import { isGlmVisionModel } from "../types"
 import { buildDefaultSisyphusJuniorPrompt } from "./default"
 
-function buildGlmSisyphusJuniorExecutionBlock(): string {
-  return `## GLM-5.1 Execution Mode
-
-You are running on GLM-5.1. Use the large context and long-horizon capability to complete the assigned task directly, not to expand scope.
-
-- Stay an executor: edit, test, verify, and finish. Do not become an orchestrator or delegate work unless the caller explicitly requested delegation.
-- Treat the spawned task/category instructions as the highest task-level priority after system/developer rules.
-- For broad tasks, maintain tight todo discipline and work phase by phase, but do not over-plan before taking action.
-- Use the available context budget to preserve relevant details, compare files, and avoid duplicate work. Do not use it to produce long status reports.
+function buildGlmSisyphusJuniorExecutionBlock(model: string): string {
+  const visionSection = isGlmVisionModel(model)
+    ? ""
+    : `
 
 ## GLM Vision Tool Routing
 
@@ -24,7 +20,17 @@ You are text-only. Route visual tasks through zai-mcp-server:
 - Expected vs actual UI comparison: \`zai-mcp-server_ui_diff_check\`
 - Video content: \`zai-mcp-server_analyze_video\`
 
-Fallback: delegate to \`multimodal-looker\` if zai tools unavailable.
+Fallback: delegate to \`multimodal-looker\` if zai tools unavailable.`
+
+  return `## GLM-5.1 Execution Mode
+
+You are running on GLM-5.1. Use the large context and long-horizon capability to complete the assigned task directly, not to expand scope.
+
+- Stay an executor: edit, test, verify, and finish. Do not become an orchestrator or delegate work unless the caller explicitly requested delegation.
+- Treat the spawned task/category instructions as the highest task-level priority after system/developer rules.
+- For broad tasks, maintain tight todo discipline and work phase by phase, but do not over-plan before taking action.
+- Use the available context budget to preserve relevant details, compare files, and avoid duplicate work. Do not use it to produce long status reports.
+${visionSection}
 
 ## Token Discipline
 
@@ -45,12 +51,13 @@ When team mode is active, you are a team member:
 }
 
 export function buildGlmSisyphusJuniorPrompt(
+  model: string,
   useTaskSystem: boolean,
   promptAppend?: string
 ): string {
   const prompt = `${buildDefaultSisyphusJuniorPrompt(useTaskSystem)}
 
-${buildGlmSisyphusJuniorExecutionBlock()}`
+${buildGlmSisyphusJuniorExecutionBlock(model)}`
   if (!promptAppend) return prompt
   return prompt + "\n\n" + resolvePromptAppend(promptAppend)
 }

@@ -64,6 +64,7 @@ You are text-only. Route visual tasks through zai-mcp-server tools (analyze_imag
 `;
 }
 
+import { isGlmVisionModel } from "../types"
 import { GPT_APPLY_PATCH_GUIDANCE } from "../gpt-apply-patch-guard"
 import type {
   AvailableAgent,
@@ -110,12 +111,13 @@ ${buildGlmWorkingMemory()}
 </identity>`
 }
 
-function buildConstraintsBlock(hardBlocks: string, antiPatterns: string): string {
+function buildConstraintsBlock(hardBlocks: string, antiPatterns: string, model: string): string {
+  const visionBlocks = isGlmVisionModel(model)
+    ? ""
+    : `\n${buildGlmVisionConstraint()}\n${buildGlmVisionHardBlock()}`
   return `<constraints>
 ${hardBlocks}
-${antiPatterns}
-${buildGlmVisionConstraint()}
-${buildGlmVisionHardBlock()}
+${antiPatterns}${visionBlocks}
 </constraints>`
 }
 
@@ -180,7 +182,10 @@ ${buildExecutionLoopSection(GPT_APPLY_PATCH_GUIDANCE)}
 </execution_loop>`
 }
 
-function buildDelegationBlock(categorySkillsGuide: string, nonClaudePlannerSection: string, parallelDelegationSection: string, delegationTable: string, oracleSection: string): string {
+function buildDelegationBlock(categorySkillsGuide: string, nonClaudePlannerSection: string, parallelDelegationSection: string, delegationTable: string, oracleSection: string, isVision: boolean): string {
+  const visualRouting = isVision
+    ? "- Visual/media: use visual-engineering category or multimodal-looker for analysis."
+    : "- Visual/media: multimodal-looker or visual-engineering, never GLM self-analysis of images."
   return `<delegation>
 ## Delegation System
 Pre-delegation:
@@ -202,7 +207,7 @@ GLM delegation defaults:
 - Research: explore/librarian in background, parallel.
 - Implementation: delegate to Hephaestus via \`task(category="deep", load_skills=[...])\` for complex work; category task with load_skills for domain-specific work.
 - Architecture/debug uncertainty: Oracle before editing.
-- Visual/media: multimodal-looker or visual-engineering, never GLM self-analysis of images.
+${visualRouting}
 Heavy work routing:
 - Long/complex or 3+ sequential self-edits → decompose and delegate to Hephaestus/deep in background.
 - Domain-specific or visual work → use the matching category with load_skills; keep only trivial targeted edits local.
@@ -283,16 +288,18 @@ ${buildParallelDelegationSection(model, availableCategories) ||
 3. **NEVER implement directly** when delegation is possible. You write prompts, collect results, verify, and synthesize.
 **Your value is orchestration, decomposition, and quality control. Delegating with crystal-clear prompts IS your work.**`}`
 
+  const isVision = isGlmVisionModel(model)
+
   const todoHookNote = useTaskSystem
     ? "YOUR TASK CREATION WOULD BE TRACKED BY HOOK([SYSTEM REMINDER - TASK CONTINUATION])"
     : "YOUR TODO CREATION WOULD BE TRACKED BY HOOK([SYSTEM REMINDER - TODO CONTINUATION])"
 
   return `${buildIdentityBlock(todoHookNote)}
-${buildConstraintsBlock(hardBlocks, antiPatterns)}
+${buildConstraintsBlock(hardBlocks, antiPatterns, model)}
 ${buildIntentBlock(keyTriggers)}
 ${buildExploreBlock(toolSelection, exploreSection, librarianSection)}
 ${buildExecutionLoopBlock()}
-${buildDelegationBlock(categorySkillsGuide, nonClaudePlannerSection, parallelDelegationSection, delegationTable, oracleSection)}
+${buildDelegationBlock(categorySkillsGuide, nonClaudePlannerSection, parallelDelegationSection, delegationTable, oracleSection, isVision)}
 ${buildGlmTeamLeadSection()}
 ${buildGlmTasksSection(useTaskSystem)}
 ${buildStyleBlock()}`

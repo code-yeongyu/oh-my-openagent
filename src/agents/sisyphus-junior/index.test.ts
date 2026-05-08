@@ -184,10 +184,10 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
   describe("barrel exports", () => {
     test("exposes buildGlmSisyphusJuniorPrompt", () => {
       // given
-      const model = false
+      const model = "glm-5"
 
       // when
-      const prompt = buildGlmSisyphusJuniorPrompt(model)
+      const prompt = buildGlmSisyphusJuniorPrompt(model, false)
 
       // then
       expect(prompt).toContain("GLM-5.1 Execution Mode")

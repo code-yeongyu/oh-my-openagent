@@ -14,7 +14,7 @@ describe("GLM Team Mode Prompts", () => {
   })
 
   test("SJ prompt contains team member section", () => {
-    const prompt = buildGlmSisyphusJuniorPrompt(false)
+    const prompt = buildGlmSisyphusJuniorPrompt("glm-5", false)
 
     expect(prompt).toContain("Team Mode")
     expect(prompt).toContain("team_send_message")
@@ -22,7 +22,7 @@ describe("GLM Team Mode Prompts", () => {
   })
 
   test("SJ team member has claim and complete instructions", () => {
-    const prompt = buildGlmSisyphusJuniorPrompt(false)
+    const prompt = buildGlmSisyphusJuniorPrompt("glm-5", false)
 
     expect(prompt).toContain("claimed")
     expect(prompt).toContain("completed")

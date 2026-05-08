@@ -88,7 +88,7 @@ export function buildSisyphusJuniorPrompt(
     case "kimi-k2":
       return buildKimiK26SisyphusJuniorPrompt(useTaskSystem, promptAppend)
     case "glm":
-      return buildGlmSisyphusJuniorPrompt(useTaskSystem, promptAppend)
+      return buildGlmSisyphusJuniorPrompt(model!, useTaskSystem, promptAppend)
     case "gpt-5-5":
       return buildGpt55SisyphusJuniorPrompt(useTaskSystem, promptAppend)
     case "gpt-5-4":
