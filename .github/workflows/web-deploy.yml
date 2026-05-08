@@ -8,7 +8,7 @@ on:
         required: false
         default: ""
   push:
-    branches: [master]
+    branches: [master, dev]
     paths:
       - "web/**"
       - ".github/workflows/web-deploy.yml"
