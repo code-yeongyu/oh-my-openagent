@@ -1,6 +1,7 @@
 /// <reference types="bun-types" />
 
 import { describe, it, expect, beforeEach, afterEach } from "bun:test"
+import fs from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import {
@@ -13,6 +14,7 @@ import {
 
 let originalEnv: Record<string, string | undefined>
 let testConfigDir: string
+const temporaryDirectories: string[] = []
 
 beforeEach(() => {
 	clearSkillCache()
@@ -26,8 +28,9 @@ beforeEach(() => {
 	process.env.OPENCODE_CONFIG_DIR = testConfigDir
 })
 
-afterEach(() => {
+afterEach(async () => {
 	clearSkillCache()
+	await Promise.all(temporaryDirectories.splice(0).map((directory) => fs.rm(directory, { recursive: true, force: true })))
 	for (const [key, value] of Object.entries(originalEnv)) {
 		if (value !== undefined) {
 			process.env[key] = value
@@ -184,6 +187,40 @@ describe("resolveSkillContentAsync", () => {
 
 		// then: returns null
 		expect(result).toBeNull()
+	})
+
+	it("should not reuse cached discovered skills across different directories", async () => {
+		// given
+		const dirA = join(tmpdir(), `skill-cache-a-${Date.now()}-${Math.random().toString(16).slice(2)}`)
+		const dirB = join(tmpdir(), `skill-cache-b-${Date.now()}-${Math.random().toString(16).slice(2)}`)
+		const skillRelPath = [".opencode", "skills", "local-skill", "SKILL.md"]
+		const skillAPath = join(dirA, ...skillRelPath)
+		const skillBPath = join(dirB, ...skillRelPath)
+		temporaryDirectories.push(dirA, dirB)
+		await fs.mkdir(join(dirA, ".opencode", "skills", "local-skill"), { recursive: true })
+		await fs.mkdir(join(dirB, ".opencode", "skills", "local-skill"), { recursive: true })
+		await fs.writeFile(skillAPath, `---
+name: local-skill
+description: local skill A
+---
+
+Directory A template
+`)
+		await fs.writeFile(skillBPath, `---
+name: local-skill
+description: local skill B
+---
+
+Directory B template
+`)
+
+		// when
+		const resultA = await resolveSkillContentAsync("local-skill", { directory: dirA })
+		const resultB = await resolveSkillContentAsync("local-skill", { directory: dirB })
+
+		// then
+		expect(resultA).toContain("Directory A template")
+		expect(resultB).toContain("Directory B template")
 	})
 })
 
