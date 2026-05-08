@@ -18,6 +18,7 @@ export const SYMBOLS = {
 }
 
 const ANSI_COLOR_PATTERN = new RegExp("\u001b\\[[0-9;]*m", "g")
+const USE_ASCII_BOX = Boolean(process.env.CI || process.env.GITHUB_ACTIONS)
 
 function formatProvider(name: string, enabled: boolean, detail?: string): string {
   const status = enabled ? SYMBOLS.check : color.dim("○")
@@ -89,27 +90,33 @@ export function printBox(content: string, title?: string): void {
       ...lines.map((line) => line.replace(ANSI_COLOR_PATTERN, "").length),
       title?.length ?? 0,
     ) + 4
-  const border = color.dim("─".repeat(maxWidth))
+  const horizontal = USE_ASCII_BOX ? "-" : "─"
+  const vertical = USE_ASCII_BOX ? "|" : "│"
+  const topLeft = USE_ASCII_BOX ? "+" : "┌"
+  const topRight = USE_ASCII_BOX ? "+" : "┐"
+  const bottomLeft = USE_ASCII_BOX ? "+" : "└"
+  const bottomRight = USE_ASCII_BOX ? "+" : "┘"
+  const border = color.dim(horizontal.repeat(maxWidth))
 
   console.log()
   if (title) {
     console.log(
-      color.dim("┌─") +
+      color.dim(`${topLeft}${horizontal}`) +
         color.bold(` ${title} `) +
-        color.dim("─".repeat(maxWidth - title.length - 4)) +
-        color.dim("┐"),
+        color.dim(horizontal.repeat(maxWidth - title.length - 4)) +
+        color.dim(topRight),
     )
   } else {
-    console.log(color.dim("┌") + border + color.dim("┐"))
+    console.log(color.dim(topLeft) + border + color.dim(topRight))
   }
 
   for (const line of lines) {
     const stripped = line.replace(ANSI_COLOR_PATTERN, "")
     const padding = maxWidth - stripped.length
-    console.log(color.dim("│") + ` ${line}${" ".repeat(padding - 1)}` + color.dim("│"))
+    console.log(color.dim(vertical) + ` ${line}${" ".repeat(padding - 1)}` + color.dim(vertical))
   }
 
-  console.log(color.dim("└") + border + color.dim("┘"))
+  console.log(color.dim(bottomLeft) + border + color.dim(bottomRight))
   console.log()
 }
 

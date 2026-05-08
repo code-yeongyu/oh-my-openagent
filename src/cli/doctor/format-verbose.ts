@@ -3,6 +3,8 @@ import { PLUGIN_NAME } from "../../shared"
 import type { DoctorResult } from "./types"
 import { formatHeader, formatStatusSymbol, formatIssue } from "./format-shared"
 
+const H_RULE = (process.env.CI || process.env.GITHUB_ACTIONS) ? "-".repeat(40) : "\u2500".repeat(40)
+
 export function formatVerbose(result: DoctorResult): string {
   const lines: string[] = []
 
@@ -11,7 +13,7 @@ export function formatVerbose(result: DoctorResult): string {
   const { systemInfo, tools, results, summary } = result
 
   lines.push(`${color.bold("System Information")}`)
-  lines.push(`${color.dim("\u2500".repeat(40))}`)
+  lines.push(`${color.dim(H_RULE)}`)
   lines.push(`  ${formatStatusSymbol("pass")} opencode    ${systemInfo.opencodeVersion ?? "unknown"}`)
   lines.push(`  ${formatStatusSymbol("pass")} ${PLUGIN_NAME} ${systemInfo.pluginVersion ?? "unknown"}`)
   if (systemInfo.loadedVersion) {
@@ -27,13 +29,13 @@ export function formatVerbose(result: DoctorResult): string {
   lines.push("")
 
   lines.push(`${color.bold("Configuration")}`)
-  lines.push(`${color.dim("\u2500".repeat(40))}`)
+  lines.push(`${color.dim(H_RULE)}`)
   const configStatus = systemInfo.configValid ? color.green("valid") : color.red("invalid")
   lines.push(`  ${formatStatusSymbol(systemInfo.configValid ? "pass" : "fail")} ${systemInfo.configPath ?? "unknown"} (${configStatus})`)
   lines.push("")
 
   lines.push(`${color.bold("Tools")}`)
-  lines.push(`${color.dim("\u2500".repeat(40))}`)
+  lines.push(`${color.dim(H_RULE)}`)
   if (tools.lspServers.length === 0) {
     lines.push(`  ${formatStatusSymbol("warn")} LSP         none detected`)
   } else {
@@ -50,7 +52,7 @@ export function formatVerbose(result: DoctorResult): string {
   lines.push("")
 
   lines.push(`${color.bold("MCPs")}`)
-  lines.push(`${color.dim("\u2500".repeat(40))}`)
+  lines.push(`${color.dim(H_RULE)}`)
   if (tools.mcpBuiltin.length === 0) {
     lines.push(`  ${color.dim("No built-in MCPs")}`)
   } else {
@@ -72,7 +74,7 @@ export function formatVerbose(result: DoctorResult): string {
     }
 
     lines.push(`${color.bold(check.name)}`)
-    lines.push(`${color.dim("\u2500".repeat(40))}`)
+    lines.push(`${color.dim(H_RULE)}`)
     for (const detail of check.details) {
       lines.push(detail)
     }
@@ -82,7 +84,7 @@ export function formatVerbose(result: DoctorResult): string {
   const allIssues = results.flatMap((r) => r.issues)
   if (allIssues.length > 0) {
     lines.push(`${color.bold("Issues")}`)
-    lines.push(`${color.dim("\u2500".repeat(40))}`)
+    lines.push(`${color.dim(H_RULE)}`)
     allIssues.forEach((issue, index) => {
       lines.push(formatIssue(issue, index + 1))
       lines.push("")
@@ -90,7 +92,7 @@ export function formatVerbose(result: DoctorResult): string {
   }
 
   lines.push(`${color.bold("Summary")}`)
-  lines.push(`${color.dim("\u2500".repeat(40))}`)
+  lines.push(`${color.dim(H_RULE)}`)
   const passText = summary.passed > 0 ? color.green(`${summary.passed} passed`) : `${summary.passed} passed`
   const failText = summary.failed > 0 ? color.red(`${summary.failed} failed`) : `${summary.failed} failed`
   const warnText = summary.warnings > 0 ? color.yellow(`${summary.warnings} warnings`) : `${summary.warnings} warnings`
