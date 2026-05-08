@@ -80,6 +80,11 @@ const RETRYABLE_MESSAGE_PATTERNS = [
   "请求过于频繁",       // "too many requests"
   "暂时不可用",         // "temporarily unavailable"
   "服务不可用",         // "service unavailable"
+  // OpenAI streaming server_error events surface either as a literal "server_error"
+  // type or as the prose error sentence below. Without these patterns subagent
+  // streams stall instead of being retried (issue #3799).
+  "server_error",
+  "an error occurred while processing",
 ]
 
 /**

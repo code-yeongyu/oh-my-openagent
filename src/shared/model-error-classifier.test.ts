@@ -434,6 +434,34 @@ describe("model-error-classifier", () => {
     //#then
     expect(result).toBe(true)
   })
+
+  test("treats OpenAI streaming server_error envelopes as retryable (issue #3799)", () => {
+    //#given: OpenAI surfaces its mid-stream error with type 'server_error'
+    const error = {
+      name: undefined,
+      message: "{\"error\":{\"type\":\"server_error\",\"message\":\"server_error\"}}",
+    }
+
+    //#when
+    const result = shouldRetryError(error)
+
+    //#then
+    expect(result).toBe(true)
+  })
+
+  test("treats the OpenAI prose 'An error occurred while processing' message as retryable (issue #3799)", () => {
+    //#given: the human-readable prose surfaced when OpenAI's stream fails
+    const error = {
+      name: undefined,
+      message: "An error occurred while processing your request. Please try again later.",
+    }
+
+    //#when
+    const result = shouldRetryError(error)
+
+    //#then
+    expect(result).toBe(true)
+  })
 })
 
 export {}
