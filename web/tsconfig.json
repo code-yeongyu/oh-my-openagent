@@ -11,13 +11,14 @@
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "jsx": "react-jsx",
+    "jsx": "preserve",
     "incremental": true,
     "noUncheckedIndexedAccess": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "noImplicitReturns": true,
+    "noUncheckedSideEffectImports": false,
     "forceConsistentCasingInFileNames": true,
     "plugins": [
       {
