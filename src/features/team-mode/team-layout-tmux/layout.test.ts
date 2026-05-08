@@ -189,8 +189,12 @@ describe("team-layout-tmux", () => {
 
     const sendKeysCalls = commands.filter((args) => args[0] === "send-keys")
     const literals = sendKeysCalls.map((args) => args.join(" "))
-    expect(literals.some((s) => s.includes("--session 's-m1'"))).toBe(true)
-    expect(literals.some((s) => s.includes("--session 's-m2'"))).toBe(true)
+    // Live-tail replaces `opencode attach --session <id>`: the sessionId is
+    // now a positional arg of the python3 tailer, not behind --session.
+    expect(literals.every((s) => s.includes("python3 -u "))).toBe(true)
+    expect(literals.every((s) => !s.includes("opencode attach"))).toBe(true)
+    expect(literals.some((s) => s.includes("'s-m1'"))).toBe(true)
+    expect(literals.some((s) => s.includes("'s-m2'"))).toBe(true)
   })
 
   test("uses caller window main-vertical layout with caller pane as primary", async () => {

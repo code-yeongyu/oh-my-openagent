@@ -1,8 +1,8 @@
 import { log } from "../../../shared"
-import { shellSingleQuote } from "../../../shared/shell-env"
 import * as sharedTmuxModule from "../../../shared/tmux"
 import * as tmuxPathResolverModule from "../../../tools/interactive-bash/tmux-path-resolver"
 import type { TmuxSessionManager } from "../../tmux-subagent/manager"
+import { buildLiveTailCommand } from "./live-tail"
 import { resolveCallerTmuxSession } from "./resolve-caller-tmux-session"
 
 type TeamLayoutMember = { name: string; sessionId: string; worktreePath?: string }
@@ -46,7 +46,11 @@ function getPaneWorkingDirectory(member: TeamLayoutMember): string {
 }
 
 function buildAttachCommand(member: TeamLayoutMember, serverUrl: string): string {
-  return `opencode attach ${shellSingleQuote(serverUrl)} --session ${shellSingleQuote(member.sessionId)} --dir ${shellSingleQuote(getPaneWorkingDirectory(member))}`
+  // Team workers carry parentID=lead, which puts OpenCode TUI's `attach
+  // --session <child>` into the static subagent-detail mode (no streaming,
+  // no prompt). The live-tail renders message updates from /event SSE so
+  // the worker pane actually shows live activity.
+  return buildLiveTailCommand(serverUrl, member.sessionId)
 }
 
 async function listPanesInWindow(tmuxPath: string, windowTarget: string, deps: TeamLayoutDeps): Promise<Array<string>> {
