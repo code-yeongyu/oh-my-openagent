@@ -79,7 +79,7 @@
       },
       "boulderTitle": "세션 연속성",
       "boulderDescription": "모든 작업은 boulder.json에 기록됩니다. 정전? 시스템 크래시? 상관없습니다. 멈춘 그 자리에서 즉시 재개하세요.",
-      "model": "Claude Opus 4.6 Max"
+      "model": "Claude Opus 4.7 Max"
     },
     "prometheusAtlas": {
       "badge": "오케스트레이션 워크플로우",
@@ -87,8 +87,8 @@
       "headline": "계획과 실행은 엄연히 다른 영역입니다",
       "prometheus": {
         "name": "Prometheus",
-        "role": "전략 기획자",
-        "model": "Claude Opus 4.6 Max",
+        "role": "Strategic Planner",
+        "model": "Claude Opus 4.7 Max",
         "description": "설계자입니다. 당신과 인터뷰하고, 코드베이스를 탐색하여 상세한 작전 계획을 짭니다. 코드는 절대 쓰지 않습니다. Metis와 Momus를 통해 품질을 검증합니다.",
         "features": [
           "지능형 인터뷰 모드",
@@ -139,39 +139,76 @@
         "verify": "VERIFY — 동작 증명"
       },
       "tagline": "'적당히'로는 충분하지 않을 때.",
-      "model": "GPT 5.3 Codex Medium"
+      "model": "GPT 5.5 Medium"
+    },
+    "teamMode": {
+      "badge": "NEW · v4.0",
+      "title": "Team Mode",
+      "headline": "여러 에이전트. 나란히. 병렬로.",
+      "description": "리드 에이전트가 카테고리별 전문 멤버 팀을 지휘합니다. 모두 병렬로 동작하며 전용 도구로 실시간 통신합니다. tmux에서 모든 멤버가 동시에 작업하는 모습을 지켜보세요. 옵트인 — team_mode.enabled를 켜고 재시작하세요.",
+      "features": {
+        "lead": {
+          "title": "리드 오케스트레이션",
+          "description": "코디네이터 한 명, 전문가 여럿. team_send_message와 team_task_create를 통한 실시간 메시징."
+        },
+        "parallel": {
+          "title": "진짜 병렬성",
+          "description": "최대 8명의 멤버가 동시 작업. 대기 없음, 큐 없음 — 모든 각도를 한 번에 커버."
+        },
+        "tmux": {
+          "title": "Tmux 시각화",
+          "description": "Focus와 grid 윈도우로 한 팀원에 집중하면서도 전체 그림을 놓치지 않습니다."
+        },
+        "tools": {
+          "title": "team_* 도구 패밀리",
+          "description": "12개 전용 도구(team_create, team_status, team_send_message, ...). team_mode.enabled 뒤에 게이팅."
+        }
+      },
+      "poweredBy": "Team Mode 기반",
+      "skills": {
+        "hyperplan": {
+          "name": "hyperplan",
+          "description": "5명의 적대적 에이전트가 코드 한 줄 작성되기 전에 직교 각도에서 계획을 갈가리 분해합니다."
+        },
+        "securityResearch": {
+          "name": "security-research",
+          "description": "3명의 취약점 헌터 + 2명의 PoC 엔지니어가 코드베이스를 감사. 실제 익스플로잇 가능성으로 심각도 보정."
+        }
+      },
+      "optIn": "team_mode.enabled = true → opencode 재시작",
+      "tagline": "기본은 OFF. 켜면 압도적."
     },
     "agents": {
       "title": "특화 에이전트",
       "subtitle": "각 태스크에 최적화된 프롬프트와 툴셋으로 무장한 전문가들입니다.",
       "oracle": {
         "name": "Oracle",
-        "role": "아키텍처 컨설턴트",
-        "model": "GPT 5.4 High",
+        "role": "Architecture Consultant",
+        "model": "GPT 5.5 High",
         "description": "복잡한 디버깅과 아키텍처 결정. 길이 보이지 않을 때."
       },
       "librarian": {
         "name": "Librarian",
-        "role": "문서 & 코드 검색",
-        "model": "MiniMax M2.5",
+        "role": "Docs & Code Search",
+        "model": "GPT 5.4 Mini Fast",
         "description": "실제 GitHub 예제와 공식 문서를 찾습니다. 증거 기반, 퍼머링크 제공."
       },
       "explore": {
         "name": "Explore",
-        "role": "코드베이스 탐색",
-        "model": "MiniMax M2.5",
+        "role": "Codebase Grep",
+        "model": "GPT 5.4 Mini Fast",
         "description": "초고속 코드베이스 검색. 저렴하고 빠르며, 항상 백그라운드에서 실행."
       },
       "metis": {
         "name": "Metis",
-        "role": "계획 컨설턴트",
-        "model": "Claude Opus 4.6",
+        "role": "Plan Consultant",
+        "model": "Claude Sonnet 4.6",
         "description": "계획의 모호함이 프로덕션 버그로 이어지기 전에 차단합니다."
       },
       "momus": {
         "name": "Momus",
-        "role": "계획 검토자",
-        "model": "GPT 5.4",
+        "role": "Plan Reviewer",
+        "model": "GPT 5.5 xHigh",
         "description": "무자비한 검증. 계획이 완벽하지 않으면 승인하지 않습니다."
       },
       "dynamicSystem": {
