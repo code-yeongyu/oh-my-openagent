@@ -38,7 +38,7 @@ Core CLI subcommands are: `install`, `run`, `doctor`, `mcp-oauth`, `refresh-mode
 Config schema URL:
 
 ```json
-"$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-openagent.schema.json"
+"$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json"
 ```
 
 Operational notes:
