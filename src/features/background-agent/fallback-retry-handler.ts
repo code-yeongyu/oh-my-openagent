@@ -7,6 +7,8 @@ import {
   shouldRetryError,
   getNextFallback,
   hasMoreFallbacks,
+  hasCrossProviderFallback,
+  isProviderScopedStop,
   selectFallbackProvider,
 } from "../../shared/model-error-classifier"
 import { transformModelForProvider } from "../../shared/provider-model-id-transform"
@@ -37,8 +39,19 @@ export async function tryFallbackRetry(args: {
 }): Promise<boolean> {
   const { task, errorInfo, source, concurrencyManager, client, idleDeferralTimers, queuesByKey, processKey, onRetrying } = args
   const fallbackChain = task.fallbackChain
+  const baseRetry = shouldRetryError(errorInfo)
+  // STOP-pattern errors (insufficient balance / quota exceeded / out of
+  // credits) are non-retryable on the SAME provider, but the user's chain
+  // may explicitly cross providers (e.g. github-copilot -> opencode-go).
+  // Permit retry in that narrow case so a cross-provider chain isn't dead
+  // wood the moment one provider's pool empties.
+  const crossProviderEscape =
+    !baseRetry &&
+    isProviderScopedStop(errorInfo) &&
+    !!fallbackChain &&
+    hasCrossProviderFallback(fallbackChain, task.attemptCount ?? 0, task.model?.providerID)
   const canRetry =
-    shouldRetryError(errorInfo) &&
+    (baseRetry || crossProviderEscape) &&
     fallbackChain &&
     fallbackChain.length > 0 &&
     hasMoreFallbacks(fallbackChain, task.attemptCount ?? 0)

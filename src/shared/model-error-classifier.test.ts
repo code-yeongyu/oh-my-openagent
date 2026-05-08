@@ -3,7 +3,7 @@ const { describe, expect, test, beforeEach, afterEach, mock, spyOn } = require("
 import * as connectedProvidersCache from "./connected-providers-cache"
 
 let readConnectedProvidersCacheSpy: ReturnType<typeof spyOn> | undefined
-const { shouldRetryError, selectFallbackProvider } = await import("./model-error-classifier")
+const { shouldRetryError, selectFallbackProvider, isProviderScopedStop, hasCrossProviderFallback } = await import("./model-error-classifier")
 
 describe("model-error-classifier", () => {
   beforeEach(() => {
@@ -269,6 +269,80 @@ describe("model-error-classifier", () => {
 
     //#then
     expect(result).toBe(false)
+  })
+
+  describe("isProviderScopedStop", () => {
+    test("flags 'insufficient balance' as provider-scoped stop", () => {
+      const error = { message: "402 Payment Required: insufficient balance for model" }
+      expect(isProviderScopedStop(error)).toBe(true)
+    })
+
+    test("flags 'credits exhausted' as provider-scoped stop", () => {
+      expect(isProviderScopedStop({ message: "Your credits exhausted, please refill" })).toBe(true)
+    })
+
+    test("flags 'quota exceeded' as provider-scoped stop", () => {
+      expect(isProviderScopedStop({ message: "Subscription quota exceeded for this month" })).toBe(true)
+    })
+
+    test("flags InsufficientCreditsError name as provider-scoped stop", () => {
+      expect(isProviderScopedStop({ name: "InsufficientCreditsError" })).toBe(true)
+    })
+
+    test("does not flag generic rate-limit messages (those go via baseRetry)", () => {
+      expect(isProviderScopedStop({ message: "rate_limit hit, retry later" })).toBe(false)
+    })
+
+    test("does not flag user-fault errors as provider-scoped stop", () => {
+      expect(isProviderScopedStop({ name: "PermissionDeniedError" })).toBe(false)
+      expect(isProviderScopedStop({ name: "ValidationError" })).toBe(false)
+    })
+
+    test("returns false on empty error info", () => {
+      expect(isProviderScopedStop({})).toBe(false)
+    })
+  })
+
+  describe("hasCrossProviderFallback", () => {
+    test("returns true when chain has a different-provider entry ahead", () => {
+      const chain = [
+        { model: "claude-haiku-4.5", providers: ["github-copilot"] },
+        { model: "glm-5.1", providers: ["opencode-go"] },
+      ]
+      expect(hasCrossProviderFallback(chain, 1, "github-copilot")).toBe(true)
+    })
+
+    test("returns false when remaining chain is all same-provider", () => {
+      const chain = [
+        { model: "claude-haiku-4.5", providers: ["github-copilot"] },
+        { model: "claude-sonnet-4.6", providers: ["github-copilot"] },
+      ]
+      expect(hasCrossProviderFallback(chain, 1, "github-copilot")).toBe(false)
+    })
+
+    test("returns false when failing provider is unknown", () => {
+      const chain = [{ model: "x", providers: ["other"] }]
+      expect(hasCrossProviderFallback(chain, 0, undefined)).toBe(false)
+    })
+
+    test("treats provider names case-insensitively", () => {
+      const chain = [{ model: "x", providers: ["OpenCode-Go"] }]
+      expect(hasCrossProviderFallback(chain, 0, "github-copilot")).toBe(true)
+      expect(hasCrossProviderFallback(chain, 0, "opencode-go")).toBe(false)
+    })
+
+    test("entry with mixed providers counts as cross-provider if any differs", () => {
+      const chain = [{ model: "x", providers: ["github-copilot", "opencode-go"] }]
+      expect(hasCrossProviderFallback(chain, 0, "github-copilot")).toBe(true)
+    })
+
+    test("respects attemptCount and ignores already-tried entries", () => {
+      const chain = [
+        { model: "y", providers: ["opencode-go"] },
+        { model: "x", providers: ["github-copilot"] },
+      ]
+      expect(hasCrossProviderFallback(chain, 1, "github-copilot")).toBe(false)
+    })
   })
 })
 

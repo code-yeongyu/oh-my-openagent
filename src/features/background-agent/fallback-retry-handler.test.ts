@@ -6,6 +6,8 @@ const readProviderModelsCacheMock = mock(() => null)
 const shouldRetryErrorMock = mock(() => true)
 const getNextFallbackMock = mock((chain: Array<{ model: string }>, attempt: number) => chain[attempt])
 const hasMoreFallbacksMock = mock((chain: Array<{ model: string }>, attempt: number) => attempt < chain.length)
+const isProviderScopedStopMock = mock(() => false)
+const hasCrossProviderFallbackMock = mock(() => false)
 const selectFallbackProviderMock = mock((providers: string[]) => providers[0])
 const transformModelForProviderMock = mock((_provider: string, model: string) => model)
 
@@ -27,6 +29,8 @@ async function importFreshFallbackRetryHandlerModule() {
     shouldRetryError: shouldRetryErrorMock,
     getNextFallback: getNextFallbackMock,
     hasMoreFallbacks: hasMoreFallbacksMock,
+    isProviderScopedStop: isProviderScopedStopMock,
+    hasCrossProviderFallback: hasCrossProviderFallbackMock,
     selectFallbackProvider: selectFallbackProviderMock,
   }))
 
@@ -42,11 +46,19 @@ async function importFreshFallbackRetryHandlerModule() {
     shouldRetryError: shouldRetryErrorMock,
     selectFallbackProvider: selectFallbackProviderMock,
     readProviderModelsCache: readProviderModelsCacheMock,
+    isProviderScopedStop: isProviderScopedStopMock,
+    hasCrossProviderFallback: hasCrossProviderFallbackMock,
   }
 }
 
-const { tryFallbackRetry, shouldRetryError, selectFallbackProvider, readProviderModelsCache } =
-  await importFreshFallbackRetryHandlerModule()
+const {
+  tryFallbackRetry,
+  shouldRetryError,
+  selectFallbackProvider,
+  readProviderModelsCache,
+  isProviderScopedStop,
+  hasCrossProviderFallback,
+} = await importFreshFallbackRetryHandlerModule()
 
 function createDeferredPromise(): {
   promise: Promise<void>
@@ -136,6 +148,8 @@ describe("tryFallbackRetry", () => {
     ;(shouldRetryError as any).mockImplementation(() => true)
     ;(selectFallbackProvider as any).mockImplementation((providers: string[]) => providers[0])
     ;(readProviderModelsCache as any).mockReturnValue(null)
+    ;(isProviderScopedStop as any).mockImplementation(() => false)
+    ;(hasCrossProviderFallback as any).mockImplementation(() => false)
   })
 
   describe("#given retryable error with fallback chain", () => {
@@ -430,6 +444,78 @@ describe("tryFallbackRetry", () => {
       expect(result).toBe(true)
       expect(args.task.model?.providerID).toBe("provider-a")
       expect(args.task.model?.modelID).toBe("fallback-model-1")
+    })
+  })
+
+  describe("#given provider-scoped stop with cross-provider chain (Copilot balance runout case)", () => {
+    test("retries on a different-provider entry even though shouldRetryError says false", async () => {
+      ;(shouldRetryError as any).mockImplementation(() => false)
+      ;(isProviderScopedStop as any).mockImplementation(() => true)
+      ;(hasCrossProviderFallback as any).mockImplementation(() => true)
+
+      const args = createDefaultArgs({
+        fallbackChain: [
+          { model: "fallback-model-1", providers: ["provider-b"], variant: undefined },
+        ],
+        model: { providerID: "provider-a", modelID: "original-model" },
+        attemptCount: 0,
+      })
+      args.errorInfo = { name: "InsufficientCreditsError", message: "402 insufficient balance" }
+
+      const result = await tryFallbackRetry(args)
+
+      expect(result).toBe(true)
+      expect(args.task.model?.providerID).toBe("provider-b")
+      expect(args.task.model?.modelID).toBe("fallback-model-1")
+    })
+
+    test("does NOT retry when chain is exhausted of cross-provider entries", async () => {
+      ;(shouldRetryError as any).mockImplementation(() => false)
+      ;(isProviderScopedStop as any).mockImplementation(() => true)
+      ;(hasCrossProviderFallback as any).mockImplementation(() => false)
+
+      const args = createDefaultArgs({
+        fallbackChain: [
+          { model: "same-prov-fallback", providers: ["provider-a"], variant: undefined },
+        ],
+        model: { providerID: "provider-a", modelID: "original-model" },
+      })
+      args.errorInfo = { name: "InsufficientCreditsError", message: "out of credits" }
+
+      const result = await tryFallbackRetry(args)
+
+      expect(result).toBe(false)
+    })
+
+    test("does NOT retry on user-fault errors even with a cross-provider chain", async () => {
+      // PermissionDenied is non-retryable AND non-stop; cross-provider escape
+      // must not rescue it.
+      ;(shouldRetryError as any).mockImplementation(() => false)
+      ;(isProviderScopedStop as any).mockImplementation(() => false)
+      ;(hasCrossProviderFallback as any).mockImplementation(() => true)
+
+      const args = createDefaultArgs()
+      args.errorInfo = { name: "PermissionDeniedError", message: "denied by user" }
+
+      const result = await tryFallbackRetry(args)
+
+      expect(result).toBe(false)
+    })
+
+    test("baseRetry takes precedence (does not double-call cross-provider gate)", async () => {
+      ;(shouldRetryError as any).mockImplementation(() => true)
+      const isStopSpy = mock(() => true)
+      const hasCrossSpy = mock(() => true)
+      ;(isProviderScopedStop as any).mockImplementation(isStopSpy)
+      ;(hasCrossProviderFallback as any).mockImplementation(hasCrossSpy)
+
+      const args = createDefaultArgs()
+      const result = await tryFallbackRetry(args)
+
+      expect(result).toBe(true)
+      // The escape gate is short-circuited when baseRetry is already true.
+      expect(isStopSpy).not.toHaveBeenCalled()
+      expect(hasCrossSpy).not.toHaveBeenCalled()
     })
   })
 })

@@ -30,7 +30,7 @@ describe("buildLiveTailCommand", () => {
     const path = match![1]!
     expect(existsSync(path)).toBe(true)
     const contents = readFileSync(path, "utf8")
-    expect(contents).toContain("OmO team live-tail")
+    expect(contents).toContain("Live-tail an OpenCode session")
     expect(contents).toContain("/event")
   })
 
@@ -46,5 +46,20 @@ describe("buildLiveTailCommand", () => {
     const path = materializeLiveTailScript()
     const contents = readFileSync(path, "utf8")
     expect(contents.endsWith("\n")).toBe(true)
+  })
+
+  test("materialized script declares the expected helper functions for renderer logic", () => {
+    // Smoke check that protects against accidentally bundling a stale script.
+    const path = materializeLiveTailScript()
+    const contents = readFileSync(path, "utf8")
+    for (const symbol of [
+      "def extract_task_line(",
+      "def summarize_peer_message(",
+      "class SessionState",
+      "def render_banner(",
+      "_KICKOFF_META_PREFIXES",
+    ]) {
+      expect(contents).toContain(symbol)
+    }
   })
 })

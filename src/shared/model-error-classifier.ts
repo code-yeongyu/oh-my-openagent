@@ -163,6 +163,51 @@ export function shouldRetryError(error: ErrorInfo): boolean {
 }
 
 /**
+ * Determines if an error is a provider-scoped stop signal (the failing
+ * provider has run out of capacity / credits / quota for this account, but
+ * the user's other providers may still be reachable). Used by the fallback
+ * handler to allow cross-provider escape: when the message says "insufficient
+ * balance" on copilot but the chain offers an opencode-go entry, that entry
+ * has its own balance pool and is worth trying.
+ *
+ * Returns false for user-fault errors (permission, validation, etc.) and for
+ * generic retryable errors (rate_limit) which `shouldRetryError` already
+ * covers via the standard chain.
+ */
+export function isProviderScopedStop(error: ErrorInfo): boolean {
+  if (error.name) {
+    const errorNameLower = error.name.toLowerCase()
+    if (NON_RETRYABLE_ERROR_NAMES.has(errorNameLower)) return false
+    if (STOP_ERROR_NAMES.has(errorNameLower)) return true
+  }
+  const msg = error.message?.toLowerCase() ?? ""
+  if (!msg) return false
+  return STOP_MESSAGE_PATTERNS.some((pattern) => msg.includes(pattern))
+}
+
+/**
+ * True iff at least one fallback entry from `attemptCount` onward names a
+ * provider different from `failingProviderID`. Used by the fallback handler
+ * to decide whether a provider-scoped stop is worth retrying.
+ */
+export function hasCrossProviderFallback(
+  chain: FallbackEntry[],
+  attemptCount: number,
+  failingProviderID: string | undefined,
+): boolean {
+  if (!failingProviderID) return false
+  const failing = failingProviderID.toLowerCase()
+  for (let i = Math.max(0, attemptCount); i < chain.length; i++) {
+    const entry = chain[i]
+    if (!entry) continue
+    if (entry.providers.some((p) => p.toLowerCase() !== failing)) {
+      return true
+    }
+  }
+  return false
+}
+
+/**
  * Gets the next fallback model from the chain based on attempt count.
  * Returns undefined if all fallbacks have been exhausted.
  */
