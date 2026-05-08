@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto"
+import { readFileSync } from "node:fs"
 import { open, readFile, rename, rm, unlink, writeFile } from "node:fs/promises"
 
 type LockOptions = {
@@ -8,6 +9,18 @@ type LockOptions = {
 
 const LOCK_RETRY_MS = 50
 const LOCK_WAIT_TIMEOUT_MS = 4_000
+const LINUX_PROC_STAT_START_TIME_INDEX = 21
+
+function readLinuxProcessStartMarkerSync(pid: number): string | undefined {
+  try {
+    const statContent = readFileSync(`/proc/${pid}/stat`, "utf8")
+    return statContent.split(" ")[LINUX_PROC_STAT_START_TIME_INDEX]?.trim() || undefined
+  } catch {
+    return undefined
+  }
+}
+
+const CURRENT_PROCESS_START_MARKER = readLinuxProcessStartMarkerSync(process.pid)
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => {
@@ -16,19 +29,33 @@ function delay(ms: number): Promise<void> {
 }
 
 function buildOwnerContent(ownerTag: string): string {
-  return `${ownerTag}\n${process.pid}\n${Date.now()}\n`
+  return [
+    ownerTag,
+    String(process.pid),
+    String(Date.now()),
+    CURRENT_PROCESS_START_MARKER ?? "",
+  ].join("\n") + "\n"
 }
 
-function parseOwnerContent(content: string): { ownerPid: number; acquiredAtEpochMs: number } | null {
+function parseOwnerContent(content: string): {
+  ownerPid: number
+  acquiredAtEpochMs: number
+  ownerStartMarker?: string
+} | null {
   const lines = content.split(/\r?\n/).filter((line) => line.length > 0)
-  if (lines.length !== 3) return null
+  if (lines.length !== 3 && lines.length !== 4) return null
 
   const ownerPid = Number.parseInt(lines[1] ?? "", 10)
   const acquiredAtEpochMs = Number.parseInt(lines[2] ?? "", 10)
   if (!Number.isInteger(ownerPid) || ownerPid <= 0) return null
   if (!Number.isInteger(acquiredAtEpochMs) || acquiredAtEpochMs <= 0) return null
 
-  return { ownerPid, acquiredAtEpochMs }
+  const ownerStartMarker = lines[3]?.trim()
+  return {
+    ownerPid,
+    acquiredAtEpochMs,
+    ...(ownerStartMarker ? { ownerStartMarker } : {}),
+  }
 }
 
 function isPidAlive(pid: number): boolean {
@@ -37,6 +64,15 @@ function isPidAlive(pid: number): boolean {
     return true
   } catch {
     return false
+  }
+}
+
+async function readLinuxProcessStartMarker(pid: number): Promise<string | undefined> {
+  try {
+    const statContent = await readFile(`/proc/${pid}/stat`, "utf8")
+    return statContent.split(" ")[LINUX_PROC_STAT_START_TIME_INDEX]?.trim() || undefined
+  } catch {
+    return undefined
   }
 }
 
@@ -93,9 +129,19 @@ export async function detectStaleLock(lockPath: string, staleAfterMs: number): P
     const parsed = parseOwnerContent(content)
     if (parsed === null) return false
 
+    const lockAgeMs = Date.now() - parsed.acquiredAtEpochMs
+    if (lockAgeMs <= staleAfterMs) return false
+
+    if (parsed.ownerStartMarker) {
+      const liveStartMarker = await readLinuxProcessStartMarker(parsed.ownerPid)
+      if (liveStartMarker !== undefined && liveStartMarker !== parsed.ownerStartMarker) {
+        return true
+      }
+    }
+
     if (isPidAlive(parsed.ownerPid)) return false
 
-    return Date.now() - parsed.acquiredAtEpochMs > staleAfterMs
+    return true
   } catch {
     return false
   }

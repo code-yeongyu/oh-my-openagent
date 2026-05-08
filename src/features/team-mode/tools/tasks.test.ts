@@ -120,8 +120,8 @@ describe("team task tools", () => {
     expect(createTaskMock).toHaveBeenCalledWith("team-run-1", expect.objectContaining({ subject: "task one", description: "desc", blockedBy: [], status: "pending" }), config)
     expect(listTasksMock).toHaveBeenCalledWith("team-run-1", config, { status: "pending", owner: "member-a" })
     expect(claimTaskMock).toHaveBeenCalledWith("team-run-1", "1", "member-a", config)
-    expect(updateTaskStatusMock).toHaveBeenCalledWith("team-run-1", "1", "in_progress", "member-a", config)
-    expect(updateTaskStatusMock).toHaveBeenCalledWith("team-run-1", "1", "completed", "member-a", config)
+    expect(updateTaskStatusMock).toHaveBeenCalledWith("team-run-1", "1", "in_progress", { memberName: "member-a", isLead: false }, config)
+    expect(updateTaskStatusMock).toHaveBeenCalledWith("team-run-1", "1", "completed", { memberName: "member-a", isLead: false }, config)
     expect(getTaskMock).toHaveBeenCalledWith("team-run-1", "1", config)
   })
 
@@ -149,5 +149,35 @@ describe("team task tools", () => {
 
     // then
     expect(result).rejects.toThrow("blocked by 2")
+  })
+
+  test("rejects task update from a non-participant session", async () => {
+    // given
+    const config = createConfig()
+    const updateTool = createTeamTaskUpdateTool(config, mockClient, deps)
+
+    // when
+    const result = updateTool.execute({ teamRunId: "team-run-1", taskId: "1", status: "completed" }, createContext("outsider-session"))
+
+    // then
+    expect(result).rejects.toThrow("team participant not found for session outsider-session")
+  })
+
+  test("rejects task creation when blockedBy references a missing task", async () => {
+    // given
+    const config = createConfig()
+    getTaskMock.mockImplementationOnce(async () => { throw new Error("missing task") })
+    const createTool = createTeamTaskCreateTool(config, mockClient, deps)
+
+    // when
+    const result = createTool.execute({
+      teamRunId: "team-run-1",
+      subject: "task one",
+      description: "desc",
+      blockedBy: ["missing-task"],
+    }, createContext("member-session-a"))
+
+    // then
+    expect(result).rejects.toThrow("blockedBy task 'missing-task' does not exist")
   })
 })

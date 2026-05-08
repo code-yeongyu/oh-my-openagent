@@ -267,7 +267,7 @@ export function createTeamShutdownRequestTool(config: TeamModeConfig, client: Op
       const runtimeContext = toolContext as TeamLifecycleToolContext
       const { participant } = await resolveParticipant(args.teamRunId, runtimeContext.sessionID, config, deps)
       if (participant?.role !== "lead") throw new Error("team_shutdown_request is lead-only")
-      await deps.requestShutdownOfMember(args.teamRunId, args.targetMemberName, participant.memberName, config)
+      await deps.requestShutdownOfMember(args.teamRunId, args.targetMemberName, participant, config)
       return JSON.stringify({ teamRunId: args.teamRunId, targetMemberName: args.targetMemberName, requesterName: participant.memberName, status: "shutdown_requested" })
     },
   })
@@ -284,7 +284,7 @@ export function createTeamApproveShutdownTool(config: TeamModeConfig, client: Op
       const runtimeContext = toolContext as TeamLifecycleToolContext
       const { participant } = await resolveParticipant(args.teamRunId, runtimeContext.sessionID, config, deps)
       if (!participant || (participant.role !== "lead" && participant.memberName !== args.memberName)) throw new Error("team_approve_shutdown: caller must be target member or team lead")
-      await deps.approveShutdown(args.teamRunId, args.memberName, participant.memberName, config)
+      await deps.approveShutdown(args.teamRunId, args.memberName, participant, config)
       return JSON.stringify({ teamRunId: args.teamRunId, memberName: args.memberName, approverName: participant.memberName, status: "shutdown_approved" })
     },
   })
@@ -301,7 +301,7 @@ export function createTeamRejectShutdownTool(config: TeamModeConfig, client: Ope
       const runtimeContext = toolContext as TeamLifecycleToolContext
       const { participant } = await resolveParticipant(args.teamRunId, runtimeContext.sessionID, config, deps)
       if (!participant || (participant.role !== "lead" && participant.memberName !== args.memberName)) throw new Error("team_reject_shutdown: caller must be target member or team lead")
-      await deps.rejectShutdown(args.teamRunId, args.memberName, args.reason, config)
+      await deps.rejectShutdown(args.teamRunId, args.memberName, args.reason, participant, config)
       return JSON.stringify({ teamRunId: args.teamRunId, memberName: args.memberName, rejectedBy: participant.memberName, reason: args.reason, status: "shutdown_rejected" })
     },
   })

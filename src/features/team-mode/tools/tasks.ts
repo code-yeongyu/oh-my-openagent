@@ -58,15 +58,21 @@ const defaultDeps: TeamTaskToolDeps = {
   getTask,
 }
 
-async function resolveSenderName(teamRunId: string, config: TeamModeConfig, sessionID: string | undefined, deps: TeamTaskToolDeps): Promise<string> {
+async function resolveParticipant(teamRunId: string, config: TeamModeConfig, sessionID: string | undefined, deps: TeamTaskToolDeps): Promise<RuntimeState["members"][number]> {
   const runtimeState: RuntimeState = await deps.loadRuntimeState(teamRunId, config)
   const matchedMember = runtimeState.members.find((member) => member.sessionId === sessionID)
-  if (matchedMember) return matchedMember.name
+  if (matchedMember) return matchedMember
+  throw new Error(`team participant not found for session ${sessionID ?? "unknown"}`)
+}
 
-  const leadMember = runtimeState.members.find((member) => member.agentType === "leader")
-  if (leadMember) return leadMember.name
-
-  throw new Error(`team member not found for session ${sessionID ?? "unknown"}`)
+async function assertBlockedByTasksExist(teamRunId: string, blockedBy: string[] | undefined, config: TeamModeConfig, deps: TeamTaskToolDeps): Promise<void> {
+  for (const blockedTaskId of blockedBy ?? []) {
+    try {
+      await deps.getTask(teamRunId, blockedTaskId, config)
+    } catch {
+      throw new Error(`blockedBy task '${blockedTaskId}' does not exist`)
+    }
+  }
 }
 
 export function createTeamTaskCreateTool(config: TeamModeConfig, client: OpencodeClient, deps: TeamTaskToolDeps = defaultDeps): ToolDefinition {
@@ -80,7 +86,9 @@ export function createTeamTaskCreateTool(config: TeamModeConfig, client: Opencod
       description: tool.schema.string().describe("Task description"),
       blockedBy: tool.schema.array(tool.schema.string()).optional().describe("Blocking task IDs"),
     },
-    execute: async (args: TeamTaskCreateArgs): Promise<string> => {
+    execute: async (args: TeamTaskCreateArgs, ctx?: TeamTaskToolContext): Promise<string> => {
+      await resolveParticipant(args.teamRunId, config, ctx?.sessionID, deps)
+      await assertBlockedByTasksExist(args.teamRunId, args.blockedBy, config, deps)
       const createdTask: Task = await deps.createTask(args.teamRunId, {
         subject: args.subject,
         description: args.description,
@@ -104,7 +112,8 @@ export function createTeamTaskListTool(config: TeamModeConfig, client: OpencodeC
       status: tool.schema.enum(["pending", "claimed", "in_progress", "completed", "deleted"]).optional(),
       owner: tool.schema.string().optional(),
     },
-    execute: async (args: TeamTaskListArgs): Promise<string> => {
+    execute: async (args: TeamTaskListArgs, ctx?: TeamTaskToolContext): Promise<string> => {
+      await resolveParticipant(args.teamRunId, config, ctx?.sessionID, deps)
       const tasks = await deps.listTasks(args.teamRunId, config, { status: args.status, owner: args.owner })
       return JSON.stringify({ tasks })
     },
@@ -123,11 +132,15 @@ export function createTeamTaskUpdateTool(config: TeamModeConfig, client: Opencod
       owner: tool.schema.string().optional().describe("Task owner"),
     },
     execute: async (args: TeamTaskUpdateArgs, ctx?: TeamTaskToolContext): Promise<string> => {
-      const senderName = await resolveSenderName(args.teamRunId, config, ctx?.sessionID, deps)
+      const participant = await resolveParticipant(args.teamRunId, config, ctx?.sessionID, deps)
+      const senderName = participant.name
 
       const updatedTask = args.status === "claimed"
         ? await deps.claimTask(args.teamRunId, args.taskId, senderName, config)
-        : await deps.updateTaskStatus(args.teamRunId, args.taskId, args.status, args.owner ?? senderName, config)
+        : await deps.updateTaskStatus(args.teamRunId, args.taskId, args.status, {
+            memberName: senderName,
+            isLead: participant.agentType === "leader",
+          }, config)
 
       return JSON.stringify({ task: updatedTask })
     },
@@ -143,7 +156,8 @@ export function createTeamTaskGetTool(config: TeamModeConfig, client: OpencodeCl
       teamRunId: tool.schema.string().describe("Team run ID"),
       taskId: tool.schema.string().describe("Task ID"),
     },
-    execute: async (args: TeamTaskGetArgs): Promise<string> => {
+    execute: async (args: TeamTaskGetArgs, ctx?: TeamTaskToolContext): Promise<string> => {
+      await resolveParticipant(args.teamRunId, config, ctx?.sessionID, deps)
       const task = await deps.getTask(args.teamRunId, args.taskId, config)
       return JSON.stringify({ task })
     },

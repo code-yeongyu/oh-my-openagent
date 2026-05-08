@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto"
-import { rm } from "node:fs/promises"
 
 import type { Message, RuntimeState } from "../types"
+import { removeWorktree } from "../team-worktree/cleanup"
 
 export const DELETABLE_MEMBER_STATUSES = new Set<RuntimeState["members"][number]["status"]>([
   "completed",
@@ -70,7 +70,7 @@ export async function removeWorktrees(memberPaths: Array<string | undefined>): P
 
   for (const memberPath of new Set(memberPaths)) {
     if (!memberPath) continue
-    await rm(memberPath, { recursive: true, force: true })
+    await removeWorktree(memberPath)
     removedWorktrees.push(memberPath)
   }
 

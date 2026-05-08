@@ -79,7 +79,7 @@ test("updateTaskStatus rejects reverse transitions", async () => {
   }
 })
 
-test("updateTaskStatus rejects non-owner updates except deletion", async () => {
+test("updateTaskStatus rejects non-owner updates and only allows lead deletion", async () => {
   // given
   const fixture = await createTasklistFixture()
 
@@ -102,7 +102,24 @@ test("updateTaskStatus rejects non-owner updates except deletion", async () => {
     expect(crossOwnerError).toBeInstanceOf(CrossOwnerUpdateError)
 
     // when
-    const deletedTask = await updateTaskStatus(fixture.teamRunId, task.id, "deleted", "lead-member", fixture.config)
+    let unauthorizedDeleteError: unknown = null
+    try {
+      await updateTaskStatus(fixture.teamRunId, task.id, "deleted", "member-b", fixture.config)
+    } catch (error) {
+      unauthorizedDeleteError = error
+    }
+
+    // then
+    expect(unauthorizedDeleteError).toBeInstanceOf(CrossOwnerUpdateError)
+
+    // when
+    const deletedTask = await updateTaskStatus(
+      fixture.teamRunId,
+      task.id,
+      "deleted",
+      { memberName: "lead-member", isLead: true },
+      fixture.config,
+    )
 
     // then
     expect(deletedTask.status).toBe("deleted")

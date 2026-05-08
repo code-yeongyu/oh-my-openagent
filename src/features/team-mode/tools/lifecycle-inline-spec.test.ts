@@ -285,13 +285,12 @@ describe("createTeamCreateTool inline_spec normalization", () => {
       members: [
         {
           name: "Agent 1: Structure Analyst",
-          kind: "agent",
           role: "Structure Analyst",
           capabilities: ["directory layouts", "module boundaries"],
         },
         {
           name: "Agent 2: Core Logic Analyst",
-          kind: "quick",
+          category: "quick",
           role: "Core Logic Analyst",
           description: "Analyze initialization flow and plugin architecture.",
         },

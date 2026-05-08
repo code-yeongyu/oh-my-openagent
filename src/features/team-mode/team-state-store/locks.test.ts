@@ -89,3 +89,19 @@ test("detects and reaps stale lock entries", async () => {
   expect(readFile(lockPath, "utf8")).rejects.toThrow()
   await rm(rootDirectory, { recursive: true, force: true })
 })
+
+test("treats a stale lock as reclaimable when the pid is alive but belongs to a different process instance", async () => {
+  // given
+  const { detectStaleLock } = await import("./locks")
+  const rootDirectory = await createTempDirectory("locks-pid-reuse-")
+  const lockPath = join(rootDirectory, "lock")
+  const staleContent = `fake-owner-name\n${process.pid}\n${Date.now() - 600_000}\nreused-process-start-marker\n`
+  await writeFile(lockPath, staleContent)
+
+  // when
+  const staleDetected = await detectStaleLock(lockPath, 300_000)
+
+  // then
+  expect(staleDetected).toBe(true)
+  await rm(rootDirectory, { recursive: true, force: true })
+})

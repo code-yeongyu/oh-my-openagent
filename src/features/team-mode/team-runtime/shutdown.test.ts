@@ -1,11 +1,11 @@
 /// <reference types="bun-types" />
 
 import { afterEach, describe, expect, mock, spyOn, test } from "bun:test"
-import { access, mkdir, rm } from "node:fs/promises"
+import { access, mkdir, readdir, rm } from "node:fs/promises"
 import path from "node:path"
 
 import { sendMessage } from "../team-mailbox/send"
-import { getRuntimeStateDir, resolveBaseDir } from "../team-registry/paths"
+import { getInboxDir, getRuntimeStateDir, resolveBaseDir } from "../team-registry/paths"
 import * as runtimeStateStore from "../team-state-store/store"
 import { loadRuntimeState, transitionRuntimeState } from "../team-state-store/store"
 import type { DeleteTeamDeps } from "./delete-team"
@@ -62,7 +62,7 @@ describe("team-runtime shutdown", () => {
     temporaryDirectories.push(fixture.baseDir)
 
     // when
-    await requestShutdownOfMember(fixture.teamRunId, "member-a", "lead", fixture.config)
+    await requestShutdownOfMember(fixture.teamRunId, "member-a", { memberName: "lead", role: "lead" }, fixture.config)
 
     // then
     const inboxMessages = await readInboxMessages(fixture.teamRunId, "member-a", fixture.config)
@@ -87,10 +87,10 @@ describe("team-runtime shutdown", () => {
     // given
     const fixture = await createFixture()
     temporaryDirectories.push(fixture.baseDir)
-    await requestShutdownOfMember(fixture.teamRunId, "member-a", "lead", fixture.config)
+    await requestShutdownOfMember(fixture.teamRunId, "member-a", { memberName: "lead", role: "lead" }, fixture.config)
 
     // when
-    await approveShutdown(fixture.teamRunId, "member-a", "member-a", fixture.config)
+    await approveShutdown(fixture.teamRunId, "member-a", { memberName: "member-a", role: "member" }, fixture.config)
 
     // then
     const runtimeState = await loadRuntimeState(fixture.teamRunId, fixture.config)
@@ -110,10 +110,10 @@ describe("team-runtime shutdown", () => {
     // given
     const fixture = await createFixture()
     temporaryDirectories.push(fixture.baseDir)
-    await requestShutdownOfMember(fixture.teamRunId, "member-a", "lead", fixture.config)
+    await requestShutdownOfMember(fixture.teamRunId, "member-a", { memberName: "lead", role: "lead" }, fixture.config)
 
     // when
-    await rejectShutdown(fixture.teamRunId, "member-a", "not done yet", fixture.config)
+    await rejectShutdown(fixture.teamRunId, "member-a", "not done yet", { memberName: "member-a", role: "member" }, fixture.config)
 
     // then
     const runtimeState = await loadRuntimeState(fixture.teamRunId, fixture.config)
@@ -129,6 +129,41 @@ describe("team-runtime shutdown", () => {
       && message.to === "lead"
       && message.body === "not done yet"
     ))).toBe(true)
+  })
+
+  test("rejects runtime-level shutdown requests from non-lead actors", async () => {
+    // given
+    const fixture = await createFixture()
+    temporaryDirectories.push(fixture.baseDir)
+
+    // when
+    const result = requestShutdownOfMember(
+      fixture.teamRunId,
+      "member-b",
+      { memberName: "member-a", role: "member" },
+      fixture.config,
+    )
+
+    // then
+    await expect(result).rejects.toThrow("team_shutdown_request is lead-only")
+  })
+
+  test("rejects runtime-level shutdown approval from unrelated members", async () => {
+    // given
+    const fixture = await createFixture()
+    temporaryDirectories.push(fixture.baseDir)
+    await requestShutdownOfMember(fixture.teamRunId, "member-a", { memberName: "lead", role: "lead" }, fixture.config)
+
+    // when
+    const result = approveShutdown(
+      fixture.teamRunId,
+      "member-a",
+      { memberName: "member-b", role: "member" },
+      fixture.config,
+    )
+
+    // then
+    await expect(result).rejects.toThrow("caller must be target member or team lead")
   })
 
   test("deletes team runtime resources after all non-lead members are approved", async () => {
@@ -391,8 +426,8 @@ describe("team-runtime shutdown", () => {
     // then
     expect(cancelTaskMock).toHaveBeenCalledTimes(2)
     expect(runtimeStatusesDuringCancellation).toEqual([
-      { teamStatus: "active", memberStatuses: ["running", "idle"] },
-      { teamStatus: "active", memberStatuses: ["running", "idle"] },
+      { teamStatus: "deleting", memberStatuses: ["completed", "completed"] },
+      { teamStatus: "deleting", memberStatuses: ["completed", "completed"] },
     ])
   })
 
@@ -425,5 +460,44 @@ describe("team-runtime shutdown", () => {
         expect(error.message).toBe("team is deleting")
       },
     )
+  })
+
+  test("serializes mailbox writes behind force delete so late sends cannot race cleanup", async () => {
+    // given
+    const fixture = await createFixture()
+    temporaryDirectories.push(fixture.baseDir)
+    await updateMemberStatuses(fixture.teamRunId, fixture.config, {
+      "member-a": "running",
+      "member-b": "idle",
+    })
+
+    let queuedSend: ReturnType<typeof sendMessage> | undefined
+
+    const bgMgr = {
+      getTasksByParentSession: () => [
+        { id: "team-task-a", sessionId: "session-a", parentMessageId: `team-create:${fixture.teamRunId}:member-a` },
+      ],
+      cancelTask: async () => {
+        queuedSend = sendMessage(
+          createTestMessage(),
+          fixture.teamRunId,
+          fixture.config,
+          { isLead: true, activeMembers: ["lead", "member-a", "member-b"] },
+        )
+        void queuedSend.catch(() => undefined)
+
+        await new Promise((resolve) => setTimeout(resolve, 20))
+        const inboxEntries = await readdir(getInboxDir(resolveBaseDir(fixture.config), fixture.teamRunId, "member-a"))
+          .catch(() => [])
+        expect(inboxEntries.filter((entry) => entry.endsWith(".json"))).toEqual([])
+        return true
+      },
+    }
+
+    // when
+    await deleteTeam(fixture.teamRunId, fixture.config, undefined, bgMgr as never, { force: true })
+
+    // then
+    await expect(queuedSend).rejects.toThrow()
   })
 })
