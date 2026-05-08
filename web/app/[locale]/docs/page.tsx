@@ -1,16 +1,14 @@
 import { getTranslations } from "next-intl/server"
-import { MDXRemote } from "next-mdx-remote/rsc"
 import { DocsShell } from "@/components/docs/docs-shell"
-import { mdxComponents } from "@/components/docs/mdx-components"
 import { DOC_SECTIONS } from "@/lib/docs-sections"
 import { loadDocSource } from "@/lib/docs-source"
 
 export default async function DocsPage() {
   const t = await getTranslations("docs")
 
-  const sectionsWithSource = DOC_SECTIONS.map((section) => ({
+  const sectionsWithHtml = DOC_SECTIONS.map((section) => ({
     ...section,
-    source: loadDocSource(section.file),
+    html: loadDocSource(section.file),
   }))
 
   return (
@@ -19,9 +17,9 @@ export default async function DocsPage() {
       searchPlaceholder={t("searchPlaceholder")}
       sections={DOC_SECTIONS.map((s) => ({ id: s.id, title: s.title }))}
     >
-      {sectionsWithSource.map((section) => (
+      {sectionsWithHtml.map((section) => (
         <section key={section.id} id={section.id} className="scroll-mt-24">
-          <MDXRemote source={section.source} components={mdxComponents} />
+          <article className="docs-content" dangerouslySetInnerHTML={{ __html: section.html }} />
         </section>
       ))}
     </DocsShell>

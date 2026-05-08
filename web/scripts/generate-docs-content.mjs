@@ -1,5 +1,6 @@
 import { readFile, writeFile } from "node:fs/promises"
 import path from "node:path"
+import { Marked } from "marked"
 
 const SECTIONS = [
   { file: "guide/overview.md" },
@@ -16,9 +17,12 @@ const SECTIONS = [
 const DOCS_ROOT = path.resolve(process.cwd(), "..", "docs")
 const OUTPUT = path.resolve(process.cwd(), "lib", "docs-content.generated.ts")
 
+const marked = new Marked({ gfm: true, breaks: false })
+
 const sources = {}
 for (const s of SECTIONS) {
-  sources[s.file] = await readFile(path.join(DOCS_ROOT, s.file), "utf8")
+  const md = await readFile(path.join(DOCS_ROOT, s.file), "utf8")
+  sources[s.file] = await marked.parse(md)
 }
 
 const out =
@@ -28,4 +32,4 @@ const out =
   "\n"
 
 await writeFile(OUTPUT, out)
-console.log("Generated " + OUTPUT + " with " + SECTIONS.length + " docs sources")
+console.log("Generated " + OUTPUT + " with " + SECTIONS.length + " HTML-compiled docs")

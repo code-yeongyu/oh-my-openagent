@@ -232,3 +232,63 @@
     text-shadow: 0 0 8px rgba(0, 212, 255, 0.3);
   }
 }
+
+@layer components {
+  .docs-content h1 {
+    @apply mt-8 mb-4 scroll-mt-24 text-4xl font-bold tracking-tight first:mt-0;
+  }
+  .docs-content h2 {
+    @apply mt-12 mb-4 scroll-mt-24 text-2xl font-semibold tracking-tight;
+  }
+  .docs-content h3 {
+    @apply mt-8 mb-3 scroll-mt-24 text-xl font-semibold tracking-tight;
+  }
+  .docs-content h4 {
+    @apply mt-6 mb-2 scroll-mt-24 text-lg font-semibold tracking-tight;
+  }
+  .docs-content p {
+    @apply text-muted-foreground my-4 leading-7;
+  }
+  .docs-content a {
+    @apply text-primary font-medium underline underline-offset-4;
+  }
+  .docs-content ul {
+    @apply text-muted-foreground my-4 ml-6 list-disc space-y-1;
+  }
+  .docs-content ol {
+    @apply text-muted-foreground my-4 ml-6 list-decimal space-y-1;
+  }
+  .docs-content li {
+    @apply leading-7;
+  }
+  .docs-content blockquote {
+    @apply border-primary/40 my-6 border-l-4 pl-4 italic;
+  }
+  .docs-content code:not(pre code) {
+    @apply bg-muted text-foreground rounded px-1.5 py-0.5 font-mono text-sm;
+  }
+  .docs-content pre {
+    @apply border-border/50 my-4 overflow-x-auto rounded-lg border bg-[#1e1e2e] p-4 font-mono text-sm text-[#cdd6f4] shadow-sm;
+  }
+  .docs-content pre code {
+    @apply bg-transparent p-0 text-inherit;
+  }
+  .docs-content table {
+    @apply border-border my-6 w-full border-collapse border text-sm;
+  }
+  .docs-content thead {
+    @apply bg-muted;
+  }
+  .docs-content th {
+    @apply border-border border px-3 py-2 text-left font-semibold;
+  }
+  .docs-content td {
+    @apply border-border text-muted-foreground border px-3 py-2;
+  }
+  .docs-content hr {
+    @apply border-border my-8;
+  }
+  .docs-content strong {
+    @apply text-foreground font-semibold;
+  }
+}
