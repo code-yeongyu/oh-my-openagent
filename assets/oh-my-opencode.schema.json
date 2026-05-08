@@ -14,6 +14,14 @@
     "default_run_agent": {
       "type": "string"
     },
+    "agent_order": {
+      "maxItems": 64,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 128
+      }
+    },
     "agent_definitions": {
       "type": "array",
       "items": {

@@ -1,6 +1,6 @@
 # src/features/claude-tasks/ — Task Schema + Storage
 
-**Generated:** 2026-04-11
+**Generated:** 2026-05-08
 
 ## OVERVIEW
 

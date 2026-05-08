@@ -1,8 +1,8 @@
 /// <reference types="bun-types" />
 
-import { beforeAll, describe, expect, test } from "bun:test"
+import { afterEach, beforeAll, describe, expect, test } from "bun:test"
 
-import { installAgentSortShim } from "./agent-sort-shim"
+import { installAgentSortShim, setAgentSortOrder } from "./agent-sort-shim"
 import { AGENT_DISPLAY_NAMES } from "./agent-display-names"
 
 type AgentListItem = {
@@ -10,15 +10,26 @@ type AgentListItem = {
   default_agent?: boolean
 }
 
+declare global {
+  interface Array<T> {
+    toSorted(compareFn?: (a: T, b: T) => number): T[]
+  }
+}
+
 describe("agent-sort-shim", () => {
   beforeAll(() => {
     installAgentSortShim()
+  })
+
+  afterEach(() => {
+    setAgentSortOrder(undefined)
   })
 
   describe("#given an array of all 4 core agent objects in random order", () => {
     describe("#when toSorted with alphabetical compareFn", () => {
       test("#then returns canonical sisyphus->hephaestus->prometheus->atlas order", () => {
         // given
+        setAgentSortOrder(undefined)
         const sisyphus = { name: "Sisyphus - Ultraworker" }
         const hephaestus = { name: "Hephaestus - Deep Agent" }
         const prometheus = { name: "Prometheus - Plan Builder" }
@@ -30,6 +41,22 @@ describe("agent-sort-shim", () => {
 
         // then
         expect(result).toEqual([sisyphus, hephaestus, prometheus, atlas])
+      })
+
+      test("#then follows configured core agent order", () => {
+        // given
+        setAgentSortOrder(["hephaestus", "sisyphus", "prometheus", "atlas"])
+        const sisyphus = { name: "Sisyphus - Ultraworker" }
+        const hephaestus = { name: "Hephaestus - Deep Agent" }
+        const prometheus = { name: "Prometheus - Plan Builder" }
+        const atlas = { name: "Atlas - Plan Executor" }
+        const input = [atlas, prometheus, hephaestus, sisyphus]
+
+        // when
+        const result = input.toSorted((a, b) => a.name.localeCompare(b.name))
+
+        // then
+        expect(result).toEqual([hephaestus, sisyphus, prometheus, atlas])
       })
     })
   })

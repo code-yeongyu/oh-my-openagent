@@ -1,6 +1,6 @@
 # src/features/claude-code-mcp-loader/ — Tier 2 MCP Loader (.mcp.json)
 
-**Generated:** 2026-04-18
+**Generated:** 2026-05-08
 
 ## OVERVIEW
 

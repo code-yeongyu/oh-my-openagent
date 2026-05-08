@@ -1,6 +1,6 @@
 # src/features/tmux-subagent/ — Tmux Pane Management
 
-**Generated:** 2026-04-11
+**Generated:** 2026-05-08
 
 ## OVERVIEW
 

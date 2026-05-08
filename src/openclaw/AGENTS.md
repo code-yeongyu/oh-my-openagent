@@ -1,6 +1,6 @@
 # src/openclaw/ — Bidirectional External Integration
 
-**Generated:** 2026-04-18
+**Generated:** 2026-05-08
 
 ## OVERVIEW
 

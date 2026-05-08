@@ -33,5 +33,9 @@ export function buildAgent(
     }
   }
 
+  if (isFactory(source) && (base as AgentConfig & { mode?: string }).mode === undefined) {
+    ;(base as AgentConfig & { mode?: string }).mode = source.mode
+  }
+
   return base
 }

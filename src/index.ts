@@ -14,7 +14,7 @@ import { loadPluginConfig } from "./plugin-config"
 import { createModelCacheState } from "./plugin-state"
 import { createFirstMessageVariantGate } from "./shared/first-message-variant"
 import { injectServerAuthIntoClient, log, logLegacyPluginStartupWarning } from "./shared"
-import { installAgentSortShim } from "./shared/agent-sort-shim"
+import { installAgentSortShim, setAgentSortOrder } from "./shared/agent-sort-shim"
 import { detectExternalSkillPlugin, getSkillPluginConflictWarning } from "./shared/external-plugin-detector"
 import { startBackgroundCheck as startTmuxCheck } from "./tools/interactive-bash"
 
@@ -34,6 +34,7 @@ const serverPlugin: Plugin = async (input, _options): Promise<Hooks> => {
   injectServerAuthIntoClient(input.client)
 
   const pluginConfig = loadPluginConfig(input.directory, input)
+  setAgentSortOrder(pluginConfig.agent_order)
 
   if (pluginConfig.openclaw) {
     await initializeOpenClaw(pluginConfig.openclaw)

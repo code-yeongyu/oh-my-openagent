@@ -14,7 +14,7 @@ OFF by default. Enable via JSONC config.
 
 ## Enable
 
-Add to `~/.config/opencode/oh-my-opencode.jsonc` (or project `.opencode/oh-my-opencode.jsonc`):
+Add to user config `~/.config/opencode/oh-my-openagent.jsonc` or project config `.opencode/oh-my-openagent.jsonc`:
 
 ```jsonc
 {
@@ -29,9 +29,25 @@ Add to `~/.config/opencode/oh-my-opencode.jsonc` (or project `.opencode/oh-my-op
 
 After enabling, restart opencode. The 12 `team_*` tools become available.
 
+## Config schema (11 fields)
+
+All fields live under `team_mode`:
+
+- `enabled` (boolean, default `false`)
+- `tmux_visualization` (boolean, default `false`)
+- `max_parallel_members` (int, `1..8`, default `4`)
+- `max_members` (int, `1..8`, default `8`)
+- `max_messages_per_run` (int, `>=1`, default `10000`)
+- `max_wall_clock_minutes` (int, `>=1`, default `120`)
+- `max_member_turns` (int, `>=1`, default `500`)
+- `base_dir` (optional string; default resolves to `~/.omo`)
+- `message_payload_max_bytes` (int, `>=1024`, default `32768`)
+- `recipient_unread_max_bytes` (int, `>=1024`, default `262144`)
+- `mailbox_poll_interval_ms` (int, `>=500`, default `3000`)
+
 ## Define a team
 
-Teams live as directories under `~/.omo/teams/{name}/config.json`:
+Team specs live under `~/.omo/teams/{name}/config.json` (user scope) or `<project>/.omo/teams/{name}/config.json` (project scope):
 
 ```json
 {
@@ -45,7 +61,7 @@ Teams live as directories under `~/.omo/teams/{name}/config.json`:
 }
 ```
 
-Project-scoped variant: `<project>/.omo/teams/{name}/config.json` (project beats user on collisions).
+When both scopes define the same team name, project scope wins.
 
 `version`, `createdAt`, and `leadAgentId` are optional in config files. The loader fills them automatically. You can either write a top-level `lead: {...}` shorthand, mark one member with `isLead: true`, or omit both when the team has exactly one member.
 
@@ -56,7 +72,11 @@ Project-scoped variant: `<project>/.omo/teams/{name}/config.json` (project beats
 
 ## Eligible agents
 
-Only **sisyphus, atlas, sisyphus-junior, hephaestus** can be members. Read-only and orchestration-only agents (`oracle`, `librarian`, `explore`, `multimodal-looker`, `metis`, `momus`, `prometheus`) are rejected at parse time. Use `delegate-task` for those.
+- **Eligible:** `sisyphus`, `atlas`, `sisyphus-junior`.
+- **Conditional:** `hephaestus` (needs teammate permission `teammate: "allow"`; otherwise use `subagent_type: "sisyphus"`).
+- **Hard-reject:** `oracle`, `librarian`, `explore`, `multimodal-looker`, `metis`, `momus`, `prometheus`.
+
+Hard-reject agents fail TeamSpec parsing because they cannot write mailbox state. Use `delegate-task` for those agents.
 
 ## Lifecycle
 

@@ -21,7 +21,7 @@ Core-agent tab cycling is deterministic via injected runtime order field. The fi
 | Agent          | Model             | Purpose                                                                                                                                            |
 | -------------- | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Prometheus** | `claude-opus-4-7` | Strategic planner with interview mode. Creates detailed work plans through iterative questioning. Fallback: `openai\|github-copilot\|opencode/gpt-5.5 (high)` → `opencode-go/glm-5.1` → `google\|github-copilot\|opencode/gemini-3.1-pro`. |
-| **Metis**      | `claude-opus-4-7` | Plan consultant — pre-planning analysis. Identifies hidden intentions, ambiguities, and AI failure points. Fallback: `openai\|github-copilot\|opencode/gpt-5.5 (high)` → `opencode-go/glm-5.1` → `kimi-for-coding/k2p5`. |
+| **Metis**      | `claude-sonnet-4-6` | Plan consultant — pre-planning analysis. Identifies hidden intentions, ambiguities, and AI failure points. Fallback: `anthropic\|github-copilot\|opencode/claude-opus-4-7 (max)` → `openai\|github-copilot\|opencode/gpt-5.5 (high)` → `opencode-go/glm-5.1` → `kimi-for-coding/k2p5`. |
 | **Momus**      | `gpt-5.5`         | Plan reviewer — validates plans against clarity, verifiability, and completeness standards. Fallback: `anthropic\|github-copilot\|opencode/claude-opus-4-7 (max)` → `google\|github-copilot\|opencode/gemini-3.1-pro (high)` → `opencode-go/glm-5.1`. |
 
 ### Orchestration Agents
@@ -90,7 +90,7 @@ When running inside tmux:
 - Watch multiple agents work in real-time
 - Each pane shows agent output live
 - Auto-cleanup when agents complete
-- **Stable agent ordering**: core-agent tab cycling is deterministic via injected runtime order field (Sisyphus: 1, Hephaestus: 2, Prometheus: 3, Atlas: 4)
+- **Stable agent ordering**: core-agent tab cycling defaults to Sisyphus, Hephaestus, Prometheus, Atlas, and can be customized with `agent_order`
 
 Customize agent models, prompts, and permissions in `oh-my-opencode.jsonc`.
 
@@ -99,6 +99,17 @@ Customize agent models, prompts, and permissions in `oh-my-opencode.jsonc`.
 Parallel multi-agent coordination modeled after Claude Code's experimental Agent Teams. Enable via `team_mode.enabled: true`. Exposes 12 `team_*` tools for spawning a lead + up to 8 members, a shared deferred-ack mailbox, a shared task list with file-locked claims, optional per-member git worktrees, and an optional tmux layout that streams each member's session output into dedicated panes.
 
 See the **[Team Mode Guide](../guide/team-mode.md)** for configuration, team spec format, lifecycle, bounds, and storage layout.
+
+### Architecture Snapshot (current)
+
+- **Feature modules**: `src/features/` has 20 modules.
+- **Tool system**: `src/tools/` has 16 tool directories that produce **20 to 39 tools** depending on config gates.
+- **Hook system**: 5-tier composition is **52 base hooks**. With team mode it becomes **59** (extra tool guard + transforms + direct team session event handlers).
+- **MCP system**: 3 tiers: built-in remote MCPs (`websearch`, `context7`, `grep_app`), `.mcp.json` loader, and skill-embedded MCP from `SKILL.md` frontmatter.
+- **Managers**: plugin startup creates 4 managers: TmuxSessionManager, BackgroundManager, SkillMcpManager, ConfigHandler.
+- **Config pipeline**: 6 phases in order: provider, plugin-components, agents, tools, MCPs, commands.
+- **Canonical core agent order**: Sisyphus, Hephaestus, Prometheus, Atlas.
+- **OpenClaw**: bidirectional integrations for Discord, Telegram, HTTP, and shell with reply listener daemon.
 
 ## Category System
 
@@ -221,6 +232,11 @@ Configure per-agent fallback chains with arrays that can mix plain model strings
 ```
 
 When a model errors, the runtime can move through the configured fallback array. Object entries let you tune the backup model itself instead of only swapping the model name.
+
+The plugin uses two independent fallback systems:
+
+- **model-fallback**: proactive model chain selection in chat params.
+- **runtime-fallback**: reactive recovery after runtime failures from provider/API behavior.
 
 ### File-Based Prompts
 
@@ -394,6 +410,8 @@ This content will be injected into the agent's system prompt.
 
 Same-named skill at higher priority overrides lower.
 
+Loaded skill display priority follows this order: `project > user > opencode > builtin/plugin`.
+
 Disable built-in skills via `disabled_skills: ["playwright"]` in config.
 
 ### Category + Skill Combo Strategies
@@ -561,6 +579,8 @@ Load custom commands from:
 
 ## Tools
 
+Tool registration is config-gated. `src/tools/` has 16 directories, and exposed tools range from **20 minimum to 39 maximum**.
+
 ### Code Search Tools
 
 | Tool     | Description                                                       |
@@ -572,7 +592,9 @@ Load custom commands from:
 
 | Tool     | Description                                                                                                                                                |
 | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **edit** | Hash-anchored edit tool. Uses `LINE#ID` format for precise, safe modifications. Validates content hashes before applying changes — zero stale-line errors. |
+| **edit** | Hash-anchored edit tool. Uses `LINE#ID` format for precise, safe modifications. Validates content hashes before applying changes and rejects stale hash edits. |
+
+Hashline IDs use characters from `ZPMQVRWSNKTXJBYH`.
 
 ### LSP Tools (IDE Features for Agents)
 
@@ -725,6 +747,16 @@ interactive_bash(tmux_command="capture-pane -p -t dev-app")
 
 Hooks intercept and modify behavior at key points in the agent lifecycle across the full session, message, tool, and parameter pipeline.
 
+Current composition counts:
+
+- Session: 24
+- Tool Guard: 14
+- Transform: 5
+- Continuation: 7
+- Skill: 2
+- Total base: 52
+- With `team_mode.enabled`: +1 Tool Guard, +2 Transform, +4 direct team session event handlers in `src/plugin/event.ts` = 59
+
 ### Hook Events
 
 | Event           | When                          | Can                                                |
@@ -753,7 +785,7 @@ Hooks intercept and modify behavior at key points in the agent lifecycle across 
 
 | Hook                        | Event               | Description                                                                                                                                                 |
 | --------------------------- | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **keyword-detector**        | Message + Transform | Detects keywords and activates modes: `ultrawork`/`ulw` (max performance), `search`/`find` (parallel exploration), `analyze`/`investigate` (deep analysis). |
+| **keyword-detector**        | Message + Transform | IntentGate detector. Activates `ultrawork`/`ulw`, `search`, `analyze`, and `team` modes from message keywords. |
 | **think-mode**              | Params              | Auto-detects extended thinking needs. Catches "think deeply", "ultrathink" and adjusts model settings.                                                      |
 | **ralph-loop**              | Event + Message     | Manages self-referential loop continuation.                                                                                                                 |
 | **start-work**              | Message             | Handles /start-work command execution.                                                                                                                      |
@@ -766,7 +798,7 @@ Hooks intercept and modify behavior at key points in the agent lifecycle across 
 
 | Hook                            | Event                    | Description                                                                               |
 | ------------------------------- | ------------------------ | ----------------------------------------------------------------------------------------- |
-| **comment-checker**             | PostToolUse              | Reminds agents to reduce excessive comments. Smartly ignores BDD, directives, docstrings. |
+| **comment-checker**             | PostToolUse              | Runs `@code-yeongyu/comment-checker` to block AI-slop comment patterns. Bypass options: `// @allow` for a line, `// comment-checker-disable-file` at file top. |
 | **thinking-block-validator**    | Transform                | Validates thinking blocks to prevent API errors.                                          |
 | **edit-error-recovery**         | PostToolUse + Event      | Recovers from edit tool failures.                                                         |
 | **write-existing-file-guard**   | PreToolUse               | Prevents accidental overwrites of existing files without reading them first.              |
@@ -869,6 +901,12 @@ Disable specific hooks in config:
 
 ## MCPs
 
+The plugin uses a three-tier MCP architecture:
+
+1. Built-in remote MCPs from `src/mcp/`
+2. Claude Code `.mcp.json` loader with `${VAR}` expansion
+3. Skill-embedded MCP servers declared in `SKILL.md` frontmatter
+
 ### Built-in MCPs
 
 | MCP           | Description                                                                                   |
@@ -892,6 +930,8 @@ mcp:
 ```
 
 The `skill_mcp` tool invokes these operations with full schema discovery.
+
+Skill MCP clients are isolated per session by key `${sessionID}:${skillName}:${serverName}`.
 
 #### OAuth-Enabled MCPs
 

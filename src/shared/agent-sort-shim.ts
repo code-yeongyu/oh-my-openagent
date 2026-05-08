@@ -3,10 +3,9 @@
  *
  * OpenCode 1.4.x ignores the agent `order` field (sst/opencode#19127) and
  * sorts the agent list by `agent.name` via Remeda `sortBy(x => x.name, "asc")`
- * at packages/opencode/src/agent/agent.ts. Without intervention, the four
- * core agents collapse into Atlas -> Hephaestus -> Prometheus -> Sisyphus,
- * which inverts the canonical sisyphus -> hephaestus -> prometheus -> atlas
- * order this project ships.
+ * at packages/opencode/src/agent/agent.ts. Without intervention, core agents
+ * collapse into name order, which can invert the default sisyphus -> hephaestus
+ * -> prometheus -> atlas order or a user's configured `agent_order`.
  *
  * Earlier attempts to bias the sort key with invisible characters (ZWSP,
  * U+2060 WORD JOINER, U+00AD SOFT HYPHEN, ANSI escape) caused visible-gap
@@ -17,22 +16,21 @@
  *   1. `isAgentArray` rejects any array element that is null, non-object, or
  *      lacks a string `name`, eliminating the throw-on-mixed-array failure
  *      mode that closed the original PR.
- *   2. The activation predicate requires >= 2 elements whose `.name` is one
- *      of the four canonical core display names, so unrelated `.sort()` and
- *      `.toSorted()` calls (string arrays, number arrays, generic objects)
- *      execute native behavior unchanged.
+ *   2. The activation predicate requires >= 2 elements whose `.name` is ranked
+ *      by the active agent order, so unrelated `.sort()` and `.toSorted()` calls
+ *      (string arrays, number arrays, generic objects) execute native behavior
+ *      unchanged.
  *
  * Remove this shim once OpenCode honors the agent `order` field
  * (sst/opencode#19127).
  */
 
-import { CANONICAL_CORE_AGENT_ORDER } from "../plugin-handlers/agent-priority-order"
-import { AGENT_DISPLAY_NAMES } from "./agent-display-names"
+import { DEFAULT_AGENT_ORDER, resolveAgentOrderDisplayNames } from "./agent-ordering"
+import { getAgentListDisplayName } from "./agent-display-names"
 
-const AGENT_RANK: ReadonlyMap<string, number> = new Map(
-  CANONICAL_CORE_AGENT_ORDER.map(
-    (configKey, index): [string, number] => [AGENT_DISPLAY_NAMES[configKey], index + 1],
-  ),
+let agentRank: ReadonlyMap<string, number> = createAgentRank(undefined)
+const AGENT_ARRAY_SENTINELS = new Set(
+  DEFAULT_AGENT_ORDER.map((configKey) => getAgentListDisplayName(configKey)),
 )
 
 const UNRANKED = Number.MAX_SAFE_INTEGER
@@ -51,7 +49,7 @@ function isAgentArray(arr: ReadonlyArray<unknown>): boolean {
     if (element === null || typeof element !== "object") return false
     const name = (element as { name?: unknown }).name
     if (typeof name !== "string") return false
-    if (AGENT_RANK.has(name)) rankedCount++
+    if (AGENT_ARRAY_SENTINELS.has(name)) rankedCount++
   }
 
   return rankedCount >= 2
@@ -62,8 +60,8 @@ function agentComparator(
   b: unknown,
   fallback: ((a: unknown, b: unknown) => number) | undefined,
 ): number {
-  const aRank = AGENT_RANK.get(extractAgentName(a)) ?? UNRANKED
-  const bRank = AGENT_RANK.get(extractAgentName(b)) ?? UNRANKED
+  const aRank = agentRank.get(extractAgentName(a)) ?? UNRANKED
+  const bRank = agentRank.get(extractAgentName(b)) ?? UNRANKED
 
   if (aRank !== bRank) return aRank - bRank
   if (fallback) return fallback(a, b)
@@ -71,6 +69,18 @@ function agentComparator(
 }
 
 let installed = false
+
+function createAgentRank(agentOrder: readonly string[] | undefined): ReadonlyMap<string, number> {
+  return new Map(
+    resolveAgentOrderDisplayNames(agentOrder).map(
+      (displayName, index): [string, number] => [displayName, index + 1],
+    ),
+  )
+}
+
+export function setAgentSortOrder(agentOrder: readonly string[] | undefined): void {
+  agentRank = createAgentRank(agentOrder)
+}
 
 export function installAgentSortShim(): void {
   if (installed) return

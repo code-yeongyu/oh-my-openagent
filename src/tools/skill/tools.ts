@@ -52,6 +52,8 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
   }
 
   const getCommands = (): CommandInfo[] => {
+    if (options.commands) return [...options.commands]
+
     return commandDiscovery.discoverCommandsSync(undefined, {
       pluginsEnabled: options.pluginsEnabled,
       enabledPluginsOverride: options.enabledPluginsOverride,

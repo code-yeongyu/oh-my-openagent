@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto"
 import { readFileSync } from "node:fs"
 import { open, readFile, rename, rm, unlink, writeFile } from "node:fs/promises"
 
+import { tolerantFsync } from "../../../shared/tolerant-fsync"
+
 type LockOptions = {
   staleAfterMs?: number
   ownerTag?: string
@@ -87,7 +89,7 @@ async function acquireLock(lockPath: string, ownerTag: string, staleAfterMs: num
       const fileHandle = await open(lockPath, "wx")
       try {
         await fileHandle.writeFile(buildOwnerContent(ownerTag))
-        await fileHandle.sync()
+        await tolerantFsync(fileHandle, `acquireLock:${lockPath}`)
       } finally {
         await fileHandle.close()
       }
@@ -162,7 +164,7 @@ export async function atomicWrite(
     await writeFile(tmpPath, content)
     const fileHandle = await open(tmpPath, "r")
     try {
-      await fileHandle.sync()
+      await tolerantFsync(fileHandle, `atomicWrite:${filePath}`)
     } finally {
       await fileHandle.close()
     }
