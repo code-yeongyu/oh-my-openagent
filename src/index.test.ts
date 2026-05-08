@@ -37,6 +37,8 @@ const mockCreateHooks = mock(() => ({
 const mockCreatePluginInterface = mock(() => ({}))
 const mockInitializeOpenClaw = mock(async () => {})
 const mockStartTmuxCheck = mock(() => {})
+const mockInstallAgentSortShim = mock(() => {})
+const mockSetAgentSortOrder = mock(() => {})
 
 let pluginModule: (typeof import("./index"))["default"]
 
@@ -95,6 +97,11 @@ function installIndexModuleMocks(): void {
     })),
   }))
 
+  mock.module("./shared/agent-sort-shim", () => ({
+    installAgentSortShim: mockInstallAgentSortShim,
+    setAgentSortOrder: mockSetAgentSortOrder,
+  }))
+
   mock.module("./openclaw", () => ({
     initializeOpenClaw: mockInitializeOpenClaw,
   }))
@@ -130,6 +137,8 @@ describe("oh-my-openagent plugin module", () => {
     mockCreatePluginInterface.mockClear()
     mockInitializeOpenClaw.mockClear()
     mockStartTmuxCheck.mockClear()
+    mockInstallAgentSortShim.mockClear()
+    mockSetAgentSortOrder.mockClear()
   })
 
   afterEach(() => {

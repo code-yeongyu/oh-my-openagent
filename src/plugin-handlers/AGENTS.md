@@ -4,11 +4,12 @@
 
 ## CRITICAL: AGENT ORDERING
 
-The canonical agent order is **sisyphus → hephaestus → prometheus → atlas**.
+The default agent order is **sisyphus → hephaestus → prometheus → atlas**. User config may override it with `agent_order`; omitted core agents fall back to this default order.
 
 This order is enforced via two cooperating mechanisms:
-1. `CANONICAL_CORE_AGENT_ORDER` in `agent-priority-order.ts` controls object key insertion order in the agent map produced by `applyAgentConfig`.
-2. `installAgentSortShim()` in `src/shared/agent-sort-shim.ts` narrows `Array.prototype.toSorted` and `Array.prototype.sort` so that whenever the sorted array contains two or more agent objects whose `.name` matches a canonical core display name, OpenCode's `Agent.list()` (and any other sort site) returns the canonical order. The shim is installed once at plugin entry, before any agent registration.
+1. `DEFAULT_AGENT_ORDER` in `src/shared/agent-ordering.ts` supplies the fallback order used when `agent_order` is absent or incomplete.
+2. `reorderAgentsByPriority()` in `agent-priority-order.ts` controls object key insertion order in the agent map produced by `applyAgentConfig`.
+3. `installAgentSortShim()` in `src/shared/agent-sort-shim.ts` narrows `Array.prototype.toSorted` and `Array.prototype.sort` so that whenever the sorted array contains two or more ranked agent objects, OpenCode's `Agent.list()` (and any other sort site) returns the active configured/default order. The shim is installed once at plugin entry, before any agent registration, and its rank map is updated after plugin config loads.
 
 ### Why a Sort Shim
 
@@ -18,7 +19,7 @@ OpenCode 1.4.x sorts agents purely by `agent.name` via Remeda `sortBy`, which us
 - Removing the prefix and relying on insertion order alone falls back to alphabetical Atlas → Hephaestus → Prometheus → Sisyphus.
 
 The sort shim resolves this by intercepting only the narrow case it cares about, with strict activation guards to prevent collateral damage from a global prototype patch:
-- The activation predicate (`isAgentArray`) requires `arr.length >= 2`, every element is a non-null object with a string `.name`, and at least 2 elements have a `.name` matching one of the four canonical core display names. This rejects mixed-type arrays (numbers, strings, plain objects without `.name`) so unrelated `.sort()` / `.toSorted()` calls execute native semantics.
+- The activation predicate (`isAgentArray`) requires `arr.length >= 2`, every element is a non-null object with a string `.name`, and at least 2 elements have a `.name` ranked by the active order. This rejects mixed-type arrays (numbers, strings, plain objects without `.name`) so unrelated `.sort()` / `.toSorted()` calls execute native semantics.
 - The comparator never throws on mixed input — it defensively extracts `.name` and falls back to the user-supplied `compareFn`.
 - `installAgentSortShim()` is idempotent.
 
@@ -34,7 +35,7 @@ Agent ordering has caused 15+ commits, 8+ PRs, and multiple reverts. Notable mil
 DO NOT introduce:
 - ZWSP, U+2060, U+00AD, ANSI escape, or any other invisible / control character in agent names, display names, or object keys.
 - ASCII spaces or other visible sort prefixes on agent names.
-- Alternative ordering constants outside `CANONICAL_CORE_AGENT_ORDER`.
+- Alternative ordering constants outside `DEFAULT_AGENT_ORDER` / `CANONICAL_CORE_AGENT_ORDER`, or ordering code that bypasses `validateAgentOrder`.
 - Object.entries() iteration-order dependencies.
 - Agent name string comparisons that skip `getAgentConfigKey` / `stripInvisibleAgentCharacters` (legacy ZWSP-baked data must keep resolving).
 
