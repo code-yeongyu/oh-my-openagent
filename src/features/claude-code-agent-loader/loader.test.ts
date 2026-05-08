@@ -56,6 +56,7 @@ const NO_FRONTMATTER_AGENT = `Just a prompt with no frontmatter.`;
 describe("claude-code-agent-loader", () => {
   const dirs: string[] = [];
   const originalEnv = {
+    CLAUDE_CONFIG_DIR: process.env.CLAUDE_CONFIG_DIR,
     OPENCODE_CONFIG_DIR: process.env.OPENCODE_CONFIG_DIR,
     XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME,
   }
@@ -65,6 +66,11 @@ describe("claude-code-agent-loader", () => {
       rmSync(dir, { recursive: true, force: true });
     }
     dirs.length = 0;
+    if (originalEnv.CLAUDE_CONFIG_DIR === undefined) {
+      delete process.env.CLAUDE_CONFIG_DIR
+    } else {
+      process.env.CLAUDE_CONFIG_DIR = originalEnv.CLAUDE_CONFIG_DIR
+    }
     if (originalEnv.OPENCODE_CONFIG_DIR === undefined) {
       delete process.env.OPENCODE_CONFIG_DIR
     } else {
