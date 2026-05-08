@@ -8,14 +8,18 @@
 
 ## TIER COMPOSITION
 
-| Tier | Composer | Count | When |
-|------|----------|-------|------|
-| **Session** | `create-session-hooks.ts` | 24 | OpenCode session lifecycle (created/idle/error/status) + chat.params + chat.message |
-| **Tool Guard** | `create-tool-guard-hooks.ts` | 14 | Pre/post tool execution |
-| **Transform** | `create-transform-hooks.ts` | 5 | `experimental.chat.messages.transform` |
-| **Continuation** | `create-continuation-hooks.ts` | 7 | Boulder/atlas/compaction/notification |
-| **Skill** | `create-skill-hooks.ts` | 2 | Skill awareness (categorySkillReminder, autoSlashCommand) |
-| **Team-mode** | conditional in registries | 4 | When `team_mode.enabled`: team-mailbox-injector, team-mode-status-injector, team-session-events, team-tool-gating |
+| Tier | Composer | Base | With team-mode | Where |
+|------|----------|------|----------------|-------|
+| **Session** | `create-session-hooks.ts` | 24 | 24 | OpenCode session lifecycle + chat.params + chat.message |
+| **Tool Guard** | `create-tool-guard-hooks.ts` | 14 | 15 | Pre/post tool execution (+1: `team-tool-gating`) |
+| **Transform** | `create-transform-hooks.ts` | 5 | 7 | `experimental.chat.messages.transform` (+2: `team-mode-status-injector`, `team-mailbox-injector`) |
+| **Continuation** | `create-continuation-hooks.ts` | 7 | 7 | Boulder/atlas/compaction/notification |
+| **Skill** | `create-skill-hooks.ts` | 2 | 2 | Skill awareness (categorySkillReminder, autoSlashCommand) |
+| **Direct event handlers** | `src/plugin/event.ts` | 0 | +4 | `team-session-events/` sub-files: `team-idle-wake-hint`, `team-lead-orphan-handler`, `team-member-error-handler`, `team-member-status-handler` |
+
+Total exposed hooks: **52 base, 59 with team-mode** (counts the 4 team-session-events handlers individually).
+
+Hook name allowlist for `disabled_hooks`: 53 enum values in [`src/config/schema/hooks.ts`](file:///Users/yeongyu/local-workspaces/omo/src/config/schema/hooks.ts) `HookNameSchema`. Team-session-event sub-hooks are not individually listed in the schema — they activate together with `team_mode.enabled`.
 
 ### Tier 1: Session Hooks (24)
 
@@ -94,16 +98,19 @@
 | `categorySkillReminder` | chat.message | Hint to load skills before invoking categories |
 | `autoSlashCommand` | chat.message | Auto-execute matching `/command` from user message |
 
-### Team-mode Hooks (4, conditional)
+### Team-mode Hooks (conditional, only when `team_mode.enabled: true`)
 
-Activated only when `team_mode.enabled: true`:
+| Hook | Tier | Registered In | Purpose |
+|------|------|---------------|---------|
+| `team-mode-status-injector` | Transform | [`create-transform-hooks.ts`](file:///Users/yeongyu/local-workspaces/omo/src/plugin/hooks/create-transform-hooks.ts) | Inject `<team_mode_status>` block into messages |
+| `team-mailbox-injector` | Transform | [`create-transform-hooks.ts`](file:///Users/yeongyu/local-workspaces/omo/src/plugin/hooks/create-transform-hooks.ts) | Pull pending team mailbox messages into agent context |
+| `team-tool-gating` | Tool Guard | [`create-tool-guard-hooks.ts`](file:///Users/yeongyu/local-workspaces/omo/src/plugin/hooks/create-tool-guard-hooks.ts) | Restrict `team_*` tools based on member role + permissions |
+| `team-idle-wake-hint` | event handler | [`src/plugin/event.ts`](file:///Users/yeongyu/local-workspaces/omo/src/plugin/event.ts) | Nudge idle team members back to work |
+| `team-lead-orphan-handler` | event handler | [`src/plugin/event.ts`](file:///Users/yeongyu/local-workspaces/omo/src/plugin/event.ts) | Detect lead departure → orphan members |
+| `team-member-error-handler` | event handler | [`src/plugin/event.ts`](file:///Users/yeongyu/local-workspaces/omo/src/plugin/event.ts) | React to member session errors |
+| `team-member-status-handler` | event handler | [`src/plugin/event.ts`](file:///Users/yeongyu/local-workspaces/omo/src/plugin/event.ts) | Track member status transitions |
 
-| Hook | Tier | Purpose |
-|------|------|---------|
-| `team-mode-status-injector` | Transform | Inject `<team_mode_status>` block into messages |
-| `team-mailbox-injector` | Transform | Pull pending team mailbox messages into agent context |
-| `team-session-events` | Continuation | React to member session lifecycle (created/idle/deleted) |
-| `team-tool-gating` | Tool Guard | Restrict `team_*` tools based on member role + permissions |
+The 4 `team-session-events/` handlers live in `src/hooks/team-session-events/` (separate files: `team-idle-wake-hint.ts`, `team-lead-orphan-handler.ts`, `team-member-error-handler.ts`, `team-member-status-handler.ts`) and are wired into `src/plugin/event.ts` directly, not through a tier composer.
 
 ## STRUCTURE
 

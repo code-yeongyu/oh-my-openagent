@@ -126,6 +126,10 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     fallbackChain: [
       {
         providers: ["anthropic", "github-copilot", "opencode", "vercel"],
+        model: "claude-sonnet-4-6",
+      },
+      {
+        providers: ["anthropic", "github-copilot", "opencode", "vercel"],
         model: "claude-opus-4-7",
         variant: "max",
       },

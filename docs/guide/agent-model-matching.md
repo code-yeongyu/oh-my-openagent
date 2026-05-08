@@ -205,7 +205,7 @@ These agents have Claude-optimized prompts — long, detailed, mechanics-driven.
 | Agent | Role | Fallback Chain |
 |---|---|---|
 | **Sisyphus** | Main orchestrator | `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7` (max) → `opencode-go\|vercel/kimi-k2.6` → `kimi-for-coding/k2p5` → `opencode\|moonshotai\|moonshotai-cn\|firmware\|ollama-cloud\|aihubmix\|vercel/kimi-k2.5` → `openai\|github-copilot\|opencode\|vercel/gpt-5.5` (medium) → `zai-coding-plan\|opencode\|vercel/glm-5` → `opencode/big-pickle` |
-| **Metis** | Plan gap analyzer | `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7` (max) → `openai\|github-copilot\|opencode\|vercel/gpt-5.5` (high) → `opencode-go\|vercel/glm-5.1` → `kimi-for-coding/k2p5` |
+| **Metis** | Plan gap analyzer | `anthropic\|github-copilot\|opencode\|vercel/claude-sonnet-4-6` → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7` (max) → `openai\|github-copilot\|opencode\|vercel/gpt-5.5` (high) → `opencode-go\|vercel/glm-5.1` → `kimi-for-coding/k2p5` |
 
 ### Dual-Prompt Agents → Claude preferred, GPT supported
 

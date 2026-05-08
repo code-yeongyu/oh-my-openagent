@@ -48,20 +48,20 @@ Tools registered via [`createToolRegistry()`](file:///Users/yeongyu/local-worksp
 
 ## DELEGATION CATEGORIES (built-in 8)
 
-`task` (delegate) selects model by category; categories defined in `delegate-task/constants.ts`:
+`task` (delegate) selects model by category. Default category models live in provider-specific files under `src/tools/delegate-task/` and aggregate via `BUILTIN_CATEGORIES` in `builtin-categories.ts`. Authoritative fallback chains in [`src/shared/model-requirements.ts`](file:///Users/yeongyu/local-workspaces/omo/src/shared/model-requirements.ts) `CATEGORY_MODEL_REQUIREMENTS`.
 
-| Category | Default Model | Domain |
-|----------|---------------|--------|
-| `visual-engineering` | gemini-3.1-pro high | Frontend, UI/UX |
-| `ultrabrain` | gpt-5.5 xhigh | Hard logic / heavy reasoning |
-| `deep` | gpt-5.5 medium | Autonomous multi-step problem-solving |
-| `artistry` | gemini-3.1-pro high | Creative / unconventional approaches |
-| `quick` | gpt-5.4-mini-fast | Trivial single-file changes |
-| `unspecified-low` | claude-sonnet-4-6 | Moderate effort fallback |
-| `unspecified-high` | claude-opus-4-7 max | High effort fallback |
-| `writing` | gemini-3-flash | Documentation, prose |
+| Category | Default Model | Source File | Domain |
+|----------|---------------|-------------|--------|
+| `visual-engineering` | google/gemini-3.1-pro (variant: high) | google-categories.ts | Frontend, UI/UX |
+| `ultrabrain` | openai/gpt-5.5 (variant: xhigh) | openai-categories.ts | Hard logic / heavy reasoning |
+| `deep` | openai/gpt-5.5 (variant: medium) | openai-categories.ts | Autonomous multi-step problem-solving |
+| `artistry` | google/gemini-3.1-pro (variant: high) | google-categories.ts | Creative / unconventional approaches |
+| `quick` | openai/gpt-5.4-mini | openai-categories.ts | Trivial single-file changes |
+| `unspecified-low` | anthropic/claude-sonnet-4-6 | anthropic-categories.ts | Moderate effort fallback |
+| `unspecified-high` | anthropic/claude-opus-4-7 (variant: max) | anthropic-categories.ts | High effort fallback |
+| `writing` | kimi-for-coding/k2p5 (default) → gemini-3-flash (first fallback) | kimi-categories.ts | Documentation, prose |
 
-User-defined categories declared in `categories: { ... }` config override and add to this set.
+User-defined categories declared in `categories: { ... }` config override and extend this set.
 
 ## TOOL DIR LAYOUT
 

@@ -28,8 +28,8 @@ serverPlugin(input, options)
   3. detectExternalSkillPlugin()   # warn if conflicting plugin loaded
   4. injectServerAuthIntoClient()  # wire auth headers into shared SDK client
   5. loadPluginConfig()            # walk project + user JSONC → Zod safeParse → migrate
-  6. initializeOpenClaw()          # if openclaw config present (start reply-listener daemon)
-  6. checkTeamModeDependencies()   # if team_mode.enabled (verify git, tmux, ensure ~/.omo/teams/)
+  6a. initializeOpenClaw()         # if openclaw config present (start reply-listener daemon)
+  6b. checkTeamModeDependencies()  # if team_mode.enabled (verify git, tmux, ensure ~/.omo/teams/)
   7. createManagers/Tools/Hooks/PluginInterface
 ```
 
@@ -50,31 +50,39 @@ loadPluginConfig(directory, ctx)
 
 ## HOOK COMPOSITION (5-tier)
 
+Counts verified from each composer's return object. Numbers in brackets show counts when `team_mode.enabled`.
+
 ```
 createHooks()
   ├─→ createCoreHooks()
-  │   ├─ createSessionHooks()     # 24: contextWindowMonitor, thinkMode, ralphLoop, modelFallback,
-  │   │                             runtimeFallback, anthropicEffort, anthropicContextWindowLimitRecovery,
-  │   │                             autoUpdateChecker, agentUsageReminder, nonInteractiveEnv,
-  │   │                             interactiveBashSession, editErrorRecovery, delegateTaskRetry,
-  │   │                             startWork, prometheusMdOnly, sisyphusJuniorNotepad,
-  │   │                             questionLabelTruncator, taskResumeInfo, noSisyphusGpt,
-  │   │                             noHephaestusNonGpt, legacyPluginToast, sessionRecovery,
-  │   │                             sessionNotification, preemptiveCompaction
-  │   ├─ createToolGuardHooks()   # 14: commentChecker, toolOutputTruncator, directoryAgentsInjector,
-  │   │                             directoryReadmeInjector, emptyTaskResponseDetector, rulesInjector,
-  │   │                             tasksTodowriteDisabler, writeExistingFileGuard, bashFileReadGuard,
-  │   │                             readImageResizer, todoDescriptionOverride, webfetchRedirectGuard,
-  │   │                             hashlineReadEnhancer, jsonErrorRecovery
-  │   └─ createTransformHooks()   # 5: claudeCodeHooks, keywordDetector, contextInjectorMessagesTransform,
-  │                                  thinkingBlockValidator, toolPairValidator
+  │   ├─ createSessionHooks()     # 24: contextWindowMonitor, preemptiveCompaction, sessionRecovery,
+  │   │                             sessionNotification, thinkMode, modelFallback,
+  │   │                             anthropicContextWindowLimitRecovery, autoUpdateChecker,
+  │   │                             agentUsageReminder, nonInteractiveEnv, interactiveBashSession,
+  │   │                             ralphLoop, editErrorRecovery, delegateTaskRetry, startWork,
+  │   │                             prometheusMdOnly, sisyphusJuniorNotepad, noSisyphusGpt,
+  │   │                             noHephaestusNonGpt, questionLabelTruncator, taskResumeInfo,
+  │   │                             anthropicEffort, runtimeFallback, legacyPluginToast
+  │   ├─ createToolGuardHooks()   # 14 [+1 with team-mode]: commentChecker, toolOutputTruncator,
+  │   │                             directoryAgentsInjector, directoryReadmeInjector,
+  │   │                             emptyTaskResponseDetector, rulesInjector, tasksTodowriteDisabler,
+  │   │                             writeExistingFileGuard, bashFileReadGuard, hashlineReadEnhancer,
+  │   │                             jsonErrorRecovery, readImageResizer, todoDescriptionOverride,
+  │   │                             webfetchRedirectGuard [+ teamToolGating]
+  │   └─ createTransformHooks()   # 5 [+2 with team-mode]: claudeCodeHooks, keywordDetector,
+  │                                  contextInjectorMessagesTransform, thinkingBlockValidator,
+  │                                  toolPairValidator [+ teamModeStatusInjector, teamMailboxInjector]
   ├─→ createContinuationHooks()   # 7: stopContinuationGuard, compactionContextInjector,
   │                                  compactionTodoPreserver, todoContinuationEnforcer (boulder),
   │                                  unstableAgentBabysitter, backgroundNotificationHook, atlasHook
   └─→ createSkillHooks()          # 2: categorySkillReminder, autoSlashCommand
+
+  Direct event handlers (src/plugin/event.ts, when team_mode.enabled): +4
+    team-idle-wake-hint, team-lead-orphan-handler,
+    team-member-error-handler, team-member-status-handler
 ```
 
-Each tier produces an array of `(input, output) => void` handlers; the matching OpenCode handler iterates and calls each in registration order.
+Total: 52 base, 59 with team-mode. Each tier produces an object whose values are `(input, output) => void` handlers; the matching OpenCode handler invokes them in registration order via `safeHook()` wrappers.
 
 ## SUBSYSTEM INVENTORY
 

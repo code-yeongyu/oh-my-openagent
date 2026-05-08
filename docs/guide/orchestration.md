@@ -36,7 +36,7 @@ flowchart TB
     subgraph Planning["Planning Layer (Human + Prometheus)"]
         User[(" User")]
         Prometheus[" Prometheus<br/>(Planner)<br/>claude-opus-4-7 / gpt-5.5 / glm-5"]
-        Metis[" Metis<br/>(Consultant)<br/>claude-opus-4-7 / gpt-5.5 / glm-5"]
+        Metis[" Metis<br/>(Consultant)<br/>claude-sonnet-4-6 / claude-opus-4-7 / gpt-5.5 / glm-5"]
         Momus[" Momus<br/>(Reviewer)<br/>gpt-5.5 / claude-opus-4-7 / gemini-3.1-pro / glm-5"]
     end
 

@@ -335,7 +335,7 @@ Based on your subscriptions, here's how the agents were configured:
 | Agent        | Role             | Default Chain                                   | What It Does                                                                             |
 | ------------ | ---------------- | ----------------------------------------------- | ---------------------------------------------------------------------------------------- |
 | **Sisyphus** | Main ultraworker | anthropic\|github-copilot\|opencode/claude-opus-4-7 (max) → opencode-go/kimi-k2.6 → kimi-for-coding/k2p5 → opencode\|moonshotai\|moonshotai-cn\|firmware\|ollama-cloud\|aihubmix/kimi-k2.5 → openai\|github-copilot\|opencode/gpt-5.5 (medium) → zai-coding-plan\|opencode/glm-5 → opencode/big-pickle | Primary coding agent. Exact runtime chain from `src/shared/model-requirements.ts`. |
-| **Metis**    | Plan review      | anthropic\|github-copilot\|opencode/claude-opus-4-7 (max) → openai\|github-copilot\|opencode/gpt-5.5 (high) → opencode-go/glm-5.1 → kimi-for-coding/k2p5 | Reviews Prometheus plans for gaps. Exact runtime chain from `src/shared/model-requirements.ts`. |
+| **Metis**    | Plan review      | anthropic\|github-copilot\|opencode/claude-sonnet-4-6 → anthropic\|github-copilot\|opencode/claude-opus-4-7 (max) → openai\|github-copilot\|opencode/gpt-5.5 (high) → opencode-go/glm-5.1 → kimi-for-coding/k2p5 | Reviews Prometheus plans for gaps. Exact runtime chain from `src/shared/model-requirements.ts`. |
 
 **Dual-Prompt Agents** (auto-switch between Claude and GPT prompts):
 

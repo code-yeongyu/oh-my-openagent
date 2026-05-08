@@ -10,18 +10,25 @@ User docs: [`docs/guide/team-mode.md`](file:///Users/yeongyu/local-workspaces/om
 
 ## CONFIG
 
+Full schema: [`src/config/schema/team-mode.ts`](file:///Users/yeongyu/local-workspaces/omo/src/config/schema/team-mode.ts).
+
 ```jsonc
 {
   "team_mode": {
-    "enabled": true,
-    "max_parallel_members": 4,    // concurrent active members
-    "max_members": 8,             // hard cap on team size
-    "tmux_visualization": false   // optional tmux pane layout
+    "enabled": false,                       // gate
+    "tmux_visualization": false,            // optional tmux pane layout
+    "max_parallel_members": 4,              // 1..8
+    "max_members": 8,                       // 1..8 hard cap
+    "max_messages_per_run": 10000,          // 1..∞
+    "max_wall_clock_minutes": 120,          // 1..∞
+    "max_member_turns": 500,                // 1..∞
+    "base_dir": null,                       // optional override of ~/.omo/teams or <project>/.omo/teams
+    "message_payload_max_bytes": 32768,     // 1024..∞ — per-message payload cap
+    "recipient_unread_max_bytes": 262144,   // 1024..∞ — per-recipient inbox cap
+    "mailbox_poll_interval_ms": 3000        // 500..∞ — recipient poll cadence
   }
 }
 ```
-
-Schema: [`src/config/schema/team-mode.ts`](file:///Users/yeongyu/local-workspaces/omo/src/config/schema/team-mode.ts).
 
 ## 12 TEAM_* TOOLS
 
@@ -44,14 +51,15 @@ Registered via [`src/plugin/tool-registry.ts`](file:///Users/yeongyu/local-works
 
 ## ELIGIBLE AGENTS
 
-```
-ALLOWED: sisyphus, atlas, sisyphus-junior, hephaestus
-REJECTED at parse: oracle, librarian, explore, multimodal-looker, metis, momus, prometheus
-```
+[`AGENT_ELIGIBILITY_REGISTRY`](file:///Users/yeongyu/local-workspaces/omo/src/features/team-mode/types.ts) in `types.ts` — three verdict tiers, each with its own rejection message:
 
-Read-only and orchestration-only agents are blocked at TeamSpec parse time. For those, the lead delegates via `task` (delegate-task) instead.
+| Verdict | Agents | Notes |
+|---------|--------|-------|
+| `eligible` | sisyphus, atlas, sisyphus-junior | Three only |
+| `conditional` | hephaestus | Lacks `teammate: "allow"` permission by default. Either apply D-36 patch (add `teammate: "allow"` in `tool-config-handler.ts`) or use `subagent_type: "sisyphus"` instead |
+| `hard-reject` | oracle, librarian, explore, multimodal-looker, metis, momus, prometheus | Read-only or plan-mode-only — cannot write to mailbox; use `task` (delegate-task) instead |
 
-Eligibility registry: [`types.ts`](file:///Users/yeongyu/local-workspaces/omo/src/features/team-mode/types.ts) `AGENT_ELIGIBILITY_REGISTRY`.
+Hard-reject agents throw at TeamSpec parse with a specific message ("Agent 'X' is read-only…"). The error message points members at delegate-task as the right escape hatch.
 
 ## MEMBER KINDS
 
@@ -131,13 +139,12 @@ team-mode/
 | Where | What |
 |-------|------|
 | [`src/index.ts`](file:///Users/yeongyu/local-workspaces/omo/src/index.ts) (entry) | `checkTeamModeDependencies()` + `ensureBaseDirs()` if `team_mode.enabled` |
-| [`src/plugin/tool-registry.ts`](file:///Users/yeongyu/local-workspaces/omo/src/plugin/tool-registry.ts) | `teamModeToolsRecord` gate registers 12 tools |
-| `src/hooks/team-mode-status-injector/` | Injects `<team_mode_status>` block into messages |
-| `src/hooks/team-mailbox-injector/` | Pulls pending mailbox messages into agent context |
-| `src/hooks/team-session-events/` | React to member session lifecycle |
-| `src/hooks/team-tool-gating/` | Restrict `team_*` tools by member role |
+| [`src/plugin/tool-registry.ts`](file:///Users/yeongyu/local-workspaces/omo/src/plugin/tool-registry.ts) `teamModeToolsRecord` | Registers 12 `team_*` tools |
+| [`create-transform-hooks.ts`](file:///Users/yeongyu/local-workspaces/omo/src/plugin/hooks/create-transform-hooks.ts) | Conditionally builds `teamModeStatusInjector` (`team-mode-status-injector` hook) and `teamMailboxInjector` (`team-mailbox-injector` hook) — both Transform tier |
+| [`create-tool-guard-hooks.ts`](file:///Users/yeongyu/local-workspaces/omo/src/plugin/hooks/create-tool-guard-hooks.ts) | Conditionally builds `teamToolGating` (`team-tool-gating` hook) — Tool Guard tier |
+| [`src/plugin/event.ts`](file:///Users/yeongyu/local-workspaces/omo/src/plugin/event.ts) | Registers 4 team-session-event handlers from `src/hooks/team-session-events/`: `team-idle-wake-hint`, `team-lead-orphan-handler`, `team-member-error-handler`, `team-member-status-handler` |
 | [`src/cli/doctor/checks/team-mode.ts`](file:///Users/yeongyu/local-workspaces/omo/src/cli/doctor/checks/team-mode.ts) | Doctor check for team-mode prerequisites |
-| [`src/features/builtin-skills/skills/team-mode.ts`](file:///Users/yeongyu/local-workspaces/omo/src/features/builtin-skills/skills/team-mode.ts) | Built-in skill that documents the tools — only loaded when enabled |
+| [`src/features/builtin-skills/skills/team-mode.ts`](file:///Users/yeongyu/local-workspaces/omo/src/features/builtin-skills/skills/team-mode.ts) | Built-in skill documenting the 12 tools — gated on `team_mode.enabled` |
 
 ## WHERE TO LOOK
 

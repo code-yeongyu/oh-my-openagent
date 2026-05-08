@@ -21,7 +21,7 @@ Core-agent tab cycling is deterministic via injected runtime order field. The fi
 | Agent          | Model             | Purpose                                                                                                                                            |
 | -------------- | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Prometheus** | `claude-opus-4-7` | Strategic planner with interview mode. Creates detailed work plans through iterative questioning. Fallback: `openai\|github-copilot\|opencode/gpt-5.5 (high)` → `opencode-go/glm-5.1` → `google\|github-copilot\|opencode/gemini-3.1-pro`. |
-| **Metis**      | `claude-opus-4-7` | Plan consultant — pre-planning analysis. Identifies hidden intentions, ambiguities, and AI failure points. Fallback: `openai\|github-copilot\|opencode/gpt-5.5 (high)` → `opencode-go/glm-5.1` → `kimi-for-coding/k2p5`. |
+| **Metis**      | `claude-sonnet-4-6` | Plan consultant — pre-planning analysis. Identifies hidden intentions, ambiguities, and AI failure points. Fallback: `anthropic\|github-copilot\|opencode/claude-opus-4-7 (max)` → `openai\|github-copilot\|opencode/gpt-5.5 (high)` → `opencode-go/glm-5.1` → `kimi-for-coding/k2p5`. |
 | **Momus**      | `gpt-5.5`         | Plan reviewer — validates plans against clarity, verifiability, and completeness standards. Fallback: `anthropic\|github-copilot\|opencode/claude-opus-4-7 (max)` → `google\|github-copilot\|opencode/gemini-3.1-pro (high)` → `opencode-go/glm-5.1`. |
 
 ### Orchestration Agents
