@@ -5,11 +5,13 @@ on:
     branches: [master, dev]
     paths:
       - "web/**"
+      - "docs/**"
       - ".github/workflows/web-ci.yml"
   pull_request:
     branches: [master, dev]
     paths:
       - "web/**"
+      - "docs/**"
       - ".github/workflows/web-ci.yml"
 
 concurrency:

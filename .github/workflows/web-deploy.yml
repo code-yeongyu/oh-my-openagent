@@ -11,6 +11,7 @@ on:
     branches: [master, dev]
     paths:
       - "web/**"
+      - "docs/**"
       - ".github/workflows/web-deploy.yml"
 
 concurrency:
