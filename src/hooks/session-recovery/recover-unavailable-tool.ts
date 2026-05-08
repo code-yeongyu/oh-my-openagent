@@ -10,8 +10,10 @@ type Client = ReturnType<typeof createOpencodeClient>
 
 interface ToolResultPart {
   type: "tool_result"
-  tool_use_id: string
-  content: string
+  toolUseId: string
+  tool_use_id?: string
+  isError?: boolean
+  content: Array<{ type: "text"; text: string }>
 }
 
 interface PromptWithToolResultInput {
@@ -91,8 +93,10 @@ export async function recoverUnavailableTool(
 
   const toolResultParts = targetToolUses.map((part) => ({
     type: "tool_result" as const,
+    toolUseId: part.id,
     tool_use_id: part.id,
-    content: '{"status":"error","error":"Tool not available. Please continue without this tool."}',
+    isError: true,
+    content: [{ type: "text" as const, text: '{"status":"error","error":"Tool not available. Please continue without this tool."}' }],
   }))
 
   try {
