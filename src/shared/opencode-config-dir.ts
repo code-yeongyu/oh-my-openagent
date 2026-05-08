@@ -78,9 +78,11 @@ export function getOpenCodeConfigDirs(options: OpenCodeConfigDirOptions): string
     return [getOpenCodeConfigDir(options)]
   }
 
+  const customConfigDir = getCliCustomConfigDir()
+
   return Array.from(
     new Set([
-      ...(getCliCustomConfigDir() ? [getCliCustomConfigDir()!] : []),
+      ...(customConfigDir ? [customConfigDir] : []),
       getCliDefaultConfigDir(),
     ]),
   )
