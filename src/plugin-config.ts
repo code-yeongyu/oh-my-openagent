@@ -6,7 +6,7 @@ import {
   log,
   containsPath,
   deepMerge,
-  getOpenCodeConfigDir,
+  getOpenCodeConfigDirs,
   addConfigLoadError,
   parseJsonc,
   detectPluginConfigFile,
@@ -275,25 +275,23 @@ export function loadPluginConfig(
   directory: string,
   ctx: unknown
 ): OhMyOpenCodeConfig {
-  // User-level config path - prefer .jsonc over .json
-  const configDir = getOpenCodeConfigDir({ binary: "opencode" });
-  const userDetected = detectPluginConfigFile(configDir);
-  let userConfigPath =
-    userDetected.format !== "none"
-      ? userDetected.path
-      : path.join(configDir, `${CONFIG_BASENAME}.json`);
+  const userConfigDirs = [...getOpenCodeConfigDirs({ binary: "opencode" })].reverse()
+  const userConfigLayers = userConfigDirs.map((configDir) => {
+    const detected = detectPluginConfigFile(configDir)
 
-  if (userDetected.legacyPath) {
-    log("Canonical plugin config detected alongside legacy config. Remove the legacy file to avoid confusion.", {
-      canonicalPath: userDetected.path,
-      legacyPath: userDetected.legacyPath,
-    });
-  }
+    if (detected.legacyPath) {
+      log("Canonical plugin config detected alongside legacy config. Remove the legacy file to avoid confusion.", {
+        canonicalPath: detected.path,
+        legacyPath: detected.legacyPath,
+      })
+    }
 
-  // Auto-copy legacy config file to canonical name if needed
-  if (userDetected.format !== "none") {
-    userConfigPath = resolveConfigPathAfterLegacyMigration(userConfigPath)
-  }
+    const configPath = detected.format !== "none"
+      ? resolveConfigPathAfterLegacyMigration(detected.path)
+      : null
+
+    return { configDir, configPath }
+  })
 
   // Pin the walk to $HOME only when the start directory is inside it. Outside
   // $HOME the walker would otherwise reach FS root and surface unrelated configs
@@ -325,20 +323,36 @@ export function loadPluginConfig(
     },
   )
 
-  // Load user config first (base). Parse empty config through Zod to apply field defaults.
-  const userConfig = loadConfigFromPath(userConfigPath, ctx)
-  const userGitMasterOverrides = loadExplicitGitMasterOverrides(userConfigPath)
+  let config: OhMyOpenCodeConfig = OhMyOpenCodeConfigSchema.parse({})
+  let mergedUserGitMasterOverrides: Record<string, unknown> | null = null
 
-  if (userConfig?.agent_definitions) {
-    userConfig.agent_definitions = resolveAgentDefinitionPaths(
-      userConfig.agent_definitions,
-      configDir,
-      null
-    )
+  for (const userLayer of userConfigLayers) {
+    if (!userLayer.configPath) continue
+
+    const userConfig = loadConfigFromPath(userLayer.configPath, ctx)
+    const userGitMasterOverrides = loadExplicitGitMasterOverrides(userLayer.configPath)
+
+    if (userConfig?.agent_definitions) {
+      userConfig.agent_definitions = resolveAgentDefinitionPaths(
+        userConfig.agent_definitions,
+        userLayer.configDir,
+        null,
+      )
+    }
+
+    if (userConfig) {
+      config = mergeConfigs(config, userConfig)
+    }
+
+    if (userGitMasterOverrides) {
+      mergedUserGitMasterOverrides = {
+        ...(mergedUserGitMasterOverrides ?? {}),
+        ...userGitMasterOverrides,
+      }
+    }
   }
 
-  let config: OhMyOpenCodeConfig =
-    userConfig ?? OhMyOpenCodeConfigSchema.parse({});
+  const userMcpEnvAllowlist = config.mcp_env_allowlist ?? []
 
   const canonicalAncestorPathsFarthestFirst = [...canonicalAncestorPathsNearestFirst].reverse()
   const defaultGitMaster = OhMyOpenCodeConfigSchema.parse({}).git_master
@@ -368,7 +382,7 @@ export function loadPluginConfig(
     }
   }
 
-  if (userGitMasterOverrides || ancestorGitMasterOverridesFarthestFirst.length > 0) {
+  if (mergedUserGitMasterOverrides || ancestorGitMasterOverridesFarthestFirst.length > 0) {
     const mergedAncestorGitMaster: Record<string, unknown> = {}
     for (const override of ancestorGitMasterOverridesFarthestFirst) {
       Object.assign(mergedAncestorGitMaster, override)
@@ -377,7 +391,7 @@ export function loadPluginConfig(
       ...config,
       git_master: {
         ...defaultGitMaster,
-        ...(userGitMasterOverrides ?? {}),
+        ...(mergedUserGitMasterOverrides ?? {}),
         ...mergedAncestorGitMaster,
       },
     }
@@ -389,7 +403,7 @@ export function loadPluginConfig(
   // expansion in .mcp.json files. See commit 316d2504 for context.
   config = {
     ...config,
-    mcp_env_allowlist: userConfig?.mcp_env_allowlist ?? [],
+    mcp_env_allowlist: userMcpEnvAllowlist,
   };
 
   log("Final merged config", {
