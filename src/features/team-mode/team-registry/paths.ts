@@ -36,6 +36,10 @@ export function getRuntimeStateDir(baseDir: string, teamRunId: string): string {
   return path.join(baseDir, "runtime", teamRunId)
 }
 
+export function getTeamMailboxLockPath(baseDir: string, teamRunId: string): string {
+  return path.join(getRuntimeStateDir(baseDir, teamRunId), "mailbox.lock")
+}
+
 export function getInboxDir(baseDir: string, teamRunId: string, memberName: string): string {
   return path.join(baseDir, "runtime", teamRunId, "inboxes", memberName)
 }

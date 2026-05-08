@@ -3,8 +3,8 @@ import { mkdir, readdir, stat } from "node:fs/promises"
 import path from "node:path"
 
 import type { TeamModeConfig } from "../../../config/schema/team-mode"
-import { getInboxDir, resolveBaseDir } from "../team-registry/paths"
-import { loadRuntimeState } from "../team-state-store/store"
+import { getInboxDir, getTeamMailboxLockPath, resolveBaseDir } from "../team-registry/paths"
+import { transitionRuntimeState } from "../team-state-store/store"
 import { atomicWrite, withLock } from "../team-state-store/locks"
 import type { Message } from "../types"
 
@@ -49,6 +49,13 @@ export class TeamDeletingError extends Error {
   }
 }
 
+export class TeamBoundsExceededError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = "TeamBoundsExceededError"
+  }
+}
+
 function isMissingPathError(error: unknown): boolean {
   return typeof error === "object"
     && error !== null
@@ -56,15 +63,30 @@ function isMissingPathError(error: unknown): boolean {
     && error.code === "ENOENT"
 }
 
-async function assertTeamAcceptsMessages(teamRunId: string, config: TeamModeConfig): Promise<void> {
+async function reserveMessageBudget(teamRunId: string, config: TeamModeConfig): Promise<void> {
   try {
-    const runtimeState = await loadRuntimeState(teamRunId, config)
-    if (runtimeState.status === "deleting" || runtimeState.status === "deleted") {
-      throw new TeamDeletingError()
-    }
+    await transitionRuntimeState(teamRunId, (runtimeState) => {
+      if (runtimeState.status === "deleting" || runtimeState.status === "deleted") {
+        throw new TeamDeletingError()
+      }
+
+      if (Date.now() - runtimeState.createdAt > runtimeState.bounds.maxWallClockMinutes * 60_000) {
+        throw new TeamBoundsExceededError("team exceeded max_wall_clock_minutes")
+      }
+
+      const nextMessageCount = (runtimeState.messageCount ?? 0) + 1
+      if (nextMessageCount > runtimeState.bounds.maxMessagesPerRun) {
+        throw new TeamBoundsExceededError("team exceeded max_messages_per_run")
+      }
+
+      return {
+        ...runtimeState,
+        messageCount: nextMessageCount,
+      }
+    }, config)
   } catch (error) {
     if (isMissingPathError(error)) {
-      return
+      throw new TeamDeletingError("team runtime missing")
     }
 
     throw error
@@ -129,38 +151,50 @@ export async function sendMessage(
     throw new PayloadTooLargeError()
   }
 
-  await assertTeamAcceptsMessages(teamRunId, config)
-
   if (message.to === "*" && !context.isLead) {
     throw new BroadcastNotPermittedError()
   }
 
   const baseDir = resolveBaseDir(config)
-  const deliveredTo: string[] = []
-  const reservedRecipients = context.reservedRecipients ?? new Set<string>()
+  const mailboxLockPath = getTeamMailboxLockPath(baseDir, teamRunId)
 
-  for (const recipient of resolveRecipients(message, context)) {
-    const inboxDir = getInboxDir(baseDir, teamRunId, recipient)
-    await mkdir(inboxDir, { recursive: true, mode: 0o700 })
+  try {
+    return await withLock(mailboxLockPath, async () => {
+      await reserveMessageBudget(teamRunId, config)
 
-    await withLock(`${inboxDir}.lock`, async () => {
-      const unreadSizeBytes = await getUnreadSizeBytes(inboxDir)
-      const nextUnreadSizeBytes = unreadSizeBytes + serializedMessageBytes
-      if (nextUnreadSizeBytes > config.recipient_unread_max_bytes) {
-        throw new RecipientBackpressureError()
+      const deliveredTo: string[] = []
+      const reservedRecipients = context.reservedRecipients ?? new Set<string>()
+
+      for (const recipient of resolveRecipients(message, context)) {
+        const inboxDir = getInboxDir(baseDir, teamRunId, recipient)
+        await mkdir(inboxDir, { recursive: true, mode: 0o700 })
+
+        await withLock(`${inboxDir}.lock`, async () => {
+          const unreadSizeBytes = await getUnreadSizeBytes(inboxDir)
+          const nextUnreadSizeBytes = unreadSizeBytes + serializedMessageBytes
+          if (nextUnreadSizeBytes > config.recipient_unread_max_bytes) {
+            throw new RecipientBackpressureError()
+          }
+
+          const unreservedPath = path.join(inboxDir, `${message.messageId}.json`)
+          const reservedPath = path.join(inboxDir, `.delivering-${message.messageId}.json`)
+          if (await fileExists(unreservedPath) || await fileExists(reservedPath)) {
+            throw new DuplicateMessageIdError()
+          }
+
+          const targetPath = reservedRecipients.has(recipient) ? reservedPath : unreservedPath
+          await atomicWrite(targetPath, serializedMessage)
+          deliveredTo.push(recipient)
+        }, { ownerTag: `team-mailbox:${recipient}` })
       }
 
-      const unreservedPath = path.join(inboxDir, `${message.messageId}.json`)
-      const reservedPath = path.join(inboxDir, `.delivering-${message.messageId}.json`)
-      if (await fileExists(unreservedPath) || await fileExists(reservedPath)) {
-        throw new DuplicateMessageIdError()
-      }
+      return { messageId: message.messageId, deliveredTo }
+    }, { ownerTag: `team-send:${message.messageId}` })
+  } catch (error) {
+    if (isMissingPathError(error)) {
+      throw new TeamDeletingError("team runtime missing")
+    }
 
-      const targetPath = reservedRecipients.has(recipient) ? reservedPath : unreservedPath
-      await atomicWrite(targetPath, serializedMessage)
-      deliveredTo.push(recipient)
-    }, { ownerTag: `team-mailbox:${recipient}` })
+    throw error
   }
-
-  return { messageId: message.messageId, deliveredTo }
 }

@@ -102,7 +102,7 @@ describe("team-mode types", () => {
     } catch (error) {
       // then
       expect(error instanceof Error ? error.message : String(error)).toBe(
-        "Unknown subagent_type 'foobar'. Available ELIGIBLE agents: sisyphus, atlas, sisyphus-junior, hephaestus (if D-36 applied). Use delegate-task for read-only agents like oracle, librarian, explore, metis, momus, multimodal-looker.",
+        "Unknown subagent_type 'foobar'. Available ELIGIBLE agents: sisyphus, atlas, sisyphus-junior, hephaestus. Use delegate-task for read-only agents like oracle, librarian, explore, metis, momus, multimodal-looker.",
       )
     }
   })
@@ -263,10 +263,8 @@ describe("team-mode types", () => {
 
     // then
     expect(entries).toHaveLength(11)
-    expect(verdictCounts).toEqual({ eligible: 3, conditional: 1, "hard-reject": 7 })
-    expect(AGENT_ELIGIBILITY_REGISTRY.hephaestus.rejectionMessage).toBe(
-      "Agent 'hephaestus' lacks teammate permission. Either apply D-36 (add teammate: \"allow\" in tool-config-handler.ts) or use subagent_type: \"sisyphus\" instead.",
-    )
+    expect(verdictCounts).toEqual({ eligible: 4, conditional: 0, "hard-reject": 7 })
+    expect(AGENT_ELIGIBILITY_REGISTRY.hephaestus.rejectionMessage).toBeUndefined()
     expect(AGENT_ELIGIBILITY_REGISTRY.oracle.rejectionMessage).toBe(
       "Agent 'oracle' is read-only (cannot write files). Team members must write to mailbox inbox files. Use delegate-task with subagent_type: 'oracle' for read-only analysis instead.",
     )

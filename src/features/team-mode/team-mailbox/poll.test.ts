@@ -168,4 +168,53 @@ describe("pollAndBuildInjection", () => {
     // then
     expect(member?.pendingInjectedMessageIds).toEqual([messageId])
   })
+
+  test("stops injecting once a member reaches max_member_turns", async () => {
+    // given
+    const { teamRunId, config } = await setupRuntime(["m1"])
+    const initialState = await loadRuntimeState(teamRunId, config)
+    await (await import("../team-state-store/store")).saveRuntimeState({
+      ...initialState,
+      bounds: {
+        ...initialState.bounds,
+        maxMemberTurns: 1,
+      },
+    }, config)
+
+    await sendMessage({
+      version: 1,
+      messageId: randomUUID(),
+      from: "lead",
+      to: "m1",
+      kind: "message",
+      body: "first",
+      timestamp: 100,
+    }, teamRunId, config, { isLead: true, activeMembers: ["m1"] })
+
+    await sendMessage({
+      version: 1,
+      messageId: randomUUID(),
+      from: "lead",
+      to: "m1",
+      kind: "message",
+      body: "second",
+      timestamp: 200,
+    }, teamRunId, config, { isLead: true, activeMembers: ["m1"] })
+
+    // when
+    const firstTurn = await pollAndBuildInjection("session-1", "m1", teamRunId, config, "turn-1")
+    const secondTurn = await pollAndBuildInjection("session-1", "m1", teamRunId, config, "turn-2")
+    const runtimeState = await loadRuntimeState(teamRunId, config)
+    const member = runtimeState.members.find((entry) => entry.name === "m1")
+
+    // then
+    expect(firstTurn.injected).toBe(true)
+    expect(secondTurn).toEqual({
+      injected: false,
+      messageIds: [],
+      reason: "max member turns reached",
+    })
+    expect(member?.turnsUsed).toBe(1)
+    expect(member?.lastSeenTurnMarker).toBe("turn-2")
+  })
 })

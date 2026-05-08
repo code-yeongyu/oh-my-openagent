@@ -6,10 +6,32 @@ export type TeamSessionEntry = {
   role: TeamSessionRole
 }
 
+type RegisterTeamSessionOptions = {
+  overwrite?: boolean
+}
+
 const registry = new Map<string, TeamSessionEntry>()
 
-export function registerTeamSession(sessionId: string, entry: TeamSessionEntry): void {
+function entriesMatch(left: TeamSessionEntry, right: TeamSessionEntry): boolean {
+  return left.teamRunId === right.teamRunId
+    && left.memberName === right.memberName
+    && left.role === right.role
+}
+
+export function registerTeamSession(
+  sessionId: string,
+  entry: TeamSessionEntry,
+  options?: RegisterTeamSessionOptions,
+): TeamSessionEntry {
+  const existingEntry = registry.get(sessionId)
+  if (existingEntry) {
+    if (entriesMatch(existingEntry, entry) || options?.overwrite === false) {
+      return existingEntry
+    }
+  }
+
   registry.set(sessionId, entry)
+  return entry
 }
 
 export function lookupTeamSession(sessionId: string): TeamSessionEntry | undefined {

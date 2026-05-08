@@ -20,7 +20,7 @@ function createRuntimeState(sessionID: string, teamRunId = randomUUID()): Runtim
     teamRunId,
     teamName: "team-alpha",
     specSource: "project",
-    createdAt: 1,
+    createdAt: Date.now(),
     status: "active",
     leadSessionId: "lead-session",
     members: [

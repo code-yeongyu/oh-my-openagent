@@ -76,14 +76,31 @@ describe("team-session-registry", () => {
     expect(lookupTeamSession("ses_beta")).toBeUndefined()
   })
 
-  test("registering the same sessionId twice overwrites the previous entry", () => {
+  test("registering the same sessionId twice overwrites the previous entry by default", () => {
     // given
     registerTeamSession("ses_alpha", { teamRunId: "team-1", memberName: "worker-1", role: "member" })
 
     // when
-    registerTeamSession("ses_alpha", { teamRunId: "team-2", memberName: "promoted-lead", role: "lead" })
+    const registered = registerTeamSession("ses_alpha", { teamRunId: "team-2", memberName: "promoted-lead", role: "lead" })
 
     // then
+    expect(registered).toEqual({ teamRunId: "team-2", memberName: "promoted-lead", role: "lead" })
     expect(lookupTeamSession("ses_alpha")).toEqual({ teamRunId: "team-2", memberName: "promoted-lead", role: "lead" })
+  })
+
+  test("does not overwrite an existing conflicting session mapping when overwrite is disabled", () => {
+    // given
+    registerTeamSession("ses_alpha", { teamRunId: "team-1", memberName: "worker-1", role: "member" })
+
+    // when
+    const registered = registerTeamSession(
+      "ses_alpha",
+      { teamRunId: "team-2", memberName: "promoted-lead", role: "lead" },
+      { overwrite: false },
+    )
+
+    // then
+    expect(registered).toEqual({ teamRunId: "team-1", memberName: "worker-1", role: "member" })
+    expect(lookupTeamSession("ses_alpha")).toEqual({ teamRunId: "team-1", memberName: "worker-1", role: "member" })
   })
 })

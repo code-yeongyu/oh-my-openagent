@@ -59,10 +59,6 @@ export async function pollAndBuildInjection(
   }
 
   const unreadMessages = await listUnreadMessages(teamRunId, memberName, config)
-  if (unreadMessages.length === 0) {
-    return { injected: false, messageIds: [], reason: "no unread" }
-  }
-
   const messageIds: string[] = []
   const envelopes: string[] = []
   for (const unreadMessage of unreadMessages) {
@@ -71,18 +67,59 @@ export async function pollAndBuildInjection(
   }
   const content = envelopes.join("\n")
 
+  let alreadyRecordedThisTurn = false
+  let blockedByTurnLimit = false
+
   await transitionRuntimeState(teamRunId, (currentRuntimeState) => ({
     ...currentRuntimeState,
-    members: currentRuntimeState.members.map((member) => (
-      member.name === memberName
-        ? {
+    members: currentRuntimeState.members.map((member) => {
+      if (member.name !== memberName) {
+        return member
+      }
+
+      if (member.lastInjectedTurnMarker === turnMarker) {
+        return member
+      }
+
+      if (member.lastSeenTurnMarker === turnMarker) {
+        alreadyRecordedThisTurn = true
+        return member
+      }
+
+      const turnsUsed = member.turnsUsed ?? 0
+      if (turnsUsed >= currentRuntimeState.bounds.maxMemberTurns) {
+        blockedByTurnLimit = true
+        return {
           ...member,
-          lastInjectedTurnMarker: turnMarker,
-          pendingInjectedMessageIds: Array.from(new Set([...member.pendingInjectedMessageIds, ...messageIds])),
+          lastSeenTurnMarker: turnMarker,
         }
-        : member
-    )),
+      }
+
+      return {
+        ...member,
+        lastSeenTurnMarker: turnMarker,
+        turnsUsed: turnsUsed + 1,
+        ...(messageIds.length > 0
+          ? {
+              lastInjectedTurnMarker: turnMarker,
+              pendingInjectedMessageIds: Array.from(new Set([...member.pendingInjectedMessageIds, ...messageIds])),
+            }
+          : {}),
+      }
+    }),
   }), config)
+
+  if (alreadyRecordedThisTurn) {
+    return { injected: false, messageIds: [], reason: "already observed this turn" }
+  }
+
+  if (blockedByTurnLimit) {
+    return { injected: false, messageIds: [], reason: "max member turns reached" }
+  }
+
+  if (unreadMessages.length === 0) {
+    return { injected: false, messageIds: [], reason: "no unread" }
+  }
 
   return { injected: true, content, messageIds }
 }

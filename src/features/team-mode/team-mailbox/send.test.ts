@@ -8,7 +8,8 @@ import path from "node:path"
 
 import { TeamModeConfigSchema } from "../../../config/schema/team-mode"
 import { getInboxDir, resolveBaseDir } from "../team-registry/paths"
-import { MessageSchema } from "../types"
+import { saveRuntimeState } from "../team-state-store/store"
+import { MessageSchema, type RuntimeState } from "../types"
 import {
   BroadcastNotPermittedError,
   DuplicateMessageIdError,
@@ -23,6 +24,39 @@ async function createBaseDirectory(): Promise<string> {
 
 function createConfig(baseDir: string) {
   return TeamModeConfigSchema.parse({ base_dir: baseDir })
+}
+
+async function seedRuntime(baseDir: string, teamRunId: string, memberNames: string[]): Promise<RuntimeState> {
+  const config = createConfig(baseDir)
+  const runtimeState: RuntimeState = {
+    version: 1,
+    teamRunId,
+    teamName: "team-mailbox-test",
+    specSource: "project",
+    createdAt: Date.now(),
+    status: "active",
+    leadSessionId: "lead-session",
+    members: memberNames.map((memberName, index) => ({
+      name: memberName,
+      agentType: index === 0 ? "leader" : "general-purpose",
+      sessionId: `${memberName}-session`,
+      status: "running",
+      turnsUsed: 0,
+      pendingInjectedMessageIds: [],
+    })),
+    shutdownRequests: [],
+    messageCount: 0,
+    bounds: {
+      maxMembers: 8,
+      maxParallelMembers: 4,
+      maxMessagesPerRun: config.max_messages_per_run,
+      maxWallClockMinutes: config.max_wall_clock_minutes,
+      maxMemberTurns: config.max_member_turns,
+    },
+  }
+  await mkdir(path.join(baseDir, "runtime", teamRunId), { recursive: true })
+  await saveRuntimeState(runtimeState, config)
+  return runtimeState
 }
 
 function createMessage(overrides?: Partial<Parameters<typeof sendMessage>[0]>) {
@@ -44,6 +78,7 @@ describe("sendMessage", () => {
     const baseDir = await createBaseDirectory()
     const config = createConfig(baseDir)
     const teamRunId = randomUUID()
+    await seedRuntime(baseDir, teamRunId, ["lead", "m1"])
     const messages = Array.from({ length: 4 }, (_, index) => createMessage({
       from: `m${index + 1}`,
       body: `message-${index + 1}`,
@@ -69,11 +104,14 @@ describe("sendMessage", () => {
 
   test("rejects payloads larger than 32 KB", async () => {
     // given
-    const config = createConfig(await createBaseDirectory())
+    const baseDir = await createBaseDirectory()
+    const config = createConfig(baseDir)
     const message = createMessage({ body: "가".repeat(20_000) })
+    const teamRunId = randomUUID()
+    await seedRuntime(baseDir, teamRunId, ["lead", "m1"])
 
     // when
-    const result = sendMessage(message, randomUUID(), config, { isLead: false, activeMembers: ["m1"] })
+    const result = sendMessage(message, teamRunId, config, { isLead: false, activeMembers: ["m1"] })
 
     // then
     try {
@@ -89,6 +127,7 @@ describe("sendMessage", () => {
     const baseDir = await createBaseDirectory()
     const config = createConfig(baseDir)
     const teamRunId = randomUUID()
+    await seedRuntime(baseDir, teamRunId, ["lead", "m1"])
     const inboxDir = getInboxDir(resolveBaseDir(config), teamRunId, "m1")
     await mkdir(inboxDir, { recursive: true })
     await writeFile(path.join(inboxDir, "full.json"), "x".repeat(config.recipient_unread_max_bytes + 1), { flag: "w" })
@@ -105,11 +144,48 @@ describe("sendMessage", () => {
     }
   })
 
+  test("rejects sends after the runtime exceeds max_messages_per_run", async () => {
+    // given
+    const baseDir = await createBaseDirectory()
+    const config = createConfig(baseDir)
+    const teamRunId = randomUUID()
+    const runtimeState = await seedRuntime(baseDir, teamRunId, ["lead", "m1"])
+    await saveRuntimeState({
+      ...runtimeState,
+      messageCount: runtimeState.bounds.maxMessagesPerRun,
+    }, config)
+
+    // when
+    const result = sendMessage(createMessage(), teamRunId, config, { isLead: false, activeMembers: ["m1"] })
+
+    // then
+    await expect(result).rejects.toThrow("team exceeded max_messages_per_run")
+  })
+
+  test("rejects sends after the runtime exceeds max_wall_clock_minutes", async () => {
+    // given
+    const baseDir = await createBaseDirectory()
+    const config = createConfig(baseDir)
+    const teamRunId = randomUUID()
+    const runtimeState = await seedRuntime(baseDir, teamRunId, ["lead", "m1"])
+    await saveRuntimeState({
+      ...runtimeState,
+      createdAt: Date.now() - ((runtimeState.bounds.maxWallClockMinutes + 1) * 60_000),
+    }, config)
+
+    // when
+    const result = sendMessage(createMessage(), teamRunId, config, { isLead: false, activeMembers: ["m1"] })
+
+    // then
+    await expect(result).rejects.toThrow("team exceeded max_wall_clock_minutes")
+  })
+
   test("counts in-flight .delivering-* reservations toward recipient backpressure", async () => {
     // given
     const baseDir = await createBaseDirectory()
     const config = createConfig(baseDir)
     const teamRunId = randomUUID()
+    await seedRuntime(baseDir, teamRunId, ["lead", "m1"])
     const inboxDir = getInboxDir(resolveBaseDir(config), teamRunId, "m1")
     await mkdir(inboxDir, { recursive: true })
     const pendingMessageId = randomUUID()
@@ -136,6 +212,7 @@ describe("sendMessage", () => {
     const baseDir = await createBaseDirectory()
     const config = createConfig(baseDir)
     const teamRunId = randomUUID()
+    await seedRuntime(baseDir, teamRunId, ["lead", "m1"])
     const message = createMessage()
     await sendMessage(message, teamRunId, config, { isLead: false, activeMembers: ["m1"] })
 
@@ -156,6 +233,7 @@ describe("sendMessage", () => {
     const baseDir = await createBaseDirectory()
     const config = createConfig(baseDir)
     const teamRunId = randomUUID()
+    await seedRuntime(baseDir, teamRunId, ["lead", "m1", "m2"])
     const broadcastMessage = createMessage({ to: "*" })
 
     // when

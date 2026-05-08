@@ -143,7 +143,9 @@ const RuntimeStateMemberSchema = z.object({
   status: z.enum(["pending", "running", "idle", "errored", "completed", "shutdown_approved"]),
   color: z.string().optional(),
   worktreePath: z.string().optional(),
+  lastSeenTurnMarker: z.string().optional(),
   lastInjectedTurnMarker: z.string().optional(),
+  turnsUsed: z.number().int().nonnegative().optional(),
   pendingInjectedMessageIds: z.array(z.string()).default([]),
 }).strict()
 
@@ -183,6 +185,7 @@ export const RuntimeStateSchema = z.object({
   tmuxLayout: RuntimeStateTmuxLayoutSchema.optional(),
   members: z.array(RuntimeStateMemberSchema),
   shutdownRequests: z.array(ShutdownRequestSchema).default([]),
+  messageCount: z.number().int().nonnegative().optional(),
   bounds: RuntimeBoundsSchema,
 })
 
@@ -191,11 +194,7 @@ export const AGENT_ELIGIBILITY_REGISTRY: Readonly<Record<string, {
   rejectionMessage?: string
 }>> = {
   sisyphus: { verdict: "eligible" },
-  hephaestus: {
-    verdict: "conditional",
-    rejectionMessage:
-      "Agent 'hephaestus' lacks teammate permission. Either apply D-36 (add teammate: \"allow\" in tool-config-handler.ts) or use subagent_type: \"sisyphus\" instead.",
-  },
+  hephaestus: { verdict: "eligible" },
   oracle: {
     verdict: "hard-reject",
     rejectionMessage:
@@ -237,7 +236,7 @@ export const AGENT_ELIGIBILITY_REGISTRY: Readonly<Record<string, {
 
 /**
  * §V.3 member validation error messages live in member-parser.ts.
- * Includes: "Unknown subagent_type '<name>'. Available ELIGIBLE agents: sisyphus, atlas, sisyphus-junior, hephaestus (if D-36 applied). Use delegate-task for read-only agents like oracle, librarian, explore, metis, momus, multimodal-looker."
+ * Includes: "Unknown subagent_type '<name>'. Available ELIGIBLE agents: sisyphus, atlas, sisyphus-junior, hephaestus. Use delegate-task for read-only agents like oracle, librarian, explore, metis, momus, multimodal-looker."
  */
 
 const parseMemberBase = createParseMember(MemberSchema, AGENT_ELIGIBILITY_REGISTRY)
