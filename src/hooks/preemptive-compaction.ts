@@ -8,6 +8,7 @@ import type {
   PreemptiveCompactionContext,
   TokenInfo,
 } from "./preemptive-compaction-types"
+import { isCompactionAgent } from "../shared/compaction-marker"
 
 export function createPreemptiveCompactionHook(
   ctx: PreemptiveCompactionContext,
@@ -77,9 +78,16 @@ export function createPreemptiveCompactionHook(
         finish?: boolean
         tokens?: TokenInfo
         parts?: unknown
+        agent?: string
       } | undefined
 
       if (!info || info.role !== "assistant" || !info.finish || !info.sessionID) return
+
+      // The compaction agent emits an assistant message that carries pre-compaction
+      // token counts. Treating it as a regular response would overwrite the cache
+      // with stale values and clear the compactedSessions guard, which immediately
+      // re-triggers preemptive compaction (issue #3819).
+      if (isCompactionAgent(info.agent)) return
 
       if (info.providerID && info.tokens) {
         tokenCache.set(info.sessionID, {

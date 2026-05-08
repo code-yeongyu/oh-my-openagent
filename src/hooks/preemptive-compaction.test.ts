@@ -761,4 +761,77 @@ describe("preemptive-compaction", () => {
 
     expect(ctx.client.session.summarize).toHaveBeenCalled()
   })
+
+  // #given a session was already compacted (compactedSessions guard set, low post-compaction tokens cached)
+  // #when the compaction agent emits message.updated carrying pre-compaction tokens
+  // #then the cache must NOT be overwritten and the compactedSessions guard must NOT be cleared,
+  //       otherwise the very next tool.execute.after would re-trigger compaction (issue #3819)
+  it("should ignore message.updated from compaction agent so it does not retrigger compaction (issue #3819)", async () => {
+    const hook = createPreemptiveCompactionHook(ctx as never, {} as never)
+    const sessionID = "ses_compaction_3819"
+
+    // Seed real assistant message with low post-compaction tokens
+    await hook.event({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            role: "assistant",
+            sessionID,
+            providerID: "anthropic",
+            modelID: "claude-sonnet-4-6",
+            finish: true,
+            tokens: {
+              input: 5000,
+              output: 100,
+              reasoning: 0,
+              cache: { read: 0, write: 0 },
+            },
+          },
+        },
+      },
+    })
+
+    // Mark session as just-compacted so compactedSessions guard would block re-compaction
+    await hook.event({
+      event: {
+        type: "session.compacted",
+        properties: { sessionID },
+      },
+    })
+
+    // Compaction agent now reports stale pre-compaction token counts; without the
+    // fix this overwrites tokenCache AND clears compactedSessions, immediately
+    // re-triggering compaction.
+    await hook.event({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            role: "assistant",
+            sessionID,
+            providerID: "anthropic",
+            modelID: "claude-sonnet-4-6",
+            finish: true,
+            agent: "compaction",
+            tokens: {
+              input: 180000,
+              output: 1000,
+              reasoning: 0,
+              cache: { read: 10000, write: 0 },
+            },
+          },
+        },
+      },
+    })
+
+    await hook["tool.execute.after"](
+      { tool: "bash", sessionID, callID: "call_1" },
+      { title: "", output: "test", metadata: null }
+    )
+
+    // No retrigger: summarize must not be called because both the guard and the
+    // low cached tokens are still in place.
+    expect(ctx.client.session.summarize).not.toHaveBeenCalled()
+  })
 })

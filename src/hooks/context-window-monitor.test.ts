@@ -381,4 +381,65 @@ describe("context-window-monitor", () => {
     //#then
     expect(output.output).toBe("original")
   })
+
+  // #given the cache holds low post-compaction token usage
+  // #when the compaction agent emits message.updated with pre-compaction tokens
+  // #then the cache must not be overwritten and stats stay accurate (issue #3819)
+  it("should ignore message.updated from the compaction agent (issue #3819)", async () => {
+    const hook = createContextWindowMonitorHook(ctx as never)
+    const sessionID = "ses_compaction_3819"
+
+    await hook.event({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            role: "assistant",
+            sessionID,
+            providerID: "anthropic",
+            finish: true,
+            tokens: {
+              input: 5000,
+              output: 100,
+              reasoning: 0,
+              cache: { read: 0, write: 0 },
+            },
+          },
+        },
+      },
+    })
+
+    // Compaction agent reports pre-compaction tokens that exceed the warning
+    // threshold; without the fix this overwrote tokenCache and made the next
+    // tool.execute.after append a context warning.
+    await hook.event({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            role: "assistant",
+            sessionID,
+            providerID: "anthropic",
+            finish: true,
+            agent: "compaction",
+            tokens: {
+              input: 180000,
+              output: 1000,
+              reasoning: 0,
+              cache: { read: 10000, write: 0 },
+            },
+          },
+        },
+      },
+    })
+
+    const output = { title: "", output: "post-compaction", metadata: null }
+    await hook["tool.execute.after"](
+      { tool: "bash", sessionID, callID: "call_1" },
+      output
+    )
+
+    // Cache still holds the low post-compaction usage so no reminder is appended
+    expect(output.output).toBe("post-compaction")
+  })
 })

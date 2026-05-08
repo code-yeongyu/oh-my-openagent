@@ -4,6 +4,7 @@ import {
   type ContextLimitModelCacheState,
 } from "../shared/context-limit-resolver"
 import { createSystemDirective, SystemDirectiveTypes } from "../shared/system-directive"
+import { isCompactionAgent } from "../shared/compaction-marker"
 
 const CONTEXT_WARNING_THRESHOLD = 0.70
 
@@ -100,10 +101,16 @@ export function createContextWindowMonitorHook(
         modelID?: string
         finish?: boolean
         tokens?: TokenInfo
+        agent?: string
       } | undefined
 
       if (!info || info.role !== "assistant" || !info.finish) return
       if (!info.sessionID || !info.providerID || !info.tokens) return
+
+      // The compaction agent reports pre-compaction token counts in its summary
+      // message. Caching those would make the displayed context-window stats
+      // jump back up after a successful compaction (issue #3819).
+      if (isCompactionAgent(info.agent)) return
 
       tokenCache.set(info.sessionID, {
         providerID: info.providerID,
