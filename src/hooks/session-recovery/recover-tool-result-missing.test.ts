@@ -82,8 +82,10 @@ describe("recoverToolResultMissing", () => {
       body: {
         parts: [{
           type: "tool_result",
+          toolUseId: "call_recovered",
           tool_use_id: "call_recovered",
-          content: "Operation cancelled by user (ESC pressed)",
+          isError: true,
+          content: [{ type: "text", text: "Operation cancelled by user (ESC pressed)" }],
         }],
       },
     })
@@ -123,8 +125,10 @@ describe("recoverToolResultMissing", () => {
       body: {
         parts: [{
           type: "tool_result",
+          toolUseId: "toolu_recovered",
           tool_use_id: "toolu_recovered",
-          content: "Operation cancelled by user (ESC pressed)",
+          isError: true,
+          content: [{ type: "text", text: "Operation cancelled by user (ESC pressed)" }],
         }],
       },
     })

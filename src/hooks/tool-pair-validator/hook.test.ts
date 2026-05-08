@@ -14,8 +14,10 @@ type TestPart = {
   type: string
   id?: string
   callID?: string
+  toolUseId?: string
   tool_use_id?: string
-  content?: string
+  isError?: boolean
+  content?: string | Array<{ type: "text"; text: string }>
   text?: string
 }
 
@@ -65,7 +67,13 @@ describe("createToolPairValidatorHook", () => {
 
     //#then
     expect(messages[1]?.parts).toEqual([
-      { type: "tool_result", tool_use_id: "toolu_1", content: TOOL_RESULT_PLACEHOLDER },
+      {
+        type: "tool_result",
+        toolUseId: "toolu_1",
+        tool_use_id: "toolu_1",
+        isError: true,
+        content: [{ type: "text", text: TOOL_RESULT_PLACEHOLDER }],
+      },
       { type: "text", text: "continue" },
     ])
   })
@@ -99,8 +107,20 @@ describe("createToolPairValidatorHook", () => {
       {
         info: { role: "user" },
         parts: [
-          { type: "tool_result", tool_use_id: "toolu_1", content: TOOL_RESULT_PLACEHOLDER },
-          { type: "tool_result", tool_use_id: "toolu_2", content: TOOL_RESULT_PLACEHOLDER },
+          {
+            type: "tool_result",
+            toolUseId: "toolu_1",
+            tool_use_id: "toolu_1",
+            isError: true,
+            content: [{ type: "text", text: TOOL_RESULT_PLACEHOLDER }],
+          },
+          {
+            type: "tool_result",
+            toolUseId: "toolu_2",
+            tool_use_id: "toolu_2",
+            isError: true,
+            content: [{ type: "text", text: TOOL_RESULT_PLACEHOLDER }],
+          },
         ],
       },
     ])
@@ -122,7 +142,13 @@ describe("createToolPairValidatorHook", () => {
       { info: { role: "assistant" }, parts: [{ type: "tool_use", id: "toolu_1" }] },
       {
         info: { role: "user" },
-        parts: [{ type: "tool_result", tool_use_id: "toolu_1", content: TOOL_RESULT_PLACEHOLDER }],
+        parts: [{
+          type: "tool_result",
+          toolUseId: "toolu_1",
+          tool_use_id: "toolu_1",
+          isError: true,
+          content: [{ type: "text", text: TOOL_RESULT_PLACEHOLDER }],
+        }],
       },
       { info: { role: "assistant" }, parts: [{ type: "text", text: "follow-up" }] },
     ])
@@ -150,7 +176,13 @@ describe("createToolPairValidatorHook", () => {
     //#then
     expect(messages[1]?.parts).toEqual([
       { type: "tool_result", tool_use_id: "toolu_1", content: "done" },
-      { type: "tool_result", tool_use_id: "call_2", content: TOOL_RESULT_PLACEHOLDER },
+      {
+        type: "tool_result",
+        toolUseId: "call_2",
+        tool_use_id: "call_2",
+        isError: true,
+        content: [{ type: "text", text: TOOL_RESULT_PLACEHOLDER }],
+      },
       { type: "text", text: "continue" },
     ])
   })
@@ -189,11 +221,34 @@ describe("createToolPairValidatorHook", () => {
       //#then
       expect(backgroundMessages).toEqual(originalBackgroundMessages)
       expect(mainMessages[1]?.parts).toEqual([
-        { type: "tool_result", tool_use_id: "toolu_main_1", content: TOOL_RESULT_PLACEHOLDER },
+        {
+          type: "tool_result",
+          tool_use_id: "toolu_main_1",
+          toolUseId: "toolu_main_1",
+          isError: true,
+          content: [{ type: "text", text: TOOL_RESULT_PLACEHOLDER }],
+        },
         { type: "text", text: "continue main session" },
       ])
     } finally {
       _resetForTesting()
     }
+  })
+
+  it("treats existing camelCase toolUseId results as already paired", async () => {
+    //#given
+    const messages = [
+      { info: { role: "assistant" }, parts: [{ type: "tool_use", id: "toolu_1" }] },
+      { info: { role: "user" }, parts: [{ type: "tool_result", toolUseId: "toolu_1", content: [{ type: "text", text: "done" }] }] },
+    ] satisfies TestMessage[]
+
+    //#when
+    await runTransform(messages)
+
+    //#then
+    expect(messages).toEqual([
+      { info: { role: "assistant" }, parts: [{ type: "tool_use", id: "toolu_1" }] },
+      { info: { role: "user" }, parts: [{ type: "tool_result", toolUseId: "toolu_1", content: [{ type: "text", text: "done" }] }] },
+    ])
   })
 })
