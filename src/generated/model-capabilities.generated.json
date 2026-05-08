@@ -15521,8 +15521,46 @@
         "output": 131072
       }
     },
+    "zai-coding-plan/glm-5": {
+      "id": "zai-coding-plan/glm-5",
+      "family": "glm",
+      "reasoning": true,
+      "temperature": true,
+      "toolCall": true,
+      "modalities": {
+        "input": [
+          "text"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "limit": {
+        "context": 204800,
+        "output": 131072
+      }
+    },
     "z-ai/glm-5.1": {
       "id": "z-ai/glm-5.1",
+      "family": "glm",
+      "reasoning": true,
+      "temperature": true,
+      "toolCall": true,
+      "modalities": {
+        "input": [
+          "text"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "limit": {
+        "context": 202752,
+        "output": 131072
+      }
+    },
+    "zai-coding-plan/glm-5.1": {
+      "id": "zai-coding-plan/glm-5.1",
       "family": "glm",
       "reasoning": true,
       "temperature": true,
@@ -15599,6 +15637,25 @@
     },
     "z-ai/glm-5-turbo": {
       "id": "z-ai/glm-5-turbo",
+      "family": "glm",
+      "reasoning": true,
+      "temperature": true,
+      "toolCall": true,
+      "modalities": {
+        "input": [
+          "text"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "limit": {
+        "context": 202752,
+        "output": 131072
+      }
+    },
+    "zai-coding-plan/glm-5-turbo": {
+      "id": "zai-coding-plan/glm-5-turbo",
       "family": "glm",
       "reasoning": true,
       "temperature": true,
@@ -18399,6 +18456,26 @@
     },
     "z-ai/glm-5v-turbo": {
       "id": "z-ai/glm-5v-turbo",
+      "reasoning": true,
+      "temperature": true,
+      "toolCall": true,
+      "modalities": {
+        "input": [
+          "image",
+          "text",
+          "video"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "limit": {
+        "context": 202752,
+        "output": 131072
+      }
+    },
+    "zai-coding-plan/glm-5v-turbo": {
+      "id": "zai-coding-plan/glm-5v-turbo",
       "reasoning": true,
       "temperature": true,
       "toolCall": true,

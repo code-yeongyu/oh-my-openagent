@@ -41,6 +41,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       },
       { providers: ["openai", "github-copilot", "opencode", "vercel"], model: "gpt-5.5", variant: "medium" },
       { providers: ["zai-coding-plan", "opencode", "vercel"], model: "glm-5" },
+      { providers: ["zai-coding-plan", "opencode"], model: "glm-5-turbo" },
       { providers: ["opencode"], model: "big-pickle" },
     ],
     requiresAnyModel: true,
@@ -194,6 +195,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         variant: "high",
       },
       { providers: ["zai-coding-plan", "opencode", "vercel"], model: "glm-5" },
+      { providers: ["zai-coding-plan", "opencode"], model: "glm-5-turbo" },
       {
         providers: ["anthropic", "github-copilot", "opencode", "vercel"],
         model: "claude-opus-4-7",
@@ -307,6 +309,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         variant: "high",
       },
       { providers: ["zai-coding-plan", "opencode", "vercel"], model: "glm-5" },
+      { providers: ["zai-coding-plan", "opencode"], model: "glm-5-turbo" },
       { providers: ["kimi-for-coding"], model: "k2p5" },
       { providers: ["opencode-go", "vercel"], model: "glm-5.1" },
       { providers: ["opencode", "vercel"], model: "kimi-k2.5" },
