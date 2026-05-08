@@ -136,6 +136,18 @@ export async function pollSyncSession(
       })
     }
 
+    if (sessionStatus && sessionStatus.type === "error") {
+      log("[task] Session entered error state, surfacing failure", { sessionID: input.sessionID })
+      let messages: SessionMessage[] = []
+      try {
+        messages = await fetchSessionMessages(client, input.sessionID)
+      } catch (error) {
+        log("[task] Failed to fetch messages on error state", { sessionID: input.sessionID, error: String(error) })
+      }
+      const errorFromMessages = getTerminalSessionError(messages)
+      return errorFromMessages ?? `Session ${input.sessionID} entered error state`
+    }
+
     if (sessionStatus && sessionStatus.type !== "idle") {
       continue
     }
@@ -184,9 +196,14 @@ export async function pollSyncSession(
       if (m.info?.role !== "assistant") return false
       const parts = m.parts ?? []
       return parts.some((p) => {
-        if (p.type !== "text" && p.type !== "reasoning") return false
-        const text = (p.text ?? "").trim()
-        return text.length > 0
+        if (p.type === "text" || p.type === "reasoning") {
+          return (p.text ?? "").trim().length > 0
+        }
+        if (p.type === "thinking") {
+          const thinkingText = (p as { thinking?: string }).thinking ?? p.text ?? ""
+          return thinkingText.trim().length > 0
+        }
+        return false
       })
     })
 

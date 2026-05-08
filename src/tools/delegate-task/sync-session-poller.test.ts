@@ -342,6 +342,96 @@ describe("pollSyncSession", () => {
       expect(result).toBeNull()
       expect(callCount).toBeGreaterThan(1)
     })
+
+    test("returns failure string when sessionStatus reports error (issue #3421)", async () => {
+      // given: session enters error state with assistant error info available
+      const { pollSyncSession } = require("./sync-session-poller")
+
+      const mockClient = {
+        session: {
+          messages: async () => ({
+            data: [
+              { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+              {
+                info: {
+                  id: "msg_002",
+                  role: "assistant",
+                  time: { created: 2000 },
+                  error: { data: { message: "Provider connection lost" } },
+                },
+                parts: [],
+              },
+            ],
+          }),
+          status: async () => ({ data: { ses_test: { type: "error" } } }),
+        },
+      }
+
+      // when: calling pollSyncSession
+      const result = await pollSyncSession(createMockCtx(), mockClient, {
+        sessionID: "ses_test",
+        agentToUse: "test-agent",
+        toastManager: null,
+        taskId: undefined,
+      })
+
+      // then: returns failure string instead of null (so caller does not treat as success)
+      expect(result).toBe("Provider connection lost")
+    })
+
+    test("returns generic error when sessionStatus reports error and messages are empty (issue #3421)", async () => {
+      // given: session enters error state but no terminal assistant error available
+      const { pollSyncSession } = require("./sync-session-poller")
+
+      const mockClient = {
+        session: {
+          messages: async () => ({ data: [] }),
+          status: async () => ({ data: { ses_test_empty: { type: "error" } } }),
+        },
+      }
+
+      // when: calling pollSyncSession
+      const result = await pollSyncSession(createMockCtx(), mockClient, {
+        sessionID: "ses_test_empty",
+        agentToUse: "test-agent",
+        toastManager: null,
+        taskId: undefined,
+      })
+
+      // then: returns generic session-id-bearing error so caller can surface failure
+      expect(result).toBe("Session ses_test_empty entered error state")
+    })
+
+    test("detects assistant thinking parts via .thinking field for fallback completion (issue #3421)", async () => {
+      // given: assistant emitted thinking parts (Anthropic-style: text empty, content in .thinking)
+      const { pollSyncSession } = require("./sync-session-poller")
+
+      const mockClient = {
+        session: {
+          messages: async () => ({
+            data: [
+              { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+              {
+                info: { id: "msg_002", role: "assistant", time: { created: 2000 } },
+                parts: [{ type: "thinking", thinking: "Considering the request" }],
+              },
+            ],
+          }),
+          status: async () => ({ data: { ses_thinking: { type: "idle" } } }),
+        },
+      }
+
+      // when: calling pollSyncSession
+      const result = await pollSyncSession(createMockCtx(), mockClient, {
+        sessionID: "ses_thinking",
+        agentToUse: "test-agent",
+        toastManager: null,
+        taskId: undefined,
+      })
+
+      // then: returns null (success) because thinking content was detected
+      expect(result).toBeNull()
+    })
   })
 
   describe("abort handling", () => {
