@@ -60,7 +60,12 @@ function parseArgs(): { model: string; iterations: number } {
       model = args[i + 1]
       i++
     } else if (args[i] === "--iterations" && args[i + 1]) {
-      iterations = parseInt(args[i + 1], 10)
+      const parsed = parseInt(args[i + 1], 10)
+      if (!Number.isFinite(parsed) || parsed < 1) {
+        console.error(`Error: --iterations must be a positive integer, got: ${args[i + 1]}`)
+        process.exit(1)
+      }
+      iterations = parsed
       i++
     }
   }
@@ -95,8 +100,10 @@ async function runFactoryBenchmark(): Promise<{ totalTests: number; passed: numb
       return { passed: parseInt(match[1], 10), failed: parseInt(match[2], 10), totalTests: parseInt(match[1], 10) + parseInt(match[2], 10) }
     }
     return { totalTests: 0, passed: 0, failed: 0 }
-  } catch {
-    return { totalTests: 0, passed: 0, failed: -1 }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.error(`  Factory benchmark error: ${message}`)
+    return { totalTests: 0, passed: 0, failed: 0 }
   }
 }
 
