@@ -34,6 +34,9 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Generate docs content from repo-root docs/
+        run: node ./scripts/generate-docs-content.mjs
+
       - name: Format check
         run: bun run format:check
 

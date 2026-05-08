@@ -53,3 +53,4 @@ next-env.d.ts
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+lib/docs-content.generated.ts

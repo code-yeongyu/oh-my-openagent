@@ -8,12 +8,10 @@ import { loadDocSource } from "@/lib/docs-source"
 export default async function DocsPage() {
   const t = await getTranslations("docs")
 
-  const sectionsWithSource = await Promise.all(
-    DOC_SECTIONS.map(async (section) => ({
-      ...section,
-      source: await loadDocSource(section.file),
-    })),
-  )
+  const sectionsWithSource = DOC_SECTIONS.map((section) => ({
+    ...section,
+    source: loadDocSource(section.file),
+  }))
 
   return (
     <DocsShell
