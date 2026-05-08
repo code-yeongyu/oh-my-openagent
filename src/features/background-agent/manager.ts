@@ -567,6 +567,15 @@ export class BackgroundManager {
         parentID: input.parentSessionId,
         title: `${input.description} (@${input.agent} subagent)`,
         ...(input.sessionPermission ? { permission: input.sessionPermission } : {}),
+        ...(input.model
+          ? {
+              model: {
+                id: input.model.modelID,
+                providerID: input.model.providerID,
+                ...(input.model.variant ? { variant: input.model.variant } : {}),
+              },
+            }
+          : {}),
       } as Record<string, unknown>,
       query: {
         directory: parentDirectory,
