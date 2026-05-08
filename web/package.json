@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "prepare": "node ./scripts/generate-docs-content.mjs",
     "prebuild": "node ./scripts/prepare-build.mjs",
     "dev": "next dev",
     "build": "next build",
