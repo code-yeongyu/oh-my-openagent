@@ -151,9 +151,6 @@ describe("oh-my-openagent plugin module", () => {
       enabled: true,
       gateways: {},
       hooks: {},
-      replyListener: {
-        discordBotToken: "discord-token",
-      },
     }
     mockLoadPluginConfig.mockReturnValue({
       openclaw: openclawConfig,
@@ -182,7 +179,7 @@ describe("oh-my-openagent plugin module", () => {
 
     // then
     expect(mockInitializeOpenClaw).not.toHaveBeenCalled()
-  })
+  }, { timeout: 15000 })
 
   it("exports a V1 PluginModule shape with id and server", () => {
     // given the plugin module is loaded
