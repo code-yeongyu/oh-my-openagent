@@ -5,6 +5,14 @@ import { isSqliteBackend } from "../../shared/opencode-storage-detection"
 import { normalizeSDKResponse } from "../../shared"
 
 type Client = ReturnType<typeof createOpencodeClient>
+type ToolResultContent = { type: "text"; text: string }
+type ToolResultPart = {
+  type: "tool_result"
+  toolUseId: string
+  tool_use_id?: string
+  isError?: boolean
+  content: ToolResultContent[]
+}
 type ClientWithPromptAsync = {
   session: {
     promptAsync: (opts: { path: { id: string }; body: Record<string, unknown> }) => Promise<unknown>
@@ -90,8 +98,10 @@ export async function recoverToolResultMissing(
 
   const toolResultParts = toolUseIds.map((id) => ({
     type: "tool_result" as const,
+    toolUseId: id,
     tool_use_id: id,
-    content: "Operation cancelled by user (ESC pressed)",
+    isError: true,
+    content: [{ type: "text" as const, text: "Operation cancelled by user (ESC pressed)" }],
   }))
 
   const launchAgent = resumeConfig?.agent

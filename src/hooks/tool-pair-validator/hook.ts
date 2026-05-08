@@ -12,8 +12,10 @@ type ToolUsePart = {
 
 type ToolResultPart = {
   type: "tool_result"
-  tool_use_id: string
-  content: string
+  toolUseId: string
+  tool_use_id?: string
+  isError?: boolean
+  content: Array<{ type: "text"; text: string }>
   [key: string]: unknown
 }
 
@@ -51,9 +53,17 @@ function getToolUseID(part: TransformPart): string | null {
 }
 
 function getToolResultID(part: TransformPart): string | null {
-  const candidate = part as { type?: unknown; tool_use_id?: unknown }
+  const candidate = part as { type?: unknown; toolUseId?: unknown; tool_use_id?: unknown }
 
-  if (candidate.type === "tool_result" && typeof candidate.tool_use_id === "string" && candidate.tool_use_id.length > 0) {
+  if (candidate.type !== "tool_result") {
+    return null
+  }
+
+  if (typeof candidate.toolUseId === "string" && candidate.toolUseId.length > 0) {
+    return candidate.toolUseId
+  }
+
+  if (typeof candidate.tool_use_id === "string" && candidate.tool_use_id.length > 0) {
     return candidate.tool_use_id
   }
 
@@ -93,8 +103,10 @@ function extractToolResultIDs(parts: TransformPart[]): Set<string> {
 function createToolResultPart(toolUseID: string): ToolResultPart {
   return {
     type: "tool_result",
+    toolUseId: toolUseID,
     tool_use_id: toolUseID,
-    content: TOOL_RESULT_PLACEHOLDER,
+    isError: true,
+    content: [{ type: "text", text: TOOL_RESULT_PLACEHOLDER }],
   }
 }
 

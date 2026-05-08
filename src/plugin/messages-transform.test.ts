@@ -136,12 +136,20 @@ describe("createMessagesTransformHandler", () => {
     expect(messages).toHaveLength(5)
     expect(messages[2]).toEqual({
       info: { role: "user" },
-      parts: [{ type: "tool_result", tool_use_id: "toolu_01SRMQs3DUtVKWoSxC8bxxVA", content: "Tool output unavailable (context compacted)" }],
+      parts: [{
+        type: "tool_result",
+        toolUseId: "toolu_01SRMQs3DUtVKWoSxC8bxxVA",
+        tool_use_id: "toolu_01SRMQs3DUtVKWoSxC8bxxVA",
+        isError: true,
+        content: [{ type: "text", text: "Tool output unavailable (context compacted)" }],
+      }],
     })
     expect(messages[4]?.parts[0]).toEqual({
       type: "tool_result",
+      toolUseId: "toolu_01Lu5cHvRtEvzoifP1UVBVRb",
       tool_use_id: "toolu_01Lu5cHvRtEvzoifP1UVBVRb",
-      content: "Tool output unavailable (context compacted)",
+      isError: true,
+      content: [{ type: "text", text: "Tool output unavailable (context compacted)" }],
     })
     expect(messages[4]?.parts[1]).toEqual({ type: "text", text: "next" })
   })
