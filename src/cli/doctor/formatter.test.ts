@@ -170,6 +170,24 @@ describe("formatDoctorOutput", () => {
       expect(output).toContain("Available models: openai/gpt-5.4")
       expect(output).toContain("Agent sisyphus -> openai/gpt-5.4")
     })
+
+    it("uses ASCII separators in CI", async () => {
+      //#given
+      process.env.CI = "true"
+      try {
+        const result = createDoctorResult()
+        const { formatVerbose } = await import(`./format-verbose?ci-separators-${Date.now()}`)
+
+        //#when
+        const output = stripAnsi(formatVerbose(result))
+
+        //#then
+        expect(output).toContain("----------------------------------------")
+        expect(output).not.toContain("────────────────────────────────────────")
+      } finally {
+        delete process.env.CI
+      }
+    })
   })
 
   describe("formatJsonOutput", () => {
