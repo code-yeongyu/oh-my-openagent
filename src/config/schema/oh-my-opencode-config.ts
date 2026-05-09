@@ -12,6 +12,7 @@ import { CommentCheckerConfigSchema } from "./comment-checker"
 import { BuiltinCommandNameSchema } from "./commands"
 import { ExperimentalConfigSchema } from "./experimental"
 import { GitMasterConfigSchema } from "./git-master"
+import { I18nConfigSchema } from "./i18n"
 import { KeywordDetectorConfigSchema } from "./keyword-detector"
 import { NotificationConfigSchema } from "./notification"
 import { OpenClawConfigSchema } from "./openclaw"
@@ -67,6 +68,8 @@ export const OhMyOpenCodeConfigSchema = z.object({
   notification: NotificationConfigSchema.optional(),
   model_capabilities: ModelCapabilitiesConfigSchema.optional(),
   openclaw: OpenClawConfigSchema.optional(),
+  /** Plugin i18n settings */
+  i18n: I18nConfigSchema.optional(),
   team_mode: TeamModeConfigSchema.optional(),
   /** Per-keyword disable list for the keyword-detector transform hook. Allowed values: "ultrawork", "search", "analyze", "team". */
   keyword_detector: KeywordDetectorConfigSchema.optional(),
