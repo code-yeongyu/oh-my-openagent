@@ -5,7 +5,7 @@ import { getAgentToolRestrictions, log } from "../../shared"
 import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
 import type { DelegatedModelConfig } from "../../shared/model-resolution-types"
 import type { FallbackEntry } from "../../shared/model-requirements"
-import { stripAgentListSortPrefix } from "../../shared/agent-display-names"
+import { getAgentDisplayName, stripAgentListSortPrefix } from "../../shared/agent-display-names"
 import { waitForCompletion } from "./completion-poller"
 import { processMessages } from "./message-processor"
 import { createOrGetSession } from "./session-creator"
@@ -105,7 +105,7 @@ export async function executeSync(
       await (ctx.client.session as unknown as SessionWithPromptAsync).promptAsync({
         path: { id: sessionID },
         body: {
-          agent: normalizedSubagentType,
+          agent: getAgentDisplayName(normalizedSubagentType),
           tools: {
             ...getAgentToolRestrictions(normalizedSubagentType),
             task: false,

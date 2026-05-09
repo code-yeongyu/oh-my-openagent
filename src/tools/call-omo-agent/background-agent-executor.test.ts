@@ -152,4 +152,32 @@ describe("executeBackgroundAgent", () => {
     expect(secondResult).toContain("Task ID: task-2")
     expect(secondResult).not.toContain("interrupt")
   })
+
+  test("#given subagent_type is the lowercase config key 'hephaestus' #when executeBackgroundAgent runs #then BackgroundManager.launch receives the registered display name 'Hephaestus - Deep Agent'", async () => {
+    //#given
+    launchMock.mockClear()
+    launchMock.mockResolvedValueOnce({
+      id: "task-heph",
+      sessionId: "ses-heph",
+      description: "task",
+      agent: "Hephaestus - Deep Agent",
+      status: "pending",
+    })
+    getTaskMock.mockReturnValueOnce({
+      id: "task-heph",
+      sessionId: "ses-heph",
+      description: "task",
+      agent: "Hephaestus - Deep Agent",
+      status: "pending",
+    })
+    const args = { ...testArgs, subagent_type: "hephaestus" }
+
+    //#when
+    await executeBackgroundAgent(args, testContext, mockManager, mockClient)
+
+    //#then
+    const launchCall = launchMock.mock.calls.find(([input]) => (input as { agent: string }).agent !== undefined)
+    expect(launchCall).toBeDefined()
+    expect((launchCall![0] as { agent: string }).agent).toBe("Hephaestus - Deep Agent")
+  })
 })
