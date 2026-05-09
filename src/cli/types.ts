@@ -26,6 +26,12 @@ export interface InstallConfig {
   hasKimiForCoding: boolean
   hasOpencodeGo: boolean
   hasVercelAiGateway: boolean
+  /**
+   * User has direct DeepSeek API auth (provider key in opencode auth.json).
+   * Optional so existing test fixtures and call sites stay valid; absent or
+   * false routes through the `opencode-go` gateway as before.
+   */
+  hasDeepSeek?: boolean
 }
 
 export interface ConfigMergeResult {

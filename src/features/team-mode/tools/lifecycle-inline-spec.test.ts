@@ -79,7 +79,7 @@ function createTeamCreateToolForTest(
   config: ReturnType<typeof createConfig>,
   executorConfig?: Parameters<typeof factory>[4],
 ) {
-  return factory(config, {} as never, {} as never, undefined, executorConfig, {
+  return factory(config, { session: { get: async ({ path: { id } }: { path: { id: string } }) => ({ data: { id } }) } } as never, {} as never, undefined, executorConfig, {
     createTeamRun: createTeamRunMock,
     loadTeamSpec: async () => {
       throw new Error("loadTeamSpec should not be called for inline_spec tests")

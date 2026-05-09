@@ -162,7 +162,11 @@ export const listActiveTeamsMock = mock(async () => Array.from(runtimes.values()
 export const loadRuntimeStateMock = mock(async (teamRunId: string) => clone(requireRuntime(teamRunId)))
 
 export const config = TeamModeConfigSchema.parse({ enabled: true })
-export const mockClient = {} as OpencodeClient
+export const mockClient = {
+  session: {
+    get: async ({ path: { id } }: { path: { id: string } }) => ({ data: { id } }),
+  },
+} as unknown as OpencodeClient
 export const backgroundManager = {} as BackgroundManager
 
 export function resetLifecycleTestState(): void {

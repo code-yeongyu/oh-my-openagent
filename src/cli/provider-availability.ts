@@ -15,6 +15,7 @@ kimiForCoding: config.hasKimiForCoding,
 		opencodeGo: config.hasOpencodeGo,
 		vercelAiGateway: config.hasVercelAiGateway,
 		isMaxPlan: config.isMax20,
+		deepseek: config.hasDeepSeek === true,
 	}
 }
 
@@ -29,6 +30,7 @@ export function isProviderAvailable(provider: string, availability: ProviderAvai
 "kimi-for-coding": availability.kimiForCoding,
 		"opencode-go": availability.opencodeGo,
 		vercel: availability.vercelAiGateway,
+		deepseek: availability.deepseek === true,
 	}
 	return mapping[provider] ?? false
 }

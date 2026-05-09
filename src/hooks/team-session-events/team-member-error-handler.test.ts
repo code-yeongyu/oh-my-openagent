@@ -92,6 +92,63 @@ describe("createTeamMemberErrorHandler", () => {
     expect(runtimeState.members[0]?.status).toBe("errored")
   })
 
+  test("does NOT mark the member errored when the session is still alive (transient session.error path)", async () => {
+    // given — session.error fires for a member whose underlying OpenCode
+    // session is still up. This is the false-positive observed during the
+    // audit-remediation team launch: members were sending peer messages
+    // and completing real work but their team-mode status displayed as
+    // "errored" because every session.error event flipped it without
+    // checking session liveness.
+    const baseDir = await createTemporaryBaseDir()
+    const config = createConfig(baseDir)
+    const teamRunId = randomUUID()
+    await seedRuntimeState(createRuntimeState(teamRunId), config)
+    const stubClient = {} as never
+    const handler = createTeamMemberErrorHandler(config, {
+      client: stubClient,
+      directory: "/tmp/stub",
+      verifySessionExists: async () => true,
+    })
+
+    // when
+    await handler({
+      event: {
+        type: "session.error",
+        properties: { sessionID: "member-session", error: new Error("transient") },
+      },
+    })
+
+    // then — member status stays "running"; the work continues.
+    const runtimeState = await loadRuntimeState(teamRunId, config)
+    expect(runtimeState.members[0]?.status).toBe("running")
+  })
+
+  test("DOES mark the member errored when verifySessionExists reports the session is dead", async () => {
+    // given
+    const baseDir = await createTemporaryBaseDir()
+    const config = createConfig(baseDir)
+    const teamRunId = randomUUID()
+    await seedRuntimeState(createRuntimeState(teamRunId), config)
+    const stubClient = {} as never
+    const handler = createTeamMemberErrorHandler(config, {
+      client: stubClient,
+      directory: "/tmp/stub",
+      verifySessionExists: async () => false,
+    })
+
+    // when
+    await handler({
+      event: {
+        type: "session.error",
+        properties: { sessionID: "member-session", error: new Error("session crashed") },
+      },
+    })
+
+    // then
+    const runtimeState = await loadRuntimeState(teamRunId, config)
+    expect(runtimeState.members[0]?.status).toBe("errored")
+  })
+
   test("marks the member errored during the spawn race when the registry tracks the fresh session before disk state persists it", async () => {
     // given
     const baseDir = await createTemporaryBaseDir()

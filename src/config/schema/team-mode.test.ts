@@ -25,6 +25,7 @@ describe("TeamModeConfigSchema", () => {
         message_payload_max_bytes: 32768,
         recipient_unread_max_bytes: 262144,
         mailbox_poll_interval_ms: 3000,
+        member_selection: "stable",
       })
     })
   })

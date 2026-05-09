@@ -1,5 +1,8 @@
 import { z } from "zod"
 
+export const MemberSelectionModeSchema = z.enum(["stable", "creative"])
+export type MemberSelectionMode = z.infer<typeof MemberSelectionModeSchema>
+
 /** Team Mode config - see .sisyphus/plans/team-mode.md (D-01/D-25). */
 export const TeamModeConfigSchema = z.object({
   enabled: z.boolean().default(false),
@@ -13,6 +16,13 @@ export const TeamModeConfigSchema = z.object({
   message_payload_max_bytes: z.number().int().min(1024).default(32768),
   recipient_unread_max_bytes: z.number().int().min(1024).default(262144),
   mailbox_poll_interval_ms: z.number().int().min(500).default(3000),
+  // "stable" (default) broadcasts the lead's resolved model to followers
+  // that lack their own pick — produces deterministic, reproducible team
+  // runs. "creative" round-robins each follower across the agent's
+  // reachable fallback chain — deliberate diversity for adversarial review
+  // / ensemble flows. In both modes every member ends up with
+  // modelIntent: "explicit", so sticky-mode protects all of them.
+  member_selection: MemberSelectionModeSchema.default("stable"),
 })
 
 export type TeamModeConfig = z.infer<typeof TeamModeConfigSchema>

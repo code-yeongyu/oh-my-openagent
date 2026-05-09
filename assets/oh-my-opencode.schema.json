@@ -6007,6 +6007,14 @@
           "type": "integer",
           "minimum": 500,
           "maximum": 9007199254740991
+        },
+        "member_selection": {
+          "default": "stable",
+          "type": "string",
+          "enum": [
+            "stable",
+            "creative"
+          ]
         }
       },
       "required": [
@@ -6019,7 +6027,8 @@
         "max_member_turns",
         "message_payload_max_bytes",
         "recipient_unread_max_bytes",
-        "mailbox_poll_interval_ms"
+        "mailbox_poll_interval_ms",
+        "member_selection"
       ],
       "additionalProperties": false
     },

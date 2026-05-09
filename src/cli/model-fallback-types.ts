@@ -13,6 +13,12 @@ kimiForCoding: boolean
 	opencodeGo: boolean
 	vercelAiGateway: boolean
 	isMaxPlan: boolean
+	/**
+	 * User has direct DeepSeek provider auth. Models like `deepseek/v4-pro`
+	 * are reachable when true; defaults to false so legacy availability
+	 * snapshots stay valid.
+	 */
+	deepseek?: boolean
 }
 
 export interface AgentConfig {
