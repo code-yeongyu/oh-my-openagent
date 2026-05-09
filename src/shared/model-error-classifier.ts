@@ -74,6 +74,11 @@ const RETRYABLE_MESSAGE_PATTERNS = [
   "529",
   "selected provider is forbidden",
   "provider is forbidden",
+  // Chinese retryable patterns (Zhipu, etc.)
+  "频率限制",           // "rate limit"
+  "请求过于频繁",       // "too many requests"
+  "暂时不可用",         // "temporarily unavailable"
+  "服务不可用",         // "service unavailable"
 ]
 
 /**
@@ -106,6 +111,10 @@ const STOP_MESSAGE_PATTERNS = [
   "in arrears",
   "fair use policy",
   "recharge and try",
+  "使用上限",
+  "额度不足",
+  "余额不足",
+  "已耗尽",
 ]
 
 const AUTO_RETRY_GATE_PATTERNS = [
