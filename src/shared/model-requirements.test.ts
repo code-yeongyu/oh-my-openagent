@@ -23,12 +23,14 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(primary.variant).toBe("high")
   })
 
-  test("sisyphus has claude-opus-4-7 as primary with k2p5, kimi-k2.5, gpt-5.5 medium fallbacks", () => {
+  test("sisyphus chain orders Claude > Kimi > GLM > GPT-5.5 > big-pickle (family-aware)", () => {
     // #given - sisyphus agent requirement
     const sisyphus = AGENT_MODEL_REQUIREMENTS["sisyphus"]
 
     // #when - accessing Sisyphus requirement
-    // #then - fallbackChain has 7 entries with correct ordering
+    // #then - fallbackChain has 7 entries; GPT-5.5 sits AFTER all
+    // Sisyphus-native families (Claude/Kimi/GLM) per the canonical role
+    // mapping in src/hooks/no-sisyphus-gpt/hook.ts.
     expect(sisyphus).toBeDefined()
     expect(sisyphus.fallbackChain).toBeArray()
     expect(sisyphus.fallbackChain).toHaveLength(7)
@@ -50,14 +52,14 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     const fourth = sisyphus.fallbackChain[3]
     expect(fourth.model).toBe("kimi-k2.5")
 
-	const fifth = sisyphus.fallbackChain[4]
-	expect(fifth.providers).toContain("openai")
-	expect(fifth.model).toBe("gpt-5.5")
-	expect(fifth.variant).toBe("medium")
+    const fifth = sisyphus.fallbackChain[4]
+    expect(fifth.providers[0]).toBe("zai-coding-plan")
+    expect(fifth.model).toBe("glm-5")
 
     const sixth = sisyphus.fallbackChain[5]
-    expect(sixth.providers[0]).toBe("zai-coding-plan")
-    expect(sixth.model).toBe("glm-5")
+    expect(sixth.providers).toContain("openai")
+    expect(sixth.model).toBe("gpt-5.5")
+    expect(sixth.variant).toBe("medium")
 
     const last = sisyphus.fallbackChain[6]
     expect(last.providers[0]).toBe("opencode")
@@ -418,12 +420,13 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(primary.providers[0]).toBe("anthropic")
   })
 
-  test("unspecified-high has claude-opus-4-7 as primary and gpt-5.5 as secondary", () => {
+  test("unspecified-high orders Claude > GLM > Kimi > GPT-5.5 (family-aware)", () => {
     // #given - unspecified-high category requirement
     const unspecifiedHigh = CATEGORY_MODEL_REQUIREMENTS["unspecified-high"]
 
     // #when - accessing unspecified-high requirement
-    // #then - claude-opus-4-7 is first and gpt-5.5 is second
+    // #then - claude-opus-4-7 is first; GPT-5.5 sits at the end as the
+    // cross-family escape after all Sisyphus-native families exhaust.
     expect(unspecifiedHigh).toBeDefined()
     expect(unspecifiedHigh.fallbackChain).toBeArray()
     expect(unspecifiedHigh.fallbackChain.length).toBeGreaterThan(1)
@@ -434,9 +437,13 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(primary.providers).toEqual(["anthropic", "github-copilot", "opencode", "vercel"])
 
     const secondary = unspecifiedHigh.fallbackChain[1]
-    expect(secondary.model).toBe("gpt-5.5")
-    expect(secondary.variant).toBe("high")
-    expect(secondary.providers).toEqual(["openai", "github-copilot", "opencode", "vercel"])
+    expect(secondary.model).toBe("glm-5")
+    expect(secondary.providers[0]).toBe("zai-coding-plan")
+
+    const last = unspecifiedHigh.fallbackChain[unspecifiedHigh.fallbackChain.length - 1]
+    expect(last.model).toBe("gpt-5.5")
+    expect(last.variant).toBe("high")
+    expect(last.providers).toEqual(["openai", "github-copilot", "opencode", "vercel"])
   })
 
   test("artistry has valid fallbackChain with gemini-3.1-pro as primary", () => {

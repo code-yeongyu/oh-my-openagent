@@ -344,6 +344,38 @@ describe("model-error-classifier", () => {
       expect(hasCrossProviderFallback(chain, 1, "github-copilot")).toBe(false)
     })
   })
+
+  describe("SDK transport error retryability", () => {
+    test("'JSON Parse error: Unterminated string' is retryable even when error name is SyntaxError", () => {
+      const error = { name: "SyntaxError", message: "JSON Parse error: Unterminated string" }
+      expect(shouldRetryError(error)).toBe(true)
+    })
+
+    test("'unexpected end of stream' is retryable", () => {
+      expect(shouldRetryError({ name: "SyntaxError", message: "Unexpected end of stream" })).toBe(true)
+    })
+
+    test("'unexpected end of json' is retryable", () => {
+      expect(shouldRetryError({ message: "Unexpected end of JSON input" })).toBe(true)
+    })
+
+    test("'stream closed' is retryable", () => {
+      expect(shouldRetryError({ message: "stream closed unexpectedly" })).toBe(true)
+    })
+
+    test("'socket hang up' is retryable", () => {
+      expect(shouldRetryError({ name: "Error", message: "socket hang up" })).toBe(true)
+    })
+
+    test("'ECONNRESET' is retryable", () => {
+      expect(shouldRetryError({ message: "fetch failed: ECONNRESET" })).toBe(true)
+    })
+
+    test("real SyntaxError without transport pattern stays non-retryable", () => {
+      const error = { name: "SyntaxError", message: "Unexpected token < in user code" }
+      expect(shouldRetryError(error)).toBe(false)
+    })
+  })
 })
 
 export {}

@@ -19,6 +19,11 @@ export type ModelRequirement = {
 
 export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   sisyphus: {
+    // Order mirrors the canonical Sisyphus role: Claude > Kimi > GLM (per
+    // README.md and src/hooks/no-sisyphus-gpt/hook.ts). GPT-5.5 stays in the
+    // chain only as the documented native-Sisyphus exception, but is placed
+    // AFTER all non-GPT options so an originalModel of any Sisyphus-native
+    // family is preferred over a cross-family escape.
     fallbackChain: [
       {
         providers: ["anthropic", "github-copilot", "opencode", "vercel"],
@@ -39,8 +44,8 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         ],
         model: "kimi-k2.5",
       },
-      { providers: ["openai", "github-copilot", "opencode", "vercel"], model: "gpt-5.5", variant: "medium" },
       { providers: ["zai-coding-plan", "opencode", "vercel"], model: "glm-5" },
+      { providers: ["openai", "github-copilot", "opencode", "vercel"], model: "gpt-5.5", variant: "medium" },
       { providers: ["opencode"], model: "big-pickle" },
     ],
     requiresAnyModel: true,
@@ -299,16 +304,14 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     ],
   },
   "unspecified-high": {
+    // Same family-aware ordering as sisyphus: Claude > GLM > Kimi > GPT-5.5.
+    // GPT-5.5 is kept only as the high-tier escape after all
+    // Sisyphus-native families are exhausted.
     fallbackChain: [
       {
         providers: ["anthropic", "github-copilot", "opencode", "vercel"],
         model: "claude-opus-4-7",
         variant: "max",
-      },
-      {
-        providers: ["openai", "github-copilot", "opencode", "vercel"],
-        model: "gpt-5.5",
-        variant: "high",
       },
       { providers: ["zai-coding-plan", "opencode", "vercel"], model: "glm-5" },
       { providers: ["kimi-for-coding"], model: "k2p5" },
@@ -325,6 +328,11 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
           "vercel",
         ],
         model: "kimi-k2.5",
+      },
+      {
+        providers: ["openai", "github-copilot", "opencode", "vercel"],
+        model: "gpt-5.5",
+        variant: "high",
       },
     ],
   },
