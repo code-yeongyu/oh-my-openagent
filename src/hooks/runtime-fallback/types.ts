@@ -38,7 +38,16 @@ export interface RuntimeFallbackPluginInput {
 export interface FallbackState {
   originalModel: string
   currentModel: string
-  fallbackIndex: number
+  /**
+   * Models the runtime has selected as a fallback during this session
+   * (regardless of whether they later failed or succeeded). The two-pass
+   * family-aware scan in findNextAvailableFallback uses this to avoid
+   * re-picking a model already tried in the current fallback episode,
+   * even when family preference would otherwise prefer it. This replaces
+   * the prior `fallbackIndex` cursor, which permanently skipped lower-
+   * indexed entries once a higher-indexed family-match was selected.
+   */
+  triedModels: Set<string>
   failedModels: Map<string, number>
   attemptCount: number
   pendingFallbackModel?: string

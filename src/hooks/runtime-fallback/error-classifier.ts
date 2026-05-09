@@ -181,3 +181,48 @@ export function isRetryableError(error: unknown, retryOnErrors: number[]): boole
 
   return RETRYABLE_ERROR_PATTERNS.some((pattern) => pattern.test(message))
 }
+
+/**
+ * Hard failures are errors where retrying the SAME model on the SAME provider
+ * cannot recover — chain advancement (or a different provider) is required.
+ * Transient errors (rate limit, 5xx, "retrying in", overloaded) are NOT hard
+ * failures: opencode's own internal retry usually clears them, and the
+ * runtime-fallback layer should defer to that retry rather than swap models
+ * mid-flight on the user's pinned choice.
+ *
+ * Hard-failure cases:
+ *   - quota_exceeded / insufficient balance (provider says "no more for you")
+ *   - model_not_found / model_not_supported on this provider
+ *   - missing or invalid API key (auth)
+ *   - HTTP 401/402/403/404 (auth/billing/not-found — 429 is intentionally
+ *     excluded; 429 is a transient rate-limit handled by provider retry)
+ */
+export function isHardFailure(error: unknown): boolean {
+  const errorType = classifyErrorType(error)
+  if (
+    errorType === "quota_exceeded" ||
+    errorType === "model_not_found" ||
+    errorType === "missing_api_key" ||
+    errorType === "invalid_api_key"
+  ) {
+    return true
+  }
+
+  const statusCode = extractStatusCode(error)
+  if (statusCode === 401 || statusCode === 402 || statusCode === 403 || statusCode === 404) {
+    return true
+  }
+
+  const message = getErrorMessage(error)
+  if (
+    /model.{0,20}?not.{0,10}?supported/i.test(message) ||
+    /model_not_supported/i.test(message) ||
+    /unauthorized/i.test(message) ||
+    /forbidden/i.test(message) ||
+    /payment\s+required/i.test(message)
+  ) {
+    return true
+  }
+
+  return false
+}

@@ -458,12 +458,15 @@ describe("runtime-fallback", () => {
       const sessionID = "test-session-category-bootstrap-session-error"
       SessionCategoryRegistry.register(sessionID, "quick")
 
+      // Use a hard-failure error (insufficient balance) so the
+      // sticky-on-pinned-model gate does not defer this transient retry —
+      // the test verifies category-model bootstrap, not retry classification.
       await hook.event({
         event: {
           type: "session.error",
           properties: {
             sessionID,
-            error: { statusCode: 429, message: "Rate limit exceeded" },
+            error: { statusCode: 429, message: "Insufficient balance for this account" },
           },
         },
       })
@@ -591,7 +594,7 @@ describe("runtime-fallback", () => {
             parts: [
               {
                 type: "text",
-                text: "This request would exceed your account's rate limit. Please try again later. [retrying in 2s attempt #2]",
+                text: "This request would exceed your account's usage limit. Please try again later. [retrying in 2s attempt #2]",
               },
             ],
           },
@@ -633,7 +636,7 @@ describe("runtime-fallback", () => {
               parts: [
                 {
                   type: "text",
-                  text: "This request would exceed your account's rate limit. Please try again later. [retrying in 2s attempt #2]",
+                  text: "This request would exceed your account's usage limit. Please try again later. [retrying in 2s attempt #2]",
                 },
               ],
             },
@@ -693,7 +696,7 @@ describe("runtime-fallback", () => {
               type: "retry",
               next: 476,
               attempt: 1,
-              message: "All credentials for model claude-opus-4-7 are cooling down [retrying in 7m 56s attempt #1]",
+              message: "All credentials for model claude-opus-4-7 are cooling down — usage limit reached [retrying in 7m 56s attempt #1]",
             },
           },
         },
@@ -752,7 +755,7 @@ describe("runtime-fallback", () => {
               type: "retry",
               next: 476,
               attempt: 1,
-              message: "All credentials for model claude-opus-4-7 are cooling down [retrying in 7m 56s attempt #1]",
+              message: "All credentials for model claude-opus-4-7 are cooling down — usage limit reached [retrying in 7m 56s attempt #1]",
             },
           },
         },
@@ -767,7 +770,7 @@ describe("runtime-fallback", () => {
               type: "retry",
               next: 475,
               attempt: 1,
-              message: "All credentials for model claude-opus-4-7 are cooling down [retrying in 7m 55s attempt #1]",
+              message: "All credentials for model claude-opus-4-7 are cooling down — usage limit reached [retrying in 7m 55s attempt #1]",
             },
           },
         },
@@ -1113,6 +1116,8 @@ describe("runtime-fallback", () => {
       const sessionID = "test-session-category-bootstrap-message-updated"
       SessionCategoryRegistry.register(sessionID, "quick")
 
+      // Hard-failure error so the sticky-on-pinned-model gate does not defer.
+      // The test verifies category-model bootstrap, not retry classification.
       await hook.event({
         event: {
           type: "message.updated",
@@ -1120,7 +1125,7 @@ describe("runtime-fallback", () => {
             info: {
               sessionID,
               role: "assistant",
-              error: { statusCode: 429, message: "Rate limit exceeded" },
+              error: { statusCode: 401, message: "Insufficient balance for this account" },
             },
           },
         },
@@ -2166,7 +2171,7 @@ describe("runtime-fallback", () => {
             },
             parts: [
               { type: "text", text: "Hello" },
-              { type: "error", text: "Rate limit exceeded" },
+              { type: "error", text: "Insufficient balance: usage limit reached" },
             ],
           },
         },
@@ -2307,11 +2312,12 @@ describe("runtime-fallback", () => {
         },
       })
 
-      //#when
+      //#when - hard-failure error (insufficient balance) so the
+      // sticky-on-pinned-model gate does not defer.
       await hook.event({
         event: {
           type: "session.error",
-          properties: { sessionID, error: { statusCode: 429, message: "Rate limit" } },
+          properties: { sessionID, error: { statusCode: 429, message: "Insufficient balance" } },
         },
       })
 
@@ -2345,7 +2351,7 @@ describe("runtime-fallback", () => {
       await hook.event({
         event: {
           type: "session.error",
-          properties: { sessionID, error: { statusCode: 429 } },
+          properties: { sessionID, error: { statusCode: 429, message: "Insufficient balance" } },
         },
       })
 
@@ -2386,11 +2392,12 @@ describe("runtime-fallback", () => {
         },
       })
 
-      //#when - error occurs
+      //#when - hard-failure error (insufficient balance) so the
+      // sticky-on-pinned-model gate does not defer.
       await hook.event({
         event: {
           type: "session.error",
-          properties: { sessionID, error: { statusCode: 503 }, agent: "oracle" },
+          properties: { sessionID, error: { statusCode: 503, message: "Insufficient balance" }, agent: "oracle" },
         },
       })
 
@@ -2417,7 +2424,7 @@ describe("runtime-fallback", () => {
       await hook.event({
         event: {
           type: "session.error",
-          properties: { sessionID, error: { statusCode: 429 } },
+          properties: { sessionID, error: { statusCode: 429, message: "Insufficient balance" } },
         },
       })
 
@@ -2453,13 +2460,15 @@ describe("runtime-fallback", () => {
       )
       const sessionID = "test-preserve-agent-on-retry"
 
+      // Hard-failure error so the sticky-on-pinned-model gate does not
+      // defer; the test verifies agent preservation, not retry classification.
       await hook.event({
         event: {
           type: "session.error",
           properties: {
             sessionID,
             model: "anthropic/claude-opus-4-7",
-            error: { statusCode: 503, message: "Service unavailable" },
+            error: { statusCode: 503, message: "Insufficient balance" },
             agent: "prometheus",
           },
         },
@@ -2491,19 +2500,21 @@ describe("runtime-fallback", () => {
         },
       })
 
-      //#when - first error occurs, switches to openai
+      //#when - first hard-failure error advances chain off the user's pin
       await hook.event({
         event: {
           type: "session.error",
-          properties: { sessionID, error: { statusCode: 429 } },
+          properties: { sessionID, error: { statusCode: 429, message: "Insufficient balance" } },
         },
       })
 
-      //#when - second error occurs immediately; tries to switch back to original model but should be in cooldown
+      //#when - second error fires (chain has already advanced once, so the
+      // sticky-on-pinned-model gate no longer applies and the cooldown path
+      // can be exercised regardless of error class)
       await hook.event({
         event: {
           type: "session.error",
-          properties: { sessionID, error: { statusCode: 429 } },
+          properties: { sessionID, error: { statusCode: 429, message: "Rate limit" } },
         },
       })
 
@@ -2582,11 +2593,13 @@ describe("runtime-fallback", () => {
         },
       })
 
-      //#when - first error starts retry (promptAsync hangs, keeping retryInFlight set)
+      //#when - first hard-failure error starts retry (promptAsync hangs,
+      // keeping retryInFlight set). Hard failure is required so the
+      // sticky-on-pinned-model gate does not defer the first event.
       const firstErrorPromise = hook.event({
         event: {
           type: "session.error",
-          properties: { sessionID, error: { statusCode: 429, message: "Rate limit" } },
+          properties: { sessionID, error: { statusCode: 429, message: "Insufficient balance" } },
         },
       })
 
@@ -2596,7 +2609,7 @@ describe("runtime-fallback", () => {
       await hook.event({
         event: {
           type: "session.error",
-          properties: { sessionID, error: { statusCode: 429, message: "Second rate limit" } },
+          properties: { sessionID, error: { statusCode: 429, message: "Second insufficient balance" } },
         },
       })
 
@@ -2638,18 +2651,20 @@ describe("runtime-fallback", () => {
         },
       })
 
-      //#when - two errors fire sequentially (retry completes immediately between them)
+      //#when - two errors fire sequentially. First must be a hard failure
+      // so the sticky-on-pinned-model gate does not defer; once the chain
+      // has advanced, the second event walks the next entry as before.
       await hook.event({
         event: {
           type: "session.error",
-          properties: { sessionID, error: { statusCode: 429, message: "Rate limit" } },
+          properties: { sessionID, error: { statusCode: 429, message: "Insufficient balance" } },
         },
       })
 
       await hook.event({
         event: {
           type: "session.error",
-          properties: { sessionID, error: { statusCode: 429, message: "Rate limit again" } },
+          properties: { sessionID, error: { statusCode: 429, message: "Rate limit" } },
         },
       })
 
@@ -2701,10 +2716,12 @@ describe("runtime-fallback", () => {
         },
       })
 
+      // Hard-failure trigger so the sticky-on-pinned-model gate does not
+      // defer; the test is about session.stop interrupting an awaiting fallback.
       await hook.event({
         event: {
           type: "session.error",
-          properties: { sessionID, error: { statusCode: 429, message: "Rate limit" } },
+          properties: { sessionID, error: { statusCode: 429, message: "Insufficient balance" } },
         },
       })
 
@@ -2747,10 +2764,13 @@ describe("runtime-fallback", () => {
         },
       })
 
+      // First error must be a hard failure to bypass the
+      // sticky-on-pinned-model gate; the test is about pendingFallbackModel
+      // persistence on subsequent errors, not about retry classification.
       await hook.event({
         event: {
           type: "session.error",
-          properties: { sessionID, error: { statusCode: 429, message: "Rate limit" } },
+          properties: { sessionID, error: { statusCode: 429, message: "Insufficient balance" } },
         },
       })
 
@@ -2768,6 +2788,308 @@ describe("runtime-fallback", () => {
       //#then - chain advances normally (not skipped), consistent with consecutive errors test
       const fallbackLogs = logCalls.filter((call) => call.msg.includes("Preparing fallback"))
       expect(fallbackLogs.length).toBeGreaterThanOrEqual(2)
+    })
+  })
+
+  describe("sticky-on-pinned-model gate", () => {
+    test("transient error on user's pinned model defers to provider internal retry", async () => {
+      const promptCalls: Array<Record<string, unknown>> = []
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput({
+          session: {
+            messages: async () => ({
+              data: [{ info: { role: "user" }, parts: [{ type: "text", text: "hello" }] }],
+            }),
+            promptAsync: async (args) => {
+              promptCalls.push(args as Record<string, unknown>)
+              return {}
+            },
+          },
+        }),
+        {
+          config: createMockConfig({ notify_on_fallback: false }),
+          pluginConfig: createMockPluginConfigWithCategoryFallback(["openai/gpt-5.4"]),
+        },
+      )
+      const sessionID = "test-sticky-transient-defer"
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "github-copilot/claude-sonnet-4.6" } },
+        },
+      })
+
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: { sessionID, error: { statusCode: 429, message: "Rate limit exceeded" } },
+        },
+      })
+
+      // No prompt issued — chain did NOT advance from the user's pin.
+      expect(promptCalls).toHaveLength(0)
+
+      const deferLog = logCalls.find((c) => c.msg.includes("Sticky-on-pinned-model"))
+      expect(deferLog).toBeDefined()
+      expect(deferLog?.data).toMatchObject({
+        sessionID,
+        currentModel: "github-copilot/claude-sonnet-4.6",
+      })
+
+      const fallbackLog = logCalls.find((c) => c.msg.includes("Preparing fallback"))
+      expect(fallbackLog).toBeUndefined()
+    })
+
+    test("hard failure on pinned model advances chain immediately", async () => {
+      const promptCalls: Array<Record<string, unknown>> = []
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput({
+          session: {
+            messages: async () => ({
+              data: [{ info: { role: "user" }, parts: [{ type: "text", text: "hello" }] }],
+            }),
+            promptAsync: async (args) => {
+              promptCalls.push(args as Record<string, unknown>)
+              return {}
+            },
+          },
+        }),
+        {
+          config: createMockConfig({ notify_on_fallback: false }),
+          pluginConfig: createMockPluginConfigWithCategoryFallback(["openai/gpt-5.4"]),
+        },
+      )
+      const sessionID = "test-sticky-hard-advance"
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "github-copilot/claude-sonnet-4.6" } },
+        },
+      })
+
+      // Insufficient balance is a hard failure — gate does NOT defer.
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: { sessionID, error: { statusCode: 429, message: "Insufficient balance" } },
+        },
+      })
+
+      expect(promptCalls).toHaveLength(1)
+      const fallbackLog = logCalls.find((c) => c.msg.includes("Preparing fallback"))
+      expect(fallbackLog).toBeDefined()
+      expect(fallbackLog?.data).toMatchObject({
+        from: "github-copilot/claude-sonnet-4.6",
+        to: "openai/gpt-5.4",
+      })
+    })
+
+    test("transient error after one chain advance still advances (gate only protects the pinned model)", async () => {
+      const promptCalls: Array<Record<string, unknown>> = []
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput({
+          session: {
+            messages: async () => ({
+              data: [{ info: { role: "user" }, parts: [{ type: "text", text: "hello" }] }],
+            }),
+            promptAsync: async (args) => {
+              promptCalls.push(args as Record<string, unknown>)
+              return {}
+            },
+          },
+        }),
+        {
+          config: createMockConfig({ notify_on_fallback: false }),
+          pluginConfig: createMockPluginConfigWithCategoryFallback(["openai/gpt-5.4", "anthropic/claude-haiku-4.5"]),
+        },
+      )
+      const sessionID = "test-sticky-after-advance"
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "github-copilot/claude-sonnet-4.6" } },
+        },
+      })
+
+      // First: hard failure → advance off the pin.
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: { sessionID, error: { statusCode: 429, message: "Insufficient balance" } },
+        },
+      })
+
+      // Second: ordinary transient — chain has already advanced, so the gate
+      // no longer applies and the existing chain-walk runs.
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: { sessionID, error: { statusCode: 503, message: "Service unavailable" } },
+        },
+      })
+
+      const fallbackLogs = logCalls.filter((c) => c.msg.includes("Preparing fallback"))
+      expect(fallbackLogs.length).toBeGreaterThanOrEqual(2)
+    })
+
+    test("session.status retry signal on pinned model defers (does not interrupt opencode internal retry)", async () => {
+      const promptCalls: Array<Record<string, unknown>> = []
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput({
+          session: {
+            messages: async () => ({
+              data: [{ info: { role: "user" }, parts: [{ type: "text", text: "hello" }] }],
+            }),
+            promptAsync: async (args) => {
+              promptCalls.push(args as Record<string, unknown>)
+              return {}
+            },
+          },
+        }),
+        {
+          config: createMockConfig({ notify_on_fallback: false }),
+          pluginConfig: createMockPluginConfigWithCategoryFallback(["openai/gpt-5.4"]),
+        },
+      )
+      const sessionID = "test-sticky-session-status"
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "github-copilot/claude-sonnet-4.6" } },
+        },
+      })
+
+      // Plain rate-limit retry signal: provider is retrying internally,
+      // gate must defer instead of swapping the user's pin.
+      await hook.event({
+        event: {
+          type: "session.status",
+          properties: {
+            sessionID,
+            status: {
+              type: "retry",
+              attempt: 1,
+              message: "rate limit hit [retrying in 30s attempt #1]",
+            },
+          },
+        },
+      })
+
+      expect(promptCalls).toHaveLength(0)
+      const deferLog = logCalls.find((c) => c.msg.includes("Sticky-on-pinned-model: deferring transient retry status"))
+      expect(deferLog).toBeDefined()
+    })
+  })
+
+  describe("family-aware fallback ordering", () => {
+    test("claude-pinned chain prefers Claude entries before GPT, even when GPT is listed earlier", async () => {
+      const promptCalls: Array<Record<string, unknown>> = []
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput({
+          session: {
+            messages: async () => ({
+              data: [{ info: { role: "user" }, parts: [{ type: "text", text: "hello" }] }],
+            }),
+            promptAsync: async (args) => {
+              promptCalls.push(args as Record<string, unknown>)
+              return {}
+            },
+          },
+        }),
+        {
+          config: createMockConfig({ notify_on_fallback: false }),
+          // User config interleaves families: GPT comes BEFORE the second
+          // Claude entry. Family-aware Pass 1 must skip GPT and pick the
+          // Claude entry first.
+          pluginConfig: createMockPluginConfigWithCategoryFallback([
+            "openai/gpt-5.5",
+            "anthropic/claude-haiku-4-5",
+            "opencode-go/glm-5.1",
+          ]),
+        },
+      )
+      const sessionID = "test-family-aware-claude-first"
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "anthropic/claude-sonnet-4-6" } },
+        },
+      })
+
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: { sessionID, error: { statusCode: 429, message: "Insufficient balance" } },
+        },
+      })
+
+      expect(promptCalls).toHaveLength(1)
+      const fallbackLog = logCalls.find((c) => c.msg.includes("Family-aware preference: selected same-family fallback"))
+      expect(fallbackLog).toBeDefined()
+      expect(fallbackLog?.data).toMatchObject({
+        candidate: "anthropic/claude-haiku-4-5",
+        family: "claude",
+      })
+      const promptBody = promptCalls[0]?.body as { model?: { providerID?: string; modelID?: string } } | undefined
+      expect(promptBody?.model).toEqual({ providerID: "anthropic", modelID: "claude-haiku-4-5" })
+    })
+
+    test("falls through to cross-family fallback after same-family options exhaust", async () => {
+      const promptCalls: Array<Record<string, unknown>> = []
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput({
+          session: {
+            messages: async () => ({
+              data: [{ info: { role: "user" }, parts: [{ type: "text", text: "hello" }] }],
+            }),
+            promptAsync: async (args) => {
+              promptCalls.push(args as Record<string, unknown>)
+              return {}
+            },
+          },
+        }),
+        {
+          config: createMockConfig({ notify_on_fallback: false }),
+          // No same-family entries available → Pass 1 finds nothing,
+          // Pass 2 takes the first available cross-family entry.
+          pluginConfig: createMockPluginConfigWithCategoryFallback([
+            "openai/gpt-5.5",
+            "opencode-go/glm-5.1",
+          ]),
+        },
+      )
+      const sessionID = "test-family-aware-cross-family-fallthrough"
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "anthropic/claude-sonnet-4-6" } },
+        },
+      })
+
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: { sessionID, error: { statusCode: 429, message: "Insufficient balance" } },
+        },
+      })
+
+      expect(promptCalls).toHaveLength(1)
+      const exhaustedLog = logCalls.find((c) => c.msg.includes("Family-aware preference exhausted; selecting cross-family fallback"))
+      expect(exhaustedLog).toBeDefined()
+      const promptBody = promptCalls[0]?.body as { model?: { providerID?: string; modelID?: string } } | undefined
+      expect(promptBody?.model).toEqual({ providerID: "openai", modelID: "gpt-5.5" })
     })
   })
 })

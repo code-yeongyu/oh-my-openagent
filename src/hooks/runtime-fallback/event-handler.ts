@@ -5,6 +5,7 @@ import { log } from "../../shared/logger"
 import { extractStatusCode, extractErrorName, classifyErrorType, isRetryableError } from "./error-classifier"
 import { createFallbackState } from "./fallback-state"
 import { getFallbackModelsForSession } from "./fallback-models"
+import { shouldDeferTransientOnPinnedModel } from "./sticky-pinned-model-gate"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { isAbortError } from "../../shared/is-abort-error"
 import { resolveFallbackBootstrapModel } from "./fallback-bootstrap-model"
@@ -186,6 +187,16 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
       sessionLastAccess.set(sessionID, Date.now())
     } else {
       sessionLastAccess.set(sessionID, Date.now())
+    }
+
+    if (shouldDeferTransientOnPinnedModel(state, error)) {
+      log(`[${HOOK_NAME}] Sticky-on-pinned-model: deferring transient error to provider internal retry`, {
+        sessionID,
+        currentModel: state.currentModel,
+        errorName: extractErrorName(error),
+        statusCode: extractStatusCode(error, config.retry_on_errors),
+      })
+      return
     }
 
     await dispatchFallbackRetry(deps, helpers, {

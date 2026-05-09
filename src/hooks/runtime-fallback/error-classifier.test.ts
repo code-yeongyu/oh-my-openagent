@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { classifyErrorType, extractAutoRetrySignal, extractStatusCode, isRetryableError } from "./error-classifier"
+import { classifyErrorType, extractAutoRetrySignal, extractStatusCode, isHardFailure, isRetryableError } from "./error-classifier"
 
 describe("runtime-fallback error classifier", () => {
   test("detects cooling-down auto-retry status signals", () => {
@@ -197,5 +197,84 @@ describe("model support fallback", () => {
     expect(retryable1).toBe(true)
     expect(retryable2).toBe(true)
     expect(retryable3).toBe(true)
+  })
+})
+
+describe("isHardFailure", () => {
+  test("classifies quota_exceeded as hard failure", () => {
+    const error = { name: "QuotaExceededError", message: "Quota exceeded for this month" }
+    expect(isHardFailure(error)).toBe(true)
+  })
+
+  test("classifies insufficient balance as hard failure", () => {
+    const error = { message: "Insufficient balance to fulfill request" }
+    expect(isHardFailure(error)).toBe(true)
+  })
+
+  test("classifies model_not_found as hard failure", () => {
+    const error = { name: "ProviderModelNotFoundError", message: "Model not found: anthropic/claude-opus-4-7" }
+    expect(isHardFailure(error)).toBe(true)
+  })
+
+  test("classifies model_not_supported as hard failure", () => {
+    const error = { message: "model_not_supported" }
+    expect(isHardFailure(error)).toBe(true)
+  })
+
+  test("classifies missing_api_key as hard failure", () => {
+    const error = { name: "AI_LoadAPIKeyError", message: "API key is missing. Pass it via the environment variable" }
+    expect(isHardFailure(error)).toBe(true)
+  })
+
+  test("classifies HTTP 401 as hard failure", () => {
+    const error = { statusCode: 401, message: "Unauthorized" }
+    expect(isHardFailure(error)).toBe(true)
+  })
+
+  test("classifies HTTP 403 as hard failure", () => {
+    const error = { statusCode: 403, message: "Forbidden" }
+    expect(isHardFailure(error)).toBe(true)
+  })
+
+  test("classifies HTTP 404 as hard failure", () => {
+    const error = { statusCode: 404, message: "Not found" }
+    expect(isHardFailure(error)).toBe(true)
+  })
+
+  test("does NOT classify HTTP 429 as hard failure", () => {
+    const error = { statusCode: 429, message: "Too Many Requests" }
+    expect(isHardFailure(error)).toBe(false)
+  })
+
+  test("does NOT classify HTTP 503 as hard failure", () => {
+    const error = { statusCode: 503, message: "Service Unavailable" }
+    expect(isHardFailure(error)).toBe(false)
+  })
+
+  test("does NOT classify HTTP 502/504 as hard failure", () => {
+    expect(isHardFailure({ statusCode: 502, message: "Bad Gateway" })).toBe(false)
+    expect(isHardFailure({ statusCode: 504, message: "Gateway Timeout" })).toBe(false)
+  })
+
+  test("does NOT classify 'retrying in' as hard failure", () => {
+    const error = {
+      message: "All credentials for model claude-opus-4-7 are cooling down [retrying in 7m attempt #1]",
+    }
+    expect(isHardFailure(error)).toBe(false)
+  })
+
+  test("does NOT classify plain rate_limit as hard failure", () => {
+    expect(isHardFailure({ message: "rate_limit hit" })).toBe(false)
+    expect(isHardFailure({ message: "Rate limit exceeded, try again later" })).toBe(false)
+  })
+
+  test("does NOT classify synthesized ProviderRateLimitError as hard failure", () => {
+    const error = { name: "ProviderRateLimitError", message: "All credentials for model X are cooling down" }
+    expect(isHardFailure(error)).toBe(false)
+  })
+
+  test("does NOT classify generic 'overloaded' or 'try again' as hard failure", () => {
+    expect(isHardFailure({ message: "Provider overloaded" })).toBe(false)
+    expect(isHardFailure({ message: "Service temporarily unavailable, try again" })).toBe(false)
   })
 })

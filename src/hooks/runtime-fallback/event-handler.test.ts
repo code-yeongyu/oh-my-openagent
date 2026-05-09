@@ -112,7 +112,7 @@ describe("createEventHandler", () => {
     const clearCalls: string[] = []
     const state = createFallbackState("google/gemini-2.5-pro")
     state.currentModel = "openai/gpt-5.4"
-    state.fallbackIndex = 1
+    state.triedModels.add("openai/gpt-5.4")
     state.attemptCount = 2
     state.pendingFallbackModel = "openai/gpt-5.4"
     state.failedModels.set("google/gemini-2.5-pro", Date.now())
@@ -127,7 +127,7 @@ describe("createEventHandler", () => {
     const resetState = deps.sessionStates.get(sessionID)
     expect(resetState?.originalModel).toBe("google/gemini-2.5-pro")
     expect(resetState?.currentModel).toBe("google/gemini-2.5-pro")
-    expect(resetState?.fallbackIndex).toBe(-1)
+    expect(resetState?.triedModels.size).toBe(0)
     expect(resetState?.attemptCount).toBe(0)
     expect(resetState?.pendingFallbackModel).toBe(undefined)
     expect(resetState?.failedModels.size).toBe(0)
@@ -145,7 +145,7 @@ describe("createEventHandler", () => {
     const clearCalls: string[] = []
     const state = createFallbackState("google/gemini-2.5-pro")
     state.currentModel = "openai/gpt-5.4"
-    state.fallbackIndex = 1
+    state.triedModels.add("openai/gpt-5.4")
     state.attemptCount = 2
     state.pendingFallbackModel = "openai/gpt-5.4"
     deps.sessionStates.set(sessionID, state)

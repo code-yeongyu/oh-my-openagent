@@ -128,7 +128,7 @@ describe("createRuntimeFallbackHook dispose", () => {
     capturedDeps?.sessionStates.set("session-1", {
       originalModel: "anthropic/claude-opus-4-7",
       currentModel: "openai/gpt-5.4",
-      fallbackIndex: 1,
+      triedModels: new Set(["openai/gpt-5.4"]),
       failedModels: new Map([["anthropic/claude-opus-4-7", 1]]),
       attemptCount: 1,
     })

@@ -3,6 +3,7 @@ import type { AutoRetryHelpers } from "./auto-retry"
 import { HOOK_NAME, RETRYABLE_ERROR_PATTERNS } from "./constants"
 import { log } from "../../shared/logger"
 import { extractAutoRetrySignal } from "./error-classifier"
+import { shouldDeferTransientOnPinnedModel } from "./sticky-pinned-model-gate"
 import { createFallbackState } from "./fallback-state"
 import { getFallbackModelsForSession } from "./fallback-models"
 import { normalizeRetryStatusMessage, extractRetryAttempt } from "../../shared/retry-status-utils"
@@ -112,6 +113,23 @@ export function createSessionStatusHandler(
       model: state.currentModel,
       retryAttempt: status.attempt,
     })
+
+    // Sticky-on-pinned-model gate placement: this MUST run after the
+    // retry-key dedup at the top of the handler (so countdown ticks for the
+    // same attempt are still suppressed) and BEFORE the abort + dispatch
+    // below (so opencode's own internal retry is not interrupted on the
+    // user's pinned model). Synthetic error carries only the retry message,
+    // since that's the sole signal the session.status channel passes
+    // through — isHardFailure classifies via message-pattern regex.
+    const syntheticRetryError = { name: "ProviderRetryStatus", message: retryMessage }
+    if (shouldDeferTransientOnPinnedModel(state, syntheticRetryError)) {
+      log(`[${HOOK_NAME}] Sticky-on-pinned-model: deferring transient retry status to provider internal retry`, {
+        sessionID,
+        currentModel: state.currentModel,
+        retryAttempt: status.attempt,
+      })
+      return
+    }
 
     await helpers.abortSessionRequest(sessionID, "session.status.retry-signal")
 

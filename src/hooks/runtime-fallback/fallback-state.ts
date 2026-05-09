@@ -2,12 +2,13 @@ import type { FallbackState, FallbackResult } from "./types"
 import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
 import type { RuntimeFallbackConfig } from "../../config"
+import { getModelFamily } from "../../agents/types"
 
 export function createFallbackState(originalModel: string): FallbackState {
   return {
     originalModel,
     currentModel: originalModel,
-    fallbackIndex: -1,
+    triedModels: new Set<string>(),
     failedModels: new Map<string, number>(),
     attemptCount: 0,
     pendingFallbackModel: undefined,
@@ -21,22 +22,72 @@ export function isModelInCooldown(model: string, state: FallbackState, cooldownS
   return Date.now() - failedAt < cooldownMs
 }
 
+function isCandidateAvailable(
+  candidate: string,
+  state: FallbackState,
+  cooldownSeconds: number,
+): boolean {
+  if (candidate === state.currentModel) return false
+  if (state.triedModels.has(candidate)) return false
+  if (isModelInCooldown(candidate, state, cooldownSeconds)) {
+    log(`[${HOOK_NAME}] Skipping fallback model in cooldown`, { model: candidate })
+    return false
+  }
+  return true
+}
+
+/**
+ * Two-pass family-aware fallback scan.
+ *
+ * Pass 1: only entries whose `getModelFamily(candidate)` matches the
+ * `originalModel`'s family. Honors agent role intent — when a user pinned
+ * `claude-sonnet-4.6` (Sisyphus's Claude family), Claude entries are tried
+ * before drifting into Hephaestus's GPT territory, even when the user's
+ * config interleaves them. See `src/hooks/no-sisyphus-gpt/hook.ts` for the
+ * canonical Sisyphus → Claude/Kimi/GLM mapping that this preference mirrors.
+ *
+ * Pass 2: any remaining entry. Runs only after Pass 1 is exhausted (or
+ * skipped when the original family is `"other"`, in which case there is no
+ * meaningful preference to express).
+ *
+ * Both passes scan the WHOLE chain (not from a cursor), skipping models
+ * already in `triedModels` or active cooldown. This avoids the prior
+ * `fallbackIndex` bug where a high-index family-match permanently hid
+ * lower-index non-family entries from later passes.
+ */
 export function findNextAvailableFallback(
   state: FallbackState,
   fallbackModels: string[],
-  cooldownSeconds: number
+  cooldownSeconds: number,
 ): string | undefined {
-  for (let i = state.fallbackIndex + 1; i < fallbackModels.length; i++) {
-    const candidate = fallbackModels[i]
-    if (candidate === state.currentModel) {
-      log(`[${HOOK_NAME}] Skipping fallback model (same as current)`, { model: candidate, index: i })
-      continue
-    }
-    if (!isModelInCooldown(candidate, state, cooldownSeconds)) {
+  const originalFamily = getModelFamily(state.originalModel)
+
+  if (originalFamily !== "other") {
+    for (const candidate of fallbackModels) {
+      if (!isCandidateAvailable(candidate, state, cooldownSeconds)) continue
+      if (getModelFamily(candidate) !== originalFamily) continue
+      log(`[${HOOK_NAME}] Family-aware preference: selected same-family fallback`, {
+        candidate,
+        family: originalFamily,
+        originalModel: state.originalModel,
+      })
       return candidate
     }
-    log(`[${HOOK_NAME}] Skipping fallback model in cooldown`, { model: candidate, index: i })
   }
+
+  for (const candidate of fallbackModels) {
+    if (!isCandidateAvailable(candidate, state, cooldownSeconds)) continue
+    if (originalFamily !== "other" && getModelFamily(candidate) !== originalFamily) {
+      log(`[${HOOK_NAME}] Family-aware preference exhausted; selecting cross-family fallback`, {
+        candidate,
+        candidateFamily: getModelFamily(candidate),
+        originalFamily,
+        originalModel: state.originalModel,
+      })
+    }
+    return candidate
+  }
+
   return undefined
 }
 
@@ -68,8 +119,8 @@ export function prepareFallback(
   const failedModel = state.currentModel
   const now = Date.now()
 
-  state.fallbackIndex = fallbackModels.indexOf(nextModel)
   state.failedModels.set(failedModel, now)
+  state.triedModels.add(nextModel)
   state.attemptCount++
   state.currentModel = nextModel
   state.pendingFallbackModel = nextModel

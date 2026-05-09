@@ -76,7 +76,7 @@ describe("createSessionStatusHandler", () => {
     const retryCalls: Array<{ sessionID: string; model: string; source: string }> = []
     const state = createFallbackState("anthropic/claude-opus-4-7")
     state.currentModel = "openai/gpt-5.4"
-    state.fallbackIndex = 0
+    state.triedModels.add("openai/gpt-5.4")
     state.attemptCount = 1
     state.pendingFallbackModel = "openai/gpt-5.4"
     state.failedModels.set("anthropic/claude-opus-4-7", Date.now())
