@@ -79,7 +79,7 @@
       },
       "boulderTitle": "Session Continuity",
       "boulderDescription": "活跃工作被记录在 boulder.json 中。停电？系统崩溃？没关系。从你停下的地方精确恢复。",
-      "model": "Claude Opus 4.6 Max"
+      "model": "Claude Opus 4.7 Max"
     },
     "prometheusAtlas": {
       "badge": "编排工作流",
@@ -88,7 +88,7 @@
       "prometheus": {
         "name": "Prometheus",
         "role": "Strategic Planner",
-        "model": "Claude Opus 4.6 Max",
+        "model": "Claude Opus 4.7 Max",
         "description": "架构师。与你访谈，探索代码库，并创建详细的执行计划。从不写代码。使用 Metis 和 Momus 作为质量关卡。",
         "features": [
           "智能访谈模式",
@@ -139,7 +139,44 @@
         "verify": "VERIFY — 证明有效"
       },
       "tagline": "当足够好还不够时。",
-      "model": "GPT 5.3 Codex Medium"
+      "model": "GPT 5.5 Medium"
+    },
+    "teamMode": {
+      "badge": "NEW · v4.0",
+      "title": "Team Mode",
+      "headline": "多个 Agent。并排运行。真正并行。",
+      "description": "一个领导 Agent 协调一队按类别专业化的成员，全部并行运行，通过专用工具实时通信。在 tmux 中同时观察每个成员工作。选择性启用 — 翻转 team_mode.enabled 并重启。",
+      "features": {
+        "lead": {
+          "title": "领导编排",
+          "description": "一个协调者，多个专家。通过 team_send_message 和 team_task_create 进行实时消息传递。"
+        },
+        "parallel": {
+          "title": "真正的并行",
+          "description": "最多 8 个成员同时工作。无等待，无队列 — 所有角度一次覆盖。"
+        },
+        "tmux": {
+          "title": "Tmux 可视化",
+          "description": "Focus 和 grid 窗口让你聚焦一名队员的同时不失全局视野。"
+        },
+        "tools": {
+          "title": "team_* 工具家族",
+          "description": "12 个专用工具(team_create、team_status、team_send_message、…)，在 team_mode.enabled 后启用。"
+        }
+      },
+      "poweredBy": "由 Team Mode 驱动",
+      "skills": {
+        "hyperplan": {
+          "name": "hyperplan",
+          "description": "5 个敌对 Agent 在写一行代码前，从正交角度撕碎你的计划。"
+        },
+        "securityResearch": {
+          "name": "security-research",
+          "description": "3 个漏洞猎手 + 2 个 PoC 工程师审计你的代码库。严重性按实际可利用性校准。"
+        }
+      },
+      "optIn": "team_mode.enabled = true → 重启 opencode",
+      "tagline": "默认关闭。开启时具有毁灭性。"
     },
     "agents": {
       "title": "Specialized Agents",
@@ -147,31 +184,31 @@
       "oracle": {
         "name": "Oracle",
         "role": "Architecture Consultant",
-        "model": "GPT 5.4 High",
+        "model": "GPT 5.5 High",
         "description": "复杂调试和架构决策。当前路不明时。"
       },
       "librarian": {
         "name": "Librarian",
         "role": "Docs & Code Search",
-        "model": "MiniMax M2.5",
+        "model": "GPT 5.4 Mini Fast",
         "description": "寻找真正的 GitHub 示例和官方文档。基于证据，附带永久链接。"
       },
       "explore": {
         "name": "Explore",
         "role": "Codebase Grep",
-        "model": "MiniMax M2.5",
+        "model": "GPT 5.4 Mini Fast",
         "description": "超高速代码库搜索。便宜、并行、始终在后台运行。"
       },
       "metis": {
         "name": "Metis",
         "role": "Plan Consultant",
-        "model": "Claude Opus 4.6 Max",
+        "model": "Claude Sonnet 4.6",
         "description": "在计划中的歧义变成生产 Bug 之前捕获它们。"
       },
       "momus": {
         "name": "Momus",
         "role": "Plan Reviewer",
-        "model": "GPT 5.4 Extra High",
+        "model": "GPT 5.5 xHigh",
         "description": "严苛验证。只有当计划无懈可击时才批准。"
       },
       "dynamicSystem": {

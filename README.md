@@ -146,6 +146,7 @@ Even with only the following subscriptions, `ultrawork` works well (this project
 |       | Feature                                                  | What it does                                                                                                                                                                                                     |
 | :---: | :------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 |   🤖   | **Discipline Agents**                                    | Sisyphus orchestrates Hephaestus, Oracle, Librarian, Explore. A full AI dev team in parallel.                                                                                                                    |
+|   👥   | **Team Mode** (v4.0, opt-in)                             | Lead agent + up to 8 parallel members, real-time tmux visualization, dedicated `team_*` tools. Powers `hyperplan` (5 hostile critics) and `security-research` (3 hunters + 2 PoC engineers). [Docs →](docs/guide/team-mode.md)                                                                                                                                       |
 |   ⚡   | **`ultrawork` / `ulw`**                                  | One word. Every agent activates. Doesn't stop until done.                                                                                                                                                        |
 |   🚪   | **[IntentGate](https://factory.ai/news/terminal-bench)** | Analyzes true user intent before classifying or acting. No more literal misinterpretations.                                                                                                                      |
 |   🔗   | **Hash-Anchored Edit Tool**                              | `LINE#ID` content hash validates every change. Zero stale-line errors. Inspired by [oh-my-pi](https://github.com/can1357/oh-my-pi). [The Harness Problem →](https://blog.can.ac/2026/02/12/the-harness-problem/) |
@@ -170,7 +171,7 @@ Even with only the following subscriptions, `ultrawork` works well (this project
 
 **Sisyphus** (`claude-opus-4-7` / **`kimi-k2.6`** / **`glm-5.1`** ) is your main orchestrator. He plans, delegates to specialists, and drives tasks to completion with aggressive parallel execution. He does not stop halfway.
 
-**Hephaestus** (`gpt-5.4`) is your autonomous deep worker. Give him a goal, not a recipe. He explores the codebase, researches patterns, and executes end-to-end without hand-holding. *The Legitimate Craftsman.*
+**Hephaestus** (`gpt-5.5`) is your autonomous deep worker. Give him a goal, not a recipe. He explores the codebase, researches patterns, and executes end-to-end without hand-holding. *The Legitimate Craftsman.*
 
 **Prometheus** (`claude-opus-4-7` / **`kimi-k2.6`** / **`glm-5.1`** ) is your strategic planner. Interview mode: he asks questions, identifies scope, and builds a detailed plan before a single line of code is touched.
 
@@ -178,7 +179,31 @@ Every agent is tuned to its model's specific strengths. No manual model juggling
 
 > Anthropic [blocked OpenCode because of us.](https://x.com/thdxr/status/2010149530486911014) That's why Hephaestus is called "The Legitimate Craftsman." The irony is intentional.
 >
-> We run best on Opus, but Kimi K2.6 + GPT-5.4 already beats vanilla Claude Code. Zero config needed.
+> We run best on Opus, but Kimi K2.6 + GPT-5.5 already beats vanilla Claude Code. Zero config needed.
+
+### Team Mode (v4.0)
+
+One agent is fast. A coordinated team is *devastating*.
+
+**Team Mode** turns oh-my-openagent from "one agent with subagents" into a real multi-agent system. A lead agent orchestrates a team of category-specialized members, all running **in parallel** and communicating through dedicated tools (`team_create`, `team_send_message`, `team_task_create`, `team_status`, ...). Watch every member work simultaneously in a tmux layout with focus + grid windows.
+
+```jsonc
+// .opencode/oh-my-openagent.jsonc
+{
+  "team_mode": {
+    "enabled": true,
+    "max_parallel_members": 4,
+    "tmux_visualization": true
+  }
+}
+```
+
+Restart opencode and the `team_*` tool family unlocks. Two skills already ride on top:
+
+- **`hyperplan`** — 5 hostile agents tear apart your plan from orthogonal angles before a single line of code is written.
+- **`security-research`** — 3 vulnerability hunters + 2 PoC engineers audit your codebase in parallel, with severity calibrated by *actual exploitability*.
+
+> **Off by default. Enable it when you want it.** [Full Team Mode guide →](docs/guide/team-mode.md)
 
 ### Agent Orchestration
 
@@ -191,7 +216,7 @@ When Sisyphus delegates to a subagent, it doesn't pick a model. It picks a **cat
 | `quick`              | Single-file changes, typos         |
 | `ultrabrain`         | Hard logic, architecture decisions |
 
-The agent says what kind of work it needs; the harness picks the right model. `ultrabrain` now routes to GPT-5.4 xhigh by default. You touch nothing.
+The agent says what kind of work it needs; the harness picks the right model. `ultrabrain` now routes to GPT-5.5 xhigh by default. You touch nothing.
 
 ### Claude Code Compatibility
 

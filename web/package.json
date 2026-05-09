@@ -37,6 +37,12 @@
     "tailwind-merge": "^3.5.0",
     "tailwindcss-animate": "^1.0.7"
   },
+  "browserslist": [
+    "chrome >= 100",
+    "firefox >= 100",
+    "safari >= 15",
+    "edge >= 100"
+  ],
   "devDependencies": {
     "@opennextjs/cloudflare": "^1.19.8",
     "@playwright/test": "1.59.1",
@@ -44,6 +50,7 @@
     "@types/node": "^25.6.2",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "critters": "^0.0.25",
     "eslint": "^10.3.0",
     "eslint-config-next": "15.5.18",
     "eslint-config-prettier": "10.1.8",
@@ -53,8 +60,8 @@
     "prettier": "3.8.3",
     "prettier-plugin-tailwindcss": "^0.8.0",
     "tailwindcss": "4.2.4",
-    "typescript-eslint": "^8.59.2",
     "typescript": "6.0.3",
+    "typescript-eslint": "^8.59.2",
     "wrangler": "^4.90.0"
   }
 }
