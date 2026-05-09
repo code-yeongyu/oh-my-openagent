@@ -1,6 +1,7 @@
 declare const require: (name: string) => any
 const { describe, test, expect, beforeEach, afterEach, mock } = require("bun:test")
 import type { ConcurrencyManager } from "../background-agent/concurrency"
+import { initI18n } from "../../shared/i18n"
 
 type TaskToastManagerClass = typeof import("./manager").TaskToastManager
 
@@ -27,6 +28,7 @@ describe("TaskToastManager", () => {
     const mod = await import("./manager")
     TaskToastManager = mod.TaskToastManager
 
+    initI18n({ locale: "en" })
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     toastManager = new TaskToastManager(mockClient as any, mockConcurrencyManager)
   })
