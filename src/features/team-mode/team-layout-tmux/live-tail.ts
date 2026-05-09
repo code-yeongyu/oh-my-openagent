@@ -29,12 +29,14 @@ export function materializeLiveTailScript(): string {
 
 type LiveTailCommandOptions = {
   allowInsecureTls?: boolean
+  disableStatusFooter?: boolean
 }
 
 export function buildLiveTailCommand(serverUrl: string, sessionId: string, options?: LiveTailCommandOptions): string {
   const scriptPath = materializeLiveTailScript()
   const insecureFlag = options?.allowInsecureTls ? " --insecure" : ""
-  return `python3 -u ${shellSingleQuote(scriptPath)} ${shellSingleQuote(serverUrl)} ${shellSingleQuote(sessionId)}${insecureFlag}`
+  const noFooterFlag = options?.disableStatusFooter ? " --no-footer" : ""
+  return `python3 -u ${shellSingleQuote(scriptPath)} ${shellSingleQuote(serverUrl)} ${shellSingleQuote(sessionId)}${insecureFlag}${noFooterFlag}`
 }
 
 export function _resetCacheForTests(): void {

@@ -13,6 +13,8 @@ import {
   InvalidTransitionError,
   RuntimeStateError,
   STALE_DELETING_TTL_MS,
+  TeamFromDeadInstanceError,
+  assertTeamServedByCurrentInstance,
   createRuntimeState,
   listActiveTeams,
   loadRuntimeState,
@@ -156,6 +158,26 @@ describe("runtime state store", () => {
     expect((await loadRuntimeState(createdState.teamRunId, config)).status).toBe("shutdown_requested")
   })
 
+  test("transitionRuntimeState allows failed to deleting so failed teams can be cleaned up via team_delete", async () => {
+    // given
+    const baseDir = await createTemporaryBaseDir()
+    temporaryDirectories.push(baseDir)
+    const config = createConfig(baseDir)
+    const createdState = await createRuntimeState(createSpec(), undefined, "user", config)
+    await seedRuntimeState({ ...createdState, status: "failed" }, config, saveRuntimeState)
+
+    // when
+    const runtimeState = await transitionRuntimeState(
+      createdState.teamRunId,
+      (currentRuntimeState) => ({ ...currentRuntimeState, status: "deleting" }),
+      config,
+    )
+
+    // then
+    expect(runtimeState.status).toBe("deleting")
+    expect((await loadRuntimeState(createdState.teamRunId, config)).status).toBe("deleting")
+  })
+
   test("transitionRuntimeState rejects reverse transition", async () => {
     // given
     const baseDir = await createTemporaryBaseDir()
@@ -265,5 +287,87 @@ describe("runtime state store", () => {
     // then
     expect(activeTeams).toEqual([])
     expect(await runtimeDirectoryExists(baseDir, runtimeState.teamRunId)).toBe(false)
+  })
+})
+
+describe("assertTeamServedByCurrentInstance", () => {
+  const temporaryDirectories: string[] = []
+
+  afterEach(async () => {
+    await Promise.all(temporaryDirectories.splice(0).map(async (directoryPath) => {
+      await rm(directoryPath, { recursive: true, force: true })
+    }))
+  })
+
+  test("throws TeamFromDeadInstanceError when serverUrl mismatches", async () => {
+    const baseDir = await createTemporaryBaseDir()
+    temporaryDirectories.push(baseDir)
+    const config = createConfig(baseDir)
+    const created = await createRuntimeState(createSpec(), "ses_lead", "user", config)
+    const rs = { ...created, serverUrl: "http://A:4096" }
+
+    await expect(assertTeamServedByCurrentInstance(rs, "http://B:4096"))
+      .rejects.toThrow(TeamFromDeadInstanceError)
+  })
+
+  test("normalizes trailing slashes in URL compare", async () => {
+    const baseDir = await createTemporaryBaseDir()
+    temporaryDirectories.push(baseDir)
+    const config = createConfig(baseDir)
+    const created = await createRuntimeState(createSpec(), "ses_lead", "user", config)
+    const rs = { ...created, serverUrl: "http://A:4096/" }
+
+    await expect(assertTeamServedByCurrentInstance(rs, "http://A:4096"))
+      .resolves.toBeUndefined()
+  })
+
+  test("legacy state (no serverUrl) falls back to client.session.get -> 404 throws", async () => {
+    const baseDir = await createTemporaryBaseDir()
+    temporaryDirectories.push(baseDir)
+    const config = createConfig(baseDir)
+    const created = await createRuntimeState(createSpec(), "ses_x", "user", config)
+    const rs = { ...created, serverUrl: undefined }
+    const client = { session: { get: async () => { const e: Record<string, unknown> = new Error("nf"); e["status"] = 404; throw e } } }
+
+    await expect(assertTeamServedByCurrentInstance(rs, undefined, client))
+      .rejects.toThrow(TeamFromDeadInstanceError)
+  })
+
+  test("legacy state with successful HTTP probe resolves", async () => {
+    const baseDir = await createTemporaryBaseDir()
+    temporaryDirectories.push(baseDir)
+    const config = createConfig(baseDir)
+    const created = await createRuntimeState(createSpec(), "ses_x", "user", config)
+    const rs = { ...created, serverUrl: undefined }
+    const client = { session: { get: async () => ({ id: "ses_x" }) } }
+
+    await expect(assertTeamServedByCurrentInstance(rs, undefined, client))
+      .resolves.toBeUndefined()
+  })
+
+  test("isNotFoundError detects three SDK shapes", async () => {
+    const baseDir = await createTemporaryBaseDir()
+    temporaryDirectories.push(baseDir)
+    const config = createConfig(baseDir)
+    const created = await createRuntimeState(createSpec(), "ses_x", "user", config)
+    const rs = { ...created, serverUrl: undefined }
+
+    for (const shape of [{ status: 404 }, { statusCode: 404 }, { response: { status: 404 } }]) {
+      const client = { session: { get: async () => { throw shape } } }
+      await expect(assertTeamServedByCurrentInstance(rs, undefined, client))
+        .rejects.toThrow(TeamFromDeadInstanceError)
+    }
+  })
+
+  test("non-404 errors bubble unchanged", async () => {
+    const baseDir = await createTemporaryBaseDir()
+    temporaryDirectories.push(baseDir)
+    const config = createConfig(baseDir)
+    const created = await createRuntimeState(createSpec(), "ses_x", "user", config)
+    const rs = { ...created, serverUrl: undefined }
+    const client = { session: { get: async () => { throw new Error("ECONNRESET") } } }
+
+    await expect(assertTeamServedByCurrentInstance(rs, undefined, client))
+      .rejects.toThrow(/ECONNRESET/)
   })
 })

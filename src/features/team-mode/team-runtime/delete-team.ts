@@ -10,6 +10,7 @@ import { withLock } from "../team-state-store/locks"
 import { listActiveTeams, transitionRuntimeState } from "../team-state-store/store"
 import type { RuntimeState } from "../types"
 import { DELETABLE_MEMBER_STATUSES, removeWorktrees } from "./shutdown-helpers"
+import { stopStuckSessionMonitor } from "./stuck-session-monitor"
 
 export type DeleteTeamDeps = {
   canVisualize: typeof canVisualize
@@ -34,6 +35,10 @@ const FORCE_DELETABLE_TEAM_STATUSES = new Set<RuntimeState["status"]>([
   ...DELETABLE_TEAM_STATUSES,
   "creating",
   "orphaned",
+  // failed teams are otherwise immortal: state-store transitions allow
+  // failed -> deleting, but team_delete needs to opt this status into
+  // the force-deletable set or the lifecycle gate trips first.
+  "failed",
 ])
 
 const FORCE_COMPLETABLE_MEMBER_STATUSES = new Set<RuntimeState["members"][number]["status"]>([
@@ -83,6 +88,11 @@ export async function deleteTeam(
           : currentRuntimeState.members,
       }
     }, config)
+
+    // Stop the stuck-session watchdog before any teardown work runs. The
+    // monitor would otherwise race against task cancellation and try to
+    // wake a member that's about to be killed.
+    stopStuckSessionMonitor(teamRunId)
 
     if (bgMgr && runtimeState.leadSessionId) {
       const teamMessageMarkerPrefix = `team-create:${teamRunId}:`
@@ -137,7 +147,14 @@ export async function deleteTeam(
     unregisterTeamSessionsByTeam(teamRunId)
 
     const activeTeams = await listActiveTeams(config)
-    sweepStaleTeamSessions(new Set(activeTeams.map((team) => team.teamRunId))).catch(() => {})
+    sweepStaleTeamSessions(new Set(activeTeams.map((team) => team.teamRunId))).catch((sweepError: unknown) => {
+      deps.log("team sweep stale sessions failed", {
+        event: "team-sweep-stale-failed",
+        phase: "delete",
+        teamRunId,
+        error: sweepError instanceof Error ? sweepError.message : String(sweepError),
+      })
+    })
 
     return { removedWorktrees, removedLayout }
   }, { ownerTag: `delete-team:${teamRunId}` })

@@ -1,5 +1,6 @@
 import type { FallbackEntry } from "../../../shared/model-requirements"
-import type { DelegatedModelConfig } from "../../../shared/model-resolution-types"
+import { AGENT_MODEL_REQUIREMENTS } from "../../../shared/model-requirements"
+import type { DelegatedModelConfig, ModelIntent } from "../../../shared/model-resolution-types"
 import type { ExecutorContext } from "../../../tools/delegate-task/executor-types"
 import type { DelegateTaskArgs } from "../../../tools/delegate-task/types"
 import { isGptModel, isGptNativeSisyphusModel } from "../../../agents/types"
@@ -10,6 +11,14 @@ import {
   resolveCategoryExecution,
   resolveSubagentExecution,
 } from "./resolve-member-dependencies"
+import {
+  filterReachableChainEntries,
+  pickCreativeChainEntry,
+  pickEntryProvider,
+  type MemberSelectionPolicy,
+  type StableSeed,
+  TEAM_MEMBER_MODEL_INTENT,
+} from "./member-selection-policy"
 
 export class TeamMemberResolutionError extends Error {
   constructor(public readonly memberName: string, public readonly cause: Error) {
@@ -24,6 +33,13 @@ export interface ResolvedMember {
   model: DelegatedModelConfig | undefined
   fallbackChain: FallbackEntry[] | undefined
   systemContent: string
+  /**
+   * Sticky-model intent surfaced from the subagent resolver. "explicit"
+   * means the user named this model via `agents.<name>.model` config —
+   * the launched task must refuse silent fallback. Undefined / "auto"
+   * preserves the existing chain-advancement behavior.
+   */
+  modelIntent?: ModelIntent
 }
 
 function createBaseDelegateTaskArgs(prompt: string): Pick<DelegateTaskArgs, "description" | "load_skills" | "prompt" | "run_in_background"> {
@@ -143,8 +159,158 @@ export async function resolveMember(
         agentToUse,
         model: execution.categoryModel,
       }),
+      modelIntent: execution.modelIntent,
     }
   } catch (error) {
     throw new TeamMemberResolutionError(member.name, normalizeResolutionError(error))
   }
+}
+
+/**
+ * Synthesizes a per-member ExecutorContext clone with the given model
+ * string injected into the channel that the underlying resolver consults
+ * for that member kind. Subagent members go through `agentOverrides[<type>].model`
+ * (read in subagent-resolver.ts:138). Category members go through
+ * `userCategories[<category>].model` (read as `explicitCategoryModel` in
+ * category-resolver.ts:139). The clone is per-call so concurrent member
+ * resolutions don't collide on shared dictionary state.
+ */
+export function injectMemberModelOverride(
+  ctx: ExecutorContext,
+  member: Member,
+  modelOverride: string,
+): ExecutorContext {
+  if (member.kind === "subagent_type") {
+    // AgentOverrides is a strict-keyed schema (build/sisyphus/atlas/...).
+    // We treat it as a string-indexed bag for the synthetic per-member
+    // injection, which is safe because subagent-resolver also reads it
+    // via a dynamic configKey lookup at subagent-resolver.ts:138 — the
+    // resolver tolerates unknown keys (returns undefined for unmatched).
+    const agentKey = member.subagent_type
+    const overrides = ctx.agentOverrides as Record<string, Record<string, unknown> | undefined> | undefined
+    return {
+      ...ctx,
+      agentOverrides: {
+        ...(ctx.agentOverrides as Record<string, Record<string, unknown> | undefined> | undefined),
+        [agentKey]: {
+          ...(overrides?.[agentKey] ?? {}),
+          model: modelOverride,
+        },
+      } as ExecutorContext["agentOverrides"],
+    }
+  }
+  const categoryKey = member.category
+  return {
+    ...ctx,
+    userCategories: {
+      ...ctx.userCategories,
+      [categoryKey]: {
+        ...(ctx.userCategories?.[categoryKey] ?? {}),
+        model: modelOverride,
+      },
+    },
+  }
+}
+
+function delegatedModelConfigToString(model: DelegatedModelConfig): string {
+  return `${model.providerID}/${model.modelID}`
+}
+
+/**
+ * Selects the agent's fallback chain for creative-mode round-robin. For
+ * subagent-kind members the agent's own chain is used. For category-kind
+ * members (which all route through sisyphus-junior at execution time) we
+ * use sisyphus-junior's chain — the lead-broadcast / per-member-override
+ * paths give users the escape hatch when they want category-specific
+ * diversity beyond what sisyphus-junior offers.
+ */
+function getCreativeChainForMember(member: Member): ReadonlyArray<FallbackEntry> {
+  const agentKey = member.kind === "subagent_type" ? member.subagent_type : "sisyphus-junior"
+  return AGENT_MODEL_REQUIREMENTS[agentKey]?.fallbackChain ?? []
+}
+
+/**
+ * Routes a member through the right model-selection lever based on the
+ * team's policy. Always returns `modelIntent: "explicit"` — every team
+ * member is a deliberate pick (the auto path is unreachable from team
+ * mode by design). Precedence inside the wrapper:
+ *
+ *   1. per-member `member.model` (TeamSpec field) wins
+ *   2. lead bypasses policy and resolves on its own model
+ *   3. stable mode + seed available -> inject seed as agent/category override
+ *   4. creative mode -> round-robin reachable chain[i % len]
+ *   5. otherwise (stable mode without seed) -> fall through to plain resolveMember
+ */
+export async function resolveMemberWithPolicy(input: {
+  member: Member
+  ctx: ExecutorContext
+  policy: MemberSelectionPolicy
+  seed?: StableSeed
+  followerIndex: number
+  isLead: boolean
+  categoryExamples: string
+  parentAgent?: string
+}): Promise<ResolvedMember> {
+  const { member, ctx, policy, seed, followerIndex, isLead, categoryExamples, parentAgent } = input
+
+  // 1. Per-member explicit override always wins.
+  // The literal sentinel "auto" (case-insensitive) means "no override —
+  // route through the team's policy / chain just like an unset field".
+  // Without this exemption, an LLM-emitted spec containing `model: "auto"`
+  // would crash team_create with "Invalid model format" because the
+  // string isn't `provider/model` and parseModelString rejects it. This
+  // is the bug observed in the team_create logs where the lead burned
+  // tokens fixing the spec after a cryptic validation error.
+  const memberModelOverride = member.model !== undefined
+    && member.model !== ""
+    && member.model.toLowerCase() !== "auto"
+    ? member.model
+    : undefined
+  if (memberModelOverride !== undefined) {
+    const ctxWithOverride = injectMemberModelOverride(ctx, member, memberModelOverride)
+    const resolved = await resolveMember(member, ctxWithOverride, categoryExamples, parentAgent)
+    return { ...resolved, modelIntent: TEAM_MEMBER_MODEL_INTENT }
+  }
+
+  // 2. Lead resolves on its own — its outcome BECOMES the seed (stable
+  //    mode), and in creative mode the lead deliberately keeps its own
+  //    model per the user's design decision.
+  if (isLead) {
+    const resolved = await resolveMember(member, ctx, categoryExamples, parentAgent)
+    return { ...resolved, modelIntent: TEAM_MEMBER_MODEL_INTENT }
+  }
+
+  // 3. Stable mode + seed available — broadcast lead's model.
+  if (policy.kind === "stable" && seed) {
+    const seedModelString = delegatedModelConfigToString(seed.model)
+    const ctxWithSeed = injectMemberModelOverride(ctx, member, seedModelString)
+    const resolved = await resolveMember(member, ctxWithSeed, categoryExamples, parentAgent)
+    return { ...resolved, modelIntent: TEAM_MEMBER_MODEL_INTENT }
+  }
+
+  // 4. Creative mode — round-robin chain[i % len], filtered by reachable.
+  if (policy.kind === "creative") {
+    const chain = getCreativeChainForMember(member)
+    const reachable = filterReachableChainEntries(chain, policy.connectedProviders)
+    if (reachable.length === 0) {
+      throw new TeamMemberResolutionError(member.name, new Error(
+        `creative mode: no reachable fallback-chain entries for member '${member.name}' (chain length ${chain.length}, connected providers: ${policy.connectedProviders?.join(", ") ?? "<unknown>"})`,
+      ))
+    }
+    const entry = pickCreativeChainEntry(reachable, followerIndex)
+    if (!entry) {
+      throw new TeamMemberResolutionError(member.name, new Error(`creative mode: empty reachable chain after filter`))
+    }
+    const provider = pickEntryProvider({ entry, connectedProviders: policy.connectedProviders })
+    if (!provider) {
+      throw new TeamMemberResolutionError(member.name, new Error(`creative mode: no provider available for chosen entry ${entry.model}`))
+    }
+    const fullModel = `${provider}/${entry.model}`
+    const ctxWithCreative = injectMemberModelOverride(ctx, member, fullModel)
+    const resolved = await resolveMember(member, ctxWithCreative, categoryExamples, parentAgent)
+    return { ...resolved, modelIntent: TEAM_MEMBER_MODEL_INTENT }
+  }
+
+  // 5. Stable mode without a seed (lead resolution failed) — auto.
+  return resolveMember(member, ctx, categoryExamples, parentAgent)
 }

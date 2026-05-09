@@ -467,25 +467,38 @@ describe("createTeamSendMessageTool", () => {
     await expect(result).rejects.toThrow("team participant not found for session")
   })
 
-  test("acks the message after live delivery so the transform hook does not redeliver", async () => {
+  test("after live delivery, inbox file remains and recipient's pendingInjectedMessageIds carries the live-delivered messageId so the injector dedupes (defer-commit contract)", async () => {
     // given
     const fixture = await createTeamFixture()
     const { client } = createRecordingClient()
     const liveTool = createTeamSendMessageTool(fixture.config, client)
 
     // when
-    await liveTool.execute({
+    const sendResult = await liveTool.execute({
       teamRunId: fixture.teamRunId,
       to: "m2",
       body: "ping",
     }, fixture.toolContext(fixture.memberOneSessionId))
 
-    // then
+    // then — inbox file STAYS (recovery anchor for stuck-session detector)
     const inboxDir = getInboxDir(resolveBaseDir(fixture.config), fixture.teamRunId, "m2")
     const inboxEntries = (await readdir(inboxDir)).filter((entry) => entry.endsWith(".json"))
-    const processedEntries = (await readdir(path.join(inboxDir, "processed"))).filter((entry) => entry.endsWith(".json"))
-    expect(inboxEntries).toHaveLength(0)
-    expect(processedEntries).toHaveLength(1)
+    expect(inboxEntries).toHaveLength(1)
+
+    // processed/ is empty until session.idle wake-hint runs ackMessages
+    const processedEntries = (await readdir(path.join(inboxDir, "processed")).catch(() => []))
+      .filter((entry) => entry.endsWith(".json"))
+    expect(processedEntries).toHaveLength(0)
+
+    // pendingInjectedMessageIds carries the live-delivered messageId so the
+    // team-mailbox-injector skips it on the recipient's next transform.
+    const sentResult = JSON.parse(typeof sendResult === "string" ? sendResult : "{}") as {
+      messageId: string
+    }
+    const { loadRuntimeState } = await import("../team-state-store/store")
+    const refreshedRuntime = await loadRuntimeState(fixture.teamRunId, fixture.config)
+    const recipient = refreshedRuntime.members.find((member) => member.name === "m2")
+    expect(recipient?.pendingInjectedMessageIds).toContain(sentResult.messageId)
   })
 
   test("broadcast fans out live delivery to every member except the sender", async () => {

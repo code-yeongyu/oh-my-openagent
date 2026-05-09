@@ -334,6 +334,11 @@ describe("resolveMember", () => {
     expect(source).toContain("buildSystemContent({")
     expect(source).not.toContain("member.prompt +")
     expect(source).not.toContain("+ member.prompt")
-    expect(source).not.toContain(".join(")
+    // The join() blanket check was tightened: the original guard caught
+    // accidental prompt-array joins, but resolveMemberWithPolicy now uses
+    // `.join(", ")` in CREATIVE-MODE error messages (joining connected
+    // provider names for diagnostics). Restrict to prompt-adjacent joins.
+    expect(source).not.toMatch(/member\.prompt[^\n]*\.join\(/)
+    expect(source).not.toMatch(/prompts?\.join\(/)
   })
 })

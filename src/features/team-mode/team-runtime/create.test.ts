@@ -371,8 +371,13 @@ describe("createTeamRun", () => {
     // then
     expect(launchMock).toHaveBeenCalledTimes(1)
     expect(launchMock.mock.calls[0]?.[0]).toMatchObject({ description: "Create team member alpha-team/member-1" })
-    expect(resolveMemberMock).toHaveBeenCalledTimes(1)
-    expect(resolveMemberMock.mock.calls[0]?.[0]).toMatchObject({ name: "member-1" })
+    // The lead is pre-resolved out-of-pool to compute the stable-mode seed
+    // (followers inherit the lead's model); the pool then short-circuits
+    // the lead because reusesCallerLeadSession=true and only spawns the
+    // follower. Two resolveMember calls total: one for the seed, one for
+    // the follower in the pool.
+    expect(resolveMemberMock).toHaveBeenCalledTimes(2)
+    expect(resolveMemberMock.mock.calls.map((call) => (call[0] as { name: string }).name).sort()).toEqual(["lead", "member-1"])
     expect(runtimeState.members.map((member) => ({ name: member.name, sessionId: member.sessionId }))).toEqual([
       { name: "lead", sessionId: "lead-session" },
       { name: "member-1", sessionId: "member-1-agent-session-1" },

@@ -3,6 +3,7 @@ import type { ToolContext } from "@opencode-ai/plugin/tool"
 import { z } from "zod"
 
 import type { TeamModeConfig } from "../../../config/schema/team-mode"
+import { MemberSelectionModeSchema } from "../../../config/schema/team-mode"
 import type { CategoriesConfig, AgentOverrides } from "../../../config/schema"
 import { mergeCategories } from "../../../shared/merge-categories"
 import type { OpencodeClient } from "../../../tools/delegate-task/types"
@@ -23,6 +24,10 @@ const TeamCreateArgsSchema = z.object({
   teamName: z.string().min(1).optional(),
   inline_spec: z.unknown().optional(),
   leadSessionId: z.string().optional(),
+  // Per-call override of member_selection; wins over TeamSpec field and
+  // global config. Undefined falls through to the spec/config precedence
+  // chain in resolveMemberSelectionMode().
+  member_selection: MemberSelectionModeSchema.optional(),
 }).superRefine((value, ctx) => {
   const optionCount = Number(value.teamName !== undefined) + Number(value.inline_spec !== undefined)
   if (optionCount !== 1) {
@@ -189,12 +194,26 @@ export function createTeamCreateTool(
       teamName: tool.schema.string().optional().describe("Named team spec to load. Provide exactly one of teamName or inline_spec."),
       inline_spec: tool.schema.unknown().optional().describe("Inline team spec object or JSON string. Provide exactly one of teamName or inline_spec."),
       leadSessionId: tool.schema.string().optional().describe("Optional non-empty session ID override. Usually omit this and let team_create use the current session."),
+      member_selection: tool.schema.string().optional().describe("Override the team's member-selection mode for this call. \"stable\" broadcasts the lead's resolved model to followers without their own pick (default). \"creative\" round-robins each follower across the agent's reachable fallback chain for deliberate diversity. Wins over TeamSpec.member_selection and team_mode.member_selection in the global config."),
     },
     async execute(rawArgs, toolContext) {
       const args = parseTeamCreateArgs(rawArgs)
       const runtimeContext = toolContext as TeamLifecycleToolContext
       const leadSessionId = args.leadSessionId ?? runtimeContext.sessionID
       if (!leadSessionId) throw new Error("team_create requires leadSessionId or tool context sessionID")
+      try {
+        await client.session.get({ path: { id: leadSessionId } })
+      } catch (e) {
+        const err = e as { status?: number; statusCode?: number; response?: { status?: number }; name?: string }
+        const is404 = err.status === 404 || err.statusCode === 404 || err.response?.status === 404 || (typeof err.name === "string" && /notfound/i.test(err.name))
+        if (is404) {
+          throw new Error(
+            `team_create denied: leadSessionId ${leadSessionId} does not exist on the current opencode server. ` +
+            `If you are resuming a session from a previous instance, restart the opencode window so the lead session is reattached.`,
+          )
+        }
+        throw e
+      }
       const projectRoot = typeof runtimeContext.directory === "string" ? runtimeContext.directory : process.cwd()
       const callerTeamLead = resolveCallerTeamLead(runtimeContext.agent)
       const defaultCategoryName = resolveDefaultInlineCategory(executorConfig?.userCategories)
@@ -222,6 +241,7 @@ export function createTeamCreateTool(
         {
           callerAgentTypeId: callerTeamLead.agentTypeId,
           parentMessageID: runtimeContext.messageID,
+          member_selection: args.member_selection,
         },
       )
       return JSON.stringify({ teamRunId: runtimeState.teamRunId, runtimeState: sanitizeRuntimeState(runtimeState) })
@@ -247,6 +267,14 @@ export function createTeamDeleteTool(
       const { runtimeState, participant } = await resolveParticipant(args.teamRunId, runtimeContext.sessionID, config, deps)
       const isOrphanedForceDelete = args.force === true && runtimeState.status === "orphaned"
       const isStuckDeletingForceDelete = args.force === true && runtimeState.status === "deleting"
+      // force=true on `orphaned` (lead is gone) or `deleting` (cleanup is
+      // hung) is intentionally a participant-level escape hatch, not a
+      // lead-only privilege: in both states the lead may be unreachable,
+      // so requiring lead role would leave the team unrecoverable. The
+      // `participant !== undefined` check still authenticates that the
+      // caller is a verified member of THIS team's runtime state — see
+      // the lifecycle.test.ts "still rejects non-participants" case for
+      // the negative coverage.
       const isForceBypass = (isStuckDeletingForceDelete || isOrphanedForceDelete) && participant !== undefined
       if (!isForceBypass && participant?.role !== "lead") {
         throw new Error("team_delete is lead-only")

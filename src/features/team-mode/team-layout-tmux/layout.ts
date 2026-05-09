@@ -5,6 +5,7 @@ import * as tmuxPathResolverModule from "../../../tools/interactive-bash/tmux-pa
 import type { TmuxSessionManager } from "../../tmux-subagent/manager"
 import { buildLiveTailCommand } from "./live-tail"
 import { resolveCallerTmuxSession } from "./resolve-caller-tmux-session"
+import { detectServerPortOwnership } from "./server-port-ownership"
 
 type TeamLayoutMember = { name: string; sessionId: string; worktreePath?: string }
 type TmuxCommandResult = Awaited<ReturnType<typeof sharedTmuxModule.runTmuxCommand>>
@@ -15,6 +16,7 @@ export type TeamLayoutDeps = {
   isServerRunning: typeof sharedTmuxModule.isServerRunning
   getTmuxPath: typeof tmuxPathResolverModule.getTmuxPath
   resolveCallerTmuxSession: typeof resolveCallerTmuxSession
+  detectServerPortOwnership: typeof detectServerPortOwnership
 }
 
 const defaultDeps: TeamLayoutDeps = {
@@ -22,6 +24,7 @@ const defaultDeps: TeamLayoutDeps = {
   isServerRunning: sharedTmuxModule.isServerRunning,
   getTmuxPath: tmuxPathResolverModule.getTmuxPath,
   resolveCallerTmuxSession,
+  detectServerPortOwnership,
 }
 
 export type TeamLayoutResult = {
@@ -66,12 +69,16 @@ function selectExistingTeammatePane(teammatePanes: Array<string>, callerPaneId: 
 }
 
 function buildSplitArgs(callerPaneId: string, teammatePanes: Array<string>, member: TeamLayoutMember): Array<string> {
+  // -d keeps the active pane on the caller; without it, every split steals
+  // focus to the freshly created teammate pane and the user sees their
+  // cursor flicker across each spawn during team creation.
   if (teammatePanes.length === 0) {
-    return ["split-window", "-t", callerPaneId, "-h", "-l", "70%", "-P", "-F", "#{pane_id}", "-c", getPaneWorkingDirectory(member)]
+    return ["split-window", "-d", "-t", callerPaneId, "-h", "-l", "70%", "-P", "-F", "#{pane_id}", "-c", getPaneWorkingDirectory(member)]
   }
 
   return [
     "split-window",
+    "-d",
     "-t",
     selectExistingTeammatePane(teammatePanes, callerPaneId),
     teammatePanes.length % 2 === 1 ? "-v" : "-h",
@@ -131,12 +138,24 @@ async function createLiveTailWindow(
   deps: TeamLayoutDeps,
   options?: TeamLayoutOptions,
 ): Promise<{ gridWindowId: string; gridPanesByMember: Record<string, string> } | null> {
+  const ownership = await deps.detectServerPortOwnership()
+  if (!ownership.hasOwnPort) {
+    log("[team-mode] skipping live-tail layout — instance has no own server port", {
+      reason: ownership.reason,
+    })
+    return null
+  }
+
   const [firstMember, ...remainingMembers] = members
   if (!firstMember) return null
 
   const liveWindowName = `team-live-${Date.now().toString(36)}`
+  // -d is critical: without it, tmux auto-switches the attached client to
+  // the new live-tail window, stranding the user away from their work
+  // window and forcing a manual `prefix + 0` to return.
   const created = await deps.runTmuxCommand(tmuxPath, [
     "new-window",
+    "-d",
     "-t",
     targetSessionId,
     "-n",
@@ -230,6 +249,13 @@ export async function createTeamLayout(
     )
     if (!liveTail) return null
 
+    // Defence-in-depth: even though every new-window/split-window above
+    // uses -d, explicitly restore the caller's window and pane so the user
+    // is never stranded on the live-tail window or a teammate pane after
+    // team_create returns. Failures are non-fatal — the layout is built.
+    await deps.runTmuxCommand(tmuxPath, ["select-window", "-t", callerSession.windowTarget])
+    await deps.runTmuxCommand(tmuxPath, ["select-pane", "-t", callerSession.paneId])
+
     return {
       focusWindowId: focus.focusWindowId,
       gridWindowId: liveTail.gridWindowId,
@@ -290,6 +316,18 @@ export async function removeTeamLayout(
         await resolvedDeps.runTmuxCommand(tmuxPath, ["kill-window", "-t", windowId])
       } catch (windowError) {
         log("tmux team layout window cleanup failed", { teamRunId, windowId, error: String(windowError) })
+      }
+    }
+
+    // If the user was viewing the just-killed grid window, tmux auto-jumps
+    // to a neighbouring window — which may not be the caller's. Explicitly
+    // restore the caller's window when we know it is safe (ownedSession=false
+    // means focusWindowId IS the caller's window, never something we own).
+    if (cleanupTarget.ownedSession === false && cleanupTarget.focusWindowId) {
+      try {
+        await resolvedDeps.runTmuxCommand(tmuxPath, ["select-window", "-t", cleanupTarget.focusWindowId])
+      } catch (selectError) {
+        log("tmux team layout window restore failed", { teamRunId, error: String(selectError) })
       }
     }
   } catch (error) {

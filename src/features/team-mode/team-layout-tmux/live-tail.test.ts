@@ -30,6 +30,18 @@ describe("buildLiveTailCommand", () => {
     expect(insecureCmd).toContain(" --insecure")
   })
 
+  test("appends --no-footer when disableStatusFooter is true", () => {
+    const cmd = buildLiveTailCommand("http://x", "ses_y", { disableStatusFooter: true })
+    expect(cmd).toContain(" --no-footer")
+  })
+
+  test("omits --no-footer when disableStatusFooter is false or absent", () => {
+    const cmdDefault = buildLiveTailCommand("http://x", "ses_y")
+    const cmdFalse = buildLiveTailCommand("http://x", "ses_y", { disableStatusFooter: false })
+    expect(cmdDefault).not.toContain("--no-footer")
+    expect(cmdFalse).not.toContain("--no-footer")
+  })
+
   test("references a file that materialize wrote with python content", () => {
     const cmd = buildLiveTailCommand("http://127.0.0.1:4096", "ses_abc123")
     const match = cmd.match(/python3 -u '([^']+)'/)

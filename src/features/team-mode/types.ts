@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { MemberSelectionModeSchema } from "../../config/schema/team-mode"
 import { createParseMember } from "./member-parser"
 
 export const MESSAGE_KINDS = [
@@ -31,6 +32,11 @@ const MemberBaseSchema = z.object({
   backendType: z.enum(["in-process", "tmux"]).default("in-process"),
   color: z.string().optional(),
   isActive: z.boolean().default(true),
+  // Optional explicit model pick for this team member (e.g.
+  // "anthropic/claude-opus-4-7"). Wins over the team's member_selection
+  // mode (stable seed broadcast / creative round-robin) and the global
+  // agents.<>.model override. Tagged modelIntent: "explicit" at launch.
+  model: z.string().min(1).optional(),
 }).strict()
 
 export const CategoryMemberSchema = MemberBaseSchema.extend({
@@ -63,6 +69,10 @@ export const TeamSpecSchema = z.object({
   teamAllowedPaths: z.array(z.string()).optional(),
   sessionPermission: z.string().optional(),
   members: z.array(MemberSchema).min(1).max(8),
+  // Optional override of team_mode.member_selection. Wins over global
+  // config but loses to the per-call team_create({ member_selection })
+  // argument. Undefined means "inherit from global config".
+  member_selection: MemberSelectionModeSchema.optional(),
 }).superRefine((teamSpec, ctx) => {
   if (teamSpec.leadAgentId === undefined && teamSpec.members.length > 1) {
     ctx.addIssue({
@@ -182,6 +192,7 @@ export const RuntimeStateSchema = z.object({
   createdAt: z.number().int().positive(),
   status: z.enum(RUNTIME_STATUSES),
   leadSessionId: z.string().optional(),
+  serverUrl: z.string().optional(),
   tmuxLayout: RuntimeStateTmuxLayoutSchema.optional(),
   members: z.array(RuntimeStateMemberSchema),
   shutdownRequests: z.array(ShutdownRequestSchema).default([]),

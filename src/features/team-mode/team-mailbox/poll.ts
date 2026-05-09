@@ -19,6 +19,15 @@ function escapeAttributeValue(value: string): string {
     .replaceAll("'", "&apos;")
 }
 
+// CDATA section preserves message body verbatim (including code, angle
+// brackets, ampersands) without an XML escape pass that would corrupt
+// readability. The only sequence that can break a CDATA section is the
+// terminator `]]>`, which we split using the standard CDATA escape
+// trick: close the section, emit `]]>` outside, reopen the section.
+function escapeCdataBody(body: string): string {
+  return `<![CDATA[${body.replaceAll("]]>", "]]]]><![CDATA[>")}]]>`
+}
+
 export function buildEnvelope(message: Message): string {
   const attributes = [
     `from="${escapeAttributeValue(message.from)}"`,
@@ -37,7 +46,7 @@ export function buildEnvelope(message: Message): string {
   }
 
   return `<peer_message ${attributes.join(" ")}>
-${message.body}
+${escapeCdataBody(message.body)}
 </peer_message>`
 }
 
@@ -58,7 +67,16 @@ export async function pollAndBuildInjection(
     return { injected: false, messageIds: [], reason: "already injected this turn" }
   }
 
-  const unreadMessages = await listUnreadMessages(teamRunId, memberName, config)
+  // Skip messages already live-delivered via team_send_message's promptAsync
+  // (and recorded in pendingInjectedMessageIds). The recipient already saw
+  // the envelope inline in its prompt body — re-injecting would double-fire
+  // the same content. The idle wake-hint hook acks pendingInjectedMessageIds
+  // and removes the inbox files in the normal path; the inbox file stays as
+  // a recovery anchor for the stuck-session detector if the recipient never
+  // reaches idle.
+  const inflightMessageIds = new Set(runtimeMember.pendingInjectedMessageIds)
+  const unreadMessages = (await listUnreadMessages(teamRunId, memberName, config))
+    .filter((unreadMessage) => !inflightMessageIds.has(unreadMessage.messageId))
   const messageIds: string[] = []
   const envelopes: string[] = []
   for (const unreadMessage of unreadMessages) {

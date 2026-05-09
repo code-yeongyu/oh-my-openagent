@@ -17,7 +17,11 @@ const ALLOWED_RUNTIME_TRANSITIONS: Readonly<Record<RuntimeState["status"], Reado
   shutdown_requested: new Set(["deleting"]),
   deleting: new Set(["deleted"]),
   deleted: new Set(),
-  failed: new Set(),
+  // failed teams must still be deletable through the standard flow.
+  // Without `failed -> deleting`, callers of team_delete on a failed
+  // team would throw InvalidTransitionError and the runtime directory
+  // would only get reaped opportunistically by listActiveTeams.
+  failed: new Set(["deleting"]),
   orphaned: new Set(["deleting"]),
 }
 
@@ -202,6 +206,73 @@ export async function transitionRuntimeState(
     await saveRuntimeState(nextRuntimeState, config)
     return nextRuntimeState
   }, { ownerTag: "team-state-store" })
+}
+
+export class TeamFromDeadInstanceError extends Error {
+  constructor(public readonly teamRunId: string, public readonly leadSessionId: string | undefined) {
+    const target = leadSessionId ?? "<unknown>"
+    super(
+      `team '${teamRunId}' was created by a previous opencode instance whose lead session ${target} no longer exists. ` +
+      `Run team_delete --force ${teamRunId} to clean up, or restart this opencode window.`,
+    )
+    this.name = "TeamFromDeadInstanceError"
+  }
+}
+
+export type SessionExistenceProbe = {
+  session: { get(input: { path: { id: string } }): Promise<unknown> }
+}
+
+/**
+ * Validates that the current opencode server still owns this team's lead
+ * session. Two paths:
+ * - Modern state: rs.serverUrl exists → string compare against currentServerUrl.
+ * - Legacy state: rs.serverUrl undefined → fall back to client.session.get probe.
+ *   404 → throw TeamFromDeadInstanceError. Other errors bubble (caller decides).
+ *
+ * Pass currentServerUrl=undefined for environments without tmux — that signals
+ * the helper to skip the modern path and rely on the HTTP fallback.
+ */
+export async function assertTeamServedByCurrentInstance(
+  rs: RuntimeState,
+  currentServerUrl: string | undefined,
+  client?: SessionExistenceProbe,
+): Promise<void> {
+  // Modern path: serverUrl recorded at activation. O(1) string compare.
+  if (rs.serverUrl !== undefined && currentServerUrl !== undefined) {
+    if (normalizeUrl(rs.serverUrl) !== normalizeUrl(currentServerUrl)) {
+      throw new TeamFromDeadInstanceError(rs.teamRunId, rs.leadSessionId)
+    }
+    return
+  }
+
+  // Legacy fallback: HTTP probe of leadSessionId.
+  if (!rs.leadSessionId || !client) return  // pre-active runtime, nothing to probe
+  try {
+    await client.session.get({ path: { id: rs.leadSessionId } })
+  } catch (error) {
+    if (isNotFoundError(error)) {
+      throw new TeamFromDeadInstanceError(rs.teamRunId, rs.leadSessionId)
+    }
+    throw error  // bubble 5xx / network / unknown
+  }
+}
+
+function normalizeUrl(url: string): string {
+  return url.replace(/\/+$/, "")
+}
+
+/**
+ * Detects "not found" errors from the opencode SDK. The SDK error shape is
+ * not stable across versions, so we check three common shapes. Pinned via
+ * unit test against the SDK behavior at the time this was written.
+ */
+function isNotFoundError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false
+  const e = error as { status?: number; statusCode?: number; response?: { status?: number }; name?: string }
+  if (e.status === 404 || e.statusCode === 404 || e.response?.status === 404) return true
+  if (typeof e.name === "string" && /notfound/i.test(e.name)) return true
+  return false
 }
 
 export async function listActiveTeams(

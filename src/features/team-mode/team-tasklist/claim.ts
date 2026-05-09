@@ -1,9 +1,9 @@
-import { access, mkdir } from "node:fs/promises"
+import { mkdir } from "node:fs/promises"
 import path from "node:path"
 
 import type { TeamModeConfig } from "../../../config/schema/team-mode"
 import { getTasksDir, resolveBaseDir } from "../team-registry"
-import { atomicWrite, detectStaleLock, reapStaleLock, withLock } from "../team-state-store/locks"
+import { atomicWrite, withLock } from "../team-state-store/locks"
 import { TaskSchema } from "../types"
 import type { Task } from "../types"
 import { canClaim } from "./dependencies"
@@ -11,15 +11,6 @@ import { getTask } from "./get"
 import { listTasks } from "./list"
 
 const CLAIM_STALE_AFTER_MS = 300_000
-
-async function lockExists(lockPath: string): Promise<boolean> {
-  try {
-    await access(lockPath)
-    return true
-  } catch {
-    return false
-  }
-}
 
 function getBlockingTaskIds(task: Task, allTasks: Task[]): string[] {
   return task.blockedBy.filter((blockerId) => {
@@ -66,12 +57,12 @@ export async function claimTask(
     throw new BlockedByError(getBlockingTaskIds(task, allTasks))
   }
 
-  if (await detectStaleLock(claimLockPath, CLAIM_STALE_AFTER_MS)) {
-    await reapStaleLock(claimLockPath)
-  } else if (await lockExists(claimLockPath)) {
-    throw new AlreadyClaimedError()
-  }
-
+  // The previous detect-stale + lockExists pre-check was a TOCTOU race:
+  // between detecting a stale lock and reaping it, a competing claimer
+  // could acquire a fresh lock that we'd then unlink, letting two
+  // workers think they own the same task. withLock/acquireLock already
+  // performs atomic O_EXCL create-with-stale-fallback (locks.ts:81-109)
+  // so the inner getTask status re-check is sufficient to serialize.
   return withLock(claimLockPath, async () => {
     const refreshedTask = await getTask(teamRunId, taskId, config)
     if (refreshedTask.status !== "pending") {

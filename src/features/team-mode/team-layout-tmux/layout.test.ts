@@ -89,6 +89,7 @@ async function loadLayoutModule() {
 
       return { sessionId: displaySessionId, paneId: process.env.TMUX_PANE, windowTarget: "test-session:0" }
     },
+    detectServerPortOwnership: async () => ({ hasOwnPort: true }),
   }
   return {
     canVisualize,
@@ -205,6 +206,7 @@ describe("team-layout-tmux", () => {
       isServerRunning: isServerRunningMock,
       getTmuxPath: async () => "tmux",
       resolveCallerTmuxSession: async () => ({ sessionId: "$7", paneId: process.env.TMUX_PANE ?? "%42", windowTarget: "test-session:0" }),
+      detectServerPortOwnership: async () => ({ hasOwnPort: true }),
     }
     const members = [{ name: "m1", sessionId: "s-m1", worktreePath: "/tmp/m1" }]
 
@@ -273,7 +275,71 @@ describe("team-layout-tmux", () => {
     expect(selectLayoutArgs).toContain("tiled")
   })
 
-  test("#given caller inside tmux #when createTeamLayout runs #then it never steals focus or mutates window border options", async () => {
+  test("#given caller inside tmux #when createTeamLayout runs #then every split-window and the live-tail new-window pass -d so focus never leaves the caller", async () => {
+    // given
+    const { createTeamLayout } = await loadLayoutModule()
+    const members = [
+      { name: "m1", sessionId: "s-m1", worktreePath: "/tmp/m1" },
+      { name: "m2", sessionId: "s-m2", worktreePath: "/tmp/m2" },
+    ]
+
+    // when
+    await createTeamLayout("run-no-steal", members, tmuxMgr as never)
+
+    // then
+    const commands = getCommands()
+    const splitCalls = commands.filter((args) => args[0] === "split-window")
+    const newWindowCalls = commands.filter((args) => args[0] === "new-window")
+    expect(splitCalls.length).toBeGreaterThan(0)
+    expect(newWindowCalls.length).toBeGreaterThan(0)
+    for (const args of splitCalls) {
+      expect(args).toContain("-d")
+    }
+    for (const args of newWindowCalls) {
+      expect(args).toContain("-d")
+    }
+  })
+
+  test("#given layout created #when createTeamLayout finishes #then it explicitly restores the caller's window and pane via select-window/select-pane", async () => {
+    // given
+    const { createTeamLayout } = await loadLayoutModule()
+    const members = [
+      { name: "m1", sessionId: "s-m1", worktreePath: "/tmp/m1" },
+      { name: "m2", sessionId: "s-m2", worktreePath: "/tmp/m2" },
+    ]
+
+    // when
+    await createTeamLayout("run-restore", members, tmuxMgr as never)
+
+    // then
+    const commands = getCommands()
+    const selectWindowIdx = commands.findIndex((args) => args[0] === "select-window" && args.includes("test-session:0"))
+    const restorePaneIdx = commands.findIndex((args) =>
+      args[0] === "select-pane" && args[1] === "-t" && args[2] === (process.env.TMUX_PANE ?? "") && !args.includes("-T"),
+    )
+    const lastSplitIdx = commands.map((c) => c[0]).lastIndexOf("split-window")
+    expect(selectWindowIdx).toBeGreaterThan(lastSplitIdx)
+    expect(restorePaneIdx).toBeGreaterThan(lastSplitIdx)
+  })
+
+  test("#given ownedSession=false cleanup #when removeTeamLayout finishes #then it select-window's back to the caller's focusWindowId so tmux does not strand the user on a neighbour window", async () => {
+    // given
+    const { removeTeamLayout } = await loadLayoutModule()
+
+    // when
+    await removeTeamLayout("run-cleanup-restore", {
+      ownedSession: false,
+      targetSessionId: "$caller",
+      focusWindowId: "@10",
+      gridWindowId: "@11",
+    }, tmuxMgr as never)
+
+    // then
+    const commands = getCommands()
+    expect(commands).toContainEqual(["select-window", "-t", "@10"])
+  })
+
+  test("#given caller inside tmux #when createTeamLayout runs #then it never steals focus mid-build (only the trailing restore-pane onto the caller is allowed) or mutates window border options", async () => {
     // given
     const { createTeamLayout } = await loadLayoutModule()
     const members = Array.from({ length: 5 }, (_, index) => ({
@@ -287,7 +353,11 @@ describe("team-layout-tmux", () => {
 
     // then
     const commands = getCommands()
-    expect(commands.some((args) => args[0] === "select-pane" && !args.includes("-T"))).toBe(false)
+    const callerPaneId = process.env.TMUX_PANE ?? ""
+    const focusStealingSelectPanes = commands.filter((args) =>
+      args[0] === "select-pane" && !args.includes("-T") && args[2] !== callerPaneId,
+    )
+    expect(focusStealingSelectPanes).toHaveLength(0)
     expect(commands.some((args) => args[0] === "set-option")).toBe(false)
   })
 
@@ -423,6 +493,27 @@ describe("team-layout-tmux", () => {
     expect(commands.some((args) => args[0] === "new-window")).toBe(false)
   })
 
+  test("#given detectServerPortOwnership returns hasOwnPort=false #when createTeamLayout runs #then createLiveTailWindow returns null without spawning a new-window", async () => {
+    // given
+    const deps: TeamLayoutDeps = {
+      runTmuxCommand: runTmuxCommandMock,
+      isServerRunning: isServerRunningMock,
+      getTmuxPath: async () => "tmux",
+      resolveCallerTmuxSession: async () => ({ sessionId: "$7", paneId: process.env.TMUX_PANE ?? "%42", windowTarget: "test-session:0" }),
+      detectServerPortOwnership: async () => ({ hasOwnPort: false, reason: "test: no LISTEN socket" }),
+    }
+    const members = [{ name: "m1", sessionId: "s-m1", worktreePath: "/tmp/m1" }]
+
+    // when
+    const result = await createTeamLayout("run-no-port", members, tmuxMgr as never, deps)
+
+    // then
+    expect(result).toBeNull()
+    const commands = getCommands()
+    expect(commands.some((args) => args[0] === "new-window")).toBe(false)
+  })
+
+
   describe("createTeamLayout - focus/grid window topology", () => {
     test("#given caller inside tmux #when createTeamLayout runs #then uses the caller window without a new session", async () => {
       // given
@@ -467,7 +558,7 @@ describe("team-layout-tmux", () => {
       const commands = getCommands()
       const splitCalls = commands.filter((args) => args[0] === "split-window")
       expect(splitCalls).toEqual([
-        ["split-window", "-t", process.env.TMUX_PANE ?? "", "-h", "-l", "70%", "-P", "-F", "#{pane_id}", "-c", "/tmp/m1"],
+        ["split-window", "-d", "-t", process.env.TMUX_PANE ?? "", "-h", "-l", "70%", "-P", "-F", "#{pane_id}", "-c", "/tmp/m1"],
       ])
       expect(commands.filter((args) => args[0] === "new-window").length).toBe(1)
     })

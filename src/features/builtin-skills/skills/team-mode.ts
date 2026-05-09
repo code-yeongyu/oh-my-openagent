@@ -89,6 +89,27 @@ Use \`kind: "subagent_type"\` only for eligible agents.
 
 Do not use \`oracle\`, \`prometheus\`, or other non-eligible agents here. For those, use \`delegate-task\` instead.
 
+## Invocation
+
+Both \`opencode\` and \`omo\` (oh-my-openagent) expose the same 12 \`team_*\` tools. There is no CLI-level "team mode" command — the lead agent invokes \`team_create\` from inside an opencode/omo session that is itself running inside a tmux window. \`tmux_visualization\` is opt-in via config and only takes effect when the caller is already inside tmux.
+
+## Tmux window management
+
+When \`tmux_visualization: true\`, \`team_create\` builds the layout inside your existing tmux session WITHOUT yanking your view:
+
+- **Focus window** = the window you ran opencode/omo in (typically window \`0\`). Your lead pane stays at ~30% width on the left, with one attached pane per teammate tiled \`main-vertical\` to the right.
+- **Live-tail window** = a sibling window named \`team-live-<id>\` containing one streaming pane per teammate. It is created in the background with \`-d\` so the user is never auto-switched onto it.
+
+After \`team_create\` returns, focus is explicitly restored to the caller's window and pane. Move between windows with the standard tmux chords (defaults; substitute your prefix if remapped):
+
+- \`prefix + 0\` — caller / focus window.
+- \`prefix + n\` / \`prefix + p\` — next / previous window.
+- \`prefix + w\` — interactive picker; the live-tail window is named \`team-live-<id>\`.
+- \`prefix + l\` — toggle to the previously visible window.
+- Inside the focus window, \`prefix + arrow\` walks between lead and teammate panes.
+
+\`team_delete\` and per-member \`team_shutdown_request\`/\`team_approve_shutdown\` reuse the same conventions: only the team-owned panes/windows are killed, never the caller's window, and the caller's view is restored after cleanup if the user happened to be viewing the killed window.
+
 ## Lifecycle
 
 1. Lead creates the team with \`team_create({ teamName: "existing-team" })\` or \`team_create({ inline_spec: { name: "team-name", members: [...] } })\`. Never call \`team_create\` with empty arguments.

@@ -5,7 +5,7 @@ import type { OpencodeClient } from "../../../tools/delegate-task/types"
 import { loadTeamSpec } from "../team-registry/loader"
 import { aggregateStatus } from "../team-runtime/status"
 import { discoverTeamSpecs } from "../team-registry/paths"
-import { listActiveTeams, loadRuntimeState } from "../team-state-store/store"
+import { listActiveTeams, loadRuntimeState, TeamFromDeadInstanceError } from "../team-state-store/store"
 
 type QueryToolDeps = {
   aggregateStatus: typeof aggregateStatus
@@ -50,6 +50,7 @@ export function createTeamStatusTool(
   client: OpencodeClient,
   backgroundManager?: Parameters<typeof aggregateStatus>[2],
   deps: QueryToolDeps = defaultDeps,
+  getCurrentServerUrl?: () => string | undefined,
 ): ToolDefinition {
   void client
 
@@ -60,6 +61,21 @@ export function createTeamStatusTool(
     },
     execute: async (args: { teamRunId: string }, ctx?: TeamQueryToolContext) => {
       await assertTeamParticipant(args.teamRunId, config, ctx?.sessionID, deps)
+      const rs = await deps.loadRuntimeState(args.teamRunId, config)
+      const { assertTeamServedByCurrentInstance } = await import("../team-state-store/store")
+      try {
+        await assertTeamServedByCurrentInstance(rs, getCurrentServerUrl?.())
+      } catch (e) {
+        if (e instanceof TeamFromDeadInstanceError) {
+          return JSON.stringify({
+            teamRunId: args.teamRunId,
+            teamName: rs.teamName,
+            state: "stale-from-previous-instance",
+            message: e.message,
+          })
+        }
+        throw e
+      }
       return JSON.stringify(await deps.aggregateStatus(args.teamRunId, config, backgroundManager))
     },
   })
