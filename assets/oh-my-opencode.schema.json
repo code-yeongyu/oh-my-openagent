@@ -5946,6 +5946,15 @@
       ],
       "additionalProperties": false
     },
+    "i18n": {
+      "type": "object",
+      "properties": {
+        "locale": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
     "team_mode": {
       "type": "object",
       "properties": {
