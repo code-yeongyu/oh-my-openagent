@@ -16,6 +16,7 @@ import { createFirstMessageVariantGate } from "./shared/first-message-variant"
 import { injectServerAuthIntoClient, log, logLegacyPluginStartupWarning } from "./shared"
 import { installAgentSortShim, setAgentSortOrder } from "./shared/agent-sort-shim"
 import { detectExternalSkillPlugin, getSkillPluginConflictWarning } from "./shared/external-plugin-detector"
+import { initI18n } from "./shared/i18n"
 import { startBackgroundCheck as startTmuxCheck } from "./tools/interactive-bash"
 
 const serverPlugin: Plugin = async (input, _options): Promise<Hooks> => {
@@ -25,6 +26,7 @@ const serverPlugin: Plugin = async (input, _options): Promise<Hooks> => {
     directory: input.directory,
   })
   logLegacyPluginStartupWarning()
+  initI18n()
 
   const skillPluginCheck = detectExternalSkillPlugin(input.directory)
   if (skillPluginCheck.detected && skillPluginCheck.pluginName) {
@@ -35,6 +37,10 @@ const serverPlugin: Plugin = async (input, _options): Promise<Hooks> => {
 
   const pluginConfig = loadPluginConfig(input.directory, input)
   setAgentSortOrder(pluginConfig.agent_order)
+
+  if (pluginConfig.i18n?.locale) {
+    initI18n({ locale: pluginConfig.i18n.locale })
+  }
 
   if (pluginConfig.openclaw) {
     await initializeOpenClaw(pluginConfig.openclaw)
