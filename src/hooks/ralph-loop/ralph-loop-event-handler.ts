@@ -70,6 +70,14 @@ function isAbortError(error: unknown): boolean {
 		&& (error as { name?: unknown }).name === "MessageAbortedError"
 }
 
+function categorizeRuntimeError(error: unknown): string {
+	const msg = String(error)
+	if (/timeout|abort/i.test(msg)) return "latency"
+	if (/rate_limit|429/i.test(msg)) return "throttle"
+	if (/auth|401|403/i.test(msg)) return "auth"
+	return "unknown"
+}
+
 function showToastBestEffort(
 	ctx: PluginInput,
 	body: { title: string; message: string; variant: "warning" | "info"; duration: number },
@@ -111,7 +119,9 @@ export function createRalphLoopEventHandler(
 	const inFlightSessions = new Set<string>()
 	const runtimeErrorRetriedSessions = new Map<string, number>()
 	const MAX_RUNTIME_ERROR_RETRIES = 3
+	const MAX_SAME_CATEGORY_RETRIES = 2
 	let runtimeErrorRetryCount = 0
+	const adaptiveRepairHistory = new Map<string, string[]>()
 
 	return async ({ event }: { event: { type: string; properties?: unknown } }): Promise<void> => {
 		const props = event.properties as Record<string, unknown> | undefined
@@ -399,20 +409,32 @@ export function createRalphLoopEventHandler(
 				}
 
 				showIterationToast(ctx, newState)
-				try {
-					await continueIteration(ctx, newState, {
-						previousSessionID: sessionID,
-						directory: options.directory,
-						apiTimeoutMs: options.apiTimeoutMs,
-						loopState: options.loopState,
-					})
-					runtimeErrorRetriedSessions.set(sessionID, newState.iteration)
-					runtimeErrorRetryCount++
-				} catch (err) {
-					log(`[${HOOK_NAME}] Failed to retry after runtime error`, {
-						sessionID,
-						error: String(err),
-					})
+			try {
+				await continueIteration(ctx, newState, {
+					previousSessionID: sessionID,
+					directory: options.directory,
+					apiTimeoutMs: options.apiTimeoutMs,
+					loopState: options.loopState,
+				})
+				runtimeErrorRetriedSessions.set(sessionID, newState.iteration)
+				runtimeErrorRetryCount++
+				const errorCategory = categorizeRuntimeError(error)
+				const history = adaptiveRepairHistory.get(sessionID) || []
+				history.push(errorCategory)
+				adaptiveRepairHistory.set(sessionID, history)
+				const sameCategoryCount = history.filter(c => c === errorCategory).length
+				if (sameCategoryCount >= MAX_SAME_CATEGORY_RETRIES) {
+					log(`[${HOOK_NAME}] Adaptive repair cap reached: repeated ${errorCategory} errors (${sameCategoryCount} consecutive) suggest systemic issue`, { sessionID, iteration: state.iteration })
+					options.loopState.clear()
+					showMaxIterationsToast(ctx, state)
+					return
+				}
+				log(`[${HOOK_NAME}] Error category: ${errorCategory} (consecutive: ${sameCategoryCount})`, { sessionID })
+			} catch (retryErr) {
+				log(`[${HOOK_NAME}] Failed to retry after runtime error`, {
+					sessionID,
+					error: String(retryErr),
+				})
 				}
 			} finally {
 				inFlightSessions.delete(sessionID)
