@@ -475,8 +475,10 @@ describe('TmuxSessionManager', () => {
       // when
       const serverUrl = manager.getServerUrl()
 
-      // then
-      expect(serverUrl).toBe('http://127.0.0.1:12345/')
+      // then — trailing slash is stripped so `opencode attach` and the
+      // Python tailer see an identical origin (b8a3319a fixed the tailer;
+      // the slash strip in serverUrl getter complements it for attach).
+      expect(serverUrl).toBe('http://127.0.0.1:12345')
     })
 
     test('returns fallback when port is 0', async () => {
@@ -501,6 +503,31 @@ describe('TmuxSessionManager', () => {
       } finally {
         if (originalPort !== undefined) process.env.OPENCODE_PORT = originalPort
       }
+    })
+
+    test('re-reads ctx.serverUrl on every call so a placeholder seen at construction is replaced once Server.url is populated', async () => {
+      // Reproduces the opencode behavior in packages/opencode/src/index.ts:
+      //   get serverUrl() { return Server.url ?? new URL("http://localhost:4096") }
+      // If a plugin snapshots ctx.serverUrl during plugin load (when
+      // Server.url is still null), it sees the localhost:4096 placeholder.
+      // Once opencode binds the real port, subsequent reads must reflect it.
+      // given
+      mockIsInsideTmux.mockReturnValue(true)
+      const { TmuxSessionManager } = await import('./manager')
+      let current = new URL('http://localhost:4096/') // placeholder while Server.url is null
+      const ctx = {
+        ...createMockContext(),
+        get serverUrl() { return current },
+      } as unknown as Parameters<typeof TmuxSessionManager>[0]
+      const config = createTmuxConfig({ enabled: true })
+      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+
+      // when — opencode finishes binding to a different port
+      current = new URL('http://localhost:4097/')
+      const serverUrl = manager.getServerUrl()
+
+      // then — trailing slash stripped (see serverUrl getter)
+      expect(serverUrl).toBe('http://localhost:4097')
     })
   })
 

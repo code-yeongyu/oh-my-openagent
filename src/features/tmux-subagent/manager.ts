@@ -76,7 +76,13 @@ export class TmuxSessionManager {
   private client: OpencodeClient
   private tmuxConfig: TmuxConfig
   private projectDirectory: string
-  private serverUrl: string
+  // Read ctx.serverUrl lazily — opencode's getter returns a localhost:4096
+  // PLACEHOLDER while Server.url is null, then the real URL once the server
+  // binds. Snapshotting in the constructor froze the placeholder forever and
+  // every consumer (team panes, polling, action-executor) inherited the
+  // wrong port. The getter below re-evaluates on every read.
+  private readonly ctxServerUrl: () => URL | undefined
+  private readonly serverUrlFallback: string
   private sourcePaneId: string | undefined
   private sessions = new Map<string, TrackedSession>()
   private pendingSessions = new Set<string>()
@@ -106,23 +112,8 @@ export class TmuxSessionManager {
     const defaultPort = Number.isInteger(parsedPort) && parsedPort > 0 && parsedPort <= 65535
       ? String(parsedPort)
       : "4096"
-    const fallbackUrl = `http://localhost:${defaultPort}`
-    const rawServerUrl = ctx.serverUrl?.toString()
-    try {
-      if (rawServerUrl) {
-        const parsed = new URL(rawServerUrl)
-        const port = parsed.port || (parsed.protocol === 'https:' ? '443' : '80')
-        this.serverUrl = port === '0' ? fallbackUrl : rawServerUrl
-      } else {
-        this.serverUrl = fallbackUrl
-      }
-    } catch (error) {
-      this.deps.log("[tmux-session-manager] failed to parse server URL, using fallback", {
-        serverUrl: rawServerUrl,
-        error: String(error),
-      })
-      this.serverUrl = fallbackUrl
-    }
+    this.serverUrlFallback = `http://localhost:${defaultPort}`
+    this.ctxServerUrl = () => ctx.serverUrl
     this.sourcePaneId = this.deps.getCurrentPaneId()
     this.pollingManager = new TmuxPollingManager(
       this.client,
@@ -137,6 +128,36 @@ export class TmuxSessionManager {
       serverUrl: this.serverUrl,
       sourcePaneId: this.sourcePaneId,
     })
+  }
+
+  // Re-evaluate ctx.serverUrl each call so we pick up the real port once
+  // opencode binds. Returns the fallback only when the getter yields
+  // undefined or an unusable URL (port 0, parse failure).
+  // Trailing slash is stripped because `opencode attach` and the Python
+  // tailer both treat `http://host:port/` differently from `http://host:port`
+  // (commit b8a3319a fixed the tailer; this normalises at the source so
+  // every consumer — attach panes included — gets a slash-free origin).
+  private get serverUrl(): string {
+    let raw: URL | undefined
+    try {
+      raw = this.ctxServerUrl()
+    } catch {
+      return this.serverUrlFallback
+    }
+    if (!raw) return this.serverUrlFallback
+    try {
+      const parsed = new URL(raw.toString())
+      const port = parsed.port || (parsed.protocol === "https:" ? "443" : "80")
+      if (port === "0") return this.serverUrlFallback
+      const serialized = parsed.toString()
+      return serialized.endsWith("/") ? serialized.slice(0, -1) : serialized
+    } catch (error) {
+      this.deps.log("[tmux-session-manager] failed to parse server URL, using fallback", {
+        serverUrl: String(raw),
+        error: String(error),
+      })
+      return this.serverUrlFallback
+    }
   }
   private isEnabled(): boolean {
     return this.tmuxConfig.enabled && this.deps.isInsideTmux()

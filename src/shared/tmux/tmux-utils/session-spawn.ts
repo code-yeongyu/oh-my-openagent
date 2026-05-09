@@ -112,9 +112,15 @@ export async function spawnTmuxSession(
 	const isolatedSessionName = getIsolatedSessionName()
 	const sessionAlreadyExists = await sessionExists(tmux, isolatedSessionName, runTmuxCommand)
 
+	// Both branches use -d so the user's attached client never gets yanked
+	// to the isolated session/window when an agent is spawned. The
+	// new-session path already had -d; the reuse-by-new-window path used
+	// to omit it, which would jump any client attached to the isolated
+	// session over to the freshly-created agent window.
 	const args = sessionAlreadyExists
 		? [
 			"new-window",
+			"-d",
 			"-t", isolatedSessionName,
 			"-P",
 			"-F", "#{pane_id}",

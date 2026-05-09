@@ -16,9 +16,15 @@ function isMarkedRunningInProcess(): boolean {
 }
 
 export async function isServerRunning(serverUrl: string): Promise<boolean> {
-	if (isMarkedRunningInProcess()) {
-		return true
-	}
+	// We deliberately do NOT short-circuit on `isMarkedRunningInProcess()`.
+	// The mark is set when the plugin is loaded inside an opencode process
+	// with tmux enabled — but opencode can run without a TCP listener
+	// (Unix-socket-only mode, when started without `--port`). In that mode
+	// the URL we'd hand to `opencode attach` (the localhost:4096 placeholder
+	// from `ctx.serverUrl`) points to a port nothing is listening on, and
+	// trusting the mark made every team pane spawn a doomed `opencode attach`
+	// against a dead port. Always probe; the cache below handles repeated
+	// calls so this is cheap on the happy path.
 
 	if (serverCheckUrl === serverUrl && serverAvailable === true) {
 		return true

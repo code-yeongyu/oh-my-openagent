@@ -188,7 +188,21 @@ describe("markServerRunningInProcess", () => {
     delete (globalThis as Record<symbol, boolean>)[SERVER_RUNNING_KEY]
   })
 
-  test("skips HTTP fetch when marked as running in-process", async () => {
+  test("still probes the URL even when marked as running in-process — opencode can be running without a TCP listener (Unix-socket-only mode), so the mark is not proof of TCP reachability", async () => {
+    // given — server health endpoint refuses the request (no listener)
+    const fetchMock = createFetchMock(async () => { throw new Error("ECONNREFUSED") })
+    globalThis.fetch = fetchMock
+    markServerRunningInProcess()
+
+    // when
+    const result = await isServerRunning("http://localhost:4096")
+
+    // then — must report unreachable, must have actually probed
+    expect(result).toBe(false)
+    expect(fetchMock.mock.calls.length).toBeGreaterThan(0)
+  })
+
+  test("returns true when the marked URL is genuinely TCP-reachable", async () => {
     // given
     const fetchMock = createFetchMock(async () => new Response(null, { status: 200 }))
     globalThis.fetch = fetchMock
@@ -199,7 +213,7 @@ describe("markServerRunningInProcess", () => {
 
     // then
     expect(result).toBe(true)
-    expect(fetchMock.mock.calls.length).toBe(0)
+    expect(fetchMock.mock.calls.length).toBeGreaterThan(0)
   })
 
   test("uses globalThis so flag survives across module instances", () => {
