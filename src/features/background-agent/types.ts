@@ -1,5 +1,5 @@
 import type { FallbackEntry } from "../../shared/model-requirements"
-import type { DelegatedModelConfig } from "../../shared/model-resolution-types"
+import type { DelegatedModelConfig, ModelIntent } from "../../shared/model-resolution-types"
 import type { SessionPermissionRule } from "../../shared/question-denied-session-permission"
 
 export type BackgroundTaskStatus =
@@ -63,6 +63,22 @@ export interface BackgroundTask {
   model?: DelegatedModelConfig
   /** Fallback chain for runtime retry on model errors */
   fallbackChain?: FallbackEntry[]
+  /**
+   * Sticky-model intent. "explicit" = user named this model, retry handler
+   * MUST NOT advance the chain on transient errors. "auto" = system-resolved,
+   * chain advancement permitted. Undefined = legacy task, treated as "auto".
+   */
+  modelIntent?: ModelIntent
+  /**
+   * Provider IDs that have already returned a `isProviderScopedStop` error
+   * during this task's lifetime (insufficient balance, quota exceeded, etc).
+   * The sticky cross-provider escape excludes these from candidate alternate
+   * providers, preventing ping-pong (e.g. opencode-go fails -> escape to
+   * github-copilot -> github-copilot fails -> escape would otherwise
+   * re-pick opencode-go which is still broken). Lower-cased for stable
+   * comparison.
+   */
+  failedProviders?: string[]
   /** Number of fallback retry attempts made */
   attemptCount?: number
   /** Active concurrency slot key */
@@ -112,6 +128,12 @@ export interface LaunchInput {
   model?: DelegatedModelConfig
   /** Fallback chain for runtime retry on model errors */
   fallbackChain?: FallbackEntry[]
+  /**
+   * Sticky-model intent for the launched task. Sets the gate that
+   * `tryFallbackRetry` consults: "explicit" refuses chain advancement.
+   * Undefined preserves legacy auto behavior.
+   */
+  modelIntent?: ModelIntent
   isUnstableAgent?: boolean
   skills?: string[]
   skillContent?: string

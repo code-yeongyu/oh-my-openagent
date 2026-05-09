@@ -17,6 +17,8 @@ import {
   promptWithModelSuggestionRetry,
   resolveInheritedPromptTools,
   createInternalAgentTextPart,
+  readConnectedProvidersCache,
+  readProviderModelsCache,
 } from "../../shared"
 import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
 import { setSessionTools } from "../../shared/session-tools-store"
@@ -27,6 +29,7 @@ import { isInsideTmux } from "../../shared/tmux"
 import {
   shouldRetryError,
   hasMoreFallbacks,
+  isProviderScopedStop,
 } from "../../shared/model-error-classifier"
 import {
   POLLING_INTERVAL_MS,
@@ -159,9 +162,12 @@ function cloneAttempts(task: BackgroundTask): BackgroundTaskAttempt[] | undefine
   return task.attempts.map((attempt) => ({ ...attempt }))
 }
 
-function buildLocalSessionUrl(directory: string, sessionID: string): string {
+function buildLocalSessionUrl(serverOrigin: string, directory: string, sessionID: string): string {
   const encodedDirectory = Buffer.from(directory).toString("base64url")
-  return `http://127.0.0.1:4096/${encodedDirectory}/session/${sessionID}`
+  // serverOrigin already includes scheme://host:port — strip any trailing slash
+  // before composing the path to avoid `//` in the result.
+  const trimmed = serverOrigin.endsWith("/") ? serverOrigin.slice(0, -1) : serverOrigin
+  return `${trimmed}/${encodedDirectory}/session/${sessionID}`
 }
 
 export interface SubagentSessionCreatedEvent {
@@ -195,6 +201,12 @@ export class BackgroundManager {
   private pendingByParent: Map<string, Set<string>>  // Track pending tasks per parent for batching
   private client: OpencodeClient
   private directory: string
+  // Lazy reader for the live server URL — opencode's `ctx.serverUrl` is a
+  // getter that returns a localhost:4096 placeholder while Server.url is
+  // null and the real URL once the server has bound. Snapshotting it in
+  // the constructor would freeze the placeholder; reading on demand always
+  // sees the current value.
+  private readonly readServerOrigin: () => string
   private pollingInterval?: ReturnType<typeof setInterval>
   private pollingInFlight = false
   private concurrencyManager: ConcurrencyManager
@@ -210,6 +222,14 @@ export class BackgroundManager {
   private completedTaskSummaries: Map<string, BackgroundTaskNotificationTask[]> = new Map()
   private idleDeferralTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
   private notificationQueueByParent: Map<string, Promise<void>> = new Map()
+  // Per-task serialization of handleSessionErrorEvent. Concurrent
+  // session.error events for the same task (rare but possible during
+  // global provider outages) would otherwise race on task.failedProviders
+  // and double-fire the cross-provider escape — both observers seeing
+  // the SAME failed-provider snapshot, both swapping to the same
+  // alternate, both calling scheduleRetryAttempt. Chaining error events
+  // per task ensures the second event sees the first's mutations.
+  private sessionErrorChainByTask: Map<string, Promise<void>> = new Map()
   private observedOutputSessions: Set<string> = new Set()
   private observedIncompleteTodosBySession: Map<string, boolean> = new Map()
   private rootDescendantCounts: Map<string, number>
@@ -230,6 +250,15 @@ export class BackgroundManager {
     this.pendingByParent = new Map()
     this.client = pluginContext.client
     this.directory = pluginContext.directory
+    this.readServerOrigin = () => {
+      const url = pluginContext.serverUrl
+      if (!url) return "http://127.0.0.1:4096"
+      try {
+        return new URL(url.toString()).origin
+      } catch {
+        return "http://127.0.0.1:4096"
+      }
+    }
     this.concurrencyManager = new ConcurrencyManager(options.config)
     this.config = options.config
     this.tmuxEnabled = options?.tmuxConfig?.enabled ?? false
@@ -421,6 +450,7 @@ export class BackgroundManager {
         parentAgent: input.parentAgent,
         parentTools: input.parentTools,
         model: input.model,
+        modelIntent: input.modelIntent,
         fallbackChain: input.fallbackChain,
         attemptCount: 0,
         category: input.category,
@@ -648,7 +678,7 @@ export class BackgroundManager {
 
     if (task.retryNotification) {
       const attemptNumber = boundAttempt.attemptNumber
-      const retrySessionUrl = buildLocalSessionUrl(parentDirectory, sessionID)
+      const retrySessionUrl = buildLocalSessionUrl(this.readServerOrigin(), parentDirectory, sessionID)
       const previousAttempt = getPreviousAttempt(task, boundAttempt.attemptId)
       const failedSessionID = previousAttempt?.sessionId ?? task.retryNotification.previousSessionID
       const failedSessionLine = failedSessionID
@@ -1382,7 +1412,8 @@ The fallback retry session is now created and can be inspected directly.
       const errorMessage = props ? getSessionErrorMessage(props) : undefined
 
       const errorInfo = { name: errorName, message: errorMessage }
-      void this.handleSessionErrorEvent({
+      const previousChain = this.sessionErrorChainByTask.get(task.id)
+      const handlerInvocation = (): Promise<void> => this.handleSessionErrorEvent({
         errorInfo,
         errorMessage,
         errorName,
@@ -1392,6 +1423,22 @@ The fallback retry session is now created and can be inspected directly.
           error,
           taskId: task.id,
         })
+      })
+      // Fast-path when no in-flight handler for this task: invoke
+      // synchronously up to the first await, matching the original
+      // void-call timing. Slow-path chains onto the in-flight promise to
+      // serialize concurrent session.error events for the same task and
+      // protect task.failedProviders from a TOCTOU race.
+      const nextChain = previousChain
+        ? previousChain.then(handlerInvocation)
+        : handlerInvocation()
+      this.sessionErrorChainByTask.set(task.id, nextChain)
+      // Cleanup: drop the entry once this dispatch is the chain head.
+      // Without cleanup the Map grows unboundedly across long sessions.
+      void nextChain.finally(() => {
+        if (this.sessionErrorChainByTask.get(task.id) === nextChain) {
+          this.sessionErrorChainByTask.delete(task.id)
+        }
       })
       return
     }
@@ -1520,16 +1567,105 @@ The fallback retry session is now created and can be inspected directly.
       canRetry,
     })
 
-    const sessionId = task.sessionId
-    if (sessionId) {
-      const sessionStillAlive = await this.verifySessionExists(sessionId)
-      if (sessionStillAlive) {
-        this.logger("[background-agent] session.error received but session still alive, treating as transient:", {
-          taskId: task.id,
-          sessionId,
-          errorMessage: errorMsg?.slice(0, 200),
-        })
-        return
+    // Sticky-model + provider-scoped-stop = the user pinned a model and
+    // the provider returned an out-of-credits / insufficient-balance /
+    // quota-exceeded error. Two-step recovery, in order:
+    //
+    //   1. **Cross-provider escape** — pin the modelID, swap providerID.
+    //      If another connected provider exists (e.g. github-copilot when
+    //      opencode-go ran out of balance), re-launch the task on that
+    //      provider with the SAME modelID. Sticky-on-model is honored;
+    //      only the provider changes. The user's work continues.
+    //   2. **Structured fail** — if no alternate provider is connected,
+    //      surface a <system-reminder> with the billing URL from the
+    //      original error and finalize the task as errored. Looping
+    //      forever on a permanently-broken provider is worse than
+    //      surfacing a clear "fix this" message.
+    //
+    // Transient errors (5xx, rate limits) skip both branches and fall
+    // through to the session-alive transparent-retry guard below.
+    const isStickyDefinitiveFailure =
+      task.modelIntent === "explicit" && isProviderScopedStop(errorInfo)
+    if (isStickyDefinitiveFailure) {
+      const requestedModel = task.model
+        ? `${task.model.providerID}/${task.model.modelID}`
+        : "<unknown>"
+
+      // Step 1: try same-model cross-provider escape.
+      if (task.model) {
+        const providerModelsCache = readProviderModelsCache()
+        const connectedProviders = providerModelsCache?.connected ?? readConnectedProvidersCache()
+        const failingProvider = task.model.providerID.toLowerCase()
+        // Persist the failing provider so subsequent stop-errors on this
+        // task can't ping-pong back to it (the escape exclusion list
+        // accumulates across multiple swaps).
+        const previouslyFailed = new Set<string>(
+          (task.failedProviders ?? []).map((provider: string) => provider.toLowerCase()),
+        )
+        previouslyFailed.add(failingProvider)
+        task.failedProviders = Array.from(previouslyFailed)
+        const altProviders: string[] = (connectedProviders ?? [])
+          .filter((provider: string) => !previouslyFailed.has(provider.toLowerCase()))
+        if (altProviders.length > 0) {
+          const swapped = await this.tryFallbackRetry(
+            task,
+            errorInfo,
+            "sticky-cross-provider-escape",
+            { forceCrossProvider: true, crossProviderProviders: altProviders },
+          )
+          if (swapped) {
+            this.queuePendingNotification(
+              task.parentSessionId,
+              [
+                `[PROVIDER SWAP: ${task.model.providerID} → ${altProviders[0]}]`,
+                `Model preserved: ${task.model.modelID} (sticky-on-model intent honored)`,
+                `Reason: ${errorName ?? "provider stop"} — ${errorMsg.slice(0, 200)}`,
+                `If the new provider also lacks this model the task will surface an unavailability error on the next failure.`,
+              ].join("\n"),
+            )
+            log("[background-agent] sticky cross-provider escape succeeded", {
+              taskId: task.id,
+              previousProvider: task.model.providerID,
+              nextProvider: altProviders[0],
+              preservedModel: task.model.modelID,
+            })
+            return
+          }
+        }
+      }
+
+      // Step 2: fall through to structured fail.
+      const reminderLines = [
+        `[STICKY MODEL UNAVAILABLE: ${requestedModel}]`,
+        `Provider returned: ${errorName ?? "provider stop"} — ${errorMsg.slice(0, 240)}`,
+        `No alternate connected provider could serve this model.`,
+        `Sticky-mode policy refused to swap to a different model. To proceed:`,
+        `  - refill provider credits, OR`,
+        `  - sign in to another provider that serves ${task.model?.modelID ?? "this model"}, OR`,
+        `  - relaunch with a different --model / agents.<>.model, OR`,
+        `  - drop the explicit pick to opt back into chain fallback`,
+      ]
+      this.queuePendingNotification(task.parentSessionId, reminderLines.join("\n"))
+      log("[background-agent] sticky-model definitive failure (no cross-provider alt)", {
+        taskId: task.id,
+        requestedModel,
+        errorName,
+        errorMessage: errorMsg.slice(0, 100),
+      })
+      // Fall through to the fail-task block (skip the transparent-retry
+      // guard since this provider error will not self-resolve).
+    } else {
+      const sessionId = task.sessionId
+      if (sessionId) {
+        const sessionStillAlive = await this.verifySessionExists(sessionId)
+        if (sessionStillAlive) {
+          this.logger("[background-agent] session.error received but session still alive, treating as transient:", {
+            taskId: task.id,
+            sessionId,
+            errorMessage: errorMsg?.slice(0, 200),
+          })
+          return
+        }
       }
     }
 
@@ -1588,6 +1724,7 @@ The fallback retry session is now created and can be inspected directly.
     task: BackgroundTask,
     errorInfo: { name?: string; message?: string },
     source: string,
+    options?: { forceCrossProvider?: boolean; crossProviderProviders?: string[] },
   ): Promise<boolean> {
     const previousSessionID = task.sessionId
     const result = tryFallbackRetry({
@@ -1599,6 +1736,8 @@ The fallback retry session is now created and can be inspected directly.
       idleDeferralTimers: this.idleDeferralTimers,
       queuesByKey: this.queuesByKey,
       processKey: (key: string) => this.processKey(key),
+      forceCrossProvider: options?.forceCrossProvider,
+      crossProviderProviders: options?.crossProviderProviders,
       onRetrying: ({ task, source }) => {
         const currentAttempt = getCurrentAttempt(task)
         const previousAttempt = getPreviousAttempt(task, currentAttempt?.attemptId)
