@@ -148,6 +148,48 @@ export function isGeminiModel(model: string): boolean {
   return modelName.startsWith("gemini-");
 }
 
+export function isClaudeModel(model: string): boolean {
+  const modelName = extractModelName(model).toLowerCase();
+  return modelName.includes("claude");
+}
+
+export function isQwenModel(model: string): boolean {
+  const modelName = extractModelName(model).toLowerCase();
+  return modelName.startsWith("qwen") || modelName.includes("/qwen");
+}
+
+export type ModelFamily =
+  | "claude"
+  | "gpt"
+  | "kimi"
+  | "glm"
+  | "gemini"
+  | "qwen"
+  | "minimax"
+  | "other";
+
+/**
+ * Coarse model-family classification for runtime-fallback ordering and
+ * agent-role compatibility checks. Operates on the last `/` path segment
+ * (via `extractModelName`) for consistency with every other helper here.
+ *
+ * Family-vs-native-sisyphus precedence: this returns "gpt" for ALL GPT
+ * models including gpt-5.4 / gpt-5.5. The native-sisyphus exception
+ * (isGptNativeSisyphusModel) only activates when GPT is the model the
+ * caller selected directly — when GPT is a sibling fallback under a
+ * Claude pin, family-aware ordering must prefer Claude entries first.
+ */
+export function getModelFamily(model: string): ModelFamily {
+  if (isClaudeModel(model)) return "claude";
+  if (isGptModel(model)) return "gpt";
+  if (isKimiK2Model(model)) return "kimi";
+  if (isGlmModel(model)) return "glm";
+  if (isGeminiModel(model)) return "gemini";
+  if (isQwenModel(model)) return "qwen";
+  if (isMiniMaxModel(model)) return "minimax";
+  return "other";
+}
+
 export type BuiltinAgentName =
   | "sisyphus"
   | "hephaestus"

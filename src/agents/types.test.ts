@@ -5,6 +5,9 @@ import {
   isGlmModel,
   isGptNativeSisyphusModel,
   isMiniMaxModel,
+  isClaudeModel,
+  isQwenModel,
+  getModelFamily,
 } from "./types";
 
 describe("isGptNativeSisyphusModel", () => {
@@ -182,5 +185,80 @@ describe("isGeminiModel", () => {
 
   test("#given opencode provider #then returns false", () => {
     expect(isGeminiModel("opencode/claude-opus-4-7")).toBe(false);
+  });
+});
+
+describe("isClaudeModel", () => {
+  test("detects claude-opus / claude-sonnet / claude-haiku across providers", () => {
+    expect(isClaudeModel("anthropic/claude-opus-4-7")).toBe(true);
+    expect(isClaudeModel("github-copilot/claude-sonnet-4.6")).toBe(true);
+    expect(isClaudeModel("opencode/claude-haiku-4-5")).toBe(true);
+    expect(isClaudeModel("vercel/claude-sonnet-4-6-thinking")).toBe(true);
+  });
+
+  test("rejects non-claude models", () => {
+    expect(isClaudeModel("openai/gpt-5.5")).toBe(false);
+    expect(isClaudeModel("opencode-go/kimi-k2.6")).toBe(false);
+    expect(isClaudeModel("opencode-go/glm-5.1")).toBe(false);
+    expect(isClaudeModel("google/gemini-3.1-pro")).toBe(false);
+  });
+});
+
+describe("isQwenModel", () => {
+  test("detects qwen-prefixed models", () => {
+    expect(isQwenModel("opencode-go/qwen3.5-plus")).toBe(true);
+    expect(isQwenModel("opencode-go/qwen3.6-plus")).toBe(true);
+    expect(isQwenModel("vercel/qwen3-coder")).toBe(true);
+  });
+
+  test("rejects non-qwen models", () => {
+    expect(isQwenModel("anthropic/claude-opus-4-7")).toBe(false);
+    expect(isQwenModel("openai/gpt-5.5")).toBe(false);
+    expect(isQwenModel("opencode-go/kimi-k2.6")).toBe(false);
+  });
+});
+
+describe("getModelFamily", () => {
+  test("classifies claude models as 'claude'", () => {
+    expect(getModelFamily("anthropic/claude-opus-4-7")).toBe("claude");
+    expect(getModelFamily("github-copilot/claude-sonnet-4.6")).toBe("claude");
+    expect(getModelFamily("opencode/claude-haiku-4-5")).toBe("claude");
+  });
+
+  test("classifies gpt models as 'gpt' (including native-sisyphus exceptions)", () => {
+    expect(getModelFamily("openai/gpt-5.5")).toBe("gpt");
+    expect(getModelFamily("github-copilot/gpt-5.4")).toBe("gpt");
+    expect(getModelFamily("openai/gpt-5-nano")).toBe("gpt");
+    expect(getModelFamily("openai/gpt-4o")).toBe("gpt");
+  });
+
+  test("classifies kimi models as 'kimi'", () => {
+    expect(getModelFamily("opencode-go/kimi-k2.6")).toBe("kimi");
+    expect(getModelFamily("kimi-for-coding/k2p5")).toBe("kimi");
+    expect(getModelFamily("moonshotai/Kimi-K2.6")).toBe("kimi");
+  });
+
+  test("classifies glm models as 'glm'", () => {
+    expect(getModelFamily("zai-coding-plan/glm-5")).toBe("glm");
+    expect(getModelFamily("opencode-go/glm-5.1")).toBe("glm");
+  });
+
+  test("classifies gemini models as 'gemini'", () => {
+    expect(getModelFamily("google/gemini-3.1-pro")).toBe("gemini");
+    expect(getModelFamily("github-copilot/gemini-3-flash")).toBe("gemini");
+  });
+
+  test("classifies qwen models as 'qwen'", () => {
+    expect(getModelFamily("opencode-go/qwen3.5-plus")).toBe("qwen");
+  });
+
+  test("classifies minimax models as 'minimax'", () => {
+    expect(getModelFamily("opencode-go/minimax-m2.7")).toBe("minimax");
+    expect(getModelFamily("vercel/minimax-text-01")).toBe("minimax");
+  });
+
+  test("falls through to 'other' for unknown families", () => {
+    expect(getModelFamily("opencode/big-pickle")).toBe("other");
+    expect(getModelFamily("custom/unknown-model")).toBe("other");
   });
 });

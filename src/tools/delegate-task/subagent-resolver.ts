@@ -1,6 +1,7 @@
 import type { DelegateTaskArgs } from "./types"
 import type { ExecutorContext } from "./executor-types"
 import type { DelegatedModelConfig } from "./types"
+import type { ModelIntent } from "../../shared/model-resolution-types"
 import { isPlanFamily } from "./constants"
 import { SISYPHUS_JUNIOR_AGENT } from "./sisyphus-junior-agent"
 import { applyCategoryParams } from "./delegated-model-config"
@@ -37,7 +38,7 @@ export async function resolveSubagentExecution(
   parentAgent: string | undefined,
   categoryExamples: string,
   options: ResolveSubagentExecutionOptions = {},
-): Promise<{ agentToUse: string; categoryModel: DelegatedModelConfig | undefined; fallbackChain?: FallbackEntry[]; error?: string }> {
+): Promise<{ agentToUse: string; categoryModel: DelegatedModelConfig | undefined; fallbackChain?: FallbackEntry[]; modelIntent?: ModelIntent; error?: string }> {
   const { client, agentOverrides, userCategories } = executorCtx
 
   if (!args.subagent_type?.trim()) {
@@ -75,6 +76,7 @@ Create the work plan directly - that's your job as the planning agent.`,
   let agentToUse = agentName
   let categoryModel: DelegatedModelConfig | undefined
   let fallbackChain: FallbackEntry[] | undefined = undefined
+  let modelIntent: ModelIntent | undefined
 
   try {
     const agentsResult = await client.app.agents()
@@ -144,6 +146,15 @@ Create the work plan directly - that's your job as the planning agent.`,
       })
 
       const resolutionSkipped = resolution && 'skipped' in resolution
+      // `agentOverride?.model` is the user writing `agents.<name>.model: "..."`
+      // in their config — an explicit pick. `agentCategoryModel` is
+      // `categories.<cat>.model` which (by user policy) still permits chain
+      // fallback. A chain-derived resolution (matchedFallback === true) is
+      // always auto regardless. Intent is reported separately from the
+      // model object so downstream equality checks on `categoryModel` are
+      // not perturbed.
+      const explicitUserOverride = agentOverride?.model !== undefined
+        && agentOverride.model !== ""
 
       if (resolution && !resolutionSkipped) {
         const normalized = normalizeModelFormat(resolution.model)
@@ -151,6 +162,9 @@ Create the work plan directly - that's your job as the planning agent.`,
           const variantToUse = agentOverride?.variant ?? resolution.variant ?? agentCategoryConfig?.variant
           const resolvedModel = variantToUse ? { ...normalized, variant: variantToUse } : normalized
           categoryModel = applyCategoryParams(resolvedModel, agentCategoryConfig)
+          modelIntent = explicitUserOverride && resolution.matchedFallback !== true
+            ? "explicit"
+            : "auto"
         }
       } else if (resolutionSkipped && (agentOverride?.model ?? agentCategoryModel)) {
         const normalized = normalizeModelFormat((agentOverride?.model ?? agentCategoryModel)!)
@@ -158,9 +172,13 @@ Create the work plan directly - that's your job as the planning agent.`,
           const variantToUse = agentOverride?.variant ?? agentCategoryConfig?.variant
           const resolvedModel = variantToUse ? { ...normalized, variant: variantToUse } : normalized
           categoryModel = applyCategoryParams(resolvedModel, agentCategoryConfig)
+          // Cold-cache path: only `agentOverride?.model` is treated as
+          // explicit. `agentCategoryModel` still allows chain fallback.
+          modelIntent = explicitUserOverride ? "explicit" : "auto"
           log("[delegate-task] Cold cache: using explicit user override for subagent", {
             agent: agentToUse,
             model: agentOverride?.model ?? agentCategoryModel,
+            modelIntent,
           })
         }
       }
@@ -217,5 +235,5 @@ Create the work plan directly - that's your job as the planning agent.`,
     }
   }
 
-  return { agentToUse, categoryModel, fallbackChain }
+  return { agentToUse, categoryModel, fallbackChain, modelIntent }
 }
