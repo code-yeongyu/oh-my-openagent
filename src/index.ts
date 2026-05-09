@@ -8,6 +8,7 @@ import { createManagers } from "./create-managers"
 import { createRuntimeTmuxConfig, isTmuxIntegrationEnabled } from "./create-runtime-tmux-config"
 import { createTools } from "./create-tools"
 import { initializeOpenClaw } from "./openclaw"
+import { createAnthropicAuthHook } from "./auth"
 import { createPluginInterface } from "./plugin-interface"
 
 import { loadPluginConfig } from "./plugin-config"
@@ -106,6 +107,7 @@ const serverPlugin: Plugin = async (input, _options): Promise<Hooks> => {
   })
 
   return {
+    auth: createAnthropicAuthHook(),
     ...pluginInterface,
 
     "experimental.session.compacting": async (
