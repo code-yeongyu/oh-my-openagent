@@ -119,6 +119,45 @@ When enabled, each member gets a dedicated tmux pane attached to that member's s
 
 `team_delete` closes the panes and tears down the team layout. Per-member shutdown closes just that pane and rebalances the remaining layout.
 
+### How to invoke team mode
+
+From inside opencode running inside tmux, ask the lead agent to call `team_create` — either by team name or with an inline spec:
+
+```
+team_create({ teamName: "ccapi-explorers" })
+team_create({ inline_spec: { name: "scratch", members: [{ name: "scout", category: "quick", prompt: "..." }] } })
+```
+
+Both `opencode` and `omo` (oh-my-openagent) expose the same 12 `team_*` tools — there is no separate command-line entrypoint. The skill prompts (`/team-mode`) document the exact tool calls a lead and member should make.
+
+### Window layout you'll see
+
+When `tmux_visualization` is on, `team_create` builds two regions inside your existing tmux session:
+
+| Region | Where | Contents |
+|--------|-------|----------|
+| Focus window | The window you ran `opencode` in (your current window — usually window `0`) | Your lead pane on the left (~30% width) plus one attached pane per teammate, tiled with `main-vertical` |
+| Live-tail window | A new sibling window named `team-live-<id>` | One pane per teammate streaming the `omo-team-pane-live-tail.py` event feed for that member's session |
+
+`team_create` keeps the active window/pane fixed on your caller window and pane after building the layout, so you do not get yanked into the live-tail window. Earlier versions could jump to the live-tail window — that is fixed: every `new-window` and `split-window` is launched with `-d`, and a final `select-window`/`select-pane` restores the caller view.
+
+### Switching between windows
+
+Standard tmux key chords (default prefix `Ctrl+B`):
+
+- `prefix + 0` — back to your focus window (lead + member panes).
+- `prefix + n` / `prefix + p` — next / previous window.
+- `prefix + w` — interactive window picker (the live-tail window is named `team-live-<id>`).
+- `prefix + l` — toggle to the previously visible window.
+- Inside the focus window, `prefix + arrow` moves between the lead pane and teammate panes.
+
+If you ever land in an unexpected window after `team_create`, run `prefix + 0` (or `prefix + l`) to return — and please file a bug with the team-run id, since restoration is now explicit.
+
+### Cleanup behaviour
+
+- `team_delete` (lead-only) tears down panes, the live-tail window, worktrees, mailbox, and tasklist. When the team was created in your existing window (the common path), `team_delete` only kills the live-tail window and the teammate panes — it never kills your caller window — and then `select-window`'s back to your caller window so you are not stranded if you happened to be viewing the live-tail.
+- Per-member `team_shutdown_request` + `team_approve_shutdown` closes only that member's focus pane (and its live-tail pane) and rebalances the remaining layout in place.
+
 ## What team mode does NOT do
 
 - No nested teams (members cannot call `team_create`).
