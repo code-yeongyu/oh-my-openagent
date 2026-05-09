@@ -701,8 +701,10 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
     expect(getSessionModel("subagent-session")).toBeUndefined()
   })
 
-  test("does not override explicit agent model overrides with stored session model", async () => {
-    //#given
+  test("restores stored session pin when it differs from the agent's configured default (sticky-pin semantics)", async () => {
+    //#given — user pinned openai/gpt-5.4 via CLI; agent default is claude-opus-4-7.
+    // Trace fix: stored pin must win over the agent default so a TUI refresh /
+    // follow-up turn does not silently revert to the role default.
     setMainSession("test-session")
     setSessionModel("test-session", { providerID: "openai", modelID: "gpt-5.4" })
     const args = createMockHandlerArgs({
@@ -720,12 +722,12 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
     //#when
     await handler(input, output)
 
-    //#then
-    expect(output.message["model"]).toBeUndefined()
+    //#then — stored pin restored
+    expect(output.message["model"]).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
     expect(getSessionModel("test-session")).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
   })
 
-  test("treats prefixed list-display agent names as explicit model overrides", async () => {
+  test("restores stored session pin for list-display agent names too (sticky-pin semantics)", async () => {
     //#given
     setMainSession("test-session")
     setSessionModel("test-session", { providerID: "openai", modelID: "gpt-5.4" })
@@ -744,8 +746,8 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
     //#when
     await handler(input, output)
 
-    //#then
-    expect(output.message["model"]).toBeUndefined()
+    //#then — list-display name is normalized via getAgentConfigKey, so the gate-lift fires the same way
+    expect(output.message["model"]).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
     expect(getSessionModel("test-session")).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
     expect(getSessionAgent("test-session")).toBe("Prometheus - Plan Builder")
   })

@@ -13,6 +13,7 @@ import {
   createTeamRejectShutdownTool,
   createTeamShutdownRequestTool,
 } from "../features/team-mode/tools/lifecycle"
+import { createTeamRefreshPanesTool } from "../features/team-mode/tools/refresh-panes"
 import { createTeamSendMessageTool } from "../features/team-mode/tools/messaging"
 import { createTeamListTool, createTeamStatusTool } from "../features/team-mode/tools/query"
 import {
@@ -83,6 +84,7 @@ type ToolRegistryFactories = {
   createTeamTaskUpdateTool: typeof createTeamTaskUpdateTool
   createTeamStatusTool: typeof createTeamStatusTool
   createTeamListTool: typeof createTeamListTool
+  createTeamRefreshPanesTool: typeof createTeamRefreshPanesTool
 }
 
 const defaultToolRegistryFactories: ToolRegistryFactories = {
@@ -116,6 +118,7 @@ const defaultToolRegistryFactories: ToolRegistryFactories = {
   createTeamTaskUpdateTool,
   createTeamStatusTool,
   createTeamListTool,
+  createTeamRefreshPanesTool,
 }
 
 export type ToolRegistryResult = {
@@ -328,13 +331,17 @@ export function createToolRegistry(args: {
         team_shutdown_request: factories.createTeamShutdownRequestTool(pluginConfig.team_mode, ctx.client),
         team_approve_shutdown: factories.createTeamApproveShutdownTool(pluginConfig.team_mode, ctx.client),
         team_reject_shutdown: factories.createTeamRejectShutdownTool(pluginConfig.team_mode, ctx.client),
-        team_send_message: factories.createTeamSendMessageTool(pluginConfig.team_mode, ctx.client),
+        team_send_message: factories.createTeamSendMessageTool(pluginConfig.team_mode, ctx.client, undefined, () => managers.tmuxSessionManager?.getServerUrl()),
         team_task_create: factories.createTeamTaskCreateTool(pluginConfig.team_mode, ctx.client),
         team_task_list: factories.createTeamTaskListTool(pluginConfig.team_mode, ctx.client),
         team_task_update: factories.createTeamTaskUpdateTool(pluginConfig.team_mode, ctx.client),
         team_task_get: factories.createTeamTaskGetTool(pluginConfig.team_mode, ctx.client),
-        team_status: factories.createTeamStatusTool(pluginConfig.team_mode, ctx.client, managers.backgroundManager),
+        team_status: factories.createTeamStatusTool(pluginConfig.team_mode, ctx.client, managers.backgroundManager, undefined, () => managers.tmuxSessionManager?.getServerUrl()),
         team_list: factories.createTeamListTool(pluginConfig.team_mode, ctx.client),
+        team_refresh_panes: factories.createTeamRefreshPanesTool(
+          pluginConfig.team_mode,
+          managers.tmuxSessionManager,
+        ),
       }
     : {}
 

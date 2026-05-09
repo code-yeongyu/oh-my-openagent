@@ -46,6 +46,25 @@ const serverPlugin: Plugin = async (input, _options): Promise<Hooks> => {
       const { checkTeamModeDependencies } = await import("./features/team-mode/deps")
       await checkTeamModeDependencies(teamModeConfig)
       await ensureBaseDirs(resolveBaseDir(teamModeConfig))
+      try {
+        const { reapStaleTailers } = await import("./features/team-mode/team-layout-tmux/reap-stale-tailers")
+        void reapStaleTailers().catch((error) => {
+          log("[team-mode] reap-stale-tailers crashed", { error: String(error) })
+        })
+      } catch (importError) {
+        log("[team-mode] reap-stale-tailers module load failed", { error: String(importError) })
+      }
+      try {
+        const { detectServerPortOwnership } = await import("./features/team-mode/team-layout-tmux/server-port-ownership")
+        const ownership = await detectServerPortOwnership()
+        if (!ownership.hasOwnPort) {
+          log("[team-mode] this opencode instance has no listening TCP port — team-mode live-tail panes will be unavailable. Reason: " + (ownership.reason ?? "<unknown>"), {
+            pid: process.pid,
+          })
+        }
+      } catch (error) {
+        log("[team-mode] server-port-ownership probe failed", { error: String(error) })
+      }
       if (pluginConfig.disabled_skills?.includes("team-mode")) {
         console.warn(
           "[team-mode] enabled=true but team-mode skill is disabled; skill docs hidden but tools still registered (D-29)",

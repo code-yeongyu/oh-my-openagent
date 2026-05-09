@@ -59,6 +59,23 @@ function hasExplicitAgentModelOverride(
   return typeof configuredModel === "string" && configuredModel.trim().length > 0
 }
 
+function getAgentConfiguredModelString(
+  agent: string | undefined,
+  pluginConfig: OhMyOpenCodeConfig
+): string | undefined {
+  const configuredAgents = pluginConfig.agents
+  const normalizedAgent = typeof agent === "string" ? getAgentConfigKey(agent) : undefined
+  if (!normalizedAgent || !configuredAgents || !(normalizedAgent in configuredAgents)) {
+    return undefined
+  }
+
+  const configuredAgent = configuredAgents[normalizedAgent as keyof typeof configuredAgents]
+  const configuredModel = configuredAgent?.model
+  return typeof configuredModel === "string" && configuredModel.trim().length > 0
+    ? configuredModel.trim()
+    : undefined
+}
+
 function getStoredMainSessionModel(
   input: ChatMessageInput,
   pluginConfig: OhMyOpenCodeConfig,
@@ -77,19 +94,35 @@ function getStoredMainSessionModel(
     return undefined
   }
 
+  const stored = getSessionModel(input.sessionID)
+  if (!stored) return undefined
+
+  const agentDefault = getAgentConfiguredModelString(input.agent, pluginConfig)
+  const storedStr = `${stored.providerID}/${stored.modelID}`
+
+  // When opencode forwards input.model (the agent-resolved default) on follow-up
+  // messages after a TUI refresh, the stored user pin must win over the agent default.
+  // Only skip recovery if (a) no stored pin exists, (b) incoming already matches the
+  // stored pin (no override needed), or (c) incoming differs from the agent default
+  // (meaning the user explicitly chose a model in the TUI — respect that choice).
   if (input.model) {
-    return undefined
+    const incomingStr = `${input.model.providerID}/${input.model.modelID}`
+    if (incomingStr === storedStr) return undefined
+    if (!agentDefault || incomingStr !== agentDefault) {
+      // Not the agent default — user explicitly picked this model; respect it
+      return undefined
+    }
+    // Fall through: incoming IS the agent default, restore the stored pin
   }
 
-  // Removed: `output.message["model"] !== undefined` guard was unreachable.
-  // OpenCode always populates output.message.model before triggering chat.message,
-  // so the guard short-circuited every time, preventing session model recovery.
-
+  // Similarly, when agents.<role>.model exists in config, only skip recovery when
+  // the stored pin already matches that default (no user override is active).
   if (hasExplicitAgentModelOverride(input.agent, pluginConfig)) {
-    return undefined
+    if (agentDefault && storedStr === agentDefault) return undefined
+    // Fall through: stored pin differs from agent config default — restore it
   }
 
-  return getSessionModel(input.sessionID)
+  return stored
 }
 
 function parseRawLoopSlashCommand(promptText: string): RawLoopCommand | null {
@@ -174,7 +207,7 @@ export function createChatMessageHandler(args: {
           body: {
             title: string
             message: string
-            variant: "warning"
+            variant: string
             duration: number
           }
         }) => Promise<unknown>
@@ -187,6 +220,8 @@ export function createChatMessageHandler(args: {
     (typeof pluginConfig.runtime_fallback === "boolean"
       ? pluginConfig.runtime_fallback
       : (pluginConfig.runtime_fallback?.enabled ?? false))
+
+  const lastPinRestoredToastKey = new Map<string, string>()
 
   return async (
     input: ChatMessageInput,
@@ -208,7 +243,38 @@ export function createChatMessageHandler(args: {
       output,
     )
     if (storedMainSessionModel) {
-      output.message["model"] = storedMainSessionModel
+      // Don't clobber a model another hook already chose (e.g. runtime-fallback
+      // resolving a chain advance). The pin restore is for the silent-revert-to-
+      // role-default case — when output.message.model is unset OR equals the
+      // agent default — not for displacing an active fallback decision.
+      const existingOverride = output.message["model"] as
+        | { providerID?: string; modelID?: string }
+        | undefined
+      const existingOverrideStr = existingOverride && existingOverride.providerID && existingOverride.modelID
+        ? `${existingOverride.providerID}/${existingOverride.modelID}`
+        : undefined
+      const pinStr = `${storedMainSessionModel.providerID}/${storedMainSessionModel.modelID}`
+      const agentDefault = getAgentConfiguredModelString(input.agent, pluginConfig)
+      const otherHookOwnsOverride = existingOverrideStr !== undefined
+        && existingOverrideStr !== pinStr
+        && (agentDefault === undefined || existingOverrideStr !== agentDefault)
+      if (!otherHookOwnsOverride) {
+        output.message["model"] = storedMainSessionModel
+        const pinKey = `${input.sessionID}:${pinStr}`
+        if (lastPinRestoredToastKey.get(input.sessionID) !== pinKey) {
+          lastPinRestoredToastKey.set(input.sessionID, pinKey)
+          pluginContext.client.tui
+            .showToast({
+              body: {
+                title: "Model pinned",
+                message: `Using your pinned model: ${pinStr}`,
+                variant: "info",
+                duration: 4000,
+              },
+            })
+            .catch(() => {})
+        }
+      }
     }
 
     if (!isRuntimeFallbackEnabled) {

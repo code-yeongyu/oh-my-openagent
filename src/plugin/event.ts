@@ -306,7 +306,10 @@ export function createEventHandler(args: {
     ? createTeamLeadOrphanHandler(teamModeConfig, managers.tmuxSessionManager, managers.backgroundManager)
     : undefined;
   const teamMemberErrorHandler = teamModeConfig
-    ? createTeamMemberErrorHandler(teamModeConfig)
+    ? createTeamMemberErrorHandler(teamModeConfig, {
+        client: pluginContext.client,
+        directory: pluginContext.directory,
+      })
     : undefined;
   const teamMemberStatusHandler = teamModeConfig
     ? createTeamMemberStatusHandler(teamModeConfig)
@@ -591,7 +594,21 @@ export function createEventHandler(args: {
         const modelID = info?.modelID as string | undefined;
         if (providerID && modelID && !isCompactionMessage) {
           lastKnownModelBySession.set(sessionID, { providerID, modelID });
-          setSessionModel(sessionID, { providerID, modelID });
+          // Guard: don't overwrite an existing user-pinned model with the agent's
+          // config default. This prevents the "silent revert to kimi-k2.6" regression
+          // where opencode forwards agents.<role>.model as the message model and the
+          // event handler clobbers the user's --model pin on every message.updated.
+          const existingPin = getSessionModel(sessionID);
+          const incoming = `${providerID}/${modelID}`;
+          const agentKey = agent ? getAgentConfigKey(agent) : undefined;
+          const agentConfiguredModel = agentKey
+            ? (pluginConfig.agents?.[agentKey as keyof NonNullable<typeof pluginConfig.agents>] as { model?: string } | undefined)?.model
+            : undefined;
+          const isAgentDefault =
+            typeof agentConfiguredModel === "string" && agentConfiguredModel.trim() === incoming;
+          if (!existingPin || !isAgentDefault) {
+            setSessionModel(sessionID, { providerID, modelID });
+          }
         }
       }
 
