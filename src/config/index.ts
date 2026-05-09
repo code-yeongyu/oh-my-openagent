@@ -6,6 +6,7 @@ export type {
   OhMyOpenCodeConfig,
   AgentOverrideConfig,
   AgentOverrides,
+  I18nConfig,
   McpName,
   AgentName,
   HookName,
