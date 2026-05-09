@@ -41,6 +41,14 @@ export const RETRYABLE_ERROR_PATTERNS = [
   /(?:^|\s)429(?:\s|$)/,
   /(?:^|\s)503(?:\s|$)/,
   /(?:^|\s)529(?:\s|$)/,
+
+  // Chinese rate-limit / quota patterns (Zhipu, etc.)
+  /使用上限/,           // "usage limit" — Zhipu: "已达到 5 小时的使用上限"
+  /频率限制/,           // "rate limit" — generic Chinese rate-limit
+  /请求过于频繁/,       // "too many requests" — common Chinese 429 message
+  /暂时不可用/,         // "temporarily unavailable"
+  /服务不可用/,         // "service unavailable"
+  /请稍后重试/,         // "please try again later"
 ]
 
 /**
