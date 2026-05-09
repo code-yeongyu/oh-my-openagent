@@ -35,12 +35,12 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(sisyphus.requiresAnyModel).toBe(true)
 
     const primary = sisyphus.fallbackChain[0]
-    expect(primary.providers).toEqual(["anthropic", "github-copilot", "opencode", "vercel"])
+    expect(primary.providers).toEqual(["anthropic", "github-copilot", "opencode", "vercel", "openrouter"])
     expect(primary.model).toBe("claude-opus-4-7")
     expect(primary.variant).toBe("max")
 
     const second = sisyphus.fallbackChain[1]
-    expect(second.providers).toEqual(["opencode-go", "vercel"])
+    expect(second.providers).toEqual(["opencode-go", "vercel", "openrouter"])
     expect(second.model).toBe("kimi-k2.6")
 
     const third = sisyphus.fallbackChain[2]
@@ -144,19 +144,20 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(multimodalLooker.fallbackChain).toHaveLength(4)
 
     const primary = multimodalLooker.fallbackChain[0]
-    expect(primary.providers).toEqual(["openai", "opencode", "vercel"])
+    expect(primary.providers).toEqual(["openai", "opencode", "vercel", "openrouter"])
     expect(primary.model).toBe("gpt-5.5")
     expect(primary.variant).toBe("medium")
 
     const secondary = multimodalLooker.fallbackChain[1]
-    expect(secondary.providers).toEqual(["opencode-go", "vercel"])
+    expect(secondary.providers).toEqual(["opencode-go", "vercel", "openrouter"])
     expect(secondary.model).toBe("kimi-k2.6")
 
     const tertiary = multimodalLooker.fallbackChain[2]
+    expect(tertiary.providers).toEqual(["zai-coding-plan", "vercel"])
     expect(tertiary.model).toBe("glm-4.6v")
 
     const last = multimodalLooker.fallbackChain[3]
-    expect(last.providers).toEqual(["openai", "github-copilot", "opencode", "vercel"])
+    expect(last.providers).toEqual(["openai", "github-copilot", "opencode", "vercel", "openrouter"])
     expect(last.model).toBe("gpt-5-nano")
   })
 
@@ -172,7 +173,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
 
     const primary = prometheus.fallbackChain[0]
     expect(primary.model).toBe("claude-opus-4-7")
-    expect(primary.providers).toEqual(["anthropic", "github-copilot", "opencode", "vercel"])
+    expect(primary.providers).toEqual(["anthropic", "github-copilot", "opencode", "vercel", "openrouter"])
     expect(primary.variant).toBe("max")
   })
 
@@ -188,7 +189,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
 
     const primary = metis.fallbackChain[0]
     expect(primary.model).toBe("claude-sonnet-4-6")
-    expect(primary.providers).toEqual(["anthropic", "github-copilot", "opencode", "vercel"])
+    expect(primary.providers).toEqual(["anthropic", "github-copilot", "opencode", "vercel", "openrouter"])
     expect(primary.variant).toBeUndefined()
 
     const opusFallback = metis.fallbackChain[1]
@@ -197,7 +198,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
 
     const openAiFallback = metis.fallbackChain.find((entry) => entry.providers.includes("openai"))
     expect(openAiFallback).toEqual({
-      providers: ["openai", "github-copilot", "opencode", "vercel"],
+      providers: ["openai", "github-copilot", "opencode", "vercel", "openrouter"],
       model: "gpt-5.5",
       variant: "high",
     })
@@ -239,7 +240,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
 
     const tertiary = atlas.fallbackChain[2]
     expect(tertiary).toEqual({
-      providers: ["openai", "github-copilot", "opencode", "vercel"],
+      providers: ["openai", "github-copilot", "opencode", "vercel", "openrouter"],
       model: "gpt-5.5",
       variant: "medium",
     })
@@ -261,7 +262,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
 
     // then
     expect(openAiFallback).toEqual({
-      providers: ["openai", "github-copilot", "opencode", "vercel"],
+      providers: ["openai", "github-copilot", "opencode", "vercel", "openrouter"],
       model: "gpt-5.5",
       variant: "medium",
     })
@@ -277,7 +278,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     // #when - accessing hephaestus requirement
     // #then - requiresProvider includes openai, github-copilot, venice, and opencode
     expect(hephaestus).toBeDefined()
-    expect(hephaestus.requiresProvider).toEqual(["openai", "github-copilot", "venice", "opencode", "vercel"])
+    expect(hephaestus.requiresProvider).toEqual(["openai", "github-copilot", "venice", "opencode", "vercel", "openrouter"])
     expect(hephaestus.requiresModel).toBeUndefined()
   })
 
@@ -431,12 +432,12 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     const primary = unspecifiedHigh.fallbackChain[0]
     expect(primary.model).toBe("claude-opus-4-7")
     expect(primary.variant).toBe("max")
-    expect(primary.providers).toEqual(["anthropic", "github-copilot", "opencode", "vercel"])
+    expect(primary.providers).toEqual(["anthropic", "github-copilot", "opencode", "vercel", "openrouter"])
 
     const secondary = unspecifiedHigh.fallbackChain[1]
     expect(secondary.model).toBe("gpt-5.5")
     expect(secondary.variant).toBe("high")
-    expect(secondary.providers).toEqual(["openai", "github-copilot", "opencode", "vercel"])
+    expect(secondary.providers).toEqual(["openai", "github-copilot", "opencode", "vercel", "openrouter"])
   })
 
   test("artistry has valid fallbackChain with gemini-3.1-pro as primary", () => {

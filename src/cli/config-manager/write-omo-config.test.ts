@@ -21,6 +21,7 @@ const installConfig: InstallConfig = {
   hasKimiForCoding: false,
   hasOpencodeGo: false,
   hasVercelAiGateway: false,
+  hasOpenRouter: false,
 }
 
 function getRecord(value: unknown): Record<string, unknown> {

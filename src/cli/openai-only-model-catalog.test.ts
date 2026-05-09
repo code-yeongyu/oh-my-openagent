@@ -15,6 +15,7 @@ function createConfig(overrides: Partial<InstallConfig> = {}): InstallConfig {
     hasKimiForCoding: false,
     hasOpencodeGo: false,
     hasVercelAiGateway: false,
+    hasOpenRouter: false,
     ...overrides,
   }
 }

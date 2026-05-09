@@ -120,6 +120,16 @@ export async function promptInstallConfig(detected: DetectedConfig): Promise<Ins
   })
   if (!vercelAiGateway) return null
 
+  const openrouter = await selectOrCancel({
+    message: "Do you have an OpenRouter API key?",
+    options: [
+      { value: "no", label: "No", hint: "Will use other configured providers" },
+      { value: "yes", label: "Yes", hint: "Unified gateway: openrouter/<upstream>/<model>" },
+    ],
+    initialValue: initial.openrouter,
+  })
+  if (!openrouter) return null
+
   return {
     hasClaude: claude !== "no",
     isMax20: claude === "max20",
@@ -131,5 +141,6 @@ export async function promptInstallConfig(detected: DetectedConfig): Promise<Ins
     hasKimiForCoding: kimiForCoding === "yes",
     hasOpencodeGo: opencodeGo === "yes",
     hasVercelAiGateway: vercelAiGateway === "yes",
+    hasOpenRouter: openrouter === "yes",
   }
 }

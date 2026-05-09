@@ -102,6 +102,11 @@ Ask the user these questions to determine CLI options:
    - If **yes** → `--vercel-ai-gateway=yes`
    - If **no** → `--vercel-ai-gateway=no` (default)
 
+10. **Do you have an OpenRouter API key?**
+    - OpenRouter is a unified gateway to hundreds of models (Claude, GPT, Gemini, Kimi, GLM, etc.) using `openrouter/<upstream>/<model>` IDs
+    - If **yes** → `--openrouter=yes`
+    - If **no** → `--openrouter=no` (default)
+
 **Provider selection is agent-specific.** The installer and runtime do not use one single global provider priority. Each agent resolves against its own fallback chain.
 
 MUST STRONGLY WARNING, WHEN USER SAID THEY DON'T HAVE CLAUDE SUBSCRIPTION, SISYPHUS AGENT MIGHT NOT WORK IDEALLY.
@@ -125,7 +130,7 @@ Spawn a subagent to handle installation and report back - to save context.
 Based on user's answers, run the CLI installer with appropriate flags:
 
 ```bash
-bunx oh-my-openagent install --no-tui --claude=<yes|no|max20> --gemini=<yes|no> --copilot=<yes|no> [--openai=<yes|no>] [--opencode-go=<yes|no>] [--opencode-zen=<yes|no>] [--zai-coding-plan=<yes|no>] [--kimi-for-coding=<yes|no>] [--vercel-ai-gateway=<yes|no>] [--skip-auth]
+bunx oh-my-openagent install --no-tui --claude=<yes|no|max20> --gemini=<yes|no> --copilot=<yes|no> [--openai=<yes|no>] [--opencode-go=<yes|no>] [--opencode-zen=<yes|no>] [--zai-coding-plan=<yes|no>] [--kimi-for-coding=<yes|no>] [--vercel-ai-gateway=<yes|no>] [--openrouter=<yes|no>] [--skip-auth]
 ```
 
 **Examples:**
@@ -137,6 +142,7 @@ bunx oh-my-openagent install --no-tui --claude=<yes|no|max20> --gemini=<yes|no> 
 - User has Z.ai for Librarian: `bunx oh-my-openagent install --no-tui --claude=yes --gemini=no --copilot=no --zai-coding-plan=yes`
 - User has only OpenCode Zen: `bunx oh-my-openagent install --no-tui --claude=no --gemini=no --copilot=no --opencode-zen=yes`
 - User has OpenCode Go only: `bunx oh-my-openagent install --no-tui --claude=no --openai=no --gemini=no --copilot=no --opencode-go=yes`
+- User has only OpenRouter: `bunx oh-my-openagent install --no-tui --claude=no --gemini=no --copilot=no --openrouter=yes`
 - User has no subscriptions: `bunx oh-my-openagent install --no-tui --claude=no --gemini=no --copilot=no`
 
 The CLI will:
@@ -292,6 +298,31 @@ bunx oh-my-openagent install --no-tui --claude=no --openai=no --gemini=no --open
 ```
 
 This provider uses the `opencode/` model catalog. If your OpenCode environment prompts for provider authentication, follow the OpenCode provider flow for `opencode/` models instead of reusing the fallback-provider auth steps above.
+
+#### OpenRouter
+
+OpenRouter is a unified API gateway that provides access to hundreds of models (Claude, GPT, Gemini, Kimi, GLM, MiniMax, etc.) through a single API key. Models are addressed with nested IDs: `openrouter/<upstream-provider>/<model>` — for example, `openrouter/anthropic/claude-opus-4-7`, `openrouter/openai/gpt-5.5`, `openrouter/google/gemini-3.1-pro`.
+
+When OpenRouter is the best available provider, install-time defaults are agent-specific. Common examples:
+
+| Agent                  | Model                                 |
+| ---------------------- | ------------------------------------- |
+| **Sisyphus**           | `openrouter/anthropic/claude-opus-4-7` |
+| **Oracle**             | `openrouter/openai/gpt-5.5`           |
+| **Explore**            | `openrouter/anthropic/claude-haiku-4-5` |
+| **Librarian**          | `openrouter/openai/gpt-5.4-mini`      |
+| **visual-engineering** | `openrouter/google/gemini-3.1-pro`    |
+
+**Priority**: OpenRouter sits last in every fallback chain (after `vercel`), so direct native subscriptions (Anthropic, OpenAI, Google) always win when present.
+
+**Authentication**: OpenRouter uses API-key auth through OpenCode's standard provider flow.
+
+```bash
+opencode auth login
+# Interactive Terminal: find Provider: Select OpenRouter
+# Paste your OpenRouter API key (or set OPENROUTER_API_KEY env var)
+# Verify success and confirm with user
+```
 
 ### Step 5: Understand Your Model Setup
 

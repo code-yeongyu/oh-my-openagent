@@ -41,6 +41,28 @@ export function transformModelForProvider(provider: string, model: string): stri
     return model
   }
 
+  if (provider === "openrouter") {
+    // OpenRouter uses nested IDs: openrouter/<upstream>/<model>, e.g.
+    // openrouter/anthropic/claude-opus-4.7.
+    // Apply the same gateway transforms as Vercel (claude dash->dot, gemini
+    // preview suffixes) plus zai->z-ai sub-provider mapping.
+    const subModel = applyGatewayTransforms(model)
+      .replace(GEMINI_3_FLASH_PREVIEW, "gemini-3-flash-preview")
+
+    const slashIndex = subModel.indexOf("/")
+    if (slashIndex !== -1) {
+      const subProvider = subModel.substring(0, slashIndex).replace(/^zai$/, "z-ai")
+      return `${subProvider}/${subModel.substring(slashIndex + 1)}`
+    }
+
+    const subProvider = inferSubProvider(model)?.replace(/^zai$/, "z-ai")
+    if (subProvider) {
+      return `${subProvider}/${subModel}`
+    }
+
+    return subModel
+  }
+
   if (provider === "github-copilot") {
     return claudeVersionDot(model)
       .replace(GEMINI_31_PRO_PREVIEW, "gemini-3.1-pro-preview")

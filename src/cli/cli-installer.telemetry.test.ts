@@ -23,6 +23,7 @@ describe("runCliInstaller telemetry isolation", () => {
         hasKimiForCoding: false,
         hasOpencodeGo: false,
         hasVercelAiGateway: false,
+        hasOpenRouter: false,
       }),
       spyOn(configManager, "isOpenCodeInstalled").mockResolvedValue(true),
       spyOn(configManager, "getOpenCodeVersion").mockResolvedValue("1.4.0"),

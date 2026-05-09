@@ -106,7 +106,8 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
     !config.hasGemini &&
     !config.hasCopilot &&
     !config.hasOpencodeZen &&
-    !config.hasVercelAiGateway
+    !config.hasVercelAiGateway &&
+    !config.hasOpenRouter
   ) {
     printWarning("No model providers configured. Using opencode/big-pickle as fallback.")
   }
@@ -136,12 +137,13 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
   console.log(color.dim("oMoMoMoMo... Enjoy!"))
   console.log()
 
-  if ((config.hasClaude || config.hasGemini || config.hasCopilot) && !args.skipAuth) {
+  if ((config.hasClaude || config.hasGemini || config.hasCopilot || config.hasOpenRouter) && !args.skipAuth) {
     printBox(
       `Run ${color.cyan("opencode auth login")} and select your provider:\n` +
         (config.hasClaude ? `  ${SYMBOLS.bullet} Anthropic ${color.gray("→ Claude Pro/Max")}\n` : "") +
         (config.hasGemini ? `  ${SYMBOLS.bullet} Google ${color.gray("→ Gemini")}\n` : "") +
-        (config.hasCopilot ? `  ${SYMBOLS.bullet} GitHub ${color.gray("→ Copilot")}` : ""),
+        (config.hasCopilot ? `  ${SYMBOLS.bullet} GitHub ${color.gray("→ Copilot")}\n` : "") +
+        (config.hasOpenRouter ? `  ${SYMBOLS.bullet} OpenRouter ${color.gray("→ OPENROUTER_API_KEY env var")}` : ""),
       "Authenticate Your Providers",
     )
   }

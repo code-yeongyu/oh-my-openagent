@@ -77,7 +77,7 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
     )
   }
 
-  if (!config.hasClaude && !config.hasOpenAI && !config.hasGemini && !config.hasCopilot && !config.hasOpencodeZen && !config.hasVercelAiGateway) {
+  if (!config.hasClaude && !config.hasOpenAI && !config.hasGemini && !config.hasCopilot && !config.hasOpencodeZen && !config.hasVercelAiGateway && !config.hasOpenRouter) {
     p.log.warn("No model providers configured. Using opencode/big-pickle as fallback.")
   }
 
@@ -102,11 +102,12 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
 
   p.outro(color.green("oMoMoMoMo... Enjoy!"))
 
-  if ((config.hasClaude || config.hasGemini || config.hasCopilot) && !args.skipAuth) {
+  if ((config.hasClaude || config.hasGemini || config.hasCopilot || config.hasOpenRouter) && !args.skipAuth) {
     const providers: string[] = []
     if (config.hasClaude) providers.push(`Anthropic ${color.gray("→ Claude Pro/Max")}`)
     if (config.hasGemini) providers.push(`Google ${color.gray("→ Gemini")}`)
     if (config.hasCopilot) providers.push(`GitHub ${color.gray("→ Copilot")}`)
+    if (config.hasOpenRouter) providers.push(`OpenRouter ${color.gray("→ OPENROUTER_API_KEY")}`)
 
     console.log()
     console.log(color.bold("Authenticate Your Providers"))

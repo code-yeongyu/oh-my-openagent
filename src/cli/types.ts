@@ -12,6 +12,7 @@ export interface InstallArgs {
 kimiForCoding?: BooleanArg
   opencodeGo?: BooleanArg
   vercelAiGateway?: BooleanArg
+  openrouter?: BooleanArg
   skipAuth?: boolean
 }
 
@@ -26,6 +27,7 @@ export interface InstallConfig {
   hasKimiForCoding: boolean
   hasOpencodeGo: boolean
   hasVercelAiGateway: boolean
+  hasOpenRouter: boolean
 }
 
 export interface ConfigMergeResult {
@@ -47,4 +49,5 @@ export interface DetectedConfig {
   hasKimiForCoding: boolean
   hasOpencodeGo: boolean
   hasVercelAiGateway: boolean
+  hasOpenRouter: boolean
 }
