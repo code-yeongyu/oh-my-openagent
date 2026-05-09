@@ -74,11 +74,6 @@ const RETRYABLE_MESSAGE_PATTERNS = [
   "529",
   "selected provider is forbidden",
   "provider is forbidden",
-  // Chinese retryable patterns (Zhipu, etc.)
-  "频率限制",           // "rate limit"
-  "请求过于频繁",       // "too many requests"
-  "暂时不可用",         // "temporarily unavailable"
-  "服务不可用",         // "service unavailable"
 ]
 
 /**
@@ -104,11 +99,6 @@ const STOP_MESSAGE_PATTERNS = [
   "credit balance",
   "usage limit for this month",
   "exhausted your capacity",
-  // Chinese stop patterns (Zhipu, etc.)
-  "使用上限",           // "usage limit" — Zhipu: "已达到 5 小时的使用上限"
-  "额度不足",           // "quota insufficient"
-  "余额不足",           // "balance insufficient"
-  "已耗尽",             // "exhausted"
 ]
 
 const AUTO_RETRY_GATE_PATTERNS = [
