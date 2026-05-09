@@ -1,21 +1,8 @@
 import type { Metadata } from "next"
 import { GeistSans } from "geist/font/sans"
 import { GeistMono } from "geist/font/mono"
-import { Inter, Manrope } from "next/font/google"
 import Script from "next/script"
 import "./globals.css"
-
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-  display: "swap",
-})
-
-const manrope = Manrope({
-  subsets: ["latin"],
-  variable: "--font-manrope",
-  display: "swap",
-})
 
 const primarySiteUrl = "https://ohmyopenagent.com"
 
@@ -26,7 +13,7 @@ export const metadata: Metadata = {
     template: "%s | Oh My OpenAgent",
   },
   description:
-    "Meet Sisyphus: The batteries-included agent that codes like you. Multi-model orchestration, background agents, 40+ lifecycle hooks.",
+    "Meet Sisyphus: The batteries-included agent that codes like you. Multi-model orchestration, Team Mode, background agents, 50+ lifecycle hooks.",
   keywords: [
     "opencode",
     "oh-my-opencode",
@@ -36,6 +23,8 @@ export const metadata: Metadata = {
     "code agent",
     "sisyphus",
     "multi-model",
+    "team mode",
+    "agent orchestration",
     "claude",
     "gpt",
     "gemini",
@@ -50,14 +39,14 @@ export const metadata: Metadata = {
     siteName: "Oh My OpenAgent",
     title: "Oh My OpenAgent — The Best Agent Harness",
     description:
-      "Meet Sisyphus: The batteries-included agent that codes like you. Multi-model orchestration, background agents, 40+ lifecycle hooks.",
-    images: [{ url: "/images/hero.png", width: 1200, height: 630, alt: "Oh My OpenAgent" }],
+      "Meet Sisyphus: The batteries-included agent that codes like you. Multi-model orchestration, Team Mode, background agents, 50+ lifecycle hooks.",
+    images: [{ url: "/images/hero.webp", width: 1024, height: 683, alt: "Oh My OpenAgent" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "Oh My OpenAgent — The Best Agent Harness",
     description: "Meet Sisyphus: The batteries-included agent that codes like you.",
-    images: ["/images/hero.png"],
+    images: ["/images/hero.webp"],
   },
   robots: {
     index: true,
@@ -82,7 +71,7 @@ const jsonLd = {
     url: "https://github.com/code-yeongyu",
   },
   description:
-    "The batteries-included agent harness for OpenCode. Multi-model orchestration, background agents, 40+ lifecycle hooks.",
+    "The batteries-included agent harness for OpenCode. Multi-model orchestration, Team Mode, background agents, 50+ lifecycle hooks.",
   offers: {
     "@type": "Offer",
     price: "0",
@@ -97,19 +86,21 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html
       lang="en"
-      className={`dark ${GeistSans.variable} ${GeistMono.variable} ${inter.variable} ${manrope.variable}`}
+      className={`dark ${GeistSans.variable} ${GeistMono.variable}`}
       suppressHydrationWarning
     >
       <body className="flex min-h-screen flex-col bg-[#0a0a0a] text-[#ededed] antialiased">
-        <Script
-          src={`https://www.googletagmanager.com/gtag/js?id=${gaMeasurementId}`}
-          strategy="afterInteractive"
-        />
-        <Script id="google-analytics" strategy="afterInteractive">
-          {`window.dataLayer = window.dataLayer || [];
-function gtag(){dataLayer.push(arguments);}
-gtag('js', new Date());
-gtag('config', '${gaMeasurementId}', { cookie_domain: '${gaTrackedDomain}' });`}
+        <Script id="google-analytics-loader" strategy="lazyOnload">
+          {`if (typeof window !== 'undefined' && window.location.hostname === '${gaTrackedDomain}') {
+  var s = document.createElement('script');
+  s.async = true;
+  s.src = 'https://www.googletagmanager.com/gtag/js?id=${gaMeasurementId}';
+  document.head.appendChild(s);
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', '${gaMeasurementId}', { cookie_domain: '${gaTrackedDomain}' });
+}`}
         </Script>
         <script
           type="application/ld+json"

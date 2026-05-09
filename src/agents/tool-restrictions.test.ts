@@ -12,9 +12,47 @@ import { createHephaestusAgent } from "./hephaestus"
 import { getAgentToolRestrictions } from "../shared/agent-tool-restrictions"
 
 const TEST_MODEL = "anthropic/claude-sonnet-4-5"
+const TEAM_TOOL_NAMES = [
+  "team_create",
+  "team_delete",
+  "team_shutdown_request",
+  "team_approve_shutdown",
+  "team_reject_shutdown",
+  "team_send_message",
+  "team_task_create",
+  "team_task_list",
+  "team_task_update",
+  "team_task_get",
+  "team_status",
+  "team_list",
+] as const
 
 describe("read-only agent tool restrictions", () => {
   const FILE_WRITE_TOOLS = ["write", "edit", "apply_patch"]
+
+  test("denies team tools for every delegated subagent prompt", () => {
+    // given
+    const restrictedAgentNames = [
+      "explore",
+      "librarian",
+      "oracle",
+      "metis",
+      "momus",
+      "multimodal-looker",
+      "sisyphus-junior",
+      "custom-worker",
+    ]
+
+    // when
+    const restrictions = restrictedAgentNames.map((agentName) => getAgentToolRestrictions(agentName))
+
+    // then
+    for (const restriction of restrictions) {
+      for (const toolName of TEAM_TOOL_NAMES) {
+        expect(restriction[toolName]).toBe(false)
+      }
+    }
+  })
 
   describe("Oracle", () => {
     test("denies all file-writing tools", () => {
