@@ -224,5 +224,47 @@ class MatchSessionTests(unittest.TestCase):
         self.assertFalse(mod.match_session(ev, "ses_abc"))
 
 
+class ReconnectWallclockBudgetTests(unittest.TestCase):
+    def test_reconnect_exits_after_wallclock_budget(self) -> None:
+        import time as _time
+
+        state = mod.SessionState("http://127.0.0.1:19999", "ses_test_budget")
+
+        # Patch open_url to always raise ConnectionRefusedError (subclass of OSError).
+        def always_fail(url: str, timeout=None, headers=None):  # type: ignore[override]
+            raise ConnectionRefusedError("refused")
+
+        state.open_url = always_fail  # type: ignore[method-assign]
+
+        opts = mod._StreamOpts(
+            idle_heartbeat_seconds=30,
+            max_reconnect_wallclock_seconds=2,
+        )
+
+        start = _time.monotonic()
+        result = mod.stream_events(state, opts)
+        elapsed = _time.monotonic() - start
+
+        self.assertEqual(result, 1, "stream_events should return 1 after budget exhaustion")
+        # Budget is 2s; the first backoff delay is 2s so it fires after one sleep.
+        self.assertLess(elapsed, 10.0, f"stream_events took too long: {elapsed:.1f}s")
+
+
+class StatusFooterEventCountTests(unittest.TestCase):
+    def test_status_footer_persists_events_across_reconnect(self) -> None:
+        footer = mod.StatusFooter("http://127.0.0.1:19999")
+
+        # 3 events, then a disconnect, then 2 more events.
+        footer.note_event()
+        footer.note_event()
+        footer.note_event()
+        footer.note_disconnect("boom")
+        footer.note_event()
+        footer.note_event()
+
+        rendered = footer._render()
+        self.assertIn("events: 5", rendered, f"Expected 'events: 5' in footer render, got: {rendered!r}")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -14,9 +14,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import ssl
+import subprocess
 import sys
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -78,6 +81,7 @@ class SessionState:
         self.model = ""
         self.role_by_message: dict[str, str] = {}
         self.ssl_context = ssl._create_unverified_context() if insecure else ssl.create_default_context()
+        self.footer: StatusFooter | None = None
 
     def open_url(
         self,
@@ -103,6 +107,90 @@ class SessionState:
             self.agent = m.group(3)
         else:
             self.member_name = title[:48]
+
+
+class StatusFooter:
+    """Daemon thread that prints a status line at the last terminal row every 10s."""
+
+    _INTERVAL = 10.0
+
+    def __init__(self, url: str) -> None:
+        self._url = url
+        self._lock = threading.Lock()
+        self._stop_event = threading.Event()
+        self._connected = False
+        self._last_error: str | None = None
+        self._events_seen: int = 0
+        self._last_event_ts: float | None = None
+        self._capable = self._detect_capability()
+        self._thread: threading.Thread | None = None
+
+    def _detect_capability(self) -> bool:
+        term = os.environ.get("TERM", "")
+        if term in ("dumb", ""):
+            return False
+        try:
+            result = subprocess.run(["tput", "sc"], capture_output=True)
+            return result.returncode == 0
+        except (OSError, FileNotFoundError):
+            return False
+
+    def note_event(self) -> None:
+        with self._lock:
+            self._events_seen += 1
+            self._last_event_ts = time.time()
+            self._connected = True
+            self._last_error = None
+
+    def note_disconnect(self, err: str) -> None:
+        with self._lock:
+            self._connected = False
+            self._last_error = err
+
+    def note_reconnect(self, url: str) -> None:
+        with self._lock:
+            self._url = url
+            self._connected = True
+            self._last_error = None
+
+    def _render(self) -> str:
+        with self._lock:
+            if self._connected:
+                last_str = (
+                    time.strftime("%H:%M:%S", time.localtime(self._last_event_ts))
+                    if self._last_event_ts is not None
+                    else "--:--:--"
+                )
+                text = f"[connected → {self._url} | events: {self._events_seen} | last: {last_str}]"
+            else:
+                err_str = f" ({self._last_error})" if self._last_error else ""
+                text = f"[disconnected ✗{err_str}]"
+        return f"\x1b[s\x1b[999;1H\x1b[2K{DIM}{text}{RST}\x1b[u"
+
+    def _run(self) -> None:
+        while not self._stop_event.wait(self._INTERVAL):
+            try:
+                sys.stdout.write(self._render())
+                sys.stdout.flush()
+            except (OSError, ValueError):
+                break
+
+    def start(self) -> None:
+        if not self._capable:
+            return
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._stop_event.set()
+        if self._thread is not None:
+            self._thread.join(timeout=2.0)
+        if self._capable:
+            try:
+                sys.stdout.write("\n")
+                sys.stdout.flush()
+            except (OSError, ValueError):
+                pass
 
 
 def render_banner(state: SessionState) -> None:
@@ -199,12 +287,41 @@ def fetch_history(state: SessionState, n: int) -> int:
     return len(msgs)
 
 
-def stream_events(state: SessionState) -> None:
+class _StreamOpts:
+    """Options for stream_events()."""
+
+    def __init__(
+        self,
+        idle_heartbeat_seconds: int = 30,
+        max_reconnect_wallclock_seconds: int = 90,
+    ) -> None:
+        self.idle_heartbeat_seconds = idle_heartbeat_seconds
+        self.max_reconnect_wallclock_seconds = max_reconnect_wallclock_seconds
+
+
+_BACKOFF_SEQUENCE = (2, 5, 10, 15, 30)
+
+
+def stream_events(state: SessionState, opts: _StreamOpts | None = None) -> int:
+    if opts is None:
+        opts = _StreamOpts()
     print(f"{DIM}── live tail (Ctrl-C to exit) ──{RST}")
     seen_parts: dict[str, int] = {}
+    failure_wallclock: float = 0.0
+    attempt: int = 0
+
     while True:
         try:
-            with state.open_url(f"{state.url}/event", timeout=None, headers={"Accept": "text/event-stream"}) as r:
+            with state.open_url(
+                f"{state.url}/event",
+                timeout=opts.idle_heartbeat_seconds,
+                headers={"Accept": "text/event-stream"},
+            ) as r:
+                # Reset failure tracking on successful connection.
+                failure_wallclock = 0.0
+                attempt = 0
+                if state.footer is not None:
+                    state.footer.note_reconnect(state.url)
                 for raw in r:
                     line = raw.decode("utf-8", errors="replace").rstrip()
                     if not line.startswith("data: "):
@@ -216,9 +333,28 @@ def stream_events(state: SessionState) -> None:
                     if not match_session(ev, state.session_id):
                         continue
                     handle_event(ev, state, seen_parts)
-        except (urllib.error.URLError, ConnectionResetError, TimeoutError) as e:
-            print(f"{DIM}stream interrupted ({e}); reconnecting in 2s{RST}")
-            time.sleep(2)
+                    if state.footer is not None:
+                        state.footer.note_event()
+        except TimeoutError:
+            # Idle heartbeat: no data for idle_heartbeat_seconds → reopen quietly.
+            if state.footer is not None:
+                state.footer.note_disconnect("idle timeout — reopening")
+            continue
+        except (urllib.error.URLError, ConnectionResetError, OSError, ssl.SSLError) as e:
+            if state.footer is not None:
+                state.footer.note_disconnect(str(e))
+            delay = _BACKOFF_SEQUENCE[min(attempt, len(_BACKOFF_SEQUENCE) - 1)]
+            failure_wallclock += delay
+            if failure_wallclock >= opts.max_reconnect_wallclock_seconds:
+                print(
+                    f"[live-tail exited: server unreachable for "
+                    f"{opts.max_reconnect_wallclock_seconds}s. "
+                    f"Run team_refresh_panes to re-attach.]"
+                )
+                return 1
+            print(f"{DIM}stream interrupted ({e}); reconnecting in {delay}s{RST}")
+            attempt += 1
+            time.sleep(delay)
 
 
 def match_session(ev: dict, session_id: str) -> bool:
@@ -285,6 +421,9 @@ def main() -> int:
     p.add_argument("--no-clear", action="store_true")
     p.add_argument("--history", type=int, default=4)
     p.add_argument("--insecure", action="store_true", help="Disable TLS certificate verification (local/dev only).")
+    p.add_argument("--idle-heartbeat-seconds", type=int, default=30, metavar="N")
+    p.add_argument("--max-reconnect-wallclock-seconds", type=int, default=90, metavar="N")
+    p.add_argument("--no-footer", action="store_true")
     args = p.parse_args()
 
     if not args.no_clear:
@@ -294,9 +433,22 @@ def main() -> int:
     render_banner(state)
     if args.insecure:
         print(f"{YEL}{DIM}TLS verify disabled (--insecure). Local/dev use only.{RST}")
+
+    if not args.no_footer:
+        state.footer = StatusFooter(state.url)
+        state.footer.start()
+
     fetch_history(state, args.history)
-    stream_events(state)
-    return 0
+    opts = _StreamOpts(
+        idle_heartbeat_seconds=args.idle_heartbeat_seconds,
+        max_reconnect_wallclock_seconds=args.max_reconnect_wallclock_seconds,
+    )
+    result = stream_events(state, opts)
+
+    if state.footer is not None:
+        state.footer.stop()
+
+    return result
 
 
 if __name__ == "__main__":
