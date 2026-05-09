@@ -4,10 +4,15 @@
  * Registers the "anthropic" provider with an OAuth login method
  * so users can run `/login` and authenticate with their Claude subscription.
  * This enables Claude Max 20x usage through Oh-My-OpenAgent.
+ *
+ * Token resolution priority:
+ *   1. OMP's agent.db (shares the same OAuth session as Oh-My-Pi)
+ *   2. Standard OAuth token refresh (direct against Anthropic API)
  */
 
 import type { AuthHook } from "@opencode-ai/plugin"
 import { authorizeAnthropic, refreshAnthropicToken } from "./anthropic-oauth"
+import { syncOmpCredentials } from "./omp-credential-sync"
 
 /**
  * Creates the auth hook that OpenCode's plugin system uses to
@@ -20,35 +25,49 @@ export function createAnthropicAuthHook(): AuthHook {
 
     /**
      * Token loader — called by OpenCode before each API request to
-     * the anthropic provider. Refreshes expired tokens automatically.
+     * the anthropic provider.
+     *
+     * Always tries OMP's credential store first. If OMP has a valid
+     * token, we use it directly — no refresh needed, no separate
+     * auth state to manage. Both tools share one session.
      */
     async loader(auth) {
+      const now = Date.now()
+
+      // ── Priority 1: Read from OMP's agent.db ─────────────────────────
+      // This is synchronous (bun:sqlite) and fast (~0.1ms).
+      const omp = syncOmpCredentials()
+      if (omp && omp.access && omp.expires > now) {
+        return {
+          apiKey: omp.access,
+          _refreshed: {
+            access: omp.access,
+            refresh: omp.refresh,
+            expires: omp.expires,
+          },
+        }
+      }
+
+      // ── Fallback: Use OpenCode's own stored credentials ──────────────
       const stored = await auth()
       if (!stored) return {}
 
-      // API key auth — pass through, nothing to refresh
+      // API key auth — pass through
       if (stored.type === "api") {
         return {}
       }
 
       // OAuth auth — check expiry and refresh if needed
       if (stored.type === "oauth") {
-        const now = Date.now()
         if (stored.expires > now) {
-          // Token is still valid
-          return {
-            apiKey: stored.access,
-          }
+          return { apiKey: stored.access }
         }
 
-        // Token expired — refresh it
+        // Token expired — try standard OAuth refresh
         try {
           const refreshed = await refreshAnthropicToken(stored.refresh)
-          // The refreshed credentials will be stored by the caller
-          // We return the new access token for immediate use
           return {
             apiKey: refreshed.access,
-            // Signal to OpenCode to persist the refreshed token
             _refreshed: {
               access: refreshed.access,
               refresh: refreshed.refresh,
@@ -60,8 +79,6 @@ export function createAnthropicAuthHook(): AuthHook {
             "[oh-my-openagent] Failed to refresh Anthropic OAuth token:",
             err instanceof Error ? err.message : err,
           )
-          // Return stale token — the API will reject it and the user
-          // will need to re-login
           return { apiKey: stored.access }
         }
       }
@@ -98,7 +115,6 @@ export function createAnthropicAuthHook(): AuthHook {
           const key = inputs?.key?.trim()
           if (!key) return { type: "failed" as const }
 
-          // Validate the key with a lightweight API call
           try {
             const res = await fetch("https://api.anthropic.com/v1/messages", {
               method: "POST",
@@ -115,22 +131,13 @@ export function createAnthropicAuthHook(): AuthHook {
               signal: AbortSignal.timeout(15_000),
             })
 
-            // 200 or 400 (bad request shape) both prove the key is valid
-            // 401 means invalid key
             if (res.status === 401) {
               return { type: "failed" as const }
             }
 
-            return {
-              type: "success" as const,
-              key,
-            }
+            return { type: "success" as const, key }
           } catch {
-            // Network error — accept the key anyway (offline use)
-            return {
-              type: "success" as const,
-              key,
-            }
+            return { type: "success" as const, key }
           }
         },
       },

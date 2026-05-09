@@ -1,4 +1,12 @@
-import { describe, test, expect } from "bun:test"
+import { describe, test, expect, beforeEach } from "bun:test"
+import { mock } from "bun:test"
+
+// Mock the OMP sync to return null in tests — prevents reading live credentials
+mock.module("./omp-credential-sync", () => ({
+  syncOmpCredentials: () => null,
+  _resetOmpSyncForTesting: () => {},
+}))
+
 import { createAnthropicAuthHook } from "./anthropic-auth-hook"
 
 describe("anthropic-auth-hook", () => {
