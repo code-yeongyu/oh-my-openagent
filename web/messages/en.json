@@ -79,7 +79,7 @@
       },
       "boulderTitle": "Session Continuity",
       "boulderDescription": "Active work tracked in boulder.json. Power outage? System crash? Doesn't matter. Pick up exactly where you stopped.",
-      "model": "Claude Opus 4.6 Max"
+      "model": "Claude Opus 4.7 Max"
     },
     "prometheusAtlas": {
       "badge": "Orchestration Workflow",
@@ -88,7 +88,7 @@
       "prometheus": {
         "name": "Prometheus",
         "role": "Strategic Planner",
-        "model": "Claude Opus 4.6 Max",
+        "model": "Claude Opus 4.7 Max",
         "description": "The architect. Interviews you, explores your codebase, and creates detailed battle plans. Never writes code. Uses Metis and Momus as quality gates.",
         "features": [
           "Intelligent interview mode",
@@ -139,7 +139,44 @@
         "verify": "VERIFY — Prove it works"
       },
       "tagline": "For when good enough isn't.",
-      "model": "GPT 5.3 Codex Medium"
+      "model": "GPT 5.5 Medium"
+    },
+    "teamMode": {
+      "badge": "NEW · v4.0",
+      "title": "Team Mode",
+      "headline": "Multiple Agents. Side-by-Side. In Parallel.",
+      "description": "A lead agent orchestrates a team of category-specialized members, all running in parallel and communicating through dedicated tools. Watch every member work simultaneously in tmux. Opt-in — flip team_mode.enabled and restart.",
+      "features": {
+        "lead": {
+          "title": "Lead Orchestration",
+          "description": "One coordinator. Multiple specialists. Real-time messaging via team_send_message and team_task_create."
+        },
+        "parallel": {
+          "title": "True Parallelism",
+          "description": "Up to 8 members work simultaneously. No waiting, no queues — every angle covered at once."
+        },
+        "tmux": {
+          "title": "Tmux Visualization",
+          "description": "Focus and grid windows let you zoom into one teammate without losing the bigger picture."
+        },
+        "tools": {
+          "title": "team_* Tool Family",
+          "description": "12 dedicated tools (team_create, team_status, team_send_message, ...) gated behind team_mode.enabled."
+        }
+      },
+      "poweredBy": "Powered by Team Mode",
+      "skills": {
+        "hyperplan": {
+          "name": "hyperplan",
+          "description": "5 hostile agents tear apart your plan from orthogonal angles before a single line of code is written."
+        },
+        "securityResearch": {
+          "name": "security-research",
+          "description": "3 vulnerability hunters + 2 PoC engineers audit your codebase. Severity calibrated by actual exploitability."
+        }
+      },
+      "optIn": "team_mode.enabled = true → restart opencode",
+      "tagline": "Off by default. Devastating when on."
     },
     "agents": {
       "title": "Specialized Agents",
@@ -147,31 +184,31 @@
       "oracle": {
         "name": "Oracle",
         "role": "Architecture Consultant",
-        "model": "GPT 5.4 High",
+        "model": "GPT 5.5 High",
         "description": "Complex debugging and architectural decisions. When the path forward isn't obvious."
       },
       "librarian": {
         "name": "Librarian",
         "role": "Docs & Code Search",
-        "model": "MiniMax M2.5",
+        "model": "GPT 5.4 Mini Fast",
         "description": "Finds real GitHub examples and official docs. Evidence-based, with permalinks."
       },
       "explore": {
         "name": "Explore",
         "role": "Codebase Grep",
-        "model": "MiniMax M2.5",
+        "model": "GPT 5.4 Mini Fast",
         "description": "Blazing fast codebase search. Cheap, parallel, always background."
       },
       "metis": {
         "name": "Metis",
         "role": "Plan Consultant",
-        "model": "Claude Opus 4.6",
+        "model": "Claude Sonnet 4.6",
         "description": "Catches ambiguities in plans before they become production bugs."
       },
       "momus": {
         "name": "Momus",
         "role": "Plan Reviewer",
-        "model": "GPT 5.4",
+        "model": "GPT 5.5 xHigh",
         "description": "Ruthless validation. Only approves when the plan is bulletproof."
       },
       "dynamicSystem": {

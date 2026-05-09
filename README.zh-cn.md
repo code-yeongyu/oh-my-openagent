@@ -145,6 +145,7 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 |       | 特性                                                            | 功能说明                                                                                                                                                                        |
 | :---: | :-------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 |   🤖   | **自律军团 (Discipline Agents)**                                | Sisyphus 负责调度 Hephaestus、Oracle、Librarian 和 Explore。一支完整的 AI 开发团队并行工作。                                                                                    |
+|   👥   | **Team Mode** (v4.0, 选择性启用)                                 | 领导 Agent + 最多 8 个并行成员，实时 tmux 可视化，专用 `team_*` 工具家族。驱动 `hyperplan`(5 个敌对评论者) 和 `security-research`(3 个猎手 + 2 个 PoC 工程师)。[文档 →](docs/guide/team-mode.md) |
 |   ⚡   | **`ultrawork` / `ulw`**                                         | 一键触发，所有智能体出动。任务完成前绝不罢休。                                                                                                                                  |
 |   🚪   | **[IntentGate 意图门](https://factory.ai/news/terminal-bench)** | 真正行动前，先分析用户的真实意图。彻底告别被字面意思误导的 AI 废话。                                                                                                            |
 |   🔗   | **基于哈希的编辑工具**                                          | 每次修改都通过 `LINE#ID` 内容哈希验证、0% 错误修改。灵感来自 [oh-my-pi](https://github.com/can1357/oh-my-pi)。[The Harness Problem →](https://blog.can.ac/2026/02/12/the-harness-problem/) |
@@ -169,7 +170,7 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 
 **Sisyphus** (`claude-opus-4-7` / **`kimi-k2.6`** / **`glm-5.1`**) 是你的主指挥官。他负责制定计划、分配任务给专家团队，并以极其激进的并行策略推动任务直至完成。他从不半途而废。
 
-**Hephaestus** (`gpt-5.4`) 是你的自主深度工作者。你只需要给他目标，不要给他具体做法。他会自动探索代码库模式，从头到尾独立执行任务，绝不会中途要你当保姆。*名副其实的正牌工匠。*
+**Hephaestus** (`gpt-5.5`) 是你的自主深度工作者。你只需要给他目标，不要给他具体做法。他会自动探索代码库模式，从头到尾独立执行任务，绝不会中途要你当保姆。*名副其实的正牌工匠。*
 
 **Prometheus** (`claude-opus-4-7` / **`kimi-k2.6`** / **`glm-5.1`**) 是你的战略规划师。他通过访谈模式，在动一行代码之前，先通过提问确定范围并构建详尽的执行计划。
 
@@ -177,7 +178,31 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 
 > Anthropic [因为我们屏蔽了 OpenCode](https://x.com/thdxr/status/2010149530486911014)。这就是为什么我们将 Hephaestus 命名为"正牌工匠 (The Legitimate Craftsman)"。这是一个故意的讽刺。
 >
-> 我们在 Opus 上运行得最好，但仅仅使用 Kimi K2.5 + GPT-5.4 就足以碾压原版的 Claude Code。完全不需要配置。
+> 我们在 Opus 上运行得最好，但仅仅使用 Kimi K2.6 + GPT-5.5 就足以碾压原版的 Claude Code。完全不需要配置。
+
+### Team Mode (v4.0)
+
+一个 Agent 已经够快。一支协调的团队是 *毁灭性* 的。
+
+**Team Mode** 把 oh-my-openagent 从「带子 Agent 的单个 Agent」升级为真正的多 Agent 系统。一个领导 Agent 协调一队按类别专业化的成员，全部 **并行** 运行，通过专用工具(`team_create`、`team_send_message`、`team_task_create`、`team_status`、…)进行通信。在 tmux 布局的 focus + grid 窗口中同时观察每个成员的工作。
+
+```jsonc
+// .opencode/oh-my-openagent.jsonc
+{
+  "team_mode": {
+    "enabled": true,
+    "max_parallel_members": 4,
+    "tmux_visualization": true
+  }
+}
+```
+
+重启 opencode，`team_*` 工具家族就会解锁。已经有两个技能站在它之上:
+
+- **`hyperplan`** — 5 个敌对 Agent 在写下第一行代码之前，从正交角度撕碎你的计划。
+- **`security-research`** — 3 个漏洞猎手 + 2 个 PoC 工程师并行审计你的代码库。严重性按 *实际可利用性* 校准。
+
+> **默认关闭。需要时再开。** [Team Mode 完整指南 →](docs/guide/team-mode.md)
 
 ### 智能体调度机制
 
@@ -190,7 +215,7 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 | `quick`              | 单文件修改、修错字     |
 | `ultrabrain`         | 复杂硬核逻辑、架构决策 |
 
-智能体只需要说明要做什么类型的工作，框架就会挑选出最合适的模型去干。`ultrabrain` 现在默认路由到 GPT-5.4 xhigh。你完全不需要操心。
+智能体只需要说明要做什么类型的工作，框架就会挑选出最合适的模型去干。`ultrabrain` 现在默认路由到 GPT-5.5 xhigh。你完全不需要操心。
 
 ### 完全兼容 Claude Code
 

@@ -6,6 +6,21 @@ import { stripInvisibleAgentCharacters } from "./agent-display-names"
  * true = tool allowed, false = tool denied.
  */
 
+const TEAM_TOOL_DENYLIST: Record<string, boolean> = {
+  team_create: false,
+  team_delete: false,
+  team_shutdown_request: false,
+  team_approve_shutdown: false,
+  team_reject_shutdown: false,
+  team_send_message: false,
+  team_task_create: false,
+  team_task_list: false,
+  team_task_update: false,
+  team_task_get: false,
+  team_status: false,
+  team_list: false,
+}
+
 const EXPLORATION_AGENT_DENYLIST: Record<string, boolean> = {
   write: false,
   edit: false,
@@ -45,12 +60,15 @@ const AGENT_RESTRICTIONS: Record<string, Record<string, boolean>> = {
 }
 
 export function getAgentToolRestrictions(agentName: string): Record<string, boolean> {
-  // Custom/unknown agents get no restrictions (empty object), matching Claude Code's
-  // trust model where project-registered agents retain full tool access including bash.
   const stripped = stripInvisibleAgentCharacters(agentName)
-  return AGENT_RESTRICTIONS[stripped]
+  const agentRestrictions = AGENT_RESTRICTIONS[stripped]
     ?? Object.entries(AGENT_RESTRICTIONS).find(([key]) => key.toLowerCase() === stripped.toLowerCase())?.[1]
     ?? {}
+
+  return {
+    ...TEAM_TOOL_DENYLIST,
+    ...agentRestrictions,
+  }
 }
 
 export function hasAgentToolRestrictions(agentName: string): boolean {

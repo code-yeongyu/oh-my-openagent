@@ -1,7 +1,6 @@
 import type { Metadata } from "next"
 import type { JSX, SVGProps } from "react"
 import { getTranslations } from "next-intl/server"
-import Image from "next/image"
 import {
   Layers,
   Star,
@@ -18,6 +17,12 @@ import {
   HardDrive,
   ArrowRight,
   Target,
+  Users,
+  Network,
+  Terminal,
+  Wrench,
+  Sparkles,
+  Sword,
 } from "lucide-react"
 import { HeroStats } from "@/components/landing/hero-stats"
 import { InstallCommand } from "@/components/landing/install-command"
@@ -38,7 +43,7 @@ const FALLBACK_STATS = {
 export const landingMetadata: Metadata = {
   title: "Oh My OpenAgent — The Best Agent Harness",
   description:
-    "Meet Sisyphus: The batteries-included agent that codes like you. Multi-model orchestration, background agents, 40+ lifecycle hooks.",
+    "Meet Sisyphus: The batteries-included agent that codes like you. Multi-model orchestration, Team Mode, background agents, 50+ lifecycle hooks.",
 }
 
 export async function LandingPage(): Promise<JSX.Element> {
@@ -109,18 +114,13 @@ export async function LandingPage(): Promise<JSX.Element> {
 
   return (
     <div className="flex min-h-screen flex-col overflow-x-hidden">
+      <link rel="preload" as="image" href="/images/hero.webp" fetchPriority="low" />
       <section className="relative flex min-h-[90vh] items-center justify-center overflow-hidden pt-16">
-        <div className="absolute inset-0 z-0 opacity-30">
-          <Image
-            src="/images/hero.png"
-            alt=""
-            fill
-            priority
-            fetchPriority="high"
-            className="object-cover object-center"
-            sizes="100vw"
-          />
-        </div>
+        <div
+          aria-hidden="true"
+          className="hero-bg absolute inset-0 z-0 bg-cover bg-center"
+          style={{ backgroundImage: "url(/images/hero.webp)" }}
+        />
         <div className="absolute inset-0 z-0 bg-gradient-to-b from-black/80 via-black/90 to-[#0a0a0a]" />
 
         <div className="relative z-10 container mx-auto flex flex-col items-center gap-8 px-4 text-center md:px-6">
@@ -146,10 +146,10 @@ export async function LandingPage(): Promise<JSX.Element> {
             }}
             labels={{
               githubStars: t("hero.githubStars", { count: "{count}" }),
-              specializedAgents: t("hero.specializedAgents", { count: "10" }),
+              specializedAgents: t("hero.specializedAgents", { count: "11" }),
               totalDownloads: t("hero.totalDownloads", { count: "{count}" }),
               monthlyDownloads: t("hero.monthlyDownloads", { count: "{count}" }),
-              lifecycleHooks: t("hero.lifecycleHooks", { count: "40+" }),
+              lifecycleHooks: t("hero.lifecycleHooks", { count: "50+" }),
             }}
           />
 
@@ -466,6 +466,126 @@ export async function LandingPage(): Promise<JSX.Element> {
         </div>
       </section>
 
+      <section
+        id="team-mode"
+        className="relative overflow-hidden border-t border-white/5 bg-[#0a0a0a] py-24"
+      >
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-fuchsia-900/20 via-black to-black opacity-70" />
+        <div className="relative z-10 container mx-auto px-4 md:px-6">
+          <div className="mx-auto max-w-5xl">
+            <div className="mb-6 flex flex-wrap items-center gap-3">
+              <Badge className="border-fuchsia-500/30 bg-fuchsia-500/10 px-4 py-1.5 font-mono text-fuchsia-300">
+                {t("teamMode.badge")}
+              </Badge>
+              <Badge variant="outline" className="border-zinc-700 text-xs text-zinc-400">
+                opt-in
+              </Badge>
+            </div>
+
+            <h2 className="mb-4 text-4xl font-bold tracking-tight md:text-5xl">
+              <span className="bg-gradient-to-r from-fuchsia-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent">
+                {t("teamMode.title")}
+              </span>
+            </h2>
+            <h3 className="mb-6 text-2xl font-bold text-zinc-200 md:text-3xl">
+              {t("teamMode.headline")}
+            </h3>
+            <p className="mb-12 max-w-3xl text-xl leading-relaxed text-zinc-400">
+              {t("teamMode.description")}
+            </p>
+
+            <div className="mb-16 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {(
+                [
+                  { key: "lead", icon: Network },
+                  { key: "parallel", icon: Users },
+                  { key: "tmux", icon: Terminal },
+                  { key: "tools", icon: Wrench },
+                ] as const
+              ).map(({ key, icon: Icon }) => (
+                <div key={key}>
+                  <Card className="h-full border-zinc-800 bg-zinc-900/30 transition-colors hover:border-fuchsia-500/30">
+                    <CardHeader className="pb-3">
+                      <div className="w-fit rounded-lg bg-fuchsia-500/10 p-2 text-fuchsia-300">
+                        <Icon className="h-5 w-5" />
+                      </div>
+                      <CardTitle className="mt-3 text-lg text-fuchsia-200">
+                        {t(`teamMode.features.${key}.title`)}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm leading-relaxed text-zinc-400">
+                        {t(`teamMode.features.${key}.description`)}
+                      </p>
+                    </CardContent>
+                  </Card>
+                </div>
+              ))}
+            </div>
+
+            <div className="mb-10 flex items-center gap-3">
+              <Sparkles className="h-4 w-4 text-fuchsia-400" />
+              <span className="font-mono text-sm tracking-widest text-fuchsia-300/80 uppercase">
+                {t("teamMode.poweredBy")}
+              </span>
+              <div className="h-px flex-1 bg-gradient-to-r from-fuchsia-500/30 to-transparent" />
+            </div>
+
+            <div className="mb-12 grid grid-cols-1 gap-6 lg:grid-cols-2">
+              {(
+                [
+                  { key: "hyperplan", icon: Sword, accent: "purple" as const },
+                  { key: "securityResearch", icon: Shield, accent: "rose" as const },
+                ] as const
+              ).map(({ key, icon: Icon, accent }) => (
+                <div key={key}>
+                  <Card
+                    className={`h-full border-zinc-800 bg-zinc-900/30 ${
+                      accent === "purple"
+                        ? "hover:border-purple-500/40"
+                        : "hover:border-rose-500/40"
+                    } transition-colors`}
+                  >
+                    <CardHeader>
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`rounded-lg p-2 ${
+                            accent === "purple"
+                              ? "bg-purple-500/10 text-purple-300"
+                              : "bg-rose-500/10 text-rose-300"
+                          }`}
+                        >
+                          <Icon className="h-5 w-5" />
+                        </div>
+                        <CardTitle
+                          className={`font-mono text-lg ${
+                            accent === "purple" ? "text-purple-300" : "text-rose-300"
+                          }`}
+                        >
+                          {t(`teamMode.skills.${key}.name`)}
+                        </CardTitle>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="leading-relaxed text-zinc-300">
+                        {t(`teamMode.skills.${key}.description`)}
+                      </p>
+                    </CardContent>
+                  </Card>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex flex-col items-start gap-4 rounded-xl border border-zinc-800 bg-black/40 p-6 sm:flex-row sm:items-center sm:justify-between">
+              <code className="font-mono text-sm break-all text-fuchsia-200/90">
+                {t("teamMode.optIn")}
+              </code>
+              <p className="text-sm text-zinc-400 italic sm:text-right">{t("teamMode.tagline")}</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section className="border-t border-white/5 bg-[#0a0a0a] py-24">
         <div className="container mx-auto px-4 md:px-6">
           <div className="mb-16 text-center">
@@ -532,10 +652,10 @@ export async function LandingPage(): Promise<JSX.Element> {
                       <div className="space-y-2">
                         {[
                           { cat: "visual-engineering", model: "Gemini 3.1 Pro" },
-                          { cat: "ultrabrain", model: "GPT 5.4" },
+                          { cat: "ultrabrain", model: "GPT 5.5 xHigh" },
                           { cat: "artistry", model: "Gemini 3.1 Pro" },
-                          { cat: "quick", model: "Claude Haiku 4.5" },
-                          { cat: "deep", model: "GPT 5.3 Codex" },
+                          { cat: "quick", model: "GPT 5.4 Mini" },
+                          { cat: "deep", model: "GPT 5.5 Medium" },
                           { cat: "writing", model: "Kimi K2.5" },
                           { cat: "git", model: "Claude Haiku 4.5" },
                         ].map((item) => (
@@ -556,7 +676,7 @@ export async function LandingPage(): Promise<JSX.Element> {
                         Skill Injection
                       </h3>
                       <div className="grid grid-cols-2 gap-3">
-                        {["playwright", "git-master", "frontend-ui-ux", "dev-browser"].map(
+                        {["playwright", "git-master", "frontend-ui-ux", "team-mode"].map(
                           (skill) => (
                             <div
                               key={skill}
