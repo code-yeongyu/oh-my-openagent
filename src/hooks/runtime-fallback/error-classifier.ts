@@ -133,7 +133,13 @@ export function classifyErrorType(error: unknown): string | undefined {
     /out\s+of\s+credits?/i.test(message) ||
     /payment.?required/i.test(message) ||
     /usage\s+limit/i.test(message) ||
-    /credit\s+balance.*too\s+low/i.test(message)
+    /credit\s+balance.*too\s+low/i.test(message) ||
+    // Chinese quota/billing patterns (Zhipu, etc.)
+    /使用上限/.test(message) ||           // "usage limit" — Zhipu: "已达到 5 小时的使用上限"
+    /达到.*限制/.test(message) ||         // "reached ... limit"
+    /额度.*不足/.test(message) ||         // "quota insufficient"
+    /余额.*不足/.test(message) ||         // "balance insufficient"
+    /已耗尽/.test(message)                // "exhausted"
   ) {
     return "quota_exceeded"
   }
