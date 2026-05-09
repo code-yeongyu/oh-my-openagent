@@ -76,7 +76,7 @@ function createTmuxConfig(enabled: boolean) {
   }
 }
 
-function createContext(directory: string): PluginInput {
+function createContext(directory: string, serverUrl?: URL): PluginInput {
   const shell = Object.assign(
     () => {
       throw new Error("shell should not be called in this test")
@@ -107,7 +107,7 @@ function createContext(directory: string): PluginInput {
     },
     directory,
     worktree: directory,
-    serverUrl: new URL("http://localhost:4096"),
+    serverUrl,
     $: shell,
     client: {} as PluginInput["client"],
   }
@@ -145,7 +145,7 @@ describe("createManagers", () => {
 
   it("#given tmux integration is enabled #when managers are created #then it marks the tmux server as running", () => {
     const args = {
-      ctx: createContext("/tmp"),
+      ctx: createContext("/tmp", new URL("http://localhost:4096")),
       pluginConfig: OhMyOpenCodeConfigSchema.parse({}),
       tmuxConfig: createTmuxConfig(true),
       modelCacheState: createModelCacheState(),
@@ -158,9 +158,24 @@ describe("createManagers", () => {
     expect(markServerRunningInProcess).toHaveBeenCalledTimes(1)
   })
 
+  it("#given tmux integration is enabled but no server URL (normal CLI mode) #when managers are created #then it does not mark the server as running", () => {
+    const args = {
+      ctx: createContext("/tmp", undefined),
+      pluginConfig: OhMyOpenCodeConfigSchema.parse({}),
+      tmuxConfig: createTmuxConfig(true),
+      modelCacheState: createModelCacheState(),
+      backgroundNotificationHookEnabled: false,
+      deps: createDeps(),
+    }
+
+    createManagers(args)
+
+    expect(markServerRunningInProcess).not.toHaveBeenCalled()
+  })
+
   it("#given openclaw is enabled #when the background session-created callback runs #then it dispatches openclaw with the tracked pane id", async () => {
     const args = {
-      ctx: createContext("/tmp/project"),
+      ctx: createContext("/tmp/project", new URL("http://localhost:4096")),
       pluginConfig: OhMyOpenCodeConfigSchema.parse({
         openclaw: {
           enabled: true,

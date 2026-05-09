@@ -54,7 +54,10 @@ export function createManagers(args: {
   const { ctx, pluginConfig, tmuxConfig, modelCacheState, backgroundNotificationHookEnabled } = args
   const deps = { ...defaultCreateManagersDeps, ...args.deps }
 
-  if (tmuxConfig.enabled) {
+  // Only mark server running if we have a server URL (running in server mode)
+  // This prevents team mode from incorrectly assuming a server exists when
+  // tmux is enabled but opencode is not running as a server (e.g., normal CLI mode)
+  if (tmuxConfig.enabled && ctx.serverUrl) {
     deps.markServerRunningInProcessFn()
   }
   const tmuxSessionManager = new deps.TmuxSessionManagerClass(ctx, tmuxConfig)
