@@ -722,7 +722,9 @@ The fallback retry session is now created and can be inspected directly.
           task: false,
           call_omo_agent: true,
           question: false,
-          ...getAgentToolRestrictions(input.agent),
+          ...getAgentToolRestrictions(input.agent, {
+            includeTeamToolDenylist: input.teamRunId === undefined,
+          }),
         }
         setSessionTools(sessionID, tools)
         return tools
@@ -742,7 +744,9 @@ The fallback retry session is now created and can be inspected directly.
           taskId: task.id,
         })
         try {
-          const fallbackBody = buildFallbackBody(promptBody, FALLBACK_AGENT)
+          const fallbackBody = buildFallbackBody(promptBody, FALLBACK_AGENT, {
+            includeTeamToolDenylist: input.teamRunId === undefined,
+          })
           setSessionTools(sessionID, fallbackBody.tools as Record<string, boolean>)
           await promptWithModelSuggestionRetry(this.client, {
             path: { id: sessionID },
@@ -1103,7 +1107,9 @@ The fallback retry session is now created and can be inspected directly.
             task: false,
             call_omo_agent: true,
             question: false,
-            ...getAgentToolRestrictions(existingTask.agent),
+            ...getAgentToolRestrictions(existingTask.agent, {
+              includeTeamToolDenylist: existingTask.teamRunId === undefined,
+            }),
           }
           setSessionTools(existingTask.sessionId!, tools)
           return tools
@@ -1584,7 +1590,7 @@ The fallback retry session is now created and can be inspected directly.
     })
   }
 
-  private tryFallbackRetry(
+  private async tryFallbackRetry(
     task: BackgroundTask,
     errorInfo: { name?: string; message?: string },
     source: string,
@@ -1620,14 +1626,13 @@ The task was re-queued on a fallback model after a retryable failure.
         )
       },
     })
-    return result.then((retried) => {
-      if (retried && previousSessionID) {
-        this.clearSessionOutputObserved(previousSessionID)
-        this.clearSessionTodoObservation(previousSessionID)
-        subagentSessions.delete(previousSessionID)
-      }
-      return retried
-    })
+    const retried = await result
+    if (retried && previousSessionID) {
+      this.clearSessionOutputObserved(previousSessionID)
+      this.clearSessionTodoObservation(previousSessionID)
+      subagentSessions.delete(previousSessionID)
+    }
+    return retried
   }
 
   markForNotification(task: BackgroundTask): void {
