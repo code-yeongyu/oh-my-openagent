@@ -312,7 +312,7 @@ export function createMetisAgent(model: string): AgentConfig {
   } as AgentConfig
 
   if (isGlmThinkingModel(model)) {
-    return { ...base, thinking: { type: "enabled" }, permission: { ...base.permission, ...getGlmVisionToolDeny() } } as AgentConfig
+    return { ...base, thinking: { type: "enabled" }, permission: { ...base.permission, ...getGlmVisionToolDeny(model) } } as AgentConfig
   }
 
   return { ...base, thinking: { type: "enabled", budgetTokens: 32000 } } as AgentConfig

@@ -572,7 +572,7 @@ export function createOracleAgent(model: string): AgentConfig {
   }
 
   if (isGlmThinkingModel(model)) {
-    return { ...base, thinking: { type: "enabled" }, prompt: base.prompt + buildGlmSubagentVisionBlock(), permission: { ...base.permission, ...getGlmVisionToolDeny() } } as AgentConfig;
+    return { ...base, thinking: { type: "enabled" }, prompt: base.prompt + buildGlmSubagentVisionBlock(), permission: { ...base.permission, ...getGlmVisionToolDeny(model) } } as AgentConfig;
   }
 
   return {

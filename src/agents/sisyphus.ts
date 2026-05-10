@@ -669,7 +669,7 @@ export function createSisyphusAgent(
       ...base,
       maxTokens: 128000,
       thinking: { type: "enabled" },
-      permission: { ...permission, ...getGlmVisionToolDeny() },
+      permission: { ...permission, ...getGlmVisionToolDeny(model) },
     };
   }
 

@@ -412,7 +412,7 @@ export function createMomusAgent(model: string): AgentConfig {
   }
 
   if (isGlmThinkingModel(model)) {
-    return { ...base, thinking: { type: "enabled" }, permission: { ...base.permission, ...getGlmVisionToolDeny() } } as AgentConfig;
+    return { ...base, thinking: { type: "enabled" }, permission: { ...base.permission, ...getGlmVisionToolDeny(model) } } as AgentConfig;
   }
 
   return {

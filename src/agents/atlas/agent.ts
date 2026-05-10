@@ -129,7 +129,7 @@ export function createAtlasAgent(ctx: OrchestratorContext): AgentConfig {
   }
 
   if (ctx.model && isGlmThinkingModel(ctx.model)) {
-    return { ...baseConfig, permission: { ...getGlmVisionToolDeny() } } as AgentConfig
+    return { ...baseConfig, permission: { ...getGlmVisionToolDeny(ctx.model) } } as AgentConfig
   }
 
   return baseConfig as AgentConfig
