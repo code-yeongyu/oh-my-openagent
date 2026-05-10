@@ -15,6 +15,7 @@ describe("extractAutoRetrySignal", () => {
     //#then
     expect(signal).toBeDefined()
     expect(signal?.signal).toContain("exceeded")
+    expect(signal?.signal).toContain("usage quota")
   })
 
   test("detects standard 'quota exceeded' signal", () => {
