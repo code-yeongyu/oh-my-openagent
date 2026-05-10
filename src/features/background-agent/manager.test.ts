@@ -5991,6 +5991,33 @@ describe("BackgroundManager regression fixes - resume and aborted notification",
 
     manager.shutdown()
   })
+
+  test("should keep completed task retrievable after scheduled removal", () => {
+    //#given
+    const manager = createBackgroundManager()
+    const task: BackgroundTask = {
+      id: "task-archive-regression",
+      sessionId: "session-archive-regression",
+      parentSessionId: "parent-session",
+      parentMessageId: "msg-1",
+      description: "archive regression",
+      prompt: "test",
+      agent: "explore",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+    }
+    getTaskMap(manager).set(task.id, task)
+
+    //#when
+    ;(cast<{ removeTask: (task: BackgroundTask) => void }>(manager)).removeTask(task)
+
+    //#then
+    expect(getTaskMap(manager).has(task.id)).toBe(false)
+    expect(manager.getTask(task.id)?.sessionId).toBe(task.sessionId)
+
+    manager.shutdown()
+  })
 })
 
 describe("BackgroundManager - tool permission spread order", () => {
