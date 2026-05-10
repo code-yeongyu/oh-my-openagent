@@ -383,6 +383,8 @@ export class BackgroundManager {
       agent: task.agent,
       sessionId: task.sessionId,
       status: task.status,
+      queuedAt: task.queuedAt,
+      startedAt: task.startedAt,
       completedAt: task.completedAt,
       model: task.model,
       error: task.error,

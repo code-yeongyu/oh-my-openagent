@@ -6017,6 +6017,7 @@ describe("BackgroundManager regression fixes - resume and aborted notification",
     const archivedTask = manager.getTask(task.id)
     expect(archivedTask?.sessionId).toBe(task.sessionId)
     expect(archivedTask?.prompt).toBe("[redacted]")
+    expect(archivedTask?.startedAt).toEqual(task.startedAt)
 
     manager.shutdown()
   })
