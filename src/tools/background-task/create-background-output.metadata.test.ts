@@ -65,4 +65,46 @@ describe("createBackgroundOutput metadata", () => {
 
     clearPendingStore()
   })
+
+  test("explains when a session id is passed as the background task id", async () => {
+    // #given
+    const task: BackgroundTask = {
+      id: "bg-real-task",
+      sessionId: "ses-child-task",
+      parentSessionId: "main-1",
+      parentMessageId: "msg-1",
+      description: "background task",
+      prompt: "do work",
+      agent: "test-agent",
+      status: "completed",
+    }
+    const manager: BackgroundOutputManager = {
+      getTask: id => (id === task.id ? task : undefined),
+    }
+    const client: BackgroundOutputClient = {
+      session: {
+        messages: async () => ({ data: [] }),
+      },
+    }
+    const tool = createBackgroundOutput(manager, client)
+    const context = {
+      sessionID: "test-session",
+      messageID: "test-message",
+      agent: "test-agent",
+      directory: projectDir,
+      worktree: projectDir,
+      abort: new AbortController().signal,
+      metadata: () => {},
+      ask: async () => {},
+      callID: "call-1",
+    } satisfies ToolContextWithCallID
+
+    // #when
+    const output = await tool.execute({ task_id: "ses-child-task" }, context)
+
+    // #then
+    expect(output).toContain("background_output expects a background task ID")
+    expect(output).toContain("bg_")
+    expect(output).toContain('session_read(session_id="ses-child-task")')
+  })
 })
