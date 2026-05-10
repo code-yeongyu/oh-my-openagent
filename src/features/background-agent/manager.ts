@@ -88,8 +88,23 @@ import {
   resolveSubagentSpawnContext,
   type SubagentSpawnContext,
 } from "./subagent-spawn-limits"
+import { settleAfterSessionIdle } from "../../hooks/shared/session-idle-settle"
 
 type OpencodeClient = PluginInput["client"]
+
+type ParentWakePromptContext = {
+  agent?: string
+  model?: { providerID: string; modelID: string }
+  variant?: string
+  tools?: Record<string, boolean>
+}
+
+type SessionStatusInfo = { type?: string }
+
+const BACKGROUND_PARENT_WAKE_PROMPT = `<system-reminder>
+[BACKGROUND TASK NOTIFICATION READY]
+A background task notification was already added to this session. Continue from that notification.
+</system-reminder>`
 
 interface MessagePartInfo {
   id?: string
@@ -210,6 +225,7 @@ export class BackgroundManager {
   private completedTaskSummaries: Map<string, BackgroundTaskNotificationTask[]> = new Map()
   private idleDeferralTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
   private notificationQueueByParent: Map<string, Promise<void>> = new Map()
+  private pendingParentWakes: Map<string, ParentWakePromptContext> = new Map()
   private observedOutputSessions: Set<string> = new Set()
   private observedIncompleteTodosBySession: Map<string, boolean> = new Map()
   private rootDescendantCounts: Map<string, number>
@@ -1360,6 +1376,12 @@ The fallback retry session is now created and can be inspected directly.
 
     if (event.type === "session.idle") {
       if (!props || typeof props !== "object") return
+      const sessionID = typeof props.sessionID === "string" ? props.sessionID : undefined
+      if (sessionID) {
+        void this.enqueueNotificationForParent(sessionID, () => this.flushPendingParentWake(sessionID)).catch((error) => {
+          log("[background-agent] Failed to flush pending parent wake:", { sessionID, error })
+        })
+      }
       handleSessionIdleBackgroundEvent({
         properties: props as Record<string, unknown>,
         findBySession: (id) => {
@@ -2152,24 +2174,32 @@ The task was re-queued on a fallback model after a retryable failure.
         const shouldReply = allComplete || isTaskFailure
 
         const variant = promptContext?.model?.variant
+        const parentPromptContext: ParentWakePromptContext = {
+          ...(agent !== undefined ? { agent } : {}),
+          ...(model !== undefined ? { model } : {}),
+          ...(variant !== undefined ? { variant } : {}),
+          ...(resolvedTools ? { tools: resolvedTools } : {}),
+        }
+        const shouldDeferReply = shouldReply && await this.isSessionActive(task.parentSessionId)
 
         try {
           await this.client.session.promptAsync({
             path: { id: task.parentSessionId },
             body: {
-              noReply: !shouldReply,
-              ...(agent !== undefined ? { agent } : {}),
-              ...(model !== undefined ? { model } : {}),
-              ...(variant !== undefined ? { variant } : {}),
-              ...(resolvedTools ? { tools: resolvedTools } : {}),
+              noReply: shouldDeferReply || !shouldReply,
+              ...parentPromptContext,
               parts: [createInternalAgentTextPart(notification)],
             },
           })
+          if (shouldDeferReply) {
+            this.pendingParentWakes.set(task.parentSessionId, parentPromptContext)
+          }
           log("[background-agent] Sent notification to parent session:", {
             taskId: task.id,
             allComplete,
             isTaskFailure,
-            noReply: !shouldReply,
+            noReply: shouldDeferReply || !shouldReply,
+            deferredReply: shouldDeferReply,
           })
         } catch (error) {
           if (isAbortedSessionError(error)) {
@@ -2199,6 +2229,60 @@ The task was re-queued on a fallback model after a retryable failure.
       if (task.status === "running") return true
     }
     return false
+  }
+
+  private async isSessionActive(sessionID: string): Promise<boolean> {
+    const sessionStatusMethod = this.client?.session?.status
+    if (typeof sessionStatusMethod !== "function") {
+      return false
+    }
+
+    try {
+      const statusResult = await this.client.session.status()
+      const statuses = normalizeSDKResponse(
+        statusResult,
+        {} as Record<string, SessionStatusInfo>,
+      )
+      const status = statuses[sessionID]
+      return typeof status?.type === "string" && isActiveSessionStatus(status.type)
+    } catch (error) {
+      log("[background-agent] Unable to check parent session status before wake:", {
+        sessionID,
+        error,
+      })
+      return false
+    }
+  }
+
+  private async flushPendingParentWake(sessionID: string): Promise<void> {
+    const wakeContext = this.pendingParentWakes.get(sessionID)
+    if (!wakeContext) return
+
+    if (await this.isSessionActive(sessionID)) {
+      return
+    }
+
+    this.pendingParentWakes.delete(sessionID)
+    await settleAfterSessionIdle()
+
+    if (await this.isSessionActive(sessionID)) {
+      this.pendingParentWakes.set(sessionID, wakeContext)
+      return
+    }
+
+    try {
+      await this.client.session.promptAsync({
+        path: { id: sessionID },
+        body: {
+          noReply: false,
+          ...wakeContext,
+          parts: [createInternalAgentTextPart(BACKGROUND_PARENT_WAKE_PROMPT)],
+        },
+      })
+      log("[background-agent] Sent deferred parent wake:", { sessionID })
+    } catch (error) {
+      log("[background-agent] Failed to send deferred parent wake:", { sessionID, error })
+    }
   }
 
   private pruneStaleTasksAndNotifications(): void {
@@ -2525,6 +2609,7 @@ The task was re-queued on a fallback model after a retryable failure.
     this.pendingNotifications.clear()
     this.pendingByParent.clear()
     this.notificationQueueByParent.clear()
+    this.pendingParentWakes.clear()
     this.rootDescendantCounts.clear()
     this.queuesByKey.clear()
     this.processingKeys.clear()
