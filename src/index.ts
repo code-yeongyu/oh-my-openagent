@@ -18,6 +18,15 @@ import { installAgentSortShim, setAgentSortOrder } from "./shared/agent-sort-shi
 import { detectExternalSkillPlugin, getSkillPluginConflictWarning } from "./shared/external-plugin-detector"
 import { startBackgroundCheck as startTmuxCheck } from "./tools/interactive-bash"
 
+type CompactionAutocontinueHook = (
+  input: { sessionID: string },
+  output: { enabled: boolean },
+) => Promise<void>
+
+type HooksWithCompactionAutocontinue = Hooks & {
+  "experimental.compaction.autocontinue"?: CompactionAutocontinueHook
+}
+
 const serverPlugin: Plugin = async (input, _options): Promise<Hooks> => {
   installAgentSortShim()
   initConfigContext("opencode", null)
@@ -105,7 +114,7 @@ const serverPlugin: Plugin = async (input, _options): Promise<Hooks> => {
     tools: toolsResult.filteredTools,
   })
 
-  return {
+  const pluginHooks: HooksWithCompactionAutocontinue = {
     ...pluginInterface,
 
     "experimental.session.compacting": async (
@@ -122,7 +131,17 @@ const serverPlugin: Plugin = async (input, _options): Promise<Hooks> => {
         output.context.push(hooks.compactionContextInjector.inject(compactingInput.sessionID))
       }
     },
+
+    "experimental.compaction.autocontinue": async (
+      autocontinueInput: { sessionID: string },
+      _output: { enabled: boolean },
+    ): Promise<void> => {
+      await hooks.compactionContextInjector?.restore(autocontinueInput.sessionID)
+      await hooks.compactionTodoPreserver?.restore(autocontinueInput.sessionID)
+    },
   }
+
+  return pluginHooks
 }
 
 const pluginModule: PluginModule = {
