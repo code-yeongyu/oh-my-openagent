@@ -3,6 +3,7 @@ import type { AgentMode, AgentPromptMetadata } from "./types"
 import { isGlmThinkingModel } from "./types"
 import { buildAntiDuplicationSection } from "./dynamic-agent-prompt-builder"
 import { getGlmVisionToolDeny } from "./frontier-tool-schema-guard"
+import { buildGlmLanguageConstraint } from "./sisyphus/glm"
 import { createAgentToolRestrictions } from "../shared/permission-compat"
 
 const MODE: AgentMode = "subagent"
@@ -312,7 +313,7 @@ export function createMetisAgent(model: string): AgentConfig {
   } as AgentConfig
 
   if (isGlmThinkingModel(model)) {
-    return { ...base, thinking: { type: "enabled" }, permission: { ...base.permission, ...getGlmVisionToolDeny(model) } } as AgentConfig
+    return { ...base, thinking: { type: "enabled" }, prompt: base.prompt + buildGlmLanguageConstraint(), permission: { ...base.permission, ...getGlmVisionToolDeny(model) } } as AgentConfig
   }
 
   return { ...base, thinking: { type: "enabled", budgetTokens: 32000 } } as AgentConfig

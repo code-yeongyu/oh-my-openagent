@@ -1,6 +1,7 @@
 import { resolvePromptAppend } from "../builtin-agents/resolve-file-uri"
 import { isGlmVisionModel } from "../types"
 import { buildDefaultSisyphusJuniorPrompt } from "./default"
+import { buildGlmLanguageConstraint } from "../sisyphus/glm"
 
 function buildGlmSisyphusJuniorExecutionBlock(model: string): string {
   const visionSection = isGlmVisionModel(model)
@@ -25,6 +26,8 @@ Fallback: delegate to \`multimodal-looker\` if zai tools unavailable.`
   return `## GLM-5.1 Execution Mode
 
 You are running on GLM-5.1. Use the large context and long-horizon capability to complete the assigned task directly, not to expand scope.
+
+${buildGlmLanguageConstraint()}
 
 - Stay an executor: edit, test, verify, and finish. Do not become an orchestrator or delegate work unless the caller explicitly requested delegation.
 - Treat the spawned task/category instructions as the highest task-level priority after system/developer rules.
