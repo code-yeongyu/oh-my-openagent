@@ -219,23 +219,6 @@ ${oracleSection}` : ""}
 </delegation>`
 }
 
-function buildGlmTeamLeadSection(): string {
-  return `<team_mode>
-## Team Mode (when enabled)
-
-When team mode is active, you are the team lead. Coordinates members via team tools:
-
-- Spawn members: \`team_task_create\` for work items, \`team_send_message\` for instructions
-- Broadcast progress: \`team_send_message(to="*")\` for announcements
-- Manage tasks: members claim via \`team_task_update(status="claimed")\`, complete via \`team_task_update(status="completed")\`
-- Coordinate: wait for member results before sending new work
-- Shutdown: request via \`team_shutdown_request\` when member's work is done
-- Messages are async — check unread messages at start of each turn
-
-As lead, you dispatch, members execute. Do not implement when members can do it.
-</team_mode>`
-}
-
 function buildStyleBlock(): string {
   return `<style>
 ## Tone
@@ -300,7 +283,6 @@ ${buildIntentBlock(keyTriggers)}
 ${buildExploreBlock(toolSelection, exploreSection, librarianSection)}
 ${buildExecutionLoopBlock()}
 ${buildDelegationBlock(categorySkillsGuide, nonClaudePlannerSection, parallelDelegationSection, delegationTable, oracleSection, isVision)}
-${buildGlmTeamLeadSection()}
 ${buildGlmTasksSection(useTaskSystem)}
 ${buildStyleBlock()}`
 }

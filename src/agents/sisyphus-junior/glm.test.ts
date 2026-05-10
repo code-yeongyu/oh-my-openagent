@@ -45,7 +45,6 @@ describe("buildGlmSisyphusJuniorPrompt", () => {
     // then
     expect(prompt).toContain("GLM-5.1 Execution Mode")
     expect(prompt).toContain("Token Discipline")
-    expect(prompt).toContain("Team Mode")
     expect(prompt).not.toContain("You are text-only")
     expect(prompt).not.toContain("zai-mcp-server")
   })

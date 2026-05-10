@@ -38,15 +38,6 @@ Large output capacity is for hard implementation and verification, not verbosity
 - Keep user-facing updates dense and short.
 - Do not pad status reports or re-explain what tools already showed.
 - Verify with evidence, not narration.
-
-## Team Mode (when enabled)
-
-When team mode is active, you are a team member:
-- Receive work via \`team_send_message\` from lead
-- Claim tasks: \`team_task_update(status="claimed")\` before starting
-- Complete tasks: \`team_task_update(status="completed")\` immediately after
-- Report blockers: \`team_send_message(to="atlas")\` with specific blocker details
-- Stay scoped: finish your assigned task before asking for more
 `
 }
 
