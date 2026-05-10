@@ -4473,6 +4473,12 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
         {
           "model": "vercel/openai/gpt-5.5",
         },
+        {
+          "model": "vercel/moonshotai/kimi-k2.6",
+        },
+        {
+          "model": "vercel/zai/glm-5.1",
+        },
       ],
       "model": "vercel/google/gemini-3.1-pro-preview",
       "variant": "high",
@@ -4486,6 +4492,12 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
         {
           "model": "vercel/google/gemini-3.1-pro-preview",
           "variant": "high",
+        },
+        {
+          "model": "vercel/moonshotai/kimi-k2.6",
+        },
+        {
+          "model": "vercel/zai/glm-5.1",
         },
       ],
       "model": "vercel/openai/gpt-5.5",
@@ -4772,6 +4784,12 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
         {
           "model": "vercel/openai/gpt-5.5",
         },
+        {
+          "model": "vercel/moonshotai/kimi-k2.6",
+        },
+        {
+          "model": "vercel/zai/glm-5.1",
+        },
       ],
       "model": "vercel/google/gemini-3.1-pro-preview",
       "variant": "high",
@@ -4785,6 +4803,12 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
         {
           "model": "vercel/google/gemini-3.1-pro-preview",
           "variant": "high",
+        },
+        {
+          "model": "vercel/moonshotai/kimi-k2.6",
+        },
+        {
+          "model": "vercel/zai/glm-5.1",
         },
       ],
       "model": "vercel/openai/gpt-5.5",
