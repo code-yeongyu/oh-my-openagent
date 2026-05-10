@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, it } from "bun:test"
-import { extractSemverFromOutput } from "./system-binary"
+import { extractSemverFromOutput } from "../../../shared/extract-semver"
 
 describe("extractSemverFromOutput", () => {
   describe("#given clean version output #when extractSemverFromOutput #then returns the semver token", () => {

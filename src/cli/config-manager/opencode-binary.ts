@@ -1,3 +1,4 @@
+import { extractSemverFromOutput } from "../../shared/extract-semver"
 import type { OpenCodeBinaryType } from "../../shared/opencode-config-dir-types"
 import { spawnWithWindowsHide } from "../../shared/spawn-with-windows-hide"
 import { initConfigContext } from "./config-context"
@@ -19,7 +20,7 @@ async function findOpenCodeBinaryWithVersion(): Promise<OpenCodeBinaryResult | n
       const output = await new Response(proc.stdout).text()
       await proc.exited
       if (proc.exitCode === 0) {
-        const version = output.trim()
+        const version = extractSemverFromOutput(output) ?? output.trim()
         initConfigContext(binary, version)
         return { binary, version }
       }
