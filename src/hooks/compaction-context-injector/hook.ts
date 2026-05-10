@@ -35,7 +35,15 @@ export function createCompactionContextInjector(options?: {
 
   const { recoverCheckpointedAgentConfig, maybeWarnAboutNoTextTail } = createRecoveryLogic(ctx, getTailState)
 
+  const restore = async (sessionID: string): Promise<boolean> => {
+    return recoverCheckpointedAgentConfig(sessionID, "compaction.autocontinue")
+  }
+
   const capture = async (sessionID: string): Promise<void> => {
+    if (sessionID) {
+      clearCompactionAgentConfigCheckpoint(sessionID)
+    }
+
     if (!ctx || !sessionID) {
       return
     }
@@ -160,5 +168,5 @@ export function createCompactionContextInjector(options?: {
     }
   }
 
-  return { capture, inject, event }
+  return { capture, restore, inject, event }
 }

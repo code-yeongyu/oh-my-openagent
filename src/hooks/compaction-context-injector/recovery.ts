@@ -28,7 +28,7 @@ export function createRecoveryLogic(
 ) {
   const recoverCheckpointedAgentConfig = async (
     sessionID: string,
-    reason: "session.compacted" | "no-text-tail",
+    reason: "compaction.autocontinue" | "session.compacted" | "no-text-tail",
   ): Promise<boolean> => {
     if (!ctx) {
       return false
@@ -73,7 +73,7 @@ export function createRecoveryLogic(
     const model = expectedPromptConfig.model
     const tools = expectedPromptConfig.tools
 
-    if (reason === "session.compacted") {
+    if (reason === "compaction.autocontinue" || reason === "session.compacted") {
       const latestPromptConfig = await resolveLatestSessionPromptConfig(ctx, sessionID)
       if (isPromptConfigRecovered(latestPromptConfig, expectedPromptConfig)) {
         return false

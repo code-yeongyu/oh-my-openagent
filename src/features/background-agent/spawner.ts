@@ -28,6 +28,7 @@ export function isAgentNotFoundError(error: unknown): boolean {
 export function buildFallbackBody(
   originalBody: Record<string, unknown>,
   fallbackAgent: string,
+  options: { includeTeamToolDenylist?: boolean } = {},
 ): Record<string, unknown> {
   return {
     ...originalBody,
@@ -36,7 +37,7 @@ export function buildFallbackBody(
       task: false,
       call_omo_agent: true,
       question: false,
-      ...getAgentToolRestrictions(fallbackAgent),
+      ...getAgentToolRestrictions(fallbackAgent, options),
     },
   }
 }
@@ -60,9 +61,11 @@ export function createTask(input: LaunchInput): BackgroundTask {
     agent: input.agent,
     parentSessionId: input.parentSessionId,
     parentMessageId: input.parentMessageId,
+    teamRunId: input.teamRunId,
     parentModel: input.parentModel,
     parentAgent: input.parentAgent,
     model: input.model,
+    onSessionCreated: input.onSessionCreated,
   }
 }
 
@@ -160,7 +163,9 @@ export async function startTask(
       task: false,
       call_omo_agent: true,
       question: false,
-      ...getAgentToolRestrictions(normalizedAgent),
+      ...getAgentToolRestrictions(normalizedAgent, {
+        includeTeamToolDenylist: input.teamRunId === undefined,
+      }),
     },
     parts: [createInternalAgentTextPart(input.prompt)],
   }
@@ -179,7 +184,9 @@ export async function startTask(
       try {
         await promptWithModelSuggestionRetry(client, {
           path: { id: sessionID },
-          body: buildFallbackBody(promptBody, FALLBACK_AGENT),
+          body: buildFallbackBody(promptBody, FALLBACK_AGENT, {
+            includeTeamToolDenylist: input.teamRunId === undefined,
+          }),
         })
         task.agent = FALLBACK_AGENT
         return
@@ -294,7 +301,9 @@ export async function resumeTask(
       task: false,
       call_omo_agent: true,
       question: false,
-      ...getAgentToolRestrictions(task.agent),
+      ...getAgentToolRestrictions(task.agent, {
+        includeTeamToolDenylist: task.teamRunId === undefined,
+      }),
     },
     parts: [createInternalAgentTextPart(input.prompt)],
   }
@@ -312,7 +321,9 @@ export async function resumeTask(
       try {
         await promptWithModelSuggestionRetry(client, {
           path: { id: task.sessionId! },
-          body: buildFallbackBody(resumeBody, FALLBACK_AGENT),
+          body: buildFallbackBody(resumeBody, FALLBACK_AGENT, {
+            includeTeamToolDenylist: task.teamRunId === undefined,
+          }),
         })
         task.agent = FALLBACK_AGENT
         return

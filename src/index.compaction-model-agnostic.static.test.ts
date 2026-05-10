@@ -18,4 +18,19 @@ describe("experimental.session.compacting", () => {
     expect(hookSlice.includes("providerID:")).toBe(false)
     expect(hookSlice.includes("modelID:")).toBe(false)
   })
+
+  test("registers autocontinue restores before OpenCode synthetic continue", () => {
+    //#given
+    const indexUrl = new URL("./index.ts", import.meta.url)
+    const content = readFileSync(indexUrl, "utf-8")
+    const hookIndex = content.lastIndexOf('"experimental.compaction.autocontinue"')
+
+    //#when
+    const hookSlice = hookIndex >= 0 ? content.slice(hookIndex, hookIndex + 500) : ""
+
+    //#then
+    expect(hookIndex).toBeGreaterThanOrEqual(0)
+    expect(hookSlice.includes("compactionContextInjector?.restore")).toBe(true)
+    expect(hookSlice.includes("compactionTodoPreserver?.restore")).toBe(true)
+  })
 })

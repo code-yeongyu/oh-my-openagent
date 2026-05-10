@@ -77,6 +77,7 @@ export interface BackgroundTask {
   isUnstableAgent?: boolean
   /** Category used for this task (e.g., 'quick', 'visual-engineering') */
   category?: string
+  onSessionCreated?: (sessionId: string) => void | Promise<void>
   /** Pending retry notification details for the next spawned retry session */
   retryNotification?: {
     previousSessionID?: string

@@ -20,7 +20,11 @@ type LoopStateController = {
 	setVerificationSessionID: (sessionID: string, verificationSessionID: string) => RalphLoopState | null
 	restartAfterFailedVerification: (sessionID: string, messageCountAtStart?: number) => RalphLoopState | null
 }
-type RalphLoopEventHandlerOptions = { directory: string; apiTimeoutMs: number; getTranscriptPath: (sessionID: string) => string | undefined; checkSessionExists?: RalphLoopOptions["checkSessionExists"]; backgroundManager?: RalphLoopOptions["backgroundManager"]; loopState: LoopStateController }
+type RalphLoopEventHandlerOptions = { directory: string; apiTimeoutMs: number; idleSettleMs: number; getTranscriptPath: (sessionID: string) => string | undefined; checkSessionExists?: RalphLoopOptions["checkSessionExists"]; backgroundManager?: RalphLoopOptions["backgroundManager"]; loopState: LoopStateController }
+
+function sleep(ms: number): Promise<void> {
+	return ms > 0 ? new Promise((resolve) => setTimeout(resolve, ms)) : Promise.resolve()
+}
 
 function hasRunningBackgroundTasks(
 	backgroundManager: RalphLoopOptions["backgroundManager"],
@@ -285,6 +289,7 @@ export function createRalphLoopEventHandler(
 				})
 
 				showIterationToast(ctx, newState)
+				await sleep(options.idleSettleMs)
 
 				try {
 					await continueIteration(ctx, newState, {
@@ -399,6 +404,7 @@ export function createRalphLoopEventHandler(
 				}
 
 				showIterationToast(ctx, newState)
+				await sleep(options.idleSettleMs)
 				try {
 					await continueIteration(ctx, newState, {
 						previousSessionID: sessionID,

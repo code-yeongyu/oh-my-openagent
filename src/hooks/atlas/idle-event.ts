@@ -11,6 +11,7 @@ import { getLastAgentFromSession } from "./session-last-agent"
 import { isSessionInBoulderLineage } from "./boulder-session-lineage"
 import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { log } from "../../shared/logger"
+import { settleAfterSessionIdle } from "../shared/session-idle-settle"
 import { injectBoulderContinuation } from "./boulder-continuation-injector"
 import { HOOK_NAME } from "./hook-name"
 import { resolveActiveBoulderSession } from "./resolve-active-boulder-session"
@@ -301,6 +302,8 @@ export async function handleAtlasSessionIdle(input: {
     })
     return
   }
+
+  await settleAfterSessionIdle(options?.idleSettleMs)
 
   await injectContinuation({
     ctx,
