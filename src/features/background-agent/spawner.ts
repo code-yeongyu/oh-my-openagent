@@ -65,6 +65,7 @@ export function createTask(input: LaunchInput): BackgroundTask {
     parentModel: input.parentModel,
     parentAgent: input.parentAgent,
     model: input.model,
+    onSessionCreated: input.onSessionCreated,
   }
 }
 

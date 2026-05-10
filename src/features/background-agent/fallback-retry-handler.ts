@@ -170,10 +170,12 @@ export async function tryFallbackRetry(args: {
     parentModel: task.parentModel,
     parentAgent: task.parentAgent,
     parentTools: task.parentTools,
+    teamRunId: task.teamRunId,
     model: nextModel,
     fallbackChain: task.fallbackChain,
     category: task.category,
     isUnstableAgent: task.isUnstableAgent,
+    onSessionCreated: task.onSessionCreated,
   }
 
   if (previousSessionID) {

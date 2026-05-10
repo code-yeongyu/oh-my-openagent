@@ -424,6 +424,7 @@ export class BackgroundManager {
         fallbackChain: input.fallbackChain,
         attemptCount: 0,
         category: input.category,
+        onSessionCreated: input.onSessionCreated,
       }
       const firstAttempt = startAttempt(task, input.model)
 
