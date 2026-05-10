@@ -105,6 +105,17 @@ export async function findOpenCodeBinary(): Promise<OpenCodeBinaryInfo | null> {
   return findDesktopBinary()
 }
 
+export function extractSemverFromOutput(output: string): string | null {
+  const trimmed = output.trim()
+  if (!trimmed) return null
+  // Match a semver-shaped token, allowing optional `v` prefix and `-prerelease+build` suffix.
+  // The negative lookbehind `(?<![\d:])` prevents matching the milliseconds segment of timestamps
+  // like `00:24:25.202` that the Electron-based OpenCode binary leaks into stdout.
+  const semverPattern = /(?<![\d:])v?(\d+\.\d+\.\d+(?:[-+][\w.]+)*)/
+  const match = trimmed.match(semverPattern)
+  return match?.[1] ?? null
+}
+
 export async function getOpenCodeVersion(
   binaryPath: string,
   platform: NodeJS.Platform = process.platform
@@ -113,7 +124,7 @@ export async function getOpenCodeVersion(
     const command = buildVersionCommand(binaryPath, platform)
     const result = await spawnWithTimeout(command, { stdout: "pipe", stderr: "pipe" })
     if (result.timedOut || result.exitCode !== 0) return null
-    return result.stdout.trim() || null
+    return extractSemverFromOutput(result.stdout)
   } catch {
     return null
   }
