@@ -8,7 +8,7 @@ import {
 	normalizeSDKResponse,
 	resolveInheritedPromptTools,
 } from "../../shared"
-import { normalizeAgentForPromptKey } from "../../shared/agent-display-names"
+import { resolveRegisteredAgentName } from "../../features/claude-code-session-state"
 
 type MessageInfo = {
 	agent?: string
@@ -70,7 +70,7 @@ export async function injectContinuationPrompt(
 	}
 
 	const inheritedTools = resolveInheritedPromptTools(sourceSessionID, tools)
-	const cleanAgent = normalizeAgentForPromptKey(agent)
+	const cleanAgent = resolveRegisteredAgentName(agent)
 
 	const launchModel = model
 		? { providerID: model.providerID, modelID: model.modelID }
