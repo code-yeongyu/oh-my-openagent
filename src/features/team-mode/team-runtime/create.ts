@@ -199,12 +199,18 @@ export async function createTeamRun(
             skillContent: resolvedMember.systemContent,
             category: member.kind === "category" ? member.category : undefined,
             sessionPermission: QUESTION_DENIED_SESSION_PERMISSION,
-            onSessionCreated: (sessionId) => {
+            onSessionCreated: async (sessionId) => {
               registerTeamSession(sessionId, {
                 teamRunId: runtimeState.teamRunId,
                 memberName: member.name,
                 role: member.name === spec.leadAgentId ? "lead" : "member",
               })
+              runtimeState = await transitionRuntimeState(runtimeState.teamRunId, (currentState) => ({
+                ...currentState,
+                members: currentState.members.map((currentMember, currentIndex) => currentIndex === memberIndex
+                  ? { ...currentMember, sessionId, status: "running" }
+                  : currentMember),
+              }), config)
             },
           })
           resource.taskId = task.id
