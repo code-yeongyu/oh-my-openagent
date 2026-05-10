@@ -16,8 +16,25 @@ import { shouldRetryError } from "../../shared/model-error-classifier"
 import type { ModelFallbackState } from "../../hooks/model-fallback/hook"
 
 function shouldAttemptPollErrorRecovery(pollError: string): boolean {
-  const normalized = pollError.toLowerCase()
-  return normalized.includes("aborted") || normalized.includes("abort")
+  const trimmed = pollError.trim()
+
+  if (trimmed.length === 0) {
+    return false
+  }
+
+  if (/\bMessageAbortedError\b/u.test(trimmed)) {
+    return true
+  }
+
+  if (/\bDOMException\b/u.test(trimmed) && /\bAbortError\b/u.test(trimmed)) {
+    return true
+  }
+
+  if (/\bAbortError\b/u.test(trimmed) && !/\bTask aborted\b/u.test(trimmed)) {
+    return true
+  }
+
+  return false
 }
 
 export async function executeSyncTask(
