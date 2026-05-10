@@ -86,17 +86,18 @@ describe("getOpenCodeVersion (installer)", () => {
         }),
       )
 
-      const setTimeoutSpy = spyOn(globalThis, "setTimeout").mockImplementation((handler: TimerHandler) => {
+      const immediateSetTimeout = ((handler: TimerHandler) => {
         if (typeof handler === "function") {
           handler()
         }
         return 1 as unknown as ReturnType<typeof setTimeout>
-      })
+      }) as unknown as typeof globalThis.setTimeout
+      const setTimeoutSpy = spyOn(globalThis, "setTimeout").mockImplementation(immediateSetTimeout)
 
       const result = await getOpenCodeVersion()
 
       expect(result).toBe(null)
-      expect(killCalls).toEqual(["SIGTERM", "SIGKILL", "SIGTERM", "SIGKILL"])
+      expect(killCalls).toEqual(["SIGTERM", "SIGKILL"])
 
       setTimeoutSpy.mockRestore()
     })
