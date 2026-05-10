@@ -6,6 +6,7 @@ export type HeuristicModelFamilyDefinition = {
   pattern?: RegExp
   variants?: string[]
   reasoningEfforts?: string[]
+  reasoningEffortAliases?: Record<string, string>
   supportsThinking?: boolean
 }
 

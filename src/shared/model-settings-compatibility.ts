@@ -86,6 +86,7 @@ function resolveField(
   ladder: string[],
   familyKnown: boolean,
   metadataOverride?: string[],
+  familyAliases?: Record<string, string>,
 ): FieldResolution {
   if (metadataOverride) {
     if (metadataOverride.includes(normalized)) return { value: normalized }
@@ -97,6 +98,10 @@ function resolveField(
 
   if (familyCaps) {
     if (familyCaps.includes(normalized)) return { value: normalized }
+    const aliased = familyAliases?.[normalized]
+    if (aliased && familyCaps.includes(aliased)) {
+      return { value: aliased, reason: "unsupported-by-model-family" }
+    }
     return {
       value: downgradeWithinLadder(normalized, familyCaps, ladder),
       reason: "unsupported-by-model-family",
@@ -132,7 +137,14 @@ export function resolveCompatibleModelSettings(
   let reasoningEffort = input.desired.reasoningEffort
   if (reasoningEffort !== undefined) {
     const normalized = reasoningEffort.toLowerCase()
-    const resolved = resolveField(normalized, family?.reasoningEfforts, REASONING_LADDER, familyKnown, metadataReasoningEfforts)
+    const resolved = resolveField(
+      normalized,
+      family?.reasoningEfforts,
+      REASONING_LADDER,
+      familyKnown,
+      metadataReasoningEfforts,
+      family?.reasoningEffortAliases,
+    )
     if (resolved.value !== normalized && resolved.reason) {
       changes.push({ field: "reasoningEffort", from: reasoningEffort, to: resolved.value, reason: resolved.reason })
     }
