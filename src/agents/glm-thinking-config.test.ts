@@ -1,8 +1,7 @@
 /**
- * GLM Thinking Configuration Benchmark
+ * GLM Thinking Configuration Regression Tests
  *
  * Verifies thinking config across all agents for every GLM model variant.
- * This is the factory-level correctness benchmark for the tune/glm-performance branch.
  *
  * Categories tested:
  * 1. GLM-5+ text models → thinking: { type: "enabled" } (no budgetTokens)
