@@ -359,6 +359,29 @@ describe("resolveCompatibleModelSettings", () => {
     }
   })
 
+  test("DeepSeek maps generic reasoningEffort levels when capabilities come from heuristics", () => {
+    const capabilities = getModelCapabilities({
+      providerID: "openai-compatible",
+      modelID: "deepseek-v4-pro",
+    })
+    const result = resolveCompatibleModelSettings({
+      providerID: "openai-compatible",
+      modelID: "deepseek-v4-pro",
+      desired: { reasoningEffort: "xhigh" },
+      capabilities,
+    })
+
+    expect(result.reasoningEffort).toBe("max")
+    expect(result.changes).toEqual([
+      {
+        field: "reasoningEffort",
+        from: "xhigh",
+        to: "max",
+        reason: "unsupported-by-model-family",
+      },
+    ])
+  })
+
   test("GPT-5 downgrades unsupported max variant to xhigh", () => {
     const result = resolveCompatibleModelSettings({
       providerID: "openai",

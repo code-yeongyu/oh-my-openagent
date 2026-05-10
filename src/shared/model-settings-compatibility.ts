@@ -88,6 +88,11 @@ function resolveField(
   metadataOverride?: string[],
   familyAliases?: Record<string, string>,
 ): FieldResolution {
+  const aliased = familyAliases?.[normalized]
+  if (aliased && (metadataOverride?.includes(aliased) || familyCaps?.includes(aliased))) {
+    return { value: aliased, reason: "unsupported-by-model-family" }
+  }
+
   if (metadataOverride) {
     if (metadataOverride.includes(normalized)) return { value: normalized }
     return {
@@ -98,10 +103,6 @@ function resolveField(
 
   if (familyCaps) {
     if (familyCaps.includes(normalized)) return { value: normalized }
-    const aliased = familyAliases?.[normalized]
-    if (aliased && familyCaps.includes(aliased)) {
-      return { value: aliased, reason: "unsupported-by-model-family" }
-    }
     return {
       value: downgradeWithinLadder(normalized, familyCaps, ladder),
       reason: "unsupported-by-model-family",
