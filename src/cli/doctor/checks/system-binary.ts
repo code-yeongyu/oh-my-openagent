@@ -1,9 +1,12 @@
 import { existsSync } from "node:fs"
 import { homedir } from "node:os"
 import { join } from "node:path"
+import { extractSemverFromOutput } from "../../../shared/extract-semver"
 import { spawnWithTimeout } from "../spawn-with-timeout"
 
 import { OPENCODE_BINARIES } from "../constants"
+
+export { extractSemverFromOutput }
 
 const WINDOWS_EXECUTABLE_EXTS = [".exe", ".cmd", ".bat", ".ps1"]
 
@@ -103,17 +106,6 @@ export async function findOpenCodeBinary(): Promise<OpenCodeBinaryInfo | null> {
   }
 
   return findDesktopBinary()
-}
-
-export function extractSemverFromOutput(output: string): string | null {
-  const trimmed = output.trim()
-  if (!trimmed) return null
-  // Match a semver-shaped token, allowing optional `v` prefix and `-prerelease+build` suffix.
-  // The negative lookbehind `(?<![\d:])` prevents matching the milliseconds segment of timestamps
-  // like `00:24:25.202` that the Electron-based OpenCode binary leaks into stdout.
-  const semverPattern = /(?<![\d:])v?(\d+\.\d+\.\d+(?:[-+][\w.]+)*)/
-  const match = trimmed.match(semverPattern)
-  return match?.[1] ?? null
 }
 
 export async function getOpenCodeVersion(
