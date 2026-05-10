@@ -73,6 +73,12 @@ export const HEURISTIC_MODEL_FAMILY_REGISTRY: ReadonlyArray<HeuristicModelFamily
     family: "deepseek",
     includes: ["deepseek"],
     variants: ["low", "medium", "high"],
+    reasoningEfforts: ["high", "max"],
+    reasoningEffortAliases: {
+      low: "high",
+      medium: "high",
+      xhigh: "max",
+    },
   },
   {
     family: "mistral",
