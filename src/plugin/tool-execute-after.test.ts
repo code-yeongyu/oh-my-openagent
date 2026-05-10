@@ -92,4 +92,54 @@ describe("createToolExecuteAfterHandler", () => {
     expect(output.title).toBe("stored title")
     expect(output.metadata).toEqual({ sessionId: "ses_native", agent: "hephaestus" })
   })
+
+  it("#given long background_output #when tool.execute.after runs #then output is preserved for agent consumption", async () => {
+    // given
+    const handler = createToolExecuteAfterHandler({
+      ctx: { directory: "/repo" } as never,
+      hooks: {} as never,
+    })
+    const longOutput = [
+      "Task Result",
+      "",
+      "Task ID: bg_test",
+      "Description: Investigate regression",
+      "---",
+      "A".repeat(3500),
+    ].join("\n")
+    const output = { title: "background result", output: longOutput, metadata: {} }
+
+    // when
+    await handler(
+      { tool: "background_output", sessionID: "ses_parent", callID: "call_background" },
+      output
+    )
+
+    // then
+    expect(output.output).toBe(longOutput)
+    expect(output.output).not.toContain("output truncated for display")
+  })
+
+  it("#given long error output #when tool.execute.after runs #then display flood guard still caps it", async () => {
+    // given
+    const handler = createToolExecuteAfterHandler({
+      ctx: { directory: "/repo" } as never,
+      hooks: {} as never,
+    })
+    const output = {
+      title: "look_at error",
+      output: `Error: Failed to analyze missing.pdf: ${"A".repeat(3500)}`,
+      metadata: {},
+    }
+
+    // when
+    await handler(
+      { tool: "look_at", sessionID: "ses_parent", callID: "call_look_at" },
+      output
+    )
+
+    // then
+    expect(output.output.length).toBeLessThan(3500)
+    expect(output.output).toContain("output truncated for display")
+  })
 })

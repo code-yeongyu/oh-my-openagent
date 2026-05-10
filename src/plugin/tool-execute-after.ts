@@ -5,6 +5,13 @@ import { stripInvisibleAgentCharacters } from "../shared/agent-display-names"
 import type { PluginContext } from "./types"
 
 const VERIFICATION_ATTEMPT_PATTERN = /<ulw_verification_attempt_id>(.*?)<\/ulw_verification_attempt_id>/i
+const MAX_ERROR_OUTPUT_CHARS = 3000
+const FAILURE_OUTPUT_PREFIX_PATTERN =
+  /^(?:Error|TypeError|ReferenceError|SyntaxError|RangeError|ENOENT|EACCES|EPERM|Traceback\b|Exception\b|Session error:)/i
+
+function shouldCapErrorOutput(output: string): boolean {
+  return output.length > MAX_ERROR_OUTPUT_CHARS && FAILURE_OUTPUT_PREFIX_PATTERN.test(output.trimStart())
+}
 
 function getMetadataString(metadata: Record<string, unknown> | undefined, keys: string[]): string | undefined {
   for (const key of keys) {
@@ -187,8 +194,7 @@ export function createToolExecuteAfterHandler(args: {
     // stack traces or framework internals. Normal outputs are handled by the
     // tool-output-truncator hook for specific tools; this catch-all only fires
     // for outputs that still exceed a safe display length after all hooks.
-    const MAX_ERROR_OUTPUT_CHARS = 3000
-    if (typeof output.output === "string" && output.output.length > MAX_ERROR_OUTPUT_CHARS) {
+    if (typeof output.output === "string" && shouldCapErrorOutput(output.output)) {
       output.output = output.output.slice(0, MAX_ERROR_OUTPUT_CHARS) + "\n\n...(output truncated for display)"
     }
   }
