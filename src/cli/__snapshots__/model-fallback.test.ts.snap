@@ -1060,6 +1060,9 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
           "model": "opencode/glm-5",
         },
         {
+          "model": "opencode/glm-5-turbo",
+        },
+        {
           "model": "opencode/big-pickle",
         },
       ],
@@ -1163,6 +1166,9 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
       "fallback_models": [
         {
           "model": "opencode/glm-5",
+        },
+        {
+          "model": "opencode/glm-5-turbo",
         },
         {
           "model": "opencode/claude-opus-4-7",
@@ -1285,6 +1291,9 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
           "model": "opencode/glm-5",
         },
         {
+          "model": "opencode/glm-5-turbo",
+        },
+        {
           "model": "opencode/big-pickle",
         },
       ],
@@ -1370,6 +1379,9 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
           "model": "opencode/glm-5",
         },
         {
+          "model": "opencode/glm-5-turbo",
+        },
+        {
           "model": "opencode/kimi-k2.5",
         },
       ],
@@ -1392,6 +1404,9 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
       "fallback_models": [
         {
           "model": "opencode/glm-5",
+        },
+        {
+          "model": "opencode/glm-5-turbo",
         },
         {
           "model": "opencode/claude-opus-4-7",
@@ -1812,6 +1827,11 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian whe
       "model": "opencode/gpt-5-nano",
     },
     "sisyphus": {
+      "fallback_models": [
+        {
+          "model": "zai-coding-plan/glm-5-turbo",
+        },
+      ],
       "model": "zai-coding-plan/glm-5",
     },
     "sisyphus-junior": {
@@ -1838,6 +1858,11 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian whe
       "model": "opencode/gpt-5-nano",
     },
     "visual-engineering": {
+      "fallback_models": [
+        {
+          "model": "zai-coding-plan/glm-5-turbo",
+        },
+      ],
       "model": "zai-coding-plan/glm-5",
     },
     "writing": {
@@ -1876,6 +1901,11 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian wit
       "model": "opencode/gpt-5-nano",
     },
     "sisyphus": {
+      "fallback_models": [
+        {
+          "model": "zai-coding-plan/glm-5-turbo",
+        },
+      ],
       "model": "zai-coding-plan/glm-5",
     },
     "sisyphus-junior": {
@@ -1896,12 +1926,22 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian wit
       "model": "opencode/gpt-5-nano",
     },
     "unspecified-high": {
+      "fallback_models": [
+        {
+          "model": "zai-coding-plan/glm-5-turbo",
+        },
+      ],
       "model": "zai-coding-plan/glm-5",
     },
     "unspecified-low": {
       "model": "opencode/gpt-5-nano",
     },
     "visual-engineering": {
+      "fallback_models": [
+        {
+          "model": "zai-coding-plan/glm-5-turbo",
+        },
+      ],
       "model": "zai-coding-plan/glm-5",
     },
     "writing": {
@@ -2041,6 +2081,9 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
           "model": "opencode/glm-5",
         },
         {
+          "model": "opencode/glm-5-turbo",
+        },
+        {
           "model": "opencode/big-pickle",
         },
       ],
@@ -2168,6 +2211,9 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
       "fallback_models": [
         {
           "model": "opencode/glm-5",
+        },
+        {
+          "model": "opencode/glm-5-turbo",
         },
         {
           "model": "anthropic/claude-opus-4-7",
@@ -2505,6 +2551,9 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + ZAI combinat
         {
           "model": "zai-coding-plan/glm-5",
         },
+        {
+          "model": "zai-coding-plan/glm-5-turbo",
+        },
       ],
       "model": "anthropic/claude-opus-4-7",
       "variant": "max",
@@ -2537,6 +2586,9 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + ZAI combinat
     },
     "visual-engineering": {
       "fallback_models": [
+        {
+          "model": "zai-coding-plan/glm-5-turbo",
+        },
         {
           "model": "anthropic/claude-opus-4-7",
           "variant": "max",
@@ -2875,6 +2927,12 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
           "model": "opencode/glm-5",
         },
         {
+          "model": "zai-coding-plan/glm-5-turbo",
+        },
+        {
+          "model": "opencode/glm-5-turbo",
+        },
+        {
           "model": "opencode/big-pickle",
         },
       ],
@@ -3044,6 +3102,12 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
         },
         {
           "model": "opencode/glm-5",
+        },
+        {
+          "model": "zai-coding-plan/glm-5-turbo",
+        },
+        {
+          "model": "opencode/glm-5-turbo",
         },
         {
           "model": "github-copilot/claude-opus-4.7",
@@ -3350,6 +3414,12 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
           "model": "opencode/glm-5",
         },
         {
+          "model": "zai-coding-plan/glm-5-turbo",
+        },
+        {
+          "model": "opencode/glm-5-turbo",
+        },
+        {
           "model": "opencode/big-pickle",
         },
       ],
@@ -3594,6 +3664,12 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
         },
         {
           "model": "opencode/glm-5",
+        },
+        {
+          "model": "zai-coding-plan/glm-5-turbo",
+        },
+        {
+          "model": "opencode/glm-5-turbo",
         },
         {
           "model": "anthropic/claude-opus-4-7",
@@ -3910,6 +3986,12 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
           "model": "opencode/glm-5",
         },
         {
+          "model": "zai-coding-plan/glm-5-turbo",
+        },
+        {
+          "model": "opencode/glm-5-turbo",
+        },
+        {
           "model": "opencode/big-pickle",
         },
       ],
@@ -4112,6 +4194,12 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
           "model": "opencode/glm-5",
         },
         {
+          "model": "zai-coding-plan/glm-5-turbo",
+        },
+        {
+          "model": "opencode/glm-5-turbo",
+        },
+        {
           "model": "opencode/kimi-k2.5",
         },
       ],
@@ -4161,6 +4249,12 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
         },
         {
           "model": "opencode/glm-5",
+        },
+        {
+          "model": "zai-coding-plan/glm-5-turbo",
+        },
+        {
+          "model": "opencode/glm-5-turbo",
         },
         {
           "model": "anthropic/claude-opus-4-7",

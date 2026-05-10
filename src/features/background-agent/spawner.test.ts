@@ -81,6 +81,18 @@ describe("background-agent spawner agent-not-found fallback", () => {
       task: false,
       call_omo_agent: true,
       question: false,
+      team_approve_shutdown: false,
+      team_create: false,
+      team_delete: false,
+      team_list: false,
+      team_reject_shutdown: false,
+      team_send_message: false,
+      team_shutdown_request: false,
+      team_status: false,
+      team_task_create: false,
+      team_task_get: false,
+      team_task_list: false,
+      team_task_update: false,
     })
     // Task agent identity updated to reflect fallback
     expect(task.agent).toBe("general")
