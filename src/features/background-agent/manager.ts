@@ -2285,11 +2285,12 @@ The task was re-queued on a fallback model after a retryable failure.
     }
   }
 
-  private pruneStaleTasksAndNotifications(): void {
+  private pruneStaleTasksAndNotifications(allStatuses?: SessionStatusMap): void {
     pruneStaleTasksAndNotifications({
       tasks: this.tasks,
       notifications: this.notifications,
       taskTtlMs: this.config?.taskTtlMs,
+      sessionStatuses: allStatuses,
       onTaskPruned: (taskId, task, errorMessage) => {
         const wasPending = task.status === "pending"
         log("[background-agent] Pruning stale task:", { taskId, status: task.status, age: Math.round(((wasPending ? task.queuedAt?.getTime() : task.startedAt?.getTime()) ? (Date.now() - (wasPending ? task.queuedAt!.getTime() : task.startedAt!.getTime())) : 0) / 1000) + "s" })
@@ -2412,8 +2413,6 @@ The task was re-queued on a fallback model after a retryable failure.
     if (this.pollingInFlight) return
     this.pollingInFlight = true
     try {
-      this.pruneStaleTasksAndNotifications()
-
       let allStatuses: SessionStatusMap | undefined
       const sessionStatusMethod = this.client?.session?.status
       if (typeof sessionStatusMethod !== "function") {
@@ -2434,6 +2433,8 @@ The task was re-queued on a fallback model after a retryable failure.
           }
         }
       }
+
+      this.pruneStaleTasksAndNotifications(allStatuses)
 
       await this.checkAndInterruptStaleTasks(allStatuses)
 

@@ -364,6 +364,29 @@ describe("BackgroundManager pollRunningTasks", () => {
       //#then
       expect(task.status).toBe("running")
     })
+
+    test("#when progress is older than prune TTL #then active status still keeps the task running", async () => {
+      //#given
+      const manager = createManagerWithClient({
+        status: async () => ({ data: { "ses-busy-stale": { type: "busy" } } }),
+      })
+      const task = createRunningTask("ses-busy-stale")
+      task.startedAt = new Date(Date.now() - 60 * 60 * 1000)
+      task.progress = {
+        toolCalls: 4,
+        lastUpdate: new Date(Date.now() - 35 * 60 * 1000),
+      }
+      injectTask(manager, task)
+
+      //#when
+      const poll = manager["pollRunningTasks"]
+      await poll.call(manager)
+      manager.shutdown()
+
+      //#then
+      expect(task.status).toBe("running")
+      expect(task.error).toBeUndefined()
+    })
   })
 
   describe("#given a running task whose session has terminal non-idle status", () => {

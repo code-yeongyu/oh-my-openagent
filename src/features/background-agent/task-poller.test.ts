@@ -903,6 +903,42 @@ describe("pruneStaleTasksAndNotifications", () => {
     expect(pruned).toContain("stale-task")
   })
 
+  it("#given running task with stale progress and active session #when lastUpdate exceeds TTL #then should NOT prune", () => {
+    //#given
+    const tasks = new Map<string, BackgroundTask>()
+    const activeTask: BackgroundTask = {
+      id: "active-status-task",
+      sessionId: "ses-active-status",
+      parentSessionId: "parent",
+      parentMessageId: "msg",
+      description: "active status",
+      prompt: "active status",
+      agent: "oracle",
+      status: "running",
+      startedAt: new Date(Date.now() - 60 * 60 * 1000),
+      progress: {
+        toolCalls: 10,
+        lastUpdate: new Date(Date.now() - 35 * 60 * 1000),
+      },
+    }
+    tasks.set("active-status-task", activeTask)
+
+    const pruned: string[] = []
+    const notifications = new Map<string, BackgroundTask[]>()
+
+    //#when
+    pruneStaleTasksAndNotifications({
+      tasks,
+      notifications,
+      sessionStatuses: { "ses-active-status": { type: "busy" } },
+      onTaskPruned: (taskId) => pruned.push(taskId),
+    })
+
+    //#then
+    expect(pruned).toEqual([])
+    expect(tasks.has("active-status-task")).toBe(true)
+  })
+
   it("#given custom taskTtlMs #when task exceeds custom TTL #then should prune", () => {
     //#given
     const tasks = new Map<string, BackgroundTask>()
