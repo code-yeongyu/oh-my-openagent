@@ -188,7 +188,7 @@ export interface SubagentSessionCreatedEvent {
 export type OnSubagentSessionCreated = (event: SubagentSessionCreatedEvent) => Promise<void>
 
 const MAX_TASK_REMOVAL_RESCHEDULES = 6
-const MAX_COMPLETED_TASK_ARCHIVE_SIZE = 500
+const MAX_COMPLETED_TASK_ARCHIVE_SIZE = 100
 
 export interface BackgroundManagerConfig {
   pluginContext: PluginInput
@@ -374,7 +374,22 @@ export class BackgroundManager {
       return
     }
 
-    this.completedTaskArchive.set(task.id, task)
+    const archivedTask: BackgroundTask = {
+      id: task.id,
+      parentSessionId: task.parentSessionId,
+      parentMessageId: task.parentMessageId,
+      description: task.description,
+      prompt: "[redacted]",
+      agent: task.agent,
+      sessionId: task.sessionId,
+      status: task.status,
+      completedAt: task.completedAt,
+      model: task.model,
+      error: task.error,
+      category: task.category,
+    }
+
+    this.completedTaskArchive.set(task.id, archivedTask)
     if (this.completedTaskArchive.size <= MAX_COMPLETED_TASK_ARCHIVE_SIZE) {
       return
     }
