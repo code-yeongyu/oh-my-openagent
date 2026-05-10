@@ -173,7 +173,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
     expect(rollback).toHaveBeenCalledTimes(1)
   })
 
-  test("cleans up toast and subagentSessions when pollSyncSession returns error", async () => {
+  test("recovers from pollSyncSession error when result already exists", async () => {
     const mockClient = {
       session: {
         create: async () => ({ data: { id: "ses_test_12345678" } }),
@@ -185,7 +185,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
     const deps = {
       createSyncSession: async () => ({ ok: true, sessionID: "ses_test_12345678" }),
       sendSyncPrompt: async () => null,
-      pollSyncSession: async () => "Poll error",
+      pollSyncSession: async () => "Task aborted.\n\nSession ID: ses_test_12345678",
       fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
     }
 
@@ -215,12 +215,61 @@ describe("executeSyncTask - cleanup on error paths", () => {
       sessionID: "parent-session",
     }, "test-agent", undefined, undefined, undefined, undefined, deps)
 
-    //#then - should return error and cleanup resources
-    expect(result).toBe("Poll error")
+    //#then - should recover via fetchSyncResult and cleanup resources
+    expect(result).toContain("Task completed in")
+    expect(result).toContain("Result")
     expect(removeTaskCalls.length).toBe(1)
     expect(removeTaskCalls[0]).toBe("sync_ses_test")
     expect(deleteCalls.length).toBe(1)
     expect(deleteCalls[0]).toBe("ses_test_12345678")
+  })
+
+  test("returns poll error when recovery fetch has no result", async () => {
+    const mockClient = {
+      session: {
+        create: async () => ({ data: { id: "ses_test_12345678" } }),
+      },
+    }
+
+    const { executeSyncTask } = require("./sync-task")
+
+    const deps = {
+      createSyncSession: async () => ({ ok: true, sessionID: "ses_test_12345678" }),
+      sendSyncPrompt: async () => null,
+      pollSyncSession: async () => "Poll error",
+      fetchSyncResult: async () => ({ ok: false as const, error: "No assistant response found" }),
+    }
+
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-123",
+      metadata: () => {},
+    }
+
+    const mockExecutorCtx = {
+      client: mockClient,
+      directory: "/tmp",
+      onSyncSessionCreated: null,
+    }
+
+    const args = {
+      prompt: "test prompt",
+      description: "test task",
+      category: "test",
+      load_skills: [],
+      run_in_background: false,
+      command: null,
+    }
+
+    //#when
+    const result = await executeSyncTask(args, mockCtx, mockExecutorCtx, {
+      sessionID: "parent-session",
+    }, "test-agent", undefined, undefined, undefined, undefined, deps)
+
+    //#then
+    expect(result).toBe("Poll error")
+    expect(removeTaskCalls.length).toBe(1)
+    expect(deleteCalls.length).toBe(1)
   })
 
   test("#given fallback chain set #when sendSyncPrompt fails #then retries with next model", async () => {

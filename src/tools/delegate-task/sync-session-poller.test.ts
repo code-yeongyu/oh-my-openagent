@@ -421,6 +421,37 @@ describe("pollSyncSession", () => {
       expect(result).toContain("ses_abort")
       expect(abortCount).toBe(1)
     })
+
+    test("retries final message fetch on abort before returning aborted", async () => {
+      // given: abort signal set and message fetch keeps failing
+      const { pollSyncSession } = require("./sync-session-poller")
+      let abortCount = 0
+      let messageCallCount = 0
+      const mockClient = {
+        session: {
+          abort: async () => {
+            abortCount++
+          },
+          messages: async () => {
+            messageCallCount++
+            throw new Error("temporary fetch failure")
+          },
+          status: async () => ({ data: {} }),
+        },
+      }
+
+      const result = await pollSyncSession(createMockCtx(true), mockClient, {
+        sessionID: "ses_abort_retry",
+        agentToUse: "test-agent",
+        toastManager: { removeTask: () => {} },
+        taskId: "task_123",
+      })
+
+      // then
+      expect(result).toContain("Task aborted")
+      expect(messageCallCount).toBe(3)
+      expect(abortCount).toBe(1)
+    })
   })
 
   describe("timeout handling", () => {

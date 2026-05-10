@@ -162,7 +162,25 @@ export async function executeSyncContinuation(
         anchorMessageCount,
       }, syncPollTimeoutMs)
       if (pollError) {
-        return pollError
+        const recoveredResult = await deps.fetchSyncResult(client, continuationID, anchorMessageCount)
+        if (!recoveredResult.ok) {
+          return pollError
+        }
+
+        const duration = formatDuration(startTime)
+
+        return `Task continued and completed in ${duration}.
+
+---
+
+${recoveredResult.textContent || "(No text output)"}
+
+${buildTaskMetadataBlock({
+          sessionId: continuationID,
+          taskId: continuationID,
+          agent: resumeAgent,
+          category: args.category,
+        })}`
       }
 
       const result = await deps.fetchSyncResult(client, continuationID, anchorMessageCount)
