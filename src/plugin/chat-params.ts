@@ -1,5 +1,7 @@
 import { getSessionPromptParams } from "../shared/session-prompt-params-state"
-import { getModelCapabilities, resolveCompatibleModelSettings } from "../shared"
+import { getModelCapabilities, log, resolveCompatibleModelSettings } from "../shared"
+
+const SAFE_MAX_OUTPUT_TOKENS_FALLBACK = 4096
 
 export type ChatParamsInput = {
   sessionID: string
@@ -168,9 +170,15 @@ export function createChatParamsHandler(args: {
       if (compatibility.maxTokens !== undefined && compatibility.maxTokens > 0) {
         output.maxOutputTokens = compatibility.maxTokens
       } else {
-        const capabilitiesLimit = capabilities?.maxOutputTokens
-        output.maxOutputTokens =
-          typeof capabilitiesLimit === "number" && capabilitiesLimit > 0 ? capabilitiesLimit : 4096
+        const originalMaxOutputTokens = typeof output.maxOutputTokens === "number"
+          ? output.maxOutputTokens
+          : compatibility.maxTokens
+        output.maxOutputTokens = SAFE_MAX_OUTPUT_TOKENS_FALLBACK
+        if (typeof originalMaxOutputTokens === "number" && originalMaxOutputTokens <= 0) {
+          log(
+            `[plugin] maxOutputTokens=${originalMaxOutputTokens} is non-positive; using safe fallback ${SAFE_MAX_OUTPUT_TOKENS_FALLBACK}`,
+          )
+        }
       }
     }
 
