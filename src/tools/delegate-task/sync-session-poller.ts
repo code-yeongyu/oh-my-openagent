@@ -214,9 +214,11 @@ export async function pollSyncSession(
   }
 
   if (timedOut) {
-    log("[task] Poll timeout reached", { sessionID: input.sessionID, pollCount })
+    log("[task] Poll inactivity timeout reached", { sessionID: input.sessionID, pollCount })
     abortSyncSession(client, input.sessionID, "poll_timeout")
   }
 
-  return timedOut ? `Poll timeout reached after ${maxPollTimeMs}ms for session ${input.sessionID}` : null
+  return timedOut
+    ? `Poll inactivity timeout reached after ${maxPollTimeMs}ms without active OpenCode status for session ${input.sessionID}`
+    : null
 }
