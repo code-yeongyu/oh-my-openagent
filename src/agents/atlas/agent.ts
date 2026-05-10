@@ -26,6 +26,7 @@ import { getGeminiAtlasPrompt } from "./gemini"
 import { getGlmAtlasPrompt } from "./glm"
 import { getKimiAtlasPrompt } from "./kimi"
 import { getOpus47AtlasPrompt } from "./opus-4-7"
+import { getGlmVisionToolDeny } from "../frontier-tool-schema-guard"
 import {
   getCategoryDescription,
   buildAgentSelectionSection,
@@ -125,6 +126,10 @@ export function createAtlasAgent(ctx: OrchestratorContext): AgentConfig {
     temperature: 0.1,
     prompt: buildDynamicOrchestratorPrompt(ctx),
     color: "#10B981",
+  }
+
+  if (ctx.model && isGlmThinkingModel(ctx.model)) {
+    return { ...baseConfig, permission: { ...getGlmVisionToolDeny() } } as AgentConfig
   }
 
   return baseConfig as AgentConfig

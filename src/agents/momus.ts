@@ -1,6 +1,7 @@
 import type { AgentConfig } from "@opencode-ai/sdk";
 import type { AgentMode, AgentPromptMetadata } from "./types";
 import { isGpt5_2Model, isGlmThinkingModel, isGptModel } from "./types";
+import { getGlmVisionToolDeny } from "./frontier-tool-schema-guard";
 import { createAgentToolRestrictions } from "../shared/permission-compat";
 
 const MODE: AgentMode = "subagent";
@@ -411,7 +412,7 @@ export function createMomusAgent(model: string): AgentConfig {
   }
 
   if (isGlmThinkingModel(model)) {
-    return { ...base, thinking: { type: "enabled" } } as AgentConfig;
+    return { ...base, thinking: { type: "enabled" }, permission: { ...base.permission, ...getGlmVisionToolDeny() } } as AgentConfig;
   }
 
   return {

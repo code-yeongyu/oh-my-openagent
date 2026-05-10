@@ -258,4 +258,50 @@ describe("read-only agent tool restrictions", () => {
       }
     })
   })
+
+  describe("Sisyphus GLM vision tool denial", () => {
+    test("denies look_at for GLM-5.1 text-only model", () => {
+      // given
+      const agent = createSisyphusAgent("zai/glm-5.1")
+
+      // when
+      const permission = (agent.permission ?? {}) as Record<string, string>
+
+      // then
+      expect(permission.look_at).toBe("deny")
+    })
+
+    test("denies look_at for GLM-5-turbo text-only model", () => {
+      // given
+      const agent = createSisyphusAgent("zai/glm-5-turbo")
+
+      // when
+      const permission = (agent.permission ?? {}) as Record<string, string>
+
+      // then
+      expect(permission.look_at).toBe("deny")
+    })
+
+    test("does not deny look_at for Claude model", () => {
+      // given
+      const agent = createSisyphusAgent(TEST_MODEL)
+
+      // when
+      const permission = (agent.permission ?? {}) as Record<string, string>
+
+      // then
+      expect(permission.look_at).not.toBe("deny")
+    })
+
+    test("does not deny look_at for GPT model", () => {
+      // given
+      const agent = createSisyphusAgent("openai/gpt-5.5")
+
+      // when
+      const permission = (agent.permission ?? {}) as Record<string, string>
+
+      // then
+      expect(permission.look_at).not.toBe("deny")
+    })
+  })
 })

@@ -1,5 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import { isGpt5_5Model } from "./types"
+import { isGlmSisyphusHarnessModel } from "./types"
 import type { PermissionValue } from "../shared/permission-compat"
 
 const FRONTIER_TOOL_SCHEMA_NAMES = ["grep", "glob"] as const
@@ -15,6 +16,15 @@ export function getFrontierToolSchemaPermission(model: string): Record<string, "
   return isOpus47Model(model) || isGpt5_5Model(model)
     ? { grep: "deny" as const, glob: "deny" as const }
     : {}
+}
+
+/**
+ * GLM-5/5.1 are text-only models that cannot render images/screenshots.
+ * Deny direct vision tools so the model is forced to delegate to
+ * zai-mcp-server_* tools or the multimodal-looker subagent.
+ */
+export function getGlmVisionToolDeny(): Record<string, "deny"> {
+  return { look_at: "deny" as const }
 }
 
 export function applyFrontierToolSchemaPermission(

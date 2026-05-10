@@ -178,7 +178,7 @@ export function buildToolSelectionTable(
     )
 
   for (const agent of sortedAgents) {
-    const shortDescription = agent.description.split(".")[0] || agent.description
+    const shortDescription = agent.description?.split(".")[0] || agent.description || ""
     rows.push(
       `- \`${agent.name}\` agent - **${agent.metadata.cost}** - ${shortDescription}`,
     )
