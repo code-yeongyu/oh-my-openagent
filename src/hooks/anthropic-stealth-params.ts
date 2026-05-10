@@ -60,11 +60,15 @@ export async function anthropicStealthParamsHook(
   // Inject billing header and system instruction into system prompt.
   // OpenCode passes options through to the Anthropic SDK; the `system`
   // field takes an array of {type: "text", text: string} blocks.
-  const existingSystem: Array<{ type: string; text: string }> = Array.isArray(output.options.system)
+  const rawSystem: Array<{ type: string; text: string }> = Array.isArray(output.options.system)
     ? output.options.system
     : typeof output.options.system === "string"
       ? [{ type: "text", text: output.options.system }]
       : []
+  // Anthropic rejects text blocks with empty `text` — filter them before re-assembly.
+  const existingSystem = rawSystem.filter(
+    (b) => typeof b.text === "string" && b.text.length > 0,
+  )
 
   // Check if billing header is already injected (idempotency)
   const hasBilling = existingSystem.some(
