@@ -183,4 +183,4 @@ async function main() {
   console.error("Full results written to stdout (JSON)")
 }
 
-main().catch(console.error)
+main().catch((e) => { console.error(e); process.exit(1) })
