@@ -10,6 +10,65 @@ import { QUESTION_DENIED_SESSION_PERMISSION } from "../../shared/question-denied
 import { stripAgentListSortPrefix } from "../../shared/agent-display-names"
 import { buildTaskMetadataBlock } from "../../features/tool-metadata-store/task-metadata-contract"
 import { resolveMetadataModel } from "./resolve-metadata-model"
+import { registerDelegatedChildSessionBootstrap } from "../../shared/delegated-child-session-bootstrap"
+
+function registerBackgroundSessionContext(args: {
+  sessionId: string
+  promptText: string
+  fallbackChain?: FallbackEntry[]
+  category?: string
+  modelFallbackControllerAccessor?: ExecutorContext["modelFallbackControllerAccessor"]
+}): void {
+  registerDelegatedChildSessionBootstrap({
+    sessionID: args.sessionId,
+    promptText: args.promptText,
+    fallbackChain: args.fallbackChain,
+    category: args.category,
+    modelFallbackControllerAccessor: args.modelFallbackControllerAccessor,
+  })
+}
+
+function continueSessionSetup(args: {
+  taskID: string
+  promptText: string
+  manager: ExecutorContext["manager"]
+  timing: ReturnType<typeof getTimingConfig>
+  fallbackChain?: FallbackEntry[]
+  category?: string
+  modelFallbackControllerAccessor?: ExecutorContext["modelFallbackControllerAccessor"]
+}): void {
+  if (!args.fallbackChain && !args.category) {
+    return
+  }
+
+  void (async () => {
+    const waitStart = Date.now()
+    while (Date.now() - waitStart < args.timing.WAIT_FOR_SESSION_TIMEOUT_MS) {
+      await new Promise(resolve => setTimeout(resolve, args.timing.WAIT_FOR_SESSION_INTERVAL_MS))
+      const updated = args.manager.getTask(args.taskID)
+      if (!updated) {
+        return
+      }
+      if (updated.status === "error" || updated.status === "cancelled" || updated.status === "interrupt") {
+        return
+      }
+
+      const sessionId = updated.sessionId
+      if (!sessionId) {
+        continue
+      }
+
+      registerBackgroundSessionContext({
+        sessionId,
+        promptText: args.promptText,
+        fallbackChain: args.fallbackChain,
+        category: args.category,
+        modelFallbackControllerAccessor: args.modelFallbackControllerAccessor,
+      })
+      return
+    }
+  })()
+}
 
 async function waitForBackgroundSessionStart(args: {
   taskId: string
@@ -88,7 +147,17 @@ export async function executeBackgroundTask(
       manager,
       timing,
       abortSignal: ctx.abort,
-      onAbort: () => {},
+      onAbort: () => {
+        continueSessionSetup({
+          taskID: task.id,
+          promptText: effectivePrompt,
+          manager,
+          timing,
+          fallbackChain,
+          category: args.category,
+          modelFallbackControllerAccessor: executorCtx.modelFallbackControllerAccessor,
+        })
+      },
     })
 
     const updatedTask = typeof manager.getTask === "function"
