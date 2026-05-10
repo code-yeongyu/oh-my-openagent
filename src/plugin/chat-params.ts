@@ -96,7 +96,10 @@ export function createChatParamsHandler(args: {
       if (storedPromptParams.topP !== undefined) {
         output.topP = storedPromptParams.topP
       }
-      if (storedPromptParams.maxOutputTokens !== undefined) {
+      if (
+        typeof storedPromptParams.maxOutputTokens === "number" &&
+        storedPromptParams.maxOutputTokens > 0
+      ) {
         (output as Record<string, unknown>).maxOutputTokens = storedPromptParams.maxOutputTokens
       }
       if (storedPromptParams.options) {
@@ -162,10 +165,12 @@ export function createChatParamsHandler(args: {
     }
 
     if ("maxTokens" in compatibility) {
-      if (compatibility.maxTokens !== undefined) {
+      if (compatibility.maxTokens !== undefined && compatibility.maxTokens > 0) {
         output.maxOutputTokens = compatibility.maxTokens
       } else {
-        delete output.maxOutputTokens
+        const capabilitiesLimit = capabilities?.maxOutputTokens
+        output.maxOutputTokens =
+          typeof capabilitiesLimit === "number" && capabilitiesLimit > 0 ? capabilitiesLimit : 4096
       }
     }
 

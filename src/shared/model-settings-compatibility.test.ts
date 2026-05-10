@@ -553,6 +553,18 @@ describe("resolveCompatibleModelSettings", () => {
     expect(result.changes).toEqual([])
   })
 
+  test("#given desired.maxTokens is 0 #then maxTokens is dropped", () => {
+    const result = resolveCompatibleModelSettings({
+      providerID: "openai",
+      modelID: "gpt-5.4",
+      desired: { maxTokens: 0 },
+      capabilities: { maxOutputTokens: 128_000 },
+    })
+
+    expect(result.maxTokens).toBeUndefined()
+    expect(result.changes).toEqual([])
+  })
+
   // Passthrough: undefined desired values produce no changes
   test("no-op when desired settings are empty", () => {
     const result = resolveCompatibleModelSettings({
