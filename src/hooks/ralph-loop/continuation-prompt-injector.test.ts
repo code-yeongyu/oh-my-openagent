@@ -1,7 +1,20 @@
-import { describe, expect, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { injectContinuationPrompt } from "./continuation-prompt-injector"
+import {
+  registerAgentName,
+  _resetForTesting,
+} from "../../features/claude-code-session-state"
 
 describe("ralph-loop continuation prompt injector", () => {
+  beforeEach(() => {
+    _resetForTesting()
+    registerAgentName("\u200bSisyphus - Ultraworker")
+  })
+
+  afterEach(() => {
+    _resetForTesting()
+  })
+
   test("#given inherited message agent has ZWSP prefix #when injecting continuation prompt #then promptAsync receives normalized agent", async () => {
     // given
     let promptBody: { agent?: string } | undefined
@@ -28,8 +41,8 @@ describe("ralph-loop continuation prompt injector", () => {
     })
 
     // then
-    expect(promptBody?.agent).toBe("sisyphus")
-    expect(promptBody?.agent).not.toContain("\u200b")
+    expect(promptBody?.agent).toBe("\u200bSisyphus - Ultraworker")
+    expect(promptBody?.agent).not.toContain("\u200b\u200b")
   })
 
   test("#given inherited message agent has no ZWSP prefix #when injecting continuation prompt #then promptAsync receives normalized agent", async () => {
@@ -58,7 +71,7 @@ describe("ralph-loop continuation prompt injector", () => {
     })
 
     // then
-    expect(promptBody?.agent).toBe("sisyphus")
+    expect(promptBody?.agent).toBe("\u200bSisyphus - Ultraworker")
   })
 
   test("#given inherited message model includes variant #when injecting continuation prompt #then promptAsync receives variant as a top-level field", async () => {
