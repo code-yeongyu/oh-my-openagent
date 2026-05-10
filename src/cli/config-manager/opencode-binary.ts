@@ -4,6 +4,8 @@ import { spawnWithWindowsHide } from "../../shared/spawn-with-windows-hide"
 import { initConfigContext } from "./config-context"
 
 const OPENCODE_BINARIES = ["opencode", "opencode-desktop"] as const
+const OPENCODE_VERSION_CHECK_TIMEOUT_MS = 1500
+const OPENCODE_VERSION_KILL_GRACE_MS = 200
 
 interface OpenCodeBinaryResult {
   binary: OpenCodeBinaryType
@@ -17,9 +19,36 @@ async function findOpenCodeBinaryWithVersion(): Promise<OpenCodeBinaryResult | n
         stdout: "pipe",
         stderr: "pipe",
       })
-      const output = await new Response(proc.stdout).text()
-      await proc.exited
-      if (proc.exitCode === 0) {
+
+      const outputPromise = new Response(proc.stdout).text()
+      let killTimer: ReturnType<typeof setTimeout> | null = null
+      const timedExitCode = await Promise.race([
+        proc.exited,
+        new Promise<number>((resolve) => {
+          killTimer = setTimeout(() => {
+            proc.kill("SIGTERM")
+            setTimeout(() => {
+              proc.kill("SIGKILL")
+            }, OPENCODE_VERSION_KILL_GRACE_MS)
+            resolve(1)
+          }, OPENCODE_VERSION_CHECK_TIMEOUT_MS)
+        }),
+      ])
+
+      if (killTimer) {
+        clearTimeout(killTimer)
+      }
+
+      const output = await Promise.race([
+        outputPromise,
+        new Promise<string>((resolve) => {
+          setTimeout(() => {
+            resolve("")
+          }, OPENCODE_VERSION_KILL_GRACE_MS)
+        }),
+      ])
+
+      if (timedExitCode === 0 && proc.exitCode === 0) {
         const version = extractSemverFromOutput(output) ?? output.trim()
         initConfigContext(binary, version)
         return { binary, version }
