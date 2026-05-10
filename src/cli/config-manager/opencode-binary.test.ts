@@ -9,17 +9,19 @@ type OpenCodeBinaryModule = typeof import("./opencode-binary")
 
 type CreateProcOptions = {
   exitCode?: number | null
+  exited?: Promise<number>
   output?: { stdout?: string; stderr?: string }
+  kill?: (signal?: NodeJS.Signals) => void
 }
 
 function createProc(options: CreateProcOptions = {}): ReturnType<typeof spawnHelpers.spawnWithWindowsHide> {
   const exitCode = options.exitCode ?? 0
   return {
-    exited: Promise.resolve(exitCode),
+    exited: options.exited ?? Promise.resolve(exitCode),
     exitCode,
     stdout: options.output?.stdout !== undefined ? new Blob([options.output.stdout]).stream() : undefined,
     stderr: options.output?.stderr !== undefined ? new Blob([options.output.stderr]).stream() : undefined,
-    kill: () => {},
+    kill: options.kill ?? (() => {}),
   } satisfies ReturnType<typeof spawnHelpers.spawnWithWindowsHide>
 }
 
@@ -68,6 +70,50 @@ describe("getOpenCodeVersion (installer)", () => {
       const result = await getOpenCodeVersion()
 
       expect(result).toBe("custom-build")
+    })
+  })
+
+  describe("#given timeout path #when getOpenCodeVersion #then sends SIGTERM and SIGKILL and returns null without hanging", () => {
+    it("bounds process lifetime on hung --version", async () => {
+      const killCalls: Array<NodeJS.Signals | undefined> = []
+      spawnSpy.mockReturnValue(
+        createProc({
+          exited: new Promise<number>(() => {}),
+          output: { stdout: "" },
+          kill: (signal?: NodeJS.Signals) => {
+            killCalls.push(signal)
+          },
+        }),
+      )
+
+      const setTimeoutSpy = spyOn(globalThis, "setTimeout").mockImplementation((handler: TimerHandler) => {
+        if (typeof handler === "function") {
+          handler()
+        }
+        return 1 as unknown as ReturnType<typeof setTimeout>
+      })
+
+      const result = await getOpenCodeVersion()
+
+      expect(result).toBe(null)
+      expect(killCalls).toEqual(["SIGTERM", "SIGKILL", "SIGTERM", "SIGKILL"])
+
+      setTimeoutSpy.mockRestore()
+    })
+  })
+
+  describe("#given quick successful exit #when getOpenCodeVersion #then clears the watchdog timer", () => {
+    it("avoids timer leak after success", async () => {
+      spawnSpy.mockReturnValue(createProc({ output: { stdout: "1.14.33\n" } }))
+
+      const clearTimeoutSpy = spyOn(globalThis, "clearTimeout")
+
+      const result = await getOpenCodeVersion()
+
+      expect(result).toBe("1.14.33")
+      expect(clearTimeoutSpy).toHaveBeenCalledTimes(1)
+
+      clearTimeoutSpy.mockRestore()
     })
   })
 
