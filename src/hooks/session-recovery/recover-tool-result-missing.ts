@@ -1,5 +1,5 @@
 import type { createOpencodeClient } from "@opencode-ai/sdk"
-import type { MessageData } from "./types"
+import type { MessageData, ResumeConfig } from "./types"
 import { readParts } from "./storage"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
 import { normalizeSDKResponse } from "../../shared"
@@ -70,7 +70,8 @@ async function readPartsFromSDKFallback(
 export async function recoverToolResultMissing(
   client: Client,
   sessionID: string,
-  failedAssistantMsg: MessageData
+  failedAssistantMsg: MessageData,
+  resumeConfig?: ResumeConfig
 ): Promise<boolean> {
   let parts = failedAssistantMsg.parts || []
   if (parts.length === 0 && failedAssistantMsg.info?.id) {
@@ -93,9 +94,20 @@ export async function recoverToolResultMissing(
     content: "Operation cancelled by user (ESC pressed)",
   }))
 
+  const launchAgent = resumeConfig?.agent
+  const launchModel = resumeConfig?.model
+    ? { providerID: resumeConfig.model.providerID, modelID: resumeConfig.model.modelID }
+    : undefined
+  const launchVariant = resumeConfig?.model?.variant
+
   const promptInput = {
     path: { id: sessionID },
-    body: { parts: toolResultParts },
+    body: {
+      parts: toolResultParts,
+      ...(launchAgent ? { agent: launchAgent } : {}),
+      ...(launchModel ? { model: launchModel } : {}),
+      ...(launchVariant ? { variant: launchVariant } : {}),
+    },
   }
 
   try {

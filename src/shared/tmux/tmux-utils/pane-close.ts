@@ -2,16 +2,12 @@ function delay(milliseconds: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, milliseconds))
 }
 
-async function readStream(stream: ReadableStream<Uint8Array> | null | undefined): Promise<string> {
-	return stream ? new Response(stream).text() : ""
-}
-
 export async function closeTmuxPane(paneId: string): Promise<boolean> {
-	const [{ log }, { isInsideTmux }, { getTmuxPath }, { spawn }] = await Promise.all([
+	const [{ log }, { isInsideTmux }, { getTmuxPath }, { runTmuxCommand }] = await Promise.all([
 		import("../../logger"),
 		import("./environment"),
 		import("../../../tools/interactive-bash/tmux-path-resolver"),
-		import("./spawn-process"),
+		import("../runner"),
 	])
 
 	if (!isInsideTmux()) {
@@ -26,36 +22,23 @@ export async function closeTmuxPane(paneId: string): Promise<boolean> {
 	}
 
 	log("[closeTmuxPane] sending Ctrl+C for graceful shutdown", { paneId })
-	const ctrlCProc = spawn([tmux, "send-keys", "-t", paneId, "C-c"], {
-		stdout: "ignore",
-		stderr: "ignore",
-	})
-	await ctrlCProc.exited
+	await runTmuxCommand(tmux, ["send-keys", "-t", paneId, "C-c"])
 
 	await delay(250)
 
 	log("[closeTmuxPane] killing pane", { paneId })
 
-	const killPaneProc = spawn([tmux, "kill-pane", "-t", paneId], {
-		stdout: "pipe",
-		stderr: "pipe",
-	})
-	const [, stderr, exitCode] = await Promise.all([
-		readStream(killPaneProc.stdout),
-		readStream(killPaneProc.stderr),
-		killPaneProc.exited,
-	])
-
-	const trimmedStderr = stderr.trim()
-	const paneAlreadyGone = exitCode !== 0 && /can't find pane/i.test(trimmedStderr)
+	const result = await runTmuxCommand(tmux, ["kill-pane", "-t", paneId])
+	const trimmedStderr = result.stderr.trim()
+	const paneAlreadyGone = result.exitCode !== 0 && /can't find pane/i.test(trimmedStderr)
 
 	if (paneAlreadyGone) {
 		log("[closeTmuxPane] SUCCESS (pane already closed by Ctrl+C)", { paneId })
 		return true
 	}
 
-	if (exitCode !== 0) {
-		log("[closeTmuxPane] FAILED", { paneId, exitCode, stderr: trimmedStderr })
+	if (result.exitCode !== 0) {
+		log("[closeTmuxPane] FAILED", { paneId, exitCode: result.exitCode, stderr: trimmedStderr })
 		return false
 	}
 

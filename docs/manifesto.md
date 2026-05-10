@@ -1,6 +1,14 @@
 # Manifesto
 
-The principles and philosophy behind Oh My OpenAgent.
+The principles and philosophy behind oh-my-openagent (OmO).
+
+Project reality check:
+
+- Name: oh-my-openagent (renamed from oh-my-opencode; both npm packages still publish in tandem during the transition)
+- Domain: https://ohmyopenagent.com (legacy https://ohmyopencode.org redirects 308)
+- Building in Public: https://discord.gg/PUwSMR9XNk
+- Maintained by Jobdori, an AI assistant running on a heavily customized OpenClaw fork
+- Sisyphus Labs: https://sisyphuslabs.ai
 
 ---
 

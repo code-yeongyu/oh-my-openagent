@@ -4,12 +4,14 @@ import {
   getTaskSessionState,
   readBoulderState,
   readCurrentTopLevelTask,
+  resolveBoulderPlanPath,
 } from "../../features/boulder-state"
 import { getSessionAgent } from "../../features/claude-code-session-state"
 import { getLastAgentFromSession } from "./session-last-agent"
 import { isSessionInBoulderLineage } from "./boulder-session-lineage"
 import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { log } from "../../shared/logger"
+import { settleAfterSessionIdle } from "../shared/session-idle-settle"
 import { injectBoulderContinuation } from "./boulder-continuation-injector"
 import { HOOK_NAME } from "./hook-name"
 import { resolveActiveBoulderSession } from "./resolve-active-boulder-session"
@@ -52,8 +54,12 @@ async function injectContinuation(input: {
 
   try {
     const currentBoulder = readBoulderState(input.ctx.directory)
+    const currentPlanPath = currentBoulder
+      ? resolveBoulderPlanPath(input.ctx.directory, currentBoulder)
+      : null
     const currentTask = currentBoulder
-      ? readCurrentTopLevelTask(currentBoulder.active_plan)
+      && currentPlanPath
+      ? readCurrentTopLevelTask(currentPlanPath)
       : null
     const preferredTaskSession = currentTask
       ? getTaskSessionState(input.ctx.directory, currentTask.key)
@@ -163,7 +169,7 @@ function scheduleRetry(input: {
     if (!currentBoulder) return
     if (!currentBoulder.session_ids?.includes(sessionID)) return
 
-    const currentProgress = getPlanProgress(currentBoulder.active_plan)
+    const currentProgress = getPlanProgress(resolveBoulderPlanPath(ctx.directory, currentBoulder))
     if (currentProgress.isComplete) return
     if (options?.isContinuationStopped?.(sessionID)) return
     const canContinueSession = await canContinueTrackedBoulderSession({
@@ -254,6 +260,12 @@ export async function handleAtlasSessionIdle(input: {
     return
   }
 
+  if (sessionState.skipNextIdleAfterRuntimeErrorRetry) {
+    sessionState.skipNextIdleAfterRuntimeErrorRetry = false
+    log(`[${HOOK_NAME}] Skipped: stale idle after runtime error retry`, { sessionID })
+    return
+  }
+
   if (sessionState.promptFailureCount >= MAX_CONSECUTIVE_PROMPT_FAILURES) {
     const timeSinceLastFailure =
       sessionState.lastFailureAt !== undefined ? now - sessionState.lastFailureAt : Number.POSITIVE_INFINITY
@@ -290,6 +302,8 @@ export async function handleAtlasSessionIdle(input: {
     })
     return
   }
+
+  await settleAfterSessionIdle(options?.idleSettleMs)
 
   await injectContinuation({
     ctx,

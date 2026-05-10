@@ -1,9 +1,9 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import {
-  appendSessionId,
   getPlanProgress,
   getTaskSessionState,
   readBoulderState,
+  resolveBoulderPlanPath,
   upsertTaskSessionState,
 } from "../../features/boulder-state"
 import { log } from "../../shared/logger"
@@ -32,15 +32,17 @@ export function createToolExecuteAfterHandler(input: {
   pendingTaskRefs: Map<string, PendingTaskRef>
   autoCommit: boolean
   getState: (sessionID: string) => SessionState
-}): (toolInput: ToolExecuteAfterInput, toolOutput: ToolExecuteAfterOutput) => Promise<void> {
+  isCallerOrchestrator?: (sessionID: string | undefined) => Promise<boolean>
+}): (toolInput: ToolExecuteAfterInput, toolOutput: ToolExecuteAfterOutput | undefined) => Promise<void> {
   const { ctx, pendingFilePaths, pendingTaskRefs, autoCommit, getState } = input
+  const resolveIsCallerOrchestrator = input.isCallerOrchestrator ?? ((sessionID) => isCallerOrchestrator(sessionID, ctx.client))
   return async (toolInput, toolOutput): Promise<void> => {
     // Guard against undefined output (e.g., from /review command - see issue #1035)
     if (!toolOutput) {
       return
     }
 
-    if (!(await isCallerOrchestrator(toolInput.sessionID, ctx.client))) {
+    if (!(await resolveIsCallerOrchestrator(toolInput.sessionID))) {
       return
     }
 
@@ -98,12 +100,13 @@ export function createToolExecuteAfterHandler(input: {
       const extractedSessionId = metadataSessionId ?? extractSessionIdFromOutput(toolOutput.output)
 
       if (boulderState) {
-        const progress = getPlanProgress(boulderState.active_plan)
+        const planPath = resolveBoulderPlanPath(ctx.directory, boulderState)
+        const progress = getPlanProgress(planPath)
         const {
           currentTask,
           shouldSkipTaskSessionUpdate,
           shouldIgnoreCurrentSessionId,
-        } = resolveTaskContext(pendingTaskRef, boulderState.active_plan)
+        } = resolveTaskContext(pendingTaskRef, planPath)
         const trackedTaskSession = currentTask
           ? getTaskSessionState(ctx.directory, currentTask.key)
           : null
@@ -136,7 +139,7 @@ export function createToolExecuteAfterHandler(input: {
         const originalResponse = toolOutput.output
         const shouldPauseForApproval = sessionState
           ? shouldPauseForFinalWaveApproval({
-              planPath: boulderState.active_plan,
+              planPath,
               taskOutput: originalResponse,
               sessionState,
             })

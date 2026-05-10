@@ -14,10 +14,18 @@ import { loadPluginConfig } from "./plugin-config"
 import { createModelCacheState } from "./plugin-state"
 import { createFirstMessageVariantGate } from "./shared/first-message-variant"
 import { injectServerAuthIntoClient, log, logLegacyPluginStartupWarning } from "./shared"
-import { installAgentSortShim } from "./shared/agent-sort-shim"
+import { installAgentSortShim, setAgentSortOrder } from "./shared/agent-sort-shim"
 import { detectExternalSkillPlugin, getSkillPluginConflictWarning } from "./shared/external-plugin-detector"
 import { startBackgroundCheck as startTmuxCheck } from "./tools/interactive-bash"
-import { createPluginPostHog, getPostHogDistinctId } from "./shared/posthog"
+
+type CompactionAutocontinueHook = (
+  input: { sessionID: string },
+  output: { enabled: boolean },
+) => Promise<void>
+
+type HooksWithCompactionAutocontinue = Hooks & {
+  "experimental.compaction.autocontinue"?: CompactionAutocontinueHook
+}
 
 const serverPlugin: Plugin = async (input, _options): Promise<Hooks> => {
   installAgentSortShim()
@@ -35,16 +43,26 @@ const serverPlugin: Plugin = async (input, _options): Promise<Hooks> => {
   injectServerAuthIntoClient(input.client)
 
   const pluginConfig = loadPluginConfig(input.directory, input)
+  setAgentSortOrder(pluginConfig.agent_order)
 
-  const posthog = createPluginPostHog()
-  const distinctId = getPostHogDistinctId()
-  try {
-    posthog.trackActive(distinctId, "plugin_loaded")
-  } catch {
-    // telemetry failure is non-fatal, silently ignore
-  }
   if (pluginConfig.openclaw) {
     await initializeOpenClaw(pluginConfig.openclaw)
+  }
+  if (pluginConfig.team_mode?.enabled) {
+    const teamModeConfig = pluginConfig.team_mode
+    try {
+      const { ensureBaseDirs, resolveBaseDir } = await import("./features/team-mode/team-registry/paths")
+      const { checkTeamModeDependencies } = await import("./features/team-mode/deps")
+      await checkTeamModeDependencies(teamModeConfig)
+      await ensureBaseDirs(resolveBaseDir(teamModeConfig))
+      if (pluginConfig.disabled_skills?.includes("team-mode")) {
+        console.warn(
+          "[team-mode] enabled=true but team-mode skill is disabled; skill docs hidden but tools still registered (D-29)",
+        )
+      }
+    } catch (err) {
+      console.warn("[team-mode] init failed:", err)
+    }
   }
   const tmuxIntegrationEnabled = isTmuxIntegrationEnabled(pluginConfig)
   if (tmuxIntegrationEnabled) {
@@ -96,7 +114,7 @@ const serverPlugin: Plugin = async (input, _options): Promise<Hooks> => {
     tools: toolsResult.filteredTools,
   })
 
-  return {
+  const pluginHooks: HooksWithCompactionAutocontinue = {
     ...pluginInterface,
 
     "experimental.session.compacting": async (
@@ -113,7 +131,17 @@ const serverPlugin: Plugin = async (input, _options): Promise<Hooks> => {
         output.context.push(hooks.compactionContextInjector.inject(compactingInput.sessionID))
       }
     },
+
+    "experimental.compaction.autocontinue": async (
+      autocontinueInput: { sessionID: string },
+      _output: { enabled: boolean },
+    ): Promise<void> => {
+      await hooks.compactionContextInjector?.restore(autocontinueInput.sessionID)
+      await hooks.compactionTodoPreserver?.restore(autocontinueInput.sessionID)
+    },
   }
+
+  return pluginHooks
 }
 
 const pluginModule: PluginModule = {

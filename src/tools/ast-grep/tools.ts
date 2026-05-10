@@ -3,6 +3,12 @@ import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
 import { CLI_LANGUAGES } from "./constants"
 import { runSg } from "./cli"
 import { formatSearchResult, formatReplaceResult } from "./result-formatter"
+import { getPatternHint } from "./pattern-hints"
+import {
+  AST_GREP_REPLACE_DESCRIPTION,
+  AST_GREP_SEARCH_DESCRIPTION,
+  AST_GREP_SEARCH_PATTERN_PARAM,
+} from "./tool-descriptions"
 import type { CliLanguage } from "./types"
 
 async function showOutputToUser(context: unknown, output: string): Promise<void> {
@@ -12,39 +18,11 @@ async function showOutputToUser(context: unknown, output: string): Promise<void>
   await ctx.metadata?.({ metadata: { output } })
 }
 
-function getEmptyResultHint(pattern: string, lang: CliLanguage): string | null {
-  const src = pattern.trim()
-
-  if (lang === "python") {
-    if (src.startsWith("class ") && src.endsWith(":")) {
-      const withoutColon = src.slice(0, -1)
-      return `Hint: Remove trailing colon. Try: "${withoutColon}"`
-    }
-    if ((src.startsWith("def ") || src.startsWith("async def ")) && src.endsWith(":")) {
-      const withoutColon = src.slice(0, -1)
-      return `Hint: Remove trailing colon. Try: "${withoutColon}"`
-    }
-  }
-
-  if (["javascript", "typescript", "tsx"].includes(lang)) {
-    if (/^(export\s+)?(async\s+)?function\s+\$[A-Z_]+\s*$/i.test(src)) {
-      return `Hint: Function patterns need params and body. Try "function $NAME($$$) { $$$ }"`
-    }
-  }
-
-  return null
-}
-
 export function createAstGrepTools(ctx: PluginInput): Record<string, ToolDefinition> {
   const ast_grep_search: ToolDefinition = tool({
-    description:
-      "Search code patterns across filesystem using AST-aware matching. Supports 25 languages. " +
-      "Use meta-variables: $VAR (single node), $$$ (multiple nodes). " +
-      "IMPORTANT: Patterns must be complete AST nodes (valid code). " +
-      "For functions, include params and body: 'export async function $NAME($$$) { $$$ }' not 'export async function $NAME'. " +
-      "Examples: 'console.log($MSG)', 'def $FUNC($$$):', 'async function $NAME($$$)'",
+    description: AST_GREP_SEARCH_DESCRIPTION,
     args: {
-      pattern: tool.schema.string().describe("AST pattern with meta-variables ($VAR, $$$). Must be complete AST node."),
+      pattern: tool.schema.string().describe(AST_GREP_SEARCH_PATTERN_PARAM),
       lang: tool.schema.enum(CLI_LANGUAGES).describe("Target language"),
       paths: tool.schema.array(tool.schema.string()).optional().describe("Paths to search (default: ['.'])"),
       globs: tool.schema.array(tool.schema.string()).optional().describe("Include/exclude globs (prefix ! to exclude)"),
@@ -63,7 +41,7 @@ export function createAstGrepTools(ctx: PluginInput): Record<string, ToolDefinit
         let output = formatSearchResult(result)
 
         if (result.matches.length === 0 && !result.error) {
-          const hint = getEmptyResultHint(args.pattern, args.lang as CliLanguage)
+          const hint = getPatternHint(args.pattern, args.lang as CliLanguage)
           if (hint) {
             output += `\n\n${hint}`
           }
@@ -80,10 +58,7 @@ export function createAstGrepTools(ctx: PluginInput): Record<string, ToolDefinit
   })
 
   const ast_grep_replace: ToolDefinition = tool({
-    description:
-      "Replace code patterns across filesystem with AST-aware rewriting. " +
-      "Dry-run by default. Use meta-variables in rewrite to preserve matched content. " +
-      "Example: pattern='console.log($MSG)' rewrite='logger.info($MSG)'",
+    description: AST_GREP_REPLACE_DESCRIPTION,
     args: {
       pattern: tool.schema.string().describe("AST pattern to match"),
       rewrite: tool.schema.string().describe("Replacement pattern (can use $VAR from pattern)"),

@@ -25,6 +25,16 @@ export function createAtlasEventHandler(input: {
       state.lastEventWasAbortError = isAbort
 
       log(`[${HOOK_NAME}] session.error`, { sessionID, isAbort })
+      if (!isAbort) {
+        const previousInjectedAt = state.lastContinuationInjectedAt
+        await handleAtlasSessionIdle({ ctx, options, getState, sessionID })
+        if (
+          state.lastContinuationInjectedAt !== undefined
+          && state.lastContinuationInjectedAt !== previousInjectedAt
+        ) {
+          state.skipNextIdleAfterRuntimeErrorRetry = true
+        }
+      }
       return
     }
 
@@ -44,6 +54,7 @@ export function createAtlasEventHandler(input: {
       const state = sessions.get(sessionID)
       if (state) {
         state.lastEventWasAbortError = false
+        state.skipNextIdleAfterRuntimeErrorRetry = false
         if (role === "user") {
           state.waitingForFinalWaveApproval = false
         }
@@ -60,6 +71,7 @@ export function createAtlasEventHandler(input: {
         const state = sessions.get(sessionID)
         if (state) {
           state.lastEventWasAbortError = false
+          state.skipNextIdleAfterRuntimeErrorRetry = false
         }
       }
       return
@@ -71,6 +83,7 @@ export function createAtlasEventHandler(input: {
         const state = sessions.get(sessionID)
         if (state) {
           state.lastEventWasAbortError = false
+          state.skipNextIdleAfterRuntimeErrorRetry = false
         }
       }
       return

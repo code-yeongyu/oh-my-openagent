@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, mock, test, afterAll } from "bun:test"
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 import { randomUUID } from "node:crypto"
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -7,32 +7,7 @@ import { createOpencodeClient } from "@opencode-ai/sdk"
 import type { AssistantMessage, Session } from "@opencode-ai/sdk"
 import type { BoulderState } from "../../features/boulder-state"
 import { clearBoulderState, writeBoulderState } from "../../features/boulder-state"
-
-const TEST_STORAGE_ROOT = join(tmpdir(), `atlas-final-wave-storage-${randomUUID()}`)
-const TEST_MESSAGE_STORAGE = join(TEST_STORAGE_ROOT, "message")
-const TEST_PART_STORAGE = join(TEST_STORAGE_ROOT, "part")
-
-mock.module("../../features/hook-message-injector/constants", () => ({
-  OPENCODE_STORAGE: TEST_STORAGE_ROOT,
-  MESSAGE_STORAGE: TEST_MESSAGE_STORAGE,
-  PART_STORAGE: TEST_PART_STORAGE,
-}))
-
-mock.module("../../shared/opencode-message-dir", () => ({
-  getMessageDir: (sessionID: string) => {
-    const directoryPath = join(TEST_MESSAGE_STORAGE, sessionID)
-    return existsSync(directoryPath) ? directoryPath : null
-  },
-}))
-
-mock.module("../../shared/opencode-storage-detection", () => ({
-  isSqliteBackend: () => false,
-}))
-
-afterAll(() => { mock.restore() })
-
-const { createAtlasHook } = await import("./index")
-const { MESSAGE_STORAGE } = await import("../../features/hook-message-injector")
+import { createAtlasHook } from "./index"
 
 type AtlasHookContext = Parameters<typeof createAtlasHook>[0]
 type PromptMock = ReturnType<typeof mock>
@@ -89,28 +64,6 @@ describe("Atlas final verification approval gate", () => {
     }
   }
 
-  function setupMessageStorage(sessionID: string): void {
-    const messageDirectory = join(MESSAGE_STORAGE, sessionID)
-    if (!existsSync(messageDirectory)) {
-      mkdirSync(messageDirectory, { recursive: true })
-    }
-
-    writeFileSync(
-      join(messageDirectory, "msg_test001.json"),
-      JSON.stringify({
-        agent: "atlas",
-        model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
-      }),
-    )
-  }
-
-  function cleanupMessageStorage(sessionID: string): void {
-    const messageDirectory = join(MESSAGE_STORAGE, sessionID)
-    if (existsSync(messageDirectory)) {
-      rmSync(messageDirectory, { recursive: true, force: true })
-    }
-  }
-
   beforeEach(() => {
     testDirectory = join(tmpdir(), `atlas-final-wave-test-${randomUUID()}`)
     mkdirSync(join(testDirectory, ".sisyphus"), { recursive: true })
@@ -127,7 +80,6 @@ describe("Atlas final verification approval gate", () => {
   test("waits for explicit user approval after the last final-wave approval arrives", async () => {
     // given
     const sessionID = "atlas-final-wave-session"
-    setupMessageStorage(sessionID)
 
     const planPath = join(testDirectory, "final-wave-plan.md")
     writeFileSync(
@@ -155,7 +107,7 @@ describe("Atlas final verification approval gate", () => {
     writeBoulderState(testDirectory, state)
 
     const mockInput = createMockPluginInput()
-    const hook = createAtlasHook(mockInput)
+    const hook = createAtlasHook(mockInput, { directory: testDirectory, isCallerOrchestrator: async () => true })
     const toolOutput = {
       title: "Sisyphus Task",
       output: `Tasks [4/4 compliant] | Contamination [CLEAN] | Unaccounted [CLEAN] | VERDICT: APPROVE
@@ -176,13 +128,11 @@ session_id: ses_final_wave_review
     expect(toolOutput.output).not.toContain("STEP 8: PROCEED TO NEXT TASK")
     expect(mockInput._promptMock).not.toHaveBeenCalled()
 
-    cleanupMessageStorage(sessionID)
   })
 
   test("keeps normal auto-continue instructions for non-final tasks", async () => {
     // given
     const sessionID = "atlas-non-final-session"
-    setupMessageStorage(sessionID)
 
     const planPath = join(testDirectory, "implementation-plan.md")
     writeFileSync(
@@ -210,7 +160,10 @@ session_id: ses_final_wave_review
     }
     writeBoulderState(testDirectory, state)
 
-    const hook = createAtlasHook(createMockPluginInput())
+    const hook = createAtlasHook(createMockPluginInput(), {
+      directory: testDirectory,
+      isCallerOrchestrator: async () => true,
+    })
     const toolOutput = {
       title: "Sisyphus Task",
       output: `Implementation finished successfully
@@ -229,6 +182,5 @@ session_id: ses_feature_task
     expect(toolOutput.output).toContain("STEP 8: PROCEED TO NEXT TASK")
     expect(toolOutput.output).not.toContain("FINAL WAVE APPROVAL GATE")
 
-    cleanupMessageStorage(sessionID)
   })
 })

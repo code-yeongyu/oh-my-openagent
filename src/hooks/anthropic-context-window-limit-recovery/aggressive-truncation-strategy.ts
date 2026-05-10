@@ -5,7 +5,18 @@ import type { Client } from "./client"
 import { clearSessionState } from "./state"
 import { formatBytes } from "./message-builder"
 import { log } from "../../shared/logger"
-import { resolveInheritedPromptTools } from "../../shared"
+import {
+  getMessageDir,
+  resolveInheritedPromptTools,
+} from "../../shared"
+import {
+  getSessionAgent,
+  resolveRegisteredAgentName,
+} from "../../features/claude-code-session-state/state"
+import {
+  findNearestMessageWithFields,
+  findNearestMessageWithFieldsFromSDK,
+} from "../../features/hook-message-injector"
 
 export async function runAggressiveTruncationStrategy(params: {
   sessionID: string
@@ -62,11 +73,27 @@ export async function runAggressiveTruncationStrategy(params: {
     clearSessionState(params.autoCompactState, params.sessionID)
     setTimeout(async () => {
       try {
-        const inheritedTools = resolveInheritedPromptTools(params.sessionID)
+        const sdkMessage = await findNearestMessageWithFieldsFromSDK(params.client, params.sessionID)
+        const previousMessage = sdkMessage ?? (() => {
+          const messageDir = getMessageDir(params.sessionID)
+          return messageDir ? findNearestMessageWithFields(messageDir) : null
+        })()
+
+        const agentName = getSessionAgent(params.sessionID) ?? previousMessage?.agent
+        const launchAgent = resolveRegisteredAgentName(agentName)
+        const launchModel = previousMessage?.model?.providerID && previousMessage.model.modelID
+          ? { providerID: previousMessage.model.providerID, modelID: previousMessage.model.modelID }
+          : undefined
+        const launchVariant = previousMessage?.model?.variant
+        const inheritedTools = resolveInheritedPromptTools(params.sessionID, previousMessage?.tools)
+
         await params.client.session.promptAsync({
           path: { id: params.sessionID },
           body: {
             auto: true,
+            ...(launchAgent ? { agent: launchAgent } : {}),
+            ...(launchModel ? { model: launchModel } : {}),
+            ...(launchVariant ? { variant: launchVariant } : {}),
             ...(inheritedTools ? { tools: inheritedTools } : {}),
           } as never,
           query: { directory: params.directory },

@@ -100,7 +100,7 @@ describe("pollSyncSession", () => {
       }, 50)
 
       // then: times out (ignores stale error)
-      expect(result).toContain("Poll timeout reached")
+      expect(result).toContain("Poll inactivity timeout reached")
     })
 
     test("detects completion when assistant message has terminal finish reason", async () => {
@@ -459,7 +459,7 @@ describe("pollSyncSession", () => {
       }, 0)
 
       // then: returns timeout error
-      expect(result).toBe("Poll timeout reached after 50ms for session ses_timeout")
+      expect(result).toBe("Poll inactivity timeout reached after 50ms without active OpenCode status for session ses_timeout")
       expect(abortCount).toBe(1)
     })
   })

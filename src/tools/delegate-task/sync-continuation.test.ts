@@ -1,5 +1,20 @@
 const { describe, test, expect, beforeEach, afterEach, mock, spyOn } = require("bun:test")
 
+const TEAM_TOOL_DENIALS = {
+  team_create: false,
+  team_delete: false,
+  team_shutdown_request: false,
+  team_approve_shutdown: false,
+  team_reject_shutdown: false,
+  team_send_message: false,
+  team_task_create: false,
+  team_task_list: false,
+  team_task_update: false,
+  team_task_get: false,
+  team_status: false,
+  team_list: false,
+}
+
 describe("executeSyncContinuation - toast cleanup error paths", () => {
   let removeTaskCalls: string[] = []
   let addTaskCalls: any[] = []
@@ -532,6 +547,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
       question: false,
       write: false,
       edit: false,
+      ...TEAM_TOOL_DENIALS,
     })
   })
 
@@ -602,6 +618,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
       question: false,
       write: false,
       edit: false,
+      ...TEAM_TOOL_DENIALS,
     })
   })
 
@@ -670,6 +687,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
       task: true,
       call_omo_agent: true,
       question: false,
+      ...TEAM_TOOL_DENIALS,
     })
   })
 })

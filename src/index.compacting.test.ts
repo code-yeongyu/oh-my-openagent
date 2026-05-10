@@ -29,6 +29,19 @@ function createCompactingHandler(hooks: {
   }
 }
 
+function createCompactionAutocontinueHandler(hooks: {
+  compactionContextInjector?: { restore: (sessionID: string) => Promise<boolean> }
+  compactionTodoPreserver?: { restore: (sessionID: string) => Promise<void> }
+}) {
+  return async (
+    input: { sessionID: string },
+    _output: { enabled: boolean },
+  ): Promise<void> => {
+    await hooks.compactionContextInjector?.restore(input.sessionID)
+    await hooks.compactionTodoPreserver?.restore(input.sessionID)
+  }
+}
+
 describe("experimental.session.compacting handler", () => {
   //#given all three hooks are present
   //#when compacting handler is invoked
@@ -132,5 +145,36 @@ describe("experimental.session.compacting handler", () => {
 
     expect(preCompactMock).toHaveBeenCalled()
     expect(output.context).toEqual([])
+  })
+})
+
+describe("experimental.compaction.autocontinue handler", () => {
+  it("restores checkpointed context and todos before OpenCode adds the synthetic continue turn", async () => {
+    //#given
+    const callOrder: string[] = []
+    const restoreContextMock = mock(async () => {
+      callOrder.push("context")
+      return true
+    })
+    const restoreMock = mock(async () => {})
+    const handler = createCompactionAutocontinueHandler({
+      compactionContextInjector: { restore: restoreContextMock },
+      compactionTodoPreserver: {
+        restore: mock(async (sessionID: string) => {
+          callOrder.push(`todos:${sessionID}`)
+          await restoreMock(sessionID)
+        }),
+      },
+    })
+    const output = { enabled: true }
+
+    //#when
+    await handler({ sessionID: "ses_autocontinue" }, output)
+
+    //#then
+    expect(restoreContextMock).toHaveBeenCalledWith("ses_autocontinue")
+    expect(restoreMock).toHaveBeenCalledWith("ses_autocontinue")
+    expect(callOrder).toEqual(["context", "todos:ses_autocontinue"])
+    expect(output.enabled).toBe(true)
   })
 })

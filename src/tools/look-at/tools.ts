@@ -6,6 +6,7 @@ import type { LookAtArgsWithAlias } from "./look-at-arguments"
 import { normalizeArgs, validateArgs } from "./look-at-arguments"
 import { prepareLookAtInput } from "./look-at-input-preparer"
 import { runLookAtSession } from "./look-at-session-runner"
+import { getMissingLookAtFilePath } from "./missing-file-error"
 
 export { normalizeArgs, validateArgs } from "./look-at-arguments"
 
@@ -43,6 +44,12 @@ export function createLookAt(ctx: PluginInput): ToolDefinition {
           isBase64Input,
         })
       } catch (error) {
+        const missingFilePath = getMissingLookAtFilePath(error, args)
+        if (missingFilePath) {
+          log(`[look_at] Missing file while analyzing ${sourceDescription}:`, error)
+          return `Error: File not found: ${missingFilePath}`
+        }
+
         const errorMessage = error instanceof Error ? error.message : String(error)
         log(`[look_at] Unexpected error analyzing ${sourceDescription}:`, error)
         return `Error: Failed to analyze ${sourceDescription}: ${errorMessage}`

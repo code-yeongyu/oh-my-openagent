@@ -23,7 +23,7 @@ function createManager(config?: BackgroundTaskConfig): BackgroundManager {
     tasks: Map<string, BackgroundTask>
   }
 
-  testManager.enqueueNotificationForParent = async (_sessionId: sessionID, fn) => {
+  testManager.enqueueNotificationForParent = async (_sessionId: string, fn) => {
     await fn()
   }
   testManager.notifyParentSession = async () => {}

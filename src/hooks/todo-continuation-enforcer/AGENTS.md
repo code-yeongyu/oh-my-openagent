@@ -1,6 +1,6 @@
 # src/hooks/todo-continuation-enforcer/ — Boulder Continuation Mechanism
 
-**Generated:** 2026-04-11
+**Generated:** 2026-05-08
 
 ## OVERVIEW
 

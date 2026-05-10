@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test"
-import { sweepStaleOmoAgentSessionsWith, type SweepDeps } from "./stale-session-sweep"
+import { sweepStaleOmoAgentSessionsWith, sweepTmuxSessionsWith, type SweepDeps } from "./stale-session-sweep"
 
 type SweepFixture = {
 	deps: SweepDeps
@@ -150,5 +150,27 @@ describe("sweepStaleOmoAgentSessionsWith", () => {
 		// then
 		expect(result).toBe(1)
 		expect(fixture.killed).toEqual(["omo-agents-99999"])
+	})
+})
+
+describe("sweepTmuxSessionsWith", () => {
+	let fixture: SweepFixture
+
+	beforeEach(() => {
+		fixture = createFixture()
+	})
+
+	it("#given custom predicate for team sessions #when shared sweep called #then only matching sessions are killed", async () => {
+		// given
+		fixture.setCandidates(["omo-team-A", "omo-team-B", "main", "omo-agents-99999"])
+
+		// when
+		const result = await sweepTmuxSessionsWith(fixture.deps, {
+			predicate: (sessionName) => sessionName.startsWith("omo-team-"),
+		})
+
+		// then
+		expect(result).toEqual(["omo-team-A", "omo-team-B"])
+		expect(fixture.killed).toEqual(["omo-team-A", "omo-team-B"])
 	})
 })

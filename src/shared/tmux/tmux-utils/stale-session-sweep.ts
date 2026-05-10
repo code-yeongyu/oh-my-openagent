@@ -1,5 +1,13 @@
 const STALE_SESSION_PATTERN = /^omo-agents-(\d+)$/
 
+function getErrorMessage(error: unknown): string {
+	if (error instanceof Error) {
+		return error.message
+	}
+
+	return String(error)
+}
+
 function isProcessAlive(pid: number): boolean {
 	try {
 		process.kill(pid, 0)
@@ -10,36 +18,48 @@ function isProcessAlive(pid: number): boolean {
 	}
 }
 
-async function listOmoAgentSessionsViaTmux(tmux: string): Promise<string[]> {
-	const { spawn } = await import("./spawn-process")
-	const proc = spawn([tmux, "list-sessions", "-F", "#{session_name}"], {
-		stdout: "pipe",
-		stderr: "pipe",
-	})
-	const [stdout, , exitCode] = await Promise.all([
-		new Response(proc.stdout).text(),
-		new Response(proc.stderr).text(),
-		proc.exited,
-	])
+async function listTmuxSessionsViaTmux(tmux: string): Promise<string[]> {
+	const { runTmuxCommand } = await import("../runner")
+	const result = await runTmuxCommand(tmux, ["list-sessions", "-F", "#{session_name}"])
 
-	if (exitCode !== 0) {
+	if (result.exitCode !== 0) {
 		return []
 	}
 
-	return stdout
+	return result.output
 		.split("\n")
 		.map((line) => line.trim())
-		.filter((name) => STALE_SESSION_PATTERN.test(name))
+		.filter((name) => name.length > 0)
 }
 
-export type SweepDeps = {
+export type SweepTmuxSessionsDeps = {
 	isInsideTmux: () => boolean
 	getTmuxPath: () => Promise<string | null | undefined>
 	listCandidateSessions: (tmux: string) => Promise<string[]>
 	killSession: (sessionName: string) => Promise<boolean>
+	log: (message: string, payload?: unknown) => void
+}
+
+export type SweepDeps = SweepTmuxSessionsDeps & {
 	processAlive: (pid: number) => boolean
 	currentPid: number
-	log: (message: string, payload?: unknown) => void
+}
+
+export type SweepTmuxSessionsOptions = {
+	prefix?: string
+	predicate?: (sessionName: string) => boolean
+}
+
+function matchesSweepOptions(sessionName: string, options: SweepTmuxSessionsOptions): boolean {
+	if (options.predicate) {
+		return options.predicate(sessionName)
+	}
+
+	if (options.prefix) {
+		return sessionName.startsWith(options.prefix)
+	}
+
+	return true
 }
 
 async function buildRuntimeDeps(): Promise<SweepDeps> {
@@ -53,7 +73,7 @@ async function buildRuntimeDeps(): Promise<SweepDeps> {
 	return {
 		isInsideTmux,
 		getTmuxPath,
-		listCandidateSessions: listOmoAgentSessionsViaTmux,
+		listCandidateSessions: listTmuxSessionsViaTmux,
 		killSession: killTmuxSessionIfExists,
 		processAlive: isProcessAlive,
 		currentPid: process.pid,
@@ -61,36 +81,75 @@ async function buildRuntimeDeps(): Promise<SweepDeps> {
 	}
 }
 
-export async function sweepStaleOmoAgentSessionsWith(deps: SweepDeps): Promise<number> {
+export async function sweepTmuxSessionsWith(
+	deps: SweepTmuxSessionsDeps,
+	options: SweepTmuxSessionsOptions,
+): Promise<string[]> {
 	if (!deps.isInsideTmux()) {
-		return 0
+		return []
 	}
 
 	const tmux = await deps.getTmuxPath()
 	if (!tmux) {
-		return 0
+		return []
 	}
 
-	const candidateSessions = await deps.listCandidateSessions(tmux)
-	let killedCount = 0
+	let candidateSessions: string[]
+
+	try {
+		candidateSessions = await deps.listCandidateSessions(tmux)
+	} catch (error) {
+		deps.log("[sweepTmuxSessionsWith] failed to list candidate sessions", {
+			error: getErrorMessage(error),
+		})
+		return []
+	}
+
+	const killedSessionNames: string[] = []
 
 	for (const sessionName of candidateSessions) {
-		const pidMatch = sessionName.match(STALE_SESSION_PATTERN)
-		if (!pidMatch) continue
+		if (!matchesSweepOptions(sessionName, options)) {
+			continue
+		}
 
-		const pid = Number.parseInt(pidMatch[1], 10)
-		if (!Number.isFinite(pid)) continue
-		if (pid === deps.currentPid) continue
-		if (deps.processAlive(pid)) continue
-
-		deps.log("[sweepStaleOmoAgentSessions] killing stale session", { sessionName, deadPid: pid })
-		const killed = await deps.killSession(sessionName)
-		if (killed) {
-			killedCount += 1
+		try {
+			const killed = await deps.killSession(sessionName)
+			if (killed) {
+				killedSessionNames.push(sessionName)
+			}
+		} catch (error) {
+			deps.log("[sweepTmuxSessionsWith] failed to kill stale session", {
+				error: getErrorMessage(error),
+				sessionName,
+			})
 		}
 	}
 
-	return killedCount
+	return killedSessionNames
+}
+
+export async function sweepStaleOmoAgentSessionsWith(deps: SweepDeps): Promise<number> {
+	const killedSessionNames = await sweepTmuxSessionsWith(deps, {
+		predicate: (sessionName) => {
+			const pidMatch = sessionName.match(STALE_SESSION_PATTERN)
+			if (!pidMatch) {
+				return false
+			}
+
+			const pid = Number.parseInt(pidMatch[1], 10)
+			if (!Number.isFinite(pid)) {
+				return false
+			}
+
+			if (pid === deps.currentPid) {
+				return false
+			}
+
+			return !deps.processAlive(pid)
+		},
+	})
+
+	return killedSessionNames.length
 }
 
 export async function sweepStaleOmoAgentSessions(): Promise<number> {

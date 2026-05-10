@@ -47,6 +47,7 @@ export interface BackgroundTask {
   rootSessionId?: string
   parentSessionId: string
   parentMessageId: string
+  teamRunId?: string
   description: string
   prompt: string
   agent: string
@@ -76,6 +77,7 @@ export interface BackgroundTask {
   isUnstableAgent?: boolean
   /** Category used for this task (e.g., 'quick', 'visual-engineering') */
   category?: string
+  onSessionCreated?: (sessionId: string) => void | Promise<void>
   /** Pending retry notification details for the next spawned retry session */
   retryNotification?: {
     previousSessionID?: string
@@ -103,6 +105,8 @@ export interface LaunchInput {
   agent: string
   parentSessionId: string
   parentMessageId: string
+  teamRunId?: string
+  suppressTmuxSpawn?: boolean
   parentModel?: { providerID: string; modelID: string }
   parentAgent?: string
   parentTools?: Record<string, boolean>
@@ -114,6 +118,7 @@ export interface LaunchInput {
   skillContent?: string
   category?: string
   sessionPermission?: SessionPermissionRule[]
+  onSessionCreated?: (sessionId: string) => void | Promise<void>
 }
 
 export interface ResumeInput {

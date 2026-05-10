@@ -60,6 +60,7 @@ export async function createStdioClient(params: SkillMcpClientConnectionParams):
     args,
     env: mergedEnv,
     stderr: "ignore",
+    ...(info.directory ? { cwd: info.directory } : {}),
   })
 
   const client: McpClient = stdioClientDependencies.createClient(

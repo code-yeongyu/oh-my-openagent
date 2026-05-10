@@ -3,7 +3,6 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync 
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 
-import { MAX_TRACKED_PATHS_PER_SESSION } from "./hook"
 import { createWriteExistingFileGuardHook } from "./index"
 
 const BLOCK_MESSAGE = "File already exists. Use edit tool instead."
@@ -56,7 +55,7 @@ describe("createWriteExistingFileGuardHook", () => {
   }
 
   const emitSessionDeleted = async (sessionID: string): Promise<void> => {
-    await hook.event?.({ event: { type: "session.deleted", properties: { info: { id: sessionID } } } })
+    await hook.event?.({ event: { type: "session.deleted", properties: { info: { id: sessionID } } } } as never)
   }
 
   beforeEach(() => {
@@ -432,6 +431,11 @@ describe("createWriteExistingFileGuardHook", () => {
 
   test("#given session reads beyond path cap #when writing oldest and newest #then only newest is authorized", async () => {
     const sessionID = "ses_path_cap"
+    const maxTrackedPathsPerSession = 4
+    hook = createWriteExistingFileGuardHook(
+      { directory: tempDir } as never,
+      { maxTrackedPathsPerSession },
+    )
     const oldestFile = createFile("path-cap/0.txt")
     let newestFile = oldestFile
 
@@ -441,7 +445,7 @@ describe("createWriteExistingFileGuardHook", () => {
       outputArgs: { filePath: oldestFile },
     })
 
-    for (let index = 1; index <= MAX_TRACKED_PATHS_PER_SESSION; index += 1) {
+    for (let index = 1; index <= maxTrackedPathsPerSession; index += 1) {
       newestFile = createFile(`path-cap/${index}.txt`)
       await invoke({
         tool: "read",

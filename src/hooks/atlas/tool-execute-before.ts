@@ -2,7 +2,7 @@ import { log } from "../../shared/logger"
 import { SYSTEM_DIRECTIVE_PREFIX } from "../../shared/system-directive"
 import { isCallerOrchestrator } from "../../shared/session-utils"
 import type { PluginInput } from "@opencode-ai/plugin"
-import { readBoulderState, readCurrentTopLevelTask } from "../../features/boulder-state"
+import { readBoulderState, readCurrentTopLevelTask, resolveBoulderPlanPath } from "../../features/boulder-state"
 import { HOOK_NAME } from "./hook-name"
 import { ORCHESTRATOR_DELEGATION_REQUIRED, SINGLE_TASK_DIRECTIVE } from "./system-reminder-templates"
 import { isSisyphusPath } from "./sisyphus-path"
@@ -13,18 +13,20 @@ export function createToolExecuteBeforeHandler(input: {
   ctx: PluginInput
   pendingFilePaths: Map<string, string>
   pendingTaskRefs: Map<string, PendingTaskRef>
+  isCallerOrchestrator?: (sessionID: string | undefined) => Promise<boolean>
 }): (
   toolInput: { tool: string; sessionID?: string; callID?: string },
   toolOutput: { args: Record<string, unknown>; message?: string }
 ) => Promise<void> {
   const { ctx, pendingFilePaths, pendingTaskRefs } = input
+  const resolveIsCallerOrchestrator = input.isCallerOrchestrator ?? ((sessionID) => isCallerOrchestrator(sessionID, ctx.client))
 
   function trackTask(callID: string, task: TrackedTopLevelTaskRef): void {
     pendingTaskRefs.set(callID, { kind: "track", task })
   }
 
   return async (toolInput, toolOutput): Promise<void> => {
-    if (!(await isCallerOrchestrator(toolInput.sessionID, ctx.client))) {
+    if (!(await resolveIsCallerOrchestrator(toolInput.sessionID))) {
       return
     }
 
@@ -60,7 +62,7 @@ export function createToolExecuteBeforeHandler(input: {
         } else {
           const boulderState = readBoulderState(ctx.directory)
           const currentTask = boulderState
-            ? readCurrentTopLevelTask(boulderState.active_plan)
+            ? readCurrentTopLevelTask(resolveBoulderPlanPath(ctx.directory, boulderState))
             : null
           if (currentTask) {
             const task = {

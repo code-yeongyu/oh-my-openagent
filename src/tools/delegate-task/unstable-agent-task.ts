@@ -89,7 +89,6 @@ export async function executeUnstableAgentTask(
 
     const taskMetadataBlock = buildTaskMetadataBlock({
       sessionId: sessionID,
-      taskId: sessionID,
       backgroundTaskId: task.id,
       agent: agentToUse,
       category: args.category,

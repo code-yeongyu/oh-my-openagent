@@ -1,5 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { getPlanProgress, readBoulderState } from "../../features/boulder-state"
+import { getPlanProgress, readBoulderState, resolveBoulderPlanPath } from "../../features/boulder-state"
 import type { BoulderState, PlanProgress } from "../../features/boulder-state"
 
 export async function resolveActiveBoulderSession(input: {
@@ -20,7 +20,7 @@ export async function resolveActiveBoulderSession(input: {
     return null
   }
 
-  const progress = getPlanProgress(boulderState.active_plan)
+  const progress = getPlanProgress(resolveBoulderPlanPath(input.directory, boulderState))
   if (progress.isComplete) {
     return { boulderState, progress, appendedSession: false }
   }

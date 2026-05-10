@@ -129,4 +129,14 @@ describe("model-capability-aliases", () => {
       ruleID: "claude-thinking-legacy-alias",
     })
   })
+
+  test("treats claude-opus-4-6-thinking as canonical, not as a legacy alias", () => {
+    const result = resolveModelIDAlias("claude-opus-4-6-thinking")
+
+    expect(result).toEqual({
+      requestedModelID: "claude-opus-4-6-thinking",
+      canonicalModelID: "claude-opus-4-6-thinking",
+      source: "canonical",
+    })
+  })
 })

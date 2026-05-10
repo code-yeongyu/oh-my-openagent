@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs"
+import { tmpdir } from "os"
 import { join } from "path"
-import os from "os"
 
 import { inferExtensionFromDirectory } from "./infer-extension"
 
@@ -9,7 +9,7 @@ describe("inferExtensionFromDirectory", () => {
   let tmpDir: string
 
   beforeEach(() => {
-    tmpDir = mkdtempSync(join(os.tmpdir(), "omo-infer-ext-"))
+    tmpDir = mkdtempSync(join(tmpdir(), "omo-infer-ext-"))
   })
 
   afterEach(() => {

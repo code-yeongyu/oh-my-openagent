@@ -190,7 +190,6 @@ export async function executeBackgroundTask(
     const taskMetadataBlock = sessionId
       ? `\n\n${buildTaskMetadataBlock({
         sessionId,
-        taskId: sessionId,
         backgroundTaskId: task.id,
         agent: task.agent,
         category: args.category,

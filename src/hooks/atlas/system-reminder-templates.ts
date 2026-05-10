@@ -6,24 +6,18 @@ export const DIRECT_WORK_REMINDER = `
 
 ${createSystemDirective(SystemDirectiveTypes.DELEGATION_REQUIRED)}
 
-You just performed direct file modifications outside \`.sisyphus/\`.
+**You just edited a source file directly.**
 
-**You are an ORCHESTRATOR, not an IMPLEMENTER.**
+Did you ACTUALLY need to be the one doing that?
 
-As an orchestrator, you should:
-- **DELEGATE** implementation work to subagents via \`task\`
-- **VERIFY** the work done by subagents
-- **COORDINATE** multiple tasks and ensure completion
+- If this was a tiny verification fix during subagent review → fine, continue.
+- If this was implementation work of any size → **you violated orchestrator protocol.** Real work goes through \`task()\`. Revert the change and delegate it via \`task()\`. The subagent has the context, the tools, and the model for that work — you do not.
 
-You should NOT:
-- Write code directly (except for \`.sisyphus/\` files like plans and notepads)
-- Make direct file edits outside \`.sisyphus/\`
-- Implement features yourself
+**Atlas does not implement. Atlas orchestrates.** Every direct edit erodes the
+delegation pipeline you exist to run, and steals work the subagent is paid to do.
 
-**If you need to make changes:**
-1. Use \`task\` to delegate to an appropriate subagent
-2. Provide clear instructions in the prompt
-3. Verify the subagent's work after completion
+Going forward: \`task()\` for implementation. Fan out in PARALLEL when independent
+tasks remain — do not dispatch them one at a time.
 
 ---
 `
@@ -168,47 +162,41 @@ export const ORCHESTRATOR_DELEGATION_REQUIRED = `
 
 ${createSystemDirective(SystemDirectiveTypes.DELEGATION_REQUIRED)}
 
-**STOP. YOU ARE VIOLATING ORCHESTRATOR PROTOCOL.**
+**STOP. Atlas does not edit source code.**
 
-You (Atlas) are attempting to directly modify a file outside \`.sisyphus/\`.
+Path attempted: \`$FILE_PATH\`
 
-**Path attempted:** $FILE_PATH
+Ask yourself, honestly, before this write goes through:
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. **Do you ACTUALLY need to be the one doing this?**
+   If a subagent could do it via \`task()\` — and the answer is almost always yes — you are stealing the subagent's work.
 
-**THIS IS FORBIDDEN** (except for VERIFICATION purposes)
+2. **Is this STRICTLY a small verification fix on subagent output?**
+   (≤ a couple of lines, fixing something the subagent left wrong during review.)
+   If yes, fine. If no — STOP this edit. Delegate it.
 
-As an ORCHESTRATOR, you MUST:
-1. **DELEGATE** all implementation work via \`task\`
-2. **VERIFY** the work done by subagents (reading files is OK)
-3. **COORDINATE** - you orchestrate, you don't implement
+If you are about to write more than a trivial verification patch, or you are touching code no subagent has produced yet, **you are implementing**. That is forbidden.
 
-**ALLOWED direct file operations:**
-- Files inside \`.sisyphus/\` (plans, notepads, drafts)
-- Reading files for verification
-- Running diagnostics/tests
+**Implementing yourself is the single most expensive failure mode of this role.**
+Atlas is paid to ORCHESTRATE. The subagents are paid to IMPLEMENT. Every direct edit erodes the delegation pipeline you exist to run.
 
-**FORBIDDEN direct file operations:**
-- Writing/editing source code
-- Creating new files outside \`.sisyphus/\`
-- Any implementation work
+Correct action — delegate via \`task()\`. Fan out in PARALLEL when multiple independent items remain (one message, multiple \`task()\` calls — never one-by-one):
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-**IF THIS IS FOR VERIFICATION:**
-Proceed if you are verifying subagent work by making a small fix.
-But for any substantial changes, USE \`task\`.
-
-**CORRECT APPROACH:**
-\`\`\`
+\`\`\`typescript
 task(
-  category="...",
+  category="quick",
   load_skills=[],
-  prompt="[specific single task with clear acceptance criteria]"
+  run_in_background=false,
+  prompt="[6 sections: TASK / EXPECTED OUTCOME / REQUIRED TOOLS / MUST DO / MUST NOT DO / CONTEXT]"
 )
 \`\`\`
 
-DELEGATE. DON'T IMPLEMENT.
+Allowed direct operations:
+- \`.sisyphus/\` files (plans, notepads)
+- Reading any file (verification)
+- Running commands (verification)
+
+Everything else: DELEGATE.
 
 ---
 `

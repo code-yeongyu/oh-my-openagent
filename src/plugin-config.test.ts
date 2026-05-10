@@ -1,14 +1,17 @@
-import { afterEach, describe, expect, it, mock, spyOn } from "bun:test";
-import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { afterEach, describe, expect, it, mock } from "bun:test";
+import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import * as shared from "./shared"
-import { mergeConfigs, parseConfigPartially } from "./plugin-config";
-import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig } from "./config";
+import { loadConfigFromPath, mergeConfigs, parseConfigPartially } from "./plugin-config";
+import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig, type TeamModeConfig } from "./config";
+import { clearConfigLoadErrors, getConfigLoadErrors } from "./shared/config-errors";
 
 const tempDirs: string[] = []
+type ConfigInput = Omit<Partial<OhMyOpenCodeConfig>, "team_mode"> & {
+  team_mode?: Partial<TeamModeConfig>
+}
 
-function createConfig(config: Partial<OhMyOpenCodeConfig>): OhMyOpenCodeConfig {
+function createConfig(config: ConfigInput): OhMyOpenCodeConfig {
   return OhMyOpenCodeConfigSchema.parse(config)
 }
 
@@ -18,11 +21,35 @@ async function importFreshPluginConfigModule(): Promise<typeof import("./plugin-
 
 afterEach(() => {
   mock.restore()
+  clearConfigLoadErrors()
+  delete process.env.OPENCODE_CONFIG_DIR
 
   for (const dir of tempDirs.splice(0)) {
     rmSync(dir, { recursive: true, force: true })
   }
 })
+
+function createLoadPluginConfigTestContext(prefix: string): {
+  rootDir: string
+  userConfigDir: string
+  projectDir: string
+  projectConfigDir: string
+} {
+  const rootDir = mkdtempSync(join(tmpdir(), prefix))
+  const userConfigDir = join(rootDir, "user-config")
+  const projectDir = join(rootDir, "project")
+  const projectConfigDir = join(projectDir, ".opencode")
+
+  tempDirs.push(rootDir)
+  mkdirSync(userConfigDir, { recursive: true })
+  mkdirSync(projectConfigDir, { recursive: true })
+
+  return { rootDir, userConfigDir, projectDir, projectConfigDir }
+}
+
+function writeJsonFile(filePath: string, value: Record<string, unknown>): void {
+  writeFileSync(filePath, JSON.stringify(value))
+}
 
 describe("mergeConfigs", () => {
   describe("categories merging", () => {
@@ -121,6 +148,29 @@ describe("mergeConfigs", () => {
       expect(result.agents?.explore).toMatchObject({ model: "anthropic/claude-haiku-4-5" });
     });
 
+    it("should deep merge team_mode", () => {
+      const base = createConfig({
+        team_mode: {
+          enabled: false,
+          tmux_visualization: false,
+          max_parallel_members: 2,
+        },
+      });
+
+      const override = {
+        team_mode: {
+          enabled: true,
+        },
+      } as OhMyOpenCodeConfig;
+
+      const result = mergeConfigs(base, override);
+
+      expect(result.team_mode).toMatchObject({
+        enabled: true,
+        max_parallel_members: 2,
+      });
+    });
+
     it("should merge disabled arrays without duplicates", () => {
       const base = createConfig({
         disabled_hooks: ["comment-checker", "think-mode"],
@@ -156,6 +206,7 @@ describe("mergeConfigs", () => {
     });
   });
 });
+
 
 describe("parseConfigPartially", () => {
   describe("disabled_hooks compatibility", () => {
@@ -222,6 +273,35 @@ describe("parseConfigPartially", () => {
       expect(result).not.toBeNull();
       expect(result!.disabled_hooks).toEqual(["comment-checker"]);
       expect(result!.agents).toBeUndefined();
+    });
+
+    it("should preserve valid agent_order when another section is invalid", () => {
+      const rawConfig = {
+        agent_order: ["hephaestus", "sisyphus", "prometheus", "atlas"],
+        disabled_skills: [42],
+      };
+
+      const result = parseConfigPartially(rawConfig);
+
+      expect(result?.agent_order).toEqual([
+        "hephaestus",
+        "sisyphus",
+        "prometheus",
+        "atlas",
+      ]);
+      expect(result?.disabled_skills).toBeUndefined();
+    });
+
+    it("should skip abusive agent_order when another section is valid", () => {
+      const rawConfig = {
+        agent_order: ["x".repeat(129)],
+        disabled_hooks: ["comment-checker"],
+      };
+
+      const result = parseConfigPartially(rawConfig);
+
+      expect(result?.agent_order).toBeUndefined();
+      expect(result?.disabled_hooks).toEqual(["comment-checker"]);
     });
 
     it("should preserve valid agents when a non-agent section is invalid", () => {
@@ -299,6 +379,51 @@ describe("parseConfigPartially", () => {
     });
   });
 });
+
+describe("loadConfigFromPath agent_order warnings", () => {
+  it("loads config and records warning for invalid agent_order entries", () => {
+    // given
+    const rootDir = mkdtempSync(join(tmpdir(), "agent-order-warning-"))
+    tempDirs.push(rootDir)
+    const configPath = join(rootDir, "oh-my-openagent.json")
+    writeJsonFile(configPath, {
+      agent_order: ["hephaestus", "not-real", "sisyphus", "hephaestus"],
+    })
+
+    // when
+    const result = loadConfigFromPath(configPath, {})
+
+    // then
+    expect(result?.agent_order).toEqual(["hephaestus", "not-real", "sisyphus", "hephaestus"])
+    expect(getConfigLoadErrors()).toEqual([
+      {
+        path: configPath,
+        error: 'agent_order warning - unknown agent names ignored: "not-real"; duplicate agent names ignored: "hephaestus"',
+      },
+    ])
+  })
+
+  it("sanitizes and caps invalid agent_order values before recording warnings", () => {
+    // given
+    const rootDir = mkdtempSync(join(tmpdir(), "agent-order-sanitize-"))
+    tempDirs.push(rootDir)
+    const configPath = join(rootDir, "oh-my-openagent.json")
+    writeJsonFile(configPath, {
+      agent_order: [
+        "\u001B[31mbad\u001B[0m",
+        ...Array.from({ length: 11 }, (_, index) => `missing-${index}`),
+      ],
+    })
+
+    // when
+    loadConfigFromPath(configPath, {})
+
+    // then
+    expect(getConfigLoadErrors()[0]?.error).toBe(
+      'agent_order warning - unknown agent names ignored: "[31mbad[0m", "missing-0", "missing-1", "missing-2", "missing-3", "missing-4", "missing-5", "missing-6", "missing-7", "missing-8", (+2 more)',
+    )
+  })
+})
 
 describe("loadPluginConfig", () => {
   it("should only honor mcp_env_allowlist from user config", async () => {
@@ -510,5 +635,411 @@ describe("loadPluginConfig", () => {
       include_co_authored_by: false,
       git_env_prefix: "GIT_MASTER=1",
     })
+  })
+  describe("team_mode.tmux_visualization", () => {
+    it("#given canonical user config enables team_mode and legacy config also exists #when loadPluginConfig runs #then tmux_visualization remains false", async () => {
+      // given
+      const { userConfigDir, projectDir } = createLoadPluginConfigTestContext("omo-plugin-config-team-mode-user-")
+
+      writeJsonFile(join(userConfigDir, "oh-my-openagent.json"), {
+        team_mode: {
+          enabled: true,
+        },
+      })
+      writeJsonFile(join(userConfigDir, "oh-my-opencode.json"), {
+        agents: {
+          oracle: {
+            model: "openai/gpt-5.4",
+          },
+        },
+      })
+
+      process.env.OPENCODE_CONFIG_DIR = userConfigDir
+
+      // when
+      const { loadPluginConfig } = await importFreshPluginConfigModule()
+      const config = loadPluginConfig(projectDir, {})
+
+      // then
+      expect(config.team_mode?.enabled).toBe(true)
+      expect(config.team_mode?.tmux_visualization).toBe(false)
+    })
+
+    it("#given canonical user config lacks team_mode and legacy config only enables team_mode #when loadPluginConfig runs #then canonical config wins and tmux_visualization stays effectively false", async () => {
+      // given
+      const { userConfigDir, projectDir } = createLoadPluginConfigTestContext("omo-plugin-config-team-mode-legacy-")
+
+      writeJsonFile(join(userConfigDir, "oh-my-openagent.json"), {
+        hashline_edit: true,
+      })
+      writeJsonFile(join(userConfigDir, "oh-my-opencode.json"), {
+        team_mode: {
+          enabled: true,
+        },
+      })
+
+      process.env.OPENCODE_CONFIG_DIR = userConfigDir
+
+      // when
+      const { loadPluginConfig } = await importFreshPluginConfigModule()
+      const config = loadPluginConfig(projectDir, {})
+
+      // then
+      expect(config.team_mode).toBeUndefined()
+      expect(config.team_mode?.tmux_visualization ?? false).toBe(false)
+    })
+
+    it("#given canonical user config lacks team_mode and legacy config sets tmux_visualization=true #when loadPluginConfig runs #then legacy team_mode is not promoted into the loaded config", async () => {
+      // given
+      const { userConfigDir, projectDir } = createLoadPluginConfigTestContext("omo-plugin-config-team-mode-visualization-")
+
+      writeJsonFile(join(userConfigDir, "oh-my-openagent.json"), {
+        hashline_edit: true,
+      })
+      writeJsonFile(join(userConfigDir, "oh-my-opencode.json"), {
+        team_mode: {
+          enabled: true,
+          tmux_visualization: true,
+        },
+      })
+
+      process.env.OPENCODE_CONFIG_DIR = userConfigDir
+
+      // when
+      const { loadPluginConfig } = await importFreshPluginConfigModule()
+      const config = loadPluginConfig(projectDir, {})
+
+      // then
+      // This proves a concurrent canonical file suppresses the legacy team_mode subtree entirely.
+      expect(config.team_mode).toBeUndefined()
+    })
+  })
+
+  it("should merge configs from ancestor directories with closer winning", async () => {
+    // given
+    const rootDir = mkdtempSync(join(tmpdir(), "omo-plugin-config-walk-"))
+    const userConfigDir = join(rootDir, "user-config")
+    const homeDir = join(rootDir, "home")
+    const workDir = join(homeDir, "work")
+    const projectDir = join(workDir, "project")
+
+    tempDirs.push(rootDir)
+    mkdirSync(userConfigDir, { recursive: true })
+    mkdirSync(join(homeDir, ".opencode"), { recursive: true })
+    mkdirSync(join(workDir, ".opencode"), { recursive: true })
+    mkdirSync(join(projectDir, ".opencode"), { recursive: true })
+
+    writeFileSync(
+      join(userConfigDir, "oh-my-openagent.jsonc"),
+      JSON.stringify({ agents: { oracle: { model: "user/model" } } })
+    )
+    writeFileSync(
+      join(homeDir, ".opencode", "oh-my-openagent.jsonc"),
+      JSON.stringify({ agents: { oracle: { model: "home/model" } } })
+    )
+    writeFileSync(
+      join(workDir, ".opencode", "oh-my-openagent.jsonc"),
+      JSON.stringify({ agents: { oracle: { model: "work/model" } } })
+    )
+    writeFileSync(
+      join(projectDir, ".opencode", "oh-my-openagent.jsonc"),
+      JSON.stringify({ agents: { oracle: { model: "project/model" } } })
+    )
+
+    process.env.OPENCODE_CONFIG_DIR = userConfigDir
+    process.env.HOME = homeDir
+
+    // when
+    const { loadPluginConfig } = await importFreshPluginConfigModule()
+    const config = loadPluginConfig(projectDir, {})
+
+    // then
+    expect(config.agents?.oracle?.model).toBe("project/model")
+  })
+
+  it("should layer ancestor configs so each contributes fields not overridden by closer ones", async () => {
+    // given
+    const rootDir = mkdtempSync(join(tmpdir(), "omo-plugin-config-walk-layer-"))
+    const userConfigDir = join(rootDir, "user-config")
+    const homeDir = join(rootDir, "home")
+    const workDir = join(homeDir, "work")
+    const projectDir = join(workDir, "project")
+
+    tempDirs.push(rootDir)
+    mkdirSync(userConfigDir, { recursive: true })
+    mkdirSync(join(homeDir, ".opencode"), { recursive: true })
+    mkdirSync(join(workDir, ".opencode"), { recursive: true })
+    mkdirSync(join(projectDir, ".opencode"), { recursive: true })
+
+    writeFileSync(join(userConfigDir, "oh-my-openagent.jsonc"), "{}")
+    writeFileSync(
+      join(homeDir, ".opencode", "oh-my-openagent.jsonc"),
+      JSON.stringify({ agents: { oracle: { model: "home/oracle" } } })
+    )
+    writeFileSync(
+      join(workDir, ".opencode", "oh-my-openagent.jsonc"),
+      JSON.stringify({ agents: { hephaestus: { model: "work/hephaestus" } } })
+    )
+    writeFileSync(
+      join(projectDir, ".opencode", "oh-my-openagent.jsonc"),
+      JSON.stringify({ agents: { sisyphus: { model: "project/sisyphus" } } })
+    )
+
+    process.env.OPENCODE_CONFIG_DIR = userConfigDir
+    process.env.HOME = homeDir
+
+    // when
+    const { loadPluginConfig } = await importFreshPluginConfigModule()
+    const config = loadPluginConfig(projectDir, {})
+
+    // then - each level contributes a non-conflicting field
+    expect(config.agents?.oracle?.model).toBe("home/oracle")
+    expect(config.agents?.hephaestus?.model).toBe("work/hephaestus")
+    expect(config.agents?.sisyphus?.model).toBe("project/sisyphus")
+  })
+
+  it("should preserve mcp_env_allowlist as user-only when ancestors set their own allowlists", async () => {
+    // given
+    const rootDir = mkdtempSync(join(tmpdir(), "omo-plugin-config-walk-allowlist-"))
+    const userConfigDir = join(rootDir, "user-config")
+    const homeDir = join(rootDir, "home")
+    const workDir = join(homeDir, "work")
+    const projectDir = join(workDir, "project")
+
+    tempDirs.push(rootDir)
+    mkdirSync(userConfigDir, { recursive: true })
+    mkdirSync(join(homeDir, ".opencode"), { recursive: true })
+    mkdirSync(join(workDir, ".opencode"), { recursive: true })
+    mkdirSync(join(projectDir, ".opencode"), { recursive: true })
+
+    writeFileSync(
+      join(userConfigDir, "oh-my-openagent.jsonc"),
+      JSON.stringify({ mcp_env_allowlist: ["USER_ONLY_TOKEN"] })
+    )
+    writeFileSync(
+      join(homeDir, ".opencode", "oh-my-openagent.jsonc"),
+      JSON.stringify({ mcp_env_allowlist: ["HOME_TOKEN"] })
+    )
+    writeFileSync(
+      join(workDir, ".opencode", "oh-my-openagent.jsonc"),
+      JSON.stringify({ mcp_env_allowlist: ["WORK_TOKEN"] })
+    )
+    writeFileSync(
+      join(projectDir, ".opencode", "oh-my-openagent.jsonc"),
+      JSON.stringify({ mcp_env_allowlist: ["PROJECT_TOKEN"] })
+    )
+
+    process.env.OPENCODE_CONFIG_DIR = userConfigDir
+    process.env.HOME = homeDir
+
+    // when
+    const { loadPluginConfig } = await importFreshPluginConfigModule()
+    const config = loadPluginConfig(projectDir, {})
+
+    // then - only the canonical user config can extend the allowlist
+    expect(config.mcp_env_allowlist).toEqual(["USER_ONLY_TOKEN"])
+  })
+
+  it("should stop walking at $HOME and ignore configs above it", async () => {
+    // given
+    const rootDir = mkdtempSync(join(tmpdir(), "omo-plugin-config-walk-stop-"))
+    const userConfigDir = join(rootDir, "user-config")
+    const aboveHomeDir = join(rootDir, "above-home")
+    const homeDir = join(aboveHomeDir, "home")
+    const projectDir = join(homeDir, "project")
+
+    tempDirs.push(rootDir)
+    mkdirSync(userConfigDir, { recursive: true })
+    mkdirSync(join(aboveHomeDir, ".opencode"), { recursive: true })
+    mkdirSync(join(homeDir, ".opencode"), { recursive: true })
+    mkdirSync(join(projectDir, ".opencode"), { recursive: true })
+
+    writeFileSync(join(userConfigDir, "oh-my-openagent.jsonc"), "{}")
+    writeFileSync(
+      join(aboveHomeDir, ".opencode", "oh-my-openagent.jsonc"),
+      JSON.stringify({ agents: { oracle: { model: "above-home/leak" } } })
+    )
+    writeFileSync(
+      join(homeDir, ".opencode", "oh-my-openagent.jsonc"),
+      JSON.stringify({ agents: { hephaestus: { model: "home/wins" } } })
+    )
+    writeFileSync(join(projectDir, ".opencode", "oh-my-openagent.jsonc"), "{}")
+
+    process.env.OPENCODE_CONFIG_DIR = userConfigDir
+    process.env.HOME = homeDir
+
+    // when
+    const { loadPluginConfig } = await importFreshPluginConfigModule()
+    const config = loadPluginConfig(projectDir, {})
+
+    // then - $HOME's config applies, but the directory above it does NOT
+    expect(config.agents?.hephaestus?.model).toBe("home/wins")
+    expect(config.agents?.oracle).toBeUndefined()
+  })
+
+  it("should not walk above the start directory when start is outside $HOME", async () => {
+    // given
+    const rootDir = mkdtempSync(join(tmpdir(), "omo-plugin-config-walk-outside-"))
+    const userConfigDir = join(rootDir, "user-config")
+    const homeDir = join(rootDir, "home")
+    const outsideHomeRoot = join(rootDir, "outside-home")
+    const projectDir = join(outsideHomeRoot, "proj")
+
+    tempDirs.push(rootDir)
+    mkdirSync(userConfigDir, { recursive: true })
+    mkdirSync(homeDir, { recursive: true })
+    mkdirSync(join(outsideHomeRoot, ".opencode"), { recursive: true })
+    mkdirSync(join(projectDir, ".opencode"), { recursive: true })
+
+    writeFileSync(join(userConfigDir, "oh-my-openagent.jsonc"), "{}")
+    writeFileSync(
+      join(outsideHomeRoot, ".opencode", "oh-my-openagent.jsonc"),
+      JSON.stringify({ agents: { oracle: { model: "outside-home/leak" } } })
+    )
+    writeFileSync(
+      join(projectDir, ".opencode", "oh-my-openagent.jsonc"),
+      JSON.stringify({ agents: { hephaestus: { model: "project/wins" } } })
+    )
+
+    process.env.OPENCODE_CONFIG_DIR = userConfigDir
+    process.env.HOME = homeDir
+
+    // when
+    const { loadPluginConfig } = await importFreshPluginConfigModule()
+    const config = loadPluginConfig(projectDir, {})
+
+    // then - project loads, but the parent above it (outside $HOME) is not walked into
+    expect(config.agents?.hephaestus?.model).toBe("project/wins")
+    expect(config.agents?.oracle).toBeUndefined()
+  })
+
+  it("should merge git_master overrides across ancestors with closer winning", async () => {
+    // given
+    const rootDir = mkdtempSync(join(tmpdir(), "omo-plugin-config-walk-git-master-"))
+    const userConfigDir = join(rootDir, "user-config")
+    const homeDir = join(rootDir, "home")
+    const workDir = join(homeDir, "work")
+    const projectDir = join(workDir, "project")
+
+    tempDirs.push(rootDir)
+    mkdirSync(userConfigDir, { recursive: true })
+    mkdirSync(join(homeDir, ".opencode"), { recursive: true })
+    mkdirSync(join(workDir, ".opencode"), { recursive: true })
+    mkdirSync(join(projectDir, ".opencode"), { recursive: true })
+
+    writeFileSync(join(userConfigDir, "oh-my-openagent.jsonc"), "{}")
+    writeFileSync(
+      join(homeDir, ".opencode", "oh-my-openagent.jsonc"),
+      JSON.stringify({
+        git_master: {
+          commit_footer: false,
+          include_co_authored_by: false,
+          git_env_prefix: "HOME=1",
+        },
+      })
+    )
+    writeFileSync(
+      join(workDir, ".opencode", "oh-my-openagent.jsonc"),
+      JSON.stringify({
+        git_master: {
+          include_co_authored_by: true,
+        },
+      })
+    )
+    writeFileSync(
+      join(projectDir, ".opencode", "oh-my-openagent.jsonc"),
+      JSON.stringify({
+        git_master: {
+          commit_footer: true,
+        },
+      })
+    )
+
+    process.env.OPENCODE_CONFIG_DIR = userConfigDir
+    process.env.HOME = homeDir
+
+    // when
+    const { loadPluginConfig } = await importFreshPluginConfigModule()
+    const config = loadPluginConfig(projectDir, {})
+
+    // then project's commit_footer wins, work's include_co_authored_by wins,
+    // home's git_env_prefix is preserved since nobody else set it
+    expect(config.git_master).toEqual({
+      commit_footer: true,
+      include_co_authored_by: true,
+      git_env_prefix: "HOME=1",
+    })
+  })
+
+  it("should resolve agent_definitions relative to each ancestor's own .opencode directory", async () => {
+    // given
+    const rootDir = mkdtempSync(join(tmpdir(), "omo-plugin-config-walk-agent-defs-"))
+    const userConfigDir = join(rootDir, "user-config")
+    const homeDir = join(rootDir, "home")
+    const workDir = join(homeDir, "work")
+    const projectDir = join(workDir, "project")
+    const workDefRelativePath = "./work-agent.md"
+    const projectDefRelativePath = "./project-agent.md"
+
+    tempDirs.push(rootDir)
+    mkdirSync(userConfigDir, { recursive: true })
+    mkdirSync(join(workDir, ".opencode"), { recursive: true })
+    mkdirSync(join(projectDir, ".opencode"), { recursive: true })
+
+    writeFileSync(join(userConfigDir, "oh-my-openagent.jsonc"), "{}")
+    writeFileSync(
+      join(workDir, ".opencode", "oh-my-openagent.jsonc"),
+      JSON.stringify({ agent_definitions: [workDefRelativePath] })
+    )
+    writeFileSync(
+      join(projectDir, ".opencode", "oh-my-openagent.jsonc"),
+      JSON.stringify({ agent_definitions: [projectDefRelativePath] })
+    )
+
+    process.env.OPENCODE_CONFIG_DIR = userConfigDir
+    process.env.HOME = homeDir
+
+    // when
+    const { loadPluginConfig } = await importFreshPluginConfigModule()
+    const config = loadPluginConfig(projectDir, {})
+
+    // then each ancestor's relative path resolves against its own .opencode/
+    expect(config.agent_definitions).toContain(join(realpathSync(workDir), ".opencode", "work-agent.md"))
+    expect(config.agent_definitions).toContain(join(realpathSync(projectDir), ".opencode", "project-agent.md"))
+  })
+
+  it("should migrate legacy basenames found in ancestor directories", async () => {
+    // given
+    const rootDir = mkdtempSync(join(tmpdir(), "omo-plugin-config-walk-legacy-"))
+    const userConfigDir = join(rootDir, "user-config")
+    const homeDir = join(rootDir, "home")
+    const workDir = join(homeDir, "work")
+    const projectDir = join(workDir, "project")
+    const ancestorLegacyPath = join(workDir, ".opencode", "oh-my-opencode.jsonc")
+    const ancestorCanonicalPath = join(workDir, ".opencode", "oh-my-openagent.jsonc")
+
+    tempDirs.push(rootDir)
+    mkdirSync(userConfigDir, { recursive: true })
+    mkdirSync(join(homeDir, ".opencode"), { recursive: true })
+    mkdirSync(join(workDir, ".opencode"), { recursive: true })
+    mkdirSync(join(projectDir, ".opencode"), { recursive: true })
+
+    writeFileSync(join(userConfigDir, "oh-my-openagent.jsonc"), "{}")
+    writeFileSync(
+      ancestorLegacyPath,
+      JSON.stringify({ agents: { oracle: { model: "ancestor-legacy/model" } } })
+    )
+
+    process.env.OPENCODE_CONFIG_DIR = userConfigDir
+    process.env.HOME = homeDir
+
+    // when
+    const { loadPluginConfig } = await importFreshPluginConfigModule()
+    const config = loadPluginConfig(projectDir, {})
+
+    // then
+    expect(existsSync(ancestorLegacyPath)).toBe(false)
+    expect(existsSync(ancestorCanonicalPath)).toBe(true)
+    expect(config.agents?.oracle?.model).toBe("ancestor-legacy/model")
   })
 })

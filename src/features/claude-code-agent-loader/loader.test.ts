@@ -191,31 +191,18 @@ describe("claude-code-agent-loader", () => {
   describe("loadUserAgents", () => {
     test("returns empty object when pointed at dir without agents/", () => {
       const root = trackDir(mkdtempSync(join(tmpdir(), "agent-loader-test-")))
-      // Temporarily set env var — best-effort in parallel test runner
-      const prev = process.env.CLAUDE_CONFIG_DIR
-      try {
-        process.env.CLAUDE_CONFIG_DIR = root
-        const result = loadUserAgents()
-        expect(result).toEqual({})
-      } finally {
-        if (prev !== undefined) process.env.CLAUDE_CONFIG_DIR = prev
-        else delete process.env.CLAUDE_CONFIG_DIR
-      }
+      process.env.CLAUDE_CONFIG_DIR = root
+      const result = loadUserAgents()
+      expect(result).toEqual({})
     })
   })
 
   describe("loadOpencodeGlobalAgents", () => {
     test("returns empty object when pointed at dir without agents/", () => {
       const root = trackDir(mkdtempSync(join(tmpdir(), "agent-loader-test-")))
-      const prev = process.env.OPENCODE_CONFIG_DIR
-      try {
-        process.env.OPENCODE_CONFIG_DIR = root
-        const result = loadOpencodeGlobalAgents()
-        expect(result).toEqual({})
-      } finally {
-        if (prev !== undefined) process.env.OPENCODE_CONFIG_DIR = prev
-        else delete process.env.OPENCODE_CONFIG_DIR
-      }
+      process.env.OPENCODE_CONFIG_DIR = root
+      const result = loadOpencodeGlobalAgents()
+      expect(result).toEqual({})
     })
   })
 

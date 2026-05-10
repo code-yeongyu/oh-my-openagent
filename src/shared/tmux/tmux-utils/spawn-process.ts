@@ -1,1 +1,1 @@
-export { spawn } from "bun"
+export { spawn } from "../../bun-spawn-shim"

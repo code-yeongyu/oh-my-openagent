@@ -36,6 +36,7 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
     const discovered = (await getAllSkills({
       disabledSkills: options?.disabledSkills,
       browserProvider: options?.browserProvider,
+      teamModeEnabled: options?.teamModeEnabled,
     })) ?? []
     const allSkills = options.skills ? [...options.skills] : discovered
 
@@ -51,6 +52,8 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
   }
 
   const getCommands = (): CommandInfo[] => {
+    if (options.commands) return [...options.commands]
+
     return commandDiscovery.discoverCommandsSync(undefined, {
       pluginsEnabled: options.pluginsEnabled,
       enabledPluginsOverride: options.enabledPluginsOverride,

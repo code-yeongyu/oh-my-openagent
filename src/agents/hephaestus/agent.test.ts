@@ -126,6 +126,8 @@ describe("getHephaestusPrompt", () => {
     expect(prompt).toContain("You build context by examining");
     expect(prompt).toContain("Forbidden stops");
     expect(prompt).toContain("Three-attempt failure protocol");
+    expect(prompt).toContain("based on GPT-5.5");
+    expect(prompt).toContain("Autonomy and Persistence");
   });
 
   test("GPT 5.3-codex model returns GPT-5.3 prompt", () => {

@@ -21,7 +21,19 @@ export function createAtlasHook(ctx: PluginInput, options?: AtlasHookOptions) {
 
   return {
     handler: createAtlasEventHandler({ ctx, options, sessions, getState }),
-    "tool.execute.before": createToolExecuteBeforeHandler({ ctx, pendingFilePaths, pendingTaskRefs }),
-    "tool.execute.after": createToolExecuteAfterHandler({ ctx, pendingFilePaths, pendingTaskRefs, autoCommit, getState }),
+    "tool.execute.before": createToolExecuteBeforeHandler({
+      ctx,
+      pendingFilePaths,
+      pendingTaskRefs,
+      isCallerOrchestrator: options?.isCallerOrchestrator,
+    }),
+    "tool.execute.after": createToolExecuteAfterHandler({
+      ctx,
+      pendingFilePaths,
+      pendingTaskRefs,
+      autoCommit,
+      getState,
+      isCallerOrchestrator: options?.isCallerOrchestrator,
+    }),
   }
 }

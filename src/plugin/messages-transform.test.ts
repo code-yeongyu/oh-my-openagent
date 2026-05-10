@@ -7,10 +7,13 @@ import type { CreatedHooks } from "../create-hooks"
 type TestPart = {
   type: string
   id?: string
+  sessionID?: string
+  messageID?: string
   callID?: string
   tool_use_id?: string
   content?: string
   text?: string
+  synthetic?: boolean
 }
 
 type TestMessage = {
@@ -38,7 +41,7 @@ function makeHooks(overrides: {
     contextInjectorMessagesTransform: overrides.contextInjector ? makeHook(overrides.contextInjector) : undefined,
     thinkingBlockValidator: overrides.thinkingBlock ? makeHook(overrides.thinkingBlock) : undefined,
     toolPairValidator: overrides.toolPair ? makeHook(overrides.toolPair) : undefined,
-  } as unknown as CreatedHooks
+  } as CreatedHooks
 }
 
 async function runHandler(
@@ -156,6 +159,25 @@ describe("createMessagesTransformHandler", () => {
 
     //#when / #then
     await runHandler(hooks, [])
+  })
+
+  it("appends a synthetic user turn when transformed messages end with assistant prefill", async () => {
+    //#given
+    const messages: TestMessage[] = [
+      { info: { role: "user" }, parts: [{ type: "text", text: "work on this" }] },
+      { info: { role: "assistant" }, parts: [{ type: "text", text: "partial assistant tail" }] },
+    ]
+
+    //#when
+    await runHandler(makeHooks({}), messages)
+
+    //#then
+    expect(messages.at(-1)?.info).toMatchObject({ role: "user" })
+    expect(messages.at(-1)?.parts[0]).toMatchObject({
+      type: "text",
+      text: "[internal] Continue from the previous assistant state.",
+      synthetic: true,
+    })
   })
 })
 

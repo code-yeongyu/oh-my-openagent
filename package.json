@@ -1,6 +1,6 @@
 {
   "name": "oh-my-opencode",
-  "version": "3.17.12",
+  "version": "4.0.0",
   "description": "The Best AI Agent Harness - Batteries-Included OpenCode Plugin with Multi-Model Orchestration, Parallel Background Agents, and Crafted LSP/AST Tools",
   "main": "./dist/index.js",
   "types": "dist/index.d.ts",
@@ -22,7 +22,8 @@
     "./schema.json": "./dist/oh-my-opencode.schema.json"
   },
   "scripts": {
-    "build": "bun build src/index.ts --outdir dist --target bun --format esm --external @ast-grep/napi --external zod && tsc --emitDeclarationOnly && bun build src/cli/index.ts --outdir dist/cli --target bun --format esm --external @ast-grep/napi && bun run build:schema",
+    "build": "bun build src/index.ts --outdir dist --target bun --format esm --external @ast-grep/napi --external zod && bun run build:node-require-shim && tsc --emitDeclarationOnly && bun build src/cli/index.ts --outdir dist/cli --target bun --format esm --external @ast-grep/napi && bun run build:schema",
+    "build:node-require-shim": "bun run script/patch-node-require-shim.ts",
     "build:all": "bun run build && bun run build:binaries",
     "build:binaries": "bun run script/build-binaries.ts",
     "build:schema": "bun run script/build-schema.ts",
@@ -33,7 +34,7 @@
     "prepublishOnly": "bun run clean && bun run build",
     "test:model-capabilities": "bun test src/shared/model-capability-aliases.test.ts src/shared/model-capability-guardrails.test.ts src/shared/model-capabilities.test.ts src/cli/doctor/checks/model-resolution.test.ts --bail",
     "typecheck": "tsc --noEmit",
-    "test": "bun test"
+    "test": "bun test bin script src"
   },
   "keywords": [
     "opencode",
@@ -68,7 +69,7 @@
     "js-yaml": "^4.1.1",
     "jsonc-parser": "^3.3.1",
     "picocolors": "^1.1.1",
-    "picomatch": "^4.0.2",
+    "picomatch": "^4.0.4",
     "posthog-node": "^5.29.2",
     "vscode-jsonrpc": "^8.2.0"
   },
@@ -80,17 +81,17 @@
     "zod": "^4.3.0"
   },
   "optionalDependencies": {
-    "oh-my-opencode-darwin-arm64": "3.17.12",
-    "oh-my-opencode-darwin-x64": "3.17.12",
-    "oh-my-opencode-darwin-x64-baseline": "3.17.12",
-    "oh-my-opencode-linux-arm64": "3.17.12",
-    "oh-my-opencode-linux-arm64-musl": "3.17.12",
-    "oh-my-opencode-linux-x64": "3.17.12",
-    "oh-my-opencode-linux-x64-baseline": "3.17.12",
-    "oh-my-opencode-linux-x64-musl": "3.17.12",
-    "oh-my-opencode-linux-x64-musl-baseline": "3.17.12",
-    "oh-my-opencode-windows-x64": "3.17.12",
-    "oh-my-opencode-windows-x64-baseline": "3.17.12"
+    "oh-my-opencode-darwin-arm64": "4.0.0",
+    "oh-my-opencode-darwin-x64": "4.0.0",
+    "oh-my-opencode-darwin-x64-baseline": "4.0.0",
+    "oh-my-opencode-linux-arm64": "4.0.0",
+    "oh-my-opencode-linux-arm64-musl": "4.0.0",
+    "oh-my-opencode-linux-x64": "4.0.0",
+    "oh-my-opencode-linux-x64-baseline": "4.0.0",
+    "oh-my-opencode-linux-x64-musl": "4.0.0",
+    "oh-my-opencode-linux-x64-musl-baseline": "4.0.0",
+    "oh-my-opencode-windows-x64": "4.0.0",
+    "oh-my-opencode-windows-x64-baseline": "4.0.0"
   },
   "overrides": {},
   "trustedDependencies": [

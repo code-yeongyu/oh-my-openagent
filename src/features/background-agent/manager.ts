@@ -59,6 +59,7 @@ import {
   startAttempt,
 } from "./attempt-lifecycle"
 import { registerManagerForCleanup, unregisterManagerForCleanup } from "./process-cleanup"
+import { setContinuationMarkerSource } from "../../features/run-continuation-state"
 import {
   findNearestMessageExcludingCompaction,
   resolvePromptContextFromSessionMessages,
@@ -66,7 +67,7 @@ import {
 import { handleSessionIdleBackgroundEvent } from "./session-idle-event-handler"
 import { MESSAGE_STORAGE } from "../hook-message-injector"
 import { join } from "node:path"
-import { pruneStaleTasksAndNotifications } from "./task-poller"
+import { pruneStaleTasksAndNotifications, type SessionStatusMap } from "./task-poller"
 import { checkAndInterruptStaleTasks } from "./task-poller"
 import { removeTaskToastTracking } from "./remove-task-toast-tracking"
 import { abortWithTimeout } from "./abort-with-timeout"
@@ -91,8 +92,23 @@ import {
   clearDelegatedChildSessionBootstrap,
   registerDelegatedChildSessionBootstrap,
 } from "../../shared/delegated-child-session-bootstrap"
+import { settleAfterSessionIdle } from "../../hooks/shared/session-idle-settle"
 
 type OpencodeClient = PluginInput["client"]
+
+type ParentWakePromptContext = {
+  agent?: string
+  model?: { providerID: string; modelID: string }
+  variant?: string
+  tools?: Record<string, boolean>
+}
+
+type SessionStatusInfo = { type?: string }
+
+const BACKGROUND_PARENT_WAKE_PROMPT = `<system-reminder>
+[BACKGROUND TASK NOTIFICATION READY]
+A background task notification was already added to this session. Continue from that notification.
+</system-reminder>`
 
 interface MessagePartInfo {
   id?: string
@@ -185,6 +201,7 @@ export interface BackgroundManagerConfig {
   onShutdown?: () => void | Promise<void>
   enableParentSessionNotifications?: boolean
   modelFallbackControllerAccessor?: ModelFallbackControllerAccessor
+  log?: typeof log
 }
 
 export class BackgroundManager {
@@ -212,12 +229,15 @@ export class BackgroundManager {
   private completedTaskSummaries: Map<string, BackgroundTaskNotificationTask[]> = new Map()
   private idleDeferralTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
   private notificationQueueByParent: Map<string, Promise<void>> = new Map()
+  private pendingParentWakes: Map<string, ParentWakePromptContext> = new Map()
   private observedOutputSessions: Set<string> = new Set()
   private observedIncompleteTodosBySession: Map<string, boolean> = new Map()
   private rootDescendantCounts: Map<string, number>
   private preStartDescendantReservations: Set<string>
   private enableParentSessionNotifications: boolean
   private modelFallbackControllerAccessor?: ModelFallbackControllerAccessor
+  private logger: typeof log
+  private loggedSessionStatusUnavailable = false
   readonly taskHistory = new TaskHistory()
   private cachedCircuitBreakerSettings?: CircuitBreakerSettings
 
@@ -239,6 +259,7 @@ export class BackgroundManager {
     this.preStartDescendantReservations = new Set()
     this.enableParentSessionNotifications = options?.enableParentSessionNotifications ?? true
     this.modelFallbackControllerAccessor = options?.modelFallbackControllerAccessor
+    this.logger = options?.log ?? log
     this.registerProcessCleanup()
   }
 
@@ -391,6 +412,12 @@ export class BackgroundManager {
       throw new Error("Agent parameter is required")
     }
 
+    input = { ...input, agent: input.agent.trim().replace(/^[\\/"']+|[\\/"']+$/g, "").trim() }
+
+    if (!input.agent) {
+      throw new Error("Agent parameter is required after sanitization")
+    }
+
     const spawnReservation = await this.reserveSubagentSpawn(input.parentSessionId)
 
     try {
@@ -415,6 +442,7 @@ export class BackgroundManager {
         spawnDepth: spawnReservation.spawnContext.childDepth,
         parentSessionId: input.parentSessionId,
         parentMessageId: input.parentMessageId,
+        teamRunId: input.teamRunId,
         parentModel: input.parentModel,
         parentAgent: input.parentAgent,
         parentTools: input.parentTools,
@@ -422,6 +450,7 @@ export class BackgroundManager {
         fallbackChain: input.fallbackChain,
         attemptCount: 0,
         category: input.category,
+        onSessionCreated: input.onSessionCreated,
       }
       const firstAttempt = startAttempt(task, input.model)
 
@@ -457,6 +486,9 @@ export class BackgroundManager {
 
       spawnReservation.commit()
       this.markPreStartDescendantReservation(task)
+
+      // Signal CLI run mode that background tasks are active
+      this.updateBackgroundTaskMarker(input.parentSessionId)
 
       // Trigger processing (fire-and-forget)
       void this.processKey(key)
@@ -521,6 +553,9 @@ export class BackgroundManager {
             await this.abortSessionWithLogging(item.task.sessionId, "startTask error cleanup")
           }
 
+          // Update continuation marker for CLI run mode
+          this.updateBackgroundTaskMarker(item.task.parentSessionId)
+
           this.markForNotification(item.task)
           this.enqueueNotificationForParent(item.task.parentSessionId, () => this.notifyParentSession(item.task)).catch(err => {
             log("[background-agent] Failed to notify on startTask error:", err)
@@ -581,6 +616,7 @@ export class BackgroundManager {
       return
     }
 
+    await input.onSessionCreated?.(sessionID)
     this.settlePreStartDescendantReservation(task)
     subagentSessions.add(sessionID)
 
@@ -592,7 +628,7 @@ export class BackgroundManager {
       parentID: input.parentSessionId,
     })
 
-    if (this.onSubagentSessionCreated && this.tmuxEnabled && isInsideTmux()) {
+    if (!input.suppressTmuxSpawn && this.onSubagentSessionCreated && this.tmuxEnabled && isInsideTmux()) {
       log("[background-agent] Invoking tmux callback NOW", { sessionID })
       await this.onSubagentSessionCreated({
         sessionID,
@@ -604,7 +640,9 @@ export class BackgroundManager {
       log("[background-agent] tmux callback completed, waiting 200ms")
       await new Promise(r => setTimeout(r, 200))
     } else {
-      log("[background-agent] SKIP tmux callback - conditions not met")
+      log("[background-agent] SKIP tmux callback - conditions not met", {
+        suppressTmuxSpawn: !!input.suppressTmuxSpawn,
+      })
     }
 
     if (this.tasks.get(task.id)?.status === "cancelled") {
@@ -719,7 +757,9 @@ The fallback retry session is now created and can be inspected directly.
           task: false,
           call_omo_agent: true,
           question: false,
-          ...getAgentToolRestrictions(input.agent),
+          ...getAgentToolRestrictions(input.agent, {
+            includeTeamToolDenylist: input.teamRunId === undefined,
+          }),
         }
         setSessionTools(sessionID, tools)
         return tools
@@ -739,7 +779,9 @@ The fallback retry session is now created and can be inspected directly.
           taskId: task.id,
         })
         try {
-          const fallbackBody = buildFallbackBody(promptBody, FALLBACK_AGENT)
+          const fallbackBody = buildFallbackBody(promptBody, FALLBACK_AGENT, {
+            includeTeamToolDenylist: input.teamRunId === undefined,
+          })
           setSessionTools(sessionID, fallbackBody.tools as Record<string, boolean>)
           await promptWithModelSuggestionRetry(this.client, {
             path: { id: sessionID },
@@ -830,6 +872,21 @@ The fallback retry session is now created and can be inspected directly.
       }
     }
     return tasks
+  }
+
+  private updateBackgroundTaskMarker(parentSessionID: string): void {
+    const tasks = this.getTasksByParentSession(parentSessionID)
+    const activeTasks = tasks.filter(t => t.status === "running" || t.status === "pending")
+    if (activeTasks.length > 0) {
+      setContinuationMarkerSource(
+        this.directory, parentSessionID, "background-task", "active",
+        `${activeTasks.length} background task(s) active`,
+      )
+    } else {
+      setContinuationMarkerSource(
+        this.directory, parentSessionID, "background-task", "idle",
+      )
+    }
   }
 
   getAllDescendantTasks(sessionID: string): BackgroundTask[] {
@@ -1086,7 +1143,9 @@ The fallback retry session is now created and can be inspected directly.
             task: false,
             call_omo_agent: true,
             question: false,
-            ...getAgentToolRestrictions(existingTask.agent),
+            ...getAgentToolRestrictions(existingTask.agent, {
+              includeTeamToolDenylist: existingTask.teamRunId === undefined,
+            }),
           }
           setSessionTools(existingTask.sessionId!, tools)
           return tools
@@ -1336,6 +1395,12 @@ The fallback retry session is now created and can be inspected directly.
 
     if (event.type === "session.idle") {
       if (!props || typeof props !== "object") return
+      const sessionID = typeof props.sessionID === "string" ? props.sessionID : undefined
+      if (sessionID) {
+        void this.enqueueNotificationForParent(sessionID, () => this.flushPendingParentWake(sessionID)).catch((error) => {
+          log("[background-agent] Failed to flush pending parent wake:", { sessionID, error })
+        })
+      }
       handleSessionIdleBackgroundEvent({
         properties: props as Record<string, unknown>,
         findBySession: (id) => {
@@ -1503,6 +1568,19 @@ The fallback retry session is now created and can be inspected directly.
       canRetry,
     })
 
+    const sessionId = task.sessionId
+    if (sessionId) {
+      const sessionStillAlive = await this.verifySessionExists(sessionId)
+      if (sessionStillAlive) {
+        this.logger("[background-agent] session.error received but session still alive, treating as transient:", {
+          taskId: task.id,
+          sessionId,
+          errorMessage: errorMsg?.slice(0, 200),
+        })
+        return
+      }
+    }
+
     if (task.currentAttemptID) {
       finalizeAttempt(task, task.currentAttemptID, "error", errorMsg)
     } else {
@@ -1543,13 +1621,18 @@ The fallback retry session is now created and can be inspected directly.
       this.cleanupDelegatedSessionContext(task.sessionId)
     }
 
+    // Update continuation marker for CLI run mode
+    if (task.parentSessionId) {
+      this.updateBackgroundTaskMarker(task.parentSessionId)
+    }
+
     this.markForNotification(task)
     this.enqueueNotificationForParent(task.parentSessionId, () => this.notifyParentSession(task)).catch(err => {
       log("[background-agent] Error in notifyParentSession for errored task:", { taskId: task.id, error: err })
     })
   }
 
-  private tryFallbackRetry(
+  private async tryFallbackRetry(
     task: BackgroundTask,
     errorInfo: { name?: string; message?: string },
     source: string,
@@ -1585,15 +1668,14 @@ The task was re-queued on a fallback model after a retryable failure.
         )
       },
     })
-    return result.then((retried) => {
-      if (retried && previousSessionID) {
-        this.clearSessionOutputObserved(previousSessionID)
-        this.clearSessionTodoObservation(previousSessionID)
-        subagentSessions.delete(previousSessionID)
-        this.cleanupDelegatedSessionContext(previousSessionID)
-      }
-      return retried
-    })
+    const retried = await result
+    if (retried && previousSessionID) {
+      this.clearSessionOutputObserved(previousSessionID)
+      this.clearSessionTodoObservation(previousSessionID)
+      subagentSessions.delete(previousSessionID)
+      this.cleanupDelegatedSessionContext(previousSessionID)
+    }
+    return retried
   }
 
   markForNotification(task: BackgroundTask): void {
@@ -1843,6 +1925,11 @@ The task was re-queued on a fallback model after a retryable failure.
 
     removeTaskToastTracking(task.id)
 
+    // Update continuation marker for CLI run mode
+    if (task.parentSessionId) {
+      this.updateBackgroundTaskMarker(task.parentSessionId)
+    }
+
     if (options?.skipNotification) {
       this.cleanupPendingByParent(task)
       this.scheduleTaskRemoval(task.id)
@@ -1959,6 +2046,11 @@ The task was re-queued on a fallback model after a retryable failure.
       await this.abortSessionWithLogging(task.sessionId, `task completion (${source})`)
 
       this.cleanupDelegatedSessionContext(task.sessionId)
+    }
+
+    // Update continuation marker for CLI run mode
+    if (task.parentSessionId) {
+      this.updateBackgroundTaskMarker(task.parentSessionId)
     }
 
     try {
@@ -2102,24 +2194,32 @@ The task was re-queued on a fallback model after a retryable failure.
         const shouldReply = allComplete || isTaskFailure
 
         const variant = promptContext?.model?.variant
+        const parentPromptContext: ParentWakePromptContext = {
+          ...(agent !== undefined ? { agent } : {}),
+          ...(model !== undefined ? { model } : {}),
+          ...(variant !== undefined ? { variant } : {}),
+          ...(resolvedTools ? { tools: resolvedTools } : {}),
+        }
+        const shouldDeferReply = shouldReply && await this.isSessionActive(task.parentSessionId)
 
         try {
           await this.client.session.promptAsync({
             path: { id: task.parentSessionId },
             body: {
-              noReply: !shouldReply,
-              ...(agent !== undefined ? { agent } : {}),
-              ...(model !== undefined ? { model } : {}),
-              ...(variant !== undefined ? { variant } : {}),
-              ...(resolvedTools ? { tools: resolvedTools } : {}),
+              noReply: shouldDeferReply || !shouldReply,
+              ...parentPromptContext,
               parts: [createInternalAgentTextPart(notification)],
             },
           })
+          if (shouldDeferReply) {
+            this.pendingParentWakes.set(task.parentSessionId, parentPromptContext)
+          }
           log("[background-agent] Sent notification to parent session:", {
             taskId: task.id,
             allComplete,
             isTaskFailure,
-            noReply: !shouldReply,
+            noReply: shouldDeferReply || !shouldReply,
+            deferredReply: shouldDeferReply,
           })
         } catch (error) {
           if (isAbortedSessionError(error)) {
@@ -2151,11 +2251,66 @@ The task was re-queued on a fallback model after a retryable failure.
     return false
   }
 
-  private pruneStaleTasksAndNotifications(): void {
+  private async isSessionActive(sessionID: string): Promise<boolean> {
+    const sessionStatusMethod = this.client?.session?.status
+    if (typeof sessionStatusMethod !== "function") {
+      return false
+    }
+
+    try {
+      const statusResult = await this.client.session.status()
+      const statuses = normalizeSDKResponse(
+        statusResult,
+        {} as Record<string, SessionStatusInfo>,
+      )
+      const status = statuses[sessionID]
+      return typeof status?.type === "string" && isActiveSessionStatus(status.type)
+    } catch (error) {
+      log("[background-agent] Unable to check parent session status before wake:", {
+        sessionID,
+        error,
+      })
+      return false
+    }
+  }
+
+  private async flushPendingParentWake(sessionID: string): Promise<void> {
+    const wakeContext = this.pendingParentWakes.get(sessionID)
+    if (!wakeContext) return
+
+    if (await this.isSessionActive(sessionID)) {
+      return
+    }
+
+    this.pendingParentWakes.delete(sessionID)
+    await settleAfterSessionIdle()
+
+    if (await this.isSessionActive(sessionID)) {
+      this.pendingParentWakes.set(sessionID, wakeContext)
+      return
+    }
+
+    try {
+      await this.client.session.promptAsync({
+        path: { id: sessionID },
+        body: {
+          noReply: false,
+          ...wakeContext,
+          parts: [createInternalAgentTextPart(BACKGROUND_PARENT_WAKE_PROMPT)],
+        },
+      })
+      log("[background-agent] Sent deferred parent wake:", { sessionID })
+    } catch (error) {
+      log("[background-agent] Failed to send deferred parent wake:", { sessionID, error })
+    }
+  }
+
+  private pruneStaleTasksAndNotifications(allStatuses?: SessionStatusMap): void {
     pruneStaleTasksAndNotifications({
       tasks: this.tasks,
       notifications: this.notifications,
       taskTtlMs: this.config?.taskTtlMs,
+      sessionStatuses: allStatuses,
       onTaskPruned: (taskId, task, errorMessage) => {
         const wasPending = task.status === "pending"
         log("[background-agent] Pruning stale task:", { taskId, status: task.status, age: Math.round(((wasPending ? task.queuedAt?.getTime() : task.startedAt?.getTime()) ? (Date.now() - (wasPending ? task.queuedAt!.getTime() : task.startedAt!.getTime())) : 0) / 1000) + "s" })
@@ -2197,6 +2352,10 @@ The task was re-queued on a fallback model after a retryable failure.
           }
         }
         this.cleanupPendingByParent(task)
+        // Update continuation marker for CLI run mode
+        if (task.parentSessionId) {
+          this.updateBackgroundTaskMarker(task.parentSessionId)
+        }
         this.markForNotification(task)
         this.enqueueNotificationForParent(task.parentSessionId, () => this.notifyParentSession(task)).catch(err => {
           log("[background-agent] Error in notifyParentSession for stale-pruned task:", { taskId: task.id, error: err })
@@ -2206,7 +2365,7 @@ The task was re-queued on a fallback model after a retryable failure.
   }
 
   private async checkAndInterruptStaleTasks(
-    allStatuses: Record<string, { type: string }> = {},
+    allStatuses: SessionStatusMap | undefined,
   ): Promise<void> {
     await checkAndInterruptStaleTasks({
       tasks: this.tasks.values(),
@@ -2259,6 +2418,11 @@ The task was re-queued on a fallback model after a retryable failure.
       this.cleanupDelegatedSessionContext(task.sessionId)
     }
 
+    // Update continuation marker for CLI run mode
+    if (task.parentSessionId) {
+      this.updateBackgroundTaskMarker(task.parentSessionId)
+    }
+
     this.markForNotification(task)
     this.enqueueNotificationForParent(task.parentSessionId, () => this.notifyParentSession(task)).catch(err => {
       log("[background-agent] Error in notifyParentSession for crashed task:", { taskId: task.id, error: err })
@@ -2269,10 +2433,28 @@ The task was re-queued on a fallback model after a retryable failure.
     if (this.pollingInFlight) return
     this.pollingInFlight = true
     try {
-      this.pruneStaleTasksAndNotifications()
+      let allStatuses: SessionStatusMap | undefined
+      const sessionStatusMethod = this.client?.session?.status
+      if (typeof sessionStatusMethod !== "function") {
+        if (!this.loggedSessionStatusUnavailable) {
+          log("[background-agent] Unable to poll session statuses:", {
+            reason: "session.status unavailable",
+          })
+          this.loggedSessionStatusUnavailable = true
+        }
+      } else {
+        try {
+          const statusResult = await this.client.session.status()
+          allStatuses = normalizeSDKResponse(statusResult, {})
+        } catch (error) {
+          if (!this.loggedSessionStatusUnavailable) {
+            log("[background-agent] Error polling session statuses:", { error })
+            this.loggedSessionStatusUnavailable = true
+          }
+        }
+      }
 
-      const statusResult = await this.client.session.status()
-      const allStatuses = normalizeSDKResponse(statusResult, {} as Record<string, { type: string }>)
+      this.pruneStaleTasksAndNotifications(allStatuses)
 
       await this.checkAndInterruptStaleTasks(allStatuses)
 
@@ -2283,7 +2465,7 @@ The task was re-queued on a fallback model after a retryable failure.
         if (!sessionID) continue
 
         try {
-          const sessionStatus = allStatuses[sessionID]
+          const sessionStatus = allStatuses?.[sessionID]
           // Handle retry before checking running state
           if (sessionStatus?.type === "retry") {
             const retryMessage = typeof (sessionStatus as { message?: string }).message === "string"
@@ -2320,8 +2502,12 @@ The task was re-queued on a fallback model after a retryable failure.
             })
           }
 
+          if (allStatuses === undefined) {
+            continue
+          }
+
           // Session is idle or no longer in status response (completed/disappeared)
-          const sessionGoneFromStatus = !sessionStatus
+          const sessionGoneFromStatus = allStatuses !== undefined && !sessionStatus
           const sessionGoneThresholdReached = sessionGoneFromStatus
             && (task.consecutiveMissedPolls ?? 0) >= MIN_SESSION_GONE_POLLS
           const completionSource = sessionStatus?.type === "idle"
@@ -2444,6 +2630,7 @@ The task was re-queued on a fallback model after a retryable failure.
     this.pendingNotifications.clear()
     this.pendingByParent.clear()
     this.notificationQueueByParent.clear()
+    this.pendingParentWakes.clear()
     this.rootDescendantCounts.clear()
     this.queuesByKey.clear()
     this.processingKeys.clear()
