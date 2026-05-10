@@ -186,7 +186,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     expect(removeTaskCalls[0]).toBe("resume_sync_ses_test")
   })
 
-  test("recovers from pollSyncSession error when result already exists", async () => {
+  test("recovers from MessageAbortedError poll error when result already exists", async () => {
     const mockClient = {
       session: {
         messages: async () => ({
@@ -208,7 +208,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     const { executeSyncContinuation } = require("./sync-continuation")
 
     const deps = {
-      pollSyncSession: async () => "Task aborted.\n\nSession ID: ses_test_12345678",
+      pollSyncSession: async () => "MessageAbortedError: aborted by user",
       fetchSyncResult: async () => ({ ok: true as const, textContent: "Recovered result" }),
     }
 
@@ -244,7 +244,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     expect(removeTaskCalls[0]).toBe("resume_sync_ses_test")
   })
 
-  test("returns poll error when recovery fetch has no result", async () => {
+  test("returns MessageAbortedError poll error when recovery fetch has no result", async () => {
     const mockClient = {
       session: {
         messages: async () => ({
@@ -266,7 +266,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     const { executeSyncContinuation } = require("./sync-continuation")
 
     const deps = {
-      pollSyncSession: async () => "Task aborted.\n\nSession ID: ses_test_12345678",
+      pollSyncSession: async () => "MessageAbortedError: aborted by user",
       fetchSyncResult: async () => ({ ok: false as const, error: "No assistant response found" }),
     }
 
@@ -296,7 +296,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     }, deps)
 
     //#then
-    expect(result).toBe("Task aborted.\n\nSession ID: ses_test_12345678")
+    expect(result).toBe("MessageAbortedError: aborted by user")
     expect(removeTaskCalls.length).toBe(1)
     expect(removeTaskCalls[0]).toBe("resume_sync_ses_test")
   })
@@ -421,8 +421,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     //#then - removeTask should be called at least once (poller and finally may both call it)
     expect(removeTaskCalls.length).toBeGreaterThanOrEqual(1)
     expect(removeTaskCalls[0]).toBe("resume_sync_ses_test")
-    expect(result).toContain("Task continued and completed in")
-    expect(result).toContain("Result")
+    expect(result).toBe("Task aborted.\n\nSession ID: ses_test_12345678")
   })
 
   test("no crash when toastManager is null", async () => {

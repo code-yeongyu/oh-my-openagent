@@ -275,7 +275,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
     expect(fetchSyncResultCalled).toBe(false)
   })
 
-  test("returns poll error when recovery fetch has no result", async () => {
+  test("returns abort poll error when recovery fetch has no result", async () => {
     const mockClient = {
       session: {
         create: async () => ({ data: { id: "ses_test_12345678" } }),
@@ -284,11 +284,16 @@ describe("executeSyncTask - cleanup on error paths", () => {
 
     const { executeSyncTask } = require("./sync-task")
 
+    let fetchSyncResultCalled = false
+
     const deps = {
       createSyncSession: async () => ({ ok: true, sessionID: "ses_test_12345678" }),
       sendSyncPrompt: async () => null,
-      pollSyncSession: async () => "Poll error",
-      fetchSyncResult: async () => ({ ok: false as const, error: "No assistant response found" }),
+      pollSyncSession: async () => "MessageAbortedError: aborted by user",
+      fetchSyncResult: async () => {
+        fetchSyncResultCalled = true
+        return { ok: false as const, error: "No assistant response found" }
+      },
     }
 
     const mockCtx = {
@@ -318,7 +323,8 @@ describe("executeSyncTask - cleanup on error paths", () => {
     }, "test-agent", undefined, undefined, undefined, undefined, deps)
 
     //#then
-    expect(result).toBe("Poll error")
+    expect(result).toBe("MessageAbortedError: aborted by user")
+    expect(fetchSyncResultCalled).toBe(true)
     expect(removeTaskCalls.length).toBe(1)
     expect(deleteCalls.length).toBe(1)
   })
