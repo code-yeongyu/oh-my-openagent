@@ -417,7 +417,10 @@ export function createEventHandler(args: {
           recentSyntheticIdles.delete(sessionID);
           // Let real idle events through even when a synthetic idle fired moments earlier.
           // OpenCode diagnostics expect a concrete session.idle event signal.
-          recentAnyIdles.delete(sessionID);
+          const lastAnyIdleAt = recentAnyIdles.get(sessionID);
+          if (lastAnyIdleAt === emittedAt) {
+            recentAnyIdles.delete(sessionID);
+          }
         }
         recentRealIdles.set(sessionID, now);
         if (!shouldDispatchIdleEvent(sessionID, now)) {
