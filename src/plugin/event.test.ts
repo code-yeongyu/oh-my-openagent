@@ -335,7 +335,7 @@ describe("createEventHandler - idle deduplication", () => {
 		expect(spawnTmuxPane).toHaveBeenCalledTimes(1)
 	})
 
-	it("dedups real-idle-after-synthetic-idle within 500ms", async () => {
+	it("does NOT dedup real-idle-after-synthetic-idle within 500ms", async () => {
 		//#given
 		const dispatchCalls: EventInput[] = []
 		const eventHandler = createIdleTrackingEventHandler(dispatchCalls)
@@ -359,9 +359,11 @@ describe("createEventHandler - idle deduplication", () => {
 		}))
 
 		//#then
-		expect(dispatchCalls).toHaveLength(1)
+		expect(dispatchCalls).toHaveLength(2)
 		expect(dispatchCalls[0]?.event.type).toBe("session.idle")
 		expect((dispatchCalls[0]?.event.properties as { sessionID?: string } | undefined)?.sessionID).toBe(sessionId)
+		expect(dispatchCalls[1]?.event.type).toBe("session.idle")
+		expect((dispatchCalls[1]?.event.properties as { sessionID?: string } | undefined)?.sessionID).toBe(sessionId)
 	})
 
 	it("dedups back-to-back real session.idle events for the same sessionID within 500ms", async () => {
