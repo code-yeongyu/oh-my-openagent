@@ -83,7 +83,7 @@ describe("createBuiltinSkills", () => {
 		expect(agentBrowserSkill!.template).toContain("agent-browser snapshot")
 	})
 
-	test("always includes frontend-ui-ux, git-master, review-work, and ai-slop-remover skills", () => {
+	test("always includes frontend-ui-ux, git-master, review-work, ai-slop-remover, and devin-cli skills", () => {
 		// given - both provider options
 
 		// when
@@ -97,10 +97,11 @@ describe("createBuiltinSkills", () => {
 			expect(skills.find((s) => s.name === "git-master")).toBeDefined()
 			expect(skills.find((s) => s.name === "review-work")).toBeDefined()
 			expect(skills.find((s) => s.name === "ai-slop-remover")).toBeDefined()
+			expect(skills.find((s) => s.name === "devin-cli")).toBeDefined()
 		}
 	})
 
-	test("returns exactly 5 skills regardless of provider", () => {
+	test("returns exactly 6 skills regardless of provider", () => {
 		// given
 
 		// when
@@ -109,9 +110,9 @@ describe("createBuiltinSkills", () => {
 		const devBrowserSkills = createBuiltinSkills({ browserProvider: "dev-browser" })
 
 		// then
-		expect(defaultSkills).toHaveLength(5)
-		expect(agentBrowserSkills).toHaveLength(5)
-		expect(devBrowserSkills).toHaveLength(5)
+		expect(defaultSkills).toHaveLength(6)
+		expect(agentBrowserSkills).toHaveLength(6)
+		expect(devBrowserSkills).toHaveLength(6)
 	})
 
 	test("should exclude playwright when it is in disabledSkills", () => {
@@ -128,7 +129,8 @@ describe("createBuiltinSkills", () => {
 		expect(skills.map((s) => s.name)).not.toContain("dev-browser")
 		expect(skills.map((s) => s.name)).toContain("review-work")
 		expect(skills.map((s) => s.name)).toContain("ai-slop-remover")
-		expect(skills.length).toBe(4)
+		expect(skills.map((s) => s.name)).toContain("devin-cli")
+		expect(skills.length).toBe(5)
 	})
 
 	test("should exclude multiple skills when they are in disabledSkills", () => {
@@ -145,12 +147,22 @@ describe("createBuiltinSkills", () => {
 		expect(skills.map((s) => s.name)).not.toContain("dev-browser")
 		expect(skills.map((s) => s.name)).toContain("review-work")
 		expect(skills.map((s) => s.name)).toContain("ai-slop-remover")
-		expect(skills.length).toBe(3)
+		expect(skills.map((s) => s.name)).toContain("devin-cli")
+		expect(skills.length).toBe(4)
 	})
 
 	test("should return an empty array when all skills are disabled", () => {
 		// #given
-		const options = { disabledSkills: new Set(["playwright", "frontend-ui-ux", "git-master", "review-work", "ai-slop-remover"]) }
+		const options = {
+			disabledSkills: new Set([
+				"playwright",
+				"frontend-ui-ux",
+				"git-master",
+				"review-work",
+				"ai-slop-remover",
+				"devin-cli",
+			]),
+		}
 
 		// #when
 		const skills = createBuiltinSkills(options)
@@ -167,7 +179,37 @@ describe("createBuiltinSkills", () => {
 		const skills = createBuiltinSkills(options)
 
 		// #then
+		expect(skills.length).toBe(6)
+	})
+
+	test("should exclude devin-cli when in disabledSkills", () => {
+		// #given
+		const options = { disabledSkills: new Set(["devin-cli"]) }
+
+		// #when
+		const skills = createBuiltinSkills(options)
+
+		// #then
+		expect(skills.map((s) => s.name)).not.toContain("devin-cli")
 		expect(skills.length).toBe(5)
+	})
+
+	test("devin-cli skill has correct structure", () => {
+		// #given - default options
+
+		// #when
+		const skills = createBuiltinSkills()
+		const devinCli = skills.find((s) => s.name === "devin-cli")
+
+		// #then
+		expect(devinCli).toBeDefined()
+		expect(devinCli!.description).toContain("Devin")
+		expect(devinCli!.template).toContain("devin_start")
+		expect(devinCli!.template).toContain("devin_status")
+		expect(devinCli!.template).toContain("devin_wait")
+		expect(devinCli!.template).toContain("devin_cancel")
+		expect(devinCli!.template).toContain("devin_list")
+		expect(devinCli!.template).toContain("session_id")
 	})
 
 	test("review-work skill has correct structure", () => {

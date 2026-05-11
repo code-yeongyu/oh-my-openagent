@@ -30,6 +30,10 @@ Wraps the `devin` CLI binary as a background-session MCP server. The OpenCode/oh
 
 Sessions live in memory (`session-store.ts` — `Map<id, DevinSession>`); logs persist on disk. State is per-MCP-process: if the MCP server restarts, in-memory sessions are gone but log files remain.
 
+### Agent guidance
+
+The `devin-cli` built-in skill ([`src/features/builtin-skills/skills/devin-cli.ts`](../features/builtin-skills/skills/devin-cli.ts)) tells agents when and how to delegate to Devin. The skill is auto-loaded by `createBuiltinSkills()`; disable via `disabled_skills: ["devin-cli"]` in your oh-my-openagent config if you don't want agents to delegate.
+
 ### Smoke test
 
 ```bash

@@ -44,6 +44,7 @@ builtin-skills/
 | `review-work` | ~500 | — | Post-implementation review orchestrator (5 parallel agents) |
 | `ai-slop-remover` | ~300 | — | Remove AI-generated code smells |
 | `team-mode` | — | — | **Conditional** — only loaded when `team_mode.enabled`; documents the 12 `team_*` tools and lifecycle |
+| `devin-cli` | ~120 | — | Delegate tasks to the Devin CLI as a background coworker. Documents the 5 `devin_*` MCP tools provided by `src/mcp-servers/devin/`. Auto-loaded by default; disable via `disabled_skills: ["devin-cli"]` |
 
 ## BROWSER VARIANT SELECTION
 
