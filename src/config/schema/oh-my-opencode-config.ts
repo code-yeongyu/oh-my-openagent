@@ -46,6 +46,13 @@ export const OhMyOpenCodeConfigSchema = z.object({
   mcp_env_allowlist: z.array(z.string()).optional(),
   /** Enable hashline_edit tool/hook integrations (default: false) */
   hashline_edit: z.boolean().optional(),
+  /**
+   * Auto-rename newly created main sessions to a friendly fruit-vegetable
+   * combo like "strawberry-carrot" (default: enabled). Set to `false` to opt
+   * out. Subagent sessions and sessions started with an explicit `--title`
+   * are left alone regardless of this flag.
+   */
+  friendly_session_names: z.boolean().optional(),
   /** Enable model fallback on API errors (default: false). Set to true to enable automatic model switching when model errors occur. */
   model_fallback: z.boolean().optional(),
   agents: AgentOverridesSchema.optional(),
