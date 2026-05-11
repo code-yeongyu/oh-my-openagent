@@ -34,6 +34,19 @@ Sessions live in memory (`session-store.ts` — `Map<id, DevinSession>`); logs p
 
 The `devin-cli` built-in skill ([`src/features/builtin-skills/skills/devin-cli.ts`](../features/builtin-skills/skills/devin-cli.ts)) tells agents when and how to delegate to Devin. The skill is auto-loaded by `createBuiltinSkills()`; disable via `disabled_skills: ["devin-cli"]` in your oh-my-openagent config if you don't want agents to delegate.
 
+### User-facing slash commands
+
+Built-in commands ([`src/features/builtin-commands/templates/devin.ts`](../features/builtin-commands/templates/devin.ts)) give the user direct entry points:
+
+| Command | Purpose |
+|---------|---------|
+| `/devin "<task>" [--model=<name>] [--wait] [--cwd=<path>]` | Delegate a task; agent auto-selects model from complexity |
+| `/devin-models` | Show the available Devin models with use cases and selection heuristics |
+| `/devin-status [<id-prefix>] [--full]` | List running sessions (or render full output for a specific id) |
+| `/devin-cancel [<id-prefix>] [--all]` | Cancel one session (prefix match) or every running session |
+
+Disable any subset via `disabled_commands: ["devin", "devin-status", ...]` in oh-my-openagent config.
+
 ### Smoke test
 
 ```bash

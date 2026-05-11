@@ -26,6 +26,7 @@ oh-my-opencode/
 │   ├── cli/                  # CLI: install, run, doctor, mcp-oauth, refresh-model-capabilities, get-local-version
 │   ├── mcp/                  # 3 built-in remote MCPs (websearch, context7, grep_app)
 │   ├── mcp-servers/          # Standalone stdio MCP servers (Tier 2): devin/ wraps the Devin CLI
+│   │                          # Slash commands: /devin /devin-models /devin-status /devin-cancel
 │   ├── plugin/               # 10 OpenCode hook handlers + 5-tier hook composition
 │   ├── plugin-handlers/      # 6-phase config loading pipeline
 │   ├── openclaw/             # Bidirectional external integration (Discord/Telegram/HTTP/shell + reply listener daemon)

@@ -9,6 +9,12 @@ import { START_WORK_TEMPLATE } from "./templates/start-work"
 import { HANDOFF_TEMPLATE } from "./templates/handoff"
 import { REMOVE_AI_SLOPS_TEMPLATE, REMOVE_AI_SLOPS_TEAM_MODE_ADDENDUM } from "./templates/remove-ai-slops"
 import { HYPERPLAN_TEMPLATE } from "./templates/hyperplan"
+import {
+  DEVIN_TEMPLATE,
+  DEVIN_MODELS_TEMPLATE,
+  DEVIN_STATUS_TEMPLATE,
+  DEVIN_CANCEL_TEMPLATE,
+} from "./templates/devin"
 
 interface LoadBuiltinCommandsOptions {
   useRegisteredAgents?: boolean
@@ -141,6 +147,49 @@ $ARGUMENTS
 ${HYPERPLAN_TEMPLATE}
 </command-instruction>`,
       argumentHint: "[planning-request]",
+    },
+    devin: {
+      description: "(builtin) Delegate a task to the Devin CLI as a background coworker; auto-selects model from task complexity",
+      template: `<command-instruction>
+${DEVIN_TEMPLATE}
+</command-instruction>
+
+<user-request>
+$ARGUMENTS
+</user-request>`,
+      argumentHint: '"<task>" [--model=<name>] [--wait] [--cwd=<path>]',
+    },
+    "devin-models": {
+      description: "(builtin) List available Devin models with use cases and selection heuristics",
+      template: `<command-instruction>
+${DEVIN_MODELS_TEMPLATE}
+</command-instruction>
+
+<user-request>
+$ARGUMENTS
+</user-request>`,
+    },
+    "devin-status": {
+      description: "(builtin) Show running Devin sessions; pass a session id (or prefix) for full output",
+      template: `<command-instruction>
+${DEVIN_STATUS_TEMPLATE}
+</command-instruction>
+
+<user-request>
+$ARGUMENTS
+</user-request>`,
+      argumentHint: "[session-id-or-prefix] [--full]",
+    },
+    "devin-cancel": {
+      description: "(builtin) Cancel a Devin session by id (or prefix); pass --all to cancel every running session",
+      template: `<command-instruction>
+${DEVIN_CANCEL_TEMPLATE}
+</command-instruction>
+
+<user-request>
+$ARGUMENTS
+</user-request>`,
+      argumentHint: "[session-id-or-prefix] [--all]",
     },
   }
 }

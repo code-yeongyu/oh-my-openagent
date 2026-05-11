@@ -414,4 +414,81 @@ describe("HANDOFF_TEMPLATE", () => {
     const emojiRegex = /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2702}-\u{27B0}\u{24C2}-\u{1F251}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/u
     expect(emojiRegex.test(HANDOFF_TEMPLATE)).toBe(false)
   })
+
+  describe("devin commands", () => {
+    test("registers /devin, /devin-models, /devin-status, /devin-cancel", () => {
+      // given - no disabled commands
+      // when
+      const commands = loadBuiltinCommands()
+
+      // then
+      expect(commands.devin).toBeDefined()
+      expect(commands.devin.name).toBe("devin")
+      expect(commands["devin-models"]).toBeDefined()
+      expect(commands["devin-models"].name).toBe("devin-models")
+      expect(commands["devin-status"]).toBeDefined()
+      expect(commands["devin-status"].name).toBe("devin-status")
+      expect(commands["devin-cancel"]).toBeDefined()
+      expect(commands["devin-cancel"].name).toBe("devin-cancel")
+    })
+
+    test("/devin command instructs the agent to delegate and pick a model", () => {
+      // when
+      const commands = loadBuiltinCommands()
+
+      // then
+      expect(commands.devin.template).toContain("devin_start")
+      expect(commands.devin.template).toContain("session_id")
+      expect(commands.devin.template).toContain("opus")
+      expect(commands.devin.template).toContain("claude-sonnet-4-6")
+      expect(commands.devin.template).toContain("swe-1-6")
+      expect(commands.devin.template).toContain("$ARGUMENTS")
+    })
+
+    test("/devin-models command lists available models", () => {
+      // when
+      const commands = loadBuiltinCommands()
+
+      // then
+      const tpl = commands["devin-models"].template
+      for (const model of ["opus", "gpt", "claude-sonnet-4-6", "sonnet", "codex", "swe-1-6"]) {
+        expect(tpl).toContain(model)
+      }
+    })
+
+    test("/devin-status command tells agent to call devin_list", () => {
+      // when
+      const commands = loadBuiltinCommands()
+
+      // then
+      expect(commands["devin-status"].template).toContain("devin_list")
+      expect(commands["devin-status"].template).toContain("devin_status")
+      expect(commands["devin-status"].template).toContain("$ARGUMENTS")
+    })
+
+    test("/devin-cancel command supports prefix match and --all", () => {
+      // when
+      const commands = loadBuiltinCommands()
+
+      // then
+      const tpl = commands["devin-cancel"].template
+      expect(tpl).toContain("devin_cancel")
+      expect(tpl).toContain("--all")
+      expect(tpl).toContain("prefix")
+    })
+
+    test("excludes devin commands when disabled", () => {
+      // given
+      const disabled: BuiltinCommandName[] = ["devin", "devin-models", "devin-status", "devin-cancel"]
+
+      // when
+      const commands = loadBuiltinCommands(disabled)
+
+      // then
+      expect(commands.devin).toBeUndefined()
+      expect(commands["devin-models"]).toBeUndefined()
+      expect(commands["devin-status"]).toBeUndefined()
+      expect(commands["devin-cancel"]).toBeUndefined()
+    })
+  })
 })
