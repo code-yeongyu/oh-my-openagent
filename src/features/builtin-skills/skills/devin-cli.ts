@@ -47,7 +47,7 @@ Each tool returns a human-readable text snapshot. \`session_id\` is a UUID — s
 
 1. **Compose a self-contained prompt.** Devin will not see your conversation history. The prompt must contain everything Devin needs: goal, constraints, file paths, acceptance criteria. Treat it like delegating to a remote engineer.
 2. **Pick a working directory.** Default is the MCP server cwd (this repo). Pass \`cwd\` explicitly if Devin should run in a sibling project.
-3. **Pick a model intelligently (optional).** Analyze the task and select the right model. Omit to use the user's Devin default (typically \`"swe-1-6-fast"\`).
+3. **Pick a model intelligently (optional).** Analyze the task and select the right model. Omit to use the user's Devin default (typically \`"swe-1-6"\`).
 4. **Start the session.** Call \`devin_start({ prompt, cwd?, model? })\`. Save the returned \`session_id\`.
 5. **Tell the user.** Briefly note that Devin is running in the background and return to whatever else you were doing.
 6. **Poll periodically.** Call \`devin_status({ session_id })\` every few of your own steps, or whenever the user asks. Look at \`status\` and the output tail.
@@ -76,18 +76,18 @@ Ask yourself these questions to pick the right model:
 |-------|----------|----------|------------|
 | \`"opus"\` | Multi-file refactors, architecture changes, deep reasoning, complex debugging | "Refactor the auth module to use the new TokenStore interface", "Investigate why the build is slow and fix it", "Redesign the data layer for performance" | Highest capability, highest cost, slower |
 | \`"gpt"\` or \`"gpt-5.5"\` | Complex refactors, cross-file changes, tasks requiring strong reasoning | "Update all API calls to use the new error handling pattern", "Refactor the state management to use the new library" | High capability, high cost, good balance |
-| \`"claude-sonnet-4"\` | General-purpose tasks, moderate complexity, balanced speed/cost | "Add tests for the auth module", "Update the README with the new deployment steps", "Fix the failing test in src/auth" | Balanced capability and cost, good default for most tasks |
+| \`"claude-sonnet-4-6"\` | General-purpose tasks, moderate complexity, balanced speed/cost | "Add tests for the auth module", "Update the README with the new deployment steps", "Fix the failing test in src/auth" | Balanced capability and cost, good default for most tasks |
 | \`"codex"\` | Code generation, boilerplate, repetitive patterns | "Generate a CRUD API for the User model", "Create unit tests for all service methods", "Write TypeScript types for the API response" | Fast for generation, less strong on reasoning |
-| \`"swe"\` or \`"swe-1-6-fast"\` | Straightforward edits, bug fixes, quick questions, cost-sensitive tasks | "Fix the typo in the error message", "Update the import statement", "Why is this test failing?" | Fast, cheap, good for simple tasks |
-| \`"sonnet"\` | General-purpose, moderate complexity | "Review this PR for issues", "Explain how this code works" | Balanced, similar to claude-sonnet-4 |
+| \`"swe"\` or \`"swe-1-6"\` | Straightforward edits, bug fixes, quick questions, cost-sensitive tasks | "Fix the typo in the error message", "Update the import statement", "Why is this test failing?" | Fast, cheap, good for simple tasks |
+| \`"sonnet"\` | General-purpose, moderate complexity | "Review this PR for issues", "Explain how this code works" | Balanced, similar to claude-sonnet-4-6 |
 
 ### Heuristics
 
 Use these rules of thumb:
 
 - **3+ files or architectural impact** → \`"opus"\` or \`"gpt"\`
-- **1-2 files, moderate complexity** → \`"claude-sonnet-4"\` or \`"sonnet"\`
-- **Single file, straightforward** → \`"swe"\` or \`"swe-1-6-fast"\`
+- **1-2 files, moderate complexity** → \`"claude-sonnet-4-6"\` or \`"sonnet"\`
+- **Single file, straightforward** → \`"swe"\` or \`"swe-1-6"\`
 - **Code generation from scratch** → \`"codex"\`
 - **User is waiting, time-sensitive** → favor faster models (\`"swe"\`, \`"codex"\`) even if less capable
 - **Critical correctness required** → favor stronger models (\`"opus"\`, \`"gpt"\`) even if slower
@@ -113,7 +113,7 @@ Omit \`model\` and let Devin use the user's configured default when:
 → **Model**: \`"codex"\` (code generation, repetitive pattern)
 
 **Task**: "Update the README with the new deployment steps."
-→ **Model**: \`"claude-sonnet-4"\` (moderate complexity, documentation)
+→ **Model**: \`"claude-sonnet-4-6"\` (moderate complexity, documentation)
 
 **Task**: "Investigate why the build is failing and fix it."
 → **Model**: \`"gpt"\` or \`"opus"\` (debugging, potentially complex)
