@@ -2,7 +2,7 @@ import { createAutoRetryHelpers } from "./auto-retry"
 import { createChatMessageHandler } from "./chat-message-handler"
 import { DEFAULT_CONFIG } from "./constants"
 import { createEventHandler } from "./event-handler"
-import { createFirstPromptWatchdog } from "./first-prompt-watchdog"
+import { createFirstPromptWatchdog, observeEventForWatchdog } from "./first-prompt-watchdog"
 import { createMessageUpdateHandler } from "./message-update-handler"
 import type { HookDeps, RuntimeFallbackHook, RuntimeFallbackInterval, RuntimeFallbackOptions, RuntimeFallbackPluginInput, RuntimeFallbackTimeout } from "./types"
 
@@ -64,55 +64,6 @@ export function createRuntimeFallbackHook(
   const chatMessageHandler = factories.createChatMessageHandler(deps)
   const firstPromptWatchdog = factories.createFirstPromptWatchdog(deps, helpers)
 
-  const TERMINAL_EVENT_TYPES = new Set([
-    "session.idle",
-    "session.stop",
-    "session.deleted",
-    "session.error",
-  ])
-
-  const observeForWatchdog = (event: { type: string; properties?: unknown }): void => {
-    const props = event.properties as Record<string, unknown> | undefined
-    if (!props) return
-
-    if (event.type === "message.updated") {
-      const info = props.info as Record<string, unknown> | undefined
-      const sessionID = info?.sessionID as string | undefined
-      const role = info?.role as string | undefined
-      if (!sessionID || !role) return
-
-      if (role === "user") {
-        const model = info?.model as string | undefined
-        const agent = info?.agent as string | undefined
-        firstPromptWatchdog.onUserMessage(sessionID, model, agent)
-        return
-      }
-
-      if (role === "assistant") {
-        const hasError = info?.error !== undefined
-        const hasFinish = info?.finish !== undefined
-        const eventParts = props.parts as Array<{ type?: string; text?: string }> | undefined
-        const infoParts = info?.parts as Array<{ type?: string; text?: string }> | undefined
-        const parts = eventParts ?? infoParts ?? []
-        const hasContent = parts.some((part) => {
-          if (part.type !== "text" && part.type !== "reasoning") return false
-          return (part.text ?? "").trim().length > 0
-        })
-        if (hasError || hasFinish || hasContent) {
-          firstPromptWatchdog.onAssistantProgress(sessionID)
-        }
-      }
-      return
-    }
-
-    if (TERMINAL_EVENT_TYPES.has(event.type)) {
-      const sessionID =
-        (props.sessionID as string | undefined) ??
-        ((props.info as Record<string, unknown> | undefined)?.id as string | undefined)
-      if (sessionID) firstPromptWatchdog.onSessionTerminal(sessionID)
-    }
-  }
-
   let cleanupInterval: RuntimeFallbackInterval | null = null
   let intervalStarted = false
 
@@ -131,7 +82,7 @@ export function createRuntimeFallbackHook(
     ensureInterval()
 
     if (config.enabled) {
-      observeForWatchdog(event)
+      observeEventForWatchdog(event, firstPromptWatchdog)
     }
 
     if (event.type === "message.updated") {
