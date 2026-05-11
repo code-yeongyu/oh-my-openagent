@@ -1,13 +1,9 @@
 import { spawn } from "../../shared/bun-spawn-shim"
+import { isCmuxCompatEnvironment } from "../../shared/tmux/cmux-detect"
 
 let tmuxPath: string | null = null
 let initPromise: Promise<string | null> | null = null
 let tmuxPathEnvironmentKey: "cmux" | "tmux" | null = null
-
-function isCmuxCompatEnvironment(): boolean {
-  return Boolean(process.env.CMUX_SOCKET_PATH) ||
-    process.env.TMUX?.includes("cmuxterm") === true
-}
 
 function getEnvironmentKey(): "cmux" | "tmux" {
   return isCmuxCompatEnvironment() ? "cmux" : "tmux"
