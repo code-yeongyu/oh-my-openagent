@@ -82,7 +82,22 @@
 
 ---
 
-# Oh My OpenAgent
+# Oh My OpenCode (Custom Fork)
+
+**This is a customized fork of [oh-my-openagent](https://github.com/code-yeongyu/oh-my-openagent) with additional features and integrations.**
+
+## What's Different
+
+This fork adds:
+- **Devin CLI Integration** - MCP server, built-in skill, and slash commands for delegating tasks to Devin CLI
+- **Local Development Tools** - Scripts for easier local development and testing
+- **Custom Configurations** - Tailored settings for specific workflows
+
+All core features from the original oh-my-openagent are preserved and maintained. See [oh-my-openagent](https://github.com/code-yeongyu/oh-my-openagent) for the upstream project.
+
+---
+
+# Oh My OpenAgent (Base Project)
 
 You're juggling Claude Code, Codex, and random OSS models. Configuring workflows. Debugging agents.
 
@@ -162,6 +177,15 @@ Even with only the following subscriptions, `ultrawork` works well (this project
 |   📋   | **Prometheus Planner**                                   | Interview-mode strategic planning before any execution.                                                                                                                                                          |
 |   🔍   | **`/init-deep`**                                         | Auto-generates hierarchical `AGENTS.md` files throughout your project. Great for both token efficiency and your agent's performance.                                                                             |
 
+### Fork-Specific Features
+
+This fork adds additional features on top of the base oh-my-openagent:
+
+| Feature | Description |
+|---------|-------------|
+| **Devin CLI Integration** | MCP server (`devin_start`, `devin_status`, `devin_wait`, `devin_cancel`, `devin_list`) + built-in skill with intelligent model selection + slash commands (`/devin`, `/devin-models`, `/devin-status`, `/devin-cancel`) |
+| **Local Development Tools** | `install-local.sh` script for easy local plugin development and testing |
+
 ### Discipline Agents
 
 <table><tr>
@@ -231,7 +255,7 @@ LSP, AST-Grep, Tmux, and MCP, actually integrated, not duct-taped together.
 - **LSP**: `lsp_rename`, `lsp_goto_definition`, `lsp_find_references`, `lsp_diagnostics`. IDE precision for every agent.
 - **AST-Grep**: Pattern-aware code search and rewriting across 25 languages.
 - **Tmux**: Full interactive terminal. REPLs, debuggers, TUI apps. Your agent stays in session.
-- **MCP**: Web search, official docs, GitHub code search. All baked in.
+- **MCP**: Web search, official docs, GitHub code search, Devin CLI background sessions. All baked in.
 
 ### Skill-Embedded MCPs
 
@@ -345,7 +369,7 @@ See full [Features Documentation](docs/reference/features.md).
 - **Hash-anchored Edit Tool**: `LINE#ID` references validate content before applying every change. Surgical edits, zero stale-line errors
 - **Context Injection**: Auto-inject AGENTS.md, README.md, conditional rules
 - **Claude Code Compatibility**: Full hook system, commands, skills, agents, MCPs
-- **Built-in MCPs**: websearch (Exa), context7 (docs), grep_app (GitHub search)
+- **Built-in MCPs**: websearch (Exa), context7 (docs), grep_app (GitHub search), devin (Devin CLI background sessions)
 - **Session Tools**: List, read, search, and analyze session history
 - **Productivity Features**: Ralph Loop, Todo Enforcer, Comment Checker, Think Mode, and more
 - **Doctor Command**: Built-in diagnostics (`bunx oh-my-opencode doctor`) verify plugin registration, config, models, and environment
@@ -353,6 +377,10 @@ See full [Features Documentation](docs/reference/features.md).
 - **File Prompts**: Load prompts from files with `file://` support in agent configurations
 - **Session Recovery**: Automatic recovery from session errors, context window limits, and API failures
 - **Model Setup**: Agent-model matching is built into the [Installation Guide](docs/guide/installation.md#step-5-understand-your-model-setup)
+
+**Fork-Specific Features:**
+- **Devin CLI Integration**: MCP server for background Devin sessions + built-in skill with intelligent model selection + slash commands (`/devin`, `/devin-models`, `/devin-status`, `/devin-cancel`)
+- **Local Development Tools**: `install-local.sh` script for easy local plugin development and testing
 
 ## Configuration
 
@@ -369,10 +397,50 @@ See [Configuration Documentation](docs/reference/configuration.md).
 - **Background Tasks**: Configure concurrency limits per provider/model
 - **Categories**: Domain-specific task delegation (`visual`, `business-logic`, custom)
 - **Hooks**: 25+ built-in hooks, all configurable via `disabled_hooks`
-- **MCPs**: Built-in websearch (Exa), context7 (docs), grep_app (GitHub search)
+- **MCPs**: Built-in websearch (Exa), context7 (docs), grep_app (GitHub search), devin (Devin CLI)
 - **LSP**: Full LSP support with refactoring tools
 - **Experimental**: Aggressive truncation, auto-resume, and more
 
+## Local Development
+
+This fork includes tools for easier local development:
+
+### Install from Local Source
+
+To install the plugin from the local repository for development:
+
+```bash
+./install-local.sh
+```
+
+This script:
+- Builds the project
+- Updates OpenCode config to use the local `file://` URI
+- Runs verification checks
+
+For global use:
+```bash
+./install-local.sh --install
+# Then run from anywhere:
+install-opencode-local
+```
+
+See [INSTALL-LOCAL.md](INSTALL-LOCAL.md) for detailed instructions.
+
+### Rebuilding After Changes
+
+After making code changes:
+```bash
+bun run build
+# Restart OpenCode
+```
+
+### Development Workflow
+
+1. Make changes to the code
+2. Run `bun run build` to rebuild
+3. Restart OpenCode to pick up changes
+4. Test your changes
 
 ## Author's Note
 
