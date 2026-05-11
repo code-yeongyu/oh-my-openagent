@@ -1,18 +1,18 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, rmSync } from "node:fs"
 import { join } from "node:path"
 
 import type { PluginEntryInfo } from "../auto-update-checker/checker"
 import type { SyncResult } from "../auto-update-checker/checker/sync-package-json"
-import { PACKAGE_NAME } from "../auto-update-checker/constants"
+import type { ManagedPluginSandboxWorkspace } from "../auto-update-checker/plugin-sandbox"
 
 type ToastMessageGetter = (isUpdate: boolean, version?: string) => string
 let importCounter = 0
 
 function createPluginEntry(overrides?: Partial<PluginEntryInfo>): PluginEntryInfo {
   return {
-    entry: `${PACKAGE_NAME}@3.4.0`,
+    entry: "oh-my-openagent",
     isPinned: false,
     pinnedVersion: null,
     configPath: "/test/opencode.json",
@@ -23,7 +23,7 @@ function createPluginEntry(overrides?: Partial<PluginEntryInfo>): PluginEntryInf
 const TEST_DIR = join(import.meta.dir, "__test-workspace-resolution__")
 const TEST_CACHE_DIR = join(TEST_DIR, "cache")
 const TEST_CACHE_WORKSPACE_DIR = join(TEST_CACHE_DIR, "packages")
-const TEST_CONFIG_DIR = join(TEST_DIR, "config")
+const TEST_SANDBOX_DIR = join(TEST_CACHE_WORKSPACE_DIR, "oh-my-openagent@latest")
 
 const mockFindPluginEntry = mock((_directory: string): PluginEntryInfo | null => createPluginEntry())
 const mockGetCachedVersion = mock((): string | null => "3.4.0")
@@ -39,29 +39,29 @@ const mockShowAutoUpdatedToast = mock(
 const mockSyncCachePackageJsonToIntent = mock((_pluginInfo: PluginEntryInfo): SyncResult => ({ synced: true, error: null }))
 const mockRunBunInstallWithDetails = mock(async (_opts?: { outputMode?: string; workspaceDir?: string }) => ({ success: true }))
 const mockLog = mock(() => {})
+const mockResolveManagedPluginSandboxWorkspace = mock(
+  (_entry: string, _cachePackagesDir: string): ManagedPluginSandboxWorkspace | null => ({
+    packageName: "oh-my-openagent",
+    spec: "oh-my-openagent@latest",
+    workspaceDir: TEST_SANDBOX_DIR,
+  }),
+)
 
 async function createRunner() {
   const { createBackgroundUpdateCheckRunner } = await import(`../auto-update-checker/hook/background-update-check?test=${importCounter++}`)
 
   return createBackgroundUpdateCheckRunner({
-    existsSync,
     join,
     runBunInstallWithDetails: mockRunBunInstallWithDetails as never,
     log: mockLog as never,
     getOpenCodeCacheDir: () => TEST_CACHE_DIR,
-    getOpenCodeConfigPaths: () => ({
-      configDir: TEST_CONFIG_DIR,
-      configJson: join(TEST_CONFIG_DIR, "opencode.json"),
-      configJsonc: join(TEST_CONFIG_DIR, "opencode.jsonc"),
-      packageJson: join(TEST_CONFIG_DIR, "package.json"),
-      omoConfig: join(TEST_CONFIG_DIR, "oh-my-openagent.json"),
-    }),
     invalidatePackage: mockInvalidatePackage as never,
     extractChannel: mockExtractChannel,
     findPluginEntry: mockFindPluginEntry,
     getCachedVersion: mockGetCachedVersion,
     getLatestVersion: mockGetLatestVersion,
     syncCachePackageJsonToIntent: mockSyncCachePackageJsonToIntent,
+    resolveManagedPluginSandboxWorkspace: mockResolveManagedPluginSandboxWorkspace,
     showUpdateAvailableToast: mockShowUpdateAvailableToast as never,
     showAutoUpdatedToast: mockShowAutoUpdatedToast as never,
   })
@@ -89,6 +89,7 @@ describe("workspace resolution", () => {
     mockShowAutoUpdatedToast.mockReset()
     mockSyncCachePackageJsonToIntent.mockReset()
     mockLog.mockReset()
+    mockResolveManagedPluginSandboxWorkspace.mockReset()
 
     mockFindPluginEntry.mockReturnValue(createPluginEntry())
     mockGetCachedVersion.mockReturnValue("3.4.0")
@@ -96,6 +97,11 @@ describe("workspace resolution", () => {
     mockExtractChannel.mockReturnValue("latest")
     mockRunBunInstallWithDetails.mockResolvedValue({ success: true })
     mockSyncCachePackageJsonToIntent.mockReturnValue({ synced: true, error: null })
+    mockResolveManagedPluginSandboxWorkspace.mockReturnValue({
+      packageName: "oh-my-openagent",
+      spec: "oh-my-openagent@latest",
+      workspaceDir: TEST_SANDBOX_DIR,
+    })
   })
 
   afterEach(() => {
@@ -104,91 +110,64 @@ describe("workspace resolution", () => {
     }
   })
 
-  it("#given config-dir install exists but cache-dir does not #when updating #then it installs to config-dir", async () => {
+  it("#given managed plugin entry #when updating #then it resolves sandbox below cache packages", async () => {
     // #given
     const runBackgroundUpdateCheck = await createRunner()
-    mkdirSync(join(TEST_CONFIG_DIR, "node_modules", PACKAGE_NAME), { recursive: true })
-    writeFileSync(join(TEST_CONFIG_DIR, "package.json"), JSON.stringify({ dependencies: { [PACKAGE_NAME]: "3.4.0" } }, null, 2))
-    writeFileSync(
-      join(TEST_CONFIG_DIR, "node_modules", PACKAGE_NAME, "package.json"),
-      JSON.stringify({ name: PACKAGE_NAME, version: "3.4.0" }, null, 2),
-    )
 
     // #when
     await runBackgroundUpdateCheck(mockCtx, true, getToastMessage)
 
     // #then
-    expect(mockRunBunInstallWithDetails.mock.calls[0]?.[0]?.workspaceDir).toBe(TEST_CONFIG_DIR)
+    expect(mockResolveManagedPluginSandboxWorkspace).toHaveBeenCalledWith("oh-my-openagent", TEST_CACHE_WORKSPACE_DIR)
   })
 
-  it("#given both config-dir and cache-dir installs exist #when updating #then it prefers config-dir", async () => {
+  it("#given managed plugin entry #when updating #then it syncs package json in sandbox workspace", async () => {
     // #given
     const runBackgroundUpdateCheck = await createRunner()
-    mkdirSync(join(TEST_CONFIG_DIR, "node_modules", PACKAGE_NAME), { recursive: true })
-    writeFileSync(join(TEST_CONFIG_DIR, "package.json"), JSON.stringify({ dependencies: { [PACKAGE_NAME]: "3.4.0" } }, null, 2))
-    writeFileSync(
-      join(TEST_CONFIG_DIR, "node_modules", PACKAGE_NAME, "package.json"),
-      JSON.stringify({ name: PACKAGE_NAME, version: "3.4.0" }, null, 2),
-    )
-    mkdirSync(join(TEST_CACHE_DIR, "node_modules", PACKAGE_NAME), { recursive: true })
-    writeFileSync(join(TEST_CACHE_DIR, "package.json"), JSON.stringify({ dependencies: { [PACKAGE_NAME]: "3.4.0" } }, null, 2))
-    writeFileSync(
-      join(TEST_CACHE_DIR, "node_modules", PACKAGE_NAME, "package.json"),
-      JSON.stringify({ name: PACKAGE_NAME, version: "3.4.0" }, null, 2),
-    )
 
     // #when
     await runBackgroundUpdateCheck(mockCtx, true, getToastMessage)
 
     // #then
-    expect(mockRunBunInstallWithDetails.mock.calls[0]?.[0]?.workspaceDir).toBe(TEST_CONFIG_DIR)
+    expect(mockSyncCachePackageJsonToIntent).toHaveBeenCalledWith(createPluginEntry(), TEST_SANDBOX_DIR, "oh-my-openagent")
   })
 
-  it("#given only cache-dir install exists #when updating #then it falls back to cache-dir", async () => {
+  it("#given managed plugin entry #when updating #then it invalidates sandbox package only", async () => {
     // #given
     const runBackgroundUpdateCheck = await createRunner()
-    mkdirSync(join(TEST_CACHE_WORKSPACE_DIR, "node_modules", PACKAGE_NAME), { recursive: true })
-    writeFileSync(join(TEST_CACHE_WORKSPACE_DIR, "package.json"), JSON.stringify({ dependencies: { [PACKAGE_NAME]: "3.4.0" } }, null, 2))
-    writeFileSync(
-      join(TEST_CACHE_WORKSPACE_DIR, "node_modules", PACKAGE_NAME, "package.json"),
-      JSON.stringify({ name: PACKAGE_NAME, version: "3.4.0" }, null, 2),
-    )
 
     // #when
     await runBackgroundUpdateCheck(mockCtx, true, getToastMessage)
 
     // #then
-    expect(mockRunBunInstallWithDetails.mock.calls[0]?.[0]?.workspaceDir).toBe(TEST_CACHE_WORKSPACE_DIR)
+    expect(mockInvalidatePackage).toHaveBeenCalledWith("oh-my-openagent", TEST_SANDBOX_DIR)
   })
 
-  it("#given cache workspace package.json exists without installed module #when updating #then it installs to cache-dir", async () => {
+  it("#given managed plugin entry #when updating #then it installs to sandbox workspace once", async () => {
     // #given
     const runner = await createRunner()
-    mkdirSync(TEST_CACHE_WORKSPACE_DIR, { recursive: true })
-    writeFileSync(join(TEST_CACHE_WORKSPACE_DIR, "package.json"), JSON.stringify({ dependencies: { [PACKAGE_NAME]: "3.4.0" } }, null, 2))
 
     // #when
     await runner(mockCtx, true, getToastMessage)
 
     // #then
-    expect(mockRunBunInstallWithDetails.mock.calls[0]?.[0]?.workspaceDir).toBe(TEST_CACHE_WORKSPACE_DIR)
+    expect(mockRunBunInstallWithDetails).toHaveBeenCalledTimes(1)
+    expect(mockRunBunInstallWithDetails).toHaveBeenCalledWith({ outputMode: "pipe", workspaceDir: TEST_SANDBOX_DIR })
   })
 
-  it("#given config-dir install exists #when updating #then it also primes the cache workspace", async () => {
+  it("#given unsafe plugin entry #when updating #then it skips workspace mutation", async () => {
     // #given
     const runBackgroundUpdateCheck = await createRunner()
-    mkdirSync(join(TEST_CONFIG_DIR, "node_modules", PACKAGE_NAME), { recursive: true })
-    writeFileSync(join(TEST_CONFIG_DIR, "package.json"), JSON.stringify({ dependencies: { [PACKAGE_NAME]: "3.4.0" } }, null, 2))
-    writeFileSync(
-      join(TEST_CONFIG_DIR, "node_modules", PACKAGE_NAME, "package.json"),
-      JSON.stringify({ name: PACKAGE_NAME, version: "3.4.0" }, null, 2),
-    )
+    mockFindPluginEntry.mockReturnValue(createPluginEntry({ entry: "oh-my-openagent@../../evil" }))
+    mockResolveManagedPluginSandboxWorkspace.mockReturnValue(null)
 
     // #when
     await runBackgroundUpdateCheck(mockCtx, true, getToastMessage)
 
     // #then
-    expect(mockRunBunInstallWithDetails.mock.calls[0]?.[0]?.workspaceDir).toBe(TEST_CONFIG_DIR)
-    expect(mockRunBunInstallWithDetails.mock.calls[1]?.[0]?.workspaceDir).toBe(TEST_CACHE_WORKSPACE_DIR)
+    expect(mockSyncCachePackageJsonToIntent).not.toHaveBeenCalled()
+    expect(mockInvalidatePackage).not.toHaveBeenCalled()
+    expect(mockRunBunInstallWithDetails).not.toHaveBeenCalled()
+    expect(mockShowUpdateAvailableToast).toHaveBeenCalledWith(mockCtx, "3.5.0", getToastMessage)
   })
 })
