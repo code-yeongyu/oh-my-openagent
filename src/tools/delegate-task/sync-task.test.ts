@@ -177,7 +177,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
     expect(rollback).toHaveBeenCalledTimes(1)
   })
 
-  test("cleans up toast and subagentSessions when pollSyncSession returns error", async () => {
+  test("recovers from MessageAbortedError poll error when result already exists", async () => {
     const mockClient = {
       session: {
         create: async () => ({ data: { id: "ses_test_12345678" } }),
@@ -189,7 +189,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
     const deps = {
       createSyncSession: async () => ({ ok: true, sessionID: "ses_test_12345678" }),
       sendSyncPrompt: async () => null,
-      pollSyncSession: async () => "Poll error",
+      pollSyncSession: async () => "MessageAbortedError: aborted by user",
       fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
     }
 
@@ -214,20 +214,173 @@ describe("executeSyncTask - cleanup on error paths", () => {
       command: null,
     }
 
-    //#when - executeSyncTask with pollSyncSession failing
+    //#when - executeSyncTask with MessageAbortedError poll error
     const result = await executeSyncTask(args, mockCtx, mockExecutorCtx, {
       sessionID: "parent-session",
     }, "test-agent", undefined, undefined, undefined, undefined, deps)
 
-    //#then - should return error and cleanup resources
-    expect(result).toBe("Poll error")
+    //#then - should recover via fetchSyncResult and cleanup resources
+    expect(result).toContain("Task completed in")
+    expect(result).toContain("Result")
     expect(removeTaskCalls.length).toBe(1)
     expect(removeTaskCalls[0]).toBe("sync_ses_test")
     expect(deleteCalls.length).toBe(1)
     expect(deleteCalls[0]).toBe("ses_test_12345678")
   })
 
-  test("#given delegated child session first prompt fails #when fallback chain set #then retries in order before polling", async () => {
+  test("recovers from canonical aborted-operation message", async () => {
+    const mockClient = {
+      session: {
+        create: async () => ({ data: { id: "ses_test_12345678" } }),
+      },
+    }
+
+    const { executeSyncTask } = require("./sync-task")
+
+    const deps = {
+      createSyncSession: async () => ({ ok: true, sessionID: "ses_test_12345678" }),
+      sendSyncPrompt: async () => null,
+      pollSyncSession: async () => "The operation was aborted.",
+      fetchSyncResult: async () => ({ ok: true as const, textContent: "Recovered result" }),
+    }
+
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-123",
+      metadata: () => {},
+    }
+
+    const mockExecutorCtx = {
+      client: mockClient,
+      directory: "/tmp",
+      onSyncSessionCreated: null,
+    }
+
+    const args = {
+      prompt: "test prompt",
+      description: "test task",
+      category: "test",
+      load_skills: [],
+      run_in_background: false,
+      command: null,
+    }
+
+    //#when
+    const result = await executeSyncTask(args, mockCtx, mockExecutorCtx, {
+      sessionID: "parent-session",
+    }, "test-agent", undefined, undefined, undefined, undefined, deps)
+
+    //#then
+    expect(result).toContain("Task completed in")
+    expect(result).toContain("Recovered result")
+  })
+
+  test("does not recover from non-abort poll error containing abort-like words", async () => {
+    const mockClient = {
+      session: {
+        create: async () => ({ data: { id: "ses_test_12345678" } }),
+      },
+    }
+
+    const { executeSyncTask } = require("./sync-task")
+    let fetchSyncResultCalled = false
+
+    const deps = {
+      createSyncSession: async () => ({ ok: true, sessionID: "ses_test_12345678" }),
+      sendSyncPrompt: async () => null,
+      pollSyncSession: async () => "Task aborted: subagent exceeded 5 assistant turns without completing",
+      fetchSyncResult: async () => {
+        fetchSyncResultCalled = true
+        return { ok: true as const, textContent: "unexpected" }
+      },
+    }
+
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-123",
+      metadata: () => {},
+    }
+
+    const mockExecutorCtx = {
+      client: mockClient,
+      directory: "/tmp",
+      onSyncSessionCreated: null,
+    }
+
+    const args = {
+      prompt: "test prompt",
+      description: "test task",
+      category: "test",
+      load_skills: [],
+      run_in_background: false,
+      command: null,
+    }
+
+    //#when
+    const result = await executeSyncTask(args, mockCtx, mockExecutorCtx, {
+      sessionID: "parent-session",
+    }, "test-agent", undefined, undefined, undefined, undefined, deps)
+
+    //#then
+    expect(result).toBe("Task aborted: subagent exceeded 5 assistant turns without completing")
+    expect(fetchSyncResultCalled).toBe(false)
+  })
+
+  test("returns abort poll error when recovery fetch has no result", async () => {
+    const mockClient = {
+      session: {
+        create: async () => ({ data: { id: "ses_test_12345678" } }),
+      },
+    }
+
+    const { executeSyncTask } = require("./sync-task")
+
+    let fetchSyncResultCalled = false
+
+    const deps = {
+      createSyncSession: async () => ({ ok: true, sessionID: "ses_test_12345678" }),
+      sendSyncPrompt: async () => null,
+      pollSyncSession: async () => "MessageAbortedError: aborted by user",
+      fetchSyncResult: async () => {
+        fetchSyncResultCalled = true
+        return { ok: false as const, error: "No assistant response found" }
+      },
+    }
+
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-123",
+      metadata: () => {},
+    }
+
+    const mockExecutorCtx = {
+      client: mockClient,
+      directory: "/tmp",
+      onSyncSessionCreated: null,
+    }
+
+    const args = {
+      prompt: "test prompt",
+      description: "test task",
+      category: "test",
+      load_skills: [],
+      run_in_background: false,
+      command: null,
+    }
+
+    //#when
+    const result = await executeSyncTask(args, mockCtx, mockExecutorCtx, {
+      sessionID: "parent-session",
+    }, "test-agent", undefined, undefined, undefined, undefined, deps)
+
+    //#then
+    expect(result).toBe("MessageAbortedError: aborted by user")
+    expect(fetchSyncResultCalled).toBe(true)
+    expect(removeTaskCalls.length).toBe(1)
+    expect(deleteCalls.length).toBe(1)
+  })
+
+  test("#given fallback chain set #when sendSyncPrompt fails #then retries with next model", async () => {
     //#given
     const mockClient = {
       session: {
@@ -643,7 +796,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
     expect(getDelegatedChildSessionBootstrap("ses_first")).toBeUndefined()
     expect(getDelegatedChildSessionBootstrap("ses_second")).toBeUndefined()
 
-    const finalMetadata = metadataCalls.at(-1)
+    const finalMetadata = metadataCalls[metadataCalls.length - 1]
     expect(finalMetadata.metadata.sessionId).toBe("ses_second")
     expect(finalMetadata.metadata.taskId).toBe("ses_second")
     expect(finalMetadata.metadata.model).toEqual({
@@ -929,5 +1082,3 @@ describe("executeSyncTask - cleanup on error paths", () => {
     expect(taskMeta.metadata.spawnDepth).toBe(3) // NOT 1 (the fallback value)
   })
 })
-
-export {}

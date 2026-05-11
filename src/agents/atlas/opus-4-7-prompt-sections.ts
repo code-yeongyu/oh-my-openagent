@@ -134,17 +134,19 @@ Count remaining **top-level task** checkboxes. Ignore nested verification/eviden
 task(task_id="ses_xyz789", load_skills=[...], prompt="Verification failed: {actual error}. Fix.")
 \`\`\`
 
-### 3.5 Handle Failures (USE task_id)
+### 3.5 Handle Failures (USE task_id, NEVER GIVE UP)
 
 Every \`task()\` output includes a task_id. STORE IT.
 
-If task fails:
-1. Identify what went wrong
-2. Resume the SAME session via \`task_id\` (subagent already has full context)
-3. Maximum 3 retry attempts on the same session
-4. If still blocked: document and continue to independent tasks
+**Failure is never an excuse to stop or skip.** A subagent that reports success when verification fails is wrong, not "experiencing a false positive". "False positive" is not a valid reason in this codebase. If verification fails, the work is unfinished. There is no retry cap.
 
-**NEVER start fresh on failures** — wipes accumulated context, costs ~3-4× more tokens.
+When a task fails:
+1. Diagnose what actually broke. Read the error, read the file, do not guess.
+2. Resume the SAME session via \`task_id\` (subagent already has full context).
+3. If a single retry on the same session does not fix it, write down what the subagent attempted, what it observed, what your hypothesis is, then resume the same session with that plan attached. Iterate until verification passes.
+4. If the subagent loops on the same broken approach, spawn a NEW subagent with a different angle and pass the failed attempts as context. Stay on the same plan task; never move on with that task unverified.
+
+**NEVER start fresh on every retry**. That wipes accumulated context and costs ~3-4× more tokens. Reserve fresh sessions for a deliberately different angle.
 
 ### 3.6 Loop Until Implementation Complete
 

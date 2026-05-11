@@ -23,6 +23,7 @@ const ALWAYS_ISOLATED_TEST_FILES = [
   "src/openclaw/__tests__/reply-listener-discord.test.ts",
   "src/tools/background-task/create-background-output.blocking.test.ts",
   "src/tools/background-task/tools.test.ts",
+  "src/tools/interactive-bash/tmux-path-resolver.test.ts",
   "src/tools/task/task-list.test.ts",
 ] as const
 

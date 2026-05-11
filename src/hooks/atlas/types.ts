@@ -48,4 +48,5 @@ export interface SessionState {
   waitingForFinalWaveApproval?: boolean
   pendingFinalWaveTaskCount?: number
   approvedFinalWaveTaskCount?: number
+  boulderCompletionNudgedAt?: Record<string, number>
 }
