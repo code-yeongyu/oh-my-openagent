@@ -1,6 +1,6 @@
 import * as fs from "node:fs"
 import * as path from "node:path"
-import { CACHE_DIR, PACKAGE_NAME, getUserConfigDir } from "./constants"
+import { CACHE_DIR, PACKAGE_NAME } from "./constants"
 import { log } from "../../shared/logger"
 
 interface BunLockfile {
@@ -43,9 +43,21 @@ function deleteBinaryBunLock(lockPath: string): boolean {
   }
 }
 
-function removeFromBunLock(packageName: string): boolean {
-  const textLockPath = path.join(CACHE_DIR, "bun.lock")
-  const binaryLockPath = path.join(CACHE_DIR, "bun.lockb")
+function removeFromNpmLock(workspaceDir: string): boolean {
+  const lockPath = path.join(workspaceDir, "package-lock.json")
+
+  try {
+    fs.unlinkSync(lockPath)
+    log("[auto-update-checker] Removed package-lock.json to force re-resolution")
+    return true
+  } catch {
+    return false
+  }
+}
+
+function removeFromBunLock(packageName: string, workspaceDir: string): boolean {
+  const textLockPath = path.join(workspaceDir, "bun.lock")
+  const binaryLockPath = path.join(workspaceDir, "bun.lockb")
 
   if (fs.existsSync(textLockPath)) {
     return removeFromTextBunLock(textLockPath, packageName)
@@ -59,13 +71,9 @@ function removeFromBunLock(packageName: string): boolean {
   return false
 }
 
-export function invalidatePackage(packageName: string = PACKAGE_NAME): boolean {
+export function invalidatePackage(packageName: string = PACKAGE_NAME, workspaceDir: string = CACHE_DIR): boolean {
   try {
-    const userConfigDir = getUserConfigDir()
-    const pkgDirs = [
-      path.join(userConfigDir, "node_modules", packageName),
-      path.join(CACHE_DIR, "node_modules", packageName),
-    ]
+    const pkgDirs = [path.join(workspaceDir, "node_modules", packageName)]
 
     let packageRemoved = false
     let lockRemoved = false
@@ -78,7 +86,7 @@ export function invalidatePackage(packageName: string = PACKAGE_NAME): boolean {
       }
     }
 
-    lockRemoved = removeFromBunLock(packageName)
+    lockRemoved = removeFromBunLock(packageName, workspaceDir) || removeFromNpmLock(workspaceDir)
 
     if (!packageRemoved && !lockRemoved) {
       log(`[auto-update-checker] Package not found, nothing to invalidate: ${packageName}`)

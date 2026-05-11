@@ -103,6 +103,22 @@ describe("invalidatePackage", () => {
     expect(bunLock.packages?.["oh-my-opencode"]).toBeUndefined()
     expect(bunLock.packages?.other).toEqual({})
   })
+
+  it("invalidates an explicitly provided sandbox workspace", async () => {
+    const sandboxDir = join(TEST_OPENCODE_CACHE_DIR, "oh-my-openagent@latest")
+    mkdirSync(join(sandboxDir, "node_modules", "oh-my-openagent"), { recursive: true })
+    writeFileSync(join(sandboxDir, "node_modules", "oh-my-openagent", "package.json"), '{"name":"oh-my-openagent"}')
+    writeFileSync(join(sandboxDir, "package-lock.json"), "{}")
+
+    const { invalidatePackage } = await importFreshCacheModule()
+
+    const result = invalidatePackage("oh-my-openagent", sandboxDir)
+
+    expect(result).toBe(true)
+    expect(existsSync(join(sandboxDir, "node_modules", "oh-my-openagent"))).toBe(false)
+    expect(existsSync(join(sandboxDir, "package-lock.json"))).toBe(false)
+    expect(existsSync(join(TEST_OPENCODE_CACHE_DIR, "node_modules", "oh-my-opencode"))).toBe(true)
+  })
 })
 
 afterAll(() => {

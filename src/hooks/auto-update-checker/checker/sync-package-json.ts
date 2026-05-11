@@ -49,14 +49,18 @@ function writeCachePackageJson(
   }
 }
 
-export function syncCachePackageJsonToIntent(pluginInfo: PluginEntryInfo): SyncResult {
-  const cachePackageJsonPath = path.join(CACHE_DIR, "package.json")
+export function syncCachePackageJsonToIntent(
+  pluginInfo: PluginEntryInfo,
+  workspaceDir: string = CACHE_DIR,
+  packageName: string = PACKAGE_NAME,
+): SyncResult {
+  const cachePackageJsonPath = path.join(workspaceDir, "package.json")
   const intentVersion = getIntentVersion(pluginInfo)
 
   if (!fs.existsSync(cachePackageJsonPath)) {
     log("[auto-update-checker] Cache package.json missing, creating workspace package.json", { intentVersion })
     return {
-      ...writeCachePackageJson(cachePackageJsonPath, { dependencies: { [PACKAGE_NAME]: intentVersion } }),
+      ...writeCachePackageJson(cachePackageJsonPath, { dependencies: { [packageName]: intentVersion } }),
       message: `Created cache package.json with: ${intentVersion}`,
     }
   }
@@ -78,22 +82,22 @@ export function syncCachePackageJsonToIntent(pluginInfo: PluginEntryInfo): SyncR
     return { synced: false, error: "parse_error", message: "Failed to parse cache package.json (malformed JSON)" }
   }
 
-  if (!pkgJson || !pkgJson.dependencies?.[PACKAGE_NAME]) {
+  if (!pkgJson || !pkgJson.dependencies?.[packageName]) {
     log("[auto-update-checker] Plugin missing from cache package.json dependencies, adding dependency", { intentVersion })
     const nextPkgJson = {
       ...(pkgJson ?? {}),
       dependencies: {
         ...(pkgJson?.dependencies ?? {}),
-        [PACKAGE_NAME]: intentVersion,
+        [packageName]: intentVersion,
       },
     }
     return {
       ...writeCachePackageJson(cachePackageJsonPath, nextPkgJson),
-      message: `Added ${PACKAGE_NAME}: ${intentVersion}`,
+      message: `Added ${packageName}: ${intentVersion}`,
     }
   }
 
-  const currentVersion = pkgJson.dependencies[PACKAGE_NAME]
+  const currentVersion = pkgJson.dependencies[packageName]
 
   if (currentVersion === intentVersion) {
     log("[auto-update-checker] Cache package.json already matches intent:", intentVersion)
@@ -113,7 +117,7 @@ export function syncCachePackageJsonToIntent(pluginInfo: PluginEntryInfo): SyncR
     )
   }
 
-  pkgJson.dependencies[PACKAGE_NAME] = intentVersion
+  pkgJson.dependencies[packageName] = intentVersion
   return {
     ...writeCachePackageJson(cachePackageJsonPath, pkgJson),
     message: `Updated: "${currentVersion}" → "${intentVersion}"`,

@@ -149,6 +149,32 @@ describe("syncCachePackageJsonToIntent", () => {
     })
   })
 
+  describe("#given custom workspace and renamed package", () => {
+    it("#then writes the configured package dependency in that workspace", async () => {
+      const workspaceDir = join(CACHE_PACKAGES_DIR, "oh-my-openagent@latest")
+      rmSync(workspaceDir, { recursive: true, force: true })
+
+      const { syncCachePackageJsonToIntent } = await importFreshSyncPackageJsonModule()
+
+      const pluginInfo: PluginEntryInfo = {
+        entry: "oh-my-openagent",
+        isPinned: false,
+        pinnedVersion: null,
+        configPath: "/tmp/opencode.json",
+      }
+
+      const result = syncCachePackageJsonToIntent(pluginInfo, workspaceDir, "oh-my-openagent")
+
+      expect(result.synced).toBe(true)
+      expect(result.error).toBeNull()
+
+      const content = readFileSync(join(workspaceDir, "package.json"), "utf-8")
+      const pkg = JSON.parse(content) as { dependencies?: Record<string, string> }
+      expect(pkg.dependencies?.["oh-my-openagent"]).toBe("latest")
+      expect(pkg.dependencies?.["oh-my-opencode"]).toBeUndefined()
+    })
+  })
+
   describe("#given plugin not in cache package.json dependencies", () => {
     it("#then adds the plugin dependency and preserves existing dependencies", async () => {
       cleanupTestCache()
