@@ -3,6 +3,7 @@ import {
   resolveActualContextLimit,
   type ContextLimitModelCacheState,
 } from "../shared/context-limit-resolver"
+import { isCompactionAgent } from "../shared/compaction-marker"
 import { createSystemDirective, SystemDirectiveTypes } from "../shared/system-directive"
 
 const CONTEXT_WARNING_THRESHOLD = 0.70
@@ -94,6 +95,7 @@ export function createContextWindowMonitorHook(
 
     if (event.type === "message.updated") {
       const info = props?.info as {
+        agent?: unknown
         role?: string
         sessionID?: string
         providerID?: string
@@ -103,6 +105,7 @@ export function createContextWindowMonitorHook(
       } | undefined
 
       if (!info || info.role !== "assistant" || !info.finish) return
+      if (isCompactionAgent(info.agent)) return
       if (!info.sessionID || !info.providerID || !info.tokens) return
 
       tokenCache.set(info.sessionID, {
