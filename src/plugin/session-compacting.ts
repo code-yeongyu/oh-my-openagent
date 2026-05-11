@@ -1,5 +1,6 @@
 import type { Hooks } from "@opencode-ai/plugin"
 
+import { isCompactionAgent } from "../shared/compaction-marker"
 import { log } from "../shared/logger"
 
 type SessionCompactingHook = NonNullable<Hooks["experimental.session.compacting"]>
@@ -92,8 +93,13 @@ export function createCompactionAutocontinueHandler(
 ): CompactionAutocontinueHook {
   return async (
     input: CompactionAutocontinueInput,
-    _output: CompactionAutocontinueOutput,
+    output: CompactionAutocontinueOutput,
   ): Promise<void> => {
+    if (isCompactionAgent(input.agent)) {
+      output.enabled = false
+      return
+    }
+
     await runCompactionStep("compactionContextInjector.restore", input.sessionID, async () => {
       const restore = hooks.compactionContextInjector?.restore
       if (restore) {

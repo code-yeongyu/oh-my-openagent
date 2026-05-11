@@ -160,6 +160,25 @@ describe("experimental.session.compacting handler", () => {
 })
 
 describe("experimental.compaction.autocontinue handler", () => {
+  it("disables OpenCode autocontinue when the compaction agent would continue itself", async () => {
+    //#given
+    const restoreContextMock = mock(async () => true)
+    const restoreTodosMock = mock(async () => {})
+    const handler = createCompactionAutocontinueHandler({
+      compactionContextInjector: { restore: restoreContextMock },
+      compactionTodoPreserver: { restore: restoreTodosMock },
+    })
+    const output = { enabled: true }
+
+    //#when
+    await handler({ sessionID: "ses_compaction_loop", agent: "compaction" }, output)
+
+    //#then
+    expect(output.enabled).toBe(false)
+    expect(restoreContextMock).not.toHaveBeenCalled()
+    expect(restoreTodosMock).not.toHaveBeenCalled()
+  })
+
   it("restores checkpointed context and todos before OpenCode adds the synthetic continue turn", async () => {
     //#given
     const callOrder: string[] = []
