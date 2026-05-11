@@ -105,19 +105,32 @@ export async function pollSyncSession(
     }
 
     if (ctx.abort?.aborted) {
-      try {
-        const messages = await fetchSessionMessages(client, input.sessionID)
+      let finalMessages: SessionMessage[] | null = null
+      const abortFetchAttempts = 3
+      for (let attempt = 1; attempt <= abortFetchAttempts; attempt++) {
+        try {
+          finalMessages = await fetchSessionMessages(client, input.sessionID)
+          break
+        } catch (error) {
+          log("[task] Final messages fetch failed after abort, retrying", {
+            sessionID: input.sessionID,
+            attempt,
+            maxAttempts: abortFetchAttempts,
+            error: String(error),
+          })
+          if (attempt < abortFetchAttempts) {
+            await wait(syncTiming.POLL_INTERVAL_MS)
+          }
+        }
+      }
+
+      if (finalMessages) {
         const hasNewMessages =
-          input.anchorMessageCount === undefined || messages.length > input.anchorMessageCount
-        if (hasNewMessages && isSessionComplete(messages)) {
+          input.anchorMessageCount === undefined || finalMessages.length > input.anchorMessageCount
+        if (hasNewMessages && isSessionComplete(finalMessages)) {
           log("[task] Abort detected after session already completed", { sessionID: input.sessionID })
           return null
         }
-      } catch (error) {
-        log("[task] Final messages fetch failed after abort, continuing with abort", {
-          sessionID: input.sessionID,
-          error: String(error),
-        })
       }
 
       log("[task] Aborted by user", { sessionID: input.sessionID })
