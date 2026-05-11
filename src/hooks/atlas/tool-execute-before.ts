@@ -80,32 +80,35 @@ export function createToolExecuteBeforeHandler(input: {
     // Warn-only policy: Atlas guides orchestrators toward delegation but doesn't block, allowing flexibility for urgent fixes
     if (isWriteOrEditToolName(toolInput.tool)) {
       const filePath = (toolOutput.args.filePath ?? toolOutput.args.path ?? toolOutput.args.file) as string | undefined
-      if (filePath && !isSisyphusPath(filePath)) {
-        // Store filePath for use in tool.execute.after
-        if (toolInput.callID) {
-          pendingFilePaths.set(toolInput.callID, filePath)
+      if (!filePath || !toolInput.callID) {
+        return
+      }
 
-          const sessionID = toolInput.sessionID
-          const sessionWork = sessionID
-            ? getWorkForSession(ctx.directory, sessionID)
-            : null
-          const state = sessionWork ? null : readBoulderState(ctx.directory)
-          const planPath = sessionWork
-            ? resolveBoulderPlanPathForWork(ctx.directory, sessionWork)
-            : state
-              ? resolveBoulderPlanPath(ctx.directory, state)
-              : null
+      // Store filePath for use in tool.execute.after
+      pendingFilePaths.set(toolInput.callID, filePath)
 
-          if (planPath && resolve(filePath) === resolve(planPath) && pendingPlanSnapshots) {
-            try {
-              if (existsSync(planPath)) {
-                pendingPlanSnapshots.set(toolInput.callID, readFileSync(planPath, "utf-8"))
-              }
-            } catch {
-              pendingPlanSnapshots.delete(toolInput.callID)
-            }
+      const sessionID = toolInput.sessionID
+      const sessionWork = sessionID
+        ? getWorkForSession(ctx.directory, sessionID)
+        : null
+      const state = sessionWork ? null : readBoulderState(ctx.directory)
+      const planPath = sessionWork
+        ? resolveBoulderPlanPathForWork(ctx.directory, sessionWork)
+        : state
+          ? resolveBoulderPlanPath(ctx.directory, state)
+          : null
+
+      if (planPath && resolve(filePath) === resolve(planPath) && pendingPlanSnapshots) {
+        try {
+          if (existsSync(planPath)) {
+            pendingPlanSnapshots.set(toolInput.callID, readFileSync(planPath, "utf-8"))
           }
+        } catch {
+          pendingPlanSnapshots.delete(toolInput.callID)
         }
+      }
+
+      if (!isSisyphusPath(filePath)) {
         const warning = ORCHESTRATOR_DELEGATION_REQUIRED.replace("$FILE_PATH", filePath)
         toolOutput.message = (toolOutput.message || "") + warning
         log(`[${HOOK_NAME}] Injected delegation warning for direct file modification`, {
